@@ -81,10 +81,21 @@ describe('human framing guard', () => {
     expect(RULES_OF_BEING).not.toMatch(FORBIDDEN_FRAMING)
   })
 
-  it('FORBIDDEN_FRAMING really catches AI, prompt, token, model, tool', () => {
-    for (const bad of ['AI', 'prompt', 'token', 'model', 'tool']) {
+  it('FORBIDDEN_FRAMING catches AI, A.I., and plural forms', () => {
+    const hits = [
+      'AI', 'A.I.', 'artificial intelligence', 'language model', 'language models', 'LLM', 'LLMs',
+      'neural', 'prompt', 'prompts', 'context window', 'context windows', 'token', 'tokens',
+      'chatbot', 'chatbots', 'simulation', 'simulations', 'model', 'models', 'tool', 'tools',
+    ]
+    for (const bad of hits) {
       expect(`the ${bad} was here`).toMatch(FORBIDDEN_FRAMING)
     }
+    expect('A.I. wrote the note.').toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('FORBIDDEN_FRAMING does not match substrings like toolkit or modelling', () => {
+    expect('the toolkit sat on the bench').not.toMatch(FORBIDDEN_FRAMING)
+    expect('she spent the afternoon modelling clay').not.toMatch(FORBIDDEN_FRAMING)
   })
 })
 

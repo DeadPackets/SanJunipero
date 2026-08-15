@@ -18,5 +18,9 @@ choose echoes in the lives around you. Live as yourself.`
 
 // The human-framing law: no world text, block template, or perception prose may
 // ever name the machinery behind the agent. This regex is the enforcement point.
+// `(?!\w)` closes the boundary instead of a trailing `\b`: every alternative
+// ends in a word character except `A\.I\.`, whose final `.` a `\b` can never
+// follow. Plurals are folded in as `s?` so "prompts"/"tokens"/"models"/"tools"
+// are caught too.
 export const FORBIDDEN_FRAMING =
-  /\b(AI|A\.I\.|artificial intelligence|language model|LLM|neural|prompt|context window|token|chatbot|simulation|model|tool)\b/i
+  /\b(AI|A\.I\.|artificial intelligence|language models?|LLMs?|neural|prompts?|context windows?|tokens?|chatbots?|simulations?|models?|tools?)(?!\w)/i
