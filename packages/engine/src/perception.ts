@@ -59,6 +59,13 @@ const PRECIPITATION: Record<string, true> = { rain: true, storm: true, snow: tru
 
 const isTileItem = (i: Item): i is Item & { loc: { t: 'tile'; x: number; y: number } } => i.loc.t === 'tile'
 
+const isStructureItem = (i: Item): i is Item & { loc: { t: 'structure'; id: string } } => i.loc.t === 'structure'
+
+// Adjacent = Chebyshev distance <= 1 to any footprint tile: you can look inside
+// a structure when standing beside it (or on it).
+const isAdjacent = (ax: number, ay: number, s: { x: number; y: number; w: number; h: number }): boolean =>
+  ax >= s.x - 1 && ax <= s.x + s.w && ay >= s.y - 1 && ay <= s.y + s.h
+
 // A felt event is something that happens *to* this agent (or ambient weather).
 // Anything about other agents — including out-of-range speech or injuries —
 // produces no tag and appears nowhere in the packet.
@@ -108,11 +115,25 @@ export function composePerception(
     .sort(byId)
     .map(s => ({ id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, burning: s.burning, stage: s.stage }))
 
-  const visibleItems: PerceivedItem[] = Object.values(state.items)
+  const tileItems: PerceivedItem[] = Object.values(state.items)
     .filter(isTileItem)
     .filter(i => withinSight(i.loc.x, i.loc.y))
     .sort(byId)
     .map(i => ({ id: i.id, kind: i.kind, qty: i.qty, x: i.loc.x, y: i.loc.y }))
+
+  const structureItems: PerceivedItem[] = Object.values(state.items)
+    .filter(isStructureItem)
+    .filter(i => {
+      const s = state.structures[i.loc.id]
+      return s !== undefined && isAdjacent(self.x, self.y, s)
+    })
+    .sort(byId)
+    .map(i => {
+      const s = state.structures[i.loc.id]!
+      return { id: i.id, kind: i.kind, qty: i.qty, x: s.x, y: s.y }
+    })
+
+  const visibleItems: PerceivedItem[] = [...tileItems, ...structureItems].sort(byId)
 
   const visibleCrops: PerceivedCrop[] = Object.values(state.crops)
     .filter(c => withinSight(c.x, c.y))

@@ -108,3 +108,36 @@ describe('composePerception: packet shape', () => {
     expect(p.weather).toEqual(s.weather)
   })
 })
+
+describe('composePerception: structure contents', () => {
+  // Storehouse footprint tiles: (10,10),(11,10),(10,11),(11,11).
+  const storehouse = { id: 'structure_1', kind: 'storehouse', x: 10, y: 10, w: 2, h: 2 }
+
+  function makeStorehouseWorld(agent: { id: string; x: number; y: number }): WorldState {
+    let s = makeWorld([agent])
+    s = fold(s, ev('structure_planned', {
+      id: storehouse.id, kind: storehouse.kind, x: storehouse.x, y: storehouse.y,
+      w: storehouse.w, h: storehouse.h, maxHp: 20, flammable: true, builderId: 'script',
+    }), DEFAULT_CONFIG)
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'bread', qty: 20, loc: { t: 'structure', id: storehouse.id } }), DEFAULT_CONFIG)
+    return s
+  }
+
+  it('agent adjacent to a structure sees its contained items', () => {
+    const s = makeStorehouseWorld({ id: 'a', x: 12, y: 10 })
+    const p = composePerception(s, DEFAULT_CONFIG, 'a', [])
+    expect(p.visible.items).toEqual([{ id: 'item_1', kind: 'bread', qty: 20, x: 10, y: 10 }])
+  })
+
+  it('agent two tiles away does not see contained items', () => {
+    const s = makeStorehouseWorld({ id: 'a', x: 13, y: 10 })
+    const p = composePerception(s, DEFAULT_CONFIG, 'a', [])
+    expect(p.visible.items).toEqual([])
+  })
+
+  it('perception never mutates the stored loc', () => {
+    const s = makeStorehouseWorld({ id: 'a', x: 12, y: 10 })
+    composePerception(s, DEFAULT_CONFIG, 'a', [])
+    expect(s.items.item_1!.loc).toEqual({ t: 'structure', id: 'structure_1' })
+  })
+})
