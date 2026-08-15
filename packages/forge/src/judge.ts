@@ -29,9 +29,9 @@ export function makeVlmJudge(opts: { apiKey: string; refSheets: Buffer[]; model?
         role: 'user',
         content: [
           { type: 'text', text: INSTRUCTIONS },
-          ...opts.refSheets.map(image => ({ type: 'image' as const, image })),
+          ...opts.refSheets.map(image => ({ type: 'image' as const, image, mediaType: 'image/png' as const })),
           { type: 'text', text: 'Candidate to score:' },
-          { type: 'image' as const, image: candidatePng },
+          { type: 'image' as const, image: candidatePng, mediaType: 'image/png' as const },
         ],
       }],
     })
