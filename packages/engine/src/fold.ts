@@ -1,10 +1,13 @@
 import { DEFAULT_CONFIG, type SimConfig, type SimEvent } from '@sj/shared'
 import type { WorldState } from './state.js'
 import {
-  AgentMoved, AgentSpawned, ItemMoved, ItemQtyChanged, ItemSpawned, NeedChanged,
-  StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
+  ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
+  AgentMoved, AgentSpawned, AgentWoke, ItemMoved, ItemQtyChanged, ItemSpawned, NeedChanged,
+  SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
   StructureProgressed, TickAdvanced,
 } from './events.def.js'
+import { findPath } from './path.js'
+import { WalkParams } from './verbs.js'
 
 const clamp = (v: number) => Math.max(0, Math.min(100, v))
 
@@ -123,6 +126,53 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       if (!state.structures[p.id]) throw new Error(`structure_destroyed for unknown structure ${p.id}`)
       const { [p.id]: _, ...structures } = state.structures
       return { ...state, structures }
+    }
+    case 'action_started': {
+      const p = ActionStarted.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`action_started for unknown agent ${p.agentId}`)
+      let path: Array<[number, number]> | undefined
+      if (p.verb === 'walk') {
+        const w = WalkParams.parse(p.params)
+        const found = findPath(state, a, w)
+        if (!found) throw new Error(`action_started walk with no path for ${p.agentId}`)
+        path = found
+      }
+      const activity = { verb: p.verb, ticksRemaining: p.duration, params: p.params, ...(path ? { path } : {}) }
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, activity } } }
+    }
+    case 'action_progressed': {
+      const p = ActionProgressed.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`action_progressed for unknown agent ${p.agentId}`)
+      if (!a.activity) throw new Error(`action_progressed for idle agent ${p.agentId}`)
+      const activity = { ...a.activity, ticksRemaining: a.activity.ticksRemaining - p.ticks }
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, activity } } }
+    }
+    case 'action_completed': {
+      const p = ActionCompleted.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`action_completed for unknown agent ${p.agentId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, activity: null } } }
+    }
+    case 'action_interrupted': {
+      const p = ActionInterrupted.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`action_interrupted for unknown agent ${p.agentId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, activity: null } } }
+    }
+    case 'skill_gained': {
+      const p = SkillGained.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`skill_gained for unknown agent ${p.agentId}`)
+      const skills = { ...a.skills, [p.track]: (a.skills[p.track] ?? 0) + p.xp }
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, skills } } }
+    }
+    case 'agent_woke': {
+      const p = AgentWoke.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_woke for unknown agent ${p.agentId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, asleep: false } } }
     }
     default:
       throw new Error(`unknown event type: ${event.type}`)

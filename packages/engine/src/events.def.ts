@@ -25,3 +25,14 @@ export const StructureProgressed = z.object({ id: z.string(), ticks: z.number() 
 export const StructureCompleted = z.object({ id: z.string() }).strict()
 export const StructureDamaged = z.object({ id: z.string(), amount: z.number() }).strict()
 export const StructureDestroyed = z.object({ id: z.string() }).strict()
+
+export const ActionStarted = z.object({
+  agentId: z.string(), verb: z.string(), params: z.record(z.string(), z.unknown()), duration: z.number(),
+}).strict()
+export const ActionProgressed = z.object({ agentId: z.string(), ticks: z.number() }).strict()
+export const ActionCompleted = z.object({
+  agentId: z.string(), verb: z.string(), results: z.record(z.string(), z.unknown()).optional(),
+}).strict()
+export const ActionInterrupted = z.object({ agentId: z.string(), reason: z.string() }).strict()
+export const SkillGained = z.object({ agentId: z.string(), track: z.string(), xp: z.number() }).strict()
+export const AgentWoke = z.object({ agentId: z.string() }).strict()
