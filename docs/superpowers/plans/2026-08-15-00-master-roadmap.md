@@ -138,6 +138,17 @@ sim-weeks), chronicle read-through, sim-config tuning pass; launch checklist.
 starvation-spirals; tuning signed off from chronicle evidence; restore drill from
 Litestream backup succeeds; public URL serves the observatory.
 
+## C1 carry-forward (from final review, 2026-08-15 — G1 GREEN, tag gate-g1)
+
+C2's plan MUST open with these hardening tasks:
+1. `stableStringify` throw-guard on non-plain-objects (Map/Set/Date hash as `{}` today) — land BEFORE choosing the terrain representation.
+2. `TickLoop.step()` txn-throw coherence (in-memory #state/#tick can run one tick ahead of durable if a caller catches and continues) — land before any supervisor loop.
+3. Event payload zod schemas use `.strict()` in the C2 vocabulary rewrite; add `ckpt.tick === state.tick` assertion in replayLatest.
+
+Deferred (address opportunistically): `RngStreams.get('__seed')` guard; `latestRngState` return type claims Record<string,RngState> but blob holds a string member; night-window edge tests; speed-setter ergonomics; SJ_SEED as explicit param.
+
+OPS (user action before any push to a remote): OPENROUTER_API_KEY was committed in early local history (d57594e) — rotate the key or rewrite history first.
+
 ## Cross-chunk rules
 
 - Golden replay (G1) runs in CI forever; every later chunk keeps it green.
