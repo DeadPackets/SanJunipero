@@ -40,6 +40,13 @@ function burningFireAdjacent(): WorldState {
   return s
 }
 
+function twoWoodStacks(): WorldState {
+  let s = agentState()
+  s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' } }), CFG)
+  s = fold(s, ev('item_spawned', { id: 'item_2', kind: 'wood', qty: 5, loc: { t: 'agent', id: 'a1' } }), CFG)
+  return s
+}
+
 describe('codify', () => {
   describe('verbFromRecipe', () => {
     it('maps the recipe onto the VerbDef shape (kind, interruptible, skill, rngStream, duration)', () => {
@@ -70,6 +77,17 @@ describe('codify', () => {
       const events = def.onComplete(state, CFG, 'a1', {}, RngStream.from([0, 0, 0, 0]))
       expect(events).toEqual([
         { type: 'item_spawned', payload: { id: `item_${nextId}`, kind: 'salt', qty: 1, loc: { t: 'agent', id: 'a1' } } },
+      ])
+    })
+  })
+
+  describe('onStart', () => {
+    it('consumes a cost across stacks in order until met', () => {
+      const def = verbFromRecipe({ ...boilSaltRecipe, costs: [{ kind: 'wood', qty: 2 }] })
+      const events = def.onStart!(twoWoodStacks(), CFG, 'a1', {})
+      expect(events).toEqual([
+        { type: 'item_qty_changed', payload: { id: 'item_1', delta: -1 } },
+        { type: 'item_qty_changed', payload: { id: 'item_2', delta: -1 } },
       ])
     })
   })

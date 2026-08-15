@@ -95,8 +95,13 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
     onStart(state, _config, agentId) {
       const events: PendingEvent[] = []
       for (const cost of recipe.costs) {
-        const stack = heldStacks(state, agentId, cost.kind)[0]
-        if (stack) events.push({ type: 'item_qty_changed', payload: { id: stack.id, delta: -cost.qty } })
+        let remaining = cost.qty
+        for (const stack of heldStacks(state, agentId, cost.kind)) {
+          if (remaining <= 0) break
+          const take = Math.min(stack.qty, remaining)
+          events.push({ type: 'item_qty_changed', payload: { id: stack.id, delta: -take } })
+          remaining -= take
+        }
       }
       return events
     },
