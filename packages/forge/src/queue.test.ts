@@ -16,16 +16,17 @@ describe('JobsQueue', () => {
   it('complete stores the result and marks done', () => {
     const q = new JobsQueue(openForgeDb(':memory:'))
     const id = q.enqueue('commission', {})
-    q.claim()
-    q.complete(id, { assetId: 'asset_x' })
+    const job = q.claim()!
+    expect(q.complete(id, job.attempts, { assetId: 'asset_x' })).toBe(true)
     expect(q.get(id)!.status).toBe('done')
   })
   it('fail re-pends with backoff until maxAttempts, then failed', () => {
     const q = new JobsQueue(openForgeDb(':memory:'))
     const id = q.enqueue('commission', {})
     for (let i = 0; i < 3; i++) {
-      expect(q.claim()).not.toBeNull()          // attempts becomes i+1
-      q.fail(id, 'boom', { retryInMs: 0 })      // re-pends until attempts hits 3
+      const job = q.claim()                          // attempts becomes i+1
+      expect(job).not.toBeNull()
+      q.fail(id, job!.attempts, 'boom', { retryInMs: 0 }) // re-pends until attempts hits 3
     }
     expect(q.get(id)!.status).toBe('failed')
     expect(q.claim()).toBeNull()
@@ -33,8 +34,38 @@ describe('JobsQueue', () => {
   it('respects run_at backoff — a future-scheduled job is not claimable', () => {
     const q = new JobsQueue(openForgeDb(':memory:'))
     const id = q.enqueue('commission', {})
-    q.claim(); q.fail(id, 'transient', { retryInMs: 60_000 })
+    const job = q.claim()!
+    q.fail(id, job.attempts, 'transient', { retryInMs: 60_000 })
     expect(q.claim()).toBeNull()
+  })
+  it('complete is fenced on the attempts token — a late worker cannot overwrite a reclaimed job', () => {
+    const q = new JobsQueue(openForgeDb(':memory:'))
+    const id = q.enqueue('commission', {})
+    const slow = q.claim()!            // attempts 1; worker stalls
+    q.requeueStale(0)                  // presumed dead → back to pending
+    const fresh = q.claim()!           // attempts 2; new owner
+    expect(q.complete(id, slow.attempts, { from: 'slow' })).toBe(false)
+    expect(q.get(id)!.status).toBe('running') // fresh owner undisturbed
+    expect(q.complete(id, fresh.attempts, { from: 'fresh' })).toBe(true)
+    expect(q.get(id)!.status).toBe('done')
+  })
+  it('fail is fenced on the attempts token — a late fail cannot clobber the new owner', () => {
+    const q = new JobsQueue(openForgeDb(':memory:'))
+    const id = q.enqueue('commission', {})
+    const slow = q.claim()!
+    q.requeueStale(0)
+    const fresh = q.claim()!
+    expect(q.fail(id, slow.attempts, 'late boom', { retryInMs: 0 })).toBe(false)
+    expect(q.get(id)!.status).toBe('running')
+    expect(q.complete(id, fresh.attempts, null)).toBe(true)
+    expect(q.get(id)!.status).toBe('done')
+  })
+  it('complete/fail on a non-running job are no-ops', () => {
+    const q = new JobsQueue(openForgeDb(':memory:'))
+    const id = q.enqueue('commission', {})
+    expect(q.complete(id, 0, null)).toBe(false)   // still pending
+    expect(q.fail(id, 0, 'x')).toBe(false)
+    expect(q.get(id)!.status).toBe('pending')
   })
   it('requeueStale reclaims a stale running job, preserving attempts', () => {
     const q = new JobsQueue(openForgeDb(':memory:'))
