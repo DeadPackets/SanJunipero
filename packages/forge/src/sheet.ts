@@ -778,6 +778,129 @@ export function sweepMagentaCensus(img: RawImage): RawImage {
   return { width: img.width, height: img.height, data: out }
 }
 
+// Outline↔fill blend repair (pipeline v7): silhouette pixels whose color sits on the
+// RGB segment between their inward fill color and the outline palette are generation
+// blends and repaint to the outline; near-fill pixels stay (repainting pure fill would
+// be a de-facto outline pass, which the style bible bans). OOB counts as transparent
+// because inputs are bbox-tight and land on a clear canvas.
+export function repairOutlineBlends(img: RawImage): { out: RawImage; repainted: number } {
+  const EPS = 10, SEG_DIST = 12
+  const w = img.width, h = img.height, data = img.data
+  const out = new Uint8ClampedArray(data)
+  const opaque = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x < w && y < h && data[(y * w + x) * 4 + 3]! > 0
+
+  // (a) silhouette: opaque with >= 1 transparent 8-neighbor (covers diagonal-only
+  // inner corners, so the (d) corner case is a subset of this set)
+  const silhouette = new Uint8Array(w * h)
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!opaque(x, y)) continue
+    outer: for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if ((dx !== 0 || dy !== 0) && !opaque(x + dx, y + dy)) { silhouette[y * w + x] = 1; break outer }
+    }
+  }
+
+  // (b) outline palette: eps single-link clusters over silhouette colors; keep
+  // clusters >= 15% of silhouette population within luma 30 of the darkest such cluster
+  const counts = new Map<number, number>()
+  let silTotal = 0
+  for (let i = 0; i < w * h; i++) {
+    if (!silhouette[i]) continue
+    silTotal++
+    const s = i * 4
+    const key = (data[s]! << 16) | (data[s + 1]! << 8) | data[s + 2]!
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  if (silTotal === 0) return { out: { width: w, height: h, data: out }, repainted: 0 }
+  const keys = [...counts.keys()]
+  const ch = (c: number) => [c >> 16, (c >> 8) & 255, c & 255] as const
+  const parent = keys.map((_, i) => i)
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)))
+  for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) {
+    const a = ch(keys[i]!), b = ch(keys[j]!)
+    if (Math.abs(a[0] - b[0]) <= EPS && Math.abs(a[1] - b[1]) <= EPS && Math.abs(a[2] - b[2]) <= EPS) {
+      const ra = find(i), rb = find(j)
+      if (ra !== rb) parent[ra] = rb
+    }
+  }
+  const clusters = new Map<number, { n: number; r: number; g: number; b: number }>()
+  keys.forEach((k, i) => {
+    const root = find(i), n = counts.get(k)!, [r, g, b] = ch(k)
+    const a = clusters.get(root) ?? { n: 0, r: 0, g: 0, b: 0 }
+    a.n += n; a.r += r * n; a.g += g * n; a.b += b * n
+    clusters.set(root, a)
+  })
+  const luma = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b
+  const eligible = [...clusters.entries()]
+    .filter(([, a]) => a.n >= 0.15 * silTotal)
+    .map(([root, a]) => ({ root, luma: luma(a.r / a.n, a.g / a.n, a.b / a.n) }))
+  if (eligible.length === 0) return { out: { width: w, height: h, data: out }, repainted: 0 }
+  const darkest = Math.min(...eligible.map(e => e.luma))
+  const outlineRoots = new Set(eligible.filter(e => e.luma <= darkest + 30).map(e => e.root))
+  const members: [number, number, number][] = []
+  keys.forEach((k, i) => { if (outlineRoots.has(find(i))) members.push([...ch(k)]) })
+
+  const nearAny = (r: number, g: number, b: number, set: [number, number, number][]) =>
+    set.some(m => Math.abs(m[0] - r) <= EPS && Math.abs(m[1] - g) <= EPS && Math.abs(m[2] - b) <= EPS)
+
+  // inward fill color: mode of opaque non-silhouette 8-neighbors, else the nearest
+  // opaque non-silhouette pixel within Chebyshev radius 4 (mode among distance ties)
+  function fillColorFor(x: number, y: number): [number, number, number] | null {
+    for (let r = 1; r <= 4; r++) {
+      const cand: { color: [number, number, number]; d2: number }[] = []
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
+        const nx = x + dx, ny = y + dy
+        if (!opaque(nx, ny) || silhouette[ny * w + nx]) continue
+        const s = (ny * w + nx) * 4
+        cand.push({ color: [data[s]!, data[s + 1]!, data[s + 2]!], d2: dx * dx + dy * dy })
+      }
+      if (cand.length === 0) continue
+      const dMin = Math.min(...cand.map(c => c.d2))
+      const modes = new Map<number, number>()
+      let best = -1, bestN = 0
+      for (const c of cand) {
+        if (c.d2 !== dMin) continue
+        const key = (c.color[0] << 16) | (c.color[1] << 8) | c.color[2]
+        const n = (modes.get(key) ?? 0) + 1
+        modes.set(key, n)
+        if (n > bestN) { bestN = n; best = key }
+      }
+      return [...ch(best)]
+    }
+    return null
+  }
+
+  function segDist(c: readonly number[], a: readonly number[], b: readonly number[]): number {
+    const ab = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!]
+    const ac = [c[0]! - a[0]!, c[1]! - a[1]!, c[2]! - a[2]!]
+    const len2 = ab[0]! * ab[0]! + ab[1]! * ab[1]! + ab[2]! * ab[2]!
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, (ac[0]! * ab[0]! + ac[1]! * ab[1]! + ac[2]! * ab[2]!) / len2))
+    return Math.hypot(a[0]! + t * ab[0]! - c[0]!, a[1]! + t * ab[1]! - c[1]!, a[2]! + t * ab[2]! - c[2]!)
+  }
+
+  // (c)+(d): segment test on every silhouette pixel that is neither outline nor fill
+  let repainted = 0
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!silhouette[y * w + x]) continue
+    const s = (y * w + x) * 4
+    const c = [data[s]!, data[s + 1]!, data[s + 2]!] as const
+    if (nearAny(c[0], c[1], c[2], members)) continue
+    const fill = fillColorFor(x, y)
+    if (!fill) continue
+    if (nearAny(c[0], c[1], c[2], [fill])) continue
+    let o = members[0]!, oD = Infinity
+    for (const m of members) {
+      const d = (m[0] - c[0]) ** 2 + (m[1] - c[1]) ** 2 + (m[2] - c[2]) ** 2
+      if (d < oD) { oD = d; o = m }
+    }
+    if (segDist(c, fill, o) > SEG_DIST) continue
+    out[s] = o[0]; out[s + 1] = o[1]; out[s + 2] = o[2]
+    repainted++
+  }
+  return { out: { width: w, height: h, data: out }, repainted }
+}
+
 // Final art-resolution sweep: any opaque pixel in the magenta family (r>g+40 AND
 // b>g+25) takes the mode color of its opaque 8-neighbors — magenta is not a Style
 // Bible color, so this is always safe at art resolution. Ties break first-seen;

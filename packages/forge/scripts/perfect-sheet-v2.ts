@@ -1,7 +1,8 @@
-// OFFLINE — zero API spend. PIPELINE V6 FINAL (controller-ruled): measured fractional
+// OFFLINE — zero API spend. PIPELINE V7 (v6 + outline blend repair): measured fractional
 // pitch, natural heights, ε-cluster sampling, census-aware magenta sweep. Per image:
 // chromaKey → erode(round(sheetPitch/2)) → refineLattice → resampleClusterLattice →
-// despeckle(logged) → fillPinholes → sweepMagentaCensus → registration → anchor.
+// despeckle(logged) → fillPinholes → sweepMagentaCensus → repairOutlineBlends →
+// registration → anchor.
 // Drift field and sheet-wide merge DROPPED (reconErr regression / linkage chaining).
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import sharp from 'sharp'
@@ -10,7 +11,8 @@ import { chromaKey } from '../src/post/chromaKey.js'
 import {
   FACINGS, POSES, assembleGrid, cellDistance, mirrorX, duplicateReport,
   erodeAlpha, estimatePitch, refineLattice, resampleClusterLattice, despeckle, fillPinholes,
-  sweepMagentaCensus, registerToReference, sheetMetrics, type Facing, type Pose, type Lattice,
+  sweepMagentaCensus, repairOutlineBlends, registerToReference, sheetMetrics,
+  type Facing, type Pose, type Lattice,
 } from '../src/sheet.js'
 
 const OUT = 'packages/forge/out/character-sheet-v2'
@@ -51,8 +53,8 @@ function upscaleNearest(img: RawImage, k: number): RawImage {
   return { width: img.width * k, height: img.height * k, data: out }
 }
 
-type Processed = { out: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice; origin: { i0: number; j0: number }; sweepHits: number }
-function v6chain(keyed: RawImage, pitch: number, name: string): Processed {
+type Processed = { out: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice; origin: { i0: number; j0: number }; sweepHits: number; blendRepaints: number }
+function v7chain(keyed: RawImage, pitch: number, name: string): Processed {
   const eroded = erodeAlpha(keyed, Math.max(1, Math.round(pitch / 2)))
   const b = bbox(eroded)
   const lat = refineLattice(eroded, pitch, { ox: b.x0, oy: b.y0 })
@@ -65,10 +67,11 @@ function v6chain(keyed: RawImage, pitch: number, name: string): Processed {
   let sweepHits = 0
   for (let i = 0; i < filled.data.length; i += 4)
     if (filled.data[i] !== swept.data[i] || filled.data[i + 1] !== swept.data[i + 1] || filled.data[i + 2] !== swept.data[i + 2]) sweepHits++
-  return { out: swept, dominance: r.dominance, eroded, lat, origin: r.origin, sweepHits }
+  const repaired = repairOutlineBlends(swept)
+  return { out: repaired.out, dominance: r.dominance, eroded, lat, origin: r.origin, sweepHits, blendRepaints: repaired.repainted }
 }
 
-// 1. Characters: per-cell pitch -> sheetPitch median -> v4 chain at sheetPitch.
+// 1. Characters: per-cell pitch -> sheetPitch median -> v7 chain at sheetPitch.
 const keyedCells = new Map<string, RawImage>()
 const pitches: number[] = []
 for (const p of POSES) for (const f of FACINGS) {
@@ -84,7 +87,7 @@ console.log(`sheetPitch (median): ${sheetPitch.toFixed(2)}`)
 
 const proc = new Map<string, Processed>()
 for (const p of POSES) for (const f of FACINGS)
-  proc.set(label(f, p), v6chain(keyedCells.get(label(f, p))!, sheetPitch, label(f, p)))
+  proc.set(label(f, p), v7chain(keyedCells.get(label(f, p))!, sheetPitch, label(f, p)))
 
 // Canvas rule: any art height > 88 -> 128/118 for the whole sheet.
 const maxH = Math.max(...[...proc.values()].map(c => c.out.height))
@@ -130,7 +133,7 @@ const metricLines: string[] = []
 for (const p of POSES) for (const f of FACINGS) {
   const c = proc.get(label(f, p))!
   const m = sheetMetrics([c])
-  const line = `${label(f, p).padEnd(12)} ${`${c.out.width}x${c.out.height}`.padEnd(8)} ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}  sweep=${c.sweepHits}`
+  const line = `${label(f, p).padEnd(12)} ${`${c.out.width}x${c.out.height}`.padEnd(8)} ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}  sweep=${c.sweepHits}  blends=${c.blendRepaints}`
   metricLines.push(line)
   console.log(`  ${line}`)
 }
@@ -144,10 +147,10 @@ const refInputs: [string, string][] = [
 for (const [name, path] of refInputs) {
   const keyed = chromaKey(await decodePng(readFileSync(path)))
   const pitch = estimatePitch(keyed)
-  const c = v6chain(keyed, pitch, name)
+  const c = v7chain(keyed, pitch, name)
   const m = sheetMetrics([c])
-  metricLines.push(`${name.padEnd(12)} ${`${c.out.width}x${c.out.height}`.padEnd(8)} ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}  sweep=${c.sweepHits}`)
-  console.log(`${name}: pitch ${pitch.toFixed(2)}, natural ${c.out.width}x${c.out.height}, ambiguous ${m.ambiguousPct.toFixed(1)}%, sweep=${c.sweepHits}`)
+  metricLines.push(`${name.padEnd(12)} ${`${c.out.width}x${c.out.height}`.padEnd(8)} ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}  sweep=${c.sweepHits}  blends=${c.blendRepaints}`)
+  console.log(`${name}: pitch ${pitch.toFixed(2)}, natural ${c.out.width}x${c.out.height}, ambiguous ${m.ambiguousPct.toFixed(1)}%, sweep=${c.sweepHits}  blends=${c.blendRepaints}`)
   const png = await encodePng(c.out)
   writeFileSync(`packages/forge/out/refs-v2/${name}.png`, png)
   writeFileSync(`${REFS_DIR}/${name}.png`, png)
@@ -204,7 +207,7 @@ const rows = POSES.flatMap(p => duplicateReport(
 const cols = FACINGS.flatMap(f => duplicateReport(
   POSES.map(p => ({ label: label(f, p), img: cells.get(label(f, p))! })), STRAIGHT_THR, MIRROR_THR))
 const report = [
-  `== PIPELINE V6 FINAL: sheetPitch ${sheetPitch.toFixed(2)}, natural heights, canvas ${CANVAS} feetY ${FEET_Y} ==`,
+  `== PIPELINE V7: sheetPitch ${sheetPitch.toFixed(2)}, natural heights, canvas ${CANVAS} feetY ${FEET_Y} ==`,
   '(v4 soft-lattice flags RETRACTED: 5-bit binning artifact; cluster-dominance is the metric)',
   '', '== per-output metrics (cluster ambiguous% / dupRows / reconErr / sweepHits) ==',
   ...metricLines,

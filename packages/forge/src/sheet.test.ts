@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, estimatePitch, refineLattice, resampleModeLattice, sheetMetrics, sweepMagenta, driftField, resampleClusterLattice, mergeSheetColors, sweepMagentaCensus, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, estimatePitch, refineLattice, resampleModeLattice, sheetMetrics, sweepMagenta, driftField, resampleClusterLattice, mergeSheetColors, sweepMagentaCensus, repairOutlineBlends, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
 import { quantize } from './post/quantize.js'
 
 type Px = [number, number, number, number]
@@ -507,6 +507,51 @@ describe('sweepMagentaCensus', () => {
     })
     const out = sweepMagentaCensus(src)
     expect([...out.data.slice((5 * 10 + 5) * 4, (5 * 10 + 5) * 4 + 3)]).toEqual([255, 0, 0]) // neighbor mode = red
+    expect([...out.data.slice((2 * 10 + 2) * 4, (2 * 10 + 2) * 4 + 3)]).toEqual([125, 28, 65])
+  })
+})
+
+describe('repairOutlineBlends', () => {
+  const WINE: Px = [125, 28, 65, 255], SKIN: Px = [230, 180, 150, 255]
+  const BLEND: Px = [178, 104, 108, 255]  // midpoint of WINE and SKIN
+  // transparent ring, wine outline ring, skin interior; edit overrides single pixels
+  const ringSprite = (edit?: (x: number, y: number) => Px | null) => img(12, 12, (x, y) => {
+    const e = edit?.(x, y)
+    if (e) return e
+    if (x === 0 || y === 0 || x === 11 || y === 11) return CLEAR
+    if (x === 1 || y === 1 || x === 10 || y === 10) return WINE
+    return SKIN
+  })
+
+  it('repaints a midpoint fill->outline blend on the border to the outline color', () => {
+    const { out, repainted } = repairOutlineBlends(ringSprite((x, y) => (x === 5 && y === 1 ? BLEND : null)))
+    expect(repainted).toBe(1)
+    expect([...out.data.slice((1 * 12 + 5) * 4, (1 * 12 + 5) * 4 + 3)]).toEqual([125, 28, 65])
+  })
+
+  it('leaves an off-segment highlight untouched', () => {
+    const HILITE: Px = [255, 255, 180, 255] // ~85 from the WINE->SKIN segment
+    const { out, repainted } = repairOutlineBlends(ringSprite((x, y) => (x === 5 && y === 1 ? HILITE : null)))
+    expect(repainted).toBe(0)
+    expect([...out.data.slice((1 * 12 + 5) * 4, (1 * 12 + 5) * 4 + 3)]).toEqual([255, 255, 180])
+  })
+
+  it('makes zero repaints on a clean sprite', () => {
+    const src = ringSprite()
+    const { out, repainted } = repairOutlineBlends(src)
+    expect(repainted).toBe(0)
+    expect([...out.data]).toEqual([...src.data])
+  })
+
+  it('repairs an inner-corner blend whose only transparency is diagonal', () => {
+    const src = img(10, 10, (x, y) => {
+      if (x === 0 || y === 0 || x === 9 || y === 9 || (x === 1 && y === 1)) return CLEAR
+      if (x === 2 && y === 2) return BLEND // silhouette only via the (1,1) diagonal
+      if (x === 1 || y === 1 || x === 8 || y === 8) return WINE
+      return SKIN
+    })
+    const { out, repainted } = repairOutlineBlends(src)
+    expect(repainted).toBe(1)
     expect([...out.data.slice((2 * 10 + 2) * 4, (2 * 10 + 2) * 4 + 3)]).toEqual([125, 28, 65])
   })
 })
