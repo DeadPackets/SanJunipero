@@ -10,9 +10,10 @@ export async function runForgeWorker(opts: {
   const pollMs = opts.pollMs ?? 500
   const staleMs = opts.staleMs ?? 60_000
   while (!opts.signal.aborted) {
+    // every iteration, not just when idle — a steady backlog must not starve crashed workers' jobs
+    opts.queue.requeueStale(staleMs)
     const job = opts.queue.claim()
     if (!job) {
-      opts.queue.requeueStale(staleMs)
       await new Promise(r => setTimeout(r, pollMs))
       continue
     }

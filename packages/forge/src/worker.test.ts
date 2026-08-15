@@ -74,6 +74,28 @@ describe('runForgeWorker', () => {
     expect(handled).toEqual([{ desc: 'orphaned' }])
     expect(q.get(id)!.status).toBe('done')
   })
+  it('requeues a stale job while a backlog is still being consumed (no idle needed)', async () => {
+    const db = openForgeDb(':memory:')
+    const q = new JobsQueue(db)
+    const idStale = q.enqueue('commission', { desc: 'stale' })
+    q.claim() // a previous worker took it and crashed
+    db.prepare("UPDATE jobs SET started_at = datetime('now', '-10 seconds') WHERE id = ?").run(idStale)
+    for (const d of ['b1', 'b2', 'b3']) q.enqueue('commission', { desc: d })
+    const ctl = new AbortController()
+    const handled: string[] = []
+    const workerDone = runForgeWorker({
+      queue: q, pollMs: 5, staleMs: 5000, signal: ctl.signal,
+      handlers: { commission: async p => { handled.push((p as { desc: string }).desc); return { ok: true } } },
+    })
+    await new Promise(r => setTimeout(r, 100))
+    ctl.abort()
+    await workerDone
+    // requeued on the first loop pass, so the stale job (lowest id) runs BEFORE the
+    // backlog drains — the old idle-only requeue would have ordered it last
+    expect(handled[0]).toBe('stale')
+    expect(handled).toEqual(['stale', 'b1', 'b2', 'b3'])
+    expect(q.get(idStale)!.status).toBe('done')
+  })
   it('an unknown kind fails immediately (maxAttempts 1), no handler TypeError', async () => {
     const q = new JobsQueue(openForgeDb(':memory:'))
     const id = q.enqueue('unknown_kind', {})
