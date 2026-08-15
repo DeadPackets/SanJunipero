@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { fold, genesisState, submitIntent, unregisterVerb, type WorldState } from '@sj/engine'
-import { openArbiterDb } from './schema.js'
+import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
+import { openArbiterDb } from './schema.js'
 import { codify } from './codify.js'
 import { ReviewStore } from './review.js'
 import type { Recipe } from './verdict.js'
@@ -35,7 +36,9 @@ function makeReview() {
   const db = openArbiterDb(':memory:')
   const rulebook = new RulebookStore(db)
   const review = new ReviewStore(db)
-  return { db, rulebook, review }
+  const codex = new CodexStore(db)
+  codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
+  return { db, rulebook, review, codex }
 }
 
 type ReviewStatusRow = { status: string; reason?: string | null }
@@ -51,8 +54,8 @@ describe('ReviewStore', () => {
   })
 
   it('codify auto-queues a pending review for every codified rule', () => {
-    const { review, rulebook } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, tick: 200 })
+    const { review, rulebook, codex } = makeReview()
+    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, codex, tick: 200 })
     expect(review.pending()).toEqual([
       expect.objectContaining({ ruleId, recipeId: 'recipe:boil_salt', status: 'pending', reason: null, tick: 200 }),
     ])
@@ -69,8 +72,8 @@ describe('ReviewStore', () => {
   })
 
   it('revert tombstones the rulebook, unregisters the verb, and marks the row reverted', () => {
-    const { db, review, rulebook } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, tick: 200 })
+    const { db, review, rulebook, codex } = makeReview()
+    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, codex, tick: 200 })
     review.revert(ruleId, 'physics wrong', 500)
 
     const row = db.prepare('SELECT status, reason FROM ruling_reviews WHERE rule_id = ?').get(ruleId) as ReviewStatusRow
@@ -85,8 +88,8 @@ describe('ReviewStore', () => {
   })
 
   it('reverting an already-approved rule re-queues idempotently: a single reverted disposition', () => {
-    const { db, review, rulebook } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, tick: 200 })
+    const { db, review, rulebook, codex } = makeReview()
+    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, codex, tick: 200 })
     review.approve(ruleId)
     review.revert(ruleId, 'physics wrong', 500)
 
@@ -100,8 +103,8 @@ describe('ReviewStore', () => {
 
 
   it('approve throws on a tombstoned rule', () => {
-    const { db, review, rulebook } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, tick: 200 })
+    const { db, review, rulebook, codex } = makeReview()
+    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, codex, tick: 200 })
     review.revert(ruleId, 'physics wrong', 500)
     review.queue(ruleId, 'recipe:boil_salt', 600) // re-queue a reverted rule
     expect(() => review.approve(ruleId)).toThrow(/reverted/)

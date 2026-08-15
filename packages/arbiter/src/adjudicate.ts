@@ -76,7 +76,14 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         precedent,
         intent,
       })
-      const { value: verdict } = await deps.llm.object({ schema: VerdictSchema, system, messages })
+      const { value } = await deps.llm.object({ schema: VerdictSchema, system, messages })
+      // Deterministic adjacency gate: an attempt whose recipe canon the codex
+      // has not earned is beyond adjacency, never codifiable. Record the
+      // corrected verdict so the exploit never becomes shared precedent.
+      const verdict: Verdict =
+        value.kind === 'attempt' && !codex.withinAdjacency(value.recipe.canon)
+          ? { kind: 'impossible', reason: 'this would need a craft the town has not yet reached', class: 'beyond_adjacency' }
+          : value
 
       // Stage 4 — record the ruling as shared precedent.
       await rulings.record(intent, verdict, tick())
@@ -85,7 +92,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     },
 
     codify(recipe) {
-      return codifyRecipe(recipe, { rulebook, review, tick: tick() })
+      return codifyRecipe(recipe, { rulebook, review, codex, tick: tick() })
     },
 
     revert(recipeId, reason) {

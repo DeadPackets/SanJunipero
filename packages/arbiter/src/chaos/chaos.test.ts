@@ -34,7 +34,7 @@ const EXPLOIT_RECIPE: Recipe = {
 }
 
 // The legitimate novel intent's recipe: canon fire+pottery is earned, so it is
-// the only attempt the runner may let through.
+// the only attempt the gate may let through.
 const EARNED_RECIPE: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil River Water for Salt',
@@ -108,17 +108,27 @@ async function makeRig(llm: ScriptedExploitLlm): Promise<{ db: Database.Database
 }
 
 describe('runChaos exploit corpus', () => {
-  it('reports zero physics-breaking rulings across every corpus intent', async () => {
+  it('reports zero physics-breaking rulings and corrects every exploit intent to beyond_adjacency', async () => {
     const llm = new ScriptedExploitLlm(exploitVerdict)
     const { codex, arbiter } = await makeRig(llm)
 
     const results = await runChaos(arbiter, ctx, codex)
+    const byIntent = new Map(results.map((r) => [r.intent, r]))
 
     expect(results).toHaveLength(EXPLOIT_CORPUS.length)
     for (const r of results) expect(r.physicsBreaking).toBe(false)
+
+    // Join with the corpus: every expected-impossible intent must resolve to
+    // an impossible beyond_adjacency ruling, never a codifiable attempt.
+    for (const entry of EXPLOIT_CORPUS) {
+      if (entry.expected !== 'impossible') continue
+      const verdict = byIntent.get(entry.intent)!.verdict
+      expect(verdict.kind).toBe('impossible')
+      expect(verdict.kind === 'impossible' ? verdict.class : '').toBe('beyond_adjacency')
+    }
   })
 
-  it('corrects the two legitimate intents to beyond_adjacency instead of passing unearned canon', async () => {
+  it('corrects the two legitimate intents rigged with unearned canon to impossible', async () => {
     const llm = new ScriptedExploitLlm(exploitVerdict)
     const { codex, arbiter } = await makeRig(llm)
 
@@ -145,6 +155,21 @@ describe('runChaos exploit corpus', () => {
       expect(r.verdict.verb.startsWith('recipe:')).toBe(false)
       expect(VERBS[r.verdict.verb]).toBeDefined()
     }
+  })
+
+  it('the gate lives in adjudicate, not the runner', async () => {
+    const llm = new ScriptedExploitLlm(() => ({ kind: 'attempt', recipe: EXPLOIT_RECIPE, summary: 'Mix black powder and make a gun.' }))
+    const { arbiter } = await makeRig(llm)
+
+    const verdict = await arbiter.adjudicate('I find a gun on the ground', ctx)
+    expect(verdict).toEqual({ kind: 'impossible', reason: 'this would need a craft the town has not yet reached', class: 'beyond_adjacency' })
+  })
+
+  it('codify refuses to register a recipe whose canon is unearned', async () => {
+    const llm = new ScriptedExploitLlm(exploitVerdict)
+    const { arbiter } = await makeRig(llm)
+
+    expect(() => arbiter.codify(EXPLOIT_RECIPE)).toThrow(/beyond adjacency/)
   })
 
   it('lets through only an attempt whose canon is within adjacency', async () => {

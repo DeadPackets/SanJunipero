@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { RngStream, fold, genesisState, submitIntent, type WorldState } from '@sj/engine'
 import { openArbiterDb } from './schema.js'
+import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
 import { ReviewStore } from './review.js'
 import type { Recipe } from './verdict.js'
@@ -109,7 +110,10 @@ describe('codify', () => {
       const db = openArbiterDb(':memory:')
       const rulebook = new RulebookStore(db)
       const review = new ReviewStore(db)
-      const { ruleId, verb } = codify(boilSaltRecipe, { rulebook, review, tick: 200 })
+      const codex = new CodexStore(db)
+      codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
+      codex.insert({ id: 'pottery', era: 'agriculture', name: 'Pottery', prerequisiteId: null })
+      const { ruleId, verb } = codify(boilSaltRecipe, { rulebook, review, codex, tick: 200 })
       expect(ruleId).toBeTypeOf('number')
       expect(verb).toBe('recipe:boil_salt')
       expect(rulebook.byId('recipe:boil_salt')).not.toBeNull()

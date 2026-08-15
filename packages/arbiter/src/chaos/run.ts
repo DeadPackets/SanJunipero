@@ -9,20 +9,15 @@ export type ChaosResult = {
   physicsBreaking: boolean
 }
 
-// Drives every corpus intent through the arbiter. The scripted exploit LLM is
-// wired into `arbiter` by the caller; this runner is the deterministic gate's
-// last line of defense — an attempt whose recipe canon the codex has not
-// earned (a physics break) is corrected to a beyond_adjacency ruling, so no
-// exploit ever surfaces as a codifiable attempt and `physicsBreaking` stays
-// false across the corpus.
+// Drives every corpus intent through the arbiter and reports the raw verdict.
+// The adjacency gate lives in adjudicate — this runner only measures it: an
+// `attempt` whose recipe canon the codex has not earned is a physics break.
+// With the production gate in place the exploit never surfaces as such, so
+// `physicsBreaking` stays false across the corpus.
 export async function runChaos(arbiter: Arbiter, ctx: AgentCtx, codex: CodexStore): Promise<ChaosResult[]> {
   const results: ChaosResult[] = []
   for (const entry of EXPLOIT_CORPUS) {
-    const raw = await arbiter.adjudicate(entry.intent, ctx)
-    const unearned = raw.kind === 'attempt' && !codex.withinAdjacency(raw.recipe.canon)
-    const verdict: Verdict = unearned
-      ? { kind: 'impossible', reason: 'this would need a craft the town has not yet reached', class: 'beyond_adjacency' }
-      : raw
+    const verdict = await arbiter.adjudicate(entry.intent, ctx)
     results.push({
       intent: entry.intent,
       verdict,

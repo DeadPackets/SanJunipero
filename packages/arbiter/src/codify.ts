@@ -1,5 +1,6 @@
 import { registerVerb } from '@sj/engine'
 import type { PendingEvent, Structure, TileId, VerbDef, WorldState } from '@sj/engine'
+import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
 import type { RulebookStore } from './rulebook.js'
 import { rollOutcomeTable, skillFactor } from './verdict.js'
@@ -119,8 +120,13 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
 
 export function codify(
   recipe: Recipe,
-  deps: { rulebook: RulebookStore; review: ReviewStore; tick: number },
+  deps: { rulebook: RulebookStore; review: ReviewStore; codex: CodexStore; tick: number },
 ): { ruleId: number; verb: string } {
+  // Belt and suspenders: even a caller who bypasses adjudicate must not be
+  // able to codify a recipe the codex has not earned.
+  if (!deps.codex.withinAdjacency(recipe.canon)) {
+    throw new Error(`cannot codify ${recipe.id}: canon ${recipe.canon.join(', ')} is beyond adjacency`)
+  }
   const ruleId = deps.rulebook.insert(recipe, deps.tick)
   registerVerb(verbFromRecipe(recipe))
   deps.review.queue(ruleId, recipe.id, deps.tick)

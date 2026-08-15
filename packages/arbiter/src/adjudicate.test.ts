@@ -6,6 +6,7 @@ import { unregisterVerb } from '@sj/engine'
 import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { ReviewStore } from './review.js'
+import { CodexStore } from './codex.js'
 import { RulingsStore } from './rulings.js'
 import { FORBIDDEN_FRAMING } from './prompt.js'
 import type { Recipe, Verdict } from './verdict.js'
@@ -164,6 +165,9 @@ type EmbedderLike = { embed(t: string): Promise<Float32Array> }
 
 async function makeRig(llm: ScriptedLlm, embedder?: EmbedderLike): Promise<{ db: Database.Database; arbiter: Arbiter; embedder: EmbedderLike }> {
   const db = openArbiterDb(':memory:')
+  const codex = new CodexStore(db)
+  codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
+  codex.insert({ id: 'pottery', era: 'agriculture', name: 'Pottery', prerequisiteId: null })
   const emb = embedder ?? (await FakeEmbedder.create())
   const arbiter = makeArbiter({ db, llm: llm as unknown as LlmClient, embedder: emb, tick: () => 100 })
   return { db, arbiter, embedder: emb }
