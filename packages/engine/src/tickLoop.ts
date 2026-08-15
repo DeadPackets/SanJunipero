@@ -23,7 +23,19 @@ export class TickLoop {
   get tick(): number { return this.#tick }
 
   step(): void {
+    const prevTick = this.#tick
+    const prevState = this.#state
     this.#tick += 1
+    try {
+      this.#doStep()
+    } catch (err) {
+      this.#tick = prevTick
+      this.#state = prevState
+      throw err
+    }
+  }
+
+  #doStep(): void {
     this.#store.transaction(() => {
       const apply = (type: string, payload: unknown) => {
         const ev = this.#store.append(this.#tick, type, payload)

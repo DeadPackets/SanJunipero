@@ -39,4 +39,12 @@ describe('replay', () => {
     const { store, live } = seedStore()
     expect(stateHash(replayLatest(store).state)).toBe(stateHash(live))
   })
+  it('throws when the rng checkpoint is behind the folded state tick', () => {
+    const { store } = seedStore()
+    const rng = new RngStreams('town1')
+    store.saveRngState(1, rng.snapshot())
+    expect(() => replayLatest(store)).not.toThrow()
+    store.append(2, 'tick_advanced', {})
+    expect(() => replayLatest(store)).toThrow(/rng checkpoint .* behind/)
+  })
 })

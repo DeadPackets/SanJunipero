@@ -30,4 +30,23 @@ describe('TickLoop', () => {
     expect(store.latestSnapshot()!.tick).toBe(10)
     expect(stateHash(replayLatest(store).state)).toBe(stateHash(l.state))
   })
+  it('restores tick and state when the transaction throws, and can step again', () => {
+    let thrown = false
+    const { store, loop: l } = loop(({ tick, emit }) => {
+      emit('agent_spawned', { id: `a${tick}`, x: tick, y: 0 })
+      if (tick === 3 && !thrown) { thrown = true; throw new Error('boom') }
+    })
+    l.step(); l.step()
+    const preTick = l.tick
+    const preHash = stateHash(l.state)
+    const preSeq = store.lastSeq()
+    expect(() => l.step()).toThrow('boom')
+    expect(l.tick).toBe(2)
+    expect(l.tick).toBe(preTick)
+    expect(stateHash(l.state)).toBe(preHash)
+    expect(store.lastSeq()).toBe(preSeq)
+    l.step()
+    expect(l.tick).toBe(3)
+    expect(stateHash(replayLatest(store).state)).toBe(stateHash(l.state))
+  })
 })

@@ -14,6 +14,10 @@ export function replayLatest(store: EventStore): { state: WorldState; rng: RngSt
     : snap ? RngStreams.restore(snap.rng)
     : new RngStreams(process.env.SJ_SEED ?? 'san-junipero')
   const startSeq = snap ? snap.seq : 0
-  for (const ev of store.readFrom(startSeq)) state = fold(state, ev)
+  const events = store.readFrom(startSeq)
+  for (const ev of events) state = fold(state, ev)
+  if (ckpt && events.length > 0 && ckpt.tick !== state.tick) {
+    throw new Error(`rng checkpoint (tick ${ckpt.tick}) is behind folded state (tick ${state.tick})`)
+  }
   return { state, rng, seq: store.lastSeq() }
 }
