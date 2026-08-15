@@ -1,12 +1,21 @@
+import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
-import { AssetRecordSchema, type AssetRecord, type AssetClass, type Footprint } from '@sj/shared'
+import { AssetRecordSchema, AssetClassSchema, FootprintSchema, type AssetRecord } from '@sj/shared'
 
-type RegisterInput = {
-  class: AssetClass; desc: string; footprint: Footprint; png: Buffer
-  widthPx: number; heightPx: number; status: 'ready' | 'placeholder'
-  score: number | null; attempts: number; costUsd: number
-}
+const RegisterInputSchema = z.object({
+  class: AssetClassSchema,
+  desc: z.string().min(1),
+  footprint: FootprintSchema,
+  png: z.instanceof(Buffer),
+  widthPx: z.number().int().positive(),
+  heightPx: z.number().int().positive(),
+  status: z.enum(['ready', 'placeholder']),
+  score: z.number().min(1).max(10).nullable(),
+  attempts: z.number().int().min(1).max(3),
+  costUsd: z.number().min(0),
+}).strict()
+type RegisterInput = z.infer<typeof RegisterInputSchema>
 
 type Row = {
   seq: number; id: string; class: string; desc: string; footprint_w: number; footprint_h: number
@@ -39,9 +48,10 @@ export class AssetCodex {
   }
 
   register(input: RegisterInput): AssetRecord {
+    const v = RegisterInputSchema.parse(input)
     const id = `asset_${randomUUID()}`
-    this.#insert.run(id, input.class, input.desc, input.footprint.w, input.footprint.h,
-      input.png, input.widthPx, input.heightPx, input.status, input.score, input.attempts, input.costUsd)
+    this.#insert.run(id, v.class, v.desc, v.footprint.w, v.footprint.h,
+      v.png, v.widthPx, v.heightPx, v.status, v.score, v.attempts, v.costUsd)
     const rec = this.#toRecord(this.#selById.get(id) as Row)
     for (const cb of this.#listeners) cb(rec)
     return rec

@@ -30,4 +30,12 @@ describe('AssetCodex', () => {
     codex.register(input)
     expect(seen).toEqual(['a wooden bucket'])
   })
+  it('register validates input before insert — failed registers leave no poison rows', () => {
+    const codex = new AssetCodex(openForgeDb(':memory:'))
+    expect(() => codex.register({ ...input, footprint: { w: 5, h: 5 } })).toThrow()
+    expect(() => codex.register({ ...input, attempts: 0 })).toThrow()
+    const ok = codex.register(input)
+    expect(ok.seq).toBe(1)
+    expect(codex.listSince(0)).toEqual([ok])
+  })
 })
