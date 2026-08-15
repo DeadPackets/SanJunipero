@@ -52,7 +52,15 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       // Stage 2 — deterministic rulings similarity short-circuit.
       const top = (await rulings.similar(intent, 1))[0]
       if (top && top.cosine >= SIMILARITY_SHORT_CIRCUIT) {
-        return JSON.parse(top.ruling.verdictJson) as Verdict
+        const stored = JSON.parse(top.ruling.verdictJson) as Verdict
+        if (stored.kind === 'attempt') {
+          const row = rulebook.byId(stored.recipe.id)
+          if (row === null) return stored
+          if (row.revertedAtTick === null) return { kind: 'map', verb: stored.recipe.id, params: {} }
+          // Reverted → fall through to the LLM (the admin re-decides after revert).
+        } else {
+          return stored
+        }
       }
 
       // Stage 3 — only genuinely novel intents reach the LLM.
