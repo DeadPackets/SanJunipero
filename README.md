@@ -1,0 +1,2 @@
+# SanJunipero
+LLM simulated life.
