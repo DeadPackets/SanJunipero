@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { LlmClient, LlmMessage } from './llm/client.js'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
-import type { PersonalityDoc, PersonalityStore } from './personality.js'
+import { PersonalityEditSchema, type PersonalityDoc, type PersonalityStore } from './personality.js'
 
 export type ReflectionLlm = {
   extractFacts(
@@ -192,8 +192,11 @@ export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc, dayMe
     system: [
       'Before sleep, you may change one thing about what you value or what you believe.',
       'You may change at most one, and only if this day gives you a clear reason.',
-      'Answer with one field named `edit`. If nothing needs to change, `edit` is empty.',
-      'If you do change something, `edit` holds the change as: `op` one of add, remove, revise; `field` one of values, beliefs; for add or revise, `text` is the new wording; for remove or revise, `index` is its place counting from 0; and `evidence` is the list of today\'s memory numbers that show why.',
+      'If today held an event that changed how you see the world — a collapse, hunger, a conflict, a first — propose exactly one change to what you value or believe, and point to the memory that shows why.',
+      'If the day was truly uneventful, say so and propose nothing.',
+      'Answer with one field named `verdict`, either `no_proposal` or `propose`.',
+      'For `no_proposal`, `verdict` is `no_proposal`.',
+      'For `propose`, `verdict` is `propose` and `edit` holds the change: `op` one of add, remove, revise; `field` one of values, beliefs; for add or revise, `text` is the new wording; for remove or revise, `index` is its place counting from 0; and `evidence` is the list of today\'s memory numbers that show why.',
       'Never change your temperament — it is yours from birth.',
     ].join('\n'),
     messages: [
@@ -219,7 +222,10 @@ const SCENES_SCHEMA = z.object({ scenes: z.array(SCENE_SCHEMA) }).strict()
 const DAY_SUMMARY_SCHEMA = z.object({ title: z.string().min(1), text: z.string().min(1) }).strict()
 const LEDGER_SCHEMA = z.object({ doc: z.string() }).strict()
 const PARAGRAPH_SCHEMA = z.object({ paragraph: z.string().min(1) }).strict()
-const PROPOSE_EDIT_SCHEMA = z.object({ edit: z.unknown().nullable() }).strict()
+export const ProposeEditSchema = z.discriminatedUnion('verdict', [
+  z.object({ verdict: z.literal('no_proposal') }).strict(),
+  z.object({ verdict: z.literal('propose'), edit: PersonalityEditSchema }).strict(),
+])
 
 export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
   return {
@@ -250,8 +256,8 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
     },
     async proposeEdit(daySummary, doc, dayMemories) {
       const p = proposeEditPrompt(daySummary, doc, dayMemories)
-      const { value } = await client.object({ system: p.system, messages: p.messages, schema: PROPOSE_EDIT_SCHEMA })
-      return value.edit
+      const { value } = await client.object({ system: p.system, messages: p.messages, schema: ProposeEditSchema })
+      return value.verdict === 'propose' ? value.edit : null
     },
   }
 }

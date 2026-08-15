@@ -3,11 +3,12 @@ import type Database from 'better-sqlite3'
 import { openAgentDb } from './memory/schema.js'
 import { MemoryStore, type MemoryRow, type MemoryTags } from './memory/store.js'
 import { FakeEmbedder } from './testutil/fakeEmbedder.js'
-import { PersonalityStore, PersonalityEditSchema, type PersonalityDoc } from './personality.js'
+import { PersonalityStore, type PersonalityDoc } from './personality.js'
 import {
   runSleepReflection,
   makeReflectionLlm,
   proposeEditPrompt,
+  ProposeEditSchema,
   type ReflectionLlm,
 } from './reflection.js'
 import { FORBIDDEN_FRAMING } from './prompt/rulesOfBeing.js'
@@ -259,14 +260,19 @@ describe('makeReflectionLlm prompts', () => {
     const text = p.system + '\n' + p.messages.map((m) => m.content).join('\n')
     expect(text).toContain(`[${memories[0]!.id}]`)
     expect(text).toContain(`[${memories[1]!.id}]`)
-    for (const kw of ['`edit`', '`op`', '`field`', '`text`', '`index`', '`evidence`', 'add', 'remove', 'revise', 'values', 'beliefs']) {
+    for (const kw of ['`verdict`', '`no_proposal`', '`propose`', '`edit`', '`op`', '`field`', '`text`', '`index`', '`evidence`', 'add', 'remove', 'revise', 'values', 'beliefs', 'collapse', 'hunger', 'conflict']) {
       expect(text).toContain(kw)
     }
     expect(text).not.toMatch(FORBIDDEN_FRAMING)
   })
 
-  it('an edit shaped per the prompt passes the drift-limiter schema', () => {
-    const edit = { op: 'add', field: 'values', text: 'fairness', evidence: [memories[0]!.id] }
-    expect(PersonalityEditSchema.safeParse(edit).success).toBe(true)
+  it('propose verdict schema accepts no_proposal and shaped edits, rejects temperament', () => {
+    expect(ProposeEditSchema.safeParse({ verdict: 'no_proposal' }).success).toBe(true)
+    expect(
+      ProposeEditSchema.safeParse({ verdict: 'propose', edit: { op: 'add', field: 'values', text: 'fairness', evidence: [memories[0]!.id] } }).success,
+    ).toBe(true)
+    expect(
+      ProposeEditSchema.safeParse({ verdict: 'propose', edit: { op: 'add', field: 'temperament', text: 'fierce', evidence: [1] } }).success,
+    ).toBe(false)
   })
 })
