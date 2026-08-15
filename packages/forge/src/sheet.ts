@@ -206,6 +206,20 @@ export function erodeAlpha(img: RawImage, radius = 1): RawImage {
   return { width: img.width, height: img.height, data: cur }
 }
 
+// Pitch-derived erosion (controller-approved): radius = max(1, round(sourcePitch/2))
+// with sourcePitch = opaque bboxH / targetH, measured BEFORE erosion — the chroma blend
+// band scales with the art pitch, so the erosion must too.
+export function erodeForPitch(img: RawImage, targetH: number): RawImage {
+  let y0 = img.height, y1 = -1
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
+    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
+      if (y < y0) y0 = y
+      if (y > y1) y1 = y
+    }
+  if (y1 < 0) throw new Error('erodeForPitch: no opaque pixels')
+  return erodeAlpha(img, Math.max(1, Math.round((y1 - y0 + 1) / targetH / 2)))
+}
+
 // Resamples big-pixel art to its true art pitch: lattice of pitch = bboxH/targetH,
 // phased at the bbox bottom-center; per cell, channel-wise MEDIAN of opaque pixels in
 // the central 1/3 x 1/3 (fallback: whole cell); opaque iff >=50% of the region is opaque.

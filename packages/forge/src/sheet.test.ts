@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
 import { quantize } from './post/quantize.js'
 
 type Px = [number, number, number, number]
@@ -289,6 +289,34 @@ describe('erodeAlpha', () => {
     let opaque = 0
     for (let i = 3; i < out.data.length; i += 4) if (out.data[i]! > 0) opaque++
     expect(opaque).toBe(4) // 6x6 -> 4x4 -> 2x2
+  })
+})
+
+describe('erodeForPitch', () => {
+  it('fully removes a 3px blend band at pitch 6, interior intact', () => {
+    // targetH 8, bboxH 48 -> pitch 6 -> radius max(1, round(3)) = 3
+    const MAGENTA: Px = [255, 0, 255, 255]
+    const src = img(30, 48, (x, y) => {
+      const depth = Math.min(x, y, 29 - x, 47 - y)
+      return depth < 3 ? MAGENTA : RED
+    })
+    const out = erodeForPitch(src, 8)
+    for (let y = 0; y < 48; y++) for (let x = 0; x < 30; x++) {
+      const i = (y * 30 + x) * 4
+      const depth = Math.min(x, y, 29 - x, 47 - y)
+      if (depth < 3) expect(out.data[i + 3], `band ${x},${y}`).toBe(0)
+      else {
+        expect(out.data[i + 3], `core ${x},${y}`).toBe(255)
+        expect([...out.data.slice(i, i + 3)]).toEqual([255, 0, 0])
+      }
+    }
+  })
+  it('never erodes below radius 1', () => {
+    const tiny = solid(4, 4, RED) // pitch 4/8=0.5 -> radius max(1, round(0.25)) = 1
+    const out = erodeForPitch(tiny, 8)
+    let opaque = 0
+    for (let i = 3; i < out.data.length; i += 4) if (out.data[i]! > 0) opaque++
+    expect(opaque).toBe(4)
   })
 })
 
