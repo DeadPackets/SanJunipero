@@ -14,6 +14,10 @@ import { VerdictSchema, type Recipe, type Verdict } from './verdict.js'
 // LLM calls.
 export const SIMILARITY_SHORT_CIRCUIT = 0.92
 
+// Impossible classes that depend on who asked (skills, inventory) must never
+// become global precedent; only context-independent classes short-circuit.
+const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set(['physically_impossible', 'beyond_adjacency'])
+
 export type AgentCtx = {
   agentId: string
   name: string
@@ -57,6 +61,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
           if (row === null) return stored
           if (row.revertedAtTick === null) return { kind: 'map', verb: stored.recipe.id, params: {} }
           // Reverted → fall through to the LLM (the admin re-decides after revert).
+        } else if (stored.kind === 'impossible') {
+          if (CONTEXT_INDEPENDENT_IMPOSSIBLE.has(stored.class)) return stored
+          // Contextual (insufficient_skill/materials) → fall through to the LLM,
+          // which sees the asking agent's own skills and inventory.
         } else {
           return stored
         }

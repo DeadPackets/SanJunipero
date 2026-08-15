@@ -246,6 +246,42 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     expect(llm.objectCalls).toBe(1)
   })
 
+  it('stage-2 short-circuit returns stored context-independent impossible verdicts verbatim', async () => {
+    const llm = new ScriptedLlm(() => ropeVerdict)
+    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const stored: Verdict = { kind: 'impossible', reason: 'no such craft exists under the sun', class: 'physically_impossible' }
+
+    await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
+
+    const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
+    expect(verdict).toEqual(stored)
+    expect(llm.objectCalls).toBe(0)
+  })
+
+  it('stage-2 short-circuit falls through to the LLM for stored agent-contextual impossible verdicts', async () => {
+    const llm = new ScriptedLlm(() => ropeVerdict)
+    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const stored: Verdict = { kind: 'impossible', reason: 'You have no reeds here.', class: 'insufficient_materials' }
+
+    await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
+
+    const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
+    expect(verdict).toEqual(ropeVerdict)
+    expect(llm.objectCalls).toBe(1)
+  })
+
+  it('stage-2 short-circuit falls through for stored insufficient_skill impossible verdicts', async () => {
+    const llm = new ScriptedLlm(() => ropeVerdict)
+    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const stored: Verdict = { kind: 'impossible', reason: 'Your hands are not yet practiced enough.', class: 'insufficient_skill' }
+
+    await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
+
+    const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
+    expect(verdict).toEqual(ropeVerdict)
+    expect(llm.objectCalls).toBe(1)
+  })
+
   it('arbiter.revert routes through the review queue, leaving no stale pending disposition', async () => {
     unregisterVerb('recipe:boil_salt')
     const llm = new ScriptedLlm(() => impossibleVerdict)
