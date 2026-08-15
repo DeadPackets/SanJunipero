@@ -6,7 +6,7 @@ import {
   AgentRecovered, AgentSlept, AgentSpawned, AgentTended, AgentWoke, HpChanged,
   ItemMoved, ItemQtyChanged, ItemSpawned, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
-  StructureProgressed, TickAdvanced,
+  StructureProgressed, TickAdvanced, WeatherChanged,
 } from './events.def.js'
 import { findPath } from './path.js'
 import { WalkParams } from './verbs.js'
@@ -194,6 +194,10 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_collapsed for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, collapsedSinceTick: event.tick } } }
+    }
+    case 'weather_changed': {
+      const p = WeatherChanged.parse(event.payload)
+      return { ...state, weather: { kind: p.kind, temperatureC: p.temperatureC } }
     }
     case 'agent_aged': {
       const p = AgentAged.parse(event.payload)

@@ -6,6 +6,7 @@ import { stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
 import { healthSystem } from './systems/health.js'
 import { agingSystem } from './systems/aging.js'
+import { weatherSystem } from './systems/weather.js'
 
 export type TickCtx = {
   readonly config: SimConfig
@@ -17,7 +18,6 @@ export type System = (ctx: TickCtx) => void
 export type WorldTickResult = { state: WorldState; events: PendingEvent[] }
 
 const noop: System = () => {}
-const weatherSystem = noop
 const fireSystem = noop
 const cropsSystem = noop
 const wildlifeSystem = noop
