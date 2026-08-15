@@ -3,10 +3,10 @@ import { openArbiterDb } from './schema.js'
 import { CodexStore, type CodexEntry } from './codex.js'
 import { CANON } from './canon.js'
 
-// Task 3 defines this regex; Task 4 re-uses the same pattern as its exported
-// FORBIDDEN_FRAMING. CANON must be fully diegetic — no meta-language leaks.
+// Mirrors FORBIDDEN_FRAMING in prompt.ts (kept as a local copy per the T4
+// review chain — CANON must be fully diegetic, no meta-language leaks).
 const FORBIDDEN_FRAMING =
-  /\b(AI|A\.I\.|artificial intelligence|language model|LLM|neural|prompt|context window|token|chatbot|simulation|model)\b/i
+  /\b(AI|A\.I\.|artificial intelligence|language models?|LLMs?|neural|prompts?|context windows?|tokens?|chatbots?|simulations?|models?|tools?)(?!\w)/i
 
 const LADDER: CodexEntry[] = [
   { id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null },
