@@ -1,5 +1,5 @@
-export type AssetClass = 'building' | 'item' | 'crop' | 'terrain' | 'rig-part' | 'portrait'
-export type Footprint = { w: number; h: number }
+import type { AssetClass, Footprint } from '@sj/shared'
+export type { AssetClass, Footprint } from '@sj/shared'
 
 export const STYLE_PROMPT = [
   'Cutesy isometric pixel-art sprite, 2:1 dimetric projection, fixed camera, light from the north-west.',
