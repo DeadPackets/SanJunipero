@@ -242,6 +242,40 @@ describe('perceptionToProse', () => {
     }
     expect(perceptionToProse(collapsing)).toContain('sleep NOW')
   })
+
+  it('renders structure footprint and advises walking beside it', () => {
+    const packet = {
+      ...quietMeadowPacket,
+      visible: {
+        agents: [],
+        structures: [{ id: 'structure_1', kind: 'storehouse', x: 10, y: 10, w: 2, h: 1, burning: false, stage: 'complete' as const }],
+        items: [],
+        crops: [],
+      },
+    }
+    const prose = perceptionToProse(packet)
+    expect(prose).toContain('storehouse (structure_1) stands at (10, 10)')
+    expect(prose).toContain('2 tiles wide and 1 tile tall')
+    expect(prose).toContain('walk to a tile beside it')
+  })
+
+  it('varies the stance verb by agent state', () => {
+    const packet = {
+      ...quietMeadowPacket,
+      visible: {
+        agents: [
+          { id: 'nadia', name: 'Nadia', x: 16, y: 10, activityVerb: null, collapsed: true, asleep: false },
+          { id: 'edda', name: 'Edda', x: 15, y: 11, activityVerb: null, collapsed: false, asleep: true },
+        ],
+        structures: [],
+        items: [],
+        crops: [],
+      },
+    }
+    const prose = perceptionToProse(packet)
+    expect(prose).toContain('Nadia (nadia) lies collapsed at (16, 10)')
+    expect(prose).toContain('Edda (edda) sleeps at (15, 11)')
+  })
 })
 
 describe('compaction', () => {

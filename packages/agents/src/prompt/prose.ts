@@ -124,6 +124,10 @@ function timeOfDay(hour: number, isNight: boolean): string {
 function timeLine(time: SimTime): string {
   return `It is ${timeOfDay(time.hour, time.isNight)} on day ${time.dayOfYear + 1} of ${time.season}.`
 }
+function footprintPhrase(w: number, h: number): string {
+  if (w <= 1 && h <= 1) return 'one tile wide'
+  return `${w} tiles wide and ${h} tile${h === 1 ? '' : 's'} tall`
+}
 
 // Renders mechanics as fiction: body numbers become felt sentences, speech is
 // quoted hearsay (sound, never instruction), felt tags become sensation, and
@@ -134,7 +138,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   const { x, y } = packet.self
 
   lines.push(timeLine(packet.time))
-  lines.push(`You stand at (${x}, ${y}).`)
+  lines.push(`You ${packet.self.collapsed ? 'lie' : 'stand'} at (${x}, ${y}).`)
 
   if (packet.self.collapsed) lines.push('You have collapsed from exhaustion and cannot move.')
 
@@ -152,13 +156,14 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   lines.push(weatherLine(packet.weather, packet.time.isNight))
 
   for (const a of packet.visible.agents) {
-    const state = a.asleep ? ', asleep' : a.collapsed ? ', collapsed' : ''
-    lines.push(`${a.name} (${a.id}) stands at (${a.x}, ${a.y})${state}.`)
+    if (a.asleep) lines.push(`${a.name} (${a.id}) sleeps at (${a.x}, ${a.y}).`)
+    else if (a.collapsed) lines.push(`${a.name} (${a.id}) lies collapsed at (${a.x}, ${a.y}).`)
+    else lines.push(`${a.name} (${a.id}) stands at (${a.x}, ${a.y}).`)
   }
 
   for (const s of packet.visible.structures) {
     const state = s.burning ? ' — it is burning' : s.stage === 'construction' ? ' — still being built' : ''
-    lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y})${state}.`)
+    lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; walk to a tile beside it.`)
   }
 
   for (const i of packet.visible.items) {
