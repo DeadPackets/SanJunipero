@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { quantize } from './post/quantize.js'
 
 type Px = [number, number, number, number]
 function img(w: number, h: number, px: (x: number, y: number) => Px): RawImage {
@@ -157,29 +158,103 @@ describe('anchorToCanvas', () => {
 
 describe('defringe', () => {
   const MAGENTA: Px = [255, 0, 255, 255]
+  const GREEN: Px = [110, 148, 85, 255] // sage: clean under every predicate branch
   it('replaces a magenta-haloed edge pixel with its clean neighbor color', () => {
-    // col 0 transparent, col 1 magenta halo, col 2 red body
-    const src = img(3, 3, x => (x === 0 ? CLEAR : x === 1 ? MAGENTA : RED))
+    // col 0 transparent, col 1 magenta halo, col 2 green body
+    const src = img(3, 3, x => (x === 0 ? CLEAR : x === 1 ? MAGENTA : GREEN))
     const out = defringe(src)
     for (let y = 0; y < 3; y++) {
-      expect([...out.data.slice((y * 3 + 1) * 4, (y * 3 + 1) * 4 + 4)]).toEqual(RED)
-      expect([...out.data.slice((y * 3 + 2) * 4, (y * 3 + 2) * 4 + 4)]).toEqual(RED)
+      expect([...out.data.slice((y * 3 + 1) * 4, (y * 3 + 1) * 4 + 4)]).toEqual(GREEN)
+      expect([...out.data.slice((y * 3 + 2) * 4, (y * 3 + 2) * 4 + 4)]).toEqual(GREEN)
       expect(out.data[(y * 3) * 4 + 3]).toBe(0)
     }
   })
+  it('replaces maroon-family and red-heavy fringe pixels (v2 predicate)', () => {
+    const MAROON: Px = [150, 60, 90, 255]    // r>g+30 and b>g+15
+    const REDDISH: Px = [200, 100, 105, 255] // b-g small, but r>g+50
+    for (const bad of [MAROON, REDDISH]) {
+      const src = img(3, 1, x => (x === 0 ? CLEAR : x === 1 ? bad : GREEN))
+      expect([...defringe(src).data.slice(4, 8)]).toEqual(GREEN)
+    }
+  })
   it('leaves magenta-contaminated interior pixels untouched', () => {
-    // 3x3 fully opaque: center magenta, ring red — no transparency anywhere
-    const src = img(3, 3, (x, y) => (x === 1 && y === 1 ? MAGENTA : RED))
-    expect([...defringe(src).data.slice((1 * 3 + 1) * 4, (1 * 3 + 1) * 4 + 4)]).toEqual(MAGENTA)
+    // 5x5 fully opaque green with magenta center: center is not on a transparency edge
+    const src = img(5, 5, (x, y) => (x === 2 && y === 2 ? MAGENTA : GREEN))
+    expect([...defringe(src).data.slice((2 * 5 + 2) * 4, (2 * 5 + 2) * 4 + 4)]).toEqual(MAGENTA)
   })
   it('does not touch legitimately pink (dusty rose) pixels, even on the edge', () => {
-    const ROSE: Px = [242, 198, 194, 255] // r-g=44 but b-g<40 -> not magenta-contaminated
+    const ROSE: Px = [242, 198, 194, 255] // r-g=44<50, b-g<15 -> clean
     const src = img(3, 1, x => (x === 0 ? CLEAR : ROSE))
     expect([...defringe(src).data.slice(4, 8)]).toEqual(ROSE)
   })
   it('desaturates toward r=b=(r+b)/2 when no clean neighbor exists', () => {
     const src = img(2, 1, x => (x === 0 ? CLEAR : [200, 100, 255, 255] as Px))
     expect([...defringe(src).data.slice(4, 8)]).toEqual([228, 100, 228, 255])
+  })
+})
+
+describe('sheetScale', () => {
+  it('returns the modal detected scale across images', () => {
+    const six = img(60, 60, (x, y) => {
+      const palette: Px[] = [RED, BLUE, [0, 255, 0, 255], [255, 255, 0, 255]]
+      const bx = Math.floor(x / 6), by = Math.floor(y / 6)
+      return palette[(bx * 3 + by * 5 + (bx * by) % 7) % palette.length]!
+    })
+    expect(sheetScale([sevenPxBlockImage(), sevenPxBlockImage(), sevenPxBlockImage(), six])).toBe(7)
+  })
+})
+
+describe('registerToReference', () => {
+  it('recovers a synthetic horizontal shift', () => {
+    const ref = img(12, 6, (x, y) => (x >= 2 && x <= 4 && y >= 1 && y <= 4 ? RED : CLEAR))
+    const shifted = img(12, 6, (x, y) => (x >= 5 && x <= 7 && y >= 1 && y <= 4 ? RED : CLEAR))
+    expect(registerToReference(ref, shifted).dx).toBe(-3)
+    expect(registerToReference(ref, ref).dx).toBe(0)
+  })
+})
+
+describe('despeckle', () => {
+  it('removes opaque islands smaller than minIsland, keeps larger ones', () => {
+    // 2x2 blob at (0,0), single at (4,0), pair at (0,4)-(1,4)
+    const on = new Set(['0,0', '1,0', '0,1', '1,1', '4,0', '0,4', '1,4'])
+    const src = img(5, 5, (x, y) => (on.has(`${x},${y}`) ? RED : CLEAR))
+    const out = despeckle(src, 3)
+    expect(out.data[(0 * 5 + 0) * 4 + 3]).toBe(255)  // 4-blob kept
+    expect(out.data[(0 * 5 + 4) * 4 + 3]).toBe(0)    // single removed
+    expect(out.data[(4 * 5 + 0) * 4 + 3]).toBe(0)    // pair removed
+    expect(out.data[(4 * 5 + 1) * 4 + 3]).toBe(0)
+  })
+})
+
+describe('fillPinholes', () => {
+  it('fills small enclosed transparent holes with the neighboring color', () => {
+    const src = img(5, 5, (x, y) => (x === 2 && y === 2 ? CLEAR : RED))
+    const out = fillPinholes(src, 2)
+    expect([...out.data.slice((2 * 5 + 2) * 4, (2 * 5 + 2) * 4 + 4)]).toEqual(RED)
+  })
+  it('leaves large holes and border-touching transparency alone', () => {
+    // 2x2 hole (size 4 > maxHole 2) in a 6x6 opaque block
+    const big = img(6, 6, (x, y) => (x >= 2 && x <= 3 && y >= 2 && y <= 3 ? CLEAR : RED))
+    expect(fillPinholes(big, 2).data[(2 * 6 + 2) * 4 + 3]).toBe(0)
+    // border-touching single transparent pixel
+    const edge = img(3, 3, (x, y) => (x === 0 && y === 1 ? CLEAR : RED))
+    expect(fillPinholes(edge, 2).data[(1 * 3) * 4 + 3]).toBe(0)
+  })
+})
+
+describe('unionPalette', () => {
+  it('keeps both images\' dominant colors and quantizing preserves them exactly', () => {
+    const a = solid(4, 4, [10, 20, 30, 255])
+    const b = solid(4, 4, [200, 210, 220, 255])
+    const pal = unionPalette([a, b], 48)
+    expect(pal).toContainEqual([10, 20, 30])
+    expect(pal).toContainEqual([200, 210, 220])
+    const qa = quantize(a, pal)
+    expect([...qa.data.slice(0, 4)]).toEqual([10, 20, 30, 255])
+  })
+  it('caps the palette at k frequency-ranked colors', () => {
+    const noisy = img(4, 4, (x, y) => [x * 16, y * 16, 128, 255] as Px) // 16 distinct colors
+    expect(unionPalette([noisy], 5)).toHaveLength(5)
   })
 })
 

@@ -1,4 +1,5 @@
 import type { RawImage } from './post/raw.js'
+import type { Rgb } from './palette.js'
 
 export const FACINGS = ['sw', 'se', 'ne', 'nw'] as const // sheet column order, left→right
 export type Facing = typeof FACINGS[number]
@@ -145,15 +146,17 @@ export function anchorToCanvas(img: RawImage, canvasW: number, canvasH: number, 
   return { width: canvasW, height: canvasH, data: out }
 }
 
-// Removes magenta chroma-key halos: an opaque edge pixel whose r AND b both exceed
-// g by >40 takes the most frequent clean (non-contaminated) opaque neighbor color in
+// Removes chroma-key halos (magenta -> maroon family): an opaque edge pixel matching
+// the contamination predicate takes the most frequent clean opaque neighbor color in
 // its 3x3 window; with no clean neighbor it desaturates to r=b=(r+b)/2. Alpha untouched.
 export function defringe(img: RawImage): RawImage {
   const out = new Uint8ClampedArray(img.data)
   const at = (x: number, y: number) =>
     x < 0 || y < 0 || x >= img.width || y >= img.height ? -1 : (y * img.width + x) * 4
-  const contaminated = (i: number) =>
-    img.data[i]! - img.data[i + 1]! > 40 && img.data[i + 2]! - img.data[i + 1]! > 40
+  const contaminated = (i: number) => {
+    const r = img.data[i]!, g = img.data[i + 1]!, b = img.data[i + 2]!
+    return (r > g + 30 && b > g + 15) || r > g + 50
+  }
   for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
     const i = at(x, y)!
     if (img.data[i + 3] === 0 || !contaminated(i)) continue
@@ -178,6 +181,113 @@ export function defringe(img: RawImage): RawImage {
     else { const m = Math.round((img.data[i]! + img.data[i + 2]!) / 2); out[i] = m; out[i + 2] = m }
   }
   return { width: img.width, height: img.height, data: out }
+}
+
+// Modal detected art scale across a set of images; ties break to the smallest scale.
+export function sheetScale(imgs: RawImage[]): number {
+  const counts = new Map<number, number>()
+  for (const img of imgs) {
+    const k = detectArtScale(img)
+    counts.set(k, (counts.get(k) ?? 0) + 1)
+  }
+  let best = -1, bestN = 0
+  for (const [k, n] of [...counts].sort((a, b) => a[0] - b[0]))
+    if (n > bestN) { bestN = n; best = k }
+  return best
+}
+
+// Horizontal-only registration: the dx (|dx| <= maxShift) that minimizes opaque-mask
+// mismatch when img is shifted by dx onto ref. Ties prefer the smallest |dx|.
+export function registerToReference(ref: RawImage, img: RawImage, maxShift = 8): { dx: number } {
+  if (ref.width !== img.width || ref.height !== img.height)
+    throw new Error(`size mismatch: ${ref.width}x${ref.height} vs ${img.width}x${img.height}`)
+  const opaque = (im: RawImage, x: number, y: number) =>
+    x >= 0 && x < im.width && im.data[(y * im.width + x) * 4 + 3]! > 0
+  let best = 0, bestErr = Infinity
+  for (let a = 0; a <= maxShift; a++) for (const dx of a === 0 ? [0] : [-a, a]) {
+    let err = 0
+    for (let y = 0; y < ref.height; y++) for (let x = 0; x < ref.width; x++)
+      if (opaque(ref, x, y) !== opaque(img, x - dx, y)) err++
+    if (err < bestErr) { bestErr = err; best = dx }
+  }
+  return { dx: best }
+}
+
+// Removes opaque 4-connected islands smaller than minIsland pixels.
+export function despeckle(img: RawImage, minIsland = 3): RawImage {
+  const out = new Uint8ClampedArray(img.data)
+  const seen = new Uint8Array(img.width * img.height)
+  for (let start = 0; start < seen.length; start++) {
+    if (seen[start] || img.data[start * 4 + 3] === 0) continue
+    const stack = [start], island: number[] = []
+    seen[start] = 1
+    while (stack.length) {
+      const p = stack.pop()!
+      island.push(p)
+      const x = p % img.width, y = (p / img.width) | 0
+      for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]] as const) {
+        if (nx < 0 || ny < 0 || nx >= img.width || ny >= img.height) continue
+        const n = ny * img.width + nx
+        if (!seen[n] && img.data[n * 4 + 3]! > 0) { seen[n] = 1; stack.push(n) }
+      }
+    }
+    if (island.length < minIsland) for (const p of island) out.fill(0, p * 4, p * 4 + 4)
+  }
+  return { width: img.width, height: img.height, data: out }
+}
+
+// Fills transparent 4-connected islands of <= maxHole pixels that are fully enclosed
+// by opaque pixels (never touching the border), using the most frequent adjacent color.
+export function fillPinholes(img: RawImage, maxHole = 2): RawImage {
+  const out = new Uint8ClampedArray(img.data)
+  const seen = new Uint8Array(img.width * img.height)
+  for (let start = 0; start < seen.length; start++) {
+    if (seen[start] || img.data[start * 4 + 3]! > 0) continue
+    const stack = [start], hole: number[] = []
+    let touchesBorder = false
+    seen[start] = 1
+    while (stack.length) {
+      const p = stack.pop()!
+      hole.push(p)
+      const x = p % img.width, y = (p / img.width) | 0
+      if (x === 0 || y === 0 || x === img.width - 1 || y === img.height - 1) touchesBorder = true
+      for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]] as const) {
+        if (nx < 0 || ny < 0 || nx >= img.width || ny >= img.height) continue
+        const n = ny * img.width + nx
+        if (!seen[n] && img.data[n * 4 + 3] === 0) { seen[n] = 1; stack.push(n) }
+      }
+    }
+    if (touchesBorder || hole.length > maxHole) continue
+    for (const p of hole) {
+      const x = p % img.width, y = (p / img.width) | 0
+      const counts = new Map<number, number>()
+      let best = -1, bestN = 0
+      for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]] as const) {
+        const n = (ny * img.width + nx) * 4
+        if (img.data[n + 3] === 0) continue
+        const key = (img.data[n]! << 16) | (img.data[n + 1]! << 8) | img.data[n + 2]!
+        const c = (counts.get(key) ?? 0) + 1
+        counts.set(key, c)
+        if (c > bestN) { bestN = c; best = key }
+      }
+      if (best < 0) continue
+      const i = p * 4
+      out[i] = best >> 16; out[i + 1] = (best >> 8) & 255; out[i + 2] = best & 255; out[i + 3] = 255
+    }
+  }
+  return { width: img.width, height: img.height, data: out }
+}
+
+// Frequency-ranked union of exact opaque colors across images, capped at k.
+export function unionPalette(imgs: RawImage[], k = 48): Rgb[] {
+  const counts = new Map<number, number>()
+  for (const img of imgs) for (let i = 0; i < img.data.length; i += 4) {
+    if (img.data[i + 3] === 0) continue
+    const key = (img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, k)
+    .map(([c]) => [c >> 16, (c >> 8) & 255, c & 255] as Rgb)
 }
 
 export function mirrorX(img: RawImage): RawImage {
