@@ -14,10 +14,11 @@ const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
 const budget = new BudgetGuard(3)
 const refs = loadReferenceSheet()
-const codex = new AssetCodex(openForgeDb('packages/forge/out/terrain.db'))
-const forge = createForge({ client: makeImageClient({ apiKey: KEY, budget }), judge: makeVlmJudge({ apiKey: KEY, refSheets: refs }), codex, refs })
 const OUT = 'packages/forge/out/terrain-candidates'
 mkdirSync(OUT, { recursive: true })
+
+const codex = new AssetCodex(openForgeDb('packages/forge/out/terrain.db'))
+const forge = createForge({ client: makeImageClient({ apiKey: KEY, budget }), judge: makeVlmJudge({ apiKey: KEY, refSheets: refs }), codex, refs })
 
 const sheets: [string, string, 'terrain' | 'building', { w: number; h: number }][] = [
   ['spring', 'seasonal ground tileset, spring: fresh sage meadow grass, dirt path, river water edge, mossy rock — 16 tile variants', 'terrain', { w: 4, h: 4 }],
