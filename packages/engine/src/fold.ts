@@ -1,6 +1,10 @@
 import { DEFAULT_CONFIG, type SimConfig, type SimEvent } from '@sj/shared'
 import type { WorldState } from './state.js'
-import { AgentMoved, AgentSpawned, NeedChanged, TickAdvanced } from './events.def.js'
+import {
+  AgentMoved, AgentSpawned, ItemMoved, ItemQtyChanged, ItemSpawned, NeedChanged,
+  StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
+  StructureProgressed, TickAdvanced,
+} from './events.def.js'
 
 const clamp = (v: number) => Math.max(0, Math.min(100, v))
 
@@ -45,6 +49,80 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const a = state.agents[p.id]
       if (!a) throw new Error(`need_changed for unknown agent ${p.id}`)
       return { ...state, agents: { ...state.agents, [p.id]: { ...a, needs: { ...a.needs, [p.need]: clamp(a.needs[p.need] + p.delta) } } } }
+    }
+    case 'item_spawned': {
+      const p = ItemSpawned.parse(event.payload)
+      return {
+        ...state,
+        items: { ...state.items, [p.id]: { id: p.id, kind: p.kind, qty: p.qty, loc: p.loc } },
+        counters: bumpCounter(state.counters, p.id),
+      }
+    }
+    case 'item_moved': {
+      const p = ItemMoved.parse(event.payload)
+      const item = state.items[p.id]
+      if (!item) throw new Error(`item_moved for unknown item ${p.id}`)
+      return { ...state, items: { ...state.items, [p.id]: { ...item, loc: p.loc } } }
+    }
+    case 'item_qty_changed': {
+      const p = ItemQtyChanged.parse(event.payload)
+      const item = state.items[p.id]
+      if (!item) throw new Error(`item_qty_changed for unknown item ${p.id}`)
+      const qty = item.qty + p.delta
+      if (qty <= 0) {
+        const { [p.id]: _, ...items } = state.items
+        return { ...state, items }
+      }
+      return { ...state, items: { ...state.items, [p.id]: { ...item, qty } } }
+    }
+    case 'structure_planned': {
+      const p = StructurePlanned.parse(event.payload)
+      for (const s of Object.values(state.structures)) {
+        if (p.x < s.x + s.w && s.x < p.x + p.w && p.y < s.y + s.h && s.y < p.y + p.h) {
+          throw new Error(`structure_planned ${p.id} overlaps structure ${s.id}`)
+        }
+      }
+      return {
+        ...state,
+        structures: {
+          ...state.structures,
+          [p.id]: {
+            id: p.id, kind: p.kind, x: p.x, y: p.y, w: p.w, h: p.h,
+            hp: 1, maxHp: p.maxHp, flammable: p.flammable, stage: 'construction',
+            progressTicks: 0, builtBy: p.builderId, burning: false, burnTicks: 0,
+          },
+        },
+        counters: bumpCounter(state.counters, p.id),
+      }
+    }
+    case 'structure_progressed': {
+      const p = StructureProgressed.parse(event.payload)
+      const s = state.structures[p.id]
+      if (!s) throw new Error(`structure_progressed for unknown structure ${p.id}`)
+      return { ...state, structures: { ...state.structures, [p.id]: { ...s, progressTicks: s.progressTicks + p.ticks } } }
+    }
+    case 'structure_completed': {
+      const p = StructureCompleted.parse(event.payload)
+      const s = state.structures[p.id]
+      if (!s) throw new Error(`structure_completed for unknown structure ${p.id}`)
+      return { ...state, structures: { ...state.structures, [p.id]: { ...s, stage: 'complete', hp: s.maxHp } } }
+    }
+    case 'structure_damaged': {
+      const p = StructureDamaged.parse(event.payload)
+      const s = state.structures[p.id]
+      if (!s) throw new Error(`structure_damaged for unknown structure ${p.id}`)
+      const hp = s.hp - p.amount
+      if (hp <= 0) {
+        const { [p.id]: _, ...structures } = state.structures
+        return { ...state, structures }
+      }
+      return { ...state, structures: { ...state.structures, [p.id]: { ...s, hp } } }
+    }
+    case 'structure_destroyed': {
+      const p = StructureDestroyed.parse(event.payload)
+      if (!state.structures[p.id]) throw new Error(`structure_destroyed for unknown structure ${p.id}`)
+      const { [p.id]: _, ...structures } = state.structures
+      return { ...state, structures }
     }
     default:
       throw new Error(`unknown event type: ${event.type}`)
