@@ -276,6 +276,29 @@ describe('perceptionToProse', () => {
     expect(prose).toContain('Nadia (nadia) lies collapsed at (16, 10)')
     expect(prose).toContain('Edda (edda) sleeps at (15, 11)')
   })
+
+  it('renders self stance by asleep/collapsed state', () => {
+    const asleep = { ...quietMeadowPacket, self: { ...quietMeadowPacket.self, asleep: true } }
+    expect(perceptionToProse(asleep)).toContain('You sleep at (12, 9)')
+
+    const collapsed = { ...quietMeadowPacket, self: { ...quietMeadowPacket.self, collapsed: true } }
+    expect(perceptionToProse(collapsed)).toContain('You lie at (12, 9)')
+  })
+
+  it('pluralizes footprint width and height correctly', () => {
+    const packet = {
+      ...quietMeadowPacket,
+      visible: {
+        agents: [],
+        structures: [{ id: 's1', kind: 'hut', x: 10, y: 10, w: 1, h: 2, burning: false, stage: 'complete' as const }],
+        items: [],
+        crops: [],
+      },
+    }
+    const prose = perceptionToProse(packet)
+    expect(prose).toContain('1 tile wide and 2 tiles tall')
+    expect(prose).not.toContain('1 tiles wide')
+  })
 })
 
 describe('compaction', () => {

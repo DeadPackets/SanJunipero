@@ -126,7 +126,7 @@ function timeLine(time: SimTime): string {
 }
 function footprintPhrase(w: number, h: number): string {
   if (w <= 1 && h <= 1) return 'one tile wide'
-  return `${w} tiles wide and ${h} tile${h === 1 ? '' : 's'} tall`
+  return `${w} ${w === 1 ? 'tile' : 'tiles'} wide and ${h} ${h === 1 ? 'tile' : 'tiles'} tall`
 }
 
 // Renders mechanics as fiction: body numbers become felt sentences, speech is
@@ -138,7 +138,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   const { x, y } = packet.self
 
   lines.push(timeLine(packet.time))
-  lines.push(`You ${packet.self.collapsed ? 'lie' : 'stand'} at (${x}, ${y}).`)
+  lines.push(`You ${packet.self.asleep ? 'sleep' : packet.self.collapsed ? 'lie' : 'stand'} at (${x}, ${y}).`)
 
   if (packet.self.collapsed) lines.push('You have collapsed from exhaustion and cannot move.')
 
