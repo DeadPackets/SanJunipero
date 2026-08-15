@@ -20,6 +20,11 @@ export function openDb(path: string): Database.Database {
       rng TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS rng_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      tick INTEGER NOT NULL,
+      rng TEXT NOT NULL
+    );
   `)
   return db
 }

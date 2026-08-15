@@ -24,15 +24,18 @@ export class TickLoop {
 
   step(): void {
     this.#tick += 1
-    const apply = (type: string, payload: unknown) => {
-      const ev = this.#store.append(this.#tick, type, payload)
-      this.#state = fold(this.#state, ev)
-    }
-    apply('tick_advanced', {})
-    this.#onTick({ tick: this.#tick, emit: apply })
-    if (this.#tick % this.#snapEvery === 0) {
-      this.#store.saveSnapshot(this.#tick, this.#store.lastSeq(), this.#state, this.#rng.snapshot())
-    }
+    this.#store.transaction(() => {
+      const apply = (type: string, payload: unknown) => {
+        const ev = this.#store.append(this.#tick, type, payload)
+        this.#state = fold(this.#state, ev)
+      }
+      apply('tick_advanced', {})
+      this.#onTick({ tick: this.#tick, emit: apply })
+      if (this.#tick % this.#snapEvery === 0) {
+        this.#store.saveSnapshot(this.#tick, this.#store.lastSeq(), this.#state, this.#rng.snapshot())
+      }
+      this.#store.saveRngState(this.#tick, this.#rng.snapshot())
+    })
   }
 
   start(): void {
