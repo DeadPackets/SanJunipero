@@ -1,6 +1,6 @@
 { "name": "@sj/agents", "version": "0.0.1", "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "scripts": { "probe": "node scripts/probe.ts", "g3": "node scripts/g3-run.ts" },
+  "scripts": { "probe": "node scripts/probe.ts", "g3": "node --import ./scripts/ts-loader.mjs scripts/g3-run.ts" },
   "dependencies": {
     "@sj/shared": "workspace:*", "@sj/engine": "workspace:*",
     "ai": "^7.0.0", "@openrouter/ai-sdk-provider": "^3.0.0",
