@@ -12,6 +12,12 @@ function block3x3(): { width: number; height: number; data: Uint8ClampedArray } 
   return { width: 3, height: 3, data }
 }
 
+function block5x5(): { width: number; height: number; data: Uint8ClampedArray } {
+  const data = new Uint8ClampedArray(25 * 4)
+  for (let i = 0; i < 25; i++) data.set([...HONEY, 255], i * 4)
+  return { width: 5, height: 5, data }
+}
+
 describe('outlinePass', () => {
   it('recolors border pixels to the darkened-local-color palette snap; center untouched', () => {
     const out = outlinePass(block3x3())
@@ -25,12 +31,12 @@ describe('outlinePass', () => {
     expect([...out.data.slice(center, center + 3)]).toEqual([...HONEY]) // interior kept
   })
   it('pixels adjacent to transparent neighbors are outlined even inside the canvas', () => {
-    const img = block3x3()
-    img.data[4 * 4 + 3] = 0 // punch a transparent hole in the center
+    const img = block5x5()
+    img.data[(2 * 5 + 2) * 4 + 3] = 0 // transparent hole at (2,2), in-canvas
     const out = outlinePass(img)
-    const top = 1 * 4        // pixel (1,0) borders the transparent center (1,1) below it
-    expect(out.data[top + 3]).toBe(255)
-    expect([...out.data.slice(top, top + 3)]).not.toEqual([...HONEY])
+    const probe = (1 * 5 + 2) * 4  // pixel (2,1); its only transparent 4-neighbor is the hole
+    expect(out.data[probe + 3]).toBe(255)
+    expect([...out.data.slice(probe, probe + 3)]).not.toEqual([...HONEY])
   })
   it('does not mutate its input and leaves transparent pixels transparent', () => {
     const img = block3x3()
