@@ -60,6 +60,32 @@ describe('createForge().commission', () => {
     expect(rec.attempts).toBe(3)
     expect(codex.get(rec.id)).not.toBeNull() // placeholder is registered and hot-loadable
   })
+  it('a generateCandidates throw on every attempt still yields a placeholder, never a rejection', async () => {
+    const codex = new AssetCodex(openForgeDb(':memory:'))
+    let calls = 0
+    const client: ImageClient = { async generateCandidates() { calls++; throw new Error('provider outage') } }
+    const forge = createForge({ client, judge: scriptedJudge([10]), codex, refs: [] })
+    const rec = await forge.commission('unreachable provider', { w: 1, h: 1 }, 'item')
+    expect(rec.status).toBe('placeholder')
+    expect(rec.score).toBeNull()
+    expect(rec.attempts).toBe(3)
+    expect(rec.costUsd).toBe(0)
+    expect(calls).toBe(3) // each throw consumed one attempt
+    expect(codex.get(rec.id)).not.toBeNull()
+  })
+  it('a generation throw counts as a failed attempt; a later attempt can still ship', async () => {
+    const codex = new AssetCodex(openForgeDb(':memory:'))
+    const png = await goodPng()
+    let calls = 0
+    const client: ImageClient = { async generateCandidates(_p, _r, n = 3) {
+      if (++calls === 1) throw new Error('transient outage')
+      return Array.from({ length: n }, (): Candidate => ({ png, model: 'fake', costUsd: 0.045 }))
+    } }
+    const forge = createForge({ client, judge: scriptedJudge([9]), codex, refs: [] })
+    const rec = await forge.commission('a resilient tent', { w: 1, h: 1 }, 'building')
+    expect(rec.status).toBe('ready')
+    expect(rec.attempts).toBe(2)
+  })
   it('mechanical-gate failures never reach the judge', async () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     // all-magenta generation → chroma-keys to fully transparent → gate fails (no opaque pixels ⇒ size ok but requireAlpha ok; palette ok; BUT judge must not run)
