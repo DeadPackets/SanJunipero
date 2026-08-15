@@ -23,6 +23,8 @@ Versioned doc + reference sheet (the 3 reference images from Task 6), injected i
 
 The 40-color master palette governs UI chrome, tints, and terrain, and is a JUDGE HARMONY criterion for sprites — it is no longer a per-pixel clamp on generated sprites (quantize retained for terrain pending its first generation).
 
+Sprites ship UNQUANTIZED: character cells and reference sprites keep their generated colors (hard quantization proved a visual regression). Cross-asset palette cohesion is judge-enforced; revisit mechanical harmonization only when multiple characters exist.
+
 | Ramp | Hexes |
 |---|---|
 | Cream stone ×5 | `#FFF6E9` `#F6E8D5` `#E8D5BC` `#D4BC9E` `#B89D7E` |

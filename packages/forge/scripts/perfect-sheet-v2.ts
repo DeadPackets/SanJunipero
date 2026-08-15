@@ -5,11 +5,10 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import sharp from 'sharp'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
-import { quantize } from '../src/post/quantize.js'
 import {
   FACINGS, POSES, assembleGrid, cellDistance, mirrorX, duplicateReport,
   detectArtScale, downscaleMajority, sheetScale, defringe, despeckle, fillPinholes,
-  unionPalette, registerToReference, type Facing, type Pose,
+  registerToReference, type Facing, type Pose,
 } from '../src/sheet.js'
 
 const OUT = 'packages/forge/out/character-sheet-v2'
@@ -92,11 +91,8 @@ for (const [name, path] of refInputs) {
   refs.set(name, clean(snapAt(rk, detectArtScale(rk))))
 }
 
-// 4. One family palette across 12 cells + 3 refs, then quantize everything against it.
-const pal = unionPalette([...nat.values(), ...refs.values()], 48)
-console.log(`union palette: ${pal.length} colors`)
-for (const [lbl, img] of nat) nat.set(lbl, quantize(img, pal))
-for (const [name, img] of refs) refs.set(name, quantize(img, pal))
+// NO quantization: sprites ship with their generated colors (controller ruling —
+// the 48-color union quantize was a visual regression; harmony is judge-enforced).
 
 // 5. Per-column registration (idle = reference) + unit feet-anchor at FEET_Y.
 const cells = new Map<string, RawImage>()
@@ -160,8 +156,8 @@ const rows = POSES.flatMap(p => duplicateReport(
 const cols = FACINGS.flatMap(f => duplicateReport(
   POSES.map(p => ({ label: label(f, p), img: cells.get(label(f, p))! })), STRAIGHT_THR, MIRROR_THR))
 const report = [
-  '== PERFECTION PASS: shared scale + registration + hygiene v2 + union palette ==',
-  `shared scale: modal=${modalK} used=${k}; union palette ${pal.length} colors`,
+  '== PERFECTION PASS: shared scale + registration + hygiene v2 (no quantization) ==',
+  `shared scale: modal=${modalK} used=${k}; sprites unquantized (palette harmony is judge-enforced)`,
   '', '== straight distance matrix (12x12) ==', matrix(false),
   '', '== mirrored distance matrix (12x12, col cell mirrored) ==', matrix(true),
   '', `== dupe findings (thresholds straight<${STRAIGHT_THR} mirror<${MIRROR_THR}) ==`,
