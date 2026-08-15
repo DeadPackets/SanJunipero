@@ -90,6 +90,23 @@ describe('codify', () => {
         { type: 'item_qty_changed', payload: { id: 'item_2', delta: -1 } },
       ])
     })
+
+    it('bails without deducting anything when any cost is short', () => {
+      const def = verbFromRecipe({ ...boilSaltRecipe, costs: [{ kind: 'wood', qty: 2 }, { kind: 'clay', qty: 1 }] })
+      expect(def.onStart!(twoWoodStacks(), CFG, 'a1', {})).toEqual([])
+    })
+  })
+
+  describe('validate costs', () => {
+    it('rejects when the agent holds less than a cost demands', () => {
+      const def = verbFromRecipe({ ...boilSaltRecipe, requires: [], costs: [{ kind: 'wood', qty: 7 }] })
+      expect(def.validate(twoWoodStacks(), CFG, 'a1', {})).toBe('not enough wood')
+    })
+
+    it('passes when every cost is covered across stacks', () => {
+      const def = verbFromRecipe({ ...boilSaltRecipe, requires: [], costs: [{ kind: 'wood', qty: 6 }] })
+      expect(def.validate(twoWoodStacks(), CFG, 'a1', {})).toBeNull()
+    })
   })
 
   describe('emitOutcomeEffects', () => {

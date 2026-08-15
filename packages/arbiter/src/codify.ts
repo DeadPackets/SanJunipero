@@ -69,6 +69,9 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
   return {
     kind: recipe.id,
     validate(state, _config, agentId) {
+      for (const cost of recipe.costs) {
+        if (heldQty(state, agentId, cost.kind) < cost.qty) return `not enough ${cost.kind}`
+      }
       for (const req of recipe.requires) {
         switch (req.type) {
           case 'held_item': {
@@ -93,6 +96,11 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
     },
     duration() { return recipe.durationTicks },
     onStart(state, _config, agentId) {
+      // Mirrors the engine craft verb: re-check sufficiency at consumption time
+      // so a stack that shrank since validate never yields a discounted craft.
+      for (const cost of recipe.costs) {
+        if (heldQty(state, agentId, cost.kind) < cost.qty) return []
+      }
       const events: PendingEvent[] = []
       for (const cost of recipe.costs) {
         let remaining = cost.qty
