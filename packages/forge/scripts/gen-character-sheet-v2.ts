@@ -9,7 +9,7 @@ import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import {
   FACINGS, POSES, FACING_CLAUSES, POSE_CLAUSES,
-  assembleGrid, cellDistance, mirrorX, duplicateReport, detectArtScale, downscaleMajority, anchorToCanvas,
+  assembleGrid, cellDistance, mirrorX, duplicateReport, detectArtScale, downscaleMajority, anchorToCanvas, defringe,
   type Facing, type Pose,
 } from '../src/sheet.js'
 
@@ -80,7 +80,7 @@ async function postProcessCell(rawPng: Buffer): Promise<RawImage> {
   for (let k = detectArtScale(keyed); ; k++) {
     const snapped = downscaleMajority(keyed,
       Math.max(1, Math.round(keyed.width / k)), Math.max(1, Math.round(keyed.height / k)))
-    try { return anchorToCanvas(snapped, CANVAS, CANVAS, FEET_Y) }
+    try { return anchorToCanvas(defringe(snapped), CANVAS, CANVAS, FEET_Y) }
     catch (e) { if (k >= 16) throw e }
   }
 }

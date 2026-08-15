@@ -4,7 +4,7 @@
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
-import { snapToGrid, detectArtScale } from '../src/sheet.js'
+import { snapToGrid, detectArtScale, defringe } from '../src/sheet.js'
 
 const REF_CANDIDATES = '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/reference-candidates'
 const SE_COTTAGE = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/building-facing/candidates/1.png'
@@ -29,7 +29,7 @@ const inputs: [string, string][] = [
 ]
 for (const [name, path] of inputs) {
   const keyed = chromaKey(await decodePng(readFileSync(path)))
-  const snapped = snapToGrid(keyed)
+  const snapped = defringe(snapToGrid(keyed))
   console.log(`${name}: art scale ${detectArtScale(keyed)}, native ${snapped.width}x${snapped.height}`)
   const png = await encodePng(snapped)
   writeFileSync(`${OUT}/${name}.png`, png)

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
 
 type Px = [number, number, number, number]
 function img(w: number, h: number, px: (x: number, y: number) => Px): RawImage {
@@ -152,6 +152,34 @@ describe('anchorToCanvas', () => {
   })
   it('throws on a fully transparent sprite', () => {
     expect(() => anchorToCanvas(solid(4, 4, CLEAR), 8, 8, 6)).toThrow()
+  })
+})
+
+describe('defringe', () => {
+  const MAGENTA: Px = [255, 0, 255, 255]
+  it('replaces a magenta-haloed edge pixel with its clean neighbor color', () => {
+    // col 0 transparent, col 1 magenta halo, col 2 red body
+    const src = img(3, 3, x => (x === 0 ? CLEAR : x === 1 ? MAGENTA : RED))
+    const out = defringe(src)
+    for (let y = 0; y < 3; y++) {
+      expect([...out.data.slice((y * 3 + 1) * 4, (y * 3 + 1) * 4 + 4)]).toEqual(RED)
+      expect([...out.data.slice((y * 3 + 2) * 4, (y * 3 + 2) * 4 + 4)]).toEqual(RED)
+      expect(out.data[(y * 3) * 4 + 3]).toBe(0)
+    }
+  })
+  it('leaves magenta-contaminated interior pixels untouched', () => {
+    // 3x3 fully opaque: center magenta, ring red — no transparency anywhere
+    const src = img(3, 3, (x, y) => (x === 1 && y === 1 ? MAGENTA : RED))
+    expect([...defringe(src).data.slice((1 * 3 + 1) * 4, (1 * 3 + 1) * 4 + 4)]).toEqual(MAGENTA)
+  })
+  it('does not touch legitimately pink (dusty rose) pixels, even on the edge', () => {
+    const ROSE: Px = [242, 198, 194, 255] // r-g=44 but b-g<40 -> not magenta-contaminated
+    const src = img(3, 1, x => (x === 0 ? CLEAR : ROSE))
+    expect([...defringe(src).data.slice(4, 8)]).toEqual(ROSE)
+  })
+  it('desaturates toward r=b=(r+b)/2 when no clean neighbor exists', () => {
+    const src = img(2, 1, x => (x === 0 ? CLEAR : [200, 100, 255, 255] as Px))
+    expect([...defringe(src).data.slice(4, 8)]).toEqual([228, 100, 228, 255])
   })
 })
 

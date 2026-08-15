@@ -145,6 +145,41 @@ export function anchorToCanvas(img: RawImage, canvasW: number, canvasH: number, 
   return { width: canvasW, height: canvasH, data: out }
 }
 
+// Removes magenta chroma-key halos: an opaque edge pixel whose r AND b both exceed
+// g by >40 takes the most frequent clean (non-contaminated) opaque neighbor color in
+// its 3x3 window; with no clean neighbor it desaturates to r=b=(r+b)/2. Alpha untouched.
+export function defringe(img: RawImage): RawImage {
+  const out = new Uint8ClampedArray(img.data)
+  const at = (x: number, y: number) =>
+    x < 0 || y < 0 || x >= img.width || y >= img.height ? -1 : (y * img.width + x) * 4
+  const contaminated = (i: number) =>
+    img.data[i]! - img.data[i + 1]! > 40 && img.data[i + 2]! - img.data[i + 1]! > 40
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
+    const i = at(x, y)!
+    if (img.data[i + 3] === 0 || !contaminated(i)) continue
+    let onEdge = false
+    for (let dy = -1; dy <= 1 && !onEdge; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const n = at(x + dx, y + dy)
+      if (n < 0 || img.data[n + 3] === 0) { onEdge = true; break }
+    }
+    if (!onEdge) continue
+    const counts = new Map<number, number>()
+    let best = -1, bestN = 0
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue
+      const n = at(x + dx, y + dy)
+      if (n < 0 || img.data[n + 3] === 0 || contaminated(n)) continue
+      const key = (img.data[n]! << 16) | (img.data[n + 1]! << 8) | img.data[n + 2]!
+      const c = (counts.get(key) ?? 0) + 1
+      counts.set(key, c)
+      if (c > bestN) { bestN = c; best = key }
+    }
+    if (best >= 0) { out[i] = best >> 16; out[i + 1] = (best >> 8) & 255; out[i + 2] = best & 255 }
+    else { const m = Math.round((img.data[i]! + img.data[i + 2]!) / 2); out[i] = m; out[i + 2] = m }
+  }
+  return { width: img.width, height: img.height, data: out }
+}
+
 export function mirrorX(img: RawImage): RawImage {
   const out = new Uint8ClampedArray(img.data.length)
   for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
