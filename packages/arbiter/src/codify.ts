@@ -1,5 +1,6 @@
 import { registerVerb } from '@sj/engine'
 import type { PendingEvent, Structure, TileId, VerbDef, WorldState } from '@sj/engine'
+import type { ReviewStore } from './review.js'
 import type { RulebookStore } from './rulebook.js'
 import { rollOutcomeTable, skillFactor } from './verdict.js'
 import type { OutcomeEffect, Recipe } from './verdict.js'
@@ -116,8 +117,12 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
   }
 }
 
-export function codify(recipe: Recipe, deps: { rulebook: RulebookStore; tick: number }): { ruleId: number; verb: string } {
+export function codify(
+  recipe: Recipe,
+  deps: { rulebook: RulebookStore; review: ReviewStore; tick: number },
+): { ruleId: number; verb: string } {
   const ruleId = deps.rulebook.insert(recipe, deps.tick)
   registerVerb(verbFromRecipe(recipe))
+  deps.review.queue(ruleId, recipe.id, deps.tick)
   return { ruleId, verb: recipe.id }
 }

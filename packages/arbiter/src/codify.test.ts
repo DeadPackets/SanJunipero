@@ -3,6 +3,7 @@ import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { RngStream, fold, genesisState, submitIntent, type WorldState } from '@sj/engine'
 import { openArbiterDb } from './schema.js'
 import { RulebookStore } from './rulebook.js'
+import { ReviewStore } from './review.js'
 import type { Recipe } from './verdict.js'
 import { codify, emitOutcomeEffects, verbFromRecipe } from './codify.js'
 
@@ -107,7 +108,8 @@ describe('codify', () => {
     it('inserts the recipe into the rulebook and hot-registers the verb live in the engine registry', () => {
       const db = openArbiterDb(':memory:')
       const rulebook = new RulebookStore(db)
-      const { ruleId, verb } = codify(boilSaltRecipe, { rulebook, tick: 200 })
+      const review = new ReviewStore(db)
+      const { ruleId, verb } = codify(boilSaltRecipe, { rulebook, review, tick: 200 })
       expect(ruleId).toBeTypeOf('number')
       expect(verb).toBe('recipe:boil_salt')
       expect(rulebook.byId('recipe:boil_salt')).not.toBeNull()

@@ -5,6 +5,7 @@ import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import { codify as codifyRecipe } from './codify.js'
 import { assembleAdjudicationPrompt } from './prompt.js'
+import { ReviewStore } from './review.js'
 import { RulebookStore } from './rulebook.js'
 import { RulingsStore } from './rulings.js'
 import { VerdictSchema, type Recipe, type Verdict } from './verdict.js'
@@ -37,6 +38,7 @@ export type Arbiter = {
 
 export function makeArbiter(deps: ArbiterDeps): Arbiter {
   const rulebook = new RulebookStore(deps.db)
+  const review = new ReviewStore(deps.db)
   const codex = new CodexStore(deps.db)
   const rulings = new RulingsStore(deps.db, deps.embedder)
   const tick = deps.tick ?? (() => 0)
@@ -76,7 +78,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     },
 
     codify(recipe) {
-      return codifyRecipe(recipe, { rulebook, tick: tick() })
+      return codifyRecipe(recipe, { rulebook, review, tick: tick() })
     },
 
     revert(recipeId, reason) {

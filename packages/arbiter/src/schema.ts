@@ -51,4 +51,14 @@ export function migrateArbiterTables(db: Database.Database): void {
       reverted_reason TEXT
     );
   `)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ruling_reviews (
+      id INTEGER PRIMARY KEY,
+      rule_id INTEGER NOT NULL REFERENCES rulebook(id),
+      recipe_id TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('pending','approved','reverted')),
+      reason TEXT,
+      tick INTEGER NOT NULL
+    );
+  `)
 }
