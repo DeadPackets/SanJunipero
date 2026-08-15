@@ -3,10 +3,11 @@ import type Database from 'better-sqlite3'
 import { openAgentDb } from './memory/schema.js'
 import { MemoryStore, type MemoryRow, type MemoryTags } from './memory/store.js'
 import { FakeEmbedder } from './testutil/fakeEmbedder.js'
-import { PersonalityStore, type PersonalityDoc } from './personality.js'
+import { PersonalityStore, PersonalityEditSchema, type PersonalityDoc } from './personality.js'
 import {
   runSleepReflection,
   makeReflectionLlm,
+  proposeEditPrompt,
   type ReflectionLlm,
 } from './reflection.js'
 import { FORBIDDEN_FRAMING } from './prompt/rulesOfBeing.js'
@@ -101,7 +102,7 @@ class ScriptedReflectionLlm implements ReflectionLlm {
     return `Today, still ${doc.current.mood}, I kept my word.`
   }
 
-  async proposeEdit(_daySummary: string, _doc: PersonalityDoc) {
+  async proposeEdit(_daySummary: string, _doc: PersonalityDoc, _dayMemories: MemoryRow[]) {
     this.calls.push('proposeEdit')
     return this.edit
   }
@@ -197,6 +198,25 @@ describe('runSleepReflection pipeline', () => {
     expect(res.editApplied).toBe(false)
     expect(personality.current().version).toBe(1)
   })
+  it("skips facts whose srcMemoryId is not one of today's memories", async () => {
+    const { mem, personality } = await makeStores()
+    const memories = await seedDay(mem, DAY, SINGLE_PERSON_DAY)
+    const llm = new ScriptedReflectionLlm(null)
+    llm.extractFacts = async () => {
+      llm.calls.push('extractFacts')
+      return [
+        { subject: 'Nadia', predicate: 'traded', object: 'grain for firewood', srcMemoryId: memories[0]!.id },
+        { subject: 'Ghost', predicate: 'did', object: 'nothing', srcMemoryId: 999_999 },
+      ]
+    }
+    const res = await runSleepReflection({ mem, personality, llm, day: DAY })
+
+    expect(res.factCount).toBe(1)
+    expect(mem.factsAbout('Ghost')).toHaveLength(0)
+    expect(mem.factsAbout('Nadia')).toHaveLength(1)
+    // pipeline completed through autobiography — the bad src id did not abort mid-write
+    expect(mem.autobiography()).toHaveLength(1)
+  })
 })
 
 describe('makeReflectionLlm prompts', () => {
@@ -225,7 +245,7 @@ describe('makeReflectionLlm prompts', () => {
     await llm.summarizeDay([{ title: 'Trade', text: 'The day was full of deals.' }])
     await llm.updateLedger('Nadia', null, memories)
     await llm.autobiographyParagraph('The day was full of deals.', doc)
-    await llm.proposeEdit('The day was full of deals.', doc)
+    await llm.proposeEdit('The day was full of deals.', doc, memories)
 
     expect(calls).toHaveLength(6)
     for (const c of calls) {
@@ -233,5 +253,20 @@ describe('makeReflectionLlm prompts', () => {
       expect(c.system).not.toMatch(FORBIDDEN_FRAMING)
       expect(c.messages.map((m) => m.content).join('\n')).not.toMatch(FORBIDDEN_FRAMING)
     }
+  })
+  it("proposeEdit prompt carries today's memory ids and the edit shape", () => {
+    const p = proposeEditPrompt('The day was full of deals.', doc, memories)
+    const text = p.system + '\n' + p.messages.map((m) => m.content).join('\n')
+    expect(text).toContain(`[${memories[0]!.id}]`)
+    expect(text).toContain(`[${memories[1]!.id}]`)
+    for (const kw of ['`edit`', '`op`', '`field`', '`text`', '`index`', '`evidence`', 'add', 'remove', 'revise', 'values', 'beliefs']) {
+      expect(text).toContain(kw)
+    }
+    expect(text).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('an edit shaped per the prompt passes the drift-limiter schema', () => {
+    const edit = { op: 'add', field: 'values', text: 'fairness', evidence: [memories[0]!.id] }
+    expect(PersonalityEditSchema.safeParse(edit).success).toBe(true)
   })
 })

@@ -13,7 +13,7 @@ export type ReflectionLlm = {
   summarizeDay(scenes: Array<{ title: string; text: string }>): Promise<{ title: string; text: string }>
   updateLedger(personName: string, existing: string | null, relevant: MemoryRow[]): Promise<string>
   autobiographyParagraph(daySummary: string, doc: PersonalityDoc): Promise<string>
-  proposeEdit(daySummary: string, doc: PersonalityDoc): Promise<unknown | null>
+  proposeEdit(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): Promise<unknown | null>
 }
 
 export type ReflectionResult = {
@@ -35,11 +35,16 @@ export async function runSleepReflection(deps: {
   // 1. Load the day's memories.
   const dayMemories = mem.memoriesOfDay(day)
 
-  // 2. Facts FIRST (spec §6 step 2 — before any summarizing).
+  // 2. Facts FIRST (spec §6 step 2 — before any summarizing). A hallucinated
+  // src_memory_id would trip the memories(id) FK (foreign_keys=ON) and abort the
+  // whole pipeline mid-write, so keep only facts that cite today's memories.
   const facts = await llm.extractFacts(dayMemories)
-  for (const f of facts) {
+  const todayIds = new Set(dayMemories.map((m) => m.id))
+  const insertedFacts = facts.filter((f) => todayIds.has(f.srcMemoryId))
+  for (const f of insertedFacts) {
     mem.insertFact({ day, subject: f.subject, predicate: f.predicate, object: f.object, srcMemoryId: f.srcMemoryId })
   }
+  const factCount = insertedFacts.length
 
   // 3. Scene summaries.
   const scenes = await llm.summarizeScenes(dayMemories)
@@ -86,21 +91,21 @@ export async function runSleepReflection(deps: {
   mem.appendAutobiography(day, paragraph)
 
   // 7. Personality edit — ≤1 by construction, drift-limiter validates.
-  const proposal = await llm.proposeEdit(daySummary.text, personalityDoc)
+  const proposal = await llm.proposeEdit(daySummary.text, personalityDoc, dayMemories)
   if (proposal == null) {
-    return { factCount: facts.length, sceneCount: scenes.length, ledgersUpdated, editApplied: false }
+    return { factCount, sceneCount: scenes.length, ledgersUpdated, editApplied: false }
   }
   const result = personality.applyNightlyEdit(day, proposal, mem)
   if (!result.ok) {
     return {
-      factCount: facts.length,
+      factCount,
       sceneCount: scenes.length,
       ledgersUpdated,
       editApplied: false,
       editRejectedReason: result.reason,
     }
   }
-  return { factCount: facts.length, sceneCount: scenes.length, ledgersUpdated, editApplied: true }
+  return { factCount, sceneCount: scenes.length, ledgersUpdated, editApplied: true }
 }
 
 // --- Real implementation: one structured-output call per method, z.strict() schemas. ---
@@ -181,12 +186,15 @@ export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): Ll
   }
 }
 
-export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc): LlmPrompt {
+export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): LlmPrompt {
+  const memoryLines = dayMemories.map((m) => `[${m.id}] ${m.text}`).join('\n')
   return {
     system: [
       'Before sleep, you may change one thing about what you value or what you believe.',
       'You may change at most one, and only if this day gives you a clear reason.',
-      'If nothing needs to change, leave the change empty.',
+      'Answer with one field named `edit`. If nothing needs to change, `edit` is empty.',
+      'If you do change something, `edit` holds the change as: `op` one of add, remove, revise; `field` one of values, beliefs; for add or revise, `text` is the new wording; for remove or revise, `index` is its place counting from 0; and `evidence` is the list of today\'s memory numbers that show why.',
+      'Never change your temperament — it is yours from birth.',
     ].join('\n'),
     messages: [
       {
@@ -195,6 +203,7 @@ export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc): LlmP
           `Your day:\n${daySummary}`,
           `What you value now: ${doc.values.join(', ')}.`,
           `What you believe now: ${doc.beliefs.join(', ') || 'nothing in particular yet.'}`,
+          `Today's memories:\n${memoryLines}`,
         ].join('\n'),
       },
     ],
@@ -239,8 +248,8 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
       const { value } = await client.object({ system: p.system, messages: p.messages, schema: PARAGRAPH_SCHEMA })
       return value.paragraph
     },
-    async proposeEdit(daySummary, doc) {
-      const p = proposeEditPrompt(daySummary, doc)
+    async proposeEdit(daySummary, doc, dayMemories) {
+      const p = proposeEditPrompt(daySummary, doc, dayMemories)
       const { value } = await client.object({ system: p.system, messages: p.messages, schema: PROPOSE_EDIT_SCHEMA })
       return value.edit
     },
