@@ -2,7 +2,7 @@ import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '
 import type { WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
-  AgentCollapsed, AgentDied, AgentFellIll, AgentInfected, AgentInjured, AgentMoved,
+  AgentAged, AgentCollapsed, AgentDied, AgentFellIll, AgentInfected, AgentInjured, AgentMoved,
   AgentRecovered, AgentSlept, AgentSpawned, AgentTended, AgentWoke, HpChanged,
   ItemMoved, ItemQtyChanged, ItemSpawned, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
@@ -194,6 +194,12 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_collapsed for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, collapsedSinceTick: event.tick } } }
+    }
+    case 'agent_aged': {
+      const p = AgentAged.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_aged for unknown agent ${p.agentId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, ageDays: a.ageDays + 1 } } }
     }
     case 'agent_died': {
       const p = AgentDied.parse(event.payload)

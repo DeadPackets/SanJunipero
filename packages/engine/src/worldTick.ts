@@ -5,6 +5,7 @@ import type { RngStreams } from './rng.js'
 import { stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
 import { healthSystem } from './systems/health.js'
+import { agingSystem } from './systems/aging.js'
 
 export type TickCtx = {
   readonly config: SimConfig
@@ -20,7 +21,6 @@ const weatherSystem = noop
 const fireSystem = noop
 const cropsSystem = noop
 const wildlifeSystem = noop
-const agingSystem = noop
 
 function actionsSystem(ctx: TickCtx): void {
   for (const id of Object.keys(ctx.state().agents).sort()) {
