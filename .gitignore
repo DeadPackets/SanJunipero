@@ -6,3 +6,4 @@ data/
 .superpowers/
 *.tsbuildinfo
 packages/forge/probe-out/
+packages/forge/out/
