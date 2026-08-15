@@ -20,8 +20,7 @@ const REF_CANDIDATES = '/Users/deadpackets/workspace/SanJunipero/.claude/scratch
 mkdirSync(GIFS_DIR, { recursive: true })
 mkdirSync('packages/forge/out/refs-v2', { recursive: true })
 
-const CANVAS = 96, FEET_Y = 88
-const STRAIGHT_THR = 0.149, MIRROR_THR = 0.087
+const CANVAS = 128, FEET_Y = 118
 const label = (f: Facing, p: Pose) => `${f}/${p}`
 const file = (f: Facing, p: Pose) => `${p}-${f}.png`
 
@@ -80,14 +79,18 @@ const clean = (img: RawImage) => defringeFix(fillPinholes(despeckle(defringeFix(
 const keyed = new Map<string, RawImage>()
 for (const p of POSES) for (const f of FACINGS)
   keyed.set(label(f, p), chromaKey(await decodePng(readFileSync(`${SHEET_DIR}/raws/${file(f, p)}`))))
-let k = sheetScale([...keyed.values()])
-const fits = (kk: number) => [...keyed.values()].every(img => {
-  const b = bbox(snapAt(img, kk))
-  return b.w <= CANVAS && b.h <= FEET_Y + 1
-})
-const modalK = k
-while (!fits(k) && k < 16) k++
-console.log(`shared scale: modal=${modalK} used=${k}`)
+// Canonical density ruling: snap at scale 4 (the modal detection AND the style anchor's
+// scale). Oversize sprites are reported, never cropped or coarsened.
+const modalK = sheetScale([...keyed.values()])
+const k = 4
+console.log(`shared scale: modal=${modalK} used=${k} (canonical)`)
+let oversize = 0
+for (const [lbl, img] of keyed) {
+  const b = bbox(snapAt(img, k))
+  if (b.w > CANVAS || b.h > FEET_Y + 1)
+    { oversize++; console.log(`OVERSIZE ${lbl}: ${b.w}x${b.h} vs limit ${CANVAS}x${FEET_Y + 1} (over by ${Math.max(0, b.w - CANVAS)}x${Math.max(0, b.h - FEET_Y - 1)})`) }
+}
+if (oversize) console.log(`${oversize} oversize cell(s) — reported, not cropped`)
 
 // 2-3. Snap at shared scale + edge hygiene v2 (characters), refs at their own scale.
 const nat = new Map<string, RawImage>()
@@ -155,8 +158,16 @@ for (const f of FACINGS) {
   console.log(`walk-${f}.gif: ${frames.length} frames, ${gif.length} bytes`)
 }
 
-// 8. Final matrices + findings.
+// 8. Final matrices + findings; thresholds recalibrated from this build's own median
+// (same rule as run 3: straight = 0.36x median, mirror = 0.21x median).
 const labels = POSES.flatMap(p => FACINGS.map(f => label(f, p)))
+const dists: number[] = []
+for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++)
+  dists.push(cellDistance(cells.get(labels[i]!)!, cells.get(labels[j]!)!))
+dists.sort((a, b) => a - b)
+const median = dists[Math.floor(dists.length / 2)]!
+const STRAIGHT_THR = 0.36 * median, MIRROR_THR = 0.21 * median
+console.log(`pairwise median=${median.toFixed(3)} -> thresholds straight<${STRAIGHT_THR.toFixed(3)} mirror<${MIRROR_THR.toFixed(3)}`)
 function matrix(mirror: boolean): string {
   const header = ['            ', ...labels.map(l => l.padStart(11))].join(' ')
   const lines = labels.map(la => [la.padEnd(12), ...labels.map(lb =>
@@ -168,8 +179,9 @@ const rows = POSES.flatMap(p => duplicateReport(
 const cols = FACINGS.flatMap(f => duplicateReport(
   POSES.map(p => ({ label: label(f, p), img: cells.get(label(f, p))! })), STRAIGHT_THR, MIRROR_THR))
 const report = [
-  '== PERFECTION PASS: shared scale + registration + hygiene v2 (no quantization) ==',
-  `shared scale: modal=${modalK} used=${k}; sprites unquantized (palette harmony is judge-enforced)`,
+  '== CANONICAL DENSITY BUILD: 128px cells at scale 4 + registration + hygiene (no quantization) ==',
+  `shared scale: modal=${modalK} used=${k} (canonical); cells ${CANVAS}x${CANVAS} feetY=${FEET_Y}; sprites unquantized`,
+  `pairwise median=${median.toFixed(3)}; recalibrated thresholds straight<${STRAIGHT_THR.toFixed(3)} mirror<${MIRROR_THR.toFixed(3)}`,
   '', '== straight distance matrix (12x12) ==', matrix(false),
   '', '== mirrored distance matrix (12x12, col cell mirrored) ==', matrix(true),
   '', `== dupe findings (thresholds straight<${STRAIGHT_THR} mirror<${MIRROR_THR}) ==`,

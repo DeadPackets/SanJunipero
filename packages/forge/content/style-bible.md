@@ -60,7 +60,7 @@ Sprites ship UNQUANTIZED: character cells and reference sprites keep their gener
 
 - ~3 heads tall (Stardew-like).
 - Age bands (child / adult / elder) must read clearly in the rigs.
-- Native-resolution sprites (snapToGrid, no forced 32px crush) on 96×96 cells, feet-anchored at y=88, rendering ≈2 tiles tall.
+- Native-resolution sprites (snapToGrid, no forced 32px crush) on 128×128 cells at the canonical art scale 4, feet-anchored at y=118 — density uniform with the style anchor across all classes. The renderer scales sprites to world height (~1.6 tiles) independently of art density.
 
 ## Atmosphere
 
@@ -75,6 +75,6 @@ Sprites ship UNQUANTIZED: character cells and reference sprites keep their gener
 
 ## Facings
 
-- Characters: 4 dimetric facings (sw, se, ne, nw) × 3 poses (idle, walk-a, walk-b) per sheet; cells 96×96 (feet-anchored at y=88), sheet 384×288. Column order sw, se, ne, nw (left→right) and row order idle, walk-a, walk-b (top→bottom), as in `sheet.ts`. Walk animation = idle, walk-a, idle, walk-b loop.
+- Characters: 4 dimetric facings (sw, se, ne, nw) × 3 poses (idle, walk-a, walk-b) per sheet; cells 128×128 at canonical scale 4 (feet-anchored at y=118), sheet 512×384. Column order sw, se, ne, nw (left→right) and row order idle, walk-a, walk-b (top→bottom), as in `sheet.ts`. Walk animation = idle, walk-a, idle, walk-b loop.
 - Buildings: up to 2 authored facings — door-sw (default) and door-se variant; codex id suffix `#se`. NEVER mirror sprites: light is locked from the north-west (mirroring flips it).
 - Engine note: Structure has no facing field yet (C2); facing is asset-selection-only until then.
