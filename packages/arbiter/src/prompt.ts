@@ -23,13 +23,13 @@ export type AssembledAdjudicationPrompt = {
 // provider's prefix cache stays warm.
 const ADJUDICATION_INSTRUCTION = `You are the physics arbiter of San Junipero. An agent proposes an action. Reply with one verdict:
 "map" only if the town already performs this exact action as a routine;
-"attempt" if the action is new but the agent can physically try it with the town's fire, clay pots, wood, fiber, stone tools, and river — whether it succeeds is decided later, never by you;
+"attempt" if the action is new but the agent can physically try it with the town's fire, clay pots, wood, fiber, stone implements, and river — whether it succeeds is decided later, never by you;
 "impossible" only if the action cannot even be started because it needs something the town wholly lacks.`
 
 // The human-framing law for arbiter outputs: no world text, recipe name,
 // verdict reason, or outcome label may name the machinery behind the agent.
 export const FORBIDDEN_FRAMING =
-  /\b(AI|A\.I\.|artificial intelligence|language model|LLM|neural|prompt|context window|token|chatbot|simulation|model)\b/i
+  /\b(AI|A\.I\.|artificial intelligence|language models?|LLMs?|neural|prompts?|context windows?|tokens?|chatbots?|simulations?|models?|tools?)(?!\w)/i
 
 function renderAgent(agent: AdjudicationBlocks['agent']): string {
   const skills = Object.entries(agent.skills)

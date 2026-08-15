@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { assembleAdjudicationPrompt, FORBIDDEN_FRAMING, type AdjudicationBlocks } from './prompt.js'
-import { CANON } from './canon.js'
 
 function fixtureBlocks(overrides: Partial<AdjudicationBlocks> = {}): AdjudicationBlocks {
   return {
@@ -78,9 +77,18 @@ describe('adjudication prompt anti-eloquence', () => {
 })
 
 describe('framing-free outputs contract', () => {
-  it('CANON passes FORBIDDEN_FRAMING and assembly takes only structural blocks', () => {
-    expect(CANON).not.toMatch(FORBIDDEN_FRAMING)
-    // The assembly function takes exactly one argument: the structural blocks.
+  it('FORBIDDEN_FRAMING catches A.I., plural models, and tools', () => {
+    for (const bad of ['the A.I. decided', 'our models', 'tools']) {
+      expect(bad).toMatch(FORBIDDEN_FRAMING)
+    }
+  })
+
+  it('FORBIDDEN_FRAMING does not match reworded implements or substrings like toolkit', () => {
+    expect('stone implements').not.toMatch(FORBIDDEN_FRAMING)
+    expect('the toolkit sat on the bench').not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('assembly takes only structural blocks', () => {
     expect(assembleAdjudicationPrompt.length).toBe(1)
   })
 })
