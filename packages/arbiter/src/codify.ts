@@ -41,12 +41,13 @@ function anyAdjacentTile(state: WorldState, agentId: string, tile: string): bool
 
 export function emitOutcomeEffects(state: WorldState, agentId: string, effects: OutcomeEffect[]): PendingEvent[] {
   const events: PendingEvent[] = []
+  let nextId = state.counters.nextEntityId
   for (const e of effects) {
     switch (e.op) {
       case 'spawn_item':
         events.push({
           type: 'item_spawned',
-          payload: { id: `item_${state.counters.nextEntityId}`, kind: e.kind, qty: e.qty, loc: { t: 'agent', id: agentId } },
+          payload: { id: `item_${nextId++}`, kind: e.kind, qty: e.qty, loc: { t: 'agent', id: agentId } },
         })
         break
       case 'gain_skill':

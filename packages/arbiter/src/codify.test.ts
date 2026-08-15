@@ -88,6 +88,19 @@ describe('codify', () => {
     it('emits [] for none', () => {
       expect(emitOutcomeEffects(agentState(), 'a1', [{ op: 'none' }])).toEqual([])
     })
+
+    it('emits distinct ids for an outcome row with multiple spawn_item effects', () => {
+      const state = agentState()
+      const nextId = state.counters.nextEntityId
+      const events = emitOutcomeEffects(state, 'a1', [
+        { op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' },
+        { op: 'spawn_item', kind: 'clay', qty: 2, to: 'agent' },
+      ])
+      expect(events).toEqual([
+        { type: 'item_spawned', payload: { id: `item_${nextId}`, kind: 'salt', qty: 1, loc: { t: 'agent', id: 'a1' } } },
+        { type: 'item_spawned', payload: { id: `item_${nextId + 1}`, kind: 'clay', qty: 2, loc: { t: 'agent', id: 'a1' } } },
+      ])
+    })
   })
 
   describe('codify', () => {
