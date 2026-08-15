@@ -9,7 +9,7 @@ import { chromaKey } from '../src/post/chromaKey.js'
 import {
   FACINGS, POSES, assembleGrid, cellDistance, mirrorX, duplicateReport,
   erodeAlpha, estimatePitch, refineLattice, resampleModeLattice, despeckle, fillPinholes,
-  registerToReference, sheetMetrics, type Facing, type Pose, type Lattice,
+  sweepMagenta, registerToReference, sheetMetrics, type Facing, type Pose, type Lattice,
 } from '../src/sheet.js'
 
 const OUT = 'packages/forge/out/character-sheet-v2'
@@ -51,6 +51,15 @@ function upscaleNearest(img: RawImage, k: number): RawImage {
 }
 
 type Processed = { out: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice; origin: { i0: number; j0: number } }
+const magentaHits = (img: RawImage) => {
+  let n = 0
+  for (let i = 0; i < img.data.length; i += 4) {
+    if (img.data[i + 3] === 0) continue
+    if (img.data[i]! > img.data[i + 1]! + 40 && img.data[i + 2]! > img.data[i + 1]! + 25) n++
+  }
+  return n
+}
+let hitsBefore = 0, hitsAfter = 0
 function v4chain(keyed: RawImage, pitch: number, name: string): Processed {
   const eroded = erodeAlpha(keyed, Math.max(1, Math.round(pitch / 2)))
   const b = bbox(eroded)
@@ -59,7 +68,20 @@ function v4chain(keyed: RawImage, pitch: number, name: string): Processed {
   const desp = despeckle(r.out, 3)
   const removed = opaqueCount(r.out) - opaqueCount(desp)
   if (removed > 0) console.log(`  ${name}: despeckle removed ${removed} px${removed > 2 ? ' ** FLAG >2 **' : ''}`)
-  return { out: fillPinholes(desp, 2), dominance: r.dominance, eroded, lat, origin: r.origin }
+  const filled = fillPinholes(desp, 2)
+  const before = magentaHits(filled)
+  // fixpoint: clustered magenta replaces from magenta-majority neighborhoods on the
+  // first pass — iterate so clean colors erode the cluster inward (defringe precedent)
+  let swept = filled
+  for (let i = 0; i < 16; i++) {
+    const next = sweepMagenta(swept)
+    if (magentaHits(next) === magentaHits(swept)) { swept = next; break }
+    swept = next
+  }
+  const after = magentaHits(swept)
+  hitsBefore += before; hitsAfter += after
+  if (before > 0) console.log(`  ${name}: magenta sweep ${before} -> ${after}`)
+  return { out: swept, dominance: r.dominance, eroded, lat, origin: r.origin }
 }
 
 // 1. Characters: per-cell pitch -> sheetPitch median -> v4 chain at sheetPitch.
@@ -195,8 +217,10 @@ const rows = POSES.flatMap(p => duplicateReport(
   FACINGS.map(f => ({ label: label(f, p), img: cells.get(label(f, p))! })), STRAIGHT_THR, MIRROR_THR))
 const cols = FACINGS.flatMap(f => duplicateReport(
   POSES.map(p => ({ label: label(f, p), img: cells.get(label(f, p))! })), STRAIGHT_THR, MIRROR_THR))
+console.log(`magenta predicate hits across all outputs: ${hitsBefore} before sweep -> ${hitsAfter} after`)
 const report = [
   `== PIPELINE V4 FULL REBUILD: sheetPitch ${sheetPitch.toFixed(2)}, natural heights, canvas ${CANVAS} feetY ${FEET_Y} ==`,
+  `magenta sweep: ${hitsBefore} predicate hits before -> ${hitsAfter} after`,
   `soft-lattice cells (ambiguous>40%): ${softCells.length ? softCells.join(', ') : 'none'}`,
   `pairwise median=${median.toFixed(3)}; thresholds straight<${STRAIGHT_THR.toFixed(3)} mirror<${MIRROR_THR.toFixed(3)}`,
   '', '== straight distance matrix (12x12) ==', matrix(false),

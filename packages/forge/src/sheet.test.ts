@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, estimatePitch, refineLattice, resampleModeLattice, sheetMetrics, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, estimatePitch, refineLattice, resampleModeLattice, sheetMetrics, sweepMagenta, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
 import { quantize } from './post/quantize.js'
 
 type Px = [number, number, number, number]
@@ -427,6 +427,18 @@ describe('sheetMetrics', () => {
       lat: { px: 1, py: 1, ox: 0, oy: 0 }, origin: { i0: 0, j0: 0 },
     }])
     expect(m.dupRowCount).toBe(1)
+  })
+})
+
+describe('sweepMagenta', () => {
+  it('replaces an enclosed magenta pixel with the neighbor mode color', () => {
+    const src = img(3, 3, (x, y) => (x === 1 && y === 1 ? [255, 0, 255, 255] as Px : RED))
+    expect([...sweepMagenta(src).data.slice((1 * 3 + 1) * 4, (1 * 3 + 1) * 4 + 4)]).toEqual(RED)
+  })
+  it('leaves dusty rose (r>g but b<g) untouched', () => {
+    const ROSE: Px = [242, 198, 194, 255]
+    const src = img(3, 3, (x, y) => (x === 1 && y === 1 ? ROSE : RED))
+    expect([...sweepMagenta(src).data.slice((1 * 3 + 1) * 4, (1 * 3 + 1) * 4 + 4)]).toEqual(ROSE)
   })
 })
 

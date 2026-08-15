@@ -518,6 +518,36 @@ export function sheetMetrics(cells: {
   }
 }
 
+// Final art-resolution sweep: any opaque pixel in the magenta family (r>g+40 AND
+// b>g+25) takes the mode color of its opaque 8-neighbors — magenta is not a Style
+// Bible color, so this is always safe at art resolution. Ties break first-seen;
+// a pixel with no opaque neighbors is left unchanged.
+export function sweepMagenta(img: RawImage): RawImage {
+  const out = new Uint8ClampedArray(img.data)
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
+    const i = (y * img.width + x) * 4
+    if (img.data[i + 3] === 0) continue
+    const r = img.data[i]!, g = img.data[i + 1]!, b = img.data[i + 2]!
+    if (!(r > g + 40 && b > g + 25)) continue
+    const counts = new Map<number, number>()
+    let best = -1, bestN = 0
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue
+      const nx = x + dx, ny = y + dy
+      if (nx < 0 || ny < 0 || nx >= img.width || ny >= img.height) continue
+      const n = (ny * img.width + nx) * 4
+      if (img.data[n + 3] === 0) continue
+      const key = (img.data[n]! << 16) | (img.data[n + 1]! << 8) | img.data[n + 2]!
+      const c = (counts.get(key) ?? 0) + 1
+      counts.set(key, c)
+      if (c > bestN) { bestN = c; best = key }
+    }
+    if (best < 0) continue
+    out[i] = best >> 16; out[i + 1] = (best >> 8) & 255; out[i + 2] = best & 255
+  }
+  return { width: img.width, height: img.height, data: out }
+}
+
 // Modal detected art scale across a set of images; ties break to the smallest scale.
 export function sheetScale(imgs: RawImage[]): number {
   const counts = new Map<number, number>()
