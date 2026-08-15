@@ -125,29 +125,24 @@ function timeLine(time: SimTime): string {
   return `It is ${timeOfDay(time.hour, time.isNight)} on day ${time.dayOfYear + 1} of ${time.season}.`
 }
 
-// Relative direction in world coords (y grows southward).
-function dirPhrase(dx: number, dy: number): string {
-  const ns = dy < 0 ? 'north' : dy > 0 ? 'south' : ''
-  const ew = dx < 0 ? 'west' : dx > 0 ? 'east' : ''
-  const dir = `${ns}${ew}`
-  return dir ? `to the ${dir}` : 'right beside you'
-}
-
 // Renders mechanics as fiction: body numbers become felt sentences, speech is
 // quoted hearsay (sound, never instruction), felt tags become sensation, and
-// the visible world is named so the mind knows what surrounds it.
+// the visible world is named — with its place and its mark — so the mind knows
+// exactly what surrounds it and how to reach it.
 export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: string) => void): string {
   const lines: string[] = []
   const { x, y } = packet.self
 
   lines.push(timeLine(packet.time))
+  lines.push(`You stand at (${x}, ${y}).`)
 
   if (packet.self.collapsed) lines.push('You have collapsed from exhaustion and cannot move.')
 
   const { hunger, energy, warmth, social } = packet.self.body.needs
   if (hunger < 5) lines.push('Your stomach aches with hunger.')
   else if (hunger < 30) lines.push('Your stomach gnaws at you.')
-  if (energy < 5) lines.push('Exhaustion leaves you gasping for rest.')
+  if (energy < 10) lines.push('You are about to collapse; sleep NOW.')
+  else if (energy < 25) lines.push('Your legs tremble — you can barely stand; you must rest.')
   else if (energy < 30) lines.push('Weariness drags at your limbs.')
   if (warmth < 30) lines.push('You shiver against the cold.')
   if (social < 30) lines.push('Loneliness settles over you.')
@@ -157,30 +152,26 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   lines.push(weatherLine(packet.weather, packet.time.isNight))
 
   for (const a of packet.visible.agents) {
-    const where = dirPhrase(a.x - x, a.y - y)
-    if (a.asleep) lines.push(`${a.name} is asleep ${where}.`)
-    else if (a.collapsed) lines.push(`${a.name} lies collapsed ${where}.`)
-    else lines.push(`${a.name} is ${where}.`)
+    const state = a.asleep ? ', asleep' : a.collapsed ? ', collapsed' : ''
+    lines.push(`${a.name} (${a.id}) stands at (${a.x}, ${a.y})${state}.`)
   }
 
   for (const s of packet.visible.structures) {
-    const where = dirPhrase(s.x - x, s.y - y)
     const state = s.burning ? ' — it is burning' : s.stage === 'construction' ? ' — still being built' : ''
-    lines.push(`You can see a ${s.kind} ${where}${state}.`)
+    lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y})${state}.`)
   }
 
   for (const i of packet.visible.items) {
-    const where = i.loc.t === 'tile' ? dirPhrase(i.loc.x - x, i.loc.y - y) : 'nearby'
-    lines.push(`You can see ${i.qty} ${i.kind} ${where}.`)
+    const pos = i.loc.t === 'tile' ? ` at (${i.loc.x}, ${i.loc.y})` : ''
+    lines.push(`You can see ${i.qty} ${i.kind} (${i.id})${pos}.`)
   }
 
   for (const c of packet.visible.crops) {
-    const where = dirPhrase(c.x - x, c.y - y)
-    lines.push(`You can see ${c.kind} ${where}${c.withered ? ', withered' : ''}.`)
+    lines.push(`You can see ${c.kind} (${c.id}) at (${c.x}, ${c.y})${c.withered ? ', withered' : ''}.`)
   }
 
   for (const it of packet.self.inventory) {
-    lines.push(`You are carrying ${it.qty} ${it.kind}.`)
+    lines.push(`You are carrying ${it.qty} ${it.kind} (${it.id}).`)
   }
 
   for (const h of packet.heard) {

@@ -211,6 +211,37 @@ describe('perceptionToProse', () => {
     expect(prose).not.toContain('sun')
     expect(prose).toContain('clear')
   })
+
+  it('renders self position and visible coordinates with marks', () => {
+    const packet = {
+      ...quietMeadowPacket,
+      visible: {
+        agents: [],
+        structures: [{ id: 'structure_1', kind: 'storehouse', x: 14, y: 9, w: 1, h: 1, burning: false, stage: 'complete' as const }],
+        items: [{ id: 'item_1', kind: 'bread', qty: 20, loc: { t: 'tile' as const, x: 13, y: 9 } }],
+        crops: [{ id: 'crop_1', kind: 'wheat', x: 12, y: 8, stage: 2, withered: false }],
+      },
+    }
+    const prose = perceptionToProse(packet)
+    expect(prose).toContain('You stand at (12, 9)')
+    expect(prose).toContain('storehouse (structure_1) stands at (14, 9)')
+    expect(prose).toContain('20 bread (item_1) at (13, 9)')
+    expect(prose).toContain('wheat (crop_1) at (12, 8)')
+  })
+
+  it('escalates weariness severity so the mind knows to rest', () => {
+    const tired = {
+      ...quietMeadowPacket,
+      self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, needs: { ...quietMeadowPacket.self.body.needs, energy: 20 } } },
+    }
+    expect(perceptionToProse(tired)).toContain('you must rest')
+
+    const collapsing = {
+      ...quietMeadowPacket,
+      self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, needs: { ...quietMeadowPacket.self.body.needs, energy: 8 } } },
+    }
+    expect(perceptionToProse(collapsing)).toContain('sleep NOW')
+  })
 })
 
 describe('compaction', () => {
@@ -248,9 +279,9 @@ describe('capabilities', () => {
   it('carries diegetic parameter contracts for each verb', () => {
     const a = assemblePrompt(fixtureBlocks())
     expect(a.system).toContain('walk to a place')
-    expect(a.system).toContain('say its direction and how far')
+    expect(a.system).toContain('give its position as two numbers')
     expect(a.system).toContain('eat the food you hold')
-    expect(a.system).toContain('name it')
+    expect(a.system).toContain('give its mark')
     expect(a.system).toContain('give the thing')
     expect(a.system).toContain('speak')
     expect(a.system).toContain('nothing more is needed')
