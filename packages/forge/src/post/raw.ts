@@ -12,6 +12,19 @@ export async function encodePng(img: RawImage): Promise<Buffer> {
     { raw: { width: img.width, height: img.height, channels: 4 } }).png().toBuffer()
 }
 
+// keeps x/y scale factors equal when a square generation feeds a non-square target
+export function centerCropToAspect(img: RawImage, tw: number, th: number): RawImage {
+  if (img.width * th === img.height * tw) return img
+  let cw = img.width, ch = img.height
+  if (img.width * th > img.height * tw) cw = Math.max(1, Math.round(img.height * tw / th))
+  else ch = Math.max(1, Math.round(img.width * th / tw))
+  const x0 = (img.width - cw) >> 1, y0 = (img.height - ch) >> 1
+  const out = new Uint8ClampedArray(cw * ch * 4)
+  for (let y = 0; y < ch; y++)
+    out.set(img.data.subarray(((y0 + y) * img.width + x0) * 4, ((y0 + y) * img.width + x0 + cw) * 4), y * cw * 4)
+  return { width: cw, height: ch, data: out }
+}
+
 export function downscaleNearest(img: RawImage, w: number, h: number): RawImage {
   const out = new Uint8ClampedArray(w * h * 4)
   for (let y = 0; y < h; y++) {

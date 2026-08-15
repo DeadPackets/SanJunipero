@@ -1,4 +1,4 @@
-import { decodePng, encodePng, downscaleNearest } from './raw.js'
+import { decodePng, encodePng, downscaleNearest, centerCropToAspect } from './raw.js'
 import { chromaKey } from './chromaKey.js'
 import { quantize } from './quantize.js'
 import { outlinePass } from './outline.js'
@@ -11,6 +11,7 @@ const KEYED: Record<AssetClass, boolean> = {
 export async function postProcess(png: Buffer, klass: AssetClass, target: { w: number; h: number }): Promise<Buffer> {
   let img = await decodePng(png)
   if (KEYED[klass]) img = chromaKey(img)
+  img = centerCropToAspect(img, target.w, target.h)
   img = downscaleNearest(img, target.w, target.h)
   img = quantize(img)
   if (KEYED[klass]) img = outlinePass(img)
