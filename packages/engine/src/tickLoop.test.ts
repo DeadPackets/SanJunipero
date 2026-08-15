@@ -4,8 +4,8 @@ import { EventStore } from './eventStore.js'
 import { genesisState } from './state.js'
 import { RngStreams } from './rng.js'
 import { TickLoop } from './tickLoop.js'
-import { replayLatest } from './replay.js'
-import { DEFAULT_CONFIG, stateHash } from '@sj/shared'
+import { replayFromGenesis, replayLatest } from './replay.js'
+import { DEFAULT_CONFIG, SimConfigSchema, stateHash } from '@sj/shared'
 
 function loop(onTick: ConstructorParameters<typeof TickLoop>[0]['onTick'], snapshotEveryTicks = 60) {
   const store = new EventStore(openDb(':memory:'))
@@ -48,5 +48,16 @@ describe('TickLoop', () => {
     l.step()
     expect(l.tick).toBe(3)
     expect(stateHash(replayLatest(store).state)).toBe(stateHash(l.state))
+  })
+  it('threads a custom SimConfig through fold, and replay with that config matches live', () => {
+    const custom = SimConfigSchema.parse({ health: { maxHp: 50 } })
+    const store = new EventStore(openDb(':memory:'))
+    const l = new TickLoop({
+      store, state: genesisState(custom), rng: new RngStreams('cfg'), config: custom,
+      onTick: ({ tick, emit }) => { if (tick === 1) emit('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }) },
+    })
+    for (let i = 0; i < 10; i++) l.step()
+    expect(l.state.agents.a1!.hp).toBe(50)
+    expect(stateHash(replayFromGenesis(store, custom))).toBe(stateHash(l.state))
   })
 })

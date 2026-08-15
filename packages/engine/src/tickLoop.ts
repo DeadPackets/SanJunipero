@@ -1,4 +1,4 @@
-import { TICK_REAL_MS } from '@sj/shared'
+import { DEFAULT_CONFIG, TICK_REAL_MS, type SimConfig } from '@sj/shared'
 import type { EventStore } from './eventStore.js'
 import type { WorldState } from './state.js'
 import { fold } from './fold.js'
@@ -10,9 +10,11 @@ export class TickLoop {
   #store: EventStore; #state: WorldState; #rng: RngStreams
   #tick: number; #realMs: number; #speed: number; #snapEvery: number
   #onTick: TickHandler; #timer: NodeJS.Timeout | null = null; #nextAt = 0
+  #config: SimConfig
 
-  constructor(opts: { store: EventStore; state: WorldState; rng: RngStreams; startTick?: number; realMsPerTick?: number; speed?: number; snapshotEveryTicks?: number; onTick: TickHandler }) {
+  constructor(opts: { store: EventStore; state: WorldState; rng: RngStreams; config?: SimConfig; startTick?: number; realMsPerTick?: number; speed?: number; snapshotEveryTicks?: number; onTick: TickHandler }) {
     this.#store = opts.store; this.#state = opts.state; this.#rng = opts.rng
+    this.#config = opts.config ?? DEFAULT_CONFIG
     this.#tick = opts.startTick ?? opts.state.tick
     this.#realMs = opts.realMsPerTick ?? TICK_REAL_MS
     this.#speed = opts.speed ?? 1
@@ -40,7 +42,7 @@ export class TickLoop {
     this.#store.transaction(() => {
       const apply = (type: string, payload: unknown) => {
         const ev = this.#store.append(this.#tick, type, payload)
-        this.#state = fold(this.#state, ev)
+        this.#state = fold(this.#state, ev, this.#config)
       }
       apply('tick_advanced', {})
       this.#onTick({ tick: this.#tick, emit: apply })
