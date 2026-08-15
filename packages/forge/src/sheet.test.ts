@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
 
 type Px = [number, number, number, number]
 function img(w: number, h: number, px: (x: number, y: number) => Px): RawImage {
@@ -100,6 +100,58 @@ describe('downscaleMajority', () => {
     expect([...out.data.slice(4, 8)]).toEqual([0, 255, 0, 255])
     expect([...out.data.slice(8, 12)]).toEqual(BLUE)
     expect(out.data[15]).toBe(0)
+  })
+})
+
+// 70x70 image drawn from 7px art blocks with varied colors per block
+function sevenPxBlockImage(): RawImage {
+  const palette: Px[] = [RED, BLUE, [0, 255, 0, 255], [255, 255, 0, 255], [128, 64, 32, 255]]
+  return img(70, 70, (x, y) => {
+    const bx = Math.floor(x / 7), by = Math.floor(y / 7)
+    return palette[(bx * 3 + by * 5 + (bx * by) % 7) % palette.length]!
+  })
+}
+
+describe('detectArtScale', () => {
+  it('detects the 7px block size of a synthetic big-pixel image', () => {
+    expect(detectArtScale(sevenPxBlockImage())).toBe(7)
+  })
+  it('honors an explicit candidate list', () => {
+    expect(detectArtScale(sevenPxBlockImage(), [5, 7, 9])).toBe(7)
+  })
+})
+
+describe('snapToGrid', () => {
+  it('reduces a 7px-block 70x70 image to its native 10x10', () => {
+    const src = sevenPxBlockImage()
+    const out = snapToGrid(src)
+    expect(out.width).toBe(10); expect(out.height).toBe(10)
+    for (let by = 0; by < 10; by++) for (let bx = 0; bx < 10; bx++)
+      expect([...out.data.slice((by * 10 + bx) * 4, (by * 10 + bx) * 4 + 4)],
+        `block ${bx},${by}`).toEqual([...src.data.slice((by * 7 * 70 + bx * 7) * 4, (by * 7 * 70 + bx * 7) * 4 + 4)])
+  })
+})
+
+describe('anchorToCanvas', () => {
+  it('centers the opaque bbox horizontally and rests its bottom on feetY', () => {
+    // 2 wide x 3 tall red block at (1,1) in a 4x5 image
+    const src = img(4, 5, (x, y) => (x >= 1 && x <= 2 && y >= 1 && y <= 3 ? RED : CLEAR))
+    const out = anchorToCanvas(src, 8, 8, 6)
+    expect(out.width).toBe(8); expect(out.height).toBe(8)
+    const opaque: [number, number][] = []
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++)
+      if (out.data[(y * 8 + x) * 4 + 3]! > 0) opaque.push([x, y])
+    // bbox is 2x3 -> left = (8-2)/2 = 3, rows 4..6
+    expect(opaque).toEqual([[3, 4], [4, 4], [3, 5], [4, 5], [3, 6], [4, 6]])
+  })
+  it('throws when the sprite exceeds the canvas', () => {
+    const tall = solid(2, 10, RED)
+    expect(() => anchorToCanvas(tall, 8, 8, 6)).toThrow()   // 10 tall cannot rest at feetY 6
+    const wide = solid(10, 2, RED)
+    expect(() => anchorToCanvas(wide, 8, 8, 6)).toThrow()
+  })
+  it('throws on a fully transparent sprite', () => {
+    expect(() => anchorToCanvas(solid(4, 4, CLEAR), 8, 8, 6)).toThrow()
   })
 })
 

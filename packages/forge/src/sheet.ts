@@ -84,6 +84,67 @@ export function downscaleMajority(img: RawImage, w: number, h: number): RawImage
   return { width: w, height: h, data: out }
 }
 
+// Finds the art-pixel size of big-pixel source art: the block size whose
+// majority-downscale -> integer-upscale round trip loses the least detail.
+export function detectArtScale(img: RawImage, candidates: number[] = [4, 5, 6, 7, 8, 9, 10, 11, 12]): number {
+  let best = candidates[0]!, bestErr = Infinity
+  for (const k of candidates) {
+    const w = Math.max(1, Math.round(img.width / k)), h = Math.max(1, Math.round(img.height / k))
+    const down = downscaleMajority(img, w, h)
+    const cw = Math.min(img.width, w * k), ch = Math.min(img.height, h * k)
+    const a = crop(img, cw, ch), b = crop(upscaleInt(down, k), cw, ch)
+    const err = cellDistance(a, b)
+    if (err < bestErr) { bestErr = err; best = k }
+  }
+  return best
+}
+
+function crop(img: RawImage, w: number, h: number): RawImage {
+  if (img.width === w && img.height === h) return img
+  const data = new Uint8ClampedArray(w * h * 4)
+  for (let y = 0; y < h; y++) data.set(img.data.subarray(y * img.width * 4, (y * img.width + w) * 4), y * w * 4)
+  return { width: w, height: h, data }
+}
+
+function upscaleInt(img: RawImage, k: number): RawImage {
+  const w = img.width * k, h = img.height * k
+  const out = new Uint8ClampedArray(w * h * 4)
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const s = (Math.floor(y / k) * img.width + Math.floor(x / k)) * 4
+    out.set(img.data.subarray(s, s + 4), (y * w + x) * 4)
+  }
+  return { width: w, height: h, data: out }
+}
+
+// Reduces big-pixel art to its native resolution (one output pixel per art pixel).
+export function snapToGrid(img: RawImage): RawImage {
+  const k = detectArtScale(img)
+  return downscaleMajority(img, Math.max(1, Math.round(img.width / k)), Math.max(1, Math.round(img.height / k)))
+}
+
+// Places the sprite's opaque bounding box horizontally centered with its bottom row at feetY.
+export function anchorToCanvas(img: RawImage, canvasW: number, canvasH: number, feetY: number): RawImage {
+  let x0 = img.width, x1 = -1, y0 = img.height, y1 = -1
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
+    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
+      if (x < x0) x0 = x
+      if (x > x1) x1 = x
+      if (y < y0) y0 = y
+      if (y > y1) y1 = y
+    }
+  if (x1 < 0) throw new Error('anchorToCanvas: sprite has no opaque pixels')
+  const w = x1 - x0 + 1, h = y1 - y0 + 1
+  const left = Math.floor((canvasW - w) / 2), top = feetY - h + 1
+  if (w > canvasW || top < 0 || feetY >= canvasH)
+    throw new Error(`anchorToCanvas: ${w}x${h} sprite exceeds ${canvasW}x${canvasH} canvas at feetY ${feetY}`)
+  const out = new Uint8ClampedArray(canvasW * canvasH * 4)
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const s = ((y0 + y) * img.width + x0 + x) * 4
+    out.set(img.data.subarray(s, s + 4), ((top + y) * canvasW + left + x) * 4)
+  }
+  return { width: canvasW, height: canvasH, data: out }
+}
+
 export function mirrorX(img: RawImage): RawImage {
   const out = new Uint8ClampedArray(img.data.length)
   for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
