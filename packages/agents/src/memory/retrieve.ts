@@ -112,8 +112,13 @@ async function retrieve(
   if (query.length > 0) {
     const qvec = await store.embed(query)
     const rows = db
-      .prepare('SELECT rowid AS id, distance AS dist FROM memory_vec WHERE embedding MATCH ? AND k = ?')
-      .all(Buffer.from(qvec.buffer, qvec.byteOffset, qvec.byteLength), VEC_POOL) as Array<{
+      .prepare(
+        `SELECT rowid AS id, distance AS dist
+         FROM memory_vec
+         WHERE embedding MATCH ? AND k = ?
+           AND rowid IN (SELECT id FROM memories WHERE agent_id = ?)`,
+      )
+      .all(Buffer.from(qvec.buffer, qvec.byteOffset, qvec.byteLength), VEC_POOL, agentId) as Array<{
       id: number
       dist: number
     }>

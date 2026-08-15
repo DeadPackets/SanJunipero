@@ -268,4 +268,36 @@ describe('hybrid retrieval', () => {
     expect(ids).toContain(bId)
     expect(results.every((r) => r.agentId === 'bob')).toBe(true)
   })
+
+  it('fencing: dense foreign rows do not displace this agent vec candidates', async () => {
+    const db = openAgentDb(':memory:')
+    const embedder = await FakeEmbedder.create()
+    const alice = new MemoryStore(db, 'alice', embedder)
+    const bob = new MemoryStore(db, 'bob', embedder)
+    const now = 4 * TICKS_PER_DAY
+    const query = 'riverbed'
+    // alice: 55 identical-text memories — distance-0 to the query, filling the unfenced vec top-50
+    for (let i = 0; i < 55; i += 1) {
+      await alice.insertMemory({
+        tick: now - 10,
+        kind: 'perception',
+        text: query,
+        importance: 5,
+        tags: EMPTY_TAGS,
+      })
+    }
+    // bob: one memory reachable only via vec (different text → no FTS/tag match for 'riverbed')
+    const bId = await bob.insertMemory({
+      tick: now - 5,
+      kind: 'thought',
+      text: "bob's private thought",
+      importance: 5,
+      tags: EMPTY_TAGS,
+    })
+    const results = await recall(bob, query, now)
+    const ids = results.map((r) => r.id)
+    expect(ids).toContain(bId)
+    expect(results).toHaveLength(1)
+    expect(results.every((r) => r.agentId === 'bob')).toBe(true)
+  })
 })
