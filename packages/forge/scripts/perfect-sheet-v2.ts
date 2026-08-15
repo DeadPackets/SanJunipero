@@ -1,15 +1,16 @@
-// OFFLINE — zero API spend. PIPELINE V4 FULL REBUILD (controller-approved): measured
-// fractional pitch, natural per-cell art heights, mode sampling on a refined lattice.
-// chromaKey → erode(round(sheetPitch/2)) → refineLattice → resampleModeLattice →
-// despeckle(logged) → fillPinholes → registration → anchor. No forced heights.
+// OFFLINE — zero API spend. PIPELINE V6 FINAL (controller-ruled): measured fractional
+// pitch, natural heights, ε-cluster sampling, census-aware magenta sweep. Per image:
+// chromaKey → erode(round(sheetPitch/2)) → refineLattice → resampleClusterLattice →
+// despeckle(logged) → fillPinholes → sweepMagentaCensus → registration → anchor.
+// Drift field and sheet-wide merge DROPPED (reconErr regression / linkage chaining).
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import sharp from 'sharp'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import {
   FACINGS, POSES, assembleGrid, cellDistance, mirrorX, duplicateReport,
-  erodeAlpha, estimatePitch, refineLattice, resampleModeLattice, despeckle, fillPinholes,
-  sweepMagenta, registerToReference, sheetMetrics, type Facing, type Pose, type Lattice,
+  erodeAlpha, estimatePitch, refineLattice, resampleClusterLattice, despeckle, fillPinholes,
+  sweepMagentaCensus, registerToReference, sheetMetrics, type Facing, type Pose, type Lattice,
 } from '../src/sheet.js'
 
 const OUT = 'packages/forge/out/character-sheet-v2'
@@ -50,38 +51,21 @@ function upscaleNearest(img: RawImage, k: number): RawImage {
   return { width: img.width * k, height: img.height * k, data: out }
 }
 
-type Processed = { out: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice; origin: { i0: number; j0: number } }
-const magentaHits = (img: RawImage) => {
-  let n = 0
-  for (let i = 0; i < img.data.length; i += 4) {
-    if (img.data[i + 3] === 0) continue
-    if (img.data[i]! > img.data[i + 1]! + 40 && img.data[i + 2]! > img.data[i + 1]! + 25) n++
-  }
-  return n
-}
-let hitsBefore = 0, hitsAfter = 0
-function v4chain(keyed: RawImage, pitch: number, name: string): Processed {
+type Processed = { out: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice; origin: { i0: number; j0: number }; sweepHits: number }
+function v6chain(keyed: RawImage, pitch: number, name: string): Processed {
   const eroded = erodeAlpha(keyed, Math.max(1, Math.round(pitch / 2)))
   const b = bbox(eroded)
   const lat = refineLattice(eroded, pitch, { ox: b.x0, oy: b.y0 })
-  const r = resampleModeLattice(eroded, lat)
+  const r = resampleClusterLattice(eroded, lat)
   const desp = despeckle(r.out, 3)
   const removed = opaqueCount(r.out) - opaqueCount(desp)
   if (removed > 0) console.log(`  ${name}: despeckle removed ${removed} px${removed > 2 ? ' ** FLAG >2 **' : ''}`)
   const filled = fillPinholes(desp, 2)
-  const before = magentaHits(filled)
-  // fixpoint: clustered magenta replaces from magenta-majority neighborhoods on the
-  // first pass — iterate so clean colors erode the cluster inward (defringe precedent)
-  let swept = filled
-  for (let i = 0; i < 16; i++) {
-    const next = sweepMagenta(swept)
-    if (magentaHits(next) === magentaHits(swept)) { swept = next; break }
-    swept = next
-  }
-  const after = magentaHits(swept)
-  hitsBefore += before; hitsAfter += after
-  if (before > 0) console.log(`  ${name}: magenta sweep ${before} -> ${after}`)
-  return { out: swept, dominance: r.dominance, eroded, lat, origin: r.origin }
+  const swept = sweepMagentaCensus(filled)
+  let sweepHits = 0
+  for (let i = 0; i < filled.data.length; i += 4)
+    if (filled.data[i] !== swept.data[i] || filled.data[i + 1] !== swept.data[i + 1] || filled.data[i + 2] !== swept.data[i + 2]) sweepHits++
+  return { out: swept, dominance: r.dominance, eroded, lat, origin: r.origin, sweepHits }
 }
 
 // 1. Characters: per-cell pitch -> sheetPitch median -> v4 chain at sheetPitch.
@@ -100,7 +84,7 @@ console.log(`sheetPitch (median): ${sheetPitch.toFixed(2)}`)
 
 const proc = new Map<string, Processed>()
 for (const p of POSES) for (const f of FACINGS)
-  proc.set(label(f, p), v4chain(keyedCells.get(label(f, p))!, sheetPitch, label(f, p)))
+  proc.set(label(f, p), v6chain(keyedCells.get(label(f, p))!, sheetPitch, label(f, p)))
 
 // Canvas rule: any art height > 88 -> 128/118 for the whole sheet.
 const maxH = Math.max(...[...proc.values()].map(c => c.out.height))
@@ -139,15 +123,16 @@ for (const f of FACINGS) {
   }
 }
 
-// 2. Per-cell metrics; flag soft-lattice cells (ambiguous > 40%).
-console.log('per-cell metrics (ambiguous% / dupRows / reconErr):')
-const softCells: string[] = []
+// 2. Per-cell metrics (cluster-dominance definition; v4's soft-lattice flags were a
+// 5-bit binning artifact and are RETRACTED — see style-bible + report).
+console.log('per-cell metrics (cluster ambiguous% / dupRows / reconErr / sweepHits):')
+const metricLines: string[] = []
 for (const p of POSES) for (const f of FACINGS) {
   const c = proc.get(label(f, p))!
   const m = sheetMetrics([c])
-  const flag = m.ambiguousPct > 40 ? '  ** SOFT-LATTICE FLAG **' : ''
-  if (m.ambiguousPct > 40) softCells.push(label(f, p))
-  console.log(`  ${label(f, p).padEnd(12)} ${c.out.width}x${c.out.height}  ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}${flag}`)
+  const line = `${label(f, p).padEnd(12)} ${`${c.out.width}x${c.out.height}`.padEnd(8)} ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}  sweep=${c.sweepHits}`
+  metricLines.push(line)
+  console.log(`  ${line}`)
 }
 
 // 3. Refs at natural heights.
@@ -159,9 +144,10 @@ const refInputs: [string, string][] = [
 for (const [name, path] of refInputs) {
   const keyed = chromaKey(await decodePng(readFileSync(path)))
   const pitch = estimatePitch(keyed)
-  const c = v4chain(keyed, pitch, name)
+  const c = v6chain(keyed, pitch, name)
   const m = sheetMetrics([c])
-  console.log(`${name}: pitch ${pitch.toFixed(2)}, natural ${c.out.width}x${c.out.height}, ambiguous ${m.ambiguousPct.toFixed(1)}%`)
+  metricLines.push(`${name.padEnd(12)} ${`${c.out.width}x${c.out.height}`.padEnd(8)} ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}  sweep=${c.sweepHits}`)
+  console.log(`${name}: pitch ${pitch.toFixed(2)}, natural ${c.out.width}x${c.out.height}, ambiguous ${m.ambiguousPct.toFixed(1)}%, sweep=${c.sweepHits}`)
   const png = await encodePng(c.out)
   writeFileSync(`packages/forge/out/refs-v2/${name}.png`, png)
   writeFileSync(`${REFS_DIR}/${name}.png`, png)
@@ -179,7 +165,7 @@ for (const p of POSES) for (const f of FACINGS) {
   writeFileSync(`${OUT}/cells/${file(f, p)}`, png)
   writeFileSync(`${SHEET_DIR}/cells/${file(f, p)}`, png)
 }
-for (const [f, p] of [['sw', 'idle'], ['se', 'idle'], ['ne', 'walk-a'], ['sw', 'walk-b']] as [Facing, Pose][]) {
+for (const [f, p] of [['sw', 'idle'], ['se', 'idle'], ['ne', 'walk-a'], ['sw', 'walk-b'], ['nw', 'walk-a']] as [Facing, Pose][]) {
   const cell = cells.get(label(f, p))!
   writeFileSync(`${CROPS_DIR}/${file(f, p)}`, await encodePng(cell))
   writeFileSync(`${CROPS_DIR}/${file(f, p).replace('.png', '-4x.png')}`, await encodePng(upscaleNearest(cell, 4)))
@@ -217,11 +203,12 @@ const rows = POSES.flatMap(p => duplicateReport(
   FACINGS.map(f => ({ label: label(f, p), img: cells.get(label(f, p))! })), STRAIGHT_THR, MIRROR_THR))
 const cols = FACINGS.flatMap(f => duplicateReport(
   POSES.map(p => ({ label: label(f, p), img: cells.get(label(f, p))! })), STRAIGHT_THR, MIRROR_THR))
-console.log(`magenta predicate hits across all outputs: ${hitsBefore} before sweep -> ${hitsAfter} after`)
 const report = [
-  `== PIPELINE V4 FULL REBUILD: sheetPitch ${sheetPitch.toFixed(2)}, natural heights, canvas ${CANVAS} feetY ${FEET_Y} ==`,
-  `magenta sweep: ${hitsBefore} predicate hits before -> ${hitsAfter} after`,
-  `soft-lattice cells (ambiguous>40%): ${softCells.length ? softCells.join(', ') : 'none'}`,
+  `== PIPELINE V6 FINAL: sheetPitch ${sheetPitch.toFixed(2)}, natural heights, canvas ${CANVAS} feetY ${FEET_Y} ==`,
+  '(v4 soft-lattice flags RETRACTED: 5-bit binning artifact; cluster-dominance is the metric)',
+  '', '== per-output metrics (cluster ambiguous% / dupRows / reconErr / sweepHits) ==',
+  ...metricLines,
+  '',
   `pairwise median=${median.toFixed(3)}; thresholds straight<${STRAIGHT_THR.toFixed(3)} mirror<${MIRROR_THR.toFixed(3)}`,
   '', '== straight distance matrix (12x12) ==', matrix(false),
   '', '== mirrored distance matrix (12x12, col cell mirrored) ==', matrix(true),

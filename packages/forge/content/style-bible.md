@@ -60,8 +60,21 @@ Sprites ship UNQUANTIZED: character cells and reference sprites keep their gener
 
 - ~3 heads tall (Stardew-like).
 - Age bands (child / adult / elder) must read clearly in the rigs.
-- Native-resolution sprites (pipeline v4: measured fractional pitch + mode resample at natural heights — no forced art height, no quantize, no outline pass) on 96×96 cells, feet-anchored at y=88 (128×128/y=118 if any cell's art exceeds 88px).
+- Native-resolution sprites (pipeline v6, below) on 96×96 cells, feet-anchored at y=88 (128×128/y=118 if any cell's art exceeds 88px). No quantize, no outline pass, no forced art heights.
 - Art resolution is DECOUPLED from world size: the renderer scales the character to ~1.6 tiles regardless of art pixel count. "Canonical density" means the pitch the raws actually carry, measured per sheet and recorded — character sheet: 5.12; anchor building: 4.00.
+
+## Pipeline v6 — canonical post chain
+
+1. chromaKey — magenta background → transparency.
+2. erodeAlpha(round(pitch/2)) — strips the chroma blend band scaled to the measured pitch.
+3. estimatePitch + refineLattice — fractional art pitch by octave-proof gradient comb, then joint pitch×phase polish; sheetPitch = median across a sheet's cells.
+4. resampleClusterLattice — one output pixel per art cell; dominant ε-cluster (≤8/channel) of the central 60% window, weighted-mean color.
+5. despeckle(3) — removes opaque islands under 3px (removals logged, >2 flagged).
+6. fillPinholes(2) — fills fully-enclosed transparent holes ≤2px.
+7. sweepMagentaCensus — repaints RARE magenta-predicate colors (count < max(2, 0.5% opaque)) from neighbor mode; frequent matchers (wine outline) are palette and stay.
+8. registration + feet-anchor — walk frames aligned to their idle by opaque-mask registration; bbox bottom on the feet line.
+
+RETRACTED: the v4 "soft-lattice" flags (8 cells at 40–44% ambiguity) were a 5-bit binning metric artifact — under ε-cluster dominance the same cells measure 0.2–3%. Do not regenerate cells on that old list. Dropped stages, kept deprecated in sheet.ts: driftField (regressed reconErr; offsets were edge jitter), mergeSheetColors (single-linkage chaining collapses natural palettes).
 
 ## Atmosphere
 

@@ -555,6 +555,8 @@ function clusterDominant(px: [number, number, number][], eps = 8):
   }
 }
 
+// DEPRECATED (v6 ruling): regressed reconErr on all real material — the recovered
+// offsets were sprite-edge jitter, not drift; refineLattice already captures the lattice.
 // Smooth lattice deformation: per art-row (and per art-column) integer offsets in
 // [-2, 2] maximizing summed full-cell ε-cluster dominance across the band, solved by
 // DP with |Δoffset| ≤ 1 between neighbors and a 0.5/px jump penalty. Full-cell windows
@@ -687,6 +689,8 @@ export function resampleClusterLattice(img: RawImage, lat: Lattice, drift?: Drif
   return { out: { width: outW, height: outH, data: out }, dominance, origin: { i0, j0 } }
 }
 
+// DEPRECATED (v6 ruling): single-linkage chaining collapses natural palettes (Δ2-5 color
+// chains fuse across the gamut — the cottage roof merged into brown). Do not use blind.
 // Sheet-wide near-duplicate color merge: union-find over every output color across the
 // images (per-channel ≤ eps), each replaced by its cluster's population-weighted centroid.
 export function mergeSheetColors(imgs: RawImage[], eps = 6): RawImage[] {
