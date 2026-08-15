@@ -211,6 +211,11 @@ async function stepUntil(loop: TickLoop, predicate: () => boolean, max = 500): P
   return i
 }
 
+function startedVerbs(db: Database.Database): string[] {
+  return (db.prepare("SELECT payload FROM events WHERE type = 'action_started' ORDER BY seq").all() as Array<{ payload: string }>)
+    .map((r) => (JSON.parse(r.payload) as { verb: string }).verb)
+}
+
 function completedVerbs(db: Database.Database): string[] {
   return (db.prepare("SELECT payload FROM events WHERE type = 'action_completed' ORDER BY seq").all() as Array<{ payload: string }>)
     .map((r) => (JSON.parse(r.payload) as { verb: string }).verb)
@@ -384,6 +389,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
     expect(memoriesOfKind(agentDb, 'action').some((m) => /You realize you cannot/.test(m.text))).toBe(true)
+    // Let any wrongly-submitted head drain and complete before asserting, so a
+    // regression of the rejection race (head submitted despite the block) shows up.
+    for (let i = 0; i < 15; i++) {
+      loop.step()
+      await flush()
+    }
+    expect(startedVerbs(world.engineDb)).toEqual([])
     expect(completedVerbs(world.engineDb)).toEqual([])
   })
 
