@@ -253,9 +253,16 @@ service at this scale, ever.
 |---|---|
 | Projection | 2:1 dimetric, fixed camera, light from NW |
 | Grid | 32×16 px base tile; structures 1×1…4×4 footprints |
-| Palette | one master palette (~40 colors); every asset quantized to it, no exceptions. Locked only after test renders under day/night/dawn/storm tints |
-| Rendering | hard pixels, no anti-aliasing, 1px dark outline, NEAREST scaling |
+| Detail density | mid-res: ~64px sprite for a 1×1 building (Stardew-class); items 16–24px; characters ~32px tall |
+| Palette | **warm cozy pastel** master palette (~40 colors): cream stone, honey wood, sage greens, dusty rose accents. Every asset quantized to it, no exceptions. Locked only after test renders under all atmosphere tints |
+| Outlines | selective soft outlines — dark-shade-of-local-color on characters/objects, none on terrain; outline pass recolors edges automatically |
+| Rendering | hard pixels, no anti-aliasing, NEAREST scaling |
 | Mood | cutesy, rounded silhouettes, oversized doors/windows, saturated-but-soft |
+| Reference anchor | Stardew Valley (sole anchor): proportions, warmth, readable silhouettes |
+| Characters | ~3 heads tall (Stardew-like); age bands (child/adult/elder) read clearly in the rigs |
+| Atmosphere | stylized-dramatic grading: deep blue moonlit nights with warm window glow, golden dawns, grey-green storm light, snow-blued winters |
+| Ambient motion | maximal cartoon life: chimney smoke, water shimmer, weather particles, swaying trees, night window glow, birds, squash-and-stretch on actions, emotes, placement bounce. **Tone-aware motion rule:** grave scenes (death, funerals, violence aftermath) suppress all cartoon effects — the renderer goes still |
+| Observatory UI | hybrid chrome: modern layout and typography for data-dense views, pixel-art headers, portraits, and iconography for warmth. Only the world canvas is fully pixel |
 
 ### Pipeline (queue worker)
 
