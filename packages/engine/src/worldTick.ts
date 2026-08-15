@@ -2,11 +2,12 @@ import type { SimConfig } from '@sj/shared'
 import type { WorldState } from './state.js'
 import { fold } from './fold.js'
 import type { RngStreams } from './rng.js'
-import { stepWalk, VERBS, type PendingEvent } from './verbs.js'
+import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
 import { healthSystem } from './systems/health.js'
 import { agingSystem } from './systems/aging.js'
 import { weatherSystem } from './systems/weather.js'
+import { fireSystem } from './systems/fire.js'
 import { cropsSystem } from './systems/crops.js'
 import { wildlifeSystem } from './systems/wildlife.js'
 
@@ -18,9 +19,6 @@ export type TickCtx = {
 }
 export type System = (ctx: TickCtx) => void
 export type WorldTickResult = { state: WorldState; events: PendingEvent[] }
-
-const noop: System = () => {}
-const fireSystem = noop
 
 function actionsSystem(ctx: TickCtx): void {
   for (const id of Object.keys(ctx.state().agents).sort()) {
@@ -34,6 +32,8 @@ function actionsSystem(ctx: TickCtx): void {
         continue
       }
       for (const e of stepWalk(ctx.state(), id)) ctx.emit(e.type, e.payload)
+    } else if (a.activity.verb === 'build') {
+      for (const e of stepBuild(ctx.state(), id)) ctx.emit(e.type, e.payload)
     } else {
       ctx.emit('action_progressed', { agentId: id, ticks: 1 })
     }

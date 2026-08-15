@@ -103,6 +103,23 @@ const ConstructionSchema = z.object({
   hutMaterials: z.object({
     wood: z.number().default(10),
   }).strict().prefault({}),
+  hutSize: z.object({
+    w: z.number().int().default(2),
+    h: z.number().int().default(2),
+  }).strict().prefault({}),
+  hutMaxHp: z.number().default(50),
+}).strict()
+
+export const RecipeSchema = z.object({
+  inputs: z.record(z.string(), z.number()),
+  output: z.object({ kind: z.string(), qty: z.number() }).strict(),
+  skill: z.string(),
+}).strict()
+
+const CraftingSchema = z.object({
+  recipes: z.record(z.string(), RecipeSchema).default({
+    plank: { inputs: { wood: 1 }, output: { kind: 'plank', qty: 2 }, skill: 'carpentry' },
+  }),
 }).strict()
 
 export const SimConfigSchema = z.object({
@@ -116,9 +133,11 @@ export const SimConfigSchema = z.object({
   wildlife: WildlifeSchema.prefault({}),
   fire: FireSchema.prefault({}),
   construction: ConstructionSchema.prefault({}),
+  crafting: CraftingSchema.prefault({}),
 }).strict()
 
 export type SimConfig = z.infer<typeof SimConfigSchema>
 export type CropDef = z.infer<typeof CropDefSchema>
+export type RecipeDef = z.infer<typeof RecipeSchema>
 
 export const DEFAULT_CONFIG: SimConfig = SimConfigSchema.parse({})

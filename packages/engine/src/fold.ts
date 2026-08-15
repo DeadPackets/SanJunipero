@@ -4,7 +4,8 @@ import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
   AgentAged, AgentCollapsed, AgentDied, AgentFellIll, AgentInfected, AgentInjured, AgentMoved,
   AgentRecovered, AgentSlept, AgentSpawned, AgentTended, AgentWoke,
-  CropGrew, CropHarvested, CropPlanted, CropWithered, HpChanged,
+  CropGrew, CropHarvested, CropPlanted, CropWithered,
+  FireExtinguished, FireIgnited, FireSpread, HpChanged,
   ItemMoved, ItemQtyChanged, ItemSpawned, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
@@ -129,13 +130,33 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
         const { [p.id]: _, ...structures } = state.structures
         return { ...state, structures }
       }
-      return { ...state, structures: { ...state.structures, [p.id]: { ...s, hp } } }
+      const burnTicks = s.burning ? s.burnTicks + 1 : s.burnTicks
+      return { ...state, structures: { ...state.structures, [p.id]: { ...s, hp, burnTicks } } }
     }
     case 'structure_destroyed': {
       const p = StructureDestroyed.parse(event.payload)
       if (!state.structures[p.id]) throw new Error(`structure_destroyed for unknown structure ${p.id}`)
       const { [p.id]: _, ...structures } = state.structures
       return { ...state, structures }
+    }
+    case 'fire_ignited': {
+      const p = FireIgnited.parse(event.payload)
+      const s = state.structures[p.structureId]
+      if (!s) throw new Error(`fire_ignited for unknown structure ${p.structureId}`)
+      return { ...state, structures: { ...state.structures, [p.structureId]: { ...s, burning: true, burnTicks: 0 } } }
+    }
+    case 'fire_spread': {
+      const p = FireSpread.parse(event.payload)
+      if (!state.structures[p.fromId]) throw new Error(`fire_spread from unknown structure ${p.fromId}`)
+      const s = state.structures[p.toId]
+      if (!s) throw new Error(`fire_spread to unknown structure ${p.toId}`)
+      return { ...state, structures: { ...state.structures, [p.toId]: { ...s, burning: true, burnTicks: 0 } } }
+    }
+    case 'fire_extinguished': {
+      const p = FireExtinguished.parse(event.payload)
+      const s = state.structures[p.structureId]
+      if (!s) throw new Error(`fire_extinguished for unknown structure ${p.structureId}`)
+      return { ...state, structures: { ...state.structures, [p.structureId]: { ...s, burning: false, burnTicks: 0 } } }
     }
     case 'action_started': {
       const p = ActionStarted.parse(event.payload)

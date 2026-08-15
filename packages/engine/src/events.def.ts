@@ -25,6 +25,11 @@ export const StructureProgressed = z.object({ id: z.string(), ticks: z.number() 
 export const StructureCompleted = z.object({ id: z.string() }).strict()
 export const StructureDamaged = z.object({ id: z.string(), amount: z.number() }).strict()
 export const StructureDestroyed = z.object({ id: z.string() }).strict()
+export const FireIgnited = z.object({ structureId: z.string(), cause: z.string() }).strict()
+export const FireSpread = z.object({ fromId: z.string(), toId: z.string() }).strict()
+export const FireExtinguished = z.object({
+  structureId: z.string(), cause: z.enum(['doused', 'rain', 'burnout']),
+}).strict()
 
 export const ActionStarted = z.object({
   agentId: z.string(), verb: z.string(), params: z.record(z.string(), z.unknown()), duration: z.number(),

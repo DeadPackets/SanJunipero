@@ -20,5 +20,6 @@ export function submitIntent(
   const events: PendingEvent[] = []
   if (a.asleep && verb !== 'sleep') events.push({ type: 'agent_woke', payload: { agentId } })
   events.push({ type: 'action_started', payload: { agentId, verb, params, duration } })
+  if (def.onStart) events.push(...def.onStart(state, config, agentId, params))
   return { ok: true, events }
 }
