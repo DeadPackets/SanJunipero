@@ -71,22 +71,22 @@ export function decideWake(
 
   const needs = packet.self.body.needs
   const sinceLast = tick - clock.lastTurnTick
+  const inConversation = tick < clock.conversationUntilTick
 
   // Floor-exempt: physical rousing and immediate surprises.
   if (bodyAlarmFired(cfg, needs, clock.prevNeeds)) return 'body_alarm'
   if (salientPerception(packet, clock.prevVisibleIds)) return 'salient_perception'
   if (plan.lastResult === 'blocked') return 'plan_blocked'
 
-  // plan_done: subject to the idle floor.
-  if (plan.lastResult === 'done' && sinceLast >= cfg.idleGapTicks) return 'plan_done'
+  // plan_done: subject to the idle floor, but the floor only applies outside
+  // an open conversation window.
+  if (plan.lastResult === 'done' && (inConversation || sinceLast >= cfg.idleGapTicks)) return 'plan_done'
 
   // conversation_beat: inside the window, its own tighter cadence.
-  if (tick < clock.conversationUntilTick && sinceLast >= cfg.conversationGapTicks) {
-    return 'conversation_beat'
-  }
+  if (inConversation && sinceLast >= cfg.conversationGapTicks) return 'conversation_beat'
 
-  // Outside conversation, the idle floor gates the remaining reasons.
-  if (sinceLast < cfg.idleGapTicks) return null
+  // The idle floor gates the remaining reasons only outside conversation.
+  if (!inConversation && sinceLast < cfg.idleGapTicks) return null
 
   if (clock.reconsiderAtTick !== null && tick >= clock.reconsiderAtTick) return 'reconsider'
   if (plan.queue.length === 0 && sinceLast >= cfg.boredomTicks) return 'boredom'

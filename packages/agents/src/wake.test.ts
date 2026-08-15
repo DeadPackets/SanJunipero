@@ -29,6 +29,7 @@ describe('decideWake — one case per reason', () => {
   const cases: Array<[string, PerceptionPacket, MindClock, number, PlanState, WakeReason | null]> = [
     ['body_alarm', withNeeds(24, 78, 71), clk(), 10, pln(), 'body_alarm'],
     ['salient_perception (heard speech)', conversationPacket, clk(), 10, pln(), 'salient_perception'],
+    ['salient_perception (felt event only)', { ...quietMeadowPacket, feltEvents: ['rain_started'] }, clk(), 10, pln(), 'salient_perception'],
     ['plan_blocked', pkt(), clk(), 10, pln({ lastResult: 'blocked' }), 'plan_blocked'],
     ['plan_done', pkt(), clk(), 30, pln({ lastResult: 'done' }), 'plan_done'],
     ['conversation_beat', pkt(), clk({ lastTurnTick: 100, conversationUntilTick: 160 }), 102, pln(), 'conversation_beat'],
@@ -56,6 +57,12 @@ describe('decideWake — priority and floor', () => {
   it('idle floor blocks plan_done and reconsider until idleGapTicks elapse', () => {
     expect(decideWake(cfg, pkt(), clk(), 5, pln({ lastResult: 'done' }))).toBe(null)
     expect(decideWake(cfg, pkt(), clk({ reconsiderAtTick: 3 }), 5, pln())).toBe(null)
+  })
+
+  it('idle floor does not apply inside an open conversation window', () => {
+    // 5 ticks since the last turn: outside conversation the floor would block
+    // plan_done (idleGapTicks = 20), but the window is still open.
+    expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 100, conversationUntilTick: 160 }), 105, pln({ lastResult: 'done' }))).toBe('plan_done')
   })
 
   it('salient_perception fires when the visible-agent set changes', () => {
