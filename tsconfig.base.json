@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "strict": true, "module": "NodeNext", "moduleResolution": "NodeNext",
+    "target": "ES2023", "declaration": true, "composite": true,
+    "skipLibCheck": true, "forceConsistentCasingInFileNames": true
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "san-junipero",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": { "test": "vitest run", "typecheck": "tsc -b packages/shared packages/engine" },
+  "devDependencies": { "typescript": "^5.9.0", "vitest": "^3.2.0", "@types/node": "^24.0.0" }
+}
