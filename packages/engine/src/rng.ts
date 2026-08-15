@@ -36,12 +36,19 @@ export class RngStreams {
     if (!s) { s = RngStream.seed(this.seed, name); this.streams.set(name, s) }
     return s
   }
-  snapshot(): Record<string, RngState> {
-    return Object.fromEntries([...this.streams].map(([k, v]) => [k, v.state()]))
+  snapshot(): { __seed: string } & Record<string, RngState> {
+    return {
+      ...Object.fromEntries([...this.streams].map(([k, v]) => [k, v.state()])),
+      __seed: this.seed,
+    } as { __seed: string } & Record<string, RngState>
   }
-  static restore(snap: Record<string, RngState>): RngStreams {
-    const s = new RngStreams('')
-    for (const [k, v] of Object.entries(snap)) s.streams.set(k, RngStream.from(v))
+  static restore(snap: Record<string, RngState | string>): RngStreams {
+    const seed = typeof snap.__seed === 'string' ? snap.__seed : ''
+    const s = new RngStreams(seed)
+    for (const [k, v] of Object.entries(snap)) {
+      if (k === '__seed') continue
+      s.streams.set(k, RngStream.from(v as RngState))
+    }
     return s
   }
 }

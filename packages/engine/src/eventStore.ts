@@ -17,8 +17,9 @@ export class EventStore {
   }
 
   append(tick: number, type: string, payload: unknown): SimEvent {
-    const info = this.insertEv.run(tick, type, JSON.stringify(payload ?? null))
-    return EventEnvelope.parse({ seq: Number(info.lastInsertRowid), tick, type, payload: payload ?? null })
+    const json = JSON.stringify(payload ?? null)
+    const info = this.insertEv.run(tick, type, json)
+    return EventEnvelope.parse({ seq: Number(info.lastInsertRowid), tick, type, payload: JSON.parse(json) })
   }
   private parseRow = (r: { seq: number; tick: number; type: string; payload: string }): SimEvent =>
     EventEnvelope.parse({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) })

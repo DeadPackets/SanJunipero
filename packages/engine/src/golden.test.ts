@@ -10,6 +10,9 @@ import { RngStreams } from './rng.js'
 import { TickLoop } from './tickLoop.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
 
+// Pinned golden hash — regenerating this constant is a deliberate, reviewed act.
+const GOLDEN_DAY_HASH = '17006dd44372cf12b4b6bca91c6450aa281cd7facfffc63560f64d2e59a752ea'
+
 // Synthetic day: 5 scripted actors move and get hungry, all randomness from named streams.
 function makeLoopHandler(rng: RngStreams): ConstructorParameters<typeof TickLoop>[0]['onTick'] {
   return ({ tick, emit }) => {
@@ -34,6 +37,7 @@ describe('GATE G1: golden replay', () => {
     const store = new EventStore(openDb(':memory:'))
     const live = makeLoop(store, new RngStreams('golden'))
     for (let i = 0; i < MINUTES_PER_DAY; i++) live.step()
+    expect(stateHash(live.state)).toBe(GOLDEN_DAY_HASH)
     expect(stateHash(replayFromGenesis(store))).toBe(stateHash(live.state))
   })
 

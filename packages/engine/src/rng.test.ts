@@ -30,4 +30,12 @@ describe('RngStreams', () => {
     expect(r.get('combat').next()).toBe(s.get('combat').next())
     expect(r.get('weather').next()).toBe(s.get('weather').next())
   })
+  it('restore preserves the seed for streams absent from the snapshot', () => {
+    const s = new RngStreams('town1')
+    s.get('weather').next()
+    const r = RngStreams.restore(s.snapshot())
+    const fresh = new RngStreams('town1')
+    expect([r.get('never-touched').next(), r.get('never-touched').next()])
+      .toEqual([fresh.get('never-touched').next(), fresh.get('never-touched').next()])
+  })
 })
