@@ -77,18 +77,34 @@ describe('worldTick: social regen via conversation', () => {
     expect(res.state.agents.a2!.needs.social).toBeCloseTo(50 - DECAY, 5)
   })
 
-  it('60-tick boundary: spoke 60 ticks ago regenerates, 61 ticks ago decays', () => {
-    let inWindow = atTick(makeWorld(), 100)
-    inWindow = patchAgent(inWindow, 'a1', { needs: { ...inWindow.agents.a1!.needs, social: 50 }, lastSpokeTick: 41 }) // 101-41 = 60
+  it('recency boundary: spoke exactly window ticks ago regenerates, window+1 decays', () => {
+    const window = CFG.needs.socialRegenRecencyTicks
+    const tick = 100
+    const checkTick = tick + 1 // needsSystem runs one tick after tick_advanced
+    let inWindow = atTick(makeWorld(), tick)
+    inWindow = patchAgent(inWindow, 'a1', { needs: { ...inWindow.agents.a1!.needs, social: 50 }, lastSpokeTick: checkTick - window })
     inWindow = patchAgent(inWindow, 'a2', { needs: { ...inWindow.agents.a2!.needs, social: 50 } })
-    const regen = tickOnce(inWindow)
-    expect(regen.state.agents.a1!.needs.social).toBeCloseTo(50 + REGEN, 5)
+    expect(tickOnce(inWindow).state.agents.a1!.needs.social).toBeCloseTo(50 + REGEN, 5)
 
-    let stale = atTick(makeWorld(), 100)
-    stale = patchAgent(stale, 'a1', { needs: { ...stale.agents.a1!.needs, social: 50 }, lastSpokeTick: 40 }) // 101-40 = 61
+    let stale = atTick(makeWorld(), tick)
+    stale = patchAgent(stale, 'a1', { needs: { ...stale.agents.a1!.needs, social: 50 }, lastSpokeTick: checkTick - window - 1 })
     stale = patchAgent(stale, 'a2', { needs: { ...stale.agents.a2!.needs, social: 50 } })
-    const decay = tickOnce(stale)
-    expect(decay.state.agents.a1!.needs.social).toBeCloseTo(50 - DECAY, 5)
+    expect(tickOnce(stale).state.agents.a1!.needs.social).toBeCloseTo(50 - DECAY, 5)
+  })
+
+  it('honors a configured recency window', () => {
+    const short = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, needs: { socialRegenRecencyTicks: 10 } })
+    const tick = 100
+    const checkTick = tick + 1
+    let s = atTick(makeWorld(short), tick)
+    s = patchAgent(s, 'a1', { needs: { ...s.agents.a1!.needs, social: 50 }, lastSpokeTick: checkTick - 10 })
+    s = patchAgent(s, 'a2', { needs: { ...s.agents.a2!.needs, social: 50 } })
+    expect(tickOnce(s, short).state.agents.a1!.needs.social).toBeCloseTo(50 + short.needs.socialRegenConversingPerTick, 5)
+
+    let stale = atTick(makeWorld(short), tick)
+    stale = patchAgent(stale, 'a1', { needs: { ...stale.agents.a1!.needs, social: 50 }, lastSpokeTick: checkTick - 11 })
+    stale = patchAgent(stale, 'a2', { needs: { ...stale.agents.a2!.needs, social: 50 } })
+    expect(tickOnce(stale, short).state.agents.a1!.needs.social).toBeCloseTo(50 - short.needs.socialDecayPerTick, 5)
   })
 
   it('regen is clamped at 100', () => {

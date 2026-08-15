@@ -3,12 +3,11 @@ import type { TickCtx } from '../worldTick.js'
 const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v))
 
 // A conversation partner within earshot keeps social from decaying and instead regenerates it.
-const SPOKE_RECENCY_TICKS = 60
-
 function socialRegenActive(ctx: TickCtx, id: string): boolean {
   const tick = ctx.state().tick
+  const window = ctx.config.needs.socialRegenRecencyTicks
   const a = ctx.state().agents[id]!
-  const aSpoke = a.lastSpokeTick !== undefined && tick - a.lastSpokeTick <= SPOKE_RECENCY_TICKS
+  const aSpoke = a.lastSpokeTick !== undefined && tick - a.lastSpokeTick <= window
   for (const otherId of Object.keys(ctx.state().agents)) {
     if (otherId === id) continue
     const o = ctx.state().agents[otherId]!
@@ -16,7 +15,7 @@ function socialRegenActive(ctx: TickCtx, id: string): boolean {
     const dx = o.x - a.x
     const dy = o.y - a.y
     if (dx * dx + dy * dy > ctx.config.movement.earshotRadius * ctx.config.movement.earshotRadius) continue
-    const oSpoke = o.lastSpokeTick !== undefined && tick - o.lastSpokeTick <= SPOKE_RECENCY_TICKS
+    const oSpoke = o.lastSpokeTick !== undefined && tick - o.lastSpokeTick <= window
     if (aSpoke || oSpoke) return true
   }
   return false

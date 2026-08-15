@@ -6,6 +6,7 @@ const NeedsSchema = z.object({
   energyRegenAsleepPerTick: z.number().default(0.25),
   socialDecayPerTick: z.number().default(0.018),
   socialRegenConversingPerTick: z.number().default(0.5),
+  socialRegenRecencyTicks: z.number().default(60),
   warmthEqualizeFactorPerTick: z.number().default(0.05),
   debuffThreshold: z.number().default(30),
   collapseThreshold: z.number().default(5),
