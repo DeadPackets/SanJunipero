@@ -778,14 +778,16 @@ export function sweepMagentaCensus(img: RawImage): RawImage {
   return { width: img.width, height: img.height, data: out }
 }
 
-// Outline↔fill blend repair (pipeline v7): silhouette pixels whose color sits on the
-// RGB segment between their inward fill color and the outline palette are generation
-// blends and repaint to the outline — but only at t >= 0.4 (majority-or-near-majority
-// outline side; controller ruling): repainting mostly-fill rim pixels would be a
-// de-facto outline-thickening pass, which the style bible bans. OOB counts as
-// transparent because inputs are bbox-tight and land on a clear canvas.
-export function repairOutlineBlends(img: RawImage): { out: RawImage; repainted: number } {
-  const EPS = 10, SEG_DIST = 12, MIN_T = 0.4
+// Outline↔fill blend repair (pipeline v7, two-sided snap): silhouette pixels whose
+// color sits on the RGB segment between their inward fill color and the outline
+// palette are generation blends; authored pixel art has no fractional-membership
+// pixels, so each commits to its majority side — t >= 0.4 snaps to the nearest
+// outline color, t in [0.15, 0.4) snaps to the fill color (no line-weight change,
+// no new colors), t < 0.15 is already fill-committed within noise and stays.
+// OOB counts as transparent because inputs are bbox-tight on a clear canvas.
+export function repairOutlineBlends(img: RawImage):
+  { out: RawImage; repainted: number; outlineSnaps: number; fillSnaps: number } {
+  const EPS = 10, SEG_DIST = 12, OUTLINE_T = 0.4, FILL_T = 0.15
   const w = img.width, h = img.height, data = img.data
   const out = new Uint8ClampedArray(data)
   const opaque = (x: number, y: number) =>
@@ -812,7 +814,7 @@ export function repairOutlineBlends(img: RawImage): { out: RawImage; repainted: 
     const key = (data[s]! << 16) | (data[s + 1]! << 8) | data[s + 2]!
     counts.set(key, (counts.get(key) ?? 0) + 1)
   }
-  if (silTotal === 0) return { out: { width: w, height: h, data: out }, repainted: 0 }
+  if (silTotal === 0) return { out: { width: w, height: h, data: out }, repainted: 0, outlineSnaps: 0, fillSnaps: 0 }
   const keys = [...counts.keys()]
   const ch = (c: number) => [c >> 16, (c >> 8) & 255, c & 255] as const
   const parent = keys.map((_, i) => i)
@@ -835,7 +837,7 @@ export function repairOutlineBlends(img: RawImage): { out: RawImage; repainted: 
   const eligible = [...clusters.entries()]
     .filter(([, a]) => a.n >= 0.15 * silTotal)
     .map(([root, a]) => ({ root, luma: luma(a.r / a.n, a.g / a.n, a.b / a.n) }))
-  if (eligible.length === 0) return { out: { width: w, height: h, data: out }, repainted: 0 }
+  if (eligible.length === 0) return { out: { width: w, height: h, data: out }, repainted: 0, outlineSnaps: 0, fillSnaps: 0 }
   const darkest = Math.min(...eligible.map(e => e.luma))
   const outlineRoots = new Set(eligible.filter(e => e.luma <= darkest + 30).map(e => e.root))
   const members: [number, number, number][] = []
@@ -881,7 +883,7 @@ export function repairOutlineBlends(img: RawImage): { out: RawImage; repainted: 
   }
 
   // (c)+(d): segment test on every silhouette pixel that is neither outline nor fill
-  let repainted = 0
+  let outlineSnaps = 0, fillSnaps = 0
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     if (!silhouette[y * w + x]) continue
     const s = (y * w + x) * 4
@@ -896,11 +898,13 @@ export function repairOutlineBlends(img: RawImage): { out: RawImage; repainted: 
       if (d < oD) { oD = d; o = m }
     }
     const { d, t } = segProj(c, fill, o)
-    if (d > SEG_DIST || t < MIN_T) continue
-    out[s] = o[0]; out[s + 1] = o[1]; out[s + 2] = o[2]
-    repainted++
+    if (d > SEG_DIST || t < FILL_T) continue
+    const target = t >= OUTLINE_T ? o : fill
+    if (t >= OUTLINE_T) outlineSnaps++
+    else fillSnaps++
+    out[s] = target[0]!; out[s + 1] = target[1]!; out[s + 2] = target[2]!
   }
-  return { out: { width: w, height: h, data: out }, repainted }
+  return { out: { width: w, height: h, data: out }, repainted: outlineSnaps + fillSnaps, outlineSnaps, fillSnaps }
 }
 
 // Final art-resolution sweep: any opaque pixel in the magenta family (r>g+40 AND

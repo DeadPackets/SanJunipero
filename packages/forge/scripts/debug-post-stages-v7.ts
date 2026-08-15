@@ -61,7 +61,7 @@ async function run(kind: string, rawPath: string) {
   const lat = refineLattice(eroded, pitch, { ox: b.x0, oy: b.y0 })
   const r = resampleClusterLattice(eroded, lat)
   const before = sweepMagentaCensus(fillPinholes(despeckle(r.out, 3), 2)) // = v6 output
-  const { out: after, repainted } = repairOutlineBlends(before)
+  const { out: after, repainted, outlineSnaps, fillSnaps } = repairOutlineBlends(before)
 
   const M = (out: RawImage) =>
     sheetMetrics([{ out, dominance: r.dominance, eroded, lat, origin: r.origin }])
@@ -84,7 +84,7 @@ async function run(kind: string, rawPath: string) {
   const exclDelta = e7 - e6
   const gate = Math.abs(exclDelta) <= 0.0005 ? 'PASS' : '** FAIL **'
   console.log(`  pitch ${pitch.toFixed(2)}, art ${before.width}x${before.height}`)
-  console.log(`  repainted ${repainted} (${(100 * repainted / (before.width * before.height)).toFixed(2)}% of frame)`)
+  console.log(`  repainted ${repainted} = ${outlineSnaps} outline-snaps + ${fillSnaps} fill-snaps (${(100 * repainted / (before.width * before.height)).toFixed(2)}% of frame)`)
   console.log(`  reconErr total v6 ${m6.reconErr.toFixed(4)} -> v7 ${m7.reconErr.toFixed(4)} (delta ${delta >= 0 ? '+' : ''}${delta.toFixed(4)}, informational)`)
   console.log(`  reconErr excl-repaints v6 ${e6.toFixed(4)} -> v7 ${e7.toFixed(4)}  delta ${exclDelta >= 0 ? '+' : ''}${exclDelta.toFixed(5)}  gate(+/-0.0005) ${gate}`)
   const W = Math.min(16, before.width), H = Math.min(16, before.height)
@@ -95,7 +95,7 @@ async function run(kind: string, rawPath: string) {
   await dump(dir, 'after-full', after)
   await dump(dir, `before-crop-${bx}-${by}`, cropRect(before, bx, by, W, H))
   await dump(dir, `after-crop-${bx}-${by}`, cropRect(after, bx, by, W, H))
-  return { kind, repainted, v6: m6.reconErr, v7: m7.reconErr, delta, exclDelta }
+  return { kind, repainted, outlineSnaps, fillSnaps, v6: m6.reconErr, v7: m7.reconErr, delta, exclDelta }
 }
 
 const results = [
@@ -103,7 +103,7 @@ const results = [
   await run('worst-cell', `${DURABLE}/character-sheet-v2/raws/walk-a-nw.png`),
   await run('building', `${REF_CANDIDATES}/building-1.png`),
 ]
-console.log('\nsummary (image / repaints / excl-gate delta / total reconErr v6 -> v7):')
+console.log('\nsummary (image / outline-snaps / fill-snaps / excl-gate delta / total reconErr v6 -> v7):')
 for (const r of results)
-  console.log(`  ${r.kind.padEnd(11)} ${String(r.repainted).padStart(4)}  ${r.exclDelta >= 0 ? '+' : ''}${r.exclDelta.toFixed(5)}  ${r.v6.toFixed(4)} -> ${r.v7.toFixed(4)} (${r.delta >= 0 ? '+' : ''}${r.delta.toFixed(4)})`)
+  console.log(`  ${r.kind.padEnd(11)} ${String(r.outlineSnaps).padStart(4)}  ${String(r.fillSnaps).padStart(4)}  ${r.exclDelta >= 0 ? '+' : ''}${r.exclDelta.toFixed(5)}  ${r.v6.toFixed(4)} -> ${r.v7.toFixed(4)} (${r.delta >= 0 ? '+' : ''}${r.delta.toFixed(4)})`)
 console.log(`crops in ${STAGES}/{cell,worst-cell,building}/ — CHECKPOINT: full rebuild awaits controller inspection`)

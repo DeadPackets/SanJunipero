@@ -536,15 +536,39 @@ describe('repairOutlineBlends', () => {
     expect([...out.data.slice((1 * 12 + 5) * 4, (1 * 12 + 5) * 4 + 3)]).toEqual([255, 255, 180])
   })
 
-  it('leaves a mostly-fill blend (t=0.25) untouched but repaints a t=0.55 blend', () => {
+  it('snaps a t=0.25 blend to FILL, a t=0.55 blend to outline, leaves t=0.10 alone', () => {
     const T25: Px = [204, 142, 129, 255] // SKIN + 0.25*(WINE-SKIN)
     const T55: Px = [172, 96, 103, 255]  // SKIN + 0.55*(WINE-SKIN)
+    const T10: Px = [220, 165, 142, 255] // SKIN + 0.10*(WINE-SKIN): fill-committed within noise
+    const px = (1 * 12 + 5) * 4
     const low = repairOutlineBlends(ringSprite((x, y) => (x === 5 && y === 1 ? T25 : null)))
-    expect(low.repainted).toBe(0)
-    expect([...low.out.data.slice((1 * 12 + 5) * 4, (1 * 12 + 5) * 4 + 3)]).toEqual([204, 142, 129])
+    expect(low.fillSnaps).toBe(1)
+    expect(low.outlineSnaps).toBe(0)
+    expect([...low.out.data.slice(px, px + 3)]).toEqual([230, 180, 150])
     const high = repairOutlineBlends(ringSprite((x, y) => (x === 5 && y === 1 ? T55 : null)))
-    expect(high.repainted).toBe(1)
-    expect([...high.out.data.slice((1 * 12 + 5) * 4, (1 * 12 + 5) * 4 + 3)]).toEqual([125, 28, 65])
+    expect(high.outlineSnaps).toBe(1)
+    expect(high.fillSnaps).toBe(0)
+    expect([...high.out.data.slice(px, px + 3)]).toEqual([125, 28, 65])
+    const noise = repairOutlineBlends(ringSprite((x, y) => (x === 5 && y === 1 ? T10 : null)))
+    expect(noise.repainted).toBe(0)
+    expect([...noise.out.data.slice(px, px + 3)]).toEqual([220, 165, 142])
+  })
+
+  it('keeps line weight: outline pixel count grows by at most outlineSnaps, fill-snaps are not outline-colored', () => {
+    const T25: Px = [204, 142, 129, 255]
+    const T55: Px = [172, 96, 103, 255]
+    const src = ringSprite((x, y) => (x === 4 && y === 1 ? T25 : x === 7 && y === 1 ? T55 : null))
+    const { out, outlineSnaps, fillSnaps } = repairOutlineBlends(src)
+    expect(outlineSnaps).toBe(1)
+    expect(fillSnaps).toBe(1)
+    const countWine = (im: RawImage) => {
+      let n = 0
+      for (let i = 0; i < im.data.length; i += 4)
+        if (im.data[i + 3]! > 0 && im.data[i] === 125 && im.data[i + 1] === 28 && im.data[i + 2] === 65) n++
+      return n
+    }
+    expect(countWine(out)).toBeLessThanOrEqual(countWine(src) + outlineSnaps)
+    expect([...out.data.slice((1 * 12 + 4) * 4, (1 * 12 + 4) * 4 + 3)]).toEqual([230, 180, 150]) // fill snap, not outline
   })
 
   it('makes zero repaints on a clean sprite', () => {
