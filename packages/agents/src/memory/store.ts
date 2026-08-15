@@ -78,10 +78,14 @@ function toMemoryRow(r: RawMemory): MemoryRow {
 
 export class MemoryStore {
   constructor(
-    private readonly db: Database.Database,
-    private readonly agentId: string,
+    readonly db: Database.Database,
+    readonly agentId: string,
     private readonly embedder: { embed(t: string): Promise<Float32Array> },
   ) {}
+
+  embed(text: string): Promise<Float32Array> {
+    return this.embedder.embed(text)
+  }
 
   async insertMemory(m: {
     tick: number
@@ -128,6 +132,15 @@ export class MemoryStore {
       .prepare('SELECT * FROM memories WHERE id = ? AND agent_id = ?')
       .get(id, this.agentId) as RawMemory | undefined
     return row ? toMemoryRow(row) : null
+  }
+
+  getMemories(ids: number[]): MemoryRow[] {
+    if (ids.length === 0) return []
+    const placeholders = ids.map(() => '?').join(', ')
+    const rows = this.db
+      .prepare(`SELECT * FROM memories WHERE agent_id = ? AND id IN (${placeholders})`)
+      .all(this.agentId, ...ids) as RawMemory[]
+    return rows.map(toMemoryRow)
   }
 
   memoriesOfDay(day: number): MemoryRow[] {
