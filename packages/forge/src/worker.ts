@@ -17,6 +17,7 @@ export async function runForgeWorker(opts: {
       continue
     }
     const handler = opts.handlers[job.kind]
+    if (!handler) { opts.queue.fail(job.id, `no handler for kind '${job.kind}'`, { maxAttempts: 1 }); continue }
     try { opts.queue.complete(job.id, await handler(job.payload)) }
     catch (e) { opts.queue.fail(job.id, String(e)) }
   }

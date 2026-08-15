@@ -74,4 +74,17 @@ describe('runForgeWorker', () => {
     expect(handled).toEqual([{ desc: 'orphaned' }])
     expect(q.get(id)!.status).toBe('done')
   })
+  it('an unknown kind fails immediately (maxAttempts 1), no handler TypeError', async () => {
+    const q = new JobsQueue(openForgeDb(':memory:'))
+    const id = q.enqueue('unknown_kind', {})
+    const ctl = new AbortController()
+    const workerDone = runForgeWorker({
+      queue: q, pollMs: 5, signal: ctl.signal,
+      handlers: { commission: async p => p },
+    })
+    await new Promise(r => setTimeout(r, 50))
+    ctl.abort()
+    await workerDone
+    expect(q.get(id)!.status).toBe('failed')
+  })
 })
