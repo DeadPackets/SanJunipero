@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, estimatePitch, refineLattice, resampleModeLattice, sheetMetrics, sweepMagenta, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, estimatePitch, refineLattice, resampleModeLattice, sheetMetrics, sweepMagenta, driftField, resampleClusterLattice, mergeSheetColors, sweepMagentaCensus, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
 import { quantize } from './post/quantize.js'
 
 type Px = [number, number, number, number]
@@ -439,6 +439,75 @@ describe('sweepMagenta', () => {
     const ROSE: Px = [242, 198, 194, 255]
     const src = img(3, 3, (x, y) => (x === 1 && y === 1 ? ROSE : RED))
     expect([...sweepMagenta(src).data.slice((1 * 3 + 1) * 4, (1 * 3 + 1) * 4 + 4)]).toEqual(ROSE)
+  })
+})
+
+describe('driftField', () => {
+  const pal: Px[] = [RED, BLUE, [0, 255, 0, 255], [255, 255, 0, 255]]
+  // 6 cols x 8 rows of 6px blocks; art-row band j drawn shifted down by d(j)
+  function drifted(d: (j: number) => number): RawImage {
+    return img(36, 6 * 8 + 2, (x, y) => {
+      let j = 0
+      for (let k = 0; k < 8; k++) if (6 * k + d(k) <= y) j = k
+      const i = Math.min(5, Math.floor(x / 6))
+      return pal[(i * 2 + j * 3 + ((i * j) % 5)) % 4]!
+    })
+  }
+  it('recovers a linear 0->2px row drift monotonically, no jumps', () => {
+    const d = (j: number) => Math.min(2, Math.floor(j / 3))
+    const { rowOffsets } = driftField(drifted(d), 6, { ox: 0, oy: 0 })
+    // bands 0..7 carry content; a trailing band past the drifted content is unconstrained
+    for (let j = 1; j <= 7; j++) {
+      expect(rowOffsets[j]! - rowOffsets[j - 1]!, `row ${j}`).toBeGreaterThanOrEqual(0)
+      expect(rowOffsets[j]! - rowOffsets[j - 1]!, `row ${j}`).toBeLessThanOrEqual(1)
+    }
+    expect(rowOffsets[0]).toBe(0)
+    expect(rowOffsets[7]).toBe(2)
+  })
+  it('yields all-zero offsets on an undrifted grid', () => {
+    const { rowOffsets, colOffsets } = driftField(drifted(() => 0), 6, { ox: 0, oy: 0 })
+    expect(rowOffsets.every(o => o === 0)).toBe(true)
+    expect(colOffsets.every(o => o === 0)).toBe(true)
+  })
+})
+
+describe('resampleClusterLattice', () => {
+  it('does not split dominance across 5-bit bin boundaries', () => {
+    // Δ2 pair straddling the 15|16 bin edge: binning splits it, ε-clustering must not
+    const src = img(10, 10, (x, y) => ((x + y) % 2 === 0 ? [15, 15, 15, 255] as Px : [17, 17, 17, 255] as Px))
+    const lat = { px: 10, py: 10, ox: 0, oy: 0 }
+    const cluster = resampleClusterLattice(src, lat)
+    const mode = resampleModeLattice(src, lat)
+    expect(cluster.dominance[0]!).toBeGreaterThan(0.9)
+    expect(mode.dominance[0]!).toBeLessThan(0.7)
+    // weighted mean of the merged cluster
+    expect(cluster.out.data[0]!).toBeGreaterThanOrEqual(15)
+    expect(cluster.out.data[0]!).toBeLessThanOrEqual(17)
+  })
+})
+
+describe('mergeSheetColors', () => {
+  it('merges Δ6 colors to the population-weighted centroid, keeps Δ30 apart', () => {
+    const a = solid(2, 2, [100, 100, 100, 255])  // 4 px
+    const b = solid(2, 1, [106, 106, 106, 255])  // 2 px, Δ6 -> merges
+    const c = solid(1, 1, [136, 136, 136, 255])  // Δ30 from b -> stays
+    const [ma, mb, mc] = mergeSheetColors([a, b, c], 6)
+    expect([...ma!.data.slice(0, 3)]).toEqual([102, 102, 102]) // (100*4+106*2)/6
+    expect([...mb!.data.slice(0, 3)]).toEqual([102, 102, 102])
+    expect([...mc!.data.slice(0, 3)]).toEqual([136, 136, 136])
+  })
+})
+
+describe('sweepMagentaCensus', () => {
+  it('repaints rare enclosed magenta but keeps a frequent wine outline', () => {
+    const WINE: Px = [125, 28, 65, 255] // matches predicate, but frequent = palette
+    const src = img(10, 10, (x, y) => {
+      if (x === 5 && y === 5) return [255, 0, 255, 255] as Px // rare magenta
+      return y < 5 ? WINE : RED
+    })
+    const out = sweepMagentaCensus(src)
+    expect([...out.data.slice((5 * 10 + 5) * 4, (5 * 10 + 5) * 4 + 3)]).toEqual([255, 0, 0]) // neighbor mode = red
+    expect([...out.data.slice((2 * 10 + 2) * 4, (2 * 10 + 2) * 4 + 3)]).toEqual([125, 28, 65])
   })
 })
 

@@ -416,7 +416,10 @@ export function refineLattice(img: RawImage, pitch: number, phase0: { ox: number
 // at 5 bits/channel, output the densest bin's mean color; if dominance < 40%, retry with
 // the window nudged ±pitch/4 in each axis direction and keep the most dominant result.
 // dominance[] parallels out (0 for transparent); origin maps lattice indices to out pixels.
-export function resampleModeLattice(img: RawImage, lat: Lattice):
+// DEPRECATED for sprite pipelines (v5): 5-bit bins split ε-close colors and the per-cell
+// nudge is superseded by driftField — use resampleClusterLattice. Kept for metrics.
+// When a drift field is passed, windows follow it and the nudge is disabled.
+export function resampleModeLattice(img: RawImage, lat: Lattice, drift?: { rowOffsets: number[]; colOffsets: number[] }):
   { out: RawImage; dominance: Float32Array; origin: { i0: number; j0: number } } {
   let bx0 = img.width, bx1 = -1, by0 = img.height, by1 = -1
   for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
@@ -462,10 +465,11 @@ export function resampleModeLattice(img: RawImage, lat: Lattice):
   }
 
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-    const cxLo = lat.ox + i * lat.px, cyLo = lat.oy + j * lat.py
+    const ddx = drift?.colOffsets[i - i0] ?? 0, ddy = drift?.rowOffsets[j - j0] ?? 0
+    const cxLo = lat.ox + i * lat.px + ddx, cyLo = lat.oy + j * lat.py + ddy
     const mx = 0.2 * lat.px, my = 0.2 * lat.py
     let s = sampleWindow(cxLo + mx, cxLo + lat.px - mx, cyLo + my, cyLo + lat.py - my)
-    if (s.color && s.dom < 0.4) {
+    if (!drift && s.color && s.dom < 0.4) {
       for (const [dx, dy] of [[lat.px / 4, 0], [-lat.px / 4, 0], [0, lat.py / 4], [0, -lat.py / 4]] as const) {
         const alt = sampleWindow(cxLo + mx + dx, cxLo + lat.px - mx + dx, cyLo + my + dy, cyLo + lat.py - my + dy)
         if (alt.color && alt.dom > s.dom) s = alt
@@ -516,6 +520,258 @@ export function sheetMetrics(cells: {
     dupRowCount: dupRows,
     reconErr: reconN ? reconSum / reconN : 0,
   }
+}
+
+type Drift = { rowOffsets: number[]; colOffsets: number[] }
+
+// ε-cluster of RGB samples via single-linkage union-find (per-channel distance ≤ eps).
+// Returns the dominant cluster's fraction and its mean color.
+function clusterDominant(px: [number, number, number][], eps = 8):
+  { dom: number; color: [number, number, number] } | null {
+  const n = px.length
+  if (n === 0) return null
+  const parent = Array.from({ length: n }, (_, i) => i)
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)))
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    if (Math.abs(px[i]![0] - px[j]![0]) <= eps && Math.abs(px[i]![1] - px[j]![1]) <= eps && Math.abs(px[i]![2] - px[j]![2]) <= eps) {
+      const a = find(i), b = find(j)
+      if (a !== b) parent[a] = b
+    }
+  }
+  const groups = new Map<number, number[]>()
+  for (let i = 0; i < n; i++) {
+    const r = find(i)
+    const g = groups.get(r)
+    if (g) g.push(i)
+    else groups.set(r, [i])
+  }
+  let best: number[] = []
+  for (const g of groups.values()) if (g.length > best.length) best = g
+  let sr = 0, sg = 0, sb = 0
+  for (const i of best) { sr += px[i]![0]; sg += px[i]![1]; sb += px[i]![2] }
+  return {
+    dom: best.length / n,
+    color: [Math.round(sr / best.length), Math.round(sg / best.length), Math.round(sb / best.length)],
+  }
+}
+
+// Smooth lattice deformation: per art-row (and per art-column) integer offsets in
+// [-2, 2] maximizing summed full-cell ε-cluster dominance across the band, solved by
+// DP with |Δoffset| ≤ 1 between neighbors and a 0.5/px jump penalty. Full-cell windows
+// (no margin) so a 1px misalignment already dents dominance.
+export function driftField(img: RawImage, pitch: number, phase: { ox: number; oy: number }): Drift {
+  let bx0 = img.width, bx1 = -1, by0 = img.height, by1 = -1
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
+    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
+      if (x < bx0) bx0 = x
+      if (x > bx1) bx1 = x
+      if (y < by0) by0 = y
+      if (y > by1) by1 = y
+    }
+  if (bx1 < 0) throw new Error('driftField: no opaque pixels')
+
+  function windowPixels(xLo: number, xHi: number, yLo: number, yHi: number): { total: number; px: [number, number, number][] } {
+    const px: [number, number, number][] = []
+    let total = 0
+    for (let y = Math.max(0, Math.floor(yLo)); y < Math.min(img.height, Math.ceil(yHi)); y++) {
+      if (y + 0.5 < yLo || y + 0.5 >= yHi) continue
+      for (let x = Math.max(0, Math.floor(xLo)); x < Math.min(img.width, Math.ceil(xHi)); x++) {
+        if (x + 0.5 < xLo || x + 0.5 >= xHi) continue
+        total++
+        const s = (y * img.width + x) * 4
+        if (img.data[s + 3] === 0) continue
+        px.push([img.data[s]!, img.data[s + 1]!, img.data[s + 2]!])
+      }
+    }
+    return { total, px }
+  }
+
+  function solve(axis: 'row' | 'col'): number[] {
+    const [o, p, lo, hi, crossLo, crossHi] = axis === 'row'
+      ? [phase.oy, pitch, by0, by1, bx0, bx1] : [phase.ox, pitch, bx0, bx1, by0, by1]
+    const j0 = Math.floor((lo - o) / p), j1 = Math.floor((hi - o) / p)
+    const nBands = j1 - j0 + 1
+    const c0 = Math.floor((crossLo - (axis === 'row' ? phase.ox : phase.oy)) / pitch)
+    const c1 = Math.floor((crossHi - (axis === 'row' ? phase.ox : phase.oy)) / pitch)
+    const DELTAS = [-2, -1, 0, 1, 2]
+    const score: number[][] = []
+    for (let b = 0; b < nBands; b++) {
+      const row: number[] = []
+      for (const d of DELTAS) {
+        let s = 0
+        for (let c = c0; c <= c1; c++) {
+          const bandLo = o + (j0 + b) * p + d, bandHi = bandLo + p
+          const crossStart = (axis === 'row' ? phase.ox : phase.oy) + c * pitch
+          const w = axis === 'row'
+            ? windowPixels(crossStart, crossStart + pitch, bandLo, bandHi)
+            : windowPixels(bandLo, bandHi, crossStart, crossStart + pitch)
+          if (w.total === 0 || w.px.length * 2 < w.total) continue
+          const cl = clusterDominant(w.px)
+          if (cl) s += cl.dom
+        }
+        row.push(s)
+      }
+      score.push(row)
+    }
+    // DP over offsets, |Δ| ≤ 1, penalty 0.5/px; ties prefer smaller |δ|
+    const best: number[][] = [score[0]!.slice()]
+    const from: number[][] = [DELTAS.map((_, k) => k)]
+    for (let b = 1; b < nBands; b++) {
+      const row: number[] = [], src: number[] = []
+      for (let k = 0; k < DELTAS.length; k++) {
+        let bv = -Infinity, bs = k
+        for (let k2 = Math.max(0, k - 1); k2 <= Math.min(DELTAS.length - 1, k + 1); k2++) {
+          const v = best[b - 1]![k2]! - 0.5 * Math.abs(DELTAS[k]! - DELTAS[k2]!)
+          if (v > bv || (v === bv && Math.abs(DELTAS[k2]!) < Math.abs(DELTAS[bs]!))) { bv = v; bs = k2 }
+        }
+        row.push(bv + score[b]![k]!)
+        src.push(bs)
+      }
+      best.push(row)
+      from.push(src)
+    }
+    let k = 0
+    for (let i = 1; i < DELTAS.length; i++) {
+      const b = best[nBands - 1]!
+      if (b[i]! > b[k]! || (b[i]! === b[k]! && Math.abs(DELTAS[i]!) < Math.abs(DELTAS[k]!))) k = i
+    }
+    const out = new Array<number>(nBands)
+    for (let b = nBands - 1; b >= 0; b--) { out[b] = DELTAS[k]!; k = from[b]![k]! }
+    return out
+  }
+  return { rowOffsets: solve('row'), colOffsets: solve('col') }
+}
+
+// ε-cluster resample (pipeline v5): like resampleModeLattice but the dominant color
+// comes from single-linkage ε-clustering (≤8/channel) instead of 5-bit bins, and an
+// optional drift field shifts each cell's sample window instead of per-cell nudging.
+export function resampleClusterLattice(img: RawImage, lat: Lattice, drift?: Drift):
+  { out: RawImage; dominance: Float32Array; origin: { i0: number; j0: number } } {
+  let bx0 = img.width, bx1 = -1, by0 = img.height, by1 = -1
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
+    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
+      if (x < bx0) bx0 = x
+      if (x > bx1) bx1 = x
+      if (y < by0) by0 = y
+      if (y > by1) by1 = y
+    }
+  if (bx1 < 0) throw new Error('resampleClusterLattice: no opaque pixels')
+  const i0 = Math.floor((bx0 - lat.ox) / lat.px), i1 = Math.floor((bx1 - lat.ox) / lat.px)
+  const j0 = Math.floor((by0 - lat.oy) / lat.py), j1 = Math.floor((by1 - lat.oy) / lat.py)
+  const outW = i1 - i0 + 1, outH = j1 - j0 + 1
+  const out = new Uint8ClampedArray(outW * outH * 4)
+  const dominance = new Float32Array(outW * outH)
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const dx = drift?.colOffsets[i - i0] ?? 0, dy = drift?.rowOffsets[j - j0] ?? 0
+    const xLo = lat.ox + i * lat.px + 0.2 * lat.px + dx, xHi = lat.ox + (i + 1) * lat.px - 0.2 * lat.px + dx
+    const yLo = lat.oy + j * lat.py + 0.2 * lat.py + dy, yHi = lat.oy + (j + 1) * lat.py - 0.2 * lat.py + dy
+    let total = 0
+    const px: [number, number, number][] = []
+    for (let y = Math.max(0, Math.floor(yLo)); y < Math.min(img.height, Math.ceil(yHi)); y++) {
+      if (y + 0.5 < yLo || y + 0.5 >= yHi) continue
+      for (let x = Math.max(0, Math.floor(xLo)); x < Math.min(img.width, Math.ceil(xHi)); x++) {
+        if (x + 0.5 < xLo || x + 0.5 >= xHi) continue
+        total++
+        const s = (y * img.width + x) * 4
+        if (img.data[s + 3] === 0) continue
+        px.push([img.data[s]!, img.data[s + 1]!, img.data[s + 2]!])
+      }
+    }
+    if (total === 0 || px.length === 0 || px.length * 2 < total) continue
+    const cl = clusterDominant(px)
+    if (!cl) continue
+    const d = ((j - j0) * outW + (i - i0)) * 4
+    out[d] = cl.color[0]; out[d + 1] = cl.color[1]; out[d + 2] = cl.color[2]; out[d + 3] = 255
+    dominance[(j - j0) * outW + (i - i0)] = cl.dom
+  }
+  return { out: { width: outW, height: outH, data: out }, dominance, origin: { i0, j0 } }
+}
+
+// Sheet-wide near-duplicate color merge: union-find over every output color across the
+// images (per-channel ≤ eps), each replaced by its cluster's population-weighted centroid.
+export function mergeSheetColors(imgs: RawImage[], eps = 6): RawImage[] {
+  const counts = new Map<number, number>()
+  for (const img of imgs) for (let i = 0; i < img.data.length; i += 4) {
+    if (img.data[i + 3] === 0) continue
+    const key = (img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const colors = [...counts.keys()]
+  const parent = colors.map((_, i) => i)
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)))
+  const ch = (c: number) => [c >> 16, (c >> 8) & 255, c & 255] as const
+  for (let i = 0; i < colors.length; i++) for (let j = i + 1; j < colors.length; j++) {
+    const a = ch(colors[i]!), b = ch(colors[j]!)
+    if (Math.abs(a[0] - b[0]) <= eps && Math.abs(a[1] - b[1]) <= eps && Math.abs(a[2] - b[2]) <= eps) {
+      const ra = find(i), rb = find(j)
+      if (ra !== rb) parent[ra] = rb
+    }
+  }
+  const acc = new Map<number, { n: number; r: number; g: number; b: number }>()
+  colors.forEach((c, i) => {
+    const root = find(i), n = counts.get(c)!, [r, g, b] = ch(c)
+    const a = acc.get(root) ?? { n: 0, r: 0, g: 0, b: 0 }
+    a.n += n; a.r += r * n; a.g += g * n; a.b += b * n
+    acc.set(root, a)
+  })
+  const remap = new Map<number, [number, number, number]>()
+  colors.forEach((c, i) => {
+    const a = acc.get(find(i))!
+    remap.set(c, [Math.round(a.r / a.n), Math.round(a.g / a.n), Math.round(a.b / a.n)])
+  })
+  return imgs.map(img => {
+    const data = new Uint8ClampedArray(img.data)
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] === 0) continue
+      const m = remap.get((data[i]! << 16) | (data[i + 1]! << 8) | data[i + 2]!)!
+      data[i] = m[0]; data[i + 1] = m[1]; data[i + 2] = m[2]
+    }
+    return { width: img.width, height: img.height, data }
+  })
+}
+
+// Census-aware sweep: a predicate-matching color is contamination only if RARE
+// (count < max(2, 0.5% of opaque)) — frequent matchers are palette (wine outline).
+export function sweepMagentaCensus(img: RawImage): RawImage {
+  const out = new Uint8ClampedArray(img.data)
+  const counts = new Map<number, number>()
+  let opaque = 0
+  for (let i = 0; i < img.data.length; i += 4) {
+    if (img.data[i + 3] === 0) continue
+    opaque++
+    const key = (img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const threshold = Math.max(2, 0.005 * opaque)
+  const contaminated = new Set<number>()
+  for (const [key, n] of counts) {
+    const r = key >> 16, g = (key >> 8) & 255, b = key & 255
+    if (r > g + 40 && b > g + 25 && n < threshold) contaminated.add(key)
+  }
+  if (contaminated.size === 0) return { width: img.width, height: img.height, data: out }
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
+    const i = (y * img.width + x) * 4
+    if (img.data[i + 3] === 0) continue
+    const key = (img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!
+    if (!contaminated.has(key)) continue
+    const nb = new Map<number, number>()
+    let best = -1, bestN = 0
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue
+      const nx = x + dx, ny = y + dy
+      if (nx < 0 || ny < 0 || nx >= img.width || ny >= img.height) continue
+      const n = (ny * img.width + nx) * 4
+      if (img.data[n + 3] === 0) continue
+      const nk = (img.data[n]! << 16) | (img.data[n + 1]! << 8) | img.data[n + 2]!
+      if (contaminated.has(nk)) continue
+      const c = (nb.get(nk) ?? 0) + 1
+      nb.set(nk, c)
+      if (c > bestN) { bestN = c; best = nk }
+    }
+    if (best < 0) continue
+    out[i] = best >> 16; out[i + 1] = (best >> 8) & 255; out[i + 2] = best & 255
+  }
+  return { width: img.width, height: img.height, data: out }
 }
 
 // Final art-resolution sweep: any opaque pixel in the magenta family (r>g+40 AND
