@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
 
 type Px = [number, number, number, number]
 function img(w: number, h: number, px: (x: number, y: number) => Px): RawImage {
@@ -71,6 +71,35 @@ describe('cellDistance', () => {
     const a = img(2, 1, x => (x === 0 ? RED : CLEAR))
     const b = img(2, 1, x => (x === 0 ? RED : CLEAR))
     expect(cellDistance(a, b)).toBe(0)
+  })
+})
+
+describe('downscaleMajority', () => {
+  it('dominant color wins over speckle noise', () => {
+    // 4x4 -> 1x1: 13 red, 3 blue speckles -> red
+    const speckles = new Set([1, 6, 11])
+    const src = img(4, 4, (x, y) => (speckles.has(y * 4 + x) ? BLUE : RED))
+    expect([...downscaleMajority(src, 1, 1).data]).toEqual(RED)
+  })
+  it('outputs transparent iff more than half the block is transparent', () => {
+    // 9 of 16 transparent -> transparent
+    const mostlyClear = img(4, 4, (x, y) => (y * 4 + x < 9 ? CLEAR : RED))
+    expect(downscaleMajority(mostlyClear, 1, 1).data[3]).toBe(0)
+    // exactly 8 of 16 transparent -> opaque, majority color
+    const halfClear = img(4, 4, (x, y) => (y * 4 + x < 8 ? CLEAR : RED))
+    expect([...downscaleMajority(halfClear, 1, 1).data]).toEqual(RED)
+  })
+  it('breaks frequency ties by first-seen scan order', () => {
+    const src = img(2, 2, (x, y) => (y === 0 ? BLUE : RED)) // 2 blue then 2 red
+    expect([...downscaleMajority(src, 1, 1).data]).toEqual(BLUE)
+  })
+  it('preserves quadrant colors on a clean 2x downscale', () => {
+    const src = img(4, 4, (x, y) => (x < 2 ? (y < 2 ? RED : BLUE) : (y < 2 ? [0, 255, 0, 255] as Px : CLEAR)))
+    const out = downscaleMajority(src, 2, 2)
+    expect([...out.data.slice(0, 4)]).toEqual(RED)
+    expect([...out.data.slice(4, 8)]).toEqual([0, 255, 0, 255])
+    expect([...out.data.slice(8, 12)]).toEqual(BLUE)
+    expect(out.data[15]).toBe(0)
   })
 })
 

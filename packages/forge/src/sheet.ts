@@ -56,6 +56,34 @@ export function sliceGrid(img: RawImage, cols: number, rows: number): RawImage[]
     }))
 }
 
+// Majority-vote reduction for big-pixel source art: each output pixel is the most
+// frequent opaque RGBA in its source block (ties: first-seen); transparent iff >50%
+// of the block is transparent. Robust to speckle noise, unlike point sampling.
+export function downscaleMajority(img: RawImage, w: number, h: number): RawImage {
+  const out = new Uint8ClampedArray(w * h * 4)
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.floor(y * img.height / h), y1 = Math.floor((y + 1) * img.height / h)
+    for (let x = 0; x < w; x++) {
+      const x0 = Math.floor(x * img.width / w), x1 = Math.floor((x + 1) * img.width / w)
+      const counts = new Map<number, number>()
+      let clear = 0, total = 0, best = -1, bestN = 0
+      for (let sy = y0; sy < y1; sy++) for (let sx = x0; sx < x1; sx++) {
+        total++
+        const i = (sy * img.width + sx) * 4
+        if (img.data[i + 3]! === 0) { clear++; continue }
+        const key = (img.data[i]! << 24 | img.data[i + 1]! << 16 | img.data[i + 2]! << 8 | img.data[i + 3]!) >>> 0
+        const n = (counts.get(key) ?? 0) + 1
+        counts.set(key, n)
+        if (n > bestN) { bestN = n; best = key } // strict > keeps first-seen on ties
+      }
+      const d = (y * w + x) * 4
+      if (clear * 2 > total || best < 0) continue // stays transparent
+      out[d] = best >>> 24; out[d + 1] = (best >>> 16) & 255; out[d + 2] = (best >>> 8) & 255; out[d + 3] = best & 255
+    }
+  }
+  return { width: w, height: h, data: out }
+}
+
 export function mirrorX(img: RawImage): RawImage {
   const out = new Uint8ClampedArray(img.data.length)
   for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
