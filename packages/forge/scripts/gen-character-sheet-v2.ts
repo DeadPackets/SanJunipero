@@ -139,11 +139,16 @@ console.log('cell sw/idle')
 const first = await generateCell('sw', 'idle', 0, [ANCHOR])
 cells.set(label('sw', 'idle'), { attempts: [first], current: first, retries: 0 })
 const laterRefs = [ANCHOR, first.raw]
+// se column proactively gets the mirrored sw/idle raw as FIRST ref (mirrored reference
+// INPUT only — the model re-renders with correct NW light) to break the recurring
+// sw/idle ~ se/idle near-dupe; output pixels are never mirrored.
+const mirroredSw = await encodePng(mirrorX(await decodePng(first.raw)))
+const refsFor = (f: Facing) => (f === 'se' ? [mirroredSw, ANCHOR] : laterRefs)
 
 for (const p of POSES) for (const f of FACINGS) {
   if (f === 'sw' && p === 'idle') continue
   console.log(`cell ${label(f, p)}`)
-  const a = await generateCell(f, p, 0, laterRefs)
+  const a = await generateCell(f, p, 0, refsFor(f))
   cells.set(label(f, p), { attempts: [a], current: a, retries: 0 })
 }
 
@@ -158,8 +163,9 @@ function medianPairwise(): number {
   return ds[Math.floor(ds.length / 2)]!
 }
 const median = medianPairwise()
-const straightThr = 0.36 * median, mirrorThr = 0.21 * median
-console.log(`pairwise median=${median.toFixed(3)} -> thresholds straight<${straightThr.toFixed(3)} mirror<${mirrorThr.toFixed(3)}`)
+// thresholds fixed by controller ruling (recalibrated from the previous run's median 0.414)
+const straightThr = 0.149, mirrorThr = 0.087
+console.log(`pairwise median=${median.toFixed(3)}; ruling thresholds straight<${straightThr} mirror<${mirrorThr}`)
 
 type Flag = { label: string; doubleFacing: boolean; doublePose: boolean }
 function collectFindings() {
