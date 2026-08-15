@@ -2,8 +2,10 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { EMBEDDING_DIM, FakeEmbedder, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
+import { unregisterVerb } from '@sj/engine'
 import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
+import { ReviewStore } from './review.js'
 import { RulingsStore } from './rulings.js'
 import { FORBIDDEN_FRAMING } from './prompt.js'
 import type { Recipe, Verdict } from './verdict.js'
@@ -238,6 +240,22 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
     expect(verdict).toEqual(impossibleVerdict)
     expect(llm.objectCalls).toBe(1)
+  })
+
+  it('arbiter.revert routes through the review queue, leaving no stale pending disposition', async () => {
+    unregisterVerb('recipe:boil_salt')
+    const llm = new ScriptedLlm(() => impossibleVerdict)
+    const { db, arbiter } = await makeRig(llm)
+    const review = new ReviewStore(db)
+
+    const { ruleId } = arbiter.codify(boilSaltRecipe)
+    expect(review.pending()).toHaveLength(1)
+
+    arbiter.revert('recipe:boil_salt', 'physics wrong')
+
+    expect(review.pending()).toEqual([])
+    const row = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').get(ruleId) as { status: string }
+    expect(row.status).toBe('reverted')
   })
 })
 

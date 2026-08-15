@@ -63,6 +63,10 @@ export class ReviewStore {
   }
 
   approve(ruleId: number): void {
+    const rb = this.db.prepare('SELECT reverted_at_tick FROM rulebook WHERE id = ?').get(ruleId) as
+      | { reverted_at_tick: number | null }
+      | undefined
+    if (!rb || rb.reverted_at_tick !== null) throw new Error(`cannot approve reverted rule ${ruleId}`)
     this.db.prepare('UPDATE ruling_reviews SET status = ? WHERE rule_id = ?').run('approved', ruleId)
   }
 
@@ -72,5 +76,15 @@ export class ReviewStore {
     this.db.prepare('UPDATE ruling_reviews SET status = ?, reason = ?, tick = ? WHERE rule_id = ?').run('reverted', reason, tick, ruleId)
     this.rulebook.revert(row.recipe_id, reason, tick)
     unregisterVerb(row.recipe_id)
+  }
+
+  revertByRecipe(recipeId: string, reason: string, tick: number): void {
+    const rb = this.rulebook.byId(recipeId)
+    if (!rb) return
+    const existing = this.db.prepare('SELECT id FROM ruling_reviews WHERE rule_id = ?').get(rb.id) as
+      | { id: number }
+      | undefined
+    if (!existing) this.queue(rb.id, recipeId, tick)
+    this.revert(rb.id, reason, tick)
   }
 }

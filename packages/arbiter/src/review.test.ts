@@ -96,6 +96,26 @@ describe('ReviewStore', () => {
     const rows = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').all(ruleId) as Array<{ status: string }>
     expect(rows).toEqual([{ status: 'reverted' }])
     expect(review.pending()).toEqual([])
-
   })
+
+
+  it('approve throws on a tombstoned rule', () => {
+    const { db, review, rulebook } = makeReview()
+    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, tick: 200 })
+    review.revert(ruleId, 'physics wrong', 500)
+    review.queue(ruleId, 'recipe:boil_salt', 600) // re-queue a reverted rule
+    expect(() => review.approve(ruleId)).toThrow(/reverted/)
+    const row = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').get(ruleId) as { status: string }
+    expect(row.status).toBe('pending') // disposition unchanged
+  })
+
+  it('revertByRecipe queues first when no review row exists, then leaves a single reverted disposition', () => {
+    const { db, review, rulebook } = makeReview()
+    const ruleId = rulebook.insert(boilSaltRecipe, 200) // bypass codify: no auto-queue
+    review.revertByRecipe('recipe:boil_salt', 'physics wrong', 500)
+    expect(review.pending()).toEqual([])
+    const rows = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').all(ruleId) as Array<{ status: string }>
+    expect(rows).toEqual([{ status: 'reverted' }])
+  })
+
 })

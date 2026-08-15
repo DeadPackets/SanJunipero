@@ -1,6 +1,5 @@
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/agents'
-import { unregisterVerb } from '@sj/engine'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import { codify as codifyRecipe } from './codify.js'
@@ -90,8 +89,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     },
 
     revert(recipeId, reason) {
-      rulebook.revert(recipeId, reason, tick())
-      unregisterVerb(recipeId)
+      review.revertByRecipe(recipeId, reason, tick())
     },
   }
 }
