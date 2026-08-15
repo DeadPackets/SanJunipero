@@ -21,7 +21,7 @@ Versioned doc + reference sheet (the 3 reference images from Task 6), injected i
 
 ## Palette (40 colors, warm cozy pastel)
 
-Every asset is quantized to this palette, no exceptions.
+The 40-color master palette governs UI chrome, tints, and terrain, and is a JUDGE HARMONY criterion for sprites — it is no longer a per-pixel clamp on generated sprites (quantize retained for terrain pending its first generation).
 
 | Ramp | Hexes |
 |---|---|
@@ -37,9 +37,9 @@ Every asset is quantized to this palette, no exceptions.
 
 ## Outlines
 
-- Selective soft outlines: dark shade of the local color (darken factor 0.55) on characters and objects.
+- Sprites carry their own outlines (the generated art includes a dark silhouette outline) — NO outline pass on sprites.
 - No outlines on terrain.
-- The outline pass recolors edges automatically.
+- The mechanical outline pass (darken factor 0.55) is retained for terrain pending its first generation.
 
 ## Rendering
 
@@ -58,6 +58,7 @@ Every asset is quantized to this palette, no exceptions.
 
 - ~3 heads tall (Stardew-like).
 - Age bands (child / adult / elder) must read clearly in the rigs.
+- Native-resolution sprites (snapToGrid, no forced 32px crush) on 96×96 cells, feet-anchored at y=88, rendering ≈2 tiles tall.
 
 ## Atmosphere
 
@@ -65,6 +66,6 @@ Every asset is quantized to this palette, no exceptions.
 
 ## Facings
 
-- Characters: 4 dimetric facings (sw, se, ne, nw) × 3 poses (idle, walk-a, walk-b) per sheet; cells 32×32, sheet 128×96. Column order sw, se, ne, nw (left→right) and row order idle, walk-a, walk-b (top→bottom), as in `sheet.ts`. Walk animation = idle, walk-a, idle, walk-b loop.
+- Characters: 4 dimetric facings (sw, se, ne, nw) × 3 poses (idle, walk-a, walk-b) per sheet; cells 96×96 (feet-anchored at y=88), sheet 384×288. Column order sw, se, ne, nw (left→right) and row order idle, walk-a, walk-b (top→bottom), as in `sheet.ts`. Walk animation = idle, walk-a, idle, walk-b loop.
 - Buildings: up to 2 authored facings — door-sw (default) and door-se variant; codex id suffix `#se`. NEVER mirror sprites: light is locked from the north-west (mirroring flips it).
 - Engine note: Structure has no facing field yet (C2); facing is asset-selection-only until then.
