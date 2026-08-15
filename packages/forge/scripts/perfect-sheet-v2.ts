@@ -1,15 +1,15 @@
-// OFFLINE — zero API spend. PIPELINE V3 FINAL (controller-approved): rebuild the 12
-// character cells + 3 refs from cached raws via chromaKey → pitch-derived erode →
-// resampleToArtHeight → despeckle → fillPinholes → registration → anchor. No defringe,
-// no detectArtScale/snapToGrid, no quantization — sprites ship with generated colors.
+// OFFLINE — zero API spend. PIPELINE V4 FULL REBUILD (controller-approved): measured
+// fractional pitch, natural per-cell art heights, mode sampling on a refined lattice.
+// chromaKey → erode(round(sheetPitch/2)) → refineLattice → resampleModeLattice →
+// despeckle(logged) → fillPinholes → registration → anchor. No forced heights.
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import sharp from 'sharp'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import {
   FACINGS, POSES, assembleGrid, cellDistance, mirrorX, duplicateReport,
-  erodeForPitch, resampleToArtHeight, despeckle, fillPinholes, registerToReference,
-  type Facing, type Pose,
+  erodeAlpha, estimatePitch, refineLattice, resampleModeLattice, despeckle, fillPinholes,
+  registerToReference, sheetMetrics, type Facing, type Pose, type Lattice,
 } from '../src/sheet.js'
 
 const OUT = 'packages/forge/out/character-sheet-v2'
@@ -21,7 +21,6 @@ const CROPS_DIR = `${DURABLE}/pipeline-v3-stages/final-crops`
 const REF_CANDIDATES = '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/reference-candidates'
 for (const d of [GIFS_DIR, CROPS_DIR, 'packages/forge/out/refs-v2']) mkdirSync(d, { recursive: true })
 
-const CANVAS = 96, FEET_Y = 88, ART_H = 64
 const label = (f: Facing, p: Pose) => `${f}/${p}`
 const file = (f: Facing, p: Pose) => `${p}-${f}.png`
 
@@ -37,6 +36,56 @@ function bbox(img: RawImage) {
   if (x1 < 0) throw new Error('empty sprite')
   return { x0, x1, y0, y1, w: x1 - x0 + 1, h: y1 - y0 + 1 }
 }
+const opaqueCount = (img: RawImage) => {
+  let n = 0
+  for (let i = 3; i < img.data.length; i += 4) if (img.data[i]! > 0) n++
+  return n
+}
+function upscaleNearest(img: RawImage, k: number): RawImage {
+  const out = new Uint8ClampedArray(img.width * k * img.height * k * 4)
+  for (let y = 0; y < img.height * k; y++) for (let x = 0; x < img.width * k; x++) {
+    const s = ((y / k | 0) * img.width + (x / k | 0)) * 4
+    out.set(img.data.subarray(s, s + 4), (y * img.width * k + x) * 4)
+  }
+  return { width: img.width * k, height: img.height * k, data: out }
+}
+
+type Processed = { out: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice; origin: { i0: number; j0: number } }
+function v4chain(keyed: RawImage, pitch: number, name: string): Processed {
+  const eroded = erodeAlpha(keyed, Math.max(1, Math.round(pitch / 2)))
+  const b = bbox(eroded)
+  const lat = refineLattice(eroded, pitch, { ox: b.x0, oy: b.y0 })
+  const r = resampleModeLattice(eroded, lat)
+  const desp = despeckle(r.out, 3)
+  const removed = opaqueCount(r.out) - opaqueCount(desp)
+  if (removed > 0) console.log(`  ${name}: despeckle removed ${removed} px${removed > 2 ? ' ** FLAG >2 **' : ''}`)
+  return { out: fillPinholes(desp, 2), dominance: r.dominance, eroded, lat, origin: r.origin }
+}
+
+// 1. Characters: per-cell pitch -> sheetPitch median -> v4 chain at sheetPitch.
+const keyedCells = new Map<string, RawImage>()
+const pitches: number[] = []
+for (const p of POSES) for (const f of FACINGS) {
+  const keyed = chromaKey(await decodePng(readFileSync(`${SHEET_DIR}/raws/${file(f, p)}`)))
+  keyedCells.set(label(f, p), keyed)
+  const pi = estimatePitch(keyed)
+  pitches.push(pi)
+  console.log(`${label(f, p)}: pitch ${pi.toFixed(2)}`)
+}
+const sorted = [...pitches].sort((a, b) => a - b)
+const sheetPitch = sorted[Math.floor(sorted.length / 2)]!
+console.log(`sheetPitch (median): ${sheetPitch.toFixed(2)}`)
+
+const proc = new Map<string, Processed>()
+for (const p of POSES) for (const f of FACINGS)
+  proc.set(label(f, p), v4chain(keyedCells.get(label(f, p))!, sheetPitch, label(f, p)))
+
+// Canvas rule: any art height > 88 -> 128/118 for the whole sheet.
+const maxH = Math.max(...[...proc.values()].map(c => c.out.height))
+const CANVAS = maxH > 88 ? 128 : 96
+const FEET_Y = maxH > 88 ? 118 : 88
+console.log(`max art height ${maxH} -> canvas ${CANVAS}x${CANVAS} feetY ${FEET_Y}`)
+
 function place(img: RawImage, tx: number, ty: number): RawImage {
   const b = bbox(img)
   tx = Math.min(CANVAS - 1 - b.x1, Math.max(-b.x0, tx))
@@ -50,59 +99,54 @@ function place(img: RawImage, tx: number, ty: number): RawImage {
   }
   return { width: CANVAS, height: CANVAS, data: out }
 }
-function upscaleNearest(img: RawImage, k: number): RawImage {
-  const out = new Uint8ClampedArray(img.width * k * img.height * k * 4)
-  for (let y = 0; y < img.height * k; y++) for (let x = 0; x < img.width * k; x++) {
-    const s = ((y / k | 0) * img.width + (x / k | 0)) * 4
-    out.set(img.data.subarray(s, s + 4), (y * img.width * k + x) * 4)
-  }
-  return { width: img.width * k, height: img.height * k, data: out }
-}
-function chain(keyed: RawImage, targetH: number): RawImage {
-  return fillPinholes(despeckle(resampleToArtHeight(erodeForPitch(keyed, targetH), targetH), 3), 2)
-}
 
-// 1. Characters: v3 chain to 64-tall natives, then per-column registration + anchor.
-const nat = new Map<string, RawImage>()
-for (const p of POSES) for (const f of FACINGS) {
-  const keyed = chromaKey(await decodePng(readFileSync(`${SHEET_DIR}/raws/${file(f, p)}`)))
-  const n = chain(keyed, ART_H)
-  nat.set(label(f, p), n)
-  console.log(`${label(f, p)}: native ${n.width}x${n.height}`)
-}
 const cells = new Map<string, RawImage>()
 for (const f of FACINGS) {
-  const idle = nat.get(label(f, 'idle'))!
+  const idle = proc.get(label(f, 'idle'))!.out
   const bI = bbox(idle)
   const placedIdle = place(idle, Math.floor((CANVAS - bI.w) / 2) - bI.x0, FEET_Y - bI.y1)
   cells.set(label(f, 'idle'), placedIdle)
   for (const p of ['walk-a', 'walk-b'] as const) {
-    const walk = nat.get(label(f, p))!
+    const walk = proc.get(label(f, p))!.out
     const bW = bbox(walk)
     const ownTx = Math.floor((CANVAS - bW.w) / 2) - bW.x0
     const placed0 = place(walk, ownTx, FEET_Y - bW.y1)
     const { dx } = registerToReference(placedIdle, placed0)
-    if (dx !== 0) console.log(`${label(f, p)}: dx=${dx}`)
+    if (dx !== 0) console.log(`${label(f, p)}: registration dx=${dx}`)
     cells.set(label(f, p), dx === 0 ? placed0 : place(walk, ownTx + dx, FEET_Y - bW.y1))
   }
 }
 
-// 2. Refs at class targets (building/se-cottage 96, item 48); style-anchor stays raw.
-const refInputs: [string, string, number][] = [
-  ['building-1', `${REF_CANDIDATES}/building-1.png`, 96],
-  ['item-1', `${REF_CANDIDATES}/item-1.png`, 48],
-  ['se-cottage', `${DURABLE}/building-facing/candidates/1.png`, 96],
-]
-for (const [name, path, targetH] of refInputs) {
-  const img = chain(chromaKey(await decodePng(readFileSync(path))), targetH)
-  console.log(`${name}: native ${img.width}x${img.height}`)
-  const png = await encodePng(img)
-  writeFileSync(`packages/forge/out/refs-v2/${name}.png`, png)
-  writeFileSync(`${REFS_DIR}/${name}.png`, png)
-  writeFileSync(`${REFS_DIR}/${name}-4x.png`, await encodePng(upscaleNearest(img, 4)))
+// 2. Per-cell metrics; flag soft-lattice cells (ambiguous > 40%).
+console.log('per-cell metrics (ambiguous% / dupRows / reconErr):')
+const softCells: string[] = []
+for (const p of POSES) for (const f of FACINGS) {
+  const c = proc.get(label(f, p))!
+  const m = sheetMetrics([c])
+  const flag = m.ambiguousPct > 40 ? '  ** SOFT-LATTICE FLAG **' : ''
+  if (m.ambiguousPct > 40) softCells.push(label(f, p))
+  console.log(`  ${label(f, p).padEnd(12)} ${c.out.width}x${c.out.height}  ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}${flag}`)
 }
 
-// 3. Assemble + persist sheet, cells, GIFs, inspection crops.
+// 3. Refs at natural heights.
+const refInputs: [string, string][] = [
+  ['building-1', `${REF_CANDIDATES}/building-1.png`],
+  ['item-1', `${REF_CANDIDATES}/item-1.png`],
+  ['se-cottage', `${DURABLE}/building-facing/candidates/1.png`],
+]
+for (const [name, path] of refInputs) {
+  const keyed = chromaKey(await decodePng(readFileSync(path)))
+  const pitch = estimatePitch(keyed)
+  const c = v4chain(keyed, pitch, name)
+  const m = sheetMetrics([c])
+  console.log(`${name}: pitch ${pitch.toFixed(2)}, natural ${c.out.width}x${c.out.height}, ambiguous ${m.ambiguousPct.toFixed(1)}%`)
+  const png = await encodePng(c.out)
+  writeFileSync(`packages/forge/out/refs-v2/${name}.png`, png)
+  writeFileSync(`${REFS_DIR}/${name}.png`, png)
+  writeFileSync(`${REFS_DIR}/${name}-4x.png`, await encodePng(upscaleNearest(c.out, 4)))
+}
+
+// 4. Assemble + persist everything.
 const sheet = assembleGrid(POSES.map(p => FACINGS.map(f => cells.get(label(f, p))!)), CANVAS, CANVAS)
 const sheetPng = await encodePng(sheet)
 writeFileSync(`${OUT}/sheet.png`, sheetPng)
@@ -133,7 +177,7 @@ for (const f of FACINGS) {
   console.log(`walk-${f}.gif: ${frames.length} frames, ${gif.length} bytes`)
 }
 
-// 4. Matrices + findings, thresholds recalibrated (0.36x / 0.21x pairwise median).
+// 5. Distance matrix, thresholds recalibrated (0.36x / 0.21x pairwise median).
 const labels = POSES.flatMap(p => FACINGS.map(f => label(f, p)))
 const dists: number[] = []
 for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++)
@@ -152,7 +196,8 @@ const rows = POSES.flatMap(p => duplicateReport(
 const cols = FACINGS.flatMap(f => duplicateReport(
   POSES.map(p => ({ label: label(f, p), img: cells.get(label(f, p))! })), STRAIGHT_THR, MIRROR_THR))
 const report = [
-  '== PIPELINE V3 FINAL: pitch-derived erode + median resample (art height 64, cells 96x96) ==',
+  `== PIPELINE V4 FULL REBUILD: sheetPitch ${sheetPitch.toFixed(2)}, natural heights, canvas ${CANVAS} feetY ${FEET_Y} ==`,
+  `soft-lattice cells (ambiguous>40%): ${softCells.length ? softCells.join(', ') : 'none'}`,
   `pairwise median=${median.toFixed(3)}; thresholds straight<${STRAIGHT_THR.toFixed(3)} mirror<${MIRROR_THR.toFixed(3)}`,
   '', '== straight distance matrix (12x12) ==', matrix(false),
   '', '== mirrored distance matrix (12x12, col cell mirrored) ==', matrix(true),

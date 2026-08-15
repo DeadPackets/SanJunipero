@@ -60,7 +60,8 @@ Sprites ship UNQUANTIZED: character cells and reference sprites keep their gener
 
 - ~3 heads tall (Stardew-like).
 - Age bands (child / adult / elder) must read clearly in the rigs.
-- Native-resolution sprites (pipeline v3: pitch-derived erosion + median resample to art height 64 — no fixed scale, no quantize, no outline pass) on 96×96 cells, feet-anchored at y=88. The renderer scales sprites to world height (~1.6 tiles) independently of art density.
+- Native-resolution sprites (pipeline v4: measured fractional pitch + mode resample at natural heights — no forced art height, no quantize, no outline pass) on 96×96 cells, feet-anchored at y=88 (128×128/y=118 if any cell's art exceeds 88px).
+- Art resolution is DECOUPLED from world size: the renderer scales the character to ~1.6 tiles regardless of art pixel count. "Canonical density" means the pitch the raws actually carry, measured per sheet and recorded — character sheet: 5.12; anchor building: 4.00.
 
 ## Atmosphere
 
