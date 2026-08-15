@@ -2,7 +2,7 @@
 
 Versioned doc + reference sheet (the 3 reference images from Task 6), injected into every generation. Locked per spec §7 — agents author the what; the pipeline owns the look.
 
-> **PALETTE STATUS: PROPOSED** — locked by human sign-off on `out/calibration/palette-tints.png` (Task 4). Record the sign-off date here.
+> **PALETTE STATUS: LOCKED (2026-08-15)** — human sign-off on `out/calibration/palette-tints.png` (Task 4). All assets quantize to this palette; any change requires a new calibration sheet and re-lock.
 
 ## Projection & camera
 
