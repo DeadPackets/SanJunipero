@@ -12,7 +12,7 @@ import { parseTurnWithRepair, reconsiderTick, TurnSchema, type Turn } from '../t
 import { decideWake, DEFAULT_MIND_CONFIG, type MindClock, type MindConfig, type PlanState, type WakeReason } from '../wake.js'
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
-import type { EngineBridge } from './bridge.js'
+import type { EngineBridge, SubmitResult } from './bridge.js'
 
 const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 
@@ -137,31 +137,36 @@ export class AgentRuntime {
   }
 
   #advancePlan(packet: PerceptionPacket): void {
-    if (!this.#planHeadInFlight || this.#plan.lastResult !== 'running') return
-    if (packet.self.activity !== null) return
-    this.#plan.queue.shift()
-    this.#planHeadInFlight = false
-    if (this.#plan.queue.length === 0) {
-      this.#plan.lastResult = 'done'
-    } else {
-      this.#submitPlanHead()
+    this.#pumpPlan(packet.self.activity)
+  }
+
+  // Submit the queue head exactly when the agent is idle, and advance the queue
+  // when an in-flight head's action completes. A rejected head is handled
+  // synchronously during the drain (onResult), before #advancePlan ever runs.
+  #pumpPlan(activity: string | null): void {
+    if (this.#plan.lastResult !== 'running') return
+    if (this.#planHeadInFlight) {
+      if (activity !== null) return
+      this.#plan.queue.shift()
+      this.#planHeadInFlight = false
+      if (this.#plan.queue.length === 0) {
+        this.#plan.lastResult = 'done'
+        return
+      }
+    }
+    if (activity === null) {
+      this.#planHeadInFlight = true
+      const head = this.#plan.queue[0]!
+      void this.#bridge.submit(this.#agentId, head, (res) => this.#onPlanHeadResult(res))
     }
   }
 
-  #submitPlanHead(): void {
-    if (this.#plan.lastResult !== 'running' || this.#plan.queue.length === 0) {
-      if (this.#plan.lastResult === 'running') this.#plan.lastResult = 'done'
-      return
-    }
-    this.#planHeadInFlight = true
-    const head = this.#plan.queue[0]!
-    void this.#bridge.submit(this.#agentId, head).then((res) => {
-      if (res.ok) return
-      this.#plan.lastResult = 'blocked'
-      this.#plan.queue = []
-      this.#planHeadInFlight = false
-      void this.#writeActionMemory(`You realize you cannot: ${res.reason}`)
-    })
+  #onPlanHeadResult(res: SubmitResult): void {
+    if (res.ok) return
+    this.#plan.lastResult = 'blocked'
+    this.#plan.queue = []
+    this.#planHeadInFlight = false
+    void this.#writeActionMemory(`You realize you cannot: ${res.reason}`)
   }
 
   #handleNight(tick: number, packet: PerceptionPacket): void {
@@ -184,10 +189,12 @@ export class AgentRuntime {
   async #startTurn(_reason: WakeReason): Promise<void> {
     if (this.#turnInFlight) return
     this.#turnInFlight = true
+    const tick = this.#bridge.currentTick()
     try {
       await this.#runTurnBody()
     } catch (err) {
       this.#llm.alert('turn_crash', err instanceof Error ? err.message : String(err))
+      this.#clock.lastTurnTick = tick + this.#config.dozeTicks
     } finally {
       this.#turnInFlight = false
     }
@@ -291,7 +298,7 @@ export class AgentRuntime {
       this.#plan.queue = [...turn.plan]
       this.#plan.lastResult = turn.plan.length > 0 ? 'running' : 'done'
       this.#planHeadInFlight = false
-      this.#submitPlanHead()
+      this.#pumpPlan(this.#bridge.perception(this.#agentId).self.activity)
     }
 
     if (turn.journal) {

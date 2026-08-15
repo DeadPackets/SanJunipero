@@ -159,6 +159,7 @@ async function setup(opts: {
   mindConfig?: Partial<MindConfig>
   reflectionLlm?: ReflectionLlm
   dreamLlm?: DreamLlm
+  embedder?: { embed(t: string): Promise<Float32Array> }
   maxRetries?: number
 }) {
   const world = buildWorld()
@@ -178,7 +179,7 @@ async function setup(opts: {
 
   const agentDb = openAgentDb(':memory:')
   migrateLlmTables(agentDb)
-  const embedder = await FakeEmbedder.create()
+  const embedder = opts.embedder ?? (await FakeEmbedder.create())
   const personality = new PersonalityStore(agentDb, AGENT)
   personality.init(baseDoc(), 0)
   const llm = new LlmClient({ model: opts.model, db: agentDb, caller: 'turn', agentId: AGENT, maxRetries: opts.maxRetries ?? 2 })
@@ -365,5 +366,62 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     const liveHash = stateHash(loop.state)
     const replayed = replayFromGenesis(world.store, world.config, world.terrain)
     expect(stateHash(replayed)).toBe(liveHash)
+  })
+
+  it('does not execute the next plan item when the head is rejected', async () => {
+    const { world, loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'Eat, then walk.',
+          plan: [
+            { verb: 'eat', params: { itemId: 'nope' } },
+            { verb: 'walk', params: { x: 5, y: 6 } },
+          ],
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+    expect(memoriesOfKind(agentDb, 'action').some((m) => /You realize you cannot/.test(m.text))).toBe(true)
+    expect(completedVerbs(world.engineDb)).toEqual([])
+  })
+
+  it('submits a plan head only after a busy agent finishes its action', async () => {
+    const { world, loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'Walk over, then eat.',
+          action: { verb: 'walk', params: { x: 5, y: 6 } },
+          plan: [
+            { verb: 'take', params: { itemId: BREAD_ID } },
+            { verb: 'eat', params: { itemId: BREAD_ID } },
+          ],
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 3, 150)
+    expect(completedVerbs(world.engineDb)).toEqual(['walk', 'take', 'eat'])
+    expect(memoriesOfKind(agentDb, 'action').length).toBe(0)
+  })
+
+  it('backs off on non-provider turn failures', async () => {
+    const { loop, runtime, agentDb } = await setup({
+      model: turnModel([{ thought: 'I think.', importance: 3 }]),
+      mindConfig: { ...FAST_MIND, dozeTicks: 20 },
+      embedder: { async embed(): Promise<Float32Array> { throw new Error('embedder down') } },
+    })
+    expect(() => loop.step()).not.toThrow()
+    await flush()
+    expect(runtime.stats().turns).toBe(0)
+    expect(alertKinds(agentDb).filter((k) => k === 'turn_crash')).toHaveLength(1)
+    for (let i = 0; i < 19; i++) {
+      expect(() => loop.step()).not.toThrow()
+      await flush()
+    }
+    expect(runtime.stats().turns).toBe(0)
+    expect(alertKinds(agentDb).filter((k) => k === 'turn_crash')).toHaveLength(1)
   })
 })

@@ -17,6 +17,7 @@ export type SubmitResult = { ok: true } | { ok: false; reason: string }
 type QueuedSubmit = {
   agentId: string
   intent: Intent
+  onResult?: (result: SubmitResult) => void
   resolve: (result: SubmitResult) => void
 }
 
@@ -94,8 +95,10 @@ export class EngineBridge {
         )
         if (result.ok) {
           for (const event of result.events) ctx.emit(event.type, event.payload)
+          item.onResult?.({ ok: true })
           item.resolve({ ok: true })
         } else {
+          item.onResult?.({ ok: false, reason: result.reason })
           item.resolve({ ok: false, reason: result.reason })
         }
       }
@@ -104,9 +107,9 @@ export class EngineBridge {
     }
   }
 
-  submit(agentId: string, intent: Intent): Promise<SubmitResult> {
+  submit(agentId: string, intent: Intent, onResult?: (result: SubmitResult) => void): Promise<SubmitResult> {
     return new Promise<SubmitResult>((resolve) => {
-      this.#queue.push({ agentId, intent, resolve })
+      this.#queue.push({ agentId, intent, onResult, resolve })
     })
   }
 
