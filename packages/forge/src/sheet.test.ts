@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, estimatePitch, refineLattice, resampleModeLattice, sheetMetrics, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
 import { quantize } from './post/quantize.js'
 
 type Px = [number, number, number, number]
@@ -350,6 +350,83 @@ describe('resampleToArtHeight', () => {
     const b = resampleToArtHeight(pitched(9, 4, 8), 8)
     expect(a.width).toBe(b.width)
     expect(a.data).toEqual(b.data)
+  })
+})
+
+const PAL5: Px[] = [RED, BLUE, [0, 255, 0, 255], [255, 255, 0, 255], [40, 40, 40, 255]]
+function pitchGrid(pitch: number, n: number, halo = 0): RawImage {
+  const inner = Math.round(pitch * n), size = inner + 2 * halo
+  return img(size, size, (x, y) => {
+    const gx = x - halo, gy = y - halo
+    if (gx < 0 || gy < 0 || gx >= inner || gy >= inner) return [255, 0, 255, 255] as Px
+    const bi = Math.min(n - 1, Math.floor(gx / pitch)), bj = Math.min(n - 1, Math.floor(gy / pitch))
+    return PAL5[(bi * 3 + bj * 2 + (bi * bj) % 7) % 5]!
+  })
+}
+
+describe('estimatePitch', () => {
+  it('recovers pitch 7.30 within ±0.1', () => {
+    expect(Math.abs(estimatePitch(pitchGrid(7.3, 8)) - 7.3)).toBeLessThanOrEqual(0.1)
+  })
+  it('recovers pitch 6.05 within ±0.1', () => {
+    expect(Math.abs(estimatePitch(pitchGrid(6.05, 8)) - 6.05)).toBeLessThanOrEqual(0.1)
+  })
+  it('is immune to a 2px halo band', () => {
+    expect(Math.abs(estimatePitch(pitchGrid(7.3, 8, 2)) - 7.3)).toBeLessThanOrEqual(0.1)
+  })
+})
+
+describe('refineLattice', () => {
+  it('recovers a known lattice offset by coordinate descent', () => {
+    const src = img(59, 61, (x, y) =>
+      PAL5[(Math.floor((x - 3 + 70) / 7) * 3 + Math.floor((y - 5 + 70) / 7) * 2 + 1) % 5]!)
+    const lat = refineLattice(src, 7.2, { ox: 2, oy: 6 })
+    expect(Math.abs(lat.px - 7)).toBeLessThan(0.3)
+    expect(Math.abs(lat.py - 7)).toBeLessThan(0.3)
+    const modDist = (v: number, target: number, p: number) => {
+      const d = (((v - target) % p) + p) % p
+      return Math.min(d, p - d)
+    }
+    expect(modDist(lat.ox, 3, lat.px)).toBeLessThan(0.6)
+    expect(modDist(lat.oy, 5, lat.py)).toBeLessThan(0.6)
+  })
+})
+
+describe('resampleModeLattice', () => {
+  it('picks the dominant color in a straddling cell', () => {
+    const src = img(10, 10, x => (x < 6 ? RED : BLUE))
+    const { out } = resampleModeLattice(src, { px: 10, py: 10, ox: 0, oy: 0 })
+    expect(out.width).toBe(1)
+    expect(out.height).toBe(1)
+    expect([...out.data]).toEqual([255, 0, 0, 255])
+  })
+  it('nudges the sample window when no color dominates', () => {
+    const GREEN: Px = [0, 255, 0, 255]
+    const pal4: Px[] = [RED, BLUE, [255, 255, 0, 255], [40, 40, 40, 255]]
+    // cell [0,12): central window is a 4-color mix (each ~25% < 40%); solid green from x=9
+    const src = img(20, 12, (x, y) => (x >= 9 ? GREEN : pal4[(x + 2 * y) % 4]!))
+    const { out } = resampleModeLattice(src, { px: 12, py: 12, ox: 0, oy: 0 })
+    expect([...out.data.slice(0, 4)]).toEqual(GREEN)
+  })
+})
+
+describe('sheetMetrics', () => {
+  it('reports clean metrics on a perfect grid', () => {
+    const src = img(28, 28, (x, y) => PAL5[(Math.floor(x / 7) + Math.floor(y / 7) * 2) % 5]!)
+    const lat = { px: 7, py: 7, ox: 0, oy: 0 }
+    const r = resampleModeLattice(src, lat)
+    const m = sheetMetrics([{ out: r.out, dominance: r.dominance, eroded: src, lat, origin: r.origin }])
+    expect(m.ambiguousPct).toBe(0)
+    expect(m.reconErr).toBeLessThan(0.02)
+    expect(m.dupRowCount).toBe(0)
+  })
+  it('counts adjacent identical opaque rows', () => {
+    const out = img(2, 3, (_, y) => (y < 2 ? RED : BLUE))
+    const m = sheetMetrics([{
+      out, dominance: new Float32Array(6).fill(1), eroded: out,
+      lat: { px: 1, py: 1, ox: 0, oy: 0 }, origin: { i0: 0, j0: 0 },
+    }])
+    expect(m.dupRowCount).toBe(1)
   })
 })
 

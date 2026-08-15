@@ -271,6 +271,253 @@ export function resampleToArtHeight(img: RawImage, targetH: number): RawImage {
   return { width: outW, height: targetH, data: out }
 }
 
+// Fractional art pitch via gradient comb: per-column/-row sums of |color delta| over
+// both-opaque neighbor pairs peak at lattice boundaries; the candidate pitch whose comb
+// (best phase) catches the highest mean profile value wins. Octave guard: the smallest
+// pitch within 97% of the best score is preferred (2x the true pitch scores as high).
+export function estimatePitch(img: RawImage, range: [number, number] = [4, 12], step = 0.05): number {
+  const colD = new Float64Array(img.width), rowD = new Float64Array(img.height)
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width - 1; x++) {
+    const i = (y * img.width + x) * 4, j = i + 4
+    if (img.data[i + 3] === 0 || img.data[j + 3] === 0) continue
+    colD[x + 1]! += Math.abs(img.data[i]! - img.data[j]!) + Math.abs(img.data[i + 1]! - img.data[j + 1]!) + Math.abs(img.data[i + 2]! - img.data[j + 2]!)
+  }
+  for (let y = 0; y < img.height - 1; y++) for (let x = 0; x < img.width; x++) {
+    const i = (y * img.width + x) * 4, j = i + img.width * 4
+    if (img.data[i + 3] === 0 || img.data[j + 3] === 0) continue
+    rowD[y + 1]! += Math.abs(img.data[i]! - img.data[j]!) + Math.abs(img.data[i + 1]! - img.data[j + 1]!) + Math.abs(img.data[i + 2]! - img.data[j + 2]!)
+  }
+  // Octave-proof score = lift x coverage. lift = how concentrated the profile is at
+  // lattice lines (mean-at-lattice / overall mean; a 2x octave keeps this high by
+  // cherry-picking strong boundaries, a 1/2 pitch dilutes it with mid-block zeros).
+  // coverage = fraction of total gradient energy the comb captures (a 2x octave only
+  // reaches half the boundaries). The true pitch alone maximizes the product.
+  function combScore(D: Float64Array, p: number): number {
+    let tot = 0
+    for (const v of D) tot += v
+    if (tot === 0) return 0
+    const overallMean = tot / D.length
+    let best = 0
+    for (let phase = 0; phase < p; phase += 0.25) {
+      let s = 0, n = 0
+      for (let pos = phase; pos < D.length; pos += p) { s += D[Math.round(pos)] ?? 0; n++ }
+      if (n <= 2) continue
+      best = Math.max(best, (s / n / overallMean) * (s / tot))
+    }
+    return best
+  }
+  const score = (p: number) => combScore(colD, p) + combScore(rowD, p)
+  let bestP = range[0], bestS = -1
+  for (let p = range[0]; p <= range[1] + 1e-9; p += step) {
+    const s = score(p)
+    if (s > bestS) { bestS = s; bestP = p }
+  }
+  // The comb score is a plateau around the true pitch (rounding absorbs small drift over
+  // few lattice lines), so re-scan locally and return the plateau's midpoint.
+  const fine: [number, number][] = []
+  let fineMax = -1
+  for (let p = Math.max(range[0], bestP - 0.6); p <= Math.min(range[1], bestP + 0.6) + 1e-9; p += 0.02) {
+    const s = score(p)
+    fine.push([p, s])
+    if (s > fineMax) fineMax = s
+  }
+  const argmax = fine.findIndex(([, s]) => s === fineMax)
+  let lo = argmax, hi = argmax
+  while (lo > 0 && fine[lo - 1]![1] >= 0.999 * fineMax) lo--
+  while (hi < fine.length - 1 && fine[hi + 1]![1] >= 0.999 * fineMax) hi++
+  return (fine[lo]![0] + fine[hi]![0]) / 2
+}
+
+export type Lattice = { px: number; py: number; ox: number; oy: number }
+
+// Coordinate descent (±pitch/4, halving over 3 rounds) on {ox, oy, px, py}, minimizing
+// mean within-cell color variance over interior cells (fully inside the bbox, ≥60% opaque).
+export function refineLattice(img: RawImage, pitch: number, phase0: { ox: number; oy: number } = { ox: 0, oy: 0 }): Lattice {
+  let bx0 = img.width, bx1 = -1, by0 = img.height, by1 = -1
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
+    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
+      if (x < bx0) bx0 = x
+      if (x > bx1) bx1 = x
+      if (y < by0) by0 = y
+      if (y > by1) by1 = y
+    }
+  if (bx1 < 0) throw new Error('refineLattice: no opaque pixels')
+
+  function cost(l: Lattice, stride = 1): number {
+    if (l.px < 2 || l.py < 2) return Infinity
+    let total = 0, cells = 0
+    const i0 = Math.floor((bx0 - l.ox) / l.px), i1 = Math.floor((bx1 - l.ox) / l.px)
+    const j0 = Math.floor((by0 - l.oy) / l.py), j1 = Math.floor((by1 - l.oy) / l.py)
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const xLo = l.ox + i * l.px, xHi = xLo + l.px, yLo = l.oy + j * l.py, yHi = yLo + l.py
+      if (xLo < bx0 || xHi > bx1 + 1 || yLo < by0 || yHi > by1 + 1) continue
+      let n = 0, area = 0
+      let sr = 0, sg = 0, sb = 0, qr = 0, qg = 0, qb = 0
+      for (let y = Math.ceil(yLo - 0.5); y + 0.5 < yHi; y += stride) for (let x = Math.ceil(xLo - 0.5); x + 0.5 < xHi; x += stride) {
+        if (x < 0 || y < 0 || x >= img.width || y >= img.height) continue
+        area++
+        const s = (y * img.width + x) * 4
+        if (img.data[s + 3] === 0) continue
+        const r = img.data[s]!, g = img.data[s + 1]!, b = img.data[s + 2]!
+        n++; sr += r; sg += g; sb += b; qr += r * r; qg += g * g; qb += b * b
+      }
+      if (area === 0 || n < 4 || n < 0.6 * area) continue
+      total += (qr / n - (sr / n) ** 2) + (qg / n - (sg / n) ** 2) + (qb / n - (sb / n) ** 2)
+      cells++
+    }
+    return cells ? total / cells : Infinity
+  }
+
+  // px/py stay within ±pitch/4 of the estimate: the variance objective is degenerate
+  // toward tiny cells, so refinement corrects, never re-decides, the pitch.
+  const clamp = (v: number) => Math.min(pitch * 1.25, Math.max(pitch * 0.75, v))
+  let lat: Lattice = { px: pitch, py: pitch, ox: phase0.ox, oy: phase0.oy }
+  let best = cost(lat)
+  let step = pitch / 4
+  for (let round = 0; round < 3; round++) {
+    for (let pass = 0; pass < 2; pass++) {
+      for (const key of ['ox', 'oy', 'px', 'py'] as const) {
+        let improved = true
+        while (improved) {
+          improved = false
+          for (const d of [step, -step, step / 2, -step / 2]) {
+            let v = lat[key] + d
+            if (key === 'px' || key === 'py') v = clamp(v)
+            if (v === lat[key]) continue
+            const cand = { ...lat, [key]: v }
+            const c = cost(cand)
+            if (c < best) { lat = cand; best = c; improved = true }
+          }
+        }
+      }
+    }
+    step /= 2
+  }
+  // Joint pitch x phase polish per axis: pitch and phase sit in a coupled valley that
+  // per-coordinate moves cannot cross (a wrong pitch relocates the optimal phase).
+  // Scan (p, φ) jointly on a subsampled cost, then confirm at full resolution.
+  for (const axis of ['y', 'x'] as const) {
+    const pKey = axis === 'x' ? 'px' : 'py', oKey = axis === 'x' ? 'ox' : 'oy'
+    let bestPair = { p: lat[pKey], o: lat[oKey] }
+    let bestC = cost(lat, 2)
+    for (let p = pitch * 0.85; p <= pitch * 1.15 + 1e-9; p += 0.05) {
+      for (let o = lat[oKey] - p / 2; o <= lat[oKey] + p / 2 + 1e-9; o += 0.1) {
+        const c = cost({ ...lat, [pKey]: p, [oKey]: o }, 2)
+        if (c < bestC) { bestC = c; bestPair = { p, o } }
+      }
+    }
+    const cand = { ...lat, [pKey]: bestPair.p, [oKey]: bestPair.o }
+    if (cost(cand) < cost(lat)) lat = cand
+  }
+  return lat
+}
+
+// Mode-color resample on an explicit lattice: per cell, bin the central-60% opaque pixels
+// at 5 bits/channel, output the densest bin's mean color; if dominance < 40%, retry with
+// the window nudged ±pitch/4 in each axis direction and keep the most dominant result.
+// dominance[] parallels out (0 for transparent); origin maps lattice indices to out pixels.
+export function resampleModeLattice(img: RawImage, lat: Lattice):
+  { out: RawImage; dominance: Float32Array; origin: { i0: number; j0: number } } {
+  let bx0 = img.width, bx1 = -1, by0 = img.height, by1 = -1
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
+    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
+      if (x < bx0) bx0 = x
+      if (x > bx1) bx1 = x
+      if (y < by0) by0 = y
+      if (y > by1) by1 = y
+    }
+  if (bx1 < 0) throw new Error('resampleModeLattice: no opaque pixels')
+  const i0 = Math.floor((bx0 - lat.ox) / lat.px), i1 = Math.floor((bx1 - lat.ox) / lat.px)
+  const j0 = Math.floor((by0 - lat.oy) / lat.py), j1 = Math.floor((by1 - lat.oy) / lat.py)
+  const outW = i1 - i0 + 1, outH = j1 - j0 + 1
+  const out = new Uint8ClampedArray(outW * outH * 4)
+  const dominance = new Float32Array(outW * outH)
+
+  function sampleWindow(xLo: number, xHi: number, yLo: number, yHi: number) {
+    let total = 0, opaque = 0
+    const bins = new Map<number, { n: number; sr: number; sg: number; sb: number }>()
+    let bestKey = -1, bestN = 0
+    for (let y = Math.max(0, Math.floor(yLo)); y < Math.min(img.height, Math.ceil(yHi)); y++) {
+      if (y + 0.5 < yLo || y + 0.5 >= yHi) continue
+      for (let x = Math.max(0, Math.floor(xLo)); x < Math.min(img.width, Math.ceil(xHi)); x++) {
+        if (x + 0.5 < xLo || x + 0.5 >= xHi) continue
+        total++
+        const s = (y * img.width + x) * 4
+        if (img.data[s + 3] === 0) continue
+        opaque++
+        const r = img.data[s]!, g = img.data[s + 1]!, b = img.data[s + 2]!
+        const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)
+        let bin = bins.get(key)
+        if (!bin) { bin = { n: 0, sr: 0, sg: 0, sb: 0 }; bins.set(key, bin) }
+        bin.n++; bin.sr += r; bin.sg += g; bin.sb += b
+        if (bin.n > bestN) { bestN = bin.n; bestKey = key }
+      }
+    }
+    if (opaque === 0 || bestKey < 0) return { total, opaque, dom: 0, color: null as null | [number, number, number] }
+    const bin = bins.get(bestKey)!
+    return {
+      total, opaque, dom: bin.n / opaque,
+      color: [Math.round(bin.sr / bin.n), Math.round(bin.sg / bin.n), Math.round(bin.sb / bin.n)] as [number, number, number],
+    }
+  }
+
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const cxLo = lat.ox + i * lat.px, cyLo = lat.oy + j * lat.py
+    const mx = 0.2 * lat.px, my = 0.2 * lat.py
+    let s = sampleWindow(cxLo + mx, cxLo + lat.px - mx, cyLo + my, cyLo + lat.py - my)
+    if (s.color && s.dom < 0.4) {
+      for (const [dx, dy] of [[lat.px / 4, 0], [-lat.px / 4, 0], [0, lat.py / 4], [0, -lat.py / 4]] as const) {
+        const alt = sampleWindow(cxLo + mx + dx, cxLo + lat.px - mx + dx, cyLo + my + dy, cyLo + lat.py - my + dy)
+        if (alt.color && alt.dom > s.dom) s = alt
+      }
+    }
+    if (!s.color || s.opaque * 2 < s.total) continue
+    const d = ((j - j0) * outW + (i - i0)) * 4
+    out[d] = s.color[0]; out[d + 1] = s.color[1]; out[d + 2] = s.color[2]; out[d + 3] = 255
+    dominance[(j - j0) * outW + (i - i0)] = s.dom
+  }
+  return { out: { width: outW, height: outH, data: out }, dominance, origin: { i0, j0 } }
+}
+
+// Jumble metrics: ambiguousPct = % of opaque output pixels sampled at <50% dominance;
+// dupRowCount = adjacent byte-identical opaque rows; reconErr = mean per-channel distance
+// between each opaque source pixel and its lattice cell's output color (both-opaque only).
+export function sheetMetrics(cells: {
+  out: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice; origin: { i0: number; j0: number }
+}[]): { ambiguousPct: number; dupRowCount: number; reconErr: number } {
+  let opaque = 0, ambiguous = 0, dupRows = 0, reconSum = 0, reconN = 0
+  for (const c of cells) {
+    for (let i = 0; i < c.out.width * c.out.height; i++)
+      if (c.out.data[i * 4 + 3]! > 0) { opaque++; if (c.dominance[i]! < 0.5) ambiguous++ }
+    for (let y = 0; y < c.out.height - 1; y++) {
+      const rowLen = c.out.width * 4
+      const a = c.out.data.subarray(y * rowLen, (y + 1) * rowLen)
+      const b = c.out.data.subarray((y + 1) * rowLen, (y + 2) * rowLen)
+      let same = true, any = false
+      for (let k = 0; k < rowLen; k++) if (a[k] !== b[k]) { same = false; break }
+      for (let k = 3; k < rowLen; k += 4) if (a[k]! > 0) { any = true; break }
+      if (same && any) dupRows++
+    }
+    for (let y = 0; y < c.eroded.height; y++) for (let x = 0; x < c.eroded.width; x++) {
+      const s = (y * c.eroded.width + x) * 4
+      if (c.eroded.data[s + 3] === 0) continue
+      const i = Math.floor((x - c.lat.ox) / c.lat.px) - c.origin.i0
+      const j = Math.floor((y - c.lat.oy) / c.lat.py) - c.origin.j0
+      if (i < 0 || j < 0 || i >= c.out.width || j >= c.out.height) continue
+      const d = (j * c.out.width + i) * 4
+      if (c.out.data[d + 3] === 0) continue
+      reconSum += (Math.abs(c.eroded.data[s]! - c.out.data[d]!) + Math.abs(c.eroded.data[s + 1]! - c.out.data[d + 1]!)
+        + Math.abs(c.eroded.data[s + 2]! - c.out.data[d + 2]!)) / (3 * 255)
+      reconN++
+    }
+  }
+  return {
+    ambiguousPct: opaque ? (100 * ambiguous) / opaque : 0,
+    dupRowCount: dupRows,
+    reconErr: reconN ? reconSum / reconN : 0,
+  }
+}
+
 // Modal detected art scale across a set of images; ties break to the smallest scale.
 export function sheetScale(imgs: RawImage[]): number {
   const counts = new Map<number, number>()
