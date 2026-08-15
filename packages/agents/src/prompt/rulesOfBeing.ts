@@ -16,6 +16,15 @@ to every other.
 No voice outside you decides what you feel or do. You choose, and what you
 choose echoes in the lives around you. Live as yourself.`
 
+// What a body in this world can do — the Tier-1 verbs in world language,
+// identical for every agent. Fully diegetic: the mind names its own acts, it
+// never hears mechanics words. Rendered into the system prompt (static block).
+export const CAPABILITIES = `What your hands and voice can do: walk, sleep, wake, eat what you hold, take,
+give, speak, write, read, teach, tend, till, plant, harvest, fish, forage, build,
+craft, extinguish, attack, and experiment. What you cannot do yet, the world
+will show you, and you will learn.`
+
+
 // The human-framing law: no world text, block template, or perception prose may
 // ever name the machinery behind the agent. This regex is the enforcement point.
 // `(?!\w)` closes the boundary instead of a trailing `\b`: every alternative

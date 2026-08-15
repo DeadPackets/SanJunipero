@@ -33,7 +33,7 @@ const tamarPersonality: PersonalityDoc = {
 export const quietMeadowPacket: PerceptionPacket = {
   time: simTimeFromTick(10 * 60),
   self: {
-    body: { needs: { hunger: 62, energy: 78, warmth: 71, social: 55 }, hp: 100, injuries: [] },
+    body: { needs: { hunger: 62, energy: 78, warmth: 71, social: 55 }, hp: 100, injuries: [], ill: false },
     x: 12,
     y: 9,
     asleep: false,
@@ -50,7 +50,7 @@ export const quietMeadowPacket: PerceptionPacket = {
 export const conversationPacket: PerceptionPacket = {
   time: simTimeFromTick(14 * 60),
   self: {
-    body: { needs: { hunger: 48, energy: 60, warmth: 66, social: 40 }, hp: 100, injuries: [] },
+    body: { needs: { hunger: 48, energy: 60, warmth: 66, social: 40 }, hp: 100, injuries: [], ill: false },
     x: 15,
     y: 10,
     asleep: false,

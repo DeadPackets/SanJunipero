@@ -1,5 +1,6 @@
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
+import { CAPABILITIES } from './rulesOfBeing.js'
 
 export type IdentityCore = {
   name: string
@@ -76,9 +77,10 @@ function renderScene(scene: PromptBlocks['scene']): string {
   }
   return parts.join('\n\n')
 }
-
 function renderSystem(blocks: PromptBlocks): string {
-  return [blocks.rulesOfBeing, renderIdentity(blocks.identity), renderPersonality(blocks.personality)].join(
+  // Rules of being + capabilities are static and identical for every agent;
+  // identity and personality complete the byte-stable system prefix.
+  return [blocks.rulesOfBeing, CAPABILITIES, renderIdentity(blocks.identity), renderPersonality(blocks.personality)].join(
     BLOCK_DELIM,
   )
 }
@@ -97,11 +99,11 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
     { role: 'user', content: dayLog },
     { role: 'user', content: now },
   ]
-  const totalChars = system.length + scene.length + dayLog.length + now.length
+  const serialized = `${system}${scene}${dayLog}${now}`
   return {
     system,
     messages,
-    estTokens: estTokens(`${system}${scene}${dayLog}${now}`),
+    estTokens: estTokens(serialized),
     needsCompaction: estTokens(dayLog) > DAYLOG_COMPACTION_TOKENS,
   }
 }

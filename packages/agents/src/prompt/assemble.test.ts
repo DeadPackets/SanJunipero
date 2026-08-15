@@ -132,6 +132,74 @@ describe('perceptionToProse', () => {
     }
     expect(perceptionToProse(packet)).toContain('Your stomach gnaws at you.')
   })
+
+  it('renders the time of day and day number', () => {
+    const prose = perceptionToProse(quietMeadowPacket)
+    expect(prose).toContain('morning')
+    expect(prose).toContain('day 1')
+    expect(prose).toContain('spring')
+  })
+
+  it('renders visible structures, items, and crops', () => {
+    const packet = {
+      ...quietMeadowPacket,
+      visible: {
+        agents: [],
+        structures: [{ id: 's1', kind: 'storehouse', x: 14, y: 9, w: 1, h: 1, burning: false, stage: 'complete' as const }],
+        items: [{ id: 'i1', kind: 'bread', qty: 20, loc: { t: 'tile' as const, x: 13, y: 9 } }],
+        crops: [{ id: 'c1', kind: 'wheat', x: 12, y: 8, stage: 2, withered: false }],
+      },
+    }
+    const prose = perceptionToProse(packet)
+    expect(prose).toContain('storehouse')
+    expect(prose).toContain('20 bread')
+    expect(prose).toContain('wheat')
+  })
+
+  it('renders a burning structure and a withered crop', () => {
+    const packet = {
+      ...quietMeadowPacket,
+      visible: {
+        agents: [],
+        structures: [{ id: 's1', kind: 'hut', x: 14, y: 9, w: 1, h: 1, burning: true, stage: 'complete' as const }],
+        items: [],
+        crops: [{ id: 'c1', kind: 'wheat', x: 12, y: 8, stage: 0, withered: true }],
+      },
+    }
+    const prose = perceptionToProse(packet)
+    expect(prose).toContain('burning')
+    expect(prose).toContain('withered')
+  })
+
+  it('renders what the agent is carrying', () => {
+    const packet = {
+      ...quietMeadowPacket,
+      self: {
+        ...quietMeadowPacket.self,
+        inventory: [{ id: 'b1', kind: 'bread', qty: 3, loc: { t: 'agent' as const, id: 'tamar' } }],
+      },
+    }
+    const prose = perceptionToProse(packet)
+    expect(prose).toContain('carrying')
+    expect(prose).toContain('3 bread')
+  })
+
+  it('renders collapse and severe hunger', () => {
+    const packet = {
+      ...quietMeadowPacket,
+      self: {
+        ...quietMeadowPacket.self,
+        collapsed: true,
+        body: {
+          ...quietMeadowPacket.self.body,
+          needs: { ...quietMeadowPacket.self.body.needs, hunger: 3 },
+        },
+      },
+    }
+    const prose = perceptionToProse(packet)
+    expect(prose).toContain('collapsed')
+    expect(prose).toContain('aches with hunger')
+  })
 })
 
 describe('compaction', () => {
@@ -155,5 +223,15 @@ describe('ambient budget', () => {
     const sceneTokens = Math.ceil(a.messages[0].content.length / 4)
     expect(blocks.scene.memories.length).toBe(8)
     expect(sceneTokens).toBeLessThanOrEqual(700)
+  })
+})
+
+describe('capabilities', () => {
+  it('carries a diegetic capability block in the system prompt', () => {
+    const a = assemblePrompt(fixtureBlocks())
+    for (const verb of ['walk', 'eat', 'sleep', 'wake', 'speak', 'take', 'give', 'till', 'extinguish', 'attack']) {
+      expect(a.system).toContain(verb)
+    }
+    expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
 })

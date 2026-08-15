@@ -23,13 +23,17 @@ byte-stable; callers must respect the cadence column above.
 ## system / messages split
 
 ```
-system   = block 1 + DELIM + block 2 + DELIM + block 3
+system   = block 1 + DELIM + capabilities + DELIM + block 2 + DELIM + block 3
 messages = [ { role: 'user', content: block 4 },
              { role: 'user', content: block 5 joined with '\n' },
              { role: 'user', content: block 6 } ]
 ```
 
-The delimiter between the three system blocks is exactly:
+`capabilities` is the exported `CAPABILITIES` constant (static, identical for
+every agent) — the Tier-1 verbs in world language. It sits inside the
+byte-stable system prefix so it never disturbs the cache.
+
+The delimiter between the system sections is exactly:
 
 ```
 \n\n---\n\n
@@ -40,11 +44,12 @@ and token estimation is `system + messages.map(m => m.content).join('')`.
 
 ## Cache expectation
 
-Blocks 1–3 (the whole `system` string) are **byte-stable except at sleep**:
-only a sleep-time personality edit may change block 3. Blocks 1 and 2 never
-change for a given agent, so the model's cached prefix survives every turn and
-every scene change. Changing block 4 (scene), block 5 (day log), or block 6
-(now) must never reflow bytes inside blocks 1–3.
+Blocks 1–3 plus `CAPABILITIES` (the whole `system` string) are **byte-stable
+except at sleep**: only a sleep-time personality edit may change block 3.
+Blocks 1, 2, and `CAPABILITIES` never change for a given agent, so the model's
+cached prefix survives every turn and every scene change. Changing block 4
+(scene), block 5 (day log), or block 6 (now) must never reflow bytes inside
+blocks 1–3 or the capabilities section.
 
 ## Token estimate and compaction
 
@@ -65,8 +70,9 @@ enforcement regex; the assembler test asserts every rendered block and
 
 ## PerceptionPacket
 
-`prose.ts` exports a local mirror of C2's frozen `PerceptionPacket`
-(`composePerception`'s return type). Until `@sj/engine` ships the composer, this
-mirror is authoritative for `perceptionToProse` and the fixture packets in
-`src/testutil/fixtures.ts`. The Task 12 EngineBridge reconciles the mirror with
-the real engine type — do not drift from C2 Task 13's shape in the meantime.
+`prose.ts` exports the agents-local `PerceptionPacket` mirror. It carries the
+engine's `composePerception` shape plus two self-state booleans (`asleep`,
+`collapsed`) that the engine's `self` omits; `EngineBridge.reconcile` maps the
+engine packet onto this mirror each perception. `perceptionToProse` renders
+time, body state, the visible world, what the agent carries, heard speech, and
+felt events into second-person fiction.
