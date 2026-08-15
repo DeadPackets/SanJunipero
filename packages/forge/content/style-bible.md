@@ -66,6 +66,13 @@ Sprites ship UNQUANTIZED: character cells and reference sprites keep their gener
 
 - Stylized-dramatic grading: deep blue moonlit nights with warm window glow, golden dawns, grey-green storm light, snow-blued winters.
 
+## Canonical style anchor
+
+- `content/reference/style-anchor.png` (the approved T6 cottage raw) is THE art-style reference for the entire simulation: pixel density ("blocky but not too much"), palette warmth, cute rounded style.
+- Measured: detectArtScale = 4 on the 512px generation canvas → effective art resolution 128×128 (each art pixel ≈ 4 source px).
+- LAW: style-anchor.png is the FIRST input_reference on EVERY generation (all classes) and the FIRST judge refSheet.
+- Prompts for non-character classes append: "match the pixel density, palette warmth, and cute rounded style of the first reference image exactly".
+
 ## Facings
 
 - Characters: 4 dimetric facings (sw, se, ne, nw) × 3 poses (idle, walk-a, walk-b) per sheet; cells 96×96 (feet-anchored at y=88), sheet 384×288. Column order sw, se, ne, nw (left→right) and row order idle, walk-a, walk-b (top→bottom), as in `sheet.ts`. Walk animation = idle, walk-a, idle, walk-b loop.

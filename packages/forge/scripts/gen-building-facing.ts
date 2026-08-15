@@ -16,10 +16,11 @@ const budget = new BudgetGuard(0.3)
 const client = makeImageClient({ apiKey: KEY, budget })
 
 const REF_CANDIDATES = '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/reference-candidates'
-const BUILDING_REF = readFileSync(`${REF_CANDIDATES}/building-1.png`)
+// Canonical style anchor (the approved cottage raw, committed): FIRST generation ref + FIRST judge ref.
+const STYLE_ANCHOR = readFileSync('packages/forge/content/reference/style-anchor.png')
 const judge = makeVlmJudge({
   apiKey: KEY,
-  refSheets: [BUILDING_REF, readFileSync(`${REF_CANDIDATES}/item-1.png`),
+  refSheets: [STYLE_ANCHOR, readFileSync(`${REF_CANDIDATES}/item-1.png`),
     readFileSync('packages/forge/content/reference/identity-anchor.png')],
 })
 
@@ -30,7 +31,8 @@ for (const d of [`${OUT}/candidates`, `${DURABLE}/candidates`]) mkdirSync(d, { r
 const PROMPT = `${STYLE_PROMPT} A single free-standing building sprite. ` +
   'the SAME cottage as the reference, identical materials and roof, but with the door and entrance ' +
   'on the other visible wall (the south-east face). Same fixed camera, do NOT mirror the image; ' +
-  'lighting stays from the north-west.'
+  'lighting stays from the north-west. ' +
+  'Match the pixel density, palette warmth, and cute rounded style of the first reference image exactly.'
 
 function upscaleNearest(img: RawImage, k: number): RawImage {
   const out = new Uint8ClampedArray(img.width * k * img.height * k * 4)
@@ -41,7 +43,7 @@ function upscaleNearest(img: RawImage, k: number): RawImage {
   return { width: img.width * k, height: img.height * k, data: out }
 }
 
-const cands = await client.generateCandidates(PROMPT, [BUILDING_REF], 3)
+const cands = await client.generateCandidates(PROMPT, [STYLE_ANCHOR], 3)
 let winner: { png: Buffer; score: number; notes: string } | null = null
 for (const [i, c] of cands.entries()) {
   const v = await judge(c.png)

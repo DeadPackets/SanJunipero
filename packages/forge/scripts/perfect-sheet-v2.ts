@@ -62,7 +62,19 @@ function upscaleNearest(img: RawImage, k: number): RawImage {
   }
   return { width: img.width * k, height: img.height * k, data: out }
 }
-const clean = (img: RawImage) => fillPinholes(despeckle(defringe(img), 3), 2)
+// Iterate defringe to fixpoint: the desaturate fallback is a no-op for symmetric magenta
+// (r==b), so inner fringe pixels need outer ones replaced first (measured: converges, and
+// zero legitimate outline pixels match the predicate at edges). Re-run after hole ops too,
+// since despeckle/fillPinholes shift the edge topology.
+function defringeFix(img: RawImage): RawImage {
+  for (let i = 0; i < 12; i++) {
+    const next = defringe(img)
+    if (next.data.every((v, j) => v === img.data[j])) return next
+    img = next
+  }
+  return img
+}
+const clean = (img: RawImage) => defringeFix(fillPinholes(despeckle(defringeFix(img), 3), 2))
 
 // 1. Shared scale over the 12 character raws, raised until every sprite fits the canvas.
 const keyed = new Map<string, RawImage>()

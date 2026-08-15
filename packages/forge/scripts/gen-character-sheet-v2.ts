@@ -21,10 +21,12 @@ const MODEL = 'google/gemini-3.1-flash-image'
 const RESERVE = 0.046
 
 const REF_CANDIDATES = '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/reference-candidates'
+// Canonical style anchor law: style-anchor.png is the FIRST input_reference and FIRST judge ref.
+const STYLE_ANCHOR = readFileSync('packages/forge/content/reference/style-anchor.png')
 const ANCHOR = readFileSync('packages/forge/content/reference/identity-anchor-v2.png')
 const judge: JudgeFn = makeVlmJudge({
   apiKey: KEY,
-  refSheets: [readFileSync(`${REF_CANDIDATES}/building-1.png`), readFileSync(`${REF_CANDIDATES}/item-1.png`), ANCHOR],
+  refSheets: [STYLE_ANCHOR, readFileSync(`${REF_CANDIDATES}/item-1.png`), ANCHOR],
 })
 
 const OUT = 'packages/forge/out/character-sheet-v2'
@@ -136,14 +138,14 @@ async function generateCell(f: Facing, p: Pose, attempt: number, refs: Buffer[],
 }
 
 console.log('cell sw/idle')
-const first = await generateCell('sw', 'idle', 0, [ANCHOR])
+const first = await generateCell('sw', 'idle', 0, [STYLE_ANCHOR, ANCHOR])
 cells.set(label('sw', 'idle'), { attempts: [first], current: first, retries: 0 })
-const laterRefs = [ANCHOR, first.raw]
-// se column proactively gets the mirrored sw/idle raw as FIRST ref (mirrored reference
-// INPUT only — the model re-renders with correct NW light) to break the recurring
+const laterRefs = [STYLE_ANCHOR, ANCHOR, first.raw]
+// se column proactively gets the mirrored sw/idle raw ahead of the identity refs (mirrored
+// reference INPUT only — the model re-renders with correct NW light) to break the recurring
 // sw/idle ~ se/idle near-dupe; output pixels are never mirrored.
 const mirroredSw = await encodePng(mirrorX(await decodePng(first.raw)))
-const refsFor = (f: Facing) => (f === 'se' ? [mirroredSw, ANCHOR] : laterRefs)
+const refsFor = (f: Facing) => (f === 'se' ? [STYLE_ANCHOR, mirroredSw, ANCHOR] : laterRefs)
 
 for (const p of POSES) for (const f of FACINGS) {
   if (f === 'sw' && p === 'idle') continue

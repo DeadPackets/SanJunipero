@@ -15,6 +15,13 @@ describe('style bible prompts', () => {
   it('crop prompts ask for 4 growth stages', () => {
     expect(buildAssetPrompt('wheat', { w: 1, h: 1 }, 'crop')).toMatch(/4 growth stages/i)
   })
+  it('non-character prompts carry the style-anchor density clause; character prompts do not', () => {
+    const clause = 'match the pixel density, palette warmth, and cute rounded style of the first reference image exactly'
+    for (const klass of ['building', 'item', 'crop', 'terrain'] as const)
+      expect(buildAssetPrompt('x', { w: 1, h: 1 }, klass)).toContain(clause)
+    for (const klass of ['rig-part', 'portrait'] as const)
+      expect(buildAssetPrompt('x', { w: 1, h: 1 }, klass)).not.toContain(clause)
+  })
   it('targetSize: 1x1 building is 64px, per Style Bible', () => {
     expect(targetSize('building', { w: 1, h: 1 })).toEqual({ w: 64, h: 64 })
     expect(targetSize('building', { w: 4, h: 4 })).toEqual({ w: 256, h: 256 })

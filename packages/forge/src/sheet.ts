@@ -155,7 +155,7 @@ export function defringe(img: RawImage): RawImage {
     x < 0 || y < 0 || x >= img.width || y >= img.height ? -1 : (y * img.width + x) * 4
   const contaminated = (i: number) => {
     const r = img.data[i]!, g = img.data[i + 1]!, b = img.data[i + 2]!
-    return (r > g + 30 && b > g + 15) || r > g + 50
+    return (r > g + 30 && b > g + 15) || r > g + 50 || (b > g + 25 && r > g + 10)
   }
   for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
     const i = at(x, y)!

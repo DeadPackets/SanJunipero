@@ -177,6 +177,16 @@ describe('defringe', () => {
       expect([...defringe(src).data.slice(4, 8)]).toEqual(GREEN)
     }
   })
+  it('catches lavender halo pixels (v3 branch) while sage and cream stay untouched', () => {
+    const LAVENDER: Px = [170, 140, 180, 255] // b>g+25 and r>g+10
+    const src = img(3, 1, x => (x === 0 ? CLEAR : x === 1 ? LAVENDER : GREEN))
+    expect([...defringe(src).data.slice(4, 8)]).toEqual(GREEN)
+    const CREAM: Px = [245, 240, 230, 255] // r≈g≈b
+    for (const good of [GREEN, CREAM]) {
+      const edge = img(3, 1, x => (x === 0 ? CLEAR : good))
+      expect([...defringe(edge).data.slice(4, 8)]).toEqual(good)
+    }
+  })
   it('leaves magenta-contaminated interior pixels untouched', () => {
     // 5x5 fully opaque green with magenta center: center is not on a transparency edge
     const src = img(5, 5, (x, y) => (x === 2 && y === 2 ? MAGENTA : GREEN))
