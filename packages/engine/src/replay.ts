@@ -1,16 +1,16 @@
 import { DEFAULT_CONFIG, type SimConfig } from '@sj/shared'
 import type { EventStore } from './eventStore.js'
-import { genesisState, type WorldState } from './state.js'
+import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { RngStreams } from './rng.js'
 
-export function replayFromGenesis(store: EventStore, config: SimConfig = DEFAULT_CONFIG): WorldState {
-  return store.readFrom(0).reduce((s, ev) => fold(s, ev, config), genesisState(config))
+export function replayFromGenesis(store: EventStore, config: SimConfig = DEFAULT_CONFIG, terrain?: TileId[][]): WorldState {
+  return store.readFrom(0).reduce((s, ev) => fold(s, ev, config), genesisState(config, terrain))
 }
 
-export function replayLatest(store: EventStore, config: SimConfig = DEFAULT_CONFIG): { state: WorldState; rng: RngStreams; seq: number } {
+export function replayLatest(store: EventStore, config: SimConfig = DEFAULT_CONFIG, terrain?: TileId[][]): { state: WorldState; rng: RngStreams; seq: number } {
   const snap = store.latestSnapshot()
-  let state = snap ? (snap.state as WorldState) : genesisState(config)
+  let state = snap ? (snap.state as WorldState) : genesisState(config, terrain)
   const ckpt = store.latestRngState()
   const rng = ckpt ? RngStreams.restore(ckpt.rng)
     : snap ? RngStreams.restore(snap.rng)
