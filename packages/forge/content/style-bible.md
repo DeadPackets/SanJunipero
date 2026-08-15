@@ -71,6 +71,7 @@ Sprites ship UNQUANTIZED: character cells and reference sprites keep their gener
 - `content/reference/style-anchor.png` (the approved T6 cottage raw) is THE art-style reference for the entire simulation: pixel density ("blocky but not too much"), palette warmth, cute rounded style.
 - Measured: detectArtScale = 4 on the 512px generation canvas → effective art resolution 128×128 (each art pixel ≈ 4 source px).
 - LAW: style-anchor.png is the FIRST input_reference on EVERY generation (all classes) and the FIRST judge refSheet.
+- style-anchor.png stays RAW — never post-processed. It is the generation/judge reference, not a shipped sprite.
 - Prompts for non-character classes append: "match the pixel density, palette warmth, and cute rounded style of the first reference image exactly".
 
 ## Facings

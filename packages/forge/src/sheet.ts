@@ -85,6 +85,9 @@ export function downscaleMajority(img: RawImage, w: number, h: number): RawImage
   return { width: w, height: h, data: out }
 }
 
+// DEPRECATED for sprite post-processing (pipeline v3): the round-trip metric is
+// degenerate — smaller blocks always fit better on non-lattice art, so it oversamples
+// the true pitch. Use resampleToArtHeight instead. Kept for grid-true inputs.
 // Finds the art-pixel size of big-pixel source art: the block size whose
 // majority-downscale -> integer-upscale round trip loses the least detail.
 export function detectArtScale(img: RawImage, candidates: number[] = [4, 5, 6, 7, 8, 9, 10, 11, 12]): number {
@@ -117,6 +120,7 @@ function upscaleInt(img: RawImage, k: number): RawImage {
   return { width: w, height: h, data: out }
 }
 
+// DEPRECATED for sprite post-processing (pipeline v3) — see detectArtScale note.
 // Reduces big-pixel art to its native resolution (one output pixel per art pixel).
 export function snapToGrid(img: RawImage): RawImage {
   const k = detectArtScale(img)
@@ -181,6 +185,76 @@ export function defringe(img: RawImage): RawImage {
     else { const m = Math.round((img.data[i]! + img.data[i + 2]!) / 2); out[i] = m; out[i + 2] = m }
   }
   return { width: img.width, height: img.height, data: out }
+}
+
+// Removes opaque pixels having any transparent 4-neighbor, once per radius iteration.
+// Strips chroma-blended edge halos before resampling instead of recoloring them.
+export function erodeAlpha(img: RawImage, radius = 1): RawImage {
+  let cur = img.data
+  for (let r = 0; r < radius; r++) {
+    const next = new Uint8ClampedArray(cur)
+    const alphaAt = (x: number, y: number) =>
+      x < 0 || y < 0 || x >= img.width || y >= img.height ? 0 : cur[(y * img.width + x) * 4 + 3]!
+    for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
+      const i = (y * img.width + x) * 4
+      if (cur[i + 3] === 0) continue
+      if (alphaAt(x - 1, y) === 0 || alphaAt(x + 1, y) === 0 || alphaAt(x, y - 1) === 0 || alphaAt(x, y + 1) === 0)
+        next.fill(0, i, i + 4)
+    }
+    cur = next
+  }
+  return { width: img.width, height: img.height, data: cur }
+}
+
+// Resamples big-pixel art to its true art pitch: lattice of pitch = bboxH/targetH,
+// phased at the bbox bottom-center; per cell, channel-wise MEDIAN of opaque pixels in
+// the central 1/3 x 1/3 (fallback: whole cell); opaque iff >=50% of the region is opaque.
+export function resampleToArtHeight(img: RawImage, targetH: number): RawImage {
+  let x0 = img.width, x1 = -1, y0 = img.height, y1 = -1
+  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
+    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
+      if (x < x0) x0 = x
+      if (x > x1) x1 = x
+      if (y < y0) y0 = y
+      if (y > y1) y1 = y
+    }
+  if (x1 < 0) throw new Error('resampleToArtHeight: no opaque pixels')
+  const bboxW = x1 - x0 + 1, bboxH = y1 - y0 + 1
+  const pitch = bboxH / targetH
+  const outW = Math.max(1, Math.round(bboxW / pitch))
+  const yBottom = y1 + 1, cx = x0 + bboxW / 2
+  const out = new Uint8ClampedArray(outW * targetH * 4)
+
+  function sample(xLo: number, xHi: number, yLo: number, yHi: number) {
+    const rs: number[] = [], gs: number[] = [], bs: number[] = []
+    let total = 0
+    for (let y = Math.max(0, Math.floor(yLo)); y < Math.min(img.height, Math.ceil(yHi)); y++) {
+      if (y + 0.5 < yLo || y + 0.5 >= yHi) continue
+      for (let x = Math.max(0, Math.floor(xLo)); x < Math.min(img.width, Math.ceil(xHi)); x++) {
+        if (x + 0.5 < xLo || x + 0.5 >= xHi) continue
+        total++
+        const i = (y * img.width + x) * 4
+        if (img.data[i + 3] === 0) continue
+        rs.push(img.data[i]!); gs.push(img.data[i + 1]!); bs.push(img.data[i + 2]!)
+      }
+    }
+    return { total, rs, gs, bs }
+  }
+  const median = (v: number[]) => v.sort((a, b) => a - b)[Math.floor(v.length / 2)]!
+
+  for (let j = 0; j < targetH; j++) {
+    const yLo = yBottom - (targetH - j) * pitch, yHi = yBottom - (targetH - 1 - j) * pitch
+    for (let i = 0; i < outW; i++) {
+      const xLo = cx + (i - outW / 2) * pitch, xHi = cx + (i + 1 - outW / 2) * pitch
+      const third = (hi: number, lo: number) => (hi - lo) / 3
+      let s = sample(xLo + third(xHi, xLo), xHi - third(xHi, xLo), yLo + third(yHi, yLo), yHi - third(yHi, yLo))
+      if (s.total === 0) s = sample(xLo, xHi, yLo, yHi)
+      if (s.total === 0 || s.rs.length === 0 || s.rs.length * 2 < s.total) continue
+      const d = (j * outW + i) * 4
+      out[d] = median(s.rs); out[d + 1] = median(s.gs); out[d + 2] = median(s.bs); out[d + 3] = 255
+    }
+  }
+  return { width: outW, height: targetH, data: out }
 }
 
 // Modal detected art scale across a set of images; ties break to the smallest scale.

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
 import { quantize } from './post/quantize.js'
 
 type Px = [number, number, number, number]
@@ -265,6 +265,63 @@ describe('unionPalette', () => {
   it('caps the palette at k frequency-ranked colors', () => {
     const noisy = img(4, 4, (x, y) => [x * 16, y * 16, 128, 255] as Px) // 16 distinct colors
     expect(unionPalette([noisy], 5)).toHaveLength(5)
+  })
+})
+
+describe('erodeAlpha', () => {
+  it('removes a 1px halo ring and keeps the interior intact', () => {
+    const MAGENTA: Px = [255, 0, 255, 255]
+    // 7x7: 5x5 blob = 1px magenta ring around a 3x3 red core
+    const src = img(7, 7, (x, y) => {
+      if (x < 1 || y < 1 || x > 5 || y > 5) return CLEAR
+      return x >= 2 && x <= 4 && y >= 2 && y <= 4 ? RED : MAGENTA
+    })
+    const out = erodeAlpha(src, 1)
+    for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) {
+      const inCore = x >= 2 && x <= 4 && y >= 2 && y <= 4
+      expect(out.data[(y * 7 + x) * 4 + 3], `${x},${y}`).toBe(inCore ? 255 : 0)
+      if (inCore) expect([...out.data.slice((y * 7 + x) * 4, (y * 7 + x) * 4 + 3)]).toEqual([255, 0, 0])
+    }
+  })
+  it('radius 2 erodes twice', () => {
+    const src = solid(6, 6, RED)
+    const out = erodeAlpha(src, 2)
+    let opaque = 0
+    for (let i = 3; i < out.data.length; i += 4) if (out.data[i]! > 0) opaque++
+    expect(opaque).toBe(4) // 6x6 -> 4x4 -> 2x2
+  })
+})
+
+describe('resampleToArtHeight', () => {
+  const palette: Px[] = [RED, BLUE, [0, 255, 0, 255], [255, 255, 0, 255], [128, 64, 32, 255]]
+  // sprite whose art blocks have a non-integer pitch, phased at the bbox bottom-left
+  function pitched(pitch: number, cols: number, rows: number): RawImage {
+    const w = Math.round(cols * pitch), h = Math.round(rows * pitch)
+    return img(w, h, (x, y) => {
+      const bi = Math.min(cols - 1, Math.floor(x / pitch))
+      const bj = Math.min(rows - 1, Math.floor((h - 1 - y) / pitch))
+      return palette[(bi * 3 + bj) % palette.length]!
+    })
+  }
+  it('recovers exact block colors from a 7.25px-pitch sprite', () => {
+    const out = resampleToArtHeight(pitched(7.25, 4, 8), 8)
+    expect(out.height).toBe(8)
+    expect(out.width).toBe(4)
+    for (let j = 0; j < 8; j++) for (let i = 0; i < 4; i++) {
+      const bj = 8 - 1 - j
+      expect([...out.data.slice((j * 4 + i) * 4, (j * 4 + i) * 4 + 4)], `cell ${i},${j}`)
+        .toEqual(palette[(i * 3 + bj) % palette.length])
+    }
+  })
+  it('output height always equals targetH', () => {
+    expect(resampleToArtHeight(solid(9, 37, RED), 8).height).toBe(8)
+    expect(resampleToArtHeight(solid(5, 20, RED), 8).height).toBe(8)
+  })
+  it('same content at different pitches resamples identically', () => {
+    const a = resampleToArtHeight(pitched(5, 4, 8), 8)
+    const b = resampleToArtHeight(pitched(9, 4, 8), 8)
+    expect(a.width).toBe(b.width)
+    expect(a.data).toEqual(b.data)
   })
 })
 
