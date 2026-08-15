@@ -2,7 +2,8 @@ import { DEFAULT_CONFIG, type SimConfig, type SimEvent } from '@sj/shared'
 import type { WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
-  AgentMoved, AgentSpawned, AgentWoke, ItemMoved, ItemQtyChanged, ItemSpawned, NeedChanged,
+  AgentCollapsed, AgentDied, AgentMoved, AgentSlept, AgentSpawned, AgentWoke,
+  ItemMoved, ItemQtyChanged, ItemSpawned, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
   StructureProgressed, TickAdvanced,
 } from './events.def.js'
@@ -51,7 +52,14 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const p = NeedChanged.parse(event.payload)
       const a = state.agents[p.id]
       if (!a) throw new Error(`need_changed for unknown agent ${p.id}`)
-      return { ...state, agents: { ...state.agents, [p.id]: { ...a, needs: { ...a.needs, [p.need]: clamp(a.needs[p.need] + p.delta) } } } }
+      const needs = { ...a.needs, [p.need]: clamp(a.needs[p.need] + p.delta) }
+      let zeroHungerSinceTick = a.zeroHungerSinceTick
+      if (p.need === 'hunger') zeroHungerSinceTick = needs.hunger <= 0 ? (zeroHungerSinceTick ?? event.tick) : null
+      let collapsedSinceTick = a.collapsedSinceTick
+      if (collapsedSinceTick !== null
+        && needs.hunger >= config.needs.collapseThreshold && needs.energy >= config.needs.collapseThreshold
+        && a.hp >= config.health.collapseHp) collapsedSinceTick = null
+      return { ...state, agents: { ...state.agents, [p.id]: { ...a, needs, zeroHungerSinceTick, collapsedSinceTick } } }
     }
     case 'item_spawned': {
       const p = ItemSpawned.parse(event.payload)
@@ -173,6 +181,24 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_woke for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, asleep: false } } }
+    }
+    case 'agent_slept': {
+      const p = AgentSlept.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_slept for unknown agent ${p.agentId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, asleep: true } } }
+    }
+    case 'agent_collapsed': {
+      const p = AgentCollapsed.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_collapsed for unknown agent ${p.agentId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, collapsedSinceTick: event.tick } } }
+    }
+    case 'agent_died': {
+      const p = AgentDied.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_died for unknown agent ${p.agentId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, alive: false, asleep: false, activity: null } } }
     }
     default:
       throw new Error(`unknown event type: ${event.type}`)

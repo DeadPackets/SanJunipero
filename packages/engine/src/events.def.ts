@@ -36,3 +36,6 @@ export const ActionCompleted = z.object({
 export const ActionInterrupted = z.object({ agentId: z.string(), reason: z.string() }).strict()
 export const SkillGained = z.object({ agentId: z.string(), track: z.string(), xp: z.number() }).strict()
 export const AgentWoke = z.object({ agentId: z.string() }).strict()
+export const AgentSlept = z.object({ agentId: z.string() }).strict()
+export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
+export const AgentDied = z.object({ agentId: z.string(), cause: z.string() }).strict()

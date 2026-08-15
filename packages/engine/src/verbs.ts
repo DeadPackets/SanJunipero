@@ -5,7 +5,7 @@ import type { RngStream } from './rng.js'
 import { findPath, isPassable } from './path.js'
 
 export type PendingEvent = { type: string; payload: unknown }
-export type VerbKind = 'walk'
+export type VerbKind = 'walk' | 'sleep' | 'wake' | 'eat'
 
 export type VerbDef = {
   kind: VerbKind
@@ -45,7 +45,54 @@ const walk: VerbDef = {
   interruptible: true,
 }
 
-export const VERBS: Record<string, VerbDef> = { walk }
+export const EatParams = z.object({ itemId: z.string() }).strict()
+
+// v1 food registry; lifts into config when cooking/foraging land.
+export const FOOD_KINDS: ReadonlySet<string> = new Set(['berries', 'fish', 'venison', 'bread', 'wheat'])
+
+const sleep: VerbDef = {
+  kind: 'sleep',
+  validate(state, _config, agentId) {
+    return state.agents[agentId]!.asleep ? 'already asleep' : null
+  },
+  duration() { return 1 },
+  onComplete(_state, _config, agentId) { return [{ type: 'agent_slept', payload: { agentId } }] },
+  interruptible: true,
+}
+
+// submitIntent already prepends agent_woke for any intent from a sleeper.
+const wake: VerbDef = {
+  kind: 'wake',
+  validate(state, _config, agentId) {
+    return state.agents[agentId]!.asleep ? null : 'not asleep'
+  },
+  duration() { return 1 },
+  onComplete() { return [] },
+  interruptible: true,
+}
+
+const eat: VerbDef = {
+  kind: 'eat',
+  validate(state, _config, agentId, params) {
+    const p = EatParams.safeParse(params)
+    if (!p.success) return 'eat needs an {itemId}'
+    const item = state.items[p.data.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (!FOOD_KINDS.has(item.kind)) return `${item.kind} is not food`
+    return null
+  },
+  duration() { return 1 },
+  onComplete(_state, config, agentId, params) {
+    const p = EatParams.parse(params)
+    return [
+      { type: 'item_qty_changed', payload: { id: p.itemId, delta: -1 } },
+      { type: 'need_changed', payload: { id: agentId, need: 'hunger', delta: config.needs.eatRestoreHunger } },
+    ]
+  },
+  interruptible: true,
+}
+
+export const VERBS: Record<string, VerbDef> = { walk, sleep, wake, eat }
 
 // One tick of an in-progress walk. Returns the events to append this tick:
 // action_progressed (+ agent_moved on tile boundaries), or a lone
