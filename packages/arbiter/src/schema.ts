@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
 import * as sqliteVec from 'sqlite-vec'
 import { openDb } from '@sj/engine'
+import { EMBEDDING_DIM } from '@sj/agents'
 
 export function openArbiterDb(path: string): Database.Database {
   const db = openDb(path)
@@ -17,5 +18,24 @@ export function migrateArbiterTables(db: Database.Database): void {
       name TEXT NOT NULL,
       prerequisite_id TEXT REFERENCES codex(id)
     );
+  `)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS rulings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      intent_text TEXT NOT NULL,
+      normalized_intent TEXT NOT NULL,
+      verdict_json TEXT NOT NULL,
+      tick INTEGER NOT NULL
+    );
+    CREATE TRIGGER IF NOT EXISTS rulings_no_update BEFORE UPDATE ON rulings
+      BEGIN SELECT RAISE(ABORT,'rulings are immutable'); END;
+    CREATE TRIGGER IF NOT EXISTS rulings_no_delete BEFORE DELETE ON rulings
+      BEGIN SELECT RAISE(ABORT,'rulings are immutable'); END;
+    CREATE VIRTUAL TABLE IF NOT EXISTS rulings_fts USING fts5(
+      intent_text, content='rulings', content_rowid='id'
+    );
+    CREATE TRIGGER IF NOT EXISTS rulings_fts_after_insert AFTER INSERT ON rulings
+      BEGIN INSERT INTO rulings_fts(rowid, intent_text) VALUES (new.id, new.intent_text); END;
+    CREATE VIRTUAL TABLE IF NOT EXISTS rulings_vec USING vec0(embedding float[${EMBEDDING_DIM}]);
   `)
 }

@@ -10,3 +10,5 @@ export {
   type LlmMessage,
   type LlmClientOpts,
 } from './llm/client.js'
+export { Embedder, cosine, EMBEDDING_DIM } from './memory/embedder.js'
+export { FakeEmbedder } from './testutil/fakeEmbedder.js'
