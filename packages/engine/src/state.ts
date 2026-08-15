@@ -8,6 +8,7 @@ export type AgentBody = {
   needs: { hunger: number; energy: number; warmth: number; social: number }
   hp: number; injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
   ill: boolean; ageDays: number
+  tendedTick?: number                     // absent until first tended: keeps pre-health state hashes stable
   skills: Record<string, number>          // track → xp
   activity: null | { verb: string; ticksRemaining: number; params: Record<string, unknown>; path?: Array<[number, number]> }
   collapsedSinceTick: number | null

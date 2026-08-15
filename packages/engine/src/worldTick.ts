@@ -4,6 +4,7 @@ import { fold } from './fold.js'
 import type { RngStreams } from './rng.js'
 import { stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
+import { healthSystem } from './systems/health.js'
 
 export type TickCtx = {
   readonly config: SimConfig
@@ -19,7 +20,6 @@ const weatherSystem = noop
 const fireSystem = noop
 const cropsSystem = noop
 const wildlifeSystem = noop
-const healthSystem = noop
 const agingSystem = noop
 
 function actionsSystem(ctx: TickCtx): void {

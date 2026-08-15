@@ -5,7 +5,7 @@ import type { RngStream } from './rng.js'
 import { findPath, isPassable } from './path.js'
 
 export type PendingEvent = { type: string; payload: unknown }
-export type VerbKind = 'walk' | 'sleep' | 'wake' | 'eat'
+export type VerbKind = 'walk' | 'sleep' | 'wake' | 'eat' | 'tend'
 
 export type VerbDef = {
   kind: VerbKind
@@ -92,7 +92,31 @@ const eat: VerbDef = {
   interruptible: true,
 }
 
-export const VERBS: Record<string, VerbDef> = { walk, sleep, wake, eat }
+export const TendParams = z.object({ targetId: z.string() }).strict()
+
+const tend: VerbDef = {
+  kind: 'tend',
+  validate(state, config, agentId, params) {
+    const p = TendParams.safeParse(params)
+    if (!p.success) return 'tend needs a {targetId}'
+    if (p.data.targetId === agentId) return 'cannot tend yourself'
+    const target = state.agents[p.data.targetId]
+    if (!target || !target.alive) return 'no one there to tend'
+    const a = state.agents[agentId]!
+    if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return 'not adjacent to the patient'
+    if (!target.ill && target.hp >= config.health.maxHp) return 'nothing to tend'
+    return null
+  },
+  duration() { return 1 },
+  onComplete(_state, _config, _agentId, params) {
+    const p = TendParams.parse(params)
+    return [{ type: 'agent_tended', payload: { agentId: p.targetId } }]
+  },
+  interruptible: true,
+  skill: { track: 'medicine', xp: 1 },
+}
+
+export const VERBS: Record<string, VerbDef> = { walk, sleep, wake, eat, tend }
 
 // One tick of an in-progress walk. Returns the events to append this tick:
 // action_progressed (+ agent_moved on tile boundaries), or a lone
