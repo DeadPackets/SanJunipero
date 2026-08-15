@@ -53,7 +53,10 @@ export class AssetCodex {
     this.#insert.run(id, v.class, v.desc, v.footprint.w, v.footprint.h,
       v.png, v.widthPx, v.heightPx, v.status, v.score, v.attempts, v.costUsd)
     const rec = this.#toRecord(this.#selById.get(id) as Row)
-    for (const cb of this.#listeners) cb(rec)
+    // the row is already committed — a throwing listener must not reject register (duplicate paid regen)
+    for (const cb of this.#listeners) {
+      try { cb(rec) } catch (e) { console.error('onAssetReady listener failed:', e) }
+    }
     return rec
   }
 

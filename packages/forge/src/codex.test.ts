@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
 
@@ -29,6 +29,19 @@ describe('AssetCodex', () => {
     codex.onAssetReady(r => seen.push(r.desc))
     codex.register(input)
     expect(seen).toEqual(['a wooden bucket'])
+  })
+  it('a throwing listener does not reject register or skip later listeners', () => {
+    const codex = new AssetCodex(openForgeDb(':memory:'))
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const seen: string[] = []
+    codex.onAssetReady(() => { throw new Error('listener boom') })
+    codex.onAssetReady(r => seen.push(r.desc))
+    let rec
+    expect(() => { rec = codex.register(input) }).not.toThrow() // row is committed; no duplicate regen
+    expect(codex.get(rec!.id)).not.toBeNull()
+    expect(seen).toEqual(['a wooden bucket'])
+    expect(errSpy).toHaveBeenCalledOnce()
+    errSpy.mockRestore()
   })
   it('register validates input before insert — failed registers leave no poison rows', () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
