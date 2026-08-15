@@ -11,7 +11,7 @@ export type VerbKind =
   | 'speak' | 'give' | 'take' | 'write' | 'read' | 'teach' | 'attack' | 'experiment'
 
 export type VerbDef = {
-  kind: VerbKind
+  kind: string
   validate(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): string | null
   duration(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): number
   onStart?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): PendingEvent[]
@@ -595,6 +595,16 @@ const experiment: VerbDef = {
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
   speak, give, take, write, read, teach, attack, experiment,
+}
+
+// Hot-registration seam: codified recipe verbs join the live registry by kind id.
+export function registerVerb(def: VerbDef): void {
+  if (VERBS[def.kind]) throw new Error(`already registered: ${def.kind}`)
+  VERBS[def.kind] = def
+}
+
+export function unregisterVerb(kind: string): void {
+  delete VERBS[kind]
 }
 
 // One tick of an in-progress build: the agent works, the site advances in step.
