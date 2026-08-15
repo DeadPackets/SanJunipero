@@ -1,12 +1,13 @@
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
-import type { WorldState } from './state.js'
+import type { TileId, WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
   AgentAged, AgentCollapsed, AgentDied, AgentFellIll, AgentInfected, AgentInjured, AgentMoved,
-  AgentRecovered, AgentSlept, AgentSpawned, AgentTended, AgentWoke, HpChanged,
+  AgentRecovered, AgentSlept, AgentSpawned, AgentTended, AgentWoke,
+  CropGrew, CropHarvested, CropPlanted, CropWithered, HpChanged,
   ItemMoved, ItemQtyChanged, ItemSpawned, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
-  StructureProgressed, TickAdvanced, WeatherChanged,
+  StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
 import { findPath } from './path.js'
 import { WalkParams } from './verbs.js'
@@ -253,6 +254,46 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
         && a.needs.hunger >= config.needs.collapseThreshold && a.needs.energy >= config.needs.collapseThreshold
         && hp >= config.health.collapseHp) collapsedSinceTick = null
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, hp, collapsedSinceTick } } }
+    }
+    case 'crop_planted': {
+      const p = CropPlanted.parse(event.payload)
+      return {
+        ...state,
+        crops: {
+          ...state.crops,
+          [p.id]: { id: p.id, kind: p.kind, x: p.x, y: p.y, plantedDay: p.plantedDay, stage: 0, withered: false },
+        },
+        counters: bumpCounter(state.counters, p.id),
+      }
+    }
+    case 'crop_grew': {
+      const p = CropGrew.parse(event.payload)
+      const c = state.crops[p.cropId]
+      if (!c) throw new Error(`crop_grew for unknown crop ${p.cropId}`)
+      return { ...state, crops: { ...state.crops, [p.cropId]: { ...c, stage: p.stage } } }
+    }
+    case 'crop_withered': {
+      const p = CropWithered.parse(event.payload)
+      const c = state.crops[p.cropId]
+      if (!c) throw new Error(`crop_withered for unknown crop ${p.cropId}`)
+      return { ...state, crops: { ...state.crops, [p.cropId]: { ...c, withered: true } } }
+    }
+    case 'crop_harvested': {
+      const p = CropHarvested.parse(event.payload)
+      if (!state.crops[p.cropId]) throw new Error(`crop_harvested for unknown crop ${p.cropId}`)
+      const { [p.cropId]: _, ...crops } = state.crops
+      return { ...state, crops }
+    }
+    case 'wildlife_changed': {
+      const p = WildlifeChanged.parse(event.payload)
+      return { ...state, wildlife: { fish: p.fish ?? state.wildlife.fish, deer: p.deer ?? state.wildlife.deer } }
+    }
+    case 'terrain_changed': {
+      const p = TerrainChanged.parse(event.payload)
+      const row = state.terrain[p.y]
+      if (!row || p.x < 0 || p.x >= row.length) throw new Error(`terrain_changed out of bounds (${p.x}, ${p.y})`)
+      const terrain = state.terrain.map((r, y) => (y === p.y ? r.map((t, x) => (x === p.x ? (p.tile as TileId) : t)) : r))
+      return { ...state, terrain }
     }
     default:
       throw new Error(`unknown event type: ${event.type}`)

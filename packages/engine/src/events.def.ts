@@ -47,3 +47,12 @@ export const AgentRecovered = z.object({ agentId: z.string() }).strict()
 export const AgentTended = z.object({ agentId: z.string() }).strict()
 export const HpChanged = z.object({ agentId: z.string(), delta: z.number() }).strict()
 export const WeatherChanged = z.object({ kind: z.string(), temperatureC: z.number() }).strict()
+
+export const CropPlanted = z.object({
+  id: z.string(), kind: z.string(), x: z.number(), y: z.number(), plantedDay: z.number(),
+}).strict()
+export const CropGrew = z.object({ cropId: z.string(), stage: z.number() }).strict()
+export const CropWithered = z.object({ cropId: z.string() }).strict()
+export const CropHarvested = z.object({ cropId: z.string() }).strict()
+export const WildlifeChanged = z.object({ fish: z.number().optional(), deer: z.number().optional() }).strict()
+export const TerrainChanged = z.object({ x: z.number(), y: z.number(), tile: z.number().int().min(0).max(6) }).strict()

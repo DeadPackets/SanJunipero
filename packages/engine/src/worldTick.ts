@@ -7,6 +7,8 @@ import { needsSystem } from './systems/needs.js'
 import { healthSystem } from './systems/health.js'
 import { agingSystem } from './systems/aging.js'
 import { weatherSystem } from './systems/weather.js'
+import { cropsSystem } from './systems/crops.js'
+import { wildlifeSystem } from './systems/wildlife.js'
 
 export type TickCtx = {
   readonly config: SimConfig
@@ -19,8 +21,6 @@ export type WorldTickResult = { state: WorldState; events: PendingEvent[] }
 
 const noop: System = () => {}
 const fireSystem = noop
-const cropsSystem = noop
-const wildlifeSystem = noop
 
 function actionsSystem(ctx: TickCtx): void {
   for (const id of Object.keys(ctx.state().agents).sort()) {
@@ -42,7 +42,7 @@ function actionsSystem(ctx: TickCtx): void {
     const def = VERBS[act.verb]
     ctx.emit('action_completed', { agentId: id, verb: act.verb })
     if (!def) continue
-    for (const e of def.onComplete(ctx.state(), ctx.config, id, act.params, ctx.rng.get('actions'))) ctx.emit(e.type, e.payload)
+    for (const e of def.onComplete(ctx.state(), ctx.config, id, act.params, ctx.rng.get(def.rngStream ?? 'actions'))) ctx.emit(e.type, e.payload)
     if (def.skill) ctx.emit('skill_gained', { agentId: id, track: def.skill.track, xp: def.skill.xp })
   }
 }
