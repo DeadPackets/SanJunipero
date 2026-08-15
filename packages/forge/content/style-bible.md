@@ -62,3 +62,9 @@ Every asset is quantized to this palette, no exceptions.
 ## Atmosphere
 
 - Stylized-dramatic grading: deep blue moonlit nights with warm window glow, golden dawns, grey-green storm light, snow-blued winters.
+
+## Facings
+
+- Characters: 4 dimetric facings (sw, se, ne, nw) × 3 poses (idle, walk-a, walk-b) per sheet; cells 32×32, sheet 128×96. Column order sw, se, ne, nw (left→right) and row order idle, walk-a, walk-b (top→bottom), as in `sheet.ts`. Walk animation = idle, walk-a, idle, walk-b loop.
+- Buildings: up to 2 authored facings — door-sw (default) and door-se variant; codex id suffix `#se`. NEVER mirror sprites: light is locked from the north-west (mirroring flips it).
+- Engine note: Structure has no facing field yet (C2); facing is asset-selection-only until then.
