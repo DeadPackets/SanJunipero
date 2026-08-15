@@ -30,7 +30,7 @@ export function fireSystem(ctx: TickCtx): void {
     }
   }
 
-  const spreadChance = cfg.spreadChancePerTickAdjacent * (weather === 'storm' ? cfg.rainSpreadMultiplier : 1)
+  const spreadChance = cfg.spreadChancePerTickAdjacent * (weather === 'storm' ? cfg.stormSpreadMultiplier : 1)
   const sources = sorted(ctx.state()).filter((s) => s.burning).map((s) => s.id)
   for (const fromId of sources) {
     const from = ctx.state().structures[fromId]!

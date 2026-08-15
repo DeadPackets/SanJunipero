@@ -17,6 +17,15 @@ describe('stableStringify', () => {
     expect(() => stableStringify(new Uint8Array(2))).toThrow(/Uint8Array/)
     expect(() => stableStringify(() => 1)).toThrow(/Function/)
   })
+  it('skips object keys whose value is undefined, matching JSON.stringify', () => {
+    expect(stableStringify({ a: 1, b: undefined })).toBe('{"a":1}')
+    expect(stableStringify({ a: 1, b: undefined })).toBe(stableStringify({ a: 1 }))
+  })
+  it('renders undefined array elements as null; no collision with the empty array', () => {
+    expect(stableStringify([undefined])).toBe('[null]')
+    expect(stableStringify([undefined])).not.toBe(stableStringify([]))
+    expect(stableStringify([1, undefined, 2])).toBe('[1,null,2]')
+  })
   it('still accepts plain nested objects, arrays, and null-prototype objects', () => {
     expect(stableStringify({ a: [{ b: 1 }], c: null })).toBe('{"a":[{"b":1}],"c":null}')
     const np = Object.create(null) as Record<string, unknown>

@@ -36,9 +36,21 @@ describe('replay', () => {
     expect(r.seq).toBe(store.lastSeq())
     expect(r.rng.get('weather').next()).toBe(rng.get('weather').next())
   })
-  it('replayLatest with no snapshot equals genesis replay', () => {
+  it('replayLatest with no snapshot equals genesis replay (seed provided)', () => {
     const { store, live } = seedStore()
-    expect(stateHash(replayLatest(store).state)).toBe(stateHash(live))
+    expect(stateHash(replayLatest(store, DEFAULT_CONFIG, undefined, 'town1').state)).toBe(stateHash(live))
+  })
+  it('throws when no rng checkpoint, no snapshot, and no seed exist', () => {
+    const { store } = seedStore()
+    expect(() => replayLatest(store)).toThrow(/no seed source/)
+  })
+  it('throws when the snapshot rng is behind the folded state tick', () => {
+    const { store } = seedStore()
+    const rng = new RngStreams('town1')
+    const firstTwo = store.readRange(1, 2).reduce((s, e) => fold(s, e), genesisState(DEFAULT_CONFIG))
+    store.saveSnapshot(1, 2, firstTwo, rng.snapshot()) // no rng checkpoint: rng falls back to the snapshot
+    store.append(3, 'tick_advanced', {})
+    expect(() => replayLatest(store)).toThrow(/rng checkpoint .* behind/)
   })
   it('throws when the rng checkpoint is behind the folded state tick', () => {
     const { store } = seedStore()

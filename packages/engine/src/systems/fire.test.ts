@@ -106,10 +106,10 @@ describe('fire: spread', () => {
   })
 
   // Seed 'f2' fire-stream draws: 0.4233, 0.4188. Exact outcomes at both multipliers — no statistics.
-  it('rain multiplier slows spread during storms: exact seeded outcomes', () => {
-    const spreadCfg = (rainSpreadMultiplier: number) => SimConfigSchema.parse({
+  it('storm multiplier slows spread during storms: exact seeded outcomes', () => {
+    const spreadCfg = (stormSpreadMultiplier: number) => SimConfigSchema.parse({
       weather: { hourlyChangeChance: 0 },
-      fire: { spreadChancePerTickAdjacent: 0.5, rainSpreadMultiplier },
+      fire: { spreadChancePerTickAdjacent: 0.5, stormSpreadMultiplier },
     })
     const run = (config: SimConfig) => {
       let s = ignite(withWeather(atTick(rowWorld(config), 1), 'storm'), 'structure_1', config)
