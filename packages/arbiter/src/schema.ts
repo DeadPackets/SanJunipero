@@ -38,4 +38,17 @@ export function migrateArbiterTables(db: Database.Database): void {
       BEGIN INSERT INTO rulings_fts(rowid, intent_text) VALUES (new.id, new.intent_text); END;
     CREATE VIRTUAL TABLE IF NOT EXISTS rulings_vec USING vec0(embedding float[${EMBEDDING_DIM}]);
   `)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS rulebook (
+      id INTEGER PRIMARY KEY,
+      recipe_id TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      normalized_name TEXT NOT NULL,
+      recipe_json TEXT NOT NULL,
+      verb TEXT NOT NULL,
+      tick INTEGER NOT NULL,
+      reverted_at_tick INTEGER,
+      reverted_reason TEXT
+    );
+  `)
 }
