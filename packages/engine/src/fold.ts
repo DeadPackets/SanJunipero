@@ -3,10 +3,10 @@ import type { TileId, WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
   AgentAged, AgentCollapsed, AgentDied, AgentFellIll, AgentInfected, AgentInjured, AgentMoved,
-  AgentRecovered, AgentSlept, AgentSpawned, AgentTended, AgentWoke,
+  AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CropGrew, CropHarvested, CropPlanted, CropWithered,
   FireExtinguished, FireIgnited, FireSpread, HpChanged,
-  ItemMoved, ItemQtyChanged, ItemSpawned, NeedChanged,
+  ItemMoved, ItemQtyChanged, ItemSpawned, ItemTextChanged, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
@@ -68,7 +68,10 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const p = ItemSpawned.parse(event.payload)
       return {
         ...state,
-        items: { ...state.items, [p.id]: { id: p.id, kind: p.kind, qty: p.qty, loc: p.loc } },
+        items: {
+          ...state.items,
+          [p.id]: { id: p.id, kind: p.kind, qty: p.qty, ...(p.text !== undefined ? { text: p.text } : {}), loc: p.loc },
+        },
         counters: bumpCounter(state.counters, p.id),
       }
     }
@@ -88,6 +91,12 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
         return { ...state, items }
       }
       return { ...state, items: { ...state.items, [p.id]: { ...item, qty } } }
+    }
+    case 'item_text_changed': {
+      const p = ItemTextChanged.parse(event.payload)
+      const item = state.items[p.id]
+      if (!item) throw new Error(`item_text_changed for unknown item ${p.id}`)
+      return { ...state, items: { ...state.items, [p.id]: { ...item, text: p.text } } }
     }
     case 'structure_planned': {
       const p = StructurePlanned.parse(event.payload)
@@ -210,6 +219,12 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_slept for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, asleep: true } } }
+    }
+    case 'agent_spoke': {
+      const p = AgentSpoke.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_spoke for unknown agent ${p.agentId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, lastSpokeTick: event.tick } } }
     }
     case 'agent_collapsed': {
       const p = AgentCollapsed.parse(event.payload)

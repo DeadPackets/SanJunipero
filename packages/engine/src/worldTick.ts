@@ -40,7 +40,8 @@ function actionsSystem(ctx: TickCtx): void {
     const act = ctx.state().agents[id]!.activity
     if (!act || act.ticksRemaining > 0) continue
     const def = VERBS[act.verb]
-    ctx.emit('action_completed', { agentId: id, verb: act.verb })
+    const results = def?.results?.(ctx.state(), ctx.config, id, act.params)
+    ctx.emit('action_completed', { agentId: id, verb: act.verb, ...(results ? { results } : {}) })
     if (!def) continue
     for (const e of def.onComplete(ctx.state(), ctx.config, id, act.params, ctx.rng.get(def.rngStream ?? 'actions'))) ctx.emit(e.type, e.payload)
     if (def.skill) ctx.emit('skill_gained', { agentId: id, track: def.skill.track, xp: def.skill.xp })

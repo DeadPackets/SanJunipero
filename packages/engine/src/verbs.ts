@@ -8,6 +8,7 @@ export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
   | 'walk' | 'sleep' | 'wake' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
   | 'build' | 'craft' | 'extinguish'
+  | 'speak' | 'give' | 'take' | 'write' | 'read' | 'teach' | 'attack' | 'experiment'
 
 export type VerbDef = {
   kind: VerbKind
@@ -15,6 +16,7 @@ export type VerbDef = {
   duration(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): number
   onStart?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): PendingEvent[]
   onComplete(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>, rng: RngStream): PendingEvent[]
+  results?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): Record<string, unknown>
   interruptible: boolean
   skill?: { track: string; xp: number }
   rngStream?: string
@@ -79,17 +81,19 @@ const wake: VerbDef = {
 
 const eat: VerbDef = {
   kind: 'eat',
-  validate(state, _config, agentId, params) {
+  validate(state, config, agentId, params) {
     const p = EatParams.safeParse(params)
     if (!p.success) return 'eat needs an {itemId}'
     const item = state.items[p.data.itemId]
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
-    if (!FOOD_KINDS.has(item.kind)) return `${item.kind} is not food`
+    if (!FOOD_KINDS.has(item.kind) && !config.crops[item.kind]) return `${item.kind} is not food`
     return null
   },
   duration() { return 1 },
-  onComplete(_state, config, agentId, params) {
+  onComplete(state, config, agentId, params) {
     const p = EatParams.parse(params)
+    const item = state.items[p.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
     return [
       { type: 'item_qty_changed', payload: { id: p.itemId, delta: -1 } },
       { type: 'need_changed', payload: { id: agentId, need: 'hunger', delta: config.needs.eatRestoreHunger } },
@@ -406,8 +410,191 @@ const extinguish: VerbDef = {
   interruptible: true,
 }
 
+export const SpeakParams = z.object({ text: z.string().min(1) }).strict()
+export const GiveParams = z.object({ itemId: z.string(), targetId: z.string() }).strict()
+export const TakeParams = z.object({ itemId: z.string() }).strict()
+export const WriteParams = z.object({ itemId: z.string().optional(), text: z.string().min(1) }).strict()
+export const ReadParams = z.object({ itemId: z.string() }).strict()
+export const TeachParams = z.object({ targetId: z.string(), track: z.string() }).strict()
+export const AttackParams = z.object({ targetId: z.string() }).strict()
+export const ExperimentParams = z.object({ description: z.string() }).strict()
+
+const speak: VerbDef = {
+  kind: 'speak',
+  validate(_state, _config, _agentId, params) {
+    const p = SpeakParams.safeParse(params)
+    if (!p.success) return 'speak needs a {text}'
+    return null
+  },
+  duration() { return 1 },
+  onComplete(state, _config, agentId, params) {
+    const p = SpeakParams.parse(params)
+    const a = state.agents[agentId]!
+    return [{ type: 'agent_spoke', payload: { agentId, text: p.text, x: a.x, y: a.y } }]
+  },
+  interruptible: true,
+}
+
+const give: VerbDef = {
+  kind: 'give',
+  validate(state, _config, agentId, params) {
+    const p = GiveParams.safeParse(params)
+    if (!p.success) return 'give needs {itemId, targetId}'
+    if (p.data.targetId === agentId) return 'cannot give to yourself'
+    const target = state.agents[p.data.targetId]
+    if (!target || !target.alive) return 'no one there to receive'
+    const a = state.agents[agentId]!
+    if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return 'not adjacent to give'
+    const item = state.items[p.data.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    return null
+  },
+  duration() { return 1 },
+  onComplete(state, _config, agentId, params) {
+    const p = GiveParams.parse(params)
+    const item = state.items[p.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: p.targetId } } }]
+  },
+  interruptible: true,
+}
+
+const take: VerbDef = {
+  kind: 'take',
+  validate(state, _config, agentId, params) {
+    const p = TakeParams.safeParse(params)
+    if (!p.success) return 'take needs an {itemId}'
+    const item = state.items[p.data.itemId]
+    if (!item) return 'no such item'
+    if (item.loc.t === 'agent') return item.loc.id === agentId ? 'already holding that' : 'someone is holding that'
+    if (item.loc.t === 'tile') {
+      if (!withinReach(state, agentId, item.loc.x, item.loc.y)) return 'not close enough to take'
+    } else {
+      const s = state.structures[item.loc.id]
+      if (!s || !nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to take'
+    }
+    return null
+  },
+  duration() { return 1 },
+  onComplete(state, _config, agentId, params) {
+    const p = TakeParams.parse(params)
+    const item = state.items[p.itemId]
+    if (!item || item.loc.t === 'agent') return []
+    return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: agentId } } }]
+  },
+  interruptible: true,
+}
+
+const write: VerbDef = {
+  kind: 'write',
+  validate(state, _config, agentId, params) {
+    const p = WriteParams.safeParse(params)
+    if (!p.success) return 'write needs {text}'
+    if (p.data.itemId !== undefined) {
+      const item = state.items[p.data.itemId]
+      if (!item) return 'no such item'
+      if (item.kind !== 'note') return 'not a note'
+      if (item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    }
+    return null
+  },
+  duration() { return 1 },
+  onComplete(state, _config, agentId, params) {
+    const p = WriteParams.parse(params)
+    if (p.itemId !== undefined) {
+      const item = state.items[p.itemId]
+      if (!item || item.kind !== 'note' || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+      return [{ type: 'item_text_changed', payload: { id: p.itemId, text: p.text } }]
+    }
+    return [{ type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: 'note', qty: 1, loc: { t: 'agent', id: agentId }, text: p.text } }]
+  },
+  interruptible: true,
+}
+
+const read: VerbDef = {
+  kind: 'read',
+  validate(state, _config, agentId, params) {
+    const p = ReadParams.safeParse(params)
+    if (!p.success) return 'read needs an {itemId}'
+    const item = state.items[p.data.itemId]
+    if (!item) return 'no such item'
+    if (item.kind !== 'note') return 'there is nothing to read'
+    if (item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    return null
+  },
+  duration() { return 1 },
+  onComplete() { return [] },
+  results(state, _config, _agentId, params) {
+    const p = ReadParams.parse(params)
+    return { text: state.items[p.itemId]?.text ?? '' }
+  },
+  interruptible: true,
+}
+
+const teach: VerbDef = {
+  kind: 'teach',
+  validate(state, _config, agentId, params) {
+    const p = TeachParams.safeParse(params)
+    if (!p.success) return 'teach needs {targetId, track}'
+    if (p.data.targetId === agentId) return 'cannot teach yourself'
+    const target = state.agents[p.data.targetId]
+    if (!target || !target.alive) return 'no one there to teach'
+    if (target.activity) return 'they are busy'
+    const a = state.agents[agentId]!
+    if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return 'not adjacent to teach'
+    return null
+  },
+  duration() { return 1 },
+  onComplete(state, _config, agentId, params) {
+    const p = TeachParams.parse(params)
+    const teacherXp = state.agents[agentId]!.skills[p.track] ?? 0
+    const grant = Math.min(teacherXp * 0.1, 50)
+    return [{ type: 'skill_gained', payload: { agentId: p.targetId, track: p.track, xp: grant } }]
+  },
+  interruptible: true,
+  skill: { track: 'scholarship', xp: 1 },
+}
+
+const attack: VerbDef = {
+  kind: 'attack',
+  validate(state, _config, agentId, params) {
+    const p = AttackParams.safeParse(params)
+    if (!p.success) return 'attack needs a {targetId}'
+    if (p.data.targetId === agentId) return 'cannot attack yourself'
+    const target = state.agents[p.data.targetId]
+    if (!target || !target.alive) return 'no one there to attack'
+    const a = state.agents[agentId]!
+    if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return 'not adjacent to attack'
+    return null
+  },
+  duration() { return 1 },
+  onComplete(state, config, agentId, params, rng) {
+    const p = AttackParams.parse(params)
+    const a = state.agents[agentId]!
+    const t = state.agents[p.targetId]!
+    const maxPower = 2 * config.health.maxHp
+    const scoreA = rng.next() * ((a.hp + a.needs.energy) / maxPower)
+    const scoreB = rng.next() * ((t.hp + t.needs.energy) / maxPower)
+    const margin = Math.abs(scoreA - scoreB)
+    const loserId = scoreA < scoreB ? agentId : p.targetId
+    const kind = margin < 0.2 ? 'minor' : margin < 0.5 ? 'serious' : 'grave'
+    return [{ type: 'agent_injured', payload: { agentId: loserId, kind } }]
+  },
+  interruptible: true,
+  rngStream: 'combat',
+}
+
+const experiment: VerbDef = {
+  kind: 'experiment',
+  validate() { return 'You lack the knowledge to attempt this.' },
+  duration() { return 1 },
+  onComplete() { return [] },
+  interruptible: true,
+}
+
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
+  speak, give, take, write, read, teach, attack, experiment,
 }
 
 // One tick of an in-progress build: the agent works, the site advances in step.

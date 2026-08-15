@@ -9,6 +9,7 @@ export type AgentBody = {
   hp: number; injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
   ill: boolean; ageDays: number
   tendedTick?: number                     // absent until first tended: keeps pre-health state hashes stable
+  lastSpokeTick?: number                  // absent until first speech: keeps golden hashes stable
   skills: Record<string, number>          // track → xp
   activity: null | { verb: string; ticksRemaining: number; params: Record<string, unknown>; path?: Array<[number, number]> }
   collapsedSinceTick: number | null
@@ -23,8 +24,10 @@ export type Structure = {
 
 export type Item = {
   id: string; kind: string; qty: number
+  text?: string
   loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
 }
+
 
 export type Crop = { id: string; kind: string; x: number; y: number; plantedDay: number; stage: number; withered: boolean }
 

@@ -10,7 +10,7 @@ export function submitIntent(
   const a = state.agents[agentId]
   if (!a) return { ok: false, reason: 'no such agent' }
   if (!a.alive) return { ok: false, reason: 'the dead do not act' }
-  if (a.collapsedSinceTick !== null) return { ok: false, reason: 'collapsed and unable to act' }
+  if (a.collapsedSinceTick !== null && verb !== 'eat') return { ok: false, reason: 'collapsed and unable to act' }
   if (a.activity) return { ok: false, reason: `already busy with ${a.activity.verb}` }
   const def = VERBS[verb]
   if (!def) return { ok: false, reason: `unknown verb: ${verb}` }
