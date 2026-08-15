@@ -16,7 +16,7 @@ in real time through a browser observatory rendered in cutesy isometric pixel ar
 
 | Decision | Choice |
 |---|---|
-| Mind model | `deepseek/deepseek-v4-flash-0731` via OpenRouter (~$0.0784/M tokens) for agents, Arbiter, and narrator |
+| Mind model | `deepseek/deepseek-v4-flash-0731` via OpenRouter for agents, Arbiter, and narrator. Verified pricing: $0.14/M in, $0.28/M out, $0.028/M cache read (80% off). Pinned dated snapshot, never `-latest` — a silent model swap mid-experiment would change every personality |
 | Population | 5 founders; newcomers arrive over time; births possible |
 | Mortality | Full realism: aging, natural death, death by neglect, violence possible between agents |
 | Time | 1 sim day = 1 real hour. Tick = 1 sim minute = 2.5 real seconds. 1 sim year ≈ 15.2 real days |
@@ -219,8 +219,10 @@ retrieval is structurally impossible.
 
 ### Retrieval — hybrid, all local
 
-Score = entity-tag match (exact) + FTS5 BM25 + cosine (sqlite-vec + fastembed/MiniLM,
-local, free) + recency decay + importance. No vector DB service at this scale, ever.
+Score = entity-tag match (exact) + FTS5 BM25 + cosine (sqlite-vec + local embeddings
+via `@huggingface/transformers`, model `Xenova/bge-small-en-v1.5`, 384-dim, CPU-fast;
+fastembed-js is archived — do not use) + recency decay + importance. No vector DB
+service at this scale, ever.
 
 - **Ambient (every turn, free):** top-K ≈ 8 memories (~600 tokens) cued by current
   scene — people present, place, topic keywords. Injected verbatim, late in prompt.
@@ -259,12 +261,18 @@ local, free) + recency decay + importance. No vector DB service at this scale, e
 
 1. Commission (build action or Discovery) → prompt = Style Bible boilerplate +
    3 reference images + agent's description + footprint.
-2. Generate 3 candidates. Provider pluggable; benchmark PixelLab, Recraft V3, and
-   Flux+pixel-LoRA on a 50-asset set before launch.
+2. Generate 3 candidates — 3 parallel requests to OpenRouter's Image API
+   (`n>1` is unreliable across providers). Primary: `google/gemini-3.1-flash-image`
+   at 512px (~$0.045/image; we downscale anyway). Fallbacks:
+   `bytedance-seed/seedream-4.5` ($0.04 flat), `black-forest-labs/flux.2-klein-4b`
+   (cheapest, weaker adherence). Benchmark all three on a 50-asset set pre-launch.
+   Transparency: prompt a solid magenta background and chroma-key it in post —
+   never depend on native alpha (per-model support is inconsistent).
 3. Post-process: background strip → nearest-neighbor downscale → quantize to
    master palette → outline pass.
 4. Style gate: mechanical checks (size, alpha, palette compliance) + VLM judge
-   scoring 1–10 vs reference sheet. Below 7 → retry, max 3.
+   (`openai/gpt-5.6-luna`, ~$0.0004/call) scoring 1–10 vs reference sheet.
+   Below 7 → retry, max 3. All-in cost ≈ $0.14 per shipped asset.
 5. All fail → generic placeholder, flagged for silent regeneration. Sim never
    blocks on art.
 6. Register in asset codex, hot-load into renderer.
@@ -398,7 +406,55 @@ images a few dollars during the founding boom, then cents/day; VPS ~$20/mo.
 - In-world telecoms.
 - Admin "god events" — the world runs on physics alone.
 
-## 15. Build order (implementation plan input)
+## 15. Technology stack (researched & version-verified 2026-08-15)
+
+### LLM layer
+
+| Concern | Pick |
+|---|---|
+| Call library | **Vercel AI SDK 7** (`ai@7.x`) + `@openrouter/ai-sdk-provider@3.x` — used as a thin call layer only (retries, Zod structured output via `Output.object`, usage accounting). All orchestration (agent loops, Arbiter, narrator) is ours; no framework agent loop. Runner-up: bare `openai` pkg @ OpenRouter baseURL |
+| Structured output | OpenRouter native `structured_outputs` (confirmed supported by deepseek-v4-flash) + OpenRouter response healing; Zod 4 (`z.toJSONSchema()` built in) |
+| Failover | OpenRouter `models: []` fallback array, passed via `extraBody` |
+| Caching | DeepSeek prefix caching is automatic (0.2× on cache reads) but **per upstream provider**: pin `provider.order` so always-warm prefixes never cold-start on a routing hop. Log `usage.inputTokenDetails.cacheReadTokens` per agent — a silent cache miss is a 5× input-cost bug |
+| Frameworks rejected | Mastra (duplicates our memory/storage design), LangGraph.js (graph runtime we don't need), OpenAI Agents SDK (agent-loop shaped), VoltAgent, TanStack AI (beta) |
+
+### Asset generation (all via OpenRouter Image API, base64 out)
+
+| Concern | Pick |
+|---|---|
+| Generator | `google/gemini-3.1-flash-image` @ 512px, reference sheet passed via `input_references`; fallbacks `bytedance-seed/seedream-4.5`, `black-forest-labs/flux.2-klein-4b` |
+| Transparency | Magenta-background prompt + chroma-key in post; never rely on native alpha |
+| Style judge | `openai/gpt-5.6-luna` (~$0.0004/score) |
+| Post-process | `sharp` (resize/alpha/raw buffer) + hand-rolled nearest-color quantizer to the 40-color master palette (~30 lines + lookup cache; no dithering) |
+| Cost | ≈ $0.14 per shipped asset (3 candidates + judge) |
+
+### Frontend
+
+| Concern | Pick |
+|---|---|
+| Renderer | **PixiJS 8.x**, mounted in a React ref (NOT @pixi/react — wrong layer for 60fps sprite sync); React drives chrome only |
+| Pixel-perfect | `scaleMode: 'nearest'`, `antialias: false`, `roundPixels: true`, integer zoom |
+| Isometric | Hand-rolled dimetric math (`screenX=(x−y)·w/2, screenY=(x+y)·h/2`, depth-sort by `x+y`); static ground layer baked once into a `RenderTexture` (one draw call) |
+| Day/night | Full-screen multiply-blend quad tinted by sim clock; `ColorMatrixFilter` on the world container for dusk/storm grading |
+| Hot-loaded sprites | `Assets.add/load` with unique keys; explicit `texture.source.unload()` on replacement (texture GC gotcha) |
+| Society graph | `react-force-graph-2d` (~50 nodes = sweet spot) |
+| Shell | React 19 + Vite 8 |
+| Transport | plain `ws` — serialize each tick's delta once, broadcast to N; gate slow viewers on `bufferedAmount`. (Socket.IO/uWS solve problems we don't have) |
+
+### Data & runtime
+
+| Concern | Pick |
+|---|---|
+| Runtime | **Node 24 LTS** (Bun's native-module gap is the wrong risk; `node:sqlite` still RC — not used) |
+| SQLite driver | `better-sqlite3` v13 — sync API suits the tick loop; FTS5 compiled in; `loadExtension()` for sqlite-vec |
+| Vectors | `sqlite-vec` 0.1.9 (pinned; pre-v1). Fallback: brute-force cosine over BLOBs — fine at <100k rows/agent |
+| Embeddings | `@huggingface/transformers` v4 + `Xenova/bge-small-en-v1.5` (384-dim, CPU, local, free); persist `env.cacheDir` on the VPS |
+| Backup | Litestream v0.5.16 → S3; WAL mode required (wanted anyway); restore drill before trusting |
+| Queue | A SQLite `jobs` table (status/attempts/run_at) polled by the forge worker — durable, zero new infra. No Redis/BullMQ |
+| Validation | Zod 4 everywhere (turn schemas, sim-config, events) |
+| Deploy | Docker Compose on Debian-slim images (sharp/musl gotcha; `pnpm approve-builds` for better-sqlite3's native compile) |
+
+## 16. Build order (implementation plan input)
 
 1. `shared` types + event-sourced engine core + golden replay harness
 2. Body/needs/time/weather physics + Tier-1 verbs
