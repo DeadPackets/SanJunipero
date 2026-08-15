@@ -1,14 +1,16 @@
+import { DEFAULT_CONFIG } from '@sj/shared'
 import type { EventStore } from './eventStore.js'
-import { genesisState, fold, type WorldState } from './state.js'
+import { genesisState, type WorldState } from './state.js'
+import { fold } from './fold.js'
 import { RngStreams } from './rng.js'
 
 export function replayFromGenesis(store: EventStore): WorldState {
-  return store.readFrom(0).reduce(fold, genesisState())
+  return store.readFrom(0).reduce((s, ev) => fold(s, ev), genesisState(DEFAULT_CONFIG))
 }
 
 export function replayLatest(store: EventStore): { state: WorldState; rng: RngStreams; seq: number } {
   const snap = store.latestSnapshot()
-  let state = snap ? (snap.state as WorldState) : genesisState()
+  let state = snap ? (snap.state as WorldState) : genesisState(DEFAULT_CONFIG)
   const ckpt = store.latestRngState()
   const rng = ckpt ? RngStreams.restore(ckpt.rng)
     : snap ? RngStreams.restore(snap.rng)

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { MINUTES_PER_DAY, stateHash } from '@sj/shared'
+import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash } from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
 import { genesisState } from './state.js'
@@ -11,12 +11,12 @@ import { TickLoop } from './tickLoop.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
 
 // Pinned golden hash — regenerating this constant is a deliberate, reviewed act.
-const GOLDEN_DAY_HASH = '17006dd44372cf12b4b6bca91c6450aa281cd7facfffc63560f64d2e59a752ea'
+const GOLDEN_DAY_HASH = 'f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac'
 
 // Synthetic day: 5 scripted actors move and get hungry, all randomness from named streams.
 function makeLoopHandler(rng: RngStreams): ConstructorParameters<typeof TickLoop>[0]['onTick'] {
   return ({ tick, emit }) => {
-    if (tick === 1) for (let i = 0; i < 5; i++) emit('agent_spawned', { id: `a${i}`, x: i, y: 0 })
+    if (tick === 1) for (let i = 0; i < 5; i++) emit('agent_spawned', { id: `a${i}`, name: `a${i}`, x: i, y: 0, ageDays: 7300 })
     if (tick > 1) {
       const mover = `a${rng.get('walk').int(5)}`
       emit('agent_moved', { id: mover, x: rng.get('walk').int(128), y: rng.get('walk').int(128) })
@@ -27,7 +27,7 @@ function makeLoopHandler(rng: RngStreams): ConstructorParameters<typeof TickLoop
 
 function makeLoop(store: EventStore, rng: RngStreams) {
   return new TickLoop({
-    store, state: genesisState(), rng, snapshotEveryTicks: 60,
+    store, state: genesisState(DEFAULT_CONFIG), rng, snapshotEveryTicks: 60,
     onTick: makeLoopHandler(rng),
   })
 }

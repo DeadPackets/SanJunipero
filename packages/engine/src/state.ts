@@ -1,38 +1,58 @@
-import { z } from 'zod'
-import type { SimEvent } from '@sj/shared'
+import type { SimConfig } from '@sj/shared'
 
-export type AgentBody = { id: string; x: number; y: number; needs: { hunger: number; energy: number } }
-export type WorldState = { tick: number; agents: Record<string, AgentBody> }
+// grass, dirt, water, forest, rock, sand, farmland
+export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
-export function genesisState(): WorldState { return { tick: 0, agents: {} } }
+export type AgentBody = {
+  id: string; name: string; x: number; y: number; alive: boolean; asleep: boolean
+  needs: { hunger: number; energy: number; warmth: number; social: number }
+  hp: number; injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
+  ill: boolean; ageDays: number
+  skills: Record<string, number>          // track → xp
+  activity: null | { verb: string; ticksRemaining: number; params: Record<string, unknown>; path?: Array<[number, number]> }
+  collapsedSinceTick: number | null
+  zeroHungerSinceTick: number | null
+}
 
-const Spawned = z.object({ id: z.string(), x: z.number(), y: z.number() })
-const Moved = Spawned
-const NeedChanged = z.object({ id: z.string(), need: z.enum(['hunger', 'energy']), delta: z.number() })
+export type Structure = {
+  id: string; kind: string; x: number; y: number; w: number; h: number
+  hp: number; maxHp: number; flammable: boolean; stage: 'construction' | 'complete'
+  progressTicks: number; builtBy: string | null; burning: boolean; burnTicks: number
+}
 
-const clamp = (v: number) => Math.max(0, Math.min(100, v))
+export type Item = {
+  id: string; kind: string; qty: number
+  loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
+}
 
-export function fold(state: WorldState, event: SimEvent): WorldState {
-  switch (event.type) {
-    case 'tick_advanced':
-      return { ...state, tick: event.tick }
-    case 'agent_spawned': {
-      const p = Spawned.parse(event.payload)
-      return { ...state, agents: { ...state.agents, [p.id]: { id: p.id, x: p.x, y: p.y, needs: { hunger: 100, energy: 100 } } } }
-    }
-    case 'agent_moved': {
-      const p = Moved.parse(event.payload)
-      const a = state.agents[p.id]
-      if (!a) throw new Error(`agent_moved for unknown agent ${p.id}`)
-      return { ...state, agents: { ...state.agents, [p.id]: { ...a, x: p.x, y: p.y } } }
-    }
-    case 'need_changed': {
-      const p = NeedChanged.parse(event.payload)
-      const a = state.agents[p.id]
-      if (!a) throw new Error(`need_changed for unknown agent ${p.id}`)
-      return { ...state, agents: { ...state.agents, [p.id]: { ...a, needs: { ...a.needs, [p.need]: clamp(a.needs[p.need] + p.delta) } } } }
-    }
-    default:
-      throw new Error(`unknown event type: ${event.type}`)
+export type Crop = { id: string; kind: string; x: number; y: number; plantedDay: number; stage: number; withered: boolean }
+
+export type WorldState = {
+  tick: number
+  terrain: TileId[][]                      // [y][x]
+  weather: { kind: string; temperatureC: number }
+  agents: Record<string, AgentBody>
+  structures: Record<string, Structure>
+  items: Record<string, Item>
+  crops: Record<string, Crop>
+  wildlife: { fish: number; deer: number }
+  counters: { nextEntityId: number }
+}
+
+export function genesisState(config: SimConfig, terrain?: TileId[][]): WorldState {
+  return {
+    tick: 0,
+    terrain: terrain ?? Array.from({ length: 32 }, () => Array.from({ length: 32 }, (): TileId => 0)),
+    weather: { kind: 'sunny', temperatureC: config.weather.seasonTemps.spring },
+    agents: {},
+    structures: {},
+    items: {},
+    crops: {},
+    wildlife: { fish: config.wildlife.fishMax, deer: config.wildlife.deerMax },
+    counters: { nextEntityId: 1 },
   }
+}
+
+export function mintId(state: WorldState, prefix: string): string {
+  return `${prefix}_${state.counters.nextEntityId}`
 }

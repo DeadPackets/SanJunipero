@@ -1,16 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { stateHash } from '@sj/shared'
+import { DEFAULT_CONFIG, stateHash } from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
-import { genesisState, fold } from './state.js'
+import { genesisState } from './state.js'
+import { fold } from './fold.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
 import { RngStreams } from './rng.js'
 
 function seedStore(): { store: EventStore; live: ReturnType<typeof genesisState> } {
   const store = new EventStore(openDb(':memory:'))
-  let live = genesisState()
+  let live = genesisState(DEFAULT_CONFIG)
   const emit = (tick: number, type: string, payload: unknown) => { live = fold(live, store.append(tick, type, payload)) }
-  emit(0, 'agent_spawned', { id: 'a1', x: 1, y: 1 })
+  emit(0, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 })
   emit(1, 'tick_advanced', {})
   emit(1, 'agent_moved', { id: 'a1', x: 2, y: 1 })
   emit(2, 'need_changed', { id: 'a1', need: 'hunger', delta: -5 })
@@ -28,7 +29,7 @@ describe('replay', () => {
     // snapshot mid-stream (after seq 2), then more events already exist after it
     const mid = replayFromGenesis(store) // final state; emulate mid by re-folding first 2
     void mid
-    const firstTwo = store.readRange(1, 2).reduce(fold, genesisState())
+    const firstTwo = store.readRange(1, 2).reduce((s, e) => fold(s, e), genesisState(DEFAULT_CONFIG))
     store.saveSnapshot(1, 2, firstTwo, rng.snapshot())
     const r = replayLatest(store)
     expect(stateHash(r.state)).toBe(stateHash(live))

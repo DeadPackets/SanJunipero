@@ -1,6 +1,7 @@
 import { TICK_REAL_MS } from '@sj/shared'
 import type { EventStore } from './eventStore.js'
-import { fold, type WorldState } from './state.js'
+import type { WorldState } from './state.js'
+import { fold } from './fold.js'
 import type { RngStreams } from './rng.js'
 
 export type TickHandler = (ctx: { tick: number; emit: (type: string, payload: unknown) => void }) => void
