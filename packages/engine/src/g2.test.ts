@@ -1,3 +1,4 @@
+// @slow — GATE G2, ~4320 ticks (documentary marker per plan; no vitest tag support, runs in CI)
 import { describe, it, expect } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'

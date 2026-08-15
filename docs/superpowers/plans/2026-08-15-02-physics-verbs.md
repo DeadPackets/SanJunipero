@@ -27,13 +27,18 @@
 // @sj/shared
 SimConfig, DEFAULT_CONFIG, SimConfigSchema (zod, .strict(), full-default parse of {})
 // @sj/engine
-createWorldTick(config: SimConfig, rng: RngStreams): TickHandler
-submitIntent(state: WorldState, config: SimConfig, agentId: string, intent: Intent):
-  { ok: true; events: PendingEvent[] } | { ok: false; reason: string }   // pure validate+start
+createWorldTick(config: SimConfig, rng: RngStreams):
+  (state: WorldState) => WorldTickResult            // WorldTickResult = { state: WorldState; events: PendingEvent[] }
+submitIntent(state: WorldState, config: SimConfig, agentId: string, verb: string,
+  params: Record<string, unknown>): IntentResult    // pure validate+start
+//   type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
 composePerception(state: WorldState, config: SimConfig, agentId: string,
   recentEvents: SimEvent[]): PerceptionPacket                            // pure
 VERBS: Record<VerbKind, VerbDef>
-type Intent = { verb: VerbKind; params: Record<string, unknown> }
+// VerbDef (actual, ratified by final review 2026-08-15): { kind; validate; duration;
+//   onStart?; onComplete; results?; interruptible; skill?; rngStream? } — onStart/results
+//   are optional engine extensions beyond Task 5's text; rngStream was ledger-ratified at T10.
+// (TickHandler is a separate type: TickLoop's onTick ctx callback — not this chunk's produce.)
 type PendingEvent = { type: string; payload: unknown }                   // engine appends via tick loop
 ```
 
