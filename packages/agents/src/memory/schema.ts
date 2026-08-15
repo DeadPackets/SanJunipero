@@ -100,5 +100,16 @@ export function migrateAgentTables(db: Database.Database): void {
       top_score REAL,
       result_count INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS personality_versions (
+      agent_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      day INTEGER NOT NULL,
+      doc TEXT NOT NULL,
+      edit TEXT,
+      PRIMARY KEY (agent_id, version)
+    );
+    CREATE INDEX IF NOT EXISTS idx_personality_versions_agent_day
+      ON personality_versions(agent_id, day);
   `)
 }
