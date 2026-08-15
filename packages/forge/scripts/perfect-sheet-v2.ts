@@ -22,7 +22,7 @@ const REFS_DIR = `${DURABLE}/refs-v2`
 const GIFS_DIR = `${DURABLE}/walk-gifs`
 const CROPS_DIR = `${DURABLE}/pipeline-v3-stages/final-crops`
 const REF_CANDIDATES = '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/reference-candidates'
-for (const d of [GIFS_DIR, CROPS_DIR, 'packages/forge/out/refs-v2']) mkdirSync(d, { recursive: true })
+for (const d of [GIFS_DIR, CROPS_DIR, 'packages/forge/out/refs-v2', `${OUT}/cells`]) mkdirSync(d, { recursive: true })
 
 const label = (f: Facing, p: Pose) => `${f}/${p}`
 const file = (f: Facing, p: Pose) => `${p}-${f}.png`
@@ -53,7 +53,10 @@ function upscaleNearest(img: RawImage, k: number): RawImage {
   return { width: img.width * k, height: img.height * k, data: out }
 }
 
-type Processed = { out: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice; origin: { i0: number; j0: number }; sweepHits: number; blendRepaints: number }
+type Processed = {
+  out: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice; origin: { i0: number; j0: number }
+  sweepHits: number; outlineSnaps: number; fillSnaps: number; exclDelta: number
+}
 function v7chain(keyed: RawImage, pitch: number, name: string): Processed {
   const eroded = erodeAlpha(keyed, Math.max(1, Math.round(pitch / 2)))
   const b = bbox(eroded)
@@ -68,7 +71,22 @@ function v7chain(keyed: RawImage, pitch: number, name: string): Processed {
   for (let i = 0; i < filled.data.length; i += 4)
     if (filled.data[i] !== swept.data[i] || filled.data[i + 1] !== swept.data[i + 1] || filled.data[i + 2] !== swept.data[i + 2]) sweepHits++
   const repaired = repairOutlineBlends(swept)
-  return { out: repaired.out, dominance: r.dominance, eroded, lat, origin: r.origin, sweepHits, blendRepaints: repaired.repainted }
+  // exclusion gate: snapped pixels alpha'd out of BOTH outputs; reconErr must agree
+  let exclDelta = 0
+  if (repaired.repainted > 0) {
+    const mask = (im: RawImage) => {
+      const data = new Uint8ClampedArray(im.data)
+      for (let i = 0; i < data.length; i += 4)
+        if (swept.data[i] !== repaired.out.data[i] || swept.data[i + 1] !== repaired.out.data[i + 1] || swept.data[i + 2] !== repaired.out.data[i + 2]) data[i + 3] = 0
+      return { width: im.width, height: im.height, data }
+    }
+    const E = (o: RawImage) => sheetMetrics([{ out: o, dominance: r.dominance, eroded, lat, origin: r.origin }]).reconErr
+    exclDelta = E(mask(repaired.out)) - E(mask(swept))
+  }
+  return {
+    out: repaired.out, dominance: r.dominance, eroded, lat, origin: r.origin,
+    sweepHits, outlineSnaps: repaired.outlineSnaps, fillSnaps: repaired.fillSnaps, exclDelta,
+  }
 }
 
 // 1. Characters: per-cell pitch -> sheetPitch median -> v7 chain at sheetPitch.
@@ -128,12 +146,12 @@ for (const f of FACINGS) {
 
 // 2. Per-cell metrics (cluster-dominance definition; v4's soft-lattice flags were a
 // 5-bit binning artifact and are RETRACTED — see style-bible + report).
-console.log('per-cell metrics (cluster ambiguous% / dupRows / reconErr / sweepHits):')
+console.log('per-cell metrics (cluster ambiguous% / dupRows / reconErr / sweep / snaps / exclDelta):')
 const metricLines: string[] = []
 for (const p of POSES) for (const f of FACINGS) {
   const c = proc.get(label(f, p))!
   const m = sheetMetrics([c])
-  const line = `${label(f, p).padEnd(12)} ${`${c.out.width}x${c.out.height}`.padEnd(8)} ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}  sweep=${c.sweepHits}  blends=${c.blendRepaints}`
+  const line = `${label(f, p).padEnd(12)} ${`${c.out.width}x${c.out.height}`.padEnd(8)} ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}  sweep=${c.sweepHits}  snaps=${c.outlineSnaps}o+${c.fillSnaps}f  excl=${c.exclDelta >= 0 ? "+" : ""}${c.exclDelta.toFixed(5)}`
   metricLines.push(line)
   console.log(`  ${line}`)
 }
@@ -149,8 +167,8 @@ for (const [name, path] of refInputs) {
   const pitch = estimatePitch(keyed)
   const c = v7chain(keyed, pitch, name)
   const m = sheetMetrics([c])
-  metricLines.push(`${name.padEnd(12)} ${`${c.out.width}x${c.out.height}`.padEnd(8)} ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}  sweep=${c.sweepHits}  blends=${c.blendRepaints}`)
-  console.log(`${name}: pitch ${pitch.toFixed(2)}, natural ${c.out.width}x${c.out.height}, ambiguous ${m.ambiguousPct.toFixed(1)}%, sweep=${c.sweepHits}  blends=${c.blendRepaints}`)
+  metricLines.push(`${name.padEnd(12)} ${`${c.out.width}x${c.out.height}`.padEnd(8)} ${m.ambiguousPct.toFixed(1).padStart(5)}%  ${m.dupRowCount}  ${m.reconErr.toFixed(4)}  sweep=${c.sweepHits}  snaps=${c.outlineSnaps}o+${c.fillSnaps}f  excl=${c.exclDelta >= 0 ? "+" : ""}${c.exclDelta.toFixed(5)}`)
+  console.log(`${name}: pitch ${pitch.toFixed(2)}, natural ${c.out.width}x${c.out.height}, ambiguous ${m.ambiguousPct.toFixed(1)}%, sweep=${c.sweepHits}  snaps=${c.outlineSnaps}o+${c.fillSnaps}f  excl=${c.exclDelta >= 0 ? "+" : ""}${c.exclDelta.toFixed(5)}`)
   const png = await encodePng(c.out)
   writeFileSync(`packages/forge/out/refs-v2/${name}.png`, png)
   writeFileSync(`${REFS_DIR}/${name}.png`, png)
@@ -209,7 +227,7 @@ const cols = FACINGS.flatMap(f => duplicateReport(
 const report = [
   `== PIPELINE V7: sheetPitch ${sheetPitch.toFixed(2)}, natural heights, canvas ${CANVAS} feetY ${FEET_Y} ==`,
   '(v4 soft-lattice flags RETRACTED: 5-bit binning artifact; cluster-dominance is the metric)',
-  '', '== per-output metrics (cluster ambiguous% / dupRows / reconErr / sweepHits) ==',
+  '', '== per-output metrics (cluster ambiguous% / dupRows / reconErr / sweep / snaps / exclDelta) ==',
   ...metricLines,
   '',
   `pairwise median=${median.toFixed(3)}; thresholds straight<${STRAIGHT_THR.toFixed(3)} mirror<${MIRROR_THR.toFixed(3)}`,

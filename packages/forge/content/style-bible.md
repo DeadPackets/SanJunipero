@@ -60,10 +60,10 @@ Sprites ship UNQUANTIZED: character cells and reference sprites keep their gener
 
 - ~3 heads tall (Stardew-like).
 - Age bands (child / adult / elder) must read clearly in the rigs.
-- Native-resolution sprites (pipeline v6, below) on 96×96 cells, feet-anchored at y=88 (128×128/y=118 if any cell's art exceeds 88px). No quantize, no outline pass, no forced art heights.
+- Native-resolution sprites (pipeline v7, below) on 96×96 cells, feet-anchored at y=88 (128×128/y=118 if any cell's art exceeds 88px). No quantize, no outline pass, no forced art heights.
 - Art resolution is DECOUPLED from world size: the renderer scales the character to ~1.6 tiles regardless of art pixel count. "Canonical density" means the pitch the raws actually carry, measured per sheet and recorded — character sheet: 5.12; anchor building: 4.00.
 
-## Pipeline v6 — canonical post chain
+## Pipeline v7 — canonical post chain
 
 1. chromaKey — magenta background → transparency.
 2. erodeAlpha(round(pitch/2)) — strips the chroma blend band scaled to the measured pitch.
@@ -72,7 +72,10 @@ Sprites ship UNQUANTIZED: character cells and reference sprites keep their gener
 5. despeckle(3) — removes opaque islands under 3px (removals logged, >2 flagged).
 6. fillPinholes(2) — fills fully-enclosed transparent holes ≤2px.
 7. sweepMagentaCensus — repaints RARE magenta-predicate colors (count < max(2, 0.5% opaque)) from neighbor mode; frequent matchers (wine outline) are palette and stay.
-8. registration + feet-anchor — walk frames aligned to their idle by opaque-mask registration; bbox bottom on the feet line.
+8. repairOutlineBlends — two-sided blend snap: silhouette pixels within RGB distance 12 of the fill→outline segment commit to their majority side (t ≥ 0.4 → nearest outline color; t ∈ [0.15, 0.4) → inward fill color; t < 0.15 stays — fill-committed within noise). Authored pixel art has no fractional-membership pixels; both targets are existing colors (zero new colors) and outline pixel count grows by at most the outline-snap count (no line-weight change). Gate: reconErr with snapped pixels excluded must match the pre-snap output ±0.0005 (total reconErr vs the eroded source is NOT a gate here — the source contains the blends being removed).
+9. registration + feet-anchor — walk frames aligned to their idle by opaque-mask registration; bbox bottom on the feet line.
+
+PRECEDENT (controller-ruled, do not re-litigate): a dimetric diagonal edge with t < 0.15 shading — e.g. building-1's door-base steps — is AUTHORED art, not blend confusion. Inking such pixels to the outline (as the first v7 draft did) is overreach; FILL_T stays 0.15.
 
 RETRACTED: the v4 "soft-lattice" flags (8 cells at 40–44% ambiguity) were a 5-bit binning metric artifact — under ε-cluster dominance the same cells measure 0.2–3%. Do not regenerate cells on that old list. Dropped stages, kept deprecated in sheet.ts: driftField (regressed reconErr; offsets were edge jitter), mergeSheetColors (single-linkage chaining collapses natural palettes).
 
