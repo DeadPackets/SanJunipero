@@ -16,6 +16,7 @@ export function mechanicalGate(img: RawImage, expected: { w: number; h: number; 
     if (img.data[i + 3] === 0) { transparent++; continue }
     if (!PALETTE_SET.has((img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!)) offPalette++
   }
+  if (transparent === img.width * img.height) failures.push('empty: sprite is fully transparent')
   if (expected.requireAlpha && transparent === 0) failures.push('no alpha: expected transparent background pixels')
   if (offPalette > 0) failures.push(`palette: ${offPalette} opaque pixels off the master palette`)
   return { ok: failures.length === 0, failures }
