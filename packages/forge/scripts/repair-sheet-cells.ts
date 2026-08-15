@@ -13,7 +13,7 @@ import { quantize } from '../src/post/quantize.js'
 import { outlinePass } from '../src/post/outline.js'
 import {
   FACINGS, POSES, FACING_CLAUSES, POSE_CLAUSES, STRAIGHT_DUPE, MIRROR_DUPE,
-  assembleGrid, cellDistance, mirrorX, duplicateReport, type Facing, type Pose,
+  assembleGrid, cellDistance, mirrorX, duplicateReport, upscaleNearest, type Facing, type Pose,
 } from '../src/sheet.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
@@ -36,14 +36,6 @@ const file = (f: Facing, p: Pose) => `${p}-${f}.png`
 
 async function postProcessCell(rawPng: Buffer): Promise<RawImage> {
   return outlinePass(quantize(downscaleNearest(chromaKey(await decodePng(rawPng)), CELL, CELL)))
-}
-function upscaleNearest(img: RawImage, k: number): RawImage {
-  const out = new Uint8ClampedArray(img.width * k * img.height * k * 4)
-  for (let y = 0; y < img.height * k; y++) for (let x = 0; x < img.width * k; x++) {
-    const s = ((y / k | 0) * img.width + (x / k | 0)) * 4
-    out.set(img.data.subarray(s, s + 4), (y * img.width * k + x) * 4)
-  }
-  return { width: img.width * k, height: img.height * k, data: out }
 }
 
 const cells = new Map<string, RawImage>()

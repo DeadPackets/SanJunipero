@@ -5,10 +5,11 @@ import { makeImageClient } from '../src/imageClient.js'
 import { makeVlmJudge } from '../src/judge.js'
 import { BudgetGuard } from '../src/budget.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
-import { decodePng, encodePng, downscaleNearest, type RawImage } from '../src/post/raw.js'
+import { decodePng, encodePng, downscaleNearest } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import { quantize } from '../src/post/quantize.js'
 import { outlinePass } from '../src/post/outline.js'
+import { upscaleNearest } from '../src/sheet.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -34,14 +35,6 @@ const PROMPT = `${STYLE_PROMPT} A single free-standing building sprite. ` +
   'lighting stays from the north-west. ' +
   'Match the pixel density, palette warmth, and cute rounded style of the first reference image exactly.'
 
-function upscaleNearest(img: RawImage, k: number): RawImage {
-  const out = new Uint8ClampedArray(img.width * k * img.height * k * 4)
-  for (let y = 0; y < img.height * k; y++) for (let x = 0; x < img.width * k; x++) {
-    const s = ((y / k | 0) * img.width + (x / k | 0)) * 4
-    out.set(img.data.subarray(s, s + 4), (y * img.width * k + x) * 4)
-  }
-  return { width: img.width * k, height: img.height * k, data: out }
-}
 
 const cands = await client.generateCandidates(PROMPT, [STYLE_ANCHOR], 3)
 let winner: { png: Buffer; score: number; notes: string } | null = null

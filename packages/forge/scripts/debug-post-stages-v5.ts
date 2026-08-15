@@ -9,36 +9,22 @@ import { chromaKey } from '../src/post/chromaKey.js'
 import {
   erodeAlpha, estimatePitch, refineLattice, driftField, resampleModeLattice,
   resampleClusterLattice, mergeSheetColors, sweepMagentaCensus, despeckle, fillPinholes,
-  anchorToCanvas, sheetMetrics,
+  anchorToCanvas, sheetMetrics, opaqueBbox, upscaleNearest,
 } from '../src/sheet.js'
 
 const DURABLE = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5'
 const STAGES = `${DURABLE}/pipeline-v5-stages`
 const REF_CANDIDATES = '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/reference-candidates'
 
-function upscaleNearest(img: RawImage, k: number): RawImage {
-  const out = new Uint8ClampedArray(img.width * k * img.height * k * 4)
-  for (let y = 0; y < img.height * k; y++) for (let x = 0; x < img.width * k; x++) {
-    const s = ((y / k | 0) * img.width + (x / k | 0)) * 4
-    out.set(img.data.subarray(s, s + 4), (y * img.width * k + x) * 4)
-  }
-  return { width: img.width * k, height: img.height * k, data: out }
-}
 async function dump(dir: string, name: string, img: RawImage) {
   writeFileSync(`${dir}/${name}.png`, await encodePng(img))
   writeFileSync(`${dir}/${name}-4x.png`, await encodePng(upscaleNearest(img, 4)))
   console.log(`  ${name}: ${img.width}x${img.height}`)
 }
 const bboxOf = (img: RawImage) => {
-  let x0 = img.width, x1 = -1, y0 = img.height, y1 = -1
-  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
-    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
-      if (x < x0) x0 = x
-      if (x > x1) x1 = x
-      if (y < y0) y0 = y
-      if (y > y1) y1 = y
-    }
-  return { x0, x1, y0, y1 }
+  const b = opaqueBbox(img)
+  if (!b) throw new Error('bboxOf: no opaque pixels')
+  return b
 }
 
 async function run(kind: string, rawPath: string, anchor: boolean) {

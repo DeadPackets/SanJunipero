@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, estimatePitch, refineLattice, resampleModeLattice, sheetMetrics, sweepMagenta, driftField, resampleClusterLattice, mergeSheetColors, sweepMagentaCensus, repairOutlineBlends, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
+import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, estimatePitch, refineLattice, resampleModeLattice, sheetMetrics, sweepMagenta, driftField, resampleClusterLattice, mergeSheetColors, sweepMagentaCensus, repairOutlineBlends, opaqueBbox, upscaleNearest, distanceMatrix, pairwiseMedian, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
 import { quantize } from './post/quantize.js'
 
 type Px = [number, number, number, number]
@@ -373,6 +373,51 @@ describe('estimatePitch', () => {
   })
   it('is immune to a 2px halo band', () => {
     expect(Math.abs(estimatePitch(pitchGrid(7.3, 8, 2)) - 7.3)).toBeLessThanOrEqual(0.1)
+  })
+  it('throws on a fully transparent input', () => {
+    expect(() => estimatePitch(solid(8, 8, CLEAR))).toThrow('estimatePitch: no opaque neighbor pairs')
+  })
+  it('throws on a 1x1 input (no neighbor pairs)', () => {
+    expect(() => estimatePitch(solid(1, 1, RED))).toThrow('estimatePitch: no opaque neighbor pairs')
+  })
+})
+
+describe('opaqueBbox', () => {
+  it('returns null when the image has no opaque pixels', () => {
+    expect(opaqueBbox(solid(3, 3, CLEAR))).toBeNull()
+  })
+  it('returns the tight box around opaque pixels', () => {
+    const src = img(4, 3, (x, y) => (x >= 1 && x <= 2 && y >= 1 ? RED : CLEAR))
+    expect(opaqueBbox(src)).toEqual({ x0: 1, x1: 2, y0: 1, y1: 2 })
+  })
+})
+
+describe('upscaleNearest', () => {
+  it('replicates each pixel into a k x k block', () => {
+    const src = img(2, 1, x => (x === 0 ? RED : BLUE))
+    const up = upscaleNearest(src, 2)
+    expect(up.width).toBe(4); expect(up.height).toBe(2)
+    for (const [x, y, want] of [[0, 0, RED], [1, 1, RED], [2, 0, BLUE], [3, 1, BLUE]] as const)
+      expect([...up.data.slice((y * 4 + x) * 4, (y * 4 + x) * 4 + 4)]).toEqual(want)
+  })
+})
+
+describe('distanceMatrix / pairwiseMedian', () => {
+  const a = solid(2, 2, RED), b = solid(2, 2, BLUE), c = solid(2, 2, CLEAR)
+  it('renders one header line plus one row per cell with cellDistance values', () => {
+    const out = distanceMatrix([{ label: 'a', img: a }, { label: 'b', img: b }], false)
+    const lines = out.split('\n')
+    expect(lines).toHaveLength(3)
+    expect(lines[1]).toBe(['a'.padEnd(12), '0.000'.padStart(11), cellDistance(a, b).toFixed(3).padStart(11)].join(' '))
+  })
+  it('mirror=true measures against the mirrored column cell', () => {
+    const asym = img(2, 1, x => (x === 0 ? RED : BLUE))
+    const out = distanceMatrix([{ label: 'a', img: asym }, { label: 'm', img: mirrorX(asym) }], true)
+    expect(out.split('\n')[1]).toContain('0.000')
+  })
+  it('pairwiseMedian returns the upper-median pairwise distance', () => {
+    const ds = [cellDistance(a, b), cellDistance(a, c), cellDistance(b, c)].sort((x, y) => x - y)
+    expect(pairwiseMedian([a, b, c])).toBe(ds[1])
   })
 })
 

@@ -5,11 +5,10 @@ import { writeFileSync, readFileSync } from 'node:fs'
 import { BudgetGuard } from '../src/budget.js'
 import { makeVlmJudge } from '../src/judge.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
-import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
-import { chromaKey } from '../src/post/chromaKey.js'
+import { encodePng, type RawImage } from '../src/post/raw.js'
 import {
   FACINGS, POSES, FACING_CLAUSES, POSE_CLAUSES,
-  assembleGrid, cellDistance, mirrorX, duplicateReport, detectArtScale, downscaleMajority, anchorToCanvas, defringe,
+  assembleGrid, cellDistance, mirrorX, duplicateReport, postProcessCell, upscaleNearest,
   type Facing, type Pose,
 } from '../src/sheet.js'
 
@@ -34,24 +33,6 @@ const STRAIGHT_THR = 0.149, MIRROR_THR = 0.087
 const label = (f: Facing, p: Pose) => `${f}/${p}`
 const file = (f: Facing, p: Pose) => `${p}-${f}.png`
 
-async function postProcessCell(rawPng: Buffer): Promise<RawImage> {
-  const keyed = chromaKey(await decodePng(rawPng))
-  for (let k = detectArtScale(keyed); ; k++) {
-    const snapped = downscaleMajority(keyed,
-      Math.max(1, Math.round(keyed.width / k)), Math.max(1, Math.round(keyed.height / k)))
-    try { return anchorToCanvas(defringe(snapped), CANVAS, CANVAS, FEET_Y) }
-    catch (e) { if (k >= 16) throw e }
-  }
-}
-
-function upscaleNearest(img: RawImage, k: number): RawImage {
-  const out = new Uint8ClampedArray(img.width * k * img.height * k * 4)
-  for (let y = 0; y < img.height * k; y++) for (let x = 0; x < img.width * k; x++) {
-    const s = ((y / k | 0) * img.width + (x / k | 0)) * 4
-    out.set(img.data.subarray(s, s + 4), (y * img.width * k + x) * 4)
-  }
-  return { width: img.width * k, height: img.height * k, data: out }
-}
 
 // Regenerate sw/walk-b with accepted-cell refs and a style-match clause.
 const swIdleRaw = readFileSync(`${DURABLE}/raws/${file('sw', 'idle')}`)
@@ -95,7 +76,7 @@ writeFileSync(`${OUT}/raws/${file('sw', 'walk-b')}`, winner!.raw)
 // Rebuild all 12 cells from winner raws through the defringed chain.
 const cells = new Map<string, RawImage>()
 for (const p of POSES) for (const f of FACINGS) {
-  const cell = await postProcessCell(readFileSync(`${DURABLE}/raws/${file(f, p)}`))
+  const cell = await postProcessCell(readFileSync(`${DURABLE}/raws/${file(f, p)}`), CANVAS, FEET_Y)
   cells.set(label(f, p), cell)
   const png = await encodePng(cell)
   writeFileSync(`${DURABLE}/cells/${file(f, p)}`, png)

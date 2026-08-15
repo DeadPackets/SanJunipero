@@ -1,4 +1,5 @@
-import type { RawImage } from './post/raw.js'
+import { decodePng, type RawImage } from './post/raw.js'
+import { chromaKey } from './post/chromaKey.js'
 import type { Rgb } from './palette.js'
 
 export const FACINGS = ['sw', 'se', 'ne', 'nw'] as const // sheet column order, left→right
@@ -96,7 +97,7 @@ export function detectArtScale(img: RawImage, candidates: number[] = [4, 5, 6, 7
     const w = Math.max(1, Math.round(img.width / k)), h = Math.max(1, Math.round(img.height / k))
     const down = downscaleMajority(img, w, h)
     const cw = Math.min(img.width, w * k), ch = Math.min(img.height, h * k)
-    const a = crop(img, cw, ch), b = crop(upscaleInt(down, k), cw, ch)
+    const a = crop(img, cw, ch), b = crop(upscaleNearest(down, k), cw, ch)
     const err = cellDistance(a, b)
     if (err < bestErr) { bestErr = err; best = k }
   }
@@ -110,7 +111,7 @@ function crop(img: RawImage, w: number, h: number): RawImage {
   return { width: w, height: h, data }
 }
 
-function upscaleInt(img: RawImage, k: number): RawImage {
+export function upscaleNearest(img: RawImage, k: number): RawImage {
   const w = img.width * k, h = img.height * k
   const out = new Uint8ClampedArray(w * h * 4)
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -127,8 +128,8 @@ export function snapToGrid(img: RawImage): RawImage {
   return downscaleMajority(img, Math.max(1, Math.round(img.width / k)), Math.max(1, Math.round(img.height / k)))
 }
 
-// Places the sprite's opaque bounding box horizontally centered with its bottom row at feetY.
-export function anchorToCanvas(img: RawImage, canvasW: number, canvasH: number, feetY: number): RawImage {
+// Bounding box of all opaque pixels; null when the image has none.
+export function opaqueBbox(img: RawImage): { x0: number; x1: number; y0: number; y1: number } | null {
   let x0 = img.width, x1 = -1, y0 = img.height, y1 = -1
   for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
     if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
@@ -137,8 +138,15 @@ export function anchorToCanvas(img: RawImage, canvasW: number, canvasH: number, 
       if (y < y0) y0 = y
       if (y > y1) y1 = y
     }
-  if (x1 < 0) throw new Error('anchorToCanvas: sprite has no opaque pixels')
-  const w = x1 - x0 + 1, h = y1 - y0 + 1
+  return x1 < 0 ? null : { x0, x1, y0, y1 }
+}
+
+// Places the sprite's opaque bounding box horizontally centered with its bottom row at feetY.
+export function anchorToCanvas(img: RawImage, canvasW: number, canvasH: number, feetY: number): RawImage {
+  const b = opaqueBbox(img)
+  if (!b) throw new Error('anchorToCanvas: sprite has no opaque pixels')
+  const { x0, y0 } = b
+  const w = b.x1 - b.x0 + 1, h = b.y1 - b.y0 + 1
   const left = Math.floor((canvasW - w) / 2), top = feetY - h + 1
   if (w > canvasW || top < 0 || feetY >= canvasH)
     throw new Error(`anchorToCanvas: ${w}x${h} sprite exceeds ${canvasW}x${canvasH} canvas at feetY ${feetY}`)
@@ -210,30 +218,19 @@ export function erodeAlpha(img: RawImage, radius = 1): RawImage {
 // with sourcePitch = opaque bboxH / targetH, measured BEFORE erosion — the chroma blend
 // band scales with the art pitch, so the erosion must too.
 export function erodeForPitch(img: RawImage, targetH: number): RawImage {
-  let y0 = img.height, y1 = -1
-  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
-    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
-      if (y < y0) y0 = y
-      if (y > y1) y1 = y
-    }
-  if (y1 < 0) throw new Error('erodeForPitch: no opaque pixels')
-  return erodeAlpha(img, Math.max(1, Math.round((y1 - y0 + 1) / targetH / 2)))
+  const b = opaqueBbox(img)
+  if (!b) throw new Error('erodeForPitch: no opaque pixels')
+  return erodeAlpha(img, Math.max(1, Math.round((b.y1 - b.y0 + 1) / targetH / 2)))
 }
 
 // Resamples big-pixel art to its true art pitch: lattice of pitch = bboxH/targetH,
 // phased at the bbox bottom-center; per cell, channel-wise MEDIAN of opaque pixels in
 // the central 1/3 x 1/3 (fallback: whole cell); opaque iff >=50% of the region is opaque.
 export function resampleToArtHeight(img: RawImage, targetH: number): RawImage {
-  let x0 = img.width, x1 = -1, y0 = img.height, y1 = -1
-  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
-    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
-      if (x < x0) x0 = x
-      if (x > x1) x1 = x
-      if (y < y0) y0 = y
-      if (y > y1) y1 = y
-    }
-  if (x1 < 0) throw new Error('resampleToArtHeight: no opaque pixels')
-  const bboxW = x1 - x0 + 1, bboxH = y1 - y0 + 1
+  const b = opaqueBbox(img)
+  if (!b) throw new Error('resampleToArtHeight: no opaque pixels')
+  const { x0, y1 } = b
+  const bboxW = b.x1 - b.x0 + 1, bboxH = b.y1 - b.y0 + 1
   const pitch = bboxH / targetH
   const outW = Math.max(1, Math.round(bboxW / pitch))
   const yBottom = y1 + 1, cx = x0 + bboxW / 2
@@ -273,8 +270,7 @@ export function resampleToArtHeight(img: RawImage, targetH: number): RawImage {
 
 // Fractional art pitch via gradient comb: per-column/-row sums of |color delta| over
 // both-opaque neighbor pairs peak at lattice boundaries; the candidate pitch whose comb
-// (best phase) catches the highest mean profile value wins. Octave guard: the smallest
-// pitch within 97% of the best score is preferred (2x the true pitch scores as high).
+// (best phase) catches the highest mean profile value wins.
 export function estimatePitch(img: RawImage, range: [number, number] = [4, 12], step = 0.05): number {
   const colD = new Float64Array(img.width), rowD = new Float64Array(img.height)
   for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width - 1; x++) {
@@ -287,6 +283,8 @@ export function estimatePitch(img: RawImage, range: [number, number] = [4, 12], 
     if (img.data[i + 3] === 0 || img.data[j + 3] === 0) continue
     rowD[y + 1]! += Math.abs(img.data[i]! - img.data[j]!) + Math.abs(img.data[i + 1]! - img.data[j + 1]!) + Math.abs(img.data[i + 2]! - img.data[j + 2]!)
   }
+  if (colD.reduce((a, v) => a + v, 0) === 0 && rowD.reduce((a, v) => a + v, 0) === 0)
+    throw new Error('estimatePitch: no opaque neighbor pairs')
   // Octave-proof score = lift x coverage. lift = how concentrated the profile is at
   // lattice lines (mean-at-lattice / overall mean; a 2x octave keeps this high by
   // cherry-picking strong boundaries, a 1/2 pitch dilutes it with mid-block zeros).
@@ -333,15 +331,9 @@ export type Lattice = { px: number; py: number; ox: number; oy: number }
 // Coordinate descent (±pitch/4, halving over 3 rounds) on {ox, oy, px, py}, minimizing
 // mean within-cell color variance over interior cells (fully inside the bbox, ≥60% opaque).
 export function refineLattice(img: RawImage, pitch: number, phase0: { ox: number; oy: number } = { ox: 0, oy: 0 }): Lattice {
-  let bx0 = img.width, bx1 = -1, by0 = img.height, by1 = -1
-  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
-    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
-      if (x < bx0) bx0 = x
-      if (x > bx1) bx1 = x
-      if (y < by0) by0 = y
-      if (y > by1) by1 = y
-    }
-  if (bx1 < 0) throw new Error('refineLattice: no opaque pixels')
+  const bb = opaqueBbox(img)
+  if (!bb) throw new Error('refineLattice: no opaque pixels')
+  const { x0: bx0, x1: bx1, y0: by0, y1: by1 } = bb
 
   function cost(l: Lattice, stride = 1): number {
     if (l.px < 2 || l.py < 2) return Infinity
@@ -421,15 +413,9 @@ export function refineLattice(img: RawImage, pitch: number, phase0: { ox: number
 // When a drift field is passed, windows follow it and the nudge is disabled.
 export function resampleModeLattice(img: RawImage, lat: Lattice, drift?: { rowOffsets: number[]; colOffsets: number[] }):
   { out: RawImage; dominance: Float32Array; origin: { i0: number; j0: number } } {
-  let bx0 = img.width, bx1 = -1, by0 = img.height, by1 = -1
-  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
-    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
-      if (x < bx0) bx0 = x
-      if (x > bx1) bx1 = x
-      if (y < by0) by0 = y
-      if (y > by1) by1 = y
-    }
-  if (bx1 < 0) throw new Error('resampleModeLattice: no opaque pixels')
+  const bb = opaqueBbox(img)
+  if (!bb) throw new Error('resampleModeLattice: no opaque pixels')
+  const { x0: bx0, x1: bx1, y0: by0, y1: by1 } = bb
   const i0 = Math.floor((bx0 - lat.ox) / lat.px), i1 = Math.floor((bx1 - lat.ox) / lat.px)
   const j0 = Math.floor((by0 - lat.oy) / lat.py), j1 = Math.floor((by1 - lat.oy) / lat.py)
   const outW = i1 - i0 + 1, outH = j1 - j0 + 1
@@ -562,15 +548,9 @@ function clusterDominant(px: [number, number, number][], eps = 8):
 // DP with |Δoffset| ≤ 1 between neighbors and a 0.5/px jump penalty. Full-cell windows
 // (no margin) so a 1px misalignment already dents dominance.
 export function driftField(img: RawImage, pitch: number, phase: { ox: number; oy: number }): Drift {
-  let bx0 = img.width, bx1 = -1, by0 = img.height, by1 = -1
-  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
-    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
-      if (x < bx0) bx0 = x
-      if (x > bx1) bx1 = x
-      if (y < by0) by0 = y
-      if (y > by1) by1 = y
-    }
-  if (bx1 < 0) throw new Error('driftField: no opaque pixels')
+  const bb = opaqueBbox(img)
+  if (!bb) throw new Error('driftField: no opaque pixels')
+  const { x0: bx0, x1: bx1, y0: by0, y1: by1 } = bb
 
   function windowPixels(xLo: number, xHi: number, yLo: number, yHi: number): { total: number; px: [number, number, number][] } {
     const px: [number, number, number][] = []
@@ -649,15 +629,9 @@ export function driftField(img: RawImage, pitch: number, phase: { ox: number; oy
 // optional drift field shifts each cell's sample window instead of per-cell nudging.
 export function resampleClusterLattice(img: RawImage, lat: Lattice, drift?: Drift):
   { out: RawImage; dominance: Float32Array; origin: { i0: number; j0: number } } {
-  let bx0 = img.width, bx1 = -1, by0 = img.height, by1 = -1
-  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++)
-    if (img.data[(y * img.width + x) * 4 + 3]! > 0) {
-      if (x < bx0) bx0 = x
-      if (x > bx1) bx1 = x
-      if (y < by0) by0 = y
-      if (y > by1) by1 = y
-    }
-  if (bx1 < 0) throw new Error('resampleClusterLattice: no opaque pixels')
+  const bb = opaqueBbox(img)
+  if (!bb) throw new Error('resampleClusterLattice: no opaque pixels')
+  const { x0: bx0, x1: bx1, y0: by0, y1: by1 } = bb
   const i0 = Math.floor((bx0 - lat.ox) / lat.px), i1 = Math.floor((bx1 - lat.ox) / lat.px)
   const j0 = Math.floor((by0 - lat.oy) / lat.py), j1 = Math.floor((by1 - lat.oy) / lat.py)
   const outW = i1 - i0 + 1, outH = j1 - j0 + 1
@@ -907,6 +881,52 @@ export function repairOutlineBlends(img: RawImage):
   return { out: { width: w, height: h, data: out }, repainted: outlineSnaps + fillSnaps, outlineSnaps, fillSnaps }
 }
 
+// Pipeline v7 stage chain on a chroma-keyed input: erode(round(pitch/2)) →
+// refineLattice → resampleClusterLattice → despeckle → fillPinholes →
+// sweepMagentaCensus (`before`, the v6 output) → repairOutlineBlends (`out`).
+// exclBefore/exclAfter are reconErr with the repainted pixels alpha'd out of BOTH
+// outputs (the exclusion gate); exclDelta = exclAfter - exclBefore.
+export function v7Chain(keyed: RawImage, pitch: number): {
+  out: RawImage; before: RawImage; dominance: Float32Array; eroded: RawImage; lat: Lattice
+  origin: { i0: number; j0: number }; despeckleRemoved: number; sweepHits: number
+  repainted: number; outlineSnaps: number; fillSnaps: number
+  exclBefore: number; exclAfter: number; exclDelta: number
+} {
+  const eroded = erodeAlpha(keyed, Math.max(1, Math.round(pitch / 2)))
+  const b = opaqueBbox(eroded)
+  if (!b) throw new Error('v7Chain: no opaque pixels')
+  const lat = refineLattice(eroded, pitch, { ox: b.x0, oy: b.y0 })
+  const r = resampleClusterLattice(eroded, lat)
+  const opaqueCount = (im: RawImage) => {
+    let n = 0
+    for (let i = 3; i < im.data.length; i += 4) if (im.data[i]! > 0) n++
+    return n
+  }
+  const desp = despeckle(r.out, 3)
+  const despeckleRemoved = opaqueCount(r.out) - opaqueCount(desp)
+  const filled = fillPinholes(desp, 2)
+  const before = sweepMagentaCensus(filled)
+  let sweepHits = 0
+  for (let i = 0; i < filled.data.length; i += 4)
+    if (filled.data[i] !== before.data[i] || filled.data[i + 1] !== before.data[i + 1] || filled.data[i + 2] !== before.data[i + 2]) sweepHits++
+  const repaired = repairOutlineBlends(before)
+  const mask = (im: RawImage) => {
+    const data = new Uint8ClampedArray(im.data)
+    for (let i = 0; i < data.length; i += 4)
+      if (before.data[i] !== repaired.out.data[i] || before.data[i + 1] !== repaired.out.data[i + 1] || before.data[i + 2] !== repaired.out.data[i + 2]) data[i + 3] = 0
+    return { width: im.width, height: im.height, data }
+  }
+  const E = (o: RawImage) => sheetMetrics([{ out: o, dominance: r.dominance, eroded, lat, origin: r.origin }]).reconErr
+  const exclBefore = E(mask(before)), exclAfter = E(mask(repaired.out))
+  return {
+    out: repaired.out, before, dominance: r.dominance, eroded, lat, origin: r.origin,
+    despeckleRemoved, sweepHits, repainted: repaired.repainted,
+    outlineSnaps: repaired.outlineSnaps, fillSnaps: repaired.fillSnaps,
+    exclBefore, exclAfter, exclDelta: exclAfter - exclBefore,
+  }
+}
+
+// DEPRECATED: predicate false-positives on legitimate palette colors; use sweepMagentaCensus.
 // Final art-resolution sweep: any opaque pixel in the magenta family (r>g+40 AND
 // b>g+25) takes the mode color of its opaque 8-neighbors — magenta is not a Style
 // Bible color, so this is always safe at art resolution. Ties break first-seen;
@@ -937,6 +957,8 @@ export function sweepMagenta(img: RawImage): RawImage {
   return { width: img.width, height: img.height, data: out }
 }
 
+// DEPRECATED for sprite post-processing (pipeline v3): aggregates detectArtScale's
+// degenerate round-trip metric — see its note. Kept for grid-true inputs.
 // Modal detected art scale across a set of images; ties break to the smallest scale.
 export function sheetScale(imgs: RawImage[]): number {
   const counts = new Map<number, number>()
@@ -1032,6 +1054,8 @@ export function fillPinholes(img: RawImage, maxHole = 2): RawImage {
   return { width: img.width, height: img.height, data: out }
 }
 
+// DEPRECATED: unused by live pipelines since v5 (ε-cluster sampling replaced shared
+// palettes); kept for palette audits.
 // Frequency-ranked union of exact opaque colors across images, capped at k.
 export function unionPalette(imgs: RawImage[], k = 48): Rgb[] {
   const counts = new Map<number, number>()
@@ -1068,6 +1092,37 @@ export function cellDistance(a: RawImage, b: RawImage): number {
       + Math.abs(a.data[i + 2]! - b.data[i + 2]!) + Math.abs(a.data[i + 3]! - b.data[i + 3]!)) / (4 * 255)
   }
   return count === 0 ? 0 : sum / count
+}
+
+// Fixed-width pairwise cellDistance table (optionally against mirrored columns).
+export function distanceMatrix(cells: { label: string; img: RawImage }[], mirror: boolean): string {
+  const header = ['            ', ...cells.map(c => c.label.padStart(11))].join(' ')
+  const lines = cells.map(a => [a.label.padEnd(12), ...cells.map(b =>
+    cellDistance(a.img, mirror ? mirrorX(b.img) : b.img).toFixed(3).padStart(11))].join(' '))
+  return [header, ...lines].join('\n')
+}
+
+// Median of all pairwise cellDistances (upper-median for even pair counts).
+export function pairwiseMedian(imgs: RawImage[]): number {
+  const ds: number[] = []
+  for (let i = 0; i < imgs.length; i++) for (let j = i + 1; j < imgs.length; j++)
+    ds.push(cellDistance(imgs[i]!, imgs[j]!))
+  ds.sort((a, b) => a - b)
+  return ds[Math.floor(ds.length / 2)]!
+}
+
+// v2 locked recipe for a generated character raw: chromaKey → majority downscale at the
+// detected art scale (coarsening until the sprite fits) → defringe → anchor. Real gemini
+// big-pixel art has no exact lattice (round-trip error rises monotonically from k=4),
+// so start at the detected scale and coarsen until the sprite fits the canvas.
+export async function postProcessCell(rawPng: Buffer, canvas: number, feetY: number): Promise<RawImage> {
+  const keyed = chromaKey(await decodePng(rawPng))
+  for (let k = detectArtScale(keyed); ; k++) {
+    const snapped = downscaleMajority(keyed,
+      Math.max(1, Math.round(keyed.width / k)), Math.max(1, Math.round(keyed.height / k)))
+    try { return anchorToCanvas(defringe(snapped), canvas, canvas, feetY) }
+    catch (e) { if (k >= 16) throw e }
+  }
 }
 
 export type DupeFinding = { a: string; b: string; distance: number; mirrored: boolean }

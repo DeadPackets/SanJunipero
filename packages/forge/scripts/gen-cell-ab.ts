@@ -8,7 +8,7 @@ import { decodePng, encodePng, downscaleNearest, type RawImage } from '../src/po
 import { chromaKey } from '../src/post/chromaKey.js'
 import { quantize } from '../src/post/quantize.js'
 import { outlinePass } from '../src/post/outline.js'
-import { FACING_CLAUSES, POSE_CLAUSES, downscaleMajority } from '../src/sheet.js'
+import { FACING_CLAUSES, POSE_CLAUSES, downscaleMajority, upscaleNearest } from '../src/sheet.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -56,14 +56,6 @@ async function generate(model: typeof MODELS[number]): Promise<{ png: Buffer; co
   return { png: Buffer.from(b64, 'base64'), costUsd }
 }
 
-function upscaleNearest(img: RawImage, k: number): RawImage {
-  const out = new Uint8ClampedArray(img.width * k * img.height * k * 4)
-  for (let y = 0; y < img.height * k; y++) for (let x = 0; x < img.width * k; x++) {
-    const s = ((y / k | 0) * img.width + (x / k | 0)) * 4
-    out.set(img.data.subarray(s, s + 4), (y * img.width * k + x) * 4)
-  }
-  return { width: img.width * k, height: img.height * k, data: out }
-}
 
 // contact sheet: rows = model, cols = cand0-nearest, cand0-majority, cand1-nearest, cand1-majority
 const CELLPX = 128, GAP = 1

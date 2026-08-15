@@ -1,4 +1,4 @@
-// LIVE — cap $1.60. Character sheet v2 with the human-locked recipe:
+// LIVE — cap $C5_V2_CAP (default $1.50). Character sheet v2 with the human-locked recipe:
 // gemini only, big-pixel prompt, chromaKey -> snapToGrid -> anchorToCanvas(96,96,88)
 // (native-resolution art: NO quantize, NO outline pass). Sheet 384x288.
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
@@ -6,16 +6,16 @@ import { BudgetGuard, BudgetExceededError } from '../src/budget.js'
 import { makeVlmJudge, type JudgeFn } from '../src/judge.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
-import { chromaKey } from '../src/post/chromaKey.js'
 import {
   FACINGS, POSES, FACING_CLAUSES, POSE_CLAUSES,
-  assembleGrid, cellDistance, mirrorX, duplicateReport, detectArtScale, downscaleMajority, anchorToCanvas, defringe,
-  type Facing, type Pose,
+  assembleGrid, mirrorX, duplicateReport, postProcessCell, upscaleNearest,
+  distanceMatrix, pairwiseMedian, type Facing, type Pose,
 } from '../src/sheet.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
-const budget = new BudgetGuard(Number(process.env.C5_V2_CAP ?? '1.5'))
+const CAP = Number(process.env.C5_V2_CAP ?? '1.5')
+const budget = new BudgetGuard(CAP)
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 const MODEL = 'google/gemini-3.1-flash-image'
 const RESERVE = 0.046
@@ -75,27 +75,6 @@ async function generate(prompt: string, refs: Buffer[]): Promise<{ png: Buffer; 
   return { png: Buffer.from(b64, 'base64'), costUsd }
 }
 
-// Real gemini big-pixel art has no exact lattice (round-trip error rises monotonically
-// from k=4), so start at the detected scale and coarsen until the sprite fits the canvas.
-async function postProcessCell(rawPng: Buffer): Promise<RawImage> {
-  const keyed = chromaKey(await decodePng(rawPng))
-  for (let k = detectArtScale(keyed); ; k++) {
-    const snapped = downscaleMajority(keyed,
-      Math.max(1, Math.round(keyed.width / k)), Math.max(1, Math.round(keyed.height / k)))
-    try { return anchorToCanvas(defringe(snapped), CANVAS, CANVAS, FEET_Y) }
-    catch (e) { if (k >= 16) throw e }
-  }
-}
-
-function upscaleNearest(img: RawImage, k: number): RawImage {
-  const out = new Uint8ClampedArray(img.width * k * img.height * k * 4)
-  for (let y = 0; y < img.height * k; y++) for (let x = 0; x < img.width * k; x++) {
-    const s = ((y / k | 0) * img.width + (x / k | 0)) * 4
-    out.set(img.data.subarray(s, s + 4), (y * img.width * k + x) * 4)
-  }
-  return { width: img.width * k, height: img.height * k, data: out }
-}
-
 type Attempt = { raw: Buffer; cell: RawImage; score: number; notes: string }
 type CellState = { attempts: Attempt[]; current: Attempt; retries: number }
 const label = (f: Facing, p: Pose) => `${f}/${p}`
@@ -122,7 +101,7 @@ async function generateCell(f: Facing, p: Pose, attempt: number, refs: Buffer[],
       console.log(`  ${key}: generated $${r.costUsd.toFixed(3)}`)
     }
     let cell: RawImage
-    try { cell = await postProcessCell(png) }
+    try { cell = await postProcessCell(png, CANVAS, FEET_Y) }
     catch (e) { console.log(`  ${key}: post-process failed: ${String(e)}`); continue }
     let v = scores[key]
     if (!v) {
@@ -157,14 +136,7 @@ for (const p of POSES) for (const f of FACINGS) {
 // Recalibrate thresholds from this sheet's own distance distribution: the v1
 // calibration put straight/mirror cutoffs at 0.36x / 0.21x the pairwise median.
 const labels = POSES.flatMap(p => FACINGS.map(f => label(f, p)))
-function medianPairwise(): number {
-  const ds: number[] = []
-  for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++)
-    ds.push(cellDistance(cells.get(labels[i]!)!.current.cell, cells.get(labels[j]!)!.current.cell))
-  ds.sort((a, b) => a - b)
-  return ds[Math.floor(ds.length / 2)]!
-}
-const median = medianPairwise()
+const median = pairwiseMedian(labels.map(l => cells.get(l)!.current.cell))
 // thresholds fixed by controller ruling (recalibrated from the previous run's median 0.414)
 const straightThr = 0.149, mirrorThr = 0.087
 console.log(`pairwise median=${median.toFixed(3)}; ruling thresholds straight<${straightThr} mirror<${mirrorThr}`)
@@ -232,14 +204,8 @@ for (const p of POSES) for (const f of FACINGS) {
   }
 }
 
-function matrix(mirror: boolean): string {
-  const header = ['            ', ...labels.map(l => l.padStart(11))].join(' ')
-  const lines = labels.map(la => [la.padEnd(12), ...labels.map(lb => {
-    const a = cells.get(la)!.current.cell, b = cells.get(lb)!.current.cell
-    return cellDistance(a, mirror ? mirrorX(b) : b).toFixed(3).padStart(11)
-  })].join(' '))
-  return [header, ...lines].join('\n')
-}
+const matrix = (mirror: boolean) =>
+  distanceMatrix(labels.map(l => ({ label: l, img: cells.get(l)!.current.cell })), mirror)
 const report = [
   '== v2 per-cell judge scores (winner) ==',
   ...labels.map(l => {
@@ -254,7 +220,7 @@ const report = [
     ...final.rows.map(f => `row  ${f.a} ~ ${f.b} d=${f.distance.toFixed(3)} mirrored=${f.mirrored}`),
     ...final.cols.map(f => `col  ${f.a} ~ ${f.b} d=${f.distance.toFixed(3)} mirrored=${f.mirrored}`),
   ]),
-  '', `total spend: $${budget.total.toFixed(3)} of $1.60`,
+  '', `total spend: $${budget.total.toFixed(3)} of $${CAP.toFixed(2)}`,
 ].join('\n')
 writeFileSync(`${DURABLE}/distance-matrix.txt`, report)
 console.log(report)

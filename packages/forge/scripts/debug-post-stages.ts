@@ -5,20 +5,12 @@
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
-import { erodeAlpha, resampleToArtHeight, despeckle, fillPinholes, anchorToCanvas } from '../src/sheet.js'
+import { erodeAlpha, resampleToArtHeight, despeckle, fillPinholes, anchorToCanvas, upscaleNearest } from '../src/sheet.js'
 
 const DURABLE = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5'
 const STAGES = `${DURABLE}/pipeline-v3-stages`
 const REF_CANDIDATES = '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/reference-candidates'
 
-function upscaleNearest(img: RawImage, k: number): RawImage {
-  const out = new Uint8ClampedArray(img.width * k * img.height * k * 4)
-  for (let y = 0; y < img.height * k; y++) for (let x = 0; x < img.width * k; x++) {
-    const s = ((y / k | 0) * img.width + (x / k | 0)) * 4
-    out.set(img.data.subarray(s, s + 4), (y * img.width * k + x) * 4)
-  }
-  return { width: img.width * k, height: img.height * k, data: out }
-}
 function crop(img: RawImage, cx: number, cy: number, size = 128): RawImage {
   const x0 = Math.max(0, Math.min(img.width - size, cx - size / 2))
   const y0 = Math.max(0, Math.min(img.height - size, cy - size / 2))
