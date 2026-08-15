@@ -36,4 +36,29 @@ describe('JobsQueue', () => {
     q.claim(); q.fail(id, 'transient', { retryInMs: 60_000 })
     expect(q.claim()).toBeNull()
   })
+  it('requeueStale reclaims a stale running job, preserving attempts', () => {
+    const q = new JobsQueue(openForgeDb(':memory:'))
+    const id = q.enqueue('commission', {})
+    q.claim()                       // attempts 1, running
+    q.requeueStale(0)               // stale → pending, attempts kept
+    expect(q.get(id)!.status).toBe('pending')
+    const again = q.claim()!
+    expect(again.attempts).toBe(2)  // attempts accumulate across crash cycles
+  })
+  it('requeueStale leaves a fresh running job untouched', () => {
+    const q = new JobsQueue(openForgeDb(':memory:'))
+    const id = q.enqueue('commission', {})
+    q.claim()
+    q.requeueStale(60_000)          // 60s stale threshold; job just started
+    expect(q.get(id)!.status).toBe('running')
+  })
+  it('a job requeued twice then hitting maxAttempts is failed', () => {
+    const q = new JobsQueue(openForgeDb(':memory:'))
+    const id = q.enqueue('commission', {})
+    q.claim(); q.requeueStale(0)    // 1st crash → pending (attempts 1)
+    q.claim(); q.requeueStale(0)    // 2nd crash → pending (attempts 2)
+    q.claim(); q.requeueStale(0)    // 3rd crash → attempts 3 >= max → failed
+    expect(q.get(id)!.status).toBe('failed')
+    expect(q.claim()).toBeNull()
+  })
 })

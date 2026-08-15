@@ -29,6 +29,7 @@ export function openForgeDb(path: string): Database.Database {
       run_at TEXT NOT NULL DEFAULT (datetime('now')),
       result TEXT,
       error TEXT,
+      started_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_jobs_claim ON jobs(status, run_at);

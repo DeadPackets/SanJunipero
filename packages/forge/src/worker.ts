@@ -4,9 +4,11 @@ export async function runForgeWorker(opts: {
   queue: JobsQueue
   handlers: Record<string, (payload: unknown) => Promise<unknown>>
   pollMs?: number
+  staleMs?: number
   signal: AbortSignal
 }): Promise<void> {
   const pollMs = opts.pollMs ?? 500
+  opts.queue.requeueStale(opts.staleMs ?? 60_000)
   while (!opts.signal.aborted) {
     const job = opts.queue.claim()
     if (!job) { await new Promise(r => setTimeout(r, pollMs)); continue }
