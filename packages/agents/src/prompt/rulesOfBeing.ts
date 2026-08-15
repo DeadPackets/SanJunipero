@@ -19,10 +19,31 @@ choose echoes in the lives around you. Live as yourself.`
 // What a body in this world can do — the Tier-1 verbs in world language,
 // identical for every agent. Fully diegetic: the mind names its own acts, it
 // never hears mechanics words. Rendered into the system prompt (static block).
-export const CAPABILITIES = `What your hands and voice can do: walk, sleep, wake, eat what you hold, take,
-give, speak, write, read, teach, tend, till, plant, harvest, fish, forage, build,
-craft, extinguish, attack, and experiment. What you cannot do yet, the world
-will show you, and you will learn.`
+export const CAPABILITIES = `What your hands and voice can do, and what each needs from you:
+
+walk to a place (say its direction and how far)
+sleep (nothing more is needed)
+wake (nothing more is needed)
+eat the food you hold (name it)
+take the thing you can reach (name it)
+give the thing (name it) to a person (name them)
+speak (say the words)
+write (say the words; if you carry a page, they are written on it)
+read the writing (name it)
+teach a person (name them and the skill)
+tend a person (name them)
+till the ground (say where)
+plant seed (name the seed and say where)
+harvest a plant (name it)
+fish the water (say where)
+forage (nothing more is needed)
+build a thing (name it and say where)
+craft (name the recipe)
+extinguish a fire (name the burning thing)
+attack a person (name them)
+experiment (describe what you attempt)
+
+What you cannot do yet, the world will show you, and you will learn.`
 
 
 // The human-framing law: no world text, block template, or perception prose may

@@ -90,6 +90,14 @@ const WEATHER_KIND_PROSE: Record<string, string> = {
   snow: 'Snow drifts from the sky.',
 }
 
+const NIGHT_WEATHER_KIND_PROSE: Record<string, string> = {
+  sunny: 'The night sky is clear.',
+  cloudy: 'The night is overcast.',
+  rain: 'Rain falls in the dark.',
+  storm: 'A storm rages through the night.',
+  snow: 'Snow drifts down through the dark.',
+}
+
 function temperatureLine(temperatureC: number): string {
   if (temperatureC < 0) return 'The air bites with cold.'
   if (temperatureC < 10) return 'The air is cool.'
@@ -97,8 +105,11 @@ function temperatureLine(temperatureC: number): string {
   return 'The air is warm.'
 }
 
-function weatherLine(weather: { kind: string; temperatureC: number }): string {
-  const kind = WEATHER_KIND_PROSE[weather.kind] ?? `The sky is ${weather.kind}.`
+// `isNight` is the single source of truth for day vs night; a 'sunny' sky at
+// night is a clear night, never a sunlit day.
+function weatherLine(weather: { kind: string; temperatureC: number }, isNight: boolean): string {
+  const table = isNight ? NIGHT_WEATHER_KIND_PROSE : WEATHER_KIND_PROSE
+  const kind = table[weather.kind] ?? (isNight ? `The night sky is ${weather.kind}.` : `The sky is ${weather.kind}.`)
   return `${kind} ${temperatureLine(weather.temperatureC)}`
 }
 
@@ -143,7 +154,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   if (packet.self.body.hp < 30) lines.push('Your body aches with its hurts.')
   if (packet.self.body.ill) lines.push('A fever grips you; you feel weak.')
 
-  lines.push(weatherLine(packet.weather))
+  lines.push(weatherLine(packet.weather, packet.time.isNight))
 
   for (const a of packet.visible.agents) {
     const where = dirPhrase(a.x - x, a.y - y)

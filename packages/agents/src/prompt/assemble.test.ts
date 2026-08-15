@@ -200,6 +200,17 @@ describe('perceptionToProse', () => {
     expect(prose).toContain('collapsed')
     expect(prose).toContain('aches with hunger')
   })
+
+  it('never mentions the sun at night', () => {
+    const nightPacket = {
+      ...quietMeadowPacket,
+      time: { ...quietMeadowPacket.time, hour: 22, isNight: true },
+    }
+    const prose = perceptionToProse(nightPacket)
+    expect(prose).toContain('night')
+    expect(prose).not.toContain('sun')
+    expect(prose).toContain('clear')
+  })
 })
 
 describe('compaction', () => {
@@ -232,6 +243,19 @@ describe('capabilities', () => {
     for (const verb of ['walk', 'eat', 'sleep', 'wake', 'speak', 'take', 'give', 'till', 'extinguish', 'attack']) {
       expect(a.system).toContain(verb)
     }
+    expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+  it('carries diegetic parameter contracts for each verb', () => {
+    const a = assemblePrompt(fixtureBlocks())
+    expect(a.system).toContain('walk to a place')
+    expect(a.system).toContain('say its direction and how far')
+    expect(a.system).toContain('eat the food you hold')
+    expect(a.system).toContain('name it')
+    expect(a.system).toContain('give the thing')
+    expect(a.system).toContain('speak')
+    expect(a.system).toContain('nothing more is needed')
+    expect(a.system).toContain('experiment')
+    expect(a.system).toContain('describe what you attempt')
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
 })
