@@ -4,7 +4,7 @@
 
 **Goal:** The deterministic world: terrain, movement, needs, health, aging, skills, weather, crops, wildlife, fire, structures, all Tier-1 verbs, perception, and the `submitIntent` API — gated by a 3-sim-day scripted headless run (G2).
 
-**Architecture:** Everything extends C1's event-sourced kernel. A `createWorldTick(config, rng)` factory returns the `TickHandler`; per tick it runs the system pipeline (weather → fire → crops/wildlife → needs → health → aging → action progression → collapse/death), each system reading state, drawing from named RNG streams, and emitting `.strict()`-validated events that `fold` applies. Agent intents enter via `submitIntent` and become tick-progressed actions. Perception is a pure function over state + recent events.
+**Architecture:** Everything extends C1's event-sourced kernel. A `createWorldTick(config, rng)` factory returns a per-tick pipeline function `(state) => WorldTickResult`; per tick it runs the system pipeline (weather → fire → crops/wildlife → needs → health → aging → action progression → collapse/death), each system reading state, drawing from named RNG streams, and emitting `.strict()`-validated events that `fold` applies. Agent intents enter via `submitIntent` and become tick-progressed actions. Perception is a pure function over state + recent events.
 
 **Tech Stack:** Same as C1 (Node 24, TS ESM, Vitest, better-sqlite3, Zod 4). No new dependencies.
 
@@ -34,7 +34,7 @@ submitIntent(state: WorldState, config: SimConfig, agentId: string, verb: string
 //   type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
 composePerception(state: WorldState, config: SimConfig, agentId: string,
   recentEvents: SimEvent[]): PerceptionPacket                            // pure
-VERBS: Record<VerbKind, VerbDef>
+VERBS: Record<string, VerbDef>   // keys are exactly the 20 VerbKind members
 // VerbDef (actual, ratified by final review 2026-08-15): { kind; validate; duration;
 //   onStart?; onComplete; results?; interruptible; skill?; rngStream? } — onStart/results
 //   are optional engine extensions beyond Task 5's text; rngStream was ledger-ratified at T10.
