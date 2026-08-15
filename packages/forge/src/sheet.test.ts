@@ -536,6 +536,17 @@ describe('repairOutlineBlends', () => {
     expect([...out.data.slice((1 * 12 + 5) * 4, (1 * 12 + 5) * 4 + 3)]).toEqual([255, 255, 180])
   })
 
+  it('leaves a mostly-fill blend (t=0.25) untouched but repaints a t=0.55 blend', () => {
+    const T25: Px = [204, 142, 129, 255] // SKIN + 0.25*(WINE-SKIN)
+    const T55: Px = [172, 96, 103, 255]  // SKIN + 0.55*(WINE-SKIN)
+    const low = repairOutlineBlends(ringSprite((x, y) => (x === 5 && y === 1 ? T25 : null)))
+    expect(low.repainted).toBe(0)
+    expect([...low.out.data.slice((1 * 12 + 5) * 4, (1 * 12 + 5) * 4 + 3)]).toEqual([204, 142, 129])
+    const high = repairOutlineBlends(ringSprite((x, y) => (x === 5 && y === 1 ? T55 : null)))
+    expect(high.repainted).toBe(1)
+    expect([...high.out.data.slice((1 * 12 + 5) * 4, (1 * 12 + 5) * 4 + 3)]).toEqual([125, 28, 65])
+  })
+
   it('makes zero repaints on a clean sprite', () => {
     const src = ringSprite()
     const { out, repainted } = repairOutlineBlends(src)

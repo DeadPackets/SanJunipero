@@ -780,11 +780,12 @@ export function sweepMagentaCensus(img: RawImage): RawImage {
 
 // Outline↔fill blend repair (pipeline v7): silhouette pixels whose color sits on the
 // RGB segment between their inward fill color and the outline palette are generation
-// blends and repaint to the outline; near-fill pixels stay (repainting pure fill would
-// be a de-facto outline pass, which the style bible bans). OOB counts as transparent
-// because inputs are bbox-tight and land on a clear canvas.
+// blends and repaint to the outline — but only at t >= 0.4 (majority-or-near-majority
+// outline side; controller ruling): repainting mostly-fill rim pixels would be a
+// de-facto outline-thickening pass, which the style bible bans. OOB counts as
+// transparent because inputs are bbox-tight and land on a clear canvas.
 export function repairOutlineBlends(img: RawImage): { out: RawImage; repainted: number } {
-  const EPS = 10, SEG_DIST = 12
+  const EPS = 10, SEG_DIST = 12, MIN_T = 0.4
   const w = img.width, h = img.height, data = img.data
   const out = new Uint8ClampedArray(data)
   const opaque = (x: number, y: number) =>
@@ -871,12 +872,12 @@ export function repairOutlineBlends(img: RawImage): { out: RawImage; repainted: 
     return null
   }
 
-  function segDist(c: readonly number[], a: readonly number[], b: readonly number[]): number {
+  function segProj(c: readonly number[], a: readonly number[], b: readonly number[]): { d: number; t: number } {
     const ab = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!]
     const ac = [c[0]! - a[0]!, c[1]! - a[1]!, c[2]! - a[2]!]
     const len2 = ab[0]! * ab[0]! + ab[1]! * ab[1]! + ab[2]! * ab[2]!
     const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, (ac[0]! * ab[0]! + ac[1]! * ab[1]! + ac[2]! * ab[2]!) / len2))
-    return Math.hypot(a[0]! + t * ab[0]! - c[0]!, a[1]! + t * ab[1]! - c[1]!, a[2]! + t * ab[2]! - c[2]!)
+    return { d: Math.hypot(a[0]! + t * ab[0]! - c[0]!, a[1]! + t * ab[1]! - c[1]!, a[2]! + t * ab[2]! - c[2]!), t }
   }
 
   // (c)+(d): segment test on every silhouette pixel that is neither outline nor fill
@@ -894,7 +895,8 @@ export function repairOutlineBlends(img: RawImage): { out: RawImage; repainted: 
       const d = (m[0] - c[0]) ** 2 + (m[1] - c[1]) ** 2 + (m[2] - c[2]) ** 2
       if (d < oD) { oD = d; o = m }
     }
-    if (segDist(c, fill, o) > SEG_DIST) continue
+    const { d, t } = segProj(c, fill, o)
+    if (d > SEG_DIST || t < MIN_T) continue
     out[s] = o[0]; out[s + 1] = o[1]; out[s + 2] = o[2]
     repainted++
   }
