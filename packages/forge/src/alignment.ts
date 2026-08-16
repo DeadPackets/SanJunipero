@@ -1,7 +1,8 @@
 import type { Footprint } from '@sj/shared'
 import type { ForgeConfig } from './forgeConfig.js'
 import type { RawImage } from './post/raw.js'
-import { TILE_W } from './roadTiles.js'
+import { TILE_W, TILE_H, ROAD_EDGE } from './roadTiles.js'
+import { checkerBackground, compositeOver } from './visionQa/rubric.js'
 
 export type AlignmentConfig = ForgeConfig['alignment']   // one source; never a re-declared shape
 
@@ -64,3 +65,70 @@ export function validateBuildingAlignment(
 
   return { ok: failures.length === 0, failures, measured: { bottomY, baseLeft, baseRight } }
 }
+
+export const GRID_MARGIN = 32
+export const DIAMOND_STROKE = '#E8785A'          // warm accent, MASTER_PALETTE
+const GRID_SPAN = 2                              // tiles either side of centre -> a 5x5 lattice
+
+function paint(img: RawImage, x: number, y: number, hex: string): void {
+  if (x < 0 || y < 0 || x >= img.width || y >= img.height) return
+  const i = (y * img.width + x) * 4
+  img.data[i] = parseInt(hex.slice(1, 3), 16); img.data[i + 1] = parseInt(hex.slice(3, 5), 16)
+  img.data[i + 2] = parseInt(hex.slice(5, 7), 16); img.data[i + 3] = 255
+}
+
+function line(img: RawImage, x0: number, y0: number, x1: number, y1: number, hex: string): void {
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0)
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1
+  let err = dx + dy, x = x0, y = y0
+  for (;;) {
+    paint(img, x, y, hex)
+    if (x === x1 && y === y1) return
+    const e2 = 2 * err
+    if (e2 >= dy) { err += dy; x += sx }
+    if (e2 <= dx) { err += dx; y += sy }
+  }
+}
+
+const HEX_ROAD_EDGE = `#${ROAD_EDGE.toString(16).padStart(6, '0').toUpperCase()}`
+
+// The seat picture: the sprite on a neutral checker, over a dimetric lattice, with its
+// own footprint diamond stroked in the warm accent. The judge scores `alignment` on this.
+export function testGridRender(img: RawImage, fp: Footprint): RawImage {
+  const out = checkerBackground(img.width + 2 * GRID_MARGIN, img.height + 2 * GRID_MARGIN)
+  const d = footprintDiamond(fp, { w: img.width, h: img.height })
+  const ox = GRID_MARGIN, oy = GRID_MARGIN
+  const vx = d.centerX + ox, vy = d.nearVertexY + oy      // the near vertex, lattice origin
+
+  // two families of tile-lattice hairlines, +x = (+16,+8) and +y = (-16,+8)
+  for (let i = -GRID_SPAN; i <= GRID_SPAN; i++) {
+    const ax = vx + i * TILE_W / 2, ay = vy + i * TILE_H / 2
+    line(out, ax - GRID_SPAN * TILE_W / 2, ay + GRID_SPAN * TILE_H / 2,
+      ax + GRID_SPAN * TILE_W / 2, ay - GRID_SPAN * TILE_H / 2, HEX_ROAD_EDGE)
+    const bx = vx - i * TILE_W / 2, by = vy + i * TILE_H / 2
+    line(out, bx - GRID_SPAN * TILE_W / 2, by - GRID_SPAN * TILE_H / 2,
+      bx + GRID_SPAN * TILE_W / 2, by + GRID_SPAN * TILE_H / 2, HEX_ROAD_EDGE)
+  }
+
+  const halfH = (fp.w + fp.h) * TILE_H / 4
+  const verts: [number, number][] = [
+    [d.centerX + ox, d.nearVertexY + oy],
+    [d.leftX + ox, d.nearVertexY - halfH + oy],
+    [d.centerX + ox, d.nearVertexY - 2 * halfH + oy],
+    [d.rightX + ox, d.nearVertexY - halfH + oy],
+  ]
+  for (let i = 0; i < 4; i++) {
+    const a = verts[i]!, b = verts[(i + 1) % 4]!
+    line(out, a[0], a[1], b[0], b[1], DIAMOND_STROKE)
+  }
+  for (const [x, y] of verts) paint(out, x, y, DIAMOND_STROKE)
+
+  compositeOver(out, img, ox, oy)
+  return out
+}
+
+export const SEAT_CRITERION_PROMPT =
+  'Does the building sit ON the highlighted diamond: not floating above it, not sunken into it, ' +
+  'not perspective-skewed relative to the grid? Its base must meet the near corner of the diamond, ' +
+  'its footprint must not overhang the diamond sideways, and its receding edges must run parallel ' +
+  'to the lattice hairlines.'

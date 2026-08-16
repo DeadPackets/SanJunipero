@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_FORGE_CONFIG } from './forgeConfig.js'
 import type { RawImage } from './post/raw.js'
-import { footprintDiamond, validateBuildingAlignment, type AlignmentConfig } from './alignment.js'
+import {
+  footprintDiamond, validateBuildingAlignment, testGridRender, SEAT_CRITERION_PROMPT,
+  GRID_MARGIN, DIAMOND_STROKE, type AlignmentConfig,
+} from './alignment.js'
 
 const CFG: AlignmentConfig = DEFAULT_FORGE_CONFIG.alignment
 const FP = { w: 1, h: 1 }
@@ -89,5 +92,55 @@ describe('validateBuildingAlignment', () => {
   it('AlignmentConfig is the forge config slice, not a re-declared shape', () => {
     const cfg: AlignmentConfig = DEFAULT_FORGE_CONFIG.alignment
     expect(cfg).toEqual({ feetTolerancePx: 2, baseFitToleranceQuarterTiles: 1 })
+  })
+})
+
+describe('testGridRender (the picture the seat judge is shown)', () => {
+  const sprite = block(63, EXACT)                      // 64x64, base on the cell's own feet line
+  const px = (img: RawImage, x: number, y: number) => {
+    const i = (y * img.width + x) * 4
+    return `#${[0, 1, 2].map(k => img.data[i + k]!.toString(16).padStart(2, '0').toUpperCase()).join('')}`
+  }
+
+  it('adds a 32px margin on every side and is deterministic', () => {
+    const a = testGridRender(sprite, FP)
+    expect(GRID_MARGIN).toBe(32)
+    expect(a.width).toBe(sprite.width + 2 * GRID_MARGIN)
+    expect(a.height).toBe(sprite.height + 2 * GRID_MARGIN)
+    expect(Array.from(a.data)).toEqual(Array.from(testGridRender(sprite, FP).data))
+  })
+
+  it('strokes the footprint diamond at its four vertices', () => {
+    // an empty sprite, so nothing occludes the stroke — a seated building covers its own near vertex
+    const bare: RawImage = { width: 64, height: 64, data: new Uint8ClampedArray(64 * 64 * 4) }
+    const out = testGridRender(bare, FP)
+    const d = footprintDiamond(FP, { w: bare.width, h: bare.height })
+    const halfH = (FP.w + FP.h) * 16 / 4
+    const verts: [number, number][] = [
+      [d.centerX, d.nearVertexY],                       // near / south
+      [d.leftX, d.nearVertexY - halfH],                 // west
+      [d.rightX, d.nearVertexY - halfH],                // east
+      [d.centerX, d.nearVertexY - 2 * halfH],           // far / north
+    ]
+    for (const [x, y] of verts)
+      expect(px(out, x + GRID_MARGIN, y + GRID_MARGIN), `vertex ${x},${y}`).toBe(DIAMOND_STROKE)
+    expect(DIAMOND_STROKE).toBe('#E8785A')
+  })
+
+  it('preserves every opaque sprite pixel exactly', () => {
+    const out = testGridRender(sprite, FP)
+    for (let y = 0; y < sprite.height; y++)
+      for (let x = 0; x < sprite.width; x++) {
+        if (sprite.data[(y * sprite.width + x) * 4 + 3] === 0) continue
+        expect(px(out, x + GRID_MARGIN, y + GRID_MARGIN), `sprite ${x},${y}`).toBe(px(sprite, x, y))
+      }
+  })
+})
+
+describe('SEAT_CRITERION_PROMPT', () => {
+  it('names floating, sunken and skew', () => {
+    const p = SEAT_CRITERION_PROMPT.toLowerCase()
+    for (const w of ['floating', 'sunken', 'skew']) expect(p).toContain(w)
+    expect(p).toContain('diamond')
   })
 })

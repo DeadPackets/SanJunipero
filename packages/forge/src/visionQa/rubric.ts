@@ -34,8 +34,7 @@ export function paletteCard(): RawImage {
   return img
 }
 
-export function checkerCard(art: RawImage): RawImage {
-  const width = art.width + 2 * CHECKER_MARGIN, height = art.height + 2 * CHECKER_MARGIN
+export function checkerBackground(width: number, height: number): RawImage {
   const img: RawImage = { width, height, data: new Uint8ClampedArray(width * height * 4) }
   const light = rgb(CHECKER_LIGHT), dark = rgb(CHECKER_DARK)
   for (let y = 0; y < height; y++)
@@ -44,15 +43,24 @@ export function checkerCard(art: RawImage): RawImage {
       const i = (y * width + x) * 4, c = odd ? dark : light
       img.data[i] = c[0]; img.data[i + 1] = c[1]; img.data[i + 2] = c[2]; img.data[i + 3] = 255
     }
+  return img
+}
+
+export function compositeOver(dst: RawImage, art: RawImage, ox: number, oy: number): void {
   for (let y = 0; y < art.height; y++)
     for (let x = 0; x < art.width; x++) {
       const s = (y * art.width + x) * 4, a = art.data[s + 3]!
       if (a === 0) continue
-      const d = ((y + CHECKER_MARGIN) * width + x + CHECKER_MARGIN) * 4
+      const d = ((y + oy) * dst.width + x + ox) * 4
       for (let k = 0; k < 3; k++)
-        img.data[d + k] = Math.round((art.data[s + k]! * a + img.data[d + k]! * (255 - a)) / 255)
-      img.data[d + 3] = 255
+        dst.data[d + k] = Math.round((art.data[s + k]! * a + dst.data[d + k]! * (255 - a)) / 255)
+      dst.data[d + 3] = 255
     }
+}
+
+export function checkerCard(art: RawImage): RawImage {
+  const img = checkerBackground(art.width + 2 * CHECKER_MARGIN, art.height + 2 * CHECKER_MARGIN)
+  compositeOver(img, art, CHECKER_MARGIN, CHECKER_MARGIN)
   return img
 }
 
