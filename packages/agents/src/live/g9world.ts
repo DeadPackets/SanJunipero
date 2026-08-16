@@ -13,17 +13,27 @@ export const MAP_N = 32
 
 export type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }
 
-// Four huts in a row at y=10, each 2x2, each door the tile south of its centre.
+// A hut apiece, in a row at y=10, each 2x2, each door the tile south of its
+// centre. Five founders, five owned huts: run 4 refused 93 sleeps 82 times for
+// want of a bed, and an exhaustion run is no fairer an emergence sample than a
+// famine one.
 export function hut(n: number): Box {
-  return { id: `structure_${n}`, kind: 'hut', x: 6 + n * 4, y: 10, w: 2, h: 2 }
+  return { id: `structure_${n}`, kind: 'hut', x: 2 + n * 4, y: 10, w: 2, h: 2 }
 }
-export const HUTS: Box[] = [hut(1), hut(2), hut(3), hut(4)]
-export const STOREHOUSE: Box = { id: 'structure_5', kind: 'storehouse', x: 12, y: 15, w: 2, h: 2 }
-export const HEARTH: Box = { id: 'structure_6', kind: 'campfire', x: 17, y: 15, w: 1, h: 1 }
+export const HUTS: Box[] = [hut(1), hut(2), hut(3), hut(4), hut(5)]
+
+// The tile a body stands on to step through a door — the engine derives the same
+// one from the footprint; `g9world.test.ts` holds the two together.
+export function hutDoor(box: Box): { x: number; y: number } {
+  return { x: box.x + Math.floor((box.w - 1) / 2), y: box.y + box.h }
+}
+
+export const STOREHOUSE: Box = { id: 'structure_6', kind: 'storehouse', x: 12, y: 15, w: 2, h: 2 }
+export const HEARTH: Box = { id: 'structure_7', kind: 'campfire', x: 17, y: 15, w: 1, h: 1 }
 // A fish trap standing in the creek. It is the town's one landmark *on* the water:
 // perception names a structure and the open tile beside it, so the water's own
 // coordinates arrive without anyone being told where the river is.
-export const WEIR: Box = { id: 'structure_7', kind: 'weir', x: 18, y: 17, w: 1, h: 1 }
+export const WEIR: Box = { id: 'structure_8', kind: 'weir', x: 18, y: 17, w: 1, h: 1 }
 
 // A creek off the eastern river, two steps south of the hearth.
 export const CREEK: Array<[number, number]> = [

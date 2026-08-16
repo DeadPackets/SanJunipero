@@ -43,7 +43,7 @@ import { watchBirths, type AgentBornPayload } from '../src/family/watchBirths.js
 import { captureSocialName, migrateFamilyTables, promptBirthLine } from '../src/family/socialName.js'
 import { G9ReportSchema, checkG9Report, median, type G9Report } from '../src/live/g9report.js'
 import {
-  HEARTH, HUTS, STOREHOUSE, makeTerrain, townGenesisEvents, type Box,
+  HEARTH, HUTS, STOREHOUSE, hutDoor, makeTerrain, townGenesisEvents, type Box,
 } from '../src/live/g9world.js'
 
 const CAP_USD = 8.0
@@ -87,7 +87,7 @@ function voice(
 
 const MINDS: Mind[] = [
   {
-    id: 'ada', sex: 'f', ageDays: 30 * 364, hut: HUTS[0]!, x: 10, y: 12,
+    id: 'ada', sex: 'f', ageDays: 30 * 364, hut: HUTS[1]!, ...hutDoor(HUTS[1]!),
     identity: {
       name: 'Ada', age: 30,
       backstory: 'Grew up in this valley, learned bread from her mother, and has kept the same hut since the year the river rose. Heavy with child now, and near her time.',
@@ -110,7 +110,7 @@ const MINDS: Mind[] = [
     },
   },
   {
-    id: 'bex', sex: 'm', ageDays: 32 * 364, hut: HUTS[0]!, x: 10, y: 13,
+    id: 'bex', sex: 'm', ageDays: 32 * 364, hut: HUTS[0]!, ...hutDoor(HUTS[0]!),
     identity: {
       name: 'Bex', age: 32,
       backstory: 'A joiner. Splits planks better than anyone here and knows it. Ada\'s man since two winters, and he keeps his mark on what he makes.',
@@ -133,7 +133,7 @@ const MINDS: Mind[] = [
     },
   },
   {
-    id: 'cass', sex: 'f', ageDays: 41 * 364, hut: HUTS[1]!, x: 14, y: 12,
+    id: 'cass', sex: 'f', ageDays: 41 * 364, hut: HUTS[2]!, ...hutDoor(HUTS[2]!),
     identity: {
       name: 'Cass', age: 41,
       backstory: 'Came down the valley eight summers ago with nothing and has eaten well ever since. Notices who owns what, and remembers it.',
@@ -156,7 +156,7 @@ const MINDS: Mind[] = [
     },
   },
   {
-    id: 'dov', sex: 'm', ageDays: 36 * 364, hut: HUTS[2]!, x: 18, y: 12,
+    id: 'dov', sex: 'm', ageDays: 36 * 364, hut: HUTS[3]!, ...hutDoor(HUTS[3]!),
     identity: {
       name: 'Dov', age: 36,
       backstory: 'Keeps the hearth. Spends his evenings putting things into the fire to see what comes out, which the others find either useful or tiresome.',
@@ -182,7 +182,7 @@ const MINDS: Mind[] = [
     },
   },
   {
-    id: 'esen', sex: 'f', ageDays: 27 * 364, hut: HUTS[3]!, x: 22, y: 12,
+    id: 'esen', sex: 'f', ageDays: 27 * 364, hut: HUTS[4]!, ...hutDoor(HUTS[4]!),
     identity: {
       name: 'Esen', age: 27,
       backstory: 'Fishes the river and hates waste. Has taken to hanging fish over the hearth smoke and has started calling it smoking, though nobody taught her the word.',
