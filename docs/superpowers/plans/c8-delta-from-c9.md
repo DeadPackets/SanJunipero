@@ -234,6 +234,14 @@ rehearsal will look like a disaster against the old bar. Either:
 
 Whichever C8 picks, it must be written into the gate before the run, not decided after it.
 
+**Amendment (C9 close-out, user ruling 2026-08-17): the rehearsal criteria must include a
+codification check.** G9 §17.3 — one novel intent adjudicated *and codified* live, a repeat of it
+resolving with zero arbiter calls — closed on the user's ruling with the defect fixed and the fix
+unverified live (see §17.3 in the addendum). The rehearsal is where that verification lands, so it
+must count `codifiedVerbs` and assert **≥ 1**, and assert every recorded `attempt` carries a
+`recipe.canon` drawn from ids the codex actually holds. A rehearsal that reports zero
+codifications is a failed rehearsal, not a quiet one.
+
 ## 9. Master roadmap — insert the C9 row, fix the order
 
 `docs/superpowers/plans/2026-08-15-00-master-roadmap.md`.

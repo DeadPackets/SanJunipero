@@ -496,3 +496,22 @@ during G9b execution; recorded here so the plan owns them:
   freeform when an adjudicator is wired. CAPABILITIES offers both; only freeform reached the
   arbiter, so a mind that followed CAPABILITIES literally had its attempt written off as refusal
   prose — which §17.3/§17.4 count against.
+
+---
+
+## AMENDMENT (2026-08-17 — GATE G9 closed on user ruling)
+
+**§17.3 is CLOSED BY USER RULING, not by a live pass, and G9 closes with it.** Five G9b runs
+adjudicated novel intents and none codified. Run 5 isolated the last cause: the adjacency frontier
+reached the arbiter and five `attempt` verdicts came back, and every one was destroyed by the
+deterministic `withinAdjacency` gate because nothing bound `recipe.canon` to the ids the context
+had listed. The user ruled, verbatim:
+
+> "Add it, but no need for a run. The run will naturally happen in the next stages of testing."
+
+The fix is commit `c8d267b` — one instruction line in the byte-stable adjudication prefix binding
+`canon` to the two id lines already in the context — covered by prompt-assembly assertions and the
+Esen adjudicator fixture. **No sixth G9b run was made and no live call was spent on this batch.**
+Live verification of §17.3 transfers to the C8 dress rehearsal, whose criteria must now include a
+codification check (`c8-delta-from-c9.md` §8 amendment). Task 28 stands complete at 8/8 with
+§17.3 closed on the ruling and §17.4 as restated.
