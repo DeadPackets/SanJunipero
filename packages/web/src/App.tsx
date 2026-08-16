@@ -4,6 +4,8 @@ import { createWorldStore, type WorldStore } from './state/worldStore.js'
 import { connectObservatory, type ObservatoryHandle } from './net/socket.js'
 import { LENSES, parseRoute, routeToPath, type Lens, type Route } from './ui/route.js'
 import { StageMount } from './render/StageMount.js'
+import { InspectorPanel } from './ui/InspectorPanel.js'
+import type { Scene } from './render/scene.js'
 
 // chrome copy speaks about townsfolk, never machinery (spec §5)
 const LENS_LABELS: Record<Lens, string> = {
@@ -27,6 +29,7 @@ export function App() {
   const store = storeRef.current
   const sockRef = useRef<ObservatoryHandle | null>(null)
   const [route, setRoute] = useState<Route>(() => parseRoute(location.pathname, location.search))
+  const [scene, setScene] = useState<Scene | null>(null)
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -69,9 +72,13 @@ export function App() {
       </header>
       <div className="stage-row">
         <main id="stage-root">
-          <StageMount store={store} />
+          <StageMount store={store} onScene={setScene} />
         </main>
-        <aside id="panel-outlet" />
+        <aside id="panel-outlet" className={route.lens === 'inspector' && route.agentId !== null ? 'open' : undefined}>
+          {route.lens === 'inspector' && route.agentId !== null && (
+            <InspectorPanel store={store} agentId={route.agentId} scene={scene} />
+          )}
+        </aside>
       </div>
     </div>
   )
