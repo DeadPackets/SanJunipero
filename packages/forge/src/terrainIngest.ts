@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import type { AssetCodex } from './codex.js'
 import { decodePng, encodePng, type RawImage } from './post/raw.js'
 import { quantize } from './post/quantize.js'
+import { paletteRgb } from './palette.js'
 import { applyTint } from './tints.js'
 import {
   SHEET_COLS, SHEET_ROWS, TERRAIN_TILE_H, TERRAIN_TILE_W, TERRAIN_VARIANTS, SHEET_KINDS,
@@ -45,6 +46,44 @@ export async function loadMaterialBook(dir: string = MATERIALS_DIR): Promise<Map
   return book
 }
 
+// VARIANT COHESION. The renderer picks a variant per tile by hash, so any difference in
+// average TONE between a kind's variants renders as a harlequin checkerboard — four clearly
+// different colours tiled at random. Seen at lattice scale in the first preview: the four
+// grass variants came back pale sage, dark green, mid green and sandy tan, and the field
+// looked far worse than the flat colour it replaced. Neither the seam check nor the frame
+// check nor the eye can see this, because it does not exist inside one tile.
+//
+// Variants exist to break up REPETITION, not to add COLOUR. So each variant is shifted onto
+// the kind's mean tone and re-quantized: the grain survives, the patchwork does not.
+export const VARIANT_TONE_TOLERANCE = 4      // mean per-channel distance considered cohesive
+
+const meanRgb = (m: RawImage): [number, number, number] => {
+  let r = 0, g = 0, b = 0, n = 0
+  for (let i = 0; i < m.data.length; i += 4) { r += m.data[i]!; g += m.data[i + 1]!; b += m.data[i + 2]!; n++ }
+  return n === 0 ? [0, 0, 0] : [r / n, g / n, b / n]
+}
+
+export function variantSpread(variants: RawImage[]): number {
+  if (variants.length < 2) return 0
+  const means = variants.map(meanRgb)
+  const kind = [0, 1, 2].map((k) => means.reduce((s2, m) => s2 + m[k]!, 0) / means.length)
+  return Math.max(...means.map((m) => [0, 1, 2].reduce((s2, k) => s2 + Math.abs(m[k]! - kind[k]!), 0) / 3))
+}
+
+export function cohereVariants(variants: RawImage[]): RawImage[] {
+  if (variants.length < 2) return variants
+  const means = variants.map(meanRgb)
+  const kind = [0, 1, 2].map((k) => means.reduce((s2, m) => s2 + m[k]!, 0) / means.length)
+  return variants.map((v, i) => {
+    const shift = [0, 1, 2].map((k) => kind[k]! - means[i]![k]!)
+    const out: RawImage = { width: v.width, height: v.height, data: new Uint8ClampedArray(v.data) }
+    for (let j = 0; j < out.data.length; j += 4) {
+      for (let k = 0; k < 3; k++) out.data[j + k] = Math.round(v.data[j + k]! + shift[k]!)
+    }
+    return quantize(out, paletteRgb())
+  })
+}
+
 // One ground tile: the generated material cut to the dimetric diamond, or the code-painted
 // tile when that material was never generated.
 export function groundTile(book: MaterialBook, kind: TerrainTileKind, variant: number): RawImage {
@@ -80,10 +119,17 @@ export async function registerGeneratedTerrain(
   }
 
   for (const kind of TERRAIN_TILE_KINDS) {
+    const made = Array.from({ length: GROUND_VARIANTS[kind] }, (_, v) =>
+      materialFor(book, terrainAssetId({ sort: 'ground', kind, variant: v })))
+    const present = made.filter((m): m is RawImage => m !== null)
+    const cohered = cohereVariants(present)
+    let seen = -1
+    const coheredFor = made.map((m) => (m === null ? null : cohered[++seen]!))
+
     for (let variant = 0; variant < TERRAIN_VARIANTS; variant++) {
       // a kind generated with fewer variants than the renderer asks for reuses its last one
       const source = Math.min(variant, GROUND_VARIANTS[kind] - 1)
-      const m = materialFor(book, terrainAssetId({ sort: 'ground', kind, variant: source }))
+      const m = coheredFor[source] ?? null
       if (m === null) painted++
       else generated++
       const img = m === null ? paintTerrainTile(kind, variant) : diamondFromMaterial(m)

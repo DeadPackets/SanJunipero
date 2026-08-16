@@ -5,7 +5,7 @@ import {
 import { MASTER_PALETTE } from './palette.js'
 import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
-import type { RawImage } from './post/raw.js'
+import { decodePng, type RawImage } from './post/raw.js'
 import {
   SHEET_COLS, SHEET_ROWS, TERRAIN_TILE_H, TERRAIN_TILE_W, TERRAIN_VARIANTS, paintTerrainTile,
 } from './terrainTiles.js'
@@ -13,17 +13,22 @@ import {
   BORDER_TOLERANCE, MATERIAL_PX, ROAD_MATERIAL_ID, borderReport, seamReport, terrainAssetId,
 } from './terrainGen.js'
 import {
-  MATERIALS_DIR, groundTile, loadMaterialBook, registerGeneratedTerrain, seasonSheetFrom,
-  seasonSheets,
+  MATERIALS_DIR, VARIANT_TONE_TOLERANCE, cohereVariants, groundTile, loadMaterialBook,
+  registerGeneratedTerrain, seasonSheetFrom, seasonSheets, variantSpread,
 } from './terrainIngest.js'
 
 const PALETTE_HEXES = new Set(MASTER_PALETTE.map((h) => parseInt(h.slice(1), 16)))
 
-// a flat, palette-true material — stands in for a generated one
-function material(hex: number, px = MATERIAL_PX): RawImage {
+// A GRAINY palette-true material — a flat fill would collapse to one picture under variant
+// cohesion, and a real generated material never is flat. Grain is seeded per material so two
+// variants of the same tone still differ pixel for pixel.
+function material(hex: number, px = MATERIAL_PX, seed = hex): RawImage {
   const img: RawImage = { width: px, height: px, data: new Uint8ClampedArray(px * px * 4) }
-  for (let i = 0; i < img.data.length; i += 4) {
-    img.data.set([(hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff, 255], i)
+  const base = [(hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff]
+  for (let i = 0; i < px * px; i++) {
+    const h = (Math.imul(i + 1, 0x27d4eb2d) ^ Math.imul(seed + 1, 0x165667b1)) >>> 0
+    const d = (h % 3) * 12 - 12                     // three tones of the same colour family
+    img.data.set([base[0]! + d, base[1]! + d, base[2]! + d, 255], i * 4)
   }
   return img
 }
@@ -191,5 +196,64 @@ describe('the shipped materials', () => {
 
   it('loads an empty book from a directory that is not there — art independence', async () => {
     expect((await loadMaterialBook(`${MATERIALS_DIR}-does-not-exist`)).size).toBe(0)
+  })
+})
+
+
+// The renderer picks a variant per tile by hash, so any difference in average TONE between a
+// kind's variants renders as a harlequin checkerboard. Seen at lattice scale in the first
+// preview and invisible to every other check, because it does not exist inside one tile.
+describe('variant cohesion', () => {
+  const four = [0x93b573, 0x4f7040, 0xb9d19a, 0xe8d5bc].map((h) => material(h))
+
+  it('measures the spread that made the field look like a harlequin', () => {
+    expect(variantSpread(four)).toBeGreaterThan(VARIANT_TONE_TOLERANCE)
+  })
+
+  it('pulls every variant onto the kind\'s tone', () => {
+    expect(variantSpread(cohereVariants(four))).toBeLessThanOrEqual(VARIANT_TONE_TOLERANCE)
+  })
+
+  it('keeps the grain — cohesion moves tone, it does not flatten texture', () => {
+    const grainy = (seed: number): RawImage => {
+      const px = MATERIAL_PX
+      const img: RawImage = { width: px, height: px, data: new Uint8ClampedArray(px * px * 4) }
+      for (let i = 0; i < px * px; i++) {
+        const h = (Math.imul(i + seed, 0x27d4eb2d) >>> 0) % 3
+        const c = [0x93b573, 0x6f9455, 0xb9d19a][h]!
+        img.data.set([(c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff, 255], i * 4)
+      }
+      return img
+    }
+    const before = grainy(1)
+    const [after] = cohereVariants([before, material(0x4f7040)])
+    expect(new Set(Array.from({ length: 200 }, (_, i) => after!.data[i * 4])).size).toBeGreaterThan(1)
+  })
+
+  it('leaves a single variant alone and never crashes on none', () => {
+    const one = [material(0x93b573)]
+    expect(cohereVariants(one)).toEqual(one)
+    expect(cohereVariants([])).toEqual([])
+    expect(variantSpread([])).toBe(0)
+  })
+
+  it('is deterministic', () => {
+    expect(cohereVariants(four).map((m) => Buffer.from(m.data).toString('base64')))
+      .toEqual(cohereVariants(four).map((m) => Buffer.from(m.data).toString('base64')))
+  })
+
+  it('ships four grass tiles that no longer read as four different materials', async () => {
+    const db = openForgeDb(':memory:')
+    try {
+      const book = fullBook()
+      book.set(terrainAssetId({ sort: 'ground', kind: 'grass', variant: 2 }), material(0xe8d5bc))
+      const codex = new AssetCodex(db)
+      const { records } = await registerGeneratedTerrain(codex, book)
+      const grass = records.filter((r) => r.kind === 'grass')
+      const imgs = await Promise.all(grass.map(async (r) => decodePng(codex.get(r.id)!.png)))
+      expect(variantSpread(imgs)).toBeLessThanOrEqual(VARIANT_TONE_TOLERANCE * 3)
+      // still four DIFFERENT pictures — cohesion is not collapse
+      expect(new Set(grass.map((r) => codex.get(r.id)!.png.toString('base64'))).size).toBe(4)
+    } finally { db.close() }
   })
 })
