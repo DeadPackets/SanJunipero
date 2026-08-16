@@ -276,6 +276,12 @@ export class AgentRuntime {
 
     const prose = perceptionToProse(packet, (detail) => this.#llm.alert('prose', detail))
     this.#dayLog.push(prose)
+
+    // Retrieve BEFORE inserting this perception: a just-written row would win
+    // recency and tag match, filling the scene with echoes of the present.
+    const cues = cuesFromPacket(packet)
+    const ambient = await retrieveAmbient(this.#mem!, cues, tick, this.#config.ambientK)
+
     await this.#mem!.insertMemory({
       tick,
       kind: 'perception',
@@ -288,9 +294,6 @@ export class AgentRuntime {
         topics: keywords(packet.heard.map((h) => h.text).join(' ')),
       },
     })
-
-    const cues = cuesFromPacket(packet)
-    const ambient = await retrieveAmbient(this.#mem!, cues, tick, this.#config.ambientK)
 
     const blocks: PromptBlocks = {
       rulesOfBeing: RULES_OF_BEING,

@@ -31,17 +31,23 @@ describe('assemblePrompt stability gradient', () => {
     expect(sa).not.toBe(sb)
   })
 
-  it('keeps everything before block 5 byte-identical when a dayLog entry is appended', () => {
+  it('orders messages stable→volatile: append-only dayLog before the per-turn scene (finding 9)', () => {
+    const a = assemblePrompt(fixtureBlocks())
+    expect(a.messages[0].content).toContain('Woke with the light.')
+    expect(a.messages[1].content).toContain('What you remember:')
+  })
+
+  it('an appended dayLog entry only extends message 0; the scene bytes stand', () => {
     const base = fixtureBlocks()
     const before = assemblePrompt(base)
     const after = assemblePrompt({ ...base, dayLog: [...base.dayLog, 'I traded a plank for flour.'] })
 
     expect(after.system).toBe(before.system)
-    expect(after.messages[0]).toEqual(before.messages[0])
-    expect(after.messages[1].content).not.toBe(before.messages[1].content)
+    expect(after.messages[0].content.startsWith(before.messages[0].content)).toBe(true)
+    expect(after.messages[1]).toEqual(before.messages[1])
   })
 
-  it('leaves system byte-identical when the scene block changes', () => {
+  it('leaves system and dayLog byte-identical when the scene block changes', () => {
     const base = fixtureBlocks()
     const before = assemblePrompt(base)
     const changed = assemblePrompt({
@@ -50,7 +56,8 @@ describe('assemblePrompt stability gradient', () => {
     })
 
     expect(changed.system).toBe(before.system)
-    expect(changed.messages[0]).not.toEqual(before.messages[0])
+    expect(changed.messages[0]).toEqual(before.messages[0])
+    expect(changed.messages[1]).not.toEqual(before.messages[1])
   })
 
   it('changes system when the personality doc changes (sleep-only by contract)', () => {
@@ -319,7 +326,7 @@ describe('ambient budget', () => {
   it('renders 8 fixture memories into block 4 at or under 700 est tokens', () => {
     const blocks = fixtureBlocks()
     const a = assemblePrompt(blocks)
-    const sceneTokens = Math.ceil(a.messages[0].content.length / 4)
+    const sceneTokens = Math.ceil(a.messages[1].content.length / 4)
     expect(blocks.scene.memories.length).toBe(8)
     expect(sceneTokens).toBeLessThanOrEqual(700)
   })

@@ -543,6 +543,16 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(memoriesOfKind(agentDb, 'action').length).toBe(0)
   })
 
+  it('retrieves ambient memories before inserting the current perception (finding 9)', async () => {
+    const { model, prompts } = capturingModel([BENIGN_TURN])
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 30)
+    // First turn ever: the store held nothing before this perception, so the
+    // scene must not present the current moment back as a remembered one.
+    const first = prompts[0]!
+    expect(first.some((m) => m.text.includes('What you remember:'))).toBe(false)
+  })
+
   it('repairs an invalid generation with an assistant/user exchange instead of blind-retrying', async () => {
     const bad = { thought: 'I speak wrongly.', importance: 'very' }
     const good = { thought: 'Righted.', speech: 'All is well.', importance: 2 }

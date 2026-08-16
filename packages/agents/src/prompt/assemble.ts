@@ -27,7 +27,7 @@ export type PromptBlocks = {
 
 export type AssembledPrompt = {
   system: string // blocks 1+2+3, fixed delimiters
-  messages: Array<{ role: 'user'; content: string }> // [scene, dayLog.join('\n'), now]
+  messages: Array<{ role: 'user'; content: string }> // stable→volatile: [dayLog.join('\n'), scene, now]
   estTokens: number // ceil(totalChars/4)
   needsCompaction: boolean // est(dayLog) > 6000 tokens
 }
@@ -75,6 +75,7 @@ function renderScene(scene: PromptBlocks['scene']): string {
   if (scene.memories.length > 0) {
     parts.push(`What you remember:\n${scene.memories.map((m) => m.text).join('\n')}`)
   }
+  if (parts.length === 0) return 'Nothing in particular comes back to you.'
   return parts.join('\n\n')
 }
 function renderSystem(blocks: PromptBlocks): string {
@@ -94,12 +95,14 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const scene = renderScene(blocks.scene)
   const dayLog = blocks.dayLog.join('\n')
   const now = blocks.now.prose
+  // dayLog is append-only all day; the scene changes every turn. Stable
+  // before volatile keeps the byte prefix cacheable across turns.
   const messages: Array<{ role: 'user'; content: string }> = [
-    { role: 'user', content: scene },
     { role: 'user', content: dayLog },
+    { role: 'user', content: scene },
     { role: 'user', content: now },
   ]
-  const serialized = `${system}${scene}${dayLog}${now}`
+  const serialized = `${system}${dayLog}${scene}${now}`
   return {
     system,
     messages,
