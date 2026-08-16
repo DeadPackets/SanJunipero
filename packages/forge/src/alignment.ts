@@ -1,7 +1,8 @@
 import type { Footprint } from '@sj/shared'
 import type { ForgeConfig } from './forgeConfig.js'
-import type { RawImage } from './post/raw.js'
+import { downscaleNearest, type RawImage } from './post/raw.js'
 import { TILE_W, TILE_H, ROAD_EDGE } from './roadTiles.js'
+import { targetSize } from './styleBible.js'
 import { checkerBackground, compositeOver } from './visionQa/rubric.js'
 
 export type AlignmentConfig = ForgeConfig['alignment']   // one source; never a re-declared shape
@@ -22,6 +23,30 @@ export function footprintDiamond(fp: Footprint, cell: AlignmentCell): {
     leftX: centerX - span / 2,
     rightX: centerX + span / 2,
   }
+}
+
+// Ruling R-3: v4 building cells ship at NATIVE resolution, trimmed to the figure, with a feet
+// anchor; the renderer scales them into the target cell. The alignment law is written in
+// TARGET-cell pixels, so the cell has to be rebuilt before the law can be applied — validating
+// a raw hi-res cell fails every shipped building spuriously.
+export function toTargetCell(
+  img: RawImage, man: { footprint: Footprint; cell: { w: number; h: number; feetX: number; feetY: number } },
+): { img: RawImage; cell: Required<AlignmentCell> } {
+  const t = targetSize('building', man.footprint)
+  const scale = man.cell.h / t.h
+  const small = downscaleNearest(img, Math.max(1, Math.round(man.cell.w / scale)), t.h)
+  const feetX = Math.round(man.cell.feetX / scale)
+  const feetY = Math.min(t.h - 1, Math.round(man.cell.feetY / scale))
+  const dx = Math.round(t.w / 2) - feetX
+  const out: RawImage = { width: t.w, height: t.h, data: new Uint8ClampedArray(t.w * t.h * 4) }
+  for (let y = 0; y < small.height && y < t.h; y++)
+    for (let x = 0; x < small.width; x++) {
+      const nx = x + dx
+      if (nx < 0 || nx >= t.w) continue
+      const s = (y * small.width + x) * 4
+      out.data.set(small.data.subarray(s, s + 4), (y * t.w + nx) * 4)
+    }
+  return { img: out, cell: { w: t.w, h: t.h, feetY } }
 }
 
 export function validateBuildingAlignment(

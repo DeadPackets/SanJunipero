@@ -4,12 +4,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { decodePng, encodePng, downscaleNearest, type RawImage } from '../src/post/raw.js'
-import { targetSize } from '../src/styleBible.js'
+import { decodePng, encodePng } from '../src/post/raw.js'
 import { loadForgeConfig } from '../src/forgeConfig.js'
 import { SpendLedger } from '../src/spendLedger.js'
 import { makeVisionJudge } from '../src/visionQa/visionJudge.js'
-import { validateBuildingAlignment, footprintDiamond, testGridRender, SEAT_CRITERION_PROMPT } from '../src/alignment.js'
+import {
+  validateBuildingAlignment, footprintDiamond, testGridRender, toTargetCell, SEAT_CRITERION_PROMPT,
+} from '../src/alignment.js'
 
 const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
 const C5 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5/production'
@@ -22,25 +23,6 @@ mkdirSync(join(C13, 'audit'), { recursive: true })
 
 type Manifest = { kind: string; footprint: { w: number; h: number }; cell: { w: number; h: number; feetX: number; feetY: number } }
 
-// v4 building cells ship at NATIVE resolution, trimmed to the figure, with a feet anchor;
-// the renderer scales them into the target cell. The alignment law is written in target-cell
-// pixels, so rebuild that cell here: uniform downscale, then place the feet at the centre.
-function toTargetCell(img: RawImage, man: Manifest): { img: RawImage; cell: { w: number; h: number; feetY: number } } {
-  const t = targetSize('building', man.footprint)
-  const scale = man.cell.h / t.h
-  const small = downscaleNearest(img, Math.max(1, Math.round(man.cell.w / scale)), t.h)
-  const feetX = Math.round(man.cell.feetX / scale)
-  const feetY = Math.min(t.h - 1, Math.round(man.cell.feetY / scale))
-  const dx = Math.round(t.w / 2) - feetX
-  const out: RawImage = { width: t.w, height: t.h, data: new Uint8ClampedArray(t.w * t.h * 4) }
-  for (let y = 0; y < small.height; y++)
-    for (let x = 0; x < small.width; x++) {
-      const nx = x + dx
-      if (nx < 0 || nx >= t.w || y >= t.h) continue
-      out.data.set(small.data.subarray((y * small.width + x) * 4, (y * small.width + x) * 4 + 4), (y * t.w + nx) * 4)
-    }
-  return { img: out, cell: { w: t.w, h: t.h, feetY } }
-}
 type Row = { id: string; ok: boolean; failures: string[]; measured: Record<string, number>; diamond: Record<string, number>; seat?: { score: number; evidence: string; pass: boolean } }
 
 const rows: Row[] = []

@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { DEFAULT_FORGE_CONFIG } from './forgeConfig.js'
 import type { RawImage } from './post/raw.js'
 import {
-  footprintDiamond, validateBuildingAlignment, testGridRender, SEAT_CRITERION_PROMPT,
-  GRID_MARGIN, DIAMOND_STROKE, type AlignmentConfig,
+  footprintDiamond, validateBuildingAlignment, testGridRender, toTargetCell,
+  SEAT_CRITERION_PROMPT, GRID_MARGIN, DIAMOND_STROKE, type AlignmentConfig,
 } from './alignment.js'
 
 const CFG: AlignmentConfig = DEFAULT_FORGE_CONFIG.alignment
@@ -134,6 +134,37 @@ describe('testGridRender (the picture the seat judge is shown)', () => {
         if (sprite.data[(y * sprite.width + x) * 4 + 3] === 0) continue
         expect(px(out, x + GRID_MARGIN, y + GRID_MARGIN), `sprite ${x},${y}`).toBe(px(sprite, x, y))
       }
+  })
+})
+
+describe('toTargetCell', () => {
+  // A native v4 cell: 800x800, the figure filling it, feet at the bottom-centre.
+  const native: RawImage = { width: 800, height: 800, data: new Uint8ClampedArray(800 * 800 * 4) }
+  for (let y = 100; y < 780; y++)
+    for (let x = 200; x < 600; x++) {
+      const i = (y * 800 + x) * 4
+      native.data[i] = 200; native.data[i + 1] = 150; native.data[i + 2] = 100; native.data[i + 3] = 255
+    }
+  const man = { footprint: { w: 1, h: 1 }, cell: { w: 800, h: 800, feetX: 400, feetY: 779 } }
+
+  it('rebuilds the 64px target cell a 1x1 building renders into', () => {
+    const { img, cell } = toTargetCell(native, man)
+    expect(img.width).toBe(64)
+    expect(img.height).toBe(64)
+    expect(cell).toEqual({ w: 64, h: 64, feetY: 62 })
+  })
+
+  it('centres the feet on the cell so the alignment law can be applied', () => {
+    const { img, cell } = toTargetCell(native, man)
+    const r = validateBuildingAlignment(img, man.footprint, CFG, cell)
+    expect(r.ok, r.failures.join('; ')).toBe(true)
+    expect(Math.abs((r.measured.baseLeft + r.measured.baseRight) / 2 - 32)).toBeLessThanOrEqual(1)
+  })
+
+  it('scales the target cell with the footprint — a 2x2 renders into 128px', () => {
+    const { img, cell } = toTargetCell(native, { ...man, footprint: { w: 2, h: 2 } })
+    expect(img.width).toBe(128)
+    expect(cell.h).toBe(128)
   })
 })
 
