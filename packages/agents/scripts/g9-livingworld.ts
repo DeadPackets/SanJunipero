@@ -351,11 +351,9 @@ async function main(): Promise<void> {
     store, state, rng, config, startTick: START_TICK, realMsPerTick: REAL_MS_PER_TICK,
     onTick: (ctx) => handler(ctx),
   })
-  // A mind senses only what happened inside this window when it next looks, and in
-  // this run a mind looks about once a sim-hour. The bridge's 10-tick default is
-  // shorter than the gap between turns, so most of what happens beside a person —
-  // speech, a taking — is over before they next open their eyes. One hour.
-  const bridge = new WatchedBridge({ loop, store, simConfig: config, recentWindowTicks: 60 })
+  // No window override: the bridge's own default now outlasts the gap between a
+  // mind's turns, and the gate is run on what a consumer gets by default.
+  const bridge = new WatchedBridge({ loop, store, simConfig: config })
   bridge.watchTicks(() => loop.tick)
   handler = bridge.wrapTickHandler(({ emit: e }) => {
     // A hearth is a fire someone keeps: relight it rather than let the gate

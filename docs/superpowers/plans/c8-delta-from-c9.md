@@ -167,6 +167,13 @@ Two decisions C8 must make explicitly, not by omission:
 4. **`bridge.drain()` on shutdown**, before closing the loop, and the returned count logged.
    Without it every mind awaiting a queued submit hangs and `stop()` never resolves.
 5. **`createLawsAdmin({ submitLaw, token, host })` → engine `applyLaw`** — see §12.
+6. **`EngineBridge`'s perception window: default now safe; override only to narrow.** The default
+   was 10 ticks against a measured turn cadence of ~59 (G9b run 1, D-28-6), so most speech and
+   every witnessed taking expired before any mind looked. `DEFAULT_RECENT_WINDOW_TICKS` is now
+   derived — `ceil(DEFAULT_MIND_CONFIG.boredomTicks × 1.1)` = 132, the longest an awake mind can
+   go without a turn plus margin. The supervisor should pass **no** `recentWindowTicks`; supply one
+   only to deliberately narrow what a mind is handed, and re-derive it if C8 changes
+   `boredomTicks` or the wake cadence.
 
 ## 7. C8 Task 13 — the manipulator corpus needs ownership attacks
 

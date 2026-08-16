@@ -11,7 +11,8 @@ import {
   type TileId,
 } from '@sj/engine'
 import { SimConfigSchema } from '@sj/shared'
-import { EngineBridge } from './bridge.js'
+import { DEFAULT_MIND_CONFIG } from '../wake.js'
+import { DEFAULT_RECENT_WINDOW_TICKS, EngineBridge } from './bridge.js'
 
 const AGENT = 'tamar'
 
@@ -38,7 +39,7 @@ function buildBridge(): { bridge: EngineBridge; step: () => void } {
 // A second town where things are owned, so the bridge's ownership mapping is
 // observable: Tamar holds her own bread, Bex's plank sits on the ground beside
 // her, and Cass lifts it while she watches.
-function ownedWorld(): { bridge: EngineBridge; step: () => void } {
+function ownedWorld(opts: { recentWindowTicks?: number } = {}): { bridge: EngineBridge; step: () => void } {
   const config = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
   const terrain: TileId[][] = Array.from({ length: 12 }, () => Array.from({ length: 12 }, (): TileId => 0))
   const store = new EventStore(openDb(':memory:'))
@@ -56,7 +57,7 @@ function ownedWorld(): { bridge: EngineBridge; step: () => void } {
   const worldTick = createWorldTick(config, rng)
   let handler: TickHandler = () => {}
   const loop = new TickLoop({ store, state, rng, config, onTick: (ctx) => handler(ctx) })
-  const bridge = new EngineBridge({ loop, store, simConfig: config })
+  const bridge = new EngineBridge({ loop, store, simConfig: config, ...opts })
   handler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
     if (loop.tick === 1) {
@@ -88,6 +89,29 @@ describe('EngineBridge carries ownership through to the mind', () => {
 
   it('a quiet tick leaves the witness channel empty', () => {
     const { bridge } = ownedWorld()
+    expect(bridge.perception(AGENT).seen).toEqual([])
+  })
+})
+
+describe('the default perception window outlasts the gap between turns (D-28-6)', () => {
+  it('covers the longest an awake mind can go without a turn, with margin', () => {
+    expect(DEFAULT_RECENT_WINDOW_TICKS).toBeGreaterThanOrEqual(DEFAULT_MIND_CONFIG.boredomTicks)
+    expect(DEFAULT_RECENT_WINDOW_TICKS).toBeGreaterThanOrEqual(64)
+  })
+
+  it('a witnessed taking still reaches a mind that looks a sim-hour later', () => {
+    const { bridge, step } = ownedWorld()
+    step() // Cass lifts Bex's plank at tick 1, in Tamar's sight
+    for (let i = 0; i < 60; i++) step()
+    expect(bridge.perception(AGENT).seen).toEqual([
+      { kind: 'item_taken', takerName: 'Cass', ownerName: 'Bex', itemKind: 'plank' },
+    ])
+  })
+
+  it('an explicit override still narrows the window', () => {
+    const { bridge, step } = ownedWorld({ recentWindowTicks: 10 })
+    step()
+    for (let i = 0; i < 60; i++) step()
     expect(bridge.perception(AGENT).seen).toEqual([])
   })
 })

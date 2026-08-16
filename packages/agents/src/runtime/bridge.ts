@@ -10,6 +10,14 @@ import {
 import type { PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
 import type { SimConfig, SimEvent } from '@sj/shared'
 import type { PerceptionPacket } from '../prompt/prose.js'
+import { DEFAULT_MIND_CONFIG } from '../wake.js'
+
+// A mind is handed only the events of this window when it next looks, so a
+// window shorter than the gap between its turns makes the town half-deaf:
+// speech and every witnessed taking expire before anybody perceives them
+// (D-28-6, measured at ~59 ticks per mind). The boredom floor is the longest
+// an awake mind can go without a turn; 10% covers the tick it actually lands on.
+export const DEFAULT_RECENT_WINDOW_TICKS = Math.ceil(DEFAULT_MIND_CONFIG.boredomTicks * 1.1)
 // The agents-local intent shape. The turn schema keeps `verb` a free string so a
 // novel intent can round-trip to the engine; the FROZEN submitIntent call just
 // forwards it and the verb registry answers in-world.
@@ -96,12 +104,13 @@ export class EngineBridge {
     loop: TickLoop
     store: EventStore
     simConfig: SimConfig
+    /** Narrower than the default only; a shorter window drops what a mind never looked at. */
     recentWindowTicks?: number
   }) {
     this.#loop = opts.loop
     this.#store = opts.store
     this.#simConfig = opts.simConfig
-    this.#recentWindowTicks = opts.recentWindowTicks ?? 10
+    this.#recentWindowTicks = opts.recentWindowTicks ?? DEFAULT_RECENT_WINDOW_TICKS
   }
 
   // Drain queued intents in arrival order, then run the world systems, then
