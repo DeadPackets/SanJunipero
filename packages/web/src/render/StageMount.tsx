@@ -7,6 +7,7 @@ import { createCharacterLayer, type CharacterLayer } from './characters.js'
 import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
 import { createAtmosphere, type Atmosphere } from './atmosphere.js'
 import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
+import { createAmbient, type AmbientDirector } from './ambient.js'
 
 // The ONLY React/Pixi contact point — React renders nothing inside the canvas (spec §15).
 export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (scene: Scene) => void }) {
@@ -22,6 +23,7 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
     let bubbles: BubbleLayer | null = null
     let atmosphere: Atmosphere | null = null
     let weather: WeatherLayer | null = null
+    let ambient: AmbientDirector | null = null
     let offEvents: (() => void) | null = null
     let tickFn: (() => void) | null = null
     void createScene(rootEl, store).then((s) => {
@@ -42,6 +44,7 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
       bubbles = createBubbleLayer(s, store)
       atmosphere = createAtmosphere(s)
       weather = createWeatherLayer(s)
+      ambient = createAmbient(s, store, { weather, bubbles, chars })
       offEvents = store.onEvents((evts) => {
         for (const ev of evts) {
           if (ev.type === 'agent_spoke') {
@@ -59,6 +62,7 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
         chars?.tick(now)
         bubbles?.tick(now)
         weather?.tick(dt)
+        ambient?.tick(dt)
         const state = store.getState()
         if (state !== null) {
           atmosphere?.update(state)
@@ -80,6 +84,7 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
       if (tickFn !== null && scene !== null) scene.app.ticker.remove(tickFn)
       chars?.destroy()
       bubbles?.destroy()
+      ambient?.destroy()
       weather?.destroy()
       atmosphere?.destroy()
       scene?.destroy()

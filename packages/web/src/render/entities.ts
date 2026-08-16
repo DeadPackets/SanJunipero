@@ -71,6 +71,11 @@ function showPopover(text: string, x: number, y: number): void {
   popEl.style.top = `${Math.round(y)}px`
 }
 
+// lookup for effect layers (placement bounce, fire glow anchoring)
+export function entitySpriteOf(scene: Scene, kind: 'structure' | 'item' | 'crop', id: string): Sprite | null {
+  return syncStates.get(scene)?.entries.get(`${kind}:${id}`)?.sprite ?? null
+}
+
 // diff-based sync, called once per store change
 export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore): void {
   const state = store.getState()

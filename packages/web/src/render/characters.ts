@@ -27,6 +27,7 @@ type CharEntry = {
 export type CharacterLayer = {
   tick(nowMs: number): void
   setEmotesHidden(v: boolean): void
+  getSprite(agentId: string): Sprite | null
   destroy(): void
 }
 
@@ -169,6 +170,7 @@ export function createCharacterLayer(
     setEmotesHidden: (v) => {
       emotesHidden = v
     },
+    getSprite: (agentId) => entries.get(agentId)?.sprite ?? null,
     destroy: () => {
       offEvents()
       for (const e of entries.values()) {
