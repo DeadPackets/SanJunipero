@@ -96,6 +96,32 @@ describe('the adjacency frontier in the adjudication context (C9 batch-10, user 
   })
 })
 
+// G9b run 5: five attempts came back and the adjacency gate destroyed all five,
+// because nothing tied the `canon` field to the ids the context had just listed.
+describe('the canon vocabulary (C9 batch-11, user ruling)', () => {
+  it('binds the recipe canon to the two lists of ids the context carries', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain(
+      'every id you put in the recipe\'s canon must be copied exactly from those two lines',
+    )
+    expect(system).toContain('The town currently knows: fire, pottery, charcoal')
+    expect(system).toContain('Within reach, though nobody here has done it yet: glazing, smoking_food')
+    expect(system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('calls an invented id a format error, not a judgement', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain('An id that appears on neither line is a format error')
+  })
+
+  it('lives in the byte-stable system prefix, never in the agent-facing block', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I smoke a fish over the fire.' }))
+    const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I want to build a clay oven.' }))
+    expect(a.system).toBe(b.system)
+    expect(a.messages[0].content).not.toContain('format error')
+  })
+})
+
 describe('adjudication prompt prefix stability', () => {
   it('keeps system byte-identical and user prefix byte-identical when only intent changes', () => {
     const intentA = 'I try to boil river water for salt.'

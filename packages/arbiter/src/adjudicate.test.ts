@@ -431,6 +431,19 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
     expect(llm.lastSystem).toContain('The town currently knows: fire, pottery, weaving, fishing')
   })
 
+  // Run 5 proved the frontier line arrives and is read; five attempts then died
+  // on the adjacency gate carrying ids that were never on it (C9 batch-11).
+  it('tells the arbiter that those same ids are the only vocabulary its canon may use', async () => {
+    const llm = new ScriptedLlm(() => beyondAdjacency)
+    const { arbiter } = await makeSmokehouseRig(llm)
+
+    await arbiter.adjudicate(ESEN_INTENT, esenCtx)
+
+    expect(llm.lastSystem).toContain('Within reach, though nobody here has done it yet: basketry, salt_extraction, smoking_food')
+    expect(llm.lastSystem).toContain('every id you put in the recipe\'s canon must be copied exactly from those two lines')
+    expect(llm.lastSystem).toContain('An id that appears on neither line is a format error')
+  })
+
   it('rules Esen’s smoked fish an attempt, where run 4 ruled it impossible', async () => {
     const llm = new ScriptedLlm((_intent, system) => (system.includes('smoking_food') ? smokedFish : beyondAdjacency))
     const { db, arbiter } = await makeSmokehouseRig(llm)
