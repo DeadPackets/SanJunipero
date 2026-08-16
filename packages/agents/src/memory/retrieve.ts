@@ -1,3 +1,4 @@
+import { MINUTES_PER_DAY } from '@sj/shared'
 import type { MemoryRow, MemoryStore, MemoryTags } from './store.js'
 
 export type SceneCues = {
@@ -36,7 +37,6 @@ export const DEFAULT_WEIGHTS: RetrievalWeights = {
 export const MISS_TOP_SCORE = 1.0
 export const MISS_MIN_RESULTS = 3
 
-const TICKS_PER_DAY = 1440
 const FTS_POOL = 50
 const VEC_POOL = 50
 const MAX_TAG_MATCH = 3
@@ -151,7 +151,7 @@ async function retrieve(
     const b = Math.max(0, -(rawBm25.get(row.id) ?? 0))
     const bm25 = b / (1 + b)
     const cos = cosine.get(row.id) ?? 0
-    const ageDays = Math.max(0, nowTick - row.tick) / TICKS_PER_DAY
+    const ageDays = Math.max(0, nowTick - row.tick) / MINUTES_PER_DAY
     const recency = 0.5 ** (ageDays / (2 * row.importance))
     const importance = row.importance
 

@@ -1,3 +1,4 @@
+import { MINUTES_PER_DAY } from '@sj/shared'
 import type Database from 'better-sqlite3'
 
 export type MemoryKind =
@@ -49,8 +50,6 @@ export type SummaryNodeRow = {
   childIds: number[]
   memoryIds: number[]
 }
-
-const TICKS_PER_DAY = 1440
 
 type RawMemory = {
   id: number
@@ -104,7 +103,7 @@ export class MemoryStore {
         .run(
           this.agentId,
           m.tick,
-          Math.floor(m.tick / TICKS_PER_DAY),
+          Math.floor(m.tick / MINUTES_PER_DAY),
           m.kind,
           m.text,
           m.importance,

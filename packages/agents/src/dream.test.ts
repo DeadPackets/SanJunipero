@@ -72,7 +72,7 @@ describe('rollDream', () => {
       },
     }
 
-    const result = await rollDream({ mem: store, agentId: AGENT, day, llm })
+    const result = await rollDream({ mem: store, agentId: AGENT, day, llm, chance: 0.35 })
     expect(result.dreamed).toBe(true)
     if (!result.dreamed) throw new Error('expected a dream')
     expect(result.text).toBe('a dream of the storehouse')
@@ -116,7 +116,7 @@ describe('rollDream', () => {
       },
     }
 
-    const result = await rollDream({ mem: store, agentId: AGENT, day, llm })
+    const result = await rollDream({ mem: store, agentId: AGENT, day, llm, chance: 0.35 })
     expect(result).toEqual({ dreamed: false })
     expect(calls).toBe(0)
     expect(store.memoriesOfDay(day).some((m) => m.kind === 'dream')).toBe(false)
@@ -135,7 +135,7 @@ describe('rollDream', () => {
           return { text: 'x', mood: 'y' }
         },
       }
-      await rollDream({ mem: store, agentId: AGENT, day, llm })
+      await rollDream({ mem: store, agentId: AGENT, day, llm, chance: 0.35 })
       orders.push(received.map((f) => f.id))
     }
     expect(orders[0]).toHaveLength(6)
