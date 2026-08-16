@@ -6,4 +6,6 @@ export { DEFAULT_SEGMENT_CONFIG, eventAgentIds, eventLocation, segmentScenes } f
 export { CONFLICT_WEIGHT, STAKES_WEIGHT, rankScenesForDirector, scoreHeat } from './heat.js'
 export { FIRST_DEFS, detectFirsts } from './firsts.js'
 export { DEFAULT_DETECT_CONFIG, ROLE_VERBS, detectInstitutions } from './institutions.js'
+export { FORBIDDEN_FRAMING } from './llm/framing.js'
+export { ChapterSummarySchema, EraSummarySchema, makeNarratorLlm, type NarratorLlmClient } from './llm/narratorLlm.js'
 export type * from './types.js'
