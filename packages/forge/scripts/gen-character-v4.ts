@@ -136,7 +136,9 @@ const sleepPrompt =
   `colors as the figures in the last reference image, at the same chunky pixel scale. The character is lying ` +
   `on the ground fast asleep, body fully horizontal, eyes closed, relaxed peaceful face, same outfit. ` +
   `NO text, NO labels. NO shadow under the figure. NO bed, NO pillow, NO props. ` +
-  `Subject: ${CHAR_DESC_V4}. ${FEATURE_CAP_V4} ${BIG_PIXEL}`
+  `NO buildings, NO houses, NO scenery, NO ground plane — do NOT draw the building from the first ` +
+  `reference image (it is a STYLE reference only). The ONLY content is the single sleeping figure ` +
+  `on the magenta background. Subject: ${CHAR_DESC_V4}. ${FEATURE_CAP_V4} ${BIG_PIXEL}`
 
 // ── post chain (surviving stages only): chroma key → slice → v7 → place ─────
 // Adaptive key: gen background can drift off #FF00FF (measured rgb(211,63,161) on the
@@ -294,7 +296,8 @@ for (const f of AUTHORED_FACINGS) {
 async function pickSleep(): Promise<{ key: string; cell: RawImage; failures: GateFailure[] }> {
   let best: { key: string; cell: RawImage; failures: GateFailure[] } | null = null
   for (let attempt = 0; attempt <= 1; attempt++) {
-    const key = `sleep-a${attempt}`
+    // b-keys: the sleep-a raws drew the style-anchor cottage as subject (no scenery ban yet)
+    const key = `sleep-b${attempt}`
     try {
       const raw = await candidate(key, sleepPrompt, [STYLE_ANCHOR, master.raw], '512x512', false)
       const keyed = keyBg(await decodePng(raw))
