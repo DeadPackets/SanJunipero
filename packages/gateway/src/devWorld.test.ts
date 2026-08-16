@@ -18,7 +18,7 @@ describe('dev world server', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-devworld-'))
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-  it('serves the scripted C2 town live with observer thoughts', async () => {
+  it('serves the founders town live with observer thoughts', async () => {
     const dw = await startDevWorld({ realMsPerTick: 1, port: 0, dbPath: join(dir, 'dev.db') })
     try {
       await until(() => dw.loop.state.tick >= 2)
@@ -34,9 +34,16 @@ describe('dev world server', () => {
       const snap = ServerMsg.parse(JSON.parse(frames[0]!))
       if (snap.t !== 'snapshot') throw new Error('expected snapshot first')
       expect(snap.live).toBe(true)
-      const state = snap.state as { agents: Record<string, unknown>; structures: Record<string, unknown> }
-      expect(Object.keys(state.agents)).toHaveLength(4)
-      expect(Object.keys(state.structures)).toHaveLength(2)
+      const state = snap.state as {
+        agents: Record<string, { name: string }>
+        structures: Record<string, { kind: string; stage: string }>
+      }
+      // the five founders by name, the six approved buildings complete on day 0
+      expect(Object.keys(state.agents).sort()).toEqual(['amara', 'nadia', 'omar', 'salma', 'yusuf'])
+      expect(state.agents['omar']?.name).toBe('Omar')
+      const kinds = Object.values(state.structures).map((s) => s.kind).sort()
+      expect(kinds).toEqual(['hut', 'scaffolding', 'shed', 'standing_stone', 'storehouse', 'wagon'])
+      for (const s of Object.values(state.structures)) expect(s.stage).toBe('complete')
 
       await until(() => dw.loop.state.tick >= 40)
       const parsed = (): ServerMsg[] => frames.map((f) => ServerMsg.parse(JSON.parse(f)))

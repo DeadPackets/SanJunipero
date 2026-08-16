@@ -3,11 +3,13 @@ import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import {
-  EventStore, RngStreams, TickLoop, genesisState, makeFixtureMap, makeScriptedOnTick, openDb,
+  EventStore, RngStreams, TickLoop, genesisState, makeFixtureMap, openDb,
 } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
+import { makeFoundersOnTick } from './founders.js'
+import { ingestProductionArt } from './ingestArt.js'
 
 export const DEV_DB_PATH = 'data/dev-world.db'
 export const DEV_PORT = 8787
@@ -27,13 +29,24 @@ export const THOUGHT_LINES: Record<string, string> = {
 export type DevWorld = { gateway: Gateway; loop: TickLoop; stop(): Promise<void> }
 
 export async function startDevWorld(
-  opts: { dbPath?: string; port?: number; realMsPerTick?: number; seed?: string } = {},
+  opts: { dbPath?: string; port?: number; realMsPerTick?: number; seed?: string; ingest?: boolean } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH
   mkdirSync(dirname(dbPath), { recursive: true })
   for (const suffix of ['', '-wal', '-shm']) rmSync(dbPath + suffix, { force: true }) // recreated fresh
 
-  openForgeDb(dbPath).close() // migrate forge assets/jobs tables for the push loop + hot-swap demo
+  const forgeDb = openForgeDb(dbPath) // migrate forge assets/jobs tables for the push loop + hot-swap demo
+  if (opts.ingest === true) {
+    // the dev DB is recreated each boot — load the approved production art so the
+    // town wakes with its real cast + buildings (CLI default; tests skip the cost)
+    try {
+      const entries = await ingestProductionArt(forgeDb)
+      console.log(`dev world: ingested production art (${entries.length} assets)`)
+    } catch (e) {
+      console.log(`dev world: production art not ingested — ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+  forgeDb.close()
   const db = openDb(dbPath)
   ensureObserverTables(db)
 
@@ -44,7 +57,7 @@ export async function startDevWorld(
   const loop: TickLoop = new TickLoop({
     store, state: genesisState(config, terrain), rng, config,
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
-    onTick: makeScriptedOnTick(config, rng, () => loop.state), // the G2 scripted town verbatim
+    onTick: makeFoundersOnTick(config, rng, () => loop.state), // the founders showcase town
   })
 
   const gateway = await createGateway({ dbPath, port: opts.port ?? DEV_PORT, terrain, config, db })
@@ -76,7 +89,7 @@ export async function startDevWorld(
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  void startDevWorld().then(({ gateway }) => {
+  void startDevWorld({ ingest: true }).then(({ gateway }) => {
     console.log(`dev world: the town is awake on ws://localhost:${gateway.port}/ws`)
   })
 }
