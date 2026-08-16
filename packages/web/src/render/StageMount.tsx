@@ -4,6 +4,9 @@ import { createScene, type Scene } from './scene.js'
 import { TextureBook } from './textures.js'
 import { syncEntities } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
+import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
+import { createAtmosphere, type Atmosphere } from './atmosphere.js'
+import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 
 // The ONLY React/Pixi contact point — React renders nothing inside the canvas (spec §15).
 export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (scene: Scene) => void }) {
@@ -16,6 +19,10 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
     let disposed = false
     let offSync: (() => void) | null = null
     let chars: CharacterLayer | null = null
+    let bubbles: BubbleLayer | null = null
+    let atmosphere: Atmosphere | null = null
+    let weather: WeatherLayer | null = null
+    let offEvents: (() => void) | null = null
     let tickFn: (() => void) | null = null
     void createScene(rootEl, store).then((s) => {
       if (disposed) {
@@ -32,15 +39,49 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
         history.pushState(null, '', url)
         window.dispatchEvent(new PopStateEvent('popstate'))
       })
-      tickFn = () => chars?.tick(performance.now())
+      bubbles = createBubbleLayer(s, store)
+      atmosphere = createAtmosphere(s)
+      weather = createWeatherLayer(s)
+      offEvents = store.onEvents((evts) => {
+        for (const ev of evts) {
+          if (ev.type === 'agent_spoke') {
+            const p = ev.payload as { agentId: string; text: string }
+            bubbles?.spawnSpeech(p.agentId, p.text)
+          }
+        }
+      })
+      let seenThoughts = store.thoughtsLog().length
+      let lastMs = performance.now()
+      tickFn = () => {
+        const now = performance.now()
+        const dt = now - lastMs
+        lastMs = now
+        chars?.tick(now)
+        bubbles?.tick(now)
+        weather?.tick(dt)
+        const state = store.getState()
+        if (state !== null) {
+          atmosphere?.update(state)
+          weather?.setKind(state.weather.kind)
+        }
+        const log = store.thoughtsLog()
+        for (; seenThoughts < log.length; seenThoughts++) {
+          const t = log[seenThoughts]!
+          bubbles?.spawnThought(t.agentId, t.text)
+        }
+      }
       s.app.ticker.add(tickFn)
       onScene?.(s)
     })
     return () => {
       disposed = true
       offSync?.()
+      offEvents?.()
       if (tickFn !== null && scene !== null) scene.app.ticker.remove(tickFn)
       chars?.destroy()
+      bubbles?.destroy()
+      weather?.destroy()
+      atmosphere?.destroy()
       scene?.destroy()
     }
   }, [])
