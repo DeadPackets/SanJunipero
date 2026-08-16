@@ -200,9 +200,9 @@ const CALIBRATED_MEDIAN = 0.310
 type Master = { key: string; raw: Buffer; cells: Record<AuthoredFacing, RawImage>; frontBackDist: number; pitch: number }
 async function pickMaster(): Promise<Master> {
   const chosen: Master[] = []
-  for (let i = 0; i < 2; i++) {
-    // a1: the a0 candidates leaked the style-anchor cottage as subject; prompt now bans scenery.
-    const key = `master-a1-c${i}`
+  // Phase 2b: master-b0-c1 is the adopted edit of the user-approved a1-c0 (adds the white
+  // undershirt, reads young-adult; a1 keys retired so the cached edit is the only candidate).
+  for (const key of ['master-b0-c1']) {
     let raw: Buffer
     if (!masterMode && !existsSync(`${DURABLE}/raws/${key}.png`)) {
       // Probe the reasoning path on the first real call; on rejection fall back to plain.
