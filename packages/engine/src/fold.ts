@@ -5,7 +5,7 @@ import {
   AgentAged, AgentCollapsed, AgentDied, AgentFellIll, AgentInfected, AgentInjured, AgentMoved,
   AgentEntered, AgentExited,
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
-  CropGrew, CropHarvested, CropPlanted, CropWithered,
+  CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
   FireExtinguished, FireIgnited, FireSpread, HpChanged,
   ItemBroke, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
   ItemTextChanged, ItemWorn, NeedChanged,
@@ -13,6 +13,7 @@ import {
   StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
 import { occupantsOf } from './interiors.js'
+import { pairKey } from './systems/reproduction.js'
 import { findPath } from './path.js'
 import { WalkParams } from './verbs.js'
 
@@ -51,6 +52,7 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
             id: p.id, name: p.name, x: p.x, y: p.y, alive: true, asleep: false,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
             hp: config.health.maxHp, injuries: [], ill: false, ageDays: p.ageDays,
+            ...(p.sex === undefined ? {} : { sex: p.sex }),
             skills: {}, activity: null, collapsedSinceTick: null, zeroHungerSinceTick: null,
           },
         },
@@ -298,6 +300,29 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_collapsed for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, collapsedSinceTick: event.tick } } }
+    }
+    // A night together is a fact; partnership is the count of them. A gap wider than
+    // the window ends the run — and if the pair had reached partnership, that is a breakup.
+    case 'co_slept': {
+      const p = CoSlept.parse(event.payload)
+      for (const id of [p.aId, p.bId]) {
+        if (!state.agents[id]) throw new Error(`co_slept for unknown agent ${id}`)
+      }
+      const key = pairKey(p.aId, p.bId)
+      const prev = state.pairNights?.[key]
+      const broken = prev !== undefined && p.day - prev.lastNightDay > config.reproduction.partnerWindowDays
+      const nights = prev === undefined || broken ? 1 : prev.nights + 1
+      let formedTick = prev?.formedTick ?? null
+      let dissolvedTick = prev?.dissolvedTick ?? null
+      if (broken && formedTick !== null) dissolvedTick = event.tick
+      if (nights >= config.reproduction.coSleepNightsToPartner && (formedTick === null || dissolvedTick !== null)) {
+        formedTick = event.tick
+        dissolvedTick = null
+      }
+      return {
+        ...state,
+        pairNights: { ...state.pairNights, [key]: { nights, lastNightDay: p.day, formedTick, dissolvedTick } },
+      }
     }
     case 'weather_changed': {
       const p = WeatherChanged.parse(event.payload)

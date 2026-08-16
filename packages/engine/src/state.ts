@@ -8,6 +8,7 @@ export type AgentBody = {
   needs: { hunger: number; energy: number; warmth: number; social: number }
   hp: number; injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
   ill: boolean; ageDays: number
+  sex?: 'f' | 'm'                         // absent = 'f'; read through sexOf(), keeps pre-C9 hashes stable
   tendedTick?: number                     // absent until first tended: keeps pre-health state hashes stable
   lastSpokeTick?: number                  // absent until first speech: keeps golden hashes stable
   insideId?: string                       // absent until first entry: keeps golden hashes stable
@@ -46,6 +47,8 @@ export type WorldState = {
   items: Record<string, Item>
   crops: Record<string, Crop>
   wildlife: { fish: number; deer: number }
+  // Absent until the first co_slept, so a world with no nights hashes as it always did.
+  pairNights?: Record<string, { nights: number; lastNightDay: number; formedTick: number | null; dissolvedTick: number | null }>
   counters: { nextEntityId: number }
 }
 

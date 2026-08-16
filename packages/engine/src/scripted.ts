@@ -155,12 +155,14 @@ export function makePolicies(config: SimConfig): Record<string, Policy> {
 }
 
 // One-shot scripted injections keyed on absolute tick (setup + the day-2 fire).
-function scriptedTimeline(tick: number, emit: (type: string, payload: unknown) => void): void {
+function scriptedTimeline(config: SimConfig, tick: number, emit: (type: string, payload: unknown) => void): void {
+  // Sexes ride the reproduction flag: a fixture with it off spawns the pre-C9 bodies exactly.
+  const sex = (s: 'f' | 'm'): { sex?: 'f' | 'm' } => (config.reproduction.enabled ? { sex: s } : {})
   if (tick === 1) {
-    emit('agent_spawned', { id: FARMER, name: 'Farmer', x: 26, y: 21, ageDays: 7300 })
-    emit('agent_spawned', { id: FISHER, name: 'Fisher', x: 4, y: 32, ageDays: 7300 })
-    emit('agent_spawned', { id: IDLER, name: 'Idler', x: 5, y: 32, ageDays: 7300 })
-    emit('agent_spawned', { id: BUILDER, name: 'Builder', x: 30, y: 22, ageDays: 7300 })
+    emit('agent_spawned', { id: FARMER, name: 'Farmer', x: 26, y: 21, ageDays: 7300, ...sex('f') })
+    emit('agent_spawned', { id: FISHER, name: 'Fisher', x: 4, y: 32, ageDays: 7300, ...sex('m') })
+    emit('agent_spawned', { id: IDLER, name: 'Idler', x: 5, y: 32, ageDays: 7300, ...sex('m') })
+    emit('agent_spawned', { id: BUILDER, name: 'Builder', x: 30, y: 22, ageDays: 7300, ...sex('f') })
     emit('structure_planned', { id: STOREHOUSE.id, kind: 'storehouse', x: STOREHOUSE.x, y: STOREHOUSE.y, w: STOREHOUSE.w, h: STOREHOUSE.h, maxHp: 20, flammable: true, builderId: 'script' })
     emit('structure_planned', { id: SHED.id, kind: 'shed', x: SHED.x, y: SHED.y, w: SHED.w, h: SHED.h, maxHp: 20, flammable: true, builderId: 'script' })
     emit('item_spawned', { id: WOOD_ITEM, kind: 'wood', qty: 12, loc: { t: 'structure', id: STOREHOUSE.id } })
@@ -185,7 +187,7 @@ export function makeScriptedOnTick(config: SimConfig, rng: RngStreams, getState:
   const policies = makePolicies(config)
   const worldTick = createWorldTick(config, rng)
   return ({ tick, emit }) => {
-    scriptedTimeline(tick, emit)
+    scriptedTimeline(config, tick, emit)
 
     // World pipeline (weather, fire, crops, wildlife, needs, health, aging, actions, collapse/death).
     const result = worldTick(getState())

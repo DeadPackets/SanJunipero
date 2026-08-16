@@ -25,10 +25,13 @@ const GOLDEN_G2_HASH = '7263dde98076dbb234bdeded24aab659987190ce00e4581999027d61
 //                           the hash intact but turns the run into 14 collapses instead of 2.
 //   spoilage.enabled      — the Fisher's catch would carry a shelf life and the run is 3 days,
 //                           long enough for fish (2 days) to turn; both move the hash.
+//   reproduction.enabled  — the four scripted actors would spawn with an explicit sex on the
+//                           body, which moves the hash before anyone sleeps anywhere.
 const G2_CONFIG = SimConfigSchema.parse({
   ownership: { enabled: false },
   structures: { sleepIndoorsOnly: false },
   spoilage: { enabled: false },
+  reproduction: { enabled: false },
 })
 
 const SEED = 'g2-scripted'

@@ -11,6 +11,7 @@ import { fireSystem } from './systems/fire.js'
 import { cropsSystem } from './systems/crops.js'
 import { wildlifeSystem } from './systems/wildlife.js'
 import { spoilageSystem } from './systems/spoilage.js'
+import { reproductionSystem } from './systems/reproduction.js'
 
 export type TickCtx = {
   readonly config: SimConfig
@@ -82,7 +83,7 @@ function collapseDeathSystem(ctx: TickCtx): void {
 
 const SYSTEMS: System[] = [
   weatherSystem, fireSystem, cropsSystem, wildlifeSystem, spoilageSystem,
-  needsSystem, healthSystem, agingSystem, actionsSystem, collapseDeathSystem,
+  needsSystem, healthSystem, reproductionSystem, agingSystem, actionsSystem, collapseDeathSystem,
 ]
 
 // Each emit folds immediately, so every system — and every later event within a
