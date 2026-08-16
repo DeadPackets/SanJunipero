@@ -2,6 +2,9 @@ import type { LlmMessage } from '@sj/agents'
 
 export type AdjudicationBlocks = {
   canon: string // CANON + "The town currently knows: " + codex known list (prose)
+  // The codex adjacency frontier — the unearned rungs `withinAdjacency` accepts.
+  // Without it the arbiter judges "beyond adjacency" blind (C9 batch-10, ruling 1).
+  frontier: string[]
   agent: {
     name: string
     skills: Record<string, number>
@@ -26,6 +29,7 @@ const ADJUDICATION_INSTRUCTION = `You are the physics arbiter of San Junipero. A
 "attempt" if the action is new but the agent can physically try it with the town's fire, clay pots, wood, fiber, stone implements, and river — whether it succeeds is decided later, never by you;
 "impossible" only if the action cannot even be started because it needs something the town wholly lacks.
 Between attempt and impossible, decide by whether the first step can be taken with what the town has at hand; a craft is not impossible merely because no one has done it yet.
+The line naming what stands within reach lists crafts nobody here has earned, each one resting on a craft the town already practices: an action that would reach one of those can be begun, so it is "attempt", never "impossible".
 Three rulings for the measure of it:
 "I cut down a tree by the river for its wood" — map: the town fells trees every day and already has the act.
 "I dig a shallow pit, line it with river clay, and bake the lining hard beside the fire so it will hold water" — attempt: nobody has made one, yet the pit, the clay and the fire are all at hand, so the first step can be taken.
@@ -78,6 +82,12 @@ function renderUser(blocks: AdjudicationBlocks): string {
   return parts.join('\n\n')
 }
 
+function renderFrontier(frontier: string[]): string {
+  return frontier.length === 0
+    ? 'Nothing stands within reach beyond what the town already knows.'
+    : `Within reach, though nobody here has done it yet: ${frontier.join(', ')}`
+}
+
 function estTokens(text: string): number {
   return Math.ceil(text.length / 4)
 }
@@ -85,7 +95,7 @@ function estTokens(text: string): number {
 export function assembleAdjudicationPrompt(
   blocks: AdjudicationBlocks,
 ): AssembledAdjudicationPrompt {
-  const system = `${blocks.canon}\n\n${ADJUDICATION_INSTRUCTION}`
+  const system = `${blocks.canon}\n${renderFrontier(blocks.frontier)}\n\n${ADJUDICATION_INSTRUCTION}`
   const user = renderUser(blocks)
   const messages: LlmMessage[] = [{ role: 'user', content: user }]
   return { system, messages, estTokens: estTokens(`${system}${user}`) }

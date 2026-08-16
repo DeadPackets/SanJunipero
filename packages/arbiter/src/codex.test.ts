@@ -68,6 +68,22 @@ describe('codex', () => {
     expect(store.withinAdjacency([])).toBe(false)
   })
 
+  it('frontier() names every unearned rung withinAdjacency would accept, and nothing else', () => {
+    const store = seededStore()
+    expect(store.frontier()).toEqual([])
+    store.insert({ id: 'iron_smelting', era: 'metallurgy', name: 'Iron smelting', prerequisiteId: 'charcoal', known: false })
+    store.insert({ id: 'steel', era: 'metallurgy', name: 'Steel', prerequisiteId: 'iron_smelting', known: false })
+    store.insert({ id: 'glazing', era: 'crafts', name: 'Glazing', prerequisiteId: 'pottery', known: false })
+
+    // Sorted, so the line it renders into is byte-stable for a given codex.
+    expect(store.frontier()).toEqual(['glazing', 'iron_smelting'])
+    for (const id of store.frontier()) expect(store.withinAdjacency([id])).toBe(true)
+    // Two rungs out, already earned, and never authored are all off the frontier.
+    expect(store.frontier()).not.toContain('steel')
+    expect(store.frontier()).not.toContain('charcoal')
+    expect(store.frontier()).not.toContain('gunpowder')
+  })
+
   it('duplicate insert throws (PK)', () => {
     const store = seededStore()
     expect(() =>

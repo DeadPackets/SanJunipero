@@ -39,6 +39,18 @@ export class CodexStore {
     return best
   }
 
+  // The rungs one step out: unearned, but their prerequisite is practiced. Sorted
+  // by id so the adjudication prefix stays byte-stable for a given codex.
+  frontier(): string[] {
+    const rows = this.db
+      .prepare(
+        'SELECT c.id FROM codex c JOIN codex p ON p.id = c.prerequisite_id'
+          + ' WHERE c.known = 0 AND p.known = 1 ORDER BY c.id',
+      )
+      .all() as Array<{ id: string }>
+    return rows.map((r) => r.id)
+  }
+
   withinAdjacency(recipeCanon: string[]): boolean {
     if (recipeCanon.length === 0) return false
     const known = new Set(this.known())

@@ -4,6 +4,7 @@ import { assembleAdjudicationPrompt, FORBIDDEN_FRAMING, type AdjudicationBlocks 
 function fixtureBlocks(overrides: Partial<AdjudicationBlocks> = {}): AdjudicationBlocks {
   return {
     canon: 'CANON BLOCK\n\nThe town currently knows: fire, pottery, charcoal',
+    frontier: ['glazing', 'smoking_food'],
     agent: {
       name: 'Tamar',
       skills: { farming: 120, pottery: 80 },
@@ -62,6 +63,36 @@ describe('mundane-vs-novel anchors (C9 batch-8 calibration)', () => {
     const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I try to smoke a fish over the fire.' }))
     const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I want to build a clay oven.' }))
     expect(a.system).toBe(b.system)
+  })
+})
+
+describe('the adjacency frontier in the adjudication context (C9 batch-10, user ruling 1)', () => {
+  it('names the unearned rungs one step out, beside the list of what the town knows', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain('The town currently knows: fire, pottery, charcoal')
+    expect(system).toContain('glazing, smoking_food')
+    expect(system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('tells the arbiter that a rung within reach is attempt, never impossible', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain('within reach')
+    expect(system).toContain('so it is "attempt", never "impossible"')
+  })
+
+  it('states plainly when nothing stands within reach, rather than trailing an empty list', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks({ frontier: [] }))
+    expect(system).toContain('Nothing stands within reach beyond what the town already knows.')
+    expect(system).not.toMatch(/within reach: *\n/)
+  })
+
+  it('is part of the byte-stable prefix, and moves only when the codex moves', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I smoke a fish over the fire.' }))
+    const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I want to build a clay oven.' }))
+    expect(a.system).toBe(b.system)
+
+    const learned = assembleAdjudicationPrompt(fixtureBlocks({ frontier: ['glazing'] }))
+    expect(learned.system).not.toBe(a.system)
   })
 })
 
