@@ -189,6 +189,35 @@ export function structureTiles(s: CityStructure): { dx: number; dy: number }[] {
   return out
 }
 
+// ---------------------------------------------------------------- assembly
+
+// Parsed on the way out, so the function cannot return an invalid template. Pure: two calls
+// are deep-equal and no RNG is consulted, which is why genesis can replay it.
+export function makeCityTemplate(anchor: { x: number; y: number } = CITY_ANCHOR_DEFAULT): CityTemplate {
+  return CityTemplateSchema.parse({
+    anchor: { x: anchor.x, y: anchor.y },
+    tiles: [...cityTerrainTiles(), ...cityRoadTiles()],
+    structures: cityStructures(),
+  })
+}
+
+export function templateFits(anchor: { x: number; y: number }, worldSize: number): boolean {
+  return anchor.x >= 0 && anchor.y >= 0
+    && anchor.x + CITY_W <= worldSize && anchor.y + CITY_H <= worldSize
+}
+
+// A growth plot is literally empty buildable ground next to a road: cleared grass, no
+// structure, orthogonally adjacent to a road tile. Derived, never stored — nothing reserves it.
+export function growthPlots(t: CityTemplate): { dx: number; dy: number }[] {
+  const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
+  const built = new Set(t.structures.flatMap(s => structureTiles(s).map(x => key(x.dx, x.dy))))
+  return t.tiles
+    .filter(x => x.to === T_GRASS && !built.has(key(x.dx, x.dy)))
+    .filter(x => [[0, -1], [1, 0], [0, 1], [-1, 0]]
+      .some(([ox, oy]) => roads.has(key(x.dx + ox!, x.dy + oy!))))
+    .map(x => ({ dx: x.dx, dy: x.dy }))
+}
+
 // Neighbours are computed over the road set only (T_ROAD ∪ T_PATH), then the shared autotiler
 // picks the tile. Keyed 'dx,dy'.
 export function cityRoadKeys(tiles: readonly CityTile[]): Map<string, RoadAutotileKey> {

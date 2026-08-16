@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { ROAD_AUTOTILE_KEYS } from './autotile.js'
 import {
   CityTemplateSchema, DISTRICTS, DISTRICT_NAMES, CITY_ANCHOR_DEFAULT, CITY_W, CITY_H,
@@ -6,6 +6,7 @@ import {
   isRoadTile, PLAZA, PLAZA_CENTRE, PATH_DX, T_ROAD, T_PATH, T_WATER,
   cityStructures, doorTile, structureTiles, FOUNDER_IDS, CITY_INTERIOR_SLOTS,
   CITY_FURNISHING_KINDS, CITY_BED_KIND, CITY_HEARTH_KIND,
+  makeCityTemplate, templateFits, growthPlots, T_GRASS,
 } from './cityTemplate.js'
 
 const MINIMAL = {
@@ -290,5 +291,83 @@ describe('city structures', () => {
 
   it('is deterministic', () => {
     expect(cityStructures()).toEqual(structures)
+  })
+})
+
+describe('makeCityTemplate', () => {
+  const t = makeCityTemplate()
+
+  it('returns a template that parses the schema', () => {
+    expect(() => CityTemplateSchema.parse(t)).not.toThrow()
+    expect(t.anchor).toEqual(CITY_ANCHOR_DEFAULT)
+  })
+
+  it('is deterministic across calls and unaffected by the other exports', () => {
+    expect(makeCityTemplate()).toEqual(t)
+    cityRoadTiles(); cityTerrainTiles(); cityStructures(); growthPlots(t)
+    expect(makeCityTemplate()).toEqual(t)
+  })
+
+  it('never consults an RNG', () => {
+    const spy = vi.spyOn(Math, 'random')
+    makeCityTemplate()
+    growthPlots(makeCityTemplate())
+    expect(spy).not.toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
+  it('stamps each tile once, inside the extent', () => {
+    const seen = new Set<string>()
+    for (const x of t.tiles) {
+      expect(inExtent(x.dx, x.dy), key(x.dx, x.dy)).toBe(true)
+      expect(seen.has(key(x.dx, x.dy)), `stamped twice at ${key(x.dx, x.dy)}`).toBe(false)
+      seen.add(key(x.dx, x.dy))
+    }
+  })
+
+  it('lands entirely inside a 128x128 world at the genesis anchor', () => {
+    for (const x of t.tiles) {
+      expect(t.anchor.x + x.dx).toBeGreaterThanOrEqual(0)
+      expect(t.anchor.x + x.dx).toBeLessThan(WORLD_SIZE_GENESIS)
+      expect(t.anchor.y + x.dy).toBeGreaterThanOrEqual(0)
+      expect(t.anchor.y + x.dy).toBeLessThan(WORLD_SIZE_GENESIS)
+    }
+    for (const s of t.structures)
+      for (const c of structureTiles(s)) {
+        expect(t.anchor.x + c.dx).toBeLessThan(WORLD_SIZE_GENESIS)
+        expect(t.anchor.y + c.dy).toBeLessThan(WORLD_SIZE_GENESIS)
+      }
+  })
+
+  it('templateFits is the caller guard, and it refuses an anchor that runs off the map', () => {
+    expect(templateFits(CITY_ANCHOR_DEFAULT, WORLD_SIZE_GENESIS)).toBe(true)
+    expect(templateFits({ x: 100, y: 100 }, WORLD_SIZE_GENESIS)).toBe(false)
+    expect(templateFits({ x: -1, y: 0 }, WORLD_SIZE_GENESIS)).toBe(false)
+    expect(templateFits({ x: WORLD_SIZE_GENESIS - CITY_W, y: WORLD_SIZE_GENESIS - CITY_H }, WORLD_SIZE_GENESIS)).toBe(true)
+  })
+
+  it('clears at least one growth plot in every district', () => {
+    const plots = growthPlots(t)
+    expect(plots.length).toBeGreaterThan(0)
+    for (const d of DISTRICT_NAMES)
+      expect(plots.some(p => inRect(DISTRICTS[d]!, p.dx, p.dy)), `no plot in ${d}`).toBe(true)
+  })
+
+  it('every plot is empty cleared grass beside a road, and none is under a structure', () => {
+    const plots = growthPlots(t)
+    const grass = new Set(t.tiles.filter(x => x.to === T_GRASS).map(x => key(x.dx, x.dy)))
+    const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
+    const built = new Set(t.structures.flatMap(s => structureTiles(s).map(c => key(c.dx, c.dy))))
+    for (const p of plots) {
+      expect(grass.has(key(p.dx, p.dy)), `${key(p.dx, p.dy)} is not cleared grass`).toBe(true)
+      expect(built.has(key(p.dx, p.dy)), `${key(p.dx, p.dy)} is under a structure`).toBe(false)
+      expect([[0, -1], [1, 0], [0, 1], [-1, 0]]
+        .some(([ox, oy]) => roads.has(key(p.dx + ox!, p.dy + oy!))), `${key(p.dx, p.dy)} touches no road`).toBe(true)
+    }
+  })
+
+  it('carries the eleven structures and the road set into the assembled template', () => {
+    expect(t.structures).toEqual(cityStructures())
+    expect(t.tiles.filter(isRoadTile)).toEqual(cityRoadTiles())
   })
 })
