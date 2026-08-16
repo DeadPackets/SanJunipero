@@ -111,6 +111,18 @@ describe('verb: craft', () => {
     expect(submitIntent(makeWorld(CFG, 1), CFG, 'a1', 'craft', { recipe: 'plank' }).ok).toBe(true)
   })
 
+  it('an unknown recipe names itself and points somewhere (T18)', () => {
+    const r = submitIntent(makeWorld(), CFG, 'a1', 'craft', { recipe: 'sword' })
+    expect(r).toEqual({
+      ok: false,
+      reason: 'no such recipe: sword — perhaps someone nearby knows how, or it wants discovering.',
+    })
+    // A known recipe the agent simply cannot afford keeps its own material refusal.
+    const poor = submitIntent(makeWorld(CFG, 0), CFG, 'a1', 'craft', { recipe: 'plank' })
+    expect(poor.ok).toBe(false)
+    if (!poor.ok) expect(poor.reason).not.toContain('wants discovering')
+  })
+
   it('plank: consumes 1 wood, yields 2 planks, grants carpentry xp', () => {
     const s = makeWorld(CFG, 1)
     const r = submitIntent(s, CFG, 'a1', 'craft', { recipe: 'plank' })

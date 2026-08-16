@@ -446,7 +446,9 @@ const craft: VerbDef = makeVerb({
     const p = CraftParams.safeParse(params)
     if (!p.success) return 'craft needs a {recipe}'
     const recipe = config.crafting.recipes[p.data.recipe]
-    if (!recipe) return `no such recipe: ${p.data.recipe}`
+    // A refusal must leave a door open (addendum §9): not knowing a craft and
+    // the craft not existing look the same from here, so name both ways out.
+    if (!recipe) return `no such recipe: ${p.data.recipe} — perhaps someone nearby knows how, or it wants discovering.`
     for (const [kind, qty] of Object.entries(recipe.inputs)) {
       if (heldQty(state, agentId, kind) < qty) return `not enough ${kind}`
     }
@@ -733,7 +735,7 @@ const attack: VerbDef = makeVerb({
 
 const experiment: VerbDef = makeVerb({
   kind: 'experiment',
-  validate() { return 'You lack the knowledge to attempt this.' },
+  validate() { return 'You lack the knowledge to attempt this. Perhaps someone in the town knows how.' },
   onComplete() { return [] },
 })
 

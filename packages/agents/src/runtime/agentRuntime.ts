@@ -43,6 +43,16 @@ function jsonOrRaw(text: string): unknown {
 
 const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [] }
 
+// A refusal must leave a door open (addendum §9). The hint is rendered here, at
+// prose time, and is never written back into the arbiter's stored ruling. Only
+// a skill deficit earns it: a thing nobody can do teaches no one a false path.
+export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
+
+export function refusalMemoryText(reason: string, impossibleClass?: string): string {
+  const hint = impossibleClass === 'insufficient_skill' ? CRAFT_HINT : ''
+  return `You realize you cannot: ${reason}${hint}`
+}
+
 function nearestStructureKind(packet: PerceptionPacket): string | null {
   const { x, y } = packet.self
   let best: string | null = null
@@ -262,7 +272,7 @@ export class AgentRuntime {
         }
         if (res.reason.startsWith('already busy')) return
         this.#pendingIntent = null
-        void this.#writeActionMemory(`You realize you cannot: ${res.reason}`)
+        void this.#writeActionMemory(refusalMemoryText(res.reason))
       })
       .then(() => undefined)
   }
@@ -272,7 +282,7 @@ export class AgentRuntime {
     this.#plan.lastResult = 'blocked'
     this.#plan.queue = []
     this.#planHeadInFlight = false
-    void this.#writeActionMemory(`You realize you cannot: ${res.reason}`)
+    void this.#writeActionMemory(refusalMemoryText(res.reason))
   }
 
   #handleNight(tick: number, packet: PerceptionPacket): void {

@@ -16,7 +16,7 @@ import {
 } from '@sj/engine'
 import { SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
-import { AgentRuntime } from './agentRuntime.js'
+import { AgentRuntime, CRAFT_HINT, refusalMemoryText } from './agentRuntime.js'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore, type MemoryRow } from '../memory/store.js'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
@@ -372,6 +372,8 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
     expect(memoriesOfKind(agentDb, 'action').some((m) => /You realize you cannot/.test(m.text))).toBe(true)
+    // A plain physics refusal is not a craft the town can teach.
+    expect(memoriesOfKind(agentDb, 'action').some((m) => m.text.includes(CRAFT_HINT))).toBe(false)
   })
 
   it('runs reflection once per night, dreams, and resets the day at dawn', async () => {
@@ -703,5 +705,30 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(runtime.stats().turns).toBeGreaterThanOrEqual(1)
     expect(seen[0]).toEqual({ tick: expect.any(Number), agentId: AGENT, text: 'I rest.' })
     expect(seen[0]!.tick).toBeGreaterThan(0)
+  })
+})
+
+describe('refusal prose teaches a path (T18)', () => {
+  it('appends the hint only to an insufficient_skill verdict', () => {
+    expect(refusalMemoryText('you have not the hands for it', 'insufficient_skill')).toBe(
+      'You realize you cannot: you have not the hands for it — perhaps someone nearby knows the craft.',
+    )
+    expect(CRAFT_HINT).toBe(' — perhaps someone nearby knows the craft.')
+  })
+
+  it('leaves every other refusal exactly as the world stated it', () => {
+    for (const cls of ['physically_impossible', 'beyond_adjacency', 'insufficient_materials', undefined]) {
+      expect(refusalMemoryText('no such craft exists under the sun', cls)).toBe(
+        'You realize you cannot: no such craft exists under the sun',
+      )
+    }
+  })
+
+  it('is applied at prose time only — the reason it was given is unchanged', () => {
+    const reason = 'you have not the hands for it'
+    const prose = refusalMemoryText(reason, 'insufficient_skill')
+    expect(prose.endsWith(CRAFT_HINT)).toBe(true)
+    expect(prose.slice(0, -CRAFT_HINT.length)).toBe(`You realize you cannot: ${reason}`)
+    expect(reason).toBe('you have not the hands for it')
   })
 })
