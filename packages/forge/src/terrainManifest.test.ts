@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { ROAD_AUTOTILE_KEYS } from '@sj/shared'
 import { TilesetManifest, loadTilesetManifest } from './terrainManifest.js'
 
 const names16 = Array.from({ length: 16 }, (_, i) => `tile-${i}`)
@@ -30,6 +31,47 @@ describe('loadTilesetManifest', () => {
       expect(loadTilesetManifest(dir).scaffolding.file).toBe('scaffolding.png')
       rmSync(join(dir, 'winter.png'))
       expect(() => loadTilesetManifest(dir)).toThrow(/winter\.png/)
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+  })
+})
+
+const allTiles = Object.fromEntries(ROAD_AUTOTILE_KEYS.map((k, i) => [k, i]))
+const withAutotile = { ...manifest, autotile: { road: { file: 'road-autotile.png', tiles: allTiles } } }
+
+describe('TilesetManifest.autotile (additive, optional)', () => {
+  it('C10 COMPAT: a manifest with no autotile block still parses', () => {
+    const m = TilesetManifest.parse(manifest)
+    expect(m.autotile).toBeUndefined()
+  })
+
+  it('accepts a complete 15-key road strip and keeps the exact column index', () => {
+    const m = TilesetManifest.parse(withAutotile)
+    expect(m.autotile!.road.tiles.cross).toBe(ROAD_AUTOTILE_KEYS.indexOf('cross'))
+    expect(Object.keys(m.autotile!.road.tiles)).toHaveLength(15)
+  })
+
+  it('rejects 14 keys with the all-15 message', () => {
+    const { cross: _drop, ...fourteen } = allTiles
+    expect(() => TilesetManifest.parse({ ...manifest, autotile: { road: { file: 'r.png', tiles: fourteen } } }))
+      .toThrow(/all 15 road tiles required/)
+  })
+
+  it('rejects an unknown tile key and a bad index', () => {
+    expect(() => TilesetManifest.parse({ ...manifest, autotile: { road: { file: 'r.png', tiles: { ...allTiles, 'cap-x': 15 } } } })).toThrow()
+    expect(() => TilesetManifest.parse({ ...manifest, autotile: { road: { file: 'r.png', tiles: { ...allTiles, cross: -1 } } } })).toThrow()
+    expect(() => TilesetManifest.parse({ ...manifest, autotile: { road: { file: 'r.png', tiles: { ...allTiles, cross: 1.5 } } } })).toThrow()
+    expect(() => TilesetManifest.parse({ ...withAutotile, autotile: { road: { file: 'r.png', tiles: allTiles }, extra: 1 } })).toThrow()
+  })
+
+  it('file-existence checking extends to the autotile strip', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sj-tiles-'))
+    try {
+      writeFileSync(join(dir, 'manifest.json'), JSON.stringify(withAutotile))
+      for (const f of ['spring.png', 'summer.png', 'autumn.png', 'winter.png', 'scaffolding.png'])
+        writeFileSync(join(dir, f), Buffer.from('png'))
+      expect(() => loadTilesetManifest(dir)).toThrow(/road-autotile\.png/)
+      writeFileSync(join(dir, 'road-autotile.png'), Buffer.from('png'))
+      expect(loadTilesetManifest(dir).autotile!.road.file).toBe('road-autotile.png')
     } finally { rmSync(dir, { recursive: true, force: true }) }
   })
 })
