@@ -33,21 +33,22 @@ export function characterArt(records: AssetRecord[], agentId: string): Character
   return { url: `/assets/${rec.id}.png`, manifest }
 }
 
-export const TILE_HALF_W = 16 // iso TILE_W/2 — a footprint's diamond spans (w+h)·16 px
+export const BUILDING_PX_PER_TILE = 32 // Style Bible: ~64px sprite for a 1×1 building → fit a 32·(w+h) square
 
 export type BuildingArt = { url: string; anchor: { x: number; y: number } | null; scale: number | null }
 
-// v4 hi-res building → feet-anchored, scaled so the art width spans the footprint
-// diamond; anything else draws at natural size with the bottom-center anchor law.
+// v4 hi-res building → feet-anchored, scaled to fit the Style Bible's 32·(w+h) px
+// square; anything else draws at natural size with the bottom-center anchor law.
 export function buildingArt(records: AssetRecord[], kind: string, fw: number, fh: number): BuildingArt {
   const rec = resolveAsset(records, 'building', kind)
   if (rec === null) return { url: '/assets/placeholder/building.png', anchor: null, scale: null }
   const m = parseBuildingManifest(rec.meta)
   if (m === null) return { url: `/assets/${rec.id}.png`, anchor: null, scale: null }
+  const target = (fw + fh) * BUILDING_PX_PER_TILE
   return {
     url: `/assets/${rec.id}.png`,
     anchor: { x: m.cell.feetX / m.cell.w, y: m.cell.feetY / m.cell.h },
-    scale: ((fw + fh) * TILE_HALF_W) / m.cell.w,
+    scale: Math.min(target / m.cell.w, target / m.cell.h),
   }
 }
 

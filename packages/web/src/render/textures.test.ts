@@ -74,11 +74,11 @@ describe('buildingArt (v4-hires-building manifest)', () => {
     cell: { w: 810, h: 866, feetX: 405, feetY: 861 },
   })
 
-  it('feet-anchors and scales the art width to the footprint diamond', () => {
+  it('feet-anchors and fits the art into the Style Bible 32·(w+h) square', () => {
     const art = buildingArt([rec({ id: 'asset_sh', kind: 'storehouse', meta })], 'storehouse', 2, 2)
     expect(art.url).toBe('/assets/asset_sh.png')
     expect(art.anchor).toEqual({ x: 405 / 810, y: 861 / 866 })
-    expect(art.scale).toBeCloseTo(((2 + 2) * 16) / 810, 10)
+    expect(art.scale).toBeCloseTo(Math.min(128 / 810, 128 / 866), 10)
   })
 
   it('v2/no-meta records draw at natural size with the bottom-center law', () => {
