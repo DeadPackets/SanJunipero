@@ -53,6 +53,25 @@ describe('fold: crop and terrain events', () => {
     expect(() => fold(s, ev('crop_harvested', { cropId: 'ghost' }), FAST)).toThrow(/unknown crop/i)
   })
 
+  it('crop_planted over a withered crop on the same tile replaces it', () => {
+    let s = makeWorld()
+    s = fold(s, ev('crop_planted', { id: 'crop_1', kind: 'wheat', x: 1, y: 0, plantedDay: 0 }), FAST)
+    s = fold(s, ev('crop_withered', { cropId: 'crop_1' }), FAST)
+    s = fold(s, ev('crop_planted', { id: 'crop_2', kind: 'wheat', x: 1, y: 0, plantedDay: 3 }), FAST)
+    expect(s.crops.crop_1).toBeUndefined()
+    expect(Object.values(s.crops).filter((c) => c.x === 1 && c.y === 0)).toHaveLength(1)
+    expect(s.crops.crop_2!.withered).toBe(false)
+  })
+
+  it('crop_planted leaves withered crops on other tiles alone', () => {
+    let s = makeWorld(['.##', '...'])
+    s = fold(s, ev('crop_planted', { id: 'crop_1', kind: 'wheat', x: 2, y: 0, plantedDay: 0 }), FAST)
+    s = fold(s, ev('crop_withered', { cropId: 'crop_1' }), FAST)
+    s = fold(s, ev('crop_planted', { id: 'crop_2', kind: 'wheat', x: 1, y: 0, plantedDay: 3 }), FAST)
+    expect(s.crops.crop_1!.withered).toBe(true)
+    expect(Object.keys(s.crops).sort()).toEqual(['crop_1', 'crop_2'])
+  })
+
   it('terrain_changed rewrites exactly one tile; out of bounds throws', () => {
     let s = makeWorld(['..', '..'])
     s = fold(s, ev('terrain_changed', { x: 0, y: 1, tile: 6 }), FAST)
@@ -118,11 +137,11 @@ describe('worldTick: crop growth at dawn', () => {
     let s = makeWorld()
     s = fold(s, ev('crop_planted', { id: 'crop_1', kind: 'wheat', x: 1, y: 0, plantedDay: 0 }), FAST)
     const d1 = tickOnce(atTick(s, 1440 + DAWN - 1))
-    // day 1 of 2: stage = floor(1×4/2) = 2, not yet mature
-    expect(cropEvents(d1)).toEqual([{ type: 'crop_grew', payload: { cropId: 'crop_1', stage: 2 } }])
+    // day 1 of 2: stage = floor(1×(4−1)/2) = 1, not yet mature
+    expect(cropEvents(d1)).toEqual([{ type: 'crop_grew', payload: { cropId: 'crop_1', stage: 1 } }])
     const d2 = tickOnce(atTick(d1.state, 2 * 1440 + DAWN - 1))
     expect(cropEvents(d2)).toEqual([{ type: 'crop_grew', payload: { cropId: 'crop_1', stage: 3 } }])
-    expect(d2.state.crops.crop_1!.stage).toBe(3) // stages−1: mature
+    expect(d2.state.crops.crop_1!.stage).toBe(3) // stages−1: mature exactly at growthDays
     const d3 = tickOnce(atTick(d2.state, 3 * 1440 + DAWN - 1))
     expect(cropEvents(d3)).toEqual([])
   })

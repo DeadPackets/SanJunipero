@@ -1,5 +1,5 @@
 import { DAYS_PER_YEAR, simTimeFromTick, type SimConfig } from '@sj/shared'
-import type { TickCtx } from '../worldTick.js'
+import { dropHeldItems, type TickCtx } from '../worldTick.js'
 
 export type AgeBand = 'child' | 'adult' | 'elder'
 
@@ -20,6 +20,9 @@ export function agingSystem(ctx: TickCtx): void {
     const years = Math.floor(ctx.state().agents[id]!.ageDays / DAYS_PER_YEAR)
     if (years < elderFromYears) continue
     const chance = naturalDeathBaseChancePerDay + naturalDeathChancePerYearOver * (years - elderFromYears)
-    if (ctx.rng.get('aging').next() < chance) ctx.emit('agent_died', { agentId: id, cause: 'old_age' })
+    if (ctx.rng.get('aging').next() < chance) {
+      dropHeldItems(ctx, id)
+      ctx.emit('agent_died', { agentId: id, cause: 'old_age' })
+    }
   }
 }

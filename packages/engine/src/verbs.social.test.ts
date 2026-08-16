@@ -203,6 +203,14 @@ describe('verb onComplete re-checks (stale target)', () => {
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c1').get('combat'))).toEqual([])
   })
 
+  it('give completes as a no-op when the target died: the item stays with the giver', () => {
+    let s = makeWorld()
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'fish', qty: 1, loc: { t: 'agent', id: 'a1' } }), CFG)
+    s = fold(s, ev('agent_died', { agentId: 'a2', cause: 'starvation' }), CFG)
+    expect(VERBS.give.onComplete(s, CFG, 'a1', { itemId: 'item_1', targetId: 'a2' }, new RngStreams('t').get('actions'))).toEqual([])
+    expect(s.items.item_1!.loc).toEqual({ t: 'agent', id: 'a1' })
+  })
+
   it('tend completes as a no-op when the target is dead or out of reach', () => {
     let dead = makeWorld()
     dead = fold(dead, ev('agent_died', { agentId: 'a2', cause: 'starvation' }), CFG)

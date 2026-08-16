@@ -89,6 +89,15 @@ describe('worldTick: natural death', () => {
     expect(adult.state.agents.a1!.alive).toBe(true)
   })
 
+  it('old-age death drops held items onto the death tile', () => {
+    let s = makeWorld(70 * DAYS_PER_YEAR)
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 3, loc: { t: 'agent', id: 'a1' } }), CFG)
+    const r = tickTo({ ...s, tick: MIDNIGHT - 1 }, MIDNIGHT, new RngStreams('ag5294'))
+    expect(r.events).toContainEqual({ type: 'agent_died', payload: { agentId: 'a1', cause: 'old_age' } })
+    expect(r.events).toContainEqual({ type: 'item_moved', payload: { id: 'item_1', loc: { t: 'tile', x: 0, y: 0 } } })
+    expect(r.state.items.item_1!.loc).toEqual({ t: 'tile', x: 0, y: 0 })
+  })
+
   it('folding the returned events over the input reproduces the returned state', () => {
     let s = { ...makeWorld(70 * DAYS_PER_YEAR), tick: MIDNIGHT - 1 }
     s = fold(s, ev('tick_advanced', {}, MIDNIGHT), CFG)

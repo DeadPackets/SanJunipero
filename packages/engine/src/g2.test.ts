@@ -13,8 +13,9 @@ import {
   createScriptedLoop, makeScriptedOnTick, makeFixtureMap,
   FARMER, FISHER, IDLER, STOREHOUSE, SHED,
 } from './scripted.js'
-// Pinned golden hash for the 3-day scripted world run (regen #2, deliberate).
-const GOLDEN_G2_HASH = '8cf5f8fdf8bcc3f42587fa4dee4fac5a300efdb7db48311dd7c5aee4841edf65'
+// Pinned golden hash for the 3-day scripted world run (regen #3, deliberate:
+// collapsed-sleep recovery + crop stage formula changed the scripted timeline).
+const GOLDEN_G2_HASH = '7263dde98076dbb234bdeded24aab659987190ce00e4581999027d615ec977e8'
 
 const SEED = 'g2-scripted'
 const TOTAL_TICKS = 4320 // 3 sim days
@@ -73,10 +74,10 @@ describe('GATE G2: 3-day scripted world run', () => {
       && (e.payload as Payload).structureId === SHED.id && (e.payload as Payload).cause === 'rain')).toBe(true)
     expect(Object.keys(state.structures)).toHaveLength(3)
 
-    // 5. Wheat planted day 1: stage 1, not mature (growthDays 8), not withered.
+    // 5. Wheat planted day 1: stage 0 after 2 dawns (floor(2×3/8)), not mature (growthDays 8), not withered.
     const wheat = Object.values(state.crops).find((c) => c.kind === 'wheat')
     expect(wheat).toBeDefined()
-    expect(wheat!.stage).toBe(1)
+    expect(wheat!.stage).toBe(0)
     expect(wheat!.withered).toBe(false)
     expect(wheat!.stage).not.toBe(DEFAULT_CONFIG.crops.wheat!.stages - 1)
 

@@ -84,10 +84,10 @@ describe('worldTick: weather', () => {
     expect(r.state.weather).toEqual({ kind: 'sunny', temperatureC: 14 })
   })
 
-  it('emits on a temperature-only change at nightfall', () => {
+  it('emits on a temperature-only change at nightfall, carrying prevKind', () => {
     const s = { ...genesisState(CFG), tick: NIGHTFALL - 1 }
     const r = tickTo(s, NIGHTFALL, new RngStreams('w0'))
-    expect(r.events).toContainEqual({ type: 'weather_changed', payload: { kind: 'sunny', temperatureC: 8 } })
+    expect(r.events).toContainEqual({ type: 'weather_changed', payload: { kind: 'sunny', temperatureC: 8, prevKind: 'sunny' } })
     expect(r.state.weather).toEqual({ kind: 'sunny', temperatureC: 8 })
   })
 
@@ -95,7 +95,7 @@ describe('worldTick: weather', () => {
     // change roll ≈ 0.1068 passes, pick int(4) = 2 → rain; 14 − 4 = 10°C
     const s = { ...genesisState(CFG), tick: NOON - 1 }
     const r = tickTo(s, NOON, new RngStreams('w11'))
-    expect(r.events).toContainEqual({ type: 'weather_changed', payload: { kind: 'rain', temperatureC: 10 } })
+    expect(r.events).toContainEqual({ type: 'weather_changed', payload: { kind: 'rain', temperatureC: 10, prevKind: 'sunny' } })
     expect(r.state.weather).toEqual({ kind: 'rain', temperatureC: 10 })
   })
 })

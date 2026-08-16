@@ -47,6 +47,13 @@ export function fireSystem(ctx: TickCtx): void {
     if (!s.burning) continue
     const perTick = s.maxHp / cfg.burnTicksToDestroy
     if (s.burnTicks + 1 >= cfg.burnTicksToDestroy || s.hp <= perTick) {
+      // The final damage deletes the structure: drop its contents first.
+      for (const itemId of Object.keys(ctx.state().items).sort()) {
+        const item = ctx.state().items[itemId]!
+        if (item.loc.t === 'structure' && item.loc.id === id) {
+          ctx.emit('item_moved', { id: itemId, loc: { t: 'tile', x: s.x, y: s.y } })
+        }
+      }
       ctx.emit('fire_extinguished', { structureId: id, cause: 'burnout' })
       ctx.emit('structure_damaged', { id, amount: s.hp })
     } else {

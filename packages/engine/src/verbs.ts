@@ -459,6 +459,8 @@ const give: VerbDef = makeVerb({
     const p = GiveParams.parse(params)
     const item = state.items[p.itemId]
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    const target = state.agents[p.targetId]
+    if (!target || !target.alive) return []
     return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: p.targetId } } }]
   },
 })

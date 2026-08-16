@@ -53,7 +53,7 @@ export const AgentFellIll = z.object({ agentId: z.string() }).strict()
 export const AgentRecovered = z.object({ agentId: z.string() }).strict()
 export const AgentTended = z.object({ agentId: z.string() }).strict()
 export const HpChanged = z.object({ agentId: z.string(), delta: z.number() }).strict()
-export const WeatherChanged = z.object({ kind: z.string(), temperatureC: z.number() }).strict()
+export const WeatherChanged = z.object({ kind: z.string(), temperatureC: z.number(), prevKind: z.string().optional() }).strict()
 
 export const CropPlanted = z.object({
   id: z.string(), kind: z.string(), x: z.number(), y: z.number(), plantedDay: z.number(),

@@ -93,6 +93,18 @@ describe('composePerception: felt events', () => {
     expect(composePerception(s, DEFAULT_CONFIG, 'a', events).feltEvents).toEqual(['rain_started'])
   })
 
+  it('does not re-tag rain_started when rain merely steps temperature (prevKind = kind)', () => {
+    const s = makeWorld([{ id: 'a', x: 0, y: 0 }])
+    const events = [ev('weather_changed', { kind: 'rain', temperatureC: 4, prevKind: 'rain' })]
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', events).feltEvents).toEqual([])
+  })
+
+  it('tags rain_started when the kind actually changes (prevKind differs)', () => {
+    const s = makeWorld([{ id: 'a', x: 0, y: 0 }])
+    const events = [ev('weather_changed', { kind: 'rain', temperatureC: 10, prevKind: 'sunny' })]
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', events).feltEvents).toEqual(['rain_started'])
+  })
+
   it('ignores sunny weather changes', () => {
     const s = makeWorld([{ id: 'a', x: 0, y: 0 }])
     const events = [ev('weather_changed', { kind: 'sunny', temperatureC: 14 })]

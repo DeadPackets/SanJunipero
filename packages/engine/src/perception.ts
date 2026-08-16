@@ -67,8 +67,10 @@ const isStructureItem = (i: Item): i is Item & { loc: { t: 'structure'; id: stri
 // produces no tag and appears nowhere in the packet.
 function feltTagFor(agentId: string, ev: SimEvent): string | null {
   if (ev.type === 'weather_changed') {
-    const kind = (ev.payload as { kind?: unknown } | null)?.kind
-    return typeof kind === 'string' && PRECIPITATION[kind] === true ? `${kind}_started` : null
+    const p = ev.payload as { kind?: unknown; prevKind?: unknown } | null
+    const kind = p?.kind
+    if (typeof kind !== 'string' || PRECIPITATION[kind] !== true) return null
+    return p?.prevKind === kind ? null : `${kind}_started` // same-kind temp steps pass silently
   }
   if ((ev.payload as { agentId?: unknown } | null)?.agentId !== agentId) return null
   switch (ev.type) {
