@@ -6,7 +6,7 @@
 import type { RawImage } from './post/raw.js'
 import { downscaleNearest } from './post/raw.js'
 import { quantize } from './post/quantize.js'
-import { opaqueBbox, sweepMagenta } from './sheet.js'
+import { opaqueBbox, opaqueArea, despeckle, sweepMagenta } from './sheet.js'
 import { CELL_NAMES_V4 } from './mirror.js'
 
 export const HIRES_MARGIN = 4
@@ -64,10 +64,12 @@ export function buildManifestV4(cells: Map<string, RawImage>, figureH: number): 
   return { version: 'v4-hires', figureH, cells: anchors }
 }
 
-// The hi-res cell chain on a chroma-keyed figure: trim → magenta-fringe sweep →
-// palette quantize (nearest scaling later preserves quantized colors exactly) →
-// optional height normalization.
+// The hi-res cell chain on a chroma-keyed figure: relative despeckle (background
+// noise islands would inflate the bbox and skew trim + height normalization) →
+// trim → magenta-fringe sweep → palette quantize (nearest scaling later preserves
+// quantized colors exactly) → optional height normalization.
 export function processHiResCell(keyed: RawImage, targetFigureH?: number): RawImage {
-  const q = quantize(sweepMagenta(trimToFigure(keyed)))
+  const cleaned = despeckle(keyed, Math.max(3, Math.ceil(opaqueArea(keyed) * 0.01)))
+  const q = quantize(sweepMagenta(trimToFigure(cleaned)))
   return targetFigureH === undefined ? q : normalizeFigureHeight(q, targetFigureH)
 }

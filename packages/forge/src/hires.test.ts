@@ -75,6 +75,15 @@ describe('processHiResCell', () => {
     const b = opaqueBbox(cell)!
     expect(Math.abs(b.y1 - b.y0 + 1 - 130)).toBeLessThanOrEqual(1)
   })
+
+  it('drops background speckle islands so they cannot inflate the bbox', () => {
+    const img = rect(200, 300, 60, 60, 139, 239) // figure 80×180 = 14400 px
+    img.data[(10 * 200 + 10) * 4 + 3] = 255      // 1px speckle far outside the figure
+    img.data[(290 * 200 + 190) * 4 + 3] = 255
+    const cell = processHiResCell(img)
+    expect(cell.width).toBe(80 + HIRES_MARGIN * 2)
+    expect(cell.height).toBe(180 + HIRES_MARGIN * 2)
+  })
 })
 
 describe('buildManifestV4', () => {
