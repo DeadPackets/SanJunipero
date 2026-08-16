@@ -10,7 +10,7 @@ import {
   FireExtinguished, FireIgnited, FireSpread, HpChanged,
   ItemBroke, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
   ItemTextChanged, ItemWorn, NeedChanged,
-  SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
+  SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
 import { occupantsOf } from './interiors.js'
@@ -183,6 +183,16 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const s = state.structures[p.id]
       if (!s) throw new Error(`structure_completed for unknown structure ${p.id}`)
       return { ...state, structures: { ...state.structures, [p.id]: { ...s, stage: 'complete', hp: s.maxHp } } }
+    }
+    // The wall holds one layer of text; every layer before it stays in the log.
+    case 'structure_inscribed': {
+      const p = StructureInscribed.parse(event.payload)
+      const s = state.structures[p.structureId]
+      if (!s) throw new Error(`structure_inscribed for unknown structure ${p.structureId}`)
+      return {
+        ...state,
+        structures: { ...state.structures, [p.structureId]: { ...s, inscription: { text: p.text, by: p.agentId } } },
+      }
     }
     case 'structure_damaged': {
       const p = StructureDamaged.parse(event.payload)

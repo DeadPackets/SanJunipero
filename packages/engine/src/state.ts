@@ -25,6 +25,7 @@ export type Structure = {
   hp: number; maxHp: number; flammable: boolean; stage: 'construction' | 'complete'
   progressTicks: number; builtBy: string | null; burning: boolean; burnTicks: number
   owner?: string                          // absent = public; the hash-stable form of `agentId | null`
+  inscription?: { text: string; by: string }  // absent = unmarked; only the latest layer, the log keeps the rest
 }
 
 export type Item = {

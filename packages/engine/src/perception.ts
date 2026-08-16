@@ -22,9 +22,13 @@ export type PerceivedAgent = {
   asleep: boolean
 }
 
+// Both fields absent on a blank wall, so a town that writes nothing reads as it always did.
+// You can tell from across the square that something is carved there; the words need arm's length.
 export type PerceivedStructure = {
   id: string; kind: string; x: number; y: number; w: number; h: number
   burning: boolean; stage: 'construction' | 'complete'
+  hasInscription?: true
+  inscription?: { text: string; by: string }
 }
 
 // Whose it is, and whose hands made it — the two things prose needs to say
@@ -171,10 +175,19 @@ export function composePerception(
     return withinSight(nx, ny)
   }
 
+  const carved = (s: { id: string; x: number; y: number; w: number; h: number; inscription?: { text: string; by: string } }) => {
+    if (s.inscription === undefined) return {}
+    const readable = indoors === null ? isAdjacentToRect(self.x, self.y, s) : s.id === indoors
+    return { hasInscription: true as const, ...(readable ? { inscription: s.inscription } : {}) }
+  }
+
   const visibleStructures: PerceivedStructure[] = Object.values(state.structures)
     .filter(s => (indoors === null ? structureInSight(s) : s.id === indoors))
     .sort(byId)
-    .map(s => ({ id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, burning: s.burning, stage: s.stage }))
+    .map(s => ({
+      id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, burning: s.burning, stage: s.stage,
+      ...carved(s),
+    }))
 
   const tileItems: PerceivedItem[] = indoors !== null ? [] : Object.values(state.items)
     .filter(isTileItem)

@@ -46,6 +46,9 @@ export const StructurePlanned = z.object({
 }).strict()
 export const StructureProgressed = z.object({ id: z.string(), ticks: z.number() }).strict()
 export const StructureCompleted = z.object({ id: z.string() }).strict()
+export const StructureInscribed = z.object({
+  structureId: z.string(), text: z.string().min(1).max(280), agentId: z.string(),
+}).strict()
 export const StructureDamaged = z.object({ id: z.string(), amount: z.number() }).strict()
 export const StructureDestroyed = z.object({ id: z.string() }).strict()
 export const FireIgnited = z.object({ structureId: z.string(), cause: z.string() }).strict()

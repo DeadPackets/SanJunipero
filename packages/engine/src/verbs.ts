@@ -10,7 +10,7 @@ export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
   | 'walk' | 'sleep' | 'wake' | 'enter' | 'exit' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
   | 'build' | 'craft' | 'extinguish'
-  | 'speak' | 'give' | 'take' | 'stow' | 'write' | 'read' | 'teach' | 'attack' | 'experiment'
+  | 'speak' | 'give' | 'take' | 'stow' | 'write' | 'read' | 'inscribe' | 'teach' | 'attack' | 'experiment'
 
 export type VerbDef = {
   kind: string
@@ -611,6 +611,33 @@ const stow: VerbDef = makeVerb({
   },
 })
 
+export const INSCRIPTION_MAX_CHARS = 280
+export const InscribeParams = z.object({
+  structureId: z.string(), text: z.string().min(1).max(INSCRIPTION_MAX_CHARS),
+}).strict()
+
+// Writing on something nobody can pocket. Three ticks, because carving is not scribbling.
+const inscribe: VerbDef = makeVerb({
+  kind: 'inscribe',
+  validate(state, _config, agentId, params) {
+    const p = InscribeParams.safeParse(params)
+    if (!p.success) return `inscribe needs {structureId, text} of 1 to ${INSCRIPTION_MAX_CHARS} characters`
+    const s = state.structures[p.data.structureId]
+    if (!s) return 'there is nothing there to mark'
+    if (s.stage !== 'complete') return 'it is not finished'
+    const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return a.insideId === s.id ? null : 'a wall is in the way'
+    if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to mark it'
+    return null
+  },
+  duration() { return 3 },
+  onComplete(state, _config, agentId, params) {
+    const p = InscribeParams.parse(params)
+    if (!state.structures[p.structureId]) return []
+    return [{ type: 'structure_inscribed', payload: { structureId: p.structureId, text: p.text, agentId } }]
+  },
+})
+
 const write: VerbDef = makeVerb({
   kind: 'write',
   validate(state, _config, agentId, params) {
@@ -711,7 +738,7 @@ const experiment: VerbDef = makeVerb({
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
-  speak, give, take, stow, write, read, teach, attack, experiment,
+  speak, give, take, stow, write, read, inscribe, teach, attack, experiment,
 }
 
 // Hot-registration seam: codified recipe verbs join the live registry by kind id.
