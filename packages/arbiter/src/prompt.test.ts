@@ -32,6 +32,39 @@ describe('canon (T20)', () => {
   })
 })
 
+describe('mundane-vs-novel anchors (C9 batch-8 calibration)', () => {
+  it('anchors the boundary with one map, one attempt and one impossible ruling', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    const anchors = system.split('\n').filter((l) => l.startsWith('"I '))
+    expect(anchors).toHaveLength(3)
+    expect(anchors[0]).toContain('— map:')
+    expect(anchors[1]).toContain('— attempt:')
+    expect(anchors[2]).toContain('— impossible:')
+  })
+
+  it('tells the arbiter which question decides attempt against impossible', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain('whether the first step can be taken with what the town has at hand')
+    expect(system).toContain('not impossible merely because no one has done it yet')
+    expect(system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('keeps the anchors in the system block, so the agent’s own words stay the only fenced line', () => {
+    const r = assembleAdjudicationPrompt(fixtureBlocks())
+    const user = r.messages[0].content
+    for (const anchor of r.system.split('\n').filter((l) => l.startsWith('"I '))) {
+      expect(user).not.toContain(anchor)
+    }
+    expect(user.split('<<<')).toHaveLength(2)
+  })
+
+  it('the anchor block is part of the byte-stable prefix', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I try to smoke a fish over the fire.' }))
+    const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I want to build a clay oven.' }))
+    expect(a.system).toBe(b.system)
+  })
+})
+
 describe('adjudication prompt prefix stability', () => {
   it('keeps system byte-identical and user prefix byte-identical when only intent changes', () => {
     const intentA = 'I try to boil river water for salt.'
