@@ -76,6 +76,14 @@ export async function startDevWorld(
       publishThought(db, { tick: ev.tick, agentId: p.agentId, text: THOUGHT_LINES[p.verb] ?? 'Hm.' })
     }
   }
+  // DEV_FAST_FORWARD=<tick>: step the world synchronously to a moment (e.g. 490 = Day 0
+  // 08:10 daylight) before the real-time cadence starts — screenshot/QA convenience only
+  const ff = Number(process.env['DEV_FAST_FORWARD'] ?? '0')
+  if (Number.isFinite(ff) && ff > 0) {
+    while (loop.state.tick < ff) tickOnce()
+    console.log(`dev world: fast-forwarded to tick ${loop.state.tick}`)
+  }
+
   const timer = setInterval(tickOnce, opts.realMsPerTick ?? DEV_MS_PER_TICK)
 
   return {

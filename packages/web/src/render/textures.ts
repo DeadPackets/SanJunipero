@@ -83,11 +83,16 @@ export class TextureBook {
 
   async swap(oldUrl: string, newUrl: string): Promise<Texture> {
     const next = await this.get(newUrl) // load the replacement FIRST — no blank frame
-    if (oldUrl !== newUrl && this.#cache.has(oldUrl)) {
-      const old = await this.#cache.get(oldUrl)!
-      old.source.unload() // texture GC gotcha — spec §15
-      await Assets.unload(oldUrl)
-      this.#cache.delete(oldUrl)
+    if (oldUrl !== newUrl) {
+      const oldP = this.#cache.get(oldUrl)
+      if (oldP !== undefined) {
+        // claim the entry synchronously: concurrent swaps off a shared url (all
+        // structures leave the placeholder at once) must unload exactly once
+        this.#cache.delete(oldUrl)
+        const old = await oldP
+        old.source.unload() // texture GC gotcha — spec §15
+        await Assets.unload(oldUrl)
+      }
     }
     return next
   }

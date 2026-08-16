@@ -32,7 +32,7 @@ function applyBuildingArt(book: TextureBook, entry: Entry, art: BuildingArt, swa
   entry.url = art.url
   const p = swapFrom !== null && swapFrom !== art.url ? book.swap(swapFrom, art.url) : book.get(art.url)
   void p.then((t) => {
-    if (entry.url !== art.url) return
+    if (entry.url !== art.url || entry.sprite.destroyed) return // superseded or torn down mid-load
     entry.sprite.texture = art.anchor !== null ? smoothSource(t) : t
     if (art.anchor !== null) entry.sprite.anchor.set(art.anchor.x, art.anchor.y)
     else entry.sprite.anchor.set(0.5, 1.0)

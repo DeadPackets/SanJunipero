@@ -3,6 +3,7 @@ import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
 import { resolveAssetId } from '../render/textures.js'
+import { bustStyle } from './rosterModel.js'
 import { diffLines } from './diffLines.js'
 
 export const TAB_CACHE_MS = 30_000
@@ -99,6 +100,8 @@ export function InspectorPanel({ store, agentId, scene }: { store: WorldStore; a
   const carrying = Object.values(state!.items).filter((it) => it.loc.t === 'agent' && it.loc.id === agentId)
   const records = store.assetRecords()
   const portraitId = resolveAssetId(records, 'portrait', agentId)
+  // no painted portrait yet → the v4 sprite bust stands in (smooth hi-res crop, not pixelated)
+  const bust = portraitId === null ? bustStyle(records, agentId, 52) : null
 
   const pickDiff = (version: number): void => {
     setDiffPick((prev) => {
@@ -117,6 +120,8 @@ export function InspectorPanel({ store, agentId, scene }: { store: WorldStore; a
       <header className="inspector-head">
         {portraitId !== null ? (
           <img className="portrait" src={`/assets/${portraitId}.png`} alt="" />
+        ) : bust !== null ? (
+          <div className="portrait" style={{ ...bust, backgroundRepeat: 'no-repeat', imageRendering: 'auto' }} />
         ) : (
           <div className="portrait silhouette" />
         )}
