@@ -86,6 +86,33 @@ function turnModel(responses: unknown[], fallback: unknown = BENIGN_TURN): MockL
   })
 }
 
+type CapturedMessage = { role: string; text: string }
+
+function capturingModel(responses: unknown[]): { model: MockLanguageModelV4; prompts: CapturedMessage[][] } {
+  const prompts: CapturedMessage[][] = []
+  let i = 0
+  const model = new MockLanguageModelV4({
+    doGenerate: async (options) => {
+      const msgs = (options.prompt as Array<{ role: string; content: unknown }>).map((m) => ({
+        role: m.role,
+        text: Array.isArray(m.content)
+          ? (m.content as Array<{ text?: string }>).map((p) => p.text ?? '').join('')
+          : String(m.content),
+      }))
+      prompts.push(msgs)
+      const r = responses[Math.min(i, responses.length - 1)]!
+      i += 1
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(r) }],
+        finishReason: { unified: 'stop' as const, raw: undefined },
+        usage: ZERO_USAGE,
+        warnings: [],
+      }
+    },
+  })
+  return { model, prompts }
+}
+
 function throwingModel(): MockLanguageModelV4 {
   return new MockLanguageModelV4({
     doGenerate: async () => {
@@ -514,6 +541,29 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 3, 150)
     expect(completedVerbs(world.engineDb)).toEqual(['walk', 'take', 'eat'])
     expect(memoriesOfKind(agentDb, 'action').length).toBe(0)
+  })
+
+  it('repairs an invalid generation with an assistant/user exchange instead of blind-retrying', async () => {
+    const bad = { thought: 'I speak wrongly.', importance: 'very' }
+    const good = { thought: 'Righted.', speech: 'All is well.', importance: 2 }
+    const { model, prompts } = capturingModel([bad, good])
+    const { world, loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+
+    expect(runtime.stats().dozes).toBe(0)
+    expect(spokeTexts(world.engineDb)).toContain('All is well.')
+
+    // The second call is the repair: it appends the bad output as the
+    // assistant's own words and the correction as a user message.
+    expect(prompts.length).toBe(2)
+    const repair = prompts[1]!
+    const assistantMsg = repair[repair.length - 2]!
+    const userMsg = repair[repair.length - 1]!
+    expect(assistantMsg.role).toBe('assistant')
+    expect(assistantMsg.text).toContain('I speak wrongly.')
+    expect(userMsg.role).toBe('user')
+    expect(userMsg.text).toMatch(/rejected/i)
+    expect(userMsg.text).toContain('importance')
   })
 
   it('backs off on non-provider turn failures', async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
+import { NoObjectGeneratedError } from 'ai'
 import { z } from 'zod'
 import { mockModel } from '../testutil/mockModel.js'
 import { migrateLlmTables } from './callLog.js'
@@ -125,6 +126,28 @@ describe('LlmClient.object', () => {
     expect(all[0]!.error).toContain('scripted failure')
     expect(all[1]!.ok).toBe(1)
     expect(all[1]!.error).toBeNull()
+  })
+
+  it('does not blind-retry a NoObjectGeneratedError: one call, error surfaces raw text', async () => {
+    const db = openDb()
+    const model = mockModel([
+      { json: { wrong: 'shape' } },
+      { json: { mood: 'never reached', count: 0 } },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test', maxRetries: 2 })
+    let caught: unknown
+    try {
+      await client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA })
+    } catch (err) {
+      caught = err
+    }
+    expect(NoObjectGeneratedError.isInstance(caught)).toBe(true)
+    expect((caught as NoObjectGeneratedError).text).toContain('wrong')
+    // the invalid output must not be blindly re-requested
+    expect(model.doGenerateCalls).toHaveLength(1)
+    const all = rows(db)
+    expect(all).toHaveLength(1)
+    expect(all[0]!.ok).toBe(0)
   })
 
   it('rejects when all attempts fail; every row has ok = 0', async () => {

@@ -1,4 +1,4 @@
-import { generateText, Output, type LanguageModel, type LanguageModelUsage, type ModelMessage } from 'ai'
+import { generateText, NoObjectGeneratedError, Output, type LanguageModel, type LanguageModelUsage, type ModelMessage } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type Database from 'better-sqlite3'
 import type { z } from 'zod'
@@ -153,6 +153,9 @@ export class LlmClient {
           ok: false,
           error: err instanceof Error ? err.message : String(err),
         })
+        // An invalid generation is not a transient provider fault: retrying
+        // the identical request wastes calls — surface it for a real repair.
+        if (NoObjectGeneratedError.isInstance(err)) throw err
       }
     }
     throw lastError

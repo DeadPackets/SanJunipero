@@ -1,4 +1,5 @@
 import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
+import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '../llm/client.js'
 import type { IdentityCore, AssembledPrompt, PromptBlocks } from '../prompt/assemble.js'
@@ -30,6 +31,14 @@ const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 const DAWN_MINUTES = 6 * 60
 function nightOf(tick: number): number {
   return Math.max(0, Math.floor((tick - DAWN_MINUTES) / MINUTES_PER_DAY))
+}
+
+function jsonOrRaw(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
 }
 
 const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [] }
@@ -303,10 +312,18 @@ export class AgentRuntime {
         this.#dayLog = compactDayLog(this.#dayLog, summary.text)
         assembled = assemblePrompt({ ...blocks, dayLog: this.#dayLog })
       }
-      const { value } = await this.#llm.object({ schema: TurnSchema, system: assembled.system, messages: assembled.messages })
+      let raw: unknown
+      let badText = ''
+      try {
+        raw = (await this.#llm.object({ schema: TurnSchema, system: assembled.system, messages: assembled.messages })).value
+      } catch (err) {
+        if (!NoObjectGeneratedError.isInstance(err)) throw err
+        badText = err.text ?? ''
+        raw = jsonOrRaw(badText)
+      }
       turn = await parseTurnWithRepair(
-        value,
-        (issues) => this.#repair(assembled, issues),
+        raw,
+        (issues) => this.#repair(assembled, badText, issues),
         (detail) => this.#llm.alert('turn_fallback', detail),
       )
     } catch {
@@ -324,13 +341,25 @@ export class AgentRuntime {
     this.#clock.prevVisibleIds = packet.visible.agents.map((a) => a.id)
   }
 
-  async #repair(assembled: AssembledPrompt, issues: string): Promise<unknown> {
-    const { value } = await this.#llm.object({
-      schema: TurnSchema,
-      system: assembled.system,
-      messages: [...assembled.messages, { role: 'assistant', content: `Your response was rejected. Fix it:\n${issues}` }],
-    })
-    return value
+  // The bad output goes back as the assistant's own words, the correction as
+  // a user message — never a correction spoken in the assistant's voice.
+  async #repair(assembled: AssembledPrompt, badText: string, issues: string): Promise<unknown> {
+    try {
+      const { value } = await this.#llm.object({
+        schema: TurnSchema,
+        system: assembled.system,
+        messages: [
+          ...assembled.messages,
+          { role: 'assistant', content: badText.length > 0 ? badText : '…' },
+          { role: 'user', content: `Your answer was rejected. Fix it:\n${issues}` },
+        ],
+      })
+      return value
+    } catch (err) {
+      // A second invalid generation falls through to the quiet fallback turn.
+      if (NoObjectGeneratedError.isInstance(err)) return err.text ?? null
+      throw err
+    }
   }
 
   async #applyTurn(turn: Turn, tick: number, day: number): Promise<void> {
