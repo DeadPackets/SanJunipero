@@ -31,8 +31,11 @@ export type VisionVerdict = z.infer<typeof VisionVerdictSchema>
 export const NA_CRITERIA_BY_CLASS: Record<string, readonly Criterion[]> = {
   icon: ['facing', 'alignment', 'proportion', 'tiling'],
   item: ['facing', 'alignment', 'tiling'],
-  // terrain is the one class that DOES tile, and the one class that is not a subject
-  terrain: ['facing', 'alignment', 'proportion', 'singleFigure'],
+  // terrain is the one class that DOES tile, and the one class that is not a subject.
+  // `transparency` is code-guaranteed here (materialFromCandidate forces alpha 255, the
+  // diamond mask cuts the edge) and unjudgeable besides: a full-bleed ground square hides
+  // the checker card entirely, so an eye can only ever fail it.
+  terrain: ['facing', 'alignment', 'proportion', 'singleFigure', 'transparency'],
   building: ['tiling'],
   portrait: ['alignment', 'tiling'],
   character: ['tiling'],

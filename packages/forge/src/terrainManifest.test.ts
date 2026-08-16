@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { ROAD_AUTOTILE_KEYS } from '@sj/shared'
+import { decodePng } from './post/raw.js'
+import { seasonTileNames } from './terrainTiles.js'
 import { TilesetManifest, loadTilesetManifest } from './terrainManifest.js'
 
 const names16 = Array.from({ length: 16 }, (_, i) => `tile-${i}`)
@@ -87,5 +90,32 @@ describe('the shipped content/tilesets manifest', () => {
     expect(m.scaffolding.file).toBe('scaffolding.png')
     expect(m.tileW).toBe(32)
     expect(Object.keys(m.autotile!.road.tiles).sort()).toEqual([...ROAD_AUTOTILE_KEYS].sort())
+  })
+
+  // TASK C3: generated art replaces the pictures, never the keys. Whatever painted the
+  // tiles, the renderer reads the same manifest — so this is the contract, not the art.
+  it('keeps every key the renderer consumes, whoever painted the pixels', () => {
+    const m = loadTilesetManifest()
+    for (const season of ['spring', 'summer', 'autumn', 'winter'] as const) {
+      expect(m.seasons[season]!.file).toBe(`${season}.png`)
+      expect(m.seasons[season]!.tiles).toEqual(seasonTileNames())
+    }
+    expect([m.tileW, m.tileH, m.cols, m.rows]).toEqual([32, 16, 4, 4])
+    expect(m.autotile!.road.file).toBe('road-autotile.png')
+    // the strip's column index per key is the renderer's cut, and it must not shuffle
+    expect(m.autotile!.road.tiles).toEqual(
+      Object.fromEntries(ROAD_AUTOTILE_KEYS.map((k, i) => [k, i])),
+    )
+  })
+
+  it('ships a real file behind every key, at the size the manifest promises', async () => {
+    const m = loadTilesetManifest()
+    const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets')
+    for (const season of Object.values(m.seasons)) {
+      const img = await decodePng(readFileSync(join(dir, season!.file)))
+      expect([img.width, img.height], season!.file).toEqual([m.cols * m.tileW, m.rows * m.tileH])
+    }
+    const strip = await decodePng(readFileSync(join(dir, m.autotile!.road.file)))
+    expect([strip.width, strip.height]).toEqual([ROAD_AUTOTILE_KEYS.length * m.tileW, m.tileH])
   })
 })

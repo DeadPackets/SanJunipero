@@ -36,34 +36,51 @@ export function terrainBoilerplate(): string {
     'outside the tile, no vignette, no border, no frame. Even lighting across the whole square ' +
     'so it can repeat without a visible seam. Hard pixel clusters, no gradients, no blur. ' +
     'Warm cozy pastel palette: sage green, honey wood, cream stone, warm grey, dusty rose. ' +
-    'The left edge must continue into the right edge and the top edge into the bottom edge.'
+    'The left edge must continue into the right edge and the top edge into the bottom edge. ' +
+    // The lesson the first live run taught: the wrap was numerically perfect and the tile
+    // still failed, because three bright flowers in one square become a lattice of flowers
+    // once it repeats. A ground material must have NOTHING the eye can lock onto.
+    'CRITICAL: the texture must be uniform and featureless at the scale of the whole square. ' +
+    'No single distinctive mark anywhere — no flower, no bright blob, no large stone, no ' +
+    'branch, no lighter or darker patch that the eye can pick out and follow. Fine, even, ' +
+    'all-over grain of the same size and contrast from corner to corner, so that when this ' +
+    'square is repeated in a grid nothing recurs visibly. ' +
+    // The second lesson: "uniform" is not "flat". A material with no internal contrast reads
+    // as mush once it is cut down to a 32x16 tile. Grain must be CHUNKY and evenly spread.
+    'The grain itself must still be clearly readable: chunky clusters three or four pixels ' +
+    'across in three or four distinct tones of the same colour family, evenly spread. Not a ' +
+    'smooth wash, not single-pixel noise — visible texture with no landmarks in it.'
 }
 
 // Ground vocabulary, one line per material. Written about earth and water, never about the
 // thing drawing it.
+// Every line describes a UNIFORM MATERIAL. Variety between tiles is the renderer's job (four
+// grass variants picked by a per-tile hash); variety inside one tile is what makes a repeat
+// visible. Differences between variants are in colour and grain density, never in landmarks.
 export const TERRAIN_COMMISSIONS: Record<string, string> = {
-  'grass:0': 'Close-cropped sage meadow grass, fine blade texture, a few paler dry tufts scattered evenly.',
-  'grass:1': 'Meadow grass a shade deeper and shaggier, with small clover leaves and two or three dusty-rose wildflower heads.',
-  'grass:2': 'Sun-bleached grass going to straw at the tips, sparse, with thin bare patches of warm earth showing through.',
-  'grass:3': 'Damp rich grass with moss creeping through it, darkest of the four, tiny pale seed heads.',
-  'earth:0': 'Bare turned earth, warm honey-brown, fine clods and small stones, the tilth of a garden path.',
-  'water:0': 'Calm shallow river water seen from directly above, soft blue-grey, gentle ripple pattern, faint paler glints, no shoreline and no reflections of anything outside the water.',
-  'forest:0': 'Deep forest floor in shade, dark sage and moss, scattered fallen needles and two or three small ferns.',
-  'rock:0': 'Weathered warm-grey bedrock, flat worn slabs with narrow cracks between them, faint lichen in the seams.',
-  'sand:0': 'A wet river bank where the water has just drawn back: pale cream sand darkening in patches, fine ripples, a scatter of small rounded pebbles. The shore itself, not the water.',
-  'farmland:0': 'Ploughed farmland soil in even furrows running corner to corner, rich damp brown, fine crumb between the ridges.',
+  'grass:0': 'Close-cropped sage meadow grass: short blade clusters in three clear tones of green, evenly spread over the whole square, plainly visible texture with no bare patches.',
+  'grass:1': 'Meadow grass one shade deeper and slightly coarser than the last: the same even all-over blade grain, a little more contrast between blades, still one uniform tone.',
+  'grass:2': 'Dry sun-bleached grass going to straw: uniform pale sage-and-wheat grain, evenly mixed at fine scale, no bare patches and no clumps.',
+  'grass:3': 'Damp mossy grass, the darkest of the four: uniform deep sage grain with an even fine mottle, no patches.',
+  'earth:0': 'Bare turned earth: uniform warm honey-brown, fine even crumb grain at a small scale, no large clods and no stones.',
+  'water:0': 'Calm shallow water seen from directly above: soft blue-grey with clearly drawn short ripple strokes in three tones of blue, evenly spread over the whole square, no shoreline, no reflections.',
+  'forest:0': 'Shaded forest floor: uniform dark sage and moss with an even fine litter grain, no ferns, no branches, no bright spots.',
+  'rock:0': 'Weathered warm-grey bedrock: uniform stone grain with an even fine crack mottle at a small scale, no large slabs and no single big fissure.',
+  'sand:0': 'A wet river bank: uniform pale cream damp sand with an even fine ripple grain, evenly mixed darker and lighter at small scale, no pebbles and no water. The shore surface itself.',
+  'farmland:0': 'Ploughed soil: uniform rich damp brown with fine even parallel furrow grain running corner to corner at a small, regular pitch, no headland and no gaps.',
 }
 
 export const SEASON_COMMISSIONS: Record<Season, string> = {
-  spring: 'the same ground under early spring: fresh new sage growth, damp dark earth, thin pale shoots',
-  summer: 'the same ground at high summer: deep warm green, dry honey-toned earth, sun-bleached highlights',
-  autumn: 'the same ground in autumn: amber and rust leaf litter, muddy earth, the green gone tired',
-  winter: 'the same ground under winter: blue-shadowed frost over it, the colour drained cool, bare hard earth',
+  spring: 'under early spring: fresh new sage growth over damp dark earth, evenly mixed',
+  summer: 'at high summer: deep warm green, dry honey undertone, evenly mixed',
+  autumn: 'in autumn: amber and rust over tired green, evenly mixed at fine scale',
+  winter: 'under winter: cool blue-shadowed frost over it, the colour evenly drained',
 }
 
 export const ROAD_COMMISSION =
-  'A packed-stone town road surface: cream and warm-grey cobbles worn smooth in the middle, ' +
-  'fine grit and pale dust between them, no kerb and no grass.'
+  'A packed-stone town road surface: uniform small cream and warm-grey cobbles of even size ' +
+  'with fine pale grit between them, the same all over, no kerb, no grass, no ruts, no large ' +
+  'stone that stands out from the rest.'
 
 // `generateFrom` names the material a piece is CUT from rather than generated for. All
 // fifteen road shapes are stencils of one road surface: fifteen separate generations would
@@ -113,7 +130,7 @@ export function planTerrainProgram(): TerrainItem[] {
   for (const season of SEASONS) {
     out.push({
       sort: 'season', season, assetId: terrainAssetId({ sort: 'season', season }),
-      commission: `Meadow grass and packed earth, ${SEASON_COMMISSIONS[season]}.`,
+      commission: `Uniform meadow ground ${SEASON_COMMISSIONS[season]}. Even fine grain all over, no landmarks.`,
     })
   }
   return out

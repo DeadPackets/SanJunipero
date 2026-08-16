@@ -1,0 +1,114 @@
+import {
+  ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS, roadAutotileKind,
+  type AssetRecord, type Season, type TerrainTileKind,
+} from '@sj/shared'
+import type { AssetCodex } from './codex.js'
+import { encodePng, type RawImage } from './post/raw.js'
+import { quantize } from './post/quantize.js'
+import { applyTint } from './tints.js'
+import {
+  SHEET_COLS, SHEET_ROWS, TERRAIN_TILE_H, TERRAIN_TILE_W, TERRAIN_VARIANTS, SHEET_KINDS,
+  paintTerrainTile,
+} from './terrainTiles.js'
+import {
+  GROUND_VARIANTS, ROAD_MATERIAL_ID, diamondFromMaterial, seasonTintFrom, stencilRoadTile,
+  terrainAssetId,
+} from './terrainGen.js'
+
+// The generated art, keyed by the program's asset id. A missing material is not an error:
+// the code-painted tile stands in, so the town never loses its ground because one call
+// failed. Art independence, the same law the ground bake already lives by.
+export type MaterialBook = ReadonlyMap<string, RawImage>
+
+export function materialFor(book: MaterialBook, assetId: string): RawImage | null {
+  return book.get(assetId) ?? null
+}
+
+// One ground tile: the generated material cut to the dimetric diamond, or the code-painted
+// tile when that material was never generated.
+export function groundTile(book: MaterialBook, kind: TerrainTileKind, variant: number): RawImage {
+  const m = materialFor(book, terrainAssetId({ sort: 'ground', kind, variant }))
+  return m === null ? paintTerrainTile(kind, variant) : diamondFromMaterial(m)
+}
+
+export type TerrainIngestReport = {
+  registered: number; generated: number; painted: number
+  kinds: string[]
+}
+
+// Registers into EXACTLY the codex kinds the renderer already reads — `grass`…`road` for the
+// flat variants and `road:<key>` for the autotile strip — so generated art hot-swaps and the
+// renderer contract does not move.
+export async function registerGeneratedTerrain(
+  codex: AssetCodex, book: MaterialBook,
+): Promise<{ records: AssetRecord[]; report: TerrainIngestReport }> {
+  const records: AssetRecord[] = []
+  const kinds: string[] = []
+  let generated = 0, painted = 0
+
+  const meta = (kind: TerrainTileKind, variant: number): string => JSON.stringify(
+    { version: 'v1-terrain-tile', kind, variant, wPx: TERRAIN_TILE_W, hPx: TERRAIN_TILE_H },
+  )
+  const put = async (kind: string, metaJson: string, img: RawImage, desc: string): Promise<void> => {
+    records.push(codex.register({
+      class: 'terrain', desc, kind, meta: metaJson, footprint: { w: 1, h: 1 },
+      png: await encodePng(img), widthPx: TERRAIN_TILE_W, heightPx: TERRAIN_TILE_H,
+      status: 'ready', score: 10, attempts: 1, costUsd: 0,
+    }))
+    kinds.push(kind)
+  }
+
+  for (const kind of TERRAIN_TILE_KINDS) {
+    for (let variant = 0; variant < TERRAIN_VARIANTS; variant++) {
+      // a kind generated with fewer variants than the renderer asks for reuses its last one
+      const source = Math.min(variant, GROUND_VARIANTS[kind] - 1)
+      const m = materialFor(book, terrainAssetId({ sort: 'ground', kind, variant: source }))
+      if (m === null) painted++
+      else generated++
+      const img = m === null ? paintTerrainTile(kind, variant) : diamondFromMaterial(m)
+      await put(kind, meta(kind, variant), img, `tile: ${kind}`)
+    }
+  }
+
+  // All fifteen shapes are cut from ONE road surface, so the lattice is one road.
+  const road = materialFor(book, ROAD_MATERIAL_ID)
+  for (const key of ROAD_AUTOTILE_KEYS) {
+    const img = road === null ? undefined : stencilRoadTile(road, key)
+    if (img === undefined) { painted++; continue }   // no generated road → the C13 strip stands
+    generated++
+    await put(roadAutotileKind(key), meta('road', 0), img, `road tile: ${key}`)
+  }
+
+  return { records, report: { registered: records.length, generated, painted, kinds } }
+}
+
+// ------------------------------------------------------------------ seasonal sheets
+
+// D-3 shipped four seasonal sheets tinted by hand-guessed ratios. These are graded from the
+// GENERATED seasonal materials instead: the tint is measured off real art, then applied to
+// the generated ground and re-quantized so the sheet stays palette-true.
+export function seasonSheetFrom(book: MaterialBook, season: Season): RawImage {
+  const width = SHEET_COLS * TERRAIN_TILE_W, height = SHEET_ROWS * TERRAIN_TILE_H
+  const sheet: RawImage = { width, height, data: new Uint8ClampedArray(width * height * 4) }
+  const seasonMat = materialFor(book, terrainAssetId({ sort: 'season', season }))
+  const summerMat = materialFor(book, terrainAssetId({ sort: 'season', season: 'summer' }))
+  const tint = seasonMat === null || summerMat === null ? null : seasonTintFrom(seasonMat, summerMat)
+
+  SHEET_KINDS.forEach((kind, row) => {
+    for (let col = 0; col < TERRAIN_VARIANTS; col++) {
+      const tile = groundTile(book, kind, col)
+      for (let y = 0; y < TERRAIN_TILE_H; y++) {
+        const src = (y * TERRAIN_TILE_W) * 4
+        sheet.data.set(
+          tile.data.subarray(src, src + TERRAIN_TILE_W * 4),
+          ((row * TERRAIN_TILE_H + y) * width + col * TERRAIN_TILE_W) * 4,
+        )
+      }
+    }
+  })
+  return tint === null ? sheet : quantize(applyTint(sheet, tint))
+}
+
+export function seasonSheets(book: MaterialBook): Record<Season, RawImage> {
+  return Object.fromEntries(SEASONS.map((s) => [s, seasonSheetFrom(book, s)])) as Record<Season, RawImage>
+}

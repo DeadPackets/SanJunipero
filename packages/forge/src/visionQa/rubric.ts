@@ -83,6 +83,7 @@ function criterionAsk(k: Criterion, a: { klass: string; expectedFacing?: string 
 
 const NA_REASON: Record<string, string> = {
   tiling: 'this class is a single object, not a repeating surface',
+  transparency: 'this class is full-bleed ground with no background to clear',
   facing: 'this class has no commissioned direction',
   alignment: 'this class never meets the ground',
   proportion: 'this class has no canonical block target',
