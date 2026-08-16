@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { composePerception, hears } from './perception.js'
@@ -309,8 +309,105 @@ describe('composePerception: interior sight', () => {
 })
 
 describe('composePerception: seen channel', () => {
-  it('exists and is empty until Task 5 fills it', () => {
+  it('is empty when nothing was witnessed', () => {
     const s = makeWorld([{ id: 'a', x: 0, y: 0 }])
     expect(composePerception(s, DEFAULT_CONFIG, 'a', []).seen).toEqual([])
+  })
+})
+
+// --- C9 Task 5: ownership prose + witnessed takings -------------------------
+
+const taken = (takerId: string, ownerId: string, x: number, y: number, itemId = 'item_1', kind = 'bread'): SimEvent =>
+  ev('item_taken', { itemId, kind, takerId, ownerId, x, y })
+
+describe('composePerception: ownership prose', () => {
+  function ownedWorld(): WorldState {
+    let s = makeWorld([{ id: 'watcher', x: 0, y: 0 }, { id: 'rahel', x: 2, y: 0 }])
+    s = fold(s, ev('agent_spawned', { id: 'yusuf', name: 'Yusuf', x: 3, y: 0, ageDays: 7300 }), DEFAULT_CONFIG)
+    s = fold(s, ev('item_spawned', {
+      id: 'item_1', kind: 'basket', qty: 1, loc: { t: 'tile', x: 1, y: 0 }, owner: 'rahel',
+    }), DEFAULT_CONFIG)
+    s = fold(s, ev('item_spawned', {
+      id: 'item_2', kind: 'chair', qty: 1, loc: { t: 'agent', id: 'watcher' }, owner: 'watcher', crafterMark: 'yusuf',
+    }), DEFAULT_CONFIG)
+    s = fold(s, ev('item_spawned', {
+      id: 'item_3', kind: 'stone', qty: 1, loc: { t: 'tile', x: 1, y: 1 },
+    }), DEFAULT_CONFIG)
+    return s
+  }
+
+  it('names the owner of a thing on the ground and the maker of a thing in hand', () => {
+    const p = composePerception(ownedWorld(), DEFAULT_CONFIG, 'watcher', [])
+    expect(p.visible.items.find(i => i.id === 'item_1')).toMatchObject({ ownerName: 'rahel' })
+    expect(p.self.inventory.find(i => i.id === 'item_2'))
+      .toMatchObject({ ownerName: 'watcher', crafterMarkName: 'Yusuf' })
+  })
+
+  it('leaves an unowned thing unnamed rather than calling it no-one’s', () => {
+    const p = composePerception(ownedWorld(), DEFAULT_CONFIG, 'watcher', [])
+    const stone = p.visible.items.find(i => i.id === 'item_3')!
+    expect(stone).not.toHaveProperty('ownerName')
+    expect(stone).not.toHaveProperty('crafterMarkName')
+  })
+
+  it('keeps naming a dead owner — the basket is still Rahel’s', () => {
+    let s = ownedWorld()
+    s = fold(s, ev('agent_died', { agentId: 'rahel', cause: 'starvation' }), DEFAULT_CONFIG)
+    const p = composePerception(s, DEFAULT_CONFIG, 'watcher', [])
+    expect(p.visible.agents.map(g => g.id)).not.toContain('rahel')
+    expect(p.visible.items.find(i => i.id === 'item_1')).toMatchObject({ ownerName: 'rahel' })
+  })
+
+  it('never mutates the stored item while dressing it in a name', () => {
+    const s = ownedWorld()
+    composePerception(s, DEFAULT_CONFIG, 'watcher', [])
+    expect(s.items.item_2!).not.toHaveProperty('crafterMarkName')
+  })
+
+  it('stops surfacing ownership when the flag is off', () => {
+    const off = SimConfigSchema.parse({ ownership: { enabled: false } })
+    const p = composePerception(ownedWorld(), off, 'watcher', [])
+    expect(p.visible.items.find(i => i.id === 'item_1')).not.toHaveProperty('ownerName')
+    expect(p.self.inventory.find(i => i.id === 'item_2')).not.toHaveProperty('crafterMarkName')
+  })
+})
+
+describe('composePerception: witnessed takings', () => {
+  function theftWorld(): WorldState {
+    return makeWorld([
+      { id: 'omar', x: 4, y: 4 },
+      { id: 'salma', x: 5, y: 4 },
+      { id: 'bystander', x: 6, y: 4 },
+      { id: 'distant', x: 40, y: 40 },
+    ])
+  }
+
+  it('a third party in sight of the spot sees who took whose', () => {
+    const p = composePerception(theftWorld(), DEFAULT_CONFIG, 'bystander', [taken('omar', 'salma', 4, 4)])
+    expect(p.seen).toEqual([{ kind: 'item_taken', takerName: 'omar', ownerName: 'salma', itemKind: 'bread' }])
+  })
+
+  it('is blind past the sight radius', () => {
+    expect(composePerception(theftWorld(), DEFAULT_CONFIG, 'distant', [taken('omar', 'salma', 4, 4)]).seen)
+      .toEqual([])
+  })
+
+  it('does not echo your own hands back at you', () => {
+    expect(composePerception(theftWorld(), DEFAULT_CONFIG, 'omar', [taken('omar', 'salma', 4, 4)]).seen)
+      .toEqual([])
+  })
+
+  it('walls block the view — indoors you see only what happens in the room', () => {
+    let s = withHut(theftWorld())
+    s = goInside(s, 'bystander')
+    expect(composePerception(s, DEFAULT_CONFIG, 'bystander', [taken('omar', 'salma', 4, 4)]).seen).toEqual([])
+    s = goInside(s, 'omar')
+    expect(composePerception(s, DEFAULT_CONFIG, 'bystander', [taken('omar', 'salma', DOOR.x, DOOR.y)]).seen)
+      .toEqual([{ kind: 'item_taken', takerName: 'omar', ownerName: 'salma', itemKind: 'bread' }])
+  })
+
+  it('goes quiet when the flag is off', () => {
+    const off = SimConfigSchema.parse({ ownership: { enabled: false } })
+    expect(composePerception(theftWorld(), off, 'bystander', [taken('omar', 'salma', 4, 4)]).seen).toEqual([])
   })
 })

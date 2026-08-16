@@ -26,7 +26,13 @@ export type PerceivedStructure = {
   burning: boolean; stage: 'construction' | 'complete'
 }
 
-export type PerceivedItem = { id: string; kind: string; qty: number; x: number; y: number }
+// Whose it is, and whose hands made it — the two things prose needs to say
+// "Rahel's basket" or "a chair bearing Yusuf's mark". Absent when unclaimed.
+export type OwnerNames = { ownerName?: string; crafterMarkName?: string }
+
+export type PerceivedItem = { id: string; kind: string; qty: number; x: number; y: number } & OwnerNames
+
+export type InventoryItem = Item & OwnerNames
 
 export type PerceivedCrop = { id: string; kind: string; x: number; y: number; stage: number; withered: boolean }
 
@@ -42,7 +48,7 @@ export type PerceptionPacket = {
     x: number
     y: number
     activity: string | null
-    inventory: Item[]
+    inventory: InventoryItem[]
   }
   weather: { kind: string; temperatureC: number }
   visible: {
@@ -131,6 +137,15 @@ export function composePerception(
   // Four walls are also a horizon: inside, the world shrinks to this one room.
   const indoors = self.insideId ?? null
 
+  // Names outlive their owners: a dead woman's basket is still hers to everyone who looks.
+  const nameOf = (id: string): string => state.agents[id]?.name ?? id
+  const ownerNames = (i: Item): OwnerNames => config.ownership.enabled
+    ? {
+        ...(i.owner === undefined ? {} : { ownerName: nameOf(i.owner) }),
+        ...(i.crafterMark === undefined ? {} : { crafterMarkName: nameOf(i.crafterMark) }),
+      }
+    : {}
+
   const visibleAgents: PerceivedAgent[] = Object.values(state.agents)
     .filter(a => a.id !== agentId && a.alive
       && (indoors === null ? (a.insideId === undefined && withinSight(a.x, a.y)) : a.insideId === indoors))
@@ -159,7 +174,7 @@ export function composePerception(
     .filter(isTileItem)
     .filter(i => withinSight(i.loc.x, i.loc.y))
     .sort(byId)
-    .map(i => ({ id: i.id, kind: i.kind, qty: i.qty, x: i.loc.x, y: i.loc.y }))
+    .map(i => ({ id: i.id, kind: i.kind, qty: i.qty, x: i.loc.x, y: i.loc.y, ...ownerNames(i) }))
 
   const structureItems: PerceivedItem[] = Object.values(state.items)
     .filter(isStructureItem)
@@ -172,7 +187,7 @@ export function composePerception(
     .sort(byId)
     .map(i => {
       const s = state.structures[i.loc.id]!
-      return { id: i.id, kind: i.kind, qty: i.qty, x: s.x, y: s.y }
+      return { id: i.id, kind: i.kind, qty: i.qty, x: s.x, y: s.y, ...ownerNames(i) }
     })
 
   const visibleItems: PerceivedItem[] = [...tileItems, ...structureItems].sort(byId)
@@ -182,9 +197,10 @@ export function composePerception(
     .sort(byId)
     .map(c => ({ id: c.id, kind: c.kind, x: c.x, y: c.y, stage: c.stage, withered: c.withered }))
 
-  const inventory: Item[] = Object.values(state.items)
+  const inventory: InventoryItem[] = Object.values(state.items)
     .filter(i => i.loc.t === 'agent' && i.loc.id === agentId)
     .sort(byId)
+    .map(i => ({ ...i, ...ownerNames(i) }))
 
   const heard: HeardSpeech[] = []
   for (const ev of recentEvents) {
@@ -196,6 +212,23 @@ export function composePerception(
     const distance = dist(self.x, self.y, p.x, p.y)
     const speakerId = String(p.agentId)
     heard.push({ speakerId, name: state.agents[speakerId]?.name ?? speakerId, text: p.text, distance })
+  }
+
+  // A taking is witnessed by whoever could see the spot — the same horizon that
+  // governs sight, so four walls hide it exactly as they hide the taker.
+  const seen: SeenEvent[] = []
+  if (config.ownership.enabled) {
+    for (const ev of recentEvents) {
+      if (ev.type !== 'item_taken') continue
+      const p = ev.payload as { takerId?: unknown; ownerId?: unknown; kind?: unknown; x?: unknown; y?: unknown }
+      if (typeof p.takerId !== 'string' || typeof p.ownerId !== 'string' || typeof p.kind !== 'string') continue
+      if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
+      if (p.takerId === agentId) continue
+      const takerInside = state.agents[p.takerId]?.insideId ?? null
+      const witnessed = indoors === null ? takerInside === null && withinSight(p.x, p.y) : takerInside === indoors
+      if (!witnessed) continue
+      seen.push({ kind: 'item_taken', takerName: nameOf(p.takerId), ownerName: nameOf(p.ownerId), itemKind: p.kind })
+    }
   }
 
   const feltEvents = recentEvents.map(ev => feltTagFor(agentId, ev)).filter((t): t is string => t !== null)
@@ -217,7 +250,7 @@ export function composePerception(
     weather: { ...state.weather },
     visible: { agents: visibleAgents, structures: visibleStructures, items: visibleItems, crops: visibleCrops },
     heard,
-    seen: [],
+    seen,
     feltEvents,
   }
 }
