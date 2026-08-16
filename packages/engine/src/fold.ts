@@ -3,6 +3,7 @@ import type { TileId, WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
   AgentAged, AgentCollapsed, AgentDied, AgentFellIll, AgentInfected, AgentInjured, AgentMoved,
+  AgentEntered, AgentExited,
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CropGrew, CropHarvested, CropPlanted, CropWithered,
   FireExtinguished, FireIgnited, FireSpread, HpChanged,
@@ -10,6 +11,7 @@ import {
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
+import { occupantsOf } from './interiors.js'
 import { findPath } from './path.js'
 import { WalkParams } from './verbs.js'
 
@@ -21,6 +23,15 @@ function bumpCounter(counters: WorldState['counters'], id: string): WorldState['
   if (!m) return counters
   const next = Number(m[1]) + 1
   return next > counters.nextEntityId ? { ...counters, nextEntityId: next } : counters
+}
+
+// Emit-free state repair is not allowed: a destroyer must emit agent_exited first,
+// so the log alone explains where everybody went.
+function refuseOccupied(state: WorldState, structureId: string): void {
+  const occupants = occupantsOf(state, structureId)
+  if (occupants.length > 0) {
+    throw new Error(`structure ${structureId} destroyed with occupant(s) ${occupants.join(', ')} still inside`)
+  }
 }
 
 export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEFAULT_CONFIG): WorldState {
@@ -113,6 +124,7 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
             id: p.id, kind: p.kind, x: p.x, y: p.y, w: p.w, h: p.h,
             hp: 1, maxHp: p.maxHp, flammable: p.flammable, stage: 'construction',
             progressTicks: 0, builtBy: p.builderId, burning: false, burnTicks: 0,
+            ...(p.owner === undefined ? {} : { owner: p.owner }),
           },
         },
         counters: bumpCounter(state.counters, p.id),
@@ -136,6 +148,7 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       if (!s) throw new Error(`structure_damaged for unknown structure ${p.id}`)
       const hp = s.hp - p.amount
       if (hp <= 0) {
+        refuseOccupied(state, p.id)
         const { [p.id]: _, ...structures } = state.structures
         return { ...state, structures }
       }
@@ -145,6 +158,7 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
     case 'structure_destroyed': {
       const p = StructureDestroyed.parse(event.payload)
       if (!state.structures[p.id]) throw new Error(`structure_destroyed for unknown structure ${p.id}`)
+      refuseOccupied(state, p.id)
       const { [p.id]: _, ...structures } = state.structures
       return { ...state, structures }
     }
@@ -219,6 +233,20 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_slept for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, asleep: true } } }
+    }
+    case 'agent_entered': {
+      const p = AgentEntered.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_entered for unknown agent ${p.agentId}`)
+      if (!state.structures[p.structureId]) throw new Error(`agent_entered for unknown structure ${p.structureId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, insideId: p.structureId } } }
+    }
+    case 'agent_exited': {
+      const p = AgentExited.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_exited for unknown agent ${p.agentId}`)
+      const { insideId: _, ...body } = a
+      return { ...state, agents: { ...state.agents, [p.agentId]: body } }
     }
     case 'agent_spoke': {
       const p = AgentSpoke.parse(event.payload)

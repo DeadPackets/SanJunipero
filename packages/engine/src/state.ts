@@ -10,6 +10,7 @@ export type AgentBody = {
   ill: boolean; ageDays: number
   tendedTick?: number                     // absent until first tended: keeps pre-health state hashes stable
   lastSpokeTick?: number                  // absent until first speech: keeps golden hashes stable
+  insideId?: string                       // absent until first entry: keeps golden hashes stable
   skills: Record<string, number>          // track → xp
   activity: null | { verb: string; ticksRemaining: number; params: Record<string, unknown>; path?: Array<[number, number]> }
   collapsedSinceTick: number | null
@@ -20,6 +21,7 @@ export type Structure = {
   id: string; kind: string; x: number; y: number; w: number; h: number
   hp: number; maxHp: number; flammable: boolean; stage: 'construction' | 'complete'
   progressTicks: number; builtBy: string | null; burning: boolean; burnTicks: number
+  owner?: string                          // absent = public; the hash-stable form of `agentId | null`
 }
 
 export type Item = {

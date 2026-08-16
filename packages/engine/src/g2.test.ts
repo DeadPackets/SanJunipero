@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
+import { SimConfigSchema, stateHash, type SimEvent } from '@sj/shared'
 import type { WorldState } from './state.js'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
@@ -16,6 +16,11 @@ import {
 // Pinned golden hash for the 3-day scripted world run (regen #3, deliberate:
 // collapsed-sleep recovery + crop stage formula changed the scripted timeline).
 const GOLDEN_G2_HASH = '7263dde98076dbb234bdeded24aab659987190ce00e4581999027d615ec977e8'
+
+// C9 flags pinned OFF so this fixture keeps the regen-#3 hash. Each pin has an owner task
+// that removes it and folds the change into the single deliberate regen (plan Task 16):
+//   ownership.enabled — the Builder would own his hut; removed by Task 4.
+const G2_CONFIG = SimConfigSchema.parse({ ownership: { enabled: false } })
 
 const SEED = 'g2-scripted'
 const TOTAL_TICKS = 4320 // 3 sim days
@@ -32,7 +37,7 @@ function allEvents(store: EventStore): SimEvent[] {
 
 function runScenario(seed = SEED): { state: WorldState; store: EventStore; evs: SimEvent[] } {
   const store = new EventStore(openDb(':memory:'))
-  const loop = createScriptedLoop(DEFAULT_CONFIG, seed, store)
+  const loop = createScriptedLoop(G2_CONFIG, seed, store)
   runTicks(loop, TOTAL_TICKS)
   return { state: loop.state, store, evs: allEvents(store) }
 }
@@ -58,7 +63,7 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(collapseEv!.tick).toBeLessThan(diedEv!.tick)
     const zeroTick = state.agents[IDLER]!.zeroHungerSinceTick
     expect(zeroTick).not.toBeNull()
-    expect(diedEv!.tick).toBe(zeroTick! + DEFAULT_CONFIG.needs.deathAfterZeroHungerTicks + 1)
+    expect(diedEv!.tick).toBe(zeroTick! + G2_CONFIG.needs.deathAfterZeroHungerTicks + 1)
 
     // 3. Builder's hut completes.
     const hut = Object.values(state.structures).find((s) => s.kind === 'hut')
@@ -79,7 +84,7 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(wheat).toBeDefined()
     expect(wheat!.stage).toBe(0)
     expect(wheat!.withered).toBe(false)
-    expect(wheat!.stage).not.toBe(DEFAULT_CONFIG.crops.wheat!.stages - 1)
+    expect(wheat!.stage).not.toBe(G2_CONFIG.crops.wheat!.stages - 1)
 
     // Rescue flow: collapsed Idler fed via give + eat (eat exempt), recovers, then dies.
     const giveEv = evs.find((e) => e.type === 'item_moved'
@@ -91,7 +96,7 @@ describe('GATE G2: 3-day scripted world run', () => {
     const eatEv = evs.find((e) => e.type === 'need_changed'
       && (e.payload as Payload).id === IDLER
       && (e.payload as Payload).need === 'hunger'
-      && (e.payload as Payload).delta === DEFAULT_CONFIG.needs.eatRestoreHunger)
+      && (e.payload as Payload).delta === G2_CONFIG.needs.eatRestoreHunger)
     expect(eatEv).toBeDefined()
     expect(giveEv!.tick).toBeLessThan(eatEv!.tick)
     // After eating, the Idler can act again (walk) -> collapse cleared.
@@ -113,7 +118,7 @@ describe('GATE G2: 3-day scripted world run', () => {
 
   it('replayFromGenesis equals the live run, config threaded explicitly', () => {
     const { state, store } = runScenario()
-    expect(stateHash(replayFromGenesis(store, DEFAULT_CONFIG, makeFixtureMap()))).toBe(stateHash(state))
+    expect(stateHash(replayFromGenesis(store, G2_CONFIG, makeFixtureMap()))).toBe(stateHash(state))
   })
 
   it('crash at tick 2000: recover, continue to 4320, hash equals uninterrupted run', () => {
@@ -123,15 +128,15 @@ describe('GATE G2: 3-day scripted world run', () => {
     const dbPath = join(dir, 'town.db')
     try {
       const store = new EventStore(openDb(dbPath))
-      const loop1 = createScriptedLoop(DEFAULT_CONFIG, SEED, store)
+      const loop1 = createScriptedLoop(G2_CONFIG, SEED, store)
       runTicks(loop1, 2000)
 
       // "crash": no clean shutdown; recover from the durable store.
-      const rec = replayLatest(store, DEFAULT_CONFIG, makeFixtureMap())
+      const rec = replayLatest(store, G2_CONFIG, makeFixtureMap())
       const loop2: TickLoop = new TickLoop({
-        store, state: rec.state, rng: rec.rng, config: DEFAULT_CONFIG, startTick: rec.state.tick,
+        store, state: rec.state, rng: rec.rng, config: G2_CONFIG, startTick: rec.state.tick,
         snapshotEveryTicks: 120,
-        onTick: makeScriptedOnTick(DEFAULT_CONFIG, rec.rng, () => loop2.state),
+        onTick: makeScriptedOnTick(G2_CONFIG, rec.rng, () => loop2.state),
       })
       runTicks(loop2, TOTAL_TICKS - rec.state.tick)
       expect(stateHash(loop2.state)).toBe(stateHash(ref.state))

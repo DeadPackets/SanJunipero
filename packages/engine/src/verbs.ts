@@ -2,11 +2,12 @@ import { z } from 'zod'
 import { MINUTES_PER_DAY, simTimeFromTick, type SimConfig } from '@sj/shared'
 import { mintId, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
+import { doorTile } from './interiors.js'
 import { findPath, isPassable } from './path.js'
 
 export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
-  | 'walk' | 'sleep' | 'wake' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
+  | 'walk' | 'sleep' | 'wake' | 'enter' | 'exit' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
   | 'build' | 'craft' | 'extinguish'
   | 'speak' | 'give' | 'take' | 'write' | 'read' | 'teach' | 'attack' | 'experiment'
 
@@ -65,6 +66,7 @@ const walk: VerbDef = makeVerb({
     const p = WalkParams.safeParse(params)
     if (!p.success) return 'walk needs a destination {x, y}'
     const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return 'you are indoors; step outside first'
     if (a.x === p.data.x && a.y === p.data.y) return 'already at that spot'
     if (findPath(state, a, p.data, config) === null) return 'no path to that spot'
     return null
@@ -92,6 +94,47 @@ const sleep: VerbDef = makeVerb({
     return state.agents[agentId]!.asleep ? 'already asleep' : null
   },
   onComplete(_state, _config, agentId) { return [{ type: 'agent_slept', payload: { agentId } }] },
+})
+
+export const EnterParams = z.object({ structureId: z.string() }).strict()
+
+const enter: VerbDef = makeVerb({
+  kind: 'enter',
+  validate(state, config, agentId, params) {
+    const p = EnterParams.safeParse(params)
+    if (!p.success) return 'enter needs a {structureId}'
+    const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return 'already inside'
+    const s = state.structures[p.data.structureId]
+    if (!s) return 'there is nothing there to enter'
+    if (!config.structures.enterableKinds.includes(s.kind)) return `there is no way into a ${s.kind}`
+    if (s.stage !== 'complete') return 'it is not finished'
+    const door = doorTile(state, s)
+    if (!door) return 'there is no way in'
+    if (Math.abs(a.x - door.x) > 1 || Math.abs(a.y - door.y) > 1) return 'not close enough to the door'
+    return null
+  },
+  onComplete(state, _config, agentId, params) {
+    const p = EnterParams.parse(params)
+    const s = state.structures[p.structureId]
+    const door = s ? doorTile(state, s) : null
+    if (!door) return []
+    return [
+      { type: 'agent_moved', payload: { id: agentId, x: door.x, y: door.y } },
+      { type: 'agent_entered', payload: { agentId, structureId: p.structureId } },
+    ]
+  },
+})
+
+const exit: VerbDef = makeVerb({
+  kind: 'exit',
+  validate(state, _config, agentId) {
+    return state.agents[agentId]!.insideId === undefined ? 'not inside anything' : null
+  },
+  onComplete(state, _config, agentId) {
+    const structureId = state.agents[agentId]!.insideId
+    return structureId === undefined ? [] : [{ type: 'agent_exited', payload: { agentId, structureId } }]
+  },
 })
 
 // submitIntent already prepends agent_woke for any intent from a sleeper.
@@ -358,6 +401,7 @@ const build: VerbDef = makeVerb({
         payload: {
           id: mintId(state, 'structure'), kind: p.kind, x: p.x, y: p.y, w, h,
           maxHp: config.construction.hutMaxHp, flammable: true, builderId: agentId,
+          ...(config.ownership.enabled ? { owner: agentId } : {}),
         },
       },
     ]
@@ -588,7 +632,7 @@ const experiment: VerbDef = makeVerb({
 })
 
 export const VERBS: Record<string, VerbDef> = {
-  walk, sleep, wake, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
+  walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
   speak, give, take, write, read, teach, attack, experiment,
 }
 

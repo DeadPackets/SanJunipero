@@ -20,7 +20,7 @@ export const ItemQtyChanged = z.object({ id: z.string(), delta: z.number() }).st
 export const ItemTextChanged = z.object({ id: z.string(), text: z.string() }).strict()
 export const StructurePlanned = z.object({
   id: z.string(), kind: z.string(), x: z.number(), y: z.number(), w: z.number(), h: z.number(),
-  maxHp: z.number(), flammable: z.boolean(), builderId: z.string(),
+  maxHp: z.number(), flammable: z.boolean(), builderId: z.string(), owner: z.string().optional(),
 }).strict()
 export const StructureProgressed = z.object({ id: z.string(), ticks: z.number() }).strict()
 export const StructureCompleted = z.object({ id: z.string() }).strict()
@@ -43,6 +43,8 @@ export const ActionInterrupted = z.object({ agentId: z.string(), reason: z.strin
 export const SkillGained = z.object({ agentId: z.string(), track: z.string(), xp: z.number() }).strict()
 export const AgentWoke = z.object({ agentId: z.string() }).strict()
 export const AgentSlept = z.object({ agentId: z.string() }).strict()
+export const AgentEntered = z.object({ agentId: z.string(), structureId: z.string() }).strict()
+export const AgentExited = z.object({ agentId: z.string(), structureId: z.string() }).strict()
 export const AgentSpoke = z.object({ agentId: z.string(), text: z.string(), x: z.number(), y: z.number() }).strict()
 export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
 export const AgentDied = z.object({ agentId: z.string(), cause: z.string() }).strict()

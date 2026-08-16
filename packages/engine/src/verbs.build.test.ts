@@ -54,7 +54,7 @@ describe('verb: build', () => {
     expect(r.events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'item_1', delta: -10 } })
     expect(r.events).toContainEqual({
       type: 'structure_planned',
-      payload: { id: 'structure_2', kind: 'hut', x: 1, y: 1, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1' },
+      payload: { id: 'structure_2', kind: 'hut', x: 1, y: 1, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1', owner: 'a1' },
     })
     const w = applyAll(s, r.events)
     expect(w.items.item_1).toBeUndefined()

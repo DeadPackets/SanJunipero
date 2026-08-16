@@ -1,4 +1,5 @@
 import { simTimeFromTick } from '@sj/shared'
+import { occupantsOf } from '../interiors.js'
 import type { Structure, WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 
@@ -47,7 +48,10 @@ export function fireSystem(ctx: TickCtx): void {
     if (!s.burning) continue
     const perTick = s.maxHp / cfg.burnTicksToDestroy
     if (s.burnTicks + 1 >= cfg.burnTicksToDestroy || s.hp <= perTick) {
-      // The final damage deletes the structure: drop its contents first.
+      // The final damage deletes the structure: put out anyone still inside, then its contents.
+      for (const agentId of occupantsOf(ctx.state(), id)) {
+        ctx.emit('agent_exited', { agentId, structureId: id })
+      }
       for (const itemId of Object.keys(ctx.state().items).sort()) {
         const item = ctx.state().items[itemId]!
         if (item.loc.t === 'structure' && item.loc.id === id) {
