@@ -38,7 +38,8 @@ export const CAST_V4: readonly CastMember[] = [
       'braid, wearing a wide-brim straw sun hat and a sage-green work dress',
     featureCap:
       'Only THREE signature features: the straw sun hat, the single braid, the sage-green dress. ' +
-      'No ledger, no papers, no basket, no extra props or accessories.',
+      'No ledger, no papers, no basket, no extra props or accessories. Both hands are EMPTY: ' +
+      'no book, nothing held in either hand.',
   },
   {
     id: 'salma',

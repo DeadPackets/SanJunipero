@@ -193,10 +193,14 @@ async function runCharacter(m: CastMember): Promise<void> {
   // concept (identity root; single candidate — the master gates + batch eyeball select)
   const concept = await candidate(DIR, `concept-${m.id}-c0`, conceptPrompt(m), [STYLE_ANCHOR], '1024x1024', 0.08)
 
-  // master pair: 2 candidates, pick by pixel pitch among those that slice into 2 figures
+  // master pair: 2 candidates, pick by pixel pitch among those that slice into 2 figures.
+  // A 3rd candidate funds only when no usable master reached pitch 6 (nadia-attempt1:
+  // c0 failed keyBg entirely and the pitch-4 c1 won unopposed — off chibi scale).
+  const MASTER_MIN_PITCH = 6
   type Master = { key: string; raw: Buffer; se: RawImage; ne: RawImage; pitch: number; frontBack: number }
   const masters: Master[] = []
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
+    if (i === 2 && masters.some(x => x.pitch >= MASTER_MIN_PITCH)) break
     const key = `master-${m.id}-c${i}`
     const raw = await candidate(DIR, key, masterPrompt(m), [STYLE_ANCHOR, concept], '1024x1024', 0.08)
     try {
@@ -295,8 +299,14 @@ async function runCharacter(m: CastMember): Promise<void> {
         const retry = await genFrame(f, p, 1)
         if (retry) frameCands[f][p].push(retry)
       }
-      const best = bestOf(frameCands[f][p])
+      let best = bestOf(frameCands[f][p])
       if (!best) throw new Error(`${m.id} ${f}/${p}: every candidate failed processing`)
+      // An identity-broken frame (concept bleed, wrong costume) inside the walk cycle is
+      // worse than one more call: fund a 3rd candidate before accepting it.
+      if (identityBroken(best)) {
+        const extra = await genFrame(f, p, 2)
+        if (extra) { frameCands[f][p].push(extra); best = bestOf(frameCands[f][p])! }
+      }
       chosen[f][p] = best
     }
     let stride = strideGateV4(f, {
