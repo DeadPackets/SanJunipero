@@ -69,6 +69,41 @@
 - [ ] **Step 4:** Test + `pnpm typecheck` PASS; run full engine suite — golden hash MUST be unchanged (config additions are inert until systems land).
 - [ ] **Step 5:** Commit `feat(shared): C9 sim-config sections (interiors, reproduction, spoilage, seasons, tools, mystery, expert crafts)`.
 
+### Task 1b: Road tile and config-priced terrain costs
+
+> EXECUTED in batch 1 (05cc218). Entry added by the 2026-08-16 plan repair (audit A0): the task
+> was reconstructed from deep-world addendum §3, the v1-core findings ledger, and the C10 plan
+> (which pins `ROAD_TILE = 7`) because the ratified plan text carried no Task 1b. Steps below
+> describe what was built.
+
+**Files:** Modify `packages/engine/src/state.ts` (`TileId` widens `0..6` → `0..7`), `path.ts`
+(`terrainCostFor`, `findPath(..., config?)`), `events.def.ts` (`TerrainChanged.tile` `.max(6)` →
+`.max(7)`), `fold.ts` + `verbs.ts` (thread config into walk pathing), `packages/shared/src/config.ts`
+(new `pathing` section), `packages/web/src/render/ground.ts` (`TILE_COLORS` gains a `7` entry);
+tests `path.test.ts`, `config.test.ts`.
+
+**Interfaces — Produces:**
+```ts
+export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7            // 7 = road, the id the C10 plan pins as ROAD_TILE
+export function terrainCostFor(config: SimConfig): Record<TileId, number>  // pure; 7 → config.pathing.roadCost
+export const TERRAIN_COST: Record<TileId, number>             // = terrainCostFor(DEFAULT_CONFIG), retained for existing callers
+```
+C10 owns the named `ROAD_TILE` constant and the road texture; C9 lands the tile id, its price, and
+a placeholder colour in `TILE_COLORS` only.
+Config: new `.strict().prefault({})` section `pathing` holding **`roadCost: 0.6` ONLY** — per audit
+A3, `pathing.maxNodes` / `pathing.regionSize` are C11's keys and must NOT be added here.
+
+- [x] **Step 1:** Failing tests: `terrainCostFor(DEFAULT_CONFIG)[7] === 0.6`; costs `0..6`
+  byte-identical to the old const; a monotone route across road tiles is preferred over grass;
+  `pathing` rejects unknown keys.
+- [x] **Step 2–4:** FAIL → implement → PASS; `pnpm typecheck` green; G1 + G2 hashes unchanged (no
+  fixture map contains tile 7).
+- [x] **Step 5:** Commit `feat(engine): road tile 7 and config-priced terrain costs`.
+
+**Recorded caveat (batch 1):** the A\* Manhattan heuristic is inadmissible once a tile costs < 1,
+so road preference is guaranteed only on monotone routes (which the tests pin). Correcting the
+heuristic would move existing paths and both goldens — left alone, flagged for C11's pathing task.
+
 ### Task 2: Structure interiors — doors, enter/exit, insideId
 
 **Files:** Create `packages/engine/src/interiors.ts` + `interiors.test.ts`; modify `state.ts` (`insideId?: string` on AgentBody — optional, absent-until-first-use for hash stability), `events.def.ts` + `fold.ts` (`agent_entered`/`agent_exited`), `verbs.ts` (verbs `enter`, `exit`; `walk` refuses while inside: `'you are indoors; step outside first'`), `intent.ts` untouched, `index.ts` exports.
@@ -84,6 +119,49 @@ Verb semantics per addendum §1: `enter {structureId}` requires complete + kind 
 
 - [ ] **Step 1:** Failing tests: door derivation (plain hut → south-center; blocked south → clockwise fallback; fully walled → null); enter/exit round-trip sets/clears `insideId` and parks the body on the door tile; enter refused for construction-stage, non-enterable kind (`standing_stone`), out of reach; walk-while-inside refused; destruction with an occupant: system emits exit-then-destroy, fold-only destroy with occupant throws.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Suite + typecheck PASS; golden hash unchanged (no existing scripted actor enters anything). **Step 5:** Commit `feat(engine): structure interiors — doors, enter/exit verbs, insideId occupancy`.
+
+**Also landed here (audit A2, batch 1):** `Structure.owner?: string` — **absent = public**, NOT the
+literal `owner: string | null` the deep-world POST-REVIEW RULING 1 wording implies, because
+`stableStringify` drops `undefined` keys but hashes `null`, so the literal form would stamp
+`owner: null` on every existing structure and move G1/G2 on the spot. `build` sets
+`owner = builderId` behind `config.ownership.enabled`; `structure_planned` gains an optional
+`owner`. No behavioural rule rides on it — entering or sleeping in another agent's hut stays legal
+and is merely witnessed. The G2 fixture pins `ownership.enabled: false` so batch-1 goldens stay
+byte-identical; **Task 16 removes that pin** (see Task 16 Step 0).
+
+### Task 2b: Sleep is indoors-only — the bed law
+
+> EXECUTED in batch 1 (0ca0427). Entry added by the 2026-08-16 plan repair (audit A0): the task
+> was reconstructed from deep-world POST-REVIEW RULINGS 1 ("sleep law checks kind + indoors only")
+> and the C10 plan ("sleep-in-bed is C9 Task 2b's law") because the ratified plan text carried no
+> Task 2b. Steps below describe what was built.
+
+**Files:** Modify `packages/shared/src/config.ts` (`structures` section gains `sleepIndoorsOnly`,
+`sleepableKinds`), `packages/engine/src/verbs.ts` (`sleep.validate`); tests `config.test.ts`,
+`interiors.test.ts`; pin the flag off in the pre-C9 bare-world fixtures (`g2.test.ts`,
+`worldTick.test.ts`, `agentRuntime.test.ts`).
+
+**Interfaces — Produces:** config `structures.sleepIndoorsOnly: true` (a §19-style C9 feature flag,
+default true) and `structures.sleepableKinds: ['hut']`. Law: `sleep` is refused unless the agent is
+inside (`insideId`, Task 2) a **complete** structure whose `kind ∈ structures.sleepableKinds`.
+Diegetic refusal, exact string: **`'there is no bed here; find somewhere to lie down'`**.
+**Collapse excepted** — an agent with `collapsedSinceTick !== null` may sleep anywhere; the
+collapsed-sleep recovery flow and the G2 Idler rescue arc depend on it. **Ownership is NOT
+checked** (deep-world RULINGS 1, verbatim). `structures.sleepIndoorsOnly` and `ownership.enabled`
+both join `TOGGLABLE_PATHS` in Task 15b.
+
+- [x] **Step 1:** Failing tests: sleep inside a complete hut allowed; outdoors refused with the
+  exact string; inside an incomplete hut refused; collapsed agent sleeps anywhere; flag off →
+  pre-C9 behaviour restored.
+- [x] **Step 2–4:** FAIL → implement → PASS; typecheck green; G1 + G2 hashes unchanged.
+- [x] **Step 5:** Commit `feat(engine): sleep needs a roof — indoors-only bed law, config-gated`.
+
+**Recorded measurement (batch 1):** over the 3-day G2 run the law ON yields 13 sleeps / 14
+collapses / 72752 events, OFF yields 21 sleeps / 2 collapses / 65550 events — and **both hash to
+`7263dde9…`**. The pin is therefore not needed to hold the hash; it is needed to stop a hut-less
+pre-C9 fixture becoming a collapse farm and silently invalidating its own documented narrative.
+Corollary for every later task: a matching golden hash is weaker evidence of "no behavioural
+change" in this codebase than it looks.
 
 ### Task 3: Perception — occlusion, interior sight, witnessed channel
 
@@ -148,11 +226,27 @@ Verb semantics per addendum §1: `enter {structureId}` requires complete + kind 
 
 ### Task 11: Reproduction I — sex, co-sleeping, partnership
 
-**Files:** Create `packages/engine/src/systems/reproduction.ts` + test; modify `state.ts` (`AgentBody.sex: 'f'|'m'` with fold default `'f'` when payload omits; `WorldState.pairNights: Record<string, {nights: number; lastNightDay: number}>` initialized `{}` in `genesisState`), `events.def.ts`/`fold.ts` (`agent_spawned` +`sex?`; `co_slept`), `worldTick.ts` (register before agingSystem), `scripted.ts` (scripted actors get explicit sexes).
+**Files:** Create `packages/engine/src/systems/reproduction.ts` + test; modify `state.ts` (`AgentBody.sex: 'f'|'m'` with fold default `'f'` when payload omits; `WorldState.pairNights: Record<string, {nights: number; lastNightDay: number; formedTick: number | null; dissolvedTick: number | null}>` initialized `{}` in `genesisState`), `events.def.ts`/`fold.ts` (`agent_spawned` +`sex?`; `co_slept`), `worldTick.ts` (register before agingSystem), `scripted.ts` (scripted actors get explicit sexes).
 
 **Interfaces — Produces:** `pairKey(a, b)` = sorted join `'|'` (exported). Midnight pass: for each private structure, each unordered pair asleep inside → `co_slept {aId, bId, day}`; fold updates `{nights, lastNightDay}` with the 7-day-gap reset (gap > `partnerWindowDays` → nights = 1). `isPartnered(state, a, b, config)` = nights ≥ `coSleepNightsToPartner`.
 
-- [ ] Steps: failing tests (two asleep in one hut at midnight → `co_slept`; awake occupant excluded; storehouse (non-private) never counts; nights 1→2→3 across consecutive midnights → partnered; 8-day gap resets to 1; three occupants → three pairs, deterministic order) → implement → PASS → commit `feat(engine): co-sleeping ledger and mechanical partnership inference`.
+**Dissolution semantics (BINDING — AMENDMENT 2026-08-16 pm2, audit A1):** the pair row carries
+partnership *transitions*, not only current state. Both new fields are **nullable and stamped only
+on transition**, so a never-partnered pair keeps today's row shape and hashes identically.
+
+```ts
+export type PairRow = { nights: number; lastNightDay: number; formedTick: number | null; dissolvedTick: number | null }
+export function partnershipOf(state: WorldState, a: string, b: string): PairRow | undefined
+```
+- `formedTick` stamps at the tick `nights` first reaches `config.reproduction.coSleepNightsToPartner`.
+- `dissolvedTick` stamps at the midnight the `partnerWindowDays` gap resets `nights` to 1 while
+  `formedTick !== null`.
+- Re-partnering re-stamps `formedTick` and clears `dissolvedTick` back to `null`.
+- `partnershipOf` is the exported read path so C11's tier-2 "first breakup" / "first affair"
+  detector queries transitions without reaching into `pairNights`. Without these fields that
+  detector has no data.
+
+- [ ] Steps: failing tests (two asleep in one hut at midnight → `co_slept`; awake occupant excluded; storehouse (non-private) never counts; nights 1→2→3 across consecutive midnights → partnered; 8-day gap resets to 1; three occupants → three pairs, deterministic order; **`formedTick` stamps exactly at the threshold tick and not before; `dissolvedTick` stamps at the gap-reset midnight; a never-partnered pair keeps both fields `null`; re-partnering re-stamps `formedTick` and nulls `dissolvedTick`; `partnershipOf` returns the row and `undefined` for strangers**) → implement → PASS → commit `feat(engine): co-sleeping ledger and mechanical partnership inference`.
 
 ### Task 12: Reproduction II — conception, gestation, birth at 12
 
@@ -202,6 +296,15 @@ export function applyLaw(queue: LawQueue, path: string, value: unknown): void   
 
 **Files:** Modify golden fixture(s) under `packages/engine/src` (whatever `replay`/golden suites pin), un-`todo` the hash rows parked by Tasks 4/8.
 
+- [ ] **Step 0 (batch-1 debt — do this FIRST, before any hash is collected):** REMOVE the two C9
+  feature pins batch 1 put in the G2 fixture's local `G2_CONFIG` const
+  (`packages/engine/src/g2.test.ts`): **`ownership.enabled: false`** (Task 2 / audit A2) and
+  **`structures.sleepIndoorsOnly: false`** (Task 2b). Both were added only to hold the golden byte-
+  identical while the goldens were frozen; regen is the moment they come off. If they survive this
+  task, G2 silently stops exercising C9's ownership and bed laws for the rest of the project.
+  Removing them changes both the G2 hash and the run's behaviour (measured in batch 1: 13 sleeps /
+  14 collapses ON vs 21 / 2 OFF) — that is expected and absorbed here. Re-read G2's documented
+  narrative afterwards and confirm it still describes the run.
 - [ ] **Step 1:** Run the full engine suite; collect the new stable hash across THREE consecutive runs (must be identical — flushes out any nondeterminism the new systems introduced).
 - [ ] **Step 2:** Regenerate the fixture via the existing harness command; assert replay-from-genesis == replay-from-snapshot == live fold.
 - [ ] **Step 3:** Full monorepo suite green; `pnpm typecheck` green.
@@ -357,7 +460,8 @@ Auth boundary per addendum §19 (decided, argued there): localhost bind by defau
 
 ## Self-Review
 
-- Every user ruling from the brief maps to a task: interiors/occlusion (2,3), ownership+marks+theft+inheritance-edge (4,5,6,7), reproduction/birth-at-12/child-mind + hybrid naming (11,12,25), unbounded population + $10/sim-day spend alert (24; population has no cap anywhere), scarcity (8,9,10), writing-as-core-verb argued in addendum §6 + built (13), mystery (14), aging/death-of-age (15 + already-landed C2 physics), refusal hints (18), humanizer + budgets (17), arbiter expansion (19,20), three probe bugs (21,22,23), world-law toggles + dashboard + viewer panel (15b,15c,25b,25c — user ruling 2026-08-16), C8 audit (26), gates (27,28). **Task count: 32.**
+- Every user ruling from the brief maps to a task: interiors/occlusion (2,3), ownership+marks+theft+inheritance-edge (4,5,6,7), reproduction/birth-at-12/child-mind + hybrid naming (11,12,25), unbounded population + $10/sim-day spend alert (24; population has no cap anywhere), scarcity (8,9,10), writing-as-core-verb argued in addendum §6 + built (13), mystery (14), aging/death-of-age (15 + already-landed C2 physics), refusal hints (18), humanizer + budgets (17), arbiter expansion (19,20), three probe bugs (21,22,23), world-law toggles + dashboard + viewer panel (15b,15c,25b,25c — user ruling 2026-08-16), C8 audit (26), gates (27,28); roads + the bed law (1b, 2b — added by the 2026-08-16 plan repair,
+  audit A0). **Task count: 34.**
 - Determinism: new streams `reproduction`/`mystery` only; spoilage/partnership/doors/occlusion roll-free; law flips only as hashed `config_changed` events at tick boundaries (Task 15b), replay-asserted at both gates; golden regen isolated to Task 16 with the Task 4/8 hash parking explicitly called out (the one messy spot — flagged in both tasks rather than hidden).
 - No placeholders: every task names exact files, interfaces, refusal strings, defaults; content tables (names, mysteries) are authored in-task.
 - Scope check: no supervisor package, no narrator code, no newcomer arrivals, no persona content rewrites — those stay C8/C7 (Task 26 lists the deltas instead). Gateway/web changes are limited to the two law surfaces the 2026-08-16 user ruling commissioned; the viewer channel stays read-only by construction (admin listener is a separate localhost+token server).
