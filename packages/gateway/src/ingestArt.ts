@@ -9,9 +9,12 @@ import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
 import {
   AssetCodex, CELL_NAMES_V4, cellAnchor, chromaKey, decodePng, encodePng,
-  packCharacterAtlas, processHiResCell, type RawImage,
+  packCharacterAtlas, processHiResCell, registerTerrainTiles, type RawImage,
 } from '@sj/forge'
-import type { BuildingManifest, CellAnchor } from '@sj/shared'
+import {
+  ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, roadAutotileKind,
+  type BuildingManifest, type CellAnchor,
+} from '@sj/shared'
 
 // durable session scratchpad (same precedent as the forge production scripts);
 // override with SJ_ART_ROOT for other machines
@@ -122,6 +125,23 @@ async function ingestCottage(codex: AssetCodex, styleAnchorPath: string): Promis
     png, widthPx: cell.width, heightPx: cell.height,
     meta: JSON.stringify(manifest), footprint: manifest.footprint,
   })
+}
+
+// Terrain art is code-painted, so it needs no art root and costs nothing: the flat kind ×
+// variant tiles AND C13's 15-tile road strip (kind `road:<key>`). Until this runs the codex
+// holds no terrain records at all and the map bakes C6's flat diamonds.
+export async function ingestTerrainArt(db: Database.Database): Promise<IngestEntry[]> {
+  const codex = new AssetCodex(db)
+  const existing = new Map<string, string>()
+  for (const r of codex.listSince(0)) {
+    if (r.status === 'ready' && r.class === 'terrain' && r.kind !== null) existing.set(r.kind, r.id)
+  }
+  const wanted = [...TERRAIN_TILE_KINDS, ...ROAD_AUTOTILE_KEYS.map(roadAutotileKind)]
+  if (wanted.every((k) => existing.has(k))) {
+    return wanted.map((kind) => ({ kind, action: 'unchanged' as const, id: existing.get(kind)! }))
+  }
+  const recs = await registerTerrainTiles(codex)
+  return recs.map((r) => ({ kind: r.kind ?? '', action: 'registered' as const, id: r.id }))
 }
 
 export async function ingestProductionArt(

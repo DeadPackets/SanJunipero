@@ -1,9 +1,13 @@
-import { SEASONS, TERRAIN_TILE_KINDS, type AssetRecord, type Season, type TerrainTileKind } from '@sj/shared'
+import {
+  ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS, roadAutotileKind,
+  type AssetRecord, type Season, type TerrainTileKind,
+} from '@sj/shared'
 import { paletteRgb } from './palette.js'
 import type { RawImage } from './post/raw.js'
 import { encodePng } from './post/raw.js'
 import { quantize } from './post/quantize.js'
 import { applyTint, type Tint } from './tints.js'
+import { paintRoadAutotile } from './roadTiles.js'
 import type { AssetCodex } from './codex.js'
 
 export const TERRAIN_TILE_W = 32, TERRAIN_TILE_H = 16   // base tile diamond (Style Bible grid)
@@ -70,20 +74,43 @@ export function paintTerrainTile(kind: TerrainTileKind, variant: number): RawIma
   return { width: TERRAIN_TILE_W, height: TERRAIN_TILE_H, data }
 }
 
+const terrainMeta = (kind: TerrainTileKind, variant: number): string => JSON.stringify(
+  { version: 'v1-terrain-tile', kind, variant, wPx: TERRAIN_TILE_W, hPx: TERRAIN_TILE_H },
+)
+
+// C13's 15-tile road strip, one codex record per key. The manifest kind stays the flat
+// `road` (the strip is road art, autotiled); the codex KIND carries the shape, which is what
+// resolveTerrainTile looks up. Without this the renderer's autotile seam always falls back
+// to the four flat road variants and every junction draws as the same slab.
+export async function registerRoadAutotiles(codex: AssetCodex): Promise<AssetRecord[]> {
+  const out: AssetRecord[] = []
+  for (const key of ROAD_AUTOTILE_KEYS) {
+    const png = await encodePng(paintRoadAutotile(key))
+    out.push(codex.register({
+      class: 'terrain', desc: `road tile: ${key}`, kind: roadAutotileKind(key),
+      meta: terrainMeta('road', 0), footprint: { w: 1, h: 1 },
+      png, widthPx: TERRAIN_TILE_W, heightPx: TERRAIN_TILE_H, status: 'ready',
+      score: 10, attempts: 1, costUsd: 0,
+    }))
+  }
+  return out
+}
+
 // ingest exactly like buildings: class 'terrain', kind = tile kind, meta = manifest JSON
 export async function registerTerrainTiles(codex: AssetCodex): Promise<AssetRecord[]> {
   const out: AssetRecord[] = []
   for (const kind of TERRAIN_TILE_KINDS) {
     for (let variant = 0; variant < TERRAIN_VARIANTS; variant++) {
       const png = await encodePng(paintTerrainTile(kind, variant))
-      const meta = JSON.stringify({ version: 'v1-terrain-tile', kind, variant, wPx: TERRAIN_TILE_W, hPx: TERRAIN_TILE_H })
       out.push(codex.register({
-        class: 'terrain', desc: `tile: ${kind}`, kind, meta, footprint: { w: 1, h: 1 },
+        class: 'terrain', desc: `tile: ${kind}`, kind, meta: terrainMeta(kind, variant),
+        footprint: { w: 1, h: 1 },
         png, widthPx: TERRAIN_TILE_W, heightPx: TERRAIN_TILE_H, status: 'ready',
         score: 10, attempts: 1, costUsd: 0,
       }))
     }
   }
+  out.push(...await registerRoadAutotiles(codex))
   return out
 }
 

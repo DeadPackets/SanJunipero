@@ -3,8 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { AssetCodex, CELL_NAMES_V4, encodePng, openForgeDb, type RawImage } from '@sj/forge'
-import { parseBuildingManifest, parseCharacterAtlasManifest } from '@sj/shared'
-import { BUILDING_ART_DIRS, FOUNDER_ART, ingestProductionArt } from './ingestArt.js'
+import {
+  ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, parseBuildingManifest, parseCharacterAtlasManifest,
+  roadAutotileKind,
+} from '@sj/shared'
+import { BUILDING_ART_DIRS, FOUNDER_ART, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
 
 const dir = mkdtempSync(join(tmpdir(), 'sj-ingest-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -93,6 +96,27 @@ describe('ingestProductionArt', () => {
     const omars = codex.listSince(0).filter((r) => r.kind === 'character:omar')
     expect(omars).toHaveLength(2)
     expect(omars.at(-1)!.seq).toBeGreaterThan(omars[0]!.seq)
+
+    db.close()
+  }, 30_000)
+})
+
+describe('ingestTerrainArt', () => {
+  it('puts every flat tile kind and all 15 road-strip keys in the codex, idempotently', async () => {
+    const db = openForgeDb(join(dir, 'terrain.db'))
+    const codex = new AssetCodex(db)
+
+    const first = await ingestTerrainArt(db)
+    expect(first.every((e) => e.action === 'registered')).toBe(true)
+    const ready = codex.listSince(0).filter((r) => r.status === 'ready' && r.class === 'terrain')
+    const kinds = new Set(ready.map((r) => r.kind))
+    for (const k of TERRAIN_TILE_KINDS) expect(kinds).toContain(k)
+    for (const key of ROAD_AUTOTILE_KEYS) expect(kinds).toContain(roadAutotileKind(key))
+
+    // a second boot over the same codex registers nothing — no duplicate rows to shadow
+    const second = await ingestTerrainArt(db)
+    expect(second.every((e) => e.action === 'unchanged')).toBe(true)
+    expect(codex.listSince(0).filter((r) => r.class === 'terrain')).toHaveLength(ready.length)
 
     db.close()
   }, 30_000)

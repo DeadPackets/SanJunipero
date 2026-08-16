@@ -9,7 +9,7 @@ import { openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
 import { makeFoundersOnTick } from './founders.js'
-import { ingestProductionArt } from './ingestArt.js'
+import { ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
 import { showcaseTerrain } from './showcaseMap.js'
 
 export const DEV_DB_PATH = 'data/dev-world.db'
@@ -57,6 +57,8 @@ export async function startDevWorld(
   if (opts.ingest === true) {
     // the dev DB is recreated each boot — load the approved production art so the
     // town wakes with its real cast + buildings (CLI default; tests skip the cost)
+    const tiles = await ingestTerrainArt(forgeDb) // code-painted, offline, $0 — never throws on a missing root
+    console.log(`dev world: ingested terrain tiles (${tiles.length} records, road strip included)`)
     try {
       const entries = await ingestProductionArt(forgeDb)
       console.log(`dev world: ingested production art (${entries.length} assets)`)

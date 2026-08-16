@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ROAD_AUTOTILE_KEYS, RoadAutotileKeySchema, roadAutotile, type RoadNeighbors,
+  ROAD_AUTOTILE_CODEX_PREFIX, ROAD_AUTOTILE_KEYS, RoadAutotileKeySchema, roadAutotile,
+  roadAutotileKind, type RoadNeighbors,
 } from './autotile.js'
 
 const F = false, T = true
@@ -33,6 +34,19 @@ describe('ROAD_AUTOTILE_KEYS', () => {
     expect(RoadAutotileKeySchema.parse('cap-s')).toBe('cap-s')
     expect(() => RoadAutotileKeySchema.parse('cap-x')).toThrow()
     for (const k of ROAD_AUTOTILE_KEYS) expect(RoadAutotileKeySchema.parse(k)).toBe(k)
+  })
+})
+
+describe('roadAutotileKind', () => {
+  it('gives all 15 keys a distinct prefixed codex kind', () => {
+    const kinds = ROAD_AUTOTILE_KEYS.map(roadAutotileKind)
+    expect(new Set(kinds).size).toBe(15)
+    expect(kinds.every((k) => k.startsWith(ROAD_AUTOTILE_CODEX_PREFIX))).toBe(true)
+    expect(roadAutotileKind('cross')).toBe('road:cross')
+  })
+
+  it('never collides with the flat road kind', () => {
+    expect(ROAD_AUTOTILE_KEYS.map(roadAutotileKind)).not.toContain('road')
   })
 })
 

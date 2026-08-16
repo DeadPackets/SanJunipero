@@ -1,8 +1,13 @@
 import {
-  parseTerrainTileManifest, roadAutotile,
+  parseTerrainTileManifest, roadAutotile, roadAutotileKind,
   type AssetRecord, type RoadAutotileKey, type RoadNeighbors, type TerrainTileKind, type TerrainTileManifest,
 } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
+
+// AMENDMENT (C13 §4) seam: an autotiled road strip is ingested one record per key, under the
+// codex kind `road:<key>`. The forge writes that kind and the renderer reads it, so the
+// spelling lives in @sj/shared beside the keys — this is the renderer's door onto it.
+export { roadAutotileKind }
 
 export const TERRAIN_KIND_FALLBACK: TerrainTileKind = 'grass'
 export const ROAD_TILE_ID = 7
@@ -24,12 +29,6 @@ export function tileVariant(x: number, y: number): number {
   // parentheses required: % binds tighter than >>>, so `>>> 0 % 4` is just `>>> 0`
   return ((Math.imul(x + TILE_VARIANT_SALT, 0x27d4eb2d) ^ Math.imul(y + TILE_VARIANT_SALT, 0x165667b1)) >>> 0)
     % TERRAIN_VARIANTS
-}
-
-// AMENDMENT (C13 §4) seam: an autotiled road strip is ingested one record per key, under the
-// codex kind `road:<key>`. Flat `road` variants stay the fallback, so this is additive.
-export function roadAutotileKind(key: RoadAutotileKey): string {
-  return `road:${key}`
 }
 
 export function roadNeighborsAt(terrain: TileId[][], x: number, y: number): RoadNeighbors {

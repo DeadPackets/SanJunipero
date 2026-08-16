@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { SEASONS, TERRAIN_TILE_KINDS, parseTerrainTileManifest } from '@sj/shared'
+import {
+  ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS, parseTerrainTileManifest, roadAutotileKind,
+} from '@sj/shared'
 import { MASTER_PALETTE } from './palette.js'
 import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
 import {
   SCAFFOLD_H, SCAFFOLD_W, SHEET_COLS, SHEET_KINDS, SHEET_ROWS, TERRAIN_COLORS, TERRAIN_TILE_H,
   TERRAIN_TILE_W, TERRAIN_VARIANTS, paintScaffolding, paintSeasonSheet, paintTerrainTile,
-  registerTerrainTiles, seasonTileNames,
+  registerRoadAutotiles, registerTerrainTiles, seasonTileNames,
 } from './terrainTiles.js'
 
 const PALETTE_HEXES = new Set(MASTER_PALETTE.map((h) => parseInt(h.slice(1), 16)))
@@ -63,11 +65,12 @@ describe('registerTerrainTiles', () => {
     const db = openForgeDb(':memory:')
     try {
       const recs = await registerTerrainTiles(new AssetCodex(db))
-      expect(recs).toHaveLength(TERRAIN_TILE_KINDS.length * TERRAIN_VARIANTS)
+      const flat = recs.filter((r) => !r.kind!.startsWith('road:'))
+      expect(flat).toHaveLength(TERRAIN_TILE_KINDS.length * TERRAIN_VARIANTS)
       expect(recs.every((r) => r.class === 'terrain' && r.status === 'ready' && r.costUsd === 0)).toBe(true)
-      const manifests = recs.map((r) => parseTerrainTileManifest(r.meta))
+      const manifests = flat.map((r) => parseTerrainTileManifest(r.meta))
       expect(manifests.every((m) => m !== null)).toBe(true)
-      expect(new Set(manifests.map((m) => `${m!.kind}/${m!.variant}`)).size).toBe(recs.length)
+      expect(new Set(manifests.map((m) => `${m!.kind}/${m!.variant}`)).size).toBe(flat.length)
       const road = recs.filter((r) => r.kind === 'road')
       expect(road).toHaveLength(TERRAIN_VARIANTS)   // TileId 7 is painted like every other tile
       expect(road[0]!.widthPx).toBe(TERRAIN_TILE_W)
@@ -83,6 +86,48 @@ describe('registerTerrainTiles', () => {
         expect(ca.get(ra[i]!.id)!.png.equals(cb.get(rb[i]!.id)!.png)).toBe(true)
       }
     } finally { a.close(); b.close() }
+  })
+})
+
+describe('registerRoadAutotiles', () => {
+  it('ingests C13\'s 15-tile strip as 15 distinct codex records under roadAutotileKind', async () => {
+    const db = openForgeDb(':memory:')
+    try {
+      const codex = new AssetCodex(db)
+      const recs = await registerRoadAutotiles(codex)
+      expect(recs).toHaveLength(ROAD_AUTOTILE_KEYS.length)
+      expect(recs.every((r) => r.class === 'terrain' && r.status === 'ready' && r.costUsd === 0)).toBe(true)
+      expect(recs.map((r) => r.kind)).toEqual(ROAD_AUTOTILE_KEYS.map(roadAutotileKind))
+      expect(new Set(recs.map((r) => r.id)).size).toBe(ROAD_AUTOTILE_KEYS.length)
+      // 15 shapes, 15 different pictures — a strip that ingested one cell fifteen times
+      // would render every junction as the same stub and nothing would catch it.
+      expect(new Set(recs.map((r) => codex.get(r.id)!.png.toString('base64'))).size)
+        .toBe(ROAD_AUTOTILE_KEYS.length)
+      expect(recs.every((r) => r.widthPx === TERRAIN_TILE_W && r.heightPx === TERRAIN_TILE_H)).toBe(true)
+    } finally { db.close() }
+  })
+
+  it('carries a parseable terrain manifest so the renderer can size the cell', async () => {
+    const db = openForgeDb(':memory:')
+    try {
+      const recs = await registerRoadAutotiles(new AssetCodex(db))
+      for (const r of recs) {
+        const m = parseTerrainTileManifest(r.meta)
+        expect(m).not.toBeNull()
+        expect(m!.kind).toBe('road')
+        expect([m!.wPx, m!.hPx]).toEqual([TERRAIN_TILE_W, TERRAIN_TILE_H])
+      }
+    } finally { db.close() }
+  })
+
+  it('rides along with registerTerrainTiles, so one ingest call textures every road', async () => {
+    const db = openForgeDb(':memory:')
+    try {
+      const recs = await registerTerrainTiles(new AssetCodex(db))
+      const kinds = new Set(recs.map((r) => r.kind))
+      for (const key of ROAD_AUTOTILE_KEYS) expect(kinds).toContain(roadAutotileKind(key))
+      expect(recs).toHaveLength(TERRAIN_TILE_KINDS.length * TERRAIN_VARIANTS + ROAD_AUTOTILE_KEYS.length)
+    } finally { db.close() }
   })
 })
 
