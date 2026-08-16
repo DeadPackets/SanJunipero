@@ -1,0 +1,24 @@
+{
+  "autotile": {
+    "road": {
+      "file": "road-autotile.png",
+      "tiles": {
+        "straight-ns": 0,
+        "straight-ew": 1,
+        "corner-ne": 2,
+        "corner-es": 3,
+        "corner-sw": 4,
+        "corner-wn": 5,
+        "t-no-n": 6,
+        "t-no-e": 7,
+        "t-no-s": 8,
+        "t-no-w": 9,
+        "cross": 10,
+        "cap-n": 11,
+        "cap-e": 12,
+        "cap-s": 13,
+        "cap-w": 14
+      }
+    }
+  }
+}
