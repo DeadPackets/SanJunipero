@@ -196,7 +196,9 @@ const globalReport: string[] = []
 
 // ── per-character pipeline ────────────────────────────────────────────────────
 async function runCharacter(m: CastMember): Promise<void> {
-  const DIR = `${PRODUCTION}/${m.id}`
+  // PROD_OUT redirects a single-character run to a fresh dir (e.g. amara-v2) so a
+  // regen neither reuses the old raw cache nor overwrites the v1 production set.
+  const DIR = process.env.PROD_OUT && RUN_CAST.length === 1 ? process.env.PROD_OUT : `${PRODUCTION}/${m.id}`
   for (const d of [`${DIR}/raws`, `${DIR}/cells`, `${DIR}/master`, `${DIR}/gifs`]) mkdirSync(d, { recursive: true })
   currentAsset = m.id
   const report: string[] = []
@@ -286,7 +288,11 @@ async function runCharacter(m: CastMember): Promise<void> {
     for (;;) {
       let raw: Buffer
       try {
-        raw = await candidate(DIR, key, framePrompt(m, f, p), [STYLE_ANCHOR, master.raw], walkSize, walkReserve)
+        // WALK_NO_STYLE_ANCHOR drops the cottage style ref from walk-frame calls — the
+        // master ref alone carries style+identity. Escape hatch for poses where the
+        // style-anchor cottage keeps bleeding in as scenery (amara-v2 ne-passing x5).
+        const walkRefs = process.env.WALK_NO_STYLE_ANCHOR ? [master.raw] : [STYLE_ANCHOR, master.raw]
+        raw = await candidate(DIR, key, framePrompt(m, f, p), walkRefs, walkSize, walkReserve)
       } catch (e) {
         if (e instanceof OutOfBudget) throw e
         if (walkSize !== '1024x1024' && String(e).includes('HTTP')) {
@@ -504,7 +510,10 @@ async function runCharacter(m: CastMember): Promise<void> {
     '', `asset spend: $${(assetSpend[m.id] ?? 0).toFixed(3)}`,
   ].join('\n')
   writeFileSync(`${DIR}/report.txt`, charReport)
-  writeFileSync(`${DIR}/spend.json`, JSON.stringify({ asset: m.id, spendUsd: assetSpend[m.id] ?? 0 }, null, 2))
+  // read-merge-write: reruns must add to the cumulative asset spend, not clobber it
+  let prevSpend = 0
+  try { prevSpend = (JSON.parse(readFileSync(`${DIR}/spend.json`, 'utf8')) as { spendUsd?: number }).spendUsd ?? 0 } catch { /* first run */ }
+  writeFileSync(`${DIR}/spend.json`, JSON.stringify({ asset: m.id, spendUsd: prevSpend + (assetSpend[m.id] ?? 0) }, null, 2))
   globalReport.push(`${m.id}: gates ${finalFailures.length === 0 ? 'PASS' : `FLAGGED (${finalFailures.length})`}, spend $${(assetSpend[m.id] ?? 0).toFixed(3)}`)
   console.log(charReport)
 }
