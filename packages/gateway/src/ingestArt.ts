@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
 import {
   AssetCodex, CELL_NAMES_V4, cellAnchor, chromaKey, decodePng, encodePng,
-  packCharacterAtlas, processHiResCell, registerTerrainTiles, type RawImage,
+  loadMaterialBook, packCharacterAtlas, processHiResCell, registerGeneratedTerrain,
+  type RawImage,
 } from '@sj/forge'
 import {
   ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, roadAutotileKind,
@@ -140,8 +141,13 @@ export async function ingestTerrainArt(db: Database.Database): Promise<IngestEnt
   if (wanted.every((k) => existing.has(k))) {
     return wanted.map((kind) => ({ kind, action: 'unchanged' as const, id: existing.get(kind)! }))
   }
-  const recs = await registerTerrainTiles(codex)
-  return recs.map((r) => ({ kind: r.kind ?? '', action: 'registered' as const, id: r.id }))
+  // Generated materials when they ship, code-painted tiles when they do not — the same art
+  // independence the ground bake lives by, so a half-generated batch still wakes a whole map.
+  const { records, report } = await registerGeneratedTerrain(codex, await loadMaterialBook())
+  if (report.generated > 0) {
+    console.log(`dev world: ${report.generated} generated terrain tiles, ${report.painted} code-painted`)
+  }
+  return records.map((r) => ({ kind: r.kind ?? '', action: 'registered' as const, id: r.id }))
 }
 
 export async function ingestProductionArt(

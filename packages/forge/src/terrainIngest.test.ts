@@ -104,7 +104,7 @@ describe('registerGeneratedTerrain', () => {
     } finally { db.close() }
   })
 
-  it('cuts all fifteen road shapes from ONE surface, and skips them entirely without it', async () => {
+  it('cuts all fifteen road shapes from ONE surface, and paints them without it', async () => {
     const withRoad = openForgeDb(':memory:'), without = openForgeDb(':memory:')
     try {
       const a = await registerGeneratedTerrain(new AssetCodex(withRoad), fullBook())
@@ -113,8 +113,9 @@ describe('registerGeneratedTerrain', () => {
       const bookNoRoad = fullBook()
       bookNoRoad.delete(ROAD_MATERIAL_ID)
       const b = await registerGeneratedTerrain(new AssetCodex(without), bookNoRoad)
-      // the C13 painted strip is left standing rather than overwritten with nothing
-      expect(b.records.filter((r) => r.kind!.startsWith('road:'))).toHaveLength(0)
+      // every key is ALWAYS registered — a missing road:<key> record drops the whole
+      // lattice back to flat variants, which is the bug fix round 2 just closed
+      expect(b.records.filter((r) => r.kind!.startsWith('road:'))).toHaveLength(15)
       expect(b.report.painted).toBeGreaterThanOrEqual(15)
     } finally { withRoad.close(); without.close() }
   })
@@ -123,7 +124,7 @@ describe('registerGeneratedTerrain', () => {
     const db = openForgeDb(':memory:')
     try {
       const { records, report } = await registerGeneratedTerrain(new AssetCodex(db), new Map())
-      expect(records).toHaveLength(TERRAIN_TILE_KINDS.length * TERRAIN_VARIANTS)
+      expect(records).toHaveLength(TERRAIN_TILE_KINDS.length * TERRAIN_VARIANTS + ROAD_AUTOTILE_KEYS.length)
       expect(report.generated).toBe(0)
     } finally { db.close() }
   })

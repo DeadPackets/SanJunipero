@@ -16,7 +16,7 @@ import {
   SHEET_COLS, SHEET_ROWS, TERRAIN_TILE_H, TERRAIN_TILE_W, paintScaffolding, seasonTileNames,
 } from '../src/terrainTiles.js'
 import { ROAD_MATERIAL_ID, stencilRoadTile } from '../src/terrainGen.js'
-import { seasonSheets } from '../src/terrainIngest.js'
+import { MATERIALS_DIR, seasonSheets } from '../src/terrainIngest.js'
 import { paintRoadAutotile } from '../src/roadTiles.js'
 
 const C3 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c3/materials'
@@ -36,6 +36,14 @@ async function loadBook(): Promise<Map<string, RawImage>> {
 const book = await loadBook()
 console.log(`${book.size} generated materials in ${C3}`)
 mkdirSync(DIR, { recursive: true })
+
+// The materials ship WITH the repo: the gateway registers them into the codex at boot, and
+// the renderer reads the codex. Without this the generated art never reaches a viewer.
+mkdirSync(MATERIALS_DIR, { recursive: true })
+for (const [assetId, img] of book) {
+  writeFileSync(join(MATERIALS_DIR, `${assetId.replace(/:/g, '_')}.png`), await encodePng(img))
+}
+console.log(`shipped ${book.size} materials into ${MATERIALS_DIR}`)
 
 // four seasonal sheets, graded off the generated seasonal materials (replaces D-3's guesses)
 const sheets = seasonSheets(book)

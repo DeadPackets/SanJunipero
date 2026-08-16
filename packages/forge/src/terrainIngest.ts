@@ -2,8 +2,11 @@ import {
   ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS, roadAutotileKind,
   type AssetRecord, type Season, type TerrainTileKind,
 } from '@sj/shared'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { AssetCodex } from './codex.js'
-import { encodePng, type RawImage } from './post/raw.js'
+import { decodePng, encodePng, type RawImage } from './post/raw.js'
 import { quantize } from './post/quantize.js'
 import { applyTint } from './tints.js'
 import {
@@ -14,6 +17,7 @@ import {
   GROUND_VARIANTS, ROAD_MATERIAL_ID, diamondFromMaterial, seasonTintFrom, stencilRoadTile,
   terrainAssetId,
 } from './terrainGen.js'
+import { paintRoadAutotile } from './roadTiles.js'
 
 // The generated art, keyed by the program's asset id. A missing material is not an error:
 // the code-painted tile stands in, so the town never loses its ground because one call
@@ -22,6 +26,23 @@ export type MaterialBook = ReadonlyMap<string, RawImage>
 
 export function materialFor(book: MaterialBook, assetId: string): RawImage | null {
   return book.get(assetId) ?? null
+}
+
+// The generated materials ship WITH the repo, beside the sheets they grade, because the
+// gateway registers them into the codex at boot — the renderer reads the codex, not the
+// manifest. Filenames are the asset id with ':' swapped for '_', so the mapping is obvious
+// on disk and reversible without a side table.
+export const MATERIALS_DIR =
+  join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets', 'materials')
+
+export async function loadMaterialBook(dir: string = MATERIALS_DIR): Promise<Map<string, RawImage>> {
+  const book = new Map<string, RawImage>()
+  if (!existsSync(dir)) return book        // no generated art yet — the painted tiles stand
+  for (const file of readdirSync(dir).sort()) {
+    if (!file.endsWith('.png')) continue
+    book.set(file.replace(/\.png$/, '').replace(/_/g, ':'), await decodePng(readFileSync(join(dir, file))))
+  }
+  return book
 }
 
 // One ground tile: the generated material cut to the dimetric diamond, or the code-painted
@@ -70,12 +91,14 @@ export async function registerGeneratedTerrain(
     }
   }
 
-  // All fifteen shapes are cut from ONE road surface, so the lattice is one road.
+  // All fifteen shapes are cut from ONE road surface, so the lattice is one road. Without a
+  // generated surface they are C13's painted cells — every key is always registered, because
+  // a missing `road:<key>` record drops the whole lattice back to flat variants.
   const road = materialFor(book, ROAD_MATERIAL_ID)
   for (const key of ROAD_AUTOTILE_KEYS) {
-    const img = road === null ? undefined : stencilRoadTile(road, key)
-    if (img === undefined) { painted++; continue }   // no generated road → the C13 strip stands
-    generated++
+    if (road === null) painted++
+    else generated++
+    const img = road === null ? paintRoadAutotile(key) : stencilRoadTile(road, key)
     await put(roadAutotileKind(key), meta('road', 0), img, `road tile: ${key}`)
   }
 
