@@ -354,6 +354,19 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
   })
 })
 
+describe('retrieval efficiency', () => {
+  it('embeds the intent once for retrieval plus once for recording (stages 2 and 3 share one similar call)', async () => {
+    const inner = await FakeEmbedder.create()
+    let embeds = 0
+    const counting = { embed: (t: string) => { embeds += 1; return inner.embed(t) } }
+    const llm = new ScriptedLlm(() => impossibleVerdict)
+    const { arbiter } = await makeRig(llm, counting)
+
+    await arbiter.adjudicate('I chart the river shallows', ctx)
+    expect(embeds).toBe(2)
+  })
+})
+
 describe('rulebook rehydration on construction', () => {
   const rehydrateRecipe: Recipe = { ...basketRecipe, id: 'recipe:rehydrate_basket', name: 'Rehydrate Basket', rngStream: 'recipe:rehydrate_basket' }
   const revertedRecipe: Recipe = { ...basketRecipe, id: 'recipe:rehydrate_gone', name: 'Rehydrate Gone', rngStream: 'recipe:rehydrate_gone' }

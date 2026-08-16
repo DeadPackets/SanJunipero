@@ -71,8 +71,12 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       const hit = rulebook.lookup(intent)
       if (hit) return { kind: 'map', verb: hit.verb, params: {} }
 
+      // Stages 2 and 3 share one retrieval: similar[0] serves the short-circuit,
+      // the full list becomes the LLM's precedent block.
+      const similar = await rulings.similar(intent, 5)
+
       // Stage 2 — deterministic rulings similarity short-circuit.
-      const top = (await rulings.similar(intent, 1))[0]
+      const top = similar[0]
       if (top && top.cosine >= SIMILARITY_SHORT_CIRCUIT) {
         const stored = JSON.parse(top.ruling.verdictJson) as Verdict
         if (stored.kind === 'attempt') {
@@ -97,7 +101,6 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       }
 
       // Stage 3 — only genuinely novel intents reach the LLM.
-      const similar = await rulings.similar(intent, 5)
       const precedent = similar.map(({ ruling }) => {
         const v = JSON.parse(ruling.verdictJson) as Verdict
         if (v.kind === 'attempt') return { summary: v.summary, verdictKind: 'attempt', recipeName: v.recipe.name } as const
