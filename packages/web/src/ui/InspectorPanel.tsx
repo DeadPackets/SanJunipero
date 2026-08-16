@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
+import { tileToScreen } from '../render/iso.js'
 import { resolveAssetId } from '../render/textures.js'
 import { diffLines } from './diffLines.js'
 
@@ -56,8 +57,6 @@ export function InspectorPanel({ store, agentId, scene }: { store: WorldStore; a
   const [personality, setPersonality] = useState<PersonalityRow[] | null>(null)
   const [diffPick, setDiffPick] = useState<number[]>([])
   const [follow, setFollow] = useState(false)
-  const followRef = useRef(follow)
-  followRef.current = follow
 
   useEffect(() => {
     if (tab === 'ledger' && ledger === null) void fetchTab<LedgerRow>(agentId, 'ledger').then(setLedger)
@@ -72,13 +71,23 @@ export function InspectorPanel({ store, agentId, scene }: { store: WorldStore; a
     setDiffPick([])
   }, [agentId])
 
-  // follow-cam: every store change re-centers on the agent
+  // follow-cam: the scene's follow rig eases toward the agent's sprite; a user
+  // drag takes the camera back and un-presses the button (never lie about state)
   useEffect(() => {
     if (!follow || scene === null) return
-    return store.subscribe(() => {
+    scene.setFollow(() => {
+      const anchor = scene.anchorOf?.(agentId)
+      if (anchor !== undefined && anchor !== null) return anchor
       const a = store.getState()?.agents[agentId]
-      if (a !== undefined && followRef.current) scene.centerOn(a.x, a.y)
+      if (a === undefined) return null
+      const { sx, sy } = tileToScreen(a.x, a.y)
+      return { x: sx, y: sy }
     })
+    const offEnd = scene.onFollowEnd(() => setFollow(false))
+    return () => {
+      offEnd()
+      scene.setFollow(null)
+    }
   }, [follow, scene, store, agentId])
 
   const a = state?.agents[agentId]

@@ -102,6 +102,19 @@ export function App() {
     else scene.app.ticker.start()
   }, [route.lens, scene])
 
+  // leaving Moments: keep the director mounted briefly so the letterboxes slide out
+  const [directorLeaving, setDirectorLeaving] = useState(false)
+  const prevLensRef = useRef<Lens>(route.lens)
+  useEffect(() => {
+    const wasDirector = prevLensRef.current === 'director'
+    prevLensRef.current = route.lens
+    if (wasDirector && route.lens !== 'director') {
+      setDirectorLeaving(true)
+      const t = setTimeout(() => setDirectorLeaving(false), 260)
+      return () => clearTimeout(t)
+    }
+  }, [route.lens])
+
   return (
     <div className="app">
       <header className="topbar">
@@ -131,7 +144,9 @@ export function App() {
           {(route.lens === 'map' || route.lens === 'inspector') && <CameraHud scene={scene} />}
           {route.lens === 'chronicle' && <Timeline store={store} handle={handle} onView={onView} />}
           {route.lens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
-          {route.lens === 'director' && <DirectorMode store={store} scene={scene} />}
+          {(route.lens === 'director' || directorLeaving) && (
+            <DirectorMode store={store} scene={scene} leaving={route.lens !== 'director'} />
+          )}
         </main>
         <aside
           id="panel-outlet"

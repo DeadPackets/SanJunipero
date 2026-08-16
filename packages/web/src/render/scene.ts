@@ -21,6 +21,8 @@ export type Scene = {
   centerHome(): void
   onCamera(cb: () => void): () => void
   setFollow(target: (() => { x: number; y: number } | null) | null): void
+  /** fires when a user gesture (drag, pan, recenter) takes the camera back */
+  onFollowEnd(cb: () => void): () => void
   onTilePointer(cb: (t: { x: number; y: number }) => void): void
   /** world-space anchor for an agent's sprite; wired by StageMount once layers exist */
   anchorOf?: (agentId: string) => { x: number; y: number } | null
@@ -77,6 +79,12 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
 
   // smooth follow: eases the camera toward a moving world-space anchor each frame
   let followFn: (() => { x: number; y: number } | null) | null = null
+  const followEndCbs: Array<() => void> = []
+  const breakFollow = (): void => {
+    if (followFn === null) return
+    followFn = null
+    for (const cb of followEndCbs) cb()
+  }
   const followTick = (): void => {
     if (followFn === null) return
     const t = followFn()
@@ -125,7 +133,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     const dy = e.global.y - last.y
     if (Math.abs(dx) + Math.abs(dy) > 2) {
       moved = true
-      followFn = null // the viewer takes the camera back
+      breakFollow() // the viewer takes the camera back
     }
     world.position.x += dx
     world.position.y += dy
@@ -188,12 +196,12 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     setZoom,
     getZoom: () => world.scale.x,
     panBy: (dx, dy) => {
-      followFn = null
+      breakFollow()
       world.position.x += dx
       world.position.y += dy
     },
     centerHome: () => {
-      followFn = null
+      breakFollow()
       if (bakedTerrain !== null) centerOn(bakedTerrain[0]!.length / 2, bakedTerrain.length / 2)
     },
     onCamera: (cb) => {
@@ -205,6 +213,13 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     },
     setFollow: (target) => {
       followFn = target
+    },
+    onFollowEnd: (cb) => {
+      followEndCbs.push(cb)
+      return () => {
+        const i = followEndCbs.indexOf(cb)
+        if (i >= 0) followEndCbs.splice(i, 1)
+      }
     },
     onTilePointer: (cb) => {
       tileCbs.push(cb)

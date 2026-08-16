@@ -5,10 +5,13 @@ import { tileToScreen } from '../render/iso.js'
 import { CUT_MIN_MS, pickCut, type HeatWindow } from './directorCut.js'
 
 export const HEAT_POLL_MS = 5000
-export const CAM_LERP = 0.08
 export const DIRECTOR_ZOOM = 3 as const
 
-export function DirectorMode({ store, scene }: { store: WorldStore; scene: Scene | null }) {
+export function DirectorMode({ store, scene, leaving = false }: {
+  store: WorldStore
+  scene: Scene | null
+  leaving?: boolean
+}) {
   const [followed, setFollowed] = useState<string | null>(null)
   const followedRef = useRef<string | null>(null)
   const lastCutRef = useRef(0)
@@ -45,26 +48,28 @@ export function DirectorMode({ store, scene }: { store: WorldStore; scene: Scene
     }
   }, [store])
 
-  // camera: ease toward the followed agent at zoom 3 (interruptible rAF, dies with the lens)
+  // camera: the scene's follow rig eases toward the followed agent's SPRITE
+  // (glide-interpolated), so cuts and tracking are smooth; a drag interrupts it
   useEffect(() => {
     if (scene === null) return
     scene.setZoom(DIRECTOR_ZOOM)
-    let raf = 0
-    const step = (): void => {
-      const agentId = followedRef.current
-      const a = agentId !== null ? store.getState()?.agents[agentId] : undefined
-      if (a !== undefined) {
-        const { sx, sy } = tileToScreen(a.x, a.y)
-        const targetX = scene.app.screen.width / 2 - sx * scene.world.scale.x
-        const targetY = scene.app.screen.height / 2 - sy * scene.world.scale.y
-        scene.world.position.x += (targetX - scene.world.position.x) * CAM_LERP
-        scene.world.position.y += (targetY - scene.world.position.y) * CAM_LERP
-      }
-      raf = requestAnimationFrame(step)
+    return () => scene.setFollow(null)
+  }, [scene])
+  useEffect(() => {
+    if (scene === null) return
+    if (leaving || followed === null) {
+      scene.setFollow(null)
+      return
     }
-    raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
-  }, [scene, store])
+    scene.setFollow(() => {
+      const anchor = scene.anchorOf?.(followed)
+      if (anchor !== undefined && anchor !== null) return anchor
+      const a = store.getState()?.agents[followed]
+      if (a === undefined) return null
+      const { sx, sy } = tileToScreen(a.x, a.y)
+      return { x: sx, y: sy }
+    })
+  }, [scene, store, followed, leaving])
 
   // subtitle: the followed agent's latest speech, else their latest thought
   let subtitle: { text: string; kind: 'speech' | 'thought' } | null = null
@@ -84,10 +89,10 @@ export function DirectorMode({ store, scene }: { store: WorldStore; scene: Scene
   const name = followed !== null ? state?.agents[followed]?.name ?? followed : null
 
   return (
-    <div className="director" aria-label="Moments — the town, televised">
-      <div className="letterbox top" />
-      <div className="letterbox bottom" />
-      {name !== null && (
+    <div className={leaving ? 'director leaving' : 'director'} aria-label="Moments — the town, televised">
+      <div className={leaving ? 'letterbox top leaving' : 'letterbox top'} />
+      <div className={leaving ? 'letterbox bottom leaving' : 'letterbox bottom'} />
+      {!leaving && name !== null && (
         <div className={subtitle?.kind === 'thought' ? 'subtitle thought' : 'subtitle'} role="status">
           <span className="subtitle-name">{name}</span>
           {subtitle !== null ? (subtitle.kind === 'thought' ? <em>{subtitle.text}</em> : `"${subtitle.text}"`) : '…'}

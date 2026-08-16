@@ -428,6 +428,11 @@ body {
     from { scale: 1 0; }
     to { scale: 1 1; }
   }
+  .letterbox.leaving { animation: box-out var(--t-fast) var(--ease-enter) forwards; }
+  @keyframes box-out {
+    from { scale: 1 1; }
+    to { scale: 1 0; }
+  }
   .letterbox.top { transform-origin: top; }
   .letterbox.bottom { transform-origin: bottom; }
 }
