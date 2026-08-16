@@ -4,8 +4,8 @@ import { MASTER_PALETTE } from './palette.js'
 import type { RawImage } from './post/raw.js'
 import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js'
 import {
-  BORDER_TOLERANCE, MATERIAL_PX, ROAD_MATERIAL_ID, SEAM_TOLERANCE, TERRAIN_COMMISSIONS,
-  TILING_CRITERION_PROMPT, borderReport,
+  BORDER_TOLERANCE, CANDIDATE_MARGIN, MATERIAL_PX, ROAD_MATERIAL_ID, SEAM_TOLERANCE,
+  TERRAIN_COMMISSIONS, TILING_CRITERION_PROMPT, borderReport, cropMargin, toMaterialGrid,
   diamondFromMaterial, generationItems, materialFromCandidate, planTerrainProgram, seamReport,
   seasonTintFrom, selfTile3x3, stencilRoadTile, terrainAssetId, terrainBoilerplate,
 } from './terrainGen.js'
@@ -13,14 +13,19 @@ import { paintRoadAutotile } from './roadTiles.js'
 
 const PALETTE_HEXES = new Set(MASTER_PALETTE.map((h) => parseInt(h.slice(1), 16)))
 
-// a square whose opposing edges match exactly — the ideal a generated material is judged against
+// A HOMOGENEOUS stochastic material — what an image model actually returns, and what the
+// seam check is really asking about: are the two opposing edges the same material? A
+// synthetic torus (f(0) === f(px)) would also pass, but it is not what the pipeline sees,
+// and it cannot survive the margin crop that real framed output requires.
 function seamlessSquare(px = MATERIAL_PX): RawImage {
   const img: RawImage = { width: px, height: px, data: new Uint8ClampedArray(px * px * 4) }
+  // two real MASTER_PALETTE greens, so quantizing is a no-op and the measurement is not
+  // reading palette-snap noise: one base tone with an even sparse speckle of the other
+  const base = [0x93, 0xb5, 0x73], speck = [0x6f, 0x94, 0x55]
   for (let y = 0; y < px; y++) {
     for (let x = 0; x < px; x++) {
-      // a torus function: f(0) === f(px) in both axes, so left==right and top==bottom
-      const v = 128 + 60 * Math.sin((2 * Math.PI * x) / px) * Math.cos((2 * Math.PI * y) / px)
-      img.data.set([v, v, v, 255], (y * px + x) * 4)
+      const h = (Math.imul(x + 1, 0x27d4eb2d) ^ Math.imul(y + 1, 0x165667b1)) >>> 0
+      img.data.set([...(h % 8 === 0 ? speck : base), 255], (y * px + x) * 4)
     }
   }
   return img
@@ -29,13 +34,17 @@ function seamlessSquare(px = MATERIAL_PX): RawImage {
 // a square with a hard vertical discontinuity — the failure a seam check must catch
 function seamedSquare(px = MATERIAL_PX): RawImage {
   const img = seamlessSquare(px)
+  const band = Math.max(4, Math.round(px * 0.12))
   for (let y = 0; y < px; y++) {
-    for (let x = px - 3; x < px; x++) img.data.set([0, 0, 0, 255], (y * px + x) * 4)
+    for (let x = px - band; x < px; x++) img.data.set([0, 0, 0, 255], (y * px + x) * 4)
   }
   return img
 }
 
 const bigCandidate = (make: (px: number) => RawImage, px = 512): RawImage => make(px)
+// seamReport and borderReport are functions of a MATERIAL, so they are tested on one
+// directly — the margin crop belongs to materialFromCandidate and is tested there
+const asMaterial = (img: RawImage): RawImage => toMaterialGrid(img)
 
 describe('planTerrainProgram', () => {
   const plan = planTerrainProgram()
@@ -112,26 +121,26 @@ describe('materialFromCandidate', () => {
 
 describe('seamReport', () => {
   it('passes a material whose opposing edges meet', () => {
-    const r = seamReport(materialFromCandidate(bigCandidate(seamlessSquare)))
+    const r = seamReport(asMaterial(seamlessSquare(MATERIAL_PX)))
     expect(r.horizontalDelta).toBeLessThanOrEqual(SEAM_TOLERANCE)
     expect(r.verticalDelta).toBeLessThanOrEqual(SEAM_TOLERANCE)
     expect(r.pass).toBe(true)
   })
 
   it('catches a hard edge discontinuity', () => {
-    const r = seamReport(materialFromCandidate(bigCandidate(seamedSquare)))
+    const r = seamReport(asMaterial(seamedSquare(MATERIAL_PX)))
     expect(r.pass).toBe(false)
     expect(r.horizontalDelta).toBeGreaterThan(SEAM_TOLERANCE)
   })
 
   it('reports which axis broke, so the retry feedback can say so', () => {
-    const r = seamReport(materialFromCandidate(bigCandidate(seamedSquare)))
+    const r = seamReport(asMaterial(seamedSquare(MATERIAL_PX)))
     expect(r.worstAxis).toBe('horizontal')
     expect(r.note).toMatch(/left|right|horizontal/i)
   })
 
   it('is deterministic', () => {
-    const m = materialFromCandidate(bigCandidate(seamlessSquare))
+    const m = asMaterial(seamlessSquare(MATERIAL_PX))
     expect(seamReport(m)).toEqual(seamReport(m))
   })
 })
@@ -300,13 +309,13 @@ describe('borderReport', () => {
   }
 
   it('passes a material whose edge looks like its middle', () => {
-    const r = borderReport(materialFromCandidate(bigCandidate(seamlessSquare)))
+    const r = borderReport(asMaterial(seamlessSquare(MATERIAL_PX)))
     expect(r.framed).toBe(false)
     expect(r.ringDelta).toBeLessThanOrEqual(BORDER_TOLERANCE)
   })
 
   it('catches a drawn frame that the SEAM check cannot see', () => {
-    const m = materialFromCandidate(framed())
+    const m = asMaterial(framed())
     // the frame wraps perfectly — left edge equals right edge — so the seam check is happy
     expect(seamReport(m).pass).toBe(true)
     // and the border check is not
@@ -315,13 +324,60 @@ describe('borderReport', () => {
   })
 
   it('tells the model exactly what to remove', () => {
-    const note = borderReport(materialFromCandidate(framed())).note
+    const note = borderReport(asMaterial(framed())).note
     expect(note).toMatch(/border|frame|rim|outline/i)
     expect(note).toMatch(/run right off all four sides/i)
   })
 
   it('is deterministic', () => {
-    const m = materialFromCandidate(bigCandidate(seamlessSquare))
+    const m = asMaterial(seamlessSquare(MATERIAL_PX))
     expect(borderReport(m)).toEqual(borderReport(m))
+  })
+})
+
+
+describe('cropMargin', () => {
+  // the rim a model actually drew: ~4% of a 512 square, which is 20px
+  const framedBig = (px = 512, rim = 20): RawImage => {
+    const img = seamlessSquare(px)
+    for (let y = 0; y < px; y++) {
+      for (let x = 0; x < px; x++) {
+        if (x >= rim && y >= rim && x < px - rim && y < px - rim) continue
+        img.data.set([120, 40, 160, 255], (y * px + x) * 4)
+      }
+    }
+    return img
+  }
+
+  it('cuts the outer margin off both axes', () => {
+    const c = cropMargin(seamlessSquare(512))
+    const cut = Math.round(512 * CANDIDATE_MARGIN)
+    expect([c.width, c.height]).toEqual([512 - 2 * cut, 512 - 2 * cut])
+  })
+
+  it('removes a drawn rim the prompt could not talk the model out of', () => {
+    // straight through, the rim survives into the material and the frame check catches it
+    const uncropped = asMaterial(framedBig())
+    expect(borderReport(uncropped).framed).toBe(true)
+    // through the real path, the rim is gone before anything measures it
+    expect(borderReport(materialFromCandidate(framedBig())).framed).toBe(false)
+  })
+
+  it('leaves an unframed candidate alone enough to still wrap', () => {
+    expect(seamReport(materialFromCandidate(bigCandidate(seamlessSquare))).pass).toBe(true)
+  })
+
+  it('never crops a small image out of existence', () => {
+    const tiny: RawImage = { width: 4, height: 4, data: new Uint8ClampedArray(64) }
+    expect(cropMargin(tiny).width).toBeGreaterThan(0)
+  })
+
+  it('fills every cell even when the crop leaves less than the material grid', () => {
+    // an integer step silently left the right and bottom edges BLACK here
+    const small = materialFromCandidate(seamlessSquare(40))
+    for (let i = 0; i < small.data.length; i += 4) {
+      const black = small.data[i] === 0 && small.data[i + 1] === 0 && small.data[i + 2] === 0
+      expect(black, `black cell at ${i / 4}`).toBe(false)
+    }
   })
 })

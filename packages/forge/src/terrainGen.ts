@@ -13,6 +13,25 @@ import { paintRoadAutotile } from './roadTiles.js'
 // renderer contract does not move — the art lands under the same codex kinds and manifest
 // keys, so it hot-swaps.
 
+// Image models draw vignettes and rims almost reflexively, and no amount of "no border" in
+// the prompt reliably stops it — grass:2 came back framed three attempts running. So the
+// margin is CUT rather than argued with: the outer 8% of each side is discarded before the
+// material is measured, which removes any rim deterministically and leaves the seam check to
+// judge what actually remains.
+export const CANDIDATE_MARGIN = 0.08
+
+export function cropMargin(img: RawImage, margin: number = CANDIDATE_MARGIN): RawImage {
+  const cut = Math.round(Math.min(img.width, img.height) * margin)
+  const w = img.width - 2 * cut, h = img.height - 2 * cut
+  if (w <= 0 || h <= 0) return img
+  const out: RawImage = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
+  for (let y = 0; y < h; y++) {
+    const src = ((y + cut) * img.width + cut) * 4
+    out.data.set(img.data.subarray(src, src + w * 4), y * w * 4)
+  }
+  return out
+}
+
 // A generated 512 square lands on this grid before anything else touches it. 64 is four
 // tile-widths of detail — enough for grain, small enough that MASTER_PALETTE reads as
 // deliberate colour rather than as banding.
@@ -141,27 +160,37 @@ export function planTerrainProgram(): TerrainItem[] {
 // Box-average down to the material grid, then snap to MASTER_PALETTE. Averaging first is what
 // keeps a 512 generation's grain from aliasing into noise; quantizing after is what makes the
 // result palette-true rather than merely close.
-export function materialFromCandidate(candidate: RawImage, px: number = MATERIAL_PX): RawImage {
-  const kx = Math.max(1, Math.floor(candidate.width / px))
-  const ky = Math.max(1, Math.floor(candidate.height / px))
+// Box-average any source onto the material grid, then snap to MASTER_PALETTE. Averaging
+// first keeps a 512 generation's grain from aliasing into noise; quantizing after makes the
+// result palette-true rather than merely close. Block bounds are computed in floating point
+// so a source SMALLER than the grid still fills every cell — an integer step silently left
+// the right and bottom edges black.
+export function toMaterialGrid(img: RawImage, px: number = MATERIAL_PX): RawImage {
   const out: RawImage = { width: px, height: px, data: new Uint8ClampedArray(px * px * 4) }
   for (let y = 0; y < px; y++) {
+    const y0 = Math.floor((y * img.height) / px)
+    const y1 = Math.max(y0 + 1, Math.floor(((y + 1) * img.height) / px))
     for (let x = 0; x < px; x++) {
+      const x0 = Math.floor((x * img.width) / px)
+      const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * img.width) / px))
       let r = 0, g = 0, b = 0, n = 0
-      for (let sy = y * ky; sy < (y + 1) * ky && sy < candidate.height; sy++) {
-        for (let sx = x * kx; sx < (x + 1) * kx && sx < candidate.width; sx++) {
-          const i = (sy * candidate.width + sx) * 4
-          r += candidate.data[i]!; g += candidate.data[i + 1]!; b += candidate.data[i + 2]!; n++
+      for (let sy = y0; sy < y1 && sy < img.height; sy++) {
+        for (let sx = x0; sx < x1 && sx < img.width; sx++) {
+          const i = (sy * img.width + sx) * 4
+          r += img.data[i]!; g += img.data[i + 1]!; b += img.data[i + 2]!; n++
         }
       }
       const d = (y * px + x) * 4
-      if (n === 0) { out.data.set([0, 0, 0, 255], d); continue }
-      out.data.set([Math.round(r / n), Math.round(g / n), Math.round(b / n), 255], d)
+      out.data.set(n === 0 ? [0, 0, 0, 255] : [Math.round(r / n), Math.round(g / n), Math.round(b / n), 255], d)
     }
   }
   const q = quantize(out, paletteRgb())
   for (let i = 3; i < q.data.length; i += 4) q.data[i] = 255   // ground is never see-through
   return q
+}
+
+export function materialFromCandidate(raw: RawImage, px: number = MATERIAL_PX): RawImage {
+  return toMaterialGrid(cropMargin(raw), px)
 }
 
 export type SeamReport = {
