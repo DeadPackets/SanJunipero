@@ -139,7 +139,7 @@ function withinReach(state: WorldState, agentId: string, x: number, y: number): 
   return Math.abs(a.x - x) <= 1 && Math.abs(a.y - y) <= 1
 }
 
-function skillLevel(state: WorldState, agentId: string, track: string, config: SimConfig): number {
+export function skillLevel(state: WorldState, agentId: string, track: string, config: SimConfig): number {
   const xp = state.agents[agentId]!.skills[track] ?? 0
   return Math.min(config.skills.maxLevel, Math.floor(xp / config.skills.xpLevelDivisor))
 }

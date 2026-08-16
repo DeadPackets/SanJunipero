@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
-import { RngStream, fold, genesisState, submitIntent, type WorldState } from '@sj/engine'
+import { RngStream, fold, genesisState, skillLevel, submitIntent, type WorldState } from '@sj/engine'
 import { openArbiterDb } from './schema.js'
 import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
@@ -106,6 +106,21 @@ describe('codify', () => {
     it('passes when every cost is covered across stacks', () => {
       const def = verbFromRecipe({ ...boilSaltRecipe, requires: [], costs: [{ kind: 'wood', qty: 6 }] })
       expect(def.validate(twoWoodStacks(), CFG, 'a1', {})).toBeNull()
+    })
+  })
+
+  describe('skill level parity with the engine', () => {
+    it('onComplete levels with the exported engine skillLevel, not floor(sqrt(xp/divisor))', () => {
+      let state = burningFireAdjacent()
+      state = fold(state, ev('skill_gained', { agentId: 'a1', track: 'cooking', xp: 2000 }), CFG)
+      expect(skillLevel(state, 'a1', 'cooking', CFG)).toBe(10)
+
+      // difficulty 2: engine level 10 → factor 0.9, success wins while
+      // roll <= 0.9/1.9 ≈ 0.474; the old sqrt level 4 → factor 0.6 loses at 0.45.
+      const def = verbFromRecipe(boilSaltRecipe)
+      const rng = { next: () => 0.45 } as unknown as RngStream
+      const events = def.onComplete(state, CFG, 'a1', {}, rng)
+      expect(events.some((e) => e.type === 'item_spawned')).toBe(true)
     })
   })
 

@@ -1,4 +1,4 @@
-import { registerVerb } from '@sj/engine'
+import { registerVerb, skillLevel } from '@sj/engine'
 import type { PendingEvent, Structure, TileId, VerbDef, WorldState } from '@sj/engine'
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
@@ -115,12 +115,7 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
     },
     onComplete(state, config, agentId, _params, rng) {
       const skillCheck = recipe.skillCheck
-      const level = skillCheck
-        ? Math.min(
-            config.skills.maxLevel,
-            Math.floor(Math.sqrt((state.agents[agentId].skills[skillCheck.track] ?? 0) / config.skills.xpLevelDivisor)),
-          )
-        : 0
+      const level = skillCheck ? skillLevel(state, agentId, skillCheck.track, config) : 0
       const factor = skillCheck ? skillFactor(level, skillCheck.difficulty) : 1
       const row = rollOutcomeTable(recipe.outcomeTable, rng, factor)
       return emitOutcomeEffects(state, agentId, row.effects)
