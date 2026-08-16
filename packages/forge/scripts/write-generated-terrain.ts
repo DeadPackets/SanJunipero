@@ -15,7 +15,7 @@ import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import {
   SHEET_COLS, SHEET_ROWS, TERRAIN_TILE_H, TERRAIN_TILE_W, paintScaffolding, seasonTileNames,
 } from '../src/terrainTiles.js'
-import { ROAD_MATERIAL_ID, stencilRoadTile } from '../src/terrainGen.js'
+import { ROAD_MATERIAL_ID, borderReport, deframe, seamReport, stencilRoadTile } from '../src/terrainGen.js'
 import { MATERIALS_DIR, seasonSheets } from '../src/terrainIngest.js'
 import { paintRoadAutotile } from '../src/roadTiles.js'
 
@@ -40,8 +40,13 @@ mkdirSync(DIR, { recursive: true })
 // The materials ship WITH the repo: the gateway registers them into the codex at boot, and
 // the renderer reads the codex. Without this the generated art never reaches a viewer.
 mkdirSync(MATERIALS_DIR, { recursive: true })
-for (const [assetId, img] of book) {
-  writeFileSync(join(MATERIALS_DIR, `${assetId.replace(/:/g, '_')}.png`), await encodePng(img))
+for (const [assetId, raw] of [...book]) {
+  const { material, passes } = deframe(raw)
+  book.set(assetId, material)
+  const seam = seamReport(material), border = borderReport(material)
+  writeFileSync(join(MATERIALS_DIR, `${assetId.replace(/:/g, '_')}.png`), await encodePng(material))
+  console.log(`  ${assetId.padEnd(24)} h=${seam.horizontalDelta.toFixed(1)} v=${seam.verticalDelta.toFixed(1)} ` +
+    `ring=${border.ringDelta.toFixed(1)}${passes > 0 ? ` (deframed x${passes})` : ''}${border.framed ? '  STILL FRAMED' : ''}`)
 }
 console.log(`shipped ${book.size} materials into ${MATERIALS_DIR}`)
 

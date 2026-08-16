@@ -5,7 +5,8 @@ import type { RawImage } from './post/raw.js'
 import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js'
 import {
   BORDER_TOLERANCE, CANDIDATE_MARGIN, MATERIAL_PX, ROAD_MATERIAL_ID, SEAM_TOLERANCE,
-  TERRAIN_COMMISSIONS, TILING_CRITERION_PROMPT, borderReport, cropMargin, toMaterialGrid,
+  DEFRAME_MAX_PASSES, TERRAIN_COMMISSIONS, TILING_CRITERION_PROMPT, borderReport, cropMargin,
+  deframe, toMaterialGrid,
   diamondFromMaterial, generationItems, materialFromCandidate, planTerrainProgram, seamReport,
   seasonTintFrom, selfTile3x3, stencilRoadTile, terrainAssetId, terrainBoilerplate,
 } from './terrainGen.js'
@@ -379,5 +380,50 @@ describe('cropMargin', () => {
       const black = small.data[i] === 0 && small.data[i + 1] === 0 && small.data[i + 2] === 0
       expect(black, `black cell at ${i / 4}`).toBe(false)
     }
+  })
+})
+
+
+describe('deframe', () => {
+  const framedMaterial = (rim: number): RawImage => {
+    const px = MATERIAL_PX
+    const img = seamlessSquare(px)
+    for (let y = 0; y < px; y++) {
+      for (let x = 0; x < px; x++) {
+        if (x >= rim && y >= rim && x < px - rim && y < px - rim) continue
+        img.data.set([0x43, 0x39, 0x4a, 255], (y * px + x) * 4)     // an ink rim
+      }
+    }
+    return toMaterialGrid(img)
+  }
+
+  it('leaves a clean material completely alone, at zero passes', () => {
+    const clean = toMaterialGrid(seamlessSquare(MATERIAL_PX))
+    const r = deframe(clean)
+    expect(r.passes).toBe(0)
+    expect(Buffer.from(r.material.data)).toEqual(Buffer.from(clean.data))
+  })
+
+  it('cuts a rim the 8% crop could not reach', () => {
+    const framed = framedMaterial(5)
+    expect(borderReport(framed).framed).toBe(true)
+    const r = deframe(framed)
+    expect(borderReport(r.material).framed).toBe(false)
+    expect(r.passes).toBeGreaterThan(0)
+    expect(r.material.width).toBe(MATERIAL_PX)      // still on the material grid
+  })
+
+  it('gives up rather than looping, and says how hard it tried', () => {
+    const allRim: RawImage = {
+      width: MATERIAL_PX, height: MATERIAL_PX,
+      data: new Uint8ClampedArray(MATERIAL_PX * MATERIAL_PX * 4),
+    }
+    for (let i = 0; i < allRim.data.length; i += 4) allRim.data.set([0x43, 0x39, 0x4a, 255], i)
+    expect(deframe(allRim).passes).toBeLessThanOrEqual(DEFRAME_MAX_PASSES)
+  })
+
+  it('is deterministic', () => {
+    const f = framedMaterial(5)
+    expect(Buffer.from(deframe(f).material.data)).toEqual(Buffer.from(deframe(f).material.data))
   })
 })

@@ -256,6 +256,21 @@ export function borderReport(m: RawImage, ring: number = BORDER_RING_PX): Border
   }
 }
 
+// A material that is ALREADY PAID FOR and still carries a rim gets the rim cut off rather
+// than regenerated: sand:0 came back framed at ring 24.7 even through the 8% crop, because
+// the model drew a thick one. Cutting is free; another attempt is not.
+export const DEFRAME_STEP = 0.10
+export const DEFRAME_MAX_PASSES = 3
+
+export function deframe(m: RawImage): { material: RawImage; passes: number } {
+  let out = m
+  for (let passes = 1; passes <= DEFRAME_MAX_PASSES; passes++) {
+    if (!borderReport(out).framed) return { material: out, passes: passes - 1 }
+    out = toMaterialGrid(cropMargin(out, DEFRAME_STEP), m.width)
+  }
+  return { material: out, passes: DEFRAME_MAX_PASSES }
+}
+
 // The picture the vision judge scores TILING on: the same square nine times, so a seam or a
 // recurring blob is the only thing that can stand out.
 export function selfTile3x3(m: RawImage): RawImage {
