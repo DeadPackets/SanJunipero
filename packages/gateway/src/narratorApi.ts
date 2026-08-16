@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type Database from 'better-sqlite3'
 import {
   CHRONICLE_TYPES, MILESTONE_ICON, MILESTONE_TYPE, chronicleIcon, chronicleLine,
-  type ChronicleEntry, type ChronicleLookup, type SimEvent,
+  type ChronicleEntry, type ChronicleLookup, type Moment, type SimEvent,
 } from '@sj/shared'
 import { MYSTERY_BY_KIND } from '@sj/engine'
 import type { Router } from './server.js'
@@ -101,5 +101,28 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     sendJson(res, readOrEmpty<{ kind: string; label: string; day: number; tick: number }>(
       deps.narratorDb, 'SELECT kind, label, day, tick FROM milestones ORDER BY id',
     ))
+  })
+
+  // A recorded day, named by its chapter when C7 has written one and by its number when it
+  // has not — the day exists either way, and the list must not wait on the prose.
+  router.route('GET', '/api/moments', (_req, res) => {
+    const rows = readOrEmpty<{
+      id: number; day: number; start_tick: number; end_tick: number
+      cast: string; location: string | null; title: string | null
+    }>(deps.narratorDb, `
+      SELECT s.id, s.day, s.start_tick, s.end_tick, s."cast", s.location, c.title
+      FROM scenes s LEFT JOIN chapters c ON c.day = s.day
+      ORDER BY s.day, s.id
+    `)
+    const moments: Moment[] = rows.map((r) => ({
+      id: r.id,
+      day: r.day,
+      startTick: r.start_tick,
+      endTick: r.end_tick,
+      title: r.title ?? `Day ${r.day}`,
+      cast: JSON.parse(r.cast) as string[],
+      location: r.location,
+    }))
+    sendJson(res, { moments })
   })
 }

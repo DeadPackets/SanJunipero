@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { CHRONICLE_ICONS, DEFAULT_CONFIG, type ChronicleEntry } from '@sj/shared'
+import { CHRONICLE_ICONS, DEFAULT_CONFIG, MomentsResponseSchema, type ChronicleEntry } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { NARRATOR_READ_TABLES, createGateway, type Gateway } from './index.js'
 
@@ -77,6 +77,12 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
       .run(1, 'What the Fire Took', 'It burned.', '[]', '[]')
     ndb.prepare('INSERT INTO milestones (kind, label, event_seq, day, tick) VALUES (?, ?, ?, ?, ?)')
       .run('first_death', 'The first death', 9000, 0, 50)
+    const scene = ndb.prepare(
+      'INSERT INTO scenes (day, start_tick, end_tick, event_ids, "cast", location) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+    scene.run(0, 10, 60, '[1,2]', '["alice","bob"]', 'the plaza')
+    scene.run(1, 1440, 1500, '[3]', '["cara"]', null)
+    scene.run(2, 2880, 2900, '[]', '[]', 'the riverbank')   // a day with no chapter written
     ndb.close()
 
     gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db, narratorDbPath: narratorPath })
@@ -149,6 +155,19 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
       { kind: 'first_death', label: 'The first death', day: 0, tick: 50 },
     ])
   })
+
+  it('turns C7’s recorded scenes into moments a viewer can open', async () => {
+    const body = MomentsResponseSchema.parse(await (await fetch(`${base}/api/moments`)).json())
+    expect(body.moments).toEqual([
+      {
+        id: 1, day: 0, startTick: 10, endTick: 60,
+        title: 'The First Morning', cast: ['alice', 'bob'], location: 'the plaza',
+      },
+      { id: 2, day: 1, startTick: 1440, endTick: 1500, title: 'What the Fire Took', cast: ['cara'], location: null },
+      // no chapter for day 2 — the day still exists, it just has no name yet
+      { id: 3, day: 2, startTick: 2880, endTick: 2900, title: 'Day 2', cast: [], location: 'the riverbank' },
+    ])
+  })
 })
 
 describe('narrator-backed observer apis, before a single day is narrated', () => {
@@ -176,6 +195,9 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
       expect(res.status, path).toBe(200)
       expect(await res.json(), path).toEqual([])
     }
+    const moments = await fetch(`${base}/api/moments`)
+    expect(moments.status).toBe(200)
+    expect(MomentsResponseSchema.parse(await moments.json()).moments).toEqual([])
   })
 
   it('still keeps the chronicle — the events are the town’s, not the narrator’s', async () => {
