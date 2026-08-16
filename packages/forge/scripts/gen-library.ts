@@ -6,7 +6,7 @@
 //
 // Controls: BATCH (required), ITEMS=<comma list> for reruns, DRY=1 for the offline plan,
 // CANDIDATES=2|3. Nothing generated is committed — art lives under $C13/library/.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { type AssetRecord } from '@sj/shared'
@@ -78,6 +78,9 @@ async function main(): Promise<void> {
     const e: LibraryEntry = item.entry
     const assetId = `library:${e.kind}`
     const dir = join(LIB, e.kind)
+    // A rerun must not leave last run's candidates behind: which file was chosen has to
+    // stay unambiguous when a human opens the folder.
+    rmSync(join(dir, 'candidates'), { recursive: true, force: true })
     mkdirSync(join(dir, 'candidates'), { recursive: true })
 
     let attemptsUsed = 0, extra = ''

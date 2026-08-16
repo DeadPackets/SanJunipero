@@ -12,9 +12,11 @@ const BATCH_CATEGORY: Record<LibraryBatch, LibraryCategory> = {
   tools: 'tool', foods: 'food', materials: 'material', ritual: 'ritual', furniture: 'furniture',
 }
 
-// Furniture silhouettes have to read at 24 px in an interior, so they get a third candidate.
+// One candidate per attempt, and the gate's retry loop does the choosing. Picking between
+// parallel candidates needs a pixel heuristic, and no pixel heuristic tells a pail from a
+// market stall — the judge does, and three judged attempts cost less than two blind ones.
 export const DEFAULT_CANDIDATES: Record<LibraryBatch, number> = {
-  tools: 2, foods: 2, materials: 2, ritual: 2, furniture: 3,
+  tools: 1, foods: 1, materials: 1, ritual: 1, furniture: 1,
 }
 
 const CATEGORY_HINT: Record<LibraryCategory, string> = {

@@ -14,16 +14,16 @@ describe('planBatch', () => {
       .toEqual(LIBRARY.filter(e => e.category === 'furniture').map(e => e.kind))
     for (const i of items) {
       expect(i.entry.iconPx).toBe(DEFAULT_FORGE_CONFIG.library.furnitureIconSizePx)
-      expect(i.candidates).toBe(3)
+      expect(i.candidates).toBe(1)
     }
   })
 
-  it('plans the materials batch at nine items and two candidates each', () => {
+  it('plans the materials batch at nine items and one candidate each', () => {
     const items = planBatch('materials')
     expect(items).toHaveLength(9)
     for (const i of items) {
       expect(i.entry.iconPx).toBe(DEFAULT_FORGE_CONFIG.library.iconSizePx)
-      expect(i.candidates).toBe(2)
+      expect(i.candidates).toBe(1)
     }
     expect(planBatch('materials', { candidates: 3 }).every(i => i.candidates === 3)).toBe(true)
   })
@@ -54,10 +54,10 @@ describe('planBatch', () => {
   it('the batch estimate is candidates of image plus two of vision, per item', () => {
     const items = planBatch('tools')
     expect(estimateBatchCost(items)).toBeCloseTo(
-      10 * 2 * EST_COST_PER_IMAGE + 10 * 2 * EST_COST_PER_VISION_CALL, 10)
-    expect(estimateBatchCost(planBatch('furniture'))).toBeCloseTo(
+      10 * 1 * EST_COST_PER_IMAGE + 10 * 2 * EST_COST_PER_VISION_CALL, 10)
+    expect(estimateBatchCost(planBatch('furniture', { candidates: 3 }))).toBeCloseTo(
       15 * 3 * EST_COST_PER_IMAGE + 15 * 2 * EST_COST_PER_VISION_CALL, 10)
-    expect(DEFAULT_CANDIDATES).toEqual({ tools: 2, foods: 2, materials: 2, ritual: 2, furniture: 3 })
+    expect(DEFAULT_CANDIDATES).toEqual({ tools: 1, foods: 1, materials: 1, ritual: 1, furniture: 1 })
   })
 
   // Batch A measured 42 live calls: the pre-flight estimate must not lie by 2x again.
