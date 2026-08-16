@@ -1,5 +1,6 @@
-import { registerVerb, skillLevel, VERBS } from '@sj/engine'
+import { crafterStamp, registerVerb, skillLevel, VERBS } from '@sj/engine'
 import type { PendingEvent, Structure, TileId, VerbDef, WorldState } from '@sj/engine'
+import type { SimConfig } from '@sj/shared'
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
 import type { RulebookStore } from './rulebook.js'
@@ -41,7 +42,15 @@ function anyAdjacentTile(state: WorldState, agentId: string, tile: string): bool
   return false
 }
 
-export function emitOutcomeEffects(state: WorldState, agentId: string, effects: OutcomeEffect[]): PendingEvent[] {
+// A recipe hard enough to be worth a specialist's name on the result.
+export function isExpertRecipe(recipe: Recipe, config: SimConfig): boolean {
+  return recipe.skillCheck !== undefined && recipe.skillCheck.difficulty >= config.crafting.expertDifficulty
+}
+
+export function emitOutcomeEffects(
+  state: WorldState, agentId: string, effects: OutcomeEffect[],
+  stamp: { owner?: string; crafterMark?: string } = {},
+): PendingEvent[] {
   const events: PendingEvent[] = []
   let nextId = state.counters.nextEntityId
   for (const e of effects) {
@@ -49,7 +58,7 @@ export function emitOutcomeEffects(state: WorldState, agentId: string, effects: 
       case 'spawn_item':
         events.push({
           type: 'item_spawned',
-          payload: { id: `item_${nextId++}`, kind: e.kind, qty: e.qty, loc: { t: 'agent', id: agentId } },
+          payload: { id: `item_${nextId++}`, kind: e.kind, qty: e.qty, loc: { t: 'agent', id: agentId }, ...stamp },
         })
         break
       case 'gain_skill':
@@ -118,7 +127,13 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
       const level = skillCheck ? skillLevel(state, agentId, skillCheck.track, config) : 0
       const factor = skillCheck ? skillFactor(level, skillCheck.difficulty) : 1
       const row = rollOutcomeTable(recipe.outcomeTable, rng, factor)
-      return emitOutcomeEffects(state, agentId, row.effects)
+      const mark = skillCheck && isExpertRecipe(recipe, config)
+        ? crafterStamp(state, config, agentId, skillCheck.track)
+        : {}
+      return emitOutcomeEffects(state, agentId, row.effects, {
+        ...(config.ownership.enabled ? { owner: agentId } : {}),
+        ...mark,
+      })
     },
     interruptible: recipe.interruptible,
     skill: recipe.skillCheck ? { track: recipe.skillCheck.track, xp: 10 } : undefined,

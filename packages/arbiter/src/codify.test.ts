@@ -6,7 +6,7 @@ import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
 import { ReviewStore } from './review.js'
 import type { Recipe } from './verdict.js'
-import { codify, emitOutcomeEffects, verbFromRecipe } from './codify.js'
+import { codify, emitOutcomeEffects, isExpertRecipe, verbFromRecipe } from './codify.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
 
@@ -76,7 +76,7 @@ describe('codify', () => {
       const nextId = state.counters.nextEntityId
       const events = def.onComplete(state, CFG, 'a1', {}, RngStream.from([0, 0, 0, 0]))
       expect(events).toEqual([
-        { type: 'item_spawned', payload: { id: `item_${nextId}`, kind: 'salt', qty: 1, loc: { t: 'agent', id: 'a1' } } },
+        { type: 'item_spawned', payload: { id: `item_${nextId}`, kind: 'salt', qty: 1, loc: { t: 'agent', id: 'a1' }, owner: 'a1' } },
       ])
     })
   })
@@ -152,6 +152,45 @@ describe('codify', () => {
         { type: 'item_spawned', payload: { id: `item_${nextId}`, kind: 'salt', qty: 1, loc: { t: 'agent', id: 'a1' } } },
         { type: 'item_spawned', payload: { id: `item_${nextId + 1}`, kind: 'clay', qty: 2, loc: { t: 'agent', id: 'a1' } } },
       ])
+    })
+  })
+
+  describe('expert crafts carry the maker’s mark', () => {
+    const expertRecipe: Recipe = { ...boilSaltRecipe, skillCheck: { track: 'cooking', difficulty: 4 } }
+    const EXPERT_XP = CFG.crafting.expertLevel * CFG.skills.xpLevelDivisor
+
+    function cook(xp: number): WorldState {
+      const s = burningFireAdjacent()
+      return xp === 0 ? s : fold(s, ev('skill_gained', { agentId: 'a1', track: 'cooking', xp }), CFG)
+    }
+
+    // A success row every time, so the spawn is never a dice question.
+    const alwaysWins = { next: () => 0 } as unknown as RngStream
+    const spawnPayload = (recipe: Recipe, state: WorldState, config = CFG): Record<string, unknown> | undefined =>
+      verbFromRecipe(recipe).onComplete(state, config, 'a1', {}, alwaysWins)
+        .find((e) => e.type === 'item_spawned')?.payload as Record<string, unknown> | undefined
+
+    it('reads difficulty against the expert threshold', () => {
+      expect(isExpertRecipe(expertRecipe, CFG)).toBe(true)
+      expect(isExpertRecipe(boilSaltRecipe, CFG)).toBe(false)             // difficulty 2
+      expect(isExpertRecipe({ ...boilSaltRecipe, skillCheck: undefined }, CFG)).toBe(false)
+    })
+
+    it('marks an expert recipe worked by an expert hand', () => {
+      expect(skillLevel(cook(EXPERT_XP), 'a1', 'cooking', CFG)).toBe(CFG.crafting.expertLevel)
+      expect(spawnPayload(expertRecipe, cook(EXPERT_XP))).toMatchObject({ owner: 'a1', crafterMark: 'a1' })
+    })
+
+    it('leaves it unmarked for a novice hand, and for an everyday recipe', () => {
+      expect(spawnPayload(expertRecipe, cook(0))!.crafterMark).toBeUndefined()
+      expect(spawnPayload(boilSaltRecipe, cook(EXPERT_XP))!.crafterMark).toBeUndefined()
+    })
+
+    it('stops marking and owning when the ownership flag is off', () => {
+      const off = SimConfigSchema.parse({ ownership: { enabled: false } })
+      const payload = spawnPayload(expertRecipe, cook(EXPERT_XP), off)!
+      expect(payload.crafterMark).toBeUndefined()
+      expect(payload.owner).toBeUndefined()
     })
   })
 

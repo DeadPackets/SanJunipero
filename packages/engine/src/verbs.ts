@@ -331,6 +331,15 @@ function ownerStamp(config: SimConfig, agentId: string): { owner?: string } {
   return config.ownership.enabled ? { owner: agentId } : {}
 }
 
+// A mark is a claim like any other, so it rides the same flag. Skill is read at
+// craft time: the hand that was expert on the day is the hand the object remembers.
+export function crafterStamp(
+  state: WorldState, config: SimConfig, agentId: string, track: string,
+): { crafterMark?: string } {
+  if (!config.ownership.enabled) return {}
+  return skillLevel(state, agentId, track, config) >= config.crafting.expertLevel ? { crafterMark: agentId } : {}
+}
+
 export const BuildParams = z.object({ kind: z.string(), x: z.number().int(), y: z.number().int() }).strict()
 export const CraftParams = z.object({ recipe: z.string() }).strict()
 export const ExtinguishParams = z.object({ structureId: z.string() }).strict()
@@ -451,7 +460,11 @@ const craft: VerbDef = makeVerb({
       ...events,
       {
         type: 'item_spawned',
-        payload: { id: mintId(state, 'item'), kind: recipe.output.kind, qty: recipe.output.qty, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId) },
+        payload: {
+          id: mintId(state, 'item'), kind: recipe.output.kind, qty: recipe.output.qty,
+          loc: { t: 'agent', id: agentId },
+          ...ownerStamp(config, agentId), ...crafterStamp(state, config, agentId, recipe.skill),
+        },
       },
       { type: 'skill_gained', payload: { agentId, track: recipe.skill, xp: 1 } },
     ]

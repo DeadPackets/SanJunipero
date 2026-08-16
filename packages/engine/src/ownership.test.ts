@@ -162,6 +162,34 @@ describe('ownership outlives the owner and the transfer', () => {
   })
 })
 
+describe('maker’s mark on expert crafts', () => {
+  const EXPERT_XP = DEFAULT_CONFIG.crafting.expertLevel * DEFAULT_CONFIG.skills.xpLevelDivisor
+
+  function carpenter(xp: number): WorldState {
+    let s = world({ id: 'a1', x: 1, y: 1 })
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 10, loc: { t: 'agent', id: 'a1' } }))
+    return xp === 0 ? s : fold(s, ev('skill_gained', { agentId: 'a1', track: 'carpentry', xp }))
+  }
+
+  const craftedPayload = (s: WorldState, config = DEFAULT_CONFIG): Record<string, unknown> =>
+    VERBS.craft!.onComplete(s, config, 'a1', { recipe: 'plank' }, RNG)
+      .find(e => e.type === 'item_spawned')!.payload as Record<string, unknown>
+
+  it('an expert leaves their mark on the work', () => {
+    expect(craftedPayload(carpenter(EXPERT_XP))).toMatchObject({ owner: 'a1', crafterMark: 'a1' })
+  })
+
+  it('an apprentice does not', () => {
+    const payload = craftedPayload(carpenter(DEFAULT_CONFIG.skills.xpLevelDivisor))
+    expect(payload.owner).toBe('a1')
+    expect(payload.crafterMark).toBeUndefined()
+  })
+
+  it('goes quiet with the ownership flag off — a mark is a claim like any other', () => {
+    expect(craftedPayload(carpenter(EXPERT_XP), OFF).crafterMark).toBeUndefined()
+  })
+})
+
 describe('item_taken is a witness record, not a mechanic', () => {
   it('folds to a state byte-identical to the one before it', () => {
     const s = withLooseItem(world({ id: 'a1', x: 1, y: 1 }, { id: 'a2', x: 4, y: 4 }), 'a2')
