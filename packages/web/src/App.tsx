@@ -3,6 +3,7 @@ import { momentToTick, tickToMoment } from '@sj/shared'
 import { createWorldStore, type WorldStore } from './state/worldStore.js'
 import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './net/socket.js'
 import { parseRoute, routeToPath, type Lens, type Route } from './ui/route.js'
+import { lensFromKey, lensKeyAllowed } from './ui/interaction.js'
 import { StageMount } from './render/StageMount.js'
 import { InspectorPanel } from './ui/InspectorPanel.js'
 import { RosterPanel } from './ui/RosterPanel.js'
@@ -97,6 +98,23 @@ export function App() {
     history.pushState(null, '', routeToPath(next))
     setRoute(next)
   }
+
+  // Left/right walk the lens bar from anywhere in the chrome. The map owns the arrows for
+  // panning and a text field owns them for typing, so both keep them (lensKeyAllowed).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return
+      const t = e.target as HTMLElement | null
+      const inApplication = t?.closest?.('[role="application"]') != null
+      if (!lensKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false, inApplication)) return
+      const next = lensFromKey(e.key, route.lens)
+      if (next === null) return
+      e.preventDefault()
+      nav(next)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [route])
 
   // the bonds graph replaces the canvas; pause the Pixi ticker while hidden (60fps budget honesty)
   useEffect(() => {

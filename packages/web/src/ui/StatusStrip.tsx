@@ -66,7 +66,7 @@ export function StatusStrip({ store }: { store: WorldStore }) {
 export function LensTabsView({ lens, hints, onNav }: { lens: Lens; hints: LensHint[]; onNav: (l: Lens) => void }) {
   const by = new Map(hints.map((h) => [h.lens, h]))
   return (
-    <nav className="lens-tabs" aria-label="Lenses">
+    <nav className="lens-tabs" aria-label="Lenses — left and right arrow keys move between them">
       {LENSES.map((l) => {
         const hint = by.get(l)!
         return (

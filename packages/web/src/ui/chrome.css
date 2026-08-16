@@ -95,6 +95,10 @@ body {
   outline-offset: 2px;
   border-radius: 2px;
 }
+/* Both of these clip their overflow, so a ring drawn outside a control's box gets sliced at
+   the edge — the same ember ring, laid inside the box instead. No second focus system. */
+#panel-outlet :focus-visible,
+.society-lens :focus-visible { outline-offset: -2px; }
 
 .app { display: flex; flex-direction: column; height: 100%; }
 
@@ -577,13 +581,14 @@ body {
 .digest-close:hover { background: var(--cream); translate: 0 -2px; box-shadow: 2px 4px 0 0 var(--deep); }
 .digest-close:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
 
-/* world-anchored popovers (structure provenance) share the slab language */
+/* world-anchored popovers (structure provenance, item and crop detail) share the slab language */
 .provenance-pop {
   position: fixed; z-index: 100; max-width: 18rem;
   background-color: var(--cream); color: var(--ink);
   font: 0.8rem/1.45 var(--font-body);
   padding: 0.2rem 0.35rem;
   white-space: pre-wrap;
+  text-wrap: pretty;   /* it is prose about a person, not a data cell — no orphans */
   pointer-events: none;
 }
 

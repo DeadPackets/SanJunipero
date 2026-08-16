@@ -2,7 +2,9 @@ import { Graphics, Sprite, type FederatedPointerEvent } from 'pixi.js'
 import { tickToMoment } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
+import { hoverLabel, itemCropDetail, type HoverKind } from '../ui/interaction.js'
 import { depthKey, tileToScreen } from './iso.js'
+import { createNameTagLayer, type NameTagLayer } from './nameTags.js'
 import type { Scene } from './scene.js'
 import { TextureBook, buildingArt, smoothSource, textureUrlFor, type BuildingArt } from './textures.js'
 
@@ -16,7 +18,7 @@ export const PIP_COLOR = 0xf2c879
 export const BUILD_TICKS_FULL = 2880 // pip denominator — DEFAULT_CONFIG construction.hutTicks; presentation only
 
 type Entry = { sprite: Sprite; url: string; pips: Graphics | null }
-type SyncState = { entries: Map<string, Entry>; lastAssetsSeq: number }
+type SyncState = { entries: Map<string, Entry>; lastAssetsSeq: number; tags: NameTagLayer }
 const syncStates = new WeakMap<Scene, SyncState>()
 
 function setTexture(book: TextureBook, entry: Entry, url: string): void {
@@ -74,9 +76,16 @@ function showPopover(text: string, x: number, y: number): void {
   if (popEl === null) {
     popEl = document.createElement('div')
     popEl.className = 'provenance-pop'
+    // A live region, so the detail reaches a reader who never sees the pointer; Escape
+    // dismisses it, so it is not a thing only a mouse can close.
+    popEl.setAttribute('role', 'status')
     document.body.appendChild(popEl)
-    document.addEventListener('pointerdown', () => {
+    const hide = (): void => {
       if (popEl !== null) popEl.style.display = 'none'
+    }
+    document.addEventListener('pointerdown', hide)
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') hide()
     })
   }
   popEl.textContent = text
@@ -96,8 +105,20 @@ export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore)
   if (state === null) return
   let sync = syncStates.get(scene)
   if (sync === undefined) {
-    sync = { entries: new Map(), lastAssetsSeq: store.assetsSeq() }
+    sync = { entries: new Map(), lastAssetsSeq: store.assetsSeq(), tags: createNameTagLayer(scene) }
     syncStates.set(scene, sync)
+  }
+  const tags = sync.tags
+
+  // Everything on the map answers to the pointer: hover names it, click tells its story.
+  const nameOnHover = (sprite: Sprite, kind: HoverKind, id: string): void => {
+    sprite.eventMode = 'static'
+    sprite.cursor = 'pointer'
+    sprite.on('pointerover', () => {
+      const text = hoverLabel(store.getState(), kind, id)
+      if (text !== null) tags.show(text, sprite.x, sprite.y - sprite.height)
+    })
+    sprite.on('pointerout', () => tags.hide())
   }
   const records = store.assetRecords()
   const live = new Set<string>()
@@ -109,9 +130,8 @@ export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore)
     if (entry === undefined) {
       const sprite = new Sprite()
       sprite.anchor.set(0.5, 1.0) // bottom-center pinned to the ground point (manifest law)
-      sprite.eventMode = 'static'
-      sprite.cursor = 'pointer'
       const sid = s.id
+      nameOnHover(sprite, 'structure', sid)
       sprite.on('pointertap', (e: FederatedPointerEvent) => {
         void provenanceText(sid, store.getState()).then((text) => showPopover(text, e.client.x, e.client.y))
       })
@@ -151,6 +171,12 @@ export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore)
     if (entry === undefined) {
       const sprite = new Sprite()
       sprite.anchor.set(0.5, 1.0)
+      const iid = it.id
+      nameOnHover(sprite, 'item', iid)
+      sprite.on('pointertap', (e: FederatedPointerEvent) => {
+        const text = itemCropDetail(store.getState(), 'item', iid)
+        if (text !== null) showPopover(text, e.client.x, e.client.y)
+      })
       entry = { sprite, url: '', pips: null }
       sync.entries.set(key, entry)
       scene.entities.addChild(sprite)
@@ -172,6 +198,12 @@ export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore)
     if (entry === undefined) {
       const sprite = new Sprite()
       sprite.anchor.set(0.5, 1.0)
+      const cid = c.id
+      nameOnHover(sprite, 'crop', cid)
+      sprite.on('pointertap', (e: FederatedPointerEvent) => {
+        const text = itemCropDetail(store.getState(), 'crop', cid)
+        if (text !== null) showPopover(text, e.client.x, e.client.y)
+      })
       entry = { sprite, url: '', pips: null }
       sync.entries.set(key, entry)
       scene.entities.addChild(sprite)
@@ -188,6 +220,7 @@ export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore)
     if (!live.has(key)) {
       entry.sprite.destroy({ children: true })
       sync.entries.delete(key)
+      tags.hide() // a torn-down sprite never fires pointerout, so its tag would hang
     }
   }
 
