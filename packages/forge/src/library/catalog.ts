@@ -36,7 +36,7 @@ const furniture = (kind: string, desc: string, interior: LibraryEntry['interior'
 const TOOLS: LibraryEntry[] = [
   tool('axe', 'a woodcutter axe with a honey-wood haft and a warm-grey iron head, the blade edge kept bright and keen'),
   tool('hoe', 'a long-handled garden hoe with a honey-wood shaft and a flat warm-grey blade turned at the neck'),
-  tool('knife', 'a short kitchen knife with a cream bone handle and a narrow warm-grey blade'),
+  tool('knife', 'a kitchen knife lying flat, a long straight warm-grey blade with a keen straight edge and a pointed tip, set into a short honey-wood handle'),
   tool('hammer', 'a carpenter hammer with a stubby honey-wood handle and a square warm-grey head'),
   tool('shovel', 'a digging shovel with a honey-wood shaft, a small crossbar grip and a rounded warm-grey scoop'),
   tool('fishing_rod', 'a long thin rod of pale springy wood with a wound sage-green line trailing from its tip and a small barbed hook'),
@@ -62,8 +62,8 @@ const FOODS: LibraryEntry[] = [
 
 const MATERIALS: LibraryEntry[] = [
   material('timber', 'a short stack of squared honey-wood planks, three high, with visible end grain'),
-  material('stone', 'two rough cream-stone blocks stacked together, chipped at the corners and speckled warm-grey'),
-  material('clay', 'a wet lump of red-brown clay pressed into a rough ball, with thumb marks in its surface'),
+  material('stone', 'two rough quarried blocks of warm-grey stone stacked one on the other, flat faces chipped at the corners, darker grey in the shadows and no other colour'),
+  material('clay', 'a wet slab of red-brown clay squared off by hand, slumping at its edges, with deep thumb grooves pressed across the top'),
   material('fiber', 'a loose coil of pale plant fibre, straw-coloured and slightly frayed at both ends'),
   material('hide', 'a folded animal skin, tan on the outside and cream on the underside, edges left ragged'),
   material('cloth', 'a folded square of woven cloth in soft cream with a thin dusty-rose stripe along one edge'),
