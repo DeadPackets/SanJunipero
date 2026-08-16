@@ -115,6 +115,18 @@ export class EngineBridge {
     })
   }
 
+  // Shutdown: a queued intent whose loop will never step again leaves its mind
+  // awaiting a promise nobody will settle. Refuse them all, in world words.
+  drain(reason = 'the moment passes'): number {
+    const queue = this.#queue
+    this.#queue = []
+    for (const item of queue) {
+      item.onResult?.({ ok: false, reason })
+      item.resolve({ ok: false, reason })
+    }
+    return queue.length
+  }
+
   perception(agentId: string): PerceptionPacket {
     return reconcile(
       composePerception(this.#loop.state, this.#simConfig, agentId, this.#recentEvents()),
