@@ -1,5 +1,28 @@
-{ "name": "@sj/web", "version": "0.0.1", "type": "module", "private": true,
-  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
-  "dependencies": { "@sj/shared": "workspace:*", "@sj/engine": "workspace:*",
-    "react": "^19.0.0", "react-dom": "^19.0.0", "pixi.js": "^8.6.0", "react-force-graph-2d": "^1.25.0", "zod": "^4.4.0" },
-  "devDependencies": { "vite": "^8.0.0", "@vitejs/plugin-react": "^5.0.0", "@types/react": "^19.0.0", "@types/react-dom": "^19.0.0" } }
+{
+  "name": "@sj/web",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource/press-start-2p": "^5.3.0",
+    "@fontsource/silkscreen": "^5.3.0",
+    "@sj/engine": "workspace:*",
+    "@sj/shared": "workspace:*",
+    "pixi.js": "^8.6.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-force-graph-2d": "^1.25.0",
+    "zod": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^8.0.0"
+  }
+}
