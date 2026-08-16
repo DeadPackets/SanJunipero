@@ -387,7 +387,13 @@ body {
 
 /* ── society lens: bonds graph over the night ground (Task 18) ── */
 .stage-hidden .stage-mount { display: none; }
-.society-lens { position: absolute; inset: 0; overflow: hidden; }
+.society-lens {
+  position: absolute; inset: 0; overflow: hidden;
+  /* the town's ledger page: night paper with a faint dot grid */
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255, 246, 233, 0.07) 1px, transparent 1.5px) 0 0 / 24px 24px,
+    var(--night);
+}
 .society-legend {
   position: absolute; top: 0.8rem; left: 0.8rem; z-index: 20;
   display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
@@ -414,7 +420,11 @@ body {
 }
 .society-empty {
   position: absolute; top: 45%; left: 50%; translate: -50% -50%; z-index: 10;
-  color: var(--cream); opacity: 0.85; font-style: italic;
+  color: var(--cream); font-style: italic;
+  background-color: var(--deep);
+  border: 10px solid transparent; border-image: var(--px-night);
+  padding: 0.4rem 0.7rem;
+  box-shadow: var(--ledge);
 }
 
 /* ── director mode + catch-up digest (Task 19) ── */

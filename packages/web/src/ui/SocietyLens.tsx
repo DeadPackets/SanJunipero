@@ -80,31 +80,49 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
       <ForceGraph2D
         width={dims.w}
         height={dims.h}
-        backgroundColor="#322B38"
+        backgroundColor="rgba(0,0,0,0)"
         graphData={{ nodes: graph.nodes.map((n) => ({ ...n })), links: links.map((l) => ({ ...l })) }}
         nodeVal={(n) => (n as GraphNode).size}
         nodeLabel={(n) => (n as GraphNode).name}
-        nodeCanvasObjectMode={() => 'after'}
+        nodeCanvasObjectMode={() => 'replace'}
         nodeCanvasObject={(node, ctx, globalScale) => {
+          // pixel token: integer-snapped square slab with ink ring, ledge, and bevel
           const n = node as GraphNode & { x?: number; y?: number }
           if (n.x === undefined || n.y === undefined) return
+          ctx.imageSmoothingEnabled = false
+          const side = Math.max(14, Math.round(Math.sqrt(n.size) * 5))
+          const x = Math.round(n.x) - Math.round(side / 2)
+          const y = Math.round(n.y) - Math.round(side / 2)
+          ctx.fillStyle = '#241F2B'
+          ctx.fillRect(x + 2, y + 2, side, side)
+          ctx.fillStyle = n.color
+          ctx.fillRect(x, y, side, side)
+          ctx.strokeStyle = '#43394A'
+          ctx.lineWidth = 2
+          ctx.strokeRect(x + 1, y + 1, side - 2, side - 2)
+          ctx.fillStyle = 'rgba(255,246,233,0.35)'
+          ctx.fillRect(x + 2, y + 2, side - 4, 2)
+          ctx.fillRect(x + 2, y + 2, 2, side - 4)
           if (n.halo) {
             ctx.strokeStyle = HALO_COLOR
-            ctx.lineWidth = 2 / globalScale
-            ctx.beginPath()
-            ctx.arc(n.x, n.y, Math.sqrt(n.size) * 2 + 4 / globalScale, 0, 2 * Math.PI)
-            ctx.stroke()
+            ctx.lineWidth = 2
+            ctx.strokeRect(x - 4, y - 4, side + 8, side + 8)
           }
-          const fontSize = Math.max(10 / globalScale, 2)
-          ctx.font = `600 ${fontSize}px system-ui, sans-serif`
+          const fontSize = Math.max(10 / globalScale, 4)
+          ctx.font = `${fontSize}px Silkscreen, monospace`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'top'
+          const lx = Math.round(n.x)
+          const ly = y + side + 4
+          ctx.fillStyle = '#241F2B'
+          ctx.fillText(n.name, lx + 1, ly + 1)
           ctx.fillStyle = '#FFF6E9'
-          ctx.fillText(n.name, n.x, n.y + Math.sqrt(n.size) * 2 + 2 / globalScale)
+          ctx.fillText(n.name, lx, ly)
         }}
         nodeColor={(n) => (n as GraphNode).color}
         linkColor={(l) => (l as { color: string }).color}
         linkWidth={(l) => (l as { width: number }).width}
+        linkLineDash={() => [4, 3]}
         onNodeClick={(n) => onPick((n as GraphNode).id)}
       />
     </div>
