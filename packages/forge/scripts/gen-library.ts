@@ -16,7 +16,7 @@ import { AssetCodex } from '../src/codex.js'
 import { loadForgeConfig } from '../src/forgeConfig.js'
 import { SpendLedger, AnomalyStopError } from '../src/spendLedger.js'
 import { makeImageClient } from '../src/imageClient.js'
-import { makeVisionJudge } from '../src/visionQa/visionJudge.js'
+import { makeVisionJudge, type VisionJudgeFn } from '../src/visionQa/visionJudge.js'
 import { runVisionGate } from '../src/visionQa/gate.js'
 import { recordVerdict } from '../src/visionQa/telemetry.js'
 import { CRITERIA, type VisionVerdict } from '../src/visionQa/verdict.js'
@@ -81,17 +81,17 @@ async function main(): Promise<void> {
     mkdirSync(join(dir, 'candidates'), { recursive: true })
 
     let attemptsUsed = 0, extra = ''
-    let chosen: RawImage | null = null, icon: RawImage | null = null
+    let chosen: RawImage | null = null, chosenRaw: RawImage | null = null, icon: RawImage | null = null
     const spriteVerdicts: VisionVerdict[] = [], iconVerdicts: VisionVerdict[] = []
     let status: ItemResult['status'] = 'blocked'
     let note = ''
 
     try {
       while (attemptsUsed < budget) {
-        const roundConfig = {
-          ...config,
-          visionQa: { ...config.visionQa, maxRetries: budget - attemptsUsed - 1 },
-        }
+        // The gate loops on the JUDGE's verdict, and the judge derives retry-vs-blocked from
+        // the attempt number it is handed. Offset it by the rounds already spent, or an icon
+        // rejection restarts the count and the item runs past its 3-attempt ceiling.
+        const roundJudge: VisionJudgeFn = a => judge({ ...a, attempt: attemptsUsed + (a.attempt ?? 1) })
         const res = await runVisionGate({
           assetId, klass: 'item', commission: e.desc,
           // Position law: boilerplate, then the fix, then the commission. Icon feedback from
@@ -100,13 +100,14 @@ async function main(): Promise<void> {
             boilerplate: extra ? `${item.boilerplate} ${extra}` : item.boilerplate,
             commissionText: item.commissionText,
           },
-          judge, ledger, config: roundConfig,
+          judge: roundJudge, ledger, config,
           regenerate: async (prompt, attempt) => {
             const n = attemptsUsed + attempt
             const cands = await client.generateCandidates(prompt, [anchor], item.candidates)
             const processed = await Promise.all(cands.map(async (c, ix) => {
               writeFileSync(join(dir, 'candidates', `a${n}-c${ix + 1}-raw.png`), c.png)
-              return { c, ix, ...toSpriteCell(await decodePng(c.png), e.spritePx) }
+              const raw = await decodePng(c.png)
+              return { c, ix, raw, ...toSpriteCell(raw, e.spritePx) }
             }))
             // Pick the cleanest silhouette: one connected subject, no floating debris.
             const pick = processed.reduce(
@@ -115,6 +116,7 @@ async function main(): Promise<void> {
               writeFileSync(join(dir, 'candidates',
                 p === pick ? `a${n}-chosen.png` : `rejected-a${n}-c${p.ix + 1}.png`),
                 await encodePng(p.cell))
+            chosenRaw = pick.raw
             return {
               sprite: pick.cell, model: pick.c.model,
               costUsd: cands.reduce((s, c) => s + c.costUsd, 0),
@@ -129,7 +131,9 @@ async function main(): Promise<void> {
         ledger.flush()
         if (res.status === 'blocked') { status = 'blocked'; note = res.verdicts.at(-1)?.feedback ?? ''; break }
 
-        icon = deriveIcon(res.sprite, e.iconPx)
+        // Resample the icon from the paid generation at its own cell count: an integer
+        // downscale of the 24 px sprite lands on 12 px of art, which the judge reads as mush.
+        icon = chosenRaw ? toSpriteCell(chosenRaw, e.iconPx).cell : deriveIcon(res.sprite, e.iconPx)
         const iv = await judge({
           assetId: `${assetId}#icon`, klass: 'icon', sprite: icon,
           commission: e.desc, attempt: attemptsUsed,
@@ -150,7 +154,7 @@ async function main(): Promise<void> {
     }
 
     if (chosen) {
-      icon ??= deriveIcon(chosen, e.iconPx)
+      icon ??= chosenRaw ? toSpriteCell(chosenRaw, e.iconPx).cell : deriveIcon(chosen, e.iconPx)
       const spritePng = await encodePng(chosen)
       const iconPng = await encodePng(icon)
       writeFileSync(join(dir, 'sprite.png'), spritePng)
