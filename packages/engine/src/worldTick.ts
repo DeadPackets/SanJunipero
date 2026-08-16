@@ -10,6 +10,7 @@ import { weatherSystem } from './systems/weather.js'
 import { fireSystem } from './systems/fire.js'
 import { cropsSystem } from './systems/crops.js'
 import { wildlifeSystem } from './systems/wildlife.js'
+import { spoilageSystem } from './systems/spoilage.js'
 
 export type TickCtx = {
   readonly config: SimConfig
@@ -80,7 +81,7 @@ function collapseDeathSystem(ctx: TickCtx): void {
 }
 
 const SYSTEMS: System[] = [
-  weatherSystem, fireSystem, cropsSystem, wildlifeSystem,
+  weatherSystem, fireSystem, cropsSystem, wildlifeSystem, spoilageSystem,
   needsSystem, healthSystem, agingSystem, actionsSystem, collapseDeathSystem,
 ]
 

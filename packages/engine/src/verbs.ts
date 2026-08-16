@@ -4,6 +4,7 @@ import { mintId, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile } from './interiors.js'
 import { findPath, isPassable } from './path.js'
+import { spoilageFor } from './systems/spoilage.js'
 
 export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
@@ -276,7 +277,7 @@ const harvest: VerbDef = makeVerb({
     const def = config.crops[crop.kind]!
     return [
       { type: 'crop_harvested', payload: { cropId: p.cropId } },
-      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: crop.kind, qty: def.yield, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId) } },
+      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: crop.kind, qty: def.yield, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId), ...spoilageFor(state, crop.kind, config) } },
     ]
   },
   skill: { track: 'farming', xp: 1 },
@@ -297,7 +298,7 @@ const fish: VerbDef = makeVerb({
     if (rng.next() >= chance) return []
     return [
       { type: 'wildlife_changed', payload: { fish: state.wildlife.fish - 1 } },
-      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FISH_KIND, qty: 1, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId) } },
+      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FISH_KIND, qty: 1, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId), ...spoilageFor(state, FISH_KIND, config) } },
     ]
   },
   skill: { track: 'fishing', xp: 1 },
@@ -320,7 +321,7 @@ const forage: VerbDef = makeVerb({
     const qty = config.wildlife.forageYieldBySeason[season]
     if (qty <= 0) return []
     return [
-      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FORAGE_KIND, qty, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId) } },
+      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FORAGE_KIND, qty, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId), ...spoilageFor(state, FORAGE_KIND, config) } },
     ]
   },
   skill: { track: 'foraging', xp: 1 },
@@ -465,6 +466,7 @@ const craft: VerbDef = makeVerb({
           id: mintId(state, 'item'), kind: recipe.output.kind, qty: recipe.output.qty,
           loc: { t: 'agent', id: agentId },
           ...ownerStamp(config, agentId), ...crafterStamp(state, config, agentId, recipe.skill),
+          ...spoilageFor(state, recipe.output.kind, config),
         },
       },
       { type: 'skill_gained', payload: { agentId, track: recipe.skill, xp: 1 } },

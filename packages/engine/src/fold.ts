@@ -7,7 +7,7 @@ import {
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CropGrew, CropHarvested, CropPlanted, CropWithered,
   FireExtinguished, FireIgnited, FireSpread, HpChanged,
-  ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemTaken, ItemTextChanged, NeedChanged,
+  ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken, ItemTextChanged, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
@@ -86,6 +86,7 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
             ...(p.text !== undefined ? { text: p.text } : {}),
             ...(p.owner !== undefined ? { owner: p.owner } : {}),
             ...(p.crafterMark !== undefined ? { crafterMark: p.crafterMark } : {}),
+            ...(p.spoilage !== undefined ? { spoilage: p.spoilage } : {}),
             loc: p.loc,
           },
         },
@@ -101,6 +102,12 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
     case 'item_taken': {
       ItemTaken.parse(event.payload)
       return state
+    }
+    case 'item_spoiled': {
+      const p = ItemSpoiled.parse(event.payload)
+      if (!state.items[p.id]) throw new Error(`item_spoiled for unknown item ${p.id}`)
+      const { [p.id]: _, ...items } = state.items
+      return { ...state, items }
     }
     case 'item_moved': {
       const p = ItemMoved.parse(event.payload)

@@ -17,15 +17,18 @@ import {
 // collapsed-sleep recovery + crop stage formula changed the scripted timeline).
 const GOLDEN_G2_HASH = '7263dde98076dbb234bdeded24aab659987190ce00e4581999027d615ec977e8'
 
-// C9 flags pinned OFF so this pre-C9 fixture keeps telling its own story. BOTH pins come off in
+// C9 flags pinned OFF so this pre-C9 fixture keeps telling its own story. ALL pins come off in
 // Task 16 Step 0, which folds their change into the single deliberate regen:
 //   ownership.enabled     — the Builder would own his hut and the scripted actors would claim,
 //                           gift and take titled goods; every one of those moves the hash.
 //   sleepIndoorsOnly      — these actors sleep in the open with no hut to enter; the law leaves
 //                           the hash intact but turns the run into 14 collapses instead of 2.
+//   spoilage.enabled      — the Fisher's catch would carry a shelf life and the run is 3 days,
+//                           long enough for fish (2 days) to turn; both move the hash.
 const G2_CONFIG = SimConfigSchema.parse({
   ownership: { enabled: false },
   structures: { sleepIndoorsOnly: false },
+  spoilage: { enabled: false },
 })
 
 const SEED = 'g2-scripted'

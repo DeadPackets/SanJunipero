@@ -1,6 +1,7 @@
 import { simTimeFromTick, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
 import { doorTile } from './interiors.js'
 import type { Item, WorldState } from './state.js'
+import { isSpoiling } from './systems/spoilage.js'
 import { isAdjacentToRect } from './verbs.js'
 
 // Perception is a pure projection: what one agent can sense from the shared
@@ -30,9 +31,12 @@ export type PerceivedStructure = {
 // "Rahel's basket" or "a chair bearing Yusuf's mark". Absent when unclaimed.
 export type OwnerNames = { ownerName?: string; crafterMarkName?: string }
 
-export type PerceivedItem = { id: string; kind: string; qty: number; x: number; y: number } & OwnerNames
+// Absent unless the thing is on its last day, so a packet full of fresh food reads as it always did.
+export type Turning = { spoiling?: true }
 
-export type InventoryItem = Item & OwnerNames
+export type PerceivedItem = { id: string; kind: string; qty: number; x: number; y: number } & OwnerNames & Turning
+
+export type InventoryItem = Item & OwnerNames & Turning
 
 export type PerceivedCrop = { id: string; kind: string; x: number; y: number; stage: number; withered: boolean }
 
@@ -146,6 +150,8 @@ export function composePerception(
       }
     : {}
 
+  const turning = (i: Item): Turning => (isSpoiling(state, i, config) ? { spoiling: true } : {})
+
   const visibleAgents: PerceivedAgent[] = Object.values(state.agents)
     .filter(a => a.id !== agentId && a.alive
       && (indoors === null ? (a.insideId === undefined && withinSight(a.x, a.y)) : a.insideId === indoors))
@@ -174,7 +180,7 @@ export function composePerception(
     .filter(isTileItem)
     .filter(i => withinSight(i.loc.x, i.loc.y))
     .sort(byId)
-    .map(i => ({ id: i.id, kind: i.kind, qty: i.qty, x: i.loc.x, y: i.loc.y, ...ownerNames(i) }))
+    .map(i => ({ id: i.id, kind: i.kind, qty: i.qty, x: i.loc.x, y: i.loc.y, ...ownerNames(i), ...turning(i) }))
 
   const structureItems: PerceivedItem[] = Object.values(state.items)
     .filter(isStructureItem)
@@ -187,7 +193,7 @@ export function composePerception(
     .sort(byId)
     .map(i => {
       const s = state.structures[i.loc.id]!
-      return { id: i.id, kind: i.kind, qty: i.qty, x: s.x, y: s.y, ...ownerNames(i) }
+      return { id: i.id, kind: i.kind, qty: i.qty, x: s.x, y: s.y, ...ownerNames(i), ...turning(i) }
     })
 
   const visibleItems: PerceivedItem[] = [...tileItems, ...structureItems].sort(byId)
@@ -200,7 +206,7 @@ export function composePerception(
   const inventory: InventoryItem[] = Object.values(state.items)
     .filter(i => i.loc.t === 'agent' && i.loc.id === agentId)
     .sort(byId)
-    .map(i => ({ ...i, ...ownerNames(i) }))
+    .map(i => ({ ...i, ...ownerNames(i), ...turning(i) }))
 
   const heard: HeardSpeech[] = []
   for (const ev of recentEvents) {
