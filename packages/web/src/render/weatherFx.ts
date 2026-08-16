@@ -18,11 +18,13 @@ type Drop = { sprite: Sprite; x: number; y: number }
 
 export function createWeatherLayer(scene: Scene): WeatherLayer {
   const layer = new Container()
+  layer.eventMode = 'none' // decorative overlays must never swallow stage hit-tests
   scene.app.stage.addChild(layer)
   const flash = new Sprite(Texture.WHITE)
   flash.tint = FLASH_COLOR
   flash.alpha = 0.6
   flash.visible = false
+  flash.eventMode = 'none'
   scene.app.stage.addChild(flash)
 
   let kind: keyof typeof PARTICLES | null = null

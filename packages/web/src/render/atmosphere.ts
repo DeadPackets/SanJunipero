@@ -10,6 +10,7 @@ export function createAtmosphere(scene: Scene): Atmosphere {
   // the deep-blue night IS this multiply quad over the whole screen
   const quad = new Sprite(Texture.WHITE)
   quad.blendMode = 'multiply'
+  quad.eventMode = 'none' // full-screen overlay must never swallow stage hit-tests
   scene.app.stage.addChild(quad)
   const filter = new ColorMatrixFilter()
   let filtered = false

@@ -43,6 +43,7 @@ export function createAmbient(
 ): AmbientDirector {
   // under-layer between ground and entities for shimmer + canopies
   const under = new Container()
+  under.eventMode = 'none' // decorative layers must never swallow stage hit-tests
   scene.world.addChildAt(under, 1)
 
   const px = (w: number, h: number, color: number): Texture => {
@@ -120,6 +121,7 @@ export function createAmbient(
     birdV.addChild(b)
   }
   birdV.visible = false
+  birdV.eventMode = 'none'
   scene.app.stage.addChild(birdV)
   let birdAt = -1 // director-time when the current flight started; <0 → waiting
   let nextBirdIn = (BIRD_MIN_S + Math.random() * (BIRD_MAX_S - BIRD_MIN_S)) * 1000
@@ -159,6 +161,7 @@ export function createAmbient(
           const p = new Sprite(puffTex)
           p.anchor.set(0.5, 0.5)
           p.zIndex = 1e8
+          p.eventMode = 'none'
           scene.entities.addChild(p)
           puffs.push(p)
         }
@@ -178,6 +181,7 @@ export function createAmbient(
         g.anchor.set(0.5, 1)
         g.blendMode = 'add'
         g.zIndex = 1e8
+        g.eventMode = 'none'
         scene.entities.addChild(g)
         glows.set(s.id, g)
       }
@@ -192,6 +196,7 @@ export function createAmbient(
         f.anchor.set(0.5, 1)
         f.blendMode = 'add'
         f.zIndex = 1e8
+        f.eventMode = 'none'
         scene.entities.addChild(f)
         fires.set(s.id, f)
       }

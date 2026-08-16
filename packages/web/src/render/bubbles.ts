@@ -59,6 +59,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
 
   const build = (text: string, isThought: boolean): Container => {
     const node = new Container()
+    node.eventMode = 'none' // bubbles float over heads — never block a character click
     const lines = wrapBubble(text.slice(0, SPEECH_MAX_CHARS))
     const label = new BitmapText({
       text: lines.join('\n'),

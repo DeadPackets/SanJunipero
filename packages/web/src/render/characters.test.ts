@@ -18,6 +18,7 @@ vi.mock('pixi.js', () => {
     visible = true
     zIndex = 0
     destroyed = false
+    eventMode = ''
     position = new Point()
     sortableChildren = false
     addChild(...cs: Container[]): void {
@@ -41,7 +42,6 @@ vi.mock('pixi.js', () => {
   class Sprite extends Container {
     anchor = new Point()
     scale = new Point()
-    eventMode = ''
     cursor = ''
     hitArea: unknown = null
     texture: unknown = null
@@ -189,6 +189,16 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(hit.height * scale.y).toBeCloseTo(72, 9)
     expect(hit.x * scale.x).toBeCloseTo(-26, 9)
     expect(hit.y * scale.y).toBeCloseTo(-72, 9)
+  })
+
+  it('companion objects are event-inert so they never swallow the sprite hit', () => {
+    layer.tick(1000)
+    const entities = scene.entities as unknown as InstanceType<typeof MockContainer>
+    const [shadow, sprite, emote, nameTag] = entities.children as unknown as Array<{ eventMode: string }>
+    expect(shadow!.eventMode).toBe('none')
+    expect(emote!.eventMode).toBe('none')
+    expect(nameTag!.eventMode).toBe('none')
+    expect(sprite!.eventMode).toBe('static')
   })
 
   it('name-tag label anchors (0.5, 1) and the bg slab wraps it with 4px padding', () => {

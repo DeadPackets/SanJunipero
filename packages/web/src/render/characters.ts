@@ -134,11 +134,14 @@ export function createCharacterLayer(
     const shadow = new Sprite(shadowTexture)
     shadow.anchor.set(0.5, 0.5)
     shadow.alpha = SHADOW_ALPHA
+    shadow.eventMode = 'none'
     const emote = new Sprite()
     emote.anchor.set(0.5, 1)
     emote.visible = false
+    emote.eventMode = 'none'
     const nameTag = new Container()
     nameTag.visible = false
+    nameTag.eventMode = 'none'
     const nameTagBg = new Graphics()
     const nameTagLabel = new BitmapText({ text: '', style: { fontFamily: 'monospace', fontSize: 8, fill: 0x43394a, lineHeight: 10 } })
     nameTagLabel.anchor.set(0.5, 1) // match the bg slab, which is drawn centered above the origin
