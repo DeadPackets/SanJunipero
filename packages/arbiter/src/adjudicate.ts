@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/agents'
+import { VERBS } from '@sj/engine'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import { codify as codifyRecipe } from './codify.js'
@@ -17,6 +18,18 @@ export const SIMILARITY_SHORT_CIRCUIT = 0.92
 // Impossible classes that depend on who asked (skills, inventory) must never
 // become global precedent; only context-independent classes short-circuit.
 const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set(['physically_impossible', 'beyond_adjacency'])
+
+// Invalid LLM verdicts (e.g. a map naming a verb that does not exist) get this
+// many total tries before the diegetic fallback below.
+const MAX_LLM_ATTEMPTS = 2
+
+// Returned — never recorded — when every try was invalid, so a bad run can
+// never become immutable precedent.
+const FALLBACK_IMPOSSIBLE: Verdict = {
+  kind: 'impossible',
+  reason: 'no clear way to do this presents itself',
+  class: 'physically_impossible',
+}
 
 export type AgentCtx = {
   agentId: string
@@ -61,12 +74,19 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
           if (row === null) return stored
           if (row.revertedAtTick === null) return { kind: 'map', verb: stored.recipe.id, params: {} }
           // Reverted → fall through to the LLM (the admin re-decides after revert).
+        } else if (stored.kind === 'map') {
+          if (stored.verb.startsWith('recipe:')) {
+            const row = rulebook.byId(stored.verb)
+            if (row !== null && row.revertedAtTick === null) return stored
+            // Reverted or never-codified recipe verb → fall through to the LLM.
+          } else if (VERBS[stored.verb]) {
+            return stored
+          }
+          // Unregistered verb → fall through to the LLM.
         } else if (stored.kind === 'impossible') {
           if (CONTEXT_INDEPENDENT_IMPOSSIBLE.has(stored.class)) return stored
           // Contextual (insufficient_skill/materials) → fall through to the LLM,
           // which sees the asking agent's own skills and inventory.
-        } else {
-          return stored
         }
       }
 
@@ -84,7 +104,16 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         precedent,
         intent,
       })
-      const { value } = await deps.llm.object({ schema: VerdictSchema, system, messages })
+      let value: Verdict | null = null
+      for (let i = 0; i < MAX_LLM_ATTEMPTS && value === null; i++) {
+        const r = await deps.llm.object({ schema: VerdictSchema, system, messages })
+        // A map naming an unregistered verb is a hallucination — retry, never
+        // return or record it (finding 8).
+        if (r.value.kind === 'map' && !VERBS[r.value.verb]) continue
+        value = r.value
+      }
+      if (value === null) return FALLBACK_IMPOSSIBLE
+
       // Deterministic adjacency gate: an attempt whose recipe canon the codex
       // has not earned is beyond adjacency, never codifiable. Record the
       // corrected verdict so the exploit never becomes shared precedent.

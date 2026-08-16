@@ -282,6 +282,61 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     expect(llm.objectCalls).toBe(1)
   })
 
+  it('a hallucinated map verb is never returned or recorded; retry then diegetic impossible', async () => {
+    const llm = new ScriptedLlm(() => ({ kind: 'map', verb: 'recipe:ghost_dance', params: {} }))
+    const { db, arbiter } = await makeRig(llm)
+
+    const verdict = await arbiter.adjudicate('I dance the ghost dance', ctx)
+    expect(verdict.kind).toBe('impossible')
+    expect(llm.objectCalls).toBe(2)
+    // Never recorded — a hallucinated verb must not become immutable precedent.
+    const n = (db.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n
+    expect(n).toBe(0)
+  })
+
+  it('a hallucinated map verb followed by a valid map on retry returns and records the valid one', async () => {
+    let call = 0
+    const llm = new ScriptedLlm(() => {
+      call += 1
+      return call === 1
+        ? { kind: 'map', verb: 'recipe:ghost_dance', params: {} }
+        : { kind: 'map', verb: 'walk', params: { x: 1, y: 1 } }
+    })
+    const { db, arbiter } = await makeRig(llm)
+
+    const verdict = await arbiter.adjudicate('I wander toward the river', ctx)
+    expect(verdict).toEqual({ kind: 'map', verb: 'walk', params: { x: 1, y: 1 } })
+    expect(llm.objectCalls).toBe(2)
+    const row = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
+    expect((JSON.parse(row.verdict_json) as Verdict).kind).toBe('map')
+  })
+
+  it('stage-2 short-circuit returns a stored map verdict whose verb is a live engine verb', async () => {
+    const llm = new ScriptedLlm(() => impossibleVerdict)
+    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const stored: Verdict = { kind: 'map', verb: 'walk', params: {} }
+
+    await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
+
+    const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
+    expect(verdict).toEqual(stored)
+    expect(llm.objectCalls).toBe(0)
+  })
+
+  it('stage-2 short-circuit re-checks stored map verdicts pointing at reverted recipe verbs', async () => {
+    const llm = new ScriptedLlm(() => impossibleVerdict)
+    const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
+    const stored: Verdict = { kind: 'map', verb: 'recipe:rope', params: {} }
+
+    await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
+    arbiter.codify(ropeRecipe)
+    arbiter.revert('recipe:rope', 'physics wrong')
+
+    const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
+    expect(verdict).toEqual(impossibleVerdict)
+    expect(llm.objectCalls).toBe(1)
+  })
+
   it('arbiter.revert routes through the review queue, leaving no stale pending disposition', async () => {
     unregisterVerb('recipe:boil_salt')
     const llm = new ScriptedLlm(() => impossibleVerdict)
