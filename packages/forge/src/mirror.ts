@@ -59,7 +59,7 @@ export function deriveSheet(authored: AuthoredSet): Map<string, RawImage> {
 // and from the passing frame. Ratios × the v1-calibrated cross-facing median.
 export function strideGateV4(facing: string, strip: Record<StripPoseV4, RawImage>, median: number): GateFailure[] {
   const failures: GateFailure[] = []
-  const check = (pa: StripPoseV4, pb: StripPoseV4, ratio: number, gate: string) => {
+  const check = (pa: StripPoseV4, pb: StripPoseV4, ratio: number, gate: GateFailure['gate']) => {
     const d = cellDistance(strip[pa], strip[pb])
     if (d < ratio * median)
       failures.push({ gate, a: `${facing}/${pa}`, b: `${facing}/${pb}`, value: d, limit: ratio * median })
