@@ -149,6 +149,16 @@ body {
 .stage-mount canvas { display: block; }
 .stage-mount:focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
 
+/* ── fps overlay: the town's health meter (toggle `f`) ── */
+.fps-overlay {
+  position: absolute; top: 0.8rem; right: 1rem; z-index: 30;
+  display: grid; gap: 0.15rem; justify-items: end;
+  background-color: var(--cream);
+  padding: 0.15rem 0.3rem;
+  font-family: var(--font-px); font-size: 0.78rem;
+}
+.fps-overlay .fps-avg { font-size: 0.68rem; opacity: 0.75; }
+
 /* ── camera controls: the town's viewfinder ── */
 .camera-hud {
   position: absolute; right: 1rem; bottom: 1rem; z-index: 20;

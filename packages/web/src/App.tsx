@@ -11,6 +11,7 @@ import { DirectorMode } from './ui/DirectorMode.js'
 import { DigestModal } from './ui/DigestModal.js'
 import { StageVeil } from './ui/StageVeil.js'
 import { CameraHud } from './ui/CameraHud.js'
+import { FpsOverlay } from './ui/FpsOverlay.js'
 import { LAST_SEEN_KEY } from './net/socket.js'
 import { Timeline } from './ui/Timeline.js'
 import type { Scene } from './render/scene.js'
@@ -142,6 +143,7 @@ export function App() {
           <StageVeil store={store} />
           <ScrubBanner store={store} />
           {(route.lens === 'map' || route.lens === 'inspector') && <CameraHud scene={scene} />}
+          <FpsOverlay />
           {route.lens === 'chronicle' && <Timeline store={store} handle={handle} onView={onView} />}
           {route.lens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
           {(route.lens === 'director' || directorLeaving) && (
