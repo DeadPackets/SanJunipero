@@ -1,0 +1,221 @@
+// GATE G4 — "boil river water for salt" adjudicates once, codifies, then the
+// byte-identical intent resolves Tier-1 with zero further Arbiter LLM calls.
+// Fully deterministic: scripted LlmClient, FakeEmbedder, :memory: db, no live API.
+import { describe, expect, it } from 'vitest'
+import type Database from 'better-sqlite3'
+import {
+  DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimConfig, type SimEvent,
+} from '@sj/shared'
+import {
+  EventStore, RngStream, RngStreams, TickLoop, VERBS, createWorldTick, fold, genesisState,
+  openDb, submitIntent, type WorldState,
+} from '@sj/engine'
+import { FakeEmbedder, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
+import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
+import { openArbiterDb } from './schema.js'
+import { RulebookStore } from './rulebook.js'
+import { CodexStore } from './codex.js'
+import type { Recipe, Verdict } from './verdict.js'
+
+// Pinned golden hashes — regenerating these is a deliberate, reviewed act.
+const GOLDEN_DAY_HASH = 'f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac'
+
+const CFG: SimConfig = DEFAULT_CONFIG
+const INTENT = 'I try to extract salt by boiling river water'
+
+// The Task 8 fixture, verbatim: boil river water until only salt remains.
+const boilSaltRecipe: Recipe = {
+  id: 'recipe:boil_salt',
+  name: 'Boil River Water for Salt',
+  skillCheck: { track: 'cooking', difficulty: 2 },
+  durationTicks: 5,
+  costs: [],
+  requires: [{ type: 'adjacent_fire' }],
+  outcomeTable: [
+    { weight: 1, success: true, label: 'A crust of salt forms as the water boils away.', effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }] },
+    { weight: 1, success: false, label: 'The water boils to nothing; the pot is bare.', effects: [{ op: 'none' }] },
+  ],
+  rngStream: 'recipe:boil_salt',
+  interruptible: true,
+  canon: ['fire', 'pottery'],
+}
+
+const boilSaltVerdict: Verdict = {
+  kind: 'attempt',
+  recipe: boilSaltRecipe,
+  summary: 'Boil river water until only salt remains.',
+}
+
+const ctx: AgentCtx = {
+  agentId: 'a1',
+  name: 'Tamar',
+  skills: { cooking: 80, farming: 120 },
+  inventory: [
+    { kind: 'wood', qty: 2 },
+    { kind: 'clay_pot', qty: 1 },
+  ],
+  position: { x: 3, y: 5 },
+}
+
+function emptyUsage(): LlmUsage {
+  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
+}
+
+// Payload guards: the tick pipeline's events are typed `unknown`; narrow to the
+// one field each assertion needs instead of fabricating an unchecked shape.
+function isVerbPayload(p: unknown): p is { verb: string } {
+  return typeof p === 'object' && p !== null && 'verb' in p && typeof p.verb === 'string'
+}
+
+function isSpawnPayload(p: unknown): p is { kind: string } {
+  return typeof p === 'object' && p !== null && 'kind' in p && typeof p.kind === 'string'
+}
+
+// Scripted LlmClient: never talks to OpenRouter; counts object calls and always
+// returns the boil-salt attempt verdict. The gate asserts the call count stays 1.
+class ScriptedLlm {
+  objectCalls = 0
+
+  async object<T>(opts: { system: string; messages: LlmMessage[]; schema: unknown }): Promise<{ value: T; usage: LlmUsage }> {
+    void opts
+    this.objectCalls += 1
+    return { value: boilSaltVerdict as unknown as T, usage: emptyUsage() }
+  }
+
+  async text(): Promise<{ text: string; usage: LlmUsage }> {
+    return { text: '', usage: emptyUsage() }
+  }
+
+  totalCostUsd(): number {
+    return 0
+  }
+
+  alert(): void {}
+}
+
+let seq = 90000
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+
+// Minimal world: one agent adjacent to a burning flammable structure at (2,1).
+function makeWorld(): WorldState {
+  let s = fold(genesisState(CFG), ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }), CFG)
+  s = fold(s, ev('structure_planned', { id: 's1', kind: 'campfire', x: 2, y: 1, w: 1, h: 1, maxHp: 10, flammable: true, builderId: 'a1' }), CFG)
+  s = fold(s, ev('fire_ignited', { structureId: 's1', cause: 'scripted' }), CFG)
+  return s
+}
+
+async function makeRig(llm: ScriptedLlm): Promise<{ db: Database.Database; arbiter: Arbiter }> {
+  const db = openArbiterDb(':memory:')
+  const codex = new CodexStore(db)
+  codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
+  codex.insert({ id: 'pottery', era: 'agriculture', name: 'Pottery', prerequisiteId: null })
+  const embedder = await FakeEmbedder.create()
+  const arbiter = makeArbiter({ db, llm: llm as unknown as LlmClient, embedder, tick: () => 100 })
+  return { db, arbiter }
+}
+
+// Seeded stream bag that pins the recipe's named rngStream to a forced roll.
+// RngStream.from([0,0,0,0]).next() === 0 → the outcome table's success row wins.
+class ForcedRngStreams extends RngStreams {
+  constructor(seed: string, private readonly forced: Record<string, RngStream>) {
+    super(seed)
+  }
+
+  get(name: string): RngStream {
+    return this.forced[name] ?? super.get(name)
+  }
+}
+
+// Tier-1 execution: submit the codified verb and drive the tick pipeline the full
+// 5 duration ticks, collecting every event the pipeline emits.
+function runTier1(state: WorldState): { state: WorldState; events: Array<{ type: string; payload: unknown }> } {
+  const events: Array<{ type: string; payload: unknown }> = []
+  const rng = new ForcedRngStreams('g4-scripted', { 'recipe:boil_salt': RngStream.from([0, 0, 0, 0]) })
+
+  const res = submitIntent(state, CFG, 'a1', 'recipe:boil_salt', {})
+  if (!res.ok) throw new Error(res.reason)
+  for (const e of res.events) {
+    state = fold(state, ev(e.type, e.payload), CFG)
+    events.push(e)
+  }
+
+  for (let i = 0; i < boilSaltRecipe.durationTicks; i++) {
+    const tick = state.tick + 1
+    state = fold(state, ev('tick_advanced', {}, tick), CFG)
+    const wt = createWorldTick(CFG, rng)(state)
+    state = wt.state
+    events.push(...wt.events)
+  }
+  return { state, events }
+}
+
+describe('GATE G4: "boil river water for salt" adjudicates once, then runs Tier-1', () => {
+  it('novel intent → attempt (1 LLM call) → codify → byte-identical intent → map (still 1 call) → Tier-1 completes deterministically', async () => {
+    const llm = new ScriptedLlm()
+    const { db, arbiter } = await makeRig(llm)
+
+    // 3. First adjudication reaches the LLM exactly once and returns the attempt.
+    const r1 = await arbiter.adjudicate(INTENT, ctx)
+    expect(r1).toEqual(boilSaltVerdict)
+    if (r1.kind !== 'attempt') throw new Error('expected attempt verdict')
+    expect(r1.recipe.id).toBe('recipe:boil_salt')
+    expect(llm.objectCalls).toBe(1)
+
+    // 4. Codify lands the recipe in the rulebook and hot-registers the verb.
+    const { verb } = arbiter.codify(r1.recipe)
+    expect(verb).toBe('recipe:boil_salt')
+    expect(new RulebookStore(db).byId('recipe:boil_salt')).not.toBeNull()
+    expect(VERBS['recipe:boil_salt']).toBeDefined()
+
+    // 5. Byte-identical intent resolves Tier-1 map with zero further LLM calls.
+    const r2 = await arbiter.adjudicate(INTENT, ctx)
+    expect(r2).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: {} })
+    expect(llm.objectCalls).toBe(1)
+
+    // 6. Tier-1 execution: submitIntent accepts, the 5-tick pipeline completes the
+    //    action and spawns the salt item.
+    expect(submitIntent(makeWorld(), CFG, 'a1', 'recipe:boil_salt', {})).toMatchObject({ ok: true })
+
+    const run = runTier1(makeWorld())
+    const completed = run.events.find(
+      (e): e is { type: string; payload: { verb: string } } =>
+        e.type === 'action_completed' && isVerbPayload(e.payload),
+    )
+    expect(completed).toBeDefined()
+    if (!completed) throw new Error('missing action_completed event')
+    expect(completed.payload.verb).toBe('recipe:boil_salt')
+    const spawned = run.events.find(
+      (e): e is { type: string; payload: { kind: string } } =>
+        e.type === 'item_spawned' && isSpawnPayload(e.payload),
+    )
+    expect(spawned).toBeDefined()
+    if (!spawned) throw new Error('missing item_spawned event')
+    expect(spawned.payload.kind).toBe('salt')
+
+    // 7. Determinism: the whole scripted run replays to the same stateHash twice —
+    //    onComplete draws only from its named rngStream, no Math.random anywhere.
+    const a = runTier1(makeWorld())
+    const b = runTier1(makeWorld())
+    expect(stateHash(a.state)).toBe(stateHash(b.state))
+  })
+})
+
+describe('GATE G4: golden replay stays green', () => {
+  it('G1 golden day still replays bit-identically to the pinned hash f487a26b', () => {
+    const store = new EventStore(openDb(':memory:'))
+    const rng = new RngStreams('golden')
+    const loop = new TickLoop({
+      store, state: genesisState(DEFAULT_CONFIG), rng, snapshotEveryTicks: 60,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) for (let i = 0; i < 5; i++) emit('agent_spawned', { id: `a${i}`, name: `a${i}`, x: i, y: 0, ageDays: 7300 })
+        if (tick > 1) {
+          const mover = `a${rng.get('walk').int(5)}`
+          emit('agent_moved', { id: mover, x: rng.get('walk').int(128), y: rng.get('walk').int(128) })
+          if (tick % 10 === 0) emit('need_changed', { id: `a${rng.get('meta').int(5)}`, need: 'hunger', delta: -1 })
+        }
+      },
+    })
+    for (let i = 0; i < MINUTES_PER_DAY; i++) loop.step()
+    expect(stateHash(loop.state)).toBe(GOLDEN_DAY_HASH)
+  })
+})
