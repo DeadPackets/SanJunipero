@@ -9,7 +9,16 @@ import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
 import { keywords, retrieveAmbient, type SceneCues } from '../memory/retrieve.js'
 import { parseTurnWithRepair, reconsiderTick, TurnSchema, type Turn } from '../turn.js'
-import { decideWake, DEFAULT_MIND_CONFIG, type MindClock, type MindConfig, type PlanState, type WakeReason } from '../wake.js'
+import {
+  decideWake,
+  disarmBodyAlarm,
+  rearmBodyAlarm,
+  DEFAULT_MIND_CONFIG,
+  type MindClock,
+  type MindConfig,
+  type PlanState,
+  type WakeReason,
+} from '../wake.js'
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
 import type { EngineBridge, SubmitResult } from './bridge.js'
@@ -40,6 +49,18 @@ function cuesFromPacket(packet: PerceptionPacket): SceneCues {
 
 export type RuntimeStats = { turns: number; dozes: number; reflections: number; costUsd: number }
 
+function freshClock(): MindClock {
+  return {
+    lastTurnTick: 0,
+    reconsiderAtTick: null,
+    conversationUntilTick: 0,
+    dozeUntilTick: 0,
+    alarmArmed: { hunger: true, energy: true, warmth: true },
+    morningWokeDay: null,
+    prevVisibleIds: [],
+  }
+}
+
 export class AgentRuntime {
   readonly #db: Database.Database
   readonly #llm: LlmClient
@@ -54,7 +75,7 @@ export class AgentRuntime {
   #agentId = ''
   #mem: MemoryStore | null = null
   #dayLog: string[] = []
-  #clock: MindClock = { lastTurnTick: 0, reconsiderAtTick: null, conversationUntilTick: 0, prevNeeds: null, prevVisibleIds: [] }
+  #clock: MindClock = freshClock()
   #plan: PlanState = { queue: [], lastResult: 'idle' }
   #planHeadInFlight = false
   #turnInFlight = false
@@ -92,7 +113,7 @@ export class AgentRuntime {
     this.#agentId = agentId
     this.#mem = new MemoryStore(this.#db, agentId, this.#embedder)
     this.#dayLog = []
-    this.#clock = { lastTurnTick: 0, reconsiderAtTick: null, conversationUntilTick: 0, prevNeeds: null, prevVisibleIds: [] }
+    this.#clock = freshClock()
     this.#plan = { queue: [], lastResult: 'idle' }
     this.#planHeadInFlight = false
     this.#turnInFlight = false
@@ -125,6 +146,7 @@ export class AgentRuntime {
   #onTick(tick: number): void {
     if (!this.#started) return
     const packet = this.#bridge.perception(this.#agentId)
+    rearmBodyAlarm(this.#config, packet.self.body.needs, this.#clock)
     this.#advancePlan(packet)
     if (packet.heard.length > 0) {
       this.#clock.conversationUntilTick = tick + this.#config.conversationWindowTicks
@@ -133,6 +155,7 @@ export class AgentRuntime {
     if (this.#turnInFlight) return
     const reason = decideWake(this.#config, packet, this.#clock, tick, this.#plan)
     if (reason === 'reconsider') this.#clock.reconsiderAtTick = null
+    if (reason === 'morning') this.#clock.morningWokeDay = Math.floor(tick / MINUTES_PER_DAY)
     if (reason !== null) void this.#startTurn(reason)
   }
 
@@ -195,6 +218,7 @@ export class AgentRuntime {
     } catch (err) {
       this.#llm.alert('turn_crash', err instanceof Error ? err.message : String(err))
       this.#clock.lastTurnTick = tick + this.#config.dozeTicks
+      this.#clock.dozeUntilTick = tick + this.#config.dozeTicks
     } finally {
       this.#turnInFlight = false
     }
@@ -260,11 +284,7 @@ export class AgentRuntime {
       this.#plan.lastResult = 'idle'
     }
     this.#stats.turns += 1
-    this.#clock.prevNeeds = {
-      hunger: packet.self.body.needs.hunger,
-      energy: packet.self.body.needs.energy,
-      warmth: packet.self.body.needs.warmth,
-    }
+    disarmBodyAlarm(this.#config, packet.self.body.needs, this.#clock)
     this.#clock.prevVisibleIds = packet.visible.agents.map((a) => a.id)
   }
 
@@ -358,5 +378,6 @@ export class AgentRuntime {
     this.#stats.dozes += 1
     this.#llm.alert('doze_off', 'providers unavailable; the mind dozes off mid-thought')
     this.#clock.lastTurnTick = tick + this.#config.dozeTicks
+    this.#clock.dozeUntilTick = tick + this.#config.dozeTicks
   }
 }

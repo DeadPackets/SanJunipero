@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PerceptionPacket } from './prompt/prose.js'
 import { quietMeadowPacket, conversationPacket } from './testutil/fixtures.js'
-import { decideWake, DEFAULT_MIND_CONFIG, type MindClock, type PlanState, type WakeReason } from './wake.js'
+import { decideWake, disarmBodyAlarm, rearmBodyAlarm, DEFAULT_MIND_CONFIG, type MindClock, type PlanState, type WakeReason } from './wake.js'
 
 const cfg = DEFAULT_MIND_CONFIG
 
@@ -18,7 +18,16 @@ function withNeeds(hunger: number, energy: number, warmth: number): PerceptionPa
 }
 
 function clk(overrides: Partial<MindClock> = {}): MindClock {
-  return { lastTurnTick: 0, reconsiderAtTick: null, conversationUntilTick: 0, prevNeeds: null, prevVisibleIds: [], ...overrides }
+  return {
+    lastTurnTick: 0,
+    reconsiderAtTick: null,
+    conversationUntilTick: 0,
+    dozeUntilTick: 0,
+    alarmArmed: { hunger: true, energy: true, warmth: true },
+    morningWokeDay: null,
+    prevVisibleIds: [],
+    ...overrides,
+  }
 }
 
 function pln(overrides: Partial<PlanState> = {}): PlanState {
@@ -84,9 +93,25 @@ describe('decideWake — asleep gate', () => {
     self: { ...quietMeadowPacket.self, asleep: true },
     feltEvents,
   })
+  const asleepAtNight = (feltEvents: string[] = []): PerceptionPacket => ({
+    ...asleep(feltEvents),
+    time: { ...quietMeadowPacket.time, hour: 23, isNight: true },
+  })
 
   it('ignores boredom while asleep', () => {
-    expect(decideWake(cfg, asleep(), clk(), 130, pln())).toBe(null)
+    expect(decideWake(cfg, asleepAtNight(), clk(), 130, pln())).toBe(null)
+  })
+
+  it('wakes once for the morning when asleep past dawn', () => {
+    // quietMeadowPacket is 10:00 — daylight. First look: morning. Once the
+    // runtime marks the day, no more morning wakes until the next day.
+    expect(decideWake(cfg, asleep(), clk(), 600, pln())).toBe('morning')
+    expect(decideWake(cfg, asleep(), clk({ morningWokeDay: 0 }), 600, pln())).toBe(null)
+    expect(decideWake(cfg, asleep(), clk({ morningWokeDay: 0 }), 1440 + 600, pln())).toBe('morning')
+  })
+
+  it('does not fire morning while it is still night', () => {
+    expect(decideWake(cfg, asleepAtNight(), clk(), 1380, pln())).toBe(null)
   })
 
   it('wakes on you_were_attacked', () => {
@@ -98,7 +123,7 @@ describe('decideWake — asleep gate', () => {
   })
 
   it('ignores non-salient felt events', () => {
-    expect(decideWake(cfg, asleep(['rain_started']), clk(), 10, pln())).toBe(null)
+    expect(decideWake(cfg, asleepAtNight(['rain_started']), clk(), 10, pln())).toBe(null)
   })
 
   it('wakes on body_alarm while asleep', () => {
@@ -111,22 +136,43 @@ describe('decideWake — asleep gate', () => {
 })
 
 describe('decideWake — hysteresis', () => {
-  it('body_alarm is edge-triggered and re-arms only past threshold + hysteresis', () => {
-    let prevNeeds: MindClock['prevNeeds'] = null
-    const run = (hunger: number, tick: number): WakeReason | null =>
-      decideWake(cfg, withNeeds(hunger, 78, 71), clk({ prevNeeds }), tick, pln())
+  it('body_alarm fires while armed, stays quiet disarmed, re-arms past threshold + hysteresis', () => {
+    const clock = clk()
+    const run = (hunger: number, tick: number): WakeReason | null => {
+      rearmBodyAlarm(cfg, { hunger, energy: 78, warmth: 71 }, clock)
+      return decideWake(cfg, withNeeds(hunger, 78, 71), clock, tick, pln())
+    }
 
     expect(run(24, 10)).toBe('body_alarm')
-    prevNeeds = { hunger: 24, energy: 78, warmth: 71 }
+    disarmBodyAlarm(cfg, { hunger: 24, energy: 78, warmth: 71 }, clock)
 
     expect(run(24, 11)).toBe(null)
-    prevNeeds = { hunger: 24, energy: 78, warmth: 71 }
+
+    // 26 is above threshold but below the 35 re-arm point: still quiet.
+    expect(run(26, 12)).toBe(null)
+    expect(run(24, 13)).toBe(null)
 
     // 36 > 25 + 10: climbs past the re-arm point, but healthy → no wake.
-    expect(run(36, 12)).toBe(null)
-    prevNeeds = { hunger: 36, energy: 78, warmth: 71 }
+    expect(run(36, 14)).toBe(null)
+    expect(run(24, 15)).toBe('body_alarm')
+  })
 
-    expect(run(24, 13)).toBe('body_alarm')
+  it('a turn at a level between threshold and re-arm point must not disarm the alarm', () => {
+    // Regression: hunger 30 lies in (25, 35]; a turn snapshot there used to
+    // permanently disarm body_alarm because 30 is not > threshold + hysteresis.
+    const clock = clk()
+    disarmBodyAlarm(cfg, { hunger: 30, energy: 78, warmth: 71 }, clock)
+    expect(decideWake(cfg, withNeeds(24, 78, 71), clock, 10, pln())).toBe('body_alarm')
+  })
+})
+
+describe('decideWake — doze backoff', () => {
+  it('suppresses every reason, floor-exempt ones included, until dozeUntilTick', () => {
+    const clock = clk({ dozeUntilTick: 50 })
+    expect(decideWake(cfg, withNeeds(24, 78, 71), clock, 49, pln())).toBe(null)
+    expect(decideWake(cfg, conversationPacket, clock, 49, pln())).toBe(null)
+    expect(decideWake(cfg, pkt(), clock, 49, pln({ lastResult: 'blocked' }))).toBe(null)
+    expect(decideWake(cfg, withNeeds(24, 78, 71), clock, 50, pln())).toBe('body_alarm')
   })
 })
 

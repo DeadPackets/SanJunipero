@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MINUTES_PER_DAY } from '@sj/shared'
 import { IntentSchema } from './turn.js'
 import type { PerceptionPacket } from './prompt/prose.js'
 
@@ -30,11 +31,15 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   ambientK: 8,
 }
 
+export type BodyNeeds = { hunger: number; energy: number; warmth: number }
+
 export type MindClock = {
   lastTurnTick: number
   reconsiderAtTick: number | null
   conversationUntilTick: number
-  prevNeeds: { hunger: number; energy: number; warmth: number } | null
+  dozeUntilTick: number
+  alarmArmed: { hunger: boolean; energy: boolean; warmth: boolean }
+  morningWokeDay: number | null
   prevVisibleIds: string[]
 }
 
@@ -53,6 +58,7 @@ export type WakeReason =
   | 'conversation_beat'
   | 'reconsider'
   | 'boredom'
+  | 'morning'
 
 export function decideWake(
   cfg: MindConfig,
@@ -61,10 +67,16 @@ export function decideWake(
   tick: number,
   plan: PlanState,
 ): WakeReason | null {
+  // Backoff after a failed turn: even floor-exempt reasons wait it out.
+  if (tick < clock.dozeUntilTick) return null
+
   if (packet.self.asleep) {
-    if (bodyAlarmFired(cfg, packet.self.body.needs, clock.prevNeeds)) return 'body_alarm'
+    if (bodyAlarmFired(cfg, packet.self.body.needs, clock.alarmArmed)) return 'body_alarm'
     if (packet.feltEvents.some((e) => e === 'you_were_attacked' || e.startsWith('fire'))) {
       return 'salient_perception'
+    }
+    if (!packet.time.isNight && clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)) {
+      return 'morning'
     }
     return null
   }
@@ -74,7 +86,7 @@ export function decideWake(
   const inConversation = tick < clock.conversationUntilTick
 
   // Floor-exempt: physical rousing and immediate surprises.
-  if (bodyAlarmFired(cfg, needs, clock.prevNeeds)) return 'body_alarm'
+  if (bodyAlarmFired(cfg, needs, clock.alarmArmed)) return 'body_alarm'
   if (salientPerception(packet, clock.prevVisibleIds)) return 'salient_perception'
   if (plan.lastResult === 'blocked') return 'plan_blocked'
 
@@ -94,17 +106,27 @@ export function decideWake(
   return null
 }
 
-function bodyAlarmFired(
-  cfg: MindConfig,
-  needs: { hunger: number; energy: number; warmth: number },
-  prevNeeds: MindClock['prevNeeds'],
-): boolean {
+function bodyAlarmFired(cfg: MindConfig, needs: BodyNeeds, armed: MindClock['alarmArmed']): boolean {
   for (const need of ['hunger', 'energy', 'warmth'] as const) {
-    if (needs[need] >= cfg.bodyAlarm[need]) continue
-    if (prevNeeds === null) return true
-    if (prevNeeds[need] > cfg.bodyAlarm[need] + cfg.alarmHysteresis) return true
+    if (needs[need] < cfg.bodyAlarm[need] && armed[need]) return true
   }
   return false
+}
+
+// Called every tick: a need that has recovered past threshold + hysteresis
+// re-arms its alarm, so oscillation around the threshold cannot re-fire it.
+export function rearmBodyAlarm(cfg: MindConfig, needs: BodyNeeds, clock: MindClock): void {
+  for (const need of ['hunger', 'energy', 'warmth'] as const) {
+    if (needs[need] >= cfg.bodyAlarm[need] + cfg.alarmHysteresis) clock.alarmArmed[need] = true
+  }
+}
+
+// Called after a successful turn: needs the mind has now seen below threshold
+// stop ringing until they recover past the re-arm point.
+export function disarmBodyAlarm(cfg: MindConfig, needs: BodyNeeds, clock: MindClock): void {
+  for (const need of ['hunger', 'energy', 'warmth'] as const) {
+    if (needs[need] < cfg.bodyAlarm[need]) clock.alarmArmed[need] = false
+  }
 }
 
 function salientPerception(packet: PerceptionPacket, prevVisibleIds: string[]): boolean {
