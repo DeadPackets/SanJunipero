@@ -41,6 +41,16 @@ export function renderNewspaper(
   return { headline: chapter.title, body: parts.join('\n\n'), citations: chapter.citations }
 }
 
+export function timelapseCaptions(
+  chapters: ChapterRow[],
+  intervalDays = 1,
+): Array<{ day: number; caption: string }> {
+  return [...chapters]
+    .sort((a, b) => a.day - b.day)
+    .filter((_c, i) => i % intervalDays === 0)
+    .map((c) => ({ day: c.day, caption: `Day ${c.day}: ${c.title}` }))
+}
+
 // The public-record boundary: structure_completed carries only the structure id
 // and crop_harvested only the crop id — unattributable, so excluded. Building is
 // attributed via structure_planned.builderId; harvests via action_completed.
