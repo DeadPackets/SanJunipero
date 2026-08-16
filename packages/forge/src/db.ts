@@ -34,5 +34,11 @@ export function openForgeDb(path: string): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_jobs_claim ON jobs(status, run_at);
   `)
+  const cols = db.pragma('table_info(assets)') as Array<{ name: string }>
+  if (!cols.some(c => c.name === 'kind')) {
+    db.exec('ALTER TABLE assets ADD COLUMN kind TEXT')
+    // backfill pre-existing rows only, by the desc-prefix convention; new rows set kind at register
+    db.exec("UPDATE assets SET kind = substr(desc, 1, instr(desc, ':') - 1) WHERE instr(desc, ':') > 0")
+  }
   return db
 }

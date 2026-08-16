@@ -92,7 +92,7 @@ describe('asset http routes', () => {
   it('serves a ready codex character sheet byte-identical instead of the placeholder', async () => {
     const png = await encodePng({ width: 4, height: 4, data: new Uint8ClampedArray(4 * 4 * 4).fill(200) })
     codex.register({
-      class: 'rig-part', desc: 'character:weaver', footprint: { w: 1, h: 1 },
+      class: 'rig-part', desc: 'character:weaver', kind: 'character:weaver', footprint: { w: 1, h: 1 },
       png, widthPx: 4, heightPx: 4, status: 'ready', score: 9, attempts: 1, costUsd: 0,
     })
     const res = await fetch(`${base}/assets/character/weaver.png`)
@@ -103,7 +103,7 @@ describe('asset http routes', () => {
   it('a placeholder-status codex row does NOT shadow the built sheet', async () => {
     const png = await encodePng({ width: 4, height: 4, data: new Uint8ClampedArray(4 * 4 * 4).fill(90) })
     codex.register({
-      class: 'rig-part', desc: 'character:mason', footprint: { w: 1, h: 1 },
+      class: 'rig-part', desc: 'character:mason', kind: 'character:mason', footprint: { w: 1, h: 1 },
       png, widthPx: 4, heightPx: 4, status: 'placeholder', score: null, attempts: 1, costUsd: 0,
     })
     const res = await fetch(`${base}/assets/character/mason.png`)

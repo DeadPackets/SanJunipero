@@ -118,6 +118,15 @@ describe('gateway server', () => {
     expect(assets).toHaveLength(1)
     expect(assets[0]!.t === 'asset' && assets[0]!.record.status).toBe('placeholder')
 
+    // asset catch-up: a late joiner receives existing codex records right after its snapshot
+    const late = await connect(gw.port); open.push(late)
+    const lateFrames: string[] = []
+    collect(late, lateFrames)
+    await hello(late)
+    await wait(80)
+    const lateAssets = lateFrames.map(f => ServerMsg.parse(JSON.parse(f))).filter(m => m.t === 'asset')
+    expect(lateAssets).toHaveLength(1)
+
     // scrub goes only to the requester and matches mirror.stateAt
     const mirror = new WorldMirror({ db, config: DEFAULT_CONFIG, terrain: GRASS })
     const before = bFrames.length

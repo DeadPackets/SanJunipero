@@ -98,6 +98,9 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         greeted = true
         removers.set(sock, hub.add(sock, snapshotJson))
         sock.send(snapshotJson())
+        // asset catch-up: late joiners must not render placeholders the codex already replaced
+        const cdx = getCodex()
+        if (cdx) for (const record of cdx.listSince(0)) sock.send(JSON.stringify({ t: 'asset', record }))
         return
       }
       if (msg.t === 'scrub') {

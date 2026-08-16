@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { createScene, type Scene } from './scene.js'
+import { TextureBook } from './textures.js'
+import { syncEntities } from './entities.js'
 
 // The ONLY React/Pixi contact point — React renders nothing inside the canvas (spec §15).
 export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (scene: Scene) => void }) {
@@ -11,16 +13,21 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
     if (rootEl === null) return
     let scene: Scene | null = null
     let disposed = false
+    let offSync: (() => void) | null = null
     void createScene(rootEl, store).then((s) => {
       if (disposed) {
         s.destroy()
         return
       }
       scene = s
+      const book = new TextureBook()
+      offSync = store.subscribe(() => syncEntities(s, book, store))
+      syncEntities(s, book, store)
       onScene?.(s)
     })
     return () => {
       disposed = true
+      offSync?.()
       scene?.destroy()
     }
   }, [])

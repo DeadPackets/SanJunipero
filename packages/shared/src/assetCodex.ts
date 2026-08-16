@@ -13,6 +13,8 @@ export const AssetRecordSchema = z.object({
   seq: z.number().int().positive(),
   class: AssetClassSchema,
   desc: z.string().min(1),
+  kind: z.string().min(1).nullable().default(null), // renderer resolution key; desc stays human prose
+
   footprint: FootprintSchema,
   widthPx: z.number().int().positive(),
   heightPx: z.number().int().positive(),

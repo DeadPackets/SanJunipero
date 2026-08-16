@@ -6,6 +6,7 @@ import { AssetRecordSchema, AssetClassSchema, FootprintSchema, type AssetRecord 
 const RegisterInputSchema = z.object({
   class: AssetClassSchema,
   desc: z.string().min(1),
+  kind: z.string().min(1).nullable().optional(),
   footprint: FootprintSchema,
   png: z.instanceof(Buffer),
   widthPx: z.number().int().positive(),
@@ -18,12 +19,12 @@ const RegisterInputSchema = z.object({
 type RegisterInput = z.infer<typeof RegisterInputSchema>
 
 type Row = {
-  seq: number; id: string; class: string; desc: string; footprint_w: number; footprint_h: number
+  seq: number; id: string; class: string; desc: string; kind: string | null; footprint_w: number; footprint_h: number
   width_px: number; height_px: number; status: string; score: number | null
   attempts: number; cost_usd: number; created_at: string
 }
 
-const COLS = 'seq, id, class, desc, footprint_w, footprint_h, width_px, height_px, status, score, attempts, cost_usd, created_at'
+const COLS = 'seq, id, class, desc, kind, footprint_w, footprint_h, width_px, height_px, status, score, attempts, cost_usd, created_at'
 
 export class AssetCodex {
   #insert; #selById; #selPngById; #selSince
@@ -31,8 +32,8 @@ export class AssetCodex {
 
   constructor(db: Database.Database) {
     this.#insert = db.prepare(`INSERT INTO assets
-      (id, class, desc, footprint_w, footprint_h, png, width_px, height_px, status, score, attempts, cost_usd)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      (id, class, desc, kind, footprint_w, footprint_h, png, width_px, height_px, status, score, attempts, cost_usd)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     this.#selById = db.prepare(`SELECT ${COLS} FROM assets WHERE id = ?`)
     this.#selPngById = db.prepare('SELECT png FROM assets WHERE id = ?')
     this.#selSince = db.prepare(`SELECT ${COLS} FROM assets WHERE seq > ? ORDER BY seq`)
@@ -40,7 +41,7 @@ export class AssetCodex {
 
   #toRecord(r: Row): AssetRecord {
     return AssetRecordSchema.parse({
-      id: r.id, seq: r.seq, class: r.class, desc: r.desc,
+      id: r.id, seq: r.seq, class: r.class, desc: r.desc, kind: r.kind,
       footprint: { w: r.footprint_w, h: r.footprint_h },
       widthPx: r.width_px, heightPx: r.height_px, status: r.status,
       score: r.score, attempts: r.attempts, costUsd: r.cost_usd, createdAt: r.created_at,
@@ -50,7 +51,7 @@ export class AssetCodex {
   register(input: RegisterInput): AssetRecord {
     const v = RegisterInputSchema.parse(input)
     const id = `asset_${randomUUID()}`
-    this.#insert.run(id, v.class, v.desc, v.footprint.w, v.footprint.h,
+    this.#insert.run(id, v.class, v.desc, v.kind ?? null, v.footprint.w, v.footprint.h,
       v.png, v.widthPx, v.heightPx, v.status, v.score, v.attempts, v.costUsd)
     const rec = this.#toRecord(this.#selById.get(id) as Row)
     // the row is already committed — a throwing listener must not reject register (duplicate paid regen)

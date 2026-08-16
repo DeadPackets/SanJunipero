@@ -19,7 +19,7 @@ function makeSnapshot() {
 }
 
 const record: AssetRecord = {
-  id: 'asset_1', seq: 1, class: 'building', desc: 'hut: timber', footprint: { w: 2, h: 2 },
+  id: 'asset_1', seq: 1, class: 'building', desc: 'hut: timber', kind: 'hut', footprint: { w: 2, h: 2 },
   widthPx: 4, heightPx: 4, status: 'placeholder', score: null, attempts: 1, costUsd: 0,
   createdAt: '2026-08-16 00:00:00',
 }

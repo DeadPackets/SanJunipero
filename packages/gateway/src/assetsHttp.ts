@@ -103,11 +103,10 @@ export function mountAssetRoutes(router: Router, deps: { getCodex(): AssetCodex 
     const agentId = stripPng(params.file ?? '')
     if (agentId === null || agentId === '') { notFound(res); return }
     // binding: newest ready codex sheet registered for this agent, else the built placeholder
-    // (exact desc match `character:<id>` until the T12 kind-column migration lands)
     const codex = deps.getCodex()
     if (codex) {
       const match = codex.listSince(0)
-        .filter(r => r.status === 'ready' && r.desc === `character:${agentId}`)
+        .filter(r => r.status === 'ready' && r.kind === `character:${agentId}`)
         .at(-1)
       if (match) {
         const hit = codex.get(match.id)
