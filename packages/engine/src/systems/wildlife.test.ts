@@ -79,6 +79,21 @@ describe('verb: fish', () => {
     expect(r.state.items.item_1!.kind).toBe('fish')
   })
 
+  // Seed 'w9' rolls ≈ 0.290: under the spring chance of 0.4, over the winter 0.2.
+  it('halves the catch chance through winter — the same cast that lands in spring comes up empty', () => {
+    const spring = castLine(atTick(makeWorld(), 1440), 'w9')
+    expect(spring.events.map((e) => e.type)).toContain('item_spawned')
+    const winter = castLine(atTick(makeWorld(), WINTER), 'w9')
+    expect(winter.events.map((e) => e.type)).not.toContain('item_spawned')
+    expect(winter.state.wildlife.fish).toBe(100)
+    expect(CFG.seasons.winter.fishCatchMultiplier).toBe(0.5)
+  })
+
+  it('still lands the easy winter cast — the dial narrows the water, it does not freeze it', () => {
+    const winter = castLine(atTick(makeWorld(), WINTER), 'w1') // roll ≈ 0.145 < 0.2
+    expect(winter.events.map((e) => e.type)).toContain('item_spawned')
+  })
+
   it('miss on seed w2: no catch, no stock change', () => {
     const r = castLine(makeWorld(), 'w2')
     const types = r.events.map((e) => e.type)

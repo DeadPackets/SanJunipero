@@ -115,3 +115,33 @@ describe('worldTick: social regen via conversation', () => {
     expect(res.state.agents.a1!.needs.social).toBe(100)
   })
 })
+
+// Winter is not a backdrop: it takes more out of a body than any other season.
+describe('winter scarcity: hunger', () => {
+  const WINTER = 273 * 1440 // first winter day
+  const hungerDeltaAt = (tick: number, config = CFG): number => {
+    const s = atTick(makeWorld(config, [{ id: 'a1', x: 0, y: 0 }]), tick)
+    const changed = tickOnce(s, config).events.find(
+      (e) => e.type === 'need_changed' && (e.payload as { need: string }).need === 'hunger',
+    )
+    return (changed!.payload as { delta: number }).delta
+  }
+
+  it('decays hunger by base × 1.25 exactly through winter', () => {
+    expect(CFG.seasons.winter.hungerDecayMultiplier).toBe(1.25)
+    expect(hungerDeltaAt(WINTER)).toBeCloseTo(-CFG.needs.hungerDecayPerTick * 1.25, 10)
+  })
+
+  it('leaves every other season at the base rate', () => {
+    for (const tick of [1440, 91 * 1440, 182 * 1440]) {
+      expect(hungerDeltaAt(tick)).toBeCloseTo(-CFG.needs.hungerDecayPerTick, 10)
+    }
+  })
+
+  it('follows the dial, not a constant', () => {
+    const harsh = SimConfigSchema.parse({
+      weather: { hourlyChangeChance: 0 }, seasons: { winter: { hungerDecayMultiplier: 3 } },
+    })
+    expect(hungerDeltaAt(WINTER, harsh)).toBeCloseTo(-harsh.needs.hungerDecayPerTick * 3, 10)
+  })
+})

@@ -294,7 +294,9 @@ const fish: VerbDef = makeVerb({
   },
   onComplete(state, config, agentId, _params, rng) {
     if (state.wildlife.fish <= 0) return []
+    const winter = simTimeFromTick(state.tick).season === 'winter'
     const chance = config.wildlife.fishCatchBase * (1 + skillLevel(state, agentId, 'fishing', config) / 10)
+      * (winter ? config.seasons.winter.fishCatchMultiplier : 1)
     if (rng.next() >= chance) return []
     return [
       { type: 'wildlife_changed', payload: { fish: state.wildlife.fish - 1 } },
