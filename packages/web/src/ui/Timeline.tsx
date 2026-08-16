@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { MINUTES_PER_DAY, tickToMoment } from '@sj/shared'
+import { MINUTES_PER_DAY, momentToTick, tickToMoment } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { ObservatoryHandle } from '../net/socket.js'
 
 export const KEY_STEP_TICKS = 10
 export const KEY_PAGE_TICKS = MINUTES_PER_DAY
 
-type Chapter = { tick: number; title: string }
+// C7 writes one chapter per day; the anchor sits at that day's first minute.
+type Chapter = { day: number; title: string }
 
 export function Timeline({ store, handle, onView }: {
   store: WorldStore
@@ -108,8 +109,13 @@ export function Timeline({ store, handle, onView }: {
         {completions.map((ev, i) => (
           <span key={`c${i}`} className="mark done" style={{ left: `${(ev.tick * 100) / edge}%` }} title="A building finished" />
         ))}
-        {chapters.map((c, i) => (
-          <span key={`ch${i}`} className="mark chapter" style={{ left: `${(c.tick * 100) / edge}%` }} title={c.title} />
+        {chapters.map((c) => (
+          <span
+            key={`ch${c.day}`}
+            className="mark chapter"
+            style={{ left: `${(momentToTick(c.day, '00:00') * 100) / edge}%` }}
+            title={`Day ${c.day} — ${c.title}`}
+          />
         ))}
         <span className="playhead" style={{ left: `${frac * 100}%` }} />
       </div>

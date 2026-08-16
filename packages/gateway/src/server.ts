@@ -9,6 +9,7 @@ import { SocketHub } from './hub.js'
 import { thoughtsSince } from './observer.js'
 import { mountAssetRoutes } from './assetsHttp.js'
 import { mountDataApi } from './api.js'
+import { mountNarratorApi } from './narratorApi.js'
 
 export type GatewayOpts = {
   dbPath: string; port?: number                 // default 8787
@@ -16,6 +17,7 @@ export type GatewayOpts = {
   pollMs?: number                               // default 250
   db?: Database.Database                        // in-process override (dev world); else opened readonly
   agentDbDir?: string                           // per-agent memory DBs (`<id>.db`); absent → [] tab responses
+  narratorDbPath?: string                       // C7's narrator.db; absent or unwritten → typed empties
 }
 export type Gateway = { port: number; close(): Promise<void>; pump(): void }  // pump exposed for tests
 
@@ -50,8 +52,20 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     codex ??= new AssetCodex(db)
     return codex
   }
+  // C7's narrator.db, opened readonly and never created: the observatory is one-way glass,
+  // and a town whose first day is still unwritten simply has nothing to read.
+  let narratorDb: Database.Database | null = null
+  if (opts.narratorDbPath !== undefined) {
+    try {
+      narratorDb = new Database(opts.narratorDbPath, { readonly: true, fileMustExist: true })
+    } catch {
+      narratorDb = null
+    }
+  }
+
   mountAssetRoutes(router, { getCodex })
   mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
+  mountNarratorApi(router, { db, mirror, narratorDb })
 
   const httpServer = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
@@ -164,6 +178,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       wss.close(() => {
         httpServer.close(() => {
           if (ownsDb) db.close()
+          narratorDb?.close()
           resolve()
         })
       })

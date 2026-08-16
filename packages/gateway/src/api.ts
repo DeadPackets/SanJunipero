@@ -138,7 +138,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
     sendJson(res, { nodes, links })
   })
 
-  router.route('GET', '/api/chapters', (_req, res) => sendJson(res, []))
+  // /api/chapters moved to narratorApi.ts, where it reads C7's real chapters instead of [].
 
   router.route('GET', '/api/heat', (_req, res) => sendJson(res, heatWindows(readEvents())))
 

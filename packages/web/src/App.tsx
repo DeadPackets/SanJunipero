@@ -170,7 +170,7 @@ export function App() {
           {route.lens === 'inspector' && route.agentId === null && (
             <RosterPanel store={store} onPick={pickAgent} />
           )}
-          {route.lens === 'chronicle' && <ChroniclePanel store={store} />}
+          {route.lens === 'chronicle' && <ChroniclePanel store={store} handle={handle} onView={onView} />}
           {route.lens === 'laws' && (
             <>
               <WorldLaws store={store} />

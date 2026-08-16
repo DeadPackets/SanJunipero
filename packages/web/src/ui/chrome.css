@@ -17,7 +17,25 @@
                enters once, 80ms after the topbar (split + stagger); nothing in it
                animates on tick. All of it inside prefers-reduced-motion.
    · STATE     the count badge is deliberately the quietest thing on a tab — sand fill,
-               hairline inset, no colour of its own. A count is a fact, not a trophy. */
+               hairline inset, no colour of its own. A count is a fact, not a trophy.
+
+   C10 T6 design-token plan (curated chronicle + scrub-to-event), written before implementing:
+   · SURFACE   no new material. The Important feed lives in the panel it already had; the
+               view switch borrows the lens tab's slab at a smaller scale (.feed-tab).
+   · COLOUR    no new token. Glyph fills are palette hexes held in importantFeed.ts beside
+               each glyph's spoken label, so the picture and the word cannot disagree.
+               --ember marks the entry you are standing in, --honey the one under the pointer.
+   · TYPE      --font-data for the stamp (tabular figures, fixed 6.2rem column, so a feed of
+               different days does not ripple); --font-body for the sentence, because the
+               label is prose about people and must read as prose.
+   · SPACE     the 6.2rem stamp column and the 16px glyph column are the two fixed rails;
+               everything else flows. Rows are 40px minimum — a jump target, not a line.
+   · MOTION    the existing 30ms feed stagger is kept for arrival; a row's own hover and
+               press are 150ms colour-only transitions. Nothing animates on tick: a curated
+               feed that re-animated every 2.5s would strobe under a reading eye.
+   · STATE     the viewed entry is marked by an ember left rail AND aria-current, never by
+               colour alone. A row is a button with a full spoken label ("… Go to this
+               moment."), so the chronicle is navigable without a pointer. */
 :root {
   --cream: #FFF6E9;
   --parchment: #F6E8D5;
@@ -397,7 +415,38 @@ body {
 .feed-line.done .feed-text::before { content: '■ '; color: var(--honey); }
 .feed-line.fire .feed-text { color: #9E3B2B; font-weight: 600; }
 .feed-line.weather .feed-text { color: #3E6786; }
-.feed-empty { opacity: 0.75; font-style: italic; }
+.feed-empty { opacity: 0.75; font-style: italic; text-wrap: pretty; }
+
+/* ── the curated chronicle: what mattered, and the way back to it ── */
+.feed-switch { display: flex; gap: 0.3rem; margin-top: 0.6rem; }
+.feed-tab {
+  font-family: var(--font-px); font-size: 0.55rem; line-height: 1;
+  background: var(--sand); color: var(--ink);
+  border: 2px solid var(--ink); border-radius: 0;
+  padding: 0.3rem 0.55rem; min-height: 40px; cursor: pointer;
+  box-shadow: var(--ledge);
+}
+.feed-tab:hover:not(.active) { background: var(--parchment); }
+.feed-tab:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.feed-tab.active { background: var(--honey); }
+
+.feed.important .feed-line { display: block; padding: 0; }
+.feed-jump {
+  display: flex; align-items: center; gap: 0.5rem;
+  width: 100%; min-height: 40px; padding: 0.3rem 0.4rem;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+  background: transparent; border: 0; border-left: 3px solid transparent; border-radius: 4px;
+}
+.feed-jump:hover { background: var(--cream); border-left-color: var(--honey); }
+/* the entry you are standing in — a rail as well as a colour, never colour alone */
+.feed-jump[aria-current='true'] { background: var(--cream); border-left-color: var(--ember); }
+.feed-glyph { flex: none; display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .feed-jump {
+    transition: background-color var(--t-fast) var(--ease-enter),
+                border-left-color var(--t-fast) var(--ease-enter);
+  }
+}
 @media (prefers-reduced-motion: no-preference) {
   .feed-line { animation: feed-in var(--t-fast) var(--ease-enter) backwards; }
   .feed-line:nth-child(1) { animation-delay: 0ms; }
