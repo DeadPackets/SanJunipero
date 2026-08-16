@@ -478,3 +478,21 @@ partnership row, with dissolution derived from the same co-sleep signal going qu
 hostile-interaction pattern between partners. C11's tier-2 milestone detector ("first
 breakup", "first affair") consumes these fields; without them it has no data. Add to the
 pre-execution plan-audit checklist for Tasks 11/12.
+
+---
+
+## AMENDMENT (2026-08-16 — Task 28 code assignment)
+
+**Task 28 (G9b) — two pieces of gate-required code the task list never assigned.** Both shipped
+during G9b execution; recorded here so the plan owns them:
+
+- **D-28-1 → commit `0daa146`** `feat(agents): minds perceive ownership and witnessed takings`.
+  `packages/agents/src/runtime/bridge.ts` + `src/prompt/prose.ts`: the mind-facing packet gains
+  `ownerName`/`crafterMarkName` on items and a `seen` channel, and the prose renders both.
+  §17.7 ("an ownership phrase in the prose a mind actually read") is unmeetable without it —
+  the engine had surfaced the fields since Tasks 4–5, but nothing outside the engine read them.
+- **D-28-2 → commit `92987dd`** `feat(agents): a named experiment reaches the arbiter like freeform`.
+  `packages/agents/src/runtime/agentRuntime.ts`: `experiment {description}` is the same door as
+  freeform when an adjudicator is wired. CAPABILITIES offers both; only freeform reached the
+  arbiter, so a mind that followed CAPABILITIES literally had its attempt written off as refusal
+  prose — which §17.3/§17.4 count against.
