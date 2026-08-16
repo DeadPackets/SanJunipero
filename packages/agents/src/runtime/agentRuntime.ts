@@ -21,7 +21,7 @@ import {
 } from '../wake.js'
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
-import type { EngineBridge, SubmitResult } from './bridge.js'
+import type { EngineBridge, Intent, SubmitResult } from './bridge.js'
 
 const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 
@@ -85,6 +85,8 @@ export class AgentRuntime {
   #clock: MindClock = freshClock()
   #plan: PlanState = { queue: [], lastResult: 'idle' }
   #planHeadInFlight = false
+  #pendingIntent: Intent | null = null
+  #pendingInFlight = false
   #turnInFlight = false
   #stats = { turns: 0, dozes: 0, reflections: 0 }
   #reflectedNight: number | null = null
@@ -123,6 +125,8 @@ export class AgentRuntime {
     this.#clock = freshClock()
     this.#plan = { queue: [], lastResult: 'idle' }
     this.#planHeadInFlight = false
+    this.#pendingIntent = null
+    this.#pendingInFlight = false
     this.#turnInFlight = false
     this.#stats = { turns: 0, dozes: 0, reflections: 0 }
     this.#reflectedNight = null
@@ -139,6 +143,8 @@ export class AgentRuntime {
     this.#started = false
     this.#turnInFlight = false
     this.#plan = { queue: [], lastResult: 'idle' }
+    this.#pendingIntent = null
+    this.#pendingInFlight = false
   }
 
   stats(): RuntimeStats {
@@ -154,6 +160,7 @@ export class AgentRuntime {
     if (!this.#started) return
     const packet = this.#bridge.perception(this.#agentId)
     rearmBodyAlarm(this.#config, packet.self.body.needs, this.#clock)
+    this.#submitPendingIfIdle(packet.self.activity)
     this.#advancePlan(packet)
     if (packet.heard.length > 0) {
       this.#clock.conversationUntilTick = tick + this.#config.conversationWindowTicks
@@ -175,6 +182,8 @@ export class AgentRuntime {
   // synchronously during the drain (onResult), before #advancePlan ever runs.
   #pumpPlan(activity: string | null): void {
     if (this.#plan.lastResult !== 'running') return
+    // A held direct action outranks the plan: the queue waits its turn.
+    if (this.#pendingIntent !== null || this.#pendingInFlight) return
     if (this.#planHeadInFlight) {
       if (activity !== null) return
       this.#plan.queue.shift()
@@ -189,6 +198,26 @@ export class AgentRuntime {
       const head = this.#plan.queue[0]!
       void this.#bridge.submit(this.#agentId, head, (res) => this.#onPlanHeadResult(res))
     }
+  }
+
+  #submitPendingIfIdle(activity: string | null): Promise<void> {
+    if (this.#pendingIntent === null || this.#pendingInFlight) return Promise.resolve()
+    if (activity !== null) return Promise.resolve()
+    const intent = this.#pendingIntent
+    this.#pendingInFlight = true
+    return this.#bridge
+      .submit(this.#agentId, intent, (res) => {
+        this.#pendingInFlight = false
+        if (this.#pendingIntent !== intent) return
+        if (res.ok) {
+          this.#pendingIntent = null
+          return
+        }
+        if (res.reason.startsWith('already busy')) return
+        this.#pendingIntent = null
+        void this.#writeActionMemory(`You realize you cannot: ${res.reason}`)
+      })
+      .then(() => undefined)
   }
 
   #onPlanHeadResult(res: SubmitResult): void {
@@ -308,17 +337,26 @@ export class AgentRuntime {
     const mem = this.#mem!
     await mem.insertMemory({ tick, kind: 'thought', text: turn.thought, importance: turn.importance, tags: EMPTY_TAGS })
 
+    // A turn that speaks or acts directly preempts whatever plan was running.
+    if (turn.speech !== undefined || turn.action !== undefined) {
+      if (this.#plan.lastResult === 'running') this.#plan.lastResult = 'idle'
+      this.#plan.queue = []
+      this.#planHeadInFlight = false
+    }
+
     if (turn.speech) {
       await this.#bridge.submit(this.#agentId, { verb: 'speak', params: { text: turn.speech } })
     }
 
     if (turn.action) {
-      if ('freeform' in turn.action) {
-        await this.#bridge.submit(this.#agentId, { verb: 'experiment', params: { description: turn.action.freeform } })
-      } else {
-        const res = await this.#bridge.submit(this.#agentId, { verb: turn.action.verb, params: turn.action.params })
-        if (!res.ok) await this.#writeActionMemory(`You realize you cannot: ${res.reason}`)
-      }
+      const intent: Intent =
+        'freeform' in turn.action
+          ? { verb: 'experiment', params: { description: turn.action.freeform } }
+          : { verb: turn.action.verb, params: turn.action.params }
+      // Held until the body is free; a busy rejection retries instead of
+      // discarding, until accepted or superseded by a newer turn's action.
+      this.#pendingIntent = intent
+      await this.#submitPendingIfIdle(this.#bridge.perception(this.#agentId).self.activity)
     }
 
     if (turn.plan) {

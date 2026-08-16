@@ -367,6 +367,32 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(runtime.dayLogSnapshot().length).toBeLessThanOrEqual(1)
   })
 
+  it('a direct action preempts a running plan and is held until the body is free', async () => {
+    const { world, loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'Walk the long way round.',
+          plan: [
+            { verb: 'walk', params: { x: 12, y: 12 } },
+            { verb: 'walk', params: { x: 3, y: 3 } },
+          ],
+          importance: 4,
+          reconsider_at: '00:05',
+        },
+        { thought: 'No — I am spent. I lie down where I stand.', action: { verb: 'sleep', params: {} }, importance: 6 },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 2, 80)
+    // The sleep from the reconsider turn must land after the in-flight walk,
+    // and the rest of the plan (the second walk) must be abandoned.
+    expect(completedVerbs(world.engineDb)).toEqual(['walk', 'sleep'])
+    expect(startedVerbs(world.engineDb)).toEqual(['walk', 'sleep'])
+    expect(loop.state.agents[AGENT]!.asleep).toBe(true)
+    // One 'already busy' rejection must not have discarded the intent.
+    expect(memoriesOfKind(agentDb, 'action')).toHaveLength(0)
+  })
+
   it('does not reflect on a merely attempted sleep that the engine rejected', async () => {
     const reflection = new ScriptedReflectionLlm()
     const { loop, runtime, mem, agentDb } = await setup({
