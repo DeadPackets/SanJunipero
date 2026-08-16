@@ -156,6 +156,49 @@ describe('codify', () => {
   })
 
   describe('codify', () => {
+    it('re-codifying an active recipe returns the same ruleId idempotently (no throw, no duplicate)', () => {
+      const db = openArbiterDb(':memory:')
+      const rulebook = new RulebookStore(db)
+      const review = new ReviewStore(db)
+      const codex = new CodexStore(db)
+      codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
+      codex.insert({ id: 'pottery', era: 'agriculture', name: 'Pottery', prerequisiteId: null })
+      const recipe = { ...boilSaltRecipe, id: 'recipe:salt_idem', name: 'Salt Idem', rngStream: 'recipe:salt_idem' }
+
+      const first = codify(recipe, { rulebook, review, codex, tick: 200 })
+      const second = codify(recipe, { rulebook, review, codex, tick: 300 })
+
+      expect(second).toEqual(first)
+      const rows = db.prepare('SELECT COUNT(*) AS n FROM rulebook WHERE recipe_id = ?').get('recipe:salt_idem') as { n: number }
+      expect(rows.n).toBe(1)
+    })
+
+    it('re-codifying a reverted recipe reactivates the row, re-registers the verb, and re-opens review', () => {
+      const db = openArbiterDb(':memory:')
+      const rulebook = new RulebookStore(db)
+      const review = new ReviewStore(db)
+      const codex = new CodexStore(db)
+      codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
+      codex.insert({ id: 'pottery', era: 'agriculture', name: 'Pottery', prerequisiteId: null })
+      const recipe = { ...boilSaltRecipe, id: 'recipe:salt_revive', name: 'Salt Revive', rngStream: 'recipe:salt_revive' }
+
+      const { ruleId } = codify(recipe, { rulebook, review, codex, tick: 200 })
+      review.revertByRecipe('recipe:salt_revive', 'physics wrong', 250)
+      expect(rulebook.byId('recipe:salt_revive')!.revertedAtTick).toBe(250)
+
+      const revived = codify({ ...recipe, durationTicks: 7 }, { rulebook, review, codex, tick: 300 })
+      expect(revived.ruleId).toBe(ruleId)
+
+      const row = rulebook.byId('recipe:salt_revive')!
+      expect(row.revertedAtTick).toBeNull()
+      expect(row.revertedReason).toBeNull()
+      expect(row.tick).toBe(300)
+      expect((JSON.parse(row.recipeJson) as Recipe).durationTicks).toBe(7)
+
+      expect(submitIntent(burningFireAdjacent(), CFG, 'a1', 'recipe:salt_revive', {})).toMatchObject({ ok: true })
+      expect(review.pending().map((r) => r.ruleId)).toContain(ruleId)
+    })
+
     it('inserts the recipe into the rulebook and hot-registers the verb live in the engine registry', () => {
       const db = openArbiterDb(':memory:')
       const rulebook = new RulebookStore(db)

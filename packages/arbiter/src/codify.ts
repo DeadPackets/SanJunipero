@@ -1,4 +1,4 @@
-import { registerVerb, skillLevel } from '@sj/engine'
+import { registerVerb, skillLevel, VERBS } from '@sj/engine'
 import type { PendingEvent, Structure, TileId, VerbDef, WorldState } from '@sj/engine'
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
@@ -134,6 +134,18 @@ export function codify(
   // able to codify a recipe the codex has not earned.
   if (!deps.codex.withinAdjacency(recipe.canon)) {
     throw new Error(`cannot codify ${recipe.id}: canon ${recipe.canon.join(', ')} is beyond adjacency`)
+  }
+  const existing = deps.rulebook.byId(recipe.id)
+  if (existing) {
+    // Active row → idempotent no-op; reverted row → reactivate it so the
+    // review queue's re-open path is reachable (UNIQUE(recipe_id) forbids a
+    // second insert either way).
+    if (existing.revertedAtTick !== null) {
+      deps.rulebook.reactivate(recipe, deps.tick)
+      if (!VERBS[recipe.id]) registerVerb(verbFromRecipe(recipe))
+      deps.review.queue(existing.id, recipe.id, deps.tick)
+    }
+    return { ruleId: existing.id, verb: recipe.id }
   }
   const ruleId = deps.rulebook.insert(recipe, deps.tick)
   registerVerb(verbFromRecipe(recipe))

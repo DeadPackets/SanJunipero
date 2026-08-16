@@ -82,6 +82,16 @@ export class RulebookStore {
     return row ? toRulebookRow(row) : null
   }
 
+  reactivate(recipe: Recipe, tick: number): void {
+    this.db
+      .prepare(
+        `UPDATE rulebook SET reverted_at_tick = NULL, reverted_reason = NULL,
+           name = ?, normalized_name = ?, recipe_json = ?, verb = ?, tick = ?
+         WHERE recipe_id = ?`,
+      )
+      .run(recipe.name, normalizeIntent(recipe.name), JSON.stringify(recipe), recipe.id, tick, recipe.id)
+  }
+
   allActive(): RulebookRow[] {
     const rows = this.db.prepare('SELECT * FROM rulebook WHERE reverted_at_tick IS NULL').all() as RawRulebookRow[]
     return rows.map(toRulebookRow)
