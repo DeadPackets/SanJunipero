@@ -51,7 +51,28 @@
    · MOTION    one entrance (the existing panel-in, 240ms), nothing else. The graph's own
                force simulation is motion enough on this surface.
    · STATE     the bar is data, not a meter: it is labelled "N shared moments, out of M for
-               the closest pair in town" and cannot be filled, completed or won. */
+               the closest pair in town" and cannot be filled, completed or won.
+
+   C10 T9 design-token plan (moments list + playback), written before implementing:
+   · SURFACE   two surfaces, both already in the language: a cream rail of postcards down
+               the left of the stage (--px-cream frame, --grain), and a night transport bar
+               across the bottom (--night, the same material as the letterbox it sits under),
+               so the lens keeps its cinema when a day is playing.
+   · COLOUR    --honey is the playhead and the open postcard's rail; cream on night in the
+               transport bar (12.6:1). Location motifs are palette hexes from the same set
+               importantFeed.ts draws its glyphs with.
+   · TYPE      --font-px for the day stamp, the speed pill and LIVE; --font-body for the
+               day's title and cast; --font-data (tabular) for the running clock, so a
+               ticking playhead cannot shift the bar it sits in.
+   · SPACE     --moment-rail: 15rem and --player-h: 56px, both tokens because the stage
+               measures against them. Every transport control is 40px.
+   · MOTION    the playhead is positioned, never transitioned — a transition would lag a
+               scrub and lie about where the town is. One 240ms entrance on the rail, and
+               the postcards stagger 30ms apart on arrival; both inside reduced-motion.
+   · STATE     the open day carries aria-current AND an ember rail; play/pause is one button
+               with aria-pressed and a label that changes with it. The transport is drawn in
+               the town's own pixels — ▶ and ❙❙ are pictographic characters whose shape
+               belongs to the reader's font, not to the town. */
 :root {
   --cream: #FFF6E9;
   --parchment: #F6E8D5;
@@ -77,6 +98,10 @@
 
   /* status strip: one fixed band so a ticking clock can never shift the stage */
   --strip-h: 30px;
+
+  /* moments: the postcard rail and the transport bar are both fixed, for the same reason */
+  --moment-rail: 15rem;
+  --player-h: 56px;
 
   /* bitmap type: display face for identity moments, ui face for labels/controls */
   --font-display: 'Press Start 2P', 'Silkscreen', monospace;
@@ -630,6 +655,90 @@ body {
 }
 
 /* ── director mode + catch-up digest (Task 19) ── */
+/* ── the days the town kept: postcard rail + transport ── */
+.moments-lens { position: absolute; inset: 0; pointer-events: none; z-index: 18; }
+.moments-rail {
+  pointer-events: auto;
+  position: absolute; top: 0.8rem; left: 0.8rem; bottom: 0.8rem;
+  width: var(--moment-rail); overflow-y: auto; overflow-x: hidden;
+  background-color: var(--cream); background-image: var(--grain); color: var(--ink);
+  border: 10px solid transparent; border-image: var(--px-cream);
+  box-shadow: var(--ledge);
+}
+.moments-rail :focus-visible { outline-offset: -2px; }   /* the rail scrolls; keep the ring inside */
+@media (prefers-reduced-motion: no-preference) {
+  .moments-rail { animation: panel-in var(--t-med) var(--ease-enter); }
+}
+.moments-list { list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
+.moment-card {
+  display: flex; gap: 0.5rem; align-items: flex-start;
+  width: 100%; min-height: 40px; padding: 0.4rem;
+  text-align: left; font: inherit; color: inherit; cursor: pointer;
+  background: var(--parchment);
+  border: 2px solid var(--ink); border-left: 4px solid var(--sand); border-radius: 0;
+  box-shadow: var(--ledge);
+}
+.moment-card:hover { background: var(--cream); border-left-color: var(--honey); }
+.moment-card:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+/* the day you are watching — a rail as well as a fill, never colour alone */
+.moment-card.open { background: var(--cream); border-left-color: var(--ember); }
+@media (prefers-reduced-motion: no-preference) {
+  .moment-card { transition: background-color var(--t-fast) var(--ease-enter), border-left-color var(--t-fast); }
+  .moments-list li { animation: feed-in var(--t-fast) var(--ease-enter) backwards; }
+  .moments-list li:nth-child(1) { animation-delay: 0ms; }
+  .moments-list li:nth-child(2) { animation-delay: 30ms; }
+  .moments-list li:nth-child(3) { animation-delay: 60ms; }
+  .moments-list li:nth-child(4) { animation-delay: 90ms; }
+}
+.thumb-motif { flex: none; display: block; }
+.thumb-body { display: grid; gap: 0.05rem; min-width: 0; }
+.thumb-day {
+  font-family: var(--font-px); font-size: 0.5rem; opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+.thumb-title { font-size: 0.8rem; font-weight: 600; text-wrap: balance; }
+.thumb-cast, .thumb-where { font-size: 0.72rem; opacity: 0.8; overflow-wrap: anywhere; }
+.thumb-where { font-style: italic; }
+
+.moment-player {
+  pointer-events: auto;
+  position: absolute; left: calc(var(--moment-rail) + 2.4rem); right: 0.8rem; bottom: 0.8rem;
+  height: var(--player-h);
+  display: flex; align-items: center; gap: 0.6rem; padding: 0 0.7rem;
+  background: var(--night); color: var(--cream);
+  border: 2px solid var(--deep); box-shadow: var(--ledge);
+}
+.player-btn {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 40px; min-height: 40px; cursor: pointer;
+  background: var(--deep); color: var(--cream);
+  border: 2px solid var(--ink); border-radius: 0;
+  font-family: var(--font-px); font-size: 0.6rem;
+}
+.player-btn:hover { background: var(--ink); }
+.player-btn:active { translate: 0 1px; }
+.player-btn[aria-pressed='true'] { background: var(--ink); }
+.player-btn.live { background: var(--ember); color: var(--deep); }
+.player-glyph { display: block; }
+.player-track {
+  flex: 1; position: relative; height: 12px; cursor: pointer;
+  background: var(--deep); border: 2px solid var(--ink);
+}
+/* positioned, never transitioned: a transition would lag a drag and lie about the town */
+.player-head {
+  position: absolute; top: -4px; width: 6px; height: 18px;
+  background: var(--honey); box-shadow: 0 0 0 2px var(--deep);
+  translate: -50% 0;
+}
+.player-clock {
+  flex: none; font-family: var(--font-data); font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 44rem) {
+  .moments-rail { width: auto; right: 0.8rem; bottom: auto; max-height: 40%; }
+  .moment-player { left: 0.8rem; }
+}
+
 .director { position: absolute; inset: 0; pointer-events: none; z-index: 15; }
 .letterbox { position: absolute; left: 0; right: 0; height: 12%; background: #171420; }
 .letterbox.top { top: 0; }

@@ -24,11 +24,11 @@ describe('route', () => {
     expect(parseRoute('/', '?lens=xray').lens).toBe('map')
   })
 
-  it('parses a recorded day by its own id', () => {
+  it('parses a recorded day by its own id, and opens the lens that can play it', () => {
     expect(parseRoute('/moment/42', '')).toEqual({
-      lens: 'map', moment: null, momentId: 42, agentId: null,
+      lens: 'director', moment: null, momentId: 42, agentId: null,
     })
-    expect(parseRoute('/moment/42', '?lens=director').momentId).toBe(42)
+    expect(parseRoute('/moment/42', '?lens=chronicle').lens).toBe('chronicle')
   })
 
   it('tells the two moment links apart by their length, not by guessing', () => {
@@ -51,7 +51,7 @@ describe('route', () => {
       { lens: 'director', moment: { day: 0, time: '00:05' }, momentId: null, agentId: null },
       { lens: 'society', moment: null, momentId: null, agentId: 'fisher' },
       { lens: 'director', moment: null, momentId: 42, agentId: null },
-      { lens: 'map', moment: null, momentId: 1, agentId: 'farmer' },
+      { lens: 'chronicle', moment: null, momentId: 1, agentId: 'farmer' },
     ]
     for (const r of routes) {
       const full = routeToPath(r)

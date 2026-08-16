@@ -12,7 +12,6 @@ export type Route = {
 export function parseRoute(pathname: string, search: string): Route {
   const params = new URLSearchParams(search)
   const lensParam = params.get('lens')
-  const lens: Lens = (LENSES as readonly string[]).includes(lensParam ?? '') ? lensParam as Lens : 'map'
   const agentId = params.get('agent')
 
   // Two moment links, told apart by their length rather than by guessing: three segments is
@@ -27,6 +26,11 @@ export function parseRoute(pathname: string, search: string): Route {
   } else if (segs.length === 2 && segs[0] === 'moment' && /^[1-9]\d*$/.test(segs[1]!)) {
     momentId = Number(segs[1])
   }
+
+  // A recorded day only plays in the Moments lens, so a hand-typed /moment/<id> opens there
+  // rather than dropping the viewer on the map with a link that does nothing.
+  const fallback: Lens = momentId === null ? 'map' : 'director'
+  const lens: Lens = (LENSES as readonly string[]).includes(lensParam ?? '') ? lensParam as Lens : fallback
   return { lens, moment, momentId, agentId }
 }
 

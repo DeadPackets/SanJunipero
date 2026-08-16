@@ -10,6 +10,7 @@ import { RosterPanel } from './ui/RosterPanel.js'
 import { ChroniclePanel } from './ui/ChroniclePanel.js'
 import { SocietyLens } from './ui/SocietyLens.js'
 import { DirectorMode } from './ui/DirectorMode.js'
+import { MomentsLens } from './ui/MomentsLens.js'
 import { DigestModal } from './ui/DigestModal.js'
 import { StageVeil } from './ui/StageVeil.js'
 import { LensTabs, StatusStrip } from './ui/StatusStrip.js'
@@ -99,6 +100,14 @@ export function App() {
     setRoute(next)
   }
 
+  // Opening a recorded day puts its id in the address bar and keeps it there while it plays,
+  // so the link a viewer copies mid-playback reopens the same day.
+  const openMoment = (momentId: number | null): void => {
+    const next: Route = { ...route, lens: 'director', momentId, moment: null }
+    history.pushState(null, '', routeToPath(next))
+    setRoute(next)
+  }
+
   // Left/right walk the lens bar from anywhere in the chrome. The map owns the arrows for
   // panning and a text field owns them for typing, so both keep them (lensKeyAllowed).
   useEffect(() => {
@@ -123,18 +132,23 @@ export function App() {
     else scene.app.ticker.start()
   }, [route.lens, scene])
 
-  // leaving Moments: keep the director mounted briefly so the letterboxes slide out
+  // The Moments lens has two readings: the live town televised (the C6 auto-cut) and a
+  // recorded day playing back. Opening a day retires the auto-cut so its heat-driven camera
+  // cannot fight the playback; LIVE brings it back.
+  const televised = route.lens === 'director' && route.momentId === null
+
+  // leaving the televised view: keep the director mounted briefly so the letterboxes slide out
   const [directorLeaving, setDirectorLeaving] = useState(false)
-  const prevLensRef = useRef<Lens>(route.lens)
+  const prevTelevisedRef = useRef(televised)
   useEffect(() => {
-    const wasDirector = prevLensRef.current === 'director'
-    prevLensRef.current = route.lens
-    if (wasDirector && route.lens !== 'director') {
+    const was = prevTelevisedRef.current
+    prevTelevisedRef.current = televised
+    if (was && !televised) {
       setDirectorLeaving(true)
       const t = setTimeout(() => setDirectorLeaving(false), 260)
       return () => clearTimeout(t)
     }
-  }, [route.lens])
+  }, [televised])
 
   return (
     <div className="app">
@@ -156,8 +170,11 @@ export function App() {
           <FpsOverlay />
           {route.lens === 'chronicle' && <Timeline store={store} handle={handle} onView={onView} />}
           {route.lens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
-          {(route.lens === 'director' || directorLeaving) && (
-            <DirectorMode store={store} scene={scene} leaving={route.lens !== 'director'} />
+          {(televised || directorLeaving) && (
+            <DirectorMode store={store} scene={scene} leaving={!televised} />
+          )}
+          {route.lens === 'director' && (
+            <MomentsLens store={store} handle={handle} momentId={route.momentId} onOpen={openMoment} />
           )}
         </main>
         <aside
