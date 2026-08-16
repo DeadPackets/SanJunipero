@@ -1,0 +1,55 @@
+/* Observatory chrome — hybrid: modern layout for data, pixel warmth in headers.
+   Tokens from the master palette (Style Bible §7). */
+:root {
+  --cream: #FFF6E9;
+  --panel: #F6E8D5;
+  --ink: #43394A;
+  --accent: #E8785A;
+  --sage: #93B573;
+  --night: #322B38;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--night);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.app { display: flex; flex-direction: column; height: 100%; }
+
+.topbar {
+  display: flex; align-items: center; gap: 1.25rem;
+  background: var(--cream);
+  border-bottom: 2px solid var(--ink);
+  padding: 0.4rem 1rem;
+}
+
+/* pixel-font stand-in until sprite text lands (Task 16) */
+.px-title {
+  font-size: 1rem; margin: 0;
+  font-variant: small-caps; letter-spacing: 0.18em; font-weight: 700;
+  color: var(--ink);
+}
+
+.lens-tabs { display: flex; gap: 0.25rem; }
+.tab {
+  border: 1px solid transparent; background: none; color: var(--ink);
+  font: inherit; font-size: 0.85rem; padding: 0.25rem 0.7rem; border-radius: 4px;
+  cursor: pointer;
+}
+.tab:hover { background: var(--panel); }
+.tab.active { background: var(--accent); color: var(--cream); }
+
+.tick-badge {
+  margin-left: auto; font-size: 0.8rem; font-variant-numeric: tabular-nums;
+  background: var(--panel); border: 1px solid var(--ink);
+  padding: 0.2rem 0.6rem; border-radius: 4px;
+}
+.tick-badge.past { background: var(--sage); color: var(--night); }
+
+.stage-row { display: flex; flex: 1; min-height: 0; }
+#stage-root { flex: 1; min-width: 0; background: var(--night); }
+#panel-outlet { width: 0; background: var(--panel); overflow-y: auto; transition: width 120ms ease; }
+#panel-outlet.open { width: 22rem; border-left: 2px solid var(--ink); }
