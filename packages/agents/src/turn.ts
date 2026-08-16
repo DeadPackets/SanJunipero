@@ -1,15 +1,25 @@
 import { z } from 'zod'
 import { MINUTES_PER_DAY } from '@sj/shared'
 
-export const IntentSchema = z.object({ verb: z.string().min(1), params: z.record(z.string(), z.unknown()).default({}) }).strict()
+export const IntentSchema = z.object({
+  verb: z.string().min(1).describe('The exact word of the act, such as walk or eat.'),
+  params: z.record(z.string(), z.unknown()).default({}).describe('Exactly what the act asks for, named by its keys.'),
+}).strict()
 export const TurnSchema = z.object({
-  thought: z.string().min(1),                                    // required; never enters world state
-  speech: z.string().min(1).optional(),                          // heard by earshot physics
-  action: z.union([IntentSchema, z.object({ freeform: z.string().min(1) }).strict()]).optional(),
-  plan: z.array(IntentSchema).max(12).optional(),                // engine executes between turns
-  journal: z.string().min(1).optional(),                         // deliberate act, costs sim time
-  importance: z.number().int().min(1).max(10),                   // self-rating for memory
-  reconsider_at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),  // sim-clock "HH:MM"
+  thought: z.string().min(1)
+    .describe('What passes through your mind this moment. Yours alone; no one else ever hears it.'),
+  speech: z.string().min(1).optional()
+    .describe('Words you say aloud. Anyone within earshot hears them.'),
+  action: z.union([IntentSchema, z.object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') }).strict()]).optional()
+    .describe('One act you begin now: its exact word as verb with what it asks as params, or freeform for a try at something new.'),
+  plan: z.array(IntentSchema).max(12).optional()
+    .describe('Up to twelve acts your body carries out one after another while your mind rests.'),
+  journal: z.string().min(1).optional()
+    .describe('Words you set down in your own book. Writing takes part of the hour.'),
+  importance: z.number().int().min(1).max(10)
+    .describe('How deeply this moment matters to you, one through ten.'),
+  reconsider_at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional()
+    .describe('A clock time such as 08:30 when you mean to return to your thoughts.'),
 }).strict()
 export type Turn = z.infer<typeof TurnSchema>
 

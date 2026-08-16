@@ -19,29 +19,40 @@ choose echoes in the lives around you. Live as yourself.`
 // What a body in this world can do — the Tier-1 verbs in world language,
 // identical for every agent. Fully diegetic: the mind names its own acts, it
 // never hears mechanics words. Rendered into the system prompt (static block).
-export const CAPABILITIES = `What your hands and voice can do, and what each needs from you:
+export const CAPABILITIES = `What your hands and voice can do. Name each act by its exact word, and give it exactly what it asks:
 
-walk to a place (give its position as two numbers)
-sleep (when weary — nothing more is needed)
-wake (nothing more is needed)
-eat the food you hold (give its mark)
-take the thing you can reach (give its mark in parentheses)
-give the thing (its mark) to a person (their name)
-speak (say the words)
-write (say the words)
-read the writing (give its mark)
-teach a person (their name and the skill)
-tend a person (their name)
-till the ground (its position as two numbers)
-plant seed (the seed's name and its position as two numbers)
-harvest a plant (give its mark)
-fish the water (its position as two numbers)
-forage (nothing more is needed)
-build a thing (its name and position as two numbers)
-craft (the recipe's name)
-extinguish a fire (give its mark)
-attack a person (their name)
-experiment (describe what you attempt)
+walk — name it walk; give x and y as two numbers, the spot you go to
+sleep — name it sleep when weary; nothing more is needed
+wake — name it wake when you sleep; nothing more is needed
+eat — name it eat; give itemId, the mark of the food you hold
+take — name it take; give itemId, the mark of the thing within reach
+give — name it give; give itemId, the mark of the thing you hold, and targetId, the mark of the person
+speak — name it speak; give text, the words you say aloud
+write — name it write; give text, the words to set down (a fresh note, or add itemId to write on one you hold)
+read — name it read; give itemId, the mark of the writing you hold
+teach — name it teach; give targetId, the person, and track, the craft you pass on
+tend — name it tend; give targetId, the hurt or ill person at your side
+till — name it till; give x and y as two numbers for ground within reach
+plant — name it plant; give x and y as two numbers and kind, the seed's name, on tilled ground
+harvest — name it harvest; give cropId, the mark of the ripe plant beside you
+fish — name it fish; give x and y as two numbers for the water at your side
+forage — name it forage when trees are near; nothing more is needed
+build — name it build; give kind, the thing to raise, and x and y as two numbers for where
+craft — name it craft; give recipe, the name of what you shape
+extinguish — name it extinguish; give structureId, the mark of the burning thing
+attack — name it attack; give targetId, the mark of the person you strike
+experiment — name it experiment; give description, what you attempt
+
+A thing's mark (itemId, cropId, structureId) becomes known to you only once you
+stand beside where it rests and see it; until then you cannot name it.
+
+How you answer each waking moment: always thought, what passes through your
+mind, and importance, how deeply the moment matters, one through ten. When you
+choose to, add: speech, words said aloud for those in earshot; action, one act
+begun now; plan, acts your body carries out one after another while your mind
+rests; journal, words set down in your own book, which takes part of the hour;
+reconsider_at, a clock time such as 08:30 when you mean to return to your
+thoughts.
 
 What you cannot do yet, the world will show you, and you will learn.`
 

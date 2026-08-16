@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MINUTES_PER_DAY } from '@sj/shared'
+import type { z } from 'zod'
 import { FALLBACK_TURN, IntentSchema, TurnSchema, parseTurnWithRepair, reconsiderTick } from './turn.js'
+import { FORBIDDEN_FRAMING } from './prompt/rulesOfBeing.js'
 
 const validTurn = {
   thought: 'The well is low; I should fetch water before noon.',
@@ -42,6 +44,16 @@ describe('TurnSchema', () => {
 
   it('FALLBACK_TURN satisfies the schema', () => {
     expect(TurnSchema.parse(FALLBACK_TURN)).toEqual(FALLBACK_TURN)
+  })
+
+  it('every field carries a diegetic description the mind can learn from (finding 8)', () => {
+    const shape = TurnSchema.shape
+    for (const key of Object.keys(shape) as Array<keyof typeof shape>) {
+      const desc = (shape[key] as z.ZodType).description
+      expect(desc, String(key)).toBeTruthy()
+      expect(desc).not.toMatch(FORBIDDEN_FRAMING)
+    }
+    expect((shape.reconsider_at as z.ZodType).description).toMatch(/\d{2}:\d{2}/)
   })
 })
 

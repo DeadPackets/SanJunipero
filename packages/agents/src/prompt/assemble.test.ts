@@ -335,15 +335,35 @@ describe('capabilities', () => {
   })
   it('carries diegetic parameter contracts for each verb', () => {
     const a = assemblePrompt(fixtureBlocks())
-    expect(a.system).toContain('walk to a place')
-    expect(a.system).toContain('give its position as two numbers')
-    expect(a.system).toContain('eat the food you hold')
-    expect(a.system).toContain('give its mark')
-    expect(a.system).toContain('give the thing')
+    expect(a.system).toContain('name it walk')
+    expect(a.system).toContain('give x and y as two numbers')
     expect(a.system).toContain('speak')
     expect(a.system).toContain('nothing more is needed')
     expect(a.system).toContain('experiment')
-    expect(a.system).toContain('describe what you attempt')
+    expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('names every verb token and its exact parameter keys (finding 7)', () => {
+    const a = assemblePrompt(fixtureBlocks())
+    const verbs = [
+      'walk', 'sleep', 'wake', 'eat', 'tend', 'till', 'plant', 'harvest', 'fish', 'forage',
+      'build', 'craft', 'extinguish', 'speak', 'give', 'take', 'write', 'read', 'teach', 'attack', 'experiment',
+    ]
+    for (const v of verbs) expect(a.system, v).toContain(v)
+    for (const key of ['itemId', 'targetId', 'cropId', 'structureId', 'recipe', 'track', 'description', 'text', 'kind']) {
+      expect(a.system, key).toContain(key)
+    }
+    // an item's mark is only learned by standing beside where it rests
+    expect(a.system).toContain('beside')
+    expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('carries a response contract naming every turn field (finding 8)', () => {
+    const a = assemblePrompt(fixtureBlocks())
+    for (const field of ['thought', 'speech', 'action', 'plan', 'journal', 'importance', 'reconsider_at']) {
+      expect(a.system, field).toContain(field)
+    }
+    expect(a.system).toContain('08:30')
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
 })
