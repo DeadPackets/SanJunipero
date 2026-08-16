@@ -171,6 +171,13 @@ async function main(): Promise<void> {
     const elapsed = Date.now() - stepStart
     await sleep(Math.max(0, REAL_MS_PER_TICK - elapsed))
   }
+  // A nightly reflection begun near the window's end must be allowed to finish:
+  // its single calls can run for minutes with no new llm_calls row to observe,
+  // so wait on the runtime's own signal (capped) before the settle loop.
+  const reflectionDeadline = Date.now() + 300_000
+  while (runtime.reflectionInFlight() && Date.now() < reflectionDeadline) {
+    await sleep(2000)
+  }
   // Stop ticking; wait for any in-flight turn/reflection/dream to settle so the
   // report reflects every call the run actually made.
   const settleDeadline = Date.now() + 60_000

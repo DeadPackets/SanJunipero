@@ -474,6 +474,33 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(mem.summaryNodes('day', 1)).toHaveLength(0)
   })
 
+  it('exposes an in-flight signal while a nightly reflection is still running (g3 round 6)', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((r) => {
+      release = r
+    })
+    class GatedReflectionLlm extends ScriptedReflectionLlm {
+      override async extractFacts(dayMemories: MemoryRow[]) {
+        await gate
+        return super.extractFacts(dayMemories)
+      }
+    }
+    const reflection = new GatedReflectionLlm()
+    const { loop, runtime, mem } = await setup({
+      model: turnModel([{ thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 }]),
+      mindConfig: FAST_MIND,
+      reflectionLlm: reflection,
+    })
+    await stepUntil(loop, () => runtime.reflectionInFlight(), 100)
+    expect(runtime.reflectionInFlight()).toBe(true)
+    expect(mem.summaryNodes('day', 0)).toHaveLength(0)
+
+    release()
+    await stepUntil(loop, () => !runtime.reflectionInFlight(), 100)
+    expect(runtime.reflectionInFlight()).toBe(false)
+    expect(mem.summaryNodes('day', 0)).toHaveLength(1)
+  })
+
   it('keeps golden replay deterministic across mind writes', async () => {
     const { world, loop, agentDb } = await setup({
       model: turnModel([

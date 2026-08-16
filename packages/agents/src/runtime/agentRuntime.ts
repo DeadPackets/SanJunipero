@@ -101,6 +101,7 @@ export class AgentRuntime {
   #wakeOwed = false
   #stats = { turns: 0, dozes: 0, reflections: 0 }
   #reflectedNight: number | null = null
+  #reflectionInFlight = false
   #pendingDreamMood: string | null = null
   #wasNight = false
   #started = false
@@ -166,6 +167,12 @@ export class AgentRuntime {
   // Observability for tests: the current day's perception log (prompt block 5).
   dayLogSnapshot(): readonly string[] {
     return [...this.#dayLog]
+  }
+
+  // A harness that ends its window mid-night can wait for this to clear
+  // instead of cutting the pipeline between its steps.
+  reflectionInFlight(): boolean {
+    return this.#reflectionInFlight
   }
 
   #onTick(tick: number): void {
@@ -445,6 +452,7 @@ export class AgentRuntime {
     this.#reflectedNight = day
     if (this.#reflectionLlm === null) return
     this.#stats.reflections += 1
+    this.#reflectionInFlight = true
     try {
       await runSleepReflection({ mem: this.#mem!, personality: this.#personality, llm: this.#reflectionLlm, day })
       if (this.#dreamLlm !== null) {
@@ -453,6 +461,8 @@ export class AgentRuntime {
       }
     } catch (err) {
       this.#llm.alert('reflection_failed', err instanceof Error ? err.message : String(err))
+    } finally {
+      this.#reflectionInFlight = false
     }
   }
 
