@@ -40,7 +40,8 @@ export function itemBoilerplate(e: LibraryEntry): string {
 }
 
 export function itemCommission(e: LibraryEntry): string {
-  return `Subject: ${e.desc}. One object only, centred, filling the frame, nothing else in view.`
+  return `Subject: ${e.desc}. One object only, centred, filling the frame, nothing else in view.` +
+    ' No stone base, no plinth, no ground tile, no scenery, no second object.'
 }
 
 export function planBatch(batch: string, opts: { candidates?: number } = {}): PlannedItem[] {

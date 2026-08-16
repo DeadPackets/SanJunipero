@@ -10,21 +10,18 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { type AssetRecord } from '@sj/shared'
-import { decodePng, encodePng, downscaleNearest, type RawImage } from '../src/post/raw.js'
-import { chromaKey } from '../src/post/chromaKey.js'
-import { quantize } from '../src/post/quantize.js'
-import { despeckle, sweepMagenta, opaqueArea, estimatePitch } from '../src/sheet.js'
-import { trimToFigure } from '../src/hires.js'
+import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import { openForgeDb } from '../src/db.js'
 import { AssetCodex } from '../src/codex.js'
 import { loadForgeConfig } from '../src/forgeConfig.js'
 import { SpendLedger, AnomalyStopError } from '../src/spendLedger.js'
-import { makeImageClient, GEN_SIZE } from '../src/imageClient.js'
+import { makeImageClient } from '../src/imageClient.js'
 import { makeVisionJudge } from '../src/visionQa/visionJudge.js'
 import { runVisionGate } from '../src/visionQa/gate.js'
 import { recordVerdict } from '../src/visionQa/telemetry.js'
 import { CRITERIA, type VisionVerdict } from '../src/visionQa/verdict.js'
 import { planBatch, estimateBatchCost, LIBRARY_BATCHES } from '../src/library/plan.js'
+import { toSpriteCell, candidateRank } from '../src/library/postItem.js'
 import { registerLibraryEntry, deriveIcon, libraryIndexJson } from '../src/library/register.js'
 import type { LibraryEntry } from '../src/library/catalog.js'
 
@@ -40,31 +37,6 @@ const CANDIDATES = process.env.CANDIDATES ? Number(process.env.CANDIDATES) : und
 const apiKey = process.env.OPENROUTER_API_KEY
 if (!DRY && !apiKey) throw new Error('OPENROUTER_API_KEY not set')
 if (!BATCH) throw new Error(`BATCH is required — one of ${LIBRARY_BATCHES.join(', ')}`)
-
-// The plan's post chain: key → despeckle → trim → nearest downscale → magenta sweep, then
-// palette quantize (the rubric judges palette membership) and a centred square canvas so the
-// codex row's pixel size is the entry's declared size.
-function padSquare(img: RawImage, px: number): RawImage {
-  if (img.width === px && img.height === px) return img
-  const data = new Uint8ClampedArray(px * px * 4)
-  const ox = (px - img.width) >> 1, oy = (px - img.height) >> 1
-  for (let y = 0; y < img.height; y++)
-    data.set(img.data.subarray(y * img.width * 4, (y + 1) * img.width * 4), ((y + oy) * px + ox) * 4)
-  return { width: px, height: px, data }
-}
-
-function toSpriteCell(raw: RawImage, px: number): { cell: RawImage; pitch: number } {
-  const keyed = chromaKey(raw)
-  const cleaned = despeckle(keyed, Math.max(3, Math.ceil(opaqueArea(keyed) * 0.01)))
-  const trimmed = trimToFigure(cleaned, 0)
-  let pitch = Number.NaN
-  try { pitch = estimatePitch(trimmed, [4, 40]) } catch { /* a flat figure has no lattice */ }
-  const k = Math.max(trimmed.width, trimmed.height) / px
-  const small = downscaleNearest(trimmed,
-    Math.max(1, Math.min(px, Math.round(trimmed.width / k))),
-    Math.max(1, Math.min(px, Math.round(trimmed.height / k))))
-  return { cell: padSquare(quantize(sweepMagenta(small)), px), pitch }
-}
 
 const meanScore = (v: VisionVerdict): number =>
   CRITERIA.reduce((s, k) => s + v.criteria[k].score, 0) / CRITERIA.length
@@ -89,6 +61,7 @@ async function main(): Promise<void> {
       `sprite ${i.entry.spritePx} icon ${i.entry.iconPx} cand ${i.candidates}`)
   if (DRY) { console.log('DRY: no API calls made.'); return }
 
+  mkdirSync(LIB, { recursive: true })
   const config = loadForgeConfig()
   const ledger = new SpendLedger(join(C13, 'spend.json'))
   const db = openForgeDb(join(LIB, 'library.db'))
@@ -135,12 +108,9 @@ async function main(): Promise<void> {
               writeFileSync(join(dir, 'candidates', `a${n}-c${ix + 1}-raw.png`), c.png)
               return { c, ix, ...toSpriteCell(await decodePng(c.png), e.spritePx) }
             }))
-            // Pick by pixel pitch: the candidate whose native block size is closest to the
-            // downscale factor keeps its lattice through the nearest resize.
-            const target = GEN_SIZE / e.spritePx
-            const dist = (p: typeof processed[number]) =>
-              Number.isFinite(p.pitch) ? Math.abs(p.pitch - target) : Number.POSITIVE_INFINITY
-            const pick = processed.reduce((b, p) => (dist(p) < dist(b) ? p : b), processed[0]!)
+            // Pick the cleanest silhouette: one connected subject, no floating debris.
+            const pick = processed.reduce(
+              (b, p) => (candidateRank(p) < candidateRank(b) ? p : b), processed[0]!)
             for (const p of processed)
               writeFileSync(join(dir, 'candidates',
                 p === pick ? `a${n}-chosen.png` : `rejected-a${n}-c${p.ix + 1}.png`),
