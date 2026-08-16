@@ -15,11 +15,14 @@ import { CameraHud } from './ui/CameraHud.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { LAST_SEEN_KEY } from './net/socket.js'
 import { Timeline } from './ui/Timeline.js'
+import { WorldLaws } from './panels/WorldLaws.js'
+import { LawsDashboard } from './admin/LawsDashboard.js'
+import { adminToken } from './panels/lawsModel.js'
 import type { Scene } from './render/scene.js'
 
 // chrome copy speaks about townsfolk, never machinery (spec §5)
 const LENS_LABELS: Record<Lens, string> = {
-  map: 'Town', inspector: 'Townsfolk', chronicle: 'Chronicle', society: 'Bonds', director: 'Moments',
+  map: 'Town', inspector: 'Townsfolk', chronicle: 'Chronicle', society: 'Bonds', director: 'Moments', laws: 'World Laws',
 }
 
 function ScrubBanner({ store }: { store: WorldStore }) {
@@ -56,6 +59,8 @@ export function App() {
   const [handle, setHandle] = useState<ObservatoryHandle | null>(null)
   const [gapTicks, setGapTicks] = useState<number | null>(null)
   const [link, setLink] = useState<LinkStatus>('connecting')
+  // Operator-only: absent for every viewer who did not put a token in this session.
+  const [operatorToken] = useState<string | null>(() => adminToken(sessionStorage))
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -153,7 +158,7 @@ export function App() {
         </main>
         <aside
           id="panel-outlet"
-          className={route.lens === 'inspector' || route.lens === 'chronicle' ? 'open' : undefined}
+          className={route.lens === 'inspector' || route.lens === 'chronicle' || route.lens === 'laws' ? 'open' : undefined}
         >
           {route.lens === 'inspector' && route.agentId !== null && (
             <InspectorPanel store={store} agentId={route.agentId} scene={scene} />
@@ -162,6 +167,12 @@ export function App() {
             <RosterPanel store={store} onPick={pickAgent} />
           )}
           {route.lens === 'chronicle' && <ChroniclePanel store={store} />}
+          {route.lens === 'laws' && (
+            <>
+              <WorldLaws store={store} />
+              <LawsDashboard store={store} token={operatorToken} />
+            </>
+          )}
         </aside>
       </div>
       {gapTicks !== null && (

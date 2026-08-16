@@ -7,6 +7,9 @@ export const RECENT_EVENTS_CAP = 400
 
 export type ViewMode = { live: true } | { live: false; tick: number }
 export type Thought = { agentId: string; tick: number; text: string }
+// Law flips are kept whole, outside the capped delta ring: a town's legal history
+// is short and must not scroll away behind four hundred footsteps.
+export type LawChange = { tick: number; path: string; value: unknown }
 
 export type WorldStore = {
   getState(): WorldState | null
@@ -17,6 +20,9 @@ export type WorldStore = {
   recentEvents(): SimEvent[]
   assetsSeq(): number
   assetRecords(): AssetRecord[]
+  getConfig(): SimConfig | null
+  getLaws(): Record<string, unknown>
+  lawHistory(): LawChange[]
   applyServer(msg: ServerMsg): void
   subscribe(fn: () => void): () => void
   onEvents(fn: (evts: SimEvent[]) => void): () => void
@@ -31,6 +37,8 @@ export function createWorldStore(): WorldStore {
   const thoughts: Thought[] = []
   const latest = new Map<string, { tick: number; text: string }>()
   const events: SimEvent[] = []
+  let laws: Record<string, unknown> = {}
+  const lawChanges: LawChange[] = []
   const subs = new Set<() => void>()
   const eventSubs = new Set<(evts: SimEvent[]) => void>()
 
@@ -45,18 +53,29 @@ export function createWorldStore(): WorldStore {
     recentEvents: () => events,
     assetsSeq: () => assetsSeq,
     assetRecords: () => records,
+    getConfig: () => config,
+    getLaws: () => laws,
+    lawHistory: () => lawChanges,
 
     applyServer(msg) {
       switch (msg.t) {
         case 'snapshot':
           config = SimConfigSchema.parse(msg.config) // strict: live view must fold with the engine's exact config
           state = msg.state as WorldState
+          laws = msg.laws
           mode = { live: true }
           break
         case 'tick':
           // deltas only advance the live view; while scrubbed the past moment stays still
           if (mode.live && state !== null && config !== null) {
             for (const ev of msg.events) state = fold(state, ev, config)
+            for (const ev of msg.events) {
+              if (ev.type !== 'config_changed') continue
+              const p = ev.payload as { path?: unknown; value?: unknown }
+              if (typeof p.path !== 'string') continue
+              laws = { ...laws, [p.path]: p.value }
+              lawChanges.push({ tick: ev.tick, path: p.path, value: p.value })
+            }
             events.push(...msg.events)
             if (events.length > RECENT_EVENTS_CAP) events.splice(0, events.length - RECENT_EVENTS_CAP)
             for (const fn of eventSubs) fn(msg.events)
