@@ -539,7 +539,13 @@ export class AgentRuntime {
     this.#stats.reflections += 1
     this.#reflectionInFlight = true
     try {
-      await runSleepReflection({ mem: this.#mem!, personality: this.#personality, llm: this.#reflectionLlm, day })
+      await runSleepReflection({
+        mem: this.#mem!,
+        personality: this.#personality,
+        llm: this.#reflectionLlm,
+        day,
+        alert: (kind, detail) => this.#llm.alert(kind, detail),
+      })
       if (this.#dreamLlm !== null) {
         const dream = await rollDream({ mem: this.#mem!, agentId: this.#agentId, day, llm: this.#dreamLlm, chance: this.#config.dreamChance })
         if (dream.dreamed) this.#pendingDreamMood = dream.mood

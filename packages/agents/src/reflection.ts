@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import type { LlmClient, LlmMessage } from './llm/client.js'
+import { NoObjectGeneratedError } from 'ai'
+import { BudgetExceededError, type LlmClient, type LlmMessage } from './llm/client.js'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
 import { PersonalityEditSchema, type PersonalityDoc, type PersonalityStore } from './personality.js'
 
@@ -22,6 +23,26 @@ export type ReflectionResult = {
   ledgersUpdated: string[]
   editApplied: boolean
   editRejectedReason?: string
+  fallback: boolean
+}
+
+export const FALLBACK_DAY_TITLE = 'A long day'
+export const FALLBACK_AUTOBIOGRAPHY = 'A long day; too weary to make sense of it.'
+export const FALLBACK_DIGEST_CHARS = 2000
+const FALLBACK_EMPTY_DIGEST = 'Nothing of the day comes back.'
+
+// A night with no headroom left must still leave the day written down, or the
+// mind wakes with a hole where yesterday was and never gets it back.
+function dayDigest(dayMemories: MemoryRow[]): string {
+  const full = dayMemories.map((m) => m.text).join('\n')
+  if (full.length === 0) return FALLBACK_EMPTY_DIGEST
+  return full.length <= FALLBACK_DIGEST_CHARS ? full : `${full.slice(0, FALLBACK_DIGEST_CHARS)}…`
+}
+
+// Only a refused budget or unusable model output degrade the night. Anything
+// else is a real fault and belongs to the caller's alert path.
+function isDegradable(err: unknown): boolean {
+  return err instanceof BudgetExceededError || NoObjectGeneratedError.isInstance(err)
 }
 
 export async function runSleepReflection(deps: {
@@ -29,16 +50,31 @@ export async function runSleepReflection(deps: {
   personality: PersonalityStore
   llm: ReflectionLlm
   day: number
+  alert?: (kind: string, detail: string) => void
 }): Promise<ReflectionResult> {
-  const { mem, personality, llm, day } = deps
+  const { mem, personality, llm, day, alert } = deps
 
   // 1. Load the day's memories.
   const dayMemories = mem.memoriesOfDay(day)
 
+  // The first refused step ends the thinking; every later step reads this latch
+  // rather than spending another call the guard will refuse anyway.
+  let degraded: string | null = null
+  async function step<T>(run: () => Promise<T>): Promise<T | null> {
+    if (degraded !== null) return null
+    try {
+      return await run()
+    } catch (err) {
+      if (!isDegradable(err)) throw err
+      degraded = err instanceof Error ? err.message : String(err)
+      return null
+    }
+  }
+
   // 2. Facts FIRST (spec §6 step 2 — before any summarizing). A hallucinated
   // src_memory_id would trip the memories(id) FK (foreign_keys=ON) and abort the
   // whole pipeline mid-write, so keep only facts that cite today's memories.
-  const facts = await llm.extractFacts(dayMemories)
+  const facts = (await step(() => llm.extractFacts(dayMemories))) ?? []
   const todayIds = new Set(dayMemories.map((m) => m.id))
   const insertedFacts = facts.filter((f) => todayIds.has(f.srcMemoryId))
   for (const f of insertedFacts) {
@@ -47,7 +83,7 @@ export async function runSleepReflection(deps: {
   const factCount = insertedFacts.length
 
   // 3. Scene summaries.
-  const scenes = await llm.summarizeScenes(dayMemories)
+  const scenes = (await step(() => llm.summarizeScenes(dayMemories))) ?? []
   const sceneIds: number[] = []
   for (const s of scenes) {
     sceneIds.push(
@@ -62,16 +98,17 @@ export async function runSleepReflection(deps: {
     )
   }
 
-  // 4. Day node with child scene ids.
-  const daySummary = await llm.summarizeDay(scenes.map((s) => ({ title: s.title, text: s.text })))
+  // 4. Day node with child scene ids — mechanical when the night went dark.
+  const daySummary = await step(() => llm.summarizeDay(scenes.map((s) => ({ title: s.title, text: s.text }))))
   mem.insertSummaryNode({
     level: 'day',
     day,
-    title: daySummary.title,
-    text: daySummary.text,
-    childIds: sceneIds,
+    title: daySummary?.title ?? FALLBACK_DAY_TITLE,
+    text: daySummary?.text ?? dayDigest(dayMemories),
+    childIds: daySummary === null ? [] : sceneIds,
     memoryIds: [],
   })
+  const daySummaryText = daySummary?.text ?? ''
 
   // 5. Ledgers — once per distinct person tag in the day's memories.
   const ledgersUpdated: string[] = []
@@ -80,20 +117,25 @@ export async function runSleepReflection(deps: {
   for (const person of people) {
     const existing = mem.getLedger(person)?.doc ?? null
     const relevant = dayMemories.filter((m) => m.tags.people.includes(person))
-    const doc = await llm.updateLedger(person, existing, relevant)
+    const doc = await step(() => llm.updateLedger(person, existing, relevant))
+    if (doc === null) break
     mem.upsertLedger(person, doc, day)
     ledgersUpdated.push(person)
   }
 
   // 6. Autobiography paragraph.
   const personalityDoc = personality.current().doc
-  const paragraph = await llm.autobiographyParagraph(daySummary.text, personalityDoc)
-  mem.appendAutobiography(day, paragraph)
+  const paragraph = await step(() => llm.autobiographyParagraph(daySummaryText, personalityDoc))
+  mem.appendAutobiography(day, paragraph ?? FALLBACK_AUTOBIOGRAPHY)
 
   // 7. Personality edit — ≤1 by construction, drift-limiter validates.
-  const proposal = await llm.proposeEdit(daySummary.text, personalityDoc, dayMemories)
+  const proposal = await step(() => llm.proposeEdit(daySummaryText, personalityDoc, dayMemories))
+  if (degraded !== null) {
+    alert?.('reflection_fallback', degraded)
+    return { factCount, sceneCount: scenes.length, ledgersUpdated, editApplied: false, fallback: true }
+  }
   if (proposal == null) {
-    return { factCount, sceneCount: scenes.length, ledgersUpdated, editApplied: false }
+    return { factCount, sceneCount: scenes.length, ledgersUpdated, editApplied: false, fallback: false }
   }
   const result = personality.applyNightlyEdit(day, proposal, mem)
   if (!result.ok) {
@@ -103,9 +145,10 @@ export async function runSleepReflection(deps: {
       ledgersUpdated,
       editApplied: false,
       editRejectedReason: result.reason,
+      fallback: false,
     }
   }
-  return { factCount, sceneCount: scenes.length, ledgersUpdated, editApplied: true }
+  return { factCount, sceneCount: scenes.length, ledgersUpdated, editApplied: true, fallback: false }
 }
 
 // --- Real implementation: one structured-output call per method, z.strict() schemas. ---
