@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 import { PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
-import { THOUGHT_LINES, startDevWorld } from './devWorld.js'
+import { RngStreams, createWorldTick, genesisState } from '@sj/engine'
+import { SHOWCASE_CONFIG, THOUGHT_LINES, startDevWorld } from './devWorld.js'
 
 const until = async (cond: () => boolean, timeoutMs = 12_000): Promise<void> => {
   const t0 = Date.now()
@@ -13,6 +14,21 @@ const until = async (cond: () => boolean, timeoutMs = 12_000): Promise<void> => 
     await new Promise((r) => setTimeout(r, 20))
   }
 }
+describe('showcase weather', () => {
+  it('freezes the weather system so the town never greys out', () => {
+    expect(SHOWCASE_CONFIG.weather.hourlyChangeChance).toBe(0)
+    expect(genesisState(SHOWCASE_CONFIG).weather).toEqual({ kind: 'sunny', temperatureC: 14 })
+
+    // A full day of world ticks under seed g6 never rolls the kind off sunny.
+    const rng = new RngStreams('g6')
+    const worldTick = createWorldTick(SHOWCASE_CONFIG, rng)
+    let s = genesisState(SHOWCASE_CONFIG)
+    for (let tick = 0; tick < 24 * 60; tick++) {
+      s = worldTick(s).state
+      expect(s.weather.kind).toBe('sunny')
+    }
+  })
+})
 
 describe('dev world server', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-devworld-'))

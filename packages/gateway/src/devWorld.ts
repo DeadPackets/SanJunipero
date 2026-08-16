@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { DEFAULT_CONFIG, type SimConfig } from '@sj/shared'
 import {
   EventStore, RngStreams, TickLoop, genesisState, makeFixtureMap, openDb,
 } from '@sj/engine'
@@ -16,6 +16,10 @@ export const DEV_PORT = 8787
 export const DEV_MS_PER_TICK = 2500
 export const DEV_SEED = 'g6'
 export const DEV_SNAPSHOT_EVERY_TICKS = 60
+
+// The founders showcase is an art demo: freeze weather to sunny so the storm
+// grading matrix never greys the town (seed g6 rolls rain within the first day).
+export const SHOWCASE_CONFIG: SimConfig = { ...DEFAULT_CONFIG, weather: { ...DEFAULT_CONFIG.weather, hourlyChangeChance: 0 } }
 
 // The G6 "live thought" source — human framing, no AI vocabulary.
 export const THOUGHT_LINES: Record<string, string> = {
@@ -50,7 +54,7 @@ export async function startDevWorld(
   const db = openDb(dbPath)
   ensureObserverTables(db)
 
-  const config = DEFAULT_CONFIG
+  const config = SHOWCASE_CONFIG
   const terrain = makeFixtureMap()
   const rng = new RngStreams(opts.seed ?? DEV_SEED)
   const store = new EventStore(db)
