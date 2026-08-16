@@ -1,4 +1,5 @@
 import { simTimeFromTick, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
+import { doorTile } from './interiors.js'
 import type { Item, WorldState } from './state.js'
 import { isAdjacentToRect } from './verbs.js'
 
@@ -31,6 +32,9 @@ export type PerceivedCrop = { id: string; kind: string; x: number; y: number; st
 
 export type HeardSpeech = { speakerId: string; name: string; text: string; distance: number }
 
+// Things this agent watched happen to someone else. Task 5 fills it from `item_taken`.
+export type SeenEvent = { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
+
 export type PerceptionPacket = {
   time: SimTime
   self: {
@@ -48,6 +52,7 @@ export type PerceptionPacket = {
     crops: PerceivedCrop[]
   }
   heard: HeardSpeech[]
+  seen: SeenEvent[]
   feltEvents: string[]
 }
 
@@ -85,6 +90,32 @@ function feltTagFor(agentId: string, ev: SimEvent): string | null {
   }
 }
 
+const chebyshev = (x1: number, y1: number, x2: number, y2: number): number =>
+  Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))
+
+// A wall stops sound. Speech carries iff both parties share an interior, both are
+// outdoors within earshot, or the one outdoors is standing in the other's doorway.
+// The speaker's side is read from the event so a recorded log replays identically.
+export function hears(state: WorldState, config: SimConfig, speakerEv: SimEvent, hearerId: string): boolean {
+  const p = speakerEv.payload as { x?: unknown; y?: unknown; insideId?: unknown } | null
+  const hearer = state.agents[hearerId]
+  if (!hearer || typeof p?.x !== 'number' || typeof p.y !== 'number') return false
+
+  const speakerInside = typeof p.insideId === 'string' ? p.insideId : null
+  const hearerInside = hearer.insideId ?? null
+  if (speakerInside !== null && hearerInside !== null) return speakerInside === hearerInside
+  if (speakerInside === null && hearerInside === null) {
+    return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
+  }
+
+  const structure = state.structures[speakerInside ?? hearerInside!]
+  if (!structure) return false
+  const door = doorTile(state, structure)
+  if (!door) return false
+  const outdoors = speakerInside !== null ? { x: hearer.x, y: hearer.y } : { x: p.x, y: p.y }
+  return chebyshev(outdoors.x, outdoors.y, door.x, door.y) <= 1
+}
+
 export function composePerception(
   state: WorldState,
   config: SimConfig,
@@ -95,11 +126,14 @@ export function composePerception(
   if (!self) throw new Error(`composePerception: no such agent ${agentId}`)
 
   const sight = config.movement.sightRadius
-  const earshot = config.movement.earshotRadius
   const withinSight = (x: number, y: number): boolean => dist(self.x, self.y, x, y) <= sight
 
+  // Four walls are also a horizon: inside, the world shrinks to this one room.
+  const indoors = self.insideId ?? null
+
   const visibleAgents: PerceivedAgent[] = Object.values(state.agents)
-    .filter(a => a.id !== agentId && a.alive && withinSight(a.x, a.y))
+    .filter(a => a.id !== agentId && a.alive
+      && (indoors === null ? (a.insideId === undefined && withinSight(a.x, a.y)) : a.insideId === indoors))
     .sort(byId)
     .map(a => ({
       id: a.id, name: a.name, x: a.x, y: a.y,
@@ -117,11 +151,11 @@ export function composePerception(
   }
 
   const visibleStructures: PerceivedStructure[] = Object.values(state.structures)
-    .filter(s => structureInSight(s))
+    .filter(s => (indoors === null ? structureInSight(s) : s.id === indoors))
     .sort(byId)
     .map(s => ({ id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, burning: s.burning, stage: s.stage }))
 
-  const tileItems: PerceivedItem[] = Object.values(state.items)
+  const tileItems: PerceivedItem[] = indoors !== null ? [] : Object.values(state.items)
     .filter(isTileItem)
     .filter(i => withinSight(i.loc.x, i.loc.y))
     .sort(byId)
@@ -131,7 +165,9 @@ export function composePerception(
     .filter(isStructureItem)
     .filter(i => {
       const s = state.structures[i.loc.id]
-      return s !== undefined && isAdjacentToRect(self.x, self.y, s)
+      if (s === undefined) return false
+      // Indoors you handle only this room's shelves; outdoors the doorway peek still works.
+      return indoors === null ? isAdjacentToRect(self.x, self.y, s) : s.id === indoors
     })
     .sort(byId)
     .map(i => {
@@ -141,7 +177,7 @@ export function composePerception(
 
   const visibleItems: PerceivedItem[] = [...tileItems, ...structureItems].sort(byId)
 
-  const visibleCrops: PerceivedCrop[] = Object.values(state.crops)
+  const visibleCrops: PerceivedCrop[] = indoors !== null ? [] : Object.values(state.crops)
     .filter(c => withinSight(c.x, c.y))
     .sort(byId)
     .map(c => ({ id: c.id, kind: c.kind, x: c.x, y: c.y, stage: c.stage, withered: c.withered }))
@@ -156,8 +192,8 @@ export function composePerception(
     const p = ev.payload as { agentId?: unknown; text?: unknown; x?: unknown; y?: unknown }
     if (p.agentId === agentId) continue // you don't hear yourself
     if (typeof p.text !== 'string' || typeof p.x !== 'number' || typeof p.y !== 'number') continue
+    if (!hears(state, config, ev, agentId)) continue
     const distance = dist(self.x, self.y, p.x, p.y)
-    if (distance > earshot) continue
     const speakerId = String(p.agentId)
     heard.push({ speakerId, name: state.agents[speakerId]?.name ?? speakerId, text: p.text, distance })
   }
@@ -181,6 +217,7 @@ export function composePerception(
     weather: { ...state.weather },
     visible: { agents: visibleAgents, structures: visibleStructures, items: visibleItems, crops: visibleCrops },
     heard,
+    seen: [],
     feltEvents,
   }
 }

@@ -490,7 +490,10 @@ const speak: VerbDef = makeVerb({
   onComplete(state, _config, agentId, params) {
     const p = SpeakParams.parse(params)
     const a = state.agents[agentId]!
-    return [{ type: 'agent_spoke', payload: { agentId, text: p.text, x: a.x, y: a.y } }]
+    return [{
+      type: 'agent_spoke',
+      payload: { agentId, text: p.text, x: a.x, y: a.y, ...(a.insideId === undefined ? {} : { insideId: a.insideId }) },
+    }]
   },
 })
 

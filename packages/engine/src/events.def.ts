@@ -45,7 +45,10 @@ export const AgentWoke = z.object({ agentId: z.string() }).strict()
 export const AgentSlept = z.object({ agentId: z.string() }).strict()
 export const AgentEntered = z.object({ agentId: z.string(), structureId: z.string() }).strict()
 export const AgentExited = z.object({ agentId: z.string(), structureId: z.string() }).strict()
-export const AgentSpoke = z.object({ agentId: z.string(), text: z.string(), x: z.number(), y: z.number() }).strict()
+// insideId replays the doorway rule from the event alone — absent when the speaker was outdoors.
+export const AgentSpoke = z.object({
+  agentId: z.string(), text: z.string(), x: z.number(), y: z.number(), insideId: z.string().optional(),
+}).strict()
 export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
 export const AgentDied = z.object({ agentId: z.string(), cause: z.string() }).strict()
 export const AgentAged = z.object({ agentId: z.string() }).strict()
