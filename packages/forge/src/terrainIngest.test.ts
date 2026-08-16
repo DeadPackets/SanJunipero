@@ -9,8 +9,13 @@ import type { RawImage } from './post/raw.js'
 import {
   SHEET_COLS, SHEET_ROWS, TERRAIN_TILE_H, TERRAIN_TILE_W, TERRAIN_VARIANTS, paintTerrainTile,
 } from './terrainTiles.js'
-import { MATERIAL_PX, ROAD_MATERIAL_ID, terrainAssetId } from './terrainGen.js'
-import { groundTile, registerGeneratedTerrain, seasonSheetFrom, seasonSheets } from './terrainIngest.js'
+import {
+  BORDER_TOLERANCE, MATERIAL_PX, ROAD_MATERIAL_ID, borderReport, seamReport, terrainAssetId,
+} from './terrainGen.js'
+import {
+  MATERIALS_DIR, groundTile, loadMaterialBook, registerGeneratedTerrain, seasonSheetFrom,
+  seasonSheets,
+} from './terrainIngest.js'
 
 const PALETTE_HEXES = new Set(MASTER_PALETTE.map((h) => parseInt(h.slice(1), 16)))
 
@@ -157,5 +162,34 @@ describe('seasonSheetFrom', () => {
     const book = fullBook()
     expect(Buffer.from(seasonSheetFrom(book, 'spring').data))
       .toEqual(Buffer.from(seasonSheetFrom(book, 'spring').data))
+  })
+})
+
+
+// Whatever ships in content/tilesets/materials is what the town's ground actually looks
+// like, so it meets the same two measurements the generator gates on. An empty directory is
+// a valid state (the code-painted tiles stand in) — but a material that IS there must wrap
+// and must not be a framed card.
+describe('the shipped materials', () => {
+  it('every one wraps, and none of them is a drawn frame', async () => {
+    const book = await loadMaterialBook()
+    for (const [assetId, img] of book) {
+      const seam = seamReport(img), border = borderReport(img)
+      expect(seam.pass, `${assetId}: ${seam.note}`).toBe(true)
+      expect(border.framed, `${assetId}: ${border.note}`).toBe(false)
+      expect(border.ringDelta, assetId).toBeLessThanOrEqual(BORDER_TOLERANCE)
+    }
+  })
+
+  it('is on the material grid, and named for the asset it is', async () => {
+    const book = await loadMaterialBook()
+    for (const [assetId, img] of book) {
+      expect([img.width, img.height], assetId).toEqual([MATERIAL_PX, MATERIAL_PX])
+      expect(assetId, `${assetId} is not a program asset id`).toMatch(/^terrain:[a-z0-9:\-]+$/)
+    }
+  })
+
+  it('loads an empty book from a directory that is not there — art independence', async () => {
+    expect((await loadMaterialBook(`${MATERIALS_DIR}-does-not-exist`)).size).toBe(0)
   })
 })
