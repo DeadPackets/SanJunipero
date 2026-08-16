@@ -8,7 +8,6 @@ import type { WeatherLayer } from './weatherFx.js'
 import type { BubbleLayer } from './bubbles.js'
 import type { CharacterLayer } from './characters.js'
 import { entitySpriteOf } from './entities.js'
-import { CHAR_TARGET_PX } from './charAnim.js'
 import { isGrave, toneReducer } from './tone.js'
 
 export const SMOKE_PUFFS = 3
@@ -251,7 +250,7 @@ export function createAmbient(
         const sprite = layers.chars.getSprite(a.id)
         if (sprite === null) continue
         const working = a.alive && a.activity !== null && (SQUASH_VERBS as readonly string[]).includes(a.activity.verb)
-        const baseY = CHAR_TARGET_PX / 64
+        const baseY = sprite.scale.x // uniform base — the character layer re-asserts x each frame (v2 and v4 scales differ)
         sprite.scale.y = working && !grave
           ? baseY * (1 - (1 - SQUASH_Y) * (0.5 + 0.5 * Math.sin(2 * Math.PI * SQUASH_HZ * (t / 1000))))
           : working ? sprite.scale.y : baseY

@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentBody } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
-import { BOB_PX, EMOTE_KINDS, WALK_LOOP, charPose, emoteFor, interpolatePos } from './charAnim.js'
+import { BOB_PX, EMOTE_KINDS, WALK_FRAME_MS_V4, WALK_LOOP, charPose, emoteFor, interpolatePos } from './charAnim.js'
+
+describe('charPose v4 cadence', () => {
+  const v4base = { asleep: false, collapsed: false, walking: true, facing: 'se' as const, nowMs: 0 }
+  it('walks the four-frame loop at 180ms per frame', () => {
+    const rows = [0, 180, 360, 540].map((nowMs) => charPose({ ...v4base, nowMs }, WALK_FRAME_MS_V4).row)
+    expect(rows).toEqual(['contact-a', 'passing-a', 'contact-b', 'passing-b'])
+    expect(charPose({ ...v4base, nowMs: 179 }, WALK_FRAME_MS_V4).row).toBe('contact-a')
+  })
+})
 
 const base = { asleep: false, collapsed: false, walking: false, facing: 'se' as const, nowMs: 0 }
 

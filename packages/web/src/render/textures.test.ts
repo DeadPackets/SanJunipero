@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AssetRecord } from '@sj/shared'
-import { resolveAssetId, textureUrlFor } from './textures.js'
+import { buildingArt, characterArt, resolveAssetId, textureUrlFor } from './textures.js'
 
 const rec = (over: Partial<AssetRecord>): AssetRecord => ({
   id: 'asset_x', seq: 1, class: 'building', desc: 'hut: timber dwelling', kind: 'hut',
@@ -37,5 +37,52 @@ describe('textureUrlFor', () => {
   })
   it('falls back to the class placeholder', () => {
     expect(textureUrlFor([], 'building', 'hut')).toBe('/assets/placeholder/building.png')
+  })
+})
+
+describe('characterArt (v4 manifest contract)', () => {
+  const atlasMeta = JSON.stringify({
+    version: 'v4-hires-atlas', figureH: 840,
+    cells: { 'idle-sw': { x: 0, y: 0, w: 347, h: 848, feetX: 173, feetY: 843 } },
+  })
+  const charRec = (over: Partial<AssetRecord>): AssetRecord => rec({
+    class: 'rig-part', kind: 'character:omar', desc: 'character sheet: omar', meta: atlasMeta,
+    footprint: { w: 1, h: 1 }, ...over,
+  })
+
+  it('resolves a v4 atlas record to its immutable png + parsed manifest', () => {
+    const art = characterArt([charRec({ id: 'asset_omar' })], 'omar')
+    expect(art.url).toBe('/assets/asset_omar.png')
+    expect(art.manifest?.figureH).toBe(840)
+    expect(art.manifest?.cells['idle-sw']?.feetY).toBe(843)
+  })
+
+  it('falls back to the gateway character route with no manifest when meta is absent or not v4', () => {
+    expect(characterArt([charRec({ meta: null })], 'omar')).toEqual({ url: '/assets/character/omar.png', manifest: null })
+    expect(characterArt([], 'omar')).toEqual({ url: '/assets/character/omar.png', manifest: null })
+  })
+
+  it('newest ready atlas wins on regen', () => {
+    const art = characterArt([charRec({ id: 'old', seq: 3 }), charRec({ id: 'new', seq: 8 })], 'omar')
+    expect(art.url).toBe('/assets/new.png')
+  })
+})
+
+describe('buildingArt (v4-hires-building manifest)', () => {
+  const meta = JSON.stringify({
+    version: 'v4-hires-building', kind: 'storehouse', footprint: { w: 2, h: 2 },
+    cell: { w: 810, h: 866, feetX: 405, feetY: 861 },
+  })
+
+  it('feet-anchors and scales the art width to the footprint diamond', () => {
+    const art = buildingArt([rec({ id: 'asset_sh', kind: 'storehouse', meta })], 'storehouse', 2, 2)
+    expect(art.url).toBe('/assets/asset_sh.png')
+    expect(art.anchor).toEqual({ x: 405 / 810, y: 861 / 866 })
+    expect(art.scale).toBeCloseTo(((2 + 2) * 16) / 810, 10)
+  })
+
+  it('v2/no-meta records draw at natural size with the bottom-center law', () => {
+    expect(buildingArt([rec({ id: 'hutv2', kind: 'hut' })], 'hut', 2, 2)).toEqual({ url: '/assets/hutv2.png', anchor: null, scale: null })
+    expect(buildingArt([], 'hut', 2, 2)).toEqual({ url: '/assets/placeholder/building.png', anchor: null, scale: null })
   })
 })

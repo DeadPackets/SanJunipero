@@ -11,13 +11,17 @@ export const WALK_FPS = 8
 export const WALK_LOOP = ['contact-a', 'passing-a', 'contact-b', 'passing-b'] as const // v2, 8fps
 export const BOB_PX = 1 // passing frames render 1px lower — render-time only, never baked
 export const CHAR_TARGET_PX = 52 // ≈1.6 tiles of 32px; art height 64 in cell → scale 52/64
+export const WALK_FRAME_MS_V4 = 180 // v4 ruling: F1-F2-F1-F3 cadence at 180ms/frame
 
 export type CharPose = { row: (typeof SHEET_ROWS)[number]; facing: Facing; bobY: number }
 
-export function charPose(a: { asleep: boolean; collapsed: boolean; walking: boolean; facing: Facing; nowMs: number }): CharPose {
+export function charPose(
+  a: { asleep: boolean; collapsed: boolean; walking: boolean; facing: Facing; nowMs: number },
+  frameMs = 1000 / WALK_FPS,
+): CharPose {
   if (a.asleep || a.collapsed) return { row: 'sleep', facing: a.facing, bobY: 0 }
   if (a.walking) {
-    const row = WALK_LOOP[Math.floor(a.nowMs / (1000 / WALK_FPS)) % WALK_LOOP.length]!
+    const row = WALK_LOOP[Math.floor(a.nowMs / frameMs) % WALK_LOOP.length]!
     return { row, facing: a.facing, bobY: row === 'passing-a' || row === 'passing-b' ? BOB_PX : 0 }
   }
   return { row: 'idle', facing: a.facing, bobY: 0 }

@@ -3,8 +3,11 @@ import type { SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { depthKey, facingFrom, tileToScreen, type Facing } from './iso.js'
 import type { Scene } from './scene.js'
-import type { TextureBook } from './textures.js'
-import { CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, SHEET_COLS, SHEET_ROWS, charPose, emoteFor, interpolatePos } from './charAnim.js'
+import { characterArt, smoothSource, type TextureBook } from './textures.js'
+import {
+  CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4,
+  charPose, emoteFor, interpolatePos,
+} from './charAnim.js'
 
 export const EMOTE_MS = 2000
 export const EMOTE_ABOVE_HEAD_PX = 12
@@ -12,6 +15,9 @@ export const SHADOW_ALPHA = 0.25
 export const GLIDE_MIN_MS = 200
 export const GLIDE_MAX_MS = 4000
 export const EMOTE_PX = 16
+
+type CharArt = ReturnType<typeof characterArt>
+type Sheet = { art: CharArt; texture: Texture | null }
 
 type CharEntry = {
   sprite: Sprite
@@ -31,23 +37,37 @@ export type CharacterLayer = {
   destroy(): void
 }
 
-// 24 slices per sheet, cached per source texture
+// per-source cell cache: v2 placeholder lattice slices AND v4 manifest rect slices
 const sliceCache = new WeakMap<Texture, Map<string, Texture>>()
-function slice(sheet: Texture, row: (typeof SHEET_ROWS)[number], facing: Facing): Texture {
+function cached(sheet: Texture, key: string, make: () => Texture): Texture {
   let m = sliceCache.get(sheet)
   if (m === undefined) {
     m = new Map()
     sliceCache.set(sheet, m)
   }
-  const key = `${row}:${facing}`
   let t = m.get(key)
   if (t === undefined) {
-    const col = SHEET_COLS.indexOf(facing)
-    const rowIdx = SHEET_ROWS.indexOf(row)
-    t = new Texture({ source: sheet.source, frame: new Rectangle(col * CELL, rowIdx * CELL, CELL, CELL) })
+    t = make()
     m.set(key, t)
   }
   return t
+}
+
+// v2 fallback (placeholder sheets, pre-v4 codex sheets): fixed 96px lattice
+function sliceV2(sheet: Texture, row: (typeof SHEET_ROWS)[number], facing: Facing): Texture {
+  return cached(sheet, `${row}:${facing}`, () => {
+    const col = SHEET_COLS.indexOf(facing)
+    const rowIdx = SHEET_ROWS.indexOf(row)
+    return new Texture({ source: sheet.source, frame: new Rectangle(col * CELL, rowIdx * CELL, CELL, CELL) })
+  })
+}
+
+// v4 hi-res atlas: manifest rects are the only slicing truth (no lattice)
+function sliceV4(atlas: Texture, art: CharArt, row: (typeof SHEET_ROWS)[number], facing: Facing): Texture | null {
+  const cell = art.manifest?.cells[`${row}-${facing}`]
+  if (cell === undefined) return null
+  return cached(atlas, `${row}-${facing}`, () =>
+    new Texture({ source: atlas.source, frame: new Rectangle(cell.x, cell.y, cell.w, cell.h) }))
 }
 
 export function createCharacterLayer(
@@ -57,12 +77,24 @@ export function createCharacterLayer(
   onSelect: (agentId: string) => void,
 ): CharacterLayer {
   const entries = new Map<string, CharEntry>()
-  const sheets = new Map<string, Texture>() // agentId → loaded sheet
+  const sheets = new Map<string, Sheet>() // agentId → resolved art + loaded texture
+  let lastAssetsSeq = store.assetsSeq()
   let emoteAtlas: Texture | null = null
   let emotesHidden = false
   void book.get('/assets/emotes.png').then((t) => {
     emoteAtlas = t
   })
+
+  const loadSheet = (agentId: string, swapFrom: string | null): void => {
+    const art = characterArt(store.assetRecords(), agentId)
+    const sheet: Sheet = { art, texture: null }
+    sheets.set(agentId, sheet)
+    const p = swapFrom !== null && swapFrom !== art.url ? book.swap(swapFrom, art.url) : book.get(art.url)
+    void p.then((t) => {
+      if (sheets.get(agentId) !== sheet) return // superseded by a newer resolve
+      sheet.texture = art.manifest !== null ? smoothSource(t) : t
+    })
+  }
 
   // shared 20×8 blob shadow — Graphics-generated once
   const shadowG = new Graphics()
@@ -93,9 +125,7 @@ export function createCharacterLayer(
       prev: { x, y, atMs: now }, next: { x, y, atMs: now }, lastMoveArrival: now,
     }
     entries.set(agentId, e)
-    void book.get(`/assets/character/${agentId}.png`).then((t) => {
-      sheets.set(agentId, t)
-    })
+    loadSheet(agentId, null)
     return e
   }
 
@@ -132,6 +162,16 @@ export function createCharacterLayer(
   const tick = (nowMs: number): void => {
     const state = store.getState()
     if (state === null) return
+    // hot swap: new codex records re-resolve every character's art in place
+    const seq = store.assetsSeq()
+    if (seq !== lastAssetsSeq) {
+      lastAssetsSeq = seq
+      for (const agentId of entries.keys()) {
+        const prev = sheets.get(agentId)
+        const next = characterArt(store.assetRecords(), agentId)
+        if (prev === undefined || prev.art.url !== next.url) loadSheet(agentId, prev?.art.url ?? null)
+      }
+    }
     const live = new Set<string>()
     for (const a of Object.values(state.agents)) {
       if (!a.alive) continue // the dead leave the map; grave tone is Task 15
@@ -144,9 +184,27 @@ export function createCharacterLayer(
       }
       const pos = interpolatePos(e.prev, e.next, nowMs)
       const walking = nowMs < e.next.atMs && (e.next.x !== e.prev.x || e.next.y !== e.prev.y)
-      const pose = charPose({ asleep: a.asleep, collapsed: a.collapsedSinceTick !== null, walking, facing: e.facing, nowMs })
       const sheet = sheets.get(a.id)
-      if (sheet !== undefined) e.sprite.texture = slice(sheet, pose.row, pose.facing)
+      const hires = sheet !== undefined && sheet.texture !== null && sheet.art.manifest !== null
+      const pose = charPose(
+        { asleep: a.asleep, collapsed: a.collapsedSinceTick !== null, walking, facing: e.facing, nowMs },
+        hires ? WALK_FRAME_MS_V4 : undefined,
+      )
+      if (sheet !== undefined && sheet.texture !== null) {
+        if (hires) {
+          const cell = sheet.art.manifest!.cells[`${pose.row}-${pose.facing}`]
+          const t = sliceV4(sheet.texture, sheet.art, pose.row, pose.facing)
+          if (t !== null && cell !== undefined) {
+            e.sprite.texture = t
+            e.sprite.anchor.set(cell.feetX / cell.w, cell.feetY / cell.h) // feet-anchor law
+            e.sprite.scale.set(CHAR_TARGET_PX / sheet.art.manifest!.figureH) // smooth downscale to world footprint
+          }
+        } else {
+          e.sprite.texture = sliceV2(sheet.texture, pose.row, pose.facing)
+          e.sprite.anchor.set(0.5, FEET_Y / CELL)
+          e.sprite.scale.set(CHAR_TARGET_PX / 64)
+        }
+      }
       const { sx, sy } = tileToScreen(pos.x, pos.y)
       e.sprite.position.set(sx, sy + pose.bobY)
       e.sprite.zIndex = depthKey(Math.round(pos.x), Math.round(pos.y)) + 1
@@ -162,6 +220,7 @@ export function createCharacterLayer(
         e.shadow.destroy()
         e.emote.destroy()
         entries.delete(agentId)
+        sheets.delete(agentId)
       }
     }
   }

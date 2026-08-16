@@ -4,7 +4,7 @@ import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { depthKey, tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
-import { TextureBook, textureUrlFor } from './textures.js'
+import { TextureBook, buildingArt, smoothSource, textureUrlFor, type BuildingArt } from './textures.js'
 
 export const CONSTRUCTION_TINT = 0xcfc6bc
 export const WITHERED_TINT = 0x857d75
@@ -23,6 +23,20 @@ function setTexture(book: TextureBook, entry: Entry, url: string): void {
   entry.url = url
   void book.get(url).then((t) => {
     if (entry.url === url) entry.sprite.texture = t
+  })
+}
+
+// v4 hi-res buildings anchor at the manifest feet point and downscale smoothly to the
+// footprint diamond; v2/placeholder art keeps the bottom-center anchor at natural size.
+function applyBuildingArt(book: TextureBook, entry: Entry, art: BuildingArt, swapFrom: string | null): void {
+  entry.url = art.url
+  const p = swapFrom !== null && swapFrom !== art.url ? book.swap(swapFrom, art.url) : book.get(art.url)
+  void p.then((t) => {
+    if (entry.url !== art.url) return
+    entry.sprite.texture = art.anchor !== null ? smoothSource(t) : t
+    if (art.anchor !== null) entry.sprite.anchor.set(art.anchor.x, art.anchor.y)
+    else entry.sprite.anchor.set(0.5, 1.0)
+    entry.sprite.scale.set(art.scale ?? 1)
   })
 }
 
@@ -104,7 +118,7 @@ export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore)
       entry = { sprite, url: '', pips: null }
       sync.entries.set(key, entry)
       scene.entities.addChild(sprite)
-      setTexture(book, entry, textureUrlFor(records, 'building', s.kind))
+      applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h), null)
     }
     const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
     entry.sprite.position.set(ground.sx, ground.sy)
@@ -113,9 +127,12 @@ export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore)
       entry.sprite.tint = CONSTRUCTION_TINT
       if (entry.pips === null) {
         entry.pips = new Graphics()
-        entry.pips.position.set(0, 6)
         entry.sprite.addChild(entry.pips)
       }
+      // children inherit the sprite scale — counter-scale so pips stay screen-sized under hi-res downscale
+      const k = entry.sprite.scale.x || 1
+      entry.pips.scale.set(1 / k)
+      entry.pips.position.set(0, 6 / k)
       drawPips(entry.pips, Math.min(PIP_COUNT, Math.floor((s.progressTicks / BUILD_TICKS_FULL) * PIP_COUNT)))
     } else {
       entry.sprite.tint = 0xffffff
@@ -180,13 +197,16 @@ export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore)
     sync.lastAssetsSeq = seq
     for (const [key, entry] of sync.entries) {
       const id = key.slice(key.indexOf(':') + 1)
-      const kind =
-        key.startsWith('structure:') ? state.structures[id]?.kind
-        : key.startsWith('item:') ? state.items[id]?.kind
-        : state.crops[id]?.kind
+      if (key.startsWith('structure:')) {
+        const s = state.structures[id]
+        if (s === undefined) continue
+        const art = buildingArt(records, s.kind, s.w, s.h)
+        if (art.url !== entry.url) applyBuildingArt(book, entry, art, entry.url)
+        continue
+      }
+      const kind = key.startsWith('item:') ? state.items[id]?.kind : state.crops[id]?.kind
       if (kind === undefined) continue
-      const klass = key.startsWith('structure:') ? 'building' : key.startsWith('item:') ? 'item' : 'crop'
-      const url = textureUrlFor(records, klass, kind)
+      const url = textureUrlFor(records, key.startsWith('item:') ? 'item' : 'crop', kind)
       if (url !== entry.url) {
         const oldUrl = entry.url
         entry.url = url
