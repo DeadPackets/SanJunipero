@@ -2,6 +2,7 @@ import type { Footprint } from '@sj/shared'
 import { MASTER_PALETTE } from '../palette.js'
 import type { RawImage } from '../post/raw.js'
 import { CRITERIA, type Criterion } from './verdict.js'
+import { TILING_CRITERION_PROMPT } from '../terrainGen.js'
 
 export const RUBRIC_VERSION = 'v1'
 export const CANONICAL_PITCH = { character: 5.12, building: 4.0 } as const
@@ -75,11 +76,13 @@ function criterionAsk(k: Criterion, a: { klass: string; expectedFacing?: string 
       : 'proportion — the subject\'s parts are in believable relative size to one another and to the rest of the set.'
     case 'facing': return `facing — the subject faces ${a.expectedFacing ?? 'the commissioned direction'}. Judge only the obvious: a subject turned the wrong way round fails; a small angular drift does not.`
     case 'density': return 'density — the artwork reads cleanly at its intended small size: crisp silhouette, no mush, no crowding of fine detail, no smear.'
+    case 'tiling': return `tiling — ${TILING_CRITERION_PROMPT}`
     case 'alignment': return 'alignment — the subject sits ON the ground diamond of its footprint: its base row meets the near vertex of the diamond, nothing floats above it, nothing sinks below it, and the base does not overhang the diamond sideways.'
   }
 }
 
 const NA_REASON: Record<string, string> = {
+  tiling: 'this class is a single object, not a repeating surface',
   facing: 'this class has no commissioned direction',
   alignment: 'this class never meets the ground',
   proportion: 'this class has no canonical block target',

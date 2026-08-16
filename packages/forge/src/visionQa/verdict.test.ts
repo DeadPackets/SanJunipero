@@ -29,7 +29,7 @@ describe('vision verdict schema', () => {
   })
 
   it('declares seven criteria with the two binary hard fails', () => {
-    expect(CRITERIA).toEqual(['palette', 'singleFigure', 'transparency', 'proportion', 'facing', 'density', 'alignment'])
+    expect(CRITERIA).toEqual(['palette', 'singleFigure', 'transparency', 'proportion', 'facing', 'density', 'alignment', 'tiling'])
     expect(HARD_FAIL_CRITERIA).toEqual(['singleFigure', 'transparency'])
     for (const na of Object.values(NA_CRITERIA_BY_CLASS))
       for (const k of na) expect(CRITERIA).toContain(k)

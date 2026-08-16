@@ -5,7 +5,9 @@ export const VisionCriterionSchema = z.object({
 }).strict()
 export type VisionCriterion = z.infer<typeof VisionCriterionSchema>
 
-export const CRITERIA = ['palette', 'singleFigure', 'transparency', 'proportion', 'facing', 'density', 'alignment'] as const
+// `tiling` is terrain-only (2026-08-17 user ruling: generated repeating textures). Every
+// other class marks it N/A, so no existing rubric moved.
+export const CRITERIA = ['palette', 'singleFigure', 'transparency', 'proportion', 'facing', 'density', 'alignment', 'tiling'] as const
 export type Criterion = (typeof CRITERIA)[number]
 
 // Binary criteria: `pass:false` fails outright, whatever the score says.
@@ -27,12 +29,13 @@ export type VisionVerdict = z.infer<typeof VisionVerdictSchema>
 
 // Filled by code, never asked of the model, and skipped by the derivation (deviation D-5).
 export const NA_CRITERIA_BY_CLASS: Record<string, readonly Criterion[]> = {
-  icon: ['facing', 'alignment', 'proportion'],
-  item: ['facing', 'alignment'],
+  icon: ['facing', 'alignment', 'proportion', 'tiling'],
+  item: ['facing', 'alignment', 'tiling'],
+  // terrain is the one class that DOES tile, and the one class that is not a subject
   terrain: ['facing', 'alignment', 'proportion', 'singleFigure'],
-  building: [],
-  portrait: ['alignment'],
-  character: [],
+  building: ['tiling'],
+  portrait: ['alignment', 'tiling'],
+  character: ['tiling'],
 }
 
 export const NA_CRITERION = (klass: string): VisionCriterion =>
