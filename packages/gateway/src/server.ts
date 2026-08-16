@@ -8,12 +8,14 @@ import { WorldMirror } from './worldMirror.js'
 import { SocketHub } from './hub.js'
 import { thoughtsSince } from './observer.js'
 import { mountAssetRoutes } from './assetsHttp.js'
+import { mountDataApi } from './api.js'
 
 export type GatewayOpts = {
   dbPath: string; port?: number                 // default 8787
   config?: SimConfig; terrain: TileId[][]
   pollMs?: number                               // default 250
   db?: Database.Database                        // in-process override (dev world); else opened readonly
+  agentDbDir?: string                           // per-agent memory DBs (`<id>.db`); absent → [] tab responses
 }
 export type Gateway = { port: number; close(): Promise<void>; pump(): void }  // pump exposed for tests
 
@@ -49,6 +51,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     return codex
   }
   mountAssetRoutes(router, { getCodex })
+  mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
 
   const httpServer = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
