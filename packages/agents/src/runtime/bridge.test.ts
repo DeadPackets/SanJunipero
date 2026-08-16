@@ -35,6 +35,63 @@ function buildBridge(): { bridge: EngineBridge; step: () => void } {
   return { bridge, step: () => loop.step() }
 }
 
+// A second town where things are owned, so the bridge's ownership mapping is
+// observable: Tamar holds her own bread, Bex's plank sits on the ground beside
+// her, and Cass lifts it while she watches.
+function ownedWorld(): { bridge: EngineBridge; step: () => void } {
+  const config = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+  const terrain: TileId[][] = Array.from({ length: 12 }, () => Array.from({ length: 12 }, (): TileId => 0))
+  const store = new EventStore(openDb(':memory:'))
+  const rng = new RngStreams('bridge-ownership')
+  let state = genesisState(config, terrain)
+  const put = (type: string, payload: unknown) => { state = fold(state, store.append(state.tick, type, payload), config) }
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 3, y: 3, ageDays: 7300 })
+  put('agent_spawned', { id: 'bex', name: 'Bex', x: 4, y: 3, ageDays: 7300 })
+  put('agent_spawned', { id: 'cass', name: 'Cass', x: 5, y: 3, ageDays: 7300 })
+  put('item_spawned', { id: 'item_1', kind: 'bread', qty: 1, loc: { t: 'agent', id: AGENT }, owner: AGENT })
+  put('item_spawned', {
+    id: 'item_2', kind: 'plank', qty: 1, loc: { t: 'tile', x: 5, y: 4 }, owner: 'bex', crafterMark: 'bex',
+  })
+
+  const worldTick = createWorldTick(config, rng)
+  let handler: TickHandler = () => {}
+  const loop = new TickLoop({ store, state, rng, config, onTick: (ctx) => handler(ctx) })
+  const bridge = new EngineBridge({ loop, store, simConfig: config })
+  handler = bridge.wrapTickHandler(({ emit }) => {
+    for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
+    if (loop.tick === 1) {
+      emit('item_moved', { id: 'item_2', loc: { t: 'agent', id: 'cass' } })
+      emit('item_taken', { itemId: 'item_2', kind: 'plank', takerId: 'cass', ownerId: 'bex', x: 5, y: 4 })
+    }
+  })
+  return { bridge, step: () => loop.step() }
+}
+
+describe('EngineBridge carries ownership through to the mind', () => {
+  it('names another\'s claim on a thing, and says nothing about your own', () => {
+    const { bridge } = ownedWorld()
+    const packet = bridge.perception(AGENT)
+    const mine = packet.self.inventory.find((i) => i.id === 'item_1')!
+    expect(mine.ownerName).toBeUndefined() // it is yours; you are not told whose it is
+    const theirs = packet.visible.items.find((i) => i.id === 'item_2')!
+    expect(theirs.ownerName).toBe('Bex')
+    expect(theirs.crafterMarkName).toBe('Bex')
+  })
+
+  it('passes the witnessed taking straight through', () => {
+    const { bridge, step } = ownedWorld()
+    step()
+    expect(bridge.perception(AGENT).seen).toEqual([
+      { kind: 'item_taken', takerName: 'Cass', ownerName: 'Bex', itemKind: 'plank' },
+    ])
+  })
+
+  it('a quiet tick leaves the witness channel empty', () => {
+    const { bridge } = ownedWorld()
+    expect(bridge.perception(AGENT).seen).toEqual([])
+  })
+})
+
 const settled: unique symbol = Symbol('pending')
 function settledYet<T>(p: Promise<T>): Promise<T | typeof settled> {
   return Promise.race([p, Promise.resolve().then((): typeof settled => settled)])

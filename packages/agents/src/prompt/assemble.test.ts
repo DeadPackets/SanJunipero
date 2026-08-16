@@ -138,6 +138,51 @@ describe('perceptionToProse', () => {
     for (const m of MYSTERIES) expect(m.prose).not.toMatch(FORBIDDEN_FRAMING)
   })
 
+  it('says whose a thing is, and whose hands made it', () => {
+    const prose = perceptionToProse({
+      ...quietMeadowPacket,
+      self: {
+        ...quietMeadowPacket.self,
+        inventory: [{ id: 'item_9', kind: 'plank', qty: 1, loc: { t: 'agent', id: 'tamar' }, ownerName: 'Bex' }],
+      },
+      visible: {
+        ...quietMeadowPacket.visible,
+        items: [{
+          id: 'item_3', kind: 'basket', qty: 1, loc: { t: 'tile', x: 12, y: 10 },
+          ownerName: 'Rahel', crafterMarkName: 'Yusuf',
+        }],
+      },
+    })
+    expect(prose).toContain("basket (item_3) at (12, 10) — Rahel's, marked by Yusuf")
+    expect(prose).toContain("carrying 1 plank (item_9) — Bex's")
+  })
+
+  it('leaves an unclaimed thing exactly as it always read', () => {
+    const prose = perceptionToProse({
+      ...quietMeadowPacket,
+      visible: {
+        ...quietMeadowPacket.visible,
+        items: [{ id: 'item_3', kind: 'basket', qty: 1, loc: { t: 'tile', x: 12, y: 10 } }],
+      },
+    })
+    expect(prose).toContain('You can see 1 basket (item_3) at (12, 10).')
+    expect(prose).not.toContain('—')
+  })
+
+  it('tells you what you watched happen: a taking, and an unexplained thing', () => {
+    const mystery = MYSTERIES.find((m) => m.scope === 'located')!
+    const prose = perceptionToProse({
+      ...quietMeadowPacket,
+      seen: [
+        { kind: 'item_taken', takerName: 'Cass', ownerName: 'Bex', itemKind: 'plank' },
+        { kind: 'mystery', mystery: mystery.kind, prose: mystery.prose },
+      ],
+    })
+    expect(prose).toContain("You watch Cass take Bex's plank.")
+    expect(prose).toContain(mystery.prose)
+    expect(prose).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
   it('renders an unknown felt tag to the generic sentence and alerts', () => {
     const alert = vi.fn()
     const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: ['quantum_flux'] }, alert)

@@ -27,10 +27,24 @@ type QueuedSubmit = {
 // prose.ts. The engine ships `self` without asleep/collapsed booleans and
 // visible.items with flat x/y; prose.ts expects self.asleep/self.collapsed and
 // tile-located items. Perception remains a pure projection either way.
+// The engine names an owner for everything it can; a mind needs telling only
+// when the thing is not its own. Names, not ids — the packet carries no ids to
+// compare, and two people in one town do not share a name.
+function claims(
+  i: { ownerName?: string; crafterMarkName?: string },
+  selfName: string,
+): { ownerName?: string; crafterMarkName?: string } {
+  return {
+    ...(i.ownerName === undefined || i.ownerName === selfName ? {} : { ownerName: i.ownerName }),
+    ...(i.crafterMarkName === undefined || i.crafterMarkName === selfName ? {} : { crafterMarkName: i.crafterMarkName }),
+  }
+}
+
 function reconcile(
   raw: EnginePerceptionPacket,
-  self: { asleep: boolean; collapsedSinceTick: number | null } | undefined,
+  self: { name: string; asleep: boolean; collapsedSinceTick: number | null } | undefined,
 ): PerceptionPacket {
+  const selfName = self?.name ?? ''
   return {
     time: raw.time,
     self: {
@@ -40,7 +54,14 @@ function reconcile(
       asleep: self?.asleep ?? false,
       collapsed: (self?.collapsedSinceTick ?? null) !== null,
       activity: raw.self.activity,
-      inventory: raw.self.inventory,
+      inventory: raw.self.inventory.map((i) => ({
+        id: i.id,
+        kind: i.kind,
+        qty: i.qty,
+        ...(i.text === undefined ? {} : { text: i.text }),
+        loc: i.loc,
+        ...claims(i, selfName),
+      })),
     },
     weather: raw.weather,
     visible: {
@@ -51,10 +72,12 @@ function reconcile(
         kind: i.kind,
         qty: i.qty,
         loc: { t: 'tile' as const, x: i.x, y: i.y },
+        ...claims(i, selfName),
       })),
       crops: raw.visible.crops,
     },
     heard: raw.heard,
+    seen: raw.seen,
     feltEvents: raw.feltEvents,
   }
 }
