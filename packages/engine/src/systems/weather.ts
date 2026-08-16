@@ -28,6 +28,6 @@ export function weatherSystem(ctx: TickCtx): void {
   const kind = rollWeatherKind(ctx.config, ctx.rng.get('weather'), time.season, current.kind)
   const temperatureC = weatherTemperature(ctx.config, kind, time.season, time.isNight)
   if (kind !== current.kind || temperatureC !== current.temperatureC) {
-    ctx.emit('weather_changed', { kind, temperatureC })
+    ctx.emit('weather_changed', { kind, temperatureC, prevKind: current.kind })
   }
 }

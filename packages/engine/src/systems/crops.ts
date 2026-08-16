@@ -16,7 +16,7 @@ export function cropsSystem(ctx: TickCtx): void {
       continue
     }
     const daysGrown = day - crop.plantedDay
-    const stage = Math.min(def.stages - 1, Math.floor((daysGrown * def.stages) / def.growthDays))
+    const stage = Math.min(def.stages - 1, Math.floor((daysGrown * (def.stages - 1)) / def.growthDays))
     if (stage !== crop.stage) ctx.emit('crop_grew', { cropId: id, stage })
   }
 }

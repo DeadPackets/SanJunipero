@@ -170,12 +170,60 @@ describe('verb: teach', () => {
   })
 
   it('rejects self, non-adjacent, and busy targets', () => {
-    const s = makeWorld()
+    const s = patchAgent(makeWorld(), 'a1', { skills: { farming: 100 } })
     expect(submitIntent(s, CFG, 'a1', 'teach', { targetId: 'a1', track: 'farming' })).toEqual({ ok: false, reason: 'cannot teach yourself' })
-    const far = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 5, y: 5 }])
+    const far = patchAgent(makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 5, y: 5 }]), 'a1', { skills: { farming: 100 } })
     expect(submitIntent(far, CFG, 'a1', 'teach', { targetId: 'a2', track: 'farming' })).toEqual({ ok: false, reason: 'not adjacent to teach' })
     const busy = applyAll(s, [{ type: 'action_started', payload: { agentId: 'a2', verb: 'walk', params: { x: 2, y: 0 }, duration: 3 } }])
     expect(submitIntent(busy, CFG, 'a1', 'teach', { targetId: 'a2', track: 'farming' })).toEqual({ ok: false, reason: 'they are busy' })
+  })
+
+  it('rejects tracks that are not configured skills', () => {
+    const s = patchAgent(makeWorld(), 'a1', { skills: { farming: 100 } })
+    expect(submitIntent(s, CFG, 'a1', 'teach', { targetId: 'a2', track: 'alchemy' })).toEqual({ ok: false, reason: 'no such skill: alchemy' })
+    expect(s.agents.a2!.skills.alchemy).toBeUndefined()
+  })
+
+  it('rejects a teacher with zero xp in the track', () => {
+    const s = makeWorld()
+    expect(submitIntent(s, CFG, 'a1', 'teach', { targetId: 'a2', track: 'farming' })).toEqual({ ok: false, reason: 'nothing to teach' })
+  })
+})
+
+describe('verb onComplete re-checks (stale target)', () => {
+  it('attack completes as a no-op when the target died before completion', () => {
+    let s = makeWorld()
+    s = fold(s, ev('agent_died', { agentId: 'a2', cause: 'starvation' }), CFG)
+    expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c1').get('combat'))).toEqual([])
+  })
+
+  it('attack completes as a no-op when the target moved out of reach', () => {
+    let s = makeWorld()
+    s = patchAgent(s, 'a2', { x: 5, y: 5 })
+    expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c1').get('combat'))).toEqual([])
+  })
+
+  it('give completes as a no-op when the target died: the item stays with the giver', () => {
+    let s = makeWorld()
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'fish', qty: 1, loc: { t: 'agent', id: 'a1' } }), CFG)
+    s = fold(s, ev('agent_died', { agentId: 'a2', cause: 'starvation' }), CFG)
+    expect(VERBS.give.onComplete(s, CFG, 'a1', { itemId: 'item_1', targetId: 'a2' }, new RngStreams('t').get('actions'))).toEqual([])
+    expect(s.items.item_1!.loc).toEqual({ t: 'agent', id: 'a1' })
+  })
+
+  it('tend completes as a no-op when the target is dead or out of reach', () => {
+    let dead = makeWorld()
+    dead = fold(dead, ev('agent_died', { agentId: 'a2', cause: 'starvation' }), CFG)
+    expect(VERBS.tend.onComplete(dead, CFG, 'a1', { targetId: 'a2' }, new RngStreams('t').get('actions'))).toEqual([])
+    const far = patchAgent(makeWorld(), 'a2', { x: 5, y: 5 })
+    expect(VERBS.tend.onComplete(far, CFG, 'a1', { targetId: 'a2' }, new RngStreams('t').get('actions'))).toEqual([])
+  })
+
+  it('teach completes as a no-op when the target is missing or dead', () => {
+    let s = patchAgent(makeWorld(), 'a1', { skills: { farming: 300 } })
+    s = fold(s, ev('agent_died', { agentId: 'a2', cause: 'starvation' }), CFG)
+    expect(VERBS.teach.onComplete(s, CFG, 'a1', { targetId: 'a2', track: 'farming' }, new RngStreams('t').get('actions'))).toEqual([])
+    expect(VERBS.teach.onComplete(s, CFG, 'a1', { targetId: 'ghost', track: 'farming' }, new RngStreams('t').get('actions'))).toEqual([])
   })
 })
 

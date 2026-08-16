@@ -1,5 +1,6 @@
 import { simTimeFromTick, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
 import type { Item, WorldState } from './state.js'
+import { isAdjacentToRect } from './verbs.js'
 
 // Perception is a pure projection: what one agent can sense from the shared
 // world state plus the events that just happened. It never mutates state and
@@ -61,18 +62,15 @@ const isTileItem = (i: Item): i is Item & { loc: { t: 'tile'; x: number; y: numb
 
 const isStructureItem = (i: Item): i is Item & { loc: { t: 'structure'; id: string } } => i.loc.t === 'structure'
 
-// Adjacent = Chebyshev distance <= 1 to any footprint tile: you can look inside
-// a structure when standing beside it (or on it).
-const isAdjacent = (ax: number, ay: number, s: { x: number; y: number; w: number; h: number }): boolean =>
-  ax >= s.x - 1 && ax <= s.x + s.w && ay >= s.y - 1 && ay <= s.y + s.h
-
 // A felt event is something that happens *to* this agent (or ambient weather).
 // Anything about other agents — including out-of-range speech or injuries —
 // produces no tag and appears nowhere in the packet.
 function feltTagFor(agentId: string, ev: SimEvent): string | null {
   if (ev.type === 'weather_changed') {
-    const kind = (ev.payload as { kind?: unknown } | null)?.kind
-    return typeof kind === 'string' && PRECIPITATION[kind] === true ? `${kind}_started` : null
+    const p = ev.payload as { kind?: unknown; prevKind?: unknown } | null
+    const kind = p?.kind
+    if (typeof kind !== 'string' || PRECIPITATION[kind] !== true) return null
+    return p?.prevKind === kind ? null : `${kind}_started` // same-kind temp steps pass silently
   }
   if ((ev.payload as { agentId?: unknown } | null)?.agentId !== agentId) return null
   switch (ev.type) {
@@ -110,8 +108,16 @@ export function composePerception(
       asleep: a.asleep,
     }))
 
+  // Nearest footprint tile, not the anchor: a long structure whose far corner is
+  // anchored out of range is still seen when its near edge is within sight.
+  const structureInSight = (s: { x: number; y: number; w: number; h: number }): boolean => {
+    const nx = Math.min(Math.max(self.x, s.x), s.x + s.w - 1)
+    const ny = Math.min(Math.max(self.y, s.y), s.y + s.h - 1)
+    return withinSight(nx, ny)
+  }
+
   const visibleStructures: PerceivedStructure[] = Object.values(state.structures)
-    .filter(s => withinSight(s.x, s.y))
+    .filter(s => structureInSight(s))
     .sort(byId)
     .map(s => ({ id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, burning: s.burning, stage: s.stage }))
 
@@ -125,7 +131,7 @@ export function composePerception(
     .filter(isStructureItem)
     .filter(i => {
       const s = state.structures[i.loc.id]
-      return s !== undefined && isAdjacent(self.x, self.y, s)
+      return s !== undefined && isAdjacentToRect(self.x, self.y, s)
     })
     .sort(byId)
     .map(i => {

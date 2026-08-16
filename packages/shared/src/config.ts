@@ -96,7 +96,7 @@ const WildlifeSchema = z.object({
 const FireSchema = z.object({
   spreadChancePerTickAdjacent: z.number().default(0.02),
   burnTicksToDestroy: z.number().default(120),
-  rainSpreadMultiplier: z.number().default(0.2),
+  stormSpreadMultiplier: z.number().default(0.2),
 }).strict()
 
 const ConstructionSchema = z.object({

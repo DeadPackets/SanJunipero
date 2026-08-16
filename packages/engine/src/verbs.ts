@@ -22,6 +22,35 @@ export type VerbDef = {
   rngStream?: string
 }
 
+// Fills the defaults nearly every verb repeats: one-tick duration, interruptible.
+function makeVerb(spec: Omit<VerbDef, 'duration' | 'interruptible'> & Partial<Pick<VerbDef, 'duration' | 'interruptible'>>): VerbDef {
+  return { duration: () => 1, interruptible: true, ...spec }
+}
+
+// Adjacent = Chebyshev distance <= 1 to any footprint tile (standing on it counts).
+export function isAdjacentToRect(ax: number, ay: number, rect: { x: number; y: number; w: number; h: number }): boolean {
+  return ax >= rect.x - 1 && ax <= rect.x + rect.w && ay >= rect.y - 1 && ay <= rect.y + rect.h
+}
+
+export function isFoodKind(config: SimConfig, kind: string): boolean {
+  return FOOD_KINDS.has(kind) || config.crops[kind] !== undefined
+}
+
+// Shared validate block for verbs aimed at another agent. Reason strings are
+// per-verb; `busy` (teach) is checked between the alive and adjacency checks.
+function adjacentLivingTarget(
+  state: WorldState, agentId: string, targetId: string,
+  reasons: { self: string; gone: string; busy?: string; far: string },
+): string | null {
+  if (targetId === agentId) return reasons.self
+  const target = state.agents[targetId]
+  if (!target || !target.alive) return reasons.gone
+  if (reasons.busy !== undefined && target.activity) return reasons.busy
+  const a = state.agents[agentId]!
+  if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return reasons.far
+  return null
+}
+
 export const WalkParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
 
 export function ticksPerTile(state: WorldState, config: SimConfig, agentId: string): number {
@@ -30,7 +59,7 @@ export function ticksPerTile(state: WorldState, config: SimConfig, agentId: stri
   return debuffed ? config.movement.debuffTicksPerTile : config.movement.baseTicksPerTile
 }
 
-const walk: VerbDef = {
+const walk: VerbDef = makeVerb({
   kind: 'walk',
   validate(state, _config, agentId, params) {
     const p = WalkParams.safeParse(params)
@@ -48,8 +77,7 @@ const walk: VerbDef = {
     return path.length * ticksPerTile(state, config, agentId)
   },
   onComplete() { return [] },
-  interruptible: true,
-}
+})
 
 export const EatParams = z.object({ itemId: z.string() }).strict()
 
@@ -58,38 +86,33 @@ export const FORAGE_KIND = 'berries'
 export const FISH_KIND = 'fish'
 export const FOOD_KINDS: ReadonlySet<string> = new Set([FORAGE_KIND, FISH_KIND, 'venison', 'bread', 'wheat'])
 
-const sleep: VerbDef = {
+const sleep: VerbDef = makeVerb({
   kind: 'sleep',
   validate(state, _config, agentId) {
     return state.agents[agentId]!.asleep ? 'already asleep' : null
   },
-  duration() { return 1 },
   onComplete(_state, _config, agentId) { return [{ type: 'agent_slept', payload: { agentId } }] },
-  interruptible: true,
-}
+})
 
 // submitIntent already prepends agent_woke for any intent from a sleeper.
-const wake: VerbDef = {
+const wake: VerbDef = makeVerb({
   kind: 'wake',
   validate(state, _config, agentId) {
     return state.agents[agentId]!.asleep ? null : 'not asleep'
   },
-  duration() { return 1 },
   onComplete() { return [] },
-  interruptible: true,
-}
+})
 
-const eat: VerbDef = {
+const eat: VerbDef = makeVerb({
   kind: 'eat',
   validate(state, config, agentId, params) {
     const p = EatParams.safeParse(params)
     if (!p.success) return 'eat needs an {itemId}'
     const item = state.items[p.data.itemId]
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
-    if (!FOOD_KINDS.has(item.kind) && !config.crops[item.kind]) return `${item.kind} is not food`
+    if (!isFoodKind(config, item.kind)) return `${item.kind} is not food`
     return null
   },
-  duration() { return 1 },
   onComplete(state, config, agentId, params) {
     const p = EatParams.parse(params)
     const item = state.items[p.itemId]
@@ -99,32 +122,33 @@ const eat: VerbDef = {
       { type: 'need_changed', payload: { id: agentId, need: 'hunger', delta: config.needs.eatRestoreHunger } },
     ]
   },
-  interruptible: true,
-}
+})
 
 export const TendParams = z.object({ targetId: z.string() }).strict()
 
-const tend: VerbDef = {
+const tend: VerbDef = makeVerb({
   kind: 'tend',
   validate(state, config, agentId, params) {
     const p = TendParams.safeParse(params)
     if (!p.success) return 'tend needs a {targetId}'
-    if (p.data.targetId === agentId) return 'cannot tend yourself'
-    const target = state.agents[p.data.targetId]
-    if (!target || !target.alive) return 'no one there to tend'
-    const a = state.agents[agentId]!
-    if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return 'not adjacent to the patient'
+    const bad = adjacentLivingTarget(state, agentId, p.data.targetId, {
+      self: 'cannot tend yourself', gone: 'no one there to tend', far: 'not adjacent to the patient',
+    })
+    if (bad) return bad
+    const target = state.agents[p.data.targetId]!
     if (!target.ill && target.hp >= config.health.maxHp) return 'nothing to tend'
     return null
   },
-  duration() { return 1 },
-  onComplete(_state, _config, _agentId, params) {
+  onComplete(state, _config, agentId, params) {
     const p = TendParams.parse(params)
+    const target = state.agents[p.targetId]
+    const a = state.agents[agentId]!
+    if (!target || !target.alive) return []
+    if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return []
     return [{ type: 'agent_tended', payload: { agentId: p.targetId } }]
   },
-  interruptible: true,
   skill: { track: 'medicine', xp: 1 },
-}
+})
 
 export const TileParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
 export const PlantParams = z.object({ x: z.number().int(), y: z.number().int(), kind: z.string() }).strict()
@@ -144,7 +168,7 @@ function skillLevel(state: WorldState, agentId: string, track: string, config: S
   return Math.min(config.skills.maxLevel, Math.floor(xp / config.skills.xpLevelDivisor))
 }
 
-const till: VerbDef = {
+const till: VerbDef = makeVerb({
   kind: 'till',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
@@ -154,16 +178,14 @@ const till: VerbDef = {
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to till'
     return null
   },
-  duration() { return 1 },
   onComplete(_state, _config, _agentId, params) {
     const p = TileParams.parse(params)
     return [{ type: 'terrain_changed', payload: { x: p.x, y: p.y, tile: 6 } }]
   },
-  interruptible: true,
   skill: { track: 'farming', xp: 1 },
-}
+})
 
-const plant: VerbDef = {
+const plant: VerbDef = makeVerb({
   kind: 'plant',
   validate(state, config, agentId, params) {
     const p = PlantParams.safeParse(params)
@@ -176,17 +198,15 @@ const plant: VerbDef = {
     }
     return null
   },
-  duration() { return 1 },
   onComplete(state, _config, _agentId, params) {
     const p = PlantParams.parse(params)
     const plantedDay = Math.floor(state.tick / MINUTES_PER_DAY)
     return [{ type: 'crop_planted', payload: { id: mintId(state, 'crop'), kind: p.kind, x: p.x, y: p.y, plantedDay } }]
   },
-  interruptible: true,
   skill: { track: 'farming', xp: 1 },
-}
+})
 
-const harvest: VerbDef = {
+const harvest: VerbDef = makeVerb({
   kind: 'harvest',
   validate(state, config, agentId, params) {
     const p = HarvestParams.safeParse(params)
@@ -199,7 +219,6 @@ const harvest: VerbDef = {
     if (!withinReach(state, agentId, crop.x, crop.y)) return 'not close enough to harvest'
     return null
   },
-  duration() { return 1 },
   onComplete(state, config, agentId, params) {
     const p = HarvestParams.parse(params)
     const crop = state.crops[p.cropId]!
@@ -209,11 +228,10 @@ const harvest: VerbDef = {
       { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: crop.kind, qty: def.yield, loc: { t: 'agent', id: agentId } } },
     ]
   },
-  interruptible: true,
   skill: { track: 'farming', xp: 1 },
-}
+})
 
-const fish: VerbDef = {
+const fish: VerbDef = makeVerb({
   kind: 'fish',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
@@ -222,7 +240,6 @@ const fish: VerbDef = {
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to the water'
     return null
   },
-  duration() { return 1 },
   onComplete(state, config, agentId, _params, rng) {
     if (state.wildlife.fish <= 0) return []
     const chance = config.wildlife.fishCatchBase * (1 + skillLevel(state, agentId, 'fishing', config) / 10)
@@ -232,12 +249,11 @@ const fish: VerbDef = {
       { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FISH_KIND, qty: 1, loc: { t: 'agent', id: agentId } } },
     ]
   },
-  interruptible: true,
   skill: { track: 'fishing', xp: 1 },
   rngStream: 'wildlife',
-}
+})
 
-const forage: VerbDef = {
+const forage: VerbDef = makeVerb({
   kind: 'forage',
   validate(state, _config, agentId) {
     const a = state.agents[agentId]!
@@ -248,7 +264,6 @@ const forage: VerbDef = {
     }
     return 'no forest nearby'
   },
-  duration() { return 1 },
   onComplete(state, config, agentId) {
     const { season } = simTimeFromTick(state.tick)
     const qty = config.wildlife.forageYieldBySeason[season]
@@ -257,9 +272,8 @@ const forage: VerbDef = {
       { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FORAGE_KIND, qty, loc: { t: 'agent', id: agentId } } },
     ]
   },
-  interruptible: true,
   skill: { track: 'foraging', xp: 1 },
-}
+})
 
 export const BuildParams = z.object({ kind: z.string(), x: z.number().int(), y: z.number().int() }).strict()
 export const CraftParams = z.object({ recipe: z.string() }).strict()
@@ -289,7 +303,7 @@ function consumeHeld(state: WorldState, agentId: string, kind: string, qty: numb
 
 function nearRect(state: WorldState, agentId: string, x: number, y: number, w: number, h: number): boolean {
   const a = state.agents[agentId]!
-  return a.x >= x - 1 && a.x <= x + w && a.y >= y - 1 && a.y <= y + h
+  return isAdjacentToRect(a.x, a.y, { x, y, w, h })
 }
 
 // The in-progress construction site at exactly (x, y), if any.
@@ -301,7 +315,7 @@ function siteAt(state: WorldState, x: number, y: number) {
   return null
 }
 
-const build: VerbDef = {
+const build: VerbDef = makeVerb({
   kind: 'build',
   validate(state, config, agentId, params) {
     const p = BuildParams.safeParse(params)
@@ -353,11 +367,10 @@ const build: VerbDef = {
     const site = siteAt(state, p.x, p.y)
     return site ? [{ type: 'structure_completed', payload: { id: site.id } }] : []
   },
-  interruptible: true,
   skill: { track: 'carpentry', xp: 1 },
-}
+})
 
-const craft: VerbDef = {
+const craft: VerbDef = makeVerb({
   kind: 'craft',
   validate(state, config, agentId, params) {
     const p = CraftParams.safeParse(params)
@@ -369,7 +382,6 @@ const craft: VerbDef = {
     }
     return null
   },
-  duration() { return 1 },
   onComplete(state, config, agentId, params) {
     const p = CraftParams.parse(params)
     const recipe = config.crafting.recipes[p.recipe]!
@@ -387,10 +399,9 @@ const craft: VerbDef = {
       { type: 'skill_gained', payload: { agentId, track: recipe.skill, xp: 1 } },
     ]
   },
-  interruptible: true,
-}
+})
 
-const extinguish: VerbDef = {
+const extinguish: VerbDef = makeVerb({
   kind: 'extinguish',
   validate(state, _config, agentId, params) {
     const p = ExtinguishParams.safeParse(params)
@@ -401,14 +412,12 @@ const extinguish: VerbDef = {
     if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to the fire'
     return null
   },
-  duration() { return 1 },
   onComplete(state, _config, _agentId, params) {
     const p = ExtinguishParams.parse(params)
     if (!state.structures[p.structureId]?.burning) return []
     return [{ type: 'fire_extinguished', payload: { structureId: p.structureId, cause: 'doused' } }]
   },
-  interruptible: true,
-}
+})
 
 export const SpeakParams = z.object({ text: z.string().min(1) }).strict()
 export const GiveParams = z.object({ itemId: z.string(), targetId: z.string() }).strict()
@@ -419,47 +428,44 @@ export const TeachParams = z.object({ targetId: z.string(), track: z.string() })
 export const AttackParams = z.object({ targetId: z.string() }).strict()
 export const ExperimentParams = z.object({ description: z.string() }).strict()
 
-const speak: VerbDef = {
+const speak: VerbDef = makeVerb({
   kind: 'speak',
   validate(_state, _config, _agentId, params) {
     const p = SpeakParams.safeParse(params)
     if (!p.success) return 'speak needs a {text}'
     return null
   },
-  duration() { return 1 },
   onComplete(state, _config, agentId, params) {
     const p = SpeakParams.parse(params)
     const a = state.agents[agentId]!
     return [{ type: 'agent_spoke', payload: { agentId, text: p.text, x: a.x, y: a.y } }]
   },
-  interruptible: true,
-}
+})
 
-const give: VerbDef = {
+const give: VerbDef = makeVerb({
   kind: 'give',
   validate(state, _config, agentId, params) {
     const p = GiveParams.safeParse(params)
     if (!p.success) return 'give needs {itemId, targetId}'
-    if (p.data.targetId === agentId) return 'cannot give to yourself'
-    const target = state.agents[p.data.targetId]
-    if (!target || !target.alive) return 'no one there to receive'
-    const a = state.agents[agentId]!
-    if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return 'not adjacent to give'
+    const bad = adjacentLivingTarget(state, agentId, p.data.targetId, {
+      self: 'cannot give to yourself', gone: 'no one there to receive', far: 'not adjacent to give',
+    })
+    if (bad) return bad
     const item = state.items[p.data.itemId]
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     return null
   },
-  duration() { return 1 },
   onComplete(state, _config, agentId, params) {
     const p = GiveParams.parse(params)
     const item = state.items[p.itemId]
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    const target = state.agents[p.targetId]
+    if (!target || !target.alive) return []
     return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: p.targetId } } }]
   },
-  interruptible: true,
-}
+})
 
-const take: VerbDef = {
+const take: VerbDef = makeVerb({
   kind: 'take',
   validate(state, _config, agentId, params) {
     const p = TakeParams.safeParse(params)
@@ -475,17 +481,15 @@ const take: VerbDef = {
     }
     return null
   },
-  duration() { return 1 },
   onComplete(state, _config, agentId, params) {
     const p = TakeParams.parse(params)
     const item = state.items[p.itemId]
     if (!item || item.loc.t === 'agent') return []
     return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: agentId } } }]
   },
-  interruptible: true,
-}
+})
 
-const write: VerbDef = {
+const write: VerbDef = makeVerb({
   kind: 'write',
   validate(state, _config, agentId, params) {
     const p = WriteParams.safeParse(params)
@@ -498,7 +502,6 @@ const write: VerbDef = {
     }
     return null
   },
-  duration() { return 1 },
   onComplete(state, _config, agentId, params) {
     const p = WriteParams.parse(params)
     if (p.itemId !== undefined) {
@@ -508,10 +511,9 @@ const write: VerbDef = {
     }
     return [{ type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: 'note', qty: 1, loc: { t: 'agent', id: agentId }, text: p.text } }]
   },
-  interruptible: true,
-}
+})
 
-const read: VerbDef = {
+const read: VerbDef = makeVerb({
   kind: 'read',
   validate(state, _config, agentId, params) {
     const p = ReadParams.safeParse(params)
@@ -522,56 +524,52 @@ const read: VerbDef = {
     if (item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     return null
   },
-  duration() { return 1 },
   onComplete() { return [] },
   results(state, _config, _agentId, params) {
     const p = ReadParams.parse(params)
     return { text: state.items[p.itemId]?.text ?? '' }
   },
-  interruptible: true,
-}
+})
 
-const teach: VerbDef = {
+const teach: VerbDef = makeVerb({
   kind: 'teach',
-  validate(state, _config, agentId, params) {
+  validate(state, config, agentId, params) {
     const p = TeachParams.safeParse(params)
     if (!p.success) return 'teach needs {targetId, track}'
-    if (p.data.targetId === agentId) return 'cannot teach yourself'
-    const target = state.agents[p.data.targetId]
-    if (!target || !target.alive) return 'no one there to teach'
-    if (target.activity) return 'they are busy'
-    const a = state.agents[agentId]!
-    if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return 'not adjacent to teach'
+    const bad = adjacentLivingTarget(state, agentId, p.data.targetId, {
+      self: 'cannot teach yourself', gone: 'no one there to teach', busy: 'they are busy', far: 'not adjacent to teach',
+    })
+    if (bad) return bad
+    if (!config.skills.tracks.includes(p.data.track)) return `no such skill: ${p.data.track}`
+    if ((state.agents[agentId]!.skills[p.data.track] ?? 0) === 0) return 'nothing to teach'
     return null
   },
-  duration() { return 1 },
   onComplete(state, _config, agentId, params) {
     const p = TeachParams.parse(params)
+    const target = state.agents[p.targetId]
+    if (!target || !target.alive) return []
     const teacherXp = state.agents[agentId]!.skills[p.track] ?? 0
     const grant = Math.min(teacherXp * 0.1, 50)
     return [{ type: 'skill_gained', payload: { agentId: p.targetId, track: p.track, xp: grant } }]
   },
-  interruptible: true,
   skill: { track: 'scholarship', xp: 1 },
-}
+})
 
-const attack: VerbDef = {
+const attack: VerbDef = makeVerb({
   kind: 'attack',
   validate(state, _config, agentId, params) {
     const p = AttackParams.safeParse(params)
     if (!p.success) return 'attack needs a {targetId}'
-    if (p.data.targetId === agentId) return 'cannot attack yourself'
-    const target = state.agents[p.data.targetId]
-    if (!target || !target.alive) return 'no one there to attack'
-    const a = state.agents[agentId]!
-    if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return 'not adjacent to attack'
-    return null
+    return adjacentLivingTarget(state, agentId, p.data.targetId, {
+      self: 'cannot attack yourself', gone: 'no one there to attack', far: 'not adjacent to attack',
+    })
   },
-  duration() { return 1 },
   onComplete(state, config, agentId, params, rng) {
     const p = AttackParams.parse(params)
     const a = state.agents[agentId]!
-    const t = state.agents[p.targetId]!
+    const t = state.agents[p.targetId]
+    if (!t || !t.alive) return []
+    if (Math.abs(a.x - t.x) > 1 || Math.abs(a.y - t.y) > 1) return []
     const maxPower = 2 * config.health.maxHp
     const scoreA = rng.next() * ((a.hp + a.needs.energy) / maxPower)
     const scoreB = rng.next() * ((t.hp + t.needs.energy) / maxPower)
@@ -580,17 +578,14 @@ const attack: VerbDef = {
     const kind = margin < 0.2 ? 'minor' : margin < 0.5 ? 'serious' : 'grave'
     return [{ type: 'agent_injured', payload: { agentId: loserId, kind } }]
   },
-  interruptible: true,
   rngStream: 'combat',
-}
+})
 
-const experiment: VerbDef = {
+const experiment: VerbDef = makeVerb({
   kind: 'experiment',
   validate() { return 'You lack the knowledge to attempt this.' },
-  duration() { return 1 },
   onComplete() { return [] },
-  interruptible: true,
-}
+})
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,

@@ -1,7 +1,7 @@
 import { type SimConfig } from '@sj/shared'
 import { composePerception, type PerceptionPacket } from './perception.js'
 import { submitIntent } from './intent.js'
-import { FOOD_KINDS } from './verbs.js'
+import { FOOD_KINDS, isAdjacentToRect, isFoodKind } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { RngStreams } from './rng.js'
@@ -52,22 +52,12 @@ export function makeFixtureMap(): TileId[][] {
 
 const cheb = (ax: number, ay: number, bx: number, by: number): number => Math.max(Math.abs(ax - bx), Math.abs(ay - by))
 
-const isFood = (p: PerceptionPacket, config: SimConfig, kind: string): boolean =>
-  FOOD_KINDS.has(kind) || Object.prototype.hasOwnProperty.call(config.crops, kind)
-
 const held = (p: PerceptionPacket, kind: string): number =>
   p.self.inventory.filter((i) => i.kind === kind).reduce((s, i) => s + i.qty, 0)
 
-const nearStorehouse = (p: PerceptionPacket): boolean => {
-  const s = STOREHOUSE
-  return p.self.x >= s.x - 1 && p.self.x <= s.x + s.w && p.self.y >= s.y - 1 && p.self.y <= s.y + s.h
-}
+const nearStorehouse = (p: PerceptionPacket): boolean => isAdjacentToRect(p.self.x, p.self.y, STOREHOUSE)
 
-const nearHutSite = (p: PerceptionPacket): boolean => {
-  const w = 2
-  const h = 2
-  return p.self.x >= HUT_SITE.x - 1 && p.self.x <= HUT_SITE.x + w && p.self.y >= HUT_SITE.y - 1 && p.self.y <= HUT_SITE.y + h
-}
+const nearHutSite = (p: PerceptionPacket): boolean => isAdjacentToRect(p.self.x, p.self.y, { ...HUT_SITE, w: 2, h: 2 })
 
 // Farmer: till + plant wheat on day 1, then eat wheat from the storehouse and sleep.
 export function makeFarmerPolicy(config: SimConfig): Policy {
@@ -84,7 +74,7 @@ export function makeFarmerPolicy(config: SimConfig): Policy {
     }
 
     if (needs.hunger < 60) {
-      const food = p.self.inventory.find((i) => isFood(p, config, i.kind))
+      const food = p.self.inventory.find((i) => isFoodKind(config, i.kind))
       if (food) return { verb: 'eat', params: { itemId: food.id } }
       if (nearStorehouse(p)) return { verb: 'take', params: { itemId: WHEAT_FARMER } }
       return { verb: 'walk', params: { x: STOREHOUSE_NEAR.x, y: STOREHOUSE_NEAR.y } }
@@ -101,7 +91,7 @@ export function makeFisherPolicy(config: SimConfig): Policy {
     const idler = p.visible.agents.find((a) => a.id === IDLER)
 
     if (needs.hunger < 60) {
-      const food = p.self.inventory.find((i) => isFood(p, config, i.kind))
+      const food = p.self.inventory.find((i) => isFoodKind(config, i.kind))
       if (food) return { verb: 'eat', params: { itemId: food.id } }
     }
     if (needs.energy < 20) return { verb: 'sleep', params: {} }
@@ -134,7 +124,7 @@ export function makeBuilderPolicy(config: SimConfig): Policy {
     const needs = p.self.body.needs
     const wood = held(p, 'wood')
     const wheat = held(p, 'wheat')
-    const food = p.self.inventory.find((i) => isFood(p, config, i.kind))
+    const food = p.self.inventory.find((i) => isFoodKind(config, i.kind))
     const hut = p.visible.structures.find((s) => s.kind === 'hut')
 
     if (hut && hut.stage === 'complete') return { verb: 'sleep', params: {} }
@@ -193,11 +183,12 @@ export type ScriptedOnTick = (ctx: { tick: number; emit: (type: string, payload:
 // and replays bit-identically from the store.
 export function makeScriptedOnTick(config: SimConfig, rng: RngStreams, getState: () => WorldState): ScriptedOnTick {
   const policies = makePolicies(config)
+  const worldTick = createWorldTick(config, rng)
   return ({ tick, emit }) => {
     scriptedTimeline(tick, emit)
 
     // World pipeline (weather, fire, crops, wildlife, needs, health, aging, actions, collapse/death).
-    const result = createWorldTick(config, rng)(getState())
+    const result = worldTick(getState())
     for (const e of result.events) emit(e.type, e.payload)
 
     // The build verb is one long, continuous activity: submitIntent rejects any

@@ -11,8 +11,9 @@ export class TickLoop {
   #tick: number; #realMs: number; #speed: number; #snapEvery: number
   #onTick: TickHandler; #timer: NodeJS.Timeout | null = null; #nextAt = 0
   #config: SimConfig
+  #onError?: (err: unknown) => void
 
-  constructor(opts: { store: EventStore; state: WorldState; rng: RngStreams; config?: SimConfig; startTick?: number; realMsPerTick?: number; speed?: number; snapshotEveryTicks?: number; onTick: TickHandler }) {
+  constructor(opts: { store: EventStore; state: WorldState; rng: RngStreams; config?: SimConfig; startTick?: number; realMsPerTick?: number; speed?: number; snapshotEveryTicks?: number; onTick: TickHandler; onError?: (err: unknown) => void }) {
     this.#store = opts.store; this.#state = opts.state; this.#rng = opts.rng
     this.#config = opts.config ?? DEFAULT_CONFIG
     this.#tick = opts.startTick ?? opts.state.tick
@@ -20,6 +21,7 @@ export class TickLoop {
     this.#speed = opts.speed ?? 1
     this.#snapEvery = opts.snapshotEveryTicks ?? 60
     this.#onTick = opts.onTick
+    this.#onError = opts.onError
   }
 
   get state(): WorldState { return this.#state }
@@ -57,7 +59,13 @@ export class TickLoop {
     if (this.#timer) return
     this.#nextAt = Date.now() + this.#realMs / this.#speed
     const run = () => {
-      this.step()
+      try {
+        this.step()
+      } catch (err) {
+        this.#timer = null
+        if (this.#onError) { this.#onError(err); return }
+        throw err
+      }
       this.#nextAt += this.#realMs / this.#speed
       this.#timer = setTimeout(run, Math.max(0, this.#nextAt - Date.now()))
     }

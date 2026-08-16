@@ -68,10 +68,40 @@ describe('composePerception: information asymmetry', () => {
   })
 })
 
+describe('composePerception: structure visibility by nearest tile', () => {
+  it('sees a structure whose anchor is out of range but whose near edge is in range', () => {
+    const sight = DEFAULT_CONFIG.movement.sightRadius // 12
+    let s = makeWorld([{ id: 'a', x: 15, y: 0 }])
+    // anchor (1,0) is 14 away; nearest footprint tile (4,0) is 11 away
+    s = fold(s, ev('structure_planned', {
+      id: 'structure_1', kind: 'storehouse', x: 1, y: 0, w: 4, h: 1, maxHp: 20, flammable: true, builderId: 'script',
+    }), DEFAULT_CONFIG)
+    // entirely out of range: nearest tile (4,30) is > sight away
+    s = fold(s, ev('structure_planned', {
+      id: 'structure_2', kind: 'shed', x: 1, y: 30, w: 4, h: 1, maxHp: 20, flammable: true, builderId: 'script',
+    }), DEFAULT_CONFIG)
+    const p = composePerception(s, DEFAULT_CONFIG, 'a', [])
+    expect(sight).toBe(12)
+    expect(p.visible.structures.map(st => st.id)).toEqual(['structure_1'])
+  })
+})
+
 describe('composePerception: felt events', () => {
   it('maps a rain weather change to rain_started for every agent', () => {
     const s = makeWorld([{ id: 'a', x: 0, y: 0 }])
     const events = [ev('weather_changed', { kind: 'rain', temperatureC: 10 })]
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', events).feltEvents).toEqual(['rain_started'])
+  })
+
+  it('does not re-tag rain_started when rain merely steps temperature (prevKind = kind)', () => {
+    const s = makeWorld([{ id: 'a', x: 0, y: 0 }])
+    const events = [ev('weather_changed', { kind: 'rain', temperatureC: 4, prevKind: 'rain' })]
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', events).feltEvents).toEqual([])
+  })
+
+  it('tags rain_started when the kind actually changes (prevKind differs)', () => {
+    const s = makeWorld([{ id: 'a', x: 0, y: 0 }])
+    const events = [ev('weather_changed', { kind: 'rain', temperatureC: 10, prevKind: 'sunny' })]
     expect(composePerception(s, DEFAULT_CONFIG, 'a', events).feltEvents).toEqual(['rain_started'])
   })
 

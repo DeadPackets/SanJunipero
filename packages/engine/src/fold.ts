@@ -293,10 +293,14 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
     }
     case 'crop_planted': {
       const p = CropPlanted.parse(event.payload)
+      // Replanting a tile clears any withered husk there, so they never pile up.
+      const crops = Object.fromEntries(
+        Object.entries(state.crops).filter(([, c]) => !(c.withered && c.x === p.x && c.y === p.y)),
+      )
       return {
         ...state,
         crops: {
-          ...state.crops,
+          ...crops,
           [p.id]: { id: p.id, kind: p.kind, x: p.x, y: p.y, plantedDay: p.plantedDay, stage: 0, withered: false },
         },
         counters: bumpCounter(state.counters, p.id),

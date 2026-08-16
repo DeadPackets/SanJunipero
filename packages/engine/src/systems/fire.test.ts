@@ -106,10 +106,10 @@ describe('fire: spread', () => {
   })
 
   // Seed 'f2' fire-stream draws: 0.4233, 0.4188. Exact outcomes at both multipliers — no statistics.
-  it('rain multiplier slows spread during storms: exact seeded outcomes', () => {
-    const spreadCfg = (rainSpreadMultiplier: number) => SimConfigSchema.parse({
+  it('storm multiplier slows spread during storms: exact seeded outcomes', () => {
+    const spreadCfg = (stormSpreadMultiplier: number) => SimConfigSchema.parse({
       weather: { hourlyChangeChance: 0 },
-      fire: { spreadChancePerTickAdjacent: 0.5, rainSpreadMultiplier },
+      fire: { spreadChancePerTickAdjacent: 0.5, stormSpreadMultiplier },
     })
     const run = (config: SimConfig) => {
       let s = ignite(withWeather(atTick(rowWorld(config), 1), 'storm'), 'structure_1', config)
@@ -155,6 +155,19 @@ describe('fire: burn damage and burnout', () => {
     expect(last.events).toContainEqual({ type: 'fire_extinguished', payload: { structureId: 'structure_1', cause: 'burnout' } })
     expect(last.events).toContainEqual({ type: 'structure_damaged', payload: { id: 'structure_1', amount: 12.5 } })
     expect(last.state.structures.structure_1).toBeUndefined()
+  })
+
+  it('burnout destruction drops contained items onto the structure origin tile', () => {
+    let s = ignite(loneHut(), 'structure_1', fast)
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 5, loc: { t: 'structure', id: 'structure_1' } }, s.tick), fast)
+    s = fold(s, ev('item_spawned', { id: 'item_2', kind: 'wheat', qty: 2, loc: { t: 'structure', id: 'structure_1' } }, s.tick), fast)
+    for (let i = 0; i < 3; i++) s = tickOnce(s, fast).state
+    const last = tickOnce(s, fast)
+    expect(last.state.structures.structure_1).toBeUndefined()
+    expect(last.events).toContainEqual({ type: 'item_moved', payload: { id: 'item_1', loc: { t: 'tile', x: 2, y: 2 } } })
+    expect(last.events).toContainEqual({ type: 'item_moved', payload: { id: 'item_2', loc: { t: 'tile', x: 2, y: 2 } } })
+    expect(last.state.items.item_1!.loc).toEqual({ t: 'tile', x: 2, y: 2 })
+    expect(last.state.items.item_2!.loc).toEqual({ t: 'tile', x: 2, y: 2 })
   })
 
   it('rain douses every burning structure before it takes damage', () => {

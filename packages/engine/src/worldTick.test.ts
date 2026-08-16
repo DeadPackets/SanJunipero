@@ -216,6 +216,25 @@ describe('worldTick: collapse', () => {
   })
 })
 
+describe('worldTick: collapse recovery through sleep', () => {
+  it('a collapsed agent may sleep; energy regen clears the collapse and it can act again', () => {
+    let s = patchAgent(makeWorld(), 'a1', { needs: { hunger: 100, energy: 4, warmth: 100, social: 100 } })
+    let t = tickOnce(s) // energy 4−4 = 0 < 5: collapses
+    expect(t.events.map((e) => e.type)).toContain('agent_collapsed')
+    expect(submitIntent(t.state, FAST, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(false)
+    const r = submitIntent(t.state, FAST, 'a1', 'sleep', {})
+    expect(r.ok).toBe(true)
+    if (!r.ok) throw new Error(r.reason)
+    s = applyAll(t.state, r.events)
+    t = tickOnce(s) // sleep completes: asleep
+    expect(t.state.agents.a1!.asleep).toBe(true)
+    expect(t.state.agents.a1!.collapsedSinceTick).not.toBeNull()
+    t = tickOnce(t.state) // asleep: energy regens past collapseThreshold
+    expect(t.state.agents.a1!.collapsedSinceTick).toBeNull()
+    expect(submitIntent(t.state, FAST, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(true)
+  })
+})
+
 describe('worldTick: death', () => {
   it('starvation death lands on the exact tick: zeroHungerSinceTick + deathAfterZeroHungerTicks + 1', () => {
     let s = patchAgent(makeWorld(), 'a1', { needs: { hunger: 10, energy: 100, warmth: 100, social: 100 } })
@@ -230,6 +249,25 @@ describe('worldTick: death', () => {
     expect(deaths).toEqual([6])
     expect(s.agents.a1!.alive).toBe(false)
     expect(submitIntent(s, FAST, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(false)
+  })
+
+  it('death drops every held item onto the death tile, before the death event', () => {
+    let s = patchAgent(makeWorld(), 'a1', {
+      x: 3, y: 2,
+      needs: { hunger: 0, energy: 100, warmth: 100, social: 100 }, zeroHungerSinceTick: 0, collapsedSinceTick: 0,
+    })
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'berries', qty: 2, loc: { t: 'agent', id: 'a1' } }), FAST)
+    s = fold(s, ev('item_spawned', { id: 'item_2', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' } }), FAST)
+    s = { ...s, tick: 10 }
+    const r = createWorldTick(FAST, new RngStreams('t'))(s)
+    const types = r.events.map((e) => e.type)
+    const diedAt = types.indexOf('agent_died')
+    expect(diedAt).toBeGreaterThan(-1)
+    expect(r.events).toContainEqual({ type: 'item_moved', payload: { id: 'item_1', loc: { t: 'tile', x: 3, y: 2 } } })
+    expect(r.events).toContainEqual({ type: 'item_moved', payload: { id: 'item_2', loc: { t: 'tile', x: 3, y: 2 } } })
+    expect(types.indexOf('item_moved')).toBeLessThan(diedAt)
+    expect(r.state.items.item_1!.loc).toEqual({ t: 'tile', x: 3, y: 2 })
+    expect(r.state.items.item_2!.loc).toEqual({ t: 'tile', x: 3, y: 2 })
   })
 
   it('agent_died carries the cause', () => {

@@ -48,6 +48,17 @@ function actionsSystem(ctx: TickCtx): void {
   }
 }
 
+// Death would otherwise strand held items: drop them on the death tile first.
+export function dropHeldItems(ctx: TickCtx, agentId: string): void {
+  const a = ctx.state().agents[agentId]!
+  for (const id of Object.keys(ctx.state().items).sort()) {
+    const item = ctx.state().items[id]!
+    if (item.loc.t === 'agent' && item.loc.id === agentId) {
+      ctx.emit('item_moved', { id, loc: { t: 'tile', x: a.x, y: a.y } })
+    }
+  }
+}
+
 function collapseDeathSystem(ctx: TickCtx): void {
   const { collapseThreshold, deathAfterZeroHungerTicks } = ctx.config.needs
   const { collapseHp, deathHp } = ctx.config.health
@@ -62,6 +73,7 @@ function collapseDeathSystem(ctx: TickCtx): void {
     const b = ctx.state().agents[id]!
     const starved = b.zeroHungerSinceTick !== null && ctx.state().tick - b.zeroHungerSinceTick > deathAfterZeroHungerTicks
     if (starved || b.hp <= deathHp) {
+      dropHeldItems(ctx, id)
       ctx.emit('agent_died', { agentId: id, cause: starved ? 'starvation' : 'health' })
     }
   }

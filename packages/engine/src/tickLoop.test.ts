@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
 import { genesisState } from './state.js'
@@ -48,6 +48,47 @@ describe('TickLoop', () => {
     l.step()
     expect(l.tick).toBe(3)
     expect(stateHash(replayLatest(store).state)).toBe(stateHash(l.state))
+  })
+  it('a throw inside the running loop clears the timer, reports via onError, and start() works again', () => {
+    vi.useFakeTimers()
+    try {
+      let boom = true
+      const errors: unknown[] = []
+      const store = new EventStore(openDb(':memory:'))
+      const l = new TickLoop({
+        store, state: genesisState(DEFAULT_CONFIG), rng: new RngStreams('t'), realMsPerTick: 10,
+        onTick: () => { if (boom) throw new Error('boom') },
+        onError: (err) => { errors.push(err) },
+      })
+      l.start()
+      vi.advanceTimersByTime(10)
+      expect(errors).toHaveLength(1)
+      expect(l.tick).toBe(0)
+      vi.advanceTimersByTime(100)
+      expect(l.tick).toBe(0) // loop stopped, no zombie timer
+      boom = false
+      l.start() // must not be a silent no-op on a stale timer handle
+      vi.advanceTimersByTime(10)
+      expect(l.tick).toBe(1)
+    } finally { vi.useRealTimers() }
+  })
+  it('without onError the loop error rethrows, and start() still works again', () => {
+    vi.useFakeTimers()
+    try {
+      let boom = true
+      const store = new EventStore(openDb(':memory:'))
+      const l = new TickLoop({
+        store, state: genesisState(DEFAULT_CONFIG), rng: new RngStreams('t'), realMsPerTick: 10,
+        onTick: () => { if (boom) throw new Error('boom') },
+      })
+      l.start()
+      expect(() => vi.advanceTimersByTime(10)).toThrow('boom')
+      expect(l.tick).toBe(0)
+      boom = false
+      l.start()
+      vi.advanceTimersByTime(10)
+      expect(l.tick).toBe(1)
+    } finally { vi.useRealTimers() }
   })
   it('threads a custom SimConfig through fold, and replay with that config matches live', () => {
     const custom = SimConfigSchema.parse({ health: { maxHp: 50 } })
