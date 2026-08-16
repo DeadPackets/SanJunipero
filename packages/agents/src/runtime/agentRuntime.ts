@@ -503,8 +503,15 @@ export class AgentRuntime {
     }
 
     if (turn.action) {
-      if ('freeform' in turn.action && this.#adjudicator !== null) {
-        await this.#adjudicateFreeform(turn.action.freeform)
+      // `experiment {description}` is the same door as freeform said the other
+      // way round — CAPABILITIES offers both, so both reach the arbiter.
+      const attempt = 'freeform' in turn.action
+        ? turn.action.freeform
+        : turn.action.verb === 'experiment' && typeof turn.action.params.description === 'string'
+          ? turn.action.params.description
+          : null
+      if (attempt !== null && attempt.length > 0 && this.#adjudicator !== null) {
+        await this.#adjudicateFreeform(attempt)
       } else {
         const intent: Intent =
           'freeform' in turn.action

@@ -767,6 +767,42 @@ describe('arbiter seam (T19)', () => {
     expect(alertKinds(agentDb)).toContain('adjudicate_failed')
   })
 
+  // CAPABILITIES offers `experiment` as well as freeform, so a mind may name
+  // either for the same try. Both are doors to the arbiter once one is wired.
+  it('sends a named experiment to the adjudicator in its own words', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return { kind: 'map', verb: 'walk', params: { x: 5, y: 6 } }
+    }
+    const { loop, world } = await setup({
+      model: turnModel([{
+        thought: 'I will try it.',
+        action: { verb: 'experiment', params: { description: 'boil river water down for salt' } },
+        importance: 4,
+      }]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes('walk'), 100)
+
+    expect(seen).toEqual(['boil river water down for salt'])
+    expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+  })
+
+  it('lets an experiment reach the world unchanged when no arbiter is wired', async () => {
+    const { loop, agentDb } = await setup({
+      model: turnModel([{
+        thought: 'I will try it.',
+        action: { verb: 'experiment', params: { description: 'boil river water down for salt' } },
+        importance: 4,
+      }]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
+  })
+
   it('leaves a named Tier-1 action untouched by the seam', async () => {
     const adjudicator: Adjudicator = async () => {
       throw new Error('must not be consulted')
