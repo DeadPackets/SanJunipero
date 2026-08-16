@@ -64,7 +64,7 @@ const MATERIALS: LibraryEntry[] = [
   material('timber', 'a short stack of squared honey-wood planks, three high, with visible end grain'),
   material('stone', 'two rough quarried blocks of warm-grey stone stacked one on the other, flat faces chipped at the corners, darker grey in the shadows and no other colour'),
   material('clay', 'a wet slab of red-brown clay squared off by hand, slumping at its edges, with deep thumb grooves pressed across the top'),
-  material('fiber', 'a loose coil of pale plant fibre, straw-coloured and slightly frayed at both ends'),
+  material('fiber', 'a neat hank of straw-coloured plant fibre folded once and tied at the middle with a thin cord, its two ends fanning out'),
   material('hide', 'a folded animal skin, tan on the outside and cream on the underside, edges left ragged'),
   material('cloth', 'a folded square of woven cloth in soft cream with a thin dusty-rose stripe along one edge'),
   material('rope', 'a length of honey-brown rope wound into a flat round coil lying on its side, one frayed end tucked under'),
