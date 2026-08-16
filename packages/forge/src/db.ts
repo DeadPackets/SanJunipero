@@ -33,6 +33,19 @@ export function openForgeDb(path: string): Database.Database {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_jobs_claim ON jobs(status, run_at);
+    CREATE TABLE IF NOT EXISTS vision_qa (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      asset_id TEXT NOT NULL,
+      asset_class TEXT NOT NULL,
+      rubric_version TEXT NOT NULL,
+      model TEXT NOT NULL,
+      attempt INTEGER NOT NULL,
+      overall TEXT NOT NULL,
+      scores TEXT NOT NULL,
+      cost_usd REAL NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_vision_qa_class ON vision_qa(asset_class, created_at);
   `)
   const cols = db.pragma('table_info(assets)') as Array<{ name: string }>
   if (!cols.some(c => c.name === 'kind')) {
