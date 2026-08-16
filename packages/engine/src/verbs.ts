@@ -9,7 +9,7 @@ export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
   | 'walk' | 'sleep' | 'wake' | 'enter' | 'exit' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
   | 'build' | 'craft' | 'extinguish'
-  | 'speak' | 'give' | 'take' | 'write' | 'read' | 'teach' | 'attack' | 'experiment'
+  | 'speak' | 'give' | 'take' | 'stow' | 'write' | 'read' | 'teach' | 'attack' | 'experiment'
 
 export type VerbDef = {
   kind: string
@@ -567,6 +567,32 @@ const take: VerbDef = makeVerb({
   },
 })
 
+export const StowParams = z.object({ itemId: z.string(), structureId: z.string() }).strict()
+
+const stow: VerbDef = makeVerb({
+  kind: 'stow',
+  validate(state, _config, agentId, params) {
+    const p = StowParams.safeParse(params)
+    if (!p.success) return 'stow needs {itemId, structureId}'
+    const item = state.items[p.data.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    const s = state.structures[p.data.structureId]
+    if (!s) return 'there is nothing there to put it in'
+    if (s.stage !== 'complete') return 'it is not finished'
+    const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return a.insideId === s.id ? null : 'a wall is in the way'
+    if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to put anything down there'
+    return null
+  },
+  onComplete(state, _config, agentId, params) {
+    const p = StowParams.parse(params)
+    const item = state.items[p.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    // A shelf is not a transfer: the owner is unchanged, wherever the thing sits.
+    return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'structure', id: p.structureId } } }]
+  },
+})
+
 const write: VerbDef = makeVerb({
   kind: 'write',
   validate(state, _config, agentId, params) {
@@ -667,7 +693,7 @@ const experiment: VerbDef = makeVerb({
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
-  speak, give, take, write, read, teach, attack, experiment,
+  speak, give, take, stow, write, read, teach, attack, experiment,
 }
 
 // Hot-registration seam: codified recipe verbs join the live registry by kind id.
