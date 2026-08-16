@@ -2,11 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { openArbiterDb } from './schema.js'
 import { CodexStore, type CodexEntry } from './codex.js'
 import { CANON } from './canon.js'
-
-// Mirrors FORBIDDEN_FRAMING in prompt.ts (kept as a local copy per the T4
-// review chain — CANON must be fully diegetic, no meta-language leaks).
-const FORBIDDEN_FRAMING =
-  /\b(AI|A\.I\.|artificial intelligence|language models?|LLMs?|neural|prompts?|context windows?|tokens?|chatbots?|simulations?|models?|tools?)(?!\w)/i
+import { FORBIDDEN_FRAMING } from './prompt.js'
 
 const LADDER: CodexEntry[] = [
   { id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null },

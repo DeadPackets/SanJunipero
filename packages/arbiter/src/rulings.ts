@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import { cosine } from '@sj/agents'
+import { normalizeIntent } from './rulebook.js'
 import type { Verdict } from './verdict.js'
 
 export type RulingRow = {
@@ -19,15 +20,6 @@ type RawRuling = {
   normalized_intent: string
   verdict_json: string
   tick: number
-}
-
-function normalizeIntent(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, ' ')
-    .replace(/^(i try to |i want to |i attempt to )/, '')
-    .replace(/[.,!?;:]+$/, '')
 }
 
 function keywords(text: string, max = 6): string[] {
