@@ -7,6 +7,9 @@ import { StageMount } from './render/StageMount.js'
 import { InspectorPanel } from './ui/InspectorPanel.js'
 import { ChroniclePanel } from './ui/ChroniclePanel.js'
 import { SocietyLens } from './ui/SocietyLens.js'
+import { DirectorMode } from './ui/DirectorMode.js'
+import { DigestModal } from './ui/DigestModal.js'
+import { LAST_SEEN_KEY } from './net/socket.js'
 import { Timeline } from './ui/Timeline.js'
 import type { Scene } from './render/scene.js'
 
@@ -45,10 +48,11 @@ export function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(location.pathname, location.search))
   const [scene, setScene] = useState<Scene | null>(null)
   const [handle, setHandle] = useState<ObservatoryHandle | null>(null)
+  const [gapTicks, setGapTicks] = useState<number | null>(null)
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    const handle = connectObservatory({ url: `${proto}://${location.host}/ws`, store })
+    const handle = connectObservatory({ url: `${proto}://${location.host}/ws`, store, onGap: setGapTicks })
     sockRef.current = handle
     setHandle(handle)
 
@@ -112,6 +116,7 @@ export function App() {
           <ScrubBanner store={store} />
           {route.lens === 'chronicle' && <Timeline store={store} handle={handle} onView={onView} />}
           {route.lens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
+          {route.lens === 'director' && <DirectorMode store={store} scene={scene} />}
         </main>
         <aside
           id="panel-outlet"
@@ -123,6 +128,23 @@ export function App() {
           {route.lens === 'chronicle' && <ChroniclePanel store={store} />}
         </aside>
       </div>
+      {gapTicks !== null && (
+        <DigestModal
+          store={store}
+          missedTicks={gapTicks}
+          onMoment={(tick) => {
+            sockRef.current?.scrub(tick)
+            onView(tick)
+            dismissDigest()
+          }}
+          onClose={dismissDigest}
+        />
+      )}
     </div>
   )
+
+  function dismissDigest(): void {
+    try { localStorage.setItem(LAST_SEEN_KEY, String(store.getTick())) } catch { /* private mode */ }
+    setGapTicks(null)
+  }
 }

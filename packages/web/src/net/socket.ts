@@ -21,7 +21,10 @@ export function connectObservatory(opts: {
   const readLastSeen = (): number | null => {
     try {
       const v = localStorage.getItem(LAST_SEEN_KEY)
-      return v === null ? null : Number(v)
+      if (v === null) return null
+      const n = Math.floor(Number(v))
+      // a corrupt stored value must never brick the hello (schema wants a nonnegative int)
+      return Number.isFinite(n) && n >= 0 ? n : null
     } catch { return null }
   }
   const writeLastSeen = (tick: number): void => {
