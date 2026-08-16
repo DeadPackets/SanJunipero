@@ -58,8 +58,8 @@ describe('characterArt (v4 manifest contract)', () => {
   })
 
   it('falls back to the gateway character route with no manifest when meta is absent or not v4', () => {
-    expect(characterArt([charRec({ meta: null })], 'omar')).toEqual({ url: '/assets/character/omar.png', manifest: null })
-    expect(characterArt([], 'omar')).toEqual({ url: '/assets/character/omar.png', manifest: null })
+    expect(characterArt([charRec({ meta: null })], 'omar')).toEqual({ url: '/assets/character/omar.png', manifest: null, size: null })
+    expect(characterArt([], 'omar')).toEqual({ url: '/assets/character/omar.png', manifest: null, size: null })
   })
 
   it('newest ready atlas wins on regen', () => {

@@ -5,6 +5,7 @@ import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './n
 import { LENSES, parseRoute, routeToPath, type Lens, type Route } from './ui/route.js'
 import { StageMount } from './render/StageMount.js'
 import { InspectorPanel } from './ui/InspectorPanel.js'
+import { RosterPanel } from './ui/RosterPanel.js'
 import { ChroniclePanel } from './ui/ChroniclePanel.js'
 import { SocietyLens } from './ui/SocietyLens.js'
 import { DirectorMode } from './ui/DirectorMode.js'
@@ -152,10 +153,13 @@ export function App() {
         </main>
         <aside
           id="panel-outlet"
-          className={(route.lens === 'inspector' && route.agentId !== null) || route.lens === 'chronicle' ? 'open' : undefined}
+          className={route.lens === 'inspector' || route.lens === 'chronicle' ? 'open' : undefined}
         >
           {route.lens === 'inspector' && route.agentId !== null && (
             <InspectorPanel store={store} agentId={route.agentId} scene={scene} />
+          )}
+          {route.lens === 'inspector' && route.agentId === null && (
+            <RosterPanel store={store} onPick={pickAgent} />
           )}
           {route.lens === 'chronicle' && <ChroniclePanel store={store} />}
         </aside>

@@ -517,3 +517,45 @@ body {
   white-space: pre-wrap;
   pointer-events: none;
 }
+
+/* ── townsfolk roster (Townsfolk lens, nobody picked) ── */
+.roster-panel { padding: 1rem; min-width: 21rem; font-size: 0.85rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .roster-panel { animation: panel-in var(--t-med) var(--ease-enter); }
+}
+.roster-grid {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.6rem;
+}
+.roster-card {
+  width: 100%; min-height: 40px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+  padding: 0.7rem 0.5rem 0.6rem;
+  background: var(--cream) var(--grain);
+  border: 2px solid var(--ink); border-radius: 0;
+  box-shadow: 3px 3px 0 0 var(--deep);
+  font: inherit; color: inherit; text-align: center;
+}
+.roster-card:hover { translate: 0 -2px; box-shadow: 3px 5px 0 0 var(--deep); background-color: var(--honey); }
+.roster-card:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.roster-bust {
+  width: 48px; height: 48px; display: block;
+  background-color: var(--sand);
+  background-repeat: no-repeat;
+  box-shadow: 0 0 0 2px var(--ink), 2px 2px 0 2px var(--deep);
+}
+.roster-token {
+  display: grid; place-items: center;
+  font-family: var(--font-px); font-size: 1.1rem; color: var(--ink);
+}
+.roster-name { font-family: var(--font-px); font-size: 0.72rem; letter-spacing: 0.03em; }
+.roster-card .badges { justify-content: center; margin-top: 0; }
+.badge.doing { background: var(--honey); }
+.roster-empty {
+  color: var(--cream); font-style: italic;
+  background-color: var(--deep);
+  border: 10px solid transparent; border-image: var(--px-night);
+  padding: 0.5rem 0.7rem;
+  display: inline-block;
+}
+.roster-gone { margin-top: 0.8rem; font-style: italic; opacity: 0.75; }

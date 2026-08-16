@@ -21,16 +21,20 @@ export function resolveAssetId(records: AssetRecord[], klass: AssetClass, kind: 
 // character sheets live in the codex as class rig-part, kind character:<agentId>
 export const CHARACTER_CLASS: AssetClass = 'rig-part'
 
-export type CharacterArt = { url: string; manifest: CharacterAtlasManifest | null }
+export type CharacterArt = {
+  url: string
+  manifest: CharacterAtlasManifest | null
+  size: { w: number; h: number } | null // atlas pixel dims (record widthPx/heightPx)
+}
 
 // v4 atlas record → its immutable png + manifest; older/no codex art → the
 // gateway's character route (v2 sheet or placeholder) sliced by v2 geometry.
 export function characterArt(records: AssetRecord[], agentId: string): CharacterArt {
   const rec = resolveAsset(records, CHARACTER_CLASS, `character:${agentId}`)
-  if (rec === null) return { url: `/assets/character/${agentId}.png`, manifest: null }
+  if (rec === null) return { url: `/assets/character/${agentId}.png`, manifest: null, size: null }
   const manifest = parseCharacterAtlasManifest(rec.meta)
-  if (manifest === null) return { url: `/assets/character/${agentId}.png`, manifest: null }
-  return { url: `/assets/${rec.id}.png`, manifest }
+  if (manifest === null) return { url: `/assets/character/${agentId}.png`, manifest: null, size: null }
+  return { url: `/assets/${rec.id}.png`, manifest, size: { w: rec.widthPx, h: rec.heightPx } }
 }
 
 export const BUILDING_PX_PER_TILE = 32 // Style Bible: ~64px sprite for a 1×1 building → fit a 32·(w+h) square
