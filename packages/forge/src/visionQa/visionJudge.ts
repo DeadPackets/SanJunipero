@@ -10,7 +10,9 @@ import {
 } from './verdict.js'
 import { RUBRIC_VERSION, buildRubricPrompt, paletteCard, checkerCard } from './rubric.js'
 
-export const EST_COST_PER_VISION_CALL = 0.0025
+// Re-based on the 42 live calls booked by the batch-A audit; the pre-flight guess of
+// $0.0025 was low by 2.2x. Only pre-flight plans read it — the ledger books reported cost.
+export const EST_COST_PER_VISION_CALL = 0.0055
 
 export type VisionGenerateFn = (args: { model: unknown; schema: unknown; messages: unknown[] }) =>
   Promise<{ object: unknown; providerMetadata?: unknown }>
