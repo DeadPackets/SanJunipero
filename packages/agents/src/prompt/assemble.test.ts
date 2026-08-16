@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { MYSTERIES } from '@sj/engine'
+import { FELT_TAGS, MYSTERIES } from '@sj/engine'
 import { assemblePrompt, compactDayLog, type PromptBlocks } from './assemble.js'
 import { FELT_EVENT_PROSE, perceptionToProse } from './prose.js'
 import { FORBIDDEN_FRAMING, RULES_OF_BEING } from './rulesOfBeing.js'
@@ -137,6 +137,21 @@ describe('perceptionToProse', () => {
     expect(prose).not.toContain('You sense something change nearby.')
     expect(alert).not.toHaveBeenCalled()
     expect(FELT_EVENT_PROSE['you_collapsed']).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  // The enumeration comes from the engine, so a new tag cannot slip in mute:
+  // run 5 left `you_died` and four illness tags with no prose at all (batch-10 concern 3).
+  it('renders every felt tag the engine can emit as its own sensation, never the fallback', () => {
+    expect(FELT_TAGS.length).toBeGreaterThan(0)
+    for (const tag of FELT_TAGS) {
+      const alert = vi.fn()
+      const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: [tag] }, alert)
+      expect(FELT_EVENT_PROSE[tag], `no prose for felt tag ${tag}`).toBeTruthy()
+      expect(prose, tag).toContain(FELT_EVENT_PROSE[tag])
+      expect(prose, tag).not.toContain('You sense something change nearby.')
+      expect(alert, tag).not.toHaveBeenCalled()
+      expect(FELT_EVENT_PROSE[tag]).not.toMatch(FORBIDDEN_FRAMING)
+    }
   })
 
   it('renders every global mystery as its authored sensation, never the fallback, never framed', () => {

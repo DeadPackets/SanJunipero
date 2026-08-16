@@ -88,6 +88,24 @@ const isTileItem = (i: Item): i is Item & { loc: { t: 'tile'; x: number; y: numb
 
 const isStructureItem = (i: Item): i is Item & { loc: { t: 'structure'; id: string } } => i.loc.t === 'structure'
 
+// Events that happen *to* one agent, and the tag each becomes.
+const SELF_EVENT_TAG: Record<string, string> = {
+  agent_injured: 'you_were_attacked',
+  agent_collapsed: 'you_collapsed',
+  agent_died: 'you_died',
+  agent_fell_ill: 'you_fell_ill',
+  agent_infected: 'you_were_infected',
+  agent_recovered: 'you_recovered',
+  agent_tended: 'you_were_tended',
+}
+
+// Every tag `feltTagFor` can produce, so the prose map can be proven complete
+// rather than sampled (C9 batch-11). Mystery tags come from MYSTERIES.
+export const FELT_TAGS: readonly string[] = [
+  ...Object.keys(PRECIPITATION).map((kind) => `${kind}_started`),
+  ...Object.values(SELF_EVENT_TAG),
+]
+
 // A felt event is something that happens *to* this agent (or ambient weather).
 // Anything about other agents — including out-of-range speech or injuries —
 // produces no tag and appears nowhere in the packet.
@@ -99,16 +117,7 @@ function feltTagFor(agentId: string, ev: SimEvent): string | null {
     return p?.prevKind === kind ? null : `${kind}_started` // same-kind temp steps pass silently
   }
   if ((ev.payload as { agentId?: unknown } | null)?.agentId !== agentId) return null
-  switch (ev.type) {
-    case 'agent_injured': return 'you_were_attacked'
-    case 'agent_collapsed': return 'you_collapsed'
-    case 'agent_died': return 'you_died'
-    case 'agent_fell_ill': return 'you_fell_ill'
-    case 'agent_infected': return 'you_were_infected'
-    case 'agent_recovered': return 'you_recovered'
-    case 'agent_tended': return 'you_were_tended'
-    default: return null
-  }
+  return SELF_EVENT_TAG[ev.type] ?? null
 }
 
 // A sleeper misses it. Nothing else about a global mystery is conditional.
