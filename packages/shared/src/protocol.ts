@@ -12,8 +12,9 @@ export const ClientLive  = z.object({ t: z.literal('live') }).strict()
 export const ClientMsg = z.discriminatedUnion('t', [ClientHello, ClientScrub, ClientLive])
 export type ClientMsg = z.infer<typeof ClientMsg>
 
-export const ServerSnapshot = z.object({ t: z.literal('snapshot'), tick, seq: z.number().int().nonnegative(), state: z.unknown(), config: z.unknown(), live: z.boolean() }).strict()
+export const ServerSnapshot = z.object({ t: z.literal('snapshot'), tick, seq: z.number().int().nonnegative(), state: z.unknown(), config: z.unknown(), laws: z.record(z.string(), z.unknown()), live: z.boolean() }).strict()
 // config = the sim's SimConfig: the client folds deltas with the SAME config as the engine, or live view drifts from truth
+// laws = the world laws in force right now, so a late joiner reads them without replaying every config_changed
 export const ServerTick    = z.object({ t: z.literal('tick'), tick, events: z.array(EventEnvelope) }).strict()
 export const ServerScrubbed = z.object({ t: z.literal('scrubbed'), reqId: z.number().int().nonnegative(), tick, state: z.unknown() }).strict()
 export const ServerThought = z.object({ t: z.literal('thought'), agentId: z.string().min(1), tick, text: z.string() }).strict()
