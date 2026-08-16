@@ -1,0 +1,50 @@
+import { z } from 'zod'
+
+// The single source for interior placement vocabulary. C10 T10's FurnishingKind union is
+// structurally identical, so that lane compiles untouched and may import this at its leisure.
+export const INTERIOR_KINDS = ['hut', 'storehouse', 'shed'] as const
+export type InteriorKind = (typeof INTERIOR_KINDS)[number]
+export const InteriorKindSchema = z.enum(INTERIOR_KINDS)
+
+export const LIBRARY_CATEGORIES = ['tool', 'food', 'material', 'ritual', 'furniture'] as const
+export type LibraryCategory = (typeof LIBRARY_CATEGORIES)[number]
+
+export const InteriorMetaSchema = z.object({
+  slots: z.object({
+    w: z.number().int().min(1).max(2), h: z.number().int().min(1).max(2),
+  }).strict(),
+  placement: z.enum(['floor', 'wall']),
+  interiorKinds: z.array(InteriorKindSchema).min(1),
+  // Literal true: absence is the only way to say "no", so a flag can never be half-set.
+  isBed: z.literal(true).optional(),
+  isHearth: z.literal(true).optional(),
+  providesLight: z.literal(true).optional(),
+}).strict()
+export type InteriorMeta = z.infer<typeof InteriorMetaSchema>
+
+export const LibraryItemManifestSchema = z.object({
+  version: z.literal('v1-library-item'),
+  kind: z.string().min(1),
+  category: z.enum(LIBRARY_CATEGORIES),
+  spritePx: z.number().int().min(16).max(24),
+  iconPx: z.union([z.literal(16), z.literal(24)]),
+  interior: InteriorMetaSchema.optional(),
+}).strict()
+export type LibraryItemManifest = z.infer<typeof LibraryItemManifestSchema>
+
+export function parseLibraryItemManifest(meta: string | null): LibraryItemManifest | null {
+  if (meta === null) return null
+  try {
+    const r = LibraryItemManifestSchema.safeParse(JSON.parse(meta))
+    return r.success ? r.data : null
+  } catch {
+    return null
+  }
+}
+
+// C10 T10's six originals include `tools`, which the addendum resolves as "anvil + saw wall rack".
+export const FURNISHING_KIND_ALIASES: Record<string, string> = { tools: 'anvil' }
+
+export function resolveFurnishingKind(kind: string): string {
+  return FURNISHING_KIND_ALIASES[kind] ?? kind
+}

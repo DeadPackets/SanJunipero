@@ -139,8 +139,11 @@ Option A + prompt cookbook).
 - DELETED from the v4 path: distance matrices, mirror-dupe detection, cross-facing gate,
   seeded sleep, per-facing sleep palette gates, guide-image machinery, compass-prose
   clauses, judge-as-facing-arbiter.
-- Facing gate = HUMAN EYEBALL on the contact sheet + walking GIFs. Never automated,
-  never claimed by the pipeline.
+- Facing gate: the C13 vision gate SCREENS facing on every asset and may auto-reject the
+  obviously wrong way round. HUMAN EYEBALL on the contact sheet + walking GIFs remains the
+  FINAL and ONLY authority for masters — the pipeline never *claims* a master's facing is
+  correct, only that it is not obviously wrong. (Narrowed 2026-08-16 by the C13 addendum §1;
+  user-accepted, ruling 2.)
 
 ## Character standard v2 (SUPERSEDED by v3, above)
 

@@ -21,11 +21,11 @@ const CLASS_HINTS: Record<AssetClass, string> = {
 
 // Canonical style anchor law: non-character classes match the first reference image
 // (style-anchor.png, always refs[0]) explicitly; characters carry their own identity refs.
-const ANCHOR_CLAUSE =
+export const STYLE_ANCHOR_CLAUSE =
   'match the pixel density, palette warmth, and cute rounded style of the first reference image exactly'
 
 export function buildAssetPrompt(desc: string, footprint: Footprint, klass: AssetClass): string {
-  const anchor = klass === 'rig-part' || klass === 'portrait' ? '' : ` Style: ${ANCHOR_CLAUSE}.`
+  const anchor = klass === 'rig-part' || klass === 'portrait' ? '' : ` Style: ${STYLE_ANCHOR_CLAUSE}.`
   return `${STYLE_PROMPT} ${CLASS_HINTS[klass]}${anchor} Subject: ${desc}. World footprint: ${footprint.w}x${footprint.h} tiles on a 32x16 pixel tile grid.`
 }
 
