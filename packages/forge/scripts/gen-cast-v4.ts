@@ -39,6 +39,11 @@ const SCRATCH = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJuniper
 const PRODUCTION = `${SCRATCH}/production`
 
 const STYLE_ANCHOR = readFileSync('packages/forge/content/reference/style-anchor.png')
+// The APPROVED omar master doubles as a proportion/pixel/layout reference for new
+// masters (eyeball round 1: nadia drifted to 4.5-heads fine-pixel and her back figure
+// faced top-LEFT; omar demonstrates the required layout and chibi scale in-context).
+const OMAR_MASTER_PATH = `${SCRATCH}/character-v4/raws/master-b0-c1.png`
+const PROPORTION_REF = existsSync(OMAR_MASTER_PATH) ? readFileSync(OMAR_MASTER_PATH) : null
 
 const CAST_FILTER = (process.env.CAST ?? CAST_V4.map(c => c.id).join(',')).split(',').map(s => s.trim())
 const RUN_CAST = CAST_V4.filter(c => CAST_FILTER.includes(c.id))
@@ -119,12 +124,20 @@ function conceptPrompt(m: CastMember): string {
 }
 
 function masterPrompt(m: CastMember): string {
+  const proportionClause = PROPORTION_REF
+    ? 'The second reference image shows ANOTHER villager of this same game in the exact required ' +
+      'layout: LEFT figure is the front three-quarter view facing bottom-right, RIGHT figure is the ' +
+      'back three-quarter view facing top-right with NO face visible. Match that layout, the ' +
+      '3-heads-tall chibi body proportions, the big round head, the chunky pixel size and the ' +
+      'simplification level EXACTLY — but do NOT copy that villager\'s costume, colors or identity. '
+    : ''
   return `${STYLE_PROMPT} Exactly TWO figures of the SAME character side by side on the magenta background, ` +
     `evenly spaced with a clear magenta gap between them, whole body and feet visible on both. ` +
     `LEFT figure: ${VIEW.se}. RIGHT figure: ${VIEW.ne}. ` +
     `The two figures are identical in costume, colors and proportions — only the view changes. ` +
+    proportionClause +
     `The ONLY content is the two figures of the villager: NO buildings, NO houses, NO scenery, NO ground ` +
-    `plane, NO path — do NOT draw the building from the reference image (it is a STYLE reference only). ` +
+    `plane, NO path — do NOT draw the building from the first reference image (it is a STYLE reference only). ` +
     `NO text, NO words, NO labels, NO captions anywhere. NO shadow under the figures. ` +
     `Subject: ${m.desc}. ${m.featureCap} ${BIG_PIXEL} ` +
     'Each figure stands about three quarters of the frame height tall, with clear magenta margin ' +
@@ -199,10 +212,15 @@ async function runCharacter(m: CastMember): Promise<void> {
   const MASTER_MIN_PITCH = 6
   type Master = { key: string; raw: Buffer; se: RawImage; ne: RawImage; pitch: number; frontBack: number }
   const masters: Master[] = []
-  for (let i = 0; i < 3; i++) {
-    if (i === 2 && masters.some(x => x.pitch >= MASTER_MIN_PITCH)) break
-    const key = `master-${m.id}-c${i}`
-    const raw = await candidate(DIR, key, masterPrompt(m), [STYLE_ANCHOR, concept], '1024x1024', 0.08)
+  // MASTER_OVERRIDE=<key> pins a specific cached raw (e.g. an edit-call output) as the
+  // sole master candidate — used for the yusuf NE-head facing fix.
+  const override = process.env.MASTER_OVERRIDE
+  const masterKeys = override && override.startsWith(`master-${m.id}`) ? [override] : null
+  const masterRefs = PROPORTION_REF ? [STYLE_ANCHOR, PROPORTION_REF, concept] : [STYLE_ANCHOR, concept]
+  for (let i = 0; i < (masterKeys ? masterKeys.length : 3); i++) {
+    if (!masterKeys && i === 2 && masters.some(x => x.pitch >= MASTER_MIN_PITCH)) break
+    const key = masterKeys ? masterKeys[i]! : `master-${m.id}-c${i}`
+    const raw = await candidate(DIR, key, masterPrompt(m), masterRefs, '1024x1024', 0.08)
     try {
       const segs = sliceStrip(keyBg(await decodePng(raw)), 2)
       const pitches = segs.map(s => estimatePitch(s))
@@ -230,6 +248,12 @@ async function runCharacter(m: CastMember): Promise<void> {
   const TARGET_H = seBbox.y1 - seBbox.y0 + 1
   const masterGate: Record<AuthoredFacing, RawImage> = { se: gateView(master.se), ne: gateView(master.ne) }
   push(`idle crops se=${master.se.width}x${master.se.height} ne=${master.ne.width}x${master.ne.height}, figureH=${TARGET_H}`)
+  if (process.env.STOP_AFTER_MASTER) {
+    push('STOP_AFTER_MASTER set — stopping before walk-frame spend (master crops written for inspection)')
+    writeFileSync(`${DIR}/report.txt`, report.join('\n'))
+    globalReport.push(`${m.id}: stopped after master (inspection), spend $${(assetSpend[m.id] ?? 0).toFixed(3)}`)
+    return
+  }
 
   // walk frames: 6 single-figure edit-calls, up to 2 candidates each
   let walkSize = '1024x1536'
