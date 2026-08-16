@@ -64,7 +64,8 @@ async function generate(prompt: string, refs: Buffer[], size: string, reasoning:
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`${MODEL}${reasoning ? '+reasoning' : ''} HTTP ${res.status}: ${await res.text()}`)
-  const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: { cost?: number } }
+  const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: Record<string, unknown> & { cost?: number } }
+  if (reasoning) console.log(`  usage: ${JSON.stringify(json.usage)}`)
   const images = (json.data ?? []).filter(d => d.b64_json)
   // Reasoning models may return interim thought images — the FINAL image is the last one.
   const b64 = images[images.length - 1]?.b64_json
@@ -110,28 +111,47 @@ const masterPrompt =
   `evenly spaced with a clear magenta gap between them, whole body and feet visible on both. ` +
   `LEFT figure: ${VIEW.se}. RIGHT figure: ${VIEW.ne}. ` +
   `The two figures are identical in costume, colors and proportions — only the view changes. ` +
+  `The ONLY content is the two figures of the villager: NO buildings, NO houses, NO scenery, NO ground ` +
+  `plane, NO path — do NOT draw the building from the reference image (it is a STYLE reference only). ` +
+  `NO text, NO words, NO labels, NO captions anywhere. NO shadow under the figures. ` +
   `Subject: ${CHAR_DESC_V4}. ${FEATURE_CAP_V4} ${BIG_PIXEL} ` +
   'Each figure stands about three quarters of the frame height tall, with clear magenta margin ' +
   'above and below; figures must NOT touch the edges of the image.'
 
+const FRAME_POSITION = ['leftmost figure', 'second figure from the left', 'third figure from the left', 'rightmost figure'] as const
 function stripPrompt(f: AuthoredFacing): string {
-  const phases = STRIP_POSES_V4.map((p, i) => `frame ${i + 1}: ${POSE_V4[p]}`).join('; ')
-  return `${STYLE_PROMPT} A horizontal sprite strip of exactly FOUR copies of the SAME character side by side, ` +
-    `evenly spaced with clear magenta gaps between figures, whole body visible in each. Every figure is the ` +
-    `${VIEW[f]} — exactly the same character, costume and colors as ${VIEW_REF[f]}. ` +
-    `Left to right: ${phases}. The four figures are identical in costume, colors and proportions — only the ` +
-    `pose changes. Subject: ${CHAR_DESC_V4}. ${FEATURE_CAP_V4} ${BIG_PIXEL}` +
+  const phases = STRIP_POSES_V4.map((p, i) => `${FRAME_POSITION[i]}: ${POSE_V4[p]}`).join('; ')
+  return `${STYLE_PROMPT} A horizontal sprite strip of exactly FOUR copies of the SAME character side by side ` +
+    `(count them: 4 figures), evenly spaced with clear magenta gaps between figures, whole body visible in each. ` +
+    `Every figure is the ${VIEW[f]} — exactly the same character, costume and colors as ${VIEW_REF[f]}, ` +
+    `at the same chunky pixel scale. ${phases}. The four figures are identical in costume, colors and ` +
+    `proportions — only the pose changes. NO text, NO words, NO labels, NO captions. NO shadow under the ` +
+    `figures. Subject: ${CHAR_DESC_V4}. ${FEATURE_CAP_V4} ${BIG_PIXEL}` +
     ' Each figure stands about three quarters of the frame height tall, with clear magenta margin above and ' +
     'below every figure; figures must NOT touch the top or bottom edge of the image.'
 }
 
 const sleepPrompt =
   `${STYLE_PROMPT} A single character sprite, exactly one figure — exactly the same character, costume and ` +
-  `colors as the figures in the last reference image. The character is lying on the ground fast asleep, body ` +
-  `fully horizontal, eyes closed, relaxed peaceful face, same outfit. ` +
+  `colors as the figures in the last reference image, at the same chunky pixel scale. The character is lying ` +
+  `on the ground fast asleep, body fully horizontal, eyes closed, relaxed peaceful face, same outfit. ` +
+  `NO text, NO labels. NO shadow under the figure. NO bed, NO pillow, NO props. ` +
   `Subject: ${CHAR_DESC_V4}. ${FEATURE_CAP_V4} ${BIG_PIXEL}`
 
 // ── post chain (surviving stages only): chroma key → slice → v7 → place ─────
+// Adaptive key: gen background can drift off #FF00FF (measured rgb(211,63,161) on the
+// a1-c0 master — b misses tol 72 by 22). Retry wider before declaring the image solid;
+// tol 110 still excludes every palette color (dusty rose g=198 stays opaque).
+function keyBg(img: RawImage): RawImage {
+  for (const tolerance of [72, 110]) {
+    const keyed = chromaKey(img, { tolerance })
+    let clear = 0
+    for (let i = 3; i < keyed.data.length; i += 4) if (keyed.data[i] === 0) clear++
+    // a real magenta background clears far more than 10% of the canvas
+    if (clear / (keyed.width * keyed.height) >= 0.10) return keyed
+  }
+  throw new Error('keyBg: <10% background keyed even at tolerance 110 — not a magenta-background image')
+}
 const MAX_ART_H = FEET_Y_V2 + 1
 function fitToBudget(img: RawImage): RawImage {
   const k = Math.min(MAX_ART_H / img.height, CELL_V2 / img.width, 1)
@@ -175,17 +195,20 @@ const reportLines: string[] = []
 const CALIBRATED_MEDIAN = 0.310
 
 // ── call 1: master (2 candidates, reasoning path first, plain flash fallback) ─
-type Master = { key: string; raw: Buffer; cells: Record<AuthoredFacing, RawImage>; frontBackDist: number }
+// Pick by PIXELNESS (median art pitch of the two figures): the a1 run proved front-back
+// distance cannot tell chibi pixel art from painterly concept bleed — pitch can.
+type Master = { key: string; raw: Buffer; cells: Record<AuthoredFacing, RawImage>; frontBackDist: number; pitch: number }
 async function pickMaster(): Promise<Master> {
   const chosen: Master[] = []
   for (let i = 0; i < 2; i++) {
-    const key = `master-c${i}`
+    // a1: the a0 candidates leaked the style-anchor cottage as subject; prompt now bans scenery.
+    const key = `master-a1-c${i}`
     let raw: Buffer
     if (!masterMode && !existsSync(`${DURABLE}/raws/${key}.png`)) {
       // Probe the reasoning path on the first real call; on rejection fall back to plain.
       try {
         raw = await candidate(key, masterPrompt, [STYLE_ANCHOR, CONCEPT], '1024x1024', true)
-        masterMode = 'flash-reasoning'
+        masterMode = 'flash (reasoning param accepted by OpenRouter; usage shows reasoning_tokens=0 — thinking did not engage)'
       } catch (e) {
         if (e instanceof OutOfBudget) throw e
         console.log(`  reasoning path rejected (${String(e).slice(0, 200)}); falling back to plain flash`)
@@ -193,24 +216,27 @@ async function pickMaster(): Promise<Master> {
         masterMode = 'flash-plain'
       }
     } else {
-      raw = await candidate(key, masterPrompt, [STYLE_ANCHOR, CONCEPT], '1024x1024', masterMode === 'flash-reasoning')
+      raw = await candidate(key, masterPrompt, [STYLE_ANCHOR, CONCEPT], '1024x1024', masterMode.startsWith('flash (reasoning'))
       if (!masterMode) masterMode = 'cached (mode of original run unknown)'
     }
     try {
-      const segs = sliceStrip(chromaKey(await decodePng(raw)), 2)
+      const segs = sliceStrip(keyBg(await decodePng(raw)), 2)
+      const pitches = segs.map(s => estimatePitch(s))
       const cells = {
-        se: place(v7Chain(segs[0]!, estimatePitch(segs[0]!)).out),
-        ne: place(v7Chain(segs[1]!, estimatePitch(segs[1]!)).out),
+        se: place(v7Chain(segs[0]!, pitches[0]!).out),
+        ne: place(v7Chain(segs[1]!, pitches[1]!).out),
       }
       const d = cellDistance(cells.se, cells.ne)
-      reportLines.push(`${key}: sliced OK, front-back distance=${d.toFixed(3)}`)
-      chosen.push({ key, raw, cells, frontBackDist: d })
+      const pitch = Math.min(...pitches)
+      const line = `${key}: sliced OK, pitch=${pitches.map(p => p.toFixed(2)).join('/')}, front-back distance=${d.toFixed(3)}`
+      reportLines.push(line); console.log(`  ${line}`)
+      chosen.push({ key, raw, cells, frontBackDist: d, pitch })
     } catch (e) {
-      reportLines.push(`${key}: process FAILED — ${String(e)}`)
+      reportLines.push(`${key}: process FAILED — ${String(e)}`); console.log(`  ${key}: process FAILED — ${String(e)}`)
     }
   }
   if (chosen.length === 0) throw new Error('master: both candidates failed to slice into two figures')
-  chosen.sort((a, b) => b.frontBackDist - a.frontBackDist)
+  chosen.sort((a, b) => b.pitch - a.pitch)
   return chosen[0]!
 }
 
@@ -235,18 +261,21 @@ async function pickStrip(f: AuthoredFacing): Promise<StripState> {
   let best: StripState | null = null
   for (let attempt = 0; attempt <= 1; attempt++) {
     for (let i = 0; i < 2; i++) {
-      const key = `strip-${f}-a${attempt}-c${i}`
+      // r2-round: a/b-round raws referenced the painterly master (bad pick, fixed by the
+      // pitch metric + keyBg) — keys retired so a funded rerun regenerates from scratch
+      const key = `strip-${f}-r2a${attempt}-c${i}`
       let state: StripState
       try {
         const raw = await candidate(key, stripPrompt(f), [STYLE_ANCHOR, master.raw], '1536x512', false)
-        state = { key, cells: processStrip(chromaKey(await decodePng(raw))), failures: [] }
+        state = { key, cells: processStrip(keyBg(await decodePng(raw))), failures: [] }
         state.failures = stripFailures(f, state.cells)
       } catch (e) {
         if (e instanceof OutOfBudget) { if (best) return best; throw e }
-        reportLines.push(`${key}: process FAILED — ${String(e)}`)
+        reportLines.push(`${key}: process FAILED — ${String(e)}`); console.log(`  ${key}: process FAILED — ${String(e)}`)
         continue
       }
-      reportLines.push(`${key}: gates=${state.failures.length === 0 ? 'PASS' : state.failures.map(x => `${x.gate}(${x.a}~${x.b} ${x.value.toFixed(3)})`).join(',')}`)
+      const gateLine = `${key}: gates=${state.failures.length === 0 ? 'PASS' : state.failures.map(x => `${x.gate}(${x.a}~${x.b} ${x.value.toFixed(3)})`).join(',')}`
+      reportLines.push(gateLine); console.log(`  ${gateLine}`)
       if (state.failures.length === 0) return state
       if (!best || state.failures.length < best.failures.length) best = state
     }
@@ -268,10 +297,11 @@ async function pickSleep(): Promise<{ key: string; cell: RawImage; failures: Gat
     const key = `sleep-a${attempt}`
     try {
       const raw = await candidate(key, sleepPrompt, [STYLE_ANCHOR, master.raw], '512x512', false)
-      const keyed = chromaKey(await decodePng(raw))
+      const keyed = keyBg(await decodePng(raw))
       const cell = place(v7Chain(keyed, estimatePitch(keyed)).out)
       const failures = sleepCoherenceGateV4(master.cells.se, cell)
-      reportLines.push(`${key}: gates=${failures.length === 0 ? 'PASS' : failures.map(x => x.gate).join(',')}`)
+      const line = `${key}: gates=${failures.length === 0 ? 'PASS' : failures.map(x => x.gate).join(',')}`
+      reportLines.push(line); console.log(`  ${line}`)
       if (failures.length === 0) return { key, cell, failures }
       if (!best || failures.length < best.failures.length) best = { key, cell, failures }
     } catch (e) {
