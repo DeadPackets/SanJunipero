@@ -1,4 +1,5 @@
 export { NARRATOR_CANON } from './canon.js'
 export { NARRATOR_TABLES, migrateNarratorTables, openNarratorDb } from './schema.js'
 export { NarratorStore } from './store.js'
+export { WORLD_TABLES, openNarratorWorld } from './glass.js'
 export type * from './types.js'
