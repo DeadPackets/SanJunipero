@@ -354,6 +354,58 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
   })
 })
 
+describe('FORBIDDEN_FRAMING enforced over live LLM output', () => {
+  it('a framing-tainted attempt is retried, and the clean retry is returned and recorded', async () => {
+    let call = 0
+    const llm = new ScriptedLlm(() => {
+      call += 1
+      return call === 1
+        ? { ...basketVerdict, summary: 'The AI grants you a basket.' }
+        : basketVerdict
+    })
+    const { db, arbiter } = await makeRig(llm)
+
+    const verdict = await arbiter.adjudicate('I weave reeds into a basket shape', ctx)
+    expect(verdict).toEqual(basketVerdict)
+    expect(llm.objectCalls).toBe(2)
+    const row = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
+    expect(FORBIDDEN_FRAMING.test(row.verdict_json)).toBe(false)
+  })
+
+  it('an attempt tainted in an outcome label falls back to diegetic impossible and is never recorded', async () => {
+    const tainted: Verdict = {
+      ...basketVerdict,
+      recipe: {
+        ...basketRecipe,
+        outcomeTable: [{ weight: 1, success: true, label: 'A neural loom hums as the basket forms.', effects: [{ op: 'none' }] }],
+      },
+    }
+    const llm = new ScriptedLlm(() => tainted)
+    const { db, arbiter } = await makeRig(llm)
+
+    const verdict = await arbiter.adjudicate('I weave reeds into a basket shape', ctx)
+    expect(verdict.kind).toBe('impossible')
+    expect(FORBIDDEN_FRAMING.test(verdict.kind === 'impossible' ? verdict.reason : '')).toBe(false)
+    expect(llm.objectCalls).toBe(2)
+    expect((db.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n).toBe(0)
+  })
+
+  it('an impossible verdict with a machinery-leaking reason gets a canned diegetic line, recorded clean', async () => {
+    const llm = new ScriptedLlm(() => ({ kind: 'impossible', reason: 'The language model refuses this.', class: 'physically_impossible' }))
+    const { db, arbiter } = await makeRig(llm)
+
+    const verdict = await arbiter.adjudicate('I whistle the rain into being', ctx)
+    expect(verdict.kind).toBe('impossible')
+    if (verdict.kind === 'impossible') {
+      expect(FORBIDDEN_FRAMING.test(verdict.reason)).toBe(false)
+      expect(verdict.class).toBe('physically_impossible')
+    }
+    expect(llm.objectCalls).toBe(1)
+    const row = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
+    expect(FORBIDDEN_FRAMING.test(row.verdict_json)).toBe(false)
+  })
+})
+
 describe('retrieval efficiency', () => {
   it('embeds the intent once for retrieval plus once for recording (stages 2 and 3 share one similar call)', async () => {
     const inner = await FakeEmbedder.create()

@@ -4,7 +4,7 @@ import { registerVerb, VERBS } from '@sj/engine'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import { codify as codifyRecipe, verbFromRecipe } from './codify.js'
-import { assembleAdjudicationPrompt } from './prompt.js'
+import { assembleAdjudicationPrompt, FORBIDDEN_FRAMING } from './prompt.js'
 import { ReviewStore } from './review.js'
 import { RulebookStore } from './rulebook.js'
 import { RulingsStore } from './rulings.js'
@@ -29,6 +29,17 @@ const FALLBACK_IMPOSSIBLE: Verdict = {
   kind: 'impossible',
   reason: 'no clear way to do this presents itself',
   class: 'physically_impossible',
+}
+
+// Canned diegetic line replacing an impossible reason that leaks the machinery.
+const CLEAN_IMPOSSIBLE_REASON = 'nothing in the town lends itself to this'
+
+// The human-framing law over live LLM output: an attempt whose world text
+// names the machinery is invalid (retry); world text is checked before record.
+function framingTainted(v: Verdict): boolean {
+  if (v.kind !== 'attempt') return false
+  const texts = [v.summary, v.recipe.name, ...v.recipe.outcomeTable.map((r) => r.label)]
+  return texts.some((t) => FORBIDDEN_FRAMING.test(t))
 }
 
 export type AgentCtx = {
@@ -119,9 +130,14 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         // A map naming an unregistered verb is a hallucination — retry, never
         // return or record it (finding 8).
         if (r.value.kind === 'map' && !VERBS[r.value.verb]) continue
+        // An attempt that leaks the machinery is invalid — retry (finding 12).
+        if (framingTainted(r.value)) continue
         value = r.value
       }
       if (value === null) return FALLBACK_IMPOSSIBLE
+      if (value.kind === 'impossible' && FORBIDDEN_FRAMING.test(value.reason)) {
+        value = { ...value, reason: CLEAN_IMPOSSIBLE_REASON }
+      }
 
       // Deterministic adjacency gate: an attempt whose recipe canon the codex
       // has not earned is beyond adjacency, never codifiable. Record the
