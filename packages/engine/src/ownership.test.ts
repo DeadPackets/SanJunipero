@@ -52,6 +52,19 @@ describe('acquisition marks the acquirer', () => {
     expect(spawned!.payload).toMatchObject({ owner: 'a1' })
   })
 
+  it('write spawns the note already owned — authorship is making', () => {
+    const s = world({ id: 'a1', x: 1, y: 1 })
+    const events = VERBS.write!.onComplete(s, DEFAULT_CONFIG, 'a1', { text: 'hello' }, RNG)
+    expect(events.find(e => e.type === 'item_spawned')!.payload).toMatchObject({ owner: 'a1' })
+    expect(apply(s, events).items.item_1!.owner).toBe('a1')
+  })
+
+  it('the flag turns a written note unowned too', () => {
+    const s = world({ id: 'a1', x: 1, y: 1 })
+    const events = VERBS.write!.onComplete(s, OFF, 'a1', { text: 'hello' }, RNG)
+    expect((events[0]!.payload as Record<string, unknown>).owner).toBeUndefined()
+  })
+
   it('the flag turns acquisition ownership off entirely', () => {
     const s = world({ id: 'a1', x: 2, y: 1 })
     const events = VERBS.forage!.onComplete(s, OFF, 'a1', {}, RNG)

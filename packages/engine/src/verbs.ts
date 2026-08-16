@@ -326,7 +326,8 @@ const forage: VerbDef = makeVerb({
   skill: { track: 'foraging', xp: 1 },
 })
 
-// What you pull out of the ground, the water or the woods is yours from the first moment.
+// What you pull out of the ground, the water or the woods — or write down — is yours from the
+// first moment. Making is making, whatever the hand does.
 function ownerStamp(config: SimConfig, agentId: string): { owner?: string } {
   return config.ownership.enabled ? { owner: agentId } : {}
 }
@@ -619,14 +620,14 @@ const write: VerbDef = makeVerb({
     }
     return null
   },
-  onComplete(state, _config, agentId, params) {
+  onComplete(state, config, agentId, params) {
     const p = WriteParams.parse(params)
     if (p.itemId !== undefined) {
       const item = state.items[p.itemId]
       if (!item || item.kind !== 'note' || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
       return [{ type: 'item_text_changed', payload: { id: p.itemId, text: p.text } }]
     }
-    return [{ type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: 'note', qty: 1, loc: { t: 'agent', id: agentId }, text: p.text } }]
+    return [{ type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: 'note', qty: 1, loc: { t: 'agent', id: agentId }, text: p.text, ...ownerStamp(config, agentId) } }]
   },
 })
 
