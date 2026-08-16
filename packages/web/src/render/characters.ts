@@ -78,6 +78,7 @@ export function createCharacterLayer(
     sprite.anchor.set(0.5, FEET_Y / CELL)
     sprite.scale.set(CHAR_TARGET_PX / 64)
     sprite.eventMode = 'static'
+    sprite.cursor = 'pointer'
     sprite.on('pointertap', () => onSelect(agentId))
     const shadow = new Sprite(shadowTexture)
     shadow.anchor.set(0.5, 0.5)

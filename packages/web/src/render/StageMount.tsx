@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
+import { cameraActionFor, stepZoom } from './cameraNav.js'
 import { createScene, type Scene } from './scene.js'
 import { TextureBook } from './textures.js'
 import { syncEntities } from './entities.js'
@@ -12,6 +13,18 @@ import { createAmbient, type AmbientDirector } from './ambient.js'
 // The ONLY React/Pixi contact point — React renders nothing inside the canvas (spec §15).
 export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (scene: Scene) => void }) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const sceneRef = useRef<Scene | null>(null)
+
+  const onKeyDown = (e: React.KeyboardEvent): void => {
+    const s = sceneRef.current
+    if (s === null) return
+    const action = cameraActionFor(e.key)
+    if (action === null) return
+    e.preventDefault()
+    if (action.kind === 'pan') s.panBy(action.dx, action.dy)
+    else if (action.kind === 'zoom') s.setZoom(stepZoom(s.getZoom(), action.dir))
+    else s.centerHome()
+  }
 
   useEffect(() => {
     const rootEl = rootRef.current
@@ -45,6 +58,12 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
       atmosphere = createAtmosphere(s)
       weather = createWeatherLayer(s)
       ambient = createAmbient(s, store, { weather, bubbles, chars })
+      sceneRef.current = s
+      const charLayer = chars
+      s.anchorOf = (agentId) => {
+        const sp = charLayer.getSprite(agentId)
+        return sp === null ? null : { x: sp.x, y: sp.y }
+      }
       offEvents = store.onEvents((evts) => {
         for (const ev of evts) {
           if (ev.type === 'agent_spoke') {
@@ -91,5 +110,14 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
     }
   }, [])
 
-  return <div ref={rootRef} className="stage-mount" />
+  return (
+    <div
+      ref={rootRef}
+      className="stage-mount"
+      tabIndex={0}
+      role="application"
+      aria-label="Town map — arrow keys pan, plus and minus zoom, Home recenters"
+      onKeyDown={onKeyDown}
+    />
+  )
 }

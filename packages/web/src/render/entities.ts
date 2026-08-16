@@ -96,6 +96,7 @@ export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore)
       const sprite = new Sprite()
       sprite.anchor.set(0.5, 1.0) // bottom-center pinned to the ground point (manifest law)
       sprite.eventMode = 'static'
+      sprite.cursor = 'pointer'
       const sid = s.id
       sprite.on('pointertap', (e: FederatedPointerEvent) => {
         void provenanceText(sid, store.getState()).then((text) => showPopover(text, e.client.x, e.client.y))

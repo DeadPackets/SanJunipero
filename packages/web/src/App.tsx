@@ -10,6 +10,7 @@ import { SocietyLens } from './ui/SocietyLens.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { DigestModal } from './ui/DigestModal.js'
 import { StageVeil } from './ui/StageVeil.js'
+import { CameraHud } from './ui/CameraHud.js'
 import { LAST_SEEN_KEY } from './net/socket.js'
 import { Timeline } from './ui/Timeline.js'
 import type { Scene } from './render/scene.js'
@@ -127,6 +128,7 @@ export function App() {
           <StageMount store={store} onScene={setScene} />
           <StageVeil store={store} />
           <ScrubBanner store={store} />
+          {(route.lens === 'map' || route.lens === 'inspector') && <CameraHud scene={scene} />}
           {route.lens === 'chronicle' && <Timeline store={store} handle={handle} onView={onView} />}
           {route.lens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
           {route.lens === 'director' && <DirectorMode store={store} scene={scene} />}

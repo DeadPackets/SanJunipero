@@ -16,7 +16,14 @@ export type Scene = {
   rebakeGround(terrain: TileId[][]): void
   centerOn(x: number, y: number): void
   setZoom(z: 1 | 2 | 3 | 4): void
+  getZoom(): number
+  panBy(dx: number, dy: number): void
+  centerHome(): void
+  onCamera(cb: () => void): () => void
+  setFollow(target: (() => { x: number; y: number } | null) | null): void
   onTilePointer(cb: (t: { x: number; y: number }) => void): void
+  /** world-space anchor for an agent's sprite; wired by StageMount once layers exist */
+  anchorOf?: (agentId: string) => { x: number; y: number } | null
   destroy(): void
 }
 
@@ -68,6 +75,26 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     world.position.set(app.screen.width / 2 - sx * world.scale.x, app.screen.height / 2 - sy * world.scale.y)
   }
 
+  // smooth follow: eases the camera toward a moving world-space anchor each frame
+  let followFn: (() => { x: number; y: number } | null) | null = null
+  const followTick = (): void => {
+    if (followFn === null) return
+    const t = followFn()
+    if (t === null) return
+    const tx = app.screen.width / 2 - t.x * world.scale.x
+    const ty = app.screen.height / 2 - t.y * world.scale.y
+    // frame-rate independent lerp (~12%/frame at 60fps)
+    const k = 1 - Math.pow(0.88, app.ticker.deltaMS / 16.7)
+    world.position.x += (tx - world.position.x) * k
+    world.position.y += (ty - world.position.y) * k
+  }
+  app.ticker.add(followTick)
+
+  const cameraCbs: Array<() => void> = []
+  const notifyCamera = (): void => {
+    for (const cb of cameraCbs) cb()
+  }
+
   function setZoom(z: 1 | 2 | 3 | 4): void {
     // keep the screen center fixed while zooming
     const cx = app.screen.width / 2
@@ -76,11 +103,13 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     const wy = (cy - world.position.y) / world.scale.y
     world.scale.set(z)
     world.position.set(cx - wx * z, cy - wy * z)
+    notifyCamera()
   }
 
-  // camera: drag to pan, wheel steps integer zoom 1-4
+  // camera: drag to pan, wheel steps integer zoom 1-4; the hand shows it
   app.stage.eventMode = 'static'
   app.stage.hitArea = app.screen
+  app.renderer.events.cursorStyles.default = 'grab'
   let dragging = false
   let moved = false
   let last = { x: 0, y: 0 }
@@ -88,18 +117,23 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     dragging = true
     moved = false
     last = { x: e.global.x, y: e.global.y }
+    app.canvas.style.cursor = 'grabbing'
   })
   app.stage.on('pointermove', (e: FederatedPointerEvent) => {
     if (!dragging) return
     const dx = e.global.x - last.x
     const dy = e.global.y - last.y
-    if (Math.abs(dx) + Math.abs(dy) > 2) moved = true
+    if (Math.abs(dx) + Math.abs(dy) > 2) {
+      moved = true
+      followFn = null // the viewer takes the camera back
+    }
     world.position.x += dx
     world.position.y += dy
     last = { x: e.global.x, y: e.global.y }
   })
   const endDrag = (): void => {
     dragging = false
+    app.canvas.style.cursor = 'grab'
   }
   app.stage.on('pointerup', endDrag)
   app.stage.on('pointerupoutside', endDrag)
@@ -152,6 +186,26 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     rebakeGround,
     centerOn,
     setZoom,
+    getZoom: () => world.scale.x,
+    panBy: (dx, dy) => {
+      followFn = null
+      world.position.x += dx
+      world.position.y += dy
+    },
+    centerHome: () => {
+      followFn = null
+      if (bakedTerrain !== null) centerOn(bakedTerrain[0]!.length / 2, bakedTerrain.length / 2)
+    },
+    onCamera: (cb) => {
+      cameraCbs.push(cb)
+      return () => {
+        const i = cameraCbs.indexOf(cb)
+        if (i >= 0) cameraCbs.splice(i, 1)
+      }
+    },
+    setFollow: (target) => {
+      followFn = target
+    },
     onTilePointer: (cb) => {
       tileCbs.push(cb)
     },
@@ -159,6 +213,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       offSub()
       offEvents()
       ro.disconnect()
+      app.ticker.remove(followTick)
       app.canvas.removeEventListener('wheel', onWheel)
       groundTexture?.destroy(true)
       app.destroy(true, { children: true })
