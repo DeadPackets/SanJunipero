@@ -10,6 +10,7 @@ export type ScriptedResponse = {
     reasoningTokens?: number
   }
   fail?: boolean
+  servedModelId?: string
 }
 
 export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
@@ -33,6 +34,7 @@ export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
           outputTokens: { total: outputTokens, text: outputTokens - reasoning, reasoning },
         },
         warnings: [],
+        ...(scripted.servedModelId === undefined ? {} : { response: { modelId: scripted.servedModelId } }),
       }
     },
   })

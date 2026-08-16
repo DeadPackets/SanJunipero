@@ -3,7 +3,7 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type Database from 'better-sqlite3'
 import type { z } from 'zod'
 import { insertAlert, insertLlmCall, sumCostUsd } from './callLog.js'
-import { FALLBACK_MODELS, MIND_MODEL, PRICE_PER_M, PROVIDER_ORDER } from './pins.js'
+import { FALLBACK_MODELS, MIND_MODEL, PRICE_PER_M, PRICE_PER_M_BY_MODEL, PROVIDER_ORDER } from './pins.js'
 
 export type LlmUsage = {
   inputTokens: number
@@ -75,7 +75,7 @@ export class LlmClient {
         maxOutputTokens: this.maxOutputTokens,
         output: Output.object({ schema: opts.schema }),
       })
-      return { usage: r.usage, value: r.output }
+      return { usage: r.usage, value: r.output, servedModel: r.response.modelId }
     })
   }
 
@@ -91,7 +91,7 @@ export class LlmClient {
         maxRetries: 0,
         maxOutputTokens: this.maxOutputTokens,
       })
-      return { usage: r.usage, value: r.text }
+      return { usage: r.usage, value: r.text, servedModel: r.response.modelId }
     })
     return { text: value, usage }
   }
@@ -105,7 +105,7 @@ export class LlmClient {
   }
 
   private async invoke<T>(
-    exec: (model: LanguageModel) => Promise<{ usage: LanguageModelUsage; value: T }>,
+    exec: (model: LanguageModel) => Promise<{ usage: LanguageModelUsage; value: T; servedModel?: string }>,
   ): Promise<{ value: T; usage: LlmUsage }> {
     if (this.budgetUsd !== undefined && this.totalCostUsd() >= this.budgetUsd) {
       throw new BudgetExceededError(
@@ -118,16 +118,17 @@ export class LlmClient {
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       const start = performance.now()
       try {
-        const { usage: raw, value } = await exec(model)
+        const { usage: raw, value, servedModel } = await exec(model)
+        const served = servedModel ?? modelName
         const inputTokens = raw.inputTokens ?? 0
         const outputTokens = raw.outputTokens ?? 0
         const cacheReadTokens = raw.inputTokenDetails.cacheReadTokens ?? 0
         const reasoningTokens = raw.outputTokenDetails.reasoningTokens ?? 0
-        const costUsd = computeCostUsd(inputTokens, outputTokens, cacheReadTokens)
+        const costUsd = computeCostUsd(inputTokens, outputTokens, cacheReadTokens, served)
         insertLlmCall(this.db, {
           agentId: this.agentId,
           caller: this.caller,
-          model: modelName,
+          model: served,
           inputTokens,
           outputTokens,
           cacheReadTokens,
@@ -175,11 +176,13 @@ export function computeCostUsd(
   inputTokens: number,
   outputTokens: number,
   cacheReadTokens: number,
+  model?: string,
 ): number {
+  const prices = (model !== undefined ? PRICE_PER_M_BY_MODEL[model] : undefined) ?? PRICE_PER_M
   return (
-    ((inputTokens - cacheReadTokens) * PRICE_PER_M.input +
-      cacheReadTokens * PRICE_PER_M.cacheRead +
-      outputTokens * PRICE_PER_M.output) /
+    ((inputTokens - cacheReadTokens) * prices.input +
+      cacheReadTokens * prices.cacheRead +
+      outputTokens * prices.output) /
     1e6
   )
 }

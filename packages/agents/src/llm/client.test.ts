@@ -220,6 +220,21 @@ describe('budget guard', () => {
   })
 })
 
+describe('served model attribution', () => {
+  it('logs the model that actually answered, costed with pinned prices when unknown', async () => {
+    const db = openDb()
+    const model = mockModel([
+      { text: 'a', usage: { inputTokens: 100, outputTokens: 10 }, servedModelId: 'deepseek/deepseek-chat' },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test' })
+    await client.text({ messages: [{ role: 'user', content: 'u' }] })
+    const row = rows(db)[0]!
+    expect(row.model).toBe('deepseek/deepseek-chat')
+    // no price pin for the fallback model: falls back to the pinned prices
+    expect(row.cost_usd).toBeCloseTo((100 * 0.14 + 10 * 0.28) / 1e6, 12)
+  })
+})
+
 describe('alerts', () => {
   it('alert() writes an alerts row', () => {
     const db = openDb()
