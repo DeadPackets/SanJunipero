@@ -9,5 +9,6 @@ export { DEFAULT_DETECT_CONFIG, ROLE_VERBS, detectInstitutions } from './institu
 export { FORBIDDEN_FRAMING } from './llm/framing.js'
 export { renderChapter, renderEra, sceneDigests, verifyCitations } from './chronicle.js'
 export { MARKER_HEAT_THRESHOLD, narrateDay, narrateWeek, renderDigest, timelineMarkers } from './narrate.js'
+export { renderNewspaper } from './publications.js'
 export { ChapterSummarySchema, EraSummarySchema, makeNarratorLlm, type NarratorLlmClient } from './llm/narratorLlm.js'
 export type * from './types.js'
