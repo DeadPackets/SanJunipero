@@ -93,7 +93,7 @@ export class RulebookStore {
   }
 
   allActive(): RulebookRow[] {
-    const rows = this.db.prepare('SELECT * FROM rulebook WHERE reverted_at_tick IS NULL').all() as RawRulebookRow[]
+    const rows = this.db.prepare('SELECT * FROM rulebook WHERE reverted_at_tick IS NULL ORDER BY id').all() as RawRulebookRow[]
     return rows.map(toRulebookRow)
   }
 

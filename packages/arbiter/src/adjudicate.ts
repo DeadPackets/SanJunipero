@@ -1,9 +1,9 @@
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/agents'
-import { VERBS } from '@sj/engine'
+import { registerVerb, VERBS } from '@sj/engine'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
-import { codify as codifyRecipe } from './codify.js'
+import { codify as codifyRecipe, verbFromRecipe } from './codify.js'
 import { assembleAdjudicationPrompt } from './prompt.js'
 import { ReviewStore } from './review.js'
 import { RulebookStore } from './rulebook.js'
@@ -58,6 +58,12 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
   const codex = new CodexStore(deps.db)
   const rulings = new RulingsStore(deps.db, deps.embedder)
   const tick = deps.tick ?? (() => 0)
+
+  // Restart resilience: the rulebook is durable but the verb registry is
+  // in-memory — re-register every active codified verb in deterministic order.
+  for (const row of rulebook.allActive()) {
+    if (!VERBS[row.verb]) registerVerb(verbFromRecipe(JSON.parse(row.recipeJson) as Recipe))
+  }
 
   return {
     async adjudicate(intent, agentCtx) {

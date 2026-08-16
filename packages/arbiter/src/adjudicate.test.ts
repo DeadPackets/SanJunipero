@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { EMBEDDING_DIM, FakeEmbedder, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
-import { unregisterVerb } from '@sj/engine'
+import { unregisterVerb, VERBS } from '@sj/engine'
 import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { ReviewStore } from './review.js'
@@ -351,6 +351,29 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     expect(review.pending()).toEqual([])
     const row = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').get(ruleId) as { status: string }
     expect(row.status).toBe('reverted')
+  })
+})
+
+describe('rulebook rehydration on construction', () => {
+  const rehydrateRecipe: Recipe = { ...basketRecipe, id: 'recipe:rehydrate_basket', name: 'Rehydrate Basket', rngStream: 'recipe:rehydrate_basket' }
+  const revertedRecipe: Recipe = { ...basketRecipe, id: 'recipe:rehydrate_gone', name: 'Rehydrate Gone', rngStream: 'recipe:rehydrate_gone' }
+
+  it('re-registers active codified verbs after a process restart; reverted rows stay out', async () => {
+    const llm = new ScriptedLlm(() => basketVerdict)
+    const { db, arbiter, embedder } = await makeRig(llm)
+
+    arbiter.codify(rehydrateRecipe)
+    arbiter.codify(revertedRecipe)
+    arbiter.revert('recipe:rehydrate_gone', 'physics wrong')
+    // Simulate restart: the in-memory registry forgets, the db remembers.
+    unregisterVerb('recipe:rehydrate_basket')
+    expect(VERBS['recipe:rehydrate_basket']).toBeUndefined()
+
+    makeArbiter({ db, llm: llm as unknown as LlmClient, embedder, tick: () => 200 })
+    expect(VERBS['recipe:rehydrate_basket']).toBeDefined()
+    expect(VERBS['recipe:rehydrate_gone']).toBeUndefined()
+
+    unregisterVerb('recipe:rehydrate_basket')
   })
 })
 
