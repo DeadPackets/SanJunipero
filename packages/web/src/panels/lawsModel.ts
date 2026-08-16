@@ -1,5 +1,7 @@
 import type { SimConfig, SimEvent } from '@sj/shared'
-import { TOGGLABLE_PATHS } from '@sj/engine'
+// The subpath, never the index: `@sj/engine` re-exports db.ts, which imports better-sqlite3
+// at module scope and throws in a browser before React mounts. browserGraph.test.ts pins it.
+import { TOGGLABLE_PATHS } from '@sj/engine/laws'
 
 export const ADMIN_TOKEN_KEY = 'sj.adminToken'
 export const ADMIN_LAWS_ROUTE = '/admin/laws'
