@@ -25,6 +25,13 @@ import type { EngineBridge, SubmitResult } from './bridge.js'
 
 const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 
+// The night running from dusk of day d to dawn of day d+1 is night d, so an
+// agent asleep past midnight still reflects (once) over the day that ended.
+const DAWN_MINUTES = 6 * 60
+function nightOf(tick: number): number {
+  return Math.max(0, Math.floor((tick - DAWN_MINUTES) / MINUTES_PER_DAY))
+}
+
 const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [] }
 
 function nearestStructureKind(packet: PerceptionPacket): string | null {
@@ -80,7 +87,7 @@ export class AgentRuntime {
   #planHeadInFlight = false
   #turnInFlight = false
   #stats = { turns: 0, dozes: 0, reflections: 0 }
-  #reflectedDay: number | null = null
+  #reflectedNight: number | null = null
   #pendingDreamMood: string | null = null
   #wasNight = false
   #started = false
@@ -118,7 +125,7 @@ export class AgentRuntime {
     this.#planHeadInFlight = false
     this.#turnInFlight = false
     this.#stats = { turns: 0, dozes: 0, reflections: 0 }
-    this.#reflectedDay = null
+    this.#reflectedNight = null
     this.#pendingDreamMood = null
     this.#wasNight = simTimeFromTick(this.#bridge.currentTick()).isNight
     this.#started = true
@@ -194,7 +201,6 @@ export class AgentRuntime {
 
   #handleNight(tick: number, packet: PerceptionPacket): void {
     const isNight = packet.time.isNight
-    const day = Math.floor(tick / MINUTES_PER_DAY)
     if (this.#wasNight && !isNight) {
       if (this.#pendingDreamMood !== null) {
         const cur = this.#personality.current().doc.current
@@ -203,8 +209,9 @@ export class AgentRuntime {
       }
       this.#dayLog = []
     }
-    if (isNight && packet.self.asleep && this.#reflectedDay !== day) {
-      void this.#runNight(day)
+    if (isNight && packet.self.asleep) {
+      const night = nightOf(tick)
+      if (this.#reflectedNight !== night) void this.#runNight(night)
     }
     this.#wasNight = isNight
   }
@@ -330,18 +337,11 @@ export class AgentRuntime {
     if (turn.reconsider_at) {
       this.#clock.reconsiderAtTick = reconsiderTick(tick, turn.reconsider_at)
     }
-
-    const submittedSleep =
-      (turn.action !== undefined && !('freeform' in turn.action) && turn.action.verb === 'sleep') ||
-      (turn.plan?.some((i) => i.verb === 'sleep') ?? false)
-    if (submittedSleep && this.#reflectedDay !== day && this.#reflectionLlm !== null) {
-      await this.#runNight(day)
-    }
   }
 
   async #runNight(day: number): Promise<void> {
-    if (this.#reflectedDay === day) return
-    this.#reflectedDay = day
+    if (this.#reflectedNight === day) return
+    this.#reflectedNight = day
     if (this.#reflectionLlm === null) return
     this.#stats.reflections += 1
     try {

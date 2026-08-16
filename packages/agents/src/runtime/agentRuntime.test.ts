@@ -51,8 +51,8 @@ function baseDoc(): PersonalityDoc {
   return { temperament: 'calm', values: ['loyalty'], beliefs: [], current: { mood: 'settled', worries: [], goals: [] } }
 }
 
-function buildWorld() {
-  const config = fastSimConfig()
+function buildWorld(simConfig?: SimConfig) {
+  const config = simConfig ?? fastSimConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
   const engineDb = openDb(':memory:')
   const store = new EventStore(engineDb)
@@ -161,8 +161,9 @@ async function setup(opts: {
   dreamLlm?: DreamLlm
   embedder?: { embed(t: string): Promise<Float32Array> }
   maxRetries?: number
+  simConfig?: SimConfig
 }) {
-  const world = buildWorld()
+  const world = buildWorld(opts.simConfig)
   const worldTick = createWorldTick(world.config, world.rng)
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
@@ -364,6 +365,60 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // The dawn reset drops yesterday's log; the morning wake may already have
     // written the new day's first entry.
     expect(runtime.dayLogSnapshot().length).toBeLessThanOrEqual(1)
+  })
+
+  it('does not reflect on a merely attempted sleep that the engine rejected', async () => {
+    const reflection = new ScriptedReflectionLlm()
+    const { loop, runtime, mem, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'Eat, then rest.',
+          plan: [
+            { verb: 'eat', params: { itemId: 'nope' } },
+            { verb: 'sleep', params: {} },
+          ],
+          importance: 4,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+      reflectionLlm: reflection,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+    for (let i = 0; i < 10; i++) {
+      loop.step()
+      await flush()
+    }
+    // The plan head was rejected, so sleep never reached the engine: no reflection.
+    expect(loop.state.agents[AGENT]!.asleep).toBe(false)
+    expect(runtime.stats().reflections).toBe(0)
+    expect(mem.summaryNodes('day', 0)).toHaveLength(0)
+  })
+
+  it('reflects exactly once for a night that spans midnight', async () => {
+    const reflection = new ScriptedReflectionLlm()
+    const { loop, runtime, mem, bridge } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 100000, boredomTicks: 100000 },
+      reflectionLlm: reflection,
+      simConfig: SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 } }),
+    })
+    while (loop.tick < 1350) {
+      loop.step()
+      await flush()
+    }
+    void bridge.submit(AGENT, { verb: 'sleep', params: {} })
+    await stepUntil(loop, () => runtime.stats().reflections >= 1, 50)
+    expect(runtime.stats().reflections).toBe(1)
+    expect(mem.summaryNodes('day', 0)).toHaveLength(1)
+
+    // Sleep on past midnight: still the same night — no second reflection.
+    while (loop.tick < 1500) {
+      loop.step()
+      await flush()
+    }
+    expect(loop.state.agents[AGENT]!.asleep).toBe(true)
+    expect(runtime.stats().reflections).toBe(1)
+    expect(mem.summaryNodes('day', 1)).toHaveLength(0)
   })
 
   it('keeps golden replay deterministic across mind writes', async () => {
