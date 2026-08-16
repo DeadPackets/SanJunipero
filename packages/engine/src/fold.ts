@@ -9,12 +9,14 @@ import {
   CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
   FireExtinguished, FireIgnited, FireSpread, HpChanged,
   ItemBroke, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
+  ConfigChanged,
   ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { occupantsOf } from './interiors.js'
+import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
 import { pairKey } from './systems/reproduction.js'
 import { findPath } from './path.js'
 import { WalkParams } from './verbs.js'
@@ -38,7 +40,10 @@ function refuseOccupied(state: WorldState, structureId: string): void {
   }
 }
 
-export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEFAULT_CONFIG): WorldState {
+export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig = DEFAULT_CONFIG): WorldState {
+  // Every fold reads the world's laws as they stand right now, so a replay of the log
+  // can never drift from the run that wrote it — even across a mid-run law change.
+  const config = effectiveConfig(baseConfig, state.laws)
   switch (event.type) {
     case 'tick_advanced': {
       TickAdvanced.parse(event.payload)
@@ -480,6 +485,16 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       if (!row || p.x < 0 || p.x >= row.length) throw new Error(`terrain_changed out of bounds (${p.x}, ${p.y})`)
       const terrain = state.terrain.map((r, y) => (y === p.y ? r.map((t, x) => (x === p.x ? (p.tile as TileId) : t)) : r))
       return { ...state, terrain }
+    }
+    // The whitelist is the whole of the authority: an operator, a bug or a doctored
+    // log can only ever move a dial this table already agreed to.
+    case 'config_changed': {
+      const p = ConfigChanged.parse(event.payload)
+      const schema = TOGGLABLE_PATHS[p.path]
+      if (schema === undefined) throw new Error(`config_changed: ${p.path} is not a world law`)
+      const parsed = schema.safeParse(p.value)
+      if (!parsed.success) throw new Error(`config_changed: value rejected for ${p.path}`)
+      return { ...state, laws: { ...state.laws, [p.path]: parsed.data } }
     }
     default:
       throw new Error(`unknown event type: ${event.type}`)

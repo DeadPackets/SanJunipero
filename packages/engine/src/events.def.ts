@@ -97,3 +97,5 @@ export const CropWithered = z.object({ cropId: z.string() }).strict()
 export const CropHarvested = z.object({ cropId: z.string() }).strict()
 export const WildlifeChanged = z.object({ fish: z.number().optional(), deer: z.number().optional() }).strict()
 export const TerrainChanged = z.object({ x: z.number(), y: z.number(), tile: z.number().int().min(0).max(7) }).strict()
+// The only road a world law travels. `value` is checked against TOGGLABLE_PATHS at fold.
+export const ConfigChanged = z.object({ path: z.string(), value: z.unknown() }).strict()

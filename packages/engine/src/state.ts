@@ -52,6 +52,9 @@ export type WorldState = {
   wildlife: { fish: number; deer: number }
   // Absent until the first co_slept, so a world with no nights hashes as it always did.
   pairNights?: Record<string, { nights: number; lastNightDay: number; formedTick: number | null; dissolvedTick: number | null }>
+  // Runtime overrides of world physics, keyed by dotted config path. Absent until the
+  // first config_changed; hashed, snapshotted and replayed like every other fact.
+  laws?: Record<string, unknown>
   counters: { nextEntityId: number }
 }
 
