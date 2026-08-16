@@ -23,9 +23,9 @@ describe('GATE G9b — committed run evidence', () => {
     const report = loadReport()
     const e = report.evidence
 
-    // 1. Two full sim-days, no crash, nothing left hanging on the bridge.
+    // 1. Two full sim-days at least, no crash, nothing left hanging on the bridge.
     expect(e.ticksRun, '1.run').toBe(report.totalTicks)
-    expect(report.totalTicks, '1.run').toBe(2 * 1440)
+    expect(report.totalTicks, '1.run').toBeGreaterThanOrEqual(2 * 1440)
     expect(e.crashAlerts, '1.run').toBe(0)
     expect(e.drainedAgainCount, '1.run').toBe(0)
 

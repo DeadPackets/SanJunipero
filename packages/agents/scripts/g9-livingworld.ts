@@ -1,7 +1,7 @@
 // GATE G9b — the live half of the living-world gate (addendum §17).
-// Five minds, one staged birth, a real arbiter, a real admin law channel, two
-// sim-days. Everything the report claims is read back out of the run's own
-// tables and event log; nothing here asserts on a mock.
+// Five minds, one staged birth, a real arbiter, a real admin law channel, and
+// at least two sim-days (G9_TICKS). Everything the report claims is read back
+// out of the run's own tables and event log; nothing here asserts on a mock.
 import { fileURLToPath } from 'node:url'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
@@ -475,7 +475,7 @@ async function main(): Promise<void> {
   }
   const stopWatchingBirths = watchBirths(bridge, store, onBorn)
 
-  // --- Two sim-days. ---
+  // --- The run. ---
   const spendProjections: Array<{ tick: number; usdPerSimDay: number; sampledCalls: number }> = []
   let forcedSpendAlert = false
   let adminPostStatus: number | null = null
@@ -712,7 +712,7 @@ function transcript(
   rejections: Rejection[],
 ): string {
   const lines: string[] = [
-    '# GATE G9b — living world, two sim-days',
+    `# GATE G9b — living world, ${(report.totalTicks / MINUTES_PER_DAY).toFixed(0)} sim-days`,
     '',
     `Model ${report.model}; ${report.totalTicks} ticks at ${report.realMsPerTick} ms; $${report.totalCostUsd.toFixed(6)} over ${report.llmCallCount} calls.`,
     '',
