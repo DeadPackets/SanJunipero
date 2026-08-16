@@ -1,6 +1,6 @@
 import type { AgentBody } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
-import type { Facing } from './iso.js'
+import { facingFrom, type Facing } from './iso.js'
 
 // Character standard v2 sheet layout (forge style bible) — the atlas is the runtime truth
 export const SHEET_COLS: Facing[] = ['sw', 'se', 'ne', 'nw']
@@ -75,6 +75,13 @@ export function prunePath(path: ReadonlyArray<Waypoint>, nowMs: number): Waypoin
     else break
   }
   return cut > 0 ? path.slice(cut) : [...path]
+}
+
+// Facing for the leg being walked NOW — path[0] (anchor) → path[1] — so a queued
+// multi-waypoint path never turns the body toward its final leg early.
+export function legFacing(path: ReadonlyArray<Waypoint>): Facing | null {
+  if (path.length < 2) return null
+  return facingFrom(path[1]!.x - path[0]!.x, path[1]!.y - path[0]!.y)
 }
 
 export const EMOTE_KINDS = ['exclaim', 'question', 'heart', 'star', 'sleep', 'hunger',

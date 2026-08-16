@@ -7,7 +7,7 @@ import { characterArt, smoothSource, type TextureBook } from './textures.js'
 import {
   CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, NAME_TAG_ABOVE_HEAD_PX,
   SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4, charPose, emoteFor, hitRect, interpolatePos,
-  nameTagText, prunePath, type Waypoint,
+  legFacing, nameTagText, prunePath, type Waypoint,
 } from './charAnim.js'
 
 export const EMOTE_MS = 2000
@@ -211,6 +211,9 @@ export function createCharacterLayer(
       e.path = prunePath(e.path, nowMs)
       const pos = interpolatePos(e.path, nowMs)
       const walking = e.path.length > 1 && nowMs < e.path[e.path.length - 1]!.atMs
+      // while walking, face the current leg; the event-time facing stays as the
+      // idle orientation after arrival
+      if (walking) e.facing = legFacing(e.path) ?? e.facing
       const sheet = sheets.get(a.id)
       const hires = sheet !== undefined && sheet.texture !== null && sheet.art.manifest !== null
       const pose = charPose(

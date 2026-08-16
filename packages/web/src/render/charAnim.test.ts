@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentBody } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
-import { BOB_PX, EMOTE_KINDS, HIT_AREA_H, HIT_AREA_W, NAME_TAG_MAX_CHARS, WALK_FRAME_MS_V4, WALK_LOOP, charPose, emoteFor, hitRect, interpolatePos, nameTagText, prunePath } from './charAnim.js'
+import { BOB_PX, EMOTE_KINDS, HIT_AREA_H, HIT_AREA_W, NAME_TAG_MAX_CHARS, WALK_FRAME_MS_V4, WALK_LOOP, charPose, emoteFor, hitRect, interpolatePos, legFacing, nameTagText, prunePath } from './charAnim.js'
 
 describe('charPose v4 cadence', () => {
   const v4base = { asleep: false, collapsed: false, walking: true, facing: 'se' as const, nowMs: 0 }
@@ -81,6 +81,23 @@ describe('prunePath', () => {
   })
   it('keeps the whole path when nothing has passed yet', () => {
     expect(prunePath(path, 50)).toEqual(path)
+  })
+})
+
+describe('legFacing', () => {
+  const wp = (x: number, y: number, atMs = 0): { x: number; y: number; atMs: number } => ({ x, y, atMs })
+  it('faces the direction of the path[0]→path[1] leg, all four ways', () => {
+    expect(legFacing([wp(0, 0), wp(1, 0, 100)])).toBe('se')
+    expect(legFacing([wp(0, 0), wp(-1, 0, 100)])).toBe('nw')
+    expect(legFacing([wp(0, 0), wp(0, 1, 100)])).toBe('sw')
+    expect(legFacing([wp(0, 0), wp(0, -1, 100)])).toBe('ne')
+  })
+  it('ignores later legs — faces the leg being walked, not the newest queued one', () => {
+    expect(legFacing([wp(0, 0), wp(0, 1, 100), wp(5, 1, 600)])).toBe('sw')
+  })
+  it('is null for a single waypoint or an empty path', () => {
+    expect(legFacing([wp(3, 3)])).toBeNull()
+    expect(legFacing([])).toBeNull()
   })
 })
 
