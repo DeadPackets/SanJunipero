@@ -267,6 +267,12 @@ async function runCharacter(m: CastMember): Promise<void> {
 
   function evalFrame(key: string, f: AuthoredFacing, raw: RawImage): FrameCand {
     const keyed = keyBg(raw)
+    // Two side-by-side figures can pass the aspect check (square-ish bbox) and the
+    // palette gate (same character twice) — reject on column clustering like sleep
+    // (seen on nadia ne-passing-c2, silhouette 2.011 with palette PASS).
+    let twoFigures = false
+    try { sliceStrip(keyed, 2); twoFigures = true } catch { /* single cluster — good */ }
+    if (twoFigures) throw new Error('slices into 2 figure clusters — multi-figure frame')
     const hi = processHiResCell(keyed, TARGET_H)
     const b = opaqueBbox(hi)!
     const aspect = (b.x1 - b.x0 + 1) / (b.y1 - b.y0 + 1)
