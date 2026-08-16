@@ -1,0 +1,392 @@
+{
+  "generatedAt": "2026-08-16T14:24:32.648Z",
+  "model": "deepseek/deepseek-v4-flash-0731",
+  "totalTicks": 2880,
+  "realMsPerTick": 250,
+  "capUsd": 8,
+  "expectedCallCostUsd": 0.005,
+  "totalCostUsd": 0.47014447200000004,
+  "costByCaller": {
+    "arbiter": 0.004321744000000001,
+    "naming": 0.00008372,
+    "reflection": 0.12394186000000001,
+    "turn": 0.34179714800000005
+  },
+  "llmCallCount": 572,
+  "excerpts": {
+    "childThought": "Ada sleeps. The house began today. Night is for rest.",
+    "motherBirthLine": "You have borne a daughter. The town rolls will know her as Talia — what do you call her?",
+    "ownershipProse": "It is morning on day 1 of spring. You stand at (10, 12). The sun is out. The air is mild. Bex (bex) stands at (10, 13). Cass (cass) stands at (14, 12). Dov (dov) stands at (18, 12). Esen (esen) stands at (22, 12). A hut (structure_1) stands at (10, 10), 2 tiles wide and 2 tiles tall; you could stand beside it at (10, 12). A hut (structure_2) stands at (14, 10), 2 tiles wide and 2 tiles tall; you could stand beside it at (13, 12). A hut (structure_3) stands at (18, 10), 2 tiles wide and 2 tiles tall; you could stand beside it at (17, 12). A storehouse (structure_5) stands at (12, 15), 2 tiles wide and 2 tiles tall; you could stand beside it at (11, 14). A campfire (structure_6) stands at (17, 15), one tile wide — it is burning; you could stand beside it at (16, 14). You can see 3 plank (item_6) at (16, 12) — Bex's, marked by Bex. You are carrying 2 bread (item_1).",
+    "witnessProse": null
+  },
+  "evidence": {
+    "ticksRun": 2880,
+    "crashAlerts": 0,
+    "drainedIntents": 2,
+    "drainedAgainCount": 0,
+    "minds": [
+      {
+        "agentId": "ada",
+        "turns": 55,
+        "reflections": 2
+      },
+      {
+        "agentId": "bex",
+        "turns": 96,
+        "reflections": 2
+      },
+      {
+        "agentId": "cass",
+        "turns": 112,
+        "reflections": 2
+      },
+      {
+        "agentId": "dov",
+        "turns": 98,
+        "reflections": 2
+      },
+      {
+        "agentId": "esen",
+        "turns": 32,
+        "reflections": 2
+      },
+      {
+        "agentId": "agent_11",
+        "turns": 36,
+        "reflections": 2
+      }
+    ],
+    "child": {
+      "id": "agent_11",
+      "registryName": "Talia",
+      "socialName": "Moth",
+      "bornTick": 1440,
+      "turns": 36,
+      "personaNamesBothParents": true,
+      "seedEntries": 29,
+      "seedAllPublic": true,
+      "motherBirthMemoryTick": 1440,
+      "motherTurnTickAfterBirth": 1800
+    },
+    "novelIntents": 21,
+    "codifiedVerbs": [],
+    "repeatIntent": null,
+    "repeatArbiterCalls": 0,
+    "unknownVerbRejections": 0,
+    "unknownVerbRefusalMemories": 0,
+    "adjudicationsAfterUnknownVerb": 0,
+    "reflectionsStarted": 12,
+    "reflectionsResolved": 12,
+    "reflectionFallbacks": 2,
+    "spendProjections": [
+      {
+        "tick": 480,
+        "usdPerSimDay": 0.018056304000000002,
+        "sampledCalls": 13
+      },
+      {
+        "tick": 540,
+        "usdPerSimDay": 0.058817136000000006,
+        "sampledCalls": 32
+      },
+      {
+        "tick": 600,
+        "usdPerSimDay": 0.07262292800000002,
+        "sampledCalls": 37
+      },
+      {
+        "tick": 660,
+        "usdPerSimDay": 0.095060448,
+        "sampledCalls": 42
+      },
+      {
+        "tick": 720,
+        "usdPerSimDay": 0.10653731200000001,
+        "sampledCalls": 46
+      },
+      {
+        "tick": 780,
+        "usdPerSimDay": 0.12027478400000001,
+        "sampledCalls": 50
+      },
+      {
+        "tick": 840,
+        "usdPerSimDay": 0.14753681600000002,
+        "sampledCalls": 56
+      },
+      {
+        "tick": 900,
+        "usdPerSimDay": 0.18004772800000002,
+        "sampledCalls": 66
+      },
+      {
+        "tick": 960,
+        "usdPerSimDay": 0.21531406400000003,
+        "sampledCalls": 78
+      },
+      {
+        "tick": 1020,
+        "usdPerSimDay": 0.23523348800000002,
+        "sampledCalls": 83
+      },
+      {
+        "tick": 1080,
+        "usdPerSimDay": 0.25081683200000005,
+        "sampledCalls": 88
+      },
+      {
+        "tick": 1140,
+        "usdPerSimDay": 0.25081683200000005,
+        "sampledCalls": 88
+      },
+      {
+        "tick": 1200,
+        "usdPerSimDay": 0.27794032,
+        "sampledCalls": 96
+      },
+      {
+        "tick": 1260,
+        "usdPerSimDay": 0.279689648,
+        "sampledCalls": 97
+      },
+      {
+        "tick": 1320,
+        "usdPerSimDay": 0.28156385600000006,
+        "sampledCalls": 98
+      },
+      {
+        "tick": 1380,
+        "usdPerSimDay": 0.320969936,
+        "sampledCalls": 106
+      },
+      {
+        "tick": 1440,
+        "usdPerSimDay": 0.35277636800000006,
+        "sampledCalls": 113
+      },
+      {
+        "tick": 1500,
+        "usdPerSimDay": 0.39182360000000005,
+        "sampledCalls": 135
+      },
+      {
+        "tick": 1560,
+        "usdPerSimDay": 0.4066273120000001,
+        "sampledCalls": 144
+      },
+      {
+        "tick": 1620,
+        "usdPerSimDay": 0.45627243200000006,
+        "sampledCalls": 160
+      },
+      {
+        "tick": 1680,
+        "usdPerSimDay": 0.48269401600000006,
+        "sampledCalls": 172
+      },
+      {
+        "tick": 1740,
+        "usdPerSimDay": 0.519205232,
+        "sampledCalls": 177
+      },
+      {
+        "tick": 1800,
+        "usdPerSimDay": 0.5497065280000001,
+        "sampledCalls": 188
+      },
+      {
+        "tick": 1860,
+        "usdPerSimDay": 0.5808376000000001,
+        "sampledCalls": 206
+      },
+      {
+        "tick": 1920,
+        "usdPerSimDay": 0.634702992,
+        "sampledCalls": 225
+      },
+      {
+        "tick": 1980,
+        "usdPerSimDay": 0.7035723520000001,
+        "sampledCalls": 243
+      },
+      {
+        "tick": 2040,
+        "usdPerSimDay": 0.7461737920000001,
+        "sampledCalls": 255
+      },
+      {
+        "tick": 2100,
+        "usdPerSimDay": 0.7847908320000001,
+        "sampledCalls": 267
+      },
+      {
+        "tick": 2160,
+        "usdPerSimDay": 0.81405464,
+        "sampledCalls": 280
+      },
+      {
+        "tick": 2220,
+        "usdPerSimDay": 0.855484784,
+        "sampledCalls": 292
+      },
+      {
+        "tick": 2280,
+        "usdPerSimDay": 0.8861969760000001,
+        "sampledCalls": 305
+      },
+      {
+        "tick": 2340,
+        "usdPerSimDay": 0.9405215680000001,
+        "sampledCalls": 324
+      },
+      {
+        "tick": 2400,
+        "usdPerSimDay": 0.9678519200000001,
+        "sampledCalls": 338
+      },
+      {
+        "tick": 2460,
+        "usdPerSimDay": 1.003740976,
+        "sampledCalls": 356
+      },
+      {
+        "tick": 2520,
+        "usdPerSimDay": 1.066096192,
+        "sampledCalls": 374
+      },
+      {
+        "tick": 2580,
+        "usdPerSimDay": 1.1024424320000001,
+        "sampledCalls": 389
+      },
+      {
+        "tick": 2640,
+        "usdPerSimDay": 1.1507807360000002,
+        "sampledCalls": 402
+      },
+      {
+        "tick": 2700,
+        "usdPerSimDay": 1.1765171040000002,
+        "sampledCalls": 411
+      },
+      {
+        "tick": 2760,
+        "usdPerSimDay": 1.2409349120000002,
+        "sampledCalls": 426
+      },
+      {
+        "tick": 2820,
+        "usdPerSimDay": 1.3518888320000002,
+        "sampledCalls": 449
+      },
+      {
+        "tick": 2880,
+        "usdPerSimDay": 1.441720112,
+        "sampledCalls": 469
+      },
+      {
+        "tick": 2940,
+        "usdPerSimDay": 1.512823312,
+        "sampledCalls": 480
+      },
+      {
+        "tick": 3000,
+        "usdPerSimDay": 1.552136656,
+        "sampledCalls": 494
+      },
+      {
+        "tick": 3060,
+        "usdPerSimDay": 1.614116448,
+        "sampledCalls": 507
+      },
+      {
+        "tick": 3120,
+        "usdPerSimDay": 1.7065792800000001,
+        "sampledCalls": 522
+      },
+      {
+        "tick": 3180,
+        "usdPerSimDay": 1.7713262560000003,
+        "sampledCalls": 541
+      },
+      {
+        "tick": 3240,
+        "usdPerSimDay": 1.821173536,
+        "sampledCalls": 555
+      },
+      {
+        "tick": 3300,
+        "usdPerSimDay": 1.8496162720000002,
+        "sampledCalls": 567
+      }
+    ],
+    "forcedSpendAlert": true,
+    "spendAlertRows": 1,
+    "voice": [
+      {
+        "agentId": "ada",
+        "budgetTypical": 9,
+        "utterances": 34,
+        "meanWords": 4.882352941176471,
+        "medianWords": 4
+      },
+      {
+        "agentId": "bex",
+        "budgetTypical": 14,
+        "utterances": 35,
+        "meanWords": 11.2,
+        "medianWords": 11
+      },
+      {
+        "agentId": "cass",
+        "budgetTypical": 20,
+        "utterances": 29,
+        "meanWords": 18.379310344827587,
+        "medianWords": 18
+      },
+      {
+        "agentId": "dov",
+        "budgetTypical": 28,
+        "utterances": 11,
+        "meanWords": 17.818181818181817,
+        "medianWords": 18
+      },
+      {
+        "agentId": "esen",
+        "budgetTypical": 26,
+        "utterances": 15,
+        "meanWords": 15.533333333333333,
+        "medianWords": 15
+      },
+      {
+        "agentId": "agent_11",
+        "budgetTypical": 12,
+        "utterances": 25,
+        "meanWords": 5.24,
+        "medianWords": 5
+      }
+    ],
+    "ownershipPhraseCount": 181,
+    "witnessProseCount": 0,
+    "theftCount": 0,
+    "adminPostStatus": 202,
+    "lawFlips": [
+      {
+        "tick": 1786,
+        "path": "mystery.chancePerDay",
+        "value": 1
+      },
+      {
+        "tick": 1786,
+        "path": "spoilage.enabled",
+        "value": false
+      }
+    ],
+    "lawHistoryEntries": 2,
+    "finalLaws": {
+      "mystery.chancePerDay": 1,
+      "spoilage.enabled": false
+    },
+    "replayHashMatches": true
+  }
+}
