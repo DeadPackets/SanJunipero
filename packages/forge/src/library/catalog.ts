@@ -16,19 +16,22 @@ export const LIBRARY_COUNTS: Record<LibraryCategory, number> =
   { tool: 10, food: 10, material: 9, ritual: 6, furniture: 15 }
 
 // Every world sprite is drawn at 24 px: measured against paid candidates, a 16 px cell
-// loses the object (a pail's handle and staves dissolve). Icons stay at the planned 16.
+// loses the object (a pail's handle and staves dissolve).
 export const WORLD_SPRITE_PX = 24
+// Controller icon ruling: every icon is 24 px too. At 16 px a needle and a fishing rod have
+// no reading at all, and 7 of the 20 batch-B blocks were a clean sprite failing only its icon.
+export const ICON_PX = 24
 
 const tool = (kind: string, desc: string): LibraryEntry =>
-  ({ kind, category: 'tool', desc, spritePx: WORLD_SPRITE_PX, iconPx: 16 })
+  ({ kind, category: 'tool', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX })
 const food = (kind: string, desc: string): LibraryEntry =>
-  ({ kind, category: 'food', desc, spritePx: WORLD_SPRITE_PX, iconPx: 16 })
+  ({ kind, category: 'food', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX })
 const material = (kind: string, desc: string): LibraryEntry =>
-  ({ kind, category: 'material', desc, spritePx: WORLD_SPRITE_PX, iconPx: 16 })
+  ({ kind, category: 'material', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX })
 const ritual = (kind: string, desc: string): LibraryEntry =>
-  ({ kind, category: 'ritual', desc, spritePx: WORLD_SPRITE_PX, iconPx: 16 })
+  ({ kind, category: 'ritual', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX })
 const furniture = (kind: string, desc: string, interior: LibraryEntry['interior']): LibraryEntry =>
-  ({ kind, category: 'furniture', desc, spritePx: WORLD_SPRITE_PX, iconPx: 24, interior })
+  ({ kind, category: 'furniture', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX, interior })
 
 const TOOLS: LibraryEntry[] = [
   tool('axe', 'a woodcutter axe with a honey-wood haft and a warm-grey iron head, the blade edge kept bright and keen'),

@@ -29,9 +29,14 @@ describe('the library catalog', () => {
     expect(() => LibraryEntrySchema.parse({ ...axe, interior: chair.interior })).toThrow()
   })
 
-  it('furniture icons are 24 px and everything else is 16 px', () => {
-    for (const e of LIBRARY)
-      expect(e.iconPx, e.kind).toBe(e.category === 'furniture' ? 24 : 16)
+  // Controller icon ruling: 24 px for every class, not just furniture. At the same size as
+  // the sprite the icon is the same art, which is exactly the point — the 16 px cell was the
+  // weakest surface in the library and the only thing failing on seven otherwise clean items.
+  it('every icon is 24 px, sprite and icon alike', () => {
+    for (const e of LIBRARY) {
+      expect(e.iconPx, e.kind).toBe(24)
+      expect(e.spritePx, e.kind).toBe(24)
+    }
   })
 
   it('resolves all six C10 T10 furnishing originals', () => {

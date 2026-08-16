@@ -13,7 +13,9 @@ export const ForgeConfigSchema = z.object({
     rubricVersion: z.string().default('v1'),
   }).strict().prefault({}),
   library: z.object({
-    iconSizePx: z.literal(16).default(16),
+    // 16 was the plan's split for non-furniture; the controller icon ruling closed it after
+    // the library sheet — a 16 px cell has no reading for a needle or a rod.
+    iconSizePx: z.literal(24).default(24),
     furnitureIconSizePx: z.literal(24).default(24),
   }).strict().prefault({}),
   alignment: z.object({
