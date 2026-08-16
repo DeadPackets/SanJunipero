@@ -14,8 +14,16 @@ export const ItemLoc = z.discriminatedUnion('t', [
   z.object({ t: z.literal('agent'), id: z.string() }).strict(),
   z.object({ t: z.literal('structure'), id: z.string() }).strict(),
 ])
-export const ItemSpawned = z.object({ id: z.string(), kind: z.string(), qty: z.number(), loc: ItemLoc, text: z.string().optional() }).strict()
+export const ItemSpawned = z.object({
+  id: z.string(), kind: z.string(), qty: z.number(), loc: ItemLoc, text: z.string().optional(),
+  owner: z.string().optional(), crafterMark: z.string().optional(),
+}).strict()
 export const ItemMoved = z.object({ id: z.string(), loc: ItemLoc }).strict()
+export const ItemOwnerChanged = z.object({ id: z.string(), owner: z.string() }).strict()
+// Pure witness record — folds to nothing. Whether a taking is theft is the town's to decide.
+export const ItemTaken = z.object({
+  itemId: z.string(), kind: z.string(), takerId: z.string(), ownerId: z.string(), x: z.number(), y: z.number(),
+}).strict()
 export const ItemQtyChanged = z.object({ id: z.string(), delta: z.number() }).strict()
 export const ItemTextChanged = z.object({ id: z.string(), text: z.string() }).strict()
 export const StructurePlanned = z.object({

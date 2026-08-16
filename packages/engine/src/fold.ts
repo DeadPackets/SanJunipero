@@ -7,7 +7,7 @@ import {
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CropGrew, CropHarvested, CropPlanted, CropWithered,
   FireExtinguished, FireIgnited, FireSpread, HpChanged,
-  ItemMoved, ItemQtyChanged, ItemSpawned, ItemTextChanged, NeedChanged,
+  ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemTaken, ItemTextChanged, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
@@ -81,10 +81,26 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
         ...state,
         items: {
           ...state.items,
-          [p.id]: { id: p.id, kind: p.kind, qty: p.qty, ...(p.text !== undefined ? { text: p.text } : {}), loc: p.loc },
+          [p.id]: {
+            id: p.id, kind: p.kind, qty: p.qty,
+            ...(p.text !== undefined ? { text: p.text } : {}),
+            ...(p.owner !== undefined ? { owner: p.owner } : {}),
+            ...(p.crafterMark !== undefined ? { crafterMark: p.crafterMark } : {}),
+            loc: p.loc,
+          },
         },
         counters: bumpCounter(state.counters, p.id),
       }
+    }
+    case 'item_owner_changed': {
+      const p = ItemOwnerChanged.parse(event.payload)
+      const item = state.items[p.id]
+      if (!item) throw new Error(`item_owner_changed for unknown item ${p.id}`)
+      return { ...state, items: { ...state.items, [p.id]: { ...item, owner: p.owner } } }
+    }
+    case 'item_taken': {
+      ItemTaken.parse(event.payload)
+      return state
     }
     case 'item_moved': {
       const p = ItemMoved.parse(event.payload)

@@ -72,7 +72,7 @@ describe('verb: fish', () => {
     expect(r.events).toContainEqual({ type: 'wildlife_changed', payload: { fish: 99 } })
     expect(r.events).toContainEqual({
       type: 'item_spawned',
-      payload: { id: 'item_1', kind: 'fish', qty: 1, loc: { t: 'agent', id: 'a1' } },
+      payload: { id: 'item_1', kind: 'fish', qty: 1, loc: { t: 'agent', id: 'a1' }, owner: 'a1' },
     })
     expect(r.events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'fishing', xp: 1 } })
     expect(r.state.wildlife.fish).toBe(99)
@@ -118,7 +118,7 @@ describe('verb: forage', () => {
     const t = tickOnce(applyAll(s, r.events))
     expect(t.events).toContainEqual({
       type: 'item_spawned',
-      payload: { id: 'item_1', kind: 'berries', qty: 2, loc: { t: 'agent', id: 'a1' } },
+      payload: { id: 'item_1', kind: 'berries', qty: 2, loc: { t: 'agent', id: 'a1' }, owner: 'a1' },
     })
     expect(t.events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'foraging', xp: 1 } })
   })

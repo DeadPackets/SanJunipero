@@ -119,7 +119,7 @@ describe('verb: craft', () => {
     expect(t.events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'item_1', delta: -1 } })
     expect(t.events).toContainEqual({
       type: 'item_spawned',
-      payload: { id: 'item_2', kind: 'plank', qty: 2, loc: { t: 'agent', id: 'a1' } },
+      payload: { id: 'item_2', kind: 'plank', qty: 2, loc: { t: 'agent', id: 'a1' }, owner: 'a1' },
     })
     expect(t.events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'carpentry', xp: 1 } })
     expect(t.state.items.item_1).toBeUndefined()

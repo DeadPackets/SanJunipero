@@ -17,9 +17,10 @@ import {
 // collapsed-sleep recovery + crop stage formula changed the scripted timeline).
 const GOLDEN_G2_HASH = '7263dde98076dbb234bdeded24aab659987190ce00e4581999027d615ec977e8'
 
-// C9 flags pinned OFF so this pre-C9 fixture keeps telling its own story. Each pin has an
-// owner task that removes it and folds the change into the single deliberate regen (Task 16):
-//   ownership.enabled     — the Builder would own his hut, moving the hash; removed by Task 4.
+// C9 flags pinned OFF so this pre-C9 fixture keeps telling its own story. BOTH pins come off in
+// Task 16 Step 0, which folds their change into the single deliberate regen:
+//   ownership.enabled     — the Builder would own his hut and the scripted actors would claim,
+//                           gift and take titled goods; every one of those moves the hash.
 //   sleepIndoorsOnly      — these actors sleep in the open with no hut to enter; the law leaves
 //                           the hash intact but turns the run into 14 collapses instead of 2.
 const G2_CONFIG = SimConfigSchema.parse({

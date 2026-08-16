@@ -27,6 +27,8 @@ export type Structure = {
 export type Item = {
   id: string; kind: string; qty: number
   text?: string
+  owner?: string                          // absent = unowned; outlives the owner's death
+  crafterMark?: string                    // expert crafts only; set once at spawn, never reassigned
   loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
 }
 

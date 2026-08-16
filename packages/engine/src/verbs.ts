@@ -276,7 +276,7 @@ const harvest: VerbDef = makeVerb({
     const def = config.crops[crop.kind]!
     return [
       { type: 'crop_harvested', payload: { cropId: p.cropId } },
-      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: crop.kind, qty: def.yield, loc: { t: 'agent', id: agentId } } },
+      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: crop.kind, qty: def.yield, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId) } },
     ]
   },
   skill: { track: 'farming', xp: 1 },
@@ -297,7 +297,7 @@ const fish: VerbDef = makeVerb({
     if (rng.next() >= chance) return []
     return [
       { type: 'wildlife_changed', payload: { fish: state.wildlife.fish - 1 } },
-      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FISH_KIND, qty: 1, loc: { t: 'agent', id: agentId } } },
+      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FISH_KIND, qty: 1, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId) } },
     ]
   },
   skill: { track: 'fishing', xp: 1 },
@@ -320,11 +320,16 @@ const forage: VerbDef = makeVerb({
     const qty = config.wildlife.forageYieldBySeason[season]
     if (qty <= 0) return []
     return [
-      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FORAGE_KIND, qty, loc: { t: 'agent', id: agentId } } },
+      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FORAGE_KIND, qty, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId) } },
     ]
   },
   skill: { track: 'foraging', xp: 1 },
 })
+
+// What you pull out of the ground, the water or the woods is yours from the first moment.
+function ownerStamp(config: SimConfig, agentId: string): { owner?: string } {
+  return config.ownership.enabled ? { owner: agentId } : {}
+}
 
 export const BuildParams = z.object({ kind: z.string(), x: z.number().int(), y: z.number().int() }).strict()
 export const CraftParams = z.object({ recipe: z.string() }).strict()
@@ -446,7 +451,7 @@ const craft: VerbDef = makeVerb({
       ...events,
       {
         type: 'item_spawned',
-        payload: { id: mintId(state, 'item'), kind: recipe.output.kind, qty: recipe.output.qty, loc: { t: 'agent', id: agentId } },
+        payload: { id: mintId(state, 'item'), kind: recipe.output.kind, qty: recipe.output.qty, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId) },
       },
       { type: 'skill_gained', payload: { agentId, track: recipe.skill, xp: 1 } },
     ]
@@ -510,13 +515,19 @@ const give: VerbDef = makeVerb({
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     return null
   },
-  onComplete(state, _config, agentId, params) {
+  onComplete(state, config, agentId, params) {
     const p = GiveParams.parse(params)
     const item = state.items[p.itemId]
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
     const target = state.agents[p.targetId]
     if (!target || !target.alive) return []
-    return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: p.targetId } } }]
+    // The only voluntary transfer of title the world has.
+    return [
+      { type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: p.targetId } } },
+      ...(config.ownership.enabled
+        ? [{ type: 'item_owner_changed', payload: { id: p.itemId, owner: p.targetId } }]
+        : []),
+    ]
   },
 })
 
@@ -536,11 +547,23 @@ const take: VerbDef = makeVerb({
     }
     return null
   },
-  onComplete(state, _config, agentId, params) {
+  onComplete(state, config, agentId, params) {
     const p = TakeParams.parse(params)
     const item = state.items[p.itemId]
     if (!item || item.loc.t === 'agent') return []
-    return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: agentId } } }]
+    const moved = { type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: agentId } } }
+    if (!config.ownership.enabled || item.owner === agentId) return [moved]
+    // Unowned things are claimed by the hand that lifts them; owned things are not.
+    // The engine blocks nothing here — it only makes sure the taking is public.
+    if (item.owner === undefined) {
+      return [moved, { type: 'item_owner_changed', payload: { id: p.itemId, owner: agentId } }]
+    }
+    const s = item.loc.t === 'structure' ? state.structures[item.loc.id] : undefined
+    const at = item.loc.t === 'tile' ? { x: item.loc.x, y: item.loc.y } : { x: s?.x ?? 0, y: s?.y ?? 0 }
+    return [moved, {
+      type: 'item_taken',
+      payload: { itemId: p.itemId, kind: item.kind, takerId: agentId, ownerId: item.owner, x: at.x, y: at.y },
+    }]
   },
 })
 
