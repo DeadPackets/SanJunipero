@@ -3,7 +3,7 @@ import { encodePng, type RawImage } from '../post/raw.js'
 import { DEFAULT_FORGE_CONFIG, ForgeConfigSchema } from '../forgeConfig.js'
 import { CRITERIA, NA_CRITERION } from './verdict.js'
 import { RUBRIC_VERSION, paletteCard, checkerCard } from './rubric.js'
-import { makeVisionJudge, EST_COST_PER_VISION_CALL, type GenerateFn } from './visionJudge.js'
+import { makeVisionJudge, EST_COST_PER_VISION_CALL, type VisionGenerateFn } from './visionJudge.js'
 
 function art(w = 16, h = 16): RawImage {
   const img = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
@@ -21,7 +21,7 @@ type Call = { model: unknown; schema: { shape: Record<string, unknown> }; messag
 
 function spy(reply: (keys: readonly string[]) => unknown, providerMetadata?: unknown) {
   const calls: Call[] = []
-  const gen: GenerateFn = async (a: any) => {
+  const gen: VisionGenerateFn = async (a: any) => {
     calls.push(a)
     const keys = Object.keys(a.schema.shape).filter(k => k !== 'feedback')
     return { object: reply(keys), providerMetadata } as any

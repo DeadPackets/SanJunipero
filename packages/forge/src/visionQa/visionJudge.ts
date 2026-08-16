@@ -12,7 +12,7 @@ import { RUBRIC_VERSION, buildRubricPrompt, paletteCard, checkerCard } from './r
 
 export const EST_COST_PER_VISION_CALL = 0.0025
 
-export type GenerateFn = (args: { model: unknown; schema: unknown; messages: unknown[] }) =>
+export type VisionGenerateFn = (args: { model: unknown; schema: unknown; messages: unknown[] }) =>
   Promise<{ object: unknown; providerMetadata?: unknown }>
 
 export type VisionJudgeArgs = {
@@ -38,12 +38,12 @@ function reportedCost(providerMetadata: unknown): number | undefined {
 }
 
 export function makeVisionJudge(opts: {
-  apiKey: string; model?: string; refs: Buffer[]; config?: ForgeConfig; generateFn?: GenerateFn
+  apiKey: string; model?: string; refs: Buffer[]; config?: ForgeConfig; generateFn?: VisionGenerateFn
 }): VisionJudgeFn {
   const config = opts.config ?? DEFAULT_FORGE_CONFIG
   const modelName = opts.model ?? config.visionQa.model
-  const gen: GenerateFn = opts.generateFn
-    ?? (args => generateObject(args as Parameters<typeof generateObject>[0]) as unknown as ReturnType<GenerateFn>)
+  const gen: VisionGenerateFn = opts.generateFn
+    ?? (args => generateObject(args as Parameters<typeof generateObject>[0]) as unknown as ReturnType<VisionGenerateFn>)
   const model = opts.generateFn ? null : createOpenRouter({ apiKey: opts.apiKey }).chat(modelName)
 
   return async a => {
