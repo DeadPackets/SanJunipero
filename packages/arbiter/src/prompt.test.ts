@@ -4,6 +4,7 @@ import { assembleAdjudicationPrompt, FORBIDDEN_FRAMING, type AdjudicationBlocks 
 function fixtureBlocks(overrides: Partial<AdjudicationBlocks> = {}): AdjudicationBlocks {
   return {
     canon: 'CANON BLOCK\n\nThe town currently knows: fire, pottery, charcoal',
+    frontier: ['glazing', 'smoking_food'],
     agent: {
       name: 'Tamar',
       skills: { farming: 120, pottery: 80 },
@@ -21,6 +22,124 @@ function fixtureBlocks(overrides: Partial<AdjudicationBlocks> = {}): Adjudicatio
     ...overrides,
   }
 }
+
+describe('canon (T20)', () => {
+  it('refuses to rule on the world’s own unexplained happenings', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(a.system).toContain(
+      'unexplained happenings in the world have no known mechanism and cannot be ruled upon',
+    )
+    expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+})
+
+describe('mundane-vs-novel anchors (C9 batch-8 calibration)', () => {
+  it('anchors the boundary with one map, one attempt and one impossible ruling', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    const anchors = system.split('\n').filter((l) => l.startsWith('"I '))
+    expect(anchors).toHaveLength(3)
+    expect(anchors[0]).toContain('— map:')
+    expect(anchors[1]).toContain('— attempt:')
+    expect(anchors[2]).toContain('— impossible:')
+  })
+
+  it('tells the arbiter which question decides attempt against impossible', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain('whether the first step can be taken with what the town has at hand')
+    expect(system).toContain('not impossible merely because no one has done it yet')
+    expect(system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('keeps the anchors in the system block, so the agent’s own words stay the only fenced line', () => {
+    const r = assembleAdjudicationPrompt(fixtureBlocks())
+    const user = r.messages[0].content
+    for (const anchor of r.system.split('\n').filter((l) => l.startsWith('"I '))) {
+      expect(user).not.toContain(anchor)
+    }
+    expect(user.split('<<<')).toHaveLength(2)
+  })
+
+  it('the anchor block is part of the byte-stable prefix', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I try to smoke a fish over the fire.' }))
+    const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I want to build a clay oven.' }))
+    expect(a.system).toBe(b.system)
+  })
+})
+
+describe('the adjacency frontier in the adjudication context (C9 batch-10, user ruling 1)', () => {
+  it('names the unearned rungs one step out, beside the list of what the town knows', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain('The town currently knows: fire, pottery, charcoal')
+    expect(system).toContain('glazing, smoking_food')
+    expect(system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('tells the arbiter that a rung within reach is attempt, never impossible', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain('within reach')
+    expect(system).toContain('so it is "attempt", never "impossible"')
+  })
+
+  it('states plainly when nothing stands within reach, rather than trailing an empty list', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks({ frontier: [] }))
+    expect(system).toContain('Nothing stands within reach beyond what the town already knows.')
+    expect(system).not.toMatch(/within reach: *\n/)
+  })
+
+  it('is part of the byte-stable prefix, and moves only when the codex moves', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I smoke a fish over the fire.' }))
+    const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I want to build a clay oven.' }))
+    expect(a.system).toBe(b.system)
+
+    const learned = assembleAdjudicationPrompt(fixtureBlocks({ frontier: ['glazing'] }))
+    expect(learned.system).not.toBe(a.system)
+  })
+})
+
+// G9b run 5: five attempts came back and the adjacency gate destroyed all five,
+// because nothing tied the `canon` field to the ids the context had just listed.
+describe('the canon vocabulary (C9 batch-11, user ruling)', () => {
+  it('binds the recipe canon to the two lists of ids the context carries', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain(
+      'every id you put in the recipe\'s canon must be copied exactly from those two lines',
+    )
+    expect(system).toContain('The town currently knows: fire, pottery, charcoal')
+    expect(system).toContain('Within reach, though nobody here has done it yet: glazing, smoking_food')
+    expect(system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('calls an invented id a format error, not a judgement', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain('An id that appears on neither line is a format error')
+  })
+
+  it('lives in the byte-stable system prefix, never in the agent-facing block', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I smoke a fish over the fire.' }))
+    const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I want to build a clay oven.' }))
+    expect(a.system).toBe(b.system)
+    expect(a.messages[0].content).not.toContain('format error')
+  })
+})
+
+// One G9b run-5 verdict reasoned "therefore it is an attempt" and then emitted
+// kind "impossible" — schema-valid, so no retry could catch it (batch-10 concern 2).
+describe('the reasoning must agree with the verdict word (C9 batch-11)', () => {
+  it('makes a ruling that reasons to an attempt and says impossible a format error', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain(
+      'if your own reasoning concludes the action can be begun, the verdict is "attempt"',
+    )
+    expect(system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('keeps the law in the system prefix, and out of the anchor rulings', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I smoke a fish over the fire.' }))
+    const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I want to build a clay oven.' }))
+    expect(a.system).toBe(b.system)
+    expect(a.system.split('\n').filter((l) => l.startsWith('"I '))).toHaveLength(3)
+  })
+})
 
 describe('adjudication prompt prefix stability', () => {
   it('keeps system byte-identical and user prefix byte-identical when only intent changes', () => {

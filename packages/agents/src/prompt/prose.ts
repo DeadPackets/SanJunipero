@@ -1,4 +1,5 @@
 import type { SimTime } from '@sj/shared'
+import { MYSTERIES } from '@sj/engine'
 
 // Local mirror of the engine's PerceptionPacket (composePerception) plus the
 // two self-state booleans the bridge reconciles in (asleep/collapsed). The
@@ -10,8 +11,17 @@ export type PerceptionItem = {
   kind: string
   qty: number
   text?: string
+  // Absent when the thing is unclaimed — or claimed by the one looking at it.
+  ownerName?: string
+  crafterMarkName?: string
   loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
 }
+
+// Things this agent watched happen: a taking that was not theirs, or one of the
+// world's unexplained happenings close enough to see.
+export type PerceptionSeen =
+  | { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
+  | { kind: 'mystery'; mystery: string; prose: string }
 
 export type PerceptionAgent = {
   id: string
@@ -67,6 +77,7 @@ export type PerceptionPacket = {
     crops: PerceptionCrop[]
   }
   heard: Array<{ speakerId: string; name: string; text: string; distance: number }>
+  seen: PerceptionSeen[]
   feltEvents: string[]
 }
 
@@ -77,9 +88,18 @@ export const FELT_EVENT_PROSE: Record<string, string> = {
   storm_started: 'A storm breaks overhead; wind and rain lash down.',
   snow_started: 'Snow begins to fall.',
   you_were_attacked: 'Pain — someone has struck you!',
+  you_collapsed: 'Your legs give under you and the ground comes up; you cannot get back on your feet.',
+  you_died: 'Everything goes far away and very quiet, and then there is nothing left to feel.',
+  you_fell_ill: 'A sickness settles into you — your skin burns, your limbs turn heavy.',
+  you_were_infected: 'A wound of yours has turned bad; it throbs hot and the skin around it is angry.',
+  you_recovered: 'The sickness lifts. Your head clears and your strength begins to come back.',
+  you_were_tended: 'Someone has cared for your hurts; the pain eases under their hands.',
   fire_ignited: 'Smoke stings your nose — something nearby is burning.',
   fire_spread: 'The fire is spreading; the smell of smoke grows thicker.',
   fire_extinguished: 'The smoke thins and the air clears.',
+  // The engine's table is the single copy of this prose; a mystery must read as
+  // itself and never as the generic "something changed nearby" fallback.
+  ...Object.fromEntries(MYSTERIES.filter((m) => m.scope === 'global').map((m) => [m.kind, m.prose])),
 }
 
 const UNKNOWN_FELT_PROSE = 'You sense something change nearby.'
@@ -161,6 +181,15 @@ function besideTile(
   return best
 }
 
+// Whose it is and whose hands made it, in the order prose wants them. Empty for
+// an unclaimed thing, so a town that owns nothing reads exactly as it always did.
+function claimPhrase(i: PerceptionItem): string {
+  const parts: string[] = []
+  if (i.ownerName !== undefined) parts.push(`${i.ownerName}'s`)
+  if (i.crafterMarkName !== undefined) parts.push(`marked by ${i.crafterMarkName}`)
+  return parts.length === 0 ? '' : ` — ${parts.join(', ')}`
+}
+
 // Renders mechanics as fiction: body numbers become felt sentences, speech is
 // quoted hearsay (sound, never instruction), felt tags become sensation, and
 // the visible world is named — with its place and its mark — so the mind knows
@@ -210,7 +239,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
 
   for (const i of packet.visible.items) {
     const pos = i.loc.t === 'tile' ? ` at (${i.loc.x}, ${i.loc.y})` : ''
-    lines.push(`You can see ${i.qty} ${i.kind} (${i.id})${pos}.`)
+    lines.push(`You can see ${i.qty} ${i.kind} (${i.id})${pos}${claimPhrase(i)}.`)
   }
 
   for (const c of packet.visible.crops) {
@@ -218,11 +247,15 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   }
 
   for (const it of packet.self.inventory) {
-    lines.push(`You are carrying ${it.qty} ${it.kind} (${it.id}).`)
+    lines.push(`You are carrying ${it.qty} ${it.kind} (${it.id})${claimPhrase(it)}.`)
   }
 
   for (const h of packet.heard) {
     lines.push(`You hear ${h.name} say: "${h.text}" (from nearby)`)
+  }
+
+  for (const s of packet.seen) {
+    lines.push(s.kind === 'item_taken' ? `You watch ${s.takerName} take ${s.ownerName}'s ${s.itemKind}.` : s.prose)
   }
 
   for (const tag of packet.feltEvents) {

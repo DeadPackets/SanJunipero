@@ -14,7 +14,7 @@ function makeSnapshot() {
   const state = fold(genesisState(DEFAULT_CONFIG, GRASS), spawn, DEFAULT_CONFIG)
   return {
     t: 'snapshot' as const, tick: state.tick, seq: 1,
-    state: JSON.parse(JSON.stringify(state)), config: JSON.parse(JSON.stringify(DEFAULT_CONFIG)), live: true,
+    state: JSON.parse(JSON.stringify(state)), config: JSON.parse(JSON.stringify(DEFAULT_CONFIG)), laws: {}, live: true,
   }
 }
 

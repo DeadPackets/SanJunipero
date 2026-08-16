@@ -2,7 +2,7 @@ import { generateText, NoObjectGeneratedError, Output, type LanguageModel, type 
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type Database from 'better-sqlite3'
 import type { z } from 'zod'
-import { insertAlert, insertLlmCall, sumCostUsd } from './callLog.js'
+import { insertAlert, insertLlmCall, makeBudgetGuard, sumCostUsd, type BudgetGuard } from './callLog.js'
 import { FALLBACK_MODELS, MIND_MODEL, PRICE_PER_M, PRICE_PER_M_BY_MODEL, PROVIDER_ORDER } from './pins.js'
 
 export type LlmUsage = {
@@ -36,7 +36,11 @@ export type LlmClientOpts = {
   maxRetries?: number
   budgetUsd?: number
   maxOutputTokens?: number
+  // Pre-booked per call while it is in flight. ~3x the observed mean call.
+  expectedCallCostUsd?: number
 }
+
+export const DEFAULT_EXPECTED_CALL_COST_USD = 0.005
 
 export class LlmClient {
   private readonly db: Database.Database
@@ -47,6 +51,8 @@ export class LlmClient {
   private readonly maxRetries: number
   private readonly budgetUsd: number | undefined
   private readonly maxOutputTokens: number | undefined
+  private readonly expectedCallCostUsd: number
+  private readonly guard: BudgetGuard
   private model: LanguageModel | undefined
 
   constructor(opts: LlmClientOpts) {
@@ -58,6 +64,8 @@ export class LlmClient {
     this.maxRetries = opts.maxRetries ?? 2
     this.budgetUsd = opts.budgetUsd
     this.maxOutputTokens = opts.maxOutputTokens
+    this.expectedCallCostUsd = opts.expectedCallCostUsd ?? DEFAULT_EXPECTED_CALL_COST_USD
+    this.guard = makeBudgetGuard(opts.db, opts.caller)
     this.model = opts.model
   }
 
@@ -112,6 +120,24 @@ export class LlmClient {
         `LLM budget exceeded for caller '${this.caller}': spent $${this.totalCostUsd().toFixed(6)} of $${this.budgetUsd.toFixed(6)}`,
       )
     }
+    // Pre-book what this call is expected to cost, so concurrent callers cannot
+    // all read the same headroom and all spend it.
+    const reservation = this.guard.reserve(this.expectedCallCostUsd, this.budgetUsd ?? null)
+    if (reservation === null) {
+      throw new BudgetExceededError(
+        `LLM budget exceeded for caller '${this.caller}': spent $${this.totalCostUsd().toFixed(6)} plus $${this.guard.sumReserved().toFixed(6)} in flight of $${(this.budgetUsd ?? 0).toFixed(6)}`,
+      )
+    }
+    try {
+      return await this.invokeReserved(exec)
+    } finally {
+      this.guard.release(reservation)
+    }
+  }
+
+  private async invokeReserved<T>(
+    exec: (model: LanguageModel) => Promise<{ usage: LanguageModelUsage; value: T; servedModel?: string }>,
+  ): Promise<{ value: T; usage: LlmUsage }> {
     const model = this.resolveModel()
     const modelName = typeof model === 'string' ? model : model.modelId
     let lastError: unknown

@@ -76,5 +76,7 @@ enforcement regex; the assembler test asserts every rendered block and
 engine's `composePerception` shape plus two self-state booleans (`asleep`,
 `collapsed`) that the engine's `self` omits; `EngineBridge.reconcile` maps the
 engine packet onto this mirror each perception. `perceptionToProse` renders
-time, body state, the visible world, what the agent carries, heard speech, and
-felt events into second-person fiction.
+time, body state, the visible world, what the agent carries, heard speech, what
+it watched happen (`seen`: a taking, an unexplained thing), and felt events into
+second-person fiction. A thing carries its owner's name only when the owner is
+someone else — the bridge drops a claim the looker already holds.

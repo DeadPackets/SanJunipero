@@ -3,7 +3,7 @@ import { z } from 'zod'
 // Magnitude caps: an out-of-range LLM verdict fails schema parse and flows
 // through the existing invalid-verdict path instead of entering the world.
 export const OutcomeEffectSchema = z.discriminatedUnion('op', [
-  z.object({ op: z.literal('spawn_item'), kind: z.string().min(1), qty: z.number().int().positive().max(20), to: z.literal('agent') }).strict(),
+  z.object({ op: z.literal('spawn_item'), kind: z.string().min(1), qty: z.number().int().positive().max(20), to: z.literal('agent'), durability: z.number().int().positive().max(200).optional() }).strict(),
   z.object({ op: z.literal('gain_skill'), track: z.string().min(1), xp: z.number().int().positive().max(100) }).strict(),
   z.object({ op: z.literal('hp_delta'), delta: z.number().int().min(-50).max(50) }).strict(),  // negative = damage, positive = heal
   z.object({ op: z.literal('none') }).strict(),

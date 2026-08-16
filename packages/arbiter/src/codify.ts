@@ -1,5 +1,6 @@
-import { registerVerb, skillLevel, VERBS } from '@sj/engine'
+import { crafterStamp, registerVerb, skillLevel, VERBS } from '@sj/engine'
 import type { PendingEvent, Structure, TileId, VerbDef, WorldState } from '@sj/engine'
+import type { SimConfig } from '@sj/shared'
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
 import type { RulebookStore } from './rulebook.js'
@@ -41,7 +42,15 @@ function anyAdjacentTile(state: WorldState, agentId: string, tile: string): bool
   return false
 }
 
-export function emitOutcomeEffects(state: WorldState, agentId: string, effects: OutcomeEffect[]): PendingEvent[] {
+// A recipe hard enough to be worth a specialist's name on the result.
+export function isExpertRecipe(recipe: Recipe, config: SimConfig): boolean {
+  return recipe.skillCheck !== undefined && recipe.skillCheck.difficulty >= config.crafting.expertDifficulty
+}
+
+export function emitOutcomeEffects(
+  state: WorldState, agentId: string, effects: OutcomeEffect[],
+  stamp: { owner?: string; crafterMark?: string } = {},
+): PendingEvent[] {
   const events: PendingEvent[] = []
   let nextId = state.counters.nextEntityId
   for (const e of effects) {
@@ -49,7 +58,10 @@ export function emitOutcomeEffects(state: WorldState, agentId: string, effects: 
       case 'spawn_item':
         events.push({
           type: 'item_spawned',
-          payload: { id: `item_${nextId++}`, kind: e.kind, qty: e.qty, loc: { t: 'agent', id: agentId } },
+          payload: {
+            id: `item_${nextId++}`, kind: e.kind, qty: e.qty, loc: { t: 'agent', id: agentId }, ...stamp,
+            ...(e.durability === undefined ? {} : { durability: e.durability }),
+          },
         })
         break
       case 'gain_skill':
@@ -60,6 +72,27 @@ export function emitOutcomeEffects(state: WorldState, agentId: string, effects: 
         break
       case 'none':
         break
+    }
+  }
+  return events
+}
+
+// A tool is used, not consumed: every completed codified use costs it one point of
+// durability, and the point that empties it breaks it in the hand.
+function wearTools(state: WorldState, config: SimConfig, agentId: string, recipe: Recipe): PendingEvent[] {
+  if (!config.tools.wearEnabled) return []
+  const events: PendingEvent[] = []
+  for (const req of recipe.requires) {
+    if (req.type !== 'held_item') continue
+    let remaining = req.qty
+    for (const stack of heldStacks(state, agentId, req.kind)) {
+      if (remaining <= 0) break
+      remaining -= stack.qty
+      if (stack.durability === undefined) continue
+      events.push({ type: 'item_worn', payload: { id: stack.id, delta: -config.tools.wearPerUse } })
+      if (stack.durability - config.tools.wearPerUse <= 0) {
+        events.push({ type: 'item_broke', payload: { id: stack.id } })
+      }
     }
   }
   return events
@@ -118,7 +151,16 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
       const level = skillCheck ? skillLevel(state, agentId, skillCheck.track, config) : 0
       const factor = skillCheck ? skillFactor(level, skillCheck.difficulty) : 1
       const row = rollOutcomeTable(recipe.outcomeTable, rng, factor)
-      return emitOutcomeEffects(state, agentId, row.effects)
+      const mark = skillCheck && isExpertRecipe(recipe, config)
+        ? crafterStamp(state, config, agentId, skillCheck.track)
+        : {}
+      return [
+        ...emitOutcomeEffects(state, agentId, row.effects, {
+          ...(config.ownership.enabled ? { owner: agentId } : {}),
+          ...mark,
+        }),
+        ...wearTools(state, config, agentId, recipe),
+      ]
     },
     interruptible: recipe.interruptible,
     skill: recipe.skillCheck ? { track: recipe.skillCheck.track, xp: 10 } : undefined,

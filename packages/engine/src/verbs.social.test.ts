@@ -276,10 +276,11 @@ describe('verb: attack', () => {
 })
 
 describe('verb: experiment (stub)', () => {
-  it('always returns the stub rejection', () => {
+  it('always returns the stub rejection, and it leaves a door open (T18)', () => {
+    const expected = 'You lack the knowledge to attempt this. Perhaps someone in the town knows how.'
     expect(submitIntent(makeWorld(), CFG, 'a1', 'experiment', { description: 'boil river water for salt' }))
-      .toEqual({ ok: false, reason: 'You lack the knowledge to attempt this.' })
-    expect(submitIntent(makeWorld(), CFG, 'a1', 'experiment', {})).toEqual({ ok: false, reason: 'You lack the knowledge to attempt this.' })
+      .toEqual({ ok: false, reason: expected })
+    expect(submitIntent(makeWorld(), CFG, 'a1', 'experiment', {})).toEqual({ ok: false, reason: expected })
   })
 })
 

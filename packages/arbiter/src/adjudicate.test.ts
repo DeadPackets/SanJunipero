@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { EMBEDDING_DIM, FakeEmbedder, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
-import { unregisterVerb, VERBS } from '@sj/engine'
+import { fold, genesisState, submitIntent, unregisterVerb, VERBS } from '@sj/engine'
+import { DEFAULT_CONFIG } from '@sj/shared'
 import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { ReviewStore } from './review.js'
@@ -98,13 +99,15 @@ function emptyUsage(): LlmUsage {
 // returns whatever verdict the script decides.
 class ScriptedLlm {
   objectCalls = 0
-  constructor(private readonly respond: (intent: string) => Verdict) {}
+  lastSystem = ''
+  constructor(private readonly respond: (intent: string, system: string) => Verdict) {}
 
   async object<T>(opts: { system: string; messages: LlmMessage[]; schema: unknown }): Promise<{ value: T; usage: LlmUsage }> {
     this.objectCalls += 1
+    this.lastSystem = opts.system
     const content = opts.messages.at(-1)?.content ?? ''
     const intent = content.split('\n').at(-1)?.replace(/^Intent: /, '') ?? ''
-    return { value: this.respond(intent) as unknown as T, usage: emptyUsage() }
+    return { value: this.respond(intent, opts.system) as unknown as T, usage: emptyUsage() }
   }
 
   async text(): Promise<{ text: string; usage: LlmUsage }> {
@@ -354,6 +357,121 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
   })
 })
 
+// Esen's smoked fish — the G9b run-4 regression (t917 and t1213), replayed.
+// She stood at a lit hearth holding two fish, in a town whose codex carries
+// `smoking_food` as an unearned rung resting on `fire`. Both asks came back
+// `impossible / beyond_adjacency`, because the adjudication context named only
+// what the town knew. The scripted model below rules the way that model ruled:
+// it can only reach for the rung the context puts within its reach.
+describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1)', () => {
+  const ESEN_INTENT =
+    'I hang the two fish from my hands over the campfire’s smoke, close enough that the heat and smoke bathe them.'
+
+  const esenCtx: AgentCtx = {
+    agentId: 'esen',
+    name: 'Esen',
+    skills: { cooking: 60, fishing: 140 },
+    inventory: [{ kind: 'fish', qty: 2 }, { kind: 'clay', qty: 2 }, { kind: 'fiber', qty: 2 }],
+    position: { x: 18, y: 16 },
+  }
+
+  const smokedFishRecipe: Recipe = {
+    id: 'recipe:smoked_fish',
+    name: 'Smoke Fish Over the Hearth',
+    skillCheck: { track: 'cooking', difficulty: 2 },
+    durationTicks: 30,
+    costs: [{ kind: 'fish', qty: 2 }],
+    requires: [{ type: 'adjacent_fire' }],
+    outcomeTable: [
+      { weight: 3, success: true, label: 'The fish darken and firm in the smoke.', effects: [{ op: 'spawn_item', kind: 'smoked fish', qty: 2, to: 'agent' }] },
+      { weight: 1, success: false, label: 'The fish scorch and fall into the ash.', effects: [{ op: 'none' }] },
+    ],
+    rngStream: 'recipe:smoked_fish',
+    interruptible: true,
+    canon: ['smoking_food'],
+  }
+  const smokedFish: Verdict = { kind: 'attempt', recipe: smokedFishRecipe, summary: 'Hang two fish in the hearth smoke.' }
+  const beyondAdjacency: Verdict = {
+    kind: 'impossible',
+    reason: 'this would need a craft the town has not yet reached',
+    class: 'beyond_adjacency',
+  }
+
+  // The G9b town's codex: ten practiced rungs and five one step out.
+  async function makeSmokehouseRig(llm: ScriptedLlm): Promise<{ db: Database.Database; arbiter: Arbiter }> {
+    const db = openArbiterDb(':memory:')
+    const codex = new CodexStore(db)
+    for (const [id, name] of [['fire', 'Fire'], ['pottery', 'Pottery'], ['weaving', 'Weaving'], ['fishing', 'Fishing']]) {
+      codex.insert({ id: id!, era: 'agriculture', name: name!, prerequisiteId: null })
+    }
+    for (const [id, name, prerequisiteId] of [
+      ['salt_extraction', 'Salt extraction', 'fire'],
+      ['smoking_food', 'Smoking food', 'fire'],
+      ['basketry', 'Basketry', 'weaving'],
+    ]) {
+      codex.insert({ id: id!, era: 'crafts', name: name!, prerequisiteId: prerequisiteId!, known: false })
+    }
+    // Two rungs out: it rests on a craft nobody has earned, so it stays off the frontier.
+    codex.insert({ id: 'salt_curing', era: 'crafts', name: 'Salt curing', prerequisiteId: 'salt_extraction', known: false })
+    const arbiter = makeArbiter({ db, llm: llm as unknown as LlmClient, embedder: await FakeEmbedder.create(), tick: () => 917 })
+    return { db, arbiter }
+  }
+
+  it('names the rungs one step out, and only those, in the context the arbiter reads', async () => {
+    const llm = new ScriptedLlm(() => beyondAdjacency)
+    const { arbiter } = await makeSmokehouseRig(llm)
+
+    await arbiter.adjudicate(ESEN_INTENT, esenCtx)
+
+    expect(llm.lastSystem).toContain('smoking_food')
+    expect(llm.lastSystem).toContain('basketry')
+    expect(llm.lastSystem).toContain('salt_extraction')
+    // Two rungs out is not within reach, and the practiced list is unchanged.
+    expect(llm.lastSystem).not.toContain('salt_curing')
+    expect(llm.lastSystem).toContain('The town currently knows: fire, pottery, weaving, fishing')
+  })
+
+  // Run 5 proved the frontier line arrives and is read; five attempts then died
+  // on the adjacency gate carrying ids that were never on it (C9 batch-11).
+  it('tells the arbiter that those same ids are the only vocabulary its canon may use', async () => {
+    const llm = new ScriptedLlm(() => beyondAdjacency)
+    const { arbiter } = await makeSmokehouseRig(llm)
+
+    await arbiter.adjudicate(ESEN_INTENT, esenCtx)
+
+    expect(llm.lastSystem).toContain('Within reach, though nobody here has done it yet: basketry, salt_extraction, smoking_food')
+    expect(llm.lastSystem).toContain('every id you put in the recipe\'s canon must be copied exactly from those two lines')
+    expect(llm.lastSystem).toContain('An id that appears on neither line is a format error')
+  })
+
+  it('rules Esen’s smoked fish an attempt, where run 4 ruled it impossible', async () => {
+    const llm = new ScriptedLlm((_intent, system) => (system.includes('smoking_food') ? smokedFish : beyondAdjacency))
+    const { db, arbiter } = await makeSmokehouseRig(llm)
+
+    const verdict = await arbiter.adjudicate(ESEN_INTENT, esenCtx)
+
+    expect(verdict.kind, JSON.stringify(verdict)).toBe('attempt')
+    if (verdict.kind === 'attempt') expect(verdict.recipe.canon).toEqual(['smoking_food'])
+    // The deterministic gate agrees with the context it was given.
+    expect(new CodexStore(db).withinAdjacency(['smoking_food'])).toBe(true)
+  })
+
+  it('still refuses a rung two steps out, so the frontier widens nothing', async () => {
+    const twoStepsOut: Verdict = {
+      kind: 'attempt',
+      recipe: { ...smokedFishRecipe, id: 'recipe:salt_cured_fish', rngStream: 'recipe:salt_cured_fish', canon: ['salt_curing'] },
+      summary: 'Pack the fish in salt to keep it.',
+    }
+    const llm = new ScriptedLlm(() => twoStepsOut)
+    const { arbiter } = await makeSmokehouseRig(llm)
+
+    const verdict = await arbiter.adjudicate('I pack the fish in salt until it keeps', esenCtx)
+
+    expect(verdict.kind).toBe('impossible')
+    if (verdict.kind === 'impossible') expect(verdict.class).toBe('beyond_adjacency')
+  })
+})
+
 describe('FORBIDDEN_FRAMING enforced over live LLM output', () => {
   it('a framing-tainted attempt is retried, and the clean retry is returned and recorded', async () => {
     let call = 0
@@ -439,6 +557,53 @@ describe('rulebook rehydration on construction', () => {
     expect(VERBS['recipe:rehydrate_gone']).toBeUndefined()
 
     unregisterVerb('recipe:rehydrate_basket')
+  })
+})
+
+describe('live codification round trip (T20)', () => {
+  const matRecipe: Recipe = {
+    id: 'recipe:reed_mat',
+    name: 'Weave Reed Mat',
+    durationTicks: 2,
+    costs: [],
+    requires: [],
+    outcomeTable: [
+      { weight: 1, success: true, label: 'The reeds lie flat as a mat.', effects: [{ op: 'spawn_item', kind: 'mat', qty: 1, to: 'agent' }] },
+    ],
+    rngStream: 'recipe:reed_mat',
+    interruptible: true,
+    canon: ['fire'],
+  }
+  const matVerdict: Verdict = { kind: 'attempt', recipe: matRecipe, summary: 'Weave reeds into a mat.' }
+
+  it('adjudicates once, codifies, and the same intent then resolves with no further LLM call', async () => {
+    const llm = new ScriptedLlm(() => matVerdict)
+    const { arbiter } = await makeRig(llm, new LexicalEmbedder())
+    try {
+      const first = await arbiter.adjudicate('weave reeds into a mat', ctx)
+      expect(first).toEqual(matVerdict)
+      expect(llm.objectCalls).toBe(1)
+
+      // Codify: the recipe becomes a verb the engine itself answers for.
+      expect(VERBS[matRecipe.id]).toBeUndefined()
+      expect(arbiter.codify(matRecipe)).toEqual({ ruleId: expect.any(Number), verb: matRecipe.id })
+      expect(VERBS[matRecipe.id]).toBeDefined()
+
+      const state = fold(
+        genesisState(DEFAULT_CONFIG),
+        { seq: 1, tick: 0, type: 'agent_spawned', payload: { id: 'a1', name: 'Tamar', x: 5, y: 5, ageDays: 7300 } },
+        DEFAULT_CONFIG,
+      )
+      const res = submitIntent(state, DEFAULT_CONFIG, 'a1', matRecipe.id, {})
+      expect(res.ok).toBe(true)
+
+      // Adjudicate once, physics forever: the second ask never reaches the model.
+      const second = await arbiter.adjudicate('weave reeds into a mat', ctx)
+      expect(second).toEqual({ kind: 'map', verb: matRecipe.id, params: {} })
+      expect(llm.objectCalls).toBe(1)
+    } finally {
+      unregisterVerb(matRecipe.id)
+    }
   })
 })
 

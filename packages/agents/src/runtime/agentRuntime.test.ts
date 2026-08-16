@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { MockLanguageModelV4 } from 'ai/test'
 import type { LanguageModel } from 'ai'
@@ -9,14 +9,17 @@ import {
   genesisState,
   openDb,
   replayFromGenesis,
+  registerVerb,
   RngStreams,
   TickLoop,
+  unregisterVerb,
   type TickHandler,
   type TileId,
 } from '@sj/engine'
 import { SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
-import { AgentRuntime } from './agentRuntime.js'
+import { AgentRuntime, CRAFT_HINT, refusalMemoryText } from './agentRuntime.js'
+import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore, type MemoryRow } from '../memory/store.js'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
@@ -43,8 +46,9 @@ const ZERO_USAGE = {
 
 const FAST_MIND: Partial<MindConfig> = { idleGapTicks: 0, boredomTicks: 1, bodyAlarm: { hunger: 0, energy: 0, warmth: 0 } }
 
+// Empty 24x24 grass, no structures: the C9 bed law would refuse every sleep these rows drive.
 function fastSimConfig(): SimConfig {
-  return SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0.5 } })
+  return SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0.5 }, structures: { sleepIndoorsOnly: false } })
 }
 
 function baseDoc(): PersonalityDoc {
@@ -190,6 +194,7 @@ async function setup(opts: {
   maxRetries?: number
   simConfig?: SimConfig
   onThought?: (t: { tick: number; agentId: string; text: string }) => void
+  adjudicator?: Adjudicator
 }) {
   const world = buildWorld(opts.simConfig)
   const worldTick = createWorldTick(world.config, world.rng)
@@ -223,6 +228,7 @@ async function setup(opts: {
     reflectionLlm: opts.reflectionLlm,
     dreamLlm: opts.dreamLlm,
     onThought: opts.onThought,
+    adjudicator: opts.adjudicator,
   })
   runtime.start(AGENT)
   const mem = new MemoryStore(agentDb, AGENT, embedder)
@@ -371,6 +377,8 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
     expect(memoriesOfKind(agentDb, 'action').some((m) => /You realize you cannot/.test(m.text))).toBe(true)
+    // A plain physics refusal is not a craft the town can teach.
+    expect(memoriesOfKind(agentDb, 'action').some((m) => m.text.includes(CRAFT_HINT))).toBe(false)
   })
 
   it('runs reflection once per night, dreams, and resets the day at dawn', async () => {
@@ -455,7 +463,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       model: turnModel([]),
       mindConfig: { idleGapTicks: 100000, boredomTicks: 100000 },
       reflectionLlm: reflection,
-      simConfig: SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 } }),
+      simConfig: SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 }, structures: { sleepIndoorsOnly: false } }),
     })
     while (loop.tick < 1350) {
       loop.step()
@@ -634,7 +642,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   })
 
   it('the body answers its own alarm: a sleeper whose turn submits nothing is woken by a runtime wake', async () => {
-    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 } })
+    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 }, structures: { sleepIndoorsOnly: false } })
     const { world, loop } = await setup({
       model: turnModel([{ thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 }]),
       mindConfig: FAST_MIND,
@@ -655,7 +663,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   })
 
   it('a sleeper whose every intent the world rejects still rises', async () => {
-    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 } })
+    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 }, structures: { sleepIndoorsOnly: false } })
     const { world, loop, agentDb } = await setup({
       model: turnModel(
         [{ thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 }],
@@ -702,5 +710,220 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(runtime.stats().turns).toBeGreaterThanOrEqual(1)
     expect(seen[0]).toEqual({ tick: expect.any(Number), agentId: AGENT, text: 'I rest.' })
     expect(seen[0]!.tick).toBeGreaterThan(0)
+  })
+})
+
+describe('arbiter seam (T19)', () => {
+  const freeformTurn = { thought: 'I will try something new.', action: { freeform: 'weave reeds into a basket' }, importance: 4 }
+
+  it('routes a freeform intent to the adjudicator and executes a map verdict as a Tier-1 act', async () => {
+    const seen: Array<{ intent: string; ctx: AgentCtx }> = []
+    const adjudicator: Adjudicator = async (intent, ctx) => {
+      seen.push({ intent, ctx })
+      return { kind: 'map', verb: 'walk', params: { x: 5, y: 6 } }
+    }
+    const { loop, world } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes('walk'), 100)
+
+    expect(startedVerbs(world.engineDb)).toContain('walk')
+    expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+    expect(seen).toHaveLength(1)
+    expect(seen[0]!.intent).toBe('weave reeds into a basket')
+    expect(seen[0]!.ctx.agentId).toBe(AGENT)
+    expect(seen[0]!.ctx.name).toBe('Tamar')
+  })
+
+  it('writes a refusal memory for an impossible verdict, hinted when it is only a want of skill', async () => {
+    const adjudicator: Adjudicator = async () => ({
+      kind: 'impossible',
+      reason: 'your hands do not yet know the weave',
+      class: 'insufficient_skill',
+    })
+    const { loop, agentDb, world } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      'You realize you cannot: your hands do not yet know the weave — perhaps someone nearby knows the craft.',
+    )
+    expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+  })
+
+  it('falls back to the world’s own answer when no adjudicator is wired', async () => {
+    const { loop, agentDb } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('Perhaps someone in the town knows how.')
+  })
+
+  it('falls back to the world when the adjudicator throws, and says so in an alert', async () => {
+    const adjudicator: Adjudicator = async () => {
+      throw new Error('the arbiter is unreachable')
+    }
+    const { loop, agentDb } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
+    expect(alertKinds(agentDb)).toContain('adjudicate_failed')
+  })
+
+  // CAPABILITIES offers `experiment` as well as freeform, so a mind may name
+  // either for the same try. Both are doors to the arbiter once one is wired.
+  it('sends a named experiment to the adjudicator in its own words', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return { kind: 'map', verb: 'walk', params: { x: 5, y: 6 } }
+    }
+    const { loop, world } = await setup({
+      model: turnModel([{
+        thought: 'I will try it.',
+        action: { verb: 'experiment', params: { description: 'boil river water down for salt' } },
+        importance: 4,
+      }]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes('walk'), 100)
+
+    expect(seen).toEqual(['boil river water down for salt'])
+    expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+  })
+
+  it('lets an experiment reach the world unchanged when no arbiter is wired', async () => {
+    const { loop, agentDb } = await setup({
+      model: turnModel([{
+        thought: 'I will try it.',
+        action: { verb: 'experiment', params: { description: 'boil river water down for salt' } },
+        importance: 4,
+      }]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
+  })
+
+  it('leaves a named Tier-1 action untouched by the seam', async () => {
+    const adjudicator: Adjudicator = async () => {
+      throw new Error('must not be consulted')
+    }
+    const { loop, agentDb, world } = await setup({
+      model: turnModel([{ thought: 'I walk.', action: { verb: 'walk', params: { x: 5, y: 6 } }, importance: 2 }]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes('walk'), 100)
+    expect(startedVerbs(world.engineDb)).toContain('walk')
+    expect(alertKinds(agentDb)).not.toContain('adjudicate_failed')
+  })
+})
+
+describe('arbiter wiring expansion (T20)', () => {
+  const RECIPE_VERB = 'recipe:t20_weave'
+  afterEach(() => unregisterVerb(RECIPE_VERB))
+
+  const unknownVerbTurn = {
+    thought: 'I will patch the roof.',
+    action: { verb: 'patch', params: { structureId: STRUCTURE_ID } },
+    importance: 4,
+  }
+
+  it('re-frames an unknown verb as freeform and sends the flattened words to the arbiter', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return { kind: 'impossible', reason: 'the roof is beyond mending', class: 'physically_impossible' }
+    }
+    const { loop, agentDb } = await setup({ model: turnModel([unknownVerbTurn]), mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(seen).toEqual([`patch ${STRUCTURE_ID}`])
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe('You realize you cannot: the roof is beyond mending')
+  })
+
+  it('asks the arbiter once per turn: a second unknown verb falls back to refusal memory', async () => {
+    let calls = 0
+    const adjudicator: Adjudicator = async () => {
+      calls += 1
+      // A map onto another verb the world does not have: the retry fails too.
+      return { kind: 'map', verb: 'patch_again', params: {} }
+    }
+    const { loop, agentDb } = await setup({ model: turnModel([unknownVerbTurn]), mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(calls).toBe(1)
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe('You realize you cannot: unknown verb: patch_again')
+  })
+
+  it('codifies an attempt verdict and then submits the new recipe verb', async () => {
+    const codified: string[] = []
+    const arbiter: SeamArbiter = {
+      adjudicate: async () => ({
+        kind: 'attempt',
+        recipe: { id: RECIPE_VERB },
+        summary: 'Weave reeds into a mat.',
+      }),
+      codify: (recipe) => {
+        codified.push(recipe.id)
+        registerVerb({
+          kind: RECIPE_VERB,
+          validate: () => null,
+          duration: () => 1,
+          onComplete: () => [],
+          interruptible: true,
+        })
+        return { ruleId: 1, verb: recipe.id }
+      },
+    }
+    const { loop, runtime, world } = await setup({
+      model: turnModel([{ thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 }]),
+      mindConfig: FAST_MIND,
+    })
+    wireArbiter(runtime, arbiter)
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes(RECIPE_VERB), 100)
+
+    expect(codified).toEqual([RECIPE_VERB])
+    expect(startedVerbs(world.engineDb)).toContain(RECIPE_VERB)
+    expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+  })
+
+  it('falls back to the world when an attempt arrives with no way to codify it', async () => {
+    const adjudicator: Adjudicator = async () => ({
+      kind: 'attempt',
+      recipe: { id: RECIPE_VERB },
+      summary: 'Weave reeds into a mat.',
+    })
+    const { loop, agentDb } = await setup({
+      model: turnModel([{ thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 }]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
+  })
+})
+
+describe('refusal prose teaches a path (T18)', () => {
+  it('appends the hint only to an insufficient_skill verdict', () => {
+    expect(refusalMemoryText('you have not the hands for it', 'insufficient_skill')).toBe(
+      'You realize you cannot: you have not the hands for it — perhaps someone nearby knows the craft.',
+    )
+    expect(CRAFT_HINT).toBe(' — perhaps someone nearby knows the craft.')
+  })
+
+  it('leaves every other refusal exactly as the world stated it', () => {
+    for (const cls of ['physically_impossible', 'beyond_adjacency', 'insufficient_materials', undefined]) {
+      expect(refusalMemoryText('no such craft exists under the sun', cls)).toBe(
+        'You realize you cannot: no such craft exists under the sun',
+      )
+    }
+  })
+
+  it('is applied at prose time only — the reason it was given is unchanged', () => {
+    const reason = 'you have not the hands for it'
+    const prose = refusalMemoryText(reason, 'insufficient_skill')
+    expect(prose.endsWith(CRAFT_HINT)).toBe(true)
+    expect(prose.slice(0, -CRAFT_HINT.length)).toBe(`You realize you cannot: ${reason}`)
+    expect(reason).toBe('you have not the hands for it')
   })
 })

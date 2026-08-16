@@ -1,0 +1,27 @@
+import { AgentBorn, type EventStore } from '@sj/engine'
+import type { z } from 'zod'
+import type { EngineBridge } from '../runtime/bridge.js'
+
+export type AgentBornPayload = z.infer<typeof AgentBorn>
+
+// A birth is the one world event that needs a mind built for it. The watch is a
+// tail of the log, not a hook in the engine: the world does not know minds exist.
+export function watchBirths(
+  bridge: EngineBridge,
+  store: EventStore,
+  spawn: (born: AgentBornPayload) => void,
+): () => void {
+  let seq = store.lastSeq()
+  let stopped = false
+  bridge.onTick(() => {
+    if (stopped) return
+    const fresh = store.readFrom(seq)
+    seq = store.lastSeq()
+    for (const ev of fresh) {
+      if (ev.type === 'agent_born') spawn(AgentBorn.parse(ev.payload))
+    }
+  })
+  return () => {
+    stopped = true
+  }
+}

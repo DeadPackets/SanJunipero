@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
-import { RngStream, fold, genesisState, skillLevel, submitIntent, type WorldState } from '@sj/engine'
+import { RngStream, VERBS, fold, genesisState, skillLevel, submitIntent, type WorldState } from '@sj/engine'
 import { openArbiterDb } from './schema.js'
 import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
 import { ReviewStore } from './review.js'
 import type { Recipe } from './verdict.js'
-import { codify, emitOutcomeEffects, verbFromRecipe } from './codify.js'
+import { codify, emitOutcomeEffects, isExpertRecipe, verbFromRecipe } from './codify.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
 
@@ -76,7 +76,7 @@ describe('codify', () => {
       const nextId = state.counters.nextEntityId
       const events = def.onComplete(state, CFG, 'a1', {}, RngStream.from([0, 0, 0, 0]))
       expect(events).toEqual([
-        { type: 'item_spawned', payload: { id: `item_${nextId}`, kind: 'salt', qty: 1, loc: { t: 'agent', id: 'a1' } } },
+        { type: 'item_spawned', payload: { id: `item_${nextId}`, kind: 'salt', qty: 1, loc: { t: 'agent', id: 'a1' }, owner: 'a1' } },
       ])
     })
   })
@@ -152,6 +152,105 @@ describe('codify', () => {
         { type: 'item_spawned', payload: { id: `item_${nextId}`, kind: 'salt', qty: 1, loc: { t: 'agent', id: 'a1' } } },
         { type: 'item_spawned', payload: { id: `item_${nextId + 1}`, kind: 'clay', qty: 2, loc: { t: 'agent', id: 'a1' } } },
       ])
+    })
+  })
+
+  describe('expert crafts carry the maker’s mark', () => {
+    const expertRecipe: Recipe = { ...boilSaltRecipe, skillCheck: { track: 'cooking', difficulty: 4 } }
+    const EXPERT_XP = CFG.crafting.expertLevel * CFG.skills.xpLevelDivisor
+
+    function cook(xp: number): WorldState {
+      const s = burningFireAdjacent()
+      return xp === 0 ? s : fold(s, ev('skill_gained', { agentId: 'a1', track: 'cooking', xp }), CFG)
+    }
+
+    // A success row every time, so the spawn is never a dice question.
+    const alwaysWins = { next: () => 0 } as unknown as RngStream
+    const spawnPayload = (recipe: Recipe, state: WorldState, config = CFG): Record<string, unknown> | undefined =>
+      verbFromRecipe(recipe).onComplete(state, config, 'a1', {}, alwaysWins)
+        .find((e) => e.type === 'item_spawned')?.payload as Record<string, unknown> | undefined
+
+    it('reads difficulty against the expert threshold', () => {
+      expect(isExpertRecipe(expertRecipe, CFG)).toBe(true)
+      expect(isExpertRecipe(boilSaltRecipe, CFG)).toBe(false)             // difficulty 2
+      expect(isExpertRecipe({ ...boilSaltRecipe, skillCheck: undefined }, CFG)).toBe(false)
+    })
+
+    it('marks an expert recipe worked by an expert hand', () => {
+      expect(skillLevel(cook(EXPERT_XP), 'a1', 'cooking', CFG)).toBe(CFG.crafting.expertLevel)
+      expect(spawnPayload(expertRecipe, cook(EXPERT_XP))).toMatchObject({ owner: 'a1', crafterMark: 'a1' })
+    })
+
+    it('leaves it unmarked for a novice hand, and for an everyday recipe', () => {
+      expect(spawnPayload(expertRecipe, cook(0))!.crafterMark).toBeUndefined()
+      expect(spawnPayload(boilSaltRecipe, cook(EXPERT_XP))!.crafterMark).toBeUndefined()
+    })
+
+    it('stops marking and owning when the ownership flag is off', () => {
+      const off = SimConfigSchema.parse({ ownership: { enabled: false } })
+      const payload = spawnPayload(expertRecipe, cook(EXPERT_XP), off)!
+      expect(payload.crafterMark).toBeUndefined()
+      expect(payload.owner).toBeUndefined()
+    })
+  })
+
+  describe('tools wear out in the hands that use them', () => {
+    // A rod is a held_item requirement, not a cost: it is used, not consumed.
+    const rodRecipe: Recipe = {
+      ...boilSaltRecipe,
+      id: 'recipe:angle',
+      requires: [{ type: 'held_item', kind: 'rod', qty: 1 }],
+      outcomeTable: [{ weight: 1, success: true, label: 'A fish.', effects: [{ op: 'spawn_item', kind: 'fish', qty: 1, to: 'agent' }] }],
+    }
+    const alwaysWins = { next: () => 0 } as unknown as RngStream
+
+    function withRod(durability?: number): WorldState {
+      return fold(agentState(), ev('item_spawned', {
+        id: 'item_1', kind: 'rod', qty: 1, loc: { t: 'agent', id: 'a1' },
+        ...(durability === undefined ? {} : { durability }),
+      }), CFG)
+    }
+
+    const wearEvents = (s: WorldState, config = CFG) =>
+      verbFromRecipe(rodRecipe).onComplete(s, config, 'a1', {}, alwaysWins)
+        .filter((e) => e.type === 'item_worn' || e.type === 'item_broke')
+
+    it('carries durability out of an arbiter spawn_item effect', () => {
+      const state = agentState()
+      const nextId = state.counters.nextEntityId
+      expect(emitOutcomeEffects(state, 'a1', [{ op: 'spawn_item', kind: 'rod', qty: 1, to: 'agent', durability: 40 }])).toEqual([
+        { type: 'item_spawned', payload: { id: `item_${nextId}`, kind: 'rod', qty: 1, loc: { t: 'agent', id: 'a1' }, durability: 40 } },
+      ])
+    })
+
+    it('wears the required tool by wearPerUse on every completed use', () => {
+      expect(wearEvents(withRod(3))).toEqual([{ type: 'item_worn', payload: { id: 'item_1', delta: -1 } }])
+    })
+
+    it('breaks the tool on the use that empties it', () => {
+      expect(wearEvents(withRod(1))).toEqual([
+        { type: 'item_worn', payload: { id: 'item_1', delta: -1 } },
+        { type: 'item_broke', payload: { id: 'item_1' } },
+      ])
+      const broken = wearEvents(withRod(1)).reduce((s, e) => fold(s, ev(e.type, e.payload), CFG), withRod(1))
+      expect(broken.items.item_1).toBeUndefined()
+    })
+
+    it('leaves a tool with no durability of its own untouched', () => {
+      expect(wearEvents(withRod())).toEqual([])
+    })
+
+    it('goes quiet with the wear flag off', () => {
+      expect(wearEvents(withRod(3), SimConfigSchema.parse({ tools: { wearEnabled: false } }))).toEqual([])
+    })
+
+    it('never touches a Tier-1 verb: the engine craft wears nothing', () => {
+      let s = withRod(3)
+      s = fold(s, ev('item_spawned', { id: 'item_2', kind: 'wood', qty: 10, loc: { t: 'agent', id: 'a1' } }), CFG)
+      const events = VERBS.craft!.onComplete(s, CFG, 'a1', { recipe: 'plank' }, alwaysWins)
+      expect(events.some((e) => e.type === 'item_worn' || e.type === 'item_broke')).toBe(false)
+      expect(fold(s, ev('item_spawned', { id: 'item_3', kind: 'fish', qty: 1, loc: { t: 'agent', id: 'a1' } }), CFG)
+        .items.item_1!.durability).toBe(3)
     })
   })
 

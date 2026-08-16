@@ -1,12 +1,15 @@
 import type { SimConfig } from '@sj/shared'
+import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
 import { VERBS, type PendingEvent } from './verbs.js'
 
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
 
 export function submitIntent(
-  state: WorldState, config: SimConfig, agentId: string, verb: string, params: Record<string, unknown>,
+  state: WorldState, baseConfig: SimConfig, agentId: string, verb: string, params: Record<string, unknown>,
 ): IntentResult {
+  // Derived here, not at the call site: every verb is judged under the world's live laws.
+  const config = effectiveConfig(baseConfig, state.laws)
   const a = state.agents[agentId]
   if (!a) return { ok: false, reason: 'no such agent' }
   if (!a.alive) return { ok: false, reason: 'the dead do not act' }

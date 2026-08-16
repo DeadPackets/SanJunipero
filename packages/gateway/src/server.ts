@@ -75,7 +75,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   let snapJson: string | null = null
   const snapshotJson = (): string => {
     if (snapJson === null) {
-      snapJson = JSON.stringify({ t: 'snapshot', tick: mirror.state().tick, seq: mirror.seq(), state: mirror.state(), config, live: true })
+      snapJson = JSON.stringify({ t: 'snapshot', tick: mirror.state().tick, seq: mirror.seq(), state: mirror.state(), config, laws: mirror.state().laws ?? {}, live: true })
     }
     return snapJson
   }

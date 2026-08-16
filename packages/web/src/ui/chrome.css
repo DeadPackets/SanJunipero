@@ -559,3 +559,32 @@ body {
   display: inline-block;
 }
 .roster-gone { margin-top: 0.8rem; font-style: italic; opacity: 0.75; }
+
+/* ── World Laws: the town's rulebook, and the operator's hand on it ── */
+.laws-panel, .laws-dashboard { padding: 1rem; min-width: 21rem; font-size: 0.85rem; }
+@media (prefers-reduced-motion: no-preference) {
+  .laws-panel { animation: panel-in var(--t-med) var(--ease-enter); }
+}
+.laws-lede { margin: 0 0 0.8rem; font-style: italic; opacity: 0.8; }
+.laws-list, .laws-edit-list { list-style: none; margin: 0; padding: 0; }
+.law-row, .law-edit {
+  display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 0.5rem;
+  padding: 0.4rem 0; border-bottom: 2px dotted var(--sand);
+}
+.law-row.changed { background: var(--honey) var(--grain); box-shadow: 0 0 0 2px var(--ink); padding: 0.4rem; }
+.law-path, .law-edit label { font-family: var(--font-px); font-size: 0.68rem; letter-spacing: 0.03em; word-break: break-all; }
+.law-value { font-family: var(--font-px); font-size: 0.72rem; }
+.law-history {
+  grid-column: 1 / -1; margin: 0.3rem 0 0; padding-left: 1.1rem;
+  font-size: 0.78rem; opacity: 0.8;
+}
+.law-edit select, .law-edit input {
+  font: inherit; padding: 0.15rem 0.35rem; min-height: 40px;
+  background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
+}
+.law-edit select:disabled, .law-edit input:disabled { opacity: 0.5; cursor: not-allowed; }
+.laws-notice {
+  color: var(--cream); background-color: var(--deep);
+  border: 10px solid transparent; border-image: var(--px-night);
+  padding: 0.5rem 0.7rem; margin: 0 0 0.8rem;
+}

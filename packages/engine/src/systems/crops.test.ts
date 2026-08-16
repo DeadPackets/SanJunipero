@@ -205,7 +205,7 @@ describe('verb: harvest', () => {
     expect(out.events).toContainEqual({ type: 'crop_harvested', payload: { cropId: 'crop_1' } })
     expect(out.events).toContainEqual({
       type: 'item_spawned',
-      payload: { id: 'item_2', kind: 'wheat', qty: 3, loc: { t: 'agent', id: 'a1' } },
+      payload: { id: 'item_2', kind: 'wheat', qty: 3, loc: { t: 'agent', id: 'a1' }, owner: 'a1', spoilage: { spawnDay: 0, days: 60 } },
     })
     expect(out.events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'farming', xp: 1 } })
     expect(out.state.crops.crop_1).toBeUndefined()

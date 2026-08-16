@@ -42,6 +42,8 @@ const AgingSchema = z.object({
   elderFromYears: z.number().default(60),
   naturalDeathBaseChancePerDay: z.number().default(0.0005),
   naturalDeathChancePerYearOver: z.number().default(0.0002),
+  deathOfOldAgeEnabled: z.boolean().default(true),
+  elderEnergyDecayMultiplier: z.number().default(1.2),
 }).strict()
 
 const SkillsSchema = z.object({
@@ -121,7 +123,60 @@ const CraftingSchema = z.object({
   recipes: z.record(z.string(), RecipeSchema).default({
     plank: { inputs: { wood: 1 }, output: { kind: 'plank', qty: 2 }, skill: 'carpentry' },
   }),
+  expertLevel: z.number().int().default(5),
+  expertDifficulty: z.number().int().default(4),
 }).strict()
+
+const StructuresSchema = z.object({
+  enterableKinds: z.array(z.string()).default(['hut', 'storehouse']),
+  privateKinds: z.array(z.string()).default(['hut']),
+  sleepIndoorsOnly: z.boolean().default(true),
+  sleepableKinds: z.array(z.string()).default(['hut']),
+}).strict()
+
+const ReproductionSchema = z.object({
+  enabled: z.boolean().default(true),
+  coSleepNightsToPartner: z.number().int().default(3),
+  partnerWindowDays: z.number().int().default(7),
+  conceptionChancePerNight: z.number().default(0.2),
+  gestationDays: z.number().int().default(72),
+  fertileYears: z.object({
+    from: z.number().int().default(16),
+    to: z.number().int().default(45),
+  }).strict().prefault({}),
+}).strict()
+
+const SpoilageSchema = z.object({
+  enabled: z.boolean().default(true),
+  days: z.record(z.string(), z.number()).default({ fish: 2, berries: 3, venison: 4, bread: 6, wheat: 60 }),
+  storehouseMultiplier: z.number().default(2),
+  preservingKinds: z.array(z.string()).default(['storehouse']),
+}).strict()
+
+const SeasonsSchema = z.object({
+  winter: z.object({
+    hungerDecayMultiplier: z.number().default(1.25),
+    fishCatchMultiplier: z.number().default(0.5),
+  }).strict().prefault({}),
+}).strict()
+
+const ToolsSchema = z.object({
+  wearEnabled: z.boolean().default(true),
+  wearPerUse: z.number().default(1),
+}).strict()
+
+const MysterySchema = z.object({
+  enabled: z.boolean().default(true),
+  chancePerDay: z.number().default(0.08),
+}).strict()
+
+// C11 adds maxNodes/regionSize here; roadCost stays C9's (deep-world addendum §11).
+const PathingSchema = z.object({
+  roadCost: z.number().default(0.6),
+}).strict()
+
+// Flag-only sections: the feature they gate is physics that already has a home elsewhere.
+const FlagSchema = z.object({ enabled: z.boolean().default(true) }).strict()
 
 export const SimConfigSchema = z.object({
   needs: NeedsSchema.prefault({}),
@@ -135,10 +190,23 @@ export const SimConfigSchema = z.object({
   fire: FireSchema.prefault({}),
   construction: ConstructionSchema.prefault({}),
   crafting: CraftingSchema.prefault({}),
+  structures: StructuresSchema.prefault({}),
+  reproduction: ReproductionSchema.prefault({}),
+  spoilage: SpoilageSchema.prefault({}),
+  seasons: SeasonsSchema.prefault({}),
+  tools: ToolsSchema.prefault({}),
+  mystery: MysterySchema.prefault({}),
+  pathing: PathingSchema.prefault({}),
+  occlusion: FlagSchema.prefault({}),
+  ownership: FlagSchema.prefault({}),
+  inscription: FlagSchema.prefault({}),
 }).strict()
 
 export type SimConfig = z.infer<typeof SimConfigSchema>
 export type CropDef = z.infer<typeof CropDefSchema>
 export type RecipeDef = z.infer<typeof RecipeSchema>
+
+// World law, not a dial: a mind wakes at twelve. Config would make it negotiable.
+export const SPAWN_AGE_YEARS = 12
 
 export const DEFAULT_CONFIG: SimConfig = SimConfigSchema.parse({})

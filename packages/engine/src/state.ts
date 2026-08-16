@@ -1,15 +1,19 @@
 import type { SimConfig } from '@sj/shared'
 
-// grass, dirt, water, forest, rock, sand, farmland
-export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6
+// grass, dirt, water, forest, rock, sand, farmland, road
+export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 export type AgentBody = {
   id: string; name: string; x: number; y: number; alive: boolean; asleep: boolean
   needs: { hunger: number; energy: number; warmth: number; social: number }
   hp: number; injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
   ill: boolean; ageDays: number
+  sex?: 'f' | 'm'                         // absent = 'f'; read through sexOf(), keeps pre-C9 hashes stable
+  pregnant?: { sinceDay: number; byId: string }
+  parents?: [string, string]              // [motherId, fatherId]; only ever set on the born
   tendedTick?: number                     // absent until first tended: keeps pre-health state hashes stable
   lastSpokeTick?: number                  // absent until first speech: keeps golden hashes stable
+  insideId?: string                       // absent until first entry: keeps golden hashes stable
   skills: Record<string, number>          // track → xp
   activity: null | { verb: string; ticksRemaining: number; params: Record<string, unknown>; path?: Array<[number, number]> }
   collapsedSinceTick: number | null
@@ -20,11 +24,17 @@ export type Structure = {
   id: string; kind: string; x: number; y: number; w: number; h: number
   hp: number; maxHp: number; flammable: boolean; stage: 'construction' | 'complete'
   progressTicks: number; builtBy: string | null; burning: boolean; burnTicks: number
+  owner?: string                          // absent = public; the hash-stable form of `agentId | null`
+  inscription?: { text: string; by: string }  // absent = unmarked; only the latest layer, the log keeps the rest
 }
 
 export type Item = {
   id: string; kind: string; qty: number
   text?: string
+  owner?: string                          // absent = unowned; outlives the owner's death
+  crafterMark?: string                    // expert crafts only; set once at spawn, never reassigned
+  spoilage?: { spawnDay: number; days: number }  // absent = keeps forever
+  durability?: number                     // absent = never wears; 0 breaks the thing
   loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
 }
 
@@ -40,6 +50,11 @@ export type WorldState = {
   items: Record<string, Item>
   crops: Record<string, Crop>
   wildlife: { fish: number; deer: number }
+  // Absent until the first co_slept, so a world with no nights hashes as it always did.
+  pairNights?: Record<string, { nights: number; lastNightDay: number; formedTick: number | null; dissolvedTick: number | null }>
+  // Runtime overrides of world physics, keyed by dotted config path. Absent until the
+  // first config_changed; hashed, snapshotted and replayed like every other fact.
+  laws?: Record<string, unknown>
   counters: { nextEntityId: number }
 }
 

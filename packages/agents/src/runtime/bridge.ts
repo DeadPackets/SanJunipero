@@ -10,6 +10,14 @@ import {
 import type { PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
 import type { SimConfig, SimEvent } from '@sj/shared'
 import type { PerceptionPacket } from '../prompt/prose.js'
+import { DEFAULT_MIND_CONFIG } from '../wake.js'
+
+// A mind is handed only the events of this window when it next looks, so a
+// window shorter than the gap between its turns makes the town half-deaf:
+// speech and every witnessed taking expire before anybody perceives them
+// (D-28-6, measured at ~59 ticks per mind). The boredom floor is the longest
+// an awake mind can go without a turn; 10% covers the tick it actually lands on.
+export const DEFAULT_RECENT_WINDOW_TICKS = Math.ceil(DEFAULT_MIND_CONFIG.boredomTicks * 1.1)
 // The agents-local intent shape. The turn schema keeps `verb` a free string so a
 // novel intent can round-trip to the engine; the FROZEN submitIntent call just
 // forwards it and the verb registry answers in-world.
@@ -27,10 +35,24 @@ type QueuedSubmit = {
 // prose.ts. The engine ships `self` without asleep/collapsed booleans and
 // visible.items with flat x/y; prose.ts expects self.asleep/self.collapsed and
 // tile-located items. Perception remains a pure projection either way.
+// The engine names an owner for everything it can; a mind needs telling only
+// when the thing is not its own. Names, not ids — the packet carries no ids to
+// compare, and two people in one town do not share a name.
+function claims(
+  i: { ownerName?: string; crafterMarkName?: string },
+  selfName: string,
+): { ownerName?: string; crafterMarkName?: string } {
+  return {
+    ...(i.ownerName === undefined || i.ownerName === selfName ? {} : { ownerName: i.ownerName }),
+    ...(i.crafterMarkName === undefined || i.crafterMarkName === selfName ? {} : { crafterMarkName: i.crafterMarkName }),
+  }
+}
+
 function reconcile(
   raw: EnginePerceptionPacket,
-  self: { asleep: boolean; collapsedSinceTick: number | null } | undefined,
+  self: { name: string; asleep: boolean; collapsedSinceTick: number | null } | undefined,
 ): PerceptionPacket {
+  const selfName = self?.name ?? ''
   return {
     time: raw.time,
     self: {
@@ -40,7 +62,14 @@ function reconcile(
       asleep: self?.asleep ?? false,
       collapsed: (self?.collapsedSinceTick ?? null) !== null,
       activity: raw.self.activity,
-      inventory: raw.self.inventory,
+      inventory: raw.self.inventory.map((i) => ({
+        id: i.id,
+        kind: i.kind,
+        qty: i.qty,
+        ...(i.text === undefined ? {} : { text: i.text }),
+        loc: i.loc,
+        ...claims(i, selfName),
+      })),
     },
     weather: raw.weather,
     visible: {
@@ -51,10 +80,12 @@ function reconcile(
         kind: i.kind,
         qty: i.qty,
         loc: { t: 'tile' as const, x: i.x, y: i.y },
+        ...claims(i, selfName),
       })),
       crops: raw.visible.crops,
     },
     heard: raw.heard,
+    seen: raw.seen,
     feltEvents: raw.feltEvents,
   }
 }
@@ -73,12 +104,13 @@ export class EngineBridge {
     loop: TickLoop
     store: EventStore
     simConfig: SimConfig
+    /** Narrower than the default only; a shorter window drops what a mind never looked at. */
     recentWindowTicks?: number
   }) {
     this.#loop = opts.loop
     this.#store = opts.store
     this.#simConfig = opts.simConfig
-    this.#recentWindowTicks = opts.recentWindowTicks ?? 10
+    this.#recentWindowTicks = opts.recentWindowTicks ?? DEFAULT_RECENT_WINDOW_TICKS
   }
 
   // Drain queued intents in arrival order, then run the world systems, then
@@ -115,6 +147,18 @@ export class EngineBridge {
     })
   }
 
+  // Shutdown: a queued intent whose loop will never step again leaves its mind
+  // awaiting a promise nobody will settle. Refuse them all, in world words.
+  drain(reason = 'the moment passes'): number {
+    const queue = this.#queue
+    this.#queue = []
+    for (const item of queue) {
+      item.onResult?.({ ok: false, reason })
+      item.resolve({ ok: false, reason })
+    }
+    return queue.length
+  }
+
   perception(agentId: string): PerceptionPacket {
     return reconcile(
       composePerception(this.#loop.state, this.#simConfig, agentId, this.#recentEvents()),
@@ -130,6 +174,13 @@ export class EngineBridge {
 
   isEdible(kind: string): boolean {
     return isFoodKind(this.#simConfig, kind)
+  }
+
+  // Body facts perception does not carry, for the arbiter seam: who is asking
+  // and what their hands already know. Read-only; skills are copied out.
+  agentFacts(agentId: string): { name: string; skills: Record<string, number> } | null {
+    const body = this.#loop.state.agents[agentId]
+    return body === undefined ? null : { name: body.name, skills: { ...body.skills } }
   }
 
   onTick(cb: (tick: number) => void): void {

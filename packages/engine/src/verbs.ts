@@ -2,13 +2,15 @@ import { z } from 'zod'
 import { MINUTES_PER_DAY, simTimeFromTick, type SimConfig } from '@sj/shared'
 import { mintId, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
+import { doorTile } from './interiors.js'
 import { findPath, isPassable } from './path.js'
+import { spoilageFor } from './systems/spoilage.js'
 
 export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
-  | 'walk' | 'sleep' | 'wake' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
+  | 'walk' | 'sleep' | 'wake' | 'enter' | 'exit' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
   | 'build' | 'craft' | 'extinguish'
-  | 'speak' | 'give' | 'take' | 'write' | 'read' | 'teach' | 'attack' | 'experiment'
+  | 'speak' | 'give' | 'take' | 'stow' | 'write' | 'read' | 'inscribe' | 'teach' | 'attack' | 'experiment'
 
 export type VerbDef = {
   kind: string
@@ -61,18 +63,19 @@ export function ticksPerTile(state: WorldState, config: SimConfig, agentId: stri
 
 const walk: VerbDef = makeVerb({
   kind: 'walk',
-  validate(state, _config, agentId, params) {
+  validate(state, config, agentId, params) {
     const p = WalkParams.safeParse(params)
     if (!p.success) return 'walk needs a destination {x, y}'
     const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return 'you are indoors; step outside first'
     if (a.x === p.data.x && a.y === p.data.y) return 'already at that spot'
-    if (findPath(state, a, p.data) === null) return 'no path to that spot'
+    if (findPath(state, a, p.data, config) === null) return 'no path to that spot'
     return null
   },
   duration(state, config, agentId, params) {
     const p = WalkParams.parse(params)
     const a = state.agents[agentId]!
-    const path = findPath(state, a, p)
+    const path = findPath(state, a, p, config)
     if (!path) throw new Error(`walk.duration: no path for ${agentId}`)
     return path.length * ticksPerTile(state, config, agentId)
   },
@@ -88,10 +91,59 @@ export const FOOD_KINDS: ReadonlySet<string> = new Set([FORAGE_KIND, FISH_KIND, 
 
 const sleep: VerbDef = makeVerb({
   kind: 'sleep',
-  validate(state, _config, agentId) {
-    return state.agents[agentId]!.asleep ? 'already asleep' : null
+  validate(state, config, agentId) {
+    const a = state.agents[agentId]!
+    if (a.asleep) return 'already asleep'
+    // A body that has already gone down does not get to pick its bed.
+    if (!config.structures.sleepIndoorsOnly || a.collapsedSinceTick !== null) return null
+    const s = a.insideId === undefined ? undefined : state.structures[a.insideId]
+    if (!s || s.stage !== 'complete' || !config.structures.sleepableKinds.includes(s.kind)) {
+      return 'there is no bed here; find somewhere to lie down'
+    }
+    return null
   },
   onComplete(_state, _config, agentId) { return [{ type: 'agent_slept', payload: { agentId } }] },
+})
+
+export const EnterParams = z.object({ structureId: z.string() }).strict()
+
+const enter: VerbDef = makeVerb({
+  kind: 'enter',
+  validate(state, config, agentId, params) {
+    const p = EnterParams.safeParse(params)
+    if (!p.success) return 'enter needs a {structureId}'
+    const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return 'already inside'
+    const s = state.structures[p.data.structureId]
+    if (!s) return 'there is nothing there to enter'
+    if (!config.structures.enterableKinds.includes(s.kind)) return `there is no way into a ${s.kind}`
+    if (s.stage !== 'complete') return 'it is not finished'
+    const door = doorTile(state, s)
+    if (!door) return 'there is no way in'
+    if (Math.abs(a.x - door.x) > 1 || Math.abs(a.y - door.y) > 1) return 'not close enough to the door'
+    return null
+  },
+  onComplete(state, _config, agentId, params) {
+    const p = EnterParams.parse(params)
+    const s = state.structures[p.structureId]
+    const door = s ? doorTile(state, s) : null
+    if (!door) return []
+    return [
+      { type: 'agent_moved', payload: { id: agentId, x: door.x, y: door.y } },
+      { type: 'agent_entered', payload: { agentId, structureId: p.structureId } },
+    ]
+  },
+})
+
+const exit: VerbDef = makeVerb({
+  kind: 'exit',
+  validate(state, _config, agentId) {
+    return state.agents[agentId]!.insideId === undefined ? 'not inside anything' : null
+  },
+  onComplete(state, _config, agentId) {
+    const structureId = state.agents[agentId]!.insideId
+    return structureId === undefined ? [] : [{ type: 'agent_exited', payload: { agentId, structureId } }]
+  },
 })
 
 // submitIntent already prepends agent_woke for any intent from a sleeper.
@@ -225,7 +277,7 @@ const harvest: VerbDef = makeVerb({
     const def = config.crops[crop.kind]!
     return [
       { type: 'crop_harvested', payload: { cropId: p.cropId } },
-      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: crop.kind, qty: def.yield, loc: { t: 'agent', id: agentId } } },
+      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: crop.kind, qty: def.yield, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId), ...spoilageFor(state, crop.kind, config) } },
     ]
   },
   skill: { track: 'farming', xp: 1 },
@@ -242,11 +294,13 @@ const fish: VerbDef = makeVerb({
   },
   onComplete(state, config, agentId, _params, rng) {
     if (state.wildlife.fish <= 0) return []
+    const winter = simTimeFromTick(state.tick).season === 'winter'
     const chance = config.wildlife.fishCatchBase * (1 + skillLevel(state, agentId, 'fishing', config) / 10)
+      * (winter ? config.seasons.winter.fishCatchMultiplier : 1)
     if (rng.next() >= chance) return []
     return [
       { type: 'wildlife_changed', payload: { fish: state.wildlife.fish - 1 } },
-      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FISH_KIND, qty: 1, loc: { t: 'agent', id: agentId } } },
+      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FISH_KIND, qty: 1, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId), ...spoilageFor(state, FISH_KIND, config) } },
     ]
   },
   skill: { track: 'fishing', xp: 1 },
@@ -269,11 +323,26 @@ const forage: VerbDef = makeVerb({
     const qty = config.wildlife.forageYieldBySeason[season]
     if (qty <= 0) return []
     return [
-      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FORAGE_KIND, qty, loc: { t: 'agent', id: agentId } } },
+      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FORAGE_KIND, qty, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId), ...spoilageFor(state, FORAGE_KIND, config) } },
     ]
   },
   skill: { track: 'foraging', xp: 1 },
 })
+
+// What you pull out of the ground, the water or the woods — or write down — is yours from the
+// first moment. Making is making, whatever the hand does.
+function ownerStamp(config: SimConfig, agentId: string): { owner?: string } {
+  return config.ownership.enabled ? { owner: agentId } : {}
+}
+
+// A mark is a claim like any other, so it rides the same flag. Skill is read at
+// craft time: the hand that was expert on the day is the hand the object remembers.
+export function crafterStamp(
+  state: WorldState, config: SimConfig, agentId: string, track: string,
+): { crafterMark?: string } {
+  if (!config.ownership.enabled) return {}
+  return skillLevel(state, agentId, track, config) >= config.crafting.expertLevel ? { crafterMark: agentId } : {}
+}
 
 export const BuildParams = z.object({ kind: z.string(), x: z.number().int(), y: z.number().int() }).strict()
 export const CraftParams = z.object({ recipe: z.string() }).strict()
@@ -358,6 +427,7 @@ const build: VerbDef = makeVerb({
         payload: {
           id: mintId(state, 'structure'), kind: p.kind, x: p.x, y: p.y, w, h,
           maxHp: config.construction.hutMaxHp, flammable: true, builderId: agentId,
+          ...(config.ownership.enabled ? { owner: agentId } : {}),
         },
       },
     ]
@@ -376,7 +446,9 @@ const craft: VerbDef = makeVerb({
     const p = CraftParams.safeParse(params)
     if (!p.success) return 'craft needs a {recipe}'
     const recipe = config.crafting.recipes[p.data.recipe]
-    if (!recipe) return `no such recipe: ${p.data.recipe}`
+    // A refusal must leave a door open (addendum §9): not knowing a craft and
+    // the craft not existing look the same from here, so name both ways out.
+    if (!recipe) return `no such recipe: ${p.data.recipe} — perhaps someone nearby knows how, or it wants discovering.`
     for (const [kind, qty] of Object.entries(recipe.inputs)) {
       if (heldQty(state, agentId, kind) < qty) return `not enough ${kind}`
     }
@@ -394,7 +466,12 @@ const craft: VerbDef = makeVerb({
       ...events,
       {
         type: 'item_spawned',
-        payload: { id: mintId(state, 'item'), kind: recipe.output.kind, qty: recipe.output.qty, loc: { t: 'agent', id: agentId } },
+        payload: {
+          id: mintId(state, 'item'), kind: recipe.output.kind, qty: recipe.output.qty,
+          loc: { t: 'agent', id: agentId },
+          ...ownerStamp(config, agentId), ...crafterStamp(state, config, agentId, recipe.skill),
+          ...spoilageFor(state, recipe.output.kind, config),
+        },
       },
       { type: 'skill_gained', payload: { agentId, track: recipe.skill, xp: 1 } },
     ]
@@ -438,7 +515,10 @@ const speak: VerbDef = makeVerb({
   onComplete(state, _config, agentId, params) {
     const p = SpeakParams.parse(params)
     const a = state.agents[agentId]!
-    return [{ type: 'agent_spoke', payload: { agentId, text: p.text, x: a.x, y: a.y } }]
+    return [{
+      type: 'agent_spoke',
+      payload: { agentId, text: p.text, x: a.x, y: a.y, ...(a.insideId === undefined ? {} : { insideId: a.insideId }) },
+    }]
   },
 })
 
@@ -455,13 +535,19 @@ const give: VerbDef = makeVerb({
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     return null
   },
-  onComplete(state, _config, agentId, params) {
+  onComplete(state, config, agentId, params) {
     const p = GiveParams.parse(params)
     const item = state.items[p.itemId]
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
     const target = state.agents[p.targetId]
     if (!target || !target.alive) return []
-    return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: p.targetId } } }]
+    // The only voluntary transfer of title the world has.
+    return [
+      { type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: p.targetId } } },
+      ...(config.ownership.enabled
+        ? [{ type: 'item_owner_changed', payload: { id: p.itemId, owner: p.targetId } }]
+        : []),
+    ]
   },
 })
 
@@ -481,11 +567,77 @@ const take: VerbDef = makeVerb({
     }
     return null
   },
-  onComplete(state, _config, agentId, params) {
+  onComplete(state, config, agentId, params) {
     const p = TakeParams.parse(params)
     const item = state.items[p.itemId]
     if (!item || item.loc.t === 'agent') return []
-    return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: agentId } } }]
+    const moved = { type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: agentId } } }
+    if (!config.ownership.enabled || item.owner === agentId) return [moved]
+    // Unowned things are claimed by the hand that lifts them; owned things are not.
+    // The engine blocks nothing here — it only makes sure the taking is public.
+    if (item.owner === undefined) {
+      return [moved, { type: 'item_owner_changed', payload: { id: p.itemId, owner: agentId } }]
+    }
+    const s = item.loc.t === 'structure' ? state.structures[item.loc.id] : undefined
+    const at = item.loc.t === 'tile' ? { x: item.loc.x, y: item.loc.y } : { x: s?.x ?? 0, y: s?.y ?? 0 }
+    return [moved, {
+      type: 'item_taken',
+      payload: { itemId: p.itemId, kind: item.kind, takerId: agentId, ownerId: item.owner, x: at.x, y: at.y },
+    }]
+  },
+})
+
+export const StowParams = z.object({ itemId: z.string(), structureId: z.string() }).strict()
+
+const stow: VerbDef = makeVerb({
+  kind: 'stow',
+  validate(state, _config, agentId, params) {
+    const p = StowParams.safeParse(params)
+    if (!p.success) return 'stow needs {itemId, structureId}'
+    const item = state.items[p.data.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    const s = state.structures[p.data.structureId]
+    if (!s) return 'there is nothing there to put it in'
+    if (s.stage !== 'complete') return 'it is not finished'
+    const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return a.insideId === s.id ? null : 'a wall is in the way'
+    if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to put anything down there'
+    return null
+  },
+  onComplete(state, _config, agentId, params) {
+    const p = StowParams.parse(params)
+    const item = state.items[p.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    // A shelf is not a transfer: the owner is unchanged, wherever the thing sits.
+    return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'structure', id: p.structureId } } }]
+  },
+})
+
+export const INSCRIPTION_MAX_CHARS = 280
+export const InscribeParams = z.object({
+  structureId: z.string(), text: z.string().min(1).max(INSCRIPTION_MAX_CHARS),
+}).strict()
+
+// Writing on something nobody can pocket. Three ticks, because carving is not scribbling.
+const inscribe: VerbDef = makeVerb({
+  kind: 'inscribe',
+  validate(state, config, agentId, params) {
+    if (!config.inscription.enabled) return 'your hands find no way to mark this'
+    const p = InscribeParams.safeParse(params)
+    if (!p.success) return `inscribe needs {structureId, text} of 1 to ${INSCRIPTION_MAX_CHARS} characters`
+    const s = state.structures[p.data.structureId]
+    if (!s) return 'there is nothing there to mark'
+    if (s.stage !== 'complete') return 'it is not finished'
+    const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return a.insideId === s.id ? null : 'a wall is in the way'
+    if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to mark it'
+    return null
+  },
+  duration() { return 3 },
+  onComplete(state, _config, agentId, params) {
+    const p = InscribeParams.parse(params)
+    if (!state.structures[p.structureId]) return []
+    return [{ type: 'structure_inscribed', payload: { structureId: p.structureId, text: p.text, agentId } }]
   },
 })
 
@@ -502,14 +654,14 @@ const write: VerbDef = makeVerb({
     }
     return null
   },
-  onComplete(state, _config, agentId, params) {
+  onComplete(state, config, agentId, params) {
     const p = WriteParams.parse(params)
     if (p.itemId !== undefined) {
       const item = state.items[p.itemId]
       if (!item || item.kind !== 'note' || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
       return [{ type: 'item_text_changed', payload: { id: p.itemId, text: p.text } }]
     }
-    return [{ type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: 'note', qty: 1, loc: { t: 'agent', id: agentId }, text: p.text } }]
+    return [{ type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: 'note', qty: 1, loc: { t: 'agent', id: agentId }, text: p.text, ...ownerStamp(config, agentId) } }]
   },
 })
 
@@ -583,13 +735,13 @@ const attack: VerbDef = makeVerb({
 
 const experiment: VerbDef = makeVerb({
   kind: 'experiment',
-  validate() { return 'You lack the knowledge to attempt this.' },
+  validate() { return 'You lack the knowledge to attempt this. Perhaps someone in the town knows how.' },
   onComplete() { return [] },
 })
 
 export const VERBS: Record<string, VerbDef> = {
-  walk, sleep, wake, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
-  speak, give, take, write, read, teach, attack, experiment,
+  walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
+  speak, give, take, stow, write, read, inscribe, teach, attack, experiment,
 }
 
 // Hot-registration seam: codified recipe verbs join the live registry by kind id.

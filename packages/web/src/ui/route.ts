@@ -1,6 +1,6 @@
 import { momentToTick } from '@sj/shared'
 
-export const LENSES = ['map', 'inspector', 'chronicle', 'society', 'director'] as const
+export const LENSES = ['map', 'inspector', 'chronicle', 'society', 'director', 'laws'] as const
 export type Lens = typeof LENSES[number]
 export type Route = {
   lens: Lens

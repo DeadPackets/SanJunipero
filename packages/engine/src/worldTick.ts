@@ -1,6 +1,7 @@
 import type { SimConfig } from '@sj/shared'
 import type { WorldState } from './state.js'
 import { fold } from './fold.js'
+import { effectiveConfig, type LawQueue } from './laws.js'
 import type { RngStreams } from './rng.js'
 import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
@@ -10,6 +11,9 @@ import { weatherSystem } from './systems/weather.js'
 import { fireSystem } from './systems/fire.js'
 import { cropsSystem } from './systems/crops.js'
 import { wildlifeSystem } from './systems/wildlife.js'
+import { spoilageSystem } from './systems/spoilage.js'
+import { reproductionSystem } from './systems/reproduction.js'
+import { mysterySystem } from './systems/mystery.js'
 
 export type TickCtx = {
   readonly config: SimConfig
@@ -80,24 +84,32 @@ function collapseDeathSystem(ctx: TickCtx): void {
 }
 
 const SYSTEMS: System[] = [
-  weatherSystem, fireSystem, cropsSystem, wildlifeSystem,
-  needsSystem, healthSystem, agingSystem, actionsSystem, collapseDeathSystem,
+  weatherSystem, mysterySystem, fireSystem, cropsSystem, wildlifeSystem, spoilageSystem,
+  needsSystem, healthSystem, reproductionSystem, agingSystem, actionsSystem, collapseDeathSystem,
 ]
 
 // Each emit folds immediately, so every system — and every later event within a
 // system — is generated against the already-folded state, never a stale snapshot.
-export function createWorldTick(config: SimConfig, rng: RngStreams): (state: WorldState) => WorldTickResult {
+// `ctx.config` is a getter: it re-derives from the world's current laws, so a flip
+// drained at this boundary is already true for every system that runs after it.
+export function createWorldTick(
+  config: SimConfig, rng: RngStreams, laws?: LawQueue,
+): (state: WorldState) => WorldTickResult {
   return (initial) => {
     let state = initial
     const events: PendingEvent[] = []
     const ctx: TickCtx = {
-      config,
+      get config() { return effectiveConfig(config, state.laws) },
       rng,
       state: () => state,
       emit: (type, payload) => {
         state = fold(state, { seq: 0, tick: state.tick, type, payload }, config)
         events.push({ type, payload })
       },
+    }
+    // Legislation before physics: a law changes at a tick boundary and never mid-tick.
+    if (laws !== undefined) {
+      for (const { path, value } of laws.splice(0)) ctx.emit('config_changed', { path, value })
     }
     for (const system of SYSTEMS) system(ctx)
     return { state, events }

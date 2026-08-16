@@ -23,6 +23,7 @@ import {
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
 import type { EngineBridge, Intent, SubmitResult } from './bridge.js'
+import { buildAgentCtx, flattenIntent, type Adjudicator, type Codifier, type SeamArbiter } from './arbiterSeam.js'
 
 const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 
@@ -42,6 +43,16 @@ function jsonOrRaw(text: string): unknown {
 }
 
 const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [] }
+
+// A refusal must leave a door open (addendum §9). The hint is rendered here, at
+// prose time, and is never written back into the arbiter's stored ruling. Only
+// a skill deficit earns it: a thing nobody can do teaches no one a false path.
+export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
+
+export function refusalMemoryText(reason: string, impossibleClass?: string): string {
+  const hint = impossibleClass === 'insufficient_skill' ? CRAFT_HINT : ''
+  return `You realize you cannot: ${reason}${hint}`
+}
 
 function nearestStructureKind(packet: PerceptionPacket): string | null {
   const { x, y } = packet.self
@@ -89,6 +100,8 @@ export class AgentRuntime {
   readonly #reflectionLlm: ReflectionLlm | null
   readonly #dreamLlm: DreamLlm | null
   readonly #onThought: ((t: { tick: number; agentId: string; text: string }) => void) | null
+  #adjudicator: Adjudicator | null
+  #codify: Codifier | null = null
 
   #agentId = ''
   #mem: MemoryStore | null = null
@@ -100,6 +113,7 @@ export class AgentRuntime {
   #pendingInFlight = false
   #turnInFlight = false
   #wakeOwed = false
+  #reframedThisTurn = false
   #stats = { turns: 0, dozes: 0, reflections: 0 }
   #reflectedNight: number | null = null
   #reflectionInFlight = false
@@ -119,6 +133,7 @@ export class AgentRuntime {
     reflectionLlm?: ReflectionLlm
     dreamLlm?: DreamLlm
     onThought?: (t: { tick: number; agentId: string; text: string }) => void
+    adjudicator?: Adjudicator
   }) {
     this.#db = deps.db
     this.#llm = deps.llm
@@ -130,6 +145,7 @@ export class AgentRuntime {
     this.#reflectionLlm = deps.reflectionLlm ?? null
     this.#dreamLlm = deps.dreamLlm ?? null
     this.#onThought = deps.onThought ?? null
+    this.#adjudicator = deps.adjudicator ?? null
   }
 
   start(agentId: string): void {
@@ -153,6 +169,13 @@ export class AgentRuntime {
       this.#offTick = (tick) => this.#onTick(tick)
       this.#bridge.onTick(this.#offTick)
     }
+  }
+
+  // Post-construction wiring: G9b and C8's supervisor build the arbiter after
+  // the minds. Called through `wireArbiter`.
+  useArbiter(arbiter: SeamArbiter): void {
+    this.#adjudicator = arbiter.adjudicate
+    this.#codify = arbiter.codify
   }
 
   stop(): void {
@@ -243,7 +266,7 @@ export class AgentRuntime {
     if (activity === null) {
       this.#planHeadInFlight = true
       const head = this.#plan.queue[0]!
-      void this.#bridge.submit(this.#agentId, head, (res) => this.#onPlanHeadResult(res))
+      void this.#bridge.submit(this.#agentId, head, (res) => this.#onPlanHeadResult(res, head))
     }
   }
 
@@ -262,17 +285,73 @@ export class AgentRuntime {
         }
         if (res.reason.startsWith('already busy')) return
         this.#pendingIntent = null
-        void this.#writeActionMemory(`You realize you cannot: ${res.reason}`)
+        if (this.#reroutesUnknownVerb(res.reason)) {
+          void this.#adjudicateFreeform(flattenIntent(intent.verb, intent.params))
+          return
+        }
+        void this.#writeActionMemory(refusalMemoryText(res.reason))
       })
       .then(() => undefined)
   }
 
-  #onPlanHeadResult(res: SubmitResult): void {
+  // An invented verb is not a mistake, it is a proposal: it re-enters the turn
+  // as freeform words for the arbiter. Once per turn — a second failure is the
+  // world's final answer, or an unwired arbiter would loop on itself.
+  #reroutesUnknownVerb(reason: string): boolean {
+    if (!reason.startsWith('unknown verb:')) return false
+    if (this.#adjudicator === null || this.#reframedThisTurn) return false
+    this.#reframedThisTurn = true
+    return true
+  }
+
+  // Held until the body is free; a busy rejection retries instead of
+  // discarding, until accepted or superseded by a newer turn's action.
+  #holdIntent(intent: Intent): Promise<void> {
+    this.#pendingIntent = intent
+    return this.#submitPendingIfIdle(this.#bridge.perception(this.#agentId).self.activity)
+  }
+
+  // A try at something new goes to the arbiter, not to the verb registry. The
+  // world stays the fallback: an unreachable arbiter must never eat the turn.
+  async #adjudicateFreeform(description: string): Promise<void> {
+    const fallback = (): Promise<void> =>
+      this.#holdIntent({ verb: 'experiment', params: { description } })
+    let verdict
+    try {
+      verdict = await this.#adjudicator!(description, buildAgentCtx(this.#bridge, this.#agentId))
+    } catch (err) {
+      this.#llm.alert('adjudicate_failed', err instanceof Error ? err.message : String(err))
+      return fallback()
+    }
+    if (verdict.kind === 'map') return this.#holdIntent({ verb: verdict.verb, params: verdict.params })
+    if (verdict.kind === 'impossible') {
+      await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
+      return
+    }
+    // Adjudicate once, physics forever: the recipe becomes a verb the engine
+    // owns, and this mind is the first to use it. With no codifier wired the
+    // attempt still reaches the world rather than vanishing.
+    if (this.#codify === null) return fallback()
+    let verb: string
+    try {
+      verb = this.#codify(verdict.recipe).verb
+    } catch (err) {
+      this.#llm.alert('codify_failed', err instanceof Error ? err.message : String(err))
+      return fallback()
+    }
+    return this.#holdIntent({ verb, params: {} })
+  }
+
+  #onPlanHeadResult(res: SubmitResult, head: Intent): void {
     if (res.ok) return
     this.#plan.lastResult = 'blocked'
     this.#plan.queue = []
     this.#planHeadInFlight = false
-    void this.#writeActionMemory(`You realize you cannot: ${res.reason}`)
+    if (this.#reroutesUnknownVerb(res.reason)) {
+      void this.#adjudicateFreeform(flattenIntent(head.verb, head.params))
+      return
+    }
+    void this.#writeActionMemory(refusalMemoryText(res.reason))
   }
 
   #handleNight(tick: number, packet: PerceptionPacket): void {
@@ -308,6 +387,7 @@ export class AgentRuntime {
   }
 
   async #runTurnBody(): Promise<void> {
+    this.#reframedThisTurn = false
     const tick = this.#bridge.currentTick()
     const packet = this.#bridge.perception(this.#agentId)
     const day = Math.floor(tick / MINUTES_PER_DAY)
@@ -423,14 +503,22 @@ export class AgentRuntime {
     }
 
     if (turn.action) {
-      const intent: Intent =
-        'freeform' in turn.action
-          ? { verb: 'experiment', params: { description: turn.action.freeform } }
-          : { verb: turn.action.verb, params: turn.action.params }
-      // Held until the body is free; a busy rejection retries instead of
-      // discarding, until accepted or superseded by a newer turn's action.
-      this.#pendingIntent = intent
-      await this.#submitPendingIfIdle(this.#bridge.perception(this.#agentId).self.activity)
+      // `experiment {description}` is the same door as freeform said the other
+      // way round — CAPABILITIES offers both, so both reach the arbiter.
+      const attempt = 'freeform' in turn.action
+        ? turn.action.freeform
+        : turn.action.verb === 'experiment' && typeof turn.action.params.description === 'string'
+          ? turn.action.params.description
+          : null
+      if (attempt !== null && attempt.length > 0 && this.#adjudicator !== null) {
+        await this.#adjudicateFreeform(attempt)
+      } else {
+        const intent: Intent =
+          'freeform' in turn.action
+            ? { verb: 'experiment', params: { description: turn.action.freeform } }
+            : { verb: turn.action.verb, params: turn.action.params }
+        await this.#holdIntent(intent)
+      }
     }
 
     if (turn.plan) {
@@ -458,7 +546,13 @@ export class AgentRuntime {
     this.#stats.reflections += 1
     this.#reflectionInFlight = true
     try {
-      await runSleepReflection({ mem: this.#mem!, personality: this.#personality, llm: this.#reflectionLlm, day })
+      await runSleepReflection({
+        mem: this.#mem!,
+        personality: this.#personality,
+        llm: this.#reflectionLlm,
+        day,
+        alert: (kind, detail) => this.#llm.alert(kind, detail),
+      })
       if (this.#dreamLlm !== null) {
         const dream = await rollDream({ mem: this.#mem!, agentId: this.#agentId, day, llm: this.#dreamLlm, chance: this.#config.dreamChance })
         if (dream.dreamed) this.#pendingDreamMood = dream.mood

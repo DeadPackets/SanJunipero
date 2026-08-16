@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { FELT_TAGS, MYSTERIES } from '@sj/engine'
 import { assemblePrompt, compactDayLog, type PromptBlocks } from './assemble.js'
 import { FELT_EVENT_PROSE, perceptionToProse } from './prose.js'
 import { FORBIDDEN_FRAMING, RULES_OF_BEING } from './rulesOfBeing.js'
@@ -125,6 +126,87 @@ describe('perceptionToProse', () => {
       expect(prose).toContain(FELT_EVENT_PROSE[tag])
       expect(alert).not.toHaveBeenCalled()
     }
+  })
+
+  // 313 of these fired in G9b run 4 and every one read "You sense something
+  // change nearby." A body going down is the loudest thing that can happen to it.
+  it('renders a collapse as its own sensation, never the fallback, never an alert', () => {
+    const alert = vi.fn()
+    const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: ['you_collapsed'] }, alert)
+    expect(prose).toContain(FELT_EVENT_PROSE['you_collapsed'])
+    expect(prose).not.toContain('You sense something change nearby.')
+    expect(alert).not.toHaveBeenCalled()
+    expect(FELT_EVENT_PROSE['you_collapsed']).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  // The enumeration comes from the engine, so a new tag cannot slip in mute:
+  // run 5 left `you_died` and four illness tags with no prose at all (batch-10 concern 3).
+  it('renders every felt tag the engine can emit as its own sensation, never the fallback', () => {
+    expect(FELT_TAGS.length).toBeGreaterThan(0)
+    for (const tag of FELT_TAGS) {
+      const alert = vi.fn()
+      const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: [tag] }, alert)
+      expect(FELT_EVENT_PROSE[tag], `no prose for felt tag ${tag}`).toBeTruthy()
+      expect(prose, tag).toContain(FELT_EVENT_PROSE[tag])
+      expect(prose, tag).not.toContain('You sense something change nearby.')
+      expect(alert, tag).not.toHaveBeenCalled()
+      expect(FELT_EVENT_PROSE[tag]).not.toMatch(FORBIDDEN_FRAMING)
+    }
+  })
+
+  it('renders every global mystery as its authored sensation, never the fallback, never framed', () => {
+    for (const m of MYSTERIES.filter((x) => x.scope === 'global')) {
+      const alert = vi.fn()
+      const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: [m.kind] }, alert)
+      expect(prose).toContain(m.prose)
+      expect(alert).not.toHaveBeenCalled()
+    }
+    for (const m of MYSTERIES) expect(m.prose).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('says whose a thing is, and whose hands made it', () => {
+    const prose = perceptionToProse({
+      ...quietMeadowPacket,
+      self: {
+        ...quietMeadowPacket.self,
+        inventory: [{ id: 'item_9', kind: 'plank', qty: 1, loc: { t: 'agent', id: 'tamar' }, ownerName: 'Bex' }],
+      },
+      visible: {
+        ...quietMeadowPacket.visible,
+        items: [{
+          id: 'item_3', kind: 'basket', qty: 1, loc: { t: 'tile', x: 12, y: 10 },
+          ownerName: 'Rahel', crafterMarkName: 'Yusuf',
+        }],
+      },
+    })
+    expect(prose).toContain("basket (item_3) at (12, 10) — Rahel's, marked by Yusuf")
+    expect(prose).toContain("carrying 1 plank (item_9) — Bex's")
+  })
+
+  it('leaves an unclaimed thing exactly as it always read', () => {
+    const prose = perceptionToProse({
+      ...quietMeadowPacket,
+      visible: {
+        ...quietMeadowPacket.visible,
+        items: [{ id: 'item_3', kind: 'basket', qty: 1, loc: { t: 'tile', x: 12, y: 10 } }],
+      },
+    })
+    expect(prose).toContain('You can see 1 basket (item_3) at (12, 10).')
+    expect(prose).not.toContain('—')
+  })
+
+  it('tells you what you watched happen: a taking, and an unexplained thing', () => {
+    const mystery = MYSTERIES.find((m) => m.scope === 'located')!
+    const prose = perceptionToProse({
+      ...quietMeadowPacket,
+      seen: [
+        { kind: 'item_taken', takerName: 'Cass', ownerName: 'Bex', itemKind: 'plank' },
+        { kind: 'mystery', mystery: mystery.kind, prose: mystery.prose },
+      ],
+    })
+    expect(prose).toContain("You watch Cass take Bex's plank.")
+    expect(prose).toContain(mystery.prose)
+    expect(prose).not.toMatch(FORBIDDEN_FRAMING)
   })
 
   it('renders an unknown felt tag to the generic sentence and alerts', () => {
@@ -422,11 +504,11 @@ describe('capabilities', () => {
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
 
-  it('teaches give as person-only, wake as the way to rise, and that nothing can be stowed (g3 round 6)', () => {
+  it('teaches give as person-only, wake as the way to rise, and stow as the way to shelve (g3 round 6, T17)', () => {
     const a = assemblePrompt(fixtureBlocks())
     expect(a.system).toMatch(/give — [^\n]*living person[^\n]*never a building/)
     expect(a.system).toMatch(/wake — [^\n]*rise/)
-    expect(a.system).toContain('no way yet to shelve')
+    expect(a.system).toContain('no way to set a thing down on bare ground')
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
 

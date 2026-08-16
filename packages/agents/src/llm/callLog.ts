@@ -39,7 +39,50 @@ export function migrateLlmTables(db: Database.Database): void {
       kind TEXT NOT NULL,
       detail TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS llm_reservations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER NOT NULL,
+      caller TEXT NOT NULL,
+      amount_usd REAL NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_llm_reservations_caller ON llm_reservations(caller);
   `)
+}
+
+export function sumReserved(db: Database.Database, caller: string): number {
+  const row = db
+    .prepare('SELECT COALESCE(SUM(amount_usd), 0) AS total FROM llm_reservations WHERE caller = ?')
+    .get(caller) as { total: number }
+  return row.total
+}
+
+export type BudgetGuard = {
+  // Returns the reservation id, or null when the call cannot be paid for.
+  reserve(expectedUsd: number, budgetUsd: number | null): number | null
+  release(reservationId: number): void
+  sumReserved(): number
+}
+
+// The budget guard cannot book after the fact: five calls in flight all pass a
+// read-only check and all overshoot. Reading the ledger and writing the claim
+// inside one synchronous better-sqlite3 transaction makes that impossible —
+// the worst overshoot left is a single reserved call.
+export function makeBudgetGuard(db: Database.Database, caller: string): BudgetGuard {
+  const insert = db.prepare('INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)')
+  const remove = db.prepare('DELETE FROM llm_reservations WHERE id = ?')
+  const reserve = db.transaction((expectedUsd: number, budgetUsd: number | null): number | null => {
+    if (budgetUsd !== null && sumCostUsd(db, caller) + sumReserved(db, caller) + expectedUsd > budgetUsd) {
+      return null
+    }
+    return Number(insert.run(Date.now(), caller, expectedUsd).lastInsertRowid)
+  })
+  return {
+    reserve,
+    release: (reservationId) => {
+      remove.run(reservationId)
+    },
+    sumReserved: () => sumReserved(db, caller),
+  }
 }
 
 export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void {

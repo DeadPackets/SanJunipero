@@ -1,6 +1,6 @@
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
-import { CAPABILITIES } from './rulesOfBeing.js'
+import { CAPABILITIES, SPEECH_RULES } from './rulesOfBeing.js'
 
 export type IdentityCore = {
   name: string
@@ -13,6 +13,8 @@ export type IdentityCore = {
     tics: string[]
     neverSays: string[]
     exampleLines: string[]
+    // Absent renders nothing, keeping every pre-C9 persona byte-stable.
+    wordBudget?: { typical: number; burst: number }
   }
 }
 
@@ -40,7 +42,7 @@ export const DAYLOG_COMPACTION_TOKENS = 6000
 
 function renderIdentity(id: IdentityCore): string {
   const v = id.voiceCard
-  return [
+  const lines = [
     `Name: ${id.name}`,
     `Age: ${id.age}`,
     `Temperament: ${id.temperament}`,
@@ -49,7 +51,13 @@ function renderIdentity(id: IdentityCore): string {
     `Tics: ${v.tics.join('; ')}`,
     `Never says: ${v.neverSays.join('; ')}`,
     `Example lines: ${v.exampleLines.join(' | ')}`,
-  ].join('\n')
+  ]
+  if (v.wordBudget) {
+    lines.push(
+      `You usually say about ${v.wordBudget.typical} words at a time; when truly moved, up to ${v.wordBudget.burst}.`,
+    )
+  }
+  return lines.join('\n')
 }
 
 function renderPersonality(p: PromptBlocks['personality']): string {
@@ -81,9 +89,13 @@ function renderScene(scene: PromptBlocks['scene']): string {
 function renderSystem(blocks: PromptBlocks): string {
   // Rules of being + capabilities are static and identical for every agent;
   // identity and personality complete the byte-stable system prefix.
-  return [blocks.rulesOfBeing, CAPABILITIES, renderIdentity(blocks.identity), renderPersonality(blocks.personality)].join(
-    BLOCK_DELIM,
-  )
+  return [
+    blocks.rulesOfBeing,
+    CAPABILITIES,
+    SPEECH_RULES,
+    renderIdentity(blocks.identity),
+    renderPersonality(blocks.personality),
+  ].join(BLOCK_DELIM)
 }
 
 function estTokens(text: string): number {

@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
+import { SimConfigSchema, stateHash, type SimEvent } from '@sj/shared'
 import type { WorldState } from './state.js'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
@@ -11,11 +11,17 @@ import { TickLoop } from './tickLoop.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
 import {
   createScriptedLoop, makeScriptedOnTick, makeFixtureMap,
-  FARMER, FISHER, IDLER, STOREHOUSE, SHED,
+  BUILDER, FARMER, FISHER, IDLER, STOREHOUSE, SHED,
 } from './scripted.js'
-// Pinned golden hash for the 3-day scripted world run (regen #3, deliberate:
-// collapsed-sleep recovery + crop stage formula changed the scripted timeline).
-const GOLDEN_G2_HASH = '7263dde98076dbb234bdeded24aab659987190ce00e4581999027d615ec977e8'
+// Pinned golden hash for the 3-day scripted world run (regen #4, deliberate: C9 Task 16.
+// Every C9 feature pin came off this fixture at once — ownership, the bed law, spoilage
+// and reproduction are live — and `agent_born` now ages a newborn by the 364-day calendar).
+const GOLDEN_G2_HASH = '6f2529fba61a0d9e3a219da05235c0ff19e105d610f96e57aa9d0cc073d82fc8'
+
+// Task 16 Step 0: every C9 pin is off this fixture. Nothing is suppressed here any more —
+// ownership, the bed law, spoilage and reproduction are all live, and the assertions below
+// name the events each of them produces in this run.
+const G2_CONFIG = SimConfigSchema.parse({})
 
 const SEED = 'g2-scripted'
 const TOTAL_TICKS = 4320 // 3 sim days
@@ -32,7 +38,7 @@ function allEvents(store: EventStore): SimEvent[] {
 
 function runScenario(seed = SEED): { state: WorldState; store: EventStore; evs: SimEvent[] } {
   const store = new EventStore(openDb(':memory:'))
-  const loop = createScriptedLoop(DEFAULT_CONFIG, seed, store)
+  const loop = createScriptedLoop(G2_CONFIG, seed, store)
   runTicks(loop, TOTAL_TICKS)
   return { state: loop.state, store, evs: allEvents(store) }
 }
@@ -58,7 +64,7 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(collapseEv!.tick).toBeLessThan(diedEv!.tick)
     const zeroTick = state.agents[IDLER]!.zeroHungerSinceTick
     expect(zeroTick).not.toBeNull()
-    expect(diedEv!.tick).toBe(zeroTick! + DEFAULT_CONFIG.needs.deathAfterZeroHungerTicks + 1)
+    expect(diedEv!.tick).toBe(zeroTick! + G2_CONFIG.needs.deathAfterZeroHungerTicks + 1)
 
     // 3. Builder's hut completes.
     const hut = Object.values(state.structures).find((s) => s.kind === 'hut')
@@ -79,7 +85,7 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(wheat).toBeDefined()
     expect(wheat!.stage).toBe(0)
     expect(wheat!.withered).toBe(false)
-    expect(wheat!.stage).not.toBe(DEFAULT_CONFIG.crops.wheat!.stages - 1)
+    expect(wheat!.stage).not.toBe(G2_CONFIG.crops.wheat!.stages - 1)
 
     // Rescue flow: collapsed Idler fed via give + eat (eat exempt), recovers, then dies.
     const giveEv = evs.find((e) => e.type === 'item_moved'
@@ -91,7 +97,7 @@ describe('GATE G2: 3-day scripted world run', () => {
     const eatEv = evs.find((e) => e.type === 'need_changed'
       && (e.payload as Payload).id === IDLER
       && (e.payload as Payload).need === 'hunger'
-      && (e.payload as Payload).delta === DEFAULT_CONFIG.needs.eatRestoreHunger)
+      && (e.payload as Payload).delta === G2_CONFIG.needs.eatRestoreHunger)
     expect(eatEv).toBeDefined()
     expect(giveEv!.tick).toBeLessThan(eatEv!.tick)
     // After eating, the Idler can act again (walk) -> collapse cleared.
@@ -105,6 +111,40 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(stateHash(state)).toBe(GOLDEN_G2_HASH)
   })
 
+  // Task 16 removed the four pins that used to hold these laws off this fixture. If a
+  // later change quietly stops one of them firing, the hash row above would still pass —
+  // so each law is named here as well as hashed.
+  it('C9 is live in this run: things are owned, a body sleeps under a roof, food turns', () => {
+    const { state, evs } = runScenario()
+
+    // Ownership: the Builder owns the hut he raised, and the Fisher owns what he pulled out.
+    const hut = Object.values(state.structures).find((s) => s.kind === 'hut')!
+    expect(hut.owner).toBe(BUILDER)
+    const caught = Object.values(state.items).filter((i) => i.kind === 'fish')
+    expect(caught.length).toBeGreaterThan(0)
+    for (const f of caught) expect(f.owner).toBe(FISHER)
+    expect(evs.some((e) => e.type === 'item_owner_changed')).toBe(true)
+
+    // The bed law: the Builder steps through his own door and lies down inside it.
+    const entered = evs.filter((e) => e.type === 'agent_entered')
+    expect(entered.map((e) => (e.payload as Payload).agentId)).toContain(BUILDER)
+    const inside = entered.find((e) => (e.payload as Payload).agentId === BUILDER)!
+    const slept = evs.find((e) => e.type === 'agent_slept' && (e.payload as Payload).agentId === BUILDER)
+    expect(slept).toBeDefined()
+    expect(inside.tick).toBeLessThan(slept!.tick)
+    expect((inside.payload as Payload).structureId).toBe(hut.id)
+    expect(state.agents[BUILDER]!.insideId).toBe(hut.id)
+
+    // Spoilage: a two-day fish does not survive a three-day run.
+    const spoiled = evs.filter((e) => e.type === 'item_spoiled')
+    expect(spoiled.length).toBeGreaterThan(0)
+    for (const e of spoiled) expect(state.items[(e.payload as Payload).id as string]).toBeUndefined()
+
+    // Reproduction: sexes are on the bodies, which is what the pin used to suppress.
+    expect(state.agents[FISHER]!.sex).toBe('m')
+    expect(state.agents[FARMER]!.sex).toBe('f')
+  })
+
   it('is deterministic: two runs from the same seed hash identically', () => {
     const a = runScenario()
     const b = runScenario()
@@ -113,7 +153,7 @@ describe('GATE G2: 3-day scripted world run', () => {
 
   it('replayFromGenesis equals the live run, config threaded explicitly', () => {
     const { state, store } = runScenario()
-    expect(stateHash(replayFromGenesis(store, DEFAULT_CONFIG, makeFixtureMap()))).toBe(stateHash(state))
+    expect(stateHash(replayFromGenesis(store, G2_CONFIG, makeFixtureMap()))).toBe(stateHash(state))
   })
 
   it('crash at tick 2000: recover, continue to 4320, hash equals uninterrupted run', () => {
@@ -123,15 +163,15 @@ describe('GATE G2: 3-day scripted world run', () => {
     const dbPath = join(dir, 'town.db')
     try {
       const store = new EventStore(openDb(dbPath))
-      const loop1 = createScriptedLoop(DEFAULT_CONFIG, SEED, store)
+      const loop1 = createScriptedLoop(G2_CONFIG, SEED, store)
       runTicks(loop1, 2000)
 
       // "crash": no clean shutdown; recover from the durable store.
-      const rec = replayLatest(store, DEFAULT_CONFIG, makeFixtureMap())
+      const rec = replayLatest(store, G2_CONFIG, makeFixtureMap())
       const loop2: TickLoop = new TickLoop({
-        store, state: rec.state, rng: rec.rng, config: DEFAULT_CONFIG, startTick: rec.state.tick,
+        store, state: rec.state, rng: rec.rng, config: G2_CONFIG, startTick: rec.state.tick,
         snapshotEveryTicks: 120,
-        onTick: makeScriptedOnTick(DEFAULT_CONFIG, rec.rng, () => loop2.state),
+        onTick: makeScriptedOnTick(G2_CONFIG, rec.rng, () => loop2.state),
       })
       runTicks(loop2, TOTAL_TICKS - rec.state.tick)
       expect(stateHash(loop2.state)).toBe(stateHash(ref.state))

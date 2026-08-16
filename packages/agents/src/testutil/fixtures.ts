@@ -44,6 +44,7 @@ export const quietMeadowPacket: PerceptionPacket = {
   weather: { kind: 'sunny', temperatureC: 18 },
   visible: { agents: [], structures: [], items: [], crops: [] },
   heard: [],
+  seen: [],
   feltEvents: [],
 }
 
@@ -66,6 +67,7 @@ export const conversationPacket: PerceptionPacket = {
     crops: [],
   },
   heard: [{ speakerId: 'nadia', name: 'Nadia', text: 'Good to see you.', distance: 2 }],
+  seen: [],
   feltEvents: ['rain_started'],
 }
 

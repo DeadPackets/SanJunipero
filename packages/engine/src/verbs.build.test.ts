@@ -54,7 +54,7 @@ describe('verb: build', () => {
     expect(r.events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'item_1', delta: -10 } })
     expect(r.events).toContainEqual({
       type: 'structure_planned',
-      payload: { id: 'structure_2', kind: 'hut', x: 1, y: 1, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1' },
+      payload: { id: 'structure_2', kind: 'hut', x: 1, y: 1, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1', owner: 'a1' },
     })
     const w = applyAll(s, r.events)
     expect(w.items.item_1).toBeUndefined()
@@ -111,6 +111,18 @@ describe('verb: craft', () => {
     expect(submitIntent(makeWorld(CFG, 1), CFG, 'a1', 'craft', { recipe: 'plank' }).ok).toBe(true)
   })
 
+  it('an unknown recipe names itself and points somewhere (T18)', () => {
+    const r = submitIntent(makeWorld(), CFG, 'a1', 'craft', { recipe: 'sword' })
+    expect(r).toEqual({
+      ok: false,
+      reason: 'no such recipe: sword — perhaps someone nearby knows how, or it wants discovering.',
+    })
+    // A known recipe the agent simply cannot afford keeps its own material refusal.
+    const poor = submitIntent(makeWorld(CFG, 0), CFG, 'a1', 'craft', { recipe: 'plank' })
+    expect(poor.ok).toBe(false)
+    if (!poor.ok) expect(poor.reason).not.toContain('wants discovering')
+  })
+
   it('plank: consumes 1 wood, yields 2 planks, grants carpentry xp', () => {
     const s = makeWorld(CFG, 1)
     const r = submitIntent(s, CFG, 'a1', 'craft', { recipe: 'plank' })
@@ -119,7 +131,7 @@ describe('verb: craft', () => {
     expect(t.events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'item_1', delta: -1 } })
     expect(t.events).toContainEqual({
       type: 'item_spawned',
-      payload: { id: 'item_2', kind: 'plank', qty: 2, loc: { t: 'agent', id: 'a1' } },
+      payload: { id: 'item_2', kind: 'plank', qty: 2, loc: { t: 'agent', id: 'a1' }, owner: 'a1' },
     })
     expect(t.events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'carpentry', xp: 1 } })
     expect(t.state.items.item_1).toBeUndefined()

@@ -3,6 +3,15 @@ import { z } from 'zod'
 export const TickAdvanced = z.object({}).strict()
 export const AgentSpawned = z.object({
   id: z.string(), name: z.string(), x: z.number(), y: z.number(), ageDays: z.number(),
+  sex: z.enum(['f', 'm']).optional(),
+}).strict()
+export const CoSlept = z.object({ aId: z.string(), bId: z.string(), day: z.number().int() }).strict()
+export const AgentConceived = z.object({
+  motherId: z.string(), fatherId: z.string(), day: z.number().int(),
+}).strict()
+export const AgentBorn = z.object({
+  id: z.string(), name: z.string(), sex: z.enum(['f', 'm']),
+  motherId: z.string(), fatherId: z.string(), x: z.number(), y: z.number(),
 }).strict()
 export const AgentMoved = z.object({ id: z.string(), x: z.number(), y: z.number() }).strict()
 export const NeedChanged = z.object({
@@ -14,16 +23,32 @@ export const ItemLoc = z.discriminatedUnion('t', [
   z.object({ t: z.literal('agent'), id: z.string() }).strict(),
   z.object({ t: z.literal('structure'), id: z.string() }).strict(),
 ])
-export const ItemSpawned = z.object({ id: z.string(), kind: z.string(), qty: z.number(), loc: ItemLoc, text: z.string().optional() }).strict()
+export const ItemSpawned = z.object({
+  id: z.string(), kind: z.string(), qty: z.number(), loc: ItemLoc, text: z.string().optional(),
+  owner: z.string().optional(), crafterMark: z.string().optional(),
+  spoilage: z.object({ spawnDay: z.number(), days: z.number() }).strict().optional(),
+  durability: z.number().int().positive().optional(),
+}).strict()
 export const ItemMoved = z.object({ id: z.string(), loc: ItemLoc }).strict()
+export const ItemSpoiled = z.object({ id: z.string() }).strict()
+export const ItemWorn = z.object({ id: z.string(), delta: z.number().int() }).strict()
+export const ItemBroke = z.object({ id: z.string() }).strict()
+export const ItemOwnerChanged = z.object({ id: z.string(), owner: z.string() }).strict()
+// Pure witness record — folds to nothing. Whether a taking is theft is the town's to decide.
+export const ItemTaken = z.object({
+  itemId: z.string(), kind: z.string(), takerId: z.string(), ownerId: z.string(), x: z.number(), y: z.number(),
+}).strict()
 export const ItemQtyChanged = z.object({ id: z.string(), delta: z.number() }).strict()
 export const ItemTextChanged = z.object({ id: z.string(), text: z.string() }).strict()
 export const StructurePlanned = z.object({
   id: z.string(), kind: z.string(), x: z.number(), y: z.number(), w: z.number(), h: z.number(),
-  maxHp: z.number(), flammable: z.boolean(), builderId: z.string(),
+  maxHp: z.number(), flammable: z.boolean(), builderId: z.string(), owner: z.string().optional(),
 }).strict()
 export const StructureProgressed = z.object({ id: z.string(), ticks: z.number() }).strict()
 export const StructureCompleted = z.object({ id: z.string() }).strict()
+export const StructureInscribed = z.object({
+  structureId: z.string(), text: z.string().min(1).max(280), agentId: z.string(),
+}).strict()
 export const StructureDamaged = z.object({ id: z.string(), amount: z.number() }).strict()
 export const StructureDestroyed = z.object({ id: z.string() }).strict()
 export const FireIgnited = z.object({ structureId: z.string(), cause: z.string() }).strict()
@@ -43,7 +68,12 @@ export const ActionInterrupted = z.object({ agentId: z.string(), reason: z.strin
 export const SkillGained = z.object({ agentId: z.string(), track: z.string(), xp: z.number() }).strict()
 export const AgentWoke = z.object({ agentId: z.string() }).strict()
 export const AgentSlept = z.object({ agentId: z.string() }).strict()
-export const AgentSpoke = z.object({ agentId: z.string(), text: z.string(), x: z.number(), y: z.number() }).strict()
+export const AgentEntered = z.object({ agentId: z.string(), structureId: z.string() }).strict()
+export const AgentExited = z.object({ agentId: z.string(), structureId: z.string() }).strict()
+// insideId replays the doorway rule from the event alone — absent when the speaker was outdoors.
+export const AgentSpoke = z.object({
+  agentId: z.string(), text: z.string(), x: z.number(), y: z.number(), insideId: z.string().optional(),
+}).strict()
 export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
 export const AgentDied = z.object({ agentId: z.string(), cause: z.string() }).strict()
 export const AgentAged = z.object({ agentId: z.string() }).strict()
@@ -54,6 +84,10 @@ export const AgentRecovered = z.object({ agentId: z.string() }).strict()
 export const AgentTended = z.object({ agentId: z.string() }).strict()
 export const HpChanged = z.object({ agentId: z.string(), delta: z.number() }).strict()
 export const WeatherChanged = z.object({ kind: z.string(), temperatureC: z.number(), prevKind: z.string().optional() }).strict()
+// Pure sensation: no fold effect, no cause, no resolution anywhere in the world.
+export const MysteryEvent = z.object({
+  kind: z.string(), x: z.number().int().optional(), y: z.number().int().optional(),
+}).strict()
 
 export const CropPlanted = z.object({
   id: z.string(), kind: z.string(), x: z.number(), y: z.number(), plantedDay: z.number(),
@@ -62,4 +96,6 @@ export const CropGrew = z.object({ cropId: z.string(), stage: z.number() }).stri
 export const CropWithered = z.object({ cropId: z.string() }).strict()
 export const CropHarvested = z.object({ cropId: z.string() }).strict()
 export const WildlifeChanged = z.object({ fish: z.number().optional(), deer: z.number().optional() }).strict()
-export const TerrainChanged = z.object({ x: z.number(), y: z.number(), tile: z.number().int().min(0).max(6) }).strict()
+export const TerrainChanged = z.object({ x: z.number(), y: z.number(), tile: z.number().int().min(0).max(7) }).strict()
+// The only road a world law travels. `value` is checked against TOGGLABLE_PATHS at fold.
+export const ConfigChanged = z.object({ path: z.string(), value: z.unknown() }).strict()

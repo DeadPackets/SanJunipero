@@ -1,15 +1,23 @@
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
+import { DAYS_PER_YEAR, DEFAULT_CONFIG, MINUTES_PER_DAY, SPAWN_AGE_YEARS, type SimConfig, type SimEvent } from '@sj/shared'
 import type { TileId, WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
-  AgentAged, AgentCollapsed, AgentDied, AgentFellIll, AgentInfected, AgentInjured, AgentMoved,
+  AgentAged, AgentBorn, AgentCollapsed, AgentConceived, AgentDied, AgentFellIll, AgentInfected,
+  AgentInjured, AgentMoved,
+  AgentEntered, AgentExited,
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
-  CropGrew, CropHarvested, CropPlanted, CropWithered,
+  CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
   FireExtinguished, FireIgnited, FireSpread, HpChanged,
-  ItemMoved, ItemQtyChanged, ItemSpawned, ItemTextChanged, NeedChanged,
-  SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
+  ItemBroke, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
+  ConfigChanged,
+  ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
+  SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
+import { MYSTERY_BY_KIND } from './data/mysteries.js'
+import { occupantsOf } from './interiors.js'
+import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
+import { pairKey } from './systems/reproduction.js'
 import { findPath } from './path.js'
 import { WalkParams } from './verbs.js'
 
@@ -23,7 +31,19 @@ function bumpCounter(counters: WorldState['counters'], id: string): WorldState['
   return next > counters.nextEntityId ? { ...counters, nextEntityId: next } : counters
 }
 
-export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEFAULT_CONFIG): WorldState {
+// Emit-free state repair is not allowed: a destroyer must emit agent_exited first,
+// so the log alone explains where everybody went.
+function refuseOccupied(state: WorldState, structureId: string): void {
+  const occupants = occupantsOf(state, structureId)
+  if (occupants.length > 0) {
+    throw new Error(`structure ${structureId} destroyed with occupant(s) ${occupants.join(', ')} still inside`)
+  }
+}
+
+export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig = DEFAULT_CONFIG): WorldState {
+  // Every fold reads the world's laws as they stand right now, so a replay of the log
+  // can never drift from the run that wrote it — even across a mid-run law change.
+  const config = effectiveConfig(baseConfig, state.laws)
   switch (event.type) {
     case 'tick_advanced': {
       TickAdvanced.parse(event.payload)
@@ -39,6 +59,7 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
             id: p.id, name: p.name, x: p.x, y: p.y, alive: true, asleep: false,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
             hp: config.health.maxHp, injuries: [], ill: false, ageDays: p.ageDays,
+            ...(p.sex === undefined ? {} : { sex: p.sex }),
             skills: {}, activity: null, collapsedSinceTick: null, zeroHungerSinceTick: null,
           },
         },
@@ -70,10 +91,48 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
         ...state,
         items: {
           ...state.items,
-          [p.id]: { id: p.id, kind: p.kind, qty: p.qty, ...(p.text !== undefined ? { text: p.text } : {}), loc: p.loc },
+          [p.id]: {
+            id: p.id, kind: p.kind, qty: p.qty,
+            ...(p.text !== undefined ? { text: p.text } : {}),
+            ...(p.owner !== undefined ? { owner: p.owner } : {}),
+            ...(p.crafterMark !== undefined ? { crafterMark: p.crafterMark } : {}),
+            ...(p.spoilage !== undefined ? { spoilage: p.spoilage } : {}),
+            ...(p.durability !== undefined ? { durability: p.durability } : {}),
+            loc: p.loc,
+          },
         },
         counters: bumpCounter(state.counters, p.id),
       }
+    }
+    case 'item_owner_changed': {
+      const p = ItemOwnerChanged.parse(event.payload)
+      const item = state.items[p.id]
+      if (!item) throw new Error(`item_owner_changed for unknown item ${p.id}`)
+      return { ...state, items: { ...state.items, [p.id]: { ...item, owner: p.owner } } }
+    }
+    case 'item_taken': {
+      ItemTaken.parse(event.payload)
+      return state
+    }
+    case 'item_worn': {
+      const p = ItemWorn.parse(event.payload)
+      const item = state.items[p.id]
+      if (!item) throw new Error(`item_worn for unknown item ${p.id}`)
+      if (item.durability === undefined) throw new Error(`item_worn for item ${p.id} with no durability`)
+      const durability = Math.max(0, item.durability + p.delta)
+      return { ...state, items: { ...state.items, [p.id]: { ...item, durability } } }
+    }
+    case 'item_broke': {
+      const p = ItemBroke.parse(event.payload)
+      if (!state.items[p.id]) throw new Error(`item_broke for unknown item ${p.id}`)
+      const { [p.id]: _, ...items } = state.items
+      return { ...state, items }
+    }
+    case 'item_spoiled': {
+      const p = ItemSpoiled.parse(event.payload)
+      if (!state.items[p.id]) throw new Error(`item_spoiled for unknown item ${p.id}`)
+      const { [p.id]: _, ...items } = state.items
+      return { ...state, items }
     }
     case 'item_moved': {
       const p = ItemMoved.parse(event.payload)
@@ -113,6 +172,7 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
             id: p.id, kind: p.kind, x: p.x, y: p.y, w: p.w, h: p.h,
             hp: 1, maxHp: p.maxHp, flammable: p.flammable, stage: 'construction',
             progressTicks: 0, builtBy: p.builderId, burning: false, burnTicks: 0,
+            ...(p.owner === undefined ? {} : { owner: p.owner }),
           },
         },
         counters: bumpCounter(state.counters, p.id),
@@ -130,12 +190,23 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       if (!s) throw new Error(`structure_completed for unknown structure ${p.id}`)
       return { ...state, structures: { ...state.structures, [p.id]: { ...s, stage: 'complete', hp: s.maxHp } } }
     }
+    // The wall holds one layer of text; every layer before it stays in the log.
+    case 'structure_inscribed': {
+      const p = StructureInscribed.parse(event.payload)
+      const s = state.structures[p.structureId]
+      if (!s) throw new Error(`structure_inscribed for unknown structure ${p.structureId}`)
+      return {
+        ...state,
+        structures: { ...state.structures, [p.structureId]: { ...s, inscription: { text: p.text, by: p.agentId } } },
+      }
+    }
     case 'structure_damaged': {
       const p = StructureDamaged.parse(event.payload)
       const s = state.structures[p.id]
       if (!s) throw new Error(`structure_damaged for unknown structure ${p.id}`)
       const hp = s.hp - p.amount
       if (hp <= 0) {
+        refuseOccupied(state, p.id)
         const { [p.id]: _, ...structures } = state.structures
         return { ...state, structures }
       }
@@ -145,6 +216,7 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
     case 'structure_destroyed': {
       const p = StructureDestroyed.parse(event.payload)
       if (!state.structures[p.id]) throw new Error(`structure_destroyed for unknown structure ${p.id}`)
+      refuseOccupied(state, p.id)
       const { [p.id]: _, ...structures } = state.structures
       return { ...state, structures }
     }
@@ -174,7 +246,7 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       let path: Array<[number, number]> | undefined
       if (p.verb === 'walk') {
         const w = WalkParams.parse(p.params)
-        const found = findPath(state, a, w)
+        const found = findPath(state, a, w, config)
         if (!found) throw new Error(`action_started walk with no path for ${p.agentId}`)
         path = found
       }
@@ -220,6 +292,20 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       if (!a) throw new Error(`agent_slept for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, asleep: true } } }
     }
+    case 'agent_entered': {
+      const p = AgentEntered.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_entered for unknown agent ${p.agentId}`)
+      if (!state.structures[p.structureId]) throw new Error(`agent_entered for unknown structure ${p.structureId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, insideId: p.structureId } } }
+    }
+    case 'agent_exited': {
+      const p = AgentExited.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_exited for unknown agent ${p.agentId}`)
+      const { insideId: _, ...body } = a
+      return { ...state, agents: { ...state.agents, [p.agentId]: body } }
+    }
     case 'agent_spoke': {
       const p = AgentSpoke.parse(event.payload)
       const a = state.agents[p.agentId]
@@ -231,6 +317,72 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_collapsed for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, collapsedSinceTick: event.tick } } }
+    }
+    case 'agent_conceived': {
+      const p = AgentConceived.parse(event.payload)
+      const mother = state.agents[p.motherId]
+      if (!mother) throw new Error(`agent_conceived for unknown agent ${p.motherId}`)
+      if (!state.agents[p.fatherId]) throw new Error(`agent_conceived for unknown agent ${p.fatherId}`)
+      return {
+        ...state,
+        agents: { ...state.agents, [p.motherId]: { ...mother, pregnant: { sinceDay: p.day, byId: p.fatherId } } },
+      }
+    }
+    // One event, one body: the child arrives where the mother stands, inside her walls if
+    // she has any, and her term ends in the same fold.
+    case 'agent_born': {
+      const p = AgentBorn.parse(event.payload)
+      const mother = state.agents[p.motherId]
+      if (!mother) throw new Error(`agent_born for unknown agent ${p.motherId}`)
+      const { pregnant: _, ...delivered } = mother
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          [p.motherId]: delivered,
+          [p.id]: {
+            id: p.id, name: p.name, x: p.x, y: p.y, alive: true, asleep: false,
+            needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
+            // Twelve years on this world's calendar, which is 364 days long — not 365.
+            hp: config.health.maxHp, injuries: [], ill: false, ageDays: SPAWN_AGE_YEARS * DAYS_PER_YEAR,
+            sex: p.sex,
+            parents: [p.motherId, p.fatherId],
+            ...(mother.insideId === undefined ? {} : { insideId: mother.insideId }),
+            skills: {}, activity: null, collapsedSinceTick: null, zeroHungerSinceTick: null,
+          },
+        },
+        counters: bumpCounter(state.counters, p.id),
+      }
+    }
+    // A night together is a fact; partnership is the count of them. A gap wider than
+    // the window ends the run — and if the pair had reached partnership, that is a breakup.
+    case 'co_slept': {
+      const p = CoSlept.parse(event.payload)
+      for (const id of [p.aId, p.bId]) {
+        if (!state.agents[id]) throw new Error(`co_slept for unknown agent ${id}`)
+      }
+      const key = pairKey(p.aId, p.bId)
+      const prev = state.pairNights?.[key]
+      const broken = prev !== undefined && p.day - prev.lastNightDay > config.reproduction.partnerWindowDays
+      const nights = prev === undefined || broken ? 1 : prev.nights + 1
+      let formedTick = prev?.formedTick ?? null
+      let dissolvedTick = prev?.dissolvedTick ?? null
+      if (broken && formedTick !== null) dissolvedTick = event.tick
+      if (nights >= config.reproduction.coSleepNightsToPartner && (formedTick === null || dissolvedTick !== null)) {
+        formedTick = event.tick
+        dissolvedTick = null
+      }
+      return {
+        ...state,
+        pairNights: { ...state.pairNights, [key]: { nights, lastNightDay: p.day, formedTick, dissolvedTick } },
+      }
+    }
+    // Nothing changes. The payload is checked so a replay cannot invent a happening
+    // the table never authored, and the state is returned untouched, same object.
+    case 'mystery_event': {
+      const p = MysteryEvent.parse(event.payload)
+      if (MYSTERY_BY_KIND[p.kind] === undefined) throw new Error(`mystery_event for unknown mystery ${p.kind}`)
+      return state
     }
     case 'weather_changed': {
       const p = WeatherChanged.parse(event.payload)
@@ -334,6 +486,16 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       if (!row || p.x < 0 || p.x >= row.length) throw new Error(`terrain_changed out of bounds (${p.x}, ${p.y})`)
       const terrain = state.terrain.map((r, y) => (y === p.y ? r.map((t, x) => (x === p.x ? (p.tile as TileId) : t)) : r))
       return { ...state, terrain }
+    }
+    // The whitelist is the whole of the authority: an operator, a bug or a doctored
+    // log can only ever move a dial this table already agreed to.
+    case 'config_changed': {
+      const p = ConfigChanged.parse(event.payload)
+      const schema = TOGGLABLE_PATHS[p.path]
+      if (schema === undefined) throw new Error(`config_changed: ${p.path} is not a world law`)
+      const parsed = schema.safeParse(p.value)
+      if (!parsed.success) throw new Error(`config_changed: value rejected for ${p.path}`)
+      return { ...state, laws: { ...state.laws, [p.path]: parsed.data } }
     }
     default:
       throw new Error(`unknown event type: ${event.type}`)

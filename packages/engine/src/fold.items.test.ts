@@ -32,6 +32,22 @@ describe('fold items', () => {
     const s = genesisState(DEFAULT_CONFIG)
     expect(() => fold(s, ev(1, 'item_moved', { id: 'nope', loc: { t: 'tile', x: 0, y: 0 } }))).toThrow(/unknown item/i)
     expect(() => fold(s, ev(1, 'item_qty_changed', { id: 'nope', delta: -1 }))).toThrow(/unknown item/i)
+    expect(() => fold(s, ev(1, 'item_worn', { id: 'nope', delta: -1 }))).toThrow(/unknown item/i)
+    expect(() => fold(s, ev(1, 'item_broke', { id: 'nope' }))).toThrow(/unknown item/i)
+    expect(() => fold(s, ev(1, 'item_spoiled', { id: 'nope' }))).toThrow(/unknown item/i)
+  })
+  it('wears a tool down and breaks it, leaving the durability-free alone', () => {
+    const rod = ev(1, 'item_spawned', { id: 'item_1', kind: 'rod', qty: 1, loc: { t: 'agent', id: 'a1' }, durability: 3 })
+    let s = fold(genesisState(DEFAULT_CONFIG), rod)
+    expect(s.items.item_1!.durability).toBe(3)
+    s = fold(s, ev(2, 'item_worn', { id: 'item_1', delta: -2 }))
+    expect(s.items.item_1!.durability).toBe(1)
+    s = fold(s, ev(3, 'item_broke', { id: 'item_1' }))
+    expect(s.items.item_1).toBeUndefined()
+
+    const plain = fold(genesisState(DEFAULT_CONFIG), spawnItem('item_2'))
+    expect(plain.items.item_2).not.toHaveProperty('durability')
+    expect(() => fold(plain, ev(2, 'item_worn', { id: 'item_2', delta: -1 }))).toThrow(/no durability/i)
   })
   it('strict payloads reject extra keys on item events', () => {
     const s = fold(genesisState(DEFAULT_CONFIG), spawnItem('item_1'))
