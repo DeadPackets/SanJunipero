@@ -8,6 +8,7 @@ import {
 
 export const ITEM_PITCH_RANGE: [number, number] = [4, 24]
 export const ART_MIN_ISLAND = 3
+export const CHROMA_BAND_PX = 4
 
 export type SpriteCell = {
   cell: RawImage
@@ -33,11 +34,9 @@ export function toSpriteCell(raw: RawImage, px: number): SpriteCell {
   let pitch = Number.NaN
   try { pitch = estimatePitch(cleaned, ITEM_PITCH_RANGE) } catch { /* a flat figure has no lattice */ }
 
-  // Erode the chroma blend band by half an art cell — but never more than a quarter of the
-  // figure's short side, or a thin wide subject (a saw, a needle) erodes away entirely.
-  const radius = Math.min(
-    Math.max(1, Math.round(bh / targetH / 2)),
-    Math.max(1, Math.floor(Math.min(bw, bh) / 4)))
+  // Erode only the chroma blend band, which is a few source pixels wide whatever the art
+  // pitch is. Eroding half an art cell (the character-sheet rule) eats a pail's handle.
+  const radius = Math.min(CHROMA_BAND_PX, Math.max(1, Math.floor(Math.min(bw, bh) / 4)))
   const art = resampleToArtHeight(erodeAlpha(cleaned, radius), targetH)
   const fitted = art.width > px
     ? downscaleNearest(art, px, Math.max(1, Math.round(art.height * px / art.width)))
