@@ -1,15 +1,17 @@
 import { z } from 'zod'
 
+// Magnitude caps: an out-of-range LLM verdict fails schema parse and flows
+// through the existing invalid-verdict path instead of entering the world.
 export const OutcomeEffectSchema = z.discriminatedUnion('op', [
-  z.object({ op: z.literal('spawn_item'), kind: z.string().min(1), qty: z.number().int().positive(), to: z.literal('agent') }).strict(),
-  z.object({ op: z.literal('gain_skill'), track: z.string().min(1), xp: z.number().int().positive() }).strict(),
-  z.object({ op: z.literal('hp_delta'), delta: z.number().int() }).strict(),        // negative = damage, positive = heal
+  z.object({ op: z.literal('spawn_item'), kind: z.string().min(1), qty: z.number().int().positive().max(20), to: z.literal('agent') }).strict(),
+  z.object({ op: z.literal('gain_skill'), track: z.string().min(1), xp: z.number().int().positive().max(100) }).strict(),
+  z.object({ op: z.literal('hp_delta'), delta: z.number().int().min(-50).max(50) }).strict(),  // negative = damage, positive = heal
   z.object({ op: z.literal('none') }).strict(),
 ])
 export type OutcomeEffect = z.infer<typeof OutcomeEffectSchema>
 
 export const OutcomeRowSchema = z.object({
-  weight: z.number().positive(),          // relative weight; engine rolls cumulative sum over rng.next()*total
+  weight: z.number().positive().max(1000), // relative weight; engine rolls cumulative sum over rng.next()*total
   success: z.boolean(),                   // true = this row is the success outcome; its weight is skill-scaled at roll time
   label: z.string().min(1),               // in-world result narration (what the agent/others perceive)
   effects: z.array(OutcomeEffectSchema),  // whitelisted engine effects ONLY — the LLM cannot emit raw events
@@ -30,7 +32,7 @@ export const RecipeSchema = z.object({
   id: z.string().regex(/^recipe:[a-z0-9_]+$/),          // deterministic slug (Task 6 slugify)
   name: z.string().min(1),                              // in-world name
   skillCheck: z.object({ track: z.string().min(1), difficulty: z.number().int().min(1).max(10) }).strict().optional(),
-  durationTicks: z.number().int().positive(),
+  durationTicks: z.number().int().positive().max(1440),
   costs: z.array(z.object({ kind: z.string().min(1), qty: z.number().int().positive() }).strict()),
   requires: z.array(RecipeRequirementSchema),
   outcomeTable: OutcomeTableSchema,

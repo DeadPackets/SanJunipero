@@ -95,6 +95,37 @@ describe('OutcomeEffectSchema', () => {
   })
 })
 
+describe('effect magnitude caps (out-of-range LLM verdicts fail schema parse)', () => {
+  it('caps spawn_item qty at 20', () => {
+    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 20, to: 'agent' }).success).toBe(true)
+    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 21, to: 'agent' }).success).toBe(false)
+    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 1_000_000_000, to: 'agent' }).success).toBe(false)
+  })
+
+  it('caps gain_skill xp at 100', () => {
+    expect(OutcomeEffectSchema.safeParse({ op: 'gain_skill', track: 'cooking', xp: 100 }).success).toBe(true)
+    expect(OutcomeEffectSchema.safeParse({ op: 'gain_skill', track: 'cooking', xp: 101 }).success).toBe(false)
+  })
+
+  it('caps |hp_delta| at 50', () => {
+    expect(OutcomeEffectSchema.safeParse({ op: 'hp_delta', delta: -50 }).success).toBe(true)
+    expect(OutcomeEffectSchema.safeParse({ op: 'hp_delta', delta: 50 }).success).toBe(true)
+    expect(OutcomeEffectSchema.safeParse({ op: 'hp_delta', delta: -51 }).success).toBe(false)
+    expect(OutcomeEffectSchema.safeParse({ op: 'hp_delta', delta: 51 }).success).toBe(false)
+  })
+
+  it('caps durationTicks at 1440 so a verdict cannot wedge an agent', () => {
+    expect(RecipeSchema.safeParse({ ...validRecipe, durationTicks: 1440 }).success).toBe(true)
+    expect(RecipeSchema.safeParse({ ...validRecipe, durationTicks: 1441 }).success).toBe(false)
+  })
+
+  it('caps outcome row weight at 1000', () => {
+    const row = (weight: number) => [{ weight, success: true, label: 'x', effects: [{ op: 'none' }] }]
+    expect(OutcomeTableSchema.safeParse(row(1000)).success).toBe(true)
+    expect(OutcomeTableSchema.safeParse(row(1001)).success).toBe(false)
+  })
+})
+
 describe('rollOutcomeTable', () => {
   const table: OutcomeRow[] = [
     { weight: 2, success: false, label: 'first', effects: [{ op: 'none' }] },
