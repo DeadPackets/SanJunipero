@@ -62,17 +62,17 @@ describe('scoreHeat', () => {
 })
 
 describe('rankScenesForDirector', () => {
-  it('ranks the argument over the idle, ties broken by lower sceneId', () => {
+  it('ranks the argument over the idle, ties broken by lower sceneIndex', () => {
     const idle = scene([1, 2])
     const argument = scene([3, 4, 5, 6])
     const zero = { conflict: 0, novelty: 0, firsts: 0, stakes: 0, dramaticIrony: 0, total: 0 }
     const hot = { ...zero, conflict: 1.25, total: 7.917 }
     const ranked = rankScenesForDirector([idle, argument], [zero, hot])
     expect(ranked).toEqual([
-      { sceneId: 1, total: 7.917 },
-      { sceneId: 0, total: 0 },
+      { sceneIndex: 1, total: 7.917 },
+      { sceneIndex: 0, total: 0 },
     ])
     const tied = rankScenesForDirector([idle, argument], [hot, hot])
-    expect(tied.map((r) => r.sceneId)).toEqual([0, 1]) // stable: lower sceneId first on ties
+    expect(tied.map((r) => r.sceneIndex)).toEqual([0, 1]) // stable: lower sceneIndex first on ties
   })
 })

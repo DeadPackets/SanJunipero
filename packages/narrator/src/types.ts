@@ -34,6 +34,10 @@ export type Institution = {
   memberIds: string[]
   sourceEventIds: number[]
 }
+// detectInstitutions output: foundingSceneIndex is an INDEX into the scenes array
+// (or -1 when the founding event sits in a dropped scene). The caller maps it to a
+// store id via insertScenes' returned ids before persisting — never persist -1.
+export type DetectedInstitution = Omit<Institution, 'foundingSceneId'> & { foundingSceneIndex: number }
 export type DetectConfig = {
   groupMinCoScenes: number
   groupMinMembers: number
@@ -79,7 +83,9 @@ export type EraRow = {
   chapterIds: number[]
 }
 
-export type TimelineMarker = { day: number; tick: number; label: string; sceneId: number }
+// sceneIndex is an index into the scenes array handed to timelineMarkers (-1 when
+// no surviving scene contains the milestone's event) — not a store id.
+export type TimelineMarker = { day: number; tick: number; label: string; sceneIndex: number }
 
 export type PublicationRow = {
   id: number

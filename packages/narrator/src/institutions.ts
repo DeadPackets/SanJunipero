@@ -1,5 +1,5 @@
 import type { SimEvent } from '@sj/shared'
-import type { DetectConfig, Institution, SceneSegment } from './types.js'
+import type { DetectConfig, DetectedInstitution, SceneSegment } from './types.js'
 
 export const DEFAULT_DETECT_CONFIG: DetectConfig = {
   groupMinCoScenes: 3,
@@ -20,13 +20,18 @@ export const ROLE_VERBS: Record<string, string> = {
 
 type Completed = { seq: number; agentId: string; verb: string }
 
-// foundingSceneId is the INDEX into the scenes array (SceneSegment has no id) —
-// same convention as rankScenesForDirector's sceneId.
+const IRREGULAR_PAST: Record<string, string> = { teach: 'taught', build: 'built' }
+const pastTense = (verb: string): string =>
+  IRREGULAR_PAST[verb] ?? (verb.endsWith('e') ? `${verb}d` : `${verb}ed`)
+
+// foundingSceneIndex is the INDEX into the scenes array (SceneSegment has no id),
+// -1 when the founding event sits in a dropped scene — the caller maps indexes to
+// store ids and must never persist -1.
 export function detectInstitutions(
   scenes: SceneSegment[],
   events: SimEvent[],
   cfg: DetectConfig = DEFAULT_DETECT_CONFIG,
-): Institution[] {
+): DetectedInstitution[] {
   const sceneOf = (seq: number): number => scenes.findIndex((s) => s.eventIds.includes(seq))
 
   const completed: Completed[] = []
@@ -38,7 +43,7 @@ export function detectInstitutions(
     }
   }
 
-  const out: Institution[] = []
+  const out: DetectedInstitution[] = []
 
   // roles: agent x role-verb, count >= roleMinActions
   const byAgentVerb = new Map<string, number[]>() // "agent|verb" -> seqs
@@ -56,8 +61,8 @@ export function detectInstitutions(
     out.push({
       kind: 'role',
       name: `the ${label}`,
-      description: `${agentId} has ${verb}ed ${seqs.length} times`,
-      foundingSceneId: sceneOf(seqs[0]),
+      description: `${agentId} has ${pastTense(verb)} ${seqs.length} times`,
+      foundingSceneIndex: sceneOf(seqs[0]),
       memberIds: [agentId],
       sourceEventIds: seqs,
     })
@@ -103,7 +108,7 @@ export function detectInstitutions(
       kind: 'group',
       name: members.join(' & '),
       description: `${members.join(' & ')} are often seen together`,
-      foundingSceneId: foundingIdx,
+      foundingSceneIndex: foundingIdx,
       memberIds: members,
       sourceEventIds: foundingIdx === -1 ? [] : scenes[foundingIdx].eventIds,
     })
@@ -123,8 +128,8 @@ export function detectInstitutions(
     out.push({
       kind: 'rule',
       name: `people ${verb}`,
-      description: `${agents.size} people have ${verb}ed ${seqs.length} times`,
-      foundingSceneId: sceneOf(seqs[0]),
+      description: `${agents.size} people have ${pastTense(verb)} ${seqs.length} times`,
+      foundingSceneIndex: sceneOf(seqs[0]),
       memberIds: [...agents].sort(),
       sourceEventIds: seqs,
     })

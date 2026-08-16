@@ -57,11 +57,13 @@ export function scoreHeat(scene: SceneSegment, ctx: HeatCtx, events: SimEvent[])
   return { conflict, novelty, firsts, stakes, dramaticIrony, total }
 }
 
+// sceneIndex is an index into the input scenes array, not a store id — the caller
+// maps it through insertScenes' returned ids when a persisted id is needed.
 export function rankScenesForDirector(
   scenes: SceneSegment[],
   heats: HeatScores[],
-): Array<{ sceneId: number; total: number }> {
+): Array<{ sceneIndex: number; total: number }> {
   return scenes
-    .map((_s, i) => ({ sceneId: i, total: heats[i].total }))
-    .sort((a, b) => b.total - a.total || a.sceneId - b.sceneId)
+    .map((_s, i) => ({ sceneIndex: i, total: heats[i].total }))
+    .sort((a, b) => b.total - a.total || a.sceneIndex - b.sceneIndex)
 }
