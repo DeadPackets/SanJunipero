@@ -73,6 +73,22 @@ describe('codex kind column migration', () => {
     db2.close()
   })
 
+  it('register accepts an optional meta manifest and round-trips it; migration adds the column to old DBs', () => {
+    const path = tempDb()
+    const db0 = openForgeDb(path)
+    db0.exec('ALTER TABLE assets DROP COLUMN meta') // simulate a pre-meta DB
+    db0.close()
+    const db = openForgeDb(path) // reopen migrates
+    const codex = new AssetCodex(db)
+    const meta = JSON.stringify({ version: 'v4-hires-building', kind: 'shed', footprint: { w: 1, h: 1 }, cell: { w: 10, h: 12, feetX: 5, feetY: 11 } })
+    const rec = codex.register({ class: 'building', desc: 'shed: tool shed', kind: 'shed', meta, footprint: { w: 1, h: 1 }, png, widthPx: 8, heightPx: 8, status: 'ready', score: 8, attempts: 1, costUsd: 0 })
+    expect(rec.meta).toBe(meta)
+    expect(codex.get(rec.id)?.record.meta).toBe(meta)
+    const plain = codex.register({ class: 'building', desc: 'barn: plain', footprint: { w: 1, h: 1 }, png, widthPx: 8, heightPx: 8, status: 'ready', score: 8, attempts: 1, costUsd: 0 })
+    expect(plain.meta).toBeNull()
+    db.close()
+  })
+
   it('register accepts an optional kind and round-trips it through records', () => {
     const db = openForgeDb(tempDb())
     const codex = new AssetCodex(db)

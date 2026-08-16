@@ -5,7 +5,7 @@ import { resolveAssetId, textureUrlFor } from './textures.js'
 const rec = (over: Partial<AssetRecord>): AssetRecord => ({
   id: 'asset_x', seq: 1, class: 'building', desc: 'hut: timber dwelling', kind: 'hut',
   footprint: { w: 2, h: 2 }, widthPx: 64, heightPx: 64, status: 'ready',
-  score: 9, attempts: 1, costUsd: 0, createdAt: '2026-08-16 00:00:00',
+  score: 9, attempts: 1, costUsd: 0, createdAt: '2026-08-16 00:00:00', meta: null,
   ...over,
 })
 

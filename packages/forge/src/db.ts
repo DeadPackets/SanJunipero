@@ -40,5 +40,8 @@ export function openForgeDb(path: string): Database.Database {
     // backfill pre-existing rows only, by the desc-prefix convention; new rows set kind at register
     db.exec("UPDATE assets SET kind = substr(desc, 1, instr(desc, ':') - 1) WHERE instr(desc, ':') > 0")
   }
+  if (!cols.some(c => c.name === 'meta')) {
+    db.exec('ALTER TABLE assets ADD COLUMN meta TEXT') // v4 hi-res manifest JSON; no backfill (v2 rows have none)
+  }
   return db
 }
