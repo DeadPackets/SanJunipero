@@ -1,5 +1,6 @@
 import { simTimeFromTick } from '@sj/shared'
 import type { TickCtx } from '../worldTick.js'
+import { ageBand } from './aging.js'
 
 const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v))
 
@@ -34,7 +35,10 @@ export function needsSystem(ctx: TickCtx): void {
     if (a.asleep) {
       if (a.needs.energy < 100) ctx.emit('need_changed', { id, need: 'energy', delta: cfg.energyRegenAsleepPerTick })
     } else if (a.needs.energy > 0) {
-      ctx.emit('need_changed', { id, need: 'energy', delta: -cfg.energyDecayAwakePerTick })
+      // An old frame gives out sooner, but only while it is up and doing something.
+      const elder = ageBand(ctx.config, a.ageDays) === 'elder'
+      const decay = cfg.energyDecayAwakePerTick * (elder ? ctx.config.aging.elderEnergyDecayMultiplier : 1)
+      ctx.emit('need_changed', { id, need: 'energy', delta: -decay })
     }
     if (socialRegenActive(ctx, id)) {
       if (a.needs.social < 100) ctx.emit('need_changed', { id, need: 'social', delta: cfg.socialRegenConversingPerTick })

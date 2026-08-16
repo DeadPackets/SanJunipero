@@ -145,3 +145,48 @@ describe('winter scarcity: hunger', () => {
     expect(hungerDeltaAt(WINTER, harsh)).toBeCloseTo(-harsh.needs.hungerDecayPerTick * 3, 10)
   })
 })
+
+// Age is not only a number on the body: an old frame gives out sooner each waking hour.
+describe('elder energy', () => {
+  const YEAR = 364 // DAYS_PER_YEAR
+  const BASE = CFG.needs.energyDecayAwakePerTick
+
+  const energyDeltaAt = (ageDays: number, config = CFG): number => {
+    let s = makeWorld(config, [{ id: 'a1', x: 0, y: 0 }])
+    s = patchAgent(s, 'a1', { ageDays })
+    const changed = tickOnce(s, config).events.find(
+      (e) => e.type === 'need_changed' && (e.payload as { need: string }).need === 'energy',
+    )
+    return (changed!.payload as { delta: number }).delta
+  }
+
+  it('an elder tires by base × 1.2 exactly', () => {
+    expect(CFG.aging.elderEnergyDecayMultiplier).toBe(1.2)
+    expect(energyDeltaAt(CFG.aging.elderFromYears * YEAR)).toBeCloseTo(-BASE * 1.2, 10)
+  })
+
+  it('adults and children are untouched — the toll starts at the elder line', () => {
+    expect(energyDeltaAt((CFG.aging.elderFromYears * YEAR) - 1)).toBeCloseTo(-BASE, 10)
+    expect(energyDeltaAt(30 * YEAR)).toBeCloseTo(-BASE, 10)
+    expect(energyDeltaAt(10 * YEAR)).toBeCloseTo(-BASE, 10)
+  })
+
+  it('follows the dial, not a constant', () => {
+    const frail = SimConfigSchema.parse({
+      weather: { hourlyChangeChance: 0 }, aging: { elderEnergyDecayMultiplier: 4 },
+    })
+    expect(energyDeltaAt(frail.aging.elderFromYears * YEAR, frail)).toBeCloseTo(-BASE * 4, 10)
+  })
+
+  it('sleep still restores at the flat rate — the toll is on waking hours only', () => {
+    let s = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }])
+    s = patchAgent(s, 'a1', {
+      ageDays: CFG.aging.elderFromYears * YEAR, asleep: true,
+      needs: { ...s.agents.a1!.needs, energy: 50 },
+    })
+    const changed = tickOnce(s).events.find(
+      (e) => e.type === 'need_changed' && (e.payload as { need: string }).need === 'energy',
+    )
+    expect((changed!.payload as { delta: number }).delta).toBeCloseTo(CFG.needs.energyRegenAsleepPerTick, 10)
+  })
+})

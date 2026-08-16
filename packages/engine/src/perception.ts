@@ -2,6 +2,7 @@ import { simTimeFromTick, type SimConfig, type SimEvent, type SimTime } from '@s
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { doorTile } from './interiors.js'
 import type { Item, WorldState } from './state.js'
+import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
 import { isAdjacentToRect } from './verbs.js'
 
@@ -21,6 +22,7 @@ export type PerceivedAgent = {
   activityVerb: string | null
   collapsed: boolean
   asleep: boolean
+  ageBand: AgeBand   // a face carries no birthday, but it does carry this much
 }
 
 // Both fields absent on a blank wall, so a town that writes nothing reads as it always did.
@@ -178,6 +180,7 @@ export function composePerception(
       activityVerb: a.activity?.verb ?? null,
       collapsed: a.collapsedSinceTick !== null,
       asleep: a.asleep,
+      ageBand: ageBand(config, a.ageDays),
     }))
 
   // Nearest footprint tile, not the anchor: a long structure whose far corner is

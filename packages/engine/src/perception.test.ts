@@ -141,6 +141,29 @@ describe('composePerception: packet shape', () => {
   })
 })
 
+// You cannot read a birthday off a face, but you can tell a child from an old woman.
+describe('composePerception: age reads off the body', () => {
+  const YEAR = 364 // DAYS_PER_YEAR
+  const withAge = (ageDays: number): WorldState => {
+    const s = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 1, y: 0 }])
+    return { ...s, agents: { ...s.agents, b: { ...s.agents.b!, ageDays } } }
+  }
+  const bandOf = (ageDays: number): string =>
+    composePerception(withAge(ageDays), DEFAULT_CONFIG, 'a', []).visible.agents[0]!.ageBand
+
+  it('carries the band of every agent in sight', () => {
+    expect(bandOf(10 * YEAR)).toBe('child')
+    expect(bandOf(30 * YEAR)).toBe('adult')
+    expect(bandOf(70 * YEAR)).toBe('elder')
+  })
+
+  it('reads the same lines the aging system does', () => {
+    expect(bandOf(DEFAULT_CONFIG.aging.childUntilYears * YEAR)).toBe('adult')
+    expect(bandOf((DEFAULT_CONFIG.aging.elderFromYears * YEAR) - 1)).toBe('adult')
+    expect(bandOf(DEFAULT_CONFIG.aging.elderFromYears * YEAR)).toBe('elder')
+  })
+})
+
 describe('composePerception: structure contents', () => {
   // Storehouse footprint tiles: (10,10),(11,10),(10,11),(11,11).
   const storehouse = { id: 'structure_1', kind: 'storehouse', x: 10, y: 10, w: 2, h: 2 }
