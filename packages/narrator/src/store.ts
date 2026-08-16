@@ -1,0 +1,228 @@
+import Database from 'better-sqlite3'
+import type {
+  ChapterRow,
+  EraRow,
+  HeatScores,
+  Institution,
+  Milestone,
+  PublicationRow,
+  SceneSegment,
+} from './types.js'
+
+const arr = (a: number[] | string[]): string => JSON.stringify(a)
+const parseArr = <T>(s: string): T[] => JSON.parse(s) as T[]
+
+export class NarratorStore {
+  constructor(private db: Database.Database) {}
+
+  insertScenes(scenes: SceneSegment[]): number[] {
+    const stmt = this.db.prepare(
+      `INSERT INTO scenes (day, start_tick, end_tick, event_ids, "cast", location) VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    const run = this.db.transaction((ss: SceneSegment[]) =>
+      ss.map(
+        (s) =>
+          stmt.run(s.day, s.startTick, s.endTick, arr(s.eventIds), arr(s.cast), s.location)
+            .lastInsertRowid as number,
+      ),
+    )
+    return run(scenes)
+  }
+
+  scenesForDay(day: number): Array<SceneSegment & { id: number }> {
+    const rows = this.db
+      .prepare(`SELECT id, day, start_tick, end_tick, event_ids, "cast", location FROM scenes WHERE day = ? ORDER BY id`)
+      .all(day) as Array<{
+      id: number
+      day: number
+      start_tick: number
+      end_tick: number
+      event_ids: string
+      cast: string
+      location: string | null
+    }>
+    return rows.map((r) => ({
+      id: r.id,
+      day: r.day,
+      startTick: r.start_tick,
+      endTick: r.end_tick,
+      eventIds: parseArr<number>(r.event_ids),
+      cast: parseArr<string>(r.cast),
+      location: r.location,
+    }))
+  }
+
+  insertHeat(sceneId: number, s: HeatScores): void {
+    this.db
+      .prepare(
+        `INSERT INTO heat_scores (scene_id, conflict, novelty, firsts, stakes, dramatic_irony, total)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(sceneId, s.conflict, s.novelty, s.firsts, s.stakes, s.dramaticIrony, s.total)
+  }
+
+  heatsForDay(day: number): Array<{ sceneId: number; s: HeatScores }> {
+    const rows = this.db
+      .prepare(
+        `SELECT h.scene_id, h.conflict, h.novelty, h.firsts, h.stakes, h.dramatic_irony, h.total
+         FROM heat_scores h JOIN scenes s ON s.id = h.scene_id WHERE s.day = ? ORDER BY h.id`,
+      )
+      .all(day) as Array<{
+      scene_id: number
+      conflict: number
+      novelty: number
+      firsts: number
+      stakes: number
+      dramatic_irony: number
+      total: number
+    }>
+    return rows.map((r) => ({
+      sceneId: r.scene_id,
+      s: {
+        conflict: r.conflict,
+        novelty: r.novelty,
+        firsts: r.firsts,
+        stakes: r.stakes,
+        dramaticIrony: r.dramatic_irony,
+        total: r.total,
+      },
+    }))
+  }
+
+  insertMilestone(m: Milestone): void {
+    this.db
+      .prepare('INSERT INTO milestones (kind, label, event_seq, day, tick) VALUES (?, ?, ?, ?, ?)')
+      .run(m.kind, m.label, m.eventSeq, m.day, m.tick)
+  }
+
+  milestoneKinds(): Set<string> {
+    const rows = this.db.prepare('SELECT DISTINCT kind FROM milestones').all() as Array<{ kind: string }>
+    return new Set(rows.map((r) => r.kind))
+  }
+
+  milestones(): Milestone[] {
+    const rows = this.db
+      .prepare('SELECT kind, label, event_seq, day, tick FROM milestones ORDER BY id')
+      .all() as Array<{ kind: string; label: string; event_seq: number; day: number; tick: number }>
+    return rows.map((r) => ({ kind: r.kind, label: r.label, eventSeq: r.event_seq, day: r.day, tick: r.tick }))
+  }
+
+  insertInstitution(i: Institution): number {
+    return this.db
+      .prepare(
+        `INSERT INTO institutions (kind, name, description, founding_scene_id, member_ids, source_event_ids)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(i.kind, i.name, i.description, i.foundingSceneId, arr(i.memberIds), arr(i.sourceEventIds))
+      .lastInsertRowid as number
+  }
+
+  institutions(): Array<Institution & { id: number }> {
+    const rows = this.db
+      .prepare(
+        'SELECT id, kind, name, description, founding_scene_id, member_ids, source_event_ids FROM institutions ORDER BY id',
+      )
+      .all() as Array<{
+      id: number
+      kind: Institution['kind']
+      name: string
+      description: string
+      founding_scene_id: number
+      member_ids: string
+      source_event_ids: string
+    }>
+    return rows.map((r) => ({
+      id: r.id,
+      kind: r.kind,
+      name: r.name,
+      description: r.description,
+      foundingSceneId: r.founding_scene_id,
+      memberIds: parseArr<string>(r.member_ids),
+      sourceEventIds: parseArr<number>(r.source_event_ids),
+    }))
+  }
+
+  insertChapter(c: { day: number; title: string; text: string; citations: number[]; sceneIds: number[] }): number {
+    return this.db
+      .prepare('INSERT INTO chapters (day, title, text, citations, scene_ids) VALUES (?, ?, ?, ?, ?)')
+      .run(c.day, c.title, c.text, arr(c.citations), arr(c.sceneIds)).lastInsertRowid as number
+  }
+
+  private chapterRows(rows: unknown[]): ChapterRow[] {
+    return (
+      rows as Array<{ id: number; day: number; title: string; text: string; citations: string; scene_ids: string }>
+    ).map((r) => ({
+      id: r.id,
+      day: r.day,
+      title: r.title,
+      text: r.text,
+      citations: parseArr<number>(r.citations),
+      sceneIds: parseArr<number>(r.scene_ids),
+    }))
+  }
+
+  chaptersForDay(day: number): ChapterRow[] {
+    return this.chapterRows(
+      this.db.prepare('SELECT id, day, title, text, citations, scene_ids FROM chapters WHERE day = ? ORDER BY id').all(day),
+    )
+  }
+
+  chaptersInRange(fromDay: number, toDay: number): ChapterRow[] {
+    return this.chapterRows(
+      this.db
+        .prepare('SELECT id, day, title, text, citations, scene_ids FROM chapters WHERE day BETWEEN ? AND ? ORDER BY day')
+        .all(fromDay, toDay),
+    )
+  }
+
+  insertEra(e: { startDay: number; endDay: number; title: string; text: string; citations: number[]; chapterIds: number[] }): number {
+    return this.db
+      .prepare('INSERT INTO eras (start_day, end_day, title, text, citations, chapter_ids) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(e.startDay, e.endDay, e.title, e.text, arr(e.citations), arr(e.chapterIds)).lastInsertRowid as number
+  }
+
+  eras(): EraRow[] {
+    const rows = this.db
+      .prepare('SELECT id, start_day, end_day, title, text, citations, chapter_ids FROM eras ORDER BY id')
+      .all() as Array<{
+      id: number
+      start_day: number
+      end_day: number
+      title: string
+      text: string
+      citations: string
+      chapter_ids: string
+    }>
+    return rows.map((r) => ({
+      id: r.id,
+      startDay: r.start_day,
+      endDay: r.end_day,
+      title: r.title,
+      text: r.text,
+      citations: parseArr<number>(r.citations),
+      chapterIds: parseArr<number>(r.chapter_ids),
+    }))
+  }
+
+  insertPublication(p: { day: number; kind: PublicationRow['kind']; title: string; body: string; citations: number[] | null }): number {
+    return this.db
+      .prepare('INSERT INTO publications (day, kind, title, body, citations) VALUES (?, ?, ?, ?, ?)')
+      .run(p.day, p.kind, p.title, p.body, p.citations === null ? null : arr(p.citations)).lastInsertRowid as number
+  }
+
+  publications(kind?: PublicationRow['kind']): PublicationRow[] {
+    const rows = (
+      kind === undefined
+        ? this.db.prepare('SELECT id, day, kind, title, body, citations FROM publications ORDER BY id').all()
+        : this.db.prepare('SELECT id, day, kind, title, body, citations FROM publications WHERE kind = ? ORDER BY id').all(kind)
+    ) as Array<{ id: number; day: number; kind: PublicationRow['kind']; title: string; body: string; citations: string | null }>
+    return rows.map((r) => ({
+      id: r.id,
+      day: r.day,
+      kind: r.kind,
+      title: r.title,
+      body: r.body,
+      citations: r.citations === null ? null : parseArr<number>(r.citations),
+    }))
+  }
+}

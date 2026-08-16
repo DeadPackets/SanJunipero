@@ -146,6 +146,28 @@ importers:
         specifier: ^8.5.0
         version: 8.18.1
 
+  packages/narrator:
+    dependencies:
+      '@sj/agents':
+        specifier: workspace:*
+        version: link:../agents
+      '@sj/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@sj/shared':
+        specifier: workspace:*
+        version: link:../shared
+      better-sqlite3:
+        specifier: ^13.0.0
+        version: 13.0.3
+      zod:
+        specifier: ^4.4.0
+        version: 4.4.3
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.0
+        version: 7.6.13
+
   packages/shared:
     dependencies:
       zod:
