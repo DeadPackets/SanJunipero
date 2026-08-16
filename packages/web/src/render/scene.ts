@@ -1,19 +1,90 @@
 import { Application, Container, Graphics, RenderTexture, Sprite, TextureSource } from 'pixi.js'
-import type { FederatedPointerEvent } from 'pixi.js'
+import type { FederatedPointerEvent, Texture } from 'pixi.js'
+import type { AssetRecord } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
-import { groundPlan, shadeColor } from './ground.js'
+import { shadeColor, tilesetPlan } from './ground.js'
+import { TextureBook } from './textures.js'
 
 export const BACKGROUND = 0x322b38
 export const ZOOM_MIN = 1
 export const ZOOM_MAX = 4
 
+// THE BAKE SEAM (C11 §9 supersession point). One whole-map pass is correct at the 48×48
+// showcase scale; C11's 128×128 growth map replaces this with a chunked, dirty-rebake baker.
+// Everything above talks to `GroundBaker`, so that swap touches this factory and nothing else.
+export type GroundBaker = {
+  rebake(terrain: TileId[][], records: AssetRecord[]): void
+  destroy(): void
+}
+
+export function createGroundBaker(app: Application, sprite: Sprite, book: TextureBook): GroundBaker {
+  let target: RenderTexture | null = null
+  // one Texture per (kind, variant) or road key — ≤ 32 entries at 48×48
+  const loaded = new Map<string, Texture>()
+  let generation = 0
+
+  function draw(terrain: TileId[][], records: AssetRecord[], offX: number): void {
+    if (target === null) return
+    const layer = new Container()
+    const g = new Graphics()
+    layer.addChild(g)
+    for (const cell of tilesetPlan(terrain, records)) {
+      const cx = cell.sx + offX
+      const tex = cell.url === null ? undefined : loaded.get(cell.url)
+      if (tex !== undefined) {
+        const s = new Sprite(tex)                 // NEAREST is global (C6 T11); drawn 1:1
+        s.position.set(cx - TILE_W / 2, cell.sy)
+        layer.addChild(s)
+        continue
+      }
+      g.poly([cx, cell.sy, cx + TILE_W / 2, cell.sy + TILE_H / 2, cx, cell.sy + TILE_H, cx - TILE_W / 2, cell.sy + TILE_H / 2])
+      g.fill(cell.shade ? shadeColor(cell.fallback) : cell.fallback)
+    }
+    app.renderer.render({ container: layer, target, clear: true })
+    layer.destroy({ children: true })
+  }
+
+  return {
+    rebake(terrain, records) {
+      const h = terrain.length
+      const w = terrain[0]?.length ?? 0
+      const texW = (w + h) * (TILE_W / 2)
+      const texH = (w + h) * (TILE_H / 2)
+      const offX = h * (TILE_W / 2) // sx can go negative down to -h*16; shift into texture space
+      if (target === null || target.width !== texW || target.height !== texH) {
+        target?.destroy(true)
+        target = RenderTexture.create({ width: texW, height: texH })
+        sprite.texture = target
+        sprite.position.set(-offX, 0)
+      }
+      draw(terrain, records, offX)
+
+      // Textures load async. Paint the flat fallback now, then repaint once the tile art is
+      // in — a viewer never waits on a blank map, and a stale load never overwrites a newer bake.
+      const urls = [...new Set(tilesetPlan(terrain, records).map((c) => c.url))]
+        .filter((u): u is string => u !== null && !loaded.has(u))
+      if (urls.length === 0) return
+      const gen = ++generation
+      void Promise.all(urls.map(async (u) => { loaded.set(u, await book.get(u)) }))
+        .then(() => { if (gen === generation) draw(terrain, records, offX) })
+        .catch(() => { /* art is optional — the flat diamonds already rendered */ })
+    },
+    destroy() {
+      generation++
+      target?.destroy(true)
+      target = null
+      loaded.clear()
+    },
+  }
+}
+
 export type Scene = {
   app: Application
   world: Container
   entities: Container
-  rebakeGround(terrain: TileId[][]): void
+  rebakeGround(terrain: TileId[][], records?: AssetRecord[]): void
   centerOn(x: number, y: number): void
   setZoom(z: 1 | 2 | 3 | 4): void
   getZoom(): number
@@ -42,7 +113,6 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const entities = new Container()
   entities.sortableChildren = true
 
-  let groundTexture: RenderTexture | null = null
   const groundSprite = new Sprite()
   world.addChild(groundSprite)
   world.addChild(entities)
@@ -50,26 +120,11 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
 
   const tileCbs: Array<(t: { x: number; y: number }) => void> = []
 
-  function rebakeGround(terrain: TileId[][]): void {
-    const h = terrain.length
-    const w = terrain[0]?.length ?? 0
-    const texW = (w + h) * (TILE_W / 2)
-    const texH = (w + h) * (TILE_H / 2)
-    const offX = h * (TILE_W / 2) // sx can go negative down to -h*16; shift into texture space
-    if (groundTexture === null || groundTexture.width !== texW || groundTexture.height !== texH) {
-      groundTexture?.destroy(true)
-      groundTexture = RenderTexture.create({ width: texW, height: texH })
-      groundSprite.texture = groundTexture
-      groundSprite.position.set(-offX, 0)
-    }
-    const g = new Graphics()
-    for (const cell of groundPlan(terrain)) {
-      const cx = cell.sx + offX
-      g.poly([cx, cell.sy, cx + TILE_W / 2, cell.sy + TILE_H / 2, cx, cell.sy + TILE_H, cx - TILE_W / 2, cell.sy + TILE_H / 2])
-      g.fill(cell.shade ? shadeColor(cell.color) : cell.color)
-    }
-    app.renderer.render({ container: g, target: groundTexture, clear: true })
-    g.destroy()
+  const book = new TextureBook()
+  const baker = createGroundBaker(app, groundSprite, book)
+
+  function rebakeGround(terrain: TileId[][], records?: AssetRecord[]): void {
+    baker.rebake(terrain, records ?? store.assetRecords())
   }
 
   function centerOn(x: number, y: number): void {
@@ -162,11 +217,16 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
 
   // bake on first snapshot and whenever the terrain array identity changes
   let bakedTerrain: TileId[][] | null = null
+  let bakedAssetsSeq = -1
   const offSub = store.subscribe(() => {
     const s = store.getState()
-    if (s !== null && s.terrain !== bakedTerrain) {
+    if (s === null) return
+    // terrain art arriving is a rebake trigger too — the flat diamonds hot-swap to tiles
+    const artChanged = store.assetsSeq() !== bakedAssetsSeq
+    if (s.terrain !== bakedTerrain || artChanged) {
       const first = bakedTerrain === null
       bakedTerrain = s.terrain
+      bakedAssetsSeq = store.assetsSeq()
       rebakeGround(s.terrain)
       if (first) centerOn(s.terrain[0]!.length / 2, s.terrain.length / 2)
     }
@@ -230,7 +290,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       ro.disconnect()
       app.ticker.remove(followTick)
       app.canvas.removeEventListener('wheel', onWheel)
-      groundTexture?.destroy(true)
+      baker.destroy()
       app.destroy(true, { children: true })
     },
   }
