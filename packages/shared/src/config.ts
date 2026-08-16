@@ -130,6 +130,8 @@ const CraftingSchema = z.object({
 const StructuresSchema = z.object({
   enterableKinds: z.array(z.string()).default(['hut', 'storehouse']),
   privateKinds: z.array(z.string()).default(['hut']),
+  sleepIndoorsOnly: z.boolean().default(true),
+  sleepableKinds: z.array(z.string()).default(['hut']),
 }).strict()
 
 const ReproductionSchema = z.object({

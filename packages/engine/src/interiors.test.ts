@@ -140,6 +140,47 @@ describe('destruction ejects occupants', () => {
   })
 })
 
+describe('sleep is indoors-only (C9 T2b)', () => {
+  const OUTDOORS = 'there is no bed here; find somewhere to lie down'
+
+  it('refuses a bed under the sky, allows one inside a hut', () => {
+    let s = withAgent(withHut(world()), 'a1', 2, 3)
+    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {})).toMatchObject({ ok: false, reason: OUTDOORS })
+    s = fold(s, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
+    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
+  })
+
+  it('checks the kind, not the owner — a storehouse is enterable but has no bed', () => {
+    let s = withAgent(withHut(world(), 'storehouse'), 'a1', 2, 3)
+    s = fold(s, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
+    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {})).toMatchObject({ ok: false, reason: OUTDOORS })
+
+    // Another agent's hut is a legal bed: ownership is witnessed, never enforced.
+    let owned = fold(world(), ev(1, 'structure_planned', {
+      id: 'structure_1', kind: 'hut', x: 2, y: 1, w: 2, h: 2,
+      maxHp: 50, flammable: true, builderId: 'a2', owner: 'a2',
+    }))
+    owned = fold(owned, ev(2, 'structure_completed', { id: 'structure_1' }))
+    owned = withAgent(owned, 'a1', 2, 3)
+    owned = fold(owned, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
+    expect(submitIntent(owned, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
+  })
+
+  it('a collapsed body sleeps where it fell', () => {
+    let s = withAgent(withHut(world()), 'a1', 6, 5)
+    s = fold(s, { seq: 12, tick: 4, type: 'agent_collapsed', payload: { agentId: 'a1' } })
+    expect(s.agents.a1!.collapsedSinceTick).toBe(4)
+    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
+  })
+
+  it('the flag turns the law off entirely', () => {
+    const off = SimConfigSchema.parse({ structures: { sleepIndoorsOnly: false } })
+    const s = withAgent(withHut(world(), 'hut', 'complete'), 'a1', 6, 5)
+    expect(submitIntent(s, off, 'a1', 'sleep', {}).ok).toBe(true)
+    expect(off.structures.sleepableKinds).toEqual(['hut'])
+  })
+})
+
 describe('structure ownership (deep-world POST-REVIEW RULING 1)', () => {
   it('is absent until set — public by default', () => {
     const s = withHut(world())

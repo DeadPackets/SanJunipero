@@ -90,8 +90,16 @@ export const FOOD_KINDS: ReadonlySet<string> = new Set([FORAGE_KIND, FISH_KIND, 
 
 const sleep: VerbDef = makeVerb({
   kind: 'sleep',
-  validate(state, _config, agentId) {
-    return state.agents[agentId]!.asleep ? 'already asleep' : null
+  validate(state, config, agentId) {
+    const a = state.agents[agentId]!
+    if (a.asleep) return 'already asleep'
+    // A body that has already gone down does not get to pick its bed.
+    if (!config.structures.sleepIndoorsOnly || a.collapsedSinceTick !== null) return null
+    const s = a.insideId === undefined ? undefined : state.structures[a.insideId]
+    if (!s || s.stage !== 'complete' || !config.structures.sleepableKinds.includes(s.kind)) {
+      return 'there is no bed here; find somewhere to lie down'
+    }
+    return null
   },
   onComplete(_state, _config, agentId) { return [{ type: 'agent_slept', payload: { agentId } }] },
 })

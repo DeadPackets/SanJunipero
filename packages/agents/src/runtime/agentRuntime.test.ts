@@ -43,8 +43,9 @@ const ZERO_USAGE = {
 
 const FAST_MIND: Partial<MindConfig> = { idleGapTicks: 0, boredomTicks: 1, bodyAlarm: { hunger: 0, energy: 0, warmth: 0 } }
 
+// Empty 24x24 grass, no structures: the C9 bed law would refuse every sleep these rows drive.
 function fastSimConfig(): SimConfig {
-  return SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0.5 } })
+  return SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0.5 }, structures: { sleepIndoorsOnly: false } })
 }
 
 function baseDoc(): PersonalityDoc {
@@ -455,7 +456,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       model: turnModel([]),
       mindConfig: { idleGapTicks: 100000, boredomTicks: 100000 },
       reflectionLlm: reflection,
-      simConfig: SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 } }),
+      simConfig: SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 }, structures: { sleepIndoorsOnly: false } }),
     })
     while (loop.tick < 1350) {
       loop.step()
@@ -634,7 +635,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   })
 
   it('the body answers its own alarm: a sleeper whose turn submits nothing is woken by a runtime wake', async () => {
-    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 } })
+    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 }, structures: { sleepIndoorsOnly: false } })
     const { world, loop } = await setup({
       model: turnModel([{ thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 }]),
       mindConfig: FAST_MIND,
@@ -655,7 +656,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   })
 
   it('a sleeper whose every intent the world rejects still rises', async () => {
-    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 } })
+    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 }, structures: { sleepIndoorsOnly: false } })
     const { world, loop, agentDb } = await setup({
       model: turnModel(
         [{ thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 }],
