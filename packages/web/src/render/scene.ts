@@ -25,6 +25,9 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const app = new Application()
   await app.init({ antialias: false, roundPixels: true, background: BACKGROUND, resizeTo: rootEl })
   rootEl.appendChild(app.canvas)
+  // resizeTo only tracks window resizes; panel open/close changes the root element itself
+  const ro = new ResizeObserver(() => app.resize())
+  ro.observe(rootEl)
 
   const world = new Container()
   const entities = new Container()
@@ -155,6 +158,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     destroy: () => {
       offSub()
       offEvents()
+      ro.disconnect()
       app.canvas.removeEventListener('wheel', onWheel)
       groundTexture?.destroy(true)
       app.destroy(true, { children: true })

@@ -267,6 +267,34 @@ body {
   }
 }
 
+/* ── society lens: bonds graph over the night ground (Task 18) ── */
+.stage-hidden .stage-mount { display: none; }
+.society-lens { position: absolute; inset: 0; overflow: hidden; }
+.society-legend {
+  position: absolute; top: 0.8rem; left: 0.8rem; z-index: 20;
+  display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+  background: var(--cream); border-radius: 6px; box-shadow: var(--frame);
+  padding: 0.4rem 0.55rem;
+}
+.legend-chip {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  border: 2px solid var(--ink); border-radius: 4px; background: var(--parchment);
+  color: var(--ink); font: inherit; font-size: 0.75rem; font-weight: 600;
+  padding: 0.25rem 0.5rem; min-height: 40px; cursor: pointer;
+  transition-property: opacity, background-color, scale; transition-duration: var(--t-fast);
+}
+.legend-chip:active { scale: 0.96; }
+.legend-chip.off { opacity: 0.45; background: var(--sand); }
+.legend-swatch { width: 10px; height: 10px; border-radius: 2px; box-shadow: 0 0 0 1px var(--ink); }
+.legend-stamp {
+  font-size: 0.7rem; opacity: 0.75; margin-left: 0.3rem;
+  font-family: ui-monospace, 'SF Mono', monospace; font-variant-numeric: tabular-nums;
+}
+.society-empty {
+  position: absolute; top: 45%; left: 50%; translate: -50% -50%; z-index: 10;
+  color: var(--cream); opacity: 0.85; font-style: italic;
+}
+
 /* world-anchored popovers (structure provenance) share the slab language */
 .provenance-pop {
   position: fixed; z-index: 100; max-width: 18rem;

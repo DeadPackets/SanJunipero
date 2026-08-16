@@ -6,6 +6,7 @@ import { LENSES, parseRoute, routeToPath, type Lens, type Route } from './ui/rou
 import { StageMount } from './render/StageMount.js'
 import { InspectorPanel } from './ui/InspectorPanel.js'
 import { ChroniclePanel } from './ui/ChroniclePanel.js'
+import { SocietyLens } from './ui/SocietyLens.js'
 import { Timeline } from './ui/Timeline.js'
 import type { Scene } from './render/scene.js'
 
@@ -79,6 +80,19 @@ export function App() {
     setRoute(next)
   }
 
+  const pickAgent = (agentId: string): void => {
+    const next: Route = { ...route, lens: 'inspector', agentId }
+    history.pushState(null, '', routeToPath(next))
+    setRoute(next)
+  }
+
+  // the bonds graph replaces the canvas; pause the Pixi ticker while hidden (60fps budget honesty)
+  useEffect(() => {
+    if (scene === null) return
+    if (route.lens === 'society') scene.app.ticker.stop()
+    else scene.app.ticker.start()
+  }, [route.lens, scene])
+
   return (
     <div className="app">
       <header className="topbar">
@@ -93,10 +107,11 @@ export function App() {
         <TickBadge store={store} />
       </header>
       <div className="stage-row">
-        <main id="stage-root">
+        <main id="stage-root" className={route.lens === 'society' ? 'stage-hidden' : undefined}>
           <StageMount store={store} onScene={setScene} />
           <ScrubBanner store={store} />
           {route.lens === 'chronicle' && <Timeline store={store} handle={handle} onView={onView} />}
+          {route.lens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
         </main>
         <aside
           id="panel-outlet"
