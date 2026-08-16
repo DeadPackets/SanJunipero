@@ -79,8 +79,8 @@ describe('prunePath', () => {
     expect(prunePath(path, 150)).toEqual([{ x: 1, y: 0, atMs: 100 }, { x: 2, y: 0, atMs: 200 }, { x: 2, y: 1, atMs: 300 }])
     expect(prunePath(path, 250)).toEqual([{ x: 2, y: 0, atMs: 200 }, { x: 2, y: 1, atMs: 300 }])
   })
-  it('keeps the whole path when nothing has passed yet', () => {
-    expect(prunePath(path, 50)).toEqual(path)
+  it('returns the SAME array when nothing has passed — no per-frame allocation', () => {
+    expect(prunePath(path, 50)).toBe(path)
   })
 })
 

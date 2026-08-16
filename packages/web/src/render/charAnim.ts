@@ -67,14 +67,15 @@ export function interpolatePos(path: ReadonlyArray<Waypoint>, nowMs: number): { 
 }
 
 // Drop waypoints we've passed, keeping the last-passed one as the anchor so the
-// path queue stays short while the interpolation never re-winds.
-export function prunePath(path: ReadonlyArray<Waypoint>, nowMs: number): Waypoint[] {
+// path queue stays short while the interpolation never re-winds. The no-op case
+// returns the same array — this runs 60fps per character.
+export function prunePath(path: Waypoint[], nowMs: number): Waypoint[] {
   let cut = 0
   for (let i = 0; i < path.length - 1; i++) {
     if (path[i + 1]!.atMs <= nowMs) cut = i + 1
     else break
   }
-  return cut > 0 ? path.slice(cut) : [...path]
+  return cut > 0 ? path.slice(cut) : path
 }
 
 // Facing for the leg being walked NOW — path[0] (anchor) → path[1] — so a queued
