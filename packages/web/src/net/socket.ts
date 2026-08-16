@@ -7,16 +7,24 @@ export const BACKOFF_MIN_MS = 1_000
 export const BACKOFF_MAX_MS = 30_000
 
 export type ObservatoryHandle = { scrub(tick: number): void; goLive(): void; close(): void }
+export type LinkStatus = 'connecting' | 'online' | 'reconnecting'
 
 export function connectObservatory(opts: {
   url: string
   store: WorldStore
   onGap?: (missedTicks: number) => void
+  onStatus?: (status: LinkStatus) => void
 }): ObservatoryHandle {
   let closed = false
   let sock: WebSocket | null = null
   let backoffMs = BACKOFF_MIN_MS
   let reqId = 0
+  let status: LinkStatus = 'connecting'
+  const setStatus = (next: LinkStatus): void => {
+    if (status === next) return
+    status = next
+    opts.onStatus?.(next)
+  }
 
   const readLastSeen = (): number | null => {
     try {
@@ -36,6 +44,7 @@ export function connectObservatory(opts: {
     sock = new WebSocket(opts.url)
     sock.onopen = () => {
       backoffMs = BACKOFF_MIN_MS
+      setStatus('online')
       sock?.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: readLastSeen() }))
     }
     sock.onmessage = (e: MessageEvent) => {
@@ -49,11 +58,13 @@ export function connectObservatory(opts: {
     }
     sock.onclose = () => {
       if (closed) return
+      setStatus('reconnecting')
       setTimeout(open, backoffMs)
       backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX_MS)
     }
   }
   open()
+  opts.onStatus?.(status)
 
   const send = (payload: unknown): void => {
     if (sock !== null && sock.readyState === WebSocket.OPEN) sock.send(JSON.stringify(payload))

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { momentToTick, tickToMoment } from '@sj/shared'
 import { createWorldStore, type WorldStore } from './state/worldStore.js'
-import { connectObservatory, type ObservatoryHandle } from './net/socket.js'
+import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './net/socket.js'
 import { LENSES, parseRoute, routeToPath, type Lens, type Route } from './ui/route.js'
 import { StageMount } from './render/StageMount.js'
 import { InspectorPanel } from './ui/InspectorPanel.js'
@@ -32,6 +32,8 @@ function ScrubBanner({ store }: { store: WorldStore }) {
 function TickBadge({ store }: { store: WorldStore }) {
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   const live = useSyncExternalStore(store.subscribe, () => store.getMode().live)
+  const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)
+  if (!awake) return <div className="tick-badge waking">Waking…</div>
   const m = tickToMoment(tick)
   return (
     <div className={live ? 'tick-badge' : 'tick-badge past'}>
@@ -49,10 +51,11 @@ export function App() {
   const [scene, setScene] = useState<Scene | null>(null)
   const [handle, setHandle] = useState<ObservatoryHandle | null>(null)
   const [gapTicks, setGapTicks] = useState<number | null>(null)
+  const [link, setLink] = useState<LinkStatus>('connecting')
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    const handle = connectObservatory({ url: `${proto}://${location.host}/ws`, store, onGap: setGapTicks })
+    const handle = connectObservatory({ url: `${proto}://${location.host}/ws`, store, onGap: setGapTicks, onStatus: setLink })
     sockRef.current = handle
     setHandle(handle)
 
@@ -101,13 +104,21 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <h1 className="px-title">San Junipero</h1>
-        <nav className="lens-tabs">
+        <nav className="lens-tabs" aria-label="Lenses">
           {LENSES.map((lens) => (
-            <button key={lens} className={lens === route.lens ? 'tab active' : 'tab'} onClick={() => nav(lens)}>
+            <button
+              key={lens}
+              className={lens === route.lens ? 'tab active' : 'tab'}
+              aria-current={lens === route.lens ? 'page' : undefined}
+              onClick={() => nav(lens)}
+            >
               {LENS_LABELS[lens]}
             </button>
           ))}
         </nav>
+        {link === 'reconnecting' && (
+          <div className="link-pill" role="status">Reaching the town…</div>
+        )}
         <TickBadge store={store} />
       </header>
       <div className="stage-row">
