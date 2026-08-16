@@ -5,8 +5,8 @@ import { depthKey, facingFrom, tileToScreen, type Facing } from './iso.js'
 import type { Scene } from './scene.js'
 import { characterArt, smoothSource, type TextureBook } from './textures.js'
 import {
-  CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, HIT_AREA_H, HIT_AREA_W, NAME_TAG_ABOVE_HEAD_PX,
-  SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4, charPose, emoteFor, interpolatePos,
+  CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, NAME_TAG_ABOVE_HEAD_PX,
+  SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4, charPose, emoteFor, hitRect, interpolatePos,
   nameTagText, prunePath, type Waypoint,
 } from './charAnim.js'
 
@@ -27,6 +27,8 @@ type CharEntry = {
   nameTag: Container
   nameTagBg: Graphics
   nameTagLabel: BitmapText
+  hit: Rectangle
+  hitScale: number
   emoteUntil: number
   facing: Facing
   path: Waypoint[]
@@ -106,6 +108,18 @@ export function createCharacterLayer(
   const shadowTexture = scene.app.renderer.generateTexture(shadowG)
   shadowG.destroy()
 
+  // one Rectangle per entry, mutated in place whenever the applied sprite scale
+  // changes, so the click target stays 52×72 screen px at any sheet resolution
+  const setHitScale = (e: CharEntry, scale: number): void => {
+    if (e.hitScale === scale) return
+    e.hitScale = scale
+    const r = hitRect(scale)
+    e.hit.x = r.x
+    e.hit.y = r.y
+    e.hit.width = r.w
+    e.hit.height = r.h
+  }
+
   const ensure = (agentId: string, x: number, y: number): CharEntry => {
     let e = entries.get(agentId)
     if (e !== undefined) return e
@@ -114,7 +128,8 @@ export function createCharacterLayer(
     sprite.scale.set(CHAR_TARGET_PX / 64)
     sprite.eventMode = 'static'
     sprite.cursor = 'pointer'
-    sprite.hitArea = new Rectangle(-HIT_AREA_W / 2, -HIT_AREA_H, HIT_AREA_W, HIT_AREA_H)
+    const hit = new Rectangle()
+    sprite.hitArea = hit
     sprite.on('pointertap', () => onSelect(agentId))
     const shadow = new Sprite(shadowTexture)
     shadow.anchor.set(0.5, 0.5)
@@ -132,9 +147,10 @@ export function createCharacterLayer(
     scene.entities.addChild(shadow, sprite, emote, nameTag)
     const now = performance.now()
     e = {
-      sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, emoteUntil: 0, facing: 'sw',
+      sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, hitScale: 0, emoteUntil: 0, facing: 'sw',
       path: [{ x, y, atMs: now }], lastMoveArrival: now,
     }
+    setHitScale(e, CHAR_TARGET_PX / 64)
     entries.set(agentId, e)
     loadSheet(agentId, null)
     return e
@@ -208,11 +224,13 @@ export function createCharacterLayer(
             e.sprite.texture = t
             e.sprite.anchor.set(cell.feetX / cell.w, cell.feetY / cell.h) // feet-anchor law
             e.sprite.scale.set(CHAR_TARGET_PX / sheet.art.manifest!.figureH) // smooth downscale to world footprint
+            setHitScale(e, CHAR_TARGET_PX / sheet.art.manifest!.figureH)
           }
         } else {
           e.sprite.texture = sliceV2(sheet.texture, pose.row, pose.facing)
           e.sprite.anchor.set(0.5, FEET_Y / CELL)
           e.sprite.scale.set(CHAR_TARGET_PX / 64)
+          setHitScale(e, CHAR_TARGET_PX / 64)
         }
       }
       const { sx, sy } = tileToScreen(pos.x, pos.y)

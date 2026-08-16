@@ -176,6 +176,17 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     ])
   })
 
+  it('hit area compensates for sprite scale so the click target is 52×72 screen px', () => {
+    layer.tick(1000)
+    const sprite = layer.getSprite('nadia') as unknown as InstanceType<typeof MockSprite>
+    const hit = sprite.hitArea as unknown as { x: number; y: number; width: number; height: number }
+    const scale = sprite.scale as unknown as { x: number; y: number }
+    expect(hit.width * scale.x).toBeCloseTo(52, 9)
+    expect(hit.height * scale.y).toBeCloseTo(72, 9)
+    expect(hit.x * scale.x).toBeCloseTo(-26, 9)
+    expect(hit.y * scale.y).toBeCloseTo(-72, 9)
+  })
+
   it('removing an agent destroys its 4 objects and drops the entry', () => {
     layer.tick(1000)
     const sprite = layer.getSprite('omar') as unknown as InstanceType<typeof MockSprite>

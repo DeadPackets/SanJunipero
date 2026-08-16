@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentBody } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
-import { BOB_PX, EMOTE_KINDS, HIT_AREA_H, HIT_AREA_W, NAME_TAG_MAX_CHARS, WALK_FRAME_MS_V4, WALK_LOOP, charPose, emoteFor, interpolatePos, nameTagText, prunePath } from './charAnim.js'
+import { BOB_PX, EMOTE_KINDS, HIT_AREA_H, HIT_AREA_W, NAME_TAG_MAX_CHARS, WALK_FRAME_MS_V4, WALK_LOOP, charPose, emoteFor, hitRect, interpolatePos, nameTagText, prunePath } from './charAnim.js'
 
 describe('charPose v4 cadence', () => {
   const v4base = { asleep: false, collapsed: false, walking: true, facing: 'se' as const, nowMs: 0 }
@@ -109,6 +109,21 @@ describe('character hit area + name tag', () => {
     expect(HIT_AREA_W).toBe(52)
     expect(HIT_AREA_H).toBe(72)
     expect(HIT_AREA_H).toBeGreaterThan(64) // taller than the sprite's default art bounds
+  })
+  it('hitRect at scale 1 is the raw local rect', () => {
+    expect(hitRect(1)).toEqual({ x: -HIT_AREA_W / 2, y: -HIT_AREA_H, w: HIT_AREA_W, h: HIT_AREA_H })
+  })
+  it('hitRect inflates local space so the screen rect stays 52×72 at v4 scales', () => {
+    expect(hitRect(0.0625)).toEqual({ x: -416, y: -1152, w: 832, h: 1152 })
+  })
+  it('hitRect screen-size invariant: w·s === HIT_AREA_W for any scale', () => {
+    for (const s of [1, 0.8125, 52 / 840, 0.0625]) {
+      const r = hitRect(s)
+      expect(r.w * s).toBeCloseTo(HIT_AREA_W, 9)
+      expect(r.h * s).toBeCloseTo(HIT_AREA_H, 9)
+      expect(r.x * s).toBeCloseTo(-HIT_AREA_W / 2, 9)
+      expect(r.y * s).toBeCloseTo(-HIT_AREA_H, 9)
+    }
   })
   it('name-tag text is the agent name, truncated to the slab', () => {
     expect(nameTagText('Omar')).toBe('Omar')

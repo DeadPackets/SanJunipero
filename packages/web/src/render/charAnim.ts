@@ -17,6 +17,11 @@ export const WALK_FRAME_MS_V4 = 180 // v4 ruling: F1-F2-F1-F3 cadence at 180ms/f
 // character is easy to hit. Local sprite coords, feet at (0,0), body rising upward.
 export const HIT_AREA_W = 52
 export const HIT_AREA_H = 72
+// hitArea lives in LOCAL sprite space and Pixi scales it with the sprite, so the
+// local rect must be inflated by 1/scale to keep the click target 52×72 SCREEN px.
+export function hitRect(scale: number): { x: number; y: number; w: number; h: number } {
+  return { x: -HIT_AREA_W / 2 / scale, y: -HIT_AREA_H / scale, w: HIT_AREA_W / scale, h: HIT_AREA_H / scale }
+}
 export const NAME_TAG_ABOVE_HEAD_PX = 8
 export const NAME_TAG_MAX_CHARS = 16
 // Hover name tag: the agent's name, truncated to fit the pixel slab.
