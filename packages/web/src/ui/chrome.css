@@ -1,6 +1,23 @@
 /* Observatory chrome — pixel-art-native: chunky stepped frames, master-palette tokens,
    warm paper surfaces over the night backdrop. World art alone renders pixelated;
-   chrome is crisp. (Style Bible §7 + AAA UI mandate.) */
+   chrome is crisp. (Style Bible §7 + AAA UI mandate.)
+
+   C10 T4 design-token plan (status strip + lens hints), written before implementing:
+   · SURFACE   reuse --parchment + --grain + --sand inset; the strip is the topbar's
+               second storey, not a new material. No new surface token.
+   · COLOUR    one new token, --stone (#ABA198, MASTER_PALETTE warm grey), for the
+               strip's tick rule and the clouded-sky glyph. Weather glyph fills come
+               from existing palette hexes, held in townStats.ts beside their labels
+               so the colour and the word can never disagree.
+   · TYPE      --font-px for the strip (it is chrome, not prose); tabular figures on
+               every number so a 2.5s clock cannot shift a pixel.
+   · SPACE     --strip-h: 30px, a fixed band. Height is a token because the stage
+               measures itself against it.
+   · MOTION    --t-slow: 300ms names the band ceiling the mandate sets. The strip
+               enters once, 80ms after the topbar (split + stagger); nothing in it
+               animates on tick. All of it inside prefers-reduced-motion.
+   · STATE     the count badge is deliberately the quietest thing on a tab — sand fill,
+               hairline inset, no colour of its own. A count is a fact, not a trophy. */
 :root {
   --cream: #FFF6E9;
   --parchment: #F6E8D5;
@@ -17,9 +34,15 @@
   --rose: #C47876;
   --water: #7FB0C9;
 
+  --stone: #ABA198;
+
   --t-fast: 150ms;
   --t-med: 240ms;
+  --t-slow: 300ms; /* motion band ceiling — nothing in the chrome runs longer */
   --ease-enter: cubic-bezier(0.2, 0, 0, 1);
+
+  /* status strip: one fixed band so a ticking clock can never shift the stage */
+  --strip-h: 30px;
 
   /* bitmap type: display face for identity moments, ui face for labels/controls */
   --font-display: 'Press Start 2P', 'Silkscreen', monospace;
@@ -114,6 +137,15 @@ body {
   translate: 0;
 }
 
+/* count badge on a lens tab: a fact, never a trophy — no ring, no colour of its own */
+.tab-count {
+  margin-left: 0.4rem; padding: 0 0.25rem;
+  font-family: var(--font-data); font-size: 0.68rem; font-variant-numeric: tabular-nums;
+  background: var(--sand); color: var(--deep);
+  box-shadow: inset 0 0 0 1px rgba(67, 57, 74, 0.45);
+}
+.tab.active .tab-count { background: var(--cream); }
+
 .tick-badge {
   margin-left: auto; font-family: var(--font-px); font-size: 0.78rem;
   background: var(--parchment); border-radius: 0;
@@ -140,6 +172,43 @@ body {
     to { opacity: 0.65; }
   }
 }
+
+/* ── status strip: the town's own instrument panel, under the signboard ──
+   Day, sky, and how many are still walking. Fixed height + tabular figures, so a clock
+   that changes every 2.5s never nudges the stage by a pixel. */
+.status-strip {
+  display: flex; align-items: center; gap: 0.55rem;
+  height: var(--strip-h); flex: none;
+  padding: 0 1rem; overflow: hidden;
+  background: var(--parchment) var(--grain);
+  border-bottom: 2px solid var(--ink);
+  box-shadow: inset 0 2px 0 0 var(--sand), 0 2px 0 0 rgba(36, 31, 43, 0.35);
+  font-family: var(--font-px); font-size: 0.72rem; letter-spacing: 0.03em;
+  color: var(--ink);
+  position: relative; z-index: 9;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .status-strip { animation: strip-in var(--t-slow) var(--ease-enter) backwards 80ms; }
+  @keyframes strip-in {
+    from { opacity: 0; translate: 0 -6px; }
+    to { opacity: 1; translate: 0 0; }
+  }
+}
+
+.strip-cell { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; min-width: 0; }
+/* the sky word is the one thing that may be clipped on a narrow window; the day and the
+   count never are, and nothing may push the page into a horizontal scroll */
+.strip-weather { overflow: hidden; text-overflow: ellipsis; }
+.strip-clock, .strip-people { flex: none; }
+.strip-glyph { display: block; flex: none; image-rendering: pixelated; }
+.strip-num i { font-style: normal; font-variant-numeric: tabular-nums; color: var(--deep); }
+.strip-rule {
+  width: 2px; height: 12px; flex: none;
+  background: repeating-linear-gradient(180deg, var(--stone) 0 2px, transparent 2px 4px);
+}
+.strip-weather { text-transform: uppercase; opacity: 0.85; }
+.strip-people { margin-left: auto; }
+.strip-gone { margin-left: 0.4rem; opacity: 0.7; }
 
 .stage-row { display: flex; flex: 1; min-height: 0; }
 #stage-root { flex: 1; min-width: 0; background: var(--night); position: relative; }
@@ -558,6 +627,7 @@ body {
   padding: 0.5rem 0.7rem;
   display: inline-block;
 }
+.roster-empty em { display: block; margin-top: 0.35rem; opacity: 0.75; font-size: 0.9em; }
 .roster-gone { margin-top: 0.8rem; font-style: italic; opacity: 0.75; }
 
 /* ── World Laws: the town's rulebook, and the operator's hand on it ── */

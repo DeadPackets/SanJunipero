@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { bustStyle, rosterRows } from './rosterModel.js'
+import { EMPTY_COPY } from './townStats.js'
 
 export const BUST_PX = 48
 
@@ -18,7 +19,10 @@ export function RosterPanel({ store, onPick }: { store: WorldStore; onPick: (age
     <div className="roster-panel" aria-label="Townsfolk roster">
       <h2>Townsfolk</h2>
       {alive.length === 0 ? (
-        <p className="roster-empty">No one walks the town yet — the first footsteps are still to come.</p>
+        <p className="roster-empty">
+          {EMPTY_COPY.roster}
+          <em>{EMPTY_COPY.rosterSub}</em>
+        </p>
       ) : (
         <ul className="roster-grid">
           {alive.map((row) => {

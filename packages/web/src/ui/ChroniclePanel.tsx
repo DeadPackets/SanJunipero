@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { tickToMoment } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { describeEvent } from './chronicleFormat.js'
+import { EMPTY_COPY } from './townStats.js'
 
 export const FEED_MAX = 120
 
@@ -27,7 +28,7 @@ export function ChroniclePanel({ store }: { store: WorldStore }) {
     <div className="chronicle-panel">
       <h2 className="px-title">Chronicle</h2>
       {lines.length === 0 ? (
-        <p className="feed-empty">The town has nothing to report yet — stay a while.</p>
+        <p className="feed-empty">{EMPTY_COPY.chronicle}</p>
       ) : (
         <ol className="feed" aria-live="polite">
           {lines.map((l) => {

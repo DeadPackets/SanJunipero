@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { momentToTick, tickToMoment } from '@sj/shared'
 import { createWorldStore, type WorldStore } from './state/worldStore.js'
 import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './net/socket.js'
-import { LENSES, parseRoute, routeToPath, type Lens, type Route } from './ui/route.js'
+import { parseRoute, routeToPath, type Lens, type Route } from './ui/route.js'
 import { StageMount } from './render/StageMount.js'
 import { InspectorPanel } from './ui/InspectorPanel.js'
 import { RosterPanel } from './ui/RosterPanel.js'
@@ -11,6 +11,7 @@ import { SocietyLens } from './ui/SocietyLens.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { DigestModal } from './ui/DigestModal.js'
 import { StageVeil } from './ui/StageVeil.js'
+import { LensTabs, StatusStrip } from './ui/StatusStrip.js'
 import { CameraHud } from './ui/CameraHud.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { LAST_SEEN_KEY } from './net/socket.js'
@@ -19,11 +20,6 @@ import { WorldLaws } from './panels/WorldLaws.js'
 import { LawsDashboard } from './admin/LawsDashboard.js'
 import { adminToken } from './panels/lawsModel.js'
 import type { Scene } from './render/scene.js'
-
-// chrome copy speaks about townsfolk, never machinery (spec §5)
-const LENS_LABELS: Record<Lens, string> = {
-  map: 'Town', inspector: 'Townsfolk', chronicle: 'Chronicle', society: 'Bonds', director: 'Moments', laws: 'World Laws',
-}
 
 function ScrubBanner({ store }: { store: WorldStore }) {
   const mode = useSyncExternalStore(store.subscribe, store.getMode)
@@ -126,23 +122,13 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <h1 className="px-title">San Junipero</h1>
-        <nav className="lens-tabs" aria-label="Lenses">
-          {LENSES.map((lens) => (
-            <button
-              key={lens}
-              className={lens === route.lens ? 'tab active' : 'tab'}
-              aria-current={lens === route.lens ? 'page' : undefined}
-              onClick={() => nav(lens)}
-            >
-              {LENS_LABELS[lens]}
-            </button>
-          ))}
-        </nav>
+        <LensTabs store={store} lens={route.lens} onNav={nav} />
         {link === 'reconnecting' && (
           <div className="link-pill" role="status">Reaching the town…</div>
         )}
         <TickBadge store={store} />
       </header>
+      <StatusStrip store={store} />
       <div className="stage-row">
         <main id="stage-root" className={route.lens === 'society' ? 'stage-hidden' : undefined}>
           <StageMount store={store} onScene={setScene} />

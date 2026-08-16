@@ -3,6 +3,7 @@ import ForceGraph2D from 'react-force-graph-2d'
 import { tickToMoment } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { HALO_COLOR, LINK_COLORS, toGraphData, type GraphNode, type LinkKind, type SocietyResponse } from './societyModel.js'
+import { EMPTY_COPY } from './townStats.js'
 
 export const REFETCH_MS = 30_000
 const KINDS: LinkKind[] = ['talk', 'give', 'teach', 'attack']
@@ -75,7 +76,7 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
         )}
       </div>
       {api !== null && api.links.length === 0 && (
-        <p className="society-empty">No bonds formed yet — the town is still finding itself.</p>
+        <p className="society-empty">{EMPTY_COPY.bonds}</p>
       )}
       <ForceGraph2D
         width={dims.w}
