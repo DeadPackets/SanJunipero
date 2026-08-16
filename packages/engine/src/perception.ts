@@ -1,4 +1,5 @@
 import { simTimeFromTick, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
+import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { doorTile } from './interiors.js'
 import type { Item, WorldState } from './state.js'
 import { isSpoiling } from './systems/spoilage.js'
@@ -46,8 +47,11 @@ export type PerceivedCrop = { id: string; kind: string; x: number; y: number; st
 
 export type HeardSpeech = { speakerId: string; name: string; text: string; distance: number }
 
-// Things this agent watched happen to someone else. Task 5 fills it from `item_taken`.
-export type SeenEvent = { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
+// Things this agent watched happen out in the world — a taking that was not theirs,
+// or one of the world's unexplained happenings close enough to see.
+export type SeenEvent =
+  | { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
+  | { kind: 'mystery'; mystery: string; prose: string }
 
 export type PerceptionPacket = {
   time: SimTime
@@ -102,6 +106,15 @@ function feltTagFor(agentId: string, ev: SimEvent): string | null {
     case 'agent_tended': return 'you_were_tended'
     default: return null
   }
+}
+
+// A sleeper misses it. Nothing else about a global mystery is conditional.
+function globalMysteryTag(asleep: boolean, ev: SimEvent): string | null {
+  if (asleep) return null
+  const kind = (ev.payload as { kind?: unknown } | null)?.kind
+  if (typeof kind !== 'string') return null
+  const entry = MYSTERY_BY_KIND[kind]
+  return entry !== undefined && entry.scope === 'global' ? entry.kind : null
 }
 
 const chebyshev = (x1: number, y1: number, x2: number, y2: number): number =>
@@ -250,7 +263,21 @@ export function composePerception(
     }
   }
 
-  const feltEvents = recentEvents.map(ev => feltTagFor(agentId, ev)).filter((t): t is string => t !== null)
+  // A global mystery reaches every open pair of eyes, walls and distance no object; a
+  // located one is a thing at a place, so it obeys the same horizon as everything else.
+  for (const ev of recentEvents) {
+    if (ev.type !== 'mystery_event') continue
+    const p = ev.payload as { kind?: unknown; x?: unknown; y?: unknown }
+    const entry = typeof p.kind === 'string' ? MYSTERY_BY_KIND[p.kind] : undefined
+    if (entry === undefined || entry.scope !== 'located') continue
+    if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
+    if (indoors !== null || !withinSight(p.x, p.y)) continue
+    seen.push({ kind: 'mystery', mystery: entry.kind, prose: entry.prose })
+  }
+
+  const feltEvents = recentEvents
+    .map(ev => (ev.type === 'mystery_event' ? globalMysteryTag(self.asleep, ev) : feltTagFor(agentId, ev)))
+    .filter((t): t is string => t !== null)
 
   return {
     time: simTimeFromTick(state.tick),

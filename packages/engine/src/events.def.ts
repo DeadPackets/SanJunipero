@@ -84,6 +84,10 @@ export const AgentRecovered = z.object({ agentId: z.string() }).strict()
 export const AgentTended = z.object({ agentId: z.string() }).strict()
 export const HpChanged = z.object({ agentId: z.string(), delta: z.number() }).strict()
 export const WeatherChanged = z.object({ kind: z.string(), temperatureC: z.number(), prevKind: z.string().optional() }).strict()
+// Pure sensation: no fold effect, no cause, no resolution anywhere in the world.
+export const MysteryEvent = z.object({
+  kind: z.string(), x: z.number().int().optional(), y: z.number().int().optional(),
+}).strict()
 
 export const CropPlanted = z.object({
   id: z.string(), kind: z.string(), x: z.number(), y: z.number(), plantedDay: z.number(),

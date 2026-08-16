@@ -1,4 +1,5 @@
 import type { SimTime } from '@sj/shared'
+import { MYSTERIES } from '@sj/engine'
 
 // Local mirror of the engine's PerceptionPacket (composePerception) plus the
 // two self-state booleans the bridge reconciles in (asleep/collapsed). The
@@ -80,6 +81,9 @@ export const FELT_EVENT_PROSE: Record<string, string> = {
   fire_ignited: 'Smoke stings your nose — something nearby is burning.',
   fire_spread: 'The fire is spreading; the smell of smoke grows thicker.',
   fire_extinguished: 'The smoke thins and the air clears.',
+  // The engine's table is the single copy of this prose; a mystery must read as
+  // itself and never as the generic "something changed nearby" fallback.
+  ...Object.fromEntries(MYSTERIES.filter((m) => m.scope === 'global').map((m) => [m.kind, m.prose])),
 }
 
 const UNKNOWN_FELT_PROSE = 'You sense something change nearby.'

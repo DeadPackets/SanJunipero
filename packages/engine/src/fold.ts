@@ -9,10 +9,11 @@ import {
   CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
   FireExtinguished, FireIgnited, FireSpread, HpChanged,
   ItemBroke, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
-  ItemTextChanged, ItemWorn, NeedChanged,
+  ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
+import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { occupantsOf } from './interiors.js'
 import { pairKey } from './systems/reproduction.js'
 import { findPath } from './path.js'
@@ -369,6 +370,13 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
         ...state,
         pairNights: { ...state.pairNights, [key]: { nights, lastNightDay: p.day, formedTick, dissolvedTick } },
       }
+    }
+    // Nothing changes. The payload is checked so a replay cannot invent a happening
+    // the table never authored, and the state is returned untouched, same object.
+    case 'mystery_event': {
+      const p = MysteryEvent.parse(event.payload)
+      if (MYSTERY_BY_KIND[p.kind] === undefined) throw new Error(`mystery_event for unknown mystery ${p.kind}`)
+      return state
     }
     case 'weather_changed': {
       const p = WeatherChanged.parse(event.payload)

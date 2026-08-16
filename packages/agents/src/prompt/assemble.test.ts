@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { MYSTERIES } from '@sj/engine'
 import { assemblePrompt, compactDayLog, type PromptBlocks } from './assemble.js'
 import { FELT_EVENT_PROSE, perceptionToProse } from './prose.js'
 import { FORBIDDEN_FRAMING, RULES_OF_BEING } from './rulesOfBeing.js'
@@ -125,6 +126,16 @@ describe('perceptionToProse', () => {
       expect(prose).toContain(FELT_EVENT_PROSE[tag])
       expect(alert).not.toHaveBeenCalled()
     }
+  })
+
+  it('renders every global mystery as its authored sensation, never the fallback, never framed', () => {
+    for (const m of MYSTERIES.filter((x) => x.scope === 'global')) {
+      const alert = vi.fn()
+      const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: [m.kind] }, alert)
+      expect(prose).toContain(m.prose)
+      expect(alert).not.toHaveBeenCalled()
+    }
+    for (const m of MYSTERIES) expect(m.prose).not.toMatch(FORBIDDEN_FRAMING)
   })
 
   it('renders an unknown felt tag to the generic sentence and alerts', () => {
