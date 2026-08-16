@@ -1,563 +1,563 @@
 {
-  "generatedAt": "2026-08-16T15:08:08.720Z",
+  "generatedAt": "2026-08-16T16:00:29.193Z",
   "model": "deepseek/deepseek-v4-flash-0731",
   "totalTicks": 5760,
   "realMsPerTick": 250,
   "capUsd": 8,
   "expectedCallCostUsd": 0.005,
-  "totalCostUsd": 1.3964359080000002,
+  "totalCostUsd": 1.581486536,
   "costByCaller": {
-    "arbiter": 0.00835758,
-    "naming": 0.00024836,
-    "reflection": 0.300367396,
-    "turn": 1.0874625720000002
+    "arbiter": 0.0024722040000000004,
+    "naming": 0.0003393600000000001,
+    "reflection": 0.35463769600000006,
+    "turn": 1.2240372760000002
   },
-  "llmCallCount": 1294,
+  "llmCallCount": 911,
   "excerpts": {
-    "childThought": "Aye, night's settled in. Nothing more to be done outside today. The work's done; the walls are up.",
+    "childThought": "The wheat is under my feet. Cass is talking, but the work is pulling it.",
     "motherBirthLine": "You have borne a daughter. The town rolls will know her as Talia — what do you call her?",
-    "ownershipProse": "It is morning on day 1 of spring. You stand at (10, 12). The sun is out. The air is mild. Bex (bex) stands at (10, 13). Cass (cass) stands at (14, 12). Dov (dov) stands at (18, 12). Esen (esen) stands at (22, 12). A hut (structure_1) stands at (10, 10), 2 tiles wide and 2 tiles tall; you could stand beside it at (10, 12). A hut (structure_2) stands at (14, 10), 2 tiles wide and 2 tiles tall; you could stand beside it at (13, 12). A hut (structure_3) stands at (18, 10), 2 tiles wide and 2 tiles tall; you could stand beside it at (17, 12). A storehouse (structure_5) stands at (12, 15), 2 tiles wide and 2 tiles tall; you could stand beside it at (11, 14). A campfire (structure_6) stands at (17, 15), one tile wide — it is burning; you could stand beside it at (16, 14). You can see 3 plank (item_6) at (16, 12) — Bex's, marked by Bex. You are carrying 2 bread (item_1).",
+    "ownershipProse": "It is morning on day 1 of spring. You stand at (10, 12). The sun is out. The air is mild. Bex (bex) stands at (10, 13). Cass (cass) stands at (14, 12). Dov (dov) stands at (18, 12). Esen (esen) stands at (22, 12). A hut (structure_1) stands at (10, 10), 2 tiles wide and 2 tiles tall; you could stand beside it at (10, 12). A hut (structure_2) stands at (14, 10), 2 tiles wide and 2 tiles tall; you could stand beside it at (13, 12). A hut (structure_3) stands at (18, 10), 2 tiles wide and 2 tiles tall; you could stand beside it at (17, 12). A storehouse (structure_5) stands at (12, 15), 2 tiles wide and 2 tiles tall; you could stand beside it at (11, 14). A campfire (structure_6) stands at (17, 15), one tile wide — it is burning; you could stand beside it at (16, 14). A weir (structure_7) stands at (18, 17), one tile wide; you could stand beside it at (17, 16). You can see 3 plank (item_17) at (16, 12) — Bex's, marked by Bex. You can see 12 clay (item_23) at (17, 16). You can see 8 clay (item_24) at (20, 16). You can see 8 fiber (item_25) at (12, 13). You can see 6 fiber (item_26) at (20, 13). You can see 6 branch (item_28) at (16, 13). You can see 8 stone (item_29) at (15, 13). You can see 6 stone (item_30) at (19, 16). You can see wheat (crop_1) at (9, 14). You can see wheat (crop_2) at (11, 14). You can see wheat (crop_3) at (15, 14). You can see wheat (crop_4) at (19, 14). You can see wheat (crop_5) at (21, 14). You are carrying 2 bread (item_1). You are carrying 2 clay (item_2). You are carrying 2 fiber (item_3).",
     "witnessProse": null
   },
   "evidence": {
     "ticksRun": 5760,
     "crashAlerts": 0,
-    "drainedIntents": 0,
+    "drainedIntents": 6,
     "drainedAgainCount": 0,
     "minds": [
       {
         "agentId": "ada",
-        "turns": 132,
-        "reflections": 4
+        "turns": 117,
+        "reflections": 3
       },
       {
         "agentId": "bex",
-        "turns": 214,
-        "reflections": 4
+        "turns": 96,
+        "reflections": 2
       },
       {
         "agentId": "cass",
-        "turns": 138,
+        "turns": 94,
         "reflections": 3
       },
       {
         "agentId": "dov",
-        "turns": 194,
+        "turns": 120,
         "reflections": 4
       },
       {
         "agentId": "esen",
-        "turns": 200,
+        "turns": 104,
         "reflections": 3
       },
       {
-        "agentId": "agent_11",
-        "turns": 140,
+        "agentId": "agent_31",
+        "turns": 68,
         "reflections": 3
       }
     ],
     "child": {
-      "id": "agent_11",
+      "id": "agent_31",
       "registryName": "Talia",
-      "socialName": "Tali",
+      "socialName": "Talia",
       "bornTick": 1440,
-      "turns": 140,
+      "turns": 68,
       "personaNamesBothParents": true,
-      "seedEntries": 34,
+      "seedEntries": 20,
       "seedAllPublic": true,
       "motherBirthMemoryTick": 1440,
-      "motherTurnTickAfterBirth": 1481
+      "motherTurnTickAfterBirth": 1877
     },
-    "novelIntents": 38,
+    "novelIntents": 6,
     "codifiedVerbs": [],
     "repeatIntent": null,
     "repeatArbiterCalls": 0,
     "unknownVerbRejections": 0,
     "unknownVerbRefusalMemories": 0,
     "adjudicationsAfterUnknownVerb": 0,
-    "reflectionsStarted": 21,
-    "reflectionsResolved": 21,
-    "reflectionFallbacks": 4,
+    "reflectionsStarted": 18,
+    "reflectionsResolved": 18,
+    "reflectionFallbacks": 7,
     "spendProjections": [
       {
         "tick": 480,
-        "usdPerSimDay": 0.028634256000000004,
-        "sampledCalls": 20
+        "usdPerSimDay": 0.010363360000000002,
+        "sampledCalls": 6
       },
       {
         "tick": 540,
-        "usdPerSimDay": 0.08539048,
-        "sampledCalls": 39
+        "usdPerSimDay": 0.010363360000000002,
+        "sampledCalls": 6
       },
       {
         "tick": 600,
-        "usdPerSimDay": 0.155397312,
-        "sampledCalls": 54
+        "usdPerSimDay": 0.024652096000000005,
+        "sampledCalls": 12
       },
       {
         "tick": 660,
-        "usdPerSimDay": 0.16536699200000002,
-        "sampledCalls": 56
+        "usdPerSimDay": 0.03924558400000001,
+        "sampledCalls": 17
       },
       {
         "tick": 720,
-        "usdPerSimDay": 0.20259859200000002,
-        "sampledCalls": 61
+        "usdPerSimDay": 0.066103744,
+        "sampledCalls": 24
       },
       {
         "tick": 780,
-        "usdPerSimDay": 0.24270993600000001,
-        "sampledCalls": 68
+        "usdPerSimDay": 0.089467952,
+        "sampledCalls": 29
       },
       {
         "tick": 840,
-        "usdPerSimDay": 0.257422144,
-        "sampledCalls": 73
+        "usdPerSimDay": 0.12256764800000002,
+        "sampledCalls": 35
       },
       {
         "tick": 900,
-        "usdPerSimDay": 0.284559968,
-        "sampledCalls": 78
+        "usdPerSimDay": 0.14776328000000002,
+        "sampledCalls": 39
       },
       {
         "tick": 960,
-        "usdPerSimDay": 0.29073676800000003,
-        "sampledCalls": 79
+        "usdPerSimDay": 0.17928982400000001,
+        "sampledCalls": 44
       },
       {
         "tick": 1020,
-        "usdPerSimDay": 0.33862248,
-        "sampledCalls": 87
+        "usdPerSimDay": 0.21465651200000002,
+        "sampledCalls": 49
       },
       {
         "tick": 1080,
-        "usdPerSimDay": 0.38353492800000005,
-        "sampledCalls": 97
+        "usdPerSimDay": 0.26959912,
+        "sampledCalls": 56
       },
       {
         "tick": 1140,
-        "usdPerSimDay": 0.41907846400000004,
-        "sampledCalls": 107
+        "usdPerSimDay": 0.30525398400000003,
+        "sampledCalls": 61
       },
       {
         "tick": 1200,
-        "usdPerSimDay": 0.46181699200000004,
-        "sampledCalls": 114
+        "usdPerSimDay": 0.324842336,
+        "sampledCalls": 64
       },
       {
         "tick": 1260,
-        "usdPerSimDay": 0.494216688,
-        "sampledCalls": 120
+        "usdPerSimDay": 0.34201832000000004,
+        "sampledCalls": 68
       },
       {
         "tick": 1320,
-        "usdPerSimDay": 0.511164976,
-        "sampledCalls": 123
+        "usdPerSimDay": 0.36666884800000005,
+        "sampledCalls": 71
       },
       {
         "tick": 1380,
-        "usdPerSimDay": 0.523012896,
-        "sampledCalls": 130
+        "usdPerSimDay": 0.396842768,
+        "sampledCalls": 75
       },
       {
         "tick": 1440,
-        "usdPerSimDay": 0.5407457440000001,
-        "sampledCalls": 134
+        "usdPerSimDay": 0.42376320000000006,
+        "sampledCalls": 79
       },
       {
         "tick": 1500,
-        "usdPerSimDay": 0.5773891200000001,
-        "sampledCalls": 144
+        "usdPerSimDay": 0.45746848000000007,
+        "sampledCalls": 84
       },
       {
         "tick": 1560,
-        "usdPerSimDay": 0.6036424800000001,
-        "sampledCalls": 157
+        "usdPerSimDay": 0.48606499200000003,
+        "sampledCalls": 89
       },
       {
         "tick": 1620,
-        "usdPerSimDay": 0.647255392,
-        "sampledCalls": 170
+        "usdPerSimDay": 0.51486736,
+        "sampledCalls": 93
       },
       {
         "tick": 1680,
-        "usdPerSimDay": 0.692585152,
-        "sampledCalls": 182
+        "usdPerSimDay": 0.5457042080000001,
+        "sampledCalls": 98
       },
       {
         "tick": 1740,
-        "usdPerSimDay": 0.7511732480000001,
-        "sampledCalls": 196
+        "usdPerSimDay": 0.574236544,
+        "sampledCalls": 103
       },
       {
         "tick": 1800,
-        "usdPerSimDay": 0.8057814240000001,
-        "sampledCalls": 208
+        "usdPerSimDay": 0.602344736,
+        "sampledCalls": 107
       },
       {
         "tick": 1860,
-        "usdPerSimDay": 0.8711065440000001,
-        "sampledCalls": 230
+        "usdPerSimDay": 0.660516976,
+        "sampledCalls": 114
       },
       {
         "tick": 1920,
-        "usdPerSimDay": 0.9328624480000001,
-        "sampledCalls": 252
+        "usdPerSimDay": 0.689276336,
+        "sampledCalls": 120
       },
       {
         "tick": 1980,
-        "usdPerSimDay": 0.9934358560000001,
-        "sampledCalls": 273
+        "usdPerSimDay": 0.7108502240000001,
+        "sampledCalls": 126
       },
       {
         "tick": 2040,
-        "usdPerSimDay": 1.0363004960000002,
-        "sampledCalls": 285
+        "usdPerSimDay": 0.731372208,
+        "sampledCalls": 130
       },
       {
         "tick": 2100,
-        "usdPerSimDay": 1.1141707360000002,
-        "sampledCalls": 297
+        "usdPerSimDay": 0.7613520320000001,
+        "sampledCalls": 136
       },
       {
         "tick": 2160,
-        "usdPerSimDay": 1.1580172800000001,
-        "sampledCalls": 309
+        "usdPerSimDay": 0.7992294240000001,
+        "sampledCalls": 143
       },
       {
         "tick": 2220,
-        "usdPerSimDay": 1.1963939680000002,
-        "sampledCalls": 317
+        "usdPerSimDay": 0.8264793600000001,
+        "sampledCalls": 148
       },
       {
         "tick": 2280,
-        "usdPerSimDay": 1.238933472,
-        "sampledCalls": 329
+        "usdPerSimDay": 0.8629555200000001,
+        "sampledCalls": 155
       },
       {
         "tick": 2340,
-        "usdPerSimDay": 1.2933170880000002,
-        "sampledCalls": 344
+        "usdPerSimDay": 0.9269581440000001,
+        "sampledCalls": 164
       },
       {
         "tick": 2400,
-        "usdPerSimDay": 1.3224828960000001,
-        "sampledCalls": 353
+        "usdPerSimDay": 0.9743896960000001,
+        "sampledCalls": 171
       },
       {
         "tick": 2460,
-        "usdPerSimDay": 1.35238768,
-        "sampledCalls": 362
+        "usdPerSimDay": 1.01804752,
+        "sampledCalls": 177
       },
       {
         "tick": 2520,
-        "usdPerSimDay": 1.3913105920000002,
-        "sampledCalls": 373
+        "usdPerSimDay": 1.062953808,
+        "sampledCalls": 183
       },
       {
         "tick": 2580,
-        "usdPerSimDay": 1.416581488,
-        "sampledCalls": 382
+        "usdPerSimDay": 1.0992785440000001,
+        "sampledCalls": 188
       },
       {
         "tick": 2640,
-        "usdPerSimDay": 1.4549507840000002,
-        "sampledCalls": 391
+        "usdPerSimDay": 1.1322062080000002,
+        "sampledCalls": 193
       },
       {
         "tick": 2700,
-        "usdPerSimDay": 1.478045744,
-        "sampledCalls": 399
+        "usdPerSimDay": 1.17568752,
+        "sampledCalls": 199
       },
       {
         "tick": 2760,
-        "usdPerSimDay": 1.4889900480000002,
-        "sampledCalls": 403
+        "usdPerSimDay": 1.1922209600000002,
+        "sampledCalls": 201
       },
       {
         "tick": 2820,
-        "usdPerSimDay": 1.5453219040000001,
-        "sampledCalls": 412
+        "usdPerSimDay": 1.234638496,
+        "sampledCalls": 207
       },
       {
         "tick": 2880,
-        "usdPerSimDay": 1.5936661440000002,
-        "sampledCalls": 423
+        "usdPerSimDay": 1.271850608,
+        "sampledCalls": 212
       },
       {
         "tick": 2940,
-        "usdPerSimDay": 1.6734273920000002,
-        "sampledCalls": 440
+        "usdPerSimDay": 1.3219858400000002,
+        "sampledCalls": 219
       },
       {
         "tick": 3000,
-        "usdPerSimDay": 1.744344448,
-        "sampledCalls": 457
+        "usdPerSimDay": 1.364191136,
+        "sampledCalls": 225
       },
       {
         "tick": 3060,
-        "usdPerSimDay": 1.8030297600000003,
-        "sampledCalls": 469
+        "usdPerSimDay": 1.4237977600000002,
+        "sampledCalls": 233
       },
       {
         "tick": 3120,
-        "usdPerSimDay": 1.8711971040000002,
-        "sampledCalls": 483
+        "usdPerSimDay": 1.4708554560000002,
+        "sampledCalls": 241
       },
       {
         "tick": 3180,
-        "usdPerSimDay": 2.017017408,
-        "sampledCalls": 505
+        "usdPerSimDay": 1.5194515840000002,
+        "sampledCalls": 249
       },
       {
         "tick": 3240,
-        "usdPerSimDay": 2.115855616,
-        "sampledCalls": 519
+        "usdPerSimDay": 1.593344816,
+        "sampledCalls": 260
       },
       {
         "tick": 3300,
-        "usdPerSimDay": 2.187801952,
-        "sampledCalls": 540
+        "usdPerSimDay": 1.6230169760000002,
+        "sampledCalls": 265
       },
       {
         "tick": 3360,
-        "usdPerSimDay": 2.234080912,
-        "sampledCalls": 558
+        "usdPerSimDay": 1.6721803840000002,
+        "sampledCalls": 272
       },
       {
         "tick": 3420,
-        "usdPerSimDay": 2.3065621600000004,
-        "sampledCalls": 580
+        "usdPerSimDay": 1.724195536,
+        "sampledCalls": 281
       },
       {
         "tick": 3480,
-        "usdPerSimDay": 2.4052099680000003,
-        "sampledCalls": 605
+        "usdPerSimDay": 1.758994608,
+        "sampledCalls": 288
       },
       {
         "tick": 3540,
-        "usdPerSimDay": 2.4849409760000003,
-        "sampledCalls": 627
+        "usdPerSimDay": 1.8088706720000003,
+        "sampledCalls": 298
       },
       {
         "tick": 3600,
-        "usdPerSimDay": 2.5652996320000003,
-        "sampledCalls": 646
+        "usdPerSimDay": 1.839116608,
+        "sampledCalls": 305
       },
       {
         "tick": 3660,
-        "usdPerSimDay": 2.639185024,
-        "sampledCalls": 661
+        "usdPerSimDay": 1.8984313600000002,
+        "sampledCalls": 315
       },
       {
         "tick": 3720,
-        "usdPerSimDay": 2.7128974880000003,
-        "sampledCalls": 678
+        "usdPerSimDay": 1.9285994560000002,
+        "sampledCalls": 321
       },
       {
         "tick": 3780,
-        "usdPerSimDay": 2.7756932,
-        "sampledCalls": 693
+        "usdPerSimDay": 1.9667584160000002,
+        "sampledCalls": 327
       },
       {
         "tick": 3840,
-        "usdPerSimDay": 2.8435335040000003,
-        "sampledCalls": 709
+        "usdPerSimDay": 2.0046556320000004,
+        "sampledCalls": 333
       },
       {
         "tick": 3900,
-        "usdPerSimDay": 2.8994362880000004,
-        "sampledCalls": 720
+        "usdPerSimDay": 2.03712376,
+        "sampledCalls": 338
       },
       {
         "tick": 3960,
-        "usdPerSimDay": 2.9850317280000005,
-        "sampledCalls": 738
+        "usdPerSimDay": 2.0674011680000004,
+        "sampledCalls": 343
       },
       {
         "tick": 4020,
-        "usdPerSimDay": 3.0645155520000005,
-        "sampledCalls": 751
+        "usdPerSimDay": 2.1063762720000003,
+        "sampledCalls": 348
       },
       {
         "tick": 4080,
-        "usdPerSimDay": 3.1312688960000004,
-        "sampledCalls": 751
+        "usdPerSimDay": 2.124046288,
+        "sampledCalls": 347
       },
       {
         "tick": 4140,
-        "usdPerSimDay": 3.149948144,
-        "sampledCalls": 751
+        "usdPerSimDay": 2.145357648,
+        "sampledCalls": 350
       },
       {
         "tick": 4200,
-        "usdPerSimDay": 3.16049608,
-        "sampledCalls": 757
+        "usdPerSimDay": 2.16819904,
+        "sampledCalls": 349
       },
       {
         "tick": 4260,
-        "usdPerSimDay": 3.2435121600000003,
-        "sampledCalls": 771
+        "usdPerSimDay": 2.175677616,
+        "sampledCalls": 346
       },
       {
         "tick": 4320,
-        "usdPerSimDay": 3.2652608800000005,
-        "sampledCalls": 777
+        "usdPerSimDay": 2.180600016,
+        "sampledCalls": 344
       },
       {
         "tick": 4380,
-        "usdPerSimDay": 3.310142304,
-        "sampledCalls": 784
+        "usdPerSimDay": 2.1999286400000004,
+        "sampledCalls": 346
       },
       {
         "tick": 4440,
-        "usdPerSimDay": 3.3724716480000003,
-        "sampledCalls": 792
+        "usdPerSimDay": 2.2138094720000003,
+        "sampledCalls": 347
       },
       {
         "tick": 4500,
-        "usdPerSimDay": 3.4423285120000005,
-        "sampledCalls": 800
+        "usdPerSimDay": 2.230943792,
+        "sampledCalls": 348
       },
       {
         "tick": 4560,
-        "usdPerSimDay": 3.5422931040000005,
-        "sampledCalls": 809
+        "usdPerSimDay": 2.226921872,
+        "sampledCalls": 348
       },
       {
         "tick": 4620,
-        "usdPerSimDay": 3.6438619840000004,
-        "sampledCalls": 823
+        "usdPerSimDay": 2.241152816,
+        "sampledCalls": 350
       },
       {
         "tick": 4680,
-        "usdPerSimDay": 3.7102634240000003,
-        "sampledCalls": 828
+        "usdPerSimDay": 2.3071518400000004,
+        "sampledCalls": 355
       },
       {
         "tick": 4740,
-        "usdPerSimDay": 3.7540516160000004,
-        "sampledCalls": 843
+        "usdPerSimDay": 2.34450664,
+        "sampledCalls": 361
       },
       {
         "tick": 4800,
-        "usdPerSimDay": 3.7801081920000006,
-        "sampledCalls": 855
+        "usdPerSimDay": 2.420106976,
+        "sampledCalls": 374
       },
       {
         "tick": 4860,
-        "usdPerSimDay": 3.8305592640000006,
-        "sampledCalls": 872
+        "usdPerSimDay": 2.4651297440000004,
+        "sampledCalls": 386
       },
       {
         "tick": 4920,
-        "usdPerSimDay": 3.8733492000000003,
-        "sampledCalls": 882
+        "usdPerSimDay": 2.532493376,
+        "sampledCalls": 400
       },
       {
         "tick": 4980,
-        "usdPerSimDay": 3.9536396480000002,
-        "sampledCalls": 898
+        "usdPerSimDay": 2.6631287200000004,
+        "sampledCalls": 423
       },
       {
         "tick": 5040,
-        "usdPerSimDay": 3.9530050560000003,
-        "sampledCalls": 902
+        "usdPerSimDay": 2.799330352,
+        "sampledCalls": 443
       },
       {
         "tick": 5100,
-        "usdPerSimDay": 3.9942437920000002,
-        "sampledCalls": 906
+        "usdPerSimDay": 2.896408704,
+        "sampledCalls": 458
       },
       {
         "tick": 5160,
-        "usdPerSimDay": 4.016631360000001,
-        "sampledCalls": 905
+        "usdPerSimDay": 2.9804127360000003,
+        "sampledCalls": 472
       },
       {
         "tick": 5220,
-        "usdPerSimDay": 4.031702640000001,
-        "sampledCalls": 907
+        "usdPerSimDay": 3.0962646400000002,
+        "sampledCalls": 488
       },
       {
         "tick": 5280,
-        "usdPerSimDay": 4.025850864000001,
-        "sampledCalls": 904
+        "usdPerSimDay": 3.217979296,
+        "sampledCalls": 506
       },
       {
         "tick": 5340,
-        "usdPerSimDay": 4.014711008000001,
-        "sampledCalls": 911
+        "usdPerSimDay": 3.2908145760000003,
+        "sampledCalls": 516
       },
       {
         "tick": 5400,
-        "usdPerSimDay": 3.9899177920000004,
-        "sampledCalls": 903
+        "usdPerSimDay": 3.357119808,
+        "sampledCalls": 527
       },
       {
         "tick": 5460,
-        "usdPerSimDay": 3.9710319040000006,
-        "sampledCalls": 891
+        "usdPerSimDay": 3.4483242080000003,
+        "sampledCalls": 541
       },
       {
         "tick": 5520,
-        "usdPerSimDay": 3.9406601920000006,
-        "sampledCalls": 879
+        "usdPerSimDay": 3.540308464,
+        "sampledCalls": 552
       },
       {
         "tick": 5580,
-        "usdPerSimDay": 3.9460210720000006,
-        "sampledCalls": 878
+        "usdPerSimDay": 3.6367785440000002,
+        "sampledCalls": 564
       },
       {
         "tick": 5640,
-        "usdPerSimDay": 3.9748449440000004,
-        "sampledCalls": 887
+        "usdPerSimDay": 3.7357305440000004,
+        "sampledCalls": 576
       },
       {
         "tick": 5700,
-        "usdPerSimDay": 3.9902466240000005,
-        "sampledCalls": 892
+        "usdPerSimDay": 3.8230736320000003,
+        "sampledCalls": 587
       },
       {
         "tick": 5760,
-        "usdPerSimDay": 4.024523664,
-        "sampledCalls": 900
+        "usdPerSimDay": 3.9993677920000006,
+        "sampledCalls": 607
       },
       {
         "tick": 5820,
-        "usdPerSimDay": 4.020382352,
-        "sampledCalls": 901
+        "usdPerSimDay": 4.080011488,
+        "sampledCalls": 613
       },
       {
         "tick": 5880,
-        "usdPerSimDay": 4.012830752,
-        "sampledCalls": 901
+        "usdPerSimDay": 4.152279376,
+        "sampledCalls": 616
       },
       {
         "tick": 5940,
-        "usdPerSimDay": 4.032085792,
-        "sampledCalls": 896
+        "usdPerSimDay": 4.291617008,
+        "sampledCalls": 624
       },
       {
         "tick": 6000,
-        "usdPerSimDay": 4.034583504,
-        "sampledCalls": 897
+        "usdPerSimDay": 4.458530384,
+        "sampledCalls": 639
       },
       {
         "tick": 6060,
-        "usdPerSimDay": 4.057411904,
-        "sampledCalls": 898
+        "usdPerSimDay": 4.549098736,
+        "sampledCalls": 655
       },
       {
         "tick": 6120,
-        "usdPerSimDay": 4.062116576,
-        "sampledCalls": 894
+        "usdPerSimDay": 4.697281344,
+        "sampledCalls": 670
       },
       {
         "tick": 6180,
-        "usdPerSimDay": 4.063202192,
-        "sampledCalls": 896
+        "usdPerSimDay": 4.893775488,
+        "sampledCalls": 693
       }
     ],
     "forcedSpendAlert": true,
@@ -566,47 +566,47 @@
       {
         "agentId": "ada",
         "budgetTypical": 9,
-        "utterances": 53,
-        "meanWords": 4.113207547169812,
-        "medianWords": 4
+        "utterances": 23,
+        "meanWords": 4.043478260869565,
+        "medianWords": 2
       },
       {
         "agentId": "bex",
         "budgetTypical": 14,
-        "utterances": 33,
-        "meanWords": 10.272727272727273,
-        "medianWords": 10
+        "utterances": 21,
+        "meanWords": 8.142857142857142,
+        "medianWords": 8
       },
       {
         "agentId": "cass",
         "budgetTypical": 20,
-        "utterances": 12,
-        "meanWords": 15.166666666666666,
-        "medianWords": 13
+        "utterances": 21,
+        "meanWords": 15.238095238095237,
+        "medianWords": 16
       },
       {
         "agentId": "dov",
         "budgetTypical": 28,
-        "utterances": 20,
-        "meanWords": 12.6,
-        "medianWords": 11.5
+        "utterances": 18,
+        "meanWords": 10.444444444444445,
+        "medianWords": 9.5
       },
       {
         "agentId": "esen",
         "budgetTypical": 26,
-        "utterances": 41,
-        "meanWords": 15.341463414634147,
-        "medianWords": 15
+        "utterances": 45,
+        "meanWords": 13.377777777777778,
+        "medianWords": 12
       },
       {
-        "agentId": "agent_11",
+        "agentId": "agent_31",
         "budgetTypical": 12,
-        "utterances": 49,
-        "meanWords": 5.489795918367347,
-        "medianWords": 4
+        "utterances": 7,
+        "meanWords": 5.285714285714286,
+        "medianWords": 5
       }
     ],
-    "ownershipPhraseCount": 329,
+    "ownershipPhraseCount": 273,
     "witnessProseCount": 0,
     "theftCount": 0,
     "adminPostStatus": 202,
