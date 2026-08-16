@@ -3,7 +3,7 @@ import { EventEnvelope } from './events.js'
 import { AssetRecordSchema } from './assetCodex.js'
 import { MINUTES_PER_DAY } from './time.js'
 
-export const PROTOCOL_VERSION = 1
+export const PROTOCOL_VERSION = 2 // 2: ServerSnapshot.laws is required — a v1 client parses no snapshot
 const tick = z.number().int().nonnegative()
 
 export const ClientHello = z.object({ t: z.literal('hello'), v: z.number().int(), lastSeenTick: tick.nullable() }).strict()
