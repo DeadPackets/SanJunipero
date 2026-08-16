@@ -189,6 +189,7 @@ async function setup(opts: {
   embedder?: { embed(t: string): Promise<Float32Array> }
   maxRetries?: number
   simConfig?: SimConfig
+  onThought?: (t: { tick: number; agentId: string; text: string }) => void
 }) {
   const world = buildWorld(opts.simConfig)
   const worldTick = createWorldTick(world.config, world.rng)
@@ -221,6 +222,7 @@ async function setup(opts: {
     config: opts.mindConfig,
     reflectionLlm: opts.reflectionLlm,
     dreamLlm: opts.dreamLlm,
+    onThought: opts.onThought,
   })
   runtime.start(AGENT)
   const mem = new MemoryStore(agentDb, AGENT, embedder)
@@ -687,5 +689,18 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     }
     expect(runtime.stats().turns).toBe(0)
     expect(alertKinds(agentDb).filter((k) => k === 'turn_crash')).toHaveLength(1)
+  })
+
+  it('fires the optional onThought hook once per turn with tick, agentId, and the turn thought', async () => {
+    const seen: Array<{ tick: number; agentId: string; text: string }> = []
+    const { loop, runtime } = await setup({
+      model: turnModel([BENIGN_TURN]),
+      mindConfig: FAST_MIND,
+      onThought: (t) => seen.push(t),
+    })
+    await stepUntil(loop, () => seen.length >= 1, 100)
+    expect(runtime.stats().turns).toBeGreaterThanOrEqual(1)
+    expect(seen[0]).toEqual({ tick: expect.any(Number), agentId: AGENT, text: 'I rest.' })
+    expect(seen[0]!.tick).toBeGreaterThan(0)
   })
 })

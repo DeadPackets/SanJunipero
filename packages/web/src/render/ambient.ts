@@ -1,0 +1,303 @@
+import { Container, Graphics, Sprite, Texture } from 'pixi.js'
+import { simTimeFromTick } from '@sj/shared'
+import type { TileId } from '@sj/engine/state'
+import type { WorldStore } from '../state/worldStore.js'
+import { tileToScreen, TILE_H } from './iso.js'
+import type { Scene } from './scene.js'
+import type { WeatherLayer } from './weatherFx.js'
+import type { BubbleLayer } from './bubbles.js'
+import type { CharacterLayer } from './characters.js'
+import { entitySpriteOf } from './entities.js'
+import { isGrave, toneReducer } from './tone.js'
+
+export const SMOKE_PUFFS = 3
+export const SMOKE_RISE_PX = 14
+export const SMOKE_LOOP_MS = 2400
+export const SHIMMER_MAX = 60
+export const SHIMMER_HZ = 0.5
+export const TREES_MAX = 80
+export const TREE_SKEW = 0.06
+export const GLOW_PX = 6
+export const GLOW_COLOR = 0xf4e289
+export const GLOW_HZ = 0.4
+export const BOUNCE_MS = 260
+export const BOUNCE_SCALE = 1.18
+export const SQUASH_Y = 0.92
+export const SQUASH_HZ = 0.3
+export const SQUASH_VERBS = ['build', 'till', 'harvest', 'fish'] as const
+export const BIRD_MIN_S = 20
+export const BIRD_MAX_S = 45
+export const FIRE_COLOR = 0xf7a66b
+export const FIRE_HZ = 7
+export const FIRE_FROZEN_ALPHA = 0.6
+
+const WATER: TileId = 2
+const FOREST: TileId = 3
+
+export type AmbientDirector = { tick(dtMs: number): void; setTone(grave: boolean): void; destroy(): void }
+
+export function createAmbient(
+  scene: Scene,
+  store: WorldStore,
+  layers: { weather: WeatherLayer; bubbles: BubbleLayer; chars?: CharacterLayer },
+): AmbientDirector {
+  // under-layer between ground and entities for shimmer + canopies
+  const under = new Container()
+  under.eventMode = 'none' // decorative layers must never swallow stage hit-tests
+  scene.world.addChildAt(under, 1)
+
+  const px = (w: number, h: number, color: number): Texture => {
+    const g = new Graphics()
+    g.rect(0, 0, w, h)
+    g.fill(color)
+    const t = scene.app.renderer.generateTexture(g)
+    g.destroy()
+    return t
+  }
+  const puffTex = px(8, 8, 0xfff6e9)
+  const shimmerTex = px(2, 2, 0xffffff)
+  const glowTex = px(GLOW_PX, GLOW_PX, GLOW_COLOR)
+  const birdTex = px(3, 2, 0x241f2b)
+  const canopyTex = px(12, 20, 0x6f9455)
+  const fireTex = px(10, 12, FIRE_COLOR)
+
+  let t = 0 // director clock — freezes under grave tone, so every animator stills mid-frame
+  let grave = false
+  let tone = { graveUntil: 0 }
+
+  const offEvents = store.onEvents((evts) => {
+    tone = toneReducer(tone, evts, store.getTick())
+    for (const ev of evts) {
+      if (ev.type === 'structure_completed' || ev.type === 'item_spawned') {
+        const p = ev.payload as { id: string }
+        bounces.push({ kind: ev.type === 'structure_completed' ? 'structure' : 'item', id: p.id, at: t })
+      }
+    }
+  })
+
+  // ── per-structure effect sprites ──
+  const smoke = new Map<string, Sprite[]>()
+  const glows = new Map<string, Sprite>()
+  const fires = new Map<string, Sprite>()
+  const bounces: Array<{ kind: 'structure' | 'item'; id: string; at: number }> = []
+  const bounceBase = new Map<string, { x: number; y: number }>()
+
+  // ── sampled terrain sprites ──
+  let sampledTerrain: TileId[][] | null = null
+  const shimmers: Array<{ sprite: Sprite; phase: number }> = []
+  const trees: Array<{ sprite: Sprite; phase: number }> = []
+
+  const sampleTerrain = (terrain: TileId[][]): void => {
+    for (const s of shimmers) s.sprite.destroy()
+    for (const s of trees) s.sprite.destroy()
+    shimmers.length = 0
+    trees.length = 0
+    for (let y = 0; y < terrain.length && shimmers.length < SHIMMER_MAX; y++)
+      for (let x = 0; x < terrain[y]!.length && shimmers.length < SHIMMER_MAX; x++)
+        if (terrain[y]![x] === WATER) {
+          const sprite = new Sprite(shimmerTex)
+          const { sx, sy } = tileToScreen(x, y)
+          sprite.position.set(sx - 1, sy + TILE_H / 2)
+          under.addChild(sprite)
+          shimmers.push({ sprite, phase: ((x * 7 + y * 13) % 628) / 100 }) // deterministic phase, no RNG
+        }
+    for (let y = 0; y < terrain.length && trees.length < TREES_MAX; y++)
+      for (let x = 0; x < terrain[y]!.length && trees.length < TREES_MAX; x++)
+        if (terrain[y]![x] === FOREST) {
+          const sprite = new Sprite(canopyTex)
+          sprite.anchor.set(0.5, 1)
+          const { sx, sy } = tileToScreen(x, y)
+          sprite.position.set(sx, sy + TILE_H / 2)
+          under.addChild(sprite)
+          trees.push({ sprite, phase: ((x * 7 + y * 13) % 628) / 100 })
+        }
+  }
+
+  // ── birds: a 3-sprite V gliding the sky band (viewer-side random — presentation only) ──
+  const birdV = new Container()
+  for (const [bx, by] of [[0, 0], [-6, 4], [6, 4]] as const) {
+    const b = new Sprite(birdTex)
+    b.position.set(bx, by)
+    birdV.addChild(b)
+  }
+  birdV.visible = false
+  birdV.eventMode = 'none'
+  scene.app.stage.addChild(birdV)
+  let birdAt = -1 // director-time when the current flight started; <0 → waiting
+  let nextBirdIn = (BIRD_MIN_S + Math.random() * (BIRD_MAX_S - BIRD_MIN_S)) * 1000
+  const BIRD_FLIGHT_MS = 10_000
+
+  const applyTone = (v: boolean): void => {
+    grave = v
+    layers.weather.setSuppressed(v)
+    layers.bubbles.setSuppressed(v)
+    layers.chars?.setEmotesHidden(v)
+    if (v) for (const f of fires.values()) f.alpha = FIRE_FROZEN_ALPHA // fire stays visible, only its animation stills
+  }
+
+  const tick = (dtMs: number): void => {
+    const state = store.getState()
+    if (state === null) return
+    const nowGrave = isGrave(tone, store.getTick())
+    if (nowGrave !== grave) applyTone(nowGrave)
+    if (!grave) t += dtMs
+
+    if (state.terrain !== sampledTerrain) {
+      sampledTerrain = state.terrain
+      sampleTerrain(state.terrain)
+    }
+
+    const night = simTimeFromTick(store.getTick()).isNight
+
+    // structures: smoke (complete), night glow (complete), fire (burning)
+    const liveIds = new Set<string>()
+    for (const s of Object.values(state.structures)) {
+      liveIds.add(s.id)
+      const anchor = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
+      const complete = s.stage === 'complete'
+      if (complete && !smoke.has(s.id)) {
+        const puffs: Sprite[] = []
+        for (let i = 0; i < SMOKE_PUFFS; i++) {
+          const p = new Sprite(puffTex)
+          p.anchor.set(0.5, 0.5)
+          p.zIndex = 1e8
+          p.eventMode = 'none'
+          scene.entities.addChild(p)
+          puffs.push(p)
+        }
+        smoke.set(s.id, puffs)
+      }
+      const puffs = smoke.get(s.id)
+      if (puffs !== undefined) {
+        puffs.forEach((p, i) => {
+          const prog = (t / SMOKE_LOOP_MS + i / SMOKE_PUFFS) % 1
+          p.position.set(anchor.sx + 8, anchor.sy - 34 - prog * SMOKE_RISE_PX)
+          p.alpha = 0.6 * (1 - prog)
+          p.visible = complete
+        })
+      }
+      if (complete && !glows.has(s.id)) {
+        const g = new Sprite(glowTex)
+        g.anchor.set(0.5, 1)
+        g.blendMode = 'add'
+        g.zIndex = 1e8
+        g.eventMode = 'none'
+        scene.entities.addChild(g)
+        glows.set(s.id, g)
+      }
+      const glow = glows.get(s.id)
+      if (glow !== undefined) {
+        glow.position.set(anchor.sx, anchor.sy - 2) // the door face — "deep blue night, warm window glow"
+        glow.visible = complete && night
+        glow.alpha = 0.5 + 0.3 * (0.5 + 0.5 * Math.sin(2 * Math.PI * GLOW_HZ * (t / 1000)))
+      }
+      if (s.burning && !fires.has(s.id)) {
+        const f = new Sprite(fireTex)
+        f.anchor.set(0.5, 1)
+        f.blendMode = 'add'
+        f.zIndex = 1e8
+        f.eventMode = 'none'
+        scene.entities.addChild(f)
+        fires.set(s.id, f)
+      }
+      const fire = fires.get(s.id)
+      if (fire !== undefined) {
+        if (!s.burning) {
+          fire.destroy()
+          fires.delete(s.id)
+        } else {
+          fire.position.set(anchor.sx, anchor.sy - 8)
+          if (!grave) fire.alpha = 0.4 + 0.4 * (0.5 + 0.5 * Math.sin(2 * Math.PI * FIRE_HZ * (t / 1000)))
+        }
+      }
+    }
+    for (const map of [smoke, glows, fires] as const) {
+      for (const [id, v] of map) {
+        if (!liveIds.has(id)) {
+          if (Array.isArray(v)) for (const p of v) p.destroy()
+          else v.destroy()
+          map.delete(id)
+        }
+      }
+    }
+
+    // water shimmer + swaying trees
+    for (const sh of shimmers) sh.sprite.alpha = 0.15 + 0.3 * (0.5 + 0.5 * Math.sin(2 * Math.PI * SHIMMER_HZ * (t / 1000) + sh.phase))
+    for (const tr of trees) tr.sprite.skew.x = TREE_SKEW * Math.sin(t / 1000 + tr.phase)
+
+    // placement bounce: 1.0 → 1.18 → 1.0 over 260ms
+    for (let i = bounces.length - 1; i >= 0; i--) {
+      const b = bounces[i]!
+      const sprite = entitySpriteOf(scene, b.kind, b.id)
+      if (sprite === null) {
+        bounces.splice(i, 1)
+        continue
+      }
+      let base = bounceBase.get(`${b.kind}:${b.id}`)
+      if (base === undefined) {
+        base = { x: sprite.scale.x, y: sprite.scale.y }
+        bounceBase.set(`${b.kind}:${b.id}`, base)
+      }
+      const p = (t - b.at) / BOUNCE_MS
+      if (p >= 1 || p < 0) {
+        sprite.scale.set(base.x, base.y)
+        bounceBase.delete(`${b.kind}:${b.id}`)
+        bounces.splice(i, 1)
+      } else {
+        const k = 1 + (BOUNCE_SCALE - 1) * Math.sin(Math.PI * p)
+        sprite.scale.set(base.x * k, base.y * k)
+      }
+    }
+
+    // squash-and-stretch while a work verb persists
+    if (layers.chars !== undefined) {
+      for (const a of Object.values(state.agents)) {
+        const sprite = layers.chars.getSprite(a.id)
+        if (sprite === null) continue
+        const working = a.alive && a.activity !== null && (SQUASH_VERBS as readonly string[]).includes(a.activity.verb)
+        const baseY = sprite.scale.x // uniform base — the character layer re-asserts x each frame (v2 and v4 scales differ)
+        sprite.scale.y = working && !grave
+          ? baseY * (1 - (1 - SQUASH_Y) * (0.5 + 0.5 * Math.sin(2 * Math.PI * SQUASH_HZ * (t / 1000))))
+          : working ? sprite.scale.y : baseY
+      }
+    }
+
+    // birds across the sky band
+    if (!grave) {
+      if (birdAt < 0) {
+        nextBirdIn -= dtMs
+        if (nextBirdIn <= 0) {
+          birdAt = t
+          birdV.visible = true
+          birdV.position.set(-20, 30 + Math.random() * 60)
+        }
+      }
+      if (birdAt >= 0) {
+        const p = (t - birdAt) / BIRD_FLIGHT_MS
+        if (p >= 1) {
+          birdAt = -1
+          birdV.visible = false
+          nextBirdIn = (BIRD_MIN_S + Math.random() * (BIRD_MAX_S - BIRD_MIN_S)) * 1000
+        } else {
+          birdV.position.x = -20 + p * (scene.app.screen.width + 40)
+        }
+      }
+    }
+  }
+
+  return {
+    tick,
+    setTone: applyTone,
+    destroy: () => {
+      offEvents()
+      for (const puffs of smoke.values()) for (const p of puffs) p.destroy()
+      for (const g of glows.values()) g.destroy()
+      for (const f of fires.values()) f.destroy()
+      for (const s of shimmers) s.sprite.destroy()
+      for (const tr of trees) tr.sprite.destroy()
+      birdV.destroy({ children: true })
+      under.destroy({ children: true })
+      for (const tex of [puffTex, shimmerTex, glowTex, birdTex, canopyTex, fireTex]) tex.destroy(true)
+    },
+  }
+}

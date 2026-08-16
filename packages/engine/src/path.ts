@@ -16,9 +16,16 @@ export function isPassable(state: WorldState, x: number, y: number): boolean {
   return true
 }
 
-// Neighbor order and open-list comparator both prefer lower y then lower x: with a
-// consistent Manhattan heuristic this makes equal-cost path choice deterministic.
+// Neighbor order + comparator prefer lower y then lower x: deterministic ties under a Manhattan heuristic.
+// Movement is 4-directional so a path can't cut corners; canStep enforces that invariant for any step.
 const NEIGHBORS: ReadonlyArray<readonly [number, number]> = [[0, -1], [-1, 0], [1, 0], [0, 1]]
+
+// Legal when the destination is passable and a diagonal step doesn't squeeze between two impassable tiles.
+export function canStep(state: WorldState, x: number, y: number, dx: number, dy: number): boolean {
+  if (!isPassable(state, x + dx, y + dy)) return false
+  if (dx !== 0 && dy !== 0 && !isPassable(state, x + dx, y) && !isPassable(state, x, y + dy)) return false
+  return true
+}
 
 type Node = { x: number; y: number; g: number; f: number; parent: Node | null }
 
@@ -51,7 +58,7 @@ export function findPath(state: WorldState, from: Point, to: Point): Array<[numb
     }
     for (const [dx, dy] of NEIGHBORS) {
       const nx = cur.x + dx, ny = cur.y + dy
-      if (!isPassable(state, nx, ny) || closed.has(key(nx, ny))) continue
+      if (!canStep(state, cur.x, cur.y, dx, dy) || closed.has(key(nx, ny))) continue
       const g = cur.g + TERRAIN_COST[state.terrain[ny]![nx]!]!
       const known = best.get(key(nx, ny))
       if (known && known.g <= g) continue
