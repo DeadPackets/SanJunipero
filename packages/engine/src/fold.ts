@@ -174,7 +174,7 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       let path: Array<[number, number]> | undefined
       if (p.verb === 'walk') {
         const w = WalkParams.parse(p.params)
-        const found = findPath(state, a, w)
+        const found = findPath(state, a, w, config)
         if (!found) throw new Error(`action_started walk with no path for ${p.agentId}`)
         path = found
       }

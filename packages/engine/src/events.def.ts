@@ -62,4 +62,4 @@ export const CropGrew = z.object({ cropId: z.string(), stage: z.number() }).stri
 export const CropWithered = z.object({ cropId: z.string() }).strict()
 export const CropHarvested = z.object({ cropId: z.string() }).strict()
 export const WildlifeChanged = z.object({ fish: z.number().optional(), deer: z.number().optional() }).strict()
-export const TerrainChanged = z.object({ x: z.number(), y: z.number(), tile: z.number().int().min(0).max(6) }).strict()
+export const TerrainChanged = z.object({ x: z.number(), y: z.number(), tile: z.number().int().min(0).max(7) }).strict()

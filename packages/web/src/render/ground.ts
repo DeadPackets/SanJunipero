@@ -10,6 +10,7 @@ export const TILE_COLORS: Record<TileId, number> = {
   4: 0xaba198 /* rock */,
   5: 0xe8d5bc /* sand */,
   6: 0xa66e38 /* farmland */,
+  7: 0xb8ad9e /* road — placeholder; C10 owns the texture */,
 }
 
 // shade tiles draw one ramp step darker for subtle checker texture

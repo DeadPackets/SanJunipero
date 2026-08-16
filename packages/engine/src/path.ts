@@ -1,9 +1,14 @@
+import { DEFAULT_CONFIG, type SimConfig } from '@sj/shared'
 import type { TileId, WorldState } from './state.js'
 
 export type Point = { x: number; y: number }
 
-// grass, dirt, water, forest, rock, sand, farmland
-export const TERRAIN_COST: Record<TileId, number> = { 0: 1, 1: 1, 2: Infinity, 3: 2, 4: 3, 5: 1.2, 6: 1 }
+// grass, dirt, water, forest, rock, sand, farmland, road
+export function terrainCostFor(config: SimConfig): Record<TileId, number> {
+  return { 0: 1, 1: 1, 2: Infinity, 3: 2, 4: 3, 5: 1.2, 6: 1, 7: config.pathing.roadCost }
+}
+
+export const TERRAIN_COST: Record<TileId, number> = terrainCostFor(DEFAULT_CONFIG)
 
 export function isPassable(state: WorldState, x: number, y: number): boolean {
   if (y < 0 || y >= state.terrain.length) return false
@@ -29,9 +34,10 @@ export function canStep(state: WorldState, x: number, y: number, dx: number, dy:
 
 type Node = { x: number; y: number; g: number; f: number; parent: Node | null }
 
-export function findPath(state: WorldState, from: Point, to: Point): Array<[number, number]> | null {
+export function findPath(state: WorldState, from: Point, to: Point, config: SimConfig = DEFAULT_CONFIG): Array<[number, number]> | null {
   if (from.x === to.x && from.y === to.y) return []
   if (!isPassable(state, to.x, to.y)) return null
+  const cost = terrainCostFor(config)
   const width = state.terrain[0]!.length
   const h = (x: number, y: number) => Math.abs(x - to.x) + Math.abs(y - to.y)
   const key = (x: number, y: number) => y * width + x
@@ -59,7 +65,7 @@ export function findPath(state: WorldState, from: Point, to: Point): Array<[numb
     for (const [dx, dy] of NEIGHBORS) {
       const nx = cur.x + dx, ny = cur.y + dy
       if (!canStep(state, cur.x, cur.y, dx, dy) || closed.has(key(nx, ny))) continue
-      const g = cur.g + TERRAIN_COST[state.terrain[ny]![nx]!]!
+      const g = cur.g + cost[state.terrain[ny]![nx]!]!
       const known = best.get(key(nx, ny))
       if (known && known.g <= g) continue
       const node: Node = { x: nx, y: ny, g, f: g + h(nx, ny), parent: cur }

@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
-import { canStep, findPath, isPassable, TERRAIN_COST } from './path.js'
+import { canStep, findPath, isPassable, terrainCostFor, TERRAIN_COST } from './path.js'
 
-const CHAR_TILE: Record<string, TileId> = { '.': 0, d: 1, '~': 2, f: 3, r: 4, s: 5, F: 6 }
+const CHAR_TILE: Record<string, TileId> = { '.': 0, d: 1, '~': 2, f: 3, r: 4, s: 5, F: 6, R: 7 }
 const world = (rows: string[]): WorldState =>
   genesisState(DEFAULT_CONFIG, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
@@ -28,6 +28,34 @@ describe('terrain costs', () => {
     expect(TERRAIN_COST[3]).toBe(2)    // forest
     expect(TERRAIN_COST[4]).toBe(3)    // rock
     expect(TERRAIN_COST[2]).toBe(Infinity) // water impassable
+  })
+})
+
+// A road on the far row must beat a grass row that the y-tie-break would otherwise win.
+const ROAD_DETOUR = ['.....', '.RRRR']
+const GRASS_DETOUR = ['.....', '.....']
+
+describe('road tile (C9 T1b)', () => {
+  it('tile 7 is a road: passable, cheaper than grass, priced from config', () => {
+    expect(terrainCostFor(DEFAULT_CONFIG)[7]).toBe(0.6)
+    expect(TERRAIN_COST).toEqual(terrainCostFor(DEFAULT_CONFIG))
+    expect(isPassable(world(ROAD_DETOUR), 1, 1)).toBe(true)
+    const dear = SimConfigSchema.parse({ pathing: { roadCost: 1.5 } })
+    expect(terrainCostFor(dear)[7]).toBe(1.5)
+  })
+
+  it('findPath prefers the road even against the tie-break', () => {
+    expect(findPath(world(GRASS_DETOUR), { x: 0, y: 0 }, { x: 4, y: 1 }))
+      .toEqual([[1, 0], [2, 0], [3, 0], [4, 0], [4, 1]])
+    expect(findPath(world(ROAD_DETOUR), { x: 0, y: 0 }, { x: 4, y: 1 }))
+      .toEqual([[1, 0], [1, 1], [2, 1], [3, 1], [4, 1]])
+  })
+
+  it('a road dearer than grass loses the preference', () => {
+    const dear = SimConfigSchema.parse({ pathing: { roadCost: 1.5 } })
+    const s = genesisState(dear, ROAD_DETOUR.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+    expect(findPath(s, { x: 0, y: 0 }, { x: 4, y: 1 }, dear))
+      .toEqual([[1, 0], [2, 0], [3, 0], [4, 0], [4, 1]])
   })
 })
 

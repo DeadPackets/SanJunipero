@@ -61,18 +61,18 @@ export function ticksPerTile(state: WorldState, config: SimConfig, agentId: stri
 
 const walk: VerbDef = makeVerb({
   kind: 'walk',
-  validate(state, _config, agentId, params) {
+  validate(state, config, agentId, params) {
     const p = WalkParams.safeParse(params)
     if (!p.success) return 'walk needs a destination {x, y}'
     const a = state.agents[agentId]!
     if (a.x === p.data.x && a.y === p.data.y) return 'already at that spot'
-    if (findPath(state, a, p.data) === null) return 'no path to that spot'
+    if (findPath(state, a, p.data, config) === null) return 'no path to that spot'
     return null
   },
   duration(state, config, agentId, params) {
     const p = WalkParams.parse(params)
     const a = state.agents[agentId]!
-    const path = findPath(state, a, p)
+    const path = findPath(state, a, p, config)
     if (!path) throw new Error(`walk.duration: no path for ${agentId}`)
     return path.length * ticksPerTile(state, config, agentId)
   },

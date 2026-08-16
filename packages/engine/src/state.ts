@@ -1,7 +1,7 @@
 import type { SimConfig } from '@sj/shared'
 
-// grass, dirt, water, forest, rock, sand, farmland
-export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6
+// grass, dirt, water, forest, rock, sand, farmland, road
+export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 export type AgentBody = {
   id: string; name: string; x: number; y: number; alive: boolean; asleep: boolean

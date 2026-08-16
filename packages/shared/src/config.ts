@@ -168,6 +168,11 @@ const MysterySchema = z.object({
   chancePerDay: z.number().default(0.08),
 }).strict()
 
+// C11 adds maxNodes/regionSize here; roadCost stays C9's (deep-world addendum §11).
+const PathingSchema = z.object({
+  roadCost: z.number().default(0.6),
+}).strict()
+
 // Flag-only sections: the feature they gate is physics that already has a home elsewhere.
 const FlagSchema = z.object({ enabled: z.boolean().default(true) }).strict()
 
@@ -189,6 +194,7 @@ export const SimConfigSchema = z.object({
   seasons: SeasonsSchema.prefault({}),
   tools: ToolsSchema.prefault({}),
   mystery: MysterySchema.prefault({}),
+  pathing: PathingSchema.prefault({}),
   occlusion: FlagSchema.prefault({}),
   ownership: FlagSchema.prefault({}),
   inscription: FlagSchema.prefault({}),
