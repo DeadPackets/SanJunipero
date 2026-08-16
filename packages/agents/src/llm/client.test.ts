@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { NoObjectGeneratedError } from 'ai'
+import { MockLanguageModelV4 } from 'ai/test'
 import { z } from 'zod'
 import { mockModel } from '../testutil/mockModel.js'
-import { migrateLlmTables } from './callLog.js'
+import { makeBudgetGuard, migrateLlmTables, sumReserved } from './callLog.js'
 import { BudgetExceededError, LlmClient, defaultExtraBody } from './client.js'
 import { FALLBACK_MODELS, MIND_MODEL, PROVIDER_ORDER } from './pins.js'
 
@@ -195,7 +196,9 @@ describe('budget guard', () => {
       { text: 'first', usage: { inputTokens: 1000, outputTokens: 1000 } },
       { text: 'never reached' },
     ])
-    const client = new LlmClient({ model, db, caller: 'test', budgetUsd: 0.00005 })
+    // expectedCallCostUsd 0 isolates the booked-spend cap: this budget is
+    // smaller than one expected call, which T21's reservation refuses outright.
+    const client = new LlmClient({ model, db, caller: 'test', budgetUsd: 0.00005, expectedCallCostUsd: 0 })
     // first call: total spend is 0, allowed; costs (1000*0.14 + 1000*0.28)/1e6 = 0.00042 > cap
     await client.text({ messages: [{ role: 'user', content: 'u' }] })
     expect(client.totalCostUsd()).toBeGreaterThan(0.00005)
@@ -251,6 +254,107 @@ describe('alerts', () => {
     expect(row.detail).toBe('spend at 80% of cap')
     expect(row.agent_id).toBe('a9')
     expect(row.ts).toBeGreaterThan(0)
+  })
+})
+
+describe('pessimistic reservation (T21)', () => {
+  // A model that will not answer until released: every caller is in flight at
+  // once, which is exactly the race the booked-after-the-fact guard lost.
+  function gatedModel(): { model: MockLanguageModelV4; started: () => number; release: () => void } {
+    let started = 0
+    let open!: () => void
+    const gate = new Promise<void>((resolve) => {
+      open = resolve
+    })
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => {
+        started += 1
+        await gate
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ mood: 'calm', count: 1 }) }],
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          usage: {
+            inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: undefined },
+            outputTokens: { total: 10, text: 10, reasoning: 0 },
+          },
+          warnings: [],
+        }
+      },
+    })
+    return { model, started: () => started, release: open }
+  }
+
+  it('admits only as many concurrent calls as the budget can pay for', async () => {
+    const db = openDb()
+    const { model, started, release } = gatedModel()
+    // Room for two reservations of $0.005; the third would cross $0.011.
+    const client = new LlmClient({ model, db, caller: 'test', budgetUsd: 0.011, expectedCallCostUsd: 0.005 })
+
+    // All five reserve synchronously before any of them can answer.
+    const calls = Array.from({ length: 5 }, () =>
+      client.object({ schema: SCHEMA, system: 's', messages: [{ role: 'user', content: 'u' }] }),
+    )
+    const settledPromise = Promise.allSettled(calls)
+    release()
+    const settled = await settledPromise
+
+    const rejected = settled.filter((s) => s.status === 'rejected')
+    expect(settled.filter((s) => s.status === 'fulfilled')).toHaveLength(2)
+    expect(rejected).toHaveLength(3)
+    for (const r of rejected) expect((r as PromiseRejectedResult).reason).toBeInstanceOf(BudgetExceededError)
+    expect(started()).toBe(2)
+    expect(sumReserved(db, 'test')).toBe(0)
+  })
+
+  it('releases the reservation when the call throws', async () => {
+    const db = openDb()
+    const model = mockModel([{ fail: true }, { fail: true }, { fail: true }])
+    const client = new LlmClient({
+      model, db, caller: 'test', budgetUsd: 1, expectedCallCostUsd: 0.005, maxRetries: 2,
+    })
+    await expect(client.text({ messages: [{ role: 'user', content: 'u' }] })).rejects.toThrow('scripted failure')
+    expect(sumReserved(db, 'test')).toBe(0)
+  })
+
+  it('leaves a single sequential call under a sane budget exactly as it was', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'a', usage: { inputTokens: 100, outputTokens: 100 } }])
+    const client = new LlmClient({ model, db, caller: 'test', budgetUsd: 1 })
+    const r = await client.text({ messages: [{ role: 'user', content: 'u' }] })
+    expect(r.text).toBe('a')
+    expect(rows(db)).toHaveLength(1)
+    expect(sumReserved(db, 'test')).toBe(0)
+  })
+
+  it('reserves nothing when no budget is set', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'a' }])
+    const client = new LlmClient({ model, db, caller: 'test' })
+    await client.text({ messages: [{ role: 'user', content: 'u' }] })
+    expect(sumReserved(db, 'test')).toBe(0)
+  })
+
+  it('counts only this caller’s reservations', () => {
+    const db = openDb()
+    const mine = makeBudgetGuard(db, 'mine')
+    const theirs = makeBudgetGuard(db, 'theirs')
+    const a = mine.reserve(0.005, 1)
+    theirs.reserve(0.005, 1)
+    expect(mine.sumReserved()).toBeCloseTo(0.005, 10)
+    expect(theirs.sumReserved()).toBeCloseTo(0.005, 10)
+    mine.release(a!)
+    expect(mine.sumReserved()).toBe(0)
+    expect(theirs.sumReserved()).toBeCloseTo(0.005, 10)
+  })
+
+  it('refuses the reservation that would cross the cap and admits it again once released', () => {
+    const db = openDb()
+    const guard = makeBudgetGuard(db, 'test')
+    const first = guard.reserve(0.005, 0.006)
+    expect(first).not.toBeNull()
+    expect(guard.reserve(0.005, 0.006)).toBeNull()
+    guard.release(first!)
+    expect(guard.reserve(0.005, 0.006)).not.toBeNull()
   })
 })
 
