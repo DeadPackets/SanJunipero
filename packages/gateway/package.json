@@ -1,0 +1,6 @@
+{ "name": "@sj/gateway", "version": "0.0.1", "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "dev:world": "tsx src/devWorld.ts", "demo:hotswap": "tsx src/hotswapDemo.ts" },
+  "dependencies": { "@sj/shared": "workspace:*", "@sj/engine": "workspace:*", "@sj/forge": "workspace:*",
+    "ws": "^8.18.0", "better-sqlite3": "^13.0.0", "zod": "^4.4.0" },
+  "devDependencies": { "@types/better-sqlite3": "^7.6.0", "@types/ws": "^8.5.0" } }
