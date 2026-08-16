@@ -141,6 +141,7 @@ export function createCharacterLayer(
     nameTag.visible = false
     const nameTagBg = new Graphics()
     const nameTagLabel = new BitmapText({ text: '', style: { fontFamily: 'monospace', fontSize: 8, fill: 0x43394a, lineHeight: 10 } })
+    nameTagLabel.anchor.set(0.5, 1) // match the bg slab, which is drawn centered above the origin
     nameTag.addChild(nameTagBg, nameTagLabel)
     sprite.on('pointerover', () => { nameTag.visible = true })
     sprite.on('pointerout', () => { nameTag.visible = false })

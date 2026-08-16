@@ -52,10 +52,14 @@ vi.mock('pixi.js', () => {
     }
   }
   class Graphics extends Container {
+    lastRoundRect: number[] | null = null
     ellipse(): this { return this }
     fill(): this { return this }
     clear(): this { return this }
-    roundRect(): this { return this }
+    roundRect(...args: number[]): this {
+      this.lastRoundRect = args
+      return this
+    }
   }
   class BitmapText extends Container {
     text: string
@@ -185,6 +189,20 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(hit.height * scale.y).toBeCloseTo(72, 9)
     expect(hit.x * scale.x).toBeCloseTo(-26, 9)
     expect(hit.y * scale.y).toBeCloseTo(-72, 9)
+  })
+
+  it('name-tag label anchors (0.5, 1) and the bg slab wraps it with 4px padding', () => {
+    layer.tick(1000)
+    const entities = scene.entities as unknown as InstanceType<typeof MockContainer>
+    const nameTag = entities.children[3]! // per-agent add order: shadow, sprite, emote, nameTag
+    const [bg, label] = nameTag.children as unknown as [
+      { lastRoundRect: number[] | null },
+      { anchor: { x: number; y: number }; width: number; height: number },
+    ]
+    expect(label.anchor.x).toBe(0.5)
+    expect(label.anchor.y).toBe(1)
+    // anchored (0.5,1) the text spans x∈[-w/2, w/2], y∈[-h, 0]; slab must pad 4px on all sides
+    expect(bg.lastRoundRect).toEqual([-label.width / 2 - 4, -label.height - 4, label.width + 8, label.height + 8, 2])
   })
 
   it('removing an agent destroys its 4 objects and drops the entry', () => {
