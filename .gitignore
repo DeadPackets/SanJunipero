@@ -5,3 +5,5 @@ data/
 *.db*
 .superpowers/
 *.tsbuildinfo
+packages/forge/probe-out/
+packages/forge/out/

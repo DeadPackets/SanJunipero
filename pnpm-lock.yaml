@@ -93,6 +93,31 @@ importers:
         specifier: ^7.6.0
         version: 7.6.13
 
+  packages/forge:
+    dependencies:
+      '@openrouter/ai-sdk-provider':
+        specifier: ^3.0.0
+        version: 3.0.0(ai@7.0.65(zod@4.4.3))(zod@4.4.3)
+      '@sj/shared':
+        specifier: workspace:*
+        version: link:../shared
+      ai:
+        specifier: ^7.0.0
+        version: 7.0.65(zod@4.4.3)
+      better-sqlite3:
+        specifier: ^13.0.0
+        version: 13.0.3
+      sharp:
+        specifier: ^0.34.0
+        version: 0.34.5
+      zod:
+        specifier: ^4.4.0
+        version: 4.4.3
+    devDependencies:
+      '@types/better-sqlite3':
+        specifier: ^7.6.0
+        version: 7.6.13
+
   packages/shared:
     dependencies:
       zod:
