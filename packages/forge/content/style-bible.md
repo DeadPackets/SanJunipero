@@ -91,7 +91,58 @@ RETRACTED: the v4 "soft-lattice" flags (8 cells at 40–44% ambiguity) were a 5-
 - style-anchor.png stays RAW — never post-processed. It is the generation/judge reference, not a shipped sprite.
 - Prompts for non-character classes append: "match the pixel density, palette warmth, and cute rounded style of the first reference image exactly".
 
-## Character standard v2
+## Character standard v3 — mirror standard
+
+SUPERSEDES Character standard v2 (below) after the v2 sheet failed human review: nothing
+faced west (the model ignores compass prose), and the four independently generated facings
+drifted into four different characters. Ratified 2026-08-16 (sprite-rethink proposal,
+Option A + prompt cookbook).
+
+### Authored vs derived facings
+
+- Characters author TWO facings only: SE = front ¾ view, NE = back ¾ view.
+  SW = horizontal flip of SE (all cells); NW = horizontal flip of NE — derived in code,
+  zero generation, facing-correct by construction.
+- The asymmetry/no-mirror law is BUILDINGS ONLY (the NW-light lock stays for structures).
+  Characters mirror freely; asymmetric props may swap sides on mirrored facings
+  (Ambidextrous Sprite — accepted per Stardew/Pokémon/Mega Man precedent; user-ruled).
+- Prompts name facings as VIEWS, never compass prose: "front three-quarter view",
+  "back three-quarter view, seen from behind". Spatial-prose clauses ("body turned toward
+  the bottom-left of the frame") are BANNED — the model demonstrably ignores them.
+
+### Simplified character spec
+
+- Stardew-class, ~3 heads tall.
+- 2-3 signature features MAX on the sprite: cap + overalls + satchel. Collar, rolled
+  sleeves, and the satchel charm survive only in portraits/concept art — never at
+  sprite scale.
+
+### Walk cadence
+
+- 3 unique walk frames per authored facing: contact-a, passing, contact-b.
+- Playback F1-F2-F1-F3: contact-a → passing → contact-b → passing, ~180 ms/frame.
+- The 24-cell sheet contract (4 facings × 6 poses) is unchanged for the renderer:
+  passing-a = passing-b = the one passing frame; sleep-se/sw = the one sleep cell,
+  sleep-ne/nw = its flip.
+
+### Generation (gen-character-v4.ts)
+
+- Call 1 — master: ONE image, two figures side by side on magenta (front ¾ + back ¾ of
+  the simplified design); the identity root attached to every later call. Reasoning
+  (thinking) generation when the API accepts it — extract the FINAL image only.
+- Calls 2-3 — per authored facing: one 1×4 wide-canvas strip (1536×512, proven):
+  idle, contact-a, passing, contact-b; master attached.
+- Call 4 — ONE sleep pose, master attached.
+- Surviving stages: magenta chroma key, sliceStrip, coarsen-to-fit/lattice/quantize
+  (v7 chain), stride check WITHIN a strip, ONE coherence gate (palette-jaccard +
+  silhouette bbox vs master).
+- DELETED from the v4 path: distance matrices, mirror-dupe detection, cross-facing gate,
+  seeded sleep, per-facing sleep palette gates, guide-image machinery, compass-prose
+  clauses, judge-as-facing-arbiter.
+- Facing gate = HUMAN EYEBALL on the contact sheet + walking GIFs. Never automated,
+  never claimed by the pipeline.
+
+## Character standard v2 (SUPERSEDED by v3, above)
 
 SUPERSEDES the v1 3-pose standard (below) after the v1 sheet failed human review: ne/nw back views were one drawing (straight distance 0.123 vs cross-facing median 0.310), sw/idle was a 0.030 mirror of se/idle, and the se strides were rigid (0.091) — all *flagged* by the old lax thresholds and shipped anyway. v2 makes every one of those a hard failure.
 
@@ -109,7 +160,7 @@ SUPERSEDES the v1 3-pose standard (below) after the v1 sheet failed human review
 
 ### Identity
 
-- Identity asymmetry LAW: every character design carries left-right asymmetric markers (e.g. satchel on the left hip, cap brim tilted right) so no facing can be a mirror of another. The markers live in CHAR_DESC and every prompt.
+- ~~Identity asymmetry LAW: every character design carries left-right asymmetric markers (e.g. satchel on the left hip, cap brim tilted right) so no facing can be a mirror of another. The markers live in CHAR_DESC and every prompt.~~ **RESCINDED for characters by standard v3 (asymmetry law is buildings-only; characters mirror).**
 - Every character's identity root is its CONCEPT image (`scripts/gen-concept.ts`: one high-detail box-art style image establishing costume, palette, accessories — not a sprite, no pixel constraints). Sprites and portraits both derive from it: when a concept exists it is inserted as an input_reference immediately after the style anchor.
 - Re-examined against an external workflow and deliberately KEPT: east-mirroring stays banned (NW-light law unchanged) and chroma stays magenta (green would collide with the sage palette).
 
@@ -135,5 +186,5 @@ All ratios are × the sheet's pairwise-median cell distance; calibrated against 
 ## Facings
 
 - ~~Characters: 4 dimetric facings (sw, se, ne, nw) × 3 poses (idle, walk-a, walk-b) per sheet; cells 96×96 at art height 64 (feet-anchored at y=88), sheet 384×288. Column order sw, se, ne, nw (left→right) and row order idle, walk-a, walk-b (top→bottom), as in `sheet.ts`. Walk animation = idle, walk-a, idle, walk-b loop.~~ **SUPERSEDED by Character standard v2 (above).**
-- Buildings: up to 2 authored facings — door-sw (default) and door-se variant; codex id suffix `#se`. NEVER mirror sprites: light is locked from the north-west (mirroring flips it).
+- Buildings: up to 2 authored facings — door-sw (default) and door-se variant; codex id suffix `#se`. NEVER mirror BUILDING sprites: light is locked from the north-west (mirroring flips it). Characters are exempt — standard v3 derives SW/NW by horizontal flip; mirrored NW-light shading at 3-head chibi scale is unnoticed (genre precedent).
 - Engine note: Structure has no facing field yet (C2); facing is asset-selection-only until then.
