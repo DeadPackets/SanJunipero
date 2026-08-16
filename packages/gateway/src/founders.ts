@@ -3,7 +3,7 @@
 // scripted module: policies are pure functions of perception, timeline is tick-keyed.
 import type { SimConfig } from '@sj/shared'
 import {
-  composePerception, createWorldTick, submitIntent,
+  composePerception, createWorldTick, doorTile, submitIntent,
   type PerceptionPacket, type RngStreams, type WorldState,
 } from '@sj/engine'
 
@@ -36,6 +36,11 @@ export const TOWN_STRUCTURES: readonly TownStructure[] = [
   { id: 'structure_stone', kind: 'standing_stone', x: 15, y: 28, w: 1, h: 1 },
 ]
 
+// The one dwelling in the fixture town — where a tired founder goes when interiors are on.
+export const FOUNDERS_HOME_ID = 'structure_cottage'
+export const GO_HOME_BELOW = 25      // above the outdoor sleep threshold: home wins first
+export const LEAVE_HOME_ABOVE = 80
+
 export const NEED_TOPUP_BELOW = 40
 export const HUNGER_TOPUP = 55
 export const WARMTH_TOPUP = 50
@@ -52,7 +57,32 @@ function makePatrolPolicy(f: FounderDef) {
 
 export type FoundersOnTick = (ctx: { tick: number; emit: (type: string, payload: unknown) => void }) => void
 
-export function makeFoundersOnTick(config: SimConfig, rng: RngStreams, getState: () => WorldState): FoundersOnTick {
+export type FoundersOpts = {
+  /** dev/demo only: a tired founder walks home, goes in, sleeps, and comes out again.
+   *  OFF by default, so every existing gate folds exactly the events it always did. */
+  interiors?: boolean
+}
+
+// Walking home is a whole errand, so it is decided from world state rather than from the
+// patrol packet: the door tile, the distance to it and `insideId` are all facts of the world.
+export function homeIntent(state: WorldState, agentId: string): { verb: string; params: Record<string, unknown> } | null {
+  const a = state.agents[agentId]
+  if (a === undefined) return null
+  if (a.insideId !== undefined) {
+    return a.needs.energy > LEAVE_HOME_ABOVE ? { verb: 'exit', params: {} } : { verb: 'sleep', params: {} }
+  }
+  if (a.needs.energy >= GO_HOME_BELOW) return null
+  const home = state.structures[FOUNDERS_HOME_ID]
+  const door = home === undefined ? null : doorTile(state, home)
+  if (door === null) return null
+  return Math.abs(a.x - door.x) <= 1 && Math.abs(a.y - door.y) <= 1
+    ? { verb: 'enter', params: { structureId: FOUNDERS_HOME_ID } }
+    : { verb: 'walk', params: { x: door.x, y: door.y } }
+}
+
+export function makeFoundersOnTick(
+  config: SimConfig, rng: RngStreams, getState: () => WorldState, opts: FoundersOpts = {},
+): FoundersOnTick {
   const policies = new Map(FOUNDERS.map(f => [f.id, makePatrolPolicy(f)]))
   const worldTick = createWorldTick(config, rng)
   return ({ tick, emit }) => {
@@ -82,7 +112,8 @@ export function makeFoundersOnTick(config: SimConfig, rng: RngStreams, getState:
       const a = state.agents[f.id]
       if (!a || !a.alive) continue
       const packet = composePerception(state, config, f.id, [])
-      const intent = policies.get(f.id)!(packet)
+      const intent = (opts.interiors === true ? homeIntent(state, f.id) : null)
+        ?? policies.get(f.id)!(packet)
       if (!intent) continue
       const r = submitIntent(state, config, f.id, intent.verb, intent.params)
       if (r.ok) for (const e of r.events) emit(e.type, e.payload)

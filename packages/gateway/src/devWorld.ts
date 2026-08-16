@@ -47,6 +47,9 @@ export async function startDevWorld(
   opts: {
     dbPath?: string; port?: number; realMsPerTick?: number; seed?: string; ingest?: boolean
     map?: DevMapKind
+    /** dev/demo only (G10 human pass): tired founders go indoors and come out again.
+     *  Off by default, so every existing gate folds exactly the events it always did. */
+    interiors?: boolean
   } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH
@@ -77,7 +80,8 @@ export async function startDevWorld(
   const loop: TickLoop = new TickLoop({
     store, state: genesisState(config, terrain), rng, config,
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
-    onTick: makeFoundersOnTick(config, rng, () => loop.state), // the founders showcase town
+    // the founders showcase town
+    onTick: makeFoundersOnTick(config, rng, () => loop.state, { interiors: opts.interiors === true }),
   })
 
   const gateway = await createGateway({ dbPath, port: opts.port ?? DEV_PORT, terrain, config, db })
@@ -116,8 +120,14 @@ export async function startDevWorld(
   }
 }
 
+// CLI switches, read HERE and nowhere else, so no test's world can drift with an env var:
+//   SJ_DEV_MAP=showcase   fold C13's city template instead of the G6 fixture map
+//   SJ_DEV_INTERIORS=1    tired founders go indoors and come out again (the G10 human pass)
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  void startDevWorld({ ingest: true }).then(({ gateway }) => {
+  const map: DevMapKind = process.env['SJ_DEV_MAP'] === 'showcase' ? 'showcase' : DEV_MAP_DEFAULT
+  const interiors = process.env['SJ_DEV_INTERIORS'] === '1'
+  void startDevWorld({ ingest: true, map, interiors }).then(({ gateway }) => {
+    console.log(`dev world: map=${map} interiors=${interiors ? 'on' : 'off'}`)
     console.log(`dev world: the town is awake on ws://localhost:${gateway.port}/ws`)
   })
 }
