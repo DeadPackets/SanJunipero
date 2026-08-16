@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { DAYS_PER_YEAR, DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick } from '../worldTick.js'
+import { ageBand } from './aging.js'
 import { BIRTH_NAMES } from '../data/names.js'
 import { isPartnered, pairKey, partnershipOf, sexOf } from './reproduction.js'
 
@@ -235,16 +236,17 @@ describe('gestation and birth', () => {
     expect(births(carrying(0), TERM)).toHaveLength(1)
   })
 
-  it('spawns the body at exactly twelve years', () => {
+  it('spawns the body at exactly twelve years of this world’s calendar', () => {
     const payload = births(carrying(0), TERM, CFG, 'r5')[0]!.payload as { id: string }
     const folded = fold(carrying(0), ev('agent_born', payload), CFG)
-    expect(folded.agents[payload.id]!.ageDays).toBe(12 * 365)
+    expect(folded.agents[payload.id]!.ageDays).toBe(12 * DAYS_PER_YEAR)
+    expect(ageBand(CFG, folded.agents[payload.id]!.ageDays)).toBe('child')
   })
 
   it('places the child beside its mother, aged twelve, with both parents named', () => {
     const born = midnight(carrying(0), TERM, CFG, 'r5').state
     const child = Object.values(born.agents).find(a => a.id !== 'a1' && a.id !== 'a2')!
-    expect(child.ageDays).toBe(12 * 365 + 1) // agingSystem runs after this midnight's birth
+    expect(child.ageDays).toBe(12 * DAYS_PER_YEAR + 1) // agingSystem runs after this midnight's birth
     expect(child.parents).toEqual(['a1', 'a2'])
     expect(child.insideId).toBe(HUT.id)
     expect([child.x, child.y]).toEqual([born.agents.a1!.x, born.agents.a1!.y])

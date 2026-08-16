@@ -11,28 +11,17 @@ import { TickLoop } from './tickLoop.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
 import {
   createScriptedLoop, makeScriptedOnTick, makeFixtureMap,
-  FARMER, FISHER, IDLER, STOREHOUSE, SHED,
+  BUILDER, FARMER, FISHER, IDLER, STOREHOUSE, SHED,
 } from './scripted.js'
-// Pinned golden hash for the 3-day scripted world run (regen #3, deliberate:
-// collapsed-sleep recovery + crop stage formula changed the scripted timeline).
-const GOLDEN_G2_HASH = '7263dde98076dbb234bdeded24aab659987190ce00e4581999027d615ec977e8'
+// Pinned golden hash for the 3-day scripted world run (regen #4, deliberate: C9 Task 16.
+// Every C9 feature pin came off this fixture at once — ownership, the bed law, spoilage
+// and reproduction are live — and `agent_born` now ages a newborn by the 364-day calendar).
+const GOLDEN_G2_HASH = '6f2529fba61a0d9e3a219da05235c0ff19e105d610f96e57aa9d0cc073d82fc8'
 
-// C9 flags pinned OFF so this pre-C9 fixture keeps telling its own story. ALL pins come off in
-// Task 16 Step 0, which folds their change into the single deliberate regen:
-//   ownership.enabled     — the Builder would own his hut and the scripted actors would claim,
-//                           gift and take titled goods; every one of those moves the hash.
-//   sleepIndoorsOnly      — these actors sleep in the open with no hut to enter; the law leaves
-//                           the hash intact but turns the run into 14 collapses instead of 2.
-//   spoilage.enabled      — the Fisher's catch would carry a shelf life and the run is 3 days,
-//                           long enough for fish (2 days) to turn; both move the hash.
-//   reproduction.enabled  — the four scripted actors would spawn with an explicit sex on the
-//                           body, which moves the hash before anyone sleeps anywhere.
-const G2_CONFIG = SimConfigSchema.parse({
-  ownership: { enabled: false },
-  structures: { sleepIndoorsOnly: false },
-  spoilage: { enabled: false },
-  reproduction: { enabled: false },
-})
+// Task 16 Step 0: every C9 pin is off this fixture. Nothing is suppressed here any more —
+// ownership, the bed law, spoilage and reproduction are all live, and the assertions below
+// name the events each of them produces in this run.
+const G2_CONFIG = SimConfigSchema.parse({})
 
 const SEED = 'g2-scripted'
 const TOTAL_TICKS = 4320 // 3 sim days
@@ -120,6 +109,40 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(actEv!.tick).toBeLessThan(diedEv!.tick)
 
     expect(stateHash(state)).toBe(GOLDEN_G2_HASH)
+  })
+
+  // Task 16 removed the four pins that used to hold these laws off this fixture. If a
+  // later change quietly stops one of them firing, the hash row above would still pass —
+  // so each law is named here as well as hashed.
+  it('C9 is live in this run: things are owned, a body sleeps under a roof, food turns', () => {
+    const { state, evs } = runScenario()
+
+    // Ownership: the Builder owns the hut he raised, and the Fisher owns what he pulled out.
+    const hut = Object.values(state.structures).find((s) => s.kind === 'hut')!
+    expect(hut.owner).toBe(BUILDER)
+    const caught = Object.values(state.items).filter((i) => i.kind === 'fish')
+    expect(caught.length).toBeGreaterThan(0)
+    for (const f of caught) expect(f.owner).toBe(FISHER)
+    expect(evs.some((e) => e.type === 'item_owner_changed')).toBe(true)
+
+    // The bed law: the Builder steps through his own door and lies down inside it.
+    const entered = evs.filter((e) => e.type === 'agent_entered')
+    expect(entered.map((e) => (e.payload as Payload).agentId)).toContain(BUILDER)
+    const inside = entered.find((e) => (e.payload as Payload).agentId === BUILDER)!
+    const slept = evs.find((e) => e.type === 'agent_slept' && (e.payload as Payload).agentId === BUILDER)
+    expect(slept).toBeDefined()
+    expect(inside.tick).toBeLessThan(slept!.tick)
+    expect((inside.payload as Payload).structureId).toBe(hut.id)
+    expect(state.agents[BUILDER]!.insideId).toBe(hut.id)
+
+    // Spoilage: a two-day fish does not survive a three-day run.
+    const spoiled = evs.filter((e) => e.type === 'item_spoiled')
+    expect(spoiled.length).toBeGreaterThan(0)
+    for (const e of spoiled) expect(state.items[(e.payload as Payload).id as string]).toBeUndefined()
+
+    // Reproduction: sexes are on the bodies, which is what the pin used to suppress.
+    expect(state.agents[FISHER]!.sex).toBe('m')
+    expect(state.agents[FARMER]!.sex).toBe('f')
   })
 
   it('is deterministic: two runs from the same seed hash identically', () => {

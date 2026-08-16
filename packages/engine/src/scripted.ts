@@ -1,5 +1,6 @@
 import { type SimConfig } from '@sj/shared'
 import { composePerception, type PerceptionPacket } from './perception.js'
+import { doorTile } from './interiors.js'
 import { submitIntent } from './intent.js'
 import { FOOD_KINDS, isAdjacentToRect, isFoodKind } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
@@ -178,6 +179,27 @@ function scriptedTimeline(config: SimConfig, tick: number, emit: (type: string, 
   if (tick === 1445) emit('weather_changed', { kind: 'rain', temperatureC: 10 })
 }
 
+// The bed law (C9 T2b) refuses sleep in the open, and a policy sees only a packet — which
+// never says "you are indoors". So the harness, which does hold the state, steps an actor
+// through a doorway it is *already standing in* before it lies down, and puts it back
+// outside the moment it wants anything else. Deliberately no commuting: an actor whose bed
+// is more than a step away sleeps rough and collapses, which is the law working, not a bug.
+// In this fixture exactly one actor qualifies — the Builder, who works at his own door.
+function bedGate(state: WorldState, config: SimConfig, id: string, intent: ScriptedIntent): ScriptedIntent {
+  const a = state.agents[id]!
+  const here = a.insideId === undefined ? undefined : state.structures[a.insideId]
+  if (intent.verb !== 'sleep') return here ? { verb: 'exit', params: {} } : intent
+  if (a.collapsedSinceTick !== null) return intent // a body already down may lie where it fell
+  if (here) return config.structures.sleepableKinds.includes(here.kind) ? intent : { verb: 'exit', params: {} }
+  for (const sid of Object.keys(state.structures).sort()) {
+    const s = state.structures[sid]!
+    if (s.stage !== 'complete' || !config.structures.sleepableKinds.includes(s.kind)) continue
+    const door = doorTile(state, s)
+    if (door && cheb(a.x, a.y, door.x, door.y) <= 1) return { verb: 'enter', params: { structureId: s.id } }
+  }
+  return intent
+}
+
 export type ScriptedOnTick = (ctx: { tick: number; emit: (type: string, payload: unknown) => void }) => void
 
 // Builds a TickLoop onTick handler. getState() must return the *current* loop state;
@@ -212,7 +234,8 @@ export function makeScriptedOnTick(config: SimConfig, rng: RngStreams, getState:
       const packet = composePerception(state, config, id, [])
       const intent = policies[id]!(packet)
       if (!intent) continue
-      const r = submitIntent(state, config, id, intent.verb, intent.params)
+      const gated = bedGate(state, config, id, intent)
+      const r = submitIntent(state, config, id, gated.verb, gated.params)
       if (r.ok) for (const e of r.events) emit(e.type, e.payload)
     }
   }

@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, SPAWN_AGE_YEARS, type SimConfig, type SimEvent } from '@sj/shared'
+import { DAYS_PER_YEAR, DEFAULT_CONFIG, MINUTES_PER_DAY, SPAWN_AGE_YEARS, type SimConfig, type SimEvent } from '@sj/shared'
 import type { TileId, WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
@@ -343,7 +343,8 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
           [p.id]: {
             id: p.id, name: p.name, x: p.x, y: p.y, alive: true, asleep: false,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
-            hp: config.health.maxHp, injuries: [], ill: false, ageDays: SPAWN_AGE_YEARS * 365,
+            // Twelve years on this world's calendar, which is 364 days long — not 365.
+            hp: config.health.maxHp, injuries: [], ill: false, ageDays: SPAWN_AGE_YEARS * DAYS_PER_YEAR,
             sex: p.sex,
             parents: [p.motherId, p.fatherId],
             ...(mother.insideId === undefined ? {} : { insideId: mother.insideId }),
