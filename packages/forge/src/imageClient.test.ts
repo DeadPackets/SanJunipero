@@ -72,6 +72,14 @@ describe('makeImageClient', () => {
       .rejects.toBeInstanceOf(BudgetExceededError)
     expect(calls).toHaveLength(0)
   })
+  it('returns already-paid candidates when the cap trips mid-batch (partial budget)', async () => {
+    const { fn, calls } = fakeFetch(() => ok)
+    const budget = new BudgetGuard(0.05) // room for exactly one 0.045 reserve
+    const out = await makeImageClient({ apiKey: 'k', fetchFn: fn, budget }).generateCandidates('p', [], 3)
+    expect(out).toHaveLength(1) // slot 1 paid and succeeded; slots 2-3 blocked pre-fire
+    expect(calls).toHaveLength(1)
+    expect(out[0]!.costUsd).toBe(0.045)
+  })
   it('books the extra when the actual cost exceeds the reserve', async () => {
     const { fn } = fakeFetch(() => ({ status: 200, json: { data: [{ b64_json: PNG_B64 }], usage: { cost: 0.0462 } } }))
     const budget = new BudgetGuard(1)

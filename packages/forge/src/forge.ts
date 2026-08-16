@@ -1,4 +1,4 @@
-import type { ImageClient } from './imageClient.js'
+import type { Candidate, ImageClient } from './imageClient.js'
 import type { JudgeFn } from './judge.js'
 import { EST_COST_PER_JUDGE } from './judge.js'
 import { mechanicalGate, PASS_SCORE, MAX_ATTEMPTS, CANDIDATES_PER_ATTEMPT } from './gate.js'
@@ -21,8 +21,11 @@ export function createForge(deps: { client: ImageClient; judge: JudgeFn; codex: 
     const requireAlpha = klass !== 'terrain' && klass !== 'portrait'
     let costUsd = 0
 
+    // contract: commission never rejects on generation failure — every path registers an asset (ready or placeholder)
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const candidates = await deps.client.generateCandidates(prompt, deps.refs, CANDIDATES_PER_ATTEMPT)
+      let candidates: Candidate[]
+      try { candidates = await deps.client.generateCandidates(prompt, deps.refs, CANDIDATES_PER_ATTEMPT) }
+      catch { continue } // provider outage / budget cap = a failed attempt, not an escaped throw
       costUsd += candidates.reduce((s, c) => s + c.costUsd, 0)
 
       let best: { png: Buffer; score: number } | null = null

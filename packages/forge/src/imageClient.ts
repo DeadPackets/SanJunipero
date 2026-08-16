@@ -60,9 +60,20 @@ export function makeImageClient(opts: { apiKey: string; fetchFn?: typeof fetch; 
 
   return {
     async generateCandidates(prompt, refs, n = 3) {
-      const results = await Promise.all(Array.from({ length: n }, () => slot(prompt, refs)))
-      const good = results.filter((r): r is Candidate => !(r instanceof ImageGenError))
-      if (good.length === 0) throw results[0] as ImageGenError
+      // allSettled: one slot's BudgetExceededError must not discard other slots' paid candidates
+      const settled = await Promise.allSettled(Array.from({ length: n }, () => slot(prompt, refs)))
+      const good: Candidate[] = []
+      let budgetErr: BudgetExceededError | undefined
+      let genErr: ImageGenError | undefined
+      for (const s of settled) {
+        if (s.status === 'rejected') {
+          if (s.reason instanceof BudgetExceededError) { budgetErr ??= s.reason; continue }
+          throw s.reason
+        }
+        if (s.value instanceof ImageGenError) genErr ??= s.value
+        else good.push(s.value)
+      }
+      if (good.length === 0) throw budgetErr ?? genErr!
       return good
     },
   }
