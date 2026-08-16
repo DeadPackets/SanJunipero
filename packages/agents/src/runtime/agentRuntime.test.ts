@@ -17,6 +17,7 @@ import {
 import { SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
 import { AgentRuntime, CRAFT_HINT, refusalMemoryText } from './agentRuntime.js'
+import type { Adjudicator, AgentCtx } from './arbiterSeam.js'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore, type MemoryRow } from '../memory/store.js'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
@@ -191,6 +192,7 @@ async function setup(opts: {
   maxRetries?: number
   simConfig?: SimConfig
   onThought?: (t: { tick: number; agentId: string; text: string }) => void
+  adjudicator?: Adjudicator
 }) {
   const world = buildWorld(opts.simConfig)
   const worldTick = createWorldTick(world.config, world.rng)
@@ -224,6 +226,7 @@ async function setup(opts: {
     reflectionLlm: opts.reflectionLlm,
     dreamLlm: opts.dreamLlm,
     onThought: opts.onThought,
+    adjudicator: opts.adjudicator,
   })
   runtime.start(AGENT)
   const mem = new MemoryStore(agentDb, AGENT, embedder)
@@ -705,6 +708,75 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(runtime.stats().turns).toBeGreaterThanOrEqual(1)
     expect(seen[0]).toEqual({ tick: expect.any(Number), agentId: AGENT, text: 'I rest.' })
     expect(seen[0]!.tick).toBeGreaterThan(0)
+  })
+})
+
+describe('arbiter seam (T19)', () => {
+  const freeformTurn = { thought: 'I will try something new.', action: { freeform: 'weave reeds into a basket' }, importance: 4 }
+
+  it('routes a freeform intent to the adjudicator and executes a map verdict as a Tier-1 act', async () => {
+    const seen: Array<{ intent: string; ctx: AgentCtx }> = []
+    const adjudicator: Adjudicator = async (intent, ctx) => {
+      seen.push({ intent, ctx })
+      return { kind: 'map', verb: 'walk', params: { x: 5, y: 6 } }
+    }
+    const { loop, world } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes('walk'), 100)
+
+    expect(startedVerbs(world.engineDb)).toContain('walk')
+    expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+    expect(seen).toHaveLength(1)
+    expect(seen[0]!.intent).toBe('weave reeds into a basket')
+    expect(seen[0]!.ctx.agentId).toBe(AGENT)
+    expect(seen[0]!.ctx.name).toBe('Tamar')
+  })
+
+  it('writes a refusal memory for an impossible verdict, hinted when it is only a want of skill', async () => {
+    const adjudicator: Adjudicator = async () => ({
+      kind: 'impossible',
+      reason: 'your hands do not yet know the weave',
+      class: 'insufficient_skill',
+    })
+    const { loop, agentDb, world } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      'You realize you cannot: your hands do not yet know the weave — perhaps someone nearby knows the craft.',
+    )
+    expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+  })
+
+  it('falls back to the world’s own answer when no adjudicator is wired', async () => {
+    const { loop, agentDb } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('Perhaps someone in the town knows how.')
+  })
+
+  it('falls back to the world when the adjudicator throws, and says so in an alert', async () => {
+    const adjudicator: Adjudicator = async () => {
+      throw new Error('the arbiter is unreachable')
+    }
+    const { loop, agentDb } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
+    expect(alertKinds(agentDb)).toContain('adjudicate_failed')
+  })
+
+  it('leaves a named Tier-1 action untouched by the seam', async () => {
+    const adjudicator: Adjudicator = async () => {
+      throw new Error('must not be consulted')
+    }
+    const { loop, agentDb, world } = await setup({
+      model: turnModel([{ thought: 'I walk.', action: { verb: 'walk', params: { x: 5, y: 6 } }, importance: 2 }]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes('walk'), 100)
+    expect(startedVerbs(world.engineDb)).toContain('walk')
+    expect(alertKinds(agentDb)).not.toContain('adjudicate_failed')
   })
 })
 

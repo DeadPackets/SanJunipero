@@ -23,6 +23,7 @@ import {
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
 import type { EngineBridge, Intent, SubmitResult } from './bridge.js'
+import { buildAgentCtx, type Adjudicator } from './arbiterSeam.js'
 
 const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 
@@ -99,6 +100,7 @@ export class AgentRuntime {
   readonly #reflectionLlm: ReflectionLlm | null
   readonly #dreamLlm: DreamLlm | null
   readonly #onThought: ((t: { tick: number; agentId: string; text: string }) => void) | null
+  readonly #adjudicator: Adjudicator | null
 
   #agentId = ''
   #mem: MemoryStore | null = null
@@ -129,6 +131,7 @@ export class AgentRuntime {
     reflectionLlm?: ReflectionLlm
     dreamLlm?: DreamLlm
     onThought?: (t: { tick: number; agentId: string; text: string }) => void
+    adjudicator?: Adjudicator
   }) {
     this.#db = deps.db
     this.#llm = deps.llm
@@ -140,6 +143,7 @@ export class AgentRuntime {
     this.#reflectionLlm = deps.reflectionLlm ?? null
     this.#dreamLlm = deps.dreamLlm ?? null
     this.#onThought = deps.onThought ?? null
+    this.#adjudicator = deps.adjudicator ?? null
   }
 
   start(agentId: string): void {
@@ -275,6 +279,35 @@ export class AgentRuntime {
         void this.#writeActionMemory(refusalMemoryText(res.reason))
       })
       .then(() => undefined)
+  }
+
+  // Held until the body is free; a busy rejection retries instead of
+  // discarding, until accepted or superseded by a newer turn's action.
+  #holdIntent(intent: Intent): Promise<void> {
+    this.#pendingIntent = intent
+    return this.#submitPendingIfIdle(this.#bridge.perception(this.#agentId).self.activity)
+  }
+
+  // A try at something new goes to the arbiter, not to the verb registry. The
+  // world stays the fallback: an unreachable arbiter must never eat the turn.
+  async #adjudicateFreeform(description: string): Promise<void> {
+    const fallback = (): Promise<void> =>
+      this.#holdIntent({ verb: 'experiment', params: { description } })
+    let verdict
+    try {
+      verdict = await this.#adjudicator!(description, buildAgentCtx(this.#bridge, this.#agentId))
+    } catch (err) {
+      this.#llm.alert('adjudicate_failed', err instanceof Error ? err.message : String(err))
+      return fallback()
+    }
+    if (verdict.kind === 'map') return this.#holdIntent({ verb: verdict.verb, params: verdict.params })
+    if (verdict.kind === 'impossible') {
+      await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
+      return
+    }
+    // 'attempt' becomes a live codification in Task 20; until then the world
+    // answers for itself rather than the attempt vanishing.
+    return fallback()
   }
 
   #onPlanHeadResult(res: SubmitResult): void {
@@ -433,14 +466,15 @@ export class AgentRuntime {
     }
 
     if (turn.action) {
-      const intent: Intent =
-        'freeform' in turn.action
-          ? { verb: 'experiment', params: { description: turn.action.freeform } }
-          : { verb: turn.action.verb, params: turn.action.params }
-      // Held until the body is free; a busy rejection retries instead of
-      // discarding, until accepted or superseded by a newer turn's action.
-      this.#pendingIntent = intent
-      await this.#submitPendingIfIdle(this.#bridge.perception(this.#agentId).self.activity)
+      if ('freeform' in turn.action && this.#adjudicator !== null) {
+        await this.#adjudicateFreeform(turn.action.freeform)
+      } else {
+        const intent: Intent =
+          'freeform' in turn.action
+            ? { verb: 'experiment', params: { description: turn.action.freeform } }
+            : { verb: turn.action.verb, params: turn.action.params }
+        await this.#holdIntent(intent)
+      }
     }
 
     if (turn.plan) {

@@ -132,6 +132,13 @@ export class EngineBridge {
     return isFoodKind(this.#simConfig, kind)
   }
 
+  // Body facts perception does not carry, for the arbiter seam: who is asking
+  // and what their hands already know. Read-only; skills are copied out.
+  agentFacts(agentId: string): { name: string; skills: Record<string, number> } | null {
+    const body = this.#loop.state.agents[agentId]
+    return body === undefined ? null : { name: body.name, skills: { ...body.skills } }
+  }
+
   onTick(cb: (tick: number) => void): void {
     this.#tickCallbacks.push(cb)
   }
