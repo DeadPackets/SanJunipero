@@ -133,7 +133,7 @@ if (existsSync(w0c0Path)) {
   sizeParams = { size: '1536x512' }
   lines.push('strip-sw-w0-c0: reusing cached raw (size support previously proven)')
 } else {
-  for (const params of [{ size: '1536x512' }, { aspect_ratio: '3:1' }]) {
+  for (const params of [{ size: '1536x512' }, { aspect_ratio: '3:1' }] as Record<string, string>[]) {
     const r = await tryGenerate(stripPrompt(false), REFS, params)
     if (r.ok) {
       sizeParams = params
