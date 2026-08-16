@@ -128,6 +128,17 @@ describe('perceptionToProse', () => {
     }
   })
 
+  // 313 of these fired in G9b run 4 and every one read "You sense something
+  // change nearby." A body going down is the loudest thing that can happen to it.
+  it('renders a collapse as its own sensation, never the fallback, never an alert', () => {
+    const alert = vi.fn()
+    const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: ['you_collapsed'] }, alert)
+    expect(prose).toContain(FELT_EVENT_PROSE['you_collapsed'])
+    expect(prose).not.toContain('You sense something change nearby.')
+    expect(alert).not.toHaveBeenCalled()
+    expect(FELT_EVENT_PROSE['you_collapsed']).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
   it('renders every global mystery as its authored sensation, never the fallback, never framed', () => {
     for (const m of MYSTERIES.filter((x) => x.scope === 'global')) {
       const alert = vi.fn()

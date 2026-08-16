@@ -88,6 +88,7 @@ export const FELT_EVENT_PROSE: Record<string, string> = {
   storm_started: 'A storm breaks overhead; wind and rain lash down.',
   snow_started: 'Snow begins to fall.',
   you_were_attacked: 'Pain — someone has struck you!',
+  you_collapsed: 'Your legs give under you and the ground comes up; you cannot get back on your feet.',
   fire_ignited: 'Smoke stings your nose — something nearby is burning.',
   fire_spread: 'The fire is spreading; the smell of smoke grows thicker.',
   fire_extinguished: 'The smoke thins and the air clears.',
