@@ -335,7 +335,13 @@ async function runCharacter(m: CastMember): Promise<void> {
     const key = `sleep-${m.id}-c${i}`
     const raw = await candidate(DIR, key, sleepPrompt(m), [STYLE_ANCHOR, master.raw], '1024x1024', 0.08)
     try {
-      let hi = processHiResCell(keyBg(await decodePng(raw)))
+      const keyed = keyBg(await decodePng(raw))
+      // Two standing figures pass the lying (wider-than-tall) sanity check — reject
+      // any candidate that slices into 2 column clusters (seen on yusuf sleep-c0).
+      let twoFigures = false
+      try { sliceStrip(keyed, 2); twoFigures = true } catch { /* single cluster — good */ }
+      if (twoFigures) throw new Error('slices into 2 figure clusters — not a single sleeping figure')
+      let hi = processHiResCell(keyed)
       // lying figure: normalize body LENGTH (opaque width) to the standing figure height
       const b = opaqueBbox(hi)!
       const bw = b.x1 - b.x0 + 1
