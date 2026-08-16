@@ -28,6 +28,21 @@ export function doorTileOf(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): { x: numb
   return { x: s.x + ((s.w - 1) >> 1), y: s.y + s.h - 1 }
 }
 
+// A building depth-sorts from its FAR corner, and its sprite is ~1.85x wider than its own
+// ground diamond (C13 hi-res art), so it covers the door tile and — being the top-most child
+// of a sortableChildren container — took every hover. The door therefore sorts against its
+// BUILDING, not against its own tile: one step above it, which is still a whole depth row
+// below anything actually standing in front of the building.
+export function structureZIndex(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): number {
+  return depthKey(s.x + s.w - 1, s.y + s.h - 1)
+}
+
+export const DOOR_Z_OVER_BUILDING = 1
+
+export function doorZIndex(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): number {
+  return structureZIndex(s) + DOOR_Z_OVER_BUILDING
+}
+
 type Entry = { sprite: Sprite; url: string; pips: Graphics | null }
 type SyncState = {
   entries: Map<string, Entry>; lastAssetsSeq: number; tags: NameTagLayer
@@ -162,7 +177,7 @@ export function syncEntities(
     }
     const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
     entry.sprite.position.set(ground.sx, ground.sy)
-    entry.sprite.zIndex = depthKey(s.x + s.w - 1, s.y + s.h - 1)
+    entry.sprite.zIndex = structureZIndex(s)
     if (s.stage === 'construction') {
       entry.sprite.tint = CONSTRUCTION_TINT
       if (entry.pips === null) {
@@ -217,7 +232,7 @@ export function syncEntities(
       const d = doorTileOf(s)
       const at = tileToScreen(d.x, d.y)
       door.position.set(at.sx, at.sy + TILE_H / 2)
-      door.zIndex = depthKey(d.x, d.y) + 2
+      door.zIndex = doorZIndex(s)
     }
   }
 

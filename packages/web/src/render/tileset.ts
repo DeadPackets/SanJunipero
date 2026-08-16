@@ -42,6 +42,9 @@ export type TerrainTex = {
   autotile: RoadAutotileKey | null
   manifest: TerrainTileManifest | null
   url: string | null
+  /** true when this is a C13 strip cell — a ribbon on transparency that needs ground beneath
+   *  it. A flat variant fills its own diamond and is never an overlay. */
+  overlay: boolean
 }
 
 type Candidate = { rec: AssetRecord; manifest: TerrainTileManifest | null }
@@ -67,7 +70,7 @@ export function resolveTerrainTile(
   if (kind === 'road' && autotile !== null) {
     const strip = readyTerrain(records, roadAutotileKind(autotile))[0]
     if (strip !== undefined) {
-      return { kind, variant, autotile, manifest: strip.manifest, url: urlOf(strip.rec) }
+      return { kind, variant, autotile, manifest: strip.manifest, url: urlOf(strip.rec), overlay: true }
     }
   }
 
@@ -78,5 +81,6 @@ export function resolveTerrainTile(
     kind, variant, autotile,
     manifest: hit?.manifest ?? null,
     url: hit !== null ? urlOf(hit.rec) : null,
+    overlay: false,
   }
 }

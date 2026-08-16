@@ -94,6 +94,43 @@ describe('paintRoadAutotile', () => {
   })
 })
 
+// FIX ROUND 2 defect 1: this is the fact the renderer has to respect. A road tile is a
+// RIBBON on transparency, not a filled diamond — half of a straight run is a hole. Drawn
+// instead of the ground it shows the stage behind it; drawn over the ground it is a road.
+describe('a road tile is an overlay, not a ground tile', () => {
+  const inDiamond = (x: number, y: number): boolean => {
+    const half = 2 * ((y < TILE_H / 2 ? y : TILE_H - 1 - y) + 1)
+    return x >= TILE_W / 2 - half && x < TILE_W / 2 + half
+  }
+  const holeFraction = (key: RoadAutotileKey): number => {
+    const img = paintRoadAutotile(key)
+    let inside = 0, clear = 0
+    for (let y = 0; y < TILE_H; y++) {
+      for (let x = 0; x < TILE_W; x++) {
+        if (!inDiamond(x, y)) continue
+        inside++
+        if (img.data[(y * TILE_W + x) * 4 + 3] === 0) clear++
+      }
+    }
+    return clear / inside
+  }
+
+  it('leaves a real hole inside the diamond for every key that is not a full junction', () => {
+    expect(holeFraction('straight-ns')).toBeGreaterThan(0.4)
+    expect(holeFraction('straight-ew')).toBeGreaterThan(0.4)
+    expect(holeFraction('cap-n')).toBeGreaterThan(0.6)
+    expect(holeFraction('corner-ne')).toBeGreaterThan(0.4)
+  })
+
+  it('is nearly solid at a crossroads — which is why the plaza looked right and roads did not', () => {
+    expect(holeFraction('cross')).toBeLessThan(0.2)
+  })
+
+  it('has SOME hole in every one of the fifteen, so none of them may replace the ground', () => {
+    for (const key of ROAD_AUTOTILE_KEYS) expect(holeFraction(key), key).toBeGreaterThan(0)
+  })
+})
+
 describe('paintRoadStrip', () => {
   it('is 480x16 and its k-th slice is the k-th key', () => {
     const strip = paintRoadStrip()

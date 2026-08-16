@@ -93,6 +93,20 @@ describe('GATE G10 — 1. tileset over the showcase terrain', () => {
     expect(seen.size).toBe(ROAD_AUTOTILE_KEYS.length)
   })
 
+  it('carries ground under every ribbon on the real showcase lattice (fix round 2)', () => {
+    const plan = tilesetPlan(terrain, codex)
+    let ribbons = 0
+    for (const cell of plan) {
+      if (!cell.overlay) continue
+      ribbons++
+      expect(cell.base, 'a ribbon with no ground under it is a hole onto the stage').not.toBeNull()
+      expect(cell.base!.url).not.toBeNull()
+    }
+    expect(ribbons).toBeGreaterThan(50)
+    // and nothing that is NOT a ribbon carries a redundant second layer
+    expect(plan.filter((c) => !c.overlay).every((c) => c.base === null)).toBe(true)
+  })
+
   it('still uses flat road variants when the strip is absent — the seam is additive', () => {
     const flatOnly = fullCodex().filter((r) => !r.kind!.startsWith('road:'))
     const plan = tilesetPlan(terrain, flatOnly)

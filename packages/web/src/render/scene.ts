@@ -31,17 +31,34 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
     const layer = new Container()
     const g = new Graphics()
     layer.addChild(g)
+    const diamond = (cx: number, sy: number, color: number, shade: boolean): void => {
+      g.poly([cx, sy, cx + TILE_W / 2, sy + TILE_H / 2, cx, sy + TILE_H, cx - TILE_W / 2, sy + TILE_H / 2])
+      g.fill(shade ? shadeColor(color) : color)
+    }
+    const blit = (url: string | null, cx: number, sy: number): boolean => {
+      const tex = url === null ? undefined : loaded.get(url)
+      if (tex === undefined) return false
+      const s = new Sprite(tex)                   // NEAREST is global (C6 T11); drawn 1:1
+      s.position.set(cx - TILE_W / 2, sy)
+      layer.addChild(s)
+      return true
+    }
     for (const cell of tilesetPlan(terrain, records)) {
       const cx = cell.sx + offX
-      const tex = cell.url === null ? undefined : loaded.get(cell.url)
-      if (tex !== undefined) {
-        const s = new Sprite(tex)                 // NEAREST is global (C6 T11); drawn 1:1
-        s.position.set(cx - TILE_W / 2, cell.sy)
-        layer.addChild(s)
+      // An overlay tile is a ribbon on transparency: paint the ground first or its own holes
+      // show the stage. If either half is still loading, the flat diamond covers the tile —
+      // a viewer never sees a hole, only a coarser tile.
+      if (cell.overlay && cell.base !== null) {
+        if (loaded.has(cell.url ?? '')) {
+          if (!blit(cell.base.url, cx, cell.sy)) diamond(cx, cell.sy, cell.base.fallback, cell.shade)
+          blit(cell.url, cx, cell.sy)
+          continue
+        }
+        diamond(cx, cell.sy, cell.fallback, cell.shade)
         continue
       }
-      g.poly([cx, cell.sy, cx + TILE_W / 2, cell.sy + TILE_H / 2, cx, cell.sy + TILE_H, cx - TILE_W / 2, cell.sy + TILE_H / 2])
-      g.fill(cell.shade ? shadeColor(cell.fallback) : cell.fallback)
+      if (blit(cell.url, cx, cell.sy)) continue
+      diamond(cx, cell.sy, cell.fallback, cell.shade)
     }
     app.renderer.render({ container: layer, target, clear: true })
     layer.destroy({ children: true })
@@ -64,7 +81,8 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
 
       // Textures load async. Paint the flat fallback now, then repaint once the tile art is
       // in — a viewer never waits on a blank map, and a stale load never overwrites a newer bake.
-      const urls = [...new Set(tilesetPlan(terrain, records).map((c) => c.url))]
+      // both layers, or a road's ground never loads and every ribbon stays a flat diamond
+      const urls = [...new Set(tilesetPlan(terrain, records).flatMap((c) => [c.url, c.base?.url ?? null]))]
         .filter((u): u is string => u !== null && !loaded.has(u))
       if (urls.length === 0) return
       const gen = ++generation

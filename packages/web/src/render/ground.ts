@@ -41,15 +41,19 @@ export function groundPlan(terrain: TileId[][]): GroundCell[] {
 }
 
 export const GROUND_FALLBACK_COLOR = 0x93b573
+export const GRASS_TILE_ID = 0
 
 // One plan entry per tile: a codex texture url when terrain art exists, otherwise the C6
 // flat palette-true diamond. Art independence — an empty record set renders exactly as C6 did.
-export type TilePlan = {
+export type TileLayer = { tex: TerrainTileManifest | null; url: string | null; fallback: number }
+
+export type TilePlan = TileLayer & {
   sx: number; sy: number
-  tex: TerrainTileManifest | null
-  url: string | null
-  fallback: number
   shade: boolean
+  /** the C13 strip is a ribbon on transparency — `tex` covers only part of the diamond */
+  overlay: boolean
+  /** the ground that goes UNDER an overlay; null when `tex` fills its own diamond */
+  base: TileLayer | null
 }
 
 export function tilesetPlan(terrain: TileId[][], records: AssetRecord[]): TilePlan[] {
@@ -62,9 +66,17 @@ export function tilesetPlan(terrain: TileId[][], records: AssetRecord[]): TilePl
       // AMENDMENT (C13 §4): a road tile asks the shared autotiler for its shape first; the
       // flat road variants stay the fallback when no autotiled strip is in the codex.
       const autotile = id === ROAD_TILE_ID ? roadAutotile(roadNeighborsAt(terrain, x, y)) : null
-      const { manifest, url } = resolveTerrainTile(records, id, x, y, autotile)
+      const { manifest, url, overlay } = resolveTerrainTile(records, id, x, y, autotile)
+      // A ribbon drawn INSTEAD of the ground shows the stage through its own transparency —
+      // half of a straight run is a hole. The road is painted to meet GRASS at its edges
+      // (roadTiles.ts strokes exactly that seam), so grass is what goes underneath it.
+      let base: TileLayer | null = null
+      if (overlay) {
+        const under = resolveTerrainTile(records, GRASS_TILE_ID, x, y)
+        base = { tex: under.manifest, url: under.url, fallback: TILE_COLORS[GRASS_TILE_ID] }
+      }
       cells.push({
-        sx, sy, tex: manifest, url,
+        sx, sy, tex: manifest, url, overlay, base,
         fallback: TILE_COLORS[id] ?? GROUND_FALLBACK_COLOR,
         shade: (x + y) % 2 === 1,
       })
