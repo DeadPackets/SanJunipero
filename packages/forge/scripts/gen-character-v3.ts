@@ -16,7 +16,7 @@ import {
   FACINGS, FACING_CLAUSES, POSES_V2, STRIP_POSES_V2, WALK_POSES_V2, POSE_CLAUSES_V2,
   CELL_V2, FEET_Y_V2, type Facing, type PoseV2, type StripPoseV2, type WalkPoseV2,
   sliceStrip, estimatePitch, v7Chain, opaqueBbox, anchorToCanvas, registerToReference,
-  assembleGrid, upscaleNearest, distanceMatrix, pairwiseMedian,
+  assembleGrid, upscaleNearest, downscaleMajority, distanceMatrix, pairwiseMedian,
   crossFacingDupeGate, strideGate, frameCoherenceGate, sleepGate, type GateFailure,
 } from '../src/sheet.js'
 import { CHAR_DESC, ASYMMETRY_CLAUSE, BIG_PIXEL } from './character.js'
@@ -76,12 +76,15 @@ async function generate(prompt: string, refs: Buffer[], size: string): Promise<B
   return Buffer.from(b64, 'base64')
 }
 
+// Margin clause per the B2 wide-canvas probe: without it figures touch the frame edges.
 function stripPrompt(f: Facing): string {
   const phases = STRIP_POSES_V2.map((p, i) => `frame ${i + 1}: ${POSE_CLAUSES_V2[p]}`).join('; ')
   return `${STYLE_PROMPT} A horizontal sprite strip of exactly FIVE copies of the SAME character side by side, ` +
     `evenly spaced with clear magenta gaps between figures, whole body visible in each. Every figure is ` +
     `${FACING_CLAUSES[f]}. Left to right: ${phases}. The five figures are identical in costume, colors and ` +
-    `proportions — only the pose changes. Subject: ${CHAR_DESC}. ${ASYMMETRY_CLAUSE} ${BIG_PIXEL}`
+    `proportions — only the pose changes. Subject: ${CHAR_DESC}. ${ASYMMETRY_CLAUSE} ${BIG_PIXEL}` +
+    ' Each figure stands about three quarters of the frame height tall, with clear magenta margin above and ' +
+    'below every figure; figures must NOT touch the top or bottom edge of the image.'
 }
 function sleepPrompt(f: Facing): string {
   return `${STYLE_PROMPT} A single character sprite, exactly one figure. The character is ${FACING_CLAUSES[f]}. ` +
@@ -112,9 +115,20 @@ async function candidate(key: string, prompt: string, guided: boolean, size: str
   return { key, raw, score: v.score, notes: v.notes, guided }
 }
 
-// Place a v7 output on the 96×96 canvas, feet at y=88; art taller than 88 px fails the strip.
+// Coarsen-to-fit (v1 postProcessCell parity, B2 probe finding): gemini draws this
+// character at ~90-113 native art px tall regardless of framing; the 96 cell with
+// feet at y=88 budgets 89 rows. Majority-downscale (the v1-shipped reduction) to fit.
+const MAX_ART_H = FEET_Y_V2 + 1
+function fitToBudget(img: RawImage): RawImage {
+  const k = Math.min(MAX_ART_H / img.height, CELL_V2 / img.width, 1)
+  if (k === 1) return img
+  return downscaleMajority(img,
+    Math.min(CELL_V2, Math.max(1, Math.round(img.width * k))),
+    Math.min(MAX_ART_H, Math.max(1, Math.round(img.height * k))))
+}
+// Place a v7 output on the 96×96 canvas, feet at y=88.
 function place(img: RawImage): RawImage {
-  return anchorToCanvas(img, CELL_V2, CELL_V2, FEET_Y_V2)
+  return anchorToCanvas(fitToBudget(img), CELL_V2, CELL_V2, FEET_Y_V2)
 }
 
 type ProcessedStrip = { cells: Record<StripPoseV2, RawImage>; pitch: number; pitchSpread: number }
@@ -168,8 +182,9 @@ const PROVISIONAL_MEDIAN = 0.310
 async function attemptStrip(f: Facing, attempt: number): Promise<{ ok: boolean; state: StripState }> {
   const cands: Candidate[] = []
   for (let i = 0; i < 2; i++) {
-    const guided = USE_GUIDES && i % 2 === 1
-    try { cands.push(await candidate(`strip-${f}-a${attempt}-c${i}`, stripPrompt(f), guided, '1024x1024')) }
+    // A/B resolved by the B2 probe (guided won): --guides now guides ALL strip candidates
+    const guided = USE_GUIDES
+    try { cands.push(await candidate(`strip-${f}-a${attempt}-c${i}`, stripPrompt(f), guided, '1536x512')) }
     catch (e) { if (e instanceof BudgetExceededError) throw new OutOfBudget(e.message); throw e }
   }
   cands.sort((a, b) => b.score - a.score)
@@ -216,7 +231,8 @@ const sleeps = new Map<Facing, SleepState>()
 async function attemptSleep(f: Facing, attempt: number): Promise<{ ok: boolean; state: SleepState }> {
   const cands: Candidate[] = []
   for (let i = 0; i < 2; i++) {
-    const guided = USE_GUIDES && i % 2 === 1
+    // sleep cells stay unguided: the guide refs are strip-layout aids, wrong for single cells
+    const guided = false
     try { cands.push(await candidate(`sleep-${f}-a${attempt}-c${i}`, sleepPrompt(f), guided, '512x512')) }
     catch (e) { if (e instanceof BudgetExceededError) throw new OutOfBudget(e.message); throw e }
   }
