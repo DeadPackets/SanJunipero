@@ -135,6 +135,8 @@ export function createCharacterLayer(
       sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, emoteUntil: 0, facing: 'sw',
       path: [{ x, y, atMs: now }], lastMoveArrival: now,
     }
+    entries.set(agentId, e)
+    loadSheet(agentId, null)
     return e
   }
 
