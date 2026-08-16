@@ -85,9 +85,13 @@ export function InspectorPanel({ store, agentId, scene }: { store: WorldStore; a
       return { x: sx, y: sy }
     })
     const offEnd = scene.onFollowEnd(() => setFollow(false))
+    // following someone through a door takes the camera in with them (C10 T11)
+    scene.interior?.setFollowed(agentId)
     return () => {
       offEnd()
       scene.setFollow(null)
+      scene.interior?.setFollowed(null)
+      scene.interior?.setActive(null)
     }
   }, [follow, scene, store, agentId])
 

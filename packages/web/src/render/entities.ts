@@ -1,9 +1,9 @@
 import { Graphics, Sprite, type FederatedPointerEvent } from 'pixi.js'
-import { tickToMoment } from '@sj/shared'
-import type { WorldState } from '@sj/engine/state'
+import { INTERIOR_KINDS, tickToMoment } from '@sj/shared'
+import type { Structure, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { hoverLabel, itemCropDetail, type HoverKind } from '../ui/interaction.js'
-import { depthKey, tileToScreen } from './iso.js'
+import { TILE_H, depthKey, tileToScreen } from './iso.js'
 import { createNameTagLayer, type NameTagLayer } from './nameTags.js'
 import type { Scene } from './scene.js'
 import { TextureBook, buildingArt, smoothSource, textureUrlFor, type BuildingArt } from './textures.js'
@@ -17,8 +17,22 @@ export const PIP_COUNT = 4
 export const PIP_COLOR = 0xf2c879
 export const BUILD_TICKS_FULL = 2880 // pip denominator — DEFAULT_CONFIG construction.hutTicks; presentation only
 
+// The door a resident walks out of: south face, centre of the frontage. The same rule the
+// C13 city template applies in template space (`doorTile`), read here in world tiles.
+export const ENTERABLE_KINDS: ReadonlySet<string> = new Set(INTERIOR_KINDS)
+export const DOOR_W = 10, DOOR_H = 13
+export const DOOR_FILL = 0x43394a, DOOR_STEP = 0xf2c879
+export const DOOR_IDLE_ALPHA = 0.5
+
+export function doorTileOf(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): { x: number; y: number } {
+  return { x: s.x + ((s.w - 1) >> 1), y: s.y + s.h - 1 }
+}
+
 type Entry = { sprite: Sprite; url: string; pips: Graphics | null }
-type SyncState = { entries: Map<string, Entry>; lastAssetsSeq: number; tags: NameTagLayer }
+type SyncState = {
+  entries: Map<string, Entry>; lastAssetsSeq: number; tags: NameTagLayer
+  doors: Map<string, Graphics>; onDoor: ((structureId: string) => void) | null
+}
 const syncStates = new WeakMap<Scene, SyncState>()
 
 function setTexture(book: TextureBook, entry: Entry, url: string): void {
@@ -100,14 +114,20 @@ export function entitySpriteOf(scene: Scene, kind: 'structure' | 'item' | 'crop'
 }
 
 // diff-based sync, called once per store change
-export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore): void {
+export function syncEntities(
+  scene: Scene, book: TextureBook, store: WorldStore, onDoor?: (structureId: string) => void,
+): void {
   const state = store.getState()
   if (state === null) return
   let sync = syncStates.get(scene)
   if (sync === undefined) {
-    sync = { entries: new Map(), lastAssetsSeq: store.assetsSeq(), tags: createNameTagLayer(scene) }
+    sync = {
+      entries: new Map(), lastAssetsSeq: store.assetsSeq(), tags: createNameTagLayer(scene),
+      doors: new Map(), onDoor: null,
+    }
     syncStates.set(scene, sync)
   }
+  if (onDoor !== undefined) sync.onDoor = onDoor
   const tags = sync.tags
 
   // Everything on the map answers to the pointer: hover names it, click tells its story.
@@ -160,6 +180,44 @@ export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore)
         entry.pips.destroy()
         entry.pips = null
       }
+    }
+
+    // Look-inside affordance: a door on the frontage of a finished enterable building. It is
+    // drawn rather than hidden behind a hover, so it can be found without a pointer sweep,
+    // and it is its own hotspot so the building keeps its provenance click.
+    const enterable = s.stage === 'complete' && ENTERABLE_KINDS.has(s.kind)
+    const doorKey = `door:${s.id}`
+    live.add(doorKey)
+    let door = sync.doors.get(doorKey)
+    if (enterable && door === undefined) {
+      door = new Graphics()
+      door.roundRect(-DOOR_W / 2, -DOOR_H, DOOR_W, DOOR_H, 3)
+      door.fill(DOOR_FILL)
+      door.rect(-DOOR_W / 2, -2, DOOR_W, 2)
+      door.fill(DOOR_STEP)
+      door.alpha = DOOR_IDLE_ALPHA
+      door.eventMode = 'static'
+      door.cursor = 'pointer'
+      const sid = s.id
+      door.on('pointerover', () => {
+        door!.alpha = 1
+        const name = hoverLabel(store.getState(), 'structure', sid)
+        if (name !== null) tags.show(`Look inside — ${name}`, door!.x, door!.y - DOOR_H)
+      })
+      door.on('pointerout', () => {
+        door!.alpha = DOOR_IDLE_ALPHA
+        tags.hide()
+      })
+      door.on('pointertap', () => sync!.onDoor?.(sid))
+      sync.doors.set(doorKey, door)
+      scene.entities.addChild(door)
+    }
+    if (door !== undefined) {
+      door.visible = enterable
+      const d = doorTileOf(s)
+      const at = tileToScreen(d.x, d.y)
+      door.position.set(at.sx, at.sy + TILE_H / 2)
+      door.zIndex = depthKey(d.x, d.y) + 2
     }
   }
 
@@ -221,6 +279,13 @@ export function syncEntities(scene: Scene, book: TextureBook, store: WorldStore)
       entry.sprite.destroy({ children: true })
       sync.entries.delete(key)
       tags.hide() // a torn-down sprite never fires pointerout, so its tag would hang
+    }
+  }
+  for (const [key, door] of sync.doors) {
+    if (!live.has(key)) {
+      door.destroy()
+      sync.doors.delete(key)
+      tags.hide()
     }
   }
 

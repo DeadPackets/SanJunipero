@@ -72,7 +72,27 @@
    · STATE     the open day carries aria-current AND an ember rail; play/pause is one button
                with aria-pressed and a label that changes with it. The transport is drawn in
                the town's own pixels — ▶ and ❙❙ are pictographic characters whose shape
-               belongs to the reader's font, not to the town. */
+               belongs to the reader's font, not to the town.
+
+   C10 T11 design-token plan (interior scenes + back to town), written before implementing:
+   · SURFACE   the ROOM is canvas, not chrome: a cream floor diamond (--parchment) with an
+               ink rim, cut from the same paper the panels are. The only chrome is one bar
+               at the head of the stage, on the --px-cream slab every floating surface wears.
+   · COLOUR    no new colour token. The town is dimmed behind --night at 0.62 — enough that
+               the room is unambiguously the subject, little enough that the town is still
+               THERE (the user ruling: the outside world stays on the main scene). --honey
+               is the hearth's light, the same warmth the moments playhead uses.
+   · TYPE      --font-px for the room's name and the button; --font-body for the line about
+               who is in, because that sentence is about people and must read as prose.
+   · SPACE     --interior-bar-h: 44px. A token because the button in it is the escape hatch
+               and must clear the 44px touch minimum whatever else the stage is showing.
+   · MOTION    INTERIOR_FADE_MS (260ms) — inside the 150–300ms band. The fade is a CAMERA
+               MOVE, not a cartoon effect, so the grave-tone director never suppresses it;
+               under prefers-reduced-motion it becomes a cut, and the bar stops sliding.
+   · STATE     focus lands on "Back to town" when the room opens and returns to the map when
+               it closes; Escape leaves. The caption observes ("Amara asleep, Yusuf are in")
+               and never counts. The door on the frontage is drawn at 0.5 and brightens on
+               hover — an affordance a viewer can find without sweeping the pointer. */
 :root {
   --cream: #FFF6E9;
   --parchment: #F6E8D5;
@@ -102,6 +122,9 @@
   /* moments: the postcard rail and the transport bar are both fixed, for the same reason */
   --moment-rail: 15rem;
   --player-h: 56px;
+
+  /* interiors: the escape hatch is a touch target before it is a decoration */
+  --interior-bar-h: 44px;
 
   /* bitmap type: display face for identity moments, ui face for labels/controls */
   --font-display: 'Press Start 2P', 'Silkscreen', monospace;
@@ -555,6 +578,45 @@ body {
   @keyframes banner-in {
     from { opacity: 0; translate: -50% -8px; }
     to { opacity: 1; translate: -50% 0; }
+  }
+}
+
+/* ── interiors: the room the camera stepped into, and the way back out (Task 11) ──
+   The room itself is drawn on the canvas; this is only the bar that names it and leaves it. */
+.interior-bar {
+  position: absolute; top: 0.8rem; left: 0.8rem; z-index: 21;
+  display: flex; align-items: center; gap: 0.7rem;
+  min-height: var(--interior-bar-h);
+  max-width: calc(100% - 1.6rem);
+  padding: 0.3rem 0.7rem 0.3rem 0.3rem;
+  background: var(--cream) var(--grain);
+  border: 10px solid transparent; border-image: var(--px-cream);
+  box-shadow: var(--ledge);
+}
+.interior-back {
+  font-family: var(--font-px); font-size: 0.72rem; letter-spacing: 0.03em;
+  min-height: var(--interior-bar-h); padding: 0 0.8rem;
+  color: var(--cream); background: var(--ink);
+  border: 2px solid var(--ink); border-radius: 0; cursor: pointer;
+  box-shadow: 2px 2px 0 0 var(--deep);
+}
+.interior-back:hover { background: var(--deep); }
+.interior-back:active { translate: 2px 2px; box-shadow: none; }
+.interior-caption { display: flex; flex-direction: column; min-width: 0; }
+.interior-title {
+  font-family: var(--font-px); font-size: 0.74rem; letter-spacing: 0.03em; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.interior-who {
+  font-family: var(--font-body); font-size: 0.8rem; color: var(--ink); opacity: 0.8;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-wrap: pretty;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .interior-bar { animation: interior-in 260ms var(--ease-enter); }
+  .interior-back { transition-property: background-color, translate, box-shadow; transition-duration: var(--t-fast); }
+  @keyframes interior-in {
+    from { opacity: 0; translate: 0 -6px; }
+    to { opacity: 1; translate: 0 0; }
   }
 }
 

@@ -13,6 +13,7 @@ import { DirectorMode } from './ui/DirectorMode.js'
 import { MomentsLens } from './ui/MomentsLens.js'
 import { DigestModal } from './ui/DigestModal.js'
 import { StageVeil } from './ui/StageVeil.js'
+import { InteriorBar } from './ui/InteriorBar.js'
 import { LensTabs, StatusStrip } from './ui/StatusStrip.js'
 import { CameraHud } from './ui/CameraHud.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
@@ -57,6 +58,8 @@ export function App() {
   const [handle, setHandle] = useState<ObservatoryHandle | null>(null)
   const [gapTicks, setGapTicks] = useState<number | null>(null)
   const [link, setLink] = useState<LinkStatus>('connecting')
+  // which interior the camera is inside; the Pixi sub-scene owns the truth, this mirrors it
+  const [insideId, setInsideId] = useState<string | null>(null)
   // Operator-only: absent for every viewer who did not put a token in this session.
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStorage))
 
@@ -163,8 +166,13 @@ export function App() {
       <StatusStrip store={store} />
       <div className="stage-row">
         <main id="stage-root" className={route.lens === 'society' ? 'stage-hidden' : undefined}>
-          <StageMount store={store} onScene={setScene} />
+          <StageMount store={store} onScene={setScene} onInterior={setInsideId} />
           <StageVeil store={store} />
+          <InteriorBar
+            store={store}
+            structureId={insideId}
+            onBack={() => scene?.interior?.setActive(null)}
+          />
           <ScrubBanner store={store} />
           {(route.lens === 'map' || route.lens === 'inspector') && <CameraHud scene={scene} />}
           <FpsOverlay />

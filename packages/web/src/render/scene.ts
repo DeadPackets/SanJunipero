@@ -3,6 +3,7 @@ import type { FederatedPointerEvent, Texture } from 'pixi.js'
 import type { AssetRecord } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
+import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import { shadeColor, tilesetPlan } from './ground.js'
 import { TextureBook } from './textures.js'
@@ -97,6 +98,8 @@ export type Scene = {
   onTilePointer(cb: (t: { x: number; y: number }) => void): void
   /** world-space anchor for an agent's sprite; wired by StageMount once layers exist */
   anchorOf?: (agentId: string) => { x: number; y: number } | null
+  /** the interior sub-scene; wired by StageMount once the character layer exists */
+  interior?: InteriorScene
   destroy(): void
 }
 

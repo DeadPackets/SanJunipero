@@ -75,6 +75,27 @@ function sliceV4(atlas: Texture, art: CharArt, row: (typeof SHEET_ROWS)[number],
     new Texture({ source: atlas.source, frame: new Rectangle(cell.x, cell.y, cell.w, cell.h) }))
 }
 
+export type CharacterCell = { texture: Texture; anchor: { x: number; y: number }; scale: number }
+
+// One posed cell out of a loaded sheet, feet-anchored and scaled to the world footprint.
+// The map layer below inlines this; the interior sub-scene borrows it rather than growing a
+// second slicer that could disagree about where a body's feet are.
+export function characterCell(
+  sheet: Texture, art: CharArt, row: (typeof SHEET_ROWS)[number], facing: Facing,
+): CharacterCell | null {
+  if (art.manifest === null) {
+    return { texture: sliceV2(sheet, row, facing), anchor: { x: 0.5, y: FEET_Y / CELL }, scale: CHAR_TARGET_PX / 64 }
+  }
+  const cell = art.manifest.cells[`${row}-${facing}`]
+  const texture = sliceV4(sheet, art, row, facing)
+  if (cell === undefined || texture === null) return null
+  return {
+    texture,
+    anchor: { x: cell.feetX / cell.w, y: cell.feetY / cell.h },
+    scale: CHAR_TARGET_PX / art.manifest.figureH,
+  }
+}
+
 export function createCharacterLayer(
   scene: Scene,
   book: TextureBook,

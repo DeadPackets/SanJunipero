@@ -9,11 +9,23 @@ import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
 import { createAtmosphere, type Atmosphere } from './atmosphere.js'
 import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 import { createAmbient, type AmbientDirector } from './ambient.js'
+import { createInteriorScene, type InteriorScene } from './interiorScene.js'
 
 // The ONLY React/Pixi contact point — React renders nothing inside the canvas (spec §15).
-export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (scene: Scene) => void }) {
+export function StageMount(
+  { store, onScene, onInterior }: {
+    store: WorldStore
+    onScene?: (scene: Scene) => void
+    /** the interior sub-scene opened or closed — App draws the back-to-town chrome from it */
+    onInterior?: (structureId: string | null) => void
+  },
+) {
   const rootRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<Scene | null>(null)
+  const interiorRef = useRef<InteriorScene | null>(null)
+  // read in the Pixi callbacks, never subscribed to — a follow change must not remount Pixi
+  const onInteriorRef = useRef(onInterior)
+  onInteriorRef.current = onInterior
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
     const s = sceneRef.current
@@ -37,6 +49,8 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
     let atmosphere: Atmosphere | null = null
     let weather: WeatherLayer | null = null
     let ambient: AmbientDirector | null = null
+    let interior: InteriorScene | null = null
+    let offInterior: (() => void) | null = null
     let offEvents: (() => void) | null = null
     let tickFn: (() => void) | null = null
     void createScene(rootEl, store).then((s) => {
@@ -46,8 +60,9 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
       }
       scene = s
       const book = new TextureBook()
-      offSync = store.subscribe(() => syncEntities(s, book, store))
-      syncEntities(s, book, store)
+      const openDoor = (structureId: string): void => interiorRef.current?.setActive(structureId)
+      offSync = store.subscribe(() => syncEntities(s, book, store, openDoor))
+      syncEntities(s, book, store, openDoor)
       chars = createCharacterLayer(s, book, store, (agentId) => {
         // click-to-inspect: the G6 check — route change only, React owns the chrome
         const url = `${location.pathname}?lens=inspector&agent=${encodeURIComponent(agentId)}`
@@ -64,6 +79,10 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
         const sp = charLayer.getSprite(agentId)
         return sp === null ? null : { x: sp.x, y: sp.y }
       }
+      interior = createInteriorScene(s, store, book)
+      s.interior = interior
+      interiorRef.current = interior
+      offInterior = interior.onChange((id) => onInteriorRef.current?.(id))
       offEvents = store.onEvents((evts) => {
         for (const ev of evts) {
           if (ev.type === 'agent_spoke') {
@@ -100,7 +119,10 @@ export function StageMount({ store, onScene }: { store: WorldStore; onScene?: (s
       disposed = true
       offSync?.()
       offEvents?.()
+      offInterior?.()
       if (tickFn !== null && scene !== null) scene.app.ticker.remove(tickFn)
+      interiorRef.current = null
+      interior?.destroy()
       chars?.destroy()
       bubbles?.destroy()
       ambient?.destroy()
