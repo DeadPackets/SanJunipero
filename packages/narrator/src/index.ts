@@ -3,4 +3,5 @@ export { NARRATOR_TABLES, migrateNarratorTables, openNarratorDb } from './schema
 export { NarratorStore } from './store.js'
 export { WORLD_TABLES, openNarratorWorld } from './glass.js'
 export { DEFAULT_SEGMENT_CONFIG, eventAgentIds, eventLocation, segmentScenes } from './segment.js'
+export { CONFLICT_WEIGHT, STAKES_WEIGHT, rankScenesForDirector, scoreHeat } from './heat.js'
 export type * from './types.js'
