@@ -20,3 +20,7 @@ export * from './worker.js'
 export * from './rig.js'
 export * from './terrainManifest.js'
 export * from './emotes.js'
+export {
+  FACINGS, POSES_V2, WALK_POSES_V2, STRIP_POSES_V2, CELL_V2, FEET_Y_V2, SHEET_W_V2, SHEET_H_V2,
+  type Facing, type PoseV2,
+} from './sheet.js'

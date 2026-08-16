@@ -7,6 +7,7 @@ import { AssetCodex } from '@sj/forge'
 import { WorldMirror } from './worldMirror.js'
 import { SocketHub } from './hub.js'
 import { thoughtsSince } from './observer.js'
+import { mountAssetRoutes } from './assetsHttp.js'
 
 export type GatewayOpts = {
   dbPath: string; port?: number                 // default 8787
@@ -37,7 +38,17 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const router: Router = {
     route(method, pattern, fn) { routes.push({ method, segs: pattern.split('/').filter(Boolean), fn }) },
   }
-  void router // consumed by Tasks 6–7 mounts
+
+  // lazy codex: the forge `assets` table may not exist yet on a bare world DB
+  let assetsSeen = false
+  let codex: AssetCodex | null = null
+  const getCodex = (): AssetCodex | null => {
+    if (!assetsSeen) assetsSeen = hasTable.get('assets') !== undefined
+    if (!assetsSeen) return null
+    codex ??= new AssetCodex(db)
+    return codex
+  }
+  mountAssetRoutes(router, { getCodex })
 
   const httpServer = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
@@ -107,8 +118,6 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   let lastThoughtId = 0
   let lastAssetSeq = 0
   let observerSeen = false
-  let assetsSeen = false
-  let codex: AssetCodex | null = null
   const pump = (): void => {
     const groups = mirror.poll()
     if (groups.length > 0) snapJson = null
@@ -122,10 +131,9 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         hub.broadcast(JSON.stringify({ t: 'thought', agentId: t.agentId, tick: t.tick, text: t.text }))
       }
     }
-    if (!assetsSeen) assetsSeen = hasTable.get('assets') !== undefined
-    if (assetsSeen) {
-      codex ??= new AssetCodex(db)
-      for (const record of codex.listSince(lastAssetSeq)) {
+    const cdx = getCodex()
+    if (cdx) {
+      for (const record of cdx.listSince(lastAssetSeq)) {
         lastAssetSeq = record.seq
         hub.broadcast(JSON.stringify({ t: 'asset', record }))
       }
