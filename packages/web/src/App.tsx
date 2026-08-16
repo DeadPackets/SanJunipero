@@ -3,6 +3,7 @@ import { momentToTick, tickToMoment } from '@sj/shared'
 import { createWorldStore, type WorldStore } from './state/worldStore.js'
 import { connectObservatory, type ObservatoryHandle } from './net/socket.js'
 import { LENSES, parseRoute, routeToPath, type Lens, type Route } from './ui/route.js'
+import { StageMount } from './render/StageMount.js'
 
 // chrome copy speaks about townsfolk, never machinery (spec §5)
 const LENS_LABELS: Record<Lens, string> = {
@@ -67,7 +68,9 @@ export function App() {
         <TickBadge store={store} />
       </header>
       <div className="stage-row">
-        <main id="stage-root" />
+        <main id="stage-root">
+          <StageMount store={store} />
+        </main>
         <aside id="panel-outlet" />
       </div>
     </div>
