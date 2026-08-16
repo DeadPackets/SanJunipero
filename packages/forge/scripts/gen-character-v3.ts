@@ -30,6 +30,7 @@ const MODEL = 'google/gemini-3.1-flash-image'
 const RESERVE = 0.046
 
 const USE_GUIDES = process.argv.includes('--guides')
+const SEED_SLEEP = process.argv.includes('--seed-sleep')
 const conceptIdx = process.argv.indexOf('--concept')
 const CONCEPT = conceptIdx >= 0 ? readFileSync(process.argv[conceptIdx + 1]!) : null
 
@@ -97,12 +98,14 @@ const file = (f: Facing, p: PoseV2) => `${p}-${f}.png`
 type Candidate = { key: string; raw: Buffer; score: number; notes: string; guided: boolean }
 
 // One candidate: generate (or reuse cached raw), judge (cached), persist synchronously.
-async function candidate(key: string, prompt: string, guided: boolean, size: string): Promise<Candidate> {
+// extraRefs slot in after style anchor + concept, before the identity ref (B3 ruling).
+async function candidate(key: string, prompt: string, guided: boolean, size: string, extraRefs: Buffer[] = []): Promise<Candidate> {
   const rawPath = `${CACHE}/${key}.png`
   let raw: Buffer
   if (existsSync(rawPath)) { raw = readFileSync(rawPath); console.log(`  ${key}: reusing cached raw`) }
   else {
-    raw = await generate(prompt, guided ? [...REFS, ...GUIDE_REFS] : REFS, size)
+    const base = extraRefs.length ? [...REFS.slice(0, -1), ...extraRefs, REFS[REFS.length - 1]!] : REFS
+    raw = await generate(prompt, guided ? [...base, ...GUIDE_REFS] : base, size)
     writeFileSync(rawPath, raw)
     console.log(`  ${key}: generated (${guided ? 'guided' : 'unguided'}), total spend $${budget.total.toFixed(3)}`)
   }
@@ -228,12 +231,13 @@ for (const f of FACINGS) {
 type SleepState = { cand: Candidate; cell: RawImage; retries: number; failures: GateFailure[] }
 const sleeps = new Map<Facing, SleepState>()
 
-async function attemptSleep(f: Facing, attempt: number): Promise<{ ok: boolean; state: SleepState }> {
+async function attemptSleep(f: Facing, attempt: number, seed?: Buffer): Promise<{ ok: boolean; state: SleepState }> {
   const cands: Candidate[] = []
   for (let i = 0; i < 2; i++) {
     // sleep cells stay unguided: the guide refs are strip-layout aids, wrong for single cells
     const guided = false
-    try { cands.push(await candidate(`sleep-${f}-a${attempt}-c${i}`, sleepPrompt(f), guided, '512x512')) }
+    const key = seed ? `sleep-${f}-s0-c${i}` : `sleep-${f}-a${attempt}-c${i}`
+    try { cands.push(await candidate(key, sleepPrompt(f), guided, '512x512', seed ? [seed] : [])) }
     catch (e) { if (e instanceof BudgetExceededError) throw new OutOfBudget(e.message); throw e }
   }
   cands.sort((a, b) => b.score - a.score)
@@ -270,6 +274,22 @@ for (const f of FACINGS) {
     last = r.state
     if (r.ok) break
     console.log(`  ${f}/sleep attempt ${attempt} failed: ${r.state.failures.map(x => x.gate).join(', ')}`)
+  }
+  // B3 ruling: one seeded attempt for a facing still blocked after protocol retries —
+  // the PASSED sw sleep raw joins the refs as an extra identity anchor. Kept only on a
+  // full gate pass; a still-failing facing ships flagged, no further spend.
+  if (SEED_SLEEP && last && last.failures.length > 0) {
+    const sw = sleeps.get('sw')
+    if (sw && sw.failures.length === 0) {
+      try {
+        const r = await attemptSleep(f, 3, sw.cand.raw)
+        if (r.ok) last = r.state
+        else console.log(`  ${f}/sleep seeded attempt failed: ${r.state.failures.map(x => x.gate).join(', ')} — stays BLOCKED`)
+      } catch (e) {
+        if (e instanceof OutOfBudget) console.log(`budget exhausted; ${f}/sleep seeded attempt skipped`)
+        else throw e
+      }
+    }
   }
   sleeps.set(f, last!)
 }
