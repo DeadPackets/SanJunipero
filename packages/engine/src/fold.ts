@@ -1,8 +1,9 @@
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, MINUTES_PER_DAY, SPAWN_AGE_YEARS, type SimConfig, type SimEvent } from '@sj/shared'
 import type { TileId, WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
-  AgentAged, AgentCollapsed, AgentDied, AgentFellIll, AgentInfected, AgentInjured, AgentMoved,
+  AgentAged, AgentBorn, AgentCollapsed, AgentConceived, AgentDied, AgentFellIll, AgentInfected,
+  AgentInjured, AgentMoved,
   AgentEntered, AgentExited,
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
@@ -300,6 +301,41 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_collapsed for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, collapsedSinceTick: event.tick } } }
+    }
+    case 'agent_conceived': {
+      const p = AgentConceived.parse(event.payload)
+      const mother = state.agents[p.motherId]
+      if (!mother) throw new Error(`agent_conceived for unknown agent ${p.motherId}`)
+      if (!state.agents[p.fatherId]) throw new Error(`agent_conceived for unknown agent ${p.fatherId}`)
+      return {
+        ...state,
+        agents: { ...state.agents, [p.motherId]: { ...mother, pregnant: { sinceDay: p.day, byId: p.fatherId } } },
+      }
+    }
+    // One event, one body: the child arrives where the mother stands, inside her walls if
+    // she has any, and her term ends in the same fold.
+    case 'agent_born': {
+      const p = AgentBorn.parse(event.payload)
+      const mother = state.agents[p.motherId]
+      if (!mother) throw new Error(`agent_born for unknown agent ${p.motherId}`)
+      const { pregnant: _, ...delivered } = mother
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          [p.motherId]: delivered,
+          [p.id]: {
+            id: p.id, name: p.name, x: p.x, y: p.y, alive: true, asleep: false,
+            needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
+            hp: config.health.maxHp, injuries: [], ill: false, ageDays: SPAWN_AGE_YEARS * 365,
+            sex: p.sex,
+            parents: [p.motherId, p.fatherId],
+            ...(mother.insideId === undefined ? {} : { insideId: mother.insideId }),
+            skills: {}, activity: null, collapsedSinceTick: null, zeroHungerSinceTick: null,
+          },
+        },
+        counters: bumpCounter(state.counters, p.id),
+      }
     }
     // A night together is a fact; partnership is the count of them. A gap wider than
     // the window ends the run — and if the pair had reached partnership, that is a breakup.

@@ -6,6 +6,13 @@ export const AgentSpawned = z.object({
   sex: z.enum(['f', 'm']).optional(),
 }).strict()
 export const CoSlept = z.object({ aId: z.string(), bId: z.string(), day: z.number().int() }).strict()
+export const AgentConceived = z.object({
+  motherId: z.string(), fatherId: z.string(), day: z.number().int(),
+}).strict()
+export const AgentBorn = z.object({
+  id: z.string(), name: z.string(), sex: z.enum(['f', 'm']),
+  motherId: z.string(), fatherId: z.string(), x: z.number(), y: z.number(),
+}).strict()
 export const AgentMoved = z.object({ id: z.string(), x: z.number(), y: z.number() }).strict()
 export const NeedChanged = z.object({
   id: z.string(), need: z.enum(['hunger', 'energy', 'warmth', 'social']), delta: z.number(),

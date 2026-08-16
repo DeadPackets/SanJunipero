@@ -9,6 +9,8 @@ export type AgentBody = {
   hp: number; injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
   ill: boolean; ageDays: number
   sex?: 'f' | 'm'                         // absent = 'f'; read through sexOf(), keeps pre-C9 hashes stable
+  pregnant?: { sinceDay: number; byId: string }
+  parents?: [string, string]              // [motherId, fatherId]; only ever set on the born
   tendedTick?: number                     // absent until first tended: keeps pre-health state hashes stable
   lastSpokeTick?: number                  // absent until first speech: keeps golden hashes stable
   insideId?: string                       // absent until first entry: keeps golden hashes stable

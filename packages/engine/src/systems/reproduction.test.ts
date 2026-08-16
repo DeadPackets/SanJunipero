@@ -4,6 +4,7 @@ import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick } from '../worldTick.js'
+import { BIRTH_NAMES } from '../data/names.js'
 import { isPartnered, pairKey, partnershipOf, sexOf } from './reproduction.js'
 
 // Partnership is inferred, never declared: the town reads it off who sleeps where.
@@ -27,14 +28,14 @@ function room(config: SimConfig, box: typeof HUT): (s: WorldState) => WorldState
 }
 
 // Agents indoors and (by default) asleep, which is all the midnight pass looks at.
-function world(
-  ids: string[], config = CFG, box = HUT, opts: { awake?: string[]; sexes?: Record<string, 'f' | 'm'> } = {},
-): WorldState {
+type WorldOpts = { awake?: string[]; sexes?: Record<string, 'f' | 'm'>; ages?: Record<string, number> }
+
+function world(ids: string[], config = CFG, box = HUT, opts: WorldOpts = {}): WorldState {
   let s = genesisState(config, Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0)))
   s = room(config, box)(s)
   for (const id of ids) {
     s = fold(s, ev('agent_spawned', {
-      id, name: id, x: box.x, y: box.y, ageDays: 7300,
+      id, name: id, x: box.x, y: box.y, ageDays: opts.ages?.[id] ?? 7300,
       ...(opts.sexes?.[id] === undefined ? {} : { sex: opts.sexes[id] }),
     }), config)
     s = fold(s, ev('agent_entered', { agentId: id, structureId: box.id }), config)
@@ -43,11 +44,17 @@ function world(
   return s
 }
 
-function midnight(s: WorldState, day: number, config = CFG): { state: WorldState; coSlept: Array<{ type: string; payload: unknown }> } {
+type Midnight = {
+  state: WorldState
+  events: Array<{ type: string; payload: unknown }>
+  coSlept: Array<{ type: string; payload: unknown }>
+}
+
+function midnight(s: WorldState, day: number, config = CFG, seed = 'repro'): Midnight {
   const tick = day * MINUTES_PER_DAY
   const advanced = fold({ ...s, tick: tick - 1 }, ev('tick_advanced', {}, tick), config)
-  const r = createWorldTick(config, new RngStreams('repro'))(advanced)
-  return { state: r.state, coSlept: r.events.filter(e => e.type === 'co_slept') }
+  const r = createWorldTick(config, new RngStreams(seed))(advanced)
+  return { state: r.state, events: r.events, coSlept: r.events.filter(e => e.type === 'co_slept') }
 }
 
 // Sleep through `days` consecutive midnights, starting at day 1.
@@ -149,6 +156,128 @@ describe('partnership is counted, not declared', () => {
     expect(partnershipOf(s, 'a1', 'a9')).toBeUndefined()
     expect(isPartnered(s, 'a1', 'a9', CFG)).toBe(false)
     expect(partnershipOf(genesisState(CFG), 'a1', 'a2')).toBeUndefined()
+  })
+})
+
+describe('conception', () => {
+  const CONCEIVES = 'r3' // first reproduction roll ≈ 0.143, under the 0.2 chance
+  const REFUSES = 'r0'   // ≈ 0.777
+  const SEXES = { a1: 'f', a2: 'm' } as const
+
+  // Three nights together, then the fourth midnight is the one that can conceive.
+  function couple(config = CFG, opts: WorldOpts = {}): WorldState {
+    return nights(world(['a1', 'a2'], config, HUT, { sexes: { ...SEXES }, ...opts }), [1, 2, 3], config)
+  }
+
+  const conceptions = (s: WorldState, seed: string, config = CFG, day = 4) =>
+    midnight(s, day, config, seed).events.filter(e => e.type === 'agent_conceived')
+
+  it('fires for a partnered, co-sleeping, fertile f/m pair when the roll lands', () => {
+    const s = couple()
+    expect(conceptions(s, CONCEIVES)).toEqual([
+      { type: 'agent_conceived', payload: { motherId: 'a1', fatherId: 'a2', day: 4 } },
+    ])
+    expect(midnight(s, 4, CFG, CONCEIVES).state.agents.a1!.pregnant).toEqual({ sinceDay: 4, byId: 'a2' })
+  })
+
+  it('does not fire when the roll misses', () => {
+    expect(conceptions(couple(), REFUSES)).toEqual([])
+  })
+
+  it('does not fire before the pair is partnered — two nights in is still two nights in', () => {
+    const one = nights(world(['a1', 'a2'], CFG, HUT, { sexes: { ...SEXES } }), [1])
+    expect(conceptions(one, CONCEIVES, CFG, 2)).toEqual([])
+    // The third night both partners them and can conceive, in that order.
+    expect(conceptions(nights(one, [2]), CONCEIVES, CFG, 3)).toHaveLength(1)
+  })
+
+  it('does not fire on a night they slept apart', () => {
+    const s = couple()
+    const apart = { ...s, agents: { ...s.agents, a2: { ...s.agents.a2!, asleep: false } } }
+    expect(conceptions(apart, CONCEIVES)).toEqual([])
+  })
+
+  it('does not fire for two of the same sex', () => {
+    expect(conceptions(couple(CFG, { sexes: { a1: 'f', a2: 'f' } }), CONCEIVES)).toEqual([])
+    expect(conceptions(couple(CFG, { sexes: { a1: 'm', a2: 'm' } }), CONCEIVES)).toEqual([])
+  })
+
+  it('does not fire outside the mother’s fertile years', () => {
+    expect(conceptions(couple(CFG, { ages: { a1: 15 * 364 } }), CONCEIVES)).toEqual([])
+    expect(conceptions(couple(CFG, { ages: { a1: 46 * 364 } }), CONCEIVES)).toEqual([])
+    expect(conceptions(couple(CFG, { ages: { a1: 16 * 364 } }), CONCEIVES)).toHaveLength(1)
+  })
+
+  it('never stacks a second pregnancy on the first', () => {
+    const carrying = fold(couple(), ev('agent_conceived', { motherId: 'a1', fatherId: 'a2', day: 4 }), CFG)
+    expect(conceptions(carrying, CONCEIVES, CFG, 5)).toEqual([])
+  })
+
+  it('goes quiet with the reproduction flag off', () => {
+    expect(conceptions(couple(OFF), CONCEIVES, OFF)).toEqual([])
+  })
+})
+
+describe('gestation and birth', () => {
+  const TERM = DEFAULT_CONFIG.reproduction.gestationDays
+
+  // A pregnancy backdated so the term completes exactly on the day under test.
+  function carrying(sinceDay: number, config = CFG): WorldState {
+    const s = world(['a1', 'a2'], config, HUT, { sexes: { a1: 'f', a2: 'm' } })
+    return fold(s, ev('agent_conceived', { motherId: 'a1', fatherId: 'a2', day: sinceDay }), config)
+  }
+
+  const births = (s: WorldState, day: number, config = CFG, seed = 'repro') =>
+    midnight(s, day, config, seed).events.filter(e => e.type === 'agent_born')
+
+  it('counts days, not ticks: nothing is born a day early', () => {
+    expect(births(carrying(0), TERM - 1)).toEqual([])
+    expect(births(carrying(0), TERM)).toHaveLength(1)
+  })
+
+  it('spawns the body at exactly twelve years', () => {
+    const payload = births(carrying(0), TERM, CFG, 'r5')[0]!.payload as { id: string }
+    const folded = fold(carrying(0), ev('agent_born', payload), CFG)
+    expect(folded.agents[payload.id]!.ageDays).toBe(12 * 365)
+  })
+
+  it('places the child beside its mother, aged twelve, with both parents named', () => {
+    const born = midnight(carrying(0), TERM, CFG, 'r5').state
+    const child = Object.values(born.agents).find(a => a.id !== 'a1' && a.id !== 'a2')!
+    expect(child.ageDays).toBe(12 * 365 + 1) // agingSystem runs after this midnight's birth
+    expect(child.parents).toEqual(['a1', 'a2'])
+    expect(child.insideId).toBe(HUT.id)
+    expect([child.x, child.y]).toEqual([born.agents.a1!.x, born.agents.a1!.y])
+    expect(child.needs).toEqual({ hunger: 100, energy: 100, warmth: 100, social: 100 })
+    expect(child.skills).toEqual({})
+    expect(child.alive).toBe(true)
+    expect(BIRTH_NAMES[sexOf(child)]).toContain(child.name)
+  })
+
+  it('empties the womb once and only once', () => {
+    const born = midnight(carrying(0), TERM, CFG, 'r5').state
+    expect(born.agents.a1!).not.toHaveProperty('pregnant')
+    expect(births(born, TERM + 1)).toEqual([])
+  })
+
+  it('rolls the same registry name and sex for the same seed, and a different one for another', () => {
+    const first = births(carrying(0), TERM, CFG, 'r5')[0]!.payload as { name: string; sex: string }
+    const same = births(carrying(0), TERM, CFG, 'r5')[0]!.payload as { name: string; sex: string }
+    expect(same).toEqual(first)
+    const other = births(carrying(0), TERM, CFG, 'r29')[0]!.payload as { name: string; sex: string }
+    expect(BIRTH_NAMES[other.sex as 'f' | 'm']).toContain(other.name)
+  })
+
+  it('keeps a birth outdoors outdoors', () => {
+    const outside = carrying(0)
+    const s = { ...outside, agents: { ...outside.agents, a1: { ...outside.agents.a1!, insideId: undefined, x: 9, y: 9 } } }
+    const child = Object.values(midnight(s, TERM, CFG, 'r5').state.agents).find(a => a.id !== 'a1' && a.id !== 'a2')!
+    expect(child).not.toHaveProperty('insideId')
+    expect([child.x, child.y]).toEqual([9, 9])
+  })
+
+  it('goes quiet with the reproduction flag off', () => {
+    expect(births(carrying(0, OFF), TERM, OFF)).toEqual([])
   })
 })
 
