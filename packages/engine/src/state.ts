@@ -30,6 +30,7 @@ export type Item = {
   owner?: string                          // absent = unowned; outlives the owner's death
   crafterMark?: string                    // expert crafts only; set once at spawn, never reassigned
   spoilage?: { spawnDay: number; days: number }  // absent = keeps forever
+  durability?: number                     // absent = never wears; 0 breaks the thing
   loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
 }
 

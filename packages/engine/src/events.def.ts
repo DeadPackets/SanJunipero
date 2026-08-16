@@ -18,9 +18,12 @@ export const ItemSpawned = z.object({
   id: z.string(), kind: z.string(), qty: z.number(), loc: ItemLoc, text: z.string().optional(),
   owner: z.string().optional(), crafterMark: z.string().optional(),
   spoilage: z.object({ spawnDay: z.number(), days: z.number() }).strict().optional(),
+  durability: z.number().int().positive().optional(),
 }).strict()
 export const ItemMoved = z.object({ id: z.string(), loc: ItemLoc }).strict()
 export const ItemSpoiled = z.object({ id: z.string() }).strict()
+export const ItemWorn = z.object({ id: z.string(), delta: z.number().int() }).strict()
+export const ItemBroke = z.object({ id: z.string() }).strict()
 export const ItemOwnerChanged = z.object({ id: z.string(), owner: z.string() }).strict()
 // Pure witness record — folds to nothing. Whether a taking is theft is the town's to decide.
 export const ItemTaken = z.object({

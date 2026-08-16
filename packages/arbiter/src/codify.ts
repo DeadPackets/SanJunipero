@@ -58,7 +58,10 @@ export function emitOutcomeEffects(
       case 'spawn_item':
         events.push({
           type: 'item_spawned',
-          payload: { id: `item_${nextId++}`, kind: e.kind, qty: e.qty, loc: { t: 'agent', id: agentId }, ...stamp },
+          payload: {
+            id: `item_${nextId++}`, kind: e.kind, qty: e.qty, loc: { t: 'agent', id: agentId }, ...stamp,
+            ...(e.durability === undefined ? {} : { durability: e.durability }),
+          },
         })
         break
       case 'gain_skill':
@@ -69,6 +72,27 @@ export function emitOutcomeEffects(
         break
       case 'none':
         break
+    }
+  }
+  return events
+}
+
+// A tool is used, not consumed: every completed codified use costs it one point of
+// durability, and the point that empties it breaks it in the hand.
+function wearTools(state: WorldState, config: SimConfig, agentId: string, recipe: Recipe): PendingEvent[] {
+  if (!config.tools.wearEnabled) return []
+  const events: PendingEvent[] = []
+  for (const req of recipe.requires) {
+    if (req.type !== 'held_item') continue
+    let remaining = req.qty
+    for (const stack of heldStacks(state, agentId, req.kind)) {
+      if (remaining <= 0) break
+      remaining -= stack.qty
+      if (stack.durability === undefined) continue
+      events.push({ type: 'item_worn', payload: { id: stack.id, delta: -config.tools.wearPerUse } })
+      if (stack.durability - config.tools.wearPerUse <= 0) {
+        events.push({ type: 'item_broke', payload: { id: stack.id } })
+      }
     }
   }
   return events
@@ -130,10 +154,13 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
       const mark = skillCheck && isExpertRecipe(recipe, config)
         ? crafterStamp(state, config, agentId, skillCheck.track)
         : {}
-      return emitOutcomeEffects(state, agentId, row.effects, {
-        ...(config.ownership.enabled ? { owner: agentId } : {}),
-        ...mark,
-      })
+      return [
+        ...emitOutcomeEffects(state, agentId, row.effects, {
+          ...(config.ownership.enabled ? { owner: agentId } : {}),
+          ...mark,
+        }),
+        ...wearTools(state, config, agentId, recipe),
+      ]
     },
     interruptible: recipe.interruptible,
     skill: recipe.skillCheck ? { track: recipe.skillCheck.track, xp: 10 } : undefined,

@@ -7,7 +7,8 @@ import {
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CropGrew, CropHarvested, CropPlanted, CropWithered,
   FireExtinguished, FireIgnited, FireSpread, HpChanged,
-  ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken, ItemTextChanged, NeedChanged,
+  ItemBroke, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
+  ItemTextChanged, ItemWorn, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
@@ -87,6 +88,7 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
             ...(p.owner !== undefined ? { owner: p.owner } : {}),
             ...(p.crafterMark !== undefined ? { crafterMark: p.crafterMark } : {}),
             ...(p.spoilage !== undefined ? { spoilage: p.spoilage } : {}),
+            ...(p.durability !== undefined ? { durability: p.durability } : {}),
             loc: p.loc,
           },
         },
@@ -102,6 +104,20 @@ export function fold(state: WorldState, event: SimEvent, config: SimConfig = DEF
     case 'item_taken': {
       ItemTaken.parse(event.payload)
       return state
+    }
+    case 'item_worn': {
+      const p = ItemWorn.parse(event.payload)
+      const item = state.items[p.id]
+      if (!item) throw new Error(`item_worn for unknown item ${p.id}`)
+      if (item.durability === undefined) throw new Error(`item_worn for item ${p.id} with no durability`)
+      const durability = Math.max(0, item.durability + p.delta)
+      return { ...state, items: { ...state.items, [p.id]: { ...item, durability } } }
+    }
+    case 'item_broke': {
+      const p = ItemBroke.parse(event.payload)
+      if (!state.items[p.id]) throw new Error(`item_broke for unknown item ${p.id}`)
+      const { [p.id]: _, ...items } = state.items
+      return { ...state, items }
     }
     case 'item_spoiled': {
       const p = ItemSpoiled.parse(event.payload)
