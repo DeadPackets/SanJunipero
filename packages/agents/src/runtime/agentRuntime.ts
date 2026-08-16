@@ -88,6 +88,7 @@ export class AgentRuntime {
   readonly #config: MindConfig
   readonly #reflectionLlm: ReflectionLlm | null
   readonly #dreamLlm: DreamLlm | null
+  readonly #onThought: ((t: { tick: number; agentId: string; text: string }) => void) | null
 
   #agentId = ''
   #mem: MemoryStore | null = null
@@ -117,6 +118,7 @@ export class AgentRuntime {
     config?: Partial<MindConfig>
     reflectionLlm?: ReflectionLlm
     dreamLlm?: DreamLlm
+    onThought?: (t: { tick: number; agentId: string; text: string }) => void
   }) {
     this.#db = deps.db
     this.#llm = deps.llm
@@ -127,6 +129,7 @@ export class AgentRuntime {
     this.#config = { ...DEFAULT_MIND_CONFIG, ...deps.config }
     this.#reflectionLlm = deps.reflectionLlm ?? null
     this.#dreamLlm = deps.dreamLlm ?? null
+    this.#onThought = deps.onThought ?? null
   }
 
   start(agentId: string): void {
@@ -406,6 +409,7 @@ export class AgentRuntime {
   async #applyTurn(turn: Turn, tick: number, day: number): Promise<void> {
     const mem = this.#mem!
     await mem.insertMemory({ tick, kind: 'thought', text: turn.thought, importance: turn.importance, tags: EMPTY_TAGS })
+    this.#onThought?.({ tick, agentId: this.#agentId, text: turn.thought })
 
     // A turn that speaks or acts directly preempts whatever plan was running.
     if (turn.speech !== undefined || turn.action !== undefined) {
