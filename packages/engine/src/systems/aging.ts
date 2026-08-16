@@ -13,10 +13,15 @@ export function ageBand(config: SimConfig, ageDays: number): AgeBand {
 export function agingSystem(ctx: TickCtx): void {
   const time = simTimeFromTick(ctx.state().tick)
   if (time.hour !== 0 || time.minute !== 0) return
-  const { elderFromYears, naturalDeathBaseChancePerDay, naturalDeathChancePerYearOver } = ctx.config.aging
+  const {
+    elderFromYears, naturalDeathBaseChancePerDay, naturalDeathChancePerYearOver, deathOfOldAgeEnabled,
+  } = ctx.config.aging
   for (const id of Object.keys(ctx.state().agents).sort()) {
     if (!ctx.state().agents[id]!.alive) continue
+    // Bodies age either way; only the death roll answers to the flag, and when it is
+    // off the roll is not drawn at all.
     ctx.emit('agent_aged', { agentId: id })
+    if (!deathOfOldAgeEnabled) continue
     const years = Math.floor(ctx.state().agents[id]!.ageDays / DAYS_PER_YEAR)
     if (years < elderFromYears) continue
     const chance = naturalDeathBaseChancePerDay + naturalDeathChancePerYearOver * (years - elderFromYears)

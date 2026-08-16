@@ -619,7 +619,8 @@ export const InscribeParams = z.object({
 // Writing on something nobody can pocket. Three ticks, because carving is not scribbling.
 const inscribe: VerbDef = makeVerb({
   kind: 'inscribe',
-  validate(state, _config, agentId, params) {
+  validate(state, config, agentId, params) {
+    if (!config.inscription.enabled) return 'your hands find no way to mark this'
     const p = InscribeParams.safeParse(params)
     if (!p.success) return `inscribe needs {structureId, text} of 1 to ${INSCRIPTION_MAX_CHARS} characters`
     const s = state.structures[p.data.structureId]

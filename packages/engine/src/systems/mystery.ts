@@ -7,6 +7,7 @@ import type { TickCtx } from '../worldTick.js'
 export const MYSTERY_HOUR = 12
 
 export function mysterySystem(ctx: TickCtx): void {
+  if (!ctx.config.mystery.enabled) return
   const time = simTimeFromTick(ctx.state().tick)
   if (time.hour !== MYSTERY_HOUR || time.minute !== 0) return
   const rng = ctx.rng.get('mystery')

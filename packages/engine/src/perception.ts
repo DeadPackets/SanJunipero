@@ -1,6 +1,7 @@
 import { simTimeFromTick, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { doorTile } from './interiors.js'
+import { effectiveConfig } from './laws.js'
 import type { Item, WorldState } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
@@ -125,10 +126,14 @@ const chebyshev = (x1: number, y1: number, x2: number, y2: number): number =>
 // A wall stops sound. Speech carries iff both parties share an interior, both are
 // outdoors within earshot, or the one outdoors is standing in the other's doorway.
 // The speaker's side is read from the event so a recorded log replays identically.
-export function hears(state: WorldState, config: SimConfig, speakerEv: SimEvent, hearerId: string): boolean {
+export function hears(state: WorldState, baseConfig: SimConfig, speakerEv: SimEvent, hearerId: string): boolean {
+  const config = effectiveConfig(baseConfig, state.laws)
   const p = speakerEv.payload as { x?: unknown; y?: unknown; insideId?: unknown } | null
   const hearer = state.agents[hearerId]
   if (!hearer || typeof p?.x !== 'number' || typeof p.y !== 'number') return false
+
+  // Occlusion off drops the wall, not the distance: plain earshot, as it was before C9.
+  if (!config.occlusion.enabled) return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
 
   const speakerInside = typeof p.insideId === 'string' ? p.insideId : null
   const hearerInside = hearer.insideId ?? null
@@ -147,12 +152,14 @@ export function hears(state: WorldState, config: SimConfig, speakerEv: SimEvent,
 
 export function composePerception(
   state: WorldState,
-  config: SimConfig,
+  baseConfig: SimConfig,
   agentId: string,
   recentEvents: SimEvent[],
 ): PerceptionPacket {
   const self = state.agents[agentId]
   if (!self) throw new Error(`composePerception: no such agent ${agentId}`)
+  // Derived here, not at the call site: no caller can forget the world's live laws.
+  const config = effectiveConfig(baseConfig, state.laws)
 
   const sight = config.movement.sightRadius
   const withinSight = (x: number, y: number): boolean => dist(self.x, self.y, x, y) <= sight
