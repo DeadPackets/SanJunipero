@@ -22,9 +22,9 @@ const testVerb: VerbDef = {
 }
 
 const TIER1 = [
-  'walk', 'sleep', 'wake', 'eat', 'tend', 'till', 'plant', 'harvest', 'fish', 'forage',
+  'walk', 'sleep', 'wake', 'enter', 'exit', 'eat', 'tend', 'till', 'plant', 'harvest', 'fish', 'forage',
   'build', 'craft', 'extinguish',
-  'speak', 'give', 'take', 'write', 'read', 'teach', 'attack', 'experiment',
+  'speak', 'give', 'take', 'stow', 'write', 'read', 'inscribe', 'teach', 'attack', 'experiment',
 ]
 
 afterEach(() => { unregisterVerb('recipe:test') })
@@ -54,8 +54,9 @@ describe('verb registry seam', () => {
     expect(() => unregisterVerb('never_existed')).not.toThrow()
   })
 
-  it('all original Tier-1 verbs still resolve', () => {
+  it('all Tier-1 verbs still resolve, and TIER1 is the whole built-in registry', () => {
     for (const v of TIER1) expect(VERBS[v]).toBeDefined()
+    expect(Object.keys(VERBS).sort()).toEqual([...TIER1].sort())
     const r = submitIntent(makeWorld(), DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'ghost' })
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).not.toBe('unknown verb: eat')
