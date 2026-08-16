@@ -11,7 +11,7 @@ import type Database from 'better-sqlite3'
 import {
   applyLaw, createWorldTick, EventStore, fold, genesisState, replayFromGenesis,
   RngStreams, TickLoop,
-  type LawQueue, type TickHandler, type TileId, type WorldState,
+  type LawQueue, type TickHandler, type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimConfig } from '@sj/shared'
 // Cross-package by relative path on purpose: @sj/arbiter, @sj/gateway and @sj/web
@@ -42,6 +42,9 @@ import { buildHouseholdSeed } from '../src/family/memorySeed.js'
 import { watchBirths, type AgentBornPayload } from '../src/family/watchBirths.js'
 import { captureSocialName, migrateFamilyTables, promptBirthLine } from '../src/family/socialName.js'
 import { G9ReportSchema, checkG9Report, median, type G9Report } from '../src/live/g9report.js'
+import {
+  HEARTH, HUTS, STOREHOUSE, makeTerrain, townGenesisEvents, type Box,
+} from '../src/live/g9world.js'
 
 const CAP_USD = 8.0
 const WARN_USD = 5.0
@@ -64,9 +67,6 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 // ---------------------------------------------------------------- the town ---
 
-const MAP_N = 32
-type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }
-
 type Mind = {
   id: string
   identity: IdentityCore
@@ -77,14 +77,6 @@ type Mind = {
   x: number
   y: number
 }
-
-// Four huts in a row at y=10, each 2x2, each door the tile south of its centre.
-function hut(n: number): Box {
-  return { id: `structure_${n}`, kind: 'hut', x: 6 + n * 4, y: 10, w: 2, h: 2 }
-}
-const HUTS: Box[] = [hut(1), hut(2), hut(3), hut(4)]
-const STOREHOUSE: Box = { id: 'structure_5', kind: 'storehouse', x: 12, y: 15, w: 2, h: 2 }
-const HEARTH: Box = { id: 'structure_6', kind: 'campfire', x: 17, y: 15, w: 1, h: 1 }
 
 function voice(
   register: string, rhythm: string, tics: string[], neverSays: string[], exampleLines: string[],
@@ -221,12 +213,6 @@ const MOTHER = MINDS[0]!
 const FATHER = MINDS[1]!
 const NAMES = MINDS.map((m) => m.identity.name)
 
-function terrain(): TileId[][] {
-  return Array.from({ length: MAP_N }, (_, y) =>
-    Array.from({ length: MAP_N }, (_, x): TileId => (x >= 29 ? 2 : y <= 2 ? 3 : 0)),
-  )
-}
-
 // The rungs the town has actually earned, plus the ones one step beyond, so an
 // adjudicated recipe has a canon to stand on (adjacency doctrine).
 function seedCodex(db: Database.Database): void {
@@ -293,7 +279,7 @@ async function main(): Promise<void> {
   for (const suffix of ['', '-wal', '-shm']) rmSync(`${DB_PATH}${suffix}`, { force: true })
 
   const config: SimConfig = DEFAULT_CONFIG
-  const map = terrain()
+  const map = makeTerrain()
   const db = openAgentDb(DB_PATH)
   migrateLlmTables(db)
   migrateFamilyTables(db)
@@ -307,35 +293,17 @@ async function main(): Promise<void> {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
 
-  // --- Genesis: the town as it stands on the morning of day zero. ---
-  for (const box of HUTS) {
-    const owner = MINDS.find((m) => m.hut.id === box.id)!.id
-    emit('structure_planned', { ...box, maxHp: 50, flammable: true, builderId: owner, owner })
-    emit('structure_completed', { id: box.id })
-  }
-  for (const m of MINDS) {
-    emit('agent_spawned', { id: m.id, name: m.identity.name, x: m.x, y: m.y, ageDays: m.ageDays, sex: m.sex })
-  }
-  emit('structure_planned', { ...STOREHOUSE, maxHp: 60, flammable: true, builderId: FATHER.id })
-  emit('structure_completed', { id: STOREHOUSE.id })
-  emit('structure_planned', { ...HEARTH, maxHp: 100000, flammable: true, builderId: 'dov' })
-  emit('structure_completed', { id: HEARTH.id })
-  emit('fire_ignited', { structureId: HEARTH.id, cause: 'the hearth is lit' })
-
-  let itemNo = 0
-  const item = (payload: Record<string, unknown>) => {
-    itemNo += 1
-    emit('item_spawned', { id: `item_${itemNo}`, qty: 1, ...payload })
-  }
-  for (const m of MINDS) {
-    item({ kind: 'bread', qty: 2, loc: { t: 'agent', id: m.id }, owner: m.id })
-  }
-  // Things with a name on them, in plain sight: ownership has to reach the prose.
-  item({ kind: 'plank', qty: 3, loc: { t: 'tile', x: 16, y: 12 }, owner: 'bex', crafterMark: 'bex' })
-  item({ kind: 'bread', qty: 4, loc: { t: 'structure', id: STOREHOUSE.id }, owner: 'ada' })
-  item({ kind: 'fish', qty: 2, loc: { t: 'agent', id: 'esen' }, owner: 'esen', spoilage: { spawnDay: 0, days: 2 } })
-  item({ kind: 'pot', qty: 1, loc: { t: 'agent', id: 'dov' }, owner: 'dov' })
-  item({ kind: 'wood', qty: 6, loc: { t: 'agent', id: 'dov' }, owner: 'dov' })
+  // --- Genesis: the town as it stands on the morning of day zero (g9world.ts). ---
+  // One unborn mouth: the staged birth lands on day 1 and eats for the rest of the run.
+  for (const e of townGenesisEvents({
+    config,
+    totalTicks: TOTAL_TICKS,
+    unbornMinds: 1,
+    minds: MINDS.map((m) => ({
+      id: m.id, name: m.identity.name, sex: m.sex, ageDays: m.ageDays, x: m.x, y: m.y,
+      hutIndex: HUTS.findIndex((h) => h.id === m.hut.id),
+    })),
+  })) emit(e.type, e.payload)
 
   // The staged birth (user ruling 2026-08-16): gestation stays at the real 72
   // sim-days and the pregnancy is backdated so the term completes on day 1.
