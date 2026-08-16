@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentBody } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
-import { BOB_PX, EMOTE_KINDS, WALK_FRAME_MS_V4, WALK_LOOP, charPose, emoteFor, interpolatePos } from './charAnim.js'
+import { BOB_PX, EMOTE_KINDS, HIT_AREA_H, HIT_AREA_W, NAME_TAG_MAX_CHARS, WALK_FRAME_MS_V4, WALK_LOOP, charPose, emoteFor, interpolatePos, nameTagText, prunePath } from './charAnim.js'
 
 describe('charPose v4 cadence', () => {
   const v4base = { asleep: false, collapsed: false, walking: true, facing: 'se' as const, nowMs: 0 }
@@ -41,15 +41,46 @@ describe('charPose', () => {
   })
 })
 
-describe('interpolatePos', () => {
-  const prev = { x: 2, y: 6, atMs: 1000 }
-  const next = { x: 4, y: 6, atMs: 2000 }
-  it('is exact at the midpoint', () => {
-    expect(interpolatePos(prev, next, 1500)).toEqual({ x: 3, y: 6 })
+describe('interpolatePos (waypoints)', () => {
+  it('is exact at the midpoint of a single leg', () => {
+    const path = [{ x: 2, y: 6, atMs: 1000 }, { x: 4, y: 6, atMs: 2000 }]
+    expect(interpolatePos(path, 1500)).toEqual({ x: 3, y: 6 })
   })
-  it('clamps beyond next.atMs and before prev.atMs', () => {
-    expect(interpolatePos(prev, next, 9999)).toEqual({ x: 4, y: 6 })
-    expect(interpolatePos(prev, next, 0)).toEqual({ x: 2, y: 6 })
+  it('follows the path polyline, never the straight line to the destination', () => {
+    // two legs: (2,6)→(4,6)→(4,4). The straight line from start to end would put
+    // t=1500 at (3,5); the polyline keeps it on the first leg at (3,6).
+    const path = [
+      { x: 2, y: 6, atMs: 1000 },
+      { x: 4, y: 6, atMs: 2000 },
+      { x: 4, y: 4, atMs: 3000 },
+    ]
+    expect(interpolatePos(path, 1500)).toEqual({ x: 3, y: 6 })
+    expect(interpolatePos(path, 2000)).toEqual({ x: 4, y: 6 }) // exactly at the corner waypoint
+    expect(interpolatePos(path, 2500)).toEqual({ x: 4, y: 5 }) // on the second leg
+  })
+  it('clamps before the first and after the last waypoint', () => {
+    const path = [{ x: 2, y: 6, atMs: 1000 }, { x: 4, y: 6, atMs: 2000 }]
+    expect(interpolatePos(path, 9999)).toEqual({ x: 4, y: 6 })
+    expect(interpolatePos(path, 0)).toEqual({ x: 2, y: 6 })
+  })
+  it('handles a single waypoint', () => {
+    expect(interpolatePos([{ x: 5, y: 5, atMs: 100 }], 999)).toEqual({ x: 5, y: 5 })
+  })
+})
+
+describe('prunePath', () => {
+  const path = [
+    { x: 0, y: 0, atMs: 0 },
+    { x: 1, y: 0, atMs: 100 },
+    { x: 2, y: 0, atMs: 200 },
+    { x: 2, y: 1, atMs: 300 },
+  ]
+  it('drops passed waypoints, keeping the last-passed one as the anchor', () => {
+    expect(prunePath(path, 150)).toEqual([{ x: 1, y: 0, atMs: 100 }, { x: 2, y: 0, atMs: 200 }, { x: 2, y: 1, atMs: 300 }])
+    expect(prunePath(path, 250)).toEqual([{ x: 2, y: 0, atMs: 200 }, { x: 2, y: 1, atMs: 300 }])
+  })
+  it('keeps the whole path when nothing has passed yet', () => {
+    expect(prunePath(path, 50)).toEqual(path)
   })
 })
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
-import { findPath, isPassable, TERRAIN_COST } from './path.js'
+import { canStep, findPath, isPassable, TERRAIN_COST } from './path.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, d: 1, '~': 2, f: 3, r: 4, s: 5, F: 6 }
 const world = (rows: string[]): WorldState =>
@@ -103,6 +103,19 @@ describe('findPath (A*)', () => {
     const path = findPath(s, { x: 0, y: 0 }, { x: 4, y: 0 })!
     expect(path).toHaveLength(8)
     for (const [x, y] of path) expect(x === 2 && y <= 1).toBe(false)
+  })
+
+  it('corner rule: a diagonal step between two blocked corners is rejected', () => {
+    let s = world(['....', '....', '....', '....'])
+    s = fold(s, ev(1, 'structure_planned', { id: 'a', kind: 'hut', x: 1, y: 1, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'x' }))
+    s = fold(s, ev(2, 'structure_planned', { id: 'b', kind: 'hut', x: 2, y: 2, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'x' }))
+    // (1,2)→(2,1) squeezes between the two diagonally-adjacent huts: illegal
+    expect(canStep(s, 1, 2, 1, -1)).toBe(false)
+    // (2,1)→(3,2) has only one blocked corner: still legal
+    expect(canStep(s, 2, 1, 1, 1)).toBe(true)
+    // cardinal steps ignore the corner rule and just check the destination
+    expect(canStep(s, 0, 0, 1, 0)).toBe(true)
+    expect(canStep(s, 1, 0, 0, 1)).toBe(false) // (1,1) is a hut footprint
   })
 
   it('returns [] when already at the goal', () => {

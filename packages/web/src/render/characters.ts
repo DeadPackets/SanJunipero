@@ -1,12 +1,13 @@
-import { Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
+import { BitmapText, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { depthKey, facingFrom, tileToScreen, type Facing } from './iso.js'
 import type { Scene } from './scene.js'
 import { characterArt, smoothSource, type TextureBook } from './textures.js'
 import {
-  CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4,
-  charPose, emoteFor, interpolatePos,
+  CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, HIT_AREA_H, HIT_AREA_W, NAME_TAG_ABOVE_HEAD_PX,
+  SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4, charPose, emoteFor, interpolatePos,
+  nameTagText, prunePath, type Waypoint,
 } from './charAnim.js'
 
 export const EMOTE_MS = 2000
@@ -23,10 +24,12 @@ type CharEntry = {
   sprite: Sprite
   shadow: Sprite
   emote: Sprite
+  nameTag: Container
+  nameTagBg: Graphics
+  nameTagLabel: BitmapText
   emoteUntil: number
   facing: Facing
-  prev: { x: number; y: number; atMs: number }
-  next: { x: number; y: number; atMs: number }
+  path: Waypoint[]
   lastMoveArrival: number
 }
 
@@ -138,13 +141,12 @@ export function createCharacterLayer(
       const p = ev.payload as { id: string; x: number; y: number }
       const e = entries.get(p.id)
       if (e === undefined) continue
-      const cur = interpolatePos(e.prev, e.next, now)
-      const glide = Math.min(GLIDE_MAX_MS, Math.max(GLIDE_MIN_MS, now - e.lastMoveArrival))
-      const dx = p.x - e.next.x
-      const dy = p.y - e.next.y
+      const last = e.path[e.path.length - 1]!
+      const dx = p.x - last.x
+      const dy = p.y - last.y
       if (dx !== 0 || dy !== 0) e.facing = facingFrom(dx, dy)
-      e.prev = { x: cur.x, y: cur.y, atMs: now }
-      e.next = { x: p.x, y: p.y, atMs: now + glide }
+      const glide = Math.min(GLIDE_MAX_MS, Math.max(GLIDE_MIN_MS, now - e.lastMoveArrival))
+      e.path.push({ x: p.x, y: p.y, atMs: Math.max(now, last.atMs) + glide })
       e.lastMoveArrival = now
     }
     // emote triggers ride the same delta batches (one batch per tick)
@@ -179,11 +181,11 @@ export function createCharacterLayer(
       const e = ensure(a.id, a.x, a.y)
       // scrubbed views teleport: past positions are facts, not animation
       if (!store.getMode().live) {
-        e.prev = { x: a.x, y: a.y, atMs: nowMs }
-        e.next = { x: a.x, y: a.y, atMs: nowMs }
+        e.path = [{ x: a.x, y: a.y, atMs: nowMs }]
       }
-      const pos = interpolatePos(e.prev, e.next, nowMs)
-      const walking = nowMs < e.next.atMs && (e.next.x !== e.prev.x || e.next.y !== e.prev.y)
+      e.path = prunePath(e.path, nowMs)
+      const pos = interpolatePos(e.path, nowMs)
+      const walking = e.path.length > 1 && nowMs < e.path[e.path.length - 1]!.atMs
       const sheet = sheets.get(a.id)
       const hires = sheet !== undefined && sheet.texture !== null && sheet.art.manifest !== null
       const pose = charPose(

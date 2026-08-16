@@ -27,14 +27,38 @@ export function charPose(
   return { row: 'idle', facing: a.facing, bobY: 0 }
 }
 
-export function interpolatePos(
-  prev: { x: number; y: number; atMs: number },
-  next: { x: number; y: number; atMs: number },
-  nowMs: number,
-): { x: number; y: number } {
-  const span = next.atMs - prev.atMs
-  const t = span <= 0 ? 1 : Math.min(1, Math.max(0, (nowMs - prev.atMs) / span))
-  return { x: prev.x + (next.x - prev.x) * t, y: prev.y + (next.y - prev.y) * t }
+export type Waypoint = { x: number; y: number; atMs: number }
+
+// Interpolate along a scheduled path polyline (path[0] is the anchor). The body
+// steps through each waypoint tile — never a straight line from start to final
+// destination — so a corner leg can't sweep across a building's drawn volume.
+export function interpolatePos(path: ReadonlyArray<Waypoint>, nowMs: number): { x: number; y: number } {
+  if (path.length === 0) return { x: 0, y: 0 }
+  const first = path[0]!
+  if (nowMs <= first.atMs) return { x: first.x, y: first.y }
+  const last = path[path.length - 1]!
+  if (nowMs >= last.atMs) return { x: last.x, y: last.y }
+  for (let i = 1; i < path.length; i++) {
+    const next = path[i]!
+    if (nowMs <= next.atMs) {
+      const prev = path[i - 1]!
+      const span = next.atMs - prev.atMs
+      const t = span <= 0 ? 1 : (nowMs - prev.atMs) / span
+      return { x: prev.x + (next.x - prev.x) * t, y: prev.y + (next.y - prev.y) * t }
+    }
+  }
+  return { x: last.x, y: last.y }
+}
+
+// Drop waypoints we've passed, keeping the last-passed one as the anchor so the
+// path queue stays short while the interpolation never re-winds.
+export function prunePath(path: ReadonlyArray<Waypoint>, nowMs: number): Waypoint[] {
+  let cut = 0
+  for (let i = 0; i < path.length - 1; i++) {
+    if (path[i + 1]!.atMs <= nowMs) cut = i + 1
+    else break
+  }
+  return cut > 0 ? path.slice(cut) : [...path]
 }
 
 export const EMOTE_KINDS = ['exclaim', 'question', 'heart', 'star', 'sleep', 'hunger',
