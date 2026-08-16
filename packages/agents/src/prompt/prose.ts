@@ -74,6 +74,8 @@ export type PerceptionPacket = {
 // sentence plus an alert, so a new C2 tag degrades to prose, never a crash.
 export const FELT_EVENT_PROSE: Record<string, string> = {
   rain_started: 'Rain begins to fall.',
+  storm_started: 'A storm breaks overhead; wind and rain lash down.',
+  snow_started: 'Snow begins to fall.',
   you_were_attacked: 'Pain — someone has struck you!',
   fire_ignited: 'Smoke stings your nose — something nearby is burning.',
   fire_spread: 'The fire is spreading; the smell of smoke grows thicker.',

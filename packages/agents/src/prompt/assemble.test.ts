@@ -118,6 +118,15 @@ describe('perceptionToProse', () => {
     expect(prose).toContain(FELT_EVENT_PROSE['rain_started'])
   })
 
+  it('renders every precipitation start tag the engine emits without alerting', () => {
+    for (const tag of ['rain_started', 'storm_started', 'snow_started']) {
+      const alert = vi.fn()
+      const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: [tag] }, alert)
+      expect(prose).toContain(FELT_EVENT_PROSE[tag])
+      expect(alert).not.toHaveBeenCalled()
+    }
+  })
+
   it('renders an unknown felt tag to the generic sentence and alerts', () => {
     const alert = vi.fn()
     const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: ['quantum_flux'] }, alert)

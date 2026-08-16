@@ -23,11 +23,18 @@ import { migrateLlmTables } from '../src/llm/callLog.js'
 import { LlmClient } from '../src/llm/client.js'
 import { Embedder } from '../src/memory/embedder.js'
 import { recall } from '../src/memory/retrieve.js'
-import { makeReflectionLlm } from '../src/reflection.js'
+import { makeReflectionLlm, type ReflectionLlm } from '../src/reflection.js'
 import type { DreamLlm } from '../src/dream.js'
 import { MIND_MODEL } from '../src/llm/pins.js'
 import { TAMAR, TAMAR_PERSONALITY_V1 } from '../src/persona/tamar.js'
-import { G3ReportSchema, type G3Report, type G3NightlyEditOutcome } from '../src/live/g3report.js'
+import {
+  G3ReportSchema,
+  checkG3Report,
+  resolveNightlyEditOutcome,
+  type G3Report,
+  type G3NightlyEditOutcome,
+  type ProposeEditRecord,
+} from '../src/live/g3report.js'
 
 const AGENT = 'tamar'
 const AGENT_NAME = 'Tamar'
@@ -141,7 +148,26 @@ async function main(): Promise<void> {
   personality.init(TAMAR_PERSONALITY_V1 satisfies PersonalityDoc, 0)
 
   const turnLlm = new LlmClient({ db, caller: 'turn', agentId: AGENT, budgetUsd: BUDGET_USD })
-  const reflectionLlm = makeReflectionLlm(new LlmClient({ db, caller: 'reflection', agentId: AGENT, budgetUsd: BUDGET_USD }))
+  const baseReflectionLlm = makeReflectionLlm(new LlmClient({ db, caller: 'reflection', agentId: AGENT, budgetUsd: BUDGET_USD }))
+  // Observe the proposeEdit step itself so assertion 5 can tell an explicit,
+  // schema-valid no_proposal apart from a night whose proposeEdit never ran.
+  const proposeEditByDay = new Map<number, ProposeEditRecord>()
+  let proposeEditCalls = 0
+  const reflectionLlm: ReflectionLlm = {
+    ...baseReflectionLlm,
+    async proposeEdit(daySummary, doc, dayMemories) {
+      const day = dayMemories[0]?.day ?? proposeEditCalls
+      proposeEditCalls += 1
+      try {
+        const proposal = await baseReflectionLlm.proposeEdit(daySummary, doc, dayMemories)
+        proposeEditByDay.set(day, proposal == null ? 'no_proposal' : 'proposed')
+        return proposal
+      } catch (err) {
+        proposeEditByDay.set(day, `failed:${err instanceof Error ? err.message : String(err)}`)
+        throw err
+      }
+    },
+  }
   const dreamLlm = makeDreamLlm(new LlmClient({ db, caller: 'dream', agentId: AGENT, budgetUsd: BUDGET_USD }))
 
   const runtime = new AgentRuntime({
@@ -242,7 +268,7 @@ async function main(): Promise<void> {
   const autobiographyParagraphs = qInt(db, `SELECT COUNT(*) FROM autobiography WHERE agent_id = ?`, AGENT)
   const nightlyEditOutcomes: G3NightlyEditOutcome[] = [0, 1].map((day) => ({
     day,
-    outcome: editOutcomeFor(personality, day),
+    outcome: resolveNightlyEditOutcome(proposeEditByDay.get(day), personality.editOutcomes.get(day)),
   }))
 
   // Assertion 6.
@@ -349,37 +375,11 @@ async function main(): Promise<void> {
   console.log(`\nGATE G3 PASSED (8/8 programmatic assertions). Report: ${REPORT_PATH}`)
 }
 
-function editOutcomeFor(personality: RecordingPersonalityStore, day: number): string {
-  const recorded = personality.editOutcomes.get(day)
-  if (recorded !== undefined) return recorded
-  // history() shows applied edits as a version row for that day; a null edit row
-  // is the initial doc, so absence of a non-null edit means no edit was applied.
-  const applied = personality.history().some((r) => r.day === day && r.edit !== null)
-  return applied ? 'applied' : 'no_proposal'
-}
-
+// One source of truth for pass/fail: the shared checker the livetest re-runs.
 function failedAssertions(report: G3Report): string[] {
-  const e = report.evidence
-  const out: string[] = []
-  if (e.sleptCount < 2 || e.wokeCount < 2) out.push(`1.sleeps/wakes: slept=${e.sleptCount} woke=${e.wokeCount}`)
-  if (e.eatCompletedCount < 2 || e.deathPathReached) out.push(`2.eats: eats=${e.eatCompletedCount} deathPath=${e.deathPathReached}`)
-  if (e.maxConsecutiveActionStartedWithoutTurn < 2) out.push(`3.plans: maxConsecutive=${e.maxConsecutiveActionStartedWithoutTurn}`)
-  if (e.journalCount < 1) out.push(`4.journals: ${e.journalCount}`)
-  const day0 = e.dayNodeDays.includes(0)
-  const day1 = e.dayNodeDays.includes(1)
-  const facts = e.factCount >= 1
-  const auto = e.autobiographyParagraphs === 2
-  const edits = e.nightlyEditOutcomes.filter((o) => o.day === 0 || o.day === 1)
-  const bothResolved = edits.length === 2 && edits.every((o) => o.outcome.startsWith('applied') || o.outcome.startsWith('rejected:'))
-  if (!(day0 && day1 && facts && auto && bothResolved)) {
-    out.push(`5.reflects: days=${e.dayNodeDays.join(',')} facts=${e.factCount} auto=${e.autobiographyParagraphs} edits=${JSON.stringify(e.nightlyEditOutcomes)}`)
-  }
-  if (!e.cacheReadConsecutivePairFound) out.push('6.cacheReadTokens: no consecutive turn pair with cache_read_tokens > 0')
-  if (e.recallVerbatimRowCount < 1) out.push(`7.recall-verbatim: ${e.recallVerbatimRowCount} rows`)
-  if (!e.allLlmRowsHaveCost || e.budgetTripped || report.totalCostUsd >= BUDGET_USD) {
-    out.push(`8.cost: allHaveCost=${e.allLlmRowsHaveCost} budgetTripped=${e.budgetTripped} total=$${report.totalCostUsd.toFixed(6)}`)
-  }
-  return out
+  return Object.entries(checkG3Report(report))
+    .filter(([, detail]) => detail !== null)
+    .map(([name, detail]) => `${name}: ${detail}`)
 }
 
 main().catch((err) => {

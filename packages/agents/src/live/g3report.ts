@@ -6,10 +6,32 @@ import { z } from 'zod'
 
 export const G3NightlyEditOutcomeSchema = z.object({
   day: z.number().int(),
-  // 'applied' | 'rejected:<reason>' | 'no_proposal'
+  // pass: 'applied' | 'rejected:<reason>' | 'no_proposal'
+  // fail: 'missing' | 'unadjudicated' | 'failed:<msg>'
   outcome: z.string().min(1),
 }).strict()
 export type G3NightlyEditOutcome = z.infer<typeof G3NightlyEditOutcomeSchema>
+
+// What the harness observed of the proposeEdit call itself for one night.
+export type ProposeEditRecord = 'no_proposal' | 'proposed' | `failed:${string}`
+
+// Controller ruling (run 6): the spec's "≤1 personality edit via drift-limiter"
+// makes zero edits compliant — a night passes when proposeEdit ran and returned
+// a schema-valid verdict: an adjudicated proposal (applied/rejected) or an
+// explicit no_proposal.
+export function resolveNightlyEditOutcome(
+  proposeEdit: ProposeEditRecord | undefined,
+  adjudication: string | undefined,
+): string {
+  if (adjudication !== undefined) return adjudication
+  if (proposeEdit === undefined) return 'missing'
+  if (proposeEdit === 'proposed') return 'unadjudicated'
+  return proposeEdit
+}
+
+export function nightlyEditOutcomePasses(outcome: string): boolean {
+  return outcome === 'applied' || outcome.startsWith('rejected:') || outcome === 'no_proposal'
+}
 
 export const G3EvidenceSchema = z
   .object({
@@ -67,7 +89,7 @@ export function checkG3Report(report: G3Report): Record<string, string | null> {
       const facts = e.factCount >= 1
       const auto = e.autobiographyParagraphs === 2
       const edits = e.nightlyEditOutcomes.filter((o) => o.day === 0 || o.day === 1)
-      const bothResolved = edits.length === 2 && edits.every((o) => o.outcome.startsWith('applied') || o.outcome.startsWith('rejected:'))
+      const bothResolved = edits.length === 2 && edits.every((o) => nightlyEditOutcomePasses(o.outcome))
       return hasDay0 && hasDay1 && facts && auto && bothResolved
         ? null
         : `days=${e.dayNodeDays.join(',')} facts=${e.factCount} auto=${e.autobiographyParagraphs} edits=${JSON.stringify(e.nightlyEditOutcomes)}`

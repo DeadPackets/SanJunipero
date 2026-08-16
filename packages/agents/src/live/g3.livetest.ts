@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { G3ReportSchema, checkG3Report, type G3Report } from './g3report.js'
+import { G3ReportSchema, checkG3Report, nightlyEditOutcomePasses, type G3Report } from './g3report.js'
 
 // Re-asserts GATE G3's assertions 1–8 against the committed `data/g3-report.json`
 // WITHOUT re-spending: the run script wrote the evidence, this test re-checks
@@ -37,7 +37,7 @@ describe('GATE G3 — committed run evidence', () => {
     const nightly = report.evidence.nightlyEditOutcomes.filter((o) => o.day === 0 || o.day === 1)
     expect(nightly, '5.reflects').toHaveLength(2)
     for (const o of nightly) {
-      expect(o.outcome.startsWith('applied') || o.outcome.startsWith('rejected:'), `5.reflects night ${o.day}`).toBe(true)
+      expect(nightlyEditOutcomePasses(o.outcome), `5.reflects night ${o.day}`).toBe(true)
     }
 
     expect(report.evidence.cacheReadConsecutivePairFound, '6.cacheReadTokens').toBe(true)
