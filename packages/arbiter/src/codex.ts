@@ -1,11 +1,14 @@
 import type Database from 'better-sqlite3'
 import { ERA_ORDER, type Era } from './canon.js'
 
+// The codex is the authored tech tree; `known` marks the rungs the town has
+// actually earned. Unearned rows exist so adjacency can see one step beyond.
 export type CodexEntry = {
   id: string
   era: Era
   name: string
   prerequisiteId: string | null
+  known?: boolean
 }
 
 export class CodexStore {
@@ -13,17 +16,17 @@ export class CodexStore {
 
   insert(entry: CodexEntry): void {
     this.db
-      .prepare('INSERT INTO codex (id, era, name, prerequisite_id) VALUES (?, ?, ?, ?)')
-      .run(entry.id, entry.era, entry.name, entry.prerequisiteId)
+      .prepare('INSERT INTO codex (id, era, name, prerequisite_id, known) VALUES (?, ?, ?, ?, ?)')
+      .run(entry.id, entry.era, entry.name, entry.prerequisiteId, entry.known === false ? 0 : 1)
   }
 
   known(): string[] {
-    const rows = this.db.prepare('SELECT id FROM codex ORDER BY rowid').all() as Array<{ id: string }>
+    const rows = this.db.prepare('SELECT id FROM codex WHERE known = 1 ORDER BY rowid').all() as Array<{ id: string }>
     return rows.map((r) => r.id)
   }
 
   knownEra(): Era {
-    const rows = this.db.prepare('SELECT era FROM codex').all() as Array<{ era: string }>
+    const rows = this.db.prepare('SELECT era FROM codex WHERE known = 1').all() as Array<{ era: string }>
     let best: Era = 'agriculture'
     let bestOrder = 0
     for (const row of rows) {

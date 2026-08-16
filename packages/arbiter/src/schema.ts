@@ -16,9 +16,15 @@ export function migrateArbiterTables(db: Database.Database): void {
       id TEXT PRIMARY KEY,
       era TEXT NOT NULL,
       name TEXT NOT NULL,
-      prerequisite_id TEXT REFERENCES codex(id)
+      prerequisite_id TEXT REFERENCES codex(id),
+      known INTEGER NOT NULL DEFAULT 1
     );
   `)
+  // Pre-known-flag DBs: every existing row was earned, so default 1.
+  const codexCols = db.prepare('PRAGMA table_info(codex)').all() as Array<{ name: string }>
+  if (!codexCols.some((c) => c.name === 'known')) {
+    db.exec('ALTER TABLE codex ADD COLUMN known INTEGER NOT NULL DEFAULT 1')
+  }
   db.exec(`
     CREATE TABLE IF NOT EXISTS rulings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

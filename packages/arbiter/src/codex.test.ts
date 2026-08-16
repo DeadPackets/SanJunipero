@@ -40,16 +40,31 @@ describe('codex', () => {
     expect(store.withinAdjacency(['charcoal'])).toBe(true)
   })
 
-  it('withinAdjacency rejects unknown ids with unknown prerequisite, then accepts after insert', () => {
+  it('withinAdjacency grants one step beyond: an unearned authored id whose prerequisite is known', () => {
     const store = seededStore()
     expect(store.withinAdjacency(['iron_smelting'])).toBe(false)
-    store.insert({ id: 'iron_smelting', era: 'metallurgy', name: 'Iron smelting', prerequisiteId: 'charcoal' })
+    store.insert({ id: 'iron_smelting', era: 'metallurgy', name: 'Iron smelting', prerequisiteId: 'charcoal', known: false })
+    // Not yet known — but reachable from a practiced craft.
+    expect(store.known()).not.toContain('iron_smelting')
     expect(store.withinAdjacency(['iron_smelting'])).toBe(true)
+  })
+
+  it('withinAdjacency rejects an unearned authored id whose prerequisite is also unearned', () => {
+    const store = seededStore()
+    store.insert({ id: 'iron_smelting', era: 'metallurgy', name: 'Iron smelting', prerequisiteId: 'charcoal', known: false })
+    store.insert({ id: 'steel', era: 'metallurgy', name: 'Steel', prerequisiteId: 'iron_smelting', known: false })
+    expect(store.withinAdjacency(['steel'])).toBe(false)
   })
 
   it('withinAdjacency rejects an unauthored unknown id', () => {
     const store = seededStore()
     expect(store.withinAdjacency(['gunpowder'])).toBe(false)
+  })
+
+  it('knownEra ignores unearned authored rows', () => {
+    const store = seededStore()
+    store.insert({ id: 'iron_smelting', era: 'chemistry', name: 'Iron smelting', prerequisiteId: 'charcoal', known: false })
+    expect(store.knownEra()).toBe('metallurgy')
   })
 
   it('withinAdjacency rejects the empty canon', () => {
@@ -62,6 +77,31 @@ describe('codex', () => {
     expect(() =>
       store.insert({ id: 'fire', era: 'agriculture', name: 'Fire again', prerequisiteId: null }),
     ).toThrow(/UNIQUE constraint failed/)
+  })
+})
+
+describe('codex known-column migration', () => {
+  it('adds the known column (default 1) to a pre-existing codex table and keeps old rows behaving', async () => {
+    const { openDb } = await import('@sj/engine')
+    const sqliteVec = await import('sqlite-vec')
+    const { migrateArbiterTables } = await import('./schema.js')
+
+    const db = openDb(':memory:')
+    sqliteVec.load(db)
+    // Old-shape table, as shipped before the known/earned flag existed.
+    db.exec(`CREATE TABLE codex (
+      id TEXT PRIMARY KEY, era TEXT NOT NULL, name TEXT NOT NULL,
+      prerequisite_id TEXT REFERENCES codex(id)
+    );`)
+    db.prepare('INSERT INTO codex (id, era, name, prerequisite_id) VALUES (?, ?, ?, ?)').run('fire', 'agriculture', 'Fire', null)
+
+    migrateArbiterTables(db)
+
+    const store = new CodexStore(db)
+    expect(store.known()).toEqual(['fire'])
+    store.insert({ id: 'charcoal', era: 'crafts', name: 'Charcoal', prerequisiteId: 'fire', known: false })
+    expect(store.known()).toEqual(['fire'])
+    expect(store.withinAdjacency(['charcoal'])).toBe(true)
   })
 })
 
