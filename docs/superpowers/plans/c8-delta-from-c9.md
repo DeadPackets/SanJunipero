@@ -147,7 +147,7 @@ Two decisions C8 must make explicitly, not by omission:
 - The draft's existing `GET /api/tokens?days=7` stays; spend projection is a different question
   (rate now) from cumulative token cost.
 
-## 6. C8 Task 15 — the supervisor's wiring list has four new lines
+## 6. C8 Task 15 — the supervisor's wiring list has six new lines
 
 `packages/supervisor/src/supervisor.ts` (draft lines 1228–1292). `createSim` must additionally:
 
