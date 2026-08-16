@@ -64,14 +64,14 @@ const MATERIALS: LibraryEntry[] = [
   material('fiber', 'a loose coil of pale plant fibre, straw-coloured and slightly frayed at both ends'),
   material('hide', 'a folded animal skin, tan on the outside and cream on the underside, edges left ragged'),
   material('cloth', 'a folded square of woven cloth in soft cream with a thin dusty-rose stripe along one edge'),
-  material('rope', 'a neat coil of honey-brown rope, three loops thick, with the frayed end tucked under'),
+  material('rope', 'a length of honey-brown rope wound into a flat round coil lying on its side, one frayed end tucked under'),
   material('charcoal', 'a small pile of charred black wood chunks with a faint warm-grey ash dusting them'),
   material('gravel', 'a low heap of small warm-grey pebbles, sizes mixed, packed close together'),
 ]
 
 const RITUAL: LibraryEntry[] = [
   ritual('offering_bowl', 'a shallow cream-stone bowl on a short foot, holding a few grains and a sprig of sage'),
-  ritual('totem', 'a carved standing post of weathered honey-wood, three stacked faces with simple round eyes'),
+  ritual('totem', 'a tall narrow post of weathered honey-wood standing upright, one simple carved face near the top'),
   ritual('banner', 'a narrow cloth pennant hanging from a crossbar, dusty rose with a cream circle stitched at its centre'),
   ritual('candle', 'a stubby cream wax taper with a soft honey-gold flame and a bead of wax down one side'),
   ritual('garland', 'a looping chain of small sage leaves and dusty-rose blossoms strung on a pale cord'),
