@@ -4,7 +4,8 @@ import { MASTER_PALETTE } from './palette.js'
 import type { RawImage } from './post/raw.js'
 import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js'
 import {
-  MATERIAL_PX, ROAD_MATERIAL_ID, SEAM_TOLERANCE, TERRAIN_COMMISSIONS, TILING_CRITERION_PROMPT,
+  BORDER_TOLERANCE, MATERIAL_PX, ROAD_MATERIAL_ID, SEAM_TOLERANCE, TERRAIN_COMMISSIONS,
+  TILING_CRITERION_PROMPT, borderReport,
   diamondFromMaterial, generationItems, materialFromCandidate, planTerrainProgram, seamReport,
   seasonTintFrom, selfTile3x3, stencilRoadTile, terrainAssetId, terrainBoilerplate,
 } from './terrainGen.js'
@@ -279,5 +280,48 @@ describe('seasonTintFrom', () => {
     const t = seasonTintFrom(dark, summer)
     expect(t.r).toBeGreaterThanOrEqual(0.6)     // clamped, never a black sheet
     expect(t.r).toBeLessThan(1)
+  })
+})
+
+
+// A tile can wrap PERFECTLY and still be useless: a drawn frame matches itself across the
+// wrap, so seamReport reads 0.0 while the material renders as a grid of framed cards. This
+// is the live water:0 finding, pinned so it cannot come back.
+describe('borderReport', () => {
+  const framed = (px = MATERIAL_PX, ring = 2): RawImage => {
+    const img = seamlessSquare(px)
+    for (let y = 0; y < px; y++) {
+      for (let x = 0; x < px; x++) {
+        if (x >= ring && y >= ring && x < px - ring && y < px - ring) continue
+        img.data.set([120, 40, 160, 255], (y * px + x) * 4)     // a violet rim
+      }
+    }
+    return img
+  }
+
+  it('passes a material whose edge looks like its middle', () => {
+    const r = borderReport(materialFromCandidate(bigCandidate(seamlessSquare)))
+    expect(r.framed).toBe(false)
+    expect(r.ringDelta).toBeLessThanOrEqual(BORDER_TOLERANCE)
+  })
+
+  it('catches a drawn frame that the SEAM check cannot see', () => {
+    const m = materialFromCandidate(framed())
+    // the frame wraps perfectly — left edge equals right edge — so the seam check is happy
+    expect(seamReport(m).pass).toBe(true)
+    // and the border check is not
+    expect(borderReport(m).framed).toBe(true)
+    expect(borderReport(m).ringDelta).toBeGreaterThan(BORDER_TOLERANCE)
+  })
+
+  it('tells the model exactly what to remove', () => {
+    const note = borderReport(materialFromCandidate(framed())).note
+    expect(note).toMatch(/border|frame|rim|outline/i)
+    expect(note).toMatch(/run right off all four sides/i)
+  })
+
+  it('is deterministic', () => {
+    const m = materialFromCandidate(bigCandidate(seamlessSquare))
+    expect(borderReport(m)).toEqual(borderReport(m))
   })
 })

@@ -197,6 +197,36 @@ export function seamReport(m: RawImage): SeamReport {
   return { horizontalDelta, verticalDelta, worstAxis, pass, note }
 }
 
+// A tile can wrap PERFECTLY and still be useless: a drawn frame matches itself across the
+// wrap (left edge == right edge), so seamReport reads 0.0 and the material still renders as
+// a grid of framed cards. Live finding, water:0. The ring must look like the middle.
+export const BORDER_TOLERANCE = 18      // mean per-channel distance, ~one palette step
+export const BORDER_RING_PX = 2
+
+export type BorderReport = { ringDelta: number; framed: boolean; note: string }
+
+export function borderReport(m: RawImage, ring: number = BORDER_RING_PX): BorderReport {
+  let ringSum = [0, 0, 0], ringN = 0, midSum = [0, 0, 0], midN = 0
+  for (let y = 0; y < m.height; y++) {
+    for (let x = 0; x < m.width; x++) {
+      const i = (y * m.width + x) * 4
+      const onRing = x < ring || y < ring || x >= m.width - ring || y >= m.height - ring
+      const t = onRing ? ringSum : midSum
+      t[0] += m.data[i]!; t[1] += m.data[i + 1]!; t[2] += m.data[i + 2]!
+      if (onRing) ringN++; else midN++
+    }
+  }
+  if (ringN === 0 || midN === 0) return { ringDelta: 0, framed: false, note: 'no ring to measure' }
+  const ringDelta = [0, 1, 2].reduce((s2, k) => s2 + Math.abs(ringSum[k]! / ringN - midSum[k]! / midN), 0) / 3
+  const framed = ringDelta > BORDER_TOLERANCE
+  return {
+    ringDelta, framed,
+    note: framed
+      ? `the outer edge is drawn as a border or frame (edge differs from the middle by ${ringDelta.toFixed(1)}); remove it — the texture must run right off all four sides with no outline, no rim and no darker margin`
+      : `no frame (edge matches the middle within ${ringDelta.toFixed(1)})`,
+  }
+}
+
 // The picture the vision judge scores TILING on: the same square nine times, so a seam or a
 // recurring blob is the only thing that can stand out.
 export function selfTile3x3(m: RawImage): RawImage {

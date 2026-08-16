@@ -20,10 +20,10 @@ import { SpendLedger, AnomalyStopError } from '../src/spendLedger.js'
 import { makeImageClient, EST_COST_PER_IMAGE } from '../src/imageClient.js'
 import { makeVisionJudge, EST_COST_PER_VISION_CALL, type VisionJudgeFn } from '../src/visionQa/visionJudge.js'
 import { runVisionGate } from '../src/visionQa/gate.js'
-import { CRITERIA, NA_CRITERIA_BY_CLASS, deriveOverall, type VisionVerdict } from '../src/visionQa/verdict.js'
+import { CRITERIA, type VisionVerdict } from '../src/visionQa/verdict.js'
 import {
   generationItems, materialFromCandidate, planTerrainProgram,
-  seamReport, selfTile3x3, terrainBoilerplate,
+  borderReport, seamReport, selfTile3x3, terrainBoilerplate,
 } from '../src/terrainGen.js'
 
 const OUT = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c3'
@@ -86,46 +86,37 @@ async function main(): Promise<void> {
 
   const results: ItemResult[] = []
   for (const item of items) {
-    const seams = new Map<string, ReturnType<typeof seamReport>>()
+    const seams = new Map<string, { seam: ReturnType<typeof seamReport>; border: ReturnType<typeof borderReport> }>()
     const eyeTiling: number[] = []
 
     // The judge sees the 3x3 SELF-TILED composite, which is the only picture in which a seam
     // or a recurring blob can show. The deterministic seam check overrides the model's tiling
     // score: a measured wrap failure is a fact, not an opinion.
     const judge: VisionJudgeFn = async (a) => {
-      const seam = seams.get(`${a.assetId}:${a.attempt ?? 1}`)
+      const m = seams.get(`${a.assetId}:${a.attempt ?? 1}`)
       // A structured-output parse failure is transport, not a verdict — one retry, then let
       // it surface. Booked cost is unaffected: the failed call returned nothing to book.
       let r
       try { r = await baseJudge({ ...a, sprite: selfTile3x3(a.sprite) }) }
       catch { r = await baseJudge({ ...a, sprite: selfTile3x3(a.sprite) }) }
       eyeTiling.push(r.verdict.criteria.tiling.score)
-      // RULING: for a MEASURABLE property the measurement wins. `tiling` is the one criterion
-      // with a deterministic check behind it, so the eye's score is recorded and reported over
-      // the population (house law) but never blocks an item whose wrap actually measures clean.
-      if (seam === undefined) return r
+      // RULING (corrected after the water:0 finding): a measurement may VETO, never RESCUE.
+      // An objective failure is decisive; an objective pass is only a floor the eye still has
+      // to clear. The first version floored the eye's tiling score whenever the seam measured
+      // clean — and a DRAWN FRAME wraps perfectly, so it sailed through with a purple grid.
+      if (m === undefined) return r
       const attempt = a.attempt ?? 1
-      const last = attempt > config.visionQa.maxRetries
-      const criteria = seam.pass
-        ? {
-          ...r.verdict.criteria,
-          tiling: {
-            pass: true,
-            score: Math.max(r.verdict.criteria.tiling.score, config.visionQa.minScore),
-            evidence: `${seam.note} (measured; eye scored ${r.verdict.criteria.tiling.score})`,
-          },
-        }
-        : { ...r.verdict.criteria, tiling: { pass: false, score: 0, evidence: seam.note } }
-      const overall = seam.pass
-        ? deriveOverall(criteria, {
-          minScore: config.visionQa.minScore, attempt,
-          maxRetries: config.visionQa.maxRetries, naFor: NA_CRITERIA_BY_CLASS['terrain'],
-        })
-        // a measured seam failure is a retry until the budget is out — never past it
-        : last ? 'blocked' as const : 'retry' as const
+      const broke = !m.seam.pass ? m.seam.note : m.border.framed ? m.border.note : null
+      if (broke === null) return r
+      const criteria = { ...r.verdict.criteria, tiling: { pass: false, score: 0, evidence: broke } }
       return {
         costUsd: r.costUsd,
-        verdict: { ...r.verdict, criteria, overall, feedback: seam.pass ? r.verdict.feedback : `${seam.note}. ${r.verdict.feedback}` },
+        verdict: {
+          ...r.verdict, criteria,
+          // a measured failure retries until the budget is out — never past it
+          overall: attempt > config.visionQa.maxRetries ? 'blocked' as const : 'retry' as const,
+          feedback: `${broke}. ${r.verdict.feedback}`,
+        },
       }
     }
 
@@ -138,17 +129,17 @@ async function main(): Promise<void> {
           const [cand] = await client.generateCandidates(prompt, refs, 1)
           if (cand === undefined) throw new Error(`${item.assetId}: no candidate returned`)
           const material = materialFromCandidate(await decodePng(cand.png))
-          seams.set(`${item.assetId}:${attempt}`, seamReport(material))
+          seams.set(`${item.assetId}:${attempt}`, { seam: seamReport(material), border: borderReport(material) })
           return { sprite: material, costUsd: cand.costUsd, model: cand.model }
         },
       })
-      const seam = seamReport(result.sprite)
+      const seam = seamReport(result.sprite), border = borderReport(result.sprite)
       writeFileSync(join(OUT, 'materials', `${item.assetId.replace(/:/g, '_')}.png`), await encodePng(result.sprite))
       writeFileSync(join(OUT, 'composites', `${item.assetId.replace(/:/g, '_')}.png`), await encodePng(selfTile3x3(result.sprite)))
       results.push({
         assetId: item.assetId, status: result.status, attempts: result.attempts,
         spendUsd: result.spendUsd, scores: result.verdicts.map(meanScore),
-        seam: `${seam.pass ? 'ok' : 'SEAM'} h=${seam.horizontalDelta.toFixed(1)} v=${seam.verticalDelta.toFixed(1)}`,
+        seam: `${seam.pass ? 'ok' : 'SEAM'}${border.framed ? '/FRAMED' : ''} h=${seam.horizontalDelta.toFixed(1)} v=${seam.verticalDelta.toFixed(1)} ring=${border.ringDelta.toFixed(1)}`,
         note: result.verdicts.at(-1)?.feedback ?? '',
         criteria: Object.fromEntries(
           CRITERIA.map((k) => [k, result.verdicts.at(-1)?.criteria[k].score ?? -1]),
