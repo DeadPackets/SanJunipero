@@ -1,5 +1,27 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { buildAssetPrompt, targetSize, STYLE_PROMPT } from './styleBible.js'
+
+// The bible wraps its lines, so every scan runs over whitespace-collapsed text —
+// otherwise a law can be "absent" purely because it straddles a newline.
+const BIBLE = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'style-bible.md'), 'utf8')
+  .replace(/\s+/g, ' ')
+
+describe('style bible facing law (narrowed by C13)', () => {
+  it('no longer claims the facing gate is never automated', () => {
+    expect(BIBLE).not.toContain('Never automated, never claimed by the pipeline')
+  })
+  it('keeps the human eyeball as the final authority for masters', () => {
+    expect(BIBLE).toContain('FINAL and ONLY authority for masters')
+    expect(BIBLE).toContain('SCREENS facing')
+  })
+  it('does not erode the neighbouring buildings-never-mirror law', () => {
+    expect(BIBLE).toContain('NEVER mirror BUILDING sprites')
+  })
+})
 
 describe('style bible prompts', () => {
   it('boilerplate demands magenta background and forbids anti-aliasing', () => {
