@@ -148,10 +148,17 @@ export function checkG9Report(report: G9Report): Record<string, string | null> {
       e.codifiedVerbs.length >= 1 && e.repeatIntent !== null && e.repeatArbiterCalls === 0
         ? null
         : `codified=${e.codifiedVerbs.join(',') || 'none'} repeat=${JSON.stringify(e.repeatIntent)} repeatCalls=${e.repeatArbiterCalls}`,
-    '4.unknown-verb-routes-to-arbiter':
-      e.unknownVerbRejections >= 1 && e.unknownVerbRefusalMemories === 0 && e.adjudicationsAfterUnknownVerb >= 1
+    // §17.4 as the user restated it on 2026-08-17: the route has to fire live
+    // end-to-end. A live codification is that route completing; an unknown verb
+    // or recipe that reaches the arbiter is that route firing. A rejection that
+    // never routed scores nothing, so verb-spam cannot buy the criterion.
+    '4.novel-intent-route-fires-live': (() => {
+      const fired = e.codifiedVerbs.length >= 1 || e.adjudicationsAfterUnknownVerb >= 1
+      return fired && e.unknownVerbRefusalMemories === 0
         ? null
-        : `rejections=${e.unknownVerbRejections} refusalProse=${e.unknownVerbRefusalMemories} routed=${e.adjudicationsAfterUnknownVerb}`,
+        : `codified=${e.codifiedVerbs.join(',') || 'none'} routed=${e.adjudicationsAfterUnknownVerb}`
+          + ` rejections=${e.unknownVerbRejections} refusalProse=${e.unknownVerbRefusalMemories}`
+    })(),
     '5.budget-reflections-alerting': (() => {
       const withinCap = report.totalCostUsd <= report.capUsd + report.expectedCallCostUsd
       const lost = e.reflectionsStarted - e.reflectionsResolved

@@ -43,10 +43,14 @@ describe('GATE G9b — committed run evidence', () => {
     expect(e.codifiedVerbs.length, '3.codify').toBeGreaterThanOrEqual(1)
     expect(e.repeatArbiterCalls, '3.codify').toBe(0)
 
-    // 4. An invented verb is a proposal, not a refusal.
-    expect(e.unknownVerbRejections, '4.routing').toBeGreaterThanOrEqual(1)
-    expect(e.unknownVerbRefusalMemories, '4.routing').toBe(0)
-    expect(e.adjudicationsAfterUnknownVerb, '4.routing').toBeGreaterThanOrEqual(1)
+    // 4. The novel-intent route fires live, end to end (§17.4 restated, user
+    // ruling 2026-08-17): a live codification is the route completing, an
+    // unknown verb or recipe reaching the arbiter is the route firing. A
+    // rejection that never routed buys nothing.
+    expect(
+      e.codifiedVerbs.length >= 1 || e.adjudicationsAfterUnknownVerb >= 1, '4.route',
+    ).toBe(true)
+    expect(e.unknownVerbRefusalMemories, '4.route').toBe(0)
 
     // 5. Budget held, no reflection lost, the operator was told about the burn.
     expect(report.totalCostUsd, '5.budget').toBeLessThanOrEqual(report.capUsd + report.expectedCallCostUsd)
@@ -77,7 +81,7 @@ describe('GATE G9b — committed run evidence', () => {
       '1.two-days-no-crash-drain-clean': null,
       '2.child-mind-lives': null,
       '3.codified-live-then-free': null,
-      '4.unknown-verb-routes-to-arbiter': null,
+      '4.novel-intent-route-fires-live': null,
       '5.budget-reflections-alerting': null,
       '6.voice-budgets-bite': null,
       '7.ownership-reaches-the-prose': null,
