@@ -580,6 +580,27 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(first.some((m) => m.text.includes('What you remember:'))).toBe(false)
   })
 
+  it('keeps the cache prefix byte-stable across consecutive turns: same system, dayLog only appended (g3 round 6)', async () => {
+    const { model, prompts } = capturingModel([BENIGN_TURN, BENIGN_TURN])
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 2, 100)
+    expect(prompts.length).toBeGreaterThanOrEqual(2)
+
+    const [a, b] = [prompts[0]!, prompts[1]!]
+    const sysA = a.find((m) => m.role === 'system')!
+    const sysB = b.find((m) => m.role === 'system')!
+    // The static system block (rules + capabilities + identity + personality)
+    // must be byte-identical between turns within a day.
+    expect(sysB.text).toBe(sysA.text)
+
+    // Message 0 is the append-only dayLog: turn 2's must extend turn 1's, byte
+    // for byte, so the provider prefix survives everything but scene + now.
+    const dayLogA = a.filter((m) => m.role === 'user')[0]!.text
+    const dayLogB = b.filter((m) => m.role === 'user')[0]!.text
+    expect(dayLogB.startsWith(dayLogA)).toBe(true)
+    expect(dayLogB.length).toBeGreaterThan(dayLogA.length)
+  })
+
   it('repairs an invalid generation with an assistant/user exchange instead of blind-retrying', async () => {
     const bad = { thought: 'I speak wrongly.', importance: 'very' }
     const good = { thought: 'Righted.', speech: 'All is well.', importance: 2 }

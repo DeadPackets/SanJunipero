@@ -24,8 +24,8 @@ byte-stable; callers must respect the cadence column above.
 
 ```
 system   = block 1 + DELIM + capabilities + DELIM + block 2 + DELIM + block 3
-messages = [ { role: 'user', content: block 4 },
-             { role: 'user', content: block 5 joined with '\n' },
+messages = [ { role: 'user', content: block 5 joined with '\n' },
+             { role: 'user', content: block 4 },
              { role: 'user', content: block 6 } ]
 ```
 
@@ -39,8 +39,10 @@ The delimiter between the system sections is exactly:
 \n\n---\n\n
 ```
 
-Blocks 4–6 are separate user messages. The full serialization used for cache
-and token estimation is `system + messages.map(m => m.content).join('')`.
+Blocks 4–6 are separate user messages, ordered stable→volatile: the append-only
+day log (block 5) precedes the per-turn scene (block 4) so the byte prefix
+survives across turns. The full serialization used for cache and token
+estimation is `system + messages.map(m => m.content).join('')`.
 
 ## Cache expectation
 
