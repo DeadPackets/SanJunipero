@@ -83,6 +83,7 @@ async function main(): Promise<void> {
     rmSync(join(dir, 'candidates'), { recursive: true, force: true })
     mkdirSync(join(dir, 'candidates'), { recursive: true })
 
+    const spentBefore = ledger.totalFor(assetId)
     let attemptsUsed = 0, extra = ''
     let chosen: RawImage | null = null, chosenRaw: RawImage | null = null, icon: RawImage | null = null
     const spriteVerdicts: VisionVerdict[] = [], iconVerdicts: VisionVerdict[] = []
@@ -167,23 +168,25 @@ async function main(): Promise<void> {
       const r = registerLibraryEntry(codex, e, {
         sprite: spritePng, icon: iconPng, score,
         attempts: Math.min(budget, Math.max(1, attemptsUsed)),
-        costUsd: ledger.totalFor(assetId),
+        costUsd: ledger.totalFor(assetId) - spentBefore,
       })
       records.push(r.spriteRecord, r.iconRecord)
       writeFileSync(join(dir, 'report.json'), JSON.stringify({
-        kind: e.kind, status, attempts: attemptsUsed, spendUsd: ledger.totalFor(assetId),
+        kind: e.kind, status, attempts: attemptsUsed,
+        spendUsd: ledger.totalFor(assetId) - spentBefore,
         spriteVerdicts, iconVerdicts,
       }, null, 2))
     }
 
     results.push({
-      kind: e.kind, status, attempts: attemptsUsed, spendUsd: ledger.totalFor(assetId),
+      kind: e.kind, status, attempts: attemptsUsed,
+      spendUsd: ledger.totalFor(assetId) - spentBefore,
       scores: spriteVerdicts.at(-1) ? CRITERIA.map(c => spriteVerdicts.at(-1)!.criteria[c].score) : [],
       iconScores: iconVerdicts.at(-1) ? CRITERIA.map(c => iconVerdicts.at(-1)!.criteria[c].score) : [],
       note,
     })
     console.log(`  ${status.padEnd(8)} ${e.kind.padEnd(16)} attempts ${attemptsUsed} ` +
-      `$${ledger.totalFor(assetId).toFixed(4)}`)
+      `$${(ledger.totalFor(assetId) - spentBefore).toFixed(4)}`)
   }
 
   // Read-merge-write: each batch adds its kinds to the one durable index.
