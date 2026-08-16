@@ -10,6 +10,7 @@ import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
 import { makeFoundersOnTick } from './founders.js'
 import { ingestProductionArt } from './ingestArt.js'
+import { showcaseTerrain } from './showcaseMap.js'
 
 export const DEV_DB_PATH = 'data/dev-world.db'
 export const DEV_PORT = 8787
@@ -32,8 +33,21 @@ export const THOUGHT_LINES: Record<string, string> = {
 
 export type DevWorld = { gateway: Gateway; loop: TickLoop; stop(): Promise<void> }
 
+// 'scripted' is the G6 fixture map and stays the default, so every existing gate is unchanged.
+// 'showcase' folds C13's city template (see showcaseMap.ts). A third 'city' value — genesis
+// taking the template directly, at 128×128 — is a one-line addition here when C11 §9 lands.
+export type DevMapKind = 'scripted' | 'showcase'
+export const DEV_MAP_DEFAULT: DevMapKind = 'scripted'
+
+export function devTerrain(map: DevMapKind = DEV_MAP_DEFAULT): ReturnType<typeof makeFixtureMap> {
+  return map === 'showcase' ? showcaseTerrain() : makeFixtureMap()
+}
+
 export async function startDevWorld(
-  opts: { dbPath?: string; port?: number; realMsPerTick?: number; seed?: string; ingest?: boolean } = {},
+  opts: {
+    dbPath?: string; port?: number; realMsPerTick?: number; seed?: string; ingest?: boolean
+    map?: DevMapKind
+  } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH
   mkdirSync(dirname(dbPath), { recursive: true })
@@ -55,7 +69,7 @@ export async function startDevWorld(
   ensureObserverTables(db)
 
   const config = SHOWCASE_CONFIG
-  const terrain = makeFixtureMap()
+  const terrain = devTerrain(opts.map ?? DEV_MAP_DEFAULT)
   const rng = new RngStreams(opts.seed ?? DEV_SEED)
   const store = new EventStore(db)
   const loop: TickLoop = new TickLoop({
