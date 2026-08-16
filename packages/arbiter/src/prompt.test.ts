@@ -122,6 +122,25 @@ describe('the canon vocabulary (C9 batch-11, user ruling)', () => {
   })
 })
 
+// One G9b run-5 verdict reasoned "therefore it is an attempt" and then emitted
+// kind "impossible" — schema-valid, so no retry could catch it (batch-10 concern 2).
+describe('the reasoning must agree with the verdict word (C9 batch-11)', () => {
+  it('makes a ruling that reasons to an attempt and says impossible a format error', () => {
+    const { system } = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(system).toContain(
+      'if your own reasoning concludes the action can be begun, the verdict is "attempt"',
+    )
+    expect(system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('keeps the law in the system prefix, and out of the anchor rulings', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I smoke a fish over the fire.' }))
+    const b = assembleAdjudicationPrompt(fixtureBlocks({ intent: 'I want to build a clay oven.' }))
+    expect(a.system).toBe(b.system)
+    expect(a.system.split('\n').filter((l) => l.startsWith('"I '))).toHaveLength(3)
+  })
+})
+
 describe('adjudication prompt prefix stability', () => {
   it('keeps system byte-identical and user prefix byte-identical when only intent changes', () => {
     const intentA = 'I try to boil river water for salt.'

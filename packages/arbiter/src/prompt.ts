@@ -29,6 +29,7 @@ const ADJUDICATION_INSTRUCTION = `You are the physics arbiter of San Junipero. A
 "attempt" if the action is new but the agent can physically try it with the town's fire, clay pots, wood, fiber, stone implements, and river — whether it succeeds is decided later, never by you;
 "impossible" only if the action cannot even be started because it needs something the town wholly lacks.
 Between attempt and impossible, decide by whether the first step can be taken with what the town has at hand; a craft is not impossible merely because no one has done it yet.
+The verdict word must agree with the reasoning that reached it: if your own reasoning concludes the action can be begun, the verdict is "attempt" and no other word will do.
 The line naming what stands within reach lists crafts nobody here has earned, each one resting on a craft the town already practices: an action that would reach one of those can be begun, so it is "attempt", never "impossible".
 Two lines above name ids: what the town currently knows, and what stands within reach. When you rule "attempt", every id you put in the recipe's canon must be copied exactly from those two lines. An id that appears on neither line is a format error, not a craft, and the ruling is thrown away unread.
 Three rulings for the measure of it:
