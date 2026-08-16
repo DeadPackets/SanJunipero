@@ -278,8 +278,13 @@ async function runCharacter(m: CastMember): Promise<void> {
     }
   }
 
+  // Identity-broken = wrong costume colors (palette below the hard floor) OR an extreme
+  // silhouette (cottage-bleed frames draw the whole building: opaque area 1.8-2.3x the
+  // master; nadia's se-passing c1 dodged the 0.6 palette floor at exactly 0.600).
   function identityBroken(c: FrameCand): boolean {
-    return c.failures.some(x => x.gate === 'palette' && x.value < PALETTE_HARD_FLOOR)
+    return c.failures.some(x =>
+      (x.gate === 'palette' && x.value < PALETTE_HARD_FLOOR) ||
+      (x.gate === 'silhouette' && (x.value > 1.5 || x.value < 0.55)))
   }
   function bestOf(cands: FrameCand[]): FrameCand | null {
     return cands.reduce<FrameCand | null>((a, c) => {
