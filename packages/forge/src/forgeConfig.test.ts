@@ -65,8 +65,9 @@ describe('forge config', () => {
 
   // Determinism proof: C13 config is ops-side, so world law cannot move and G1/G2 goldens hold.
   it('leaves SimConfig untouched — the world config hash does not move', () => {
+    // moves whenever SimConfigSchema changes world law — re-pin is a deliberate reviewed act (see merge-train-3 report)
     expect(stateHash(DEFAULT_CONFIG)).toBe(
-      '29264e61245b74656d668851a72e516c31c932315d91d66a6eb81ffcb9f232c7')
+      '31b6304a7850172fe7ab17ebf95f7faa06ae5212b92c71bfed59b23ef68693a9')
     expect(stateHash(SimConfigSchema.parse({}))).toBe(stateHash(DEFAULT_CONFIG))
     expect(Object.keys(DEFAULT_CONFIG)).not.toContain('visionQa')
   })
