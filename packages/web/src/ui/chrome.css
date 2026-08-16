@@ -35,7 +35,23 @@
                feed that re-animated every 2.5s would strobe under a reading eye.
    · STATE     the viewed entry is marked by an ember left rail AND aria-current, never by
                colour alone. A row is a button with a full spoken label ("… Go to this
-               moment."), so the chronicle is navigable without a pointer. */
+               moment."), so the chronicle is navigable without a pointer.
+
+   C10 T7 design-token plan (bond detail over the redesigned graph):
+   · SURFACE   the detail is a cream slab in the same 9-slice frame the timeline and legend
+               wear (--px-cream + --grain + --ledge). No new material, no modal scrim: the
+               graph behind it stays live and readable, because the bond is about it.
+   · COLOUR    six tie colours, one per kind, all MASTER_PALETTE, held in bondsModel.ts.
+               A tie colour NEVER sits behind text — six hues cannot all clear AA under a
+               label — so it rides a swatch and a bar, and the word carries the meaning.
+   · TYPE      --font-px for the kind chip and the date labels, --font-data (tabular) for
+               every tick-stamped figure, --font-body for the title and the notes.
+   · SPACE     the same 6.2rem stamp rail as the chronicle, so the two feeds read as one
+               family; 40px on the close button.
+   · MOTION    one entrance (the existing panel-in, 240ms), nothing else. The graph's own
+               force simulation is motion enough on this surface.
+   · STATE     the bar is data, not a meter: it is labelled "N shared moments, out of M for
+               the closest pair in town" and cannot be filled, completed or won. */
 :root {
   --cream: #FFF6E9;
   --parchment: #F6E8D5;
@@ -529,6 +545,8 @@ body {
 .society-legend {
   position: absolute; top: 0.8rem; left: 0.8rem; z-index: 20;
   display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+  /* six kinds now, not four: the legend wraps inside the lens rather than off its edge */
+  max-width: min(40rem, calc(100% - 1.6rem));
   background-color: var(--cream);
   padding: 0.1rem 0.2rem;
 }
@@ -538,7 +556,7 @@ body {
 .legend-chip {
   display: inline-flex; align-items: center; gap: 0.35rem;
   border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
-  color: var(--ink); font-family: var(--font-px); font-size: 0.72rem; text-transform: uppercase;
+  color: var(--ink); font-family: var(--font-px); font-size: 0.62rem; text-transform: uppercase;
   padding: 0.25rem 0.5rem; min-height: 40px; cursor: pointer;
   transition-property: opacity, background-color, translate; transition-duration: var(--t-fast);
 }
@@ -557,6 +575,58 @@ body {
   border: 10px solid transparent; border-image: var(--px-night);
   padding: 0.4rem 0.7rem;
   box-shadow: var(--ledge);
+}
+
+/* ── what passed between two people: the bond detail ── */
+.bond-detail {
+  position: absolute; top: 4.6rem; right: 1rem; z-index: 30;
+  width: min(21rem, calc(100% - 2rem)); max-height: 62%; overflow-y: auto;
+  background-color: var(--cream); background-image: var(--grain); color: var(--ink);
+  border: 10px solid transparent; border-image: var(--px-cream);
+  box-shadow: var(--ledge);
+  font-size: 0.8rem;
+}
+.bond-detail :focus-visible { outline-offset: -2px; }  /* the panel scrolls; keep the ring inside */
+@media (prefers-reduced-motion: no-preference) {
+  .bond-detail { animation: panel-in var(--t-med) var(--ease-enter); }
+}
+.bond-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.bond-kind {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  background: var(--sand); color: var(--ink);
+  font-family: var(--font-px); font-size: 0.52rem; line-height: 1; text-transform: uppercase;
+  border: 2px solid var(--ink); padding: 0.3rem 0.4rem;
+}
+.bond-title { flex: 1 1 8rem; margin: 0; font-size: 0.85rem; font-weight: 600; text-wrap: balance; }
+.bond-close {
+  flex: none; min-width: 40px; min-height: 40px; cursor: pointer;
+  background: var(--parchment); color: var(--ink);
+  border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
+  font: 1rem/1 var(--font-body);
+}
+.bond-close:hover { background: var(--honey); }
+.bond-close:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+/* a history, drawn to scale — it counts what happened, it does not fill toward anything */
+.bond-bar { height: 10px; margin-top: 0.7rem; background: var(--sand); border: 2px solid var(--ink); }
+.bond-bar-fill { display: block; height: 100%; }
+.bond-count {
+  margin: 0.3rem 0 0; font-size: 0.72rem; opacity: 0.8;
+  font-family: var(--font-data); font-variant-numeric: tabular-nums;
+}
+.bond-dates {
+  display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.6rem;
+  margin: 0.6rem 0 0; font-size: 0.72rem;
+}
+.bond-dates dt { font-family: var(--font-px); font-size: 0.5rem; align-self: center; opacity: 0.8; }
+.bond-dates dd { margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.bond-history { list-style: none; margin: 0.7rem 0 0; padding: 0; }
+.bond-history li {
+  display: flex; gap: 0.5rem; align-items: baseline;
+  padding: 0.3rem 0; border-top: 1px solid var(--sand);
+}
+.bond-history .stamp {
+  flex: none; width: 6.2rem; font-size: 0.7rem; opacity: 0.75;
+  font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 
 /* ── director mode + catch-up digest (Task 19) ── */

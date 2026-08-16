@@ -10,6 +10,7 @@ import { thoughtsSince } from './observer.js'
 import { mountAssetRoutes } from './assetsHttp.js'
 import { mountDataApi } from './api.js'
 import { mountNarratorApi } from './narratorApi.js'
+import { mountBondsApi } from './bonds.js'
 
 export type GatewayOpts = {
   dbPath: string; port?: number                 // default 8787
@@ -66,6 +67,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   mountAssetRoutes(router, { getCodex })
   mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
   mountNarratorApi(router, { db, mirror, narratorDb })
+  mountBondsApi(router, { db, mirror, config })
 
   const httpServer = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')

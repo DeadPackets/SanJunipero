@@ -1,10 +1,15 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { BondsResponseSchema } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { LENSES, type Lens } from './route.js'
 import {
   lensHints, townStats, weatherGlyph,
-  type LensHint, type TownStats, type WeatherGlyph,
+  type LensCounts, type LensHint, type TownStats, type WeatherGlyph,
 } from './townStats.js'
+
+// The bond count is history, not a tick reading — a slow beat keeps the badge honest without
+// putting a fetch on the world's clock.
+export const BOND_COUNT_REFETCH_MS = 60_000
 
 // chrome copy speaks about townsfolk, never machinery (spec §5)
 export const LENS_LABELS: Record<Lens, string> = {
@@ -87,11 +92,35 @@ export function LensTabsView({ lens, hints, onNav }: { lens: Lens; hints: LensHi
   )
 }
 
+function useBondCount(): number | null {
+  const [count, setCount] = useState<number | null>(null)
+  useEffect(() => {
+    let alive = true
+    const load = (): void => {
+      void fetch('/api/bonds')
+        .then(async (r) => (r.ok ? BondsResponseSchema.safeParse(await r.json()) : null))
+        .then((parsed) => {
+          if (alive && parsed?.success === true) setCount(parsed.data.bonds.length)
+        })
+        .catch(() => { /* no badge is better than a wrong one */ })
+    }
+    load()
+    const timer = setInterval(load, BOND_COUNT_REFETCH_MS)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
+  }, [])
+  return count
+}
+
 // The lens bar subscribes on its own so the counts can tick without re-rendering App and,
 // with it, the Pixi stage.
 export function LensTabs({ store, lens, onNav }: { store: WorldStore; lens: Lens; onNav: (l: Lens) => void }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   const events = useSyncExternalStore(store.subscribe, store.recentEvents)
-  return <LensTabsView lens={lens} hints={lensHints(townStats(state, tick), events)} onNav={onNav} />
+  const bonds = useBondCount()
+  const counts: LensCounts = bonds === null ? {} : { society: bonds }
+  return <LensTabsView lens={lens} hints={lensHints(townStats(state, tick), events, counts)} onNav={onNav} />
 }
