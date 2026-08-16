@@ -18,5 +18,19 @@ export {
   type LlmMessage,
   type LlmClientOpts,
 } from './llm/client.js'
+export { derivePersona, type ParentPersona, type Parents } from './family/derivePersona.js'
+export {
+  buildHouseholdSeed,
+  DEFAULT_HOUSEHOLD_SEED_MAX,
+  type HouseholdSeedOpts,
+  type SeedEntry,
+} from './family/memorySeed.js'
+export { watchBirths, type AgentBornPayload } from './family/watchBirths.js'
+export {
+  captureSocialName,
+  migrateFamilyTables,
+  promptBirthLine,
+  MAX_SOCIAL_NAME_CHARS,
+} from './family/socialName.js'
 export { Embedder, cosine, EMBEDDING_DIM } from './memory/embedder.js'
 export { FakeEmbedder } from './testutil/fakeEmbedder.js'
