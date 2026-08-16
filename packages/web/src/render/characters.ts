@@ -114,6 +114,7 @@ export function createCharacterLayer(
     sprite.scale.set(CHAR_TARGET_PX / 64)
     sprite.eventMode = 'static'
     sprite.cursor = 'pointer'
+    sprite.hitArea = new Rectangle(-HIT_AREA_W / 2, -HIT_AREA_H, HIT_AREA_W, HIT_AREA_H)
     sprite.on('pointertap', () => onSelect(agentId))
     const shadow = new Sprite(shadowTexture)
     shadow.anchor.set(0.5, 0.5)
@@ -121,14 +122,19 @@ export function createCharacterLayer(
     const emote = new Sprite()
     emote.anchor.set(0.5, 1)
     emote.visible = false
-    scene.entities.addChild(shadow, sprite, emote)
+    const nameTag = new Container()
+    nameTag.visible = false
+    const nameTagBg = new Graphics()
+    const nameTagLabel = new BitmapText({ text: '', style: { fontFamily: 'monospace', fontSize: 8, fill: 0x43394a, lineHeight: 10 } })
+    nameTag.addChild(nameTagBg, nameTagLabel)
+    sprite.on('pointerover', () => { nameTag.visible = true })
+    sprite.on('pointerout', () => { nameTag.visible = false })
+    scene.entities.addChild(shadow, sprite, emote, nameTag)
     const now = performance.now()
     e = {
-      sprite, shadow, emote, emoteUntil: 0, facing: 'sw',
-      prev: { x, y, atMs: now }, next: { x, y, atMs: now }, lastMoveArrival: now,
+      sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, emoteUntil: 0, facing: 'sw',
+      path: [{ x, y, atMs: now }], lastMoveArrival: now,
     }
-    entries.set(agentId, e)
-    loadSheet(agentId, null)
     return e
   }
 
@@ -215,12 +221,22 @@ export function createCharacterLayer(
       e.emote.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX)
       e.emote.zIndex = e.sprite.zIndex + 1
       e.emote.visible = !emotesHidden && nowMs < e.emoteUntil && e.emote.texture !== Texture.EMPTY
+      const tag = nameTagText(a.name)
+      if (e.nameTagLabel.text !== tag) {
+        e.nameTagLabel.text = tag
+        e.nameTagBg.clear()
+        e.nameTagBg.roundRect(-e.nameTagLabel.width / 2 - 4, -e.nameTagLabel.height - 4, e.nameTagLabel.width + 8, e.nameTagLabel.height + 8, 2)
+        e.nameTagBg.fill(0xfff6e9)
+      }
+      e.nameTag.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX - NAME_TAG_ABOVE_HEAD_PX)
+      e.nameTag.zIndex = e.sprite.zIndex + 1
     }
     for (const [agentId, e] of entries) {
       if (!live.has(agentId)) {
         e.sprite.destroy()
         e.shadow.destroy()
         e.emote.destroy()
+        e.nameTag.destroy({ children: true })
         entries.delete(agentId)
         sheets.delete(agentId)
       }
@@ -239,6 +255,7 @@ export function createCharacterLayer(
         e.sprite.destroy()
         e.shadow.destroy()
         e.emote.destroy()
+        e.nameTag.destroy({ children: true })
       }
       entries.clear()
       shadowTexture.destroy(true)

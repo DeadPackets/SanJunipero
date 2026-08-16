@@ -13,6 +13,17 @@ export const BOB_PX = 1 // passing frames render 1px lower — render-time only,
 export const CHAR_TARGET_PX = 52 // ≈1.6 tiles of 32px; art height 64 in cell → scale 52/64
 export const WALK_FRAME_MS_V4 = 180 // v4 ruling: F1-F2-F1-F3 cadence at 180ms/frame
 
+// Click target: wider than the ~52px sprite and taller than its ~64px art, so a
+// character is easy to hit. Local sprite coords, feet at (0,0), body rising upward.
+export const HIT_AREA_W = 52
+export const HIT_AREA_H = 72
+export const NAME_TAG_ABOVE_HEAD_PX = 8
+export const NAME_TAG_MAX_CHARS = 16
+// Hover name tag: the agent's name, truncated to fit the pixel slab.
+export function nameTagText(name: string): string {
+  return name.length <= NAME_TAG_MAX_CHARS ? name : `${name.slice(0, NAME_TAG_MAX_CHARS - 1)}…`
+}
+
 export type CharPose = { row: (typeof SHEET_ROWS)[number]; facing: Facing; bobY: number }
 
 export function charPose(

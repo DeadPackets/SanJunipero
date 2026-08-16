@@ -103,3 +103,17 @@ describe('emoteFor', () => {
     expect(emoteFor(agent(), [])).toBeNull()
   })
 })
+
+describe('character hit area + name tag', () => {
+  it('pins the generous hit rect constants', () => {
+    expect(HIT_AREA_W).toBe(52)
+    expect(HIT_AREA_H).toBe(72)
+    expect(HIT_AREA_H).toBeGreaterThan(64) // taller than the sprite's default art bounds
+  })
+  it('name-tag text is the agent name, truncated to the slab', () => {
+    expect(nameTagText('Omar')).toBe('Omar')
+    const long = nameTagText('A very long founder name beyond the slab')
+    expect(long).toHaveLength(NAME_TAG_MAX_CHARS)
+    expect(long.endsWith('…')).toBe(true)
+  })
+})
