@@ -12,7 +12,7 @@ import {
 } from '@sj/engine'
 import { SimConfigSchema } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
-import { buildAgentCtx } from './arbiterSeam.js'
+import { buildAgentCtx, flattenIntent, wireArbiter, type SeamArbiter } from './arbiterSeam.js'
 
 const AGENT = 'tamar'
 
@@ -56,5 +56,33 @@ describe('buildAgentCtx', () => {
   it('throws for a body the world does not have — an unknown asker is a bug, not a verdict', () => {
     const { bridge } = world()
     expect(() => buildAgentCtx(bridge, 'nobody')).toThrow(/nobody/)
+  })
+})
+
+describe('flattenIntent', () => {
+  it('turns a rejected named verb back into the words a mind would use', () => {
+    expect(flattenIntent('patch', { structureId: 'structure_1' })).toBe('patch structure_1')
+    expect(flattenIntent('inspect', {})).toBe('inspect')
+  })
+
+  it('is deterministic: params read in key order, whatever order they arrived in', () => {
+    expect(flattenIntent('walk', { y: 6, x: 5 })).toBe('walk 5 6')
+    expect(flattenIntent('walk', { x: 5, y: 6 })).toBe('walk 5 6')
+  })
+
+  it('flattens a nested param without losing it', () => {
+    expect(flattenIntent('offer', { gift: { kind: 'bread' } })).toBe('offer {"kind":"bread"}')
+  })
+})
+
+describe('wireArbiter', () => {
+  it('hands the runtime both halves of the arbiter in one call', () => {
+    const arbiter: SeamArbiter = {
+      adjudicate: async () => ({ kind: 'impossible', reason: 'no', class: 'physically_impossible' }),
+      codify: () => ({ ruleId: 1, verb: 'recipe:x' }),
+    }
+    const wired: SeamArbiter[] = []
+    wireArbiter({ useArbiter: (a) => wired.push(a) }, arbiter)
+    expect(wired).toEqual([arbiter])
   })
 })

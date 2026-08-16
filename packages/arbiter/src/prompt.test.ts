@@ -22,6 +22,16 @@ function fixtureBlocks(overrides: Partial<AdjudicationBlocks> = {}): Adjudicatio
   }
 }
 
+describe('canon (T20)', () => {
+  it('refuses to rule on the world’s own unexplained happenings', () => {
+    const a = assembleAdjudicationPrompt(fixtureBlocks())
+    expect(a.system).toContain(
+      'unexplained happenings in the world have no known mechanism and cannot be ruled upon',
+    )
+    expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+})
+
 describe('adjudication prompt prefix stability', () => {
   it('keeps system byte-identical and user prefix byte-identical when only intent changes', () => {
     const intentA = 'I try to boil river water for salt.'

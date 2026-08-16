@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { MockLanguageModelV4 } from 'ai/test'
 import type { LanguageModel } from 'ai'
@@ -9,15 +9,17 @@ import {
   genesisState,
   openDb,
   replayFromGenesis,
+  registerVerb,
   RngStreams,
   TickLoop,
+  unregisterVerb,
   type TickHandler,
   type TileId,
 } from '@sj/engine'
 import { SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
 import { AgentRuntime, CRAFT_HINT, refusalMemoryText } from './agentRuntime.js'
-import type { Adjudicator, AgentCtx } from './arbiterSeam.js'
+import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore, type MemoryRow } from '../memory/store.js'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
@@ -777,6 +779,91 @@ describe('arbiter seam (T19)', () => {
     await stepUntil(loop, () => startedVerbs(world.engineDb).includes('walk'), 100)
     expect(startedVerbs(world.engineDb)).toContain('walk')
     expect(alertKinds(agentDb)).not.toContain('adjudicate_failed')
+  })
+})
+
+describe('arbiter wiring expansion (T20)', () => {
+  const RECIPE_VERB = 'recipe:t20_weave'
+  afterEach(() => unregisterVerb(RECIPE_VERB))
+
+  const unknownVerbTurn = {
+    thought: 'I will patch the roof.',
+    action: { verb: 'patch', params: { structureId: STRUCTURE_ID } },
+    importance: 4,
+  }
+
+  it('re-frames an unknown verb as freeform and sends the flattened words to the arbiter', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return { kind: 'impossible', reason: 'the roof is beyond mending', class: 'physically_impossible' }
+    }
+    const { loop, agentDb } = await setup({ model: turnModel([unknownVerbTurn]), mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(seen).toEqual([`patch ${STRUCTURE_ID}`])
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe('You realize you cannot: the roof is beyond mending')
+  })
+
+  it('asks the arbiter once per turn: a second unknown verb falls back to refusal memory', async () => {
+    let calls = 0
+    const adjudicator: Adjudicator = async () => {
+      calls += 1
+      // A map onto another verb the world does not have: the retry fails too.
+      return { kind: 'map', verb: 'patch_again', params: {} }
+    }
+    const { loop, agentDb } = await setup({ model: turnModel([unknownVerbTurn]), mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(calls).toBe(1)
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe('You realize you cannot: unknown verb: patch_again')
+  })
+
+  it('codifies an attempt verdict and then submits the new recipe verb', async () => {
+    const codified: string[] = []
+    const arbiter: SeamArbiter = {
+      adjudicate: async () => ({
+        kind: 'attempt',
+        recipe: { id: RECIPE_VERB },
+        summary: 'Weave reeds into a mat.',
+      }),
+      codify: (recipe) => {
+        codified.push(recipe.id)
+        registerVerb({
+          kind: RECIPE_VERB,
+          validate: () => null,
+          duration: () => 1,
+          onComplete: () => [],
+          interruptible: true,
+        })
+        return { ruleId: 1, verb: recipe.id }
+      },
+    }
+    const { loop, runtime, world } = await setup({
+      model: turnModel([{ thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 }]),
+      mindConfig: FAST_MIND,
+    })
+    wireArbiter(runtime, arbiter)
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes(RECIPE_VERB), 100)
+
+    expect(codified).toEqual([RECIPE_VERB])
+    expect(startedVerbs(world.engineDb)).toContain(RECIPE_VERB)
+    expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+  })
+
+  it('falls back to the world when an attempt arrives with no way to codify it', async () => {
+    const adjudicator: Adjudicator = async () => ({
+      kind: 'attempt',
+      recipe: { id: RECIPE_VERB },
+      summary: 'Weave reeds into a mat.',
+    })
+    const { loop, agentDb } = await setup({
+      model: turnModel([{ thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 }]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
   })
 })
 

@@ -23,7 +23,7 @@ import {
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
 import type { EngineBridge, Intent, SubmitResult } from './bridge.js'
-import { buildAgentCtx, type Adjudicator } from './arbiterSeam.js'
+import { buildAgentCtx, flattenIntent, type Adjudicator, type Codifier, type SeamArbiter } from './arbiterSeam.js'
 
 const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 
@@ -100,7 +100,8 @@ export class AgentRuntime {
   readonly #reflectionLlm: ReflectionLlm | null
   readonly #dreamLlm: DreamLlm | null
   readonly #onThought: ((t: { tick: number; agentId: string; text: string }) => void) | null
-  readonly #adjudicator: Adjudicator | null
+  #adjudicator: Adjudicator | null
+  #codify: Codifier | null = null
 
   #agentId = ''
   #mem: MemoryStore | null = null
@@ -112,6 +113,7 @@ export class AgentRuntime {
   #pendingInFlight = false
   #turnInFlight = false
   #wakeOwed = false
+  #reframedThisTurn = false
   #stats = { turns: 0, dozes: 0, reflections: 0 }
   #reflectedNight: number | null = null
   #reflectionInFlight = false
@@ -167,6 +169,13 @@ export class AgentRuntime {
       this.#offTick = (tick) => this.#onTick(tick)
       this.#bridge.onTick(this.#offTick)
     }
+  }
+
+  // Post-construction wiring: G9b and C8's supervisor build the arbiter after
+  // the minds. Called through `wireArbiter`.
+  useArbiter(arbiter: SeamArbiter): void {
+    this.#adjudicator = arbiter.adjudicate
+    this.#codify = arbiter.codify
   }
 
   stop(): void {
@@ -257,7 +266,7 @@ export class AgentRuntime {
     if (activity === null) {
       this.#planHeadInFlight = true
       const head = this.#plan.queue[0]!
-      void this.#bridge.submit(this.#agentId, head, (res) => this.#onPlanHeadResult(res))
+      void this.#bridge.submit(this.#agentId, head, (res) => this.#onPlanHeadResult(res, head))
     }
   }
 
@@ -276,9 +285,23 @@ export class AgentRuntime {
         }
         if (res.reason.startsWith('already busy')) return
         this.#pendingIntent = null
+        if (this.#reroutesUnknownVerb(res.reason)) {
+          void this.#adjudicateFreeform(flattenIntent(intent.verb, intent.params))
+          return
+        }
         void this.#writeActionMemory(refusalMemoryText(res.reason))
       })
       .then(() => undefined)
+  }
+
+  // An invented verb is not a mistake, it is a proposal: it re-enters the turn
+  // as freeform words for the arbiter. Once per turn — a second failure is the
+  // world's final answer, or an unwired arbiter would loop on itself.
+  #reroutesUnknownVerb(reason: string): boolean {
+    if (!reason.startsWith('unknown verb:')) return false
+    if (this.#adjudicator === null || this.#reframedThisTurn) return false
+    this.#reframedThisTurn = true
+    return true
   }
 
   // Held until the body is free; a busy rejection retries instead of
@@ -305,16 +328,29 @@ export class AgentRuntime {
       await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
       return
     }
-    // 'attempt' becomes a live codification in Task 20; until then the world
-    // answers for itself rather than the attempt vanishing.
-    return fallback()
+    // Adjudicate once, physics forever: the recipe becomes a verb the engine
+    // owns, and this mind is the first to use it. With no codifier wired the
+    // attempt still reaches the world rather than vanishing.
+    if (this.#codify === null) return fallback()
+    let verb: string
+    try {
+      verb = this.#codify(verdict.recipe).verb
+    } catch (err) {
+      this.#llm.alert('codify_failed', err instanceof Error ? err.message : String(err))
+      return fallback()
+    }
+    return this.#holdIntent({ verb, params: {} })
   }
 
-  #onPlanHeadResult(res: SubmitResult): void {
+  #onPlanHeadResult(res: SubmitResult, head: Intent): void {
     if (res.ok) return
     this.#plan.lastResult = 'blocked'
     this.#plan.queue = []
     this.#planHeadInFlight = false
+    if (this.#reroutesUnknownVerb(res.reason)) {
+      void this.#adjudicateFreeform(flattenIntent(head.verb, head.params))
+      return
+    }
     void this.#writeActionMemory(refusalMemoryText(res.reason))
   }
 
@@ -351,6 +387,7 @@ export class AgentRuntime {
   }
 
   async #runTurnBody(): Promise<void> {
+    this.#reframedThisTurn = false
     const tick = this.#bridge.currentTick()
     const packet = this.#bridge.perception(this.#agentId)
     const day = Math.floor(tick / MINUTES_PER_DAY)

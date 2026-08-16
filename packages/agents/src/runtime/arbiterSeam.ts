@@ -18,6 +18,28 @@ export type Verdict =
   | { kind: 'impossible'; reason: string; class: string }
 
 export type Adjudicator = (intent: string, ctx: AgentCtx) => Promise<Verdict>
+export type Codifier = (recipe: { id: string }) => { ruleId: number; verb: string }
+
+// Both halves of the arbiter the runtime needs: rule on it, then make it law.
+export type SeamArbiter = { adjudicate: Adjudicator; codify: Codifier }
+
+// A rejected named verb, put back into the words the mind would have used.
+// Values only, read in key order, so the same intent always flattens the same
+// way — the arbiter's precedent lookup depends on it.
+export function flattenIntent(verb: string, params: Record<string, unknown>): string {
+  const values = Object.keys(params)
+    .sort()
+    .map((k) => {
+      const v = params[k]
+      return typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)
+    })
+  return [verb, ...values].join(' ')
+}
+
+// The one call G9b and C8's supervisor make once both halves exist.
+export function wireArbiter(runtime: { useArbiter(a: SeamArbiter): void }, arbiter: SeamArbiter): void {
+  runtime.useArbiter(arbiter)
+}
 
 // What the arbiter is told about the asker. Everything comes from the world
 // itself — the mind's own account of what it holds is never consulted.
