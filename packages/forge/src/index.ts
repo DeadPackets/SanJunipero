@@ -39,3 +39,4 @@ export {
 export { packCharacterAtlas } from './atlasV4.js'
 export { CELL_NAMES_V4, WALK_CYCLE_V4, WALK_FRAME_MS } from './mirror.js'
 export { cellAnchor, processHiResCell } from './hires.js'
+export * from './terrainTiles.js'

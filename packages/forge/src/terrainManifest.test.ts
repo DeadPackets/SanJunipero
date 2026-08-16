@@ -75,3 +75,17 @@ describe('TilesetManifest.autotile (additive, optional)', () => {
     } finally { rmSync(dir, { recursive: true, force: true }) }
   })
 })
+
+// C13 wrote the autotile block into the shipped manifest and left the rest for C10 T1.
+// The merge is read-merge-write, so this is the guard that neither half ever overwrites
+// the other: the real content directory must carry BOTH and still load.
+describe('the shipped content/tilesets manifest', () => {
+  it('carries the C10 seasons/scaffolding block AND the C13 autotile block', () => {
+    const m = loadTilesetManifest()
+    expect(Object.keys(m.seasons).sort()).toEqual(['autumn', 'spring', 'summer', 'winter'])
+    for (const s of Object.values(m.seasons)) expect(s!.tiles).toHaveLength(16)
+    expect(m.scaffolding.file).toBe('scaffolding.png')
+    expect(m.tileW).toBe(32)
+    expect(Object.keys(m.autotile!.road.tiles).sort()).toEqual([...ROAD_AUTOTILE_KEYS].sort())
+  })
+})
