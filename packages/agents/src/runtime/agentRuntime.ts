@@ -73,6 +73,7 @@ function freshClock(): MindClock {
     dozeUntilTick: 0,
     alarmArmed: { hunger: true, energy: true, warmth: true },
     morningWokeDay: null,
+    wakeRetryAtTick: 0,
     prevVisibleIds: [],
   }
 }
@@ -97,6 +98,7 @@ export class AgentRuntime {
   #pendingIntent: Intent | null = null
   #pendingInFlight = false
   #turnInFlight = false
+  #wakeOwed = false
   #stats = { turns: 0, dozes: 0, reflections: 0 }
   #reflectedNight: number | null = null
   #pendingDreamMood: string | null = null
@@ -137,6 +139,7 @@ export class AgentRuntime {
     this.#pendingIntent = null
     this.#pendingInFlight = false
     this.#turnInFlight = false
+    this.#wakeOwed = false
     this.#stats = { turns: 0, dozes: 0, reflections: 0 }
     this.#reflectedNight = null
     this.#pendingDreamMood = null
@@ -171,15 +174,40 @@ export class AgentRuntime {
     rearmBodyAlarm(this.#config, packet.self.body.needs, this.#clock)
     this.#submitPendingIfIdle(packet.self.activity)
     this.#advancePlan(packet)
+    this.#answerWakeOwed(packet)
     if (packet.heard.length > 0) {
       this.#clock.conversationUntilTick = tick + this.#config.conversationWindowTicks
     }
     this.#handleNight(tick, packet)
+    // Morning is consumed by an actual rise, not by the reason firing: a body
+    // seen awake in daylight has had its morning.
+    if (!packet.self.asleep && !packet.time.isNight) {
+      this.#clock.morningWokeDay = Math.floor(tick / MINUTES_PER_DAY)
+    }
     if (this.#turnInFlight) return
     const reason = decideWake(this.#config, packet, this.#clock, tick, this.#plan)
     if (reason === 'reconsider') this.#clock.reconsiderAtTick = null
-    if (reason === 'morning') this.#clock.morningWokeDay = Math.floor(tick / MINUTES_PER_DAY)
-    if (reason !== null) void this.#startTurn(reason)
+    if (reason !== null) {
+      if (packet.self.asleep) {
+        this.#wakeOwed = true
+        this.#clock.wakeRetryAtTick = tick + this.#config.wakeRetryTicks
+      }
+      void this.#startTurn(reason)
+    }
+  }
+
+  // A roused sleeper owes the world a wake. If the turn it was given put no
+  // act into the world — or the world refused every act it tried — the body
+  // answers its own alarm and rises by the wake verb.
+  #answerWakeOwed(packet: PerceptionPacket): void {
+    if (!this.#wakeOwed) return
+    if (!packet.self.asleep) {
+      this.#wakeOwed = false
+      return
+    }
+    if (this.#turnInFlight || this.#pendingIntent !== null || this.#pendingInFlight || this.#planHeadInFlight) return
+    this.#wakeOwed = false
+    void this.#bridge.submit(this.#agentId, { verb: 'wake', params: {} })
   }
 
   #advancePlan(packet: PerceptionPacket): void {

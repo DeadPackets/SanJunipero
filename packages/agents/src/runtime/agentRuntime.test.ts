@@ -576,6 +576,46 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(userMsg.text).toContain('importance')
   })
 
+  it('the body answers its own alarm: a sleeper whose turn submits nothing is woken by a runtime wake', async () => {
+    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 } })
+    const { world, loop } = await setup({
+      model: turnModel([{ thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 }]),
+      mindConfig: FAST_MIND,
+      simConfig: stillSim,
+    })
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.asleep, 30)
+    expect(loop.state.agents[AGENT]!.asleep).toBe(true)
+
+    // Sleep through to dawn. The morning turn is thought-only (BENIGN fallback);
+    // the runtime itself must answer with the wake verb.
+    await stepUntil(loop, () => loop.tick >= DAWN_TICK && !loop.state.agents[AGENT]!.asleep, 500)
+    expect(loop.state.agents[AGENT]!.asleep).toBe(false)
+    expect(startedVerbs(world.engineDb)).toContain('wake')
+    const woke = world.engineDb
+      .prepare("SELECT COUNT(*) AS n FROM events WHERE type = 'agent_woke'")
+      .get() as { n: number }
+    expect(woke.n).toBeGreaterThanOrEqual(1)
+  })
+
+  it('a sleeper whose every intent the world rejects still rises', async () => {
+    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 } })
+    const { world, loop, agentDb } = await setup({
+      model: turnModel(
+        [{ thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 }],
+        // Every later turn targets the storehouse's own tile: the engine
+        // rejects it ('no path to that spot'), just as in the live run.
+        { thought: 'To the storehouse.', action: { verb: 'walk', params: { x: 5, y: 5 } }, importance: 4 },
+      ),
+      mindConfig: FAST_MIND,
+      simConfig: stillSim,
+    })
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.asleep, 30)
+    await stepUntil(loop, () => loop.tick >= DAWN_TICK && !loop.state.agents[AGENT]!.asleep, 500)
+    expect(loop.state.agents[AGENT]!.asleep).toBe(false)
+    expect(startedVerbs(world.engineDb)).toContain('wake')
+    expect(memoriesOfKind(agentDb, 'action').some((m) => /no path to that spot/.test(m.text))).toBe(true)
+  })
+
   it('backs off on non-provider turn failures', async () => {
     const { loop, runtime, agentDb } = await setup({
       model: turnModel([{ thought: 'I think.', importance: 3 }]),

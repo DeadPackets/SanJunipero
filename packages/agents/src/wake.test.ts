@@ -25,6 +25,7 @@ function clk(overrides: Partial<MindClock> = {}): MindClock {
     dozeUntilTick: 0,
     alarmArmed: { hunger: true, energy: true, warmth: true },
     morningWokeDay: null,
+    wakeRetryAtTick: 0,
     prevVisibleIds: [],
     ...overrides,
   }
@@ -132,6 +133,29 @@ describe('decideWake — asleep gate', () => {
       self: { ...asleep().self, body: { ...quietMeadowPacket.self.body, needs: { ...quietMeadowPacket.self.body.needs, energy: 10 } } },
     }
     expect(decideWake(cfg, packet, clk(), 10, pln())).toBe('body_alarm')
+  })
+
+  it('body_alarm re-fires while asleep even after the armed flag was spent', () => {
+    // A starving sleeper never recovers past the re-arm point; asleep, the
+    // one-shot armed flag must not silence the body forever.
+    const packet = {
+      ...asleepAtNight(),
+      self: { ...asleep().self, body: { ...quietMeadowPacket.self.body, needs: { ...quietMeadowPacket.self.body.needs, hunger: 10 } } },
+    }
+    const clock = clk({ alarmArmed: { hunger: false, energy: true, warmth: true } })
+    expect(decideWake(cfg, packet, clock, 900, pln())).toBe('body_alarm')
+  })
+
+  it('asleep wake reasons respect the wakeRetryAtTick backoff', () => {
+    const hungry = {
+      ...asleepAtNight(),
+      self: { ...asleep().self, body: { ...quietMeadowPacket.self.body, needs: { ...quietMeadowPacket.self.body.needs, hunger: 10 } } },
+    }
+    expect(decideWake(cfg, hungry, clk({ wakeRetryAtTick: 910 }), 900, pln())).toBe(null)
+    expect(decideWake(cfg, hungry, clk({ wakeRetryAtTick: 910 }), 910, pln())).toBe('body_alarm')
+    // morning backs off the same way, then fires again — not one-shot.
+    expect(decideWake(cfg, asleep(), clk({ wakeRetryAtTick: 620 }), 610, pln())).toBe(null)
+    expect(decideWake(cfg, asleep(), clk({ wakeRetryAtTick: 620 }), 620, pln())).toBe('morning')
   })
 })
 

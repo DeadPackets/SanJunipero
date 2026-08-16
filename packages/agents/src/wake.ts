@@ -12,6 +12,7 @@ export type MindConfig = {
   alarmHysteresis: number
   journalTicks: number
   dozeTicks: number
+  wakeRetryTicks: number
   dayLogTokenBudget: number
   dreamChance: number
   ambientK: number
@@ -26,6 +27,7 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   alarmHysteresis: 10,
   journalTicks: 10,
   dozeTicks: 60,
+  wakeRetryTicks: 25,
   dayLogTokenBudget: 6000,
   dreamChance: 0.35,
   ambientK: 8,
@@ -40,6 +42,7 @@ export type MindClock = {
   dozeUntilTick: number
   alarmArmed: { hunger: boolean; energy: boolean; warmth: boolean }
   morningWokeDay: number | null
+  wakeRetryAtTick: number
   prevVisibleIds: string[]
 }
 
@@ -71,10 +74,14 @@ export function decideWake(
   if (tick < clock.dozeUntilTick) return null
 
   if (packet.self.asleep) {
-    if (bodyAlarmFired(cfg, packet.self.body.needs, clock.alarmArmed)) return 'body_alarm'
     if (packet.feltEvents.some((e) => e === 'you_were_attacked' || e.startsWith('fire'))) {
       return 'salient_perception'
     }
+    // Asleep, the one-shot armed flags give way to the retry backoff: a
+    // starving sleeper never recovers past the re-arm point, so the alarm
+    // rings again each backoff until the body actually rises.
+    if (tick < clock.wakeRetryAtTick) return null
+    if (bodyAlarmBelow(cfg, packet.self.body.needs)) return 'body_alarm'
     if (!packet.time.isNight && clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)) {
       return 'morning'
     }
@@ -104,6 +111,13 @@ export function decideWake(
   if (plan.queue.length === 0 && sinceLast >= cfg.boredomTicks) return 'boredom'
 
   return null
+}
+
+function bodyAlarmBelow(cfg: MindConfig, needs: BodyNeeds): boolean {
+  for (const need of ['hunger', 'energy', 'warmth'] as const) {
+    if (needs[need] < cfg.bodyAlarm[need]) return true
+  }
+  return false
 }
 
 function bodyAlarmFired(cfg: MindConfig, needs: BodyNeeds, armed: MindClock['alarmArmed']): boolean {
