@@ -1,13 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_CONFIG, SimConfigSchema, stateHash } from '@sj/shared'
 import { ForgeConfigSchema, DEFAULT_FORGE_CONFIG, loadForgeConfig } from './forgeConfig.js'
+import { openForgeDb } from './db.js'
+import { AssetCodex } from './codex.js'
 
 describe('forge config', () => {
   it('DEFAULT_FORGE_CONFIG is exact on all 10 leaf values', () => {
     expect(DEFAULT_FORGE_CONFIG).toEqual({
       visionQa: {
         enabled: true, model: 'google/gemini-3.7-flash', minScore: 7,
-        maxRetries: 3, costCapPerAssetUsd: 0.05, rubricVersion: 'v1',
+        maxRetries: 2, costCapPerAssetUsd: 0.05, rubricVersion: 'v1',
       },
       library: { iconSizePx: 16, furnitureIconSizePx: 24 },
       alignment: { feetTolerancePx: 2, baseFitToleranceQuarterTiles: 1 },
@@ -42,6 +44,23 @@ describe('forge config', () => {
 
   it('an out-of-range env override fails the schema, not the world', () => {
     expect(() => loadForgeConfig({ FORGE_VISION_MIN_SCORE: '12' })).toThrow()
+  })
+
+  // A gated asset that burns its whole retry budget must still be registrable: the codex
+  // `attempts` column tops out at 3, so maxRetries can never exceed 2.
+  it('the worst-case attempt count the gate can produce still registers in the codex', () => {
+    const codex = new AssetCodex(openForgeDb(':memory:'))
+    const attempts = DEFAULT_FORGE_CONFIG.visionQa.maxRetries + 1
+    expect(() => codex.register({
+      class: 'item', desc: 'a wooden bucket', footprint: { w: 1, h: 1 },
+      png: Buffer.from('png-bytes'), widthPx: 16, heightPx: 16,
+      status: 'ready', score: null, attempts, costUsd: 0.09,
+    })).not.toThrow()
+    expect(() => codex.register({
+      class: 'item', desc: 'a wooden bucket', footprint: { w: 1, h: 1 },
+      png: Buffer.from('png-bytes'), widthPx: 16, heightPx: 16,
+      status: 'ready', score: null, attempts: attempts + 1, costUsd: 0.09,
+    })).toThrow()
   })
 
   // Determinism proof: C13 config is ops-side, so world law cannot move and G1/G2 goldens hold.

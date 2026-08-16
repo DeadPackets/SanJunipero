@@ -7,7 +7,8 @@ export const ForgeConfigSchema = z.object({
     enabled: z.boolean().default(true),
     model: z.string().default('google/gemini-3.7-flash'),
     minScore: z.number().min(0).max(10).default(7),
-    maxRetries: z.number().int().min(0).max(5).default(3),
+    // 2 retries = 3 total attempts, the ceiling the codex `attempts` column accepts.
+    maxRetries: z.number().int().min(0).max(5).default(2),
     costCapPerAssetUsd: z.number().min(0).default(0.05),
     rubricVersion: z.string().default('v1'),
   }).strict().prefault({}),
