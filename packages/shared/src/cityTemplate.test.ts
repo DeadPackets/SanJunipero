@@ -4,6 +4,8 @@ import {
   CityTemplateSchema, DISTRICTS, DISTRICT_NAMES, CITY_ANCHOR_DEFAULT, CITY_W, CITY_H,
   WORLD_SIZE_GENESIS, inExtent, inRect, key, cityTerrainTiles, cityRoadTiles, cityRoadKeys,
   isRoadTile, PLAZA, PLAZA_CENTRE, PATH_DX, T_ROAD, T_PATH, T_WATER,
+  cityStructures, doorTile, structureTiles, FOUNDER_IDS, CITY_INTERIOR_SLOTS,
+  CITY_FURNISHING_KINDS, CITY_BED_KIND, CITY_HEARTH_KIND,
 } from './cityTemplate.js'
 
 const MINIMAL = {
@@ -184,5 +186,109 @@ describe('city roads', () => {
     expect(cityRoadTiles()).toEqual(roads)
     expect(cityTerrainTiles()).toEqual(terrain)
     expect(T_ROAD).toBe(7)
+  })
+})
+
+describe('city structures', () => {
+  const structures = cityStructures()
+  const roads = cityRoadTiles()
+  const roadSet = new Set(roads.filter(isRoadTile).map(t => key(t.dx, t.dy)))
+  const water = new Set(cityTerrainTiles().filter(t => t.to === T_WATER).map(t => key(t.dx, t.dy)))
+  const huts = structures.filter(s => s.kind === 'hut')
+
+  it('places exactly eleven structures', () => {
+    expect(structures).toHaveLength(11)
+  })
+
+  // USER RULING 1, both halves.
+  it('gives each of the five huts a distinct founder owner', () => {
+    expect(huts).toHaveLength(5)
+    expect(huts.map(h => h.owner).sort()).toEqual([...FOUNDER_IDS].sort())
+  })
+
+  it('leaves every non-hut public — owner null, never absent', () => {
+    for (const s of structures.filter(x => x.kind !== 'hut'))
+      expect(s.owner, s.kind).toBeNull()
+  })
+
+  it('never overlaps another structure', () => {
+    const seen = new Set<string>()
+    for (const s of structures)
+      for (const t of structureTiles(s)) {
+        const k = key(t.dx, t.dy)
+        expect(seen.has(k), `${s.kind} overlaps at ${k}`).toBe(false)
+        seen.add(k)
+      }
+  })
+
+  // The districts are disjoint, so "entirely inside exactly one" is the whole assertion:
+  // no structure straddles a boundary and none stands in the gaps between districts.
+  it('sits entirely inside exactly one district', () => {
+    for (const s of structures) {
+      const tiles = structureTiles(s)
+      const holds = DISTRICT_NAMES.filter(d => tiles.every(t => inRect(DISTRICTS[d]!, t.dx, t.dy)))
+      expect(holds, `${s.kind} at ${key(s.dx, s.dy)}`).toHaveLength(1)
+    }
+    // and the five huts all share the homes district
+    for (const h of huts) expect(inRect(DISTRICTS.homes, h.dx, h.dy), h.owner!).toBe(true)
+  })
+
+  it('never occupies a road, a path or a water tile', () => {
+    for (const s of structures)
+      for (const t of structureTiles(s)) {
+        expect(roadSet.has(key(t.dx, t.dy)), `${s.kind} on a road at ${key(t.dx, t.dy)}`).toBe(false)
+        expect(water.has(key(t.dx, t.dy)), `${s.kind} on water at ${key(t.dx, t.dy)}`).toBe(false)
+        expect(inExtent(t.dx, t.dy), `${s.kind} outside the extent`).toBe(true)
+      }
+  })
+
+  it('opens every south-centre door onto a road tile', () => {
+    for (const s of structures) {
+      const d = doorTile(s)
+      const touches = [[d.dx, d.dy - 1], [d.dx + 1, d.dy], [d.dx, d.dy + 1], [d.dx - 1, d.dy]]
+        .some(([x, y]) => roadSet.has(key(x!, y!)))
+      expect(touches, `${s.kind} door ${key(d.dx, d.dy)} reaches no road`).toBe(true)
+      expect(structureTiles(s).some(t => t.dx === d.dx && t.dy === d.dy)).toBe(true)
+    }
+  })
+
+  // C11 §9: the standing stone stands beyond the edge of town, unexplained.
+  it('does not build the standing stone', () => {
+    expect(structures.some(s => s.kind === 'standing_stone')).toBe(false)
+  })
+
+  it('gives every hut exactly one bed and one hearth', () => {
+    for (const h of huts) {
+      expect(h.furnishings.filter(f => f.kind === CITY_BED_KIND), 'bed').toHaveLength(1)
+      expect(h.furnishings.filter(f => f.kind === CITY_HEARTH_KIND), 'hearth').toHaveLength(1)
+    }
+  })
+
+  it('lays every furnishing on its own slot inside the interior grid', () => {
+    for (const s of structures) {
+      const seen = new Set<string>()
+      for (const f of s.furnishings) {
+        expect(f.slot.x, `${s.kind} ${f.kind}`).toBeGreaterThanOrEqual(0)
+        expect(f.slot.y, `${s.kind} ${f.kind}`).toBeGreaterThanOrEqual(0)
+        expect(f.slot.x, `${s.kind} ${f.kind}`).toBeLessThan(CITY_INTERIOR_SLOTS.w)
+        expect(f.slot.y, `${s.kind} ${f.kind}`).toBeLessThan(CITY_INTERIOR_SLOTS.h)
+        const k = key(f.slot.x, f.slot.y)
+        expect(seen.has(k), `${s.kind} stacks two furnishings on ${k}`).toBe(false)
+        seen.add(k)
+      }
+    }
+  })
+
+  // The stand-in for the cross-package check; Task 28 asserts this list against the library.
+  it('furnishes only kinds the stand-in list declares', () => {
+    for (const s of structures)
+      for (const f of s.furnishings)
+        expect(CITY_FURNISHING_KINDS, `${s.kind} ${f.kind}`).toContain(f.kind)
+    const used = new Set(structures.flatMap(s => s.furnishings.map(f => f.kind)))
+    expect([...used].sort()).toEqual([...CITY_FURNISHING_KINDS].sort())
+  })
+
+  it('is deterministic', () => {
+    expect(cityStructures()).toEqual(structures)
   })
 })

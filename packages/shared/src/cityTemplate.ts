@@ -117,6 +117,78 @@ export function cityRoadTiles(): CityTile[] {
 
 export const isRoadTile = (t: CityTile): boolean => t.to === T_ROAD || t.to === T_PATH
 
+// ---------------------------------------------------------------- structures
+
+// Assumption A-2: the five locked founders (design spec §10). Template data, not engine truth
+// — genesis binds them, and different id strings are one data edit with no code change.
+export const FOUNDER_IDS = ['amara', 'yusuf', 'nadia', 'omar', 'salma'] as const
+export type FounderId = (typeof FOUNDER_IDS)[number]
+
+// The room grid every enterable structure exposes to its furnishings. Template vocabulary:
+// C10 T11 owns what a room actually looks like.
+export const CITY_INTERIOR_SLOTS = { w: 3, h: 3 } as const
+
+// Shared cannot import the forge catalog, so these stand in for it here and Task 28's
+// g13.test.ts asserts them equal to the library (the plan's declared seam).
+export const CITY_FURNISHING_KINDS =
+  ['bed', 'hearth', 'table', 'chair', 'rug', 'shelf', 'crate', 'barrel', 'anvil', 'bench'] as const
+export const CITY_BED_KIND = 'bed'
+export const CITY_HEARTH_KIND = 'hearth'
+
+const HUT_FURNISHINGS: CityFurnishing[] = [
+  { kind: 'bed', slot: { x: 2, y: 1 } },
+  { kind: 'hearth', slot: { x: 0, y: 2 } },
+  { kind: 'table', slot: { x: 1, y: 2 } },
+  { kind: 'chair', slot: { x: 1, y: 1 } },
+  // The plan put the rug at (0,1). A rug is two slots tall, so it would have lain across the
+  // hearth; (0,0) is the same wall with the collision gone.
+  { kind: 'rug', slot: { x: 0, y: 0 } },
+]
+const STOREHOUSE_FURNISHINGS: CityFurnishing[] = [
+  { kind: 'shelf', slot: { x: 0, y: 1 } },
+  { kind: 'shelf', slot: { x: 1, y: 1 } },
+  { kind: 'crate', slot: { x: 2, y: 2 } },
+  { kind: 'crate', slot: { x: 2, y: 1 } },
+  { kind: 'barrel', slot: { x: 0, y: 2 } },
+]
+const SHED_FURNISHINGS: CityFurnishing[] = [
+  { kind: 'anvil', slot: { x: 1, y: 1 } },
+  { kind: 'bench', slot: { x: 2, y: 1 } },
+  { kind: 'shelf', slot: { x: 0, y: 1 } },
+]
+
+const HUT_ORIGINS: readonly (readonly [number, number])[] = [[14, 4], [17, 4], [20, 4], [23, 4], [26, 4]]
+
+// Eleven structures, inside the ruled 8-12. The STANDING STONE is deliberately absent: it
+// stands beyond the edge of town, unexplained (C11 §9).
+export function cityStructures(): CityStructure[] {
+  return [
+    ...HUT_ORIGINS.map(([dx, dy], i) => ({
+      kind: 'hut', dx, dy, w: 2, h: 2,
+      owner: FOUNDER_IDS[i]! as string, furnishings: [...HUT_FURNISHINGS],
+    })),
+    { kind: 'storehouse', dx: 13, dy: 12, w: 2, h: 2, owner: null, furnishings: [...STOREHOUSE_FURNISHINGS] },
+    { kind: 'shed', dx: 16, dy: 17, w: 1, h: 1, owner: null, furnishings: [...SHED_FURNISHINGS] },
+    { kind: 'shed', dx: 16, dy: 21, w: 1, h: 1, owner: null, furnishings: [...SHED_FURNISHINGS] },
+    { kind: 'well', dx: 20, dy: 13, w: 1, h: 1, owner: null, furnishings: [] },
+    { kind: 'fire_pit', dx: 20, dy: 15, w: 1, h: 1, owner: null, furnishings: [] },
+    // Open question 2, answered: the wagon is a lore prop and stays unenterable.
+    { kind: 'wagon', dx: 5, dy: 16, w: 1, h: 2, owner: null, furnishings: [] },
+  ]
+}
+
+// The tile a resident walks out of, on the south face, at the centre of the frontage.
+export function doorTile(s: CityStructure): { dx: number; dy: number } {
+  return { dx: s.dx + ((s.w - 1) >> 1), dy: s.dy + s.h - 1 }
+}
+
+export function structureTiles(s: CityStructure): { dx: number; dy: number }[] {
+  const out: { dx: number; dy: number }[] = []
+  for (let dy = s.dy; dy < s.dy + s.h; dy++)
+    for (let dx = s.dx; dx < s.dx + s.w; dx++) out.push({ dx, dy })
+  return out
+}
+
 // Neighbours are computed over the road set only (T_ROAD ∪ T_PATH), then the shared autotiler
 // picks the tile. Keyed 'dx,dy'.
 export function cityRoadKeys(tiles: readonly CityTile[]): Map<string, RoadAutotileKey> {
