@@ -302,7 +302,10 @@ export class AgentRuntime {
     const packet = this.#bridge.perception(this.#agentId)
     const day = Math.floor(tick / MINUTES_PER_DAY)
 
-    const prose = perceptionToProse(packet, (detail) => this.#llm.alert('prose', detail))
+    const prose = perceptionToProse(packet, (detail) => this.#llm.alert('prose', detail), {
+      isWalkable: (x, y) => this.#bridge.isWalkable(x, y),
+      isEdible: (kind) => this.#bridge.isEdible(kind),
+    })
     this.#dayLog.push(prose)
 
     // Retrieve BEFORE inserting this perception: a just-written row would win

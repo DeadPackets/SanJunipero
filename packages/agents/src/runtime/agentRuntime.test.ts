@@ -576,6 +576,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(userMsg.text).toContain('importance')
   })
 
+  it('perception prose offers a standable tile beside a visible structure (g3 round 6)', async () => {
+    const { loop, runtime } = await setup({ model: turnModel([]), mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 30)
+    // Agent at (3, 3), storehouse footprint at (5, 5): nearest open tile is (4, 4).
+    expect(runtime.dayLogSnapshot()[0]).toContain('you could stand beside it at (4, 4)')
+  })
+
   it('the body answers its own alarm: a sleeper whose turn submits nothing is woken by a runtime wake', async () => {
     const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 } })
     const { world, loop } = await setup({

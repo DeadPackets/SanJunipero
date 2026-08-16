@@ -23,10 +23,10 @@ export const CAPABILITIES = `What your hands and voice can do. Name each act by 
 
 walk — name it walk; give x and y as two numbers, the spot you go to
 sleep — name it sleep when weary; nothing more is needed
-wake — name it wake when you sleep; nothing more is needed
+wake — name it wake to rise from sleep; nothing more is needed
 eat — name it eat; give itemId, the mark of the food you hold
 take — name it take; give itemId, the mark of the thing within reach
-give — name it give; give itemId, the mark of the thing you hold, and targetId, the mark of the person
+give — name it give; give itemId, the mark of the thing you hold, and targetId, the mark of a living person standing at your side — never a building
 speak — name it speak; give text, the words you say aloud
 write — name it write; give text, the words to set down (a fresh note, or add itemId to write on one you hold)
 read — name it read; give itemId, the mark of the writing you hold
@@ -45,6 +45,10 @@ experiment — name it experiment; give description, what you attempt
 
 A thing's mark (itemId, cropId, structureId) becomes known to you only once you
 stand beside where it rests and see it; until then you cannot name it.
+
+What you carry stays with you. There is no way yet to shelve what you hold
+inside a building, nor to set it upon the ground: keep it, eat it if it is
+food, or give it to a person standing beside you.
 
 How you answer each waking moment: always thought, what passes through your
 mind, and importance, how deeply the moment matters, one through ten. When you

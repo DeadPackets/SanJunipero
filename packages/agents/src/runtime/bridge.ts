@@ -1,5 +1,7 @@
 import {
   composePerception,
+  isFoodKind,
+  isPassable,
   submitIntent,
   type EventStore,
   type TickHandler,
@@ -118,6 +120,16 @@ export class EngineBridge {
       composePerception(this.#loop.state, this.#simConfig, agentId, this.#recentEvents()),
       this.#loop.state.agents[agentId],
     )
+  }
+
+  // World answers for perception prose: open ground and food kinds, straight
+  // from the engine's own path and verb semantics.
+  isWalkable(x: number, y: number): boolean {
+    return isPassable(this.#loop.state, x, y)
+  }
+
+  isEdible(kind: string): boolean {
+    return isFoodKind(this.#simConfig, kind)
   }
 
   onTick(cb: (tick: number) => void): void {

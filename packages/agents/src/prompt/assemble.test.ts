@@ -266,6 +266,54 @@ describe('perceptionToProse', () => {
     expect(prose).toContain('walk to a tile beside it')
   })
 
+  it('offers the nearest open tile beside a structure when the world can be asked', () => {
+    const packet = {
+      ...quietMeadowPacket,
+      visible: {
+        agents: [],
+        structures: [{ id: 'structure_1', kind: 'storehouse', x: 10, y: 10, w: 1, h: 1, burning: false, stage: 'complete' as const }],
+        items: [],
+        crops: [],
+      },
+    }
+    // Self is at (12, 9): with all neighbors open, (11, 9) is nearest.
+    const open = perceptionToProse(packet, undefined, { isWalkable: () => true })
+    expect(open).toContain('you could stand beside it at (11, 9)')
+    expect(open).not.toContain('walk to a tile beside it')
+
+    // Only (10, 11) is open ground; the offer must skip blocked tiles.
+    const oneGap = perceptionToProse(packet, undefined, { isWalkable: (x, y) => x === 10 && y === 11 })
+    expect(oneGap).toContain('you could stand beside it at (10, 11)')
+
+    // No open ground at all: say so instead of pointing at a wall.
+    const walled = perceptionToProse(packet, undefined, { isWalkable: () => false })
+    expect(walled).toContain('no open ground lies beside it')
+  })
+
+  it('names the food in hand when hunger gnaws (g3 round 6)', () => {
+    const hungry = {
+      ...quietMeadowPacket,
+      self: {
+        ...quietMeadowPacket.self,
+        body: { ...quietMeadowPacket.self.body, needs: { ...quietMeadowPacket.self.body.needs, hunger: 20 } },
+        inventory: [
+          { id: 'w1', kind: 'wood', qty: 2, loc: { t: 'agent' as const, id: 'tamar' } },
+          { id: 'b1', kind: 'bread', qty: 20, loc: { t: 'agent' as const, id: 'tamar' } },
+        ],
+      },
+    }
+    const isEdible = (kind: string) => kind === 'bread'
+    expect(perceptionToProse(hungry, undefined, { isEdible })).toContain('Your satchel holds bread (b1) — you could eat it now.')
+
+    // Sated: no nagging about the satchel.
+    const sated = { ...hungry, self: { ...hungry.self, body: quietMeadowPacket.self.body } }
+    expect(perceptionToProse(sated, undefined, { isEdible })).not.toContain('you could eat it now')
+
+    // Hungry but holding nothing edible: no false comfort.
+    const noFood = { ...hungry, self: { ...hungry.self, inventory: [hungry.self.inventory[0]!] } }
+    expect(perceptionToProse(noFood, undefined, { isEdible })).not.toContain('you could eat it now')
+  })
+
   it('varies the stance verb by agent state', () => {
     const packet = {
       ...quietMeadowPacket,
@@ -362,6 +410,14 @@ describe('capabilities', () => {
     }
     // an item's mark is only learned by standing beside where it rests
     expect(a.system).toContain('beside')
+    expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('teaches give as person-only, wake as the way to rise, and that nothing can be stowed (g3 round 6)', () => {
+    const a = assemblePrompt(fixtureBlocks())
+    expect(a.system).toMatch(/give — [^\n]*living person[^\n]*never a building/)
+    expect(a.system).toMatch(/wake — [^\n]*rise/)
+    expect(a.system).toContain('no way yet to shelve')
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
 

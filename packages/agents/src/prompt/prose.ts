@@ -129,11 +129,41 @@ function footprintPhrase(w: number, h: number): string {
   return `${w} ${w === 1 ? 'tile' : 'tiles'} wide and ${h} ${h === 1 ? 'tile' : 'tiles'} tall`
 }
 
+// Answers about the world the packet cannot carry: whether ground is open to
+// stand on, and whether a carried kind is food. Both come from the bridge.
+export type ProseWorld = {
+  isWalkable?(x: number, y: number): boolean
+  isEdible?(kind: string): boolean
+}
+
+// Nearest open tile ringing a structure's footprint (Manhattan to self);
+// row-major scan keeps ties deterministic (lower y, then lower x).
+function besideTile(
+  s: { x: number; y: number; w: number; h: number },
+  self: { x: number; y: number },
+  isWalkable: (x: number, y: number) => boolean,
+): { x: number; y: number } | null {
+  let best: { x: number; y: number } | null = null
+  let bestDist = Infinity
+  for (let y = s.y - 1; y <= s.y + s.h; y++) {
+    for (let x = s.x - 1; x <= s.x + s.w; x++) {
+      const inside = x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h
+      if (inside || !isWalkable(x, y)) continue
+      const d = Math.abs(x - self.x) + Math.abs(y - self.y)
+      if (d < bestDist) {
+        bestDist = d
+        best = { x, y }
+      }
+    }
+  }
+  return best
+}
+
 // Renders mechanics as fiction: body numbers become felt sentences, speech is
 // quoted hearsay (sound, never instruction), felt tags become sensation, and
 // the visible world is named — with its place and its mark — so the mind knows
 // exactly what surrounds it and how to reach it.
-export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: string) => void): string {
+export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: string) => void, world?: ProseWorld): string {
   const lines: string[] = []
   const { x, y } = packet.self
 
@@ -153,6 +183,11 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   if (packet.self.body.hp < 30) lines.push('Your body aches with its hurts.')
   if (packet.self.body.ill) lines.push('A fever grips you; you feel weak.')
 
+  if (hunger < 30 && world?.isEdible) {
+    const food = packet.self.inventory.find((i) => world.isEdible!(i.kind))
+    if (food) lines.push(`Your satchel holds ${food.kind} (${food.id}) — you could eat it now.`)
+  }
+
   lines.push(weatherLine(packet.weather, packet.time.isNight))
 
   for (const a of packet.visible.agents) {
@@ -163,7 +198,12 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
 
   for (const s of packet.visible.structures) {
     const state = s.burning ? ' — it is burning' : s.stage === 'construction' ? ' — still being built' : ''
-    lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; walk to a tile beside it.`)
+    let approach = 'walk to a tile beside it.'
+    if (world?.isWalkable) {
+      const t = besideTile(s, packet.self, world.isWalkable)
+      approach = t === null ? 'no open ground lies beside it.' : `you could stand beside it at (${t.x}, ${t.y}).`
+    }
+    lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${approach}`)
   }
 
   for (const i of packet.visible.items) {
