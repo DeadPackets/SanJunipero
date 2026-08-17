@@ -5,7 +5,8 @@ import { GAMIFICATION_BAN } from './townStats.js'
 import { HudDock } from './HudDock.js'
 import {
   DEFAULT_HUD, DOCKABLE, DOCKABLE_LABEL, DOCK_SLOTS, HUD_PEEK_PX, HUD_STORAGE_KEY,
-  HUD_TOGGLE_KEY, SLOT_LABEL, hiddenCount, hudReducer, hudToggle, isFullyHidden, loadHud, saveHud,
+  HUD_TOGGLE_KEY, SLOTS_FOR, SLOT_LABEL, canDock, hiddenCount, hudReducer, hudToggle,
+  isFullyHidden, loadHud, saveHud,
   type DockSlot, type HudLayout,
 } from './hudLayout.js'
 
@@ -76,6 +77,52 @@ describe('hudReducer — moving one thing moves one thing', () => {
   })
 })
 
+// SHIP NO DEAD OPTIONS (batch 3 concern 9, controller ruling R4.3). The reducer advertised all
+// five slots for all four surfaces while only the control bar has left/right in CSS — the other
+// three are honoured for `hidden` and placed where they already live otherwise.
+describe('SLOTS_FOR — a surface is only offered a slot the renderer can place it in', () => {
+  it('every surface can be put away and can go back where it started, and no more is claimed', () => {
+    for (const what of DOCKABLE) {
+      expect(SLOTS_FOR[what], what).toContain('hidden')
+      expect(SLOTS_FOR[what], what).toContain(DEFAULT_HUD[what])
+      for (const slot of SLOTS_FOR[what]) expect(DOCK_SLOTS as readonly string[]).toContain(slot)
+    }
+    // only the control bar has all five in CSS; claiming more for the others is the dead option
+    expect([...SLOTS_FOR.controlBar].sort()).toEqual([...DOCK_SLOTS].sort())
+    for (const what of DOCKABLE) {
+      if (what !== 'controlBar') expect(SLOTS_FOR[what].length, what).toBe(2)
+    }
+  })
+
+  // RED against the landed reducer: it moves the timeline to `left` and the renderer leaves it
+  // along the bottom, so the menu says one thing and the stage shows another.
+  it('refuses a move the renderer cannot perform, and keeps the surface where it was', () => {
+    expect(canDock('timeline', 'left')).toBe(false)
+    expect(canDock('controlBar', 'left')).toBe(true)
+    const next = hudReducer(DEFAULT_HUD, { kind: 'dock', what: 'timeline', to: 'left' })
+    expect(next.timeline).toBe(DEFAULT_HUD.timeline)
+    expect(next).toBe(DEFAULT_HUD)
+  })
+
+  it('a stored layout naming an unplaceable slot loads as the default for that surface', () => {
+    const l = loadHud(fakeStorage({
+      [HUD_STORAGE_KEY]: '{"timeline":"left","statusStrip":"hidden","controlBar":"right"}',
+    }))
+    expect(l.timeline).toBe(DEFAULT_HUD.timeline)
+    expect(l.statusStrip).toBe('hidden')
+    expect(l.controlBar).toBe('right')
+  })
+
+  it('the reducer can never reach a slot the surface does not have', () => {
+    for (const what of DOCKABLE) {
+      for (const to of DOCK_SLOTS) {
+        const next = hudReducer(DEFAULT_HUD, { kind: 'dock', what, to })
+        expect(SLOTS_FOR[what], `${what}:${to}`).toContain(next[what])
+      }
+    }
+  })
+})
+
 describe('loadHud / saveHud — a preference, never a requirement', () => {
   it('an empty store, an empty object and bad JSON all give the defaults', () => {
     expect(loadHud(fakeStorage())).toEqual(DEFAULT_HUD)
@@ -87,10 +134,10 @@ describe('loadHud / saveHud — a preference, never a requirement', () => {
 
   it('drops a bad slot and keeps the good ones beside it', () => {
     const l = loadHud(fakeStorage({
-      [HUD_STORAGE_KEY]: '{"controlBar":"nope","timeline":"left","nonsense":"top"}',
+      [HUD_STORAGE_KEY]: '{"controlBar":"nope","timeline":"hidden","nonsense":"top"}',
     }))
     expect(l.controlBar).toBe(DEFAULT_HUD.controlBar)
-    expect(l.timeline).toBe('left')
+    expect(l.timeline).toBe('hidden')
     expect(Object.keys(l).sort()).toEqual([...DOCKABLE].sort())
   })
 
@@ -143,17 +190,20 @@ describe('HudDock — a viewer can never hide the way back', () => {
     expect(html).toContain(`--hud-peek:${HUD_PEEK_PX}px`)
   })
 
-  it('the open dock offers every slot for every surface, in the town’s own words', () => {
+  it('offers every slot it can place, in the town’s own words, and not one it cannot', () => {
     const html = render(DEFAULT_HUD, true)
     for (const what of DOCKABLE) expect(html, what).toContain(DOCKABLE_LABEL[what])
     for (const slot of DOCK_SLOTS) expect(html, slot).toContain(SLOT_LABEL[slot])
     for (const what of DOCKABLE) {
-      for (const slot of DOCK_SLOTS) expect(html).toContain(`data-dock="${what}:${slot}"`)
+      for (const slot of DOCK_SLOTS) {
+        const offered = html.includes(`data-dock="${what}:${slot}"`)
+        expect(offered, `${what}:${slot}`).toBe(SLOTS_FOR[what].includes(slot))
+      }
     }
   })
 
   it('marks where each surface currently sits, and only there', () => {
-    const layout = hudReducer(DEFAULT_HUD, { kind: 'dock', what: 'timeline', to: 'left' })
+    const layout = hudReducer(DEFAULT_HUD, { kind: 'dock', what: 'controlBar', to: 'left' })
     const html = render(layout, true)
     const pressed = [...html.matchAll(/data-dock="([^"]+)"[^>]*aria-pressed="true"/g)]
       .map((m) => m[1])

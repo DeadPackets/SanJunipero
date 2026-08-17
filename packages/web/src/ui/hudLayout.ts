@@ -27,6 +27,26 @@ export const DEFAULT_HUD: HudLayout = {
   controlBar: 'bottom', timeline: 'bottom', statusStrip: 'top', fps: 'right',
 }
 
+/**
+ * WHICH SLOTS EACH SURFACE CAN REALLY TAKE.
+ *
+ * Only `controlBar` has all four edges in CSS. The timeline and the status strip are
+ * horizontal bands and the frame counter is a corner tag; the renderer honours `hidden` for
+ * all three and otherwise leaves them where they live. Offering a move nothing performs is a
+ * setting that does nothing, so the menu, the reducer and the stored preference all answer to
+ * this one table.
+ */
+export const SLOTS_FOR: Readonly<Record<Dockable, readonly DockSlot[]>> = {
+  controlBar: DOCK_SLOTS,
+  timeline: ['bottom', 'hidden'],
+  statusStrip: ['top', 'hidden'],
+  fps: ['right', 'hidden'],
+}
+
+export function canDock(what: Dockable, to: DockSlot): boolean {
+  return SLOTS_FOR[what].includes(to)
+}
+
 export const HUD_STORAGE_KEY = 'sj.hud.layout'
 /** However much is hidden, the dock leaves a grab handle — never nothing. */
 export const HUD_PEEK_PX = 12
@@ -50,7 +70,7 @@ export function loadHud(storage: Storage): HudLayout {
   if (typeof parsed !== 'object' || parsed === null) return DEFAULT_HUD
   const rec = parsed as Record<string, unknown>
   const out = { ...DEFAULT_HUD } as Record<Dockable, DockSlot>
-  for (const key of DOCKABLE) if (isSlot(rec[key])) out[key] = rec[key]
+  for (const key of DOCKABLE) if (isSlot(rec[key]) && canDock(key, rec[key])) out[key] = rec[key]
   return out
 }
 
@@ -69,7 +89,7 @@ export type HudEv =
 export function hudReducer(prev: HudLayout, ev: HudEv): HudLayout {
   switch (ev.kind) {
     case 'dock': {
-      if (prev[ev.what] === ev.to) return prev
+      if (prev[ev.what] === ev.to || !canDock(ev.what, ev.to)) return prev
       return { ...prev, [ev.what]: ev.to }
     }
     case 'hide-all': {

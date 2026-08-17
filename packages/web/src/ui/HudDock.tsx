@@ -1,5 +1,5 @@
 import {
-  DOCKABLE, DOCKABLE_LABEL, DOCK_SLOTS, HUD_PEEK_PX, HUD_TOGGLE_KEY, SLOT_LABEL,
+  DOCKABLE, DOCKABLE_LABEL, HUD_PEEK_PX, HUD_TOGGLE_KEY, SLOTS_FOR, SLOT_LABEL,
   hiddenCount, isFullyHidden, type HudEv, type HudLayout,
 } from './hudLayout.js'
 
@@ -48,7 +48,7 @@ export function HudDock(
             <div className="hud-row" key={what}>
               <span className="hud-row-name">{DOCKABLE_LABEL[what]}</span>
               <span className="hud-slots">
-                {DOCK_SLOTS.map((slot) => (
+                {SLOTS_FOR[what].map((slot) => (
                   <button
                     key={slot}
                     type="button"
