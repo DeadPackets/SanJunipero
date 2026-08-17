@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { CHAR_TARGET_PX, HIT_AREA_H, HIT_AREA_W } from './charAnim.js'
 import {
   HEAD_W, HIT_MIN_PX, HIT_TIGHTNESS_MAX, SHOULDER_W, STANCE_W, TORSO_TOP, bodyHitPolygon,
-  hitTightness, inflateToMin, legacyHitRectPolygon, polygonBounds,
+  doorLocalRect, hitTightness, inflateToMin, legacyHitRectPolygon, polygonBounds,
 } from './hitShapes.js'
+import { ZOOM_STOPS } from './camera.js'
+import { ZOOM_MAX, ZOOM_MIN } from './scene.js'
 
 // The v2 sheet the product ships: a 96 px cell whose figure is 64 px tall, drawn at
 // CHAR_TARGET_PX. figureW/figureH are SHEET px throughout; multiplied by the sprite scale
@@ -124,5 +126,52 @@ describe('inflateToMin — small on screen is still clickable', () => {
     const g = polygonBounds(inflateToMin(local, HIT_MIN_PX, 0.1))
     expect(g.cx).toBeCloseTo(b.cx, 9)
     expect(g.cy).toBeCloseTo(b.cy, 9)
+  })
+})
+
+// TASK 75 MAKES THE FLOOR LIVE. `ZOOM_MIN` was 1, where every target already cleared 24 px,
+// so `inflateToMin` shipped unexercised. The 0.5 overview stop is a real product state now,
+// and every hit class has to be measured there rather than assumed.
+describe('the 24 px floor at the new ZOOM_MIN', () => {
+  const local = bodyHitPolygon(FIGURE_H, SCALE)
+  const FOOTPRINT = { w: 1, h: 1 }
+  const ART = 0.25   // a hi-res building sprite's applied scale
+
+  it('ZOOM_MIN is the bottom of the stop set, and it is 0.5', () => {
+    expect(ZOOM_MIN).toBe(0.5)
+    expect(ZOOM_MIN).toBe(ZOOM_STOPS[0])
+    expect(ZOOM_MAX).toBe(4)
+  })
+
+  it('a body capsule clears 24 px in BOTH axes at every stop', () => {
+    for (const z of ZOOM_STOPS) {
+      const k = SCALE * z
+      const b = polygonBounds(screen(inflateToMin(local, HIT_MIN_PX, k), k))
+      expect(b.w, `${z}× width`).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
+      expect(b.h, `${z}× height`).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
+    }
+  })
+
+  it('THE DEFECT THE NEW STOP CREATES: a zoom-blind door target is 12 px at 0.5', () => {
+    // the landed rule floors at HIT_MIN_PX in WORLD px, which halves on screen at 0.5
+    const blind = doorLocalRect(FOOTPRINT, ART)
+    expect(blind.w * ART * 0.5).toBeCloseTo(HIT_MIN_PX / 2, 9)   // 12 px. RED.
+    expect(blind.w * ART * 0.5).toBeLessThan(HIT_MIN_PX)
+  })
+
+  it('a door target clears 24 px in both axes at every stop, at every art scale', () => {
+    for (const z of ZOOM_STOPS) {
+      for (const art of [0.125, 0.25, 1]) {
+        const r = doorLocalRect(FOOTPRINT, art, z)
+        expect(r.w * art * z, `${z}× ${art} width`).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
+        expect(r.h * art * z, `${z}× ${art} height`).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
+      }
+    }
+  })
+
+  it('nothing above 1× changed — the door is the size batch 2 measured', () => {
+    for (const z of [1, 2, 3, 4] as const) {
+      expect(doorLocalRect(FOOTPRINT, ART, z)).toEqual(doorLocalRect(FOOTPRINT, ART))
+    }
   })
 })

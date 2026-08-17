@@ -68,6 +68,10 @@ type Entry = {
   sprite: Sprite; url: string; pips: Graphics | null; form: Graphics | null
   /** the look-inside threshold, a CHILD of the sprite so it shares the building's depth */
   door: Graphics | null
+  /** the ground plan the door and the hit diamond are both cut from */
+  footprint: { w: number; h: number }
+  /** the camera scale this door's target was last cut for — the 24 px floor is a SCREEN size */
+  doorZoom: number
   /** the ground this drawable stands on, republished every sync for the frame's depth sort */
   box: DepthBox
 }
@@ -78,6 +82,8 @@ const NO_ART = ''
 type SyncState = {
   entries: Map<string, Entry>; lastAssetsSeq: number
   onDoor: ((structureId: string) => void) | null
+  /** the camera scale every door target was last cut for */
+  doorZoom: number
 }
 const syncStates = new WeakMap<Scene, SyncState>()
 
@@ -126,7 +132,7 @@ function applyBuildingArt(
     entry.sprite.scale.set(scale)
     // the hit area is scaled with the sprite, so it is re-cut whenever the scale moves
     entry.sprite.hitArea = new Polygon(footprintHitPoints(footprint.w, footprint.h, scale))
-    layoutDoor(entry, footprint)   // a child inherits the new scale; the threshold follows it
+    layoutDoor(entry)   // a child inherits the new scale; the threshold follows it
   })
 }
 
@@ -136,9 +142,11 @@ function applyBuildingArt(
  * on the ground it never punches a hole in the building's own art. Re-cut whenever the
  * sprite's scale moves, so it stays one size on screen at any art resolution.
  */
-function layoutDoor(entry: Entry, footprint: { w: number; h: number }): void {
+function layoutDoor(entry: Entry, zoom = entry.doorZoom): void {
   const door = entry.door
   if (door === null) return
+  entry.doorZoom = zoom
+  const footprint = entry.footprint
   const scale = entry.sprite.scale.x || 1
   door.clear()
   door.poly(doorSillPolygon(footprint, scale))
@@ -147,7 +155,8 @@ function layoutDoor(entry: Entry, footprint: { w: number; h: number }): void {
   door.stroke({ width: 1 / scale, color: DOOR_LINTEL, alignment: 0.5 })
   door.alpha = DOOR_IDLE_ALPHA
   door.position.set(0, 0)
-  const r = doorLocalRect(footprint, scale)
+  // The 24 px floor is a SCREEN size, so the target is re-cut on a zoom change, not per frame.
+  const r = doorLocalRect(footprint, scale, zoom)
   door.hitArea = new Rectangle(r.x, r.y, r.w, r.h)
 }
 
@@ -218,8 +227,20 @@ export function syncEntities(
   if (sync === undefined) {
     sync = {
       entries: new Map(), lastAssetsSeq: store.assetsSeq(), onDoor: null,
+      doorZoom: scene.getZoom(),
     }
     syncStates.set(scene, sync)
+    // A door's 24 px floor is a SCREEN size, and task 75's 0.5 overview stop makes that floor
+    // live. Re-cut every target when the camera settles, not on a 2.5s world tick.
+    const cut = sync
+    scene.onCamera(() => {
+      const z = scene.getZoom()
+      if (z === cut.doorZoom) return
+      cut.doorZoom = z
+      for (const e of cut.entries.values()) {
+        if (e.door !== null) layoutDoor(e, z)
+      }
+    })
     // Publish the ground every structure, item and crop stands on. One owner sorts the whole
     // frame from these; nothing here writes a depth of its own.
     const published = sync
@@ -260,7 +281,10 @@ export function syncEntities(
         void provenanceText(sid, store.getState()).then((text) => showPopover(text, e.client.x, e.client.y))
       })
       sprite.hitArea = new Polygon(footprintHitPoints(s.w, s.h))   // until the art sets its scale
-      entry = { sprite, url: '', pips: null, form: null, door: null, box: structureDepthBox(key, s) }
+      entry = {
+        sprite, url: '', pips: null, form: null, door: null,
+        footprint: { w: s.w, h: s.h }, doorZoom: sync.doorZoom, box: structureDepthBox(key, s),
+      }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
       applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h), null, s, s.kind)
@@ -326,7 +350,8 @@ export function syncEntities(
     }
     if (entry.door !== null) {
       entry.door.visible = enterable
-      layoutDoor(entry, s)
+      entry.footprint = { w: s.w, h: s.h }
+      layoutDoor(entry, sync.doorZoom)
     }
   }
 
@@ -344,7 +369,10 @@ export function syncEntities(
         const text = itemCropDetail(store.getState(), 'item', iid)
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
-      entry = { sprite, url: '', pips: null, form: null, door: null, box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX) }
+      entry = {
+        sprite, url: '', pips: null, form: null, door: null,
+        footprint: { w: 1, h: 1 }, doorZoom: 1, box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX),
+      }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'item', it.kind))
@@ -371,7 +399,10 @@ export function syncEntities(
         const text = itemCropDetail(store.getState(), 'crop', cid)
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
-      entry = { sprite, url: '', pips: null, form: null, door: null, box: tileDepthBox(key, c.x, c.y) }
+      entry = {
+        sprite, url: '', pips: null, form: null, door: null,
+        footprint: { w: 1, h: 1 }, doorZoom: 1, box: tileDepthBox(key, c.x, c.y),
+      }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'crop', c.kind))

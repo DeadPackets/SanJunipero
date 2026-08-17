@@ -116,13 +116,19 @@ export function doorLocalCentre(footprint: { w: number; h: number }): { x: numbe
  * from two hardcoded pixel constants, and centred on the threshold it names. A child inherits
  * the parent's scale, so the local rect is divided by it and the SCREEN size is constant at any
  * art resolution.
+ *
+ * `zoom` is the CAMERA's scale, and the floor is a SCREEN size. Task 75 adds the 0.5 overview
+ * stop, at which a 24-world-px target is 12 screen px — half the floor. The floor was
+ * unexercised while `ZOOM_MIN` was 1; it is live now, so it has to know the zoom.
  */
 export function doorLocalRect(
-  footprint: { w: number; h: number }, scale: number,
+  footprint: { w: number; h: number }, scale: number, zoom = 1,
 ): { x: number; y: number; w: number; h: number } {
   const k = scale === 0 ? 1 : scale
-  const w = Math.max(DOOR_W_TILES * TILE_PX, HIT_MIN_PX)
-  const h = Math.max(DOOR_H_TILES * TILE_PX, HIT_MIN_PX)
+  const z = zoom > 0 ? zoom : 1
+  const floor = Math.max(HIT_MIN_PX, HIT_MIN_PX / z)
+  const w = Math.max(DOOR_W_TILES * TILE_PX, floor)
+  const h = Math.max(DOOR_H_TILES * TILE_PX, floor)
   const c = doorLocalCentre(footprint)
   return { x: (c.x - w / 2) / k, y: (c.y - h / 2) / k, w: w / k, h: h / k }
 }

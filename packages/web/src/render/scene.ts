@@ -6,6 +6,10 @@ import type { WorldStore } from '../state/worldStore.js'
 import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import {
+  ZOOM_STOPS, initialZoom, nearestStop, zoomScaleAt, zoomSettled, zoomTo, zoomWheel,
+  type ZoomState, type ZoomStop,
+} from './camera.js'
+import {
   OCTAVE_ALPHA, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField,
   isRoadMass, materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
 } from './groundField.js'
@@ -16,8 +20,11 @@ import { tileKind } from './tileset.js'
 import { TextureBook } from './textures.js'
 
 export const BACKGROUND = 0x322b38
-export const ZOOM_MIN = 1
-export const ZOOM_MAX = 4
+/** The camera's bounds are the ends of `ZOOM_STOPS` (task 75) — one source, so the HUD's
+ *  disabled state and the wheel's clamp can never disagree. `ZOOM_MIN` is 0.5 now: the
+ *  overview stop that makes the whole town visible at once. */
+export const ZOOM_MIN: ZoomStop = ZOOM_STOPS[0]
+export const ZOOM_MAX: ZoomStop = ZOOM_STOPS[ZOOM_STOPS.length - 1]!
 
 // THE BAKE SEAM (C11 §9 supersession point). One whole-map pass is correct at the 48×48
 // showcase scale; C11's 128×128 growth map replaces this with a chunked, dirty-rebake baker.
@@ -198,8 +205,15 @@ export type Scene = {
   overlay: Container
   rebakeGround(terrain: TileId[][], records?: AssetRecord[]): void
   centerOn(x: number, y: number): void
-  setZoom(z: 1 | 2 | 3 | 4): void
+  /** move to a named rest stop, turning about the screen centre */
+  setZoom(stop: ZoomStop): void
+  /** move to a named rest stop, keeping the world point under (screenX, screenY) fixed */
+  setZoomAt(stop: ZoomStop, screenX: number, screenY: number): void
+  /** the scale being drawn this frame — animated during a transit */
   getZoom(): number
+  /** where the camera is going, and where it will be at rest. The HUD reads THIS, so a label
+   *  never shows a number the stop set does not contain. */
+  getZoomStop(): ZoomStop
   panBy(dx: number, dy: number): void
   centerHome(): void
   onCamera(cb: () => void): () => void
@@ -300,14 +314,33 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     for (const cb of cameraCbs) cb()
   }
 
-  function setZoom(z: 1 | 2 | 3 | 4): void {
-    // keep the screen center fixed while zooming
-    const cx = app.screen.width / 2
-    const cy = app.screen.height / 2
-    const wx = (cx - world.position.x) / world.scale.x
-    const wy = (cy - world.position.y) / world.scale.y
-    world.scale.set(z)
-    world.position.set(cx - wx * z, cy - wy * z)
+  // THE ZOOM (task 75). Rest stops stay exact so the pixel grid stays exact; the transit
+  // between them is eased, and it turns about the world point under the POINTER rather than
+  // about the screen centre, so zooming toward a thing keeps that thing where it is.
+  let zoom: ZoomState = initialZoom(1)
+  let anchor = { sx: 0, sy: 0, wx: 0, wy: 0 }
+
+  function captureAnchor(sx: number, sy: number): void {
+    const k = world.scale.x || 1
+    anchor = { sx, sy, wx: (sx - world.position.x) / k, wy: (sy - world.position.y) / k }
+  }
+
+  function setZoomAt(stop: ZoomStop, screenX: number, screenY: number): void {
+    if (stop === zoom.stop && zoomSettled(zoom, performance.now())) return
+    captureAnchor(screenX, screenY)
+    zoom = zoomTo(zoom, stop, performance.now())
+  }
+
+  const setZoom = (stop: ZoomStop): void =>
+    setZoomAt(stop, app.screen.width / 2, app.screen.height / 2)
+
+  // One ticker step applies the eased scale. A settled camera costs one comparison a frame.
+  const zoomTick = (): void => {
+    const s = zoomScaleAt(zoom, performance.now())
+    if (s === world.scale.x) return
+    world.scale.set(s)
+    // While a follow is running it owns the position; otherwise the anchor stays put.
+    if (followFn === null) world.position.set(anchor.sx - anchor.wx * s, anchor.sy - anchor.wy * s)
     notifyCamera()
   }
 
@@ -349,13 +382,15 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     const t = screenToTile(wx, wy)
     for (const cb of tileCbs) cb(t)
   })
+  // Six lines: read the delta, ask the pure rule, store. The DOM half has no logic (P6).
   const onWheel = (e: WheelEvent): void => {
     e.preventDefault()
-    const cur = Math.round(world.scale.x)
-    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, cur + (e.deltaY < 0 ? 1 : -1)))
-    setZoom(next as 1 | 2 | 3 | 4)
+    const next = zoomWheel(zoom, e.deltaY, performance.now())
+    if (next.stop !== zoom.stop) captureAnchor(e.offsetX, e.offsetY)
+    zoom = next
   }
   app.canvas.addEventListener('wheel', onWheel, { passive: false })
+  app.ticker.add(zoomTick)
 
   // bake on first snapshot and whenever the terrain array identity changes
   let bakedTerrain: TileId[][] | null = null
@@ -426,7 +461,9 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     rebakeGround,
     centerOn,
     setZoom,
+    setZoomAt,
     getZoom: () => world.scale.x,
+    getZoomStop: () => zoom.stop,
     panBy: (dx, dy) => {
       breakFollow()
       world.position.x += dx
@@ -461,6 +498,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       offEvents()
       ro.disconnect()
       app.ticker.remove(followTick)
+      app.ticker.remove(zoomTick)
       app.ticker.remove(bakeTick)
       app.canvas.removeEventListener('wheel', onWheel)
       tags.destroy()

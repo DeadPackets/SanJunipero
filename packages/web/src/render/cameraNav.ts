@@ -1,4 +1,4 @@
-import { ZOOM_MAX, ZOOM_MIN } from './scene.js'
+import { nearestStop, stepStop, type ZoomStop } from './camera.js'
 
 export const PAN_STEP_PX = 48
 
@@ -22,7 +22,9 @@ export function cameraActionFor(key: string): CameraAction | null {
   }
 }
 
-export function stepZoom(current: number, dir: 1 | -1): 1 | 2 | 3 | 4 {
-  const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(current) + dir))
-  return next as 1 | 2 | 3 | 4
+/** One step along `ZOOM_STOPS` (task 75). The keyboard, the bar's buttons and the wheel all
+ *  come through here, so `+` and one notch mean exactly the same thing. A camera caught
+ *  mid-transit is snapped to the stop it is nearest before stepping. */
+export function stepZoom(current: number, dir: 1 | -1): ZoomStop {
+  return stepStop(nearestStop(current), dir)
 }
