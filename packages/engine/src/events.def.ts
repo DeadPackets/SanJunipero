@@ -14,8 +14,11 @@ export const AgentBorn = z.object({
   motherId: z.string(), fatherId: z.string(), x: z.number(), y: z.number(),
 }).strict()
 export const AgentMoved = z.object({ id: z.string(), x: z.number(), y: z.number() }).strict()
+// `reason` is optional so every recorded C1-C10 need change still parses. Only the cold sets
+// it, on the one event per tick where a body with no warmth left pays for it in energy.
 export const NeedChanged = z.object({
   id: z.string(), need: z.enum(['hunger', 'energy', 'warmth', 'social']), delta: z.number(),
+  reason: z.literal('exposure').optional(),
 }).strict()
 
 export const ItemLoc = z.discriminatedUnion('t', [

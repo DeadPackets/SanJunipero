@@ -463,7 +463,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       model: turnModel([]),
       mindConfig: { idleGapTicks: 100000, boredomTicks: 100000 },
       reflectionLlm: reflection,
-      simConfig: SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 }, structures: { sleepIndoorsOnly: false } }),
+      // Warmth is pinned off with the other two clocks: from C11 Task 22 a body left out in a
+      // spring night loses warmth until the C2 body alarm rings, and a woken sleeper is not
+      // what this row is about.
+      simConfig: SimConfigSchema.parse({
+        needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 },
+        structures: { sleepIndoorsOnly: false }, warmth: { enabled: false },
+      }),
     })
     while (loop.tick < 1350) {
       loop.step()

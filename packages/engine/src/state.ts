@@ -29,7 +29,14 @@ export type AgentBody = {
   // How many times this body has hit the ground without a meal or a night's sleep since.
   // Absent until the first such fall, and absent again the moment it eats or sleeps.
   collapsesWithoutRecovery?: number
-  tendedTick?: number                     // absent until first tended: keeps pre-health state hashes stable
+  // How many ticks the cold has taken energy out of this body since its last meal or sleep.
+  // Absent until the first such tick, and absent again the moment it recovers — it is what
+  // lets a fatal ladder a winter night drove be named for the night.
+  coldTicksSinceRecovery?: number
+  // What the body is wearing. One slot in v1; absent until the first thing is put on, so a
+  // town that never made a garment hashes exactly as it always did.
+  equipped?: { body?: string }
+  tendedTick?: number                   // absent until first tended: keeps pre-health state hashes stable
   lastSpokeTick?: number                  // absent until first speech: keeps golden hashes stable
   insideId?: string                       // absent until first entry: keeps golden hashes stable
   skills: Record<string, number>          // track → xp
@@ -44,6 +51,9 @@ export type Structure = {
   progressTicks: number; builtBy: string | null; burning: boolean; burnTicks: number
   owner?: string                          // absent = public; the hash-stable form of `agentId | null`
   inscription?: { text: string; by: string }  // absent = unmarked; only the latest layer, the log keeps the rest
+  // The tick a fed fire burns down to. Absent until somebody stokes it, so an unlit hearth is
+  // a hearth that was never lit — and the same field answers "is it warm" and "is it bright".
+  fueledUntilTick?: number
 }
 
 export type Item = {

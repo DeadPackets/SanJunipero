@@ -39,8 +39,8 @@ function bumpCounter(counters: WorldState['counters'], id: string): WorldState['
 // A meal or a night's sleep is what "recovered" means: the collapse ladder starts over,
 // and the counter goes back to absent so the body hashes like one that never fell.
 function rested(a: AgentBody): AgentBody {
-  if (a.collapsesWithoutRecovery === undefined) return a
-  const { collapsesWithoutRecovery: _, ...rest } = a
+  if (a.collapsesWithoutRecovery === undefined && a.coldTicksSinceRecovery === undefined) return a
+  const { collapsesWithoutRecovery: _c, coldTicksSinceRecovery: _x, ...rest } = a
   return rest
 }
 
@@ -100,7 +100,15 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (collapsedSinceTick !== null
         && needs.hunger >= config.needs.collapseThreshold && needs.energy >= config.needs.collapseThreshold
         && a.hp >= config.health.collapseHp) collapsedSinceTick = null
-      return { ...state, agents: { ...state.agents, [p.id]: { ...a, needs, zeroHungerSinceTick, collapsedSinceTick } } }
+      // A tick the cold billed to this body is remembered until it eats or sleeps: it is the
+      // difference between dying tired and dying cold, and nothing else records it.
+      const chilled = p.reason === 'exposure'
+        ? { coldTicksSinceRecovery: (a.coldTicksSinceRecovery ?? 0) + 1 }
+        : {}
+      return {
+        ...state,
+        agents: { ...state.agents, [p.id]: { ...a, needs, zeroHungerSinceTick, collapsedSinceTick, ...chilled } },
+      }
     }
     case 'item_spawned': {
       const p = ItemSpawned.parse(event.payload)

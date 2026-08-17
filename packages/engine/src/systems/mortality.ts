@@ -32,11 +32,14 @@ function drains(state: WorldState, config: SimConfig, agentId: string): Drain[] 
   const { mortality } = config
   if (!mortality.enabled) return []
   const out: Drain[] = []
+  // The ladder is the only road the cold takes (Task 22), so a fatal rung a winter night drove
+  // is named for the night. Nothing else about the drain changes: same amount, same clock.
+  const chilled = (a.coldTicksSinceRecovery ?? 0) > 0
   for (const x of a.afflictions ?? []) {
     // A wound with a hand behind it is not an accident, and the death says so.
     const slain = x.kind === 'injury' && x.sourceId !== undefined
     out.push({
-      cause: slain ? 'slain' : x.kind,
+      cause: slain ? 'slain' : x.kind === 'fatigue' && chilled ? 'exposure' : x.kind,
       amount: mortality.drainPerTick[x.kind] * x.severity,
       sinceTick: x.sinceTick,
       ...(slain ? { byId: x.sourceId } : {}),

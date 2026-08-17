@@ -5,6 +5,7 @@ import { effectiveConfig, type LawQueue } from './laws.js'
 import type { RngStreams } from './rng.js'
 import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
+import { warmthSystem } from './systems/warmth.js'
 import { healthSystem } from './systems/health.js'
 import { deathAttribution, escalateFatigue, mortalitySystem, placeGrave } from './systems/mortality.js'
 import { illnessSystem } from './systems/illness.js'
@@ -104,7 +105,7 @@ function collapseDeathSystem(ctx: TickCtx): void {
 // position may have moved, and a system holding a pre-growth position would act on the wrong tile.
 const SYSTEMS: System[] = [
   weatherSystem, mysterySystem, mapGrowthSystem, fireSystem, cropsSystem, wildlifeSystem, faunaSystem, forageSystem, spoilageSystem,
-  needsSystem, thirstSystem, healthSystem, mortalitySystem, illnessSystem, desirePathsSystem,
+  needsSystem, warmthSystem, thirstSystem, healthSystem, mortalitySystem, illnessSystem, desirePathsSystem,
   reproductionSystem, agingSystem, actionsSystem,
   collapseDeathSystem,
 ]

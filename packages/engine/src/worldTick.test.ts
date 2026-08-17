@@ -114,9 +114,14 @@ describe('verbs: sleep / wake / eat', () => {
   })
 })
 
+// Noon, so the equalization is what runs: a spring midnight is cold enough to be exposure,
+// and from C11 Task 22 the cold owns warmth whenever it has the body (warmthSystem).
+// Off the hour as well as off the night, so the weather roll leaves the sky as the row set it.
+const atNoon = (s: WorldState): WorldState => ({ ...s, tick: 700 })
+
 describe('worldTick: needs system', () => {
   it('one tick of awake decay: hunger, energy, social fall by config; warmth equalizes', () => {
-    const r = tickOnce(makeWorld())
+    const r = tickOnce(atNoon(makeWorld()))
     const n = r.state.agents.a1!.needs
     expect(n.hunger).toBe(95)
     expect(n.energy).toBe(96)
@@ -126,7 +131,7 @@ describe('worldTick: needs system', () => {
   })
 
   it('warmth target clamps to 100 in extreme heat', () => {
-    let s = makeWorld()
+    let s = atNoon(makeWorld())
     s = { ...s, weather: { kind: 'sunny', temperatureC: 40 } } // raw target 110 → 100
     s = patchAgent(s, 'a1', { needs: { hunger: 100, energy: 100, warmth: 60, social: 100 } })
     const r = tickOnce(s)
