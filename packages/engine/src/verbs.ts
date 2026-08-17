@@ -3,7 +3,7 @@ import { fertilityAt, MINUTES_PER_DAY, simTimeFromTick, WATER_TILES, type SimCon
 import { mintId, type Affliction, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
-import { findPath, isPassable } from './path.js'
+import { bridgeAt, BRIDGE_KIND, findPath, isPassable } from './path.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 
 export type PendingEvent = { type: string; payload: unknown }
@@ -561,6 +561,43 @@ export function buildTicks(config: SimConfig, kind: string): number {
   return kind === 'hut' ? config.construction.hutTicks : (config.structures.recipes[kind]?.durationTicks ?? 0)
 }
 
+function buildableGroundRefusal(state: WorldState, x: number, y: number, w: number, h: number): string | null {
+  for (let dy = 0; dy < h; dy++) {
+    for (let dx = 0; dx < w; dx++) {
+      if (!isPassable(state, x + dx, y + dy)) return 'cannot build there'
+    }
+  }
+  return null
+}
+
+// A bank is anything that is not open water — or a deck already laid over it.
+function banked(state: WorldState, x: number, y: number): boolean {
+  const tile = state.terrain[y]?.[x]
+  if (tile === undefined) return false
+  return !WATER_TILES.has(tile) || bridgeAt(state, x, y)
+}
+
+// Two or three tiles of deck, every one of them over water, and a foot on solid ground at each
+// end. Longer than that and it is a causeway, which is more than six planks can hold up.
+const BRIDGE_SPAN = { min: 2, max: 3 }
+
+function bridgeSiteRefusal(state: WorldState, x: number, y: number, w: number, h: number): string | null {
+  const span = w === 1 ? h : h === 1 ? w : 0
+  if (span < BRIDGE_SPAN.min || span > BRIDGE_SPAN.max) return 'no bridge that shape will stand'
+  for (let dy = 0; dy < h; dy++) {
+    for (let dx = 0; dx < w; dx++) {
+      const tile = state.terrain[y + dy]?.[x + dx]
+      if (tile === undefined || !WATER_TILES.has(tile)) return 'a bridge belongs over water'
+      if (bridgeAt(state, x + dx, y + dy)) return 'that spot is taken'
+    }
+  }
+  const ends = w === 1
+    ? [{ x, y: y - 1 }, { x, y: y + h }]
+    : [{ x: x - 1, y }, { x: x + w, y }]
+  if (!ends.every((e) => banked(state, e.x, e.y))) return 'both ends must reach something solid'
+  return null
+}
+
 const build: VerbDef = makeVerb({
   kind: 'build',
   validate(state, config, agentId, params) {
@@ -577,11 +614,10 @@ const build: VerbDef = makeVerb({
         return 'that spot is taken'
       }
     }
-    for (let dy = 0; dy < h; dy++) {
-      for (let dx = 0; dx < w; dx++) {
-        if (!isPassable(state, p.data.x + dx, p.data.y + dy)) return 'cannot build there'
-      }
-    }
+    const ground = p.data.kind === BRIDGE_KIND
+      ? bridgeSiteRefusal(state, p.data.x, p.data.y, w, h)
+      : buildableGroundRefusal(state, p.data.x, p.data.y, w, h)
+    if (ground) return ground
     for (const a of Object.values(state.agents)) {
       if (a.alive && a.x >= p.data.x && a.x < p.data.x + w && a.y >= p.data.y && a.y < p.data.y + h) {
         return 'someone is in the way'

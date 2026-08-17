@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
-import { canStep, findPath, isPassable, terrainCostFor, TERRAIN_COST } from './path.js'
+import { submitIntent } from './intent.js'
+import { canStep, findPath, isPassable, stepCostAt, terrainCostFor, TERRAIN_COST } from './path.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, d: 1, '~': 2, f: 3, r: 4, s: 5, F: 6, R: 7, p: 8, S: 9, c: 10 }
 const world = (rows: string[]): WorldState =>
@@ -166,5 +167,97 @@ describe('findPath (A*)', () => {
   it('returns [] when already at the goal', () => {
     const s = world(['..', '..'])
     expect(findPath(s, { x: 1, y: 1 }, { x: 1, y: 1 })).toEqual([])
+  })
+})
+
+// A river three tiles wide, banks at x=0 and x=4. Nothing crosses it but a bridge.
+const RIVER = ['.~~~.', '.~~~.', '.~~~.']
+
+// A bridge is a structure like any other: planned, progressed, completed.
+function span(s: WorldState, id: string, x: number, y: number, w: number, h: number, complete = true): WorldState {
+  let out = fold(s, ev(50, 'structure_planned', {
+    id, kind: 'bridge', x, y, w, h, maxHp: 20, flammable: false, builderId: 'a1',
+  }))
+  if (complete) out = fold(out, ev(51, 'structure_completed', { id }))
+  return out
+}
+
+describe('bridges: the one structure that grants passage', () => {
+  it('a river is uncrossable until a finished bridge spans it', () => {
+    const s = world(RIVER)
+    expect(findPath(s, { x: 0, y: 1 }, { x: 4, y: 1 })).toBeNull()
+    const half = span(s, 'structure_1', 1, 1, 3, 1, false)
+    expect(findPath(half, { x: 0, y: 1 }, { x: 4, y: 1 })).toBeNull()
+    const done = span(s, 'structure_1', 1, 1, 3, 1)
+    expect(findPath(done, { x: 0, y: 1 }, { x: 4, y: 1 })).toEqual([[1, 1], [2, 1], [3, 1], [4, 1]])
+  })
+
+  it('a bridge deck walks like a road, and the water beneath it is still water', () => {
+    const done = span(world(RIVER), 'structure_1', 1, 1, 3, 1)
+    // terrainCostFor still calls the tile impassable: findPath can only cross by asking stepCostAt.
+    expect(terrainCostFor(DEFAULT_CONFIG)[done.terrain[1]![2]!]).toBe(Infinity)
+    expect(stepCostAt(done, 2, 1, DEFAULT_CONFIG)).toBe(DEFAULT_CONFIG.pathing.roadCost)
+    expect(done.terrain[1]![2]).toBe(2)
+    expect(isPassable(done, 2, 1)).toBe(true)
+    // Every other tile is priced exactly as the plain table prices it.
+    for (let y = 0; y < done.terrain.length; y++) {
+      for (let x = 0; x < done.terrain[y]!.length; x++) {
+        if (y === 1 && x >= 1 && x <= 3) continue
+        expect(stepCostAt(done, x, y, DEFAULT_CONFIG)).toBe(terrainCostFor(DEFAULT_CONFIG)[done.terrain[y]![x]!])
+      }
+    }
+  })
+
+  it('any other structure over water still blocks', () => {
+    let s = world(RIVER)
+    s = fold(s, ev(50, 'structure_planned', {
+      id: 'structure_1', kind: 'hut', x: 1, y: 1, w: 3, h: 1, maxHp: 50, flammable: true, builderId: 'a1',
+    }))
+    s = fold(s, ev(51, 'structure_completed', { id: 'structure_1' }))
+    expect(isPassable(s, 2, 1)).toBe(false)
+  })
+})
+
+describe('build: planning a bridge', () => {
+  const BRIDGE3 = SimConfigSchema.parse({ structures: { recipes: {
+    bridge: { inputs: { wood: 6 }, w: 3, h: 1, maxHp: 20, flammable: false, durationTicks: 480 },
+  } } })
+  const BRIDGE4 = SimConfigSchema.parse({ structures: { recipes: {
+    bridge: { inputs: { wood: 6 }, w: 4, h: 1, maxHp: 20, flammable: false, durationTicks: 480 },
+  } } })
+
+  function builder(rows: string[], config: SimConfig): WorldState {
+    let s = genesisState(config, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 1, ageDays: 7300 }), config)
+    return fold(s, ev(2, 'item_spawned', {
+      id: 'item_1', kind: 'wood', qty: 6, loc: { t: 'agent', id: 'a1' },
+    }), config)
+  }
+
+  it('plans across the water when both ends touch land', () => {
+    const s = builder(RIVER, BRIDGE3)
+    const r = submitIntent(s, BRIDGE3, 'a1', 'build', { kind: 'bridge', x: 1, y: 1 })
+    expect(r.ok).toBe(true)
+  })
+
+  it('refuses a span longer than three, an end in open water, and dry ground', () => {
+    const wide = ['.~~~~.', '.~~~~.', '.~~~~.']
+    const long = submitIntent(builder(wide, BRIDGE4), BRIDGE4, 'a1', 'build', { kind: 'bridge', x: 1, y: 1 })
+    expect(long.ok).toBe(false)
+    // A five-wide river with a three-tile deck leaves one end standing in the river.
+    const short = submitIntent(builder(wide, BRIDGE3), BRIDGE3, 'a1', 'build', { kind: 'bridge', x: 1, y: 1 })
+    expect(short.ok).toBe(false)
+    const dry = submitIntent(builder(['......', '......', '......'], BRIDGE3), BRIDGE3, 'a1', 'build', { kind: 'bridge', x: 1, y: 1 })
+    expect(dry.ok).toBe(false)
+  })
+
+  it('an existing bridge is a bank to build the next span from', () => {
+    const wide = ['.~~~~~~.', '.~~~~~~.', '.~~~~~~.']
+    let s = builder(wide, BRIDGE3)
+    s = span(s, 'structure_1', 1, 1, 3, 1)
+    // Standing on the deck they just finished, reaching for the next span.
+    s = fold(s, ev(60, 'agent_moved', { id: 'a1', x: 3, y: 1 }), BRIDGE3)
+    const r = submitIntent(s, BRIDGE3, 'a1', 'build', { kind: 'bridge', x: 4, y: 1 })
+    expect(r.ok).toBe(true)
   })
 })

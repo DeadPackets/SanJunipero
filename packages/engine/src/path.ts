@@ -14,15 +14,35 @@ export function terrainCostFor(config: SimConfig): Record<TileId, number> {
 
 export const TERRAIN_COST: Record<TileId, number> = terrainCostFor(DEFAULT_CONFIG)
 
+export const BRIDGE_KIND = 'bridge'
+
+// The only structure that opens ground instead of closing it. Under construction it is still
+// scaffolding over open water, and nobody walks on scaffolding.
+export function bridgeAt(state: WorldState, x: number, y: number): boolean {
+  for (const s of Object.values(state.structures)) {
+    if (s.kind !== BRIDGE_KIND || s.stage !== 'complete') continue
+    if (x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h) return true
+  }
+  return false
+}
+
 export function isPassable(state: WorldState, x: number, y: number): boolean {
   if (y < 0 || y >= state.terrain.length) return false
   const row = state.terrain[y]!
   if (x < 0 || x >= row.length) return false
+  if (bridgeAt(state, x, y)) return true
   if (!Number.isFinite(TERRAIN_COST[row[x]!])) return false
   for (const s of Object.values(state.structures)) {
     if (x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h) return false
   }
   return true
+}
+
+// The single place that prices a step (G4). Terrain is what the map says; a bridge deck is
+// what the town built over it, and it walks like the road it is.
+export function stepCostAt(state: WorldState, x: number, y: number, config: SimConfig): number {
+  if (bridgeAt(state, x, y)) return config.pathing.roadCost
+  return terrainCostFor(config)[state.terrain[y]![x]!]!
 }
 
 // Neighbor order + comparator prefer lower y then lower x: deterministic ties under a Manhattan heuristic.
@@ -41,7 +61,6 @@ type Node = { x: number; y: number; g: number; f: number; parent: Node | null }
 export function findPath(state: WorldState, from: Point, to: Point, config: SimConfig = DEFAULT_CONFIG): Array<[number, number]> | null {
   if (from.x === to.x && from.y === to.y) return []
   if (!isPassable(state, to.x, to.y)) return null
-  const cost = terrainCostFor(config)
   const width = state.terrain[0]!.length
   const h = (x: number, y: number) => Math.abs(x - to.x) + Math.abs(y - to.y)
   const key = (x: number, y: number) => y * width + x
@@ -69,7 +88,7 @@ export function findPath(state: WorldState, from: Point, to: Point, config: SimC
     for (const [dx, dy] of NEIGHBORS) {
       const nx = cur.x + dx, ny = cur.y + dy
       if (!canStep(state, cur.x, cur.y, dx, dy) || closed.has(key(nx, ny))) continue
-      const g = cur.g + cost[state.terrain[ny]![nx]!]!
+      const g = cur.g + stepCostAt(state, nx, ny, config)
       const known = best.get(key(nx, ny))
       if (known && known.g <= g) continue
       const node: Node = { x: nx, y: ny, g, f: g + h(nx, ny), parent: cur }
