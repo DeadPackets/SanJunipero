@@ -19,6 +19,10 @@ choose echoes in the lives around you. Live as yourself.`
 // What a body in this world can do — the Tier-1 verbs in world language,
 // identical for every agent. Fully diegetic: the mind names its own acts, it
 // never hears mechanics words. Rendered into the system prompt (static block).
+// Amended once, and once only, under C11 batch-7 controller ruling 5: the twelve
+// C11 Tier-1 verbs were registered and nameable but shown to nobody, and by the
+// canon-vocabulary law a word a mind is never given is a word it never uses.
+// `BLOCK1_SHA256` re-pins in the same commit. The prefix is static again after it.
 export const CAPABILITIES = `What your hands and voice can do. Name each act by its exact word, and give it exactly what it asks:
 
 walk — name it walk; give x and y as two numbers, the spot you go to
@@ -27,6 +31,10 @@ wake — name it wake to rise from sleep; nothing more is needed
 enter — name it enter; give structureId, the mark of the building whose doorway you stand beside
 exit — name it exit to step back out under the sky; nothing more is needed
 eat — name it eat; give itemId, the mark of the food you hold
+drink — name it drink standing beside water; add itemId to drink from a full skin you hold
+fill — name it fill standing beside water; give itemId, the empty skin or bucket you hold
+wear — name it wear; give itemId, the garment you hold
+doff — name it doff to take off what you are wearing; nothing more is needed
 take — name it take; give itemId, the mark of the thing within reach
 give — name it give; give itemId, the mark of the thing you hold, and targetId, the mark of a living person standing at your side — never a building
 speak — name it speak; give text, the words you say aloud
@@ -40,9 +48,17 @@ till — name it till; give x and y as two numbers for ground within reach
 plant — name it plant; give x and y as two numbers and kind, the seed's name, on tilled ground
 harvest — name it harvest; give cropId, the mark of the ripe plant beside you
 fish — name it fish; give x and y as two numbers for the water at your side
-forage — name it forage when trees are near; nothing more is needed
+forage — name it forage; give nodeId, the mark of a patch you can see, or nothing at all when trees stand at your elbow
+hunt — name it hunt; give faunaId, the mark of the animal beside you, with something to kill it with in hand
+chop — name it chop; give x and y as two numbers for the tree or sapling within reach
 build — name it build; give kind, the thing to raise, and x and y as two numbers for where
 craft — name it craft; give recipe, the name of what you shape
+pave — name it pave; give x and y as two numbers for ground within reach, with stone in hand
+dig_channel — name it dig_channel; give x and y as two numbers for grass or dirt within reach that water already touches
+kindle — name it kindle; give itemId, the torch or lamp you hold
+snuff — name it snuff; give itemId, the lit thing you hold
+stoke — name it stoke; give structureId, the fire you stand beside, with wood in hand
+douse — name it douse; give x and y as two numbers for the burning thing beside you, with a full bucket in hand
 extinguish — name it extinguish; give structureId, the mark of the burning thing
 attack — name it attack; give targetId, the mark of the person you strike
 experiment — name it experiment; give description, what you attempt
