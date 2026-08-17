@@ -351,6 +351,60 @@ describe('build: planning a bridge', () => {
     expect(dry.ok).toBe(false)
   })
 
+  // Batch-3 controller ruling 2: a recipe's w and h are a shape, not a bearing.
+  describe('the transpose fallback', () => {
+    const TALL3 = SimConfigSchema.parse({ structures: { recipes: {
+      bridge: { inputs: { wood: 6 }, w: 1, h: 3, maxHp: 20, flammable: false, durationTicks: 480 },
+    } } })
+    const planned = (s: WorldState, config: SimConfig, at: { x: number; y: number }) => {
+      const r = submitIntent(s, config, 'a1', 'build', { kind: 'bridge', ...at })
+      if (!r.ok) return r.reason
+      const p = r.events.find((e) => e.type === 'structure_planned')!.payload as { w: number; h: number }
+      return { w: p.w, h: p.h }
+    }
+
+    it('turns a deck written the long way to span the river it is standing at', () => {
+      // RIVER runs north-south, so a 1x3 deck reads off the map and a 3x1 one spans it.
+      expect(planned(builder(RIVER, TALL3), TALL3, { x: 1, y: 1 })).toEqual({ w: 3, h: 1 })
+    })
+
+    it('leaves the written shape alone when the written shape works', () => {
+      expect(planned(builder(RIVER, BRIDGE3), BRIDGE3, { x: 1, y: 1 })).toEqual({ w: 3, h: 1 })
+    })
+
+    it('keeps the written refusal when neither reading stands up', () => {
+      const wide = ['.~~~~.', '.~~~~.', '.~~~~.']
+      expect(planned(builder(wide, TALL3), TALL3, { x: 1, y: 1 })).toBe('a bridge belongs over water')
+      expect(planned(builder(['......', '......', '......'], TALL3), TALL3, { x: 1, y: 1 }))
+        .toBe('a bridge belongs over water')
+    })
+
+    it('is deterministic, and validate and onStart agree on the rectangle', () => {
+      const s = builder(RIVER, TALL3)
+      for (let i = 0; i < 5; i++) expect(planned(s, TALL3, { x: 1, y: 1 })).toEqual({ w: 3, h: 1 })
+      let after = s
+      const r = submitIntent(s, TALL3, 'a1', 'build', { kind: 'bridge', x: 1, y: 1 })
+      expect(r.ok).toBe(true)
+      if (r.ok) r.events.forEach((e, i) => { after = fold(after, ev(200 + i, e.type, e.payload), TALL3) })
+      const site = Object.values(after.structures).find((x) => x.kind === 'bridge')!
+      expect({ w: site.w, h: site.h }).toEqual({ w: 3, h: 1 })
+    })
+
+    it('applies to anything with a footprint, not only to bridges', () => {
+      const SHED = SimConfigSchema.parse({ structures: { recipes: {
+        shed: { inputs: { wood: 6 }, w: 1, h: 3, maxHp: 20, flammable: true, durationTicks: 60 },
+      } } })
+      // Three tiles of dry ground running east, one tile deep: only the turned shed fits.
+      const s = builder(['....', '.~~~'], SHED)
+      const r = submitIntent(s, SHED, 'a1', 'build', { kind: 'shed', x: 1, y: 0 })
+      expect(r.ok).toBe(true)
+      if (r.ok) {
+        expect(r.events.find((e) => e.type === 'structure_planned')!.payload)
+          .toMatchObject({ w: 3, h: 1 })
+      }
+    })
+  })
+
   it('an existing bridge is a bank to build the next span from', () => {
     const wide = ['.~~~~~~.', '.~~~~~~.', '.~~~~~~.']
     let s = builder(wide, BRIDGE3)

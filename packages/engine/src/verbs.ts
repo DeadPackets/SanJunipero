@@ -918,35 +918,53 @@ function bridgeSiteRefusal(state: WorldState, x: number, y: number, w: number, h
   return null
 }
 
+type BuildSite = { kind: string; x: number; y: number }
+
+// Everything about a site that depends on how big the thing standing on it is.
+function footprintRefusal(
+  state: WorldState, config: SimConfig, agentId: string, d: BuildSite, w: number, h: number,
+): string | null {
+  const recipe = buildableRecipe(config, d.kind)!
+  if (!nearRect(state, agentId, d.x, d.y, w, h)) return 'not close enough to build'
+  const site = siteAt(state, d.x, d.y)
+  if (site && site.kind === d.kind) return null // resume: materials already spent
+  for (const s of Object.values(state.structures)) {
+    if (d.x < s.x + s.w && s.x < d.x + w && d.y < s.y + s.h && s.y < d.y + h) return 'that spot is taken'
+  }
+  const ground = d.kind === BRIDGE_KIND
+    ? bridgeSiteRefusal(state, d.x, d.y, w, h)
+    : buildableGroundRefusal(state, d.x, d.y, w, h)
+  if (ground) return ground
+  for (const a of Object.values(state.agents)) {
+    if (a.alive && a.x >= d.x && a.x < d.x + w && a.y >= d.y && a.y < d.y + h) return 'someone is in the way'
+  }
+  for (const [kind, qty] of Object.entries(recipe.inputs)) {
+    if (heldQty(state, agentId, kind) < qty) return `not enough ${kind}`
+  }
+  return null
+}
+
+// A recipe's w and h are a shape, not a compass bearing: a deck written three long and one
+// wide is the same deck turned sideways. As written wins; the turned reading is tried only
+// when the written one refuses, and a refusal is always the written one's words. Deterministic,
+// so validate, duration and onStart all reach for the same rectangle.
+export function buildFootprint(
+  state: WorldState, config: SimConfig, agentId: string, d: BuildSite,
+): { w: number; h: number; refusal: string | null } {
+  const { w, h } = buildableRecipe(config, d.kind)!
+  const written = footprintRefusal(state, config, agentId, d, w, h)
+  if (written === null || w === h) return { w, h, refusal: written }
+  const turned = footprintRefusal(state, config, agentId, d, h, w)
+  return turned === null ? { w: h, h: w, refusal: null } : { w, h, refusal: written }
+}
+
 const build: VerbDef = makeVerb({
   kind: 'build',
   validate(state, config, agentId, params) {
     const p = BuildParams.safeParse(params)
     if (!p.success) return 'build needs {kind, x, y}'
-    const recipe = buildableRecipe(config, p.data.kind)
-    if (recipe === null) return `cannot build a ${p.data.kind}`
-    const { w, h } = recipe
-    if (!nearRect(state, agentId, p.data.x, p.data.y, w, h)) return 'not close enough to build'
-    const site = siteAt(state, p.data.x, p.data.y)
-    if (site && site.kind === p.data.kind) return null // resume: materials already spent
-    for (const s of Object.values(state.structures)) {
-      if (p.data.x < s.x + s.w && s.x < p.data.x + w && p.data.y < s.y + s.h && s.y < p.data.y + h) {
-        return 'that spot is taken'
-      }
-    }
-    const ground = p.data.kind === BRIDGE_KIND
-      ? bridgeSiteRefusal(state, p.data.x, p.data.y, w, h)
-      : buildableGroundRefusal(state, p.data.x, p.data.y, w, h)
-    if (ground) return ground
-    for (const a of Object.values(state.agents)) {
-      if (a.alive && a.x >= p.data.x && a.x < p.data.x + w && a.y >= p.data.y && a.y < p.data.y + h) {
-        return 'someone is in the way'
-      }
-    }
-    for (const [kind, qty] of Object.entries(recipe.inputs)) {
-      if (heldQty(state, agentId, kind) < qty) return `not enough ${kind}`
-    }
-    return null
+    if (buildableRecipe(config, p.data.kind) === null) return `cannot build a ${p.data.kind}`
+    return buildFootprint(state, config, agentId, p.data).refusal
   },
   duration(state, config, _agentId, params) {
     const p = BuildParams.parse(params)
@@ -957,12 +975,13 @@ const build: VerbDef = makeVerb({
     if (siteAt(state, p.x, p.y)) return []
     const recipe = buildableRecipe(config, p.kind)
     if (recipe === null) return []
+    const { w, h } = buildFootprint(state, config, agentId, p)
     return [
       ...Object.entries(recipe.inputs).flatMap(([kind, qty]) => consumeHeld(state, agentId, kind, qty)),
       {
         type: 'structure_planned',
         payload: {
-          id: mintId(state, 'structure'), kind: p.kind, x: p.x, y: p.y, w: recipe.w, h: recipe.h,
+          id: mintId(state, 'structure'), kind: p.kind, x: p.x, y: p.y, w, h,
           maxHp: recipe.maxHp, flammable: recipe.flammable, builderId: agentId,
           ...(config.ownership.enabled ? { owner: agentId } : {}),
         },
