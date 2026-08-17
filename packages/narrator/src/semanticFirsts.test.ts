@@ -49,6 +49,35 @@ const run = async (llm: ScriptedLlm, over: Record<string, unknown> = {}) => {
 const alerts = (db: Database.Database): Array<{ kind: string; detail: string }> =>
   db.prepare('SELECT kind, detail FROM alerts ORDER BY id').all() as Array<{ kind: string; detail: string }>
 
+// A model whose answer the generator refuses outright. GATE G11b met this on its first live
+// night: a hit that cited neither an event nor a remembered record, and the throw took the
+// whole chapter down with it.
+class ThrowingLlm {
+  objectCalls = 0
+  async object(): Promise<never> {
+    this.objectCalls += 1
+    throw new Error('No object generated: response did not match schema.')
+  }
+
+  async text(): Promise<{ text: string; usage: LlmUsage }> { return { text: '', usage: emptyUsage() } }
+  totalCostUsd(): number { return 0 }
+  alert(): void {}
+}
+
+describe('a verdict nobody can read', () => {
+  it('is a night with no semantic firsts, an alert, and a chapter that still gets written', async () => {
+    const { db, store } = rig()
+    const llm = new ThrowingLlm()
+    const milestones = await detectSemanticFirsts({
+      db, store, llm: llm as unknown as LlmClient, day: DAY, records: AUTHORED_DAY,
+    })
+    expect(llm.objectCalls).toBe(1)
+    expect(milestones).toEqual([])
+    expect(store.semanticFirsts()).toEqual([])
+    expect(alerts(db).map((a) => a.kind)).toEqual(['semantic_firsts_unreadable'])
+  })
+})
+
 describe('the nightly pass', () => {
   it('takes the god reference and the lie, and nothing else from that day', async () => {
     const { store, milestones } = await run(new ScriptedLlm())
