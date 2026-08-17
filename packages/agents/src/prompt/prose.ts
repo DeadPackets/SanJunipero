@@ -82,6 +82,10 @@ export type PerceptionPacket = {
     asleep: boolean
     collapsed: boolean
     activity: string | null
+    // Where the legs are already going. Absent when they are not.
+    activityToward?: { x: number; y: number }
+    // The roof overhead. Absent under open sky, so an outdoor packet reads as it always did.
+    inside?: { id: string; kind: string }
     inventory: PerceptionItem[]
   }
   weather: { kind: string; temperatureC: number }
@@ -201,6 +205,9 @@ export type ProseWorld = {
   // never projects, and block 1 now teaches two verbs that need it.
   waterAtHand?(): boolean
   nearestWater?(x: number, y: number): { x: number; y: number } | null
+  // Where the food is. The same answer thirst has had since the last batch, for the need that
+  // never got one: the run that drank fifteen times ate once (R21).
+  nearestFood?(x: number, y: number): { x: number; y: number; kind: string } | null
 }
 
 // Nearest open tile ringing a structure's footprint (Manhattan to self);
@@ -244,9 +251,23 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   const { x, y } = packet.self
 
   lines.push(calendarLine(packet.time))
-  lines.push(`You ${packet.self.asleep ? 'sleep' : packet.self.collapsed ? 'lie' : 'stand'} at (${x}, ${y}).`)
+  const inside = packet.self.inside
+  const where = inside === undefined ? '' : ` inside the ${inside.kind} (${inside.id})`
+  lines.push(`You ${packet.self.asleep ? 'sleep' : packet.self.collapsed ? 'lie' : 'stand'}${where} at (${x}, ${y}).`)
+  // Said out loud because a body that cannot tell it is under a roof walks into the wall
+  // twice a turn: fifty-nine of the live run's refusals were this one silence (R21).
+  if (inside !== undefined) lines.push('Four walls are around you; step out under the sky before you can go anywhere else.')
 
   if (packet.self.collapsed) lines.push('You have collapsed from exhaustion and cannot move.')
+
+  // What the body is already doing. A mind told it is standing still sets out again, and
+  // again: one founder said she was leaving for the berries in forty-four turns (R21).
+  if (packet.self.activity !== null && !packet.self.asleep) {
+    const toward = packet.self.activityToward
+    lines.push(toward === undefined
+      ? `Your hands are already busy — you are partway through ${packet.self.activity}, and it will finish before anything else can begin.`
+      : `Your legs are already carrying you toward (${toward.x}, ${toward.y}); you will get there if you let them.`)
+  }
 
   const { hunger, energy, warmth, social } = packet.self.body.needs
   if (hunger < 5) lines.push('Your stomach aches with hunger.')
@@ -279,9 +300,17 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
     }
   }
 
-  if (hunger < 30 && world?.isEdible) {
-    const food = packet.self.inventory.find((i) => world.isEdible!(i.kind))
+  // The road thirst has had, given to the need that never had one. Hands first, then the
+  // nearest thing worth walking to — and never as a refusal.
+  if (hunger < 30) {
+    const food = world?.isEdible === undefined
+      ? undefined
+      : packet.self.inventory.find((i) => world.isEdible!(i.kind))
     if (food) lines.push(`Your satchel holds ${food.kind} (${food.id}) — you could eat it now.`)
+    else {
+      const f = world?.nearestFood?.(x, y) ?? null
+      if (f !== null) lines.push(`The nearest food you know of is ${f.kind} at (${f.x}, ${f.y}).`)
+    }
   }
 
   lines.push(weatherLine(packet.weather, packet.time.isNight))
@@ -312,7 +341,11 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
     // The doorway outranks the wall: the tile the packet names is the tile `enter` measures
     // against, so a mind told to stand there is a mind the world lets in.
     let approach = 'walk to a tile beside it.'
-    if (s.door !== undefined) {
+    if (s.id === inside?.id) {
+      approach = s.door === undefined
+        ? 'this is the roof you are under.'
+        : `this is the roof you are under; the way out is at (${s.door.x}, ${s.door.y}).`
+    } else if (s.door !== undefined) {
       approach = `its doorway is at (${s.door.x}, ${s.door.y}) — stand there and you can go in.`
     } else if (world?.isWalkable) {
       const t = besideTile(s, packet.self, world.isWalkable)

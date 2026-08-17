@@ -1,5 +1,6 @@
 import {
   composePerception,
+  FORAGEABLE_YIELD,
   isFoodKind,
   isPassable,
   recipeTileKind,
@@ -66,6 +67,8 @@ function reconcile(
       asleep: self?.asleep ?? false,
       collapsed: (self?.collapsedSinceTick ?? null) !== null,
       activity: raw.self.activity,
+      ...(raw.self.activityToward === undefined ? {} : { activityToward: raw.self.activityToward }),
+      ...(raw.self.inside === undefined ? {} : { inside: raw.self.inside }),
       inventory: raw.self.inventory.map((i) => ({
         id: i.id,
         kind: i.kind,
@@ -217,6 +220,38 @@ export class EngineBridge {
     for (const id of Object.keys(state.structures).sort()) {
       const s = state.structures[id]!
       if (s.kind === WELL_KIND && s.stage === 'complete') offer(s.x, s.y)
+    }
+    return best
+  }
+
+  // The nearest thing worth walking to for a meal: a loaf on a shelf, a loaf on the ground, or
+  // a patch still standing. Kind and place only — the mark is still earned by going and
+  // looking, exactly as `nearestWater` names a bank and never a well's id.
+  nearestFood(x: number, y: number, radius = 24): { x: number; y: number; kind: string } | null {
+    const state = this.#loop.state
+    let best: { x: number; y: number; kind: string } | null = null
+    let bestD = Infinity
+    const offer = (px: number, py: number, kind: string): void => {
+      const d = Math.abs(px - x) + Math.abs(py - y)
+      if (d > radius || d >= bestD) return
+      bestD = d
+      best = { x: px, y: py, kind }
+    }
+    for (const id of Object.keys(state.items).sort()) {
+      const item = state.items[id]!
+      if (!isFoodKind(this.#simConfig, item.kind)) continue
+      if (item.loc.t === 'tile') offer(item.loc.x, item.loc.y, item.kind)
+      else if (item.loc.t === 'structure') {
+        const s = state.structures[item.loc.id]
+        if (s !== undefined) offer(s.x, s.y, item.kind)
+      }
+    }
+    for (const id of Object.keys(state.forageables ?? {}).sort()) {
+      const node = state.forageables![id]!
+      if (node.stock <= 0) continue
+      const kind = FORAGEABLE_YIELD[node.kind as keyof typeof FORAGEABLE_YIELD]
+      if (kind === undefined || !isFoodKind(this.#simConfig, kind)) continue
+      offer(node.x, node.y, kind)
     }
     return best
   }

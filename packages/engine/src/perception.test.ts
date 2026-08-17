@@ -585,3 +585,37 @@ describe('night-witness: a torch does not let you see, it lets the dark see you'
     expect(JSON.stringify(once)).toBe(JSON.stringify(twice))
   })
 })
+
+// R21-A: the two things a body knows about itself that the packet used to drop on the floor.
+// Between them they account for 59 of the live gate's 222 refusals, and for a mind that
+// restated the same journey in forty-four turns without ever setting off.
+describe('composePerception: the body knows where it is and what it is doing', () => {
+  it('names the roof overhead, and says nothing at all under open sky', () => {
+    const outside = withHut(makeWorld([{ id: 'a', x: 9, y: 12 }]))
+    expect(composePerception(outside, DEFAULT_CONFIG, 'a', []).self.inside).toBeUndefined()
+    const inside = goInside(outside, 'a')
+    expect(composePerception(inside, DEFAULT_CONFIG, 'a', []).self.inside)
+      .toEqual({ id: HUT.id, kind: HUT.kind })
+  })
+
+  it('names where the legs are already going, and only while they are walking', () => {
+    const s = withHut(makeWorld([{ id: 'a', x: 9, y: 12 }]))
+    const busy = (activity: unknown): WorldState =>
+      ({ ...s, agents: { ...s.agents, a: { ...s.agents.a!, activity } } } as WorldState)
+
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', []).self.activityToward).toBeUndefined()
+
+    const walking = composePerception(
+      busy({ verb: 'walk', params: { x: 20, y: 4 }, ticksRemaining: 12 }), DEFAULT_CONFIG, 'a', [],
+    )
+    expect(walking.self.activity).toBe('walk')
+    expect(walking.self.activityToward).toEqual({ x: 20, y: 4 })
+
+    // A pair of hands busy with anything else is busy without a destination.
+    const chopping = composePerception(
+      busy({ verb: 'chop', params: { x: 20, y: 4 }, ticksRemaining: 3 }), DEFAULT_CONFIG, 'a', [],
+    )
+    expect(chopping.self.activity).toBe('chop')
+    expect(chopping.self.activityToward).toBeUndefined()
+  })
+})

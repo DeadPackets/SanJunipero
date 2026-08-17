@@ -153,11 +153,14 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
       agents: { ...s.agents, nadia: { ...s.agents.nadia!, insideId: hut.id, x: hut.x, y: hut.y } },
     }
     const prose = proseFor(inside, 'nadia')
-    // FIXED BY R21-A. Until then: no line says she is under a roof, and the one line about
-    // the roof she is under tells her to walk to its doorway and enter it.
-    expect(prose).not.toMatch(/inside|indoors|under a roof|within/i)
-    expect(prose).toContain('stand there and you can go in')
-    // And the world's answer to taking that instruction, twice over.
+    // R21-A. The defect was that no line said she was under a roof, and the one line about
+    // the roof she was under told her to walk to its doorway and go in — 59 of the run's 222
+    // refusals. Both halves are now said the other way round.
+    expect(prose).toContain(`You stand inside the hut (${hut.id}) at (68, 60).`)
+    expect(prose).toContain('Four walls are around you')
+    expect(prose).toContain('this is the roof you are under; the way out is at (68, 62).')
+    expect(prose).not.toContain('stand there and you can go in')
+    // The world's answer to the instruction that used to be given, twice over.
     expect(submitIntent(inside, CFG, 'nadia', 'enter', { structureId: hut.id })).toEqual(
       { ok: false, reason: 'already inside' },
     )
@@ -178,11 +181,23 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
         },
       },
     }
-    // The packet carries it; the prose drops it. FIXED BY R21-A.
-    expect(composePerception(walking, CFG, 'nadia', []).self.activity).toBe('walk')
-    const prose = proseFor(walking, 'nadia')
-    expect(prose).toContain('You stand at (68, 62)')
-    expect(prose).not.toMatch(/walking|on your way|already going|your hands are busy/i)
+    // R21-A. The packet carried it and the prose dropped it; now the legs say where they
+    // are going, so a mind that has already set out does not set out again.
+    const p = composePerception(walking, CFG, 'nadia', [])
+    expect(p.self.activity).toBe('walk')
+    expect(p.self.activityToward).toEqual({ x: 68, y: 47 })
+    expect(proseFor(walking, 'nadia'))
+      .toContain('Your legs are already carrying you toward (68, 47)')
+
+    // A pair of hands busy with something that is not a walk says so without a destination.
+    const cutting: WorldState = {
+      ...s,
+      agents: {
+        ...s.agents,
+        nadia: { ...s.agents.nadia!, activity: { verb: 'chop', params: {}, ticksRemaining: 8 } },
+      },
+    }
+    expect(proseFor(cutting, 'nadia')).toContain('you are partway through chop')
   })
 
   it('thirst is given a road and hunger is not, and the run drank fifteen times and ate once', () => {
@@ -191,11 +206,30 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
       ...s,
       agents: { ...s.agents, nadia: { ...s.agents.nadia!, thirst: 10, needs: { ...s.agents.nadia!.needs, hunger: 10 } } },
     }
-    const prose = proseFor(dry, 'nadia')
+    const prose = perceptionToProse(prosePacket(dry, 'nadia'), undefined, {
+      ...WORLD,
+      nearestFood: () => ({ x: 68, y: 60, kind: 'bread' }),
+    })
     expect(prose).toContain('The nearest water you know of lies at (50, 62)')
-    // The stomach gets a sensation and no road. FIXED BY R21-B.
+    // R21-B. The stomach used to get a sensation and no road; it now gets the road thirst
+    // has had, and only when the hands are empty.
     expect(prose).toContain('Your stomach gnaws at you')
-    expect(prose).not.toMatch(/nearest food|you could eat|берр/i)
+    expect(prose).toContain('The nearest food you know of is bread at (68, 60).')
+
+    // A hand already holding a loaf is told about the loaf, not sent across town for one.
+    const held: WorldState = {
+      ...dry,
+      items: {
+        ...dry.items,
+        held_loaf: { id: 'held_loaf', kind: 'bread', qty: 1, loc: { t: 'agent', id: 'nadia' } },
+      },
+    }
+    const fed = perceptionToProse(prosePacket(held, 'nadia'), undefined, {
+      ...WORLD,
+      nearestFood: () => ({ x: 0, y: 0, kind: 'berries' }),
+    })
+    expect(fed).toContain('Your satchel holds bread (held_loaf) — you could eat it now.')
+    expect(fed).not.toContain('The nearest food you know of')
   })
 
   it('a founder wakes with an empty satchel and the loaves on a shelf behind a wall', () => {

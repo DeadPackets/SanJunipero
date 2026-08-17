@@ -89,6 +89,10 @@ export type SeenEvent =
 // a town with no roads reads exactly as it always did. A fact about hauling, not a site score.
 export type PerceivedGround = { wellTravelled: true }
 
+// The roof the body is standing under. Absent under open sky, so a packet from a town that
+// never went in reads exactly as it always did.
+export type PerceivedInterior = { id: string; kind: string }
+
 export type PerceptionPacket = {
   time: SimTime
   self: {
@@ -96,6 +100,10 @@ export type PerceptionPacket = {
     x: number
     y: number
     activity: string | null
+    // Where the legs are already headed, present only while they are walking. The verb alone
+    // cannot say it, and a body that cannot tell it is already going somewhere sets out again.
+    activityToward?: { x: number; y: number }
+    inside?: PerceivedInterior
     inventory: InventoryItem[]
   }
   weather: { kind: string; temperatureC: number }
@@ -407,6 +415,12 @@ export function composePerception(
   const fumbling = self.activity !== null
     && workPenalty(state, config, agentId, self.activity.verb) !== 1
 
+  const roof = indoors === null ? undefined : state.structures[indoors]
+  const walkTo = self.activity?.verb === 'walk' ? self.activity.params : undefined
+  const toward = typeof walkTo?.x === 'number' && typeof walkTo.y === 'number'
+    ? { x: walkTo.x, y: walkTo.y }
+    : undefined
+
   return {
     time: simTimeFromTick(state.tick),
     self: {
@@ -421,6 +435,8 @@ export function composePerception(
       x: self.x,
       y: self.y,
       activity: self.activity?.verb ?? null,
+      ...(toward === undefined ? {} : { activityToward: toward }),
+      ...(roof === undefined ? {} : { inside: { id: roof.id, kind: roof.kind } }),
       inventory,
     },
     weather: { ...state.weather },
