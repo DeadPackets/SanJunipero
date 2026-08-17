@@ -12,10 +12,15 @@ export { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS, PRICE_PER_M } from './llm/
 export { migrateLlmTables, insertAlert } from './llm/callLog.js'
 export {
   checkSpend,
+  classifyFailure,
+  deadCallCounts,
   projectDailySpend,
+  reportDeadCalls,
   DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY,
   DEFAULT_SPEND_WINDOW_REAL_MINUTES,
   REAL_MINUTES_PER_SIM_DAY,
+  type DeadCallRow,
+  type DeadCalls,
   type SpendProjection,
 } from './llm/spendMonitor.js'
 export {

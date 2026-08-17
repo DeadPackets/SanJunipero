@@ -6,7 +6,10 @@ import {
   DEFAULT_SPEND_WINDOW_REAL_MINUTES,
   REAL_MINUTES_PER_SIM_DAY,
   checkSpend,
+  classifyFailure,
+  deadCallCounts,
   projectDailySpend,
+  reportDeadCalls,
 } from './spendMonitor.js'
 
 const NOW = 1_700_000_000_000
@@ -74,6 +77,81 @@ describe('projectDailySpend (T24)', () => {
     const db = openDb()
     expect(DEFAULT_SPEND_WINDOW_REAL_MINUTES).toBe(15)
     expect(projectDailySpend(db).windowRealMinutes).toBe(15)
+  })
+})
+
+// 135 of 1296 live calls came back with nothing and were billed anyway — 75 empty, 56
+// unparseable — and the whole run raised one alert and zero crashes, because the repair path
+// and the client retry absorb both in silence. The ops surface has to be able to say so.
+describe('dead calls — paid for, and nothing came back', () => {
+  const fail = (db: Database.Database, agentId: string | null, error: string | null, agoMinutes = 1, now = NOW): void => {
+    db.prepare(
+      `INSERT INTO llm_calls
+         (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+          reasoning_tokens, cost_usd, latency_ms, ok, error)
+       VALUES (?, ?, 'turn', 'm', 0, 0, 0, 0, 0, 0, 0, ?)`,
+    ).run(now - agoMinutes * 60_000, agentId, error)
+  }
+
+  it('tells an empty answer from an unparseable one from anything else', () => {
+    expect(classifyFailure('No output generated.')).toBe('empty_output')
+    expect(classifyFailure('No object generated: could not parse the response.')).toBe('unparseable')
+    expect(classifyFailure('fetch failed')).toBe('other')
+    expect(classifyFailure(null)).toBe('other')
+  })
+
+  it('counts them per mind per day, beside the calls that mind was billed for', () => {
+    const db = openDb()
+    seedCall(db, 1, 0.002) // one good turn, no agent named
+    fail(db, 'omar', 'No output generated.')
+    fail(db, 'omar', 'No object generated: could not parse the response.')
+    fail(db, 'omar', 'No output generated.', 60 * 30) // the day before
+    fail(db, 'nadia', 'fetch failed')
+
+    const rows = deadCallCounts(db)
+    expect(rows.map((r) => r.agentId)).toEqual(['nadia', 'omar', 'omar'])
+    const omarToday = rows.find((r) => r.agentId === 'omar' && r.emptyOutput === 1 && r.unparseable === 1)!
+    expect(omarToday).toMatchObject({ emptyOutput: 1, unparseable: 1, otherFailures: 0, calls: 2 })
+    expect(rows.find((r) => r.agentId === 'nadia')).toMatchObject({ otherFailures: 1, emptyOutput: 0 })
+    // Two days for one mind means two rows, never one lumped total.
+    expect(rows.filter((r) => r.agentId === 'omar')).toHaveLength(2)
+    expect(new Set(rows.filter((r) => r.agentId === 'omar').map((r) => r.day)).size).toBe(2)
+  })
+
+  it('a clean run reports nothing at all', () => {
+    const db = openDb()
+    seedCall(db, 1, 0.002)
+    expect(deadCallCounts(db)).toEqual([])
+    expect(reportDeadCalls(db)).toEqual([])
+    expect(alerts(db)).toEqual([])
+  })
+
+  it('writes one alert and one line per mind per day, naming both counts', () => {
+    const db = openDb()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    fail(db, 'omar', 'No output generated.')
+    fail(db, 'omar', 'No object generated: could not parse the response.')
+    fail(db, 'nadia', 'No output generated.')
+
+    const rows = reportDeadCalls(db)
+    expect(rows).toHaveLength(2)
+    expect(alerts(db)).toHaveLength(2)
+    expect(alerts(db).map((a) => a.kind)).toEqual(['llm_dead_calls', 'llm_dead_calls'])
+    expect(alerts(db)[1]!.detail).toContain('1 empty')
+    expect(alerts(db)[1]!.detail).toContain('1 unparseable')
+    expect(warn).toHaveBeenCalledTimes(2)
+  })
+
+  it('rides along with the spend projection, so a clean-looking burn cannot hide them', () => {
+    const db = openDb()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    seedCall(db, 1, 4)
+    fail(db, 'omar', 'No output generated.')
+
+    const r = checkSpend(db, { thresholdUsdPerSimDay: 10, windowRealMinutes: 15, now: NOW })
+    expect(r.deadCalls).toMatchObject({ calls: 1, emptyOutput: 1, unparseable: 0 })
+    expect(alerts(db)[0]!.detail).toContain('1 of 2 calls came back empty or unparseable')
+    expect(warn).toHaveBeenCalled()
   })
 })
 
