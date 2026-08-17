@@ -130,6 +130,9 @@
   /* interiors: the escape hatch is a touch target before it is a decoration */
   --interior-bar-h: 44px;
 
+  /* the bottom control bar: a fixed band, so the stage never resizes under a hover */
+  --control-bar-h: 56px;
+
   /* bitmap type: display face for identity moments, ui face for labels/controls */
   --font-display: 'Press Start 2P', 'Silkscreen', monospace;
   --font-px: 'Silkscreen', 'Press Start 2P', monospace;
@@ -151,17 +154,17 @@
 }
 
 /* every floating slab wears real 9-slice frame art; grain never bleeds past the notches */
-.timeline, .society-legend, .camera-hud, .provenance-pop, .subtitle,
+.timeline, .society-legend, .provenance-pop, .subtitle,
 .digest-modal, .veil-slab, .fps-overlay {
   border: 10px solid transparent;
   border-radius: 0;
   background-clip: padding-box;
   box-shadow: var(--ledge);
 }
-.timeline, .society-legend, .camera-hud, .provenance-pop, .fps-overlay { border-image: var(--px-cream); }
+.timeline, .society-legend, .provenance-pop, .fps-overlay { border-image: var(--px-cream); }
 .digest-modal, .veil-slab { border-width: 12px; border-image: var(--px-ceremony); }
 .subtitle { border-image: var(--px-night); }
-.timeline, .society-legend, .camera-hud, .digest-modal, .veil-slab, .provenance-pop {
+.timeline, .society-legend, .digest-modal, .veil-slab, .provenance-pop {
   background-image: var(--grain);
 }
 
@@ -301,7 +304,12 @@ body {
 .strip-gone { margin-left: 0.4rem; color: var(--ink-quiet); }
 
 .stage-row { display: flex; flex: 1; min-height: 0; }
-#stage-root { flex: 1; min-width: 0; background: var(--night); position: relative; }
+#stage-root {
+  flex: 1; min-width: 0; background: var(--night);
+  display: grid; grid-template-rows: 1fr auto; min-height: 0;
+}
+/* everything that floats over the town scopes to THIS, so the bar is never covered */
+.stage-cell { grid-row: 1; position: relative; min-height: 0; overflow: hidden; }
 
 /* the stage fills its cell; canvas is a block so no inline descender gap seeds resizeTo */
 .stage-mount { position: absolute; inset: 0; overflow: hidden; }
@@ -318,31 +326,49 @@ body {
 }
 .fps-overlay .fps-avg { font-size: 0.75rem; color: var(--ink-quiet); }
 
-/* ── camera controls: the town's viewfinder ── */
-.camera-hud {
-  position: absolute; right: 1rem; bottom: 1rem; z-index: 20;
-  display: flex; align-items: center; gap: 0.35rem;
-  background-color: var(--cream);
-  padding: 0.1rem 0.15rem;
+/* ── the bottom control bar: one control surface, not two (Task 77) ──
+   A grid ROW of the stage, never an overlay, so P19 holds by construction: nothing in it can
+   sit on top of the town. `.camera-hud` is retired into its `camera` group. */
+.control-bar {
+  grid-row: 2;
+  display: flex; align-items: stretch; gap: 0.9rem;
+  min-height: var(--control-bar-h);
+  padding: 0.3rem 0.8rem;
+  overflow-x: auto; overflow-y: hidden;
+  background: var(--cream) var(--grain);
+  border-top: 2px solid var(--ink);
+  box-shadow: 0 -4px 0 0 var(--deep);
+}
+.ctl-group { display: flex; align-items: stretch; gap: 0.25rem; }
+/* the groups read as groups: a hairline between them, never a heading nobody asked for */
+.ctl-group + .ctl-group { padding-left: 0.9rem; border-left: 2px solid var(--sand); }
+.ctl-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.1rem;
+  flex: none; min-width: 44px; min-height: 44px; padding: 0.2rem 0.35rem;
+  background: var(--parchment); color: var(--ink);
+  border: 2px solid var(--ink); border-radius: 0; cursor: pointer;
+  box-shadow: 2px 2px 0 0 var(--deep);
+}
+.ctl-btn:hover:not(:disabled) { background: var(--honey); translate: 0 -2px; box-shadow: 2px 4px 0 0 var(--deep); }
+.ctl-btn:active:not(:disabled) { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.ctl-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.ctl-btn.on { background: var(--honey); box-shadow: inset 0 0 0 2px var(--cream), 2px 2px 0 0 var(--deep); }
+.ctl-btn:disabled { color: var(--ink-quiet); background: var(--sand); cursor: not-allowed; box-shadow: none; }
+.ctl-btn:disabled .ctl-glyph { opacity: 0.45; }
+.ctl-glyph { display: block; image-rendering: pixelated; }
+.ctl-label {
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.02em; line-height: 1;
+  white-space: nowrap;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .camera-hud { animation: rise-in var(--t-med) var(--ease-enter); }
+  .ctl-btn {
+    transition-property: background-color, translate, box-shadow, color;
+    transition-duration: var(--t-fast); transition-timing-function: var(--ease-enter);
+  }
 }
-.cam-btn {
-  border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
-  color: var(--ink); font-family: var(--font-px); font-size: 0.95rem; line-height: 1;
-  min-width: 40px; min-height: 40px; cursor: pointer;
-  box-shadow: 2px 2px 0 0 var(--deep);
-  transition-property: background-color, translate, box-shadow, color;
-  transition-duration: var(--t-fast); transition-timing-function: var(--ease-enter);
-}
-.cam-btn:hover:not(:disabled) { background: var(--honey); translate: 0 -2px; box-shadow: 2px 4px 0 0 var(--deep); }
-.cam-btn:active:not(:disabled) { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
-.cam-btn:disabled { color: var(--ink-quiet); background: var(--sand); cursor: default; box-shadow: none; }
-.cam-btn.center { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0.5rem; }
-.cam-zoom {
-  min-width: 2.1rem; text-align: center;
-  font-family: var(--font-px); font-size: 0.875rem;
+/* a narrow stage keeps the buttons and drops the words — the label is still spoken */
+@media (max-width: 1100px) {
+  .ctl-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 
 /* ── slide-over panel: parchment slab sliding in from the frame edge ── */

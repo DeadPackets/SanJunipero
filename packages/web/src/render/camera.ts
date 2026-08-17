@@ -207,8 +207,15 @@ export function clampCamera(
   }
 }
 
-/** The breathing room a fitted view keeps on every side. */
-export const FIT_MARGIN_PX = 48
+/**
+ * The breathing room a fitted view keeps on every side.
+ *
+ * WHAT THE BROWSER CAUGHT: task 77's bar takes 56 px off the bottom of the stage, and at 48
+ * the fit fell a WHOLE STOP — the town went back to the small overview R8 is about, with
+ * 62 px of the stage left unused. 24 px is a real edge on a subject 376 px tall; 48 was a
+ * margin that cost more than it bought.
+ */
+export const FIT_MARGIN_PX = 24
 
 /** The largest stop at which `bounds` fits inside the stage with a margin — the overview
  *  control, and the first frame. Falls to the smallest stop when nothing fits. */

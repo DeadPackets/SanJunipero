@@ -17,7 +17,10 @@ import { DigestModal } from './ui/DigestModal.js'
 import { StageVeil } from './ui/StageVeil.js'
 import { InteriorBar } from './ui/InteriorBar.js'
 import { LensTabs, StatusStrip } from './ui/StatusStrip.js'
-import { CameraHud } from './ui/CameraHud.js'
+import { ControlBar } from './ui/ControlBarView.js'
+import { controlItems, type ControlAction } from './ui/controlBar.js'
+import { stepZoom } from './render/cameraNav.js'
+import type { ZoomStop } from './render/camera.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { LAST_SEEN_KEY } from './net/socket.js'
 import { Timeline } from './ui/Timeline.js'
@@ -64,6 +67,9 @@ export function App() {
   const [insideId, setInsideId] = useState<string | null>(null)
   // Operator-only: absent for every viewer who did not put a token in this session.
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStorage))
+  // what the bottom bar reads: the camera's own stop, and whether the chrome is put away
+  const [zoomStop, setZoomStop] = useState<ZoomStop>(1)
+  const [hudHidden, setHudHidden] = useState(false)
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -155,6 +161,44 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [route])
 
+  const live = useSyncExternalStore(store.subscribe, () => store.getMode().live)
+
+  // A viewer who puts the controls away must always be able to get them back: `H` toggles
+  // from anywhere, so hiding is never a trap. Task 78 adds the pointer's way back.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'h' && e.key !== 'H') return
+      if (e.altKey || e.ctrlKey || e.metaKey) return
+      const t = e.target as HTMLElement | null
+      if (t !== null && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
+      if (t?.isContentEditable === true) return
+      e.preventDefault()
+      setHudHidden((v) => !v)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // the bar mirrors the camera's rest stop; the camera owns the truth, this follows it
+  useEffect(() => {
+    if (scene === null) return
+    setZoomStop(scene.getZoomStop())
+    return scene.onCamera(() => setZoomStop(scene.getZoomStop()))
+  }, [scene])
+
+  // ONE place where a control becomes a thing that happens. The bar has no logic of its own.
+  const onControl = (a: ControlAction): void => {
+    switch (a.kind) {
+      case 'lens': nav(a.lens); return
+      case 'zoom': scene?.setZoom(stepZoom(scene.getZoomStop(), a.dir)); return
+      case 'fit': scene?.fitToTown(); return
+      case 'live': sockRef.current?.goLive(); return
+      case 'follow': scene?.setFollow(null); return
+      case 'exit-interior': scene?.interior?.setActive(null); return
+      case 'hud': setHudHidden(a.op === 'hide'); return
+    }
+  }
+
   // the bonds graph replaces the canvas; pause the Pixi ticker while hidden (60fps budget honesty)
   useEffect(() => {
     if (scene === null) return
@@ -193,6 +237,7 @@ export function App() {
       <StatusStrip store={store} />
       <div className="stage-row">
         <main id="stage-root" className={route.lens === 'society' ? 'stage-hidden' : undefined}>
+          <div className="stage-cell">
           <StageMount store={store} onScene={setScene} onInterior={setInsideId} />
           <StageVeil store={store} />
           <InteriorBar
@@ -201,7 +246,6 @@ export function App() {
             onBack={() => scene?.interior?.setActive(null)}
           />
           <ScrubBanner store={store} />
-          {(route.lens === 'map' || route.lens === 'inspector') && <CameraHud scene={scene} />}
           <FpsOverlay />
           {route.lens === 'chronicle' && <Timeline store={store} handle={handle} onView={onView} />}
           {route.lens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
@@ -210,6 +254,15 @@ export function App() {
           )}
           {route.lens === 'director' && (
             <MomentsLens store={store} handle={handle} momentId={route.momentId} onOpen={openMoment} />
+          )}
+          </div>
+          {!hudHidden && (
+            <ControlBar
+              items={controlItems({
+                lens: route.lens, live, zoom: zoomStop, following: null, insideId, hudHidden,
+              })}
+              onAction={onControl}
+            />
           )}
         </main>
         <aside
