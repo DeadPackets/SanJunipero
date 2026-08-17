@@ -5,6 +5,17 @@ export const DAYS_PER_YEAR = 364
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const
 export type Season = (typeof SEASONS)[number]
 
+export type DayPhase = 'day' | 'dusk' | 'night'
+
+// The only phase derivation in the codebase (C11 G4). `SimTime.isNight` is C1's two-way
+// clock and every landed caller keeps it — the two disagree at dusk on purpose.
+export function dayPhaseFromTick(tick: number): DayPhase {
+  const hour = Math.floor((tick % MINUTES_PER_DAY) / 60)
+  if (hour >= 21 || hour < 5) return 'night'
+  if (hour === 5 || hour === 6 || hour === 19 || hour === 20) return 'dusk'
+  return 'day'
+}
+
 export type SimTime = {
   tick: number; year: number; season: Season; dayOfSeason: number
   dayOfYear: number; hour: number; minute: number; isNight: boolean
