@@ -140,7 +140,7 @@ describe('verb: build reads structures.recipes', () => {
   it('one stone short is one stone short, by the name of the material', () => {
     const r = submitIntent(withStone(WELL.inputs.stone! - 1), CFG, 'a1', 'build', { kind: 'well', x: 1, y: 1 })
     expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toBe('not enough stone')
+    if (!r.ok) expect(r.reason).toMatch(/^not enough stone — /)
   })
 
   it('refuses a grave: an empty recipe marks what the world places and nobody builds', () => {

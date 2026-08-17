@@ -58,7 +58,11 @@ function adjacentLivingTarget(
   if (!target || !target.alive) return reasons.gone
   if (reasons.busy !== undefined && target.activity) return reasons.busy
   const a = state.agents[agentId]!
-  if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return reasons.far
+  // A refusal must leave a door open (addendum §9): the one thing missing is two paces, so
+  // the answer says which two. Zero tends and one give across five live runs (C11 R21).
+  if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) {
+    return `${reasons.far} — they are at (${target.x}, ${target.y})`
+  }
   return null
 }
 
@@ -239,7 +243,10 @@ const eat: VerbDef = makeVerb({
     const p = EatParams.safeParse(params)
     if (!p.success) return 'eat needs an {itemId}'
     const item = state.items[p.data.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (!item) return 'not holding that'
+    // The founders' bread wakes up on a shelf and their hands wake up empty, so the whole of
+    // the first breakfast is this one missing sentence (C11 R21).
+    if (item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that — take it into your hands first'
     if (!isFoodKind(config, item.kind)) return `${item.kind} is not food`
     return null
   },
@@ -505,7 +512,7 @@ const stoke: VerbDef = makeVerb({
     if (!s || !HEAT_SOURCE_KINDS.has(s.kind)) return 'there is no fire there to feed'
     if (s.stage !== 'complete') return 'it is not finished'
     if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to the fire'
-    if (heldQty(state, agentId, FUEL_KIND) < 1) return `not enough ${FUEL_KIND}`
+    if (heldQty(state, agentId, FUEL_KIND) < 1) return shortOf(FUEL_KIND)
     return null
   },
   onComplete(state, config, agentId, params) {
@@ -791,7 +798,9 @@ const forage: VerbDef = makeVerb({
       const node = state.forageables?.[p.data.nodeId]
       if (!node) return 'nothing of the kind there'
       if (node.stock <= 0) return 'there is nothing left to take here'
-      if (!withinReach(state, agentId, node.x, node.y)) return 'not close enough to gather'
+      if (!withinReach(state, agentId, node.x, node.y)) {
+        return `not close enough to gather — the patch is at (${node.x}, ${node.y}); stand beside it`
+      }
       return null
     }
     const a = state.agents[agentId]!
@@ -800,7 +809,7 @@ const forage: VerbDef = makeVerb({
         if (tileAt(state, a.x + dx, a.y + dy) === 3) return null
       }
     }
-    return 'no forest nearby'
+    return 'no forest nearby — berries, mushrooms and herbs grow in patches, and a patch is gathered by name once you can see one'
   },
   onComplete(state, config, agentId, params) {
     const p = ForageParams.parse(params)
@@ -937,7 +946,7 @@ function footprintRefusal(
   state: WorldState, config: SimConfig, agentId: string, d: BuildSite, w: number, h: number,
 ): string | null {
   const recipe = buildableRecipe(config, d.kind)!
-  if (!nearRect(state, agentId, d.x, d.y, w, h)) return 'not close enough to build'
+  if (!nearRect(state, agentId, d.x, d.y, w, h)) return `not close enough to build — stand within reach of (${d.x}, ${d.y})`
   const site = siteAt(state, d.x, d.y)
   if (site && site.kind === d.kind) return null // resume: materials already spent
   for (const s of Object.values(state.structures)) {
@@ -951,7 +960,7 @@ function footprintRefusal(
     if (a.alive && a.x >= d.x && a.x < d.x + w && a.y >= d.y && a.y < d.y + h) return 'someone is in the way'
   }
   for (const [kind, qty] of Object.entries(recipe.inputs)) {
-    if (heldQty(state, agentId, kind) < qty) return `not enough ${kind}`
+    if (heldQty(state, agentId, kind) < qty) return shortOf(kind)
   }
   return null
 }
@@ -1096,10 +1105,31 @@ function keptFireInReach(state: WorldState, agentId: string): boolean {
   return false
 }
 
+// Where a material comes from, for the refusal that says a pair of hands is short of one.
+// The emergence law's first lever is refusal prose that teaches a path, and the live gate
+// answered "not enough meat" to a town that had never seen an animal (C11 R21).
+const MATERIAL_SOURCE: Readonly<Record<string, string>> = {
+  meat: 'meat comes off an animal you have hunted, or a fish out of the water',
+  vegetables: 'a vegetable comes from a berry patch, a mushroom ground or a field you have harvested',
+  fiber: 'fiber comes from cutting the reeds where the bank is wet',
+  cloth: 'cloth is woven from fiber',
+  hide: 'a hide comes off an animal you have killed',
+  wood: 'wood comes from felling a tree',
+  plank: 'planks are cut from wood',
+  stone: 'stone comes from the loose rock at the foot of an outcrop',
+  clay: 'clay comes from a bank where the ground has slumped',
+}
+
+export function shortOf(kind: string): string {
+  const name = inputName(kind)
+  const source = MATERIAL_SOURCE[name]
+  return source === undefined ? `not enough ${name}` : `not enough ${name} — ${source}`
+}
+
 // What stands between these hands and this recipe right now, or null when nothing does.
 function craftRefusal(state: WorldState, agentId: string, recipe: SeedRecipe): string | null {
   for (const [kind, qty] of Object.entries(recipe.inputs)) {
-    if (heldForInput(state, agentId, kind) < qty) return `not enough ${inputName(kind)}`
+    if (heldForInput(state, agentId, kind) < qty) return shortOf(kind)
   }
   if (recipe.atFire && !keptFireInReach(state, agentId)) return 'there is no fire lit here to cook on'
   if (recipe.water !== undefined && heldWater(state, agentId) === undefined) return 'you have no water to cook with'
@@ -1202,7 +1232,7 @@ const pave: VerbDef = makeVerb({
     const tile = tileAt(state, p.data.x, p.data.y)
     if (tile === null || !PAVEABLE.has(tile)) return 'nothing to pave here'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to pave'
-    if (heldQty(state, agentId, STONE_KIND) < config.roads.stonePerTile) return 'not enough stone'
+    if (heldQty(state, agentId, STONE_KIND) < config.roads.stonePerTile) return shortOf(STONE_KIND)
     return null
   },
   onComplete(state, config, agentId, params) {

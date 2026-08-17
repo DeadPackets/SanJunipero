@@ -107,7 +107,7 @@ describe('stoke: a fire is warm for as long as somebody feeds it', () => {
   it('refuses with no wood, at a distance, and at something that is not a fire', () => {
     const empty = submitIntent(withPit(), CFG, 'a1', 'stoke', { structureId: 'structure_1' })
     expect(empty.ok).toBe(false)
-    if (!empty.ok) expect(empty.reason).toBe('not enough wood')
+    if (!empty.ok) expect(empty.reason).toMatch(/^not enough wood — /)
 
     const far = holding(withPit(), 'item_1', 'wood')
     const away = { ...far, agents: { ...far.agents, a1: { ...far.agents.a1!, x: 0, y: 0 } } }

@@ -245,7 +245,7 @@ describe('G11a-W4: pave converts and consumes, and the costs are ordered', () =>
     const spent = doVerb(out.state, CFG, 110, 'mason', 'pave', { x: 6, y: 6 })
     expect(spent.refusal).toBeNull()
     expect(spent.state.items.item_stone).toBeUndefined()
-    expect(doVerb(spent.state, CFG, 120, 'mason', 'pave', { x: 5, y: 6 }).refusal).toBe('not enough stone')
+    expect(doVerb(spent.state, CFG, 120, 'mason', 'pave', { x: 5, y: 6 }).refusal).toMatch(/^not enough stone — /)
   })
 
   it('grass costs more than a worn path, and a worn path more than a road', () => {

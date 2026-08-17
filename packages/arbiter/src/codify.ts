@@ -1,4 +1,4 @@
-import { crafterStamp, RECIPE_TILE_IDS, registerVerb, skillLevel, VERBS } from '@sj/engine'
+import { crafterStamp, RECIPE_TILE_IDS, registerVerb, shortOf, skillLevel, VERBS } from '@sj/engine'
 import type { PendingEvent, Structure, VerbDef, WorldState } from '@sj/engine'
 import type { SimConfig } from '@sj/shared'
 import type { CodexStore } from './codex.js'
@@ -100,7 +100,7 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
     kind: recipe.id,
     validate(state, _config, agentId) {
       for (const cost of recipe.costs) {
-        if (heldQty(state, agentId, cost.kind) < cost.qty) return `not enough ${cost.kind}`
+        if (heldQty(state, agentId, cost.kind) < cost.qty) return shortOf(cost.kind)
       }
       for (const req of recipe.requires) {
         switch (req.type) {

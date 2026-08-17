@@ -63,7 +63,8 @@ describe('verb: give', () => {
   it('rejects non-adjacent target, self, missing target, and unheld items', () => {
     const far = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 5, y: 5 }])
     let s = fold(far, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' } }), CFG)
-    expect(submitIntent(s, CFG, 'a1', 'give', { itemId: 'item_1', targetId: 'a2' })).toEqual({ ok: false, reason: 'not adjacent to give' })
+    expect(submitIntent(s, CFG, 'a1', 'give', { itemId: 'item_1', targetId: 'a2' }))
+      .toMatchObject({ ok: false, reason: expect.stringMatching(/^not adjacent to give — they are at \(/) })
     expect(submitIntent(makeWorld(), CFG, 'a1', 'give', { itemId: 'item_1', targetId: 'a1' })).toEqual({ ok: false, reason: 'cannot give to yourself' })
     expect(submitIntent(makeWorld(), CFG, 'a1', 'give', { itemId: 'item_1', targetId: 'ghost' })).toEqual({ ok: false, reason: 'no one there to receive' })
     expect(submitIntent(makeWorld(), CFG, 'a1', 'give', { itemId: 'nope', targetId: 'a2' })).toEqual({ ok: false, reason: 'not holding that' })
@@ -173,7 +174,8 @@ describe('verb: teach', () => {
     const s = patchAgent(makeWorld(), 'a1', { skills: { farming: 100 } })
     expect(submitIntent(s, CFG, 'a1', 'teach', { targetId: 'a1', track: 'farming' })).toEqual({ ok: false, reason: 'cannot teach yourself' })
     const far = patchAgent(makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 5, y: 5 }]), 'a1', { skills: { farming: 100 } })
-    expect(submitIntent(far, CFG, 'a1', 'teach', { targetId: 'a2', track: 'farming' })).toEqual({ ok: false, reason: 'not adjacent to teach' })
+    expect(submitIntent(far, CFG, 'a1', 'teach', { targetId: 'a2', track: 'farming' }))
+      .toMatchObject({ ok: false, reason: expect.stringMatching(/^not adjacent to teach — they are at \(/) })
     const busy = applyAll(s, [{ type: 'action_started', payload: { agentId: 'a2', verb: 'walk', params: { x: 2, y: 0 }, duration: 3 } }])
     expect(submitIntent(busy, CFG, 'a1', 'teach', { targetId: 'a2', track: 'farming' })).toEqual({ ok: false, reason: 'they are busy' })
   })
@@ -233,7 +235,8 @@ describe('verb: attack', () => {
     expect(submitIntent(s, CFG, 'a1', 'attack', { targetId: 'a1' })).toEqual({ ok: false, reason: 'cannot attack yourself' })
     expect(submitIntent(s, CFG, 'a1', 'attack', { targetId: 'ghost' })).toEqual({ ok: false, reason: 'no one there to attack' })
     const far = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 5, y: 5 }])
-    expect(submitIntent(far, CFG, 'a1', 'attack', { targetId: 'a2' })).toEqual({ ok: false, reason: 'not adjacent to attack' })
+    expect(submitIntent(far, CFG, 'a1', 'attack', { targetId: 'a2' }))
+      .toMatchObject({ ok: false, reason: expect.stringMatching(/^not adjacent to attack — they are at \(/) })
   })
 
   it('seeded outcome runs both directions: attacker wins (c1) and loses (c6)', () => {

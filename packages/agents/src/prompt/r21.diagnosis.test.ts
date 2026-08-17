@@ -236,13 +236,17 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     const p = composePerception(s, CFG, 'amara', [])
     expect(p.self.inventory).toHaveLength(0)
     // Six things, all of them on the hut's shelf; the doorway peek shows them and the hands
-    // hold none of them. `eat` answers "not holding that" and the road there is never named.
+    // hold none of them. R21-D: `eat` used to answer "not holding that" and stop there.
     expect(p.visible.items).toHaveLength(6)
     const bread = p.visible.items.find((i) => i.kind === 'bread')!
     expect(submitIntent(s, CFG, 'amara', 'eat', { itemId: bread.id })).toEqual(
-      { ok: false, reason: 'not holding that' },
+      { ok: false, reason: 'not holding that — take it into your hands first' },
     )
     expect(submitIntent(s, CFG, 'amara', 'take', { itemId: bread.id }).ok).toBe(true)
+    // A mark for nothing that exists still says only that the hands are empty.
+    expect(submitIntent(s, CFG, 'amara', 'eat', { itemId: 'item_nowhere' })).toEqual(
+      { ok: false, reason: 'not holding that' },
+    )
   })
 
   it('the makeable vocabulary is never spoken: seven nouns the world knows and no mind is given', () => {
@@ -274,48 +278,57 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
   })
 })
 
-// ------------------------------------------------- candidate 3: the refusals. CONFIRMED.
+// ------------------------------------------------- candidate 3: the refusals. CONFIRMED, FIXED.
 
-describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED', () => {
+describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21-D answers it', () => {
   // Every designed survival-social overlap, asked from a founder's own doorway on the first
-  // morning, and what the world says back. Only one of these leaves a door open.
-  const EXPECTED: ReadonlyArray<[string, Record<string, unknown>, string]> = [
-    ['forage', {}, 'no forest nearby'],
-    ['hunt', {}, 'hunt needs a {faunaId}'],
-    ['fish', { x: 62, y: 62 }, 'no water there'],
-    ['craft', { recipe: 'stew' }, 'not enough meat'],
-    ['craft', { recipe: 'garment' }, 'not enough cloth'],
-    ['build', { kind: 'hut', x: 66, y: 66 }, 'not close enough to build'],
-    ['tend', { targetId: 'yusuf' }, 'not adjacent to the patient'],
-    ['douse', { x: 62, y: 62 }, 'nothing is burning there'],
-    ['pave', { x: 62, y: 63 }, 'not enough stone'],
+  // morning. The left column is what the world used to say and stop; the right is the door
+  // the same refusal now leaves open (addendum §9).
+  const NOW: ReadonlyArray<[string, Record<string, unknown>, string]> = [
+    ['forage', {}, 'no forest nearby — berries, mushrooms and herbs grow in patches, and a patch is gathered by name once you can see one'],
+    ['craft', { recipe: 'stew' }, 'not enough meat — meat comes off an animal you have hunted, or a fish out of the water'],
+    ['craft', { recipe: 'garment' }, 'not enough cloth — cloth is woven from fiber'],
+    ['build', { kind: 'hut', x: 66, y: 66 }, 'not close enough to build — stand within reach of (66, 66)'],
+    ['tend', { targetId: 'yusuf' }, 'not adjacent to the patient — they are at (65, 62)'],
+    ['give', { itemId: 'item_17', targetId: 'yusuf' }, 'not adjacent to give — they are at (65, 62)'],
+    ['pave', { x: 62, y: 63 }, 'not enough stone — stone comes from the loose rock at the foot of an outcrop'],
   ]
 
-  it('nine refusals, and not one of them names where to go or what to carry', () => {
+  it('every refusal that used to be a wall now names a place or a source', () => {
     const s = genesisTown()
-    for (const [verb, params, reason] of EXPECTED) {
+    for (const [verb, params, reason] of NOW) {
       expect({ verb, ...submitIntent(s, CFG, 'amara', verb, params) })
         .toEqual({ verb, ok: false, reason })
-      // A door left open would name a place, a distance, or a thing to fetch. None do.
-      expect(reason).not.toMatch(/\(\d+, ?\d+\)|steps|perhaps|try|fetch/)
+      expect(reason).toMatch(/ — /)
     }
   })
 
-  it('the one refusal that does teach is the craft the world has never heard of', () => {
+  it('the refusals that were already honest are left exactly as they were', () => {
     const s = genesisTown()
+    // Nothing to teach: the water is not here, nothing is alight, and the mark is missing.
+    for (const [verb, params, reason] of [
+      ['fish', { x: 62, y: 62 }, 'no water there'],
+      ['douse', { x: 62, y: 62 }, 'nothing is burning there'],
+      ['hunt', {}, 'hunt needs a {faunaId}'],
+    ] as ReadonlyArray<[string, Record<string, unknown>, string]>) {
+      expect(submitIntent(s, CFG, 'amara', verb, params)).toEqual({ ok: false, reason })
+    }
+    // And the one that always did leave a door open still does.
     expect(submitIntent(s, CFG, 'amara', 'craft', { recipe: 'bread' })).toEqual({
       ok: false,
       reason: 'no such recipe: bread — perhaps someone nearby knows how, or it wants discovering.',
     })
   })
 
-  it('a named node out of arm’s reach is refused without a distance or a direction', () => {
+  it('a named node out of arm\u2019s reach is now refused with the place to stand', () => {
     const s = genesisTown()
-    const bush = Object.values(s.forageables ?? {}).find((n) => n.kind === 'berry_bush')!
-    const id = Object.keys(s.forageables ?? {}).find((k) => s.forageables![k] === bush)!
-    expect(submitIntent(s, CFG, 'amara', 'forage', { nodeId: id })).toEqual(
-      { ok: false, reason: 'not close enough to gather' },
-    )
+    const id = Object.keys(s.forageables ?? {})
+      .find((k) => s.forageables![k]!.kind === 'berry_bush')!
+    const node = s.forageables![id]!
+    expect(submitIntent(s, CFG, 'amara', 'forage', { nodeId: id })).toEqual({
+      ok: false,
+      reason: `not close enough to gather — the patch is at (${node.x}, ${node.y}); stand beside it`,
+    })
   })
 })
 

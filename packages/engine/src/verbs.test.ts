@@ -273,7 +273,7 @@ describe('verb: pave', () => {
     if (!wet.ok) expect(wet.reason).toBe('nothing to pave here')
     const broke = submitIntent(quarried(['..', '..'], 0), CFG, 'a1', 'pave', { x: 1, y: 0 })
     expect(broke.ok).toBe(false)
-    if (!broke.ok) expect(broke.reason).toBe('not enough stone')
+    if (!broke.ok) expect(broke.reason).toMatch(/^not enough stone — /)
     expect(submitIntent(quarried(['....', '....']), CFG, 'a1', 'pave', { x: 3, y: 1 }).ok).toBe(false)
     expect(submitIntent(quarried(['..', '..'], 1, OFF), OFF, 'a1', 'pave', { x: 1, y: 0 }).ok).toBe(false)
   })
@@ -521,7 +521,7 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
 
     const short = submitIntent(carrying(['fiber']), CFG, 'a1', 'craft', { recipe: 'cloth' })
     expect(short.ok).toBe(false)
-    if (!short.ok) expect(short.reason).toBe('not enough fiber')
+    if (!short.ok) expect(short.reason).toMatch(/^not enough fiber — /)
   })
 
   it('a worn garment offsets the exposure band, and the packet names it without a number', () => {
@@ -795,7 +795,7 @@ describe('stew: the one recipe the world ships with', () => {
 
     const vegan = cook(kitchen({ fire: 'lit', food: ['berries', 'mushroom'] }))
     expect(vegan.ok).toBe(false)
-    if (!vegan.ok) expect(vegan.reason).toBe('not enough meat')
+    if (!vegan.ok) expect(vegan.reason).toMatch(/^not enough meat — /)
   })
 
   it('does not touch the config the world ships: the seed recipe is code, not a dial', () => {
@@ -838,7 +838,7 @@ describe('the clothing line has two upstreams: the reed bed and the deer', () =>
   it('one hide is not a garment', () => {
     const thin = make(holding('hide', 1), 'hide_garment')
     expect(thin.ok).toBe(false)
-    if (!thin.ok) expect(thin.reason).toBe('not enough hide')
+    if (!thin.ok) expect(thin.reason).toMatch(/^not enough hide — /)
   })
 
   it('asking for the thing, not the road: two hides and "craft garment" makes one', () => {
@@ -862,10 +862,10 @@ describe('the clothing line has two upstreams: the reed bed and the deer', () =>
   it('with nothing that will do it, the refusal is the one the named road gives', () => {
     const empty = make(makeWorld(), 'garment')
     expect(empty.ok).toBe(false)
-    if (!empty.ok) expect(empty.reason).toBe('not enough cloth')
+    if (!empty.ok) expect(empty.reason).toMatch(/^not enough cloth — /)
     const oneHide = make(holding('hide', 1), 'garment')
     expect(oneHide.ok).toBe(false)
-    if (!oneHide.ok) expect(oneHide.reason).toBe('not enough cloth')
+    if (!oneHide.ok) expect(oneHide.reason).toMatch(/^not enough cloth — /)
   })
 
   it('every route to a name is deterministic and named-row-first', () => {

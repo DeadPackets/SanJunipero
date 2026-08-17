@@ -101,7 +101,7 @@ describe('forage: with a node named, and without', () => {
     expect(bare).toBe('there is nothing left to take here')
     const far = VERBS.forage!.validate(
       patch('berry_bush', 3, [3, 0], ['....', 'ffff']), CFG, 'a1', { nodeId: 'node_1' })
-    expect(far).toBe('not close enough to gather')
+    expect(far).toMatch(/^not close enough to gather — the patch is at \(/)
     expect(VERBS.forage!.validate(patch('berry_bush', 3), CFG, 'a1', { nodeId: 'node_9' })).toBe('nothing of the kind there')
   })
 })

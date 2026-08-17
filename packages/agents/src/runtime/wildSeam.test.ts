@@ -117,6 +117,6 @@ describe('the wild seam — prose, intent, verb, the thing taken', () => {
     const { bridge, step } = wild()
     const blind = bridge.submit(AGENT, { verb: 'forage', params: {} })
     step()
-    expect(await blind).toEqual({ ok: false, reason: 'no forest nearby' })
+    expect(await blind).toMatchObject({ ok: false, reason: expect.stringMatching(/^no forest nearby — /) })
   })
 })
