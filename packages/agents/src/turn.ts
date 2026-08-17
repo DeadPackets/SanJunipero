@@ -9,9 +9,29 @@ export const ReconsiderAtSchema = z.union([
 ])
 export type ReconsiderAt = z.infer<typeof ReconsiderAtSchema>
 
+// Every key any registered verb reads, named. An open `z.record` says the same thing with
+// `propertyNames`, which a grammar-constrained decoder refuses outright — `Grammar error:
+// Unimplemented keys: ["propertyNames"]` — and that key will break such a provider whichever
+// one is pinned. The object stays LOOSE so a verb minted at runtime can still be handed a
+// parameter nobody has written down yet; the verb's own schema is what refuses a wrong one.
+export const IntentParamsSchema = z.looseObject({
+  x: z.number().optional(),
+  y: z.number().optional(),
+  itemId: z.string().optional(),
+  structureId: z.string().optional(),
+  targetId: z.string().optional(),
+  cropId: z.string().optional(),
+  nodeId: z.string().optional(),
+  faunaId: z.string().optional(),
+  kind: z.string().optional(),
+  recipe: z.string().optional(),
+  track: z.string().optional(),
+  text: z.string().optional(),
+  description: z.string().optional(),
+})
 export const IntentSchema = z.object({
   verb: z.string().min(1).describe('The exact word of the act, such as walk or eat.'),
-  params: z.record(z.string(), z.unknown()).default({}).describe('Exactly what the act asks for, named by its keys.'),
+  params: IntentParamsSchema.default({}).describe('Exactly what the act asks for, named by its keys.'),
 }).strict()
 export const TurnSchema = z.object({
   thought: z.string().min(1)

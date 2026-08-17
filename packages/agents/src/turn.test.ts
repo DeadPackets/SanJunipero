@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { dayPhaseFromTick, MINUTES_PER_DAY } from '@sj/shared'
-import type { z } from 'zod'
-import { FALLBACK_TURN, IntentSchema, TurnSchema, parseTurnWithRepair, reconsiderTick } from './turn.js'
+import { z } from 'zod'
+import * as engine from '@sj/engine'
+import { FALLBACK_TURN, IntentParamsSchema, IntentSchema, TurnSchema, parseTurnWithRepair, reconsiderTick } from './turn.js'
 import { FORBIDDEN_FRAMING } from './prompt/rulesOfBeing.js'
 
 const validTurn = {
@@ -54,6 +55,45 @@ describe('TurnSchema', () => {
       expect(desc).not.toMatch(FORBIDDEN_FRAMING)
     }
     expect((shape.reconsider_at as z.ZodType).description).toMatch(/\d{2}:\d{2}/)
+  })
+})
+
+// Every `*Params` schema the engine exports, which is every parameter shape a registered
+// Tier-1 verb reads. The arbiter's `ExpressiveParams` is not reachable from here — @sj/arbiter
+// depends on @sj/agents — so its single key is named explicitly below.
+const enginePlaces = Object.entries(engine as Record<string, unknown>)
+  .filter(([name]) => name.endsWith('Params'))
+  .map(([name, schema]) => [name, Object.keys((schema as z.ZodObject).shape)] as const)
+
+describe('IntentSchema.params emits a grammar a constrained decoder can compile', () => {
+  it('names every parameter every registered verb reads', () => {
+    expect(enginePlaces.length).toBeGreaterThan(20)
+    const named = new Set(Object.keys(IntentParamsSchema.shape))
+    for (const [verbSchema, keys] of enginePlaces) {
+      for (const key of keys) expect(named, `${verbSchema}.${key}`).toContain(key)
+    }
+    // @sj/arbiter's ExpressiveParams, which a coined verb is validated against.
+    expect(named).toContain('targetId')
+  })
+
+  it('carries no propertyNames key, in either direction', () => {
+    for (const io of ['input', 'output'] as const) {
+      const json = JSON.stringify(z.toJSONSchema(TurnSchema, { io, unrepresentable: 'any' }))
+      expect(json, io).not.toContain('propertyNames')
+    }
+  })
+
+  it('still carries a parameter nobody has written down yet, for a verb minted at runtime', () => {
+    const parsed = IntentSchema.parse({ verb: 'recipe:spoon', params: { whittledFrom: 'ash' } })
+    expect(parsed.params).toEqual({ whittledFrom: 'ash' })
+  })
+
+  it('keeps the params every real act passes', () => {
+    expect(IntentSchema.parse({ verb: 'walk', params: { x: 62, y: 70 } }).params).toEqual({ x: 62, y: 70 })
+    expect(IntentSchema.parse({ verb: 'give', params: { itemId: 'i1', targetId: 'omar' } }).params)
+      .toEqual({ itemId: 'i1', targetId: 'omar' })
+    expect(IntentSchema.parse({ verb: 'build', params: { kind: 'hut', x: 1, y: 2 } }).params)
+      .toEqual({ kind: 'hut', x: 1, y: 2 })
   })
 })
 
