@@ -50,6 +50,7 @@ import {
   G11ReportSchema, checkG11Report, chronicleViolations, classifyVerb, median, survivalTax,
   type G11Discretion, type G11Report,
 } from '../src/live/g11report.js'
+import { preflightRefusal, runPreflight } from '../src/live/providerPreflight.js'
 
 // The user has ratified Baidu Qianfan as the v1 provider (cleanup/c8-cost-plan.md L1).
 // OpenRouter's `provider.order` is a PREFERENCE, not an allow-list: `defaultExtraBody` sends
@@ -311,6 +312,28 @@ async function main(): Promise<void> {
   migrateArbiterTables(db)
   migrateNarratorTables(db)
   seedCodex(db)
+
+  // THE PRE-FLIGHT, BEFORE ANYTHING ELSE. Three calls on the real schema decide whether this
+  // provider can emit an act at all. The last gate spent 38 minutes and $0.76 discovering it
+  // could not; the gate does not start again without asking first.
+  const preflightLlm = makeClient(db, 'preflight')
+  const preflight = await runPreflight({
+    llm: preflightLlm, provider: PROVIDER_ORDER.join(','),
+    hardAllowList: HARD_PROVIDER_ALLOW_LIST, model: MIND_MODEL,
+    identity: MINDS[0]!.identity, personality: MINDS[0]!.personality,
+    costUsd: () => qInt(db, `SELECT COALESCE(SUM(cost_usd), 0) FROM llm_calls WHERE caller = 'preflight'`),
+    servedProviders: () => qRows<{ provider: string }>(
+      db, `SELECT DISTINCT provider FROM llm_calls WHERE caller = 'preflight' AND provider IS NOT NULL`)
+      .map((r) => r.provider),
+  })
+  console.log(`[g11] pre-flight: action ${preflight.actions}/${preflight.calls},`
+    + ` speech ${preflight.speeches}/${preflight.calls},`
+    + ` served ${preflight.servedProviders.join(',') || 'unattributed'},`
+    + ` $${preflight.costUsd.toFixed(6)}`)
+  if (!preflight.passed) {
+    console.error(preflightRefusal(preflight))
+    process.exit(3)
+  }
 
   const { terrain, events: genesisEvents } = makeGenesisWorld(config)
   const store = new EventStore(db)
@@ -834,6 +857,7 @@ async function main(): Promise<void> {
     totalTicks: TOTAL_TICKS,
     realMsPerTick: REAL_MS_PER_TICK,
     startTick: START_TICK,
+    preflight,
     opsPlane: {
       runConstructPass: 'wired',
       narrateDayWorldSeam: 'wired',

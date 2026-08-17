@@ -15,6 +15,11 @@ const PASSING: G11Report = {
   totalTicks: 2880,
   realMsPerTick: 250,
   startTick: 420,
+  preflight: {
+    provider: 'Baidu', hardAllowList: false, model: 'deepseek/deepseek-v4-flash-0731',
+    calls: 3, answered: 3, actions: 3, speeches: 2, passed: true, costUsd: 0.0009,
+    servedProviders: ['Baidu'], failures: [],
+  },
   opsPlane: {
     runConstructPass: 'wired',
     narrateDayWorldSeam: 'wired',

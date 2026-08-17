@@ -207,12 +207,29 @@ export const G11EvidenceSchema = z.object({
 }).strict()
 export type G11Evidence = z.infer<typeof G11EvidenceSchema>
 
+// The three calls the gate refused to start without. Recorded so a run can never again be
+// read without knowing whether its provider could emit an act.
+export const G11PreflightSchema = z.object({
+  provider: z.string(),
+  hardAllowList: z.boolean(),
+  model: z.string(),
+  calls: z.number().int(),
+  answered: z.number().int(),
+  actions: z.number().int(),
+  speeches: z.number().int(),
+  passed: z.boolean(),
+  costUsd: z.number(),
+  servedProviders: z.array(z.string()),
+  failures: z.array(z.string()),
+}).strict()
+
 export const G11ReportSchema = z.object({
   generatedAt: z.string(),
   model: z.string(),
   totalTicks: z.number().int(),
   realMsPerTick: z.number(),
   startTick: z.number().int(),
+  preflight: G11PreflightSchema,
   opsPlane: G11OpsPlaneSchema,
   measurements: G11MeasurementSchema,
   spend: G11SpendSchema,
