@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
+import { IntentParamsSchema } from '@sj/agents'
+import { ExpressiveParams } from './expressive.js'
 import {
   OutcomeEffectSchema,
   OutcomeTableSchema,
@@ -51,6 +54,33 @@ describe('VerdictSchema', () => {
       expect(impossible.reason).toBe('No fire is available.')
       expect(impossible.class).toBe('physically_impossible')
     }
+  })
+
+  it('emits a grammar a constrained decoder can compile: no propertyNames, in either direction', () => {
+    // The same fault C11 batch 13 cured in `IntentSchema.params`. `z.record` puts
+    // `propertyNames` in the emitted schema and a grammar compiler refuses it outright —
+    // `Grammar error: Unimplemented keys: ["propertyNames"]` — so the arbiter caller would
+    // break on the next grammar-constrained provider exactly as the turn caller did.
+    for (const io of ['input', 'output'] as const) {
+      expect(JSON.stringify(z.toJSONSchema(VerdictSchema, { io })), io).not.toContain('propertyNames')
+    }
+  })
+
+  it('names every parameter a mapped verb can be handed, and the two schemas cannot drift', () => {
+    type Branch = { properties: { kind: { const: string }; params?: { properties?: Record<string, unknown> } } }
+    const emitted = z.toJSONSchema(VerdictSchema, { io: 'input' }) as unknown as { oneOf: Branch[] }
+    const mapBranch = emitted.oneOf.find((b) => b.properties.kind.const === 'map')!
+    const named = Object.keys(mapBranch.properties.params?.properties ?? {})
+    // Everything the turn caller can name, the arbiter can map to.
+    for (const key of Object.keys(IntentParamsSchema.shape)) expect(named).toContain(key)
+    // The arbiter's own expressive verb takes `targetId`, which is in that set.
+    for (const key of Object.keys(ExpressiveParams.shape)) expect(named).toContain(key)
+  })
+
+  it('stays loose, so a verb minted at runtime can be handed a parameter nobody has written down', () => {
+    const v = VerdictSchema.parse({ kind: 'map', verb: 'express:hum', params: { whittledFrom: 'ash' } })
+    expect(v.kind).toBe('map')
+    if (v.kind === 'map') expect(v.params.whittledFrom).toBe('ash')
   })
 
   it('rejects an extra key via strict', () => {

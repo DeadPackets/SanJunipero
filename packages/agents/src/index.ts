@@ -1,4 +1,4 @@
-export { IntentSchema, TurnSchema, FALLBACK_TURN, parseTurnWithRepair, reconsiderTick, type Turn } from './turn.js'
+export { IntentParamsSchema, IntentSchema, TurnSchema, FALLBACK_TURN, parseTurnWithRepair, reconsiderTick, type Turn } from './turn.js'
 export {
   assertNoGlassLeak,
   assertQuotedName,

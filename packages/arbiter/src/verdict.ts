@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { IntentParamsSchema } from '@sj/agents'
 
 // Magnitude caps: an out-of-range LLM verdict fails schema parse and flows
 // through the existing invalid-verdict path instead of entering the world.
@@ -44,8 +45,13 @@ export type Recipe = z.infer<typeof RecipeSchema>
 
 export const ImpossibleClassSchema = z.enum(['physically_impossible', 'beyond_adjacency', 'insufficient_skill', 'insufficient_materials'])
 
+// `params` names its keys and does not use `z.record`, which emits `propertyNames` — the key
+// a grammar-constrained decoder refuses outright. It is the turn caller's own params shape, so
+// what a mind can ask for and what the arbiter can map it to cannot drift apart, and it stays
+// LOOSE for the same reason: a verb minted at runtime may take a parameter nobody has written
+// down yet, and the verb's own schema is what refuses a wrong one.
 export const VerdictSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('map'), verb: z.string().min(1), params: z.record(z.string(), z.unknown()) }).strict(),
+  z.object({ kind: z.literal('map'), verb: z.string().min(1), params: IntentParamsSchema }).strict(),
   z.object({ kind: z.literal('attempt'), recipe: RecipeSchema, summary: z.string().min(1) }).strict(),
   z.object({ kind: z.literal('impossible'), reason: z.string().min(1), class: ImpossibleClassSchema }).strict(),
 ])
