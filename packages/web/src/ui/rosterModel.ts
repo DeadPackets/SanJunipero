@@ -1,13 +1,16 @@
 import type { WorldState } from '@sj/engine/state'
 import type { AssetRecord } from '@sj/shared'
 import { characterArt } from '../render/textures.js'
+import { conditionsOf, stateWord, type Condition } from './status.js'
 
 export type RosterRow = {
   id: string
   name: string
   band: 'young' | 'grown' | 'elder'
-  asleep: boolean
-  doing: string
+  /** exactly ONE word for what they are doing (task 79) — never a second badge beside it */
+  state: string
+  /** zero or more, from a vocabulary disjoint from the state's (task 79) */
+  conditions: Condition[]
 }
 
 const band = (ageDays: number): RosterRow['band'] => {
@@ -15,10 +18,9 @@ const band = (ageDays: number): RosterRow['band'] => {
   return years < 18 ? 'young' : years < 60 ? 'grown' : 'elder'
 }
 
-// t7 gerund ruling: drop a trailing 'e', append 'ing'; no other morphology
-const gerund = (verb: string): string => `${verb.endsWith('e') ? verb.slice(0, -1) : verb}ing`
-
-export function rosterRows(state: WorldState | null): { alive: RosterRow[]; gone: number } {
+export function rosterRows(
+  state: WorldState | null, nowTick?: number,
+): { alive: RosterRow[]; gone: number } {
   if (state === null) return { alive: [], gone: 0 }
   const alive: RosterRow[] = []
   let gone = 0
@@ -28,8 +30,8 @@ export function rosterRows(state: WorldState | null): { alive: RosterRow[]; gone
       continue
     }
     alive.push({
-      id: a.id, name: a.name, band: band(a.ageDays), asleep: a.asleep,
-      doing: a.activity !== null ? gerund(a.activity.verb) : 'resting',
+      id: a.id, name: a.name, band: band(a.ageDays),
+      state: stateWord(a, nowTick), conditions: conditionsOf(a),
     })
   }
   alive.sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : x.id < y.id ? -1 : 1))

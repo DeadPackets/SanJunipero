@@ -4,6 +4,7 @@ import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
 import { resolveAssetId } from '../render/textures.js'
 import { bustStyle } from './rosterModel.js'
+import { CONDITION_WORD, conditionsOf, stateWord } from './status.js'
 import { diffLines } from './diffLines.js'
 
 export const TAB_CACHE_MS = 30_000
@@ -150,10 +151,15 @@ export function InspectorPanel(
         )}
         <div>
           <h2 className="px-title">{a.name}</h2>
+          {/* ONE state and its conditions, from the one vocabulary (task 79). This badge row
+              used to carry "asleep"/"awake"/"at rest forever" beside a separate unwell chip —
+              three words for one fact and a synonym pair among them. */}
           <div className="badges">
             <span className="badge">{ageBand(a.ageDays)}</span>
-            <span className="badge">{a.alive ? (a.asleep ? 'asleep' : 'awake') : 'at rest forever'}</span>
-            {a.ill && <span className="badge ill">unwell</span>}
+            <span className="badge">{stateWord(a, tick)}</span>
+            {conditionsOf(a).map((c) => (
+              <span key={c} className={c === 'unwell' ? 'badge ill' : 'badge'}>{CONDITION_WORD[c]}</span>
+            ))}
           </div>
         </div>
         <button
@@ -184,7 +190,11 @@ export function InspectorPanel(
 
       <section className="block">
         <h3>Doing</h3>
-        <p>{a.activity !== null ? `${a.activity.verb} — ${a.activity.ticksRemaining} min to go` : 'resting'}</p>
+        <p>
+          {a.activity !== null
+            ? `${stateWord(a, tick)} — ${a.activity.ticksRemaining} min to go`
+            : stateWord(a, tick)}
+        </p>
       </section>
 
       <section className="block">

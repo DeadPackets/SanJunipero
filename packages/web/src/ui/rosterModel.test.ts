@@ -12,7 +12,7 @@ const agent = (over: Record<string, unknown>) => ({
 const state = (agents: Record<string, unknown>): WorldState => ({ agents } as unknown as WorldState)
 
 describe('rosterRows', () => {
-  it('maps bands, sleep, and gerund doing; sorts by name; counts the dead', () => {
+  it('maps bands and ONE state word; sorts by name; counts the dead', () => {
     const s = state({
       omar: agent({ id: 'omar', name: 'Omar', ageDays: 24 * 364, activity: { verb: 'walk', ticksRemaining: 3 } }),
       yusuf: agent({ id: 'yusuf', name: 'Yusuf', ageDays: 65 * 364, asleep: true, activity: { verb: 'sleep', ticksRemaining: 9 } }),
@@ -22,8 +22,9 @@ describe('rosterRows', () => {
     const { alive, gone } = rosterRows(s)
     expect(alive.map((r) => r.name)).toEqual(['Bud', 'Omar', 'Yusuf'])
     expect(alive.map((r) => r.band)).toEqual(['young', 'grown', 'elder'])
-    expect(alive.map((r) => r.doing)).toEqual(['resting', 'walking', 'sleeping'])
-    expect(alive[2]?.asleep).toBe(true)
+    // one word each, and the sleeper's is `Asleep` alone — never `Asleep` plus `sleeping`
+    expect(alive.map((r) => r.state)).toEqual(['Between things', 'Walking', 'Asleep'])
+    expect(alive.every((r) => r.conditions.length === 0)).toBe(true)
     expect(gone).toBe(1)
   })
 
