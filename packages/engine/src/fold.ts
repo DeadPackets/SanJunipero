@@ -20,6 +20,7 @@ import {
   WorldGrown,
 } from './events.def.js'
 import { countsAsFootfall, decayTraffic, fromTrafficKey, quietPathsAt, trafficKey } from './systems/desirePaths.js'
+import { fromSaplingKey, saplingKey } from './systems/regrowth.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { occupantsOf } from './interiors.js'
 import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
@@ -28,6 +29,10 @@ import { findPath } from './path.js'
 import { WalkParams } from './verbs.js'
 
 const clamp = (v: number) => Math.max(0, Math.min(100, v))
+
+// The sapling tile id, named here because the fold is the only place outside the regrowth
+// system that has to recognise one.
+const SAPLING_TILE = 9
 
 // Counter law: entity-creating events carry their id; the counter only ever rises.
 function bumpCounter(counters: WorldState['counters'], id: string): WorldState['counters'] {
@@ -719,7 +724,13 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (state.forageables?.[p.id]) throw new Error(`forageable_spawned for existing node ${p.id}`)
       return {
         ...state,
-        forageables: { ...state.forageables, [p.id]: { kind: p.kind, x: p.x, y: p.y, stock: p.stock } },
+        forageables: {
+          ...state.forageables,
+          [p.id]: {
+            kind: p.kind, x: p.x, y: p.y, stock: p.stock,
+            ...(p.fullStock === undefined ? {} : { fullStock: p.fullStock }),
+          },
+        },
         counters: bumpCounter(state.counters, p.id),
       }
     }
@@ -748,7 +759,17 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (!row || p.x < 0 || p.x >= row.length) throw new Error(`tile_changed out of bounds (${p.x}, ${p.y})`)
       if (row[p.x] !== p.from) throw new Error(`tile_changed from-mismatch at (${p.x}, ${p.y})`)
       const terrain = state.terrain.map((r, y) => (y === p.y ? r.map((t, x) => (x === p.x ? (p.to as TileId) : t)) : r))
-      return { ...state, terrain }
+      // The maturity clock is stamped where the seed fell and dropped however the sapling
+      // leaves — grown, chopped, paved or tilled. Nothing else is stored about it (G2, G4).
+      if (p.from !== SAPLING_TILE && p.to !== SAPLING_TILE) return { ...state, terrain }
+      const key = saplingKey(p.x, p.y)
+      const saplings = { ...state.saplings }
+      if (p.to === SAPLING_TILE) saplings[key] = Math.floor(event.tick / MINUTES_PER_DAY)
+      else delete saplings[key]
+      const next: WorldState = { ...state, terrain }
+      if (Object.keys(saplings).length > 0) next.saplings = saplings
+      else delete next.saplings
+      return next
     }
     // Growing north or west moves the origin, so every stored coordinate moves with it —
     // inside this one fold, or a replay would find the town standing beside itself.
@@ -808,14 +829,20 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
         Object.entries(state.fauna).map(([id, f]) => [id, { ...f, x: f.x + dx, y: f.y + dy }]))
       const forageables = state.forageables === undefined ? undefined : Object.fromEntries(
         Object.entries(state.forageables).map(([id, f]) => [id, { ...f, x: f.x + dx, y: f.y + dy }]))
-      // Task 28 adds saplings; they are stamped by coordinate and must be translated here
-      // too, in this same fold.
+      // Saplings are stamped by coordinate, so they move with everything else — in this same
+      // fold, or a replay would find the wood growing back in the wrong place.
+      const shiftSaplings = (m: Record<string, number>): Record<string, number> =>
+        Object.fromEntries(Object.entries(m).map(([k, v]) => {
+          const at = fromSaplingKey(k)
+          return [saplingKey(at.x + dx, at.y + dy), v]
+        }))
       return {
         ...state, terrain, growths, agents, structures, items, crops,
         ...(fauna === undefined ? {} : { fauna }),
         ...(forageables === undefined ? {} : { forageables }),
         ...(state.traffic === undefined ? {} : { traffic: shiftKeys(state.traffic) }),
         ...(state.quietSince === undefined ? {} : { quietSince: shiftKeys(state.quietSince) }),
+        ...(state.saplings === undefined ? {} : { saplings: shiftSaplings(state.saplings) }),
       }
     }
     // One night's worth of grass growing back through the ruts, and a fresh stamp on every

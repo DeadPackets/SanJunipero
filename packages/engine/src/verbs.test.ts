@@ -34,7 +34,7 @@ const testVerb: VerbDef = {
 
 const TIER1 = [
   'walk', 'sleep', 'wake', 'enter', 'exit', 'eat', 'tend', 'till', 'plant', 'harvest', 'fish', 'forage',
-  'build', 'craft', 'extinguish', 'drink', 'fill', 'dig_channel', 'douse', 'pave', 'hunt', 'wear', 'doff', 'kindle', 'snuff', 'stoke',
+  'build', 'craft', 'extinguish', 'drink', 'fill', 'dig_channel', 'douse', 'pave', 'hunt', 'wear', 'doff', 'kindle', 'snuff', 'stoke', 'chop',
   'speak', 'give', 'take', 'stow', 'write', 'read', 'inscribe', 'teach', 'attack', 'experiment',
 ]
 

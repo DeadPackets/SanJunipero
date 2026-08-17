@@ -84,7 +84,10 @@ export type Fauna = { kind: FaunaKind; x: number; y: number; alive: boolean; sto
 
 // A standing thing worth working: a bush, a patch, a bank of clay. Stripped it stays where it
 // is at zero — a bare bush is still a bush, and the ground remembers where to put the berries back.
-export type Forageable = { kind: ForageableKind; x: number; y: number; stock: number }
+// `fullStock` is the abundance the world authored for this node — what the ground climbs back
+// toward, season by season. Absent on a node from a log that predates the ceiling, which keeps
+// the old behaviour of crawling back to one.
+export type Forageable = { kind: ForageableKind; x: number; y: number; stock: number; fullStock?: number }
 
 export type WorldState = {
   tick: number
@@ -108,6 +111,9 @@ export type WorldState = {
   traffic?: Record<string, number>
   // The day each standing trail went quiet; absent while every trail is still in use.
   quietSince?: Record<string, number>
+  // The day each standing sapling was seeded, keyed "x,y" — the maturity clock, sparse and
+  // dropped the moment the tile stops being a sapling, so a grown wood hashes like an old one.
+  saplings?: Record<string, number>
   // The herd, the warren and the schools. Absent until the genesis scatter or the first dawn
   // that spawns one, and absent again when the last body is taken.
   fauna?: Record<string, Fauna>

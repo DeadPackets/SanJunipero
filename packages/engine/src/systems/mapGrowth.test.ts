@@ -13,6 +13,8 @@ const SIZE = 32
 const base = (over: Record<string, unknown> = {}): SimConfig => SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
   mystery: { chancePerDay: 0 },
+  // Nothing else may write terrain at midnight: from C11 Task 28 the wood seeds itself there.
+  regrowth: { enabled: false },
   mapGrowth: { structuresPerStep: 2, step: 4, maxSize: 40 },
   ...over,
 })

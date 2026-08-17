@@ -7,6 +7,7 @@ import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
 import { warmthSystem } from './systems/warmth.js'
 import { lightingSystem } from './systems/lighting.js'
+import { regrowthSystem } from './systems/regrowth.js'
 import { healthSystem } from './systems/health.js'
 import { deathAttribution, escalateFatigue, mortalitySystem, placeGrave } from './systems/mortality.js'
 import { illnessSystem } from './systems/illness.js'
@@ -106,7 +107,8 @@ function collapseDeathSystem(ctx: TickCtx): void {
 // position may have moved, and a system holding a pre-growth position would act on the wrong tile.
 const SYSTEMS: System[] = [
   weatherSystem, mysterySystem, mapGrowthSystem, fireSystem, cropsSystem, wildlifeSystem, faunaSystem, forageSystem, spoilageSystem, lightingSystem,
-  needsSystem, warmthSystem, thirstSystem, healthSystem, mortalitySystem, illnessSystem, desirePathsSystem,
+  needsSystem, warmthSystem, thirstSystem, healthSystem, mortalitySystem, illnessSystem,
+  desirePathsSystem, regrowthSystem,
   reproductionSystem, agingSystem, actionsSystem,
   collapseDeathSystem,
 ]

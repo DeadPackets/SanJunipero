@@ -178,9 +178,12 @@ export const FaunaKilled = z.object({
 const ForageableKindSchema = z.enum([
   'berry_bush', 'mushroom_patch', 'pale_mushroom_patch', 'herb_patch', 'clay_deposit', 'stone_outcrop',
 ])
+// `fullStock` is the abundance the ground climbs back toward. Optional so every recorded C11
+// scatter still parses; absent means the old ceiling of one.
 export const ForageableSpawned = z.object({
   id: z.string(), kind: ForageableKindSchema,
   x: z.number().int(), y: z.number().int(), stock: z.number().int().nonnegative(),
+  fullStock: z.number().int().positive().optional(),
 }).strict()
 export const ForageableStockChanged = z.object({ id: z.string(), stock: z.number().int().positive() }).strict()
 export const ForageableDepleted = z.object({ id: z.string() }).strict()
@@ -193,7 +196,7 @@ export const TileChanged = z.object({
   x: z.number(), y: z.number(),
   from: z.number().int().min(0).max(10),
   to: z.number().int().min(0).max(10),
-  reason: z.enum(['paved', 'worn', 'overgrown', 'channel', 'seeded', 'grown', 'tilled']),
+  reason: z.enum(['paved', 'worn', 'overgrown', 'channel', 'seeded', 'grown', 'tilled', 'cleared']),
   byId: z.string().optional(),
 }).strict()
 // The border strip is rolled from the `worldgen` stream at emission and travels in the

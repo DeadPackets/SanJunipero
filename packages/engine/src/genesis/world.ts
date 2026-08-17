@@ -159,7 +159,8 @@ export function makeGenesisWorld(config: SimConfig, opts: { anchor?: { x: number
   for (const n of GENESIS_FORAGEABLES) {
     events.push({
       type: 'forageable_spawned',
-      payload: { id: mint('node'), kind: n.kind, x: n.x, y: n.y, stock: n.stock },
+      // The authored abundance rides the spawn, so the ground knows what to climb back to.
+      payload: { id: mint('node'), kind: n.kind, x: n.x, y: n.y, stock: n.stock, fullStock: n.stock },
     })
   }
 

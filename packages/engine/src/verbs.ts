@@ -18,7 +18,7 @@ export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
   | 'walk' | 'sleep' | 'wake' | 'enter' | 'exit' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
   | 'build' | 'craft' | 'extinguish' | 'drink' | 'fill' | 'hunt' | 'wear' | 'doff'
-  | 'kindle' | 'snuff' | 'stoke'
+  | 'kindle' | 'snuff' | 'stoke' | 'chop'
   | 'speak' | 'give' | 'take' | 'stow' | 'write' | 'read' | 'inscribe' | 'teach' | 'attack' | 'experiment'
 
 export type VerbDef = {
@@ -1124,6 +1124,32 @@ const pave: VerbDef = makeVerb({
   skill: { track: 'masonry', xp: 1 },
 })
 
+// A sapling is not timber yet. Clearing one costs the swing and yields nothing at all —
+// which is the whole of it: taking land back from the wood is a real act with a real price.
+const SAPLING_TILE: TileId = 9
+const CLEAR_TICKS = 4
+
+const chop: VerbDef = makeVerb({
+  kind: 'chop',
+  duration: () => CLEAR_TICKS,
+  validate(state, _config, agentId, params) {
+    const p = TileParams.safeParse(params)
+    if (!p.success) return 'chop needs a tile {x, y}'
+    if (tileAt(state, p.data.x, p.data.y) !== SAPLING_TILE) return 'there is no sapling there'
+    if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to cut'
+    return null
+  },
+  onComplete(state, _config, agentId, params) {
+    const p = TileParams.parse(params)
+    if (tileAt(state, p.x, p.y) !== SAPLING_TILE) return []
+    return [{
+      type: 'tile_changed',
+      payload: { x: p.x, y: p.y, from: SAPLING_TILE, to: 0, reason: 'cleared', byId: agentId },
+    }]
+  },
+  skill: { track: 'farming', xp: 1 },
+})
+
 export const DouseParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
 
 // The burning structure whose footprint covers this tile, if one is alight there.
@@ -1411,7 +1437,7 @@ const experiment: VerbDef = makeVerb({
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
-  drink, fill, dig_channel: digChannel, douse, pave, hunt, wear, doff, kindle, snuff, stoke,
+  drink, fill, dig_channel: digChannel, douse, pave, hunt, wear, doff, kindle, snuff, stoke, chop,
   speak, give, take, stow, write, read, inscribe, teach, attack, experiment,
 }
 
