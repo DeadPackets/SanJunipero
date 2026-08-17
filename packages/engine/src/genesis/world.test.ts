@@ -4,7 +4,7 @@ import {
   makeCityTemplate, stateHash, templateFits, type SimEvent,
 } from '@sj/shared'
 import { fold } from '../fold.js'
-import { findPath } from '../path.js'
+import { findPath, searchPath } from '../path.js'
 import { genesisState, type WorldState } from '../state.js'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
@@ -108,7 +108,12 @@ describe('makeGenesisWorld: the town', () => {
     const s = foldAll()
     expect(Object.values(s.structures).some((x) => x.kind === 'bridge')).toBe(false)
     expect(s.terrain.every((row) => row[48] === T_WATER && row[49] === T_WATER && row[50] === T_WATER)).toBe(true)
-    expect(findPath(s, { x: 30, y: 100 }, { x: 55, y: 100 }, DEFAULT_CONFIG)).toBeNull()
+    // 128x128 holds more open ground than the 6000-node budget can walk, so the search cannot
+    // prove the far bank unreachable — it spends the budget and stops at the water, which is
+    // the same fact told the other way round (Task 29).
+    const across = searchPath(s, { x: 30, y: 100 }, { x: 55, y: 100 }, DEFAULT_CONFIG)!
+    expect(across.capped).toBe(true)
+    expect(across.path.every(([x]) => x < 48)).toBe(true)
     expect(findPath(s, { x: 55, y: 100 }, { x: 55, y: 40 }, DEFAULT_CONFIG)).not.toBeNull()
   })
 

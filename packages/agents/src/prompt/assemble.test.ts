@@ -127,6 +127,24 @@ describe('perceptionToProse: the ground says what it is, and nothing about what 
   })
 })
 
+describe('perceptionToProse: a walk that stops short says so, in a body\'s words', () => {
+  const UNCLEAR = 'The way is unclear from here.'
+  const MECHANICS = /\b(path|node|budget|A\*|search|route|cap|capped|partial|unreachable)\b/i
+  const cutShort = { ...quietMeadowPacket, wayUnclear: true as const }
+
+  it('renders the line exactly once, and not at all on an ordinary walk', () => {
+    const prose = perceptionToProse(cutShort)
+    expect(prose).toContain(UNCLEAR)
+    expect(prose.split(UNCLEAR)).toHaveLength(2)
+    expect(perceptionToProse(quietMeadowPacket)).not.toContain(UNCLEAR)
+  })
+
+  it('names no mechanism and asks for nothing', () => {
+    expect(UNCLEAR).not.toMatch(MECHANICS)
+    expect(UNCLEAR).not.toMatch(FORBIDDEN_FRAMING)
+  })
+})
+
 describe('perceptionToProse', () => {
   it('quotes heard speech with the speaker name', () => {
     const prose = perceptionToProse(conversationPacket)

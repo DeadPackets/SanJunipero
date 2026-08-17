@@ -77,6 +77,8 @@ export type PerceptionPacket = {
   ground?: { wellTravelled: true }
   // Present only while the dark is charging this body for the work in its hands.
   fumbling?: true
+  // Present only while the legs are on a route that stops short of where they were sent.
+  wayUnclear?: true
   // How much light is on the ground underfoot. Absent on a packet from before the dark had
   // a price, which reads as it always did.
   light?: 'bright' | 'dim' | 'dark'
@@ -245,6 +247,9 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
 
   // The cost, said as it feels. Never a refusal, and never a number.
   if (packet.fumbling) lines.push('You fumble in the dark.')
+
+  // Where the legs are going, and how far of it the body actually knows. Not a refusal.
+  if (packet.wayUnclear) lines.push('The way is unclear from here.')
 
   for (const a of packet.visible.agents) {
     const dressed = a.worn === undefined ? '' : `, ${a.worn}`

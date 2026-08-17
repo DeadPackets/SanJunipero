@@ -7,7 +7,7 @@ import {
 import { mintId, type Affliction, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
-import { bridgeAt, BRIDGE_KIND, findPath, isPassable } from './path.js'
+import { bridgeAt, BRIDGE_KIND, findPath, isPassable, searchPath } from './path.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 import { fleeTo } from './systems/fauna.js'
 import { HEAT_SOURCE_KINDS } from './systems/warmth.js'
@@ -90,6 +90,15 @@ const walk: VerbDef = makeVerb({
   },
   onComplete() { return [] },
 })
+
+// A walk the search could not finish inside its budget. The legs still go, and they stop short
+// of where the mind aimed them — which is a thing the body can tell, and the only thing it can.
+export function walkIsCapped(state: WorldState, config: SimConfig, agentId: string): boolean {
+  const a = state.agents[agentId]
+  if (!a?.activity || a.activity.verb !== 'walk') return false
+  const p = WalkParams.safeParse(a.activity.params)
+  return p.success && searchPath(state, a, p.data, config)?.capped === true
+}
 
 export const EatParams = z.object({ itemId: z.string() }).strict()
 

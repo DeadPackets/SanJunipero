@@ -6,7 +6,7 @@ import { effectiveConfig } from './laws.js'
 import { thirstOf, type AfflictionKind, type Item, type WorldState } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
-import { isAdjacentToRect, workPenalty } from './verbs.js'
+import { isAdjacentToRect, walkIsCapped, workPenalty } from './verbs.js'
 
 // Perception is a pure projection: what one agent can sense from the shared
 // world state plus the events that just happened. It never mutates state and
@@ -109,6 +109,9 @@ export type PerceptionPacket = {
   // Present only while this body is doing work the dark is charging it for. Absent otherwise,
   // so a packet from a town that never worked at night reads exactly as it always did.
   fumbling?: true
+  // Present only while the legs are walking a route the search could not follow to its end.
+  // A distance, not a failure — and never the word for what the search did (G10).
+  wayUnclear?: true
   heard: HeardSpeech[]
   seen: SeenEvent[]
   feltEvents: string[]
@@ -395,6 +398,7 @@ export function composePerception(
     ...(ground === undefined ? {} : { ground }),
     light: lightBandAt(state, self.x, self.y, state.tick, config),
     ...(fumbling ? { fumbling: true as const } : {}),
+    ...(walkIsCapped(state, config, agentId) ? { wayUnclear: true as const } : {}),
     visible: {
       agents: visibleAgents, structures: visibleStructures, items: visibleItems,
       crops: visibleCrops, fauna: visibleFauna, forageables: visibleForageables,

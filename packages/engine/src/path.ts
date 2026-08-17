@@ -56,19 +56,39 @@ export function canStep(state: WorldState, x: number, y: number, dx: number, dy:
   return true
 }
 
-type Node = { x: number; y: number; g: number; f: number; parent: Node | null }
+type Node = { x: number; y: number; g: number; h: number; f: number; parent: Node | null }
 
-export function findPath(state: WorldState, from: Point, to: Point, config: SimConfig = DEFAULT_CONFIG): Array<[number, number]> | null {
-  if (from.x === to.x && from.y === to.y) return []
+// A finished search and a search that ran out of budget are both walkable answers; only the
+// second one is a lie about where the walking ends. `capped` is the one bit that tells them
+// apart, and it is why a long walk is a partial and not a refusal.
+export type PathSearch = { path: Array<[number, number]>; capped: boolean }
+
+function pathTo(node: Node): Array<[number, number]> {
+  const path: Array<[number, number]> = []
+  for (let n: Node | null = node; n && n.parent; n = n.parent) path.push([n.x, n.y])
+  return path.reverse()
+}
+
+// Closest to the goal wins; the existing (y, x) comparator breaks the tie, so the frontier a
+// budget stops at is the same frontier on every machine.
+function closerToGoal(a: Node, b: Node): boolean {
+  return a.h < b.h || (a.h === b.h && (a.y < b.y || (a.y === b.y && a.x < b.x)))
+}
+
+export function searchPath(state: WorldState, from: Point, to: Point, config: SimConfig = DEFAULT_CONFIG): PathSearch | null {
+  if (from.x === to.x && from.y === to.y) return { path: [], capped: false }
   if (!isPassable(state, to.x, to.y)) return null
   const width = state.terrain[0]!.length
   const h = (x: number, y: number) => Math.abs(x - to.x) + Math.abs(y - to.y)
   const key = (x: number, y: number) => y * width + x
   const best = new Map<number, Node>()
-  const start: Node = { x: from.x, y: from.y, g: 0, f: h(from.x, from.y), parent: null }
+  const start: Node = { x: from.x, y: from.y, g: 0, h: h(from.x, from.y), f: h(from.x, from.y), parent: null }
   best.set(key(from.x, from.y), start)
   const open: Node[] = [start]
   const closed = new Set<number>()
+  const budget = config.pathing.maxNodes
+  let expansions = 0
+  let frontier = start
 
   while (open.length > 0) {
     let mi = 0
@@ -80,21 +100,28 @@ export function findPath(state: WorldState, from: Point, to: Point, config: SimC
     const ck = key(cur.x, cur.y)
     if (closed.has(ck)) continue
     closed.add(ck)
-    if (cur.x === to.x && cur.y === to.y) {
-      const path: Array<[number, number]> = []
-      for (let n: Node | null = cur; n && n.parent; n = n.parent) path.push([n.x, n.y])
-      return path.reverse()
-    }
+    if (cur.x === to.x && cur.y === to.y) return { path: pathTo(cur), capped: false }
     for (const [dx, dy] of NEIGHBORS) {
       const nx = cur.x + dx, ny = cur.y + dy
       if (!canStep(state, cur.x, cur.y, dx, dy) || closed.has(key(nx, ny))) continue
       const g = cur.g + stepCostAt(state, nx, ny, config)
       const known = best.get(key(nx, ny))
       if (known && known.g <= g) continue
-      const node: Node = { x: nx, y: ny, g, f: g + h(nx, ny), parent: cur }
+      const node: Node = { x: nx, y: ny, g, h: h(nx, ny), f: g + h(nx, ny), parent: cur }
       best.set(key(nx, ny), node)
       open.push(node)
+      if (closerToGoal(node, frontier)) frontier = node
+    }
+    // Spent the budget: walk as far toward the goal as the search actually got. An empty
+    // partial is no walk at all, so it reads as the refusal it is.
+    if (++expansions >= budget) {
+      const path = pathTo(frontier)
+      return path.length === 0 ? null : { path, capped: true }
     }
   }
   return null
+}
+
+export function findPath(state: WorldState, from: Point, to: Point, config: SimConfig = DEFAULT_CONFIG): Array<[number, number]> | null {
+  return searchPath(state, from, to, config)?.path ?? null
 }

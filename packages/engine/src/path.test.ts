@@ -3,7 +3,9 @@ import { DEFAULT_CONFIG, SimConfigSchema, type SimConfig, type SimEvent } from '
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
-import { canStep, findPath, isPassable, stepCostAt, terrainCostFor, TERRAIN_COST } from './path.js'
+import { canStep, findPath, isPassable, searchPath, stepCostAt, terrainCostFor, TERRAIN_COST } from './path.js'
+import { makeFixtureMap } from './scripted.js'
+import { composePerception } from './perception.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, d: 1, '~': 2, f: 3, r: 4, s: 5, F: 6, R: 7, p: 8, S: 9, c: 10 }
 const world = (rows: string[]): WorldState =>
@@ -167,6 +169,104 @@ describe('findPath (A*)', () => {
   it('returns [] when already at the goal', () => {
     const s = world(['..', '..'])
     expect(findPath(s, { x: 1, y: 1 }, { x: 1, y: 1 })).toEqual([])
+  })
+})
+
+// ------------------------------------------------------- Task 29: the node budget
+
+const withMaxNodes = (config: SimConfig, maxNodes: number): SimConfig =>
+  ({ ...config, pathing: { ...config.pathing, maxNodes } })
+
+const UNBOUNDED = withMaxNodes(DEFAULT_CONFIG, Infinity)
+const manhattan = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+  Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
+
+// A serpentine 192x192: every odd row is a water wall with one gap, and the gap alternates
+// ends. The corridor is ~36k tiles long, so 200 nodes buys a fraction of the first leg.
+const MAZE_W = 192, MAZE_H = 192
+const MAZE_FROM = { x: 0, y: 0 }
+const MAZE_TO = { x: MAZE_W - 1, y: MAZE_H - 1 }
+
+function serpentineMaze(): TileId[][] {
+  const rows: TileId[][] = []
+  for (let y = 0; y < MAZE_H; y++) {
+    const wall = y % 2 === 1 && y < MAZE_H - 1
+    const gap = y % 4 === 1 ? MAZE_W - 1 : 0
+    const row: TileId[] = []
+    for (let x = 0; x < MAZE_W; x++) row.push(wall && x !== gap ? 2 : 0)
+    rows.push(row)
+  }
+  return rows
+}
+
+describe('the A* node budget', () => {
+  it('changes no path the 64x64 fixture map can ask for', () => {
+    const s = genesisState(DEFAULT_CONFIG, makeFixtureMap())
+    const targets = [{ x: 60, y: 60 }, { x: 5, y: 5 }, { x: 33, y: 4 }, { x: 4, y: 58 }, { x: 45, y: 31 }]
+    let asked = 0
+    for (let fy = 2; fy < 64; fy += 9) {
+      for (let fx = 4; fx < 61; fx += 11) {
+        for (const to of targets) {
+          expect(findPath(s, { x: fx, y: fy }, to, DEFAULT_CONFIG))
+            .toEqual(findPath(s, { x: fx, y: fy }, to, UNBOUNDED))
+          asked++
+        }
+      }
+    }
+    expect(asked).toBeGreaterThan(100)
+  })
+
+  it('a search the budget cuts short returns a usable partial, never a null', () => {
+    const s = genesisState(DEFAULT_CONFIG, serpentineMaze())
+    const tight = withMaxNodes(DEFAULT_CONFIG, 200)
+    expect(searchPath(s, MAZE_FROM, MAZE_TO, UNBOUNDED)!.capped).toBe(false)
+
+    const cut = searchPath(s, MAZE_FROM, MAZE_TO, tight)!
+    expect(cut.capped).toBe(true)
+    expect(cut.path.length).toBeGreaterThan(0)
+    const last = cut.path[cut.path.length - 1]!
+    expect(manhattan({ x: last[0], y: last[1] }, MAZE_TO)).toBeLessThan(manhattan(MAZE_FROM, MAZE_TO))
+    for (const [x, y] of cut.path) expect(isPassable(s, x, y)).toBe(true)
+    let [px, py] = [MAZE_FROM.x, MAZE_FROM.y]
+    for (const [x, y] of cut.path) {
+      expect(Math.abs(x - px) + Math.abs(y - py)).toBe(1)
+      ;[px, py] = [x, y]
+    }
+    expect(findPath(s, MAZE_FROM, MAZE_TO, tight)).toEqual(cut.path)
+    for (let i = 0; i < 5; i++) expect(searchPath(s, MAZE_FROM, MAZE_TO, tight)!.path).toEqual(cut.path)
+  })
+
+  it('an unreachable target is a null when the search really exhausts', () => {
+    const s = world(['..~..', '..~..', '..~..'])
+    expect(searchPath(s, { x: 0, y: 0 }, { x: 4, y: 0 }, DEFAULT_CONFIG)).toBeNull()
+    // A budget too small to prove there is no way across cannot claim there is none: it walks
+    // as far as it looked.
+    expect(findPath(s, { x: 0, y: 0 }, { x: 4, y: 0 }, withMaxNodes(DEFAULT_CONFIG, 2))).toEqual([[1, 0]])
+  })
+
+  it('a partial that goes nowhere is a refusal, not a walk of length zero', () => {
+    // Every step out of (1,1) leads away from (1,3); one expansion buys no ground at all.
+    const s = world(['....', '....', '.~~~', '....'])
+    expect(findPath(s, { x: 1, y: 1 }, { x: 1, y: 3 }, withMaxNodes(DEFAULT_CONFIG, 1))).toBeNull()
+    expect(findPath(s, { x: 1, y: 1 }, { x: 1, y: 3 }, UNBOUNDED)).not.toBeNull()
+  })
+
+  it('walk accepts the cut-short target and perception says the way is unclear', () => {
+    const tight = withMaxNodes(DEFAULT_CONFIG, 200)
+    let s = genesisState(tight, serpentineMaze())
+    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), tight)
+    expect(composePerception(s, tight, 'a1', []).wayUnclear).toBeUndefined()
+
+    const r = submitIntent(s, tight, 'a1', 'walk', MAZE_TO)
+    expect(r.ok).toBe(true)
+    const partial = searchPath(s, MAZE_FROM, MAZE_TO, tight)!.path
+    s = fold(s, ev(2, 'action_started', {
+      agentId: 'a1', verb: 'walk', params: { ...MAZE_TO }, duration: partial.length,
+    }), tight)
+    expect(s.agents.a1!.activity!.path).toEqual(partial)
+    expect(composePerception(s, tight, 'a1', []).wayUnclear).toBe(true)
+    // The same walk under a budget that can finish it is an ordinary walk.
+    expect(composePerception(s, UNBOUNDED, 'a1', []).wayUnclear).toBeUndefined()
   })
 })
 
