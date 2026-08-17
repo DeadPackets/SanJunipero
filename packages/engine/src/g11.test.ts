@@ -508,6 +508,47 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     expect(cured.agents.ada!.afflictions).toBeUndefined()
   })
 
+  // THE SHAPE THE LIVE RUN DIED OF, reproduced offline. A body outdoors may not lie down
+  // until it has already fallen over: `sleep` refuses "there is no bed here" while it is
+  // standing and allows anywhere the moment it collapses. So the only rest a body outside a
+  // roof can take is the rest that costs it a fall — and while `agent_slept` clears the
+  // collapse COUNTER, so the rung never climbs, it does not clear the AFFLICTION. One fall
+  // ever, and the body is on a clock nothing but a herb stops.
+  it('a body with no roof can only rest by falling over, and the first fall starts a clock', () => {
+    const fatigueOf = (s: WorldState): number =>
+      s.agents.ada!.afflictions?.find((x) => x.kind === 'fatigue')?.severity ?? 0
+
+    let s = genesisState(CFG, MAP())
+    s = fold(s, ev('agent_spawned', { id: 'ada', name: 'ada', x: 5, y: 5, ageDays: 7300 }, 0), CFG)
+    s = fold(s, ev('need_changed', { id: 'ada', need: 'energy', delta: -90 }, 0), CFG)
+    s = { ...s, tick: 0 }
+
+    // Standing outdoors and tired, she is told to find somewhere to lie down.
+    expect(submitIntent({ ...s, tick: 1 }, CFG, 'ada', 'sleep', {}))
+      .toEqual({ ok: false, reason: 'there is no bed here; find somewhere to lie down' })
+
+    // She falls over. Now — and only now — the same ground is a bed.
+    let tick = 1
+    for (; tick < 40000 && s.agents.ada!.collapsedSinceTick === null; tick++) s = pass(s, CFG, tick, 'spiral').state
+    expect(fatigueOf(s)).toBe(1)
+    const lie = submitIntent({ ...s, tick }, CFG, 'ada', 'sleep', {})
+    expect(lie.ok).toBe(true)
+    s = apply({ ...s, tick }, CFG, (lie as { events: PendingEvent[] }).events, tick)
+
+    // She sleeps it off: the collapse counter goes, the clock stays.
+    for (tick += 1; tick < 40000 && s.agents.ada!.needs.energy < 99; tick++) s = pass(s, CFG, tick, 'spiral').state
+    expect(s.agents.ada!.collapsesWithoutRecovery).toBeUndefined()
+    expect(fatigueOf(s)).toBe(1)
+
+    // And the clock is faster than the one thing that answers it. A day of the drain is more
+    // than four days of the best dawn recovery a fed, sleeping body can get.
+    const drainPerDay = CFG.mortality.drainPerTick.fatigue * MINUTES_PER_DAY
+    const bestRecoveryPerDay = CFG.health.recoveryHpPerDay * CFG.mortality.sleepRegenMultiplier
+    expect(drainPerDay).toBeCloseTo(57.6, 6)
+    expect(bestRecoveryPerDay).toBe(15)
+    expect(drainPerDay).toBeGreaterThan(bestRecoveryPerDay * 3)
+  })
+
   it('and the same body given nothing to eat, drink or lie on does not — which is the difference', () => {
     // The control: the script is what changed, not the physics.
     let s = genesisState(CFG, MAP())
