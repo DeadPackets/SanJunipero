@@ -75,6 +75,14 @@ function sliceV4(atlas: Texture, art: CharArt, row: (typeof SHEET_ROWS)[number],
     new Texture({ source: atlas.source, frame: new Rectangle(cell.x, cell.y, cell.w, cell.h) }))
 }
 
+// Who belongs on the TOWN map. The dead leave it (grave tone is Task 15), and so does anyone
+// who has gone indoors — C9 gives them an `insideId` and the interior sub-scene draws them
+// there. Without this an occupant kept being drawn at the door tile they entered from, which
+// is why a founder asleep in the cottage appeared to be asleep on the grass beside it.
+export function rendersOnMap(a: { alive: boolean; insideId?: string }): boolean {
+  return a.alive && a.insideId === undefined
+}
+
 export type CharacterCell = { texture: Texture; anchor: { x: number; y: number }; scale: number }
 
 // One posed cell out of a loaded sheet, feet-anchored and scaled to the world footprint.
@@ -225,7 +233,7 @@ export function createCharacterLayer(
     }
     const live = new Set<string>()
     for (const a of Object.values(state.agents)) {
-      if (!a.alive) continue // the dead leave the map; grave tone is Task 15
+      if (!rendersOnMap(a)) continue
       live.add(a.id)
       const e = ensure(a.id, a.x, a.y)
       // scrubbed views teleport: past positions are facts, not animation

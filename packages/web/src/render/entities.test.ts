@@ -5,6 +5,7 @@ import {
   BUILDING_PX_PER_TILE, ENTERABLE_KINDS, doorTileOf, doorZIndex, footprintHitPoints,
   structureZIndex,
 } from './entities.js'
+import { rendersOnMap } from './characters.js'
 
 // FIX ROUND 2 defect 2: the door affordance was drawn at the door TILE's depth, but the
 // building it belongs to is depth-sorted from its FAR corner — a whole depth row higher. In
@@ -171,5 +172,27 @@ describe('a structure hit-tests its ground, never its padding', () => {
       const xs = footprintHitPoints(w, h).filter((_, i) => i % 2 === 0)
       expect(Math.max(...xs) - Math.min(...xs)).toBe((w + h) * 16)
     }
+  })
+})
+
+
+// FINAL ROUND. The controller saw a founder "sleeping OUTDOORS next to the hut with a
+// blanket". A 5500-tick measurement of the dev world says nobody ever sleeps or collapses
+// outdoors — so that was an occupant asleep INSIDE the cottage, still being drawn on the town
+// map at the door tile they walked in through, because the character layer only ever checked
+// `alive`.
+describe('rendersOnMap', () => {
+  it('draws the living who are out of doors', () => {
+    expect(rendersOnMap({ alive: true })).toBe(true)
+    expect(rendersOnMap({ alive: true, insideId: undefined })).toBe(true)
+  })
+
+  it('does NOT draw someone who has gone inside — the interior scene has them', () => {
+    expect(rendersOnMap({ alive: true, insideId: 'structure_cottage' })).toBe(false)
+  })
+
+  it('still does not draw the dead', () => {
+    expect(rendersOnMap({ alive: false })).toBe(false)
+    expect(rendersOnMap({ alive: false, insideId: 'structure_cottage' })).toBe(false)
   })
 })

@@ -38,8 +38,16 @@ export const TOWN_STRUCTURES: readonly TownStructure[] = [
 
 // The one dwelling in the fixture town — where a tired founder goes when interiors are on.
 export const FOUNDERS_HOME_ID = 'structure_cottage'
-export const GO_HOME_BELOW = 25      // above the outdoor sleep threshold: home wins first
+// Above the patrol policy's own outdoor-sleep threshold (20), so home always wins first —
+// measured over 5500 dev ticks, no founder ever sleeps or collapses out of doors.
+export const GO_HOME_BELOW = 25
 export const LEAVE_HOME_ABOVE = 80
+// MEASURED (2026-08-17): the five founders first go indoors at ticks 820-875 and make ten
+// indoor trips per 1500 ticks thereafter. DEV_FAST_FORWARD=1200 lands the world just AFTER
+// that first cycle with everyone freshly rested at energy 66-73, so a viewer then waits
+// ~450 ticks — nineteen real minutes — for the next one. Start here instead and the walk
+// home is the first thing the checklist sees.
+export const DEV_FAST_FORWARD_FOR_INTERIORS = 810
 
 export const NEED_TOPUP_BELOW = 40
 export const HUNGER_TOPUP = 55
