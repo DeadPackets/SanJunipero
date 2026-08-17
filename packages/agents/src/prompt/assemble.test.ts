@@ -365,12 +365,15 @@ describe('perceptionToProse', () => {
     expect(prose).toContain('wheat (crop_1) at (12, 8)')
   })
 
-  it('escalates weariness severity so the mind knows to rest', () => {
+  // The word has to be a word the world answers to: there is no `rest` verb, and a mind told
+  // to rest can only ever try one and be refused (C11 batch-8 R11).
+  it('escalates weariness severity so the mind knows to sleep', () => {
     const tired = {
       ...quietMeadowPacket,
       self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, needs: { ...quietMeadowPacket.self.body.needs, energy: 20 } } },
     }
-    expect(perceptionToProse(tired)).toContain('you must rest')
+    expect(perceptionToProse(tired)).toContain('you must sleep')
+    expect(perceptionToProse(tired)).not.toContain('rest')
 
     const collapsing = {
       ...quietMeadowPacket,

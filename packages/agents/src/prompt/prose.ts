@@ -59,6 +59,12 @@ export type PerceptionCrop = {
   withered: boolean
 }
 
+// A shape at a distance and a patch of ground worth working. The engine has composed both
+// since C11 Task 21; nothing on the mind side ever looked at them, so `hunt` needed an id no
+// mind had ever been given and `forage` could only ever mean "any forest nearby".
+export type PerceptionFauna = { id: string; kind: string; x: number; y: number }
+export type PerceptionForageable = { id: string; kind: string; x: number; y: number; prose: string }
+
 export type PerceptionPacket = {
   time: SimTime
   self: {
@@ -93,6 +99,9 @@ export type PerceptionPacket = {
     structures: PerceptionStructure[]
     items: PerceptionItem[]
     crops: PerceptionCrop[]
+    // Absent on a packet from before the mind side could see them, which reads as before.
+    fauna?: PerceptionFauna[]
+    forageables?: PerceptionForageable[]
   }
   heard: Array<{ speakerId: string; name: string; text: string; distance: number }>
   seen: PerceptionSeen[]
@@ -232,7 +241,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   if (thirst < 5) lines.push('Your throat burns; you must drink.')
   else if (thirst < 30) lines.push('Your mouth is dry.')
   if (energy < 10) lines.push('You are about to collapse; sleep NOW.')
-  else if (energy < 25) lines.push('Your legs tremble — you can barely stand; you must rest.')
+  else if (energy < 25) lines.push('Your legs tremble — you can barely stand; you must sleep.')
   else if (energy < 30) lines.push('Weariness drags at your limbs.')
   if (warmth < 30) lines.push('You shiver against the cold.')
   if (social < 30) lines.push('Loneliness settles over you.')
@@ -288,6 +297,16 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
 
   for (const c of packet.visible.crops) {
     lines.push(`You can see ${c.kind} (${c.id}) at (${c.x}, ${c.y})${c.withered ? ', withered' : ''}.`)
+  }
+
+  // Named, so a mind can point at one: `hunt` wants a faunaId and `forage` a nodeId, and
+  // neither was ever nameable before.
+  for (const f of packet.visible.fauna ?? []) {
+    lines.push(`A ${f.kind} (${f.id}) is out at (${f.x}, ${f.y}).`)
+  }
+
+  for (const n of packet.visible.forageables ?? []) {
+    lines.push(`You see ${n.prose} (${n.id}) at (${n.x}, ${n.y}).`)
   }
 
   for (const it of packet.self.inventory) {

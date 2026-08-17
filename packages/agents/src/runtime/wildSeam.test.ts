@@ -1,0 +1,97 @@
+import { describe, expect, it } from 'vitest'
+import {
+  createWorldTick,
+  EventStore,
+  fold,
+  genesisState,
+  openDb,
+  RngStreams,
+  TickLoop,
+  type TickHandler,
+  type TileId,
+} from '@sj/engine'
+import { SimConfigSchema } from '@sj/shared'
+import { perceptionToProse } from '../prompt/prose.js'
+import { EngineBridge } from './bridge.js'
+
+// `hunt` was tried once in two live sim-days and refused — "hunt needs a {faunaId}" — and
+// `forage` failed both its tries with "no forest nearby". The engine had composed the deer and
+// the berry bushes all along; the bridge dropped them and the prose never named one. These
+// rows walk both verbs from the sentence a mind reads to the thing it takes.
+const AGENT = 'tamar'
+
+function wild(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
+  const config = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }, mapGrowth: { enabled: false } })
+  const terrain: TileId[][] = Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+  const store = new EventStore(openDb(':memory:'))
+  const rng = new RngStreams('wild-seam')
+  let state = genesisState(config, terrain)
+  const put = (type: string, payload: unknown): void => {
+    state = fold(state, store.append(state.tick, type, payload), config)
+  }
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 8, y: 8, ageDays: 7300 })
+  put('item_spawned', { id: 'item_1', kind: 'knife', qty: 1, loc: { t: 'agent', id: AGENT } })
+  put('fauna_spawned', { id: 'fauna_1', kind: 'deer', x: 9, y: 8 })
+  put('forageable_spawned', { id: 'node_1', kind: 'berry_bush', x: 7, y: 8, stock: 3 })
+  state = { ...state, tick: 720 }
+
+  const worldTick = createWorldTick(config, rng)
+  let handler: TickHandler = () => {}
+  const loop = new TickLoop({ store, state, rng, config, onTick: (ctx) => handler(ctx) })
+  const bridge = new EngineBridge({ loop, store, simConfig: config })
+  handler = bridge.wrapTickHandler(({ emit }) => {
+    for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
+  })
+  return { bridge, step: () => loop.step(), loop }
+}
+
+const proseFor = (bridge: EngineBridge): string =>
+  perceptionToProse(bridge.perception(AGENT), undefined, {
+    isWalkable: (x, y) => bridge.isWalkable(x, y),
+    isEdible: (kind) => bridge.isEdible(kind),
+  })
+
+describe('the wild seam — prose, intent, verb, the thing taken', () => {
+  it('names the animal and the patch, each with the mark the verb asks for', () => {
+    const said = proseFor(wild().bridge)
+    expect(said).toContain('A deer (fauna_1) is out at (9, 8).')
+    expect(said).toContain('You see berry bushes heavy with fruit (node_1) at (7, 8).')
+  })
+
+  it('a mind reads a deer out of its own prose and hunts it', async () => {
+    const { bridge, step, loop } = wild()
+    const id = /A deer \((fauna_\d+)\)/.exec(proseFor(bridge))![1]!
+
+    const hunting = bridge.submit(AGENT, { verb: 'hunt', params: { faunaId: id } })
+    step()
+    expect(await hunting).toEqual({ ok: true })
+    for (let i = 0; i < 60 && loop.state.agents[AGENT]!.activity !== null; i++) step()
+    // A hunt is a roll: it either kills or the deer runs. Neither answer is a refusal.
+    const deer = loop.state.fauna?.[id]
+    const carried = Object.values(loop.state.items)
+      .filter((i) => i.loc.t === 'agent' && i.loc.id === AGENT)
+      .map((i) => i.kind)
+    if (deer === undefined || !deer.alive) expect(carried).toContain('venison')
+    else expect({ x: deer.x, y: deer.y }).not.toEqual({ x: 9, y: 8 })
+  })
+
+  it('a mind reads a berry patch out of its own prose and strips it', async () => {
+    const { bridge, step, loop } = wild()
+    const id = /berry bushes heavy with fruit \((node_\d+)\)/.exec(proseFor(bridge))![1]!
+
+    const picking = bridge.submit(AGENT, { verb: 'forage', params: { nodeId: id } })
+    step()
+    expect(await picking).toEqual({ ok: true })
+    for (let i = 0; i < 60 && loop.state.agents[AGENT]!.activity !== null; i++) step()
+    const held = Object.values(loop.state.items).filter((i) => i.loc.t === 'agent' && i.kind === 'berries')
+    expect(held).toHaveLength(1)
+    expect(loop.state.forageables!.node_1!.stock).toBe(2)
+  })
+
+  it('reproduces the run: with no node named, forage still needs a wood at the elbow', async () => {
+    const { bridge, step } = wild()
+    const blind = bridge.submit(AGENT, { verb: 'forage', params: {} })
+    step()
+    expect(await blind).toEqual({ ok: false, reason: 'no forest nearby' })
+  })
+})
