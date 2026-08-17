@@ -884,6 +884,13 @@ export function contactShadow(widthPx: number): { rx: number; ry: number; alpha:
 
 ### Task 68: What this room is *(U4, and audit R7)*
 
+> **AMENDED BY C12a batch 3.** This task consumes Task 79's `statusOf` and Task 80's
+> `placeOf`, neither of which had landed. `interiorModel.ts` carries the three state words it
+> needs — `Asleep`, a gerund of the current verb, and `Between things` for awake with nothing
+> to do (ruling R7, Q6) — chosen to obey P17 in advance, so **Task 79 REPLACES
+> `ROOM_STATE_*`/`roomStateOf` rather than auditing them.** The card shows no "where they
+> are" line, because inside a room the answer is the room; Task 80 adds nothing here.
+
 **Files:** Modify `packages/web/src/ui/InteriorBar.tsx`, `InteriorBar.test.ts`; Create
 `packages/web/src/ui/interiorModel.ts`, `interiorModel.test.ts`
 
@@ -1349,6 +1356,14 @@ export function zoomScaleAt(s: ZoomState, nowMs: number): number
 export function zoomSettled(s: ZoomState, nowMs: number): boolean
 ```
 
+> **AMENDED BY C12a batch 3, from measurement in the page.** `zoomWheel` as written below
+> never zooms a real mouse. "One notch is 120" is a convention, not a fact — Chrome commonly
+> reports 100 and some mice 53 — and with a gesture reset each notch arrives alone, below the
+> threshold, and is discarded: five deliberate 100-delta notches leave the camera at stop 1.
+> A gesture's FIRST event is therefore itself a step, above a `WHEEL_MIN_DELTA` dead zone;
+> `WHEEL_STEP_DELTA` governs continued travel inside one gesture and the cooldown governs the
+> rate. The thirty-event flick still advances exactly one stop, because the cooldown holds.
+
 **Implementation of the two functions the complaint lives in:**
 ```ts
 export function zoomWheel(prev: ZoomState, deltaY: number, nowMs: number): ZoomState {
@@ -1404,6 +1419,22 @@ export function zoomScaleAt(s: ZoomState, nowMs: number): number {
 - [ ] **Step 5: Commit** `fix(web): zoom you can steer — one gesture, one step, and it eases into place`.
 
 ### Task 76: The camera knows the edges, and there is a view of the whole town *(U19, and audit R8)*
+
+> **AMENDED BY C12a batch 3, from measurement.** Two of this task's stated numbers are
+> arithmetically incompatible and the parenthetical describes a town that does not exist.
+> The real settlement is 23 x 18 tiles: **528 x 256 px of ground, 584 x 376 px AS DRAWN**
+> (a building sprite overhangs its own ground upward). Therefore:
+> - `fitStop` and `stageFill` both answer to the DRAWN box (`drawnBoundsOf`), not the
+>   footprint. Fitting the footprint chose 3x and cut the roofs off the stage.
+> - `stageFill` at the landed 1x is **0.1444** — which is the audit's "under 15 %",
+>   reproduced rather than asserted. At the new first frame (`fitStop` = 2 on 1728 x 880)
+>   it is **0.5776**, against `STAGE_FILL_MIN` 0.45.
+> - `fitStop` returns whatever the box it is handed fits at. The FIRST FRAME hands it the
+>   SETTLEMENT — that is what "a view of the whole town" means, and it is the only reading
+>   under which the fill floor is met. Handed the terrain box it still returns 1 on the
+>   48 x 48 map and 0.5 on a 128 x 128 one, as the task says.
+> - `FIT_MARGIN_PX` is **24**, not 48: Task 77's bar takes 56 px off the stage, and at 48
+>   the fit fell a whole stop back to the small overview R8 is about.
 
 **Files:** Modify `packages/web/src/render/camera.ts`, `camera.test.ts`, `packages/web/src/render/scene.ts`
 
@@ -2565,8 +2596,8 @@ an executor reading a v1 task knows to read this too.
 | **2** (portraits + `moodOf`) | **MOVED EARLIER — it is a hard prerequisite of Task 81**, which needs `Expression` and `moodOf` for the roster's mood icon. Execute Task 2 in Phase P's first batch, before 81. Its content is unchanged. |
 | **5** (day ramp, shadows) | Shadows now draw into `layers.shadow` (P16), not into the `ambient` under-layer, and the day/night crossing hands off to Task 91's `daybreak`/`nightfall` scene. |
 | **8** (new tiles, camera bounds, culling) | `cameraBounds`/`minZoomFor` are **superseded by Task 76's `cameraBoundsOf`/`fitStop`**; Task 8 keeps the three new tiles and the culling predicate, and the culled set becomes `depthOrder`'s input (Task 70). |
-| **9** (minimap, bookmarks) | The minimap becomes a `Dockable` (Task 78) and its default slot is `hidden` — U20 asks for controls *out of the way*. `MINIMAP_PX_PER_TILE` unchanged. |
-| **10** (overlay lenses) | Overlay tints draw into `layers.groundDecal` (P16); the overlay switch moves into the control bar's `view` group (Task 77). |
+| **9** (minimap, bookmarks) | The minimap becomes a `Dockable` (Task 78) and its default slot is `hidden` — U20 asks for controls *out of the way*. `MINIMAP_PX_PER_TILE` unchanged. **C12a batch 3: `DOCKABLE` ships without `minimap` and without the retired `cameraHud`, because a dockable the renderer cannot place is a setting that does nothing. Task 9 ADDS `'minimap'` to `DOCKABLE` and `hidden` to `DEFAULT_HUD` when the widget lands — one line each, plus its own case in the renderer.** |
+| **10** (overlay lenses) | Overlay tints draw into `layers.groundDecal` (P16); the overlay switch moves into the control bar's `view` group (Task 77). **C12a batch 3: `OverlayKind` does not exist yet, so `ControlCtx` carries no `overlay` field and `ControlAction` has no `overlay` member. Task 10 adds both, plus one item per overlay in the `view` group; `actionFor`'s totality test covers them the moment they appear in `controlItems`.** |
 | **13** (construction stages) | The stake decal draws into `layers.groundDecal`; the `hitArea` re-cut rule is unchanged but now also re-cuts the **door child** (Task 73). |
 | **15** (conversation staging, selection) | Selection rings draw into `layers.overlay`; the new `hoverLabel` cases route through Task 74's `TooltipLayer`, not through a second tag path. |
 | **17** (structure art) | **One line added to every enterable kind's commission:** the art must contain a legible doorway on the south frontage, at ≥ `DOOR_W_TILES × DOOR_H_TILES` of the footprint, so Task 73's threshold plate is a fallback rather than the normal case. |

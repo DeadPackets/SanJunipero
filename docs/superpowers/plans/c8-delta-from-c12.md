@@ -107,3 +107,61 @@ inside it. That is true because a body that is genuinely indoors leaves the town
 (`rendersOnMap`) and is drawn by the interior sub-scene. **If C8 ever lets an agent occupy a
 structure's tile while remaining on the town map** — a roofless pen, a scaffold a builder
 climbs — that rule needs revisiting, and the counted depth fallback is where it will show up.
+
+
+---
+
+## C12a BATCH 3 — what Phases M and O hand on
+
+### ART — the C13 furniture library is drawn at half the scale of the people
+
+The interior room is a 3x3 grid of 2x2-tile slots; the library draws furniture at
+`spritePx` 16-24, and a body draws at `CHAR_TARGET_PX = 52`. Live, a sleeping founder was
+THREE TIMES the length of the bed he was lying in, and three 24 px objects rattled around a
+192 px floor. `interiors.furnishingScale` takes the one integer factor that keeps the biggest
+library sprite inside a slot — 2 today — which brings a bed to 48 px against a 52 px figure.
+
+That closes the gross mismatch, but it is a viewer-side correction to an ART decision. A
+sleeper still overhangs the bed's foot slightly, and 2x nearest-neighbour inside a 3x room
+zoom is 6x effective — chunkier than the smoothly downscaled hi-res characters beside it.
+**Whoever next owns the library should consider drawing bed, table, bench and loom at the
+size a 52 px person actually uses**, at which point `furnishingScale` returns 1 and this
+correction disappears with no call-site change.
+
+### ART — `interior-floor` has no material in any root
+
+`interiorScene` resolves `resolveMaterial(records, 'interior-floor')` and hot-swaps the floor
+to a continuous material the moment one exists, exactly as the outdoor ground does. No root
+supplies one, so the floor ships as a palette-true plane with board seams. The path is wired
+and, like the farmland half of U7, unexercised until the art lands.
+
+### WORLD — nothing is ever stored in a structure, so a room's holdings are untested live
+
+`roomCard.holds` lists items whose `loc` is `{t:'structure', id}`, merged by kind and capped
+at eight with an honest count of the rest. The dev world at day 4 holds **zero items in any
+structure** — `state.items` is empty — so the holdings grid is proven by unit test and has
+never been seen. It becomes real the first time a founder puts grain in the storehouse.
+
+### WORLD — the dev town's provenance reads "Raised by script"
+
+`/api/structure/:id/provenance` returns `builderId: 'script'` for every showcase building,
+because the founders fixture raises them. The room card names the builder faithfully, so it
+says "Raised by script, Day 0". The card is right; the fixture's builder id is the thing that
+reads oddly to a viewer. Worth a real name — or a genesis builder — whenever the founders
+fixture is next opened.
+
+### CAMERA — a clamped rectangle around a diamond world still shows the corners
+
+`clampCamera` keeps the world's BOUNDING BOX covering the viewport. The map is a diamond
+inside that box, so at the box's own edge a viewer sees a dark wedge outside the map. That is
+the world's shape, not a runaway camera: the town can no longer be pushed off screen, and
+three full-width drags now stop at the corner with the town still in view. If a later map is
+non-square or the world grows, this is the rule to revisit.
+
+### CONVENTION — two files whose names differ only in case cannot both exist
+
+macOS resolves paths case-insensitively, so a plan that names `controlBar.ts` (the model),
+`ControlBar.tsx` (the component) and `ControlBar.test.ts` (its test) specifies a trio that
+cannot coexist: the test overwrote the model's test, and the component's import resolved to
+the model. Later phases naming a `foo.ts` / `Foo.tsx` pair should give the tests distinct
+stems, as `controlBar.test.ts` / `controlBarView.test.ts` now do.
