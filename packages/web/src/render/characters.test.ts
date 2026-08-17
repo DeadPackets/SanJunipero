@@ -136,14 +136,25 @@ const LAYER_NAMES = [
   'ground', 'groundDecal', 'shadow', 'entities', 'overhead', 'worldText', 'bubbles', 'overlay',
 ] as const
 
-function makeScene(): Scene {
+function makeScene(): Scene & { sortDepth: () => void } {
   const layers = Object.fromEntries(LAYER_NAMES.map((n) => [n, new MockContainer()]))
+  const sources = new Set<() => Array<{ box: { id: string }; node: unknown }>>()
   return {
     app: { renderer: { generateTexture: () => ({ destroy: () => {} }) } },
     layers,
     entities: layers.entities,
-  } as unknown as Scene
+    addDepthSource: (fn: () => Array<{ box: { id: string }; node: unknown }>) => {
+      sources.add(fn)
+      return () => sources.delete(fn)
+    },
+    // the real scene runs depth.ts here; the test only needs the published boxes
+    sortDepth: () => [...sources].flatMap((f) => f()),
+  } as unknown as Scene & { sortDepth: () => void }
 }
+
+const publishedBoxes = (scene: Scene): Array<{ id: string }> =>
+  ((scene as unknown as { sortDepth: () => Array<{ box: { id: string } }> }).sortDepth() ?? [])
+    .map((e) => e.box)
 
 // every display object the layer put anywhere in the stack
 const placed = (scene: Scene): InstanceType<typeof MockContainer>[] => {
@@ -184,6 +195,14 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(l.shadow!.children).toHaveLength(2)     // one contact shadow per body
     expect(l.entities!.children).toHaveLength(2)   // ONLY the bodies are depth-sorted
     expect(l.worldText!.children).toHaveLength(4)  // emote + name tag per body
+  })
+
+  it('publishes one depth box per living body, at its INTERPOLATED tile', () => {
+    layer.tick(1000)
+    const boxes = publishedBoxes(scene) as unknown as Array<{ id: string; x0: number; y0: number }>
+    expect(boxes.map((b) => b.id).sort()).toEqual(['nadia', 'omar'])
+    const nadia = boxes.find((b) => b.id === 'nadia')!
+    expect([nadia.x0, nadia.y0]).toEqual([2.5, 3.5])   // tile (3,4) spans [2.5,3.5]×[3.5,4.5]
   })
 
   it('getSprite returns the same registered sprite across ticks', () => {

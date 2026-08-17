@@ -4,7 +4,9 @@ import type { Structure, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { hoverLabel, itemCropDetail, type HoverKind } from '../ui/interaction.js'
 import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
+import { structureDepthBox, tileDepthBox, type DepthBox } from './depth.js'
 import { TILE_H, depthKey, tileToScreen } from './iso.js'
+import type { DepthEntry } from './layers.js'
 import { createNameTagLayer, type NameTagLayer } from './nameTags.js'
 import type { Scene } from './scene.js'
 import {
@@ -65,14 +67,19 @@ export function footprintHitPoints(w: number, h: number, scale = 1): number[] {
   return footprintDiamond(w, h).map((v) => v / k)
 }
 
-type Entry = { sprite: Sprite; url: string; pips: Graphics | null; form: Graphics | null }
+type Entry = {
+  sprite: Sprite; url: string; pips: Graphics | null; form: Graphics | null
+  /** the ground this drawable stands on, republished every sync for the frame's depth sort */
+  box: DepthBox
+}
 
 /** `entry.url` for a structure whose kind has no art at all — never a real url, so the
  *  hot-load path re-resolves it exactly once, when the art finally lands. */
 const NO_ART = ''
+type Door = { g: Graphics; box: DepthBox }
 type SyncState = {
   entries: Map<string, Entry>; lastAssetsSeq: number; tags: NameTagLayer
-  doors: Map<string, Graphics>; onDoor: ((structureId: string) => void) | null
+  doors: Map<string, Door>; onDoor: ((structureId: string) => void) | null
 }
 const syncStates = new WeakMap<Scene, SyncState>()
 
@@ -194,6 +201,15 @@ export function syncEntities(
       doors: new Map(), onDoor: null,
     }
     syncStates.set(scene, sync)
+    // Publish the ground every structure, item and crop stands on. One owner sorts the whole
+    // frame from these; nothing here writes a depth of its own.
+    const published = sync
+    scene.addDepthSource(() => {
+      const out: DepthEntry[] = []
+      for (const e of published.entries.values()) out.push({ box: e.box, node: e.sprite })
+      for (const d of published.doors.values()) out.push({ box: d.box, node: d.g })
+      return out
+    })
   }
   if (onDoor !== undefined) sync.onDoor = onDoor
   const tags = sync.tags
@@ -224,14 +240,14 @@ export function syncEntities(
         void provenanceText(sid, store.getState()).then((text) => showPopover(text, e.client.x, e.client.y))
       })
       sprite.hitArea = new Polygon(footprintHitPoints(s.w, s.h))   // until the art sets its scale
-      entry = { sprite, url: '', pips: null, form: null }
+      entry = { sprite, url: '', pips: null, form: null, box: structureDepthBox(key, s) }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
       applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h), null, s, s.kind)
     }
     const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
     entry.sprite.position.set(ground.sx, ground.sy)
-    entry.sprite.zIndex = structureZIndex(s)
+    entry.box = structureDepthBox(key, s)
     if (s.stage === 'construction') {
       entry.sprite.tint = CONSTRUCTION_TINT
       if (entry.pips === null) {
@@ -257,7 +273,7 @@ export function syncEntities(
     const enterable = s.stage === 'complete' && ENTERABLE_KINDS.has(s.kind)
     const doorKey = `door:${s.id}`
     live.add(doorKey)
-    let door = sync.doors.get(doorKey)
+    let door = sync.doors.get(doorKey)?.g
     if (enterable && door === undefined) {
       door = new Graphics()
       door.roundRect(-DOOR_W / 2, -DOOR_H, DOOR_W, DOOR_H, 3)
@@ -278,15 +294,18 @@ export function syncEntities(
         tags.hide()
       })
       door.on('pointertap', () => sync!.onDoor?.(sid))
-      sync.doors.set(doorKey, door)
+      sync.doors.set(doorKey, { g: door, box: structureDepthBox(`${key}~door`, s) })
       scene.layers.entities.addChild(door)
     }
-    if (door !== undefined) {
+    const record = sync.doors.get(doorKey)
+    if (door !== undefined && record !== undefined) {
       door.visible = enterable
       const d = doorTileOf(s)
       const at = tileToScreen(d.x, d.y)
       door.position.set(at.sx, at.sy + TILE_H / 2)
-      door.zIndex = doorZIndex(s)
+      // A door shares its BUILDING's ground, so it can never sort against the building it
+      // belongs to; the `~` in the id puts it immediately after in the seed tiebreak.
+      record.box = structureDepthBox(`${key}~door`, s)
     }
   }
 
@@ -304,7 +323,7 @@ export function syncEntities(
         const text = itemCropDetail(store.getState(), 'item', iid)
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
-      entry = { sprite, url: '', pips: null, form: null }
+      entry = { sprite, url: '', pips: null, form: null, box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX) }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'item', it.kind))
@@ -315,7 +334,7 @@ export function syncEntities(
     }
     const ground = tileToScreen(it.loc.x, it.loc.y)
     entry.sprite.position.set(ground.sx, ground.sy)
-    entry.sprite.zIndex = depthKey(it.loc.x, it.loc.y)
+    entry.box = tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX)
   }
 
   for (const c of Object.values(state.crops)) {
@@ -331,14 +350,14 @@ export function syncEntities(
         const text = itemCropDetail(store.getState(), 'crop', cid)
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
-      entry = { sprite, url: '', pips: null, form: null }
+      entry = { sprite, url: '', pips: null, form: null, box: tileDepthBox(key, c.x, c.y) }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'crop', c.kind))
     }
     const ground = tileToScreen(c.x, c.y)
     entry.sprite.position.set(ground.sx, ground.sy)
-    entry.sprite.zIndex = depthKey(c.x, c.y)
+    entry.box = tileDepthBox(key, c.x, c.y)
     entry.sprite.scale.set(CROP_SCALE_BASE + CROP_SCALE_PER_STAGE * c.stage)
     entry.sprite.tint = c.withered ? WITHERED_TINT : 0xffffff
   }
@@ -352,7 +371,7 @@ export function syncEntities(
   }
   for (const [key, door] of sync.doors) {
     if (!live.has(key)) {
-      door.destroy()
+      door.g.destroy()
       sync.doors.delete(key)
       tags.hide()
     }

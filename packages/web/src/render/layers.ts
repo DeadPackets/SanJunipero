@@ -1,4 +1,5 @@
 import { Container } from 'pixi.js'
+import { depthOrder, type DepthBox } from './depth.js'
 
 // ONE TABLE, ONE AUTHORITY (U8, plan task 69).
 //
@@ -46,19 +47,35 @@ export function createLayers(world: Container): LayerSet {
   return out
 }
 
+// ── the depth sort's one writer ──────────────────────────────────────────────────────────
+
+/** A drawable inside `entities`, and the ground it stands on. */
+export type DepthEntry = { box: DepthBox; node: Container }
+
+/**
+ * THE ONLY PLACE A DEPTH IS WRITTEN. Every drawable in `entities` publishes a DepthBox each
+ * frame; depth.ts turns the set into a painter's order; the index in that order IS the
+ * zIndex. No module invents a number, so no two modules can disagree about one.
+ */
+export function applyDepthOrder(entries: readonly DepthEntry[]): void {
+  const order = depthOrder(entries.map((e) => e.box))
+  const index = new Map(order.map((id, i) => [id, i]))
+  for (const e of entries) e.node.zIndex = index.get(e.box.id) ?? 0
+}
+
 // ── P16's mechanical guard ───────────────────────────────────────────────────────────────
 
 /** An assignment, not a read and not a comparison — `=` but never `==`. */
 export const Z_ASSIGN = /\.zIndex\s*=(?!=)/
 
 /** The only files allowed to write a zIndex, and why:
- *  - `layers.ts` owns the stack itself;
- *  - `entities.ts` and `characters.ts` write the depth INDEX inside `entities`, from
- *    depth.ts — never a literal;
+ *  - `layers.ts` owns the stack AND `applyDepthOrder`, the one writer of a depth;
+ *  - `entities.ts` still positions the door affordance against its own building (task 73
+ *    makes the door a child and this entry goes away);
  *  - `interiorScene.ts` owns a SEPARATE scene graph, a room with its own sorted container,
  *    which never competes with the town's layers. */
 export const Z_AUTHORISED: readonly string[] = [
-  'render/layers.ts', 'render/entities.ts', 'render/characters.ts', 'render/interiorScene.ts',
+  'render/layers.ts', 'render/entities.ts', 'render/interiorScene.ts',
 ]
 
 function authorised(path: string): boolean {

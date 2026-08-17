@@ -9,7 +9,7 @@ import {
   OCTAVE_ALPHA, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField,
   isRoadMass, materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
 } from './groundField.js'
-import { createLayers, type LayerSet } from './layers.js'
+import { applyDepthOrder, createLayers, type DepthEntry, type LayerSet } from './layers.js'
 import { HEADLAND_COLOR, KERB_COLOR, furrowLines, patchOutline, type Tile } from './patches.js'
 import { tileKind } from './tileset.js'
 import { TextureBook } from './textures.js'
@@ -184,6 +184,10 @@ export type Scene = {
   layers: LayerSet
   /** the only depth-sorted layer; `layers.entities`, named for the code that lives in it */
   entities: Container
+  /** register what this module draws into `entities`; returns the unregister */
+  addDepthSource(fn: () => DepthEntry[]): () => void
+  /** one painter's order for the whole frame — called once per tick, by StageMount */
+  sortDepth(): void
   /** above the entities and never hit-tested: place names and other reading aids */
   overlay: Container
   rebakeGround(terrain: TileId[][], records?: AssetRecord[]): void
@@ -238,6 +242,10 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   app.stage.addChild(world)
 
   const tileCbs: Array<(t: { x: number; y: number }) => void> = []
+
+  // The depth sort has ONE owner and runs ONCE a frame over the whole live set. Modules
+  // publish the ground they stand on; nobody publishes an opinion about who is in front.
+  const depthSources = new Set<() => DepthEntry[]>()
 
   const book = new TextureBook()
   const baker = createGroundBaker(app, groundSprite, book)
@@ -389,6 +397,15 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     layers,
     entities: layers.entities,
     overlay: layers.overlay,
+    addDepthSource: (fn) => {
+      depthSources.add(fn)
+      return () => depthSources.delete(fn)
+    },
+    sortDepth: () => {
+      const entries: DepthEntry[] = []
+      for (const fn of depthSources) entries.push(...fn())
+      applyDepthOrder(entries)
+    },
     rebakeGround,
     centerOn,
     setZoom,

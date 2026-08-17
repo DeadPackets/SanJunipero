@@ -2,7 +2,9 @@ import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
-import { depthKey, facingFrom, tileToScreen, type Facing } from './iso.js'
+import { bodyDepthBox, type DepthBox } from './depth.js'
+import { facingFrom, tileToScreen, type Facing } from './iso.js'
+import type { DepthEntry } from './layers.js'
 import type { Scene } from './scene.js'
 import { characterArt, smoothSource, type TextureBook } from './textures.js'
 import { WORLD_FONT_FAMILY, createWorldLabel, type WorldLabel } from './worldLabel.js'
@@ -37,6 +39,8 @@ type CharEntry = {
   facing: Facing
   path: Waypoint[]
   lastMoveArrival: number
+  /** the tile the body is standing on RIGHT NOW — interpolated, never rounded (F-3c) */
+  box: DepthBox
 }
 
 export type CharacterLayer = {
@@ -134,6 +138,14 @@ export function createCharacterLayer(
     })
   }
 
+  // Publish where every body is standing. The frame's one owner sorts these against the
+  // structures; a body no longer carries an opinion about who is in front of whom.
+  scene.addDepthSource(() => {
+    const out: DepthEntry[] = []
+    for (const e of entries.values()) out.push({ box: e.box, node: e.sprite })
+    return out
+  })
+
   // shared 20×8 blob shadow — Graphics-generated once
   const shadowG = new Graphics()
   shadowG.ellipse(10, 4, 10, 4)
@@ -191,7 +203,7 @@ export function createCharacterLayer(
     const now = performance.now()
     e = {
       sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, hitScale: 0, emoteUntil: 0, facing: 'sw',
-      path: [{ x, y, atMs: now }], lastMoveArrival: now,
+      path: [{ x, y, atMs: now }], lastMoveArrival: now, box: bodyDepthBox(agentId, x, y),
     }
     setHitScale(e, CHAR_TARGET_PX / 64)
     entries.set(agentId, e)
@@ -281,7 +293,7 @@ export function createCharacterLayer(
       }
       const { sx, sy } = tileToScreen(pos.x, pos.y)
       e.sprite.position.set(sx, sy + pose.bobY)
-      e.sprite.zIndex = depthKey(Math.round(pos.x), Math.round(pos.y)) + 1
+      e.box = bodyDepthBox(a.id, pos.x, pos.y)
       e.shadow.position.set(sx, sy)
       e.emote.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX)
       e.emote.visible = !emotesHidden && nowMs < e.emoteUntil && e.emote.texture !== Texture.EMPTY

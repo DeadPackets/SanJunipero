@@ -109,6 +109,7 @@ export function StageMount(
         const dt = now - lastMs
         lastMs = now
         chars?.tick(now)
+        s.sortDepth()   // one painter's order for the whole frame, after every box is published
         bubbles?.tick(now)
         weather?.tick(dt)
         ambient?.tick(dt)
