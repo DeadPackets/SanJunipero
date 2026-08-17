@@ -6,9 +6,12 @@ import {
 import { fold } from '../fold.js'
 import { findPath, isPassable, searchPath } from '../path.js'
 import { genesisState, type WorldState } from '../state.js'
+import { submitIntent } from '../intent.js'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
-import { makeGenesisWorld, GENESIS_FORK_Y, GENESIS_BUILDER_ID, GENESIS_RIVER_X } from './world.js'
+import {
+  makeGenesisWorld, GENESIS_FORD, GENESIS_FORK_Y, GENESIS_BUILDER_ID, GENESIS_RIVER_X,
+} from './world.js'
 
 const T_WATER = 2
 
@@ -107,7 +110,9 @@ describe('makeGenesisWorld: the town', () => {
   it('builds no bridge, and the far bank has no route to it', () => {
     const s = foldAll()
     expect(Object.values(s.structures).some((x) => x.kind === 'bridge')).toBe(false)
-    expect(s.terrain.every((row) => row[48] === T_WATER && row[49] === T_WATER && row[50] === T_WATER)).toBe(true)
+    const inFord = (y: number): boolean => y >= GENESIS_FORD.y0 && y <= GENESIS_FORD.y1
+    expect(s.terrain.every((row, y) => row[48] === T_WATER && row[49] === T_WATER
+      && (row[50] === T_WATER) === !inFord(y))).toBe(true)
     // 128x128 holds more open ground than the 6000-node budget can walk, so the search cannot
     // prove the far bank unreachable — it spends the budget and stops at the water, which is
     // the same fact told the other way round (Task 29).
@@ -192,5 +197,72 @@ describe('makeGenesisWorld: the town', () => {
       expect(id).toMatch(/_\d+$/)
       expect(Number(/_(\d+)$/.exec(id)![1])).toBeLessThan(s.counters.nextEntityId)
     }
+  })
+})
+
+// R6, and every line of it measured rather than reasoned: the arithmetic of a deck against
+// the arithmetic of a channel, then a walk that actually arrives.
+describe('the ford: one reach where the channel runs two wide', () => {
+  const T_SAND = 5
+
+  it('narrows the water to two tiles across four rows, and nowhere else', () => {
+    const { terrain } = makeGenesisWorld(DEFAULT_CONFIG)
+    const widths = terrain.map((row) => row.filter((t, x) => t === T_WATER && Math.abs(x - GENESIS_RIVER_X) <= 1).length)
+    for (let y = 0; y < terrain.length; y++) {
+      const narrowed = y >= GENESIS_FORD.y0 && y <= GENESIS_FORD.y1
+      expect(widths[y], `y=${y}`).toBe(narrowed ? 2 : 3)
+      if (narrowed) expect(terrain[y]![GENESIS_FORD.x]).toBe(T_SAND)
+    }
+    expect(GENESIS_FORD.y1 - GENESIS_FORD.y0 + 1).toBe(4)
+  })
+
+  it('leaves a bank on both sides of it, and dry ground to stand on', () => {
+    const s = foldAll()
+    for (let y = GENESIS_FORD.y0; y <= GENESIS_FORD.y1; y++) {
+      expect(isPassable(s, 47, y), `west bank at y=${y}`).toBe(true)
+      expect(isPassable(s, GENESIS_FORD.x, y), `the spit at y=${y}`).toBe(true)
+      expect(isPassable(s, 48, y)).toBe(false)
+      expect(isPassable(s, 49, y)).toBe(false)
+    }
+  })
+
+  it('takes a bridge, and the bridge takes feet to the far bank', () => {
+    const s = foldAll()
+    const y = GENESIS_FORD.y0 + 1
+    let world = fold(s, {
+      seq: 9000, tick: 0, type: 'agent_spawned',
+      payload: { id: 'builder', name: 'Bridger', x: GENESIS_FORD.x, y, ageDays: 7300 },
+    }, DEFAULT_CONFIG)
+    world = fold(world, {
+      seq: 9001, tick: 0, type: 'item_spawned',
+      payload: { id: 'planks', kind: 'wood', qty: 6, loc: { t: 'agent', id: 'builder' } },
+    }, DEFAULT_CONFIG)
+
+    // Nowhere else on the river will take one: measured from the same bank, three rows south.
+    const wide = submitIntent(world, DEFAULT_CONFIG, 'builder', 'build', { kind: 'bridge', x: 48, y: GENESIS_FORD.y1 + 2 })
+    expect(wide.ok).toBe(false)
+
+    const started = submitIntent(world, DEFAULT_CONFIG, 'builder', 'build', { kind: 'bridge', x: 48, y })
+    expect(started.ok).toBe(true)
+    const planned = started.ok
+      ? started.events.find((e) => e.type === 'structure_planned')!.payload as Record<string, number>
+      : {}
+    expect([planned.w, planned.h]).toEqual([2, 1])
+
+    // Lay the deck by hand — the point being measured is the crossing, not the labour.
+    let crossed = fold(world, {
+      seq: 9002, tick: 0, type: 'structure_planned',
+      payload: {
+        id: 'structure_bridge', kind: 'bridge', x: 48, y, w: 2, h: 1,
+        maxHp: 20, flammable: false, builderId: 'builder',
+      },
+    }, DEFAULT_CONFIG)
+    crossed = fold(crossed, { seq: 9003, tick: 0, type: 'structure_completed', payload: { id: 'structure_bridge' } }, DEFAULT_CONFIG)
+
+    const route = findPath(crossed, { x: GENESIS_FORD.x, y }, { x: 45, y }, DEFAULT_CONFIG)
+    expect(route).not.toBeNull()
+    expect(route!.some(([x]) => x === 48)).toBe(true)
+    // And with no deck there is still no crossing.
+    expect(findPath(s, { x: GENESIS_FORD.x, y }, { x: 45, y }, DEFAULT_CONFIG)).toBeNull()
   })
 })

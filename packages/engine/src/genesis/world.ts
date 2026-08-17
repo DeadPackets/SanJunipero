@@ -24,6 +24,15 @@ export const GENESIS_LAKE = { x: 86, y: 20, rx: 9, ry: 6 } as const
 export const GENESIS_HILL = { x: 22, y: 104, rx: 9, ry: 7 } as const
 export const GENESIS_FOREST_X = 92
 
+// The ford. One reach, four rows, a little north of where the town wakes up: a spit of sand
+// reaches out from the near bank and the channel runs two tiles instead of three. It is the
+// only place a six-plank deck can span, so the paths will converge on it and the bridge will
+// go where feet already go — which is better world than a wider recipe would have been.
+export const GENESIS_FORD = { x: GENESIS_RIVER_X + 1, y0: 50, y1: 53 } as const
+
+const inFord = (x: number, y: number): boolean =>
+  x === GENESIS_FORD.x && y >= GENESIS_FORD.y0 && y <= GENESIS_FORD.y1
+
 // Structures the world places and nobody built. The template is the single source of every
 // footprint; `structures.recipes` is the single source for the kinds that can also be built.
 export const GENESIS_BUILDER_ID = 'genesis'
@@ -50,6 +59,9 @@ export function genesisTerrainAt(x: number, y: number): TileId {
   // the branch that leaves the main river for the lake, and the pool where it leaves
   if (Math.abs(y - GENESIS_FORK_Y) <= 1 && x >= GENESIS_RIVER_X && x <= GENESIS_LAKE.x) return T_WATER
   if (Math.abs(y - GENESIS_FORK_Y) <= 3 && Math.abs(x - GENESIS_RIVER_X) <= 3) return T_WATER
+  // The spit comes before the channel and after the fork: it narrows the main river and
+  // never the pool the branch leaves from.
+  if (inFord(x, y)) return T_SAND
   if (Math.abs(x - GENESIS_RIVER_X) <= 1) return T_WATER
   if (inEllipse(x, y, GENESIS_HILL)) return T_ROCK
   if (inEllipse(x, y, GENESIS_HILL, 2)) return T_EARTH
