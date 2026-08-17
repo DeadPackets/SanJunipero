@@ -4,6 +4,12 @@ import type { SimConfig } from '@sj/shared'
 export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
 export const MAX_TILE_ID = 10
 
+// The four ways a body can be failing. A named affliction is a cause with a clock on it —
+// `ill: boolean` stays for the C1 logs that only ever knew the one word.
+export const AFFLICTION_KINDS = ['fatigue', 'illness', 'injury', 'poison'] as const
+export type AfflictionKind = (typeof AFFLICTION_KINDS)[number]
+export type Affliction = { kind: AfflictionKind; severity: number; sinceTick: number }
+
 export type AgentBody = {
   id: string; name: string; x: number; y: number; alive: boolean; asleep: boolean
   needs: { hunger: number; energy: number; warmth: number; social: number }
@@ -12,6 +18,9 @@ export type AgentBody = {
   sex?: 'f' | 'm'                         // absent = 'f'; read through sexOf(), keeps pre-C9 hashes stable
   pregnant?: { sinceDay: number; byId: string }
   parents?: [string, string]              // [motherId, fatherId]; only ever set on the born
+  // Absent until the first affliction and absent again when the last one lifts, sorted by kind
+  // so two bodies ailing the same way hash the same way.
+  afflictions?: Affliction[]
   tendedTick?: number                     // absent until first tended: keeps pre-health state hashes stable
   lastSpokeTick?: number                  // absent until first speech: keeps golden hashes stable
   insideId?: string                       // absent until first entry: keeps golden hashes stable

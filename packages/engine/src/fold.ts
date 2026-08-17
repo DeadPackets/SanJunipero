@@ -1,7 +1,8 @@
 import { DAYS_PER_YEAR, DEFAULT_CONFIG, MINUTES_PER_DAY, SPAWN_AGE_YEARS, type SimConfig, type SimEvent } from '@sj/shared'
-import type { TileId, WorldState } from './state.js'
+import type { Affliction, TileId, WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
+  AfflictionRecovered, AfflictionWorsened, AgentAfflicted, AgentHarmed,
   AgentAged, AgentBorn, AgentCollapsed, AgentConceived, AgentDied, AgentFellIll, AgentInfected,
   AgentInjured, AgentMoved,
   AgentEntered, AgentExited,
@@ -432,6 +433,48 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_tended for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, tendedTick: event.tick } } }
+    }
+    case 'agent_harmed': {
+      const p = AgentHarmed.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_harmed for unknown agent ${p.agentId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, hp: Math.max(0, a.hp - p.amount) } } }
+    }
+    // A second dose of the same thing is the same illness, worse: severity sums and the clock
+    // keeps its original start, so "how long has she been ill" survives the second exposure.
+    case 'agent_afflicted': {
+      const p = AgentAfflicted.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_afflicted for unknown agent ${p.agentId}`)
+      const prev = a.afflictions ?? []
+      const existing = prev.find((x) => x.kind === p.kind)
+      const merged: Affliction = existing === undefined
+        ? { kind: p.kind, severity: p.severity, sinceTick: event.tick }
+        : { kind: p.kind, severity: existing.severity + p.severity, sinceTick: existing.sinceTick }
+      const afflictions = [...prev.filter((x) => x.kind !== p.kind), merged].sort((l, r) => l.kind.localeCompare(r.kind))
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, afflictions } } }
+    }
+    case 'affliction_worsened': {
+      const p = AfflictionWorsened.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`affliction_worsened for unknown agent ${p.agentId}`)
+      if (!a.afflictions?.some((x) => x.kind === p.kind)) throw new Error(`affliction_worsened: ${p.agentId} has no ${p.kind}`)
+      const afflictions = a.afflictions.map((x) => (x.kind === p.kind ? { ...x, severity: p.severity } : x))
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, afflictions } } }
+    }
+    // Losing the last one restores the absent shape, so a body that recovered fully hashes
+    // exactly like one that was never ill.
+    case 'affliction_recovered': {
+      const p = AfflictionRecovered.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`affliction_recovered for unknown agent ${p.agentId}`)
+      if (!a.afflictions?.some((x) => x.kind === p.kind)) throw new Error(`affliction_recovered: ${p.agentId} has no ${p.kind}`)
+      const afflictions = a.afflictions.filter((x) => x.kind !== p.kind)
+      if (afflictions.length > 0) {
+        return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, afflictions } } }
+      }
+      const { afflictions: _, ...body } = a
+      return { ...state, agents: { ...state.agents, [p.agentId]: body } }
     }
     case 'hp_changed': {
       const p = HpChanged.parse(event.payload)

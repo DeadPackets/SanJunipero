@@ -83,6 +83,21 @@ export const AgentFellIll = z.object({ agentId: z.string() }).strict()
 export const AgentRecovered = z.object({ agentId: z.string() }).strict()
 export const AgentTended = z.object({ agentId: z.string() }).strict()
 export const HpChanged = z.object({ agentId: z.string(), delta: z.number() }).strict()
+
+// C11 mortality. Harm is an amount with a source; an affliction is a cause with a clock.
+const AfflictionKindSchema = z.enum(['fatigue', 'illness', 'injury', 'poison'])
+export const AgentHarmed = z.object({
+  agentId: z.string(), amount: z.number().nonnegative(),
+  source: z.enum(['attack', 'fire', 'accident']), byId: z.string().optional(),
+}).strict()
+export const AgentAfflicted = z.object({
+  agentId: z.string(), kind: AfflictionKindSchema, severity: z.number().positive(),
+  sourceId: z.string().optional(), itemId: z.string().optional(),
+}).strict()
+export const AfflictionWorsened = z.object({
+  agentId: z.string(), kind: AfflictionKindSchema, severity: z.number().positive(),
+}).strict()
+export const AfflictionRecovered = z.object({ agentId: z.string(), kind: AfflictionKindSchema }).strict()
 export const WeatherChanged = z.object({ kind: z.string(), temperatureC: z.number(), prevKind: z.string().optional() }).strict()
 // Pure sensation: no fold effect, no cause, no resolution anywhere in the world.
 export const MysteryEvent = z.object({

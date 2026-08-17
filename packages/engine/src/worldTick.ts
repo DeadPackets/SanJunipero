@@ -6,6 +6,7 @@ import type { RngStreams } from './rng.js'
 import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
 import { healthSystem } from './systems/health.js'
+import { mortalitySystem } from './systems/mortality.js'
 import { agingSystem } from './systems/aging.js'
 import { weatherSystem } from './systems/weather.js'
 import { fireSystem } from './systems/fire.js'
@@ -88,7 +89,7 @@ function collapseDeathSystem(ctx: TickCtx): void {
 // position may have moved, and a system holding a pre-growth position would act on the wrong tile.
 const SYSTEMS: System[] = [
   weatherSystem, mysterySystem, mapGrowthSystem, fireSystem, cropsSystem, wildlifeSystem, spoilageSystem,
-  needsSystem, healthSystem, reproductionSystem, agingSystem, actionsSystem, collapseDeathSystem,
+  needsSystem, healthSystem, mortalitySystem, reproductionSystem, agingSystem, actionsSystem, collapseDeathSystem,
 ]
 
 // Each emit folds immediately, so every system — and every later event within a
