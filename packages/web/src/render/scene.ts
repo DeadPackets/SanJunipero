@@ -7,8 +7,10 @@ import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import {
   OCTAVE_ALPHA, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField,
-  materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
+  isRoadMass, materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
 } from './groundField.js'
+import { HEADLAND_COLOR, KERB_COLOR, furrowLines, patchOutline, type Tile } from './patches.js'
+import { tileKind } from './tileset.js'
 import { TextureBook } from './textures.js'
 
 export const BACKGROUND = 0x322b38
@@ -106,6 +108,35 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
         layer.addChild(oct)
       }
     }
+    // U7: a patch was only ever the union of its tiles' diamonds under one material — a shape
+    // with no edge, which is what read as an amorphous blob. Paved ground gets a kerb, a field
+    // gets a headland and furrows. All of it lands in the BAKE, so it costs nothing per frame.
+    const plaza: Tile[] = [], farmland: Tile[] = []
+    for (let y = 0; y < terrain.length; y++) {
+      const row = terrain[y]!
+      for (let x = 0; x < row.length; x++) {
+        if (tileKind(row[x]!) === 'farmland') farmland.push({ x, y })
+        else if (isRoadMass(terrain, x, y)) plaza.push({ x, y })
+      }
+    }
+
+    const strokeAt = (polys: number[][], color: number, alpha: number, close: boolean): void => {
+      if (polys.length === 0) return
+      const g = new Graphics()
+      for (const poly of polys) {
+        const pts: number[] = []
+        for (let i = 0; i < poly.length; i += 2) pts.push(poly[i]! + offX, poly[i + 1]!)
+        if (close) g.poly(pts)
+        else { g.moveTo(pts[0]!, pts[1]!); g.lineTo(pts[2]!, pts[3]!) }
+      }
+      g.stroke({ color, alpha, width: 1, alignment: 0.5 })
+      layer.addChild(g)
+    }
+
+    strokeAt(furrowLines(farmland), HEADLAND_COLOR, OCTAVE_ALPHA, false)
+    strokeAt(patchOutline(farmland), HEADLAND_COLOR, 1, true)
+    strokeAt(patchOutline(plaza), KERB_COLOR, 1, true)
+
     app.renderer.render({ container: layer, target, clear: true })
     layer.destroy({ children: true })
   }
