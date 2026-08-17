@@ -20,6 +20,8 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
   const [api, setApi] = useState<BondsResponse | null>(null)
   const [lineage, setLineage] = useState<LineageLike>(EMPTY_LINEAGE)
   const [hidden, setHidden] = useState<Set<string>>(new Set())
+  // R6: the key is shut on arrival, so the graph is never explained by a card standing on it.
+  const [keyOpen, setKeyOpen] = useState(false)
   const [selected, setSelected] = useState<RelationLink | null>(null)
   const boxRef = useRef<HTMLDivElement>(null)
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined)
@@ -85,6 +87,9 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
   const links = graph.links.filter((l) =>
     !hidden.has(`level:${l.level}`) && !hidden.has(`type:${l.type}`) && !hidden.has(`arc:${l.arc.direction}`))
 
+  // A shut key must not hide the fact that lines are being filtered out.
+  const hiddenCount = hidden.size
+
   const toggle = (k: string): void => {
     setHidden((prev) => {
       const next = new Set(prev)
@@ -96,21 +101,35 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
 
   return (
     <div className="society-lens" ref={boxRef}>
-      <div className="society-legend" role="group" aria-label="How to read this">
-        {(['level', 'type', 'arc'] as const).map((axis) => (
-          <div className="legend-axis" key={axis} data-axis={axis}>
-            <span className="legend-axis-name">
-              {axis === 'level' ? 'How close' : axis === 'type' ? 'Family' : 'Which way'}
-            </span>
-            {legend.filter((r) => r.axis === axis).map((r) => (
-              <LegendChip key={key(r)} row={r} off={hidden.has(key(r))} onToggle={() => toggle(key(r))} />
+      <div className="society-key" data-open={keyOpen ? 'yes' : 'no'}>
+        <button
+          type="button"
+          className="key-summary"
+          aria-expanded={keyOpen}
+          aria-controls="society-key-body"
+          onClick={() => setKeyOpen((v) => !v)}
+        >
+          {keyOpen ? 'Hide the key' : 'How to read this'}
+          {hiddenCount > 0 && <span className="key-filtered">{hiddenCount} hidden</span>}
+        </button>
+        {keyOpen && (
+          <div id="society-key-body" className="society-legend" role="group" aria-label="How to read this">
+            {(['level', 'type', 'arc'] as const).map((axis) => (
+              <div className="legend-axis" key={axis} data-axis={axis}>
+                <span className="legend-axis-name">
+                  {axis === 'level' ? 'How close' : axis === 'type' ? 'Family' : 'Which way'}
+                </span>
+                {legend.filter((r) => r.axis === axis).map((r) => (
+                  <LegendChip key={key(r)} row={r} off={hidden.has(key(r))} onToggle={() => toggle(key(r))} />
+                ))}
+              </div>
             ))}
+            {api !== null && (
+              <span className="legend-stamp">
+                as of Day {tickToMoment(api.asOfTick).day} {tickToMoment(api.asOfTick).time}
+              </span>
+            )}
           </div>
-        ))}
-        {api !== null && (
-          <span className="legend-stamp">
-            as of Day {tickToMoment(api.asOfTick).day} {tickToMoment(api.asOfTick).time}
-          </span>
         )}
       </div>
 

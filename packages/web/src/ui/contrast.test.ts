@@ -108,6 +108,19 @@ describe('--ink-quiet — the de-emphasis token', () => {
   })
 })
 
+// R6: a shut key must still say that lines are being filtered out, so the badge that says it
+// is the one piece of chrome that carries ink on a saturated fill.
+describe('the filtered-count badge on the shut bonds key', () => {
+  it('paints its own two tokens, and they clear AA', () => {
+    const body = ruleBody(CSS, '.key-filtered')
+    const fg = /color:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    const bg = /background:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    expect(fg).toBe('deep')
+    expect(bg).toBe('ember')
+    expect(contrast(T[fg!]!, T[bg!]!)).toBeGreaterThanOrEqual(AA)
+  })
+})
+
 describe('the opacity habit, at every ink-on-paper site it produced', () => {
   it.each(QUIET_SITES)('%s states its colour instead of thinning it', (selector) => {
     const body = ruleBody(CSS, selector)

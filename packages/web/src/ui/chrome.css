@@ -833,11 +833,34 @@ body {
     radial-gradient(circle at 1px 1px, rgba(255, 246, 233, 0.07) 1px, transparent 1.5px) 0 0 / 24px 24px,
     var(--night);
 }
-.society-legend {
+/* R6: thirteen chips permanently across the corner is a card standing on the graph, and on a
+   larger town a node spawns behind it. The key opens on request; shut, it is one control. */
+.society-key {
   position: absolute; top: 0.8rem; left: 0.8rem; z-index: 20;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem;
+  max-width: min(40rem, calc(100% - 1.6rem));
+}
+.key-summary {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  min-width: 10.5rem; min-height: 40px; padding: 0.3rem 0.7rem; cursor: pointer;
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--ink); background: var(--cream) var(--grain);
+  border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
+  transition-property: background-color, translate, box-shadow; transition-duration: var(--t-fast);
+}
+.key-summary:hover { translate: 0 -2px; box-shadow: 2px 6px 0 0 var(--deep); }
+.key-summary:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.society-key[data-open='yes'] .key-summary { background-color: var(--honey); }
+/* struck-out chips keep filtering while the key is shut — say so where the key is */
+.key-filtered {
+  font-family: var(--font-px); font-size: 0.75rem;
+  background: var(--ember); color: var(--deep);
+  padding: 0.1rem 0.3rem; box-shadow: 0 0 0 2px var(--ink);
+}
+.society-legend {
   display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
   /* six kinds now, not four: the legend wraps inside the lens rather than off its edge */
-  max-width: min(40rem, calc(100% - 1.6rem));
+  max-width: min(40rem, 100%);
   background-color: var(--cream);
   padding: 0.1rem 0.2rem;
 }
