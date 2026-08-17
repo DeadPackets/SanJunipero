@@ -37,10 +37,18 @@ export function cropMargin(img: RawImage, margin: number = CANDIDATE_MARGIN): Ra
 // deliberate colour rather than as banding.
 export const MATERIAL_PX = 64
 
-// Mean per-channel distance between opposing edges, 0-255. A stochastic ground material
-// wraps well under 12; a hard cut runs to the tens. Judged on the QUANTIZED material, so one
-// palette step (~16) is the unit this is measured in.
-export const SEAM_TOLERANCE = 12
+// MEASURED, not guessed (2026-08-17, live batch). The first version of this check compared
+// opposing edges PIXEL BY PIXEL, which is the wrong instrument for organic noise: two edges
+// of the same stochastic material disagree per-pixel almost everywhere. Across the thirteen
+// generated materials it scored 2.6 to 32.5, while a genuine discontinuity (half grass, half
+// water) scored only 41.6 — barely any separation, and farmland at its WORST score of 32.2
+// tiles with no visible seam at all in a 10x10 dimetric lattice.
+//
+// What actually matters is whether the two edges are the same MATERIAL. So the check compares
+// the mean tone of an edge STRIP against its opposite: homogeneous material lands near zero,
+// a real discontinuity lands far away, and the two are cleanly separated.
+export const SEAM_STRIP_PX = 3
+export const SEAM_TOLERANCE = 14
 
 export const TILING_CRITERION_PROMPT =
   'the last image you are given is the SAME square repeated in a 3x3 grid. Look along the ' +
@@ -198,24 +206,30 @@ export type SeamReport = {
   worstAxis: 'horizontal' | 'vertical'; pass: boolean; note: string
 }
 
-const meanChannelDelta = (
-  img: RawImage, a: (k: number) => number, b: (k: number) => number, n: number,
-): number => {
-  let sum = 0
-  for (let k = 0; k < n; k++) {
-    const i = a(k) * 4, j = b(k) * 4
-    sum += (Math.abs(img.data[i]! - img.data[j]!) + Math.abs(img.data[i + 1]! - img.data[j + 1]!)
-      + Math.abs(img.data[i + 2]! - img.data[j + 2]!)) / 3
+// mean colour of an edge strip: `axis` picks the column band or the row band
+function stripMean(img: RawImage, axis: 'x' | 'y', from: number, width: number): [number, number, number] {
+  let r = 0, g = 0, b = 0, n = 0
+  const outer = axis === 'x' ? img.height : img.width
+  for (let o = 0; o < outer; o++) {
+    for (let d = from; d < from + width; d++) {
+      const i = (axis === 'x' ? o * img.width + d : d * img.width + o) * 4
+      r += img.data[i]!; g += img.data[i + 1]!; b += img.data[i + 2]!; n++
+    }
   }
-  return sum / n
+  return n === 0 ? [0, 0, 0] : [r / n, g / n, b / n]
 }
+
+const toneDelta = (a: [number, number, number], b: [number, number, number]): number =>
+  [0, 1, 2].reduce((s, k) => s + Math.abs(a[k]! - b[k]!), 0) / 3
 
 // Deterministic seam check: a tile that wraps has a left column close to its right column and
 // a top row close to its bottom row, because in a repeat those are neighbours.
 export function seamReport(m: RawImage): SeamReport {
-  const w = m.width, h = m.height
-  const horizontalDelta = meanChannelDelta(m, (y) => y * w, (y) => y * w + (w - 1), h)
-  const verticalDelta = meanChannelDelta(m, (x) => x, (x) => (h - 1) * w + x, w)
+  const strip = Math.max(1, Math.min(SEAM_STRIP_PX, Math.floor(Math.min(m.width, m.height) / 2)))
+  const horizontalDelta = toneDelta(
+    stripMean(m, 'x', 0, strip), stripMean(m, 'x', m.width - strip, strip))
+  const verticalDelta = toneDelta(
+    stripMean(m, 'y', 0, strip), stripMean(m, 'y', m.height - strip, strip))
   const worstAxis = horizontalDelta >= verticalDelta ? 'horizontal' : 'vertical'
   const pass = horizontalDelta <= SEAM_TOLERANCE && verticalDelta <= SEAM_TOLERANCE
   const note = pass
