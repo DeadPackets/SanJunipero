@@ -14,6 +14,7 @@ import { wildlifeSystem } from './systems/wildlife.js'
 import { spoilageSystem } from './systems/spoilage.js'
 import { reproductionSystem } from './systems/reproduction.js'
 import { mysterySystem } from './systems/mystery.js'
+import { mapGrowthSystem } from './systems/mapGrowth.js'
 
 export type TickCtx = {
   readonly config: SimConfig
@@ -83,8 +84,10 @@ function collapseDeathSystem(ctx: TickCtx): void {
   }
 }
 
+// mapGrowth runs before anything that reads a coordinate this tick: after it, every stored
+// position may have moved, and a system holding a pre-growth position would act on the wrong tile.
 const SYSTEMS: System[] = [
-  weatherSystem, mysterySystem, fireSystem, cropsSystem, wildlifeSystem, spoilageSystem,
+  weatherSystem, mysterySystem, mapGrowthSystem, fireSystem, cropsSystem, wildlifeSystem, spoilageSystem,
   needsSystem, healthSystem, reproductionSystem, agingSystem, actionsSystem, collapseDeathSystem,
 ]
 

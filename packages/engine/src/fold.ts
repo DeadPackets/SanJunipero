@@ -13,6 +13,7 @@ import {
   ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, TileChanged, WeatherChanged, WildlifeChanged,
+  WorldGrown,
 } from './events.def.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { occupantsOf } from './interiors.js'
@@ -494,6 +495,59 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (row[p.x] !== p.from) throw new Error(`tile_changed from-mismatch at (${p.x}, ${p.y})`)
       const terrain = state.terrain.map((r, y) => (y === p.y ? r.map((t, x) => (x === p.x ? (p.to as TileId) : t)) : r))
       return { ...state, terrain }
+    }
+    // Growing north or west moves the origin, so every stored coordinate moves with it —
+    // inside this one fold, or a replay would find the town standing beside itself.
+    case 'world_grown': {
+      const p = WorldGrown.parse(event.payload)
+      const h = state.terrain.length
+      const w = state.terrain[0]!.length
+      const vertical = p.edge === 'n' || p.edge === 's'
+      const rows = vertical ? p.depth : h
+      const cols = vertical ? w : p.depth
+      if (p.tiles.length !== rows || p.tiles.some((r) => r.length !== cols)) {
+        throw new Error(`world_grown strip is ${p.tiles.length}x${p.tiles[0]?.length ?? 0}, not ${rows}x${cols}`)
+      }
+      const strip = p.tiles.map((r) => r.map((t) => t as TileId))
+      let terrain: TileId[][]
+      if (p.edge === 'n') terrain = [...strip, ...state.terrain]
+      else if (p.edge === 's') terrain = [...state.terrain, ...strip]
+      else if (p.edge === 'w') terrain = state.terrain.map((r, y) => [...strip[y]!, ...r])
+      else terrain = state.terrain.map((r, y) => [...r, ...strip[y]!])
+
+      const growths = (state.growths ?? 0) + 1
+
+      const dx = p.edge === 'w' ? p.depth : 0
+      const dy = p.edge === 'n' ? p.depth : 0
+      if (dx === 0 && dy === 0) return { ...state, terrain, growths }
+
+      // Params are translated on the `{x, y}` pair every landed coordinate-taking verb uses
+      // (walk, till, plant, build): a destination in the old frame is a different tile now.
+      const shiftParams = (params: Record<string, unknown>): Record<string, unknown> =>
+        typeof params['x'] === 'number' && typeof params['y'] === 'number'
+          ? { ...params, x: params['x'] + dx, y: params['y'] + dy }
+          : params
+      const agents = Object.fromEntries(Object.entries(state.agents).map(([id, a]) => [id, {
+        ...a, x: a.x + dx, y: a.y + dy,
+        ...(a.activity === null ? {} : {
+          activity: {
+            ...a.activity,
+            params: shiftParams(a.activity.params),
+            ...(a.activity.path === undefined
+              ? {}
+              : { path: a.activity.path.map(([x, y]): [number, number] => [x + dx, y + dy]) }),
+          },
+        }),
+      }]))
+      const structures = Object.fromEntries(
+        Object.entries(state.structures).map(([id, s]) => [id, { ...s, x: s.x + dx, y: s.y + dy }]))
+      const items = Object.fromEntries(Object.entries(state.items).map(([id, i]) => [id,
+        i.loc.t === 'tile' ? { ...i, loc: { ...i.loc, x: i.loc.x + dx, y: i.loc.y + dy } } : i]))
+      const crops = Object.fromEntries(
+        Object.entries(state.crops).map(([id, c]) => [id, { ...c, x: c.x + dx, y: c.y + dy }]))
+      // Tasks 17, 19, 21 and 28 add traffic, fauna, forageables and saplings; each is keyed or
+      // stamped by coordinate and must be translated here too, in this same fold.
+      return { ...state, terrain, growths, agents, structures, items, crops }
     }
     // The whitelist is the whole of the authority: an operator, a bug or a doctored
     // log can only ever move a dial this table already agreed to.

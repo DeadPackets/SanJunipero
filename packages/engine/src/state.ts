@@ -56,6 +56,9 @@ export type WorldState = {
   // Runtime overrides of world physics, keyed by dotted config path. Absent until the
   // first config_changed; hashed, snapshotted and replayed like every other fact.
   laws?: Record<string, unknown>
+  // How many times the map has grown. Absent until the first world_grown, so a world that
+  // never widens hashes as it always did. Read only through growthsSoFar().
+  growths?: number
   counters: { nextEntityId: number }
 }
 

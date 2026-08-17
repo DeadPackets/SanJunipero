@@ -106,5 +106,12 @@ export const TileChanged = z.object({
   reason: z.enum(['paved', 'worn', 'overgrown', 'channel', 'seeded', 'grown', 'tilled']),
   byId: z.string().optional(),
 }).strict()
+// The border strip is rolled from the `worldgen` stream at emission and travels in the
+// payload, so replay from genesis and replay from any snapshot reach the identical map.
+export const WorldGrown = z.object({
+  edge: z.enum(['n', 'e', 's', 'w']),
+  depth: z.number().int().positive(),
+  tiles: z.array(z.array(z.number().int().min(0).max(10))),
+}).strict()
 // The only road a world law travels. `value` is checked against TOGGLABLE_PATHS at fold.
 export const ConfigChanged = z.object({ path: z.string(), value: z.unknown() }).strict()
