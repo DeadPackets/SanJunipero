@@ -107,6 +107,26 @@ describe('human framing guard', () => {
   })
 })
 
+describe('perceptionToProse: the ground says what it is, and nothing about what to do', () => {
+  // The engine may state a physical fact. The moment it states a preference it is a rule.
+  const NUDGES = /\b(should|ought|better site|recommended|recommend|ideal|best place|advise)\b/i
+  const ROAD_CLAUSE = 'Carts and feet reach this spot easily.'
+  const onRoad = { ...quietMeadowPacket, ground: { wellTravelled: true as const } }
+
+  it('renders the clause once for well-travelled ground and not at all otherwise', () => {
+    const prose = perceptionToProse(onRoad)
+    expect(prose).toContain(ROAD_CLAUSE)
+    expect(prose.split(ROAD_CLAUSE)).toHaveLength(2)
+    expect(perceptionToProse(quietMeadowPacket)).not.toContain(ROAD_CLAUSE)
+  })
+
+  it('never tells the mind what to do with the fact', () => {
+    expect(ROAD_CLAUSE).not.toMatch(NUDGES)
+    expect(ROAD_CLAUSE).not.toMatch(FORBIDDEN_FRAMING)
+    expect(perceptionToProse(onRoad)).not.toMatch(NUDGES)
+  })
+})
+
 describe('perceptionToProse', () => {
   it('quotes heard speech with the speaker name', () => {
     const prose = perceptionToProse(conversationPacket)

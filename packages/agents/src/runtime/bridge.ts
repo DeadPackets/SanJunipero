@@ -72,6 +72,7 @@ function reconcile(
       })),
     },
     weather: raw.weather,
+    ...(raw.ground === undefined ? {} : { ground: raw.ground }),
     visible: {
       agents: raw.visible.agents,
       structures: raw.visible.structures,

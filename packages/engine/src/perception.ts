@@ -59,6 +59,10 @@ export type SeenEvent =
   | { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
   | { kind: 'mystery'; mystery: string; prose: string }
 
+// What the ground under and around the feet is like. Absent on plain earth, so a packet from
+// a town with no roads reads exactly as it always did. A fact about hauling, not a site score.
+export type PerceivedGround = { wellTravelled: true }
+
 export type PerceptionPacket = {
   time: SimTime
   self: {
@@ -75,9 +79,25 @@ export type PerceptionPacket = {
     items: PerceivedItem[]
     crops: PerceivedCrop[]
   }
+  ground?: PerceivedGround
   heard: HeardSpeech[]
   seen: SeenEvent[]
   feltEvents: string[]
+}
+
+// Road and worn path both. The advantage is already real — it is the move cost roads changed
+// in C9 — and this only says so out loud.
+const TRAVELLED_TILES: ReadonlySet<number> = new Set([7, 8])
+
+function groundUnderfoot(state: WorldState, config: SimConfig, x: number, y: number): PerceivedGround | undefined {
+  if (!config.roads.enabled) return undefined
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const tile = state.terrain[y + dy]?.[x + dx]
+      if (tile !== undefined && TRAVELLED_TILES.has(tile)) return { wellTravelled: true }
+    }
+  }
+  return undefined
 }
 
 const dist = (x1: number, y1: number, x2: number, y2: number): number => Math.hypot(x2 - x1, y2 - y1)
@@ -301,6 +321,8 @@ export function composePerception(
     .map(ev => (ev.type === 'mystery_event' ? globalMysteryTag(self.asleep, ev) : feltTagFor(agentId, ev)))
     .filter((t): t is string => t !== null)
 
+  const ground = groundUnderfoot(state, config, self.x, self.y)
+
   return {
     time: simTimeFromTick(state.tick),
     self: {
@@ -318,6 +340,7 @@ export function composePerception(
       inventory,
     },
     weather: { ...state.weather },
+    ...(ground === undefined ? {} : { ground }),
     visible: { agents: visibleAgents, structures: visibleStructures, items: visibleItems, crops: visibleCrops },
     heard,
     seen,

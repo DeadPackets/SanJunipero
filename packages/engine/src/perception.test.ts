@@ -434,3 +434,29 @@ describe('composePerception: witnessed takings', () => {
     expect(composePerception(theftWorld(), off, 'bystander', [taken('omar', 'salma', 4, 4)]).seen).toEqual([])
   })
 })
+
+describe('the ground underfoot: a benefit stated, never a rule given', () => {
+  function paved(tiles: Array<{ x: number; y: number; tile: TileId }>, self = { x: 0, y: 0 }): WorldState {
+    const s = makeWorld([{ id: 'a', ...self }])
+    const terrain = s.terrain.map((row, y) => row.map((t, x) => tiles.find((p) => p.x === x && p.y === y)?.tile ?? t))
+    return { ...s, terrain }
+  }
+  const ground = (s: WorldState, config = DEFAULT_CONFIG) => composePerception(s, config, 'a', []).ground
+
+  it('reads the road under the feet and the road beside them, and nothing further off', () => {
+    expect(ground(paved([{ x: 0, y: 0, tile: 7 }]))).toEqual({ wellTravelled: true })
+    expect(ground(paved([{ x: 1, y: 1, tile: 7 }]))).toEqual({ wellTravelled: true })
+    expect(ground(paved([{ x: 0, y: 1, tile: 8 }]))).toEqual({ wellTravelled: true })
+    expect(ground(paved([{ x: 2, y: 0, tile: 7 }]))).toBeUndefined()
+    expect(ground(paved([]))).toBeUndefined()
+  })
+
+  it('says it once however much road there is, and says nothing at all when roads are off', () => {
+    const surrounded = paved([
+      { x: 0, y: 0, tile: 7 }, { x: 1, y: 0, tile: 7 }, { x: 0, y: 1, tile: 7 }, { x: 1, y: 1, tile: 8 },
+    ])
+    expect(ground(surrounded)).toEqual({ wellTravelled: true })
+    const off = SimConfigSchema.parse({ roads: { enabled: false } })
+    expect(ground(surrounded, off)).toBeUndefined()
+  })
+})
