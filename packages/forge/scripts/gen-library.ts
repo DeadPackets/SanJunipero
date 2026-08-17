@@ -23,6 +23,7 @@ import { CRITERIA, type VisionVerdict } from '../src/visionQa/verdict.js'
 import { planBatch, estimateBatchCost, LIBRARY_BATCHES } from '../src/library/plan.js'
 import { toSpriteCell, candidateRank } from '../src/library/postItem.js'
 import { registerLibraryEntry, deriveIcon, libraryIndexJson } from '../src/library/register.js'
+import { spriteGateStatus } from '../src/library/status.js'
 import type { LibraryEntry } from '../src/library/catalog.js'
 
 const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
@@ -156,6 +157,7 @@ async function main(): Promise<void> {
       note = err instanceof AnomalyStopError ? err.message : String(err)
       ledger.flush()
     }
+    if (status !== 'error') status = spriteGateStatus(spriteVerdicts, status)
 
     if (chosen) {
       icon ??= chosenRaw ? toSpriteCell(chosenRaw, e.iconPx).cell : deriveIcon(chosen, e.iconPx)

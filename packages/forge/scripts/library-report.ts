@@ -4,8 +4,9 @@
 // ruled G13b assertion 1 must be read from. No key, no network, no spend.
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { CRITERIA, type Criterion, type VisionVerdict } from '../src/visionQa/verdict.js'
+import { CRITERIA, criterionOf, type Criterion, type VisionVerdict } from '../src/visionQa/verdict.js'
 import { LIBRARY } from '../src/library/catalog.js'
+import { spriteGateStatus } from '../src/library/status.js'
 import { LIBRARY_CATEGORIES } from '@sj/shared'
 
 const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
@@ -21,23 +22,25 @@ type Row = {
 }
 
 const scores = (v: VisionVerdict | null): string =>
-  v ? CRITERIA.map(c => v.criteria[c].score).join(' ') : '—'
+  v ? CRITERIA.map(c => criterionOf(v, c)?.score ?? '—').join(' ') : '—'
 // A criterion "holds" when it is not N/A for the class and clears minScore without a hard fail.
-const holds = (v: VisionVerdict, c: Criterion): boolean =>
-  v.criteria[c].evidence.startsWith('not applicable') || (v.criteria[c].pass && v.criteria[c].score >= 7)
-const live = (v: VisionVerdict, c: Criterion): boolean => !v.criteria[c].evidence.startsWith('not applicable')
+// A criterion the stored rubric version never asked is neither held nor counted.
+const asked = (v: VisionVerdict, c: Criterion): boolean => criterionOf(v, c) !== undefined
+const holds = (v: VisionVerdict, c: Criterion): boolean => {
+  const x = criterionOf(v, c)
+  return x !== undefined && (x.evidence.startsWith('not applicable') || (x.pass && x.score >= 7))
+}
+const live = (v: VisionVerdict, c: Criterion): boolean =>
+  asked(v, c) && !criterionOf(v, c)!.evidence.startsWith('not applicable')
 
 const rows: Row[] = []
 for (const e of LIBRARY) {
   const p = join(LIB, e.kind, 'report.json')
   if (!existsSync(p)) { rows.push({ kind: e.kind, category: e.category, status: 'missing', attempts: 0, spendUsd: 0, sprite: null, icon: null }); continue }
   const r = JSON.parse(readFileSync(p, 'utf8')) as Report
-  // The runner's own `status` is 'blocked' whenever the ITEM did not close, which includes a
-  // clean sprite whose 16 px icon failed three rounds. The sprite gate's own outcome is the
-  // last sprite verdict, and that is what the sprite column reports.
   rows.push({
     kind: e.kind, category: e.category, attempts: r.attempts, spendUsd: r.spendUsd,
-    status: r.spriteVerdicts.at(-1)?.overall ?? r.status,
+    status: spriteGateStatus(r.spriteVerdicts, r.status),
     sprite: r.spriteVerdicts.at(-1) ?? null, icon: r.iconVerdicts.at(-1) ?? null,
   })
 }
@@ -54,7 +57,7 @@ const perCriterion = CRITERIA.map(c => {
 })
 const allVerdicts = rows.flatMap(r => [r.sprite, r.icon].filter((v): v is VisionVerdict => v !== null))
 const criteriaHeld = allVerdicts.reduce((s, v) => s + CRITERIA.filter(c => holds(v, c)).length, 0)
-const criteriaTotal = allVerdicts.length * CRITERIA.length
+const criteriaTotal = allVerdicts.reduce((s, v) => s + CRITERIA.filter(c => asked(v, c)).length, 0)
 
 const md = [
   '# C13 premade library — results (50 entries)',

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   CRITERIA, HARD_FAIL_CRITERIA, VisionCriteriaSchema, VisionVerdictSchema,
-  NA_CRITERIA_BY_CLASS, NA_CRITERION, deriveOverall, type VisionCriteria,
+  NA_CRITERIA_BY_CLASS, NA_CRITERION, criterionOf, deriveOverall, type VisionCriteria,
 } from './verdict.js'
 
 function crit(score = 10, pass = true) { return { pass, score, evidence: 'looks right' } }
@@ -73,5 +73,23 @@ describe('deriveOverall', () => {
 
   it('NA_CRITERION names the class and always passes', () => {
     expect(NA_CRITERION('icon')).toEqual({ pass: true, score: 10, evidence: 'not applicable for class icon' })
+  })
+})
+
+describe('criterionOf', () => {
+  const v = {
+    assetId: 'library:axe', model: 'm', rubricVersion: 'v1',
+    criteria: all(8), overall: 'pass' as const, feedback: '',
+  }
+
+  it('reads a criterion the verdict carries', () => {
+    expect(criterionOf(v, 'palette')?.score).toBe(8)
+  })
+
+  it('returns undefined for a criterion the stored verdict predates, rather than crashing', () => {
+    const { tiling, ...older } = v.criteria
+    const stored = { ...v, criteria: older as unknown as VisionCriteria }
+    expect(criterionOf(stored, 'tiling')).toBeUndefined()
+    expect(criterionOf(stored, 'palette')?.score).toBe(8)
   })
 })
