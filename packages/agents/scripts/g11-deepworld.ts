@@ -212,7 +212,7 @@ const MINDS: Mind[] = [
       temperament: 'restless, cheerful, impatient',
       values: ['nothing wasted', 'a dry way home'],
       beliefs: ['feet make the road'],
-      current: { mood: 'in a hurry and hungry', worries: ['the berries will go over and there is nothing in your hands'], goals: ['walk to the berry bushes out at (62, 44) — you have known them for years — and gather from them', 'eat what you gather, and take a handful back'] },
+      current: { mood: 'in a hurry and hungry', worries: ['the berries will go over and there is nothing in your hands'], goals: ['gather from a berry bush', 'eat what you gather, and take a handful back'] },
     },
   },
   {

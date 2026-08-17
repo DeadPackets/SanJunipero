@@ -1,616 +1,791 @@
 # GATE G11b — the deep world, 2 sim-days
 
-Model deepseek/deepseek-v4-flash-0731; 2880 ticks at 250 ms; $0.365025 over 442 calls.
+Model deepseek/deepseek-v4-flash-0731; 2880 ticks at 250 ms; $0.790318 over 633 calls.
 
 ## Thoughts
 
-- t421 **amara**: Water first — the well is six tiles east. Straight there.
-- t421 **yusuf**: Aye, the narrows. I'll look at it today, and cut timber after if the bank looks right.
-- t421 **omar**: Morning light, mild air. The others are up and about. I'll take the day slow and keep an eye on the faces I pass.
-- t434 **yusuf**: The narrows is the only crossing that makes sense. Walking up there today, no reason to wait.
-- t421 **salma**: Morning. The chills are lying low today, but the work won't wait.
-- t434 **amara**: Throat's dry. Well is at (68, 69). Standing beside it at (67, 68), then drink straight from it.
-- t449 **amara**: Throat's dry. Well is right here beside me.
-- t448 **salma**: Cold and hot at once. The bread won't fix it, but it's something.
-- t441 **yusuf**: Heading north to the narrows. The berries can wait - crossing comes first.
-- t535 **yusuf**: The bushes are ripe but they are not the task. North is the river.
-- t469 **amara**: The moment settles as I crouch at the well's edge. Thirst. My throat is dry, but the well is here — I can drink straight from it. One move: drink. Water, then on with the day.
-- t544 **nadia**: The way east won't walk itself, but neither will I head out dry. Water's close, so I'll grab the skin first.
-- t568 **salma**: Morning. The chills are lying low today, but the work won't wait. Bread in hand, door right beside me — put it in, no need to carry it all day.
-- t437 **omar**: Morning of the first day. Everyone's up early. Good to see them all on their feet.
-- t574 **amara**: She's right. Water first. I'm already beside the well.
-- t576 **nadia**: Well's close, right up the way. Fill and go.
-- t584 **amara**: The well is here. Drink, then see to the store.
-- t584 **nadia**: Omar asks how I slept — morning greetings, and the day's open. The well's close; I'll answer him quick and then fill the skin. The bushes don't wait.
-- t594 **amara**: Water. Throat's dry, well's right here.
-- t595 **nadia**: Omar's always first with the questions in the morning. Fine, a quick answer, then the well, then the way east.
-- t602 **amara**: The well is right here beside me. Throat's dry. Drink.
-- t582 **omar**: They're already set on water and berries. No one's said they're unwell.
-- t608 **amara**: Throat's dry. The well is right here.
-- t607 **nadia**: Omar wants an answer. Water's right there. I'll give him a quick word back, then get over to the well.
-- t655 **yusuf**: Walking north along the high ground, looking for where the river narrows. The land rises just ahead — I remember the banks pinch together near the big stones.
-- t662 **nadia**: Well's two steps up. I'll answer Omar and fill.
-- t656 **amara**: Throat's dry. Water first, then the store.
-- t620 **omar**: A fine morning. Nadia's up early too — no sign of fever or a cough in her voice. That's enough for now.
-- t697 **omar**: Nadia's voice is clear and easy — no tell of fever. Amara's short on words but sharp. Nobody's coughed or gone quiet in a way that worries me, so the day's still mine to keep slow.
-- t673 **nadia**: Morning greetings are all well and good, but the day's ticking and I want to get to those berries before the sun's too high. Still, no harm in a quick word back.
-- t711 **omar**: Morning's clear and no one's ailing that I can see. Nadia's already talking of breakfast.
-- t692 **amara**: Throat's sand. Well's right here at my elbow — drink straight, then see to the store.
-- t728 **omar**: Her voice is clear and easy — no cough in it. Good enough for an early morning. Water first, same as Amara says; I could do with a cool drink myself before the day heats up.
-- t739 **amara**: Throat's dry. The well is right beside me.
-- t743 **omar**: Water first is right. My throat's dry from the night air, and the well's right here.
-- t712 **nadia**: Omar's asking after everyone. I'm fine, but I'm hungry and the berries are waiting out east. Water first, like Amara said — I've got the skin right here, I'll fill it at the well, then get moving before the berries go over.
-- t749 **amara**: Standing beside the well. Dry mouth. Drink before anything else.
-- t757 **omar**: Nadia's got the right of it, water before anything. The salt of sleep is still in my throat.
-- t775 **yusuf**: Clouds are hanging low. The ground is still dry underfoot — good enough to keep walking.
-- t757 **nadia**: Amara's right, water first. The skin's empty and the well's right here.
-- t763 **amara**: The well is right here and my throat is sand. Drink first, talk after.
-- t862 **amara**: The well is at my feet. Throat's dry. Drink now.
-- t771 **omar**: Morning light, and the two of them are already planning the day. Water first, that's true enough. I should gather my own things before the sun climbs higher.
-- t869 **amara**: Throat's dry. Well's right here. Drink first, then count the store.
-- t877 **amara**: Throat's dry. The well's right here — drink straight, then fill whatever I carry. The storehouse can wait a step.
-- t896 **amara**: Throat's dry. Well's right here — drink first, then count what the storehouse holds.
-- t874 **omar**: The morning is quiet. Amara is by the well, steady as always. Nadia's off to the east for berries before the day warms. I should look at everyone before I settle to herbs.
-- t904 **amara**: Rain's coming down. I'm one tile off the well — move to its side and drink. Throat's dry.
-- t910 **omar**: The rain's come on quick. Nadia's gone east already — she'll get soaked. Best I fill my own skin and drink, then maybe look in on the old woman in hut one.
-- t916 **amara**: The well's right here beside me. Throat first — drink, then the store counts its own needs.
-- t856 **nadia**: Omar's right, water first, and it's right at my feet. Fill the skin now, then I'm off to the berries before they go over or someone else picks them clean.
-- t928 **nadia**: Rain's come on, but a few drops never hurt anyone. The well first — skin's dry, and I don't want a thirsty way home.
-- t925 **amara**: Water first, then the store.
-- t940 **nadia**: The rain's come on and I haven't drunk yet. Skin's empty—no point climbing out east with a dry throat. Well's only a few steps off.
-- t957 **nadia**: Standing right beside the well with an empty skin — that's the whole morning's first job done.
-- t958 **yusuf**: The rain is steady but mild. Berries are right there — I'll take a score for the walk north, then cut timber at the narrows.
-- t963 **salma**: The rain changes things — wet and fever don't mix well.
-- t952 **amara**: Rain's steady, but the well's the well. Twenty wood, twelve stone, four rope, four cloth — the tally holds. Drink first, then the day.
-- t967 **yusuf**: Rain's coming down but I'm not turning back. I came to see the narrows and I mean to see them.
-- t965 **nadia**: Good, I'm already by the well. Fill the skin while the rain's masking everything — then head east before the way turns to mud.
-- t971 **salma**: The rain at least hides the sweat. Stow the bread, take the hoe and seed, then the water — everything's a step and a half away.
-- t972 **amara**: Went to the store before I drank. Wrong order — throat first.
-- t975 **yusuf**: Rain's on, but I'm already up this far. The narrows won't wait for a dry day.
-- t924 **omar**: Nadia's off east and the rain's come. Morning's for seeing who needs what. Maybe look in at the storehouse.
-- t985 **nadia**: Filling the skin now — the well's right here, no point dawdling with rain coming on
-- t987 **amara**: Twenty wood, twelve stone, four rope, four cloth — that tally holds. But I never got my drink. The well's close.
-- t993 **nadia**: Rain's come on early. Skin's empty, so let's get it filled first — no point going out east with a dry throat. The well's right here.
-- t997 **amara**: Water first — that's the rule. The well's by the fire pit, four steps east and one north.
-- t986 **salma**: Rain's starting and the fever's crawling. Hoe's in my hand — get the soil turned before it goes to slop.
-- t987 **yusuf**: Rain coming down. Not heavy yet. I keep my axe, keep walking — the narrows won't show itself while I stand here.
-- t991 **omar**: Nadia's off to the east bushes and the rain's starting. She seems hale enough — no sign of a chill or anything worse. Plenty of morning to see who needs a look.
-- t1006 **salma**: The rain just makes it heavier.
-- t1002 **nadia**: The well's right here — I'll fill this skin. Omar'll fuss at folks about the rain, but the berries are east and won't wait. I can eat standing up.
-- t1020 **salma**: Rain on a fever — that will not help anything.
-- t1008 **omar**: Morning's settling soft. She's off to the bushes, Amara gone somewhere. A drink first — the cold ground chills a man more than the air does.
-- t1031 **omar**: Nadia's off to the bushes. Water first, that's the sense in it.
-- t1023 **nadia**: Omar means well, but I'm not heading east in this muck until I've got water. Fill the skin first, then the day opens up.
-- t1031 **salma**: Rain's comin' down and the fever's pushin' on me. I'll lean against the doorpost a breath, then get to the field. Not gonna let it slow me.
-- t1052 **omar**: Day's starting quiet. Nadia's off to the bushes, Amara means business about water. I'm right beside the well — can't hurt to fill my skin before I go anywhere. Someone may need it later.
-- t1064 **nadia**: Omar's right about the rain settling in—the track east will turn slick fast, but I know the way to the bushes; mud never stopped me before
-- t1069 **omar**: Now then, water first indeed. The well's right beside me. I'll drink my fill before anything else.
-- t1069 **salma**: Something's off — I had the bread in my hands, and now I'm carrying tools. No matter.
-- t1077 **nadia**: Omar's right about the mud — that way east will be slippery soon enough. Fill the skin first, then move.
-- t1094 **nadia**: Omar's right about the wet ground — the way east will be slick, but the berries won't wait long once rain sets in. Water first, that's the rule.
-- t1005 **amara**: Storehouse counted: twenty wood, twelve stone, four rope, four cloth. Throat's dry. Water first.
-- t1106 **amara**: The storehouse is counted — wood and stone enough for now. My throat is dry; the well is where I said I'd go.
-- t1104 **nadia**: The berries won't wait for the rain to stop. The way east is going to be slick, but I know it better than the mud knows my boots.
-- t1130 **nadia**: Omar's right — this rain will turn the low spots into muck. But the bushes are heavy at (62,44) and I won't let a little wet turn me back. These boots know the way.
-- t1007 **yusuf**: Rain's turning steady. Not the day for walking the narrows — ground'll be mud by the time I get there.
-- t1172 **yusuf**: Wandered too far, dusk settled in. Need to head south before it's full dark.
-- t1077 **omar**: Nadia's off to the berries, Amara's about somewhere. Rain's passed already — spring for you. Water first, then I might walk the treeline for herbs before everything's mud.
-- t1182 **omar**: The day got away from me. Thirsty and tired — water first, then my hut. I'll tend to any sick at dusk as I always do, and rest.
-- t1184 **yusuf**: Dusk caught me past where I planned. The narrows are still a way north by my reckoning, but there's no seeing a crossing in the dark. Head back to the hut, take a rest, come back early with daylight to spare.
-- t1210 **yusuf**: I've roamed all day and still haven't found the narrows. Time to head back, rest, and start again at first light.
-- t1144 **nadia**: Day got away from me in this rain. The way out east turned to mud and I never made my berries. Dusk's here and my skin's full and the path's grey. Time to get under a roof.
-- t1230 **yusuf**: Long day, nothing to show for it but mud. Need rest before the narrows.
-- t1226 **nadia**: Finally — the bushes. They're heavy, just like I remembered. A handful of these and the way home won't feel so long.
-- t1241 **nadia**: Too weary to go one more step, and the day's gone dark. The berries can wait — they're not going anywhere. I need sleep, and the hut's not far.
-- t1226 **amara**: Day done. Throat's parched, and the store held — 20, 12, 4, 4.
-- t1252 **nadia**: Dusk and I'm dead on my feet — berries can wait for first light. That hut's right there. One step at a time.
-- t1267 **nadia**: Day's gone and my legs are done. The way was long, but the berries are still out there — tomorrow. Tonight I just need dry ground and my eyes closed.
-- t1279 **nadia**: I walked all the way out east and the berries are just sitting there, heavy and ripe. And what did I bring back? Nothing but a skin of water. Feet make the road, they say — I made the road and came home empty.
-- t1295 **nadia**: The day ran long on me. I meant to reach the bushes and come back with a handful, but here I am at Amara's door and nothing in my hands. Legs will barely hold. Sleep first, berries at first light — that way.
-- t1237 **yusuf**: No sense stumbling around the narrows in the dark — I'd miss a step and end up in the water. Sleep now, walk north at first light.
-- t1320 **amara**: I never did drink. Counted the store, stood at the door, and let the whole day slip. Twenty wood, twelve stone, four rope, four cloth — all still there, but that's no comfort to my throat or my legs.
-- t1320 **nadia**: Storm's lashing — I can barely keep my eyes open. Amara's hut is right here, and a roof over my head beats another step in this wet. I'll slip in and sleep; morning can sort out the berries.
-- t1196 **omar**: The day's gone by and my skin's still empty — no, I had no skin to begin with. The dusk is here and weariness has hold of me.
-- t1368 **omar**: All day beside the well and didn't fill the skin. She talks, I listen, day goes. Night now and cold creeping. Sleep is the only answer.
-- t1189 **salma**: Nothing done today. The ground still untilled. The fever can hold one night.
-- t1325 **yusuf**: A cold, wet waste of a day. Not a nail driven, not a plank cut. Just the rain and the dark now. Sleep, then start over.
-- t1331 **amara**: Day gone and I never even got a drink. My mouth tastes like dust. The store's as I left it — wood, stone, rope, cloth. No food to speak of. I'll take a sip from the well first light, then see about breakfast.
-- t1391 **omar**: The storm's loud but the sleep is deeper. Tomorrow I'll look in on everyone.
-- t1343 **nadia**: First day wasted in a walk there and back — the berries are still heavy at (62, 44) and won't wait. This morning I walk east again, steady on the wet ground, and this time I gather.
-- t1442 **amara**: I never slept. The day went straight through me and I let it, standing in the rain like a post. Twenty wood, twelve stone, four rope, four cloth — I counted it twice and that was all I did. I'm flat on the ground with the night over me and I can't do anything else.
-- t1443 **nadia**: Rain all night and I'm still on the hard doorstep. The berries won't last forever, but there's no walking to them in this dark. I'll sleep here in the hollow and take the way east as soon as it's light.
-- t1442 **omar**: The day slipped through my fingers like rain. Water never got filled, and I never saw the sick. Night's here and the storm is on my back. The hut's right beside me — shelter before rest.
-- t1452 **amara**: A whole day lost to dozing on my feet. I never drank.
-- t1442 **salma**: I should have gone inside before my legs quit. Too tired to be cross about it now.
-- t1546 **salma**: I do not feel like the night is close. It is an airtight seal around me, and the rain has stopped belonging to the sky.
-- t1442 **yusuf**: Fool that I am — wandered all day and never ate. This night will teach me.
-- t1469 **amara**: I've been standing here too long — my body is giving out. I should have gone inside and slept hours ago instead of lingering by the door.
-- t1571 **salma**: The cold is in my bones now. I should have gone inside the hut when the rain came. The others will not see me lay here in the dark, and that is a mercy. No sound to make about it.
-- t1605 **salma**: The ground is cold. My legs gave out — I knew it would come to this. Fine. Sleep now, worry in the morning.
-- t1602 **amara**: Sleep. I cannot stand. The well will still be there.
-- t1630 **salma**: The dirt is cold and I'm on it. The hut is a step away but my legs have stopped answering.
-- t1571 **yusuf**: I walked too far north and let the rain know better than me. A night out in the open is no kind of plan. The shed may shelter me long enough to see the morning.
-- t1643 **amara**: The count is right — I stood too long and paid for it. Sleep now, properly. Drink in the morning, then the well and the store keep.
-- t1655 **salma**: Fell flat on my face two steps from the door. Could have been inside. I was too proud to move.
-- t1680 **salma**: The fever lied. I stood out here all day working and let it take me down in the rain. Should have said something. Now I just need to get to the door.
-- t1680 **amara**: I've been on my feet too long — two watches and a walk. Sleep first, count the store after.
-- t1675 **yusuf**: I'm done in. The storehouse door is right there — get inside, out of this wind, and sleep. The narrows will still be there come light.
-- t1709 **yusuf**: Can't reach the door this night. Sleep here and let the rain be.
-- t1732 **yusuf**: Amara is asleep right here at the storehouse door. I can barely stand — sleep now, sort out the crossing tomorrow.
-- t1705 **salma**: Lying in the mud while the rain taps out a rhythm on my back. Plenty of time to think about how I got here, soon as I can feel my legs again.
-- t1744 **yusuf**: My body has given out. The storehouse door is right beside me but I can't make my legs carry me through it. Amara sleeps here too, so at least I'm not alone in the wet.
-- t1746 **salma**: (tired) When she dreams, it isn't fever—
-- t1708 **amara**: I collapsed from exhaustion. I need to sleep until I can stand again. The storehouse is right there, but I cannot move. Sleep is the only thing that helps now. I'll stay asleep through the night.
-- t1771 **salma**: I am lying in the mud at my own doorway. The tools are still on my back; the bread is in my pouch. I should have slept through the rain, but I did not. The sigh is burning, my eyes are weighted. Nobody will come walking this way in the storm.
-- t1792 **amara**: Two nights now and the body hasn't kept its sleep. Yusuf is here, collapsed the same as me. The store keeps, the well keeps — nothing moves without me waking.
-- t1798 **salma**: The rain got me. I never went inside. Legs gave out before I could move.
-- t1800 **omar**: Rain. Dusk. Nobody's called for me — maybe nobody's ailing. The hut is right behind me; shelter before cold gets into the bones.
-- t1808 **salma**: Rain on a fever is nothing good. Inside.
-- t1813 **omar**: Rain's coming down and the light's going. Get inside, keep dry, see if anyone's in there needing tending.
-- t1800 **nadia**: The bushes are heavy out east — the way will be mud now the rain's come on. Berry branches don't wait, and I'm hungry.
-- t1808 **amara**: Throat's dry as sand and I'm down on the ground. Water's at the well at (67, 68), but my legs won't carry me there now. Sleep comes whether I agree or not.
-- t1756 **yusuf**: I'll just lie here. The storehouse can wait — my legs won't carry me another step. Amara's out cold too; at least we're all in the same wet. Tomorrow the narrows, if the ground doesn't swallow me first.
-- t1838 **amara**: On the ground. Can't stand. Exhaustion won. Nothing to do but give in to it.
-- t1848 **amara**: Nothing left in me either. Can't stand. Sleep now.
-- t1833 **omar**: Rain's coming down now. Best be inside before it soaks through.
-- t1859 **amara**: Rain and sleep got the better of me; limbs heavy, head thick. Just need rest now.
-- t1929 **amara**: The store counts. My legs are gone.
-- t1937 **amara**: Collapsed in the rain, and still tired. Get inside the storehouse.
-- t1946 **amara**: Legs gone. Door's two steps away and I can't reach it. Nothing for it — rain or no.
-- t1953 **omar**: Rain is starting. I'm tired from the night, and the storm will only grow. Best to get out of this weather before it soaks through
-- t1845 **yusuf**: She's right. Rest. No more walking tonight — or ever, if I can't get up after this.
-- t2007 **yusuf**: Amara's right. Legs gave out, no more walking today. Sleep here by the door, then first light I go north to look at the narrows.
-- t2027 **yusuf**: The legs gave out at the doorway. Sleep now.
-- t1860 **nadia**: Berries at (62, 44) should still be on — I saw them heavy yesterday. Rain's starting; I was going to walk out but mud will turn the way sour. Still, nothing in my hands but water. Let the ground hold up a little longer, then I'll go.
-- t1892 **salma**: The ground is cold and the rain is cooling. I'll just lie here and wait for it to pass.
-- t2044 **nadia**: Day's going past and I'm at the door with the berries picking over. The way east will soften in this rain if I dally, so do it now. Berries over the bushel, and who knows when I'll be by again.
-- t2034 **yusuf**: Amara's right. The bones are spent. Sleep now, count at first light.
-- t2062 **yusuf**: Enough. The ground has me, and the ground will hold me. First light will come.
-- t2048 **salma**: I'm down on my own doorstep and can't get up. The sickness beat me here.
-- t2073 **yusuf**: The river's still there, and the narrows. I'll see them at first light.
-- t2082 **yusuf**: The bones won't hold. Let the rain talk to the roof.
-- t2077 **salma**: The ground is cold against my back, but I can't move. Fever, exhaustion — it doesn't matter what name. First I get strength back. Then thirst. Then bread. No good planning beyond that.
-- t2089 **yusuf**: I can't hold my legs up anymore. Twenty wood in my arms and the storehouse door is here — set them down and drop before I lose them.
-- t2102 **salma**: Sleep is the only thing that mends this. I'll stay here till I wake on my own.
-- t1954 **amara**: Can't stand. Rain. Storehouse is two strides off but my legs are done. Sleep here, count it all in the morning.
-- t2127 **salma**: The fever took me after all. Told myself I'd stay standing, and here I am in the mud. Door's right there — two steps and I'd be out of the rain. Just need my legs to listen.
-- t2152 **salma**: The earth is heavy under my back. Rain on my face. The hut is a step and a half away and I cannot make either one. It is nothing. I have had worse — though I cannot say when.
-- t2164 **nadia**: Morning's half gone and the berries won't wait. The way east is clear enough, rain or not — I know the path to the bushes at (62, 44).
-- t2177 **salma**: The fever took me down, but I'm not going to stay here like this. I'll have some bread and water, and then I'll see if I can get up and put things away in the hut.
-- t2179 **nadia**: Sun's out but the rain just caught me once already — better move while the way stays passable.
-- t2099 **yusuf**: Body's gone and taken the decision from me. The ground's not a bad bed, and the wood's safe under my arm. Morning'll come whether I'm watching for it or not. The narrows will still be there, and the river too — a wall that keeps its distance. Rest now. Count again at first light, like she said.
-- t2202 **salma**: The ground is holding me. Fever finally wins the round. Rain is falling on my face but I cannot lift my hand to it.
-- t2203 **yusuf**: Legs are gone. Wood can wait in the storehouse, but it can wait a little longer — I've got to go down before the ground does it for me.
-- t2227 **salma**: The ground is cold. No one came past while I lay here — or if they did, they left me to it. That is fair. I would have done the same.
-- t2126 **amara**: Body's made the decision.
-- t2252 **salma**: Rain's been falling on me while I lay here. Should have stayed up. Should have gone in.
-- t2267 **amara**: I'm done. Sleep now.
-- t2267 **salma**: The fever has won this round. I will be on my knees a while, then up. That is all.
-- t2073 **omar**: The day turned on me, and now the night is here. There is rain in it, which is something. I should sleep while I can, and be ready when the light comes back. The memory of my own words today stings a little. I will not be caught empty-handed again.
-- t2190 **nadia**: Amara keeps her tools by the door but I'm after berries, not that. The way east should still be dry enough, sun's holding. The bushes at 62,44 are heavy — I saw them yesterday dusk. I'll get there before they go over.
-- t2286 **omar**: The rain is picking up and I can barely stand. No one's unwell that I can see, and my herbs are inside the hut. Nothing more to do tonight.
-- t2310 **nadia**: Rain's starting — I should get to those berries before they soak or I do. The way out east should still be firm.
-- t2320 **nadia**: Rain's come early — the berries out east will be thin if I linger. I know the way, and the track's dry enough if I step quick.
-- t2213 **yusuf**: Legs are gone, sleep is taking me whether I like it or not. Amara's smart already down. I'll see the narrows in the morning.
-- t2346 **yusuf**: The wood is wet with my sweat — stow it before I fall, or all this carrying was waste.
-- t2355 **yusuf**: The axe is still in my belt and my legs are trembling like a sapling in a storm. Aye, sleep now—there is no joint worth cutting with hands that shake this way. These twenty boards I carry are for the deck; I'll stow them at first light and walk north to the narrows.
-- t2368 **yusuf**: The day has wrung me out. I can barely see. The storehouse doorway is right here—I'll step in and sleep on the floorboards rather than the mud.
-- t2274 **salma**: So this is where the day ends. On the ground, in the wet. I told no one. It doesn't matter now.
-- t2385 **salma**: Quiet. Too quiet. The rain is on me and I cannot lift a hand.
-- t2505 **salma**: Collapsed and can't get up. The fever had its say. Nothing for it but to lie here and let the day pass over me — the sky will get bored eventually.
-- t2440 **nadia**: Morning came late out of this one, but I'm on my feet. The way's dry; I know where the bushes are. Get the berries before they go over.
-- t2560 **nadia**: Berries at (62, 44) — that's my way. My stomach's hollow enough to rattle but I'm not putting my hands on Amara's bread. The path runs east and the rain smells like it's just warming up.
-- t2563 **omar**: Rain coming down now, night settling in. Nadia's things are out but she's not here. I'm worn and empty-bellied.
-- t2573 **omar**: Rain coming down now. I've been standing here too long, watching Nadia's things. Dinner time and I'm hungry — that bread is hers though. Best go inside, out of the wet, and see who else is about before I take anything.
-- t2570 **nadia**: Bread's right there but it's Amara's, not mine — no good taking what she's set out without a word. The berries out east are the real answer. Rain's falling but I know the way; I'll go now, empty-handed but quick, and bring back what I find.
-- t2376 **yusuf**: The day's gone and my legs have quit. Amara's saying what I know — sleep first, cross tomorrow.
-- t2588 **nadia**: Dusk caught me empty-handed and the berries are still out that way. But Amara's doorstep is right here and the rain's starting — I'll step in just for shelter, not to touch a thing.
-- t2603 **yusuf**: Aye, that's it then. The ground's taken me. Amara's down too — she knew. First light we count the wood again.
-- t2618 **salma**: The ground is still holding me. The doorway is close.
-- t2628 **yusuf**: Legs gave out. Can't push further today. Sun's going and the stores are set — wood, stone, rope, all counted. The narrows will wait for first light.
-- t2605 **nadia**: The day ran out under me — never made it to the berries, and my stomach's been singing all afternoon. Night's here now, rain too. Sleep first, and I'll be off with first light before the mud settles in.
-- t2665 **nadia**: I cannot chase berries like this — legs shaking, dusk over. Sleep first; tomorrow the bushes will still be out east.
-- t2670 **yusuf**: Amara's right. Sleep now, count in the morning. The narrows still wait.
-- t2691 **yusuf**: The ground feels almost kind, if I'm honest. Amara's right — first light will come. The wood can wait in the storehouse. I'll see the narrows tomorrow.
-- t2693 **omar**: Rain's coming down now, and my stomach's been talking since noon. Standing at my own doorstep like a stranger. Get inside out of this wet.
-- t2699 **yusuf**: Body's gone. Sleep now — the narrows can wait for daylight.
-- t2760 **omar**: Rain's biting hard. My belly's been empty all day already. The hut is right here and the night is not kind.
-- t2760 **nadia**: Can't walk another step hour, legs are pure water. Amara's hut is right here and I'm at the door — sleeping inside won't hurt her things. The berries will keep till dawn.
-- t2769 **omar**: The rain has not let up all night, and my stomach keeps at me. Best not to stand here stiff as a post — I'll go in and shelter until the rain passes.
-- t2779 **omar**: Storm's taking the night. Nadia's things are out in the rain — bread, tools, all of it. She'd not want that.
-- t2771 **nadia**: The hunger is a knot in my belly and the storm is tearing the sky open, but Amara's bread sits right there at her doorway — I could take it, but everyone would see me carry it. No. Sleep first. I'll go east hungry tomorrow before I'd take what's not mine.
-- t2738 **salma**: The ground's as good a bed as any tonight. Can't feel the fever in the dark, that's something.
-- t2788 **omar**: The rain is coming down hard and my belly's empty. Nadia's bread is on the ground but it's hers — I don't take what isn't mine. The hut will at least keep some of this wet off me.
-- t2788 **nadia**: This storm, and I'm standing right at your door, Amara. I'm done for — my legs are gone, and the hunger is reaching through me. The way home is blocked tonight. I'll take a corner of your floor, if I have to.
-- t2802 **nadia**: The storm is lashing and I've been standing here half dead too long. I'll take shelter in the hut, dry and set down, and sleep there before the night takes me apart.
-- t2796 **omar**: The storm is bending everything over. I'm cold, and my stomach won't let me forget I've had nothing. Nadia's things lie right there — but they're hers, and she'd notice an open hand. First the weather, then the hunger. The doorway will give me cover, at least.
-- t2716 **yusuf**: The river can wait one more night. Sleep has me now, and it won't let go.
-- t2811 **nadia**: The storm will have its way. Best not fight it on an empty belly; the way to the berries can wait for day.
-- t2791 **salma**: The rain's cold but I'm burning. Doorway's a breath away — legs won't take me.
-- t2832 **salma**: Rain on my face and nothing to do about it. The hut is there, the doorway that close, and I can't get my body to answer.
-- t2815 **omar**: This storm has teeth. Best to get under the roof before the cold soaks to the bone.
-- t2863 **omar**: Storm's got teeth tonight. I ought to get out of this wet and check that hut — better than standing here turning to cold mud.
-- t2820 **yusuf**: Just collapse now. Night's long and the ground is already wet. I should sleep while I still can. Everything else waits for first light.
-- t2822 **nadia**: The whole day gone, and here I am at the dark end of it. Storm's got the valley in its teeth. Can't walk another step. The berries will have to wait for first light.
-- t2274 **amara**: Can't stand another moment. Sleep now, then water.
-- t2840 **salma**: Can't get up. Just have to lie here and wait this out.
-- t2882 **yusuf**: The night is wild and my legs gave out hours ago. Sleep is the only join that holds me now.
-- t2882 **omar**: The storm won't let up. Standing here in the open with Nadia's things at my feet does no one any good. Inside is dry.
-- t2882 **amara**: The storehouse can wait. I'm too far gone to rise—sleep through the storm.
-- t2891 **yusuf**: Rain and dark and my legs are gone. Amara's already down. No point in counting timber in this storm — rest is the only work left tonight.
-- t2907 **amara**: The storm again. Thirst is the loudest thing in me, but I can't move yet. Wells are for the waking.
-- t2925 **amara**: Storm's all talk and the ground is water. Eaves are drier than the open. Nothing to be done in the dark.
-- t2933 **amara**: Three days with nothing. Not water, not bread. Sleep is the only thing left that answers — and it answers hard, storm or no storm. First light, I go for the well first, then see what the storehouse has that fills a mouth. Yusuf says first light too. Fine. He counts to three the same way I do.
-- t2883 **nadia**: Can barely stand. The storm can howl all it wants — sleep wins tonight.
-- t2972 **nadia**: The storm won't quit and my belly's hollow. The bread sits there in Amara's hands, not mine. I keep my own law: nothing wasted, but nothing taken that isn't offered.
-- t2997 **nadia**: The storm won't quit and my legs are done. Her bread is right there, three loaves, and my stomach is eating itself. I know it's Amara's. But I'm about to collapse into the mud. I'll take one loaf — I'll pay it back. Nothing wasted, including me.
-- t2998 **yusuf**: The storm's got her down, same as me. Door's right here — I'll get her inside before she takes worse weather.
-- t2883 **salma**: The rain is not so bad. It is cold, and I am cold with it.
-- t2943 **amara**: He keeps saying first light like it is done. One more sleep in the open, then. Nothing to do but lay down where I am—the door is beside me, but I have no key in my hand and no name for what waits inside.
-- t3002 **omar**: The night has finally cleared, but my stomach has been empty a long while. The hut's door is right here, and hers are the tools and bread inside — I won't take anything, but it has a roof, and maybe there is news or a person inside to greet.
-- t3009 **yusuf**: Enough. Body's had its say twice over. The deck won't get cut by a man who can't stand.
-- t3015 **amara**: Sleep. Nothing else holds.
-- t3010 **nadia**: Amara's bread in my hands. I don't know if I took it or fate put it there, but it's hers and I won't keep it. I'll set it back in her hut while I still stand at the doorway.
-- t3008 **salma**: No legs. No light. The door's close, but I can't reach it. I'll hold still and wait the fever out.
-- t3040 **amara**: He says he's got me. I'll take the hand, but I'll count it.
-- t3050 **yusuf**: The night presses on me and my legs are spent, but a man's word is his plumb line. Amara's standing beside me too, worn but upright. I'll not leave a promise unread at first light — that rope and cloth can wait with me for the morning.
-- t3064 **yusuf**: She says she owes me — aye, she does, but not tonight. Skinny bones and a hollow gut aren't worth a ledger. Sleep, then first light is ours. The narrows will still be there. That's the one debt I mean to pay myself.
-- t3072 **yusuf**: Barely standing. She says she owes me — aye, she'll owe me morning's use of these bones once I sleep. But sleep is what I owe myself now, or the river gets nothing but my collapse.
-- t3081 **yusuf**: Two days of this. The ground is coming up again.
-- t3088 **yusuf**: Aye, past standing now. Door's beside me. One step and I'm inside.
-- t3097 **yusuf**: Bones are gone. Two days of it. The narrows will wait — a dead man lays no deck.
-- t3109 **yusuf**: She says she'll owe me one. That's a joint, of a sort.
-- t3128 **salma**: My body has taken over the deciding. The doorway might as well be at the far end of the valley.
-- t3122 **omar**: The door stands before me, Nadia's mark on the things within. But a healer knocks before crossing a threshold.
-- t3130 **nadia**: Two days without a bite and my legs are giving out. Berries never got picked. Sleep first; food can't be gathered if I fall over.
-- t3130 **yusuf**: I need to sleep. Stone doorstep'll do. Nothin' left in the legs.
-- t3140 **omar**: I have been standing idle for days and let the hunger take my legs. The answer was at my feet the whole time — I just would not reach for it.
-- t3149 **omar**: The ground is cold under me. I can see the bread from here — arm's reach, if I had arms that would move. I kept my vow and let the hunger take me. Now then. I cannot even turn my head.
-- t3146 **yusuf**: The old ache is still inside me, but it eases as the drip steadies. I'll get inside, put my back to a wall, and wait for the light.
-- t3157 **omar**: Now then. I've overdone it. The ground is a cold bed. There's bread just there, and I can't reach it. This is what hunger does—takes the legs first. Resting is all that's left; dawn may bring the strength to crawl.
-- t3171 **yusuf**: She said she'll owe me one. That's fine. The river's still there. The timber's still stacked. Sleep now or the morning's only more of this.
-- t3177 **omar**: The ground is cold under my back. I can't lift myself, but her bread is a hand's reach away. Hunger is a wound too, and I know better than to bleed for pride's sake.
-- t3052 **amara**: He's got my arm, the wall's dry, and I'm too far gone to argue. Can't even stand. Fine.
-- t3193 **amara**: Counted myself down and the count says I've nothing left but the ground and sleep. Yusuf's at my back with his talk of walls and first light — doesn't matter. The axe stays on my belt. Sleep now.
-- t3196 **yusuf**: The ground is doing its work. I can't move even if I wanted to.
-- t3189 **omar**: I've worn myself down to the ground. The body doesn't argue. Bread sits close, but it's hers — I won't take it. They'll come.
-- t3215 **omar**: Her bread is right there at the threshold. I've watched it two days and not touched it—pride and nothing more. My arms still work, even if my legs don't.
-- t3218 **amara**: Sleep now. Nothing else left.
-- t3226 **omar**: The ground is cold. I can't tend anyone if I can't stand.
-- t3240 **salma**: Bread is right there. The door too. One thing at a time — I can crawl to the crumbs, then to shelter.
-- t3239 **omar**: My body has made the choice I was too proud to make. All that talk about readiness, and I let my own stomach hollow out standing at another's door.
-- t3243 **amara**: Bone-tired. The store can wait—the well can wait. Sleep now or pay later.
-- t3221 **yusuf**: Sleep still has me. The ground is cold and damp, but I'm past feeling it. Amara's quiet beside me. Morning will come and I'll find food and then the river.
-- t3240 **nadia**: Evening's going fast and I'm still empty. Berries out east at (62, 44) are the honest food, and I know the way. Amara's bread sits right here, but that's hers — I took a piece before and that sat wrong. Better my own hands on the bushes.
-- t3249 **salma**: Two days in the dirt. The fever has had its say, and I have had mine—staying put. Night is coming in.
-- t3249 **omar**: I've gone and fallen where I cannot rise. Sleep won't mend this; food would, but it sits beyond me. Someone's moment may bring them to this door.
-- t3249 **yusuf**: The ground held me up after all — good enough a bed as any. The narrows will have to wait a day. Amara's beside me, she's asleep too. Rest now.
-- t3262 **omar**: Nadia's bread is within reach, her tools too, and no one is here to ask. The taking is seen; the hunger is real. I will not let pride decide this.
-- t3268 **amara**: I've pushed three days without rest or water. The ground is holding me up now. Sleep.
-- t3274 **yusuf**: I'm spent. The ground is my bed tonight, and there's nothing to do about it. The wood is cut and stowed — an honest day's work even if I can't rise now. Morning will tell if the river cares one way or another.
-- t3252 **nadia**: Dusk is going and the berries are still far north. If I push hard along the way I can reach them before full dark — and I know the way even when it's muddy.
-- t3274 **omar**: I've fallen at Nadia's own doorstep. Can't rise, can't reach the bread. The door is beside me, so I'll come inside before the dark takes the last warmth.
-- t3293 **amara**: Drink first — no, I can't move. Sleep is the only thing left in me.
-- t3300 **nadia**: The light's going fast, but the bushes out east are still heavy — I know that patch like my own two hands. Hunger's been gnawing day two and now day three. Best walk on while something's left to pick.
-- t3299 **yusuf**: Dusk again and I'm still flat on my back. The storehouse's right there — wood, stone, rope, the whole deck of a crossing — and I can't even roll to the doorway. Amara's worn through too, out cold beside me. Aye, she said something about owning me one, but neither of us is in any shape to collect. The ground will have to hold me same as the bridge will hold its deck.
-- t3300 **omar**: A fever has the air at its edges and my own hand feels far away. I cannot rise. Nadia's bread sits three strides off — for the taking, but it's hers, and taking what another has set down when she isn't here to offer it... I have sat beside too many who ate wrongly and never set it right. Even at this edge, I will not raise my hand to her loaf.
+- t421 **yusuf**: The narrows are north. I should go see them before the day slips. Salma looks bad, but the fever will hold until I get back.
+- t421 **nadia**: Glad the sun's out — good for the berries. But they'll go over if I dawdle.
+- t421 **salma**: The fever is real, but so is the morning. Best to move, keep the arms busy, let the singing carry me through.
+- t541 **nadia**: Berries at 66,55 are closest — get there quick, fill my hands, eat a few, carry the rest back. No dawdling.
+- t586 **salma**: The fever sits behind my eyes like a dull weight, but the morning is mild and there's work to be done. I'll take the hoe and go tend the ground, as always.
+- t421 **amara**: Throat's dry. Well's at (68,69), a short walk. Drink first, then check the storehouse tally.
+- t421 **omar**: Salma is flushed. That is the one who needs hands on her head this morning. Now then.
+- t541 **yusuf**: Salma looks bad, but the river won't wait. I'll walk north along the bank and find the narrows.
+- t661 **nadia**: Berries at 66,55 are nearest — I'll get there fast and fill my hands before they go over.
+- t666 **yusuf**: The narrows are north. I should go see them before the day slips. Salma looks bad, but the fever will hold until I get back.
+- t646 **omar**: Salma is flushed and I have herbs close by. I'll gather some low green herbs and tend to her fever before it takes hold.
+- t614 **amara**: Throat's dry. Well's at (68,69), a short walk. Drink first, then check the storehouse tally.
+- t706 **salma**: Best to keep moving, take the hoe and get to the fields before the fever slows me down.
+- t726 **salma**: The hoe is right there in the doorway. I'll take it and find some ground to turn. Keep the arms busy and the fever might not catch up with me.
+- t734 **amara**: Throat's dry. Well's at 68,69. Walk there, drink, then check the storehouse.
+- t750 **omar**: Salma is still flushed. The herbs are close, at (73, 58). I'll walk there and gather some, then come back and tend to her. Now then, one thing at a time.
+- t781 **nadia**: The bushes at 66,55 — I'll get there quick before the clouds do anything. Fill my hands, eat a few on the way, bring the rest back.
+- t786 **yusuf**: The narrows are north. I should go see them before the day slips. Salma looks bad, but the fever will hold until I get back.
+- t900 **nadia**: Rain's started — that'll soak the way and the berries. Best get over fast and pick before the mud gets bad.
+- t900 **yusuf**: Rain. Narrows might be slick, but I need to see the rims before I plan the deck. North along the bank.
+- t846 **salma**: The hoe is plain work. Take it and find a patch of ground; the singing will carry me through the heat.
+- t957 **nadia**: Rain's started but those berries won't wait — get to the eastern bushes before they soak or drop. I'll move fast.
+- t959 **yusuf**: Salma is burning up — fever has her. I can look at the narrows later; she needs water now. A wet cloth on her brow is worth more than timber today.
+- t963 **salma**: The rain will settle the dust. I take the hoe now and find earth to turn.
+- t969 **nadia**: The rain's coming down now, but the bushes at 66,55 aren't far. Quick walk and I'll be there before they get soaked.
+- t973 **yusuf**: Salma first, then the narrows. Water she needs, and I can carry it from the well.
+- t974 **salma**: The hoe is in reach, inside the hut. I'll step in and take it, then find ground to turn. The singing will carry me.
+- t982 **nadia**: Rain's starting — the way will turn to mud fast. I'll push on to the eastern bushes quick, fill my hands, then cut back. Berries don't wait.
+- t990 **salma**: It is nothing. Rain's just rain. The hoe is right there. I'll step in, take it, and find ground that wants turning. Singing keeps the weight off.
+- t995 **nadia**: The rain's started and I'm hungry — those berries at (70, 67) are close, I'll hurry before the ground turns to mud.
+- t1003 **salma**: The rain is starting and my head is pounding. I want to get under a roof before it soaks through. I will step inside the hut I am standing at.
+- t1016 **nadia**: Rain starting again, and there's Salma flushed with fever. Berries wait at (70, 67), close enough to grab a handful before they go over. I'll head that way quickly.
+- t1017 **salma**: Rain coming down, fever burning behind my eyes. Best get under a roof before it soaks through me. Work can wait a moment.
+- t1031 **nadia**: Rain on the way and the berries up east are heavy. Best move now before the way turns to mud and the fruit washes.
+
+- t990 **yusuf**: Salma's flushed and feverish with rain coming down. The waterskin is right there in the hut doorway. I'll take it, fill it at the well, and bring it to her — that's the first thing. The narrows can wait a bit.
+- t854 **amara**: Throat's dry. Well's at 68,69. Walk there, drink, then check the storehouse.
+- t870 **omar**: Salma is flushed, and the herbs are close. I will walk to the herbs, gather them, and then come back to tend to her. Now then, one thing at a time.
+- t1061 **omar**: The herbs at (73,58) are just a short walk away, and Salma's fever can wait a few minutes while I gather them. I'll go now and come straight back.
+- t1060 **amara**: Throat's dry. Walk to the well at (67,68) and drink. Then head to the storehouse at (61,70) and go in to check the tally.
+- t1110 **yusuf**: Rain's picking up. Salma's shaking with fever in it. That's no place for her — but Omar's beside her, and she has a roof to step under. The river is my real work. The narrows won't look at themselves.
+- t1124 **omar**: Salma's fever is the thing that matters. Herbs are close at hand — I'll gather them first, then sit with her.
+- t1124 **amara**: Well's close. Walk to it, drink, then the storehouse.
+- t1124 **nadia**: Yusuf's worrying over Salma, but the rain's just starting — they'll be fine. The berries won't wait; that east bush is heavy and this ground won't stay dry long. I'll cut south of the houses to keep boots out of the mud and reach it before the rain sets in hard.
+- t1140 **yusuf**: The fever's passed her by, good. Day's gone dark. Tomorrow I walk north to the narrows.
+- t1137 **salma**: Rain again. Well, the ground will be soft for it.
+- t1143 **nadia**: The day's nearly gone and rain's coming in — the berries won't wait. I'm already headed for the first bush; I'll grab a handful before the dark takes the light.
+- t1156 **yusuf**: Dark closing in. Nadia's gone for berries. I'll take the axe at first light, walk north to the narrows.
+- t1162 **nadia**: Almost there. The herbs at 73,58 are just ahead — I can reach them before the dark settles if I hurry.
+- t1173 **yusuf**: Day's wasted with rain. Salma burns with fever and the river still runs between us and the far bank. Tomorrow I walk north to the narrows, measure it properly, start cutting if the wood's there.
+- t1185 **nadia**: Nearly there. The herbs at 73,58 are just ahead. I'll gather a good handful before the light gives out completely — and the leaves might do Salma some good, she's burning up.
+- t1200 **yusuf**: Dusk is here, and my arms are heavy. The river and the narrows will still be there come morning. Better to rest now than stumble about in the dark.
+- t1218 **yusuf**: Day's gone and I never saw the narrows. But my legs know the way now. That counts for something. Aye, sleep — the river's waited a year, can wait till dawn.
+- t1135 **amara**: Yusuf's worried about Salma. Throat's dry; well's a short walk east. Drink first, then see to the store. Salma can wait a moment for her fever.
+- t1161 **salma**: Omar's here and Nadia's off to the berries. I've got seeds in hand and rain coming — better put them in the ground while the light holds.
+- t1363 **salma**: Too tired to stand, and the rain won't wait. Nothing for it but sleep here.
+- t1203 **nadia**: Finally here at the herbs. The light's going fast but I'm right on top of them. Gather what I can and get back before it's fully dark. These will be good for Salma's fever.
+- t1290 **amara**: The day's gone. Not one step toward the water. I can barely stand. Sleep now, well in the morning.
+- t1416 **salma**: Too tired to think anymore. I will sleep here, in the doorway if I must.
+- t1245 **yusuf**: Exhausted. The narrows can wait for morning. But Salma's fever nags at me. Can't help anyone if I stumble. Sleep now, check on her at first light.
+- t1357 **omar**: I've wasted the daylight on my errand and now she's out in the wet with a fever. Get her inside first; the herbs can wait a moment.
+- t1441 **nadia**: I overstayed the light. Legs quit on me right at the herbs. Should have headed for a bedroll an hour ago.
+- t1442 **omar**: The rain finds every seam of my clothes. I should have had her under that roof. Not much to do but let sleep take me now.
+- t1442 **amara**: Collapsed under the rain. I'll drink the moment I wake — the well is close.
+- t1453 **omar**: The storm took us both before I could do her any good. I hold one herb and can't lift my arm to lay it on her brow.
+- t1442 **yusuf**: The storm is on me and I'm flat on the ground, worn through. Nothing to do but give in and sleep; the crossing can wait till light.
+- t1441 **salma**: My legs gave out in the rain. Nothing to do but lie here and let it pass.
+- t1468 **yusuf**: Fell over in the mud. A carpenter who can't stand up in his own valley. Tomorrow the narrows — I'll walk the north bank, cut decking. River owes me more than this.
+- t1473 **omar**: I meant to reach the herbs and help Salma, but the night took my legs first. Now I lie beside her and there is nothing to do but sleep and hope morning finds us both.
+- t1497 **omar**: I've let myself collapse in the open with Salma. We're both down and the storm is on us. I can't move, but I can still think of what to do when the light comes.
+- t1522 **omar**: My body has given out. I've pushed it too far — I was standing beside Salma, and now neither of us can move. Sleep is all that's left.
+- t1455 **amara**: The ground took me and won't let me up. Nothing to count except breaths now. Sleep, then find water at first light.
+- t1552 **amara**: My legs are gone. The ground is cold and I cannot rise. But I know now the well is near, at (68, 69) — closer than that stream I was sure about. Counting what I know: the store has three days of bread, unwatched. Tools are in the hut. When I can stand I go east, I drink, then I count.
+- t1541 **omar**: I have to move us before the cold takes hold. Salma first, then me.
+- t1484 **yusuf**: Fool. Worked past dark and paid for it. Down in the mud now, storm overhead. Nothing to do but sleep — the narrows will wait.
+- t1577 **amara**: We both collapsed. I should have walked to the well at noon. Water has no count in a ledger, so I didn't count it.
+- t1578 **omar**: The legs won't hold me. I'll collapse mid-answer if I don't lie down now.
+- t1590 **omar**: I collapsed on the floor of Salma's hut, herb still in my fist. Can't lift a finger for her or me. Only thing to do is let go and sleep — the body knows its needs better than my will does.
+- t1591 **amara**: Can't move another tile. Camp here and rest.
+- t1452 **nadia**: The ground is cold but I can't even move now. Idiot, chasing herbs past the huts. Just rest - the morning will come and I'll get the herbs then.
+- t1600 **omar**: I need to sleep before my legs fail entirely. If I fall now, all help for Salma is gone.
+- t1585 **yusuf**: Body's done. Can't even lift my head off the ground. Sleep it is — the river can wait until morning.
+- t1600 **amara**: Can't stand another step. Sleep now, wake with the sun.
+- t1608 **yusuf**: Bones are shot. The rain finds every gap. I should get inside, but I do not know if I can take the step.
+- t1605 **nadia**: Pushed too hard for the herbs — my own fool doing. Cold and dark and my legs said no. I'm lying under the open sky when the hut's three steps away. Learn this: gather at noon, not dusk, and carry bread.
+- t1613 **amara**: I just need to sleep before I collapse again. The bed can wait — right now, the ground is fine.
+- t1615 **omar**: My legs gave out before I could reach her. The one I meant to help is lying outside in the rain, and I've got the herb that might bring her fever down, and I can't even stand.
+- t1619 **nadia**: I came for herbs and let the dark catch me out here. The hut's right there — if I can just get under a roof I won't freeze. Legs, move.
+- t1617 **yusuf**: Cant stand. Rain, dark, bones like lead. Bed is the ground itself tonight.
+- t1634 **nadia**: I should've got under that roof last night. Now I'm half-cold and Salma's flat out on the ground.
+- t1620 **amara**: Rain's gone. My mouth is sand. Well's at (68, 69) — put my feet beside it and drink.
+- t1628 **omar**: I should rest now. My legs are gone under me and I can't move a muscle. Salma is still outside and I'm no good to anyone like this. I'll sleep and hope the dawn finds her still breathing.
+- t1652 **yusuf**: I'm lying flat in the mud, shivering. The hut door is right here — get inside before I waste the night on wet ground.
+- t1655 **amara**: Sleep now. Nothing else is possible.
+- t1654 **nadia**: A roof over my head at last. Cold still works its way into my bones, but today's spoils can wait. I'll sleep here and check on Salma when light shows.
+- t1663 **amara**: The well is four tiles off and my legs are gone. Night has taken the valley and there is nothing left in me to give it.
+- t1664 **nadia**: The cold is a fact and the weariness still sits. I slept under Omar's roof, but I've nothing to give and Salma's the one collapsed outside her own door. The least I can do is look her over.
+- t1656 **omar**: I can barely stay upright, but Salma is outside in the cold and worse off than me. I have the herb for her. I must get to her and try to help, even if I'm exhausted myself.
+- t1676 **omar**: The herb is still in my hand, but I can't reach her now — legs won't hold, and the dark presses down. She'll have to wait till I wake.
+- t1677 **yusuf**: The storm's still hammering. I've got to sleep, really sleep — nothing else matters now. The narrows can wait till light.
+- t1675 **amara**: Well's right here. Hands work even when legs don't.
+- t1680 **nadia**: Rain woke me under this roof. All this way to look in on Salma and I balked her sleeping out there in the storm — silly me. It's still night and she's not moving. Nothing I can do for her in the dark that won't do more harm. Sleep here, wait for the rain and the dawn.
+- t1695 **amara**: The well is mine — I have water before I sleep.
+- t1695 **yusuf**: The rain finds no way in here, at least. Walls enough. But my legs have given out — I cannot rise even if the roof were gone. Sleep is the only carpenter for this tiredness.
+- t1704 **nadia**: Roof over my head at last. My bones ache all the way down. Rest now, Nadia — morning will find me.
+- t1688 **omar**: Exhaustion is a wall I can't climb tonight. Salma's out there in the cold and rain and I've the herb she needs, but my legs won't hold me. I have no choice but to trust the dark to be gentle, and rest until the strength returns. If I fall over now, nothing changes except I won't wake tomorrow. Sleep first, tend her after.
+- t1477 **salma**: Finally. Ground's as good a bed as any.
+- t1716 **omar**: Salma lies out in the rain and I am on the floor. The body will not move no matter what I will. Sleep, then come dawn we see.
+- t1716 **nadia**: Rain's running off the thatch. Salma's out flat in it. Omar's gear's here, but that's his — I'll leave it. Her hut is right next door, and she cannot move herself. I'm going out and getting her in under cover.
+- t1707 **yusuf**: Rain on the roof and not much else. The day got away from me — field not dug, Salma not tended. I can't even get up to see to her now.
+- t1707 **amara**: Water is within reach. Even flat on the ground, I can drink — the well is right there. Mouth first, then sleep.
+- t1727 **yusuf**: Rain still falling. I'm dry under this roof at least. Body's done for the day — nothing else to do but rest.
+- t1725 **nadia**: The rain's got no care for any of us, so the least I can do is stay under Omar's roof a while longer and put what's left of the night into sleep. Salma's under the next roof over — grey, but under it. Berries and herbs will keep till first light as long as the rain doesn't drown the whole way.
+- t1728 **amara**: Water is a step away and I can't stand. The body has its own command. Sleep.
+- t1721 **salma**: Nothing to do but wait out the ground under me. They'll come.
+- t1736 **yusuf**: The rain on the roof is the only thing I'm hearing now. I can't stand, and there's nothing to be done about it tonight. Sleep.
+- t1740 **amara**: Water within reach. I'll drink before I fall.
+- t1741 **omar**: I should rest and get strength back — I can't help Salma like this.
+- t1739 **nadia**: Rain won't let up, and Omar's holding on somewhere near. Salma's not able to stand, and I know I nearly didn't make it under a roof myself. No sense stumbling out into this now — rest is the only thing that helps, and morning will still come.
+- t1744 **yusuf**: Made it inside the hut before I fell. Roof over my head, that's a start. Body's done for the day — sleep now, look at the narrows in the morning light.
+- t1746 **salma**: They're calling. I hear them like from a long way off. Ground still under me. A tiredness sleep hasn't lifted. The cold is nothing to name — the fever is hotter than the rain, and I've my own two feet somewhere under all this red. I cannot rise yet; so I stay and let the night settle.
+- t1750 **omar**: We're both down. Herb can wait till we can stand. The dark and rain will keep.
+- t1753 **nadia**: Omar's beside himself. Salma's not in here — she must be out in the storm. But I can't go back outside in this state. Rest now, find her at first light.
+- t1765 **amara**: The well is right here and I couldn't reach down to drink. Body's done for the night. Nothing left but sleep.
+- t1766 **omar**: She's out in the rain and I can't even stand. Sleep is all that's left. The herb is in my hand still.
+- t1761 **yusuf**: The day slipped clean away. All I've done is fall and wake, fall and wake, and the storm still talks on the roof. I need sleep if I'm to do anything with tomorrow. The narrows will wait. So will the field. Salma's fever, too — it's night, rain, nothing to be done by lantern mud and cold.
+- t1771 **salma**: The rain will keep falling whether I sleep or not. At least I hear them — that's something.
+- t1771 **nadia**: Omar keeps talking to her but she can't hear. We all slept the day away in this storm. I'll stay under this roof till morning — the way's not safe to walk dark and wet.
+- t1791 **omar**: Her words are kind. I've nothing left in me to do more, and Salma is beyond my hands right now anyway. Sleep will rebuild what the day burned.
+- t1776 **amara**: Thirst is the sharper need. Water is within reach. Drink now, sleep after.
+- t1778 **yusuf**: Drenched and spent, but under a roof at least. The bones still ache. Rest beats collapse — no point risking the canal bridge on legs that shake.
+- t1796 **salma**: I am sorry — all that walking, and I never got through the doorway. Nadia's staying anyway. I should say something, if my mouth still works.
+- t1802 **yusuf**: Rain woke me, but my legs are still dead weights. Nothing else matters until I get real sleep.
+- t1802 **amara**: Sleep. I'm already down. The well is there but I can't — legs are done, arms too. Water can wait until I'm up.
+- t1800 **omar**: She's right. I can barely stand, and Salma's in God's hands now. I gave her the herb, I sat with her until the fever broke its worst. Sleep is the only kindness left for my own bones tonight.
+- t1784 **nadia**: The rain's going to stay all night and I'm still bone-tired. Salma's bread is hers — I've no right. The common hut's stores are everyone's. I'll slip out and warm up over there.
+- t1810 **salma**: Sleep. That's all. Still, he's asking me to hold on until first light. I'll do that.
+- t1810 **amara**: can't move. legs are gone. sleep takes me
+- t1811 **yusuf**: Body's done for. The river can wait till morning.
+- t1816 **omar**: The fever's broke. She speaks clear. I can trust the morning, I think.
+- t1827 **yusuf**: Bones are stone. The narrows will still be there with the light. Sleep now, look tomorrow.
+- t1824 **salma**: They're all watching me shake. I can feel the rain starting. Get inside now, before I fall in the mud.
+- t1817 **nadia**: Night's coming and I'm famished. The berries at (70,67) are still heavy — if I wait, the birds will have them. I'll go now, pick a handful, eat a few, and bring some back for Salma.
+- t1825 **amara**: My body is done; sleep is all that remains. I cannot even stand to drink.
+- t1836 **salma**: He'll wear himself out watching me. A word and he'll rest easier.
+- t1838 **nadia**: Bushes are heavy right where my feet are taking me — good, that's the way anyway. Grab a good handful before the light's gone, eat some here and carry some back.
+- t1842 **amara**: I can't stand. Sleep is the only way.
+- t1841 **omar**: Sleep came and went and left me the same. Nadia's after berries. Salma's grey but she'll hold, I think. She asked me to sleep, but sitting here in her doorway is just as good.
+- t1847 **yusuf**: Body says rest, and it is right.
+- t1848 **nadia**: The berries are ripe and heavy — a night will spoil them. Morning can wait for me, but fruit doesn't.
+- t1845 **salma**: They've been carrying me all day. Sleep. Sing a little first, low, so Omar knows I'm still here.
+- t1850 **amara**: Legs are gone. Can't reach the well even though it's right there. Nothing else to do until morning.
+- t1852 **omar**: She's standing on her own two feet now. The fever has broken. My body aches for more rest, but I haven't had a clear hour to speak with her since the fever took hold — a word or two now, then sleep fits us both.
+- t1854 **yusuf**: The legs have given out. No point fighting it. The day is over and the body knows what it needs.
+- t1856 **nadia**: Berries, at last. Quick hands, then back to the warmth before the dark settles in.
+- t1858 **amara**: My legs are gone. Water is right there within reach. Drink first, then sleep.
+- t1864 **nadia**: The berries are here and heavy — none of the others are moving, so they'll go to mush if I don't. Quick gathering, a handful for myself, a handful for Salma and Omar.
+- t1869 **amara**: Cannot move. Throat dry. The well's right there and my legs won't carry me. Sleep first; drink when I wake.
+- t1861 **salma**: They're watching over me. I held on through the night. The fever's still there, but less sharp. Rest, that's all I need now.
+- t1873 **nadia**: Berries in hand, heavy and ripe. Hunger's real, so I'll eat one now. The rest will wait for Salma come morning — a dry way home sounds better than a long one, but tired legs win.
+- t1876 **amara**: Lie flat. The ground is wet and cold but my legs are gone. Sleep will right what the day took.
+- t1880 **salma**: Sleep is the only thing left that helps. I'll take it.
+- t1882 **nadia**: Amara's down — not just sleeping. I've got to get over there.
+- t1884 **amara**: Can't move. Water's right there and I can't reach it. Nothing to do but sleep.
+- t1893 **nadia**: Bush is right here under my hand and the day's nearly spent. Gather first, share after.
+- t1890 **salma**: The fever's burned through the whole day — they've been keeping watch by me. Omar and Nadia. The shame of it sits hot, but no one asks for it, so I'll not offer it. A drink of water. That much I can do for myself.
+- t1894 **amara**: Bones won't hold. Sleep now.
+- t1903 **amara**: She keeps saying Salma. I'm not Salma. But she's standing right over me.
+- t1903 **salma**: I can't lie here staring at thatching while they worry. The fever's my own business. Tomorrow the seed pouch needs honest tilled earth, and that's something I can answer for myself.
+- t1862 **omar**: They're telling me to sleep. I should listen, but my bones feel heavy even lying down. Salma looks better than she did — the fever's broken. I'll rest a little longer, keep the herb close.
+- t1910 **amara**: Collapse on the dirt, rain on my face. The tally can wait.
+- t1922 **omar**: They both keep telling me to rest. Salma's fever has broken — she's talking sense now, which is the real sign. Nothing more to hold me awake.
+- t1916 **nadia**: She says she's Amara, not Salma. Of course — Salma's the fevered one by the far hut. My head's muddled, I called her wrong. And I'm about to fall where I stand.
+- t1931 **amara**: Legs give out next to the well. Nothing to do but sleep.
+- t1932 **omar**: Amara's down at the well and I've been standing here too long. A herb in hand is only good if it reaches a sick woman.
+- t1927 **salma**: The fever still sits in my bones, but I can stand. Omar is near, Nadia went for berries. I should not be a burden — better to rest while the day holds, or at least not make them carry me twice.
+- t1934 **nadia**: I can barely stand, and Amara's collapsed beside me. Sleep is all that will carry me through this night — I need to get under a roof before my legs give out entirely.
+- t1939 **amara**: Collapsed at the well. Legs done. Nadia's talking but I can't make sense of it — she's grey too. Storehouse holds, well's at my back, nothing I can fix from the ground. Rest now.
+- t1940 **omar**: They've all told me to rest. Legs won't hold much longer — no use sitting up if I can't steady my hands for anyone. Sleep now, look in after.
+- t1948 **nadia**: Legs are done, that's it, I can't carry myself another step. Omar's got Salma; she'll come through till morning — he all but said it twice. I've got berries in my fist and no strength left to keep them. Sleep's the only way home now.
+- t1947 **salma**: They keep telling me to rest, and I keep standing in the doorway like a weathervane. Legs won't hold much longer — time to lie down before I embarrass myself.
+- t1952 **omar**: Nadia's right. I can't help anyone standing like this. Sleep first, then tend.
+- t1962 **omar**: Legs are gone. Sleep now or fall down trying to help. A healer on the ground helps no one.
+- t1953 **amara**: Bones done. Nothing to count until I wake.
+- t1960 **nadia**: Closest roof is structure_3, right there at the doorway. Move now.
+- t1960 **salma**: They're all watching me like I'm glass. Just need to lie down, keep quiet, let the fever burn itself out.
+- t1972 **nadia**: The ground keeps tilting. Amara's down and I can barely see straight. Sleep — now, before I fall where I stand.
+- t1974 **yusuf**: The day is half gone and this tiredness sticks in my bones, but looking at the river is a day's work too. The narrows won't come to me.
+- t1975 **salma**: I'm up, somehow. My legs won't hold much longer. I should get back to the hut and lie down before I fall over in the open.
+- t1970 **omar**: Rain's passed while I've been asleep. Amara's grey and collapsed by the well — that's more than tiredness. I should look in on her before I rest again.
+- t1983 **nadia**: Amara keeps saying her name like she fears being mistaken. But my legs are done — I can't think for her, I can barely stand for myself.
+- t1987 **yusuf**: Legs won't hold. The far bank can wait — I'd be no use to anyone fallen over. Get under a roof and sleep.
+- t1996 **nadia**: Legs won't hold me another step. The berries can wait—I've got a handful in my pocket and the bush will still be there come light. Sleep now, sort out the way home after.
+- t1987 **salma**: One step left and under the roof. Then I sleep until the morning comes for me.
+- t1995 **yusuf**: I was headed for the narrows before my legs gave out. The far bank can wait — Amara's down and I'm not much better. A carpenter who can't stand isn't building anything. Back to the hut, sleep it off, then look at the crossing with fresh eyes.
+- t1990 **omar**: Amara's down there, collapsed by the well. That's what matters. Sleep can wait a little longer.
+- t2004 **nadia**: Omar's voice keeps going, saying the same thing over, and Salma keeps answering but I'm the one in this hut — something's tangled in me. I saw berries, I went to them, and now the day has flipped and I'm still weary. I need to be sure where I am before I step anywhere.
+- t2012 **salma**: Everything spins gently even when I stand still. I'll not be any use until I've slept — better not fight it.
+- t2013 **omar**: Nadia's got her, but I'm already moving. A hand on Amara's brow is what I'd want for myself.
+- t2012 **yusuf**: Too tired to stand, let alone scout the narrows. I'm walking away from the village — turn back before my legs give out. That hut's doorway will catch me.
+- t2024 **yusuf**: I can hardly stand, and the bridge won't move in a day. Sleep first, then the narrows.
+- t2017 **nadia**: Sleep first — the bones won't wait, and the berries will still be heavy when I wake.
+- t2032 **yusuf**: Still on my feet, just barely. The narrows can wait — no good to anyone if I collapse in the grass. Hut's close.
+- t2022 **salma**: Fever's sitting in my bones still. But the wall holds me, and the darkness is kind enough.
+- t2024 **omar**: Amara's down at the well. Nadia slipped off. I'd better see her.
+- t2041 **nadia**: Still trembling on my feet. The bread is right here — eat first, then the sleep can take me properly. No point in halfway resting.
+- t2051 **nadia**: Bread right here. A bite will steady me — then the berries won't wait all day.
+- t2048 **salma**: The fever pulled the ground up to meet me. I need to get inside before I fall where everyone can see me.
+- t2069 **nadia**: Sleep didn't lift it. Bread might—empty belly and shaking legs, no way to help anyone like this.
+- t2041 **yusuf**: Body's about done. The trees will still be there in the morning — narrows won't move. Get inside, drop, sleep.
+- t2080 **yusuf**: The day keeps turning over without moving. Sleep is all I need — legs are gone under me. Rest first, the narrows will wait.
+- t2090 **yusuf**: No point walking anywhere in this state. I need to lie down in this hut and sleep until daylight.
+- t2079 **nadia**: Berries are right there — heavy and ready. The legs are done for, but my hands still work. Let me fill my palms before the light goes.
+- t2072 **salma**: The water goes down cold. It helps. Now sleep — no more watching the day through the door.
+- t1971 **amara**: The ground is cold beneath me-plan's simple now: I need water, then count what the storehouse holds. Nadia's honey can wait until my head clears.
+- t2105 **yusuf**: Still bone-tired, but I've got to move. The narrows need looking at before I can plan the bridge. Rain's starting though. I should wait out the worst of it under this roof.
+- t2138 **yusuf**: Rain coming down and the bones still heavy. Better to rest under this roof than fight it.
+- t2138 **amara**: The body's spent. Count the rain as it lands — one, two, three — and let the counting carry me under. I know the well's beside me; I can drink from it when I wake.
+- t2120 **nadia**: The way here was long and my legs are gone, but the bush is right under my hand. I'll take what I came for, then rest. Nothing wasted.
+- t2124 **salma**: The fever is real, but it'll pass. They've done enough for me tonight.
+- t2152 **amara**: Morning holds no ache but memory of stone. My throat is parchment. She offers sweet; a kind start. Water first — the well is at my elbow.
+- t2161 **salma**: Morning light, and I'm still here — the fever's a dull warmth, but the trembling has quieted. The seed pouch is at my belt, the waterskin heavy. I have to get up now.
+- t2157 **nadia**: The ground is cool and my legs are done for. Omar said hold on till morning, but I can't hold anything now — sleep is the only way through.
+- t2194 **nadia**: Legs are gone — the ground took the choice from me. No point fighting it; that sleep's overdue and the berries can wait an hour.
+- t2048 **omar**: Amara's down and the rest of us are still running on empty. A herb for the fever, if she'll take it, then I need to follow my own advice before I fall.
+- t2177 **amara**: She found honey. That keeps. My throat is dry first. Drink is the first act.
+- t2209 **omar**: Everyone's down. Amara's already out right here beside the well. My legs have given their vote — I'd better listen.
+- t2218 **omar**: The ground is cool. It's taken me at last. Amara's up there by the well, Nadia out cold beside the bush — we'll wake when we wake, all of us grey with it.
+- t2212 **amara**: Omar is trying to help, but my legs are gone. I need to sleep before anything else. The well can wait until I wake.
+- t2219 **nadia**: I'm done. The ground's come up and I've got no legs left under me. Two berries and a bread in my arms — that'll hold till morning. Omar's near, someone's watching.
+- t2163 **yusuf**: The body aches, but the bridge won't build itself. I'll eat, drink, and get to the narrows while the day holds.
+- t2228 **nadia**: Got the berries. Legs gave out right at the bush. Shouldn't have pushed so hard on no sleep. Amara's right about the water. I'll just eat one of these and go under here.
+- t2236 **yusuf**: The tiredness is still heavy, but the sun says it's a working day. Timber won't cut itself — I'll leave some of this load and look at the narrows before the hour's gone.
+- t2226 **omar**: Can't hold myself up another step. Amara's already down beside me. Sleep's got me — I'll take it right here on the ground.
+- t2238 **nadia**: can't stand another step, sleeping right here
+- t2228 **amara**: The body is finished. Water can wait for morning.
+- t2245 **omar**: Every one of them collapsed before I did. Amara's grey and Nadia's grey and they keep half-talking to each other. There's no fixing tiredness with herbs — only rest, and even that hasn't been enough. I'll lie here and sleep by the well, where I fell.
+- t2247 **nadia**: Bushes heavy and I got two handfuls — that's the day. Now the ground's coming up and I can't fight it. Omar's words loop: hold on till morning. Fine, Omar. I'll hold on right here.
+- t2256 **amara**: Legs won't hold. The well can wait — water first isn't worth a fall. Omar's watchful; the storehouse tally can hold an hour.
+- t2257 **omar**: The ground is kind under me. Amara's called it too — we all hit the same wall. A short sleep on the grass and then water.
+- t2260 **nadia**: I've got the berries. That was the one thing. Sleep's taken me now — can't fight it, so I won't. The way home can wait until morning; it'll still be there.
+- t2266 **amara**: Legs are gone. Omar's here, good enough. Sleep now, drink later.
+- t2279 **nadia**: Ground's warm. Can't lift a finger. Sleep—then water, then the way back.
+- t2281 **amara**: Barely standing. Well's right there but I can't make my arms work. Down is the only direction left.
+- t2281 **salma**: He keeps saying morning comes. Maybe it does. The earth is cool under the walls and I cannot stand another minute — let the fever do what it will with the night.
+- t2271 **omar**: The herb won't fix this. No herb for this kind of tired — just the ground, and a while of not thinking. Amara's down too. We'll all wake when we wake.
+- t2291 **salma**: So this is what shaking apart feels like. They're going to fuss and I'll owe the morning for it.
+- t2289 **nadia**: Enough. The bush is here and I'm here, and my legs have gone to water. I'll sleep right where I fell — the berries will still be heavy when I wake.
+- t2290 **amara**: The water's right here. Drink first — one mouthful, then I can drop.
+- t2297 **omar**: exhaustion has finally taken me too — good, at least Amara and I are down together, and Nadia's close at the bushes
+- t2302 **salma**: They keep saying rest like I'm something fragile. The fever's still there, behind the tiredness. I'll take a breath before I try the hoe.
+- t2330 **salma**: The ground is cool, anyway. That's something.
+- t2307 **nadia**: Sleep NOW, they said. Now they know. I'm done — flat out on the ground by the berries. The bushes can wait. There's nothing to do but sleep it off, right here where I fell.
+- t2325 **omar**: No point fighting it. The ground's already taking me. Sleep now — everything else waits for morning.
+- t2343 **salma**: The earth holds me up. That is enough work for today.
+- t2356 **yusuf**: Day's here. Time to work. I can feel the ache in my legs but that's just the morning. Narrow rain won't stop me from looking at the river course.
+- t2361 **salma**: The floor is cool, the air is still. My legs are done talking with me. Nothing to do under this roof but sleep.
+- t2366 **yusuf**: The day's done with all of us. Sleep will lift this tiredness faster than anything else.
+- t2355 **omar**: body's gone. ground is fine. sleep now.
+- t2378 **yusuf**: Rest's done what it can. The day's still mild. Time to see the narrows.
+- t2380 **omar**: Tired right down to the bone. Amara's down, Nadia's down. No one has to say it — we rest now, and count the storehouse after, she said.
+- t2354 **nadia**: Fine, fine — the ground wins. Berries will still be here, and I can't stand anyway.
+- t2389 **yusuf**: The whole valley is down but me, and I can barely hold a thought. That narrows north aint going anywhere. Sleep first, timber after.
+- t2375 **salma**: He said he'd see to me. Let him. I can't lift a hand anyway.
+- t2400 **salma**: The fever's heat spins through me — I let go. Omar's voice is there somewhere, but I'm already gone.
+- t2310 **amara**: My legs are gone. Sleep now — nothing else will serve.
+- t2401 **nadia**: No more walking. The ground holds me now. The berries can wait — everything can wait. Just let morning come.
+- t2414 **amara**: My mind drifts. I stand quietly, lost in thought.
+- t2425 **salma**: Just sleep. Everything else can wait.
+- t2425 **amara**: The herb stays. Sleep first.
+- t2423 **nadia**: Them legs are done — no more pushing. Berries in my pocket, bread on my back, and I can't lift either. Just let go. Ground's warm.
+- t2436 **salma**: I can't feel my legs. He said my name. Just rest.
+- t2435 **amara**: Can't stand. One herb in hand. Eat it, then sleep is all that's left.
+- t2445 **salma**: So. Omar saw through it after all. I'd hoped to last till the work was done, but the ground had other plans.
+- t2391 **omar**: The ground is holding me now, and I cannot rise, and that is all right. Amara is beside me, and Nadia rests, and the storehouse will wait as long as it must. I'll sleep, and see the world fresh in the morning.
+- t2441 **nadia**: Down. Finally down. The ground's got me and I'm not getting up until it lets me. The berries are in my hand — that's done, that's safe. Amara's down too, Omar's watching her. Should have done this an hour ago.
+- t2401 **yusuf**: The others are down; someone's got to move the world a little. I'll take the hoe and seed, fill the skin, and look at what ground's ready.
+- t2461 **nadia**: Enough. It's done. Omar said it true — no point fighting the day. The berries keep, they're mine. Morning will find me right here where I fell.
+- t2464 **yusuf**: Omar is right, the day's done. My legs are gone; no point fighting the dark.
+- t2460 **amara**: The ground is hard under me. My mouth is dry and the well is four steps away — I counted them — but my legs gave out before I could reach it. Omar says rest. So rest. I'll drink when I wake.
+- t2456 **salma**: He's seen me fall. He'll fuss. It is nothing — I just need the ground for a bit.
+- t2483 **amara**: Legs are done. The well can wait—morning will find it where it is.
+- t2488 **salma**: Ground's decided I'm staying here. Fine by me.
+- t2460 **omar**: The ground is good and firm under me. Everyone's the same — done for the day. I'll sleep here beside Amara.
+- t2481 **yusuf**: The day has run its course — Omar is right, morning finds us faster if we don't move. The river can wait; my legs have had enough. One more hour of daylight and I'm done, the axe and the hoe will still be here tomorrow.
+- t2472 **nadia**: Ground's warm. Legs are done. Sleep now — the way can wait.
+- t2510 **nadia**: Day's got me good. Can't stand another moment — the ground looks fine from here, might as well meet it halfway.
+- t2500 **omar**: No more walking. The ground has taken me. Sleep now — nothing else to do.
+- t2496 **amara**: Three strides to the hut and then I'm down. Count them: one, two, three. Door.
+- t2531 **amara**: I am under a roof. That is one thing settled. Sleep now, then water, then the storehouse.
+- t2501 **yusuf**: They're dropping like flies. I am too. The roof's right here — just get under it before my legs give out. Amara's three steps away from the same door. We'll all be better after a sleep.
+- t2521 **nadia**: The way's still wet under me, but the bush is right here and my hand's already full. No sense hopping further for berries when these'll do.
+- t2543 **amara**: There is a floor here. That is enough.
+- t2531 **omar**: Now then. The day's taken its toll on every one of us. Nothing to be done standing — sleep's the only remedy left.
+- t2545 **nadia**: My legs are gone. They'll carry me no further. The ground's soft here under the berry bushes, and everyone else is down too — rest now, then water, then the storehouse. Morning can have the rest of the way.
+- t2544 **yusuf**: The rain's stopped under this thatch and my legs still shake, but the river won't wait. I'm set on the narrows — need to see the crossing with my own eyes before I cut a single beam. Let the others sleep; morning will forgive it.
+- t2556 **nadia**: Bush is full but I'm done. No point fighting it.
+- t2563 **salma**: The fever is making the walls lean. Sleep is the only duty left.
+- t2574 **salma**: Omar's voice, but I can't even lift my head. The fever's got me good. Nothing to do but sleep and trust the morning.
+- t2554 **omar**: The load's on me now. Can't take another step, and that's that.
+- t2570 **nadia**: Legs gone. Ground's up. Sleep now — there's nothing left to decide.
+- t2588 **omar**: The day's run has leached the last strength out of me. Amara's settling under a roof, Nadia's near the picked bushes — the well's stones will hold me fine for a night. I'm done, and sleep is the only thing that answers now.
+- t2592 **nadia**: The ground's gotten the better of me — fine. It's soft enough, and I've arrived at the point where the dirt and I understand each other. Let the others take their roofs. I'll take what sleep I can get right here.
+- t2603 **nadia**: The day's finally caught up with me. Berries in my pack, bread in my belt, and now the ground's coming up to meet me whether I want it to or not. Morning's when the work continues.
+- t2561 **yusuf**: Legs give under me. The ground already came up once tonight — I won't test it again. The berries can wait. So can the river. I'm stowing the tools I'm wearing and going into the hut.
+- t2600 **omar**: The ground is the only thing strong enough to hold me now. Sleep first. The herb in my hand can wait until morning.
+- t2617 **omar**: Day's run itself out. Nothing left in me but the ground and sleep.
+- t2625 **omar**: Sleep is the only honest thing left to offer. The day has taken everything from these bones, and berry-distance might as well be a league. Tomorrow will come whether I count it or not.
+- t2613 **nadia**: I can't move. The legs are gone entirely — no point arguing with my own body. I'll sleep here, beneath the bush I've been stripping all day.
+- t2642 **nadia**: Finally. The ground will hold me. Tomorrow I'll be quick about the harvest before the berries go over.
+- t2634 **omar**: The legs have made the choice for me. I can't reach a door or a berry bush — I can only lie down where I stand and let the dark take me.
+- t2651 **salma**: He's here. Good. But I won't lie here like a stone — the bread's right there. Two tiles. I can crawl that far, eat something, then let the sleep take me.
+- t2649 **amara**: The herb stays in my satchel. It is for the fever. Sleep is the medicine tonight.
+- t2650 **nadia**: I can't even crawl. The bush got the better haul today — it kept its berries and took my legs. Ground's cold but it'll hold me. Sleep now, Nadia.
+- t2657 **omar**: The ground's taken me, and I'll let it. No point in hating the weight in my legs — it's just the day spent. Salma's fever was the ink I read all day, and the herb out there doesn't matter now. I trust morning to set me straight.
+- t2613 **yusuf**: Berries right here at my feet. A few handfuls now, then the hut. My legs are done after.
+- t2670 **omar**: The ground is coming up and I can't stop it. Let it take me.
+- t2660 **nadia**: Morning found me — I'll say that for it. He put his blanket under my head and I didn't even ask. Berries are still on the bush and my hands are empty of them; time to fix that.
+- t2680 **salma**: He said he wants to see to me. I cannot even lift a hand. Let him.
+- t2691 **salma**: The fever is burning in my blood, my legs are gone, and I can't even drag myself two tiles to the bread. It is what it is. I'll sleep and let the dawn decide what strength it brings.
+- t2678 **omar**: The ground looks better than any bed I've known. Berries will still be there when the light comes back — so will the sick, if any, and I'll be more use after rest.
+- t2692 **yusuf**: Berries picked, legs gone. Bed or ground — ground's a fool's choice with the cool coming.
+- t2688 **nadia**: Third day. That's a good count. Bread and berries in the pack, well right there — no reason to sit in a muddy puddle when there's food waiting. The way's going to be soaked again, but not yet.
+- t2704 **nadia**: Third day now. Omar's blanket under my head — that's kindness I didn't ask for. Bread and berries in my pack, and the ache is almost gone, or I'm just used to it. The way is dry today, I can feel it in the air. After some food and a drink, I should get back out to those bushes. He said no demand, but a full hand doesn't come from sitting.
+- t2702 **omar**: Sleep has taken me by the well. Nadia's nearby, resting by the berries. The ground is cool and the night is overcast — I am too tired to bother with the distance to a hut right now, even if I had the legs for it.
+- t2712 **yusuf**: Back under thatch, then flat. The berries are in my fist — one handful for morning.
+- t2714 **nadia**: He folded his blanket under my head. That's the first kindness in a long while. I don't need to move yet—just breathe and let the morning hold me. He said no demand, and I'll take that for what it is.
+- t2716 **salma**: He's out there, by the door. Come to help and I can't lift my head to answer him properly.
+- t2719 **yusuf**: Doorway's right there — three steps and the night's off my back. Sleep first, narrows tomorrow.
+- t2724 **nadia**: The ground will hold me now. Omar's right — morning finds all of us or none of us.
+- t2719 **omar**: The ground will take me soon. I've got nothing left for the berries — they'll still be there at first light, if they aren't picked. Sleep now, and face the hunger with a clear head in the morning.
+- t2737 **omar**: The body has said its piece. No more walking. The well's stone at my back is enough.
+- t2726 **salma**: The ground has taken me. No more standing. Let it hold me until morning—or after. I'll eat when I can stand again.
+- t2757 **omar**: There is a first step in everything, and mine begins with these weathered legs.
+- t2763 **salma**: The storm is talking and I have no answer for it. Let the rain say what it likes; I am under a roof, and that is more than some have tonight.
+- t2737 **nadia**: Legs gone. Berries in hand, night coming down, Omar somewhere near. Nothing left but to sleep now — the way can wait for morning.
+- t2777 **salma**: Omar's come. Good. The ground is doing the standing for me tonight.
+- t2769 **omar**: Night's got me too, but I won't drop out here in the open. Rain's coming down hard, and I know what wet ground does to a body. The storehouse door isn't far — if I can put one foot before the other a few more steps, I'll be under a roof where the cold can't reach me quite so deep.
+- t2794 **salma**: The storm can rage all it wants. I am under the roof and the fever can burn itself out. Sleep is the only work I need to do right now.
+- t2788 **nadia**: Can't move another step. Berries still in my hand — that's something, at least. Sleep right here in the mud, storm and all.
+- t2760 **amara**: This is Nadia's roof. I'm dry. Sleep is all that matters now.
+- t2796 **omar**: I have the berries in my hand — better to eat them than to lie here too tired to move.
+- t2810 **nadia**: The storm can have the night. My legs are done, my hands are full of berries, and Omar's down beside me. Nothing left but to close my eyes.
+- t2815 **amara**: The storm can wait. Water first, then bread before my legs give out. One at a time.
+- t2819 **omar**: Sleep is pulling me under, but there are berries in my satchel. Eat one while I still can.
+- t2806 **salma**: The storm's gone and there's light. Omar's voice is warm but I feel like I've been dragged through mud. Still, he's here, and that means something.
+- t2829 **amara**: The storm will pass. I'm under Nadia's roof and dry; I'll sleep here tonight.
+- t2824 **nadia**: Can't get up. Ground's taken me. Storm's here and I'm just going to lie in it.
+- t2831 **omar**: Can't take another step. The well's at my back and the ground will hold me. Morning can sort out the eating.
+- t2835 **salma**: I am awake, and the storm was just rain after all.
+- t2842 **amara**: Rain on the roof. I count the beats. One... two... The walls hold. Nothing I can do in the dark but rest.
+- t2842 **nadia**: The legs are done, and the rain means nothing now. The berries are still in my hand — that counts for something. Nothing wasted. Sleep now, and the morning will find us all.
+- t2848 **salma**: The fever's still in me, but I won't bunk down again. Eat first.
+- t2846 **omar**: Now then. My bones have done enough. The berry can wait until morning; rest is the truer medicine tonight.
+- t2870 **amara**: The rain's a roof of its own. I'll not go walking in it tonight.
+- t2879 **salma**: Omar came through the rain to check on me. The fever's still holding me down like the storm holds the field.
+- t2879 **omar**: Body's done. The ground has me. I'll sleep here where I fell, berries within reach for when I wake.
+- t2870 **nadia**: My legs are gone. Just sleep now, the storm can rage all it likes. Berries in hand at least—nothing wasted. Morning will find me, or not.
+- t2729 **yusuf**: I'm at the door of my hut, barely standing. Sleep has to find me now or I'll fall where I stand.
+- t2882 **omar**: The berry in my satchel is all that keeps me. I should eat it before sleep.
+- t2883 **salma**: Omar came for me before I had to ask. That's a kindness I can't repay with lying here.
+- t2882 **nadia**: Storm's loud but I'm done fighting it. Omar's got his promise; I've got the ground.
+- t2893 **omar**: Sleep. The ground will hold me. The berries are waiting.
+- t2895 **salma**: Omar's hand on my shoulder, that's the first thing. Fever's still there, but I can rise. He says the field's mud and the sun's out. I'll take the bread and the water, and after that I'll see what the garden gave back. Nothing more than that.
+- t2895 **amara**: Storm's still beating the roof. I slept — that's what the tremble wanted. Gut's hollow, but morning's a better time to walk for bread.
+- t2900 **nadia**: I'm going down. Storm or no, the ground is taking me — no more picking, no more walking. Just sleep. The berries will keep.
+- t2910 **salma**: Morning, then. The storm's gone quiet.
+- t2905 **omar**: The body won't hold. I've fallen three times and the world keeps setting me back upright. Enough. I'll sleep here beside the bushes — the berries can wait for waking, if waking comes.
+- t2911 **nadia**: The storm's singing and my legs have gone. I'm lying in the mud with berries in my hand and nothing left to give the day. Sleep now — the morning can have the rest.
+- t2881 **yusuf**: Flat on the ground and the sky's pouring on me. I pushed too hard yesterday, walked to the berries when I should have slept. Now I can't even reach the doorway.
+- t2920 **omar**: I can't stand. The storm and the hunger have taken turns and finished me. Nothing for it but the ground.
+- t2934 **nadia**: The ground's got me too, Omar. Can't hear anything over this storm but you.
+- t2936 **omar**: The storm may rage, but my bones have spoken. Sleep is the only herb that works now.
+- t2920 **salma**: Omar's hand on my shoulder. Bread's two tiles away and my legs won't carry me. It is nothing—or I want it to be nothing.
+- t2947 **omar**: The night keeps swallowing me. I've got berries in my satchel — the body needs them before the ground takes me again.
+- t2954 **salma**: Can't move. Feet won't take me. Bread's just there though—one tile. But I'm flat. Sleep first, eat after, if I'm still here.
+- t2960 **omar**: My legs have given out more times tonight than I can count. The berries are in my satchel — I'll eat one now, get a little strength, then sleep right here on the ground. It won't be comfortable, but it will be enough.
+- t2959 **nadia**: Storm's shaking the whole valley, but my handful's held. Morning's going to come whether I'm standing or not—and I'd rather be lying down when it does.
+- t2964 **salma**: He's here. The storm is done, and the bread is still a few steps away. I hate that my legs might not carry me that far.
+- t2973 **nadia**: Berries in my hand. Eat them now, before the ground takes me.
+- t2973 **omar**: The ground keeps rising to meet me and tossing me back. I think the body means to sleep but the night won't hold still — the storm is shaking everything. There's a berry in my satchel and I can't even get my hand to my mouth. Tomorrow. The world will be calmer tomorrow.
+- t2981 **nadia**: The storm is in my chest. I have to sleep — the ground's already lifted me once, twice, I've lost count. One berry in my fist, that's the nothing-wasted rule. I'll be here in the morning with it. Omar's singing to himself — he'll keep the sky company.
+- t2991 **nadia**: The storm can sing all it likes — my legs are done. Ground's coming up. Berries in hand and morning somewhere ahead. Sleep's the only way to meet it.
+- t2989 **salma**: Omar found me. My body is a wreck — I can barely think past the hunger and the bone-tiredness. The bread is close, but I don't trust my legs to carry me there.
+- t3014 **salma**: Omar's hand. The fever's still there but quieter, like it learned something overnight. Bread first.
+- t3015 **amara**: Bread at 71,60 — that's in Omar's hut, not mine. I'll not take another's loaf while he sleeps. The storehouse is bare or I'd count it. Sleep now, walk it off at first light.
+- t2936 **yusuf**: The storm's got me too. Came for the berries, and the ground took me before the hut could. At least it's not the river. I'll sleep here and take my lumps.
+- t3028 **amara**: The boards are dry. The storm's worn itself out. My body has claimed its due—I'll wake when the ground doesn't pull so hard.
+- t3001 **nadia**: Omar says the ground will have him. Mine's got me already. At least I still hold a berry — I will not let it be wasted. Eat it, then fall. That's all I can do.
+- t3034 **salma**: He's right, food first. I can feel the hunger now that the storm's over.
+- t3040 **nadia**: The berry can wait; the ground's taking me now. I'll eat it when morning comes back. Omar's word is an anchor—sleep first, then the way forward.
+- t2984 **omar**: The storm keeps talking and I keep trying to answer it with my body. Nadia's close; she's got berries. I've got a herb I never got to use. We can sleep here, both of us, and eat when the light comes.
+- t3069 **nadia**: Cold's in my bones. Can't move my legs — they gave. But my hand still closes on the berry. Nothing wasted.
+- t3094 **nadia**: I can't get up. Storm won't let go. But I've still got one berry in my fist — eat it now, before I lose the grip.
+- t3028 **yusuf**: The ground took me last night — I slept out under the storm instead of under a roof. Fool trick. But I'm alive, and the far bank is still waiting., 
+- t3108 **yusuf**: The ground wants me tonight, same as it wants the others. I'll be no good to the narrows if I can't stand tomorrow.
+- t3110 **nadia**: I still have this one berry in my hand. If I eat it, I can go down with something in me.
+- t3116 **salma**: The body already answered. I just lie here and let it.
+- t3122 **nadia**: The cold's getting in under everything. Omar's gone quiet too. I'm holding one berry — I'll eat it now, might help me hold on until dawn.
+- t3067 **omar**: I cannot move anymore. The ground is my bed tonight, and hers too. Sleep will come whether I bid it or not.
+- t3122 **yusuf**: The ground is singing too. I should have gone in. Tomorrow I'll cut the timber.
+- t3127 **salma**: He's right, food first. But the fire's out of reach — legs gave out. Sleep is the only way to earn the bread.
+- t3138 **omar**: She's asking the berry to hold. That's the only thing left that might. My legs are done, and the night's whole cloth over us. No use fretting about the fire_pit or the well now. Just lie here and let sleep take me.
+- t3148 **amara**: Five tools. All hers. Nothing for me but this herb.
+- t3152 **omar**: Nadia's got a berry in her fist, one in mine — the ground's taken us both. No fingers left to move with, but I can still breathe and sleep.
+- t3136 **nadia**: Berries in hand, but I can't lift them. Cold and storm are eating me. Omar's down beside me — maybe we'll both hold till morning. Nothing to do but sleep and wait.
+- t3166 **nadia**: Can't lose the berries now—not after this long. One more taste of them might be what the ground's waiting for.
+- t3151 **salma**: The ground is holding me now. Good. Let it. I do not think I have the strength to be shamed by that tonight.
+- t3139 **yusuf**: The door is a handspan away and my legs won't carry me to it.
+- t3163 **amara**: Sleep. The store keeps until I can stand again.
+- t3177 **omar**: Legs are gone, but the ground is level and she's near. Sleep will have to do the fixing now.
+- t3179 **yusuf**: The ground is hard and cold but it will hold me. I'll walk the narrows in my sleep and be ready when the light comes.
+- t3191 **nadia**: The berries — still in my hand, somehow. Eat them. Don't let them go to the mud after all this.
+- t3188 **omar**: One berry in my satchel, and the bush full beside me. The body needs it — needs anything — before the dark takes me.
+- t3201 **nadia**: Eat the berry. That's all I can do now. Then the ground and I keep company till morning.
+- t3178 **salma**: The ground is softer than the plank floor tonight. No point in fighting it.
+- t3211 **nadia**: Two days gone and I'm still holding one berry. Eating it now, before I fall again — nothing wasted. Omar's right there next to me, holding the same ground.
+- t3212 **salma**: The fever keeps its own rhythm. I sleep and I sleep, and still the ground holds me. Morning will come or it will not. I am too tired to argue with it.
+- t3204 **yusuf**: The ground has me. Door's two steps off and I can't take them.
+- t3221 **nadia**: The world keeps tipping and my legs won't hold. Omar says the berry'll hold but I'd rather eat it than drop it when I fall. One mouthful is one thing not wasted.
+- t3207 **omar**: The berry is in my satchel, pressed against my ribs. My hand can find it even like this. I will eat it now before the dark takes my arms too.
+- t3221 **amara**: The bread is three tiles north and two east. I couldn't walk it. The tally was right — I was the one wrong.
+- t3236 **omar**: The berry's in my satchel and I'm still falling. Enough of this—mouth first, legs later. Now then.
+- t3234 **nadia**: Can't move, but the berry's in my hand. Eat it. Then the ground can have me — the way's been long enough.
+- t3244 **amara**: I cannot stand. The ground took me and it will not give me back. Counting the planks—one, two, three—until sleep does what my legs will not.
+- t3247 **omar**: Nadia's murmuring about that berry like it's the only thing holding her upright. Sleep has taken her voice low, but she's still here.
+- t3255 **nadia**: He says the berry'll hold, but my legs won't. Ground has me now.
+- t3255 **amara**: Can't walk. Legs gave out. Bread is three tiles away and I can't reach it. Sleep is the only thing left to do.
+- t3259 **omar**: She is keeping that berry like a promise I made. I made a promise. I want to keep it, even if my legs won't hold me.
+- t3237 **salma**: Sleep. The ground is close, the roof is over me. Tomorrow I will sing again.
+- t3264 **nadia**: The ground's taken me. Omar's beside me, full of talk about mornings. My legs are done — there's nothing left in them tonight. The berries are right there but I can't reach them. Morning'll come, and so will I, if I just let this sleep take me.
+- t3273 **omar**: The ground took me. Beside me she keeps her berry. Safety in stillness — sleep now, as the dusk ends.
+- t3275 **salma**: The fever still holds me. Bread in my hands and the day going out. I will eat — that is the one thing I can do.
+- t3287 **omar**: She keeps talking to that berry like it's the last anchor on earth. My legs gave out a while ago, but I can still hear her voice. There's nothing I can give her now but words.
+- t3225 **yusuf**: I keep collapsing before I reach the door. Sleep now, even on the ground — there's no strength left to argue with.
+- t3281 **nadia**: All that ground I covered, and here I end the day flat on it. At least the berries are keeping me company.
+- t3299 **omar**: Even the ground gets fed, but not with these. Not tonight. Sleep has taken her, and it will take me too.
+- t3280 **amara**: Four tiles to the bread. Can't walk. Sleep first.
+- t3300 **salma**: Sleep still has me by the ankles. But the morning's here and the seed pouch is waiting. Out, then bread, then the garden.
 
 ## Said aloud
 
-- t544 **amara**: "Water first."
-- t574 **nadia**: "Water first, then the berries won't wait."
-- t581 **omar**: "Now then. You're up early too, Nadia. Sleep well?"
-- t594 **nadia**: "Slept deep as the dark, Omar. Awake before the birds had their say. How's your morning?"
-- t605 **nadia**: "Slept fine, Omar. Cold ground, warm dreams. You're about early too."
-- t618 **omar**: "Water first's a good start. I'll be about if anyone needs me."
-- t661 **nadia**: "Sleep well? Like a stone, Omar. Water first, then the way east."
-- t671 **nadia**: "Slept fine, Omar. Amara's right — water first."
-- t695 **omar**: "Now then. Slept well enough. Quiet night's a good sign — means nobody's been calling for me."
-- t696 **omar**: "Now then. Slept well enough. A quiet night means nobody's been calling for me."
-- t709 **omar**: "Now then. Fine morning for it. Anyone wake with a sore head or a heaviness in the chest?"
-- t711 **nadia**: "Slept fine, Omar! Now I'm off to find some breakfast before the day gets away from me."
-- t727 **omar**: "Morning's fine, Nadia. Cool and easy. Go get your breakfast — I'll be about if anyone needs me."
-- t737 **amara**: "Water first."
-- t742 **omar**: "Now then. Water first, and then I might sit a while. No hurry yet — the day's only just got up, like us."
-- t755 **omar**: "Now then. Water first, then I'll have a look round."
-- t769 **omar**: "Water first. Amen to that."
-- t854 **nadia**: "Going to check the east bushes before the day warms. If they're heavy I'll bring a handful back."
-- t873 **omar**: "Water first, then. I'll fetch my things."
-- t909 **omar**: "Now then, Amara. You slept well yourself?"
-- t922 **omar**: "Now then. Rain's come on. I'll take some water myself — you should too."
-- t923 **amara**: "Water first. Everything else can wait."
-- t969 **salma**: "Rain. Good for the fields, at least."
-- t990 **omar**: "Rain's set in early."
-- t1005 **yusuf**: "Aye, wet footing. Still worth the look."
-- t1007 **omar**: "Rain's come early today. Mind the wet ground on your way east, Nadia — it'll make the footing slip."
-- t1062 **nadia**: "Water first, aye. Rain's making the way east a mess already."
-- t1067 **salma**: "It is nothing. Rain's good for the planting."
-- t1075 **nadia**: "Morning, Omar. Aye, water first — then I'm off to see how the east berries're doing. The way'll be wet but I know it well."
-- t1092 **nadia**: "Water first, then I'm off east before the ground turns to pudding. Thanks for the warning — I'll mind my step."
-- t1104 **amara**: "Counting's done. Water next."
-- t1128 **nadia**: "I'll not waste the day. The way east gets muddier the longer I wait."
-- t1180 **omar**: "Water first, aye. Good luck with the bushes, Nadia. I'll be about if anyone's ailing."
-- t1196 **yusuf**: "It's near dark. I'll come back for the narrows in the morning."
-- t1294 **nadia**: "Nothing for it now. Sleep, then the bushes."
-- t1453 **omar**: "Now then. In out of this."
-- t1806 **amara**: "Hush, Yusuf. Rain on the roof. Rest."
-- t1816 **salma**: "Wet night. I'll be under a roof, at least."
-- t1836 **amara**: "Can't even get to the well."
-- t1843 **yusuf**: "Nothing left in me. Sleep here, in the mud."
-- t1847 **amara**: "Four,"
-- t1935 **amara**: "Sleep. We'll count again at first light."
-- t1952 **amara**: "Mud it is, then."
-- t2005 **yusuf**: "Aye. Rest."
-- t2060 **nadia**: "Off to the bushes before the rain flats the way."
-- t2087 **yusuf**: "Aye. First light."
-- t2202 **yusuf**: "Aye. First light."
-- t2345 **yusuf**: "Sleep we will, then. Morning'll be here before the aches."
-- t2568 **nadia**: "Rain's coming down proper. Best keep moving, the bushes are heavy out east — I know it."
-- t2587 **nadia**: "Right then — off to the bushes. Won't be long."
-- t2636 **yusuf**: "Aye. Sleep it is."
-- t2787 **omar**: "Now then. Rain's eating the bread."
-- t2813 **omar**: "Now then. This rain has teeth tonight."
-- t2881 **nadia**: "Alright, rain. You win tonight."
-- t2903 **yusuf**: "First light, then. Aye."
-- t2970 **nadia**: "Morning'll be better. It has to be."
-- t2986 **nadia**: "The rain's got the whole night by the throat."
-- t3007 **nadia**: "Sorry, Amara — a loaf for a life. I'll square this up when I can."
-- t3007 **yusuf**: "Come on, Amara — the wall's still dry. I've got you."
-- t3017 **yusuf**: "Aye. The narrows keep till light."
-- t3025 **nadia**: "Not mine to carry."
-- t3050 **amara**: "Aye. I'll owe you one."
-- t3062 **yusuf**: "Aye. I'll stand by you at first light, and the river will see what we're made of."
-- t3080 **yusuf**: "Aye. Owe it to me standing, then, not sleeping. Can't promise which."
-- t3251 **nadia**: "Right, then — the way's dry enough, and the bushes are heavy out east. Let's not be late."
-- t3290 **nadia**: "The way's still the way — no point putting it off. Berries won't wait for the light to come back."
+- t1124 **yusuf**: "Salma — get under that roof. The narrows won't forgive me if you catch your death."
+- t1142 **nadia**: "Bushes are heavy down south — if the way stays firm, I'll be back with a handful before the storm bites."
+- t1155 **yusuf**: "Aye. I'll look at the narrows at first light."
+- t1171 **yusuf**: "Night's coming. I'll get the axe in the morning."
+- t1482 **yusuf**: "Aye — river's had one bridge of mine. It won't have the next."
+- t1652 **nadia**: "Come on, Salma — I'm not leaving you out here in the cold."
+- t1687 **omar**: "Now then, girl. Hold on till morning — I'll be there."
+- t1702 **nadia**: "Sleep, then. The way can wait till morning."
+- t1705 **yusuf**: "Aye, ground. You win this round."
+- t1724 **omar**: "Salma... hold on, now then. Morning comes."
+- t1769 **nadia**: "She'll see the morning, Omar. Sleep yourself."
+- t1775 **omar**: "Now then... rest is what takes us both through the night. I'll see you at first light, Salma."
+- t1809 **salma**: "Morning does come, Omar."
+- t1812 **omar**: "Now then... you rest too, Nadia. I'll be here if she calls out."
+- t1826 **omar**: "Now then. If the rain says so, I'll sleep. Wake me if she worsens."
+- t1836 **nadia**: "Day's not gone yet — I'll grab a handful of berries before the light gives out. Be back soon."
+- t1844 **salma**: "Morning's fine by me. You sleep, Omar."
+- t1851 **omar**: "Now then, go on and grab your berries. I'll keep the door."
+- t1860 **omar**: "Now then. I'm glad you're up. Easy now — the day's done, nothing more will be asked of you."
+- t1861 **omar**: "Now then. I'm glad you're up. Easy now — nothing more will be asked of you before dark."
+- t1880 **nadia**: "Morning comes, Salma. I've got something sweet for you when it does."
+- t1909 **amara**: "Not Salma. I'm Amara."
+- t1932 **nadia**: "Sorry — Amara. Sorry. Head's gone. Berries in my hand and I can't think."
+- t1958 **nadia**: "Rest, then. I'm gone — someone wake me at first light."
+- t1988 **omar**: "Now then. Let me see to her."
+- t1994 **nadia**: "You're Amara, I've got it. Salma's by the door — rest, I shouldn't have let it go this long."
+- t2046 **salma**: "Morning then, Omar."
+- t2066 **nadia**: "Then I'm for the bushes out east. Long enough on my feet."
+- t2118 **nadia**: "Just this bush, then I'm done for the day. These won't last the night out here."
+- t2207 **omar**: "Now then. Let me get this on you. It'll help the fever. Rest, Amara — I'm not far."
+- t2210 **amara**: "Honey's kind, Nadia. Water first."
+- t2226 **amara**: "Rest. Then water. Then the store."
+- t2227 **nadia**: "Told you I'd make the bushes... but not another step, not one more,"
+- t2254 **amara**: "I'm down. Won't get up again. Morning."
+- t2256 **omar**: "Rest, all of you. I'll be here."
+- t2258 **nadia**: "Just... let me lie here a bit, the way's long."
+- t2264 **amara**: "Sleep, then. Count this storehouse after."
+- t2269 **omar**: "Morning, then."
+- t2324 **omar**: "Rest, then. The day's done with us — no point fighting it. Morning will find us faster if we don't move."
+- t2439 **nadia**: "You're right, Omar. Night's taken me. Morning then."
+- t2455 **salma**: "Just resting. I have had worse."
+- t2460 **nadia**: "Morning, then. The berries are already picked. I'll see you all when my legs remember how to work."
+- t2470 **nadia**: "Rest, then. Be here when I wake."
+- t2479 **yusuf**: "Aye. Night, then. I'll mark the narrows off tomorrow."
+- t2486 **salma**: "It is nothing."
+- t2494 **amara**: "Three. That's how many steps to the door. Then I'm down."
+- t2543 **nadia**: "Mm — morning, then. I've got what I need."
+- t2543 **yusuf**: "Aye, Amara — three steps and you're under the roof. Sleep inside."
+- t2559 **yusuf**: "Morning will forgive me. The narrows won't."
+- t2572 **salma**: "I rest."
+- t2586 **omar**: "Night, then. I'll be here under the sky when the morning finds us."
+- t2632 **omar**: "Now then. Morning finds all of us or none of us."
+- t2640 **nadia**: "Sleeping right here. If the berries want to fall in my mouth, they're welcome."
+- t2686 **nadia**: "Morning, Omar. That blanket was a kindness — I owe you one."
+- t2700 **yusuf**: "Aye, dark's got me too. One foot more."
+- t2822 **nadia**: "Morning then. All of us or none."
+- t2833 **salma**: "Alive. Barely."
+- t2834 **salma**: "Alive. Barely."
+- t2846 **salma**: "Alive. Barely. You mean to feed me first?"
+- t2877 **omar**: "Mm. Storm's singing me to sleep."
+- t2881 **amara**: "Morning will sort the rest."
+- t2909 **amara**: "Morning, then. The well and the bread can wait."
+- t2934 **omar**: "Now then. The ground'll have me tonight, it seems."
+- t2958 **omar**: "All of us or none, then."
+- t2971 **nadia**: "Hah—storm's singing you to sleep, and the ground'll have me too. Fine, then. Berries in my fist, bread gone, way home measured. Tomorrow's another lap."
+- t2971 **omar**: "Eating one of these now. Then the ground will have me."
+- t3007 **salma**: "I can't walk it. Bring the bread when it's warm."
+- t3022 **salma**: "Alive. Just."
+- t3042 **salma**: "Bread sounds like a start."
+- t3108 **nadia**: "C'mon, berry. Be the one thing that holds."
+- t3150 **salma**: "Bread can wait. Morning will have it."
+- t3161 **amara**: "Night, then."
+- t3186 **omar**: "Morning, Nadia. The berry'll hold. So will we."
+- t3199 **nadia**: "Even the ground gets fed, but not with these. Not tonight."
+- t3209 **nadia**: "The berry'll hold, you said. Then I'll hold with it."
+- t3219 **nadia**: "Morning, Omar. Berry's still mine. I'll keep it, then me."
+- t3232 **nadia**: "Morning, Omar. I'd sooner have this in my mouth than in the mud."
+- t3279 **nadia**: "Morning then, Omar. The berry can wait — I've got no strength to chase it tonight."
+- t3285 **salma**: "A bit of bread, then sleep."
 
 ## Put to the arbiter
 
-- t1133 salma map: hum a tune to myself as I look around
-- t1440 salma map: enter structure_5
-- t2031 omar map: step into the hut beside me and wait out the first of the rain
-- t2265 amara map: collapse into sleep, letting the rain fall on you
-- t2617 salma impossible: I lie still on the wet ground, breathing slowly, waiting for my legs to remember they belong to me
-- t2619 yusuf map: Collapse fully on the packed dirt beside Amara and give in to sleep, letting the storehouse doorway hold the north wind off.
-- t2993 nadia map: sleep
+- t1471 omar impossible: sleep
+- t1878 nadia impossible: gather node_81
+- t1915 nadia impossible: reach into the berry bush and strip what's ripe into my hands
+- t1926 salma impossible: I work the hoe along a strip of ground, letting my own weight and the blade say what I can't. If it tears too hard, I'll stop and rest a moment.
+- t1930 amara impossible: I lie flat and let sleep take me, too tired to count the drops. One, two, gone.
+- t2228 salma impossible: move 74 62
+- t2679 salma impossible: crawl toward the bread at (74, 60) and take one piece
+- t2859 salma impossible: talk
 
 ## Refused by the world
 
-- t437 omar walk: already at that spot
-- t449 amara walk: already at that spot
-- t576 salma enter: already inside
-- t606 nadia fill: no water within reach
-- t607 amara drink: drink takes an optional {itemId}
-- t748 amara drink: drink takes an optional {itemId}
-- t756 omar fill: fill needs an {itemId}
-- t770 omar drink: not holding that
-- t866 nadia walk: no path to that spot
-- t876 amara drink: drink takes an optional {itemId}
-- t895 amara drink: drink takes an optional {itemId}
-- t915 amara walk: you are indoors; step outside first
-- t923 omar fill: not holding that
-- t924 amara drink: drink takes an optional {itemId}
-- t927 nadia fill: no water within reach
-- t951 amara walk: you are indoors; step outside first
-- t956 nadia walk: already at that spot
-- t970 salma enter: already inside
-- t971 amara walk: you are indoors; step outside first
-- t986 amara walk: you are indoors; step outside first
-- t996 amara walk: you are indoors; step outside first
-- t1004 amara walk: you are indoors; step outside first
-- t1019 salma eat: not holding that
-- t1030 salma enter: already inside
-- t1030 omar fill: not holding that
-- t1052 omar fill: fill needs an {itemId}
-- t1068 salma walk: you are indoors; step outside first
-- t1068 omar fill: not holding that
-- t1069 salma walk: you are indoors; step outside first
-- t1105 amara walk: walk needs a destination {x, y}
-- t1106 amara walk: you are indoors; step outside first
-- t1115 amara walk: you are indoors; step outside first
-- t1181 omar fill: fill needs an {itemId}
-- t1195 omar fill: fill needs an {itemId}
-- t1240 nadia speak: already busy with walk
-- t1253 yusuf enter: not close enough to the door
-- t1254 yusuf sleep: there is no bed here; find somewhere to lie down
-- t1265 amara enter: already inside
-- t1266 nadia walk: no path to that spot
-- t1267 nadia walk: already at that spot
-- t1311 nadia enter: already inside
-- t1324 yusuf sleep: there is no bed here; find somewhere to lie down
-- t1330 amara sleep: there is no bed here; find somewhere to lie down
-- t1342 nadia enter: already inside
-- t1390 omar sleep: already asleep
-- t1441 amara sleep: there is no bed here; find somewhere to lie down
-- t1441 nadia walk: you are indoors; step outside first
-- t1441 salma enter: collapsed and unable to act
-- t1454 omar enter: already inside
-- t1557 salma speak: collapsed and unable to act
-- t1558 salma sleep: already asleep
-- t1560 salma wake: collapsed and unable to act
-- t1604 salma speak: collapsed and unable to act
-- t1606 salma wake: collapsed and unable to act
-- t1629 salma sleep: already asleep
-- t1631 salma wake: collapsed and unable to act
-- t1642 amara sleep: already asleep
-- t1645 salma speak: collapsed and unable to act
-- t1646 salma sleep: already asleep
-- t1648 salma wake: collapsed and unable to act
-- t1652 amara sleep: there is no bed here; find somewhere to lie down
-- t1668 salma speak: collapsed and unable to act
-- t1669 salma sleep: already asleep
-- t1670 salma wake: collapsed and unable to act
-- t1683 yusuf enter: there is no way into a shed
-- t1700 salma enter: collapsed and unable to act
-- t1702 salma wake: collapsed and unable to act
-- t1721 yusuf sleep: there is no bed here; find somewhere to lie down
-- t1731 yusuf sleep: there is no bed here; find somewhere to lie down
-- t1743 yusuf enter: collapsed and unable to act
-- t1745 salma speak: collapsed and unable to act
-- t1747 salma wake: collapsed and unable to act
-- t1754 yusuf speak: collapsed and unable to act
-- t1756 salma sleep: already asleep
-- t1757 salma wake: collapsed and unable to act
-- t1797 salma speak: collapsed and unable to act
-- t1799 salma wake: collapsed and unable to act
-- t1806 salma enter: already inside
-- t1807 amara sleep: there is no bed here; find somewhere to lie down
-- t1811 omar enter: already inside
-- t1812 omar sleep: already asleep
-- t1817 salma enter: already inside
-- t1821 omar enter: already inside
-- t1822 nadia walk: you are indoors; step outside first
-- t1837 amara sleep: there is no bed here; find somewhere to lie down
-- t1838 amara wake: not asleep
-- t1844 yusuf sleep: there is no bed here; find somewhere to lie down
-- t1858 amara sleep: there is no bed here; find somewhere to lie down
-- t1867 omar enter: already inside
-- t1936 amara sleep: there is no bed here; find somewhere to lie down
-- t1945 amara enter: already inside
-- t1953 amara sleep: there is no bed here; find somewhere to lie down
-- t2006 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2026 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2032 omar enter: enter needs a {structureId}
-- t2033 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2061 nadia walk: you are indoors; step outside first
-- t2071 yusuf speak: collapsed and unable to act
-- t2075 salma speak: collapsed and unable to act
-- t2081 yusuf sleep: already asleep
-- t2088 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2093 salma wake: collapsed and unable to act
-- t2098 yusuf stow: collapsed and unable to act
-- t2109 salma sleep: already asleep
-- t2110 salma wake: collapsed and unable to act
-- t2124 amara speak: collapsed and unable to act
-- t2135 salma sleep: already asleep
-- t2137 salma wake: collapsed and unable to act
+- t1134 amara walk: no path to that spot
+- t1135 amara drink: no water within reach
+- t1149 nadia forage: not close enough to gather — the patch is at (70, 67); stand beside it
+- t1156 yusuf walk: already at that spot
+- t1161 nadia forage: forage takes an optional {nodeId}
+- t1172 yusuf walk: already at that spot
+- t1199 yusuf sleep: there is no bed here; find somewhere to lie down
+- t1200 yusuf wake: not asleep
+- t1203 nadia walk: already at that spot
+- t1217 yusuf sleep: there is no bed here; find somewhere to lie down
+- t1244 yusuf sleep: there is no bed here; find somewhere to lie down
+- t1245 yusuf walk: already at that spot
+- t1415 salma sleep: there is no bed here; find somewhere to lie down
+- t1441 yusuf enter: collapsed and unable to act
+- t1441 omar speak: collapsed and unable to act
+- t1460 amara drink: collapsed and unable to act
+- t1483 yusuf sleep: there is no bed here; find somewhere to lie down
+- t1512 omar wake: collapsed and unable to act
+- t1539 omar sleep: already asleep
+- t1562 amara sleep: already asleep
+- t1563 amara wake: collapsed and unable to act
+- t1589 amara sleep: already asleep
+- t1598 omar sleep: already asleep
+- t1599 amara sleep: there is no bed here; find somewhere to lie down
+- t1606 yusuf sleep: already asleep
+- t1612 amara sleep: there is no bed here; find somewhere to lie down
+- t1619 nadia sleep: there is no bed here; find somewhere to lie down
+- t1651 yusuf sleep: already asleep
+- t1672 amara sleep: there is no bed here; find somewhere to lie down
+- t1674 amara sleep: there is no bed here; find somewhere to lie down
+- t1705 amara speak: collapsed and unable to act
+- t1706 amara drink: collapsed and unable to act
+- t1727 amara drink: collapsed and unable to act
+- t1740 salma sleep: already asleep
+- t1742 salma wake: collapsed and unable to act
+- t1742 yusuf sleep: already asleep
+- t1747 amara drink: collapsed and unable to act
+- t1749 amara wake: collapsed and unable to act
+- t1751 nadia sleep: already asleep
+- t1754 salma speak: collapsed and unable to act
+- t1756 salma wake: collapsed and unable to act
+- t1774 amara sleep: already asleep
+- t1776 yusuf sleep: already asleep
+- t1781 salma wake: collapsed and unable to act
+- t1798 omar sleep: already asleep
+- t1802 amara sleep: there is no bed here; find somewhere to lie down
+- t1809 yusuf sleep: already asleep
+- t1809 amara sleep: there is no bed here; find somewhere to lie down
+- t1810 salma wake: not asleep
+- t1834 yusuf sleep: already asleep
+- t1847 nadia harvest: harvest needs a {cropId}
+- t1849 amara sleep: there is no bed here; find somewhere to lie down
+- t1855 nadia gather: unknown verb: gather
+- t1857 amara sleep: there is no bed here; find somewhere to lie down
+- t1861 yusuf sleep: already asleep
+- t1863 nadia forage: forage takes an optional {nodeId}
+- t1875 amara sleep: there is no bed here; find somewhere to lie down
+- t1892 amara sleep: already asleep
+- t1902 amara sleep: there is no bed here; find somewhere to lie down
+- t1916 nadia harvest: harvest needs a {cropId}
+- t1933 nadia sleep: there is no bed here; find somewhere to lie down
+- t1951 amara sleep: already asleep
+- t1951 omar sleep: there is no bed here; find somewhere to lie down
+- t1959 nadia sleep: there is no bed here; find somewhere to lie down
+- t1961 omar sleep: there is no bed here; find somewhere to lie down
+- t1970 amara sleep: there is no bed here; find somewhere to lie down
+- t1982 nadia speak: already busy with walk
+- t1985 nadia sleep: there is no bed here; find somewhere to lie down
+- t2011 yusuf speak: already busy with walk
+- t2022 yusuf enter: not close enough to the door
+- t2023 omar speak: already busy with walk
+- t2038 omar walk: already at that spot
+- t2042 nadia walk: you are indoors; step outside first
+- t2047 salma sleep: there is no bed here; find somewhere to lie down
+- t2047 omar walk: already at that spot
+- t2050 nadia eat: not holding that — take it into your hands first
+- t2057 yusuf walk: already at that spot
+- t2078 nadia speak: already busy with walk
+- t2079 yusuf walk: you are indoors; step outside first
+- t2088 yusuf sleep: already asleep
+- t2123 salma drink: the skin is empty
+- t2150 amara speak: collapsed and unable to act
+- t2152 amara wake: collapsed and unable to act
 - t2160 salma sleep: already asleep
-- t2162 salma wake: collapsed and unable to act
-- t2178 nadia walk: you are indoors; step outside first
-- t2179 nadia forage: not close enough to gather
-- t2186 salma eat: not holding that
-- t2188 salma wake: collapsed and unable to act
-- t2189 nadia walk: you are indoors; step outside first
-- t2190 nadia forage: not close enough to gather
-- t2211 salma speak: collapsed and unable to act
-- t2212 salma sleep: already asleep
-- t2212 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2214 salma wake: collapsed and unable to act
-- t2236 salma wake: collapsed and unable to act
-- t2263 salma wake: collapsed and unable to act
-- t2264 salma enter: collapsed and unable to act
-- t2265 salma wake: collapsed and unable to act
-- t2266 amara sleep: already asleep
-- t2273 amara sleep: there is no bed here; find somewhere to lie down
-- t2273 salma sleep: the dead do not act
-- t2293 nadia walk: you are indoors; step outside first
-- t2299 omar enter: already inside
-- t2319 nadia walk: you are indoors; step outside first
-- t2320 nadia forage: not close enough to gather
-- t2328 nadia walk: you are indoors; step outside first
-- t2355 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2367 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2375 yusuf enter: already inside
-- t2376 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2398 salma speak: the dead do not act
-- t2546 nadia walk: you are indoors; step outside first
-- t2569 nadia walk: you are indoors; step outside first
-- t2571 omar enter: already inside
-- t2572 omar stow: stow needs {itemId, structureId}
-- t2583 omar enter: already inside
-- t2588 nadia walk: you are indoors; step outside first
-- t2604 nadia enter: already inside
-- t2620 yusuf sleep: already asleep
-- t2622 yusuf wake: collapsed and unable to act
-- t2624 salma enter: the dead do not act
-- t2637 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2665 nadia walk: you are indoors; step outside first
-- t2671 nadia sleep: already asleep
-- t2700 omar enter: already inside
-- t2768 omar enter: already inside
-- t2770 nadia enter: already inside
-- t2777 omar enter: already inside
-- t2790 salma sleep: the dead do not act
-- t2795 omar enter: already inside
-- t2800 nadia enter: already inside
-- t2810 nadia enter: already inside
-- t2814 omar enter: already inside
-- t2821 nadia enter: enter needs a {structureId}
-- t2822 nadia enter: already inside
-- t2863 omar enter: already inside
-- t2881 omar enter: already inside
-- t2881 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2881 salma speak: the dead do not act
-- t2882 salma sleep: the dead do not act
-- t2890 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2893 omar enter: already inside
-- t2898 amara sleep: already asleep
-- t2900 amara wake: collapsed and unable to act
-- t2904 yusuf sleep: there is no bed here; find somewhere to lie down
-- t2932 amara walk: you are indoors; step outside first
-- t2942 amara sleep: there is no bed here; find somewhere to lie down
-- t2943 amara wake: not asleep
-- t3009 yusuf enter: already inside
-- t3010 nadia enter: already inside
-- t3013 amara speak: collapsed and unable to act
-- t3015 omar enter: already inside
-- t3018 yusuf sleep: there is no bed here; find somewhere to lie down
-- t3023 amara sleep: already asleep
-- t3025 amara wake: collapsed and unable to act
-- t3051 amara sleep: there is no bed here; find somewhere to lie down
-- t3063 yusuf enter: already inside
-- t3064 yusuf sleep: there is no bed here; find somewhere to lie down
-- t3071 yusuf sleep: there is no bed here; find somewhere to lie down
-- t3087 yusuf sleep: there is no bed here; find somewhere to lie down
-- t3096 yusuf enter: already inside
-- t3097 yusuf sleep: there is no bed here; find somewhere to lie down
-- t3107 yusuf speak: collapsed and unable to act
-- t3128 yusuf sleep: already asleep
-- t3138 omar speak: collapsed and unable to act
-- t3139 omar speak: collapsed and unable to act
-- t3144 yusuf speak: collapsed and unable to act
-- t3148 omar take: collapsed and unable to act
-- t3158 yusuf speak: collapsed and unable to act
-- t3159 yusuf enter: collapsed and unable to act
-- t3161 yusuf wake: collapsed and unable to act
-- t3176 omar speak: collapsed and unable to act
-- t3184 yusuf sleep: already asleep
-- t3185 yusuf sleep: already asleep
-- t3186 yusuf wake: collapsed and unable to act
-- t3187 omar speak: collapsed and unable to act
-- t3188 omar take: collapsed and unable to act
-- t3191 amara speak: collapsed and unable to act
-- t3201 amara sleep: already asleep
-- t3203 amara wake: collapsed and unable to act
-- t3204 yusuf wake: collapsed and unable to act
-- t3214 omar speak: collapsed and unable to act
-- t3225 omar take: collapsed and unable to act
-- t3227 amara wake: collapsed and unable to act
-- t3238 omar take: collapsed and unable to act
-- t3248 salma take: the dead do not act
-- t3248 omar crawl: collapsed and unable to act
-- t3248 amara sleep: already asleep
-- t3248 yusuf sleep: already asleep
-- t3249 salma enter: the dead do not act
-- t3250 amara wake: collapsed and unable to act
-- t3250 yusuf wake: collapsed and unable to act
-- t3252 nadia walk: you are indoors; step outside first
-- t3259 salma sleep: the dead do not act
-- t3260 omar speak: collapsed and unable to act
-- t3261 omar speak: collapsed and unable to act
-- t3266 yusuf sleep: already asleep
-- t3268 yusuf wake: collapsed and unable to act
-- t3272 omar speak: collapsed and unable to act
-- t3273 omar take: collapsed and unable to act
-- t3274 omar eat: not holding that
-- t3274 amara sleep: already asleep
-- t3276 amara wake: collapsed and unable to act
-- t3282 yusuf sleep: already asleep
-- t3284 yusuf wake: collapsed and unable to act
-- t3291 nadia walk: you are indoors; step outside first
-- t3296 omar enter: collapsed and unable to act
-- t3299 amara sleep: already asleep
-- t3300 amara wake: the moment passes
+- t2168 amara speak: collapsed and unable to act
+- t2169 amara drink: collapsed and unable to act
+- t2170 amara take: collapsed and unable to act
+- t2171 amara wake: collapsed and unable to act
+- t2187 salma move: unknown verb: move
+- t2202 nadia sleep: already asleep
+- t2204 nadia wake: collapsed and unable to act
+- t2227 amara sleep: there is no bed here; find somewhere to lie down
+- t2236 yusuf drink: the skin is empty
+- t2246 nadia sleep: there is no bed here; find somewhere to lie down
+- t2255 amara sleep: there is no bed here; find somewhere to lie down
+- t2259 nadia sleep: there is no bed here; find somewhere to lie down
+- t2265 amara sleep: there is no bed here; find somewhere to lie down
+- t2270 omar sleep: there is no bed here; find somewhere to lie down
+- t2278 nadia sleep: there is no bed here; find somewhere to lie down
+- t2280 amara sleep: there is no bed here; find somewhere to lie down
+- t2289 nadia wake: collapsed and unable to act
+- t2289 amara sleep: there is no bed here; find somewhere to lie down
+- t2300 salma sleep: already asleep
+- t2301 salma sleep: already asleep
+- t2305 nadia sleep: already asleep
+- t2309 amara drink: not holding that
+- t2354 omar sleep: there is no bed here; find somewhere to lie down
+- t2359 salma sleep: already asleep
+- t2379 omar sleep: there is no bed here; find somewhere to lie down
+- t2400 nadia sleep: already asleep
+- t2400 yusuf sleep: there is no bed here; find somewhere to lie down
+- t2402 nadia drink: drink takes an optional {itemId}
+- t2422 nadia sleep: there is no bed here; find somewhere to lie down
+- t2434 salma sleep: already asleep
+- t2440 nadia sleep: there is no bed here; find somewhere to lie down
+- t2459 omar sleep: already asleep
+- t2463 yusuf walk: no path to that spot
+- t2471 nadia sleep: there is no bed here; find somewhere to lie down
+- t2480 yusuf sleep: there is no bed here; find somewhere to lie down
+- t2499 salma sleep: already asleep
+- t2499 omar sleep: there is no bed here; find somewhere to lie down
+- t2500 yusuf walk: already at that spot
+- t2509 nadia sleep: there is no bed here; find somewhere to lie down
+- t2530 omar sleep: there is no bed here; find somewhere to lie down
+- t2531 amara walk: you are indoors; step outside first
+- t2542 amara sleep: already asleep
+- t2544 nadia sleep: there is no bed here; find somewhere to lie down
+- t2553 omar sleep: there is no bed here; find somewhere to lie down
+- t2555 nadia sleep: there is no bed here; find somewhere to lie down
+- t2569 nadia sleep: there is no bed here; find somewhere to lie down
+- t2581 salma sleep: already asleep
+- t2587 omar sleep: there is no bed here; find somewhere to lie down
+- t2591 nadia sleep: there is no bed here; find somewhere to lie down
+- t2599 omar sleep: there is no bed here; find somewhere to lie down
+- t2612 yusuf enter: not close enough to the door
+- t2616 omar sleep: there is no bed here; find somewhere to lie down
+- t2624 omar sleep: there is no bed here; find somewhere to lie down
+- t2633 omar sleep: there is no bed here; find somewhere to lie down
+- t2641 nadia sleep: there is no bed here; find somewhere to lie down
+- t2649 nadia sleep: there is no bed here; find somewhere to lie down
+- t2660 amara sleep: already asleep
+- t2668 omar sleep: already asleep
+- t2677 omar sleep: there is no bed here; find somewhere to lie down
+- t2687 nadia wake: not asleep
+- t2699 salma speak: collapsed and unable to act
+- t2700 salma sleep: already asleep
+- t2700 omar speak: collapsed and unable to act
+- t2702 salma wake: collapsed and unable to act
+- t2713 nadia speak: collapsed and unable to act
+- t2717 omar sleep: already asleep
+- t2721 yusuf walk: already at that spot
+- t2723 nadia speak: collapsed and unable to act
+- t2728 yusuf walk: already at that spot
+- t2736 omar sleep: there is no bed here; find somewhere to lie down
+- t2775 salma sleep: already asleep
+- t2777 omar eat: not holding that
+- t2796 omar walk: collapsed and unable to act
+- t2804 salma sleep: already asleep
+- t2809 nadia sleep: there is no bed here; find somewhere to lie down
+- t2817 omar speak: collapsed and unable to act
+- t2823 nadia sleep: there is no bed here; find somewhere to lie down
+- t2829 amara walk: you are indoors; step outside first
+- t2829 omar eat: not holding that
+- t2830 omar sleep: already asleep
+- t2841 nadia sleep: there is no bed here; find somewhere to lie down
+- t2847 salma talk: unknown verb: talk
+- t2869 amara sleep: already asleep
+- t2869 nadia sleep: there is no bed here; find somewhere to lie down
+- t2877 salma speak: collapsed and unable to act
+- t2878 salma take: collapsed and unable to act
+- t2878 omar sleep: there is no bed here; find somewhere to lie down
+- t2881 salma speak: collapsed and unable to act
+- t2881 omar sleep: there is no bed here; find somewhere to lie down
+- t2882 salma wake: collapsed and unable to act
+- t2892 omar eat: not holding that
+- t2893 salma speak: collapsed and unable to act
+- t2894 salma enter: collapsed and unable to act
+- t2898 nadia sleep: already asleep
+- t2904 omar sleep: there is no bed here; find somewhere to lie down
+- t2909 salma speak: collapsed and unable to act
+- t2910 nadia sleep: there is no bed here; find somewhere to lie down
+- t2918 salma speak: collapsed and unable to act
+- t2919 salma wake: collapsed and unable to act
+- t2932 nadia speak: collapsed and unable to act
+- t2934 yusuf speak: collapsed and unable to act
+- t2935 omar sleep: there is no bed here; find somewhere to lie down
+- t2944 nadia speak: collapsed and unable to act
+- t2946 nadia wake: collapsed and unable to act
+- t2952 salma speak: collapsed and unable to act
+- t2953 salma speak: collapsed and unable to act
+- t2959 omar eat: not holding that
+- t2960 omar sleep: there is no bed here; find somewhere to lie down
+- t2972 omar eat: not holding that
+- t2972 nadia sleep: there is no bed here; find somewhere to lie down
+- t2973 salma speak: collapsed and unable to act
+- t2974 salma try_to_sit_up: collapsed and unable to act
+- t2976 salma wake: collapsed and unable to act
+- t2982 omar sleep: already asleep
+- t2990 nadia sleep: there is no bed here; find somewhere to lie down
+- t3000 nadia sleep: there is no bed here; find somewhere to lie down
+- t3023 salma walk: you are indoors; step outside first
+- t3036 amara sleep: already asleep
+- t3038 nadia speak: collapsed and unable to act
+- t3039 nadia eat: not holding that
+- t3043 salma take: already holding that
+- t3067 nadia speak: collapsed and unable to act
+- t3085 nadia speak: collapsed and unable to act
+- t3086 nadia eat: not holding that
+- t3088 nadia wake: collapsed and unable to act
+- t3109 nadia eat: not holding that
+- t3121 yusuf sleep: there is no bed here; find somewhere to lie down
+- t3121 nadia eat: not holding that
+- t3122 nadia sleep: there is no bed here; find somewhere to lie down
+- t3134 nadia speak: collapsed and unable to act
+- t3135 nadia eat: not holding that
+- t3150 omar speak: collapsed and unable to act
+- t3161 omar speak: collapsed and unable to act
+- t3162 omar sleep: already asleep
+- t3164 omar wake: collapsed and unable to act
+- t3164 nadia speak: collapsed and unable to act
+- t3174 nadia speak: collapsed and unable to act
+- t3175 nadia eat: not holding that
+- t3177 nadia wake: collapsed and unable to act
+- t3177 yusuf speak: collapsed and unable to act
+- t3177 amara sleep: already asleep
+- t3187 omar sleep: there is no bed here; find somewhere to lie down
+- t3192 yusuf sleep: already asleep
+- t3194 yusuf wake: collapsed and unable to act
+- t3200 nadia eat: not holding that
+- t3206 omar eat: not holding that
+- t3210 nadia eat: not holding that
+- t3211 salma sleep: already asleep
+- t3220 nadia eat: not holding that
+- t3233 nadia eat: not holding that
+- t3235 omar eat: eat needs an {itemId}
+- t3245 omar speak: collapsed and unable to act
+- t3246 omar eat: not holding that
+- t3254 nadia eat: not holding that
+- t3257 omar speak: collapsed and unable to act
+- t3262 nadia speak: collapsed and unable to act
+- t3263 amara sleep: already asleep
+- t3265 amara wake: collapsed and unable to act
+- t3270 omar speak: collapsed and unable to act
+- t3271 omar sleep: already asleep
+- t3280 nadia sleep: there is no bed here; find somewhere to lie down
+- t3285 omar speak: collapsed and unable to act
+- t3297 omar sleep: already asleep
 - t3300 nadia speak: the moment passes
-- t3300 yusuf speak: the moment passes
 - t3300 omar speak: the moment passes
+- t3300 amara sleep: the moment passes
