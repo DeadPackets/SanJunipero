@@ -7,6 +7,17 @@ const INJURY_HEAL_DAYS = 3
 // foot of this file is gone. Illness spreads once, at midnight, from systems/illness.ts — two
 // contagion systems at different cadences was one too many.
 
+// Four ways back, all of them arithmetic on one dawn payment. With mortality off the world
+// keeps C9's flat rates exactly, which is what holds the G2 fixture still until Task 37.
+function recoveryDelta(ctx: TickCtx, hunger: number, asleep: boolean, tended: boolean): number {
+  const { health, mortality } = ctx.config
+  const base = tended ? health.tendedRecoveryHpPerDay : health.recoveryHpPerDay
+  if (!mortality.enabled) return base
+  // A body with nothing in it does not mend itself; only another pair of hands can.
+  if (!tended && hunger < mortality.fedThreshold) return 0
+  return base * (tended ? mortality.tendMultiplier : 1) * (asleep ? mortality.sleepRegenMultiplier : 1)
+}
+
 export function healthSystem(ctx: TickCtx): void {
   const { health: cfg } = ctx.config
   const tick = ctx.state().tick
@@ -28,7 +39,8 @@ export function healthSystem(ctx: TickCtx): void {
       const b = ctx.state().agents[id]!
       if (b.hp < cfg.maxHp) {
         const tended = b.tendedTick !== undefined && tick - b.tendedTick <= MINUTES_PER_DAY
-        ctx.emit('hp_changed', { agentId: id, delta: tended ? cfg.tendedRecoveryHpPerDay : cfg.recoveryHpPerDay })
+        const delta = recoveryDelta(ctx, b.needs.hunger, b.asleep, tended)
+        if (delta > 0) ctx.emit('hp_changed', { agentId: id, delta })
       }
       const c = ctx.state().agents[id]!
       if (c.ill && c.hp >= cfg.maxHp) ctx.emit('agent_recovered', { agentId: id })

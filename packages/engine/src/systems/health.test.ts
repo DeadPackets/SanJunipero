@@ -155,19 +155,46 @@ describe('worldTick: recovery and tend', () => {
     let s = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 1, y: 0 }])
     s = patchAgent(s, 'a1', { hp: 50 })
     s = patchAgent(s, 'a2', { hp: 50 })
-    s = atTick(s, DAWN - 3)
+    s = atTick(s, DAWN - 6)
     const r = submitIntent(s, CFG, 'a2', 'tend', { targetId: 'a1' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    const t1 = tickOnce(s) // tend completes
-    expect(t1.events).toContainEqual({ type: 'agent_tended', payload: { agentId: 'a1' } })
-    expect(t1.events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a2', track: 'medicine', xp: 1 } })
-    const t2 = tickOnce(t1.state)
-    const t3 = tickOnce(t2.state) // dawn
-    expect(t3.events).toContainEqual({ type: 'hp_changed', payload: { agentId: 'a1', delta: 15 } })
-    expect(t3.events).toContainEqual({ type: 'hp_changed', payload: { agentId: 'a2', delta: 5 } })
-    expect(t3.state.agents.a1!.hp).toBe(65)
-    expect(t3.state.agents.a2!.hp).toBe(55)
+    let last: WorldTickResult | null = null
+    for (let i = 0; i < 6; i++) { last = tickOnce(s); s = last.state }
+    // The hour of care lands three ticks in, and dawn pays it at the tended rate x tendMultiplier.
+    expect(s.agents.a1!.tendedTick).toBe(DAWN - 3)
+    expect(last!.events).toContainEqual({
+      type: 'hp_changed', payload: { agentId: 'a1', delta: CFG.health.tendedRecoveryHpPerDay * CFG.mortality.tendMultiplier },
+    })
+    expect(last!.events).toContainEqual({ type: 'hp_changed', payload: { agentId: 'a2', delta: 5 } })
+    expect(s.agents.a1!.hp).toBe(80)
+    expect(s.agents.a2!.hp).toBe(55)
+  })
+
+  it('rest and a full belly are the other two ways back', () => {
+    const asleep = tickOnce(atTick(patchAgent(makeWorld(), 'a1', { hp: 50, asleep: true }), DAWN - 1))
+    expect(asleep.events).toContainEqual({
+      type: 'hp_changed',
+      payload: { agentId: 'a1', delta: CFG.health.recoveryHpPerDay * CFG.mortality.sleepRegenMultiplier },
+    })
+
+    const fed = tickOnce(atTick(patchAgent(makeWorld(), 'a1', {
+      hp: 50, needs: { hunger: CFG.mortality.fedThreshold + 1, energy: 100, warmth: 100, social: 100 },
+    }), DAWN - 1))
+    expect(fed.events).toContainEqual({ type: 'hp_changed', payload: { agentId: 'a1', delta: 5 } })
+
+    const hungry = tickOnce(atTick(patchAgent(makeWorld(), 'a1', {
+      hp: 50, needs: { hunger: CFG.mortality.fedThreshold - 1, energy: 100, warmth: 100, social: 100 },
+    }), DAWN - 1))
+    expect(hungry.events.map((e) => e.type)).not.toContain('hp_changed')
+  })
+
+  it('leaves C9 recovery exactly as it was when the world has mortality switched off', () => {
+    const OFF = SimConfigSchema.parse({ mortality: { enabled: false } })
+    const s = atTick(patchAgent(makeWorld(OFF), 'a1', {
+      hp: 50, asleep: true, needs: { hunger: 1, energy: 100, warmth: 100, social: 100 },
+    }), DAWN - 1)
+    expect(tickOnce(s, OFF).events).toContainEqual({ type: 'hp_changed', payload: { agentId: 'a1', delta: 5 } })
   })
 
   it('ill clears with agent_recovered when hp is back at max', () => {

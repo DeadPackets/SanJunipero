@@ -132,6 +132,21 @@ describe('eat: a last-day meal and the pale mushroom', () => {
     expect(rng.state()).toEqual(before)
   })
 
+  it('an herb takes a step off the worst thing wrong, and lifts it outright at the last step', () => {
+    const CFG = SimConfigSchema.parse({})
+    let s = holding('herb')
+    s = fold(s, ev(4, 'agent_afflicted', { agentId: 'a1', kind: 'illness', severity: 3 }))
+    s = fold(s, ev(5, 'agent_afflicted', { agentId: 'a1', kind: 'poison', severity: 1 }))
+    expect(eaten(s, CFG, illness())).toContainEqual({
+      type: 'affliction_worsened', payload: { agentId: 'a1', kind: 'illness', severity: 3 - CFG.mortality.herbRelief },
+    })
+    let last = holding('herb')
+    last = fold(last, ev(6, 'agent_afflicted', { agentId: 'a1', kind: 'poison', severity: 1 }))
+    expect(eaten(last, CFG, illness())).toContainEqual({
+      type: 'affliction_recovered', payload: { agentId: 'a1', kind: 'poison' },
+    })
+  })
+
   it('tells the eye a pale mushroom and nothing more: which ones kill is the town\'s to learn', () => {
     const s = fold(makeWorld(), ev(3, 'item_spawned', {
       id: 'item_1', kind: 'pale_mushroom', qty: 1, loc: { t: 'tile', x: 1, y: 1 },
@@ -139,5 +154,67 @@ describe('eat: a last-day meal and the pale mushroom', () => {
     const seen = composePerception(s, DEFAULT_CONFIG, 'a1', []).visible.items
     expect(seen.find((i) => i.kind === 'pale_mushroom')).toBeDefined()
     expect(JSON.stringify(seen)).not.toMatch(/warn|danger|poison|deadly/i)
+  })
+})
+
+describe('tend: an hour of another body\'s hands', () => {
+  const CFG = SimConfigSchema.parse({})
+
+  function pair(): WorldState {
+    let s = genesisState(CFG, ['....', '....', '....', '....'].map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
+    s = fold(s, ev(2, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: 7300 }), CFG)
+    return { ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, hp: 50 } } }
+  }
+  const complete = (s: WorldState, params: Record<string, unknown>) =>
+    VERBS.tend!.onComplete(s, CFG, 'a2', params, new RngStreams('t').get('actions'))
+
+  it('takes three ticks, names the tender, and reads as a C9 log when it has to', () => {
+    expect(VERBS.tend!.duration(pair(), CFG, 'a2', { targetId: 'a1' })).toBe(3)
+    expect(complete(pair(), { targetId: 'a1' }))
+      .toEqual([{ type: 'agent_tended', payload: { agentId: 'a1', tenderId: 'a2' } }])
+    // A recorded C9 log carries the target and nothing else, and still folds.
+    const old = fold(pair(), ev(3, 'agent_tended', { agentId: 'a1' }), CFG)
+    expect(old.agents.a1!.tendedTick).toBe(0)
+  })
+
+  it('refuses across a wall, however close the two bodies stand', () => {
+    let s = pair()
+    s = fold(s, ev(3, 'structure_planned', {
+      id: 'structure_1', kind: 'hut', x: 2, y: 2, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a2',
+    }), CFG)
+    s = fold(s, ev(4, 'structure_completed', { id: 'structure_1' }), CFG)
+    s = fold(s, ev(5, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
+    const r = submitIntent(s, CFG, 'a2', 'tend', { targetId: 'a1' })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('a wall is in the way')
+  })
+
+  it('an offered herb is consumed and gives double what eating it would', () => {
+    let s = fold(pair(), ev(3, 'item_spawned', {
+      id: 'item_1', kind: 'herb', qty: 1, loc: { t: 'agent', id: 'a2' },
+    }), CFG)
+    s = fold(s, ev(4, 'agent_afflicted', { agentId: 'a1', kind: 'illness', severity: 3 }), CFG)
+    const out = complete(s, { targetId: 'a1', itemId: 'item_1' })
+    expect(out).toEqual([
+      { type: 'agent_tended', payload: { agentId: 'a1', tenderId: 'a2', itemId: 'item_1' } },
+      { type: 'item_qty_changed', payload: { id: 'item_1', delta: -1 } },
+      {
+        type: 'affliction_worsened',
+        payload: { agentId: 'a1', kind: 'illness', severity: 3 - CFG.mortality.herbRelief * 2 },
+      },
+    ])
+  })
+
+  it('refuses to offer something that is not a remedy, or that the tender is not holding', () => {
+    const s = fold(pair(), ev(3, 'item_spawned', {
+      id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a2' },
+    }), CFG)
+    const wood = submitIntent(s, CFG, 'a2', 'tend', { targetId: 'a1', itemId: 'item_1' })
+    expect(wood.ok).toBe(false)
+    if (!wood.ok) expect(wood.reason).toBe('wood is not a remedy')
+    const ghost = submitIntent(s, CFG, 'a2', 'tend', { targetId: 'a1', itemId: 'item_9' })
+    expect(ghost.ok).toBe(false)
+    if (!ghost.ok) expect(ghost.reason).toBe('not holding that')
   })
 })

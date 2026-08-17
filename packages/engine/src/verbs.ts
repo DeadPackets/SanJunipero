@@ -1,8 +1,8 @@
 import { z } from 'zod'
 import { MINUTES_PER_DAY, simTimeFromTick, type SimConfig } from '@sj/shared'
-import { mintId, type TileId, type WorldState } from './state.js'
+import { mintId, type Affliction, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
-import { doorTile } from './interiors.js'
+import { doorTile, sameInterior } from './interiors.js'
 import { findPath, isPassable } from './path.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 
@@ -89,7 +89,30 @@ export const FORAGE_KIND = 'berries'
 export const FISH_KIND = 'fish'
 // Edible, and that is the point: the town has to learn which mushroom is which.
 export const PALE_MUSHROOM = 'pale_mushroom'
-export const FOOD_KINDS: ReadonlySet<string> = new Set([FORAGE_KIND, FISH_KIND, 'venison', 'bread', 'wheat', PALE_MUSHROOM])
+export const HERB_KIND = 'herb'
+export const FOOD_KINDS: ReadonlySet<string> = new Set([
+  FORAGE_KIND, FISH_KIND, 'venison', 'bread', 'wheat', PALE_MUSHROOM, HERB_KIND,
+])
+
+// The worst thing wrong with a body: highest severity, ties to the alphabetically first kind.
+// The list is already stored in kind order, so a strictly-greater scan is that tiebreak.
+export function worstAffliction(state: WorldState, agentId: string): Affliction | undefined {
+  let worst: Affliction | undefined
+  for (const x of state.agents[agentId]?.afflictions ?? []) {
+    if (worst === undefined || x.severity > worst.severity) worst = x
+  }
+  return worst
+}
+
+// One relief, whether it was chewed or pressed into a patient's hands (G4).
+export function relieveWorst(state: WorldState, agentId: string, amount: number): PendingEvent[] {
+  const worst = worstAffliction(state, agentId)
+  if (worst === undefined) return []
+  const left = worst.severity - amount
+  return [left > 0
+    ? { type: 'affliction_worsened', payload: { agentId, kind: worst.kind, severity: left } }
+    : { type: 'affliction_recovered', payload: { agentId, kind: worst.kind } }]
+}
 
 const sleep: VerbDef = makeVerb({
   kind: 'sleep',
@@ -182,16 +205,21 @@ const eat: VerbDef = makeVerb({
       ...(risky
         ? [{ type: 'agent_afflicted', payload: { agentId, kind: 'poison', severity: 1, itemId: p.itemId } }]
         : []),
+      ...(item.kind === HERB_KIND ? relieveWorst(state, agentId, config.mortality.herbRelief) : []),
       { type: 'item_qty_changed', payload: { id: p.itemId, delta: -1 } },
       { type: 'need_changed', payload: { id: agentId, need: 'hunger', delta: config.needs.eatRestoreHunger } },
     ]
   },
 })
 
-export const TendParams = z.object({ targetId: z.string() }).strict()
+export const TendParams = z.object({ targetId: z.string(), itemId: z.string().optional() }).strict()
+
+// An hour, not a scribble: three ticks, the C9 carving precedent.
+const TEND_TICKS = 3
 
 const tend: VerbDef = makeVerb({
   kind: 'tend',
+  duration: () => TEND_TICKS,
   validate(state, config, agentId, params) {
     const p = TendParams.safeParse(params)
     if (!p.success) return 'tend needs a {targetId}'
@@ -199,17 +227,35 @@ const tend: VerbDef = makeVerb({
       self: 'cannot tend yourself', gone: 'no one there to tend', far: 'not adjacent to the patient',
     })
     if (bad) return bad
+    if (!sameInterior(state, agentId, p.data.targetId)) return 'a wall is in the way'
     const target = state.agents[p.data.targetId]!
-    if (!target.ill && target.hp >= config.health.maxHp) return 'nothing to tend'
+    if (!target.ill && target.hp >= config.health.maxHp && (target.afflictions?.length ?? 0) === 0) return 'nothing to tend'
+    if (p.data.itemId !== undefined) {
+      const item = state.items[p.data.itemId]
+      if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+      if (item.kind !== HERB_KIND) return `${item.kind} is not a remedy`
+    }
     return null
   },
-  onComplete(state, _config, agentId, params) {
+  onComplete(state, config, agentId, params) {
     const p = TendParams.parse(params)
     const target = state.agents[p.targetId]
     const a = state.agents[agentId]!
     if (!target || !target.alive) return []
     if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return []
-    return [{ type: 'agent_tended', payload: { agentId: p.targetId } }]
+    const item = p.itemId === undefined ? undefined : state.items[p.itemId]
+    const offered = item !== undefined && item.kind === HERB_KIND
+      && item.loc.t === 'agent' && item.loc.id === agentId
+    return [
+      { type: 'agent_tended', payload: { agentId: p.targetId, tenderId: agentId, ...(offered ? { itemId: p.itemId } : {}) } },
+      // Given, not swallowed: the same leaf does twice as much in another body's hands.
+      ...(offered
+        ? [
+          { type: 'item_qty_changed', payload: { id: p.itemId, delta: -1 } },
+          ...relieveWorst(state, p.targetId, config.mortality.herbRelief * 2),
+        ]
+        : []),
+    ]
   },
   skill: { track: 'medicine', xp: 1 },
 })

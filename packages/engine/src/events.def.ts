@@ -83,7 +83,11 @@ export const AgentInjured = z.object({ agentId: z.string(), kind: z.enum(['minor
 export const AgentInfected = z.object({ agentId: z.string() }).strict()
 export const AgentFellIll = z.object({ agentId: z.string() }).strict()
 export const AgentRecovered = z.object({ agentId: z.string() }).strict()
-export const AgentTended = z.object({ agentId: z.string() }).strict()
+// `agentId` stays the PATIENT so recorded C9 logs fold unchanged; the hands and what was in
+// them arrive as optional fields.
+export const AgentTended = z.object({
+  agentId: z.string(), tenderId: z.string().optional(), itemId: z.string().optional(),
+}).strict()
 export const HpChanged = z.object({ agentId: z.string(), delta: z.number() }).strict()
 
 // C11 mortality. Harm is an amount with a source; an affliction is a cause with a clock.
