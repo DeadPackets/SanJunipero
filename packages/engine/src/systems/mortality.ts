@@ -93,6 +93,19 @@ export function placeGrave(ctx: TickCtx, agentId: string): void {
   ctx.emit('grave_placed', { id: mintId(ctx.state(), 'structure'), agentId, name: a.name, x: at.x, y: at.y })
 }
 
+// Called straight after every agent_collapsed, when the fold has already counted the rung.
+// Cold reaches death through this ladder and no other way (Task 22), which is what keeps
+// the cause list closed while still giving a winter night teeth.
+export function escalateFatigue(ctx: TickCtx, agentId: string): void {
+  if (!ctx.config.mortality.enabled) return
+  const a = ctx.state().agents[agentId]
+  const rung = a?.collapsesWithoutRecovery
+  if (a === undefined || rung === undefined) return
+  const has = a.afflictions?.some((x) => x.kind === 'fatigue') ?? false
+  // Absolute, not incremental: a body that ate its way off the ladder comes back on at one.
+  ctx.emit(has ? 'affliction_worsened' : 'agent_afflicted', { agentId, kind: 'fatigue', severity: rung })
+}
+
 export function mortalitySystem(ctx: TickCtx): void {
   if (!ctx.config.mortality.enabled) return
   for (const id of Object.keys(ctx.state().agents).sort()) {

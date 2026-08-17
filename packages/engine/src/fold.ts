@@ -1,5 +1,5 @@
 import { DAYS_PER_YEAR, DEFAULT_CONFIG, MINUTES_PER_DAY, SPAWN_AGE_YEARS, type SimConfig, type SimEvent } from '@sj/shared'
-import type { Affliction, TileId, WorldState } from './state.js'
+import type { Affliction, AgentBody, TileId, WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
   AfflictionRecovered, AfflictionWorsened, AgentAfflicted, AgentHarmed,
@@ -31,6 +31,14 @@ function bumpCounter(counters: WorldState['counters'], id: string): WorldState['
   if (!m) return counters
   const next = Number(m[1]) + 1
   return next > counters.nextEntityId ? { ...counters, nextEntityId: next } : counters
+}
+
+// A meal or a night's sleep is what "recovered" means: the collapse ladder starts over,
+// and the counter goes back to absent so the body hashes like one that never fell.
+function rested(a: AgentBody): AgentBody {
+  if (a.collapsesWithoutRecovery === undefined) return a
+  const { collapsesWithoutRecovery: _, ...rest } = a
+  return rest
 }
 
 // Emit-free state repair is not allowed: a destroyer must emit agent_exited first,
@@ -267,7 +275,8 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = ActionCompleted.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`action_completed for unknown agent ${p.agentId}`)
-      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, activity: null } } }
+      const body = p.verb === 'eat' ? rested(a) : a
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...body, activity: null } } }
     }
     case 'action_interrupted': {
       const p = ActionInterrupted.parse(event.payload)
@@ -292,7 +301,7 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = AgentSlept.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_slept for unknown agent ${p.agentId}`)
-      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, asleep: true } } }
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...rested(a), asleep: true } } }
     }
     case 'agent_entered': {
       const p = AgentEntered.parse(event.payload)
@@ -314,11 +323,16 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (!a) throw new Error(`agent_spoke for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, lastSpokeTick: event.tick } } }
     }
+    // The ladder is counted here and climbed by mortality.ts. Gated on the flag so a world
+    // with mortality off keeps the pre-C11 body shape, hash and all.
     case 'agent_collapsed': {
       const p = AgentCollapsed.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_collapsed for unknown agent ${p.agentId}`)
-      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, collapsedSinceTick: event.tick } } }
+      const rung = config.mortality.enabled
+        ? { collapsesWithoutRecovery: (a.collapsesWithoutRecovery ?? 0) + 1 }
+        : {}
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, collapsedSinceTick: event.tick, ...rung } } }
     }
     case 'agent_conceived': {
       const p = AgentConceived.parse(event.payload)

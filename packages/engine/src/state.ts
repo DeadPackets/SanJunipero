@@ -23,6 +23,9 @@ export type AgentBody = {
   // Absent until the first affliction and absent again when the last one lifts, sorted by kind
   // so two bodies ailing the same way hash the same way.
   afflictions?: Affliction[]
+  // How many times this body has hit the ground without a meal or a night's sleep since.
+  // Absent until the first such fall, and absent again the moment it eats or sleeps.
+  collapsesWithoutRecovery?: number
   tendedTick?: number                     // absent until first tended: keeps pre-health state hashes stable
   lastSpokeTick?: number                  // absent until first speech: keeps golden hashes stable
   insideId?: string                       // absent until first entry: keeps golden hashes stable

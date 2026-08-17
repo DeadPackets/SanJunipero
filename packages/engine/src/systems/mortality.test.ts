@@ -288,6 +288,67 @@ describe('a grave where the life ended', () => {
   })
 })
 
+// ------------------------------------------------- Task 9: the collapse ladder gets a floor
+describe('a collapse that never recovers becomes fatigue', () => {
+  // Hunger under collapseThreshold puts the body down; raising it lifts the collapse so the
+  // next fall is a fresh one. Nothing here feeds the body — that is the whole point.
+  const hunger = (s: WorldState, delta: number, tick: number, config = CFG) =>
+    fold(s, ev('need_changed', { id: 'a1', need: 'hunger', delta }, tick), config)
+  const fatigueOf = (s: WorldState) => s.agents.a1!.afflictions?.find((x) => x.kind === 'fatigue')?.severity
+
+  // Down: hunger under collapseThreshold, and the tick puts the body on the ground.
+  // Up: hunger back over it, which is a nudge, not a meal — the ladder does not reset.
+  function fall(s: WorldState, tick: number, config = CFG): WorldState {
+    const down = hunger({ ...s, tick }, -(s.agents.a1!.needs.hunger - 1), tick, config)
+    return tickOnce({ ...down, tick }, config).state
+  }
+  const rise = (s: WorldState, tick: number, config = CFG) => hunger(s, 50, tick, config)
+
+  it('escalates one step for every collapse the body never came back from', () => {
+    let s = body()
+    const seen: Array<number | undefined> = []
+    for (let i = 0; i < 3; i++) {
+      s = fall(s, 10 + i * 10)
+      seen.push(fatigueOf(s))
+      s = rise(s, 11 + i * 10)
+    }
+    expect(seen).toEqual([1, 2, 3])
+    expect(s.agents.a1!.collapsesWithoutRecovery).toBe(3)
+  })
+
+  it('starts the ladder over for a body that ate between falls', () => {
+    let s = rise(fall(body(), 10), 11)
+    s = rise(fall(s, 20), 21)
+    expect(fatigueOf(s)).toBe(2)
+    s = fold(s, ev('action_completed', { agentId: 'a1', verb: 'eat' }, 22), CFG)
+    expect(s.agents.a1!.collapsesWithoutRecovery).toBeUndefined()
+    expect(fatigueOf(fall(s, 30))).toBe(1)
+  })
+
+  it('starts the ladder over for a body that slept between falls', () => {
+    let s = rise(fall(body(), 10), 11)
+    expect(fatigueOf(s)).toBe(1)
+    s = fold(s, ev('agent_slept', { agentId: 'a1' }, 12), CFG)
+    expect(s.agents.a1!.collapsesWithoutRecovery).toBeUndefined()
+    s = fold(s, ev('agent_woke', { agentId: 'a1' }, 13), CFG)
+    expect(fatigueOf(fall(s, 20))).toBe(1)
+  })
+
+  it('keeps the counter absent on a body that never went down, and while mortality is off', () => {
+    expect(body().agents.a1!.collapsesWithoutRecovery).toBeUndefined()
+    const off = fall(body(OFF), 10, OFF)
+    expect(off.agents.a1!.collapsesWithoutRecovery).toBeUndefined()
+    expect(fatigueOf(off)).toBeUndefined()
+    expect(stateHash(off)).toBe(stateHash(fall(body(OFF), 10, OFF)))
+  })
+
+  it('drains hp at the fatigue rate, and the sleepless body dies naming fatigue', () => {
+    const two = afflict(body(), 'fatigue', 2, 0)
+    expect(hpDeltas(tickOnce(two))).toEqual([-(CFG.mortality.drainPerTick.fatigue * 2)])
+    expect(died(tickOnce(hurt(afflict(body(), 'fatigue', 3, 0), 99.9)))).toEqual({ agentId: 'a1', cause: 'fatigue' })
+  })
+})
+
 describe('perception: a body knows what ails it, not when it started', () => {
   it('carries kind and severity, and no tick', () => {
     const s = afflict(afflict(body(), 'poison', 1, 33), 'illness', 2, 33)

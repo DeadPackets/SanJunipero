@@ -6,7 +6,7 @@ import type { RngStreams } from './rng.js'
 import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
 import { healthSystem } from './systems/health.js'
-import { deathAttribution, mortalitySystem, placeGrave } from './systems/mortality.js'
+import { deathAttribution, escalateFatigue, mortalitySystem, placeGrave } from './systems/mortality.js'
 import { illnessSystem } from './systems/illness.js'
 import { agingSystem } from './systems/aging.js'
 import { weatherSystem } from './systems/weather.js'
@@ -73,7 +73,8 @@ function collapseDeathSystem(ctx: TickCtx): void {
     const a = ctx.state().agents[id]!
     if (!a.alive) continue
     const down = a.needs.hunger < collapseThreshold || a.needs.energy < collapseThreshold || a.hp < collapseHp
-    if (down && a.collapsedSinceTick === null) {
+    const fell = down && a.collapsedSinceTick === null
+    if (fell) {
       if (a.activity) ctx.emit('action_interrupted', { agentId: id, reason: 'collapsed' })
       ctx.emit('agent_collapsed', { agentId: id })
     }
@@ -87,7 +88,11 @@ function collapseDeathSystem(ctx: TickCtx): void {
       dropHeldItems(ctx, id)
       ctx.emit('agent_died', { agentId: id, cause, ...(byId === undefined ? {} : { byId }) })
       placeGrave(ctx, id)
+      continue
     }
+    // A fall you never get up from is not exhaustion, it is the end — the ladder is for
+    // the ones still breathing at the foot of it.
+    if (fell) escalateFatigue(ctx, id)
   }
 }
 
