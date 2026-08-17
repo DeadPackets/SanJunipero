@@ -131,6 +131,17 @@ export const FELT_EVENT_PROSE: Record<string, string> = {
 
 const UNKNOWN_FELT_PROSE = 'You sense something change nearby.'
 
+// What ails a body, said as it feels and never as a number (G10). The alarm now wakes a mind
+// for any of these, and a mind woken by poison has to be able to feel the poison.
+const AFFLICTION_PROSE: Record<string, string> = {
+  injury: 'A hurt on your body throbs and will not let you forget it.',
+  poison: 'Your gut cramps and turns; something you ate has gone against you.',
+  illness: 'A sickness is in you — heat behind the eyes, weight in the limbs.',
+  fatigue: 'A tiredness sits in your bones that sleep has not lifted.',
+}
+
+const AFFLICTION_SEVERE = 3
+
 const WEATHER_KIND_PROSE: Record<string, string> = {
   sunny: 'The sun is out.',
   cloudy: 'Clouds hang low.',
@@ -247,6 +258,10 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   if (social < 30) lines.push('Loneliness settles over you.')
   if (packet.self.body.hp < 30) lines.push('Your body aches with its hurts.')
   if (packet.self.body.ill) lines.push('A fever grips you; you feel weak.')
+  for (const a of packet.self.body.afflictions ?? []) {
+    const prose = AFFLICTION_PROSE[a.kind]
+    if (prose !== undefined) lines.push(a.severity >= AFFLICTION_SEVERE ? `${prose} It is very bad.` : prose)
+  }
 
   if (hunger < 30 && world?.isEdible) {
     const food = packet.self.inventory.find((i) => world.isEdible!(i.kind))

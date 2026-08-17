@@ -365,6 +365,26 @@ describe('perceptionToProse', () => {
     expect(prose).toContain('wheat (crop_1) at (12, 8)')
   })
 
+  // The alarm wakes a body for any named affliction; the body has to be able to feel it.
+  it('says what ails the body, in feeling and never in a number', () => {
+    const ailing = (kind: string, severity: number): string => perceptionToProse({
+      ...quietMeadowPacket,
+      self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, afflictions: [{ kind, severity }] } },
+    })
+    expect(ailing('poison', 1)).toContain('something you ate has gone against you')
+    expect(ailing('poison', 1)).not.toContain('It is very bad')
+    expect(ailing('illness', 4)).toContain('It is very bad.')
+    expect(ailing('fatigue', 2)).toContain('A tiredness sits in your bones')
+    // Whatever the severity, the sentences it adds carry no digit at all.
+    const sentences = (p: string): string[] => p.split('. ')
+    const base = sentences(perceptionToProse(quietMeadowPacket))
+    const added = sentences(ailing('injury', 9)).filter((s) => !base.includes(s))
+    expect(added.length).toBeGreaterThan(0)
+    expect(added.join(' ')).not.toMatch(/\d/)
+    // A kind prose has no words for is silence, not a crash and not a number.
+    expect(ailing('cursed', 2)).toBe(perceptionToProse(quietMeadowPacket))
+  })
+
   // The word has to be a word the world answers to: there is no `rest` verb, and a mind told
   // to rest can only ever try one and be refused (C11 batch-8 R11).
   it('escalates weariness severity so the mind knows to sleep', () => {
