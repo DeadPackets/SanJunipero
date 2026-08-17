@@ -67,6 +67,7 @@ describe('effectiveConfig', () => {
     'mortality.enabled', 'illness.enabled', 'thirst.enabled', 'fertility.enabled', 'roads.enabled',
     'desirePaths.enabled', 'fauna.enabled', 'warmth.enabled', 'light.enabled', 'nightWitness.enabled',
     'foodVariety.enabled', 'regrowth.enabled', 'mapGrowth.enabled', 'constructs.enabled',
+    'constructs.minParticipants',
     'mortality.poisonChanceSpoiled', 'illness.dailyWorsenChance', 'illness.contagionEnabled',
     'illness.contagionChance', 'thirst.decayFactorOfHunger', 'desirePaths.wearThreshold',
     'light.nightWorkPenalty', 'light.fireRiskPerTick', 'nightWitness.nightFactor',

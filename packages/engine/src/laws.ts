@@ -41,6 +41,7 @@ export const TOGGLABLE_PATHS: Readonly<Record<string, z.ZodType>> = {
   'regrowth.enabled': z.boolean(),
   'mapGrowth.enabled': z.boolean(),
   'constructs.enabled': z.boolean(),
+  'constructs.minParticipants': z.number().int().positive(),
   // C11: the starred dials of addendum §11 and §19 — the ones tuning is expected to reach for.
   'mortality.poisonChanceSpoiled': z.number().min(0).max(1),
   'illness.dailyWorsenChance': z.number().min(0).max(1),
