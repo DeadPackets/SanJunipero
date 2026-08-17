@@ -77,6 +77,9 @@ export type PerceptionPacket = {
   ground?: { wellTravelled: true }
   // Present only while the dark is charging this body for the work in its hands.
   fumbling?: true
+  // How much light is on the ground underfoot. Absent on a packet from before the dark had
+  // a price, which reads as it always did.
+  light?: 'bright' | 'dim' | 'dark'
   visible: {
     agents: PerceptionAgent[]
     structures: PerceptionStructure[]
@@ -231,6 +234,11 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   }
 
   lines.push(weatherLine(packet.weather, packet.time.isNight))
+
+  // What the dark is doing where the body stands. Silent in plain daylight.
+  if (packet.light === 'dark') lines.push('The night is close around you.')
+  else if (packet.light === 'dim') lines.push('The last of the light is going out of the day.')
+  else if (packet.light === 'bright' && packet.time.isNight) lines.push('A fire throws a circle of light around you.')
 
   // The physics, said plainly. What it is worth building here is not the ground's to say.
   if (packet.ground?.wellTravelled) lines.push('Carts and feet reach this spot easily.')

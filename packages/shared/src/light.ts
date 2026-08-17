@@ -90,3 +90,25 @@ export function lightLevelAt(
   if (flamesAt(state, tick, config).some((f) => distanceToFlame(f, x, y) <= f.radius)) return 1
   return phase === 'dusk' ? config.nightWitness.duskFactor : config.nightWitness.nightFactor
 }
+
+// How far a pair of eyes reaches TO A GIVEN TILE. The viewer is in the signature and unused on
+// purpose: a torch does not let you see into the dark, it lets the dark see you. A thief
+// carrying a flame is lit, and so is the theft; a lantern hung by the storehouse keeps its
+// tiles bright, so a taking there is witnessed at full day radius. That asymmetry IS the
+// deterrence (addendum deviation 11 — it reads as a bug to anyone expecting a flashlight).
+export function visionRadiusAt(
+  state: LitWorld,
+  _viewer: { x: number; y: number },
+  x: number, y: number, tick: number, config: SimConfig,
+): number {
+  return Math.round(config.movement.sightRadius * lightLevelAt(state, x, y, tick, config))
+}
+
+// The same fact in the three words a body would use for it. Never a number (G10).
+export function lightBandAt(
+  state: LitWorld, x: number, y: number, tick: number, config: SimConfig,
+): 'bright' | 'dim' | 'dark' {
+  const level = lightLevelAt(state, x, y, tick, config)
+  if (level >= 1) return 'bright'
+  return level <= config.nightWitness.nightFactor ? 'dark' : 'dim'
+}

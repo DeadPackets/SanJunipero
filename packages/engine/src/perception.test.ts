@@ -9,10 +9,14 @@ import { RngStream } from './rng.js'
 let seq = 90000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
 
+// Noon by default: from C11 Task 26 the witness radius scales with the light on the thing seen,
+// and every row below the night-witness block is about a horizon, not about the dark.
+const NOON = 720
+
 function makeWorld(agents: Array<{ id: string; x: number; y: number }>): WorldState {
   let s = genesisState(DEFAULT_CONFIG, Array.from({ length: 64 }, () => Array.from({ length: 64 }, (): TileId => 0)))
   for (const a of agents) s = fold(s, ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 7300 }), DEFAULT_CONFIG)
-  return s
+  return { ...s, tick: NOON }
 }
 
 describe('composePerception: information asymmetry', () => {
@@ -458,5 +462,99 @@ describe('the ground underfoot: a benefit stated, never a rule given', () => {
     expect(ground(surrounded)).toEqual({ wellTravelled: true })
     const off = SimConfigSchema.parse({ roads: { enabled: false } })
     expect(ground(surrounded, off)).toBeUndefined()
+  })
+})
+
+// ------------------------- Task 26: the dark is a price change, and it is paid at the target
+describe('night-witness: a torch does not let you see, it lets the dark see you', () => {
+  const CFG = DEFAULT_CONFIG
+  const DAY_CFG = SimConfigSchema.parse({ nightWitness: { enabled: false } })
+  const MIDNIGHT = 0
+  const NIGHT_R = Math.round(CFG.movement.sightRadius * CFG.nightWitness.nightFactor)
+
+  const night = (s: WorldState): WorldState => ({ ...s, tick: MIDNIGHT })
+  const lit = (s: WorldState, itemId: string, kind: string, loc: unknown, config = CFG): WorldState => {
+    let out = fold(s, ev('item_spawned', { id: itemId, kind, qty: 1, loc }, s.tick), config)
+    return fold(out, ev('item_lit', { itemId, burnsUntilTick: s.tick + 500 }, s.tick), config)
+  }
+  const firePit = (s: WorldState, x: number, y: number, fueled: boolean, config = CFG): WorldState => {
+    let out = fold(s, ev('structure_planned', {
+      id: 'structure_9', kind: 'fire_pit', x, y, w: 1, h: 1, maxHp: 10, flammable: false, builderId: 'a',
+    }, s.tick), config)
+    out = fold(out, ev('structure_completed', { id: 'structure_9' }, s.tick), config)
+    if (!fueled) return out
+    return fold(out, ev('structure_fueled', { structureId: 'structure_9', burnsUntilTick: s.tick + 500 }, s.tick), config)
+  }
+
+  // A taking at (x,y) that 'a' at the origin may or may not witness.
+  const takingAt = (x: number, y: number): SimEvent[] =>
+    [ev('item_taken', { itemId: 'item_5', kind: 'bread', takerId: 'thief', ownerId: 'a', x, y }, MIDNIGHT)]
+
+  const world = (): WorldState => night(makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'thief', x: 6, y: 0 }]))
+
+  it('a theft six paces off is unwitnessed at night and witnessed by day', () => {
+    expect(NIGHT_R).toBeLessThan(6)
+    expect(composePerception(world(), CFG, 'a', takingAt(6, 0)).seen).toEqual([])
+    const byDay = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'thief', x: 6, y: 0 }])
+    expect(composePerception(byDay, CFG, 'a', takingAt(6, 0)).seen).toHaveLength(1)
+  })
+
+  it('the same theft beside a fed fire is witnessed at full daylight range', () => {
+    const bright = firePit(world(), 6, 1, true)
+    expect(composePerception(bright, CFG, 'a', takingAt(6, 0)).seen).toHaveLength(1)
+    const cold = firePit(world(), 6, 1, false)
+    expect(composePerception(cold, CFG, 'a', takingAt(6, 0)).seen).toEqual([])
+  })
+
+  it('a body carrying a flame is seen at full range; an unlit one at the same distance is not', () => {
+    const carried = lit(world(), 'item_7', 'torch', { t: 'agent', id: 'thief' })
+    expect(composePerception(carried, CFG, 'a', []).visible.agents.map((g) => g.id)).toEqual(['thief'])
+    expect(composePerception(world(), CFG, 'a', []).visible.agents).toEqual([])
+  })
+
+  it('light at the eye buys nothing: the torch in your own hand shows you no further', () => {
+    const own = lit(world(), 'item_7', 'torch', { t: 'agent', id: 'a' })
+    expect(composePerception(own, CFG, 'a', []).visible.agents).toEqual([])
+  })
+
+  it('carries the light as one of three words at the body\'s own feet, never a number', () => {
+    expect(composePerception(world(), CFG, 'a', []).light).toBe('dark')
+    expect(composePerception(makeWorld([{ id: 'a', x: 0, y: 0 }]), CFG, 'a', []).light).toBe('bright')
+    const held = lit(world(), 'item_7', 'torch', { t: 'agent', id: 'a' })
+    expect(composePerception(held, CFG, 'a', []).light).toBe('bright')
+    expect(typeof composePerception(world(), CFG, 'a', []).light).toBe('string')
+  })
+
+  it('a long room is dark past the darkness radius, and a lit hand shows the far end', () => {
+    let s = night(makeWorld([{ id: 'a', x: 1, y: 1 }, { id: 'b', x: 10, y: 1 }]))
+    s = fold(s, ev('structure_planned', {
+      id: 'structure_1', kind: 'storehouse', x: 0, y: 0, w: 14, h: 3, maxHp: 40, flammable: true, builderId: 'a',
+    }, s.tick), CFG)
+    s = fold(s, ev('structure_completed', { id: 'structure_1' }, s.tick), CFG)
+    for (const id of ['a', 'b']) s = fold(s, ev('agent_entered', { agentId: id, structureId: 'structure_1' }, s.tick), CFG)
+    expect(composePerception(s, CFG, 'a', []).visible.agents).toEqual([])
+    const shown = lit(s, 'item_7', 'torch', { t: 'agent', id: 'b' })
+    expect(composePerception(shown, CFG, 'a', []).visible.agents.map((g) => g.id)).toEqual(['b'])
+  })
+
+  it('sound does not care: earshot at midnight is earshot at noon', () => {
+    const said = (s: WorldState) => composePerception(s, CFG, 'a', [
+      ev('agent_spoke', { agentId: 'thief', text: 'in the dark', x: 6, y: 0 }, s.tick),
+    ]).heard.length
+    expect(said(world())).toBe(1)
+    expect(said(makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'thief', x: 6, y: 0 }]))).toBe(1)
+  })
+
+  it('with the law off, midnight witnesses exactly what noon does', () => {
+    expect(composePerception(world(), DAY_CFG, 'a', takingAt(6, 0)).seen).toHaveLength(1)
+    expect(composePerception(world(), DAY_CFG, 'a', []).visible.agents.map((g) => g.id)).toEqual(['thief'])
+    expect(composePerception(world(), DAY_CFG, 'a', []).light).toBe('bright')
+  })
+
+  it('is a pure projection: the same state and log give the same witness set twice', () => {
+    const s = firePit(world(), 6, 1, true)
+    const once = composePerception(s, CFG, 'a', takingAt(6, 0))
+    const twice = composePerception(s, CFG, 'a', takingAt(6, 0))
+    expect(JSON.stringify(once)).toBe(JSON.stringify(twice))
   })
 })

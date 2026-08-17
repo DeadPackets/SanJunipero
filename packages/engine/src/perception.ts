@@ -1,4 +1,4 @@
-import { simTimeFromTick, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
+import { lightBandAt, simTimeFromTick, visionRadiusAt, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
 import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { doorTile } from './interiors.js'
@@ -104,6 +104,8 @@ export type PerceptionPacket = {
     forageables: PerceivedForageable[]
   }
   ground?: PerceivedGround
+  // How much light is on the ground this body stands on. Three words, never a number (G10).
+  light: 'bright' | 'dim' | 'dark'
   // Present only while this body is doing work the dark is charging it for. Absent otherwise,
   // so a packet from a town that never worked at night reads exactly as it always did.
   fumbling?: true
@@ -220,8 +222,10 @@ export function composePerception(
   // Derived here, not at the call site: no caller can forget the world's live laws.
   const config = effectiveConfig(baseConfig, state.laws)
 
-  const sight = config.movement.sightRadius
-  const withinSight = (x: number, y: number): boolean => dist(self.x, self.y, x, y) <= sight
+  // Every sight-class channel below goes through this one horizon, and the horizon is set by
+  // the light ON THE THING SEEN (§19). Hearing does not use it: sound carries in the dark.
+  const withinSight = (x: number, y: number): boolean =>
+    dist(self.x, self.y, x, y) <= visionRadiusAt(state, self, x, y, state.tick, config)
 
   // Four walls are also a horizon: inside, the world shrinks to this one room.
   const indoors = self.insideId ?? null
@@ -238,8 +242,9 @@ export function composePerception(
   const turning = (i: Item): Turning => (isSpoiling(state, i, config) ? { spoiling: true } : {})
 
   const visibleAgents: PerceivedAgent[] = Object.values(state.agents)
-    .filter(a => a.id !== agentId && a.alive
-      && (indoors === null ? (a.insideId === undefined && withinSight(a.x, a.y)) : a.insideId === indoors))
+    // Four walls outrank the light, and inside them the darkness still costs distance.
+    .filter(a => a.id !== agentId && a.alive && withinSight(a.x, a.y)
+      && (indoors === null ? a.insideId === undefined : a.insideId === indoors))
     .sort(byId)
     .map(a => {
       const worn = wornProse(state, a.id)
@@ -344,8 +349,8 @@ export function composePerception(
       if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
       if (p.takerId === agentId) continue
       const takerInside = state.agents[p.takerId]?.insideId ?? null
-      const witnessed = indoors === null ? takerInside === null && withinSight(p.x, p.y) : takerInside === indoors
-      if (!witnessed) continue
+      const sameSide = indoors === null ? takerInside === null : takerInside === indoors
+      if (!sameSide || !withinSight(p.x, p.y)) continue
       seen.push({ kind: 'item_taken', takerName: nameOf(p.takerId), ownerName: nameOf(p.ownerId), itemKind: p.kind })
     }
   }
@@ -388,6 +393,7 @@ export function composePerception(
     },
     weather: { ...state.weather },
     ...(ground === undefined ? {} : { ground }),
+    light: lightBandAt(state, self.x, self.y, state.tick, config),
     ...(fumbling ? { fumbling: true as const } : {}),
     visible: {
       agents: visibleAgents, structures: visibleStructures, items: visibleItems,

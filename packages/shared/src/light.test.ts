@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { SimConfigSchema, type SimConfig } from './config.js'
 import { MINUTES_PER_DAY } from './time.js'
-import { glowRadiusFor, LIGHT_GLOW_RADIUS, lightLevelAt, type LitWorld } from './light.js'
+import {
+  glowRadiusFor, LIGHT_GLOW_RADIUS, lightBandAt, lightLevelAt, visionRadiusAt, type LitWorld,
+} from './light.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
 const DARK: SimConfig = SimConfigSchema.parse({ nightWitness: { enabled: false } })
@@ -89,5 +91,40 @@ describe('lightLevelAt: the day is free, the night is not', () => {
   it('with the night-witness law off the world is bright at midnight', () => {
     expect(lightLevelAt(world(), 0, 0, MIDNIGHT, DARK)).toBe(1)
     expect(lightLevelAt(world(), 0, 0, 3 * MINUTES_PER_DAY + MIDNIGHT, DARK)).toBe(1)
+  })
+})
+
+describe('visionRadiusAt: the light that matters is the light on the thing seen', () => {
+  const eye = { x: 0, y: 0 }
+  const SIGHT = CFG.movement.sightRadius
+
+  it('is full sight by day and scales by the darkness factor at night', () => {
+    expect(visionRadiusAt(world(), eye, 30, 30, NOON, CFG)).toBe(SIGHT)
+    expect(visionRadiusAt(world(), eye, 30, 30, MIDNIGHT, CFG)).toBe(Math.round(SIGHT * CFG.nightWitness.nightFactor))
+    expect(visionRadiusAt(world(), eye, 30, 30, DUSK, CFG)).toBe(Math.round(SIGHT * CFG.nightWitness.duskFactor))
+  })
+
+  it('a torch at the target restores full sight; the same torch at the eye does not', () => {
+    const atTarget = torchAt(30, 30, MIDNIGHT + 10)
+    expect(visionRadiusAt(atTarget, eye, 30, 30, MIDNIGHT, CFG)).toBe(SIGHT)
+    const atEye = torchAt(0, 0, MIDNIGHT + 10)
+    expect(visionRadiusAt(atEye, eye, 30, 30, MIDNIGHT, CFG))
+      .toBe(Math.round(SIGHT * CFG.nightWitness.nightFactor))
+  })
+
+  it('with the law off the night sees as far as the day', () => {
+    expect(visionRadiusAt(world(), eye, 30, 30, MIDNIGHT, DARK)).toBe(SIGHT)
+  })
+})
+
+describe('lightBandAt: three words, never a number', () => {
+  it('names the day bright, the dusk dim and the deep night dark', () => {
+    expect(lightBandAt(world(), 0, 0, NOON, CFG)).toBe('bright')
+    expect(lightBandAt(world(), 0, 0, DUSK, CFG)).toBe('dim')
+    expect(lightBandAt(world(), 0, 0, MIDNIGHT, CFG)).toBe('dark')
+    expect(lightBandAt(torchAt(0, 0, MIDNIGHT + 1), 0, 0, MIDNIGHT, CFG)).toBe('bright')
+    for (const tick of [NOON, DUSK, MIDNIGHT]) {
+      expect(['bright', 'dim', 'dark']).toContain(lightBandAt(world(), 0, 0, tick, CFG))
+    }
   })
 })

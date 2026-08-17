@@ -182,7 +182,11 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
     s = indoors(s, CFG, 'shut', HUT)
     // A hand expert enough to leave a mark on what it makes.
     s = fold(s, ev('skill_gained', { agentId: 'maker', track: 'carpentry', xp: 500 }), CFG)
-    return fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 4, loc: { t: 'agent', id: 'maker' } }), CFG)
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 4, loc: { t: 'agent', id: 'maker' } }), CFG)
+    // By daylight: from C11 Task 26 the witness radius scales with the light on the tile
+    // looked at, and 4.5 tiles at midnight is past it. Who sees a theft is the point here,
+    // and the dark has its own row in perception.test.ts.
+    return { ...s, tick: 720 }
   }
 
   it('what is made is owned and marked, what is given changes hands, what is taken is witnessed', () => {
@@ -364,7 +368,9 @@ describe('G9a-7: what is carved can be read back', () => {
     let s = raise(genesisState(config, MAP()), config, HUT)
     s = spawn(s, config, { id: 'carver', x: 4, y: 6 })
     s = spawn(s, config, { id: 'passerby', x: 12, y: 6 })  // in sight, out of arm's reach
-    return s
+    // By daylight, for the same reason the ownership chain above is: what "in sight" means
+    // now depends on the light on the wall (C11 Task 26).
+    return { ...s, tick: 720 }
   }
 
   it('an inscription is written, and read at arm\'s length only', () => {
