@@ -104,7 +104,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
 
   it('mortality, illness and thirst carry their exact dials', () => {
     const c = SimConfigSchema.parse({})
-    expect(c.mortality.drainPerTick).toEqual({ injury: 0.05, poison: 0.12, illness: 0.08, fatigue: 0.04 })
+    expect(c.mortality.drainPerTick).toEqual({ injury: 0.025, poison: 0.12, illness: 0.08, fatigue: 0.04 })
     expect(c.mortality.hungerHpDrainPerTick).toBe(0.1)
     expect(c.mortality.thirstHpDrainPerTick).toBe(0.15)
     expect(c.mortality.poisonChanceSpoiled).toBe(0.35)

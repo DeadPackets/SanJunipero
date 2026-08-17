@@ -160,22 +160,28 @@ const died = (r: { events: Array<{ type: string; payload: unknown }> }) =>
   r.events.find((e) => e.type === 'agent_died')?.payload
 const graveOf = (s: WorldState) => Object.values(s.structures).find((x) => x.kind === 'grave')
 
+// A sliver of hp: less than one tick of the SMALLEST drain any row below applies, so one
+// tick is a death with a name on it. Derived, not a literal — T37b halved the injury
+// drain and a hardcoded 0.1 silently stopped being a sliver.
+const SLIVER = 0.01
+const nearlyDead = (s: WorldState) => hurt(s, CFG.health.maxHp - SLIVER)
+
 // One tick of drain on a body with a sliver of hp left is a death with a name on it.
 const SCENARIOS: Array<[DeathCause, () => WorldState]> = [
-  ['injury', () => hurt(afflict(body(), 'injury', 2, 0), 99.9)],
-  ['slain', () => hurt(afflict(body(), 'injury', 2, 0, { sourceId: 'a2' }), 99.9)],
-  ['poison', () => hurt(afflict(body(), 'poison', 1, 0), 99.9)],
-  ['illness', () => hurt(afflict(body(), 'illness', 2, 0), 99.9)],
-  ['fatigue', () => hurt(afflict(body(), 'fatigue', 3, 0), 99.9)],
-  ['hunger', () => hurt(starve(body()), 99.9)],
+  ['injury', () => nearlyDead(afflict(body(), 'injury', 2, 0))],
+  ['slain', () => nearlyDead(afflict(body(), 'injury', 2, 0, { sourceId: 'a2' }))],
+  ['poison', () => nearlyDead(afflict(body(), 'poison', 1, 0))],
+  ['illness', () => nearlyDead(afflict(body(), 'illness', 2, 0))],
+  ['fatigue', () => nearlyDead(afflict(body(), 'fatigue', 3, 0))],
+  ['hunger', () => nearlyDead(starve(body()))],
   ['thirst', () => {
-    const s = hurt(body(), 99.9)
+    const s = nearlyDead(body())
     return { ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, thirst: 0 } } }
   }],
   // The same fatigue rung, on a body the cold has been billing. Task 22: the ladder is the
   // only road the cold takes, so the drain is identical and only the name changes.
   ['exposure', () => {
-    const s = hurt(afflict(body(), 'fatigue', 3, 0), 99.9)
+    const s = nearlyDead(afflict(body(), 'fatigue', 3, 0))
     return { ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, coldTicksSinceRecovery: 4 } } }
   }],
 ]
@@ -184,18 +190,18 @@ const PENDING: Partial<Record<DeathCause, string>> = {}
 
 describe('death has a cause', () => {
   it('an attack-sourced wound makes the death a slaying, and names the hand', () => {
-    expect(died(tickOnce(hurt(afflict(body(), 'injury', 2, 0, { sourceId: 'a2' }), 99.9))))
+    expect(died(tickOnce(nearlyDead(afflict(body(), 'injury', 2, 0, { sourceId: 'a2' })))))
       .toEqual({ agentId: 'a1', cause: 'slain', byId: 'a2' })
   })
 
   it('the same wound with nobody behind it is an injury, and carries no hand at all', () => {
-    const p = died(tickOnce(hurt(afflict(body(), 'injury', 2, 0), 99.9)))
+    const p = died(tickOnce(nearlyDead(afflict(body(), 'injury', 2, 0))))
     expect(p).toEqual({ agentId: 'a1', cause: 'injury' })
     expect(Object.keys(p as object)).not.toContain('byId')
   })
 
   it('an empty belly kills as hunger, both by the drain and by the long-starvation clock', () => {
-    expect(died(tickOnce(hurt(starve(body()), 99.9)))).toEqual({ agentId: 'a1', cause: 'hunger' })
+    expect(died(tickOnce(nearlyDead(starve(body()))))).toEqual({ agentId: 'a1', cause: 'hunger' })
     const long = { ...starve(body()), tick: 2000 }
     expect(died(tickOnce({ ...long, agents: { a1: { ...long.agents.a1!, zeroHungerSinceTick: 0 } } })))
       .toEqual({ agentId: 'a1', cause: 'hunger' })
@@ -215,16 +221,16 @@ describe('death has a cause', () => {
     // The pair the tiebreak needs: two kinds whose drains are the same number, to the bit.
     expect(CFG.mortality.drainPerTick.fatigue * 2).toBe(CFG.mortality.drainPerTick.illness)
     const older = (first: string, fs: number, second: string, ss: number) =>
-      hurt(afflict(afflict(body(), first, fs, 5), second, ss, 40), 99.9)
+      nearlyDead(afflict(afflict(body(), first, fs, 5), second, ss, 40))
     expect(died(tickOnce(older('fatigue', 2, 'illness', 1)))).toMatchObject({ cause: 'fatigue' })
     expect(died(tickOnce(older('illness', 1, 'fatigue', 2)))).toMatchObject({ cause: 'illness' })
     // Same drain, same onset: 'illness' precedes 'fatigue' in DEATH_CAUSES.
-    const tied = hurt(afflict(afflict(body(), 'fatigue', 2, 5), 'illness', 1, 5), 99.9)
+    const tied = nearlyDead(afflict(afflict(body(), 'fatigue', 2, 5), 'illness', 1, 5))
     expect(died(tickOnce(tied))).toMatchObject({ cause: 'illness' })
   })
 
   it('dominantDrain is the one attribution, and it agrees with what the tick emits', () => {
-    const s = hurt(afflict(afflict(body(), 'poison', 1, 5), 'illness', 1, 5), 99.9)
+    const s = nearlyDead(afflict(afflict(body(), 'poison', 1, 5), 'illness', 1, 5))
     expect(dominantDrain(s, CFG, 'a1')).toBe('poison')
     expect(died(tickOnce(s))).toMatchObject({ cause: 'poison' })
   })
@@ -255,7 +261,7 @@ describe('death has a cause', () => {
 
 describe('a grave where the life ended', () => {
   it('stands on the death tile, complete, unowned and unburnable', () => {
-    const r = tickOnce(hurt(afflict(body(), 'illness', 2, 0), 99.9))
+    const r = tickOnce(nearlyDead(afflict(body(), 'illness', 2, 0)))
     expect(r.events).toContainEqual({
       type: 'grave_placed', payload: { id: 'structure_1', agentId: 'a1', name: 'a1', x: 2, y: 2 },
     })
@@ -274,12 +280,12 @@ describe('a grave where the life ended', () => {
     s = fold(s, ev('structure_planned', {
       id: 'structure_9', kind: 'shed', x: 2, y: 2, w: 1, h: 1, maxHp: 20, flammable: true, builderId: 'a1',
     }), CFG)
-    const g = graveOf(tickOnce(hurt(s, 99.9)).state)!
+    const g = graveOf(tickOnce(nearlyDead(s)).state)!
     expect({ x: g.x, y: g.y }).toEqual({ x: 3, y: 3 })
   })
 
   it('places none when the world says graves are off, and buries the old just the same', () => {
-    const off = tickOnce(hurt(afflict(body(NO_GRAVE), 'illness', 2, 0), 99.9), NO_GRAVE)
+    const off = tickOnce(nearlyDead(afflict(body(NO_GRAVE), 'illness', 2, 0)), NO_GRAVE)
     expect(off.events.map((e) => e.type)).not.toContain('grave_placed')
     expect(graveOf(off.state)).toBeUndefined()
 
@@ -291,7 +297,7 @@ describe('a grave where the life ended', () => {
   })
 
   it('folding the death tick reproduces the state it returned, grave and all', () => {
-    const s = hurt(afflict(body(), 'illness', 2, 0), 99.9)
+    const s = nearlyDead(afflict(body(), 'illness', 2, 0))
     const advanced = fold(s, ev('tick_advanced', {}, 1), CFG)
     const out = createWorldTick(CFG, new RngStreams('m'))(advanced)
     let replayed = advanced
@@ -358,7 +364,7 @@ describe('a collapse that never recovers becomes fatigue', () => {
   it('drains hp at the fatigue rate, and the sleepless body dies naming fatigue', () => {
     const two = afflict(body(), 'fatigue', 2, 0)
     expect(hpDeltas(tickOnce(two))).toEqual([-(CFG.mortality.drainPerTick.fatigue * 2)])
-    expect(died(tickOnce(hurt(afflict(body(), 'fatigue', 3, 0), 99.9)))).toEqual({ agentId: 'a1', cause: 'fatigue' })
+    expect(died(tickOnce(nearlyDead(afflict(body(), 'fatigue', 3, 0))))).toEqual({ agentId: 'a1', cause: 'fatigue' })
   })
 })
 

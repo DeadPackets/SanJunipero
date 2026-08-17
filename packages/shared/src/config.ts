@@ -215,7 +215,12 @@ const FlagSchema = z.object({ enabled: z.boolean().default(true) }).strict()
 const MortalitySchema = z.object({
   enabled: z.boolean().default(true),
   drainPerTick: z.object({
-    injury: z.number().default(0.05),
+    // At 0.05 a grave wound killed in 4.8 hours and a serious one in half a day — less time
+    // than it takes to be seen from across a meadow and walked to, so the designed overlap
+    // (one body notices another is hurt and crosses the town) could not physically happen.
+    // 0.025 gives every tier a window longer than that walk and still leaves the herb as the
+    // only answer to a grave one: tended and asleep saves a serious wound, not that (T37b).
+    injury: z.number().default(0.025),
     poison: z.number().default(0.12),
     illness: z.number().default(0.08),
     fatigue: z.number().default(0.04),

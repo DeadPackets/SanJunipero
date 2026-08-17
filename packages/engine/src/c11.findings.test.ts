@@ -84,9 +84,11 @@ describe('C11 finding 2 — the garment decides a winter hour, and only the mild
   })
 })
 
-describe('C11 finding 3 — an untended wound is a clock', () => {
+describe('C11 finding 3 — an untended wound is a clock, and the clock now waits to be noticed', () => {
   // A consequence of the `slain` fix, which mints an `injury` affliction at the wound's tier.
-  // Correct by the affliction model; never reviewed as tuning. This is the survival curve.
+  // Correct by the affliction model and never reviewed as tuning until T37b step 2c. A wound
+  // has to outlast the walk of whoever might tend it, or the designed social overlap — one
+  // body sees another is hurt and crosses the town — cannot physically happen.
   const hpAfterBlow = (kind: 'minor' | 'serious' | 'grave'): number => C.health.maxHp - C.health.injuryDamage[kind]
   const drainPerDay = (severity: number): number => perDay(C.mortality.drainPerTick.injury * severity)
   // The best case a body can give itself: fed, and asleep when the dawn payment lands.
@@ -94,30 +96,40 @@ describe('C11 finding 3 — an untended wound is a clock', () => {
   const daysToDeath = (kind: 'minor' | 'serious' | 'grave', severity: number): number =>
     hpAfterBlow(kind) / (drainPerDay(severity) - selfHealPerDay)
 
-  it('a scuffle nobody treats kills inside two sim-days, and a bad one inside four hours', () => {
+  it('every tier now outlasts the walk of whoever might notice it', () => {
+    expect(C.mortality.drainPerTick.injury).toBe(0.025)
     expect(selfHealPerDay).toBe(15)
-    expect(drainPerDay(1)).toBeCloseTo(72, 6)
-    expect(daysToDeath('minor', 1)).toBeCloseTo(1.58, 2)
-    expect(daysToDeath('serious', 2)).toBeCloseTo(0.54, 2)
-    expect(daysToDeath('grave', 3)).toBeCloseTo(0.2, 2)
+    expect(drainPerDay(1)).toBeCloseTo(36, 6)
+    // Was 1.58 / 0.54 / 0.20 — a bad wound killed inside five hours, which is less than the
+    // time it takes to be seen from across a meadow and walked to.
+    expect(daysToDeath('minor', 1)).toBeCloseTo(4.29, 2)
+    expect(daysToDeath('serious', 2)).toBeCloseTo(1.23, 2)
+    expect(daysToDeath('grave', 3)).toBeCloseTo(0.43, 2)
+    // The worst of them is still urgent — ten waking hours — and no longer hopeless.
+    expect(daysToDeath('grave', 3) * 24).toBeGreaterThan(10)
   })
 
-  it('a hungry body does not mend at all, and then a bruise is a day and a quarter', () => {
+  it('a hungry body still does not mend, and even then a bruise is two and a half days', () => {
     // `recoveryDelta` pays nothing to a body under the fed threshold unless somebody tends it.
+    // The threshold is left where it is: hunger should cost a wounded body its own recovery,
+    // and at this drain it still leaves a window somebody else can reach.
     expect(C.mortality.fedThreshold).toBe(40)
-    expect(hpAfterBlow('minor') / drainPerDay(1)).toBeCloseTo(1.25, 2)
+    expect(hpAfterBlow('minor') / drainPerDay(1)).toBeCloseTo(2.5, 2)
+    expect(hpAfterBlow('grave') / drainPerDay(3) * 24).toBeGreaterThan(8)
   })
 
-  it('the only thing that stops the clock is a herb in somebody else’s hand', () => {
+  it('a herb in somebody else’s hand is still the only answer to the worst of them', () => {
     // Tending with a leaf lifts two rungs, which clears a minor or a serious outright.
     expect(C.mortality.herbRelief * 2).toBe(2)
-    // Tending without one buys hp and nothing else: the drain outruns it for every tier.
+    // Tending without one still buys hp and nothing else while the body is awake.
     const tendedPerDay = C.health.tendedRecoveryHpPerDay * C.mortality.tendMultiplier
     expect(tendedPerDay).toBe(30)
     expect(drainPerDay(1)).toBeGreaterThan(tendedPerDay)
-    // Asleep at dawn and tended, a minor wound is survivable and nothing worse is.
+    // Tended and asleep, a minor and a serious wound are both survivable — which is the point
+    // of the change: care is worth giving. A GRAVE one is not, and the leaf is still what
+    // decides it. Medicine stays load-bearing at exactly the tier that should need it.
     const tendedAsleep = tendedPerDay * C.mortality.sleepRegenMultiplier
-    expect(tendedAsleep).toBeGreaterThan(drainPerDay(1))
-    expect(tendedAsleep).toBeLessThan(drainPerDay(2))
+    expect(tendedAsleep).toBeGreaterThan(drainPerDay(2))
+    expect(tendedAsleep).toBeLessThan(drainPerDay(3))
   })
 })
