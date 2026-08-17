@@ -608,38 +608,94 @@ body {
   }
 }
 
-/* ── interiors: the room the camera stepped into, and the way back out (Task 11) ──
-   The room itself is drawn on the canvas; this is only the bar that names it and leaves it. */
-.interior-bar {
+/* ── interiors: the room the camera stepped into, and the way back out (Tasks 11, 68) ──
+   The room itself is drawn on the canvas; this card is what the room IS — whose it is, who
+   raised it, who lives in it, what it holds. Every line is omitted when the world has nothing
+   to put in it, so an honest empty room is short rather than full of blanks. */
+.room-card {
   position: absolute; top: 0.8rem; left: 0.8rem; z-index: 21;
-  display: flex; align-items: center; gap: 0.7rem;
-  min-height: var(--interior-bar-h);
-  max-width: calc(100% - 1.6rem);
-  padding: 0.3rem 0.7rem 0.3rem 0.3rem;
+  display: grid; gap: 0.55rem;
+  width: 17rem; max-width: calc(100% - 1.6rem);
+  max-height: calc(100% - 1.6rem); overflow-y: auto;
+  padding: 0.4rem 0.7rem 0.6rem;
   background: var(--cream) var(--grain);
   border: 10px solid transparent; border-image: var(--px-cream);
   box-shadow: var(--ledge);
 }
+/* The button first (it is the escape hatch, and the reading order must match the tab order),
+   the room's name on its own line under it. Side by side, "the storehouse" truncated to
+   "the store…" — a card may not cut the one thing it is naming. */
+.room-head { display: grid; justify-items: start; gap: 0.35rem; }
 .interior-back {
+  flex: none;
   font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
-  min-height: var(--interior-bar-h); padding: 0 0.8rem;
+  min-height: var(--interior-bar-h); padding: 0 0.7rem;
   color: var(--cream); background: var(--ink);
   border: 2px solid var(--ink); border-radius: 0; cursor: pointer;
   box-shadow: 2px 2px 0 0 var(--deep);
 }
 .interior-back:hover { background: var(--deep); }
 .interior-back:active { translate: 2px 2px; box-shadow: none; }
-.interior-caption { display: flex; flex-direction: column; min-width: 0; }
-.interior-title {
-  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em; color: var(--ink);
+.room-title {
+  max-width: 100%;
+  font-family: var(--font-px); font-size: 0.875rem; letter-spacing: 0.03em; color: var(--ink);
+  line-height: 1.35; overflow-wrap: anywhere;
+}
+.room-built {
+  margin: -0.2rem 0 0;
+  font-family: var(--font-body); font-size: 0.875rem; color: var(--ink-quiet);
+  font-style: italic; text-wrap: pretty;
+}
+/* the one repeated shape: a small pixel label over the thing it names */
+.room-label {
+  display: block; margin-bottom: 0.2rem;
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-quiet);
+}
+.room-lives { display: block; margin: 0; }
+.room-names, .room-empty, .room-who {
+  font-family: var(--font-body); font-size: 0.875rem; color: var(--ink);
+}
+.room-empty { margin: 0; font-style: italic; color: var(--ink-quiet); text-wrap: pretty; }
+.room-roll { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.15rem; }
+.room-roll li { display: flex; align-items: baseline; gap: 0.5rem; }
+.room-who { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-state {
+  flex: none;
+  font-family: var(--font-px); font-size: 0.75rem; color: var(--ink);
+  padding: 0.1rem 0.3rem; background: var(--sand); border: 1px solid var(--ink);
+}
+.hold-grid {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(4.6rem, 1fr)); gap: 0.3rem;
+}
+.hold {
+  display: flex; align-items: center; gap: 0.25rem;
+  padding: 0.15rem 0.25rem; background: var(--parchment); border: 1px solid var(--ink);
+}
+.hold-icon {
+  flex: none; width: 16px; height: 16px;
+  background-repeat: no-repeat; background-position: center; background-size: contain;
+  image-rendering: pixelated;
+}
+/* a kind the codex has no icon for gets a drawn chip, never a broken image */
+.hold-icon.bare { background: var(--sand); box-shadow: inset 0 0 0 1px var(--stone); }
+.hold-kind {
+  flex: 1; min-width: 0;
+  font-family: var(--font-body); font-size: 0.75rem; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.interior-who {
-  font-family: var(--font-body); font-size: 0.875rem; color: var(--ink-quiet);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-wrap: pretty;
+.hold-qty {
+  flex: none;
+  font-family: var(--font-px); font-size: 0.75rem; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.room-more {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-body); font-size: 0.75rem; font-style: italic; color: var(--ink-quiet);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .interior-bar { animation: interior-in 260ms var(--ease-enter); }
+  .room-card { animation: interior-in 260ms var(--ease-enter); }
   .interior-back { transition-property: background-color, translate, box-shadow; transition-duration: var(--t-fast); }
   @keyframes interior-in {
     from { opacity: 0; translate: 0 -6px; }

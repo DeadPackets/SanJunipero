@@ -80,7 +80,7 @@ describe('B3 — the timeline day labels are on the slab they sit on', () => {
 const QUIET_SITES = [
   '.tick-badge.waking', '.strip-weather', '.strip-gone', '.fps-overlay .fps-avg',
   '.cam-btn:disabled', '.block h3', '.thought-line', '.tab-body .stamp', '.veil-sub',
-  '.feed-line .stamp', '.feed-empty', '.interior-who', '.legend-chip.off', '.legend-stamp',
+  '.feed-line .stamp', '.feed-empty', '.room-who', '.legend-chip.off', '.legend-stamp',
   '.bond-count', '.bond-dates dt', '.bond-history .stamp', '.thumb-day', '.thumb-cast',
   '.digest-footer', '.roster-gone', '.laws-lede', '.law-history', '.law-edit input:disabled',
 ]

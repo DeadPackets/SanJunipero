@@ -8,7 +8,7 @@ const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').repla
 // Chips, stamps, counts, pills and pixel-face labels sit on TEXT_MIN_PX, not on this list.
 const PROSE = [
   '.inspector-panel', '.chronicle-panel', '.roster-panel', '.laws-panel', '.laws-dashboard',
-  '.bond-detail', '.provenance-pop', '.interior-who', '.thumb-title', '.need-label',
+  '.bond-detail', '.provenance-pop', '.room-who', '.thumb-title', '.need-label',
   '.law-history', '.veil-sub', '.tab-body article h4',
 ]
 
