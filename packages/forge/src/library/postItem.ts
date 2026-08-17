@@ -88,6 +88,6 @@ export function padSquare(img: RawImage, px: number): RawImage {
 // plus floating debris, and among equals the fuller cell wins. The plan named pixel pitch,
 // but estimatePitch pins to its range floor on these painterly generations and cannot
 // separate two candidates — islands can, and it is what the judge actually rejects on.
-export function candidateRank(c: SpriteCell): number {
+export function candidateRank(c: { islands: number; opaqueFrac: number }): number {
   return c.islands - c.opaqueFrac
 }

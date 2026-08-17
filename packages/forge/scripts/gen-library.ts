@@ -15,20 +15,24 @@ import { openForgeDb } from '../src/db.js'
 import { AssetCodex } from '../src/codex.js'
 import { loadForgeConfig } from '../src/forgeConfig.js'
 import { SpendLedger, AnomalyStopError } from '../src/spendLedger.js'
-import { makeImageClient } from '../src/imageClient.js'
+import { makeImageClient, GEN_SIZE } from '../src/imageClient.js'
 import { makeVisionJudge, type VisionJudgeFn } from '../src/visionQa/visionJudge.js'
 import { runVisionGate } from '../src/visionQa/gate.js'
 import { recordVerdict } from '../src/visionQa/telemetry.js'
 import { CRITERIA, type VisionVerdict } from '../src/visionQa/verdict.js'
 import { planBatch, estimateBatchCost, LIBRARY_BATCHES } from '../src/library/plan.js'
-import { toSpriteCell, candidateRank } from '../src/library/postItem.js'
+import { candidateRank } from '../src/library/postItem.js'
+import { integralSpriteCell } from '../src/library/integralCell.js'
+import { pixelBarReport } from '../src/pixelGates.js'
 import { registerLibraryEntry, deriveIcon, libraryIndexJson } from '../src/library/register.js'
 import { spriteGateStatus } from '../src/library/status.js'
 import type { LibraryEntry } from '../src/library/catalog.js'
 
 const C13 = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13'
 const FORGE = join(dirname(fileURLToPath(import.meta.url)), '..')
-const LIB = join(C13, 'library')
+// ROOT lets a re-run at a new resolution land beside the old art rather than over it.
+const ROOT = process.env.LIB_ROOT ?? C13
+const LIB = join(ROOT, 'library')
 
 const DRY = process.env.DRY === '1'
 const BATCH = process.env.BATCH ?? ''
@@ -64,7 +68,7 @@ async function main(): Promise<void> {
 
   mkdirSync(LIB, { recursive: true })
   const config = loadForgeConfig()
-  const ledger = new SpendLedger(join(C13, 'spend.json'))
+  const ledger = new SpendLedger(join(ROOT, 'spend.json'))
   const db = openForgeDb(join(LIB, 'library.db'))
   const codex = new AssetCodex(db)
   const anchor = readFileSync(join(FORGE, 'content', 'reference', 'style-anchor.png'))
@@ -112,7 +116,7 @@ async function main(): Promise<void> {
             const processed = await Promise.all(cands.map(async (c, ix) => {
               writeFileSync(join(dir, 'candidates', `a${n}-c${ix + 1}-raw.png`), c.png)
               const raw = await decodePng(c.png)
-              return { c, ix, raw, ...toSpriteCell(raw, e.spritePx) }
+              return { c, ix, raw, ...integralSpriteCell(raw, e.spritePx) }
             }))
             // Pick the cleanest silhouette: one connected subject, no floating debris.
             const pick = processed.reduce(
@@ -138,7 +142,7 @@ async function main(): Promise<void> {
 
         // Resample the icon from the paid generation at its own cell count: an integer
         // downscale of the 24 px sprite lands on 12 px of art, which the judge reads as mush.
-        icon = chosenRaw ? toSpriteCell(chosenRaw, e.iconPx).cell : deriveIcon(res.sprite, e.iconPx)
+        icon = chosenRaw ? integralSpriteCell(chosenRaw, e.iconPx).cell : deriveIcon(res.sprite, e.iconPx)
         const iv = await judge({
           assetId: `${assetId}#icon`, klass: 'icon', sprite: icon,
           commission: e.desc, attempt: attemptsUsed,
@@ -160,7 +164,17 @@ async function main(): Promise<void> {
     if (status !== 'error') status = spriteGateStatus(spriteVerdicts, status)
 
     if (chosen) {
-      icon ??= chosenRaw ? toSpriteCell(chosenRaw, e.iconPx).cell : deriveIcon(chosen, e.iconPx)
+      icon ??= chosenRaw ? integralSpriteCell(chosenRaw, e.iconPx).cell : deriveIcon(chosen, e.iconPx)
+      // Mechanical criteria are COUNTED, never asked of the judge. A sprite that fails the
+      // pixel bar never ships, whatever the eye said about it.
+      for (const bar of [
+        await pixelBarReport({ name: e.kind, img: chosen, raw: { w: GEN_SIZE, h: GEN_SIZE } }),
+        await pixelBarReport({ name: `${e.kind}#icon`, img: icon, raw: { w: GEN_SIZE, h: GEN_SIZE } }),
+      ]) {
+        if (bar.ok) continue
+        status = 'blocked'
+        note = `${note} pixel bar: ${bar.failures.join('; ')}`.trim()
+      }
       const spritePng = await encodePng(chosen)
       const iconPng = await encodePng(icon)
       writeFileSync(join(dir, 'sprite.png'), spritePng)
@@ -200,7 +214,7 @@ async function main(): Promise<void> {
   const merged = [...prior.filter(p => !fresh.entries.some(f => f.kind === p.kind)), ...fresh.entries]
   writeFileSync(indexPath, JSON.stringify({ version: fresh.version, entries: merged }, null, 2))
 
-  mkdirSync(join(C13, 'reports'), { recursive: true })
+  mkdirSync(join(ROOT, 'reports'), { recursive: true })
   const spend = results.reduce((s, r) => s + r.spendUsd, 0)
   const md = [
     `# C13 library batch \`${BATCH}\``,
@@ -218,8 +232,8 @@ async function main(): Promise<void> {
       `${r.iconScores.join(' ')} | ${r.spendUsd.toFixed(4)} | ${r.note.replace(/\|/g, '/')} |`),
     '',
   ].join('\n')
-  writeFileSync(join(C13, 'reports', `batch-${BATCH}.md`), md)
-  console.log(`\nbatch ${BATCH}: $${spend.toFixed(4)} — wrote ${join(C13, 'reports', `batch-${BATCH}.md`)}`)
+  writeFileSync(join(ROOT, 'reports', `batch-${BATCH}.md`), md)
+  console.log(`\nbatch ${BATCH}: $${spend.toFixed(4)} — wrote ${join(ROOT, 'reports', `batch-${BATCH}.md`)}`)
 }
 
 await main()
