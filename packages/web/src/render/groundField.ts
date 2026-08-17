@@ -209,6 +209,63 @@ const toScreen = (dx: number, dy: number): [number, number] =>
 export const SHOULDER_T = 0.26            // how far into the arm the rim reaches
 export const ROAD_SHOULDER = 0xb89d7e     // v1's own ROAD_EDGE, a MASTER_PALETTE member
 
+// ── U5: a road you can see from the widest view ─────────────────────────────────────────────
+//
+// MEASURED from the shipped 256px materials: grass reads 0.4186 mean relative luminance and
+// road reads 0.5066 — a delta of 0.088, so at scale 1 a one-tile ribbon is 32x16 px of a
+// near-flat average that lands within a few luma points of the grass beside it. The single
+// shoulder colour above is WORSE: 0xB89D7E is 0.3581, only 0.060 from the grass. That is the
+// whole mechanism of "roads read ghost-faint at 1x".
+//
+// The fix is an EDGE, not a repaint — the art is generated and P11 forbids tinting it. The rim
+// wedge is split across its depth into two palette tones, so the ribbon carries a hard edge at
+// any zoom: dark where the shoulder meets the road, light where it meets the ground.
+
+/** WCAG-style relative luminance of a packed 0xRRGGBB colour, 0..1. */
+export function luma(rgb: number): number {
+  const ch = (shift: number): number => {
+    const s = ((rgb >> shift) & 0xff) / 255
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+  }
+  return 0.2126 * ch(16) + 0.7152 * ch(8) + 0.0722 * ch(0)
+}
+
+/** The floor a road's edge must clear against the ground it runs through. Measured, not
+ *  guessed: the shipped road/grass pair sits at 0.088 and fails it, which is the complaint. */
+export const ROAD_GROUND_LUMA_DELTA_MIN = 0.14
+
+/** Both MASTER_PALETTE members: #9C6B47 and #E8D5BC. */
+export const ROAD_SHOULDER_DARK = 0x9c6b47
+export const ROAD_SHOULDER_LIGHT = 0xe8d5bc
+
+/** How much of the rim's depth the dark half takes, measured from the road side. */
+export const SHOULDER_SPLIT = 0.55
+
+export function roadReadsAt(roadTone: number, groundTone: number): boolean {
+  return Math.abs(roadTone - groundTone) >= ROAD_GROUND_LUMA_DELTA_MIN
+}
+
+export type ImageLike = { data: Uint8ClampedArray | Uint8Array; width: number; height: number }
+
+const toneCache = new Map<string, number>()
+
+/** Mean relative luminance of a material, cached per url — the number a delta is measured
+ *  against. Pure for a given url: the first sample wins, as a material never changes. */
+export function materialTone(url: string, sample: ImageLike): number {
+  const hit = toneCache.get(url)
+  if (hit !== undefined) return hit
+  const d = sample.data
+  const stride = d.length / (sample.width * sample.height)
+  let sum = 0, n = 0
+  for (let i = 0; i + 2 < d.length; i += stride) {
+    sum += luma((d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!)
+    n++
+  }
+  const tone = n === 0 ? 0 : sum / n
+  toneCache.set(url, tone)
+  return tone
+}
+
 // each arm's two corner vertices, and the neighbouring direction that shares that edge
 const ARM_SIDES: Record<ArmDir, ReadonlyArray<{ v: readonly [number, number]; shared: ArmDir }>> = {
   n: [{ v: [-0.5, -0.5], shared: 'w' }, { v: [0.5, -0.5], shared: 'e' }],
@@ -217,24 +274,49 @@ const ARM_SIDES: Record<ArmDir, ReadonlyArray<{ v: readonly [number, number]; sh
   w: [{ v: [-0.5, 0.5], shared: 's' }, { v: [-0.5, -0.5], shared: 'n' }],
 }
 
-export function roadShoulderPolys(key: RoadAutotileKey): number[][] {
+const lerp2 = (a: readonly [number, number], b: readonly [number, number], t: number): [number, number] =>
+  [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+
+/** Every exposed rim wedge, as [outer edge a, corner, tapered corner, tapered a]. The two
+ *  colour bands are cut out of these, so the SHOULDER_T rule has exactly one definition. */
+function shoulderWedges(key: RoadAutotileKey): Array<{
+  a: readonly [number, number]; v: readonly [number, number]; other: readonly [number, number]
+}> {
   const arms = roadArms(key)
-  const out: number[][] = []
-  const lerp = (a: readonly [number, number], b: readonly [number, number], t: number): [number, number] =>
-    [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+  const out: Array<{ a: readonly [number, number]; v: readonly [number, number]; other: readonly [number, number] }> = []
   for (const dir of Object.keys(ARM_DIRS) as ArmDir[]) {
     if (!arms[dir]) continue
     const sides = ARM_SIDES[dir]
     for (let i = 0; i < sides.length; i++) {
       const side = sides[i]!
       if (arms[side.shared]) continue          // an interior join keeps no rim
-      const other = sides[1 - i]!.v            // the arm's third vertex, to taper inward
-      const a: readonly [number, number] = [0, 0]
-      const quad = [a, side.v, lerp(side.v, other, SHOULDER_T), lerp(a, other, SHOULDER_T)]
-      out.push(quad.flatMap(([dx, dy]) => toScreen(dx, dy)))
+      out.push({ a: [0, 0], v: side.v, other: sides[1 - i]!.v })
     }
   }
   return out
+}
+
+export function roadShoulderPolys(key: RoadAutotileKey): number[][] {
+  return shoulderWedges(key).map(({ a, v, other }) =>
+    [a, v, lerp2(v, other, SHOULDER_T), lerp2(a, other, SHOULDER_T)]
+      .flatMap(([dx, dy]) => toScreen(dx, dy)))
+}
+
+/**
+ * The same rim, in two tones across its depth. `light` is the outer strip, against the ground;
+ * `dark` is the inner strip, against the road. Both are subdivisions of the wedge above, so
+ * they inherit its "only on edges facing a missing arm" rule and stay inside their own tile.
+ */
+export function roadShoulderBands(key: RoadAutotileKey): { dark: number[][]; light: number[][] } {
+  const split = SHOULDER_T * (1 - SHOULDER_SPLIT)
+  const dark: number[][] = [], light: number[][] = []
+  for (const { a, v, other } of shoulderWedges(key)) {
+    const aSplit = lerp2(a, other, split), vSplit = lerp2(v, other, split)
+    light.push([a, v, vSplit, aSplit].flatMap(([dx, dy]) => toScreen(dx, dy)))
+    dark.push([aSplit, vSplit, lerp2(v, other, SHOULDER_T), lerp2(a, other, SHOULDER_T)]
+      .flatMap(([dx, dy]) => toScreen(dx, dy)))
+  }
+  return { dark, light }
 }
 
 /**

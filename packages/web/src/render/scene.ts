@@ -6,7 +6,8 @@ import type { WorldStore } from '../state/worldStore.js'
 import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import {
-  ROAD_SHOULDER, groundArtSignature, groundField, roadRibbonPolys, roadShoulderPolys,
+  ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField, roadRibbonPolys,
+  roadShoulderBands,
 } from './groundField.js'
 import { TextureBook } from './textures.js'
 
@@ -42,19 +43,26 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
       // edge and the material does not. Every shoulder is laid down BEFORE any ribbon, so a
       // neighbour's rim can never sit on top of this tile's surface.
       if (l.kind === 'road') {
-        const sh = new Graphics()
-        for (const shape of l.shapes) {
-          if (shape.roadKey === null) continue
-          for (const poly of roadShoulderPolys(shape.roadKey)) {
-            const pts: number[] = []
-            for (let i = 0; i < poly.length; i += 2) {
-              pts.push(shape.sx + offX + poly[i]!, shape.sy + poly[i + 1]!)
+        // Two tones across the rim's depth: light where the shoulder meets the ground, dark
+        // where it meets the road. One flat shoulder measured only 0.060 luma from the grass,
+        // which is why a road vanished at 1x (U5).
+        for (const [tone, pick] of [
+          [ROAD_SHOULDER_LIGHT, 'light'], [ROAD_SHOULDER_DARK, 'dark'],
+        ] as const) {
+          const sh = new Graphics()
+          for (const shape of l.shapes) {
+            if (shape.roadKey === null) continue
+            for (const poly of roadShoulderBands(shape.roadKey)[pick]) {
+              const pts: number[] = []
+              for (let i = 0; i < poly.length; i += 2) {
+                pts.push(shape.sx + offX + poly[i]!, shape.sy + poly[i + 1]!)
+              }
+              sh.poly(pts)
             }
-            sh.poly(pts)
           }
+          sh.fill(tone)
+          layer.addChild(sh)
         }
-        sh.fill(ROAD_SHOULDER)
-        layer.addChild(sh)
       }
       const g = new Graphics()
       for (const shape of l.shapes) {
