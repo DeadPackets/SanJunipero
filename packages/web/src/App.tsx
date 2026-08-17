@@ -306,7 +306,7 @@ export function App() {
             <InspectorPanel store={store} agentId={route.agentId} scene={scene} onBack={showRoster} />
           )}
           {route.lens === 'inspector' && route.agentId === null && (
-            <RosterPanel store={store} onPick={pickAgent} />
+            <RosterPanel store={store} openId={null} onToggle={pickAgent} />
           )}
           {route.lens === 'chronicle' && <ChroniclePanel store={store} handle={handle} onView={onView} />}
           {route.lens === 'laws' && (

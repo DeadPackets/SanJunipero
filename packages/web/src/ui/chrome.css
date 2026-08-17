@@ -1086,39 +1086,101 @@ body {
   pointer-events: none;
 }
 
-/* ── townsfolk roster (Townsfolk lens, nobody picked) ── */
+/* ── townsfolk roster (Townsfolk lens, nobody picked) ──
+   U12: "redesign as a video-game character roster. Required per row: portrait · name · current
+   status · a MOOD STATUS ICON · WHERE THEY ARE." The landed card was a bust, a name and three
+   badges with ~60% of it blank. A row is now a four-column GRID — portrait rail, name+state
+   column, mood glyph, place line — because that is what makes a party screen scannable. */
 .roster-panel { padding: 1rem; min-width: 21rem; font-size: 0.875rem; }
 @media (prefers-reduced-motion: no-preference) {
   .roster-panel { animation: panel-in var(--t-med) var(--ease-enter); }
 }
-.roster-grid {
-  list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.6rem;
+.roster-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  flex-wrap: wrap; gap: 0.4rem;
 }
-.roster-card {
-  width: 100%; min-height: 40px; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
-  padding: 0.7rem 0.5rem 0.6rem;
+.roster-sorts { display: flex; gap: 0.25rem; }
+.roster-sort {
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
+  min-height: 24px; padding: 0.15rem 0.4rem; cursor: pointer;
+  background: var(--parchment); color: var(--ink);
+  border: 2px solid var(--ink); border-radius: 0;
+}
+.roster-sort:hover { background: var(--honey); }
+.roster-sort.on { background: var(--honey); box-shadow: inset 0 0 0 2px var(--cream); }
+
+.roster-list { list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
+
+.roster-row {
+  width: 100%; min-height: 56px; cursor: pointer; font: inherit; color: inherit;
+  display: grid; align-items: center; text-align: left;
+  grid-template-columns: 48px minmax(0, 1fr) 32px;
+  grid-template-areas: 'face who mood' 'face doing mood' 'face place mood' 'face with with';
+  gap: 0.1rem 0.55rem;
+  padding: 0.45rem 0.55rem;
   background: var(--cream) var(--grain);
   border: 2px solid var(--ink); border-radius: 0;
   box-shadow: 3px 3px 0 0 var(--deep);
-  font: inherit; color: inherit; text-align: center;
 }
-.roster-card:hover { translate: 0 -2px; box-shadow: 3px 5px 0 0 var(--deep); background-color: var(--honey); }
-.roster-card:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
-.roster-bust {
+@media (prefers-reduced-motion: no-preference) {
+  .roster-row { transition: translate var(--t-fast) var(--ease-enter), box-shadow var(--t-fast); }
+}
+.roster-row:hover { translate: 0 -2px; box-shadow: 3px 5px 0 0 var(--deep); background-color: var(--honey); }
+.roster-row:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.roster-row.open { background-color: var(--honey); box-shadow: inset 0 0 0 2px var(--cream), 3px 3px 0 0 var(--deep); }
+/* substance drives DENSITY, never a printed number: a person the run has made something of
+   gets a row with more room to say it in. */
+.roster-row[data-lived='some'] { padding-block: 0.55rem; }
+.roster-row[data-lived='much'] { padding-block: 0.7rem; border-left-width: 5px; }
+
+.rr-face {
+  grid-area: face; align-self: start;
   width: 48px; height: 48px; display: block;
-  background-color: var(--sand);
-  background-repeat: no-repeat;
+  background-color: var(--sand); background-repeat: no-repeat;
+  background-size: cover; background-position: center;
+  image-rendering: pixelated;
   box-shadow: 0 0 0 2px var(--ink), 2px 2px 0 2px var(--deep);
 }
-.roster-token {
-  display: grid; place-items: center;
+.rr-token {
+  display: grid; place-items: center; image-rendering: auto;
   font-family: var(--font-px); font-size: 1.1rem; color: var(--ink);
 }
-.roster-name { font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em; }
-.roster-card .badges { justify-content: center; margin-top: 0; }
-.badge.doing { background: var(--honey); }
+.rr-who { grid-area: who; display: flex; align-items: baseline; gap: 0.4rem; min-width: 0; }
+.rr-name {
+  font-family: var(--font-px); font-size: 0.875rem; letter-spacing: 0.03em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rr-age {
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--ink-quiet); flex: none;
+}
+.rr-doing { grid-area: doing; display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.rr-state {
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.04em;
+  padding: 0.05rem 0.35rem; background: var(--honey);
+  border: 1px solid var(--ink); border-radius: 0;
+}
+.roster-row:hover .rr-state, .roster-row.open .rr-state { background: var(--cream); }
+.rr-conds { display: flex; gap: 0.2rem; flex-wrap: wrap; }
+.rr-cond {
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.04em;
+  padding: 0.05rem 0.3rem; background: var(--sand);
+  border: 1px solid var(--ink); border-radius: 0;
+}
+.rr-cond.ill { background: var(--rose); color: var(--cream); }
+/* the mood token: a 16-px face at 2×, on its own ground so it reads as an icon and not as
+   ink that fell off the row */
+.rr-mood {
+  grid-area: mood; align-self: center; justify-self: end;
+  image-rendering: pixelated;
+  background: var(--parchment); box-shadow: 0 0 0 2px var(--ink), 2px 2px 0 2px var(--deep);
+}
+.roster-row:hover .rr-mood, .roster-row.open .rr-mood { background: var(--cream); }
+.rr-place {
+  grid-area: place; font-size: 0.875rem; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rr-with { grid-area: with; font-size: 0.75rem; color: var(--ink-quiet); font-style: italic; }
 .roster-empty {
   color: var(--cream); font-style: italic;
   background-color: var(--deep);

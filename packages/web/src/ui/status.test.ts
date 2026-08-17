@@ -6,7 +6,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { GAMIFICATION_BAN } from './townStats.js'
 import { RosterPanelView } from './RosterPanel.js'
-import { rosterRows } from './rosterModel.js'
+import { rosterRows2 } from './roster/rosterRow.js'
 import type { WorldState } from '@sj/engine/state'
 import {
   BANNED_STATUS_LITERALS, CONDITIONS, CONDITION_WORD, DRIVES, MACHINE_STATUS_IDS, NEED_LOW,
@@ -68,9 +68,9 @@ describe('the duplicate, as a test', () => {
       terrain: [[0] as unknown], weather: { kind: 'sunny', temperatureC: 12 },
       wildlife: { fish: 1, deer: 1 }, counters: { nextEntityId: 2 },
     } as unknown as WorldState
-    const { alive, gone } = rosterRows(state, state.tick)
     const html = renderToStaticMarkup(createElement(RosterPanelView, {
-      rows: alive, gone, bustOf: () => null, onPick: () => {},
+      rows: rosterRows2(state, [], null, state.tick), gone: 0,
+      sort: 'name' as const, openId: null, onSort: () => {}, onToggle: () => {},
     }))
     const text = html.replace(/<[^>]*>/g, ' ')
     // the landed card carried BOTH: an `asleep` badge and a `resting` doing-badge
