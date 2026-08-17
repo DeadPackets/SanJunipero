@@ -228,6 +228,24 @@ export function fitStop(bounds: CameraBounds, screen: { w: number; h: number }):
   return best
 }
 
+/**
+ * WHAT A RESIZE SHOULD DO TO THE CAMERA.
+ *
+ * The stage changes size when the control bar docks to another edge or a panel opens, and the
+ * landed observer only re-CLAMPED: a viewer who had asked for the whole town was left at a stop
+ * the new stage cannot hold it at, with part of the town outside the view until they pressed
+ * "The whole town" again.
+ *
+ * The rule is STICKY, not automatic. A camera the viewer steered is never moved — a stage that
+ * jumps when a panel opens is worse than one that does not. A camera that is showing the whole
+ * town keeps showing the whole town, which is the thing that was asked for in the first place.
+ */
+export function resizeIntent(
+  fitted: boolean, box: CameraBounds, screen: { w: number; h: number },
+): { kind: 'refit'; stop: ZoomStop } | { kind: 'clamp' } {
+  return fitted ? { kind: 'refit', stop: fitStop(box, screen) } : { kind: 'clamp' }
+}
+
 /** The fraction of the stage AREA the settlement occupies AS DRAWN. The audit measured this
  *  "under 15 %" at the old `ZOOM_MIN = 1`, and on the real eleven-building town it reproduces
  *  at 14.4 %; the gate asserts it on the first frame. */

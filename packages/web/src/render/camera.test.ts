@@ -6,7 +6,8 @@ import {
   FIT_MARGIN_PX, STAGE_FILL_MIN,
   WHEEL_GESTURE_GAP_MS, WHEEL_MIN_DELTA, WHEEL_STEP_DELTA, ZOOM_SETTLE_MS, ZOOM_STEP_COOLDOWN_MS,
   ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, easeOutCubic, fitStop, initialZoom,
-  drawnBoundsOf, stageFill, structureBoundsOf, zoomScaleAt, zoomSettled, zoomTo, zoomWheel, type ZoomStop,
+  drawnBoundsOf, resizeIntent, stageFill, structureBoundsOf, zoomScaleAt, zoomSettled, zoomTo,
+  zoomWheel, type ZoomStop,
 } from './camera.js'
 
 // THE LANDED RULE, quoted so the before-state is measured and not remembered
@@ -322,6 +323,46 @@ describe('fitStop — a view of the whole thing, with a margin', () => {
       for (const n of [4, 16, 48, 128, 512]) {
         expect(ZOOM_STOPS as readonly number[])
           .toContain(fitStop(cameraBoundsOf(terrainOf(n, n)), { w, h }))
+      }
+    }
+  })
+})
+
+// A STAGE THAT CHANGES SIZE (batch 3 concern 6, controller ruling R4.2). Docking the control
+// bar to another edge, or opening a panel, resizes the stage; the landed observer re-CLAMPS and
+// stops there, so a viewer who asked for the whole town keeps a camera that no longer shows it.
+describe('resizeIntent — a resize keeps the view the viewer asked for', () => {
+  // the bar moving from the bottom edge to the left edge: 56 px off the width, 56 px back on
+  // the height, and the town no longer fits at the stop it was fitted to
+  const NARROW = { w: 700, h: 880 }
+
+  it('THE BUG, AS A TEST: a fitted camera stops fitting when the stage narrows', () => {
+    expect(fitStop(TOWN_DRAWN, STAGE)).toBe(2)
+    expect(fitStop(TOWN_DRAWN, NARROW)).toBe(1)
+    // the landed behaviour is the clamp alone, which leaves the stop at 2 on a stage that
+    // can no longer hold the town at 2
+    expect((TOWN_DRAWN.maxX - TOWN_DRAWN.minX) * 2).toBeGreaterThan(NARROW.w - 2 * FIT_MARGIN_PX)
+  })
+
+  it('re-fits a fitted camera to the stop the new stage can hold', () => {
+    expect(resizeIntent(true, TOWN_DRAWN, NARROW)).toEqual({ kind: 'refit', stop: 1 })
+  })
+
+  it('leaves a camera the viewer steered alone — a stage that resizes must not jump', () => {
+    expect(resizeIntent(false, TOWN_DRAWN, NARROW)).toEqual({ kind: 'clamp' })
+    expect(resizeIntent(false, TOWN_DRAWN, STAGE)).toEqual({ kind: 'clamp' })
+  })
+
+  it('a fitted camera whose stop still fits re-centres rather than moving stop', () => {
+    expect(resizeIntent(true, TOWN_DRAWN, STAGE)).toEqual({ kind: 'refit', stop: 2 })
+  })
+
+  it('never leaves the stop set, over every stage a window can be', () => {
+    for (const w of [320, 700, 1024, 1728, 3840]) {
+      for (const h of [240, 500, 880, 2160]) {
+        const r = resizeIntent(true, TOWN_DRAWN, { w, h })
+        expect(r.kind).toBe('refit')
+        if (r.kind === 'refit') expect(ZOOM_STOPS as readonly number[]).toContain(r.stop)
       }
     }
   })

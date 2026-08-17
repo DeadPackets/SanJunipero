@@ -7,7 +7,7 @@ import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import {
   ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, fitStop, initialZoom, nearestStop,
-  drawnBoundsOf, zoomScaleAt, zoomSettled, zoomTo, zoomWheel,
+  drawnBoundsOf, resizeIntent, zoomScaleAt, zoomSettled, zoomTo, zoomWheel,
   type CameraBounds, type ZoomState, type ZoomStop,
 } from './camera.js'
 import {
@@ -252,10 +252,14 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   rootEl.appendChild(app.canvas)
   // resizeTo only tracks window resizes; a panel opening, or the control bar moving to
   // another edge (task 78), changes the root element itself — and a stage that got smaller
-  // can leave the camera showing outside the world, so the clamp runs with it.
+  // can leave the camera showing outside the world, so the clamp runs with it. A camera that
+  // was showing the WHOLE TOWN re-fits instead: it only re-clamped, and the town fell off the
+  // edge of a narrower stage until the viewer pressed the overview again.
   const ro = new ResizeObserver(() => {
     app.resize()
-    place(world.position.x, world.position.y)
+    const intent = resizeIntent(fitted, townBox(), screenBox())
+    if (intent.kind === 'refit') fitTo(intent.stop)
+    else place(world.position.x, world.position.y)
   })
   ro.observe(rootEl)
 
@@ -322,18 +326,26 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
    *  centred on the settlement — not on the middle of a mostly-empty terrain array. The
    *  transit reuses the zoom anchor, so the town eases into the middle of the stage rather
    *  than jumping there. */
-  function fitToTown(): void {
+  /** True while the camera is showing the whole town — set by a fit, cleared the moment the
+   *  viewer takes the camera anywhere themselves. A resize honours the view that was asked
+   *  for and leaves a steered camera alone. */
+  let fitted = false
+
+  function fitTo(stop: ZoomStop): void {
     breakFollow()
-    const box = townBox()
-    const stop = fitStop(box, screenBox())
-    const c = boundsCentre(box)
+    const c = boundsCentre(townBox())
     anchor = { sx: app.screen.width / 2, sy: app.screen.height / 2, wx: c.sx, wy: c.sy }
+    fitted = true
     if (stop === zoom.stop) {
       centerOnScreen(c.sx, c.sy)
       notifyCamera()
       return
     }
     zoom = zoomTo(zoom, stop, performance.now())
+  }
+
+  function fitToTown(): void {
+    fitTo(fitStop(townBox(), screenBox()))
   }
 
   // smooth follow: eases the camera toward a moving world-space anchor each frame
@@ -374,6 +386,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
 
   function setZoomAt(stop: ZoomStop, screenX: number, screenY: number): void {
     if (stop === zoom.stop && zoomSettled(zoom, performance.now())) return
+    fitted = false
     captureAnchor(screenX, screenY)
     zoom = zoomTo(zoom, stop, performance.now())
   }
@@ -411,6 +424,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     const dy = e.global.y - last.y
     if (Math.abs(dx) + Math.abs(dy) > 2) {
       moved = true
+      fitted = false
       breakFollow() // the viewer takes the camera back
     }
     place(world.position.x + dx, world.position.y + dy)
@@ -514,10 +528,12 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     getZoom: () => world.scale.x,
     getZoomStop: () => zoom.stop,
     panBy: (dx, dy) => {
+      fitted = false
       breakFollow()
       place(world.position.x + dx, world.position.y + dy)
     },
     centerHome: () => {
+      fitted = false
       breakFollow()
       const c = boundsCentre(townBox())
       centerOnScreen(c.sx, c.sy)
@@ -532,6 +548,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       }
     },
     setFollow: (target) => {
+      if (target !== null) fitted = false
       followFn = target
     },
     onFollowEnd: (cb) => {
