@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SimConfigSchema, stateHash, type SimEvent } from '@sj/shared'
+import { dayPhaseFromTick, SimConfigSchema, stateHash, type SimEvent } from '@sj/shared'
 import type { WorldState } from './state.js'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
@@ -12,7 +12,9 @@ import { replayFromGenesis, replayLatest } from './replay.js'
 import {
   createScriptedLoop, makeScriptedOnTick, makeFixtureMap,
   BUILDER, FARMER, FISHER, IDLER, STOREHOUSE, SHED,
+  KEEPER, THIEF, STOLEN_ITEM, NIGHT_THEFT_TICK, NOON_THEFT_TICK,
 } from './scripted.js'
+import { composePerception } from './perception.js'
 // Pinned golden hash for the 3-day scripted world run (regen #4, deliberate: C9 Task 16.
 // Every C9 feature pin came off this fixture at once — ownership, the bed law, spoilage
 // and reproduction are live — and `agent_born` now ages a newborn by the 364-day calendar).
@@ -41,6 +43,11 @@ const G2_CONFIG = SimConfigSchema.parse({
   mapGrowth: { enabled: false },
   constructs: { enabled: false },
 })
+
+// Task 37(b) lands the theft before Task 37(c) unpins the fixture, so the witness law it
+// exercises is still off in G2_CONFIG above. This is the same world with the pins already
+// gone; at the regen the two configs become the same object.
+const LIVE = SimConfigSchema.parse({})
 
 const SEED = 'g2-scripted'
 const TOTAL_TICKS = 4320 // 3 sim days
@@ -174,6 +181,31 @@ describe('GATE G2: 3-day scripted world run', () => {
   it('replayFromGenesis equals the live run, config threaded explicitly', () => {
     const { state, store } = runScenario()
     expect(stateHash(replayFromGenesis(store, G2_CONFIG, makeFixtureMap()))).toBe(stateHash(state))
+  })
+
+  // Task 37(b). The C8 delta's missing fixture: `item_taken` had no scripted witness in the
+  // golden world. Two takings of the same knife off the same shelf by the same pair of hands,
+  // watched from the same six tiles — the only difference between them is the light.
+  it('the same theft is invisible at night and plain at noon (§19)', () => {
+    const seen = (tick: number) => {
+      const store = new EventStore(openDb(':memory:'))
+      const loop = createScriptedLoop(LIVE, SEED, store)
+      runTicks(loop, tick)
+      const taken = allEvents(store).filter((e) => e.type === 'item_taken')
+      const last = taken.slice(-1)
+      return { taken, watched: composePerception(loop.state, LIVE, KEEPER, last).seen }
+    }
+
+    const night = seen(NIGHT_THEFT_TICK + 1)
+    expect(night.taken).toHaveLength(1)
+    expect(night.taken[0]!.payload).toMatchObject({ itemId: STOLEN_ITEM, takerId: THIEF, ownerId: KEEPER })
+    expect(dayPhaseFromTick(night.taken[0]!.tick)).toBe('night')
+    expect(night.watched).toEqual([])
+
+    const noon = seen(NOON_THEFT_TICK + 1)
+    expect(noon.taken).toHaveLength(2)
+    expect(dayPhaseFromTick(noon.taken[1]!.tick)).toBe('day')
+    expect(noon.watched).toContainEqual({ kind: 'item_taken', takerName: 'Thief', ownerName: 'Keeper', itemKind: 'knife' })
   })
 
   it('crash at tick 2000: recover, continue to 4320, hash equals uninterrupted run', () => {

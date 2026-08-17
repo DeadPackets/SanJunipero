@@ -21,7 +21,9 @@ export const FARMER = 'farmer'
 export const FISHER = 'fisher'
 export const IDLER = 'idler'
 export const BUILDER = 'builder'
-export const ACTORS = [FARMER, FISHER, IDLER, BUILDER] as const
+export const THIEF = 'thief'
+export const KEEPER = 'keeper'
+export const ACTORS = [FARMER, FISHER, IDLER, BUILDER, THIEF, KEEPER] as const
 
 // Fixture geometry (64x64): river on the west edge, forest on the east edge.
 export const MAP_W = 64
@@ -36,6 +38,19 @@ export const WOOD_ITEM = 'item_1'
 export const WHEAT_FARMER = 'item_2'
 export const WHEAT_BUILDER = 'item_3'
 export const FISHER_WATER = { x: 3, y: 32 }
+
+// ------------------------------------------------------- Task 37(b): the scripted theft
+// The knife's id ends in no number on purpose: the counter law only rises on a numeric
+// suffix, so putting this on the shelf shifts no id the fixture already minted.
+export const STOLEN_ITEM = 'item_knife'
+export const THIEF_POST = { x: 19, y: 20 } // beside the storehouse, on the far side from the traffic
+// Six tiles from (20, 20), the corner a taking out of the storehouse is logged at. Night
+// vision reaches four; noon reaches twelve. The post is the whole experiment.
+export const WATCH_POST = { x: 20, y: 26 }
+export const NIGHT_THEFT_TICK = 2760 // day 2, 22:00 — no moon, no torch
+export const NOON_THEFT_TICK = 3600  // day 3, 12:00 — the same act, in full light
+const RESTOW_TICK = 3000             // the knife goes back on the shelf between the two
+const UPKEEP_EVERY = 720             // see keepUpright
 
 export function makeFixtureMap(): TileId[][] {
   const rows: TileId[][] = []
@@ -146,12 +161,29 @@ export function makeBuilderPolicy(config: SimConfig): Policy {
   }
 }
 
+// Keeper: owns the knife on the storehouse shelf and stands his post for three days. He
+// does nothing on purpose — he is the pair of eyes the night is measured against, and a body
+// that walks about would change what is six tiles away from the taking.
+export function makeKeeperPolicy(_config: SimConfig): Policy {
+  return () => null
+}
+
+// Thief: stands beside the storehouse and reaches in twice, at two named ticks. Carries no
+// flame, which is the other half of the night rule — a lit body is a witnessed body.
+export function makeThiefPolicy(_config: SimConfig): Policy {
+  return (p) => (p.time.tick === NIGHT_THEFT_TICK || p.time.tick === NOON_THEFT_TICK
+    ? { verb: 'take', params: { itemId: STOLEN_ITEM } }
+    : null)
+}
+
 export function makePolicies(config: SimConfig): Record<string, Policy> {
   return {
     [FARMER]: makeFarmerPolicy(config),
     [FISHER]: makeFisherPolicy(config),
     [IDLER]: makeIdlerPolicy(config),
     [BUILDER]: makeBuilderPolicy(config),
+    [THIEF]: makeThiefPolicy(config),
+    [KEEPER]: makeKeeperPolicy(config),
   }
 }
 
@@ -177,6 +209,27 @@ function scriptedTimeline(config: SimConfig, tick: number, emit: (type: string, 
   if (tick === 1441) emit('fire_ignited', { structureId: STOREHOUSE.id, cause: 'scripted' })
   if (tick === 1443) emit('fire_spread', { fromId: STOREHOUSE.id, toId: SHED.id })
   if (tick === 1445) emit('weather_changed', { kind: 'rain', temperatureC: 10 })
+
+  // The theft rides the witness flag the way the sexes ride the reproduction flag: a fixture
+  // with §19 off runs the pre-C11 timeline body for body and event for event.
+  if (!config.nightWitness.enabled) return
+  if (tick === 1) {
+    emit('agent_spawned', { id: THIEF, name: 'Thief', x: THIEF_POST.x, y: THIEF_POST.y, ageDays: 7300, ...sex('m') })
+    emit('agent_spawned', { id: KEEPER, name: 'Keeper', x: WATCH_POST.x, y: WATCH_POST.y, ageDays: 7300, ...sex('f') })
+    emit('item_spawned', { id: STOLEN_ITEM, kind: 'knife', qty: 1, loc: { t: 'structure', id: STOREHOUSE.id }, owner: KEEPER })
+  }
+  // The knife goes back on the shelf, so the noon taking is the same act as the night one and
+  // the light is the only thing that changed.
+  if (tick === RESTOW_TICK) emit('item_moved', { id: STOLEN_ITEM, loc: { t: 'structure', id: STOREHOUSE.id } })
+  // These two are placed, not lived: they hold one post for three days, and a body that only
+  // stands runs out before the second night. Twice a day the fixture puts them back on their
+  // feet — the same device the Builder's rest break uses, on a fixed clock so replay agrees.
+  if (tick % UPKEEP_EVERY === 0) {
+    for (const id of [THIEF, KEEPER]) {
+      emit('need_changed', { id, need: 'energy', delta: 100 })
+      emit('need_changed', { id, need: 'hunger', delta: 100 })
+    }
+  }
 }
 
 // The bed law (C9 T2b) refuses sleep in the open, and a policy sees only a packet — which
