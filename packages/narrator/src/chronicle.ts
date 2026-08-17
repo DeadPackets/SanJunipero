@@ -1,5 +1,43 @@
+import type { SimEvent } from '@sj/shared'
 import type { NarratorStore } from './store.js'
 import type { ChapterRow, EraRow, NarratorLlm, SceneDigest, SceneSegment } from './types.js'
+
+// The narrator's binding vocabulary (addendum §12). Every line of it is a rule about what
+// may be SAID, and every one of them is a rule against inventing: hurt is never a number,
+// sickness is never a severity, care is credited only where somebody actually sat down, and
+// a killing names the hand that was witnessed and never a verdict on it.
+export const NARRATOR_VOCABULARY_NOTES = [
+  'Write "hurt" or "wounded"; never how much.',
+  'Write "sickness" or "a bad turn"; never how bad.',
+  'You may credit care — "after days at her side" — only where the digest records somebody tending them. Detect, never invent.',
+  'Write "sat with" or "nursed". Never call anybody a healer unless the town calls them one first.',
+  'A death by another hand may name the hand that was seen. It may never say whether it was deserved.',
+  'The world growing wider is never explained.',
+].join(' ')
+
+// Who actually sat with whom, off the ledger. The chapter may credit care only from this.
+export function creditedCare(events: SimEvent[]): Array<{ patient: string; tender: string }> {
+  const out: Array<{ patient: string; tender: string }> = []
+  for (const ev of events) {
+    if (ev.type !== 'agent_tended') continue
+    const p = (ev.payload ?? {}) as { agentId?: unknown; tenderId?: unknown }
+    if (typeof p.agentId !== 'string' || typeof p.tenderId !== 'string') continue
+    out.push({ patient: p.agentId, tender: p.tenderId })
+  }
+  return out
+}
+
+// The hand a death was witnessed by — the payload's own `byId`, and nothing inferred.
+export function witnessedAttackers(events: SimEvent[]): Array<{ victim: string; byId: string }> {
+  const out: Array<{ victim: string; byId: string }> = []
+  for (const ev of events) {
+    if (ev.type !== 'agent_died') continue
+    const p = (ev.payload ?? {}) as { agentId?: unknown; byId?: unknown }
+    if (typeof p.agentId !== 'string' || typeof p.byId !== 'string') continue
+    out.push({ victim: p.agentId, byId: p.byId })
+  }
+  return out
+}
 
 export function verifyCitations(citations: number[], valid: Set<number>): { ok: boolean; dangling: number[] } {
   const dangling = citations.filter((c) => !valid.has(c))

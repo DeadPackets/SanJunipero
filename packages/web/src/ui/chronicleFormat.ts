@@ -1,4 +1,4 @@
-import type { SimEvent } from '@sj/shared'
+import { chronicleLine, type SimEvent } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 
 // Human-framed one-liners for the viewer-worthy subset; null hides plumbing (spec §5/§8).
@@ -12,8 +12,25 @@ export function describeEvent(ev: SimEvent, state: WorldState | null): string | 
   switch (ev.type) {
     case 'agent_spoke':
       return `${name(p.agentId)}: "${String(p.text)}"`
+    // The feed's C11 vocabulary lives in one place, so the viewer's ticker and the chronicle
+    // cannot drift into two different sentences for the same fact.
     case 'agent_died':
-      return `${name(p.agentId)} has died (${String(p.cause)}).`
+    case 'agent_harmed':
+    case 'agent_afflicted':
+    case 'affliction_worsened':
+    case 'affliction_recovered':
+    case 'agent_tended':
+    case 'grave_placed':
+    case 'fire_extinguished':
+    case 'tile_changed':
+    case 'world_grown':
+    case 'fauna_killed':
+    case 'agent_expressed':
+      return chronicleLine(ev, {
+        agentName: (id) => name(id),
+        structureKind: (id) => structureKind(id),
+        mysteryProse: () => null,
+      })
     case 'structure_completed':
       return `The ${structureKind(p.id)} is finished.`
     case 'structure_planned':
@@ -30,8 +47,6 @@ export function describeEvent(ev: SimEvent, state: WorldState | null): string | 
       return `The weather turned ${String(p.kind)}.`
     case 'agent_collapsed':
       return `${name(p.agentId)} collapsed.`
-    case 'agent_tended':
-      return `${name(p.agentId)} was tended.`
     case 'action_completed':
       return p.verb === 'give' ? `${name(p.agentId)} gave something away.` : null
     default:

@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
-import { renderChapter, sceneDigests, verifyCitations } from './chronicle.js'
+import {
+  NARRATOR_VOCABULARY_NOTES, creditedCare, renderChapter, sceneDigests, verifyCitations,
+  witnessedAttackers,
+} from './chronicle.js'
+import type { SimEvent } from '@sj/shared'
 import type { NarratorLlm, SceneSegment } from './types.js'
 
 const memStore = (): NarratorStore => {
@@ -66,5 +70,32 @@ describe('sceneDigests', () => {
       { eventIds: [1, 2, 3], cast: ['omar', 'yusuf'], location: '3,4', typeCounts: { agent_spoke: 3 } },
       { eventIds: [4, 5], cast: ['nadia'], location: null, typeCounts: { agent_spoke: 2 } },
     ])
+  })
+})
+
+describe('the narrator vocabulary (§12)', () => {
+  const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 100, type, payload })
+
+  it('credits care only where somebody actually sat down', () => {
+    expect(creditedCare([ev(1, 'agent_tended', { agentId: 'ada', tenderId: 'bex' })]))
+      .toEqual([{ patient: 'ada', tender: 'bex' }])
+    // A recovery on its own credits nobody: detect, never invent.
+    expect(creditedCare([ev(2, 'affliction_recovered', { agentId: 'ada', kind: 'illness' })])).toEqual([])
+    expect(creditedCare([ev(3, 'agent_tended', { agentId: 'ada' })])).toEqual([])
+  })
+
+  it('names the hand a death was witnessed by, and never more than that', () => {
+    expect(witnessedAttackers([ev(4, 'agent_died', { agentId: 'ada', cause: 'slain', byId: 'cass' })]))
+      .toEqual([{ victim: 'ada', byId: 'cass' }])
+    expect(witnessedAttackers([ev(5, 'agent_died', { agentId: 'ada', cause: 'hunger' })])).toEqual([])
+  })
+
+  it('binds the chapter writer: no numbers for hurt, no titles, no verdicts, no explanations', () => {
+    expect(NARRATOR_VOCABULARY_NOTES).toMatch(/never how much/i)
+    expect(NARRATOR_VOCABULARY_NOTES).toMatch(/never how bad/i)
+    expect(NARRATOR_VOCABULARY_NOTES).toMatch(/detect, never invent/i)
+    expect(NARRATOR_VOCABULARY_NOTES).toMatch(/healer/i)
+    expect(NARRATOR_VOCABULARY_NOTES).toMatch(/never say whether it was deserved/i)
+    expect(NARRATOR_VOCABULARY_NOTES).toMatch(/never explained/i)
   })
 })

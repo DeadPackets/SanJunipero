@@ -116,7 +116,7 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     expect(byType.get('structure_completed')).toBe('The hut is finished.')
     expect(byType.get('co_slept')).toBe('Alice and Bob kept house together.')
     expect(byType.get('fire_ignited')).toBe('Fire! The hut is burning.')
-    expect(byType.get('agent_died')).toBe('Cara has died (hunger).')
+    expect(byType.get('agent_died')).toBe('Cara starved.')
     expect(byType.get('first')).toBe('The first death')
   })
 

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { LlmClient } from '@sj/agents'
 import { NARRATOR_CANON } from '../canon.js'
+import { NARRATOR_VOCABULARY_NOTES } from '../chronicle.js'
 import type {
   ChapterDigest,
   ChapterSummary,
@@ -46,7 +47,8 @@ export function makeNarratorLlm(client: NarratorLlmClient): NarratorLlm {
       const { value } = await client.object({
         system: NARRATOR_CANON,
         messages: user(
-          'Write this day\'s chapter of the chronicle from the scene digests below. ' +
+          `${NARRATOR_VOCABULARY_NOTES}\n` +
+            'Write this day\'s chapter of the chronicle from the scene digests below. ' +
             'Give it a title and a short narrative. ' +
             'Cite only ledger numbers listed; each citation is the number of an event you summarize.\n' +
             JSON.stringify(scenes),
