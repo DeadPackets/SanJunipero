@@ -8,7 +8,7 @@ import {
   AgentEntered, AgentExited,
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
-  FireExtinguished, FireIgnited, FireSpread, HpChanged,
+  FireExtinguished, FireIgnited, FireSpread, GravePlaced, HpChanged,
   ItemBroke, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
   ConfigChanged,
   ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
@@ -448,9 +448,13 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (!a) throw new Error(`agent_afflicted for unknown agent ${p.agentId}`)
       const prev = a.afflictions ?? []
       const existing = prev.find((x) => x.kind === p.kind)
-      const merged: Affliction = existing === undefined
-        ? { kind: p.kind, severity: p.severity, sinceTick: event.tick }
-        : { kind: p.kind, severity: existing.severity + p.severity, sinceTick: existing.sinceTick }
+      const sourceId = existing?.sourceId ?? p.sourceId
+      const merged: Affliction = {
+        kind: p.kind,
+        severity: (existing?.severity ?? 0) + p.severity,
+        sinceTick: existing?.sinceTick ?? event.tick,
+        ...(sourceId === undefined ? {} : { sourceId }),
+      }
       const afflictions = [...prev.filter((x) => x.kind !== p.kind), merged].sort((l, r) => l.kind.localeCompare(r.kind))
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, afflictions } } }
     }
@@ -475,6 +479,31 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       }
       const { afflictions: _, ...body } = a
       return { ...state, agents: { ...state.agents, [p.agentId]: body } }
+    }
+    // The one structure the world places and nobody builds: no builder, no owner, complete
+    // the moment it exists. Its shape comes from the same recipe table every building reads.
+    case 'grave_placed': {
+      const p = GravePlaced.parse(event.payload)
+      if (!state.agents[p.agentId]) throw new Error(`grave_placed for unknown agent ${p.agentId}`)
+      const row = config.structures.recipes.grave
+      if (row === undefined) throw new Error('grave_placed but structures.recipes has no grave row')
+      for (const s of Object.values(state.structures)) {
+        if (p.x < s.x + s.w && s.x < p.x + row.w && p.y < s.y + s.h && s.y < p.y + row.h) {
+          throw new Error(`grave_placed ${p.id} overlaps structure ${s.id}`)
+        }
+      }
+      return {
+        ...state,
+        structures: {
+          ...state.structures,
+          [p.id]: {
+            id: p.id, kind: 'grave', x: p.x, y: p.y, w: row.w, h: row.h,
+            hp: row.maxHp, maxHp: row.maxHp, flammable: row.flammable, stage: 'complete',
+            progressTicks: 0, builtBy: null, burning: false, burnTicks: 0,
+          },
+        },
+        counters: bumpCounter(state.counters, p.id),
+      }
     }
     case 'hp_changed': {
       const p = HpChanged.parse(event.payload)

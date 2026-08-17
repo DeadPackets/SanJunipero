@@ -8,7 +8,9 @@ export const MAX_TILE_ID = 10
 // `ill: boolean` stays for the C1 logs that only ever knew the one word.
 export const AFFLICTION_KINDS = ['fatigue', 'illness', 'injury', 'poison'] as const
 export type AfflictionKind = (typeof AFFLICTION_KINDS)[number]
-export type Affliction = { kind: AfflictionKind; severity: number; sinceTick: number }
+// `sourceId` is the hand behind it, absent when nobody is: a death has to be able to name
+// an attacker a tick after the blow, and only the body still remembers.
+export type Affliction = { kind: AfflictionKind; severity: number; sinceTick: number; sourceId?: string }
 
 export type AgentBody = {
   id: string; name: string; x: number; y: number; alive: boolean; asleep: boolean

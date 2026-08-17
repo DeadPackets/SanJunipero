@@ -277,7 +277,7 @@ describe('worldTick: death', () => {
     s = { ...s, tick: 10 }
     const r = createWorldTick(FAST, new RngStreams('t'))(s)
     const died = r.events.find((e) => e.type === 'agent_died')
-    expect(died?.payload).toEqual({ agentId: 'a1', cause: 'starvation' })
+    expect(died?.payload).toEqual({ agentId: 'a1', cause: 'hunger' })
   })
 })
 

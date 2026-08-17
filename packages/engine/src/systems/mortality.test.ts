@@ -1,14 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
+import { DAYS_PER_YEAR, SimConfigSchema, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick } from '../worldTick.js'
+import { DEATH_CAUSES, dominantDrain, type DeathCause } from './mortality.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
 const OFF: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }, mortality: { enabled: false },
+})
+const NO_GRAVE: SimConfig = SimConfigSchema.parse({
+  weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }, mortality: { graveEnabled: false },
 })
 
 let seq = 80000
@@ -21,9 +25,9 @@ function body(config = CFG): WorldState {
 const afflict = (s: WorldState, kind: string, severity: number, tick = 0, extra: Record<string, unknown> = {}) =>
   fold(s, ev('agent_afflicted', { agentId: 'a1', kind, severity, ...extra }, tick), CFG)
 
-function tickOnce(s: WorldState, config = CFG) {
+function tickOnce(s: WorldState, config = CFG, rng = new RngStreams('m')) {
   const advanced = fold({ ...s, tick: s.tick }, ev('tick_advanced', {}, s.tick + 1), config)
-  return createWorldTick(config, new RngStreams('m'))(advanced)
+  return createWorldTick(config, rng)(advanced)
 }
 const hpDeltas = (r: { events: Array<{ type: string; payload: unknown }> }) =>
   r.events.filter((e) => e.type === 'hp_changed').map((e) => (e.payload as { delta: number }).delta)
@@ -81,9 +85,22 @@ describe('fold: the afflicted body', () => {
     expect(() => fold(s, ev('agent_harmed', { agentId: 'a1', amount: 1, source: 'meteor' }), CFG)).toThrow()
   })
 
-  it('records who and what the affliction came from without letting it into the body', () => {
+  // The hand that did it stays on the body — a death has to be able to name it a tick later.
+  // What it was carried in does not: the itemId is the log's business, not the flesh's.
+  it('keeps the hand behind the affliction and drops the vessel it came in', () => {
     const s = afflict(body(), 'poison', 1, 5, { sourceId: 'a2', itemId: 'item_9' })
-    expect(s.agents.a1!.afflictions).toEqual([{ kind: 'poison', severity: 1, sinceTick: 5 }])
+    expect(s.agents.a1!.afflictions).toEqual([{ kind: 'poison', severity: 1, sinceTick: 5, sourceId: 'a2' }])
+    const anon = afflict(body(), 'poison', 1, 5)
+    expect(Object.keys(anon.agents.a1!.afflictions![0]!)).not.toContain('sourceId')
+  })
+
+  it('a second dose keeps the first hand, and a first hand can arrive with the second dose', () => {
+    let s = afflict(body(), 'injury', 1, 5, { sourceId: 'a2' })
+    s = afflict(s, 'injury', 1, 9, { sourceId: 'a3' })
+    expect(s.agents.a1!.afflictions).toEqual([{ kind: 'injury', severity: 2, sinceTick: 5, sourceId: 'a2' }])
+    let t = afflict(body(), 'injury', 1, 5)
+    t = afflict(t, 'injury', 1, 9, { sourceId: 'a3' })
+    expect(t.agents.a1!.afflictions).toEqual([{ kind: 'injury', severity: 2, sinceTick: 5, sourceId: 'a3' }])
   })
 })
 
@@ -132,6 +149,142 @@ describe('mortalitySystem: the drain is arithmetic, never a roll', () => {
     let replayed = advanced
     for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, 1), CFG)
     expect(stateHash(replayed)).toBe(stateHash(out.state))
+  })
+})
+
+// ---------------------------------------------------------------- Task 6: cause and grave
+const hurt = (s: WorldState, amount: number) =>
+  fold(s, ev('agent_harmed', { agentId: 'a1', amount, source: 'accident' }), CFG)
+const starve = (s: WorldState) => fold(s, ev('need_changed', { id: 'a1', need: 'hunger', delta: -100 }), CFG)
+const died = (r: { events: Array<{ type: string; payload: unknown }> }) =>
+  r.events.find((e) => e.type === 'agent_died')?.payload
+const graveOf = (s: WorldState) => Object.values(s.structures).find((x) => x.kind === 'grave')
+
+// One tick of drain on a body with a sliver of hp left is a death with a name on it.
+const SCENARIOS: Array<[DeathCause, () => WorldState]> = [
+  ['injury', () => hurt(afflict(body(), 'injury', 2, 0), 99.9)],
+  ['slain', () => hurt(afflict(body(), 'injury', 2, 0, { sourceId: 'a2' }), 99.9)],
+  ['poison', () => hurt(afflict(body(), 'poison', 1, 0), 99.9)],
+  ['illness', () => hurt(afflict(body(), 'illness', 2, 0), 99.9)],
+  ['fatigue', () => hurt(afflict(body(), 'fatigue', 3, 0), 99.9)],
+  ['hunger', () => hurt(starve(body()), 99.9)],
+]
+// Wired by a later task that owns the field the drain reads. The alarm is the assertion below.
+const PENDING: Partial<Record<DeathCause, string>> = { thirst: 'Task 11', exposure: 'Task 22' }
+
+describe('death has a cause', () => {
+  it('an attack-sourced wound makes the death a slaying, and names the hand', () => {
+    expect(died(tickOnce(hurt(afflict(body(), 'injury', 2, 0, { sourceId: 'a2' }), 99.9))))
+      .toEqual({ agentId: 'a1', cause: 'slain', byId: 'a2' })
+  })
+
+  it('the same wound with nobody behind it is an injury, and carries no hand at all', () => {
+    const p = died(tickOnce(hurt(afflict(body(), 'injury', 2, 0), 99.9)))
+    expect(p).toEqual({ agentId: 'a1', cause: 'injury' })
+    expect(Object.keys(p as object)).not.toContain('byId')
+  })
+
+  it('an empty belly kills as hunger, both by the drain and by the long-starvation clock', () => {
+    expect(died(tickOnce(hurt(starve(body()), 99.9)))).toEqual({ agentId: 'a1', cause: 'hunger' })
+    const long = { ...starve(body()), tick: 2000 }
+    expect(died(tickOnce({ ...long, agents: { a1: { ...long.agents.a1!, zeroHungerSinceTick: 0 } } })))
+      .toEqual({ agentId: 'a1', cause: 'hunger' })
+  })
+
+  it('a body worn to nothing with no affliction on it still names the wound', () => {
+    // The C1 path: agent_injured drops hp with no named affliction behind it.
+    let s = fold(body(), ev('agent_injured', { agentId: 'a1', kind: 'grave' }), CFG)
+    s = hurt(s, 40)
+    expect(died(tickOnce(s))).toEqual({ agentId: 'a1', cause: 'injury' })
+  })
+
+  it('breaks equal drains by seniority, then by the order of the cause list', () => {
+    // The pair the tiebreak needs: two kinds whose drains are the same number, to the bit.
+    expect(CFG.mortality.drainPerTick.fatigue * 2).toBe(CFG.mortality.drainPerTick.illness)
+    const older = (first: string, fs: number, second: string, ss: number) =>
+      hurt(afflict(afflict(body(), first, fs, 5), second, ss, 40), 99.9)
+    expect(died(tickOnce(older('fatigue', 2, 'illness', 1)))).toMatchObject({ cause: 'fatigue' })
+    expect(died(tickOnce(older('illness', 1, 'fatigue', 2)))).toMatchObject({ cause: 'illness' })
+    // Same drain, same onset: 'illness' precedes 'fatigue' in DEATH_CAUSES.
+    const tied = hurt(afflict(afflict(body(), 'fatigue', 2, 5), 'illness', 1, 5), 99.9)
+    expect(died(tickOnce(tied))).toMatchObject({ cause: 'illness' })
+  })
+
+  it('dominantDrain is the one attribution, and it agrees with what the tick emits', () => {
+    const s = hurt(afflict(afflict(body(), 'poison', 1, 5), 'illness', 1, 5), 99.9)
+    expect(dominantDrain(s, CFG, 'a1')).toBe('poison')
+    expect(died(tickOnce(s))).toMatchObject({ cause: 'poison' })
+  })
+
+  it('produces every cause in DEATH_CAUSES, or names the task that will', () => {
+    const produced = new Set<string>()
+    for (const [, make] of SCENARIOS) {
+      const p = died(tickOnce(make())) as { cause: string } | undefined
+      if (p) produced.add(p.cause)
+    }
+    const elder = { ...body(), tick: 1439 }
+    elder.agents.a1 = { ...elder.agents.a1!, ageDays: 60 * DAYS_PER_YEAR }
+    const p = died(tickOnce(elder, CFG, new RngStreams('ag87'))) as { cause: string } | undefined
+    if (p) produced.add(p.cause)
+    for (const cause of DEATH_CAUSES) {
+      if (PENDING[cause] !== undefined) continue
+      expect([cause, produced.has(cause)]).toEqual([cause, true])
+    }
+    expect(Object.keys(PENDING).sort()).toEqual(['exposure', 'thirst'])
+  })
+
+  it('names each scenario the cause the table says it does', () => {
+    for (const [cause, make] of SCENARIOS) {
+      expect([cause, died(tickOnce(make()))]).toMatchObject([cause, { agentId: 'a1', cause }])
+    }
+  })
+})
+
+describe('a grave where the life ended', () => {
+  it('stands on the death tile, complete, unowned and unburnable', () => {
+    const r = tickOnce(hurt(afflict(body(), 'illness', 2, 0), 99.9))
+    expect(r.events).toContainEqual({
+      type: 'grave_placed', payload: { id: 'structure_1', agentId: 'a1', name: 'a1', x: 2, y: 2 },
+    })
+    const g = graveOf(r.state)!
+    expect({ x: g.x, y: g.y, w: g.w, h: g.h }).toEqual({ x: 2, y: 2, w: 1, h: 1 })
+    expect(g.stage).toBe('complete')
+    expect(g.hp).toBe(g.maxHp)
+    expect(g.maxHp).toBe(CFG.structures.recipes.grave!.maxHp)
+    expect(g.flammable).toBe(false)
+    expect(g.builtBy).toBeNull()
+    expect(Object.keys(g)).not.toContain('owner')
+  })
+
+  it('steps to the ring-nearest free tile when the ground it fell on is taken', () => {
+    let s = afflict(body(), 'illness', 2, 0)
+    s = fold(s, ev('structure_planned', {
+      id: 'structure_9', kind: 'shed', x: 2, y: 2, w: 1, h: 1, maxHp: 20, flammable: true, builderId: 'a1',
+    }), CFG)
+    const g = graveOf(tickOnce(hurt(s, 99.9)).state)!
+    expect({ x: g.x, y: g.y }).toEqual({ x: 3, y: 3 })
+  })
+
+  it('places none when the world says graves are off, and buries the old just the same', () => {
+    const off = tickOnce(hurt(afflict(body(NO_GRAVE), 'illness', 2, 0), 99.9), NO_GRAVE)
+    expect(off.events.map((e) => e.type)).not.toContain('grave_placed')
+    expect(graveOf(off.state)).toBeUndefined()
+
+    const elder = { ...body(), tick: 1439 }
+    elder.agents.a1 = { ...elder.agents.a1!, ageDays: 60 * DAYS_PER_YEAR }
+    const r = tickOnce(elder, CFG, new RngStreams('ag87'))
+    expect(died(r)).toEqual({ agentId: 'a1', cause: 'old_age' })
+    expect(graveOf(r.state)).toBeDefined()
+  })
+
+  it('folding the death tick reproduces the state it returned, grave and all', () => {
+    const s = hurt(afflict(body(), 'illness', 2, 0), 99.9)
+    const advanced = fold(s, ev('tick_advanced', {}, 1), CFG)
+    const out = createWorldTick(CFG, new RngStreams('m'))(advanced)
+    let replayed = advanced
+    for (const e of out.events) replayed = fold(replayed, ev(e.type, e.payload, 1), CFG)
+    expect(stateHash(replayed)).toBe(stateHash(out.state))
+    expect(graveOf(out.state)).toBeDefined()
   })
 })
 

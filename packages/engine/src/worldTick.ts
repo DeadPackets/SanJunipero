@@ -6,7 +6,7 @@ import type { RngStreams } from './rng.js'
 import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
 import { healthSystem } from './systems/health.js'
-import { mortalitySystem } from './systems/mortality.js'
+import { deathAttribution, mortalitySystem, placeGrave } from './systems/mortality.js'
 import { agingSystem } from './systems/aging.js'
 import { weatherSystem } from './systems/weather.js'
 import { fireSystem } from './systems/fire.js'
@@ -79,8 +79,13 @@ function collapseDeathSystem(ctx: TickCtx): void {
     const b = ctx.state().agents[id]!
     const starved = b.zeroHungerSinceTick !== null && ctx.state().tick - b.zeroHungerSinceTick > deathAfterZeroHungerTicks
     if (starved || b.hp <= deathHp) {
+      // Attribution reads the living body: after agent_died there is nothing left to ask.
+      const { cause, byId } = starved
+        ? { cause: 'hunger' as const, byId: undefined }
+        : deathAttribution(ctx.state(), ctx.config, id)
       dropHeldItems(ctx, id)
-      ctx.emit('agent_died', { agentId: id, cause: starved ? 'starvation' : 'health' })
+      ctx.emit('agent_died', { agentId: id, cause, ...(byId === undefined ? {} : { byId }) })
+      placeGrave(ctx, id)
     }
   }
 }

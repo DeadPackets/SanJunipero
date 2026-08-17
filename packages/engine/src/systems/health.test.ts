@@ -191,7 +191,7 @@ describe('worldTick: hp floor (Task 6 integration)', () => {
 
     const dead = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'minor' }), CFG)
     const t2 = tickOnce(dead) // hp 0 <= deathHp
-    expect(t2.events).toContainEqual({ type: 'agent_died', payload: { agentId: 'a1', cause: 'health' } })
+    expect(t2.events).toContainEqual({ type: 'agent_died', payload: { agentId: 'a1', cause: 'injury' } })
     expect(t2.state.agents.a1!.alive).toBe(false)
   })
 })

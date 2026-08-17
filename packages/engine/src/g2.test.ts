@@ -79,7 +79,8 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(collapseEv).toBeDefined()
     const diedEv = evs.find((e) => e.type === 'agent_died' && (e.payload as Payload).agentId === IDLER)
     expect(diedEv).toBeDefined()
-    expect((diedEv!.payload as Payload).cause).toBe('starvation')
+    // C11 Task 6 renamed the string, not the fact: `cause` is payload, so the hash is unmoved.
+    expect((diedEv!.payload as Payload).cause).toBe('hunger')
     expect(collapseEv!.tick).toBeLessThan(diedEv!.tick)
     const zeroTick = state.agents[IDLER]!.zeroHungerSinceTick
     expect(zeroTick).not.toBeNull()

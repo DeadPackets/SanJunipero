@@ -2,8 +2,9 @@ import type { Structure, WorldState } from './state.js'
 import { isPassable, type Point } from './path.js'
 
 // The ring of tiles hugging a footprint, ordered clockwise on screen (y grows south)
-// starting from the south-east corner. Pure geometry — no state read.
-function perimeter(s: Structure): Point[] {
+// starting from the south-east corner. Pure geometry — no state read. Exported because
+// it is the codebase's one "nearest tile" tiebreak, and graves reuse it (C11 Task 6).
+export function perimeter(s: { x: number; y: number; w: number; h: number }): Point[] {
   const x0 = s.x - 1, x1 = s.x + s.w, y0 = s.y - 1, y1 = s.y + s.h
   const ring: Point[] = []
   for (let x = x1; x >= x0; x--) ring.push({ x, y: y1 })

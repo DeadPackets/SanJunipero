@@ -75,7 +75,9 @@ export const AgentSpoke = z.object({
   agentId: z.string(), text: z.string(), x: z.number(), y: z.number(), insideId: z.string().optional(),
 }).strict()
 export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
-export const AgentDied = z.object({ agentId: z.string(), cause: z.string() }).strict()
+// `cause` stays a free string so every recorded C1-C10 log still parses; DEATH_CAUSES is the
+// vocabulary emitters are held to (controller ruling 6).
+export const AgentDied = z.object({ agentId: z.string(), cause: z.string(), byId: z.string().optional() }).strict()
 export const AgentAged = z.object({ agentId: z.string() }).strict()
 export const AgentInjured = z.object({ agentId: z.string(), kind: z.enum(['minor', 'serious', 'grave']) }).strict()
 export const AgentInfected = z.object({ agentId: z.string() }).strict()
@@ -98,6 +100,11 @@ export const AfflictionWorsened = z.object({
   agentId: z.string(), kind: AfflictionKindSchema, severity: z.number().positive(),
 }).strict()
 export const AfflictionRecovered = z.object({ agentId: z.string(), kind: AfflictionKindSchema }).strict()
+// `x`/`y` are where the stone goes, already stepped clear of anything standing on the death
+// tile; `name` is the dead as they were known, kept in the log because a grave has no name field.
+export const GravePlaced = z.object({
+  id: z.string(), agentId: z.string(), name: z.string(), x: z.number().int(), y: z.number().int(),
+}).strict()
 export const WeatherChanged = z.object({ kind: z.string(), temperatureC: z.number(), prevKind: z.string().optional() }).strict()
 // Pure sensation: no fold effect, no cause, no resolution anywhere in the world.
 export const MysteryEvent = z.object({
