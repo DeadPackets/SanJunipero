@@ -13,7 +13,7 @@ import { stepCostAt } from './path.js'
 import { RngStreams, type RngStream } from './rng.js'
 import {
   fishCatchChance, huntChance, isFoodKind, isKindleable, isWearable, nutritionOf, registerVerb,
-  SEED_RECIPES, unregisterVerb, VERBS, type VerbDef,
+  craftRoutes, SEED_RECIPES, unregisterVerb, VERBS, type VerbDef,
 } from './verbs.js'
 import { FORAGEABLE_YIELD } from './data/forageables.js'
 
@@ -811,6 +811,39 @@ describe('the clothing line has two upstreams: the reed bed and the deer', () =>
     const thin = make(holding('hide', 1), 'hide_garment')
     expect(thin.ok).toBe(false)
     if (!thin.ok) expect(thin.reason).toBe('not enough hide')
+  })
+
+  it('asking for the thing, not the road: two hides and "craft garment" makes one', () => {
+    const s = holding('hide', 2)
+    expect(make(s, 'garment').ok).toBe(true)
+    const events = VERBS.craft!.onComplete(s, CFG, 'a1', { recipe: 'garment' }, new RngStreams('h').get('actions'))
+    expect(events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'stock', delta: -2 } })
+    const made = events.find((e) => e.type === 'item_spawned')!.payload as { kind: string }
+    expect(made.kind).toBe('garment')
+    expect(events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'tailoring', xp: 1 } })
+  })
+
+  it('the named row still goes first: cloth in hand weaves, it does not skin', () => {
+    const s = holding('cloth', 2)
+    expect(make(s, 'garment').ok).toBe(true)
+    const events = VERBS.craft!.onComplete(s, CFG, 'a1', { recipe: 'garment' }, new RngStreams('h').get('actions'))
+    expect(events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'stock', delta: -2 } })
+    expect(events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'tailoring', xp: 1 } })
+  })
+
+  it('with nothing that will do it, the refusal is the one the named road gives', () => {
+    const empty = make(makeWorld(), 'garment')
+    expect(empty.ok).toBe(false)
+    if (!empty.ok) expect(empty.reason).toBe('not enough cloth')
+    const oneHide = make(holding('hide', 1), 'garment')
+    expect(oneHide.ok).toBe(false)
+    if (!oneHide.ok) expect(oneHide.reason).toBe('not enough cloth')
+  })
+
+  it('every route to a name is deterministic and named-row-first', () => {
+    expect(craftRoutes(CFG, 'garment').map((r) => r.inputs)).toEqual([{ cloth: 2 }, { hide: 2 }])
+    expect(craftRoutes(CFG, 'hide_garment').map((r) => r.inputs)).toEqual([{ hide: 2 }])
+    expect(craftRoutes(CFG, 'a_thing_nobody_makes')).toEqual([])
   })
 })
 

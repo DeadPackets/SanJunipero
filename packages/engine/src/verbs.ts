@@ -1030,6 +1030,21 @@ export function recipeFor(config: SimConfig, name: string): SeedRecipe | undefin
   return config.crafting.recipes[name] ?? SEED_RECIPES[name]
 }
 
+// A mind asks for the THING, not the road to it: "craft garment" with two hides in hand must
+// not be told there is no cloth. Precedence is unchanged — the row that owns the name is
+// always tried first — and every other route makes the same product. Deterministic by key
+// order, so two towns holding the same larder take the same road.
+export function craftRoutes(config: SimConfig, name: string): SeedRecipe[] {
+  const named = recipeFor(config, name)
+  const product = named?.output.kind ?? name
+  const routes = named === undefined ? [] : [named]
+  for (const key of Object.keys(SEED_RECIPES).sort()) {
+    const seed = SEED_RECIPES[key]!
+    if (seed !== named && seed.output.kind === product) routes.push(seed)
+  }
+  return routes
+}
+
 // How much of an input the hands hold, counting every member when the input is a canon class.
 function heldForInput(state: WorldState, agentId: string, input: string): number {
   const members = classMembers(input)
@@ -1069,25 +1084,49 @@ function keptFireInReach(state: WorldState, agentId: string): boolean {
   return false
 }
 
+// What stands between these hands and this recipe right now, or null when nothing does.
+function craftRefusal(state: WorldState, agentId: string, recipe: SeedRecipe): string | null {
+  for (const [kind, qty] of Object.entries(recipe.inputs)) {
+    if (heldForInput(state, agentId, kind) < qty) return `not enough ${inputName(kind)}`
+  }
+  if (recipe.atFire && !keptFireInReach(state, agentId)) return 'there is no fire lit here to cook on'
+  if (recipe.water !== undefined && heldWater(state, agentId) === undefined) return 'you have no water to cook with'
+  return null
+}
+
+// The first road whose inputs are all in hand. Refusal comes only when no road has them, and
+// it is the road that was NAMED that speaks — the same shape as the build transpose fallback.
+function chosenRoute(
+  state: WorldState, config: SimConfig, agentId: string, name: string,
+): { recipe: SeedRecipe } | { refusal: string } {
+  const routes = craftRoutes(config, name)
+  // A refusal must leave a door open (addendum §9): not knowing a craft and
+  // the craft not existing look the same from here, so name both ways out.
+  if (routes.length === 0) {
+    return { refusal: `no such recipe: ${name} — perhaps someone nearby knows how, or it wants discovering.` }
+  }
+  let asNamed: string | null = null
+  for (const recipe of routes) {
+    const refusal = craftRefusal(state, agentId, recipe)
+    if (refusal === null) return { recipe }
+    asNamed ??= refusal
+  }
+  return { refusal: asNamed! }
+}
+
 const craft: VerbDef = makeVerb({
   kind: 'craft',
   validate(state, config, agentId, params) {
     const p = CraftParams.safeParse(params)
     if (!p.success) return 'craft needs a {recipe}'
-    const recipe = recipeFor(config, p.data.recipe)
-    // A refusal must leave a door open (addendum §9): not knowing a craft and
-    // the craft not existing look the same from here, so name both ways out.
-    if (!recipe) return `no such recipe: ${p.data.recipe} — perhaps someone nearby knows how, or it wants discovering.`
-    for (const [kind, qty] of Object.entries(recipe.inputs)) {
-      if (heldForInput(state, agentId, kind) < qty) return `not enough ${inputName(kind)}`
-    }
-    if (recipe.atFire && !keptFireInReach(state, agentId)) return 'there is no fire lit here to cook on'
-    if (recipe.water !== undefined && heldWater(state, agentId) === undefined) return 'you have no water to cook with'
-    return null
+    const route = chosenRoute(state, config, agentId, p.data.recipe)
+    return 'refusal' in route ? route.refusal : null
   },
   onComplete(state, config, agentId, params) {
     const p = CraftParams.parse(params)
-    const recipe = recipeFor(config, p.recipe)!
+    const route = chosenRoute(state, config, agentId, p.recipe)
+    if ('refusal' in route) return []
+    const recipe = route.recipe
     const events: PendingEvent[] = []
     for (const [kind, qty] of Object.entries(recipe.inputs)) {
       if (heldForInput(state, agentId, kind) < qty) return []
