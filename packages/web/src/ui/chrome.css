@@ -197,7 +197,7 @@ body {
 
 .px-title {
   font-family: var(--font-display);
-  font-size: 0.85rem; margin: 0; font-weight: 400;
+  font-size: 0.875rem; margin: 0; font-weight: 400;
   letter-spacing: 0; line-height: 1;
   color: var(--ink);
   text-shadow: 2px 2px 0 var(--sand);
@@ -226,7 +226,7 @@ body {
 /* count badge on a lens tab: a fact, never a trophy — no ring, no colour of its own */
 .tab-count {
   margin-left: 0.4rem; padding: 0 0.25rem;
-  font-family: var(--font-data); font-size: 0.68rem; font-variant-numeric: tabular-nums;
+  font-family: var(--font-data); font-size: 0.75rem; font-variant-numeric: tabular-nums;
   background: var(--sand); color: var(--deep);
   box-shadow: inset 0 0 0 1px rgba(67, 57, 74, 0.45);
 }
@@ -269,7 +269,7 @@ body {
   background: var(--parchment) var(--grain);
   border-bottom: 2px solid var(--ink);
   box-shadow: inset 0 2px 0 0 var(--sand), 0 2px 0 0 rgba(36, 31, 43, 0.35);
-  font-family: var(--font-px); font-size: 0.72rem; letter-spacing: 0.03em;
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
   color: var(--ink);
   position: relative; z-index: 9;
 }
@@ -312,7 +312,7 @@ body {
   padding: 0.15rem 0.3rem;
   font-family: var(--font-px); font-size: 0.78rem;
 }
-.fps-overlay .fps-avg { font-size: 0.68rem; opacity: 0.75; }
+.fps-overlay .fps-avg { font-size: 0.75rem; opacity: 0.75; }
 
 /* ── camera controls: the town's viewfinder ── */
 .camera-hud {
@@ -335,10 +335,10 @@ body {
 .cam-btn:hover:not(:disabled) { background: var(--honey); translate: 0 -2px; box-shadow: 2px 4px 0 0 var(--deep); }
 .cam-btn:active:not(:disabled) { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
 .cam-btn:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
-.cam-btn.center { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0.5rem; }
+.cam-btn.center { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0.5rem; }
 .cam-zoom {
   min-width: 2.1rem; text-align: center;
-  font-family: var(--font-px); font-size: 0.85rem;
+  font-family: var(--font-px); font-size: 0.875rem;
 }
 
 /* ── slide-over panel: parchment slab sliding in from the frame edge ── */
@@ -351,7 +351,7 @@ body {
   box-shadow: inset 2px 0 0 0 var(--sand), inset -4px 0 0 0 var(--sand), -4px 0 0 0 rgba(36, 31, 43, 0.35);
 }
 
-.inspector-panel { padding: 1rem; font-size: 0.85rem; min-width: 21rem; }
+.inspector-panel { padding: 1rem; font-size: 0.875rem; min-width: 21rem; }
 @media (prefers-reduced-motion: no-preference) {
   .inspector-panel { animation: panel-in var(--t-med) var(--ease-enter); }
   @keyframes panel-in {
@@ -380,7 +380,7 @@ body {
 
 .badges { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-top: 0.25rem; }
 .badge {
-  font-family: var(--font-px); font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase;
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase;
   background: var(--cream); border-radius: 0; box-shadow: 0 0 0 2px var(--ink);
   padding: 0.05rem 0.4rem;
 }
@@ -388,7 +388,7 @@ body {
 
 .block { margin: 0.8rem 0; }
 .block h3 {
-  margin: 0 0 0.35rem; font-size: 0.72rem;
+  margin: 0 0 0.35rem; font-size: 0.75rem;
   font-family: var(--font-px); text-transform: uppercase; letter-spacing: 0.1em;
   color: var(--deep); opacity: 0.85;
 }
@@ -402,7 +402,7 @@ body {
 .thought-line { font-style: italic; color: var(--deep); opacity: 0.85; margin: 0; }
 
 .need-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.25rem 0; }
-.need-label { width: 4.5rem; font-size: 0.75rem; font-weight: 500; }
+.need-label { width: 4.5rem; font-size: 0.875rem; font-weight: 500; }
 .need-track {
   flex: 1; height: 10px; background: var(--cream);
   border-radius: 3px; box-shadow: 0 0 0 1.5px var(--ink);
@@ -419,10 +419,10 @@ body {
 
 .tab-body .doc { white-space: pre-wrap; margin: 0.35rem 0; }
 .tab-body .stamp {
-  font-size: 0.7rem; opacity: 0.75; font-variant-numeric: tabular-nums;
+  font-size: 0.75rem; opacity: 0.75; font-variant-numeric: tabular-nums;
   font-family: ui-monospace, 'SF Mono', monospace;
 }
-.tab-body article h4 { margin: 0.5rem 0 0.1rem; font-size: 0.8rem; font-variant: small-caps; letter-spacing: 0.08em; }
+.tab-body article h4 { margin: 0.5rem 0 0.1rem; font-size: 0.875rem; font-variant: small-caps; letter-spacing: 0.08em; }
 
 .diff {
   font-family: ui-monospace, 'SF Mono', monospace; font-size: 0.75rem;
@@ -448,7 +448,7 @@ body {
   background-color: var(--parchment); color: var(--ink);
   padding: 1rem 1.4rem;
 }
-.veil-title { font-family: var(--font-display); font-size: 0.85rem; line-height: 1.6; }
+.veil-title { font-family: var(--font-display); font-size: 0.875rem; line-height: 1.6; }
 .veil-loader { display: flex; gap: 6px; }
 .veil-loader i { width: 8px; height: 8px; background: var(--honey); }
 @media (prefers-reduced-motion: no-preference) {
@@ -460,10 +460,10 @@ body {
     33% { background: var(--ink); }
   }
 }
-.veil-sub { font-size: 0.78rem; font-style: italic; opacity: 0.75; }
+.veil-sub { font-size: 0.875rem; font-style: italic; opacity: 0.75; }
 
 /* ── chronicle lens: feed + timeline + scrub banner (Task 17) ── */
-.chronicle-panel { padding: 1rem; font-size: 0.85rem; }
+.chronicle-panel { padding: 1rem; font-size: 0.875rem; }
 .feed { list-style: none; margin: 0.6rem 0 0; padding: 0; }
 .feed-line {
   display: flex; gap: 0.55rem; align-items: baseline;
@@ -471,7 +471,7 @@ body {
 }
 .feed-line:nth-child(odd) { background: rgba(232, 213, 188, 0.35); }
 .feed-line .stamp {
-  flex: none; width: 6.2rem; font-size: 0.7rem; opacity: 0.75;
+  flex: none; width: 6.2rem; font-size: 0.75rem; opacity: 0.75;
   font-family: ui-monospace, 'SF Mono', monospace; font-variant-numeric: tabular-nums;
 }
 .feed-text { text-wrap: pretty; }
@@ -484,7 +484,7 @@ body {
 /* ── the curated chronicle: what mattered, and the way back to it ── */
 .feed-switch { display: flex; gap: 0.3rem; margin-top: 0.6rem; }
 .feed-tab {
-  font-family: var(--font-px); font-size: 0.55rem; line-height: 1;
+  font-family: var(--font-px); font-size: 0.75rem; line-height: 1;
   background: var(--sand); color: var(--ink);
   border: 2px solid var(--ink); border-radius: 0;
   padding: 0.3rem 0.55rem; min-height: 40px; cursor: pointer;
@@ -546,7 +546,7 @@ body {
    the sand track it overhangs (7.6:1). */
 .timeline-day em {
   position: absolute; top: -1.15rem; left: 2px; font-style: normal;
-  font-size: 0.62rem; letter-spacing: 0.05em; color: var(--ink);
+  font-size: 0.75rem; letter-spacing: 0.05em; color: var(--ink);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .mark { position: absolute; top: 50%; translate: -50% -50%; width: 6px; height: 6px; border-radius: 1px; }
@@ -562,7 +562,7 @@ body {
 }
 .live-pill {
   border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
-  color: var(--ink); font-family: var(--font-px); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink); font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
   padding: 0.3rem 0.6rem; min-height: 40px; cursor: pointer;
   box-shadow: 2px 2px 0 0 var(--deep);
   transition-property: background-color, translate, box-shadow; transition-duration: var(--t-fast);
@@ -590,7 +590,7 @@ body {
 .roster-back {
   display: inline-flex; align-items: center; gap: 0.4rem;
   min-height: 40px; margin: 0 0 0.6rem; padding: 0 0.7rem;
-  font-family: var(--font-px); font-size: 0.7rem; letter-spacing: 0.03em;
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
   color: var(--ink); background: var(--sand);
   border: 2px solid var(--ink); border-radius: 0; cursor: pointer;
   box-shadow: 2px 2px 0 0 var(--deep);
@@ -617,7 +617,7 @@ body {
   box-shadow: var(--ledge);
 }
 .interior-back {
-  font-family: var(--font-px); font-size: 0.72rem; letter-spacing: 0.03em;
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
   min-height: var(--interior-bar-h); padding: 0 0.8rem;
   color: var(--cream); background: var(--ink);
   border: 2px solid var(--ink); border-radius: 0; cursor: pointer;
@@ -627,11 +627,11 @@ body {
 .interior-back:active { translate: 2px 2px; box-shadow: none; }
 .interior-caption { display: flex; flex-direction: column; min-width: 0; }
 .interior-title {
-  font-family: var(--font-px); font-size: 0.74rem; letter-spacing: 0.03em; color: var(--ink);
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em; color: var(--ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .interior-who {
-  font-family: var(--font-body); font-size: 0.8rem; color: var(--ink); opacity: 0.8;
+  font-family: var(--font-body); font-size: 0.875rem; color: var(--ink); opacity: 0.8;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-wrap: pretty;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -666,7 +666,7 @@ body {
 .legend-chip {
   display: inline-flex; align-items: center; gap: 0.35rem;
   border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
-  color: var(--ink); font-family: var(--font-px); font-size: 0.62rem; text-transform: uppercase;
+  color: var(--ink); font-family: var(--font-px); font-size: 0.75rem; text-transform: uppercase;
   padding: 0.25rem 0.5rem; min-height: 40px; cursor: pointer;
   transition-property: opacity, background-color, translate; transition-duration: var(--t-fast);
 }
@@ -675,7 +675,7 @@ body {
 .legend-chip.off { opacity: 0.45; background: var(--sand); }
 .legend-swatch { width: 10px; height: 10px; border-radius: 0; box-shadow: 0 0 0 2px var(--ink); }
 .legend-stamp {
-  font-size: 0.7rem; opacity: 0.75; margin-left: 0.3rem;
+  font-size: 0.75rem; opacity: 0.75; margin-left: 0.3rem;
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 .society-empty {
@@ -694,7 +694,7 @@ body {
   background-color: var(--cream); background-image: var(--grain); color: var(--ink);
   border: 10px solid transparent; border-image: var(--px-cream);
   box-shadow: var(--ledge);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
 }
 .bond-detail :focus-visible { outline-offset: -2px; }  /* the panel scrolls; keep the ring inside */
 @media (prefers-reduced-motion: no-preference) {
@@ -704,10 +704,10 @@ body {
 .bond-kind {
   display: inline-flex; align-items: center; gap: 0.35rem;
   background: var(--sand); color: var(--ink);
-  font-family: var(--font-px); font-size: 0.52rem; line-height: 1; text-transform: uppercase;
+  font-family: var(--font-px); font-size: 0.75rem; line-height: 1; text-transform: uppercase;
   border: 2px solid var(--ink); padding: 0.3rem 0.4rem;
 }
-.bond-title { flex: 1 1 8rem; margin: 0; font-size: 0.85rem; font-weight: 600; text-wrap: balance; }
+.bond-title { flex: 1 1 8rem; margin: 0; font-size: 0.875rem; font-weight: 600; text-wrap: balance; }
 .bond-close {
   flex: none; min-width: 40px; min-height: 40px; cursor: pointer;
   background: var(--parchment); color: var(--ink);
@@ -720,14 +720,14 @@ body {
 .bond-bar { height: 10px; margin-top: 0.7rem; background: var(--sand); border: 2px solid var(--ink); }
 .bond-bar-fill { display: block; height: 100%; }
 .bond-count {
-  margin: 0.3rem 0 0; font-size: 0.72rem; opacity: 0.8;
+  margin: 0.3rem 0 0; font-size: 0.75rem; opacity: 0.8;
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 .bond-dates {
   display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.6rem;
-  margin: 0.6rem 0 0; font-size: 0.72rem;
+  margin: 0.6rem 0 0; font-size: 0.75rem;
 }
-.bond-dates dt { font-family: var(--font-px); font-size: 0.5rem; align-self: center; opacity: 0.8; }
+.bond-dates dt { font-family: var(--font-px); font-size: 0.75rem; align-self: center; opacity: 0.8; }
 .bond-dates dd { margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 .bond-history { list-style: none; margin: 0.7rem 0 0; padding: 0; }
 .bond-history li {
@@ -735,7 +735,7 @@ body {
   padding: 0.3rem 0; border-top: 1px solid var(--sand);
 }
 .bond-history .stamp {
-  flex: none; width: 6.2rem; font-size: 0.7rem; opacity: 0.75;
+  flex: none; width: 6.2rem; font-size: 0.75rem; opacity: 0.75;
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 
@@ -778,11 +778,11 @@ body {
 .thumb-motif { flex: none; display: block; }
 .thumb-body { display: grid; gap: 0.05rem; min-width: 0; }
 .thumb-day {
-  font-family: var(--font-px); font-size: 0.5rem; opacity: 0.8;
+  font-family: var(--font-px); font-size: 0.75rem; opacity: 0.8;
   font-variant-numeric: tabular-nums;
 }
-.thumb-title { font-size: 0.8rem; font-weight: 600; text-wrap: balance; }
-.thumb-cast, .thumb-where { font-size: 0.72rem; opacity: 0.8; overflow-wrap: anywhere; }
+.thumb-title { font-size: 0.875rem; font-weight: 600; text-wrap: balance; }
+.thumb-cast, .thumb-where { font-size: 0.75rem; opacity: 0.8; overflow-wrap: anywhere; }
 .thumb-where { font-style: italic; }
 
 .moment-player {
@@ -798,7 +798,7 @@ body {
   min-width: 40px; min-height: 40px; cursor: pointer;
   background: var(--deep); color: var(--cream);
   border: 2px solid var(--ink); border-radius: 0;
-  font-family: var(--font-px); font-size: 0.6rem;
+  font-family: var(--font-px); font-size: 0.75rem;
 }
 .player-btn:hover { background: var(--ink); }
 .player-btn:active { translate: 0 1px; }
@@ -816,7 +816,7 @@ body {
   translate: -50% 0;
 }
 .player-clock {
-  flex: none; font-family: var(--font-data); font-size: 0.72rem;
+  flex: none; font-family: var(--font-data); font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
 @media (max-width: 44rem) {
@@ -850,7 +850,7 @@ body {
 }
 .subtitle.thought { opacity: 0.85; }
 .subtitle-name {
-  display: block; font-family: var(--font-px); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase;
+  display: block; font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--honey); margin-bottom: 0.1rem;
 }
 
@@ -898,7 +898,7 @@ body {
 .provenance-pop {
   position: fixed; z-index: 100; max-width: 18rem;
   background-color: var(--cream); color: var(--ink);
-  font: 0.8rem/1.45 var(--font-body);
+  font: 0.875rem/1.45 var(--font-body);
   padding: 0.2rem 0.35rem;
   white-space: pre-wrap;
   text-wrap: pretty;   /* it is prose about a person, not a data cell — no orphans */
@@ -906,7 +906,7 @@ body {
 }
 
 /* ── townsfolk roster (Townsfolk lens, nobody picked) ── */
-.roster-panel { padding: 1rem; min-width: 21rem; font-size: 0.85rem; }
+.roster-panel { padding: 1rem; min-width: 21rem; font-size: 0.875rem; }
 @media (prefers-reduced-motion: no-preference) {
   .roster-panel { animation: panel-in var(--t-med) var(--ease-enter); }
 }
@@ -935,7 +935,7 @@ body {
   display: grid; place-items: center;
   font-family: var(--font-px); font-size: 1.1rem; color: var(--ink);
 }
-.roster-name { font-family: var(--font-px); font-size: 0.72rem; letter-spacing: 0.03em; }
+.roster-name { font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em; }
 .roster-card .badges { justify-content: center; margin-top: 0; }
 .badge.doing { background: var(--honey); }
 .roster-empty {
@@ -945,11 +945,11 @@ body {
   padding: 0.5rem 0.7rem;
   display: inline-block;
 }
-.roster-empty em { display: block; margin-top: 0.35rem; opacity: 0.75; font-size: 0.9em; }
+.roster-empty em { display: block; margin-top: 0.35rem; opacity: 0.75; }
 .roster-gone { margin-top: 0.8rem; font-style: italic; opacity: 0.75; }
 
 /* ── World Laws: the town's rulebook, and the operator's hand on it ── */
-.laws-panel, .laws-dashboard { padding: 1rem; min-width: 21rem; font-size: 0.85rem; }
+.laws-panel, .laws-dashboard { padding: 1rem; min-width: 21rem; font-size: 0.875rem; }
 @media (prefers-reduced-motion: no-preference) {
   .laws-panel { animation: panel-in var(--t-med) var(--ease-enter); }
 }
@@ -960,11 +960,11 @@ body {
   padding: 0.4rem 0; border-bottom: 2px dotted var(--sand);
 }
 .law-row.changed { background: var(--honey) var(--grain); box-shadow: 0 0 0 2px var(--ink); padding: 0.4rem; }
-.law-path, .law-edit label { font-family: var(--font-px); font-size: 0.68rem; letter-spacing: 0.03em; word-break: break-all; }
-.law-value { font-family: var(--font-px); font-size: 0.72rem; }
+.law-path, .law-edit label { font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em; word-break: break-all; }
+.law-value { font-family: var(--font-px); font-size: 0.75rem; }
 .law-history {
   grid-column: 1 / -1; margin: 0.3rem 0 0; padding-left: 1.1rem;
-  font-size: 0.78rem; opacity: 0.8;
+  font-size: 0.875rem; opacity: 0.8;
 }
 .law-edit select, .law-edit input {
   font: inherit; padding: 0.15rem 0.35rem; min-height: 40px;
