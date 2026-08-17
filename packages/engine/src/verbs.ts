@@ -4,7 +4,7 @@ import { mintId, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile } from './interiors.js'
 import { findPath, isPassable } from './path.js'
-import { spoilageFor } from './systems/spoilage.js'
+import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 
 export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
@@ -87,7 +87,9 @@ export const EatParams = z.object({ itemId: z.string() }).strict()
 // Single food registry: eat validates against it, forage/fish/harvest spawn from it.
 export const FORAGE_KIND = 'berries'
 export const FISH_KIND = 'fish'
-export const FOOD_KINDS: ReadonlySet<string> = new Set([FORAGE_KIND, FISH_KIND, 'venison', 'bread', 'wheat'])
+// Edible, and that is the point: the town has to learn which mushroom is which.
+export const PALE_MUSHROOM = 'pale_mushroom'
+export const FOOD_KINDS: ReadonlySet<string> = new Set([FORAGE_KIND, FISH_KIND, 'venison', 'bread', 'wheat', PALE_MUSHROOM])
 
 const sleep: VerbDef = makeVerb({
   kind: 'sleep',
@@ -165,11 +167,21 @@ const eat: VerbDef = makeVerb({
     if (!isFoodKind(config, item.kind)) return `${item.kind} is not food`
     return null
   },
-  onComplete(state, config, agentId, params) {
+  rngStream: 'illness',
+  onComplete(state, config, agentId, params, rng) {
     const p = EatParams.parse(params)
     const item = state.items[p.itemId]
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    // A pale mushroom is always a gamble; anything else only on its last day. The roll is
+    // drawn once, here at emission, and never when the meal is safe — a fresh loaf must not
+    // move the stream, or two worlds that ate differently would diverge for no reason.
+    const risky = config.mortality.enabled
+      && (item.kind === PALE_MUSHROOM || isSpoiling(state, item, config))
+      && rng.next() < config.mortality.poisonChanceSpoiled
     return [
+      ...(risky
+        ? [{ type: 'agent_afflicted', payload: { agentId, kind: 'poison', severity: 1, itemId: p.itemId } }]
+        : []),
       { type: 'item_qty_changed', payload: { id: p.itemId, delta: -1 } },
       { type: 'need_changed', payload: { id: agentId, need: 'hunger', delta: config.needs.eatRestoreHunger } },
     ]
