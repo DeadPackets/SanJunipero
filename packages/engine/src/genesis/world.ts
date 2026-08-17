@@ -3,6 +3,7 @@ import {
   type CityStructure, type SimConfig,
 } from '@sj/shared'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
+import { GENESIS_FORAGEABLES } from '../data/forageables.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { spoilageFor } from '../systems/spoilage.js'
 import type { PendingEvent } from '../verbs.js'
@@ -153,6 +154,14 @@ export function makeGenesisWorld(config: SimConfig, opts: { anchor?: { x: number
     })
   }
 
-  // Task 21 adds the forageable scatter here, from data/forageables.
+  // Berries by the meadow, mushrooms — safe and pale together — at the forest edge, herbs by
+  // the river, clay at the bank, stone at the hill. Which mushroom kills is not written here.
+  for (const n of GENESIS_FORAGEABLES) {
+    events.push({
+      type: 'forageable_spawned',
+      payload: { id: mint('node'), kind: n.kind, x: n.x, y: n.y, stock: n.stock },
+    })
+  }
+
   return { terrain, events }
 }

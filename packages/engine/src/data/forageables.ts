@@ -30,6 +30,17 @@ export const GENESIS_FORAGEABLES: readonly ForageableScatter[] = [
   { kind: 'stone_outcrop', x: 18, y: 108, stock: 10 },
 ]
 
+// How a node reads from across the clearing. Never a count — a picker sees abundance or
+// bareness, and the difference between the two mushrooms is not one of them (G10).
+export const FORAGEABLE_PROSE: Readonly<Record<ForageableKind, { standing: string; bare: string }>> = {
+  berry_bush: { standing: 'berry bushes heavy with fruit', bare: 'the berry bushes are picked bare' },
+  mushroom_patch: { standing: 'mushrooms pushing up through the leaf litter', bare: 'the mushroom ground is turned over and empty' },
+  pale_mushroom_patch: { standing: 'pale mushrooms standing in the shade', bare: 'the pale ground is turned over and empty' },
+  herb_patch: { standing: 'a spread of low green herbs', bare: 'the herbs have been cut back to the root' },
+  clay_deposit: { standing: 'grey clay showing where the bank has slumped', bare: 'the clay is dug out to the gravel' },
+  stone_outcrop: { standing: 'loose stone lying at the foot of the rock', bare: 'the loose stone has all been carried off' },
+}
+
 // What a node yields when it is worked.
 export const FORAGEABLE_YIELD: Readonly<Record<ForageableKind, string>> = {
   berry_bush: 'berries',

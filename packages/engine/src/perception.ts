@@ -1,4 +1,5 @@
 import { simTimeFromTick, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
+import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { doorTile } from './interiors.js'
 import { effectiveConfig } from './laws.js'
@@ -54,6 +55,9 @@ export type PerceivedCrop = { id: string; kind: string; x: number; y: number; st
 // A shape at a distance: what kind of animal and where. Never how many are in the school.
 export type PerceivedFauna = { id: string; kind: string; x: number; y: number }
 
+// What the patch looks like, not what is left in it: abundance or bareness, never a count.
+export type PerceivedForageable = { id: string; kind: string; x: number; y: number; prose: string }
+
 export type HeardSpeech = { speakerId: string; name: string; text: string; distance: number }
 
 // Things this agent watched happen out in the world — a taking that was not theirs,
@@ -82,6 +86,7 @@ export type PerceptionPacket = {
     items: PerceivedItem[]
     crops: PerceivedCrop[]
     fauna: PerceivedFauna[]
+    forageables: PerceivedForageable[]
   }
   ground?: PerceivedGround
   heard: HeardSpeech[]
@@ -281,6 +286,14 @@ export function composePerception(
     .filter((f) => f.alive && withinSight(f.x, f.y))
     .map((f) => ({ id: f.id, kind: f.kind, x: f.x, y: f.y }))
 
+  const visibleForageables: PerceivedForageable[] = indoors !== null ? [] : Object.keys(state.forageables ?? {}).sort()
+    .map((id) => ({ id, ...state.forageables![id]! }))
+    .filter((f) => withinSight(f.x, f.y))
+    .map((f) => ({
+      id: f.id, kind: f.kind, x: f.x, y: f.y,
+      prose: FORAGEABLE_PROSE[f.kind][f.stock > 0 ? 'standing' : 'bare'],
+    }))
+
   const inventory: InventoryItem[] = Object.values(state.items)
     .filter(i => i.loc.t === 'agent' && i.loc.id === agentId)
     .sort(byId)
@@ -353,7 +366,7 @@ export function composePerception(
     ...(ground === undefined ? {} : { ground }),
     visible: {
       agents: visibleAgents, structures: visibleStructures, items: visibleItems,
-      crops: visibleCrops, fauna: visibleFauna,
+      crops: visibleCrops, fauna: visibleFauna, forageables: visibleForageables,
     },
     heard,
     seen,

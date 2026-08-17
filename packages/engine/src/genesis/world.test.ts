@@ -7,6 +7,7 @@ import { fold } from '../fold.js'
 import { findPath } from '../path.js'
 import { genesisState, type WorldState } from '../state.js'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
+import { GENESIS_FORAGEABLES } from '../data/forageables.js'
 import { makeGenesisWorld, GENESIS_FORK_Y, GENESIS_BUILDER_ID } from './world.js'
 
 const T_WATER = 2
@@ -152,9 +153,22 @@ describe('makeGenesisWorld: the town', () => {
     expect(fauna.some((f) => f.x > 50)).toBe(true)
   })
 
+  it('scatters the authored nodes, both mushrooms among them, every one standing full', () => {
+    const s = foldAll()
+    const nodes = Object.values(s.forageables!)
+    expect(nodes).toHaveLength(GENESIS_FORAGEABLES.length)
+    expect(nodes.every((n) => n.stock > 0)).toBe(true)
+    const kinds = new Set(nodes.map((n) => n.kind))
+    expect(kinds.has('mushroom_patch') && kinds.has('pale_mushroom_patch')).toBe(true)
+    expect(nodes.some((n) => n.x > 50)).toBe(true)
+  })
+
   it('mints ids the counter law can follow', () => {
     const s = foldAll()
-    for (const id of [...Object.keys(s.structures), ...Object.keys(s.items), ...Object.keys(s.fauna ?? {})]) {
+    for (const id of [
+      ...Object.keys(s.structures), ...Object.keys(s.items),
+      ...Object.keys(s.fauna ?? {}), ...Object.keys(s.forageables ?? {}),
+    ]) {
       expect(id).toMatch(/_\d+$/)
       expect(Number(/_(\d+)$/.exec(id)![1])).toBeLessThan(s.counters.nextEntityId)
     }

@@ -12,6 +12,7 @@ import {
   ItemBroke, ItemFilled, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
   ConfigChanged,
   FaunaKilled, FaunaMoved, FaunaSpawned, FaunaStockChanged,
+  ForageableDepleted, ForageableRegrown, ForageableSpawned, ForageableStockChanged,
   ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, TileChanged, TrafficDecayed, WeatherChanged, WildlifeChanged,
@@ -639,6 +640,27 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       else delete next.fauna
       return next
     }
+    case 'forageable_spawned': {
+      const p = ForageableSpawned.parse(event.payload)
+      if (state.forageables?.[p.id]) throw new Error(`forageable_spawned for existing node ${p.id}`)
+      return {
+        ...state,
+        forageables: { ...state.forageables, [p.id]: { kind: p.kind, x: p.x, y: p.y, stock: p.stock } },
+        counters: bumpCounter(state.counters, p.id),
+      }
+    }
+    case 'forageable_stock_changed':
+    case 'forageable_depleted':
+    case 'forageable_regrown': {
+      const p = event.type === 'forageable_depleted'
+        ? { ...ForageableDepleted.parse(event.payload), stock: 0 }
+        : event.type === 'forageable_regrown'
+          ? ForageableRegrown.parse(event.payload)
+          : ForageableStockChanged.parse(event.payload)
+      const node = state.forageables?.[p.id]
+      if (!node) throw new Error(`${event.type} for unknown node ${p.id}`)
+      return { ...state, forageables: { ...state.forageables, [p.id]: { ...node, stock: p.stock } } }
+    }
     case 'terrain_changed': {
       const p = TerrainChanged.parse(event.payload)
       const row = state.terrain[p.y]
@@ -710,11 +732,14 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
         }))
       const fauna = state.fauna === undefined ? undefined : Object.fromEntries(
         Object.entries(state.fauna).map(([id, f]) => [id, { ...f, x: f.x + dx, y: f.y + dy }]))
+      const forageables = state.forageables === undefined ? undefined : Object.fromEntries(
+        Object.entries(state.forageables).map(([id, f]) => [id, { ...f, x: f.x + dx, y: f.y + dy }]))
       // Task 28 adds saplings; they are stamped by coordinate and must be translated here
       // too, in this same fold.
       return {
         ...state, terrain, growths, agents, structures, items, crops,
         ...(fauna === undefined ? {} : { fauna }),
+        ...(forageables === undefined ? {} : { forageables }),
         ...(state.traffic === undefined ? {} : { traffic: shiftKeys(state.traffic) }),
         ...(state.quietSince === undefined ? {} : { quietSince: shiftKeys(state.quietSince) }),
       }

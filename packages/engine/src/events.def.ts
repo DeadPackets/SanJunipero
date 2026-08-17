@@ -155,6 +155,19 @@ export const FaunaKilled = z.object({
   id: z.string(), kind: FaunaKindSchema, x: z.number().int(), y: z.number().int(),
   byId: z.string().optional(),
 }).strict()
+// C11 forageables. Stripping one is a stock change; the last handful is a depletion, which is
+// the same arithmetic with a name the chronicle can use. A node is never removed.
+const ForageableKindSchema = z.enum([
+  'berry_bush', 'mushroom_patch', 'pale_mushroom_patch', 'herb_patch', 'clay_deposit', 'stone_outcrop',
+])
+export const ForageableSpawned = z.object({
+  id: z.string(), kind: ForageableKindSchema,
+  x: z.number().int(), y: z.number().int(), stock: z.number().int().nonnegative(),
+}).strict()
+export const ForageableStockChanged = z.object({ id: z.string(), stock: z.number().int().positive() }).strict()
+export const ForageableDepleted = z.object({ id: z.string() }).strict()
+export const ForageableRegrown = z.object({ id: z.string(), stock: z.number().int().positive() }).strict()
+
 export const TerrainChanged = z.object({ x: z.number(), y: z.number(), tile: z.number().int().min(0).max(7) }).strict()
 // C11's terrain event. `terrain_changed` stays folded so recorded C1-C10 logs replay; this one
 // carries where the cell came from and why, which is what a doctored log cannot fake.

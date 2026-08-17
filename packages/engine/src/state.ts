@@ -1,5 +1,6 @@
 import type { SimConfig } from '@sj/shared'
 import type { FaunaKind } from './data/faunaDefs.js'
+import type { ForageableKind } from './data/forageables.js'
 
 // grass, dirt, water, forest, rock, sand, farmland, road, path, sapling, channel
 export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
@@ -63,6 +64,10 @@ export type Crop = { id: string; kind: string; x: number; y: number; plantedDay:
 // walks; `alive` is the interface the hunt reads, and a kill removes the entity outright.
 export type Fauna = { kind: FaunaKind; x: number; y: number; alive: boolean; stock?: number }
 
+// A standing thing worth working: a bush, a patch, a bank of clay. Stripped it stays where it
+// is at zero — a bare bush is still a bush, and the ground remembers where to put the berries back.
+export type Forageable = { kind: ForageableKind; x: number; y: number; stock: number }
+
 export type WorldState = {
   tick: number
   terrain: TileId[][]                      // [y][x]
@@ -88,6 +93,9 @@ export type WorldState = {
   // The herd, the warren and the schools. Absent until the genesis scatter or the first dawn
   // that spawns one, and absent again when the last body is taken.
   fauna?: Record<string, Fauna>
+  // Every bush, patch, bank and outcrop the world authored. Absent until the genesis scatter,
+  // and never removed: a picked node is a node at zero, not a node that stopped existing.
+  forageables?: Record<string, Forageable>
   counters: { nextEntityId: number }
 }
 

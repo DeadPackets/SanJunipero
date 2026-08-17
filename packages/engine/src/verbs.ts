@@ -7,6 +7,7 @@ import { bridgeAt, BRIDGE_KIND, findPath, isPassable } from './path.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 import { fleeTo } from './systems/fauna.js'
 import { FAUNA_YIELD, type FaunaKind } from './data/faunaDefs.js'
+import { FORAGEABLE_YIELD } from './data/forageables.js'
 
 export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
@@ -89,11 +90,13 @@ export const EatParams = z.object({ itemId: z.string() }).strict()
 // Single food registry: eat validates against it, forage/fish/harvest spawn from it.
 export const FORAGE_KIND = 'berries'
 export const FISH_KIND = 'fish'
-// Edible, and that is the point: the town has to learn which mushroom is which.
+// Both edible, and that is the point: from across the clearing they are the same mushroom, and
+// which one kills is knowledge the town has to earn. `rabbit_meat` is the hunt's smaller catch.
 export const PALE_MUSHROOM = 'pale_mushroom'
+export const MUSHROOM_KIND = 'mushroom'
 export const HERB_KIND = 'herb'
 export const FOOD_KINDS: ReadonlySet<string> = new Set([
-  FORAGE_KIND, FISH_KIND, 'venison', 'bread', 'wheat', PALE_MUSHROOM, HERB_KIND,
+  FORAGE_KIND, FISH_KIND, 'venison', 'rabbit_meat', 'bread', 'wheat', MUSHROOM_KIND, PALE_MUSHROOM, HERB_KIND,
 ])
 
 // The worst thing wrong with a body: highest severity, ties to the alphabetically first kind.
@@ -564,9 +567,22 @@ const hunt: VerbDef = makeVerb({
   rngStream: 'fauna',
 })
 
+// Naming a node is optional, and that is the whole of the backward compatibility: an empty
+// `{}` is still C9's "gather from the wood beside you", event for event.
+export const ForageParams = z.object({ nodeId: z.string().optional() }).strict()
+
 const forage: VerbDef = makeVerb({
   kind: 'forage',
-  validate(state, _config, agentId) {
+  validate(state, _config, agentId, params) {
+    const p = ForageParams.safeParse(params)
+    if (!p.success) return 'forage takes an optional {nodeId}'
+    if (p.data.nodeId !== undefined) {
+      const node = state.forageables?.[p.data.nodeId]
+      if (!node) return 'nothing of the kind there'
+      if (node.stock <= 0) return 'there is nothing left to take here'
+      if (!withinReach(state, agentId, node.x, node.y)) return 'not close enough to gather'
+      return null
+    }
     const a = state.agents[agentId]!
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
@@ -575,7 +591,19 @@ const forage: VerbDef = makeVerb({
     }
     return 'no forest nearby'
   },
-  onComplete(state, config, agentId) {
+  onComplete(state, config, agentId, params) {
+    const p = ForageParams.parse(params)
+    if (p.nodeId !== undefined) {
+      const node = state.forageables?.[p.nodeId]
+      if (!node || node.stock <= 0) return []
+      const kind = FORAGEABLE_YIELD[node.kind]
+      return [
+        node.stock > 1
+          ? { type: 'forageable_stock_changed', payload: { id: p.nodeId, stock: node.stock - 1 } }
+          : { type: 'forageable_depleted', payload: { id: p.nodeId } },
+        { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind, qty: 1, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId), ...spoilageFor(state, kind, config) } },
+      ]
+    }
     const { season } = simTimeFromTick(state.tick)
     const qty = config.wildlife.forageYieldBySeason[season]
     if (qty <= 0) return []
