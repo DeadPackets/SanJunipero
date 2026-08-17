@@ -411,3 +411,34 @@ describe('the back end that answered is written down (C11 R20)', () => {
     ])
   })
 })
+
+// C11 T37b step 5 — a stalled provider response used to hang the caller for ever. The
+// interrupted G11b re-run lost its night to a `semantic` call that sat for 614 s and then
+// failed; with `maxRetries` 2 behind it, one stalled request could hold a gate open for the
+// best part of an hour. The bound turns an unbounded wait into an ordinary failed attempt.
+describe('a stalled request is bounded (T37b)', () => {
+  it('aborts a call that outlives the timeout, and logs it as a failed attempt', async () => {
+    const db = openDb()
+    const model = new MockLanguageModelV4({
+      doGenerate: async ({ abortSignal }) => {
+        await new Promise((_resolve, reject) => {
+          abortSignal?.addEventListener('abort', () => { reject(new Error('aborted')) })
+        })
+        throw new Error('unreachable')
+      },
+    })
+    const client = new LlmClient({ model, db, caller: 'test', maxRetries: 0, requestTimeoutMs: 30 })
+    await expect(client.text({ messages: [{ role: 'user', content: 'u' }] })).rejects.toThrow()
+    const logged = rows(db)
+    expect(logged).toHaveLength(1)
+    expect(logged[0]!.ok).toBe(0)
+  })
+
+  it('leaves a call that answers inside the timeout completely alone', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'quick', usage: { inputTokens: 1, outputTokens: 1 } }])
+    const client = new LlmClient({ model, db, caller: 'test', requestTimeoutMs: 60_000 })
+    expect((await client.text({ messages: [{ role: 'user', content: 'u' }] })).text).toBe('quick')
+    expect(rows(db)[0]!.ok).toBe(1)
+  })
+})

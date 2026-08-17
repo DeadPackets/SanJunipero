@@ -59,6 +59,10 @@ export type LlmClientOpts = {
   // routing exactly as it has always been.
   allowProviderFallbacks?: boolean
   maxRetries?: number
+  // How long one attempt may sit before it is abandoned. A stalled provider response used to
+  // hang the caller for ever: an interrupted G11b night lost 614 s to one `semantic` call and
+  // then failed anyway, with two more retries queued behind it (C11 T37b).
+  requestTimeoutMs?: number
   budgetUsd?: number
   maxOutputTokens?: number
   // Pre-booked per call while it is in flight. ~3x the observed mean call.
@@ -66,6 +70,10 @@ export type LlmClientOpts = {
 }
 
 export const DEFAULT_EXPECTED_CALL_COST_USD = 0.005
+
+// Six minutes. The slowest call that has ever legitimately answered is a nightly chronicle at
+// 205 s, so this is ~75% headroom over it; the stall that forced the bound sat for 614 s.
+export const DEFAULT_REQUEST_TIMEOUT_MS = 360_000
 
 export class LlmClient {
   private readonly db: Database.Database
@@ -75,6 +83,7 @@ export class LlmClient {
   private readonly providerOrder: string[]
   private readonly allowProviderFallbacks: boolean
   private readonly maxRetries: number
+  private readonly requestTimeoutMs: number
   private readonly budgetUsd: number | undefined
   private readonly maxOutputTokens: number | undefined
   private readonly expectedCallCostUsd: number
@@ -89,6 +98,7 @@ export class LlmClient {
     this.providerOrder = opts.providerOrder ?? PROVIDER_ORDER
     this.allowProviderFallbacks = opts.allowProviderFallbacks ?? true
     this.maxRetries = opts.maxRetries ?? 2
+    this.requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
     this.budgetUsd = opts.budgetUsd
     this.maxOutputTokens = opts.maxOutputTokens
     this.expectedCallCostUsd = opts.expectedCallCostUsd ?? DEFAULT_EXPECTED_CALL_COST_USD
@@ -108,6 +118,7 @@ export class LlmClient {
         messages: toModelMessages(opts.messages),
         maxRetries: 0,
         maxOutputTokens: this.maxOutputTokens,
+        abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
         output: Output.object({ schema: opts.schema }),
       })
       return {
@@ -128,6 +139,7 @@ export class LlmClient {
         messages: toModelMessages(opts.messages),
         maxRetries: 0,
         maxOutputTokens: this.maxOutputTokens,
+        abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
       })
       return {
         usage: r.usage, value: r.text, servedModel: r.response.modelId,
