@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { RngStreams, doorTile, fold, genesisState, makeFixtureMap } from '@sj/engine'
 import type { WorldState } from '@sj/engine'
-import { FOUNDER_IDS } from '@sj/shared'
+import { FOUNDER_IDS, INTERIOR_KINDS } from '@sj/shared'
+import { libraryEntry } from '@sj/forge'
 import { SHOWCASE_CONFIG } from './devWorld.js'
 import { devTown } from './devTown.js'
 import { showcaseTerrain } from './showcaseMap.js'
 import {
   DEV_FAST_FORWARD_FOR_INTERIORS, FOUNDERS_HOME_ID, GO_HOME_BELOW, LEAVE_HOME_ABOVE,
-  foundersFor, homeIntent, homeOf, makeFoundersOnTick,
+  devHoldings, foundersFor, homeIntent, homeOf, makeFoundersOnTick, townStructuresFor,
 } from './founders.js'
 
 // The dev world after its first tick: five founders, six finished buildings.
@@ -231,5 +232,82 @@ describe('the interiors demo window', () => {
   it('keeps home ahead of the patrol policy\'s own outdoor sleep', () => {
     expect(GO_HOME_BELOW).toBeGreaterThan(20)
     expect(LEAVE_HOME_ABOVE).toBeGreaterThan(GO_HOME_BELOW)
+  })
+})
+
+// ★ THE HOLDINGS GRID HAD NEVER BEEN SEEN (batch 3 concern 2, controller ruling R4.1). The dev
+// world stored ZERO items in ANY structure, so `roomCard.holds`, its icons, its cap and its
+// "and N more" line were proven by unit test only and had never once rendered against data.
+describe('the storerooms hold something', () => {
+  /** the web card's cap — packages/web/src/ui/interiorModel.ts ROOM_HOLDS_MAX */
+  const ROOM_HOLDS_MAX = 8
+
+  /** the showcase town after its first tick, which is the town a viewer actually opens */
+  function showcaseAtTick1(): WorldState {
+    const structures = townStructuresFor('showcase')
+    let state = genesisState(SHOWCASE_CONFIG, showcaseTerrain())
+    const events: Array<{ type: string; payload: unknown }> = []
+    const onTick = makeFoundersOnTick(SHOWCASE_CONFIG, new RngStreams('holdings-test'), () => state, {
+      structures, founders: foundersFor(structures), holdings: true,
+    })
+    onTick({ tick: 1, emit: (type, payload) => events.push({ type, payload }) })
+    let seq = 0
+    for (const e of events) state = fold(state, { seq: ++seq, tick: 1, ...e }, SHOWCASE_CONFIG)
+    return state
+  }
+
+  const held = (state: WorldState, structureId: string) =>
+    Object.values(state.items).filter((i) => i.loc.t === 'structure' && i.loc.id === structureId)
+
+  it('THE BEFORE-STATE: the town stored nothing at all, in any building', () => {
+    // the landed script emits agents and buildings and not one item, which is why a panel
+    // with passing tests had never rendered against data
+    expect(devHoldings([]).length).toBe(0)
+    expect(Object.values(showcaseAtTick1().items).filter((i) => i.loc.t === 'structure').length)
+      .toBeGreaterThan(0)   // RED against the landed script, which stores zero
+  })
+
+  it('fills the public storehouse past the card’s cap, so "and N more" is real', () => {
+    const state = showcaseAtTick1()
+    const store = Object.values(state.structures).find((s) => s.kind === 'storehouse')!
+    expect(new Set(held(state, store.id).map((i) => i.kind)).size).toBeGreaterThan(ROOM_HOLDS_MAX)
+  })
+
+  it('puts something in every enterable room, so no room reads as empty by accident', () => {
+    const state = showcaseAtTick1()
+    for (const s of Object.values(state.structures)) {
+      if (!(INTERIOR_KINDS as readonly string[]).includes(s.kind)) continue
+      expect(held(state, s.id).length, s.id).toBeGreaterThan(0)
+    }
+  })
+
+  it('marks a hut’s things as its owner’s, and leaves the public store unowned', () => {
+    const state = showcaseAtTick1()
+    for (const s of Object.values(state.structures)) {
+      for (const it of held(state, s.id)) expect(it.owner, `${s.id}/${it.kind}`).toBe(s.owner)
+    }
+  })
+
+  it('every kind it seeds is one the library can draw an icon for', () => {
+    for (const h of devHoldings(townStructuresFor('showcase'))) {
+      expect(libraryEntry(h.kind), h.kind).not.toBeNull()
+    }
+  })
+
+  it('is deterministic, and its ids can never collide with a minted one', () => {
+    const a = devHoldings(townStructuresFor('showcase'))
+    const b = devHoldings(townStructuresFor('showcase'))
+    expect(a).toEqual(b)
+    expect(a.length).toBeGreaterThan(0)
+    expect(new Set(a.map((h) => h.id)).size).toBe(a.length)
+    // mintId hands out `<prefix>_<n>` and fold bumps the counter off a trailing number, so an
+    // id ending in a digit would move the world's entity counter. A fixture must never do that.
+    for (const h of a) expect(h.id, h.id).not.toMatch(/_\d+$/)
+  })
+
+  // The seed is OFF unless asked for, so every landed gate folds exactly the world it always
+  // did — the scripted fixture is frozen and this is a demo town's larder, not world law.
+  it('leaves the frozen scripted fixture exactly as every landed gate folded it', () => {
+    expect(Object.keys(townAtTick1().items)).toEqual([])
   })
 })

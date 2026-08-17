@@ -95,6 +95,9 @@ export async function startDevWorld(
     onTick: makeFoundersOnTick(config, rng, () => loop.state, {
       // foundersFor is identity on an unowned town, so the scripted arm is byte-identical.
       interiors: opts.interiors === true, structures, founders: foundersFor(structures),
+      // the showcase town is what a viewer opens, and an empty storeroom is why the room
+      // card's holdings grid had never been seen
+      holdings: map === 'showcase',
     }),
   })
 

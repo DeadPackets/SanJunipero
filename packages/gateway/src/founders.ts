@@ -50,6 +50,48 @@ export function townStructuresFor(map: DevMapKind): readonly DevStructure[] {
   return map === 'showcase' ? devTown().structures : SCRIPTED_STRUCTURES
 }
 
+// ── WHAT THE BUILDINGS HOLD ────────────────────────────────────────────────────────────────
+//
+// The dev world stored ZERO items in ANY structure, so the room card's holdings grid, its
+// icons, its cap and its "and N more" line had never once rendered against data. This is a
+// demo town's larder — DEV FIXTURE DATA (P20), like the founders themselves — and it is off
+// unless asked for, so every landed gate folds exactly the world it always did.
+
+export type DevHolding = { id: string; kind: string; qty: number; structureId: string; owner: string | null }
+
+/** Deliberately past the card's eight-row cap, so the "and N more" line is a thing a viewer
+ *  can actually see. Every kind is a library entry, so every row resolves a real icon. */
+const STOREHOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
+  ['wheat_sheaf', 12], ['bread', 6], ['fish', 4], ['berries', 9], ['timber', 15], ['stone', 11],
+  ['rope', 3], ['cloth', 5], ['fiber', 7], ['charcoal', 2], ['hide', 2], ['clay', 6],
+]
+const SHED_STOCK: ReadonlyArray<readonly [string, number]> = [
+  ['axe', 1], ['saw', 1], ['hammer', 1], ['gravel', 8], ['timber', 4],
+]
+/** A home holds a household's things, not a warehouse's — three kinds and few of each. */
+const HUT_STOCK: ReadonlyArray<readonly [string, number]> = [
+  ['bread', 2], ['waterskin', 1], ['herb_bundle', 3],
+]
+
+const STOCK_FOR: Readonly<Record<string, ReadonlyArray<readonly [string, number]>>> = {
+  storehouse: STOREHOUSE_STOCK, shed: SHED_STOCK, hut: HUT_STOCK,
+}
+
+/**
+ * Pure and deterministic: same structures in, byte-equal holdings out. Ids carry the kind
+ * rather than a number, because `fold` advances the world's entity counter off any id that
+ * ends in one and a fixture must never move the counter a minted id reads.
+ */
+export function devHoldings(structures: readonly DevStructure[]): DevHolding[] {
+  const out: DevHolding[] = []
+  for (const s of structures) {
+    for (const [kind, qty] of STOCK_FOR[s.kind] ?? []) {
+      out.push({ id: `item_${s.id}_${kind}`, kind, qty, structureId: s.id, owner: s.owner })
+    }
+  }
+  return out
+}
+
 // The one dwelling in the fixture town — where a tired founder goes when interiors are on.
 export const FOUNDERS_HOME_ID = 'structure_cottage'
 // Above the patrol policy's own outdoor-sleep threshold (20), so home always wins first —
@@ -88,6 +130,9 @@ export type FoundersOpts = {
   structures?: readonly DevStructure[]
   /** Who to spawn and where. Defaults to the landed FOUNDERS spawns. */
   founders?: readonly FounderDef[]
+  /** dev/demo only: the buildings start with something in them, so the room card's holdings
+   *  grid renders against data. OFF by default — every existing gate folds what it always did. */
+  holdings?: boolean
 }
 
 /** The hut this person owns, or null. Ownership is a fact of the world (Structure.owner) —
@@ -153,6 +198,15 @@ export function makeFoundersOnTick(
           ...(s.owner === null ? {} : { owner: s.owner }),
         })
         emit('structure_completed', { id: s.id })
+      }
+      if (opts.holdings === true) {
+        for (const h of devHoldings(structures)) {
+          emit('item_spawned', {
+            id: h.id, kind: h.kind, qty: h.qty,
+            ...(h.owner === null ? {} : { owner: h.owner }),
+            loc: { t: 'structure', id: h.structureId },
+          })
+        }
       }
     }
 
