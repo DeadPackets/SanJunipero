@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
-import type { SimEvent } from '@sj/shared'
+import { SimConfigSchema, type SimEvent } from '@sj/shared'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 import { MARKER_HEAT_THRESHOLD, narrateDay, narrateWeek, renderDigest, timelineMarkers } from './narrate.js'
@@ -162,5 +162,47 @@ describe('narrateWeek', () => {
     expect(era.chapterIds.length).toBe(7)
     expect(era.startDay).toBe(0)
     expect(era.endDay).toBe(6)
+  })
+})
+
+// C11 R18: `first_hut` and `first_bridge` read a structure's kind, and a hut takes two sim-days
+// to raise — so the day the roof goes on, the plan that named it is in a stream this pass never
+// sees. `narrateDay` passed no `structureKind` at all, so both firsts missed every building the
+// town actually built.
+describe('narrateDay: a roof finished on a day whose plan it never read', () => {
+  const FINISH: SimEvent[] = [
+    ev(1, 4320, 'structure_completed', { id: 'structure_9' }),
+    ev(2, 4340, 'agent_spoke', { agentId: 'amara', text: 'It stands.', x: 3, y: 3 }),
+  ]
+
+  const worldWith = (kind: string) => ({
+    config: SimConfigSchema.parse({}),
+    state: { agents: {}, structures: { structure_9: { id: 'structure_9', kind } }, pairNights: {} } as never,
+  })
+
+  it('names the hut from the world in reach, though the plan was three days ago', async () => {
+    const { milestones } = await narrateDay({
+      store: memStore(), llm: scriptedLlm([1]), events: FINISH, rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 }, world: worldWith('hut'),
+    })
+    expect(milestones.map((m) => m.kind)).toContain('first_hut')
+    expect(milestones.map((m) => m.kind)).not.toContain('first_bridge')
+  })
+
+  it('and the crossing likewise', async () => {
+    const { milestones } = await narrateDay({
+      store: memStore(), llm: scriptedLlm([1]), events: FINISH, rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 }, world: worldWith('bridge'),
+    })
+    expect(milestones.map((m) => m.kind)).toContain('first_bridge')
+  })
+
+  it('with no world in reach the day still narrates, and claims no kind it cannot know', async () => {
+    const { milestones } = await narrateDay({
+      store: memStore(), llm: scriptedLlm([1]), events: FINISH, rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+    })
+    expect(milestones.map((m) => m.kind)).toContain('first_structure')
+    expect(milestones.map((m) => m.kind)).not.toContain('first_hut')
   })
 })
