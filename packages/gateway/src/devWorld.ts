@@ -8,7 +8,7 @@ import {
 import { openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
-import { makeFoundersOnTick } from './founders.js'
+import { makeFoundersOnTick, townStructuresFor } from './founders.js'
 import { ingestLibraryArt, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
 import { showcaseTerrain } from './showcaseMap.js'
 
@@ -81,14 +81,20 @@ export async function startDevWorld(
   ensureObserverTables(db)
 
   const config = SHOWCASE_CONFIG
-  const terrain = devTerrain(opts.map ?? DEV_MAP_DEFAULT)
+  const map = opts.map ?? DEV_MAP_DEFAULT
+  const terrain = devTerrain(map)
+  // Terrain and buildings are read from the SAME map kind, so the town can never again be an
+  // overlay of two unrelated layouts.
+  const structures = townStructuresFor(map)
   const rng = new RngStreams(opts.seed ?? DEV_SEED)
   const store = new EventStore(db)
   const loop: TickLoop = new TickLoop({
     store, state: genesisState(config, terrain), rng, config,
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
     // the founders showcase town
-    onTick: makeFoundersOnTick(config, rng, () => loop.state, { interiors: opts.interiors === true }),
+    onTick: makeFoundersOnTick(config, rng, () => loop.state, {
+      interiors: opts.interiors === true, structures,
+    }),
   })
 
   const gateway = await createGateway({ dbPath, port: opts.port ?? DEV_PORT, terrain, config, db })
@@ -134,7 +140,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const map: DevMapKind = process.env['SJ_DEV_MAP'] === 'showcase' ? 'showcase' : DEV_MAP_DEFAULT
   const interiors = process.env['SJ_DEV_INTERIORS'] === '1'
   void startDevWorld({ ingest: true, map, interiors }).then(({ gateway }) => {
-    console.log(`dev world: map=${map} interiors=${interiors ? 'on' : 'off'}`)
+    console.log(`dev world: map=${map} interiors=${interiors ? 'on' : 'off'} structures=${townStructuresFor(map).length}`)
     console.log(`dev world: the town is awake on ws://localhost:${gateway.port}/ws`)
   })
 }

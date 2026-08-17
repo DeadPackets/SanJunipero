@@ -6,6 +6,9 @@ import {
   composePerception, createWorldTick, doorTile, submitIntent,
   type PerceptionPacket, type RngStreams, type WorldState,
 } from '@sj/engine'
+import { devTown, type DevStructure } from './devTown.js'
+// Type-only, so no import cycle survives compilation.
+import type { DevMapKind } from './devWorld.js'
 
 export type FounderDef = {
   id: string
@@ -35,6 +38,17 @@ export const TOWN_STRUCTURES: readonly TownStructure[] = [
   { id: 'structure_scaffolding', kind: 'scaffolding', x: 34, y: 23, w: 1, h: 1 },
   { id: 'structure_stone', kind: 'standing_stone', x: 15, y: 28, w: 1, h: 1 },
 ]
+
+// The scripted fixture keeps its own unowned, unburnable-by-kind shape so every landed gate
+// folds exactly the events it always folded.
+const SCRIPTED_STRUCTURES: readonly DevStructure[] = TOWN_STRUCTURES.map((s) => ({
+  ...s, owner: null, flammable: s.kind !== 'standing_stone',
+}))
+
+/** 'scripted' keeps the frozen G6 fixture set; 'showcase' serves the town the roads were drawn for. */
+export function townStructuresFor(map: DevMapKind): readonly DevStructure[] {
+  return map === 'showcase' ? devTown().structures : SCRIPTED_STRUCTURES
+}
 
 // The one dwelling in the fixture town — where a tired founder goes when interiors are on.
 export const FOUNDERS_HOME_ID = 'structure_cottage'
@@ -69,6 +83,9 @@ export type FoundersOpts = {
   /** dev/demo only: a tired founder walks home, goes in, sleeps, and comes out again.
    *  OFF by default, so every existing gate folds exactly the events it always did. */
   interiors?: boolean
+  /** The town to raise on tick 1. Defaults to the frozen scripted fixture, so every existing
+   *  caller and every existing test folds exactly the world it always did. */
+  structures?: readonly DevStructure[]
 }
 
 // Walking home is a whole errand, so it is decided from world state rather than from the
@@ -93,13 +110,20 @@ export function makeFoundersOnTick(
 ): FoundersOnTick {
   const policies = new Map(FOUNDERS.map(f => [f.id, makePatrolPolicy(f)]))
   const worldTick = createWorldTick(config, rng)
+  const structures = opts.structures ?? SCRIPTED_STRUCTURES
   return ({ tick, emit }) => {
     if (tick === 1) {
       for (const f of FOUNDERS) {
         emit('agent_spawned', { id: f.id, name: f.name, x: f.spawn.x, y: f.spawn.y, ageDays: f.ageDays })
       }
-      for (const s of TOWN_STRUCTURES) {
-        emit('structure_planned', { id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, maxHp: 20, flammable: s.kind !== 'standing_stone', builderId: 'script' })
+      for (const s of structures) {
+        // `owner` rides along only when there is one, so the scripted fixture's payload is
+        // byte-identical to the one every landed gate already folded.
+        emit('structure_planned', {
+          id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, maxHp: 20,
+          flammable: s.flammable, builderId: 'script',
+          ...(s.owner === null ? {} : { owner: s.owner }),
+        })
         emit('structure_completed', { id: s.id })
       }
     }
