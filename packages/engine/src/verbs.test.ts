@@ -12,8 +12,8 @@ import { composePerception } from './perception.js'
 import { stepCostAt } from './path.js'
 import { RngStreams, type RngStream } from './rng.js'
 import {
-  fishCatchChance, huntChance, isFoodKind, isWearable, nutritionOf, registerVerb, SEED_RECIPES,
-  unregisterVerb, VERBS, type VerbDef,
+  fishCatchChance, huntChance, isFoodKind, isKindleable, isWearable, nutritionOf, registerVerb,
+  SEED_RECIPES, unregisterVerb, VERBS, type VerbDef,
 } from './verbs.js'
 import { FORAGEABLE_YIELD } from './data/forageables.js'
 
@@ -811,5 +811,41 @@ describe('the clothing line has two upstreams: the reed bed and the deer', () =>
     const thin = make(holding('hide', 1), 'hide_garment')
     expect(thin.ok).toBe(false)
     if (!thin.ok) expect(thin.reason).toBe('not enough hide')
+  })
+})
+
+describe('a torch is a thing hands can make', () => {
+  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+
+  function bench(stock: Array<[string, number]>): WorldState {
+    let s = makeWorld()
+    stock.forEach(([kind, qty], i) => {
+      s = fold(s, ev(1100 + i, 'item_spawned', { id: `it_${i}`, kind, qty, loc: { t: 'agent', id: 'a1' } }), CFG)
+    })
+    return s
+  }
+  const make = (s: WorldState) => submitIntent(s, CFG, 'a1', 'craft', { recipe: 'torch' })
+
+  it('a stick and a handful of reed fiber, and the recipe is code not a dial', () => {
+    expect(CFG.crafting.recipes.torch).toBeUndefined()
+    expect(SEED_RECIPES.torch!.output).toEqual({ kind: 'torch', qty: 1 })
+    const s = bench([['wood', 1], ['fiber', 1]])
+    expect(make(s).ok).toBe(true)
+    const events = VERBS.craft!.onComplete(s, CFG, 'a1', { recipe: 'torch' }, new RngStreams('t').get('actions'))
+    const made = events.find((e) => e.type === 'item_spawned')!.payload as { kind: string }
+    expect(made.kind).toBe('torch')
+  })
+
+  it('what it makes will take a flame, which is the whole point of making it', () => {
+    expect(isKindleable(CFG, 'torch')).toBe(true)
+    const lit = fold(bench([]), ev(1200, 'item_spawned', {
+      id: 'torch_1', kind: 'torch', qty: 1, loc: { t: 'agent', id: 'a1' },
+    }), CFG)
+    expect(submitIntent(lit, CFG, 'a1', 'kindle', { itemId: 'torch_1' }).ok).toBe(true)
+  })
+
+  it('needs both halves', () => {
+    expect(make(bench([['wood', 1]])).ok).toBe(false)
+    expect(make(bench([['fiber', 1]])).ok).toBe(false)
   })
 })

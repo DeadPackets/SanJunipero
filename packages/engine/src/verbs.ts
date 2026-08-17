@@ -998,6 +998,13 @@ export const SEED_RECIPES: Readonly<Record<string, SeedRecipe>> = {
     output: { kind: 'garment', qty: 1 },
     skill: 'tailoring',
   },
+  // A stick and a wrap of dry reed. Until this row the only flame in the world was the one
+  // the founders were given, and `kindle` had nothing to strike.
+  torch: {
+    inputs: { wood: 1, fiber: 1 },
+    output: { kind: 'torch', qty: 1 },
+    skill: 'carpentry',
+  },
 }
 
 export function recipeFor(config: SimConfig, name: string): SeedRecipe | undefined {
