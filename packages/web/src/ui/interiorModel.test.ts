@@ -139,14 +139,27 @@ describe('roomCard — what it holds', () => {
   it('lists only this room’s items, merging duplicate kinds by summing qty', () => {
     const c = roomCard(world(), 'store1', RECORDS, null)!
     expect(c.holds).toEqual([
-      { kind: 'grain', qty: 8, iconUrl: '/assets/a1.png' },
-      { kind: 'plank', qty: 2, iconUrl: '/assets/a2.png' },
+      { kind: 'grain', words: 'grain', qty: 8, iconUrl: '/assets/a1.png' },
+      { kind: 'plank', words: 'plank', qty: 2, iconUrl: '/assets/a2.png' },
     ])
   })
 
   it('gives a kind with no icon in the codex a null, not a broken url', () => {
     expect(roomCard(world(), 'hut1', RECORDS, null)!.holds)
-      .toEqual([{ kind: 'bowl', qty: 1, iconUrl: null }])
+      .toEqual([{ kind: 'bowl', words: 'bowl', qty: 1, iconUrl: null }])
+  })
+
+  // WHAT THE BROWSER CAUGHT the first time this grid ever had data in it: it printed the
+  // engine's slug, so `wheat_sheaf` reached a viewer as `wheat_s…`.
+  it('says the kind in words — the slug resolves the icon and never reaches a viewer', () => {
+    const stocked: WorldState['items'] = {
+      w1: item('w1', 'wheat_sheaf', 12, 'store1'),
+      m1: item('m1', 'field_mushroom', 3, 'store1'),
+    }
+    const c = roomCard(world({ items: stocked }), 'store1', RECORDS, null)!
+    expect(c.holds.map((h) => h.words)).toEqual(['wheat sheaf', 'field mushroom'])
+    expect(c.holds.map((h) => h.kind)).toEqual(['wheat_sheaf', 'field_mushroom'])
+    for (const h of c.holds) expect(h.words, h.kind).not.toContain('_')
   })
 
   it('caps the grid and says honestly how much it left out', () => {
@@ -185,7 +198,7 @@ describe('roomCard — the house style', () => {
     for (const id of ['hut1', 'store1']) {
       const c = roomCard(world(), id, RECORDS, PROV)!
       const text = [c.title, c.built ?? '', c.empty, ...c.lives,
-        ...c.holds.map((h) => h.kind), ...c.present.map((p) => `${p.name} ${p.state}`)].join(' ')
+        ...c.holds.map((h) => h.words), ...c.present.map((p) => `${p.name} ${p.state}`)].join(' ')
       expect(text, id).not.toMatch(GAMIFICATION_BAN)
       expect(text, id).not.toMatch(EMOJI)
     }

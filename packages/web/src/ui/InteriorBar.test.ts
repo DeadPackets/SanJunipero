@@ -13,8 +13,8 @@ const FULL: RoomCard = {
   built: 'Raised by Yusuf, Day 3',
   lives: ['Amara'],
   holds: [
-    { kind: 'grain', qty: 8, iconUrl: '/assets/a1.png' },
-    { kind: 'bowl', qty: 1, iconUrl: null },
+    { kind: 'wheat_sheaf', words: 'wheat sheaf', qty: 8, iconUrl: '/assets/a1.png' },
+    { kind: 'bowl', words: 'bowl', qty: 1, iconUrl: null },
   ],
   more: 32,
   present: [
@@ -51,7 +51,9 @@ describe('RoomCardView — a room that is somebody’s', () => {
   })
 
   it('shows what it holds, with a count, and says what it left out', () => {
-    expect(html).toContain('grain')
+    // the WORDS, never the slug the icon is looked up by (browser-caught, task 83's pass)
+    expect(html).toContain('wheat sheaf')
+    expect(html).not.toContain('wheat_sheaf')
     expect(html).toContain('url(&quot;/assets/a1.png&quot;)')
     expect(html).toContain('and 32 more')
     // a kind with no icon gets a drawn placeholder class, never a broken image
@@ -88,7 +90,7 @@ describe('RoomCardView — the honest empty room', () => {
 
   it('a room with holdings but no overflow says nothing about more', () => {
     const some = render({ ...BARE, holds: FULL.holds, more: 0 })
-    expect(some).toContain('grain')
+    expect(some).toContain('wheat sheaf')
     expect(some).not.toContain('more')
   })
 })

@@ -48,7 +48,11 @@ export type Provenance = {
   completedTick: number | null
 }
 
-export type RoomHolding = { kind: string; qty: number; iconUrl: string | null }
+/** `kind` is the engine's slug and is what resolves the icon; `words` is what a viewer reads.
+ *  WHAT THE BROWSER CAUGHT, the first time this grid ever rendered against data: it printed
+ *  the slug, so `wheat_sheaf` reached a viewer as `wheat_s…` — machine vocabulary, cut in the
+ *  middle of the one thing the row names. */
+export type RoomHolding = { kind: string; words: string; qty: number; iconUrl: string | null }
 export type RoomPresence = { id: string; name: string; state: string }
 
 export type RoomCard = {
@@ -117,7 +121,10 @@ export function roomCard(
     .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
     .map(([kind, qty]): RoomHolding => {
       const id = resolveAssetId(records, 'item', `${kind}#icon`)
-      return { kind, qty, iconUrl: id === null ? null : `/assets/${id}.png` }
+      return {
+        kind, words: kind.replace(/_/g, ' '), qty,
+        iconUrl: id === null ? null : `/assets/${id}.png`,
+      }
     })
 
   const present = room.occupants

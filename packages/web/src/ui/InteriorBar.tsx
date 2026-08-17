@@ -65,7 +65,7 @@ export function RoomCardView(
                   style={h.iconUrl === null ? undefined : { backgroundImage: `url("${h.iconUrl}")` }}
                   aria-hidden="true"
                 />
-                <span className="hold-kind">{h.kind}</span>
+                <span className="hold-kind">{h.words}</span>
                 <span className="hold-qty">{h.qty}</span>
               </li>
             ))}

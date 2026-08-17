@@ -544,6 +544,17 @@ body {
 .diff-line.add { background: #DCE8C8; }
 .diff-line.del { background: #F2C6C2; text-decoration: line-through; }
 
+/* ── how they have changed: what the run MOVED, newest first (task 83) ──
+   Not a character sheet. Each entry is a day the town rewrote its record of somebody, and
+   the diff under it is the evidence. A person with one version gets one honest line. */
+.change-entry { margin: 0.5rem 0 0; padding-left: 0.55rem; border-left: 2px solid var(--sand); }
+.change-entry:first-of-type { border-left-color: var(--honey); }
+.change-head { margin: 0; font-size: 0.875rem; }
+.change-head .stamp {
+  margin-right: 0.35rem; font-size: 0.75rem; color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums; font-family: ui-monospace, 'SF Mono', monospace;
+}
+
 /* ── stage arrival veil: cold boot only, the topbar pill owns mid-session trouble ── */
 .stage-veil {
   position: absolute; inset: 0; z-index: 30;
@@ -774,7 +785,8 @@ body {
 }
 .hold-grid {
   list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(4.6rem, 1fr)); gap: 0.3rem;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr)); gap: 0.3rem;
+  align-items: stretch;
 }
 .hold {
   display: flex; align-items: center; gap: 0.25rem;
@@ -787,10 +799,12 @@ body {
 }
 /* a kind the codex has no icon for gets a drawn chip, never a broken image */
 .hold-icon.bare { background: var(--sand); box-shadow: inset 0 0 0 1px var(--stone); }
+/* A row may not cut the one thing it names — `wheat_sheaf` read as `wheat_s…` the first time
+   this grid ever had data in it. Two words wrap onto two lines instead. */
 .hold-kind {
   flex: 1; min-width: 0;
   font-family: var(--font-body); font-size: 0.75rem; color: var(--ink);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  white-space: normal; overflow-wrap: break-word; text-wrap: pretty; line-height: 1.25;
 }
 .hold-qty {
   flex: none;
