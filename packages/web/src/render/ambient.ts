@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
-import { simTimeFromTick } from '@sj/shared'
+import { CITY_HEARTH_KIND, cityStructures, simTimeFromTick } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { tileToScreen, TILE_H } from './iso.js'
@@ -13,12 +13,29 @@ import { isGrave, toneReducer } from './tone.js'
 export const SMOKE_PUFFS = 3
 export const SMOKE_RISE_PX = 14
 export const SMOKE_LOOP_MS = 2400
+export const SMOKE_PUFF_R = 3          // a round puff, not an 8x8 card
+export const SMOKE_MAX_ALPHA = 0.42
+export const SMOKE_COLOR = 0xcfc6bc    // warm grey, MASTER_PALETTE — cream read as white glass
+
+// Smoke rises from a FIRE and a window glows because something is burning inside it, so both
+// effects answer to the same question: does this building have a hearth? The C13 city
+// template says which kinds are furnished with one (the hut), and a fire pit is an open fire
+// whether or not anything furnished it. EVERY completed structure used to do both, which is
+// why pale squares hung over the wagon and the shed — neither has a chimney or a window.
+export const HEARTH_KINDS: ReadonlySet<string> = new Set([
+  ...cityStructures().filter((c) => c.furnishings.some((f) => f.kind === CITY_HEARTH_KIND)).map((c) => c.kind),
+  'fire_pit',
+])
 export const SHIMMER_MAX = 60
 export const SHIMMER_HZ = 0.5
 export const TREES_MAX = 80
 export const TREE_SKEW = 0.06
-export const GLOW_PX = 6
+export const GLOW_R = 4                 // a round pool of light, not a 6x6 card
 export const GLOW_COLOR = 0xf4e289
+// additive blending drives a honey square to near-white; this is the ceiling that keeps it
+// reading as lamplight rather than as a pale rectangle stuck to the wall
+export const GLOW_BASE_ALPHA = 0.30
+export const GLOW_SWING = 0.12
 export const GLOW_HZ = 0.4
 export const BOUNCE_MS = 260
 export const BOUNCE_SCALE = 1.18
@@ -54,9 +71,17 @@ export function createAmbient(
     g.destroy()
     return t
   }
-  const puffTex = px(8, 8, 0xfff6e9)
+  const puffG = new Graphics()
+  puffG.circle(SMOKE_PUFF_R, SMOKE_PUFF_R, SMOKE_PUFF_R)
+  puffG.fill(SMOKE_COLOR)
+  const puffTex = scene.app.renderer.generateTexture(puffG)
+  puffG.destroy()
   const shimmerTex = px(2, 2, 0xffffff)
-  const glowTex = px(GLOW_PX, GLOW_PX, GLOW_COLOR)
+  const glowG = new Graphics()
+  glowG.circle(GLOW_R, GLOW_R, GLOW_R)
+  glowG.fill(GLOW_COLOR)
+  const glowTex = scene.app.renderer.generateTexture(glowG)
+  glowG.destroy()
   const birdTex = px(3, 2, 0x241f2b)
   const canopyTex = px(12, 20, 0x6f9455)
   const fireTex = px(10, 12, FIRE_COLOR)
@@ -155,7 +180,8 @@ export function createAmbient(
       liveIds.add(s.id)
       const anchor = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
       const complete = s.stage === 'complete'
-      if (complete && !smoke.has(s.id)) {
+      const hasFire = complete && HEARTH_KINDS.has(s.kind)
+      if (hasFire && !smoke.has(s.id)) {
         const puffs: Sprite[] = []
         for (let i = 0; i < SMOKE_PUFFS; i++) {
           const p = new Sprite(puffTex)
@@ -172,11 +198,11 @@ export function createAmbient(
         puffs.forEach((p, i) => {
           const prog = (t / SMOKE_LOOP_MS + i / SMOKE_PUFFS) % 1
           p.position.set(anchor.sx + 8, anchor.sy - 34 - prog * SMOKE_RISE_PX)
-          p.alpha = 0.6 * (1 - prog)
-          p.visible = complete
+          p.alpha = SMOKE_MAX_ALPHA * (1 - prog)
+          p.visible = hasFire
         })
       }
-      if (complete && !glows.has(s.id)) {
+      if (hasFire && !glows.has(s.id)) {
         const g = new Sprite(glowTex)
         g.anchor.set(0.5, 1)
         g.blendMode = 'add'
@@ -188,8 +214,8 @@ export function createAmbient(
       const glow = glows.get(s.id)
       if (glow !== undefined) {
         glow.position.set(anchor.sx, anchor.sy - 2) // the door face — "deep blue night, warm window glow"
-        glow.visible = complete && night
-        glow.alpha = 0.5 + 0.3 * (0.5 + 0.5 * Math.sin(2 * Math.PI * GLOW_HZ * (t / 1000)))
+        glow.visible = hasFire && night
+        glow.alpha = GLOW_BASE_ALPHA + GLOW_SWING * (0.5 + 0.5 * Math.sin(2 * Math.PI * GLOW_HZ * (t / 1000)))
       }
       if (s.burning && !fires.has(s.id)) {
         const f = new Sprite(fireTex)
