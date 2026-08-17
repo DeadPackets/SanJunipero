@@ -4,7 +4,7 @@
 import type { SimConfig } from '@sj/shared'
 import {
   composePerception, createWorldTick, doorTile, submitIntent,
-  type PerceptionPacket, type RngStreams, type WorldState,
+  type PerceptionPacket, type RngStreams, type Structure, type WorldState,
 } from '@sj/engine'
 import { devTown, type DevStructure } from './devTown.js'
 // Type-only, so no import cycle survives compilation.
@@ -86,6 +86,31 @@ export type FoundersOpts = {
   /** The town to raise on tick 1. Defaults to the frozen scripted fixture, so every existing
    *  caller and every existing test folds exactly the world it always did. */
   structures?: readonly DevStructure[]
+  /** Who to spawn and where. Defaults to the landed FOUNDERS spawns. */
+  founders?: readonly FounderDef[]
+}
+
+/** The hut this person owns, or null. Ownership is a fact of the world (Structure.owner) —
+ *  this reads it, it does not invent it. */
+export function homeOf(state: WorldState, agentId: string): Structure | null {
+  for (const s of Object.values(state.structures)) {
+    if (s.owner === agentId && s.stage === 'complete') return s
+  }
+  return null
+}
+
+/** Showcase spawns: each founder starts at their own door, so the first frame reads as a town
+ *  of five households rather than five strangers on a lawn. */
+export function foundersFor(structures: readonly DevStructure[]): readonly FounderDef[] {
+  const byOwner = new Map(structures.filter((s) => s.owner !== null).map((s) => [s.owner!, s]))
+  return FOUNDERS.map((f) => {
+    const home = byOwner.get(f.id)
+    if (home === undefined) return f
+    // The south-centre tile just outside the footprint — the same tile engine doorTile picks
+    // first, and on this template it is the yard road the rank faces.
+    const spawn = { x: home.x + ((home.w - 1) >> 1), y: home.y + home.h }
+    return { ...f, spawn, patrol: [spawn, f.patrol[1]] as FounderDef['patrol'] }
+  })
 }
 
 // Walking home is a whole errand, so it is decided from world state rather than from the
@@ -97,23 +122,26 @@ export function homeIntent(state: WorldState, agentId: string): { verb: string; 
     return a.needs.energy > LEAVE_HOME_ABOVE ? { verb: 'exit', params: {} } : { verb: 'sleep', params: {} }
   }
   if (a.needs.energy >= GO_HOME_BELOW) return null
-  const home = state.structures[FOUNDERS_HOME_ID]
-  const door = home === undefined ? null : doorTile(state, home)
-  if (door === null) return null
+  // An unhoused person keeps the landed behaviour and heads for the shared roof; an owner goes
+  // to their own. Nobody is left with nowhere to sleep.
+  const home = homeOf(state, agentId) ?? state.structures[FOUNDERS_HOME_ID] ?? null
+  const door = home === null ? null : doorTile(state, home)
+  if (door === null || home === null) return null
   return Math.abs(a.x - door.x) <= 1 && Math.abs(a.y - door.y) <= 1
-    ? { verb: 'enter', params: { structureId: FOUNDERS_HOME_ID } }
+    ? { verb: 'enter', params: { structureId: home.id } }
     : { verb: 'walk', params: { x: door.x, y: door.y } }
 }
 
 export function makeFoundersOnTick(
   config: SimConfig, rng: RngStreams, getState: () => WorldState, opts: FoundersOpts = {},
 ): FoundersOnTick {
-  const policies = new Map(FOUNDERS.map(f => [f.id, makePatrolPolicy(f)]))
+  const cast = opts.founders ?? FOUNDERS
+  const policies = new Map(cast.map(f => [f.id, makePatrolPolicy(f)]))
   const worldTick = createWorldTick(config, rng)
   const structures = opts.structures ?? SCRIPTED_STRUCTURES
   return ({ tick, emit }) => {
     if (tick === 1) {
-      for (const f of FOUNDERS) {
+      for (const f of cast) {
         emit('agent_spawned', { id: f.id, name: f.name, x: f.spawn.x, y: f.spawn.y, ageDays: f.ageDays })
       }
       for (const s of structures) {
@@ -132,14 +160,14 @@ export function makeFoundersOnTick(
     for (const e of result.events) emit(e.type, e.payload)
 
     // scripted need top-ups keep the showcase town alive without a food economy
-    for (const f of FOUNDERS) {
+    for (const f of cast) {
       const a = getState().agents[f.id]
       if (!a || !a.alive) continue
       if (a.needs.hunger < NEED_TOPUP_BELOW) emit('need_changed', { id: f.id, need: 'hunger', delta: HUNGER_TOPUP })
       if (a.needs.warmth < NEED_TOPUP_BELOW) emit('need_changed', { id: f.id, need: 'warmth', delta: WARMTH_TOPUP })
     }
 
-    for (const f of FOUNDERS) {
+    for (const f of cast) {
       const state = getState()
       const a = state.agents[f.id]
       if (!a || !a.alive) continue

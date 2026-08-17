@@ -8,7 +8,7 @@ import {
 import { openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
-import { makeFoundersOnTick, townStructuresFor } from './founders.js'
+import { foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.js'
 import { ingestLibraryArt, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
 import { showcaseTerrain } from './showcaseMap.js'
 
@@ -93,7 +93,8 @@ export async function startDevWorld(
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
     // the founders showcase town
     onTick: makeFoundersOnTick(config, rng, () => loop.state, {
-      interiors: opts.interiors === true, structures,
+      // foundersFor is identity on an unowned town, so the scripted arm is byte-identical.
+      interiors: opts.interiors === true, structures, founders: foundersFor(structures),
     }),
   })
 
