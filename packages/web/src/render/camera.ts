@@ -1,3 +1,5 @@
+import { TILE_H, TILE_W } from './iso.js'
+
 // SMOOTH, DAMPED, BOUNDED ZOOM (U19, plan task 75).
 //
 // THE COMPLAINT, verbatim: "sometimes I zoom way too much by accident and I can't control my
@@ -111,3 +113,124 @@ export function stepStop(stop: ZoomStop, dir: 1 | -1): ZoomStop {
   const i = ZOOM_STOPS.indexOf(stop)
   return ZOOM_STOPS[Math.min(ZOOM_STOPS.length - 1, Math.max(0, i + dir))]!
 }
+
+// ── THE CAMERA KNOWS THE EDGES (U19, audit R8, plan task 76) ─────────────────────────────
+//
+// THE DEFECT: nothing clamped the camera. `panBy` and the drag handler added pixels without
+// bound, so one drag pushed the town entirely off screen with no way back but `Center`. And
+// the first frame centred on the middle of the TERRAIN ARRAY, which on a town anchored at
+// y 13 is not the town — the settlement occupied 8.9 % of a 1728 x 880 stage, the rest
+// blank field. That is the number R8 is about.
+
+/** A box in world-screen space: the same coordinates `tileToScreen` produces. */
+export type CameraBounds = { minX: number; maxX: number; minY: number; maxY: number }
+
+/** The world-space box the map occupies. Recomputed on terrain change, never stored. */
+export function cameraBoundsOf(terrain: readonly (readonly unknown[])[]): CameraBounds {
+  const h = terrain.length
+  const w = terrain[0]?.length ?? 0
+  return { minX: -h * (TILE_W / 2), maxX: w * (TILE_W / 2), minY: 0, maxY: (w + h) * (TILE_H / 2) }
+}
+
+/** The settlement's OWN box — the thing the first frame is of, and the thing `stageFill`
+ *  measures. A map is mostly field; a town is what a viewer came for. */
+export function structureBoundsOf(
+  list: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
+): CameraBounds {
+  if (list.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0 }
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const s of list) {
+    for (const [x, y] of [
+      [s.x - 0.5, s.y - 0.5], [s.x + s.w - 0.5, s.y - 0.5],
+      [s.x + s.w - 0.5, s.y + s.h - 0.5], [s.x - 0.5, s.y + s.h - 0.5],
+    ]) {
+      const sx = (x! - y!) * (TILE_W / 2), sy = (x! + y!) * (TILE_H / 2)
+      minX = Math.min(minX, sx); maxX = Math.max(maxX, sx)
+      minY = Math.min(minY, sy); maxY = Math.max(maxY, sy)
+    }
+  }
+  return { minX, maxX, minY, maxY }
+}
+
+/**
+ * The settlement as it is DRAWN, which is not the ground it stands on.
+ *
+ * WHAT THE BROWSER CAUGHT: fitting the footprint box put the camera at 3× and cut the roofs
+ * off the top and right of the stage. A building sprite is drawn to a `(w + h) · 32 px`
+ * square anchored at its base diamond, so it overhangs its own ground by about 1.85× upward
+ * and reaches half that square to each side. A fit that ignores the overhang is not a fit.
+ *
+ * The same geometry `depth.structureDepthBox` uses for its screen AABB, kept here rather than
+ * imported so the camera stays free of the renderer.
+ */
+export const BUILDING_OVERHANG_PX_PER_TILE = 32   // textures.BUILDING_PX_PER_TILE
+
+export function drawnBoundsOf(
+  list: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
+): CameraBounds {
+  if (list.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0 }
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const s of list) {
+    const cx = s.x + s.w / 2 - 0.5, cy = s.y + s.h / 2 - 0.5
+    const gsx = (cx - cy) * (TILE_W / 2), gsy = (cx + cy) * (TILE_H / 2)
+    const side = (s.w + s.h) * BUILDING_OVERHANG_PX_PER_TILE
+    minX = Math.min(minX, gsx - side / 2); maxX = Math.max(maxX, gsx + side / 2)
+    minY = Math.min(minY, gsy - side); maxY = Math.max(maxY, gsy + ((s.w + s.h) * TILE_H) / 2)
+  }
+  return { minX, maxX, minY, maxY }
+}
+
+export function boundsCentre(b: CameraBounds): { sx: number; sy: number } {
+  return { sx: (b.minX + b.maxX) / 2, sy: (b.minY + b.maxY) / 2 }
+}
+
+/** One axis of the clamp. `pos` is the world container's offset in screen px, so the visible
+ *  span is `[-pos, -pos + size] / scale`. When the world is SMALLER than the viewport at this
+ *  scale it is CENTRED instead of clamped, which is the only sane reading of "in bounds" for
+ *  a small map. */
+function clampAxis(pos: number, scale: number, lo: number, hi: number, size: number): number {
+  const min = size - hi * scale       // the far edge may not come inside the viewport
+  const max = -lo * scale             // nor the near edge
+  if (min > max) return (size - (lo + hi) * scale) / 2
+  return Math.min(max, Math.max(min, pos))
+}
+
+/** Clamp a camera position so the world box always covers the viewport. */
+export function clampCamera(
+  pos: { x: number; y: number }, scale: number, bounds: CameraBounds,
+  screen: { w: number; h: number },
+): { x: number; y: number } {
+  const k = scale > 0 ? scale : 1
+  return {
+    x: clampAxis(pos.x, k, bounds.minX, bounds.maxX, screen.w),
+    y: clampAxis(pos.y, k, bounds.minY, bounds.maxY, screen.h),
+  }
+}
+
+/** The breathing room a fitted view keeps on every side. */
+export const FIT_MARGIN_PX = 48
+
+/** The largest stop at which `bounds` fits inside the stage with a margin — the overview
+ *  control, and the first frame. Falls to the smallest stop when nothing fits. */
+export function fitStop(bounds: CameraBounds, screen: { w: number; h: number }): ZoomStop {
+  const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY
+  const availW = Math.max(1, screen.w - 2 * FIT_MARGIN_PX)
+  const availH = Math.max(1, screen.h - 2 * FIT_MARGIN_PX)
+  let best: ZoomStop = ZOOM_STOPS[0]
+  for (const z of ZOOM_STOPS) if (w * z <= availW && h * z <= availH) best = z
+  return best
+}
+
+/** The fraction of the stage AREA the settlement occupies AS DRAWN. The audit measured this
+ *  "under 15 %" at the old `ZOOM_MIN = 1`, and on the real eleven-building town it reproduces
+ *  at 14.4 %; the gate asserts it on the first frame. */
+export function stageFill(
+  drawnBounds: CameraBounds, scale: number, screen: { w: number; h: number },
+): number {
+  const w = (drawnBounds.maxX - drawnBounds.minX) * scale
+  const h = (drawnBounds.maxY - drawnBounds.minY) * scale
+  if (w <= 0 || h <= 0 || screen.w <= 0 || screen.h <= 0) return 0
+  return (w * h) / (screen.w * screen.h)
+}
+
+export const STAGE_FILL_MIN = 0.45

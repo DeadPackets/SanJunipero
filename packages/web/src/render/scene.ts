@@ -6,8 +6,9 @@ import type { WorldStore } from '../state/worldStore.js'
 import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import {
-  ZOOM_STOPS, initialZoom, nearestStop, zoomScaleAt, zoomSettled, zoomTo, zoomWheel,
-  type ZoomState, type ZoomStop,
+  ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, fitStop, initialZoom, nearestStop,
+  drawnBoundsOf, zoomScaleAt, zoomSettled, zoomTo, zoomWheel,
+  type CameraBounds, type ZoomState, type ZoomStop,
 } from './camera.js'
 import {
   OCTAVE_ALPHA, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField,
@@ -216,6 +217,8 @@ export type Scene = {
   getZoomStop(): ZoomStop
   panBy(dx: number, dy: number): void
   centerHome(): void
+  /** a view of the whole settlement, at the largest stop it fits at (task 76) */
+  fitToTown(): void
   onCamera(cb: () => void): () => void
   setFollow(target: (() => { x: number; y: number } | null) | null): void
   /** fires when a user gesture (drag, pan, recenter) takes the camera back */
@@ -283,9 +286,49 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     baker.rebake(terrain, records ?? store.assetRecords())
   }
 
+  // THE EDGES (task 76). Every write to `world.position` goes through the clamp, so there is
+  // no path by which a drag, a pan, a follow or a zoom can push the town off the screen.
+  let bounds: CameraBounds = cameraBoundsOf([])
+  const screenBox = (): { w: number; h: number } => ({ w: app.screen.width, h: app.screen.height })
+
+  function place(x: number, y: number): void {
+    const p = clampCamera({ x, y }, world.scale.x, bounds, screenBox())
+    world.position.set(p.x, p.y)
+  }
+
+  function centerOnScreen(sx: number, sy: number): void {
+    place(app.screen.width / 2 - sx * world.scale.x, app.screen.height / 2 - sy * world.scale.y)
+  }
+
   function centerOn(x: number, y: number): void {
     const { sx, sy } = tileToScreen(x, y)
-    world.position.set(app.screen.width / 2 - sx * world.scale.x, app.screen.height / 2 - sy * world.scale.y)
+    centerOnScreen(sx, sy)
+  }
+
+  /** The settlement AS DRAWN, or the whole map when nothing has been built yet. Drawn, not
+   *  footprint: a sprite overhangs its own ground, and fitting the ground cuts the roofs off. */
+  function townBox(): CameraBounds {
+    const s = store.getState()
+    const list = s === null ? [] : Object.values(s.structures)
+    return list.length === 0 ? bounds : drawnBoundsOf(list)
+  }
+
+  /** A VIEW OF THE WHOLE TOWN: the largest stop at which the settlement fits with a margin,
+   *  centred on the settlement — not on the middle of a mostly-empty terrain array. The
+   *  transit reuses the zoom anchor, so the town eases into the middle of the stage rather
+   *  than jumping there. */
+  function fitToTown(): void {
+    breakFollow()
+    const box = townBox()
+    const stop = fitStop(box, screenBox())
+    const c = boundsCentre(box)
+    anchor = { sx: app.screen.width / 2, sy: app.screen.height / 2, wx: c.sx, wy: c.sy }
+    if (stop === zoom.stop) {
+      centerOnScreen(c.sx, c.sy)
+      notifyCamera()
+      return
+    }
+    zoom = zoomTo(zoom, stop, performance.now())
   }
 
   // smooth follow: eases the camera toward a moving world-space anchor each frame
@@ -304,8 +347,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     const ty = app.screen.height / 2 - t.y * world.scale.y
     // frame-rate independent lerp (~12%/frame at 60fps)
     const k = 1 - Math.pow(0.88, app.ticker.deltaMS / 16.7)
-    world.position.x += (tx - world.position.x) * k
-    world.position.y += (ty - world.position.y) * k
+    place(world.position.x + (tx - world.position.x) * k, world.position.y + (ty - world.position.y) * k)
   }
   app.ticker.add(followTick)
 
@@ -340,7 +382,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     if (s === world.scale.x) return
     world.scale.set(s)
     // While a follow is running it owns the position; otherwise the anchor stays put.
-    if (followFn === null) world.position.set(anchor.sx - anchor.wx * s, anchor.sy - anchor.wy * s)
+    if (followFn === null) place(anchor.sx - anchor.wx * s, anchor.sy - anchor.wy * s)
+    else place(world.position.x, world.position.y)
     notifyCamera()
   }
 
@@ -365,8 +408,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       moved = true
       breakFollow() // the viewer takes the camera back
     }
-    world.position.x += dx
-    world.position.y += dy
+    place(world.position.x + dx, world.position.y + dy)
     last = { x: e.global.x, y: e.global.y }
   })
   const endDrag = (): void => {
@@ -417,10 +459,11 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     const first = bakedTerrain === null
     bakedTerrain = s.terrain
     bakedArtSig = sig
+    bounds = cameraBoundsOf(s.terrain)
     if (first) {
       // the very first map appears immediately; every later one waits for the frame
       rebakeGround(s.terrain)
-      centerOn(s.terrain[0]!.length / 2, s.terrain.length / 2)
+      fitToTown()
       return
     }
     dirty = true
@@ -437,8 +480,9 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const boot = store.getState()
   if (boot !== null) {
     bakedTerrain = boot.terrain
+    bounds = cameraBoundsOf(boot.terrain)
     rebakeGround(boot.terrain)
-    centerOn(boot.terrain[0]!.length / 2, boot.terrain.length / 2)
+    fitToTown()
   }
 
   return {
@@ -466,13 +510,15 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     getZoomStop: () => zoom.stop,
     panBy: (dx, dy) => {
       breakFollow()
-      world.position.x += dx
-      world.position.y += dy
+      place(world.position.x + dx, world.position.y + dy)
     },
     centerHome: () => {
       breakFollow()
-      if (bakedTerrain !== null) centerOn(bakedTerrain[0]!.length / 2, bakedTerrain.length / 2)
+      const c = boundsCentre(townBox())
+      centerOnScreen(c.sx, c.sy)
+      notifyCamera()
     },
+    fitToTown,
     onCamera: (cb) => {
       cameraCbs.push(cb)
       return () => {

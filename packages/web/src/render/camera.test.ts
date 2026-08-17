@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import { makeCityTemplate } from '@sj/shared'
+import type { TileId } from '@sj/engine/state'
+import { TILE_H, TILE_W } from './iso.js'
 import {
-  WHEEL_GESTURE_GAP_MS, WHEEL_MIN_DELTA, WHEEL_STEP_DELTA, ZOOM_SETTLE_MS, ZOOM_STEP_COOLDOWN_MS, ZOOM_STOPS,
-  easeOutCubic, initialZoom, zoomScaleAt, zoomSettled, zoomTo, zoomWheel, type ZoomStop,
+  FIT_MARGIN_PX, STAGE_FILL_MIN,
+  WHEEL_GESTURE_GAP_MS, WHEEL_MIN_DELTA, WHEEL_STEP_DELTA, ZOOM_SETTLE_MS, ZOOM_STEP_COOLDOWN_MS,
+  ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, easeOutCubic, fitStop, initialZoom,
+  drawnBoundsOf, stageFill, structureBoundsOf, zoomScaleAt, zoomSettled, zoomTo, zoomWheel, type ZoomStop,
 } from './camera.js'
 
 // THE LANDED RULE, quoted so the before-state is measured and not remembered
@@ -201,5 +206,173 @@ describe('every function is pure', () => {
     zoomWheel(s, -300, 5000)
     zoomTo(s, 4, 5000)
     expect(s).toEqual(before)
+  })
+})
+
+// ── TASK 76: the camera knows the edges, and there is a view of the whole town (U19, R8) ──
+
+const terrainOf = (w: number, h: number): TileId[][] =>
+  Array.from({ length: h }, () => Array.from({ length: w }, () => 0 as TileId))
+
+/** The task-59 town, rebuilt from the template at the gateway's showcase anchor — the same
+ *  eleven buildings `occlusion.test.ts` measures U8 against, so the two agree by construction
+ *  rather than by a pasted number. */
+const ANCHOR = { x: 0, y: 9 }        // gateway SHOWCASE_ANCHOR
+const TOWN = makeCityTemplate(ANCHOR).structures.map((s) => ({
+  x: ANCHOR.x + s.dx, y: ANCHOR.y + s.dy, w: s.w, h: s.h,
+}))
+const TOWN_BOX = structureBoundsOf(TOWN)          // the ground it stands on
+const TOWN_DRAWN = drawnBoundsOf(TOWN)            // what a viewer actually sees
+const STAGE = { w: 1728, h: 880 }
+
+describe('cameraBoundsOf — the world box, exactly', () => {
+  it('is the dimetric extent of the terrain array', () => {
+    const b = cameraBoundsOf(terrainOf(48, 48))
+    expect(b.minX).toBe(-48 * (TILE_W / 2))
+    expect(b.maxX).toBe(48 * (TILE_W / 2))
+    expect(b.minY).toBe(0)
+    expect(b.maxY).toBe((48 + 48) * (TILE_H / 2))
+  })
+
+  it('handles a non-square map, and an empty one without throwing', () => {
+    const b = cameraBoundsOf(terrainOf(64, 16))
+    expect(b.minX).toBe(-16 * (TILE_W / 2))
+    expect(b.maxX).toBe(64 * (TILE_W / 2))
+    expect(b.maxY).toBe((64 + 16) * (TILE_H / 2))
+    expect(() => cameraBoundsOf([])).not.toThrow()
+  })
+
+  it('structureBoundsOf gives the settlement its own box, in the same space', () => {
+    const b = structureBoundsOf(TOWN)
+    expect(b.minX).toBeLessThan(b.maxX)
+    expect(b.minY).toBeLessThan(b.maxY)
+    expect(structureBoundsOf([])).toEqual({ minX: 0, maxX: 0, minY: 0, maxY: 0 })
+  })
+})
+
+describe('clampCamera — the town cannot be lost off the edge', () => {
+  const bounds = cameraBoundsOf(terrainOf(48, 48))
+
+  it('THE DEFECT: nothing clamped, so one drag pushed the world off the screen', () => {
+    // scene.panBy added pixels without bound; this is that position, and where it should land
+    const runaway = { x: 99_999, y: -99_999 }
+    const legal = clampCamera(runaway, 4, bounds, STAGE)
+    expect(legal).not.toEqual(runaway)
+    expect(legal.x).toBeLessThanOrEqual(-bounds.minX * 4 + 1e-9)
+    expect(legal.y).toBeGreaterThanOrEqual(STAGE.h - bounds.maxY * 4 - 1e-9)
+  })
+
+  it('refuses a position that would show blank, and returns the NEAREST legal one', () => {
+    const legal = clampCamera({ x: -100_000, y: 0 }, 4, bounds, STAGE)
+    expect(legal.x).toBeCloseTo(STAGE.w - bounds.maxX * 4, 9)
+  })
+
+  it('CENTRES instead of clamping when the world is smaller than the viewport', () => {
+    const small = cameraBoundsOf(terrainOf(8, 8))
+    const a = clampCamera({ x: 5000, y: -5000 }, 0.5, small, STAGE)
+    const b = clampCamera({ x: -5000, y: 5000 }, 0.5, small, STAGE)
+    expect(a).toEqual(b)
+    expect(a.x).toBeCloseTo((STAGE.w - (small.minX + small.maxX) * 0.5) / 2, 9)
+    expect(clampCamera(a, 0.5, small, STAGE)).toEqual(a)      // idempotent
+  })
+
+  it('is idempotent at every stop', () => {
+    for (const z of ZOOM_STOPS) {
+      const once = clampCamera({ x: 12_345, y: -6_789 }, z, bounds, STAGE)
+      expect(clampCamera(once, z, bounds, STAGE), `${z}`).toEqual(once)
+    }
+  })
+
+  it('a 500-step random pan walk never shows the outside of the world', () => {
+    const r = rng(0x76)
+    let pos = clampCamera({ x: 0, y: 0 }, 2, bounds, STAGE)
+    for (let i = 0; i < 500; i++) {
+      pos = clampCamera(
+        { x: pos.x + (r() - 0.5) * 900, y: pos.y + (r() - 0.5) * 900 }, 2, bounds, STAGE,
+      )
+      expect(-pos.x / 2).toBeGreaterThanOrEqual(bounds.minX - 1e-6)
+      expect((-pos.x + STAGE.w) / 2).toBeLessThanOrEqual(bounds.maxX + 1e-6)
+      expect(-pos.y / 2).toBeGreaterThanOrEqual(bounds.minY - 1e-6)
+      expect((-pos.y + STAGE.h) / 2).toBeLessThanOrEqual(bounds.maxY + 1e-6)
+    }
+  })
+})
+
+describe('fitStop — a view of the whole thing, with a margin', () => {
+  it('is the largest stop at which the box fits inside the stage minus the margin', () => {
+    const town = TOWN_DRAWN
+    const at = fitStop(town, STAGE)
+    const w = (town.maxX - town.minX) * at, h = (town.maxY - town.minY) * at
+    expect(w).toBeLessThanOrEqual(STAGE.w - 2 * FIT_MARGIN_PX)
+    expect(h).toBeLessThanOrEqual(STAGE.h - 2 * FIT_MARGIN_PX)
+    const bigger = ZOOM_STOPS[ZOOM_STOPS.indexOf(at) + 1]
+    if (bigger !== undefined) {
+      expect((town.maxX - town.minX) * bigger > STAGE.w - 2 * FIT_MARGIN_PX
+        || (town.maxY - town.minY) * bigger > STAGE.h - 2 * FIT_MARGIN_PX).toBe(true)
+    }
+  })
+
+  it('the 48x48 world fits at 1x; a 128x128 world does not fit at all and takes the floor', () => {
+    expect(fitStop(cameraBoundsOf(terrainOf(48, 48)), STAGE)).toBe(1)
+    expect(fitStop(cameraBoundsOf(terrainOf(128, 128)), STAGE)).toBe(0.5)
+  })
+
+  it('never leaves the stop set, and never returns a stop that does not exist', () => {
+    for (const [w, h] of [[320, 240], [1728, 880], [4000, 3000]] as const) {
+      for (const n of [4, 16, 48, 128, 512]) {
+        expect(ZOOM_STOPS as readonly number[])
+          .toContain(fitStop(cameraBoundsOf(terrainOf(n, n)), { w, h }))
+      }
+    }
+  })
+})
+
+describe('stageFill — the number R8 is about', () => {
+  it('THE R8 ASSERTION: the landed first frame is far below the floor', () => {
+    // eleven buildings across tiles x 5..28, y 13..31: 528 x 256 px of GROUND, and
+    // 584 x 376 px as DRAWN, because a sprite overhangs the ground it stands on
+    expect(TOWN_BOX).toEqual({ minX: -352, maxX: 176, minY: 208, maxY: 464 })
+    expect(TOWN_DRAWN).toEqual({ minX: -376, maxX: 208, minY: 96, maxY: 472 })
+    // the landed first frame: scale 1, centred on the middle of a 48x48 grid
+    const landed = stageFill(TOWN_DRAWN, 1, STAGE)
+    expect(landed).toBeLessThan(STAGE_FILL_MIN)
+    expect(landed).toBeCloseTo(0.1444, 4)    // 14.4% — the audit's "under 15%", reproduced
+  })
+
+  it('and the first frame clears it once the camera fits the TOWN', () => {
+    const at = fitStop(TOWN_DRAWN, STAGE)
+    expect(at).toBe(2)
+    expect(stageFill(TOWN_DRAWN, at, STAGE)).toBeGreaterThanOrEqual(STAGE_FILL_MIN)
+    expect(stageFill(TOWN_DRAWN, at, STAGE)).toBeCloseTo(0.5776, 4)
+  })
+
+  // WHAT THE BROWSER CAUGHT: fitting the FOOTPRINT box put the camera at 3x and cut the roofs
+  // off the top and the right of the stage.
+  it('fitting the footprint instead of the drawing overshoots by a whole stop', () => {
+    expect(fitStop(TOWN_BOX, STAGE)).toBe(3)
+    expect(fitStop(TOWN_DRAWN, STAGE)).toBe(2)
+    const overshoot = 3
+    expect((TOWN_DRAWN.maxY - TOWN_DRAWN.minY) * overshoot)
+      .toBeGreaterThan(STAGE.h - 2 * FIT_MARGIN_PX)     // the roofs, off the stage. RED.
+  })
+
+  it('a drawn box is taller and wider than the ground under it', () => {
+    expect(TOWN_DRAWN.maxY - TOWN_DRAWN.minY).toBeGreaterThan(TOWN_BOX.maxY - TOWN_BOX.minY)
+    expect(TOWN_DRAWN.maxX - TOWN_DRAWN.minX).toBeGreaterThan(TOWN_BOX.maxX - TOWN_BOX.minX)
+    expect(TOWN_DRAWN.minY).toBeLessThan(TOWN_BOX.minY)   // the overhang is upward
+    expect(drawnBoundsOf([])).toEqual({ minX: 0, maxX: 0, minY: 0, maxY: 0 })
+  })
+
+  it('is an area fraction, and it is 0 for a settlement with no extent', () => {
+    expect(stageFill({ minX: 0, maxX: 0, minY: 0, maxY: 0 }, 4, STAGE)).toBe(0)
+    expect(stageFill({ minX: 0, maxX: 100, minY: 0, maxY: 100 }, 1, { w: 200, h: 200 }))
+      .toBeCloseTo(0.25, 9)
+  })
+
+  it('boundsCentre is the middle of the box, so the first frame is OF the town', () => {
+    expect(boundsCentre(TOWN_BOX)).toEqual({ sx: -88, sy: 336 })
+    // the landed first frame centred on the middle of a 48x48 grid, which is not the town
+    const landed = boundsCentre(cameraBoundsOf(terrainOf(48, 48)))
+    expect(landed).not.toEqual(boundsCentre(TOWN_BOX))
   })
 })
