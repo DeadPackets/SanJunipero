@@ -1,13 +1,23 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 // The browser bundle is a LAYER, and vitest runs in Node — so nothing in the suite can feel
 // a Node-only module leaking into it. `packages/engine`'s index re-exports `db.ts`, which
-// imports `better-sqlite3` at module scope; one `from '@sj/engine'` anywhere in the reachable
-// graph and the dev server hands the browser a module that throws before React mounts.
-// This walks the real graph from the real entry and pins what may cross the wire.
+// imports `better-sqlite3` at module scope; one `from '@sj/engine'` anywhere that gets bundled
+// and the dev server hands the browser a module that throws before React mounts.
+//
+// WHY THIS GUARD IS WIDER THAN IT WAS (C12a batch-1 ruling R2). It walked the graph from
+// `main.tsx` ALONE. C12a task 62 wrote `import type { WorldState } from '@sj/engine'` into
+// `render/landmarks.ts`, and the guard stayed green for a whole commit — because landmarks.ts
+// was not yet imported by anything the entry reached. It only fired one commit later, when
+// StageMount imported the module, i.e. at the exact moment the defect became fatal in the
+// browser. A guard that reports a leak only once it is already fatal buys false confidence.
+//
+// Every `.ts`/`.tsx` under `src` is a file the bundler WILL take the moment somebody imports
+// it, so every one of them is a root here. Dynamic `import('…')` is scanned too — it is a
+// wire crossing that the static forms do not cover.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = resolve(HERE, '..')                 // packages/web
@@ -26,15 +36,19 @@ const NEVER = ['better-sqlite3', 'node:fs', 'node:util', 'fs', 'util', 'sharp', 
 
 const IMPORT_RE = /(?:^|\n)\s*(?:import|export)\b[^;\n]*?from\s*['"]([^'"]+)['"]/g
 const BARE_IMPORT_RE = /(?:^|\n)\s*import\s*['"]([^'"]+)['"]/g
+const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g
 
-function specifiersOf(file: string): string[] {
-  const src = readFileSync(file, 'utf8')
+export function specifiersOfSource(src: string): string[] {
   const out: string[] = []
-  for (const re of [IMPORT_RE, BARE_IMPORT_RE]) {
+  for (const re of [IMPORT_RE, BARE_IMPORT_RE, DYNAMIC_IMPORT_RE]) {
     re.lastIndex = 0
     for (let m = re.exec(src); m !== null; m = re.exec(src)) out.push(m[1]!)
   }
   return out
+}
+
+function specifiersOf(file: string): string[] {
+  return specifiersOfSource(readFileSync(file, 'utf8'))
 }
 
 // './x.js' → './x.ts' | './x.tsx'; a directory → its index
@@ -63,11 +77,11 @@ function resolveWorkspace(spec: string): string | null {
 
 export type GraphWalk = { files: string[]; externals: Map<string, string[]> }
 
-export function walkBrowserGraph(entry: string): GraphWalk {
+export function walkBrowserGraph(entries: string | readonly string[]): GraphWalk {
   const files: string[] = []
   const externals = new Map<string, string[]>()   // specifier → the files that asked for it
   const seen = new Set<string>()
-  const queue = [entry]
+  const queue = typeof entries === 'string' ? [entries] : [...entries]
   while (queue.length > 0) {
     const file = queue.shift()!
     if (seen.has(file)) continue
@@ -86,13 +100,50 @@ export function walkBrowserGraph(entry: string): GraphWalk {
   return { files, externals }
 }
 
+/** Every source under `src` the bundler would take. A test file is not one of them; every
+ *  other `.ts`/`.tsx` is, whether or not anything imports it TODAY. */
+export function webSourceFiles(dir = join(WEB, 'src')): string[] {
+  const out: string[] = []
+  for (const name of readdirSync(dir).sort()) {
+    const p = join(dir, name)
+    if (statSync(p).isDirectory()) {
+      out.push(...webSourceFiles(p))
+      continue
+    }
+    if (!/\.(ts|tsx)$/.test(name) || /\.test\.(ts|tsx)$/.test(name)) continue
+    out.push(p)
+  }
+  return out
+}
+
+/** The banned modules a bare specifier drags in with it. This is the rule stated about the
+ *  DOOR rather than about the file that happens to open it, so it holds for a file nobody
+ *  has written yet. */
+export function bannedReachableFrom(spec: string): string[] {
+  const target = resolveWorkspace(spec)
+  if (target === null) return NEVER.includes(spec) ? [spec] : []
+  const walk = walkBrowserGraph(target)
+  return NEVER.filter((b) => walk.externals.has(b))
+}
+
 describe('the browser graph', () => {
-  const walk = walkBrowserGraph(ENTRY)
+  const roots = webSourceFiles()
+  const walk = walkBrowserGraph(roots)
+  const fromEntry = walkBrowserGraph(ENTRY)
 
   it('starts at the entry the dev server actually serves', () => {
     expect(readFileSync(join(WEB, 'index.html'), 'utf8')).toContain('src="/src/main.tsx"')
     expect(existsSync(ENTRY)).toBe(true)
-    expect(walk.files.length).toBeGreaterThan(20)
+    expect(fromEntry.files.length).toBeGreaterThan(20)
+  })
+
+  it('roots at EVERY bundlable source, not only what the entry reaches today', () => {
+    expect(roots.length).toBeGreaterThan(20)
+    for (const f of fromEntry.files) expect(walk.files).toContain(f)
+    // R2, in one assertion: the widening is load-bearing only if it sees files the entry
+    // does not. A module lands, then gets wired up — the guard must judge it at landing.
+    const unreached = roots.filter((r) => !fromEntry.files.includes(r))
+    expect(walk.files.length).toBeGreaterThanOrEqual(fromEntry.files.length + unreached.length)
   })
 
   it('never reaches a native or Node-only module', () => {
@@ -100,7 +151,7 @@ describe('the browser graph', () => {
       const askers = walk.externals.get(banned)
       expect(
         askers ?? null,
-        `${banned} is reachable from the browser entry via:\n  ${(askers ?? []).join('\n  ')}`,
+        `${banned} is reachable from a bundlable web source via:\n  ${(askers ?? []).join('\n  ')}`,
       ).toBeNull()
     }
     // …including through a file of ours that imports it directly
@@ -113,6 +164,27 @@ describe('the browser graph', () => {
 
   it('crosses the wire with nothing but the allowlist', () => {
     expect([...walk.externals.keys()].sort()).toEqual([...BROWSER_SAFE_IMPORTS].sort())
+  })
+
+  it('THE BATCH-1 LEAK: the engine ROOT is a banned door, its deep paths are not', () => {
+    // `import type { WorldState } from '@sj/engine'` — the literal line task 62 shipped.
+    expect(bannedReachableFrom('@sj/engine')).toContain('better-sqlite3')
+    expect(bannedReachableFrom('@sj/engine/state')).toEqual([])
+    expect(bannedReachableFrom('@sj/engine/laws')).toEqual([])
+    expect(bannedReachableFrom('@sj/shared')).toEqual([])
+    // and no bundlable source may open a banned door, wherever in src it lives
+    for (const file of walk.files) {
+      for (const spec of specifiersOf(file)) {
+        if (!spec.startsWith('@sj/')) continue
+        expect(bannedReachableFrom(spec), `${file} imports ${spec}`).toEqual([])
+      }
+    }
+  })
+
+  it('counts a dynamic import as a wire crossing too', () => {
+    expect(specifiersOfSource("const m = await import('@sj/engine')")).toEqual(['@sj/engine'])
+    expect(specifiersOfSource("import x from 'a'\nexport * from 'b'\nimport 'c'"))
+      .toEqual(expect.arrayContaining(['a', 'b', 'c']))
   })
 
   it('keeps the one aliased builtin actually aliased', () => {
