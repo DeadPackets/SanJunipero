@@ -106,6 +106,16 @@ export const SEASON_COMMISSIONS: Record<Season, string> = {
   winter: 'under winter: cool blue-shadowed frost over it, the colour evenly drained',
 }
 
+// TERRAIN V2.1 (controller, final art round): the plaza cobble reads beautifully at plaza
+// scale and as a noisy stone-string on a 16px ribbon. Thin runs get their own CALM material —
+// same warm sand family, same mean, much lower contrast — and the plaza keeps its cobbles.
+export const CALM_ROAD_NAME = 'road-calm'
+export const CALM_ROAD_ID = `terrain:${CALM_ROAD_NAME}:0`
+export const CALM_ROAD_COMMISSION =
+  'A packed sandy footpath surface, walked smooth: fine warm sand with only a few small ' +
+  'pebbles pressed flush into it, very low contrast, almost even in tone, no cobbles, no ' +
+  'paving stones, no joints or grout lines, no ruts.'
+
 export const ROAD_COMMISSION =
   'A packed-stone town road surface: uniform small cream and warm-grey cobbles of even size ' +
   'with fine pale grit between them, the same all over, no kerb, no grass, no ruts, no large ' +
@@ -118,6 +128,7 @@ export type TerrainItem = { assetId: string; commission: string; generateFrom?: 
   | { sort: 'ground'; kind: TerrainTileKind; variant: number }
   | { sort: 'road'; roadKey: RoadAutotileKey }
   | { sort: 'season'; season: Season }
+  | { sort: 'material'; name: string }
 )
 
 type IdInput =
@@ -156,6 +167,10 @@ export function planTerrainProgram(): TerrainItem[] {
       out.push({ sort: 'ground', kind, variant, assetId: terrainAssetId({ sort: 'ground', kind, variant }), commission })
     }
   }
+  out.push({
+    sort: 'material', name: CALM_ROAD_NAME, assetId: CALM_ROAD_ID,
+    commission: CALM_ROAD_COMMISSION,
+  })
   for (const roadKey of ROAD_AUTOTILE_KEYS) {
     out.push({
       sort: 'road', roadKey, assetId: terrainAssetId({ sort: 'road', roadKey }),
@@ -367,6 +382,12 @@ export function gradeMaterial(m: RawImage, grade: Grade): RawImage {
 export const MATERIAL_GRADES: Record<string, Grade> = {
   grass: { targetMean: [151, 184, 119], contrast: 0.6, coolOnly: true },
   road: { targetMean: [205, 183, 148], contrast: 0.85, noRose: true },
+  // The calm variant came back almost FLAT — 90.6% a single palette entry at SD 8 — and a
+  // large flat warm tan against a sage field reads chromatic (the "salmon" stretch), even
+  // though the material contains no rose whatever: it is v1's own ROAD_BASE and ROAD_EDGE
+  // plus two neutral greys. So it is nudged UP, to keep some grit while staying far under
+  // the plaza cobble's SD 28.
+  [CALM_ROAD_NAME]: { targetMean: [205, 183, 148], contrast: 1.2, noRose: true },
 }
 
 // The picture the vision judge scores TILING on: the same square nine times, so a seam or a

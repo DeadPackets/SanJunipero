@@ -4,8 +4,8 @@ import type { TileId } from '@sj/engine/state'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { ROAD_TILE_ID } from './tileset.js'
 import {
-  MATERIAL_REPEAT_PX, ROAD_UNDER, groundArtSignature, groundField, materialUv, resolveMaterial,
-  roadArms, roadRibbonPolys, roadShoulderPolys, roadStripFrame,
+  CALM_ROAD_KIND, MATERIAL_REPEAT_PX, ROAD_UNDER, groundArtSignature, groundField, isRoadMass,
+  materialUv, resolveMaterial, roadArms, roadRibbonPolys, roadShoulderPolys, roadStripFrame,
 } from './groundField.js'
 
 const material = (kind: string, seq: number): AssetRecord => ({
@@ -389,5 +389,81 @@ describe('a road run is CONNECTED', () => {
     const t = road(12, [[2, 2], [3, 2], [4, 2], [8, 8], [9, 8], [10, 8]])
     const r = rasterRun(t)
     expect(reaches(r, centreOf(r, 2, 2), centreOf(r, 10, 8))).toBe(false)
+  })
+})
+
+
+// TERRAIN V2.1. The plaza cobble reads right at plaza scale and as a noisy stone-string on a
+// 16px ribbon, so thin runs draw from a calmer material. The rule has to separate a wide area
+// from a one-tile-wide run, and "belongs to a fully-road 2x2 block" is the simplest one that
+// actually does — including at a crossroads, where each 2x2 still holds a diagonal of grass.
+describe('mass vs ribbon', () => {
+  const grid = (n: number, cells: Array<[number, number]>): TileId[][] => {
+    const t: TileId[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 0 as TileId))
+    for (const [x, y] of cells) t[y]![x] = ROAD_TILE_ID as TileId
+    return t
+  }
+  const block = (x0: number, y0: number, w: number, h: number): Array<[number, number]> => {
+    const out: Array<[number, number]> = []
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) out.push([x, y])
+    return out
+  }
+
+  it('EVERY tile of a plaza is mass — edges and corners too', () => {
+    const t = grid(12, block(3, 3, 5, 5))
+    for (let y = 3; y < 8; y++) for (let x = 3; x < 8; x++) {
+      expect(isRoadMass(t, x, y), `${x},${y}`).toBe(true)
+    }
+  })
+
+  it('NO tile of a one-wide run is mass, in either direction', () => {
+    const ns = grid(12, [[5, 2], [5, 3], [5, 4], [5, 5], [5, 6]])
+    for (let y = 2; y <= 6; y++) expect(isRoadMass(ns, 5, y), `ns ${y}`).toBe(false)
+    const ew = grid(12, [[2, 5], [3, 5], [4, 5], [5, 5], [6, 5]])
+    for (let x = 2; x <= 6; x++) expect(isRoadMass(ew, x, 5), `ew ${x}`).toBe(false)
+  })
+
+  it('a crossroads of two thin runs is STILL a ribbon — each 2x2 holds a diagonal of grass', () => {
+    const t = grid(12, [[5, 3], [5, 4], [5, 5], [5, 6], [5, 7], [3, 5], [4, 5], [6, 5], [7, 5]])
+    expect(roadArms('cross')).toEqual({ n: true, e: true, s: true, w: true })
+    expect(isRoadMass(t, 5, 5)).toBe(false)
+  })
+
+  it('a 2x2 patch is the smallest thing that counts as mass', () => {
+    const t = grid(8, block(3, 3, 2, 2))
+    for (const [x, y] of block(3, 3, 2, 2)) expect(isRoadMass(t, x, y), `${x},${y}`).toBe(true)
+  })
+
+  it('splits the field into a calm ribbon layer and a cobbled mass layer', () => {
+    const t = grid(14, [...block(4, 4, 4, 4), [9, 5], [10, 5], [11, 5]])
+    const records = [
+      { id: 'cob', seq: 1, class: 'terrain', kind: 'material:road', status: 'ready', desc: 'r',
+        meta: null, footprint: { w: 1, h: 1 }, widthPx: 256, heightPx: 256,
+        score: 10, attempts: 1, costUsd: 0, createdAt: 'x' },
+      { id: 'calm', seq: 2, class: 'terrain', kind: 'material:road-calm', status: 'ready', desc: 'c',
+        meta: null, footprint: { w: 1, h: 1 }, widthPx: 256, heightPx: 256,
+        score: 10, attempts: 1, costUsd: 0, createdAt: 'x' },
+    ] as unknown as AssetRecord[]
+    const f = groundField(t, records)
+    const calm = f.layers.find((l) => l.id === CALM_ROAD_KIND)!
+    const cobble = f.layers.find((l) => l.id === 'road')!
+    expect(calm.url).toBe('/assets/calm.png')
+    expect(cobble.url).toBe('/assets/cob.png')
+    expect(cobble.shapes).toHaveLength(16)          // the 4x4 mass
+    expect(calm.shapes).toHaveLength(3)             // the thin spur
+    // both are road, so both keep the rim rule and both draw over the ground
+    expect(calm.kind).toBe('road')
+    expect(f.layers.at(-1)!.kind).toBe('road')
+  })
+
+  it('falls back to the cobble material when no calm one has been generated', () => {
+    const t = grid(10, [[4, 4], [5, 4], [6, 4]])
+    const records = [
+      { id: 'cob', seq: 1, class: 'terrain', kind: 'material:road', status: 'ready', desc: 'r',
+        meta: null, footprint: { w: 1, h: 1 }, widthPx: 256, heightPx: 256,
+        score: 10, attempts: 1, costUsd: 0, createdAt: 'x' },
+    ] as unknown as AssetRecord[]
+    expect(groundField(t, records).layers.find((l) => l.id === CALM_ROAD_KIND)!.url)
+      .toBe('/assets/cob.png')
   })
 })

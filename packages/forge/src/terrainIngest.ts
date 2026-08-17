@@ -15,8 +15,8 @@ import {
   paintTerrainTile,
 } from './terrainTiles.js'
 import {
-  GROUND_VARIANTS, MATERIAL_PX, ROAD_MATERIAL_ID, diamondFromMaterial, seasonTintFrom,
-  stencilRoadTile, terrainAssetId,
+  CALM_ROAD_ID, CALM_ROAD_NAME, GROUND_VARIANTS, MATERIAL_PX, ROAD_MATERIAL_ID,
+  diamondFromMaterial, seasonTintFrom, stencilRoadTile, terrainAssetId,
 } from './terrainGen.js'
 import { paintRoadAutotile } from './roadTiles.js'
 
@@ -133,6 +133,21 @@ export async function registerGeneratedTerrain(
       status: 'ready', score: 10, attempts: 1, costUsd: 0,
     }))
     kinds.push(materialKind(kind))
+  }
+
+  // TERRAIN V2.1: the calm ribbon material has no TileId — a road tile picks between it and
+  // the cobble by SHAPE, so it is registered as a material and nothing else.
+  const calm = materialFor(book, CALM_ROAD_ID)
+  if (calm !== null) {
+    generated++
+    records.push(codex.register({
+      class: 'terrain', desc: `material: ${CALM_ROAD_NAME}`, kind: materialKind(CALM_ROAD_NAME),
+      meta: JSON.stringify({ version: 'v2-terrain-material', kind: 'road', wPx: calm.width, hPx: calm.height }),
+      footprint: { w: 1, h: 1 }, png: await encodePng(calm),
+      widthPx: calm.width, heightPx: calm.height,
+      status: 'ready', score: 10, attempts: 1, costUsd: 0,
+    }))
+    kinds.push(materialKind(CALM_ROAD_NAME))
   }
 
   for (const kind of TERRAIN_TILE_KINDS) {

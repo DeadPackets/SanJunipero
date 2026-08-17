@@ -43,7 +43,7 @@ export function groundArtSignature(records: AssetRecord[]): number {
   return n
 }
 
-export function resolveMaterial(records: AssetRecord[], kind: TerrainTileKind): string | null {
+export function resolveMaterial(records: AssetRecord[], kind: string): string | null {
   let best: AssetRecord | null = null
   for (const r of records) {
     if (r.status !== 'ready' || r.class !== 'terrain' || r.kind !== materialKind(kind)) continue
@@ -56,6 +56,8 @@ export function resolveMaterial(records: AssetRecord[], kind: TerrainTileKind): 
 export type MaskShape = { sx: number; sy: number; roadKey: RoadAutotileKey | null }
 
 export type FieldLayer = {
+  /** identity — two layers can share a `kind` and draw from different materials */
+  id: string
   kind: TerrainTileKind
   /** the continuous material to lay under this layer's mask; null → flat fallback colour */
   url: string | null
@@ -74,6 +76,23 @@ export type GroundField = {
 
 export const ROAD_UNDER: TerrainTileKind = 'grass'
 
+// TERRAIN V2.1: the plaza cobble is right at plaza scale and reads as a noisy stone-string on
+// a 16px ribbon. So a road tile draws from one of two materials, and the rule for which is the
+// simplest one that actually separates a wide area from a one-tile-wide run: a tile is MASS if
+// it belongs to any fully-road 2x2 block. Every tile of a plaza does, including its edges and
+// corners; no tile of a 1-wide run ever does, not even where two runs cross, because each 2x2
+// there still contains a diagonal of grass.
+export const CALM_ROAD_KIND = 'road-calm'
+
+export function isRoadMass(terrain: TileId[][], x: number, y: number): boolean {
+  const isRoad = (px: number, py: number): boolean => terrain[py]?.[px] === ROAD_TILE_ID
+  for (const [ox, oy] of [[0, 0], [-1, 0], [0, -1], [-1, -1]] as const) {
+    if (isRoad(x + ox, y + oy) && isRoad(x + ox + 1, y + oy)
+      && isRoad(x + ox, y + oy + 1) && isRoad(x + ox + 1, y + oy + 1)) return true
+  }
+  return false
+}
+
 // Layer order is TERRAIN_TILE_KINDS order with road last, so a road ribbon is drawn over the
 // ground it runs through rather than punched out of it.
 const LAYER_ORDER: TerrainTileKind[] =
@@ -83,6 +102,8 @@ export function groundField(terrain: TileId[][], records: AssetRecord[]): Ground
   const h = terrain.length
   const w = terrain[0]?.length ?? 0
   const shapes = new Map<TerrainTileKind, MaskShape[]>()
+  const mass: MaskShape[] = []      // plaza-scale road, the cobble material
+  const ribbon: MaskShape[] = []    // one-tile-wide runs, the calm material
   const push = (kind: TerrainTileKind, s: MaskShape): void => {
     const list = shapes.get(kind)
     if (list === undefined) shapes.set(kind, [s])
@@ -97,9 +118,10 @@ export function groundField(terrain: TileId[][], records: AssetRecord[]): Ground
       const kind = tileKind(id)
       if (id === ROAD_TILE_ID) {
         // the diamond under the ribbon belongs to the ground the road runs through, and the
-        // ribbon itself is a shaped mask over the road material
+        // ribbon itself is a shaped mask over one of the two road materials
         push(ROAD_UNDER, { sx, sy, roadKey: null })
-        push('road', { sx, sy, roadKey: roadAutotile(roadNeighborsAt(terrain, x, y)) })
+        const key = roadAutotile(roadNeighborsAt(terrain, x, y))
+        ;(isRoadMass(terrain, x, y) ? mass : ribbon).push({ sx, sy, roadKey: key })
         continue
       }
       push(kind, { sx, sy, roadKey: null })
@@ -108,12 +130,29 @@ export function groundField(terrain: TileId[][], records: AssetRecord[]): Ground
 
   const layers: FieldLayer[] = []
   for (const kind of LAYER_ORDER) {
+    if (kind === 'road') continue
     const list = shapes.get(kind)
     if (list === undefined || list.length === 0) continue
     layers.push({
-      kind, shapes: list,
+      id: kind, kind, shapes: list,
       url: resolveMaterial(records, kind),
       fallback: TILE_COLORS[ID_OF_KIND.get(kind) ?? 0],
+    })
+  }
+  // road last, over the ground it runs through; calm ribbons and cobbled mass are disjoint
+  // sets of tiles, so their order relative to each other never matters
+  const roadFallback = TILE_COLORS[ROAD_TILE_ID]
+  if (ribbon.length > 0) {
+    layers.push({
+      id: CALM_ROAD_KIND, kind: 'road', shapes: ribbon, fallback: roadFallback,
+      // a town with no calm material yet falls back to the cobble one, then to flat colour
+      url: resolveMaterial(records, CALM_ROAD_KIND) ?? resolveMaterial(records, 'road'),
+    })
+  }
+  if (mass.length > 0) {
+    layers.push({
+      id: 'road', kind: 'road', shapes: mass, fallback: roadFallback,
+      url: resolveMaterial(records, 'road'),
     })
   }
 

@@ -56,7 +56,7 @@ const provenance: Record<string, { h: number; v: number; ring: number; deframed:
 for (const [assetId, raw] of [...book]) {
   const { material: deframed, passes } = deframe(raw)
   // tone grading, measured against the v1 materials the user accepted structurally
-  const kindOf = /^terrain:([a-z]+):0$/.exec(assetId)?.[1] ?? ''
+  const kindOf = /^terrain:([a-z-]+):0$/.exec(assetId)?.[1] ?? ''
   const grade = MATERIAL_GRADES[kindOf]
   const material = grade === undefined ? deframed : gradeMaterial(deframed, grade)
   if (grade !== undefined) {

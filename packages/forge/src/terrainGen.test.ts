@@ -4,7 +4,7 @@ import { MASTER_PALETTE } from './palette.js'
 import type { RawImage } from './post/raw.js'
 import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js'
 import {
-  BORDER_TOLERANCE, CANDIDATE_MARGIN, MATERIAL_PX, ROAD_MATERIAL_ID, SEAM_TOLERANCE,
+  BORDER_TOLERANCE, CALM_ROAD_ID, CANDIDATE_MARGIN, MATERIAL_PX, ROAD_MATERIAL_ID, SEAM_TOLERANCE,
   DEFRAME_MAX_PASSES, TERRAIN_COMMISSIONS, TILING_CRITERION_PROMPT, borderReport, cropMargin,
   deframe, toMaterialGrid,
   diamondFromMaterial, generationItems, materialFromCandidate, planTerrainProgram, seamReport,
@@ -219,9 +219,11 @@ describe('generationItems', () => {
     expect(plan.filter((p) => p.sort === 'road').every((p) => p.generateFrom === ROAD_MATERIAL_ID)).toBe(true)
   })
 
-  it('is every ground plus every season, and nothing else', () => {
-    expect(gen).toHaveLength(TERRAIN_TILE_KINDS.length + 4)
-    expect(new Set(gen.map((p) => p.sort))).toEqual(new Set(['ground', 'season']))
+  it('is every ground, the calm ribbon material, and every season', () => {
+    // +1 for road-calm: TERRAIN V2.1 gives thin runs their own quieter surface
+    expect(gen).toHaveLength(TERRAIN_TILE_KINDS.length + 1 + 4)
+    expect(new Set(gen.map((p) => p.sort))).toEqual(new Set(['ground', 'material', 'season']))
+    expect(gen.filter((p) => p.sort === 'material').map((p) => p.assetId)).toEqual([CALM_ROAD_ID])
   })
 
   it('names a material that the program actually generates for every derived piece', () => {

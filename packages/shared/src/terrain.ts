@@ -9,7 +9,9 @@ export const TerrainTileKindSchema = z.enum(TERRAIN_TILE_KINDS)
 // and the renderer reads it, so — like roadAutotileKind — it lives here or it drifts.
 export const MATERIAL_KIND_PREFIX = 'material:'
 
-export function materialKind(kind: TerrainTileKind): string {
+// widened past TerrainTileKind on purpose: TERRAIN V2.1 adds `road-calm`, a material with no
+// TileId of its own — a road tile picks between it and `road` by shape, not by terrain id.
+export function materialKind(kind: string): string {
   return `${MATERIAL_KIND_PREFIX}${kind}`
 }
 
