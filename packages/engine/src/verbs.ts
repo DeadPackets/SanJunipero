@@ -1515,6 +1515,14 @@ const teach: VerbDef = makeVerb({
   skill: { track: 'scholarship', xp: 1 },
 })
 
+// How deep the wound goes, as a clock the body then carries. `agent_injured` takes the hp and
+// remembers the day; the affliction is what a death can be attributed to, and it is the only
+// thing that carries the hand behind the blow — without it `slain` is a word DEATH_CAUSES holds
+// and the world can never produce (gap found by GATE G11a).
+const INJURY_SEVERITY: Readonly<Record<'minor' | 'serious' | 'grave', number>> = {
+  minor: 1, serious: 2, grave: 3,
+}
+
 const attack: VerbDef = makeVerb({
   kind: 'attack',
   validate(state, _config, agentId, params) {
@@ -1536,7 +1544,14 @@ const attack: VerbDef = makeVerb({
     const margin = Math.abs(scoreA - scoreB)
     const loserId = scoreA < scoreB ? agentId : p.targetId
     const kind = margin < 0.2 ? 'minor' : margin < 0.5 ? 'serious' : 'grave'
-    return [{ type: 'agent_injured', payload: { agentId: loserId, kind } }]
+    const winnerId = loserId === agentId ? p.targetId : agentId
+    return [
+      { type: 'agent_injured', payload: { agentId: loserId, kind } },
+      {
+        type: 'agent_afflicted',
+        payload: { agentId: loserId, kind: 'injury', severity: INJURY_SEVERITY[kind], sourceId: winnerId },
+      },
+    ]
   },
   rngStream: 'combat',
 })

@@ -240,9 +240,11 @@ describe('verb: attack', () => {
     const s = makeWorld()
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c1').get('combat'))).toEqual([
       { type: 'agent_injured', payload: { agentId: 'a2', kind: 'grave' } },
+      { type: 'agent_afflicted', payload: { agentId: 'a2', kind: 'injury', severity: 3, sourceId: 'a1' } },
     ])
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c6').get('combat'))).toEqual([
       { type: 'agent_injured', payload: { agentId: 'a1', kind: 'grave' } },
+      { type: 'agent_afflicted', payload: { agentId: 'a1', kind: 'injury', severity: 3, sourceId: 'a2' } },
     ])
   })
 
@@ -250,9 +252,11 @@ describe('verb: attack', () => {
     const s = makeWorld()
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c2').get('combat'))).toEqual([
       { type: 'agent_injured', payload: { agentId: 'a2', kind: 'minor' } },
+      { type: 'agent_afflicted', payload: { agentId: 'a2', kind: 'injury', severity: 1, sourceId: 'a1' } },
     ])
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c3').get('combat'))).toEqual([
       { type: 'agent_injured', payload: { agentId: 'a2', kind: 'serious' } },
+      { type: 'agent_afflicted', payload: { agentId: 'a2', kind: 'injury', severity: 2, sourceId: 'a1' } },
     ])
   })
 
@@ -262,6 +266,7 @@ describe('verb: attack', () => {
     // seed w3: raw rollA 0.9315 > raw rollB 0.1737, but weight 0.1 drops scoreA below scoreB
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('w3').get('combat'))).toEqual([
       { type: 'agent_injured', payload: { agentId: 'a1', kind: 'minor' } },
+      { type: 'agent_afflicted', payload: { agentId: 'a1', kind: 'injury', severity: 1, sourceId: 'a2' } },
     ])
   })
 
