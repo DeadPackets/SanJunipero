@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, Matrix, RenderTexture, Sprite, TextureSource } from 'pixi.js'
-import type { FederatedPointerEvent, Texture } from 'pixi.js'
+import type { ApplicationOptions, FederatedPointerEvent, Texture } from 'pixi.js'
 import type { AssetRecord } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
@@ -139,10 +139,24 @@ export type Scene = {
   destroy(): void
 }
 
+// Pixi defaults to one backing pixel per CSS pixel. On a DPR-2 screen the browser then resamples
+// the whole canvas, so NEAREST art and every in-canvas glyph arrive soft. `autoDensity` keeps the
+// CSS box (and therefore `app.screen`, which all the camera maths is written in) unchanged.
+export function rendererOptions(rootEl: HTMLElement, dpr: number): Partial<ApplicationOptions> {
+  return {
+    antialias: false,
+    roundPixels: true,
+    background: BACKGROUND,
+    resizeTo: rootEl,
+    resolution: Number.isFinite(dpr) && dpr > 0 ? dpr : 1,
+    autoDensity: true,
+  }
+}
+
 export async function createScene(rootEl: HTMLElement, store: WorldStore): Promise<Scene> {
   TextureSource.defaultOptions.scaleMode = 'nearest' // global NEAREST law — before any texture exists
   const app = new Application()
-  await app.init({ antialias: false, roundPixels: true, background: BACKGROUND, resizeTo: rootEl })
+  await app.init(rendererOptions(rootEl, globalThis.devicePixelRatio))
   rootEl.appendChild(app.canvas)
   // resizeTo only tracks window resizes; panel open/close changes the root element itself
   const ro = new ResizeObserver(() => app.resize())
