@@ -11,7 +11,7 @@ import {
   AgentDrank, FireExtinguished, FireIgnited, FireSpread, GravePlaced, HpChanged, ThirstChanged,
   ItemBroke, ItemFilled, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
   ConfigChanged,
-  FaunaKilled, FaunaMoved, FaunaSpawned,
+  FaunaKilled, FaunaMoved, FaunaSpawned, FaunaStockChanged,
   ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, TileChanged, TrafficDecayed, WeatherChanged, WildlifeChanged,
@@ -623,6 +623,12 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
         fauna[m.id] = { ...f, x: m.x, y: m.y }
       }
       return { ...state, fauna }
+    }
+    case 'fauna_stock_changed': {
+      const p = FaunaStockChanged.parse(event.payload)
+      const f = state.fauna?.[p.id]
+      if (!f) throw new Error(`fauna_stock_changed for unknown fauna ${p.id}`)
+      return { ...state, fauna: { ...state.fauna, [p.id]: { ...f, stock: p.stock } } }
     }
     case 'fauna_killed': {
       const p = FaunaKilled.parse(event.payload)

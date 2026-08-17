@@ -5,11 +5,13 @@ import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
 import { bridgeAt, BRIDGE_KIND, findPath, isPassable } from './path.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
+import { fleeTo } from './systems/fauna.js'
+import { FAUNA_YIELD, type FaunaKind } from './data/faunaDefs.js'
 
 export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
   | 'walk' | 'sleep' | 'wake' | 'enter' | 'exit' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
-  | 'build' | 'craft' | 'extinguish' | 'drink' | 'fill'
+  | 'build' | 'craft' | 'extinguish' | 'drink' | 'fill' | 'hunt'
   | 'speak' | 'give' | 'take' | 'stow' | 'write' | 'read' | 'inscribe' | 'teach' | 'attack' | 'experiment'
 
 export type VerbDef = {
@@ -447,6 +449,36 @@ const harvest: VerbDef = makeVerb({
   skill: { track: 'farming', xp: 1 },
 })
 
+// How far from the cast a school still counts as "where the fish are".
+export const FISH_SCHOOL_RADIUS = 2
+
+// The school a cast reaches, if any: the nearest one in id order. Gated on the fauna law, so
+// with the entity layer off the C9 catch chance is exactly what it always was.
+export function schoolNear(
+  state: WorldState, config: SimConfig, x: number, y: number,
+): { id: string; stock: number } | null {
+  if (!config.fauna.enabled) return null
+  for (const id of Object.keys(state.fauna ?? {}).sort()) {
+    const f = state.fauna![id]!
+    if (f.kind !== 'fish' || !f.alive) continue
+    if (Math.max(Math.abs(f.x - x), Math.abs(f.y - y)) > FISH_SCHOOL_RADIUS) continue
+    return { id, stock: f.stock ?? 1 }
+  }
+  return null
+}
+
+// The one derivation of a cast's odds (G4): season and school compose on top of skill, which
+// is why winter's 0.5 and a school's 2x cancel to exactly the plain-day chance.
+export function fishCatchChance(
+  state: WorldState, config: SimConfig, agentId: string, x: number, y: number,
+): number {
+  const winter = simTimeFromTick(state.tick).season === 'winter'
+  return config.wildlife.fishCatchBase
+    * (1 + skillLevel(state, agentId, 'fishing', config) / 10)
+    * (winter ? config.seasons.winter.fishCatchMultiplier : 1)
+    * (schoolNear(state, config, x, y) === null ? 1 : config.fauna.fishSchoolBonus)
+}
+
 const fish: VerbDef = makeVerb({
   kind: 'fish',
   validate(state, _config, agentId, params) {
@@ -456,19 +488,80 @@ const fish: VerbDef = makeVerb({
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to the water'
     return null
   },
-  onComplete(state, config, agentId, _params, rng) {
+  onComplete(state, config, agentId, params, rng) {
     if (state.wildlife.fish <= 0) return []
-    const winter = simTimeFromTick(state.tick).season === 'winter'
-    const chance = config.wildlife.fishCatchBase * (1 + skillLevel(state, agentId, 'fishing', config) / 10)
-      * (winter ? config.seasons.winter.fishCatchMultiplier : 1)
-    if (rng.next() >= chance) return []
+    const p = TileParams.parse(params)
+    const school = schoolNear(state, config, p.x, p.y)
+    if (rng.next() >= fishCatchChance(state, config, agentId, p.x, p.y)) return []
     return [
+      // A school is a place the fish are, not a second stock of them: both books move.
+      ...(school === null
+        ? []
+        : [school.stock > 1
+            ? { type: 'fauna_stock_changed', payload: { id: school.id, stock: school.stock - 1 } }
+            : { type: 'fauna_killed', payload: { id: school.id, kind: 'fish', x: p.x, y: p.y, byId: agentId } }]),
       { type: 'wildlife_changed', payload: { fish: state.wildlife.fish - 1 } },
       { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: FISH_KIND, qty: 1, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId), ...spoilageFor(state, FISH_KIND, config) } },
     ]
   },
   skill: { track: 'fishing', xp: 1 },
   rngStream: 'wildlife',
+})
+
+export const HuntParams = z.object({ faunaId: z.string() }).strict()
+
+// Not a dial. `RecipeSchema` has no weapon column and `SimConfigSchema` is closed after Task 2
+// (G6), so the list of things that can take an animal lives here until a schema task reopens it.
+export const WEAPON_KINDS: ReadonlySet<string> = new Set(['knife'])
+// A school is not hunted; it is fished. These two are what a knife and a close approach can take.
+export const HUNTABLE_KINDS: ReadonlySet<FaunaKind> = new Set<FaunaKind>(['deer', 'rabbit'])
+
+// Skill against the animal's difficulty: a novice takes one deer in four, and enough seasons at
+// it make the approach certain. Rolled at emission from the `fauna` stream.
+export function huntChance(state: WorldState, config: SimConfig, agentId: string, kind: 'deer' | 'rabbit'): number {
+  const difficulty = config.fauna.huntDifficulty[kind]
+  return Math.min(1, (1 + skillLevel(state, agentId, 'foraging', config)) / (1 + difficulty))
+}
+
+const hunt: VerbDef = makeVerb({
+  kind: 'hunt',
+  validate(state, _config, agentId, params) {
+    const p = HuntParams.safeParse(params)
+    if (!p.success) return 'hunt needs a {faunaId}'
+    const f = state.fauna?.[p.data.faunaId]
+    if (!f || !f.alive) return 'nothing there to hunt'
+    if (!HUNTABLE_KINDS.has(f.kind)) return 'that is not something you can run down'
+    const a = state.agents[agentId]!
+    if (Math.max(Math.abs(a.x - f.x), Math.abs(a.y - f.y)) > 1) return 'too far off to reach'
+    if (!Object.values(state.items).some(
+      (i) => WEAPON_KINDS.has(i.kind) && i.loc.t === 'agent' && i.loc.id === agentId,
+    )) return 'you have nothing to hunt with'
+    return null
+  },
+  onComplete(state, config, agentId, params, rng) {
+    const p = HuntParams.parse(params)
+    const f = state.fauna?.[p.faunaId]
+    if (!f || !f.alive || !HUNTABLE_KINDS.has(f.kind)) return []
+    const a = state.agents[agentId]!
+    if (Math.max(Math.abs(a.x - f.x), Math.abs(a.y - f.y)) > 1) return []
+    if (rng.next() >= huntChance(state, config, agentId, f.kind as 'deer' | 'rabbit')) {
+      const to = fleeTo(state, f.kind, f, a)
+      if (to.x === f.x && to.y === f.y) return []
+      return [{ type: 'fauna_moved', payload: { moves: [{ id: p.faunaId, x: to.x, y: to.y }] } }]
+    }
+    return [
+      { type: 'fauna_killed', payload: { id: p.faunaId, kind: f.kind, x: f.x, y: f.y, byId: agentId } },
+      ...FAUNA_YIELD[f.kind].map((y, i) => ({
+        type: 'item_spawned',
+        payload: {
+          id: mintId(state, 'item', i), kind: y.kind, qty: y.qty, loc: { t: 'agent', id: agentId },
+          ...ownerStamp(config, agentId), ...spoilageFor(state, y.kind, config),
+        },
+      })),
+    ]
+  },
+  skill: { track: 'foraging', xp: 1 },
+  rngStream: 'fauna',
 })
 
 const forage: VerbDef = makeVerb({
@@ -1031,7 +1124,7 @@ const experiment: VerbDef = makeVerb({
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
-  drink, fill, dig_channel: digChannel, douse, pave,
+  drink, fill, dig_channel: digChannel, douse, pave, hunt,
   speak, give, take, stow, write, read, inscribe, teach, attack, experiment,
 }
 

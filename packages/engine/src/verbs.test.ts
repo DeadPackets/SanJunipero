@@ -1,12 +1,14 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { DEFAULT_CONFIG, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  DAYS_PER_SEASON, DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, type SimConfig, type SimEvent,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { composePerception } from './perception.js'
 import { stepCostAt } from './path.js'
 import { RngStreams, type RngStream } from './rng.js'
-import { registerVerb, unregisterVerb, VERBS, type VerbDef } from './verbs.js'
+import { fishCatchChance, huntChance, registerVerb, unregisterVerb, VERBS, type VerbDef } from './verbs.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2, p: 8 }
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
@@ -26,7 +28,7 @@ const testVerb: VerbDef = {
 
 const TIER1 = [
   'walk', 'sleep', 'wake', 'enter', 'exit', 'eat', 'tend', 'till', 'plant', 'harvest', 'fish', 'forage',
-  'build', 'craft', 'extinguish', 'drink', 'fill', 'dig_channel', 'douse', 'pave',
+  'build', 'craft', 'extinguish', 'drink', 'fill', 'dig_channel', 'douse', 'pave', 'hunt',
   'speak', 'give', 'take', 'stow', 'write', 'read', 'inscribe', 'teach', 'attack', 'experiment',
 ]
 
@@ -262,5 +264,124 @@ describe('verb: pave', () => {
     if (!broke.ok) expect(broke.reason).toBe('not enough stone')
     expect(submitIntent(quarried(['....', '....']), CFG, 'a1', 'pave', { x: 3, y: 1 }).ok).toBe(false)
     expect(submitIntent(quarried(['..', '..'], 1, OFF), OFF, 'a1', 'pave', { x: 1, y: 0 }).ok).toBe(false)
+  })
+})
+
+describe('hunt: the caps and the regen ARE the ecology', () => {
+  const CFG = SimConfigSchema.parse({})
+
+  // A stream that hands back one number: a success is a fact of the test, not of a seed.
+  const roll = (v: number): RngStream => ({ next: () => v, int: (n: number) => Math.floor(v * n) }) as unknown as RngStream
+
+  function stalked(kind: string, at: [number, number] = [1, 0], armed = true, rows = ['..', '..']): WorldState {
+    let s = makeWorld(rows)
+    s = fold(s, ev(40, 'fauna_spawned', { id: 'fauna_1', kind, x: at[0], y: at[1] }), CFG)
+    if (armed) {
+      s = fold(s, ev(41, 'item_spawned', { id: 'item_1', kind: 'knife', qty: 1, loc: { t: 'agent', id: 'a1' } }), CFG)
+    }
+    return s
+  }
+
+  const taken = (s: WorldState, v: number) =>
+    VERBS.hunt!.onComplete(s, CFG, 'a1', { faunaId: 'fauna_1' }, roll(v))
+
+  it('a deer taken leaves two cuts of venison and one hide; a rabbit leaves meat and no hide', () => {
+    const deer = taken(stalked('deer'), 0)
+    expect(deer.map((e) => e.type)).toEqual(['fauna_killed', 'item_spawned', 'item_spawned'])
+    expect(deer[0]!.payload).toEqual({ id: 'fauna_1', kind: 'deer', x: 1, y: 0, byId: 'a1' })
+    expect(deer.slice(1).map((e) => e.payload)).toEqual([
+      { id: 'item_2', kind: 'venison', qty: 2, loc: { t: 'agent', id: 'a1' }, owner: 'a1', spoilage: { spawnDay: 0, days: 4 } },
+      { id: 'item_3', kind: 'hide', qty: 1, loc: { t: 'agent', id: 'a1' }, owner: 'a1' },
+    ])
+    const rabbit = taken(stalked('rabbit'), 0).slice(1).map((e) => (e.payload as { kind: string }).kind)
+    expect(rabbit).toEqual(['rabbit_meat'])
+  })
+
+  it('two carcass yields get two ids, and the world folds both', () => {
+    let s = stalked('deer')
+    for (const e of taken(s, 0)) s = fold(s, ev(50, e.type, e.payload), CFG)
+    expect(s.fauna).toBeUndefined()
+    expect(Object.values(s.items).map((i) => i.kind).sort()).toEqual(['hide', 'knife', 'venison'])
+    expect(s.counters.nextEntityId).toBe(4)
+  })
+
+  it('a missed approach spends the animal, not the hunter: it bolts two tiles and drops nothing', () => {
+    const missed = taken(stalked('deer', [1, 0], true, ['....', '....']), 0.99)
+    expect(missed).toEqual([{ type: 'fauna_moved', payload: { moves: [{ id: 'fauna_1', x: 3, y: 0 }] } }])
+  })
+
+  it('the odds are skill against the animal, and they cap at certainty', () => {
+    const s = stalked('deer')
+    expect(huntChance(s, CFG, 'a1', 'deer')).toBeCloseTo(1 / 4)
+    expect(huntChance(s, CFG, 'a1', 'rabbit')).toBeCloseTo(1 / 3)
+    const skilled = fold(s, ev(60, 'skill_gained', { agentId: 'a1', track: 'foraging', xp: 900 }), CFG)
+    expect(huntChance(skilled, CFG, 'a1', 'deer')).toBe(1)
+  })
+
+  it('refuses bare hands, a body out of reach, a school, and a tile with nothing on it', () => {
+    const bare = submitIntent(stalked('deer', [1, 0], false), CFG, 'a1', 'hunt', { faunaId: 'fauna_1' })
+    expect(bare.ok).toBe(false)
+    if (!bare.ok) expect(bare.reason).toBe('you have nothing to hunt with')
+
+    const far = submitIntent(stalked('deer', [2, 0], true, ['...', '...']), CFG, 'a1', 'hunt', { faunaId: 'fauna_1' })
+    expect(far.ok).toBe(false)
+    if (!far.ok) expect(far.reason).toBe('too far off to reach')
+
+    const school = submitIntent(stalked('fish'), CFG, 'a1', 'hunt', { faunaId: 'fauna_1' })
+    expect(school.ok).toBe(false)
+    if (!school.ok) expect(school.reason).toBe('that is not something you can run down')
+
+    const empty = submitIntent(makeWorld(), CFG, 'a1', 'hunt', { faunaId: 'fauna_9' })
+    expect(empty.ok).toBe(false)
+    if (!empty.ok) expect(empty.reason).toBe('nothing there to hunt')
+  })
+})
+
+describe('fish: a school is where the fish are', () => {
+  const CFG = SimConfigSchema.parse({})
+  const OFF = SimConfigSchema.parse({ fauna: { enabled: false } })
+
+  function cast(stock: number | null, config = CFG): WorldState {
+    const s = makeWorld(['.~', '.~'])
+    if (stock === null) return s
+    return fold(s, ev(70, 'fauna_spawned', { id: 'fauna_1', kind: 'fish', x: 1, y: 0, stock }), config)
+  }
+
+  const roll = (v: number): RngStream => ({ next: () => v, int: () => 0 }) as unknown as RngStream
+  const catches = (s: WorldState, v: number, config = CFG) =>
+    VERBS.fish!.onComplete(s, config, 'a1', { x: 1, y: 0 }, roll(v))
+
+  it('doubles the odds within two tiles of a school and leaves them alone with the law off', () => {
+    const plain = fishCatchChance(cast(null), CFG, 'a1', 1, 0)
+    expect(fishCatchChance(cast(3), CFG, 'a1', 1, 0)).toBeCloseTo(plain * 2)
+    expect(fishCatchChance(cast(3, OFF), OFF, 'a1', 1, 0)).toBeCloseTo(plain)
+  })
+
+  it('doubles the measured catch rate over 200 rolls of the same stream', () => {
+    const stream = new RngStreams('school').get('wildlife')
+    const draws = Array.from({ length: 200 }, () => stream.next())
+    const rate = (s: WorldState) => draws.filter((d) => catches(s, d).length > 0).length
+    const without = rate(cast(null))
+    const withSchool = rate(cast(200))
+    expect(without).toBeGreaterThan(0)
+    expect(withSchool / without).toBeGreaterThan(1.7)
+    expect(withSchool / without).toBeLessThan(2.3)
+  })
+
+  it('takes one fish from the school per catch, and the school disbands on the last one', () => {
+    expect(catches(cast(3), 0)[0]).toEqual({ type: 'fauna_stock_changed', payload: { id: 'fauna_1', stock: 2 } })
+    const last = catches(cast(1), 0)
+    expect(last[0]).toEqual({ type: 'fauna_killed', payload: { id: 'fauna_1', kind: 'fish', x: 1, y: 0, byId: 'a1' } })
+    let s = cast(1)
+    for (const e of last) s = fold(s, ev(80, e.type, e.payload), CFG)
+    expect(s.fauna).toBeUndefined()
+    expect(s.wildlife.fish).toBe(CFG.wildlife.fishMax - 1)
+  })
+
+  it('winter halves what the school doubles, and the two compose to exactly the plain day', () => {
+    const plain = fishCatchChance(cast(null), CFG, 'a1', 1, 0)
+    const cold = { ...cast(3), tick: 3 * DAYS_PER_SEASON * MINUTES_PER_DAY }
+    expect(CFG.seasons.winter.fishCatchMultiplier * CFG.fauna.fishSchoolBonus).toBe(1)
+    expect(fishCatchChance(cold, CFG, 'a1', 1, 0)).toBeCloseTo(plain)
   })
 })

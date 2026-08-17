@@ -147,6 +147,10 @@ export const FaunaSpawned = z.object({
 export const FaunaMoved = z.object({
   moves: z.array(z.object({ id: z.string(), x: z.number().int(), y: z.number().int() }).strict()).min(1),
 }).strict()
+// A school is one entity with many fish in it; a catch takes one of them. `fold` is the only
+// writer of world state, so the taking needs an event of its own — a school that reaches zero
+// disbands as `fauna_killed` instead, which is why this one never carries a zero.
+export const FaunaStockChanged = z.object({ id: z.string(), stock: z.number().int().positive() }).strict()
 export const FaunaKilled = z.object({
   id: z.string(), kind: FaunaKindSchema, x: z.number().int(), y: z.number().int(),
   byId: z.string().optional(),

@@ -111,6 +111,8 @@ export function thirstOf(a: { thirst?: number }): number {
   return a.thirst ?? 100
 }
 
-export function mintId(state: WorldState, prefix: string): string {
-  return `${prefix}_${state.counters.nextEntityId}`
+// `offset` is for the rare emitter that mints two ids before either has folded — a carcass
+// that yields meat and a hide. One derivation of an id, still (G4).
+export function mintId(state: WorldState, prefix: string, offset = 0): string {
+  return `${prefix}_${state.counters.nextEntityId + offset}`
 }
