@@ -4,6 +4,7 @@ import type Database from 'better-sqlite3'
 import type { z } from 'zod'
 import { insertAlert, insertLlmCall, makeBudgetGuard, sumCostUsd, type BudgetGuard } from './callLog.js'
 import { FALLBACK_MODELS, MIND_MODEL, PRICE_PER_M, PRICE_PER_M_BY_MODEL, PROVIDER_ORDER } from './pins.js'
+import { repairToSchema } from './repair.js'
 
 export type LlmUsage = {
   inputTokens: number
@@ -22,6 +23,15 @@ type ExecResult<T> = {
 }
 
 export class BudgetExceededError extends Error {}
+
+// A rejected generation still carries its usage; this stands in only when the SDK reports none.
+const EMPTY_USAGE: LanguageModelUsage = {
+  inputTokens: 0,
+  outputTokens: 0,
+  totalTokens: 0,
+  inputTokenDetails: { noCacheTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+  outputTokenDetails: { textTokens: 0, reasoningTokens: 0 },
+}
 
 // `provider.order` is a PREFERENCE; only `allow_fallbacks:false` makes it an allow-list. It
 // was a hardcoded literal, so pinning a provider pinned nothing and the run got the pinned
@@ -112,18 +122,35 @@ export class LlmClient {
     schema: z.ZodType<T>
   }): Promise<{ value: T; usage: LlmUsage }> {
     return this.invoke(async (model) => {
-      const r = await generateText({
-        model,
-        system: opts.system,
-        messages: toModelMessages(opts.messages),
-        maxRetries: 0,
-        maxOutputTokens: this.maxOutputTokens,
-        abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
-        output: Output.object({ schema: opts.schema }),
-      })
-      return {
-        usage: r.usage, value: r.output, servedModel: r.response.modelId,
-        provider: servedProvider(r.response, r.providerMetadata),
+      try {
+        const r = await generateText({
+          model,
+          system: opts.system,
+          messages: toModelMessages(opts.messages),
+          maxRetries: 0,
+          maxOutputTokens: this.maxOutputTokens,
+          abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
+          output: Output.object({ schema: opts.schema }),
+        })
+        return {
+          usage: r.usage, value: r.output, servedModel: r.response.modelId,
+          provider: servedProvider(r.response, r.providerMetadata),
+        }
+      } catch (err) {
+        // The shape was wrong; the content may not have been. GATE G11b day 3 threw away a
+        // chronicle whose title and text were both complete and whole. The repair re-frames
+        // the provider's own bytes and re-checks them against this caller's schema — it never
+        // re-asks and never invents (C11 batch 16 fix 2).
+        if (!NoObjectGeneratedError.isInstance(err)) throw err
+        const repaired = repairToSchema(err.text ?? '', opts.schema)
+        if (repaired === undefined) throw err
+        this.alert('decode_repaired', `${this.caller}: ${repaired.how}`)
+        return {
+          usage: err.usage ?? EMPTY_USAGE,
+          value: repaired.value,
+          servedModel: err.response?.modelId,
+          provider: servedProvider(err.response, undefined),
+        }
       }
     })
   }

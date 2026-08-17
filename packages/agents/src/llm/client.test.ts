@@ -151,6 +151,51 @@ describe('LlmClient.object', () => {
     expect(all[0]!.ok).toBe(0)
   })
 
+  // GATE G11b day 3: a chronicle whose `title` and `text` were both complete and whose shape
+  // was wrong cost the run a night and criterion 11. An answer that only needs reframing is
+  // not a dead call (C11 batch 16 fix 2).
+  it('repairs a shape the decoder refused, logs the call as answered, and says it repaired it', async () => {
+    const db = openDb()
+    const model = mockModel([
+      {
+        text: 'Here is the object you asked for:\n{"mood":"calm","count":3}\nHope that helps.',
+        usage: { inputTokens: 1000, outputTokens: 50, cacheReadTokens: 600 },
+      },
+    ])
+    const client = new LlmClient({ model, db, caller: 'narrator', maxRetries: 2 })
+    const { value, usage } = await client.object({
+      system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA,
+    })
+
+    expect(value).toEqual({ mood: 'calm', count: 3 })
+    // One call, not two: the repair costs nothing and never re-asks.
+    expect(model.doGenerateCalls).toHaveLength(1)
+    const all = rows(db)
+    expect(all).toHaveLength(1)
+    expect(all[0]!.ok).toBe(1)
+    // The tokens were spent whether or not the shape was right, so they are reported.
+    expect(all[0]!.input_tokens).toBe(1000)
+    expect(usage.costUsd).toBeGreaterThan(0)
+    const alerts = db.prepare('SELECT kind, detail FROM alerts').all() as Array<{ kind: string; detail: string }>
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0]!.kind).toBe('decode_repaired')
+    expect(alerts[0]!.detail).toContain('narrator')
+  })
+
+  it('still fails, and still does not re-ask, when the shape cannot be repaired without guessing', async () => {
+    const db = openDb()
+    const model = mockModel([
+      { text: 'The mood was calm but I did not count.' },
+      { json: { mood: 'never reached', count: 0 } },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test', maxRetries: 2 })
+    await expect(
+      client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA }),
+    ).rejects.toThrow(/did not match schema|No object generated/)
+    expect(model.doGenerateCalls).toHaveLength(1)
+    expect(rows(db)[0]!.ok).toBe(0)
+  })
+
   it('rejects when all attempts fail; every row has ok = 0', async () => {
     const db = openDb()
     const model = mockModel([{ fail: true }, { fail: true }, { fail: true }])
