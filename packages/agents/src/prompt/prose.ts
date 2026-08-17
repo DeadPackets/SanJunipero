@@ -197,6 +197,10 @@ function footprintPhrase(w: number, h: number): string {
 export type ProseWorld = {
   isWalkable?(x: number, y: number): boolean
   isEdible?(kind: string): boolean
+  // Where the water is. Nothing in the packet can say: terrain is the one thing perception
+  // never projects, and block 1 now teaches two verbs that need it.
+  waterAtHand?(): boolean
+  nearestWater?(x: number, y: number): { x: number; y: number } | null
 }
 
 // Nearest open tile ringing a structure's footprint (Manhattan to self);
@@ -261,6 +265,18 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   for (const a of packet.self.body.afflictions ?? []) {
     const prose = AFFLICTION_PROSE[a.kind]
     if (prose !== undefined) lines.push(a.severity >= AFFLICTION_SEVERE ? `${prose} It is very bad.` : prose)
+  }
+
+  // Said whenever the body is dry, and never as a refusal: a thirsty mind with no field to
+  // look at answered its throat 204 times in the live run and got water 133 times only
+  // because a throwaway patch told it where to go.
+  if (thirst < 30) {
+    if (world?.waterAtHand?.() === true) {
+      lines.push('Water lies within reach of your hands — you could drink here, or fill what you carry.')
+    } else {
+      const w = world?.nearestWater?.(x, y) ?? null
+      if (w !== null) lines.push(`The nearest water you know of lies at (${w.x}, ${w.y}).`)
+    }
   }
 
   if (hunger < 30 && world?.isEdible) {

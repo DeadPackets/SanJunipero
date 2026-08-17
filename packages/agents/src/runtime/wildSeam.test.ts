@@ -33,6 +33,10 @@ function wild(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
   put('item_spawned', { id: 'item_1', kind: 'knife', qty: 1, loc: { t: 'agent', id: AGENT } })
   put('fauna_spawned', { id: 'fauna_1', kind: 'deer', x: 9, y: 8 })
   put('forageable_spawned', { id: 'node_1', kind: 'berry_bush', x: 7, y: 8, stock: 3 })
+  put('structure_planned', {
+    id: 'structure_1', kind: 'well', x: 12, y: 8, w: 1, h: 1, maxHp: 40, flammable: false, builderId: AGENT,
+  })
+  put('structure_completed', { id: 'structure_1' })
   state = { ...state, tick: 720 }
 
   const worldTick = createWorldTick(config, rng)
@@ -49,6 +53,8 @@ const proseFor = (bridge: EngineBridge): string =>
   perceptionToProse(bridge.perception(AGENT), undefined, {
     isWalkable: (x, y) => bridge.isWalkable(x, y),
     isEdible: (kind) => bridge.isEdible(kind),
+    waterAtHand: () => bridge.waterAtHand(AGENT),
+    nearestWater: (x, y) => bridge.nearestWater(x, y),
   })
 
 describe('the wild seam — prose, intent, verb, the thing taken', () => {
@@ -86,6 +92,25 @@ describe('the wild seam — prose, intent, verb, the thing taken', () => {
     const held = Object.values(loop.state.items).filter((i) => i.loc.t === 'agent' && i.kind === 'berries')
     expect(held).toHaveLength(1)
     expect(loop.state.forageables!.node_1!.stock).toBe(2)
+  })
+
+  // Block 1 now teaches `drink` and `fill`, both of which want water at the elbow, and terrain
+  // is the one thing perception never projects. A dry throat has to have somewhere to look.
+  it('a dry throat is told where the water is, and the well counts as water', async () => {
+    const { bridge, step, loop } = wild()
+    loop.state.agents[AGENT]!.thirst = 10
+    expect(proseFor(bridge)).toContain('The nearest water you know of lies at (12, 8)')
+
+    const walking = bridge.submit(AGENT, { verb: 'walk', params: { x: 11, y: 8 } })
+    step()
+    expect(await walking).toEqual({ ok: true })
+    for (let i = 0; i < 60 && loop.state.agents[AGENT]!.activity !== null; i++) step()
+    loop.state.agents[AGENT]!.thirst = 10
+    expect(proseFor(bridge)).toContain('Water lies within reach of your hands')
+
+    const drinking = bridge.submit(AGENT, { verb: 'drink', params: {} })
+    step()
+    expect(await drinking).toEqual({ ok: true })
   })
 
   it('reproduces the run: with no node named, forage still needs a wood at the elbow', async () => {

@@ -4,6 +4,9 @@ import {
   isPassable,
   recipeTileKind,
   submitIntent,
+  waterWithinReach,
+  WATER_TILES,
+  WELL_KIND,
   type EventStore,
   type TickHandler,
   type TickLoop,
@@ -183,6 +186,39 @@ export class EngineBridge {
 
   isEdible(kind: string): boolean {
     return isFoodKind(this.#simConfig, kind)
+  }
+
+  // Water is terrain, and terrain is the one thing perception never projects: a body that
+  // feels "your throat burns" has no field to answer it with. Both answers come from the
+  // engine's own reach test, so what the prose promises is what `drink` and `fill` accept.
+  waterAtHand(agentId: string): boolean {
+    return waterWithinReach(this.#loop.state, agentId) !== null
+  }
+
+  // The nearest drink, counting a finished well: the town's own well is usually nearer than
+  // the river, and pointing five thirsty founders eighteen tiles west is how a town dies.
+  nearestWater(x: number, y: number, radius = 24): { x: number; y: number } | null {
+    const state = this.#loop.state
+    let best: { x: number; y: number } | null = null
+    let bestD = Infinity
+    const offer = (px: number, py: number): void => {
+      const d = Math.abs(px - x) + Math.abs(py - y)
+      if (d < bestD || (d === bestD && best !== null && (py < best.y || (py === best.y && px < best.x)))) {
+        bestD = d
+        best = { x: px, y: py }
+      }
+    }
+    for (let py = y - radius; py <= y + radius; py++) {
+      for (let px = x - radius; px <= x + radius; px++) {
+        const tile = state.terrain[py]?.[px]
+        if (tile !== undefined && WATER_TILES.has(tile)) offer(px, py)
+      }
+    }
+    for (const id of Object.keys(state.structures).sort()) {
+      const s = state.structures[id]!
+      if (s.kind === WELL_KIND && s.stage === 'complete') offer(s.x, s.y)
+    }
+    return best
   }
 
   // The ground within sight, in the words a recipe may ask for — sorted, deduplicated, and

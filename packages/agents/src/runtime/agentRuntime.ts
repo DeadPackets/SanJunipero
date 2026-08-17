@@ -395,6 +395,8 @@ export class AgentRuntime {
     const prose = perceptionToProse(packet, (detail) => this.#llm.alert('prose', detail), {
       isWalkable: (x, y) => this.#bridge.isWalkable(x, y),
       isEdible: (kind) => this.#bridge.isEdible(kind),
+      waterAtHand: () => this.#bridge.waterAtHand(this.#agentId),
+      nearestWater: (x, y) => this.#bridge.nearestWater(x, y),
     })
     this.#dayLog.push(prose)
 
