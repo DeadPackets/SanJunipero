@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  composePerception, doorTile, findPath, fold, genesisState, makeGenesisWorld, submitIntent,
+  composePerception, doorTile, fold, genesisState, makeGenesisWorld, searchPath, submitIntent,
   type WorldState,
 } from '@sj/engine'
 import { CITY_ANCHOR_DEFAULT, DEFAULT_CONFIG, FOUNDER_IDS, type SimEvent } from '@sj/shared'
@@ -70,59 +70,101 @@ const proseFor = (state: WorldState, agentId: string): string =>
 
 // ------------------------------------------------- candidate 4: distance. REFUTED.
 
+// A capped search returns how far it got, not how far it is: half the genesis forage table
+// is across the river, and `findPath` answers those with a partial that reads like a short
+// walk. Every distance below is a real one.
+function walk(state: WorldState, agentId: string, x: number, y: number): number | null {
+  const r = searchPath(state, state.agents[agentId]!, { x, y }, CFG)
+  return r === null || r.capped ? null : r.path.length
+}
+
+const nearestOfKind = (state: WorldState, agentId: string, kind: string): number | null => {
+  let best: number | null = null
+  for (const n of Object.values(state.forageables ?? {})) {
+    if (n.kind !== kind) continue
+    const d = walk(state, agentId, n.x, n.y)
+    if (d !== null && (best === null || d < best)) best = d
+  }
+  return best
+}
+
 describe('R21 candidate 4 — "distance makes gathering irrational": REFUTED', () => {
-  it('every founder is inside half an hour of a standing berry bush, on a path that exists', () => {
+  it('the bushes that were always there are a twenty-minute walk, and the ground is one tick a tile', () => {
     const s = genesisTown()
-    const steps: Record<string, number> = {}
-    for (const id of FOUNDER_IDS) {
-      const a = s.agents[id]!
-      let best = Infinity
-      for (const n of Object.values(s.forageables ?? {})) {
-        if (n.kind !== 'berry_bush') continue
-        const path = findPath(s, a, { x: n.x, y: n.y }, CFG)
-        if (path !== null && path.length < best) best = path.length
-      }
-      steps[id] = best
-    }
-    // 17 to 21 tiles, and the ground costs one tick a tile to a body that is not debuffed.
-    expect(Object.values(steps).every((n) => n >= 17 && n <= 21)).toBe(true)
+    // The four authored bushes, before R14 put three more in the town's own meadow: 17 to 21
+    // steps from a founder's door, every one of them on a path that finishes.
+    const authored = [{ x: 62, y: 44 }, { x: 68, y: 47 }, { x: 59, y: 92 }, { x: 71, y: 96 }]
+    const nearest = FOUNDER_IDS.map((id) => {
+      const d = authored.map((b) => walk(s, id, b.x, b.y)).filter((n): n is number => n !== null)
+      return Math.min(...d)
+    })
+    expect(nearest).toEqual([20, 18, 17, 18, 21])
     expect(CFG.movement.baseTicksPerTile).toBe(1)
-    // The round trip is 2% of a sixteen-hour waking day. Distance is not what stopped them.
-    const worstRoundTripTicks = Math.max(...Object.values(steps)) * 2 * CFG.movement.baseTicksPerTile
-    expect(worstRoundTripTicks).toBeLessThan(0.05 * 16 * 60)
+    // The worst round trip is under 5% of a sixteen-hour waking day. Distance is not what
+    // stopped them, so this is an effectiveness defect before it is an abundance one.
+    expect(Math.max(...nearest) * 2 * CFG.movement.baseTicksPerTile).toBeLessThan(0.05 * 16 * 60)
   })
 
-  it('a herb patch is nearer still, and the healer never went to one either', () => {
+  it('R14: three patches now stand inside the town, and the far bank is still a bridge away', () => {
     const s = genesisTown()
-    const amara = s.agents.amara!
-    const herb = Object.values(s.forageables ?? {}).filter((n) => n.kind === 'herb_patch')
-    const best = Math.min(...herb.map((n) => findPath(s, amara, { x: n.x, y: n.y }, CFG)?.length ?? Infinity))
-    expect(best).toBe(15)
+    // Every founder is a quarter-hour from a bush and the healer from his herbs, where before
+    // the nearest bush was seventeen steps and every near herb patch was over the water.
+    expect(FOUNDER_IDS.map((id) => nearestOfKind(s, id, 'berry_bush'))).toEqual([11, 10, 7, 6, 9])
+    expect(FOUNDER_IDS.map((id) => nearestOfKind(s, id, 'herb_patch'))).toEqual([15, 12, 9, 6, 5])
+    // And nothing over the water moved: the west bank answers a capped search, as it always did.
+    for (const [x, y] of [[45, 62], [46, 66], [47, 70], [22, 100]] as Array<[number, number]>) {
+      expect(walk(s, 'amara', x, y)).toBeNull()
+    }
+  })
+
+  it('before R14 the healer had no herbs at all: every near patch is over the water', () => {
+    const s = genesisTown()
+    // The three authored herb patches. Two are on the far bank and answer a capped search;
+    // the one that is reachable is fifty-four steps south, most of a working morning.
+    expect(walk(s, 'amara', 46, 33)).toBeNull()
+    expect(walk(s, 'amara', 46, 66)).toBeNull()
+    expect(walk(s, 'amara', 52, 100)).toBe(54)
+    // Seven of the twenty authored nodes are across the river — two herb patches, both clay
+    // banks, all three stone outcrops and a reed bed. Nothing R14 adds is over there.
+    const unreachable = Object.keys(s.forageables ?? {}).filter((id) => {
+      const n = s.forageables![id]!
+      return walk(s, 'amara', n.x, n.y) === null
+    })
+    expect(unreachable).toHaveLength(7)
   })
 })
 
 // ------------------------------------------------- candidate 2: perception. CONFIRMED.
 
 describe('R21 candidate 2 — "perception omits it": CONFIRMED', () => {
-  it('not one founder can see a single forageable node or a single animal on the first morning', () => {
+  it('no animal is in sight on the first morning, and none was ever brought nearer', () => {
     const s = genesisTown()
-    for (const id of FOUNDER_IDS) {
-      const p = composePerception(s, CFG, id, [])
-      expect(p.visible.forageables).toHaveLength(0)
-      expect(p.visible.fauna).toHaveLength(0)
-    }
+    for (const id of FOUNDER_IDS) expect(composePerception(s, CFG, id, []).visible.fauna).toHaveLength(0)
+    // The nearest thing with meat on it is a long walk away and it moves. `craft stew` wants
+    // meat, meat wants a hunt, and a hunt wants a mark no mind has ever been given: that whole
+    // chain is still broken at its first link, and it is why the shared stew never happened.
+    const nearestBeast = Math.min(...Object.values(s.fauna ?? {})
+      .filter((f) => f.kind !== 'fish')
+      .map((f) => walk(s, 'amara', f.x, f.y) ?? Infinity))
+    expect(nearestBeast).toBe(27)
+    expect(nearestBeast).toBeGreaterThan(CFG.movement.sightRadius)
   })
 
-  it('the horizon is shorter than the nearest food: a mind can never name the node it needs', () => {
+  it('R14: every founder now wakes up looking at a patch they can name', () => {
     // `forage` wants a nodeId and a thing's mark "becomes known to you only once you stand
-    // beside where it rests and see it". Sight stops four tiles short of the nearest bush.
+    // beside where it rests and see it". Before R14 sight stopped five tiles short of the
+    // nearest bush and no mind could ever name one.
     expect(CFG.movement.sightRadius).toBe(12)
     const s = genesisTown()
-    const nadia = s.agents.nadia!
-    const nearest = Math.min(...Object.values(s.forageables ?? {})
-      .filter((n) => n.kind === 'berry_bush')
-      .map((n) => findPath(s, nadia, { x: n.x, y: n.y }, CFG)?.length ?? Infinity))
-    expect(nearest).toBeGreaterThan(CFG.movement.sightRadius)
+    for (const id of FOUNDER_IDS) {
+      const seen = composePerception(s, CFG, id, []).visible.forageables
+      expect(seen.length).toBeGreaterThanOrEqual(2)
+      // And what a mind is handed is a phrase and a mark, not a count of what is left in it.
+      expect(seen.every((n) => n.prose.length > 0 && !/[0-9]/.test(n.prose))).toBe(true)
+    }
+    // Nadia, whose whole standing goal is berries, can name two of them from her own doorway.
+    expect(composePerception(s, CFG, 'nadia', []).visible.forageables.map((n) => n.kind).sort())
+      .toEqual(['berry_bush', 'berry_bush', 'herb_patch'])
   })
 
   it('a body carries no visible condition: the healer cannot see the fever standing next to him', () => {

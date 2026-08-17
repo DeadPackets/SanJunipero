@@ -101,13 +101,22 @@ noun the mind was never given.
 
 ### 2a. Nothing edible is in sight on the first morning
 
+True walking distances — a capped A\* returns how far it got, not how far it is, so every
+figure below is from a search that finished:
+
 | Founder | Standing at | Berry bush | Herb patch | Mushrooms | Reeds | Clay | Stone |
 |---|---|---:|---:|---:|---:|---:|---:|
-| amara | (62, 62) | 20 | **15** | 42 | 21 | 25 | 55 |
-| yusuf | (65, 62) | 18 | 18 | 39 | 22 | 28 | 52 |
-| nadia | (68, 62) | **17** | 21 | 36 | 25 | 31 | 55 |
-| omar | (71, 62) | 18 | 24 | 33 | 28 | 34 | 58 |
-| salma | (74, 62) | 21 | 27 | 30 | 31 | 37 | 61 |
+| amara | (62, 62) | 20 | 54 | 42 | 21 | — | — |
+| yusuf | (65, 62) | 18 | 51 | 39 | 24 | — | — |
+| nadia | (68, 62) | **17** | 54 | 36 | 27 | — | — |
+| omar | (71, 62) | 18 | 57 | 33 | 30 | — | — |
+| salma | (74, 62) | 21 | 60 | 30 | 33 | — | — |
+
+**Seven of the twenty authored nodes are across the river and cannot be walked to at all** —
+two of the three herb patches, both clay banks and all three stone outcrops. So the healer's
+nearest remedy was **fifty-four steps** away, most of a working morning, and the town could
+not have paved a tile or sunk a well from the ground even if it had wanted to. The nearest
+animal with meat on it is 27 steps and moves.
 
 `movement.sightRadius` is **12**. Every founder's opening packet carries
 `forageables: []` and `fauna: []`. A thing's mark "becomes known to you only once you stand
@@ -161,11 +170,11 @@ heard of. Addendum §9 asks for the opposite ratio.
 
 ## Candidate 4 — distance. REFUTED
 
-17–21 tiles, `movement.baseTicksPerTile` = 1, every node on a finite path. The worst round trip
-is **42 ticks of a 960-tick waking day — 4.4%**, and the nearest herb patch is 15 steps from
-Amara's door. Nothing about the geometry makes gathering irrational. **This is not an abundance
-problem first; it is an effectiveness problem first**, exactly as the emergence-tuning law's
-diagnostic predicts. R14 still shortens the walk, but it is the second lever, not the first.
+17–21 tiles to a berry bush, `movement.baseTicksPerTile` = 1, every one of them on a path that
+finishes. The worst round trip is **42 ticks of a 960-tick waking day — 4.4%**. Nothing about
+the geometry makes gathering irrational. **This is not an abundance problem first; it is an
+effectiveness problem first**, exactly as the emergence-tuning law's diagnostic predicts. R14
+still shortens the walk, but it is the second lever, not the first.
 
 ## Candidate 5 — mind choice. REFUTED
 
@@ -187,6 +196,16 @@ world did not let the choice land.
    These four are code-side and between them address 59 refusals, both zero-count social
    overlaps, and the meal count.
 2. **ABUNDANCE (R14).** Forageable nodes inside the founders' horizon, so `forage` has a
-   nameable target on the first morning.
+   nameable target on the first morning. Three were added, all on the town's side:
+
+   | Node | Place | Nearest founder | Furthest founder | In sight of |
+   |---|---|---:|---:|---|
+   | berry_bush | (66, 55) | nadia, 9 | salma, 15 | all five |
+   | berry_bush | (70, 67) | omar, 6 | amara, 13 | all five |
+   | herb_patch | (73, 58) | salma, 5 | amara, 15 | all five |
+
+   Every founder now wakes up able to name at least two patches, the nearest bush is 6–11
+   steps instead of 17–21, and the healer has herbs for the first time. Nothing was moved and
+   nothing was placed over the water: the far bank still answers a capped search.
 3. **CONTROLLER-VALUED.** The makeable vocabulary is the highest-leverage thing left, and its
    natural home is block 1, which is frozen. Reported, not taken.

@@ -34,6 +34,15 @@ export const GENESIS_FORAGEABLES: readonly ForageableScatter[] = [
   { kind: 'reed_bed', x: 51, y: 52, stock: 6 },
   { kind: 'reed_bed', x: 51, y: 84, stock: 6 },
   { kind: 'reed_bed', x: 47, y: 70, stock: 6 },
+  // The town's own meadow (C11 R14). Everything above stands beyond the founders' horizon on
+  // the first morning — the nearest bush is seventeen steps and sight reaches twelve — so no
+  // mind could ever name a patch, and the town gathered ONCE in five live runs. These three
+  // are inside every founder's sight from their own doorway, on the town's side of the water:
+  // the far bank stays a bridge away, as it always was. The herbs are the healer's, and there
+  // was not one reachable herb patch in the world before this row.
+  { kind: 'berry_bush', x: 66, y: 55, stock: 6 },
+  { kind: 'berry_bush', x: 70, y: 67, stock: 6 },
+  { kind: 'herb_patch', x: 73, y: 58, stock: 4 },
 ]
 
 // How a node reads from across the clearing. Never a count — a picker sees abundance or
