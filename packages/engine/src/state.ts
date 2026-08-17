@@ -75,6 +75,11 @@ export type WorldState = {
   // How many times the map has grown. Absent until the first world_grown, so a world that
   // never widens hashes as it always did. Read only through growthsSoFar().
   growths?: number
+  // Footfalls per tile, keyed "x,y" — sparse, because a 128x128 array of zeroes is a hash of
+  // nothing. Absent until the first step anybody takes.
+  traffic?: Record<string, number>
+  // The day each standing trail went quiet; absent while every trail is still in use.
+  quietSince?: Record<string, number>
   counters: { nextEntityId: number }
 }
 

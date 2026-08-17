@@ -8,6 +8,7 @@ import { needsSystem } from './systems/needs.js'
 import { healthSystem } from './systems/health.js'
 import { deathAttribution, escalateFatigue, mortalitySystem, placeGrave } from './systems/mortality.js'
 import { illnessSystem } from './systems/illness.js'
+import { desirePathsSystem } from './systems/desirePaths.js'
 import { thirstSystem } from './systems/thirst.js'
 import { agingSystem } from './systems/aging.js'
 import { weatherSystem } from './systems/weather.js'
@@ -101,7 +102,8 @@ function collapseDeathSystem(ctx: TickCtx): void {
 // position may have moved, and a system holding a pre-growth position would act on the wrong tile.
 const SYSTEMS: System[] = [
   weatherSystem, mysterySystem, mapGrowthSystem, fireSystem, cropsSystem, wildlifeSystem, spoilageSystem,
-  needsSystem, thirstSystem, healthSystem, mortalitySystem, illnessSystem, reproductionSystem, agingSystem, actionsSystem,
+  needsSystem, thirstSystem, healthSystem, mortalitySystem, illnessSystem, desirePathsSystem,
+  reproductionSystem, agingSystem, actionsSystem,
   collapseDeathSystem,
 ]
 

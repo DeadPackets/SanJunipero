@@ -151,5 +151,8 @@ export const WorldGrown = z.object({
   depth: z.number().int().positive(),
   tiles: z.array(z.array(z.number().int().min(0).max(10))),
 }).strict()
+// The nightly bookkeeping of the trails: no payload, because the arithmetic is the same
+// everywhere and reading it out of the world is cheaper than writing it into the log.
+export const TrafficDecayed = z.object({}).strict()
 // The only road a world law travels. `value` is checked against TOGGLABLE_PATHS at fold.
 export const ConfigChanged = z.object({ path: z.string(), value: z.unknown() }).strict()

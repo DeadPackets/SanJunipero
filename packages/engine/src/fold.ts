@@ -13,9 +13,10 @@ import {
   ConfigChanged,
   ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
-  StructureProgressed, TerrainChanged, TickAdvanced, TileChanged, WeatherChanged, WildlifeChanged,
+  StructureProgressed, TerrainChanged, TickAdvanced, TileChanged, TrafficDecayed, WeatherChanged, WildlifeChanged,
   WorldGrown,
 } from './events.def.js'
+import { countsAsFootfall, decayTraffic, fromTrafficKey, quietPathsAt, trafficKey } from './systems/desirePaths.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { occupantsOf } from './interiors.js'
 import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
@@ -80,7 +81,11 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = AgentMoved.parse(event.payload)
       const a = state.agents[p.id]
       if (!a) throw new Error(`agent_moved for unknown agent ${p.id}`)
-      return { ...state, agents: { ...state.agents, [p.id]: { ...a, x: p.x, y: p.y } } }
+      const agents = { ...state.agents, [p.id]: { ...a, x: p.x, y: p.y } }
+      // A trail is worn by feet, not by arriving: only a body mid-walk marks the ground.
+      if (!countsAsFootfall(state, p.id, config)) return { ...state, agents }
+      const key = trafficKey(p.x, p.y)
+      return { ...state, agents, traffic: { ...state.traffic, [key]: (state.traffic?.[key] ?? 0) + 1 } }
     }
     case 'need_changed': {
       const p = NeedChanged.parse(event.payload)
@@ -657,9 +662,32 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
         i.loc.t === 'tile' ? { ...i, loc: { ...i.loc, x: i.loc.x + dx, y: i.loc.y + dy } } : i]))
       const crops = Object.fromEntries(
         Object.entries(state.crops).map(([id, c]) => [id, { ...c, x: c.x + dx, y: c.y + dy }]))
-      // Tasks 17, 19, 21 and 28 add traffic, fauna, forageables and saplings; each is keyed or
+      const shiftKeys = (m: Record<string, number>): Record<string, number> =>
+        Object.fromEntries(Object.entries(m).map(([k, v]) => {
+          const at = fromTrafficKey(k)
+          return [trafficKey(at.x + dx, at.y + dy), v]
+        }))
+      // Tasks 19, 21 and 28 add fauna, forageables and saplings; each is keyed or
       // stamped by coordinate and must be translated here too, in this same fold.
-      return { ...state, terrain, growths, agents, structures, items, crops }
+      return {
+        ...state, terrain, growths, agents, structures, items, crops,
+        ...(state.traffic === undefined ? {} : { traffic: shiftKeys(state.traffic) }),
+        ...(state.quietSince === undefined ? {} : { quietSince: shiftKeys(state.quietSince) }),
+      }
+    }
+    // One night's worth of grass growing back through the ruts, and a fresh stamp on every
+    // trail the town has stopped using. Pure arithmetic over what the world already holds.
+    case 'traffic_decayed': {
+      TrafficDecayed.parse(event.payload)
+      const traffic: Record<string, number> = {}
+      for (const [key, value] of Object.entries(state.traffic ?? {})) traffic[key] = decayTraffic(value, config)
+      const quietSince = quietPathsAt(state, traffic, Math.floor(event.tick / MINUTES_PER_DAY), config)
+      const next: WorldState = { ...state }
+      if (Object.keys(traffic).length > 0) next.traffic = traffic
+      else delete next.traffic
+      if (Object.keys(quietSince).length > 0) next.quietSince = quietSince
+      else delete next.quietSince
+      return next
     }
     // The whitelist is the whole of the authority: an operator, a bug or a doctored
     // log can only ever move a dial this table already agreed to.
