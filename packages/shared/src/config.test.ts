@@ -166,7 +166,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(c.warmth.comfortBand).toBe(8)
     expect(c.warmth.exposureDecayPerTick).toBe(0.3)
     expect(c.warmth.heatRadius).toBe(2)
-    expect(c.warmth.insulation).toEqual({ garment: 2 })
+    expect(c.warmth.insulation).toEqual({ garment: 12 })
     expect(c.warmth.ambient).toEqual({
       spring: { day: 14, dusk: 9, night: 5 },
       summer: { day: 26, dusk: 20, night: 15 },

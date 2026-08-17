@@ -45,32 +45,42 @@ describe('C11 finding 1 — the energy budget spends more than a day holds', () 
   })
 })
 
-describe('C11 finding 2 — the garment flips no winter threshold', () => {
-  // `isExposed` is a threshold on `ambient + insulation >= comfortBand`, and the only band a
-  // coat decides is an autumn dusk. The winter rungs close because four walls are an absolute
-  // shield, not because of the coat — so the whole clothing line is decorative in the season
-  // it exists for. Escalated by batch 10; the numbers are here.
+describe('C11 finding 2 — the garment decides a winter hour, and only the mildest one', () => {
+  // `isExposed` is a threshold on `ambient + insulation >= comfortBand`. At 2 the only band a
+  // coat decided was an autumn dusk: the winter rungs closed because four walls are an
+  // absolute shield, not because of the coat, so the whole clothing line was decorative in the
+  // season it exists for. T37b step 2b closes exactly the gap the finding named and no more.
   const flips = (ambient: number): boolean =>
     (ambient >= C.warmth.comfortBand) !== (ambient + C.warmth.insulation.garment >= C.warmth.comfortBand)
 
-  it('one band in twelve, and it is not in winter', () => {
+  it('the coat is worth the gap the finding measured: twelve, not two', () => {
     expect(C.warmth.comfortBand).toBe(8)
-    expect(C.warmth.insulation.garment).toBe(2)
+    // The gap at the mildest winter hour was twelve and the coat closed two. It closes twelve.
+    expect(C.warmth.comfortBand - C.warmth.ambient.winter.day).toBe(12)
+    expect(C.warmth.insulation.garment).toBe(12)
+  })
+
+  it('four bands in twelve now, and one of them is in winter', () => {
     const deciding: string[] = []
     for (const [season, phases] of Object.entries(C.warmth.ambient)) {
       for (const [phase, ambient] of Object.entries(phases as Record<string, number>)) {
         if (flips(ambient)) deciding.push(`${season} ${phase}`)
       }
     }
-    expect(deciding).toEqual(['autumn dusk'])
+    expect(deciding).toEqual(['spring night', 'autumn dusk', 'autumn night', 'winter day'])
   })
 
-  it('at every winter hour a coated body is exactly as exposed as a bare one', () => {
-    for (const ambient of Object.values(C.warmth.ambient.winter)) {
-      expect(ambient + C.warmth.insulation.garment).toBeLessThan(C.warmth.comfortBand)
+  it('and no further: dusk, night and any weather in winter still want a roof or a fire', () => {
+    for (const phase of ['dusk', 'night'] as const) {
+      expect(C.warmth.ambient.winter[phase] + C.warmth.insulation.garment).toBeLessThan(C.warmth.comfortBand)
     }
-    // The gap the coat would have to close at the mildest winter hour is twelve; it closes two.
-    expect(C.warmth.comfortBand - C.warmth.ambient.winter.day).toBe(12)
+    // Twelve is the LEAST that reaches winter at all, and it reaches no hour past the mildest:
+    // eleven decides nothing there, and thirteen decides nothing more.
+    expect(C.warmth.ambient.winter.day + 11).toBeLessThan(C.warmth.comfortBand)
+    expect(C.warmth.ambient.winter.dusk + 13).toBeLessThan(C.warmth.comfortBand)
+    // A coat holds a clear winter day. It does not hold a winter day it is snowing on.
+    const snowing = C.warmth.ambient.winter.day + C.warmth.weatherDelta.snow
+    expect(snowing + C.warmth.insulation.garment).toBeLessThan(C.warmth.comfortBand)
   })
 })
 

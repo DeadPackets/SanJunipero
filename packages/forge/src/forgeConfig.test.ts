@@ -67,8 +67,10 @@ describe('forge config', () => {
   it('leaves SimConfig untouched — the world config hash does not move', () => {
     // moves whenever SimConfigSchema changes world law — re-pin is a deliberate reviewed act (see merge-train-3 report).
     // Moved by C11 Task 2, the chunk's single SimConfigSchema edit: fourteen new sections, world.size,
-    // the pathing and structures.recipes additions, and health's retired contagion dials. Every other
-    // C11 task is forbidden to touch the schema (Global Constraint G6), so this pin moves once for C11.
+    // the pathing and structures.recipes additions, and health's retired contagion dials.
+    // Every other C11 task is forbidden to touch the schema (Global Constraint G6), so this
+    // pin moves once for C11 — and once more at Task 37b's authorized regen, where it is
+    // re-pinned in the single regen commit alongside G2.
     expect(stateHash(DEFAULT_CONFIG)).toBe(
       '482f12038e542e54d9cb5a5add1e4556c4e40457bd5300dc7e66ae8e341dbf70')
     expect(stateHash(SimConfigSchema.parse({}))).toBe(stateHash(DEFAULT_CONFIG))

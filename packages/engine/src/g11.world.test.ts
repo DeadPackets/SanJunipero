@@ -223,7 +223,7 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
     const at = (tick: number): number => ambientTempAt({ ...genesisState(CFG, MAP()), tick }, CFG)
     expect([at(WINTER_DAY), at(WINTER_DUSK), at(WINTER_NIGHT)]).toEqual([-4, -8, -12])
     expect(CFG.warmth.comfortBand).toBe(8)
-    expect(CFG.warmth.insulation.garment).toBe(2)
+    expect(CFG.warmth.insulation.garment).toBe(12)
   })
 
   // One body, one winter night, one set of protections. Returns what the night cost it.
@@ -283,11 +283,10 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
     expect(beside.energyLeft / 100).toBeGreaterThanOrEqual(0.25)
   })
 
-  // MEASURED, NOT ASSUMED, and escalated in the gate report: `isExposed` is a threshold and
-  // the garment is worth two degrees of it, so at winter's −4/−8/−12 a coat changes nothing.
-  // comfortBand and the ambient table are FROZEN CONFIG (batch-5 ruling 1), so this is
-  // reported and not tuned.
-  it('the garment is a threshold flip, and winter is far below the threshold', () => {
+  // MEASURED, NOT ASSUMED. `isExposed` is a threshold, and at insulation 2 the garment was
+  // worth two degrees of it: at winter's −4/−8/−12 a coat changed nothing at all, which is
+  // what batch 10 escalated and T37b step 2b answers. Rung 1 is now the coat's own rung.
+  it('the garment is a threshold flip, and it flips the mildest winter hour and no other', () => {
     const at = (tick: number, garment: boolean): boolean => {
       let s = spawn(genesisState(CFG, MAP()), CFG, 'body', 4, 4)
       if (garment) {
@@ -296,7 +295,9 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
       }
       return isExposed({ ...s, tick }, CFG, 'body')
     }
-    for (const tick of [WINTER_DAY, WINTER_DUSK, WINTER_NIGHT]) {
+    expect({ bare: at(WINTER_DAY, false), clothed: at(WINTER_DAY, true) })
+      .toEqual({ bare: true, clothed: false })
+    for (const tick of [WINTER_DUSK, WINTER_NIGHT]) {
       expect({ tick, bare: at(tick, false), clothed: at(tick, true) })
         .toEqual({ tick, bare: true, clothed: true })
     }

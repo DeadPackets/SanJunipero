@@ -298,7 +298,11 @@ const WarmthSchema = z.object({
   comfortBand: z.number().default(8),
   exposureDecayPerTick: z.number().default(0.3),
   heatRadius: z.number().default(2),
-  insulation: z.object({ garment: z.number().default(2) }).strict().prefault({}),
+  // Twelve is the gap at the mildest winter hour (comfortBand 8 over ambient −4). At 2 the
+  // coat decided one band of twelve — an autumn dusk — and nothing at all in the season the
+  // clothing line exists for. Twelve is the LEAST that reaches winter and reaches no hour
+  // past its mildest: dusk, night and a snowy day still want a roof or a fire (C11 T37b).
+  insulation: z.object({ garment: z.number().default(12) }).strict().prefault({}),
   ambient: z.object({
     spring: ambientBand(14, 9, 5),
     summer: ambientBand(26, 20, 15),
