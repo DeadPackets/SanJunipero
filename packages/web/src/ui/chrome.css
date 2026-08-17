@@ -581,6 +581,26 @@ body {
   }
 }
 
+/* ── back out of one townsperson to the roster (user bug 2026-08-17) ──
+   The lens is a roster or one person, and there was no route back. Ink-on-cream, the panel's
+   own language, 40px tall, and the global :focus-visible ember ring reaches it. */
+.roster-back {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  min-height: 40px; margin: 0 0 0.6rem; padding: 0 0.7rem;
+  font-family: var(--font-px); font-size: 0.7rem; letter-spacing: 0.03em;
+  color: var(--ink); background: var(--sand);
+  border: 2px solid var(--ink); border-radius: 0; cursor: pointer;
+  box-shadow: 2px 2px 0 0 var(--deep);
+}
+.roster-back:hover { background: var(--honey); }
+.roster-back:active { translate: 2px 2px; box-shadow: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .roster-back {
+    transition-property: background-color, translate, box-shadow;
+    transition-duration: var(--t-fast);
+  }
+}
+
 /* ── interiors: the room the camera stepped into, and the way back out (Task 11) ──
    The room itself is drawn on the canvas; this is only the bar that names it and leaves it. */
 .interior-bar {

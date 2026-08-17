@@ -49,7 +49,20 @@ function NeedBar({ label, value }: { label: string; value: number }) {
   )
 }
 
-export function InspectorPanel({ store, agentId, scene }: { store: WorldStore; agentId: string; scene: Scene | null }) {
+// The way back to the roster. A viewer who picked one person had no route back to the list —
+// this is the visible one; the TOWNSFOLK nav item and Escape are the other two.
+export function BackToRoster({ onBack }: { onBack: () => void }) {
+  return (
+    <button type="button" className="roster-back" onClick={onBack}>
+      <span aria-hidden="true">&#8592;</span> All townsfolk
+    </button>
+  )
+}
+
+export function InspectorPanel(
+  { store, agentId, scene, onBack }:
+  { store: WorldStore; agentId: string; scene: Scene | null; onBack?: () => void },
+) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   const [tab, setTab] = useState<Tab>('ledger')
@@ -97,7 +110,12 @@ export function InspectorPanel({ store, agentId, scene }: { store: WorldStore; a
 
   const a = state?.agents[agentId]
   if (a === undefined) {
-    return <div className="inspector-panel">No such townsfolk.</div>
+    return (
+      <div className="inspector-panel">
+        {onBack ? <BackToRoster onBack={onBack} /> : null}
+        No such townsfolk.
+      </div>
+    )
   }
 
   const thought = store.latestThought(agentId)
@@ -121,6 +139,7 @@ export function InspectorPanel({ store, agentId, scene }: { store: WorldStore; a
 
   return (
     <div className="inspector-panel" data-tick={tick}>
+      {onBack ? <BackToRoster onBack={onBack} /> : null}
       <header className="inspector-head">
         {portraitId !== null ? (
           <img className="portrait" src={`/assets/${portraitId}.png`} alt="" />

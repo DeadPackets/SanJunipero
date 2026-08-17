@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { momentToTick, tickToMoment } from '@sj/shared'
 import { createWorldStore, type WorldStore } from './state/worldStore.js'
 import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './net/socket.js'
-import { parseRoute, routeToPath, type Lens, type Route } from './ui/route.js'
+import {
+  backToRoster, isSingleAgentView, navToLens, parseRoute, routeToPath, type Lens, type Route,
+} from './ui/route.js'
 import { lensFromKey, lensKeyAllowed } from './ui/interaction.js'
 import { StageMount } from './render/StageMount.js'
 import { InspectorPanel } from './ui/InspectorPanel.js'
@@ -91,8 +93,18 @@ export function App() {
     setRoute(next)
   }
 
+  // ADAPTER: the nav item is the way back a viewer reaches for first, so TOWNSFOLK returns
+  // to the roster when one person is already open (see navToLens).
   const nav = (lens: Lens): void => {
-    const next = { ...route, lens }
+    const next = navToLens(route, lens)
+    history.pushState(null, '', routeToPath(next))
+    setRoute(next)
+  }
+
+  // ADAPTER: the back affordance in the single-character view.
+  const showRoster = (): void => {
+    const next = backToRoster(route)
+    if (next === route) return
     history.pushState(null, '', routeToPath(next))
     setRoute(next)
   }
@@ -110,6 +122,21 @@ export function App() {
     history.pushState(null, '', routeToPath(next))
     setRoute(next)
   }
+
+  // ADAPTER: Escape steps back out of one person to the roster — but only when no interior
+  // is open, because the room claimed Escape first and a viewer expects one step at a time.
+  useEffect(() => {
+    if (!isSingleAgentView(route) || insideId !== null) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      const t = e.target as HTMLElement | null
+      if (t !== null && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
+      e.preventDefault()
+      showRoster()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [route, insideId])
 
   // Left/right walk the lens bar from anywhere in the chrome. The map owns the arrows for
   // panning and a text field owns them for typing, so both keep them (lensKeyAllowed).
@@ -190,7 +217,7 @@ export function App() {
           className={route.lens === 'inspector' || route.lens === 'chronicle' || route.lens === 'laws' ? 'open' : undefined}
         >
           {route.lens === 'inspector' && route.agentId !== null && (
-            <InspectorPanel store={store} agentId={route.agentId} scene={scene} />
+            <InspectorPanel store={store} agentId={route.agentId} scene={scene} onBack={showRoster} />
           )}
           {route.lens === 'inspector' && route.agentId === null && (
             <RosterPanel store={store} onPick={pickAgent} />

@@ -45,3 +45,31 @@ export function routeToPath(r: Route): string {
   const q = params.toString()
   return q === '' ? path : `${path}?${q}`
 }
+
+
+// ── stepping back out of a single-character view ────────────────────────────────────────
+// USER BUG 2026-08-17: "there is no way to go back to the selection of townsfolk after
+// picking one character to follow." The Townsfolk lens is a roster when `agentId` is null and
+// one person's inspector when it is not, and nothing ever set it back. Three ways back, all
+// of them the same transition, so they are one pure reducer and three thin adapters.
+
+export const ROSTER_LENS: Lens = 'inspector'
+
+export function isSingleAgentView(r: Route): boolean {
+  return r.lens === ROSTER_LENS && r.agentId !== null
+}
+
+/** the back affordance and Escape: one person -> the roster. Everywhere else, unchanged. */
+export function backToRoster(r: Route): Route {
+  return isSingleAgentView(r) ? { ...r, agentId: null } : r
+}
+
+/**
+ * Clicking a lens in the nav. Clicking TOWNSFOLK while already reading one person returns to
+ * the roster rather than doing nothing - the nav item is the way back a viewer reaches for
+ * first.
+ */
+export function navToLens(r: Route, lens: Lens): Route {
+  if (lens === ROSTER_LENS && isSingleAgentView(r)) return { ...r, agentId: null }
+  return { ...r, lens }
+}
