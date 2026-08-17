@@ -121,6 +121,33 @@ function capturingModel(responses: unknown[]): { model: MockLanguageModelV4; pro
   return { model, prompts }
 }
 
+// A back end that answers with nothing at all — the empty call R20 made visible, which ran at
+// 6.0% of the last live gate. `content: []` is a landed call carrying no answer.
+function blankModel(blanks: number, then: unknown = BENIGN_TURN):
+{ model: MockLanguageModelV4; prompts: CapturedMessage[][] } {
+  const prompts: CapturedMessage[][] = []
+  let i = 0
+  const model = new MockLanguageModelV4({
+    doGenerate: async (options) => {
+      prompts.push((options.prompt as Array<{ role: string; content: unknown }>).map((m) => ({
+        role: m.role,
+        text: Array.isArray(m.content)
+          ? (m.content as Array<{ text?: string }>).map((p) => p.text ?? '').join('')
+          : String(m.content),
+      })))
+      const blank = i < blanks
+      i += 1
+      return {
+        content: blank ? [] : [{ type: 'text' as const, text: JSON.stringify(then) }],
+        finishReason: { unified: 'stop' as const, raw: undefined },
+        usage: ZERO_USAGE,
+        warnings: [],
+      }
+    },
+  })
+  return { model, prompts }
+}
+
 function throwingModel(): MockLanguageModelV4 {
   return new MockLanguageModelV4({
     doGenerate: async () => {
@@ -636,6 +663,37 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // would compact the day out of the mind that lived it.
     expect(runtime.dayLogSnapshot().join(' ')).not.toContain('a hut (10 wood)')
     expect(b.filter((m) => m.role === 'user')[0]!.text).not.toContain('a hut (10 wood)')
+  })
+
+  // Controller amendment to T37b — a blank answer is not a wrong answer. R20's first
+  // measurement put empty calls at 6.0% of a live gate, and every one of them used to cost
+  // the mind a whole turn and leave a drift in its memory that it never actually had.
+  it('asks a blank answer again, unchanged — not as a correction for something never said', async () => {
+    const { model, prompts } = blankModel(1)
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 60)
+
+    expect(prompts.length).toBe(2)
+    // Byte-identical: nothing is appended, so the cached prefix is still the whole request.
+    expect(prompts[1]).toEqual(prompts[0]!)
+    expect(prompts[1]!.some((m) => /rejected/i.test(m.text))).toBe(false)
+    expect(runtime.stats().turns).toBeGreaterThanOrEqual(1)
+  })
+
+  it('a second blank leaves the turn unspent: no drift it never had, and the body carries on', async () => {
+    const thoughts: string[] = []
+    const { model, prompts } = blankModel(2)
+    const { loop, runtime, agentDb } = await setup({
+      model, mindConfig: FAST_MIND, onThought: (t) => thoughts.push(t.text),
+    })
+    await stepUntil(loop, () => prompts.length >= 2, 60)
+
+    // Asked twice and no more: the tripwire against hammering a back end that is answering.
+    expect(prompts.length).toBe(2)
+    expect(runtime.stats().turns).toBe(0)
+    // FALLBACK_TURN used to be applied here as though the mind had really stood there musing.
+    expect(thoughts).toEqual([])
+    expect(alertKinds(agentDb)).toContain('blank_answer')
   })
 
   it('repairs an invalid generation with an assistant/user exchange instead of blind-retrying', async () => {

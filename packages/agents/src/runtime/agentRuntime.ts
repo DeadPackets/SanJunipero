@@ -9,7 +9,7 @@ import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
 import { keywords, retrieveAmbient, type SceneCues } from '../memory/retrieve.js'
-import { parseTurnWithRepair, reconsiderTick, TurnSchema, type Turn } from '../turn.js'
+import { isBlankAnswer, parseTurnWithRepair, reconsiderTick, TurnSchema, type Turn } from '../turn.js'
 import {
   decideWake,
   disarmBodyAlarm,
@@ -442,15 +442,19 @@ export class AgentRuntime {
         this.#dayLog = compactDayLog(this.#dayLog, summary.text)
         assembled = assemblePrompt({ ...blocks, dayLog: this.#dayLog })
       }
-      let raw: unknown
-      let badText = ''
-      try {
-        raw = (await this.#llm.object({ schema: TurnSchema, system: assembled.system, messages: assembled.messages })).value
-      } catch (err) {
-        if (!NoObjectGeneratedError.isInstance(err)) throw err
-        badText = err.text ?? ''
-        raw = jsonOrRaw(badText)
+      let answer = await this.#ask(assembled)
+      // A blank answer is not a wrong answer. There is nothing to correct, so the honest
+      // retry is the same request again — byte-identical, and so still a cached prefix.
+      if (isBlankAnswer(answer.raw)) answer = await this.#ask(assembled)
+      if (isBlankAnswer(answer.raw)) {
+        // Twice nothing. The turn is left UNSPENT: no thought the mind never had, no turn
+        // counted, and whatever the body was already doing carries on being done. The doze
+        // is the back-pressure, so a silent back end is not hammered.
+        this.#llm.alert('blank_answer', 'two blank answers; the turn is left unspent')
+        this.#doze(tick)
+        return
       }
+      const { raw, badText } = answer
       turn = await parseTurnWithRepair(
         raw,
         (issues) => this.#repair(assembled, badText, issues),
@@ -469,6 +473,21 @@ export class AgentRuntime {
     this.#stats.turns += 1
     disarmBodyAlarm(this.#config, packet.self.body, this.#clock)
     this.#clock.prevVisibleIds = packet.visible.agents.map((a) => a.id)
+  }
+
+  // One ask, and what came back of it: the parsed answer, plus the raw text when the answer
+  // did not fit the shape, which is what a repair needs to quote back.
+  async #ask(assembled: AssembledPrompt): Promise<{ raw: unknown; badText: string }> {
+    try {
+      const { value } = await this.#llm.object({
+        schema: TurnSchema, system: assembled.system, messages: assembled.messages,
+      })
+      return { raw: value, badText: '' }
+    } catch (err) {
+      if (!NoObjectGeneratedError.isInstance(err)) throw err
+      const badText = err.text ?? ''
+      return { raw: jsonOrRaw(badText), badText }
+    }
   }
 
   // The bad output goes back as the assistant's own words, the correction as

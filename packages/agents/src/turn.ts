@@ -33,6 +33,15 @@ export type Turn = z.infer<typeof TurnSchema>
 
 export const FALLBACK_TURN: Turn = { thought: 'My mind drifts. I stand quietly, lost in thought.', importance: 1 }
 
+// Nothing came back at all, as against something wrong coming back. The two need different
+// answers: a wrong answer is worth correcting, and a blank one is worth only asking again.
+export function isBlankAnswer(raw: unknown): boolean {
+  if (raw === null || raw === undefined) return true
+  if (typeof raw === 'string') return raw.trim().length === 0
+  if (typeof raw === 'object') return Object.keys(raw).length === 0
+  return false
+}
+
 export async function parseTurnWithRepair(
   raw: unknown,
   repair: (issues: string) => Promise<unknown>,
