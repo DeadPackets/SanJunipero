@@ -50,7 +50,11 @@ export function fireSystem(ctx: TickCtx): void {
   const spreadChance = cfg.spreadChancePerTickAdjacent * (weather === 'storm' ? cfg.stormSpreadMultiplier : 1)
   const sources = sorted(ctx.state()).filter((s) => s.burning).map((s) => s.id)
   for (const fromId of sources) {
-    const from = ctx.state().structures[fromId]!
+    // The list of sources is taken before the loop and every emit inside it folds, so a
+    // structure that burns down — or that a law or another system removes — between one
+    // source and the next is a ghost the non-null assertion used to crash on (C11 R17).
+    const from = ctx.state().structures[fromId]
+    if (from === undefined) continue
     for (const to of sorted(ctx.state())) {
       if (to.id === fromId || !to.flammable || to.burning || !structuresAdjacent(from, to)) continue
       if (ctx.rng.get('fire').next() < spreadChance) {

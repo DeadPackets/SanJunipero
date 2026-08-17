@@ -5,6 +5,7 @@ import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
+import { fireSystem } from './fire.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
 
@@ -290,5 +291,35 @@ describe('a carried flame is both the light and the hazard', () => {
 
   it('with the light law off, a lit torch is just a light', () => {
     expect(burningIds(tickOnce(alight(OFF, 9999), OFF).state)).toEqual([])
+  })
+})
+
+// C11 R17: `sources` is captured before the spread loop and every emit inside it folds, so a
+// source can be gone by the time its turn comes. The non-null assertion made that a crash.
+describe('fire_spread: a source that is gone by its turn is skipped, not crashed on', () => {
+  it('survives a structure removed mid-loop, and still spreads from the ones still standing', () => {
+    let state = ignite(ignite(rowWorld(), 'structure_1'), 'structure_3')
+    const emitted: Array<{ type: string; payload: unknown }> = []
+    const ctx = {
+      config: { ...CFG, fire: { ...CFG.fire, spreadChancePerTickAdjacent: 1 } },
+      rng: new RngStreams('ghost'),
+      state: () => state,
+      emit: (type: string, payload: unknown) => {
+        emitted.push({ type, payload })
+        // The hazard, made to happen: the first spread takes the second source with it.
+        if (type === 'fire_spread' && state.structures.structure_3 !== undefined) {
+          const { structure_3: _gone, ...rest } = state.structures
+          state = { ...state, structures: rest }
+          return
+        }
+        state = fold(state, ev(type, payload, state.tick), CFG)
+      },
+    }
+    expect(() => fireSystem(ctx)).not.toThrow()
+    // The fire that was still standing did spread; the ghost was passed over in silence.
+    expect(emitted.some((e) => e.type === 'fire_spread'
+      && (e.payload as { fromId: string }).fromId === 'structure_1')).toBe(true)
+    expect(emitted.some((e) => e.type === 'fire_spread'
+      && (e.payload as { fromId: string }).fromId === 'structure_3')).toBe(false)
   })
 })
