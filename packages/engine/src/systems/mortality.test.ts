@@ -202,8 +202,11 @@ describe('death has a cause', () => {
   })
 
   it('a body worn to nothing with no affliction on it still names the wound', () => {
-    // The C1 path: agent_injured drops hp with no named affliction behind it.
-    let s = fold(body(), ev('agent_injured', { agentId: 'a1', kind: 'grave' }), CFG)
+    // The C1 path: a wound drops hp with no named affliction behind it.
+    let s = fold(body(), ev('agent_harmed', {
+      agentId: 'a1', amount: CFG.health.injuryDamage.grave, source: 'attack',
+    }), CFG)
+    s = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'grave' }), CFG)
     s = hurt(s, 40)
     expect(died(tickOnce(s))).toEqual({ agentId: 'a1', cause: 'injury' })
   })

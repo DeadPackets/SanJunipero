@@ -1575,7 +1575,13 @@ const attack: VerbDef = makeVerb({
     const loserId = scoreA < scoreB ? agentId : p.targetId
     const kind = margin < 0.2 ? 'minor' : margin < 0.5 ? 'serious' : 'grave'
     const winnerId = loserId === agentId ? p.targetId : agentId
+    // Three things happen when a blow lands, and each is owned by exactly one event: the hp
+    // comes off through `agent_harmed`, which is the only event in the world that says a hand
+    // was behind it; the wound goes on the record through `agent_injured`; and the clock that
+    // can kill starts with the affliction. `agent_harmed` had no emitter at all before this,
+    // so first_quarrel and first_reconciliation could never fire (C11 R16).
     return [
+      { type: 'agent_harmed', payload: { agentId: loserId, amount: config.health.injuryDamage[kind], source: 'attack', byId: winnerId } },
       { type: 'agent_injured', payload: { agentId: loserId, kind } },
       {
         type: 'agent_afflicted',

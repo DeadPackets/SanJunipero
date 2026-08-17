@@ -518,13 +518,15 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (!a) throw new Error(`agent_died for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, alive: false, asleep: false, activity: null } } }
     }
+    // The wound on the record, and only that: the hp it costs comes off through the
+    // `agent_harmed` the same blow emits, which is the one event that can name the hand
+    // behind it. Two events, one subtraction (C11 R16).
     case 'agent_injured': {
       const p = AgentInjured.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_injured for unknown agent ${p.agentId}`)
-      const hp = Math.max(0, a.hp - config.health.injuryDamage[p.kind])
       const injuries = [...a.injuries, { kind: p.kind, day: Math.floor(event.tick / MINUTES_PER_DAY) }]
-      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, hp, injuries } } }
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, injuries } } }
     }
     case 'agent_infected': {
       const p = AgentInfected.parse(event.payload)

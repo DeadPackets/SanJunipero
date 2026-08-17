@@ -239,13 +239,18 @@ describe('verb: attack', () => {
       .toMatchObject({ ok: false, reason: expect.stringMatching(/^not adjacent to attack — they are at \(/) })
   })
 
+  // A blow is three events and one subtraction (C11 R16): `agent_harmed` takes the hp and
+  // names the hand, so first_quarrel and first_reconciliation finally have something to
+  // match on; `agent_injured` puts the wound on the record; the affliction starts the clock.
   it('seeded outcome runs both directions: attacker wins (c1) and loses (c6)', () => {
     const s = makeWorld()
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c1').get('combat'))).toEqual([
+      { type: 'agent_harmed', payload: { agentId: 'a2', amount: CFG.health.injuryDamage.grave, source: 'attack', byId: 'a1' } },
       { type: 'agent_injured', payload: { agentId: 'a2', kind: 'grave' } },
       { type: 'agent_afflicted', payload: { agentId: 'a2', kind: 'injury', severity: 3, sourceId: 'a1' } },
     ])
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c6').get('combat'))).toEqual([
+      { type: 'agent_harmed', payload: { agentId: 'a1', amount: CFG.health.injuryDamage.grave, source: 'attack', byId: 'a2' } },
       { type: 'agent_injured', payload: { agentId: 'a1', kind: 'grave' } },
       { type: 'agent_afflicted', payload: { agentId: 'a1', kind: 'injury', severity: 3, sourceId: 'a2' } },
     ])
@@ -254,10 +259,12 @@ describe('verb: attack', () => {
   it('injury tier by margin: minor (c2) vs serious (c3) vs grave (c1)', () => {
     const s = makeWorld()
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c2').get('combat'))).toEqual([
+      { type: 'agent_harmed', payload: { agentId: 'a2', amount: CFG.health.injuryDamage.minor, source: 'attack', byId: 'a1' } },
       { type: 'agent_injured', payload: { agentId: 'a2', kind: 'minor' } },
       { type: 'agent_afflicted', payload: { agentId: 'a2', kind: 'injury', severity: 1, sourceId: 'a1' } },
     ])
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('c3').get('combat'))).toEqual([
+      { type: 'agent_harmed', payload: { agentId: 'a2', amount: CFG.health.injuryDamage.serious, source: 'attack', byId: 'a1' } },
       { type: 'agent_injured', payload: { agentId: 'a2', kind: 'serious' } },
       { type: 'agent_afflicted', payload: { agentId: 'a2', kind: 'injury', severity: 2, sourceId: 'a1' } },
     ])
@@ -268,6 +275,7 @@ describe('verb: attack', () => {
     s = patchAgent(s, 'a1', { hp: 10, needs: { ...s.agents.a1!.needs, energy: 10 } })
     // seed w3: raw rollA 0.9315 > raw rollB 0.1737, but weight 0.1 drops scoreA below scoreB
     expect(VERBS.attack.onComplete(s, CFG, 'a1', { targetId: 'a2' }, new RngStreams('w3').get('combat'))).toEqual([
+      { type: 'agent_harmed', payload: { agentId: 'a1', amount: CFG.health.injuryDamage.minor, source: 'attack', byId: 'a2' } },
       { type: 'agent_injured', payload: { agentId: 'a1', kind: 'minor' } },
       { type: 'agent_afflicted', payload: { agentId: 'a1', kind: 'injury', severity: 1, sourceId: 'a2' } },
     ])

@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import type { LlmClient, LlmMessage, LlmUsage } from '@sj/agents'
-import { DEATH_CAUSES, fold, genesisState, type TileId, type WorldState } from '@sj/engine'
+import { DEATH_CAUSES, fold, genesisState, RngStreams, VERBS, type TileId, type WorldState } from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import { detectFirsts } from './firsts.js'
 import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak } from './glass.js'
@@ -131,6 +131,40 @@ describe('G11a-L2: the parting a scripted lapse produces', () => {
   it('a pass with no world in reach simply does not run the three that need one', () => {
     const lapse = [ev(day(12) + 60, 'agent_moved', { id: 'ada', x: 9, y: 9 })]
     expect(t2(lapse).map((m) => m.kind)).not.toContain('first_breakup')
+  })
+
+  // C11 R16: both of these match on `agent_harmed{source:'attack'}`, and nothing in the world
+  // emitted one, so neither could ever fire. `attack` emits it now, and the log the verb
+  // actually produces is what these rows are driven with.
+  it('a blow and a word after it: the quarrel and the peace, off the log attack really writes', () => {
+    const s = pairWorld({})
+    const blow = VERBS.attack.onComplete(s, DEFAULT_CONFIG, 'ada', { targetId: 'bex' }, new RngStreams('c1').get('combat'))
+    const harmed = blow.find((e) => e.type === 'agent_harmed')
+    expect(harmed).toBeDefined()
+    expect(harmed!.payload).toMatchObject({ agentId: 'bex', source: 'attack', byId: 'ada' })
+    expect((harmed!.payload as { amount: number }).amount).toBeGreaterThan(0)
+
+    const log = [
+      ev(day(1) + 10, harmed!.type, harmed!.payload),
+      // Far enough after the blow that it is a peace and not the same argument continuing.
+      ev(day(1) + 400, 'agent_spoke', { agentId: 'bex', text: 'enough of that', x: 4, y: 4 }),
+    ]
+    const found = t2(log, s)
+    const quarrel = found.find((m) => m.kind === 'first_quarrel')
+    const peace = found.find((m) => m.kind === 'first_reconciliation')
+    expect(quarrel).toBeDefined()
+    expect(quarrel!.agentIds).toEqual(['ada', 'bex'])
+    expect(peace).toBeDefined()
+    expect(peace!.agentIds).toEqual(['ada', 'bex'])
+  })
+
+  it('a hurt with no hand behind it is not a quarrel', () => {
+    const s = pairWorld({})
+    const log = [
+      ev(day(1) + 10, 'agent_harmed', { agentId: 'bex', amount: 5, source: 'fire' }),
+      ev(day(1) + 400, 'agent_spoke', { agentId: 'bex', text: 'that was close', x: 4, y: 4 }),
+    ]
+    expect(t2(log, s).map((m) => m.kind)).not.toContain('first_quarrel')
   })
 })
 

@@ -33,17 +33,30 @@ function tickOnce(s: WorldState, config = CFG, rng = new RngStreams('t')): World
   return wt(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
 }
 
+// The pair `attack` emits, so a test that wants a wound gets the hp loss with it.
+function wound(s: WorldState, agentId: string, kind: 'minor' | 'serious' | 'grave', tick?: number): WorldState {
+  const at = tick ?? s.tick
+  const hurtEv = ev('agent_harmed', { agentId, amount: CFG.health.injuryDamage[kind], source: 'attack' }, at)
+  return fold(fold(s, hurtEv, CFG), ev('agent_injured', { agentId, kind }, at), CFG)
+}
+
 describe('fold: health events', () => {
-  it('agent_injured subtracts injuryDamage[kind] once and records the injury day', () => {
+  // A blow is two events and one subtraction (C11 R16): `agent_harmed` takes the hp and is
+  // the only event that can name the hand behind it, `agent_injured` puts the wound on the
+  // record. Every row that used to drive one now drives the pair, as `attack` does.
+  it('agent_injured records the injury day, and the hp comes off through agent_harmed', () => {
     let s = makeWorld()
-    s = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'minor' }, 2885), CFG)
+    s = wound(s, 'a1', 'minor', 2885)
     expect(s.agents.a1!.hp).toBe(90)
     expect(s.agents.a1!.injuries).toEqual([{ kind: 'minor', day: 2 }])
-    s = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'serious' }, 2885), CFG)
+    s = wound(s, 'a1', 'serious', 2885)
     expect(s.agents.a1!.hp).toBe(60)
-    s = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'grave' }, 2885), CFG)
+    s = wound(s, 'a1', 'grave', 2885)
     expect(s.agents.a1!.hp).toBe(0)
     expect(s.agents.a1!.injuries).toHaveLength(3)
+    // The record alone takes nothing: one subtraction, and it is the other event's.
+    const recorded = fold(makeWorld(), ev('agent_injured', { agentId: 'a1', kind: 'grave' }), CFG)
+    expect(recorded.agents.a1!.hp).toBe(100)
     expect(() => fold(s, ev('agent_injured', { agentId: 'ghost', kind: 'minor' }), CFG)).toThrow(/unknown agent/i)
   })
 
@@ -114,7 +127,7 @@ describe('verb: tend', () => {
 describe('worldTick: infection is not healthSystem\'s any more', () => {
   it('an open wound at dawn infects nobody here, on the seed that used to', () => {
     let s = makeWorld()
-    s = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'minor' }), CFG)
+    s = wound(s, 'a1', 'minor')
     const r = tickOnce(atTick(s, DAWN - 1), CFG, new RngStreams('h3'))
     expect(r.events.map((e) => e.type)).not.toContain('agent_infected')
     expect(r.state.agents.a1!.ill).toBe(false)
@@ -193,13 +206,13 @@ describe('worldTick: recovery and tend', () => {
 describe('worldTick: hp floor (Task 6 integration)', () => {
   it('injuries driving hp under collapseHp collapse the agent; hp at deathHp kills', () => {
     let s = makeWorld()
-    s = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'grave' }), CFG)
-    s = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'serious' }), CFG)
+    s = wound(s, 'a1', 'grave')
+    s = wound(s, 'a1', 'serious')
     const t1 = tickOnce(s) // hp 10 < collapseHp 15
     expect(t1.events).toContainEqual({ type: 'agent_collapsed', payload: { agentId: 'a1' } })
     expect(t1.state.agents.a1!.collapsedSinceTick).toBe(t1.state.tick)
 
-    const dead = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'minor' }), CFG)
+    const dead = wound(s, 'a1', 'minor')
     const t2 = tickOnce(dead) // hp 0 <= deathHp
     expect(t2.events).toContainEqual({ type: 'agent_died', payload: { agentId: 'a1', cause: 'injury' } })
     expect(t2.state.agents.a1!.alive).toBe(false)
@@ -209,7 +222,7 @@ describe('worldTick: hp floor (Task 6 integration)', () => {
 describe('worldTick: health replay safety', () => {
   it('folding the returned events over the input reproduces the returned state', () => {
     let s = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 2, y: 0 }])
-    s = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'serious' }), CFG)
+    s = wound(s, 'a1', 'serious')
     s = fold(s, ev('agent_fell_ill', { agentId: 'a2' }), CFG)
     s = atTick(s, DAWN - 1)
     s = fold(s, ev('tick_advanced', {}, DAWN), CFG)

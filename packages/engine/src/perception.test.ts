@@ -159,6 +159,11 @@ describe('composePerception: packet shape', () => {
     let s = makeWorld([{ id: 'a', x: 2, y: 3 }])
     s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 3, loc: { t: 'agent', id: 'a' } }), DEFAULT_CONFIG)
     s = fold(s, ev('item_spawned', { id: 'item_2', kind: 'stone', qty: 1, loc: { t: 'tile', x: 3, y: 3 } }), DEFAULT_CONFIG)
+    // A blow is two events and one subtraction (C11 R16): the hp comes off through
+    // `agent_harmed` and the wound goes on the record through `agent_injured`.
+    s = fold(s, ev('agent_harmed', {
+      agentId: 'a', amount: DEFAULT_CONFIG.health.injuryDamage.minor, source: 'attack',
+    }), DEFAULT_CONFIG)
     s = fold(s, ev('agent_injured', { agentId: 'a', kind: 'minor' }), DEFAULT_CONFIG)
     const p = composePerception(s, DEFAULT_CONFIG, 'a', [])
     expect(p.time.tick).toBe(s.tick)
