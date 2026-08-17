@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { MINUTES_PER_DAY, simTimeFromTick, type SimConfig } from '@sj/shared'
+import { MINUTES_PER_DAY, simTimeFromTick, type SimConfig, type StructureRecipeDef } from '@sj/shared'
 import { mintId, type Affliction, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
@@ -9,7 +9,7 @@ import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
   | 'walk' | 'sleep' | 'wake' | 'enter' | 'exit' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
-  | 'build' | 'craft' | 'extinguish' | 'drink'
+  | 'build' | 'craft' | 'extinguish' | 'drink' | 'fill'
   | 'speak' | 'give' | 'take' | 'stow' | 'write' | 'read' | 'inscribe' | 'teach' | 'attack' | 'experiment'
 
 export type VerbDef = {
@@ -311,6 +311,32 @@ const drink: VerbDef = makeVerb({
   },
 })
 
+// A bucket carries one dose and it is heavy: it is the firefighting unit, not a canteen.
+export const BUCKET_CHARGES = 1
+
+export const FillParams = z.object({ itemId: z.string() }).strict()
+
+const fill: VerbDef = makeVerb({
+  kind: 'fill',
+  validate(state, _config, agentId, params) {
+    const p = FillParams.safeParse(params)
+    if (!p.success) return 'fill needs an {itemId}'
+    const item = state.items[p.data.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (!VESSEL_KINDS.has(item.kind)) return 'that holds no water'
+    if (waterWithinReach(state, agentId) === null) return 'no water within reach'
+    return null
+  },
+  onComplete(state, config, agentId, params) {
+    const p = FillParams.parse(params)
+    const item = state.items[p.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    if (!VESSEL_KINDS.has(item.kind) || waterWithinReach(state, agentId) === null) return []
+    const charges = item.kind === 'bucket' ? BUCKET_CHARGES : config.thirst.waterskinCharges
+    return [{ type: 'item_filled', payload: { itemId: p.itemId, charges } }]
+  },
+})
+
 export const TileParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
 export const PlantParams = z.object({ x: z.number().int(), y: z.number().int(), kind: z.string() }).strict()
 export const HarvestParams = z.object({ cropId: z.string() }).strict()
@@ -493,13 +519,27 @@ function siteAt(state: WorldState, x: number, y: number) {
   return null
 }
 
+// What can be built at all: a row with materials on it. An empty `inputs` marks a kind the
+// world places and nobody raises — a grave is not a building project.
+export function buildableRecipe(config: SimConfig, kind: string): StructureRecipeDef | null {
+  const row = config.structures.recipes[kind]
+  return row !== undefined && Object.keys(row.inputs).length > 0 ? row : null
+}
+
+// The hut keeps its C9 dial as the duration source; every other kind reads its row. The two
+// are asserted equal in config.test.ts, so this is one number under two names, not two numbers.
+export function buildTicks(config: SimConfig, kind: string): number {
+  return kind === 'hut' ? config.construction.hutTicks : (config.structures.recipes[kind]?.durationTicks ?? 0)
+}
+
 const build: VerbDef = makeVerb({
   kind: 'build',
   validate(state, config, agentId, params) {
     const p = BuildParams.safeParse(params)
     if (!p.success) return 'build needs {kind, x, y}'
-    if (p.data.kind !== 'hut') return `cannot build a ${p.data.kind}`
-    const { w, h } = config.construction.hutSize
+    const recipe = buildableRecipe(config, p.data.kind)
+    if (recipe === null) return `cannot build a ${p.data.kind}`
+    const { w, h } = recipe
     if (!nearRect(state, agentId, p.data.x, p.data.y, w, h)) return 'not close enough to build'
     const site = siteAt(state, p.data.x, p.data.y)
     if (site && site.kind === p.data.kind) return null // resume: materials already spent
@@ -518,24 +558,27 @@ const build: VerbDef = makeVerb({
         return 'someone is in the way'
       }
     }
-    if (heldQty(state, agentId, 'wood') < config.construction.hutMaterials.wood) return 'not enough wood'
+    for (const [kind, qty] of Object.entries(recipe.inputs)) {
+      if (heldQty(state, agentId, kind) < qty) return `not enough ${kind}`
+    }
     return null
   },
   duration(state, config, _agentId, params) {
     const p = BuildParams.parse(params)
-    return config.construction.hutTicks - (siteAt(state, p.x, p.y)?.progressTicks ?? 0)
+    return buildTicks(config, p.kind) - (siteAt(state, p.x, p.y)?.progressTicks ?? 0)
   },
   onStart(state, config, agentId, params) {
     const p = BuildParams.parse(params)
     if (siteAt(state, p.x, p.y)) return []
-    const { w, h } = config.construction.hutSize
+    const recipe = buildableRecipe(config, p.kind)
+    if (recipe === null) return []
     return [
-      ...consumeHeld(state, agentId, 'wood', config.construction.hutMaterials.wood),
+      ...Object.entries(recipe.inputs).flatMap(([kind, qty]) => consumeHeld(state, agentId, kind, qty)),
       {
         type: 'structure_planned',
         payload: {
-          id: mintId(state, 'structure'), kind: p.kind, x: p.x, y: p.y, w, h,
-          maxHp: config.construction.hutMaxHp, flammable: true, builderId: agentId,
+          id: mintId(state, 'structure'), kind: p.kind, x: p.x, y: p.y, w: recipe.w, h: recipe.h,
+          maxHp: recipe.maxHp, flammable: recipe.flammable, builderId: agentId,
           ...(config.ownership.enabled ? { owner: agentId } : {}),
         },
       },
@@ -850,7 +893,7 @@ const experiment: VerbDef = makeVerb({
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
-  drink,
+  drink, fill,
   speak, give, take, stow, write, read, inscribe, teach, attack, experiment,
 }
 

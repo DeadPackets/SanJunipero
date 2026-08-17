@@ -35,6 +35,8 @@ export const ItemSpoiled = z.object({ id: z.string() }).strict()
 export const ItemWorn = z.object({ id: z.string(), delta: z.number().int() }).strict()
 export const ItemBroke = z.object({ id: z.string() }).strict()
 export const ItemOwnerChanged = z.object({ id: z.string(), owner: z.string() }).strict()
+// A vessel is filled to a whole number of doses, never topped up by a fraction.
+export const ItemFilled = z.object({ itemId: z.string(), charges: z.number().int().nonnegative() }).strict()
 // Pure witness record — folds to nothing. Whether a taking is theft is the town's to decide.
 export const ItemTaken = z.object({
   itemId: z.string(), kind: z.string(), takerId: z.string(), ownerId: z.string(), x: z.number(), y: z.number(),

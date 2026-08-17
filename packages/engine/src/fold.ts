@@ -9,7 +9,7 @@ import {
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
   AgentDrank, FireExtinguished, FireIgnited, FireSpread, GravePlaced, HpChanged, ThirstChanged,
-  ItemBroke, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
+  ItemBroke, ItemFilled, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
   ConfigChanged,
   ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
@@ -120,6 +120,12 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const item = state.items[p.id]
       if (!item) throw new Error(`item_owner_changed for unknown item ${p.id}`)
       return { ...state, items: { ...state.items, [p.id]: { ...item, owner: p.owner } } }
+    }
+    case 'item_filled': {
+      const p = ItemFilled.parse(event.payload)
+      const item = state.items[p.itemId]
+      if (!item) throw new Error(`item_filled for unknown item ${p.itemId}`)
+      return { ...state, items: { ...state.items, [p.itemId]: { ...item, charges: p.charges } } }
     }
     case 'item_taken': {
       ItemTaken.parse(event.payload)
