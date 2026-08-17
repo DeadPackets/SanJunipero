@@ -63,7 +63,10 @@ export function StageMount(
       }
       scene = s
       const book = new TextureBook()
-      const openDoor = (structureId: string): void => interiorRef.current?.setActive(structureId)
+      const openDoor = (structureId: string): void => {
+        s.tags.hideAll()   // a destroyed sprite never fires pointerout (audit M8)
+        interiorRef.current?.setActive(structureId)
+      }
       landmarks = createLandmarkLayer(s, store)
       const marks = landmarks
       offSync = store.subscribe(() => {
@@ -93,7 +96,10 @@ export function StageMount(
       interior = createInteriorScene(s, store, book)
       s.interior = interior
       interiorRef.current = interior
-      offInterior = interior.onChange((id) => onInteriorRef.current?.(id))
+      offInterior = interior.onChange((id) => {
+        s.tags.hideAll()
+        onInteriorRef.current?.(id)
+      })
       offEvents = store.onEvents((evts) => {
         for (const ev of evts) {
           if (ev.type === 'agent_spoke') {

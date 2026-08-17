@@ -8,7 +8,7 @@ import { structureDepthBox, tileDepthBox, type DepthBox } from './depth.js'
 import { TILE_H, depthKey, tileToScreen } from './iso.js'
 import type { DepthEntry } from './layers.js'
 import { doorLocalRect } from './hitShapes.js'
-import { createNameTagLayer, type NameTagLayer } from './nameTags.js'
+import { anchorForSprite } from './tooltip.js'
 import type { Scene } from './scene.js'
 import {
   BUILDING_PX_PER_TILE, TextureBook, buildingArt, smoothSource, textureUrlFor, type BuildingArt,
@@ -77,7 +77,7 @@ type Entry = {
  *  hot-load path re-resolves it exactly once, when the art finally lands. */
 const NO_ART = ''
 type SyncState = {
-  entries: Map<string, Entry>; lastAssetsSeq: number; tags: NameTagLayer
+  entries: Map<string, Entry>; lastAssetsSeq: number
   onDoor: ((structureId: string) => void) | null
 }
 const syncStates = new WeakMap<Scene, SyncState>()
@@ -225,8 +225,7 @@ export function syncEntities(
   let sync = syncStates.get(scene)
   if (sync === undefined) {
     sync = {
-      entries: new Map(), lastAssetsSeq: store.assetsSeq(), tags: createNameTagLayer(scene),
-      onDoor: null,
+      entries: new Map(), lastAssetsSeq: store.assetsSeq(), onDoor: null,
     }
     syncStates.set(scene, sync)
     // Publish the ground every structure, item and crop stands on. One owner sorts the whole
@@ -239,7 +238,7 @@ export function syncEntities(
     })
   }
   if (onDoor !== undefined) sync.onDoor = onDoor
-  const tags = sync.tags
+  const tags = scene.tags
 
   // Everything on the map answers to the pointer: hover names it, click tells its story.
   const nameOnHover = (sprite: Sprite, kind: HoverKind, id: string): void => {
@@ -247,9 +246,11 @@ export function syncEntities(
     sprite.cursor = 'pointer'
     sprite.on('pointerover', () => {
       const text = hoverLabel(store.getState(), kind, id)
-      if (text !== null) tags.show(text, sprite.x, sprite.y - sprite.height)
+      // the anchor comes from the sprite's DRAWN bounds — for a base-anchored 1.85× building
+      // `sprite.y - sprite.height` landed above the roof and off nobody's screen in particular
+      if (text !== null) tags.show('hover', text, anchorForSprite(sprite, sprite.getLocalBounds()))
     })
-    sprite.on('pointerout', () => tags.hide())
+    sprite.on('pointerout', () => tags.hide('hover'))
   }
   const records = store.assetRecords()
   const live = new Set<string>()
@@ -305,15 +306,22 @@ export function syncEntities(
       door.cursor = 'pointer'
       const sid = s.id
       const self = entry
+      const sw = s.w, sh = s.h
       door.on('pointerover', () => {
         door.alpha = 1
         const name = hoverLabel(store.getState(), 'structure', sid)
-        const at = self.sprite
-        if (name !== null) tags.show(`Look inside — ${name}`, at.x + door.x, at.y + door.y)
+        const k = self.sprite.scale.x || 1
+        const r = doorLocalRect({ w: sw, h: sh }, k)
+        if (name !== null) {
+          tags.show('door', `Look inside — ${name}`, {
+            sx: self.sprite.x + (r.x + r.w / 2) * k, sy: self.sprite.y + (r.y + r.h) * k,
+            halfW: (r.w * k) / 2, topY: self.sprite.y + r.y * k,
+          })
+        }
       })
       door.on('pointerout', () => {
         door.alpha = DOOR_IDLE_ALPHA
-        tags.hide()
+        tags.hide('door')
       })
       door.on('pointertap', (e: FederatedPointerEvent) => {
         e.stopPropagation()   // the building's provenance popover is a different question
@@ -385,7 +393,7 @@ export function syncEntities(
     if (!live.has(key)) {
       entry.sprite.destroy({ children: true })
       sync.entries.delete(key)
-      tags.hide() // a torn-down sprite never fires pointerout, so its tag would hang
+      tags.hideAll() // a torn-down sprite never fires pointerout, so its tag would hang
     }
   }
 

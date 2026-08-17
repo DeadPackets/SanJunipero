@@ -150,6 +150,7 @@ function makeScene(): Scene & { sortDepth: () => void } {
     layers,
     entities: layers.entities,
     getZoom: () => 1,
+    viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
     addDepthSource: (fn: () => Array<{ box: { id: string }; node: unknown }>) => {
       sources.add(fn)
       return () => sources.delete(fn)
@@ -210,6 +211,19 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(boxes.map((b) => b.id).sort()).toEqual(['nadia', 'omar'])
     const nadia = boxes.find((b) => b.id === 'nadia')!
     expect([nadia.x0, nadia.y0]).toEqual([2.5, 3.5])   // tile (3,4) spans [2.5,3.5]×[3.5,4.5]
+  })
+
+  it('places a hovered name tag above the figure and inside the view (U10)', () => {
+    layer.tick(1000)
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    const nameTag = l.worldText!.children[1] as unknown as { visible: boolean; position: { x: number; y: number } }
+    nameTag.visible = true
+    layer.tick(1016)
+    const view = { x: -400, y: -300, w: 800, h: 600 }
+    expect(nameTag.position.x).toBeGreaterThanOrEqual(view.x)
+    expect(nameTag.position.x).toBeLessThanOrEqual(view.x + view.w)
+    expect(nameTag.position.y).toBeGreaterThanOrEqual(view.y)
+    expect(nameTag.position.y).toBeLessThanOrEqual(view.y + view.h)
   })
 
   it('getSprite returns the same registered sprite across ticks', () => {

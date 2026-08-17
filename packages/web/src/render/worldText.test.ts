@@ -2,14 +2,14 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { BODY_MIN_PX, TEXT_MIN_PX, WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
 import { CHAR_TAG_FONT_PX, CHAR_TAG_LINE_H } from './characters.js'
-import { TAG_FONT_PX, TAG_LINE_H } from './nameTags.js'
+import { TAG_FONT_PX, TAG_LINE_H } from './tooltip.js'
 import { BUBBLE_FONT_PX, BUBBLE_LINE_H } from './bubbles.js'
 
 const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8')
 
 // Every glyph the product draws onto a canvas is set in one of these four modules.
 const CANVAS_TEXT_FILES = [
-  './characters.ts', './nameTags.ts', './bubbles.ts', '../ui/SocietyLens.tsx',
+  './characters.ts', './tooltip.ts', './bubbles.ts', '../ui/SocietyLens.tsx',
 ]
 
 describe('the legibility floors themselves', () => {

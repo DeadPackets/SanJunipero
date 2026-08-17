@@ -10,6 +10,7 @@ import {
   isRoadMass, materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
 } from './groundField.js'
 import { applyDepthOrder, createLayers, type DepthEntry, type LayerSet } from './layers.js'
+import { createTooltipLayer, type TooltipLayer } from './tooltip.js'
 import { HEADLAND_COLOR, KERB_COLOR, furrowLines, patchOutline, type Tile } from './patches.js'
 import { tileKind } from './tileset.js'
 import { TextureBook } from './textures.js'
@@ -188,6 +189,11 @@ export type Scene = {
   addDepthSource(fn: () => DepthEntry[]): () => void
   /** one painter's order for the whole frame — called once per tick, by StageMount */
   sortDepth(): void
+  /** the visible world rectangle, in the space labels are drawn in (tooltip.ts places in it) */
+  viewRect(): { x: number; y: number; w: number; h: number }
+  /** THE label layer. One owner for every world tag, so two can never be up by accident and
+   *  a torn-down sprite cannot leave one behind. */
+  tags: TooltipLayer
   /** above the entities and never hit-tested: place names and other reading aids */
   overlay: Container
   rebakeGround(terrain: TileId[][], records?: AssetRecord[]): void
@@ -240,6 +246,15 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const groundSprite = new Sprite()
   layers.ground.addChild(groundSprite)
   app.stage.addChild(world)
+
+  const viewRect = (): { x: number; y: number; w: number; h: number } => {
+    const k = world.scale.x || 1
+    return {
+      x: -world.position.x / k, y: -world.position.y / k,
+      w: app.screen.width / k, h: app.screen.height / k,
+    }
+  }
+  const tags = createTooltipLayer(layers, viewRect)
 
   const tileCbs: Array<(t: { x: number; y: number }) => void> = []
 
@@ -401,6 +416,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       depthSources.add(fn)
       return () => depthSources.delete(fn)
     },
+    viewRect,
+    tags,
     sortDepth: () => {
       const entries: DepthEntry[] = []
       for (const fn of depthSources) entries.push(...fn())
@@ -446,6 +463,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       app.ticker.remove(followTick)
       app.ticker.remove(bakeTick)
       app.canvas.removeEventListener('wheel', onWheel)
+      tags.destroy()
       baker.destroy()
       app.destroy(true, { children: true })
     },

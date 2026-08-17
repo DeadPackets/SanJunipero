@@ -6,7 +6,8 @@ import { bodyDepthBox, type DepthBox } from './depth.js'
 import { facingFrom, tileToScreen, type Facing } from './iso.js'
 import type { DepthEntry } from './layers.js'
 import type { Scene } from './scene.js'
-import { HIT_MIN_PX, bodyHitPolygon, inflateToMin } from './hitShapes.js'
+import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin } from './hitShapes.js'
+import { TAG_PAD_X, TAG_PAD_Y, anchorForSprite, placeTag } from './tooltip.js'
 import { characterArt, smoothSource, type TextureBook } from './textures.js'
 import { WORLD_FONT_FAMILY, createWorldLabel, type WorldLabel } from './worldLabel.js'
 import {
@@ -322,7 +323,15 @@ export function createCharacterLayer(
         e.nameTagBg.roundRect(-e.nameTagLabel.width / 2 - 4, -e.nameTagLabel.height - 4, e.nameTagLabel.width + 8, e.nameTagLabel.height + 8, 2)
         e.nameTagBg.fill(0xfff6e9)
       }
-      e.nameTag.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX - NAME_TAG_ABOVE_HEAD_PX)
+      // ONE placement rule for every label in the product (U10): above the DRAWN figure,
+      // flipped or slid to stay on screen instead of being drawn off the edge of it.
+      if (e.nameTag.visible) {
+        const size = { w: e.nameTagLabel.width + TAG_PAD_X * 2, h: e.nameTagLabel.height + TAG_PAD_Y * 2 }
+        const head = CHAR_TARGET_PX + EMOTE_ABOVE_HEAD_PX + NAME_TAG_ABOVE_HEAD_PX
+        const at = placeTag(anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
+          size, scene.viewRect())
+        e.nameTag.position.set(Math.round(at.sx), Math.round(at.sy + size.h))
+      }
     }
     for (const [agentId, e] of entries) {
       if (!live.has(agentId)) {

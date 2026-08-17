@@ -111,6 +111,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     },
     tick: (nowMs) => {
       const state = store.getState()
+      const boxes: Array<{ x: number; y: number; w: number; h: number }> = []
       for (let i = bubbles.length - 1; i >= 0; i--) {
         const b = bubbles[i]!
         const a = state?.agents[b.agentId]
@@ -122,7 +123,11 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         const { sx, sy } = tileToScreen(a.x, a.y)
         const drift = b.isThought ? (THOUGHT_DRIFT_PX * (nowMs - b.bornMs)) / (b.dieMs - b.bornMs) : 0
         b.node.position.set(sx, sy - CHAR_TARGET_PX - 18 - drift)
+        // audit M8: a tag and a bubble used to composite into an unreadable pile
+        const w = b.node.width, h = b.node.height
+        boxes.push({ x: b.node.position.x - w / 2, y: b.node.position.y - h, w, h })
       }
+      scene.tags.setOccupied(boxes)
     },
     destroy: () => {
       for (const b of bubbles) b.node.destroy({ children: true })
