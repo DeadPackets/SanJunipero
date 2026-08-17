@@ -83,6 +83,10 @@ describe('buildingArt (v4-hires-building manifest)', () => {
 
   it('v2/no-meta records draw at natural size with the bottom-center law', () => {
     expect(buildingArt([rec({ id: 'hutv2', kind: 'hut' })], 'hut', 2, 2)).toEqual({ url: '/assets/hutv2.png', anchor: null, scale: null })
-    expect(buildingArt([], 'hut', 2, 2)).toEqual({ url: '/assets/placeholder/building.png', anchor: null, scale: null })
+  })
+
+  it('reports NO ART rather than a checkerboard, so the renderer can draw a built form', () => {
+    expect(buildingArt([], 'hut', 2, 2)).toEqual({ url: null, anchor: null, scale: null })
+    expect(buildingArt([], 'well', 1, 1).url).toBeNull()
   })
 })

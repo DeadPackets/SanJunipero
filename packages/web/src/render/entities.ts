@@ -1,9 +1,10 @@
-import { Graphics, Polygon, Sprite, type FederatedPointerEvent } from 'pixi.js'
+import { Graphics, Polygon, Sprite, Texture, type FederatedPointerEvent } from 'pixi.js'
 import { INTERIOR_KINDS, tickToMoment } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { hoverLabel, itemCropDetail, type HoverKind } from '../ui/interaction.js'
-import { TILE_H, TILE_W, depthKey, tileToScreen } from './iso.js'
+import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
+import { TILE_H, depthKey, tileToScreen } from './iso.js'
 import { createNameTagLayer, type NameTagLayer } from './nameTags.js'
 import type { Scene } from './scene.js'
 import {
@@ -60,20 +61,15 @@ export function doorZIndex(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): number {
 // tile — and Pixi scales hitArea with the sprite, so the points are divided by the applied
 // scale exactly as `hitRect` does for characters.
 export function footprintHitPoints(w: number, h: number, scale = 1): number[] {
-  const corners: ReadonlyArray<readonly [number, number]> = [
-    [0.5 - w / 2, 0.5 - h / 2],   // north
-    [w / 2 + 0.5, 0.5 - h / 2],   // east
-    [w / 2 + 0.5, h / 2 + 0.5],   // south
-    [0.5 - w / 2, h / 2 + 0.5],   // west
-  ]
   const k = scale === 0 ? 1 : scale
-  return corners.flatMap(([dx, dy]) => [
-    ((dx - dy) * (TILE_W / 2)) / k,
-    ((dx + dy) * (TILE_H / 2)) / k,
-  ])
+  return footprintDiamond(w, h).map((v) => v / k)
 }
 
-type Entry = { sprite: Sprite; url: string; pips: Graphics | null }
+type Entry = { sprite: Sprite; url: string; pips: Graphics | null; form: Graphics | null }
+
+/** `entry.url` for a structure whose kind has no art at all — never a real url, so the
+ *  hot-load path re-resolves it exactly once, when the art finally lands. */
+const NO_ART = ''
 type SyncState = {
   entries: Map<string, Entry>; lastAssetsSeq: number; tags: NameTagLayer
   doors: Map<string, Graphics>; onDoor: ((structureId: string) => void) | null
@@ -91,8 +87,29 @@ function setTexture(book: TextureBook, entry: Entry, url: string): void {
 // footprint diamond; v2/placeholder art keeps the bottom-center anchor at natural size.
 function applyBuildingArt(
   book: TextureBook, entry: Entry, art: BuildingArt, swapFrom: string | null,
-  footprint: { w: number; h: number },
+  footprint: { w: number; h: number }, kind: string,
 ): void {
+  // NO ART IN ANY ROOT — draw the thing rather than the forge's checkerboard. The volume is
+  // a child of the sprite, so it inherits the sprite's depth, position and tint for free and
+  // disappears the moment real art arrives.
+  if (art.url === null) {
+    entry.url = NO_ART
+    entry.sprite.texture = Texture.EMPTY
+    entry.sprite.anchor.set(0.5, 1.0)
+    entry.sprite.scale.set(1)
+    entry.sprite.hitArea = new Polygon(footprintHitPoints(footprint.w, footprint.h))
+    if (entry.form === null) {
+      entry.form = new Graphics()
+      entry.form.eventMode = 'none' // the volume is a picture; the sprite owns the pointer
+      entry.sprite.addChild(entry.form)
+    }
+    drawBuiltForm(entry.form, builtFormSpec(kind, footprint.w, footprint.h))
+    return
+  }
+  if (entry.form !== null) {
+    entry.form.destroy()
+    entry.form = null
+  }
   entry.url = art.url
   const p = swapFrom !== null && swapFrom !== art.url ? book.swap(swapFrom, art.url) : book.get(art.url)
   void p.then((t) => {
@@ -207,10 +224,10 @@ export function syncEntities(
         void provenanceText(sid, store.getState()).then((text) => showPopover(text, e.client.x, e.client.y))
       })
       sprite.hitArea = new Polygon(footprintHitPoints(s.w, s.h))   // until the art sets its scale
-      entry = { sprite, url: '', pips: null }
+      entry = { sprite, url: '', pips: null, form: null }
       sync.entries.set(key, entry)
       scene.entities.addChild(sprite)
-      applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h), null, s)
+      applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h), null, s, s.kind)
     }
     const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
     entry.sprite.position.set(ground.sx, ground.sy)
@@ -287,7 +304,7 @@ export function syncEntities(
         const text = itemCropDetail(store.getState(), 'item', iid)
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
-      entry = { sprite, url: '', pips: null }
+      entry = { sprite, url: '', pips: null, form: null }
       sync.entries.set(key, entry)
       scene.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'item', it.kind))
@@ -314,7 +331,7 @@ export function syncEntities(
         const text = itemCropDetail(store.getState(), 'crop', cid)
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
-      entry = { sprite, url: '', pips: null }
+      entry = { sprite, url: '', pips: null, form: null }
       sync.entries.set(key, entry)
       scene.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'crop', c.kind))
@@ -351,7 +368,9 @@ export function syncEntities(
         const s = state.structures[id]
         if (s === undefined) continue
         const art = buildingArt(records, s.kind, s.w, s.h)
-        if (art.url !== entry.url) applyBuildingArt(book, entry, art, entry.url, s)
+        if ((art.url ?? NO_ART) !== entry.url) {
+          applyBuildingArt(book, entry, art, entry.url === NO_ART ? null : entry.url, s, s.kind)
+        }
         continue
       }
       const kind = key.startsWith('item:') ? state.items[id]?.kind : state.crops[id]?.kind

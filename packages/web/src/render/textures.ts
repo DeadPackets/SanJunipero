@@ -39,13 +39,17 @@ export function characterArt(records: AssetRecord[], agentId: string): Character
 
 export const BUILDING_PX_PER_TILE = 32 // Style Bible: ~64px sprite for a 1×1 building → fit a 32·(w+h) square
 
-export type BuildingArt = { url: string; anchor: { x: number; y: number } | null; scale: number | null }
+/** `url: null` means NO ART EXISTS for this kind — the renderer draws a palette-true built
+ *  form instead. It must never mean the forge's checkerboard placeholder: a checkerboard in
+ *  the middle of the plaza reads as a broken product, and the well and fire pit have no art
+ *  in any root until v1 Task 17 commissions the structure set. */
+export type BuildingArt = { url: string | null; anchor: { x: number; y: number } | null; scale: number | null }
 
 // v4 hi-res building → feet-anchored, scaled to fit the Style Bible's 32·(w+h) px
 // square; anything else draws at natural size with the bottom-center anchor law.
 export function buildingArt(records: AssetRecord[], kind: string, fw: number, fh: number): BuildingArt {
   const rec = resolveAsset(records, 'building', kind)
-  if (rec === null) return { url: '/assets/placeholder/building.png', anchor: null, scale: null }
+  if (rec === null) return { url: null, anchor: null, scale: null }
   const m = parseBuildingManifest(rec.meta)
   if (m === null) return { url: `/assets/${rec.id}.png`, anchor: null, scale: null }
   const target = (fw + fh) * BUILDING_PX_PER_TILE
