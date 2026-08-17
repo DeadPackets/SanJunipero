@@ -8,7 +8,9 @@ import {
   type BondLevel, type LineageLike,
 } from './bondModel2.js'
 
-const DAY = WARMTH_HALF_LIFE_TICKS
+/** one half-life, which is TWO sim-days — see the constant's own note */
+const HALF = WARMTH_HALF_LIFE_TICKS
+const DAY = HALF
 
 /** the endpoint records a BondKind per event, so the fixtures speak the endpoint's language */
 const at = (tick: number, kind: BondKind): BondEvent => ({ tick, kind, note: 'x' })
@@ -92,12 +94,13 @@ describe('a friendship is losable and hatred is earnable', () => {
   it('a friendship nobody keeps up cools on its own — the level WENT DOWN', () => {
     const h = Array.from({ length: 5 }, () => at(0, 'owe'))          // warmth 15 → friendly
     expect(bondLevel(bondWarmth(h, 0))).toBe('friendly')
-    const after = bondLevel(bondWarmth(h, 2 * DAY))
+    const after = bondLevel(bondWarmth(h, 2 * HALF))
     expect(after).toBe('acquaintances')
     expect(LEVEL_RANK.indexOf(after)).toBeLessThan(LEVEL_RANK.indexOf('friendly'))
-    // MEASURED: with a one-sim-day half-life, two days is what it takes from 15; the plan's
-    // "four sim-days" would already have reached `strangers`.
-    expect(bondLevel(bondWarmth(h, 4 * DAY))).toBe('strangers')
+    // MEASURED, and it amends the plan twice over: the half-life is TWO sim-days, not one, so
+    // the plan's "four sim-days of nothing → acquaintances" is exactly right in DAYS while
+    // being two half-lives, not four. Four half-lives is already `strangers`.
+    expect(bondLevel(bondWarmth(h, 4 * HALF))).toBe('strangers')
   })
 
   it('bondWarmth is deterministic and order-independent within a tick', () => {

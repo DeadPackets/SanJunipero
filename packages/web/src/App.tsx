@@ -9,6 +9,7 @@ import { lensFromKey, lensKeyAllowed } from './ui/interaction.js'
 import { StageMount } from './render/StageMount.js'
 import { InspectorPanel } from './ui/InspectorPanel.js'
 import { RosterPanel } from './ui/RosterPanel.js'
+import { expandReducer } from './ui/roster/expand.js'
 import { ChroniclePanel } from './ui/ChroniclePanel.js'
 import { SocietyLens } from './ui/SocietyLens.js'
 import { DirectorMode } from './ui/DirectorMode.js'
@@ -137,7 +138,16 @@ export function App() {
   }
 
   const pickAgent = (agentId: string): void => {
-    const next: Route = { ...route, lens: 'inspector', agentId }
+    const next: Route = { ...route, lens: 'inspector', agentId, openId: null }
+    history.pushState(null, '', routeToPath(next))
+    setRoute(next)
+  }
+
+  // Opening a roster row is a state of the LIST, not a navigation: the list never unmounts, so
+  // there is no back to get wrong. It is still shareable, as `?open=`.
+  const toggleRow = (agentId: string): void => {
+    const nextState = expandReducer({ openId: route.openId }, { kind: 'toggle', id: agentId }, [agentId])
+    const next: Route = { ...route, openId: nextState.openId }
     history.pushState(null, '', routeToPath(next))
     setRoute(next)
   }
@@ -306,7 +316,7 @@ export function App() {
             <InspectorPanel store={store} agentId={route.agentId} scene={scene} onBack={showRoster} />
           )}
           {route.lens === 'inspector' && route.agentId === null && (
-            <RosterPanel store={store} openId={null} onToggle={pickAgent} />
+            <RosterPanel store={store} openId={route.openId} onToggle={toggleRow} onOpenFull={pickAgent} />
           )}
           {route.lens === 'chronicle' && <ChroniclePanel store={store} handle={handle} onView={onView} />}
           {route.lens === 'laws' && (

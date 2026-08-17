@@ -7,12 +7,16 @@ export type Route = {
   moment: { day: number; time: string } | null
   momentId: number | null              // a recorded day, by its narrator scene id
   agentId: string | null
+  /** the roster row that is open UNDER the list — a third state of the Townsfolk lens, and
+   *  shareable like the other two. `?agent=` still opens the standalone page. */
+  openId: string | null
 }
 
 export function parseRoute(pathname: string, search: string): Route {
   const params = new URLSearchParams(search)
   const lensParam = params.get('lens')
   const agentId = params.get('agent')
+  const openId = params.get('open')
 
   // Two moment links, told apart by their length rather than by guessing: three segments is
   // a point in time (/moment/:day/:time), two is a recorded day (/moment/:id).
@@ -31,7 +35,7 @@ export function parseRoute(pathname: string, search: string): Route {
   // rather than dropping the viewer on the map with a link that does nothing.
   const fallback: Lens = momentId === null ? 'map' : 'director'
   const lens: Lens = (LENSES as readonly string[]).includes(lensParam ?? '') ? lensParam as Lens : fallback
-  return { lens, moment, momentId, agentId }
+  return { lens, moment, momentId, agentId, openId }
 }
 
 export function routeToPath(r: Route): string {
@@ -42,6 +46,7 @@ export function routeToPath(r: Route): string {
   const params = new URLSearchParams()
   if (r.lens !== 'map') params.set('lens', r.lens)
   if (r.agentId !== null) params.set('agent', r.agentId)
+  if (r.openId !== null) params.set('open', r.openId)
   const q = params.toString()
   return q === '' ? path : `${path}?${q}`
 }

@@ -1,10 +1,14 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { BondsResponseSchema, type BondsResponse } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
+import { RosterExpanded } from './roster/RosterExpanded.js'
 import { RosterRowView } from './roster/RosterRowView.js'
+import { actsOf, becomingOf as buildBecoming, type Becoming } from './roster/expand.js'
 import {
   ROSTER_SORTS, ROSTER_SORT_WORD, rosterRows2, sortRoster, type RosterSort,
 } from './roster/rosterRow.js'
+import { EMPTY_LINEAGE, type LineageLike } from './bondModel2.js'
+import { changeLog, type PersonalityRow } from './becoming.js'
 import { EMPTY_COPY } from './townStats.js'
 
 export const BUST_PX = 48
@@ -13,13 +17,16 @@ export const BONDS_REFETCH_MS = 30_000
 /** The panel with the store taken out of it, so a test can render the markup without a fake
  *  store and without a DOM (the `StatusStripView` precedent). */
 export function RosterPanelView(
-  { rows, gone, sort, openId, onSort, onToggle }: {
+  { rows, gone, sort, openId, becomingOf, onSort, onToggle, onOpenFull }: {
     rows: ReturnType<typeof rosterRows2>
     gone: number
     sort: RosterSort
     openId: string | null
+    /** absent in the cheapest tests; the list renders without an expansion */
+    becomingOf?: (agentId: string) => Becoming
     onSort: (by: RosterSort) => void
     onToggle: (agentId: string) => void
+    onOpenFull?: (agentId: string) => void
   },
 ) {
   return (
@@ -53,6 +60,12 @@ export function RosterPanelView(
           {rows.map((row) => (
             <li key={row.id}>
               <RosterRowView row={row} open={openId === row.id} onToggle={onToggle} />
+              {openId === row.id && becomingOf !== undefined && (
+                <RosterExpanded
+                  becoming={becomingOf(row.id)}
+                  onOpenFull={() => onOpenFull?.(row.id)}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -70,10 +83,11 @@ export function RosterPanelView(
 // The Townsfolk lens with nobody picked: a character roster — a face, a name, what they are
 // doing, how they are, and where.
 export function RosterPanel(
-  { store, openId, onToggle }: {
+  { store, openId, onToggle, onOpenFull }: {
     store: WorldStore
     openId: string | null
     onToggle: (agentId: string) => void
+    onOpenFull: (agentId: string) => void
   },
 ) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
@@ -81,6 +95,27 @@ export function RosterPanel(
   useSyncExternalStore(store.subscribe, store.assetsSeq) // faces re-resolve on codex pushes
   const [sort, setSort] = useState<RosterSort>('name')
   const [bonds, setBonds] = useState<BondsResponse | null>(null)
+  const [lineage, setLineage] = useState<LineageLike>(EMPTY_LINEAGE)
+  const [changes, setChanges] = useState<PersonalityRow[]>([])
+
+  // Who came from whom. A childless town answers with a typed empty, so this never fails.
+  useEffect(() => {
+    void fetch('/api/lineage')
+      .then(async (r) => (r.ok ? (await r.json()) as LineageLike : null))
+      .then((l) => { if (l !== null && Array.isArray(l.parentOf)) setLineage(l) })
+      .catch(() => { /* ancestry is a nice-to-have, never a requirement */ })
+  }, [])
+
+  // Only the open row's document, and only while it is open — a roster does not fetch five.
+  useEffect(() => {
+    if (openId === null) { setChanges([]); return }
+    let alive = true
+    void fetch(`/api/agent/${encodeURIComponent(openId)}/personality`)
+      .then(async (r) => (r.ok ? (await r.json()) as PersonalityRow[] : []))
+      .then((rows) => { if (alive) setChanges(Array.isArray(rows) ? rows : []) })
+      .catch(() => { if (alive) setChanges([]) })
+    return () => { alive = false }
+  }, [openId])
 
   // The ties are what turn "five strangers" into a town; they arrive on their own clock and
   // the roster is complete without them.
@@ -104,6 +139,20 @@ export function RosterPanel(
     sort,
   )
   const gone = Object.values(state.agents).filter((a) => !a.alive).length
+  const people = Object.fromEntries(Object.values(state.agents).map((a) => [a.id, a.name]))
+  const events = store.recentEvents()
+
+  const becomingOf = (agentId: string): Becoming => buildBecoming({
+    id: agentId,
+    name: people[agentId] ?? agentId,
+    nowTick: tick,
+    skills: state.agents[agentId]?.skills ?? {},
+    acts: actsOf(agentId, bonds, events),
+    bonds,
+    lineage,
+    people,
+    changes: changeLog(changes),
+  })
 
   return (
     <RosterPanelView
@@ -111,8 +160,10 @@ export function RosterPanel(
       gone={gone}
       sort={sort}
       openId={openId}
+      becomingOf={becomingOf}
       onSort={setSort}
       onToggle={onToggle}
+      onOpenFull={onOpenFull}
     />
   )
 }

@@ -1181,6 +1181,46 @@ body {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .rr-with { grid-area: with; font-size: 0.75rem; color: var(--ink-quiet); font-style: italic; }
+
+/* ── who they have become, opened UNDER the row (task 82) ──
+   The list stays mounted behind it, so the way back is the row the viewer just clicked. */
+.roster-expanded {
+  margin: 0 0 0 0.6rem; padding: 0.6rem 0.7rem;
+  background: var(--parchment) var(--grain);
+  border: 2px solid var(--ink); border-top: 0; border-radius: 0;
+  box-shadow: 3px 3px 0 0 var(--deep);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .roster-expanded { animation: panel-in var(--t-fast) var(--ease-enter); }
+}
+.rx-lived { margin: 0 0 0.5rem; font-style: italic; color: var(--ink-quiet); }
+.rx-block { margin: 0 0 0.55rem; }
+.rx-title {
+  margin: 0 0 0.2rem;
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-quiet);
+}
+.rx-empty { margin: 0; font-size: 0.875rem; font-style: italic; color: var(--ink-quiet); text-wrap: pretty; }
+.rx-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; }
+.rx-list li { font-size: 0.875rem; text-wrap: pretty; }
+.rx-list .stamp {
+  margin-right: 0.3rem; font-size: 0.75rem; color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums; font-family: ui-monospace, 'SF Mono', monospace;
+}
+.rx-level {
+  margin-right: 0.3rem; padding: 0.05rem 0.3rem;
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.04em;
+  background: var(--sand); border: 1px solid var(--ink);
+}
+.rx-full {
+  margin-top: 0.3rem; min-height: 32px; cursor: pointer;
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
+  padding: 0.25rem 0.5rem; color: var(--ink);
+  background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
+  box-shadow: 2px 2px 0 0 var(--deep);
+}
+.rx-full:hover { background: var(--honey); }
+.rx-full:active { translate: 2px 2px; box-shadow: none; }
 .roster-empty {
   color: var(--cream); font-style: italic;
   background-color: var(--deep);

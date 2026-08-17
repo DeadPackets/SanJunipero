@@ -107,8 +107,15 @@ function actOf(h: BondEvent): string {
     : ACT_OF_BOND_KIND[h.kind as BondKind] ?? h.kind
 }
 
-/** One sim-day. A friendship needs keeping up: silence costs warmth, which is what lets a
- *  level FALL without anybody doing anything wrong. */
+/**
+ * A friendship needs keeping up: silence costs warmth, which is what lets a level FALL without
+ * anybody doing anything wrong.
+ *
+ * MEASURED CORRECTION to the plan, which calls this constant "one sim-day": a tick is a
+ * sim-MINUTE and `MINUTES_PER_DAY` is 1440, so 2880 ticks is **two** sim-days. The value is
+ * kept — two days of silence to halve a warmth is the gentler and better-behaved of the two
+ * readings — and the comment is corrected rather than the number.
+ */
 export const WARMTH_HALF_LIFE_TICKS = 2880
 
 /** Deterministic and order-independent — a sum is commutative, and two reads of one history
