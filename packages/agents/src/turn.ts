@@ -33,20 +33,27 @@ export const IntentSchema = z.object({
   verb: z.string().min(1).describe('The exact word of the act, such as walk or eat.'),
   params: IntentParamsSchema.default({}).describe('Exactly what the act asks for, named by its keys.'),
 }).strict()
+// Every optional field takes null as well as absence. A model writing `null` for a field it
+// has nothing to put in is saying "none", and a strict optional turns that into a whole-turn
+// parse failure: one live turn carried a valid action AND speech and was thrown away for
+// `"reconsider_at": null`, at the price of a repair call. Null is not normalised away by a
+// `.transform()` on purpose — `z.toJSONSchema(..., { io: 'output' })` refuses to represent one,
+// and that is the direction an output schema is converted in. Every reader below treats null
+// and absent alike instead.
 export const TurnSchema = z.object({
   thought: z.string().min(1)
     .describe('What passes through your mind this moment. Yours alone; no one else ever hears it.'),
-  speech: z.string().min(1).optional()
+  speech: z.string().min(1).nullish()
     .describe('Words you say aloud. Anyone within earshot hears them.'),
-  action: z.union([IntentSchema, z.object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') }).strict()]).optional()
+  action: z.union([IntentSchema, z.object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') }).strict()]).nullish()
     .describe('One act you begin now: its exact word as verb with what it asks as params, or freeform for a try at something new.'),
-  plan: z.array(IntentSchema).max(12).optional()
+  plan: z.array(IntentSchema).max(12).nullish()
     .describe('Up to twelve acts your body carries out one after another while your mind rests.'),
-  journal: z.string().min(1).optional()
+  journal: z.string().min(1).nullish()
     .describe('Words you set down in your own book. Writing takes part of the hour.'),
   importance: z.number().int().min(1).max(10)
     .describe('How deeply this moment matters to you, one through ten.'),
-  reconsider_at: ReconsiderAtSchema.optional()
+  reconsider_at: ReconsiderAtSchema.nullish()
     .describe('When you mean to return to your thoughts: a clock time today such as 08:30, or a day and a part of that day such as {"day": 12, "phase": "dusk"}. The parts of a day are day, dusk and night.'),
 }).strict()
 export type Turn = z.infer<typeof TurnSchema>

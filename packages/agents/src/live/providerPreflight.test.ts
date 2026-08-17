@@ -97,6 +97,13 @@ describe('scorePreflight', () => {
     expect(r.passed).toBe(false)
   })
 
+  it('does not count a null action as an act, now that the schema accepts one', () => {
+    const r = score([ok({ ...WHOLE_TURNS[0], action: null, speech: null }), ok(WHOLE_TURNS[1]), ok(WHOLE_TURNS[2])])
+    expect(r.actions).toBe(2)
+    expect(r.speeches).toBe(1)
+    expect(r.passed).toBe(false)
+  })
+
   it('counts a call that never came back as unanswered and keeps its error', () => {
     const r = score([
       ok(WHOLE_TURNS[0]), ok(WHOLE_TURNS[2]),

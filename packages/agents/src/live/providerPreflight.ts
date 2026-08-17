@@ -99,8 +99,10 @@ export function scorePreflight(opts: {
   servedProviders?: readonly string[]
 }): PreflightResult {
   const answered = opts.answers.filter((a) => a.ok).length
-  const actions = opts.answers.filter((a) => a.ok && a.turn.action !== undefined).length
-  const speeches = opts.answers.filter((a) => a.ok && a.turn.speech !== undefined).length
+  // `?? null`, not `!== undefined`: the turn schema takes null for an optional field, and a
+  // provider writing `"action": null` has emitted no act.
+  const actions = opts.answers.filter((a) => a.ok && (a.turn.action ?? null) !== null).length
+  const speeches = opts.answers.filter((a) => a.ok && (a.turn.speech ?? null) !== null).length
   return {
     provider: opts.provider,
     hardAllowList: opts.hardAllowList,

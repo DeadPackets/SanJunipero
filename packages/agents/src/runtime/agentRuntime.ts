@@ -467,7 +467,7 @@ export class AgentRuntime {
 
     this.#clock.lastTurnTick = tick
     await this.#applyTurn(turn, tick, day)
-    if (turn.plan === undefined && (this.#plan.lastResult === 'done' || this.#plan.lastResult === 'blocked')) {
+    if ((turn.plan ?? undefined) === undefined && (this.#plan.lastResult === 'done' || this.#plan.lastResult === 'blocked')) {
       this.#plan.lastResult = 'idle'
     }
     this.#stats.turns += 1
@@ -517,7 +517,7 @@ export class AgentRuntime {
     this.#onThought?.({ tick, agentId: this.#agentId, text: turn.thought })
 
     // A turn that speaks or acts directly preempts whatever plan was running.
-    if (turn.speech !== undefined || turn.action !== undefined) {
+    if ((turn.speech ?? null) !== null || (turn.action ?? null) !== null) {
       if (this.#plan.lastResult === 'running') this.#plan.lastResult = 'idle'
       this.#plan.queue = []
       this.#planHeadInFlight = false

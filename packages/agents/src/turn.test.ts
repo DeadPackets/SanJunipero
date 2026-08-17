@@ -47,6 +47,39 @@ describe('TurnSchema', () => {
     expect(TurnSchema.parse(FALLBACK_TURN)).toEqual(FALLBACK_TURN)
   })
 
+  it('keeps a complete turn that wrote null where it had nothing to say', () => {
+    // Measured live: Baidu returned a turn carrying a valid action AND speech and the whole
+    // answer was discarded, because it wrote `"reconsider_at": null` where the schema wanted
+    // the key absent. A null in an optional field is the model saying "none", not a malformed
+    // answer, and it costs a repair call every time.
+    for (const key of ['speech', 'action', 'plan', 'journal', 'reconsider_at'] as const) {
+      const parsed = TurnSchema.safeParse({ ...validTurn, [key]: null })
+      expect(parsed.success, key).toBe(true)
+    }
+  })
+
+  it('a null optional field reads as absent, so nothing downstream acts on it', () => {
+    const t = TurnSchema.parse({
+      thought: 'nothing to add', importance: 2,
+      speech: null, action: null, plan: null, journal: null, reconsider_at: null,
+    })
+    expect(t.speech ?? undefined).toBeUndefined()
+    expect(t.action ?? undefined).toBeUndefined()
+    expect(t.plan ?? undefined).toBeUndefined()
+    expect(t.journal ?? undefined).toBeUndefined()
+    expect(t.reconsider_at ?? undefined).toBeUndefined()
+  })
+
+  it('still names exactly two required fields, and no transform blocks the emitted grammar', () => {
+    // A `.transform()` that normalised null to absent would read better and cannot be used:
+    // `z.toJSONSchema(..., { io: 'output' })` throws on one, and that is the direction the
+    // SDK converts an output schema in.
+    for (const io of ['input', 'output'] as const) {
+      const emitted = z.toJSONSchema(TurnSchema, { io }) as { required: string[] }
+      expect(emitted.required, io).toEqual(['thought', 'importance'])
+    }
+  })
+
   it('every field carries a diegetic description the mind can learn from (finding 8)', () => {
     const shape = TurnSchema.shape
     for (const key of Object.keys(shape) as Array<keyof typeof shape>) {
