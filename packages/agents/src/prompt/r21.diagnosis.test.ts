@@ -129,16 +129,15 @@ describe('R21 candidate 2 — "perception omits it": CONFIRMED', () => {
     const s = genesisTown()
     // Salma wakes with the staged fever the live gate seeds, and she dies of it.
     const sick = fold(s, ev('agent_afflicted', { agentId: 'salma', kind: 'illness', severity: 3 }), CFG)
-    const omarSees = composePerception(sick, CFG, 'omar', [])
-    const salma = omarSees.visible.agents.find((a) => a.id === 'salma')
+    const salma = composePerception(sick, CFG, 'omar', []).visible.agents.find((a) => a.id === 'salma')
     expect(salma).toBeDefined()
-    // Everything a pair of eyes gets: a name, a place, a verb, asleep, collapsed, an age band,
-    // and what she has on. Nothing about the body under it.
-    expect(Object.keys(salma!).sort()).toEqual(
-      ['activityVerb', 'ageBand', 'asleep', 'collapsed', 'id', 'name', 'x', 'y'],
-    )
-    expect(proseFor(sick, 'omar')).toContain('salma (salma) stands at')
-    expect(proseFor(sick, 'omar')).not.toMatch(/fever|ill|sick|hurt|ails/i)
+    // R21-C. A pair of eyes used to get a name, a place, a verb, asleep, collapsed and an age
+    // band, and nothing about the body under it. It now gets the ailment too, in words.
+    expect(salma!.condition).toBe('flushed with fever')
+    expect(proseFor(sick, 'omar')).toContain('salma (salma) stands at (74, 62), flushed with fever.')
+
+    // And a town with nothing wrong with it reads exactly as it always did.
+    expect(proseFor(s, 'omar')).toContain('salma (salma) stands at (74, 62).')
   })
 })
 

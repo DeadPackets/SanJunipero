@@ -31,6 +31,10 @@ export type PerceivedAgent = {
   // What the body has on, as it looks from across the square. Absent on bare shoulders, so a
   // town that has sewn nothing reads exactly as it always did, and never a number (G10).
   worn?: string
+  // How the body looks, when it looks bad. Absent on a well one, so a healthy town reads
+  // exactly as it always did — and never a number (G10). The forageable-prose precedent: the
+  // packet carries the phrase, because the phrase is what a pair of eyes actually gets.
+  condition?: string
 }
 
 // How a worn thing reads to whoever is looking. The forageable-prose precedent: the packet
@@ -43,6 +47,33 @@ export function wornProse(state: WorldState, agentId: string): string | undefine
   const itemId = state.agents[agentId]?.equipped?.body
   const kind = itemId === undefined ? undefined : state.items[itemId]?.kind
   return kind === undefined ? undefined : WORN_PROSE[kind]
+}
+
+// What ails a body, as it shows from across the square. The self already reads these in the
+// first person; a town whose healer cannot see a fever six tiles away tends nobody, and the
+// live gate's healer looked for the sick in 33 turns and found none (C11 R21).
+export const CONDITION_PROSE: Readonly<Record<AfflictionKind, string>> = {
+  illness: 'flushed with fever',
+  poison: 'grey-faced and doubled over',
+  injury: 'favouring a hurt',
+  fatigue: 'grey with a tiredness sleep has not lifted',
+}
+
+const HURT_SHARE = 0.3
+const GAUNT_HUNGER = 5
+
+// One phrase, worst thing first: an affliction outranks a wound, and a wound outranks an
+// empty belly. Absent when there is nothing to see.
+export function conditionProse(state: WorldState, config: SimConfig, agentId: string): string | undefined {
+  const a = state.agents[agentId]
+  if (a === undefined || !a.alive) return undefined
+  const worst = [...(a.afflictions ?? [])].sort((p, q) =>
+    q.severity - p.severity || (p.kind < q.kind ? -1 : p.kind > q.kind ? 1 : 0))[0]
+  if (worst !== undefined) return CONDITION_PROSE[worst.kind]
+  if (a.ill) return CONDITION_PROSE.illness
+  if (a.hp < config.health.maxHp * HURT_SHARE) return 'badly hurt'
+  if (a.needs.hunger < GAUNT_HUNGER) return 'hollowed out with hunger'
+  return undefined
 }
 
 // Both fields absent on a blank wall, so a town that writes nothing reads as it always did.
@@ -263,6 +294,7 @@ export function composePerception(
     .sort(byId)
     .map(a => {
       const worn = wornProse(state, a.id)
+      const condition = conditionProse(state, config, a.id)
       return {
         id: a.id, name: a.name, x: a.x, y: a.y,
         activityVerb: a.activity?.verb ?? null,
@@ -270,6 +302,7 @@ export function composePerception(
         asleep: a.asleep,
         ageBand: ageBand(config, a.ageDays),
         ...(worn === undefined ? {} : { worn }),
+        ...(condition === undefined ? {} : { condition }),
       }
     })
 

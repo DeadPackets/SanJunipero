@@ -619,3 +619,61 @@ describe('composePerception: the body knows where it is and what it is doing', (
     expect(chopping.self.activityToward).toBeUndefined()
   })
 })
+
+// R21-C: a body that looks ill looks ill. The live gate's healer thought about who might be
+// sick in 33 separate turns and tended nobody, because a pair of eyes got a name, a place and
+// nothing else — while the founder six tiles away died of a fever.
+describe('composePerception: a body carries what ails it, where eyes can reach', () => {
+  const sicken = (s: WorldState, id: string, kind: string, severity: number): WorldState =>
+    fold(s, ev('agent_afflicted', { agentId: id, kind, severity }), DEFAULT_CONFIG)
+
+  it('a well body carries nothing, so a healthy town reads exactly as it always did', () => {
+    const s = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 2, y: 0 }])
+    const seen = composePerception(s, DEFAULT_CONFIG, 'a', []).visible.agents[0]!
+    expect(seen.condition).toBeUndefined()
+    expect(Object.keys(seen).sort())
+      .toEqual(['activityVerb', 'ageBand', 'asleep', 'collapsed', 'id', 'name', 'x', 'y'])
+  })
+
+  it('names the ailment in words and never in numbers', () => {
+    let s = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 2, y: 0 }])
+    s = sicken(s, 'b', 'illness', 2)
+    const seen = composePerception(s, DEFAULT_CONFIG, 'a', []).visible.agents[0]!
+    expect(seen.condition).toBe('flushed with fever')
+    expect(seen.condition).not.toMatch(/[0-9]/)
+  })
+
+  it('one phrase, and it is the worst thing there is to see', () => {
+    let s = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 2, y: 0 }])
+    s = sicken(s, 'b', 'injury', 1)
+    s = sicken(s, 'b', 'poison', 3)
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', []).visible.agents[0]!.condition)
+      .toBe('grey-faced and doubled over')
+  })
+
+  it('a wound with no affliction still shows, and so does an empty belly', () => {
+    const base = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 2, y: 0 }])
+    const hurt: WorldState = {
+      ...base,
+      agents: { ...base.agents, b: { ...base.agents.b!, hp: DEFAULT_CONFIG.health.maxHp * 0.2 } },
+    }
+    expect(composePerception(hurt, DEFAULT_CONFIG, 'a', []).visible.agents[0]!.condition).toBe('badly hurt')
+
+    const starved: WorldState = {
+      ...base,
+      agents: { ...base.agents, b: { ...base.agents.b!, needs: { ...base.agents.b!.needs, hunger: 2 } } },
+    }
+    expect(composePerception(starved, DEFAULT_CONFIG, 'a', []).visible.agents[0]!.condition)
+      .toBe('hollowed out with hunger')
+  })
+
+  it('the dark hides a fever exactly as it hides the body wearing it', () => {
+    let s = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 11, y: 0 }])
+    s = sicken(s, 'b', 'illness', 3)
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', []).visible.agents[0]!.condition)
+      .toBe('flushed with fever')
+    // Midnight: the horizon shrinks past the body, and the fever goes with it.
+    const night: WorldState = { ...s, tick: 0 }
+    expect(composePerception(night, DEFAULT_CONFIG, 'a', []).visible.agents).toEqual([])
+  })
+})
