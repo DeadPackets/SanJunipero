@@ -1,10 +1,11 @@
-import { Container, Text } from 'pixi.js'
+import { Container } from 'pixi.js'
 // the deep path, never the package root: @sj/engine's index reaches db.ts and therefore
 // better-sqlite3, which the browser graph guard forbids
 import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
+import { WORLD_FONT_FAMILY, createWorldLabel, type WorldLabel } from './worldLabel.js'
 
 // A good plan is not a legible picture. At the default zoom the viewer sees roofs and roads
 // and cannot tell the square from a wide street. These are the reading aids a real town has:
@@ -116,9 +117,9 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
   const node = new Container()
   node.eventMode = 'none'
   scene.overlay.addChild(node)
-  // Text, not BitmapText: the pixel BitmapFont install is a later task, and a BitmapText with
-  // no installed font crashes the whole renderer rather than falling back.
-  const labels = new Map<string, Text>()
+  // createWorldLabel, never `new BitmapText`: a bitmap glyph with no installed font blanks the
+  // entire canvas, so the choice is made once from the font cache (worldLabel.ts, ruling R3).
+  const labels = new Map<string, WorldLabel>()
 
   function sync(): void {
     const alpha = landmarkAlpha(scene.getZoom())
@@ -135,11 +136,9 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
       seen.add(m.id)
       let t = labels.get(m.id)
       if (t === undefined) {
-        t = new Text({
-          text: m.name,
-          style: { fontFamily: 'monospace', fontSize: LANDMARK_LABEL_PX, fill: LANDMARK_INK },
+        t = createWorldLabel(m.name, {
+          fontFamily: WORLD_FONT_FAMILY, fontSize: LANDMARK_LABEL_PX, fill: LANDMARK_INK,
         })
-        t.resolution = 2                      // NEAREST upscale would soften a 12px glyph
         t.anchor.set(0.5, 1)
         t.eventMode = 'none'
         labels.set(m.id, t)

@@ -1,5 +1,6 @@
-import { BitmapText, Container, Graphics } from 'pixi.js'
+import { Container, Graphics } from 'pixi.js'
 import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
+import { WORLD_FONT_FAMILY, createWorldLabel } from './worldLabel.js'
 import { tileToScreen } from './iso.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import type { WorldStore } from '../state/worldStore.js'
@@ -64,9 +65,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const node = new Container()
     node.eventMode = 'none' // bubbles float over heads — never block a character click
     const lines = wrapBubble(text.slice(0, SPEECH_MAX_CHARS))
-    const label = new BitmapText({
-      text: lines.join('\n'),
-      style: { fontFamily: 'monospace', fontSize: BUBBLE_FONT_PX, fill: BUBBLE_INK, lineHeight: BUBBLE_LINE_H, align: 'left' },
+    const label = createWorldLabel(lines.join('\n'), {
+      fontFamily: WORLD_FONT_FAMILY, fontSize: BUBBLE_FONT_PX, fill: BUBBLE_INK,
+      lineHeight: BUBBLE_LINE_H, align: 'left',
     })
     const w = Math.ceil(label.width) + 10
     const h = Math.ceil(label.height) + 8

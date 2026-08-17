@@ -1,10 +1,11 @@
-import { BitmapText, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
+import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
 import { depthKey, facingFrom, tileToScreen, type Facing } from './iso.js'
 import type { Scene } from './scene.js'
 import { characterArt, smoothSource, type TextureBook } from './textures.js'
+import { WORLD_FONT_FAMILY, createWorldLabel, type WorldLabel } from './worldLabel.js'
 import {
   CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, NAME_TAG_ABOVE_HEAD_PX,
   SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4, charPose, emoteFor, hitRect, interpolatePos,
@@ -29,7 +30,7 @@ type CharEntry = {
   emote: Sprite
   nameTag: Container
   nameTagBg: Graphics
-  nameTagLabel: BitmapText
+  nameTagLabel: WorldLabel
   hit: Rectangle
   hitScale: number
   emoteUntil: number
@@ -175,9 +176,8 @@ export function createCharacterLayer(
     nameTag.visible = false
     nameTag.eventMode = 'none'
     const nameTagBg = new Graphics()
-    const nameTagLabel = new BitmapText({
-      text: '',
-      style: { fontFamily: 'monospace', fontSize: CHAR_TAG_FONT_PX, fill: 0x43394a, lineHeight: CHAR_TAG_LINE_H },
+    const nameTagLabel = createWorldLabel('', {
+      fontFamily: WORLD_FONT_FAMILY, fontSize: CHAR_TAG_FONT_PX, fill: 0x43394a, lineHeight: CHAR_TAG_LINE_H,
     })
     nameTagLabel.anchor.set(0.5, 1) // match the bg slab, which is drawn centered above the origin
     nameTag.addChild(nameTagBg, nameTagLabel)

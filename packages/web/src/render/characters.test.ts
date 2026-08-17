@@ -71,6 +71,12 @@ vi.mock('pixi.js', () => {
       this.text = opts?.text ?? ''
     }
   }
+  // No pixel BitmapFont is installed in the product yet, so createWorldLabel takes the canvas
+  // glyph path — the fallback that stops a missing font blanking the whole canvas (R3).
+  class Text extends BitmapText {
+    resolution = 1
+  }
+  const Cache = { has: () => false }
   class Rectangle {
     constructor(
       public x = 0,
@@ -91,7 +97,7 @@ vi.mock('pixi.js', () => {
   }
   Texture.EMPTY = new Texture()
   const Assets = { add: vi.fn(), load: vi.fn(() => new Promise(() => {})) }
-  return { Assets, BitmapText, Container, Graphics, Point, Rectangle, Sprite, Texture }
+  return { Assets, BitmapText, Cache, Container, Graphics, Point, Rectangle, Sprite, Text, Texture }
 })
 
 import { Container as MockContainer, Sprite as MockSprite } from 'pixi.js'

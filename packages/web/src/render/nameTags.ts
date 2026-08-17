@@ -1,8 +1,9 @@
-import { BitmapText, Container, Graphics } from 'pixi.js'
+import { Container, Graphics } from 'pixi.js'
 import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
 import { BUBBLE_FILL, BUBBLE_INK } from './bubbles.js'
 import { EMOTE_ABOVE_HEAD_PX } from './characters.js'
 import type { Scene } from './scene.js'
+import { WORLD_FONT_FAMILY, createWorldLabel } from './worldLabel.js'
 
 export const TAG_FONT_PX = WORLD_TEXT_PX
 export const TAG_LINE_H = WORLD_TEXT_LINE_H
@@ -26,9 +27,8 @@ export function createNameTagLayer(scene: Scene): NameTagLayer {
   node.eventMode = 'none' // the tag must never eat the click on the thing it names
   node.zIndex = TAG_Z
   const slab = new Graphics()
-  const label = new BitmapText({
-    text: '',
-    style: { fontFamily: 'monospace', fontSize: TAG_FONT_PX, fill: BUBBLE_INK, lineHeight: TAG_LINE_H },
+  const label = createWorldLabel('', {
+    fontFamily: WORLD_FONT_FAMILY, fontSize: TAG_FONT_PX, fill: BUBBLE_INK, lineHeight: TAG_LINE_H,
   })
   label.anchor.set(0.5, 1)
   node.addChild(slab, label)
