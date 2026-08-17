@@ -1,19 +1,19 @@
-import { Container, Graphics, Sprite, Texture } from 'pixi.js'
+import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { AssetRecord, SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
-import { TILE_H, tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
 import { materialMatrix, resolveMaterial } from './groundField.js'
 import { characterArt, smoothSource, type TextureBook } from './textures.js'
 import { characterCell } from './characters.js'
 import {
-  INTERIOR_FADE_MS, advanceInterior, bedSlots, interiorOf, roomPlan,
-  type InteriorPhaseState, type RoomItem,
+  INTERIOR_FADE_MS, advanceInterior, bedSlots, contactShadow, furnishingId, furnishingScale,
+  interiorOf, interiorOrder, interiorPieces, isFlat, roomPlan,
+  type InteriorPhaseState, type PlacedBody, type RoomItem,
 } from './interiors.js'
 import {
   ROOM_SHELL_INK, ROOM_SHELL_PAINT, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES,
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorPolyOf, floorPools,
-  roomOriginY, wallMount,
+  roomMaskPoly, roomOriginY, slotCentreScreen, slotSpanCentre, wallMount,
 } from './roomShell.js'
 
 // Palette-true: the room is cut from the same warm paper the chrome is (Style Bible §7).
@@ -34,11 +34,6 @@ export const PLACEHOLDER_URL = '/assets/placeholder/item.png'
 /** A hung piece is on the back plane, so it draws behind everything standing on the floor
  *  and in front of the wall itself — one depth, because a wall has no depth of its own. */
 export const WALL_PIECE_Z = -1
-
-// A slot's TOP vertex. Furniture and bodies draw at native pixel size; the only scaling in
-// the room is ROOM_ZOOM, an integer, so nothing here lands off the pixel grid.
-const slotToScreen = (x: number, y: number): { sx: number; sy: number } =>
-  tileToScreen(x * SLOT_TILES, y * SLOT_TILES)
 
 // Awake occupants stand where the room's life is: the hearth first, then the table, then
 // whatever else is furnished. Deterministic, so two viewers see the same room.
@@ -71,6 +66,14 @@ export function createInteriorScene(
   const room = new Container()
   room.eventMode = 'none'          // the room is a view; the chrome bar owns the way out
   room.sortableChildren = true
+  // A room is a box, and nothing drawn inside it belongs outside it. One mask settles that for
+  // every prop: a hearth's glow is a child of its sprite and grew with the furniture scale
+  // until it was painting a pale disc across the town.
+  const roomMask = new Graphics()
+  roomMask.poly(roomMaskPoly(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES))
+  roomMask.fill(0xffffff)
+  room.addChild(roomMask)
+  room.mask = roomMask
   root.addChild(veil, room)
   app.stage.addChild(root)
 
@@ -92,9 +95,14 @@ export function createInteriorScene(
   floorLight.mask = floorMask
   const floorTop = new Graphics()
   floorTop.zIndex = -2
-  room.addChild(walls, floorArt, floor, floorMask, floorLight, floorTop)
+  // ONE shadow plane, under everything that stands in the room — the same arrangement the
+  // town's eight-layer contract uses. Nothing floats, and a shadow can never sort in front of
+  // the body it belongs to because it is not in the sort at all.
+  const shadows = new Graphics()
+  shadows.zIndex = -1.5
+  room.addChild(walls, floorArt, floor, floorMask, floorLight, floorTop, shadows)
 
-  const furniture = new Map<string, Sprite>()   // `${kind}:${x},${y}` → sprite
+  const furniture = new Map<string, Sprite>()   // piece id → sprite
   const bodies = new Map<string, Sprite>()      // agentId → sprite
   const sheets = new Map<string, Sheet>()
 
@@ -156,38 +164,74 @@ export function createInteriorScene(
     plannedFor = null
   }
 
+  const onWall = (item: RoomItem): boolean => item.meta?.placement === 'wall'
+  const sizeOf = (item: RoomItem): { w: number; h: number } => item.meta?.slots ?? { w: 1, h: 1 }
+
+  /**
+   * A furnishing a body lies IN is drawn as TWO sprites cut from ONE texture, split at its
+   * own mid-line, so the body can go between them. Everything else is one sprite. The two
+   * halves reassemble exactly: each keeps a bottom anchor, and the back half is lifted by the
+   * front half's own height.
+   */
+  function applyHalf(sprite: Sprite, t: Texture, half: 'back' | 'front' | null): void {
+    if (half === null) {
+      sprite.texture = t
+      return
+    }
+    const f = t.frame
+    const cut = Math.round(f.height / 2)
+    const rect = half === 'back'
+      ? new Rectangle(f.x, f.y, f.width, cut)
+      : new Rectangle(f.x, f.y + cut, f.width, f.height - cut)
+    sprite.texture = new Texture({ source: t.source, frame: rect })
+    if (half === 'back') sprite.position.y -= (f.height - cut) * sprite.scale.y
+  }
+
   function placeFurniture(items: RoomItem[]): void {
-    for (const item of items) {
-      const key = `${item.kind}:${item.slot.x},${item.slot.y}`
-      if (furniture.has(key)) continue
-      const sprite = new Sprite()
-      sprite.anchor.set(0.5, 1)
-      sprite.eventMode = 'none'
+    const floorItems = items.filter((i) => !onWall(i))
+    const byId = new Map(floorItems.map((i) => [furnishingId(i.kind, i.slot), i]))
+
+    for (const item of items.filter(onWall)) {
       // A wall piece now HANGS: `placement: 'wall'` used to mean a 0 px offset because there
       // was nothing to hang it on. It mounts on the wall plane behind its slot, at eye height.
-      const onWall = item.meta?.placement === 'wall'
-      const at = onWall
-        ? wallMount(item.slot, ROOM_SLOTS, SLOT_TILES)
-        : (() => {
-          const s = slotToScreen(item.slot.x, item.slot.y)
-          return { sx: s.sx, sy: s.sy + TILE_H }
-        })()
-      sprite.position.set(at.sx, at.sy)
-      sprite.zIndex = onWall ? WALL_PIECE_Z : item.slot.x + item.slot.y
-      const url = item.url ?? PLACEHOLDER_URL
-      void book.get(url).then((t) => {
-        if (!sprite.destroyed) sprite.texture = t   // native pixels; ROOM_ZOOM is the only scale
-      })
-      furniture.set(key, sprite)
-      room.addChild(sprite)
-      if (item.meta?.providesLight === true) {
-        const glow = new Graphics()
-        glow.circle(0, -HEARTH_GLOW_PX / 2, HEARTH_GLOW_PX)
-        glow.fill({ color: INTERIOR_HEARTH_GLOW, alpha: 0.14 })
-        glow.eventMode = 'none'
-        glow.zIndex = sprite.zIndex - 0.5
-        sprite.addChild(glow)
-      }
+      const at = wallMount(item.slot, ROOM_SLOTS, SLOT_TILES)
+      addPiece(furnishingId(item.kind, item.slot), item, null, at.sx, at.sy, WALL_PIECE_Z)
+    }
+
+    for (const p of interiorPieces(floorItems, [])) {
+      const item = byId.get(p.half === null ? p.id : p.id.slice(0, p.id.indexOf('#')))
+      if (item === undefined) continue
+      const foot = slotSpanCentre(item.slot, sizeOf(item), SLOT_TILES)
+      addPiece(p.id, item, p.half, foot.sx, foot.sy, 0)
+    }
+  }
+
+  function addPiece(
+    key: string, item: RoomItem, half: 'back' | 'front' | null, sx: number, sy: number, z: number,
+  ): void {
+    if (furniture.has(key)) return
+    const sprite = new Sprite()
+    // A flat piece is anchored at the CENTRE of its ground; a standing piece at the bottom of
+    // its texture, which is the near vertex of the ground it stands on.
+    sprite.anchor.set(0.5, isFlat(item.kind) ? 0.5 : 1)
+    sprite.eventMode = 'none'
+    sprite.scale.set(furnishingScale(SLOT_TILES))
+    sprite.position.set(sx, sy)
+    sprite.zIndex = z
+    const url = item.url ?? PLACEHOLDER_URL
+    void book.get(url).then((t) => {
+      if (!sprite.destroyed) applyHalf(sprite, t, half)   // native px; ROOM_ZOOM is the only scale
+    })
+    furniture.set(key, sprite)
+    room.addChild(sprite)
+    // The glow belongs to the whole furnishing, so only the front half of a split one wears it.
+    if (item.meta?.providesLight === true && half !== 'back') {
+      const glow = new Graphics()
+      glow.circle(0, -HEARTH_GLOW_PX / 2, HEARTH_GLOW_PX)
+      glow.fill({ color: INTERIOR_HEARTH_GLOW, alpha: 0.14 })
+      glow.eventMode = 'none'
+      glow.zIndex = -0.5
+      sprite.addChild(glow)
     }
   }
 
@@ -238,16 +282,22 @@ export function createInteriorScene(
 
     const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true)
     const beds = bedSlots(room2.kind, sleeping, records)
+    const floorItems = plan.filter((i) => !onWall(i))
     let awakeIdx = 0
 
+    // Whom each body is with. A sleeper is IN the furnishing whose cells it was given; an
+    // awake body is AT its perch. `interiorPieces` turns that into where it stands.
+    const placed: PlacedBody[] = []
     const live = new Set(room2.occupants)
     for (const id of room2.occupants) {
       const agent = state.agents[id]
       if (agent === undefined) continue
       const asleep = agent.asleep
-      const slot = asleep
+      const own = asleep
         ? beds[id] ?? { x: ROOM_SLOTS - 1, y: ROOM_SLOTS - 1 }
         : perches[awakeIdx++ % Math.max(1, perches.length)] ?? { x: 1, y: 1 }
+      const host = floorItems.find((i) => hosts(i, own)) ?? null
+      placed.push({ id, slot: own, inside: host === null ? null : furnishingId(host.kind, host.slot) })
       const sprite = bodyFor(id)
       const sheet = sheetFor(id, records)
       if (sheet.texture !== null) {
@@ -258,15 +308,47 @@ export function createInteriorScene(
           sprite.scale.set(cell.scale)
         }
       }
-      const { sx, sy } = slotToScreen(slot.x, slot.y)
-      sprite.position.set(sx, sy + TILE_H)
-      sprite.zIndex = slot.x + slot.y + 0.5
     }
+
+    // ONE painter's order for the room, from the same authority the town answers to. No
+    // module invents a number, so a sleeper can no longer sit on top of the bed it is in.
+    const pieces = interiorPieces(floorItems, placed)
+    const index = new Map(interiorOrder(pieces).map((id, i) => [id, i]))
+    shadows.clear()
+    for (const p of pieces) {
+      const node = p.kind === 'body' ? bodies.get(p.id) : furniture.get(p.id)
+      if (node === undefined) continue
+      node.zIndex = index.get(p.id) ?? 0
+      if (p.kind === 'body') {
+        const foot = slotCentreScreen(p.slot.x, p.slot.y, SLOT_TILES)
+        node.position.set(foot.sx, foot.sy)
+      }
+      // A split furnishing casts ONE shadow, under its front half, not two; a flat one casts
+      // none, because it IS on the floor.
+      if (p.half === 'back' || node.texture.width <= 1) continue
+      if (p.kind === 'furniture' && isFlat(p.id.slice(0, p.id.indexOf(':')))) continue
+      const s = contactShadow(node.texture.width * node.scale.x)
+      // A body is anchored at its FEET, which already is the ground centre; a furnishing is
+      // anchored at its texture's bottom, which is the near vertex of the ground it stands on.
+      const foot = p.kind === 'body'
+        ? slotCentreScreen(p.slot.x, p.slot.y, SLOT_TILES)
+        : { sx: node.position.x, sy: node.position.y - s.lift }
+      shadows.ellipse(foot.sx, foot.sy, s.rx, s.ry)
+      shadows.fill({ color: ROOM_SHELL_INK, alpha: s.alpha })
+    }
+
     for (const [id, sprite] of bodies) {
       if (live.has(id)) continue
       sprite.destroy()
       bodies.delete(id)
     }
+  }
+
+  /** The furnishing a body at `slot` is with: the one whose footprint covers that slot. */
+  function hosts(item: RoomItem, slot: { x: number; y: number }): boolean {
+    const size = sizeOf(item)
+    return slot.x >= item.slot.x && slot.x < item.slot.x + size.w
+      && slot.y >= item.slot.y && slot.y < item.slot.y + size.h
   }
 
   function setActive(structureId: string | null): void {

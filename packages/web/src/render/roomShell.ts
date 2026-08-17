@@ -75,9 +75,21 @@ export function floorPolyOf(slots: number, slotTiles: number): number[] {
   return c.flatMap((p) => [p.sx, p.sy])
 }
 
-/** The centre of a slot, in room space. */
+/**
+ * The centre of the ground a piece stands on, in room space — the point its sprite's feet
+ * belong at. A furnishing two slots deep has its foot TWO slots from its origin, not one; the
+ * landed room offset every sprite by a single tile whatever its footprint, so anything bigger
+ * than one slot stood half outside its own ground.
+ */
+export function slotSpanCentre(
+  slot: { x: number; y: number }, size: { w: number; h: number }, slotTiles: number = SLOT_TILES,
+): { sx: number; sy: number } {
+  return tileToScreen((slot.x + size.w / 2) * slotTiles, (slot.y + size.h / 2) * slotTiles)
+}
+
+/** The centre of a single slot, in room space. */
 export function slotCentreScreen(x: number, y: number, slotTiles: number = SLOT_TILES): { sx: number; sy: number } {
-  return tileToScreen((x + 0.5) * slotTiles, (y + 0.5) * slotTiles)
+  return slotSpanCentre({ x, y }, { w: 1, h: 1 }, slotTiles)
 }
 
 /** The base edge of a wall, from the far vertex outward. `back-right` runs along +x, which is
@@ -190,6 +202,25 @@ export function floorPools(
     pools.push({ sx: c.sx, sy: c.sy, radius: HEARTH_POOL_R_TILES * TILE_W, alpha: HEARTH_POOL_ALPHA })
   }
   return pools
+}
+
+/**
+ * The union outline of the two walls and the floor — the room as ONE closed shape.
+ *
+ * WHAT THE BROWSER CAUGHT: a hearth's glow is a child of its sprite, so it grew with the
+ * furniture scale and painted a pale disc across the town outside the room. A room is a box;
+ * nothing drawn inside it belongs outside it. One mask on the room container settles that for
+ * every prop, present and future, instead of one clamp per light.
+ */
+export function roomMaskPoly(slots: number, slotTiles: number, wallH: number): number[] {
+  const rise = wallH * TILE_W
+  const e = wallBase('back-right', slots, slotTiles)
+  const w = wallBase('back-left', slots, slotTiles)
+  const near = tileToScreen(slots * slotTiles, slots * slotTiles)
+  return [
+    w.sx, w.sy - rise, 0, -rise, e.sx, e.sy - rise,
+    e.sx, e.sy, near.sx, near.sy, w.sx, w.sy,
+  ]
 }
 
 /**

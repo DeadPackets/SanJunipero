@@ -4,8 +4,8 @@ import {
   DOORWAY_POOL_ALPHA, HEARTH_POOL_ALPHA, ROOM_SHELL_INK, ROOM_SHELL_PAINT, ROOM_SLOTS,
   SLOT_TILES, WALL_H_TILES, WALL_KINDS, WALL_MOUNT_H_TILES,
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorBoards, floorPolyOf, floorPools,
-  roomBox, roomOriginY, skirtingPolys, slotCentreScreen, thresholdPoly, wallCourses, wallMount,
-  wallPolys, type ShellPainter,
+  roomBox, roomMaskPoly, roomOriginY, skirtingPolys, slotCentreScreen, thresholdPoly,
+  wallCourses, wallMount, wallPolys, type ShellPainter,
 } from './roomShell.js'
 
 // Every colour the room shell paints must be a MASTER_PALETTE member — the same law the
@@ -280,6 +280,30 @@ describe('roomShell — what the painter is asked to draw', () => {
       (o) => o.op === 'stroke' && (o.arg as { color: number }).color === ROOM_SHELL_INK,
     )
     expect(rim).toHaveLength(1)
+  })
+})
+
+// WHAT THE BROWSER CAUGHT: a hearth's glow is a child of its sprite, so it grew with the
+// furniture scale and painted a pale disc across the town OUTSIDE the room.
+describe('roomShell — the room is a closed box', () => {
+  const mask = roomMaskPoly(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+
+  it('is the union of both walls and the floor, and holds every point of all three', () => {
+    expect(mask).toHaveLength(12)              // a hexagon
+    const walls = wallPolys(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+    const inside = (x: number, y: number): boolean =>
+      pointInPoly(mask, x, y) || pts(mask).some(([mx, my]) => mx === x && my === y)
+    for (const kind of WALL_KINDS) {
+      for (const [x, y] of pts(walls[kind])) expect(inside(x, y), `${kind} ${x},${y}`).toBe(true)
+    }
+    for (const [x, y] of pts(floorPolyOf(ROOM_SLOTS, SLOT_TILES))) expect(inside(x, y)).toBe(true)
+  })
+
+  it('excludes the space a spilling light would reach', () => {
+    const near = tileToScreen(ROOM_SLOTS * SLOT_TILES, ROOM_SLOTS * SLOT_TILES)
+    expect(pointInPoly(mask, 0, near.sy + 200)).toBe(false)
+    expect(pointInPoly(mask, -600, 0)).toBe(false)
+    expect(pointInPoly(mask, 0, -WALL_H_TILES * TILE_W - 50)).toBe(false)
   })
 })
 
