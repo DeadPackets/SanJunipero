@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
+import { doorTile } from './interiors.js'
 import { composePerception, hears } from './perception.js'
 import { VERBS } from './verbs.js'
 import { RngStream } from './rng.js'
@@ -89,6 +90,32 @@ describe('composePerception: structure visibility by nearest tile', () => {
     const p = composePerception(s, DEFAULT_CONFIG, 'a', [])
     expect(sight).toBe(12)
     expect(p.visible.structures.map(st => st.id)).toEqual(['structure_1'])
+  })
+})
+
+// The mini-rehearsal's worst causal chain: `enter` was tried 15 times and succeeded 0, because
+// the prose named a tile beside the wall and the verb measured against the doorway. The packet
+// now carries the doorway itself, from the same `doorTile` the verb uses.
+describe('composePerception: the doorway a body must stand on', () => {
+  const hut = (s: WorldState, id: string, kind: string, x: number, y: number, complete: boolean): WorldState => {
+    let out = fold(s, ev('structure_planned', {
+      id, kind, x, y, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'script',
+    }), DEFAULT_CONFIG)
+    if (complete) out = fold(out, ev('structure_completed', { id }), DEFAULT_CONFIG)
+    return out
+  }
+
+  it('names the same tile enter measures against', () => {
+    const s = hut(makeWorld([{ id: 'a', x: 6, y: 6 }]), 'structure_1', 'hut', 2, 1, true)
+    const seen = composePerception(s, DEFAULT_CONFIG, 'a', []).visible.structures[0]!
+    expect(seen.door).toEqual(doorTile(s, s.structures.structure_1!))
+  })
+
+  it('is absent on a kind with no way in, and on a building still going up', () => {
+    let s = hut(makeWorld([{ id: 'a', x: 6, y: 6 }]), 'structure_1', 'shed', 2, 1, true)
+    s = hut(s, 'structure_2', 'hut', 8, 1, false)
+    const seen = composePerception(s, DEFAULT_CONFIG, 'a', []).visible.structures
+    expect(seen.map((st) => st.door)).toEqual([undefined, undefined])
   })
 })
 

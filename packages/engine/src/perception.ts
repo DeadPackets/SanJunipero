@@ -3,7 +3,7 @@ import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { doorTile } from './interiors.js'
 import { effectiveConfig } from './laws.js'
-import { thirstOf, type AfflictionKind, type Item, type WorldState } from './state.js'
+import { thirstOf, type AfflictionKind, type Item, type Structure, type WorldState } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
 import { isAdjacentToRect, walkIsCapped, workPenalty } from './verbs.js'
@@ -47,11 +47,14 @@ export function wornProse(state: WorldState, agentId: string): string | undefine
 
 // Both fields absent on a blank wall, so a town that writes nothing reads as it always did.
 // You can tell from across the square that something is carved there; the words need arm's length.
+// `door` is the tile `enter` measures against — absent on a kind with no way in, on a building
+// still going up, and on one nothing passable rings. One doorway, one source of truth.
 export type PerceivedStructure = {
   id: string; kind: string; x: number; y: number; w: number; h: number
   burning: boolean; stage: 'construction' | 'complete'
   hasInscription?: true
   inscription?: { text: string; by: string }
+  door?: { x: number; y: number }
 }
 
 // Whose it is, and whose hands made it — the two things prose needs to say
@@ -276,12 +279,20 @@ export function composePerception(
     return { hasInscription: true as const, ...(readable ? { inscription: s.inscription } : {}) }
   }
 
+  // The way in, from the same function the verb uses. A body that reads this and stands there
+  // is a body `enter` accepts (C11 batch-8 R7).
+  const wayIn = (s: Structure): { door: { x: number; y: number } } | Record<string, never> => {
+    if (s.stage !== 'complete' || !config.structures.enterableKinds.includes(s.kind)) return {}
+    const door = doorTile(state, s)
+    return door === null ? {} : { door: { x: door.x, y: door.y } }
+  }
+
   const visibleStructures: PerceivedStructure[] = Object.values(state.structures)
     .filter(s => (indoors === null ? structureInSight(s) : s.id === indoors))
     .sort(byId)
     .map(s => ({
       id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, burning: s.burning, stage: s.stage,
-      ...carved(s),
+      ...carved(s), ...wayIn(s),
     }))
 
   const tileItems: PerceivedItem[] = indoors !== null ? [] : Object.values(state.items)

@@ -45,6 +45,9 @@ export type PerceptionStructure = {
   h: number
   burning: boolean
   stage: 'construction' | 'complete'
+  // The tile `enter` measures against. Absent when there is no way in at all, and then the
+  // prose falls back to the nearest open ground beside the wall.
+  door?: { x: number; y: number }
 }
 
 export type PerceptionCrop = {
@@ -264,8 +267,12 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
 
   for (const s of packet.visible.structures) {
     const state = s.burning ? ' — it is burning' : s.stage === 'construction' ? ' — still being built' : ''
+    // The doorway outranks the wall: the tile the packet names is the tile `enter` measures
+    // against, so a mind told to stand there is a mind the world lets in.
     let approach = 'walk to a tile beside it.'
-    if (world?.isWalkable) {
+    if (s.door !== undefined) {
+      approach = `its doorway is at (${s.door.x}, ${s.door.y}) — stand there and you can go in.`
+    } else if (world?.isWalkable) {
       const t = besideTile(s, packet.self, world.isWalkable)
       approach = t === null ? 'no open ground lies beside it.' : `you could stand beside it at (${t.x}, ${t.y}).`
     }

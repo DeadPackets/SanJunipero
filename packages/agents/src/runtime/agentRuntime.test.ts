@@ -643,8 +643,10 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   it('perception prose offers a standable tile beside a visible structure (g3 round 6)', async () => {
     const { loop, runtime } = await setup({ model: turnModel([]), mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 1, 30)
-    // Agent at (3, 3), storehouse footprint at (5, 5): nearest open tile is (4, 4).
-    expect(runtime.dayLogSnapshot()[0]).toContain('you could stand beside it at (4, 4)')
+    // Agent at (3, 3), storehouse footprint at (5, 5). A storehouse is a thing you can walk
+    // into, so the prose names the doorway `enter` measures against (C11 batch-8 R7) rather
+    // than the nearest open ground beside the wall.
+    expect(runtime.dayLogSnapshot()[0]).toContain('its doorway is at (5, 6) — stand there and you can go in')
   })
 
   it('the body answers its own alarm: a sleeper whose turn submits nothing is woken by a runtime wake', async () => {
