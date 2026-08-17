@@ -177,6 +177,7 @@ export const FaunaKilled = z.object({
 // the same arithmetic with a name the chronicle can use. A node is never removed.
 const ForageableKindSchema = z.enum([
   'berry_bush', 'mushroom_patch', 'pale_mushroom_patch', 'herb_patch', 'clay_deposit', 'stone_outcrop',
+  'reed_bed',
 ])
 // `fullStock` is the abundance the ground climbs back toward. Optional so every recorded C11
 // scatter still parses; absent means the old ceiling of one.

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { DAYS_PER_SEASON, MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
-import { FORAGEABLE_PROSE } from '../data/forageables.js'
+import { FORAGEABLE_KINDS, FORAGEABLE_PROSE, FORAGEABLE_YIELD } from '../data/forageables.js'
+import { ForageableSpawned } from '../events.def.js'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import type { RngState, RngStreams } from '../rng.js'
@@ -153,5 +154,21 @@ describe('forageables: what a body can see of them', () => {
       id: 'structure_1', kind: 'hut', x: 0, y: 1, w: 3, h: 2, maxHp: 30, flammable: true, builderId: 'a1',
     }), CFG), ev('agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
     expect(seen(roofed)).toEqual([])
+  })
+})
+
+describe('the kind table and the event schema are one list', () => {
+  it('every authored kind spawns, yields something, and reads as prose', () => {
+    for (const kind of FORAGEABLE_KINDS) {
+      expect(ForageableSpawned.safeParse({ id: 'node_1', kind, x: 0, y: 0, stock: 1 }).success).toBe(true)
+      expect(FORAGEABLE_YIELD[kind]).toBeTruthy()
+      expect(FORAGEABLE_PROSE[kind].standing).toBeTruthy()
+    }
+  })
+
+  it('a reed bed hands up fiber, which is the one thing the loom was missing', () => {
+    const s = patch('reed_bed', 2)
+    expect(VERBS.forage!.validate(s, CFG, 'a1', { nodeId: 'node_1' })).toBeNull()
+    expect(picked(s).some((e) => e.type === 'item_spawned' && (e.payload as { kind: string }).kind === 'fiber')).toBe(true)
   })
 })

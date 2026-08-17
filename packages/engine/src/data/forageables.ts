@@ -4,6 +4,7 @@
 
 export const FORAGEABLE_KINDS = [
   'berry_bush', 'mushroom_patch', 'pale_mushroom_patch', 'herb_patch', 'clay_deposit', 'stone_outcrop',
+  'reed_bed',
 ] as const
 export type ForageableKind = (typeof FORAGEABLE_KINDS)[number]
 
@@ -28,6 +29,11 @@ export const GENESIS_FORAGEABLES: readonly ForageableScatter[] = [
   { kind: 'stone_outcrop', x: 22, y: 100, stock: 10 },
   { kind: 'stone_outcrop', x: 26, y: 107, stock: 10 },
   { kind: 'stone_outcrop', x: 18, y: 108, stock: 10 },
+  // Reeds stand where the bank is wet: two beds on the town's side of the water and one on
+  // the far bank, which is a bridge away like everything else over there.
+  { kind: 'reed_bed', x: 51, y: 52, stock: 6 },
+  { kind: 'reed_bed', x: 51, y: 84, stock: 6 },
+  { kind: 'reed_bed', x: 47, y: 70, stock: 6 },
 ]
 
 // How a node reads from across the clearing. Never a count — a picker sees abundance or
@@ -39,6 +45,7 @@ export const FORAGEABLE_PROSE: Readonly<Record<ForageableKind, { standing: strin
   herb_patch: { standing: 'a spread of low green herbs', bare: 'the herbs have been cut back to the root' },
   clay_deposit: { standing: 'grey clay showing where the bank has slumped', bare: 'the clay is dug out to the gravel' },
   stone_outcrop: { standing: 'loose stone lying at the foot of the rock', bare: 'the loose stone has all been carried off' },
+  reed_bed: { standing: 'tall reeds standing thick in the shallows', bare: 'the reeds are cut down to the waterline' },
 }
 
 // What a node yields when it is worked.
@@ -49,4 +56,5 @@ export const FORAGEABLE_YIELD: Readonly<Record<ForageableKind, string>> = {
   herb_patch: 'herb',
   clay_deposit: 'clay',
   stone_outcrop: 'stone',
+  reed_bed: 'fiber',
 }

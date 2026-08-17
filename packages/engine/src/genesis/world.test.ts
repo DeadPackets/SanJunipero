@@ -4,11 +4,11 @@ import {
   makeCityTemplate, stateHash, templateFits, type SimEvent,
 } from '@sj/shared'
 import { fold } from '../fold.js'
-import { findPath, searchPath } from '../path.js'
+import { findPath, isPassable, searchPath } from '../path.js'
 import { genesisState, type WorldState } from '../state.js'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
-import { makeGenesisWorld, GENESIS_FORK_Y, GENESIS_BUILDER_ID } from './world.js'
+import { makeGenesisWorld, GENESIS_FORK_Y, GENESIS_BUILDER_ID, GENESIS_RIVER_X } from './world.js'
 
 const T_WATER = 2
 
@@ -166,6 +166,21 @@ describe('makeGenesisWorld: the town', () => {
     const kinds = new Set(nodes.map((n) => n.kind))
     expect(kinds.has('mushroom_patch') && kinds.has('pale_mushroom_patch')).toBe(true)
     expect(nodes.some((n) => n.x > 50)).toBe(true)
+  })
+
+  // The clothing line had no source: fiber existed only in a recipe's input list.
+  it('stands the reeds by the water, on both banks, on ground a body can reach', () => {
+    const s = foldAll()
+    const reeds = Object.values(s.forageables!).filter((n) => n.kind === 'reed_bed')
+    expect(reeds.length).toBeGreaterThanOrEqual(2)
+    for (const r of reeds) {
+      expect(Math.abs(r.x - GENESIS_RIVER_X)).toBeLessThanOrEqual(3)
+      expect(isPassable(s, r.x, r.y)).toBe(true)
+      expect(s.terrain[r.y]![r.x]).not.toBe(T_WATER)
+    }
+    // One bank the town stands on, one it does not: the far reeds wait on a bridge.
+    expect(reeds.some((r) => r.x > 50)).toBe(true)
+    expect(reeds.some((r) => r.x < 48)).toBe(true)
   })
 
   it('mints ids the counter law can follow', () => {

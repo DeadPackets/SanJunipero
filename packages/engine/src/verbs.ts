@@ -990,6 +990,14 @@ export const SEED_RECIPES: Readonly<Record<string, SeedRecipe>> = {
     atFire: true,
     water: 1,
   },
+  // The hunter's road to a warm back. `crafting.recipes` already holds the weaver's road
+  // (fiber → cloth → garment) and closed at Task 2, so the one that skips the loom lives
+  // here. The name has to differ from the row it stands beside; the thing it makes does not.
+  hide_garment: {
+    inputs: { hide: 2 },
+    output: { kind: 'garment', qty: 1 },
+    skill: 'tailoring',
+  },
 }
 
 export function recipeFor(config: SimConfig, name: string): SeedRecipe | undefined {

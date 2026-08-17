@@ -12,9 +12,10 @@ import { composePerception } from './perception.js'
 import { stepCostAt } from './path.js'
 import { RngStreams, type RngStream } from './rng.js'
 import {
-  fishCatchChance, huntChance, isFoodKind, nutritionOf, registerVerb, SEED_RECIPES, unregisterVerb,
-  VERBS, type VerbDef,
+  fishCatchChance, huntChance, isFoodKind, isWearable, nutritionOf, registerVerb, SEED_RECIPES,
+  unregisterVerb, VERBS, type VerbDef,
 } from './verbs.js'
+import { FORAGEABLE_YIELD } from './data/forageables.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2, p: 8 }
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
@@ -772,5 +773,43 @@ describe('stew: the one recipe the world ships with', () => {
   it('does not touch the config the world ships: the seed recipe is code, not a dial', () => {
     expect(CFG.crafting.recipes.stew).toBeUndefined()
     expect(SEED_RECIPES.stew!.output).toEqual({ kind: 'stew', qty: 1 })
+  })
+})
+
+describe('the clothing line has two upstreams: the reed bed and the deer', () => {
+  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+
+  function holding(kind: string, qty: number): WorldState {
+    return fold(makeWorld(), ev(1000, 'item_spawned', {
+      id: 'stock', kind, qty, loc: { t: 'agent', id: 'a1' },
+    }), CFG)
+  }
+  const make = (s: WorldState, recipe: string) => submitIntent(s, CFG, 'a1', 'craft', { recipe })
+
+  it('the fiber road is the config one, and the reeds now feed it', () => {
+    expect(CFG.crafting.recipes.cloth!.inputs).toEqual({ fiber: 2 })
+    expect(CFG.crafting.recipes.garment!.inputs).toEqual({ cloth: 2 })
+    expect(FORAGEABLE_YIELD.reed_bed).toBe('fiber')
+    expect(make(holding('fiber', 2), 'cloth').ok).toBe(true)
+    expect(make(holding('cloth', 2), 'garment').ok).toBe(true)
+  })
+
+  it('the hunter road is a seed recipe: two hides make a garment nobody wove', () => {
+    expect(CFG.crafting.recipes.hide_garment).toBeUndefined()
+    expect(SEED_RECIPES.hide_garment!.output).toEqual({ kind: 'garment', qty: 1 })
+    const s = holding('hide', 2)
+    expect(make(s, 'hide_garment').ok).toBe(true)
+    const events = VERBS.craft!.onComplete(s, CFG, 'a1', { recipe: 'hide_garment' }, new RngStreams('h').get('actions'))
+    expect(events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'stock', delta: -2 } })
+    const made = events.find((e) => e.type === 'item_spawned')!.payload as { kind: string }
+    expect(made.kind).toBe('garment')
+    expect(isWearable(CFG, made.kind)).toBe(true)
+    expect(events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'tailoring', xp: 1 } })
+  })
+
+  it('one hide is not a garment', () => {
+    const thin = make(holding('hide', 1), 'hide_garment')
+    expect(thin.ok).toBe(false)
+    if (!thin.ok) expect(thin.reason).toBe('not enough hide')
   })
 })
