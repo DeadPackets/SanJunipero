@@ -1,12 +1,16 @@
-import { Graphics, Sprite, type FederatedPointerEvent } from 'pixi.js'
+import { Graphics, Polygon, Sprite, type FederatedPointerEvent } from 'pixi.js'
 import { INTERIOR_KINDS, tickToMoment } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { hoverLabel, itemCropDetail, type HoverKind } from '../ui/interaction.js'
-import { TILE_H, depthKey, tileToScreen } from './iso.js'
+import { TILE_H, TILE_W, depthKey, tileToScreen } from './iso.js'
 import { createNameTagLayer, type NameTagLayer } from './nameTags.js'
 import type { Scene } from './scene.js'
-import { TextureBook, buildingArt, smoothSource, textureUrlFor, type BuildingArt } from './textures.js'
+import {
+  BUILDING_PX_PER_TILE, TextureBook, buildingArt, smoothSource, textureUrlFor, type BuildingArt,
+} from './textures.js'
+
+export { BUILDING_PX_PER_TILE }
 
 export const CONSTRUCTION_TINT = 0xcfc6bc
 export const WITHERED_TINT = 0x857d75
@@ -43,6 +47,32 @@ export function doorZIndex(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): number {
   return structureZIndex(s) + DOOR_Z_OVER_BUILDING
 }
 
+// A building sprite is ~1.85x wider than the ground it stands on, and Pixi hit-tests a
+// sprite's full RECTANGULAR bounds — transparent margin included. So a wagon one depth row
+// south of the storehouse was intercepting hits on the storehouse's door with nothing but
+// its empty canopy padding, and the scaffolding was doing the same to the hut.
+//
+// The honest target for "tell me about this building" is the ground it occupies, so the
+// hit area is the footprint DIAMOND: it can never reach past the tiles the building stands
+// on, and therefore can never cover a neighbour's door.
+//
+// Local sprite space has its origin at the sprite's position — the TOP vertex of the centre
+// tile — and Pixi scales hitArea with the sprite, so the points are divided by the applied
+// scale exactly as `hitRect` does for characters.
+export function footprintHitPoints(w: number, h: number, scale = 1): number[] {
+  const corners: ReadonlyArray<readonly [number, number]> = [
+    [0.5 - w / 2, 0.5 - h / 2],   // north
+    [w / 2 + 0.5, 0.5 - h / 2],   // east
+    [w / 2 + 0.5, h / 2 + 0.5],   // south
+    [0.5 - w / 2, h / 2 + 0.5],   // west
+  ]
+  const k = scale === 0 ? 1 : scale
+  return corners.flatMap(([dx, dy]) => [
+    ((dx - dy) * (TILE_W / 2)) / k,
+    ((dx + dy) * (TILE_H / 2)) / k,
+  ])
+}
+
 type Entry = { sprite: Sprite; url: string; pips: Graphics | null }
 type SyncState = {
   entries: Map<string, Entry>; lastAssetsSeq: number; tags: NameTagLayer
@@ -59,7 +89,10 @@ function setTexture(book: TextureBook, entry: Entry, url: string): void {
 
 // v4 hi-res buildings anchor at the manifest feet point and downscale smoothly to the
 // footprint diamond; v2/placeholder art keeps the bottom-center anchor at natural size.
-function applyBuildingArt(book: TextureBook, entry: Entry, art: BuildingArt, swapFrom: string | null): void {
+function applyBuildingArt(
+  book: TextureBook, entry: Entry, art: BuildingArt, swapFrom: string | null,
+  footprint: { w: number; h: number },
+): void {
   entry.url = art.url
   const p = swapFrom !== null && swapFrom !== art.url ? book.swap(swapFrom, art.url) : book.get(art.url)
   void p.then((t) => {
@@ -67,7 +100,10 @@ function applyBuildingArt(book: TextureBook, entry: Entry, art: BuildingArt, swa
     entry.sprite.texture = art.anchor !== null ? smoothSource(t) : t
     if (art.anchor !== null) entry.sprite.anchor.set(art.anchor.x, art.anchor.y)
     else entry.sprite.anchor.set(0.5, 1.0)
-    entry.sprite.scale.set(art.scale ?? 1)
+    const scale = art.scale ?? 1
+    entry.sprite.scale.set(scale)
+    // the hit area is scaled with the sprite, so it is re-cut whenever the scale moves
+    entry.sprite.hitArea = new Polygon(footprintHitPoints(footprint.w, footprint.h, scale))
   })
 }
 
@@ -170,10 +206,11 @@ export function syncEntities(
       sprite.on('pointertap', (e: FederatedPointerEvent) => {
         void provenanceText(sid, store.getState()).then((text) => showPopover(text, e.client.x, e.client.y))
       })
+      sprite.hitArea = new Polygon(footprintHitPoints(s.w, s.h))   // until the art sets its scale
       entry = { sprite, url: '', pips: null }
       sync.entries.set(key, entry)
       scene.entities.addChild(sprite)
-      applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h), null)
+      applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h), null, s)
     }
     const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
     entry.sprite.position.set(ground.sx, ground.sy)
@@ -314,7 +351,7 @@ export function syncEntities(
         const s = state.structures[id]
         if (s === undefined) continue
         const art = buildingArt(records, s.kind, s.w, s.h)
-        if (art.url !== entry.url) applyBuildingArt(book, entry, art, entry.url)
+        if (art.url !== entry.url) applyBuildingArt(book, entry, art, entry.url, s)
         continue
       }
       const kind = key.startsWith('item:') ? state.items[id]?.kind : state.crops[id]?.kind
