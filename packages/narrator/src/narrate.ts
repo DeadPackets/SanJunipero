@@ -3,6 +3,7 @@ import type { WorldState } from '@sj/engine'
 import { renderChapter, renderEra } from './chronicle.js'
 import { detectFirsts } from './firsts.js'
 import { detectTier2 } from './milestones/tier2.js'
+import { detectSemanticFirsts, type SemanticPassDeps, type TranscriptRecord } from './semanticFirsts.js'
 import { scoreHeat } from './heat.js'
 import { detectInstitutions } from './institutions.js'
 import { segmentScenes } from './segment.js'
@@ -70,6 +71,9 @@ export async function narrateDay(deps: {
   // Tier 2 reads relationships, so it runs only where a world is in reach. Absent, the day
   // gets its engine firsts and nothing is claimed about anybody's partnership.
   world?: { config: SimConfig; state?: WorldState }
+  // The tier-2.5 pass, run after the chapter is written. Absent, the night has no semantic
+  // firsts and costs nothing — the detector is never called speculatively.
+  semantic?: Omit<SemanticPassDeps, 'store' | 'day' | 'records'> & { records: TranscriptRecord[] }
 }): Promise<{ chapter: ChapterRow; heat: HeatScores[]; milestones: Milestone[] }> {
   const { store, events } = deps
   if (events.length === 0) throw new Error('narrateDay requires at least one event')
@@ -134,6 +138,13 @@ export async function narrateDay(deps: {
   const chapter = await renderChapter({ store, llm: deps.llm, day, scenes, typeCounts, alert: deps.alert })
   chapter.sceneIds.forEach((sceneId, i) => store.insertHeat(sceneId, heats[i]!))
   for (const m of milestones) store.insertMilestone(m)
+
+  // After the chapters, as §20 requires: one batched pass over the day's words.
+  if (deps.semantic !== undefined) {
+    const semantic = await detectSemanticFirsts({ ...deps.semantic, store, day })
+    for (const m of semantic) store.insertMilestone(m)
+    milestones.push(...semantic)
+  }
 
   if (day % 7 === 0) {
     for (const inst of detectInstitutions(scenes, events, deps.detectCfg)) {

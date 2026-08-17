@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import type { SemanticCandidateRow, SemanticFirstRow } from './semanticFirsts.js'
 import type {
   ChapterRow,
   EraRow,
@@ -129,6 +130,62 @@ export class NarratorStore {
       ...(r.name_provenance === null
         ? {}
         : { nameProvenance: JSON.parse(r.name_provenance) as Milestone['nameProvenance'] }),
+    }))
+  }
+
+  insertSemanticFirst(r: SemanticFirstRow): void {
+    this.db.prepare(
+      `INSERT INTO semantic_first_detected
+        (concept_kind, agent_id, day, source_kind, event_seq, memory_ref, quote, quote2, provenance2, confidence, rationale)
+       VALUES (@conceptKind, @agentId, @day, @sourceKind, @eventSeq, @memoryRef, @quote, @quote2, @provenance2, @confidence, @rationale)`,
+    ).run(r)
+  }
+
+  semanticFirsts(): SemanticFirstRow[] {
+    const rows = this.db.prepare(
+      `SELECT concept_kind, agent_id, day, source_kind, event_seq, memory_ref, quote, quote2, provenance2, confidence, rationale
+       FROM semantic_first_detected ORDER BY id`,
+    ).all() as Array<Record<string, unknown>>
+    return rows.map((r) => ({
+      conceptKind: r.concept_kind as string,
+      agentId: r.agent_id as string,
+      day: r.day as number,
+      sourceKind: r.source_kind as string,
+      eventSeq: r.event_seq as number | null,
+      memoryRef: r.memory_ref as string | null,
+      quote: r.quote as string,
+      quote2: r.quote2 as string | null,
+      provenance2: r.provenance2 as string | null,
+      confidence: r.confidence as number,
+      rationale: r.rationale as string,
+    }))
+  }
+
+  semanticFirstKinds(): Set<string> {
+    const rows = this.db.prepare('SELECT concept_kind FROM semantic_first_detected').all() as Array<{ concept_kind: string }>
+    return new Set(rows.map((r) => r.concept_kind))
+  }
+
+  insertSemanticCandidate(c: SemanticCandidateRow): void {
+    this.db.prepare(
+      `INSERT INTO semantic_candidates (concept_kind, agent_id, day, source_kind, quote, confidence, rationale, reason)
+       VALUES (@conceptKind, @agentId, @day, @sourceKind, @quote, @confidence, @rationale, @reason)`,
+    ).run(c)
+  }
+
+  semanticCandidates(): SemanticCandidateRow[] {
+    const rows = this.db.prepare(
+      'SELECT concept_kind, agent_id, day, source_kind, quote, confidence, rationale, reason FROM semantic_candidates ORDER BY id',
+    ).all() as Array<Record<string, unknown>>
+    return rows.map((r) => ({
+      conceptKind: r.concept_kind as string,
+      agentId: r.agent_id as string,
+      day: r.day as number,
+      sourceKind: r.source_kind as string,
+      quote: r.quote as string,
+      confidence: r.confidence as number,
+      rationale: r.rationale as string,
+      reason: r.reason as string,
     }))
   }
 

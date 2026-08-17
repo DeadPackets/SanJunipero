@@ -9,7 +9,7 @@ export {
   type QuotedName,
 } from './prompt/glassScan.js'
 export { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS, PRICE_PER_M } from './llm/pins.js'
-export { migrateLlmTables } from './llm/callLog.js'
+export { migrateLlmTables, insertAlert } from './llm/callLog.js'
 export {
   checkSpend,
   projectDailySpend,

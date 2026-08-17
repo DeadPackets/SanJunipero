@@ -9,6 +9,8 @@ export const NARRATOR_TABLES = [
   'milestones',
   'institutions',
   'publications',
+  'semantic_first_detected',
+  'semantic_candidates',
 ] as const
 
 // "cast" is a SQLite keyword — quoted everywhere it appears in SQL.
@@ -37,6 +39,14 @@ CREATE TABLE IF NOT EXISTS institutions (
   id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL CHECK (kind IN ('group','rule','role')),
   name TEXT NOT NULL, description TEXT NOT NULL, founding_scene_id INTEGER NOT NULL,
   member_ids TEXT NOT NULL, source_event_ids TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS semantic_first_detected (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, concept_kind TEXT NOT NULL UNIQUE, agent_id TEXT NOT NULL,
+  day INTEGER NOT NULL, source_kind TEXT NOT NULL, event_seq INTEGER, memory_ref TEXT,
+  quote TEXT NOT NULL, quote2 TEXT, provenance2 TEXT, confidence REAL NOT NULL, rationale TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS semantic_candidates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, concept_kind TEXT NOT NULL, agent_id TEXT NOT NULL,
+  day INTEGER NOT NULL, source_kind TEXT NOT NULL, quote TEXT NOT NULL, confidence REAL NOT NULL,
+  rationale TEXT NOT NULL, reason TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS publications (
   id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('newspaper','biography','timelapse_caption','share_card')),
