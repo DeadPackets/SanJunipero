@@ -172,6 +172,42 @@ describe('findPath (A*)', () => {
   })
 })
 
+// ------------------------------------------- Task 37(a): the admissible heuristic
+
+// The straight grass line home is 13 steps at 1 each. The road runs the long way round —
+// 19 steps — and still costs less, because a road is 0.6. An A* whose heuristic charges a
+// full grass tile per remaining step cannot believe that, so it walks the dearer line.
+const ROAD_RING = [
+  '..............',
+  'R............R',
+  'R............R',
+  'RRRRRRRRRRRRRR',
+]
+
+const costOf = (s: WorldState, path: Array<[number, number]>, config: SimConfig): number =>
+  path.reduce((sum, [x, y]) => sum + stepCostAt(s, x, y, config), 0)
+
+describe('the A* heuristic is admissible (Task 37a)', () => {
+  it('never over-estimates, so the cheapest route wins even when it is the longest', () => {
+    const s = world(ROAD_RING)
+    const path = findPath(s, { x: 0, y: 0 }, { x: 13, y: 0 })!
+    const straight = Array.from({ length: 13 }, (_, i): [number, number] => [i + 1, 0])
+
+    expect(costOf(s, straight, DEFAULT_CONFIG)).toBe(13)
+    expect(costOf(s, path, DEFAULT_CONFIG)).toBeCloseTo(11.8, 10)
+    expect(path).not.toEqual(straight)
+    expect(path.some(([, y]) => y === 3)).toBe(true) // it went down to the road
+  })
+
+  it('scales by the cheapest tile the config can price, not by one', () => {
+    // A world where nothing is cheaper than grass has no reason to detour: same answer as before.
+    const flat = SimConfigSchema.parse({ pathing: { roadCost: 1 }, desirePaths: { pathCost: 1 } })
+    const s = genesisState(flat, ROAD_RING.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+    expect(findPath(s, { x: 0, y: 0 }, { x: 13, y: 0 }, flat))
+      .toEqual(Array.from({ length: 13 }, (_, i) => [i + 1, 0]))
+  })
+})
+
 // ------------------------------------------------------- Task 29: the node budget
 
 const withMaxNodes = (config: SimConfig, maxNodes: number): SimConfig =>

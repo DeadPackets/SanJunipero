@@ -79,7 +79,11 @@ export function searchPath(state: WorldState, from: Point, to: Point, config: Si
   if (from.x === to.x && from.y === to.y) return { path: [], capped: false }
   if (!isPassable(state, to.x, to.y)) return null
   const width = state.terrain[0]!.length
-  const h = (x: number, y: number) => Math.abs(x - to.x) + Math.abs(y - to.y)
+  // Charging a full grass tile per remaining step over-estimates the moment anything is
+  // cheaper than grass — a road is 0.6 — and an over-estimating A* returns a short route
+  // instead of a cheap one. The cheapest tile the config can price is the honest floor.
+  const minCost = Math.min(...Object.values(terrainCostFor(config)).filter(Number.isFinite))
+  const h = (x: number, y: number) => (Math.abs(x - to.x) + Math.abs(y - to.y)) * minCost
   const key = (x: number, y: number) => y * width + x
   const best = new Map<number, Node>()
   const start: Node = { x: from.x, y: from.y, g: 0, h: h(from.x, from.y), f: h(from.x, from.y), parent: null }
