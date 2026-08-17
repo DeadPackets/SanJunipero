@@ -1,11 +1,10 @@
 import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import type { TickCtx } from '../worldTick.js'
 
-const INJURY_HEAL_DAYS = 3
-
 // C11 deviation 3 (controller ruling 3): the per-tick contagion loop that used to live at the
 // foot of this file is gone. Illness spreads once, at midnight, from systems/illness.ts — two
-// contagion systems at different cadences was one too many.
+// contagion systems at different cadences was one too many. Task 37 took the last of it: the
+// dawn injury-infection roll went with it, and mints an affliction instead of a boolean.
 
 // Four ways back, all of them arithmetic on one dawn payment. With mortality off the world
 // keeps C9's flat rates exactly, which is what holds the G2 fixture still until Task 37.
@@ -25,21 +24,12 @@ export function healthSystem(ctx: TickCtx): void {
   const ids = () => Object.keys(ctx.state().agents).sort()
 
   if (time.hour === 6 && time.minute === 0) {
-    const day = Math.floor(tick / MINUTES_PER_DAY)
     for (const id of ids()) {
       const a = ctx.state().agents[id]!
       if (!a.alive) continue
-      for (const injury of a.injuries) {
-        if (day >= injury.day + INJURY_HEAL_DAYS) continue
-        const roll = ctx.rng.get('health').next()
-        if (roll < cfg.infectionChancePerInjuryPerDay && !ctx.state().agents[id]!.ill) {
-          ctx.emit('agent_infected', { agentId: id })
-        }
-      }
-      const b = ctx.state().agents[id]!
-      if (b.hp < cfg.maxHp) {
-        const tended = b.tendedTick !== undefined && tick - b.tendedTick <= MINUTES_PER_DAY
-        const delta = recoveryDelta(ctx, b.needs.hunger, b.asleep, tended)
+      if (a.hp < cfg.maxHp) {
+        const tended = a.tendedTick !== undefined && tick - a.tendedTick <= MINUTES_PER_DAY
+        const delta = recoveryDelta(ctx, a.needs.hunger, a.asleep, tended)
         if (delta > 0) ctx.emit('hp_changed', { agentId: id, delta })
       }
       const c = ctx.state().agents[id]!

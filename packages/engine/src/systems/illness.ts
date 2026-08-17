@@ -1,6 +1,8 @@
-import { simTimeFromTick } from '@sj/shared'
+import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import type { WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
+
+const INJURY_HEAL_DAYS = 3
 
 // A fever is a nightly coin, not a per-tick one: the body either loses ground or gains it,
 // and the same event carries both directions. C9's per-tick contagion loop is retired
@@ -17,10 +19,32 @@ function breathesTheSameAir(state: WorldState, aId: string, bId: string, radius:
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= radius
 }
 
+// A wound is the world's other way into a fever. C9 rolled this at dawn in healthSystem and
+// set a boolean nothing could lift; the roll is unchanged — same chance, same `health` stream,
+// same open-wound window — but what it mints is an affliction the midnight turn above owns
+// (batch-2 ruling 1). Gated with the rest of the system: an illness no night can lift is a
+// life sentence, not a sickness.
+function septicWounds(ctx: TickCtx): void {
+  const chance = ctx.config.health.infectionChancePerInjuryPerDay
+  const day = Math.floor(ctx.state().tick / MINUTES_PER_DAY)
+  for (const id of Object.keys(ctx.state().agents).sort()) {
+    const a = ctx.state().agents[id]!
+    if (!a.alive) continue
+    for (const injury of a.injuries) {
+      if (day >= injury.day + INJURY_HEAL_DAYS) continue
+      const roll = ctx.rng.get('health').next()
+      if (roll < chance && !hasIllness(ctx.state(), id)) {
+        ctx.emit('agent_afflicted', { agentId: id, kind: 'illness', severity: 1 })
+      }
+    }
+  }
+}
+
 export function illnessSystem(ctx: TickCtx): void {
   const cfg = ctx.config.illness
   if (!cfg.enabled) return
   const time = simTimeFromTick(ctx.state().tick)
+  if (time.hour === 6 && time.minute === 0) septicWounds(ctx)
   if (time.hour !== 0 || time.minute !== 0) return
   const living = () => Object.keys(ctx.state().agents).sort().filter((id) => ctx.state().agents[id]!.alive)
 

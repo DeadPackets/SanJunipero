@@ -108,33 +108,16 @@ describe('verb: tend', () => {
   })
 })
 
-describe('worldTick: infection at dawn', () => {
-  function injured(): WorldState {
+// Task 37 (batch-2 ruling 1): the dawn injury-infection roll left this file with the rest of
+// the illness. `agent_infected` still folds for a recorded log; nothing emits it any more, and
+// what a septic wound produces is an illness affliction — see systems/illness.test.ts.
+describe('worldTick: infection is not healthSystem\'s any more', () => {
+  it('an open wound at dawn infects nobody here, on the seed that used to', () => {
     let s = makeWorld()
     s = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'minor' }), CFG)
-    return s
-  }
-
-  it('rolls once per unhealed injury at dawn: infects on seed h3, not on seed h1', () => {
-    const s = atTick(injured(), DAWN - 1)
-    const infected = tickOnce(s, CFG, new RngStreams('h3'))
-    expect(infected.events).toContainEqual({ type: 'agent_infected', payload: { agentId: 'a1' } })
-    expect(infected.state.agents.a1!.ill).toBe(true)
-    const clean = tickOnce(s, CFG, new RngStreams('h1'))
-    expect(clean.events.map((e) => e.type)).not.toContain('agent_infected')
-    expect(clean.state.agents.a1!.ill).toBe(false)
-  })
-
-  it('does not roll outside the dawn tick', () => {
-    const r = tickOnce(atTick(injured(), 999), CFG, new RngStreams('h3'))
+    const r = tickOnce(atTick(s, DAWN - 1), CFG, new RngStreams('h3'))
     expect(r.events.map((e) => e.type)).not.toContain('agent_infected')
-    expect(r.events.map((e) => e.type)).not.toContain('hp_changed')
-  })
-
-  it('stops rolling once the injury is healed (day + 3)', () => {
-    const s = atTick(injured(), 3 * 1440 + DAWN - 1)
-    const r = tickOnce(s, CFG, new RngStreams('h3'))
-    expect(r.events.map((e) => e.type)).not.toContain('agent_infected')
+    expect(r.state.agents.a1!.ill).toBe(false)
   })
 })
 

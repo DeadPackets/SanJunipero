@@ -119,6 +119,47 @@ describe('illnessSystem: contagion, once a night, on the illness stream', () => 
   })
 })
 
+// Task 37, batch-2 ruling 1: the wound's own way into the fever. C9 set a boolean nothing
+// could lift; the same roll now mints the affliction the midnight turn above can worsen or lift.
+describe('illnessSystem: a wound turns septic at dawn', () => {
+  const DAWN = 360
+  const wound = (config: SimConfig, tick = 0): WorldState =>
+    fold(town(config, [['a1', 2, 2]]), ev('agent_injured', { agentId: 'a1', kind: 'minor' }, tick), config)
+
+  function dawn(s: WorldState, config: SimConfig, seed: string, day = 0): WorldTickResult {
+    const at = day * MIDNIGHT + DAWN
+    const advanced = fold({ ...s, tick: at - 1 }, ev('tick_advanced', {}, at), config)
+    return createWorldTick(config, new RngStreams(seed))(advanced)
+  }
+
+  it('mints an illness affliction on the seed that infects, and nothing on the seed that does not', () => {
+    const r = dawn(wound(TURNS), TURNS, 'h3')
+    expect(of(r, 'agent_afflicted')).toEqual([{ agentId: 'a1', kind: 'illness', severity: 1 }])
+    expect(illnessOf(r.state, 'a1')!.severity).toBe(1)
+    expect(r.events.map((e) => e.type)).not.toContain('agent_infected')
+
+    const clean = dawn(wound(TURNS), TURNS, 'h1')
+    expect(of(clean, 'agent_afflicted')).toEqual([])
+    expect(clean.state.agents.a1!.afflictions).toBeUndefined()
+  })
+
+  it('rolls only at dawn, only while the wound is open, and never twice onto the same fever', () => {
+    const noon = createWorldTick(TURNS, new RngStreams('h3'))(
+      fold({ ...wound(TURNS), tick: 719 }, ev('tick_advanced', {}, 720), TURNS))
+    expect(noon.events.map((e) => e.type)).not.toContain('agent_afflicted')
+
+    // Day 0's wound has healed by day 3's dawn, so there is nothing left to roll for.
+    expect(of(dawn(wound(TURNS), TURNS, 'h3', 3), 'agent_afflicted')).toEqual([])
+    expect(of(dawn(afflict(wound(TURNS), TURNS, 'a1', 2), TURNS, 'h3'), 'agent_afflicted')).toEqual([])
+  })
+
+  it('mints nothing when the system is off — an affliction no midnight can lift is a life sentence', () => {
+    const r = dawn(wound(OFF), OFF, 'h3')
+    expect(r.events.map((e) => e.type)).not.toContain('agent_afflicted')
+    expect(r.state.agents.a1!.afflictions).toBeUndefined()
+  })
+})
+
 describe('C9 per-tick contagion is retired', () => {
   it('no agent_fell_ill is emitted anywhere in three scripted days', () => {
     const store = new EventStore(openDb(':memory:'))

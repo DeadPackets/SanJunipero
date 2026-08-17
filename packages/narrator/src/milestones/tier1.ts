@@ -58,7 +58,9 @@ export const TIER1_DEFS: MilestoneDef[] = [
   { kind: 'first_death', label: 'the first grave', tier: 1, domain: 'engine', match: (ev) => ev.type === 'agent_died', agentIds: one('agentId') },
   { kind: 'first_trade', label: 'the first trade', tier: 1, domain: 'engine', match: (ev) => ev.type === 'action_completed' && verbOf(ev) === 'give', agentIds: one('agentId') },
   { kind: 'first_harvest', label: 'the first harvest', tier: 1, domain: 'engine', match: (ev) => ev.type === 'crop_harvested' },
-  { kind: 'first_infection', label: 'the first sickness', tier: 1, domain: 'engine', match: (ev) => ev.type === 'agent_infected', agentIds: one('agentId') },
+  // C11 Task 37 moved sickness onto afflictions; the C7 event still counts so an older
+  // town's ledger reads true, and a C11 town's first fever is the same first.
+  { kind: 'first_infection', label: 'the first sickness', tier: 1, domain: 'engine', match: (ev) => ev.type === 'agent_infected' || (ev.type === 'agent_afflicted' && p(ev).kind === 'illness'), agentIds: one('agentId') },
   { kind: 'first_recovery', label: 'the first recovery', tier: 1, domain: 'engine', match: (ev) => ev.type === 'agent_recovered', agentIds: one('agentId') },
   { kind: 'first_law', label: 'the first law', tier: 1, domain: 'engine', match: () => false }, // emitted from rulebookCount
 

@@ -74,7 +74,7 @@ describe('tier 1 — the engine firsts', () => {
       first_invention: [ev(1, 'action_completed', { agentId: 'a', verb: 'recipe:basket' })],
       first_expression: [ev(1, 'agent_expressed', { agentId: 'a', verb: 'dance', x: 0, y: 0 })],
       first_injury: [ev(1, 'agent_injured', { agentId: 'a', kind: 'minor' })],
-      first_infection: [ev(1, 'agent_infected', { agentId: 'a' })],
+      first_infection: [ev(1, 'agent_afflicted', { agentId: 'a', kind: 'illness', severity: 1 })],
       first_recovery: [ev(1, 'agent_recovered', { agentId: 'a' })],
       first_pregnancy: [ev(1, 'agent_conceived', { motherId: 'a', fatherId: 'b', day: 0 })],
       first_birth: [ev(1, 'agent_born', { id: 'c', name: 'Mira', sex: 'f', motherId: 'a', fatherId: 'b', x: 1, y: 1 })],
@@ -90,6 +90,14 @@ describe('tier 1 — the engine firsts', () => {
       expect(fired[0]!.tier, kind).toBe(1)
       expect(fired[0]!.domain, kind).toBe('engine')
     }
+  })
+
+  it('counts the first sickness however the engine of the day recorded it', () => {
+    const old = detectFirsts([ev(1, 'agent_infected', { agentId: 'a' })], ctx())
+    expect(old.map((m) => m.kind)).toContain('first_infection')
+    // A poisoning is an affliction too, and it is not a sickness.
+    const poison = detectFirsts([ev(1, 'agent_afflicted', { agentId: 'a', kind: 'poison', severity: 1 })], ctx())
+    expect(poison.map((m) => m.kind)).not.toContain('first_infection')
   })
 
   it('gives every way of dying its own first, and each fires independently', () => {
