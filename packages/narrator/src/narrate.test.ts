@@ -3,8 +3,9 @@ import Database from 'better-sqlite3'
 import { SimConfigSchema, type SimEvent } from '@sj/shared'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
-import { MARKER_HEAT_THRESHOLD, narrateDay, narrateWeek, renderDigest, timelineMarkers } from './narrate.js'
+import { ChapterRenderError, MARKER_HEAT_THRESHOLD, narrateDay, narrateWeek, renderDigest, timelineMarkers } from './narrate.js'
 import type { ChapterRow, NarratorLlm } from './types.js'
+import type { LlmClient, LlmUsage } from '@sj/agents'
 
 const memStore = (): NarratorStore => {
   const db = new Database(':memory:')
@@ -106,6 +107,69 @@ describe('narrateDay', () => {
     const store = memStore()
     await narrateDay({ store, llm: scriptedLlm([4]), events: DAY1, rulebookCount: 0, privateCounts: { thoughts: 0, journals: 0 } })
     expect(store.institutions().length).toBe(0) // day 1 is not a week boundary
+  })
+})
+
+// GATE G11b day 3, 2026-08-17: the chronicle would not render and the night's semantic pass
+// never ran, because the pass sat downstream of the render. One night's chronicle failing is
+// one loss; it must not silently cost the pass as well (C11 batch 16 fix 1).
+describe('narrateDay: a chronicle that will not render does not take the semantic pass with it', () => {
+  const throwingLlm = (): NarratorLlm =>
+    ({
+      summarizeChapter: vi.fn(async () => { throw new Error('response did not match schema') }),
+      summarizeEra: vi.fn(),
+      newspaperCopy: vi.fn(),
+      biography: vi.fn(),
+    }) as unknown as NarratorLlm
+
+  const semanticRig = () => {
+    const db = new Database(':memory:')
+    db.exec(`CREATE TABLE IF NOT EXISTS alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, agent_id TEXT, kind TEXT NOT NULL, detail TEXT NOT NULL)`)
+    migrateNarratorTables(db)
+    const objectCalls = vi.fn(async () => ({
+      value: { hits: [] },
+      usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 } satisfies LlmUsage,
+    }))
+    const llm = { object: objectCalls, text: vi.fn(), totalCostUsd: () => 0, alert: vi.fn() } as unknown as LlmClient
+    return { db, store: new NarratorStore(db), llm, objectCalls }
+  }
+
+  const records = [
+    { sourceKind: 'speech' as const, agentId: 'omar', day: 1, tick: 1480, text: 'The wall is mine.', eventSeq: 4 },
+  ]
+
+  it('runs the pass and reports it, then rethrows the render failure as a ChapterRenderError', async () => {
+    const { db, store, llm, objectCalls } = semanticRig()
+    const caught = await narrateDay({
+      store, llm: throwingLlm(), events: DAY1, rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+      semantic: { db, llm, records },
+    }).then(() => null, (err: unknown) => err)
+
+    expect(objectCalls).toHaveBeenCalledTimes(1)
+    expect(caught).toBeInstanceOf(ChapterRenderError)
+    expect((caught as ChapterRenderError).night.semanticRan).toBe(true)
+    expect((caught as ChapterRenderError).message).toContain('response did not match schema')
+  })
+
+  it('says the pass ran on a night that rendered, so a caller can count the nights it did not', async () => {
+    const { db, store, llm } = semanticRig()
+    const out = await narrateDay({
+      store, llm: scriptedLlm([4]), events: DAY1, rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+      semantic: { db, llm, records },
+    })
+    expect(out.semanticRan).toBe(true)
+  })
+
+  it('says the pass did not run when no transcript was handed to it', async () => {
+    const store = memStore()
+    const out = await narrateDay({
+      store, llm: scriptedLlm([4]), events: DAY1, rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+    })
+    expect(out.semanticRan).toBe(false)
   })
 })
 
