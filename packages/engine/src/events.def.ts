@@ -28,6 +28,7 @@ export const ItemSpawned = z.object({
   owner: z.string().optional(), crafterMark: z.string().optional(),
   spoilage: z.object({ spawnDay: z.number(), days: z.number() }).strict().optional(),
   durability: z.number().int().positive().optional(),
+  charges: z.number().int().nonnegative().optional(),
 }).strict()
 export const ItemMoved = z.object({ id: z.string(), loc: ItemLoc }).strict()
 export const ItemSpoiled = z.object({ id: z.string() }).strict()
@@ -108,6 +109,12 @@ export const AfflictionRecovered = z.object({ agentId: z.string(), kind: Afflict
 // tile; `name` is the dead as they were known, kept in the log because a grave has no name field.
 export const GravePlaced = z.object({
   id: z.string(), agentId: z.string(), name: z.string(), x: z.number().int(), y: z.number().int(),
+}).strict()
+// Thirst is not one of the four needs: widening the NeedChanged enum would change what every
+// recorded log means. It gets its own event and its own clock.
+export const ThirstChanged = z.object({ id: z.string(), delta: z.number() }).strict()
+export const AgentDrank = z.object({
+  agentId: z.string(), source: z.enum(['water_tile', 'well', 'item']), itemId: z.string().optional(),
 }).strict()
 export const WeatherChanged = z.object({ kind: z.string(), temperatureC: z.number(), prevKind: z.string().optional() }).strict()
 // Pure sensation: no fold effect, no cause, no resolution anywhere in the world.

@@ -61,6 +61,7 @@ export type PerceptionPacket = {
       hp: number
       injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
       ill: boolean
+      thirst?: number
     }
     x: number
     y: number
@@ -206,6 +207,10 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   const { hunger, energy, warmth, social } = packet.self.body.needs
   if (hunger < 5) lines.push('Your stomach aches with hunger.')
   else if (hunger < 30) lines.push('Your stomach gnaws at you.')
+  // The same ladder hunger uses. A packet from before thirst existed reads as a full body.
+  const thirst = packet.self.body.thirst ?? 100
+  if (thirst < 5) lines.push('Your throat burns; you must drink.')
+  else if (thirst < 30) lines.push('Your mouth is dry.')
   if (energy < 10) lines.push('You are about to collapse; sleep NOW.')
   else if (energy < 25) lines.push('Your legs tremble — you can barely stand; you must rest.')
   else if (energy < 30) lines.push('Weariness drags at your limbs.')

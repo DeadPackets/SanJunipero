@@ -2,7 +2,7 @@ import { simTimeFromTick, type SimConfig, type SimEvent, type SimTime } from '@s
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { doorTile } from './interiors.js'
 import { effectiveConfig } from './laws.js'
-import type { AfflictionKind, Item, WorldState } from './state.js'
+import { thirstOf, type AfflictionKind, type Item, type WorldState } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
 import { isAdjacentToRect } from './verbs.js'
@@ -16,6 +16,7 @@ export type SelfBody = {
   hp: number
   injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
   ill: boolean
+  thirst: number   // always a number here: absence is a storage fact, not something a body feels
   // A body knows what ails it and how badly. It does not know the tick it fell ill.
   afflictions: Array<{ kind: AfflictionKind; severity: number }>
 }
@@ -308,6 +309,7 @@ export function composePerception(
         hp: self.hp,
         injuries: self.injuries,
         ill: self.ill,
+        thirst: thirstOf(self),
         afflictions: (self.afflictions ?? []).map((a) => ({ kind: a.kind, severity: a.severity })),
       },
       x: self.x,

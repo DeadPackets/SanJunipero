@@ -23,6 +23,7 @@ export type AgentBody = {
   // Absent until the first affliction and absent again when the last one lifts, sorted by kind
   // so two bodies ailing the same way hash the same way.
   afflictions?: Affliction[]
+  thirst?: number                         // 0..100; absent means full, read only through thirstOf()
   // How many times this body has hit the ground without a meal or a night's sleep since.
   // Absent until the first such fall, and absent again the moment it eats or sleeps.
   collapsesWithoutRecovery?: number
@@ -50,6 +51,7 @@ export type Item = {
   crafterMark?: string                    // expert crafts only; set once at spawn, never reassigned
   spoilage?: { spawnDay: number; days: number }  // absent = keeps forever
   durability?: number                     // absent = never wears; 0 breaks the thing
+  charges?: number                        // absent = not a vessel; 0 = a vessel standing empty
   loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
 }
 
@@ -88,6 +90,12 @@ export function genesisState(config: SimConfig, terrain?: TileId[][]): WorldStat
     wildlife: { fish: config.wildlife.fishMax, deer: config.wildlife.deerMax },
     counters: { nextEntityId: 1 },
   }
+}
+
+// The one reader of the field (G4). A body that has never been thirsty is a full one, which
+// is what lets every pre-C11 log fold to the hash it always had.
+export function thirstOf(a: { thirst?: number }): number {
+  return a.thirst ?? 100
 }
 
 export function mintId(state: WorldState, prefix: string): string {

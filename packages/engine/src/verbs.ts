@@ -9,7 +9,7 @@ import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
   | 'walk' | 'sleep' | 'wake' | 'enter' | 'exit' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
-  | 'build' | 'craft' | 'extinguish'
+  | 'build' | 'craft' | 'extinguish' | 'drink'
   | 'speak' | 'give' | 'take' | 'stow' | 'write' | 'read' | 'inscribe' | 'teach' | 'attack' | 'experiment'
 
 export type VerbDef = {
@@ -258,6 +258,57 @@ const tend: VerbDef = makeVerb({
     ]
   },
   skill: { track: 'medicine', xp: 1 },
+})
+
+// Standing water and a dug channel are the same thing to a mouth (G4: one definition site;
+// `fill` in Task 12 and `douse` in Task 14 read this too).
+export const WATER_TILES: ReadonlySet<TileId> = new Set<TileId>([2, 10])
+export const VESSEL_KINDS: ReadonlySet<string> = new Set(['waterskin', 'bucket'])
+export const WELL_KIND = 'well'
+
+export function waterWithinReach(state: WorldState, agentId: string): 'water_tile' | 'well' | null {
+  const a = state.agents[agentId]!
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const t = state.terrain[a.y + dy]?.[a.x + dx]
+      if (t !== undefined && WATER_TILES.has(t)) return 'water_tile'
+    }
+  }
+  for (const id of Object.keys(state.structures).sort()) {
+    const s = state.structures[id]!
+    if (s.kind === WELL_KIND && s.stage === 'complete' && isAdjacentToRect(a.x, a.y, s)) return 'well'
+  }
+  return null
+}
+
+export const DrinkParams = z.object({ itemId: z.string().optional() }).strict()
+
+const drink: VerbDef = makeVerb({
+  kind: 'drink',
+  validate(state, _config, agentId, params) {
+    const p = DrinkParams.safeParse(params)
+    if (!p.success) return 'drink takes an optional {itemId}'
+    if (p.data.itemId !== undefined) {
+      const item = state.items[p.data.itemId]
+      if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+      if (!VESSEL_KINDS.has(item.kind)) return 'nothing to drink from'
+      if ((item.charges ?? 0) <= 0) return 'the skin is empty'
+      return null
+    }
+    if (waterWithinReach(state, agentId) === null) return 'no water within reach'
+    return null
+  },
+  onComplete(state, _config, agentId, params) {
+    const p = DrinkParams.parse(params)
+    if (p.itemId !== undefined) {
+      const item = state.items[p.itemId]
+      if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId || (item.charges ?? 0) <= 0) return []
+      return [{ type: 'agent_drank', payload: { agentId, source: 'item', itemId: p.itemId } }]
+    }
+    const source = waterWithinReach(state, agentId)
+    if (source === null) return []
+    return [{ type: 'agent_drank', payload: { agentId, source } }]
+  },
 })
 
 export const TileParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
@@ -799,6 +850,7 @@ const experiment: VerbDef = makeVerb({
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
+  drink,
   speak, give, take, stow, write, read, inscribe, teach, attack, experiment,
 }
 

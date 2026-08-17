@@ -168,9 +168,13 @@ const SCENARIOS: Array<[DeathCause, () => WorldState]> = [
   ['illness', () => hurt(afflict(body(), 'illness', 2, 0), 99.9)],
   ['fatigue', () => hurt(afflict(body(), 'fatigue', 3, 0), 99.9)],
   ['hunger', () => hurt(starve(body()), 99.9)],
+  ['thirst', () => {
+    const s = hurt(body(), 99.9)
+    return { ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, thirst: 0 } } }
+  }],
 ]
 // Wired by a later task that owns the field the drain reads. The alarm is the assertion below.
-const PENDING: Partial<Record<DeathCause, string>> = { thirst: 'Task 11', exposure: 'Task 22' }
+const PENDING: Partial<Record<DeathCause, string>> = { exposure: 'Task 22' }
 
 describe('death has a cause', () => {
   it('an attack-sourced wound makes the death a slaying, and names the hand', () => {
@@ -230,7 +234,7 @@ describe('death has a cause', () => {
       if (PENDING[cause] !== undefined) continue
       expect([cause, produced.has(cause)]).toEqual([cause, true])
     }
-    expect(Object.keys(PENDING).sort()).toEqual(['exposure', 'thirst'])
+    expect(Object.keys(PENDING).sort()).toEqual(['exposure'])
   })
 
   it('names each scenario the cause the table says it does', () => {

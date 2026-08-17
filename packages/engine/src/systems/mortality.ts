@@ -1,4 +1,4 @@
-import { mintId, type WorldState } from '../state.js'
+import { mintId, thirstOf, type WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 import type { SimConfig } from '@sj/shared'
 import { perimeter } from '../interiors.js'
@@ -45,7 +45,9 @@ function drains(state: WorldState, config: SimConfig, agentId: string): Drain[] 
   if (a.needs.hunger <= 0) {
     out.push({ cause: 'hunger', amount: mortality.hungerHpDrainPerTick, sinceTick: a.zeroHungerSinceTick ?? state.tick })
   }
-  // Task 11 adds the thirst term here, once the body has a thirst to be at zero.
+  if (thirstOf(a) <= 0) {
+    out.push({ cause: 'thirst', amount: mortality.thirstHpDrainPerTick, sinceTick: state.tick })
+  }
   return out
 }
 

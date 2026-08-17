@@ -1,5 +1,5 @@
 import { DAYS_PER_YEAR, DEFAULT_CONFIG, MINUTES_PER_DAY, SPAWN_AGE_YEARS, type SimConfig, type SimEvent } from '@sj/shared'
-import type { Affliction, AgentBody, TileId, WorldState } from './state.js'
+import { thirstOf, type Affliction, type AgentBody, type TileId, type WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
   AfflictionRecovered, AfflictionWorsened, AgentAfflicted, AgentHarmed,
@@ -8,7 +8,7 @@ import {
   AgentEntered, AgentExited,
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
-  FireExtinguished, FireIgnited, FireSpread, GravePlaced, HpChanged,
+  AgentDrank, FireExtinguished, FireIgnited, FireSpread, GravePlaced, HpChanged, ThirstChanged,
   ItemBroke, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
   ConfigChanged,
   ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
@@ -108,6 +108,7 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
             ...(p.crafterMark !== undefined ? { crafterMark: p.crafterMark } : {}),
             ...(p.spoilage !== undefined ? { spoilage: p.spoilage } : {}),
             ...(p.durability !== undefined ? { durability: p.durability } : {}),
+            ...(p.charges !== undefined ? { charges: p.charges } : {}),
             loc: p.loc,
           },
         },
@@ -518,6 +519,23 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
         },
         counters: bumpCounter(state.counters, p.id),
       }
+    }
+    case 'thirst_changed': {
+      const p = ThirstChanged.parse(event.payload)
+      const a = state.agents[p.id]
+      if (!a) throw new Error(`thirst_changed for unknown agent ${p.id}`)
+      return { ...state, agents: { ...state.agents, [p.id]: { ...a, thirst: clamp(thirstOf(a) + p.delta) } } }
+    }
+    case 'agent_drank': {
+      const p = AgentDrank.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_drank for unknown agent ${p.agentId}`)
+      const agents = { ...state.agents, [p.agentId]: { ...a, thirst: clamp(thirstOf(a) + config.thirst.drinkRestore) } }
+      if (p.source !== 'item' || p.itemId === undefined) return { ...state, agents }
+      const item = state.items[p.itemId]
+      if (!item) throw new Error(`agent_drank from unknown item ${p.itemId}`)
+      const charges = Math.max(0, (item.charges ?? 0) - 1)
+      return { ...state, agents, items: { ...state.items, [p.itemId]: { ...item, charges } } }
     }
     case 'hp_changed': {
       const p = HpChanged.parse(event.payload)
