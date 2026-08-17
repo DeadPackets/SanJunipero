@@ -17,15 +17,21 @@ import {
 import { composePerception } from './perception.js'
 import { DEATH_CAUSES } from './systems/mortality.js'
 import { nutritionOf } from './verbs.js'
-// Pinned golden hash for the 3-day scripted world run (regen #5, deliberate: C11 Task 37,
-// the chunk's single golden regen — Global Constraint G3). Two things moved it, and both are
-// this one act: the fourteen C11 `enabled` pins came off the fixture at once, and the
-// scripted night theft — which rides the witness pin — fired for the first time. Task 37's
-// other three parts (the admissible heuristic, the illness bridge, the optional weaponKinds
-// column) were each measured against this fixture and moved nothing. The behavioral diff,
-// event type by event type, is in docs/superpowers/reports/g2-regen-c11.md.
-// Previous value (C9 Task 16): 6f2529fba61a0d9e3a219da05235c0ff19e105d610f96e57aa9d0cc073d82fc8
-const GOLDEN_G2_HASH = '665a824948155304d7dcc1131e821e89299dd73d6cb5c976287955edc5a5fa11'
+// Pinned golden hash for the 3-day scripted world run (regen #6, deliberate: C11 TASK 37b,
+// the authorized gate-remediation regen — batch-11 controller ruling R-G, on the evidence
+// that G11b correctly rejected the world this fixture was pinning). C11's SECOND AND FINAL
+// regen; there is no third, and society work that needs config goes to C8's keystone.
+//
+// EXACTLY ONE of the batch's six changes moves this hash: R15, the fatigue ladder (step 2a).
+// G2's own row reads "bodies … wear out", and the Farmer's death IS that wearing out — a
+// ruling that makes exhaustion survivable makes that death not happen, so no formulation of
+// R-C leaves the pin still. The other five were each measured against this fixture and moved
+// nothing: the makeable vocabulary and the blank-answer retry never touch the world, the
+// take-then-eat seam changes no scripted act, and the two dials (garment insulation, injury
+// drain) are inert on three spring days in which nobody owns a coat or is wounded.
+// The attribution table, change by change, is in docs/superpowers/reports/g2-regen-c11-37b.md.
+// Previous value (C11 Task 37): 665a824948155304d7dcc1131e821e89299dd73d6cb5c976287955edc5a5fa11
+const GOLDEN_G2_HASH = 'c1c51b42aa340f0e5ae0d8cc321b602345f6ec4fee4e4d20b48f7e692b946d9c'
 
 // Task 16 Step 0 took C9's four pins off. Task 37 took C11's fourteen off in one act: this
 // world has nothing suppressed in it at all. Every C11 law — mortality, thirst, fauna,
@@ -91,8 +97,10 @@ describe('GATE G2: 3-day scripted world run', () => {
       && (e.payload as Payload).structureId === STOREHOUSE.id && (e.payload as Payload).cause === 'rain')).toBe(true)
     expect(evs.some((e) => e.type === 'fire_extinguished'
       && (e.payload as Payload).structureId === SHED.id && (e.payload as Payload).cause === 'rain')).toBe(true)
-    // Three buildings and one stone for each of the three dead: graves are structures too.
-    expect(Object.keys(state.structures)).toHaveLength(6)
+    // Three buildings and one stone for each of the two dead: graves are structures too.
+    // Was six. Task 37b's fatigue ladder is why the third stone is not cut — see the death
+    // table in the C11 row below.
+    expect(Object.keys(state.structures)).toHaveLength(5)
 
     // 5. Wheat planted day 1: stage 0 after 2 dawns (floor(2×3/8)), not mature (growthDays 8), not withered.
     const wheat = Object.values(state.crops).find((c) => c.kind === 'wheat')
@@ -175,17 +183,27 @@ describe('GATE G2: 3-day scripted world run', () => {
     const dead = evs.filter((e) => e.type === 'agent_died')
       .map((e) => [(e.payload as Payload).agentId, (e.payload as Payload).cause])
 
-    // Mortality: three bodies, three different ways out, and each cause is one the world names.
-    expect(dead).toEqual([[IDLER, 'hunger'], [FISHER, 'poison'], [FARMER, 'fatigue']])
+    // Mortality: two bodies, two different ways out, and each cause is one the world names.
+    // THE FARMER USED TO BE THE THIRD, of fatigue. Task 37b's R15 is why he is not: his falls
+    // still put him on the ladder, and now each night he sleeps takes him back off it. The
+    // ladder is not switched off — it is answerable, which is the whole of ruling R-C.
+    expect(dead).toEqual([[IDLER, 'hunger'], [FISHER, 'poison']])
     for (const [, cause] of dead) expect(DEATH_CAUSES).toContain(cause)
     // A grave at the tile each of them fell on.
     const graves = Object.values(state.structures).filter((s) => s.kind === 'grave')
-    expect(graves).toHaveLength(3)
-    expect(evs.filter((e) => e.type === 'grave_placed')).toHaveLength(3)
+    expect(graves).toHaveLength(2)
+    expect(evs.filter((e) => e.type === 'grave_placed')).toHaveLength(2)
 
     // The fatigue ladder and the poison that killed the Fisher are afflictions, not booleans.
     expect(evs.some((e) => e.type === 'agent_afflicted' && (e.payload as Payload).kind === 'poison')).toBe(true)
-    expect(evs.some((e) => e.type === 'affliction_worsened' && (e.payload as Payload).kind === 'fatigue')).toBe(true)
+    // The ladder is still minted by a fall — three times here — and it is lifted every time a
+    // body sleeps, which is the named proof that R15 fires on this fixture and not merely that
+    // the death stopped happening.
+    const fatigue = (type: string): number =>
+      evs.filter((e) => e.type === type && (e.payload as Payload).kind === 'fatigue').length
+    expect(fatigue('agent_afflicted')).toBe(3)
+    expect(fatigue('affliction_recovered')).toBe(3)
+    expect(evs.filter((e) => e.type === 'agent_collapsed')).toHaveLength(3)
 
     // Thirst: a second clock runs on every body, every tick, and the Builder is drier than he began.
     expect(types).toContain('thirst_changed')
