@@ -6,14 +6,15 @@
 // The ops plane is WIRED HERE OR THE GATE RUNS DARK (batch-7 concern 1, batch-8 concern 1):
 // runConstructPass, narrateDay's world and semantic seams, the arbiter's `vocabulary` table
 // and reportDeadCalls each have exactly one live caller, and it is this file.
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type Database from 'better-sqlite3'
 import {
   applyLaw, buildFootprint, BRIDGE_KIND, createWorldTick, doorTile, EventStore, findPath, fold,
-  genesisState, GENESIS_FORD, isPassable, makeGenesisWorld, replayFromGenesis, RngStreams,
-  submitIntent, TickLoop, TOGGLABLE_PATHS, thirstOf, WATER_TILES,
+  genesisState, GENESIS_FORD, isPassable, makeGenesisWorld, replayFromGenesis, replayLatest,
+  RngStreams, submitIntent, TickLoop, TOGGLABLE_PATHS, thirstOf, WATER_TILES,
   type LawQueue, type TickHandler, type TileId, type WorldState,
 } from '@sj/engine'
 import {
@@ -50,6 +51,11 @@ import {
   FullNeedTally, G11ReportSchema, checkG11Report, chronicleViolations, classifyVerb, median,
   survivalTax, type G11Discretion, type G11Report,
 } from '../src/live/g11report.js'
+import {
+  G11_CHECKPOINT_VERSION, checkpointRefusal, fingerprintMismatch, migrateCheckpointTable,
+  readCheckpoint, restoreSnapshot, writeCheckpoint,
+  type G11Checkpoint, type G11Fingerprint, type G11Sidecar,
+} from '../src/live/g11checkpoint.js'
 import { PREFLIGHT_ROUNDS, preflightRefusal, runPreflight } from '../src/live/providerPreflight.js'
 
 // The user has ratified Baidu Qianfan as the v1 provider (cleanup/c8-cost-plan.md L1).
@@ -69,6 +75,15 @@ const HARD_PROVIDER_ALLOW_LIST = process.env.G11_HARD_PROVIDER === '1'
 // report — for nothing, before a single paid token is spent.
 const DRY_RUN = process.env.G11_DRY_RUN === '1'
 
+// Pick the run up from its last checkpoint instead of building the world from genesis. Batch
+// 13's gate reached 93% and was reaped inside the last day-close; without this the score, the
+// transcript and the $0.68 all go with the process, every time.
+const RESUME = process.env.G11_RESUME === '1'
+// How often the run is made survivable. A snapshot of the whole database is ~200 ms against
+// 480 ticks of 250 ms, so it costs about a tenth of a percent of the run to lose at most two
+// minutes of it.
+const CHECKPOINT_TICKS = Number(process.env.G11_CHECKPOINT_TICKS ?? 480)
+
 const TOTAL_TICKS = Number(process.env.G11_TICKS ?? 2 * MINUTES_PER_DAY)
 const REAL_MS_PER_TICK = Number(process.env.G11_MS_PER_TICK ?? 250)
 // The town wakes at seven: a world that opens at midnight spends its first hours in the dark.
@@ -87,8 +102,14 @@ const TICK_BUDGET_MS = 50
 
 const DATA_DIR = fileURLToPath(new URL('../data/', import.meta.url))
 const DB_PATH = path.join(DATA_DIR, 'g11.db')
+const CHECKPOINT_PATH = path.join(DATA_DIR, 'g11-checkpoint.db')
 const REPORT_PATH = path.join(DATA_DIR, 'g11-report.json')
 const TRANSCRIPT_PATH = path.join(DATA_DIR, 'g11-transcript.md')
+// The safety net. Written at every day-close and again the moment the tick loop ends, BEFORE
+// the settle and the final close — the exact window batch 13 died in. A gate that computes a
+// score it cannot emit has failed for no reason.
+const PARTIAL_REPORT_PATH = path.join(DATA_DIR, 'g11-report.partial.json')
+const PARTIAL_TRANSCRIPT_PATH = path.join(DATA_DIR, 'g11-transcript.partial.md')
 const MODELS_DIR = fileURLToPath(new URL('../../../data/models/', import.meta.url))
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
@@ -280,6 +301,13 @@ class WatchedBridge extends EngineBridge {
 
   watchTicks(tick: () => number): void { this.#tick = tick }
 
+  // A resumed run keeps the refusals and the accepted acts it already made. They are the
+  // transcript's two halves and neither is in the event log.
+  restore(sidecar: Pick<G11Sidecar, 'rejections' | 'accepted'>): void {
+    this.rejections.push(...sidecar.rejections)
+    this.accepted.push(...sidecar.accepted)
+  }
+
   override submit(agentId: string, intent: Intent, onResult?: (r: SubmitResult) => void): Promise<SubmitResult> {
     return super.submit(agentId, intent, (r) => {
       if (r.ok) this.accepted.push({ tick: this.#tick(), agentId, verb: intent.verb })
@@ -296,6 +324,29 @@ const qRows = <T>(db: Database.Database, sql: string, ...p: unknown[]): T[] =>
 
 const payloadOf = (e: SimEvent): Record<string, unknown> => (e.payload ?? {}) as Record<string, unknown>
 
+// The commit this run's code is at, and whether the tree it was run from was clean. A resume
+// across a code change would score a repaired run on the broken one's evidence, so the sha is
+// part of the fingerprint and a dirty tree is a different fingerprint every time it changes.
+//
+// `-uno` and the excluded data directory are not laxity: the run REWRITES its own artifacts in
+// `packages/agents/data` as it goes, so counting those would give the same run a different
+// fingerprint before and after its first day-close and no run could ever resume itself.
+function gitSha(): string {
+  try {
+    const at = fileURLToPath(new URL('../../../', import.meta.url))
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: at, encoding: 'utf8' }).trim()
+    const dirty = execFileSync(
+      'git', ['status', '--porcelain', '-uno', '--', '.', ':(exclude)packages/agents/data'],
+      { cwd: at, encoding: 'utf8' }).trim()
+    return dirty.length === 0 ? head : `${head}-dirty:${hashOf(dirty)}`
+  } catch { return 'unknown' }
+}
+const hashOf = (s: string): string => {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0
+  return (h >>> 0).toString(16)
+}
+
 // ------------------------------------------------------------------- the run ---
 
 async function main(): Promise<void> {
@@ -304,14 +355,61 @@ async function main(): Promise<void> {
     process.exit(2)
   }
   mkdirSync(DATA_DIR, { recursive: true })
-  for (const suffix of ['', '-wal', '-shm']) rmSync(`${DB_PATH}${suffix}`, { force: true })
 
   const config: SimConfig = DEFAULT_CONFIG
+  const fingerprint: G11Fingerprint = {
+    gitSha: gitSha(),
+    configHash: stateHash(config),
+    totalTicks: TOTAL_TICKS,
+    startTick: START_TICK,
+    wearThreshold: WEAR_THRESHOLD,
+    model: MIND_MODEL,
+    providerOrder: PROVIDER_ORDER,
+    hardProviderAllowList: HARD_PROVIDER_ALLOW_LIST,
+    mindIds: MINDS.map((m) => m.id),
+    dryRun: DRY_RUN,
+  }
+
+  // A resume puts the last checkpoint's snapshot back where the live database lives and reads
+  // the run's memory out of it; a fresh run wipes the database and builds from genesis. The
+  // checkpoint's fingerprint has to match this run's or the resume is refused: continuing a
+  // different gate's evidence is the one way a checkpoint could launder a failure into a pass.
+  if (RESUME) {
+    if (!existsSync(CHECKPOINT_PATH)) {
+      console.error(`GATE REFUSED TO RESUME: there is no checkpoint at ${CHECKPOINT_PATH}.`)
+      process.exit(4)
+    }
+    restoreSnapshot(CHECKPOINT_PATH, DB_PATH)
+  } else {
+    for (const suffix of ['', '-wal', '-shm']) rmSync(`${DB_PATH}${suffix}`, { force: true })
+    rmSync(CHECKPOINT_PATH, { force: true })
+    rmSync(PARTIAL_REPORT_PATH, { force: true })
+    rmSync(PARTIAL_TRANSCRIPT_PATH, { force: true })
+  }
+
   const db = openAgentDb(DB_PATH)
   migrateLlmTables(db)
   migrateArbiterTables(db)
   migrateNarratorTables(db)
-  seedCodex(db)
+  migrateCheckpointTable(db)
+
+  const saved = RESUME ? readCheckpoint(db) : null
+  if (RESUME) {
+    if (saved === null) {
+      console.error('GATE REFUSED TO RESUME: the snapshot carries no checkpoint row.')
+      process.exit(4)
+    }
+    const reasons = fingerprintMismatch(saved.fingerprint, fingerprint)
+    if (reasons.length > 0) { console.error(checkpointRefusal(reasons)); process.exit(4) }
+    // The dry run's canned answers cycle off a counter, so a resumed dry run has to pick the
+    // cycle up where it left it or it is not the same run. This is what makes the resumed-run
+    // -equals-continuous-run proof mechanical rather than a claim.
+    dryTurn = saved.sidecar.dryTurn
+    console.log(`[g11] resuming from tick ${saved.sidecar.tick},`
+      + ` day ${saved.sidecar.lastDayClosed} closed, resume #${saved.sidecar.resumes.length + 1}`)
+  } else {
+    seedCodex(db)
+  }
 
   // THE PRE-FLIGHT, BEFORE ANYTHING ELSE. Three calls on the real schema decide whether this
   // provider can emit an act at all. The last gate spent 38 minutes and $0.76 discovering it
@@ -337,41 +435,69 @@ async function main(): Promise<void> {
     process.exit(3)
   }
 
+  // The terrain is a pure function of the config, so it is the same map on a resume as it was
+  // on the first tick; the genesis EVENTS are only replayed into a fresh store.
   const { terrain, events: genesisEvents } = makeGenesisWorld(config)
   const store = new EventStore(db)
-  const rng = new RngStreams('g11-deep-world')
+  let rng = new RngStreams('g11-deep-world')
   let state = genesisState(config, terrain)
-  const emit = (type: string, payload: unknown): void => {
-    state = fold(state, store.append(state.tick, type, payload), config)
-  }
-  for (const e of genesisEvents) emit(e.type, e.payload)
 
-  // The five founders, each at their own doorway.
-  for (const m of MINDS) {
-    const hut = Object.values(state.structures).find((s) => s.kind === 'hut' && s.owner === m.id)
-    if (hut === undefined) throw new Error(`genesis: no hut owned by ${m.id}`)
-    const door = doorTile(state, hut)
-    if (door === null) throw new Error(`genesis: no doorway on ${m.id}'s hut`)
-    emit('agent_spawned', { id: m.id, name: m.identity.name, x: door.x, y: door.y, sex: m.sex, ageDays: m.ageDays })
+  if (saved !== null) {
+    // The engine's own crash recovery, which G2 holds to a hash: the latest snapshot, the rng
+    // checkpoint, and every event after them. The world AND the random streams come back, so
+    // the run continues rather than restarting with fresh luck.
+    const recovered = replayLatest(store, config, terrain)
+    state = recovered.state
+    rng = recovered.rng
+    const hash = stateHash(state)
+    if (hash !== saved.sidecar.stateHash) {
+      console.error(checkpointRefusal([
+        `the world replayed out of this snapshot hashes ${hash},`
+        + ` and the checkpoint recorded ${saved.sidecar.stateHash}`,
+      ]))
+      process.exit(4)
+    }
+    if (state.tick !== saved.sidecar.tick) {
+      console.error(checkpointRefusal([
+        `the snapshot's event log ends at tick ${state.tick}, and the checkpoint says ${saved.sidecar.tick}`,
+      ]))
+      process.exit(4)
+    }
+  } else {
+    const emit = (type: string, payload: unknown): void => {
+      state = fold(state, store.append(state.tick, type, payload), config)
+    }
+    for (const e of genesisEvents) emit(e.type, e.payload)
+
+    // The five founders, each at their own doorway.
+    for (const m of MINDS) {
+      const hut = Object.values(state.structures).find((s) => s.kind === 'hut' && s.owner === m.id)
+      if (hut === undefined) throw new Error(`genesis: no hut owned by ${m.id}`)
+      const door = doorTile(state, hut)
+      if (door === null) throw new Error(`genesis: no doorway on ${m.id}'s hut`)
+      emit('agent_spawned', { id: m.id, name: m.identity.name, x: door.x, y: door.y, sex: m.sex, ageDays: m.ageDays })
+    }
+    // The staged affliction: one founder wakes on day zero with a fever nobody has been told
+    // about. Recovery or death both pass the criterion; silence does not.
+    emit('agent_afflicted', { agentId: SICK_ONE, kind: 'illness', severity: 1 })
+    // A staged thirst, the same device: the clock runs at 0.021 a tick, so a body that starts
+    // full does not reach the debuff line until day three and a two-sim-day window can never
+    // show the criterion. One founder wakes already dry, and crosses it before noon on day one.
+    emit('thirst_changed', { id: PARCHED_ONE, delta: -65 })
   }
-  // The staged affliction: one founder wakes on day zero with a fever nobody has been told
-  // about. Recovery or death both pass the criterion; silence does not.
-  emit('agent_afflicted', { agentId: SICK_ONE, kind: 'illness', severity: 1 })
-  // A staged thirst, the same device: the clock runs at 0.021 a tick, so a body that starts
-  // full does not reach the debuff line until day three and a two-sim-day window can never
-  // show the criterion. One founder wakes already dry, and crosses it before noon on day one.
-  emit('thirst_changed', { id: PARCHED_ONE, delta: -65 })
 
   // --- the loop, the bridge, the law channel ---
   const lawQueue: LawQueue = []
   const worldTick = createWorldTick(config, rng, lawQueue)
-  const tickMs: number[] = []
+  const tickMs: number[] = saved?.sidecar.tickMs ?? []
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
-    store, state, rng, config, startTick: START_TICK, realMsPerTick: REAL_MS_PER_TICK,
+    store, state, rng, config, startTick: saved?.sidecar.tick ?? START_TICK,
+    realMsPerTick: REAL_MS_PER_TICK,
     onTick: (ctx) => handler(ctx),
   })
   const bridge = new WatchedBridge({ loop, store, simConfig: config })
+  if (saved !== null) bridge.restore(saved.sidecar)
   bridge.watchTicks(() => loop.tick)
   handler = bridge.wrapTickHandler(({ emit: e }) => {
     const at = performance.now()
@@ -381,13 +507,21 @@ async function main(): Promise<void> {
 
   // --- the minds ---
   const embedder = await Embedder.create(MODELS_DIR)
-  const thoughts: Array<{ tick: number; agentId: string; text: string }> = []
+  const thoughts: Array<{ tick: number; agentId: string; text: string }> = saved?.sidecar.thoughts ?? []
   const runtimes = new Map<string, AgentRuntime>()
   let seam: { adjudicate: Adjudicator; codify: Codifier } | null = null
 
+  // A resumed mind comes back with the clock, the half-run plan and the counts it had. A fresh
+  // clock would make it think the instant the run woke up, drop what it was doing, and start
+  // counting turns at zero — and criterion 8 gates on `reflectionsStarted` matching the
+  // resolved half, which is counted out of the database and does NOT restart.
+  const restoring = new Map(
+    (saved?.sidecar.minds ?? []).map((m) => [m.agentId, m.snapshot] as const))
+
   function boot(spec: Mind): void {
     const personality = new PersonalityStore(db, spec.id)
-    personality.init(spec.personality, Math.floor(loop.tick / MINUTES_PER_DAY))
+    // A resumed mind's personality is already in the restored database, versions and all.
+    if (saved === null) personality.init(spec.personality, Math.floor(loop.tick / MINUTES_PER_DAY))
     const turnLlm = makeClient(db, 'turn', spec.id)
     const reflectionLlm = makeReflectionLlm(makeClient(db, 'reflection', spec.id))
     const runtime = new AgentRuntime({
@@ -395,6 +529,8 @@ async function main(): Promise<void> {
       onThought: (t) => thoughts.push(t),
     })
     runtime.start(spec.id)
+    const was = restoring.get(spec.id)
+    if (was !== undefined) runtime.restore(was)
     if (seam !== null) wireArbiter(runtime, seam)
     runtimes.set(spec.id, runtime)
   }
@@ -415,7 +551,8 @@ async function main(): Promise<void> {
   const arbiter = makeArbiter({
     db, llm: arbiterLlm, embedder, tick: () => loop.tick, vocabulary: VOCABULARY,
   })
-  const adjudications: Array<{ tick: number; agentId: string; intent: string; kind: string; verb: string | null }> = []
+  const adjudications: Array<{ tick: number; agentId: string; intent: string; kind: string; verb: string | null }>
+    = saved?.sidecar.adjudications ?? []
   const watched = {
     adjudicate: async (intent: string, ctx: Parameters<typeof arbiter.adjudicate>[1]) => {
       const verdict = await arbiter.adjudicate(intent, ctx)
@@ -437,12 +574,14 @@ async function main(): Promise<void> {
   const semanticLlm = makeClient(db, 'semantic')
   const constructLlm = makeClient(db, 'constructs')
 
-  let narrateErrors = 0
-  let constructErrors = 0
-  let semanticRan = false
-  let semanticErrors = 0
-  const semanticHits: string[] = []
-  const nightsRun: number[] = []
+  // Restored, never reset. Every one of these can only make the gate harder to pass, and a
+  // resume that zeroed them would turn a night that errored into a night that ran clean.
+  let narrateErrors = saved?.sidecar.narrateErrors ?? 0
+  let constructErrors = saved?.sidecar.constructErrors ?? 0
+  let semanticRan = saved?.sidecar.semanticRan ?? false
+  let semanticErrors = saved?.sidecar.semanticErrors ?? 0
+  const semanticHits: string[] = saved?.sidecar.semanticHits ?? []
+  const nightsRun: number[] = saved?.sidecar.nightsRun ?? []
 
   // What a mind said and what it thought, for the tier-2.5 pass. Speech is a public event;
   // thoughts come off the runtime's own callback, which is the only place they exist.
@@ -509,19 +648,61 @@ async function main(): Promise<void> {
   }
 
   // --- the run ---
-  const spendProjections: Array<{ tick: number; usdPerSimDay: number }> = []
+  const spendProjections: Array<{ tick: number; usdPerSimDay: number }> = saved?.sidecar.spendProjections ?? []
   const FULL_NEED_SAMPLE_TICKS = 10
-  const fullNeed = new FullNeedTally(FULL_NEED_SAMPLE_TICKS)
-  let lastDayClosed = Math.floor(START_TICK / MINUTES_PER_DAY)
+  const fullNeed = saved === null
+    ? new FullNeedTally(FULL_NEED_SAMPLE_TICKS)
+    : FullNeedTally.restore(FULL_NEED_SAMPLE_TICKS, saved.sidecar.fullNeed)
+  let lastDayClosed = saved?.sidecar.lastDayClosed ?? Math.floor(START_TICK / MINUTES_PER_DAY)
   let tripwireHit = false
   const totalSpend = (): number => qInt(db, 'SELECT COALESCE(SUM(cost_usd), 0) FROM llm_calls')
+  const resumes = saved?.sidecar.resumes ?? []
+  if (saved !== null) resumes.push({ atTick: saved.sidecar.tick, at: new Date().toISOString() })
+  const resumeBlock = (): G11Report['resume'] => ({
+    resumed: resumes.length > 0,
+    attempts: resumes.length,
+    fromTicks: resumes.map((r) => r.atTick),
+    checkpointEveryTicks: CHECKPOINT_TICKS,
+  })
 
   console.log(`[g11] model=${MIND_MODEL} provider=${PROVIDER_ORDER.join(',')}`
     + ` allowList=${HARD_PROVIDER_ALLOW_LIST} ticks=${TOTAL_TICKS}`
     + ` pace=${REAL_MS_PER_TICK}ms minds=${MINDS.length} (no cap; tripwire $${TRIPWIRE_USD_PER_MIND_SIM_HOUR}/mind/sim-hour)`)
   const startWall = Date.now()
 
-  for (let i = 0; i < TOTAL_TICKS; i += 1) {
+  // The cheap word, and a SECOND body using it for nothing (criterion 9). It costs one arbiter
+  // call, so it is resolved once and reused rather than re-asked by every partial report.
+  let reuse: { reusedBy: string | null; reuseArbiterCalls: number } = { reusedBy: null, reuseArbiterCalls: 0 }
+  let reuseResolved = false
+
+  // The rollback point. It is written into the live database and the whole database is copied
+  // out atomically, so the snapshot and the run's memory inside it are always the same moment.
+  const checkpoint = (): void => {
+    const cp: G11Checkpoint = {
+      version: G11_CHECKPOINT_VERSION,
+      writtenAt: new Date().toISOString(),
+      fingerprint,
+      sidecar: {
+        tick: loop.tick,
+        lastDayClosed,
+        stateHash: stateHash(loop.state),
+        thoughts, adjudications,
+        rejections: bridge.rejections, accepted: bridge.accepted,
+        tickMs, spendProjections,
+        fullNeed: fullNeed.entries(),
+        nightsRun, semanticRan, semanticErrors, narrateErrors, constructErrors, semanticHits,
+        minds: [...runtimes.entries()].map(([agentId, r]) => ({ agentId, snapshot: r.snapshot() })),
+        dryTurn,
+        resumes,
+      },
+    }
+    writeCheckpoint(db, CHECKPOINT_PATH, cp)
+  }
+
+  // The last tick this process is responsible for. A resumed run finishes the SAME run: the
+  // end is where the first run's budget said it was, not TOTAL_TICKS past wherever it woke up.
+  const lastTick = START_TICK + TOTAL_TICKS
+  for (let i = loop.tick - START_TICK; i < TOTAL_TICKS; i += 1) {
     const stepStart = Date.now()
     loop.step()
 
@@ -561,15 +742,28 @@ async function main(): Promise<void> {
     if (day > lastDayClosed) {
       await closeTheDay(lastDayClosed)
       lastDayClosed = day
+      // A day-close is ~9 minutes of the hour and the most expensive thing to lose. Checkpoint
+      // the moment one lands, and write the score out with it.
+      checkpoint()
+      writePartial('the day closed')
     }
+
+    if (loop.tick % CHECKPOINT_TICKS === 0) checkpoint()
 
     if (loop.tick % 240 === 0) {
       const mins = ((Date.now() - startWall) / 60_000).toFixed(1)
       const turns = [...runtimes.values()].reduce((s, r) => s + r.stats().turns, 0)
-      console.log(`[g11] tick ${loop.tick}/${START_TICK + TOTAL_TICKS} (${mins} min, turns=${turns}, $${totalSpend().toFixed(4)})`)
+      console.log(`[g11] tick ${loop.tick}/${lastTick} (${mins} min, turns=${turns}, $${totalSpend().toFixed(4)})`)
     }
     await sleep(Math.max(0, REAL_MS_PER_TICK - (Date.now() - stepStart)))
   }
+
+  // THE SAFETY NET. The tick loop is done and every criterion's data is in hand; the settle
+  // and the last day-close that follow are the ~9 minutes batch 13's reaper landed in, and it
+  // took the whole score with it. Emit the score BEFORE them.
+  await resolveReuse()
+  writePartial('the tick loop finished, before the settle and the last day-close')
+  checkpoint()
 
   // Let a reflection begun near the end finish, then let everything settle.
   const reflectionDeadline = Date.now() + 300_000
@@ -583,6 +777,8 @@ async function main(): Promise<void> {
     lastLlmId = nowId
   }
   await closeTheDay(lastDayClosed)
+  writePartial('the last day closed')
+  checkpoint()
 
   for (const runtime of runtimes.values()) runtime.stop()
   const drainedIntents = bridge.drain('the moment passes')
@@ -593,30 +789,53 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  // --------------------------------------------------------------- evidence ---
+  // ------------------------------------------------------- the report writer ---
+  // Callable at any moment, and called at every day-close and again the instant the tick loop
+  // ends. It reads the run out of the event store, the database and the accumulators above —
+  // never out of a variable only the end of the run would have — so a partial written at 93%
+  // is the same arithmetic as the final one on the same evidence.
+  async function resolveReuse(): Promise<void> {
+    if (reuseResolved) return
+    reuseResolved = true
+    const first = adjudications.find((a) => a.verb !== null && a.verb.startsWith('express:')) ?? null
+    if (first === null) return
+    const other = MINDS.map((m) => m.id)
+      .find((id) => id !== first.agentId && loop.state.agents[id]?.alive === true)
+    if (other === undefined) return
+    const before = qInt(db, `SELECT COUNT(*) FROM llm_calls WHERE caller = 'arbiter'`)
+    let reusedBy: string | null = null
+    try {
+      const again = await arbiter.adjudicate(first.intent, buildAgentCtx(bridge, other))
+      if (again.kind === 'map' && again.verb === first.verb) reusedBy = other
+    } catch (err) { console.error('[g11] the reuse adjudication threw:', err) }
+    reuse = { reusedBy, reuseArbiterCalls: qInt(db, `SELECT COUNT(*) FROM llm_calls WHERE caller = 'arbiter'`) - before }
+  }
+
+  function writePartial(why: string): void {
+    try {
+      const r = buildReport({ partial: true, drainedIntents: 0, drainedAgainCount: 0 })
+      writeFileSync(PARTIAL_REPORT_PATH, JSON.stringify(r, null, 2))
+      writeFileSync(PARTIAL_TRANSCRIPT_PATH,
+        transcript(r, thoughts, store.readFrom(0), adjudications, bridge.rejections))
+      const checks = checkG11Report(r)
+      const passing = Object.values(checks).filter((d) => d === null).length
+      console.log(`[g11] partial report at tick ${loop.tick} (${why}): ${passing}/${Object.keys(checks).length}`
+        + ` — ${Object.entries(checks).filter(([, d]) => d !== null).map(([k]) => k).join(', ') || 'all pass'}`)
+    } catch (err) { console.error('[g11] the partial report writer threw:', err) }
+  }
+
+  function buildReport(opts: {
+    partial: boolean; drainedIntents: number; drainedAgainCount: number
+  }): G11Report {
   const allEvents = store.readFrom(0)
   const finalState: WorldState = loop.state
   const simDays = TOTAL_TICKS / MINUTES_PER_DAY
 
-  // --- the cheap word, and a SECOND body using it for nothing ---
   const expressiveVerbs = [...new Set(adjudications
     .filter((a) => a.verb !== null && a.verb.startsWith('express:'))
     .map((a) => a.verb!))]
   const firstExpressive = adjudications.find((a) => a.verb !== null && a.verb.startsWith('express:')) ?? null
-  let reusedBy: string | null = null
-  let reuseArbiterCalls = 0
-  if (firstExpressive !== null) {
-    const other = MINDS.map((m) => m.id)
-      .find((id) => id !== firstExpressive.agentId && finalState.agents[id]?.alive === true)
-    if (other !== undefined) {
-      const before = qInt(db, `SELECT COUNT(*) FROM llm_calls WHERE caller = 'arbiter'`)
-      try {
-        const again = await arbiter.adjudicate(firstExpressive.intent, buildAgentCtx(bridge, other))
-        if (again.kind === 'map' && again.verb === firstExpressive.verb) reusedBy = other
-      } catch (err) { console.error('[g11] the reuse adjudication threw:', err) }
-      reuseArbiterCalls = qInt(db, `SELECT COUNT(*) FROM llm_calls WHERE caller = 'arbiter'`) - before
-    }
-  }
+  const { reusedBy, reuseArbiterCalls } = reuse
 
   // --- the chronicle, over every C11 event that fired ---
   const C11_TYPES = new Set([
@@ -855,12 +1074,14 @@ async function main(): Promise<void> {
     ?? { i: 0, o: 0, c: 0 }
 
   const spent = totalSpend()
-  const report: G11Report = {
+  const built: G11Report = {
     generatedAt: new Date().toISOString(),
+    partial: opts.partial,
     model: MIND_MODEL,
     totalTicks: TOTAL_TICKS,
     realMsPerTick: REAL_MS_PER_TICK,
     startTick: START_TICK,
+    resume: resumeBlock(),
     preflight,
     opsPlane: {
       runConstructPass: 'wired',
@@ -906,8 +1127,8 @@ async function main(): Promise<void> {
     evidence: {
       ticksRun: loop.tick - START_TICK,
       crashAlerts: qInt(db, `SELECT COUNT(*) FROM alerts WHERE kind IN ('turn_crash', 'reflection_failed')`),
-      drainedIntents,
-      drainedAgainCount,
+      drainedIntents: opts.drainedIntents,
+      drainedAgainCount: opts.drainedAgainCount,
       minds: [...runtimes.entries()].map(([agentId, r]) => ({
         agentId, turns: r.stats().turns, reflections: r.stats().reflections,
       })),
@@ -985,10 +1206,13 @@ async function main(): Promise<void> {
       },
     },
   }
+  return G11ReportSchema.parse(built)
+  }
 
-  G11ReportSchema.parse(report)
+  const report = buildReport({ partial: false, drainedIntents, drainedAgainCount })
   writeFileSync(REPORT_PATH, JSON.stringify(report, null, 2))
-  writeFileSync(TRANSCRIPT_PATH, transcript(report, thoughts, allEvents, adjudications, bridge.rejections))
+  writeFileSync(TRANSCRIPT_PATH,
+    transcript(report, thoughts, store.readFrom(0), adjudications, bridge.rejections))
 
   console.log('\n=== GATE G11b report ===')
   console.log(JSON.stringify(report, null, 2))

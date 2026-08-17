@@ -76,6 +76,18 @@ function cuesFromPacket(packet: PerceptionPacket): SceneCues {
 
 export type RuntimeStats = { turns: number; dozes: number; reflections: number; costUsd: number }
 
+// What a mind is carrying at a tick boundary, in a shape that survives a JSON round trip. Cost
+// is absent on purpose: it is in the database and would be double-counted here.
+export type RuntimeSnapshot = {
+  clock: MindClock
+  plan: PlanState
+  stats: { turns: number; dozes: number; reflections: number }
+  dayLog: string[]
+  reflectedNight: number | null
+  wasNight: boolean
+  pendingDreamMood: string | null
+}
+
 function freshClock(): MindClock {
   return {
     lastTurnTick: 0,
@@ -169,6 +181,33 @@ export class AgentRuntime {
       this.#offTick = (tick) => this.#onTick(tick)
       this.#bridge.onTick(this.#offTick)
     }
+  }
+
+  // Everything a mind carries between ticks that is not in the database. A run that is
+  // interrupted and picked up again restores this, or every mind wakes with a fresh clock: it
+  // would think the moment the run resumed rather than when it meant to, drop the plan it was
+  // halfway through, and report a turn count that starts at the resume.
+  snapshot(): RuntimeSnapshot {
+    return {
+      clock: { ...this.#clock, alarmArmed: { ...this.#clock.alarmArmed }, prevVisibleIds: [...this.#clock.prevVisibleIds] },
+      plan: { queue: this.#plan.queue.map((i) => ({ ...i })), lastResult: this.#plan.lastResult },
+      stats: { ...this.#stats },
+      dayLog: [...this.#dayLog],
+      reflectedNight: this.#reflectedNight,
+      wasNight: this.#wasNight,
+      pendingDreamMood: this.#pendingDreamMood,
+    }
+  }
+
+  // Applied AFTER `start`, which is what clears these in the first place.
+  restore(s: RuntimeSnapshot): void {
+    this.#clock = { ...s.clock, alarmArmed: { ...s.clock.alarmArmed }, prevVisibleIds: [...s.clock.prevVisibleIds] }
+    this.#plan = { queue: s.plan.queue.map((i) => ({ ...i })), lastResult: s.plan.lastResult }
+    this.#stats = { ...s.stats }
+    this.#dayLog = [...s.dayLog]
+    this.#reflectedNight = s.reflectedNight
+    this.#wasNight = s.wasNight
+    this.#pendingDreamMood = s.pendingDreamMood
   }
 
   // Post-construction wiring: G9b and C8's supervisor build the arbiter after

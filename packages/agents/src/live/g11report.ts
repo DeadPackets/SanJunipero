@@ -227,12 +227,28 @@ export const G11PreflightSchema = z.object({
   failures: z.array(z.string()),
 }).strict()
 
+// Whether this run was continuous, and if not, where it picked itself up. Reported, never
+// gated: a resumed run must be readable as a resumed run, and a checkpoint that could hide
+// itself would be a way to launder a failure into a pass. NOT a criterion — `checkG11Report`
+// returns the same seventeen either way.
+export const G11ResumeSchema = z.object({
+  resumed: z.boolean(),
+  attempts: z.number().int(),
+  fromTicks: z.array(z.number().int()),
+  checkpointEveryTicks: z.number().int(),
+}).strict()
+
 export const G11ReportSchema = z.object({
   generatedAt: z.string(),
+  // A report written before the run finished. It exists so that a gate reaped inside its last
+  // day-close still leaves a score behind: batch 13 had all seventeen criteria's data in the
+  // database and lost the lot to the reaper alone.
+  partial: z.boolean(),
   model: z.string(),
   totalTicks: z.number().int(),
   realMsPerTick: z.number(),
   startTick: z.number().int(),
+  resume: G11ResumeSchema,
   preflight: G11PreflightSchema,
   opsPlane: G11OpsPlaneSchema,
   measurements: G11MeasurementSchema,
@@ -266,6 +282,18 @@ export class FullNeedTally {
 
   totalTicks(): number {
     return [...this.#counts.values()].reduce((a, b) => a + b, 0) * this.ticksPerSample
+  }
+
+  // The samples, so a checkpoint can put them back. A resumed run that started this tally at
+  // zero would report a day's full-need moments as the fraction taken after the resume.
+  entries(): Array<[string, number]> {
+    return [...this.#counts.entries()]
+  }
+
+  static restore(ticksPerSample: number, entries: ReadonlyArray<readonly [string, number]>): FullNeedTally {
+    const t = new FullNeedTally(ticksPerSample)
+    for (const [key, n] of entries) t.#counts.set(key, n)
+    return t
   }
 }
 

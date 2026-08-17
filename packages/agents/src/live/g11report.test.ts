@@ -11,10 +11,12 @@ import {
 // A pass-shaped report. Every row below is a plausible reading off a real 2-sim-day run.
 const PASSING: G11Report = {
   generatedAt: '2026-08-17T12:00:00.000Z',
+  partial: false,
   model: 'deepseek/deepseek-v4-flash-0731',
   totalTicks: 2880,
   realMsPerTick: 250,
   startTick: 420,
+  resume: { resumed: false, attempts: 0, fromTicks: [], checkpointEveryTicks: 480 },
   preflight: {
     provider: 'Baidu', hardAllowList: false, model: 'deepseek/deepseek-v4-flash-0731',
     calls: 3, answered: 3, actions: 3, speeches: 2, passed: true, costUsd: 0.0009,
@@ -108,6 +110,18 @@ const failing = (r: G11Report): string[] =>
   Object.entries(checkG11Report(r)).filter(([, d]) => d !== null).map(([k]) => k)
 
 describe('the report shape', () => {
+  it('scores exactly seventeen criteria, and a resume block is not one of them', () => {
+    expect(Object.keys(checkG11Report(PASSING))).toHaveLength(17)
+    const resumed: G11Report = {
+      ...PASSING,
+      resume: { resumed: true, attempts: 2, fromTicks: [2880, 4320], checkpointEveryTicks: 480 },
+    }
+    expect(Object.keys(checkG11Report(resumed))).toHaveLength(17)
+    // A resumed run is scored exactly as a continuous one, and says it was resumed.
+    expect(checkG11Report(resumed)).toEqual(checkG11Report(PASSING))
+    expect(g11GatePassed(resumed)).toBe(true)
+  })
+
   it('parses the recorded fixture and refuses an unknown field', () => {
     expect(() => G11ReportSchema.parse(PASSING)).not.toThrow()
     expect(G11ReportSchema.safeParse({ ...PASSING, extra: 1 }).success).toBe(false)
@@ -311,5 +325,20 @@ describe('FullNeedTally', () => {
 
   it('still totals the whole run, which is what the run-level figure reports', () => {
     expect(tally().totalTicks()).toBe(200)
+  })
+
+  it('survives a checkpoint: restored samples read exactly as the originals did', () => {
+    const restored = FullNeedTally.restore(10, tally().entries())
+    expect(restored.ticksOn('amara', 0)).toBe(50)
+    expect(restored.ticksOn('amara', 1)).toBe(120)
+    expect(restored.ticksOn('yusuf', 1)).toBe(30)
+    expect(restored.totalTicks()).toBe(200)
+  })
+
+  it('keeps counting from where it was restored, not from zero', () => {
+    const restored = FullNeedTally.restore(10, tally().entries())
+    restored.sample('yusuf', 1)
+    expect(restored.ticksOn('yusuf', 1)).toBe(40)
+    expect(restored.totalTicks()).toBe(210)
   })
 })
