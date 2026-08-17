@@ -1066,6 +1066,37 @@ export function craftRoutes(config: SimConfig, name: string): SeedRecipe[] {
   return routes
 }
 
+// What a pair of hands can raise and what it can shape, off the same two tables `build` and
+// `craft` already validate against. No new physics: this is the vocabulary those verbs have
+// always accepted, gathered in one place so somebody can finally be told it (C11 R-H).
+export type MakeableRoad = { inputs: Record<string, number>; atFire?: true; water?: number }
+export type Makeables = {
+  builds: Array<{ kind: string; inputs: Record<string, number> }>
+  crafts: Array<{ name: string; roads: MakeableRoad[] }>
+}
+
+export function makeables(config: SimConfig): Makeables {
+  const builds = Object.keys(config.structures.recipes).sort().flatMap((kind) => {
+    const row = buildableRecipe(config, kind)
+    return row === null ? [] : [{ kind, inputs: row.inputs }]
+  })
+  // One word per product, because `craftRoutes` already lets one word reach every road to it:
+  // "garment" finds the loom and the hide, where `hide_garment` would have found only the hide.
+  const products = new Set<string>()
+  for (const name of [...Object.keys(config.crafting.recipes), ...Object.keys(SEED_RECIPES)]) {
+    products.add(recipeFor(config, name)?.output.kind ?? name)
+  }
+  const crafts = [...products].sort().map((name) => ({
+    name,
+    roads: craftRoutes(config, name).map((r) => ({
+      inputs: r.inputs,
+      ...(r.atFire === true ? { atFire: true as const } : {}),
+      ...(r.water === undefined ? {} : { water: r.water }),
+    })),
+  }))
+  return { builds, crafts }
+}
+
 // How much of an input the hands hold, counting every member when the input is a canon class.
 function heldForInput(state: WorldState, agentId: string, input: string): number {
   const members = classMembers(input)

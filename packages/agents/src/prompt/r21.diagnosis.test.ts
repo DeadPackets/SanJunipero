@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
-  composePerception, doorTile, fold, genesisState, makeGenesisWorld, searchPath, submitIntent,
+  composePerception, doorTile, fold, genesisState, makeables, makeGenesisWorld, searchPath, submitIntent,
   type WorldState,
 } from '@sj/engine'
 import { CITY_ANCHOR_DEFAULT, DEFAULT_CONFIG, FOUNDER_IDS, type SimEvent } from '@sj/shared'
-import { perceptionToProse, type PerceptionPacket } from './prose.js'
+import { makeablesLine, perceptionToProse, type PerceptionPacket } from './prose.js'
 import { CAPABILITIES } from './rulesOfBeing.js'
 
 // R21 — WHY the town talks and cannot feed itself. Five candidate causes were named; these
@@ -291,7 +291,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     )
   })
 
-  it('the makeable vocabulary is never spoken: seven nouns the world knows and no mind is given', () => {
+  it('the makeable vocabulary reached block 1 and the perception, and neither ever said it', () => {
     // `build` wants a kind and `craft` wants a recipe, and by the canon-vocabulary law a word
     // a mind is never given is a word it never uses. Nothing in the prompt names one.
     const buildable = Object.keys(CFG.structures.recipes).sort()
@@ -317,6 +317,9 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     for (const noun of ['hut', 'bridge', 'grave', ...craftable, 'stew', 'torch']) {
       expect(everyProse).not.toMatch(new RegExp(`(build|craft|raise|shape|make)[^.]{0,40}${noun}`, 'i'))
     }
+    // R-H closed it, and neither of these two places is where: block 1 is byte-frozen and the
+    // perception is the day log. `makeablesLine` speaks it in block 6, once per turn.
+    expect(makeablesLine(makeables(CFG))).toContain('a hut (10 wood)')
   })
 })
 

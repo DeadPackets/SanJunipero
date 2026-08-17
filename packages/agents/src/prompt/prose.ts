@@ -1,5 +1,5 @@
-import { dayPhaseFromTick, DAYS_PER_SEASON, MINUTES_PER_DAY, type SimTime } from '@sj/shared'
-import { MYSTERIES } from '@sj/engine'
+import { dayPhaseFromTick, DAYS_PER_SEASON, inputName, MINUTES_PER_DAY, type SimTime } from '@sj/shared'
+import { MYSTERIES, type MakeableRoad, type Makeables } from '@sj/engine'
 
 // Local mirror of the engine's PerceptionPacket (composePerception) plus the
 // two self-state booleans the bridge reconciles in (asleep/collapsed). The
@@ -242,6 +242,40 @@ function claimPhrase(i: PerceptionItem): string {
   if (i.ownerName !== undefined) parts.push(`${i.ownerName}'s`)
   if (i.crafterMarkName !== undefined) parts.push(`marked by ${i.crafterMarkName}`)
   return parts.length === 0 ? '' : ` — ${parts.join(', ')}`
+}
+
+// What a thing costs, in the words a refusal already uses for it. `inputName` turns the two
+// canon classes into plain words; the singular is only ever needed by "vegetables".
+function costPhrase(inputs: Record<string, number>): string {
+  return Object.keys(inputs).sort().map((k) => {
+    const qty = inputs[k]!
+    const word = inputName(k)
+    return `${qty} ${qty === 1 ? word.replace(/s$/, '') : word}`
+  }).join(' and ')
+}
+
+function roadPhrase(r: MakeableRoad): string {
+  const conditions: string[] = []
+  if (r.atFire === true) conditions.push('at a fire someone is feeding')
+  if (r.water !== undefined) conditions.push('with water in something you carry')
+  return [costPhrase(r.inputs), ...conditions].join(', ')
+}
+
+// Block 6, not block 1: the static prefix is byte-frozen and prompt caching rides on it, so
+// the vocabulary a mind needs rides the same breath as what it can see (C11 R-H).
+export function makeablesLine(m: Makeables): string {
+  const parts: string[] = []
+  if (m.builds.length > 0) {
+    parts.push(`What your hands know how to raise, given the stuff and a spot to put it: ${
+      m.builds.map((b) => `a ${b.kind.replace(/_/g, ' ')} (${costPhrase(b.inputs)})`).join(', ')
+    }.`)
+  }
+  if (m.crafts.length > 0) {
+    parts.push(`What they know how to shape: ${
+      m.crafts.map((c) => `${c.name.replace(/_/g, ' ')} (${c.roads.map(roadPhrase).join(', or ')})`).join(', ')
+    }.`)
+  }
+  return parts.join(' ')
 }
 
 // Renders mechanics as fiction: body numbers become felt sentences, speech is

@@ -621,6 +621,23 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(dayLogB.length).toBeGreaterThan(dayLogA.length)
   })
 
+  it('the makeable vocabulary rides the volatile block and never the frozen prefix (C11 R-H)', async () => {
+    const { model, prompts } = capturingModel([BENIGN_TURN, BENIGN_TURN])
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 2, 100)
+
+    const [a, b] = [prompts[0]!, prompts[1]!]
+    // Last user message is block 6, `now`. It is the one place the words appear.
+    const nowA = a.filter((m) => m.role === 'user').at(-1)!.text
+    expect(nowA).toContain('a hut (10 wood)')
+    expect(nowA).toContain('stew (1 meat and 1 vegetable, at a fire someone is feeding')
+    expect(a.find((m) => m.role === 'system')!.text).not.toContain('a hut (10 wood)')
+    // And not in the day log, which is the day's events: a standing fact repeated every turn
+    // would compact the day out of the mind that lived it.
+    expect(runtime.dayLogSnapshot().join(' ')).not.toContain('a hut (10 wood)')
+    expect(b.filter((m) => m.role === 'user')[0]!.text).not.toContain('a hut (10 wood)')
+  })
+
   it('repairs an invalid generation with an assistant/user exchange instead of blind-retrying', async () => {
     const bad = { thought: 'I speak wrongly.', importance: 'very' }
     const good = { thought: 'Righted.', speech: 'All is well.', importance: 2 }

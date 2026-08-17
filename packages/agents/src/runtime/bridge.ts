@@ -3,6 +3,7 @@ import {
   FORAGEABLE_YIELD,
   isFoodKind,
   isPassable,
+  makeables,
   recipeTileKind,
   submitIntent,
   waterWithinReach,
@@ -12,7 +13,7 @@ import {
   type TickHandler,
   type TickLoop,
 } from '@sj/engine'
-import type { PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
+import type { Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
 import type { SimConfig, SimEvent } from '@sj/shared'
 import type { PerceptionPacket } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
@@ -189,6 +190,12 @@ export class EngineBridge {
 
   isEdible(kind: string): boolean {
     return isFoodKind(this.#simConfig, kind)
+  }
+
+  // The words `build` and `craft` accept. Handed over whole, because the tables behind them do
+  // not change inside a run and a mind that is never given a word never uses it (C11 R-H).
+  makeables(): Makeables {
+    return makeables(this.#simConfig)
   }
 
   // Water is terrain, and terrain is the one thing perception never projects: a body that
