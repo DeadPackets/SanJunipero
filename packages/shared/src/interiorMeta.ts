@@ -26,8 +26,10 @@ export const LibraryItemManifestSchema = z.object({
   version: z.literal('v1-library-item'),
   kind: z.string().min(1),
   category: z.enum(LIBRARY_CATEGORIES),
-  spritePx: z.number().int().min(16).max(24),
-  iconPx: z.union([z.literal(16), z.literal(24)]),
+  // The 24 px ceiling moved to the C-level bar (forge assetResolution.ts). The bound only
+  // widens, so the 24 px manifests already in the codex keep parsing beside 128 px art.
+  spritePx: z.number().int().min(16).max(256),
+  iconPx: z.number().int().min(16).max(128),
   interior: InteriorMetaSchema.optional(),
 }).strict()
 export type LibraryItemManifest = z.infer<typeof LibraryItemManifestSchema>

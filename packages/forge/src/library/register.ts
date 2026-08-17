@@ -41,7 +41,7 @@ export function registerLibraryEntry(codex: AssetCodex, e: LibraryEntry, args: {
 // Largest integer divisor that fits the sprite inside iconPx, then centred on a square
 // canvas. Nearest sampling means alpha and quantized colours survive untouched, and k=1
 // makes an already-small sprite a byte-for-byte no-op.
-export function deriveIcon(sprite: RawImage, iconPx: 16 | 24): RawImage {
+export function deriveIcon(sprite: RawImage, iconPx: number): RawImage {
   const long = Math.max(sprite.width, sprite.height)
   let k = 1
   while (Math.ceil(long / k) > iconPx) k++

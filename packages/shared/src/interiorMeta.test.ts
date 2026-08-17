@@ -50,9 +50,15 @@ describe('LibraryItemManifestSchema', () => {
     expect(LibraryItemManifestSchema.parse(axe).interior).toBeUndefined()
   })
 
-  it('rejects an off-grid icon size and an over-large sprite', () => {
-    expect(() => LibraryItemManifestSchema.parse({ ...MANIFEST, iconPx: 20 })).toThrow()
-    expect(() => LibraryItemManifestSchema.parse({ ...MANIFEST, spritePx: 32 })).toThrow()
+  it('takes C-level sizes beside the 24 px art already in the codex', () => {
+    expect(LibraryItemManifestSchema.parse({ ...MANIFEST, spritePx: 128, iconPx: 64 }).spritePx).toBe(128)
+    expect(LibraryItemManifestSchema.parse({ ...MANIFEST, spritePx: 24, iconPx: 24 }).spritePx).toBe(24)
+  })
+
+  it('rejects sizes off either end of the bound, and an unknown version', () => {
+    expect(() => LibraryItemManifestSchema.parse({ ...MANIFEST, iconPx: 8 })).toThrow()
+    expect(() => LibraryItemManifestSchema.parse({ ...MANIFEST, spritePx: 512 })).toThrow()
+    expect(() => LibraryItemManifestSchema.parse({ ...MANIFEST, spritePx: 24.5 })).toThrow()
     expect(() => LibraryItemManifestSchema.parse({ ...MANIFEST, version: 'v2-library-item' })).toThrow()
   })
 })

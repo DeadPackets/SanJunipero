@@ -29,13 +29,14 @@ describe('the library catalog', () => {
     expect(() => LibraryEntrySchema.parse({ ...axe, interior: chair.interior })).toThrow()
   })
 
-  // Controller icon ruling: 24 px for every class, not just furniture. At the same size as
-  // the sprite the icon is the same art, which is exactly the point — the 16 px cell was the
-  // weakest surface in the library and the only thing failing on seven otherwise clean items.
-  it('every icon is 24 px, sprite and icon alike', () => {
+  // The C-level bar: 128 px of sprite and a 64 px icon, both exact divisors of the 512
+  // generation. The old pair were 24 and 24, and 512/24 = 21.33.
+  it('every entry is authored at the C-level sizes', () => {
     for (const e of LIBRARY) {
-      expect(e.iconPx, e.kind).toBe(24)
-      expect(e.spritePx, e.kind).toBe(24)
+      expect(e.spritePx, e.kind).toBe(128)
+      expect(e.iconPx, e.kind).toBe(64)
+      expect(512 % e.spritePx, e.kind).toBe(0)
+      expect(512 % e.iconPx, e.kind).toBe(0)
     }
   })
 

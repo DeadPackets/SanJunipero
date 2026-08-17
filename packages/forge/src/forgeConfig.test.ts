@@ -11,7 +11,7 @@ describe('forge config', () => {
         enabled: true, model: 'google/gemini-3.7-flash', minScore: 7,
         maxRetries: 2, costCapPerAssetUsd: 0.05, rubricVersion: 'v1',
       },
-      library: { iconSizePx: 24, furnitureIconSizePx: 24 },
+      library: { iconSizePx: 64, furnitureIconSizePx: 64 },
       alignment: { feetTolerancePx: 2, baseFitToleranceQuarterTiles: 1 },
     })
   })

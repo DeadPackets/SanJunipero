@@ -5,8 +5,8 @@ export const LibraryEntrySchema = z.object({
   kind: z.string().min(1),
   category: z.enum(LIBRARY_CATEGORIES),
   desc: z.string().min(1),
-  spritePx: z.number().int().min(16).max(24),
-  iconPx: z.union([z.literal(16), z.literal(24)]),
+  spritePx: z.number().int().min(16).max(256),
+  iconPx: z.number().int().min(16).max(128),
   interior: InteriorMetaSchema.optional(),
 }).strict().refine(e => (e.category === 'furniture') === (e.interior !== undefined),
   { message: 'furniture entries require meta.interior; non-furniture entries must omit it' })
@@ -15,12 +15,10 @@ export type LibraryEntry = z.infer<typeof LibraryEntrySchema>
 export const LIBRARY_COUNTS: Record<LibraryCategory, number> =
   { tool: 10, food: 10, material: 9, ritual: 6, furniture: 15 }
 
-// Every world sprite is drawn at 24 px: measured against paid candidates, a 16 px cell
-// loses the object (a pail's handle and staves dissolve).
-export const WORLD_SPRITE_PX = 24
-// Controller icon ruling: every icon is 24 px too. At 16 px a needle and a fishing rod have
-// no reading at all, and 7 of the 20 batch-B blocks were a clean sprite failing only its icon.
-export const ICON_PX = 24
+// The C-level bar owns both numbers now. 24 px was never a divisor of the 512 generation
+// (512/24 = 21.33), so every sprite in the library came off a fractional downscale.
+export { WORLD_SPRITE_PX, ICON_PX } from '../assetResolution.js'
+import { WORLD_SPRITE_PX, ICON_PX } from '../assetResolution.js'
 
 const tool = (kind: string, desc: string): LibraryEntry =>
   ({ kind, category: 'tool', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX })
