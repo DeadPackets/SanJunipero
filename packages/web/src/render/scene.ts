@@ -121,6 +121,8 @@ export type Scene = {
   app: Application
   world: Container
   entities: Container
+  /** above the entities and never hit-tested: place names and other reading aids */
+  overlay: Container
   rebakeGround(terrain: TileId[][], records?: AssetRecord[]): void
   centerOn(x: number, y: number): void
   setZoom(z: 1 | 2 | 3 | 4): void
@@ -166,9 +168,15 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const entities = new Container()
   entities.sortableChildren = true
 
+  // A label is a reading aid, not a thing in the world: it draws over everything and takes no
+  // pointer, so it can never steal a click from the building it names.
+  const overlay = new Container()
+  overlay.eventMode = 'none'
+
   const groundSprite = new Sprite()
   world.addChild(groundSprite)
   world.addChild(entities)
+  world.addChild(overlay)
   app.stage.addChild(world)
 
   const tileCbs: Array<(t: { x: number; y: number }) => void> = []
@@ -321,6 +329,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     app,
     world,
     entities,
+    overlay,
     rebakeGround,
     centerOn,
     setZoom,
