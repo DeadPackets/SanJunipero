@@ -250,8 +250,13 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const app = new Application()
   await app.init(rendererOptions(rootEl, globalThis.devicePixelRatio))
   rootEl.appendChild(app.canvas)
-  // resizeTo only tracks window resizes; panel open/close changes the root element itself
-  const ro = new ResizeObserver(() => app.resize())
+  // resizeTo only tracks window resizes; a panel opening, or the control bar moving to
+  // another edge (task 78), changes the root element itself — and a stage that got smaller
+  // can leave the camera showing outside the world, so the clamp runs with it.
+  const ro = new ResizeObserver(() => {
+    app.resize()
+    place(world.position.x, world.position.y)
+  })
   ro.observe(rootEl)
 
   const world = new Container()

@@ -306,7 +306,88 @@ body {
 .stage-row { display: flex; flex: 1; min-height: 0; }
 #stage-root {
   flex: 1; min-width: 0; background: var(--night);
-  display: grid; grid-template-rows: 1fr auto; min-height: 0;
+  display: grid; grid-template-rows: 1fr auto; grid-template-columns: 1fr; min-height: 0;
+}
+/* WHERE THE CONTROLS SIT (Task 78). Slot-based, so a viewer can put the bar out of the way
+   without being able to lose it: four edges plus put-away, and the dock handle is never
+   itself dockable. */
+#stage-root[data-dock-controls="top"] { grid-template-rows: auto 1fr; }
+#stage-root[data-dock-controls="top"] .stage-cell { grid-row: 2; }
+#stage-root[data-dock-controls="top"] .control-bar { grid-row: 1; border-top: 0; border-bottom: 2px solid var(--ink); box-shadow: 0 4px 0 0 var(--deep); }
+#stage-root[data-dock-controls="left"],
+#stage-root[data-dock-controls="right"] { grid-template-rows: 1fr; grid-template-columns: auto 1fr; }
+#stage-root[data-dock-controls="left"] .stage-cell,
+#stage-root[data-dock-controls="right"] .stage-cell { grid-row: 1; grid-column: 2; }
+#stage-root[data-dock-controls="right"] { grid-template-columns: 1fr auto; }
+#stage-root[data-dock-controls="right"] .stage-cell { grid-column: 1; }
+#stage-root[data-dock-controls="left"] .control-bar,
+#stage-root[data-dock-controls="right"] .control-bar {
+  grid-row: 1; grid-column: 1;
+  flex-direction: column; align-items: stretch;
+  min-height: 0; max-width: 12rem;
+  overflow-x: hidden; overflow-y: auto;
+  border-top: 0; border-right: 2px solid var(--ink); box-shadow: 4px 0 0 0 var(--deep);
+}
+#stage-root[data-dock-controls="right"] .control-bar {
+  grid-column: 2;
+  border-right: 0; border-left: 2px solid var(--ink); box-shadow: -4px 0 0 0 var(--deep);
+}
+#stage-root[data-dock-controls="left"] .ctl-group,
+#stage-root[data-dock-controls="right"] .ctl-group { flex-direction: column; }
+#stage-root[data-dock-controls="left"] .ctl-group + .ctl-group,
+#stage-root[data-dock-controls="right"] .ctl-group + .ctl-group {
+  padding-left: 0; padding-top: 0.6rem; border-left: 0; border-top: 2px solid var(--sand);
+}
+#stage-root[data-dock-controls="left"] .ctl-btn,
+#stage-root[data-dock-controls="right"] .ctl-btn { flex-direction: row; justify-content: flex-start; gap: 0.4rem; }
+
+/* ── the dock: the way back, whatever is put away ── */
+.hud-dock {
+  position: absolute; right: 0; bottom: 0; z-index: 40;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem;
+}
+.hud-handle {
+  width: 44px; height: 44px; padding: 0;
+  display: grid; place-items: center;
+  background: var(--cream); color: var(--ink);
+  border: 2px solid var(--ink); border-radius: 0; cursor: pointer;
+  box-shadow: -2px -2px 0 0 var(--deep);
+}
+.hud-handle:hover { background: var(--honey); }
+.hud-handle:focus-visible { outline: 2px solid var(--ember); outline-offset: -4px; }
+/* the grip is drawn, never a character: three bars the width of the peek */
+.hud-grip {
+  display: block; width: 18px; height: var(--hud-peek);
+  background: repeating-linear-gradient(180deg, var(--ink) 0 2px, transparent 2px 4px);
+}
+.hud-menu {
+  display: grid; gap: 0.4rem;
+  max-width: min(30rem, calc(100vw - 2rem)); max-height: 60vh; overflow: auto;
+  padding: 0.6rem;
+  background: var(--cream) var(--grain);
+  border: 2px solid var(--ink); box-shadow: var(--ledge);
+}
+.hud-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.hud-row-wide { justify-content: flex-end; }
+.hud-row-name {
+  flex: none; width: 9.5rem;
+  font-family: var(--font-body); font-size: 0.875rem; color: var(--ink);
+}
+.hud-slots { display: flex; gap: 0.2rem; flex-wrap: wrap; }
+.hud-slot {
+  min-height: 44px; padding: 0 0.5rem;
+  font-family: var(--font-px); font-size: 0.75rem; color: var(--ink);
+  background: var(--parchment); border: 2px solid var(--ink); border-radius: 0; cursor: pointer;
+  box-shadow: 2px 2px 0 0 var(--deep);
+}
+.hud-slot:hover { background: var(--honey); }
+.hud-slot[aria-pressed="true"] { background: var(--honey); box-shadow: inset 0 0 0 2px var(--cream), 2px 2px 0 0 var(--deep); }
+.hud-slot:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .hud-menu { animation: rise-in var(--t-med) var(--ease-enter); }
+  .hud-handle, .hud-slot {
+    transition-property: background-color; transition-duration: var(--t-fast);
+  }
 }
 /* everything that floats over the town scopes to THIS, so the bar is never covered */
 .stage-cell { grid-row: 1; position: relative; min-height: 0; overflow: hidden; }

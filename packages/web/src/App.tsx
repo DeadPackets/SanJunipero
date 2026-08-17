@@ -19,6 +19,10 @@ import { InteriorBar } from './ui/InteriorBar.js'
 import { LensTabs, StatusStrip } from './ui/StatusStrip.js'
 import { ControlBar } from './ui/ControlBarView.js'
 import { controlItems, type ControlAction } from './ui/controlBar.js'
+import { HudDock } from './ui/HudDock.js'
+import {
+  DEFAULT_HUD, HUD_TOGGLE_KEY, hudReducer, hudToggle, loadHud, saveHud, type HudEv,
+} from './ui/hudLayout.js'
 import { stepZoom } from './render/cameraNav.js'
 import type { ZoomStop } from './render/camera.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
@@ -69,7 +73,24 @@ export function App() {
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStorage))
   // what the bottom bar reads: the camera's own stop, and whether the chrome is put away
   const [zoomStop, setZoomStop] = useState<ZoomStop>(1)
-  const [hudHidden, setHudHidden] = useState(false)
+  // WHERE THE CHROME SITS. Slot-based, persisted per viewer, and never able to hide its own
+  // way back — HudDock is not itself a Dockable.
+  const [hud, setHud] = useState(() => {
+    try { return loadHud(localStorage) } catch { return DEFAULT_HUD }
+  })
+  const [dockOpen, setDockOpen] = useState(false)
+  // the key handler is registered once; it reads the layout through a ref rather than
+  // re-registering on every dock change
+  const hudRef = useRef(hud)
+  hudRef.current = hud
+  const hudHidden = hud.controlBar === 'hidden'
+  const applyHud = (ev: HudEv): void => {
+    setHud((prev) => {
+      const next = hudReducer(prev, ev)
+      try { saveHud(localStorage, next) } catch { /* private mode */ }
+      return next
+    })
+  }
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -167,13 +188,13 @@ export function App() {
   // from anywhere, so hiding is never a trap. Task 78 adds the pointer's way back.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'h' && e.key !== 'H') return
+      if (e.key.toLowerCase() !== HUD_TOGGLE_KEY) return
       if (e.altKey || e.ctrlKey || e.metaKey) return
       const t = e.target as HTMLElement | null
       if (t !== null && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
       if (t?.isContentEditable === true) return
       e.preventDefault()
-      setHudHidden((v) => !v)
+      applyHud(hudToggle(hudRef.current))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -195,7 +216,7 @@ export function App() {
       case 'live': sockRef.current?.goLive(); return
       case 'follow': scene?.setFollow(null); return
       case 'exit-interior': scene?.interior?.setActive(null); return
-      case 'hud': setHudHidden(a.op === 'hide'); return
+      case 'hud': applyHud({ kind: a.op === 'hide' ? 'hide-all' : 'show-all' }); return
     }
   }
 
@@ -234,9 +255,13 @@ export function App() {
         )}
         <TickBadge store={store} />
       </header>
-      <StatusStrip store={store} />
+      {hud.statusStrip !== 'hidden' && <StatusStrip store={store} />}
       <div className="stage-row">
-        <main id="stage-root" className={route.lens === 'society' ? 'stage-hidden' : undefined}>
+        <main
+          id="stage-root"
+          data-dock-controls={hud.controlBar}
+          className={route.lens === 'society' ? 'stage-hidden' : undefined}
+        >
           <div className="stage-cell">
           <StageMount store={store} onScene={setScene} onInterior={setInsideId} />
           <StageVeil store={store} />
@@ -246,8 +271,10 @@ export function App() {
             onBack={() => scene?.interior?.setActive(null)}
           />
           <ScrubBanner store={store} />
-          <FpsOverlay />
-          {route.lens === 'chronicle' && <Timeline store={store} handle={handle} onView={onView} />}
+          {hud.fps !== 'hidden' && <FpsOverlay />}
+          {route.lens === 'chronicle' && hud.timeline !== 'hidden' && (
+            <Timeline store={store} handle={handle} onView={onView} />
+          )}
           {route.lens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
           {(televised || directorLeaving) && (
             <DirectorMode store={store} scene={scene} leaving={!televised} />
@@ -256,6 +283,12 @@ export function App() {
             <MomentsLens store={store} handle={handle} momentId={route.momentId} onOpen={openMoment} />
           )}
           </div>
+          <HudDock
+            layout={hud}
+            open={dockOpen}
+            onEvent={(ev) => { applyHud(ev); if (ev.kind !== 'dock') setDockOpen(false) }}
+            onOpen={setDockOpen}
+          />
           {!hudHidden && (
             <ControlBar
               items={controlItems({
