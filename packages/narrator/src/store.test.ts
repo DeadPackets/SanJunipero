@@ -66,7 +66,10 @@ describe('NarratorStore', () => {
 
   it('milestones: kinds round-trip and duplicate kind throws', () => {
     const { store } = memStore()
-    const m: Milestone = { kind: 'first_trade', label: 'the first trade', eventSeq: 9, day: 0, tick: 100 }
+    const m: Milestone = {
+      kind: 'first_trade', tier: 1, domain: 'engine', label: 'the first trade',
+      eventSeq: 9, day: 0, tick: 100, agentIds: ['omar'],
+    }
     store.insertMilestone(m)
     expect(store.milestoneKinds()).toEqual(new Set(['first_trade']))
     expect(store.milestones()).toEqual([m])

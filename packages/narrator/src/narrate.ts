@@ -1,6 +1,8 @@
-import { MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
+import { MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
+import type { WorldState } from '@sj/engine'
 import { renderChapter, renderEra } from './chronicle.js'
 import { detectFirsts } from './firsts.js'
+import { detectTier2 } from './milestones/tier2.js'
 import { scoreHeat } from './heat.js'
 import { detectInstitutions } from './institutions.js'
 import { segmentScenes } from './segment.js'
@@ -65,6 +67,9 @@ export async function narrateDay(deps: {
   segmentCfg?: SegmentConfig
   detectCfg?: DetectConfig
   alert?: (d: string) => void
+  // Tier 2 reads relationships, so it runs only where a world is in reach. Absent, the day
+  // gets its engine firsts and nothing is claimed about anybody's partnership.
+  world?: { config: SimConfig; state?: WorldState }
 }): Promise<{ chapter: ChapterRow; heat: HeatScores[]; milestones: Milestone[] }> {
   const { store, events } = deps
   if (events.length === 0) throw new Error('narrateDay requires at least one event')
@@ -80,7 +85,16 @@ export async function narrateDay(deps: {
   }
 
   const scenes = segmentScenes(events, deps.segmentCfg)
-  const milestones = detectFirsts(events, { seenKinds: store.milestoneKinds(), rulebookCount: deps.rulebookCount })
+  const seenKinds = store.milestoneKinds()
+  const tier1 = detectFirsts(events, { seenKinds, rulebookCount: deps.rulebookCount })
+  const tier2 = deps.world === undefined
+    ? []
+    : detectTier2(events, {
+        seenKinds: new Set([...seenKinds, ...tier1.map((m) => m.kind)]),
+        config: deps.world.config,
+        state: deps.world.state,
+      })
+  const milestones = [...tier1, ...tier2]
   const privateThoughts = deps.privateCounts.thoughts + deps.privateCounts.journals
 
   // F3 ruling (novelty priors): priors count each type's occurrences in EARLIER

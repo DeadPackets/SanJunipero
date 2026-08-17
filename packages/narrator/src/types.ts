@@ -1,3 +1,5 @@
+import type { QuotedName } from '@sj/agents'
+import type { SimEvent } from '@sj/shared'
 export type SceneSegment = {
   day: number
   startTick: number
@@ -23,8 +25,44 @@ export type HeatCtx = {
   publicSpeech: number
 }
 
-export type Milestone = { kind: string; label: string; eventSeq: number; day: number; tick: number }
-export type FirstCtx = { seenKinds: Set<string>; rulebookCount: number }
+// Tiers: 1 engine firsts, 2 pattern firsts, 2.5 semantic firsts, 3 reserved. Stored as TEXT
+// so 2.5 is representable (POST-REVIEW USER RULING 3).
+export type MilestoneTier = 1 | 2 | 2.5 | 3
+
+export type MilestoneRow = {
+  kind: string
+  tier: MilestoneTier
+  domain: string
+  label: string
+  eventSeq: number
+  day: number
+  tick: number
+  agentIds: string[]
+  constructId?: string
+  // Present only when the town named the thing itself, kept verbatim (G9).
+  nameProvenance?: QuotedName
+}
+// One registry, one type: C7's ledger grew columns, it did not gain a rival.
+export type Milestone = MilestoneRow
+
+export type FirstCtx = {
+  seenKinds: Set<string>
+  rulebookCount: number
+  // What kind of thing a completed structure is. Injected, because a hut may have been
+  // planned on a day this pass never sees; the detector falls back to its own stream.
+  structureKind?: (id: string) => string | undefined
+  // Souls alive as the pass runs. The detector counts spawns, births and deaths onto it.
+  population?: number
+}
+
+export type MilestoneDef = {
+  kind: string
+  label: string
+  tier: MilestoneTier
+  domain: string
+  match(ev: SimEvent, ctx: FirstCtx): boolean
+  agentIds?(ev: SimEvent): string[]
+}
 
 export type Institution = {
   kind: 'group' | 'rule' | 'role'

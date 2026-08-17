@@ -91,8 +91,14 @@ export class NarratorStore {
 
   insertMilestone(m: Milestone): void {
     this.db
-      .prepare('INSERT INTO milestones (kind, label, event_seq, day, tick) VALUES (?, ?, ?, ?, ?)')
-      .run(m.kind, m.label, m.eventSeq, m.day, m.tick)
+      .prepare(
+        `INSERT INTO milestones (kind, label, event_seq, day, tick, tier, domain, agent_ids, construct_id, name_provenance)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        m.kind, m.label, m.eventSeq, m.day, m.tick, String(m.tier), m.domain, arr(m.agentIds),
+        m.constructId ?? null, m.nameProvenance === undefined ? null : JSON.stringify(m.nameProvenance),
+      )
   }
 
   milestoneKinds(): Set<string> {
@@ -102,9 +108,28 @@ export class NarratorStore {
 
   milestones(): Milestone[] {
     const rows = this.db
-      .prepare('SELECT kind, label, event_seq, day, tick FROM milestones ORDER BY id')
-      .all() as Array<{ kind: string; label: string; event_seq: number; day: number; tick: number }>
-    return rows.map((r) => ({ kind: r.kind, label: r.label, eventSeq: r.event_seq, day: r.day, tick: r.tick }))
+      .prepare(
+        `SELECT kind, label, event_seq, day, tick, tier, domain, agent_ids, construct_id, name_provenance
+         FROM milestones ORDER BY id`,
+      )
+      .all() as Array<{
+      kind: string; label: string; event_seq: number; day: number; tick: number
+      tier: string; domain: string; agent_ids: string; construct_id: string | null; name_provenance: string | null
+    }>
+    return rows.map((r) => ({
+      kind: r.kind,
+      tier: Number(r.tier) as Milestone['tier'],
+      domain: r.domain,
+      label: r.label,
+      eventSeq: r.event_seq,
+      day: r.day,
+      tick: r.tick,
+      agentIds: parseArr<string>(r.agent_ids),
+      ...(r.construct_id === null ? {} : { constructId: r.construct_id }),
+      ...(r.name_provenance === null
+        ? {}
+        : { nameProvenance: JSON.parse(r.name_provenance) as Milestone['nameProvenance'] }),
+    }))
   }
 
   insertInstitution(i: Institution): number {

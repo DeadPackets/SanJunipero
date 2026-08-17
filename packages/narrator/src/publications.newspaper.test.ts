@@ -17,8 +17,8 @@ const scenes: SceneSegment[] = [
   { day: 1, startTick: 1520, endTick: 1521, eventIds: [4, 5], cast: ['nadia'], location: null },
 ]
 const milestones: Milestone[] = [
-  { kind: 'first_speech', label: 'the first word spoken', eventSeq: 1, day: 1, tick: 1480 },
-  { kind: 'first_trade', label: 'the first trade', eventSeq: 9, day: 2, tick: 2900 },
+  { kind: 'first_speech', tier: 1, domain: 'engine', label: 'the first word spoken', eventSeq: 1, day: 1, tick: 1480, agentIds: ['omar'] },
+  { kind: 'first_trade', tier: 1, domain: 'engine', label: 'the first trade', eventSeq: 9, day: 2, tick: 2900, agentIds: ['yusuf'] },
 ]
 
 describe('renderNewspaper', () => {

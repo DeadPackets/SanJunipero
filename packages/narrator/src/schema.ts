@@ -44,8 +44,21 @@ CREATE TABLE IF NOT EXISTS publications (
   rendered_at TEXT NOT NULL DEFAULT (datetime('now')));
 `
 
+// C11 widens C7's ledger rather than standing a rival one beside it: every existing row is a
+// tier-1 engine first, which is exactly what the defaults say. Idempotent — the columns are
+// added only where they are missing, so a second run is a no-op.
+const MILESTONE_COLUMNS: ReadonlyArray<{ name: string; ddl: string }> = [
+  { name: 'tier', ddl: "ALTER TABLE milestones ADD COLUMN tier TEXT NOT NULL DEFAULT '1'" },
+  { name: 'domain', ddl: "ALTER TABLE milestones ADD COLUMN domain TEXT NOT NULL DEFAULT 'engine'" },
+  { name: 'agent_ids', ddl: "ALTER TABLE milestones ADD COLUMN agent_ids TEXT NOT NULL DEFAULT '[]'" },
+  { name: 'construct_id', ddl: 'ALTER TABLE milestones ADD COLUMN construct_id TEXT' },
+  { name: 'name_provenance', ddl: 'ALTER TABLE milestones ADD COLUMN name_provenance TEXT' },
+]
+
 export function migrateNarratorTables(db: Database.Database): void {
   db.exec(DDL)
+  const have = new Set((db.prepare('PRAGMA table_info(milestones)').all() as Array<{ name: string }>).map((c) => c.name))
+  for (const col of MILESTONE_COLUMNS) if (!have.has(col.name)) db.exec(col.ddl)
 }
 
 // Not engine openDb: that would create events/snapshots/rng_state — world tables
