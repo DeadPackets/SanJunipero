@@ -1148,27 +1148,45 @@ const pave: VerbDef = makeVerb({
   skill: { track: 'masonry', xp: 1 },
 })
 
-// A sapling is not timber yet. Clearing one costs the swing and yields nothing at all —
-// which is the whole of it: taking land back from the wood is a real act with a real price.
+// A sapling is not timber yet. Clearing one costs the swing and yields nothing at all; felling
+// a grown tree costs an hour's work and hands over the wood the town has otherwise only ever
+// been given. Either way the ground goes back to grass, where the next seed can fall — which
+// is what makes the regrowth cycle a cycle and not an ornament.
 const SAPLING_TILE: TileId = 9
-const CLEAR_TICKS = 4
+const FOREST_TILE: TileId = 3
+export const CLEAR_TICKS = 4
+export const FELL_TICKS = 30
+export const TIMBER_PER_TREE = 2
 
 const chop: VerbDef = makeVerb({
   kind: 'chop',
-  duration: () => CLEAR_TICKS,
+  duration(state, _config, _agentId, params) {
+    const p = TileParams.parse(params)
+    return tileAt(state, p.x, p.y) === FOREST_TILE ? FELL_TICKS : CLEAR_TICKS
+  },
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
     if (!p.success) return 'chop needs a tile {x, y}'
-    if (tileAt(state, p.data.x, p.data.y) !== SAPLING_TILE) return 'there is no sapling there'
+    const tile = tileAt(state, p.data.x, p.data.y)
+    if (tile !== SAPLING_TILE && tile !== FOREST_TILE) return 'there is nothing standing there to cut'
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to cut'
     return null
   },
-  onComplete(state, _config, agentId, params) {
+  onComplete(state, config, agentId, params) {
     const p = TileParams.parse(params)
-    if (tileAt(state, p.x, p.y) !== SAPLING_TILE) return []
-    return [{
+    const tile = tileAt(state, p.x, p.y)
+    if (tile !== SAPLING_TILE && tile !== FOREST_TILE) return []
+    const cleared: PendingEvent = {
       type: 'tile_changed',
-      payload: { x: p.x, y: p.y, from: SAPLING_TILE, to: 0, reason: 'cleared', byId: agentId },
+      payload: { x: p.x, y: p.y, from: tile, to: 0, reason: 'cleared', byId: agentId },
+    }
+    if (tile === SAPLING_TILE) return [cleared]
+    return [cleared, {
+      type: 'item_spawned',
+      payload: {
+        id: mintId(state, 'item'), kind: FUEL_KIND, qty: TIMBER_PER_TREE,
+        loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId),
+      },
     }]
   },
   skill: { track: 'farming', xp: 1 },

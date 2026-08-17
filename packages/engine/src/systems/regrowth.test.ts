@@ -5,7 +5,7 @@ import { submitIntent } from '../intent.js'
 import { stepCostAt, isPassable } from '../path.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
-import { VERBS } from '../verbs.js'
+import { CLEAR_TICKS, FELL_TICKS, TIMBER_PER_TREE, VERBS } from '../verbs.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { saplingKey } from './regrowth.js'
 
@@ -125,13 +125,15 @@ describe('a sapling is ground you can walk on and ground you can clear', () => {
     expect(after.terrain[1]![2]).toBe(0)
   })
 
-  it('refuses standing timber and open ground alike: only a sapling is a sapling', () => {
+  it('refuses bare ground: a swing needs something standing in front of it', () => {
     const s = sapling()
-    for (const [x, y] of [[2, 2], [3, 0]]) {
-      const r = submitIntent(s, CFG, 'a1', 'chop', { x, y })
-      expect([x, y, r.ok]).toEqual([x, y, false])
-      if (!r.ok) expect(r.reason).toBe('there is no sapling there')
-    }
+    const r = submitIntent(s, CFG, 'a1', 'chop', { x: 3, y: 0 })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('there is nothing standing there to cut')
+    // The tree two tiles off is a legal target and still out of arm's reach.
+    const far = submitIntent(s, CFG, 'a1', 'chop', { x: 2, y: 2 })
+    expect(far.ok).toBe(false)
+    if (!far.ok) expect(far.reason).toBe('not close enough to cut')
   })
 
   it('clearing a sapling takes its stamp with it, so the ground forgets it was ever planted', () => {
@@ -139,6 +141,57 @@ describe('a sapling is ground you can walk on and ground you can clear', () => {
     expect(s.saplings?.[saplingKey(2, 1)]).toBe(1)
     s = fold(s, ev('tile_changed', { x: 2, y: 1, from: 9, to: 0, reason: 'cleared', byId: 'a1' }, s.tick), SURE)
     expect(s.saplings?.[saplingKey(2, 1)]).toBeUndefined()
+  })
+})
+
+describe('the wood loop: felling is the consumer the regrowth cycle was missing', () => {
+  function stand(config = CFG, trees: Array<[number, number]> = [[2, 2]]): WorldState {
+    const t = Array.from({ length: 6 }, () => Array.from({ length: 6 }, (): TileId => 0))
+    for (const [x, y] of trees) t[y]![x] = 3
+    const s = { ...genesisState(config, t), tick: 720 }
+    return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 1, ageDays: 7300 }, 720), config)
+  }
+
+  it('a tree costs a long swing and hands over timber the town can build with', () => {
+    const s = stand()
+    const r = submitIntent(s, CFG, 'a1', 'chop', { x: 2, y: 2 })
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      const started = r.events.find((e) => e.type === 'action_started')!.payload as { duration: number }
+      expect(started.duration).toBe(FELL_TICKS)
+    }
+    expect(FELL_TICKS).toBeGreaterThan(CLEAR_TICKS)
+
+    const out = VERBS.chop!.onComplete(s, CFG, 'a1', { x: 2, y: 2 }, new RngStreams('c').get('actions'))
+    expect(out[0]).toEqual({
+      type: 'tile_changed', payload: { x: 2, y: 2, from: 3, to: 0, reason: 'cleared', byId: 'a1' },
+    })
+    const timber = out.find((e) => e.type === 'item_spawned')!.payload as Record<string, unknown>
+    expect(timber['kind']).toBe('wood')
+    expect(timber['qty']).toBe(TIMBER_PER_TREE)
+    expect(timber['loc']).toEqual({ t: 'agent', id: 'a1' })
+  })
+
+  it('the stump is grass, and grass beside a wood is where the next sapling comes up', () => {
+    let s = stand(SURE, [[2, 2], [3, 2]])
+    const out = VERBS.chop!.onComplete(s, SURE, 'a1', { x: 2, y: 2 }, new RngStreams('c').get('actions'))
+    for (const e of out) s = fold(s, ev(e.type, e.payload, s.tick), SURE)
+    expect(s.terrain[2]![2]).toBe(0)
+    const seeds = seeded(tickOnce({ ...s, tick: midnightOf(1) }, SURE))
+    expect(seeds.some((p) => p.x === 2 && p.y === 2)).toBe(true)
+  })
+
+  it('a sapling is still a sapling: four ticks, and nothing to carry away', () => {
+    const s = stand(CFG, [])
+    const young = fold(s, ev('tile_changed', { x: 2, y: 2, from: 0, to: 9, reason: 'seeded' }, s.tick), CFG)
+    const r = submitIntent(young, CFG, 'a1', 'chop', { x: 2, y: 2 })
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      const started = r.events.find((e) => e.type === 'action_started')!.payload as { duration: number }
+      expect(started.duration).toBe(CLEAR_TICKS)
+    }
+    const out = VERBS.chop!.onComplete(young, CFG, 'a1', { x: 2, y: 2 }, new RngStreams('c').get('actions'))
+    expect(out.some((e) => e.type === 'item_spawned')).toBe(false)
   })
 })
 
