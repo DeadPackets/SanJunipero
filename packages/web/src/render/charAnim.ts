@@ -13,12 +13,12 @@ export const BOB_PX = 1 // passing frames render 1px lower — render-time only,
 export const CHAR_TARGET_PX = 52 // ≈1.6 tiles of 32px; art height 64 in cell → scale 52/64
 export const WALK_FRAME_MS_V4 = 180 // v4 ruling: F1-F2-F1-F3 cadence at 180ms/frame
 
-// Click target: wider than the ~52px sprite and taller than its ~64px art, so a
-// character is easy to hit. Local sprite coords, feet at (0,0), body rising upward.
+// The click target BEFORE U9: a 52×72 rectangle around a figure drawn 26×52, i.e. 2.77× the
+// silhouette's area. hitShapes.ts replaced it with a measured capsule; these two constants
+// stay because they are the before-state the gate cites.
 export const HIT_AREA_W = 52
 export const HIT_AREA_H = 72
-// hitArea lives in LOCAL sprite space and Pixi scales it with the sprite, so the
-// local rect must be inflated by 1/scale to keep the click target 52×72 SCREEN px.
+/** @deprecated superseded by hitShapes.bodyHitPolygon (U9). Kept for the landed C10 tests. */
 export function hitRect(scale: number): { x: number; y: number; w: number; h: number } {
   return { x: -HIT_AREA_W / 2 / scale, y: -HIT_AREA_H / scale, w: HIT_AREA_W / scale, h: HIT_AREA_H / scale }
 }

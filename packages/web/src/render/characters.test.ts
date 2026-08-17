@@ -85,6 +85,12 @@ vi.mock('pixi.js', () => {
       public height = 0,
     ) {}
   }
+  class Polygon {
+    points: number[]
+    constructor(points: number[] = []) {
+      this.points = points
+    }
+  }
   class Texture {
     static EMPTY: Texture
     source: unknown
@@ -97,7 +103,7 @@ vi.mock('pixi.js', () => {
   }
   Texture.EMPTY = new Texture()
   const Assets = { add: vi.fn(), load: vi.fn(() => new Promise(() => {})) }
-  return { Assets, BitmapText, Cache, Container, Graphics, Point, Rectangle, Sprite, Text, Texture }
+  return { Assets, BitmapText, Cache, Container, Graphics, Point, Polygon, Rectangle, Sprite, Text, Texture }
 })
 
 import { Container as MockContainer, Sprite as MockSprite } from 'pixi.js'
@@ -143,6 +149,7 @@ function makeScene(): Scene & { sortDepth: () => void } {
     app: { renderer: { generateTexture: () => ({ destroy: () => {} }) } },
     layers,
     entities: layers.entities,
+    getZoom: () => 1,
     addDepthSource: (fn: () => Array<{ box: { id: string }; node: unknown }>) => {
       sources.add(fn)
       return () => sources.delete(fn)
@@ -223,15 +230,17 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     ])
   })
 
-  it('hit area compensates for sprite scale so the click target is 52×72 screen px', () => {
+  it('hit area is the measured capsule, in screen px, whatever the sheet resolution', () => {
     layer.tick(1000)
     const sprite = layer.getSprite('nadia') as unknown as InstanceType<typeof MockSprite>
-    const hit = sprite.hitArea as unknown as { x: number; y: number; width: number; height: number }
-    const scale = sprite.scale as unknown as { x: number; y: number }
-    expect(hit.width * scale.x).toBeCloseTo(52, 9)
-    expect(hit.height * scale.y).toBeCloseTo(72, 9)
-    expect(hit.x * scale.x).toBeCloseTo(-26, 9)
-    expect(hit.y * scale.y).toBeCloseTo(-72, 9)
+    const hit = sprite.hitArea as unknown as { points: number[] }
+    const scale = (sprite.scale as unknown as { x: number }).x
+    const screen = hit.points.map((v) => v * scale)
+    const xs = screen.filter((_, i) => i % 2 === 0), ys = screen.filter((_, i) => i % 2 === 1)
+    // U9: 28 wide at the shoulders and 48.9 tall, NOT the old 52 × 72 box
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(28, 9)
+    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(0.94 * 52, 9)
+    expect(Math.max(...ys)).toBeCloseTo(0, 9)   // feet at the origin
   })
 
   it('companion objects are event-inert so they never swallow the sprite hit', () => {

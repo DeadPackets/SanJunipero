@@ -1,4 +1,4 @@
-import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
+import { Container, Graphics, Polygon, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
@@ -6,11 +6,12 @@ import { bodyDepthBox, type DepthBox } from './depth.js'
 import { facingFrom, tileToScreen, type Facing } from './iso.js'
 import type { DepthEntry } from './layers.js'
 import type { Scene } from './scene.js'
+import { HIT_MIN_PX, bodyHitPolygon, inflateToMin } from './hitShapes.js'
 import { characterArt, smoothSource, type TextureBook } from './textures.js'
 import { WORLD_FONT_FAMILY, createWorldLabel, type WorldLabel } from './worldLabel.js'
 import {
   CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, NAME_TAG_ABOVE_HEAD_PX,
-  SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4, charPose, emoteFor, hitRect, interpolatePos,
+  SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4, charPose, emoteFor, interpolatePos,
   legFacing, nameTagText, prunePath, type Waypoint,
 } from './charAnim.js'
 
@@ -33,7 +34,9 @@ type CharEntry = {
   nameTag: Container
   nameTagBg: Graphics
   nameTagLabel: WorldLabel
-  hit: Rectangle
+  hit: Polygon
+  /** the sheet's own figure height, so the capsule follows the art rather than a second table */
+  figureH: number
   hitScale: number
   emoteUntil: number
   facing: Facing
@@ -153,16 +156,29 @@ export function createCharacterLayer(
   const shadowTexture = scene.app.renderer.generateTexture(shadowG)
   shadowG.destroy()
 
-  // one Rectangle per entry, mutated in place whenever the applied sprite scale
-  // changes, so the click target stays 52×72 screen px at any sheet resolution
-  const setHitScale = (e: CharEntry, scale: number): void => {
-    if (e.hitScale === scale) return
+  // ONE Polygon per entry, its points rewritten in place whenever the applied sprite scale
+  // moves. U9: the landed 52×72 rectangle was 2.77× the drawn silhouette's area — it claimed
+  // the sky where the name tag sits and reached far enough sideways to steal a neighbour's
+  // door. The capsule is 0.93×, and it is inflated only when the figure would otherwise be
+  // under HIT_MIN_PX on screen.
+  let hitZoom = 1
+  const setHitScale = (e: CharEntry, scale: number, figureH: number): void => {
+    if (e.hitScale === scale && e.figureH === figureH) return
     e.hitScale = scale
-    const r = hitRect(scale)
-    e.hit.x = r.x
-    e.hit.y = r.y
-    e.hit.width = r.w
-    e.hit.height = r.h
+    e.figureH = figureH
+    e.hit.points = inflateToMin(bodyHitPolygon(figureH, scale), HIT_MIN_PX, scale * hitZoom)
+  }
+  // The inflation floor is a SCREEN size, so a zoom change re-cuts every capsule. Cheap: it
+  // fires on a camera stop, not on a frame.
+  const recutOnZoom = (): void => {
+    const zoom = scene.getZoom?.() ?? 1
+    if (zoom === hitZoom) return
+    hitZoom = zoom
+    for (const e of entries.values()) {
+      const scale = e.hitScale, figureH = e.figureH
+      e.hitScale = 0
+      setHitScale(e, scale, figureH)
+    }
   }
 
   const ensure = (agentId: string, x: number, y: number): CharEntry => {
@@ -173,7 +189,7 @@ export function createCharacterLayer(
     sprite.scale.set(CHAR_TARGET_PX / 64)
     sprite.eventMode = 'static'
     sprite.cursor = 'pointer'
-    const hit = new Rectangle()
+    const hit = new Polygon(bodyHitPolygon(64, CHAR_TARGET_PX / 64))
     sprite.hitArea = hit
     sprite.on('pointertap', () => onSelect(agentId))
     const shadow = new Sprite(shadowTexture)
@@ -202,10 +218,11 @@ export function createCharacterLayer(
     scene.layers.worldText.addChild(emote, nameTag)
     const now = performance.now()
     e = {
-      sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, hitScale: 0, emoteUntil: 0, facing: 'sw',
+      sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, figureH: 0, hitScale: 0,
+      emoteUntil: 0, facing: 'sw',
       path: [{ x, y, atMs: now }], lastMoveArrival: now, box: bodyDepthBox(agentId, x, y),
     }
-    setHitScale(e, CHAR_TARGET_PX / 64)
+    setHitScale(e, CHAR_TARGET_PX / 64, 64)
     entries.set(agentId, e)
     loadSheet(agentId, null)
     return e
@@ -241,6 +258,7 @@ export function createCharacterLayer(
   })
 
   const tick = (nowMs: number): void => {
+    recutOnZoom()
     const state = store.getState()
     if (state === null) return
     // hot swap: new codex records re-resolve every character's art in place
@@ -282,13 +300,13 @@ export function createCharacterLayer(
             e.sprite.texture = t
             e.sprite.anchor.set(cell.feetX / cell.w, cell.feetY / cell.h) // feet-anchor law
             e.sprite.scale.set(CHAR_TARGET_PX / sheet.art.manifest!.figureH) // smooth downscale to world footprint
-            setHitScale(e, CHAR_TARGET_PX / sheet.art.manifest!.figureH)
+            setHitScale(e, CHAR_TARGET_PX / sheet.art.manifest!.figureH, sheet.art.manifest!.figureH)
           }
         } else {
           e.sprite.texture = sliceV2(sheet.texture, pose.row, pose.facing)
           e.sprite.anchor.set(0.5, FEET_Y / CELL)
           e.sprite.scale.set(CHAR_TARGET_PX / 64)
-          setHitScale(e, CHAR_TARGET_PX / 64)
+          setHitScale(e, CHAR_TARGET_PX / 64, 64)
         }
       }
       const { sx, sy } = tileToScreen(pos.x, pos.y)
