@@ -99,6 +99,10 @@
   --panel: #F6E8D5; /* legacy alias */
   --sand: #E8D5BC;
   --ink: #43394A;
+  /* De-emphasis is a colour, never `opacity` — a transparency's ratio is unknowable at the
+     call site, and that habit produced four of the six AA failures in the audit. Ink lifted
+     toward the warm greys: 6.57:1 on cream, 5.83:1 on parchment, 4.91:1 on sand. */
+  --ink-quiet: #5F5568;
   --deep: #241F2B;
   --night: #322B38;
   --honey: #F2C879;
@@ -241,7 +245,7 @@ body {
   transition-duration: var(--t-med);
 }
 .tick-badge.past { background: var(--sage); color: var(--deep); }
-.tick-badge.waking { color: var(--deep); opacity: 0.8; }
+.tick-badge.waking { color: var(--ink-quiet); }
 
 /* link trouble is the only time the chrome raises its voice */
 .link-pill {
@@ -292,9 +296,9 @@ body {
   width: 2px; height: 12px; flex: none;
   background: repeating-linear-gradient(180deg, var(--stone) 0 2px, transparent 2px 4px);
 }
-.strip-weather { text-transform: uppercase; opacity: 0.85; }
+.strip-weather { text-transform: uppercase; color: var(--ink-quiet); }
 .strip-people { margin-left: auto; }
-.strip-gone { margin-left: 0.4rem; opacity: 0.7; }
+.strip-gone { margin-left: 0.4rem; color: var(--ink-quiet); }
 
 .stage-row { display: flex; flex: 1; min-height: 0; }
 #stage-root { flex: 1; min-width: 0; background: var(--night); position: relative; }
@@ -312,7 +316,7 @@ body {
   padding: 0.15rem 0.3rem;
   font-family: var(--font-px); font-size: 0.78rem;
 }
-.fps-overlay .fps-avg { font-size: 0.75rem; opacity: 0.75; }
+.fps-overlay .fps-avg { font-size: 0.75rem; color: var(--ink-quiet); }
 
 /* ── camera controls: the town's viewfinder ── */
 .camera-hud {
@@ -329,12 +333,12 @@ body {
   color: var(--ink); font-family: var(--font-px); font-size: 0.95rem; line-height: 1;
   min-width: 40px; min-height: 40px; cursor: pointer;
   box-shadow: 2px 2px 0 0 var(--deep);
-  transition-property: background-color, translate, box-shadow, opacity;
+  transition-property: background-color, translate, box-shadow, color;
   transition-duration: var(--t-fast); transition-timing-function: var(--ease-enter);
 }
 .cam-btn:hover:not(:disabled) { background: var(--honey); translate: 0 -2px; box-shadow: 2px 4px 0 0 var(--deep); }
 .cam-btn:active:not(:disabled) { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
-.cam-btn:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+.cam-btn:disabled { color: var(--ink-quiet); background: var(--sand); cursor: default; box-shadow: none; }
 .cam-btn.center { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0.5rem; }
 .cam-zoom {
   min-width: 2.1rem; text-align: center;
@@ -390,7 +394,7 @@ body {
 .block h3 {
   margin: 0 0 0.35rem; font-size: 0.75rem;
   font-family: var(--font-px); text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--deep); opacity: 0.85;
+  color: var(--ink-quiet);
 }
 .block h3::after {
   content: ''; display: block; margin-top: 2px; height: 2px; width: 2.2rem;
@@ -399,7 +403,7 @@ body {
 .block ul { margin: 0; padding-left: 1.1rem; }
 .block p { margin: 0.25rem 0; text-wrap: pretty; }
 
-.thought-line { font-style: italic; color: var(--deep); opacity: 0.85; margin: 0; }
+.thought-line { font-style: italic; color: var(--ink-quiet); margin: 0; }
 
 .need-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.25rem 0; }
 .need-label { width: 4.5rem; font-size: 0.875rem; font-weight: 500; }
@@ -419,7 +423,7 @@ body {
 
 .tab-body .doc { white-space: pre-wrap; margin: 0.35rem 0; }
 .tab-body .stamp {
-  font-size: 0.75rem; opacity: 0.75; font-variant-numeric: tabular-nums;
+  font-size: 0.75rem; color: var(--ink-quiet); font-variant-numeric: tabular-nums;
   font-family: ui-monospace, 'SF Mono', monospace;
 }
 .tab-body article h4 { margin: 0.5rem 0 0.1rem; font-size: 0.875rem; font-variant: small-caps; letter-spacing: 0.08em; }
@@ -460,7 +464,7 @@ body {
     33% { background: var(--ink); }
   }
 }
-.veil-sub { font-size: 0.875rem; font-style: italic; opacity: 0.75; }
+.veil-sub { font-size: 0.875rem; font-style: italic; color: var(--ink-quiet); }
 
 /* ── chronicle lens: feed + timeline + scrub banner (Task 17) ── */
 .chronicle-panel { padding: 1rem; font-size: 0.875rem; }
@@ -471,7 +475,7 @@ body {
 }
 .feed-line:nth-child(odd) { background: rgba(232, 213, 188, 0.35); }
 .feed-line .stamp {
-  flex: none; width: 6.2rem; font-size: 0.75rem; opacity: 0.75;
+  flex: none; width: 6.2rem; font-size: 0.75rem; color: var(--ink-quiet);
   font-family: ui-monospace, 'SF Mono', monospace; font-variant-numeric: tabular-nums;
 }
 .feed-text { text-wrap: pretty; }
@@ -479,7 +483,7 @@ body {
 .feed-line.done .feed-text::before { content: '■ '; color: var(--honey); }
 .feed-line.fire .feed-text { color: #9E3B2B; font-weight: 600; }
 .feed-line.weather .feed-text { color: #3E6786; }
-.feed-empty { opacity: 0.75; font-style: italic; text-wrap: pretty; }
+.feed-empty { color: var(--ink-quiet); font-style: italic; text-wrap: pretty; }
 
 /* ── the curated chronicle: what mattered, and the way back to it ── */
 .feed-switch { display: flex; gap: 0.3rem; margin-top: 0.6rem; }
@@ -631,7 +635,7 @@ body {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .interior-who {
-  font-family: var(--font-body); font-size: 0.875rem; color: var(--ink); opacity: 0.8;
+  font-family: var(--font-body); font-size: 0.875rem; color: var(--ink-quiet);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-wrap: pretty;
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -668,14 +672,14 @@ body {
   border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
   color: var(--ink); font-family: var(--font-px); font-size: 0.75rem; text-transform: uppercase;
   padding: 0.25rem 0.5rem; min-height: 40px; cursor: pointer;
-  transition-property: opacity, background-color, translate; transition-duration: var(--t-fast);
+  transition-property: color, background-color, translate; transition-duration: var(--t-fast);
 }
 .legend-chip:hover { translate: 0 -2px; }
 .legend-chip:active { translate: 0 1px; }
-.legend-chip.off { opacity: 0.45; background: var(--sand); }
+.legend-chip.off { color: var(--ink-quiet); background: var(--sand); }
 .legend-swatch { width: 10px; height: 10px; border-radius: 0; box-shadow: 0 0 0 2px var(--ink); }
 .legend-stamp {
-  font-size: 0.75rem; opacity: 0.75; margin-left: 0.3rem;
+  font-size: 0.75rem; color: var(--ink-quiet); margin-left: 0.3rem;
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 .society-empty {
@@ -720,14 +724,14 @@ body {
 .bond-bar { height: 10px; margin-top: 0.7rem; background: var(--sand); border: 2px solid var(--ink); }
 .bond-bar-fill { display: block; height: 100%; }
 .bond-count {
-  margin: 0.3rem 0 0; font-size: 0.75rem; opacity: 0.8;
+  margin: 0.3rem 0 0; font-size: 0.75rem; color: var(--ink-quiet);
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 .bond-dates {
   display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.6rem;
   margin: 0.6rem 0 0; font-size: 0.75rem;
 }
-.bond-dates dt { font-family: var(--font-px); font-size: 0.75rem; align-self: center; opacity: 0.8; }
+.bond-dates dt { font-family: var(--font-px); font-size: 0.75rem; align-self: center; color: var(--ink-quiet); }
 .bond-dates dd { margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 .bond-history { list-style: none; margin: 0.7rem 0 0; padding: 0; }
 .bond-history li {
@@ -735,7 +739,7 @@ body {
   padding: 0.3rem 0; border-top: 1px solid var(--sand);
 }
 .bond-history .stamp {
-  flex: none; width: 6.2rem; font-size: 0.75rem; opacity: 0.75;
+  flex: none; width: 6.2rem; font-size: 0.75rem; color: var(--ink-quiet);
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
 
@@ -778,11 +782,11 @@ body {
 .thumb-motif { flex: none; display: block; }
 .thumb-body { display: grid; gap: 0.05rem; min-width: 0; }
 .thumb-day {
-  font-family: var(--font-px); font-size: 0.75rem; opacity: 0.8;
+  font-family: var(--font-px); font-size: 0.75rem; color: var(--ink-quiet);
   font-variant-numeric: tabular-nums;
 }
 .thumb-title { font-size: 0.875rem; font-weight: 600; text-wrap: balance; }
-.thumb-cast, .thumb-where { font-size: 0.75rem; opacity: 0.8; overflow-wrap: anywhere; }
+.thumb-cast, .thumb-where { font-size: 0.75rem; color: var(--ink-quiet); overflow-wrap: anywhere; }
 .thumb-where { font-style: italic; }
 
 .moment-player {
@@ -883,7 +887,7 @@ body {
 }
 .moment-link:hover { translate: 0 -2px; box-shadow: 2px 4px 0 0 var(--deep); }
 .moment-link:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
-.digest-footer { font-style: italic; opacity: 0.75; margin: 1rem 0 0.6rem; }
+.digest-footer { font-style: italic; color: var(--ink-quiet); margin: 1rem 0 0.6rem; }
 .digest-close {
   border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
   font-family: var(--font-px); text-transform: uppercase; font-size: 0.75rem;
@@ -946,14 +950,14 @@ body {
   display: inline-block;
 }
 .roster-empty em { display: block; margin-top: 0.35rem; opacity: 0.75; }
-.roster-gone { margin-top: 0.8rem; font-style: italic; opacity: 0.75; }
+.roster-gone { margin-top: 0.8rem; font-style: italic; color: var(--ink-quiet); }
 
 /* ── World Laws: the town's rulebook, and the operator's hand on it ── */
 .laws-panel, .laws-dashboard { padding: 1rem; min-width: 21rem; font-size: 0.875rem; }
 @media (prefers-reduced-motion: no-preference) {
   .laws-panel { animation: panel-in var(--t-med) var(--ease-enter); }
 }
-.laws-lede { margin: 0 0 0.8rem; font-style: italic; opacity: 0.8; }
+.laws-lede { margin: 0 0 0.8rem; font-style: italic; color: var(--ink-quiet); }
 .laws-list, .laws-edit-list { list-style: none; margin: 0; padding: 0; }
 .law-row, .law-edit {
   display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 0.5rem;
@@ -964,13 +968,13 @@ body {
 .law-value { font-family: var(--font-px); font-size: 0.75rem; }
 .law-history {
   grid-column: 1 / -1; margin: 0.3rem 0 0; padding-left: 1.1rem;
-  font-size: 0.875rem; opacity: 0.8;
+  font-size: 0.875rem; color: var(--ink-quiet);
 }
 .law-edit select, .law-edit input {
   font: inherit; padding: 0.15rem 0.35rem; min-height: 40px;
   background: var(--cream); border: 2px solid var(--ink); border-radius: 0;
 }
-.law-edit select:disabled, .law-edit input:disabled { opacity: 0.5; cursor: not-allowed; }
+.law-edit select:disabled, .law-edit input:disabled { color: var(--ink-quiet); cursor: not-allowed; }
 .laws-notice {
   color: var(--cream); background-color: var(--deep);
   border: 10px solid transparent; border-image: var(--px-night);

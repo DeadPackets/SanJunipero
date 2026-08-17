@@ -26,12 +26,14 @@ export function tokens(css: string): Record<string, string> {
   return out
 }
 
-/** The declaration body of the first rule whose selector list contains `selector` exactly. */
+/** Every declaration the sheet applies to `selector`, in cascade order. */
 export function ruleBody(css: string, selector: string): string {
+  const hits: string[] = []
   for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    if ((sel ?? '').split(',').some((s) => s.trim() === selector)) return body ?? ''
+    if ((sel ?? '').split(',').some((s) => s.trim() === selector)) hits.push(body ?? '')
   }
-  throw new Error(`no rule for ${selector}`)
+  if (hits.length === 0) throw new Error(`no rule for ${selector}`)
+  return hits.join(';')
 }
 
 const T = tokens(CSS)
@@ -67,5 +69,51 @@ describe('B3 — the timeline day labels are on the slab they sit on', () => {
 
   it('does not thin its own colour back down with opacity', () => {
     expect(body).not.toMatch(/opacity:/)
+  })
+})
+
+// ── --ink-quiet: de-emphasis as a chosen colour, not as a transparency ───────────────
+// Partial C12 Task 54. Four AA failures and all six near-misses in the audit came from one
+// habit: reducing contrast with `opacity`, whose ratio is unknowable at authoring time.
+// These are the ink-on-paper sites. Cream text on the night surfaces (.subtitle.thought,
+// .roster-empty em) keeps its opacity — a second token for that surface is C12's.
+const QUIET_SITES = [
+  '.tick-badge.waking', '.strip-weather', '.strip-gone', '.fps-overlay .fps-avg',
+  '.cam-btn:disabled', '.block h3', '.thought-line', '.tab-body .stamp', '.veil-sub',
+  '.feed-line .stamp', '.feed-empty', '.interior-who', '.legend-chip.off', '.legend-stamp',
+  '.bond-count', '.bond-dates dt', '.bond-history .stamp', '.thumb-day', '.thumb-cast',
+  '.digest-footer', '.roster-gone', '.laws-lede', '.law-history', '.law-edit input:disabled',
+]
+
+/** Every paper the chrome paints quiet text on. */
+const PAPERS = ['cream', 'parchment', 'sand'] as const
+
+describe('--ink-quiet — the de-emphasis token', () => {
+  it('exists as a colour in the palette', () => {
+    expect(T['ink-quiet']).toMatch(/^#[0-9A-Fa-f]{6}$/)
+  })
+
+  it('clears AA on every paper the chrome uses', () => {
+    for (const paper of PAPERS) {
+      expect(contrast(T['ink-quiet']!, T[paper]!), `ink-quiet on ${paper}`).toBeGreaterThanOrEqual(AA)
+    }
+  })
+
+  it('is genuinely quieter than ink, or it is not de-emphasis', () => {
+    for (const paper of PAPERS) {
+      expect(contrast(T['ink-quiet']!, T[paper]!)).toBeLessThan(contrast(T['ink']!, T[paper]!))
+    }
+  })
+})
+
+describe('the opacity habit, at every ink-on-paper site it produced', () => {
+  it.each(QUIET_SITES)('%s states its colour instead of thinning it', (selector) => {
+    const body = ruleBody(CSS, selector)
+    expect(body, `${selector} still de-emphasises with opacity`).not.toMatch(/opacity:/)
+    const colour = /color:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    expect(colour, `${selector} sets no colour token`).toBeDefined()
+    for (const paper of PAPERS) {
+      expect(contrast(T[colour!]!, T[paper]!), `${selector} on ${paper}`).toBeGreaterThanOrEqual(AA)
+    }
   })
 })
