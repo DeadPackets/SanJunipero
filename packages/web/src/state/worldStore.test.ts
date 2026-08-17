@@ -86,13 +86,31 @@ describe('worldStore', () => {
     const seen: SimEvent[][] = []
     store.onEvents(evts => seen.push(evts))
     const events: SimEvent[] = Array.from({ length: 401 }, (_, i) => ({
-      seq: 2 + i, tick: 2, type: 'agent_moved', payload: { id: 'walker', x: 1, y: 1 },
+      seq: 2 + i, tick: 2, type: 'agent_spoke', payload: { agentId: 'walker', text: 'hm', x: 0, y: 0 },
     }) as SimEvent)
     store.applyServer({ t: 'tick', tick: 2, events })
     expect(seen).toHaveLength(1)
     expect(seen[0]).toHaveLength(401)
     expect(store.recentEvents()).toHaveLength(400)
     expect(store.recentEvents()[0]!.seq).toBe(3)
+  })
+
+  // M1: the ring was ~95% need_changed, so the Chronicle badge counted 400 while the panel
+  // it labels could render none of them. The ring now holds only what the chronicle narrates.
+  it('keeps only narratable events in the ring, while every event still folds and fans out', () => {
+    const store = createWorldStore()
+    store.applyServer(makeSnapshot())
+    const seen: SimEvent[][] = []
+    store.onEvents(evts => seen.push(evts))
+    const noise: SimEvent[] = Array.from({ length: 20 }, (_, i) => ({
+      seq: 10 + i, tick: 3, type: 'need_changed', payload: { id: 'walker', need: 'hunger', delta: -1 },
+    }) as SimEvent)
+    const spoke = { seq: 40, tick: 3, type: 'agent_spoke', payload: { agentId: 'walker', text: 'hm', x: 0, y: 0 } } as SimEvent
+    const advanced = { seq: 41, tick: 3, type: 'tick_advanced', payload: {} } as SimEvent
+    store.applyServer({ t: 'tick', tick: 3, events: [advanced, ...noise, spoke] })
+
+    expect(seen[0]).toHaveLength(22)                       // the raw delta is untouched
+    expect(store.recentEvents().map(e => e.type)).toEqual(['agent_spoke'])
   })
 
   it('subscribe notifies on every server message and unsubscribes cleanly', () => {

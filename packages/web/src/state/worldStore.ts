@@ -1,8 +1,10 @@
 import { SimConfigSchema, type AssetRecord, type ServerMsg, type SimConfig, type SimEvent } from '@sj/shared'
 import { fold } from '@sj/engine/fold'
 import type { WorldState } from '@sj/engine/state'
+import { isNarratable } from '../ui/chronicleFormat.js'
 
 export const THOUGHT_LOG_CAP = 200
+/** Narratable events only — see the filter in `applyServer`. */
 export const RECENT_EVENTS_CAP = 400
 
 export type ViewMode = { live: true } | { live: false; tick: number }
@@ -76,7 +78,11 @@ export function createWorldStore(): WorldStore {
               laws = { ...laws, [p.path]: p.value }
               lawChanges.push({ tick: ev.tick, path: p.path, value: p.value })
             }
-            events.push(...msg.events)
+            // Only what the chronicle can narrate. The ring was ~95% `need_changed`, so the
+            // lens badge counted four hundred entries the panel it labels could not render,
+            // and a death scrolled out of the ring behind a wall of hunger ticks. Every event
+            // still folds into state above and still reaches `onEvents` below.
+            for (const ev of msg.events) if (isNarratable(ev)) events.push(ev)
             if (events.length > RECENT_EVENTS_CAP) events.splice(0, events.length - RECENT_EVENTS_CAP)
             for (const fn of eventSubs) fn(msg.events)
           }

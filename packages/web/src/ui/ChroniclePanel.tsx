@@ -95,8 +95,14 @@ export function ImportantFeedView({ entries, viewTick, onJump }: {
   )
 }
 
-export function EverythingFeedView({ lines }: { lines: Array<{ key: number; tick: number; kind: string; text: string }> }) {
-  if (lines.length === 0) return <p className="feed-empty">{EMPTY_COPY.chronicle}</p>
+export function EverythingFeedView({ lines, tick = 0 }: {
+  lines: Array<{ key: number; tick: number; kind: string; text: string }>
+  tick?: number
+}) {
+  if (lines.length === 0) {
+    const copy = tickToMoment(tick).day >= 1 ? EMPTY_COPY.chronicleQuiet : EMPTY_COPY.chronicle
+    return <p className="feed-empty">{copy}</p>
+  }
   return (
     <ol className="feed" aria-live="polite">
       {lines.map((l) => (
@@ -169,7 +175,7 @@ export function ChroniclePanel({ store, handle, onView }: {
             onJump={jump}
           />
         ) : (
-          <EverythingFeedView lines={lines} />
+          <EverythingFeedView lines={lines} tick={store.getTick()} />
         )}
       </div>
     </div>

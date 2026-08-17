@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
-import { describeEvent } from './chronicleFormat.js'
+import { describeEvent, isNarratable } from './chronicleFormat.js'
 
 function fixtureState(): WorldState {
   const s = genesisState(DEFAULT_CONFIG)
@@ -52,5 +52,31 @@ describe('describeEvent', () => {
     expect(describeEvent(ev('agent_moved', { id: 'farmer', x: 1, y: 2 }), state)).toBeNull()
     expect(describeEvent(ev('action_completed', { agentId: 'farmer', verb: 'fish' }), state)).toBeNull()
     expect(describeEvent(ev('some_future_event', { anything: 1 }), state)).toBeNull()
+  })
+})
+
+describe('isNarratable — the predicate the recent-event ring is filtered by (M1)', () => {
+  it('keeps what the chronicle can put into words', () => {
+    expect(isNarratable(ev('agent_spoke', { agentId: 'farmer', text: 'hm' }))).toBe(true)
+    expect(isNarratable(ev('agent_died', { agentId: 'farmer', cause: 'hunger' }))).toBe(true)
+    expect(isNarratable(ev('structure_completed', { id: 's1' }))).toBe(true)
+  })
+
+  it('drops the plumbing that filled the ring and left the panel empty', () => {
+    expect(isNarratable(ev('need_changed', { agentId: 'farmer', need: 'hunger', value: 79 }))).toBe(false)
+    expect(isNarratable(ev('tick_advanced', {}))).toBe(false)
+    expect(isNarratable(ev('agent_moved', { id: 'farmer', x: 1, y: 2 }))).toBe(false)
+  })
+
+  it('agrees with describeEvent whatever the world state is', () => {
+    const state = fixtureState()
+    for (const e of [
+      ev('agent_spoke', { agentId: 'farmer', text: 'hm' }),
+      ev('need_changed', { agentId: 'farmer', need: 'hunger', value: 79 }),
+      ev('action_completed', { agentId: 'farmer', verb: 'give' }),
+      ev('action_completed', { agentId: 'farmer', verb: 'fish' }),
+    ]) {
+      expect(isNarratable(e)).toBe(describeEvent(e, state) !== null)
+    }
   })
 })

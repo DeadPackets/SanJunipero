@@ -61,6 +61,18 @@ describe('EverythingFeedView', () => {
     expect(html).toContain('aria-live="polite"')
     expect(render(createElement(EverythingFeedView, { lines: [] }))).toContain(EMPTY_COPY.chronicle)
   })
+
+  // M1: the live feed only holds what arrived since the viewer joined. On a town that is
+  // days old, "day one is still unwritten" is a lie about the world, not about the feed.
+  it('does not blame day one on a town that is past it', () => {
+    const html = render(createElement(EverythingFeedView, { lines: [], tick: 4000 }))
+    expect(html).not.toContain(EMPTY_COPY.chronicle)
+    expect(html).toContain(EMPTY_COPY.chronicleQuiet)
+  })
+
+  it('still says day one is unwritten on a town that is actually on day one', () => {
+    expect(render(createElement(EverythingFeedView, { lines: [], tick: 12 }))).toContain(EMPTY_COPY.chronicle)
+  })
 })
 
 describe('ChronicleViewTabs', () => {

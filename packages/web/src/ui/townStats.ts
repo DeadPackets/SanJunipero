@@ -44,6 +44,9 @@ export const EMPTY_COPY = {
   roster: 'No one walks the town yet — the first footsteps are still to come.',
   rosterSub: 'The founders arrive at dawn.',
   chronicle: 'Day one is still unwritten. The town’s ledger fills as the townsfolk live it.',
+  // The live feed holds what has arrived since you joined. On a town that is days old, saying
+  // day one is unwritten is a lie about the world rather than a description of the feed.
+  chronicleQuiet: 'Nothing has happened since you arrived. The whole record is under “What mattered”.',
   bonds: 'No bonds recorded yet — watch long enough and the town will braid its own ties.',
   moments: 'Nothing worth replaying yet — the first recorded day is still ahead.',
 } as const
