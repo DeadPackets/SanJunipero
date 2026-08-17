@@ -47,8 +47,8 @@ import { makeReflectionLlm } from '../src/reflection.js'
 import { MIND_MODEL } from '../src/llm/pins.js'
 import type { IdentityCore } from '../src/prompt/assemble.js'
 import {
-  G11ReportSchema, checkG11Report, chronicleViolations, classifyVerb, median, survivalTax,
-  type G11Discretion, type G11Report,
+  FullNeedTally, G11ReportSchema, checkG11Report, chronicleViolations, classifyVerb, median,
+  survivalTax, type G11Discretion, type G11Report,
 } from '../src/live/g11report.js'
 import { preflightRefusal, runPreflight } from '../src/live/providerPreflight.js'
 
@@ -508,7 +508,8 @@ async function main(): Promise<void> {
 
   // --- the run ---
   const spendProjections: Array<{ tick: number; usdPerSimDay: number }> = []
-  const fullNeedSamples = new Map<string, number>()
+  const FULL_NEED_SAMPLE_TICKS = 10
+  const fullNeed = new FullNeedTally(FULL_NEED_SAMPLE_TICKS)
   let lastDayClosed = Math.floor(START_TICK / MINUTES_PER_DAY)
   let tripwireHit = false
   const totalSpend = (): number => qInt(db, 'SELECT COALESCE(SUM(cost_usd), 0) FROM llm_calls')
@@ -529,7 +530,8 @@ async function main(): Promise<void> {
       console.log(`[g11] tick ${loop.tick}: operator sets desirePaths.wearThreshold = ${WEAR_THRESHOLD}`)
     }
 
-    if (loop.tick % 10 === 0) {
+    if (loop.tick % FULL_NEED_SAMPLE_TICKS === 0) {
+      const sampleDay = Math.floor(loop.tick / MINUTES_PER_DAY)
       for (const id of Object.keys(loop.state.agents)) {
         const a = loop.state.agents[id]!
         if (!a.alive) continue
@@ -537,7 +539,7 @@ async function main(): Promise<void> {
         const full = a.needs.hunger >= floor && a.needs.energy >= floor
           && a.needs.warmth >= floor && a.needs.social >= floor && thirstOf(a) >= floor
           && (a.afflictions?.length ?? 0) === 0
-        if (full) fullNeedSamples.set(id, (fullNeedSamples.get(id) ?? 0) + 1)
+        if (full) fullNeed.sample(id, sampleDay)
       }
     }
 
@@ -763,7 +765,7 @@ async function main(): Promise<void> {
         agentId: m.id, day, turns: mine.length, ...bucket,
         mealsEaten: completed.filter((e) => payloadOf(e).agentId === m.id
           && payloadOf(e).verb === 'eat' && Math.floor(e.tick / MINUTES_PER_DAY) === day).length,
-        fullNeedTicks: (fullNeedSamples.get(m.id) ?? 0) * 10,
+        fullNeedTicks: fullNeed.ticksOn(m.id, day),
       })
     }
   }
@@ -953,7 +955,7 @@ async function main(): Promise<void> {
       clothedSurviveLadder: clothedSurvive,
       discretion,
       mealsNeededPerMindPerDay: Number(mealsNeeded.toFixed(3)),
-      fullNeedMoments: [...fullNeedSamples.values()].reduce((a, b) => a + b, 0) * 10,
+      fullNeedMoments: fullNeed.totalTicks(),
       socialSurvivalActs: {
         tends: allEvents.filter((e) => e.type === 'agent_tended' && payloadOf(e).tenderId !== undefined).length,
         gives: completed.filter((e) => payloadOf(e).verb === 'give').length,

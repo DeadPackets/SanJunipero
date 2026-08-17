@@ -243,6 +243,28 @@ export const G11ReportSchema = z.object({
 }).strict()
 export type G11Report = z.infer<typeof G11ReportSchema>
 
+// Moments a body had nothing wrong with it, kept per mind AND per sim-day. It was kept per
+// mind for the whole run, so every row of the per-mind-per-sim-day table carried the same
+// number and none of them was a per-day figure (C11 batch 12's reporting flaw).
+export class FullNeedTally {
+  readonly #counts = new Map<string, number>()
+
+  constructor(private readonly ticksPerSample: number) {}
+
+  sample(agentId: string, day: number): void {
+    const key = `${agentId}:${day}`
+    this.#counts.set(key, (this.#counts.get(key) ?? 0) + 1)
+  }
+
+  ticksOn(agentId: string, day: number): number {
+    return (this.#counts.get(`${agentId}:${day}`) ?? 0) * this.ticksPerSample
+  }
+
+  totalTicks(): number {
+    return [...this.#counts.values()].reduce((a, b) => a + b, 0) * this.ticksPerSample
+  }
+}
+
 export const median = (xs: readonly number[]): number => {
   if (xs.length === 0) return 0
   const s = [...xs].sort((a, b) => a - b)

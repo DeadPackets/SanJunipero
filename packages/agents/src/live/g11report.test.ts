@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CHRONICLE_BANNED, G11ReportSchema, G11_MIN_SIM_DAYS, checkG11Report, chronicleViolations,
-  classifyVerb, g11GatePassed, median, survivalTax, type G11Report,
+  CHRONICLE_BANNED, FullNeedTally, G11ReportSchema, G11_MIN_SIM_DAYS, checkG11Report,
+  chronicleViolations, classifyVerb, g11GatePassed, median, survivalTax, type G11Report,
 } from './g11report.js'
 
 // Offline, $0: the checker is proved against a recorded fixture before a single live call is
@@ -278,5 +278,37 @@ describe('the gate criteria', () => {
     })
     expect(survivalTax(grim.evidence.discretion)).toBe(1)
     expect(failing(grim)).not.toContain('F.discretionary-time-reported')
+  })
+})
+
+describe('FullNeedTally', () => {
+  // The batch-12 reporting flaw: every row of the per-mind-per-sim-day table carried the same
+  // number, because the tally was kept per mind for the whole run. A window that opened on
+  // day three is not a window that was open all week.
+  const tally = (): FullNeedTally => {
+    const t = new FullNeedTally(10)
+    for (let i = 0; i < 5; i++) t.sample('amara', 0)
+    for (let i = 0; i < 12; i++) t.sample('amara', 1)
+    for (let i = 0; i < 3; i++) t.sample('yusuf', 1)
+    return t
+  }
+
+  it('reports a per-day figure, not the run total repeated', () => {
+    const t = tally()
+    expect(t.ticksOn('amara', 0)).toBe(50)
+    expect(t.ticksOn('amara', 1)).toBe(120)
+    expect(t.ticksOn('amara', 0)).not.toBe(t.totalTicks())
+  })
+
+  it('keeps the minds apart on the same day', () => {
+    expect(tally().ticksOn('yusuf', 1)).toBe(30)
+  })
+
+  it('is zero for a mind-day with no full-need moment in it', () => {
+    expect(tally().ticksOn('yusuf', 0)).toBe(0)
+  })
+
+  it('still totals the whole run, which is what the run-level figure reports', () => {
+    expect(tally().totalTicks()).toBe(200)
   })
 })
