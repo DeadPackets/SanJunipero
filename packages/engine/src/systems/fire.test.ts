@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { EventEnvelope, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { genesisState, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
@@ -201,5 +201,56 @@ describe('verb: extinguish', () => {
     expect(t1.state.structures.structure_1!.burning).toBe(false)
     const t2 = tickOnce(t1.state, CFG)
     expect(t2.events.map((e) => e.type)).not.toContain('structure_damaged')
+  })
+})
+
+describe('verb: douse', () => {
+  function withBucket(s: WorldState, charges: number, config = CFG): WorldState {
+    return fold(s, ev('item_spawned', {
+      id: 'item_1', kind: 'bucket', qty: 1, loc: { t: 'agent', id: 'a1' }, charges,
+    }, s.tick), config)
+  }
+  function burning(charges: number | null): WorldState {
+    const s = ignite(atTick(rowWorld(), 1), 'structure_1')
+    return charges === null ? s : withBucket(s, charges)
+  }
+
+  it('a full bucket against a burning wall puts it out and comes back empty', () => {
+    let s = burning(1)
+    const r = submitIntent(s, CFG, 'a1', 'douse', { x: 2, y: 2 })
+    if (!r.ok) throw new Error(r.reason)
+    for (const e of r.events) s = fold(s, ev(e.type, e.payload, s.tick), CFG)
+    const t = tickOnce(s, CFG)
+    expect(t.events).toContainEqual({
+      type: 'fire_extinguished',
+      payload: { structureId: 'structure_1', cause: 'doused', x: 2, y: 2, agentId: 'a1' },
+    })
+    expect(t.events).toContainEqual({ type: 'item_filled', payload: { itemId: 'item_1', charges: 0 } })
+    expect(t.state.structures.structure_1!.burning).toBe(false)
+    expect(t.state.items.item_1!.charges).toBe(0)
+  })
+
+  it('refuses an empty bucket, no bucket at all, unburnt ground, and a fire two tiles off', () => {
+    const empty = submitIntent(burning(0), CFG, 'a1', 'douse', { x: 2, y: 2 })
+    expect(empty.ok).toBe(false)
+    if (!empty.ok) expect(empty.reason).toBe('the bucket is empty')
+    expect(submitIntent(burning(null), CFG, 'a1', 'douse', { x: 2, y: 2 }).ok).toBe(false)
+    expect(submitIntent(burning(1), CFG, 'a1', 'douse', { x: 4, y: 2 }).ok).toBe(false) // structure_2 is not alight
+    const away = burning(1)
+    const stepped = { ...away, agents: { a1: { ...away.agents.a1!, x: 0, y: 0 } } }
+    expect(submitIntent(stepped, CFG, 'a1', 'douse', { x: 2, y: 2 }).ok).toBe(false)
+  })
+
+  it('a recorded C9 dousing still folds, and the widened payload survives the envelope', () => {
+    const s = ignite(atTick(rowWorld(), 1), 'structure_1')
+    const old = fold(s, ev('fire_extinguished', { structureId: 'structure_1', cause: 'rain' }, s.tick), CFG)
+    expect(old.structures.structure_1!.burning).toBe(false)
+    const wide = { structureId: 'structure_1', cause: 'doused', x: 2, y: 2, agentId: 'a1' }
+    const parsed = EventEnvelope.parse({ seq: 1, tick: 1, type: 'fire_extinguished', payload: wide })
+    expect(parsed.payload).toEqual(wide)
+    expect(fold(s, parsed as SimEvent, CFG).structures.structure_1!.burning).toBe(false)
+    // The one field fold cannot do without: a dousing has to name what stopped burning.
+    expect(() => fold(s, ev('fire_extinguished', { cause: 'doused', x: 2, y: 2 }, s.tick), CFG))
+      .toThrow(/no structure/i)
   })
 })

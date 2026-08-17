@@ -252,6 +252,8 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
     }
     case 'fire_extinguished': {
       const p = FireExtinguished.parse(event.payload)
+      // The place and the hands are colour; the structure is the fact the fold cannot do without.
+      if (p.structureId === undefined) throw new Error('fire_extinguished names no structure')
       const s = state.structures[p.structureId]
       if (!s) throw new Error(`fire_extinguished for unknown structure ${p.structureId}`)
       return { ...state, structures: { ...state.structures, [p.structureId]: { ...s, burning: false, burnTicks: 0 } } }

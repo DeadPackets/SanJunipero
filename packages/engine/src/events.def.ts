@@ -56,8 +56,11 @@ export const StructureDamaged = z.object({ id: z.string(), amount: z.number() })
 export const StructureDestroyed = z.object({ id: z.string() }).strict()
 export const FireIgnited = z.object({ structureId: z.string(), cause: z.string() }).strict()
 export const FireSpread = z.object({ fromId: z.string(), toId: z.string() }).strict()
+// C11 widens this: a dousing has a place and a pair of hands. The new fields are optional so
+// every recorded C6/C9 rain and burnout still parses, and `cause` stays required.
 export const FireExtinguished = z.object({
-  structureId: z.string(), cause: z.enum(['doused', 'rain', 'burnout']),
+  structureId: z.string().optional(), cause: z.enum(['doused', 'rain', 'burnout']),
+  x: z.number().int().optional(), y: z.number().int().optional(), agentId: z.string().optional(),
 }).strict()
 
 export const ActionStarted = z.object({

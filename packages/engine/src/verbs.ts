@@ -261,7 +261,8 @@ const tend: VerbDef = makeVerb({
 })
 
 export { WATER_TILES }
-export const VESSEL_KINDS: ReadonlySet<string> = new Set(['waterskin', 'bucket'])
+export const BUCKET_KIND = 'bucket'
+export const VESSEL_KINDS: ReadonlySet<string> = new Set(['waterskin', BUCKET_KIND])
 export const WELL_KIND = 'well'
 
 export function waterWithinReach(state: WorldState, agentId: string): 'water_tile' | 'well' | null {
@@ -330,7 +331,7 @@ const fill: VerbDef = makeVerb({
     const item = state.items[p.itemId]
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
     if (!VESSEL_KINDS.has(item.kind) || waterWithinReach(state, agentId) === null) return []
-    const charges = item.kind === 'bucket' ? BUCKET_CHARGES : config.thirst.waterskinCharges
+    const charges = item.kind === BUCKET_KIND ? BUCKET_CHARGES : config.thirst.waterskinCharges
     return [{ type: 'item_filled', payload: { itemId: p.itemId, charges } }]
   },
 })
@@ -676,6 +677,48 @@ const extinguish: VerbDef = makeVerb({
   },
 })
 
+export const DouseParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
+
+// The burning structure whose footprint covers this tile, if one is alight there.
+function burningAt(state: WorldState, x: number, y: number) {
+  for (const id of Object.keys(state.structures).sort()) {
+    const s = state.structures[id]!
+    if (s.burning && x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h) return s
+  }
+  return null
+}
+
+function heldBuckets(state: WorldState, agentId: string) {
+  return heldStacks(state, agentId, BUCKET_KIND)
+}
+
+// One bucket, one dose, one tile of wall. Anything bigger than that is a bucket line, and a
+// bucket line is a thing the town has to organise for itself.
+const douse: VerbDef = makeVerb({
+  kind: 'douse',
+  validate(state, _config, agentId, params) {
+    const p = DouseParams.safeParse(params)
+    if (!p.success) return 'douse needs a tile {x, y}'
+    const s = burningAt(state, p.data.x, p.data.y)
+    if (!s) return 'nothing is burning there'
+    if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to the fire'
+    const buckets = heldBuckets(state, agentId)
+    if (buckets.length === 0) return 'you have nothing to carry water in'
+    if (!buckets.some((i) => (i.charges ?? 0) > 0)) return 'the bucket is empty'
+    return null
+  },
+  onComplete(state, _config, agentId, params) {
+    const p = DouseParams.parse(params)
+    const s = burningAt(state, p.x, p.y)
+    const bucket = heldBuckets(state, agentId).find((i) => (i.charges ?? 0) > 0)
+    if (!s || bucket === undefined) return []
+    return [
+      { type: 'fire_extinguished', payload: { structureId: s.id, cause: 'doused', x: p.x, y: p.y, agentId } },
+      { type: 'item_filled', payload: { itemId: bucket.id, charges: 0 } },
+    ]
+  },
+})
+
 export const SpeakParams = z.object({ text: z.string().min(1) }).strict()
 export const GiveParams = z.object({ itemId: z.string(), targetId: z.string() }).strict()
 export const TakeParams = z.object({ itemId: z.string() }).strict()
@@ -921,7 +964,7 @@ const experiment: VerbDef = makeVerb({
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
-  drink, fill, dig_channel: digChannel,
+  drink, fill, dig_channel: digChannel, douse,
   speak, give, take, stow, write, read, inscribe, teach, attack, experiment,
 }
 
