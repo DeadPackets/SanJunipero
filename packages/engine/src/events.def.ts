@@ -134,6 +134,23 @@ export const CropGrew = z.object({ cropId: z.string(), stage: z.number() }).stri
 export const CropWithered = z.object({ cropId: z.string() }).strict()
 export const CropHarvested = z.object({ cropId: z.string() }).strict()
 export const WildlifeChanged = z.object({ fish: z.number().optional(), deer: z.number().optional() }).strict()
+
+// C11 fauna: bodies with no minds. `stock` rides the spawn because a school arrives as a
+// number of fish, not as one; nothing that walks ever carries it.
+const FaunaKindSchema = z.enum(['deer', 'rabbit', 'fish'])
+export const FaunaSpawned = z.object({
+  id: z.string(), kind: FaunaKindSchema, x: z.number().int(), y: z.number().int(),
+  stock: z.number().int().positive().optional(),
+}).strict()
+// One event per movement beat, whatever moved. The destinations ARE the roll: they are drawn
+// from the `fauna` stream at emission and travel here, so the fold never touches randomness.
+export const FaunaMoved = z.object({
+  moves: z.array(z.object({ id: z.string(), x: z.number().int(), y: z.number().int() }).strict()).min(1),
+}).strict()
+export const FaunaKilled = z.object({
+  id: z.string(), kind: FaunaKindSchema, x: z.number().int(), y: z.number().int(),
+  byId: z.string().optional(),
+}).strict()
 export const TerrainChanged = z.object({ x: z.number(), y: z.number(), tile: z.number().int().min(0).max(7) }).strict()
 // C11's terrain event. `terrain_changed` stays folded so recorded C1-C10 logs replay; this one
 // carries where the cell came from and why, which is what a doctored log cannot fake.

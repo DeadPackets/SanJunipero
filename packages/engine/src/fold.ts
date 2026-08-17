@@ -11,6 +11,7 @@ import {
   AgentDrank, FireExtinguished, FireIgnited, FireSpread, GravePlaced, HpChanged, ThirstChanged,
   ItemBroke, ItemFilled, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
   ConfigChanged,
+  FaunaKilled, FaunaMoved, FaunaSpawned,
   ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
   StructureProgressed, TerrainChanged, TickAdvanced, TileChanged, TrafficDecayed, WeatherChanged, WildlifeChanged,
@@ -598,6 +599,40 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = WildlifeChanged.parse(event.payload)
       return { ...state, wildlife: { fish: p.fish ?? state.wildlife.fish, deer: p.deer ?? state.wildlife.deer } }
     }
+    // A body arrives, a batch of bodies move, a body is taken. The map is absent until the
+    // first arrival and absent again when the last one is gone, so a world with no herd
+    // hashes exactly as one that never had any.
+    case 'fauna_spawned': {
+      const p = FaunaSpawned.parse(event.payload)
+      if (state.fauna?.[p.id]) throw new Error(`fauna_spawned for existing fauna ${p.id}`)
+      return {
+        ...state,
+        fauna: {
+          ...state.fauna,
+          [p.id]: { kind: p.kind, x: p.x, y: p.y, alive: true, ...(p.stock === undefined ? {} : { stock: p.stock }) },
+        },
+        counters: bumpCounter(state.counters, p.id),
+      }
+    }
+    case 'fauna_moved': {
+      const p = FaunaMoved.parse(event.payload)
+      const fauna = { ...state.fauna }
+      for (const m of p.moves) {
+        const f = fauna[m.id]
+        if (!f) throw new Error(`fauna_moved for unknown fauna ${m.id}`)
+        fauna[m.id] = { ...f, x: m.x, y: m.y }
+      }
+      return { ...state, fauna }
+    }
+    case 'fauna_killed': {
+      const p = FaunaKilled.parse(event.payload)
+      if (!state.fauna?.[p.id]) throw new Error(`fauna_killed for unknown fauna ${p.id}`)
+      const { [p.id]: _, ...fauna } = state.fauna
+      const next: WorldState = { ...state }
+      if (Object.keys(fauna).length > 0) next.fauna = fauna
+      else delete next.fauna
+      return next
+    }
     case 'terrain_changed': {
       const p = TerrainChanged.parse(event.payload)
       const row = state.terrain[p.y]
@@ -667,10 +702,13 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
           const at = fromTrafficKey(k)
           return [trafficKey(at.x + dx, at.y + dy), v]
         }))
-      // Tasks 19, 21 and 28 add fauna, forageables and saplings; each is keyed or
-      // stamped by coordinate and must be translated here too, in this same fold.
+      const fauna = state.fauna === undefined ? undefined : Object.fromEntries(
+        Object.entries(state.fauna).map(([id, f]) => [id, { ...f, x: f.x + dx, y: f.y + dy }]))
+      // Task 28 adds saplings; they are stamped by coordinate and must be translated here
+      // too, in this same fold.
       return {
         ...state, terrain, growths, agents, structures, items, crops,
+        ...(fauna === undefined ? {} : { fauna }),
         ...(state.traffic === undefined ? {} : { traffic: shiftKeys(state.traffic) }),
         ...(state.quietSince === undefined ? {} : { quietSince: shiftKeys(state.quietSince) }),
       }

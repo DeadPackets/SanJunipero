@@ -15,6 +15,7 @@ import { weatherSystem } from './systems/weather.js'
 import { fireSystem } from './systems/fire.js'
 import { cropsSystem } from './systems/crops.js'
 import { wildlifeSystem } from './systems/wildlife.js'
+import { faunaSystem } from './systems/fauna.js'
 import { spoilageSystem } from './systems/spoilage.js'
 import { reproductionSystem } from './systems/reproduction.js'
 import { mysterySystem } from './systems/mystery.js'
@@ -101,7 +102,7 @@ function collapseDeathSystem(ctx: TickCtx): void {
 // mapGrowth runs before anything that reads a coordinate this tick: after it, every stored
 // position may have moved, and a system holding a pre-growth position would act on the wrong tile.
 const SYSTEMS: System[] = [
-  weatherSystem, mysterySystem, mapGrowthSystem, fireSystem, cropsSystem, wildlifeSystem, spoilageSystem,
+  weatherSystem, mysterySystem, mapGrowthSystem, fireSystem, cropsSystem, wildlifeSystem, faunaSystem, spoilageSystem,
   needsSystem, thirstSystem, healthSystem, mortalitySystem, illnessSystem, desirePathsSystem,
   reproductionSystem, agingSystem, actionsSystem,
   collapseDeathSystem,

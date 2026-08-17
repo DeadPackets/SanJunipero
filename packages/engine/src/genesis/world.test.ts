@@ -6,6 +6,7 @@ import {
 import { fold } from '../fold.js'
 import { findPath } from '../path.js'
 import { genesisState, type WorldState } from '../state.js'
+import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { makeGenesisWorld, GENESIS_FORK_Y, GENESIS_BUILDER_ID } from './world.js'
 
 const T_WATER = 2
@@ -137,9 +138,23 @@ describe('makeGenesisWorld: the town', () => {
     expect(stateHash(foldAll())).toBe(stateHash(foldAll()))
   })
 
+  // Section 9 again: the herd is scattered on both banks, and half of it stands where
+  // nobody can walk. That is the lever, not a bug — a bridge is what buys the far side.
+  it('scatters the authored herd, warren and schools, schools alone carrying a stock', () => {
+    const s = foldAll()
+    const fauna = Object.values(s.fauna!)
+    expect(fauna).toHaveLength(GENESIS_FAUNA.length)
+    for (const f of fauna) {
+      expect(f.alive).toBe(true)
+      expect(f.stock === undefined).toBe(f.kind !== 'fish')
+    }
+    expect(fauna.filter((f) => f.kind === 'fish').every((f) => s.terrain[f.y]![f.x] === T_WATER)).toBe(true)
+    expect(fauna.some((f) => f.x > 50)).toBe(true)
+  })
+
   it('mints ids the counter law can follow', () => {
     const s = foldAll()
-    for (const id of [...Object.keys(s.structures), ...Object.keys(s.items)]) {
+    for (const id of [...Object.keys(s.structures), ...Object.keys(s.items), ...Object.keys(s.fauna ?? {})]) {
       expect(id).toMatch(/_\d+$/)
       expect(Number(/_(\d+)$/.exec(id)![1])).toBeLessThan(s.counters.nextEntityId)
     }

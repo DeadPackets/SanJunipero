@@ -1,4 +1,5 @@
 import type { SimConfig } from '@sj/shared'
+import type { FaunaKind } from './data/faunaDefs.js'
 
 // grass, dirt, water, forest, rock, sand, farmland, road, path, sapling, channel
 export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
@@ -58,6 +59,10 @@ export type Item = {
 
 export type Crop = { id: string; kind: string; x: number; y: number; plantedDay: number; stage: number; withered: boolean }
 
+// A body with no mind. `stock` is the size of a fish school and is absent on anything that
+// walks; `alive` is the interface the hunt reads, and a kill removes the entity outright.
+export type Fauna = { kind: FaunaKind; x: number; y: number; alive: boolean; stock?: number }
+
 export type WorldState = {
   tick: number
   terrain: TileId[][]                      // [y][x]
@@ -80,6 +85,9 @@ export type WorldState = {
   traffic?: Record<string, number>
   // The day each standing trail went quiet; absent while every trail is still in use.
   quietSince?: Record<string, number>
+  // The herd, the warren and the schools. Absent until the genesis scatter or the first dawn
+  // that spawns one, and absent again when the last body is taken.
+  fauna?: Record<string, Fauna>
   counters: { nextEntityId: number }
 }
 

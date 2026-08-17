@@ -2,6 +2,7 @@ import {
   CITY_ANCHOR_DEFAULT, FOUNDER_IDS, makeCityTemplate,
   type CityStructure, type SimConfig,
 } from '@sj/shared'
+import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { spoilageFor } from '../systems/spoilage.js'
 import type { PendingEvent } from '../verbs.js'
@@ -143,6 +144,15 @@ export function makeGenesisWorld(config: SimConfig, opts: { anchor?: { x: number
   }
   for (const item of STOREHOUSE_STOCK) spawnItem(item.kind, item.qty, structureIdByIndex[storehouseIndex]!)
 
-  // Tasks 19 and 21 add the fauna and forageable scatter here, from data/{faunaDefs,forageables}.
+  // The herd, the warren and the schools are already here on the morning of day one — the
+  // ones east of the water among them, which nobody can reach until somebody builds a bridge.
+  for (const f of GENESIS_FAUNA) {
+    events.push({
+      type: 'fauna_spawned',
+      payload: { id: mint('fauna'), kind: f.kind, x: f.x, y: f.y, ...(f.stock === undefined ? {} : { stock: f.stock }) },
+    })
+  }
+
+  // Task 21 adds the forageable scatter here, from data/forageables.
   return { terrain, events }
 }

@@ -51,6 +51,9 @@ export type InventoryItem = Item & OwnerNames & Turning
 
 export type PerceivedCrop = { id: string; kind: string; x: number; y: number; stage: number; withered: boolean }
 
+// A shape at a distance: what kind of animal and where. Never how many are in the school.
+export type PerceivedFauna = { id: string; kind: string; x: number; y: number }
+
 export type HeardSpeech = { speakerId: string; name: string; text: string; distance: number }
 
 // Things this agent watched happen out in the world — a taking that was not theirs,
@@ -78,6 +81,7 @@ export type PerceptionPacket = {
     structures: PerceivedStructure[]
     items: PerceivedItem[]
     crops: PerceivedCrop[]
+    fauna: PerceivedFauna[]
   }
   ground?: PerceivedGround
   heard: HeardSpeech[]
@@ -271,6 +275,12 @@ export function composePerception(
     .sort(byId)
     .map(c => ({ id: c.id, kind: c.kind, x: c.x, y: c.y, stage: c.stage, withered: c.withered }))
 
+  // Four walls hide the herd as completely as they hide everything else outdoors.
+  const visibleFauna: PerceivedFauna[] = indoors !== null ? [] : Object.keys(state.fauna ?? {}).sort()
+    .map((id) => ({ id, ...state.fauna![id]! }))
+    .filter((f) => f.alive && withinSight(f.x, f.y))
+    .map((f) => ({ id: f.id, kind: f.kind, x: f.x, y: f.y }))
+
   const inventory: InventoryItem[] = Object.values(state.items)
     .filter(i => i.loc.t === 'agent' && i.loc.id === agentId)
     .sort(byId)
@@ -341,7 +351,10 @@ export function composePerception(
     },
     weather: { ...state.weather },
     ...(ground === undefined ? {} : { ground }),
-    visible: { agents: visibleAgents, structures: visibleStructures, items: visibleItems, crops: visibleCrops },
+    visible: {
+      agents: visibleAgents, structures: visibleStructures, items: visibleItems,
+      crops: visibleCrops, fauna: visibleFauna,
+    },
     heard,
     seen,
     feltEvents,
