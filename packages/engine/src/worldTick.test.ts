@@ -3,7 +3,7 @@ import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
-import { FOOD_KINDS, VERBS } from './verbs.js'
+import { FOOD_KINDS, nutritionOf, VERBS } from './verbs.js'
 import { RngStreams } from './rng.js'
 import { createWorldTick, type WorldTickResult } from './worldTick.js'
 
@@ -176,8 +176,8 @@ describe('worldTick: sleep and eat flows', () => {
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     const t1 = tickOnce(s)
-    // decay first (20−5), then eat completes (+60)
-    expect(t1.state.agents.a1!.needs.hunger).toBe(75)
+    // decay first (20−5), then eat completes: berries are half a meal (C11 Task 27), so +30.
+    expect(t1.state.agents.a1!.needs.hunger).toBe(15 + FAST.needs.eatRestoreHunger * nutritionOf(FAST, 'berries'))
     expect(t1.state.items.item_1!.qty).toBe(1)
     expect(t1.state.agents.a1!.activity).toBeNull()
 

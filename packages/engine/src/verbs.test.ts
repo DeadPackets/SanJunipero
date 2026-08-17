@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import {
   DAYS_PER_SEASON, DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, type SimConfig, type SimEvent,
 } from '@sj/shared'
-import { stateHash } from '@sj/shared'
+import { ITEM_CLASSES, stateHash } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { createWorldTick } from './worldTick.js'
@@ -11,7 +11,10 @@ import { submitIntent } from './intent.js'
 import { composePerception } from './perception.js'
 import { stepCostAt } from './path.js'
 import { RngStreams, type RngStream } from './rng.js'
-import { fishCatchChance, huntChance, registerVerb, unregisterVerb, VERBS, type VerbDef } from './verbs.js'
+import {
+  fishCatchChance, huntChance, isFoodKind, nutritionOf, registerVerb, SEED_RECIPES, unregisterVerb,
+  VERBS, type VerbDef,
+} from './verbs.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2, p: 8 }
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
@@ -110,8 +113,13 @@ describe('eat: a last-day meal and the pale mushroom', () => {
     expect(out[0]).toEqual({
       type: 'agent_afflicted', payload: { agentId: 'a1', kind: 'poison', severity: 1, itemId: 'item_1' },
     })
+    // A pale mushroom is a poor meal as well as a gamble (C11 Task 27's per-kind nutrition).
     expect(out).toContainEqual({
-      type: 'need_changed', payload: { id: 'a1', need: 'hunger', delta: POISONS.needs.eatRestoreHunger },
+      type: 'need_changed',
+      payload: {
+        id: 'a1', need: 'hunger',
+        delta: POISONS.needs.eatRestoreHunger * nutritionOf(POISONS, 'pale_mushroom'),
+      },
     })
   })
 
@@ -593,5 +601,176 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
 
   it('with the light law off, the night costs nothing at all', () => {
     expect(durationOf(site(MIDNIGHT, OFF), 'build', { kind: 'hut', x: 2, y: 1 }, OFF)).toBe(HUT)
+  })
+})
+
+// --------------------------------- Task 27: monotony is a cost, and a shared stew is a reason
+describe('food variety: the same meal twice is worth less than two meals', () => {
+  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+  const OFF = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }, foodVariety: { enabled: false },
+  })
+  const FULL = CFG.needs.eatRestoreHunger
+  const NOON = 720
+
+  let nextItem = 0
+  const larder = (kinds: string[], config = CFG, tick = NOON): WorldState => {
+    let s = { ...makeWorld(), tick }
+    kinds.forEach((kind) => {
+      nextItem += 1
+      s = fold(s, ev(900 + nextItem, 'item_spawned', {
+        id: `food_${nextItem}`, kind, qty: 1, loc: { t: 'agent', id: 'a1' },
+      }), config)
+    })
+    return s
+  }
+  const heldIdOf = (s: WorldState, kind: string): string =>
+    Object.keys(s.items).sort().find((id) => s.items[id]!.kind === kind)!
+
+  // The window is counted in days, so these events must carry the tick they happened on.
+  const at = (type: string, payload: unknown, tick: number): SimEvent =>
+    ({ seq: 9500 + (nextItem += 1), tick, type, payload })
+
+  // One meal, the way the tick pipeline serves it: the eating is recorded, then the belly fills.
+  const eatOne = (s: WorldState, kind: string, config = CFG): { state: WorldState; restored: number } => {
+    const itemId = heldIdOf(s, kind)
+    const def = VERBS.eat!
+    const results = def.results?.(s, config, 'a1', { itemId })
+    let out = fold(s, at('action_completed', {
+      agentId: 'a1', verb: 'eat', ...(results ? { results } : {}),
+    }, s.tick), config)
+    let restored = 0
+    for (const e of def.onComplete(out, config, 'a1', { itemId }, new RngStreams('fv').get('illness'))) {
+      if (e.type === 'need_changed' && (e.payload as { need: string }).need === 'hunger') {
+        restored = (e.payload as { delta: number }).delta
+      }
+      out = fold(out, at(e.type, e.payload, out.tick), config)
+    }
+    return { state: out, restored }
+  }
+  const eatAll = (kinds: string[], config = CFG): number[] => {
+    let s = larder(kinds, config)
+    const out: number[] = []
+    for (const kind of kinds) {
+      const r = eatOne(s, kind, config)
+      s = r.state
+      out.push(r.restored)
+    }
+    return out
+  }
+
+  it('one loaf is exactly the flat restore, and a second loaf is worth no more', () => {
+    expect(eatAll(['bread', 'bread'])).toEqual([FULL, FULL])
+  })
+
+  it('every distinct kind in the window is worth five per cent more, up to twenty', () => {
+    const six = ['bread', 'berries', 'fish', 'venison', 'mushroom', 'wheat']
+    const got = eatAll(six)
+    const want = six.map((kind, i) => {
+      const bonus = 1 + Math.min(CFG.foodVariety.maxBonus, CFG.foodVariety.bonusPerKind * i)
+      return FULL * nutritionOf(CFG, kind) * bonus
+    })
+    got.forEach((n, i) => expect([six[i], n]).toEqual([six[i], want[i]]))
+    // Five kinds are already at the cap; the sixth buys nothing.
+    expect(1 + CFG.foodVariety.bonusPerKind * 4).toBe(1 + CFG.foodVariety.maxBonus)
+  })
+
+  it('records what was eaten and prunes it to the window, so an old meal stops counting', () => {
+    const first = eatOne(larder(['bread', 'berries']), 'bread')
+    expect(first.state.agents.a1!.recentFoods).toEqual([{ kind: 'bread', day: 0 }])
+    const later = eatOne({ ...first.state, tick: 4 * MINUTES_PER_DAY + NOON }, 'berries')
+    expect(later.state.agents.a1!.recentFoods).toEqual([{ kind: 'berries', day: 4 }])
+    expect(later.restored).toBe(FULL * nutritionOf(CFG, 'berries'))
+  })
+
+  it('is absent on a body that has never eaten, and hashes like one that never did', () => {
+    const clean = larder(['bread'])
+    expect(clean.agents.a1!.recentFoods).toBeUndefined()
+    const flat = eatOne(larder(['bread'], OFF), 'bread', OFF)
+    expect(flat.state.agents.a1!.recentFoods).toBeUndefined()
+    expect(flat.restored).toBe(FULL)
+  })
+
+  it('an herb is a remedy, not a meal: it restores a token and nothing like a dinner', () => {
+    expect(nutritionOf(CFG, 'herb')).toBeLessThan(0.2)
+    const herb = eatOne(larder(['herb']), 'herb').restored
+    expect(herb).toBe(FULL * nutritionOf(CFG, 'herb'))
+    expect(herb).toBeLessThan(FULL * nutritionOf(CFG, 'bread') / 4)
+  })
+
+  it('prices the smaller catches below a full meal and a stew above one', () => {
+    for (const kind of ['mushroom', 'rabbit_meat', 'fish']) {
+      expect([kind, nutritionOf(CFG, kind)]).toEqual([kind, expect.any(Number)])
+      expect(nutritionOf(CFG, kind)).toBeLessThan(nutritionOf(CFG, 'bread'))
+    }
+    expect(nutritionOf(CFG, 'stew')).toBeGreaterThan(nutritionOf(CFG, 'bread'))
+    expect(isFoodKind(CFG, 'stew')).toBe(true)
+  })
+})
+
+describe('stew: the one recipe the world ships with', () => {
+  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+  const NOON = 720
+
+  function kitchen(opts: { fire?: 'lit' | 'cold'; water?: boolean; food?: string[] } = {}): WorldState {
+    let s: WorldState = { ...makeWorld(['........', '........', '........', '........']), tick: NOON }
+    const food = opts.food ?? ['venison', 'berries']
+    food.forEach((kind, i) => {
+      s = fold(s, ev(1000 + i, 'item_spawned', { id: `food_${i}`, kind, qty: 1, loc: { t: 'agent', id: 'a1' } }), CFG)
+    })
+    if (opts.water !== false) {
+      s = fold(s, ev(1010, 'item_spawned', {
+        id: 'pot', kind: 'bucket', qty: 1, loc: { t: 'agent', id: 'a1' }, charges: 1,
+      }), CFG)
+    }
+    if (opts.fire !== undefined) {
+      s = fold(s, ev(1020, 'structure_planned', {
+        id: 'structure_1', kind: 'fire_pit', x: 1, y: 0, w: 1, h: 1, maxHp: 10, flammable: false, builderId: 'a1',
+      }), CFG)
+      s = fold(s, ev(1021, 'structure_completed', { id: 'structure_1' }), CFG)
+      if (opts.fire === 'lit') {
+        s = fold(s, ev(1022, 'structure_fueled', { structureId: 'structure_1', burnsUntilTick: NOON + 100 }), CFG)
+      }
+    }
+    return s
+  }
+  const cook = (s: WorldState) => submitIntent(s, CFG, 'a1', 'craft', { recipe: 'stew' })
+
+  it('resolves any meat and any vegetable through the canon classes, at a lit fire', () => {
+    expect(ITEM_CLASSES.any_meat).toContain('venison')
+    expect(ITEM_CLASSES.any_vegetable).toContain('berries')
+    const s = kitchen({ fire: 'lit' })
+    expect(cook(s).ok).toBe(true)
+    const events = VERBS.craft!.onComplete(s, CFG, 'a1', { recipe: 'stew' }, new RngStreams('st').get('actions'))
+    expect(events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'food_0', delta: -1 } })
+    expect(events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'food_1', delta: -1 } })
+    expect(events).toContainEqual({ type: 'item_filled', payload: { itemId: 'pot', charges: 0 } })
+    expect(events.some((e) => e.type === 'item_spawned'
+      && (e.payload as { kind: string }).kind === 'stew')).toBe(true)
+    expect(events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'cooking', xp: 1 } })
+  })
+
+  it('takes rabbit and a mushroom just as readily: the class is the ingredient', () => {
+    expect(cook(kitchen({ fire: 'lit', food: ['rabbit_meat', 'mushroom'] })).ok).toBe(true)
+  })
+
+  it('refuses beside a cold pit, with no fire at all, with no water, and with no meat', () => {
+    const cold = cook(kitchen({ fire: 'cold' }))
+    expect(cold.ok).toBe(false)
+    if (!cold.ok) expect(cold.reason).toBe('there is no fire lit here to cook on')
+    expect(cook(kitchen({})).ok).toBe(false)
+
+    const dry = cook(kitchen({ fire: 'lit', water: false }))
+    expect(dry.ok).toBe(false)
+    if (!dry.ok) expect(dry.reason).toBe('you have no water to cook with')
+
+    const vegan = cook(kitchen({ fire: 'lit', food: ['berries', 'mushroom'] }))
+    expect(vegan.ok).toBe(false)
+    if (!vegan.ok) expect(vegan.reason).toBe('not enough meat')
+  })
+
+  it('does not touch the config the world ships: the seed recipe is code, not a dial', () => {
+    expect(CFG.crafting.recipes.stew).toBeUndefined()
+    expect(SEED_RECIPES.stew!.output).toEqual({ kind: 'stew', qty: 1 })
   })
 })

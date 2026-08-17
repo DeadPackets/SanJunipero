@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import {
-  dayPhaseFromTick, fertilityAt, glowRadiusFor, litSourceWithin, MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
-  type SimConfig, type StructureRecipeDef,
+  classMembers, dayPhaseFromTick, fertilityAt, glowRadiusFor, inputName, litSourceWithin,
+  MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
+  type RecipeDef, type SimConfig, type StructureRecipeDef,
 } from '@sj/shared'
 import { mintId, type Affliction, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
@@ -100,9 +101,32 @@ export const FISH_KIND = 'fish'
 export const PALE_MUSHROOM = 'pale_mushroom'
 export const MUSHROOM_KIND = 'mushroom'
 export const HERB_KIND = 'herb'
+export const STEW_KIND = 'stew'
 export const FOOD_KINDS: ReadonlySet<string> = new Set([
   FORAGE_KIND, FISH_KIND, 'venison', 'rabbit_meat', 'bread', 'wheat', MUSHROOM_KIND, PALE_MUSHROOM, HERB_KIND,
+  STEW_KIND,
 ])
+
+// What a kind is worth at the table, as a share of `needs.eatRestoreHunger`. A module const,
+// not a dial: `SimConfigSchema` is closed after Task 2. An unlisted kind is a full meal, which
+// is what every crop the config names has always been.
+// The herb's 0.05 is the point of the table: chewing a remedy is not dinner.
+export const FOOD_NUTRITION: Readonly<Record<string, number>> = {
+  [HERB_KIND]: 0.05,
+  [MUSHROOM_KIND]: 0.4,
+  [PALE_MUSHROOM]: 0.4,
+  [FORAGE_KIND]: 0.5,
+  wheat: 0.5,
+  [FISH_KIND]: 0.75,
+  rabbit_meat: 0.75,
+  venison: 1,
+  bread: 1,
+  [STEW_KIND]: 1.5,
+}
+
+export function nutritionOf(_config: SimConfig, kind: string): number {
+  return FOOD_NUTRITION[kind] ?? 1
+}
 
 // The worst thing wrong with a body: highest severity, ties to the alphabetically first kind.
 // The list is already stored in kind order, so a strictly-greater scan is that tiebreak.
@@ -190,6 +214,16 @@ const wake: VerbDef = makeVerb({
   onComplete() { return [] },
 })
 
+// What a meal is worth to THIS body right now: the kind's own nutrition, then a mild bonus for
+// every distinct kind the window still remembers. The one derivation of both (G4).
+export function mealRestore(state: WorldState, config: SimConfig, agentId: string, kind: string): number {
+  if (!config.foodVariety.enabled) return config.needs.eatRestoreHunger
+  const kinds = new Set((state.agents[agentId]?.recentFoods ?? []).map((m) => m.kind))
+  kinds.add(kind)
+  const bonus = Math.min(config.foodVariety.maxBonus, config.foodVariety.bonusPerKind * (kinds.size - 1))
+  return config.needs.eatRestoreHunger * nutritionOf(config, kind) * (1 + bonus)
+}
+
 const eat: VerbDef = makeVerb({
   kind: 'eat',
   validate(state, config, agentId, params) {
@@ -199,6 +233,14 @@ const eat: VerbDef = makeVerb({
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     if (!isFoodKind(config, item.kind)) return `${item.kind} is not food`
     return null
+  },
+  // The kind rides `action_completed`, which is what the fold counts the window by. It is
+  // recorded before the belly fills, so the meal in hand counts toward its own variety.
+  results(state, _config, agentId, params) {
+    const p = EatParams.safeParse(params)
+    const item = p.success ? state.items[p.data.itemId] : undefined
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return {}
+    return { kind: item.kind }
   },
   rngStream: 'illness',
   onComplete(state, config, agentId, params, rng) {
@@ -217,7 +259,10 @@ const eat: VerbDef = makeVerb({
         : []),
       ...(item.kind === HERB_KIND ? relieveWorst(state, agentId, config.mortality.herbRelief) : []),
       { type: 'item_qty_changed', payload: { id: p.itemId, delta: -1 } },
-      { type: 'need_changed', payload: { id: agentId, need: 'hunger', delta: config.needs.eatRestoreHunger } },
+      {
+        type: 'need_changed',
+        payload: { id: agentId, need: 'hunger', delta: mealRestore(state, config, agentId, item.kind) },
+      },
     ]
   },
 })
@@ -923,27 +968,96 @@ const build: VerbDef = makeVerb({
   skill: { track: 'carpentry', xp: 1 },
 })
 
+// The one recipe the world ships knowing (§9 genesis rulebook). It is code and not a dial,
+// because `SimConfigSchema` closed at Task 2 — and it wants two things a config row cannot
+// say: a fire somebody is feeding, and a vessel with water in it.
+export type SeedRecipe = RecipeDef & { atFire?: true; water?: number }
+
+export const SEED_RECIPES: Readonly<Record<string, SeedRecipe>> = {
+  [STEW_KIND]: {
+    inputs: { any_meat: 1, any_vegetable: 1 },
+    output: { kind: STEW_KIND, qty: 1 },
+    skill: 'cooking',
+    atFire: true,
+    water: 1,
+  },
+}
+
+export function recipeFor(config: SimConfig, name: string): SeedRecipe | undefined {
+  return config.crafting.recipes[name] ?? SEED_RECIPES[name]
+}
+
+// How much of an input the hands hold, counting every member when the input is a canon class.
+function heldForInput(state: WorldState, agentId: string, input: string): number {
+  const members = classMembers(input)
+  if (members === undefined) return heldQty(state, agentId, input)
+  return members.reduce((sum, kind) => sum + heldQty(state, agentId, kind), 0)
+}
+
+// Spend an input, taking from the class members in kind order so two towns holding the same
+// larder always cook the same pot.
+function consumeForInput(state: WorldState, agentId: string, input: string, qty: number): PendingEvent[] {
+  const members = classMembers(input)
+  if (members === undefined) return consumeHeld(state, agentId, input, qty)
+  const events: PendingEvent[] = []
+  let left = qty
+  for (const kind of [...members].sort()) {
+    if (left <= 0) break
+    const take = Math.min(heldQty(state, agentId, kind), left)
+    if (take <= 0) continue
+    events.push(...consumeHeld(state, agentId, kind, take))
+    left -= take
+  }
+  return events
+}
+
+const heldWater = (state: WorldState, agentId: string) =>
+  Object.keys(state.items).sort().map((id) => state.items[id]!)
+    .find((i) => i.loc.t === 'agent' && i.loc.id === agentId && VESSEL_KINDS.has(i.kind) && (i.charges ?? 0) > 0)
+
+// A fire somebody is feeding, within arm's reach of where the cooking happens.
+function keptFireInReach(state: WorldState, agentId: string): boolean {
+  for (const id of Object.keys(state.structures).sort()) {
+    const s = state.structures[id]!
+    if (!HEAT_SOURCE_KINDS.has(s.kind) || s.stage !== 'complete') continue
+    if ((s.fueledUntilTick ?? 0) <= state.tick) continue
+    if (nearRect(state, agentId, s.x, s.y, s.w, s.h)) return true
+  }
+  return false
+}
+
 const craft: VerbDef = makeVerb({
   kind: 'craft',
   validate(state, config, agentId, params) {
     const p = CraftParams.safeParse(params)
     if (!p.success) return 'craft needs a {recipe}'
-    const recipe = config.crafting.recipes[p.data.recipe]
+    const recipe = recipeFor(config, p.data.recipe)
     // A refusal must leave a door open (addendum §9): not knowing a craft and
     // the craft not existing look the same from here, so name both ways out.
     if (!recipe) return `no such recipe: ${p.data.recipe} — perhaps someone nearby knows how, or it wants discovering.`
     for (const [kind, qty] of Object.entries(recipe.inputs)) {
-      if (heldQty(state, agentId, kind) < qty) return `not enough ${kind}`
+      if (heldForInput(state, agentId, kind) < qty) return `not enough ${inputName(kind)}`
     }
+    if (recipe.atFire && !keptFireInReach(state, agentId)) return 'there is no fire lit here to cook on'
+    if (recipe.water !== undefined && heldWater(state, agentId) === undefined) return 'you have no water to cook with'
     return null
   },
   onComplete(state, config, agentId, params) {
     const p = CraftParams.parse(params)
-    const recipe = config.crafting.recipes[p.recipe]!
+    const recipe = recipeFor(config, p.recipe)!
     const events: PendingEvent[] = []
     for (const [kind, qty] of Object.entries(recipe.inputs)) {
-      if (heldQty(state, agentId, kind) < qty) return []
-      events.push(...consumeHeld(state, agentId, kind, qty))
+      if (heldForInput(state, agentId, kind) < qty) return []
+      events.push(...consumeForInput(state, agentId, kind, qty))
+    }
+    if (recipe.atFire && !keptFireInReach(state, agentId)) return []
+    if (recipe.water !== undefined) {
+      const vessel = heldWater(state, agentId)
+      if (vessel === undefined) return []
+      events.push({
+        type: 'item_filled',
+        payload: { itemId: vessel.id, charges: Math.max(0, (vessel.charges ?? 0) - recipe.water) },
+      })
     }
     return [
       ...events,

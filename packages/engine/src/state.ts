@@ -33,6 +33,9 @@ export type AgentBody = {
   // Absent until the first such tick, and absent again the moment it recovers — it is what
   // lets a fatal ladder a winter night drove be named for the night.
   coldTicksSinceRecovery?: number
+  // What this body has eaten lately, pruned to the variety window at every meal. Absent until
+  // the first one, so a body that has never eaten hashes as it always did.
+  recentFoods?: Array<{ kind: string; day: number }>
   // What the body is wearing. One slot in v1; absent until the first thing is put on, so a
   // town that never made a garment hashes exactly as it always did.
   equipped?: { body?: string }

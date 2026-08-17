@@ -357,7 +357,16 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`action_completed for unknown agent ${p.agentId}`)
       const body = p.verb === 'eat' ? rested(a) : a
-      return { ...state, agents: { ...state.agents, [p.agentId]: { ...body, activity: null } } }
+      // A meal is remembered by kind for as long as the variety window is wide, and the
+      // remembering happens before the belly fills — the kind just eaten counts toward it.
+      const kind = p.verb === 'eat' ? p.results?.['kind'] : undefined
+      if (typeof kind !== 'string' || !config.foodVariety.enabled) {
+        return { ...state, agents: { ...state.agents, [p.agentId]: { ...body, activity: null } } }
+      }
+      const day = Math.floor(event.tick / MINUTES_PER_DAY)
+      const recentFoods = [...(body.recentFoods ?? []), { kind, day }]
+        .filter((m) => day - m.day < config.foodVariety.windowDays)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...body, recentFoods, activity: null } } }
     }
     case 'action_interrupted': {
       const p = ActionInterrupted.parse(event.payload)
