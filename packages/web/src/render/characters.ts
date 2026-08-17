@@ -183,7 +183,11 @@ export function createCharacterLayer(
     nameTag.addChild(nameTagBg, nameTagLabel)
     sprite.on('pointerover', () => { nameTag.visible = true })
     sprite.on('pointerout', () => { nameTag.visible = false })
-    scene.entities.addChild(shadow, sprite, emote, nameTag)
+    // each companion to the layer it belongs in: a contact shadow under every body, the
+    // emote and the tag over every body. None of them competes with the depth sort any more.
+    scene.layers.shadow.addChild(shadow)
+    scene.layers.entities.addChild(sprite)
+    scene.layers.worldText.addChild(emote, nameTag)
     const now = performance.now()
     e = {
       sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, hitScale: 0, emoteUntil: 0, facing: 'sw',
@@ -279,9 +283,7 @@ export function createCharacterLayer(
       e.sprite.position.set(sx, sy + pose.bobY)
       e.sprite.zIndex = depthKey(Math.round(pos.x), Math.round(pos.y)) + 1
       e.shadow.position.set(sx, sy)
-      e.shadow.zIndex = e.sprite.zIndex - 1
       e.emote.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX)
-      e.emote.zIndex = e.sprite.zIndex + 1
       e.emote.visible = !emotesHidden && nowMs < e.emoteUntil && e.emote.texture !== Texture.EMPTY
       const tag = nameTagText(a.name)
       if (e.nameTagLabel.text !== tag) {
@@ -291,7 +293,6 @@ export function createCharacterLayer(
         e.nameTagBg.fill(0xfff6e9)
       }
       e.nameTag.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX - NAME_TAG_ABOVE_HEAD_PX)
-      e.nameTag.zIndex = e.sprite.zIndex + 1
     }
     for (const [agentId, e] of entries) {
       if (!live.has(agentId)) {

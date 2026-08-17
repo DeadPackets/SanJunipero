@@ -10,8 +10,6 @@ export const TAG_LINE_H = WORLD_TEXT_LINE_H
 export const TAG_PAD_X = 5
 export const TAG_PAD_Y = 3
 export const TAG_MAX_CHARS = 48
-// Under the speech bubbles (1e9) and over every world sprite: a tag never hides a line.
-export const TAG_Z = 1e9 - 1
 
 export type NameTagLayer = {
   show(text: string, sx: number, sy: number): void
@@ -25,14 +23,13 @@ export function createNameTagLayer(scene: Scene): NameTagLayer {
   const node = new Container()
   node.visible = false
   node.eventMode = 'none' // the tag must never eat the click on the thing it names
-  node.zIndex = TAG_Z
   const slab = new Graphics()
   const label = createWorldLabel('', {
     fontFamily: WORLD_FONT_FAMILY, fontSize: TAG_FONT_PX, fill: BUBBLE_INK, lineHeight: TAG_LINE_H,
   })
   label.anchor.set(0.5, 1)
   node.addChild(slab, label)
-  scene.entities.addChild(node)
+  scene.layers.worldText.addChild(node)  // over every body, under a line of speech
 
   return {
     show(text, sx, sy) {

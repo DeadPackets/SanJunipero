@@ -91,7 +91,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     if (state === null || state.agents[agentId] === undefined) return // visible agents only
     const now = performance.now()
     const node = build(text, isThought)
-    scene.entities.addChild(node)
+    scene.layers.bubbles.addChild(node)
     bubbles.push({ agentId, node, bornMs: now, dieMs: now + bubbleLife(text), isThought })
   }
 
@@ -122,7 +122,6 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         const { sx, sy } = tileToScreen(a.x, a.y)
         const drift = b.isThought ? (THOUGHT_DRIFT_PX * (nowMs - b.bornMs)) / (b.dieMs - b.bornMs) : 0
         b.node.position.set(sx, sy - CHAR_TARGET_PX - 18 - drift)
-        b.node.zIndex = 1e9 // bubbles float above every world sprite
       }
     },
     destroy: () => {

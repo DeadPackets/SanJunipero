@@ -226,7 +226,7 @@ export function syncEntities(
       sprite.hitArea = new Polygon(footprintHitPoints(s.w, s.h))   // until the art sets its scale
       entry = { sprite, url: '', pips: null, form: null }
       sync.entries.set(key, entry)
-      scene.entities.addChild(sprite)
+      scene.layers.entities.addChild(sprite)
       applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h), null, s, s.kind)
     }
     const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
@@ -279,7 +279,7 @@ export function syncEntities(
       })
       door.on('pointertap', () => sync!.onDoor?.(sid))
       sync.doors.set(doorKey, door)
-      scene.entities.addChild(door)
+      scene.layers.entities.addChild(door)
     }
     if (door !== undefined) {
       door.visible = enterable
@@ -306,7 +306,7 @@ export function syncEntities(
       })
       entry = { sprite, url: '', pips: null, form: null }
       sync.entries.set(key, entry)
-      scene.entities.addChild(sprite)
+      scene.layers.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'item', it.kind))
       void book.get(entry.url).then(() => {
         entry!.sprite.width = ITEM_PX
@@ -333,7 +333,7 @@ export function syncEntities(
       })
       entry = { sprite, url: '', pips: null, form: null }
       sync.entries.set(key, entry)
-      scene.entities.addChild(sprite)
+      scene.layers.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'crop', c.kind))
     }
     const ground = tileToScreen(c.x, c.y)

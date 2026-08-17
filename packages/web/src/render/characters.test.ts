@@ -132,12 +132,23 @@ function makeStore(agents: MutableAgents): { store: WorldStore; emit: (evts: Sim
   return { store, emit: (evts) => { for (const fn of handlers) fn(evts) } }
 }
 
+const LAYER_NAMES = [
+  'ground', 'groundDecal', 'shadow', 'entities', 'overhead', 'worldText', 'bubbles', 'overlay',
+] as const
+
 function makeScene(): Scene {
-  const entities = new MockContainer()
+  const layers = Object.fromEntries(LAYER_NAMES.map((n) => [n, new MockContainer()]))
   return {
     app: { renderer: { generateTexture: () => ({ destroy: () => {} }) } },
-    entities,
+    layers,
+    entities: layers.entities,
   } as unknown as Scene
+}
+
+// every display object the layer put anywhere in the stack
+const placed = (scene: Scene): InstanceType<typeof MockContainer>[] => {
+  const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+  return LAYER_NAMES.flatMap((n) => l[n]!.children)
 }
 
 function makeBook(): { book: TextureBook; get: ReturnType<typeof vi.fn> } {
@@ -164,8 +175,15 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
   it('two ticks add exactly 4 display objects per agent, not 4 per agent per tick', () => {
     layer.tick(1000)
     layer.tick(1016)
-    const entities = scene.entities as unknown as InstanceType<typeof MockContainer>
-    expect(entities.children).toHaveLength(2 * 4) // sprite, shadow, emote, nameTag × 2 agents
+    expect(placed(scene)).toHaveLength(2 * 4) // sprite, shadow, emote, nameTag × 2 agents
+  })
+
+  it('puts each companion in the layer that owns it, never in the depth sort', () => {
+    layer.tick(1000)
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    expect(l.shadow!.children).toHaveLength(2)     // one contact shadow per body
+    expect(l.entities!.children).toHaveLength(2)   // ONLY the bodies are depth-sorted
+    expect(l.worldText!.children).toHaveLength(4)  // emote + name tag per body
   })
 
   it('getSprite returns the same registered sprite across ticks', () => {
@@ -199,8 +217,10 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
 
   it('companion objects are event-inert so they never swallow the sprite hit', () => {
     layer.tick(1000)
-    const entities = scene.entities as unknown as InstanceType<typeof MockContainer>
-    const [shadow, sprite, emote, nameTag] = entities.children as unknown as Array<{ eventMode: string }>
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    const shadow = l.shadow!.children[0] as unknown as { eventMode: string }
+    const sprite = l.entities!.children[0] as unknown as { eventMode: string }
+    const [emote, nameTag] = l.worldText!.children as unknown as Array<{ eventMode: string }>
     expect(shadow!.eventMode).toBe('none')
     expect(emote!.eventMode).toBe('none')
     expect(nameTag!.eventMode).toBe('none')
@@ -209,8 +229,8 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
 
   it('name-tag label anchors (0.5, 1) and the bg slab wraps it with 4px padding', () => {
     layer.tick(1000)
-    const entities = scene.entities as unknown as InstanceType<typeof MockContainer>
-    const nameTag = entities.children[3]! // per-agent add order: shadow, sprite, emote, nameTag
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    const nameTag = l.worldText!.children[1]! // per-agent add order into worldText: emote, nameTag
     const [bg, label] = nameTag.children as unknown as [
       { lastRoundRect: number[] | null },
       { anchor: { x: number; y: number }; width: number; height: number },
@@ -227,8 +247,7 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(sprite).not.toBeNull()
     delete agents.omar
     layer.tick(1016)
-    const entities = scene.entities as unknown as InstanceType<typeof MockContainer>
-    expect(entities.children).toHaveLength(4)
+    expect(placed(scene)).toHaveLength(4)
     expect(sprite.destroyed).toBe(true)
     expect(layer.getSprite('omar')).toBeNull()
   })

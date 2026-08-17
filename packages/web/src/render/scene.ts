@@ -9,6 +9,7 @@ import {
   OCTAVE_ALPHA, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField,
   isRoadMass, materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
 } from './groundField.js'
+import { createLayers, type LayerSet } from './layers.js'
 import { HEADLAND_COLOR, KERB_COLOR, furrowLines, patchOutline, type Tile } from './patches.js'
 import { tileKind } from './tileset.js'
 import { TextureBook } from './textures.js'
@@ -179,6 +180,9 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
 export type Scene = {
   app: Application
   world: Container
+  /** the eight named layers — the one place that decides what is drawn over what */
+  layers: LayerSet
+  /** the only depth-sorted layer; `layers.entities`, named for the code that lives in it */
   entities: Container
   /** above the entities and never hit-tested: place names and other reading aids */
   overlay: Container
@@ -224,18 +228,13 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   ro.observe(rootEl)
 
   const world = new Container()
-  const entities = new Container()
-  entities.sortableChildren = true
-
-  // A label is a reading aid, not a thing in the world: it draws over everything and takes no
-  // pointer, so it can never steal a click from the building it names.
-  const overlay = new Container()
-  overlay.eventMode = 'none'
+  // One table decides what is over what (layers.ts). A label is a reading aid, not a thing in
+  // the world: every layer but `entities` is event-inert, so it can never steal a click from
+  // the building it names.
+  const layers = createLayers(world)
 
   const groundSprite = new Sprite()
-  world.addChild(groundSprite)
-  world.addChild(entities)
-  world.addChild(overlay)
+  layers.ground.addChild(groundSprite)
   app.stage.addChild(world)
 
   const tileCbs: Array<(t: { x: number; y: number }) => void> = []
@@ -387,8 +386,9 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   return {
     app,
     world,
-    entities,
-    overlay,
+    layers,
+    entities: layers.entities,
+    overlay: layers.overlay,
     rebakeGround,
     centerOn,
     setZoom,

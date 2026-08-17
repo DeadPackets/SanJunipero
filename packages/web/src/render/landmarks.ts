@@ -116,7 +116,7 @@ export type LandmarkLayer = { sync(): void; destroy(): void }
 export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLayer {
   const node = new Container()
   node.eventMode = 'none'
-  scene.overlay.addChild(node)
+  scene.layers.overlay.addChild(node)
   // createWorldLabel, never `new BitmapText`: a bitmap glyph with no installed font blanks the
   // entire canvas, so the choice is made once from the font cache (worldLabel.ts, ruling R3).
   const labels = new Map<string, WorldLabel>()
