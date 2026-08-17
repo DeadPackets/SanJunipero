@@ -1,5 +1,5 @@
 import {
-  ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS,
+  MATERIAL_KIND_PREFIX, ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS, materialKind,
   type RoadAutotileKey, type Season, type TerrainTileKind,
 } from '@sj/shared'
 import { paletteRgb } from './palette.js'
@@ -32,10 +32,12 @@ export function cropMargin(img: RawImage, margin: number = CANDIDATE_MARGIN): Ra
   return out
 }
 
-// A generated 512 square lands on this grid before anything else touches it. 64 is four
-// tile-widths of detail — enough for grain, small enough that MASTER_PALETTE reads as
-// deliberate colour rather than as banding.
-export const MATERIAL_PX = 64
+// TERRAIN V2 (user directive 2026-08-17): the ground is a CONTINUOUS world-space material
+// field, not per-tile art. A tile is a window onto the material, so the material must carry
+// the fidelity — 64px was four tile-widths and read as low-resolution mush once it stopped
+// being squashed into a 32x16 diamond. 256 is eight tile-widths at full ground resolution,
+// and it is what the 512 generation can actually support after the margin crop.
+export const MATERIAL_PX = 256
 
 // MEASURED, not guessed (2026-08-17, live batch). The first version of this check compared
 // opposing edges PIXEL BY PIXEL, which is the wrong instrument for organic noise: two edges
@@ -129,11 +131,17 @@ export function terrainAssetId(i: IdInput): string {
   return `terrain:season:${i.season}`
 }
 
-// grass earns four readings because it is most of the map and repetition shows there first;
-// every other ground gets one, because a second reading of bedrock is not worth a call.
+// TERRAIN V2: per-tile variants are GONE. They existed to break up a repeating tile stamp,
+// and a continuous world-space field has no tile stamp to break up — the material's own
+// variation does that job, at its own scale rather than at tile frequency. One material per
+// ground, which is also seven fewer calls.
 export const GROUND_VARIANTS: Record<TerrainTileKind, number> = {
-  grass: 4, earth: 1, water: 1, forest: 1, rock: 1, sand: 1, farmland: 1, road: 1,
+  grass: 1, earth: 1, water: 1, forest: 1, rock: 1, sand: 1, farmland: 1, road: 1,
 }
+
+// `materialKind` lives in @sj/shared beside the tile kinds — the forge writes that codex
+// kind and the renderer reads it.
+export { MATERIAL_KIND_PREFIX, materialKind }
 
 export const ROAD_MATERIAL_ID = 'terrain:road:0'
 
@@ -273,8 +281,11 @@ export function borderReport(m: RawImage, ring: number = BORDER_RING_PX): Border
 // A material that is ALREADY PAID FOR and still carries a rim gets the rim cut off rather
 // than regenerated: sand:0 came back framed at ring 24.7 even through the 8% crop, because
 // the model drew a thick one. Cutting is free; another attempt is not.
-export const DEFRAME_STEP = 0.10
-export const DEFRAME_MAX_PASSES = 3
+// Every pass costs WRAP: cropping a seamless square breaks its own edges, and farmland went
+// from h=2.0 to h=23.4 under a single 10% bite. So the step is small and the loop stops at
+// the FIRST crop that clears the frame — the least damage that does the job.
+export const DEFRAME_STEP = 0.03
+export const DEFRAME_MAX_PASSES = 6
 
 export function deframe(m: RawImage): { material: RawImage; passes: number } {
   let out = m

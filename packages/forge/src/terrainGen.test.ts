@@ -55,12 +55,10 @@ describe('planTerrainProgram', () => {
     for (const k of TERRAIN_TILE_KINDS) expect(kinds, k).toContain(k)
   })
 
-  it('gives grass real variety and every other ground at least one tile', () => {
+  it('is ONE material per ground — TERRAIN V2 has no per-tile variants to fill', () => {
     const variantsOf = (kind: string): number =>
       plan.filter((p) => p.sort === 'ground' && p.kind === kind).length
-    expect(variantsOf('grass')).toBeGreaterThanOrEqual(2)
-    expect(variantsOf('grass')).toBeLessThanOrEqual(4)
-    for (const k of TERRAIN_TILE_KINDS) expect(variantsOf(k), k).toBeGreaterThanOrEqual(1)
+    for (const k of TERRAIN_TILE_KINDS) expect(variantsOf(k), k).toBe(1)
   })
 
   it('re-skins all fifteen road autotile keys', () => {
@@ -221,8 +219,8 @@ describe('generationItems', () => {
     expect(plan.filter((p) => p.sort === 'road').every((p) => p.generateFrom === ROAD_MATERIAL_ID)).toBe(true)
   })
 
-  it('is every ground variant plus every season, and nothing else', () => {
-    expect(gen).toHaveLength(11 + 4)
+  it('is every ground plus every season, and nothing else', () => {
+    expect(gen).toHaveLength(TERRAIN_TILE_KINDS.length + 4)
     expect(new Set(gen.map((p) => p.sort))).toEqual(new Set(['ground', 'season']))
   })
 

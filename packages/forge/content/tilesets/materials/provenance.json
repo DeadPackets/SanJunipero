@@ -1,0 +1,74 @@
+{
+  "terrain:earth:0": {
+    "h": 2.92,
+    "v": 0.08,
+    "ring": 0.53,
+    "deframed": 0
+  },
+  "terrain:farmland:0": {
+    "h": 11.73,
+    "v": 17.68,
+    "ring": 8.31,
+    "deframed": 3
+  },
+  "terrain:forest:0": {
+    "h": 7.25,
+    "v": 6.95,
+    "ring": 2.07,
+    "deframed": 0
+  },
+  "terrain:grass:0": {
+    "h": 6.85,
+    "v": 2.89,
+    "ring": 1.38,
+    "deframed": 0
+  },
+  "terrain:road:0": {
+    "h": 2.95,
+    "v": 9.71,
+    "ring": 3.45,
+    "deframed": 0
+  },
+  "terrain:rock:0": {
+    "h": 9.5,
+    "v": 6.98,
+    "ring": 2.17,
+    "deframed": 0
+  },
+  "terrain:sand:0": {
+    "h": 2.81,
+    "v": 4.24,
+    "ring": 0.48,
+    "deframed": 0
+  },
+  "terrain:season:autumn": {
+    "h": 0.91,
+    "v": 12.52,
+    "ring": 1.42,
+    "deframed": 0
+  },
+  "terrain:season:spring": {
+    "h": 2.55,
+    "v": 1.95,
+    "ring": 5.08,
+    "deframed": 0
+  },
+  "terrain:season:summer": {
+    "h": 2.41,
+    "v": 1.95,
+    "ring": 7.95,
+    "deframed": 0
+  },
+  "terrain:season:winter": {
+    "h": 3.21,
+    "v": 2.88,
+    "ring": 0.32,
+    "deframed": 0
+  },
+  "terrain:water:0": {
+    "h": 1.77,
+    "v": 2.52,
+    "ring": 0.5,
+    "deframed": 0
+  }
+}

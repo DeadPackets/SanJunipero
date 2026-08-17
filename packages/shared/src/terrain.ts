@@ -4,6 +4,15 @@ export const TERRAIN_TILE_KINDS = ['grass', 'earth', 'water', 'forest', 'rock', 
 export type TerrainTileKind = (typeof TERRAIN_TILE_KINDS)[number]
 export const TerrainTileKindSchema = z.enum(TERRAIN_TILE_KINDS)
 
+// TERRAIN V2: the codex kind a CONTINUOUS world-space material is registered under, distinct
+// from the flat per-tile kinds which stay for the fallback path. The forge writes this string
+// and the renderer reads it, so — like roadAutotileKind — it lives here or it drifts.
+export const MATERIAL_KIND_PREFIX = 'material:'
+
+export function materialKind(kind: TerrainTileKind): string {
+  return `${MATERIAL_KIND_PREFIX}${kind}`
+}
+
 export const TerrainTileManifestSchema = z.object({
   version: z.literal('v1-terrain-tile'),
   kind: TerrainTileKindSchema,

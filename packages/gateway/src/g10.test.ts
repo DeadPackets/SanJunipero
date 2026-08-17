@@ -150,7 +150,13 @@ describe('GATE G10 — automated half, gateway side', () => {
       try {
         await ingestTerrainArt(fdb)
         const ready = new AssetCodex(fdb).listSince(0).filter((r) => r.class === 'terrain')
-        expect(ready).toHaveLength(TERRAIN_TILE_KINDS.length * 4 + ROAD_AUTOTILE_KEYS.length)
+        // TERRAIN V2: one CONTINUOUS material per ground (what the bake samples in world
+        // space) on top of the flat per-tile fallback set and the road strip
+        const materials = ready.filter((r) => r.kind!.startsWith('material:'))
+        expect(materials.length).toBeGreaterThan(0)
+        expect(materials).toHaveLength(TERRAIN_TILE_KINDS.length)
+        expect(ready).toHaveLength(
+          TERRAIN_TILE_KINDS.length + TERRAIN_TILE_KINDS.length * 4 + ROAD_AUTOTILE_KEYS.length)
       } finally { fdb.close() }
     })
   })

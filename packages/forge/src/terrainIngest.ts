@@ -1,5 +1,5 @@
 import {
-  ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS, roadAutotileKind,
+  ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS, materialKind, roadAutotileKind,
   type AssetRecord, type Season, type TerrainTileKind,
 } from '@sj/shared'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
@@ -15,8 +15,8 @@ import {
   paintTerrainTile,
 } from './terrainTiles.js'
 import {
-  GROUND_VARIANTS, ROAD_MATERIAL_ID, diamondFromMaterial, seasonTintFrom, stencilRoadTile,
-  terrainAssetId,
+  GROUND_VARIANTS, MATERIAL_PX, ROAD_MATERIAL_ID, diamondFromMaterial, seasonTintFrom,
+  stencilRoadTile, terrainAssetId,
 } from './terrainGen.js'
 import { paintRoadAutotile } from './roadTiles.js'
 
@@ -116,6 +116,23 @@ export async function registerGeneratedTerrain(
       status: 'ready', score: 10, attempts: 1, costUsd: 0,
     }))
     kinds.push(kind)
+  }
+
+  // TERRAIN V2: the CONTINUOUS material, registered whole under `material:<kind>`. This is
+  // what the ground bake samples in world space; the per-tile records below stay only as the
+  // fallback path and for anything still asking for a single tile.
+  for (const kind of TERRAIN_TILE_KINDS) {
+    const m = materialFor(book, terrainAssetId({ sort: 'ground', kind, variant: 0 }))
+    if (m === null) continue
+    generated++
+    records.push(codex.register({
+      class: 'terrain', desc: `material: ${kind}`, kind: materialKind(kind),
+      meta: JSON.stringify({ version: 'v2-terrain-material', kind, wPx: m.width, hPx: m.height }),
+      footprint: { w: 1, h: 1 }, png: await encodePng(m),
+      widthPx: m.width, heightPx: m.height,
+      status: 'ready', score: 10, attempts: 1, costUsd: 0,
+    }))
+    kinds.push(materialKind(kind))
   }
 
   for (const kind of TERRAIN_TILE_KINDS) {

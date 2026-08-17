@@ -1,11 +1,11 @@
-import { Application, Container, Graphics, RenderTexture, Sprite, TextureSource } from 'pixi.js'
+import { Application, Container, Graphics, Matrix, RenderTexture, Sprite, TextureSource } from 'pixi.js'
 import type { FederatedPointerEvent, Texture } from 'pixi.js'
 import type { AssetRecord } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
-import { shadeColor, tilesetPlan } from './ground.js'
+import { groundField, roadRibbonPolys } from './groundField.js'
 import { TextureBook } from './textures.js'
 
 export const BACKGROUND = 0x322b38
@@ -22,43 +22,41 @@ export type GroundBaker = {
 
 export function createGroundBaker(app: Application, sprite: Sprite, book: TextureBook): GroundBaker {
   let target: RenderTexture | null = null
-  // one Texture per (kind, variant) or road key — ≤ 32 entries at 48×48
+  // one Texture per TERRAIN now — at most eight, whatever the size of the map
   const loaded = new Map<string, Texture>()
   let generation = 0
 
+  // TERRAIN V2. One pass PER TERRAIN, not one stamp per tile. Every tile of a terrain
+  // contributes its outline to a single Graphics, and that whole shape is filled from the
+  // terrain's material with an IDENTITY matrix — so the texture is sampled in bake space,
+  // which is world space. The material therefore flows across tile boundaries, and nothing
+  // in the picture varies at tile frequency. The old `shade` checkerboard is gone with it:
+  // alternating every other diamond by 15% was a literal checkerboard in the fallback path.
   function draw(terrain: TileId[][], records: AssetRecord[], offX: number): void {
     if (target === null) return
     const layer = new Container()
-    const g = new Graphics()
-    layer.addChild(g)
-    const diamond = (cx: number, sy: number, color: number, shade: boolean): void => {
-      g.poly([cx, sy, cx + TILE_W / 2, sy + TILE_H / 2, cx, sy + TILE_H, cx - TILE_W / 2, sy + TILE_H / 2])
-      g.fill(shade ? shadeColor(color) : color)
-    }
-    const blit = (url: string | null, cx: number, sy: number): boolean => {
-      const tex = url === null ? undefined : loaded.get(url)
-      if (tex === undefined) return false
-      const s = new Sprite(tex)                   // NEAREST is global (C6 T11); drawn 1:1
-      s.position.set(cx - TILE_W / 2, sy)
-      layer.addChild(s)
-      return true
-    }
-    for (const cell of tilesetPlan(terrain, records)) {
-      const cx = cell.sx + offX
-      // An overlay tile is a ribbon on transparency: paint the ground first or its own holes
-      // show the stage. If either half is still loading, the flat diamond covers the tile —
-      // a viewer never sees a hole, only a coarser tile.
-      if (cell.overlay && cell.base !== null) {
-        if (loaded.has(cell.url ?? '')) {
-          if (!blit(cell.base.url, cx, cell.sy)) diamond(cx, cell.sy, cell.base.fallback, cell.shade)
-          blit(cell.url, cx, cell.sy)
+    for (const l of groundField(terrain, records).layers) {
+      const g = new Graphics()
+      for (const shape of l.shapes) {
+        const cx = shape.sx + offX, cy = shape.sy
+        if (shape.roadKey === null) {
+          g.poly([cx, cy, cx + TILE_W / 2, cy + TILE_H / 2, cx, cy + TILE_H, cx - TILE_W / 2, cy + TILE_H / 2])
           continue
         }
-        diamond(cx, cell.sy, cell.fallback, cell.shade)
-        continue
+        for (const poly of roadRibbonPolys(shape.roadKey)) {
+          const pts: number[] = []
+          for (let i = 0; i < poly.length; i += 2) pts.push(cx + poly[i]!, cy + poly[i + 1]!)
+          g.poly(pts)
+        }
       }
-      if (blit(cell.url, cx, cell.sy)) continue
-      diamond(cx, cell.sy, cell.fallback, cell.shade)
+      const tex = l.url === null ? undefined : loaded.get(l.url)
+      if (tex === undefined) {
+        g.fill(l.fallback)                     // art independence: palette-true flat ground
+      } else {
+        tex.source.addressMode = 'repeat'      // the field wraps; the material must too
+        g.fill({ texture: tex, matrix: new Matrix() })
+      }
+      layer.addChild(g)
     }
     app.renderer.render({ container: layer, target, clear: true })
     layer.destroy({ children: true })
@@ -81,8 +79,8 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
 
       // Textures load async. Paint the flat fallback now, then repaint once the tile art is
       // in — a viewer never waits on a blank map, and a stale load never overwrites a newer bake.
-      // both layers, or a road's ground never loads and every ribbon stays a flat diamond
-      const urls = [...new Set(tilesetPlan(terrain, records).flatMap((c) => [c.url, c.base?.url ?? null]))]
+      // one material per terrain — at most eight urls for the whole map
+      const urls = [...new Set(groundField(terrain, records).layers.map((l) => l.url))]
         .filter((u): u is string => u !== null && !loaded.has(u))
       if (urls.length === 0) return
       const gen = ++generation

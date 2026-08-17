@@ -7,7 +7,7 @@
 //
 // A material that was never generated falls back to its code-painted tile, so this is safe
 // to run after a partial generation batch.
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ROAD_AUTOTILE_KEYS, SEASONS } from '@sj/shared'
@@ -40,14 +40,33 @@ mkdirSync(DIR, { recursive: true })
 // The materials ship WITH the repo: the gateway registers them into the codex at boot, and
 // the renderer reads the codex. Without this the generated art never reaches a viewer.
 mkdirSync(MATERIALS_DIR, { recursive: true })
+// Prune first: the shipped directory is exactly what this run produces, never a pile of
+// whatever any earlier run left. A stale v1 tile-sized material would otherwise keep being
+// loaded by the gateway and keep failing the shipped-materials check.
+for (const stale of readdirSync(MATERIALS_DIR)) {
+  if (stale.endsWith('.png') && !book.has(stale.replace(/\.png$/, '').replace(/_/g, ':'))) {
+    rmSync(join(MATERIALS_DIR, stale))
+    console.log(`  pruned stale ${stale}`)
+  }
+}
+const provenance: Record<string, { h: number; v: number; ring: number; deframed: number }> = {}
 for (const [assetId, raw] of [...book]) {
   const { material, passes } = deframe(raw)
   book.set(assetId, material)
   const seam = seamReport(material), border = borderReport(material)
+  provenance[assetId] = {
+    h: Number(seam.horizontalDelta.toFixed(2)), v: Number(seam.verticalDelta.toFixed(2)),
+    ring: Number(border.ringDelta.toFixed(2)), deframed: passes,
+  }
   writeFileSync(join(MATERIALS_DIR, `${assetId.replace(/:/g, '_')}.png`), await encodePng(material))
   console.log(`  ${assetId.padEnd(24)} h=${seam.horizontalDelta.toFixed(1)} v=${seam.verticalDelta.toFixed(1)} ` +
     `ring=${border.ringDelta.toFixed(1)}${passes > 0 ? ` (deframed x${passes})` : ''}${border.framed ? '  STILL FRAMED' : ''}`)
 }
+// The shipped state describes itself: what each material measured and how hard it had to be
+// cropped to lose its frame. A deframed material is ALLOWED a looser wrap, because the crop
+// that removed the frame is precisely what damaged the wrap — and a frame is the worse
+// artifact of the two. The test reads this rather than carrying a list of exceptions.
+writeFileSync(join(MATERIALS_DIR, 'provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`)
 console.log(`shipped ${book.size} materials into ${MATERIALS_DIR}`)
 
 // four seasonal sheets, graded off the generated seasonal materials (replaces D-3's guesses)
