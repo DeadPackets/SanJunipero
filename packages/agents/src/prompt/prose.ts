@@ -68,6 +68,8 @@ export type PerceptionPacket = {
       injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
       ill: boolean
       thirst?: number
+      // What ails this body and how badly. Absent on a packet from before C11 named them.
+      afflictions?: Array<{ kind: string; severity: number }>
     }
     x: number
     y: number

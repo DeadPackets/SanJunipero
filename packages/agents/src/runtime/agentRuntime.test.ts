@@ -44,7 +44,11 @@ const ZERO_USAGE = {
   outputTokens: { total: 0, text: 0, reasoning: 0 },
 }
 
-const FAST_MIND: Partial<MindConfig> = { idleGapTicks: 0, boredomTicks: 1, bodyAlarm: { hunger: 0, energy: 0, warmth: 0 } }
+const FAST_MIND: Partial<MindConfig> = {
+  idleGapTicks: 0, boredomTicks: 1,
+  // Every rung switched off: these rows drive the cadence themselves.
+  bodyAlarm: { hunger: 0, energy: 0, warmth: 0, thirst: 0, affliction: Infinity },
+}
 
 // Empty 24x24 grass, no structures: the C9 bed law would refuse every sleep these rows drive.
 function fastSimConfig(): SimConfig {

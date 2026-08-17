@@ -8,7 +8,9 @@ export type MindConfig = {
   conversationWindowTicks: number
   idleGapTicks: number
   boredomTicks: number
-  bodyAlarm: { hunger: number; energy: number; warmth: number }
+  // Four clocks that ring when they run low, and one rung that rings when it rises: a named
+  // affliction at or above `affliction` severity is a body failing, and worth waking for.
+  bodyAlarm: { hunger: number; energy: number; warmth: number; thirst: number; affliction: number }
   alarmHysteresis: number
   journalTicks: number
   dozeTicks: number
@@ -23,7 +25,9 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   conversationWindowTicks: 60,
   idleGapTicks: 20,
   boredomTicks: 120,
-  bodyAlarm: { hunger: 25, energy: 15, warmth: 20 },
+  // Thirst empties as hunger does and kills faster, so it rings on the same rung. Any named
+  // affliction rings at its first severity: poison and illness both begin there.
+  bodyAlarm: { hunger: 25, energy: 15, warmth: 20, thirst: 25, affliction: 1 },
   alarmHysteresis: 10,
   journalTicks: 10,
   dozeTicks: 60,
@@ -35,12 +39,29 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
 
 export type BodyNeeds = { hunger: number; energy: number; warmth: number }
 
+// The body the alarm reads. `thirst` and `afflictions` are absent on a packet from before
+// C11, which reads as a full body carrying nothing.
+export type AlarmBody = {
+  needs: BodyNeeds
+  thirst?: number
+  afflictions?: ReadonlyArray<{ kind: string; severity: number }>
+}
+
+// The three needs the alarm has always watched, and the fourth C11 gave it.
+const ALARM_NEEDS = ['hunger', 'energy', 'warmth', 'thirst'] as const
+type AlarmNeed = (typeof ALARM_NEEDS)[number]
+
+const levelOf = (body: AlarmBody, need: AlarmNeed): number =>
+  need === 'thirst' ? body.thirst ?? 100 : body.needs[need]
+
 export type MindClock = {
   lastTurnTick: number
   reconsiderAtTick: number | null
   conversationUntilTick: number
   dozeUntilTick: number
-  alarmArmed: { hunger: boolean; energy: boolean; warmth: boolean }
+  // Keyed by need name and by `affliction:<kind>`. Absent is armed: a rung nobody has spent
+  // yet still rings, so a clock added after a mind woke up needs no migration.
+  alarmArmed: Partial<Record<string, boolean>>
   morningWokeDay: number | null
   wakeRetryAtTick: number
   prevVisibleIds: string[]
@@ -81,19 +102,18 @@ export function decideWake(
     // starving sleeper never recovers past the re-arm point, so the alarm
     // rings again each backoff until the body actually rises.
     if (tick < clock.wakeRetryAtTick) return null
-    if (bodyAlarmBelow(cfg, packet.self.body.needs)) return 'body_alarm'
+    if (bodyAlarmBelow(cfg, packet.self.body)) return 'body_alarm'
     if (!packet.time.isNight && clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)) {
       return 'morning'
     }
     return null
   }
 
-  const needs = packet.self.body.needs
   const sinceLast = tick - clock.lastTurnTick
   const inConversation = tick < clock.conversationUntilTick
 
   // Floor-exempt: physical rousing and immediate surprises.
-  if (bodyAlarmFired(cfg, needs, clock.alarmArmed)) return 'body_alarm'
+  if (bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)) return 'body_alarm'
   if (salientPerception(packet, clock.prevVisibleIds)) return 'salient_perception'
   if (plan.lastResult === 'blocked') return 'plan_blocked'
 
@@ -113,34 +133,43 @@ export function decideWake(
   return null
 }
 
-function bodyAlarmBelow(cfg: MindConfig, needs: BodyNeeds): boolean {
-  for (const need of ['hunger', 'energy', 'warmth'] as const) {
-    if (needs[need] < cfg.bodyAlarm[need]) return true
+// Every rung the body is failing on right now, need and affliction alike, as alarm keys.
+function ringing(cfg: MindConfig, body: AlarmBody): string[] {
+  const keys: string[] = []
+  for (const need of ALARM_NEEDS) {
+    if (levelOf(body, need) < cfg.bodyAlarm[need]) keys.push(need)
   }
-  return false
+  for (const a of body.afflictions ?? []) {
+    if (a.severity >= cfg.bodyAlarm.affliction) keys.push(`affliction:${a.kind}`)
+  }
+  return keys
 }
 
-function bodyAlarmFired(cfg: MindConfig, needs: BodyNeeds, armed: MindClock['alarmArmed']): boolean {
-  for (const need of ['hunger', 'energy', 'warmth'] as const) {
-    if (needs[need] < cfg.bodyAlarm[need] && armed[need]) return true
-  }
-  return false
+function bodyAlarmBelow(cfg: MindConfig, body: AlarmBody): boolean {
+  return ringing(cfg, body).length > 0
 }
 
-// Called every tick: a need that has recovered past threshold + hysteresis
-// re-arms its alarm, so oscillation around the threshold cannot re-fire it.
-export function rearmBodyAlarm(cfg: MindConfig, needs: BodyNeeds, clock: MindClock): void {
-  for (const need of ['hunger', 'energy', 'warmth'] as const) {
-    if (needs[need] >= cfg.bodyAlarm[need] + cfg.alarmHysteresis) clock.alarmArmed[need] = true
+function bodyAlarmFired(cfg: MindConfig, body: AlarmBody, armed: MindClock['alarmArmed']): boolean {
+  return ringing(cfg, body).some((key) => armed[key] ?? true)
+}
+
+// Called every tick: a need that has recovered past threshold + hysteresis re-arms its alarm,
+// so oscillation around the threshold cannot re-fire it. An affliction has no scale to
+// oscillate on — losing it is the recovery, and getting worse is not a second bell.
+export function rearmBodyAlarm(cfg: MindConfig, body: AlarmBody, clock: MindClock): void {
+  for (const need of ALARM_NEEDS) {
+    if (levelOf(body, need) >= cfg.bodyAlarm[need] + cfg.alarmHysteresis) clock.alarmArmed[need] = true
+  }
+  const still = new Set(ringing(cfg, body))
+  for (const key of Object.keys(clock.alarmArmed)) {
+    if (key.startsWith('affliction:') && !still.has(key)) clock.alarmArmed[key] = true
   }
 }
 
-// Called after a successful turn: needs the mind has now seen below threshold
-// stop ringing until they recover past the re-arm point.
-export function disarmBodyAlarm(cfg: MindConfig, needs: BodyNeeds, clock: MindClock): void {
-  for (const need of ['hunger', 'energy', 'warmth'] as const) {
-    if (needs[need] < cfg.bodyAlarm[need]) clock.alarmArmed[need] = false
-  }
+// Called after a successful turn: rungs the mind has now seen itself on stop ringing until
+// it climbs off them.
+export function disarmBodyAlarm(cfg: MindConfig, body: AlarmBody, clock: MindClock): void {
+  for (const key of ringing(cfg, body)) clock.alarmArmed[key] = false
 }
 
 function salientPerception(packet: PerceptionPacket, prevVisibleIds: string[]): boolean {

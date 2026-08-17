@@ -82,7 +82,7 @@ function freshClock(): MindClock {
     reconsiderAtTick: null,
     conversationUntilTick: 0,
     dozeUntilTick: 0,
-    alarmArmed: { hunger: true, energy: true, warmth: true },
+    alarmArmed: {},
     morningWokeDay: null,
     wakeRetryAtTick: 0,
     prevVisibleIds: [],
@@ -204,7 +204,7 @@ export class AgentRuntime {
   #onTick(tick: number): void {
     if (!this.#started) return
     const packet = this.#bridge.perception(this.#agentId)
-    rearmBodyAlarm(this.#config, packet.self.body.needs, this.#clock)
+    rearmBodyAlarm(this.#config, packet.self.body, this.#clock)
     this.#submitPendingIfIdle(packet.self.activity)
     this.#advancePlan(packet)
     this.#answerWakeOwed(packet)
@@ -461,7 +461,7 @@ export class AgentRuntime {
       this.#plan.lastResult = 'idle'
     }
     this.#stats.turns += 1
-    disarmBodyAlarm(this.#config, packet.self.body.needs, this.#clock)
+    disarmBodyAlarm(this.#config, packet.self.body, this.#clock)
     this.#clock.prevVisibleIds = packet.visible.agents.map((a) => a.id)
   }
 
