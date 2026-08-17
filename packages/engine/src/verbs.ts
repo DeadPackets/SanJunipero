@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { MINUTES_PER_DAY, simTimeFromTick, type SimConfig, type StructureRecipeDef } from '@sj/shared'
+import { fertilityAt, MINUTES_PER_DAY, simTimeFromTick, WATER_TILES, type SimConfig, type StructureRecipeDef } from '@sj/shared'
 import { mintId, type Affliction, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
@@ -260,9 +260,7 @@ const tend: VerbDef = makeVerb({
   skill: { track: 'medicine', xp: 1 },
 })
 
-// Standing water and a dug channel are the same thing to a mouth (G4: one definition site;
-// `fill` in Task 12 and `douse` in Task 14 read this too).
-export const WATER_TILES: ReadonlySet<TileId> = new Set<TileId>([2, 10])
+export { WATER_TILES }
 export const VESSEL_KINDS: ReadonlySet<string> = new Set(['waterskin', 'bucket'])
 export const WELL_KIND = 'well'
 
@@ -372,6 +370,34 @@ const till: VerbDef = makeVerb({
   skill: { track: 'farming', xp: 1 },
 })
 
+// Digging is slower than scratching a furrow: four ticks with a spade's worth of effort.
+const DIG_CHANNEL_TICKS = 4
+
+// Water only runs downhill from water. A channel spreads one tile at a time from the river
+// or from what has already been cut, which is why irrigation is a project and not a wish.
+const digChannel: VerbDef = makeVerb({
+  kind: 'dig_channel',
+  duration: () => DIG_CHANNEL_TICKS,
+  validate(state, _config, agentId, params) {
+    const p = TileParams.safeParse(params)
+    if (!p.success) return 'dig_channel needs a tile {x, y}'
+    const tile = tileAt(state, p.data.x, p.data.y)
+    if (tile !== 0 && tile !== 1) return 'only grass or dirt can be dug out'
+    if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to dig'
+    const fed = [[0, -1], [-1, 0], [1, 0], [0, 1]].some(([dx, dy]) => {
+      const t = tileAt(state, p.data.x + dx!, p.data.y + dy!)
+      return t !== null && WATER_TILES.has(t)
+    })
+    if (!fed) return 'no water reaches here'
+    return null
+  },
+  onComplete(state, _config, agentId, params) {
+    const p = TileParams.parse(params)
+    return [{ type: 'tile_changed', payload: { x: p.x, y: p.y, from: tileAt(state, p.x, p.y), to: 10, reason: 'channel', byId: agentId } }]
+  },
+  skill: { track: 'farming', xp: 1 },
+})
+
 const plant: VerbDef = makeVerb({
   kind: 'plant',
   validate(state, config, agentId, params) {
@@ -410,9 +436,11 @@ const harvest: VerbDef = makeVerb({
     const p = HarvestParams.parse(params)
     const crop = state.crops[p.cropId]!
     const def = config.crops[crop.kind]!
+    // Water near the roots is worth more than skill at the sickle: the ground decides the number.
+    const qty = Math.floor(def.yield * fertilityAt(state.terrain, crop.x, crop.y, config))
     return [
       { type: 'crop_harvested', payload: { cropId: p.cropId } },
-      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: crop.kind, qty: def.yield, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId), ...spoilageFor(state, crop.kind, config) } },
+      { type: 'item_spawned', payload: { id: mintId(state, 'item'), kind: crop.kind, qty, loc: { t: 'agent', id: agentId }, ...ownerStamp(config, agentId), ...spoilageFor(state, crop.kind, config) } },
     ]
   },
   skill: { track: 'farming', xp: 1 },
@@ -893,7 +921,7 @@ const experiment: VerbDef = makeVerb({
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
-  drink, fill,
+  drink, fill, dig_channel: digChannel,
   speak, give, take, stow, write, read, inscribe, teach, attack, experiment,
 }
 
