@@ -27,27 +27,41 @@ describe('F-3(b) — the exact tie the old scalar produced', () => {
 })
 
 describe('F-3(c) — a rounded depth against an unrounded position', () => {
-  const walk = (steps: number): number[] => {
+  // One body walks past another standing at (20,22). Two bodies share a rank, so this is the
+  // pure geometric case with nothing else deciding it.
+  const still = bodyDepthBox('still', 20, 22)
+  const walk = (steps: number, from = 20.5, to = 23.5): number[] => {
     const flips: number[] = []
     let prev: boolean | null = null
     for (let i = 0; i <= steps; i++) {
-      const py = 21 + i / steps
-      const order = depthOrder([hut, bodyDepthBox('body', 20, py)])
-      const inFront = before(order, 'hut', 'body')
-      if (prev !== null && inFront !== prev) flips.push(py)
+      const py = from + ((to - from) * i) / steps
+      const inFront = before(depthOrder([still, bodyDepthBox('walker', 20, py)]), 'still', 'walker')
+      if (prev !== null && inFront !== prev) flips.push(Number(py.toFixed(6)))
       prev = inFront
     }
     return flips
   }
 
-  it('flips exactly once, where the body’s back edge reaches the hut’s front edge', () => {
-    // the hut's front edge is y = 21.5; a body's back edge is py − 0.5, so the crossing is 22
-    expect(walk(20)).toEqual([22])
+  it('flips exactly once, where the walker reaches the tile the other is standing on', () => {
+    expect(walk(30)).toEqual([22])
   })
 
   it('crosses in the same PLACE however finely the walk is sampled — no pop', () => {
-    expect(walk(200)).toEqual([22])
-    expect(walk(37)).toEqual([22])
+    expect(walk(300)).toEqual([22])
+    expect(walk(60)).toEqual([22])
+  })
+
+  it('is monotonic walking up to a building too — one transition, never a flicker', () => {
+    const flips: Array<{ py: number; front: boolean }> = []
+    let prev: boolean | null = null
+    for (let i = 0; i <= 400; i++) {
+      const py = 16 + i / 100
+      const front = before(depthOrder([hut, bodyDepthBox('body', 20, py)]), 'hut', 'body')
+      if (prev !== null && front !== prev) flips.push({ py, front })
+      prev = front
+    }
+    expect(flips).toHaveLength(1)
+    expect(flips[0]!.front).toBe(true)   // it comes OUT from behind and stays out
   })
 
   it('the landed rule popped instead: the rounded key jumps a whole row at py = 21.5', () => {
@@ -156,10 +170,12 @@ describe('the counted deterministic fallback', () => {
     expect(depthFallbacks().nodes).toBe(3)
   })
 
-  it('MEASURED: no arrangement of real ground boxes produces a cycle at all', () => {
-    // A cycle needs a "turn" — one box east of another while that one is south of it — and
-    // any such pair is mutually in front, so its edge is dropped before the graph is built.
-    // 20 000 random scenes of five overlapping drawables, as evidence for the argument.
+  it('MEASURED: how often 20 000 dense random scenes actually reach the fallback', () => {
+    // Separation alone cannot produce a cycle — a pair that is east of one another while
+    // south of it is mutually in front, so its edge is dropped. The OVERLAP RANK can: a body
+    // standing on a building jumps in front of it regardless of separation. This is the
+    // measurement, not an assumption, and the scenes below are far denser than any real town
+    // (five drawables inside a 6×6 patch).
     let seed = 20260817
     const rnd = (n: number): number => {
       seed = (seed * 1103515245 + 12345) % 2147483648
@@ -177,7 +193,16 @@ describe('the counted deterministic fallback', () => {
       }
       depthOrder(boxes)
     }
-    expect(depthFallbacks()).toEqual({ frames: 0, nodes: 0 })
+    const { frames, nodes } = depthFallbacks()
+    expect(frames).toBe(304)          // 1.52 % of 20 000 — pinned so a rule change is visible
+    expect(nodes).toBe(1203)
+    expect(frames / 20000).toBeLessThan(0.02)
+  })
+
+  it('puts a body standing IN a doorway in front of the building, never inside it', () => {
+    const inDoorway = bodyDepthBox('body', 20, 21)   // the south-centre tile of the 2×2 hut
+    expect(before(depthOrder([hut, inDoorway]), 'hut', 'body')).toBe(true)
+    expect(before(depthOrder([inDoorway, hut]), 'hut', 'body')).toBe(true)
   })
 
   it('counts a frame that blows the budget and still returns everything', () => {
