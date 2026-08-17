@@ -75,6 +75,31 @@ describe('fold', () => {
     void s
   })
 
+  it('tile_changed rewrites one cell and carries where it came from', () => {
+    let s = genesisState(DEFAULT_CONFIG)
+    s = fold(s, ev(1, 'tile_changed', { x: 2, y: 3, from: 0, to: 8, reason: 'worn' }))
+    expect(s.terrain[3]![2]).toBe(8)
+    expect(s.terrain[3]![1]).toBe(0)
+    expect(s.terrain[2]![2]).toBe(0)
+  })
+  it('tile_changed refuses a from that does not match the ground', () => {
+    const s = genesisState(DEFAULT_CONFIG)
+    expect(() => fold(s, ev(1, 'tile_changed', { x: 2, y: 3, from: 7, to: 8, reason: 'worn' })))
+      .toThrow(/from-mismatch at \(2, 3\)/)
+  })
+  it('tile_changed out of bounds throws, and an unknown reason is rejected', () => {
+    const s = genesisState(DEFAULT_CONFIG)
+    expect(() => fold(s, ev(1, 'tile_changed', { x: 99, y: 0, from: 0, to: 8, reason: 'worn' })))
+      .toThrow(/out of bounds/i)
+    expect(() => fold(s, ev(1, 'tile_changed', { x: 0, y: 0, from: 0, to: 8, reason: 'vibes' }))).toThrow()
+    expect(() => fold(s, ev(1, 'tile_changed', { x: 0, y: 0, from: 0, to: 11, reason: 'worn' }))).toThrow()
+  })
+  it('tile_changed records who did it when a body did it', () => {
+    let s = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
+    s = fold(s, ev(2, 'tile_changed', { x: 0, y: 0, from: 0, to: 7, reason: 'paved', byId: 'a1' }))
+    expect(s.terrain[0]![0]).toBe(7)
+  })
+
   it('bumps counters.nextEntityId on spawn and never lowers it', () => {
     let s = fold(genesisState(DEFAULT_CONFIG), spawn('agent_7'))
     expect(s.counters.nextEntityId).toBe(8)

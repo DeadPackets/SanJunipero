@@ -96,13 +96,15 @@ describe('verb: till', () => {
     expect(submitIntent(s, FAST, 'a1', 'till', { x: 0, y: 0 }).ok).toBe(true) // own tile
   })
 
-  it('converts grass and dirt to farmland via terrain_changed; plant then works there', () => {
+  it('converts grass and dirt to farmland via tile_changed; plant then works there', () => {
     let s = makeWorld([',.', '..'])
     const r = submitIntent(s, FAST, 'a1', 'till', { x: 0, y: 0 })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     const t = tickOnce(s)
-    expect(t.events).toContainEqual({ type: 'terrain_changed', payload: { x: 0, y: 0, tile: 6 } })
+    expect(t.events).toContainEqual({
+      type: 'tile_changed', payload: { x: 0, y: 0, from: 1, to: 6, reason: 'tilled', byId: 'a1' },
+    })
     expect(t.events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'farming', xp: 1 } })
     expect(t.state.terrain[0]![0]).toBe(6)
     expect(submitIntent(t.state, FAST, 'a1', 'plant', { x: 0, y: 0, kind: 'wheat' }).ok).toBe(true)

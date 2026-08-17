@@ -3,9 +3,11 @@ import type { TileId, WorldState } from './state.js'
 
 export type Point = { x: number; y: number }
 
-// grass, dirt, water, forest, rock, sand, farmland, road
+// grass, dirt, water, forest, rock, sand, farmland, road, path, sapling, channel.
+// A channel is impassable but drinkable; a sapling walks like the grass it grew from.
+// Tile 8 takes its cost from `desirePaths.pathCost` once C11 Task 2 lands that section.
 export function terrainCostFor(config: SimConfig): Record<TileId, number> {
-  return { 0: 1, 1: 1, 2: Infinity, 3: 2, 4: 3, 5: 1.2, 6: 1, 7: config.pathing.roadCost }
+  return { 0: 1, 1: 1, 2: Infinity, 3: 2, 4: 3, 5: 1.2, 6: 1, 7: config.pathing.roadCost, 8: 0.8, 9: 1, 10: Infinity }
 }
 
 export const TERRAIN_COST: Record<TileId, number> = terrainCostFor(DEFAULT_CONFIG)

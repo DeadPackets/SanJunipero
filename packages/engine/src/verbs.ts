@@ -230,9 +230,9 @@ const till: VerbDef = makeVerb({
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to till'
     return null
   },
-  onComplete(_state, _config, _agentId, params) {
+  onComplete(state, _config, agentId, params) {
     const p = TileParams.parse(params)
-    return [{ type: 'terrain_changed', payload: { x: p.x, y: p.y, tile: 6 } }]
+    return [{ type: 'tile_changed', payload: { x: p.x, y: p.y, from: tileAt(state, p.x, p.y), to: 6, reason: 'tilled', byId: agentId } }]
   },
   skill: { track: 'farming', xp: 1 },
 })

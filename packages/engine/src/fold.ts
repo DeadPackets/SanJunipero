@@ -12,7 +12,7 @@ import {
   ConfigChanged,
   ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
-  StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
+  StructureProgressed, TerrainChanged, TickAdvanced, TileChanged, WeatherChanged, WildlifeChanged,
 } from './events.def.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { occupantsOf } from './interiors.js'
@@ -485,6 +485,14 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const row = state.terrain[p.y]
       if (!row || p.x < 0 || p.x >= row.length) throw new Error(`terrain_changed out of bounds (${p.x}, ${p.y})`)
       const terrain = state.terrain.map((r, y) => (y === p.y ? r.map((t, x) => (x === p.x ? (p.tile as TileId) : t)) : r))
+      return { ...state, terrain }
+    }
+    case 'tile_changed': {
+      const p = TileChanged.parse(event.payload)
+      const row = state.terrain[p.y]
+      if (!row || p.x < 0 || p.x >= row.length) throw new Error(`tile_changed out of bounds (${p.x}, ${p.y})`)
+      if (row[p.x] !== p.from) throw new Error(`tile_changed from-mismatch at (${p.x}, ${p.y})`)
+      const terrain = state.terrain.map((r, y) => (y === p.y ? r.map((t, x) => (x === p.x ? (p.to as TileId) : t)) : r))
       return { ...state, terrain }
     }
     // The whitelist is the whole of the authority: an operator, a bug or a doctored

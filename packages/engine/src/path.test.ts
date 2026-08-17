@@ -4,7 +4,7 @@ import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { canStep, findPath, isPassable, terrainCostFor, TERRAIN_COST } from './path.js'
 
-const CHAR_TILE: Record<string, TileId> = { '.': 0, d: 1, '~': 2, f: 3, r: 4, s: 5, F: 6, R: 7 }
+const CHAR_TILE: Record<string, TileId> = { '.': 0, d: 1, '~': 2, f: 3, r: 4, s: 5, F: 6, R: 7, p: 8, S: 9, c: 10 }
 const world = (rows: string[]): WorldState =>
   genesisState(DEFAULT_CONFIG, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
@@ -28,6 +28,22 @@ describe('terrain costs', () => {
     expect(TERRAIN_COST[3]).toBe(2)    // forest
     expect(TERRAIN_COST[4]).toBe(3)    // rock
     expect(TERRAIN_COST[2]).toBe(Infinity) // water impassable
+  })
+})
+
+describe('the C11 tiles: path, sapling, channel', () => {
+  it('a worn path is cheaper than grass and dearer than road', () => {
+    const cost = terrainCostFor(DEFAULT_CONFIG)
+    expect(cost[8]).toBe(0.8)
+    expect(cost[7]).toBeLessThan(cost[8]!)
+    expect(cost[8]).toBeLessThan(cost[0]!)
+  })
+  it('a sapling walks like grass and a channel is impassable', () => {
+    expect(terrainCostFor(DEFAULT_CONFIG)[9]).toBe(1)
+    expect(terrainCostFor(DEFAULT_CONFIG)[10]).toBe(Infinity)
+    const s = world(['.c.', 'S..'])
+    expect(isPassable(s, 1, 0)).toBe(false)
+    expect(isPassable(s, 0, 1)).toBe(true)
   })
 })
 
