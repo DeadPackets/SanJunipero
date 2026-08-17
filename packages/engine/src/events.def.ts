@@ -50,6 +50,15 @@ export const ItemEquipped = z.object({
   agentId: z.string(), itemId: z.string(), slot: z.literal('body'),
 }).strict()
 export const ItemUnequipped = z.object({ agentId: z.string(), itemId: z.string() }).strict()
+// C11 light. `burnsUntilTick` rides the event because the fold must not have to know the
+// config to place the flame in time; snuffing carries nothing, because what is left is
+// arithmetic the fold can do from the tick it happened on.
+export const ItemLit = z.object({ itemId: z.string(), burnsUntilTick: z.number().int() }).strict()
+export const ItemSnuffed = z.object({ itemId: z.string() }).strict()
+export const ItemBurnedOut = z.object({ itemId: z.string() }).strict()
+export const StructureFueled = z.object({
+  structureId: z.string(), burnsUntilTick: z.number().int(),
+}).strict()
 export const ItemQtyChanged = z.object({ id: z.string(), delta: z.number() }).strict()
 export const ItemTextChanged = z.object({ id: z.string(), text: z.string() }).strict()
 export const StructurePlanned = z.object({

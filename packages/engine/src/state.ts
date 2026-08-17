@@ -64,6 +64,11 @@ export type Item = {
   spoilage?: { spawnDay: number; days: number }  // absent = keeps forever
   durability?: number                     // absent = never wears; 0 breaks the thing
   charges?: number                        // absent = not a vessel; 0 = a vessel standing empty
+  // A flame and the fuel behind it, never both at once: `litUntilTick` is the tick it burns
+  // down to while alight, `fuelTicks` is what a snuffed one has left. Absent on both means a
+  // torch nobody has struck yet — which is a full one.
+  litUntilTick?: number
+  fuelTicks?: number
   loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
 }
 

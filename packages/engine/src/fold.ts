@@ -9,8 +9,8 @@ import {
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
   AgentDrank, FireExtinguished, FireIgnited, FireSpread, GravePlaced, HpChanged, ThirstChanged,
-  ItemBroke, ItemEquipped, ItemFilled, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled,
-  ItemTaken, ItemUnequipped,
+  ItemBroke, ItemBurnedOut, ItemEquipped, ItemFilled, ItemLit, ItemMoved, ItemOwnerChanged, ItemQtyChanged,
+  ItemSnuffed, ItemSpawned, ItemSpoiled, ItemTaken, ItemUnequipped, StructureFueled,
   ConfigChanged,
   FaunaKilled, FaunaMoved, FaunaSpawned, FaunaStockChanged,
   ForageableDepleted, ForageableRegrown, ForageableSpawned, ForageableStockChanged,
@@ -160,6 +160,38 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (!state.items[p.id]) throw new Error(`item_broke for unknown item ${p.id}`)
       const { [p.id]: _, ...items } = state.items
       return { ...state, items }
+    }
+    // A flame and its fuel are the same number wearing two faces: alight it is the tick the
+    // torch goes out, snuffed it is how many ticks are left in it.
+    case 'item_lit': {
+      const p = ItemLit.parse(event.payload)
+      const item = state.items[p.itemId]
+      if (!item) throw new Error(`item_lit for unknown item ${p.itemId}`)
+      const { fuelTicks: _, ...rest } = item
+      return { ...state, items: { ...state.items, [p.itemId]: { ...rest, litUntilTick: p.burnsUntilTick } } }
+    }
+    case 'item_snuffed': {
+      const p = ItemSnuffed.parse(event.payload)
+      const item = state.items[p.itemId]
+      if (!item) throw new Error(`item_snuffed for unknown item ${p.itemId}`)
+      if (item.litUntilTick === undefined) throw new Error(`item_snuffed for unlit item ${p.itemId}`)
+      const { litUntilTick, ...rest } = item
+      return {
+        ...state,
+        items: { ...state.items, [p.itemId]: { ...rest, fuelTicks: Math.max(0, litUntilTick - event.tick) } },
+      }
+    }
+    case 'item_burned_out': {
+      const p = ItemBurnedOut.parse(event.payload)
+      if (!state.items[p.itemId]) throw new Error(`item_burned_out for unknown item ${p.itemId}`)
+      const { [p.itemId]: _, ...items } = state.items
+      return { ...state, items }
+    }
+    case 'structure_fueled': {
+      const p = StructureFueled.parse(event.payload)
+      const s = state.structures[p.structureId]
+      if (!s) throw new Error(`structure_fueled for unknown structure ${p.structureId}`)
+      return { ...state, structures: { ...state.structures, [p.structureId]: { ...s, fueledUntilTick: p.burnsUntilTick } } }
     }
     case 'item_spoiled': {
       const p = ItemSpoiled.parse(event.payload)

@@ -6,6 +6,7 @@ import type { RngStreams } from './rng.js'
 import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
 import { warmthSystem } from './systems/warmth.js'
+import { lightingSystem } from './systems/lighting.js'
 import { healthSystem } from './systems/health.js'
 import { deathAttribution, escalateFatigue, mortalitySystem, placeGrave } from './systems/mortality.js'
 import { illnessSystem } from './systems/illness.js'
@@ -104,7 +105,7 @@ function collapseDeathSystem(ctx: TickCtx): void {
 // mapGrowth runs before anything that reads a coordinate this tick: after it, every stored
 // position may have moved, and a system holding a pre-growth position would act on the wrong tile.
 const SYSTEMS: System[] = [
-  weatherSystem, mysterySystem, mapGrowthSystem, fireSystem, cropsSystem, wildlifeSystem, faunaSystem, forageSystem, spoilageSystem,
+  weatherSystem, mysterySystem, mapGrowthSystem, fireSystem, cropsSystem, wildlifeSystem, faunaSystem, forageSystem, spoilageSystem, lightingSystem,
   needsSystem, warmthSystem, thirstSystem, healthSystem, mortalitySystem, illnessSystem, desirePathsSystem,
   reproductionSystem, agingSystem, actionsSystem,
   collapseDeathSystem,

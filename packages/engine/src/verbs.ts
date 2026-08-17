@@ -1,11 +1,15 @@
 import { z } from 'zod'
-import { fertilityAt, MINUTES_PER_DAY, simTimeFromTick, WATER_TILES, type SimConfig, type StructureRecipeDef } from '@sj/shared'
+import {
+  fertilityAt, glowRadiusFor, MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
+  type SimConfig, type StructureRecipeDef,
+} from '@sj/shared'
 import { mintId, type Affliction, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
 import { bridgeAt, BRIDGE_KIND, findPath, isPassable } from './path.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 import { fleeTo } from './systems/fauna.js'
+import { HEAT_SOURCE_KINDS } from './systems/warmth.js'
 import { FAUNA_YIELD, type FaunaKind } from './data/faunaDefs.js'
 import { FORAGEABLE_YIELD } from './data/forageables.js'
 
@@ -13,6 +17,7 @@ export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
   | 'walk' | 'sleep' | 'wake' | 'enter' | 'exit' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
   | 'build' | 'craft' | 'extinguish' | 'drink' | 'fill' | 'hunt' | 'wear' | 'doff'
+  | 'kindle' | 'snuff' | 'stoke'
   | 'speak' | 'give' | 'take' | 'stow' | 'write' | 'read' | 'inscribe' | 'teach' | 'attack' | 'experiment'
 
 export type VerbDef = {
@@ -377,6 +382,86 @@ const doff: VerbDef = makeVerb({
   onComplete(state, _config, agentId) {
     const itemId = state.agents[agentId]!.equipped?.body
     return itemId === undefined ? [] : [{ type: 'item_unequipped', payload: { agentId, itemId } }]
+  },
+})
+
+export const KindleParams = z.object({ itemId: z.string() }).strict()
+export const StokeParams = z.object({ structureId: z.string() }).strict()
+
+// A thing you can carry and set alight: it glows, and it is not a building. One table of what
+// glows (`light.glowRadius`) answers both halves, so a codified lantern needs no second list.
+export function isKindleable(config: SimConfig, kind: string): boolean {
+  return glowRadiusFor(config, kind) !== undefined && !HEAT_SOURCE_KINDS.has(kind)
+}
+
+// What is left in this torch: a full one has never been struck, a snuffed one remembers.
+export function fuelLeft(item: { fuelTicks?: number }, config: SimConfig): number {
+  return item.fuelTicks ?? config.light.torchBurnTicks
+}
+
+const kindle: VerbDef = makeVerb({
+  kind: 'kindle',
+  validate(state, config, agentId, params) {
+    const p = KindleParams.safeParse(params)
+    if (!p.success) return 'kindle needs an {itemId}'
+    const item = state.items[p.data.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (!isKindleable(config, item.kind)) return 'that will not take a flame'
+    if (item.litUntilTick !== undefined) return 'it is already lit'
+    if (fuelLeft(item, config) <= 0) return 'it is burnt out'
+    return null
+  },
+  onComplete(state, config, agentId, params) {
+    const p = KindleParams.parse(params)
+    const item = state.items[p.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    if (!isKindleable(config, item.kind) || item.litUntilTick !== undefined) return []
+    const left = fuelLeft(item, config)
+    if (left <= 0) return []
+    return [{ type: 'item_lit', payload: { itemId: p.itemId, burnsUntilTick: state.tick + left } }]
+  },
+})
+
+const snuff: VerbDef = makeVerb({
+  kind: 'snuff',
+  validate(state, _config, agentId, params) {
+    const p = KindleParams.safeParse(params)
+    if (!p.success) return 'snuff needs an {itemId}'
+    const item = state.items[p.data.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (item.litUntilTick === undefined) return 'it is not lit'
+    return null
+  },
+  onComplete(state, _config, agentId, params) {
+    const p = KindleParams.parse(params)
+    const item = state.items[p.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId || item.litUntilTick === undefined) return []
+    return [{ type: 'item_snuffed', payload: { itemId: p.itemId } }]
+  },
+})
+
+export const FUEL_KIND = 'wood'
+
+const stoke: VerbDef = makeVerb({
+  kind: 'stoke',
+  validate(state, _config, agentId, params) {
+    const p = StokeParams.safeParse(params)
+    if (!p.success) return 'stoke needs a {structureId}'
+    const s = state.structures[p.data.structureId]
+    if (!s || !HEAT_SOURCE_KINDS.has(s.kind)) return 'there is no fire there to feed'
+    if (s.stage !== 'complete') return 'it is not finished'
+    if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to the fire'
+    if (heldQty(state, agentId, FUEL_KIND) < 1) return `not enough ${FUEL_KIND}`
+    return null
+  },
+  onComplete(state, config, agentId, params) {
+    const p = StokeParams.parse(params)
+    const s = state.structures[p.structureId]
+    if (!s || !HEAT_SOURCE_KINDS.has(s.kind) || heldQty(state, agentId, FUEL_KIND) < 1) return []
+    return [
+      ...consumeHeld(state, agentId, FUEL_KIND, 1),
+      { type: 'structure_fueled', payload: { structureId: p.structureId, burnsUntilTick: state.tick + config.light.fuelBurnTicks } },
+    ]
   },
 })
 
@@ -1191,7 +1276,7 @@ const experiment: VerbDef = makeVerb({
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
-  drink, fill, dig_channel: digChannel, douse, pave, hunt, wear, doff,
+  drink, fill, dig_channel: digChannel, douse, pave, hunt, wear, doff, kindle, snuff, stoke,
   speak, give, take, stow, write, read, inscribe, teach, attack, experiment,
 }
 
