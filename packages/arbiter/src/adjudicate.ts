@@ -53,6 +53,12 @@ export type AgentCtx = {
   skills: Record<string, number>
   inventory: Array<{ kind: string; qty: number }>
   position: { x: number; y: number }
+  // What the asker can see. Absent from a caller that projects no world — and then the
+  // arbiter judges as it always did, on the asker alone.
+  visible?: {
+    structures: Array<{ kind: string; x: number; y: number }>
+    ground: string[]
+  }
 }
 
 export type ArbiterDeps = {
@@ -129,7 +135,12 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         ? {}
         : {
             itemKinds: new Set([...shown.itemKinds, ...agentCtx.inventory.map((i) => i.kind), ...knownProducts]),
-            structureKinds: new Set(shown.structureKinds),
+            // A building the asker is looking at is a building the ruling may name, whether or
+            // not the town knows how to raise one — the live run denied its own well.
+            structureKinds: new Set([
+              ...shown.structureKinds,
+              ...(agentCtx.visible?.structures ?? []).map((s) => s.kind),
+            ]),
           }),
       knownProducts,
       knownRecipeIds,

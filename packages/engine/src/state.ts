@@ -6,6 +6,22 @@ import type { ForageableKind } from './data/forageables.js'
 export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
 export const MAX_TILE_ID = 10
 
+// The ground a recipe is allowed to name, and the one table for it: the arbiter's
+// `adjacent_tile` requirement reads it forwards, and the ground shown to the arbiter reads it
+// backwards. Road, path, sapling and channel are deliberately absent — a rule may not ask for
+// ground the town has no word for.
+export const RECIPE_TILE_IDS: Readonly<Record<string, TileId>> = {
+  grass: 0, dirt: 1, water: 2, forest: 3, rock: 4, sand: 5, farmland: 6,
+}
+
+const RECIPE_TILE_KIND_BY_ID: ReadonlyMap<TileId, string> = new Map(
+  Object.entries(RECIPE_TILE_IDS).map(([kind, id]) => [id, kind]),
+)
+
+export function recipeTileKind(tile: TileId): string | null {
+  return RECIPE_TILE_KIND_BY_ID.get(tile) ?? null
+}
+
 // The four ways a body can be failing. A named affliction is a cause with a clock on it —
 // `ill: boolean` stays for the C1 logs that only ever knew the one word.
 export const AFFLICTION_KINDS = ['fatigue', 'illness', 'injury', 'poison'] as const

@@ -1,5 +1,5 @@
-import { crafterStamp, registerVerb, skillLevel, VERBS } from '@sj/engine'
-import type { PendingEvent, Structure, TileId, VerbDef, WorldState } from '@sj/engine'
+import { crafterStamp, RECIPE_TILE_IDS, registerVerb, skillLevel, VERBS } from '@sj/engine'
+import type { PendingEvent, Structure, VerbDef, WorldState } from '@sj/engine'
 import type { SimConfig } from '@sj/shared'
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
@@ -7,10 +7,6 @@ import type { RulebookStore } from './rulebook.js'
 import { recipeSanityRefusal } from './sanity.js'
 import { rollOutcomeTable, skillFactor } from './verdict.js'
 import type { OutcomeEffect, Recipe } from './verdict.js'
-
-const TILE_IDS: Record<string, TileId> = {
-  grass: 0, dirt: 1, water: 2, forest: 3, rock: 4, sand: 5, farmland: 6,
-}
 
 function heldStacks(state: WorldState, agentId: string, kind: string) {
   return Object.keys(state.items).sort()
@@ -37,7 +33,7 @@ function anyAdjacentTile(state: WorldState, agentId: string, tile: string): bool
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue
-      if (state.terrain[a.y + dy]?.[a.x + dx] === TILE_IDS[tile]) return true
+      if (state.terrain[a.y + dy]?.[a.x + dx] === RECIPE_TILE_IDS[tile]) return true
     }
   }
   return false

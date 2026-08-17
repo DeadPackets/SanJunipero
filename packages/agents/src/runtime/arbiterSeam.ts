@@ -10,6 +10,12 @@ export type AgentCtx = {
   skills: Record<string, number>
   inventory: Array<{ kind: string; qty: number }>
   position: { x: number; y: number }
+  // The world the asker is standing in. The live run's arbiter ruled three times that the
+  // town has no well while five minds drank from one, because it was shown neither.
+  visible: {
+    structures: Array<{ kind: string; x: number; y: number }>
+    ground: string[]
+  }
 }
 
 export type Verdict =
@@ -53,5 +59,9 @@ export function buildAgentCtx(bridge: EngineBridge, agentId: string): AgentCtx {
     skills: body.skills,
     inventory: packet.self.inventory.map((i) => ({ kind: i.kind, qty: i.qty })),
     position: { x: packet.self.x, y: packet.self.y },
+    visible: {
+      structures: packet.visible.structures.map((s) => ({ kind: s.kind, x: s.x, y: s.y })),
+      ground: bridge.groundKinds(agentId),
+    },
   }
 }

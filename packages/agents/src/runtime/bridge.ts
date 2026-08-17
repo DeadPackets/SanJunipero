@@ -2,6 +2,7 @@ import {
   composePerception,
   isFoodKind,
   isPassable,
+  recipeTileKind,
   submitIntent,
   type EventStore,
   type TickHandler,
@@ -178,6 +179,26 @@ export class EngineBridge {
 
   isEdible(kind: string): boolean {
     return isFoodKind(this.#simConfig, kind)
+  }
+
+  // The ground within sight, in the words a recipe may ask for — sorted, deduplicated, and
+  // silent about tiles the recipe vocabulary has no word for. Terrain is the one thing
+  // perception never projects, and the arbiter has to be able to see the river it rules on.
+  groundKinds(agentId: string): string[] {
+    const state = this.#loop.state
+    const a = state.agents[agentId]
+    if (a === undefined) return []
+    const radius = this.#simConfig.movement.sightRadius
+    const kinds = new Set<string>()
+    for (let y = a.y - radius; y <= a.y + radius; y++) {
+      for (let x = a.x - radius; x <= a.x + radius; x++) {
+        const tile = state.terrain[y]?.[x]
+        if (tile === undefined) continue
+        const kind = recipeTileKind(tile)
+        if (kind !== null) kinds.add(kind)
+      }
+    }
+    return [...kinds].sort()
   }
 
   // Body facts perception does not carry, for the arbiter seam: who is asking

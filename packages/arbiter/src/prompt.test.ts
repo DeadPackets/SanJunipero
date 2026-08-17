@@ -223,6 +223,43 @@ describe('intent fencing (prompt-injection hardening)', () => {
   })
 })
 
+// W2 of the live run: three rulings that the town has no well, while five minds drank from
+// one eight tiles south. The arbiter was handed a name and a skill list and nothing else.
+describe('what stands around the asker', () => {
+  const seeing = (): AdjudicationBlocks => fixtureBlocks({
+    agent: {
+      ...fixtureBlocks().agent,
+      visible: { structures: [{ kind: 'well', x: 14, y: 8 }, { kind: 'hut', x: 10, y: 6 }], ground: ['grass', 'water'] },
+    },
+  })
+
+  it('names every structure in sight and the ground underfoot, in the asker block', () => {
+    const user = assembleAdjudicationPrompt(seeing()).messages[0].content
+    expect(user).toContain('Standing nearby:')
+    expect(user).toContain('a well at 14, 8')
+    expect(user).toContain('a hut at 10, 6')
+    expect(user).toContain('The ground here: grass, water')
+  })
+
+  it('says so plainly when there is nothing in sight, rather than leaving a blank', () => {
+    const user = assembleAdjudicationPrompt(fixtureBlocks({
+      agent: { ...fixtureBlocks().agent, visible: { structures: [], ground: ['grass'] } },
+    })).messages[0].content
+    expect(user).toContain('Standing nearby: nothing but open ground')
+  })
+
+  it('stays in the asker block: the cache-stable system prefix never sees it', () => {
+    const { system } = assembleAdjudicationPrompt(seeing())
+    expect(system).not.toContain('Standing nearby')
+    expect(system).toBe(assembleAdjudicationPrompt(fixtureBlocks()).system)
+  })
+
+  it('never names the machinery', () => {
+    const user = assembleAdjudicationPrompt(seeing()).messages[0].content
+    expect(user).not.toMatch(FORBIDDEN_FRAMING)
+  })
+})
+
 describe('framing-free outputs contract', () => {
   it('FORBIDDEN_FRAMING catches A.I., plural models, and tools', () => {
     for (const bad of ['the A.I. decided', 'our models', 'tools']) {

@@ -10,6 +10,12 @@ export type AdjudicationBlocks = {
     skills: Record<string, number>
     inventory: Array<{ kind: string; qty: number }>
     position: { x: number; y: number }
+    // What stands around the asker and what the ground is. Rendered into the asker block,
+    // never into the cache-stable system prefix: it changes with every step taken.
+    visible?: {
+      structures: Array<{ kind: string; x: number; y: number }>
+      ground: string[]
+    }
   }
   precedent: Array<{ summary: string; verdictKind: string; recipeName?: string }>
   // The words for stuff. Every material and building the recipe may name has to be on the
@@ -68,7 +74,19 @@ function renderAgent(agent: AdjudicationBlocks['agent']): string {
     'Inventory:',
     inventory,
     `Position: ${agent.position.x}, ${agent.position.y}`,
+    ...renderVisible(agent.visible),
   ].join('\n')
+}
+
+// A ruling about a place is a ruling about ground the arbiter can see. Anything named here is
+// a word the ruling may use, so it goes into the enforced vocabulary too (canon-vocabulary law).
+function renderVisible(visible: AdjudicationBlocks['agent']['visible']): string[] {
+  if (visible === undefined) return []
+  const standing = visible.structures.map((s) => `a ${s.kind} at ${s.x}, ${s.y}`).join('; ')
+  return [
+    `Standing nearby: ${standing.length > 0 ? standing : 'nothing but open ground'}`,
+    `The ground here: ${visible.ground.join(', ')}`,
+  ]
 }
 
 function renderPrecedent(precedent: AdjudicationBlocks['precedent']): string {
