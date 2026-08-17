@@ -18,9 +18,9 @@
     "deframed": 0
   },
   "terrain:grass:0": {
-    "h": 6.85,
-    "v": 2.89,
-    "ring": 1.38,
+    "h": 2.23,
+    "v": 0.58,
+    "ring": 0.65,
     "deframed": 0
   },
   "terrain:road:0": {

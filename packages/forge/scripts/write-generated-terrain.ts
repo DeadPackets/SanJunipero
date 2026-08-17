@@ -15,7 +15,10 @@ import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import {
   SHEET_COLS, SHEET_ROWS, TERRAIN_TILE_H, TERRAIN_TILE_W, paintScaffolding, seasonTileNames,
 } from '../src/terrainTiles.js'
-import { ROAD_MATERIAL_ID, borderReport, deframe, seamReport, stencilRoadTile } from '../src/terrainGen.js'
+import {
+  MATERIAL_GRADES, ROAD_MATERIAL_ID, borderReport, deframe, gradeMaterial, materialContrast,
+  materialMean, seamReport, stencilRoadTile,
+} from '../src/terrainGen.js'
 import { MATERIALS_DIR, seasonSheets } from '../src/terrainIngest.js'
 import { paintRoadAutotile } from '../src/roadTiles.js'
 
@@ -51,7 +54,16 @@ for (const stale of readdirSync(MATERIALS_DIR)) {
 }
 const provenance: Record<string, { h: number; v: number; ring: number; deframed: number }> = {}
 for (const [assetId, raw] of [...book]) {
-  const { material, passes } = deframe(raw)
+  const { material: deframed, passes } = deframe(raw)
+  // tone grading, measured against the v1 materials the user accepted structurally
+  const kindOf = /^terrain:([a-z]+):0$/.exec(assetId)?.[1] ?? ''
+  const grade = MATERIAL_GRADES[kindOf]
+  const material = grade === undefined ? deframed : gradeMaterial(deframed, grade)
+  if (grade !== undefined) {
+    console.log(`  ${assetId.padEnd(24)} graded  mean ${materialMean(deframed).map((v) => Math.round(v)).join(',')}` +
+      ` -> ${materialMean(material).map((v) => Math.round(v)).join(',')}` +
+      `  contrast ${materialContrast(deframed).toFixed(0)} -> ${materialContrast(material).toFixed(0)}`)
+  }
   book.set(assetId, material)
   const seam = seamReport(material), border = borderReport(material)
   provenance[assetId] = {

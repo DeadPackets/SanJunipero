@@ -4,8 +4,8 @@ import type { TileId } from '@sj/engine/state'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { ROAD_TILE_ID } from './tileset.js'
 import {
-  MATERIAL_REPEAT_PX, ROAD_UNDER, groundField, materialUv, resolveMaterial, roadArms,
-  roadRibbonPolys, roadStripFrame,
+  MATERIAL_REPEAT_PX, ROAD_UNDER, groundArtSignature, groundField, materialUv, resolveMaterial,
+  roadArms, roadRibbonPolys, roadStripFrame,
 } from './groundField.js'
 
 const material = (kind: string, seq: number): AssetRecord => ({
@@ -140,13 +140,29 @@ describe('road silhouettes', () => {
   })
 
   it('reaches the shared edge so a run joins up with no gap', () => {
-    // the n arm must end ON the midpoint of the upper-right edge, which is where the
-    // neighbouring tile's s arm arrives from the other side. roadTiles.ts paints that same
-    // point at (23,4) of a 32x16 cell — (+7,-4) from the centre, so (8,4) from the top vertex.
+    // the n arm's far edge IS the diamond's upper-right edge, whose midpoint is where the
+    // neighbouring tile's s arm arrives. roadTiles.ts paints that same point at (23,4) of a
+    // 32x16 cell — (+7,-4) from the centre, so (8,4) from the top vertex.
     const n = roadRibbonPolys('straight-ns')[1]!
-    const farMid = [(n[4]! + n[6]!) / 2, (n[5]! + n[7]!) / 2]
-    expect(farMid[0]).toBeCloseTo(8, 5)
-    expect(farMid[1]).toBeCloseTo(4, 5)
+    expect([(n[2]! + n[4]!) / 2, (n[3]! + n[5]!) / 2]).toEqual([8, 4])
+  })
+
+  it('an arm owns its whole QUADRANT — a narrow band is what made roads vanish at 1x', () => {
+    // the painter fills the diamond and removes the wedge of every ABSENT arm, so a straight
+    // run covers half its tile. Area of the two arm triangles of `straight-ns` must be half
+    // the diamond, not a thin ribbon.
+    const area = (p: number[]): number => {
+      let a = 0
+      for (let i = 0, j = p.length / 2 - 1; i < p.length / 2; j = i++) {
+        a += (p[j * 2]! + p[i * 2]!) * (p[j * 2 + 1]! - p[i * 2 + 1]!)
+      }
+      return Math.abs(a / 2)
+    }
+    const diamond = (TILE_W * TILE_H) / 2
+    const arms = roadRibbonPolys('straight-ns').slice(1).reduce((s2, p) => s2 + area(p), 0)
+    expect(arms).toBeCloseTo(diamond / 2, 5)
+    // and a crossroads covers the whole tile
+    expect(roadRibbonPolys('cross').slice(1).reduce((s2, p) => s2 + area(p), 0)).toBeCloseTo(diamond, 5)
   })
 
   it('is deterministic and carries no per-tile term', () => {
@@ -206,5 +222,45 @@ describe('the ground carries no tile-frequency pattern', () => {
     for (const shape of groundField(field(16, 0), []).layers[0]!.shapes) {
       expect(Object.keys(shape).sort()).toEqual(['roadKey', 'sx', 'sy'])
     }
+  })
+})
+
+
+// FPS REGRESSION GUARD. The ground bake tessellates every tile outline on the map, and it was
+// firing once per ASSET MESSAGE. With the C13 library ingested that is ~166 messages back to
+// back — enough main-thread blocking that requestAnimationFrame itself (which is what the FPS
+// overlay counts, not the Pixi ticker) fell to 0.2 frames per second. Only terrain records can
+// change the ground; nothing else may trigger a bake.
+describe('groundArtSignature', () => {
+  const rec = (klass: string, kind: string, seq: number): AssetRecord => ({
+    id: `r${seq}`, seq, class: klass as 'terrain', kind, status: 'ready', desc: kind, meta: null,
+    footprint: { w: 1, h: 1 }, widthPx: 8, heightPx: 8,
+    score: 10, attempts: 1, costUsd: 0, createdAt: '2026-08-17T00:00:00Z',
+  })
+
+  it('moves when terrain art arrives', () => {
+    const before = [rec('terrain', 'grass', 1)]
+    expect(groundArtSignature(before)).toBe(1)
+    expect(groundArtSignature([...before, rec('terrain', 'water', 2)])).toBe(2)
+  })
+
+  it('does NOT move for the hundred library records that caused the stall', () => {
+    const terrain = [rec('terrain', 'grass', 1), rec('terrain', 'road', 2)]
+    const sig = groundArtSignature(terrain)
+    const withLibrary = [...terrain]
+    for (let i = 0; i < 100; i++) withLibrary.push(rec('item', `thing-${i}`, 10 + i))
+    for (let i = 0; i < 11; i++) withLibrary.push(rec('building', `b-${i}`, 200 + i))
+    withLibrary.push(rec('rig-part', 'character:omar', 400))
+    expect(groundArtSignature(withLibrary)).toBe(sig)
+  })
+
+  it('ignores art that is not ready yet', () => {
+    const pending = { ...rec('terrain', 'grass', 3), status: 'placeholder' as const }
+    expect(groundArtSignature([pending])).toBe(0)
+  })
+
+  it('is cheap and pure — it runs on every store notify', () => {
+    const many = Array.from({ length: 500 }, (_, i) => rec(i % 3 === 0 ? 'terrain' : 'item', `k${i}`, i + 1))
+    expect(groundArtSignature(many)).toBe(groundArtSignature(many))
   })
 })

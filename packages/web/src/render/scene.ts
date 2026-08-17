@@ -5,7 +5,9 @@ import type { TileId } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
-import { groundField, roadRibbonPolys } from './groundField.js'
+import {
+  ROAD_SHOULDER, groundArtSignature, groundField, roadRibbonPolys, roadShoulderPolys,
+} from './groundField.js'
 import { TextureBook } from './textures.js'
 
 export const BACKGROUND = 0x322b38
@@ -36,6 +38,24 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
     if (target === null) return
     const layer = new Container()
     for (const l of groundField(terrain, records).layers) {
+      // A road needs a rim or it disappears into the grass at 1x — v1's art carried a painted
+      // edge and the material does not. Every shoulder is laid down BEFORE any ribbon, so a
+      // neighbour's rim can never sit on top of this tile's surface.
+      if (l.kind === 'road') {
+        const sh = new Graphics()
+        for (const shape of l.shapes) {
+          if (shape.roadKey === null) continue
+          for (const poly of roadShoulderPolys(shape.roadKey)) {
+            const pts: number[] = []
+            for (let i = 0; i < poly.length; i += 2) {
+              pts.push(shape.sx + offX + poly[i]!, shape.sy + poly[i + 1]!)
+            }
+            sh.poly(pts)
+          }
+        }
+        sh.fill(ROAD_SHOULDER)
+        layer.addChild(sh)
+      }
       const g = new Graphics()
       for (const shape of l.shapes) {
         const cx = shape.sx + offX, cy = shape.sy
@@ -236,26 +256,43 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
 
   // bake on first snapshot and whenever the terrain array identity changes
   let bakedTerrain: TileId[][] | null = null
-  let bakedAssetsSeq = -1
+  let bakedArtSig = -1
+  // A bake tessellates every tile outline on the map, so it must never run more than once a
+  // frame — and it must not run at all for art the ground does not use. Booting used to fire
+  // one full bake PER ASSET MESSAGE; with the library ingested that is ~166 of them back to
+  // back, which blocks the main thread hard enough that requestAnimationFrame itself drops to
+  // fractions of a frame per second. Mark dirty, bake once on the next tick.
+  let dirty = false
+  const bakeTick = (): void => {
+    if (!dirty || bakedTerrain === null) return
+    dirty = false
+    rebakeGround(bakedTerrain)
+  }
+  app.ticker.add(bakeTick)
+
   const offSub = store.subscribe(() => {
     const s = store.getState()
     if (s === null) return
-    // terrain art arriving is a rebake trigger too — the flat diamonds hot-swap to tiles
-    const artChanged = store.assetsSeq() !== bakedAssetsSeq
-    if (s.terrain !== bakedTerrain || artChanged) {
-      const first = bakedTerrain === null
-      bakedTerrain = s.terrain
-      bakedAssetsSeq = store.assetsSeq()
+    // terrain art arriving is a rebake trigger too — the flat ground hot-swaps to materials
+    const sig = groundArtSignature(store.assetRecords())
+    if (s.terrain === bakedTerrain && sig === bakedArtSig) return
+    const first = bakedTerrain === null
+    bakedTerrain = s.terrain
+    bakedArtSig = sig
+    if (first) {
+      // the very first map appears immediately; every later one waits for the frame
       rebakeGround(s.terrain)
-      if (first) centerOn(s.terrain[0]!.length / 2, s.terrain.length / 2)
+      centerOn(s.terrain[0]!.length / 2, s.terrain.length / 2)
+      return
     }
+    dirty = true
   })
   const offEvents = store.onEvents((evts) => {
     if (evts.some((ev) => ev.type === 'terrain_changed')) {
       const s = store.getState()
       if (s !== null) {
         bakedTerrain = s.terrain
-        rebakeGround(s.terrain)
+        dirty = true
       }
     }
   })
@@ -308,6 +345,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       offEvents()
       ro.disconnect()
       app.ticker.remove(followTick)
+      app.ticker.remove(bakeTick)
       app.canvas.removeEventListener('wheel', onWheel)
       baker.destroy()
       app.destroy(true, { children: true })

@@ -33,6 +33,16 @@ export function materialUv(sx: number, sy: number, repeat: number = MATERIAL_REP
   return { u: wrap(sx), v: wrap(sy) }
 }
 
+// What the GROUND cares about in the codex. `assetsSeq` counts every asset that has ever
+// arrived, so with the library ingested (50 items = 100 records) a bed sprite landing was
+// re-baking the whole map. Only terrain records can change the ground, and records are
+// append-only, so counting them is a complete signature and costs one pass.
+export function groundArtSignature(records: AssetRecord[]): number {
+  let n = 0
+  for (const r of records) if (r.class === 'terrain' && r.status === 'ready') n++
+  return n
+}
+
 export function resolveMaterial(records: AssetRecord[], kind: TerrainTileKind): string | null {
   let best: AssetRecord | null = null
   for (const r of records) {
@@ -148,26 +158,50 @@ export function roadArms(key: RoadAutotileKey): Record<ArmDir, boolean> {
 const toScreen = (dx: number, dy: number): [number, number] =>
   [(dx - dy) * (TILE_W / 2), (dx + dy) * (TILE_H / 2) + TILE_H / 2]
 
+// A road read as a path in v1 because the art carried a painted edge where it met grass.
+// The v2 ribbon fills flat material with no boundary at all, which is why runs "nearly
+// vanished" at 1x. The shoulder is the same silhouette grown slightly and drawn UNDER the
+// ribbon, so every run keeps a dark rim without any new art.
+export const SHOULDER_GROW = 1.22
+export const ROAD_SHOULDER = 0xb89d7e     // v1's own ROAD_EDGE, a MASTER_PALETTE member
+
+export function roadShoulderPolys(key: RoadAutotileKey): number[][] {
+  const centre = TILE_H / 2
+  return roadRibbonPolys(key).map((poly) => {
+    const out: number[] = []
+    for (let i = 0; i < poly.length; i += 2) {
+      out.push(poly[i]! * SHOULDER_GROW, centre + (poly[i + 1]! - centre) * SHOULDER_GROW)
+    }
+    return out
+  })
+}
+
 /**
  * Polygons covering one road cell, in screen coords relative to the tile's TOP VERTEX.
- * A central stub, plus a quad reaching to the edge midpoint of every present arm.
+ *
+ * This reproduces what roadTiles.ts PAINTS, which is not a narrow band: the painter fills the
+ * whole diamond and then removes the outer wedge of every quadrant the key has no arm for. So
+ * a present arm owns its entire QUADRANT — half the tile for a straight run — and only the
+ * central core survives in the directions the road does not continue. A narrow-band version
+ * of this made roads read as faint dotted ribbons at 1x.
  */
 export function roadRibbonPolys(key: RoadAutotileKey): number[][] {
-  const h = ARM_HALF_W
+  const c = ARM_HALF_W
+  // the core stub, always kept, so an isolated tile is still a piece of road
   const polys: number[][] = [
-    [...toScreen(-h, -h), ...toScreen(h, -h), ...toScreen(h, h), ...toScreen(-h, h)],
+    [...toScreen(-c, -c), ...toScreen(c, -c), ...toScreen(c, c), ...toScreen(-c, c)],
   ]
+  // each arm is the quadrant it points into: |v| >= |u| for n/s, |u| >= |v| for e/w
+  const QUADRANT: Record<ArmDir, ReadonlyArray<readonly [number, number]>> = {
+    n: [[0, 0], [-0.5, -0.5], [0.5, -0.5]],
+    e: [[0, 0], [0.5, -0.5], [0.5, 0.5]],
+    s: [[0, 0], [0.5, 0.5], [-0.5, 0.5]],
+    w: [[0, 0], [-0.5, 0.5], [-0.5, -0.5]],
+  }
   const arms = roadArms(key)
   for (const dir of Object.keys(ARM_DIRS) as ArmDir[]) {
     if (!arms[dir]) continue
-    const [ax, ay] = ARM_DIRS[dir]
-    // perpendicular in tile space, so the arm keeps its width under the dimetric skew
-    const [px, py] = [-ay * h, ax * h]
-    const [tx, ty] = [ax * 0.5, ay * 0.5]      // the shared edge midpoint, half a tile out
-    polys.push([
-      ...toScreen(-px, -py), ...toScreen(px, py),
-      ...toScreen(tx + px, ty + py), ...toScreen(tx - px, ty - py),
-    ])
+    polys.push(QUADRANT[dir].flatMap(([dx, dy]) => toScreen(dx, dy)))
   }
   return polys
 }

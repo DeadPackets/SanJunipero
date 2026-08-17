@@ -296,6 +296,67 @@ export function deframe(m: RawImage): { material: RawImage; passes: number } {
   return { material: out, passes: DEFRAME_MAX_PASSES }
 }
 
+// TONE GRADING ($0, deterministic, no regeneration). Measured against the v1 materials the
+// user accepted structurally: v1 grass mean [151,184,119] with contrast SD 11; the v2
+// generation came back [146,160,116] at SD 21 — a third of the green gone (G-R fell from +33
+// to +14) and twice the noise, which is exactly "washed-out grey-green" that "reads as static
+// rather than texture" at 1x. Grading fixes both without paying for new art.
+export type Grade = {
+  targetMean?: readonly [number, number, number]
+  contrast?: number
+  /** drop the warm half of MASTER_PALETTE before quantizing (see COOL_PALETTE) */
+  coolOnly?: boolean
+}
+
+// Quantizing a green-grey midtone against the WHOLE palette lets it snap to dusty rose or
+// ember, which is why the graded grass came out flecked with pink at 1x. A ground that is
+// green has no business borrowing the warm ramp, so grass quantizes against the palette
+// minus its warm entries. Everything else keeps the full palette.
+export function coolPalette(): ReturnType<typeof paletteRgb> {
+  return paletteRgb().filter((p) => p[0] <= p[1] + 18)
+}
+
+export function materialMean(m: RawImage): [number, number, number] {
+  let r = 0, g = 0, b = 0, n = 0
+  for (let i = 0; i < m.data.length; i += 4) { r += m.data[i]!; g += m.data[i + 1]!; b += m.data[i + 2]!; n++ }
+  return n === 0 ? [0, 0, 0] : [r / n, g / n, b / n]
+}
+
+export function materialContrast(m: RawImage): number {
+  const mean = materialMean(m)
+  const mid = (mean[0] + mean[1] + mean[2]) / 3
+  let sd = 0, n = 0
+  for (let i = 0; i < m.data.length; i += 4) {
+    sd += (((m.data[i]! + m.data[i + 1]! + m.data[i + 2]!) / 3) - mid) ** 2
+    n++
+  }
+  return n === 0 ? 0 : Math.sqrt(sd / n)
+}
+
+// Contrast first (pull each pixel toward the material's own mean), then the mean shift, then
+// back onto MASTER_PALETTE so the result is still palette-true.
+export function gradeMaterial(m: RawImage, grade: Grade): RawImage {
+  const k = grade.contrast ?? 1
+  const from = materialMean(m)
+  const out: RawImage = { width: m.width, height: m.height, data: new Uint8ClampedArray(m.data) }
+  for (let i = 0; i < out.data.length; i += 4) {
+    for (let c = 0; c < 3; c++) out.data[i + c] = from[c]! + (m.data[i + c]! - from[c]!) * k
+  }
+  if (grade.targetMean !== undefined) {
+    const now = materialMean(out)
+    for (let i = 0; i < out.data.length; i += 4) {
+      for (let c = 0; c < 3; c++) out.data[i + c] = out.data[i + c]! + (grade.targetMean[c]! - now[c]!)
+    }
+  }
+  return quantize(out, grade.coolOnly === true ? coolPalette() : paletteRgb())
+}
+
+// Targets measured off the v1 materials, which the user accepted structurally.
+export const MATERIAL_GRADES: Record<string, Grade> = {
+  grass: { targetMean: [151, 184, 119], contrast: 0.6, coolOnly: true },
+  road: { targetMean: [205, 183, 148], contrast: 0.85 },
+}
+
 // The picture the vision judge scores TILING on: the same square nine times, so a seam or a
 // recurring blob is the only thing that can stand out.
 export function selfTile3x3(m: RawImage): RawImage {
