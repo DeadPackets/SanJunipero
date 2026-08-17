@@ -90,6 +90,55 @@ export function hitTightness(poly: number[], figureW: number, figureH: number, s
   return (polygonArea(poly) * k * k) / (figureW * k * (figureH * k))
 }
 
+// ── the door, as part of the building it belongs to (U11, plan task 73) ──────────────────
+//
+// THE DEFECT: the door was a Graphics rounded rect in ink at 50 % alpha, 10 × 13 world px,
+// drawn as a SIBLING of its building at `structureZIndex + 1` — so it painted over anyone
+// standing in the doorway (U11's dark rectangle) and its tiny target lost every contest with
+// the 52 × 72 body box. P9d is repealed: the door is a CHILD of its building sprite, so it
+// inherits the building's depth and can never sort against it.
+
+/** The frontage plate, in tiles. Inflated to HIT_MIN_PX where a 1×1 frontage would be
+ *  smaller than a pointer can reliably find. */
+export const DOOR_W_TILES = 0.55, DOOR_H_TILES = 0.85
+const TILE_PX = 32   // iso.TILE_W — a tile of width is also a tile of height up a wall
+
+/**
+ * The door's rect in the PARENT sprite's local space, derived from the footprint rather than
+ * from two hardcoded pixel constants. A child inherits the parent's scale, so the local rect
+ * is divided by it and the SCREEN size is constant at any art resolution.
+ */
+export function doorLocalRect(
+  footprint: { w: number; h: number }, scale: number,
+): { x: number; y: number; w: number; h: number } {
+  const k = scale === 0 ? 1 : scale
+  const w = Math.max(DOOR_W_TILES * TILE_PX, HIT_MIN_PX)
+  const h = Math.max(DOOR_H_TILES * TILE_PX, HIT_MIN_PX)
+  // the door tile as an offset from the footprint's centre — the same south-face,
+  // centre-of-frontage rule `doorTileOf` applies in world tiles
+  const ddx = ((footprint.w - 1) >> 1) - (footprint.w / 2 - 0.5)
+  const ddy = footprint.h - 1 - (footprint.h / 2 - 0.5)
+  const cx = (ddx - ddy) * (TILE_PX / 2)
+  const cy = (ddx + ddy) * (TILE_PX / 4) + TILE_PX / 4   // the tile's centre, not its top vertex
+  return { x: (cx - w / 2) / k, y: (cy - h) / k, w: w / k, h: h / k }
+}
+
+/** Priority when two hit-testable things genuinely overlap. Lower wins. A door beats a body
+ *  BECAUSE a door is a destination and a body has a whole panel of its own; a body beats a
+ *  building because a building's story is one popover. */
+export const HIT_PRIORITY: Readonly<Record<'door' | 'agent' | 'item' | 'crop' | 'structure', number>> =
+  { door: 0, agent: 1, item: 2, crop: 3, structure: 4 }
+
+export function resolveHit(
+  candidates: ReadonlyArray<{ kind: keyof typeof HIT_PRIORITY; id: string }>,
+): string | null {
+  let best: { kind: keyof typeof HIT_PRIORITY; id: string } | null = null
+  for (const c of candidates) {
+    if (best === null || HIT_PRIORITY[c.kind] < HIT_PRIORITY[best.kind]) best = c
+  }
+  return best?.id ?? null
+}
+
 /** The landed rectangle, as a polygon, so the before-state can be measured not remembered. */
 export function legacyHitRectPolygon(w: number, h: number, scale: number): number[] {
   const k = scale === 0 ? 1 : scale

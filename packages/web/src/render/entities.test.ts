@@ -1,10 +1,11 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { Structure } from '@sj/engine/state'
 import { TILE_H, depthKey, tileToScreen } from './iso.js'
 import {
-  BUILDING_PX_PER_TILE, ENTERABLE_KINDS, doorTileOf, doorZIndex, footprintHitPoints,
-  structureZIndex,
+  BUILDING_PX_PER_TILE, ENTERABLE_KINDS, doorTileOf, footprintHitPoints, structureZIndex,
 } from './entities.js'
+import { HIT_MIN_PX, doorLocalRect, resolveHit } from './hitShapes.js'
 import { rendersOnMap } from './characters.js'
 
 // FIX ROUND 2 defect 2: the door affordance was drawn at the door TILE's depth, but the
@@ -37,31 +38,63 @@ describe('doorTileOf', () => {
   })
 })
 
-describe('the door out-ranks its own building', () => {
-  it('takes the pointer at the door tile, whatever the footprint', () => {
-    for (const [w, h] of SHAPES) {
-      const s = box(10, 10, w, h)
-      expect(doorZIndex(s), `${w}x${h}`).toBeGreaterThan(structureZIndex(s))
+// P9d IS REPEALED (controller ruling R6). The door used to be a SIBLING of its building at
+// `structureZIndex + 1`, which is how it painted over anybody standing in the doorway (U11)
+// and how its 10 × 13 target lost every contest with the 52 × 72 body box (audit M5). It is
+// now a CHILD of the building sprite: a child cannot sort against its parent, and Pixi
+// hit-tests children before parents, so the door wins its own click with no priority table.
+describe('the door is part of the building', () => {
+  const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
+
+  it('is added to the SPRITE, not to the scene', () => {
+    expect(src).toContain('entry.sprite.addChild(door)')
+    expect(src).not.toContain('scene.layers.entities.addChild(door)')
+  })
+
+  it('has no depth of its own any more — doorZIndex is deleted, and that is the test', () => {
+    expect(src).not.toContain('doorZIndex')
+    expect(src).not.toContain('DOOR_Z_OVER_BUILDING')
+  })
+
+  it('is a threshold in palette tokens, not a dark rounded rectangle', () => {
+    expect(src).toContain('DOOR_RECESS')
+    expect(src).toContain('DOOR_LINTEL')
+    expect(src).toContain('DOOR_STEP')
+    expect(src).not.toContain('roundRect(-DOOR_W')
+  })
+
+  it('gives a 1×1 frontage a target at least HIT_MIN_PX in both axes — it was 10 × 13', () => {
+    const r = doorLocalRect({ w: 1, h: 1 }, 1)
+    expect(r.w).toBeGreaterThanOrEqual(HIT_MIN_PX)
+    expect(r.h).toBeGreaterThanOrEqual(HIT_MIN_PX)
+    expect([10, 13].every((v) => v >= HIT_MIN_PX)).toBe(false)   // the landed size, for the record
+  })
+
+  it('scales inversely with the sprite, so the door is one size on screen', () => {
+    for (const scale of [0.0625, 0.25, 1, 2]) {
+      const r = doorLocalRect({ w: 2, h: 2 }, scale)
+      expect(r.w * scale, `scale ${scale}`).toBeCloseTo(doorLocalRect({ w: 2, h: 2 }, 1).w, 9)
+      expect(r.h * scale, `scale ${scale}`).toBeCloseTo(doorLocalRect({ w: 2, h: 2 }, 1).h, 9)
     }
   })
 
-  it('was the bug: the door tile\'s own depth loses to the building by a whole row', () => {
-    const s = box(10, 10, 2, 2)
-    const d = doorTileOf(s)
-    expect(depthKey(d.x, d.y)).toBeLessThan(structureZIndex(s))   // the old value — pointer lost
-    expect(doorZIndex(s)).toBeGreaterThan(structureZIndex(s))     // the new one — pointer won
+  it('sits on the south face, centred on the frontage the resident walks out of', () => {
+    for (const [w, h] of SHAPES) {
+      const r = doorLocalRect({ w, h }, 1)
+      const s = box(10, 10, w, h)
+      const d = doorTileOf(s)
+      // the door tile's centre, expressed against the sprite's own origin
+      const ddx = d.x - s.x - (w / 2 - 0.5), ddy = d.y - s.y - (h / 2 - 0.5)
+      expect(r.x + r.w / 2, `${w}x${h}`).toBeCloseTo((ddx - ddy) * 16, 9)
+      expect(r.y + r.h, `${w}x${h}`).toBeCloseTo((ddx + ddy) * 8 + 8, 9)
+    }
   })
 
-  it('still lets a building one row nearer the camera occlude the door behind it', () => {
-    const back = box(10, 10, 2, 2)
-    const front = box(10, 12, 2, 2)          // two rows south — unambiguously in front
-    expect(structureZIndex(front)).toBeGreaterThan(doorZIndex(back))
-  })
-
-  it("rides just above its own building, not above the whole map", () => {
-    const s = box(10, 10, 2, 2)
-    // the door rides just above its building, not above the whole map
-    expect(doorZIndex(s) - structureZIndex(s)).toBeLessThan(1000)
+  it('resolveHit: a door beats a body, a body beats a building, nothing beats nothing', () => {
+    expect(resolveHit([{ kind: 'agent', id: 'a' }, { kind: 'door', id: 'd' }])).toBe('d')
+    expect(resolveHit([{ kind: 'structure', id: 's' }, { kind: 'agent', id: 'a' }])).toBe('a')
+    expect(resolveHit([{ kind: 'crop', id: 'c' }, { kind: 'item', id: 'i' }])).toBe('i')
+    expect(resolveHit([])).toBeNull()
   })
 })
 

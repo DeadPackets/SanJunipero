@@ -1,4 +1,4 @@
-import { Graphics, Polygon, Sprite, Texture, type FederatedPointerEvent } from 'pixi.js'
+import { Graphics, Polygon, Rectangle, Sprite, Texture, type FederatedPointerEvent } from 'pixi.js'
 import { INTERIOR_KINDS, tickToMoment } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
@@ -7,6 +7,7 @@ import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
 import { structureDepthBox, tileDepthBox, type DepthBox } from './depth.js'
 import { TILE_H, depthKey, tileToScreen } from './iso.js'
 import type { DepthEntry } from './layers.js'
+import { doorLocalRect } from './hitShapes.js'
 import { createNameTagLayer, type NameTagLayer } from './nameTags.js'
 import type { Scene } from './scene.js'
 import {
@@ -27,27 +28,24 @@ export const BUILD_TICKS_FULL = 2880 // pip denominator — DEFAULT_CONFIG const
 // The door a resident walks out of: south face, centre of the frontage. The same rule the
 // C13 city template applies in template space (`doorTile`), read here in world tiles.
 export const ENTERABLE_KINDS: ReadonlySet<string> = new Set(INTERIOR_KINDS)
-export const DOOR_W = 10, DOOR_H = 13
-export const DOOR_FILL = 0x43394a, DOOR_STEP = 0xf2c879
-export const DOOR_IDLE_ALPHA = 0.5
+
+// A THRESHOLD, NOT A DARK RECTANGLE (U11). Palette tokens in the chrome's own pixel language:
+// a 2px ink lintel over a deep recess with a honey step, lifted to full alpha on hover.
+export const DOOR_LINTEL = 0x43394a       // --ink
+export const DOOR_RECESS = 0x241f2b       // --deep
+export const DOOR_STEP = 0xf2c879         // --honey
+export const DOOR_JAMB = 0x7e512b         // the darkest honey timber
+export const DOOR_IDLE_ALPHA = 0.85
+export const DOOR_LINTEL_PX = 2
 
 export function doorTileOf(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): { x: number; y: number } {
   return { x: s.x + ((s.w - 1) >> 1), y: s.y + s.h - 1 }
 }
 
-// A building depth-sorts from its FAR corner, and its sprite is ~1.85x wider than its own
-// ground diamond (C13 hi-res art), so it covers the door tile and — being the top-most child
-// of a sortableChildren container — took every hover. The door therefore sorts against its
-// BUILDING, not against its own tile: one step above it, which is still a whole depth row
-// below anything actually standing in front of the building.
+/** @deprecated for sorting — depth.ts owns the painter's order. Kept as the landed
+ *  before-state that depth.test.ts and occlusion.test.ts measure U8 against. */
 export function structureZIndex(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): number {
   return depthKey(s.x + s.w - 1, s.y + s.h - 1)
-}
-
-export const DOOR_Z_OVER_BUILDING = 1
-
-export function doorZIndex(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): number {
-  return structureZIndex(s) + DOOR_Z_OVER_BUILDING
 }
 
 // A building sprite is ~1.85x wider than the ground it stands on, and Pixi hit-tests a
@@ -69,6 +67,8 @@ export function footprintHitPoints(w: number, h: number, scale = 1): number[] {
 
 type Entry = {
   sprite: Sprite; url: string; pips: Graphics | null; form: Graphics | null
+  /** the look-inside threshold, a CHILD of the sprite so it shares the building's depth */
+  door: Graphics | null
   /** the ground this drawable stands on, republished every sync for the frame's depth sort */
   box: DepthBox
 }
@@ -76,10 +76,9 @@ type Entry = {
 /** `entry.url` for a structure whose kind has no art at all — never a real url, so the
  *  hot-load path re-resolves it exactly once, when the art finally lands. */
 const NO_ART = ''
-type Door = { g: Graphics; box: DepthBox }
 type SyncState = {
   entries: Map<string, Entry>; lastAssetsSeq: number; tags: NameTagLayer
-  doors: Map<string, Door>; onDoor: ((structureId: string) => void) | null
+  onDoor: ((structureId: string) => void) | null
 }
 const syncStates = new WeakMap<Scene, SyncState>()
 
@@ -128,7 +127,36 @@ function applyBuildingArt(
     entry.sprite.scale.set(scale)
     // the hit area is scaled with the sprite, so it is re-cut whenever the scale moves
     entry.sprite.hitArea = new Polygon(footprintHitPoints(footprint.w, footprint.h, scale))
+    layoutDoor(entry, footprint)   // a child inherits the new scale; the threshold follows it
   })
+}
+
+/**
+ * The threshold plate, in the parent sprite's local space. Not a dark rectangle: a 2 px ink
+ * lintel over a deep recess, a honey step at the sill and a jamb down each side — the same
+ * palette language the chrome is drawn in. Re-cut whenever the sprite's scale moves, so it
+ * stays the same size on screen at any art resolution.
+ */
+function layoutDoor(entry: Entry, footprint: { w: number; h: number }): void {
+  const door = entry.door
+  if (door === null) return
+  const scale = entry.sprite.scale.x || 1
+  const r = doorLocalRect(footprint, scale)
+  const lintel = DOOR_LINTEL_PX / scale
+  const step = (DOOR_LINTEL_PX * 1.5) / scale
+  door.clear()
+  door.rect(r.x, r.y, r.w, r.h)
+  door.fill(DOOR_RECESS)
+  door.rect(r.x, r.y, r.w, lintel)
+  door.fill(DOOR_LINTEL)
+  door.rect(r.x, r.y + lintel, lintel, r.h - lintel - step)
+  door.rect(r.x + r.w - lintel, r.y + lintel, lintel, r.h - lintel - step)
+  door.fill(DOOR_JAMB)
+  door.rect(r.x, r.y + r.h - step, r.w, step)
+  door.fill(DOOR_STEP)
+  door.alpha = DOOR_IDLE_ALPHA
+  door.position.set(0, 0)
+  door.hitArea = new Rectangle(r.x, r.y, r.w, r.h)
 }
 
 function drawPips(g: Graphics, filled: number): void {
@@ -198,7 +226,7 @@ export function syncEntities(
   if (sync === undefined) {
     sync = {
       entries: new Map(), lastAssetsSeq: store.assetsSeq(), tags: createNameTagLayer(scene),
-      doors: new Map(), onDoor: null,
+      onDoor: null,
     }
     syncStates.set(scene, sync)
     // Publish the ground every structure, item and crop stands on. One owner sorts the whole
@@ -207,7 +235,6 @@ export function syncEntities(
     scene.addDepthSource(() => {
       const out: DepthEntry[] = []
       for (const e of published.entries.values()) out.push({ box: e.box, node: e.sprite })
-      for (const d of published.doors.values()) out.push({ box: d.box, node: d.g })
       return out
     })
   }
@@ -240,7 +267,7 @@ export function syncEntities(
         void provenanceText(sid, store.getState()).then((text) => showPopover(text, e.client.x, e.client.y))
       })
       sprite.hitArea = new Polygon(footprintHitPoints(s.w, s.h))   // until the art sets its scale
-      entry = { sprite, url: '', pips: null, form: null, box: structureDepthBox(key, s) }
+      entry = { sprite, url: '', pips: null, form: null, door: null, box: structureDepthBox(key, s) }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
       applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h), null, s, s.kind)
@@ -267,45 +294,37 @@ export function syncEntities(
       }
     }
 
-    // Look-inside affordance: a door on the frontage of a finished enterable building. It is
-    // drawn rather than hidden behind a hover, so it can be found without a pointer sweep,
-    // and it is its own hotspot so the building keeps its provenance click.
+    // THE DOOR IS PART OF THE BUILDING (U11, P9d repealed). As a CHILD of the building
+    // sprite it inherits its depth, so it can never paint over somebody standing in the
+    // doorway, and Pixi hit-tests children before parents, so it wins its own click without
+    // a priority table. It scales with the sprite, so it is re-cut for free when art swaps.
     const enterable = s.stage === 'complete' && ENTERABLE_KINDS.has(s.kind)
-    const doorKey = `door:${s.id}`
-    live.add(doorKey)
-    let door = sync.doors.get(doorKey)?.g
-    if (enterable && door === undefined) {
-      door = new Graphics()
-      door.roundRect(-DOOR_W / 2, -DOOR_H, DOOR_W, DOOR_H, 3)
-      door.fill(DOOR_FILL)
-      door.rect(-DOOR_W / 2, -2, DOOR_W, 2)
-      door.fill(DOOR_STEP)
-      door.alpha = DOOR_IDLE_ALPHA
+    if (enterable && entry.door === null) {
+      const door = new Graphics()
       door.eventMode = 'static'
       door.cursor = 'pointer'
       const sid = s.id
+      const self = entry
       door.on('pointerover', () => {
-        door!.alpha = 1
+        door.alpha = 1
         const name = hoverLabel(store.getState(), 'structure', sid)
-        if (name !== null) tags.show(`Look inside — ${name}`, door!.x, door!.y - DOOR_H)
+        const at = self.sprite
+        if (name !== null) tags.show(`Look inside — ${name}`, at.x + door.x, at.y + door.y)
       })
       door.on('pointerout', () => {
-        door!.alpha = DOOR_IDLE_ALPHA
+        door.alpha = DOOR_IDLE_ALPHA
         tags.hide()
       })
-      door.on('pointertap', () => sync!.onDoor?.(sid))
-      sync.doors.set(doorKey, { g: door, box: structureDepthBox(`${key}~door`, s) })
-      scene.layers.entities.addChild(door)
+      door.on('pointertap', (e: FederatedPointerEvent) => {
+        e.stopPropagation()   // the building's provenance popover is a different question
+        sync!.onDoor?.(sid)
+      })
+      entry.door = door
+      entry.sprite.addChild(door)
     }
-    const record = sync.doors.get(doorKey)
-    if (door !== undefined && record !== undefined) {
-      door.visible = enterable
-      const d = doorTileOf(s)
-      const at = tileToScreen(d.x, d.y)
-      door.position.set(at.sx, at.sy + TILE_H / 2)
-      // A door shares its BUILDING's ground, so it can never sort against the building it
-      // belongs to; the `~` in the id puts it immediately after in the seed tiebreak.
-      record.box = structureDepthBox(`${key}~door`, s)
+    if (entry.door !== null) {
+      entry.door.visible = enterable
+      layoutDoor(entry, s)
     }
   }
 
@@ -323,7 +342,7 @@ export function syncEntities(
         const text = itemCropDetail(store.getState(), 'item', iid)
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
-      entry = { sprite, url: '', pips: null, form: null, box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX) }
+      entry = { sprite, url: '', pips: null, form: null, door: null, box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX) }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'item', it.kind))
@@ -350,7 +369,7 @@ export function syncEntities(
         const text = itemCropDetail(store.getState(), 'crop', cid)
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
-      entry = { sprite, url: '', pips: null, form: null, box: tileDepthBox(key, c.x, c.y) }
+      entry = { sprite, url: '', pips: null, form: null, door: null, box: tileDepthBox(key, c.x, c.y) }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
       setTexture(book, entry, textureUrlFor(records, 'crop', c.kind))
@@ -367,13 +386,6 @@ export function syncEntities(
       entry.sprite.destroy({ children: true })
       sync.entries.delete(key)
       tags.hide() // a torn-down sprite never fires pointerout, so its tag would hang
-    }
-  }
-  for (const [key, door] of sync.doors) {
-    if (!live.has(key)) {
-      door.g.destroy()
-      sync.doors.delete(key)
-      tags.hide()
     }
   }
 

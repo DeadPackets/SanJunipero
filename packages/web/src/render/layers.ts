@@ -68,15 +68,13 @@ export function applyDepthOrder(entries: readonly DepthEntry[]): void {
 /** An assignment, not a read and not a comparison — `=` but never `==`. */
 export const Z_ASSIGN = /\.zIndex\s*=(?!=)/
 
-/** The only files allowed to write a zIndex, and why:
- *  - `layers.ts` owns the stack AND `applyDepthOrder`, the one writer of a depth;
- *  - `entities.ts` still positions the door affordance against its own building (task 73
- *    makes the door a child and this entry goes away);
- *  - `interiorScene.ts` owns a SEPARATE scene graph, a room with its own sorted container,
- *    which never competes with the town's layers. */
-export const Z_AUTHORISED: readonly string[] = [
-  'render/layers.ts', 'render/entities.ts', 'render/interiorScene.ts',
-]
+/** The only two files allowed to write a zIndex:
+ *  - `layers.ts` owns the stack AND `applyDepthOrder`, the one writer of a town depth;
+ *  - `interiorScene.ts` owns a SEPARATE scene graph — a room with its own sorted container,
+ *    which never competes with the town's layers.
+ *  Nothing else. entities.ts and characters.ts publish a DepthBox and take what they are
+ *  given; the door is a CHILD of its building and has no depth to write. */
+export const Z_AUTHORISED: readonly string[] = ['render/layers.ts', 'render/interiorScene.ts']
 
 function authorised(path: string): boolean {
   const p = path.split('\\').join('/')
