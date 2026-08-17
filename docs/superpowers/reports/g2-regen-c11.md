@@ -88,3 +88,26 @@ from `DEATH_CAUSES`. Two do not fire here and were **not** faked:
   asserted instead. Owner: Task 38 (G11a), which dials the threshold down deliberately.
 - **A fauna kill.** No scripted actor hunts. `fauna_spawned` and `fauna_moved` are asserted
   instead. Owner: Task 38, which forces the roll.
+
+## Not in this regen
+
+Task 37(d), hierarchical pathing (`pathing.regionSize`, a cached portal graph, region-level
+routing), is **not implemented here**. It is absent from the controller-maintained Task 37
+bundle list, which has been the authoritative version of this task since batch 3 and was
+re-stated at batches 4, 5 and 6. It changes path results, so whenever it does land it needs a
+golden regen of its own and a ruling to authorise one. Carried to Task 40's list.
+
+## Verification
+
+| Check | Result |
+|---|---|
+| `pnpm test` in the working tree | **2484 / 215 green** |
+| `pnpm typecheck` | **exit 0** |
+| Fresh tree — `git archive 6fe1683` into an empty directory, clean `pnpm install` | **2484 / 215 green, typecheck exit 0** |
+| `git status --porcelain` at every commit | empty |
+| G1 `f487a26b…` | **unmoved at every one of the five steps** |
+| `stateHash(DEFAULT_CONFIG)` `482f1203…` | **unmoved**, including across the `weaponKinds?` schema edit |
+| `BLOCK1_SHA256` `28c1fce0…` | untouched; no prompt file was opened |
+
+Test counts by step: 2476 (baseline) → 2478 (a) → 2480 (illness bridge) → 2481 (night theft)
+→ 2483 (`weaponKinds?`) → 2484 (the regen).
