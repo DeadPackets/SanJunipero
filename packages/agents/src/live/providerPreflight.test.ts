@@ -149,6 +149,16 @@ describe('runPreflight', () => {
     expect(r.passed).toBe(false)
   })
 
+  it('hands every answer back, so a bar cleared with three-word turns can be seen', async () => {
+    const seen: PreflightAnswer[] = []
+    await runPreflight({
+      llm: fakeLlm(WHOLE_TURNS), provider: 'StreamLake', hardAllowList: true, model: 'm',
+      onAnswer: (a) => seen.push(a),
+    })
+    expect(seen).toHaveLength(PREFLIGHT_CALLS)
+    expect(seen.every((a) => a.ok)).toBe(true)
+  })
+
   it('treats an answer that does not fit the turn shape as a failed call', async () => {
     const r = await runPreflight({
       llm: fakeLlm([{ nonsense: true }, WHOLE_TURNS[1], WHOLE_TURNS[2]]),

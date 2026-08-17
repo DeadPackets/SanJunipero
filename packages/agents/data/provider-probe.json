@@ -1,0 +1,268 @@
+{
+  "generatedAt": "2026-08-17T19:36:41.943Z",
+  "model": "deepseek/deepseek-v4-flash-0731",
+  "totalCostUsd": 0.0023416400000000003,
+  "rows": [
+    {
+      "candidate": "Baidu",
+      "hardAllowList": true,
+      "rounds": [
+        {
+          "provider": "Baidu",
+          "hardAllowList": true,
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "calls": 3,
+          "answered": 3,
+          "actions": 3,
+          "speeches": 3,
+          "passed": true,
+          "costUsd": 0.0008953280000000001,
+          "servedProviders": [
+            "Baidu"
+          ],
+          "failures": []
+        },
+        {
+          "provider": "Baidu",
+          "hardAllowList": true,
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "calls": 3,
+          "answered": 1,
+          "actions": 0,
+          "speeches": 1,
+          "passed": false,
+          "costUsd": 0.0013957720000000002,
+          "servedProviders": [
+            "Baidu"
+          ],
+          "failures": [
+            "No object generated: could not parse the response. :: Nadia's early today. The bush is right here, so I'll take some before she gets close. Berry juice on my hands is fine for greeting her.\n\nthought: The bush is heavy and I haven't eaten since yesterday. Nadia coming up the path means company, but the fruit won't wait.\nimportance: 6\nspeech: Morning, Nadia. The berries are ripe if you want some.\naction: {\"verb\":\"forage\",\"params\":{\"nodeId\":\"node_e14\"}}",
+            "No object generated: could not parse the response. :: She is too hot. That herb is all I have to bring the fever down.\n\n{\"action\":{\"verb\":\"tend\",\"params\":{\"targetId\":\"Salma\"}},\"thought\":\"Salma is shaking with fever and I have this herb in my hand. Nobody else is here to help, so it falls to me.\",\"importance\":9,\"speech\":\"Easy now, Salma. I have something for the fever.\"}"
+          ]
+        },
+        {
+          "provider": "Baidu",
+          "hardAllowList": true,
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "calls": 3,
+          "answered": 3,
+          "actions": 3,
+          "speeches": 3,
+          "passed": true,
+          "costUsd": 0.00193354,
+          "servedProviders": [
+            "Baidu"
+          ],
+          "failures": []
+        },
+        {
+          "provider": "Baidu",
+          "hardAllowList": true,
+          "model": "deepseek/deepseek-v4-flash-0731",
+          "calls": 3,
+          "answered": 2,
+          "actions": 2,
+          "speeches": 2,
+          "passed": false,
+          "costUsd": 0.0023416400000000003,
+          "servedProviders": [
+            "Baidu"
+          ],
+          "failures": [
+            "No object generated: response did not match schema. :: {\"thought\":\"Morning light, belly empty, and there's a bush full of berries right here. Nadia coming up the path. I'll take some fruit, and speak plain.\",\"importance\":6,\"action\":{\"verb\":\"forage\",\"params\":{\"nodeId\":\"node_e14\"}},\"speech\":\"Morning, Nadia. Berries are ripe if you want some.\",\"reconsider_at\":null}"
+          ]
+        }
+      ],
+      "roundsPassed": 2,
+      "actions": 8,
+      "speeches": 9,
+      "answered": 9,
+      "calls": 12,
+      "costUsd": 0.0023416400000000003,
+      "servedProviders": [
+        "Baidu"
+      ],
+      "failures": [
+        "No object generated: could not parse the response. :: Nadia's early today. The bush is right here, so I'll take some before she gets close. Berry juice on my hands is fine for greeting her.\n\nthought: The bush is heavy and I haven't eaten since yesterday. Nadia coming up the path means company, but the fruit won't wait.\nimportance: 6\nspeech: Morning, Nadia. The berries are ripe if you want some.\naction: {\"verb\":\"forage\",\"params\":{\"nodeId\":\"node_e14\"}}",
+        "No object generated: could not parse the response. :: She is too hot. That herb is all I have to bring the fever down.\n\n{\"action\":{\"verb\":\"tend\",\"params\":{\"targetId\":\"Salma\"}},\"thought\":\"Salma is shaking with fever and I have this herb in my hand. Nobody else is here to help, so it falls to me.\",\"importance\":9,\"speech\":\"Easy now, Salma. I have something for the fever.\"}",
+        "No object generated: response did not match schema. :: {\"thought\":\"Morning light, belly empty, and there's a bush full of berries right here. Nadia coming up the path. I'll take some fruit, and speak plain.\",\"importance\":6,\"action\":{\"verb\":\"forage\",\"params\":{\"nodeId\":\"node_e14\"}},\"speech\":\"Morning, Nadia. Berries are ripe if you want some.\",\"reconsider_at\":null}"
+      ],
+      "inputTokens": 23892,
+      "outputTokens": 4609,
+      "cacheReadTokens": 20480,
+      "publishedPricePerM": {
+        "prompt": 0.0798,
+        "completion": 0.1596
+      },
+      "answers": [
+        {
+          "ok": true,
+          "turn": {
+            "thought": "The well is right there. Drink first, then see what Yusuf needs.",
+            "speech": "Just getting some water.",
+            "action": {
+              "verb": "walk",
+              "params": {
+                "x": 62,
+                "y": 70
+              }
+            },
+            "plan": [
+              {
+                "verb": "walk",
+                "params": {
+                  "x": 62,
+                  "y": 70
+                }
+              },
+              {
+                "verb": "drink",
+                "params": {}
+              }
+            ],
+            "importance": 4
+          }
+        },
+        {
+          "ok": true,
+          "turn": {
+            "thought": "Hungry, and these berries are ripe. Nadia is walking right up, so I will pick a few and see what she needs.",
+            "speech": "Morning, Nadia. The bush is heavy this year.",
+            "action": {
+              "verb": "forage",
+              "params": {
+                "nodeId": "node_e14"
+              }
+            },
+            "importance": 6
+          }
+        },
+        {
+          "ok": true,
+          "turn": {
+            "thought": "Salma is burning up and I have the herb right in my hand. No time to wait.",
+            "speech": "Hush, Salma. I am here. Here, take this.",
+            "action": {
+              "verb": "tend",
+              "params": {
+                "targetId": "Salma"
+              }
+            },
+            "importance": 9
+          }
+        },
+        {
+          "ok": true,
+          "turn": {
+            "thought": "Throat is dry, the well is right there. I want water before anything else, and Yusuf is waiting.",
+            "speech": "Throat is dry. Give me a moment.",
+            "plan": [
+              {
+                "verb": "walk",
+                "params": {
+                  "x": 62,
+                  "y": 70
+                }
+              },
+              {
+                "verb": "drink",
+                "params": {}
+              }
+            ],
+            "importance": 5
+          }
+        },
+        {
+          "ok": false,
+          "error": "No object generated: could not parse the response. :: Nadia's early today. The bush is right here, so I'll take some before she gets close. Berry juice on my hands is fine for greeting her.\n\nthought: The bush is heavy and I haven't eaten since yesterday. Nadia coming up the path means company, but the fruit won't wait.\nimportance: 6\nspeech: Morning, Nadia. The berries are ripe if you want some.\naction: {\"verb\":\"forage\",\"params\":{\"nodeId\":\"node_e14\"}}"
+        },
+        {
+          "ok": false,
+          "error": "No object generated: could not parse the response. :: She is too hot. That herb is all I have to bring the fever down.\n\n{\"action\":{\"verb\":\"tend\",\"params\":{\"targetId\":\"Salma\"}},\"thought\":\"Salma is shaking with fever and I have this herb in my hand. Nobody else is here to help, so it falls to me.\",\"importance\":9,\"speech\":\"Easy now, Salma. I have something for the fever.\"}"
+        },
+        {
+          "ok": true,
+          "turn": {
+            "thought": "The well is right there, my throat is dry, and Yusuf is waiting on me. First water, then see what he needs.",
+            "speech": "Just a moment, let me drink. This morning air has a bite to it.",
+            "action": {
+              "verb": "walk",
+              "params": {
+                "x": 62,
+                "y": 70
+              }
+            },
+            "plan": [
+              {
+                "verb": "drink",
+                "params": {}
+              }
+            ],
+            "importance": 6
+          }
+        },
+        {
+          "ok": true,
+          "turn": {
+            "thought": "Morning. I am hungry and the bush is right here, so I will take what it gives before anything else.",
+            "speech": "Morning, Nadia. The berries are good today.",
+            "action": {
+              "verb": "forage",
+              "params": {
+                "nodeId": "node_e14"
+              }
+            },
+            "importance": 6
+          }
+        },
+        {
+          "ok": true,
+          "turn": {
+            "thought": "She is shaking hard. I have the herb right here. It will bring the fever down.",
+            "speech": "Easy now. I have something for the fever.",
+            "action": {
+              "verb": "tend",
+              "params": {
+                "targetId": "Salma"
+              }
+            },
+            "importance": 9
+          }
+        },
+        {
+          "ok": true,
+          "turn": {
+            "thought": "Throat is cracked. The well is right there — drink, then see what Yusuf needs.",
+            "speech": "Water first.",
+            "action": {
+              "verb": "walk",
+              "params": {
+                "x": 62,
+                "y": 70
+              }
+            },
+            "importance": 4
+          }
+        },
+        {
+          "ok": false,
+          "error": "No object generated: response did not match schema. :: {\"thought\":\"Morning light, belly empty, and there's a bush full of berries right here. Nadia coming up the path. I'll take some fruit, and speak plain.\",\"importance\":6,\"action\":{\"verb\":\"forage\",\"params\":{\"nodeId\":\"node_e14\"}},\"speech\":\"Morning, Nadia. Berries are ripe if you want some.\",\"reconsider_at\":null}"
+        },
+        {
+          "ok": true,
+          "turn": {
+            "thought": "Salma is shaking with fever and I have the herb right here. No time to waste.",
+            "speech": "Salma, hold still. I have something for you.",
+            "action": {
+              "verb": "tend",
+              "params": {
+                "targetId": "Salma"
+              }
+            },
+            "importance": 9
+          }
+        }
+      ]
+    }
+  ]
+}

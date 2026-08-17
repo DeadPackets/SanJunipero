@@ -1,3 +1,4 @@
+import { NoObjectGeneratedError } from 'ai'
 import { assemblePrompt, type AssembledPrompt, type IdentityCore } from '../prompt/assemble.js'
 import type { PersonalityDoc } from '../personality.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
@@ -146,19 +147,26 @@ export async function runPreflight(opts: {
   personality?: PersonalityDoc
   costUsd?: () => number
   servedProviders?: () => string[]
+  // A probe that discards its answers cannot be audited: a back end can clear the bar with
+  // three-word turns, and only the turns themselves say so.
+  onAnswer?: (answer: PreflightAnswer) => void
 }): Promise<PreflightResult> {
   const answers: PreflightAnswer[] = []
+  const record = (a: PreflightAnswer): void => { answers.push(a); opts.onAnswer?.(a) }
   for (const prompt of preflightPrompts(opts.identity, opts.personality)) {
     try {
       const { value } = await opts.llm.object<Turn>({
         system: prompt.system, messages: prompt.messages, schema: TurnSchema,
       })
       const parsed = TurnSchema.safeParse(value)
-      answers.push(parsed.success
+      record(parsed.success
         ? { ok: true, turn: parsed.data }
         : { ok: false, error: `answer did not fit TurnSchema: ${JSON.stringify(value).slice(0, 200)}` })
     } catch (err) {
-      answers.push({ ok: false, error: err instanceof Error ? err.message : String(err) })
+      // The raw text a rejected generation carried. Without it "could not parse the response"
+      // names a symptom and hides which field the schema refused.
+      const raw = NoObjectGeneratedError.isInstance(err) ? ` :: ${(err.text ?? '').slice(0, 400)}` : ''
+      record({ ok: false, error: `${err instanceof Error ? err.message : String(err)}${raw}` })
     }
   }
   return scorePreflight({
