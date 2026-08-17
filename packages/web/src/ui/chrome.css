@@ -541,9 +541,12 @@ body {
   cursor: pointer;
 }
 .timeline-day { position: absolute; top: 0; bottom: 0; border-left: 1px solid rgba(67, 57, 74, 0.35); }
+/* The label was cream from when the timeline sat on the night ground. The slab is cream now,
+   so it was painting the label in its own background: ink reads on the slab (10.2:1) and on
+   the sand track it overhangs (7.6:1). */
 .timeline-day em {
   position: absolute; top: -1.15rem; left: 2px; font-style: normal;
-  font-size: 0.62rem; letter-spacing: 0.05em; color: var(--cream); opacity: 0.9;
+  font-size: 0.62rem; letter-spacing: 0.05em; color: var(--ink);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .mark { position: absolute; top: 50%; translate: -50% -50%; width: 6px; height: 6px; border-radius: 1px; }
