@@ -147,6 +147,65 @@ describe('eat: a last-day meal and the pale mushroom', () => {
     expect(rng.state()).toEqual(before)
   })
 
+  // C11 R-I, T37b step 1b — THE TAKE-THEN-EAT SEAM. `eat: not holding that` rose 2 → 18 the
+  // moment the hunger line started working: the stomach now knows where the loaf is and the
+  // hands still have to be told to close around it in a separate turn, which costs a turn the
+  // mind rarely spends. A body that means to eat something it can reach may now simply eat it.
+  describe('a meal within reach is a meal', () => {
+    const at = (loc: unknown, kind = 'bread'): WorldState =>
+      fold(makeWorld(), ev(2, 'item_spawned', { id: 'item_1', kind, qty: 1, loc }))
+    const shelf = (): WorldState => {
+      const s = fold(at({ t: 'tile', x: 5, y: 5 }), ev(3, 'structure_planned', {
+        id: 'structure_1', kind: 'storehouse', x: 1, y: 0, w: 1, h: 1, maxHp: 30, flammable: true, builderId: 'a1',
+      }))
+      const done = fold(s, ev(4, 'structure_completed', { id: 'structure_1' }))
+      return fold(done, ev(5, 'item_moved', { id: 'item_1', loc: { t: 'structure', id: 'structure_1' } }))
+    }
+
+    it('a loaf at the feet is eaten without a turn spent picking it up', () => {
+      const s = at({ t: 'tile', x: 1, y: 0 })
+      const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_1' })
+      expect(r.ok).toBe(true)
+      const out = VERBS.eat!.onComplete(s, DEFAULT_CONFIG, 'a1', { itemId: 'item_1' }, illness())
+      // The lifting comes first and is the same lifting `take` does, ownership and all.
+      expect(out[0]).toEqual({ type: 'item_moved', payload: { id: 'item_1', loc: { t: 'agent', id: 'a1' } } })
+      expect(out).toContainEqual({ type: 'item_owner_changed', payload: { id: 'item_1', owner: 'a1' } })
+      expect(out.map((e) => e.type)).toContain('need_changed')
+    })
+
+    it('a loaf on a shelf the body stands beside is the same', () => {
+      expect(submitIntent(shelf(), DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_1' }).ok).toBe(true)
+    })
+
+    it('the meal still counts as its own kind, so the variety window sees it', () => {
+      const s = at({ t: 'tile', x: 1, y: 0 }, 'fish')
+      expect(VERBS.eat!.results!(s, DEFAULT_CONFIG, 'a1', { itemId: 'item_1' })).toEqual({ kind: 'fish' })
+    })
+
+    it('a loaf across the clearing is still a walk, and the refusal says so', () => {
+      expect(submitIntent(at({ t: 'tile', x: 5, y: 5 }), DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_1' }))
+        .toEqual({ ok: false, reason: 'not holding that — go and stand beside it first' })
+    })
+
+    it('a loaf in another pair of hands is not within anybody else’s reach', () => {
+      const s = fold(at({ t: 'tile', x: 1, y: 0 }), ev(3, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: 7300 }))
+      const held = fold(s, ev(4, 'item_moved', { id: 'item_1', loc: { t: 'agent', id: 'a2' } }))
+      expect(submitIntent(held, DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_1' }))
+        .toEqual({ ok: false, reason: 'someone is holding that' })
+    })
+
+    it('a mark for nothing that exists still says only that the hands are empty', () => {
+      expect(submitIntent(makeWorld(), DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_nowhere' }))
+        .toEqual({ ok: false, reason: 'not holding that' })
+    })
+
+    it('taking somebody else’s supper off the ground is still seen', () => {
+      const s = fold(at({ t: 'tile', x: 1, y: 0 }), ev(3, 'item_owner_changed', { id: 'item_1', owner: 'a2' }))
+      const out = VERBS.eat!.onComplete(s, DEFAULT_CONFIG, 'a1', { itemId: 'item_1' }, illness())
+      expect(out.map((e) => e.type)).toContain('item_taken')
+    })
+  })
+
   it('an herb takes a step off the worst thing wrong, and lifts it outright at the last step', () => {
     const CFG = SimConfigSchema.parse({})
     let s = holding('herb')

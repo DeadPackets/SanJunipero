@@ -4,7 +4,7 @@ import {
   MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
   type RecipeDef, type SimConfig, type StructureRecipeDef,
 } from '@sj/shared'
-import { mintId, type Affliction, type TileId, type WorldState } from './state.js'
+import { mintId, type Affliction, type Item, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
 import { bridgeAt, BRIDGE_KIND, findPath, isPassable, searchPath } from './path.js'
@@ -237,6 +237,16 @@ export function mealRestore(state: WorldState, config: SimConfig, agentId: strin
   return config.needs.eatRestoreHunger * nutritionOf(config, kind) * (1 + bonus)
 }
 
+// In the hands, or close enough to put there in the same motion (C11 R-I): the founders' bread
+// woke up on a shelf and their hands woke up empty, and once the hunger line started saying
+// where the loaf was, `eat: not holding that` rose 2 → 18. Reaching for supper is not a turn.
+function mealInHand(state: WorldState, agentId: string, itemId: string): Item | undefined {
+  const item = state.items[itemId]
+  if (!item) return undefined
+  if (item.loc.t === 'agent') return item.loc.id === agentId ? item : undefined
+  return itemWithinReach(state, agentId, item) ? item : undefined
+}
+
 const eat: VerbDef = makeVerb({
   kind: 'eat',
   validate(state, config, agentId, params) {
@@ -244,9 +254,10 @@ const eat: VerbDef = makeVerb({
     if (!p.success) return 'eat needs an {itemId}'
     const item = state.items[p.data.itemId]
     if (!item) return 'not holding that'
-    // The founders' bread wakes up on a shelf and their hands wake up empty, so the whole of
-    // the first breakfast is this one missing sentence (C11 R21).
-    if (item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that — take it into your hands first'
+    if (item.loc.t === 'agent' && item.loc.id !== agentId) return 'someone is holding that'
+    if (mealInHand(state, agentId, p.data.itemId) === undefined) {
+      return 'not holding that — go and stand beside it first'
+    }
     if (!isFoodKind(config, item.kind)) return `${item.kind} is not food`
     return null
   },
@@ -254,15 +265,14 @@ const eat: VerbDef = makeVerb({
   // recorded before the belly fills, so the meal in hand counts toward its own variety.
   results(state, _config, agentId, params) {
     const p = EatParams.safeParse(params)
-    const item = p.success ? state.items[p.data.itemId] : undefined
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return {}
-    return { kind: item.kind }
+    const item = p.success ? mealInHand(state, agentId, p.data.itemId) : undefined
+    return item === undefined ? {} : { kind: item.kind }
   },
   rngStream: 'illness',
   onComplete(state, config, agentId, params, rng) {
     const p = EatParams.parse(params)
-    const item = state.items[p.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    const item = mealInHand(state, agentId, p.itemId)
+    if (item === undefined) return []
     // A pale mushroom is always a gamble; anything else only on its last day. The roll is
     // drawn once, here at emission, and never when the meal is safe — a fresh loaf must not
     // move the stream, or two worlds that ate differently would diverge for no reason.
@@ -270,6 +280,8 @@ const eat: VerbDef = makeVerb({
       && (item.kind === PALE_MUSHROOM || isSpoiling(state, item, config))
       && rng.next() < config.mortality.poisonChanceSpoiled
     return [
+      // The hand closes before the mouth opens, and it closes exactly as `take` closes it.
+      ...liftEvents(state, config, agentId, p.itemId),
       ...(risky
         ? [{ type: 'agent_afflicted', payload: { agentId, kind: 'poison', severity: 1, itemId: p.itemId } }]
         : []),
@@ -1420,6 +1432,35 @@ const give: VerbDef = makeVerb({
   },
 })
 
+// Close enough to close a hand around. The one reach test `take` has always used, so a thing
+// another verb reaches for is exactly the thing `take` would have handed it.
+export function itemWithinReach(state: WorldState, agentId: string, item: Item): boolean {
+  if (item.loc.t === 'agent') return false
+  if (item.loc.t === 'tile') return withinReach(state, agentId, item.loc.x, item.loc.y)
+  const s = state.structures[item.loc.id]
+  return s !== undefined && nearRect(state, agentId, s.x, s.y, s.w, s.h)
+}
+
+// The lifting itself, so every verb that folds a taking into itself lifts the same way — the
+// claim on an unowned thing, and the public record when the thing is somebody's.
+function liftEvents(state: WorldState, config: SimConfig, agentId: string, itemId: string): PendingEvent[] {
+  const item = state.items[itemId]
+  if (!item || item.loc.t === 'agent') return []
+  const moved = { type: 'item_moved', payload: { id: itemId, loc: { t: 'agent', id: agentId } } }
+  if (!config.ownership.enabled || item.owner === agentId) return [moved]
+  // Unowned things are claimed by the hand that lifts them; owned things are not.
+  // The engine blocks nothing here — it only makes sure the taking is public.
+  if (item.owner === undefined) {
+    return [moved, { type: 'item_owner_changed', payload: { id: itemId, owner: agentId } }]
+  }
+  const s = item.loc.t === 'structure' ? state.structures[item.loc.id] : undefined
+  const at = item.loc.t === 'tile' ? { x: item.loc.x, y: item.loc.y } : { x: s?.x ?? 0, y: s?.y ?? 0 }
+  return [moved, {
+    type: 'item_taken',
+    payload: { itemId, kind: item.kind, takerId: agentId, ownerId: item.owner, x: at.x, y: at.y },
+  }]
+}
+
 const take: VerbDef = makeVerb({
   kind: 'take',
   validate(state, _config, agentId, params) {
@@ -1428,31 +1469,10 @@ const take: VerbDef = makeVerb({
     const item = state.items[p.data.itemId]
     if (!item) return 'no such item'
     if (item.loc.t === 'agent') return item.loc.id === agentId ? 'already holding that' : 'someone is holding that'
-    if (item.loc.t === 'tile') {
-      if (!withinReach(state, agentId, item.loc.x, item.loc.y)) return 'not close enough to take'
-    } else {
-      const s = state.structures[item.loc.id]
-      if (!s || !nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to take'
-    }
-    return null
+    return itemWithinReach(state, agentId, item) ? null : 'not close enough to take'
   },
   onComplete(state, config, agentId, params) {
-    const p = TakeParams.parse(params)
-    const item = state.items[p.itemId]
-    if (!item || item.loc.t === 'agent') return []
-    const moved = { type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: agentId } } }
-    if (!config.ownership.enabled || item.owner === agentId) return [moved]
-    // Unowned things are claimed by the hand that lifts them; owned things are not.
-    // The engine blocks nothing here — it only makes sure the taking is public.
-    if (item.owner === undefined) {
-      return [moved, { type: 'item_owner_changed', payload: { id: p.itemId, owner: agentId } }]
-    }
-    const s = item.loc.t === 'structure' ? state.structures[item.loc.id] : undefined
-    const at = item.loc.t === 'tile' ? { x: item.loc.x, y: item.loc.y } : { x: s?.x ?? 0, y: s?.y ?? 0 }
-    return [moved, {
-      type: 'item_taken',
-      payload: { itemId: p.itemId, kind: item.kind, takerId: agentId, ownerId: item.owner, x: at.x, y: at.y },
-    }]
+    return liftEvents(state, config, agentId, TakeParams.parse(params).itemId)
   },
 })
 

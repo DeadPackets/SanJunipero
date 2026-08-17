@@ -281,10 +281,11 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     // hold none of them. R21-D: `eat` used to answer "not holding that" and stop there.
     expect(p.visible.items).toHaveLength(6)
     const bread = p.visible.items.find((i) => i.kind === 'bread')!
-    expect(submitIntent(s, CFG, 'amara', 'eat', { itemId: bread.id })).toEqual(
-      { ok: false, reason: 'not holding that — take it into your hands first' },
-    )
     expect(submitIntent(s, CFG, 'amara', 'take', { itemId: bread.id }).ok).toBe(true)
+    // R21-D answered this with a refusal that taught the path — "take it into your hands
+    // first" — and the live gate then said it eighteen times in two days. T37b step 1b takes
+    // the turn out: the same reach `take` measures is now reach enough to eat.
+    expect(submitIntent(s, CFG, 'amara', 'eat', { itemId: bread.id }).ok).toBe(true)
     // A mark for nothing that exists still says only that the hands are empty.
     expect(submitIntent(s, CFG, 'amara', 'eat', { itemId: 'item_nowhere' })).toEqual(
       { ok: false, reason: 'not holding that' },
