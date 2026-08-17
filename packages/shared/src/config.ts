@@ -113,10 +113,15 @@ const ConstructionSchema = z.object({
   hutMaxHp: z.number().default(50),
 }).strict()
 
+// `weaponKinds` is optional and carries NO default, which is the whole of it: absent from
+// every authored row, absent from the parsed object, and therefore invisible to
+// stateHash(DEFAULT_CONFIG). It is the one door left for an arbiter-codified spear to be a
+// weapon now that the schema is closed (C11 Task 37, batch-4 ruling 1).
 export const RecipeSchema = z.object({
   inputs: z.record(z.string(), z.number()),
   output: z.object({ kind: z.string(), qty: z.number() }).strict(),
   skill: z.string(),
+  weaponKinds: z.array(z.string()).optional(),
 }).strict()
 
 const CraftingSchema = z.object({

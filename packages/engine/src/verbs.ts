@@ -712,9 +712,20 @@ const fish: VerbDef = makeVerb({
 
 export const HuntParams = z.object({ faunaId: z.string() }).strict()
 
-// Not a dial. `RecipeSchema` has no weapon column and `SimConfigSchema` is closed after Task 2
-// (G6), so the list of things that can take an animal lives here until a schema task reopens it.
+// What the world was authored with. A recipe may add to it and can never take from it, so a
+// codified spear arrives without anybody re-authoring the knife.
 export const WEAPON_KINDS: ReadonlySet<string> = new Set(['knife'])
+
+// The one reader of the weapon list (G4): the module's own kinds plus whatever a recipe row
+// declares it makes. `weaponKinds` is absent from every authored row, so at world defaults
+// this is `WEAPON_KINDS` exactly (C11 Task 37, batch-4 ruling 1).
+export function weaponKindsFor(config: SimConfig): ReadonlySet<string> {
+  const out = new Set(WEAPON_KINDS)
+  for (const row of Object.values(config.crafting.recipes)) {
+    for (const kind of row.weaponKinds ?? []) out.add(kind)
+  }
+  return out
+}
 // A school is not hunted; it is fished. These two are what a knife and a close approach can take.
 export const HUNTABLE_KINDS: ReadonlySet<FaunaKind> = new Set<FaunaKind>(['deer', 'rabbit'])
 
@@ -727,7 +738,7 @@ export function huntChance(state: WorldState, config: SimConfig, agentId: string
 
 const hunt: VerbDef = makeVerb({
   kind: 'hunt',
-  validate(state, _config, agentId, params) {
+  validate(state, config, agentId, params) {
     const p = HuntParams.safeParse(params)
     if (!p.success) return 'hunt needs a {faunaId}'
     const f = state.fauna?.[p.data.faunaId]
@@ -735,8 +746,9 @@ const hunt: VerbDef = makeVerb({
     if (!HUNTABLE_KINDS.has(f.kind)) return 'that is not something you can run down'
     const a = state.agents[agentId]!
     if (Math.max(Math.abs(a.x - f.x), Math.abs(a.y - f.y)) > 1) return 'too far off to reach'
+    const weapons = weaponKindsFor(config)
     if (!Object.values(state.items).some(
-      (i) => WEAPON_KINDS.has(i.kind) && i.loc.t === 'agent' && i.loc.id === agentId,
+      (i) => weapons.has(i.kind) && i.loc.t === 'agent' && i.loc.id === agentId,
     )) return 'you have nothing to hunt with'
     return null
   },

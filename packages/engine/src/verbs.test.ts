@@ -13,7 +13,7 @@ import { stepCostAt } from './path.js'
 import { RngStreams, type RngStream } from './rng.js'
 import {
   fishCatchChance, huntChance, isFoodKind, isKindleable, isWearable, nutritionOf, registerVerb,
-  craftRoutes, SEED_RECIPES, unregisterVerb, VERBS, type VerbDef,
+  craftRoutes, SEED_RECIPES, unregisterVerb, VERBS, WEAPON_KINDS, weaponKindsFor, type VerbDef,
 } from './verbs.js'
 import { FORAGEABLE_YIELD } from './data/forageables.js'
 
@@ -346,6 +346,34 @@ describe('hunt: the caps and the regen ARE the ecology', () => {
     const empty = submitIntent(makeWorld(), CFG, 'a1', 'hunt', { faunaId: 'fauna_9' })
     expect(empty.ok).toBe(false)
     if (!empty.ok) expect(empty.reason).toBe('nothing there to hunt')
+  })
+
+  // Task 37, batch-4 ruling 1. SimConfigSchema is closed, so a recipe says what it makes is
+  // a weapon in its own row, and a spear nobody authored can take a deer.
+  it('a recipe that says it makes a weapon makes one, and the knife stays a weapon regardless', () => {
+    const speared = (config: SimConfig): WorldState => {
+      let s = makeWorld(['..', '..'])
+      s = fold(s, ev(40, 'fauna_spawned', { id: 'fauna_1', kind: 'deer', x: 1, y: 0 }), config)
+      return fold(s, ev(41, 'item_spawned', { id: 'item_1', kind: 'spear', qty: 1, loc: { t: 'agent', id: 'a1' } }), config)
+    }
+    const armed = SimConfigSchema.parse({
+      crafting: { recipes: { spear: { inputs: { wood: 2 }, output: { kind: 'spear', qty: 1 }, skill: 'carpentry', weaponKinds: ['spear'] } } },
+    })
+    expect(weaponKindsFor(armed)).toEqual(new Set(['knife', 'spear']))
+    expect(submitIntent(speared(armed), armed, 'a1', 'hunt', { faunaId: 'fauna_1' }).ok).toBe(true)
+
+    // Undeclared, the same spear is a stick: the world's authored list is unchanged.
+    expect(weaponKindsFor(CFG)).toEqual(new Set(WEAPON_KINDS))
+    const bare = submitIntent(speared(CFG), CFG, 'a1', 'hunt', { faunaId: 'fauna_1' })
+    expect(bare.ok).toBe(false)
+    if (!bare.ok) expect(bare.reason).toBe('you have nothing to hunt with')
+    expect(submitIntent(stalked('deer'), armed, 'a1', 'hunt', { faunaId: 'fauna_1' }).ok).toBe(true)
+  })
+
+  it('the optional column is absent from every authored row, so the config hash cannot feel it', () => {
+    for (const row of Object.values(DEFAULT_CONFIG.crafting.recipes)) {
+      expect(Object.prototype.hasOwnProperty.call(row, 'weaponKinds')).toBe(false)
+    }
   })
 })
 
