@@ -88,6 +88,7 @@ const PASSING: G11Report = {
     tier1Milestones: ['first_speech', 'first_meal'],
     darkPerceptions: 61,
     semanticPassRan: true, semanticHits: [], semanticPassErrors: 0, semanticUnreadableNights: 1,
+    semanticSkippedNights: 0,
     fordBridge: { x: 50, y: 50, buildable: true, refusal: null },
     farBankWalk: { refused: true, reason: 'no path to that spot', stoppedAtWaterEdge: true },
     clothedSurviveLadder: true,
@@ -121,6 +122,21 @@ describe('the report shape', () => {
     // A resumed run is scored exactly as a continuous one, and says it was resumed.
     expect(checkG11Report(resumed)).toEqual(checkG11Report(PASSING))
     expect(g11GatePassed(resumed)).toBe(true)
+  })
+
+  // GATE G11b day 3: the pass never ran, because the chronicle render it sat behind failed
+  // first. Under any reading of criterion 11 a night the pass never reached has to be visible
+  // in the report — and it is not a criterion, so it can never be the thing that fails a gate
+  // (C11 batch 16 fix 3).
+  it('reports the nights the semantic pass never reached, and never scores them', () => {
+    expect(PASSING.evidence.semanticSkippedNights).toBe(0)
+    const lostANight: G11Report = {
+      ...PASSING,
+      evidence: { ...PASSING.evidence, semanticSkippedNights: 2 },
+    }
+    expect(Object.keys(checkG11Report(lostANight))).toHaveLength(17)
+    expect(checkG11Report(lostANight)).toEqual(checkG11Report(PASSING))
+    expect(g11GatePassed(lostANight)).toBe(true)
   })
 
   it('parses the recorded fixture and refuses an unknown field', () => {

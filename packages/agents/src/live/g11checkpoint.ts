@@ -43,7 +43,9 @@ import { IntentSchema } from '../turn.js'
 //    - every resume appends to `resumes`, which rides in the report. A run that was resumed
 //      says so, with the tick it was resumed from, every time.
 
-export const G11_CHECKPOINT_VERSION = 1
+// 2: the sidecar gained `semanticSkippedNights`. A version-1 checkpoint carries no count of
+// the nights it lost, so it cannot be resumed into a run that reports one.
+export const G11_CHECKPOINT_VERSION = 2
 
 const Thought = z.object({ tick: z.number().int(), agentId: z.string(), text: z.string() }).strict()
 const Adjudication = z.object({
@@ -120,6 +122,9 @@ export const G11SidecarSchema = z.object({
   nightsRun: z.array(z.number().int()),
   semanticRan: z.boolean(),
   semanticErrors: z.number().int(),
+  // Restored like the rest: a resume that zeroed it would turn a lost night into one that
+  // never happened (C11 batch 16 fix 3).
+  semanticSkippedNights: z.number().int(),
   narrateErrors: z.number().int(),
   constructErrors: z.number().int(),
   semanticHits: z.array(z.string()),

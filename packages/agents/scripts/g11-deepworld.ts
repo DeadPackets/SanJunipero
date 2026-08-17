@@ -31,7 +31,7 @@ import { migrateArbiterTables } from '../../arbiter/src/schema.js'
 import type { Recipe } from '../../arbiter/src/verdict.js'
 import { UNNAMED_CONSTRUCT_COPY } from '../../narrator/src/glass.js'
 import { makeNarratorLlm } from '../../narrator/src/llm/narratorLlm.js'
-import { narrateDay } from '../../narrator/src/narrate.js'
+import { ChapterRenderError, narrateDay } from '../../narrator/src/narrate.js'
 import { migrateNarratorTables } from '../../narrator/src/schema.js'
 import { NarratorStore } from '../../narrator/src/store.js'
 import type { TranscriptRecord } from '../../narrator/src/semanticFirsts.js'
@@ -580,6 +580,7 @@ async function main(): Promise<void> {
   let constructErrors = saved?.sidecar.constructErrors ?? 0
   let semanticRan = saved?.sidecar.semanticRan ?? false
   let semanticErrors = saved?.sidecar.semanticErrors ?? 0
+  let semanticSkippedNights = saved?.sidecar.semanticSkippedNights ?? 0
   const semanticHits: string[] = saved?.sidecar.semanticHits ?? []
   const nightsRun: number[] = saved?.sidecar.nightsRun ?? []
 
@@ -624,6 +625,10 @@ async function main(): Promise<void> {
     if (dayEvents.length > 0) {
       const records = transcriptFor(day, allEvents)
       console.log(`[g11] closing day ${day}: ${dayEvents.length} events to narrate, ${records.length} records to read`)
+      // Whether the pass was reached, read off the night itself rather than assumed from the
+      // absence of a throw: a chronicle that will not render no longer takes the pass with it,
+      // and a ChapterRenderError carries what the night still managed (C11 batch 16).
+      let reachedThePass = false
       try {
         const out = await narrateDay({
           store: narratorStore, llm: narratorLlm, events: dayEvents,
@@ -634,12 +639,21 @@ async function main(): Promise<void> {
             semantic: { db, llm: semanticLlm, records, spentUsdToday: 0 },
           }),
         })
-        if (records.length > 0) semanticRan = true
+        reachedThePass = out.semanticRan
         for (const m of out.milestones) if (m.tier === 2.5) semanticHits.push(m.kind)
       } catch (err) {
         narrateErrors += 1
         if (records.length > 0) semanticErrors += 1
+        if (err instanceof ChapterRenderError) {
+          reachedThePass = err.night.semanticRan
+          for (const m of err.night.milestones) if (m.tier === 2.5) semanticHits.push(m.kind)
+        }
         console.error(`[g11] narrateDay day ${day}:`, err)
+      }
+      if (reachedThePass) semanticRan = true
+      else if (records.length > 0) {
+        semanticSkippedNights += 1
+        console.error(`[g11] day ${day}: ${records.length} records and the semantic pass never ran`)
       }
     }
 
@@ -690,7 +704,8 @@ async function main(): Promise<void> {
         rejections: bridge.rejections, accepted: bridge.accepted,
         tickMs, spendProjections,
         fullNeed: fullNeed.entries(),
-        nightsRun, semanticRan, semanticErrors, narrateErrors, constructErrors, semanticHits,
+        nightsRun, semanticRan, semanticErrors, semanticSkippedNights, narrateErrors,
+        constructErrors, semanticHits,
         minds: [...runtimes.entries()].map(([agentId, r]) => ({ agentId, snapshot: r.snapshot() })),
         dryTurn,
         resumes,
@@ -1173,6 +1188,7 @@ async function main(): Promise<void> {
       semanticHits,
       semanticPassErrors: semanticPassErrorCount({ narrateErrors, semanticErrors }),
       semanticUnreadableNights: qInt(db, `SELECT COUNT(*) FROM alerts WHERE kind = 'semantic_firsts_unreadable'`),
+      semanticSkippedNights,
       fordBridge: fordProbe,
       farBankWalk: farBank,
       clothedSurviveLadder: clothedSurvive,

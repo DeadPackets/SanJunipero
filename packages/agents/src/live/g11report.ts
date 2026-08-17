@@ -186,6 +186,11 @@ export const G11EvidenceSchema = z.object({
   // Reported, not gated: a night whose verdict the generator refused. The pass ran and said
   // so; what it found was nothing. Hiding it would make a silent night look like a clean one.
   semanticUnreadableNights: z.number().int(),
+  // Reported, not gated: a night that had words to read and never got its pass at all. GATE
+  // G11b day 3 was one, and nothing in the report said so — the pass sat downstream of the
+  // chronicle render and went down with it. It must read 0 now that they are independent, and
+  // if it ever reads anything else the ordering has come back (C11 batch 16 fix 3).
+  semanticSkippedNights: z.number().int(),
   // the brief's three named world assertions
   fordBridge: z.object({
     x: z.number().int(), y: z.number().int(),

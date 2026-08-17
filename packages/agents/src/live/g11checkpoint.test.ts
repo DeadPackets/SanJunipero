@@ -41,6 +41,7 @@ const checkpointAt = (tick: number): G11Checkpoint => ({
     nightsRun: [0],
     semanticRan: true,
     semanticErrors: 1,
+    semanticSkippedNights: 1,
     narrateErrors: 0,
     constructErrors: 0,
     semanticHits: ['first_song'],
