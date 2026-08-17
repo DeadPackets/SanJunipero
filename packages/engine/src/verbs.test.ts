@@ -4,10 +4,11 @@ import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { composePerception } from './perception.js'
+import { stepCostAt } from './path.js'
 import { RngStreams, type RngStream } from './rng.js'
 import { registerVerb, unregisterVerb, VERBS, type VerbDef } from './verbs.js'
 
-const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
+const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2, p: 8 }
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
 
 function makeWorld(rows: string[] = ['........', '........', '........', '........']): WorldState {
@@ -25,7 +26,7 @@ const testVerb: VerbDef = {
 
 const TIER1 = [
   'walk', 'sleep', 'wake', 'enter', 'exit', 'eat', 'tend', 'till', 'plant', 'harvest', 'fish', 'forage',
-  'build', 'craft', 'extinguish', 'drink', 'fill', 'dig_channel', 'douse',
+  'build', 'craft', 'extinguish', 'drink', 'fill', 'dig_channel', 'douse', 'pave',
   'speak', 'give', 'take', 'stow', 'write', 'read', 'inscribe', 'teach', 'attack', 'experiment',
 ]
 
@@ -216,5 +217,50 @@ describe('tend: an hour of another body\'s hands', () => {
     const ghost = submitIntent(s, CFG, 'a2', 'tend', { targetId: 'a1', itemId: 'item_9' })
     expect(ghost.ok).toBe(false)
     if (!ghost.ok) expect(ghost.reason).toBe('not holding that')
+  })
+})
+
+describe('verb: pave', () => {
+  const CFG = SimConfigSchema.parse({})
+  const OFF = SimConfigSchema.parse({ roads: { enabled: false } })
+
+  function quarried(rows: string[] = ['..', '..'], qty = 1, config = CFG): WorldState {
+    let s = genesisState(config, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
+    if (qty === 0) return s
+    return fold(s, ev(2, 'item_spawned', {
+      id: 'item_1', kind: 'stone', qty, loc: { t: 'agent', id: 'a1' },
+    }), config)
+  }
+  const laid = (s: WorldState, x: number, y: number, config = CFG) =>
+    VERBS.pave!.onComplete(s, config, 'a1', { x, y }, new RngStreams('t').get('actions'))
+
+  it('turns grass to road for one stone and six ticks of work', () => {
+    const s = quarried()
+    expect(VERBS.pave!.duration(s, CFG, 'a1', { x: 1, y: 0 })).toBe(CFG.roads.paveDurationTicks)
+    expect(CFG.roads.paveDurationTicks).toBe(6)
+    expect(laid(s, 1, 0)).toEqual([
+      { type: 'item_qty_changed', payload: { id: 'item_1', delta: -CFG.roads.stonePerTile } },
+      { type: 'tile_changed', payload: { x: 1, y: 0, from: 0, to: 7, reason: 'paved', byId: 'a1' } },
+    ])
+  })
+
+  it('paves the dirt feet already wore, and the road it makes is the cheapest ground there is', () => {
+    let s = quarried(['.p', '..'])
+    expect(submitIntent(s, CFG, 'a1', 'pave', { x: 1, y: 0 }).ok).toBe(true)
+    for (const e of laid(s, 1, 0)) s = fold(s, ev(9, e.type, e.payload), CFG)
+    expect(s.terrain[0]![1]).toBe(7)
+    expect(stepCostAt(s, 1, 0, CFG)).toBe(0.6)
+  })
+
+  it('refuses water, an empty pack, ground out of reach, and a world with no roads in it', () => {
+    const wet = submitIntent(quarried(['.~', '..']), CFG, 'a1', 'pave', { x: 1, y: 0 })
+    expect(wet.ok).toBe(false)
+    if (!wet.ok) expect(wet.reason).toBe('nothing to pave here')
+    const broke = submitIntent(quarried(['..', '..'], 0), CFG, 'a1', 'pave', { x: 1, y: 0 })
+    expect(broke.ok).toBe(false)
+    if (!broke.ok) expect(broke.reason).toBe('not enough stone')
+    expect(submitIntent(quarried(['....', '....']), CFG, 'a1', 'pave', { x: 3, y: 1 }).ok).toBe(false)
+    expect(submitIntent(quarried(['..', '..'], 1, OFF), OFF, 'a1', 'pave', { x: 1, y: 0 }).ok).toBe(false)
   })
 })

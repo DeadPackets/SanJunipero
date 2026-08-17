@@ -713,6 +713,37 @@ const extinguish: VerbDef = makeVerb({
   },
 })
 
+export const STONE_KIND = 'stone'
+// Grass, bare earth and the dirt feet have already worn: all three take a road.
+const PAVEABLE: ReadonlySet<TileId> = new Set<TileId>([0, 1, 8])
+
+// A road is not something the map has; it is something somebody carried stone for.
+const pave: VerbDef = makeVerb({
+  kind: 'pave',
+  duration: (_state, config) => config.roads.paveDurationTicks,
+  validate(state, config, agentId, params) {
+    if (!config.roads.enabled) return 'your hands find no way to lay a road here'
+    const p = TileParams.safeParse(params)
+    if (!p.success) return 'pave needs a tile {x, y}'
+    const tile = tileAt(state, p.data.x, p.data.y)
+    if (tile === null || !PAVEABLE.has(tile)) return 'nothing to pave here'
+    if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to pave'
+    if (heldQty(state, agentId, STONE_KIND) < config.roads.stonePerTile) return 'not enough stone'
+    return null
+  },
+  onComplete(state, config, agentId, params) {
+    const p = TileParams.parse(params)
+    const tile = tileAt(state, p.x, p.y)
+    if (tile === null || !PAVEABLE.has(tile)) return []
+    if (heldQty(state, agentId, STONE_KIND) < config.roads.stonePerTile) return []
+    return [
+      ...consumeHeld(state, agentId, STONE_KIND, config.roads.stonePerTile),
+      { type: 'tile_changed', payload: { x: p.x, y: p.y, from: tile, to: 7, reason: 'paved', byId: agentId } },
+    ]
+  },
+  skill: { track: 'masonry', xp: 1 },
+})
+
 export const DouseParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
 
 // The burning structure whose footprint covers this tile, if one is alight there.
@@ -1000,7 +1031,7 @@ const experiment: VerbDef = makeVerb({
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
-  drink, fill, dig_channel: digChannel, douse,
+  drink, fill, dig_channel: digChannel, douse, pave,
   speak, give, take, stow, write, read, inscribe, teach, attack, experiment,
 }
 
