@@ -30,9 +30,9 @@ export function footprintDiamond(w: number, h: number): number[] {
  *  One ramp per material, lit from above: the top face catches the light, the south-east face
  *  holds mid tone, the south-west face falls away, and the plinth is the ground contact. */
 export const BUILT_FORM_RAMPS = {
-  stone:  { top: 0xe9e2da, right: 0xcfc6bc, left: 0xaba198, plinth: 0x857d75 },
-  timber: { top: 0xe0a95e, right: 0xc68a48, left: 0xa66e38, plinth: 0x7e512b },
-  clay:   { top: 0xf5d3b3, right: 0xd9a876, left: 0x9c6b47, plinth: 0x7e512b },
+  stone:  { top: 0xe9e2da, right: 0xaba198, left: 0x857d75, plinth: 0x5d5751 },
+  timber: { top: 0xe0a95e, right: 0xa66e38, left: 0x7e512b, plinth: 0x5d5751 },
+  clay:   { top: 0xf5d3b3, right: 0xd9a876, left: 0x9c6b47, plinth: 0x5d5751 },
 } as const
 export type RampName = keyof typeof BUILT_FORM_RAMPS
 const RAMP_NAMES = Object.keys(BUILT_FORM_RAMPS) as RampName[]
@@ -62,7 +62,7 @@ export const BUILT_FORM_UNIT_PX = TILE_W
 /** How tall each kind stands, in tiles. A well is waist-high and a fire pit is a ring of
  *  stones; nothing here may read as a house that happens to be grey. */
 export const BUILT_FORM_HEIGHT_TILES: Readonly<Record<string, number>> = {
-  fire_pit: 0.3, well: 0.6, grave: 0.45, wagon: 0.65,
+  fire_pit: 0.4, well: 0.6, grave: 0.45, wagon: 0.65,
   standing_stone: 1.1, scaffolding: 1.0, bridge: 0.35,
 }
 export const BUILT_FORM_DEFAULT_HEIGHT_TILES = 0.9
@@ -82,6 +82,11 @@ export type BuiltForm = {
   /** south-west face, south-east face, top — in paint order */
   faces: [BuiltFace, BuiltFace, BuiltFace]
   accent: BuiltFace
+  /** the OUTER outline of the whole volume — six points, so the rim reads as a silhouette
+   *  rather than as a wireframe box with every internal edge drawn */
+  silhouette: number[]
+  /** the one internal edge a solid has: the near vertical corner */
+  nearEdge: [number, number, number, number]
   ink: number
 }
 
@@ -114,6 +119,7 @@ export function builtFormSpec(kind: string, w: number, h: number): BuiltForm {
   const [, gE, gS, gW] = [pt(ground, 0), pt(ground, 1), pt(ground, 2), pt(ground, 3)]
   const [, tE, tS, tW] = [pt(top, 0), pt(top, 1), pt(top, 2), pt(top, 3)]
 
+  const tN = pt(top, 0)
   return {
     kind,
     heightPx,
@@ -123,6 +129,8 @@ export function builtFormSpec(kind: string, w: number, h: number): BuiltForm {
       { poly: [...gS!, ...gE!, ...tE!, ...tS!], color: ramp.right },
       { poly: top, color: ramp.top },
     ],
+    silhouette: [...gW!, ...gS!, ...gE!, ...tE!, ...tN!, ...tW!],
+    nearEdge: [gS![0], gS![1], tS![0], tS![1]],
     accent: {
       poly: raise(inset(w, h, BUILT_FORM_ACCENT_INSET_TILES), -heightPx),
       color: BUILT_FORM_ACCENTS[kind] ?? BUILT_FORM_ACCENTS.default!,
@@ -146,9 +154,12 @@ export function drawBuiltForm(g: FormPainter, form: BuiltForm): void {
     g.poly(face.poly)
     g.fill(face.color)
   }
-  // the rim last, over every fill, so the silhouette reads against grass and paving alike
-  for (const face of [form.plinth, ...form.faces]) {
-    g.poly(face.poly)
+  // The rim is the OUTER outline plus the one internal edge a solid actually has. Stroking
+  // every face instead drew a wireframe box, which reads as glass rather than as masonry.
+  for (const poly of [form.plinth.poly, form.silhouette]) {
+    g.poly(poly)
     g.stroke({ width: 1, color: form.ink, alignment: 0.5 })
   }
+  g.poly(form.nearEdge)
+  g.stroke({ width: 1, color: form.ink, alignment: 0.5 })
 }

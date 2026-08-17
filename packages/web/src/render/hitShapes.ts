@@ -103,10 +103,19 @@ export function hitTightness(poly: number[], figureW: number, figureH: number, s
 export const DOOR_W_TILES = 0.55, DOOR_H_TILES = 0.85
 const TILE_PX = 32   // iso.TILE_W — a tile of width is also a tile of height up a wall
 
+/** The door tile's CENTRE in the parent sprite's local space, before scaling. The same
+ *  south-face, centre-of-frontage rule `doorTileOf` applies in world tiles. */
+export function doorLocalCentre(footprint: { w: number; h: number }): { x: number; y: number } {
+  const ddx = ((footprint.w - 1) >> 1) - (footprint.w / 2 - 0.5)
+  const ddy = footprint.h - 1 - (footprint.h / 2 - 0.5)
+  return { x: (ddx - ddy) * (TILE_PX / 2), y: (ddx + ddy) * (TILE_PX / 4) + TILE_PX / 4 }
+}
+
 /**
- * The door's rect in the PARENT sprite's local space, derived from the footprint rather than
- * from two hardcoded pixel constants. A child inherits the parent's scale, so the local rect
- * is divided by it and the SCREEN size is constant at any art resolution.
+ * The door's TARGET in the PARENT sprite's local space, derived from the footprint rather than
+ * from two hardcoded pixel constants, and centred on the threshold it names. A child inherits
+ * the parent's scale, so the local rect is divided by it and the SCREEN size is constant at any
+ * art resolution.
  */
 export function doorLocalRect(
   footprint: { w: number; h: number }, scale: number,
@@ -114,13 +123,20 @@ export function doorLocalRect(
   const k = scale === 0 ? 1 : scale
   const w = Math.max(DOOR_W_TILES * TILE_PX, HIT_MIN_PX)
   const h = Math.max(DOOR_H_TILES * TILE_PX, HIT_MIN_PX)
-  // the door tile as an offset from the footprint's centre — the same south-face,
-  // centre-of-frontage rule `doorTileOf` applies in world tiles
-  const ddx = ((footprint.w - 1) >> 1) - (footprint.w / 2 - 0.5)
-  const ddy = footprint.h - 1 - (footprint.h / 2 - 0.5)
-  const cx = (ddx - ddy) * (TILE_PX / 2)
-  const cy = (ddx + ddy) * (TILE_PX / 4) + TILE_PX / 4   // the tile's centre, not its top vertex
-  return { x: (cx - w / 2) / k, y: (cy - h) / k, w: w / k, h: h / k }
+  const c = doorLocalCentre(footprint)
+  return { x: (c.x - w / 2) / k, y: (c.y - h / 2) / k, w: w / k, h: h / k }
+}
+
+/** The threshold itself: the door tile's own ground diamond, inset so it reads as a sill laid
+ *  in front of the doorway rather than as a slab painted over the wall (U11). */
+export const DOOR_SILL_INSET = 0.16
+export function doorSillPolygon(footprint: { w: number; h: number }, scale: number): number[] {
+  const k = scale === 0 ? 1 : scale
+  const c = doorLocalCentre(footprint)
+  const halfW = (TILE_PX / 2) * (1 - DOOR_SILL_INSET)
+  const halfH = (TILE_PX / 4) * (1 - DOOR_SILL_INSET)
+  return [c.x, c.y - halfH, c.x + halfW, c.y, c.x, c.y + halfH, c.x - halfW, c.y]
+    .map((v, i) => (i % 2 === 0 ? (v - 0) / k : v / k))
 }
 
 /** Priority when two hit-testable things genuinely overlap. Lower wins. A door beats a body

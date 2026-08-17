@@ -72,6 +72,8 @@ describe('a structure kind with no art still reads as a built thing', () => {
       for (const face of [form.plinth, ...form.faces, form.accent]) {
         expect(MASTER_PALETTE, `${kind} — 0x${face.color.toString(16)}`).toContain(face.color)
       }
+      expect(form.silhouette).toHaveLength(12)   // six points around the outside
+      expect(form.nearEdge).toHaveLength(4)
       expect(MASTER_PALETTE).toContain(form.ink)
     }
     for (const ramp of Object.values(BUILT_FORM_RAMPS)) {
@@ -157,7 +159,9 @@ describe('drawBuiltForm', () => {
     expect(log.filter((o) => o.op === 'fill').map((o) => o.arg)).toEqual([
       form.plinth.color, ...form.faces.map((f) => f.color), form.accent.color,
     ])
-    expect(log.filter((o) => o.op === 'stroke')).toHaveLength(4)
+    // the outer outline, the plinth and the one near vertical edge — NOT every face, which
+    // drew a wireframe box that read as glass
+    expect(log.filter((o) => o.op === 'stroke')).toHaveLength(3)
     for (const s of log.filter((o) => o.op === 'stroke')) {
       expect((s.arg as { color: number }).color).toBe(BUILT_FORM_INK)
     }

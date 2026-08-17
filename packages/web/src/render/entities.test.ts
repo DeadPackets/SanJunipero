@@ -5,7 +5,7 @@ import { TILE_H, depthKey, tileToScreen } from './iso.js'
 import {
   BUILDING_PX_PER_TILE, ENTERABLE_KINDS, doorTileOf, footprintHitPoints, structureZIndex,
 } from './entities.js'
-import { HIT_MIN_PX, doorLocalRect, resolveHit } from './hitShapes.js'
+import { HIT_MIN_PX, doorLocalCentre, doorLocalRect, doorSillPolygon, resolveHit } from './hitShapes.js'
 import { rendersOnMap } from './characters.js'
 
 // FIX ROUND 2 defect 2: the door affordance was drawn at the door TILE's depth, but the
@@ -56,11 +56,12 @@ describe('the door is part of the building', () => {
     expect(src).not.toContain('DOOR_Z_OVER_BUILDING')
   })
 
-  it('is a threshold in palette tokens, not a dark rounded rectangle', () => {
-    expect(src).toContain('DOOR_RECESS')
+  it('is a lit sill on the ground, not a dark plate over the building’s own face', () => {
+    expect(src).toContain('doorSillPolygon')
+    expect(src).toContain('DOOR_SILL')
     expect(src).toContain('DOOR_LINTEL')
-    expect(src).toContain('DOOR_STEP')
     expect(src).not.toContain('roundRect(-DOOR_W')
+    expect(src).not.toContain('DOOR_RECESS')   // the dark slab is gone, and that is the test
   })
 
   it('gives a 1×1 frontage a target at least HIT_MIN_PX in both axes — it was 10 × 13', () => {
@@ -86,7 +87,19 @@ describe('the door is part of the building', () => {
       // the door tile's centre, expressed against the sprite's own origin
       const ddx = d.x - s.x - (w / 2 - 0.5), ddy = d.y - s.y - (h / 2 - 0.5)
       expect(r.x + r.w / 2, `${w}x${h}`).toBeCloseTo((ddx - ddy) * 16, 9)
-      expect(r.y + r.h, `${w}x${h}`).toBeCloseTo((ddx + ddy) * 8 + 8, 9)
+      expect(r.y + r.h / 2, `${w}x${h}`).toBeCloseTo((ddx + ddy) * 8 + 8, 9)
+    }
+  })
+
+  it('draws the sill inside the door tile it names — it can never cover a neighbour', () => {
+    for (const [w, h] of SHAPES) {
+      const poly = doorSillPolygon({ w, h }, 1)
+      const c = doorLocalCentre({ w, h })
+      const xs = poly.filter((_, i) => i % 2 === 0), ys = poly.filter((_, i) => i % 2 === 1)
+      expect(Math.max(...xs) - Math.min(...xs), `${w}x${h}`).toBeLessThanOrEqual(32)
+      expect(Math.max(...ys) - Math.min(...ys), `${w}x${h}`).toBeLessThanOrEqual(16)
+      expect((Math.max(...xs) + Math.min(...xs)) / 2).toBeCloseTo(c.x, 9)
+      expect((Math.max(...ys) + Math.min(...ys)) / 2).toBeCloseTo(c.y, 9)
     }
   })
 

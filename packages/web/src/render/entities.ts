@@ -7,7 +7,7 @@ import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
 import { structureDepthBox, tileDepthBox, type DepthBox } from './depth.js'
 import { TILE_H, depthKey, tileToScreen } from './iso.js'
 import type { DepthEntry } from './layers.js'
-import { doorLocalRect } from './hitShapes.js'
+import { doorLocalRect, doorSillPolygon } from './hitShapes.js'
 import { anchorForSprite } from './tooltip.js'
 import type { Scene } from './scene.js'
 import {
@@ -29,14 +29,13 @@ export const BUILD_TICKS_FULL = 2880 // pip denominator — DEFAULT_CONFIG const
 // C13 city template applies in template space (`doorTile`), read here in world tiles.
 export const ENTERABLE_KINDS: ReadonlySet<string> = new Set(INTERIOR_KINDS)
 
-// A THRESHOLD, NOT A DARK RECTANGLE (U11). Palette tokens in the chrome's own pixel language:
-// a 2px ink lintel over a deep recess with a honey step, lifted to full alpha on hover.
-export const DOOR_LINTEL = 0x43394a       // --ink
-export const DOOR_RECESS = 0x241f2b       // --deep
-export const DOOR_STEP = 0xf2c879         // --honey
-export const DOOR_JAMB = 0x7e512b         // the darkest honey timber
-export const DOOR_IDLE_ALPHA = 0.85
-export const DOOR_LINTEL_PX = 2
+// A THRESHOLD, NOT A DARK RECTANGLE (U11). The affordance is a SILL laid on the door tile —
+// a warm step in front of the doorway — never a slab painted over the building's own face.
+// A dark plate on the wall was exactly the artefact the user reported.
+export const DOOR_SILL = 0xf2c879         // --honey, the lit step
+export const DOOR_LINTEL = 0x43394a       // --ink, its 1px rim
+export const DOOR_IDLE_ALPHA = 0.45
+export const DOOR_HOVER_ALPHA = 1
 
 export function doorTileOf(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): { x: number; y: number } {
   return { x: s.x + ((s.w - 1) >> 1), y: s.y + s.h - 1 }
@@ -132,30 +131,23 @@ function applyBuildingArt(
 }
 
 /**
- * The threshold plate, in the parent sprite's local space. Not a dark rectangle: a 2 px ink
- * lintel over a deep recess, a honey step at the sill and a jamb down each side — the same
- * palette language the chrome is drawn in. Re-cut whenever the sprite's scale moves, so it
- * stays the same size on screen at any art resolution.
+ * The threshold, in the parent sprite's local space: the door tile's own ground diamond, lit
+ * in honey with a 1 px ink rim. It is a step you can see from any angle, and because it lies
+ * on the ground it never punches a hole in the building's own art. Re-cut whenever the
+ * sprite's scale moves, so it stays one size on screen at any art resolution.
  */
 function layoutDoor(entry: Entry, footprint: { w: number; h: number }): void {
   const door = entry.door
   if (door === null) return
   const scale = entry.sprite.scale.x || 1
-  const r = doorLocalRect(footprint, scale)
-  const lintel = DOOR_LINTEL_PX / scale
-  const step = (DOOR_LINTEL_PX * 1.5) / scale
   door.clear()
-  door.rect(r.x, r.y, r.w, r.h)
-  door.fill(DOOR_RECESS)
-  door.rect(r.x, r.y, r.w, lintel)
-  door.fill(DOOR_LINTEL)
-  door.rect(r.x, r.y + lintel, lintel, r.h - lintel - step)
-  door.rect(r.x + r.w - lintel, r.y + lintel, lintel, r.h - lintel - step)
-  door.fill(DOOR_JAMB)
-  door.rect(r.x, r.y + r.h - step, r.w, step)
-  door.fill(DOOR_STEP)
+  door.poly(doorSillPolygon(footprint, scale))
+  door.fill(DOOR_SILL)
+  door.poly(doorSillPolygon(footprint, scale))
+  door.stroke({ width: 1 / scale, color: DOOR_LINTEL, alignment: 0.5 })
   door.alpha = DOOR_IDLE_ALPHA
   door.position.set(0, 0)
+  const r = doorLocalRect(footprint, scale)
   door.hitArea = new Rectangle(r.x, r.y, r.w, r.h)
 }
 
@@ -307,8 +299,9 @@ export function syncEntities(
       const sid = s.id
       const self = entry
       const sw = s.w, sh = s.h
-      door.on('pointerover', () => {
-        door.alpha = 1
+      door.on('pointerover', (e: FederatedPointerEvent) => {
+        e.stopPropagation()   // one pointer names ONE thing: the door, not also its building
+        door.alpha = DOOR_HOVER_ALPHA
         const name = hoverLabel(store.getState(), 'structure', sid)
         const k = self.sprite.scale.x || 1
         const r = doorLocalRect({ w: sw, h: sh }, k)
@@ -319,7 +312,8 @@ export function syncEntities(
           })
         }
       })
-      door.on('pointerout', () => {
+      door.on('pointerout', (e: FederatedPointerEvent) => {
+        e.stopPropagation()
         door.alpha = DOOR_IDLE_ALPHA
         tags.hide('door')
       })
