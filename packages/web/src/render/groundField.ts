@@ -158,22 +158,44 @@ export function roadArms(key: RoadAutotileKey): Record<ArmDir, boolean> {
 const toScreen = (dx: number, dy: number): [number, number] =>
   [(dx - dy) * (TILE_W / 2), (dx + dy) * (TILE_H / 2) + TILE_H / 2]
 
-// A road read as a path in v1 because the art carried a painted edge where it met grass.
-// The v2 ribbon fills flat material with no boundary at all, which is why runs "nearly
-// vanished" at 1x. The shoulder is the same silhouette grown slightly and drawn UNDER the
-// ribbon, so every run keeps a dark rim without any new art.
-export const SHOULDER_GROW = 1.22
+// A road needs a rim where it meets grass, and NOWHERE ELSE. Growing the whole silhouette
+// about the tile centre put a dark wedge at every tile's side corners — perpendicular to the
+// run, once per tile — which is precisely what read as "disconnected cobble islands with
+// grass gaps". Measuring the spine of a 20-tile run proved the surface was continuous all
+// along; the banding was the shoulder, not the road.
+//
+// So the rim is drawn only on the sides that face a MISSING arm: each present arm's two side
+// edges are shared with an adjacent quadrant, and only the ones whose neighbour is absent get
+// a wedge. On a straight run that is the two long sides and nothing at the joins.
+export const SHOULDER_T = 0.26            // how far into the arm the rim reaches
 export const ROAD_SHOULDER = 0xb89d7e     // v1's own ROAD_EDGE, a MASTER_PALETTE member
 
+// each arm's two corner vertices, and the neighbouring direction that shares that edge
+const ARM_SIDES: Record<ArmDir, ReadonlyArray<{ v: readonly [number, number]; shared: ArmDir }>> = {
+  n: [{ v: [-0.5, -0.5], shared: 'w' }, { v: [0.5, -0.5], shared: 'e' }],
+  e: [{ v: [0.5, -0.5], shared: 'n' }, { v: [0.5, 0.5], shared: 's' }],
+  s: [{ v: [0.5, 0.5], shared: 'e' }, { v: [-0.5, 0.5], shared: 'w' }],
+  w: [{ v: [-0.5, 0.5], shared: 's' }, { v: [-0.5, -0.5], shared: 'n' }],
+}
+
 export function roadShoulderPolys(key: RoadAutotileKey): number[][] {
-  const centre = TILE_H / 2
-  return roadRibbonPolys(key).map((poly) => {
-    const out: number[] = []
-    for (let i = 0; i < poly.length; i += 2) {
-      out.push(poly[i]! * SHOULDER_GROW, centre + (poly[i + 1]! - centre) * SHOULDER_GROW)
+  const arms = roadArms(key)
+  const out: number[][] = []
+  const lerp = (a: readonly [number, number], b: readonly [number, number], t: number): [number, number] =>
+    [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+  for (const dir of Object.keys(ARM_DIRS) as ArmDir[]) {
+    if (!arms[dir]) continue
+    const sides = ARM_SIDES[dir]
+    for (let i = 0; i < sides.length; i++) {
+      const side = sides[i]!
+      if (arms[side.shared]) continue          // an interior join keeps no rim
+      const other = sides[1 - i]!.v            // the arm's third vertex, to taper inward
+      const a: readonly [number, number] = [0, 0]
+      const quad = [a, side.v, lerp(side.v, other, SHOULDER_T), lerp(a, other, SHOULDER_T)]
+      out.push(quad.flatMap(([dx, dy]) => toScreen(dx, dy)))
     }
-    return out
-  })
+  }
+  return out
 }
 
 /**

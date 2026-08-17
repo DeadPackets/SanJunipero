@@ -304,8 +304,10 @@ export function deframe(m: RawImage): { material: RawImage; passes: number } {
 export type Grade = {
   targetMean?: readonly [number, number, number]
   contrast?: number
-  /** drop the warm half of MASTER_PALETTE before quantizing (see COOL_PALETTE) */
+  /** drop the warm half of MASTER_PALETTE before quantizing (see coolPalette) */
   coolOnly?: boolean
+  /** drop only the pink/purple entries, keeping the sandy ramp (see noRosePalette) */
+  noRose?: boolean
 }
 
 // Quantizing a green-grey midtone against the WHOLE palette lets it snap to dusty rose or
@@ -314,6 +316,14 @@ export type Grade = {
 // minus its warm entries. Everything else keeps the full palette.
 export function coolPalette(): ReturnType<typeof paletteRgb> {
   return paletteRgb().filter((p) => p[0] <= p[1] + 18)
+}
+
+// A stone road is warm, so it cannot use the grass filter — it needs its sandy ramp. What it
+// must not borrow is the ROSE ramp, which is what speckled road segments and the plaza's north
+// edge pink. Pinks and the purple sit where red leads green but green does NOT lead blue;
+// tans and golds have green well clear of blue, so this keeps every road tone.
+export function noRosePalette(): ReturnType<typeof paletteRgb> {
+  return paletteRgb().filter((p) => !(p[0] > p[1] + 25 && p[1] - p[2] < 20))
 }
 
 export function materialMean(m: RawImage): [number, number, number] {
@@ -348,13 +358,15 @@ export function gradeMaterial(m: RawImage, grade: Grade): RawImage {
       for (let c = 0; c < 3; c++) out.data[i + c] = out.data[i + c]! + (grade.targetMean[c]! - now[c]!)
     }
   }
-  return quantize(out, grade.coolOnly === true ? coolPalette() : paletteRgb())
+  const palette = grade.coolOnly === true ? coolPalette()
+    : grade.noRose === true ? noRosePalette() : paletteRgb()
+  return quantize(out, palette)
 }
 
 // Targets measured off the v1 materials, which the user accepted structurally.
 export const MATERIAL_GRADES: Record<string, Grade> = {
   grass: { targetMean: [151, 184, 119], contrast: 0.6, coolOnly: true },
-  road: { targetMean: [205, 183, 148], contrast: 0.85 },
+  road: { targetMean: [205, 183, 148], contrast: 0.85, noRose: true },
 }
 
 // The picture the vision judge scores TILING on: the same square nine times, so a seam or a

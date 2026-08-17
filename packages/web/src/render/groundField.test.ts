@@ -5,7 +5,7 @@ import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { ROAD_TILE_ID } from './tileset.js'
 import {
   MATERIAL_REPEAT_PX, ROAD_UNDER, groundArtSignature, groundField, materialUv, resolveMaterial,
-  roadArms, roadRibbonPolys, roadStripFrame,
+  roadArms, roadRibbonPolys, roadShoulderPolys, roadStripFrame,
 } from './groundField.js'
 
 const material = (kind: string, seq: number): AssetRecord => ({
@@ -262,5 +262,132 @@ describe('groundArtSignature', () => {
   it('is cheap and pure — it runs on every store notify', () => {
     const many = Array.from({ length: 500 }, (_, i) => rec(i % 3 === 0 ? 'terrain' : 'item', `k${i}`, i + 1))
     expect(groundArtSignature(many)).toBe(groundArtSignature(many))
+  })
+})
+
+
+// ── CONNECTIVITY ACCEPTANCE (controller, final round) ───────────────────────────────────
+// Roads rendered as chains of disconnected cobble islands. Adjacent quadrants SHARE an edge
+// mathematically, so the gaps are a rasterisation seam: two polygons abutting on a boundary
+// can each drop the boundary pixel. The acceptance test is the controller's own — flood-fill
+// a rasterised run from one end and require the other end to be reachable.
+
+/** rasterise a road run into a boolean grid the way the baker fills it */
+function rasterRun(terrain: TileId[][]): { grid: boolean[][]; w: number; h: number; off: number } {
+  const n = terrain.length
+  const w = 2 * n * (TILE_W / 2), h = 2 * n * (TILE_H / 2) + TILE_H, off = n * (TILE_W / 2)
+  const grid: boolean[][] = Array.from({ length: h }, () => Array.from({ length: w }, () => false))
+  const field = groundField(terrain, [])
+  for (const l of field.layers) {
+    if (l.kind !== 'road') continue
+    for (const shape of l.shapes) {
+      if (shape.roadKey === null) continue
+      for (const poly of roadRibbonPolys(shape.roadKey)) {
+        const pts: number[] = []
+        for (let i = 0; i < poly.length; i += 2) pts.push(shape.sx + off + poly[i]!, shape.sy + poly[i + 1]!)
+        const xs = pts.filter((_, i) => i % 2 === 0), ys = pts.filter((_, i) => i % 2 === 1)
+        for (let y = Math.max(0, Math.floor(Math.min(...ys))); y <= Math.min(h - 1, Math.ceil(Math.max(...ys))); y++) {
+          for (let x = Math.max(0, Math.floor(Math.min(...xs))); x <= Math.min(w - 1, Math.ceil(Math.max(...xs))); x++) {
+            let inside = false
+            for (let i = 0, j = pts.length / 2 - 1; i < pts.length / 2; j = i++) {
+              const xi = pts[i * 2]!, yi = pts[i * 2 + 1]!, xj = pts[j * 2]!, yj = pts[j * 2 + 1]!
+              if ((yi > y + 0.5) !== (yj > y + 0.5)
+                && x + 0.5 < ((xj - xi) * (y + 0.5 - yi)) / (yj - yi) + xi) inside = !inside
+            }
+            if (inside) grid[y]![x] = true
+          }
+        }
+      }
+    }
+  }
+  return { grid, w, h, off }
+}
+
+/** 4-way flood fill from the first filled pixel of `from`, does it reach `to`? */
+function reaches(r: ReturnType<typeof rasterRun>, from: [number, number], to: [number, number]): boolean {
+  const seen = Array.from({ length: r.h }, () => Array.from({ length: r.w }, () => false))
+  const start = [Math.round(from[0]), Math.round(from[1])] as [number, number]
+  if (!r.grid[start[1]]?.[start[0]]) return false
+  const q: Array<[number, number]> = [start]
+  seen[start[1]]![start[0]] = true
+  while (q.length > 0) {
+    const [x, y] = q.pop()!
+    if (Math.abs(x - to[0]) <= 1 && Math.abs(y - to[1]) <= 1) return true
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const nx = x + dx, ny = y + dy
+      if (nx < 0 || ny < 0 || nx >= r.w || ny >= r.h) continue
+      if (seen[ny]![nx] || !r.grid[ny]![nx]) continue
+      seen[ny]![nx] = true
+      q.push([nx, ny])
+    }
+  }
+  return false
+}
+
+const road = (n: number, cells: Array<[number, number]>): TileId[][] => {
+  const t: TileId[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 0 as TileId))
+  for (const [x, y] of cells) t[y]![x] = ROAD_TILE_ID as TileId
+  return t
+}
+const centreOf = (r: { off: number }, x: number, y: number): [number, number] =>
+  [tileToScreen(x, y).sx + r.off, tileToScreen(x, y).sy + TILE_H / 2]
+
+describe('the rim only faces grass', () => {
+  it('a straight run gets a rim on its two long sides and NOTHING at the joins', () => {
+    // 4 present-arm side-edges on a straight run; the two facing the other (absent) arms get
+    // a rim, the two shared with the road's own continuation do not
+    expect(roadShoulderPolys('straight-ns')).toHaveLength(4)
+    expect(roadShoulderPolys('straight-ew')).toHaveLength(4)
+  })
+
+  it('a crossroads has no rim at all — every side is road', () => {
+    expect(roadShoulderPolys('cross')).toHaveLength(0)
+  })
+
+  it('a T keeps a rim only on the side its missing arm faces', () => {
+    expect(roadShoulderPolys('t-no-n')).toHaveLength(2)
+    expect(roadShoulderPolys('t-no-w')).toHaveLength(2)
+  })
+
+  it('a dead end is rimmed on three sides of its one arm', () => {
+    expect(roadShoulderPolys('cap-n')).toHaveLength(2)
+  })
+
+  it('every rim stays inside its own tile, so it cannot band a neighbour', () => {
+    const inDiamond = (x: number, y: number): boolean =>
+      Math.abs(x) / (TILE_W / 2) + Math.abs(y - TILE_H / 2) / (TILE_H / 2) <= 1.001
+    for (const key of ROAD_AUTOTILE_KEYS) {
+      for (const poly of roadShoulderPolys(key)) {
+        for (let i = 0; i < poly.length; i += 2) {
+          expect(inDiamond(poly[i]!, poly[i + 1]!), `${key}`).toBe(true)
+        }
+      }
+    }
+  })
+})
+
+describe('a road run is CONNECTED', () => {
+  it('a straight 5-tile run: one end reaches the other', () => {
+    const t = road(9, [[4, 2], [4, 3], [4, 4], [4, 5], [4, 6]])
+    const r = rasterRun(t)
+    expect(reaches(r, centreOf(r, 4, 2), centreOf(r, 4, 6))).toBe(true)
+  })
+
+  it('a straight 5-tile run the other way, too', () => {
+    const t = road(9, [[2, 4], [3, 4], [4, 4], [5, 4], [6, 4]])
+    const r = rasterRun(t)
+    expect(reaches(r, centreOf(r, 2, 4), centreOf(r, 6, 4))).toBe(true)
+  })
+
+  it('an L-bend stays connected across the corner', () => {
+    const t = road(9, [[2, 4], [3, 4], [4, 4], [4, 5], [4, 6]])
+    const r = rasterRun(t)
+    expect(reaches(r, centreOf(r, 2, 4), centreOf(r, 4, 6))).toBe(true)
+  })
+
+  it('and two runs that never touch are still SEPARATE — the test discriminates', () => {
+    const t = road(12, [[2, 2], [3, 2], [4, 2], [8, 8], [9, 8], [10, 8]])
+    const r = rasterRun(t)
+    expect(reaches(r, centreOf(r, 2, 2), centreOf(r, 10, 8))).toBe(false)
   })
 })
