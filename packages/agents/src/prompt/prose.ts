@@ -22,6 +22,7 @@ export type PerceptionItem = {
 export type PerceptionSeen =
   | { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
   | { kind: 'mystery'; mystery: string; prose: string }
+  | { kind: 'expression'; actorName: string; verb: string; sense: 'sight' | 'sound' }
 
 export type PerceptionAgent = {
   id: string
@@ -286,7 +287,10 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   }
 
   for (const s of packet.seen) {
-    lines.push(s.kind === 'item_taken' ? `You watch ${s.takerName} take ${s.ownerName}'s ${s.itemKind}.` : s.prose)
+    if (s.kind === 'item_taken') lines.push(`You watch ${s.takerName} take ${s.ownerName}'s ${s.itemKind}.`)
+    else if (s.kind === 'expression') {
+      lines.push(s.sense === 'sound' ? `You hear ${s.actorName} ${s.verb}.` : `You watch ${s.actorName} ${s.verb}.`)
+    } else lines.push(s.prose)
   }
 
   for (const tag of packet.feltEvents) {

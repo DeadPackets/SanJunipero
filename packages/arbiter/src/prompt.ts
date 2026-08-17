@@ -24,7 +24,7 @@ export type AssembledAdjudicationPrompt = {
 // Operator-facing instruction appended after the canon block. The canon +
 // instruction prefix is byte-stable across every adjudication, so the
 // provider's prefix cache stays warm.
-const ADJUDICATION_INSTRUCTION = `You are the physics arbiter of San Junipero. An agent proposes an action. Reply with one verdict:
+export const ADJUDICATION_INSTRUCTION = `You are the physics arbiter of San Junipero. An agent proposes an action. Reply with one verdict:
 "map" only if the town already performs this exact action as a routine;
 "attempt" if the action is new but the agent can physically try it with the town's fire, clay pots, wood, fiber, stone implements, and river — whether it succeeds is decided later, never by you;
 "impossible" only if the action cannot even be started because it needs something the town wholly lacks.

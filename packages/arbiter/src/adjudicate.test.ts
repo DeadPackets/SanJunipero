@@ -291,7 +291,9 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
 
     const verdict = await arbiter.adjudicate('I dance the ghost dance', ctx)
     expect(verdict.kind).toBe('impossible')
-    expect(llm.objectCalls).toBe(2)
+    // Three: a dance is tried on the cheap expressive path first, and this script has no
+    // ruling to give it, so it falls through to the two verdict attempts.
+    expect(llm.objectCalls).toBe(3)
     // Never recorded — a hallucinated verb must not become immutable precedent.
     const n = (db.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n
     expect(n).toBe(0)
@@ -518,7 +520,8 @@ describe('FORBIDDEN_FRAMING enforced over live LLM output', () => {
       expect(FORBIDDEN_FRAMING.test(verdict.reason)).toBe(false)
       expect(verdict.class).toBe('physically_impossible')
     }
-    expect(llm.objectCalls).toBe(1)
+    // Two: a whistle reaches the cheap expressive path first and gets no ruling from it.
+    expect(llm.objectCalls).toBe(2)
     const row = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
     expect(FORBIDDEN_FRAMING.test(row.verdict_json)).toBe(false)
   })

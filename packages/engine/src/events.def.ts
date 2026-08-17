@@ -98,6 +98,15 @@ export const AgentExited = z.object({ agentId: z.string(), structureId: z.string
 export const AgentSpoke = z.object({
   agentId: z.string(), text: z.string(), x: z.number(), y: z.number(), insideId: z.string().optional(),
 }).strict()
+// A witness record and nothing else: the fold returns the state it was handed. `sense` says
+// which way the act travelled, so a replay knows a song from a dance without asking the
+// arbiter; optional, because an act with no sense recorded is one the eye caught.
+// `insideId` replays the doorway rule from the event alone, exactly as agent_spoke does.
+export const AgentExpressed = z.object({
+  agentId: z.string(), verb: z.string().min(1), targetId: z.string().optional(),
+  x: z.number(), y: z.number(), sense: z.enum(['sight', 'sound']).optional(),
+  insideId: z.string().optional(),
+}).strict()
 export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
 // `cause` stays a free string so every recorded C1-C10 log still parses; DEATH_CAUSES is the
 // vocabulary emitters are held to (controller ruling 6).

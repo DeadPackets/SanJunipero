@@ -6,6 +6,7 @@ import {
   AgentAged, AgentBorn, AgentCollapsed, AgentConceived, AgentDied, AgentFellIll, AgentInfected,
   AgentInjured, AgentMoved,
   AgentEntered, AgentExited,
+  AgentExpressed,
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
   AgentDrank, FireExtinguished, FireIgnited, FireSpread, GravePlaced, HpChanged, ThirstChanged,
@@ -150,6 +151,12 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
     }
     case 'item_taken': {
       ItemTaken.parse(event.payload)
+      return state
+    }
+    // The same class as a taking: witnessed, recorded, and folded to nothing. What a dance
+    // means is the town's to decide, and the world state is not where that lives.
+    case 'agent_expressed': {
+      AgentExpressed.parse(event.payload)
       return state
     }
     case 'item_worn': {

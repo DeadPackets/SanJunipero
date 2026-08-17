@@ -1,5 +1,4 @@
 import type Database from 'better-sqlite3'
-import type { Recipe } from './verdict.js'
 
 export function normalizeIntent(text: string): string {
   return text
@@ -55,10 +54,14 @@ function toRulebookRow(r: RawRulebookRow): RulebookRow {
   }
 }
 
+// What the rulebook actually needs from a codified thing: an id and a name. A crafting
+// recipe is one; an expressive ruling is the other, and the row keeps whichever JSON it got.
+export type RulebookEntry = { id: string; name: string }
+
 export class RulebookStore {
   constructor(readonly db: Database.Database) {}
 
-  insert(recipe: Recipe, tick: number): number {
+  insert(recipe: RulebookEntry, tick: number): number {
     const res = this.db
       .prepare(
         `INSERT INTO rulebook (recipe_id, name, normalized_name, recipe_json, verb, tick)
@@ -82,7 +85,7 @@ export class RulebookStore {
     return row ? toRulebookRow(row) : null
   }
 
-  reactivate(recipe: Recipe, tick: number): void {
+  reactivate(recipe: RulebookEntry, tick: number): void {
     this.db
       .prepare(
         `UPDATE rulebook SET reverted_at_tick = NULL, reverted_reason = NULL,

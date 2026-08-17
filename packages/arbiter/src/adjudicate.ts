@@ -4,6 +4,10 @@ import { registerVerb, VERBS } from '@sj/engine'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import { codify as codifyRecipe, verbFromRecipe } from './codify.js'
+import {
+  assembleExpressivePrompt, ExpressiveRulingSchema, expressiveRow, expressiveVerbFromRuling,
+  isExpressive, isExpressiveRow, type ExpressiveRuling,
+} from './expressive.js'
 import { assembleAdjudicationPrompt, FORBIDDEN_FRAMING } from './prompt.js'
 import { ReviewStore } from './review.js'
 import { RulebookStore } from './rulebook.js'
@@ -73,7 +77,29 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
   // Restart resilience: the rulebook is durable but the verb registry is
   // in-memory — re-register every active codified verb in deterministic order.
   for (const row of rulebook.allActive()) {
-    if (!VERBS[row.verb]) registerVerb(verbFromRecipe(JSON.parse(row.recipeJson) as Recipe))
+    if (VERBS[row.verb]) continue
+    const parsed: unknown = JSON.parse(row.recipeJson)
+    registerVerb(isExpressiveRow(parsed)
+      ? expressiveVerbFromRuling(parsed.name, parsed)
+      : verbFromRecipe(parsed as Recipe))
+  }
+
+  // The cheap approval: a word for an act that changes nothing. One small call, one rulebook
+  // row, and thereafter the whole town has the verb for free.
+  function codifyExpressive(ruling: ExpressiveRuling, tick: number): string {
+    const row = expressiveRow(ruling)
+    const existing = rulebook.byId(row.id)
+    if (existing !== null && existing.revertedAtTick === null) return row.id
+    if (existing !== null) {
+      rulebook.reactivate(row, tick)
+      if (!VERBS[row.id]) registerVerb(expressiveVerbFromRuling(row.name, row))
+      review.queue(existing.id, row.id, tick)
+      return row.id
+    }
+    const ruleId = rulebook.insert(row, tick)
+    if (!VERBS[row.id]) registerVerb(expressiveVerbFromRuling(row.name, row))
+    review.queue(ruleId, row.id, tick)
+    return row.id
   }
 
   return {
@@ -108,6 +134,19 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
           if (CONTEXT_INDEPENDENT_IMPOSSIBLE.has(stored.class)) return stored
           // Contextual (insufficient_skill/materials) → fall through to the LLM,
           // which sees the asking agent's own skills and inventory.
+        }
+      }
+
+      // Stage 2b — an act with nothing to adjudicate. It skips the recipe prompt entirely:
+      // one small call names it, and a ruling nobody can parse falls through to the full path.
+      if (isExpressive(intent)) {
+        const cheap = assembleExpressivePrompt({ canon: CANON, agent: agentCtx, intent })
+        const r = await deps.llm.object({ schema: ExpressiveRulingSchema, ...cheap })
+        const ruling = ExpressiveRulingSchema.safeParse(r.value)
+        if (ruling.success) {
+          const verdict: Verdict = { kind: 'map', verb: codifyExpressive(ruling.data, tick()), params: {} }
+          await rulings.record(intent, verdict, tick())
+          return verdict
         }
       }
 

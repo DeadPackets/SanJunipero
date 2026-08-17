@@ -80,6 +80,7 @@ export type HeardSpeech = { speakerId: string; name: string; text: string; dista
 export type SeenEvent =
   | { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
   | { kind: 'mystery'; mystery: string; prose: string }
+  | { kind: 'expression'; actorName: string; verb: string; sense: 'sight' | 'sound' }
 
 // What the ground under and around the feet is like. Absent on plain earth, so a packet from
 // a town with no roads reads exactly as it always did. A fact about hauling, not a site score.
@@ -356,6 +357,23 @@ export function composePerception(
       if (!sameSide || !withinSight(p.x, p.y)) continue
       seen.push({ kind: 'item_taken', takerName: nameOf(p.takerId), ownerName: nameOf(p.ownerId), itemKind: p.kind })
     }
+  }
+
+  // A dance is a thing at a place and obeys the light like everything else seen; a song is
+  // carried by the voice, so it goes as far as speech goes and the dark does not touch it.
+  for (const ev of recentEvents) {
+    if (ev.type !== 'agent_expressed') continue
+    const p = ev.payload as { agentId?: unknown; verb?: unknown; x?: unknown; y?: unknown; sense?: unknown }
+    if (typeof p.agentId !== 'string' || typeof p.verb !== 'string') continue
+    if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
+    if (p.agentId === agentId) continue
+    const sense = p.sense === 'sound' ? 'sound' : 'sight'
+    const actorInside = state.agents[p.agentId]?.insideId ?? null
+    const reaches = sense === 'sound'
+      ? hears(state, config, ev, agentId)
+      : (indoors === null ? actorInside === null : actorInside === indoors) && withinSight(p.x, p.y)
+    if (!reaches) continue
+    seen.push({ kind: 'expression', actorName: nameOf(p.agentId), verb: p.verb, sense })
   }
 
   // A global mystery reaches every open pair of eyes, walls and distance no object; a
