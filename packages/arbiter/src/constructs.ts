@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { LlmClient } from '@sj/agents'
+import { assertQuotedName, type LlmClient } from '@sj/agents'
 import { effectiveConfig, TOGGLABLE_PATHS } from '@sj/engine'
 import { MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
 import type { ConstructStore } from './constructStore.js'
@@ -101,13 +101,13 @@ const NAME_PATTERNS: readonly RegExp[] = [
 function nameIn(ev: SimEvent): CandidateName | null {
   const p = ev.payload as { agentId?: unknown; text?: unknown } | null
   if (typeof p?.text !== 'string' || typeof p.agentId !== 'string') return null
+  const source = { sourceKind: 'speech' as const, text: p.text, eventSeq: ev.seq, byId: p.agentId }
   for (const re of NAME_PATTERNS) {
-    const m = re.exec(p.text)
-    const found = m?.[1]?.replace(/[.,!?;:]+$/, '').trim()
-    // Verbatim or nothing: a name the utterance does not contain is not a name (G9).
-    if (found !== undefined && found.length > 1 && p.text.includes(found)) {
-      return { eventSeq: ev.seq, quote: p.text, byId: p.agentId, name: found }
-    }
+    const found = re.exec(p.text)?.[1]?.replace(/[.,!?;:]+$/, '').trim()
+    if (found === undefined || found.length < 2) continue
+    // Verbatim or nothing, through the one enforcement point of the naming law (G9).
+    const quoted = assertQuotedName(found, [source])
+    if (quoted !== null) return { eventSeq: quoted.eventSeq, quote: quoted.quote, byId: quoted.byId, name: quoted.name }
   }
   return null
 }

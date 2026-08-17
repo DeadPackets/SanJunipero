@@ -1,9 +1,13 @@
-import { expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openDb } from '@sj/engine'
-import { NARRATOR_TABLES, WORLD_TABLES, openNarratorDb, openNarratorWorld } from './glass.js'
+import {
+  CONSTRUCT_VOCABULARY, NARRATOR_TABLES, WORLD_TABLES, openNarratorDb, openNarratorWorld,
+  scanPromptForGlassLeak,
+} from './glass.js'
+import { FIRST_DEFS } from './firsts.js'
 
 it('narrator has no write grant on world tables', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-glass-'))
@@ -37,4 +41,21 @@ it('narrator has no write grant on world tables', () => {
   read.close()
   obs.close()
   rmSync(dir, { recursive: true, force: true })
+})
+
+describe('the other face of the glass: what the narrator names never reaches a mind', () => {
+  it('catches every milestone kind it can write', () => {
+    for (const def of FIRST_DEFS) {
+      expect(scanPromptForGlassLeak(`the day of ${def.kind}`), def.kind).toEqual([def.kind])
+    }
+  })
+
+  it('leaves the human label of a first alone — that is world text, not a label', () => {
+    for (const def of FIRST_DEFS) expect(scanPromptForGlassLeak(def.label), def.label).toEqual([])
+  })
+
+  it('is the same list the agents side enforces, through one door', () => {
+    expect(CONSTRUCT_VOCABULARY).toContain('milestone')
+    expect(CONSTRUCT_VOCABULARY).toContain('tier')
+  })
 })

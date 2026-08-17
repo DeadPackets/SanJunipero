@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { LlmClient, LlmMessage, LlmUsage } from '@sj/agents'
+import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
 import { fold, genesisState, type TileId, type WorldState } from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimEvent } from '@sj/shared'
 import {
   CONSTRUCT_TYPES, ConstructSchema, CONSTRUCT_TYPE_INSTRUCTION, detectCandidates, runConstructPass,
 } from './constructs.js'
 import { ConstructStore } from './constructStore.js'
+import { CANON } from './canon.js'
 import { openArbiterDb } from './schema.js'
 
 let seq = 1
@@ -177,6 +178,24 @@ describe('one-way glass', () => {
   })
 
   it('never lets a type word out into a prompt an agent can see', () => {
-    for (const t of CONSTRUCT_TYPES) expect(ConstructSchema.shape.type.options).toContain(t)
+    for (const t of CONSTRUCT_TYPES) {
+      expect(ConstructSchema.shape.type.options).toContain(t)
+      // The mirror guard: the taxonomy the arbiter writes is the taxonomy the scan catches.
+      expect(CONSTRUCT_VOCABULARY, t).toContain(t)
+    }
+  })
+
+  it('the arbiter\'s own agent-facing text is clean', () => {
+    const agentFacing = [
+      'no clear way to do this presents itself',
+      'nothing in the town lends itself to this',
+      'this would need a craft the town has not yet reached',
+      CANON,
+    ]
+    for (const text of agentFacing) expect(scanPromptForGlassLeak(text), text).toEqual([])
+  })
+
+  it('the recognizer\'s own prompt is ops-side, and says so by carrying the taxonomy', () => {
+    expect(scanPromptForGlassLeak(CONSTRUCT_TYPE_INSTRUCTION).sort()).toEqual([...CONSTRUCT_TYPES].sort())
   })
 })
