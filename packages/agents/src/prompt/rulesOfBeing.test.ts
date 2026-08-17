@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
+import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import { assemblePrompt } from './assemble.js'
+import { calendarLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, FORBIDDEN_FRAMING, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
-import { fixtureBlocks, tamarIdentity } from '../testutil/fixtures.js'
+import { fixtureBlocks, quietMeadowPacket, tamarIdentity } from '../testutil/fixtures.js'
 
 // Block 1 is the cache-stable prefix of every prompt. Task 17 rewrites it once
 // (SPEECH_RULES + stow/ownership capabilities) and then it is frozen: this hash
@@ -54,6 +56,33 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
 
   it('never names the machinery', () => {
     expect(CAPABILITIES).not.toMatch(FORBIDDEN_FRAMING)
+  })
+})
+
+describe('the shared calendar', () => {
+  const at = (tick: number): string => calendarLine(simTimeFromTick(tick))
+
+  it('names the day, the part of the day and the season, in that order', () => {
+    expect(at(11 * MINUTES_PER_DAY + 19 * 60)).toBe('It is day 12, dusk, early spring.')
+    expect(at(350 * MINUTES_PER_DAY + 3 * 60)).toBe('It is day 351, night, late winter.')
+    expect(at(222 * MINUTES_PER_DAY + 12 * 60)).toBe('It is day 223, day, mid autumn.')
+  })
+
+  it('reaches every turn through the moment prose, ahead of everything else in it', () => {
+    const prose = perceptionToProse({
+      ...quietMeadowPacket, time: simTimeFromTick(11 * MINUTES_PER_DAY + 19 * 60),
+    })
+    expect(prose.startsWith('It is day 12, dusk, early spring.')).toBe(true)
+    const a = assemblePrompt(fixtureBlocks({ now: { prose } }))
+    expect(a.messages.at(-1)!.content).toContain('day 12, dusk, early spring')
+  })
+
+  it('is a fact and nothing more — no machinery, no counsel, no taxonomy', () => {
+    for (const tick of [0, 11 * MINUTES_PER_DAY + 19 * 60, 350 * MINUTES_PER_DAY + 3 * 60]) {
+      const line = at(tick)
+      expect(line).not.toMatch(FORBIDDEN_FRAMING)
+      expect(line).not.toMatch(/\b(festival|faith|council|market|milestone|tier|construct|should|gather)\b/i)
+    }
   })
 })
 

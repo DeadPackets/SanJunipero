@@ -1,4 +1,4 @@
-import type { SimTime } from '@sj/shared'
+import { dayPhaseFromTick, DAYS_PER_SEASON, MINUTES_PER_DAY, type SimTime } from '@sj/shared'
 import { MYSTERIES } from '@sj/engine'
 
 // Local mirror of the engine's PerceptionPacket (composePerception) plus the
@@ -148,16 +148,19 @@ function weatherLine(weather: { kind: string; temperatureC: number }, isNight: b
   return `${kind} ${temperatureLine(weather.temperatureC)}`
 }
 
-function timeOfDay(hour: number, isNight: boolean): string {
-  if (isNight) return 'night'
-  if (hour < 11) return 'morning'
-  if (hour < 14) return 'midday'
-  if (hour < 18) return 'afternoon'
-  return 'evening'
+// Which third of its season a day falls in. Three words for ninety-one days, which is as
+// fine as anybody outdoors actually tells it.
+function seasonPart(dayOfSeason: number): string {
+  if (dayOfSeason <= DAYS_PER_SEASON / 3) return 'early'
+  return dayOfSeason <= (DAYS_PER_SEASON * 2) / 3 ? 'mid' : 'late'
 }
 
-function timeLine(time: SimTime): string {
-  return `It is ${timeOfDay(time.hour, time.isNight)} on day ${time.dayOfYear + 1} of ${time.season}.`
+// The calendar every mind shares, said the same way every turn: which day it is, where the
+// day has got to, and where the year has got to. A fact, like the weather — it says nothing
+// about what a day is for. The phase is `dayPhaseFromTick` and no second derivation (G4).
+export function calendarLine(time: SimTime): string {
+  const day = Math.floor(time.tick / MINUTES_PER_DAY) + 1
+  return `It is day ${day}, ${dayPhaseFromTick(time.tick)}, ${seasonPart(time.dayOfSeason)} ${time.season}.`
 }
 function footprintPhrase(w: number, h: number): string {
   if (w <= 1 && h <= 1) return 'one tile wide'
@@ -211,7 +214,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   const lines: string[] = []
   const { x, y } = packet.self
 
-  lines.push(timeLine(packet.time))
+  lines.push(calendarLine(packet.time))
   lines.push(`You ${packet.self.asleep ? 'sleep' : packet.self.collapsed ? 'lie' : 'stand'} at (${x}, ${y}).`)
 
   if (packet.self.collapsed) lines.push('You have collapsed from exhaustion and cannot move.')

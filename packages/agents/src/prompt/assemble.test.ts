@@ -269,11 +269,11 @@ describe('perceptionToProse', () => {
     expect(perceptionToProse(packet)).toContain('Your stomach gnaws at you.')
   })
 
-  it('renders the time of day and day number', () => {
+  it('renders the shared calendar — the day, the part of it, and the season', () => {
     const prose = perceptionToProse(quietMeadowPacket)
-    expect(prose).toContain('morning')
     expect(prose).toContain('day 1')
-    expect(prose).toContain('spring')
+    expect(prose).toContain('day 1, day,')
+    expect(prose).toContain('early spring')
   })
 
   it('renders visible structures, items, and crops', () => {

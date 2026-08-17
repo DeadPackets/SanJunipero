@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { MINUTES_PER_DAY } from '@sj/shared'
+import { dayPhaseFromTick, MINUTES_PER_DAY } from '@sj/shared'
 import type { z } from 'zod'
 import { FALLBACK_TURN, IntentSchema, TurnSchema, parseTurnWithRepair, reconsiderTick } from './turn.js'
 import { FORBIDDEN_FRAMING } from './prompt/rulesOfBeing.js'
@@ -88,6 +88,40 @@ describe('parseTurnWithRepair', () => {
     expect(alert).toHaveBeenCalledTimes(1)
     const detail = alert.mock.calls[0]![0] as string
     expect(detail).toContain('importance')
+  })
+})
+
+describe('reconsiderTick on an absolute day and phase', () => {
+  const day = (n: number): number => MINUTES_PER_DAY * (n - 1)
+
+  it('resolves a named day and phase to the exact tick that phase begins', () => {
+    expect(reconsiderTick(day(11) + 9 * 60, { day: 12, phase: 'dusk' })).toBe(day(12) + 19 * 60)
+    expect(reconsiderTick(day(11) + 9 * 60, { day: 12, phase: 'day' })).toBe(day(12) + 7 * 60)
+    expect(reconsiderTick(day(11) + 9 * 60, { day: 12, phase: 'night' })).toBe(day(12) + 21 * 60)
+  })
+
+  it('every anchor it resolves to is genuinely that phase of the day', () => {
+    for (const phase of ['day', 'dusk', 'night'] as const) {
+      expect(dayPhaseFromTick(reconsiderTick(0, { day: 3, phase }))).toBe(phase)
+    }
+  })
+
+  it('a day already gone becomes the next time that phase comes round', () => {
+    expect(reconsiderTick(day(14) + 9 * 60, { day: 12, phase: 'dusk' })).toBe(day(14) + 19 * 60)
+    expect(reconsiderTick(day(14) + 20 * 60, { day: 12, phase: 'dusk' })).toBe(day(15) + 19 * 60)
+  })
+
+  it('is strictly future when now is exactly the anchor', () => {
+    expect(reconsiderTick(day(12) + 19 * 60, { day: 12, phase: 'dusk' })).toBe(day(13) + 19 * 60)
+  })
+
+  it('rides the turn schema, and the model is shown the words it must answer with', () => {
+    const t = TurnSchema.parse({ ...validTurn, reconsider_at: { day: 12, phase: 'dusk' } })
+    expect(t.reconsider_at).toEqual({ day: 12, phase: 'dusk' })
+    expect(TurnSchema.safeParse({ ...validTurn, reconsider_at: { day: 12, phase: 'teatime' } }).success).toBe(false)
+    expect(TurnSchema.safeParse({ ...validTurn, reconsider_at: { day: 12 } }).success).toBe(false)
+    const desc = (TurnSchema.shape.reconsider_at as z.ZodType).description ?? ''
+    for (const word of ['day', 'dusk', 'night']) expect(desc).toContain(word)
   })
 })
 
