@@ -853,14 +853,36 @@ body {
 }
 .legend-chip:hover { translate: 0 -2px; }
 .legend-chip:active { translate: 0 1px; }
-.legend-chip.off { color: var(--ink-quiet); background: var(--sand); }
+/* AUDIT M4: the off state was a DIMMING. The ask was a MARK — a struck-through chip says
+   "filtered out"; a faded one says "less important", which is a different claim. The chip
+   keeps its own contrast and wears a rule through it. */
+.legend-chip { position: relative; }
+/* full-strength ink even when off: the STRIKE is the signal, so the word stays as readable
+   as every other chip's. Fading it would say "less important", which it is not. */
+.legend-chip.off { color: var(--ink); background: var(--sand); }
+.legend-strike {
+  position: absolute; left: 0.25rem; right: 0.25rem; top: 50%;
+  height: 2px; background: var(--ink); pointer-events: none;
+}
+.legend-mark { flex: none; }
+.legend-word { line-height: 1; }
+/* three axes, each labelled, so a two-channel encoding does not become a manual */
+.legend-axis { display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+.legend-axis + .legend-axis { border-left: 2px solid var(--sand); padding-left: 0.5rem; }
+.legend-axis-name {
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-quiet);
+}
 .legend-swatch { width: 10px; height: 10px; border-radius: 0; box-shadow: 0 0 0 2px var(--ink); }
 .legend-stamp {
   font-size: 0.75rem; color: var(--ink-quiet); margin-left: 0.3rem;
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
+/* WHAT THE BROWSER CAUGHT: centred, this card sat on top of a person. It used to be safe
+   because a town with no ties drew no nodes at all — which is exactly the defect task 85
+   fixed, so the card had to move off the middle of the page with it. */
 .society-empty {
-  position: absolute; top: 45%; left: 50%; translate: -50% -50%; z-index: 10;
+  position: absolute; bottom: 1rem; left: 50%; translate: -50% 0; z-index: 10;
   color: var(--cream); font-style: italic;
   background-color: var(--deep);
   border: 10px solid transparent; border-image: var(--px-night);
@@ -882,12 +904,22 @@ body {
   .bond-detail { animation: panel-in var(--t-med) var(--ease-enter); }
 }
 .bond-head { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
-.bond-kind {
+.bond-level, .bond-type {
   display: inline-flex; align-items: center; gap: 0.35rem;
   background: var(--sand); color: var(--ink);
   font-family: var(--font-px); font-size: 0.75rem; line-height: 1; text-transform: uppercase;
   border: 2px solid var(--ink); padding: 0.3rem 0.4rem;
 }
+.bond-level { background: var(--honey); }
+/* the sentence, then which way it is going — the two things the bar could not say */
+.bond-line { margin: 0.6rem 0 0; text-wrap: pretty; }
+.bond-arc {
+  display: flex; align-items: center; gap: 0.35rem;
+  margin: 0.4rem 0 0; font-size: 0.75rem;
+  font-family: var(--font-px); letter-spacing: 0.03em; text-transform: uppercase;
+}
+.bond-arc-mark { width: 18px; height: 4px; box-shadow: 0 0 0 1px var(--ink); }
+.bond-evidence { margin: 0.35rem 0 0; font-style: italic; color: var(--ink-quiet); text-wrap: pretty; }
 .bond-title { flex: 1 1 8rem; margin: 0; font-size: 0.875rem; font-weight: 600; text-wrap: balance; }
 .bond-close {
   flex: none; min-width: 40px; min-height: 40px; cursor: pointer;
@@ -897,13 +929,6 @@ body {
 }
 .bond-close:hover { background: var(--honey); }
 .bond-close:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
-/* a history, drawn to scale — it counts what happened, it does not fill toward anything */
-.bond-bar { height: 10px; margin-top: 0.7rem; background: var(--sand); border: 2px solid var(--ink); }
-.bond-bar-fill { display: block; height: 100%; }
-.bond-count {
-  margin: 0.3rem 0 0; font-size: 0.75rem; color: var(--ink-quiet);
-  font-family: var(--font-data); font-variant-numeric: tabular-nums;
-}
 .bond-dates {
   display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.6rem;
   margin: 0.6rem 0 0; font-size: 0.75rem;

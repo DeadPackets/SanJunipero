@@ -81,7 +81,9 @@ const QUIET_SITES = [
   '.tick-badge.waking', '.strip-weather', '.strip-gone', '.fps-overlay .fps-avg',
   '.block h3', '.thought-line', '.tab-body .stamp', '.veil-sub',
   '.feed-line .stamp', '.feed-empty', '.room-who', '.legend-chip.off', '.legend-stamp',
-  '.bond-count', '.bond-dates dt', '.bond-history .stamp', '.thumb-day', '.thumb-cast',
+  // `.bond-count` is gone: task 85 retired the strength bar and the count under it, because a
+  // count that can only go up cannot express a relationship cooling.
+  '.bond-evidence', '.bond-dates dt', '.bond-history .stamp', '.thumb-day', '.thumb-cast',
   '.digest-footer', '.roster-gone', '.laws-lede', '.law-history', '.law-edit input:disabled',
 ]
 
