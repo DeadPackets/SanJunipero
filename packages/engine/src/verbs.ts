@@ -161,20 +161,36 @@ export function relieveWorst(state: WorldState, agentId: string, amount: number)
     : { type: 'affliction_recovered', payload: { agentId, kind: worst.kind } }]
 }
 
+// A body that has already gone down does not get to pick its bed — and neither does one that
+// is only just still upright. Rest a body must fall over to earn is a ratchet: it was 74% of
+// the last live gate's refusals and half of its completed acts (C11 ruling R-C, R15 half 2).
+function mayLieDownRough(state: WorldState, config: SimConfig, agentId: string): boolean {
+  const a = state.agents[agentId]!
+  return a.collapsedSinceTick !== null || a.needs.energy < config.needs.debuffThreshold
+}
+
 const sleep: VerbDef = makeVerb({
   kind: 'sleep',
   validate(state, config, agentId) {
     const a = state.agents[agentId]!
     if (a.asleep) return 'already asleep'
-    // A body that has already gone down does not get to pick its bed.
-    if (!config.structures.sleepIndoorsOnly || a.collapsedSinceTick !== null) return null
+    if (!config.structures.sleepIndoorsOnly || mayLieDownRough(state, config, agentId)) return null
     const s = a.insideId === undefined ? undefined : state.structures[a.insideId]
     if (!s || s.stage !== 'complete' || !config.structures.sleepableKinds.includes(s.kind)) {
-      return 'there is no bed here; find somewhere to lie down'
+      return 'there is no bed here; find somewhere to lie down — weary enough and the bare ground will do'
     }
     return null
   },
-  onComplete(_state, _config, agentId) { return [{ type: 'agent_slept', payload: { agentId } }] },
+  onComplete(state, _config, agentId) {
+    // A night lifts the ladder as well as the counter, and lifts it EVERY time. Recovery that
+    // works once is a body that can only ever wear out; sleep is what answers wearing out
+    // (R15 half 1). The herb keeps working and is no longer the only thing that does.
+    const weary = state.agents[agentId]?.afflictions?.some((x) => x.kind === 'fatigue') ?? false
+    return [
+      { type: 'agent_slept', payload: { agentId } },
+      ...(weary ? [{ type: 'affliction_recovered', payload: { agentId, kind: 'fatigue' } }] : []),
+    ]
+  },
 })
 
 export const EnterParams = z.object({ structureId: z.string() }).strict()

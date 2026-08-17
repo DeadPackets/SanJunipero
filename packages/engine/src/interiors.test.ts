@@ -141,7 +141,7 @@ describe('destruction ejects occupants', () => {
 })
 
 describe('sleep is indoors-only (C9 T2b)', () => {
-  const OUTDOORS = 'there is no bed here; find somewhere to lie down'
+  const OUTDOORS = 'there is no bed here; find somewhere to lie down — weary enough and the bare ground will do'
 
   it('refuses a bed under the sky, allows one inside a hut', () => {
     let s = withAgent(withHut(world()), 'a1', 2, 3)
@@ -164,6 +164,16 @@ describe('sleep is indoors-only (C9 T2b)', () => {
     owned = withAgent(owned, 'a1', 2, 3)
     owned = fold(owned, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     expect(submitIntent(owned, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
+  })
+
+  // R15 half 2: the law is about a bed, not about a punishment. A body under the sky that is
+  // weary enough to be walking badly may lie down on the ground without falling over first.
+  it('a body weary enough to stumble may lie down under the sky', () => {
+    let s = withAgent(withHut(world()), 'a1', 2, 3)
+    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {})).toMatchObject({ ok: false, reason: OUTDOORS })
+    s = fold(s, ev(12, 'need_changed', { id: 'a1', need: 'energy', delta: -75 }))
+    expect(s.agents.a1!.needs.energy).toBeLessThan(DEFAULT_CONFIG.needs.debuffThreshold)
+    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
   })
 
   it('a collapsed body sleeps where it fell', () => {

@@ -19,7 +19,7 @@ import { replayFromGenesis } from './replay.js'
 import { RngStreams } from './rng.js'
 import { genesisState, thirstOf, type TileId, type WorldState } from './state.js'
 import { GROWTH_EDGES } from './systems/mapGrowth.js'
-import type { PendingEvent } from './verbs.js'
+import { VERBS, type PendingEvent } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
 
 const QUIET = {
@@ -508,40 +508,59 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     expect(cured.agents.ada!.afflictions).toBeUndefined()
   })
 
-  // THE SHAPE THE LIVE RUN DIED OF, reproduced offline. A body outdoors may not lie down
-  // until it has already fallen over: `sleep` refuses "there is no bed here" while it is
-  // standing and allows anywhere the moment it collapses. So the only rest a body outside a
-  // roof can take is the rest that costs it a fall — and while `agent_slept` clears the
-  // collapse COUNTER, so the rung never climbs, it does not clear the AFFLICTION. One fall
-  // ever, and the body is on a clock nothing but a herb stops.
-  it('a body with no roof can only rest by falling over, and the first fall starts a clock', () => {
+  // THE SHAPE THE LIVE RUN DIED OF, and the three halves of R15 that answer it. Before this,
+  // a body outdoors could not lie down until it had already fallen over: `sleep` refused
+  // "there is no bed here" while it was standing and allowed anywhere the moment it collapsed.
+  // So the only rest a roofless body could take was the rest that cost it a fall — and while
+  // `agent_slept` cleared the collapse COUNTER, it did not clear the AFFLICTION. One fall ever
+  // and the body was on a clock nothing but a herb stopped. Sleep and wake were 51% of every
+  // act the last live gate completed, and the ratchet was 74% of its refusals.
+  it('a weary body may lie down before it falls over, and a night lifts the clock every time', () => {
     const fatigueOf = (s: WorldState): number =>
       s.agents.ada!.afflictions?.find((x) => x.kind === 'fatigue')?.severity ?? 0
 
     let s = genesisState(CFG, MAP())
     s = fold(s, ev('agent_spawned', { id: 'ada', name: 'ada', x: 5, y: 5, ageDays: 7300 }, 0), CFG)
-    s = fold(s, ev('need_changed', { id: 'ada', need: 'energy', delta: -90 }, 0), CFG)
     s = { ...s, tick: 0 }
 
-    // Standing outdoors and tired, she is told to find somewhere to lie down.
-    expect(submitIntent({ ...s, tick: 1 }, CFG, 'ada', 'sleep', {}))
-      .toEqual({ ok: false, reason: 'there is no bed here; find somewhere to lie down' })
+    // HALF 3 — a body with a full bar is told where a bed is, and the refusal names the door
+    // its own weariness will open.
+    expect(submitIntent({ ...s, tick: 1 }, CFG, 'ada', 'sleep', {})).toEqual({
+      ok: false,
+      reason: 'there is no bed here; find somewhere to lie down — weary enough and the bare ground will do',
+    })
 
-    // She falls over. Now — and only now — the same ground is a bed.
+    // HALF 2 — weary enough, and the bare ground will do. No fall is required to earn it.
+    s = fold(s, ev('need_changed', { id: 'ada', need: 'energy', delta: -75 }, 0), CFG)
+    expect(s.agents.ada!.needs.energy).toBeLessThan(CFG.needs.debuffThreshold)
+    expect(s.agents.ada!.collapsedSinceTick).toBeNull()
+    expect(submitIntent({ ...s, tick: 1 }, CFG, 'ada', 'sleep', {}).ok).toBe(true)
+
+    // HALF 1 — and for a body that did go down before anyone reached it, the night lifts the
+    // affliction as well as the counter, so the clock stops instead of running for ever.
     let tick = 1
     for (; tick < 40000 && s.agents.ada!.collapsedSinceTick === null; tick++) s = pass(s, CFG, tick, 'spiral').state
     expect(fatigueOf(s)).toBe(1)
     const lie = submitIntent({ ...s, tick }, CFG, 'ada', 'sleep', {})
     expect(lie.ok).toBe(true)
     s = apply({ ...s, tick }, CFG, (lie as { events: PendingEvent[] }).events, tick)
-
-    // She sleeps it off: the collapse counter goes, the clock stays.
-    for (tick += 1; tick < 40000 && s.agents.ada!.needs.energy < 99; tick++) s = pass(s, CFG, tick, 'spiral').state
+    for (tick += 1; tick < 80000 && !s.agents.ada!.asleep; tick++) s = pass(s, CFG, tick, 'spiral').state
     expect(s.agents.ada!.collapsesWithoutRecovery).toBeUndefined()
-    expect(fatigueOf(s)).toBe(1)
+    expect(fatigueOf(s)).toBe(0)
 
-    // And the clock is faster than the one thing that answers it. A day of the drain is more
-    // than four days of the best dawn recovery a fed, sleeping body can get.
+    // REPEATABLE, which is the whole of the ruling. Said at the verb, because a body left out
+    // in the open long enough to wear out twice has died of thirst before the second time.
+    const weary = fold(s, ev('agent_afflicted', { agentId: 'ada', kind: 'fatigue', severity: 2 }, tick), CFG)
+    expect(VERBS.sleep!.onComplete(weary, CFG, 'ada', {}, new RngStreams('r15').get('illness')))
+      .toContainEqual({ type: 'affliction_recovered', payload: { agentId: 'ada', kind: 'fatigue' } })
+    // And it is the ladder it lifts, not every ill a body has: a fever is not slept off.
+    const feverish = fold(s, ev('agent_afflicted', { agentId: 'ada', kind: 'illness', severity: 1 }, tick), CFG)
+    expect(VERBS.sleep!.onComplete(feverish, CFG, 'ada', {}, new RngStreams('r15').get('illness')).map((e) => e.type))
+      .toEqual(['agent_slept'])
+
+    // The clock it stops is still faster than anything else that answers it: a day of the
+    // drain is more than three days of the best dawn recovery a fed, sleeping body can get.
+    // Sleep is now the answer to fatigue, and it is the only one that keeps up.
     const drainPerDay = CFG.mortality.drainPerTick.fatigue * MINUTES_PER_DAY
     const bestRecoveryPerDay = CFG.health.recoveryHpPerDay * CFG.mortality.sleepRegenMultiplier
     expect(drainPerDay).toBeCloseTo(57.6, 6)
