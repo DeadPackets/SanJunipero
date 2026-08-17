@@ -18,6 +18,7 @@ const PASSING: G11Report = {
   preflight: {
     provider: 'Baidu', hardAllowList: false, model: 'deepseek/deepseek-v4-flash-0731',
     calls: 3, answered: 3, actions: 3, speeches: 2, passed: true, costUsd: 0.0009,
+    speechAdvisory: 'speech 2/3 — ADVISORY, not gated', roundsRun: 1, roundsPassed: 1,
     servedProviders: ['Baidu'], failures: [],
   },
   opsPlane: {

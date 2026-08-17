@@ -76,10 +76,9 @@ describe('scorePreflight', () => {
     expect(r.passed).toBe(false)
   })
 
-  it('PASSES a back end that acts three times and speaks twice — the bar exactly', () => {
+  it('PASSES a back end that acts three times — the bar exactly', () => {
     const r = score(WHOLE_TURNS.map(ok))
     expect(r.actions).toBe(PREFLIGHT_BAR.action)
-    expect(r.speeches).toBe(PREFLIGHT_BAR.speech)
     expect(r.passed).toBe(true)
   })
 
@@ -90,11 +89,20 @@ describe('scorePreflight', () => {
     expect(r.passed).toBe(false)
   })
 
-  it('fails one speech out of three even when every act lands', () => {
-    const r = score([ok(WHOLE_TURNS[0]), ok({ ...WHOLE_TURNS[1] }), ok({ ...WHOLE_TURNS[2], speech: undefined })])
+  it('SPEECH IS ADVISORY: a silent back end that acts three times still starts the gate', () => {
+    // C11 batch 13 ran the same probe twice on identical code and got 3/3 speech then 0/3.
+    // `speech` measures a mind's CHOICE, not a provider's CAPABILITY, so gating on it aborts
+    // a $0.70 run on sampling. Controller ruling: measured and reported, never aborting.
+    const r = score([
+      ok({ ...WHOLE_TURNS[0], speech: undefined }),
+      ok(WHOLE_TURNS[1]),
+      ok({ ...WHOLE_TURNS[2], speech: undefined }),
+    ])
     expect(r.actions).toBe(3)
-    expect(r.speeches).toBe(1)
-    expect(r.passed).toBe(false)
+    expect(r.speeches).toBe(0)
+    expect(r.passed).toBe(true)
+    expect(r.speechAdvisory).toContain('0/3')
+    expect(r.speechAdvisory).toMatch(/advisory/i)
   })
 
   it('does not count a null action as an act, now that the schema accepts one', () => {
@@ -133,6 +141,48 @@ describe('preflightRefusal', () => {
     expect(msg).toContain('action 0/3')
     expect(msg).toContain('speech 0/3')
     expect(msg).toContain('GATE REFUSED TO START')
+  })
+
+  it('says the refusal was the action bar and never the speech one', () => {
+    const msg = preflightRefusal(score([ok(REQUIRED_ONLY), ok(REQUIRED_ONLY), ok(REQUIRED_ONLY)]))
+    expect(msg).toMatch(/speech[^\n]*advisory/i)
+  })
+})
+
+describe('runPreflight repeats the bar, because one probe concludes nothing', () => {
+  it('takes the first round that clears the action bar and stops paying', async () => {
+    // Round 1 is the DeepInfra signature; round 2 acts three times. Six calls, then done.
+    const r = await runPreflight({
+      llm: fakeLlm([REQUIRED_ONLY, REQUIRED_ONLY, REQUIRED_ONLY, ...WHOLE_TURNS, ...WHOLE_TURNS]),
+      provider: 'Baidu', hardAllowList: true, model: 'm', rounds: 4,
+    })
+    expect(r.roundsRun).toBe(2)
+    expect(r.roundsPassed).toBe(1)
+    expect(r.calls).toBe(2 * PREFLIGHT_CALLS)
+    expect(r.passed).toBe(true)
+  })
+
+  it('refuses only when every round fails the action bar, and totals them all', async () => {
+    const dead = Array.from({ length: 4 * PREFLIGHT_CALLS }, () => REQUIRED_ONLY)
+    const r = await runPreflight({
+      llm: fakeLlm(dead), provider: 'DeepInfra', hardAllowList: true, model: 'm', rounds: 4,
+    })
+    expect(r.roundsRun).toBe(4)
+    expect(r.roundsPassed).toBe(0)
+    expect(r.calls).toBe(4 * PREFLIGHT_CALLS)
+    expect(r.actions).toBe(0)
+    expect(r.passed).toBe(false)
+  })
+
+  it('never repeats on speech alone: three acts and no words is one round and a pass', async () => {
+    const silent = WHOLE_TURNS.map((t) => ({ ...t, speech: undefined }))
+    const r = await runPreflight({
+      llm: fakeLlm([...silent, ...WHOLE_TURNS]), provider: 'StreamLake', hardAllowList: true,
+      model: 'm', rounds: 4,
+    })
+    expect(r.roundsRun).toBe(1)
+    expect(r.speeches).toBe(0)
+    expect(r.passed).toBe(true)
   })
 })
 

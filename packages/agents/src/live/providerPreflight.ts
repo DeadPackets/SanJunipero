@@ -17,10 +17,19 @@ import { TurnSchema, type Turn } from '../turn.js'
 // object, and only the shape the run actually sends can exercise that.
 
 export const PREFLIGHT_CALLS = 3
-// `action` on every call and `speech` on two of three. A provider that cannot begin an act is
-// unusable for the turn caller at any price; speech is allowed one miss because a mind may
-// legitimately keep its mouth shut once.
-export const PREFLIGHT_BAR = { action: 3, speech: 2 } as const
+// `action` on every call, and NOTHING ELSE. A provider that cannot begin an act is unusable
+// for the turn caller at any price, and the action count is stable across rounds: it separated
+// four candidates cleanly over 48 probe calls.
+//
+// `speech` was half of this bar and is no longer any of it (controller ruling, C11 batch 13).
+// The same probe run twice on identical code scored speech 3/3 and then 0/3, because speech
+// measures a mind's CHOICE and not a provider's CAPABILITY. A precondition that flips on
+// sampling does not gate anything — it aborts a $0.70 run at random. It is measured on every
+// call and reported beside the verdict, and it never stops a gate.
+export const PREFLIGHT_BAR = { action: 3 } as const
+// How many times the bar is repeated before the gate gives up on a provider. One probe
+// concludes nothing; a round costs ~$0.0008, and an abort costs the whole run.
+export const PREFLIGHT_ROUNDS = 4
 
 // A founder of the same shape the gate boots, so the system prefix is the real one — block 1,
 // the capabilities, the speech rules, an identity and a personality — and not a stub.
@@ -83,6 +92,12 @@ export type PreflightResult = {
   actions: number
   speeches: number
   passed: boolean
+  // Rounds of PREFLIGHT_CALLS actually paid for, and how many of them cleared the action bar.
+  roundsRun: number
+  roundsPassed: number
+  // The speech count in words, marked for what it is, so a reader of the report cannot mistake
+  // it for something the gate refused on.
+  speechAdvisory: string
   costUsd: number
   servedProviders: string[]
   failures: string[]
@@ -95,6 +110,8 @@ export function scorePreflight(opts: {
   hardAllowList: boolean
   model: string
   answers: readonly PreflightAnswer[]
+  roundsRun?: number
+  roundsPassed?: number
   costUsd?: number
   servedProviders?: readonly string[]
 }): PreflightResult {
@@ -103,6 +120,11 @@ export function scorePreflight(opts: {
   // provider writing `"action": null` has emitted no act.
   const actions = opts.answers.filter((a) => a.ok && (a.turn.action ?? null) !== null).length
   const speeches = opts.answers.filter((a) => a.ok && (a.turn.speech ?? null) !== null).length
+  // Over several rounds the bar is "one round cleared it", never "three acts turned up
+  // somewhere": a provider that emits one act per round has not cleared a 3-of-3 bar.
+  const passed = opts.roundsPassed === undefined
+    ? actions >= PREFLIGHT_BAR.action
+    : opts.roundsPassed > 0
   return {
     provider: opts.provider,
     hardAllowList: opts.hardAllowList,
@@ -111,7 +133,11 @@ export function scorePreflight(opts: {
     answered,
     actions,
     speeches,
-    passed: actions >= PREFLIGHT_BAR.action && speeches >= PREFLIGHT_BAR.speech,
+    passed,
+    roundsRun: opts.roundsRun ?? 1,
+    roundsPassed: opts.roundsPassed ?? (passed ? 1 : 0),
+    speechAdvisory: `speech ${speeches}/${opts.answers.length} — ADVISORY, not gated`
+      + ' (it measures a mind\'s choice, not a provider\'s capability)',
     costUsd: opts.costUsd ?? 0,
     servedProviders: [...new Set(opts.servedProviders ?? [])].sort(),
     failures: opts.answers.flatMap((a) => (a.ok ? [] : [a.error])),
@@ -124,9 +150,10 @@ export function preflightRefusal(r: PreflightResult): string {
   return [
     `GATE REFUSED TO START: provider '${r.provider}' failed the turn pre-flight.`,
     `  model=${r.model} allowList=${r.hardAllowList} served=${r.servedProviders.join(',') || 'unattributed'}`,
-    `  action ${r.actions}/${r.calls} (need ${PREFLIGHT_BAR.action}),`
-    + ` speech ${r.speeches}/${r.calls} (need ${PREFLIGHT_BAR.speech}),`
-    + ` answered ${r.answered}/${r.calls}`,
+    `  action ${r.actions}/${r.calls} (need ${PREFLIGHT_BAR.action} in one round of ${PREFLIGHT_CALLS}),`
+    + ` answered ${r.answered}/${r.calls}`
+    + ` over ${r.roundsRun} round(s), ${r.roundsPassed} passed`,
+    `  ${r.speechAdvisory}`,
     ...r.failures.map((f) => `  failed call: ${f}`),
     '  A provider that cannot emit an optional field cannot emit an act, and a town that',
     '  cannot act is not a gate result. Pick a provider by probe, not by publication.',
@@ -147,32 +174,47 @@ export async function runPreflight(opts: {
   model: string
   identity?: IdentityCore
   personality?: PersonalityDoc
+  // How many times the three scenes are asked before the provider is refused. The gate asks
+  // for PREFLIGHT_ROUNDS; the default of one keeps a bare call to this a single probe.
+  rounds?: number
   costUsd?: () => number
   servedProviders?: () => string[]
   // A probe that discards its answers cannot be audited: a back end can clear the bar with
   // three-word turns, and only the turns themselves say so.
   onAnswer?: (answer: PreflightAnswer) => void
 }): Promise<PreflightResult> {
-  const answers: PreflightAnswer[] = []
-  const record = (a: PreflightAnswer): void => { answers.push(a); opts.onAnswer?.(a) }
-  for (const prompt of preflightPrompts(opts.identity, opts.personality)) {
-    try {
-      const { value } = await opts.llm.object<Turn>({
-        system: prompt.system, messages: prompt.messages, schema: TurnSchema,
-      })
-      const parsed = TurnSchema.safeParse(value)
-      record(parsed.success
-        ? { ok: true, turn: parsed.data }
-        : { ok: false, error: `answer did not fit TurnSchema: ${JSON.stringify(value).slice(0, 200)}` })
-    } catch (err) {
-      // The raw text a rejected generation carried. Without it "could not parse the response"
-      // names a symptom and hides which field the schema refused.
-      const raw = NoObjectGeneratedError.isInstance(err) ? ` :: ${(err.text ?? '').slice(0, 400)}` : ''
-      record({ ok: false, error: `${err instanceof Error ? err.message : String(err)}${raw}` })
+  const rounds = Math.max(1, opts.rounds ?? 1)
+  const all: PreflightAnswer[] = []
+  let roundsRun = 0
+  let roundsPassed = 0
+  for (let round = 0; round < rounds; round++) {
+    const answers: PreflightAnswer[] = []
+    const record = (a: PreflightAnswer): void => { answers.push(a); all.push(a); opts.onAnswer?.(a) }
+    for (const prompt of preflightPrompts(opts.identity, opts.personality)) {
+      try {
+        const { value } = await opts.llm.object<Turn>({
+          system: prompt.system, messages: prompt.messages, schema: TurnSchema,
+        })
+        const parsed = TurnSchema.safeParse(value)
+        record(parsed.success
+          ? { ok: true, turn: parsed.data }
+          : { ok: false, error: `answer did not fit TurnSchema: ${JSON.stringify(value).slice(0, 200)}` })
+      } catch (err) {
+        // The raw text a rejected generation carried. Without it "could not parse the response"
+        // names a symptom and hides which field the schema refused.
+        const raw = NoObjectGeneratedError.isInstance(err) ? ` :: ${(err.text ?? '').slice(0, 400)}` : ''
+        record({ ok: false, error: `${err instanceof Error ? err.message : String(err)}${raw}` })
+      }
     }
+    roundsRun += 1
+    const thisRound = scorePreflight({
+      provider: opts.provider, hardAllowList: opts.hardAllowList, model: opts.model, answers,
+    })
+    if (thisRound.passed) { roundsPassed += 1; break }
   }
   return scorePreflight({
-    provider: opts.provider, hardAllowList: opts.hardAllowList, model: opts.model, answers,
+    provider: opts.provider, hardAllowList: opts.hardAllowList, model: opts.model,
+    answers: all, roundsRun, roundsPassed,
     ...(opts.costUsd === undefined ? {} : { costUsd: opts.costUsd() }),
     ...(opts.servedProviders === undefined ? {} : { servedProviders: opts.servedProviders() }),
   })

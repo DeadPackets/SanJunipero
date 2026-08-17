@@ -216,7 +216,11 @@ export const G11PreflightSchema = z.object({
   calls: z.number().int(),
   answered: z.number().int(),
   actions: z.number().int(),
+  // Measured on every call and gated on none of it: it swung 0/3 to 3/3 on identical code.
   speeches: z.number().int(),
+  speechAdvisory: z.string(),
+  roundsRun: z.number().int(),
+  roundsPassed: z.number().int(),
   passed: z.boolean(),
   costUsd: z.number(),
   servedProviders: z.array(z.string()),
