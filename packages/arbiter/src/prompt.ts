@@ -12,6 +12,9 @@ export type AdjudicationBlocks = {
     position: { x: number; y: number }
   }
   precedent: Array<{ summary: string; verdictKind: string; recipeName?: string }>
+  // The words for stuff. Every material and building the recipe may name has to be on the
+  // page, or the ruling is thrown away unread (canon-vocabulary law, c8d267b precedent).
+  materials?: { itemKinds: readonly string[]; structureKinds: readonly string[] }
   intent: string
 }
 
@@ -94,10 +97,19 @@ function estTokens(text: string): number {
   return Math.ceil(text.length / 4)
 }
 
+function renderMaterials(m: AdjudicationBlocks['materials']): string {
+  if (m === undefined) return ''
+  return [
+    `\nThe town has words for these things: ${[...m.itemKinds].sort().join(', ')}.`,
+    `And it builds these: ${[...m.structureKinds].sort().join(', ')}.`,
+    'A recipe may ask for and spend only those, named exactly as they are written above. Never name a particular thing standing in the world; a recipe is a rule and outlives every one of them.',
+  ].join('\n')
+}
+
 export function assembleAdjudicationPrompt(
   blocks: AdjudicationBlocks,
 ): AssembledAdjudicationPrompt {
-  const system = `${blocks.canon}\n${renderFrontier(blocks.frontier)}\n\n${ADJUDICATION_INSTRUCTION}`
+  const system = `${blocks.canon}\n${renderFrontier(blocks.frontier)}${renderMaterials(blocks.materials)}\n\n${ADJUDICATION_INSTRUCTION}`
   const user = renderUser(blocks)
   const messages: LlmMessage[] = [{ role: 'user', content: user }]
   return { system, messages, estTokens: estTokens(`${system}${user}`) }

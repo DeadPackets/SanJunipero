@@ -461,7 +461,10 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
   it('still refuses a rung two steps out, so the frontier widens nothing', async () => {
     const twoStepsOut: Verdict = {
       kind: 'attempt',
-      recipe: { ...smokedFishRecipe, id: 'recipe:salt_cured_fish', rngStream: 'recipe:salt_cured_fish', canon: ['salt_curing'] },
+      recipe: {
+        ...smokedFishRecipe, id: 'recipe:salt_cured_fish', name: 'Salt-Cure the Fish',
+        rngStream: 'recipe:salt_cured_fish', canon: ['salt_curing'],
+      },
       summary: 'Pack the fish in salt to keep it.',
     }
     const llm = new ScriptedLlm(() => twoStepsOut)

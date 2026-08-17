@@ -9,6 +9,7 @@ import {
   isExpressive, isExpressiveRow, type ExpressiveRuling,
 } from './expressive.js'
 import { assembleAdjudicationPrompt, FORBIDDEN_FRAMING } from './prompt.js'
+import { recipeSanityRefusal, type RecipeVocabulary } from './sanity.js'
 import { ReviewStore } from './review.js'
 import { RulebookStore } from './rulebook.js'
 import { RulingsStore } from './rulings.js'
@@ -59,11 +60,18 @@ export type ArbiterDeps = {
   llm: LlmClient
   embedder: { embed(t: string): Promise<Float32Array> }
   tick?: () => number
+  // The materials and buildings the town has words for. Rendered into the prompt AND enforced
+  // against the answer, so the two can never disagree (canon-vocabulary law). A caller that
+  // shows no table gets the checks that need no table; the rest wait for one.
+  vocabulary?: { itemKinds: readonly string[]; structureKinds: readonly string[] }
 }
 
 export type Arbiter = {
   adjudicate(intent: string, agentCtx: AgentCtx): Promise<Verdict>
   codify(recipe: Recipe): { ruleId: number; verb: string }
+  // Why this recipe may never become a verb, or null. The same gate adjudicate applies,
+  // exposed so an operator queue can say what it refused and why.
+  sanity(recipe: Recipe, agentCtx: AgentCtx): string | null
   revert(recipeId: string, reason: string): void
 }
 
@@ -100,6 +108,32 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     if (!VERBS[row.id]) registerVerb(expressiveVerbFromRuling(row.name, row))
     review.queue(ruleId, row.id, tick)
     return row.id
+  }
+
+  // What the rulebook already makes, read fresh each time: a second waterskin is only a
+  // second one against the first, and the first may have been codified a minute ago.
+  function codifiedVocabulary(agentCtx: AgentCtx): RecipeVocabulary {
+    const knownProducts = new Set<string>()
+    const knownRecipeIds = new Set<string>()
+    for (const row of rulebook.allActive()) {
+      knownRecipeIds.add(row.recipeId)
+      const parsed: unknown = JSON.parse(row.recipeJson)
+      if (isExpressiveRow(parsed)) continue
+      for (const r of (parsed as Recipe).outcomeTable) {
+        for (const e of r.effects) if (e.op === 'spawn_item') knownProducts.add(e.kind)
+      }
+    }
+    const shown = deps.vocabulary
+    return {
+      ...(shown === undefined
+        ? {}
+        : {
+            itemKinds: new Set([...shown.itemKinds, ...agentCtx.inventory.map((i) => i.kind), ...knownProducts]),
+            structureKinds: new Set(shown.structureKinds),
+          }),
+      knownProducts,
+      knownRecipeIds,
+    }
   }
 
   return {
@@ -157,6 +191,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         if (v.kind === 'impossible') return { summary: v.reason, verdictKind: 'impossible' } as const
         return { summary: v.verb, verdictKind: 'map' } as const
       })
+      const vocab = codifiedVocabulary(agentCtx)
       const { system, messages } = assembleAdjudicationPrompt({
         canon: `${CANON}\n\nThe town currently knows: ${codex.known().join(', ')}`,
         // Without the frontier the model cannot tell an unearned rung one step
@@ -165,6 +200,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         agent: agentCtx,
         precedent,
         intent,
+        ...(deps.vocabulary === undefined ? {} : { materials: deps.vocabulary }),
       })
       let value: Verdict | null = null
       for (let i = 0; i < MAX_LLM_ATTEMPTS && value === null; i++) {
@@ -174,6 +210,9 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         if (r.value.kind === 'map' && !VERBS[r.value.verb]) continue
         // An attempt that leaks the machinery is invalid — retry (finding 12).
         if (framingTainted(r.value)) continue
+        // A recipe that cannot stand as a permanent verb is invalid — retry. Codification is
+        // forever, and the mini-rehearsal proved a bad one is minted in silence otherwise.
+        if (r.value.kind === 'attempt' && recipeSanityRefusal(r.value.recipe, vocab) !== null) continue
         value = r.value
       }
       if (value === null) return FALLBACK_IMPOSSIBLE
@@ -197,6 +236,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
 
     codify(recipe) {
       return codifyRecipe(recipe, { rulebook, review, codex, tick: tick() })
+    },
+
+    sanity(recipe, agentCtx) {
+      return recipeSanityRefusal(recipe, codifiedVocabulary(agentCtx))
     },
 
     revert(recipeId, reason) {

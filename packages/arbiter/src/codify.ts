@@ -4,6 +4,7 @@ import type { SimConfig } from '@sj/shared'
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
 import type { RulebookStore } from './rulebook.js'
+import { recipeSanityRefusal } from './sanity.js'
 import { rollOutcomeTable, skillFactor } from './verdict.js'
 import type { OutcomeEffect, Recipe } from './verdict.js'
 
@@ -177,6 +178,10 @@ export function codify(
   if (!deps.codex.withinAdjacency(recipe.canon)) {
     throw new Error(`cannot codify ${recipe.id}: canon ${recipe.canon.join(', ')} is beyond adjacency`)
   }
+  // Nor one that cannot stand as a permanent verb. The tableless checks apply to every
+  // caller: a verdict word, a truncated id and an entity id are wrong on their face.
+  const unsound = recipeSanityRefusal(recipe)
+  if (unsound !== null) throw new Error(`cannot codify ${recipe.id}: ${unsound}`)
   const existing = deps.rulebook.byId(recipe.id)
   if (existing) {
     // Active row → idempotent no-op; reverted row → reactivate it so the
