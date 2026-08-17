@@ -49,7 +49,7 @@ import { MIND_MODEL } from '../src/llm/pins.js'
 import type { IdentityCore } from '../src/prompt/assemble.js'
 import {
   FullNeedTally, G11ReportSchema, checkG11Report, chronicleViolations, classifyVerb, median,
-  survivalTax, type G11Discretion, type G11Report,
+  semanticPassErrorCount, survivalTax, type G11Discretion, type G11Report,
 } from '../src/live/g11report.js'
 import {
   G11_CHECKPOINT_VERSION, checkpointRefusal, fingerprintMismatch, migrateCheckpointTable,
@@ -1171,7 +1171,7 @@ async function main(): Promise<void> {
       darkPerceptions,
       semanticPassRan: semanticRan,
       semanticHits,
-      semanticPassErrors: semanticErrors + narrateErrors,
+      semanticPassErrors: semanticPassErrorCount({ narrateErrors, semanticErrors }),
       semanticUnreadableNights: qInt(db, `SELECT COUNT(*) FROM alerts WHERE kind = 'semantic_firsts_unreadable'`),
       fordBridge: fordProbe,
       farBankWalk: farBank,

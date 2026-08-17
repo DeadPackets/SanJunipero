@@ -297,6 +297,13 @@ export class FullNeedTally {
   }
 }
 
+// Nights whose close errored, each counted once. `semanticErrors` is a strict subset of
+// `narrateErrors` — the day-close catch raises both for one failed night — so summing them
+// reported one bad night as two.
+export const semanticPassErrorCount = (
+  counters: { narrateErrors: number; semanticErrors: number },
+): number => counters.narrateErrors
+
 export const median = (xs: readonly number[]): number => {
   if (xs.length === 0) return 0
   const s = [...xs].sort((a, b) => a - b)

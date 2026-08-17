@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   CHRONICLE_BANNED, FullNeedTally, G11ReportSchema, G11_MIN_SIM_DAYS, checkG11Report,
-  chronicleViolations, classifyVerb, g11GatePassed, median, survivalTax, type G11Report,
+  chronicleViolations, classifyVerb, g11GatePassed, median, semanticPassErrorCount, survivalTax,
+  type G11Report,
 } from './g11report.js'
 
 // Offline, $0: the checker is proved against a recorded fixture before a single live call is
@@ -148,6 +149,15 @@ describe('the pure helpers', () => {
     expect(median([])).toBe(0)
     expect(median([3, 1, 2])).toBe(2)
     expect(median([4, 1, 2, 3])).toBe(2.5)
+  })
+
+  it('counts a single failed night once, not twice', () => {
+    // The day-close catch raises `narrateErrors` and, when the night had records, `semanticErrors`
+    // too. Summing them reported C11 batch 14's ONE bad night (day 3's chronicle) as `errors=2`.
+    expect(semanticPassErrorCount({ narrateErrors: 1, semanticErrors: 1 })).toBe(1)
+    expect(semanticPassErrorCount({ narrateErrors: 1, semanticErrors: 0 })).toBe(1)
+    expect(semanticPassErrorCount({ narrateErrors: 0, semanticErrors: 0 })).toBe(0)
+    expect(semanticPassErrorCount({ narrateErrors: 3, semanticErrors: 3 })).toBe(3)
   })
 
   it('catches a chronicle line that names a mechanism, a number or the machinery', () => {
