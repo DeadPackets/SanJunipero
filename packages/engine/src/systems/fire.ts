@@ -1,6 +1,7 @@
-import { simTimeFromTick } from '@sj/shared'
+import { flamesAt, simTimeFromTick } from '@sj/shared'
 import { occupantsOf } from '../interiors.js'
 import type { Structure, WorldState } from '../state.js'
+import { isAdjacentToRect } from '../verbs.js'
 import type { TickCtx } from '../worldTick.js'
 
 // Footprints whose nearest tiles touch, orthogonally or diagonally.
@@ -27,6 +28,21 @@ export function fireSystem(ctx: TickCtx): void {
       if (!s.flammable || s.burning) continue
       if (ctx.rng.get('fire').next() < ctx.config.weather.stormLightningFireChance) {
         ctx.emit('fire_ignited', { structureId: s.id, cause: 'lightning' })
+      }
+    }
+  }
+
+  // A carried flame is the light and the hazard in one object. The roll happens only where a
+  // flame actually stands beside something that burns, so a world with no torches lit never
+  // touches the `fire` stream and hashes exactly as it did.
+  if (ctx.config.light.enabled) {
+    for (const f of flamesAt(ctx.state(), ctx.state().tick, ctx.config).filter((x) => x.source === 'item')) {
+      for (const to of sorted(ctx.state())) {
+        if (!to.flammable || to.burning) continue
+        if (!isAdjacentToRect(f.x, f.y, to)) continue
+        if (ctx.rng.get('fire').next() < ctx.config.light.fireRiskPerTick) {
+          ctx.emit('fire_ignited', { structureId: to.id, cause: 'a carried flame' })
+        }
       }
     }
   }

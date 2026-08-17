@@ -75,6 +75,8 @@ export type PerceptionPacket = {
   weather: { kind: string; temperatureC: number }
   // Absent on plain earth; present when road or worn path runs under or beside the feet.
   ground?: { wellTravelled: true }
+  // Present only while the dark is charging this body for the work in its hands.
+  fumbling?: true
   visible: {
     agents: PerceptionAgent[]
     structures: PerceptionStructure[]
@@ -232,6 +234,9 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
 
   // The physics, said plainly. What it is worth building here is not the ground's to say.
   if (packet.ground?.wellTravelled) lines.push('Carts and feet reach this spot easily.')
+
+  // The cost, said as it feels. Never a refusal, and never a number.
+  if (packet.fumbling) lines.push('You fumble in the dark.')
 
   for (const a of packet.visible.agents) {
     const dressed = a.worn === undefined ? '' : `, ${a.worn}`

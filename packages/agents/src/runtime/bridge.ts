@@ -73,6 +73,7 @@ function reconcile(
     },
     weather: raw.weather,
     ...(raw.ground === undefined ? {} : { ground: raw.ground }),
+    ...(raw.fumbling === undefined ? {} : { fumbling: raw.fumbling }),
     visible: {
       agents: raw.visible.agents,
       structures: raw.visible.structures,

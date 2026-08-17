@@ -500,3 +500,98 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
     expect(seen!.worn).not.toMatch(/\d/)
   })
 })
+
+// ------------------------------------------ Task 25: night work costs time, or it costs fuel
+describe('night work: the choice is fuel or time, and it is theirs', () => {
+  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+  const OFF = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }, light: { enabled: false },
+  })
+  const MIDNIGHT = 30
+  const NOON = 12 * 60 + 30
+  const HUT = CFG.construction.hutTicks
+  const PENALTY = CFG.light.nightWorkPenalty
+
+  // Wide enough for a hut beside the builder, with stone and wood in hand for the other verbs.
+  function site(tick: number, config = CFG): WorldState {
+    let s = genesisState(config, Array.from({ length: 8 }, () => Array.from({ length: 8 }, (): TileId => 0)))
+    s = { ...s, tick }
+    s = fold(s, ev(700, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }), config)
+    const kit: Array<[string, string]> = [['item_1', 'wood'], ['item_2', 'stone'], ['item_3', 'fiber']]
+    kit.forEach(([id, kind], i) => {
+      s = fold(s, ev(710 + i, 'item_spawned', { id, kind, qty: 20, loc: { t: 'agent', id: 'a1' } }), config)
+    })
+    return s
+  }
+  const withTorch = (s: WorldState, x: number, y: number, config = CFG): WorldState => {
+    let out = fold(s, ev(730, 'item_spawned', { id: 'item_9', kind: 'torch', qty: 1, loc: { t: 'tile', x, y } }), config)
+    out = fold(out, ev(731, 'item_lit', { itemId: 'item_9', burnsUntilTick: s.tick + 500 }), config)
+    return out
+  }
+  const durationOf = (s: WorldState, verb: string, params: Record<string, unknown>, config = CFG): number => {
+    const r = submitIntent(s, config, 'a1', verb, params)
+    if (!r.ok) throw new Error(`${verb}: ${r.reason}`)
+    const started = r.events.find((e) => e.type === 'action_started')!
+    return (started.payload as { duration: number }).duration
+  }
+
+  it('a hut raised in the dark takes half again as long, and one raised by a torch does not', () => {
+    expect(durationOf(site(MIDNIGHT), 'build', { kind: 'hut', x: 2, y: 1 })).toBe(Math.ceil(HUT * PENALTY))
+    expect(durationOf(withTorch(site(MIDNIGHT), 1, 2), 'build', { kind: 'hut', x: 2, y: 1 })).toBe(HUT)
+    expect(durationOf(site(NOON), 'build', { kind: 'hut', x: 2, y: 1 })).toBe(HUT)
+  })
+
+  it('the torch has to be within workRadius: three tiles off is still fumbling', () => {
+    expect(CFG.light.workRadius).toBe(2)
+    expect(durationOf(withTorch(site(MIDNIGHT), 3, 1), 'build', { kind: 'hut', x: 2, y: 1 })).toBe(HUT)
+    expect(durationOf(withTorch(site(MIDNIGHT), 4, 1), 'build', { kind: 'hut', x: 2, y: 1 }))
+      .toBe(Math.ceil(HUT * PENALTY))
+  })
+
+  it('slows exactly the five working verbs, and leaves everything else at its own pace', () => {
+    const slowed: Array<[string, Record<string, unknown>]> = [
+      ['build', { kind: 'hut', x: 2, y: 1 }], ['craft', { recipe: 'plank' }],
+      ['till', { x: 1, y: 2 }], ['pave', { x: 1, y: 2 }], ['dig_channel', { x: 1, y: 2 }],
+    ]
+    for (const [verb, params] of slowed) {
+      // dig_channel needs water beside it, so it is measured on its own below.
+      if (verb === 'dig_channel') continue
+      const dark = durationOf(site(MIDNIGHT), verb, params)
+      const day = durationOf(site(NOON), verb, params)
+      expect([verb, dark]).toEqual([verb, Math.ceil(day * PENALTY)])
+    }
+    for (const [verb, params] of [['speak', { text: 'hi' }], ['walk', { x: 4, y: 4 }]] as const) {
+      expect([verb, durationOf(site(MIDNIGHT), verb, params)])
+        .toEqual([verb, durationOf(site(NOON), verb, params)])
+    }
+  })
+
+  it('dig_channel is slowed too, beside the water it needs', () => {
+    const wet = (tick: number): WorldState => {
+      const s = site(tick)
+      const terrain = s.terrain.map((row, y) => row.map((t, x) => (x === 0 && y === 2 ? (2 as TileId) : t)))
+      return { ...s, terrain }
+    }
+    expect(durationOf(wet(MIDNIGHT), 'dig_channel', { x: 1, y: 2 }))
+      .toBe(Math.ceil(durationOf(wet(NOON), 'dig_channel', { x: 1, y: 2 }) * PENALTY))
+  })
+
+  it('never refuses, and says so in the body\'s own words — only while the penalty is on', () => {
+    const dark = site(MIDNIGHT)
+    const r = submitIntent(dark, CFG, 'a1', 'build', { kind: 'hut', x: 2, y: 1 })
+    expect(r.ok).toBe(true)
+    let working = dark
+    if (r.ok) for (const e of r.events) working = fold(working, ev(740, e.type, e.payload), CFG)
+    expect(composePerception(working, CFG, 'a1', []).fumbling).toBe(true)
+
+    const lit = withTorch(working, 1, 2)
+    expect(composePerception(lit, CFG, 'a1', []).fumbling).toBeUndefined()
+    expect(composePerception({ ...working, tick: NOON }, CFG, 'a1', []).fumbling).toBeUndefined()
+    // Standing idle in the dark is not fumbling; it is standing.
+    expect(composePerception(dark, CFG, 'a1', []).fumbling).toBeUndefined()
+  })
+
+  it('with the light law off, the night costs nothing at all', () => {
+    expect(durationOf(site(MIDNIGHT, OFF), 'build', { kind: 'hut', x: 2, y: 1 }, OFF)).toBe(HUT)
+  })
+})

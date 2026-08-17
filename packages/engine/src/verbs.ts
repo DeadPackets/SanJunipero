@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import {
-  fertilityAt, glowRadiusFor, MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
+  dayPhaseFromTick, fertilityAt, glowRadiusFor, litSourceWithin, MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
   type SimConfig, type StructureRecipeDef,
 } from '@sj/shared'
 import { mintId, type Affliction, type TileId, type WorldState } from './state.js'
@@ -464,6 +464,27 @@ const stoke: VerbDef = makeVerb({
     ]
   },
 })
+
+// The five things hands do that eyes have to be part of. Speech, walking and everything else
+// cost the same in the dark as at noon — the night is a price change, not a curfew.
+export const NIGHT_WORK_VERBS: ReadonlySet<string> = new Set(['build', 'craft', 'till', 'pave', 'dig_channel'])
+
+// Working blind: night, no flame within reach, and the light law switched on.
+export function fumblesInTheDark(state: WorldState, config: SimConfig, agentId: string): boolean {
+  if (!config.light.enabled) return false
+  if (dayPhaseFromTick(state.tick) !== 'night') return false
+  const a = state.agents[agentId]
+  if (a === undefined) return false
+  return !litSourceWithin(state, a.x, a.y, state.tick, config, config.light.workRadius)
+}
+
+// The one derivation of what the dark costs (G4): submitIntent multiplies a duration by it,
+// and perception says so out loud. Never a refusal — burning fuel or burning time is a choice.
+export function workPenalty(state: WorldState, config: SimConfig, agentId: string, verb: string): number {
+  return NIGHT_WORK_VERBS.has(verb) && fumblesInTheDark(state, config, agentId)
+    ? config.light.nightWorkPenalty
+    : 1
+}
 
 export const TileParams = z.object({ x: z.number().int(), y: z.number().int() }).strict()
 export const PlantParams = z.object({ x: z.number().int(), y: z.number().int(), kind: z.string() }).strict()

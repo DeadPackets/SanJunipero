@@ -13,11 +13,15 @@ const FAST: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0
 let seq = 13000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
 
+// Noon: from C11 Task 25 work started in the dark takes half again as long, and nothing in
+// this file is about the dark.
+const NOON = 720
+
 function makeWorld(config = CFG, wood = 10): WorldState {
   let s = genesisState(config)
   s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
   if (wood > 0) s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: wood, loc: { t: 'agent', id: 'a1' } }), config)
-  return s
+  return { ...s, tick: NOON }
 }
 function applyAll(s: WorldState, events: Array<{ type: string; payload: unknown }>, config = CFG): WorldState {
   for (const e of events) s = fold(s, ev(e.type, e.payload, s.tick), config)
@@ -106,7 +110,8 @@ describe('verb: build reads structures.recipes', () => {
   function withStone(qty: number): WorldState {
     let s = genesisState(CFG)
     s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
-    return fold(s, ev('item_spawned', { id: 'item_1', kind: 'stone', qty, loc: { t: 'agent', id: 'a1' } }), CFG)
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'stone', qty, loc: { t: 'agent', id: 'a1' } }), CFG)
+    return { ...s, tick: NOON }
   }
   const WELL = CFG.structures.recipes.well!
 

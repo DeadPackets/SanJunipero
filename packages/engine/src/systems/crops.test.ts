@@ -14,6 +14,7 @@ const FAST: SimConfig = SimConfigSchema.parse({
   },
 })
 const DAWN = 360 // hour 6, minute 0
+const NOON = 720 // hour 12: daylight, so the night-work penalty is not what is being measured
 const CHAR_TILE: Record<string, TileId> = { '.': 0, ',': 1, '~': 2, '#': 6, c: 10 }
 
 let seq = 9000
@@ -97,7 +98,8 @@ describe('verb: till', () => {
   })
 
   it('converts grass and dirt to farmland via tile_changed; plant then works there', () => {
-    let s = makeWorld([',.', '..'])
+    // By daylight: from C11 Task 25 a tilled furrow cut at midnight takes half again as long.
+    let s = atTick(makeWorld([',.', '..']), NOON)
     const r = submitIntent(s, FAST, 'a1', 'till', { x: 0, y: 0 })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
@@ -236,7 +238,7 @@ describe('verb: harvest', () => {
 
 describe('verb: dig_channel', () => {
   it('cuts a channel beside water in four ticks', () => {
-    let s = makeWorld(['.~.', '...'])
+    let s = atTick(makeWorld(['.~.', '...']), NOON)
     const r = submitIntent(s, FAST, 'a1', 'dig_channel', { x: 1, y: 1 })
     if (!r.ok) throw new Error(r.reason)
     expect(r.events[0]).toEqual({

@@ -254,3 +254,41 @@ describe('verb: douse', () => {
       .toThrow(/no structure/i)
   })
 })
+
+// ------------------------------------------------- Task 25: a carried flame is a fire risk
+describe('a carried flame is both the light and the hazard', () => {
+  const SURE: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, light: { fireRiskPerTick: 1 } })
+  const OFF: SimConfig = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 }, light: { fireRiskPerTick: 1, enabled: false },
+  })
+
+  // A torch on the ground at (1,2), which touches the flammable hut structure_1 at (2,2) and
+  // lies inside the unburnable structure_5 at (0,2).
+  const torch = (config: SimConfig): WorldState => {
+    const s = atTick(rowWorld(config), 1)
+    return fold(s, ev('item_spawned', {
+      id: 'item_1', kind: 'torch', qty: 1, loc: { t: 'tile', x: 1, y: 2 },
+    }, s.tick), config)
+  }
+  const alight = (config: SimConfig, until: number): WorldState => {
+    const s = torch(config)
+    return fold(s, ev('item_lit', { itemId: 'item_1', burnsUntilTick: until }, s.tick), config)
+  }
+
+  it('sets the hut it lies against alight on a certain roll, and nothing else', () => {
+    const r = tickOnce(alight(SURE, 9999), SURE)
+    expect(r.events).toContainEqual({
+      type: 'fire_ignited', payload: { structureId: 'structure_1', cause: 'a carried flame' },
+    })
+    expect(burningIds(r.state)).toEqual(['structure_1'])
+  })
+
+  it('never rolls for a torch nobody struck, or one whose fuel is gone', () => {
+    expect(burningIds(tickOnce(torch(SURE), SURE).state)).toEqual([])
+    expect(burningIds(tickOnce(alight(SURE, 0), SURE).state)).toEqual([])
+  })
+
+  it('with the light law off, a lit torch is just a light', () => {
+    expect(burningIds(tickOnce(alight(OFF, 9999), OFF).state)).toEqual([])
+  })
+})
