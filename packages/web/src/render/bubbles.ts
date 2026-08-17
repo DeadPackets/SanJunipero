@@ -1,4 +1,5 @@
 import { BitmapText, Container, Graphics } from 'pixi.js'
+import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
 import { tileToScreen } from './iso.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import type { WorldStore } from '../state/worldStore.js'
@@ -13,6 +14,8 @@ export const THOUGHT_DRIFT_PX = 2
 
 export const BUBBLE_FILL = 0xfff6e9
 export const BUBBLE_INK = 0x43394a
+export const BUBBLE_FONT_PX = WORLD_TEXT_PX
+export const BUBBLE_LINE_H = WORLD_TEXT_LINE_H
 
 export function bubbleLife(text: string): number {
   return SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * Math.min(text.length, SPEECH_MAX_CHARS)
@@ -63,7 +66,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const lines = wrapBubble(text.slice(0, SPEECH_MAX_CHARS))
     const label = new BitmapText({
       text: lines.join('\n'),
-      style: { fontFamily: 'monospace', fontSize: 9, fill: BUBBLE_INK, lineHeight: 11, align: 'left' },
+      style: { fontFamily: 'monospace', fontSize: BUBBLE_FONT_PX, fill: BUBBLE_INK, lineHeight: BUBBLE_LINE_H, align: 'left' },
     })
     const w = Math.ceil(label.width) + 10
     const h = Math.ceil(label.height) + 8

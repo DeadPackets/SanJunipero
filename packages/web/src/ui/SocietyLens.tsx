@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import ForceGraph2D from 'react-force-graph-2d'
 import { BOND_KINDS, BondsResponseSchema, tickToMoment, type Bond, type BondKind, type BondsResponse } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
+import { TEXT_MIN_PX } from '../textFloor.js'
 import { BondDetailPanel } from './BondDetailPanel.js'
 import {
   BOND_COLORS, BOND_KIND_LABEL, bondTooltip, maxBondStrength, toBondGraph,
@@ -131,7 +132,9 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
             ctx.lineWidth = 2
             ctx.strokeRect(x - 4, y - 4, side + 8, side + 8)
           }
-          const fontSize = Math.max(10 / globalScale, 4)
+          // ctx is already scaled, so dividing by globalScale pins the label at TEXT_MIN_PX
+          // on screen however far the graph is zoomed out.
+          const fontSize = Math.max(TEXT_MIN_PX / globalScale, 4)
           ctx.font = `${fontSize}px Silkscreen, monospace`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'top'

@@ -1,6 +1,7 @@
 import { BitmapText, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
+import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
 import { depthKey, facingFrom, tileToScreen, type Facing } from './iso.js'
 import type { Scene } from './scene.js'
 import { characterArt, smoothSource, type TextureBook } from './textures.js'
@@ -12,6 +13,8 @@ import {
 
 export const EMOTE_MS = 2000
 export const EMOTE_ABOVE_HEAD_PX = 12
+export const CHAR_TAG_FONT_PX = WORLD_TEXT_PX
+export const CHAR_TAG_LINE_H = WORLD_TEXT_LINE_H
 export const SHADOW_ALPHA = 0.25
 export const GLIDE_MIN_MS = 200
 export const GLIDE_MAX_MS = 4000
@@ -172,7 +175,10 @@ export function createCharacterLayer(
     nameTag.visible = false
     nameTag.eventMode = 'none'
     const nameTagBg = new Graphics()
-    const nameTagLabel = new BitmapText({ text: '', style: { fontFamily: 'monospace', fontSize: 8, fill: 0x43394a, lineHeight: 10 } })
+    const nameTagLabel = new BitmapText({
+      text: '',
+      style: { fontFamily: 'monospace', fontSize: CHAR_TAG_FONT_PX, fill: 0x43394a, lineHeight: CHAR_TAG_LINE_H },
+    })
     nameTagLabel.anchor.set(0.5, 1) // match the bg slab, which is drawn centered above the origin
     nameTag.addChild(nameTagBg, nameTagLabel)
     sprite.on('pointerover', () => { nameTag.visible = true })

@@ -1,10 +1,11 @@
 import { BitmapText, Container, Graphics } from 'pixi.js'
+import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
 import { BUBBLE_FILL, BUBBLE_INK } from './bubbles.js'
 import { EMOTE_ABOVE_HEAD_PX } from './characters.js'
 import type { Scene } from './scene.js'
 
-export const TAG_FONT_PX = 9
-export const TAG_LINE_H = 11
+export const TAG_FONT_PX = WORLD_TEXT_PX
+export const TAG_LINE_H = WORLD_TEXT_LINE_H
 export const TAG_PAD_X = 5
 export const TAG_PAD_Y = 3
 export const TAG_MAX_CHARS = 48
