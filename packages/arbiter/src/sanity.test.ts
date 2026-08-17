@@ -87,6 +87,43 @@ describe('the codification sanity gate', () => {
   })
 })
 
+// The four rows the live run actually minted, each named in the batch-8 brief, walked one at
+// a time against the landed gate. None of these may ever become a permanent verb again.
+describe('the four verbs the mini-rehearsal minted', () => {
+  const ground = { ...vocab, tileKinds: new Set(['grass', 'dirt', 'water', 'forest']) }
+
+  it('refuses recipe:arrative — a name with its head eaten', () => {
+    expect(recipeSanityRefusal({ ...base, id: 'recipe:arrative', name: 'Narrative' }, ground)).not.toBeNull()
+  })
+
+  it('refuses recipe:attempt — the verdict word taken for a craft', () => {
+    expect(recipeSanityRefusal({ ...base, id: 'recipe:attempt', name: 'Attempt' }, ground)).not.toBeNull()
+  })
+
+  it('refuses all three rival waterskins, including the one keyed to item_28', () => {
+    const known = { ...ground, knownRecipeIds: new Set(['recipe:fill_waterskin']) }
+    expect(recipeSanityRefusal({
+      ...base, id: 'recipe:fill_item_28', name: 'Fill item_28 at the well',
+    }, known)).toMatch(/item_28/)
+    expect(recipeSanityRefusal({
+      ...base, id: 'recipe:fill_waterskin_well', name: 'Fill Waterskin at the Well',
+    }, known)).toMatch(/second name/)
+  })
+
+  it('refuses a rule that wants ground nobody within sight can point at', () => {
+    const sand: Recipe = {
+      ...base,
+      id: 'recipe:collapse_against_the_wall',
+      name: 'Collapse Against the Wall',
+      requires: [{ type: 'adjacent_tile', tile: 'sand' }],
+    }
+    expect(recipeSanityRefusal(sand, ground)).toMatch(/sand/)
+    // The ground that IS there is nameable, and with no table shown the check stands down.
+    expect(recipeSanityRefusal({ ...sand, requires: [{ type: 'adjacent_tile', tile: 'water' }] }, ground)).toBeNull()
+    expect(recipeSanityRefusal(sand, vocab)).toBeNull()
+  })
+})
+
 describe('the materials the arbiter is shown', () => {
   const blocks = {
     canon: 'canon', frontier: ['pottery'],

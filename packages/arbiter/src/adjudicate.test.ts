@@ -530,6 +530,45 @@ describe('FORBIDDEN_FRAMING enforced over live LLM output', () => {
   })
 })
 
+// The ground the asker can see is shown to the arbiter, so the ground the asker can see is
+// what a recipe may require: the live run demanded sand for work against a wooden wall.
+describe('the ground the arbiter was shown is the ground a recipe may ask for', () => {
+  const sandVerdict: Verdict = {
+    kind: 'attempt',
+    summary: 'Bank the wall with sand.',
+    recipe: { ...basketRecipe, id: 'recipe:bank_the_wall', name: 'Bank the Wall', requires: [{ type: 'adjacent_tile', tile: 'sand' }] },
+  }
+  const seeing = (ground: string[]): AgentCtx => ({ ...ctx, visible: { structures: [], ground } })
+
+  it('refuses ground nobody in sight can point at, and retries instead of minting it', async () => {
+    const llm = new ScriptedLlm(() => sandVerdict)
+    const { db, arbiter } = await makeRig(llm)
+
+    const verdict = await arbiter.adjudicate('I bank the wall against the wind', seeing(['grass', 'water']))
+    expect(verdict.kind).toBe('impossible')
+    expect(llm.objectCalls).toBe(2)
+    expect((db.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n).toBe(0)
+    expect(arbiter.sanity(sandVerdict.kind === 'attempt' ? sandVerdict.recipe : basketRecipe, seeing(['grass'])))
+      .toMatch(/sand/)
+  })
+
+  it('lets the same recipe through where the sand actually is', async () => {
+    const llm = new ScriptedLlm(() => sandVerdict)
+    const { arbiter } = await makeRig(llm)
+
+    const verdict = await arbiter.adjudicate('I bank the wall against the wind', seeing(['grass', 'sand']))
+    expect(verdict.kind).toBe('attempt')
+    expect(llm.objectCalls).toBe(1)
+  })
+
+  it('an asker who was shown no world is judged as before', async () => {
+    const llm = new ScriptedLlm(() => sandVerdict)
+    const { arbiter } = await makeRig(llm)
+
+    expect((await arbiter.adjudicate('I bank the wall against the wind', ctx)).kind).toBe('attempt')
+  })
+})
+
 describe('retrieval efficiency', () => {
   it('embeds the intent once for retrieval plus once for recording (stages 2 and 3 share one similar call)', async () => {
     const inner = await FakeEmbedder.create()

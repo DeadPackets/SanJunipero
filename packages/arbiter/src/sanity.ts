@@ -42,12 +42,25 @@ export function nearDuplicate(a: string, b: string): boolean {
   return long.length - short.length <= 2 && (long.startsWith(short) || long.endsWith(short))
 }
 
+// One act, named twice: every word of the shorter id is a word of the longer, and the shorter
+// says more than one thing on its own. `fill_waterskin_well` is `fill_waterskin` with a place
+// bolted onto it, and the live run minted both.
+export function sameActNamedTwice(a: string, b: string): boolean {
+  if (a === b) return false
+  const [x, y] = [tokens(a), tokens(b)]
+  const [short, long] = x.length < y.length ? [x, y] : [y, x]
+  if (short.length < 2 || short.length === long.length) return false
+  return short.every((t) => long.includes(t))
+}
+
 // What the arbiter was shown, and therefore all it may answer with. Absent tables are not
 // enforced: a check against a list nobody rendered would refuse the world for being wide.
 export type RecipeVocabulary = {
   // Every material named in the prompt: the agent's own hands plus whatever table was shown.
   itemKinds?: ReadonlySet<string>
   structureKinds?: ReadonlySet<string>
+  // The ground the asker can see, in the words a requirement may use.
+  tileKinds?: ReadonlySet<string>
   // What the rulebook already makes, for telling a second waterskin from a first.
   knownProducts?: ReadonlySet<string>
   knownRecipeIds?: ReadonlySet<string>
@@ -90,6 +103,14 @@ export function recipeSanityRefusal(recipe: Recipe, vocab: RecipeVocabulary = {}
       if (!vocab.structureKinds.has(req.kind)) return `${recipe.id} wants a ${req.kind}, which the town does not build`
     }
   }
+  // A rule that asks for ground nobody in sight can point at: the live run required sand for
+  // work against a wooden wall, in a town of grass and river.
+  if (vocab.tileKinds !== undefined) {
+    for (const req of recipe.requires) {
+      if (req.type !== 'adjacent_tile') continue
+      if (!vocab.tileKinds.has(req.tile)) return `${recipe.id} wants ${req.tile} ground, and none lies within sight`
+    }
+  }
 
   for (const product of productsOf(recipe)) {
     for (const known of vocab.knownProducts ?? []) {
@@ -97,7 +118,10 @@ export function recipeSanityRefusal(recipe: Recipe, vocab: RecipeVocabulary = {}
     }
   }
   for (const known of vocab.knownRecipeIds ?? []) {
-    if (nearDuplicate(slug, known.replace(/^recipe:/, ''))) return `${recipe.id} is a second name for ${known}`
+    const other = known.replace(/^recipe:/, '')
+    if (nearDuplicate(slug, other) || sameActNamedTwice(slug, other)) {
+      return `${recipe.id} is a second name for ${known}`
+    }
   }
   return null
 }

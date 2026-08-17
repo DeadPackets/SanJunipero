@@ -131,6 +131,9 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     }
     const shown = deps.vocabulary
     return {
+      // Shown is enforced: the ground rides the asker block, so it is checked whenever the
+      // asker block carries it, table or no table.
+      ...(agentCtx.visible === undefined ? {} : { tileKinds: new Set(agentCtx.visible.ground) }),
       ...(shown === undefined
         ? {}
         : {
