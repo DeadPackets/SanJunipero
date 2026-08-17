@@ -8,9 +8,9 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
 import {
-  AssetCodex, CELL_NAMES_V4, cellAnchor, chromaKey, decodePng, encodePng,
+  AssetCodex, CELL_NAMES_V4, LIBRARY, cellAnchor, chromaKey, decodePng, encodePng,
   loadMaterialBook, packCharacterAtlas, processHiResCell, registerGeneratedTerrain,
-  type RawImage,
+  registerLibraryEntry, type LibraryEntry, type RawImage,
 } from '@sj/forge'
 import {
   ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, roadAutotileKind,
@@ -148,6 +148,51 @@ export async function ingestTerrainArt(db: Database.Database): Promise<IngestEnt
     console.log(`dev world: ${report.generated} generated terrain tiles, ${report.painted} code-painted`)
   }
   return records.map((r) => ({ kind: r.kind ?? '', action: 'registered' as const, id: r.id }))
+}
+
+// C13's premade library — 50 painted items, fifteen of them the furniture the interior
+// scenes place on their slots. Without this a room draws every furnishing as the item
+// placeholder, which is what the storehouse was showing. Same convention as the production
+// art above: the art lives in the durable scratchpad, overridable for another machine.
+export const DEFAULT_LIBRARY_ROOT =
+  '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13/library'
+
+export function libraryArtRoot(env: NodeJS.ProcessEnv = process.env): string {
+  return env['SJ_LIBRARY_ROOT'] ?? DEFAULT_LIBRARY_ROOT
+}
+
+// The entries whose art is actually on disk. A missing sprite is not an error — the renderer
+// falls back to the placeholder, the same art independence the ground bake lives by.
+export function libraryEntriesOnDisk(root: string): LibraryEntry[] {
+  return LIBRARY.filter((e) => existsSync(join(root, e.kind, 'sprite.png'))
+    && existsSync(join(root, e.kind, 'icon.png')))
+}
+
+export async function ingestLibraryArt(
+  db: Database.Database, opts: { libraryRoot?: string } = {},
+): Promise<IngestEntry[]> {
+  const root = opts.libraryRoot ?? libraryArtRoot()
+  const codex = new AssetCodex(db)
+  const out: IngestEntry[] = []
+  for (const entry of libraryEntriesOnDisk(root)) {
+    const sprite = readFileSync(join(root, entry.kind, 'sprite.png'))
+    const existing = latestByKind(codex, 'item', entry.kind)
+    if (existing !== null) {
+      const stored = codex.get(existing.id)
+      if (stored !== null && stored.png.equals(sprite)) {
+        out.push({ kind: entry.kind, action: 'unchanged', id: existing.id })
+        continue
+      }
+    }
+    // C13 already booked what this art cost in its own ledger; re-booking here would
+    // double-count the spend, so the ingest is free by construction.
+    const { spriteRecord } = registerLibraryEntry(codex, entry, {
+      sprite, icon: readFileSync(join(root, entry.kind, 'icon.png')),
+      score: 10, attempts: 1, costUsd: 0,
+    })
+    out.push({ kind: entry.kind, action: 'registered', id: spriteRecord.id })
+  }
+  return out
 }
 
 export async function ingestProductionArt(

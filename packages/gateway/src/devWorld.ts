@@ -9,7 +9,7 @@ import { openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
 import { makeFoundersOnTick } from './founders.js'
-import { ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
+import { ingestLibraryArt, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
 import { showcaseTerrain } from './showcaseMap.js'
 
 export const DEV_DB_PATH = 'data/dev-world.db'
@@ -67,6 +67,13 @@ export async function startDevWorld(
       console.log(`dev world: ingested production art (${entries.length} assets)`)
     } catch (e) {
       console.log(`dev world: production art not ingested — ${e instanceof Error ? e.message : String(e)}`)
+    }
+    // the C13 premade library: the furniture the interior scenes place on their slots
+    try {
+      const lib = await ingestLibraryArt(forgeDb)
+      console.log(`dev world: ingested library art (${lib.length} items, furniture included)`)
+    } catch (e) {
+      console.log(`dev world: library art not ingested — ${e instanceof Error ? e.message : String(e)}`)
     }
   }
   forgeDb.close()

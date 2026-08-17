@@ -7,7 +7,12 @@ import {
   ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, parseBuildingManifest, parseCharacterAtlasManifest,
   roadAutotileKind,
 } from '@sj/shared'
-import { BUILDING_ART_DIRS, FOUNDER_ART, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
+import { INTERIOR_KINDS, cityStructures, parseLibraryItemManifest, resolveFurnishingKind } from '@sj/shared'
+import { LIBRARY } from '@sj/forge'
+import {
+  BUILDING_ART_DIRS, FOUNDER_ART, ingestLibraryArt, ingestProductionArt, ingestTerrainArt,
+  libraryArtRoot, libraryEntriesOnDisk,
+} from './ingestArt.js'
 
 const dir = mkdtempSync(join(tmpdir(), 'sj-ingest-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -120,4 +125,68 @@ describe('ingestTerrainArt', () => {
 
     db.close()
   }, 30_000)
+})
+
+
+// FINAL ROUND item 1. The storehouse room drew checkerboard placeholders because the dev
+// world ingested terrain and production art but never the C13 library — so `roomPlan` found
+// no `class:'item'` record for bed, shelf, crate or barrel and fell through to the
+// placeholder. G13's "interiors live" close would have failed on exactly that.
+describe('ingestLibraryArt', () => {
+  it('registers a sprite AND an icon per item, idempotently', async () => {
+    const root = join(dir, 'lib')
+    for (const kind of ['bed', 'shelf']) {
+      mkdirSync(join(root, kind), { recursive: true })
+      writeFileSync(join(root, kind, 'sprite.png'), await encodePng(cell(24, 24, 90)))
+      writeFileSync(join(root, kind, 'icon.png'), await encodePng(cell(24, 24, 90)))
+    }
+    const db = openForgeDb(join(dir, 'lib.db'))
+    const codex = new AssetCodex(db)
+
+    const first = await ingestLibraryArt(db, { libraryRoot: root })
+    expect(first.map((e) => e.kind).sort()).toEqual(['bed', 'shelf'])
+    expect(first.every((e) => e.action === 'registered')).toBe(true)
+
+    const items = codex.listSince(0).filter((r) => r.class === 'item')
+    expect(items).toHaveLength(4)                       // two sprites + two icons
+    const bed = items.find((r) => r.kind === 'bed')!
+    const manifest = parseLibraryItemManifest(bed.meta)
+    expect(manifest).not.toBeNull()
+    expect(manifest!.interior?.isBed).toBe(true)        // the meta the interior scene reads
+    expect(bed.costUsd).toBe(0)                         // C13 already booked this spend
+
+    const second = await ingestLibraryArt(db, { libraryRoot: root })
+    expect(second.every((e) => e.action === 'unchanged')).toBe(true)
+    expect(codex.listSince(0).filter((r) => r.class === 'item')).toHaveLength(4)
+    db.close()
+  }, 30_000)
+
+  it('skips an item whose art is not on disk rather than failing the boot', async () => {
+    const root = join(dir, 'empty-lib')
+    mkdirSync(root, { recursive: true })
+    expect(libraryEntriesOnDisk(root)).toEqual([])
+    const db = openForgeDb(join(dir, 'empty-lib.db'))
+    expect(await ingestLibraryArt(db, { libraryRoot: root })).toEqual([])
+    db.close()
+  })
+
+  it('the catalog can furnish every interior kind the renderer places', () => {
+    const known = new Set(LIBRARY.map((e) => e.kind))
+    for (const kind of INTERIOR_KINDS) {
+      const s = cityStructures().find((c) => c.kind === kind)
+      expect(s, kind).toBeDefined()
+      for (const f of s!.furnishings) {
+        expect(known, `${kind} places ${f.kind}, which the library cannot paint`)
+          .toContain(resolveFurnishingKind(f.kind))
+      }
+    }
+  })
+
+  it('finds the real shipped library on this machine, or says so plainly', () => {
+    const found = libraryEntriesOnDisk(libraryArtRoot()).map((e) => e.kind)
+    const furniture = LIBRARY.filter((e) => e.category === 'furniture').map((e) => e.kind)
+    // not an assertion about the machine — a report, so a missing library is visible
+    if (found.length === 0) return
+    for (const k of furniture) expect(found, `${k} has no art`).toContain(k)
+  })
 })
