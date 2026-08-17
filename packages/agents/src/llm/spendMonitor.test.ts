@@ -9,7 +9,9 @@ import {
   classifyFailure,
   deadCallCounts,
   projectDailySpend,
+  providerCounts,
   reportDeadCalls,
+  reportProviders,
 } from './spendMonitor.js'
 
 const NOW = 1_700_000_000_000
@@ -206,5 +208,57 @@ describe('checkSpend (T24)', () => {
     expect(checkSpend(db, { windowRealMinutes: 15, now: NOW }).alerted).toBe(true)
     seedCall(db, 1, -0.2) // pull the window back under
     expect(checkSpend(db, { windowRealMinutes: 15, now: NOW }).alerted).toBe(false)
+  })
+})
+
+// C11 R20: the last gate was decided by an empty-call rate that swung 14-51% across identical
+// runs, and nobody could say whose rate it was. Every call now names the back end that served
+// it, so the rate is attributable — and the ones that never came back are reported as their
+// own row rather than spread across the providers by guesswork.
+describe('providerCounts: which back end answered, and how much of it was worth paying for', () => {
+  function seedProviderCall(
+    db: Database.Database,
+    row: { provider: string | null; ok: boolean; error?: string; costUsd?: number },
+  ): void {
+    db.prepare(
+      `INSERT INTO llm_calls
+         (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+          reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
+       VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, ?, 0, ?, ?, ?)`,
+    ).run(NOW, row.costUsd ?? 0.001, row.ok ? 1 : 0, row.error ?? null, row.provider)
+  }
+
+  const mixed = (): Database.Database => {
+    const db = openDb()
+    seedProviderCall(db, { provider: 'Wafer', ok: true, costUsd: 0.01 })
+    seedProviderCall(db, { provider: 'Wafer', ok: true, costUsd: 0.01 })
+    seedProviderCall(db, { provider: 'Baidu', ok: true, costUsd: 0.001 })
+    seedProviderCall(db, { provider: null, ok: false, error: 'No output generated.' })
+    seedProviderCall(db, { provider: null, ok: false, error: 'No object generated: could not parse' })
+    return db
+  }
+
+  it('folds calls, answers, failures and cost per back end, sorted by name', () => {
+    expect(providerCounts(mixed())).toEqual([
+      { provider: null, calls: 2, ok: 0, failed: 2, emptyOutput: 1, unparseable: 1, costUsd: 0.002 },
+      { provider: 'Baidu', calls: 1, ok: 1, failed: 0, emptyOutput: 0, unparseable: 0, costUsd: 0.001 },
+      { provider: 'Wafer', calls: 2, ok: 2, failed: 0, emptyOutput: 0, unparseable: 0, costUsd: 0.02 },
+    ])
+  })
+
+  it('writes one alert row per back end, and names the unattributable ones as such', () => {
+    const db = mixed()
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const rows = reportProviders(db)
+    expect(rows).toHaveLength(3)
+    const details = alerts(db).filter((a) => a.kind === 'llm_provider_mix').map((a) => a.detail)
+    expect(details).toHaveLength(3)
+    expect(details.some((d) => d.startsWith('unattributed: 2 calls'))).toBe(true)
+    expect(details.some((d) => d.startsWith('Wafer: 2 calls, 2 answered'))).toBe(true)
+  })
+
+  it('a ledger with nothing in the window reports nothing at all', () => {
+    const db = mixed()
+    expect(providerCounts(db, { since: NOW + 1 })).toEqual([])
   })
 })

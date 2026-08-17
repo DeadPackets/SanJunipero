@@ -5,7 +5,7 @@ import { MockLanguageModelV4 } from 'ai/test'
 import { z } from 'zod'
 import { mockModel } from '../testutil/mockModel.js'
 import { makeBudgetGuard, migrateLlmTables, sumReserved } from './callLog.js'
-import { BudgetExceededError, LlmClient, defaultExtraBody } from './client.js'
+import { BudgetExceededError, LlmClient, defaultExtraBody, servedProvider } from './client.js'
 import { FALLBACK_MODELS, MIND_MODEL, PROVIDER_ORDER } from './pins.js'
 
 type CallRow = {
@@ -368,5 +368,46 @@ describe('default OpenRouter path extraBody', () => {
       models: [MIND_MODEL, 'x/y'],
       provider: { order: ['P'], allow_fallbacks: true },
     })
+  })
+
+  // C11 R20: `provider.order` is a preference and only `allow_fallbacks:false` makes it an
+  // allow-list. It was a hardcoded literal, so a run that "pinned" a provider got that
+  // provider's answer rate AND whatever OpenRouter fell through to.
+  it('the allow-list is a switch now, and the default leaves the routing where it was', () => {
+    expect(defaultExtraBody(['x/y'], ['P'], false)).toEqual({
+      models: [MIND_MODEL, 'x/y'],
+      provider: { order: ['P'], allow_fallbacks: false },
+    })
+    expect(defaultExtraBody(['x/y'], ['P']).provider.allow_fallbacks).toBe(true)
+  })
+})
+
+describe('the back end that answered is written down (C11 R20)', () => {
+  it('reads the provider off OpenRouter metadata, then off the raw body, then gives up', () => {
+    expect(servedProvider(undefined, { openrouter: { provider: 'Wafer' } })).toBe('Wafer')
+    expect(servedProvider({ body: { provider: 'Baidu' } }, undefined)).toBe('Baidu')
+    expect(servedProvider({ body: { provider: 'Baidu' } }, { openrouter: { provider: 'Wafer' } })).toBe('Wafer')
+    expect(servedProvider({}, {})).toBeNull()
+    expect(servedProvider({ body: { provider: '' } }, {})).toBeNull()
+  })
+
+  it('records it on the call, and records null for a call that never came back', async () => {
+    const db = openDb()
+    const model = mockModel([
+      { json: { mood: 'calm', count: 1 }, provider: 'Wafer', usage: { inputTokens: 10, outputTokens: 2 } },
+      { fail: true },
+      { json: { mood: 'calm', count: 2 }, usage: { inputTokens: 10, outputTokens: 2 } },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test', agentId: 'a1' })
+    await client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA })
+    await client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA })
+    const logged = db.prepare('SELECT provider, ok FROM llm_calls ORDER BY id').all() as
+      Array<{ provider: string | null; ok: number }>
+    // A failure carries no answer, so it carries no back end to name it by.
+    expect(logged).toEqual([
+      { provider: 'Wafer', ok: 1 },
+      { provider: null, ok: 0 },
+      { provider: null, ok: 1 },
+    ])
   })
 })

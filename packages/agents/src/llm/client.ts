@@ -14,16 +14,38 @@ export type LlmUsage = {
 
 export type LlmMessage = { role: 'user' | 'assistant'; content: string }
 
+type ExecResult<T> = {
+  usage: LanguageModelUsage
+  value: T
+  servedModel?: string
+  provider?: string | null
+}
+
 export class BudgetExceededError extends Error {}
 
+// `provider.order` is a PREFERENCE; only `allow_fallbacks:false` makes it an allow-list. It
+// was a hardcoded literal, so pinning a provider pinned nothing and the run got the pinned
+// provider's answer rate AND whatever OpenRouter fell through to — which is why an empty-call
+// rate that swung 14-51% across identical runs decided the last gate (C11 R20).
+// The default stays `true`: this exposes the switch, it does not throw one.
 export function defaultExtraBody(
   fallbackModels: string[] = FALLBACK_MODELS,
   providerOrder: string[] = PROVIDER_ORDER,
+  allowFallbacks = true,
 ): { models: string[]; provider: { order: string[]; allow_fallbacks: boolean } } {
   return {
     models: [MIND_MODEL, ...fallbackModels],
-    provider: { order: providerOrder, allow_fallbacks: true },
+    provider: { order: providerOrder, allow_fallbacks: allowFallbacks },
   }
+}
+
+// Which back end answered. OpenRouter says so in its own metadata and again in the raw body;
+// neither is guaranteed, and a call nobody can attribute is recorded as one.
+export function servedProvider(response: unknown, meta: unknown): string | null {
+  const fromMeta = (meta as { openrouter?: { provider?: unknown } } | undefined)?.openrouter?.provider
+  if (typeof fromMeta === 'string' && fromMeta.length > 0) return fromMeta
+  const fromBody = (response as { body?: { provider?: unknown } } | undefined)?.body?.provider
+  return typeof fromBody === 'string' && fromBody.length > 0 ? fromBody : null
 }
 
 export type LlmClientOpts = {
@@ -33,6 +55,9 @@ export type LlmClientOpts = {
   agentId?: string
   fallbackModels?: string[]
   providerOrder?: string[]
+  // False turns `providerOrder` from a preference into an allow-list. Absent leaves the
+  // routing exactly as it has always been.
+  allowProviderFallbacks?: boolean
   maxRetries?: number
   budgetUsd?: number
   maxOutputTokens?: number
@@ -48,6 +73,7 @@ export class LlmClient {
   private readonly agentId: string | null
   private readonly fallbackModels: string[]
   private readonly providerOrder: string[]
+  private readonly allowProviderFallbacks: boolean
   private readonly maxRetries: number
   private readonly budgetUsd: number | undefined
   private readonly maxOutputTokens: number | undefined
@@ -61,6 +87,7 @@ export class LlmClient {
     this.agentId = opts.agentId ?? null
     this.fallbackModels = opts.fallbackModels ?? FALLBACK_MODELS
     this.providerOrder = opts.providerOrder ?? PROVIDER_ORDER
+    this.allowProviderFallbacks = opts.allowProviderFallbacks ?? true
     this.maxRetries = opts.maxRetries ?? 2
     this.budgetUsd = opts.budgetUsd
     this.maxOutputTokens = opts.maxOutputTokens
@@ -83,7 +110,10 @@ export class LlmClient {
         maxOutputTokens: this.maxOutputTokens,
         output: Output.object({ schema: opts.schema }),
       })
-      return { usage: r.usage, value: r.output, servedModel: r.response.modelId }
+      return {
+        usage: r.usage, value: r.output, servedModel: r.response.modelId,
+        provider: servedProvider(r.response, r.providerMetadata),
+      }
     })
   }
 
@@ -99,7 +129,10 @@ export class LlmClient {
         maxRetries: 0,
         maxOutputTokens: this.maxOutputTokens,
       })
-      return { usage: r.usage, value: r.text, servedModel: r.response.modelId }
+      return {
+        usage: r.usage, value: r.text, servedModel: r.response.modelId,
+        provider: servedProvider(r.response, r.providerMetadata),
+      }
     })
     return { text: value, usage }
   }
@@ -113,7 +146,7 @@ export class LlmClient {
   }
 
   private async invoke<T>(
-    exec: (model: LanguageModel) => Promise<{ usage: LanguageModelUsage; value: T; servedModel?: string }>,
+    exec: (model: LanguageModel) => Promise<ExecResult<T>>,
   ): Promise<{ value: T; usage: LlmUsage }> {
     if (this.budgetUsd !== undefined && this.totalCostUsd() >= this.budgetUsd) {
       throw new BudgetExceededError(
@@ -136,7 +169,7 @@ export class LlmClient {
   }
 
   private async invokeReserved<T>(
-    exec: (model: LanguageModel) => Promise<{ usage: LanguageModelUsage; value: T; servedModel?: string }>,
+    exec: (model: LanguageModel) => Promise<ExecResult<T>>,
   ): Promise<{ value: T; usage: LlmUsage }> {
     const model = this.resolveModel()
     const modelName = typeof model === 'string' ? model : model.modelId
@@ -144,7 +177,7 @@ export class LlmClient {
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       const start = performance.now()
       try {
-        const { usage: raw, value, servedModel } = await exec(model)
+        const { usage: raw, value, servedModel, provider } = await exec(model)
         const served = servedModel ?? modelName
         const inputTokens = raw.inputTokens ?? 0
         const outputTokens = raw.outputTokens ?? 0
@@ -155,6 +188,7 @@ export class LlmClient {
           agentId: this.agentId,
           caller: this.caller,
           model: served,
+          provider: provider ?? null,
           inputTokens,
           outputTokens,
           cacheReadTokens,
@@ -171,6 +205,9 @@ export class LlmClient {
           agentId: this.agentId,
           caller: this.caller,
           model: modelName,
+          // A failure carries no answer, so it carries no back end to name it by. The
+          // per-provider empty-call rate is therefore a rate over the calls that landed.
+          provider: null,
           inputTokens: 0,
           outputTokens: 0,
           cacheReadTokens: 0,
@@ -192,7 +229,7 @@ export class LlmClient {
     if (this.model !== undefined) return this.model
     const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY })
     this.model = openrouter(MIND_MODEL, {
-      extraBody: defaultExtraBody(this.fallbackModels, this.providerOrder),
+      extraBody: defaultExtraBody(this.fallbackModels, this.providerOrder, this.allowProviderFallbacks),
     })
     return this.model
   }

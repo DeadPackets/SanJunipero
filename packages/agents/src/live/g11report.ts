@@ -105,8 +105,21 @@ export const G11SpendSchema = z.object({
   costPerMindPerSimDay: z.number(),
   requestedProviderOrder: z.array(z.string()),
   // OpenRouter's `provider.order` with allow_fallbacks:true is a PREFERENCE, not an allow-list.
-  // False here is the C8 L1 carry-item, recorded rather than assumed away.
+  // Until C11 R20 this was a hardcoded literal and could only ever be false.
   hardProviderAllowList: z.boolean(),
+  // Which back end actually served each call, and how much of what it served was worth
+  // paying for. The empty-call rate decided the last gate and nobody could say whose it was,
+  // so it is a REPORTED METRIC here and not a footnote (C11 R20). `provider: null` is the
+  // row for calls that never came back, which carry no answer to read a back end off.
+  providerMix: z.array(z.object({
+    provider: z.string().nullable(),
+    calls: z.number().int(),
+    ok: z.number().int(),
+    failed: z.number().int(),
+    emptyOutput: z.number().int(),
+    unparseable: z.number().int(),
+    costUsd: z.number(),
+  }).strict()),
 }).strict()
 
 export const G11ConstructsSchema = z.object({

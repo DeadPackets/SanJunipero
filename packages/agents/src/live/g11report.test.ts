@@ -34,6 +34,10 @@ const PASSING: G11Report = {
     inputTokens: 1_800_000, outputTokens: 82_000, cacheReadTokens: 122_400,
     cacheReadShare: 0.068, costPerMindPerSimDay: 0.231,
     requestedProviderOrder: ['Baidu'], hardProviderAllowList: false,
+    providerMix: [
+      { provider: 'Baidu', calls: 500, ok: 480, failed: 20, emptyOutput: 18, unparseable: 2, costUsd: 2.0 },
+      { provider: null, calls: 104, ok: 0, failed: 104, emptyOutput: 100, unparseable: 4, costUsd: 0.31 },
+    ],
   },
   excerpts: {
     darkPerception: 'It is dark here.',

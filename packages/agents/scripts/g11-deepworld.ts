@@ -41,7 +41,7 @@ import { openAgentDb } from '../src/memory/schema.js'
 import { PersonalityStore, type PersonalityDoc } from '../src/personality.js'
 import { insertAlert, migrateLlmTables } from '../src/llm/callLog.js'
 import { LlmClient } from '../src/llm/client.js'
-import { checkSpend, reportDeadCalls } from '../src/llm/spendMonitor.js'
+import { checkSpend, reportDeadCalls, reportProviders } from '../src/llm/spendMonitor.js'
 import { Embedder } from '../src/memory/embedder.js'
 import { makeReflectionLlm } from '../src/reflection.js'
 import { MIND_MODEL } from '../src/llm/pins.js'
@@ -58,7 +58,10 @@ import {
 // `G11_PROVIDER` lets the gate be run twice against the same world with only the routing
 // changed, which is the only way to tell a provider's answer rate from a town's behaviour.
 const PROVIDER_ORDER = (process.env.G11_PROVIDER ?? 'Baidu').split(',').filter((x) => x.length > 0)
-const HARD_PROVIDER_ALLOW_LIST = false
+// C11 R20 made this real: false leaves OpenRouter free to fall through to whatever answers,
+// true turns `G11_PROVIDER` into an allow-list. Default stays false so this run is routed
+// exactly as the last one was, and the A/B is a flag away rather than a code change.
+const HARD_PROVIDER_ALLOW_LIST = process.env.G11_HARD_PROVIDER === '1'
 
 // The dry run (plan step 3): every client is a script, and `llm_calls` must be empty at the
 // end. It proves the wiring end to end — the tick loop, the seams, the nightly passes and the
@@ -148,7 +151,10 @@ const dryAnswers = (): unknown[] => {
 
 function makeClient(db: Database.Database, caller: string, agentId?: string): LlmClient {
   if (DRY_RUN) return new DryLlm(db, agentId ?? null) as unknown as LlmClient
-  return new LlmClient({ db, caller, ...(agentId === undefined ? {} : { agentId }), providerOrder: PROVIDER_ORDER })
+  return new LlmClient({
+    db, caller, ...(agentId === undefined ? {} : { agentId }),
+    providerOrder: PROVIDER_ORDER, allowProviderFallbacks: !HARD_PROVIDER_ALLOW_LIST,
+  })
 }
 
 // ---------------------------------------------------------------- the minds ---
@@ -484,7 +490,8 @@ async function main(): Promise<void> {
   let tripwireHit = false
   const totalSpend = (): number => qInt(db, 'SELECT COALESCE(SUM(cost_usd), 0) FROM llm_calls')
 
-  console.log(`[g11] model=${MIND_MODEL} provider=${PROVIDER_ORDER.join(',')} ticks=${TOTAL_TICKS}`
+  console.log(`[g11] model=${MIND_MODEL} provider=${PROVIDER_ORDER.join(',')}`
+    + ` allowList=${HARD_PROVIDER_ALLOW_LIST} ticks=${TOTAL_TICKS}`
     + ` pace=${REAL_MS_PER_TICK}ms minds=${MINDS.length} (no cap; tripwire $${TRIPWIRE_USD_PER_MIND_SIM_HOUR}/mind/sim-hour)`)
   const startWall = Date.now()
 
@@ -810,6 +817,7 @@ async function main(): Promise<void> {
     c.name === null ? UNNAMED_CONSTRUCT_COPY : `they call it ${c.name}`)
 
   const deadRows = reportDeadCalls(db)
+  const providerRows = reportProviders(db)
   const deadCalls = deadRows.reduce((acc, r) => ({
     calls: acc.calls + r.calls, emptyOutput: acc.emptyOutput + r.emptyOutput,
     unparseable: acc.unparseable + r.unparseable, otherFailures: acc.otherFailures + r.otherFailures,
@@ -859,6 +867,7 @@ async function main(): Promise<void> {
       costPerMindPerSimDay: spent / MINDS.length / simDays,
       requestedProviderOrder: PROVIDER_ORDER,
       hardProviderAllowList: HARD_PROVIDER_ALLOW_LIST,
+      providerMix: providerRows,
     },
     excerpts: {
       darkPerception: darkExcerpt,
