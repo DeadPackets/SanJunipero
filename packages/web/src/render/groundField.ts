@@ -2,6 +2,7 @@ import {
   TERRAIN_TILE_KINDS, materialKind, roadAutotile, roadAutotileKind,
   type AssetRecord, type RoadAutotileKey, type TerrainTileKind,
 } from '@sj/shared'
+import { Matrix } from 'pixi.js'
 import type { TileId } from '@sj/engine/state'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { TILE_COLORS } from './ground.js'
@@ -31,6 +32,89 @@ export const MATERIAL_REPEAT_PX = 256   // must match the forge's MATERIAL_PX
 export function materialUv(sx: number, sy: number, repeat: number = MATERIAL_REPEAT_PX): { u: number; v: number } {
   const wrap = (n: number): number => ((n % repeat) + repeat) % repeat
   return { u: wrap(sx), v: wrap(sy) }
+}
+
+// ── U6: two periods that never line up ──────────────────────────────────────────────────────
+//
+// Terrain v2 removed TILE-frequency pattern and introduced MATERIAL-frequency pattern in its
+// place: every ground shape was filled with `{ texture, matrix: new Matrix() }`, an identity
+// matrix, so one 256px material tiled on an axis-aligned 256px lattice across the whole map.
+// The eye finds a 256px grid as easily as a 32px one.
+//
+// Two fixes, both to WHERE the material is sampled — the geometry never moves, so nothing in
+// the world shifts. First, each ground layer gets its own small rotation and offset, derived
+// from its id so two runs agree. Second, each layer is filled a second time with the same
+// material at an incommensurate scale and low alpha: two periods whose least common multiple
+// exceeds the map cannot produce a visible lattice.
+
+/** Bounded and auditable: a layer's rotation is drawn from this set by index, never rolled. */
+export const MATERIAL_ROTATIONS_DEG: readonly number[] = [0, 7.5, -5, 12]
+
+/** 2.37 is irrational-enough that the second period never re-aligns with the first. */
+export const OCTAVE_SCALE = 2.37
+export const OCTAVE_ALPHA = 0.22
+
+/** Autocorrelation of a rendered strip at the material period. 1 = a perfect lattice. */
+export const LATTICE_PEAK_MAX = 0.35
+
+// FNV-1a, so a layer id maps to a stable offset without pulling in a hash dependency.
+function idHash(s: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0
+  return h >>> 0
+}
+
+/** The fill transform for a ground layer: a bounded rotation plus an id-derived offset,
+ *  applied to WHERE the material is sampled and never to the geometry. */
+export function materialMatrix(layerId: string, index: number): Matrix {
+  const deg = MATERIAL_ROTATIONS_DEG[index % MATERIAL_ROTATIONS_DEG.length]!
+  const h = idHash(layerId)
+  const m = new Matrix()
+  m.rotate((deg * Math.PI) / 180)
+  m.translate(h % MATERIAL_REPEAT_PX, (h >>> 11) % MATERIAL_REPEAT_PX)
+  return m
+}
+
+/** The coarse second pass: the same material, scaled so its period never lines up with the
+ *  first, and offset by half a repeat so the two do not share an origin either. */
+export function octaveMatrix(layerId: string, index: number): Matrix {
+  const m = materialMatrix(layerId, index)
+  m.scale(OCTAVE_SCALE, OCTAVE_SCALE)
+  m.translate(MATERIAL_REPEAT_PX / 2, MATERIAL_REPEAT_PX / 3)
+  return m
+}
+
+/** One pixel of the octave pass over one pixel of the base. A convex blend, so the result can
+ *  never leave the material's own tone range. */
+export function octaveComposite(base: number, octave: number): number {
+  return base * (1 - OCTAVE_ALPHA) + octave * OCTAVE_ALPHA
+}
+
+/** Normalised autocorrelation of an RGBA buffer at `period` px along x. 1.0 is an exact
+ *  repeat; white noise is ~0. Calibrate it before trusting it — the tests do. */
+export function latticePeak(
+  pixels: Uint8ClampedArray | Uint8Array, w: number, h: number, period: number,
+): number {
+  if (period <= 0 || period >= w) return 0
+  const lum = new Float64Array(w * h)
+  for (let i = 0; i < w * h; i++) {
+    lum[i] = luma((pixels[i * 4]! << 16) | (pixels[i * 4 + 1]! << 8) | pixels[i * 4 + 2]!)
+  }
+  let n = 0, sa = 0, sb = 0
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x + period < w; x++) { sa += lum[y * w + x]!; sb += lum[y * w + x + period]!; n++ }
+  }
+  if (n === 0) return 0
+  const ma = sa / n, mb = sb / n
+  let cov = 0, va = 0, vb = 0
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x + period < w; x++) {
+      const a = lum[y * w + x]! - ma, b = lum[y * w + x + period]! - mb
+      cov += a * b; va += a * a; vb += b * b
+    }
+  }
+  const d = Math.sqrt(va * vb)
+  return d === 0 ? 0 : Math.max(0, cov / d)
 }
 
 // What the GROUND cares about in the codex. `assetsSeq` counts every asset that has ever

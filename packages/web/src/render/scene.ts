@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Matrix, RenderTexture, Sprite, TextureSource } from 'pixi.js'
+import { Application, Container, Graphics, RenderTexture, Sprite, TextureSource } from 'pixi.js'
 import type { ApplicationOptions, FederatedPointerEvent, Texture } from 'pixi.js'
 import type { AssetRecord } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
@@ -6,8 +6,8 @@ import type { WorldStore } from '../state/worldStore.js'
 import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import {
-  ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField, roadRibbonPolys,
-  roadShoulderBands,
+  OCTAVE_ALPHA, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField,
+  materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
 } from './groundField.js'
 import { TextureBook } from './textures.js'
 
@@ -31,14 +31,18 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
 
   // TERRAIN V2. One pass PER TERRAIN, not one stamp per tile. Every tile of a terrain
   // contributes its outline to a single Graphics, and that whole shape is filled from the
-  // terrain's material with an IDENTITY matrix — so the texture is sampled in bake space,
-  // which is world space. The material therefore flows across tile boundaries, and nothing
-  // in the picture varies at tile frequency. The old `shade` checkerboard is gone with it:
-  // alternating every other diamond by 15% was a literal checkerboard in the fallback path.
+  // terrain's material in bake space, which is world space. The material therefore flows
+  // across tile boundaries, and nothing in the picture varies at tile frequency. The old
+  // `shade` checkerboard is gone with it: alternating every other diamond by 15% was a
+  // literal checkerboard in the fallback path.
+  //
+  // V2.2 (U6): the fill matrix is no longer the identity. An identity tiled one 256px material
+  // on an axis-aligned lattice across the whole map, so the pattern the eye found had simply
+  // moved from tile frequency to material frequency.
   function draw(terrain: TileId[][], records: AssetRecord[], offX: number): void {
     if (target === null) return
     const layer = new Container()
-    for (const l of groundField(terrain, records).layers) {
+    for (const [li, l] of groundField(terrain, records).layers.entries()) {
       // A road needs a rim or it disappears into the grass at 1x — v1's art carried a painted
       // edge and the material does not. Every shoulder is laid down BEFORE any ribbon, so a
       // neighbour's rim can never sit on top of this tile's surface.
@@ -64,27 +68,43 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
           layer.addChild(sh)
         }
       }
-      const g = new Graphics()
-      for (const shape of l.shapes) {
-        const cx = shape.sx + offX, cy = shape.sy
-        if (shape.roadKey === null) {
-          g.poly([cx, cy, cx + TILE_W / 2, cy + TILE_H / 2, cx, cy + TILE_H, cx - TILE_W / 2, cy + TILE_H / 2])
-          continue
-        }
-        for (const poly of roadRibbonPolys(shape.roadKey)) {
-          const pts: number[] = []
-          for (let i = 0; i < poly.length; i += 2) pts.push(cx + poly[i]!, cy + poly[i + 1]!)
-          g.poly(pts)
+      // the layer's mask, laid down once per pass
+      const shapesInto = (g: Graphics): void => {
+        for (const shape of l.shapes) {
+          const cx = shape.sx + offX, cy = shape.sy
+          if (shape.roadKey === null) {
+            g.poly([cx, cy, cx + TILE_W / 2, cy + TILE_H / 2, cx, cy + TILE_H, cx - TILE_W / 2, cy + TILE_H / 2])
+            continue
+          }
+          for (const poly of roadRibbonPolys(shape.roadKey)) {
+            const pts: number[] = []
+            for (let i = 0; i < poly.length; i += 2) pts.push(cx + poly[i]!, cy + poly[i + 1]!)
+            g.poly(pts)
+          }
         }
       }
+
+      const g = new Graphics()
+      shapesInto(g)
       const tex = l.url === null ? undefined : loaded.get(l.url)
       if (tex === undefined) {
         g.fill(l.fallback)                     // art independence: palette-true flat ground
+        layer.addChild(g)
       } else {
         tex.source.addressMode = 'repeat'      // the field wraps; the material must too
-        g.fill({ texture: tex, matrix: new Matrix() })
+        // An IDENTITY matrix tiled one 256px material on an axis-aligned lattice across the
+        // whole map — tile-frequency pattern replaced by material-frequency pattern (U6). Each
+        // layer now samples through its own rotation and offset.
+        g.fill({ texture: tex, matrix: materialMatrix(l.id, li) })
+        layer.addChild(g)
+        // One coarser pass at an incommensurate scale. Two periods with no common multiple
+        // inside the map cannot line up into a lattice. One extra fill per ground layer, at
+        // bake time — not a frame cost.
+        const oct = new Graphics()
+        shapesInto(oct)
+        oct.fill({ texture: tex, matrix: octaveMatrix(l.id, li), alpha: OCTAVE_ALPHA })
+        layer.addChild(oct)
       }
-      layer.addChild(g)
     }
     app.renderer.render({ container: layer, target, clear: true })
     layer.destroy({ children: true })

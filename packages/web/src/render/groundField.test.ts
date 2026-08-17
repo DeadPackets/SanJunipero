@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Matrix } from 'pixi.js'
 import { ROAD_AUTOTILE_KEYS, materialKind, type AssetRecord } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
@@ -6,6 +7,8 @@ import { ROAD_TILE_ID } from './tileset.js'
 import {
   CALM_ROAD_KIND, MATERIAL_REPEAT_PX, ROAD_UNDER, groundArtSignature, groundField, isRoadMass,
   materialUv, resolveMaterial, roadArms, roadRibbonPolys, roadShoulderPolys, roadStripFrame,
+  LATTICE_PEAK_MAX, MATERIAL_ROTATIONS_DEG, OCTAVE_ALPHA, OCTAVE_SCALE, latticePeak,
+  materialMatrix, octaveComposite, octaveMatrix,
   ROAD_GROUND_LUMA_DELTA_MIN, ROAD_SHOULDER, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT,
   SHOULDER_T, luma, materialTone, roadReadsAt, roadShoulderBands,
 } from './groundField.js'
@@ -576,5 +579,130 @@ describe('the two-tone rim', () => {
     for (const d of [...depth(b.dark), ...depth(b.light)])
       expect(d).toBeLessThanOrEqual(Math.max(...full) + 1e-9)
     expect(SHOULDER_T).toBe(0.26)
+  })
+})
+
+// --------------------------------------------------- U6: two periods that never line up
+//
+// The lattice is a property of the SAMPLING, not of the art: any material tiled by an identity
+// matrix repeats exactly at MATERIAL_REPEAT_PX. So the detector is calibrated on synthetic
+// buffers, then pointed at buffers built by the real sampling transforms.
+
+// A deterministic stand-in material: value noise that is NOT itself periodic at 256.
+const materialAt = (u: number, v: number): number => {
+  const h = Math.imul(Math.round(u) * 374761393 + Math.round(v) * 668265263, 1274126177) >>> 0
+  return 40 + (h % 180)
+}
+
+const bufferOf = (
+  w: number, h: number, sample: (x: number, y: number) => number,
+): Uint8ClampedArray => {
+  const d = new Uint8ClampedArray(w * h * 4)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const v = sample(x, y), i = (y * w + x) * 4
+      d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255
+    }
+  }
+  return d
+}
+
+// How a fill matrix maps a bake-space point to a point in the material, the way Pixi samples.
+const sampleThrough = (m: Matrix, x: number, y: number): number => {
+  const inv = m.clone().invert()
+  const p = inv.apply({ x, y })
+  const wrap = (n: number): number => ((n % MATERIAL_REPEAT_PX) + MATERIAL_REPEAT_PX) % MATERIAL_REPEAT_PX
+  return materialAt(wrap(p.x), wrap(p.y))
+}
+
+describe('latticePeak, calibrated before it is trusted', () => {
+  const W = 768, H = 96
+
+  it('reads ~1.0 on a perfect 256px tiling', () => {
+    const buf = bufferOf(W, H, (x, y) => materialAt(x % MATERIAL_REPEAT_PX, y % MATERIAL_REPEAT_PX))
+    expect(latticePeak(buf, W, H, MATERIAL_REPEAT_PX)).toBeGreaterThan(0.95)
+  })
+
+  it('reads under 0.1 on white noise', () => {
+    // the HIGH bits: an LCG's low bits have a short period, which this very detector caught
+    let s = 1
+    const buf = bufferOf(W, H, () => { s = Math.imul(s, 1103515245) + 12345 >>> 0; return s >>> 24 })
+    expect(latticePeak(buf, W, H, MATERIAL_REPEAT_PX)).toBeLessThan(0.1)
+  })
+
+  it('reads 0 for a degenerate period', () => {
+    const flat = bufferOf(W, H, () => 128)
+    expect(latticePeak(flat, W, H, 0)).toBe(0)
+    expect(latticePeak(flat, W, H, W)).toBe(0)
+  })
+})
+
+describe('the ground stops repeating', () => {
+  const W = 768, H = 96
+
+  it('THE COMPLAINT: an identity fill matrix lays a visible 256px lattice', () => {
+    const buf = bufferOf(W, H, (x, y) => sampleThrough(new Matrix(), x, y))
+    const peak = latticePeak(buf, W, H, MATERIAL_REPEAT_PX)
+    expect(peak).toBeGreaterThan(LATTICE_PEAK_MAX)
+    expect(peak).toBeGreaterThan(0.95)     // it is an EXACT repeat, not merely a strong one
+  })
+
+  it('drops under the ceiling once the layer is rotated and an octave is laid over it', () => {
+    const base = materialMatrix('grass', 0 as number)
+    const oct = octaveMatrix('grass', 0 as number)
+    const rotated = materialMatrix('grass', 1)   // index 0 is the 0-degree member
+    const buf = bufferOf(W, H, (x, y) => octaveComposite(
+      sampleThrough(rotated, x, y), sampleThrough(octaveMatrix('grass', 1), x, y),
+    ))
+    expect(latticePeak(buf, W, H, MATERIAL_REPEAT_PX)).toBeLessThan(LATTICE_PEAK_MAX)
+    expect(base).toBeInstanceOf(Matrix)
+    expect(oct).toBeInstanceOf(Matrix)
+  })
+})
+
+describe('materialMatrix', () => {
+  it('is deterministic per layer, and two layers do not agree', () => {
+    expect(materialMatrix('grass', 0).toArray(false))
+      .toEqual(materialMatrix('grass', 0).toArray(false))
+    expect(materialMatrix('grass', 0).toArray(false))
+      .not.toEqual(materialMatrix('earth', 1).toArray(false))
+  })
+
+  it('draws its rotation from the bounded set, by index', () => {
+    for (let i = 0; i < MATERIAL_ROTATIONS_DEG.length * 2; i++) {
+      const deg = MATERIAL_ROTATIONS_DEG[i % MATERIAL_ROTATIONS_DEG.length]!
+      const m = materialMatrix('grass', i)
+      expect(Math.atan2(m.b, m.a) * 180 / Math.PI).toBeCloseTo(deg, 9)
+    }
+  })
+
+  it('offsets a layer without scaling it — only WHERE the material is sampled moves', () => {
+    const m = materialMatrix('grass', 1)
+    expect(Math.hypot(m.a, m.b)).toBeCloseTo(1, 9)   // a pure rotation, no zoom
+  })
+})
+
+describe('the octave pass', () => {
+  it('scales by an incommensurate factor, so the two periods never re-align', () => {
+    expect(OCTAVE_SCALE).toBe(2.37)
+    // the lowest common multiple of 256 and 256*2.37 exceeds any map we bake
+    const lcmPx = MATERIAL_REPEAT_PX * OCTAVE_SCALE * 100
+    expect(lcmPx).toBeGreaterThan(48 * 32)
+  })
+
+  it('never pushes a pixel outside the material own tone range', () => {
+    let lo = Infinity, hi = -Infinity
+    for (let u = 0; u < MATERIAL_REPEAT_PX; u += 7)
+      for (let v = 0; v < MATERIAL_REPEAT_PX; v += 7) {
+        const t = materialAt(u, v); lo = Math.min(lo, t); hi = Math.max(hi, t)
+      }
+    const span = hi - lo
+    for (let u = 0; u < MATERIAL_REPEAT_PX; u += 13)
+      for (let v = 0; v < MATERIAL_REPEAT_PX; v += 13) {
+        const out = octaveComposite(materialAt(u, v), materialAt(v, u))
+        expect(out).toBeGreaterThanOrEqual(lo - span * 0.06)
+        expect(out).toBeLessThanOrEqual(hi + span * 0.06)
+      }
+    expect(OCTAVE_ALPHA).toBe(0.22)
   })
 })
