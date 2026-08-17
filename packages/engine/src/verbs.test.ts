@@ -2,8 +2,11 @@ import { describe, it, expect, afterEach } from 'vitest'
 import {
   DAYS_PER_SEASON, DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, type SimConfig, type SimEvent,
 } from '@sj/shared'
+import { stateHash } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
+import { createWorldTick } from './worldTick.js'
+import { insulationOf, isExposed } from './systems/warmth.js'
 import { submitIntent } from './intent.js'
 import { composePerception } from './perception.js'
 import { stepCostAt } from './path.js'
@@ -28,7 +31,7 @@ const testVerb: VerbDef = {
 
 const TIER1 = [
   'walk', 'sleep', 'wake', 'enter', 'exit', 'eat', 'tend', 'till', 'plant', 'harvest', 'fish', 'forage',
-  'build', 'craft', 'extinguish', 'drink', 'fill', 'dig_channel', 'douse', 'pave', 'hunt',
+  'build', 'craft', 'extinguish', 'drink', 'fill', 'dig_channel', 'douse', 'pave', 'hunt', 'wear', 'doff',
   'speak', 'give', 'take', 'stow', 'write', 'read', 'inscribe', 'teach', 'attack', 'experiment',
 ]
 
@@ -383,5 +386,117 @@ describe('fish: a school is where the fish are', () => {
     const cold = { ...cast(3), tick: 3 * DAYS_PER_SEASON * MINUTES_PER_DAY }
     expect(CFG.seasons.winter.fishCatchMultiplier * CFG.fauna.fishSchoolBonus).toBe(1)
     expect(fishCatchChance(cold, CFG, 'a1', 1, 0)).toBeCloseTo(plain)
+  })
+})
+
+// ------------------------------------------------- Task 23: the clothing line, and one slot
+describe('wear and doff: one body slot, and a night you can survive', () => {
+  const CFG = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+  const AUTUMN_DUSK = 200 * MINUTES_PER_DAY + 19 * 60 + 30
+
+  const carrying = (kinds: string[], s = makeWorld()): WorldState => {
+    let out = s
+    kinds.forEach((kind, i) => {
+      out = fold(out, ev(300 + i, 'item_spawned', {
+        id: `item_${i + 1}`, kind, qty: 1, loc: { t: 'agent', id: 'a1' },
+      }), CFG)
+    })
+    return out
+  }
+  const apply = (s: WorldState, verb: string, params: Record<string, unknown>): WorldState => {
+    const r = submitIntent(s, CFG, 'a1', verb, params)
+    if (!r.ok) throw new Error(r.reason)
+    const done = VERBS[verb]!.onComplete(s, CFG, 'a1', params, new RngStreams('w').get('actions'))
+    const finish = { type: 'action_completed', payload: { agentId: 'a1', verb } }
+    let out = s
+    for (const e of [...r.events, finish, ...done]) out = fold(out, ev(400, e.type, e.payload), CFG)
+    return out
+  }
+
+  it('wears a held garment into the body slot, and says so on the wire', () => {
+    const s = carrying(['garment'])
+    const r = submitIntent(s, CFG, 'a1', 'wear', { itemId: 'item_1' })
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.events[0]).toEqual({
+      type: 'action_started', payload: { agentId: 'a1', verb: 'wear', params: { itemId: 'item_1' }, duration: 1 },
+    })
+    expect(VERBS.wear!.onComplete(s, CFG, 'a1', { itemId: 'item_1' }, new RngStreams('w').get('actions'))).toEqual([
+      { type: 'item_equipped', payload: { agentId: 'a1', itemId: 'item_1', slot: 'body' } },
+    ])
+    expect(apply(s, 'wear', { itemId: 'item_1' }).agents.a1!.equipped).toEqual({ body: 'item_1' })
+  })
+
+  it('refuses a second garment, something that is not clothing, and something not held', () => {
+    const worn = apply(carrying(['garment', 'garment']), 'wear', { itemId: 'item_1' })
+    const second = submitIntent(worn, CFG, 'a1', 'wear', { itemId: 'item_2' })
+    expect(second.ok).toBe(false)
+    if (!second.ok) expect(second.reason).toBe('you are already wearing something')
+
+    const wood = submitIntent(carrying(['wood']), CFG, 'a1', 'wear', { itemId: 'item_1' })
+    expect(wood.ok).toBe(false)
+    if (!wood.ok) expect(wood.reason).toBe('that is not something you can wear')
+
+    const ghost = submitIntent(makeWorld(), CFG, 'a1', 'wear', { itemId: 'item_9' })
+    expect(ghost.ok).toBe(false)
+    if (!ghost.ok) expect(ghost.reason).toBe('not holding that')
+  })
+
+  it('doff clears the slot and takes the field with it, so the body hashes as it did bare', () => {
+    const bare = carrying(['garment'])
+    const worn = apply(bare, 'wear', { itemId: 'item_1' })
+    const off = apply(worn, 'doff', {})
+    expect(off.agents.a1!.equipped).toBeUndefined()
+    expect(Object.keys(off.agents.a1!)).not.toContain('equipped')
+    expect(stateHash(off)).toBe(stateHash(bare))
+
+    const nothing = submitIntent(bare, CFG, 'a1', 'doff', {})
+    expect(nothing.ok).toBe(false)
+    if (!nothing.ok) expect(nothing.reason).toBe('you are not wearing anything')
+  })
+
+  it('a garment leaving the hands leaves the slot too, however it goes', () => {
+    const worn = apply(carrying(['garment']), 'wear', { itemId: 'item_1' })
+    const dropped = fold(worn, ev(500, 'item_moved', { id: 'item_1', loc: { t: 'tile', x: 3, y: 3 } }), CFG)
+    expect(dropped.agents.a1!.equipped).toBeUndefined()
+  })
+
+  it('the clothes of the dead fall on the tile the life ended on', () => {
+    let s = apply(carrying(['garment']), 'wear', { itemId: 'item_1' })
+    s = { ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, x: 2, y: 1, hp: 0.05 } } }
+    s = fold(s, ev(510, 'agent_afflicted', { agentId: 'a1', kind: 'illness', severity: 2 }), CFG)
+    const advanced = fold(s, { seq: 511, tick: 1, type: 'tick_advanced', payload: {} }, CFG)
+    const r = createWorldTick(CFG, new RngStreams('cl'))(advanced)
+    expect(r.events.some((e) => e.type === 'agent_died')).toBe(true)
+    expect(r.state.items.item_1!.loc).toEqual({ t: 'tile', x: 2, y: 1 })
+    expect(r.state.agents.a1!.equipped).toBeUndefined()
+  })
+
+  it('crafts cloth from two fiber and a garment from two cloth, on the tailoring track', () => {
+    expect(CFG.crafting.recipes.cloth)
+      .toEqual({ inputs: { fiber: 2 }, output: { kind: 'cloth', qty: 1 }, skill: 'tailoring' })
+    expect(CFG.crafting.recipes.garment)
+      .toEqual({ inputs: { cloth: 2 }, output: { kind: 'garment', qty: 1 }, skill: 'tailoring' })
+    const spun = apply(carrying(['fiber', 'fiber']), 'craft', { recipe: 'cloth' })
+    expect(Object.values(spun.items).map((i) => i.kind)).toEqual(['cloth'])
+    const sewn = apply(carrying(['cloth', 'cloth']), 'craft', { recipe: 'garment' })
+    expect(Object.values(sewn.items).map((i) => i.kind)).toEqual(['garment'])
+    expect(sewn.agents.a1!.skills.tailoring).toBe(1)
+
+    const short = submitIntent(carrying(['fiber']), CFG, 'a1', 'craft', { recipe: 'cloth' })
+    expect(short.ok).toBe(false)
+    if (!short.ok) expect(short.reason).toBe('not enough fiber')
+  })
+
+  it('a worn garment offsets the exposure band, and the packet names it without a number', () => {
+    const bare = { ...carrying(['garment']), tick: AUTUMN_DUSK }
+    expect(isExposed(bare, CFG, 'a1')).toBe(true)
+    const worn = apply(bare, 'wear', { itemId: 'item_1' })
+    expect(insulationOf(worn, CFG, 'a1')).toBe(CFG.warmth.insulation.garment)
+    expect(isExposed(worn, CFG, 'a1')).toBe(false)
+
+    const onlooker = fold(worn, ev(600, 'agent_spawned', { id: 'a2', name: 'a2', x: 2, y: 0, ageDays: 7300 }), CFG)
+    const seen = composePerception(onlooker, CFG, 'a2', []).visible.agents.find((a) => a.id === 'a1')
+    expect(seen!.worn).toBe('wrapped in a rough cloak')
+    expect(seen!.worn).not.toMatch(/\d/)
   })
 })

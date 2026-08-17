@@ -31,6 +31,8 @@ export type PerceptionAgent = {
   activityVerb: string | null
   collapsed: boolean
   asleep: boolean
+  // How the body is dressed, already in words. Absent on bare shoulders.
+  worn?: string
 }
 
 export type PerceptionStructure = {
@@ -232,9 +234,10 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   if (packet.ground?.wellTravelled) lines.push('Carts and feet reach this spot easily.')
 
   for (const a of packet.visible.agents) {
-    if (a.asleep) lines.push(`${a.name} (${a.id}) sleeps at (${a.x}, ${a.y}).`)
-    else if (a.collapsed) lines.push(`${a.name} (${a.id}) lies collapsed at (${a.x}, ${a.y}).`)
-    else lines.push(`${a.name} (${a.id}) stands at (${a.x}, ${a.y}).`)
+    const dressed = a.worn === undefined ? '' : `, ${a.worn}`
+    if (a.asleep) lines.push(`${a.name} (${a.id}) sleeps at (${a.x}, ${a.y})${dressed}.`)
+    else if (a.collapsed) lines.push(`${a.name} (${a.id}) lies collapsed at (${a.x}, ${a.y})${dressed}.`)
+    else lines.push(`${a.name} (${a.id}) stands at (${a.x}, ${a.y})${dressed}.`)
   }
 
   for (const s of packet.visible.structures) {

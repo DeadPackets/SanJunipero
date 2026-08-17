@@ -9,7 +9,8 @@ import {
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
   AgentDrank, FireExtinguished, FireIgnited, FireSpread, GravePlaced, HpChanged, ThirstChanged,
-  ItemBroke, ItemFilled, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
+  ItemBroke, ItemEquipped, ItemFilled, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled,
+  ItemTaken, ItemUnequipped,
   ConfigChanged,
   FaunaKilled, FaunaMoved, FaunaSpawned, FaunaStockChanged,
   ForageableDepleted, ForageableRegrown, ForageableSpawned, ForageableStockChanged,
@@ -170,7 +171,31 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = ItemMoved.parse(event.payload)
       const item = state.items[p.id]
       if (!item) throw new Error(`item_moved for unknown item ${p.id}`)
-      return { ...state, items: { ...state.items, [p.id]: { ...item, loc: p.loc } } }
+      const items = { ...state.items, [p.id]: { ...item, loc: p.loc } }
+      // A cloak given away, dropped, or fallen off a body on the ground is off the body:
+      // the slot cannot hold what the hands no longer have.
+      const wearerId = item.loc.t === 'agent' ? item.loc.id : undefined
+      const wearer = wearerId === undefined ? undefined : state.agents[wearerId]
+      if (wearer === undefined || wearer.equipped?.body !== p.id) return { ...state, items }
+      const { equipped: _, ...bare } = wearer
+      return { ...state, items, agents: { ...state.agents, [wearerId!]: bare } }
+    }
+    // The body slot: one thing at a time, and absent again the moment it comes off, so a
+    // town that never sewed anything hashes exactly as it always did.
+    case 'item_equipped': {
+      const p = ItemEquipped.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`item_equipped for unknown agent ${p.agentId}`)
+      if (!state.items[p.itemId]) throw new Error(`item_equipped for unknown item ${p.itemId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, equipped: { [p.slot]: p.itemId } } } }
+    }
+    case 'item_unequipped': {
+      const p = ItemUnequipped.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`item_unequipped for unknown agent ${p.agentId}`)
+      if (a.equipped?.body !== p.itemId) throw new Error(`item_unequipped: ${p.agentId} is not wearing ${p.itemId}`)
+      const { equipped: _, ...bare } = a
+      return { ...state, agents: { ...state.agents, [p.agentId]: bare } }
     }
     case 'item_qty_changed': {
       const p = ItemQtyChanged.parse(event.payload)

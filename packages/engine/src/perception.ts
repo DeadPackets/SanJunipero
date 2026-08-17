@@ -28,6 +28,21 @@ export type PerceivedAgent = {
   collapsed: boolean
   asleep: boolean
   ageBand: AgeBand   // a face carries no birthday, but it does carry this much
+  // What the body has on, as it looks from across the square. Absent on bare shoulders, so a
+  // town that has sewn nothing reads exactly as it always did, and never a number (G10).
+  worn?: string
+}
+
+// How a worn thing reads to whoever is looking. The forageable-prose precedent: the packet
+// carries the phrase, because the phrase is what a pair of eyes actually gets.
+export const WORN_PROSE: Readonly<Record<string, string>> = {
+  garment: 'wrapped in a rough cloak',
+}
+
+export function wornProse(state: WorldState, agentId: string): string | undefined {
+  const itemId = state.agents[agentId]?.equipped?.body
+  const kind = itemId === undefined ? undefined : state.items[itemId]?.kind
+  return kind === undefined ? undefined : WORN_PROSE[kind]
 }
 
 // Both fields absent on a blank wall, so a town that writes nothing reads as it always did.
@@ -223,13 +238,17 @@ export function composePerception(
     .filter(a => a.id !== agentId && a.alive
       && (indoors === null ? (a.insideId === undefined && withinSight(a.x, a.y)) : a.insideId === indoors))
     .sort(byId)
-    .map(a => ({
-      id: a.id, name: a.name, x: a.x, y: a.y,
-      activityVerb: a.activity?.verb ?? null,
-      collapsed: a.collapsedSinceTick !== null,
-      asleep: a.asleep,
-      ageBand: ageBand(config, a.ageDays),
-    }))
+    .map(a => {
+      const worn = wornProse(state, a.id)
+      return {
+        id: a.id, name: a.name, x: a.x, y: a.y,
+        activityVerb: a.activity?.verb ?? null,
+        collapsed: a.collapsedSinceTick !== null,
+        asleep: a.asleep,
+        ageBand: ageBand(config, a.ageDays),
+        ...(worn === undefined ? {} : { worn }),
+      }
+    })
 
   // Nearest footprint tile, not the anchor: a long structure whose far corner is
   // anchored out of range is still seen when its near edge is within sight.

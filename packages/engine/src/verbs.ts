@@ -12,7 +12,7 @@ import { FORAGEABLE_YIELD } from './data/forageables.js'
 export type PendingEvent = { type: string; payload: unknown }
 export type VerbKind =
   | 'walk' | 'sleep' | 'wake' | 'enter' | 'exit' | 'eat' | 'tend' | 'till' | 'plant' | 'harvest' | 'fish' | 'forage'
-  | 'build' | 'craft' | 'extinguish' | 'drink' | 'fill' | 'hunt'
+  | 'build' | 'craft' | 'extinguish' | 'drink' | 'fill' | 'hunt' | 'wear' | 'doff'
   | 'speak' | 'give' | 'take' | 'stow' | 'write' | 'read' | 'inscribe' | 'teach' | 'attack' | 'experiment'
 
 export type VerbDef = {
@@ -338,6 +338,45 @@ const fill: VerbDef = makeVerb({
     if (!VESSEL_KINDS.has(item.kind) || waterWithinReach(state, agentId) === null) return []
     const charges = item.kind === BUCKET_KIND ? BUCKET_CHARGES : config.thirst.waterskinCharges
     return [{ type: 'item_filled', payload: { itemId: p.itemId, charges } }]
+  },
+})
+
+export const WearParams = z.object({ itemId: z.string() }).strict()
+
+// What counts as clothing is what the world knows how to be warmed by: `warmth.insulation` is
+// the one table of it (G4), so a kind nobody can be warmed by is a kind nobody can wear.
+export function isWearable(config: SimConfig, kind: string): boolean {
+  return (config.warmth.insulation as Record<string, number | undefined>)[kind] !== undefined
+}
+
+const wear: VerbDef = makeVerb({
+  kind: 'wear',
+  validate(state, config, agentId, params) {
+    const p = WearParams.safeParse(params)
+    if (!p.success) return 'wear needs an {itemId}'
+    const item = state.items[p.data.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (!isWearable(config, item.kind)) return 'that is not something you can wear'
+    if (state.agents[agentId]!.equipped?.body !== undefined) return 'you are already wearing something'
+    return null
+  },
+  onComplete(state, config, agentId, params) {
+    const p = WearParams.parse(params)
+    const item = state.items[p.itemId]
+    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    if (!isWearable(config, item.kind) || state.agents[agentId]!.equipped?.body !== undefined) return []
+    return [{ type: 'item_equipped', payload: { agentId, itemId: p.itemId, slot: 'body' } }]
+  },
+})
+
+const doff: VerbDef = makeVerb({
+  kind: 'doff',
+  validate(state, _config, agentId) {
+    return state.agents[agentId]!.equipped?.body === undefined ? 'you are not wearing anything' : null
+  },
+  onComplete(state, _config, agentId) {
+    const itemId = state.agents[agentId]!.equipped?.body
+    return itemId === undefined ? [] : [{ type: 'item_unequipped', payload: { agentId, itemId } }]
   },
 })
 
@@ -1152,7 +1191,7 @@ const experiment: VerbDef = makeVerb({
 
 export const VERBS: Record<string, VerbDef> = {
   walk, sleep, wake, enter, exit, eat, tend, till, plant, harvest, fish, forage, build, craft, extinguish,
-  drink, fill, dig_channel: digChannel, douse, pave, hunt,
+  drink, fill, dig_channel: digChannel, douse, pave, hunt, wear, doff,
   speak, give, take, stow, write, read, inscribe, teach, attack, experiment,
 }
 

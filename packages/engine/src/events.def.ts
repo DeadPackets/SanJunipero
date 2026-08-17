@@ -44,6 +44,12 @@ export const ItemFilled = z.object({ itemId: z.string(), charges: z.number().int
 export const ItemTaken = z.object({
   itemId: z.string(), kind: z.string(), takerId: z.string(), ownerId: z.string(), x: z.number(), y: z.number(),
 }).strict()
+// C11 clothing. One slot in v1, and the slot rides the event so a second one costs a schema
+// change and not a guess. Taking a worn thing out of the hands takes it off the body too.
+export const ItemEquipped = z.object({
+  agentId: z.string(), itemId: z.string(), slot: z.literal('body'),
+}).strict()
+export const ItemUnequipped = z.object({ agentId: z.string(), itemId: z.string() }).strict()
 export const ItemQtyChanged = z.object({ id: z.string(), delta: z.number() }).strict()
 export const ItemTextChanged = z.object({ id: z.string(), text: z.string() }).strict()
 export const StructurePlanned = z.object({
