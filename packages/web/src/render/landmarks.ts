@@ -1,4 +1,10 @@
-import type { WorldState } from '@sj/engine'
+import { Container, Text } from 'pixi.js'
+// the deep path, never the package root: @sj/engine's index reaches db.ts and therefore
+// better-sqlite3, which the browser graph guard forbids
+import type { WorldState } from '@sj/engine/state'
+import type { WorldStore } from '../state/worldStore.js'
+import { tileToScreen } from './iso.js'
+import type { Scene } from './scene.js'
 
 // A good plan is not a legible picture. At the default zoom the viewer sees roofs and roads
 // and cannot tell the square from a wide street. These are the reading aids a real town has:
@@ -91,4 +97,72 @@ export function landmarksOf(state: WorldState): Landmark[] {
   }
 
   return out.sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id))
+}
+
+// ---------------------------------------------------------------- drawing the names
+
+/** Ink for a place name. --stone, so a label reads as chrome over the world, never as art. */
+export const LANDMARK_INK = 0x5d5751
+const RANK_ALPHA: Record<1 | 2 | 3, number> = { 1: 1, 2: 0.9, 3: 0.75 }
+
+export type LandmarkLayer = { sync(): void; destroy(): void }
+
+/**
+ * Place names in the scene's overlay: above everything, hit-testable by nothing. The whole
+ * layer fades with landmarkAlpha, and each label counter-scales so it stays LANDMARK_LABEL_PX
+ * on screen at any zoom rather than growing into the art.
+ */
+export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLayer {
+  const node = new Container()
+  node.eventMode = 'none'
+  scene.overlay.addChild(node)
+  // Text, not BitmapText: the pixel BitmapFont install is a later task, and a BitmapText with
+  // no installed font crashes the whole renderer rather than falling back.
+  const labels = new Map<string, Text>()
+
+  function sync(): void {
+    const alpha = landmarkAlpha(scene.getZoom())
+    node.visible = alpha > 0
+    node.alpha = alpha
+    if (!node.visible) return
+
+    const state = store.getState()
+    const marks = state === null ? [] : landmarksOf(state)
+    const seen = new Set<string>()
+    const inv = 1 / (scene.world.scale.x || 1)
+
+    for (const m of marks) {
+      seen.add(m.id)
+      let t = labels.get(m.id)
+      if (t === undefined) {
+        t = new Text({
+          text: m.name,
+          style: { fontFamily: 'monospace', fontSize: LANDMARK_LABEL_PX, fill: LANDMARK_INK },
+        })
+        t.resolution = 2                      // NEAREST upscale would soften a 12px glyph
+        t.anchor.set(0.5, 1)
+        t.eventMode = 'none'
+        labels.set(m.id, t)
+        node.addChild(t)
+      }
+      if (t.text !== m.name) t.text = m.name
+      const { sx, sy } = tileToScreen(m.x, m.y)
+      t.position.set(Math.round(sx), Math.round(sy))
+      t.alpha = RANK_ALPHA[m.rank]
+      t.scale.set(inv)
+    }
+    for (const [id, t] of labels) {
+      if (seen.has(id)) continue
+      t.destroy()
+      labels.delete(id)
+    }
+  }
+
+  return {
+    sync,
+    destroy: () => {
+      node.destroy({ children: true })
+      labels.clear()
+    },
+  }
 }

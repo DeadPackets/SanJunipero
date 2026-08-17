@@ -10,6 +10,7 @@ import { createAtmosphere, type Atmosphere } from './atmosphere.js'
 import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 import { createAmbient, type AmbientDirector } from './ambient.js'
 import { createInteriorScene, type InteriorScene } from './interiorScene.js'
+import { createLandmarkLayer, type LandmarkLayer } from './landmarks.js'
 
 // The ONLY React/Pixi contact point — React renders nothing inside the canvas (spec §15).
 export function StageMount(
@@ -50,6 +51,8 @@ export function StageMount(
     let weather: WeatherLayer | null = null
     let ambient: AmbientDirector | null = null
     let interior: InteriorScene | null = null
+    let landmarks: LandmarkLayer | null = null
+    let offCamera: (() => void) | null = null
     let offInterior: (() => void) | null = null
     let offEvents: (() => void) | null = null
     let tickFn: (() => void) | null = null
@@ -61,8 +64,16 @@ export function StageMount(
       scene = s
       const book = new TextureBook()
       const openDoor = (structureId: string): void => interiorRef.current?.setActive(structureId)
-      offSync = store.subscribe(() => syncEntities(s, book, store, openDoor))
+      landmarks = createLandmarkLayer(s, store)
+      const marks = landmarks
+      offSync = store.subscribe(() => {
+        syncEntities(s, book, store, openDoor)
+        marks.sync()
+      })
       syncEntities(s, book, store, openDoor)
+      // a place name is a map legend: it fades on the way in, so it follows the camera too
+      offCamera = s.onCamera(() => marks.sync())
+      marks.sync()
       chars = createCharacterLayer(s, book, store, (agentId) => {
         // click-to-inspect: the G6 check — route change only, React owns the chrome
         const url = `${location.pathname}?lens=inspector&agent=${encodeURIComponent(agentId)}`
@@ -119,9 +130,11 @@ export function StageMount(
       disposed = true
       offSync?.()
       offEvents?.()
+      offCamera?.()
       offInterior?.()
       if (tickFn !== null && scene !== null) scene.app.ticker.remove(tickFn)
       interiorRef.current = null
+      landmarks?.destroy()
       interior?.destroy()
       chars?.destroy()
       bubbles?.destroy()
