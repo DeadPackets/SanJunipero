@@ -67,3 +67,43 @@ road coordinate must re-read it from the template, never re-type it.
 `structure_planned` now carries an `owner` field when the template assigns one. The engine
 folds it into `Structure.owner`. The scripted fixture emits no `owner` key at all, so every
 landed gate's event stream is byte-identical.
+
+## C12a batch 2 (Phase N + the plaza regression) — what it hands on
+
+Phase N is presentation only: no engine, arbiter, agent, narrator or forge file moved, and
+`cityTemplate.ts` was not edited in this batch. Three things it found belong to other lanes.
+
+### ART-17 — the built-form fallback is a bridge, and Task 17 is the road
+
+`buildingArt()` now reports `url: null` for a kind with no codex record, and the renderer
+draws a palette-true volume instead of the forge's checkerboard (controller ruling R1). This
+is generic over kind, so it will quietly absorb every future structure the art lane has not
+reached. **C12b Phase D Task 17 still owns the real sprites for well, bridge, fire pit,
+grave, wagon and standing stone.** When they land, the fallback disappears for those kinds
+with no code change — the volume is destroyed the moment a record resolves.
+
+Task 17 also inherits one line from Phase N: **every enterable kind's art needs a doorway on
+its south frontage.** The viewer draws a sill on the door tile rather than a plate on the
+wall precisely because it cannot know where the art's own doorway is. A `door` field on the
+v4 building manifest would let the viewer defer to the art; it is deliberately NOT added
+here, because no art declares one yet.
+
+### TOWN-PLAN — the fire pit is standing behind the workshop
+
+Template `FIRE_PIT_AT (dx 17, dy 16)` is diagonally adjacent to shed A, the workshop, at
+`(dx 18, dy 17)`. The shed is one tile south-east, so it is correctly drawn IN FRONT, and its
+1.85× sprite covers the whole tile behind it. A fire pit is 0.4 tiles tall. The result, seen
+live: the town's second monument is invisible at every zoom, and only its landmark label
+shows where it is.
+
+This is a plan question, not a rendering one — the depth sort is right and the art is the
+right size. Whoever next owns the template should move the workshop off the fire pit's
+north-west diagonal, or move the fire pit onto the plaza's own centre line clear of it.
+
+### DEPTH — the overlap rank is a presentation rule with a physical claim in it
+
+`depth.ts` says a body standing on a structure's own ground is drawn IN FRONT of it, never
+inside it. That is true because a body that is genuinely indoors leaves the town map
+(`rendersOnMap`) and is drawn by the interior sub-scene. **If C8 ever lets an agent occupy a
+structure's tile while remaining on the town map** — a roofless pen, a scaffold a builder
+climbs — that rule needs revisiting, and the counted depth fallback is where it will show up.
