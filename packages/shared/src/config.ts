@@ -29,8 +29,8 @@ const HealthSchema = z.object({
     grave: z.number().default(60),
   }).strict().prefault({}),
   infectionChancePerInjuryPerDay: z.number().default(0.2),
-  contagionRadius: z.number().default(4),
-  contagionChancePerTick: z.number().default(0.001),
+  // C11 deviation 3: the per-tick contagion dials are gone with the loop that read them.
+  // Contagion is one midnight roll now, on `illness`, so the world has one contagion system.
   recoveryHpPerDay: z.number().default(5),
   tendedRecoveryHpPerDay: z.number().default(15),
   collapseHp: z.number().default(15),
@@ -122,9 +122,23 @@ export const RecipeSchema = z.object({
 const CraftingSchema = z.object({
   recipes: z.record(z.string(), RecipeSchema).default({
     plank: { inputs: { wood: 1 }, output: { kind: 'plank', qty: 2 }, skill: 'carpentry' },
+    // The clothing line: what a hide or a handful of fiber becomes on the way to a warm night.
+    cloth: { inputs: { fiber: 2 }, output: { kind: 'cloth', qty: 1 }, skill: 'tailoring' },
+    garment: { inputs: { cloth: 2 }, output: { kind: 'garment', qty: 1 }, skill: 'tailoring' },
   }),
   expertLevel: z.number().int().default(5),
   expertDifficulty: z.number().int().default(4),
+}).strict()
+
+// What a building costs, how big it stands, how hard it is to knock down and how long it takes.
+// Enterability is NOT here: `structures.enterableKinds` is its one landed home.
+export const StructureRecipeSchema = z.object({
+  inputs: z.record(z.string(), z.number()),
+  w: z.number().int().positive(),
+  h: z.number().int().positive(),
+  maxHp: z.number().positive(),
+  flammable: z.boolean(),
+  durationTicks: z.number().int().positive(),
 }).strict()
 
 const StructuresSchema = z.object({
@@ -132,6 +146,13 @@ const StructuresSchema = z.object({
   privateKinds: z.array(z.string()).default(['hut']),
   sleepIndoorsOnly: z.boolean().default(true),
   sleepableKinds: z.array(z.string()).default(['hut']),
+  // An empty `inputs` marks a kind the world places and nobody builds.
+  recipes: z.record(z.string(), StructureRecipeSchema).default({
+    hut: { inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880 },
+    well: { inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720 },
+    bridge: { inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480 },
+    grave: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1 },
+  }),
 }).strict()
 
 const ReproductionSchema = z.object({
@@ -148,7 +169,8 @@ const ReproductionSchema = z.object({
 
 const SpoilageSchema = z.object({
   enabled: z.boolean().default(true),
-  days: z.record(z.string(), z.number()).default({ fish: 2, berries: 3, venison: 4, bread: 6, wheat: 60 }),
+  // `hide` is deliberately absent: it is a material, not a meal, and absent means it keeps.
+  days: z.record(z.string(), z.number()).default({ fish: 2, berries: 3, rabbit_meat: 3, venison: 4, bread: 6, wheat: 60 }),
   storehouseMultiplier: z.number().default(2),
   preservingKinds: z.array(z.string()).default(['storehouse']),
 }).strict()
@@ -173,10 +195,182 @@ const MysterySchema = z.object({
 // C11 adds maxNodes/regionSize here; roadCost stays C9's (deep-world addendum §11).
 const PathingSchema = z.object({
   roadCost: z.number().default(0.6),
+  maxNodes: z.number().int().positive().default(6000),
+  regionSize: z.number().int().positive().default(16),
 }).strict()
 
 // Flag-only sections: the feature they gate is physics that already has a home elsewhere.
 const FlagSchema = z.object({ enabled: z.boolean().default(true) }).strict()
+
+// ------------------------------------------------------------------ C11: the deep world
+// Every section below carries an `enabled` flag and lands in exactly one schema edit, so
+// `stateHash(DEFAULT_CONFIG)` moves once for the whole chunk instead of twenty times.
+
+// No `maxHp` of its own (deviation 1): `health.maxHp` already exists and fold reads it.
+const MortalitySchema = z.object({
+  enabled: z.boolean().default(true),
+  drainPerTick: z.object({
+    injury: z.number().default(0.05),
+    poison: z.number().default(0.12),
+    illness: z.number().default(0.08),
+    fatigue: z.number().default(0.04),
+  }).strict().prefault({}),
+  hungerHpDrainPerTick: z.number().default(0.1),
+  thirstHpDrainPerTick: z.number().default(0.15),
+  poisonChanceSpoiled: z.number().default(0.35),
+  sleepRegenMultiplier: z.number().default(3),
+  fedThreshold: z.number().default(40),
+  herbRelief: z.number().default(1),
+  tendMultiplier: z.number().default(2),
+  graveEnabled: z.boolean().default(true),
+}).strict()
+
+// Contagion is ON at a low dial from genesis (§13 option A, user ruling 2). §13 is closed.
+const IllnessSchema = z.object({
+  enabled: z.boolean().default(true),
+  dailyWorsenChance: z.number().default(0.25),
+  contagionEnabled: z.boolean().default(true),
+  contagionChance: z.number().default(0.06),
+  contagionRadius: z.number().default(3),
+}).strict()
+
+// Deviation 2: the spec writes the decay as "0.6 x hunger rate", which is a derivation and
+// not a literal — so it is stored as the factor and derived once, by thirstDecayPerTick.
+const ThirstSchema = z.object({
+  enabled: z.boolean().default(true),
+  decayFactorOfHunger: z.number().default(0.6),
+  drinkRestore: z.number().default(60),
+  waterskinCharges: z.number().int().positive().default(4),
+}).strict()
+
+const FertilitySchema = z.object({
+  enabled: z.boolean().default(true),
+  radius: z.number().default(3),
+  waterBonus: z.number().default(0.5),
+  maxMultiplier: z.number().default(1.5),
+}).strict()
+
+const RoadsSchema = z.object({
+  enabled: z.boolean().default(true),
+  stonePerTile: z.number().int().positive().default(1),
+  paveDurationTicks: z.number().int().positive().default(6),
+}).strict()
+
+const DesirePathsSchema = z.object({
+  enabled: z.boolean().default(true),
+  wearThreshold: z.number().positive().default(120),
+  decayPerDay: z.number().default(0.1),
+  regrowThreshold: z.number().default(30),
+  overgrowDays: z.number().int().positive().default(20),
+  pathCost: z.number().default(0.8),
+}).strict()
+
+// The caps and the regen ARE the ecology: there is no population model beneath them.
+const FaunaSchema = z.object({
+  enabled: z.boolean().default(true),
+  caps: z.object({
+    deer: z.number().int().default(8),
+    rabbit: z.number().int().default(12),
+    fish: z.number().int().default(6),
+  }).strict().prefault({}),
+  movePeriodTicks: z.number().int().positive().default(4),
+  fleeRadius: z.number().default(4),
+  huntDifficulty: z.object({
+    deer: z.number().default(3),
+    rabbit: z.number().default(2),
+  }).strict().prefault({}),
+  fishSchoolBonus: z.number().default(2),
+}).strict()
+
+const ambientBand = (day: number, dusk: number, night: number) => z.object({
+  day: z.number().default(day), dusk: z.number().default(dusk), night: z.number().default(night),
+}).strict().prefault({})
+
+// Controller ruling 4 ratified these numbers: they decide whether the first winter is
+// survivable with effort, which is the product intent. Retune in C8 via config_changed.
+const WarmthSchema = z.object({
+  enabled: z.boolean().default(true),
+  comfortBand: z.number().default(8),
+  exposureDecayPerTick: z.number().default(0.3),
+  heatRadius: z.number().default(2),
+  insulation: z.object({ garment: z.number().default(2) }).strict().prefault({}),
+  ambient: z.object({
+    spring: ambientBand(14, 9, 5),
+    summer: ambientBand(26, 20, 15),
+    autumn: ambientBand(10, 6, 2),
+    winter: ambientBand(-4, -8, -12),
+  }).strict().prefault({}),
+  weatherDelta: z.object({
+    storm: z.number().default(-1),
+    snow: z.number().default(-2),
+  }).strict().prefault({}),
+}).strict()
+
+const LightSchema = z.object({
+  enabled: z.boolean().default(true),
+  nightWorkPenalty: z.number().default(1.5),
+  workRadius: z.number().default(2),
+  torchBurnTicks: z.number().int().positive().default(240),
+  fuelBurnTicks: z.number().int().positive().default(480),
+  fireRiskPerTick: z.number().default(0.0005),
+  glowRadius: z.object({
+    torch: z.number().default(3),
+    lantern: z.number().default(5),
+    hearth: z.number().default(3),
+    fire_pit: z.number().default(4),
+  }).strict().prefault({}),
+}).strict()
+
+// Light at the target restores visibility, not light at the eye. That asymmetry is the mechanic.
+const NightWitnessSchema = z.object({
+  enabled: z.boolean().default(true),
+  nightFactor: z.number().default(0.35),
+  duskFactor: z.number().default(0.7),
+}).strict()
+
+const FoodVarietySchema = z.object({
+  enabled: z.boolean().default(true),
+  windowDays: z.number().int().positive().default(3),
+  bonusPerKind: z.number().default(0.05),
+  maxBonus: z.number().default(0.2),
+}).strict()
+
+const RegrowthSchema = z.object({
+  enabled: z.boolean().default(true),
+  saplingChancePerDay: z.number().default(0.02),
+  saplingDays: z.number().int().positive().default(30),
+}).strict()
+
+const MapGrowthSchema = z.object({
+  enabled: z.boolean().default(true),
+  step: z.number().int().positive().default(16),
+  structuresPerStep: z.number().int().positive().default(12),
+  maxSize: z.number().int().positive().default(192),
+}).strict()
+
+// `custom` exists precisely so the taxonomy is open-ended: the arbiter may recognize a type
+// nobody seeded. None of these words ever reaches a prompt.
+const ConstructsSchema = z.object({
+  enabled: z.boolean().default(true),
+  minParticipants: z.number().int().positive().default(3),
+  minRecurrences: z.number().int().positive().default(2),
+  windowDays: z.number().int().positive().default(7),
+  types: z.object({
+    festival: z.boolean().default(true),
+    faith: z.boolean().default(true),
+    council: z.boolean().default(true),
+    market: z.boolean().default(true),
+    custom: z.boolean().default(true),
+  }).strict().prefault({}),
+}).strict()
+
+// A genesis input, not a dial. The map grows by world_grown, never by an operator edit.
+const WorldSchema = z.object({
+  size: z.object({
+    w: z.number().int().positive().default(128),
+    h: z.number().int().positive().default(128),
+  }).strict().prefault({}),
+}).strict()
 
 export const SimConfigSchema = z.object({
   needs: NeedsSchema.prefault({}),
@@ -200,11 +394,32 @@ export const SimConfigSchema = z.object({
   occlusion: FlagSchema.prefault({}),
   ownership: FlagSchema.prefault({}),
   inscription: FlagSchema.prefault({}),
+  mortality: MortalitySchema.prefault({}),
+  illness: IllnessSchema.prefault({}),
+  thirst: ThirstSchema.prefault({}),
+  fertility: FertilitySchema.prefault({}),
+  roads: RoadsSchema.prefault({}),
+  desirePaths: DesirePathsSchema.prefault({}),
+  fauna: FaunaSchema.prefault({}),
+  warmth: WarmthSchema.prefault({}),
+  light: LightSchema.prefault({}),
+  nightWitness: NightWitnessSchema.prefault({}),
+  foodVariety: FoodVarietySchema.prefault({}),
+  regrowth: RegrowthSchema.prefault({}),
+  mapGrowth: MapGrowthSchema.prefault({}),
+  constructs: ConstructsSchema.prefault({}),
+  world: WorldSchema.prefault({}),
 }).strict()
 
 export type SimConfig = z.infer<typeof SimConfigSchema>
 export type CropDef = z.infer<typeof CropDefSchema>
 export type RecipeDef = z.infer<typeof RecipeSchema>
+export type StructureRecipeDef = z.infer<typeof StructureRecipeSchema>
+
+// The one derivation of the slower clock (G4): 0.021/tick at defaults, 0.6x hunger by ruling D4.
+export function thirstDecayPerTick(config: SimConfig): number {
+  return config.needs.hungerDecayPerTick * config.thirst.decayFactorOfHunger
+}
 
 // World law, not a dial: a mind wakes at twelve. Config would make it negotiable.
 export const SPAWN_AGE_YEARS = 12

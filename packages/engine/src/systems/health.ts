@@ -3,6 +3,10 @@ import type { TickCtx } from '../worldTick.js'
 
 const INJURY_HEAL_DAYS = 3
 
+// C11 deviation 3 (controller ruling 3): the per-tick contagion loop that used to live at the
+// foot of this file is gone. Illness spreads once, at midnight, from systems/illness.ts — two
+// contagion systems at different cadences was one too many.
+
 export function healthSystem(ctx: TickCtx): void {
   const { health: cfg } = ctx.config
   const tick = ctx.state().tick
@@ -28,22 +32,6 @@ export function healthSystem(ctx: TickCtx): void {
       }
       const c = ctx.state().agents[id]!
       if (c.ill && c.hp >= cfg.maxHp) ctx.emit('agent_recovered', { agentId: id })
-    }
-  }
-
-  for (const id of ids()) {
-    const a = ctx.state().agents[id]!
-    if (!a.alive || !a.ill) continue
-    for (const otherId of ids()) {
-      if (otherId === id) continue
-      const o = ctx.state().agents[otherId]!
-      if (!o.alive || o.ill) continue
-      const dx = o.x - a.x
-      const dy = o.y - a.y
-      if (dx * dx + dy * dy > cfg.contagionRadius * cfg.contagionRadius) continue
-      if (ctx.rng.get('health').next() < cfg.contagionChancePerTick) {
-        ctx.emit('agent_fell_ill', { agentId: otherId })
-      }
     }
   }
 }

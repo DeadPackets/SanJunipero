@@ -21,7 +21,26 @@ const GOLDEN_G2_HASH = '6f2529fba61a0d9e3a219da05235c0ff19e105d610f96e57aa9d0cc0
 // Task 16 Step 0: every C9 pin is off this fixture. Nothing is suppressed here any more —
 // ownership, the bed law, spoilage and reproduction are all live, and the assertions below
 // name the events each of them produces in this run.
-const G2_CONFIG = SimConfigSchema.parse({})
+//
+// Pinned off until Task 37, the single deliberate regen (Global Constraint G3). Twenty C11
+// systems land between here and there; each ships inert on this fixture so the golden moves
+// once, in one reviewed diff, instead of once per feature.
+const G2_CONFIG = SimConfigSchema.parse({
+  mortality: { enabled: false },
+  illness: { enabled: false },
+  thirst: { enabled: false },
+  fertility: { enabled: false },
+  roads: { enabled: false },
+  desirePaths: { enabled: false },
+  fauna: { enabled: false },
+  warmth: { enabled: false },
+  light: { enabled: false },
+  nightWitness: { enabled: false },
+  foodVariety: { enabled: false },
+  regrowth: { enabled: false },
+  mapGrowth: { enabled: false },
+  constructs: { enabled: false },
+})
 
 const SEED = 'g2-scripted'
 const TOTAL_TICKS = 4320 // 3 sim days

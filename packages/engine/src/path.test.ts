@@ -37,6 +37,7 @@ describe('the C11 tiles: path, sapling, channel', () => {
     expect(cost[8]).toBe(0.8)
     expect(cost[7]).toBeLessThan(cost[8]!)
     expect(cost[8]).toBeLessThan(cost[0]!)
+    expect(terrainCostFor(SimConfigSchema.parse({ desirePaths: { pathCost: 0.95 } }))[8]).toBe(0.95)
   })
   it('a sapling walks like grass and a channel is impassable', () => {
     expect(terrainCostFor(DEFAULT_CONFIG)[9]).toBe(1)

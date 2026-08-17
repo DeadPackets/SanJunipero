@@ -26,6 +26,32 @@ export const TOGGLABLE_PATHS: Readonly<Record<string, z.ZodType>> = {
   'occlusion.enabled': z.boolean(),
   'ownership.enabled': z.boolean(),
   'inscription.enabled': z.boolean(),
+  // C11: every section flag, so an operator can switch any of the deep world off mid-run.
+  'mortality.enabled': z.boolean(),
+  'illness.enabled': z.boolean(),
+  'thirst.enabled': z.boolean(),
+  'fertility.enabled': z.boolean(),
+  'roads.enabled': z.boolean(),
+  'desirePaths.enabled': z.boolean(),
+  'fauna.enabled': z.boolean(),
+  'warmth.enabled': z.boolean(),
+  'light.enabled': z.boolean(),
+  'nightWitness.enabled': z.boolean(),
+  'foodVariety.enabled': z.boolean(),
+  'regrowth.enabled': z.boolean(),
+  'mapGrowth.enabled': z.boolean(),
+  'constructs.enabled': z.boolean(),
+  // C11: the starred dials of addendum §11 and §19 — the ones tuning is expected to reach for.
+  'mortality.poisonChanceSpoiled': z.number().min(0).max(1),
+  'illness.dailyWorsenChance': z.number().min(0).max(1),
+  'illness.contagionEnabled': z.boolean(),
+  'illness.contagionChance': z.number().min(0).max(1),
+  'thirst.decayFactorOfHunger': z.number().min(0).max(1),
+  'desirePaths.wearThreshold': z.number().positive(),
+  'light.nightWorkPenalty': z.number().positive(),
+  'light.fireRiskPerTick': z.number().min(0).max(1),
+  'nightWitness.nightFactor': z.number().min(0).max(1),
+  'regrowth.saplingChancePerDay': z.number().min(0).max(1),
 }
 
 export type LawQueue = Array<{ path: string; value: unknown }>

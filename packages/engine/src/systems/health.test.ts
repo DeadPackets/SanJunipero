@@ -8,7 +8,6 @@ import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
-const CONTAGION: SimConfig = SimConfigSchema.parse({ health: { contagionChancePerTick: 1 } })
 const DAWN = 360 // hour 6, minute 0
 
 let seq = 5000
@@ -139,15 +138,15 @@ describe('worldTick: infection at dawn', () => {
   })
 })
 
-describe('worldTick: contagion', () => {
-  it('spreads only within contagionRadius', () => {
-    let s = makeWorld(CONTAGION, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 3, y: 0 }, { id: 'a3', x: 10, y: 0 }])
-    s = fold(s, ev('agent_fell_ill', { agentId: 'a1' }), CONTAGION)
-    const r = tickOnce(s, CONTAGION)
-    expect(r.events).toContainEqual({ type: 'agent_fell_ill', payload: { agentId: 'a2' } })
-    expect(r.state.agents.a2!.ill).toBe(true)
-    expect(r.state.agents.a3!.ill).toBe(false)
-    expect(r.state.agents.a1!.ill).toBe(true)
+// C11 deviation 3: healthSystem no longer spreads anything. `agent_fell_ill` still folds for
+// recorded logs, but nothing in the engine emits it — illnessSystem owns contagion from Task 7.
+describe('worldTick: contagion is not healthSystem\'s any more', () => {
+  it('an ill body beside a healthy one infects nobody, at any dial', () => {
+    let s = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 1, y: 0 }, { id: 'a3', x: 10, y: 0 }])
+    s = fold(s, ev('agent_fell_ill', { agentId: 'a1' }), CFG)
+    for (let i = 0; i < 50; i++) s = tickOnce(s, CFG, new RngStreams(`c${i}`)).state
+    expect(s.agents.a2!.ill).toBe(false)
+    expect(s.agents.a3!.ill).toBe(false)
   })
 })
 
@@ -199,13 +198,13 @@ describe('worldTick: hp floor (Task 6 integration)', () => {
 
 describe('worldTick: health replay safety', () => {
   it('folding the returned events over the input reproduces the returned state', () => {
-    let s = makeWorld(CONTAGION, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 2, y: 0 }])
-    s = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'serious' }), CONTAGION)
-    s = fold(s, ev('agent_fell_ill', { agentId: 'a2' }), CONTAGION)
+    let s = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 2, y: 0 }])
+    s = fold(s, ev('agent_injured', { agentId: 'a1', kind: 'serious' }), CFG)
+    s = fold(s, ev('agent_fell_ill', { agentId: 'a2' }), CFG)
     s = atTick(s, DAWN - 1)
-    s = fold(s, ev('tick_advanced', {}, DAWN), CONTAGION)
-    const out = createWorldTick(CONTAGION, new RngStreams('h3'))(s)
+    s = fold(s, ev('tick_advanced', {}, DAWN), CFG)
+    const out = createWorldTick(CFG, new RngStreams('h3'))(s)
     expect(out.events.length).toBeGreaterThan(0)
-    expect(applyAll(s, out.events, CONTAGION, s.tick)).toEqual(out.state)
+    expect(applyAll(s, out.events, CFG, s.tick)).toEqual(out.state)
   })
 })
