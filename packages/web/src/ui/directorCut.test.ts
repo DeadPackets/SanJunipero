@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { CUT_MIN_MS, STICKY_FACTOR, pickCut } from './directorCut.js'
+import {
+  CUT_MIN_MS, QUIET_TURN_TICKS, STICKY_FACTOR, pickCut, quietSubject, subjectFor,
+} from './directorCut.js'
 
 const w = (agentId: string, fromTick: number, score: number) => ({ agentId, fromTick, toTick: fromTick + 59, score })
 
@@ -26,5 +28,47 @@ describe('pickCut', () => {
     expect(pickCut([], 'farmer', 1000)).toBeNull()
     expect(pickCut([w('fisher', 0, 40)], null, 1000)).toBeNull()
     expect(CUT_MIN_MS).toBe(8000)
+  })
+})
+
+// ── ★ A BROADCAST ALWAYS HAS A SUBJECT ────────────────────────────────────────────────────
+//
+// WHAT THE BROWSER CAUGHT, in the broadcast frame at `?broadcast=1`: the picture was a 3x
+// crop of empty grass with no caption, for as long as the town stayed quiet — and the dev
+// town stays quiet for days. `/api/heat` is legitimately `[]`: over 592 ticks it recorded 0
+// `agent_spoke`, 0 deaths, 0 fires, and its eleven `structure_completed` events carry a
+// `builderId` of `script`, so nothing in the town has ever scored. R1's first clause is "no
+// empty frame", and holding the camera is only the right answer when a person is steering it.
+
+describe('the televised town always has somebody in front of the camera', () => {
+  const TOWN = ['amara', 'omar', 'salma', 'yusuf']
+
+  it('still takes the hottest agent whenever the town gives it one', () => {
+    expect(subjectFor([w('farmer', 940, 6), w('builder', 940, 20)], null, 1000, TOWN)).toBe('builder')
+  })
+
+  it('falls back to somebody who is actually there when nothing has scored', () => {
+    expect(TOWN).toContain(subjectFor([], null, 1000, TOWN))
+  })
+
+  it('turns the round over one heat window at a time, and never faster', () => {
+    expect(QUIET_TURN_TICKS).toBe(60)
+    const seen = Array.from({ length: 8 }, (_, i) => quietSubject(TOWN, i * QUIET_TURN_TICKS))
+    expect(seen).toEqual(['amara', 'omar', 'salma', 'yusuf', 'amara', 'omar', 'salma', 'yusuf'])
+    // every tick inside one window is the same person: a cut is a decision, not a flicker
+    for (let t = 60; t < 120; t++) expect(quietSubject(TOWN, t), `${t}`).toBe('omar')
+  })
+
+  it('holds still on a one-person town rather than cutting to the same face', () => {
+    for (const t of [0, 59, 60, 1000]) expect(quietSubject(['amara'], t)).toBe('amara')
+  })
+
+  it('answers null only when there is nobody left to look at', () => {
+    expect(subjectFor([], null, 1000, [])).toBeNull()
+    expect(quietSubject([], 1000)).toBeNull()
+  })
+
+  it('never indexes off the end on a tick the world has not reached', () => {
+    for (const t of [-1, 0, Number.NaN]) expect(TOWN).toContain(quietSubject(TOWN, t))
   })
 })

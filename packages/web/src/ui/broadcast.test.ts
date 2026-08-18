@@ -14,6 +14,15 @@ import { fontSizes } from './chromeType.test.js'
 const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
 const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8')
 
+/** Every declaration block whose selector list contains `sel` exactly, in cascade order. */
+function rulesFor(sel: string): string {
+  const hits: string[] = []
+  for (const [, list, body] of CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if ((list ?? '').split(',').some((s) => s.trim() === sel)) hits.push(body ?? '')
+  }
+  return hits.join(';')
+}
+
 /** The size the sheet lands on for one exact selector, in px. */
 function sheetPx(selector: string): number {
   const hits = fontSizes(CSS).filter((d) => d.selectors.split(',').some((s) => s.trim() === selector))
@@ -97,6 +106,18 @@ describe('what a stream viewer is left with', () => {
 
   it('takes the overlaid bands away with the filmstrip that was one of them', () => {
     expect(CSS).toContain("[data-broadcast='on'] .moments-lens[data-letterboxed='true'] { --letterbox-h: 0px; }")
+  })
+
+  // ★ WHAT THE BROWSER CAUGHT. With the caption floating over the picture, a doubled bubble —
+  // 624 x 272 CSS px, measured on the live canvas for a 33-character line — landed on top of
+  // it. The stage ENDS above the band now, from ONE variable, so `placeBubbles` clamping to
+  // `viewRect()` cannot put anything in the world across the caption. Measured in the browser
+  // at 0px overlap: canvas bottom 647, caption top 647.
+  it('★ ends the picture where the caption starts, from one number', () => {
+    const h = /\[data-broadcast='on'\]\s*\{[^}]*--bc-caption-h:\s*([^;}]+)/.exec(CSS)?.[1]?.trim()
+    expect(h).toBe('11rem')
+    expect(rulesFor("[data-broadcast='on'] .stage-mount")).toContain('bottom: var(--bc-caption-h)')
+    expect(rulesFor("[data-broadcast='on'] .subtitle")).toContain('height: var(--bc-caption-h)')
   })
 })
 

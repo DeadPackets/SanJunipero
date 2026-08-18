@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
-import { CUT_MIN_MS, pickCut, type HeatWindow } from './directorCut.js'
+import { CUT_MIN_MS, subjectFor, type HeatWindow } from './directorCut.js'
 
 export const HEAT_POLL_MS = 5000
 export const DIRECTOR_ZOOM = 3 as const
@@ -22,6 +22,10 @@ export function DirectorMode({ store, scene, autoCut, leaving = false }: {
   const lastCutRef = useRef(0)
   const events = useSyncExternalStore(store.subscribe, store.recentEvents)
   const state = useSyncExternalStore(store.subscribe, store.getState)
+  // read inside the poll, never subscribed to — the town changing must not restart the timer
+  const livingRef = useRef<string[]>([])
+  livingRef.current = Object.values(state?.agents ?? {})
+    .filter((a) => a.alive).map((a) => a.id).sort()
 
   // heat poll → sticky cut, never faster than CUT_MIN_MS
   useEffect(() => {
@@ -36,7 +40,7 @@ export function DirectorMode({ store, scene, autoCut, leaving = false }: {
         .then(async (r) => (r.ok ? ((await r.json()) as HeatWindow[]) : []))
         .then((heat) => {
           if (!alive) return
-          const next = pickCut(heat, followedRef.current, store.getTick())
+          const next = subjectFor(heat, followedRef.current, store.getTick(), livingRef.current)
           const now = performance.now()
           if (next !== null && next !== followedRef.current && now - lastCutRef.current >= CUT_MIN_MS) {
             followedRef.current = next
@@ -62,9 +66,17 @@ export function DirectorMode({ store, scene, autoCut, leaving = false }: {
   // (glide-interpolated), so cuts and tracking are smooth; a drag interrupts it
   useEffect(() => {
     if (scene === null || !autoCut) return
-    scene.setZoom(DIRECTOR_ZOOM)
     return () => scene.setFollow(null)
   }, [scene, autoCut])
+  // WHAT THE BROWSER CAUGHT. Pushing to 3x on mount, before the first heat poll has named
+  // anybody, framed a 3x crop of whatever the camera happened to be over — in the broadcast
+  // frame that was a screenful of grass with no caption on it. With no subject the picture is
+  // the whole settlement; the push-in waits for somebody to push in ON.
+  useEffect(() => {
+    if (scene === null || !autoCut) return
+    if (followed === null) scene.fitToTown()
+    else scene.setZoom(DIRECTOR_ZOOM)
+  }, [scene, autoCut, followed])
   useEffect(() => {
     if (scene === null) return
     if (leaving || followed === null) {
