@@ -3,7 +3,7 @@ import type { AssetRecord, SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 import { materialMatrix, resolveMaterial } from './groundField.js'
-import { characterArt, smoothSource, type TextureBook } from './textures.js'
+import { characterArt, type TextureBook } from './textures.js'
 import { characterCell } from './characters.js'
 import {
   advanceInterior, bedSlots, contactShadow, furnishingId, furnishingScale,
@@ -257,7 +257,7 @@ export function createInteriorScene(
       const claimed = sheet
       void book.get(art.url).then((t) => {
         if (sheets.get(agentId) !== claimed) return
-        claimed.texture = art.manifest !== null ? smoothSource(t) : t
+        claimed.texture = t
       })
     }
     return sheet

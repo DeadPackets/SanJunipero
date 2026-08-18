@@ -11,7 +11,7 @@ import { doorLocalRect, doorSillPolygon } from './hitShapes.js'
 import { anchorForSprite } from './tooltip.js'
 import type { Scene } from './scene.js'
 import {
-  BUILDING_PX_PER_TILE, TextureBook, buildingArt, fadeArtIn, smoothSource, textureUrlFor,
+  BUILDING_PX_PER_TILE, TextureBook, buildingArt, fadeArtIn, textureUrlFor,
   type BuildingArt,
 } from './textures.js'
 
@@ -127,7 +127,7 @@ function applyBuildingArt(
   const p = swapping ? book.swap(swapFrom, art.url) : book.get(art.url)
   void p.then((t) => {
     if (entry.url !== art.url || entry.sprite.destroyed) return // superseded or torn down mid-load
-    entry.sprite.texture = art.anchor !== null ? smoothSource(t) : t
+    entry.sprite.texture = t
     if (swapping) fadeArtIn(entry.sprite)   // finish line 8: art arrives, it does not pop in
     if (art.anchor !== null) entry.sprite.anchor.set(art.anchor.x, art.anchor.y)
     else entry.sprite.anchor.set(0.5, 1.0)

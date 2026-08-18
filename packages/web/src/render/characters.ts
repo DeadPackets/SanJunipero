@@ -8,7 +8,7 @@ import type { DepthEntry } from './layers.js'
 import type { Scene } from './scene.js'
 import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin } from './hitShapes.js'
 import { TAG_PAD_X, TAG_PAD_Y, anchorForSprite, placeTag } from './tooltip.js'
-import { characterArt, smoothSource, type TextureBook } from './textures.js'
+import { characterArt, type TextureBook } from './textures.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
 import { faceFor, worldTextScale } from './textFaces.js'
 import {
@@ -140,7 +140,7 @@ export function createCharacterLayer(
     const p = swapFrom !== null && swapFrom !== art.url ? book.swap(swapFrom, art.url) : book.get(art.url)
     void p.then((t) => {
       if (sheets.get(agentId) !== sheet) return // superseded by a newer resolve
-      sheet.texture = art.manifest !== null ? smoothSource(t) : t
+      sheet.texture = t
     })
   }
 

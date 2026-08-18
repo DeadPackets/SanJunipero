@@ -61,13 +61,6 @@ export function buildingArt(records: AssetRecord[], kind: string, fw: number, fh
   }
 }
 
-// hi-res sources downscale smoothly (user ruling); world tiles/UI stay nearest
-export function smoothSource(t: Texture): Texture {
-  t.source.autoGenerateMipmaps = true
-  t.source.scaleMode = 'linear'
-  return t
-}
-
 export function textureUrlFor(records: AssetRecord[], klass: AssetClass, kind: string): string {
   const id = resolveAssetId(records, klass, kind)
   return id !== null ? `/assets/${id}.png` : `/assets/placeholder/${klass}.png`
