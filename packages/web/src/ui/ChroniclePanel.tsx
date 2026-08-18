@@ -69,11 +69,20 @@ export function ChronicleViewTabs({ view, onView }: { view: ChronicleView; onVie
 
 // Newest first, like the live feed beside it: the town's most recent turn is the one a
 // viewer arrives looking for.
-export function ImportantFeedView({ entries, viewTick, onJump }: {
+export function ImportantFeedView({ entries, viewTick, onJump, loading = false }: {
   entries: ChronicleEntry[]
   viewTick: number | null
   onJump: (tick: number) => void
+  /** the first fetch has not answered yet — which is NOT the same thing as "nothing happened" */
+  loading?: boolean
 }) {
+  if (entries.length === 0 && loading) {
+    return (
+      <ol className="feed important" aria-busy="true">
+        {[0, 1, 2, 3, 4].map((i) => <li key={i} className="skeleton-row" />)}
+      </ol>
+    )
+  }
   if (entries.length === 0) return <p className="feed-empty">{EMPTY_COPY.chronicle}</p>
   return (
     <ol className="feed important">
@@ -125,6 +134,7 @@ export function ChroniclePanel({ store, handle, onView }: {
   const mode = useSyncExternalStore(store.subscribe, store.getMode)
   const [view, setView] = useState<ChronicleView>('important')
   const [entries, setEntries] = useState<ChronicleEntry[]>([])
+  const [loaded, setLoaded] = useState(false)
 
   // The curated feed is history, not a stream: it is read on a slow beat rather than rebuilt
   // every tick, so a 2.5s world never re-renders the panel underneath the reader's pointer.
@@ -134,9 +144,11 @@ export function ChroniclePanel({ store, handle, onView }: {
       void fetch('/api/chronicle')
         .then(async (r) => (r.ok ? ChronicleResponseSchema.safeParse(await r.json()) : null))
         .then((parsed) => {
-          if (alive && parsed?.success === true) setEntries(parsed.data.entries)
+          if (!alive) return
+          if (parsed?.success === true) setEntries(parsed.data.entries)
+          setLoaded(true)
         })
-        .catch(() => { /* the town is still the town without its index */ })
+        .catch(() => { if (alive) setLoaded(true) })
     }
     load()
     const timer = setInterval(load, CHRONICLE_REFETCH_MS)
@@ -171,6 +183,7 @@ export function ChroniclePanel({ store, handle, onView }: {
         {view === 'important' ? (
           <ImportantFeedView
             entries={[...entries].reverse()}
+            loading={!loaded}
             viewTick={mode.live ? null : mode.tick}
             onJump={jump}
           />

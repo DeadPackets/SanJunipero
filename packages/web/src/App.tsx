@@ -9,15 +9,25 @@ import { lensFromKey, lensKeyAllowed } from './ui/interaction.js'
 import { StageMount } from './render/StageMount.js'
 import { InspectorPanel } from './ui/InspectorPanel.js'
 import { RosterPanel } from './ui/RosterPanel.js'
+import { expandReducer } from './ui/roster/expand.js'
 import { ChroniclePanel } from './ui/ChroniclePanel.js'
 import { SocietyLens } from './ui/SocietyLens.js'
-import { DirectorMode } from './ui/DirectorMode.js'
 import { MomentsLens } from './ui/MomentsLens.js'
 import { DigestModal } from './ui/DigestModal.js'
 import { StageVeil } from './ui/StageVeil.js'
 import { InteriorBar } from './ui/InteriorBar.js'
 import { LensTabs, StatusStrip } from './ui/StatusStrip.js'
-import { CameraHud } from './ui/CameraHud.js'
+import { ControlBar } from './ui/ControlBarView.js'
+import { controlItems, type ControlAction } from './ui/controlBar.js'
+import { HudDock } from './ui/HudDock.js'
+import {
+  DEFAULT_HUD, HUD_TOGGLE_KEY, hudReducer, hudToggle, loadHud, saveHud, type HudEv,
+} from './ui/hudLayout.js'
+import { SCENE_TOTAL_MS, idleScene, sceneReducer, type SceneState } from './ui/sceneTransition.js'
+import { BADGE_WORD, tickBadgeState } from './ui/broadcastReady.js'
+import { BROADCAST_TEXT_SCALE } from './render/textFaces.js'
+import { stepZoom } from './render/cameraNav.js'
+import type { ZoomStop } from './render/camera.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { LAST_SEEN_KEY } from './net/socket.js'
 import { Timeline } from './ui/Timeline.js'
@@ -37,15 +47,21 @@ function ScrubBanner({ store }: { store: WorldStore }) {
   )
 }
 
-function TickBadge({ store }: { store: WorldStore }) {
+// ★ R8, AUDIT M9. With the socket down this went on reading `Now · Day 0 · 19:31` in its live
+// colour — a broadcast showing a confident clock it is no longer being told about, which is
+// worse than showing nothing because the viewer has no way to know. One pure function decides
+// the state now (broadcastReady.ts), and the word and the class both come from it.
+function TickBadge({ store, link }: { store: WorldStore; link: LinkStatus }) {
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   const live = useSyncExternalStore(store.subscribe, () => store.getMode().live)
   const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)
-  if (!awake) return <div className="tick-badge waking">Waking…</div>
+  const state = tickBadgeState(link, live, awake)
+  if (state === 'waking') return <div className="tick-badge waking">{BADGE_WORD.waking}</div>
   const m = tickToMoment(tick)
+  const cls = state === 'live' ? 'tick-badge' : `tick-badge ${state}`
   return (
-    <div className={live ? 'tick-badge' : 'tick-badge past'}>
-      {live ? 'Now' : 'Back then'} · Day {m.day} · {m.time}
+    <div className={cls} aria-live="polite">
+      {BADGE_WORD[state]} · Day {m.day} · {m.time}
     </div>
   )
 }
@@ -64,6 +80,32 @@ export function App() {
   const [insideId, setInsideId] = useState<string | null>(null)
   // Operator-only: absent for every viewer who did not put a token in this session.
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStorage))
+  // what the bottom bar reads: the camera's own stop, and whether the chrome is put away
+  const [zoomStop, setZoomStop] = useState<ZoomStop>(1)
+  // WHERE THE CHROME SITS. Slot-based, persisted per viewer, and never able to hide its own
+  // way back — HudDock is not itself a Dockable.
+  const [hud, setHud] = useState(() => {
+    try { return loadHud(localStorage) } catch { return DEFAULT_HUD }
+  })
+  const [dockOpen, setDockOpen] = useState(false)
+  // A LENS CHANGE IS A CHANGE OF SUBJECT (U23). The outgoing view leaves before the incoming
+  // arrives — never both at once — so the body of the panel lags the tab bar by SCENE_OUT_MS
+  // and the viewer sees which way they moved. The reducer owns the timing; the sheet owns the
+  // curve; a viewer mashing the lens bar retargets the same transition rather than restarting it.
+  const [lensScene, setLensScene] = useState<SceneState>(() => idleScene('lens', route.lens))
+  const shownLens: Lens = lensScene.phase === 'out' ? (lensScene.from as Lens) : route.lens
+  // the key handler is registered once; it reads the layout through a ref rather than
+  // re-registering on every dock change
+  const hudRef = useRef(hud)
+  hudRef.current = hud
+  const hudHidden = hud.controlBar === 'hidden'
+  const applyHud = (ev: HudEv): void => {
+    setHud((prev) => {
+      const next = hudReducer(prev, ev)
+      try { saveHud(localStorage, next) } catch { /* private mode */ }
+      return next
+    })
+  }
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -110,7 +152,16 @@ export function App() {
   }
 
   const pickAgent = (agentId: string): void => {
-    const next: Route = { ...route, lens: 'inspector', agentId }
+    const next: Route = { ...route, lens: 'inspector', agentId, openId: null }
+    history.pushState(null, '', routeToPath(next))
+    setRoute(next)
+  }
+
+  // Opening a roster row is a state of the LIST, not a navigation: the list never unmounts, so
+  // there is no back to get wrong. It is still shareable, as `?open=`.
+  const toggleRow = (agentId: string): void => {
+    const nextState = expandReducer({ openId: route.openId }, { kind: 'toggle', id: agentId }, [agentId])
+    const next: Route = { ...route, openId: nextState.openId }
     history.pushState(null, '', routeToPath(next))
     setRoute(next)
   }
@@ -155,17 +206,78 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [route])
 
+  const live = useSyncExternalStore(store.subscribe, () => store.getMode().live)
+
+  // A viewer who puts the controls away must always be able to get them back: `H` toggles
+  // from anywhere, so hiding is never a trap. Task 78 adds the pointer's way back.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key.toLowerCase() !== HUD_TOGGLE_KEY) return
+      if (e.altKey || e.ctrlKey || e.metaKey) return
+      const t = e.target as HTMLElement | null
+      if (t !== null && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return
+      if (t?.isContentEditable === true) return
+      e.preventDefault()
+      applyHud(hudToggle(hudRef.current))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  useEffect(() => {
+    setLensScene((p) => sceneReducer(p, { kind: 'go', name: 'lens', to: route.lens, atMs: performance.now() }))
+  }, [route.lens])
+
+  // `sceneReducer` returns the same object when nothing changed, so React bails out and this
+  // whole frame loop costs two renders per transition, not one per frame.
+  useEffect(() => {
+    if (lensScene.phase === 'idle') return
+    let raf = 0
+    const step = (): void => {
+      setLensScene((p) => sceneReducer(p, { kind: 'tick', atMs: performance.now() }))
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [lensScene.phase])
+
+  // the bar mirrors the camera's rest stop; the camera owns the truth, this follows it
+  useEffect(() => {
+    if (scene === null) return
+    setZoomStop(scene.getZoomStop())
+    return scene.onCamera(() => setZoomStop(scene.getZoomStop()))
+  }, [scene])
+
+  // ONE place where a control becomes a thing that happens. The bar has no logic of its own.
+  const onControl = (a: ControlAction): void => {
+    switch (a.kind) {
+      case 'lens': nav(a.lens); return
+      case 'zoom': scene?.setZoom(stepZoom(scene.getZoomStop(), a.dir)); return
+      case 'fit': scene?.fitToTown(); return
+      case 'live': sockRef.current?.goLive(); return
+      case 'follow': scene?.setFollow(null); return
+      case 'exit-interior': scene?.interior?.setActive(null); return
+      case 'hud': applyHud({ kind: a.op === 'hide' ? 'hide-all' : 'show-all' }); return
+    }
+  }
+
   // the bonds graph replaces the canvas; pause the Pixi ticker while hidden (60fps budget honesty)
   useEffect(() => {
     if (scene === null) return
-    if (route.lens === 'society') scene.app.ticker.stop()
-    else scene.app.ticker.start()
-  }, [route.lens, scene])
+    scene.setTicking(shownLens !== 'society')
+  }, [shownLens, scene])
+
+  // The stream frame's half of R2 that CSS cannot reach: the town's own speech is a bitmap
+  // face in the canvas, and 16px of it is 4.00px on a 480-wide player.
+  useEffect(() => {
+    if (scene === null) return
+    scene.textScale = route.broadcast ? BROADCAST_TEXT_SCALE : 1
+  }, [scene, route.broadcast])
 
   // The Moments lens has two readings: the live town televised (the C6 auto-cut) and a
   // recorded day playing back. Opening a day retires the auto-cut so its heat-driven camera
   // cannot fight the playback; LIVE brings it back.
-  const televised = route.lens === 'director' && route.momentId === null
+  const televised = shownLens === 'director' && route.momentId === null
 
   // leaving the televised view: keep the director mounted briefly so the letterboxes slide out
   const [directorLeaving, setDirectorLeaving] = useState(false)
@@ -175,24 +287,29 @@ export function App() {
     prevTelevisedRef.current = televised
     if (was && !televised) {
       setDirectorLeaving(true)
-      const t = setTimeout(() => setDirectorLeaving(false), 260)
+      const t = setTimeout(() => setDirectorLeaving(false), SCENE_TOTAL_MS)
       return () => clearTimeout(t)
     }
   }, [televised])
 
   return (
-    <div className="app">
+    <div className="app" data-broadcast={route.broadcast ? 'on' : undefined}>
       <header className="topbar">
         <h1 className="px-title">San Junipero</h1>
         <LensTabs store={store} lens={route.lens} onNav={nav} />
         {link === 'reconnecting' && (
           <div className="link-pill" role="status">Reaching the town…</div>
         )}
-        <TickBadge store={store} />
+        <TickBadge store={store} link={link} />
       </header>
-      <StatusStrip store={store} />
-      <div className="stage-row">
-        <main id="stage-root" className={route.lens === 'society' ? 'stage-hidden' : undefined}>
+      {hud.statusStrip !== 'hidden' && <StatusStrip store={store} />}
+      <div className="stage-row" data-scene-phase={lensScene.phase}>
+        <main
+          id="stage-root"
+          data-dock-controls={hud.controlBar}
+          className={shownLens === 'society' ? 'stage-hidden' : undefined}
+        >
+          <div className="stage-cell">
           <StageMount store={store} onScene={setScene} onInterior={setInsideId} />
           <StageVeil store={store} />
           <InteriorBar
@@ -201,29 +318,50 @@ export function App() {
             onBack={() => scene?.interior?.setActive(null)}
           />
           <ScrubBanner store={store} />
-          {(route.lens === 'map' || route.lens === 'inspector') && <CameraHud scene={scene} />}
-          <FpsOverlay />
-          {route.lens === 'chronicle' && <Timeline store={store} handle={handle} onView={onView} />}
-          {route.lens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
-          {(televised || directorLeaving) && (
-            <DirectorMode store={store} scene={scene} leaving={!televised} />
+          {hud.fps !== 'hidden' && <FpsOverlay />}
+          {shownLens === 'chronicle' && hud.timeline !== 'hidden' && (
+            <Timeline store={store} handle={handle} onView={onView} />
           )}
-          {route.lens === 'director' && (
-            <MomentsLens store={store} handle={handle} momentId={route.momentId} onOpen={openMoment} />
+          {shownLens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
+          {(shownLens === 'director' || directorLeaving) && (
+            <MomentsLens
+              store={store}
+              handle={handle}
+              scene={scene}
+              momentId={route.momentId}
+              televised={televised}
+              leaving={shownLens !== 'director'}
+              onOpen={openMoment}
+            />
+          )}
+          </div>
+          <HudDock
+            layout={hud}
+            open={dockOpen}
+            onEvent={(ev) => { applyHud(ev); if (ev.kind !== 'dock') setDockOpen(false) }}
+            onOpen={setDockOpen}
+          />
+          {!hudHidden && (
+            <ControlBar
+              items={controlItems({
+                lens: route.lens, live, zoom: zoomStop, following: null, insideId, hudHidden,
+              })}
+              onAction={onControl}
+            />
           )}
         </main>
         <aside
           id="panel-outlet"
-          className={route.lens === 'inspector' || route.lens === 'chronicle' || route.lens === 'laws' ? 'open' : undefined}
+          className={shownLens === 'inspector' || shownLens === 'chronicle' || shownLens === 'laws' ? 'open' : undefined}
         >
-          {route.lens === 'inspector' && route.agentId !== null && (
+          {shownLens === 'inspector' && route.agentId !== null && (
             <InspectorPanel store={store} agentId={route.agentId} scene={scene} onBack={showRoster} />
           )}
-          {route.lens === 'inspector' && route.agentId === null && (
-            <RosterPanel store={store} onPick={pickAgent} />
+          {shownLens === 'inspector' && route.agentId === null && (
+            <RosterPanel store={store} openId={route.openId} onToggle={toggleRow} onOpenFull={pickAgent} />
           )}
-          {route.lens === 'chronicle' && <ChroniclePanel store={store} handle={handle} onView={onView} />}
-          {route.lens === 'laws' && (
+          {shownLens === 'chronicle' && <ChroniclePanel store={store} handle={handle} onView={onView} />}
+          {shownLens === 'laws' && (
             <>
               <WorldLaws store={store} />
               <LawsDashboard store={store} token={operatorToken} />

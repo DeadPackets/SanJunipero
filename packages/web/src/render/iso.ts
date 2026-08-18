@@ -12,7 +12,8 @@ export function screenToTile(sx: number, sy: number): { x: number; y: number } {
   return { x: Math.round((a + b) / 2), y: Math.round((b - a) / 2) }
 }
 
-// depth-sort by x+y; +x breaks ties so a diagonal renders stably
+/** @deprecated for sorting — depth.ts owns the painter's order (U8). Kept because it is the
+ *  minimap's cheap draw order and C10's landed tests still pin it. */
 export function depthKey(x: number, y: number): number {
   return (x + y) * 1000 + x
 }

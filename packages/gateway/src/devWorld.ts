@@ -8,7 +8,7 @@ import {
 import { openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
-import { makeFoundersOnTick } from './founders.js'
+import { foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.js'
 import { ingestLibraryArt, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
 import { showcaseTerrain } from './showcaseMap.js'
 
@@ -50,6 +50,10 @@ export async function startDevWorld(
     /** dev/demo only (G10 human pass): tired founders go indoors and come out again.
      *  Off by default, so every existing gate folds exactly the events it always did. */
     interiors?: boolean
+    /** C7's narrator.db. Absent, every narrated surface — chapters, milestones, moments —
+     *  answers typed-empty, which is why the timeline marks and the filmstrip had never been
+     *  seen with data. The gateway already opens it readonly; the dev world could not ask. */
+    narratorDbPath?: string
   } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH
@@ -81,17 +85,29 @@ export async function startDevWorld(
   ensureObserverTables(db)
 
   const config = SHOWCASE_CONFIG
-  const terrain = devTerrain(opts.map ?? DEV_MAP_DEFAULT)
+  const map = opts.map ?? DEV_MAP_DEFAULT
+  const terrain = devTerrain(map)
+  // Terrain and buildings are read from the SAME map kind, so the town can never again be an
+  // overlay of two unrelated layouts.
+  const structures = townStructuresFor(map)
   const rng = new RngStreams(opts.seed ?? DEV_SEED)
   const store = new EventStore(db)
   const loop: TickLoop = new TickLoop({
     store, state: genesisState(config, terrain), rng, config,
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
     // the founders showcase town
-    onTick: makeFoundersOnTick(config, rng, () => loop.state, { interiors: opts.interiors === true }),
+    onTick: makeFoundersOnTick(config, rng, () => loop.state, {
+      // foundersFor is identity on an unowned town, so the scripted arm is byte-identical.
+      interiors: opts.interiors === true, structures, founders: foundersFor(structures),
+      // the showcase town is what a viewer opens, and an empty storeroom is why the room
+      // card's holdings grid had never been seen
+      holdings: map === 'showcase',
+    }),
   })
 
-  const gateway = await createGateway({ dbPath, port: opts.port ?? DEV_PORT, terrain, config, db })
+  const gateway = await createGateway({
+    dbPath, port: opts.port ?? DEV_PORT, terrain, config, db, narratorDbPath: opts.narratorDbPath,
+  })
 
   // Scripted thoughts: when an actor's chosen intent verb changes, it "thinks" a line.
   let lastSeq = 0
@@ -134,7 +150,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const map: DevMapKind = process.env['SJ_DEV_MAP'] === 'showcase' ? 'showcase' : DEV_MAP_DEFAULT
   const interiors = process.env['SJ_DEV_INTERIORS'] === '1'
   void startDevWorld({ ingest: true, map, interiors }).then(({ gateway }) => {
-    console.log(`dev world: map=${map} interiors=${interiors ? 'on' : 'off'}`)
+    console.log(`dev world: map=${map} interiors=${interiors ? 'on' : 'off'} structures=${townStructuresFor(map).length}`)
     console.log(`dev world: the town is awake on ws://localhost:${gateway.port}/ws`)
   })
 }

@@ -79,14 +79,24 @@ describe('B3 — the timeline day labels are on the slab they sit on', () => {
 // .roster-empty em) keeps its opacity — a second token for that surface is C12's.
 const QUIET_SITES = [
   '.tick-badge.waking', '.strip-weather', '.strip-gone', '.fps-overlay .fps-avg',
-  '.cam-btn:disabled', '.block h3', '.thought-line', '.tab-body .stamp', '.veil-sub',
-  '.feed-line .stamp', '.feed-empty', '.interior-who', '.legend-chip.off', '.legend-stamp',
-  '.bond-count', '.bond-dates dt', '.bond-history .stamp', '.thumb-day', '.thumb-cast',
+  '.block h3', '.thought-line', '.tab-body .stamp', '.veil-sub',
+  '.feed-line .stamp', '.feed-empty', '.room-who', '.legend-chip.off', '.legend-stamp',
+  // `.bond-count` is gone: task 85 retired the strength bar and the count under it, because a
+  // count that can only go up cannot express a relationship cooling.
+  '.bond-evidence', '.bond-dates dt', '.bond-history .stamp', '.thumb-day', '.thumb-cast',
   '.digest-footer', '.roster-gone', '.laws-lede', '.law-history', '.law-edit input:disabled',
 ]
 
+// U18 closes the deferral in the comment above. A thought was `opacity: 0.85` on the DOM
+// subtitle for the same reason it was `alpha: 0.55` on the canvas bubble, and it is the same
+// mistake in both places: a thought must read as a different INK, not a thinner one, or its
+// ratio is unknowable at the one surface where the town is actually speaking.
+const DARK_QUIET_SITES = ['.subtitle.thought', '.roster-empty em']
+
 /** Every paper the chrome paints quiet text on. */
 const PAPERS = ['cream', 'parchment', 'sand'] as const
+/** The two dark grounds the chrome paints quiet CREAM on. */
+const DARK_PAPERS = ['deep', 'night'] as const
 
 describe('--ink-quiet — the de-emphasis token', () => {
   it('exists as a colour in the palette', () => {
@@ -106,6 +116,40 @@ describe('--ink-quiet — the de-emphasis token', () => {
   })
 })
 
+// R6: a shut key must still say that lines are being filtered out, so the badge that says it
+// is the one piece of chrome that carries ink on a saturated fill.
+describe('the filtered-count badge on the shut bonds key', () => {
+  it('paints its own two tokens, and they clear AA', () => {
+    const body = ruleBody(CSS, '.key-filtered')
+    const fg = /color:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    const bg = /background:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    expect(fg).toBe('deep')
+    expect(bg).toBe('ember')
+    expect(contrast(T[fg!]!, T[bg!]!)).toBeGreaterThanOrEqual(AA)
+  })
+})
+
+describe('--cream-quiet — the same de-emphasis, on the dark ground the town speaks over', () => {
+  it('exists as a colour, clears AA on both dark grounds, and is visibly quieter than cream', () => {
+    expect(T['cream-quiet']).toMatch(/^#[0-9A-Fa-f]{6}$/)
+    for (const paper of DARK_PAPERS) {
+      expect(contrast(T['cream-quiet']!, T[paper]!), `cream-quiet on ${paper}`).toBeGreaterThanOrEqual(AA)
+      expect(contrast(T['cream-quiet']!, T[paper]!), `cream-quiet vs cream on ${paper}`)
+        .toBeLessThan(contrast(T['cream']!, T[paper]!))
+    }
+  })
+
+  it.each(DARK_QUIET_SITES)('%s states its colour instead of thinning it', (selector) => {
+    const body = ruleBody(CSS, selector)
+    expect(body, `${selector} still de-emphasises with opacity`).not.toMatch(/opacity:/)
+    const colour = /color:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    expect(colour, `${selector} sets no colour token`).toBeDefined()
+    for (const paper of DARK_PAPERS) {
+      expect(contrast(T[colour!]!, T[paper]!), `${selector} on ${paper}`).toBeGreaterThanOrEqual(AA)
+    }
+  })
+})
+
 describe('the opacity habit, at every ink-on-paper site it produced', () => {
   it.each(QUIET_SITES)('%s states its colour instead of thinning it', (selector) => {
     const body = ruleBody(CSS, selector)
@@ -115,5 +159,32 @@ describe('the opacity habit, at every ink-on-paper site it produced', () => {
     for (const paper of PAPERS) {
       expect(contrast(T[colour!]!, T[paper]!), `${selector} on ${paper}`).toBeGreaterThanOrEqual(AA)
     }
+  })
+})
+
+// ── ★ THE BADGE THAT RAISES ITS VOICE, MEASURED ───────────────────────────────────────────
+//
+// R8 gave the tick badge a stale state and painted it `--cream` on `--rose`. That is 3.12:1,
+// and the badge is 12.48px in the desktop chrome — normal text, so AA is 4.5 and it FAILS.
+// `.link-pill`, which wears the same rose beside it, had `--deep` on it all along: 4.82:1.
+// The one surface whose whole job is to tell a viewer the clock is no longer being told to us
+// was the one they could not read. Fourth time opacity-or-colour has been asserted rather
+// than measured on this project.
+
+describe('a stale clock is legible, not just loud', () => {
+  const ROSE_SITES = ['.tick-badge.stale', '.link-pill']
+
+  it.each(ROSE_SITES)('%s clears AA on the rose it wears', (selector) => {
+    const body = ruleBody(CSS, selector)
+    const fg = /color:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    const bg = /background:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    expect(bg, `${selector} sets no background token`).toBe('rose')
+    expect(fg, `${selector} sets no colour token`).toBeDefined()
+    expect(contrast(T[fg!]!, T['rose']!), `${selector}`).toBeGreaterThanOrEqual(AA)
+  })
+
+  it('records the pair it rejected, so it cannot come back', () => {
+    expect(contrast(T['cream']!, T['rose']!)).toBeCloseTo(3.12, 2)
+    expect(contrast(T['deep']!, T['rose']!)).toBeCloseTo(4.82, 2)
   })
 })

@@ -58,10 +58,10 @@ export function createAmbient(
   store: WorldStore,
   layers: { weather: WeatherLayer; bubbles: BubbleLayer; chars?: CharacterLayer },
 ): AmbientDirector {
-  // under-layer between ground and entities for shimmer + canopies
+  // shimmer and canopies are ground decoration: under every body, over the baked field
   const under = new Container()
   under.eventMode = 'none' // decorative layers must never swallow stage hit-tests
-  scene.world.addChildAt(under, 1)
+  scene.layers.groundDecal.addChild(under)
 
   const px = (w: number, h: number, color: number): Texture => {
     const g = new Graphics()
@@ -186,9 +186,8 @@ export function createAmbient(
         for (let i = 0; i < SMOKE_PUFFS; i++) {
           const p = new Sprite(puffTex)
           p.anchor.set(0.5, 0.5)
-          p.zIndex = 1e8
           p.eventMode = 'none'
-          scene.entities.addChild(p)
+          scene.layers.overhead.addChild(p)
           puffs.push(p)
         }
         smoke.set(s.id, puffs)
@@ -206,9 +205,8 @@ export function createAmbient(
         const g = new Sprite(glowTex)
         g.anchor.set(0.5, 1)
         g.blendMode = 'add'
-        g.zIndex = 1e8
         g.eventMode = 'none'
-        scene.entities.addChild(g)
+        scene.layers.overhead.addChild(g)
         glows.set(s.id, g)
       }
       const glow = glows.get(s.id)
@@ -221,9 +219,8 @@ export function createAmbient(
         const f = new Sprite(fireTex)
         f.anchor.set(0.5, 1)
         f.blendMode = 'add'
-        f.zIndex = 1e8
         f.eventMode = 'none'
-        scene.entities.addChild(f)
+        scene.layers.overhead.addChild(f)
         fires.set(s.id, f)
       }
       const fire = fires.get(s.id)

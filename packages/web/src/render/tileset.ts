@@ -7,7 +7,7 @@ import type { TileId } from '@sj/engine/state'
 // AMENDMENT (C13 §4) seam: an autotiled road strip is ingested one record per key, under the
 // codex kind `road:<key>`. The forge writes that kind and the renderer reads it, so the
 // spelling lives in @sj/shared beside the keys — this is the renderer's door onto it.
-export { roadAutotileKind }
+export { roadAutotileKind } from '@sj/shared'
 
 export const TERRAIN_KIND_FALLBACK: TerrainTileKind = 'grass'
 export const ROAD_TILE_ID = 7

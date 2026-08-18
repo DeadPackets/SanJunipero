@@ -20,6 +20,7 @@ vi.mock('pixi.js', () => {
     destroyed = false
     eventMode = ''
     position = new Point()
+    scale = new Point()
     sortableChildren = false
     addChild(...cs: Container[]): void {
       for (const c of cs) {
@@ -71,6 +72,12 @@ vi.mock('pixi.js', () => {
       this.text = opts?.text ?? ''
     }
   }
+  // No pixel BitmapFont is installed in the product yet, so createWorldLabel takes the canvas
+  // glyph path — the fallback that stops a missing font blanking the whole canvas (R3).
+  class Text extends BitmapText {
+    resolution = 1
+  }
+  const Cache = { has: () => false }
   class Rectangle {
     constructor(
       public x = 0,
@@ -78,6 +85,12 @@ vi.mock('pixi.js', () => {
       public width = 0,
       public height = 0,
     ) {}
+  }
+  class Polygon {
+    points: number[]
+    constructor(points: number[] = []) {
+      this.points = points
+    }
   }
   class Texture {
     static EMPTY: Texture
@@ -91,7 +104,7 @@ vi.mock('pixi.js', () => {
   }
   Texture.EMPTY = new Texture()
   const Assets = { add: vi.fn(), load: vi.fn(() => new Promise(() => {})) }
-  return { Assets, BitmapText, Container, Graphics, Point, Rectangle, Sprite, Texture }
+  return { Assets, BitmapText, Cache, Container, Graphics, Point, Polygon, Rectangle, Sprite, Text, Texture }
 })
 
 import { Container as MockContainer, Sprite as MockSprite } from 'pixi.js'
@@ -126,12 +139,36 @@ function makeStore(agents: MutableAgents): { store: WorldStore; emit: (evts: Sim
   return { store, emit: (evts) => { for (const fn of handlers) fn(evts) } }
 }
 
-function makeScene(): Scene {
-  const entities = new MockContainer()
+const LAYER_NAMES = [
+  'ground', 'groundDecal', 'shadow', 'entities', 'overhead', 'worldText', 'bubbles', 'overlay',
+] as const
+
+function makeScene(): Scene & { sortDepth: () => void } {
+  const layers = Object.fromEntries(LAYER_NAMES.map((n) => [n, new MockContainer()]))
+  const sources = new Set<() => Array<{ box: { id: string }; node: unknown }>>()
   return {
     app: { renderer: { generateTexture: () => ({ destroy: () => {} }) } },
-    entities,
-  } as unknown as Scene
+    layers,
+    entities: layers.entities,
+    getZoom: () => 1,
+    viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
+    addDepthSource: (fn: () => Array<{ box: { id: string }; node: unknown }>) => {
+      sources.add(fn)
+      return () => sources.delete(fn)
+    },
+    // the real scene runs depth.ts here; the test only needs the published boxes
+    sortDepth: () => [...sources].flatMap((f) => f()),
+  } as unknown as Scene & { sortDepth: () => void }
+}
+
+const publishedBoxes = (scene: Scene): Array<{ id: string }> =>
+  ((scene as unknown as { sortDepth: () => Array<{ box: { id: string } }> }).sortDepth() ?? [])
+    .map((e) => e.box)
+
+// every display object the layer put anywhere in the stack
+const placed = (scene: Scene): InstanceType<typeof MockContainer>[] => {
+  const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+  return LAYER_NAMES.flatMap((n) => l[n]!.children)
 }
 
 function makeBook(): { book: TextureBook; get: ReturnType<typeof vi.fn> } {
@@ -158,8 +195,36 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
   it('two ticks add exactly 4 display objects per agent, not 4 per agent per tick', () => {
     layer.tick(1000)
     layer.tick(1016)
-    const entities = scene.entities as unknown as InstanceType<typeof MockContainer>
-    expect(entities.children).toHaveLength(2 * 4) // sprite, shadow, emote, nameTag × 2 agents
+    expect(placed(scene)).toHaveLength(2 * 4) // sprite, shadow, emote, nameTag × 2 agents
+  })
+
+  it('puts each companion in the layer that owns it, never in the depth sort', () => {
+    layer.tick(1000)
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    expect(l.shadow!.children).toHaveLength(2)     // one contact shadow per body
+    expect(l.entities!.children).toHaveLength(2)   // ONLY the bodies are depth-sorted
+    expect(l.worldText!.children).toHaveLength(4)  // emote + name tag per body
+  })
+
+  it('publishes one depth box per living body, at its INTERPOLATED tile', () => {
+    layer.tick(1000)
+    const boxes = publishedBoxes(scene) as unknown as Array<{ id: string; x0: number; y0: number }>
+    expect(boxes.map((b) => b.id).sort()).toEqual(['nadia', 'omar'])
+    const nadia = boxes.find((b) => b.id === 'nadia')!
+    expect([nadia.x0, nadia.y0]).toEqual([2.5, 3.5])   // tile (3,4) spans [2.5,3.5]×[3.5,4.5]
+  })
+
+  it('places a hovered name tag above the figure and inside the view (U10)', () => {
+    layer.tick(1000)
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    const nameTag = l.worldText!.children[1] as unknown as { visible: boolean; position: { x: number; y: number } }
+    nameTag.visible = true
+    layer.tick(1016)
+    const view = { x: -400, y: -300, w: 800, h: 600 }
+    expect(nameTag.position.x).toBeGreaterThanOrEqual(view.x)
+    expect(nameTag.position.x).toBeLessThanOrEqual(view.x + view.w)
+    expect(nameTag.position.y).toBeGreaterThanOrEqual(view.y)
+    expect(nameTag.position.y).toBeLessThanOrEqual(view.y + view.h)
   })
 
   it('getSprite returns the same registered sprite across ticks', () => {
@@ -180,21 +245,25 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     ])
   })
 
-  it('hit area compensates for sprite scale so the click target is 52×72 screen px', () => {
+  it('hit area is the measured capsule, in screen px, whatever the sheet resolution', () => {
     layer.tick(1000)
     const sprite = layer.getSprite('nadia') as unknown as InstanceType<typeof MockSprite>
-    const hit = sprite.hitArea as unknown as { x: number; y: number; width: number; height: number }
-    const scale = sprite.scale as unknown as { x: number; y: number }
-    expect(hit.width * scale.x).toBeCloseTo(52, 9)
-    expect(hit.height * scale.y).toBeCloseTo(72, 9)
-    expect(hit.x * scale.x).toBeCloseTo(-26, 9)
-    expect(hit.y * scale.y).toBeCloseTo(-72, 9)
+    const hit = sprite.hitArea as unknown as { points: number[] }
+    const scale = (sprite.scale as unknown as { x: number }).x
+    const screen = hit.points.map((v) => v * scale)
+    const xs = screen.filter((_, i) => i % 2 === 0), ys = screen.filter((_, i) => i % 2 === 1)
+    // U9: 28 wide at the shoulders and 48.9 tall, NOT the old 52 × 72 box
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(28, 9)
+    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(0.94 * 52, 9)
+    expect(Math.max(...ys)).toBeCloseTo(0, 9)   // feet at the origin
   })
 
   it('companion objects are event-inert so they never swallow the sprite hit', () => {
     layer.tick(1000)
-    const entities = scene.entities as unknown as InstanceType<typeof MockContainer>
-    const [shadow, sprite, emote, nameTag] = entities.children as unknown as Array<{ eventMode: string }>
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    const shadow = l.shadow!.children[0] as unknown as { eventMode: string }
+    const sprite = l.entities!.children[0] as unknown as { eventMode: string }
+    const [emote, nameTag] = l.worldText!.children as unknown as Array<{ eventMode: string }>
     expect(shadow!.eventMode).toBe('none')
     expect(emote!.eventMode).toBe('none')
     expect(nameTag!.eventMode).toBe('none')
@@ -203,8 +272,8 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
 
   it('name-tag label anchors (0.5, 1) and the bg slab wraps it with 4px padding', () => {
     layer.tick(1000)
-    const entities = scene.entities as unknown as InstanceType<typeof MockContainer>
-    const nameTag = entities.children[3]! // per-agent add order: shadow, sprite, emote, nameTag
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    const nameTag = l.worldText!.children[1]! // per-agent add order into worldText: emote, nameTag
     const [bg, label] = nameTag.children as unknown as [
       { lastRoundRect: number[] | null },
       { anchor: { x: number; y: number }; width: number; height: number },
@@ -221,8 +290,7 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(sprite).not.toBeNull()
     delete agents.omar
     layer.tick(1016)
-    const entities = scene.entities as unknown as InstanceType<typeof MockContainer>
-    expect(entities.children).toHaveLength(4)
+    expect(placed(scene)).toHaveLength(4)
     expect(sprite.destroyed).toBe(true)
     expect(layer.getSprite('omar')).toBeNull()
   })

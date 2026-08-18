@@ -1,63 +1,101 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react'
-import type { WorldState } from '@sj/engine/state'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
-import { interiorOf } from '../render/interiors.js'
+import { ROOM_WORDS, roomCard, type Provenance, type RoomCard } from './interiorModel.js'
 
-// Chrome copy speaks about townsfolk, never machinery (spec §5), and observes rather than
-// scores (living-documentary law) — nothing here can be filled, completed or won.
-export const INTERIOR_ROOM_WORDS: Record<string, string> = {
-  hut: 'hut', storehouse: 'storehouse', shed: 'shed',
-}
+// A ROOM TELLS YOU WHOSE IT IS (U4, audit R7, plan task 68).
+//
+// The bar used to say two things: a title and a one-line roll call. Everything else the world
+// already knew about the room — who raised it, who lives in it, what it holds — was reachable
+// from the endpoints and shown nowhere. It is a CARD now, and `interiorModel.roomCard` is the
+// single answer to "what is this room"; the caption pair it replaces is retired rather than
+// left beside it, because two descriptions of one room is the defect this task is fixing.
 
-export type InteriorCaption = { title: string; who: string }
+export { ROOM_WORDS as INTERIOR_ROOM_WORDS } from './interiorModel.js'
 
-export function interiorCaption(
-  state: WorldState | null, structureId: string | null,
-): InteriorCaption | null {
-  if (state === null || structureId === null) return null
-  const room = interiorOf(state, structureId)
-  if (room === null) return null
-  const word = INTERIOR_ROOM_WORDS[room.kind] ?? 'room'
-  const ownerId = room.structure.owner
-  const ownerName = ownerId === undefined ? null : state.agents[ownerId]?.name ?? null
-  const title = ownerName === null ? `The ${word}` : `${ownerName}'s ${word}`
-
-  const names = room.occupants.map((id) => {
-    const a = state.agents[id]
-    const name = a?.name ?? id
-    return a?.asleep === true ? `${name} asleep` : name
-  })
-  const who = names.length === 0
-    ? 'No one is in just now'
-    : names.length === 1 ? `${names[0]} is in`
-      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} are in`
-  return { title, who }
-}
-
-export function InteriorBarView(
-  { caption, onBack, backRef }: {
-    caption: InteriorCaption
+export function RoomCardView(
+  { card, onBack, backRef }: {
+    card: RoomCard
     onBack: () => void
     backRef?: React.Ref<HTMLButtonElement>
   },
 ) {
   return (
-    <div className="interior-bar" role="group" aria-label={`Inside ${caption.title}`}>
-      <button ref={backRef} type="button" className="interior-back" onClick={onBack}>
-        Back to town
-      </button>
-      <span className="interior-caption">
-        <span className="interior-title">{caption.title}</span>
-        <span className="interior-who">{caption.who}</span>
-      </span>
-    </div>
+    <aside className="room-card" role="group" aria-label={`Inside ${card.title}`}>
+      <div className="room-head">
+        <button ref={backRef} type="button" className="interior-back" onClick={onBack}>
+          Back to town
+        </button>
+        <span className="room-title">{card.title}</span>
+      </div>
+      {/* the provenance takes the card's full width: squeezed beside the button it wrapped
+          mid-phrase, which the browser showed */}
+      {card.built !== null && <p className="room-built">{card.built}</p>}
+
+      {card.lives.length > 0 && (
+        <p className="room-lives">
+          <span className="room-label">Home to</span>
+          <span className="room-names">{card.lives.join(', ')}</span>
+        </p>
+      )}
+
+      <div className="room-present">
+        <span className="room-label">In just now</span>
+        {card.present.length === 0
+          ? <p className="room-empty">{card.empty}</p>
+          : (
+            <ul className="room-roll">
+              {card.present.map((p) => (
+                <li key={p.id}>
+                  <span className="room-who">{p.name}</span>
+                  <span className="room-state">{p.state}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+      </div>
+
+      {card.holds.length > 0 && (
+        <div className="room-holds">
+          <span className="room-label">Holding</span>
+          <ul className="hold-grid">
+            {card.holds.map((h) => (
+              <li key={h.kind} className="hold">
+                <span
+                  className={h.iconUrl === null ? 'hold-icon bare' : 'hold-icon'}
+                  style={h.iconUrl === null ? undefined : { backgroundImage: `url("${h.iconUrl}")` }}
+                  aria-hidden="true"
+                />
+                <span className="hold-kind">{h.words}</span>
+                <span className="hold-qty">{h.qty}</span>
+              </li>
+            ))}
+          </ul>
+          {card.more > 0 && <p className="room-more">and {card.more} more</p>}
+        </div>
+      )}
+    </aside>
   )
 }
 
-const SEP = '\n'   // a newline: neither the room's title nor its line can contain one
+/** The provenance endpoint, as a hook. A room the gateway has forgotten is `null`, which the
+ *  card renders by omitting the line rather than by printing a blank. */
+export function useProvenance(structureId: string | null): Provenance | null {
+  const [prov, setProv] = useState<Provenance | null>(null)
+  useEffect(() => {
+    setProv(null)
+    if (structureId === null) return
+    let live = true
+    void fetch(`/api/structure/${encodeURIComponent(structureId)}/provenance`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => { if (live) setProv(p as Provenance | null) })
+      .catch(() => { /* a room with no recorded beginning still opens */ })
+    return () => { live = false }
+  }, [structureId])
+  return prov
+}
 
 // Escape leaves the room and focus goes back to the map, so the interior is never a place a
-// keyboard can walk into and not out of. The bar subscribes to a DERIVED string rather than
+// keyboard can walk into and not out of. The card subscribes to a DERIVED string rather than
 // to world state, so a 2.5s tick that changed nobody's whereabouts re-renders nothing.
 export function InteriorBar(
   { store, structureId, onBack }: {
@@ -67,11 +105,12 @@ export function InteriorBar(
   },
 ) {
   const backRef = useRef<HTMLButtonElement>(null)
-  const line = useSyncExternalStore(store.subscribe, () => {
-    const c = interiorCaption(store.getState(), structureId)
-    return c === null ? '' : `${c.title}${SEP}${c.who}`
+  const prov = useProvenance(structureId)
+  const signature = useSyncExternalStore(store.subscribe, () => {
+    const c = roomCard(store.getState(), structureId, store.assetRecords(), null)
+    return c === null ? '' : JSON.stringify(c)
   })
-  const open = line !== ''
+  const open = signature !== ''
 
   useEffect(() => {
     if (!open) return
@@ -89,7 +128,8 @@ export function InteriorBar(
   }, [open, onBack])
 
   if (!open) return null
-  const cut = line.indexOf(SEP)
-  const caption = { title: line.slice(0, cut), who: line.slice(cut + 1) }
-  return <InteriorBarView caption={caption} onBack={onBack} backRef={backRef} />
+  // the signature carries everything but the provenance line, which arrives on its own clock
+  const card = { ...(JSON.parse(signature) as RoomCard), built: null }
+  const built = roomCard(store.getState(), structureId, store.assetRecords(), prov)?.built ?? null
+  return <RoomCardView card={{ ...card, built }} onBack={onBack} backRef={backRef} />
 }

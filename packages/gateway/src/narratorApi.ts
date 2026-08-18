@@ -1,5 +1,7 @@
+import { readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type Database from 'better-sqlite3'
+import Database from 'better-sqlite3'
 import {
   CHRONICLE_TYPES, MILESTONE_ICON, MILESTONE_TYPE, chronicleIcon, chronicleLine,
   type ChronicleEntry, type ChronicleLookup, type Moment, type SimEvent,
@@ -22,7 +24,16 @@ export type NarratorApiDeps = {
   db: Database.Database                     // the world DB — events are the town's own record
   mirror: WorldMirror
   narratorDb: Database.Database | null      // absent until C7 narrates a day
+  agentDbDir?: string                       // agent memory, for the days a personality moved
 }
+
+/** U14 — the five things the world's own log records that the town would remember. Anything
+ *  else is the everyday, and a scrub bar covered in the everyday points nowhere. */
+export const MARK_EVENT_TYPES: readonly string[] = [
+  'agent_died', 'agent_born', 'agent_spawned', 'agent_injured', 'structure_completed',
+]
+
+const MINUTES_PER_DAY = 1440
 
 const sendJson = (res: ServerResponse, body: unknown, status = 200): void => {
   res.writeHead(status, { 'content-type': 'application/json' })
@@ -51,7 +62,10 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     const state = deps.mirror.state()
     return {
       agentName: (id) => state.agents[id]?.name ?? id,
-      structureKind: (id) => state.structures[id]?.kind ?? 'building',
+      // R4: a kind is a slug in the engine and PROSE to a viewer. `kindWords` in
+      // web/ui/broadcastReady.ts owns this rule; the gateway cannot import the web bundle,
+      // so the one line is repeated here rather than the rule being forgotten.
+      structureKind: (id) => (state.structures[id]?.kind ?? 'building').replace(/_/g, ' '),
       mysteryProse: (kind) => MYSTERY_BY_KIND[kind]?.prose ?? null,
     }
   }
@@ -124,5 +138,54 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       location: r.location,
     }))
     sendJson(res, { moments })
+  })
+
+  // THE MARKS ON THE SCRUB BAR (U14). This hands over the SOURCES, not the marks: the rule
+  // that turns them into marks — the weighting, the coalescing, the words — is one function in
+  // the viewer (`ui/timelineMarks.ts`), and a second copy of it here is a second copy to keep
+  // right. Plain SELECTs, typed-empty when a source is absent, never a 500.
+  const selMarkEvents = deps.db.prepare(
+    `SELECT tick, type FROM events WHERE type IN (${MARK_EVENT_TYPES.map(() => '?').join(', ')})
+     ORDER BY tick, seq`,
+  )
+
+  /** The days a personality document actually MOVED. Version 1 is the document arriving, not
+   *  a change, so it is excluded — otherwise everybody "changed" on the day they were written. */
+  const changeDays = (): Array<{ tick: number }> => {
+    if (deps.agentDbDir === undefined) return []
+    let files: string[]
+    try {
+      files = readdirSync(deps.agentDbDir).filter((f) => f.endsWith('.db')).sort()
+    } catch {
+      return []
+    }
+    const ticks: number[] = []
+    for (const file of files) {
+      let adb: Database.Database | null = null
+      try {
+        adb = new Database(join(deps.agentDbDir, file), { readonly: true, fileMustExist: true })
+        for (const r of adb.prepare('SELECT day FROM personality_versions WHERE version > 1').all() as
+          Array<{ day: number }>) ticks.push(r.day * MINUTES_PER_DAY)
+      } catch {
+        /* an agent with no memory file, or a file predating the table, simply has no changes */
+      } finally {
+        adb?.close()
+      }
+    }
+    return [...new Set(ticks)].sort((a, b) => a - b).map((tick) => ({ tick }))
+  }
+
+  router.route('GET', '/api/timeline/marks', (_req, res) => {
+    sendJson(res, {
+      throughTick: deps.mirror.state().tick,
+      chapters: readOrEmpty<{ day: number; title: string }>(
+        deps.narratorDb, 'SELECT day, title FROM chapters ORDER BY day'),
+      milestones: readOrEmpty<{ label: string; day: number; tick: number }>(
+        deps.narratorDb, 'SELECT label, day, tick FROM milestones ORDER BY tick, id'),
+      moments: readOrEmpty<{ day: number; startTick: number }>(
+        deps.narratorDb, 'SELECT day, start_tick AS startTick FROM scenes ORDER BY day, id'),
+      changes: changeDays(),
+      events: selMarkEvents.all(...MARK_EVENT_TYPES) as Array<{ tick: number; type: string }>,
+    })
   })
 }

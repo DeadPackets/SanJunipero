@@ -23,13 +23,16 @@ describe('cameraActionFor', () => {
 })
 
 describe('stepZoom', () => {
-  it('steps within 1-4 and clamps at the bounds', () => {
+  it('steps along ZOOM_STOPS and clamps at the bounds', () => {
     expect(stepZoom(1, 1)).toBe(2)
     expect(stepZoom(4, 1)).toBe(4)
-    expect(stepZoom(1, -1)).toBe(1)
     expect(stepZoom(3, -1)).toBe(2)
+    // task 75 added the 0.5 overview stop below 1; stepping out from 1 now reaches it
+    expect(stepZoom(1, -1)).toBe(0.5)
+    expect(stepZoom(0.5, -1)).toBe(0.5)
   })
-  it('rounds a fractional current zoom before stepping', () => {
+  it('snaps a camera caught mid-transit to its nearest stop before stepping', () => {
     expect(stepZoom(2.4, 1)).toBe(3)
+    expect(stepZoom(0.7, -1)).toBe(0.5)
   })
 })

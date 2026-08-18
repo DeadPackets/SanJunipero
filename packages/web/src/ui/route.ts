@@ -1,4 +1,5 @@
 import { momentToTick } from '@sj/shared'
+import { BROADCAST_PARAM, broadcastFromSearch } from './broadcast.js'
 
 export const LENSES = ['map', 'inspector', 'chronicle', 'society', 'director', 'laws'] as const
 export type Lens = typeof LENSES[number]
@@ -7,12 +8,19 @@ export type Route = {
   moment: { day: number; time: string } | null
   momentId: number | null              // a recorded day, by its narrator scene id
   agentId: string | null
+  /** the roster row that is open UNDER the list — a third state of the Townsfolk lens, and
+   *  shareable like the other two. `?agent=` still opens the standalone page. */
+  openId: string | null
+  /** the stream frame (`broadcast.ts`), addressed rather than detected — this is the URL an
+   *  OBS browser source is pointed at, and no viewport width may ever turn it on */
+  broadcast: boolean
 }
 
 export function parseRoute(pathname: string, search: string): Route {
   const params = new URLSearchParams(search)
   const lensParam = params.get('lens')
   const agentId = params.get('agent')
+  const openId = params.get('open')
 
   // Two moment links, told apart by their length rather than by guessing: three segments is
   // a point in time (/moment/:day/:time), two is a recorded day (/moment/:id).
@@ -31,7 +39,14 @@ export function parseRoute(pathname: string, search: string): Route {
   // rather than dropping the viewer on the map with a link that does nothing.
   const fallback: Lens = momentId === null ? 'map' : 'director'
   const lens: Lens = (LENSES as readonly string[]).includes(lensParam ?? '') ? lensParam as Lens : fallback
-  return { lens, moment, momentId, agentId }
+
+  // A broadcast IS the town televised — the auto-cut camera and its caption are the layout,
+  // not a decoration on top of one. So the flag decides the lens rather than sitting beside
+  // it, and the reading surfaces a stream has no reader for are not addressable at all.
+  if (broadcastFromSearch(search)) {
+    return { lens: 'director', moment, momentId: null, agentId: null, openId: null, broadcast: true }
+  }
+  return { lens, moment, momentId, agentId, openId, broadcast: false }
 }
 
 export function routeToPath(r: Route): string {
@@ -42,6 +57,10 @@ export function routeToPath(r: Route): string {
   const params = new URLSearchParams()
   if (r.lens !== 'map') params.set('lens', r.lens)
   if (r.agentId !== null) params.set('agent', r.agentId)
+  if (r.openId !== null) params.set('open', r.openId)
+  // Every scrub rewrites the address bar in place. Drop the flag here and the first minute
+  // that passes takes the stream frame away with it.
+  if (r.broadcast) params.set(BROADCAST_PARAM, '1')
   const q = params.toString()
   return q === '' ? path : `${path}?${q}`
 }
@@ -70,6 +89,9 @@ export function backToRoster(r: Route): Route {
  * first.
  */
 export function navToLens(r: Route, lens: Lens): Route {
+  // The stream frame has one view by construction. Its tabs are gone, but the left/right keys
+  // are still live on the canvas, and a stray press must not walk a broadcast into the roster.
+  if (r.broadcast) return r
   if (lens === ROSTER_LENS && isSingleAgentView(r)) return { ...r, agentId: null }
   return { ...r, lens }
 }

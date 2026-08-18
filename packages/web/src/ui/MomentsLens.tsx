@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { MomentsResponseSchema, tickToMoment, type Moment } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
+import type { Scene } from '../render/scene.js'
 import type { ObservatoryHandle } from '../net/socket.js'
 import type { PeopleIndex } from './bondsModel.js'
+import { DirectorMode } from './DirectorMode.js'
+import { stripLayout } from './frame.js'
 import { thumbLabel, thumbMotif, thumbTitle } from './momentThumb.js'
 import {
   idlePlayer, nextPlaySpeed, pausePlayer, playPlayer, seekPlayer, tickPlayer,
@@ -80,11 +83,70 @@ export function MomentCardView({ moment, people, open, onOpen }: {
         <span className="thumb-body">
           <span className="thumb-day">Day {label.day}</span>
           <span className="thumb-title">{thumbTitle(moment)}</span>
-          <span className="thumb-cast">{label.cast}</span>
-          {label.location !== null && <span className="thumb-where">{label.location}</span>}
+          {/* one line inside a filmstrip card: the whole postcard is still in the aria-label */}
+          <span className="thumb-meta">
+            <span className="thumb-cast">{label.cast}</span>
+            {label.location !== null && <span className="thumb-where">{label.location}</span>}
+          </span>
         </span>
       </button>
     </li>
+  )
+}
+
+/**
+ * U16 — THE PICTURE IS THE PICTURE, AND THE BAND IS THE FILMSTRIP.
+ *
+ * The stage is three boxes (`frame.ts`) and every surface is placed into one of them. The top
+ * band is the letterbox; the BOTTOM band is this strip, so the rail that used to run the full
+ * height of the stage over both bars is gone and the 12% is spent on something.
+ *
+ * Pure by construction: the scroll offset comes from `stripLayout`, so where the strip has got
+ * to is a number a test can read rather than a scrollLeft nobody can.
+ */
+export function MomentsFrameView({
+  moments, people, momentId, letterboxed, leaving, bandW, onOpen, children,
+}: {
+  moments: Moment[] | null
+  people: PeopleIndex
+  momentId: number | null
+  letterboxed: boolean
+  leaving: boolean
+  bandW: number
+  onOpen: (id: number) => void
+  children?: ReactNode
+}) {
+  const days = moments ?? []
+  const { scrollX } = stripLayout(days.length, days.findIndex((m) => m.id === momentId), bandW)
+
+  // ★ WHAT THE BROWSER CAUGHT. A computed `translate` put the open day in the middle of the
+  // band and left every card past the edge unreachable: the strip clipped, so tabbing to the
+  // sixth day focused something nobody could see. The strip scrolls NATIVELY — which is how
+  // focus gets carried into view for free — and `stripLayout` drives that scroll rather than
+  // replacing it, so opening a day still centres it.
+  const stripRef = useRef<HTMLOListElement>(null)
+  useEffect(() => {
+    if (stripRef.current !== null) stripRef.current.scrollLeft = scrollX
+  }, [scrollX])
+
+  return (
+    <div className="moments-lens" data-letterboxed={letterboxed ? 'true' : 'false'}>
+      {letterboxed && <div className={leaving ? 'letterbox top leaving' : 'letterbox top'} />}
+      <div className="film-strip" role="group" aria-label="The days the town kept">
+        {moments !== null && days.length === 0 ? (
+          <p className="feed-empty">{EMPTY_COPY.moments}</p>
+        ) : (
+          <ol ref={stripRef} className="strip-list" data-scroll-x={scrollX}>
+            {days.map((m) => (
+              <MomentCardView
+                key={m.id} moment={m} people={people} open={m.id === momentId} onOpen={onOpen}
+              />
+            ))}
+          </ol>
+        )}
+      </div>
+      {children}
+    </div>
   )
 }
 
@@ -161,15 +223,22 @@ export function PlayerStripView({ moment, player, onToggle, onSeek, onSpeed, onL
   )
 }
 
-export function MomentsLens({ store, handle, momentId, onOpen }: {
+export function MomentsLens({ store, handle, scene, momentId, televised, leaving, onOpen }: {
   store: WorldStore
   handle: ObservatoryHandle | null
+  scene: Scene | null
   momentId: number | null
+  /** the live town, auto-cut by heat — as opposed to a recorded day playing back */
+  televised: boolean
+  /** held mounted for one beat while the bands slide out */
+  leaving: boolean
   onOpen: (id: number | null) => void
 }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const [moments, setMoments] = useState<Moment[] | null>(null)
   const [player, setPlayer] = useState<PlayerState>(() => idlePlayer(0))
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [bandW, setBandW] = useState(0)
 
   useEffect(() => {
     let alive = true
@@ -180,6 +249,17 @@ export function MomentsLens({ store, handle, momentId, onOpen }: {
       })
       .catch(() => { /* the town is still watchable without its record */ })
     return () => { alive = false }
+  }, [])
+
+  // The strip's scroll is computed, not scrolled, so the band's own width is the only thing
+  // the DOM has to tell us. ResizeObserver rather than a window listener: the stage narrows
+  // when a side panel opens without the window changing at all.
+  useEffect(() => {
+    const el = rootRef.current
+    if (el === null || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(([entry]) => setBandW(entry?.contentRect.width ?? 0))
+    ro.observe(el)
+    return () => ro.disconnect()
   }, [])
 
   const people: PeopleIndex = useMemo(() => {
@@ -240,38 +320,36 @@ export function MomentsLens({ store, handle, momentId, onOpen }: {
     onOpen(null)
   }
 
+  // Audit M7: the letterbox and the camera move belong to the composed view, not to whichever
+  // of two siblings happened to be mounted. The bands are the frame; the auto-cut runs only
+  // while the town is being televised, so it cannot fight a recorded day's playback.
+  const letterboxed = momentId !== null || televised
+
   return (
-    <div className="moments-lens">
-      <div className="moments-rail" role="group" aria-label="The days the town kept">
-        <h2 className="px-title">Moments</h2>
-        {moments !== null && moments.length === 0 ? (
-          <p className="feed-empty">{EMPTY_COPY.moments}</p>
-        ) : (
-          <ol className="moments-list">
-            {(moments ?? []).map((m) => (
-              <MomentCardView
-                key={m.id}
-                moment={m}
-                people={people}
-                open={m.id === momentId}
-                onOpen={onOpen}
-              />
-            ))}
-          </ol>
+    <div ref={rootRef} className="moments-frame">
+      <MomentsFrameView
+        moments={moments}
+        people={people}
+        momentId={momentId}
+        letterboxed={letterboxed}
+        leaving={leaving}
+        bandW={bandW}
+        onOpen={onOpen}
+      >
+        <DirectorMode store={store} scene={scene} autoCut={televised} leaving={leaving} />
+        {open !== null && (
+          <PlayerStripView
+            moment={open}
+            player={player}
+            onToggle={() =>
+              setPlayer((prev) =>
+                prev.status === 'playing' ? pausePlayer(prev) : playPlayer(prev, open.startTick, open.endTick))}
+            onSeek={seek}
+            onSpeed={() => setPlayer((prev) => ({ ...prev, speed: nextPlaySpeed(prev.speed) }))}
+            onLive={goLive}
+          />
         )}
-      </div>
-      {open !== null && (
-        <PlayerStripView
-          moment={open}
-          player={player}
-          onToggle={() =>
-            setPlayer((prev) =>
-              prev.status === 'playing' ? pausePlayer(prev) : playPlayer(prev, open.startTick, open.endTick))}
-          onSeek={seek}
-          onSpeed={() => setPlayer((prev) => ({ ...prev, speed: nextPlaySpeed(prev.speed) }))}
-          onLive={goLive}
-        />
-      )}
+      </MomentsFrameView>
     </div>
   )
 }

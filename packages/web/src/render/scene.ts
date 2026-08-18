@@ -1,4 +1,4 @@
-import { Application, Container, Graphics, Matrix, RenderTexture, Sprite, TextureSource } from 'pixi.js'
+import { Application, Container, Graphics, RenderTexture, Sprite, TextureSource } from 'pixi.js'
 import type { ApplicationOptions, FederatedPointerEvent, Texture } from 'pixi.js'
 import type { AssetRecord } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
@@ -6,13 +6,26 @@ import type { WorldStore } from '../state/worldStore.js'
 import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import {
-  ROAD_SHOULDER, groundArtSignature, groundField, roadRibbonPolys, roadShoulderPolys,
+  ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, fitStop, initialZoom, nearestStop,
+  drawnBoundsOf, resizeIntent, zoomScaleAt, zoomSettled, zoomTo, zoomWheel,
+  type CameraBounds, type ZoomState, type ZoomStop,
+} from './camera.js'
+import {
+  OCTAVE_ALPHA, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField,
+  isRoadMass, materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
 } from './groundField.js'
+import { applyDepthOrder, createLayers, type DepthEntry, type LayerSet } from './layers.js'
+import { createTooltipLayer, type TooltipLayer } from './tooltip.js'
+import { HEADLAND_COLOR, KERB_COLOR, furrowLines, patchOutline, type Tile } from './patches.js'
+import { tileKind } from './tileset.js'
 import { TextureBook } from './textures.js'
 
 export const BACKGROUND = 0x322b38
-export const ZOOM_MIN = 1
-export const ZOOM_MAX = 4
+/** The camera's bounds are the ends of `ZOOM_STOPS` (task 75) — one source, so the HUD's
+ *  disabled state and the wheel's clamp can never disagree. `ZOOM_MIN` is 0.5 now: the
+ *  overview stop that makes the whole town visible at once. */
+export const ZOOM_MIN: ZoomStop = ZOOM_STOPS[0]
+export const ZOOM_MAX: ZoomStop = ZOOM_STOPS[ZOOM_STOPS.length - 1]!
 
 // THE BAKE SEAM (C11 §9 supersession point). One whole-map pass is correct at the 48×48
 // showcase scale; C11's 128×128 growth map replaces this with a chunked, dirty-rebake baker.
@@ -30,54 +43,110 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
 
   // TERRAIN V2. One pass PER TERRAIN, not one stamp per tile. Every tile of a terrain
   // contributes its outline to a single Graphics, and that whole shape is filled from the
-  // terrain's material with an IDENTITY matrix — so the texture is sampled in bake space,
-  // which is world space. The material therefore flows across tile boundaries, and nothing
-  // in the picture varies at tile frequency. The old `shade` checkerboard is gone with it:
-  // alternating every other diamond by 15% was a literal checkerboard in the fallback path.
+  // terrain's material in bake space, which is world space. The material therefore flows
+  // across tile boundaries, and nothing in the picture varies at tile frequency. The old
+  // `shade` checkerboard is gone with it: alternating every other diamond by 15% was a
+  // literal checkerboard in the fallback path.
+  //
+  // V2.2 (U6): the fill matrix is no longer the identity. An identity tiled one 256px material
+  // on an axis-aligned lattice across the whole map, so the pattern the eye found had simply
+  // moved from tile frequency to material frequency.
   function draw(terrain: TileId[][], records: AssetRecord[], offX: number): void {
     if (target === null) return
     const layer = new Container()
-    for (const l of groundField(terrain, records).layers) {
+    for (const [li, l] of groundField(terrain, records).layers.entries()) {
       // A road needs a rim or it disappears into the grass at 1x — v1's art carried a painted
       // edge and the material does not. Every shoulder is laid down BEFORE any ribbon, so a
       // neighbour's rim can never sit on top of this tile's surface.
       if (l.kind === 'road') {
-        const sh = new Graphics()
-        for (const shape of l.shapes) {
-          if (shape.roadKey === null) continue
-          for (const poly of roadShoulderPolys(shape.roadKey)) {
-            const pts: number[] = []
-            for (let i = 0; i < poly.length; i += 2) {
-              pts.push(shape.sx + offX + poly[i]!, shape.sy + poly[i + 1]!)
+        // Two tones across the rim's depth: light where the shoulder meets the ground, dark
+        // where it meets the road. One flat shoulder measured only 0.060 luma from the grass,
+        // which is why a road vanished at 1x (U5).
+        for (const [tone, pick] of [
+          [ROAD_SHOULDER_LIGHT, 'light'], [ROAD_SHOULDER_DARK, 'dark'],
+        ] as const) {
+          const sh = new Graphics()
+          for (const shape of l.shapes) {
+            if (shape.roadKey === null) continue
+            for (const poly of roadShoulderBands(shape.roadKey)[pick]) {
+              const pts: number[] = []
+              for (let i = 0; i < poly.length; i += 2) {
+                pts.push(shape.sx + offX + poly[i]!, shape.sy + poly[i + 1]!)
+              }
+              sh.poly(pts)
             }
-            sh.poly(pts)
+          }
+          sh.fill(tone)
+          layer.addChild(sh)
+        }
+      }
+      // the layer's mask, laid down once per pass
+      const shapesInto = (g: Graphics): void => {
+        for (const shape of l.shapes) {
+          const cx = shape.sx + offX, cy = shape.sy
+          if (shape.roadKey === null) {
+            g.poly([cx, cy, cx + TILE_W / 2, cy + TILE_H / 2, cx, cy + TILE_H, cx - TILE_W / 2, cy + TILE_H / 2])
+            continue
+          }
+          for (const poly of roadRibbonPolys(shape.roadKey)) {
+            const pts: number[] = []
+            for (let i = 0; i < poly.length; i += 2) pts.push(cx + poly[i]!, cy + poly[i + 1]!)
+            g.poly(pts)
           }
         }
-        sh.fill(ROAD_SHOULDER)
-        layer.addChild(sh)
       }
+
       const g = new Graphics()
-      for (const shape of l.shapes) {
-        const cx = shape.sx + offX, cy = shape.sy
-        if (shape.roadKey === null) {
-          g.poly([cx, cy, cx + TILE_W / 2, cy + TILE_H / 2, cx, cy + TILE_H, cx - TILE_W / 2, cy + TILE_H / 2])
-          continue
-        }
-        for (const poly of roadRibbonPolys(shape.roadKey)) {
-          const pts: number[] = []
-          for (let i = 0; i < poly.length; i += 2) pts.push(cx + poly[i]!, cy + poly[i + 1]!)
-          g.poly(pts)
-        }
-      }
+      shapesInto(g)
       const tex = l.url === null ? undefined : loaded.get(l.url)
       if (tex === undefined) {
         g.fill(l.fallback)                     // art independence: palette-true flat ground
+        layer.addChild(g)
       } else {
         tex.source.addressMode = 'repeat'      // the field wraps; the material must too
-        g.fill({ texture: tex, matrix: new Matrix() })
+        // An IDENTITY matrix tiled one 256px material on an axis-aligned lattice across the
+        // whole map — tile-frequency pattern replaced by material-frequency pattern (U6). Each
+        // layer now samples through its own rotation and offset.
+        g.fill({ texture: tex, matrix: materialMatrix(l.id, li) })
+        layer.addChild(g)
+        // One coarser pass at an incommensurate scale. Two periods with no common multiple
+        // inside the map cannot line up into a lattice. One extra fill per ground layer, at
+        // bake time — not a frame cost.
+        const oct = new Graphics()
+        shapesInto(oct)
+        oct.fill({ texture: tex, matrix: octaveMatrix(l.id, li), alpha: OCTAVE_ALPHA })
+        layer.addChild(oct)
       }
+    }
+    // U7: a patch was only ever the union of its tiles' diamonds under one material — a shape
+    // with no edge, which is what read as an amorphous blob. Paved ground gets a kerb, a field
+    // gets a headland and furrows. All of it lands in the BAKE, so it costs nothing per frame.
+    const plaza: Tile[] = [], farmland: Tile[] = []
+    for (let y = 0; y < terrain.length; y++) {
+      const row = terrain[y]!
+      for (let x = 0; x < row.length; x++) {
+        if (tileKind(row[x]!) === 'farmland') farmland.push({ x, y })
+        else if (isRoadMass(terrain, x, y)) plaza.push({ x, y })
+      }
+    }
+
+    const strokeAt = (polys: number[][], color: number, alpha: number, close: boolean): void => {
+      if (polys.length === 0) return
+      const g = new Graphics()
+      for (const poly of polys) {
+        const pts: number[] = []
+        for (let i = 0; i < poly.length; i += 2) pts.push(poly[i]! + offX, poly[i + 1]!)
+        if (close) g.poly(pts)
+        else { g.moveTo(pts[0]!, pts[1]!); g.lineTo(pts[2]!, pts[3]!) }
+      }
+      g.stroke({ color, alpha, width: 1, alignment: 0.5 })
       layer.addChild(g)
     }
+
+    strokeAt(furrowLines(farmland), HEADLAND_COLOR, OCTAVE_ALPHA, false)
+    strokeAt(patchOutline(farmland), HEADLAND_COLOR, 1, true)
+    strokeAt(patchOutline(plaza), KERB_COLOR, 1, true)
+
     app.renderer.render({ container: layer, target, clear: true })
     layer.destroy({ children: true })
   }
@@ -117,16 +186,71 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
   }
 }
 
+/**
+ * A SCENE'S CLOCK, HELD BY THE SCENE RATHER THAN REACHED FOR THROUGH `app.ticker`.
+ *
+ * Pixi's `Application.destroy()` nulls that field, so an effect queued before a teardown lands
+ * after it and throws `Cannot read properties of null (reading 'start')` — the load-time error
+ * R1 forbids. A closed scene does nothing when it is asked to tick, because that is the truth
+ * about it; it is not a null-check standing in for one.
+ */
+export function sceneClock(app: { ticker: { start(): void; stop(): void } | null }): {
+  set(on: boolean): void
+  close(): void
+} {
+  let closed = false
+  return {
+    set: (on) => {
+      if (closed) return
+      if (on) app.ticker!.start()
+      else app.ticker!.stop()
+    },
+    close: () => { closed = true },
+  }
+}
+
 export type Scene = {
   app: Application
+  /** Run or pause the scene's own clock. The ONLY way to do it: `app.ticker` is null on a
+   *  destroyed scene, and a caller upstream of the teardown cannot know which it is holding. */
+  setTicking(on: boolean): void
+  /** How much larger than the reader's size a world caption is drawn — 1 for a person at a
+   *  desk, `BROADCAST_TEXT_SCALE` for the frame a stream viewer sees at a quarter scale. */
+  textScale: number
   world: Container
+  /** the eight named layers — the one place that decides what is drawn over what */
+  layers: LayerSet
+  /** the only depth-sorted layer; `layers.entities`, named for the code that lives in it */
   entities: Container
+  /** register what this module draws into `entities`; returns the unregister */
+  addDepthSource(fn: () => DepthEntry[]): () => void
+  /** one painter's order for the whole frame — called once per tick, by StageMount */
+  sortDepth(): void
+  /** the visible world rectangle, in the space labels are drawn in (tooltip.ts places in it) */
+  viewRect(): { x: number; y: number; w: number; h: number }
+  /** THE label layer. One owner for every world tag, so two can never be up by accident and
+   *  a torn-down sprite cannot leave one behind. */
+  tags: TooltipLayer
+  /** above the entities and never hit-tested: place names and other reading aids */
+  overlay: Container
   rebakeGround(terrain: TileId[][], records?: AssetRecord[]): void
   centerOn(x: number, y: number): void
-  setZoom(z: 1 | 2 | 3 | 4): void
+  /** the same move in the space `tileToScreen` returns, so a camera can be put back EXACTLY
+   *  where it was rather than on the nearest whole tile (interiorScene's `restoreCamera`) */
+  centerOnScreen(sx: number, sy: number): void
+  /** move to a named rest stop, turning about the screen centre */
+  setZoom(stop: ZoomStop): void
+  /** move to a named rest stop, keeping the world point under (screenX, screenY) fixed */
+  setZoomAt(stop: ZoomStop, screenX: number, screenY: number): void
+  /** the scale being drawn this frame — animated during a transit */
   getZoom(): number
+  /** where the camera is going, and where it will be at rest. The HUD reads THIS, so a label
+   *  never shows a number the stop set does not contain. */
+  getZoomStop(): ZoomStop
   panBy(dx: number, dy: number): void
   centerHome(): void
+  /** a view of the whole settlement, at the largest stop it fits at (task 76) */
+  fitToTown(): void
   onCamera(cb: () => void): () => void
   setFollow(target: (() => { x: number; y: number } | null) | null): void
   /** fires when a user gesture (drag, pan, recenter) takes the camera back */
@@ -158,20 +282,43 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const app = new Application()
   await app.init(rendererOptions(rootEl, globalThis.devicePixelRatio))
   rootEl.appendChild(app.canvas)
-  // resizeTo only tracks window resizes; panel open/close changes the root element itself
-  const ro = new ResizeObserver(() => app.resize())
+  // resizeTo only tracks window resizes; a panel opening, or the control bar moving to
+  // another edge (task 78), changes the root element itself — and a stage that got smaller
+  // can leave the camera showing outside the world, so the clamp runs with it. A camera that
+  // was showing the WHOLE TOWN re-fits instead: it only re-clamped, and the town fell off the
+  // edge of a narrower stage until the viewer pressed the overview again.
+  const ro = new ResizeObserver(() => {
+    app.resize()
+    const intent = resizeIntent(fitted, townBox(), screenBox())
+    if (intent.kind === 'refit') fitTo(intent.stop)
+    else place(world.position.x, world.position.y)
+  })
   ro.observe(rootEl)
 
   const world = new Container()
-  const entities = new Container()
-  entities.sortableChildren = true
+  // One table decides what is over what (layers.ts). A label is a reading aid, not a thing in
+  // the world: every layer but `entities` is event-inert, so it can never steal a click from
+  // the building it names.
+  const layers = createLayers(world)
 
   const groundSprite = new Sprite()
-  world.addChild(groundSprite)
-  world.addChild(entities)
+  layers.ground.addChild(groundSprite)
   app.stage.addChild(world)
 
+  const viewRect = (): { x: number; y: number; w: number; h: number } => {
+    const k = world.scale.x || 1
+    return {
+      x: -world.position.x / k, y: -world.position.y / k,
+      w: app.screen.width / k, h: app.screen.height / k,
+    }
+  }
+  const tags = createTooltipLayer(layers, viewRect, () => world.scale.x)
+
   const tileCbs: Array<(t: { x: number; y: number }) => void> = []
+
+  // The depth sort has ONE owner and runs ONCE a frame over the whole live set. Modules
+  // publish the ground they stand on; nobody publishes an opinion about who is in front.
+  const depthSources = new Set<() => DepthEntry[]>()
 
   const book = new TextureBook()
   const baker = createGroundBaker(app, groundSprite, book)
@@ -180,9 +327,57 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     baker.rebake(terrain, records ?? store.assetRecords())
   }
 
+  // THE EDGES (task 76). Every write to `world.position` goes through the clamp, so there is
+  // no path by which a drag, a pan, a follow or a zoom can push the town off the screen.
+  let bounds: CameraBounds = cameraBoundsOf([])
+  const screenBox = (): { w: number; h: number } => ({ w: app.screen.width, h: app.screen.height })
+
+  function place(x: number, y: number): void {
+    const p = clampCamera({ x, y }, world.scale.x, bounds, screenBox())
+    world.position.set(p.x, p.y)
+  }
+
+  function centerOnScreen(sx: number, sy: number): void {
+    place(app.screen.width / 2 - sx * world.scale.x, app.screen.height / 2 - sy * world.scale.y)
+  }
+
   function centerOn(x: number, y: number): void {
     const { sx, sy } = tileToScreen(x, y)
-    world.position.set(app.screen.width / 2 - sx * world.scale.x, app.screen.height / 2 - sy * world.scale.y)
+    centerOnScreen(sx, sy)
+  }
+
+  /** The settlement AS DRAWN, or the whole map when nothing has been built yet. Drawn, not
+   *  footprint: a sprite overhangs its own ground, and fitting the ground cuts the roofs off. */
+  function townBox(): CameraBounds {
+    const s = store.getState()
+    const list = s === null ? [] : Object.values(s.structures)
+    return list.length === 0 ? bounds : drawnBoundsOf(list)
+  }
+
+  /** A VIEW OF THE WHOLE TOWN: the largest stop at which the settlement fits with a margin,
+   *  centred on the settlement — not on the middle of a mostly-empty terrain array. The
+   *  transit reuses the zoom anchor, so the town eases into the middle of the stage rather
+   *  than jumping there. */
+  /** True while the camera is showing the whole town — set by a fit, cleared the moment the
+   *  viewer takes the camera anywhere themselves. A resize honours the view that was asked
+   *  for and leaves a steered camera alone. */
+  let fitted = false
+
+  function fitTo(stop: ZoomStop): void {
+    breakFollow()
+    const c = boundsCentre(townBox())
+    anchor = { sx: app.screen.width / 2, sy: app.screen.height / 2, wx: c.sx, wy: c.sy }
+    fitted = true
+    if (stop === zoom.stop) {
+      centerOnScreen(c.sx, c.sy)
+      notifyCamera()
+      return
+    }
+    zoom = zoomTo(zoom, stop, performance.now())
+  }
+
+  function fitToTown(): void {
+    fitTo(fitStop(townBox(), screenBox()))
   }
 
   // smooth follow: eases the camera toward a moving world-space anchor each frame
@@ -201,8 +396,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     const ty = app.screen.height / 2 - t.y * world.scale.y
     // frame-rate independent lerp (~12%/frame at 60fps)
     const k = 1 - Math.pow(0.88, app.ticker.deltaMS / 16.7)
-    world.position.x += (tx - world.position.x) * k
-    world.position.y += (ty - world.position.y) * k
+    place(world.position.x + (tx - world.position.x) * k, world.position.y + (ty - world.position.y) * k)
   }
   app.ticker.add(followTick)
 
@@ -211,14 +405,35 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     for (const cb of cameraCbs) cb()
   }
 
-  function setZoom(z: 1 | 2 | 3 | 4): void {
-    // keep the screen center fixed while zooming
-    const cx = app.screen.width / 2
-    const cy = app.screen.height / 2
-    const wx = (cx - world.position.x) / world.scale.x
-    const wy = (cy - world.position.y) / world.scale.y
-    world.scale.set(z)
-    world.position.set(cx - wx * z, cy - wy * z)
+  // THE ZOOM (task 75). Rest stops stay exact so the pixel grid stays exact; the transit
+  // between them is eased, and it turns about the world point under the POINTER rather than
+  // about the screen centre, so zooming toward a thing keeps that thing where it is.
+  let zoom: ZoomState = initialZoom(1)
+  let anchor = { sx: 0, sy: 0, wx: 0, wy: 0 }
+
+  function captureAnchor(sx: number, sy: number): void {
+    const k = world.scale.x || 1
+    anchor = { sx, sy, wx: (sx - world.position.x) / k, wy: (sy - world.position.y) / k }
+  }
+
+  function setZoomAt(stop: ZoomStop, screenX: number, screenY: number): void {
+    if (stop === zoom.stop && zoomSettled(zoom, performance.now())) return
+    fitted = false
+    captureAnchor(screenX, screenY)
+    zoom = zoomTo(zoom, stop, performance.now())
+  }
+
+  const setZoom = (stop: ZoomStop): void =>
+    setZoomAt(stop, app.screen.width / 2, app.screen.height / 2)
+
+  // One ticker step applies the eased scale. A settled camera costs one comparison a frame.
+  const zoomTick = (): void => {
+    const s = zoomScaleAt(zoom, performance.now())
+    if (s === world.scale.x) return
+    world.scale.set(s)
+    // While a follow is running it owns the position; otherwise the anchor stays put.
+    if (followFn === null) place(anchor.sx - anchor.wx * s, anchor.sy - anchor.wy * s)
+    else place(world.position.x, world.position.y)
     notifyCamera()
   }
 
@@ -241,10 +456,10 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     const dy = e.global.y - last.y
     if (Math.abs(dx) + Math.abs(dy) > 2) {
       moved = true
+      fitted = false
       breakFollow() // the viewer takes the camera back
     }
-    world.position.x += dx
-    world.position.y += dy
+    place(world.position.x + dx, world.position.y + dy)
     last = { x: e.global.x, y: e.global.y }
   })
   const endDrag = (): void => {
@@ -260,13 +475,15 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     const t = screenToTile(wx, wy)
     for (const cb of tileCbs) cb(t)
   })
+  // Six lines: read the delta, ask the pure rule, store. The DOM half has no logic (P6).
   const onWheel = (e: WheelEvent): void => {
     e.preventDefault()
-    const cur = Math.round(world.scale.x)
-    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, cur + (e.deltaY < 0 ? 1 : -1)))
-    setZoom(next as 1 | 2 | 3 | 4)
+    const next = zoomWheel(zoom, e.deltaY, performance.now())
+    if (next.stop !== zoom.stop) captureAnchor(e.offsetX, e.offsetY)
+    zoom = next
   }
   app.canvas.addEventListener('wheel', onWheel, { passive: false })
+  app.ticker.add(zoomTick)
 
   // bake on first snapshot and whenever the terrain array identity changes
   let bakedTerrain: TileId[][] | null = null
@@ -293,10 +510,11 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     const first = bakedTerrain === null
     bakedTerrain = s.terrain
     bakedArtSig = sig
+    bounds = cameraBoundsOf(s.terrain)
     if (first) {
       // the very first map appears immediately; every later one waits for the frame
       rebakeGround(s.terrain)
-      centerOn(s.terrain[0]!.length / 2, s.terrain.length / 2)
+      fitToTown()
       return
     }
     dirty = true
@@ -313,27 +531,52 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const boot = store.getState()
   if (boot !== null) {
     bakedTerrain = boot.terrain
+    bounds = cameraBoundsOf(boot.terrain)
     rebakeGround(boot.terrain)
-    centerOn(boot.terrain[0]!.length / 2, boot.terrain.length / 2)
+    fitToTown()
   }
+
+  const clock = sceneClock(app)
 
   return {
     app,
+    setTicking: clock.set,
+    textScale: 1,
     world,
-    entities,
+    layers,
+    entities: layers.entities,
+    overlay: layers.overlay,
+    addDepthSource: (fn) => {
+      depthSources.add(fn)
+      return () => depthSources.delete(fn)
+    },
+    viewRect,
+    tags,
+    sortDepth: () => {
+      const entries: DepthEntry[] = []
+      for (const fn of depthSources) entries.push(...fn())
+      applyDepthOrder(entries)
+    },
     rebakeGround,
     centerOn,
+    centerOnScreen,
     setZoom,
+    setZoomAt,
     getZoom: () => world.scale.x,
+    getZoomStop: () => zoom.stop,
     panBy: (dx, dy) => {
+      fitted = false
       breakFollow()
-      world.position.x += dx
-      world.position.y += dy
+      place(world.position.x + dx, world.position.y + dy)
     },
     centerHome: () => {
+      fitted = false
       breakFollow()
-      if (bakedTerrain !== null) centerOn(bakedTerrain[0]!.length / 2, bakedTerrain.length / 2)
+      const c = boundsCentre(townBox())
+      centerOnScreen(c.sx, c.sy)
+      notifyCamera()
     },
+    fitToTown,
     onCamera: (cb) => {
       cameraCbs.push(cb)
       return () => {
@@ -342,6 +585,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       }
     },
     setFollow: (target) => {
+      if (target !== null) fitted = false
       followFn = target
     },
     onFollowEnd: (cb) => {
@@ -355,12 +599,15 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       tileCbs.push(cb)
     },
     destroy: () => {
+      clock.close()
       offSub()
       offEvents()
       ro.disconnect()
       app.ticker.remove(followTick)
+      app.ticker.remove(zoomTick)
       app.ticker.remove(bakeTick)
       app.canvas.removeEventListener('wheel', onWheel)
+      tags.destroy()
       baker.destroy()
       app.destroy(true, { children: true })
     },

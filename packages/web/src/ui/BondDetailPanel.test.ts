@@ -3,7 +3,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { Bond } from '@sj/shared'
 import { BondDetailPanel } from './BondDetailPanel.js'
-import { BOND_COLORS } from './bondsModel.js'
+import { bondArc } from './bondModel2.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 
 const bond: Bond = {
@@ -17,29 +17,19 @@ const bond: Bond = {
 }
 
 const people = { alice: { name: 'Alice', alive: true }, bob: { name: 'Bob', alive: true } }
+const arc = bondArc(bond.history, 1500)
 
 const html = renderToStaticMarkup(createElement(BondDetailPanel, {
-  bond, people, maxStrength: 6, onClose: () => {},
+  bond, people, type: 'partner' as const, level: 'friendly' as const, arc,
+  words: 'Alice and Bob are partners, and they are friends.',
+  onClose: () => {},
 }))
 
-describe('BondDetailPanel', () => {
+describe('BondDetailPanel — the landed assertions, carried across the redraw', () => {
   it('says who this is about, in words, at the top', () => {
-    expect(html).toContain('Alice — kept house with — Bob')
-    expect(html).toContain('Kept house')
-  })
-
-  it('draws the bar in the kind’s own colour and measures it against the closest pair', () => {
-    expect(html).toContain(BOND_COLORS.partner)
-    expect(html).toContain('width:50%')
-    expect(html).toContain('aria-label="3 shared moments, out of 6 for the closest pair in town"')
-  })
-
-  it('keeps a single shared moment visible rather than collapsing it to nothing', () => {
-    const thin = renderToStaticMarkup(createElement(BondDetailPanel, {
-      bond: { ...bond, strength: 1, history: [bond.history[0]!] }, people, maxStrength: 40, onClose: () => {},
-    }))
-    expect(thin).toContain('width:6%')
-    expect(thin).toContain('1 shared moment')       // singular, not "1 moments"
+    expect(html).toContain('Alice')
+    expect(html).toContain('Bob')
+    expect(html).toContain('Partners')
   })
 
   it('dates the first and the last of it', () => {
@@ -55,11 +45,29 @@ describe('BondDetailPanel', () => {
 
   it('is a labelled dialog with a way out', () => {
     expect(html).toContain('role="dialog"')
-    expect(html).toContain('aria-label="Alice — kept house with — Bob"')
+    expect(html).toContain('aria-label="Alice and Bob are partners, and they are friends."')
     expect(html).toContain('aria-label="Close this bond"')
   })
 
   it('measures a history and never a score', () => {
     expect(html.replace(/[<>][^<>]*[<>]/g, ' ')).not.toMatch(GAMIFICATION_BAN)
+  })
+})
+
+// THE THREE ENCODINGS THE REDRAW RETIRED. Each of these was in the landed panel and each is a
+// claim the new model can make better — so each is pinned as a thing that must not come back.
+describe('what the redraw took OUT', () => {
+  it('★ the filled strength bar is gone — a relationship is not a meter with a leader', () => {
+    expect(html).not.toContain('bond-bar')
+    expect(html).not.toMatch(/width:\s*\d+%/)
+  })
+
+  it('the "out of N for the closest pair in town" ranking is gone', () => {
+    expect(html).not.toMatch(/out of \d+/)
+    expect(html).not.toContain('closest pair')
+  })
+
+  it('the unsigned "N shared moments" count is gone — it could only ever go up', () => {
+    expect(html).not.toMatch(/shared moments?/)
   })
 })

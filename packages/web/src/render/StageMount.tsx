@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { cameraActionFor, stepZoom } from './cameraNav.js'
 import { createScene, type Scene } from './scene.js'
+import { installFaces } from './textFaces.js'
 import { TextureBook } from './textures.js'
 import { syncEntities } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
@@ -10,12 +11,15 @@ import { createAtmosphere, type Atmosphere } from './atmosphere.js'
 import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 import { createAmbient, type AmbientDirector } from './ambient.js'
 import { createInteriorScene, type InteriorScene } from './interiorScene.js'
+import { createLandmarkLayer, type LandmarkLayer } from './landmarks.js'
 
 // The ONLY React/Pixi contact point — React renders nothing inside the canvas (spec §15).
 export function StageMount(
   { store, onScene, onInterior }: {
     store: WorldStore
-    onScene?: (scene: Scene) => void
+    /** The live scene, and `null` the moment it is torn down — React must never be left
+     *  holding a destroyed one, whose `app.ticker` is null and throws on the next touch. */
+    onScene?: (scene: Scene | null) => void
     /** the interior sub-scene opened or closed — App draws the back-to-town chrome from it */
     onInterior?: (structureId: string | null) => void
   },
@@ -43,6 +47,7 @@ export function StageMount(
     if (rootEl === null) return
     let scene: Scene | null = null
     let disposed = false
+    let published = false
     let offSync: (() => void) | null = null
     let chars: CharacterLayer | null = null
     let bubbles: BubbleLayer | null = null
@@ -50,19 +55,35 @@ export function StageMount(
     let weather: WeatherLayer | null = null
     let ambient: AmbientDirector | null = null
     let interior: InteriorScene | null = null
+    let landmarks: LandmarkLayer | null = null
+    let offCamera: (() => void) | null = null
     let offInterior: (() => void) | null = null
     let offEvents: (() => void) | null = null
     let tickFn: (() => void) | null = null
-    void createScene(rootEl, store).then((s) => {
+    // The town's faces are installed BEFORE the scene exists, so the first label a viewer
+    // sees is already a bitmap glyph. If the webfonts never resolve, installFaces resolves
+    // anyway and worldLabel keeps drawing canvas glyphs — a font must never blank the world.
+    void installFaces(document).then(() => createScene(rootEl, store)).then((s) => {
       if (disposed) {
         s.destroy()
         return
       }
       scene = s
       const book = new TextureBook()
-      const openDoor = (structureId: string): void => interiorRef.current?.setActive(structureId)
-      offSync = store.subscribe(() => syncEntities(s, book, store, openDoor))
+      const openDoor = (structureId: string): void => {
+        s.tags.hideAll()   // a destroyed sprite never fires pointerout (audit M8)
+        interiorRef.current?.setActive(structureId)
+      }
+      landmarks = createLandmarkLayer(s, store)
+      const marks = landmarks
+      offSync = store.subscribe(() => {
+        syncEntities(s, book, store, openDoor)
+        marks.sync()
+      })
       syncEntities(s, book, store, openDoor)
+      // a place name is a map legend: it fades on the way in, so it follows the camera too
+      offCamera = s.onCamera(() => marks.sync())
+      marks.sync()
       chars = createCharacterLayer(s, book, store, (agentId) => {
         // click-to-inspect: the G6 check — route change only, React owns the chrome
         const url = `${location.pathname}?lens=inspector&agent=${encodeURIComponent(agentId)}`
@@ -82,7 +103,10 @@ export function StageMount(
       interior = createInteriorScene(s, store, book)
       s.interior = interior
       interiorRef.current = interior
-      offInterior = interior.onChange((id) => onInteriorRef.current?.(id))
+      offInterior = interior.onChange((id) => {
+        s.tags.hideAll()
+        onInteriorRef.current?.(id)
+      })
       offEvents = store.onEvents((evts) => {
         for (const ev of evts) {
           if (ev.type === 'agent_spoke') {
@@ -98,6 +122,7 @@ export function StageMount(
         const dt = now - lastMs
         lastMs = now
         chars?.tick(now)
+        s.sortDepth()   // one painter's order for the whole frame, after every box is published
         bubbles?.tick(now)
         weather?.tick(dt)
         ambient?.tick(dt)
@@ -113,15 +138,21 @@ export function StageMount(
         }
       }
       s.app.ticker.add(tickFn)
+      published = true
       onScene?.(s)
     })
     return () => {
       disposed = true
+      // Fast Refresh remounts this component and the effect below destroys the scene; without
+      // this line the chrome upstream keeps the dead one and throws on its next ticker call.
+      if (published) onScene?.(null)
       offSync?.()
       offEvents?.()
+      offCamera?.()
       offInterior?.()
       if (tickFn !== null && scene !== null) scene.app.ticker.remove(tickFn)
       interiorRef.current = null
+      landmarks?.destroy()
       interior?.destroy()
       chars?.destroy()
       bubbles?.destroy()

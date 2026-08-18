@@ -1,3 +1,4 @@
+import { kindWords } from './broadcastReady.js'
 import { chronicleLine, type SimEvent } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 
@@ -6,8 +7,10 @@ export function describeEvent(ev: SimEvent, state: WorldState | null): string | 
   const p = ev.payload as Record<string, unknown>
   const name = (agentId: unknown): string =>
     (typeof agentId === 'string' ? state?.agents[agentId]?.name ?? agentId : 'Someone')
+  // R4: a kind is a slug in the engine and PROSE to a viewer. The chronicle read "The
+  // fire_pit is finished." on screen until this went through kindWords.
   const structureKind = (id: unknown): string =>
-    (typeof id === 'string' ? state?.structures[id]?.kind ?? 'building' : 'building')
+    kindWords(typeof id === 'string' ? state?.structures[id]?.kind ?? 'building' : 'building')
 
   switch (ev.type) {
     case 'agent_spoke':
@@ -34,9 +37,9 @@ export function describeEvent(ev: SimEvent, state: WorldState | null): string | 
     case 'structure_completed':
       return `The ${structureKind(p.id)} is finished.`
     case 'structure_planned':
-      return `${name(p.builderId)} began a ${String(p.kind)}.`
+      return `${name(p.builderId)} began a ${kindWords(String(p.kind))}.`
     case 'crop_planted':
-      return `${String(p.kind)} was planted.`
+      return `${kindWords(String(p.kind))} was planted.`
     case 'crop_harvested': {
       const kind = typeof p.cropId === 'string' ? state?.crops[p.cropId]?.kind ?? 'harvest' : 'harvest'
       return `The ${kind} came in.`
@@ -44,7 +47,7 @@ export function describeEvent(ev: SimEvent, state: WorldState | null): string | 
     case 'fire_ignited':
       return `Fire! The ${structureKind(p.structureId)} is burning.`
     case 'weather_changed':
-      return `The weather turned ${String(p.kind)}.`
+      return `The weather turned ${kindWords(String(p.kind))}.`
     case 'agent_collapsed':
       return `${name(p.agentId)} collapsed.`
     case 'action_completed':

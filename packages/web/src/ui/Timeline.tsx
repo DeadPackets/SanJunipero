@@ -1,13 +1,130 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { MINUTES_PER_DAY, momentToTick, tickToMoment } from '@sj/shared'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { MINUTES_PER_DAY, tickToMoment } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { ObservatoryHandle } from '../net/socket.js'
+import {
+  MARK_GLYPH, MARK_GLYPH_PX, MARK_GLYPH_SCALE, coalesceMarks, markLeft, marksFrom, tipSide,
+  type Mark, type MarkSources,
+} from './timelineMarks.js'
 
 export const KEY_STEP_TICKS = 10
 export const KEY_PAGE_TICKS = MINUTES_PER_DAY
 
-// C7 writes one chapter per day; the anchor sits at that day's first minute.
-type Chapter = { day: number; title: string }
+/** The marks come from the record, in one request. Refreshed slowly, because a mark is a
+ *  thing that already happened and re-folding it per frame would buy nothing. */
+export const MARKS_REFETCH_MS = 30_000
+
+const EMPTY_SOURCES: MarkSources = { chapters: [], milestones: [], moments: [], changes: [], events: [] }
+
+function MarkGlyph({ mark }: { mark: Mark }) {
+  return (
+    <svg
+      className="mark-glyph" viewBox={`0 0 ${MARK_GLYPH_PX} ${MARK_GLYPH_PX}`}
+      width={MARK_GLYPH_PX * MARK_GLYPH_SCALE} height={MARK_GLYPH_PX * MARK_GLYPH_SCALE}
+      shapeRendering="crispEdges" aria-hidden="true" focusable="false"
+    >
+      {MARK_GLYPH[mark.kind].map(([x, y, fill]) => (
+        <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
+      ))}
+    </svg>
+  )
+}
+
+export function TimelineView({ edge, viewTick, live, marks, onScrub, onLive }: {
+  edge: number
+  viewTick: number
+  live: boolean
+  marks: readonly Mark[]
+  onScrub: (tick: number) => void
+  onLive: () => void
+}) {
+  const span = Math.max(1, edge)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const frac = Math.min(1, viewTick / span)
+  const m = tickToMoment(viewTick)
+
+  const pick = (clientX: number): void => {
+    const el = trackRef.current
+    if (el === null) return
+    const r = el.getBoundingClientRect()
+    onScrub(((clientX - r.left) / r.width) * span)
+  }
+
+  const onKey = (e: React.KeyboardEvent): void => {
+    const step =
+      e.key === 'ArrowLeft' ? -KEY_STEP_TICKS
+      : e.key === 'ArrowRight' ? KEY_STEP_TICKS
+      : e.key === 'PageDown' ? -KEY_PAGE_TICKS
+      : e.key === 'PageUp' ? KEY_PAGE_TICKS
+      : null
+    if (step !== null) {
+      e.preventDefault()
+      onScrub(viewTick + step)
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      onScrub(0)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      onLive()
+    }
+  }
+
+  const gridDays = Array.from({ length: Math.floor(span / MINUTES_PER_DAY) + 1 }, (_, d) => d)
+
+  return (
+    <div className="timeline" role="group" aria-label="Town timeline">
+      <div className="timeline-body">
+        <div className="timeline-marks">
+          {marks.map((mk) => {
+            const at = tickToMoment(mk.tick)
+            return (
+              <button
+                key={`${mk.kind}-${mk.tick}`}
+                type="button"
+                className={`mark ${mk.kind}`}
+                style={{ left: markLeft(mk.tick, span) }}
+                aria-label={`Day ${at.day} ${at.time} — ${mk.words}. Go to this moment.`}
+                onClick={() => onScrub(mk.tick)}
+              >
+                <MarkGlyph mark={mk} />
+                <span className="mark-tip" data-side={tipSide(mk.tick, span)}>{mk.words}</span>
+              </button>
+            )
+          })}
+        </div>
+        <div
+          ref={trackRef}
+          className="timeline-track"
+          role="slider"
+          tabIndex={0}
+          aria-label="Moment in the town's history"
+          aria-valuemin={0}
+          aria-valuemax={edge}
+          aria-valuenow={viewTick}
+          aria-valuetext={`Day ${m.day} ${m.time}`}
+          onKeyDown={onKey}
+          onPointerDown={(e) => {
+            ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
+            pick(e.clientX)
+          }}
+          onPointerMove={(e) => {
+            if (e.buttons === 1) pick(e.clientX)
+          }}
+        >
+          {gridDays.map((d) => (
+            <span key={d} className="timeline-day" style={{ left: `${(d * MINUTES_PER_DAY * 100) / span}%` }}>
+              <em>Day {d}</em>
+            </span>
+          ))}
+          <span className="playhead" style={{ left: `${frac * 100}%` }} />
+        </div>
+      </div>
+      <button className={live ? 'live-pill live' : 'live-pill'} onClick={onLive} aria-pressed={live}>
+        {live ? 'LIVE' : 'Return to now'}
+      </button>
+    </div>
+  )
+}
 
 export function Timeline({ store, handle, onView }: {
   store: WorldStore
@@ -20,20 +137,34 @@ export function Timeline({ store, handle, onView }: {
     return store.getMode().live ? s?.tick ?? 0 : Math.max(s?.tick ?? 0, liveEdgeRef.current)
   })
   const mode = useSyncExternalStore(store.subscribe, store.getMode)
-  const events = useSyncExternalStore(store.subscribe, store.recentEvents)
   if (mode.live) liveEdgeRef.current = Math.max(liveEdgeRef.current, liveTick)
-  const [chapters, setChapters] = useState<Chapter[]>([])
-  const trackRef = useRef<HTMLDivElement>(null)
+  const [sources, setSources] = useState<MarkSources>(EMPTY_SOURCES)
 
   useEffect(() => {
-    void fetch('/api/chapters').then(async (r) => {
-      if (r.ok) setChapters(((await r.json()) as Chapter[]) ?? [])
-    }).catch(() => {})
+    let alive = true
+    const load = (): void => {
+      void fetch('/api/timeline/marks')
+        .then(async (r) => (r.ok ? (await r.json()) as Partial<MarkSources> : null))
+        .then((body) => {
+          if (!alive || body === null) return
+          setSources({
+            chapters: body.chapters ?? [], milestones: body.milestones ?? [],
+            moments: body.moments ?? [], changes: body.changes ?? [], events: body.events ?? [],
+          })
+        })
+        .catch(() => { /* the scrubber still scrubs without its marks */ })
+    }
+    load()
+    const timer = setInterval(load, MARKS_REFETCH_MS)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
   }, [])
 
   const edge = Math.max(liveEdgeRef.current, 1)
   const viewTick = mode.live ? edge : mode.tick
-  const frac = Math.min(1, viewTick / edge)
+  const marks = useMemo(() => coalesceMarks(marksFrom(sources), edge), [sources, edge])
 
   const scrubTo = (tick: number): void => {
     const t = Math.max(0, Math.min(edge, Math.round(tick)))
@@ -45,83 +176,10 @@ export function Timeline({ store, handle, onView }: {
     onView(null)
   }
 
-  const pick = (clientX: number): void => {
-    const el = trackRef.current
-    if (el === null) return
-    const r = el.getBoundingClientRect()
-    scrubTo(((clientX - r.left) / r.width) * edge)
-  }
-
-  const onKey = (e: React.KeyboardEvent): void => {
-    const step =
-      e.key === 'ArrowLeft' ? -KEY_STEP_TICKS
-      : e.key === 'ArrowRight' ? KEY_STEP_TICKS
-      : e.key === 'PageDown' ? -KEY_PAGE_TICKS
-      : e.key === 'PageUp' ? KEY_PAGE_TICKS
-      : null
-    if (step !== null) {
-      e.preventDefault()
-      scrubTo(viewTick + step)
-    } else if (e.key === 'Home') {
-      e.preventDefault()
-      scrubTo(0)
-    } else if (e.key === 'End') {
-      e.preventDefault()
-      goLive()
-    }
-  }
-
-  const days = Math.floor(edge / MINUTES_PER_DAY)
-  const gridDays = Array.from({ length: days + 1 }, (_, d) => d)
-  const deaths = events.filter((ev) => ev.type === 'agent_died')
-  const completions = events.filter((ev) => ev.type === 'structure_completed')
-  const m = tickToMoment(viewTick)
-
   return (
-    <div className="timeline" role="group" aria-label="Town timeline">
-      <div
-        ref={trackRef}
-        className="timeline-track"
-        role="slider"
-        tabIndex={0}
-        aria-label="Moment in the town's history"
-        aria-valuemin={0}
-        aria-valuemax={edge}
-        aria-valuenow={viewTick}
-        aria-valuetext={`Day ${m.day} ${m.time}`}
-        onKeyDown={onKey}
-        onPointerDown={(e) => {
-          ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
-          pick(e.clientX)
-        }}
-        onPointerMove={(e) => {
-          if (e.buttons === 1) pick(e.clientX)
-        }}
-      >
-        {gridDays.map((d) => (
-          <span key={d} className="timeline-day" style={{ left: `${(d * MINUTES_PER_DAY * 100) / edge}%` }}>
-            <em>Day {d}</em>
-          </span>
-        ))}
-        {deaths.map((ev, i) => (
-          <span key={`d${i}`} className="mark death" style={{ left: `${(ev.tick * 100) / edge}%` }} title="A death" />
-        ))}
-        {completions.map((ev, i) => (
-          <span key={`c${i}`} className="mark done" style={{ left: `${(ev.tick * 100) / edge}%` }} title="A building finished" />
-        ))}
-        {chapters.map((c) => (
-          <span
-            key={`ch${c.day}`}
-            className="mark chapter"
-            style={{ left: `${(momentToTick(c.day, '00:00') * 100) / edge}%` }}
-            title={`Day ${c.day} — ${c.title}`}
-          />
-        ))}
-        <span className="playhead" style={{ left: `${frac * 100}%` }} />
-      </div>
-      <button className={mode.live ? 'live-pill live' : 'live-pill'} onClick={goLive} aria-pressed={mode.live}>
-        {mode.live ? 'LIVE' : 'Return to now'}
-      </button>
-    </div>
+    <TimelineView
+      edge={edge} viewTick={viewTick} live={mode.live} marks={marks}
+      onScrub={scrubTo} onLive={goLive}
+    />
   )
 }

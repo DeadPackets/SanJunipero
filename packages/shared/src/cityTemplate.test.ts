@@ -7,6 +7,7 @@ import {
   cityStructures, doorTile, structureTiles, FOUNDER_IDS, CITY_INTERIOR_SLOTS,
   CITY_FURNISHING_KINDS, CITY_BED_KIND, CITY_HEARTH_KIND,
   makeCityTemplate, templateFits, growthPlots, T_GRASS,
+  HUT_ORIGINS, WELL_AT, FIRE_PIT_AT, danglingRoadEnds, frontages,
 } from './cityTemplate.js'
 
 const MINIMAL = {
@@ -157,17 +158,32 @@ describe('city roads', () => {
   })
 
   // The autotiler has to be exercised by the town's own roads, not only by a test map.
+  // The square's paving is laid AROUND the well and the fire pit, so its two monument tiles
+  // are the only interior tiles that are not road.
   it('resolves the plaza interior to cross and its four outer corners to corner keys', () => {
     const keys = cityRoadKeys(roads)
+    const monument = new Set([key(WELL_AT.dx, WELL_AT.dy), key(FIRE_PIT_AT.dx, FIRE_PIT_AT.dy)])
+    // A tile that touches a monument keeps three arms, and the missing one points at it.
+    const DIRS = [['n', 0, -1], ['e', 1, 0], ['s', 0, 1], ['w', -1, 0]] as const
+    const expectedKey = (dx: number, dy: number): string => {
+      const gone = DIRS.find(([, ox, oy]) => monument.has(key(dx + ox, dy + oy)))
+      return gone === undefined ? 'cross' : `t-no-${gone[0]}`
+    }
     for (let dy = PLAZA.dy0 + 1; dy <= PLAZA.dy1 - 1; dy++)
-      for (let dx = PLAZA.dx0 + 1; dx <= PLAZA.dx1 - 1; dx++)
-        expect(keys.get(key(dx, dy)), key(dx, dy)).toBe('cross')
-    const corners: [number, number][] = [
-      [PLAZA.dx0, PLAZA.dy0], [PLAZA.dx1, PLAZA.dy0],
-      [PLAZA.dx0, PLAZA.dy1], [PLAZA.dx1, PLAZA.dy1],
-    ]
-    for (const [dx, dy] of corners)
-      expect(keys.get(key(dx, dy)), key(dx, dy)).toMatch(/^corner-/)
+      for (let dx = PLAZA.dx0 + 1; dx <= PLAZA.dx1 - 1; dx++) {
+        if (monument.has(key(dx, dy))) continue
+        expect(keys.get(key(dx, dy)), key(dx, dy)).toBe(expectedKey(dx, dy))
+      }
+    // The tile you actually stand on, between the well and the fire, is open paving.
+    expect(keys.get(key(PLAZA_CENTRE.dx, PLAZA_CENTRE.dy))).toBe('cross')
+    expect(keys.get(key(WELL_AT.dx, WELL_AT.dy + 1))).toBe('t-no-n')
+    expect(keys.get(key(FIRE_PIT_AT.dx, FIRE_PIT_AT.dy - 1))).toBe('t-no-s')
+    // Two corners are plain corners; the other two are where the north and south approaches
+    // arrive, so they carry a third arm.
+    expect(keys.get(key(PLAZA.dx1, PLAZA.dy0)), 'NE').toMatch(/^corner-/)
+    expect(keys.get(key(PLAZA.dx0, PLAZA.dy1)), 'SW').toMatch(/^corner-/)
+    expect(keys.get(key(PLAZA.dx0, PLAZA.dy0)), 'NW, the north approach').toBe('t-no-w')
+    expect(keys.get(key(PLAZA.dx1, PLAZA.dy1)), 'SE, the south approach').toBe('t-no-e')
   })
 
   it('reaches all four districts', () => {
@@ -369,5 +385,104 @@ describe('makeCityTemplate', () => {
   it('carries the eleven structures and the road set into the assembled template', () => {
     expect(t.structures).toEqual(cityStructures())
     expect(t.tiles.filter(isRoadTile)).toEqual(cityRoadTiles())
+  })
+})
+
+// ------------------------------------------------------- the town, read as a designed place
+//
+// U3: "doesn't have an actual genuine structure. It just looks like chaos." Read as a plan the
+// old template was not chaos, but it was a grid with no centre and no frontage: five identical
+// huts in one straight line, a well and a fire pit sitting BESIDE the square rather than in it,
+// two identical sheds four rows apart, and roads that stopped in the grass. Each design move
+// below is stated as an invariant a test can check.
+
+describe('a centre that reads as a centre', () => {
+  const t = makeCityTemplate()
+  const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
+
+  it('stands the well and the fire pit INSIDE the square', () => {
+    expect(inRect(PLAZA, WELL_AT.dx, WELL_AT.dy)).toBe(true)
+    expect(inRect(PLAZA, FIRE_PIT_AT.dx, FIRE_PIT_AT.dy)).toBe(true)
+  })
+
+  it('puts both of them on the square own axis', () => {
+    for (const m of [WELL_AT, FIRE_PIT_AT] as ReadonlyArray<{ dx: number; dy: number }>)
+      expect(m.dx === PLAZA_CENTRE.dx || m.dy === PLAZA_CENTRE.dy, `${m.dx},${m.dy}`).toBe(true)
+  })
+
+  it('faces them across the centre you actually stand on', () => {
+    expect(WELL_AT.dy).toBeLessThan(PLAZA_CENTRE.dy)
+    expect(FIRE_PIT_AT.dy).toBeGreaterThan(PLAZA_CENTRE.dy)
+    expect(roads.has(key(PLAZA_CENTRE.dx, PLAZA_CENTRE.dy))).toBe(true)
+  })
+
+  it('lays the paving around them, so neither stands on a road', () => {
+    expect(roads.has(key(WELL_AT.dx, WELL_AT.dy))).toBe(false)
+    expect(roads.has(key(FIRE_PIT_AT.dx, FIRE_PIT_AT.dy))).toBe(false)
+  })
+})
+
+describe('frontage', () => {
+  const t = makeCityTemplate()
+
+  it('opens every single door onto a road', () => {
+    const f = frontages(t)
+    expect(f).toHaveLength(t.structures.length)
+    for (const x of f)
+      expect(x.onto, `${x.kind} at ${x.door.dx},${x.door.dy} faces nothing`).not.toBeNull()
+  })
+})
+
+describe('a street, not a row', () => {
+  const t = makeCityTemplate()
+
+  it('stands the five huts in two facing ranks, not one line', () => {
+    expect(HUT_ORIGINS).toEqual([[14, 4], [18, 4], [22, 4], [19, 7], [23, 7]])
+    expect(HUT_ORIGINS.filter(([, dy]) => dy === 4)).toHaveLength(3)
+    expect(HUT_ORIGINS.filter(([, dy]) => dy === 7)).toHaveLength(2)
+  })
+
+  it('runs the shared yard street between the two ranks', () => {
+    const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
+    for (let dx = 14; dx <= 22; dx++) expect(roads.has(key(dx, 6)), `yard ${dx},6`).toBe(true)
+  })
+
+  it('staggers the ranks so no two doors look straight down each other', () => {
+    const huts = cityStructures().filter(s => s.kind === 'hut')
+    const doorsAt = (dy: number): number[] =>
+      huts.filter(s => s.dy === dy).map(s => doorTile(s).dx).sort((a, b) => a - b)
+    expect(doorsAt(4).some(dx => doorsAt(7).includes(dx)), 'a door faces a door').toBe(false)
+  })
+})
+
+describe('paths that lead somewhere', () => {
+  const t = makeCityTemplate()
+
+  it('never ends a road in the grass', () => {
+    expect(danglingRoadEnds(t)).toEqual([])
+  })
+
+  it('finds a dangling end when one is planted, so the check is not vacuous', () => {
+    const stub = {
+      ...t, tiles: [...t.tiles, { dx: 9, dy: 12, to: T_ROAD }, { dx: 9, dy: 13, to: T_ROAD }],
+    }
+    expect(danglingRoadEnds(stub).length).toBeGreaterThan(0)
+  })
+})
+
+describe('districts you can point at', () => {
+  const t = makeCityTemplate()
+  const districtOf = (s: { dx: number; dy: number; w: number; h: number }): string | undefined =>
+    DISTRICT_NAMES.find(d => structureTiles(s as never).every(x => inRect(DISTRICTS[d]!, x.dx, x.dy)))
+
+  it('gives every district at least one building of its own', () => {
+    for (const d of DISTRICT_NAMES)
+      expect(t.structures.some(s => districtOf(s) === d), `${d} has no building`).toBe(true)
+  })
+
+  it('no longer stands the two sheds in one district as a matched pair', () => {
+    const sheds = t.structures.filter(s => s.kind === 'shed')
+    expect(sheds).toHaveLength(2)
+    expect(districtOf(sheds[0]!)).not.toBe(districtOf(sheds[1]!))
   })
 })

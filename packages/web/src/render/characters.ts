@@ -1,20 +1,27 @@
-import { BitmapText, Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
+import { Container, Graphics, Polygon, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
-import { depthKey, facingFrom, tileToScreen, type Facing } from './iso.js'
+import { bodyDepthBox, type DepthBox } from './depth.js'
+import { facingFrom, tileToScreen, type Facing } from './iso.js'
+import type { DepthEntry } from './layers.js'
 import type { Scene } from './scene.js'
-import { characterArt, smoothSource, type TextureBook } from './textures.js'
+import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin } from './hitShapes.js'
+import { TAG_PAD_X, TAG_PAD_Y, anchorForSprite, placeTag } from './tooltip.js'
+import { characterArt, type TextureBook } from './textures.js'
+import { createWorldLabel, type WorldLabel } from './worldLabel.js'
+import { faceFor, worldTextScale } from './textFaces.js'
 import {
   CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, NAME_TAG_ABOVE_HEAD_PX,
-  SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4, charPose, emoteFor, hitRect, interpolatePos,
+  SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4, charPose, emoteFor, interpolatePos,
   legFacing, nameTagText, prunePath, type Waypoint,
 } from './charAnim.js'
 
 export const EMOTE_MS = 2000
 export const EMOTE_ABOVE_HEAD_PX = 12
-export const CHAR_TAG_FONT_PX = WORLD_TEXT_PX
-export const CHAR_TAG_LINE_H = WORLD_TEXT_LINE_H
+// The name tag is set at the face's own size, which is above the 12px floor, not at it.
+export const CHAR_TAG_FONT_PX = faceFor('name').size
+export const CHAR_TAG_LINE_H = Math.max(WORLD_TEXT_LINE_H, CHAR_TAG_FONT_PX + 2)
 export const SHADOW_ALPHA = 0.25
 export const GLIDE_MIN_MS = 200
 export const GLIDE_MAX_MS = 4000
@@ -29,13 +36,17 @@ type CharEntry = {
   emote: Sprite
   nameTag: Container
   nameTagBg: Graphics
-  nameTagLabel: BitmapText
-  hit: Rectangle
+  nameTagLabel: WorldLabel
+  hit: Polygon
+  /** the sheet's own figure height, so the capsule follows the art rather than a second table */
+  figureH: number
   hitScale: number
   emoteUntil: number
   facing: Facing
   path: Waypoint[]
   lastMoveArrival: number
+  /** the tile the body is standing on RIGHT NOW — interpolated, never rounded (F-3c) */
+  box: DepthBox
 }
 
 export type CharacterLayer = {
@@ -129,9 +140,17 @@ export function createCharacterLayer(
     const p = swapFrom !== null && swapFrom !== art.url ? book.swap(swapFrom, art.url) : book.get(art.url)
     void p.then((t) => {
       if (sheets.get(agentId) !== sheet) return // superseded by a newer resolve
-      sheet.texture = art.manifest !== null ? smoothSource(t) : t
+      sheet.texture = t
     })
   }
+
+  // Publish where every body is standing. The frame's one owner sorts these against the
+  // structures; a body no longer carries an opinion about who is in front of whom.
+  scene.addDepthSource(() => {
+    const out: DepthEntry[] = []
+    for (const e of entries.values()) out.push({ box: e.box, node: e.sprite })
+    return out
+  })
 
   // shared 20×8 blob shadow — Graphics-generated once
   const shadowG = new Graphics()
@@ -140,16 +159,29 @@ export function createCharacterLayer(
   const shadowTexture = scene.app.renderer.generateTexture(shadowG)
   shadowG.destroy()
 
-  // one Rectangle per entry, mutated in place whenever the applied sprite scale
-  // changes, so the click target stays 52×72 screen px at any sheet resolution
-  const setHitScale = (e: CharEntry, scale: number): void => {
-    if (e.hitScale === scale) return
+  // ONE Polygon per entry, its points rewritten in place whenever the applied sprite scale
+  // moves. U9: the landed 52×72 rectangle was 2.77× the drawn silhouette's area — it claimed
+  // the sky where the name tag sits and reached far enough sideways to steal a neighbour's
+  // door. The capsule is 0.93×, and it is inflated only when the figure would otherwise be
+  // under HIT_MIN_PX on screen.
+  let hitZoom = 1
+  const setHitScale = (e: CharEntry, scale: number, figureH: number): void => {
+    if (e.hitScale === scale && e.figureH === figureH) return
     e.hitScale = scale
-    const r = hitRect(scale)
-    e.hit.x = r.x
-    e.hit.y = r.y
-    e.hit.width = r.w
-    e.hit.height = r.h
+    e.figureH = figureH
+    e.hit.points = inflateToMin(bodyHitPolygon(figureH, scale), HIT_MIN_PX, scale * hitZoom)
+  }
+  // The inflation floor is a SCREEN size, so a zoom change re-cuts every capsule. Cheap: it
+  // fires on a camera stop, not on a frame.
+  const recutOnZoom = (): void => {
+    const zoom = scene.getZoom?.() ?? 1
+    if (zoom === hitZoom) return
+    hitZoom = zoom
+    for (const e of entries.values()) {
+      const scale = e.hitScale, figureH = e.figureH
+      e.hitScale = 0
+      setHitScale(e, scale, figureH)
+    }
   }
 
   const ensure = (agentId: string, x: number, y: number): CharEntry => {
@@ -160,7 +192,7 @@ export function createCharacterLayer(
     sprite.scale.set(CHAR_TARGET_PX / 64)
     sprite.eventMode = 'static'
     sprite.cursor = 'pointer'
-    const hit = new Rectangle()
+    const hit = new Polygon(bodyHitPolygon(64, CHAR_TARGET_PX / 64))
     sprite.hitArea = hit
     sprite.on('pointertap', () => onSelect(agentId))
     const shadow = new Sprite(shadowTexture)
@@ -175,21 +207,26 @@ export function createCharacterLayer(
     nameTag.visible = false
     nameTag.eventMode = 'none'
     const nameTagBg = new Graphics()
-    const nameTagLabel = new BitmapText({
-      text: '',
-      style: { fontFamily: 'monospace', fontSize: CHAR_TAG_FONT_PX, fill: 0x43394a, lineHeight: CHAR_TAG_LINE_H },
+    const nameTagLabel = createWorldLabel('', {
+      fontFamily: faceFor('name').family, fontSize: CHAR_TAG_FONT_PX, fill: 0x43394a,
+      lineHeight: CHAR_TAG_LINE_H,
     })
     nameTagLabel.anchor.set(0.5, 1) // match the bg slab, which is drawn centered above the origin
     nameTag.addChild(nameTagBg, nameTagLabel)
     sprite.on('pointerover', () => { nameTag.visible = true })
     sprite.on('pointerout', () => { nameTag.visible = false })
-    scene.entities.addChild(shadow, sprite, emote, nameTag)
+    // each companion to the layer it belongs in: a contact shadow under every body, the
+    // emote and the tag over every body. None of them competes with the depth sort any more.
+    scene.layers.shadow.addChild(shadow)
+    scene.layers.entities.addChild(sprite)
+    scene.layers.worldText.addChild(emote, nameTag)
     const now = performance.now()
     e = {
-      sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, hitScale: 0, emoteUntil: 0, facing: 'sw',
-      path: [{ x, y, atMs: now }], lastMoveArrival: now,
+      sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, figureH: 0, hitScale: 0,
+      emoteUntil: 0, facing: 'sw',
+      path: [{ x, y, atMs: now }], lastMoveArrival: now, box: bodyDepthBox(agentId, x, y),
     }
-    setHitScale(e, CHAR_TARGET_PX / 64)
+    setHitScale(e, CHAR_TARGET_PX / 64, 64)
     entries.set(agentId, e)
     loadSheet(agentId, null)
     return e
@@ -225,6 +262,7 @@ export function createCharacterLayer(
   })
 
   const tick = (nowMs: number): void => {
+    recutOnZoom()
     const state = store.getState()
     if (state === null) return
     // hot swap: new codex records re-resolve every character's art in place
@@ -266,22 +304,20 @@ export function createCharacterLayer(
             e.sprite.texture = t
             e.sprite.anchor.set(cell.feetX / cell.w, cell.feetY / cell.h) // feet-anchor law
             e.sprite.scale.set(CHAR_TARGET_PX / sheet.art.manifest!.figureH) // smooth downscale to world footprint
-            setHitScale(e, CHAR_TARGET_PX / sheet.art.manifest!.figureH)
+            setHitScale(e, CHAR_TARGET_PX / sheet.art.manifest!.figureH, sheet.art.manifest!.figureH)
           }
         } else {
           e.sprite.texture = sliceV2(sheet.texture, pose.row, pose.facing)
           e.sprite.anchor.set(0.5, FEET_Y / CELL)
           e.sprite.scale.set(CHAR_TARGET_PX / 64)
-          setHitScale(e, CHAR_TARGET_PX / 64)
+          setHitScale(e, CHAR_TARGET_PX / 64, 64)
         }
       }
       const { sx, sy } = tileToScreen(pos.x, pos.y)
       e.sprite.position.set(sx, sy + pose.bobY)
-      e.sprite.zIndex = depthKey(Math.round(pos.x), Math.round(pos.y)) + 1
+      e.box = bodyDepthBox(a.id, pos.x, pos.y)
       e.shadow.position.set(sx, sy)
-      e.shadow.zIndex = e.sprite.zIndex - 1
       e.emote.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX)
-      e.emote.zIndex = e.sprite.zIndex + 1
       e.emote.visible = !emotesHidden && nowMs < e.emoteUntil && e.emote.texture !== Texture.EMPTY
       const tag = nameTagText(a.name)
       if (e.nameTagLabel.text !== tag) {
@@ -290,8 +326,22 @@ export function createCharacterLayer(
         e.nameTagBg.roundRect(-e.nameTagLabel.width / 2 - 4, -e.nameTagLabel.height - 4, e.nameTagLabel.width + 8, e.nameTagLabel.height + 8, 2)
         e.nameTagBg.fill(0xfff6e9)
       }
-      e.nameTag.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX - NAME_TAG_ABOVE_HEAD_PX)
-      e.nameTag.zIndex = e.sprite.zIndex + 1
+      // ONE placement rule for every label in the product (U10): above the DRAWN figure,
+      // flipped or slid to stay on screen instead of being drawn off the edge of it.
+      if (e.nameTag.visible) {
+        // The tag holds its size for the reader, so its world FOOTPRINT is what the camera
+        // changes — that is the number placeTag de-conflicts against, not the drawn one.
+        const inv = worldTextScale(scene.getZoom())
+        e.nameTag.scale.set(inv)
+        const size = {
+          w: (e.nameTagLabel.width + TAG_PAD_X * 2) * inv,
+          h: (e.nameTagLabel.height + TAG_PAD_Y * 2) * inv,
+        }
+        const head = CHAR_TARGET_PX + EMOTE_ABOVE_HEAD_PX + NAME_TAG_ABOVE_HEAD_PX
+        const at = placeTag(anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
+          size, scene.viewRect())
+        e.nameTag.position.set(Math.round(at.sx), Math.round(at.sy + size.h))
+      }
     }
     for (const [agentId, e] of entries) {
       if (!live.has(agentId)) {

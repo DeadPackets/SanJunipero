@@ -4,12 +4,16 @@ import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
 import { resolveAssetId } from '../render/textures.js'
 import { bustStyle } from './rosterModel.js'
-import { diffLines } from './diffLines.js'
+import { CONDITION_WORD, conditionsOf, stateWord, type AgentView } from './status.js'
+import {
+  CHANGE_EMPTY, SKILLS_EMPTY, THOUGHT_EMPTY, changeLog, hasChanged, type ChangeEntry,
+} from './becoming.js'
 
 export const TAB_CACHE_MS = 30_000
 export const NEED_LOW = 30
 const EMPTY_COPY = 'Nothing written yet.'
 
+/** Two tabs a viewer picks between, plus the personality feed the panel always reads. */
 type Tab = 'ledger' | 'journal' | 'personality'
 type LedgerRow = { personId: string; doc: string; updatedDay: number }
 type JournalRow = { tick: number; day: number; text: string }
@@ -49,6 +53,103 @@ function NeedBar({ label, value }: { label: string; value: number }) {
   )
 }
 
+/** What the body view needs of a person: a structural read, so a test needs no whole world. */
+export type InspectorAgent = AgentView & { skills: Record<string, number> } & {
+  activity: null | { verb: string; ticksRemaining: number }
+}
+
+/**
+ * ★ WHAT A RUN HAS MADE OF THIS PERSON — the panel's substance, with the store taken out of it.
+ *
+ * Every section here is sourced to something the run recorded: a thought the observer wrote
+ * down, a body the engine ticked, an activity the mind chose, things the world put in their
+ * hands, crafts they have practised, and the days their own document changed. NOTHING here is
+ * handed to them at genesis, and where the record is empty it says the RECORD is empty — the
+ * two placeholders that described an empty person instead ("Their mind is quiet.", "Still
+ * learning everything.") are deleted, not softened.
+ */
+export function InspectorBodyView(
+  { agent, tick, thought, carrying, changes }: {
+    agent: InspectorAgent
+    tick: number
+    thought: { text: string } | null
+    carrying: ReadonlyArray<{ id: string; kind: string; qty: number }>
+    changes: readonly ChangeEntry[]
+  },
+) {
+  const moved = hasChanged(changes)
+  return (
+    <>
+      <section className="block">
+        <h3>Thought</h3>
+        <p className="thought-line" aria-live="polite">
+          {thought !== null ? `“${thought.text}”` : THOUGHT_EMPTY}
+        </p>
+      </section>
+
+      <section className="block">
+        <h3>Body</h3>
+        <NeedBar label="Food" value={agent.needs.hunger} />
+        <NeedBar label="Rest" value={agent.needs.energy} />
+        <NeedBar label="Warmth" value={agent.needs.warmth} />
+        <NeedBar label="Company" value={agent.needs.social} />
+        <p>
+          Health {agent.hp}
+          {agent.injuries.length > 0
+            && ` — ${agent.injuries.map((i) => `${i.kind} injury (day ${i.day})`).join(', ')}`}
+        </p>
+      </section>
+
+      {/* WHAT THE BROWSER CAUGHT: the header badge already prints the state, so an idle
+          person read "Asleep" twice on one panel — U13's own defect, one level down. The
+          section now carries only what the badge cannot: how long there is left to go. */}
+      {agent.activity !== null && (
+        <section className="block">
+          <h3>Doing</h3>
+          <p>{`${stateWord(agent, tick)} — ${agent.activity.ticksRemaining} min to go`}</p>
+        </section>
+      )}
+
+      <section className="block">
+        <h3>Carrying</h3>
+        {carrying.length === 0 ? <p>Empty hands.</p> : (
+          <ul>{carrying.map((it) => <li key={it.id}>{it.kind} × {it.qty}</li>)}</ul>
+        )}
+      </section>
+
+      <section className="block">
+        <h3>Skills</h3>
+        {Object.keys(agent.skills).length === 0 ? <p>{SKILLS_EMPTY}</p> : (
+          <ul>{Object.entries(agent.skills).map(([track, xp]) => <li key={track}>{track} — level {level(xp)}</li>)}</ul>
+        )}
+      </section>
+
+      {/* The one legitimate identity surface in the product, re-framed. It leads with the
+          LATEST document and the most recent edit; a person with one version has moved
+          nothing yet and is told so, rather than handed v1 as a character sheet. */}
+      <section className="block">
+        <h3>How they have changed</h3>
+        {!moved ? <p className="doc">{CHANGE_EMPTY}</p> : changes.map((e) => (
+          <article key={e.version} className="change-entry">
+            <p className="change-head">
+              <span className="stamp">Day {e.day}</span> {e.edit}
+            </p>
+            {e.diff.length > 0 && (
+              <pre className="diff">
+                {e.diff.map((l, i) => (
+                  <div key={i} className={`diff-line ${l.kind}`}>
+                    {l.kind === 'add' ? '+ ' : l.kind === 'del' ? '− ' : '  '}{l.text}
+                  </div>
+                ))}
+              </pre>
+            )}
+          </article>
+        ))}
+      </section>
+    </>
+  )
+}
+
 // The way back to the roster. A viewer who picked one person had no route back to the list —
 // this is the visible one; the TOWNSFOLK nav item and Escape are the other two.
 export function BackToRoster({ onBack }: { onBack: () => void }) {
@@ -69,20 +170,19 @@ export function InspectorPanel(
   const [ledger, setLedger] = useState<LedgerRow[] | null>(null)
   const [journal, setJournal] = useState<JournalRow[] | null>(null)
   const [personality, setPersonality] = useState<PersonalityRow[] | null>(null)
-  const [diffPick, setDiffPick] = useState<number[]>([])
   const [follow, setFollow] = useState(false)
 
   useEffect(() => {
     if (tab === 'ledger' && ledger === null) void fetchTab<LedgerRow>(agentId, 'ledger').then(setLedger)
     if (tab === 'journal' && journal === null) void fetchTab<JournalRow>(agentId, 'journal').then(setJournal)
-    if (tab === 'personality' && personality === null) void fetchTab<PersonalityRow>(agentId, 'personality').then(setPersonality)
+    // no longer behind a tab: what changed about a person is the panel's own subject now
+    if (personality === null) void fetchTab<PersonalityRow>(agentId, 'personality').then(setPersonality)
   }, [tab, agentId, ledger, journal, personality])
 
   useEffect(() => {
     setLedger(null)
     setJournal(null)
     setPersonality(null)
-    setDiffPick([])
   }, [agentId])
 
   // follow-cam: the scene's follow rig eases toward the agent's sprite; a user
@@ -125,18 +225,6 @@ export function InspectorPanel(
   // no painted portrait yet → the v4 sprite bust stands in (smooth hi-res crop, not pixelated)
   const bust = portraitId === null ? bustStyle(records, agentId, 52) : null
 
-  const pickDiff = (version: number): void => {
-    setDiffPick((prev) => {
-      const next = prev.includes(version) ? prev.filter((v) => v !== version) : [...prev.slice(-1), version]
-      return next
-    })
-  }
-
-  const diffDocs =
-    diffPick.length === 2 && personality !== null
-      ? ([personality.find((p) => p.version === diffPick[0]), personality.find((p) => p.version === diffPick[1])] as const)
-      : null
-
   return (
     <div className="inspector-panel" data-tick={tick}>
       {onBack ? <BackToRoster onBack={onBack} /> : null}
@@ -150,10 +238,15 @@ export function InspectorPanel(
         )}
         <div>
           <h2 className="px-title">{a.name}</h2>
+          {/* ONE state and its conditions, from the one vocabulary (task 79). This badge row
+              used to carry "asleep"/"awake"/"at rest forever" beside a separate unwell chip —
+              three words for one fact and a synonym pair among them. */}
           <div className="badges">
             <span className="badge">{ageBand(a.ageDays)}</span>
-            <span className="badge">{a.alive ? (a.asleep ? 'asleep' : 'awake') : 'at rest forever'}</span>
-            {a.ill && <span className="badge ill">unwell</span>}
+            <span className="badge">{stateWord(a, tick)}</span>
+            {conditionsOf(a).map((c) => (
+              <span key={c} className={c === 'unwell' ? 'badge ill' : 'badge'}>{CONDITION_WORD[c]}</span>
+            ))}
           </div>
         </div>
         <button
@@ -165,46 +258,18 @@ export function InspectorPanel(
         </button>
       </header>
 
-      <section className="block">
-        <h3>Thought</h3>
-        <p className="thought-line" aria-live="polite">{thought !== null ? `“${thought.text}”` : 'Their mind is quiet.'}</p>
-      </section>
-
-      <section className="block">
-        <h3>Body</h3>
-        <NeedBar label="Food" value={a.needs.hunger} />
-        <NeedBar label="Rest" value={a.needs.energy} />
-        <NeedBar label="Warmth" value={a.needs.warmth} />
-        <NeedBar label="Company" value={a.needs.social} />
-        <p>
-          Health {a.hp}
-          {a.injuries.length > 0 && ` — ${a.injuries.map((i) => `${i.kind} injury (day ${i.day})`).join(', ')}`}
-        </p>
-      </section>
-
-      <section className="block">
-        <h3>Doing</h3>
-        <p>{a.activity !== null ? `${a.activity.verb} — ${a.activity.ticksRemaining} min to go` : 'resting'}</p>
-      </section>
-
-      <section className="block">
-        <h3>Carrying</h3>
-        {carrying.length === 0 ? <p>Empty hands.</p> : (
-          <ul>{carrying.map((it) => <li key={it.id}>{it.kind} × {it.qty}</li>)}</ul>
-        )}
-      </section>
-
-      <section className="block">
-        <h3>Skills</h3>
-        {Object.keys(a.skills).length === 0 ? <p>Still learning everything.</p> : (
-          <ul>{Object.entries(a.skills).map(([track, xp]) => <li key={track}>{track} — level {level(xp)}</li>)}</ul>
-        )}
-      </section>
+      <InspectorBodyView
+        agent={a}
+        tick={tick}
+        thought={thought}
+        carrying={carrying}
+        changes={personality === null ? [] : changeLog(personality)}
+      />
 
       <nav className="lens-tabs">
-        {(['ledger', 'journal', 'personality'] as const).map((t) => (
+        {(['ledger', 'journal'] as const).map((t) => (
           <button key={t} className={t === tab ? 'tab active' : 'tab'} onClick={() => setTab(t)}>
-            {t === 'ledger' ? 'People' : t === 'journal' ? 'Journal' : 'Character'}
+            {t === 'ledger' ? 'People' : 'Journal'}
           </button>
         ))}
       </nav>
@@ -224,30 +289,6 @@ export function InspectorPanel(
           {journal === null ? <p>…</p> : journal.length === 0 ? <p>{EMPTY_COPY}</p> : journal.map((row, i) => (
             <p key={i} className="doc"><span className="stamp">Day {row.day}</span> {row.text}</p>
           ))}
-        </section>
-      )}
-      {tab === 'personality' && (
-        <section className="block tab-body">
-          {personality === null ? <p>…</p> : personality.length === 0 ? <p>{EMPTY_COPY}</p> : (
-            <>
-              <div className="badges">
-                {personality.map((p) => (
-                  <button key={p.version} className={diffPick.includes(p.version) ? 'tab active' : 'tab'} onClick={() => pickDiff(p.version)}>
-                    v{p.version}
-                  </button>
-                ))}
-              </div>
-              {diffDocs !== null && diffDocs[0] !== undefined && diffDocs[1] !== undefined ? (
-                <pre className="diff">
-                  {diffLines(diffDocs[0].doc, diffDocs[1].doc).map((l, i) => (
-                    <div key={i} className={`diff-line ${l.kind}`}>{l.kind === 'add' ? '+ ' : l.kind === 'del' ? '− ' : '  '}{l.text}</div>
-                  ))}
-                </pre>
-              ) : (
-                <p className="doc">{personality.at(-1)?.doc}</p>
-              )}
-            </>
-          )}
         </section>
       )}
     </div>
