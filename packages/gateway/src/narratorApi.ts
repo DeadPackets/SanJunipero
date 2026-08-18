@@ -62,7 +62,10 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     const state = deps.mirror.state()
     return {
       agentName: (id) => state.agents[id]?.name ?? id,
-      structureKind: (id) => state.structures[id]?.kind ?? 'building',
+      // R4: a kind is a slug in the engine and PROSE to a viewer. `kindWords` in
+      // web/ui/broadcastReady.ts owns this rule; the gateway cannot import the web bundle,
+      // so the one line is repeated here rather than the rule being forgotten.
+      structureKind: (id) => (state.structures[id]?.kind ?? 'building').replace(/_/g, ' '),
       mysteryProse: (kind) => MYSTERY_BY_KIND[kind]?.prose ?? null,
     }
   }

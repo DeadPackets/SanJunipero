@@ -24,6 +24,7 @@ import {
   DEFAULT_HUD, HUD_TOGGLE_KEY, hudReducer, hudToggle, loadHud, saveHud, type HudEv,
 } from './ui/hudLayout.js'
 import { SCENE_TOTAL_MS, idleScene, sceneReducer, type SceneState } from './ui/sceneTransition.js'
+import { BADGE_WORD, tickBadgeState } from './ui/broadcastReady.js'
 import { stepZoom } from './render/cameraNav.js'
 import type { ZoomStop } from './render/camera.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
@@ -45,15 +46,21 @@ function ScrubBanner({ store }: { store: WorldStore }) {
   )
 }
 
-function TickBadge({ store }: { store: WorldStore }) {
+// ★ R8, AUDIT M9. With the socket down this went on reading `Now · Day 0 · 19:31` in its live
+// colour — a broadcast showing a confident clock it is no longer being told about, which is
+// worse than showing nothing because the viewer has no way to know. One pure function decides
+// the state now (broadcastReady.ts), and the word and the class both come from it.
+function TickBadge({ store, link }: { store: WorldStore; link: LinkStatus }) {
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   const live = useSyncExternalStore(store.subscribe, () => store.getMode().live)
   const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)
-  if (!awake) return <div className="tick-badge waking">Waking…</div>
+  const state = tickBadgeState(link, live, awake)
+  if (state === 'waking') return <div className="tick-badge waking">{BADGE_WORD.waking}</div>
   const m = tickToMoment(tick)
+  const cls = state === 'live' ? 'tick-badge' : `tick-badge ${state}`
   return (
-    <div className={live ? 'tick-badge' : 'tick-badge past'}>
-      {live ? 'Now' : 'Back then'} · Day {m.day} · {m.time}
+    <div className={cls} aria-live="polite">
+      {BADGE_WORD[state]} · Day {m.day} · {m.time}
     </div>
   )
 }
@@ -286,7 +293,7 @@ export function App() {
         {link === 'reconnecting' && (
           <div className="link-pill" role="status">Reaching the town…</div>
         )}
-        <TickBadge store={store} />
+        <TickBadge store={store} link={link} />
       </header>
       {hud.statusStrip !== 'hidden' && <StatusStrip store={store} />}
       <div className="stage-row" data-scene-phase={lensScene.phase}>

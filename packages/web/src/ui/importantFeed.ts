@@ -1,3 +1,4 @@
+import { kindWords } from './broadcastReady.js'
 import { CHRONICLE_FALLBACK_ICON, chronicleLine, type ChronicleLookup, type SimEvent } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 
@@ -9,7 +10,8 @@ import type { WorldState } from '@sj/engine/state'
 export function chronicleLabel(ev: SimEvent, state: WorldState | null): string | null {
   const look: ChronicleLookup = {
     agentName: (id) => state?.agents[id]?.name ?? id,
-    structureKind: (id) => state?.structures[id]?.kind ?? 'building',
+    // R4: prose to a viewer, never the engine's slug
+    structureKind: (id) => kindWords(state?.structures[id]?.kind ?? 'building'),
     mysteryProse: () => null,
   }
   return chronicleLine(ev, look)

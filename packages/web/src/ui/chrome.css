@@ -266,6 +266,10 @@ body {
 }
 .tick-badge.past { background: var(--sage); color: var(--deep); }
 .tick-badge.waking { color: var(--ink-quiet); }
+/* R8 / audit M9: with the socket down the badge went on reading `Now` in its live colour. It
+   says "Last seen" now, and it wears the rose the link pill wears — a stale figure is stated,
+   never implied by the absence of something. Colour is the SECOND signal; the word is first. */
+.tick-badge.stale { background: var(--rose); color: var(--cream); }
 
 /* link trouble is the only time the chrome raises its voice */
 .link-pill {

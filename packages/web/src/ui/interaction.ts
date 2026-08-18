@@ -1,5 +1,6 @@
 import type { WorldState } from '@sj/engine/state'
 import { LENSES, type Lens } from './route.js'
+import { kindWords } from './broadcastReady.js'
 
 export type HoverKind = 'agent' | 'structure' | 'item' | 'crop'
 
@@ -24,7 +25,9 @@ export function hoverLabel(state: WorldState | null, kind: HoverKind, id: string
     case 'structure': {
       const s = state.structures[id]
       if (s === undefined) return null
-      return s.builtBy === null ? s.kind : `${s.kind} — built by ${agentName(state, s.builtBy)}`
+      // R4: prose to a viewer — a hover used to read "fire_pit"
+      const words = kindWords(s.kind)
+      return s.builtBy === null ? words : `${words} — built by ${agentName(state, s.builtBy)}`
     }
     case 'item': {
       const it = state.items[id]
