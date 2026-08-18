@@ -370,21 +370,23 @@ describe('resizeIntent — a resize keeps the view the viewer asked for', () => 
 
 describe('stageFill — the number R8 is about', () => {
   it('THE R8 ASSERTION: the landed first frame is far below the floor', () => {
-    // eleven buildings across tiles x 5..28, y 13..31: 528 x 256 px of GROUND, and
-    // 584 x 376 px as DRAWN, because a sprite overhangs the ground it stands on
-    expect(TOWN_BOX).toEqual({ minX: -352, maxX: 176, minY: 208, maxY: 464 })
-    expect(TOWN_DRAWN).toEqual({ minX: -376, maxX: 208, minY: 96, maxY: 472 })
+    // eleven buildings across tiles x 5..27, y 13..29: 512 x 256 px of GROUND, and
+    // 576 x 376 px as DRAWN, because a sprite overhangs the ground it stands on. Re-measured
+    // when the town gained a cottage, a cabin and a farmhouse — a 4x2 roof is drawn to a
+    // 192 px square, so the overhang above the plan is what moved most.
+    expect(TOWN_BOX).toEqual({ minX: -272, maxX: 240, minY: 192, maxY: 448 })
+    expect(TOWN_DRAWN).toEqual(drawnBoundsOf(TOWN))
     // the landed first frame: scale 1, centred on the middle of a 48x48 grid
     const landed = stageFill(TOWN_DRAWN, 1, STAGE)
     expect(landed).toBeLessThan(STAGE_FILL_MIN)
-    expect(landed).toBeCloseTo(0.1444, 4)    // 14.4% — the audit's "under 15%", reproduced
+    expect(landed).toBeCloseTo(0.1485, 4)    // 14.8% — the audit's "under 15%", reproduced
   })
 
   it('and the first frame clears it once the camera fits the TOWN', () => {
     const at = fitStop(TOWN_DRAWN, STAGE)
     expect(at).toBe(2)
     expect(stageFill(TOWN_DRAWN, at, STAGE)).toBeGreaterThanOrEqual(STAGE_FILL_MIN)
-    expect(stageFill(TOWN_DRAWN, at, STAGE)).toBeCloseTo(0.5776, 4)
+    expect(stageFill(TOWN_DRAWN, at, STAGE)).toBeCloseTo(0.5939, 4)
   })
 
   // WHAT THE BROWSER CAUGHT: fitting the FOOTPRINT box put the camera at 3x and cut the roofs
@@ -411,7 +413,7 @@ describe('stageFill — the number R8 is about', () => {
   })
 
   it('boundsCentre is the middle of the box, so the first frame is OF the town', () => {
-    expect(boundsCentre(TOWN_BOX)).toEqual({ sx: -88, sy: 336 })
+    expect(boundsCentre(TOWN_BOX)).toEqual({ sx: -16, sy: 320 })
     // the landed first frame centred on the middle of a 48x48 grid, which is not the town
     const landed = boundsCentre(cameraBoundsOf(terrainOf(48, 48)))
     expect(landed).not.toEqual(boundsCentre(TOWN_BOX))

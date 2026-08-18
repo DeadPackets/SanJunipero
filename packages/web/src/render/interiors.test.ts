@@ -117,8 +117,10 @@ describe('INTERIOR_LAYOUTS and roomFurnishings', () => {
     expect(hut.map((f) => f.kind)).toEqual(['bed', 'hearth', 'table', 'chair', 'rug'])
     expect(roomFurnishings('storehouse').map((f) => f.kind))
       .toEqual(['shelf', 'shelf', 'crate', 'crate', 'barrel'])
-    // the plan's `tools` is the library's anvil (interiorMeta's declared alias)
-    expect(roomFurnishings('shed').map((f) => f.kind)).toEqual(['anvil', 'bench', 'shelf'])
+    // The town plan no longer stands a shed, so the room falls back to INTERIOR_LAYOUTS —
+    // which is what that fallback is for. The plan's `tools` is still the library's anvil
+    // (interiorMeta's declared alias).
+    expect(roomFurnishings('shed').map((f) => f.kind)).toEqual(['anvil', 'crate'])
     for (const kind of INTERIOR_KINDS) {
       for (const f of roomFurnishings(kind)) {
         expect(CITY_FURNISHING_KINDS as readonly string[]).toContain(f.kind)
@@ -153,7 +155,7 @@ describe('roomPlan', () => {
 
   it('renders with an empty codex — art independence', () => {
     const plan = roomPlan('shed', [])
-    expect(plan.map((p) => p.kind)).toEqual(['anvil', 'bench', 'shelf'])
+    expect(plan.map((p) => p.kind)).toEqual(['anvil', 'crate'])
     expect(plan.every((p) => p.url === null && p.meta === null)).toBe(true)
   })
 })

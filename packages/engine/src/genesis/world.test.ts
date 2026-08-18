@@ -10,8 +10,10 @@ import { submitIntent } from '../intent.js'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
 import {
-  makeGenesisWorld, GENESIS_FORD, GENESIS_FORK_Y, GENESIS_BUILDER_ID, GENESIS_RIVER_X,
+  makeGenesisWorld, genesisDurability, GENESIS_FORD, GENESIS_FORK_Y, GENESIS_BUILDER_ID,
+  GENESIS_RIVER_X,
 } from './world.js'
+import { CITY_DWELLING_KINDS } from '@sj/shared'
 
 const T_WATER = 2
 
@@ -104,6 +106,19 @@ describe('makeGenesisWorld: the town', () => {
     const well = Object.values(s.structures).find((x) => x.kind === 'well')!
     expect(well.maxHp).toBe(DEFAULT_CONFIG.structures.recipes['well']!.maxHp)
     expect(well.flammable).toBe(false)
+  })
+
+  // The template may place any of the three dwelling kinds; genesis has to know how tough each
+  // one is BEFORE the plan uses it, or the first cottage throws on the morning of day one.
+  it('knows a durability for every dwelling kind the shared contract names', () => {
+    for (const kind of CITY_DWELLING_KINDS)
+      expect(genesisDurability(DEFAULT_CONFIG, kind), kind).not.toBeNull()
+    expect(genesisDurability(DEFAULT_CONFIG, 'observatory')).toBeNull()
+  })
+
+  it('knows a durability for every kind the template actually stands', () => {
+    for (const s of makeCityTemplate().structures)
+      expect(genesisDurability(DEFAULT_CONFIG, s.kind), s.kind).not.toBeNull()
   })
 
   // Section 9: the far bank is earned, not given. Nothing crosses the water on day one.

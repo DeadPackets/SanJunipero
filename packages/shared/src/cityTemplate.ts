@@ -19,10 +19,15 @@ export type Rect = { dx0: number; dy0: number; dx1: number; dy1: number }
 // reads these rectangles at runtime. They exist so the template author and the reviewer can
 // talk about the city.
 export const DISTRICTS: Record<District, Rect> = {
-  riverfront: { dx0: 0, dy0: 0, dx1: 5, dy1: 29 },     // west bank: fishing frontage, clay, reeds
+  // Two columns of dry ground, not one: the bank held nothing but a cart because a single
+  // buildable column (dx 5) cannot take a 2-wide house, and a town with no house on its river
+  // is a town whose river is scenery.
+  riverfront: { dx0: 0, dy0: 0, dx1: 6, dy1: 29 },     // west bank: the landing, clay, reeds
   market: { dx0: 13, dy0: 11, dx1: 21, dy1: 17 },      // the widened plaza
-  homes: { dx0: 14, dy0: 1, dx1: 31, dy1: 9 },         // huts around a shared yard, NE of the square
-  farm: { dx0: 7, dy0: 20, dx1: 27, dy1: 29 },         // tilled-ready meadow, south, in river reach
+  homes: { dx0: 14, dy0: 1, dx1: 31, dy1: 9 },         // the yard street and the lane behind it
+  // Two rows further north than C13 drew it, so the farmhouse can stand on the dry side of
+  // the headland it fronts: a building south of that road would have its door in the field.
+  farm: { dx0: 7, dy0: 18, dx1: 27, dy1: 29 },         // tilled-ready meadow, south, in river reach
 }
 export const DISTRICT_NAMES = Object.keys(DISTRICTS) as District[]
 
@@ -83,10 +88,12 @@ export const FIRE_PIT_AT = { dx: 17, dy: 16 } as const    // the plaza's south a
 // Empty buildable ground beside a road. A plot carries no schema field and reserves nothing:
 // the template clears it, and the road-adjacency benefit (C11 §3) is why life will fill it.
 const GROWTH_PLOT_TILES: readonly (readonly [number, number])[] = [
-  [5, 13], [5, 15],                       // riverfront, off the main street's west end
-  [15, 17], [16, 17],                     // market, off the plaza's south edge
-  [16, 5], [17, 5], [20, 5], [21, 5],     // homes, the gaps between the north rank
-  [10, 21], [11, 21], [12, 21], [13, 21], // farm, along the north headland
+  [5, 10], [5, 13], [5, 15], [5, 16],     // the landing, above and below the river house
+  [15, 17], [16, 17], [18, 17],           // market, off the plaza's south edge
+  [16, 5], [17, 5], [18, 5],              // homes, the near gap in the yard street's rank
+  [22, 5], [23, 5], [24, 5], [25, 5],     // homes, the wide gap where the street thins out
+  [18, 8], [19, 8], [20, 8], [23, 8], [24, 8], // homes, the two gaps in the back lane's rank
+  [10, 21], [11, 21], [12, 21], [13, 21], // farm, along the headland west of the farmhouse
 ]
 
 function rectTiles(r: Rect, to: number): CityTile[] {
@@ -119,9 +126,12 @@ export function cityRoadTiles(): CityTile[] {
     ...rectTiles({ dx0: PLAZA.dx1 + 1, dy0: 14, dx1: CITY_W - 1, dy1: 14 }, T_ROAD), // starter spine, east
     ...rectTiles({ dx0: 15, dy0: 7, dx1: 15, dy1: PLAZA.dy0 - 1 }, T_ROAD),          // north approach
     ...rectTiles({ dx0: 19, dy0: PLAZA.dy1 + 1, dx1: 19, dy1: 19 }, T_ROAD),         // south approach
-    ...rectTiles({ dx0: 14, dy0: 6, dx1: 22, dy1: 6 }, T_ROAD),                      // the homes yard street
-    ...rectTiles({ dx0: 16, dy0: 9, dx1: 23, dy1: 9 }, T_ROAD),                      // the homes back lane
-    ...rectTiles({ dx0: 5, dy0: 20, dx1: 27, dy1: 20 }, T_ROAD),                     // the farm headland
+    // The yard street starts where the north approach meets it and ends at the last door on
+    // it; the back lane does the same behind. A run that carried on past its last house was
+    // the dangling end this file already forbids, so the houses set the length of the street.
+    ...rectTiles({ dx0: 14, dy0: 6, dx1: 26, dy1: 6 }, T_ROAD),                      // the homes yard street
+    ...rectTiles({ dx0: 16, dy0: 9, dx1: 25, dy1: 9 }, T_ROAD),                      // the homes back lane
+    ...rectTiles({ dx0: 5, dy0: 20, dx1: 25, dy1: 20 }, T_ROAD),                     // the farm headland
   ]
   const path = rectTiles({ dx0: PATH_DX, dy0: 0, dx1: PATH_DX, dy1: CITY_H - 1 }, T_PATH)
   return [...road, ...path]
@@ -130,6 +140,40 @@ export function cityRoadTiles(): CityTile[] {
 export const isRoadTile = (t: CityTile): boolean => t.to === T_ROAD || t.to === T_PATH
 
 // ---------------------------------------------------------------- structures
+
+// ★ THE THREE DWELLING KINDS — a shared contract with the art lane, for the CONTEMPORARY
+// RURAL setting. These are FIXTURES this template places, never new buildable verbs:
+// `structures.recipes` is the buildable set and it is C8's business, not this file's.
+export const CITY_DWELLING_KINDS = ['cottage', 'farmhouse', 'cabin'] as const
+export type DwellingKind = (typeof CITY_DWELLING_KINDS)[number]
+export const isDwellingKind = (kind: string): kind is DwellingKind =>
+  (CITY_DWELLING_KINDS as readonly string[]).includes(kind)
+
+// ★ `hut` IS RETIRED AS A NAME AND STILL LOAD-BEARING AS AN ID.
+//
+// The five founders' homes are the only buildings a person can walk into and sleep in, and
+// the kinds that may be entered and slept in are `structures.enterableKinds` and
+// `sleepableKinds` — inside SimConfigSchema, whose `stateHash(DEFAULT_CONFIG)` is a PINNED
+// gate (packages/forge/src/forgeConfig.test.ts:79). Naming a founder's house `cottage` would
+// move that pin, so the homes keep the id until the cross-lane rename commit retires it
+// everywhere at once. What the template CAN do — and does below — is stop the town being
+// eight copies of that one building.
+export const LEGACY_HOME_KIND = 'hut'
+
+/** Every kind that reads as somebody's house: the three contracted dwellings and the legacy
+ *  home id the founders still live under. The layout properties are measured over these. */
+export const CITY_HOUSE_KINDS = [...CITY_DWELLING_KINDS, LEGACY_HOME_KIND] as const
+export const isHouseKind = (kind: string): boolean =>
+  (CITY_HOUSE_KINDS as readonly string[]).includes(kind)
+
+// Three masses, not three palettes. In isometric a change of DEPTH is nearly invisible and a
+// change of WIDTH along the street is not, so the kinds differ where the eye can see it:
+// four, six and eight ground tiles.
+export const DWELLING_FOOTPRINTS: Readonly<Record<DwellingKind, { w: number; h: number }>> = {
+  cabin: { w: 2, h: 2 }, cottage: { w: 3, h: 2 }, farmhouse: { w: 4, h: 2 },
+}
+/** The legacy home keeps the 2×2 footprint every landed gate measured it at. */
+export const LEGACY_HOME_FOOTPRINT = { w: 2, h: 2 } as const
 
 // Assumption A-2: the five locked founders (design spec §10). Template data, not engine truth
 // — genesis binds them, and different id strings are one data edit with no code change.
@@ -163,42 +207,75 @@ const STOREHOUSE_FURNISHINGS: CityFurnishing[] = [
   { kind: 'crate', slot: { x: 2, y: 1 } },
   { kind: 'barrel', slot: { x: 0, y: 2 } },
 ]
-const SHED_FURNISHINGS: CityFurnishing[] = [
-  { kind: 'anvil', slot: { x: 1, y: 1 } },
-  { kind: 'bench', slot: { x: 2, y: 1 } },
-  { kind: 'shelf', slot: { x: 0, y: 1 } },
+// The workshop shed's set is gone with the sheds. `CITY_FURNISHING_KINDS` stays the LIBRARY's
+// vocabulary (G13 Task 28 asserts it against the catalog), not a list of what the current
+// eleven buildings happen to hold.
+
+// ★ A STREET OF DIFFERENT BUILDINGS, NOT ONE BUILDING FIVE TIMES.
+//
+// USER FEEDBACK: "it does not look like a town at all, the buildings are all the same." Read
+// as a plan the old layout was already a street; what it was not was a place with more than
+// one kind of building on it. Five identical 2×2 homes stood at dx 14, 18 and 22 — one mass,
+// one silhouette, one spacing — and a 2×2 sprite is drawn to a 128 px square over 64 px of
+// ground, so at four tiles apart they abutted into a single blob. Four things change here,
+// and each is asserted in cityTemplate.test.ts:
+//
+//   MASS      four widths on the street (4, 4, 6 and 8 ground tiles), never two of a kind
+//             standing next to each other.
+//   SPACING   the gaps between neighbours are 2, 3 and 4 tiles. A street that thins out as
+//             it leaves the centre is a town; equal gaps are a spreadsheet.
+//   PLACE     two houses are NOT on the homes street — one at the landing on the river path,
+//             the farmhouse out at the field — so the town has more than one address.
+//   ARRIVAL   four roads reach the square, one from each side.
+//
+// A door is the south-centre tile of a footprint, so a rank's door row is its bottom row.
+// The yard street's rank opens onto dy 6, the back lane's rank onto dy 9, and the two door
+// sets are disjoint so no door looks straight down another.
+export const DWELLINGS: readonly { kind: string; dx: number; dy: number; owner: string | null }[] = [
+  // The yard street, west to east.
+  { kind: LEGACY_HOME_KIND, dx: 14, dy: 4, owner: 'amara' },
+  { kind: 'cottage', dx: 19, dy: 4, owner: null },
+  { kind: LEGACY_HOME_KIND, dx: 26, dy: 4, owner: 'yusuf' },
+  // The back lane behind them.
+  { kind: LEGACY_HOME_KIND, dx: 16, dy: 7, owner: 'nadia' },
+  { kind: 'cabin', dx: 21, dy: 7, owner: null },
+  { kind: LEGACY_HOME_KIND, dx: 25, dy: 7, owner: 'omar' },
+  // The landing, on the river path — a house where the town meets its water. Its nearest
+  // neighbour is inside its line of sight, so nobody wakes up alone.
+  { kind: LEGACY_HOME_KIND, dx: 5, dy: 11, owner: 'salma' },
+  // The farmhouse stands at its own field, north of the headland it fronts. It is the largest
+  // roof in the parish and the only building out here, which is what a farm looks like.
+  { kind: 'farmhouse', dx: 24, dy: 18, owner: null },
 ]
 
-// A STREET, NOT A ROW. Five identical huts in one line at dy 4 was a grid with no frontage —
-// nothing faced anything. The huts now stand in two ranks across the yard street at dy 6: a
-// rank of three to its north, a rank of two to its south, staggered so no door on one side
-// looks straight down a door on the other.
-//
-// A door is the south-centre tile of a footprint, so a rank's door row is its bottom row. The
-// north rank's doors open onto the yard at dy 6; the south rank's open onto the back lane at
-// dy 9. Both ranks front a road, and the yard between them is the shared ground.
-export const HUT_ORIGINS: readonly (readonly [number, number])[] =
-  [[14, 4], [18, 4], [22, 4], [19, 7], [23, 7]]
-
-// Eleven structures, inside the ruled 8-12. The STANDING STONE is deliberately absent: it
+// Eleven structures, the count C13 pinned. The STANDING STONE is deliberately absent: it
 // stands beyond the edge of town, unexplained (C11 §9).
+//
+// Eleven is a hard budget and every slot is spoken for: five founders' homes, the three
+// contracted dwellings, the storehouse genesis stocks, and the two monuments in the square.
+// What that budget bought the layout, it paid for by dropping the two 1×1 sheds and the river
+// wagon — a matched pair of identical boxes and a parked cart, in exchange for a cottage, a
+// cabin and a farmhouse. (Deviation from C13's open question 2, which kept the wagon;
+// reversible the moment the count may be twelve.)
+//
+// ONLY A HUT IS A HOME. `structures.enterableKinds` and `sleepableKinds` name `hut` and
+// nothing else, and that list lives in `SimConfigSchema` — whose hash is a pinned gate. So the
+// five founders keep five huts, one each, and the hall and the cottage stand as fixtures the
+// eye reads and nobody walks into, exactly as the wagon and the well already do.
 export function cityStructures(): CityStructure[] {
   return [
-    ...HUT_ORIGINS.map(([dx, dy], i) => ({
-      kind: 'hut', dx, dy, w: 2, h: 2,
-      owner: FOUNDER_IDS[i]! as string, furnishings: [...HUT_FURNISHINGS],
-    })),
+    ...DWELLINGS.map(({ kind, dx, dy, owner }) => {
+      const f = isDwellingKind(kind) ? DWELLING_FOOTPRINTS[kind] : LEGACY_HOME_FOOTPRINT
+      return {
+        kind, dx, dy, w: f.w, h: f.h, owner,
+        furnishings: kind === LEGACY_HOME_KIND ? [...HUT_FURNISHINGS] : [],
+      }
+    }),
     // The storehouse fronts the main street where it arrives at the square, so the first
     // building you pass coming from the river is the one the town keeps its food in.
     { kind: 'storehouse', dx: 13, dy: 12, w: 2, h: 2, owner: null, furnishings: [...STOREHOUSE_FURNISHINGS] },
-    // A workshop on the square's south approach, and a field barn at the far end of the farm
-    // headland — two sheds that do different jobs in different districts, not a matched pair.
-    { kind: 'shed', dx: 18, dy: 17, w: 1, h: 1, owner: null, furnishings: [...SHED_FURNISHINGS] },
-    { kind: 'shed', dx: 27, dy: 21, w: 1, h: 1, owner: null, furnishings: [...SHED_FURNISHINGS] },
     { kind: 'well', dx: WELL_AT.dx, dy: WELL_AT.dy, w: 1, h: 1, owner: null, furnishings: [] },
     { kind: 'fire_pit', dx: FIRE_PIT_AT.dx, dy: FIRE_PIT_AT.dy, w: 1, h: 1, owner: null, furnishings: [] },
-    // Open question 2, answered: the wagon is a lore prop and stays unenterable.
-    { kind: 'wagon', dx: 5, dy: 16, w: 1, h: 2, owner: null, furnishings: [] },
   ]
 }
 
@@ -275,6 +352,140 @@ export function danglingRoadEnds(t: CityTemplate): { dx: number; dy: number }[] 
     out.push({ dx, dy })
   }
   return out.sort((a, b) => a.dy - b.dy || a.dx - b.dx)
+}
+
+// ------------------------------------------------- WHAT "LOOKS LIKE A TOWN" MEANS, MEASURED
+//
+// Five properties, each a function of the template alone. They are the reason this file can be
+// re-authored without a person squinting at a screenshot to decide whether it got better.
+
+const roadSetOf = (t: CityTemplate): Set<string> =>
+  new Set(t.tiles.filter(isRoadTile).map((x) => key(x.dx, x.dy)))
+
+/** 1. FRONTAGE. Pairs of structures whose footprints touch orthogonally. A door that opens
+ *  against a neighbour's wall is not frontage, and a town has ground on every side of every
+ *  building — so the invariant is that this list is empty. */
+export function touchingStructures(t: CityTemplate): Array<[string, string]> {
+  const out: Array<[string, string]> = []
+  const at = new Map<string, number>()
+  t.structures.forEach((s, i) => { for (const c of structureTiles(s)) at.set(key(c.dx, c.dy), i) })
+  t.structures.forEach((s, i) => {
+    const touched = new Set<number>()
+    for (const c of structureTiles(s))
+      for (const [ox, oy] of ORTHO) {
+        const j = at.get(key(c.dx + ox, c.dy + oy))
+        if (j !== undefined && j > i) touched.add(j)
+      }
+    for (const j of [...touched].sort((a, b) => a - b))
+      out.push([`${s.kind}@${s.dx},${s.dy}`, `${t.structures[j]!.kind}@${t.structures[j]!.dx},${t.structures[j]!.dy}`])
+  })
+  return out
+}
+
+/** 2. CONNECTIVITY. Structures grouped by the road component their door opens onto. One group
+ *  means you can walk from any building in town to any other without leaving the roads. */
+export function structureComponents(t: CityTemplate): string[][] {
+  const roads = roadSetOf(t)
+  const label = new Map<string, number>()
+  let n = 0
+  for (const k of [...roads].sort()) {
+    if (label.has(k)) continue
+    const id = n++
+    const stack = [k]
+    label.set(k, id)
+    while (stack.length > 0) {
+      const [dx, dy] = stack.pop()!.split(',').map(Number) as [number, number]
+      for (const [ox, oy] of ORTHO) {
+        const nk = key(dx + ox, dy + oy)
+        if (roads.has(nk) && !label.has(nk)) { label.set(nk, id); stack.push(nk) }
+      }
+    }
+  }
+  const groups = new Map<number | 'none', string[]>()
+  for (const f of frontages(t)) {
+    const id = f.onto === null ? 'none' : label.get(key(f.onto.dx, f.onto.dy))!
+    const name = `${f.kind}@${f.door.dx},${f.door.dy}`
+    const g = groups.get(id)
+    if (g === undefined) groups.set(id, [name]); else g.push(name)
+  }
+  return [...groups.values()]
+}
+
+export type PlazaArrival = { side: 'n' | 'e' | 's' | 'w'; from: { dx: number; dy: number } }
+
+/** 4. A CENTRE. The road tiles that arrive at the square from outside it, by compass side. A
+ *  square streets merely pass is a wide street; a square streets ARRIVE at is a centre. */
+export function plazaArrivals(t: CityTemplate): PlazaArrival[] {
+  const roads = roadSetOf(t)
+  const out: PlazaArrival[] = []
+  const SIDES = [['n', 0, -1], ['e', 1, 0], ['s', 0, 1], ['w', -1, 0]] as const
+  for (let dy = PLAZA.dy0; dy <= PLAZA.dy1; dy++)
+    for (let dx = PLAZA.dx0; dx <= PLAZA.dx1; dx++) {
+      if (!roads.has(key(dx, dy))) continue
+      for (const [side, ox, oy] of SIDES) {
+        const p = { dx: dx + ox, dy: dy + oy }
+        if (inRect(PLAZA, p.dx, p.dy) || !roads.has(key(p.dx, p.dy))) continue
+        out.push({ side, from: p })
+      }
+    }
+  return out.sort((a, b) => a.from.dy - b.from.dy || a.from.dx - b.from.dx)
+}
+
+export type StreetRank = {
+  /** `row 6` or `col 4` — the line of road every door on this rank opens onto */
+  street: string
+  dwellings: Array<{ kind: string; along: number; span: number }>
+}
+
+/** The houses of the town, grouped by the street their doors open onto and ordered along it.
+ *  `along` is the near edge in the street's own direction and `span` the extent. */
+export function dwellingRanks(t: CityTemplate): StreetRank[] {
+  const roads = roadSetOf(t)
+  const byStreet = new Map<string, StreetRank['dwellings']>()
+  const onto0 = frontages(t)
+  t.structures.forEach((s, i) => {
+    if (!isHouseKind(s.kind)) return
+    const onto = onto0[i]!.onto
+    if (onto === null) return
+    const horizontal = roads.has(key(onto.dx - 1, onto.dy)) || roads.has(key(onto.dx + 1, onto.dy))
+    const street = horizontal ? `row ${onto.dy}` : `col ${onto.dx}`
+    const entry = horizontal
+      ? { kind: s.kind, along: s.dx, span: s.w }
+      : { kind: s.kind, along: s.dy, span: s.h }
+    const g = byStreet.get(street)
+    if (g === undefined) byStreet.set(street, [entry]); else g.push(entry)
+  })
+  return [...byStreet.entries()]
+    .map(([street, dwellings]) => ({ street, dwellings: dwellings.sort((a, b) => a.along - b.along) }))
+    .sort((a, b) => a.street.localeCompare(b.street))
+}
+
+/** 3. VARIETY OF MASS. The longest run of one dwelling kind standing consecutively on one
+ *  street. Two neighbours of a kind read as neighbours; three read as a terrace, and five in
+ *  a line was the complaint — so the ruling is N = 2. */
+export function longestKindRun(t: CityTemplate): number {
+  let worst = 0
+  for (const rank of dwellingRanks(t)) {
+    let run = 0, last = ''
+    for (const d of rank.dwellings) {
+      run = d.kind === last ? run + 1 : 1
+      last = d.kind
+      worst = Math.max(worst, run)
+    }
+  }
+  return worst
+}
+
+/** 5. PLOTS AND GAPS. The empty ground between consecutive dwellings on each street. Every
+ *  gap is at least one tile, and they are not all the same number. */
+export function dwellingGaps(t: CityTemplate): number[] {
+  const out: number[] = []
+  for (const rank of dwellingRanks(t))
+    for (let i = 1; i < rank.dwellings.length; i++) {
+      const prev = rank.dwellings[i - 1]!, next = rank.dwellings[i]!
+      out.push(next.along - (prev.along + prev.span))
+    }
+  return out
 }
 
 // Neighbours are computed over the road set only (T_ROAD ∪ T_PATH), then the shared autotiler

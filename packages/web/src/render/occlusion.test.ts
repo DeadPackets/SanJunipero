@@ -86,30 +86,39 @@ describe('the walk-around, on the eleven buildings of the real town', () => {
     expect(town.structures).toHaveLength(11)
     expect(town.structures.filter((s) => s.owner !== null)).toHaveLength(5)
     expect([...new Set(town.structures.map((s) => s.kind))].sort())
-      .toEqual(['fire_pit', 'hut', 'shed', 'storehouse', 'wagon', 'well'])
+      .toEqual(['cabin', 'cottage', 'farmhouse', 'fire_pit', 'hut', 'storehouse', 'well'])
   })
 
   it('MEASURES U8: the landed rule disagreed with the geometry on this many tiles', () => {
     const { decided, disagreements } = sweep((_b, i, tile) => landedInFront(town.structures[i]!, tile))
-    expect(decided).toBe(368)
-    // THE MEASURED SIZE OF U8 on the real town: six tiles, one per 2×2 building, all of them
+    expect(decided).toBe(432)
+    // THE MEASURED SIZE OF U8 on the real town: one row of tiles per building, all of them
     // the exact tie — a body standing on the tile directly in front of a door was drawn
-    // BEHIND the building. That is U8's sentence, in coordinates.
+    // BEHIND the building. That is U8's sentence, in coordinates. Thirteen rather than six
+    // because the town now stands wider buildings: a 3× and a 4×-wide frontage ties on every
+    // tile across its face, not only on the one in front of a 2×2 door.
     expect(disagreements.map((d) => `${d.structure} ${d.tile} oracle=${d.oracle} got=${d.got}`)).toEqual([
       'structure_hut_14_13 (14,15) oracle=true got=false',
-      'structure_hut_18_13 (18,15) oracle=true got=false',
-      'structure_hut_22_13 (22,15) oracle=true got=false',
-      'structure_hut_19_16 (19,18) oracle=true got=false',
-      'structure_hut_23_16 (23,18) oracle=true got=false',
+      'structure_cottage_19_13 (19,15) oracle=true got=false',
+      'structure_cottage_19_13 (20,15) oracle=true got=false',
+      'structure_hut_26_13 (26,15) oracle=true got=false',
+      'structure_hut_16_16 (16,18) oracle=true got=false',
+      'structure_cabin_21_16 (21,18) oracle=true got=false',
+      'structure_hut_25_16 (25,18) oracle=true got=false',
+      'structure_hut_5_20 (5,22) oracle=true got=false',
+      'structure_farmhouse_24_27 (24,29) oracle=true got=false',
+      'structure_farmhouse_24_27 (25,29) oracle=true got=false',
+      'structure_farmhouse_24_27 (25,30) oracle=true got=false',
+      'structure_farmhouse_24_27 (26,29) oracle=true got=false',
       'structure_storehouse_13_21 (13,23) oracle=true got=false',
     ])
-    expect(disagreements).toHaveLength(6)
+    expect(disagreements).toHaveLength(13)
   })
 
   it('the new sort disagrees with the geometry on NO tile', () => {
     const { decided, disagreements } = sweep((box, _i, tile) =>
       before(depthOrder([box, bodyDepthBox('body', tile.x, tile.y)]), box.id, 'body'))
-    expect(decided).toBe(368)
+    expect(decided).toBe(432)
     expect(
       disagreements.map((d) => `${d.structure} at ${d.tile}: oracle ${d.oracle}, got ${d.got}`),
     ).toEqual([])

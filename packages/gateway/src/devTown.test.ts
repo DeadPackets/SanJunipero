@@ -41,8 +41,10 @@ describe('devTown — one town, not two', () => {
       return out
     }
     expect(count(town.structures)).toEqual(count(cityStructures()))
+    // Six kinds over eleven roofs, where the eleven used to be five copies of one home and a
+    // matched pair of sheds. The cottage, the cabin and the farmhouse are unowned fixtures.
     expect(count(town.structures)).toEqual({
-      hut: 5, storehouse: 1, shed: 2, well: 1, fire_pit: 1, wagon: 1,
+      hut: 5, cottage: 1, cabin: 1, farmhouse: 1, storehouse: 1, well: 1, fire_pit: 1,
     })
   })
 

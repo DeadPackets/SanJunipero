@@ -22,7 +22,8 @@ export type Landmark = { id: string; name: string; x: number; y: number; rank: 1
 
 /** Every kind the town can stand, dev fixture included. A new kind with no rank is a type error. */
 export const TOWN_KINDS = [
-  'hut', 'storehouse', 'shed', 'well', 'fire_pit', 'wagon', 'standing_stone', 'scaffolding',
+  'hut', 'cottage', 'farmhouse', 'cabin',
+  'storehouse', 'shed', 'well', 'fire_pit', 'wagon', 'standing_stone', 'scaffolding',
 ] as const
 export type TownKind = (typeof TOWN_KINDS)[number]
 
@@ -30,15 +31,18 @@ export type TownKind = (typeof TOWN_KINDS)[number]
  *  eye lands on the civic centre first. Applied as a rim and a ledge, never as a tint (P11). */
 export const SILHOUETTE_RANK: Record<TownKind, 1 | 2 | 3> = {
   fire_pit: 1, well: 1, storehouse: 1, standing_stone: 1,
-  shed: 2, wagon: 2,
-  hut: 3, scaffolding: 3,
+  // The farmhouse is the biggest roof outside the square and the anchor of its own district,
+  // so it reads a rung above the houses without joining the civic centre.
+  farmhouse: 2, shed: 2, wagon: 2,
+  hut: 3, cottage: 3, cabin: 3, scaffolding: 3,
 }
 
 // Which part of town a kind belongs to. The viewer does not know the template's anchor, so a
 // district is read from what is standing rather than from a rectangle in template space.
 const DISTRICT_OF_KIND: Partial<Record<TownKind, string>> = {
-  hut: 'houses', well: 'square', fire_pit: 'square', storehouse: 'square',
-  shed: 'fields', wagon: 'landing',
+  hut: 'houses', cottage: 'houses', cabin: 'houses',
+  well: 'square', fire_pit: 'square', storehouse: 'square',
+  farmhouse: 'fields', shed: 'fields', wagon: 'landing',
 }
 const DISTRICT_NAME: Record<string, string> = {
   houses: 'the houses', square: 'the square', fields: 'the fields', landing: 'the landing',

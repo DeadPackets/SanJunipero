@@ -42,7 +42,8 @@ const RAMP_NAMES = Object.keys(BUILT_FORM_RAMPS) as RampName[]
 export const BUILT_FORM_MATERIALS: Readonly<Record<string, RampName>> = {
   well: 'stone', fire_pit: 'stone', standing_stone: 'stone', grave: 'stone',
   wagon: 'timber', scaffolding: 'timber', bridge: 'timber', shed: 'timber',
-  hut: 'clay', cottage: 'clay', storehouse: 'clay',
+  cabin: 'timber',
+  hut: 'clay', cottage: 'clay', farmhouse: 'clay', storehouse: 'clay',
 }
 
 /** The one mark that says a person made this and meant it: water in the well's mouth, embers
@@ -64,6 +65,10 @@ export const BUILT_FORM_UNIT_PX = TILE_W
 export const BUILT_FORM_HEIGHT_TILES: Readonly<Record<string, number>> = {
   fire_pit: 0.4, well: 0.6, grave: 0.45, wagon: 0.65,
   standing_stone: 1.1, scaffolding: 1.0, bridge: 0.35,
+  // Three dwellings that differ in the two things a roofline can differ in. A cottage stands
+  // taller than the cabin it is bigger than; a farmhouse is the widest roof and sits LOW, so
+  // width alone tells it apart from a house that is merely nearer.
+  cabin: 0.85, cottage: 1.05, farmhouse: 0.95,
 }
 export const BUILT_FORM_DEFAULT_HEIGHT_TILES = 0.9
 
