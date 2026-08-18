@@ -14,6 +14,7 @@ vi.mock('pixi.js', () => {
     visible = true
     eventMode = ''
     position = new Point()
+    scale = new Point()
     get width(): number { return 0 }
     get height(): number { return 0 }
     addChild(...cs: Container[]): void {

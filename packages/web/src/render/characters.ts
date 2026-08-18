@@ -9,7 +9,8 @@ import type { Scene } from './scene.js'
 import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin } from './hitShapes.js'
 import { TAG_PAD_X, TAG_PAD_Y, anchorForSprite, placeTag } from './tooltip.js'
 import { characterArt, smoothSource, type TextureBook } from './textures.js'
-import { WORLD_FONT_FAMILY, createWorldLabel, type WorldLabel } from './worldLabel.js'
+import { createWorldLabel, type WorldLabel } from './worldLabel.js'
+import { faceFor, worldTextScale } from './textFaces.js'
 import {
   CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, NAME_TAG_ABOVE_HEAD_PX,
   SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4, charPose, emoteFor, interpolatePos,
@@ -18,8 +19,9 @@ import {
 
 export const EMOTE_MS = 2000
 export const EMOTE_ABOVE_HEAD_PX = 12
-export const CHAR_TAG_FONT_PX = WORLD_TEXT_PX
-export const CHAR_TAG_LINE_H = WORLD_TEXT_LINE_H
+// The name tag is set at the face's own size, which is above the 12px floor, not at it.
+export const CHAR_TAG_FONT_PX = faceFor('name').size
+export const CHAR_TAG_LINE_H = Math.max(WORLD_TEXT_LINE_H, CHAR_TAG_FONT_PX + 2)
 export const SHADOW_ALPHA = 0.25
 export const GLIDE_MIN_MS = 200
 export const GLIDE_MAX_MS = 4000
@@ -206,7 +208,8 @@ export function createCharacterLayer(
     nameTag.eventMode = 'none'
     const nameTagBg = new Graphics()
     const nameTagLabel = createWorldLabel('', {
-      fontFamily: WORLD_FONT_FAMILY, fontSize: CHAR_TAG_FONT_PX, fill: 0x43394a, lineHeight: CHAR_TAG_LINE_H,
+      fontFamily: faceFor('name').family, fontSize: CHAR_TAG_FONT_PX, fill: 0x43394a,
+      lineHeight: CHAR_TAG_LINE_H,
     })
     nameTagLabel.anchor.set(0.5, 1) // match the bg slab, which is drawn centered above the origin
     nameTag.addChild(nameTagBg, nameTagLabel)
@@ -326,7 +329,14 @@ export function createCharacterLayer(
       // ONE placement rule for every label in the product (U10): above the DRAWN figure,
       // flipped or slid to stay on screen instead of being drawn off the edge of it.
       if (e.nameTag.visible) {
-        const size = { w: e.nameTagLabel.width + TAG_PAD_X * 2, h: e.nameTagLabel.height + TAG_PAD_Y * 2 }
+        // The tag holds its size for the reader, so its world FOOTPRINT is what the camera
+        // changes — that is the number placeTag de-conflicts against, not the drawn one.
+        const inv = worldTextScale(scene.getZoom())
+        e.nameTag.scale.set(inv)
+        const size = {
+          w: (e.nameTagLabel.width + TAG_PAD_X * 2) * inv,
+          h: (e.nameTagLabel.height + TAG_PAD_Y * 2) * inv,
+        }
         const head = CHAR_TARGET_PX + EMOTE_ABOVE_HEAD_PX + NAME_TAG_ABOVE_HEAD_PX
         const at = placeTag(anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
           size, scene.viewRect())

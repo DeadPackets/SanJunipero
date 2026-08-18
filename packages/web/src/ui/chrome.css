@@ -103,6 +103,10 @@
      call site, and that habit produced four of the six AA failures in the audit. Ink lifted
      toward the warm greys: 6.57:1 on cream, 5.83:1 on parchment, 4.91:1 on sand. */
   --ink-quiet: #5F5568;
+  /* The same rule turned over: quiet CREAM, for the dark grounds the town speaks over. The
+     subtitle's thought was the last `opacity` left on a reading surface. 8.28:1 on deep,
+     7.03:1 on night, and 1.81x quieter than cream — a ratio that is now known. */
+  --cream-quiet: #C4B8AE;
   --deep: #241F2B;
   --night: #322B38;
   --honey: #F2C879;
@@ -1100,7 +1104,7 @@ body {
   background-color: var(--deep); color: var(--cream);
   font-size: 0.95rem; padding: 0.1rem 0.4rem;
 }
-.subtitle.thought { opacity: 0.85; }
+.subtitle.thought { color: var(--cream-quiet); font-style: italic; }
 .subtitle-name {
   display: block; font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--honey); margin-bottom: 0.1rem;
@@ -1299,7 +1303,7 @@ body {
   padding: 0.5rem 0.7rem;
   display: inline-block;
 }
-.roster-empty em { display: block; margin-top: 0.35rem; opacity: 0.75; }
+.roster-empty em { display: block; margin-top: 0.35rem; color: var(--cream-quiet); }
 .roster-gone { margin-top: 0.8rem; font-style: italic; color: var(--ink-quiet); }
 
 /* ── World Laws: the town's rulebook, and the operator's hand on it ── */

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { cameraActionFor, stepZoom } from './cameraNav.js'
 import { createScene, type Scene } from './scene.js'
+import { installFaces } from './textFaces.js'
 import { TextureBook } from './textures.js'
 import { syncEntities } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
@@ -56,7 +57,10 @@ export function StageMount(
     let offInterior: (() => void) | null = null
     let offEvents: (() => void) | null = null
     let tickFn: (() => void) | null = null
-    void createScene(rootEl, store).then((s) => {
+    // The town's faces are installed BEFORE the scene exists, so the first label a viewer
+    // sees is already a bitmap glyph. If the webfonts never resolve, installFaces resolves
+    // anyway and worldLabel keeps drawing canvas glyphs — a font must never blank the world.
+    void installFaces(document).then(() => createScene(rootEl, store)).then((s) => {
       if (disposed) {
         s.destroy()
         return

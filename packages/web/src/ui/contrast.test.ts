@@ -87,8 +87,16 @@ const QUIET_SITES = [
   '.digest-footer', '.roster-gone', '.laws-lede', '.law-history', '.law-edit input:disabled',
 ]
 
+// U18 closes the deferral in the comment above. A thought was `opacity: 0.85` on the DOM
+// subtitle for the same reason it was `alpha: 0.55` on the canvas bubble, and it is the same
+// mistake in both places: a thought must read as a different INK, not a thinner one, or its
+// ratio is unknowable at the one surface where the town is actually speaking.
+const DARK_QUIET_SITES = ['.subtitle.thought', '.roster-empty em']
+
 /** Every paper the chrome paints quiet text on. */
 const PAPERS = ['cream', 'parchment', 'sand'] as const
+/** The two dark grounds the chrome paints quiet CREAM on. */
+const DARK_PAPERS = ['deep', 'night'] as const
 
 describe('--ink-quiet — the de-emphasis token', () => {
   it('exists as a colour in the palette', () => {
@@ -118,6 +126,27 @@ describe('the filtered-count badge on the shut bonds key', () => {
     expect(fg).toBe('deep')
     expect(bg).toBe('ember')
     expect(contrast(T[fg!]!, T[bg!]!)).toBeGreaterThanOrEqual(AA)
+  })
+})
+
+describe('--cream-quiet — the same de-emphasis, on the dark ground the town speaks over', () => {
+  it('exists as a colour, clears AA on both dark grounds, and is visibly quieter than cream', () => {
+    expect(T['cream-quiet']).toMatch(/^#[0-9A-Fa-f]{6}$/)
+    for (const paper of DARK_PAPERS) {
+      expect(contrast(T['cream-quiet']!, T[paper]!), `cream-quiet on ${paper}`).toBeGreaterThanOrEqual(AA)
+      expect(contrast(T['cream-quiet']!, T[paper]!), `cream-quiet vs cream on ${paper}`)
+        .toBeLessThan(contrast(T['cream']!, T[paper]!))
+    }
+  })
+
+  it.each(DARK_QUIET_SITES)('%s states its colour instead of thinning it', (selector) => {
+    const body = ruleBody(CSS, selector)
+    expect(body, `${selector} still de-emphasises with opacity`).not.toMatch(/opacity:/)
+    const colour = /color:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    expect(colour, `${selector} sets no colour token`).toBeDefined()
+    for (const paper of DARK_PAPERS) {
+      expect(contrast(T[colour!]!, T[paper]!), `${selector} on ${paper}`).toBeGreaterThanOrEqual(AA)
+    }
   })
 })
 

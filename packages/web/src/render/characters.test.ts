@@ -20,6 +20,7 @@ vi.mock('pixi.js', () => {
     destroyed = false
     eventMode = ''
     position = new Point()
+    scale = new Point()
     sortableChildren = false
     addChild(...cs: Container[]): void {
       for (const c of cs) {

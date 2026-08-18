@@ -2,7 +2,8 @@ import { Container, Graphics } from 'pixi.js'
 import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
 import { BUBBLE_FILL, BUBBLE_INK } from './bubbles.js'
 import type { LayerSet } from './layers.js'
-import { WORLD_FONT_FAMILY, createWorldLabel } from './worldLabel.js'
+import { createWorldLabel } from './worldLabel.js'
+import { faceFor, worldTextScale } from './textFaces.js'
 
 // TOOLTIPS THAT LAND WHERE THEY POINT (U10, plan task 74).
 //
@@ -16,8 +17,8 @@ import { WORLD_FONT_FAMILY, createWorldLabel } from './worldLabel.js'
 //
 // One rule, one owner, one place to change it.
 
-export const TAG_FONT_PX = WORLD_TEXT_PX
-export const TAG_LINE_H = WORLD_TEXT_LINE_H
+export const TAG_FONT_PX = faceFor('label').size
+export const TAG_LINE_H = Math.max(WORLD_TEXT_LINE_H, TAG_FONT_PX + 2)
 export const TAG_PAD_X = 5
 export const TAG_PAD_Y = 3
 export const TAG_MAX_CHARS = 48
@@ -114,7 +115,7 @@ function makeTag(parent: Container): Tag {
   node.eventMode = 'none' // a label must never eat the click on the thing it names
   const slab = new Graphics()
   const label = createWorldLabel('', {
-    fontFamily: WORLD_FONT_FAMILY, fontSize: TAG_FONT_PX, fill: BUBBLE_INK, lineHeight: TAG_LINE_H,
+    fontFamily: faceFor('label').family, fontSize: TAG_FONT_PX, fill: BUBBLE_INK, lineHeight: TAG_LINE_H,
   })
   label.anchor.set(0.5, 0)
   node.addChild(slab, label)
@@ -122,7 +123,7 @@ function makeTag(parent: Container): Tag {
   return { node, slab, label, box: null }
 }
 
-export function createTooltipLayer(layers: LayerSet, view: () => Rect): TooltipLayer {
+export function createTooltipLayer(layers: LayerSet, view: () => Rect, zoom: () => number = () => 1): TooltipLayer {
   const tags = new Map<TagOwner, Tag>()
   let occupied: readonly Rect[] = []
 
@@ -154,12 +155,19 @@ export function createTooltipLayer(layers: LayerSet, view: () => Rect): TooltipL
         t.slab.fill(BUBBLE_FILL)
         t.slab.stroke({ width: 1, color: BUBBLE_INK })
       }
-      const size = { w: t.label.width + TAG_PAD_X * 2, h: t.label.height + TAG_PAD_Y * 2 }
+      // A tag is the reader's size at every stop; the camera only changes its world footprint,
+      // which is the number the de-confliction below has to reason about.
+      const inv = worldTextScale(zoom())
+      t.node.scale.set(inv)
+      const size = {
+        w: (t.label.width + TAG_PAD_X * 2) * inv,
+        h: (t.label.height + TAG_PAD_Y * 2) * inv,
+      }
       // every OTHER live tag is something this one must not land on
       const taken = [...occupied, ...[...tags].filter(([o]) => o !== owner).map(([, x]) => x.box)
         .filter((b): b is Rect => b !== null)]
       const at = placeTag(a, size, view(), taken)
-      t.node.position.set(Math.round(at.sx), Math.round(at.sy + TAG_PAD_Y))
+      t.node.position.set(Math.round(at.sx), Math.round(at.sy + TAG_PAD_Y * inv))
       t.node.visible = true
       t.box = { x: at.sx - size.w / 2, y: at.sy, w: size.w, h: size.h }
     },

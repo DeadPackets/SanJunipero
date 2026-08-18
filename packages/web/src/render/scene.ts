@@ -280,7 +280,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       w: app.screen.width / k, h: app.screen.height / k,
     }
   }
-  const tags = createTooltipLayer(layers, viewRect)
+  const tags = createTooltipLayer(layers, viewRect, () => world.scale.x)
 
   const tileCbs: Array<(t: { x: number; y: number }) => void> = []
 

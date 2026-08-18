@@ -5,7 +5,8 @@ import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
-import { WORLD_FONT_FAMILY, createWorldLabel, type WorldLabel } from './worldLabel.js'
+import { createWorldLabel, type WorldLabel } from './worldLabel.js'
+import { faceFor, worldTextScale } from './textFaces.js'
 
 // A good plan is not a legible picture. At the default zoom the viewer sees roofs and roads
 // and cannot tell the square from a wide street. These are the reading aids a real town has:
@@ -53,7 +54,7 @@ export const LANDMARK_SHOW_BELOW_SCALE = 1.5
 const LANDMARK_FULL_BELOW_SCALE = 0.5
 
 /** The chrome type floor is 12px and a world label is chrome. */
-export const LANDMARK_LABEL_PX = 12
+export const LANDMARK_LABEL_PX = faceFor('label').size
 
 export function landmarkAlpha(scale: number): number {
   const span = LANDMARK_SHOW_BELOW_SCALE - LANDMARK_FULL_BELOW_SCALE
@@ -130,14 +131,14 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
     const state = store.getState()
     const marks = state === null ? [] : landmarksOf(state)
     const seen = new Set<string>()
-    const inv = 1 / (scene.world.scale.x || 1)
+    const inv = worldTextScale(scene.world.scale.x)
 
     for (const m of marks) {
       seen.add(m.id)
       let t = labels.get(m.id)
       if (t === undefined) {
         t = createWorldLabel(m.name, {
-          fontFamily: WORLD_FONT_FAMILY, fontSize: LANDMARK_LABEL_PX, fill: LANDMARK_INK,
+          fontFamily: faceFor('label').family, fontSize: LANDMARK_LABEL_PX, fill: LANDMARK_INK,
         })
         t.anchor.set(0.5, 1)
         t.eventMode = 'none'

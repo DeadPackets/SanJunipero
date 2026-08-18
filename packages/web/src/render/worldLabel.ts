@@ -1,4 +1,5 @@
 import { BitmapText, Cache, Container, Text } from 'pixi.js'
+import { FACE_PX } from './textFaces.js'
 
 // EVERY GLYPH THE WORLD DRAWS IS BUILT HERE.
 //
@@ -12,10 +13,10 @@ import { BitmapText, Cache, Container, Text } from 'pixi.js'
 // a bitmap glyph when the font is provably installed, a canvas glyph when it is not, and an
 // empty node if even that fails. A label may cost itself. It may never cost the view.
 
-/** The family every world label asks for. The pixel BitmapFont install (Task 88) registers
- *  under this name, and every call site upgrades from canvas glyphs to bitmap glyphs on that
- *  day without being edited. */
-export const WORLD_FONT_FAMILY = 'monospace'
+/** The family a world label falls back to when it is not told which face it wants. Task 88
+ *  installed the pixel BitmapFont under this name, so the fallback this module was built for
+ *  is now the upgrade: every call site reads bitmap glyphs without having been edited. */
+export const WORLD_FONT_FAMILY = FACE_PX
 
 /** A canvas glyph at 12px would be resampled by NEAREST upscaling; 2 keeps it crisp. */
 export const LABEL_RESOLUTION = 2

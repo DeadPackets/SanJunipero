@@ -1,0 +1,312 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { describe, expect, it, vi } from 'vitest'
+
+const installs: Array<Record<string, unknown>> = []
+vi.mock('pixi.js', () => ({
+  BitmapFont: { install: (o: Record<string, unknown>) => { installs.push(o) } },
+}))
+import {
+  BUBBLE_FRAME_PX, BUBBLE_SLICE, FACE_ADVANCE_EM, FACE_BODY, FACE_DESIGN_PX, FACE_INSTALL_PX,
+  FACE_PX, FACE_ROLES, FACE_SIZES, FACE_SOURCE, LOWERCASE_FACES, SPEECH_FILL, SPEECH_INK,
+  TAIL_PX, THOUGHT_FILL, THOUGHT_INK, faceFor, installFaces, nineSlice, tailPoly, worldTextScale,
+  wrapCharsFor,
+} from './textFaces.js'
+import { ZOOM_STOPS } from './camera.js'
+import { TEXT_MIN_PX, WORLD_TEXT_PX } from '../textFloor.js'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+const src = (rel: string): string => readFileSync(join(HERE, rel), 'utf8')
+
+const ch = (v: number): number => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+const lum = (hex: number): number => {
+  const [r, g, b] = [16, 8, 0].map((s) => ch(((hex >> s) & 0xff) / 255))
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!
+}
+const contrast = (a: number, b: number): number => {
+  const [x, y] = [lum(a), lum(b)]
+  const [hi, lo] = x > y ? [x, y] : [y, x]
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+describe('U18 — the town speaks in its own typeface', () => {
+  // A font cannot be installed in node, so the call sites are checked at the source. Today
+  // bubbles.ts, characters.ts, tooltip.ts and landmarks.ts all ask for `monospace`.
+  const CALL_SITES = ['./bubbles.ts', './characters.ts', './tooltip.ts', './landmarks.ts']
+
+  // The call sites never wrote 'monospace' themselves — batch 2 had already routed them through
+  // WORLD_FONT_FAMILY, so scanning only them passes against the broken code and measures
+  // nothing. worldLabel.ts is where the word actually was, so it is scanned too.
+  it('leaves no world label asking the browser for its default mono', () => {
+    for (const f of [...CALL_SITES, './worldLabel.ts']) {
+      expect(src(f), `${f} still asks for monospace`).not.toMatch(/=\s*'monospace'|fontFamily:\s*'monospace'/)
+    }
+  })
+
+  it('routes every world label through faceFor, so no site picks its own type', () => {
+    for (const f of CALL_SITES) expect(src(f), f).toMatch(/faceFor\(/)
+  })
+
+  it('installs under the family worldLabel already looks for, so no call site changed', () => {
+    expect(src('./worldLabel.ts')).toContain('FACE_PX')
+  })
+})
+
+// ★ WHAT THE BROWSER SETTLED, and it inverts the obvious assignment: Silkscreen has NO
+// lowercase — "Hey Nadia" sets as HEY NADIA. Press Start 2P has real lowercase and is the
+// more readable of the two at a sentence. So the pixel face labels and the display face
+// SPEAKS, which is the opposite of what the two names suggest.
+describe('the two faces, and which one is allowed to say a sentence', () => {
+  it('sets labels in the face with no lowercase and sentences in the face that has it', () => {
+    expect(FACE_SOURCE[FACE_PX]).toBe('Silkscreen')
+    expect(FACE_SOURCE[FACE_BODY]).toBe('Press Start 2P')
+    expect(LOWERCASE_FACES).toContain(FACE_BODY)
+    expect(LOWERCASE_FACES).not.toContain(FACE_PX)
+  })
+
+  it('never lets a face without lowercase carry a spoken sentence', () => {
+    for (const role of ['speech', 'thought'] as const) {
+      expect(LOWERCASE_FACES, role).toContain(faceFor(role).family)
+    }
+  })
+
+  it('is total over its four roles', () => {
+    expect([...FACE_ROLES].sort()).toEqual(['label', 'name', 'speech', 'thought'])
+    for (const role of FACE_ROLES) {
+      const f = faceFor(role)
+      expect([FACE_PX, FACE_BODY], role).toContain(f.family)
+      expect(FACE_SIZES, role).toContain(f.size)
+    }
+  })
+
+  it('never drops below the floors the ui-blockers round set', () => {
+    for (const role of FACE_ROLES) {
+      expect(faceFor(role).size, role).toBeGreaterThanOrEqual(TEXT_MIN_PX)
+      expect(faceFor(role).size, role).toBeGreaterThanOrEqual(WORLD_TEXT_PX)
+    }
+  })
+
+  // The forge lane owns how much detail the art carries; this lane owns not wrecking it.
+  it('sets a pixel face only at whole multiples of the grid it was drawn on', () => {
+    expect(FACE_DESIGN_PX).toBe(8)
+    for (const size of FACE_SIZES) expect(size % FACE_DESIGN_PX, `${size}px`).toBe(0)
+    expect(FACE_INSTALL_PX % FACE_DESIGN_PX).toBe(0)
+    for (const role of FACE_ROLES) expect(faceFor(role).size % FACE_DESIGN_PX, role).toBe(0)
+  })
+})
+
+describe('wrapping, derived from the face rather than from a guess', () => {
+  it('wraps the wide face sooner than the narrow one at the same width', () => {
+    const wide = wrapCharsFor(FACE_BODY, 16, 240)
+    const narrow = wrapCharsFor(FACE_PX, 16, 240)
+    expect(narrow).toBeGreaterThan(wide)
+    expect(FACE_ADVANCE_EM[FACE_BODY]).toBeGreaterThan(FACE_ADVANCE_EM[FACE_PX]!)
+  })
+
+  it('halves the count when the face doubles in size', () => {
+    expect(wrapCharsFor(FACE_BODY, 8, 240)).toBe(2 * wrapCharsFor(FACE_BODY, 16, 240))
+  })
+
+  it('never returns a wrap so short that a word cannot fit on a line', () => {
+    for (const family of [FACE_PX, FACE_BODY]) {
+      for (const size of FACE_SIZES) {
+        expect(wrapCharsFor(family, size, 240), `${family} ${size}`).toBeGreaterThanOrEqual(8)
+      }
+    }
+  })
+
+  it('states an advance no narrower than the face really sets', () => {
+    // Both are monospace pixel faces on an 8px em. The numbers are deliberate upper bounds:
+    // wrapping early can only make a bubble narrower, never wider than its box.
+    expect(FACE_ADVANCE_EM[FACE_BODY]).toBe(1)
+    expect(FACE_ADVANCE_EM[FACE_PX]).toBeLessThan(1)
+    expect(FACE_ADVANCE_EM[FACE_PX]).toBeGreaterThan(0.5)
+  })
+})
+
+describe('a bubble is a nine-slice, like every other slab in the product', () => {
+  it('cuts the frame art the sheet already uses', () => {
+    expect(BUBBLE_FRAME_PX).toBe(3 * BUBBLE_SLICE)
+    expect(BUBBLE_SLICE).toBe(10)
+  })
+
+  it('returns exactly nine pieces', () => {
+    expect(nineSlice(64, 32, 10)).toHaveLength(9)
+  })
+
+  it('tiles the destination exactly — no gap and no overlap', () => {
+    for (const [w, h] of [[64, 32], [20, 20], [300, 41], [21, 200]] as const) {
+      const rects = nineSlice(w, h, 10)
+      const area = rects.reduce((n, r) => n + r.dw * r.dh, 0)
+      expect(area, `${w}x${h} area`).toBe(w * h)
+      for (let i = 0; i < rects.length; i++) {
+        for (let j = i + 1; j < rects.length; j++) {
+          const a = rects[i]!, b = rects[j]!
+          const overlap =
+            Math.max(0, Math.min(a.dx + a.dw, b.dx + b.dw) - Math.max(a.dx, b.dx)) *
+            Math.max(0, Math.min(a.dy + a.dh, b.dy + b.dh) - Math.max(a.dy, b.dy))
+          expect(overlap, `${w}x${h} ${i} overlaps ${j}`).toBe(0)
+        }
+      }
+    }
+  })
+
+  it('never scales a corner, whatever the bubble grows to', () => {
+    for (const [w, h] of [[64, 32], [300, 41], [512, 300]] as const) {
+      const rects = nineSlice(w, h, 10)
+      // A corner is a piece against both a vertical and a horizontal edge of the box.
+      const corners = rects.filter((r) =>
+        (r.dx === 0 || r.dx + r.dw === w) && (r.dy === 0 || r.dy + r.dh === h))
+      expect(corners, `${w}x${h}`).toHaveLength(4)
+      for (const c of corners) {
+        expect(c.dw, `${w}x${h} corner width`).toBe(c.sw)
+        expect(c.dh, `${w}x${h} corner height`).toBe(c.sh)
+      }
+      // and the pieces that are NOT corners do stretch, or the frame would not fit the box
+      expect(rects.some((r) => r.dw !== r.sw || r.dh !== r.sh), `${w}x${h}`).toBe(true)
+    }
+  })
+
+  it('reads every piece from inside the frame texture', () => {
+    for (const r of nineSlice(64, 32, 10)) {
+      expect(r.sx).toBeGreaterThanOrEqual(0)
+      expect(r.sy).toBeGreaterThanOrEqual(0)
+      expect(r.sx + r.sw).toBeLessThanOrEqual(BUBBLE_FRAME_PX)
+      expect(r.sy + r.sh).toBeLessThanOrEqual(BUBBLE_FRAME_PX)
+    }
+  })
+
+  it('refuses to fold a box smaller than its own corners', () => {
+    const rects = nineSlice(4, 4, 10)
+    expect(rects).toHaveLength(9)
+    expect(rects.reduce((n, r) => n + r.dw * r.dh, 0)).toBe(2 * 10 * (2 * 10))
+  })
+})
+
+describe('the tail points at the speaker', () => {
+  it('hangs downward from a bubble placed above, and upward from one placed below', () => {
+    const above = tailPoly('above', 60, 30)
+    const below = tailPoly('below', 60, 30)
+    expect(Math.max(...above.filter((_, i) => i % 2 === 1))).toBeGreaterThan(30)
+    expect(Math.min(...below.filter((_, i) => i % 2 === 1))).toBeLessThan(0)
+  })
+
+  it('points right from a bubble placed left, and left from one placed right', () => {
+    const left = tailPoly('left', 60, 30)
+    const right = tailPoly('right', 60, 30)
+    expect(Math.max(...left.filter((_, i) => i % 2 === 0))).toBeGreaterThan(60)
+    expect(Math.min(...right.filter((_, i) => i % 2 === 0))).toBeLessThan(0)
+  })
+
+  it('is total over the four sides, and every tail is a triangle', () => {
+    for (const side of ['above', 'below', 'left', 'right'] as const) {
+      const poly = tailPoly(side, 60, 30)
+      expect(poly, side).toHaveLength(6)
+      for (const n of poly) expect(Number.isFinite(n), side).toBe(true)
+    }
+    expect(TAIL_PX).toBeGreaterThan(2)
+  })
+})
+
+// ★ THE ALPHA BAN. A thought was `alpha: 0.55` — the exact de-emphasis-by-transparency habit
+// the ui-blockers round removed from 24 chrome sites, still alive on the one surface where
+// legibility matters most.
+describe('a thought is a different material, never a thinner one', () => {
+  it('leaves no alpha on a bubble node', () => {
+    // comments stripped: the source SAYS `alpha: 0.55` where it explains what it stopped doing
+    const text = src('./bubbles.ts').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    expect(text).not.toMatch(/\.alpha\s*=/)
+    expect(text).not.toMatch(/THOUGHT_ALPHA/)
+    expect(text).not.toMatch(/alpha:\s*0\.\d/)
+  })
+
+  it('paints a thought on its own paper, in its own ink', () => {
+    expect(THOUGHT_FILL).not.toBe(SPEECH_FILL)
+    expect(THOUGHT_INK).not.toBe(SPEECH_INK)
+  })
+
+  it('clears AA both ways, computed rather than asserted as a hex', () => {
+    expect(contrast(THOUGHT_INK, THOUGHT_FILL)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(SPEECH_INK, SPEECH_FILL)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('is still quieter than speech, by ink rather than by transparency', () => {
+    expect(contrast(THOUGHT_INK, THOUGHT_FILL)).toBeLessThan(contrast(SPEECH_INK, SPEECH_FILL))
+  })
+})
+
+// ★ WHAT THE BROWSER CAUGHT AND NO UNIT TEST DID. World text is drawn in world space, so its
+// apparent size is multiplied by the camera: at the 3x stop a thought bubble measured 750 CSS
+// px across and buried the town under it, and at the 0.5x stop the same face was 8 px. The
+// landmark layer had already solved this for itself with a private `1 / world.scale`; every
+// other label site had no rule at all. One rule now, in one place.
+describe('a world label is the same size to the viewer at every zoom stop', () => {
+  it('cancels the camera exactly, so the face is FACE_INSTALL_PX on screen wherever it is read', () => {
+    for (const zoom of ZOOM_STOPS) {
+      const apparent = FACE_INSTALL_PX * worldTextScale(zoom) * zoom
+      expect(apparent, `${zoom}x`).toBeCloseTo(FACE_INSTALL_PX, 10)
+      expect(apparent, `${zoom}x`).toBeGreaterThanOrEqual(TEXT_MIN_PX)
+    }
+  })
+
+  // The counter-scale is also what makes the atlas crisp: one texel per screen pixel, at every
+  // stop, instead of the 0.5x and 3x resampling the world scale was imposing on it.
+  it('draws the atlas at one texel per screen pixel, never resampled', () => {
+    for (const zoom of ZOOM_STOPS) expect(worldTextScale(zoom) * zoom, `${zoom}x`).toBeCloseTo(1, 10)
+  })
+
+  it('never returns a scale of zero or a negative, whatever the camera reports', () => {
+    for (const bad of [0, -1, Number.NaN]) expect(worldTextScale(bad), `${bad}`).toBe(1)
+  })
+
+  it('is applied by every layer that puts a label in the world, not just by landmarks', () => {
+    for (const f of ['./bubbles.ts', './characters.ts', './tooltip.ts', './landmarks.ts']) {
+      expect(src(f), `${f} draws world text at the camera's scale`).toMatch(/worldTextScale\(/)
+    }
+  })
+})
+
+// ★★ THE ONE THE BROWSER SAVED US FROM, AND THE WHOLE POINT OF LOOKING. With the font landed
+// and every test green, the town said "the fsh are biting" and "i wonder f the roof will hold".
+//
+// Press Start 2P carries `fi` and `fl` LIGATURES, so the browser measures "fi" as ONE 16px em.
+// Pixi derives a kerning pair as measure(ab) − measure(a) − measure(b) = 16 − 16 − 16 = **−16**,
+// a whole em of negative kerning, and draws the `i` exactly on top of the `f`. Both faces are
+// monospace on a fixed em, so there is no real kerning to lose by refusing to derive any.
+describe('the letter after an f survives — no derived kerning on a ligature face', () => {
+  it('installs both faces with kerning skipped', async () => {
+    installs.length = 0
+    await installFaces({ fonts: { load: async () => [], ready: Promise.resolve() } as unknown as FontFaceSet })
+    expect(installs.length).toBe(2)
+    for (const o of installs) expect(o['skipKerning'], String(o['name'])).toBe(true)
+  })
+
+  it('keeps the atlas one texel per screen pixel and tintable, so one atlas serves every ink', () => {
+    for (const o of installs) {
+      expect(o['resolution'], String(o['name'])).toBe(1)
+      expect(o['dynamicFill'], String(o['name'])).toBe(true)
+      expect((o['textureStyle'] as { scaleMode: string }).scaleMode).toBe('nearest')
+    }
+  })
+})
+
+describe('the structural guard batch 2 left, still green', () => {
+  const sources = (dir: string): string[] => {
+    const out: string[] = []
+    for (const name of readdirSync(dir).sort()) {
+      const p = join(dir, name)
+      if (statSync(p).isDirectory()) { out.push(...sources(p)); continue }
+      if (!/\.(ts|tsx)$/.test(name) || /\.test\.(ts|tsx)$/.test(name)) continue
+      out.push(p)
+    }
+    return out
+  }
+
+  it('still lets only worldLabel.ts build a glyph, now that a font exists to build one from', () => {
+    const offenders = sources(join(HERE, '..'))
+      .filter((f) => !f.endsWith('worldLabel.ts'))
+      .filter((f) => /new\s+(BitmapText|Text)\s*\(/.test(readFileSync(f, 'utf8')))
+    expect(offenders).toEqual([])
+  })
+})
