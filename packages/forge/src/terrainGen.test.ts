@@ -1,12 +1,13 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS } from '@sj/shared'
 import { MASTER_PALETTE } from './palette.js'
-import type { RawImage } from './post/raw.js'
+import { decodePng, type RawImage } from './post/raw.js'
 import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js'
 import {
   BORDER_TOLERANCE, CALM_ROAD_ID, CANDIDATE_MARGIN, MATERIAL_PX, ROAD_MATERIAL_ID, SEAM_TOLERANCE,
   DEFRAME_MAX_PASSES, TERRAIN_COMMISSIONS, TILING_CRITERION_PROMPT, borderReport, cropMargin,
-  deframe, toMaterialGrid,
+  deframe, toMaterialGrid, materialVeto,
   diamondFromMaterial, generationItems, materialFromCandidate, planTerrainProgram, seamReport,
   seasonTintFrom, selfTile3x3, stencilRoadTile, terrainAssetId, terrainBoilerplate,
 } from './terrainGen.js'
@@ -141,6 +142,27 @@ describe('seamReport', () => {
   it('is deterministic', () => {
     const m = asMaterial(seamlessSquare(MATERIAL_PX))
     expect(seamReport(m)).toEqual(seamReport(m))
+  })
+})
+
+describe('materialVeto', () => {
+  it('passes a material whose opposing edges meet', () => {
+    expect(materialVeto(asMaterial(seamlessSquare(MATERIAL_PX)))).toBeNull()
+  })
+
+  it('speaks the seam note when the absolute wrap breaks', () => {
+    expect(materialVeto(asMaterial(seamedSquare(MATERIAL_PX)))).toMatch(/left|right|horizontal/i)
+  })
+
+  // The one the absolute check cannot see. terrain_earth is a near-uniform material: its wrap
+  // delta is 2.9 against a tolerance of 14, so seamReport calls it clean — and the wrap is
+  // still 5x its own interior noise, which is a visible line on smooth ground.
+  it('vetoes a wrap that is quiet in absolute terms and loud against its own grain', async () => {
+    const earth = await decodePng(readFileSync(
+      new URL('../content/tilesets/materials/terrain_earth_0.png', import.meta.url)))
+    expect(seamReport(earth).pass).toBe(true)
+    expect(borderReport(earth).framed).toBe(false)
+    expect(materialVeto(earth)).toMatch(/interior noise/)
   })
 })
 

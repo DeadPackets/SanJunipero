@@ -7,6 +7,7 @@ import { downscaleNearest, type RawImage } from './post/raw.js'
 import { quantize } from './post/quantize.js'
 import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js'
 import { paintRoadAutotile } from './roadTiles.js'
+import { tileSeamGate } from './pixelGates.js'
 
 // USER RULING 2026-08-17: "I want properly generated repeating tiling textures from an image
 // model." This supersedes C10 T1's code-painted tiles and C13's code-painted road strip. The
@@ -291,6 +292,20 @@ export function borderReport(m: RawImage, ring: number = BORDER_RING_PX): Border
       ? `the outer edge is drawn as a border or frame (edge differs from the middle by ${ringDelta.toFixed(1)}); remove it — the texture must run right off all four sides with no outline, no rim and no darker margin`
       : `no frame (edge matches the middle within ${ringDelta.toFixed(1)})`,
   }
+}
+
+// The one veto the generator answers to. seamReport reads the wrap in ABSOLUTE tone, which
+// is blind on smooth ground: terrain_earth wraps at 2.9 against a tolerance of 14 and the
+// line is still plainly there, because the material's own interior only varies by 2.1.
+// tileSeamGate reads the same wrap RELATIVE to that grain and catches it.
+export function materialVeto(m: RawImage): string | null {
+  const seam = seamReport(m)
+  if (!seam.pass) return seam.note
+  const border = borderReport(m)
+  if (border.framed) return border.note
+  const bar = tileSeamGate(m)
+  if (!bar.ok) return `${bar.failures.join('; ')}; make the wrap as quiet as the middle of the tile`
+  return null
 }
 
 // A material that is ALREADY PAID FOR and still carries a rim gets the rim cut off rather
