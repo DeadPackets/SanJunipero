@@ -1166,7 +1166,7 @@ export const HEAD_REGION_FRAC = 0.40
 export const HEAD_DIFF_MAX = 0.20 // v1 legit frames measure ≤0.123; sw~se cross-facing measures 0.269
 
 export type GateFailure = {
-  gate: 'near-dupe' | 'mirror-dupe' | 'stride' | 'contact-passing' | 'palette' | 'silhouette' | 'head' | 'lying'
+  gate: 'near-dupe' | 'mirror-dupe' | 'stride' | 'contact-passing' | 'palette' | 'silhouette' | 'head' | 'lying' | 'lying-axis'
   a: string; b: string; value: number; limit: number
 }
 

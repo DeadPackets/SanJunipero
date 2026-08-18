@@ -83,6 +83,40 @@ export function coherenceGateV4(label: string, master: RawImage, cell: RawImage)
   return failures
 }
 
+// A body asleep on a 2:1 dimetric ground plane runs ALONG the ground diagonal, so its long
+// axis tilts up to the right; drawn flat across the screen it reads as pasted on rather than
+// lying on. The band is signed, so the same number also catches a cell whose head points the
+// wrong way — the mirrored one has the right magnitude and the wrong sign.
+export const SLEEP_AXIS_DEG_MIN = -50
+export const SLEEP_AXIS_DEG_MAX = -20
+
+// Principal axis of the opaque mass, degrees, in image coordinates (y down): negative means
+// the right-hand end of the body sits higher up the screen, which is where the head belongs.
+export function sleepAxisDeg(sleep: RawImage): number {
+  let n = 0, sx = 0, sy = 0
+  const { width: w, height: h, data } = sleep
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (data[(y * w + x) * 4 + 3]! > 0) { n++; sx += x; sy += y }
+  }
+  if (n === 0) throw new Error('sleepAxisDeg: sleep cell has no opaque pixels')
+  const mx = sx / n, my = sy / n
+  let xx = 0, yy = 0, xy = 0
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (data[(y * w + x) * 4 + 3]! > 0) {
+      const dx = x - mx, dy = y - my
+      xx += dx * dx; yy += dy * dy; xy += dx * dy
+    }
+  }
+  return (0.5 * Math.atan2((2 * xy) / n, xx / n - yy / n) * 180) / Math.PI
+}
+
+export function sleepAxisGate(sleep: RawImage): GateFailure[] {
+  const deg = sleepAxisDeg(sleep)
+  if (deg >= SLEEP_AXIS_DEG_MIN && deg <= SLEEP_AXIS_DEG_MAX) return []
+  const limit = deg > SLEEP_AXIS_DEG_MAX ? SLEEP_AXIS_DEG_MAX : SLEEP_AXIS_DEG_MIN
+  return [{ gate: 'lying-axis', a: 'sleep', b: 'ground-plane', value: deg, limit }]
+}
+
 // Sleep coherence: palette vs master (a lying body voids the area check) + lying bbox.
 export function sleepCoherenceGateV4(master: RawImage, sleep: RawImage): GateFailure[] {
   const failures: GateFailure[] = []
@@ -94,5 +128,6 @@ export function sleepCoherenceGateV4(master: RawImage, sleep: RawImage): GateFai
   const aspect = (bb.x1 - bb.x0 + 1) / (bb.y1 - bb.y0 + 1)
   if (aspect <= 1)
     failures.push({ gate: 'lying', a: 'sleep', b: 'master', value: aspect, limit: 1 })
+  failures.push(...sleepAxisGate(sleep))
   return failures
 }
