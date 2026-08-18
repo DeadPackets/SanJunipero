@@ -206,6 +206,9 @@ export type Scene = {
   overlay: Container
   rebakeGround(terrain: TileId[][], records?: AssetRecord[]): void
   centerOn(x: number, y: number): void
+  /** the same move in the space `tileToScreen` returns, so a camera can be put back EXACTLY
+   *  where it was rather than on the nearest whole tile (interiorScene's `restoreCamera`) */
+  centerOnScreen(sx: number, sy: number): void
   /** move to a named rest stop, turning about the screen centre */
   setZoom(stop: ZoomStop): void
   /** move to a named rest stop, keeping the world point under (screenX, screenY) fixed */
@@ -523,6 +526,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     },
     rebakeGround,
     centerOn,
+    centerOnScreen,
     setZoom,
     setZoomAt,
     getZoom: () => world.scale.x,

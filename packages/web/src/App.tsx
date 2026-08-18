@@ -23,6 +23,7 @@ import { HudDock } from './ui/HudDock.js'
 import {
   DEFAULT_HUD, HUD_TOGGLE_KEY, hudReducer, hudToggle, loadHud, saveHud, type HudEv,
 } from './ui/hudLayout.js'
+import { SCENE_TOTAL_MS, idleScene, sceneReducer, type SceneState } from './ui/sceneTransition.js'
 import { stepZoom } from './render/cameraNav.js'
 import type { ZoomStop } from './render/camera.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
@@ -79,6 +80,12 @@ export function App() {
     try { return loadHud(localStorage) } catch { return DEFAULT_HUD }
   })
   const [dockOpen, setDockOpen] = useState(false)
+  // A LENS CHANGE IS A CHANGE OF SUBJECT (U23). The outgoing view leaves before the incoming
+  // arrives — never both at once — so the body of the panel lags the tab bar by SCENE_OUT_MS
+  // and the viewer sees which way they moved. The reducer owns the timing; the sheet owns the
+  // curve; a viewer mashing the lens bar retargets the same transition rather than restarting it.
+  const [lensScene, setLensScene] = useState<SceneState>(() => idleScene('lens', route.lens))
+  const shownLens: Lens = lensScene.phase === 'out' ? (lensScene.from as Lens) : route.lens
   // the key handler is registered once; it reads the layout through a ref rather than
   // re-registering on every dock change
   const hudRef = useRef(hud)
@@ -209,6 +216,23 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  useEffect(() => {
+    setLensScene((p) => sceneReducer(p, { kind: 'go', name: 'lens', to: route.lens, atMs: performance.now() }))
+  }, [route.lens])
+
+  // `sceneReducer` returns the same object when nothing changed, so React bails out and this
+  // whole frame loop costs two renders per transition, not one per frame.
+  useEffect(() => {
+    if (lensScene.phase === 'idle') return
+    let raf = 0
+    const step = (): void => {
+      setLensScene((p) => sceneReducer(p, { kind: 'tick', atMs: performance.now() }))
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [lensScene.phase])
+
   // the bar mirrors the camera's rest stop; the camera owns the truth, this follows it
   useEffect(() => {
     if (scene === null) return
@@ -232,14 +256,14 @@ export function App() {
   // the bonds graph replaces the canvas; pause the Pixi ticker while hidden (60fps budget honesty)
   useEffect(() => {
     if (scene === null) return
-    if (route.lens === 'society') scene.app.ticker.stop()
+    if (shownLens === 'society') scene.app.ticker.stop()
     else scene.app.ticker.start()
-  }, [route.lens, scene])
+  }, [shownLens, scene])
 
   // The Moments lens has two readings: the live town televised (the C6 auto-cut) and a
   // recorded day playing back. Opening a day retires the auto-cut so its heat-driven camera
   // cannot fight the playback; LIVE brings it back.
-  const televised = route.lens === 'director' && route.momentId === null
+  const televised = shownLens === 'director' && route.momentId === null
 
   // leaving the televised view: keep the director mounted briefly so the letterboxes slide out
   const [directorLeaving, setDirectorLeaving] = useState(false)
@@ -249,7 +273,7 @@ export function App() {
     prevTelevisedRef.current = televised
     if (was && !televised) {
       setDirectorLeaving(true)
-      const t = setTimeout(() => setDirectorLeaving(false), 260)
+      const t = setTimeout(() => setDirectorLeaving(false), SCENE_TOTAL_MS)
       return () => clearTimeout(t)
     }
   }, [televised])
@@ -265,11 +289,11 @@ export function App() {
         <TickBadge store={store} />
       </header>
       {hud.statusStrip !== 'hidden' && <StatusStrip store={store} />}
-      <div className="stage-row">
+      <div className="stage-row" data-scene-phase={lensScene.phase}>
         <main
           id="stage-root"
           data-dock-controls={hud.controlBar}
-          className={route.lens === 'society' ? 'stage-hidden' : undefined}
+          className={shownLens === 'society' ? 'stage-hidden' : undefined}
         >
           <div className="stage-cell">
           <StageMount store={store} onScene={setScene} onInterior={setInsideId} />
@@ -281,18 +305,18 @@ export function App() {
           />
           <ScrubBanner store={store} />
           {hud.fps !== 'hidden' && <FpsOverlay />}
-          {route.lens === 'chronicle' && hud.timeline !== 'hidden' && (
+          {shownLens === 'chronicle' && hud.timeline !== 'hidden' && (
             <Timeline store={store} handle={handle} onView={onView} />
           )}
-          {route.lens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
-          {(route.lens === 'director' || directorLeaving) && (
+          {shownLens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
+          {(shownLens === 'director' || directorLeaving) && (
             <MomentsLens
               store={store}
               handle={handle}
               scene={scene}
               momentId={route.momentId}
               televised={televised}
-              leaving={route.lens !== 'director'}
+              leaving={shownLens !== 'director'}
               onOpen={openMoment}
             />
           )}
@@ -314,16 +338,16 @@ export function App() {
         </main>
         <aside
           id="panel-outlet"
-          className={route.lens === 'inspector' || route.lens === 'chronicle' || route.lens === 'laws' ? 'open' : undefined}
+          className={shownLens === 'inspector' || shownLens === 'chronicle' || shownLens === 'laws' ? 'open' : undefined}
         >
-          {route.lens === 'inspector' && route.agentId !== null && (
+          {shownLens === 'inspector' && route.agentId !== null && (
             <InspectorPanel store={store} agentId={route.agentId} scene={scene} onBack={showRoster} />
           )}
-          {route.lens === 'inspector' && route.agentId === null && (
+          {shownLens === 'inspector' && route.agentId === null && (
             <RosterPanel store={store} openId={route.openId} onToggle={toggleRow} onOpenFull={pickAgent} />
           )}
-          {route.lens === 'chronicle' && <ChroniclePanel store={store} handle={handle} onView={onView} />}
-          {route.lens === 'laws' && (
+          {shownLens === 'chronicle' && <ChroniclePanel store={store} handle={handle} onView={onView} />}
+          {shownLens === 'laws' && (
             <>
               <WorldLaws store={store} />
               <LawsDashboard store={store} token={operatorToken} />

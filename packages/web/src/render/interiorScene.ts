@@ -6,10 +6,13 @@ import { materialMatrix, resolveMaterial } from './groundField.js'
 import { characterArt, smoothSource, type TextureBook } from './textures.js'
 import { characterCell } from './characters.js'
 import {
-  INTERIOR_FADE_MS, advanceInterior, bedSlots, contactShadow, furnishingId, furnishingScale,
+  advanceInterior, bedSlots, contactShadow, furnishingId, furnishingScale,
   interiorOf, interiorOrder, interiorPieces, isFlat, roomPlan,
   type InteriorPhaseState, type PlacedBody, type RoomItem,
 } from './interiors.js'
+import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
+import { doorTileOf } from './entities.js'
+import type { ZoomStop } from './camera.js'
 import {
   ROOM_SHELL_INK, ROOM_SHELL_PAINT, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES,
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorPolyOf, floorPools,
@@ -351,11 +354,40 @@ export function createInteriorScene(
       && slot.y >= item.slot.y && slot.y < item.slot.y + size.h
   }
 
+  // ★ A CARD APPEARING IS NOT GOING INSIDE. The veil used to rise over a town that never
+  // moved, so entering a room read as a panel opening. The camera pushes in to the door tile
+  // while the veil rises, and leaving puts it back on the exact point it left — `centerOnScreen`
+  // rather than `centerOn`, because a whole-tile restore lands somewhere the viewer did not
+  // leave from.
+  const PUSH_IN_STOP: ZoomStop = 3
+  let beforePush: { sx: number; sy: number; stop: ZoomStop } | null = null
+
+  function pushInTo(structureId: string): void {
+    const s = store.getState()?.structures[structureId]
+    if (s === undefined) return
+    const v = scene.viewRect()
+    beforePush = { sx: v.x + v.w / 2, sy: v.y + v.h / 2, stop: scene.getZoomStop() }
+    const door = doorTileOf(s)
+    scene.centerOn(door.x, door.y)
+    if (scene.getZoomStop() !== PUSH_IN_STOP) scene.setZoom(PUSH_IN_STOP)
+  }
+
+  function restoreCamera(): void {
+    if (beforePush === null) return
+    const { sx, sy, stop } = beforePush
+    beforePush = null
+    if (scene.getZoomStop() !== stop) scene.setZoom(stop)
+    scene.centerOnScreen(sx, sy)
+  }
+
   function setActive(structureId: string | null): void {
     if (structureId === activeId) return
     if (structureId !== null && (store.getState() === null || interiorOf(store.getState()!, structureId) === null)) return
     activeId = structureId
-    if (structureId !== null) clearRoom()
+    if (structureId !== null) {
+      clearRoom()
+      pushInTo(structureId)
+    } else restoreCamera()
     notify()
   }
 
@@ -379,7 +411,7 @@ export function createInteriorScene(
 
     const t = phase.phase === 'inside' ? 1
       : phase.phase === 'town' ? 0
-        : Math.min(1, Math.max(0, (now - phase.sinceMs) / INTERIOR_FADE_MS))
+        : Math.min(1, Math.max(0, (now - phase.sinceMs) / SCENE_TOTAL_MS))
     const alpha = phase.phase === 'entering' ? t : phase.phase === 'exiting' ? 1 - t : (entered ? 1 : 0)
 
     root.visible = alpha > 0

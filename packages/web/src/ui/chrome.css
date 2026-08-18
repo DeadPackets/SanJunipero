@@ -479,6 +479,44 @@ body {
   box-shadow: inset 2px 0 0 0 var(--sand), inset -4px 0 0 0 var(--sand), -4px 0 0 0 rgba(36, 31, 43, 0.35);
 }
 
+/* ── a lens change is a change of subject (U23, task 91) ──────────────────────────────────
+   OUT THEN IN, NEVER BOTH: the leaving view slides 8px BACK toward its own edge and goes,
+   then the arriving one comes from that edge. Two live scenes crossfading doubles the frame
+   cost and smears at this pixel density. The CANVAS never fades — the town is not the thing
+   that changed — so every selector here names a chrome surface. */
+.stage-row[data-scene-phase='out'] #panel-outlet > *,
+.stage-row[data-scene-phase='out'] .society-lens,
+.stage-row[data-scene-phase='out'] .moments-frame,
+.stage-row[data-scene-phase='out'] .timeline {
+  opacity: 0; translate: 8px 0;
+  transition-property: opacity, translate;
+  transition-duration: var(--t-fast);
+  transition-timing-function: var(--ease-move);
+}
+.stage-row[data-scene-phase='in'] #panel-outlet > *,
+.stage-row[data-scene-phase='in'] .society-lens,
+.stage-row[data-scene-phase='in'] .moments-frame,
+.stage-row[data-scene-phase='in'] .timeline {
+  opacity: 1; translate: 0 0;
+  transition-property: opacity, translate;
+  transition-duration: var(--t-move);
+  transition-timing-function: var(--ease-move);
+}
+/* Instant arrival, not the absence of a change: the state machine is identical, only the
+   curve steps. Opacity survives at a third of the duration; the 8px slide does not. */
+@media (prefers-reduced-motion: reduce) {
+  .stage-row[data-scene-phase='out'] #panel-outlet > *,
+  .stage-row[data-scene-phase='out'] .society-lens,
+  .stage-row[data-scene-phase='out'] .moments-frame,
+  .stage-row[data-scene-phase='out'] .timeline,
+  .stage-row[data-scene-phase='in'] #panel-outlet > *,
+  .stage-row[data-scene-phase='in'] .society-lens,
+  .stage-row[data-scene-phase='in'] .moments-frame,
+  .stage-row[data-scene-phase='in'] .timeline {
+    translate: none; transition-duration: var(--t-tap);
+  }
+}
+
 .inspector-panel { padding: 1rem; font-size: 0.875rem; min-width: 21rem; }
 @media (prefers-reduced-motion: no-preference) {
   .inspector-panel { animation: panel-in var(--t-med) var(--ease-enter); }

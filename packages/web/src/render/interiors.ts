@@ -6,6 +6,7 @@ import type { Structure, WorldState } from '@sj/engine/state'
 import { OVERLAP_RANK, depthOrder, type DepthBox } from './depth.js'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { SLOT_TILES } from './roomShell.js'
+import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 
 // The vocabulary is @sj/shared's (C13 interiorMeta.ts) — one source, so a kind added there
 // cannot go missing here. Re-exported because Task 11 and the gate read it off this module.
@@ -293,7 +294,9 @@ export function interiorOrder(pieces: readonly RoomPiece[]): string[] {
 }
 
 export type InteriorPhase = 'town' | 'entering' | 'inside' | 'exiting'
-export const INTERIOR_FADE_MS = 260
+/** The room's fade IS a scene change, so it takes the scene vocabulary's length rather than a
+ *  number of its own — one motion table, both runtimes (Task 90/91). */
+export const INTERIOR_FADE_MS = SCENE_TOTAL_MS
 
 // Pure: the caller owns the clock. `sinceMs` is when `prev` began — advanceInterior keeps it
 // for a caller that would rather not. A viewer who turns around mid-fade reverses; the fade
