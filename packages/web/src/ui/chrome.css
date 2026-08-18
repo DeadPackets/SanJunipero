@@ -119,10 +119,21 @@
 
   --stone: #ABA198;
 
+  /* MOTION. One vocabulary, two runtimes: every value below is DERIVED from `motion.ts`'s
+     MOTION table and a test fails if the two disagree. A motion is named by what it is for —
+     `--t-fast`, `--t-med` and `--t-slow` keep their landed spelling for reveal, enter and
+     scene, and lose their independence. `--t-ambient` is scenery, never a response to an
+     input, which is why it is the one value above the 300ms ceiling. */
+  --t-tap: 90ms;
   --t-fast: 150ms;
+  --t-move: 180ms;
   --t-med: 240ms;
-  --t-slow: 300ms; /* motion band ceiling — nothing in the chrome runs longer */
+  --t-slow: 300ms; /* motion band ceiling — nothing that answers an input runs longer */
+  --t-ambient: 1200ms;
+  --ease-tap: cubic-bezier(0.3, 0, 0.2, 1);
   --ease-enter: cubic-bezier(0.2, 0, 0, 1);
+  --ease-move: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-ambient: linear;
 
   /* status strip: one fixed band so a ticking clock can never shift the stage */
   --strip-h: 30px;
@@ -265,7 +276,7 @@ body {
 }
 .link-pill + .tick-badge { margin-left: 0; }
 @media (prefers-reduced-motion: no-preference) {
-  .link-pill { animation: link-pulse 1.2s ease-in-out infinite alternate; }
+  .link-pill { animation: link-pulse var(--t-ambient) ease-in-out infinite alternate; }
   @keyframes link-pulse {
     from { opacity: 1; }
     to { opacity: 0.65; }
@@ -580,7 +591,7 @@ body {
 .veil-loader { display: flex; gap: 6px; }
 .veil-loader i { width: 8px; height: 8px; background: var(--honey); }
 @media (prefers-reduced-motion: no-preference) {
-  .veil-loader i { animation: veil-step 1.2s steps(1) infinite; }
+  .veil-loader i { animation: veil-step var(--t-ambient) steps(1) infinite; }
   .veil-loader i:nth-child(2) { animation-delay: 0.4s; }
   .veil-loader i:nth-child(3) { animation-delay: 0.8s; }
   @keyframes veil-step {
@@ -845,7 +856,7 @@ body {
   font-family: var(--font-body); font-size: 0.75rem; font-style: italic; color: var(--ink-quiet);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .room-card { animation: interior-in 260ms var(--ease-enter); }
+  .room-card { animation: interior-in var(--t-slow) var(--ease-enter); }
   .interior-back { transition-property: background-color, translate, box-shadow; transition-duration: var(--t-fast); }
   @keyframes interior-in {
     from { opacity: 0; translate: 0 -6px; }
