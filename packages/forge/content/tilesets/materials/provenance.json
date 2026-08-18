@@ -8,12 +8,14 @@
     "wrapV": 0
   },
   "terrain:farmland:0": {
-    "h": 1.38,
-    "v": 2.65,
-    "ring": 2.77,
-    "deframed": 3,
+    "h": 2.09,
+    "v": 0.9,
+    "ring": 0.42,
+    "deframed": 0,
     "wrapH": 0,
-    "wrapV": 0
+    "wrapV": 0,
+    "source": "terrain_earth_0 graded to damp soil, furrow imposed by scripts/build-farmland.ts",
+    "note": "the generated farmland was a picture of the style-anchor cottage (user rejected); regenerating against a ground reference fixed the subject and blocked on the wrap at 3 attempts"
   },
   "terrain:forest:0": {
     "h": 0.66,

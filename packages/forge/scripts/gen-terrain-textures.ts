@@ -85,8 +85,14 @@ async function main(): Promise<void> {
   const ledger = new SpendLedger(LEDGER)
   const budget = new BudgetGuard(CAP)
   const client = makeImageClient({ apiKey: apiKey!, budget })
-  // the committed canonical style anchor, exactly what C13's own live runner used
-  const refs = [readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'reference', 'style-anchor.png'))]
+  // The committed canonical style anchor is a COTTAGE, and `farmland_0` came back as a
+  // picture of it — the same bleed gen-cast-v4 already carries WALK_NO_STYLE_ANCHOR for.
+  // A ground material is better anchored by a ground material, so REFS names its own.
+  const refPaths = (process.env.REFS ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  const refs = refPaths.length > 0
+    ? refPaths.map((p) => readFileSync(p))
+    : [readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'reference', 'style-anchor.png'))]
+  console.log(`references: ${refPaths.length > 0 ? refPaths.join(', ') : 'content/reference/style-anchor.png (the cottage)'}`)
   const baseJudge = makeVisionJudge({ apiKey: apiKey!, refs, config })
 
   const results: ItemResult[] = []

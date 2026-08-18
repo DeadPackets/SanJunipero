@@ -97,7 +97,11 @@ export const TERRAIN_COMMISSIONS: Record<string, string> = {
   'forest:0': 'Shaded forest floor: uniform dark sage and moss with an even fine litter grain, no ferns, no branches, no bright spots.',
   'rock:0': 'Weathered warm-grey bedrock: uniform stone grain with an even fine crack mottle at a small scale, no large slabs and no single big fissure.',
   'sand:0': 'A wet river bank: uniform pale cream damp sand with an even fine ripple grain, evenly mixed darker and lighter at small scale, no pebbles and no water. The shore surface itself.',
-  'farmland:0': 'Ploughed soil: uniform rich damp brown with fine even parallel furrow grain running corner to corner at a small, regular pitch, no headland and no gaps.',
+  // The first farmland came back as a picture of the style-anchor COTTAGE — the reference
+  // bled in whole, and it passed every mechanical gate because a cottage wraps as well as
+  // soil does. The reference is now another ground material (REFS=), and the commission
+  // names the furrow as the only structure in the square.
+  'farmland:0': 'Ploughed soil seen from directly above: rich damp brown, covered corner to corner with straight parallel furrow ridges at a small even pitch, every ridge the same width and the same length as every other, running in ONE direction across the whole square. The furrows are the only structure in the picture. No building, no roof, no wall, no window, no door, no fence, no crop, no plant, no path, no headland, no field boundary, no bare patch.',
 }
 
 export const SEASON_COMMISSIONS: Record<Season, string> = {
