@@ -302,7 +302,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     dirty = true
   })
   const offEvents = store.onEvents((evts) => {
-    if (evts.some((ev) => ev.type === 'terrain_changed')) {
+    if (evts.some((ev) => ev.type === 'terrain_changed' || ev.type === 'tile_changed')) {
       const s = store.getState()
       if (s !== null) {
         bakedTerrain = s.terrain

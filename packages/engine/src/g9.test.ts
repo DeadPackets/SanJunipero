@@ -182,7 +182,11 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
     s = indoors(s, CFG, 'shut', HUT)
     // A hand expert enough to leave a mark on what it makes.
     s = fold(s, ev('skill_gained', { agentId: 'maker', track: 'carpentry', xp: 500 }), CFG)
-    return fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 4, loc: { t: 'agent', id: 'maker' } }), CFG)
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 4, loc: { t: 'agent', id: 'maker' } }), CFG)
+    // By daylight: from C11 Task 26 the witness radius scales with the light on the tile
+    // looked at, and 4.5 tiles at midnight is past it. Who sees a theft is the point here,
+    // and the dark has its own row in perception.test.ts.
+    return { ...s, tick: 720 }
   }
 
   it('what is made is owned and marked, what is given changes hands, what is taken is witnessed', () => {
@@ -364,7 +368,9 @@ describe('G9a-7: what is carved can be read back', () => {
     let s = raise(genesisState(config, MAP()), config, HUT)
     s = spawn(s, config, { id: 'carver', x: 4, y: 6 })
     s = spawn(s, config, { id: 'passerby', x: 12, y: 6 })  // in sight, out of arm's reach
-    return s
+    // By daylight, for the same reason the ownership chain above is: what "in sight" means
+    // now depends on the light on the wall (C11 Task 26).
+    return { ...s, tick: 720 }
   }
 
   it('an inscription is written, and read at arm\'s length only', () => {
@@ -567,13 +573,19 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
 })
 
 describe('G9a-11: the goldens are where the single deliberate regen left them', () => {
-  // The regen was Task 16 and happens once. This row fails the moment a golden hash
-  // moves again, which is the signal that G9 must be re-run before anything ships.
+  // This row fails the moment a golden hash moves again, which is the signal that G9 must be
+  // re-run before anything ships. It names the values as they stand after the latest
+  // authorized regen, so moving a pin means coming here and saying why.
+  //   G2 regen #4 (C9 Task 16):  6f2529fb…
+  //   G2 regen #5 (C11 Task 37): 665a8249…
+  //   G2 regen #6 (C11 Task 37b, the gate-remediation regen, ruling R-G): the value below.
+  // G1 HAS NEVER MOVED and must not: it is the replay proof, and it is not a world run —
+  // `TickLoop` folds the events it is handed and runs no world system, so no dial reaches it.
   const source = (name: string): string =>
     readFileSync(fileURLToPath(new URL(name, import.meta.url)), 'utf8')
 
   it('G1 and G2 still pin the post-regen hashes', () => {
     expect(source('golden.test.ts')).toContain('f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac')
-    expect(source('g2.test.ts')).toContain('6f2529fba61a0d9e3a219da05235c0ff19e105d610f96e57aa9d0cc073d82fc8')
+    expect(source('g2.test.ts')).toContain('c1c51b42aa340f0e5ae0d8cc321b602345f6ec4fee4e4d20b48f7e692b946d9c')
   })
 })

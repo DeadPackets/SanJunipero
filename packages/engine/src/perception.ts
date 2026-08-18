@@ -1,11 +1,12 @@
-import { simTimeFromTick, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
+import { lightBandAt, simTimeFromTick, visionRadiusAt, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
+import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { doorTile } from './interiors.js'
 import { effectiveConfig } from './laws.js'
-import type { Item, WorldState } from './state.js'
+import { thirstOf, type AfflictionKind, type Item, type Structure, type WorldState } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
-import { isAdjacentToRect } from './verbs.js'
+import { isAdjacentToRect, walkIsCapped, workPenalty } from './verbs.js'
 
 // Perception is a pure projection: what one agent can sense from the shared
 // world state plus the events that just happened. It never mutates state and
@@ -16,6 +17,9 @@ export type SelfBody = {
   hp: number
   injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
   ill: boolean
+  thirst: number   // always a number here: absence is a storage fact, not something a body feels
+  // A body knows what ails it and how badly. It does not know the tick it fell ill.
+  afflictions: Array<{ kind: AfflictionKind; severity: number }>
 }
 
 export type PerceivedAgent = {
@@ -24,15 +28,64 @@ export type PerceivedAgent = {
   collapsed: boolean
   asleep: boolean
   ageBand: AgeBand   // a face carries no birthday, but it does carry this much
+  // What the body has on, as it looks from across the square. Absent on bare shoulders, so a
+  // town that has sewn nothing reads exactly as it always did, and never a number (G10).
+  worn?: string
+  // How the body looks, when it looks bad. Absent on a well one, so a healthy town reads
+  // exactly as it always did — and never a number (G10). The forageable-prose precedent: the
+  // packet carries the phrase, because the phrase is what a pair of eyes actually gets.
+  condition?: string
+}
+
+// How a worn thing reads to whoever is looking. The forageable-prose precedent: the packet
+// carries the phrase, because the phrase is what a pair of eyes actually gets.
+export const WORN_PROSE: Readonly<Record<string, string>> = {
+  garment: 'wrapped in a rough cloak',
+}
+
+export function wornProse(state: WorldState, agentId: string): string | undefined {
+  const itemId = state.agents[agentId]?.equipped?.body
+  const kind = itemId === undefined ? undefined : state.items[itemId]?.kind
+  return kind === undefined ? undefined : WORN_PROSE[kind]
+}
+
+// What ails a body, as it shows from across the square. The self already reads these in the
+// first person; a town whose healer cannot see a fever six tiles away tends nobody, and the
+// live gate's healer looked for the sick in 33 turns and found none (C11 R21).
+export const CONDITION_PROSE: Readonly<Record<AfflictionKind, string>> = {
+  illness: 'flushed with fever',
+  poison: 'grey-faced and doubled over',
+  injury: 'favouring a hurt',
+  fatigue: 'grey with a tiredness sleep has not lifted',
+}
+
+const HURT_SHARE = 0.3
+const GAUNT_HUNGER = 5
+
+// One phrase, worst thing first: an affliction outranks a wound, and a wound outranks an
+// empty belly. Absent when there is nothing to see.
+export function conditionProse(state: WorldState, config: SimConfig, agentId: string): string | undefined {
+  const a = state.agents[agentId]
+  if (a === undefined || !a.alive) return undefined
+  const worst = [...(a.afflictions ?? [])].sort((p, q) =>
+    q.severity - p.severity || (p.kind < q.kind ? -1 : p.kind > q.kind ? 1 : 0))[0]
+  if (worst !== undefined) return CONDITION_PROSE[worst.kind]
+  if (a.ill) return CONDITION_PROSE.illness
+  if (a.hp < config.health.maxHp * HURT_SHARE) return 'badly hurt'
+  if (a.needs.hunger < GAUNT_HUNGER) return 'hollowed out with hunger'
+  return undefined
 }
 
 // Both fields absent on a blank wall, so a town that writes nothing reads as it always did.
 // You can tell from across the square that something is carved there; the words need arm's length.
+// `door` is the tile `enter` measures against — absent on a kind with no way in, on a building
+// still going up, and on one nothing passable rings. One doorway, one source of truth.
 export type PerceivedStructure = {
   id: string; kind: string; x: number; y: number; w: number; h: number
   burning: boolean; stage: 'construction' | 'complete'
   hasInscription?: true
   inscription?: { text: string; by: string }
+  door?: { x: number; y: number }
 }
 
 // Whose it is, and whose hands made it — the two things prose needs to say
@@ -48,6 +101,12 @@ export type InventoryItem = Item & OwnerNames & Turning
 
 export type PerceivedCrop = { id: string; kind: string; x: number; y: number; stage: number; withered: boolean }
 
+// A shape at a distance: what kind of animal and where. Never how many are in the school.
+export type PerceivedFauna = { id: string; kind: string; x: number; y: number }
+
+// What the patch looks like, not what is left in it: abundance or bareness, never a count.
+export type PerceivedForageable = { id: string; kind: string; x: number; y: number; prose: string }
+
 export type HeardSpeech = { speakerId: string; name: string; text: string; distance: number }
 
 // Things this agent watched happen out in the world — a taking that was not theirs,
@@ -55,6 +114,15 @@ export type HeardSpeech = { speakerId: string; name: string; text: string; dista
 export type SeenEvent =
   | { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
   | { kind: 'mystery'; mystery: string; prose: string }
+  | { kind: 'expression'; actorName: string; verb: string; sense: 'sight' | 'sound' }
+
+// What the ground under and around the feet is like. Absent on plain earth, so a packet from
+// a town with no roads reads exactly as it always did. A fact about hauling, not a site score.
+export type PerceivedGround = { wellTravelled: true }
+
+// The roof the body is standing under. Absent under open sky, so a packet from a town that
+// never went in reads exactly as it always did.
+export type PerceivedInterior = { id: string; kind: string }
 
 export type PerceptionPacket = {
   time: SimTime
@@ -63,6 +131,10 @@ export type PerceptionPacket = {
     x: number
     y: number
     activity: string | null
+    // Where the legs are already headed, present only while they are walking. The verb alone
+    // cannot say it, and a body that cannot tell it is already going somewhere sets out again.
+    activityToward?: { x: number; y: number }
+    inside?: PerceivedInterior
     inventory: InventoryItem[]
   }
   weather: { kind: string; temperatureC: number }
@@ -71,10 +143,36 @@ export type PerceptionPacket = {
     structures: PerceivedStructure[]
     items: PerceivedItem[]
     crops: PerceivedCrop[]
+    fauna: PerceivedFauna[]
+    forageables: PerceivedForageable[]
   }
+  ground?: PerceivedGround
+  // How much light is on the ground this body stands on. Three words, never a number (G10).
+  light: 'bright' | 'dim' | 'dark'
+  // Present only while this body is doing work the dark is charging it for. Absent otherwise,
+  // so a packet from a town that never worked at night reads exactly as it always did.
+  fumbling?: true
+  // Present only while the legs are walking a route the search could not follow to its end.
+  // A distance, not a failure — and never the word for what the search did (G10).
+  wayUnclear?: true
   heard: HeardSpeech[]
   seen: SeenEvent[]
   feltEvents: string[]
+}
+
+// Road and worn path both. The advantage is already real — it is the move cost roads changed
+// in C9 — and this only says so out loud.
+const TRAVELLED_TILES: ReadonlySet<number> = new Set([7, 8])
+
+function groundUnderfoot(state: WorldState, config: SimConfig, x: number, y: number): PerceivedGround | undefined {
+  if (!config.roads.enabled) return undefined
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const tile = state.terrain[y + dy]?.[x + dx]
+      if (tile !== undefined && TRAVELLED_TILES.has(tile)) return { wellTravelled: true }
+    }
+  }
+  return undefined
 }
 
 const dist = (x1: number, y1: number, x2: number, y2: number): number => Math.hypot(x2 - x1, y2 - y1)
@@ -170,8 +268,10 @@ export function composePerception(
   // Derived here, not at the call site: no caller can forget the world's live laws.
   const config = effectiveConfig(baseConfig, state.laws)
 
-  const sight = config.movement.sightRadius
-  const withinSight = (x: number, y: number): boolean => dist(self.x, self.y, x, y) <= sight
+  // Every sight-class channel below goes through this one horizon, and the horizon is set by
+  // the light ON THE THING SEEN (§19). Hearing does not use it: sound carries in the dark.
+  const withinSight = (x: number, y: number): boolean =>
+    dist(self.x, self.y, x, y) <= visionRadiusAt(state, self, x, y, state.tick, config)
 
   // Four walls are also a horizon: inside, the world shrinks to this one room.
   const indoors = self.insideId ?? null
@@ -188,16 +288,23 @@ export function composePerception(
   const turning = (i: Item): Turning => (isSpoiling(state, i, config) ? { spoiling: true } : {})
 
   const visibleAgents: PerceivedAgent[] = Object.values(state.agents)
-    .filter(a => a.id !== agentId && a.alive
-      && (indoors === null ? (a.insideId === undefined && withinSight(a.x, a.y)) : a.insideId === indoors))
+    // Four walls outrank the light, and inside them the darkness still costs distance.
+    .filter(a => a.id !== agentId && a.alive && withinSight(a.x, a.y)
+      && (indoors === null ? a.insideId === undefined : a.insideId === indoors))
     .sort(byId)
-    .map(a => ({
-      id: a.id, name: a.name, x: a.x, y: a.y,
-      activityVerb: a.activity?.verb ?? null,
-      collapsed: a.collapsedSinceTick !== null,
-      asleep: a.asleep,
-      ageBand: ageBand(config, a.ageDays),
-    }))
+    .map(a => {
+      const worn = wornProse(state, a.id)
+      const condition = conditionProse(state, config, a.id)
+      return {
+        id: a.id, name: a.name, x: a.x, y: a.y,
+        activityVerb: a.activity?.verb ?? null,
+        collapsed: a.collapsedSinceTick !== null,
+        asleep: a.asleep,
+        ageBand: ageBand(config, a.ageDays),
+        ...(worn === undefined ? {} : { worn }),
+        ...(condition === undefined ? {} : { condition }),
+      }
+    })
 
   // Nearest footprint tile, not the anchor: a long structure whose far corner is
   // anchored out of range is still seen when its near edge is within sight.
@@ -213,12 +320,20 @@ export function composePerception(
     return { hasInscription: true as const, ...(readable ? { inscription: s.inscription } : {}) }
   }
 
+  // The way in, from the same function the verb uses. A body that reads this and stands there
+  // is a body `enter` accepts (C11 batch-8 R7).
+  const wayIn = (s: Structure): { door: { x: number; y: number } } | Record<string, never> => {
+    if (s.stage !== 'complete' || !config.structures.enterableKinds.includes(s.kind)) return {}
+    const door = doorTile(state, s)
+    return door === null ? {} : { door: { x: door.x, y: door.y } }
+  }
+
   const visibleStructures: PerceivedStructure[] = Object.values(state.structures)
     .filter(s => (indoors === null ? structureInSight(s) : s.id === indoors))
     .sort(byId)
     .map(s => ({
       id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, burning: s.burning, stage: s.stage,
-      ...carved(s),
+      ...carved(s), ...wayIn(s),
     }))
 
   const tileItems: PerceivedItem[] = indoors !== null ? [] : Object.values(state.items)
@@ -248,6 +363,20 @@ export function composePerception(
     .sort(byId)
     .map(c => ({ id: c.id, kind: c.kind, x: c.x, y: c.y, stage: c.stage, withered: c.withered }))
 
+  // Four walls hide the herd as completely as they hide everything else outdoors.
+  const visibleFauna: PerceivedFauna[] = indoors !== null ? [] : Object.keys(state.fauna ?? {}).sort()
+    .map((id) => ({ id, ...state.fauna![id]! }))
+    .filter((f) => f.alive && withinSight(f.x, f.y))
+    .map((f) => ({ id: f.id, kind: f.kind, x: f.x, y: f.y }))
+
+  const visibleForageables: PerceivedForageable[] = indoors !== null ? [] : Object.keys(state.forageables ?? {}).sort()
+    .map((id) => ({ id, ...state.forageables![id]! }))
+    .filter((f) => withinSight(f.x, f.y))
+    .map((f) => ({
+      id: f.id, kind: f.kind, x: f.x, y: f.y,
+      prose: FORAGEABLE_PROSE[f.kind][f.stock > 0 ? 'standing' : 'bare'],
+    }))
+
   const inventory: InventoryItem[] = Object.values(state.items)
     .filter(i => i.loc.t === 'agent' && i.loc.id === agentId)
     .sort(byId)
@@ -276,10 +405,27 @@ export function composePerception(
       if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
       if (p.takerId === agentId) continue
       const takerInside = state.agents[p.takerId]?.insideId ?? null
-      const witnessed = indoors === null ? takerInside === null && withinSight(p.x, p.y) : takerInside === indoors
-      if (!witnessed) continue
+      const sameSide = indoors === null ? takerInside === null : takerInside === indoors
+      if (!sameSide || !withinSight(p.x, p.y)) continue
       seen.push({ kind: 'item_taken', takerName: nameOf(p.takerId), ownerName: nameOf(p.ownerId), itemKind: p.kind })
     }
+  }
+
+  // A dance is a thing at a place and obeys the light like everything else seen; a song is
+  // carried by the voice, so it goes as far as speech goes and the dark does not touch it.
+  for (const ev of recentEvents) {
+    if (ev.type !== 'agent_expressed') continue
+    const p = ev.payload as { agentId?: unknown; verb?: unknown; x?: unknown; y?: unknown; sense?: unknown }
+    if (typeof p.agentId !== 'string' || typeof p.verb !== 'string') continue
+    if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
+    if (p.agentId === agentId) continue
+    const sense = p.sense === 'sound' ? 'sound' : 'sight'
+    const actorInside = state.agents[p.agentId]?.insideId ?? null
+    const reaches = sense === 'sound'
+      ? hears(state, config, ev, agentId)
+      : (indoors === null ? actorInside === null : actorInside === indoors) && withinSight(p.x, p.y)
+    if (!reaches) continue
+    seen.push({ kind: 'expression', actorName: nameOf(p.agentId), verb: p.verb, sense })
   }
 
   // A global mystery reaches every open pair of eyes, walls and distance no object; a
@@ -298,6 +444,16 @@ export function composePerception(
     .map(ev => (ev.type === 'mystery_event' ? globalMysteryTag(self.asleep, ev) : feltTagFor(agentId, ev)))
     .filter((t): t is string => t !== null)
 
+  const ground = groundUnderfoot(state, config, self.x, self.y)
+  const fumbling = self.activity !== null
+    && workPenalty(state, config, agentId, self.activity.verb) !== 1
+
+  const roof = indoors === null ? undefined : state.structures[indoors]
+  const walkTo = self.activity?.verb === 'walk' ? self.activity.params : undefined
+  const toward = typeof walkTo?.x === 'number' && typeof walkTo.y === 'number'
+    ? { x: walkTo.x, y: walkTo.y }
+    : undefined
+
   return {
     time: simTimeFromTick(state.tick),
     self: {
@@ -306,14 +462,25 @@ export function composePerception(
         hp: self.hp,
         injuries: self.injuries,
         ill: self.ill,
+        thirst: thirstOf(self),
+        afflictions: (self.afflictions ?? []).map((a) => ({ kind: a.kind, severity: a.severity })),
       },
       x: self.x,
       y: self.y,
       activity: self.activity?.verb ?? null,
+      ...(toward === undefined ? {} : { activityToward: toward }),
+      ...(roof === undefined ? {} : { inside: { id: roof.id, kind: roof.kind } }),
       inventory,
     },
     weather: { ...state.weather },
-    visible: { agents: visibleAgents, structures: visibleStructures, items: visibleItems, crops: visibleCrops },
+    ...(ground === undefined ? {} : { ground }),
+    light: lightBandAt(state, self.x, self.y, state.tick, config),
+    ...(fumbling ? { fumbling: true as const } : {}),
+    ...(walkIsCapped(state, config, agentId) ? { wayUnclear: true as const } : {}),
+    visible: {
+      agents: visibleAgents, structures: visibleStructures, items: visibleItems,
+      crops: visibleCrops, fauna: visibleFauna, forageables: visibleForageables,
+    },
     heard,
     seen,
     feltEvents,

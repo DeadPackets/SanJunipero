@@ -4,7 +4,12 @@ import { registerVerb, VERBS } from '@sj/engine'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import { codify as codifyRecipe, verbFromRecipe } from './codify.js'
+import {
+  assembleExpressivePrompt, ExpressiveRulingSchema, expressiveRow, expressiveVerbFromRuling,
+  isExpressive, isExpressiveRow, type ExpressiveRuling,
+} from './expressive.js'
 import { assembleAdjudicationPrompt, FORBIDDEN_FRAMING } from './prompt.js'
+import { recipeSanityRefusal, type RecipeVocabulary } from './sanity.js'
 import { ReviewStore } from './review.js'
 import { RulebookStore } from './rulebook.js'
 import { RulingsStore } from './rulings.js'
@@ -48,6 +53,12 @@ export type AgentCtx = {
   skills: Record<string, number>
   inventory: Array<{ kind: string; qty: number }>
   position: { x: number; y: number }
+  // What the asker can see. Absent from a caller that projects no world — and then the
+  // arbiter judges as it always did, on the asker alone.
+  visible?: {
+    structures: Array<{ kind: string; x: number; y: number }>
+    ground: string[]
+  }
 }
 
 export type ArbiterDeps = {
@@ -55,11 +66,18 @@ export type ArbiterDeps = {
   llm: LlmClient
   embedder: { embed(t: string): Promise<Float32Array> }
   tick?: () => number
+  // The materials and buildings the town has words for. Rendered into the prompt AND enforced
+  // against the answer, so the two can never disagree (canon-vocabulary law). A caller that
+  // shows no table gets the checks that need no table; the rest wait for one.
+  vocabulary?: { itemKinds: readonly string[]; structureKinds: readonly string[] }
 }
 
 export type Arbiter = {
   adjudicate(intent: string, agentCtx: AgentCtx): Promise<Verdict>
   codify(recipe: Recipe): { ruleId: number; verb: string }
+  // Why this recipe may never become a verb, or null. The same gate adjudicate applies,
+  // exposed so an operator queue can say what it refused and why.
+  sanity(recipe: Recipe, agentCtx: AgentCtx): string | null
   revert(recipeId: string, reason: string): void
 }
 
@@ -73,7 +91,63 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
   // Restart resilience: the rulebook is durable but the verb registry is
   // in-memory — re-register every active codified verb in deterministic order.
   for (const row of rulebook.allActive()) {
-    if (!VERBS[row.verb]) registerVerb(verbFromRecipe(JSON.parse(row.recipeJson) as Recipe))
+    if (VERBS[row.verb]) continue
+    const parsed: unknown = JSON.parse(row.recipeJson)
+    registerVerb(isExpressiveRow(parsed)
+      ? expressiveVerbFromRuling(parsed.name, parsed)
+      : verbFromRecipe(parsed as Recipe))
+  }
+
+  // The cheap approval: a word for an act that changes nothing. One small call, one rulebook
+  // row, and thereafter the whole town has the verb for free.
+  function codifyExpressive(ruling: ExpressiveRuling, tick: number): string {
+    const row = expressiveRow(ruling)
+    const existing = rulebook.byId(row.id)
+    if (existing !== null && existing.revertedAtTick === null) return row.id
+    if (existing !== null) {
+      rulebook.reactivate(row, tick)
+      if (!VERBS[row.id]) registerVerb(expressiveVerbFromRuling(row.name, row))
+      review.queue(existing.id, row.id, tick)
+      return row.id
+    }
+    const ruleId = rulebook.insert(row, tick)
+    if (!VERBS[row.id]) registerVerb(expressiveVerbFromRuling(row.name, row))
+    review.queue(ruleId, row.id, tick)
+    return row.id
+  }
+
+  // What the rulebook already makes, read fresh each time: a second waterskin is only a
+  // second one against the first, and the first may have been codified a minute ago.
+  function codifiedVocabulary(agentCtx: AgentCtx): RecipeVocabulary {
+    const knownProducts = new Set<string>()
+    const knownRecipeIds = new Set<string>()
+    for (const row of rulebook.allActive()) {
+      knownRecipeIds.add(row.recipeId)
+      const parsed: unknown = JSON.parse(row.recipeJson)
+      if (isExpressiveRow(parsed)) continue
+      for (const r of (parsed as Recipe).outcomeTable) {
+        for (const e of r.effects) if (e.op === 'spawn_item') knownProducts.add(e.kind)
+      }
+    }
+    const shown = deps.vocabulary
+    return {
+      // Shown is enforced: the ground rides the asker block, so it is checked whenever the
+      // asker block carries it, table or no table.
+      ...(agentCtx.visible === undefined ? {} : { tileKinds: new Set(agentCtx.visible.ground) }),
+      ...(shown === undefined
+        ? {}
+        : {
+            itemKinds: new Set([...shown.itemKinds, ...agentCtx.inventory.map((i) => i.kind), ...knownProducts]),
+            // A building the asker is looking at is a building the ruling may name, whether or
+            // not the town knows how to raise one — the live run denied its own well.
+            structureKinds: new Set([
+              ...shown.structureKinds,
+              ...(agentCtx.visible?.structures ?? []).map((s) => s.kind),
+            ]),
+          }),
+      knownProducts,
+      knownRecipeIds,
+    }
   }
 
   return {
@@ -111,6 +185,19 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         }
       }
 
+      // Stage 2b — an act with nothing to adjudicate. It skips the recipe prompt entirely:
+      // one small call names it, and a ruling nobody can parse falls through to the full path.
+      if (isExpressive(intent)) {
+        const cheap = assembleExpressivePrompt({ canon: CANON, agent: agentCtx, intent })
+        const r = await deps.llm.object({ schema: ExpressiveRulingSchema, ...cheap })
+        const ruling = ExpressiveRulingSchema.safeParse(r.value)
+        if (ruling.success) {
+          const verdict: Verdict = { kind: 'map', verb: codifyExpressive(ruling.data, tick()), params: {} }
+          await rulings.record(intent, verdict, tick())
+          return verdict
+        }
+      }
+
       // Stage 3 — only genuinely novel intents reach the LLM.
       const precedent = similar.map(({ ruling }) => {
         const v = JSON.parse(ruling.verdictJson) as Verdict
@@ -118,6 +205,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         if (v.kind === 'impossible') return { summary: v.reason, verdictKind: 'impossible' } as const
         return { summary: v.verb, verdictKind: 'map' } as const
       })
+      const vocab = codifiedVocabulary(agentCtx)
       const { system, messages } = assembleAdjudicationPrompt({
         canon: `${CANON}\n\nThe town currently knows: ${codex.known().join(', ')}`,
         // Without the frontier the model cannot tell an unearned rung one step
@@ -126,6 +214,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         agent: agentCtx,
         precedent,
         intent,
+        ...(deps.vocabulary === undefined ? {} : { materials: deps.vocabulary }),
       })
       let value: Verdict | null = null
       for (let i = 0; i < MAX_LLM_ATTEMPTS && value === null; i++) {
@@ -135,6 +224,9 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         if (r.value.kind === 'map' && !VERBS[r.value.verb]) continue
         // An attempt that leaks the machinery is invalid — retry (finding 12).
         if (framingTainted(r.value)) continue
+        // A recipe that cannot stand as a permanent verb is invalid — retry. Codification is
+        // forever, and the mini-rehearsal proved a bad one is minted in silence otherwise.
+        if (r.value.kind === 'attempt' && recipeSanityRefusal(r.value.recipe, vocab) !== null) continue
         value = r.value
       }
       if (value === null) return FALLBACK_IMPOSSIBLE
@@ -158,6 +250,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
 
     codify(recipe) {
       return codifyRecipe(recipe, { rulebook, review, codex, tick: tick() })
+    },
+
+    sanity(recipe, agentCtx) {
+      return recipeSanityRefusal(recipe, codifiedVocabulary(agentCtx))
     },
 
     revert(recipeId, reason) {

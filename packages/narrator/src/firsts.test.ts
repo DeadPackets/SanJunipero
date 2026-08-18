@@ -17,8 +17,14 @@ describe('detectFirsts', () => {
   it('emits first_speech and first_trade once each', () => {
     const ms = detectFirsts(speechAndTrade, { seenKinds: new Set(), rulebookCount: 0 })
     expect(ms).toHaveLength(2)
-    expect(ms[0]).toEqual({ kind: 'first_speech', label: 'the first word spoken', eventSeq: 1, day: 0, tick: 10 })
-    expect(ms[1]).toEqual({ kind: 'first_trade', label: 'the first trade', eventSeq: 3, day: 0, tick: 12 })
+    expect(ms[0]).toEqual({
+      kind: 'first_speech', tier: 1, domain: 'engine', label: 'the first word spoken',
+      eventSeq: 1, day: 0, tick: 10, agentIds: ['a'],
+    })
+    expect(ms[1]).toEqual({
+      kind: 'first_trade', tier: 1, domain: 'engine', label: 'the first trade',
+      eventSeq: 3, day: 0, tick: 12, agentIds: ['a'],
+    })
   })
 
   it('already-seen kinds are suppressed', () => {
@@ -29,7 +35,10 @@ describe('detectFirsts', () => {
   it('first_law fires from rulebookCount, citing the first event of the day', () => {
     const ms = detectFirsts(speechAndTrade, { seenKinds: new Set(), rulebookCount: 1 })
     const law = ms.find((m) => m.kind === 'first_law')
-    expect(law).toEqual({ kind: 'first_law', label: 'the first law', eventSeq: 1, day: 0, tick: 10 })
+    expect(law).toEqual({
+      kind: 'first_law', tier: 1, domain: 'engine', label: 'the first law',
+      eventSeq: 1, day: 0, tick: 10, agentIds: [],
+    })
   })
 
   it('first_law already seen emits nothing', () => {
@@ -37,9 +46,9 @@ describe('detectFirsts', () => {
     expect(ms.find((m) => m.kind === 'first_law')).toBeUndefined()
   })
 
-  it('non-give action_completed is not a trade', () => {
+  it('non-give action_completed is not a trade — it is whatever it actually was', () => {
     const ms = detectFirsts([ev(1, 5, 'action_completed', { agentId: 'a', verb: 'fish' })], { seenKinds: new Set(), rulebookCount: 0 })
-    expect(ms).toEqual([])
+    expect(ms.map((m) => m.kind)).toEqual(['first_fish'])
   })
 
   it('persists via NarratorStore: kinds round-trip, duplicate kind throws', () => {

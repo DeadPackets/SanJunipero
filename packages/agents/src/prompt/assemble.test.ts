@@ -107,6 +107,44 @@ describe('human framing guard', () => {
   })
 })
 
+describe('perceptionToProse: the ground says what it is, and nothing about what to do', () => {
+  // The engine may state a physical fact. The moment it states a preference it is a rule.
+  const NUDGES = /\b(should|ought|better site|recommended|recommend|ideal|best place|advise)\b/i
+  const ROAD_CLAUSE = 'Carts and feet reach this spot easily.'
+  const onRoad = { ...quietMeadowPacket, ground: { wellTravelled: true as const } }
+
+  it('renders the clause once for well-travelled ground and not at all otherwise', () => {
+    const prose = perceptionToProse(onRoad)
+    expect(prose).toContain(ROAD_CLAUSE)
+    expect(prose.split(ROAD_CLAUSE)).toHaveLength(2)
+    expect(perceptionToProse(quietMeadowPacket)).not.toContain(ROAD_CLAUSE)
+  })
+
+  it('never tells the mind what to do with the fact', () => {
+    expect(ROAD_CLAUSE).not.toMatch(NUDGES)
+    expect(ROAD_CLAUSE).not.toMatch(FORBIDDEN_FRAMING)
+    expect(perceptionToProse(onRoad)).not.toMatch(NUDGES)
+  })
+})
+
+describe('perceptionToProse: a walk that stops short says so, in a body\'s words', () => {
+  const UNCLEAR = 'The way is unclear from here.'
+  const MECHANICS = /\b(path|node|budget|A\*|search|route|cap|capped|partial|unreachable)\b/i
+  const cutShort = { ...quietMeadowPacket, wayUnclear: true as const }
+
+  it('renders the line exactly once, and not at all on an ordinary walk', () => {
+    const prose = perceptionToProse(cutShort)
+    expect(prose).toContain(UNCLEAR)
+    expect(prose.split(UNCLEAR)).toHaveLength(2)
+    expect(perceptionToProse(quietMeadowPacket)).not.toContain(UNCLEAR)
+  })
+
+  it('names no mechanism and asks for nothing', () => {
+    expect(UNCLEAR).not.toMatch(MECHANICS)
+    expect(UNCLEAR).not.toMatch(FORBIDDEN_FRAMING)
+  })
+})
+
 describe('perceptionToProse', () => {
   it('quotes heard speech with the speaker name', () => {
     const prose = perceptionToProse(conversationPacket)
@@ -231,11 +269,11 @@ describe('perceptionToProse', () => {
     expect(perceptionToProse(packet)).toContain('Your stomach gnaws at you.')
   })
 
-  it('renders the time of day and day number', () => {
+  it('renders the shared calendar — the day, the part of it, and the season', () => {
     const prose = perceptionToProse(quietMeadowPacket)
-    expect(prose).toContain('morning')
     expect(prose).toContain('day 1')
-    expect(prose).toContain('spring')
+    expect(prose).toContain('day 1, day,')
+    expect(prose).toContain('early spring')
   })
 
   it('renders visible structures, items, and crops', () => {
@@ -327,12 +365,35 @@ describe('perceptionToProse', () => {
     expect(prose).toContain('wheat (crop_1) at (12, 8)')
   })
 
-  it('escalates weariness severity so the mind knows to rest', () => {
+  // The alarm wakes a body for any named affliction; the body has to be able to feel it.
+  it('says what ails the body, in feeling and never in a number', () => {
+    const ailing = (kind: string, severity: number): string => perceptionToProse({
+      ...quietMeadowPacket,
+      self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, afflictions: [{ kind, severity }] } },
+    })
+    expect(ailing('poison', 1)).toContain('something you ate has gone against you')
+    expect(ailing('poison', 1)).not.toContain('It is very bad')
+    expect(ailing('illness', 4)).toContain('It is very bad.')
+    expect(ailing('fatigue', 2)).toContain('A tiredness sits in your bones')
+    // Whatever the severity, the sentences it adds carry no digit at all.
+    const sentences = (p: string): string[] => p.split('. ')
+    const base = sentences(perceptionToProse(quietMeadowPacket))
+    const added = sentences(ailing('injury', 9)).filter((s) => !base.includes(s))
+    expect(added.length).toBeGreaterThan(0)
+    expect(added.join(' ')).not.toMatch(/\d/)
+    // A kind prose has no words for is silence, not a crash and not a number.
+    expect(ailing('cursed', 2)).toBe(perceptionToProse(quietMeadowPacket))
+  })
+
+  // The word has to be a word the world answers to: there is no `rest` verb, and a mind told
+  // to rest can only ever try one and be refused (C11 batch-8 R11).
+  it('escalates weariness severity so the mind knows to sleep', () => {
     const tired = {
       ...quietMeadowPacket,
       self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, needs: { ...quietMeadowPacket.self.body.needs, energy: 20 } } },
     }
-    expect(perceptionToProse(tired)).toContain('you must rest')
+    expect(perceptionToProse(tired)).toContain('you must sleep')
+    expect(perceptionToProse(tired)).not.toContain('rest')
 
     const collapsing = {
       ...quietMeadowPacket,

@@ -5,7 +5,7 @@ import { MockLanguageModelV4 } from 'ai/test'
 import { z } from 'zod'
 import { mockModel } from '../testutil/mockModel.js'
 import { makeBudgetGuard, migrateLlmTables, sumReserved } from './callLog.js'
-import { BudgetExceededError, LlmClient, defaultExtraBody } from './client.js'
+import { BudgetExceededError, LlmClient, defaultExtraBody, servedProvider } from './client.js'
 import { FALLBACK_MODELS, MIND_MODEL, PROVIDER_ORDER } from './pins.js'
 
 type CallRow = {
@@ -149,6 +149,51 @@ describe('LlmClient.object', () => {
     const all = rows(db)
     expect(all).toHaveLength(1)
     expect(all[0]!.ok).toBe(0)
+  })
+
+  // GATE G11b day 3: a chronicle whose `title` and `text` were both complete and whose shape
+  // was wrong cost the run a night and criterion 11. An answer that only needs reframing is
+  // not a dead call (C11 batch 16 fix 2).
+  it('repairs a shape the decoder refused, logs the call as answered, and says it repaired it', async () => {
+    const db = openDb()
+    const model = mockModel([
+      {
+        text: 'Here is the object you asked for:\n{"mood":"calm","count":3}\nHope that helps.',
+        usage: { inputTokens: 1000, outputTokens: 50, cacheReadTokens: 600 },
+      },
+    ])
+    const client = new LlmClient({ model, db, caller: 'narrator', maxRetries: 2 })
+    const { value, usage } = await client.object({
+      system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA,
+    })
+
+    expect(value).toEqual({ mood: 'calm', count: 3 })
+    // One call, not two: the repair costs nothing and never re-asks.
+    expect(model.doGenerateCalls).toHaveLength(1)
+    const all = rows(db)
+    expect(all).toHaveLength(1)
+    expect(all[0]!.ok).toBe(1)
+    // The tokens were spent whether or not the shape was right, so they are reported.
+    expect(all[0]!.input_tokens).toBe(1000)
+    expect(usage.costUsd).toBeGreaterThan(0)
+    const alerts = db.prepare('SELECT kind, detail FROM alerts').all() as Array<{ kind: string; detail: string }>
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0]!.kind).toBe('decode_repaired')
+    expect(alerts[0]!.detail).toContain('narrator')
+  })
+
+  it('still fails, and still does not re-ask, when the shape cannot be repaired without guessing', async () => {
+    const db = openDb()
+    const model = mockModel([
+      { text: 'The mood was calm but I did not count.' },
+      { json: { mood: 'never reached', count: 0 } },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test', maxRetries: 2 })
+    await expect(
+      client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA }),
+    ).rejects.toThrow(/did not match schema|No object generated/)
+    expect(model.doGenerateCalls).toHaveLength(1)
+    expect(rows(db)[0]!.ok).toBe(0)
   })
 
   it('rejects when all attempts fail; every row has ok = 0', async () => {
@@ -368,5 +413,77 @@ describe('default OpenRouter path extraBody', () => {
       models: [MIND_MODEL, 'x/y'],
       provider: { order: ['P'], allow_fallbacks: true },
     })
+  })
+
+  // C11 R20: `provider.order` is a preference and only `allow_fallbacks:false` makes it an
+  // allow-list. It was a hardcoded literal, so a run that "pinned" a provider got that
+  // provider's answer rate AND whatever OpenRouter fell through to.
+  it('the allow-list is a switch now, and the default leaves the routing where it was', () => {
+    expect(defaultExtraBody(['x/y'], ['P'], false)).toEqual({
+      models: [MIND_MODEL, 'x/y'],
+      provider: { order: ['P'], allow_fallbacks: false },
+    })
+    expect(defaultExtraBody(['x/y'], ['P']).provider.allow_fallbacks).toBe(true)
+  })
+})
+
+describe('the back end that answered is written down (C11 R20)', () => {
+  it('reads the provider off OpenRouter metadata, then off the raw body, then gives up', () => {
+    expect(servedProvider(undefined, { openrouter: { provider: 'Wafer' } })).toBe('Wafer')
+    expect(servedProvider({ body: { provider: 'Baidu' } }, undefined)).toBe('Baidu')
+    expect(servedProvider({ body: { provider: 'Baidu' } }, { openrouter: { provider: 'Wafer' } })).toBe('Wafer')
+    expect(servedProvider({}, {})).toBeNull()
+    expect(servedProvider({ body: { provider: '' } }, {})).toBeNull()
+  })
+
+  it('records it on the call, and records null for a call that never came back', async () => {
+    const db = openDb()
+    const model = mockModel([
+      { json: { mood: 'calm', count: 1 }, provider: 'Wafer', usage: { inputTokens: 10, outputTokens: 2 } },
+      { fail: true },
+      { json: { mood: 'calm', count: 2 }, usage: { inputTokens: 10, outputTokens: 2 } },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test', agentId: 'a1' })
+    await client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA })
+    await client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA })
+    const logged = db.prepare('SELECT provider, ok FROM llm_calls ORDER BY id').all() as
+      Array<{ provider: string | null; ok: number }>
+    // A failure carries no answer, so it carries no back end to name it by.
+    expect(logged).toEqual([
+      { provider: 'Wafer', ok: 1 },
+      { provider: null, ok: 0 },
+      { provider: null, ok: 1 },
+    ])
+  })
+})
+
+// C11 T37b step 5 — a stalled provider response used to hang the caller for ever. The
+// interrupted G11b re-run lost its night to a `semantic` call that sat for 614 s and then
+// failed; with `maxRetries` 2 behind it, one stalled request could hold a gate open for the
+// best part of an hour. The bound turns an unbounded wait into an ordinary failed attempt.
+describe('a stalled request is bounded (T37b)', () => {
+  it('aborts a call that outlives the timeout, and logs it as a failed attempt', async () => {
+    const db = openDb()
+    const model = new MockLanguageModelV4({
+      doGenerate: async ({ abortSignal }) => {
+        await new Promise((_resolve, reject) => {
+          abortSignal?.addEventListener('abort', () => { reject(new Error('aborted')) })
+        })
+        throw new Error('unreachable')
+      },
+    })
+    const client = new LlmClient({ model, db, caller: 'test', maxRetries: 0, requestTimeoutMs: 30 })
+    await expect(client.text({ messages: [{ role: 'user', content: 'u' }] })).rejects.toThrow()
+    const logged = rows(db)
+    expect(logged).toHaveLength(1)
+    expect(logged[0]!.ok).toBe(0)
+  })
+
+  it('leaves a call that answers inside the timeout completely alone', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'quick', usage: { inputTokens: 1, outputTokens: 1 } }])
+    const client = new LlmClient({ model, db, caller: 'test', requestTimeoutMs: 60_000 })
+    expect((await client.text({ messages: [{ role: 'user', content: 'u' }] })).text).toBe('quick')
+    expect(rows(db)[0]!.ok).toBe(1)
   })
 })

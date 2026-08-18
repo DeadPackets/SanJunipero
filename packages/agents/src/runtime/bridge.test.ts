@@ -177,3 +177,46 @@ describe('EngineBridge.drain (T23)', () => {
     expect(bridge.perception(AGENT).self.activity).toBeNull()
   })
 })
+
+// R21-B: the road to a meal. Thirst has had `nearestWater` since the last batch and hunger
+// had nothing, and the live run drank fifteen times and ate once.
+describe('nearestFood: the nearest thing worth walking to for a meal', () => {
+  function larder(): EngineBridge {
+    const config = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+    const terrain: TileId[][] = Array.from({ length: 40 }, () => Array.from({ length: 40 }, (): TileId => 0))
+    const store = new EventStore(openDb(':memory:'))
+    const rng = new RngStreams('bridge-larder')
+    let state = genesisState(config, terrain)
+    const put = (type: string, payload: unknown) => { state = fold(state, store.append(state.tick, type, payload), config) }
+    put('agent_spawned', { id: AGENT, name: 'Tamar', x: 20, y: 20, ageDays: 7300 })
+    put('structure_planned', {
+      id: 'shed_1', kind: 'storehouse', x: 24, y: 20, w: 1, h: 1, maxHp: 20, flammable: true, builderId: 'g',
+    })
+    put('structure_completed', { id: 'shed_1' })
+    put('item_spawned', { id: 'loaf', kind: 'bread', qty: 1, loc: { t: 'structure', id: 'shed_1' } })
+    put('item_spawned', { id: 'plank', kind: 'plank', qty: 1, loc: { t: 'tile', x: 21, y: 20 } })
+    put('forageable_spawned', { id: 'bush', kind: 'berry_bush', x: 30, y: 20, stock: 6, fullStock: 6 })
+    put('forageable_spawned', { id: 'rocks', kind: 'stone_outcrop', x: 21, y: 21, stock: 6, fullStock: 6 })
+    const loop = new TickLoop({ store, state, rng, config, onTick: () => {} })
+    return new EngineBridge({ loop, store, simConfig: config })
+  }
+
+  it('names the kind and the place of the nearest meal, shelves and patches alike', () => {
+    const bridge = larder()
+    // The loaf on the shelf at four tiles beats the bushes at ten.
+    expect(bridge.nearestFood(20, 20)).toEqual({ x: 24, y: 20, kind: 'bread' })
+    // From the far side of the meadow the bushes win.
+    expect(bridge.nearestFood(34, 20)).toEqual({ x: 30, y: 20, kind: 'berries' })
+  })
+
+  it('passes over what is not food, however close it lies', () => {
+    const bridge = larder()
+    // A plank one tile away and a stone outcrop two: neither is dinner.
+    expect(bridge.nearestFood(20, 20)?.kind).toBe('bread')
+  })
+
+  it('nothing beyond the horizon is a meal', () => {
+    const bridge = larder()
+    expect(bridge.nearestFood(20, 20, 2)).toBeNull()
+  })
+})

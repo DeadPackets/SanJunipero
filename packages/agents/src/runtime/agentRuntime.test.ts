@@ -44,7 +44,11 @@ const ZERO_USAGE = {
   outputTokens: { total: 0, text: 0, reasoning: 0 },
 }
 
-const FAST_MIND: Partial<MindConfig> = { idleGapTicks: 0, boredomTicks: 1, bodyAlarm: { hunger: 0, energy: 0, warmth: 0 } }
+const FAST_MIND: Partial<MindConfig> = {
+  idleGapTicks: 0, boredomTicks: 1,
+  // Every rung switched off: these rows drive the cadence themselves.
+  bodyAlarm: { hunger: 0, energy: 0, warmth: 0, thirst: 0, affliction: Infinity },
+}
 
 // Empty 24x24 grass, no structures: the C9 bed law would refuse every sleep these rows drive.
 function fastSimConfig(): SimConfig {
@@ -108,6 +112,33 @@ function capturingModel(responses: unknown[]): { model: MockLanguageModelV4; pro
       i += 1
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(r) }],
+        finishReason: { unified: 'stop' as const, raw: undefined },
+        usage: ZERO_USAGE,
+        warnings: [],
+      }
+    },
+  })
+  return { model, prompts }
+}
+
+// A back end that answers with nothing at all — the empty call R20 made visible, which ran at
+// 6.0% of the last live gate. `content: []` is a landed call carrying no answer.
+function blankModel(blanks: number, then: unknown = BENIGN_TURN):
+{ model: MockLanguageModelV4; prompts: CapturedMessage[][] } {
+  const prompts: CapturedMessage[][] = []
+  let i = 0
+  const model = new MockLanguageModelV4({
+    doGenerate: async (options) => {
+      prompts.push((options.prompt as Array<{ role: string; content: unknown }>).map((m) => ({
+        role: m.role,
+        text: Array.isArray(m.content)
+          ? (m.content as Array<{ text?: string }>).map((p) => p.text ?? '').join('')
+          : String(m.content),
+      })))
+      const blank = i < blanks
+      i += 1
+      return {
+        content: blank ? [] : [{ type: 'text' as const, text: JSON.stringify(then) }],
         finishReason: { unified: 'stop' as const, raw: undefined },
         usage: ZERO_USAGE,
         warnings: [],
@@ -463,7 +494,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       model: turnModel([]),
       mindConfig: { idleGapTicks: 100000, boredomTicks: 100000 },
       reflectionLlm: reflection,
-      simConfig: SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 }, structures: { sleepIndoorsOnly: false } }),
+      // Warmth is pinned off with the other two clocks: from C11 Task 22 a body left out in a
+      // spring night loses warmth until the C2 body alarm rings, and a woken sleeper is not
+      // what this row is about.
+      simConfig: SimConfigSchema.parse({
+        needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 },
+        structures: { sleepIndoorsOnly: false }, warmth: { enabled: false },
+      }),
     })
     while (loop.tick < 1350) {
       loop.step()
@@ -611,6 +648,54 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(dayLogB.length).toBeGreaterThan(dayLogA.length)
   })
 
+  it('the makeable vocabulary rides the volatile block and never the frozen prefix (C11 R-H)', async () => {
+    const { model, prompts } = capturingModel([BENIGN_TURN, BENIGN_TURN])
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 2, 100)
+
+    const [a, b] = [prompts[0]!, prompts[1]!]
+    // Last user message is block 6, `now`. It is the one place the words appear.
+    const nowA = a.filter((m) => m.role === 'user').at(-1)!.text
+    expect(nowA).toContain('a hut (10 wood)')
+    expect(nowA).toContain('stew (1 meat and 1 vegetable, at a fire someone is feeding')
+    expect(a.find((m) => m.role === 'system')!.text).not.toContain('a hut (10 wood)')
+    // And not in the day log, which is the day's events: a standing fact repeated every turn
+    // would compact the day out of the mind that lived it.
+    expect(runtime.dayLogSnapshot().join(' ')).not.toContain('a hut (10 wood)')
+    expect(b.filter((m) => m.role === 'user')[0]!.text).not.toContain('a hut (10 wood)')
+  })
+
+  // Controller amendment to T37b — a blank answer is not a wrong answer. R20's first
+  // measurement put empty calls at 6.0% of a live gate, and every one of them used to cost
+  // the mind a whole turn and leave a drift in its memory that it never actually had.
+  it('asks a blank answer again, unchanged — not as a correction for something never said', async () => {
+    const { model, prompts } = blankModel(1)
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 60)
+
+    expect(prompts.length).toBe(2)
+    // Byte-identical: nothing is appended, so the cached prefix is still the whole request.
+    expect(prompts[1]).toEqual(prompts[0]!)
+    expect(prompts[1]!.some((m) => /rejected/i.test(m.text))).toBe(false)
+    expect(runtime.stats().turns).toBeGreaterThanOrEqual(1)
+  })
+
+  it('a second blank leaves the turn unspent: no drift it never had, and the body carries on', async () => {
+    const thoughts: string[] = []
+    const { model, prompts } = blankModel(2)
+    const { loop, runtime, agentDb } = await setup({
+      model, mindConfig: FAST_MIND, onThought: (t) => thoughts.push(t.text),
+    })
+    await stepUntil(loop, () => prompts.length >= 2, 60)
+
+    // Asked twice and no more: the tripwire against hammering a back end that is answering.
+    expect(prompts.length).toBe(2)
+    expect(runtime.stats().turns).toBe(0)
+    // FALLBACK_TURN used to be applied here as though the mind had really stood there musing.
+    expect(thoughts).toEqual([])
+    expect(alertKinds(agentDb)).toContain('blank_answer')
+  })
+
   it('repairs an invalid generation with an assistant/user exchange instead of blind-retrying', async () => {
     const bad = { thought: 'I speak wrongly.', importance: 'very' }
     const good = { thought: 'Righted.', speech: 'All is well.', importance: 2 }
@@ -637,8 +722,10 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   it('perception prose offers a standable tile beside a visible structure (g3 round 6)', async () => {
     const { loop, runtime } = await setup({ model: turnModel([]), mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 1, 30)
-    // Agent at (3, 3), storehouse footprint at (5, 5): nearest open tile is (4, 4).
-    expect(runtime.dayLogSnapshot()[0]).toContain('you could stand beside it at (4, 4)')
+    // Agent at (3, 3), storehouse footprint at (5, 5). A storehouse is a thing you can walk
+    // into, so the prose names the doorway `enter` measures against (C11 batch-8 R7) rather
+    // than the nearest open ground beside the wall.
+    expect(runtime.dayLogSnapshot()[0]).toContain('its doorway is at (5, 6) — stand there and you can go in')
   })
 
   it('the body answers its own alarm: a sleeper whose turn submits nothing is woken by a runtime wake', async () => {

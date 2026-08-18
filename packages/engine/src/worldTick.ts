@@ -5,15 +5,25 @@ import { effectiveConfig, type LawQueue } from './laws.js'
 import type { RngStreams } from './rng.js'
 import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs.js'
 import { needsSystem } from './systems/needs.js'
+import { warmthSystem } from './systems/warmth.js'
+import { lightingSystem } from './systems/lighting.js'
+import { regrowthSystem } from './systems/regrowth.js'
 import { healthSystem } from './systems/health.js'
+import { deathAttribution, escalateFatigue, mortalitySystem, placeGrave } from './systems/mortality.js'
+import { illnessSystem } from './systems/illness.js'
+import { desirePathsSystem } from './systems/desirePaths.js'
+import { thirstSystem } from './systems/thirst.js'
 import { agingSystem } from './systems/aging.js'
 import { weatherSystem } from './systems/weather.js'
 import { fireSystem } from './systems/fire.js'
 import { cropsSystem } from './systems/crops.js'
 import { wildlifeSystem } from './systems/wildlife.js'
+import { faunaSystem } from './systems/fauna.js'
+import { forageSystem } from './systems/forage.js'
 import { spoilageSystem } from './systems/spoilage.js'
 import { reproductionSystem } from './systems/reproduction.js'
 import { mysterySystem } from './systems/mystery.js'
+import { mapGrowthSystem } from './systems/mapGrowth.js'
 
 export type TickCtx = {
   readonly config: SimConfig
@@ -70,22 +80,37 @@ function collapseDeathSystem(ctx: TickCtx): void {
     const a = ctx.state().agents[id]!
     if (!a.alive) continue
     const down = a.needs.hunger < collapseThreshold || a.needs.energy < collapseThreshold || a.hp < collapseHp
-    if (down && a.collapsedSinceTick === null) {
+    const fell = down && a.collapsedSinceTick === null
+    if (fell) {
       if (a.activity) ctx.emit('action_interrupted', { agentId: id, reason: 'collapsed' })
       ctx.emit('agent_collapsed', { agentId: id })
     }
     const b = ctx.state().agents[id]!
     const starved = b.zeroHungerSinceTick !== null && ctx.state().tick - b.zeroHungerSinceTick > deathAfterZeroHungerTicks
     if (starved || b.hp <= deathHp) {
+      // Attribution reads the living body: after agent_died there is nothing left to ask.
+      const { cause, byId } = starved
+        ? { cause: 'hunger' as const, byId: undefined }
+        : deathAttribution(ctx.state(), ctx.config, id)
       dropHeldItems(ctx, id)
-      ctx.emit('agent_died', { agentId: id, cause: starved ? 'starvation' : 'health' })
+      ctx.emit('agent_died', { agentId: id, cause, ...(byId === undefined ? {} : { byId }) })
+      placeGrave(ctx, id)
+      continue
     }
+    // A fall you never get up from is not exhaustion, it is the end — the ladder is for
+    // the ones still breathing at the foot of it.
+    if (fell) escalateFatigue(ctx, id)
   }
 }
 
+// mapGrowth runs before anything that reads a coordinate this tick: after it, every stored
+// position may have moved, and a system holding a pre-growth position would act on the wrong tile.
 const SYSTEMS: System[] = [
-  weatherSystem, mysterySystem, fireSystem, cropsSystem, wildlifeSystem, spoilageSystem,
-  needsSystem, healthSystem, reproductionSystem, agingSystem, actionsSystem, collapseDeathSystem,
+  weatherSystem, mysterySystem, mapGrowthSystem, fireSystem, cropsSystem, wildlifeSystem, faunaSystem, forageSystem, spoilageSystem, lightingSystem,
+  needsSystem, warmthSystem, thirstSystem, healthSystem, mortalitySystem, illnessSystem,
+  desirePathsSystem, regrowthSystem,
+  reproductionSystem, agingSystem, actionsSystem,
+  collapseDeathSystem,
 ]
 
 // Each emit folds immediately, so every system — and every later event within a

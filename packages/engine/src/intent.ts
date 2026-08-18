@@ -1,7 +1,7 @@
 import type { SimConfig } from '@sj/shared'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
-import { VERBS, type PendingEvent } from './verbs.js'
+import { VERBS, workPenalty, type PendingEvent } from './verbs.js'
 
 export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; reason: string }
 
@@ -21,7 +21,11 @@ export function submitIntent(
   if (!def) return { ok: false, reason: `unknown verb: ${verb}` }
   const invalid = def.validate(state, config, agentId, params)
   if (invalid) return { ok: false, reason: invalid }
-  const duration = def.duration(state, config, agentId, params)
+  // The one place a duration is settled, so the dark can charge for work without every verb
+  // having to remember that it is night (G4).
+  const penalty = workPenalty(state, config, agentId, verb)
+  const base = def.duration(state, config, agentId, params)
+  const duration = penalty === 1 ? base : Math.ceil(base * penalty)
   const events: PendingEvent[] = []
   if (a.asleep && verb !== 'sleep') events.push({ type: 'agent_woke', payload: { agentId } })
   events.push({ type: 'action_started', payload: { agentId, verb, params, duration } })

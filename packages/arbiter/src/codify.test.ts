@@ -100,7 +100,7 @@ describe('codify', () => {
   describe('validate costs', () => {
     it('rejects when the agent holds less than a cost demands', () => {
       const def = verbFromRecipe({ ...boilSaltRecipe, requires: [], costs: [{ kind: 'wood', qty: 7 }] })
-      expect(def.validate(twoWoodStacks(), CFG, 'a1', {})).toBe('not enough wood')
+      expect(def.validate(twoWoodStacks(), CFG, 'a1', {})).toBe('not enough wood — wood comes from felling a tree')
     })
 
     it('passes when every cost is covered across stacks', () => {

@@ -14,8 +14,11 @@ export const AgentBorn = z.object({
   motherId: z.string(), fatherId: z.string(), x: z.number(), y: z.number(),
 }).strict()
 export const AgentMoved = z.object({ id: z.string(), x: z.number(), y: z.number() }).strict()
+// `reason` is optional so every recorded C1-C10 need change still parses. Only the cold sets
+// it, on the one event per tick where a body with no warmth left pays for it in energy.
 export const NeedChanged = z.object({
   id: z.string(), need: z.enum(['hunger', 'energy', 'warmth', 'social']), delta: z.number(),
+  reason: z.literal('exposure').optional(),
 }).strict()
 
 export const ItemLoc = z.discriminatedUnion('t', [
@@ -28,15 +31,33 @@ export const ItemSpawned = z.object({
   owner: z.string().optional(), crafterMark: z.string().optional(),
   spoilage: z.object({ spawnDay: z.number(), days: z.number() }).strict().optional(),
   durability: z.number().int().positive().optional(),
+  charges: z.number().int().nonnegative().optional(),
 }).strict()
 export const ItemMoved = z.object({ id: z.string(), loc: ItemLoc }).strict()
 export const ItemSpoiled = z.object({ id: z.string() }).strict()
 export const ItemWorn = z.object({ id: z.string(), delta: z.number().int() }).strict()
 export const ItemBroke = z.object({ id: z.string() }).strict()
 export const ItemOwnerChanged = z.object({ id: z.string(), owner: z.string() }).strict()
+// A vessel is filled to a whole number of doses, never topped up by a fraction.
+export const ItemFilled = z.object({ itemId: z.string(), charges: z.number().int().nonnegative() }).strict()
 // Pure witness record — folds to nothing. Whether a taking is theft is the town's to decide.
 export const ItemTaken = z.object({
   itemId: z.string(), kind: z.string(), takerId: z.string(), ownerId: z.string(), x: z.number(), y: z.number(),
+}).strict()
+// C11 clothing. One slot in v1, and the slot rides the event so a second one costs a schema
+// change and not a guess. Taking a worn thing out of the hands takes it off the body too.
+export const ItemEquipped = z.object({
+  agentId: z.string(), itemId: z.string(), slot: z.literal('body'),
+}).strict()
+export const ItemUnequipped = z.object({ agentId: z.string(), itemId: z.string() }).strict()
+// C11 light. `burnsUntilTick` rides the event because the fold must not have to know the
+// config to place the flame in time; snuffing carries nothing, because what is left is
+// arithmetic the fold can do from the tick it happened on.
+export const ItemLit = z.object({ itemId: z.string(), burnsUntilTick: z.number().int() }).strict()
+export const ItemSnuffed = z.object({ itemId: z.string() }).strict()
+export const ItemBurnedOut = z.object({ itemId: z.string() }).strict()
+export const StructureFueled = z.object({
+  structureId: z.string(), burnsUntilTick: z.number().int(),
 }).strict()
 export const ItemQtyChanged = z.object({ id: z.string(), delta: z.number() }).strict()
 export const ItemTextChanged = z.object({ id: z.string(), text: z.string() }).strict()
@@ -53,8 +74,11 @@ export const StructureDamaged = z.object({ id: z.string(), amount: z.number() })
 export const StructureDestroyed = z.object({ id: z.string() }).strict()
 export const FireIgnited = z.object({ structureId: z.string(), cause: z.string() }).strict()
 export const FireSpread = z.object({ fromId: z.string(), toId: z.string() }).strict()
+// C11 widens this: a dousing has a place and a pair of hands. The new fields are optional so
+// every recorded C6/C9 rain and burnout still parses, and `cause` stays required.
 export const FireExtinguished = z.object({
-  structureId: z.string(), cause: z.enum(['doused', 'rain', 'burnout']),
+  structureId: z.string().optional(), cause: z.enum(['doused', 'rain', 'burnout']),
+  x: z.number().int().optional(), y: z.number().int().optional(), agentId: z.string().optional(),
 }).strict()
 
 export const ActionStarted = z.object({
@@ -74,15 +98,56 @@ export const AgentExited = z.object({ agentId: z.string(), structureId: z.string
 export const AgentSpoke = z.object({
   agentId: z.string(), text: z.string(), x: z.number(), y: z.number(), insideId: z.string().optional(),
 }).strict()
+// A witness record and nothing else: the fold returns the state it was handed. `sense` says
+// which way the act travelled, so a replay knows a song from a dance without asking the
+// arbiter; optional, because an act with no sense recorded is one the eye caught.
+// `insideId` replays the doorway rule from the event alone, exactly as agent_spoke does.
+export const AgentExpressed = z.object({
+  agentId: z.string(), verb: z.string().min(1), targetId: z.string().optional(),
+  x: z.number(), y: z.number(), sense: z.enum(['sight', 'sound']).optional(),
+  insideId: z.string().optional(),
+}).strict()
 export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
-export const AgentDied = z.object({ agentId: z.string(), cause: z.string() }).strict()
+// `cause` stays a free string so every recorded C1-C10 log still parses; DEATH_CAUSES is the
+// vocabulary emitters are held to (controller ruling 6).
+export const AgentDied = z.object({ agentId: z.string(), cause: z.string(), byId: z.string().optional() }).strict()
 export const AgentAged = z.object({ agentId: z.string() }).strict()
 export const AgentInjured = z.object({ agentId: z.string(), kind: z.enum(['minor', 'serious', 'grave']) }).strict()
 export const AgentInfected = z.object({ agentId: z.string() }).strict()
 export const AgentFellIll = z.object({ agentId: z.string() }).strict()
 export const AgentRecovered = z.object({ agentId: z.string() }).strict()
-export const AgentTended = z.object({ agentId: z.string() }).strict()
+// `agentId` stays the PATIENT so recorded C9 logs fold unchanged; the hands and what was in
+// them arrive as optional fields.
+export const AgentTended = z.object({
+  agentId: z.string(), tenderId: z.string().optional(), itemId: z.string().optional(),
+}).strict()
 export const HpChanged = z.object({ agentId: z.string(), delta: z.number() }).strict()
+
+// C11 mortality. Harm is an amount with a source; an affliction is a cause with a clock.
+const AfflictionKindSchema = z.enum(['fatigue', 'illness', 'injury', 'poison'])
+export const AgentHarmed = z.object({
+  agentId: z.string(), amount: z.number().nonnegative(),
+  source: z.enum(['attack', 'fire', 'accident']), byId: z.string().optional(),
+}).strict()
+export const AgentAfflicted = z.object({
+  agentId: z.string(), kind: AfflictionKindSchema, severity: z.number().positive(),
+  sourceId: z.string().optional(), itemId: z.string().optional(),
+}).strict()
+export const AfflictionWorsened = z.object({
+  agentId: z.string(), kind: AfflictionKindSchema, severity: z.number().positive(),
+}).strict()
+export const AfflictionRecovered = z.object({ agentId: z.string(), kind: AfflictionKindSchema }).strict()
+// `x`/`y` are where the stone goes, already stepped clear of anything standing on the death
+// tile; `name` is the dead as they were known, kept in the log because a grave has no name field.
+export const GravePlaced = z.object({
+  id: z.string(), agentId: z.string(), name: z.string(), x: z.number().int(), y: z.number().int(),
+}).strict()
+// Thirst is not one of the four needs: widening the NeedChanged enum would change what every
+// recorded log means. It gets its own event and its own clock.
+export const ThirstChanged = z.object({ id: z.string(), delta: z.number() }).strict()
+export const AgentDrank = z.object({
+  agentId: z.string(), source: z.enum(['water_tile', 'well', 'item']), itemId: z.string().optional(),
+}).strict()
 export const WeatherChanged = z.object({ kind: z.string(), temperatureC: z.number(), prevKind: z.string().optional() }).strict()
 // Pure sensation: no fold effect, no cause, no resolution anywhere in the world.
 export const MysteryEvent = z.object({
@@ -96,6 +161,63 @@ export const CropGrew = z.object({ cropId: z.string(), stage: z.number() }).stri
 export const CropWithered = z.object({ cropId: z.string() }).strict()
 export const CropHarvested = z.object({ cropId: z.string() }).strict()
 export const WildlifeChanged = z.object({ fish: z.number().optional(), deer: z.number().optional() }).strict()
+
+// C11 fauna: bodies with no minds. `stock` rides the spawn because a school arrives as a
+// number of fish, not as one; nothing that walks ever carries it.
+const FaunaKindSchema = z.enum(['deer', 'rabbit', 'fish'])
+export const FaunaSpawned = z.object({
+  id: z.string(), kind: FaunaKindSchema, x: z.number().int(), y: z.number().int(),
+  stock: z.number().int().positive().optional(),
+}).strict()
+// One event per movement beat, whatever moved. The destinations ARE the roll: they are drawn
+// from the `fauna` stream at emission and travel here, so the fold never touches randomness.
+export const FaunaMoved = z.object({
+  moves: z.array(z.object({ id: z.string(), x: z.number().int(), y: z.number().int() }).strict()).min(1),
+}).strict()
+// A school is one entity with many fish in it; a catch takes one of them. `fold` is the only
+// writer of world state, so the taking needs an event of its own — a school that reaches zero
+// disbands as `fauna_killed` instead, which is why this one never carries a zero.
+export const FaunaStockChanged = z.object({ id: z.string(), stock: z.number().int().positive() }).strict()
+export const FaunaKilled = z.object({
+  id: z.string(), kind: FaunaKindSchema, x: z.number().int(), y: z.number().int(),
+  byId: z.string().optional(),
+}).strict()
+// C11 forageables. Stripping one is a stock change; the last handful is a depletion, which is
+// the same arithmetic with a name the chronicle can use. A node is never removed.
+const ForageableKindSchema = z.enum([
+  'berry_bush', 'mushroom_patch', 'pale_mushroom_patch', 'herb_patch', 'clay_deposit', 'stone_outcrop',
+  'reed_bed',
+])
+// `fullStock` is the abundance the ground climbs back toward. Optional so every recorded C11
+// scatter still parses; absent means the old ceiling of one.
+export const ForageableSpawned = z.object({
+  id: z.string(), kind: ForageableKindSchema,
+  x: z.number().int(), y: z.number().int(), stock: z.number().int().nonnegative(),
+  fullStock: z.number().int().positive().optional(),
+}).strict()
+export const ForageableStockChanged = z.object({ id: z.string(), stock: z.number().int().positive() }).strict()
+export const ForageableDepleted = z.object({ id: z.string() }).strict()
+export const ForageableRegrown = z.object({ id: z.string(), stock: z.number().int().positive() }).strict()
+
 export const TerrainChanged = z.object({ x: z.number(), y: z.number(), tile: z.number().int().min(0).max(7) }).strict()
+// C11's terrain event. `terrain_changed` stays folded so recorded C1-C10 logs replay; this one
+// carries where the cell came from and why, which is what a doctored log cannot fake.
+export const TileChanged = z.object({
+  x: z.number(), y: z.number(),
+  from: z.number().int().min(0).max(10),
+  to: z.number().int().min(0).max(10),
+  reason: z.enum(['paved', 'worn', 'overgrown', 'channel', 'seeded', 'grown', 'tilled', 'cleared']),
+  byId: z.string().optional(),
+}).strict()
+// The border strip is rolled from the `worldgen` stream at emission and travels in the
+// payload, so replay from genesis and replay from any snapshot reach the identical map.
+export const WorldGrown = z.object({
+  edge: z.enum(['n', 'e', 's', 'w']),
+  depth: z.number().int().positive(),
+  tiles: z.array(z.array(z.number().int().min(0).max(10))),
+}).strict()
+// The nightly bookkeeping of the trails: no payload, because the arithmetic is the same
+// everywhere and reading it out of the world is cheaper than writing it into the log.
+export const TrafficDecayed = z.object({}).strict()
 // The only road a world law travels. `value` is checked against TOGGLABLE_PATHS at fold.
 export const ConfigChanged = z.object({ path: z.string(), value: z.unknown() }).strict()

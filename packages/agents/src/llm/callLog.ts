@@ -4,6 +4,10 @@ export type LlmCallInsert = {
   agentId: string | null
   caller: string
   model: string
+  // Which of OpenRouter's back ends actually served it. Null when the answer did not say —
+  // and null is itself a finding, because a run cannot be attributed to a provider it
+  // cannot name (C11 R20).
+  provider: string | null
   inputTokens: number
   outputTokens: number
   cacheReadTokens: number
@@ -29,9 +33,11 @@ export function migrateLlmTables(db: Database.Database): void {
       cost_usd REAL NOT NULL,
       latency_ms INTEGER NOT NULL,
       ok INTEGER NOT NULL,
-      error TEXT
+      error TEXT,
+      provider TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_llm_calls_caller ON llm_calls(caller);
+    CREATE INDEX IF NOT EXISTS idx_llm_calls_provider ON llm_calls(provider);
     CREATE TABLE IF NOT EXISTS alerts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       ts INTEGER NOT NULL,
@@ -47,6 +53,10 @@ export function migrateLlmTables(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_llm_reservations_caller ON llm_reservations(caller);
   `)
+  // A ledger written before the column existed is still a ledger: add it in place rather
+  // than making every recorded run unreadable.
+  const cols = db.prepare('PRAGMA table_info(llm_calls)').all() as Array<{ name: string }>
+  if (!cols.some((c) => c.name === 'provider')) db.exec('ALTER TABLE llm_calls ADD COLUMN provider TEXT')
 }
 
 export function sumReserved(db: Database.Database, caller: string): number {
@@ -89,8 +99,8 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void 
   db.prepare(
     `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
-        reasoning_tokens, cost_usd, latency_ms, ok, error)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     Date.now(),
     call.agentId,
@@ -104,6 +114,7 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void 
     Math.round(call.latencyMs),
     call.ok ? 1 : 0,
     call.error,
+    call.provider,
   )
 }
 

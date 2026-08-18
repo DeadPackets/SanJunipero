@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { EventEnvelope, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { genesisState, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
+import { fireSystem } from './fire.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
 
@@ -201,5 +202,124 @@ describe('verb: extinguish', () => {
     expect(t1.state.structures.structure_1!.burning).toBe(false)
     const t2 = tickOnce(t1.state, CFG)
     expect(t2.events.map((e) => e.type)).not.toContain('structure_damaged')
+  })
+})
+
+describe('verb: douse', () => {
+  function withBucket(s: WorldState, charges: number, config = CFG): WorldState {
+    return fold(s, ev('item_spawned', {
+      id: 'item_1', kind: 'bucket', qty: 1, loc: { t: 'agent', id: 'a1' }, charges,
+    }, s.tick), config)
+  }
+  function burning(charges: number | null): WorldState {
+    const s = ignite(atTick(rowWorld(), 1), 'structure_1')
+    return charges === null ? s : withBucket(s, charges)
+  }
+
+  it('a full bucket against a burning wall puts it out and comes back empty', () => {
+    let s = burning(1)
+    const r = submitIntent(s, CFG, 'a1', 'douse', { x: 2, y: 2 })
+    if (!r.ok) throw new Error(r.reason)
+    for (const e of r.events) s = fold(s, ev(e.type, e.payload, s.tick), CFG)
+    const t = tickOnce(s, CFG)
+    expect(t.events).toContainEqual({
+      type: 'fire_extinguished',
+      payload: { structureId: 'structure_1', cause: 'doused', x: 2, y: 2, agentId: 'a1' },
+    })
+    expect(t.events).toContainEqual({ type: 'item_filled', payload: { itemId: 'item_1', charges: 0 } })
+    expect(t.state.structures.structure_1!.burning).toBe(false)
+    expect(t.state.items.item_1!.charges).toBe(0)
+  })
+
+  it('refuses an empty bucket, no bucket at all, unburnt ground, and a fire two tiles off', () => {
+    const empty = submitIntent(burning(0), CFG, 'a1', 'douse', { x: 2, y: 2 })
+    expect(empty.ok).toBe(false)
+    if (!empty.ok) expect(empty.reason).toBe('the bucket is empty')
+    expect(submitIntent(burning(null), CFG, 'a1', 'douse', { x: 2, y: 2 }).ok).toBe(false)
+    expect(submitIntent(burning(1), CFG, 'a1', 'douse', { x: 4, y: 2 }).ok).toBe(false) // structure_2 is not alight
+    const away = burning(1)
+    const stepped = { ...away, agents: { a1: { ...away.agents.a1!, x: 0, y: 0 } } }
+    expect(submitIntent(stepped, CFG, 'a1', 'douse', { x: 2, y: 2 }).ok).toBe(false)
+  })
+
+  it('a recorded C9 dousing still folds, and the widened payload survives the envelope', () => {
+    const s = ignite(atTick(rowWorld(), 1), 'structure_1')
+    const old = fold(s, ev('fire_extinguished', { structureId: 'structure_1', cause: 'rain' }, s.tick), CFG)
+    expect(old.structures.structure_1!.burning).toBe(false)
+    const wide = { structureId: 'structure_1', cause: 'doused', x: 2, y: 2, agentId: 'a1' }
+    const parsed = EventEnvelope.parse({ seq: 1, tick: 1, type: 'fire_extinguished', payload: wide })
+    expect(parsed.payload).toEqual(wide)
+    expect(fold(s, parsed as SimEvent, CFG).structures.structure_1!.burning).toBe(false)
+    // The one field fold cannot do without: a dousing has to name what stopped burning.
+    expect(() => fold(s, ev('fire_extinguished', { cause: 'doused', x: 2, y: 2 }, s.tick), CFG))
+      .toThrow(/no structure/i)
+  })
+})
+
+// ------------------------------------------------- Task 25: a carried flame is a fire risk
+describe('a carried flame is both the light and the hazard', () => {
+  const SURE: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, light: { fireRiskPerTick: 1 } })
+  const OFF: SimConfig = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 }, light: { fireRiskPerTick: 1, enabled: false },
+  })
+
+  // A torch on the ground at (1,2), which touches the flammable hut structure_1 at (2,2) and
+  // lies inside the unburnable structure_5 at (0,2).
+  const torch = (config: SimConfig): WorldState => {
+    const s = atTick(rowWorld(config), 1)
+    return fold(s, ev('item_spawned', {
+      id: 'item_1', kind: 'torch', qty: 1, loc: { t: 'tile', x: 1, y: 2 },
+    }, s.tick), config)
+  }
+  const alight = (config: SimConfig, until: number): WorldState => {
+    const s = torch(config)
+    return fold(s, ev('item_lit', { itemId: 'item_1', burnsUntilTick: until }, s.tick), config)
+  }
+
+  it('sets the hut it lies against alight on a certain roll, and nothing else', () => {
+    const r = tickOnce(alight(SURE, 9999), SURE)
+    expect(r.events).toContainEqual({
+      type: 'fire_ignited', payload: { structureId: 'structure_1', cause: 'a carried flame' },
+    })
+    expect(burningIds(r.state)).toEqual(['structure_1'])
+  })
+
+  it('never rolls for a torch nobody struck, or one whose fuel is gone', () => {
+    expect(burningIds(tickOnce(torch(SURE), SURE).state)).toEqual([])
+    expect(burningIds(tickOnce(alight(SURE, 0), SURE).state)).toEqual([])
+  })
+
+  it('with the light law off, a lit torch is just a light', () => {
+    expect(burningIds(tickOnce(alight(OFF, 9999), OFF).state)).toEqual([])
+  })
+})
+
+// C11 R17: `sources` is captured before the spread loop and every emit inside it folds, so a
+// source can be gone by the time its turn comes. The non-null assertion made that a crash.
+describe('fire_spread: a source that is gone by its turn is skipped, not crashed on', () => {
+  it('survives a structure removed mid-loop, and still spreads from the ones still standing', () => {
+    let state = ignite(ignite(rowWorld(), 'structure_1'), 'structure_3')
+    const emitted: Array<{ type: string; payload: unknown }> = []
+    const ctx = {
+      config: { ...CFG, fire: { ...CFG.fire, spreadChancePerTickAdjacent: 1 } },
+      rng: new RngStreams('ghost'),
+      state: () => state,
+      emit: (type: string, payload: unknown) => {
+        emitted.push({ type, payload })
+        // The hazard, made to happen: the first spread takes the second source with it.
+        if (type === 'fire_spread' && state.structures.structure_3 !== undefined) {
+          const { structure_3: _gone, ...rest } = state.structures
+          state = { ...state, structures: rest }
+          return
+        }
+        state = fold(state, ev(type, payload, state.tick), CFG)
+      },
+    }
+    expect(() => fireSystem(ctx)).not.toThrow()
+    // The fire that was still standing did spread; the ghost was passed over in silence.
+    expect(emitted.some((e) => e.type === 'fire_spread'
+      && (e.payload as { fromId: string }).fromId === 'structure_1')).toBe(true)
+    expect(emitted.some((e) => e.type === 'fire_spread'
+      && (e.payload as { fromId: string }).fromId === 'structure_3')).toBe(false)
   })
 })

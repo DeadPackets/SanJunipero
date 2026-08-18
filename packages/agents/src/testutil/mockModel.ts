@@ -11,6 +11,8 @@ export type ScriptedResponse = {
   }
   fail?: boolean
   servedModelId?: string
+  // Which OpenRouter back end answered, as OpenRouter reports it (C11 R20).
+  provider?: string
 }
 
 export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
@@ -35,6 +37,9 @@ export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
         },
         warnings: [],
         ...(scripted.servedModelId === undefined ? {} : { response: { modelId: scripted.servedModelId } }),
+        ...(scripted.provider === undefined
+          ? {}
+          : { providerMetadata: { openrouter: { provider: scripted.provider } } }),
       }
     },
   })

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   CHRONICLE_FALLBACK_ICON, CHRONICLE_ICONS, CHRONICLE_TYPES, CHRONICLE_WEIGHTS,
-  ChronicleEntrySchema, ChronicleResponseSchema, chronicleIcon, chronicleLine,
+  ChronicleEntrySchema, ChronicleResponseSchema, FAR_BANK_PHRASE, NOT_CHRONICLED,
+  UNNAMED_CONSTRUCT_COPY, chronicleIcon, chronicleLine, constructLine, faunaSightingLine,
   type ChronicleLookup,
 } from './chronicle.js'
 import type { SimEvent } from './events.js'
@@ -56,7 +58,7 @@ describe('ChronicleEntrySchema', () => {
 describe('chronicleLine', () => {
   it('writes a death, a birth and a night kept as the town would tell them', () => {
     expect(chronicleLine(ev('agent_died', { agentId: 'a1', cause: 'hunger' }), look))
-      .toBe('Rahel has died (hunger).')
+      .toBe('Rahel starved.')
     expect(chronicleLine(ev('agent_born', { id: 'a3', name: 'Mira', motherId: 'a1', fatherId: 'a2' }), look))
       .toBe('Mira was born.')
     expect(chronicleLine(ev('co_slept', { aId: 'a1', bId: 'a2', day: 3 }), look))
@@ -74,8 +76,8 @@ describe('chronicleLine', () => {
   })
 
   it('names an unknown id rather than inventing a person or a building', () => {
-    expect(chronicleLine(ev('agent_died', { agentId: 'ghost', cause: 'cold' }), look))
-      .toBe('ghost has died (cold).')
+    expect(chronicleLine(ev('agent_died', { agentId: 'ghost', cause: 'unrecorded' }), look))
+      .toBe('ghost has died.')
     expect(chronicleLine(ev('structure_completed', { id: 'gone' }), look)).toBe('The building is finished.')
   })
 
@@ -99,5 +101,138 @@ describe('chronicleLine', () => {
       chronicleLine(ev('structure_completed', { id: 's1' }), look),
     ]
     for (const l of lines) expect(l).not.toMatch(/\b(ai|llm|model|prompt|token|agent)\b/i)
+  })
+})
+
+// The nine ways the engine can name a death (mortality.ts DEATH_CAUSES), each with the
+// sentence the town would use. Held here rather than imported: shared sits under the engine.
+const DEATH_CAUSES = [
+  'injury', 'poison', 'illness', 'fatigue', 'exposure', 'hunger', 'thirst', 'slain', 'old_age',
+]
+
+describe('the C11 vocabulary', () => {
+  it('covers every event the fold knows — weighted, or silent on purpose', () => {
+    const fold = readFileSync(new URL('../../engine/src/fold.ts', import.meta.url), 'utf8')
+    const types = [...fold.matchAll(/case '([a-z_]+)':/g)].map((m) => m[1]!)
+    expect(types.length).toBeGreaterThan(70)
+    for (const type of types) {
+      const known = CHRONICLE_WEIGHTS[type] !== undefined || NOT_CHRONICLED.has(type)
+      expect(known, `${type} is neither chronicled nor deliberately silent`).toBe(true)
+    }
+  })
+
+  it('never both weighs and silences the same event', () => {
+    for (const type of Object.keys(CHRONICLE_WEIGHTS)) expect(NOT_CHRONICLED.has(type), type).toBe(false)
+  })
+
+  it('gives every way of dying its own human sentence', () => {
+    const said = DEATH_CAUSES.map((cause) => chronicleLine(ev('agent_died', { agentId: 'a1', cause }), look))
+    expect(new Set(said).size).toBe(DEATH_CAUSES.length)
+    for (const line of said) {
+      expect(line).toMatch(/^Rahel /)
+      expect(line).not.toMatch(/[0-9]/)
+    }
+    expect(chronicleLine(ev('agent_died', { agentId: 'a1', cause: 'exposure' }), look)).toBe('Rahel froze.')
+  })
+
+  it('says the body plainly — hurt, ill, poisoned, worse, mending, cared for, buried', () => {
+    expect(chronicleLine(ev('agent_harmed', { agentId: 'a1', amount: 12, source: 'attack' }), look))
+      .toBe('Rahel was hurt.')
+    expect(chronicleLine(ev('agent_afflicted', { agentId: 'a1', kind: 'illness', severity: 1 }), look))
+      .toBe('Rahel has fallen ill.')
+    expect(chronicleLine(ev('agent_afflicted', { agentId: 'a1', kind: 'poison', severity: 1 }), look))
+      .toBe('Rahel was poisoned.')
+    expect(chronicleLine(ev('affliction_worsened', { agentId: 'a1', kind: 'illness', severity: 2 }), look))
+      .toBe('Rahel grows worse.')
+    expect(chronicleLine(ev('affliction_recovered', { agentId: 'a1', kind: 'illness' }), look))
+      .toBe('Rahel is on the mend.')
+    expect(chronicleLine(ev('agent_tended', { agentId: 'a1', tenderId: 'a2' }), look))
+      .toBe('Tomas cared for Rahel.')
+    expect(chronicleLine(ev('grave_placed', { id: 'g1', agentId: 'a1', name: 'Rahel', x: 1, y: 1 }), look))
+      .toBe('A grave was made for Rahel.')
+  })
+
+  it('speaks of the work: a road, a channel, a felled tree, a fire beaten back, a beast taken', () => {
+    expect(chronicleLine(ev('tile_changed', { x: 1, y: 1, from: 0, to: 7, reason: 'paved', byId: 'a1' }), look))
+      .toBe('Rahel laid a stretch of road.')
+    expect(chronicleLine(ev('tile_changed', { x: 1, y: 1, from: 0, to: 2, reason: 'channel', byId: 'a1' }), look))
+      .toBe('A channel now carries water to the fields.')
+    expect(chronicleLine(ev('tile_changed', { x: 1, y: 1, from: 3, to: 0, reason: 'cleared', byId: 'a1' }), look))
+      .toBe('Rahel felled a tree.')
+    expect(chronicleLine(ev('fire_extinguished', { structureId: 's1', cause: 'doused', agentId: 'a1' }), look))
+      .toBe('Rahel beat back the fire.')
+    expect(chronicleLine(ev('fauna_killed', { id: 'f1', kind: 'deer', x: 1, y: 1, byId: 'a1' }), look))
+      .toBe('Rahel brought down a deer.')
+    expect(chronicleLine(ev('world_grown', { edge: 'n', depth: 4, tiles: [[0]] }), look))
+      .toBe('The world is wider than it was.')
+  })
+
+  it('keeps the coined word whole, and says how it reached whoever noticed', () => {
+    expect(chronicleLine(ev('agent_expressed', { agentId: 'a1', verb: 'dance', x: 1, y: 1, sense: 'sight' }), look))
+      .toBe('Rahel was seen to dance.')
+    expect(chronicleLine(ev('agent_expressed', { agentId: 'a1', verb: 'sing', x: 1, y: 1, sense: 'sound' }), look))
+      .toBe('Rahel was heard to sing.')
+    expect(chronicleLine(ev('agent_expressed', { agentId: 'a1', verb: 'mourn', targetId: 'a2', x: 1, y: 1 }), look))
+      .toBe('Rahel was seen to mourn for Tomas.')
+  })
+
+  it('says nothing at all for the ground wearing, the rain putting a fire out, or a body drinking', () => {
+    for (const reason of ['worn', 'overgrown', 'seeded', 'grown', 'tilled']) {
+      expect(chronicleLine(ev('tile_changed', { x: 1, y: 1, from: 0, to: 8, reason }), look), reason).toBeNull()
+    }
+    expect(chronicleLine(ev('fire_extinguished', { structureId: 's1', cause: 'rain' }), look)).toBeNull()
+    for (const type of ['agent_drank', 'item_filled', 'fauna_moved', 'forageable_regrown']) {
+      expect(chronicleLine(ev(type, {}), look), type).toBeNull()
+    }
+  })
+
+  it('reads no temperature anywhere — the cold is a cause of death, never a number', () => {
+    expect(NOT_CHRONICLED.has('weather_changed')).toBe(true)
+    expect(NOT_CHRONICLED.has('need_changed')).toBe(true)
+    expect(chronicleLine(ev('weather_changed', { kind: 'snow', temperatureC: -12 }), look)).toBeNull()
+  })
+
+  it('phrases a herd on the far bank as seen and not as had', () => {
+    expect(faunaSightingLine('deer', true)).toBe(`a deer ${FAR_BANK_PHRASE}`)
+    expect(faunaSightingLine('deer', false)).toBe('a deer')
+    expect(FAR_BANK_PHRASE).toBe('across the river')
+  })
+
+  it('tells a gathering by the name they gave it, or says plainly that they have not', () => {
+    expect(constructLine({ name: 'the Long Turning' }))
+      .toBe('They have taken to gathering, and they call it the Long Turning.')
+    expect(constructLine({ name: null })).toContain(UNNAMED_CONSTRUCT_COPY)
+    expect(constructLine({ name: null })).not.toMatch(/festival|council|market|faith/i)
+  })
+
+  it('never names the machinery, a stat, or a bare number, in any line it can write', () => {
+    const lines = [
+      ...DEATH_CAUSES.map((cause) => chronicleLine(ev('agent_died', { agentId: 'a1', cause }), look)),
+      chronicleLine(ev('agent_harmed', { agentId: 'a1', amount: 12, source: 'fire' }), look),
+      chronicleLine(ev('agent_afflicted', { agentId: 'a1', kind: 'illness', severity: 3 }), look),
+      chronicleLine(ev('affliction_worsened', { agentId: 'a1', kind: 'illness', severity: 3 }), look),
+      chronicleLine(ev('affliction_recovered', { agentId: 'a1', kind: 'illness' }), look),
+      chronicleLine(ev('agent_tended', { agentId: 'a1', tenderId: 'a2' }), look),
+      chronicleLine(ev('grave_placed', { id: 'g1', agentId: 'a1', name: 'Rahel', x: 1, y: 1 }), look),
+      chronicleLine(ev('fire_extinguished', { structureId: 's1', cause: 'doused', agentId: 'a1' }), look),
+      chronicleLine(ev('tile_changed', { x: 1, y: 1, from: 0, to: 7, reason: 'paved', byId: 'a1' }), look),
+      chronicleLine(ev('world_grown', { edge: 'n', depth: 4, tiles: [[0]] }), look),
+      chronicleLine(ev('fauna_killed', { id: 'f1', kind: 'deer', x: 1, y: 1, byId: 'a1' }), look),
+      chronicleLine(ev('agent_expressed', { agentId: 'a1', verb: 'dance', x: 1, y: 1 }), look),
+      constructLine({ name: null }),
+    ]
+    for (const line of lines) {
+      expect(line).not.toBeNull()
+      expect(line).not.toMatch(/\b(hp|severity|affliction|config|tier|roll|construct|milestone)\b/i)
+      expect(line).not.toMatch(/[0-9]/)
+      expect(line).not.toMatch(/\b(ai|llm|model|prompt|token)\b/i)
+    }
+  })
+
+  it('gives every new weighted type an icon, and holds the two tables together', () => {
+    expect(Object.keys(CHRONICLE_WEIGHTS).sort()).toEqual(Object.keys(CHRONICLE_ICONS).sort())
+    expect([...CHRONICLE_TYPES].sort()).toEqual(Object.keys(CHRONICLE_WEIGHTS).sort())
+    expect(chronicleIcon('tile_changed')).toBe('road')
+    expect(chronicleIcon('never_heard_of_it')).toBe(CHRONICLE_FALLBACK_ICON)
   })
 })

@@ -3,7 +3,7 @@ import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
-import { FOOD_KINDS, VERBS } from './verbs.js'
+import { FOOD_KINDS, nutritionOf, VERBS } from './verbs.js'
 import { RngStreams } from './rng.js'
 import { createWorldTick, type WorldTickResult } from './worldTick.js'
 
@@ -114,9 +114,14 @@ describe('verbs: sleep / wake / eat', () => {
   })
 })
 
+// Noon, so the equalization is what runs: a spring midnight is cold enough to be exposure,
+// and from C11 Task 22 the cold owns warmth whenever it has the body (warmthSystem).
+// Off the hour as well as off the night, so the weather roll leaves the sky as the row set it.
+const atNoon = (s: WorldState): WorldState => ({ ...s, tick: 700 })
+
 describe('worldTick: needs system', () => {
   it('one tick of awake decay: hunger, energy, social fall by config; warmth equalizes', () => {
-    const r = tickOnce(makeWorld())
+    const r = tickOnce(atNoon(makeWorld()))
     const n = r.state.agents.a1!.needs
     expect(n.hunger).toBe(95)
     expect(n.energy).toBe(96)
@@ -126,7 +131,7 @@ describe('worldTick: needs system', () => {
   })
 
   it('warmth target clamps to 100 in extreme heat', () => {
-    let s = makeWorld()
+    let s = atNoon(makeWorld())
     s = { ...s, weather: { kind: 'sunny', temperatureC: 40 } } // raw target 110 → 100
     s = patchAgent(s, 'a1', { needs: { hunger: 100, energy: 100, warmth: 60, social: 100 } })
     const r = tickOnce(s)
@@ -171,8 +176,8 @@ describe('worldTick: sleep and eat flows', () => {
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     const t1 = tickOnce(s)
-    // decay first (20−5), then eat completes (+60)
-    expect(t1.state.agents.a1!.needs.hunger).toBe(75)
+    // decay first (20−5), then eat completes: berries are half a meal (C11 Task 27), so +30.
+    expect(t1.state.agents.a1!.needs.hunger).toBe(15 + FAST.needs.eatRestoreHunger * nutritionOf(FAST, 'berries'))
     expect(t1.state.items.item_1!.qty).toBe(1)
     expect(t1.state.agents.a1!.activity).toBeNull()
 
@@ -277,7 +282,7 @@ describe('worldTick: death', () => {
     s = { ...s, tick: 10 }
     const r = createWorldTick(FAST, new RngStreams('t'))(s)
     const died = r.events.find((e) => e.type === 'agent_died')
-    expect(died?.payload).toEqual({ agentId: 'a1', cause: 'starvation' })
+    expect(died?.payload).toEqual({ agentId: 'a1', cause: 'hunger' })
   })
 })
 

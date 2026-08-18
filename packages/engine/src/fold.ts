@@ -1,19 +1,27 @@
 import { DAYS_PER_YEAR, DEFAULT_CONFIG, MINUTES_PER_DAY, SPAWN_AGE_YEARS, type SimConfig, type SimEvent } from '@sj/shared'
-import type { TileId, WorldState } from './state.js'
+import { thirstOf, type Affliction, type AgentBody, type TileId, type WorldState } from './state.js'
 import {
   ActionCompleted, ActionInterrupted, ActionProgressed, ActionStarted,
+  AfflictionRecovered, AfflictionWorsened, AgentAfflicted, AgentHarmed,
   AgentAged, AgentBorn, AgentCollapsed, AgentConceived, AgentDied, AgentFellIll, AgentInfected,
   AgentInjured, AgentMoved,
   AgentEntered, AgentExited,
+  AgentExpressed,
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
-  FireExtinguished, FireIgnited, FireSpread, HpChanged,
-  ItemBroke, ItemMoved, ItemOwnerChanged, ItemQtyChanged, ItemSpawned, ItemSpoiled, ItemTaken,
+  AgentDrank, FireExtinguished, FireIgnited, FireSpread, GravePlaced, HpChanged, ThirstChanged,
+  ItemBroke, ItemBurnedOut, ItemEquipped, ItemFilled, ItemLit, ItemMoved, ItemOwnerChanged, ItemQtyChanged,
+  ItemSnuffed, ItemSpawned, ItemSpoiled, ItemTaken, ItemUnequipped, StructureFueled,
   ConfigChanged,
+  FaunaKilled, FaunaMoved, FaunaSpawned, FaunaStockChanged,
+  ForageableDepleted, ForageableRegrown, ForageableSpawned, ForageableStockChanged,
   ItemTextChanged, ItemWorn, MysteryEvent, NeedChanged,
   SkillGained, StructureCompleted, StructureDamaged, StructureDestroyed, StructureInscribed, StructurePlanned,
-  StructureProgressed, TerrainChanged, TickAdvanced, WeatherChanged, WildlifeChanged,
+  StructureProgressed, TerrainChanged, TickAdvanced, TileChanged, TrafficDecayed, WeatherChanged, WildlifeChanged,
+  WorldGrown,
 } from './events.def.js'
+import { countsAsFootfall, decayTraffic, fromTrafficKey, quietPathsAt, trafficKey } from './systems/desirePaths.js'
+import { fromSaplingKey, saplingKey } from './systems/regrowth.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { occupantsOf } from './interiors.js'
 import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
@@ -23,12 +31,24 @@ import { WalkParams } from './verbs.js'
 
 const clamp = (v: number) => Math.max(0, Math.min(100, v))
 
+// The sapling tile id, named here because the fold is the only place outside the regrowth
+// system that has to recognise one.
+const SAPLING_TILE = 9
+
 // Counter law: entity-creating events carry their id; the counter only ever rises.
 function bumpCounter(counters: WorldState['counters'], id: string): WorldState['counters'] {
   const m = /_(\d+)$/.exec(id)
   if (!m) return counters
   const next = Number(m[1]) + 1
   return next > counters.nextEntityId ? { ...counters, nextEntityId: next } : counters
+}
+
+// A meal or a night's sleep is what "recovered" means: the collapse ladder starts over,
+// and the counter goes back to absent so the body hashes like one that never fell.
+function rested(a: AgentBody): AgentBody {
+  if (a.collapsesWithoutRecovery === undefined && a.coldTicksSinceRecovery === undefined) return a
+  const { collapsesWithoutRecovery: _c, coldTicksSinceRecovery: _x, ...rest } = a
+  return rest
 }
 
 // Emit-free state repair is not allowed: a destroyer must emit agent_exited first,
@@ -70,7 +90,11 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = AgentMoved.parse(event.payload)
       const a = state.agents[p.id]
       if (!a) throw new Error(`agent_moved for unknown agent ${p.id}`)
-      return { ...state, agents: { ...state.agents, [p.id]: { ...a, x: p.x, y: p.y } } }
+      const agents = { ...state.agents, [p.id]: { ...a, x: p.x, y: p.y } }
+      // A trail is worn by feet, not by arriving: only a body mid-walk marks the ground.
+      if (!countsAsFootfall(state, p.id, config)) return { ...state, agents }
+      const key = trafficKey(p.x, p.y)
+      return { ...state, agents, traffic: { ...state.traffic, [key]: (state.traffic?.[key] ?? 0) + 1 } }
     }
     case 'need_changed': {
       const p = NeedChanged.parse(event.payload)
@@ -83,7 +107,15 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (collapsedSinceTick !== null
         && needs.hunger >= config.needs.collapseThreshold && needs.energy >= config.needs.collapseThreshold
         && a.hp >= config.health.collapseHp) collapsedSinceTick = null
-      return { ...state, agents: { ...state.agents, [p.id]: { ...a, needs, zeroHungerSinceTick, collapsedSinceTick } } }
+      // A tick the cold billed to this body is remembered until it eats or sleeps: it is the
+      // difference between dying tired and dying cold, and nothing else records it.
+      const chilled = p.reason === 'exposure'
+        ? { coldTicksSinceRecovery: (a.coldTicksSinceRecovery ?? 0) + 1 }
+        : {}
+      return {
+        ...state,
+        agents: { ...state.agents, [p.id]: { ...a, needs, zeroHungerSinceTick, collapsedSinceTick, ...chilled } },
+      }
     }
     case 'item_spawned': {
       const p = ItemSpawned.parse(event.payload)
@@ -98,6 +130,7 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
             ...(p.crafterMark !== undefined ? { crafterMark: p.crafterMark } : {}),
             ...(p.spoilage !== undefined ? { spoilage: p.spoilage } : {}),
             ...(p.durability !== undefined ? { durability: p.durability } : {}),
+            ...(p.charges !== undefined ? { charges: p.charges } : {}),
             loc: p.loc,
           },
         },
@@ -110,8 +143,20 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (!item) throw new Error(`item_owner_changed for unknown item ${p.id}`)
       return { ...state, items: { ...state.items, [p.id]: { ...item, owner: p.owner } } }
     }
+    case 'item_filled': {
+      const p = ItemFilled.parse(event.payload)
+      const item = state.items[p.itemId]
+      if (!item) throw new Error(`item_filled for unknown item ${p.itemId}`)
+      return { ...state, items: { ...state.items, [p.itemId]: { ...item, charges: p.charges } } }
+    }
     case 'item_taken': {
       ItemTaken.parse(event.payload)
+      return state
+    }
+    // The same class as a taking: witnessed, recorded, and folded to nothing. What a dance
+    // means is the town's to decide, and the world state is not where that lives.
+    case 'agent_expressed': {
+      AgentExpressed.parse(event.payload)
       return state
     }
     case 'item_worn': {
@@ -128,6 +173,38 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const { [p.id]: _, ...items } = state.items
       return { ...state, items }
     }
+    // A flame and its fuel are the same number wearing two faces: alight it is the tick the
+    // torch goes out, snuffed it is how many ticks are left in it.
+    case 'item_lit': {
+      const p = ItemLit.parse(event.payload)
+      const item = state.items[p.itemId]
+      if (!item) throw new Error(`item_lit for unknown item ${p.itemId}`)
+      const { fuelTicks: _, ...rest } = item
+      return { ...state, items: { ...state.items, [p.itemId]: { ...rest, litUntilTick: p.burnsUntilTick } } }
+    }
+    case 'item_snuffed': {
+      const p = ItemSnuffed.parse(event.payload)
+      const item = state.items[p.itemId]
+      if (!item) throw new Error(`item_snuffed for unknown item ${p.itemId}`)
+      if (item.litUntilTick === undefined) throw new Error(`item_snuffed for unlit item ${p.itemId}`)
+      const { litUntilTick, ...rest } = item
+      return {
+        ...state,
+        items: { ...state.items, [p.itemId]: { ...rest, fuelTicks: Math.max(0, litUntilTick - event.tick) } },
+      }
+    }
+    case 'item_burned_out': {
+      const p = ItemBurnedOut.parse(event.payload)
+      if (!state.items[p.itemId]) throw new Error(`item_burned_out for unknown item ${p.itemId}`)
+      const { [p.itemId]: _, ...items } = state.items
+      return { ...state, items }
+    }
+    case 'structure_fueled': {
+      const p = StructureFueled.parse(event.payload)
+      const s = state.structures[p.structureId]
+      if (!s) throw new Error(`structure_fueled for unknown structure ${p.structureId}`)
+      return { ...state, structures: { ...state.structures, [p.structureId]: { ...s, fueledUntilTick: p.burnsUntilTick } } }
+    }
     case 'item_spoiled': {
       const p = ItemSpoiled.parse(event.payload)
       if (!state.items[p.id]) throw new Error(`item_spoiled for unknown item ${p.id}`)
@@ -138,7 +215,31 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = ItemMoved.parse(event.payload)
       const item = state.items[p.id]
       if (!item) throw new Error(`item_moved for unknown item ${p.id}`)
-      return { ...state, items: { ...state.items, [p.id]: { ...item, loc: p.loc } } }
+      const items = { ...state.items, [p.id]: { ...item, loc: p.loc } }
+      // A cloak given away, dropped, or fallen off a body on the ground is off the body:
+      // the slot cannot hold what the hands no longer have.
+      const wearerId = item.loc.t === 'agent' ? item.loc.id : undefined
+      const wearer = wearerId === undefined ? undefined : state.agents[wearerId]
+      if (wearer === undefined || wearer.equipped?.body !== p.id) return { ...state, items }
+      const { equipped: _, ...bare } = wearer
+      return { ...state, items, agents: { ...state.agents, [wearerId!]: bare } }
+    }
+    // The body slot: one thing at a time, and absent again the moment it comes off, so a
+    // town that never sewed anything hashes exactly as it always did.
+    case 'item_equipped': {
+      const p = ItemEquipped.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`item_equipped for unknown agent ${p.agentId}`)
+      if (!state.items[p.itemId]) throw new Error(`item_equipped for unknown item ${p.itemId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, equipped: { [p.slot]: p.itemId } } } }
+    }
+    case 'item_unequipped': {
+      const p = ItemUnequipped.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`item_unequipped for unknown agent ${p.agentId}`)
+      if (a.equipped?.body !== p.itemId) throw new Error(`item_unequipped: ${p.agentId} is not wearing ${p.itemId}`)
+      const { equipped: _, ...bare } = a
+      return { ...state, agents: { ...state.agents, [p.agentId]: bare } }
     }
     case 'item_qty_changed': {
       const p = ItemQtyChanged.parse(event.payload)
@@ -235,6 +336,8 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
     }
     case 'fire_extinguished': {
       const p = FireExtinguished.parse(event.payload)
+      // The place and the hands are colour; the structure is the fact the fold cannot do without.
+      if (p.structureId === undefined) throw new Error('fire_extinguished names no structure')
       const s = state.structures[p.structureId]
       if (!s) throw new Error(`fire_extinguished for unknown structure ${p.structureId}`)
       return { ...state, structures: { ...state.structures, [p.structureId]: { ...s, burning: false, burnTicks: 0 } } }
@@ -265,7 +368,17 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = ActionCompleted.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`action_completed for unknown agent ${p.agentId}`)
-      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, activity: null } } }
+      const body = p.verb === 'eat' ? rested(a) : a
+      // A meal is remembered by kind for as long as the variety window is wide, and the
+      // remembering happens before the belly fills — the kind just eaten counts toward it.
+      const kind = p.verb === 'eat' ? p.results?.['kind'] : undefined
+      if (typeof kind !== 'string' || !config.foodVariety.enabled) {
+        return { ...state, agents: { ...state.agents, [p.agentId]: { ...body, activity: null } } }
+      }
+      const day = Math.floor(event.tick / MINUTES_PER_DAY)
+      const recentFoods = [...(body.recentFoods ?? []), { kind, day }]
+        .filter((m) => day - m.day < config.foodVariety.windowDays)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...body, recentFoods, activity: null } } }
     }
     case 'action_interrupted': {
       const p = ActionInterrupted.parse(event.payload)
@@ -290,7 +403,7 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = AgentSlept.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_slept for unknown agent ${p.agentId}`)
-      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, asleep: true } } }
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...rested(a), asleep: true } } }
     }
     case 'agent_entered': {
       const p = AgentEntered.parse(event.payload)
@@ -312,11 +425,16 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (!a) throw new Error(`agent_spoke for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, lastSpokeTick: event.tick } } }
     }
+    // The ladder is counted here and climbed by mortality.ts. Gated on the flag so a world
+    // with mortality off keeps the pre-C11 body shape, hash and all.
     case 'agent_collapsed': {
       const p = AgentCollapsed.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_collapsed for unknown agent ${p.agentId}`)
-      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, collapsedSinceTick: event.tick } } }
+      const rung = config.mortality.enabled
+        ? { collapsesWithoutRecovery: (a.collapsesWithoutRecovery ?? 0) + 1 }
+        : {}
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, collapsedSinceTick: event.tick, ...rung } } }
     }
     case 'agent_conceived': {
       const p = AgentConceived.parse(event.payload)
@@ -400,13 +518,15 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       if (!a) throw new Error(`agent_died for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, alive: false, asleep: false, activity: null } } }
     }
+    // The wound on the record, and only that: the hp it costs comes off through the
+    // `agent_harmed` the same blow emits, which is the one event that can name the hand
+    // behind it. Two events, one subtraction (C11 R16).
     case 'agent_injured': {
       const p = AgentInjured.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_injured for unknown agent ${p.agentId}`)
-      const hp = Math.max(0, a.hp - config.health.injuryDamage[p.kind])
       const injuries = [...a.injuries, { kind: p.kind, day: Math.floor(event.tick / MINUTES_PER_DAY) }]
-      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, hp, injuries } } }
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, injuries } } }
     }
     case 'agent_infected': {
       const p = AgentInfected.parse(event.payload)
@@ -431,6 +551,94 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_tended for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, tendedTick: event.tick } } }
+    }
+    case 'agent_harmed': {
+      const p = AgentHarmed.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_harmed for unknown agent ${p.agentId}`)
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, hp: Math.max(0, a.hp - p.amount) } } }
+    }
+    // A second dose of the same thing is the same illness, worse: severity sums and the clock
+    // keeps its original start, so "how long has she been ill" survives the second exposure.
+    case 'agent_afflicted': {
+      const p = AgentAfflicted.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_afflicted for unknown agent ${p.agentId}`)
+      const prev = a.afflictions ?? []
+      const existing = prev.find((x) => x.kind === p.kind)
+      const sourceId = existing?.sourceId ?? p.sourceId
+      const merged: Affliction = {
+        kind: p.kind,
+        severity: (existing?.severity ?? 0) + p.severity,
+        sinceTick: existing?.sinceTick ?? event.tick,
+        ...(sourceId === undefined ? {} : { sourceId }),
+      }
+      const afflictions = [...prev.filter((x) => x.kind !== p.kind), merged].sort((l, r) => l.kind.localeCompare(r.kind))
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, afflictions } } }
+    }
+    case 'affliction_worsened': {
+      const p = AfflictionWorsened.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`affliction_worsened for unknown agent ${p.agentId}`)
+      if (!a.afflictions?.some((x) => x.kind === p.kind)) throw new Error(`affliction_worsened: ${p.agentId} has no ${p.kind}`)
+      const afflictions = a.afflictions.map((x) => (x.kind === p.kind ? { ...x, severity: p.severity } : x))
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, afflictions } } }
+    }
+    // Losing the last one restores the absent shape, so a body that recovered fully hashes
+    // exactly like one that was never ill.
+    case 'affliction_recovered': {
+      const p = AfflictionRecovered.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`affliction_recovered for unknown agent ${p.agentId}`)
+      if (!a.afflictions?.some((x) => x.kind === p.kind)) throw new Error(`affliction_recovered: ${p.agentId} has no ${p.kind}`)
+      const afflictions = a.afflictions.filter((x) => x.kind !== p.kind)
+      if (afflictions.length > 0) {
+        return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, afflictions } } }
+      }
+      const { afflictions: _, ...body } = a
+      return { ...state, agents: { ...state.agents, [p.agentId]: body } }
+    }
+    // The one structure the world places and nobody builds: no builder, no owner, complete
+    // the moment it exists. Its shape comes from the same recipe table every building reads.
+    case 'grave_placed': {
+      const p = GravePlaced.parse(event.payload)
+      if (!state.agents[p.agentId]) throw new Error(`grave_placed for unknown agent ${p.agentId}`)
+      const row = config.structures.recipes.grave
+      if (row === undefined) throw new Error('grave_placed but structures.recipes has no grave row')
+      for (const s of Object.values(state.structures)) {
+        if (p.x < s.x + s.w && s.x < p.x + row.w && p.y < s.y + s.h && s.y < p.y + row.h) {
+          throw new Error(`grave_placed ${p.id} overlaps structure ${s.id}`)
+        }
+      }
+      return {
+        ...state,
+        structures: {
+          ...state.structures,
+          [p.id]: {
+            id: p.id, kind: 'grave', x: p.x, y: p.y, w: row.w, h: row.h,
+            hp: row.maxHp, maxHp: row.maxHp, flammable: row.flammable, stage: 'complete',
+            progressTicks: 0, builtBy: null, burning: false, burnTicks: 0,
+          },
+        },
+        counters: bumpCounter(state.counters, p.id),
+      }
+    }
+    case 'thirst_changed': {
+      const p = ThirstChanged.parse(event.payload)
+      const a = state.agents[p.id]
+      if (!a) throw new Error(`thirst_changed for unknown agent ${p.id}`)
+      return { ...state, agents: { ...state.agents, [p.id]: { ...a, thirst: clamp(thirstOf(a) + p.delta) } } }
+    }
+    case 'agent_drank': {
+      const p = AgentDrank.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_drank for unknown agent ${p.agentId}`)
+      const agents = { ...state.agents, [p.agentId]: { ...a, thirst: clamp(thirstOf(a) + config.thirst.drinkRestore) } }
+      if (p.source !== 'item' || p.itemId === undefined) return { ...state, agents }
+      const item = state.items[p.itemId]
+      if (!item) throw new Error(`agent_drank from unknown item ${p.itemId}`)
+      const charges = Math.max(0, (item.charges ?? 0) - 1)
+      return { ...state, agents, items: { ...state.items, [p.itemId]: { ...item, charges } } }
     }
     case 'hp_changed': {
       const p = HpChanged.parse(event.payload)
@@ -480,12 +688,185 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = WildlifeChanged.parse(event.payload)
       return { ...state, wildlife: { fish: p.fish ?? state.wildlife.fish, deer: p.deer ?? state.wildlife.deer } }
     }
+    // A body arrives, a batch of bodies move, a body is taken. The map is absent until the
+    // first arrival and absent again when the last one is gone, so a world with no herd
+    // hashes exactly as one that never had any.
+    case 'fauna_spawned': {
+      const p = FaunaSpawned.parse(event.payload)
+      if (state.fauna?.[p.id]) throw new Error(`fauna_spawned for existing fauna ${p.id}`)
+      return {
+        ...state,
+        fauna: {
+          ...state.fauna,
+          [p.id]: { kind: p.kind, x: p.x, y: p.y, alive: true, ...(p.stock === undefined ? {} : { stock: p.stock }) },
+        },
+        counters: bumpCounter(state.counters, p.id),
+      }
+    }
+    case 'fauna_moved': {
+      const p = FaunaMoved.parse(event.payload)
+      const fauna = { ...state.fauna }
+      for (const m of p.moves) {
+        const f = fauna[m.id]
+        if (!f) throw new Error(`fauna_moved for unknown fauna ${m.id}`)
+        fauna[m.id] = { ...f, x: m.x, y: m.y }
+      }
+      return { ...state, fauna }
+    }
+    case 'fauna_stock_changed': {
+      const p = FaunaStockChanged.parse(event.payload)
+      const f = state.fauna?.[p.id]
+      if (!f) throw new Error(`fauna_stock_changed for unknown fauna ${p.id}`)
+      return { ...state, fauna: { ...state.fauna, [p.id]: { ...f, stock: p.stock } } }
+    }
+    case 'fauna_killed': {
+      const p = FaunaKilled.parse(event.payload)
+      if (!state.fauna?.[p.id]) throw new Error(`fauna_killed for unknown fauna ${p.id}`)
+      const { [p.id]: _, ...fauna } = state.fauna
+      const next: WorldState = { ...state }
+      if (Object.keys(fauna).length > 0) next.fauna = fauna
+      else delete next.fauna
+      return next
+    }
+    case 'forageable_spawned': {
+      const p = ForageableSpawned.parse(event.payload)
+      if (state.forageables?.[p.id]) throw new Error(`forageable_spawned for existing node ${p.id}`)
+      return {
+        ...state,
+        forageables: {
+          ...state.forageables,
+          [p.id]: {
+            kind: p.kind, x: p.x, y: p.y, stock: p.stock,
+            ...(p.fullStock === undefined ? {} : { fullStock: p.fullStock }),
+          },
+        },
+        counters: bumpCounter(state.counters, p.id),
+      }
+    }
+    case 'forageable_stock_changed':
+    case 'forageable_depleted':
+    case 'forageable_regrown': {
+      const p = event.type === 'forageable_depleted'
+        ? { ...ForageableDepleted.parse(event.payload), stock: 0 }
+        : event.type === 'forageable_regrown'
+          ? ForageableRegrown.parse(event.payload)
+          : ForageableStockChanged.parse(event.payload)
+      const node = state.forageables?.[p.id]
+      if (!node) throw new Error(`${event.type} for unknown node ${p.id}`)
+      return { ...state, forageables: { ...state.forageables, [p.id]: { ...node, stock: p.stock } } }
+    }
     case 'terrain_changed': {
       const p = TerrainChanged.parse(event.payload)
       const row = state.terrain[p.y]
       if (!row || p.x < 0 || p.x >= row.length) throw new Error(`terrain_changed out of bounds (${p.x}, ${p.y})`)
       const terrain = state.terrain.map((r, y) => (y === p.y ? r.map((t, x) => (x === p.x ? (p.tile as TileId) : t)) : r))
       return { ...state, terrain }
+    }
+    case 'tile_changed': {
+      const p = TileChanged.parse(event.payload)
+      const row = state.terrain[p.y]
+      if (!row || p.x < 0 || p.x >= row.length) throw new Error(`tile_changed out of bounds (${p.x}, ${p.y})`)
+      if (row[p.x] !== p.from) throw new Error(`tile_changed from-mismatch at (${p.x}, ${p.y})`)
+      const terrain = state.terrain.map((r, y) => (y === p.y ? r.map((t, x) => (x === p.x ? (p.to as TileId) : t)) : r))
+      // The maturity clock is stamped where the seed fell and dropped however the sapling
+      // leaves — grown, chopped, paved or tilled. Nothing else is stored about it (G2, G4).
+      if (p.from !== SAPLING_TILE && p.to !== SAPLING_TILE) return { ...state, terrain }
+      const key = saplingKey(p.x, p.y)
+      const saplings = { ...state.saplings }
+      if (p.to === SAPLING_TILE) saplings[key] = Math.floor(event.tick / MINUTES_PER_DAY)
+      else delete saplings[key]
+      const next: WorldState = { ...state, terrain }
+      if (Object.keys(saplings).length > 0) next.saplings = saplings
+      else delete next.saplings
+      return next
+    }
+    // Growing north or west moves the origin, so every stored coordinate moves with it —
+    // inside this one fold, or a replay would find the town standing beside itself.
+    case 'world_grown': {
+      const p = WorldGrown.parse(event.payload)
+      const h = state.terrain.length
+      const w = state.terrain[0]!.length
+      const vertical = p.edge === 'n' || p.edge === 's'
+      const rows = vertical ? p.depth : h
+      const cols = vertical ? w : p.depth
+      if (p.tiles.length !== rows || p.tiles.some((r) => r.length !== cols)) {
+        throw new Error(`world_grown strip is ${p.tiles.length}x${p.tiles[0]?.length ?? 0}, not ${rows}x${cols}`)
+      }
+      const strip = p.tiles.map((r) => r.map((t) => t as TileId))
+      let terrain: TileId[][]
+      if (p.edge === 'n') terrain = [...strip, ...state.terrain]
+      else if (p.edge === 's') terrain = [...state.terrain, ...strip]
+      else if (p.edge === 'w') terrain = state.terrain.map((r, y) => [...strip[y]!, ...r])
+      else terrain = state.terrain.map((r, y) => [...r, ...strip[y]!])
+
+      const growths = (state.growths ?? 0) + 1
+
+      const dx = p.edge === 'w' ? p.depth : 0
+      const dy = p.edge === 'n' ? p.depth : 0
+      if (dx === 0 && dy === 0) return { ...state, terrain, growths }
+
+      // Params are translated on the `{x, y}` pair every landed coordinate-taking verb uses
+      // (walk, till, plant, build): a destination in the old frame is a different tile now.
+      const shiftParams = (params: Record<string, unknown>): Record<string, unknown> =>
+        typeof params['x'] === 'number' && typeof params['y'] === 'number'
+          ? { ...params, x: params['x'] + dx, y: params['y'] + dy }
+          : params
+      const agents = Object.fromEntries(Object.entries(state.agents).map(([id, a]) => [id, {
+        ...a, x: a.x + dx, y: a.y + dy,
+        ...(a.activity === null ? {} : {
+          activity: {
+            ...a.activity,
+            params: shiftParams(a.activity.params),
+            ...(a.activity.path === undefined
+              ? {}
+              : { path: a.activity.path.map(([x, y]): [number, number] => [x + dx, y + dy]) }),
+          },
+        }),
+      }]))
+      const structures = Object.fromEntries(
+        Object.entries(state.structures).map(([id, s]) => [id, { ...s, x: s.x + dx, y: s.y + dy }]))
+      const items = Object.fromEntries(Object.entries(state.items).map(([id, i]) => [id,
+        i.loc.t === 'tile' ? { ...i, loc: { ...i.loc, x: i.loc.x + dx, y: i.loc.y + dy } } : i]))
+      const crops = Object.fromEntries(
+        Object.entries(state.crops).map(([id, c]) => [id, { ...c, x: c.x + dx, y: c.y + dy }]))
+      const shiftKeys = (m: Record<string, number>): Record<string, number> =>
+        Object.fromEntries(Object.entries(m).map(([k, v]) => {
+          const at = fromTrafficKey(k)
+          return [trafficKey(at.x + dx, at.y + dy), v]
+        }))
+      const fauna = state.fauna === undefined ? undefined : Object.fromEntries(
+        Object.entries(state.fauna).map(([id, f]) => [id, { ...f, x: f.x + dx, y: f.y + dy }]))
+      const forageables = state.forageables === undefined ? undefined : Object.fromEntries(
+        Object.entries(state.forageables).map(([id, f]) => [id, { ...f, x: f.x + dx, y: f.y + dy }]))
+      // Saplings are stamped by coordinate, so they move with everything else — in this same
+      // fold, or a replay would find the wood growing back in the wrong place.
+      const shiftSaplings = (m: Record<string, number>): Record<string, number> =>
+        Object.fromEntries(Object.entries(m).map(([k, v]) => {
+          const at = fromSaplingKey(k)
+          return [saplingKey(at.x + dx, at.y + dy), v]
+        }))
+      return {
+        ...state, terrain, growths, agents, structures, items, crops,
+        ...(fauna === undefined ? {} : { fauna }),
+        ...(forageables === undefined ? {} : { forageables }),
+        ...(state.traffic === undefined ? {} : { traffic: shiftKeys(state.traffic) }),
+        ...(state.quietSince === undefined ? {} : { quietSince: shiftKeys(state.quietSince) }),
+        ...(state.saplings === undefined ? {} : { saplings: shiftSaplings(state.saplings) }),
+      }
+    }
+    // One night's worth of grass growing back through the ruts, and a fresh stamp on every
+    // trail the town has stopped using. Pure arithmetic over what the world already holds.
+    case 'traffic_decayed': {
+      TrafficDecayed.parse(event.payload)
+      const traffic: Record<string, number> = {}
+      for (const [key, value] of Object.entries(state.traffic ?? {})) traffic[key] = decayTraffic(value, config)
+      const quietSince = quietPathsAt(state, traffic, Math.floor(event.tick / MINUTES_PER_DAY), config)
+      const next: WorldState = { ...state }
+      if (Object.keys(traffic).length > 0) next.traffic = traffic
+      else delete next.traffic
+      if (Object.keys(quietSince).length > 0) next.quietSince = quietSince
+      else delete next.quietSince
+      return next
     }
     // The whitelist is the whole of the authority: an operator, a bug or a doctored
     // log can only ever move a dial this table already agreed to.

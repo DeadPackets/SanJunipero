@@ -16,9 +16,10 @@ import { buildAgentCtx, flattenIntent, wireArbiter, type SeamArbiter } from './a
 
 const AGENT = 'tamar'
 
-function world() {
+function world(opts: { well?: boolean; terrain?: TileId[][] } = {}) {
   const config = SimConfigSchema.parse({})
-  const terrain: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
+  const terrain: TileId[][] = opts.terrain
+    ?? Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
   const db = openDb(':memory:')
   const store = new EventStore(db)
   const rng = new RngStreams('arbiter-seam-test')
@@ -30,6 +31,14 @@ function world() {
   emit('agent_spawned', { id: AGENT, name: 'Tamar', x: 7, y: 4, ageDays: 30 })
   emit('item_spawned', { id: 'item_1', kind: 'wood', qty: 3, loc: { t: 'agent', id: AGENT } })
   emit('skill_gained', { agentId: AGENT, track: 'carpentry', xp: 5 })
+  if (opts.well === true) {
+    emit('structure_planned', {
+      id: 'structure_1', kind: 'well', x: 9, y: 4, w: 1, h: 1, maxHp: 40, flammable: false, builderId: AGENT,
+    })
+    emit('structure_completed', { id: 'structure_1' })
+  }
+  // Noon: the sight horizon narrows in the dark, and this seam is about what stands in view.
+  state = { ...state, tick: 720 }
 
   const worldTick = createWorldTick(config, rng)
   let handler: TickHandler = () => {}
@@ -50,7 +59,24 @@ describe('buildAgentCtx', () => {
       skills: { carpentry: 5 },
       inventory: [{ kind: 'wood', qty: 3 }],
       position: { x: 7, y: 4 },
+      visible: { structures: [], ground: ['grass'] },
     })
+  })
+
+  // The live run's worst ruling: the arbiter said three times that the town has no well while
+  // five minds drank from one, and overturned its own precedent to do it. It could not see.
+  it('shows the arbiter what stands in front of the asker', () => {
+    const { bridge } = world({ well: true })
+    expect(buildAgentCtx(bridge, AGENT).visible.structures).toEqual([{ kind: 'well', x: 9, y: 4 }])
+  })
+
+  it('names the ground within sight, in the words a recipe may ask for', () => {
+    const rows: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
+    rows[4]![9] = 2   // water, two steps east
+    rows[4]![10] = 7  // a road: the town has no recipe word for it, so it is not offered
+    rows[20]![20] = 5 // sand, far out of sight
+    const { bridge } = world({ terrain: rows })
+    expect(buildAgentCtx(bridge, AGENT).visible.ground).toEqual(['grass', 'water'])
   })
 
   it('throws for a body the world does not have — an unknown asker is a bug, not a verdict', () => {

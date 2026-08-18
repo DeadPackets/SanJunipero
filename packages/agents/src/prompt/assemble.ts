@@ -1,5 +1,6 @@
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
+import { assertNoGlassLeak } from './glassScan.js'
 import { CAPABILITIES, SPEECH_RULES } from './rulesOfBeing.js'
 
 export type IdentityCore = {
@@ -107,6 +108,8 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const scene = renderScene(blocks.scene)
   const dayLog = blocks.dayLog.join('\n')
   const now = blocks.now.prose
+  // The last door before a mind reads anything: no ops-plane label goes through it.
+  assertNoGlassLeak(`${system}\n${dayLog}\n${scene}\n${now}`, 'assemblePrompt')
   // dayLog is append-only all day; the scene changes every turn. Stable
   // before volatile keeps the byte prefix cacheable across turns.
   const messages: Array<{ role: 'user'; content: string }> = [

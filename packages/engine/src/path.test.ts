@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
-import { canStep, findPath, isPassable, terrainCostFor, TERRAIN_COST } from './path.js'
+import { submitIntent } from './intent.js'
+import { canStep, findPath, isPassable, searchPath, stepCostAt, terrainCostFor, TERRAIN_COST } from './path.js'
+import { makeFixtureMap } from './scripted.js'
+import { composePerception } from './perception.js'
 
-const CHAR_TILE: Record<string, TileId> = { '.': 0, d: 1, '~': 2, f: 3, r: 4, s: 5, F: 6, R: 7 }
+const CHAR_TILE: Record<string, TileId> = { '.': 0, d: 1, '~': 2, f: 3, r: 4, s: 5, F: 6, R: 7, p: 8, S: 9, c: 10 }
 const world = (rows: string[]): WorldState =>
   genesisState(DEFAULT_CONFIG, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
@@ -28,6 +31,23 @@ describe('terrain costs', () => {
     expect(TERRAIN_COST[3]).toBe(2)    // forest
     expect(TERRAIN_COST[4]).toBe(3)    // rock
     expect(TERRAIN_COST[2]).toBe(Infinity) // water impassable
+  })
+})
+
+describe('the C11 tiles: path, sapling, channel', () => {
+  it('a worn path is cheaper than grass and dearer than road', () => {
+    const cost = terrainCostFor(DEFAULT_CONFIG)
+    expect(cost[8]).toBe(0.8)
+    expect(cost[7]).toBeLessThan(cost[8]!)
+    expect(cost[8]).toBeLessThan(cost[0]!)
+    expect(terrainCostFor(SimConfigSchema.parse({ desirePaths: { pathCost: 0.95 } }))[8]).toBe(0.95)
+  })
+  it('a sapling walks like grass and a channel is impassable', () => {
+    expect(terrainCostFor(DEFAULT_CONFIG)[9]).toBe(1)
+    expect(terrainCostFor(DEFAULT_CONFIG)[10]).toBe(Infinity)
+    const s = world(['.c.', 'S..'])
+    expect(isPassable(s, 1, 0)).toBe(false)
+    expect(isPassable(s, 0, 1)).toBe(true)
   })
 })
 
@@ -149,5 +169,285 @@ describe('findPath (A*)', () => {
   it('returns [] when already at the goal', () => {
     const s = world(['..', '..'])
     expect(findPath(s, { x: 1, y: 1 }, { x: 1, y: 1 })).toEqual([])
+  })
+})
+
+// ------------------------------------------- Task 37(a): the admissible heuristic
+
+// The straight grass line home is 13 steps at 1 each. The road runs the long way round —
+// 19 steps — and still costs less, because a road is 0.6. An A* whose heuristic charges a
+// full grass tile per remaining step cannot believe that, so it walks the dearer line.
+const ROAD_RING = [
+  '..............',
+  'R............R',
+  'R............R',
+  'RRRRRRRRRRRRRR',
+]
+
+const costOf = (s: WorldState, path: Array<[number, number]>, config: SimConfig): number =>
+  path.reduce((sum, [x, y]) => sum + stepCostAt(s, x, y, config), 0)
+
+describe('the A* heuristic is admissible (Task 37a)', () => {
+  it('never over-estimates, so the cheapest route wins even when it is the longest', () => {
+    const s = world(ROAD_RING)
+    const path = findPath(s, { x: 0, y: 0 }, { x: 13, y: 0 })!
+    const straight = Array.from({ length: 13 }, (_, i): [number, number] => [i + 1, 0])
+
+    expect(costOf(s, straight, DEFAULT_CONFIG)).toBe(13)
+    expect(costOf(s, path, DEFAULT_CONFIG)).toBeCloseTo(11.8, 10)
+    expect(path).not.toEqual(straight)
+    expect(path.some(([, y]) => y === 3)).toBe(true) // it went down to the road
+  })
+
+  it('scales by the cheapest tile the config can price, not by one', () => {
+    // A world where nothing is cheaper than grass has no reason to detour: same answer as before.
+    const flat = SimConfigSchema.parse({ pathing: { roadCost: 1 }, desirePaths: { pathCost: 1 } })
+    const s = genesisState(flat, ROAD_RING.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+    expect(findPath(s, { x: 0, y: 0 }, { x: 13, y: 0 }, flat))
+      .toEqual(Array.from({ length: 13 }, (_, i) => [i + 1, 0]))
+  })
+})
+
+// ------------------------------------------------------- Task 29: the node budget
+
+const withMaxNodes = (config: SimConfig, maxNodes: number): SimConfig =>
+  ({ ...config, pathing: { ...config.pathing, maxNodes } })
+
+const UNBOUNDED = withMaxNodes(DEFAULT_CONFIG, Infinity)
+const manhattan = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+  Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
+
+// A serpentine 192x192: every odd row is a water wall with one gap, and the gap alternates
+// ends. The corridor is ~36k tiles long, so 200 nodes buys a fraction of the first leg.
+const MAZE_W = 192, MAZE_H = 192
+const MAZE_FROM = { x: 0, y: 0 }
+const MAZE_TO = { x: MAZE_W - 1, y: MAZE_H - 1 }
+
+function serpentineMaze(): TileId[][] {
+  const rows: TileId[][] = []
+  for (let y = 0; y < MAZE_H; y++) {
+    const wall = y % 2 === 1 && y < MAZE_H - 1
+    const gap = y % 4 === 1 ? MAZE_W - 1 : 0
+    const row: TileId[] = []
+    for (let x = 0; x < MAZE_W; x++) row.push(wall && x !== gap ? 2 : 0)
+    rows.push(row)
+  }
+  return rows
+}
+
+describe('the A* node budget', () => {
+  it('changes no path the 64x64 fixture map can ask for', () => {
+    const s = genesisState(DEFAULT_CONFIG, makeFixtureMap())
+    const targets = [{ x: 60, y: 60 }, { x: 5, y: 5 }, { x: 33, y: 4 }, { x: 4, y: 58 }, { x: 45, y: 31 }]
+    let asked = 0
+    for (let fy = 2; fy < 64; fy += 9) {
+      for (let fx = 4; fx < 61; fx += 11) {
+        for (const to of targets) {
+          expect(findPath(s, { x: fx, y: fy }, to, DEFAULT_CONFIG))
+            .toEqual(findPath(s, { x: fx, y: fy }, to, UNBOUNDED))
+          asked++
+        }
+      }
+    }
+    expect(asked).toBeGreaterThan(100)
+  })
+
+  it('a search the budget cuts short returns a usable partial, never a null', () => {
+    const s = genesisState(DEFAULT_CONFIG, serpentineMaze())
+    const tight = withMaxNodes(DEFAULT_CONFIG, 200)
+    expect(searchPath(s, MAZE_FROM, MAZE_TO, UNBOUNDED)!.capped).toBe(false)
+
+    const cut = searchPath(s, MAZE_FROM, MAZE_TO, tight)!
+    expect(cut.capped).toBe(true)
+    expect(cut.path.length).toBeGreaterThan(0)
+    const last = cut.path[cut.path.length - 1]!
+    expect(manhattan({ x: last[0], y: last[1] }, MAZE_TO)).toBeLessThan(manhattan(MAZE_FROM, MAZE_TO))
+    for (const [x, y] of cut.path) expect(isPassable(s, x, y)).toBe(true)
+    let [px, py] = [MAZE_FROM.x, MAZE_FROM.y]
+    for (const [x, y] of cut.path) {
+      expect(Math.abs(x - px) + Math.abs(y - py)).toBe(1)
+      ;[px, py] = [x, y]
+    }
+    expect(findPath(s, MAZE_FROM, MAZE_TO, tight)).toEqual(cut.path)
+    for (let i = 0; i < 5; i++) expect(searchPath(s, MAZE_FROM, MAZE_TO, tight)!.path).toEqual(cut.path)
+  })
+
+  it('an unreachable target is a null when the search really exhausts', () => {
+    const s = world(['..~..', '..~..', '..~..'])
+    expect(searchPath(s, { x: 0, y: 0 }, { x: 4, y: 0 }, DEFAULT_CONFIG)).toBeNull()
+    // A budget too small to prove there is no way across cannot claim there is none: it walks
+    // as far as it looked.
+    expect(findPath(s, { x: 0, y: 0 }, { x: 4, y: 0 }, withMaxNodes(DEFAULT_CONFIG, 2))).toEqual([[1, 0]])
+  })
+
+  it('a partial that goes nowhere is a refusal, not a walk of length zero', () => {
+    // Every step out of (1,1) leads away from (1,3); one expansion buys no ground at all.
+    const s = world(['....', '....', '.~~~', '....'])
+    expect(findPath(s, { x: 1, y: 1 }, { x: 1, y: 3 }, withMaxNodes(DEFAULT_CONFIG, 1))).toBeNull()
+    expect(findPath(s, { x: 1, y: 1 }, { x: 1, y: 3 }, UNBOUNDED)).not.toBeNull()
+  })
+
+  it('walk accepts the cut-short target and perception says the way is unclear', () => {
+    const tight = withMaxNodes(DEFAULT_CONFIG, 200)
+    let s = genesisState(tight, serpentineMaze())
+    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), tight)
+    expect(composePerception(s, tight, 'a1', []).wayUnclear).toBeUndefined()
+
+    const r = submitIntent(s, tight, 'a1', 'walk', MAZE_TO)
+    expect(r.ok).toBe(true)
+    const partial = searchPath(s, MAZE_FROM, MAZE_TO, tight)!.path
+    s = fold(s, ev(2, 'action_started', {
+      agentId: 'a1', verb: 'walk', params: { ...MAZE_TO }, duration: partial.length,
+    }), tight)
+    expect(s.agents.a1!.activity!.path).toEqual(partial)
+    expect(composePerception(s, tight, 'a1', []).wayUnclear).toBe(true)
+    // The same walk under a budget that can finish it is an ordinary walk.
+    expect(composePerception(s, UNBOUNDED, 'a1', []).wayUnclear).toBeUndefined()
+  })
+})
+
+// A river three tiles wide, banks at x=0 and x=4. Nothing crosses it but a bridge.
+const RIVER = ['.~~~.', '.~~~.', '.~~~.']
+
+// A bridge is a structure like any other: planned, progressed, completed.
+function span(s: WorldState, id: string, x: number, y: number, w: number, h: number, complete = true): WorldState {
+  let out = fold(s, ev(50, 'structure_planned', {
+    id, kind: 'bridge', x, y, w, h, maxHp: 20, flammable: false, builderId: 'a1',
+  }))
+  if (complete) out = fold(out, ev(51, 'structure_completed', { id }))
+  return out
+}
+
+describe('bridges: the one structure that grants passage', () => {
+  it('a river is uncrossable until a finished bridge spans it', () => {
+    const s = world(RIVER)
+    expect(findPath(s, { x: 0, y: 1 }, { x: 4, y: 1 })).toBeNull()
+    const half = span(s, 'structure_1', 1, 1, 3, 1, false)
+    expect(findPath(half, { x: 0, y: 1 }, { x: 4, y: 1 })).toBeNull()
+    const done = span(s, 'structure_1', 1, 1, 3, 1)
+    expect(findPath(done, { x: 0, y: 1 }, { x: 4, y: 1 })).toEqual([[1, 1], [2, 1], [3, 1], [4, 1]])
+  })
+
+  it('a bridge deck walks like a road, and the water beneath it is still water', () => {
+    const done = span(world(RIVER), 'structure_1', 1, 1, 3, 1)
+    // terrainCostFor still calls the tile impassable: findPath can only cross by asking stepCostAt.
+    expect(terrainCostFor(DEFAULT_CONFIG)[done.terrain[1]![2]!]).toBe(Infinity)
+    expect(stepCostAt(done, 2, 1, DEFAULT_CONFIG)).toBe(DEFAULT_CONFIG.pathing.roadCost)
+    expect(done.terrain[1]![2]).toBe(2)
+    expect(isPassable(done, 2, 1)).toBe(true)
+    // Every other tile is priced exactly as the plain table prices it.
+    for (let y = 0; y < done.terrain.length; y++) {
+      for (let x = 0; x < done.terrain[y]!.length; x++) {
+        if (y === 1 && x >= 1 && x <= 3) continue
+        expect(stepCostAt(done, x, y, DEFAULT_CONFIG)).toBe(terrainCostFor(DEFAULT_CONFIG)[done.terrain[y]![x]!])
+      }
+    }
+  })
+
+  it('any other structure over water still blocks', () => {
+    let s = world(RIVER)
+    s = fold(s, ev(50, 'structure_planned', {
+      id: 'structure_1', kind: 'hut', x: 1, y: 1, w: 3, h: 1, maxHp: 50, flammable: true, builderId: 'a1',
+    }))
+    s = fold(s, ev(51, 'structure_completed', { id: 'structure_1' }))
+    expect(isPassable(s, 2, 1)).toBe(false)
+  })
+})
+
+describe('build: planning a bridge', () => {
+  const BRIDGE3 = SimConfigSchema.parse({ structures: { recipes: {
+    bridge: { inputs: { wood: 6 }, w: 3, h: 1, maxHp: 20, flammable: false, durationTicks: 480 },
+  } } })
+  const BRIDGE4 = SimConfigSchema.parse({ structures: { recipes: {
+    bridge: { inputs: { wood: 6 }, w: 4, h: 1, maxHp: 20, flammable: false, durationTicks: 480 },
+  } } })
+
+  function builder(rows: string[], config: SimConfig): WorldState {
+    let s = genesisState(config, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 1, ageDays: 7300 }), config)
+    return fold(s, ev(2, 'item_spawned', {
+      id: 'item_1', kind: 'wood', qty: 6, loc: { t: 'agent', id: 'a1' },
+    }), config)
+  }
+
+  it('plans across the water when both ends touch land', () => {
+    const s = builder(RIVER, BRIDGE3)
+    const r = submitIntent(s, BRIDGE3, 'a1', 'build', { kind: 'bridge', x: 1, y: 1 })
+    expect(r.ok).toBe(true)
+  })
+
+  it('refuses a span longer than three, an end in open water, and dry ground', () => {
+    const wide = ['.~~~~.', '.~~~~.', '.~~~~.']
+    const long = submitIntent(builder(wide, BRIDGE4), BRIDGE4, 'a1', 'build', { kind: 'bridge', x: 1, y: 1 })
+    expect(long.ok).toBe(false)
+    // A five-wide river with a three-tile deck leaves one end standing in the river.
+    const short = submitIntent(builder(wide, BRIDGE3), BRIDGE3, 'a1', 'build', { kind: 'bridge', x: 1, y: 1 })
+    expect(short.ok).toBe(false)
+    const dry = submitIntent(builder(['......', '......', '......'], BRIDGE3), BRIDGE3, 'a1', 'build', { kind: 'bridge', x: 1, y: 1 })
+    expect(dry.ok).toBe(false)
+  })
+
+  // Batch-3 controller ruling 2: a recipe's w and h are a shape, not a bearing.
+  describe('the transpose fallback', () => {
+    const TALL3 = SimConfigSchema.parse({ structures: { recipes: {
+      bridge: { inputs: { wood: 6 }, w: 1, h: 3, maxHp: 20, flammable: false, durationTicks: 480 },
+    } } })
+    const planned = (s: WorldState, config: SimConfig, at: { x: number; y: number }) => {
+      const r = submitIntent(s, config, 'a1', 'build', { kind: 'bridge', ...at })
+      if (!r.ok) return r.reason
+      const p = r.events.find((e) => e.type === 'structure_planned')!.payload as { w: number; h: number }
+      return { w: p.w, h: p.h }
+    }
+
+    it('turns a deck written the long way to span the river it is standing at', () => {
+      // RIVER runs north-south, so a 1x3 deck reads off the map and a 3x1 one spans it.
+      expect(planned(builder(RIVER, TALL3), TALL3, { x: 1, y: 1 })).toEqual({ w: 3, h: 1 })
+    })
+
+    it('leaves the written shape alone when the written shape works', () => {
+      expect(planned(builder(RIVER, BRIDGE3), BRIDGE3, { x: 1, y: 1 })).toEqual({ w: 3, h: 1 })
+    })
+
+    it('keeps the written refusal when neither reading stands up', () => {
+      const wide = ['.~~~~.', '.~~~~.', '.~~~~.']
+      expect(planned(builder(wide, TALL3), TALL3, { x: 1, y: 1 })).toBe('a bridge belongs over water')
+      expect(planned(builder(['......', '......', '......'], TALL3), TALL3, { x: 1, y: 1 }))
+        .toBe('a bridge belongs over water')
+    })
+
+    it('is deterministic, and validate and onStart agree on the rectangle', () => {
+      const s = builder(RIVER, TALL3)
+      for (let i = 0; i < 5; i++) expect(planned(s, TALL3, { x: 1, y: 1 })).toEqual({ w: 3, h: 1 })
+      let after = s
+      const r = submitIntent(s, TALL3, 'a1', 'build', { kind: 'bridge', x: 1, y: 1 })
+      expect(r.ok).toBe(true)
+      if (r.ok) r.events.forEach((e, i) => { after = fold(after, ev(200 + i, e.type, e.payload), TALL3) })
+      const site = Object.values(after.structures).find((x) => x.kind === 'bridge')!
+      expect({ w: site.w, h: site.h }).toEqual({ w: 3, h: 1 })
+    })
+
+    it('applies to anything with a footprint, not only to bridges', () => {
+      const SHED = SimConfigSchema.parse({ structures: { recipes: {
+        shed: { inputs: { wood: 6 }, w: 1, h: 3, maxHp: 20, flammable: true, durationTicks: 60 },
+      } } })
+      // Three tiles of dry ground running east, one tile deep: only the turned shed fits.
+      const s = builder(['....', '.~~~'], SHED)
+      const r = submitIntent(s, SHED, 'a1', 'build', { kind: 'shed', x: 1, y: 0 })
+      expect(r.ok).toBe(true)
+      if (r.ok) {
+        expect(r.events.find((e) => e.type === 'structure_planned')!.payload)
+          .toMatchObject({ w: 3, h: 1 })
+      }
+    })
+  })
+
+  it('an existing bridge is a bank to build the next span from', () => {
+    const wide = ['.~~~~~~.', '.~~~~~~.', '.~~~~~~.']
+    let s = builder(wide, BRIDGE3)
+    s = span(s, 'structure_1', 1, 1, 3, 1)
+    // Standing on the deck they just finished, reaching for the next span.
+    s = fold(s, ev(60, 'agent_moved', { id: 'a1', x: 3, y: 1 }), BRIDGE3)
+    const r = submitIntent(s, BRIDGE3, 'a1', 'build', { kind: 'bridge', x: 4, y: 1 })
+    expect(r.ok).toBe(true)
   })
 })

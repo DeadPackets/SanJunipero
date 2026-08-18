@@ -9,6 +9,8 @@ export const NARRATOR_TABLES = [
   'milestones',
   'institutions',
   'publications',
+  'semantic_first_detected',
+  'semantic_candidates',
 ] as const
 
 // "cast" is a SQLite keyword — quoted everywhere it appears in SQL.
@@ -37,6 +39,14 @@ CREATE TABLE IF NOT EXISTS institutions (
   id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL CHECK (kind IN ('group','rule','role')),
   name TEXT NOT NULL, description TEXT NOT NULL, founding_scene_id INTEGER NOT NULL,
   member_ids TEXT NOT NULL, source_event_ids TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS semantic_first_detected (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, concept_kind TEXT NOT NULL UNIQUE, agent_id TEXT NOT NULL,
+  day INTEGER NOT NULL, source_kind TEXT NOT NULL, event_seq INTEGER, memory_ref TEXT,
+  quote TEXT NOT NULL, quote2 TEXT, provenance2 TEXT, confidence REAL NOT NULL, rationale TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS semantic_candidates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, concept_kind TEXT NOT NULL, agent_id TEXT NOT NULL,
+  day INTEGER NOT NULL, source_kind TEXT NOT NULL, quote TEXT NOT NULL, confidence REAL NOT NULL,
+  rationale TEXT NOT NULL, reason TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS publications (
   id INTEGER PRIMARY KEY AUTOINCREMENT, day INTEGER NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('newspaper','biography','timelapse_caption','share_card')),
@@ -44,8 +54,21 @@ CREATE TABLE IF NOT EXISTS publications (
   rendered_at TEXT NOT NULL DEFAULT (datetime('now')));
 `
 
+// C11 widens C7's ledger rather than standing a rival one beside it: every existing row is a
+// tier-1 engine first, which is exactly what the defaults say. Idempotent — the columns are
+// added only where they are missing, so a second run is a no-op.
+const MILESTONE_COLUMNS: ReadonlyArray<{ name: string; ddl: string }> = [
+  { name: 'tier', ddl: "ALTER TABLE milestones ADD COLUMN tier TEXT NOT NULL DEFAULT '1'" },
+  { name: 'domain', ddl: "ALTER TABLE milestones ADD COLUMN domain TEXT NOT NULL DEFAULT 'engine'" },
+  { name: 'agent_ids', ddl: "ALTER TABLE milestones ADD COLUMN agent_ids TEXT NOT NULL DEFAULT '[]'" },
+  { name: 'construct_id', ddl: 'ALTER TABLE milestones ADD COLUMN construct_id TEXT' },
+  { name: 'name_provenance', ddl: 'ALTER TABLE milestones ADD COLUMN name_provenance TEXT' },
+]
+
 export function migrateNarratorTables(db: Database.Database): void {
   db.exec(DDL)
+  const have = new Set((db.prepare('PRAGMA table_info(milestones)').all() as Array<{ name: string }>).map((c) => c.name))
+  for (const col of MILESTONE_COLUMNS) if (!have.has(col.name)) db.exec(col.ddl)
 }
 
 // Not engine openDb: that would create events/snapshots/rng_state — world tables

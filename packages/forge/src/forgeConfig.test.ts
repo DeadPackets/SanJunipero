@@ -65,9 +65,18 @@ describe('forge config', () => {
 
   // Determinism proof: C13 config is ops-side, so world law cannot move and G1/G2 goldens hold.
   it('leaves SimConfig untouched — the world config hash does not move', () => {
-    // moves whenever SimConfigSchema changes world law — re-pin is a deliberate reviewed act (see merge-train-3 report)
+    // moves whenever SimConfigSchema changes world law — re-pin is a deliberate reviewed act (see merge-train-3 report).
+    // Moved by C11 Task 2, the chunk's single SimConfigSchema edit: fourteen new sections, world.size,
+    // the pathing and structures.recipes additions, and health's retired contagion dials.
+    // Moved again by C11 TASK 37b, the authorized gate-remediation regen (batch-11 ruling
+    // R-G), and re-pinned here in the same single regen commit as G2. It retunes two VALUES
+    // and adds, removes and renames no key: `warmth.insulation.garment` 2 → 12, so the
+    // clothing line decides an hour of the season it exists for, and
+    // `mortality.drainPerTick.injury` 0.05 → 0.025, so an untended wound outlasts the walk of
+    // whoever might tend it. C11 has no third re-pin; later tuning belongs to C8's keystone.
+    // Previous value (C11 Task 2): 482f12038e542e54d9cb5a5add1e4556c4e40457bd5300dc7e66ae8e341dbf70
     expect(stateHash(DEFAULT_CONFIG)).toBe(
-      '31b6304a7850172fe7ab17ebf95f7faa06ae5212b92c71bfed59b23ef68693a9')
+      'a90bd7471668eea6e8a8e7932129ef7905ae2477b396d5c7b792df539065c4d8')
     expect(stateHash(SimConfigSchema.parse({}))).toBe(stateHash(DEFAULT_CONFIG))
     expect(Object.keys(DEFAULT_CONFIG)).not.toContain('visionQa')
   })

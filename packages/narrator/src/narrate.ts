@@ -1,6 +1,9 @@
-import { MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
+import { MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
+import type { WorldState } from '@sj/engine'
 import { renderChapter, renderEra } from './chronicle.js'
 import { detectFirsts } from './firsts.js'
+import { detectTier2 } from './milestones/tier2.js'
+import { detectSemanticFirsts, type SemanticPassDeps, type TranscriptRecord } from './semanticFirsts.js'
 import { scoreHeat } from './heat.js'
 import { detectInstitutions } from './institutions.js'
 import { segmentScenes } from './segment.js'
@@ -18,6 +21,19 @@ import type {
 } from './types.js'
 
 export const MARKER_HEAT_THRESHOLD = 6
+
+// A night whose chronicle would not render. The rest of the night is attached, because the
+// render is not the only thing that happened and the caller has to be able to say so: GATE
+// G11b day 3 lost its semantic pass to a chapter that failed a schema (C11 batch 16).
+export class ChapterRenderError extends Error {
+  constructor(
+    readonly renderCause: unknown,
+    readonly night: { semanticRan: boolean; milestones: Milestone[] },
+  ) {
+    super(renderCause instanceof Error ? renderCause.message : String(renderCause), { cause: renderCause })
+    this.name = 'ChapterRenderError'
+  }
+}
 
 export function timelineMarkers(deps: {
   milestones: Milestone[]
@@ -65,7 +81,13 @@ export async function narrateDay(deps: {
   segmentCfg?: SegmentConfig
   detectCfg?: DetectConfig
   alert?: (d: string) => void
-}): Promise<{ chapter: ChapterRow; heat: HeatScores[]; milestones: Milestone[] }> {
+  // Tier 2 reads relationships, so it runs only where a world is in reach. Absent, the day
+  // gets its engine firsts and nothing is claimed about anybody's partnership.
+  world?: { config: SimConfig; state?: WorldState }
+  // The tier-2.5 pass, run after the chapter is written. Absent, the night has no semantic
+  // firsts and costs nothing — the detector is never called speculatively.
+  semantic?: Omit<SemanticPassDeps, 'store' | 'day' | 'records'> & { records: TranscriptRecord[] }
+}): Promise<{ chapter: ChapterRow; heat: HeatScores[]; milestones: Milestone[]; semanticRan: boolean }> {
   const { store, events } = deps
   if (events.length === 0) throw new Error('narrateDay requires at least one event')
   const day = Math.floor(events[0]!.tick / MINUTES_PER_DAY)
@@ -76,11 +98,30 @@ export async function narrateDay(deps: {
       chapter: existing[0]!,
       heat: store.heatsForDay(day).map((h) => h.s),
       milestones: store.milestones(),
+      semanticRan: false,
     }
   }
 
   const scenes = segmentScenes(events, deps.segmentCfg)
-  const milestones = detectFirsts(events, { seenKinds: store.milestoneKinds(), rulebookCount: deps.rulebookCount })
+  const seenKinds = store.milestoneKinds()
+  // The world in reach answers what the day's own events cannot: a hut planned on a Tuesday
+  // and finished on a Friday is `structure_completed` with no kind on it, and narrating day by
+  // day the Friday pass has never seen the plan. Without this, first_hut and first_bridge miss
+  // every building that took more than a day to raise — which is every hut (C11 R18).
+  const structures = deps.world?.state?.structures
+  const tier1 = detectFirsts(events, {
+    seenKinds,
+    rulebookCount: deps.rulebookCount,
+    ...(structures === undefined ? {} : { structureKind: (id: string) => structures[id]?.kind }),
+  })
+  const tier2 = deps.world === undefined
+    ? []
+    : detectTier2(events, {
+        seenKinds: new Set([...seenKinds, ...tier1.map((m) => m.kind)]),
+        config: deps.world.config,
+        state: deps.world.state,
+      })
+  const milestones = [...tier1, ...tier2]
   const privateThoughts = deps.privateCounts.thoughts + deps.privateCounts.journals
 
   // F3 ruling (novelty priors): priors count each type's occurrences in EARLIER
@@ -117,14 +158,35 @@ export async function narrateDay(deps: {
 
   // renderChapter owns scene persistence; chapter.sceneIds (ordered as scenes) is
   // the single index -> store-id mapping point (T1-7 review ruling).
-  const chapter = await renderChapter({ store, llm: deps.llm, day, scenes, typeCounts, alert: deps.alert })
-  chapter.sceneIds.forEach((sceneId, i) => store.insertHeat(sceneId, heats[i]!))
+  // Only what needs the chapter fails with the chapter. The heats are indexed by its scene
+  // ids and go down with it; the milestones and the semantic pass are not its dependants and
+  // no longer share its fate (C11 batch 16 fix 1).
+  let chapter: ChapterRow | undefined
+  let renderFailure: unknown
+  try {
+    chapter = await renderChapter({ store, llm: deps.llm, day, scenes, typeCounts, alert: deps.alert })
+    chapter.sceneIds.forEach((sceneId, i) => store.insertHeat(sceneId, heats[i]!))
+  } catch (err) {
+    renderFailure = err
+  }
   for (const m of milestones) store.insertMilestone(m)
+
+  // After the chapters, as §20 requires: one batched pass over the day's words.
+  let semanticRan = false
+  if (deps.semantic !== undefined) {
+    semanticRan = true
+    const semantic = await detectSemanticFirsts({ ...deps.semantic, store, day })
+    for (const m of semantic) store.insertMilestone(m)
+    milestones.push(...semantic)
+  }
+
+  if (renderFailure !== undefined) throw new ChapterRenderError(renderFailure, { semanticRan, milestones })
+  const rendered = chapter!
 
   if (day % 7 === 0) {
     for (const inst of detectInstitutions(scenes, events, deps.detectCfg)) {
       const { foundingSceneIndex, ...rest } = inst
-      const foundingSceneId = chapter.sceneIds[foundingSceneIndex]
+      const foundingSceneId = rendered.sceneIds[foundingSceneIndex]
       if (foundingSceneIndex === -1 || foundingSceneId === undefined) {
         deps.alert?.(`unmapped_founding_scene: institution "${inst.name}" founded in a dropped scene — not persisted`)
         continue
@@ -133,7 +195,7 @@ export async function narrateDay(deps: {
     }
   }
 
-  return { chapter, heat: heats, milestones }
+  return { chapter: rendered, heat: heats, milestones, semanticRan }
 }
 
 export async function narrateWeek(deps: {

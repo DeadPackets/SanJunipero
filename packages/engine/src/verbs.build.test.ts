@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
-import { genesisState, type WorldState } from './state.js'
+import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { VERBS } from './verbs.js'
@@ -13,11 +13,15 @@ const FAST: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0
 let seq = 13000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
 
+// Noon: from C11 Task 25 work started in the dark takes half again as long, and nothing in
+// this file is about the dark.
+const NOON = 720
+
 function makeWorld(config = CFG, wood = 10): WorldState {
   let s = genesisState(config)
   s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
   if (wood > 0) s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: wood, loc: { t: 'agent', id: 'a1' } }), config)
-  return s
+  return { ...s, tick: NOON }
 }
 function applyAll(s: WorldState, events: Array<{ type: string; payload: unknown }>, config = CFG): WorldState {
   for (const e of events) s = fold(s, ev(e.type, e.payload, s.tick), config)
@@ -99,6 +103,111 @@ describe('verb: build', () => {
     expect(done.events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'carpentry', xp: 1 } })
     expect(done.state.structures.structure_2).toMatchObject({ stage: 'complete', hp: 50, progressTicks: 3 })
     expect(done.state.agents.a1!.activity).toBeNull()
+  })
+})
+
+describe('verb: build reads structures.recipes', () => {
+  function withStone(qty: number): WorldState {
+    let s = genesisState(CFG)
+    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'stone', qty, loc: { t: 'agent', id: 'a1' } }), CFG)
+    return { ...s, tick: NOON }
+  }
+  const WELL = CFG.structures.recipes.well!
+
+  it('a well is 1x1, costs its row in stone, and does not burn', () => {
+    const s = withStone(WELL.inputs.stone!)
+    const r = submitIntent(s, CFG, 'a1', 'build', { kind: 'well', x: 1, y: 1 })
+    if (!r.ok) throw new Error(r.reason)
+    expect(r.events).toContainEqual({
+      type: 'structure_planned',
+      payload: {
+        id: 'structure_2', kind: 'well', x: 1, y: 1, w: 1, h: 1,
+        maxHp: WELL.maxHp, flammable: false, builderId: 'a1', owner: 'a1',
+      },
+    })
+    expect(r.events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'item_1', delta: -WELL.inputs.stone! } })
+    expect(r.events).toContainEqual({
+      type: 'action_started',
+      payload: { agentId: 'a1', verb: 'build', params: { kind: 'well', x: 1, y: 1 }, duration: WELL.durationTicks },
+    })
+
+    let w = applyAll(s, r.events)
+    for (let i = 0; i < WELL.durationTicks; i++) w = tickOnce(w).state
+    expect(w.structures.structure_2).toMatchObject({ kind: 'well', stage: 'complete', hp: WELL.maxHp, flammable: false })
+  })
+
+  it('one stone short is one stone short, by the name of the material', () => {
+    const r = submitIntent(withStone(WELL.inputs.stone! - 1), CFG, 'a1', 'build', { kind: 'well', x: 1, y: 1 })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/^not enough stone — /)
+  })
+
+  it('refuses a grave: an empty recipe marks what the world places and nobody builds', () => {
+    expect(CFG.structures.recipes.grave!.inputs).toEqual({})
+    const r = submitIntent(withStone(8), CFG, 'a1', 'build', { kind: 'grave', x: 1, y: 1 })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('cannot build a grave')
+  })
+
+  it('leaves the hut byte-identical to C9: same row, same dials, same number', () => {
+    const hut = CFG.structures.recipes.hut!
+    expect(hut.inputs).toEqual(CFG.construction.hutMaterials)
+    expect({ w: hut.w, h: hut.h }).toEqual(CFG.construction.hutSize)
+    expect(hut.maxHp).toBe(CFG.construction.hutMaxHp)
+    expect(hut.durationTicks).toBe(CFG.construction.hutTicks)
+  })
+})
+
+describe('verb: fill', () => {
+  // A pond at (1,0); the agent stands beside it at (0,0).
+  function withVessel(kind: string, charges = 0, x = 0): WorldState {
+    const terrain = Array.from({ length: 8 }, () => Array.from({ length: 8 }, (): TileId => 0))
+    terrain[0]![1] = 2
+    let s = genesisState(CFG, terrain)
+    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x, y: 0, ageDays: 7300 }), CFG)
+    return fold(s, ev('item_spawned', {
+      id: 'item_1', kind, qty: 1, loc: { t: 'agent', id: 'a1' }, charges,
+    }), CFG)
+  }
+  const filled = (s: WorldState) => {
+    const r = submitIntent(s, CFG, 'a1', 'fill', { itemId: 'item_1' })
+    if (!r.ok) throw new Error(r.reason)
+    return tickOnce(applyAll(s, r.events))
+  }
+
+  it('fills a waterskin to its config charge count and a bucket to exactly one', () => {
+    const skin = filled(withVessel('waterskin'))
+    expect(skin.events).toContainEqual({
+      type: 'item_filled', payload: { itemId: 'item_1', charges: CFG.thirst.waterskinCharges },
+    })
+    expect(skin.state.items.item_1!.charges).toBe(CFG.thirst.waterskinCharges)
+
+    const bucket = filled(withVessel('bucket'))
+    expect(bucket.state.items.item_1!.charges).toBe(1)
+  })
+
+  it('fills at a finished well too, and refuses away from any water at all', () => {
+    let s = withVessel('waterskin', 0, 5)
+    s = fold(s, ev('structure_planned', {
+      id: 'structure_1', kind: 'well', x: 6, y: 0, w: 1, h: 1, maxHp: 30, flammable: false, builderId: 'a1',
+    }), CFG)
+    const unfinished = submitIntent(s, CFG, 'a1', 'fill', { itemId: 'item_1' })
+    expect(unfinished.ok).toBe(false)
+    if (!unfinished.ok) expect(unfinished.reason).toBe('no water within reach')
+
+    s = fold(s, ev('structure_completed', { id: 'structure_1' }), CFG)
+    expect(filled(s).state.items.item_1!.charges).toBe(CFG.thirst.waterskinCharges)
+
+    const dry = submitIntent(withVessel('waterskin', 0, 4), CFG, 'a1', 'fill', { itemId: 'item_1' })
+    expect(dry.ok).toBe(false)
+    if (!dry.ok) expect(dry.reason).toBe('no water within reach')
+  })
+
+  it('refuses to fill something that does not hold water', () => {
+    const r = submitIntent(withVessel('wood'), CFG, 'a1', 'fill', { itemId: 'item_1' })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('that holds no water')
   })
 })
 

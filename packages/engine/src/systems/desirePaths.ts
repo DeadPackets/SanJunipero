@@ -1,0 +1,70 @@
+import { MINUTES_PER_DAY, simTimeFromTick, type SimConfig } from '@sj/shared'
+import type { TileId, WorldState } from '../state.js'
+import type { TickCtx } from '../worldTick.js'
+
+// Nobody plans a desire path. Feet wear grass to dirt where the town actually goes, and grass
+// takes it back where the town stopped going. Zero RNG anywhere in this law.
+
+const GRASS: TileId = 0
+const PATH: TileId = 8
+
+// The one spelling of a tile's name in the sparse maps (G4).
+export function trafficKey(x: number, y: number): string {
+  return `${x},${y}`
+}
+
+export function fromTrafficKey(key: string): { x: number; y: number } {
+  const comma = key.indexOf(',')
+  return { x: Number(key.slice(0, comma)), y: Number(key.slice(comma + 1)) }
+}
+
+// A step counts only when it is a step: a body mid-walk, on a world that wears.
+export function countsAsFootfall(state: WorldState, agentId: string, config: SimConfig): boolean {
+  return config.desirePaths.enabled && state.agents[agentId]?.activity?.verb === 'walk'
+}
+
+export function decayTraffic(value: number, config: SimConfig): number {
+  return Math.max(0, Math.floor(value * (1 - config.desirePaths.decayPerDay)))
+}
+
+// Which trails are standing empty tonight, and since when. A tile busy again loses its stamp;
+// a tile that stopped being a trail — paved, overgrown, flooded — drops out entirely.
+export function quietPathsAt(
+  state: WorldState, traffic: Record<string, number>, day: number, config: SimConfig,
+): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (let y = 0; y < state.terrain.length; y++) {
+    const row = state.terrain[y]!
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] !== PATH) continue
+      const key = trafficKey(x, y)
+      if ((traffic[key] ?? 0) >= config.desirePaths.regrowThreshold) continue
+      out[key] = state.quietSince?.[key] ?? day
+    }
+  }
+  return out
+}
+
+export function desirePathsSystem(ctx: TickCtx): void {
+  const cfg = ctx.config.desirePaths
+  if (!cfg.enabled) return
+  const time = simTimeFromTick(ctx.state().tick)
+  if (time.hour !== 0 || time.minute !== 0) return
+  const day = Math.floor(ctx.state().tick / MINUTES_PER_DAY)
+
+  for (const key of Object.keys(ctx.state().traffic ?? {}).sort()) {
+    if ((ctx.state().traffic?.[key] ?? 0) < cfg.wearThreshold) continue
+    const { x, y } = fromTrafficKey(key)
+    if (ctx.state().terrain[y]?.[x] !== GRASS) continue
+    ctx.emit('tile_changed', { x, y, from: GRASS, to: PATH, reason: 'worn' })
+  }
+
+  for (const key of Object.keys(ctx.state().quietSince ?? {}).sort()) {
+    if (day - ctx.state().quietSince![key]! < cfg.overgrowDays) continue
+    const { x, y } = fromTrafficKey(key)
+    if (ctx.state().terrain[y]?.[x] !== PATH) continue
+    ctx.emit('tile_changed', { x, y, from: PATH, to: GRASS, reason: 'overgrown' })
+  }
+
+  ctx.emit('traffic_decayed', {})
+}

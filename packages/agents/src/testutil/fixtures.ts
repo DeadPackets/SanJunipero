@@ -26,7 +26,7 @@ const tamarPersonality: PersonalityDoc = {
   current: {
     mood: 'calm',
     worries: ['the roof will not hold another storm'],
-    goals: ['repair the roof', 'visit the market'],
+    goals: ['repair the roof', 'walk down to the weir'],
   },
 }
 

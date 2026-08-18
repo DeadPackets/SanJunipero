@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
+import { doorTile } from './interiors.js'
 import { composePerception, hears } from './perception.js'
 import { VERBS } from './verbs.js'
 import { RngStream } from './rng.js'
@@ -9,10 +10,14 @@ import { RngStream } from './rng.js'
 let seq = 90000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
 
+// Noon by default: from C11 Task 26 the witness radius scales with the light on the thing seen,
+// and every row below the night-witness block is about a horizon, not about the dark.
+const NOON = 720
+
 function makeWorld(agents: Array<{ id: string; x: number; y: number }>): WorldState {
   let s = genesisState(DEFAULT_CONFIG, Array.from({ length: 64 }, () => Array.from({ length: 64 }, (): TileId => 0)))
   for (const a of agents) s = fold(s, ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 7300 }), DEFAULT_CONFIG)
-  return s
+  return { ...s, tick: NOON }
 }
 
 describe('composePerception: information asymmetry', () => {
@@ -88,6 +93,32 @@ describe('composePerception: structure visibility by nearest tile', () => {
   })
 })
 
+// The mini-rehearsal's worst causal chain: `enter` was tried 15 times and succeeded 0, because
+// the prose named a tile beside the wall and the verb measured against the doorway. The packet
+// now carries the doorway itself, from the same `doorTile` the verb uses.
+describe('composePerception: the doorway a body must stand on', () => {
+  const hut = (s: WorldState, id: string, kind: string, x: number, y: number, complete: boolean): WorldState => {
+    let out = fold(s, ev('structure_planned', {
+      id, kind, x, y, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'script',
+    }), DEFAULT_CONFIG)
+    if (complete) out = fold(out, ev('structure_completed', { id }), DEFAULT_CONFIG)
+    return out
+  }
+
+  it('names the same tile enter measures against', () => {
+    const s = hut(makeWorld([{ id: 'a', x: 6, y: 6 }]), 'structure_1', 'hut', 2, 1, true)
+    const seen = composePerception(s, DEFAULT_CONFIG, 'a', []).visible.structures[0]!
+    expect(seen.door).toEqual(doorTile(s, s.structures.structure_1!))
+  })
+
+  it('is absent on a kind with no way in, and on a building still going up', () => {
+    let s = hut(makeWorld([{ id: 'a', x: 6, y: 6 }]), 'structure_1', 'shed', 2, 1, true)
+    s = hut(s, 'structure_2', 'hut', 8, 1, false)
+    const seen = composePerception(s, DEFAULT_CONFIG, 'a', []).visible.structures
+    expect(seen.map((st) => st.door)).toEqual([undefined, undefined])
+  })
+})
+
 describe('composePerception: felt events', () => {
   it('maps a rain weather change to rain_started for every agent', () => {
     const s = makeWorld([{ id: 'a', x: 0, y: 0 }])
@@ -128,6 +159,11 @@ describe('composePerception: packet shape', () => {
     let s = makeWorld([{ id: 'a', x: 2, y: 3 }])
     s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 3, loc: { t: 'agent', id: 'a' } }), DEFAULT_CONFIG)
     s = fold(s, ev('item_spawned', { id: 'item_2', kind: 'stone', qty: 1, loc: { t: 'tile', x: 3, y: 3 } }), DEFAULT_CONFIG)
+    // A blow is two events and one subtraction (C11 R16): the hp comes off through
+    // `agent_harmed` and the wound goes on the record through `agent_injured`.
+    s = fold(s, ev('agent_harmed', {
+      agentId: 'a', amount: DEFAULT_CONFIG.health.injuryDamage.minor, source: 'attack',
+    }), DEFAULT_CONFIG)
     s = fold(s, ev('agent_injured', { agentId: 'a', kind: 'minor' }), DEFAULT_CONFIG)
     const p = composePerception(s, DEFAULT_CONFIG, 'a', [])
     expect(p.time.tick).toBe(s.tick)
@@ -432,5 +468,217 @@ describe('composePerception: witnessed takings', () => {
   it('goes quiet when the flag is off', () => {
     const off = SimConfigSchema.parse({ ownership: { enabled: false } })
     expect(composePerception(theftWorld(), off, 'bystander', [taken('omar', 'salma', 4, 4)]).seen).toEqual([])
+  })
+})
+
+describe('the ground underfoot: a benefit stated, never a rule given', () => {
+  function paved(tiles: Array<{ x: number; y: number; tile: TileId }>, self = { x: 0, y: 0 }): WorldState {
+    const s = makeWorld([{ id: 'a', ...self }])
+    const terrain = s.terrain.map((row, y) => row.map((t, x) => tiles.find((p) => p.x === x && p.y === y)?.tile ?? t))
+    return { ...s, terrain }
+  }
+  const ground = (s: WorldState, config = DEFAULT_CONFIG) => composePerception(s, config, 'a', []).ground
+
+  it('reads the road under the feet and the road beside them, and nothing further off', () => {
+    expect(ground(paved([{ x: 0, y: 0, tile: 7 }]))).toEqual({ wellTravelled: true })
+    expect(ground(paved([{ x: 1, y: 1, tile: 7 }]))).toEqual({ wellTravelled: true })
+    expect(ground(paved([{ x: 0, y: 1, tile: 8 }]))).toEqual({ wellTravelled: true })
+    expect(ground(paved([{ x: 2, y: 0, tile: 7 }]))).toBeUndefined()
+    expect(ground(paved([]))).toBeUndefined()
+  })
+
+  it('says it once however much road there is, and says nothing at all when roads are off', () => {
+    const surrounded = paved([
+      { x: 0, y: 0, tile: 7 }, { x: 1, y: 0, tile: 7 }, { x: 0, y: 1, tile: 7 }, { x: 1, y: 1, tile: 8 },
+    ])
+    expect(ground(surrounded)).toEqual({ wellTravelled: true })
+    const off = SimConfigSchema.parse({ roads: { enabled: false } })
+    expect(ground(surrounded, off)).toBeUndefined()
+  })
+})
+
+// ------------------------- Task 26: the dark is a price change, and it is paid at the target
+describe('night-witness: a torch does not let you see, it lets the dark see you', () => {
+  const CFG = DEFAULT_CONFIG
+  const DAY_CFG = SimConfigSchema.parse({ nightWitness: { enabled: false } })
+  const MIDNIGHT = 0
+  const NIGHT_R = Math.round(CFG.movement.sightRadius * CFG.nightWitness.nightFactor)
+
+  const night = (s: WorldState): WorldState => ({ ...s, tick: MIDNIGHT })
+  const lit = (s: WorldState, itemId: string, kind: string, loc: unknown, config = CFG): WorldState => {
+    let out = fold(s, ev('item_spawned', { id: itemId, kind, qty: 1, loc }, s.tick), config)
+    return fold(out, ev('item_lit', { itemId, burnsUntilTick: s.tick + 500 }, s.tick), config)
+  }
+  const firePit = (s: WorldState, x: number, y: number, fueled: boolean, config = CFG): WorldState => {
+    let out = fold(s, ev('structure_planned', {
+      id: 'structure_9', kind: 'fire_pit', x, y, w: 1, h: 1, maxHp: 10, flammable: false, builderId: 'a',
+    }, s.tick), config)
+    out = fold(out, ev('structure_completed', { id: 'structure_9' }, s.tick), config)
+    if (!fueled) return out
+    return fold(out, ev('structure_fueled', { structureId: 'structure_9', burnsUntilTick: s.tick + 500 }, s.tick), config)
+  }
+
+  // A taking at (x,y) that 'a' at the origin may or may not witness.
+  const takingAt = (x: number, y: number): SimEvent[] =>
+    [ev('item_taken', { itemId: 'item_5', kind: 'bread', takerId: 'thief', ownerId: 'a', x, y }, MIDNIGHT)]
+
+  const world = (): WorldState => night(makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'thief', x: 6, y: 0 }]))
+
+  it('a theft six paces off is unwitnessed at night and witnessed by day', () => {
+    expect(NIGHT_R).toBeLessThan(6)
+    expect(composePerception(world(), CFG, 'a', takingAt(6, 0)).seen).toEqual([])
+    const byDay = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'thief', x: 6, y: 0 }])
+    expect(composePerception(byDay, CFG, 'a', takingAt(6, 0)).seen).toHaveLength(1)
+  })
+
+  it('the same theft beside a fed fire is witnessed at full daylight range', () => {
+    const bright = firePit(world(), 6, 1, true)
+    expect(composePerception(bright, CFG, 'a', takingAt(6, 0)).seen).toHaveLength(1)
+    const cold = firePit(world(), 6, 1, false)
+    expect(composePerception(cold, CFG, 'a', takingAt(6, 0)).seen).toEqual([])
+  })
+
+  it('a body carrying a flame is seen at full range; an unlit one at the same distance is not', () => {
+    const carried = lit(world(), 'item_7', 'torch', { t: 'agent', id: 'thief' })
+    expect(composePerception(carried, CFG, 'a', []).visible.agents.map((g) => g.id)).toEqual(['thief'])
+    expect(composePerception(world(), CFG, 'a', []).visible.agents).toEqual([])
+  })
+
+  it('light at the eye buys nothing: the torch in your own hand shows you no further', () => {
+    const own = lit(world(), 'item_7', 'torch', { t: 'agent', id: 'a' })
+    expect(composePerception(own, CFG, 'a', []).visible.agents).toEqual([])
+  })
+
+  it('carries the light as one of three words at the body\'s own feet, never a number', () => {
+    expect(composePerception(world(), CFG, 'a', []).light).toBe('dark')
+    expect(composePerception(makeWorld([{ id: 'a', x: 0, y: 0 }]), CFG, 'a', []).light).toBe('bright')
+    const held = lit(world(), 'item_7', 'torch', { t: 'agent', id: 'a' })
+    expect(composePerception(held, CFG, 'a', []).light).toBe('bright')
+    expect(typeof composePerception(world(), CFG, 'a', []).light).toBe('string')
+  })
+
+  it('a long room is dark past the darkness radius, and a lit hand shows the far end', () => {
+    let s = night(makeWorld([{ id: 'a', x: 1, y: 1 }, { id: 'b', x: 10, y: 1 }]))
+    s = fold(s, ev('structure_planned', {
+      id: 'structure_1', kind: 'storehouse', x: 0, y: 0, w: 14, h: 3, maxHp: 40, flammable: true, builderId: 'a',
+    }, s.tick), CFG)
+    s = fold(s, ev('structure_completed', { id: 'structure_1' }, s.tick), CFG)
+    for (const id of ['a', 'b']) s = fold(s, ev('agent_entered', { agentId: id, structureId: 'structure_1' }, s.tick), CFG)
+    expect(composePerception(s, CFG, 'a', []).visible.agents).toEqual([])
+    const shown = lit(s, 'item_7', 'torch', { t: 'agent', id: 'b' })
+    expect(composePerception(shown, CFG, 'a', []).visible.agents.map((g) => g.id)).toEqual(['b'])
+  })
+
+  it('sound does not care: earshot at midnight is earshot at noon', () => {
+    const said = (s: WorldState) => composePerception(s, CFG, 'a', [
+      ev('agent_spoke', { agentId: 'thief', text: 'in the dark', x: 6, y: 0 }, s.tick),
+    ]).heard.length
+    expect(said(world())).toBe(1)
+    expect(said(makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'thief', x: 6, y: 0 }]))).toBe(1)
+  })
+
+  it('with the law off, midnight witnesses exactly what noon does', () => {
+    expect(composePerception(world(), DAY_CFG, 'a', takingAt(6, 0)).seen).toHaveLength(1)
+    expect(composePerception(world(), DAY_CFG, 'a', []).visible.agents.map((g) => g.id)).toEqual(['thief'])
+    expect(composePerception(world(), DAY_CFG, 'a', []).light).toBe('bright')
+  })
+
+  it('is a pure projection: the same state and log give the same witness set twice', () => {
+    const s = firePit(world(), 6, 1, true)
+    const once = composePerception(s, CFG, 'a', takingAt(6, 0))
+    const twice = composePerception(s, CFG, 'a', takingAt(6, 0))
+    expect(JSON.stringify(once)).toBe(JSON.stringify(twice))
+  })
+})
+
+// R21-A: the two things a body knows about itself that the packet used to drop on the floor.
+// Between them they account for 59 of the live gate's 222 refusals, and for a mind that
+// restated the same journey in forty-four turns without ever setting off.
+describe('composePerception: the body knows where it is and what it is doing', () => {
+  it('names the roof overhead, and says nothing at all under open sky', () => {
+    const outside = withHut(makeWorld([{ id: 'a', x: 9, y: 12 }]))
+    expect(composePerception(outside, DEFAULT_CONFIG, 'a', []).self.inside).toBeUndefined()
+    const inside = goInside(outside, 'a')
+    expect(composePerception(inside, DEFAULT_CONFIG, 'a', []).self.inside)
+      .toEqual({ id: HUT.id, kind: HUT.kind })
+  })
+
+  it('names where the legs are already going, and only while they are walking', () => {
+    const s = withHut(makeWorld([{ id: 'a', x: 9, y: 12 }]))
+    const busy = (activity: unknown): WorldState =>
+      ({ ...s, agents: { ...s.agents, a: { ...s.agents.a!, activity } } } as WorldState)
+
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', []).self.activityToward).toBeUndefined()
+
+    const walking = composePerception(
+      busy({ verb: 'walk', params: { x: 20, y: 4 }, ticksRemaining: 12 }), DEFAULT_CONFIG, 'a', [],
+    )
+    expect(walking.self.activity).toBe('walk')
+    expect(walking.self.activityToward).toEqual({ x: 20, y: 4 })
+
+    // A pair of hands busy with anything else is busy without a destination.
+    const chopping = composePerception(
+      busy({ verb: 'chop', params: { x: 20, y: 4 }, ticksRemaining: 3 }), DEFAULT_CONFIG, 'a', [],
+    )
+    expect(chopping.self.activity).toBe('chop')
+    expect(chopping.self.activityToward).toBeUndefined()
+  })
+})
+
+// R21-C: a body that looks ill looks ill. The live gate's healer thought about who might be
+// sick in 33 separate turns and tended nobody, because a pair of eyes got a name, a place and
+// nothing else — while the founder six tiles away died of a fever.
+describe('composePerception: a body carries what ails it, where eyes can reach', () => {
+  const sicken = (s: WorldState, id: string, kind: string, severity: number): WorldState =>
+    fold(s, ev('agent_afflicted', { agentId: id, kind, severity }), DEFAULT_CONFIG)
+
+  it('a well body carries nothing, so a healthy town reads exactly as it always did', () => {
+    const s = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 2, y: 0 }])
+    const seen = composePerception(s, DEFAULT_CONFIG, 'a', []).visible.agents[0]!
+    expect(seen.condition).toBeUndefined()
+    expect(Object.keys(seen).sort())
+      .toEqual(['activityVerb', 'ageBand', 'asleep', 'collapsed', 'id', 'name', 'x', 'y'])
+  })
+
+  it('names the ailment in words and never in numbers', () => {
+    let s = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 2, y: 0 }])
+    s = sicken(s, 'b', 'illness', 2)
+    const seen = composePerception(s, DEFAULT_CONFIG, 'a', []).visible.agents[0]!
+    expect(seen.condition).toBe('flushed with fever')
+    expect(seen.condition).not.toMatch(/[0-9]/)
+  })
+
+  it('one phrase, and it is the worst thing there is to see', () => {
+    let s = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 2, y: 0 }])
+    s = sicken(s, 'b', 'injury', 1)
+    s = sicken(s, 'b', 'poison', 3)
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', []).visible.agents[0]!.condition)
+      .toBe('grey-faced and doubled over')
+  })
+
+  it('a wound with no affliction still shows, and so does an empty belly', () => {
+    const base = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 2, y: 0 }])
+    const hurt: WorldState = {
+      ...base,
+      agents: { ...base.agents, b: { ...base.agents.b!, hp: DEFAULT_CONFIG.health.maxHp * 0.2 } },
+    }
+    expect(composePerception(hurt, DEFAULT_CONFIG, 'a', []).visible.agents[0]!.condition).toBe('badly hurt')
+
+    const starved: WorldState = {
+      ...base,
+      agents: { ...base.agents, b: { ...base.agents.b!, needs: { ...base.agents.b!.needs, hunger: 2 } } },
+    }
+    expect(composePerception(starved, DEFAULT_CONFIG, 'a', []).visible.agents[0]!.condition)
+      .toBe('hollowed out with hunger')
+  })
+
+  it('the dark hides a fever exactly as it hides the body wearing it', () => {
+    let s = makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 11, y: 0 }])
+    s = sicken(s, 'b', 'illness', 3)
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', []).visible.agents[0]!.condition)
+      .toBe('flushed with fever')
+    // Midnight: the horizon shrinks past the body, and the fever goes with it.
+    const night: WorldState = { ...s, tick: 0 }
+    expect(composePerception(night, DEFAULT_CONFIG, 'a', []).visible.agents).toEqual([])
   })
 })

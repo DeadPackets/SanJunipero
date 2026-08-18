@@ -57,6 +57,27 @@ export function migrateArbiterTables(db: Database.Database): void {
       reverted_reason TEXT
     );
   `)
+  // The construct registry and its ops-plane record. Agent-invisible by construction: these
+  // tables live in the arbiter's database, never in the world's.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS constructs (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      name TEXT,
+      name_provenance TEXT,
+      anchor TEXT,
+      participants TEXT NOT NULL,
+      first_tick INTEGER NOT NULL,
+      recurrences TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS construct_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL CHECK(type IN ('construct_recognized','construct_named','construct_recurred')),
+      construct_id TEXT NOT NULL REFERENCES constructs(id),
+      tick INTEGER NOT NULL,
+      payload TEXT NOT NULL
+    );
+  `)
   db.exec(`
     CREATE TABLE IF NOT EXISTS ruling_reviews (
       id INTEGER PRIMARY KEY,

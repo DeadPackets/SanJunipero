@@ -291,7 +291,9 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
 
     const verdict = await arbiter.adjudicate('I dance the ghost dance', ctx)
     expect(verdict.kind).toBe('impossible')
-    expect(llm.objectCalls).toBe(2)
+    // Three: a dance is tried on the cheap expressive path first, and this script has no
+    // ruling to give it, so it falls through to the two verdict attempts.
+    expect(llm.objectCalls).toBe(3)
     // Never recorded — a hallucinated verb must not become immutable precedent.
     const n = (db.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n
     expect(n).toBe(0)
@@ -459,7 +461,10 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
   it('still refuses a rung two steps out, so the frontier widens nothing', async () => {
     const twoStepsOut: Verdict = {
       kind: 'attempt',
-      recipe: { ...smokedFishRecipe, id: 'recipe:salt_cured_fish', rngStream: 'recipe:salt_cured_fish', canon: ['salt_curing'] },
+      recipe: {
+        ...smokedFishRecipe, id: 'recipe:salt_cured_fish', name: 'Salt-Cure the Fish',
+        rngStream: 'recipe:salt_cured_fish', canon: ['salt_curing'],
+      },
       summary: 'Pack the fish in salt to keep it.',
     }
     const llm = new ScriptedLlm(() => twoStepsOut)
@@ -518,9 +523,49 @@ describe('FORBIDDEN_FRAMING enforced over live LLM output', () => {
       expect(FORBIDDEN_FRAMING.test(verdict.reason)).toBe(false)
       expect(verdict.class).toBe('physically_impossible')
     }
-    expect(llm.objectCalls).toBe(1)
+    // Two: a whistle reaches the cheap expressive path first and gets no ruling from it.
+    expect(llm.objectCalls).toBe(2)
     const row = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
     expect(FORBIDDEN_FRAMING.test(row.verdict_json)).toBe(false)
+  })
+})
+
+// The ground the asker can see is shown to the arbiter, so the ground the asker can see is
+// what a recipe may require: the live run demanded sand for work against a wooden wall.
+describe('the ground the arbiter was shown is the ground a recipe may ask for', () => {
+  const sandVerdict: Verdict = {
+    kind: 'attempt',
+    summary: 'Bank the wall with sand.',
+    recipe: { ...basketRecipe, id: 'recipe:bank_the_wall', name: 'Bank the Wall', requires: [{ type: 'adjacent_tile', tile: 'sand' }] },
+  }
+  const seeing = (ground: string[]): AgentCtx => ({ ...ctx, visible: { structures: [], ground } })
+
+  it('refuses ground nobody in sight can point at, and retries instead of minting it', async () => {
+    const llm = new ScriptedLlm(() => sandVerdict)
+    const { db, arbiter } = await makeRig(llm)
+
+    const verdict = await arbiter.adjudicate('I bank the wall against the wind', seeing(['grass', 'water']))
+    expect(verdict.kind).toBe('impossible')
+    expect(llm.objectCalls).toBe(2)
+    expect((db.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n).toBe(0)
+    expect(arbiter.sanity(sandVerdict.kind === 'attempt' ? sandVerdict.recipe : basketRecipe, seeing(['grass'])))
+      .toMatch(/sand/)
+  })
+
+  it('lets the same recipe through where the sand actually is', async () => {
+    const llm = new ScriptedLlm(() => sandVerdict)
+    const { arbiter } = await makeRig(llm)
+
+    const verdict = await arbiter.adjudicate('I bank the wall against the wind', seeing(['grass', 'sand']))
+    expect(verdict.kind).toBe('attempt')
+    expect(llm.objectCalls).toBe(1)
+  })
+
+  it('an asker who was shown no world is judged as before', async () => {
+    const llm = new ScriptedLlm(() => sandVerdict)
+    const { arbiter } = await makeRig(llm)
+
+    expect((await arbiter.adjudicate('I bank the wall against the wind', ctx)).kind).toBe('attempt')
   })
 })
 

@@ -1,8 +1,19 @@
 import type { SimEvent } from '@sj/shared'
 import type { HeatCtx, HeatScores, SceneSegment } from './types.js'
 
+// C11 put sickness, poison and wounds on a clock and the director could not see any of it: a
+// day with a poisoning, three nights of it getting worse, two tendings and a burial scored the
+// same heat as a quiet one. Every row below now names an event something in the world actually
+// emits (C11 R19). `agent_fell_ill` and `agent_infected` are the exception, kept at their old
+// weight because recorded C1-C10 logs carry them and rescoring history is not a heat fix.
+//
+// `hp_changed` is deliberately absent from both tables: a body with any affliction on it emits
+// one every tick, so weighting it would drown every other signal in the arithmetic of dying.
 export const CONFLICT_WEIGHT: Record<string, number> = {
   agent_injured: 1,
+  agent_harmed: 1.5,
+  agent_afflicted: 1,
+  affliction_worsened: 1,
   agent_fell_ill: 1,
   agent_infected: 1,
   action_interrupted: 1,
@@ -18,6 +29,13 @@ export const STAKES_WEIGHT: Record<string, number> = {
   agent_died: 3,
   agent_collapsed: 2,
   agent_injured: 1,
+  agent_harmed: 1,
+  agent_afflicted: 1,
+  affliction_worsened: 1,
+  // Relief is stakes resolved, and somebody kneeling to help is somebody with something to lose.
+  affliction_recovered: 1,
+  agent_tended: 1,
+  grave_placed: 1,
   fire_ignited: 1,
   structure_destroyed: 1,
   crop_withered: 1,

@@ -1,15 +1,12 @@
-import { crafterStamp, registerVerb, skillLevel, VERBS } from '@sj/engine'
-import type { PendingEvent, Structure, TileId, VerbDef, WorldState } from '@sj/engine'
+import { crafterStamp, RECIPE_TILE_IDS, registerVerb, shortOf, skillLevel, VERBS } from '@sj/engine'
+import type { PendingEvent, Structure, VerbDef, WorldState } from '@sj/engine'
 import type { SimConfig } from '@sj/shared'
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
 import type { RulebookStore } from './rulebook.js'
+import { recipeSanityRefusal } from './sanity.js'
 import { rollOutcomeTable, skillFactor } from './verdict.js'
 import type { OutcomeEffect, Recipe } from './verdict.js'
-
-const TILE_IDS: Record<string, TileId> = {
-  grass: 0, dirt: 1, water: 2, forest: 3, rock: 4, sand: 5, farmland: 6,
-}
 
 function heldStacks(state: WorldState, agentId: string, kind: string) {
   return Object.keys(state.items).sort()
@@ -36,7 +33,7 @@ function anyAdjacentTile(state: WorldState, agentId: string, tile: string): bool
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       if (dx === 0 && dy === 0) continue
-      if (state.terrain[a.y + dy]?.[a.x + dx] === TILE_IDS[tile]) return true
+      if (state.terrain[a.y + dy]?.[a.x + dx] === RECIPE_TILE_IDS[tile]) return true
     }
   }
   return false
@@ -103,7 +100,7 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
     kind: recipe.id,
     validate(state, _config, agentId) {
       for (const cost of recipe.costs) {
-        if (heldQty(state, agentId, cost.kind) < cost.qty) return `not enough ${cost.kind}`
+        if (heldQty(state, agentId, cost.kind) < cost.qty) return shortOf(cost.kind)
       }
       for (const req of recipe.requires) {
         switch (req.type) {
@@ -177,6 +174,10 @@ export function codify(
   if (!deps.codex.withinAdjacency(recipe.canon)) {
     throw new Error(`cannot codify ${recipe.id}: canon ${recipe.canon.join(', ')} is beyond adjacency`)
   }
+  // Nor one that cannot stand as a permanent verb. The tableless checks apply to every
+  // caller: a verdict word, a truncated id and an entity id are wrong on their face.
+  const unsound = recipeSanityRefusal(recipe)
+  if (unsound !== null) throw new Error(`cannot codify ${recipe.id}: ${unsound}`)
   const existing = deps.rulebook.byId(recipe.id)
   if (existing) {
     // Active row → idempotent no-op; reverted row → reactivate it so the

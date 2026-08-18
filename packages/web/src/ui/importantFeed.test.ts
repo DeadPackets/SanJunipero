@@ -40,8 +40,8 @@ describe('chronicleLabel', () => {
   const state = fixture()
 
   it('writes the entries the town would remember', () => {
-    expect(chronicleLabel(ev('agent_died', { agentId: 'a1', cause: 'cold' }), state))
-      .toBe('Rahel has died (cold).')
+    expect(chronicleLabel(ev('agent_died', { agentId: 'a1', cause: 'exposure' }), state))
+      .toBe('Rahel froze.')
     expect(chronicleLabel(ev('agent_born', { id: 'a3', name: 'Mira', motherId: 'a1', fatherId: 'a2' }), state))
       .toBe('Mira was born.')
     expect(chronicleLabel(ev('co_slept', { aId: 'a1', bId: 'a2', day: 1 }), state))
@@ -61,8 +61,8 @@ describe('chronicleLabel', () => {
   })
 
   it('falls back to raw ids rather than inventing a person before the first snapshot', () => {
-    expect(chronicleLabel(ev('agent_died', { agentId: 'a1', cause: 'cold' }), null))
-      .toBe('a1 has died (cold).')
+    expect(chronicleLabel(ev('agent_died', { agentId: 'a1', cause: 'exposure' }), null))
+      .toBe('a1 froze.')
   })
 })
 

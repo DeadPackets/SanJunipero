@@ -10,8 +10,17 @@ export type AdjudicationBlocks = {
     skills: Record<string, number>
     inventory: Array<{ kind: string; qty: number }>
     position: { x: number; y: number }
+    // What stands around the asker and what the ground is. Rendered into the asker block,
+    // never into the cache-stable system prefix: it changes with every step taken.
+    visible?: {
+      structures: Array<{ kind: string; x: number; y: number }>
+      ground: string[]
+    }
   }
   precedent: Array<{ summary: string; verdictKind: string; recipeName?: string }>
+  // The words for stuff. Every material and building the recipe may name has to be on the
+  // page, or the ruling is thrown away unread (canon-vocabulary law, c8d267b precedent).
+  materials?: { itemKinds: readonly string[]; structureKinds: readonly string[] }
   intent: string
 }
 
@@ -24,7 +33,7 @@ export type AssembledAdjudicationPrompt = {
 // Operator-facing instruction appended after the canon block. The canon +
 // instruction prefix is byte-stable across every adjudication, so the
 // provider's prefix cache stays warm.
-const ADJUDICATION_INSTRUCTION = `You are the physics arbiter of San Junipero. An agent proposes an action. Reply with one verdict:
+export const ADJUDICATION_INSTRUCTION = `You are the physics arbiter of San Junipero. An agent proposes an action. Reply with one verdict:
 "map" only if the town already performs this exact action as a routine;
 "attempt" if the action is new but the agent can physically try it with the town's fire, clay pots, wood, fiber, stone implements, and river — whether it succeeds is decided later, never by you;
 "impossible" only if the action cannot even be started because it needs something the town wholly lacks.
@@ -65,7 +74,19 @@ function renderAgent(agent: AdjudicationBlocks['agent']): string {
     'Inventory:',
     inventory,
     `Position: ${agent.position.x}, ${agent.position.y}`,
+    ...renderVisible(agent.visible),
   ].join('\n')
+}
+
+// A ruling about a place is a ruling about ground the arbiter can see. Anything named here is
+// a word the ruling may use, so it goes into the enforced vocabulary too (canon-vocabulary law).
+function renderVisible(visible: AdjudicationBlocks['agent']['visible']): string[] {
+  if (visible === undefined) return []
+  const standing = visible.structures.map((s) => `a ${s.kind} at ${s.x}, ${s.y}`).join('; ')
+  return [
+    `Standing nearby: ${standing.length > 0 ? standing : 'nothing but open ground'}`,
+    `The ground here: ${visible.ground.join(', ')}`,
+  ]
 }
 
 function renderPrecedent(precedent: AdjudicationBlocks['precedent']): string {
@@ -94,10 +115,19 @@ function estTokens(text: string): number {
   return Math.ceil(text.length / 4)
 }
 
+function renderMaterials(m: AdjudicationBlocks['materials']): string {
+  if (m === undefined) return ''
+  return [
+    `\nThe town has words for these things: ${[...m.itemKinds].sort().join(', ')}.`,
+    `And it builds these: ${[...m.structureKinds].sort().join(', ')}.`,
+    'A recipe may ask for and spend only those, named exactly as they are written above. Never name a particular thing standing in the world; a recipe is a rule and outlives every one of them.',
+  ].join('\n')
+}
+
 export function assembleAdjudicationPrompt(
   blocks: AdjudicationBlocks,
 ): AssembledAdjudicationPrompt {
-  const system = `${blocks.canon}\n${renderFrontier(blocks.frontier)}\n\n${ADJUDICATION_INSTRUCTION}`
+  const system = `${blocks.canon}\n${renderFrontier(blocks.frontier)}${renderMaterials(blocks.materials)}\n\n${ADJUDICATION_INSTRUCTION}`
   const user = renderUser(blocks)
   const messages: LlmMessage[] = [{ role: 'user', content: user }]
   return { system, messages, estTokens: estTokens(`${system}${user}`) }

@@ -13,9 +13,11 @@ export const TERRAIN_KIND_FALLBACK: TerrainTileKind = 'grass'
 export const ROAD_TILE_ID = 7
 
 // Every TileId the engine can emit has a tile kind — C9 Task 1b added road (7), so a road
-// tile must never fall through to grass.
+// tile must never fall through to grass. C11's path/sapling/channel borrow the nearest
+// existing art kind; their own terrain art is C12's, not the engine's.
 export const TILE_KIND: Record<TileId, TerrainTileKind> = {
   0: 'grass', 1: 'earth', 2: 'water', 3: 'forest', 4: 'rock', 5: 'sand', 6: 'farmland', 7: 'road',
+  8: 'earth', 9: 'forest', 10: 'water',
 }
 
 export function tileKind(id: number): TerrainTileKind {

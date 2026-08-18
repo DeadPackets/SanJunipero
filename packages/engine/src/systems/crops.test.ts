@@ -14,7 +14,8 @@ const FAST: SimConfig = SimConfigSchema.parse({
   },
 })
 const DAWN = 360 // hour 6, minute 0
-const CHAR_TILE: Record<string, TileId> = { '.': 0, ',': 1, '~': 2, '#': 6 }
+const NOON = 720 // hour 12: daylight, so the night-work penalty is not what is being measured
+const CHAR_TILE: Record<string, TileId> = { '.': 0, ',': 1, '~': 2, '#': 6, c: 10 }
 
 let seq = 9000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
@@ -96,13 +97,16 @@ describe('verb: till', () => {
     expect(submitIntent(s, FAST, 'a1', 'till', { x: 0, y: 0 }).ok).toBe(true) // own tile
   })
 
-  it('converts grass and dirt to farmland via terrain_changed; plant then works there', () => {
-    let s = makeWorld([',.', '..'])
+  it('converts grass and dirt to farmland via tile_changed; plant then works there', () => {
+    // By daylight: from C11 Task 25 a tilled furrow cut at midnight takes half again as long.
+    let s = atTick(makeWorld([',.', '..']), NOON)
     const r = submitIntent(s, FAST, 'a1', 'till', { x: 0, y: 0 })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     const t = tickOnce(s)
-    expect(t.events).toContainEqual({ type: 'terrain_changed', payload: { x: 0, y: 0, tile: 6 } })
+    expect(t.events).toContainEqual({
+      type: 'tile_changed', payload: { x: 0, y: 0, from: 1, to: 6, reason: 'tilled', byId: 'a1' },
+    })
     expect(t.events).toContainEqual({ type: 'skill_gained', payload: { agentId: 'a1', track: 'farming', xp: 1 } })
     expect(t.state.terrain[0]![0]).toBe(6)
     expect(submitIntent(t.state, FAST, 'a1', 'plant', { x: 0, y: 0, kind: 'wheat' }).ok).toBe(true)
@@ -211,5 +215,59 @@ describe('verb: harvest', () => {
     expect(out.state.crops.crop_1).toBeUndefined()
     expect(out.state.items.item_2!.qty).toBe(3)
     expect(applyAll(s, out.events, FAST, s.tick)).toEqual(out.state)
+  })
+
+  it('a plot beside water yields more, and the same crop out in the dry yields the plain number', () => {
+    function harvestQty(rows: string[]): number {
+      let s = makeWorld(rows)
+      s = fold(s, ev('crop_planted', { id: 'crop_1', kind: 'wheat', x: 1, y: 0, plantedDay: 0 }), FAST)
+      s = fold(s, ev('crop_grew', { cropId: 'crop_1', stage: 3 }), FAST)
+      const r = submitIntent(s, FAST, 'a1', 'harvest', { cropId: 'crop_1' })
+      if (!r.ok) throw new Error(r.reason)
+      s = applyAll(s, r.events)
+      s = fold(s, ev('tick_advanced', {}, s.tick + 1), FAST)
+      const out = createWorldTick(FAST, new RngStreams('t'))(s)
+      const spawned = out.events.find((e) => e.type === 'item_spawned')!
+      return (spawned.payload as { qty: number }).qty
+    }
+    // fertility 1.375 one tile from the bank: floor(3 x 1.375) = 4.
+    expect(harvestQty(['.#~', '...'])).toBe(4)
+    expect(harvestQty(['.#.', '...'])).toBe(3)
+  })
+})
+
+describe('verb: dig_channel', () => {
+  it('cuts a channel beside water in four ticks', () => {
+    let s = atTick(makeWorld(['.~.', '...']), NOON)
+    const r = submitIntent(s, FAST, 'a1', 'dig_channel', { x: 1, y: 1 })
+    if (!r.ok) throw new Error(r.reason)
+    expect(r.events[0]).toEqual({
+      type: 'action_started', payload: { agentId: 'a1', verb: 'dig_channel', params: { x: 1, y: 1 }, duration: 4 },
+    })
+    s = applyAll(s, r.events)
+    let out = createWorldTick(FAST, new RngStreams('t'))(fold(s, ev('tick_advanced', {}, s.tick + 1), FAST))
+    for (let i = 0; i < 3; i++) {
+      out = createWorldTick(FAST, new RngStreams('t'))(fold(out.state, ev('tick_advanced', {}, out.state.tick + 1), FAST))
+    }
+    expect(out.events).toContainEqual({
+      type: 'tile_changed', payload: { x: 1, y: 1, from: 0, to: 10, reason: 'channel', byId: 'a1' },
+    })
+    expect(out.state.terrain[1]![1]).toBe(10)
+  })
+
+  it('extends from a channel as readily as from the river itself', () => {
+    const s = makeWorld(['.c.', '...'])
+    expect(submitIntent(s, FAST, 'a1', 'dig_channel', { x: 1, y: 1 }).ok).toBe(true)
+  })
+
+  it('refuses a meadow, a diagonal neighbour, a tile out of reach, and anything but grass or dirt', () => {
+    const dry = makeWorld(['...', '...'])
+    const r = submitIntent(dry, FAST, 'a1', 'dig_channel', { x: 1, y: 1 })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toBe('no water reaches here')
+    // (0,1) touches the water at (1,0) only corner to corner.
+    expect(submitIntent(makeWorld(['.~.', '...']), FAST, 'a1', 'dig_channel', { x: 0, y: 1 }).ok).toBe(false)
+    expect(submitIntent(makeWorld(['.~..', '....']), FAST, 'a1', 'dig_channel', { x: 3, y: 1 }).ok).toBe(false)
+    expect(submitIntent(makeWorld(['.~#', '...']), FAST, 'a1', 'dig_channel', { x: 2, y: 0 }).ok).toBe(false)
   })
 })

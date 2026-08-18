@@ -60,6 +60,39 @@ describe('effectiveConfig', () => {
       expect(node).toBeDefined()
     }
   })
+
+  // Driven from an explicit array, not from the table itself: a missing whitelist entry has to
+  // fail loudly, and a table-derived loop would happily agree with its own omission.
+  const C11_LAW_PATHS = [
+    'mortality.enabled', 'illness.enabled', 'thirst.enabled', 'fertility.enabled', 'roads.enabled',
+    'desirePaths.enabled', 'fauna.enabled', 'warmth.enabled', 'light.enabled', 'nightWitness.enabled',
+    'foodVariety.enabled', 'regrowth.enabled', 'mapGrowth.enabled', 'constructs.enabled',
+    'constructs.minParticipants',
+    'mortality.poisonChanceSpoiled', 'illness.dailyWorsenChance', 'illness.contagionEnabled',
+    'illness.contagionChance', 'thirst.decayFactorOfHunger', 'desirePaths.wearThreshold',
+    'light.nightWorkPenalty', 'light.fireRiskPerTick', 'nightWitness.nightFactor',
+    'regrowth.saplingChancePerDay',
+  ]
+
+  it('every C11 flag and starred dial is a world law with a value schema', () => {
+    for (const path of C11_LAW_PATHS) expect(TOGGLABLE_PATHS[path]).toBeDefined()
+  })
+
+  it('the C11 value schemas reject the wrong shape and the out-of-range value', () => {
+    expect(TOGGLABLE_PATHS['mortality.enabled']!.safeParse(true).success).toBe(true)
+    expect(TOGGLABLE_PATHS['mortality.enabled']!.safeParse('yes').success).toBe(false)
+    expect(TOGGLABLE_PATHS['illness.contagionChance']!.safeParse(0.4).success).toBe(true)
+    expect(TOGGLABLE_PATHS['illness.contagionChance']!.safeParse(1.4).success).toBe(false)
+    expect(TOGGLABLE_PATHS['desirePaths.wearThreshold']!.safeParse(60).success).toBe(true)
+    expect(TOGGLABLE_PATHS['desirePaths.wearThreshold']!.safeParse(-1).success).toBe(false)
+    expect(TOGGLABLE_PATHS['light.nightWorkPenalty']!.safeParse(2).success).toBe(true)
+    expect(TOGGLABLE_PATHS['light.nightWorkPenalty']!.safeParse(0).success).toBe(false)
+  })
+
+  // world.size is a genesis input, not a dial: growing the map mid-run is world_grown's job.
+  it('world.size is not toggleable', () => {
+    expect(TOGGLABLE_PATHS['world.size']).toBeUndefined()
+  })
 })
 
 describe('fold: config_changed', () => {

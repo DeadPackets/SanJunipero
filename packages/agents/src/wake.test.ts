@@ -163,12 +163,12 @@ describe('decideWake — hysteresis', () => {
   it('body_alarm fires while armed, stays quiet disarmed, re-arms past threshold + hysteresis', () => {
     const clock = clk()
     const run = (hunger: number, tick: number): WakeReason | null => {
-      rearmBodyAlarm(cfg, { hunger, energy: 78, warmth: 71 }, clock)
+      rearmBodyAlarm(cfg, { needs: { hunger, energy: 78, warmth: 71 } }, clock)
       return decideWake(cfg, withNeeds(hunger, 78, 71), clock, tick, pln())
     }
 
     expect(run(24, 10)).toBe('body_alarm')
-    disarmBodyAlarm(cfg, { hunger: 24, energy: 78, warmth: 71 }, clock)
+    disarmBodyAlarm(cfg, { needs: { hunger: 24, energy: 78, warmth: 71 } }, clock)
 
     expect(run(24, 11)).toBe(null)
 
@@ -185,8 +185,69 @@ describe('decideWake — hysteresis', () => {
     // Regression: hunger 30 lies in (25, 35]; a turn snapshot there used to
     // permanently disarm body_alarm because 30 is not > threshold + hysteresis.
     const clock = clk()
-    disarmBodyAlarm(cfg, { hunger: 30, energy: 78, warmth: 71 }, clock)
+    disarmBodyAlarm(cfg, { needs: { hunger: 30, energy: 78, warmth: 71 } }, clock)
     expect(decideWake(cfg, withNeeds(24, 78, 71), clock, 10, pln())).toBe('body_alarm')
+  })
+})
+
+// C11 shipped four new ways for a body to fail and the alarm clock knew about none of them:
+// the mini-rehearsal's minds ended two sim-days at hunger 0 with fatigue on every one of them,
+// and a sleeper dying of thirst had no path back at all.
+describe('decideWake — the thirst rung and the affliction rung', () => {
+  const withThirst = (thirst: number): PerceptionPacket => ({
+    ...quietMeadowPacket,
+    self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, thirst } },
+  })
+  const withAffliction = (kind: 'fatigue' | 'illness' | 'injury' | 'poison', severity: number): PerceptionPacket => ({
+    ...quietMeadowPacket,
+    self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, afflictions: [{ kind, severity }] } },
+  })
+  const sleeping = (packet: PerceptionPacket): PerceptionPacket => ({
+    ...packet,
+    self: { ...packet.self, asleep: true },
+    time: { ...packet.time, hour: 23, isNight: true },
+  })
+
+  it('a dry throat rings the bell', () => {
+    expect(decideWake(cfg, withThirst(24), clk(), 10, pln())).toBe('body_alarm')
+    expect(decideWake(cfg, withThirst(26), clk(), 10, pln())).toBe(null)
+  })
+
+  it('a sleeper dying of thirst is woken by its own body', () => {
+    expect(decideWake(cfg, sleeping(withThirst(4)), clk(), 900, pln())).toBe('body_alarm')
+  })
+
+  it('a packet from before thirst existed reads as a full body', () => {
+    expect(decideWake(cfg, quietMeadowPacket, clk(), 10, pln())).toBe(null)
+  })
+
+  it.each(['fatigue', 'illness', 'injury', 'poison'] as const)('%s rouses a sleeper', (kind) => {
+    expect(decideWake(cfg, sleeping(withAffliction(kind, 1)), clk(), 900, pln())).toBe('body_alarm')
+  })
+
+  it('rings once and then keeps quiet until the body is clear of it', () => {
+    const clock = clk()
+    const poisoned = withAffliction('poison', 2)
+    expect(decideWake(cfg, poisoned, clock, 10, pln())).toBe('body_alarm')
+    disarmBodyAlarm(cfg, poisoned.self.body, clock)
+    expect(decideWake(cfg, poisoned, clock, 11, pln())).toBe(null)
+
+    // Still poisoned, worse: no second bell. Only losing it re-arms the alarm.
+    rearmBodyAlarm(cfg, withAffliction('poison', 3).self.body, clock)
+    expect(decideWake(cfg, poisoned, clock, 12, pln())).toBe(null)
+    rearmBodyAlarm(cfg, quietMeadowPacket.self.body, clock)
+    expect(decideWake(cfg, poisoned, clock, 13, pln())).toBe('body_alarm')
+  })
+
+  it('thirst disarms and re-arms on the same hysteresis as hunger', () => {
+    const clock = clk()
+    expect(decideWake(cfg, withThirst(24), clock, 10, pln())).toBe('body_alarm')
+    disarmBodyAlarm(cfg, withThirst(24).self.body, clock)
+    expect(decideWake(cfg, withThirst(24), clock, 11, pln())).toBe(null)
+    rearmBodyAlarm(cfg, withThirst(30).self.body, clock)
+    expect(decideWake(cfg, withThirst(24), clock, 12, pln())).toBe(null)
+    rearmBodyAlarm(cfg, withThirst(36).self.body, clock)
+    expect(decideWake(cfg, withThirst(24), clock, 13, pln())).toBe('body_alarm')
   })
 })
 

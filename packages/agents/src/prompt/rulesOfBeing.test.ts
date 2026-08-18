@@ -1,13 +1,18 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
+import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import { assemblePrompt } from './assemble.js'
+import { calendarLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, FORBIDDEN_FRAMING, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
-import { fixtureBlocks, tamarIdentity } from '../testutil/fixtures.js'
+import { fixtureBlocks, quietMeadowPacket, tamarIdentity } from '../testutil/fixtures.js'
 
 // Block 1 is the cache-stable prefix of every prompt. Task 17 rewrites it once
 // (SPEECH_RULES + stow/ownership capabilities) and then it is frozen: this hash
 // is the enforcement point, not documentation.
-const BLOCK1_SHA256 = 'fa7892fb6f29d253ae44c9cd57a55c9b40751b97a1d110eaadf9c2ae3ff788d0'
+// Moved once since, by C11 batch-7 controller ruling 5 — the one-time authorized
+// amendment adding the twelve C11 Tier-1 verbs to CAPABILITIES. Re-pinned in that
+// same commit; the prefix is frozen again from here.
+const BLOCK1_SHA256 = '28c1fce0781ec9019416c234a9eae47401ff4b9dc4a96b91c371335fbad97bd6'
 
 function block1(): string {
   return [RULES_OF_BEING, CAPABILITIES, SPEECH_RULES].join('\n\n---\n\n')
@@ -54,6 +59,62 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
 
   it('never names the machinery', () => {
     expect(CAPABILITIES).not.toMatch(FORBIDDEN_FRAMING)
+  })
+})
+
+// Batch-7 ruling 5, the one-time amendment: twelve verbs were registered, nameable, and shown
+// to nobody. The mini-rehearsal found `drink` and `fill` through the turn schema alone;
+// discovery by schema is not knowledge, and `hunt` proved it by asking for an id no mind had.
+describe('CAPABILITIES — the twelve C11 Tier-1 verbs', () => {
+  const C11_VERBS = [
+    'drink', 'fill', 'dig_channel', 'douse', 'pave', 'hunt',
+    'wear', 'doff', 'kindle', 'snuff', 'stoke', 'chop',
+  ]
+
+  it.each(C11_VERBS)('names %s with the word the registry answers to', (verb) => {
+    expect(CAPABILITIES).toMatch(new RegExp(`^${verb} — name it ${verb}`, 'm'))
+  })
+
+  it('gives each of them exactly what its verb asks for', () => {
+    expect(CAPABILITIES).toMatch(/hunt — [^\n]*faunaId/)
+    expect(CAPABILITIES).toMatch(/forage — [^\n]*nodeId/)
+    expect(CAPABILITIES).toMatch(/fill — [^\n]*itemId/)
+    expect(CAPABILITIES).toMatch(/stoke — [^\n]*structureId/)
+    expect(CAPABILITIES).toMatch(/dig_channel — [^\n]*x and y as two numbers/)
+    expect(CAPABILITIES).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  it('leaves every verb a mind already had exactly where it was', () => {
+    for (const verb of ['walk', 'sleep', 'enter', 'stow', 'craft', 'experiment']) {
+      expect(CAPABILITIES).toMatch(new RegExp(`^${verb} — name it ${verb}`, 'm'))
+    }
+  })
+})
+
+describe('the shared calendar', () => {
+  const at = (tick: number): string => calendarLine(simTimeFromTick(tick))
+
+  it('names the day, the part of the day and the season, in that order', () => {
+    expect(at(11 * MINUTES_PER_DAY + 19 * 60)).toBe('It is day 12, dusk, early spring.')
+    expect(at(350 * MINUTES_PER_DAY + 3 * 60)).toBe('It is day 351, night, late winter.')
+    expect(at(222 * MINUTES_PER_DAY + 12 * 60)).toBe('It is day 223, day, mid autumn.')
+  })
+
+  it('reaches every turn through the moment prose, ahead of everything else in it', () => {
+    const prose = perceptionToProse({
+      ...quietMeadowPacket, time: simTimeFromTick(11 * MINUTES_PER_DAY + 19 * 60),
+    })
+    expect(prose.startsWith('It is day 12, dusk, early spring.')).toBe(true)
+    const a = assemblePrompt(fixtureBlocks({ now: { prose } }))
+    expect(a.messages.at(-1)!.content).toContain('day 12, dusk, early spring')
+  })
+
+  it('is a fact and nothing more — no machinery, no counsel, no taxonomy', () => {
+    for (const tick of [0, 11 * MINUTES_PER_DAY + 19 * 60, 350 * MINUTES_PER_DAY + 3 * 60]) {
+      const line = at(tick)
+      expect(line).not.toMatch(FORBIDDEN_FRAMING)
+      expect(line).not.toMatch(/\b(festival|faith|council|market|milestone|tier|construct|should|gather)\b/i)
+    }
   })
 })
 

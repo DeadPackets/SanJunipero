@@ -1,5 +1,6 @@
 import { DAYS_PER_YEAR, simTimeFromTick, type SimConfig } from '@sj/shared'
 import { dropHeldItems, type TickCtx } from '../worldTick.js'
+import { placeGrave } from './mortality.js'
 
 export type AgeBand = 'child' | 'adult' | 'elder'
 
@@ -28,6 +29,7 @@ export function agingSystem(ctx: TickCtx): void {
     if (ctx.rng.get('aging').next() < chance) {
       dropHeldItems(ctx, id)
       ctx.emit('agent_died', { agentId: id, cause: 'old_age' })
+      placeGrave(ctx, id)
     }
   }
 }

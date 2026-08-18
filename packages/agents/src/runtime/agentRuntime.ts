@@ -4,12 +4,12 @@ import type Database from 'better-sqlite3'
 import type { LlmClient } from '../llm/client.js'
 import type { IdentityCore, AssembledPrompt, PromptBlocks } from '../prompt/assemble.js'
 import { assemblePrompt, compactDayLog } from '../prompt/assemble.js'
-import { perceptionToProse, type PerceptionPacket } from '../prompt/prose.js'
+import { makeablesLine, perceptionToProse, type PerceptionPacket } from '../prompt/prose.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
 import { keywords, retrieveAmbient, type SceneCues } from '../memory/retrieve.js'
-import { parseTurnWithRepair, reconsiderTick, TurnSchema, type Turn } from '../turn.js'
+import { isBlankAnswer, parseTurnWithRepair, reconsiderTick, TurnSchema, type Turn } from '../turn.js'
 import {
   decideWake,
   disarmBodyAlarm,
@@ -76,13 +76,25 @@ function cuesFromPacket(packet: PerceptionPacket): SceneCues {
 
 export type RuntimeStats = { turns: number; dozes: number; reflections: number; costUsd: number }
 
+// What a mind is carrying at a tick boundary, in a shape that survives a JSON round trip. Cost
+// is absent on purpose: it is in the database and would be double-counted here.
+export type RuntimeSnapshot = {
+  clock: MindClock
+  plan: PlanState
+  stats: { turns: number; dozes: number; reflections: number }
+  dayLog: string[]
+  reflectedNight: number | null
+  wasNight: boolean
+  pendingDreamMood: string | null
+}
+
 function freshClock(): MindClock {
   return {
     lastTurnTick: 0,
     reconsiderAtTick: null,
     conversationUntilTick: 0,
     dozeUntilTick: 0,
-    alarmArmed: { hunger: true, energy: true, warmth: true },
+    alarmArmed: {},
     morningWokeDay: null,
     wakeRetryAtTick: 0,
     prevVisibleIds: [],
@@ -171,6 +183,33 @@ export class AgentRuntime {
     }
   }
 
+  // Everything a mind carries between ticks that is not in the database. A run that is
+  // interrupted and picked up again restores this, or every mind wakes with a fresh clock: it
+  // would think the moment the run resumed rather than when it meant to, drop the plan it was
+  // halfway through, and report a turn count that starts at the resume.
+  snapshot(): RuntimeSnapshot {
+    return {
+      clock: { ...this.#clock, alarmArmed: { ...this.#clock.alarmArmed }, prevVisibleIds: [...this.#clock.prevVisibleIds] },
+      plan: { queue: this.#plan.queue.map((i) => ({ ...i })), lastResult: this.#plan.lastResult },
+      stats: { ...this.#stats },
+      dayLog: [...this.#dayLog],
+      reflectedNight: this.#reflectedNight,
+      wasNight: this.#wasNight,
+      pendingDreamMood: this.#pendingDreamMood,
+    }
+  }
+
+  // Applied AFTER `start`, which is what clears these in the first place.
+  restore(s: RuntimeSnapshot): void {
+    this.#clock = { ...s.clock, alarmArmed: { ...s.clock.alarmArmed }, prevVisibleIds: [...s.clock.prevVisibleIds] }
+    this.#plan = { queue: s.plan.queue.map((i) => ({ ...i })), lastResult: s.plan.lastResult }
+    this.#stats = { ...s.stats }
+    this.#dayLog = [...s.dayLog]
+    this.#reflectedNight = s.reflectedNight
+    this.#wasNight = s.wasNight
+    this.#pendingDreamMood = s.pendingDreamMood
+  }
+
   // Post-construction wiring: G9b and C8's supervisor build the arbiter after
   // the minds. Called through `wireArbiter`.
   useArbiter(arbiter: SeamArbiter): void {
@@ -204,7 +243,7 @@ export class AgentRuntime {
   #onTick(tick: number): void {
     if (!this.#started) return
     const packet = this.#bridge.perception(this.#agentId)
-    rearmBodyAlarm(this.#config, packet.self.body.needs, this.#clock)
+    rearmBodyAlarm(this.#config, packet.self.body, this.#clock)
     this.#submitPendingIfIdle(packet.self.activity)
     this.#advancePlan(packet)
     this.#answerWakeOwed(packet)
@@ -395,8 +434,14 @@ export class AgentRuntime {
     const prose = perceptionToProse(packet, (detail) => this.#llm.alert('prose', detail), {
       isWalkable: (x, y) => this.#bridge.isWalkable(x, y),
       isEdible: (kind) => this.#bridge.isEdible(kind),
+      waterAtHand: () => this.#bridge.waterAtHand(this.#agentId),
+      nearestWater: (x, y) => this.#bridge.nearestWater(x, y),
+      nearestFood: (x, y) => this.#bridge.nearestFood(x, y),
     })
     this.#dayLog.push(prose)
+    // Said in the same breath as what the eyes can reach, and NOT into the day log: what these
+    // hands can make is a standing fact about the world, not something that happened today.
+    const nowProse = `${prose} ${makeablesLine(this.#bridge.makeables())}`
 
     // Retrieve BEFORE inserting this perception: a just-written row would win
     // recency and tag match, filling the scene with echoes of the present.
@@ -422,7 +467,7 @@ export class AgentRuntime {
       personality: { doc: this.#personality.current().doc, autobiography: this.#mem!.autobiography() },
       scene: { ledgers: this.#buildLedgers(cues.people), memories: ambient },
       dayLog: this.#dayLog,
-      now: { prose },
+      now: { prose: nowProse },
     }
     let assembled = assemblePrompt(blocks)
 
@@ -436,15 +481,19 @@ export class AgentRuntime {
         this.#dayLog = compactDayLog(this.#dayLog, summary.text)
         assembled = assemblePrompt({ ...blocks, dayLog: this.#dayLog })
       }
-      let raw: unknown
-      let badText = ''
-      try {
-        raw = (await this.#llm.object({ schema: TurnSchema, system: assembled.system, messages: assembled.messages })).value
-      } catch (err) {
-        if (!NoObjectGeneratedError.isInstance(err)) throw err
-        badText = err.text ?? ''
-        raw = jsonOrRaw(badText)
+      let answer = await this.#ask(assembled)
+      // A blank answer is not a wrong answer. There is nothing to correct, so the honest
+      // retry is the same request again — byte-identical, and so still a cached prefix.
+      if (isBlankAnswer(answer.raw)) answer = await this.#ask(assembled)
+      if (isBlankAnswer(answer.raw)) {
+        // Twice nothing. The turn is left UNSPENT: no thought the mind never had, no turn
+        // counted, and whatever the body was already doing carries on being done. The doze
+        // is the back-pressure, so a silent back end is not hammered.
+        this.#llm.alert('blank_answer', 'two blank answers; the turn is left unspent')
+        this.#doze(tick)
+        return
       }
+      const { raw, badText } = answer
       turn = await parseTurnWithRepair(
         raw,
         (issues) => this.#repair(assembled, badText, issues),
@@ -457,12 +506,27 @@ export class AgentRuntime {
 
     this.#clock.lastTurnTick = tick
     await this.#applyTurn(turn, tick, day)
-    if (turn.plan === undefined && (this.#plan.lastResult === 'done' || this.#plan.lastResult === 'blocked')) {
+    if ((turn.plan ?? undefined) === undefined && (this.#plan.lastResult === 'done' || this.#plan.lastResult === 'blocked')) {
       this.#plan.lastResult = 'idle'
     }
     this.#stats.turns += 1
-    disarmBodyAlarm(this.#config, packet.self.body.needs, this.#clock)
+    disarmBodyAlarm(this.#config, packet.self.body, this.#clock)
     this.#clock.prevVisibleIds = packet.visible.agents.map((a) => a.id)
+  }
+
+  // One ask, and what came back of it: the parsed answer, plus the raw text when the answer
+  // did not fit the shape, which is what a repair needs to quote back.
+  async #ask(assembled: AssembledPrompt): Promise<{ raw: unknown; badText: string }> {
+    try {
+      const { value } = await this.#llm.object({
+        schema: TurnSchema, system: assembled.system, messages: assembled.messages,
+      })
+      return { raw: value, badText: '' }
+    } catch (err) {
+      if (!NoObjectGeneratedError.isInstance(err)) throw err
+      const badText = err.text ?? ''
+      return { raw: jsonOrRaw(badText), badText }
+    }
   }
 
   // The bad output goes back as the assistant's own words, the correction as
@@ -492,7 +556,7 @@ export class AgentRuntime {
     this.#onThought?.({ tick, agentId: this.#agentId, text: turn.thought })
 
     // A turn that speaks or acts directly preempts whatever plan was running.
-    if (turn.speech !== undefined || turn.action !== undefined) {
+    if ((turn.speech ?? null) !== null || (turn.action ?? null) !== null) {
       if (this.#plan.lastResult === 'running') this.#plan.lastResult = 'idle'
       this.#plan.queue = []
       this.#planHeadInFlight = false

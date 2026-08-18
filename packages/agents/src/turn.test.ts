@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { MINUTES_PER_DAY } from '@sj/shared'
-import type { z } from 'zod'
-import { FALLBACK_TURN, IntentSchema, TurnSchema, parseTurnWithRepair, reconsiderTick } from './turn.js'
+import { dayPhaseFromTick, MINUTES_PER_DAY } from '@sj/shared'
+import { z } from 'zod'
+import * as engine from '@sj/engine'
+import { FALLBACK_TURN, IntentParamsSchema, IntentSchema, TurnSchema, parseTurnWithRepair, reconsiderTick } from './turn.js'
 import { FORBIDDEN_FRAMING } from './prompt/rulesOfBeing.js'
 
 const validTurn = {
@@ -46,6 +47,39 @@ describe('TurnSchema', () => {
     expect(TurnSchema.parse(FALLBACK_TURN)).toEqual(FALLBACK_TURN)
   })
 
+  it('keeps a complete turn that wrote null where it had nothing to say', () => {
+    // Measured live: Baidu returned a turn carrying a valid action AND speech and the whole
+    // answer was discarded, because it wrote `"reconsider_at": null` where the schema wanted
+    // the key absent. A null in an optional field is the model saying "none", not a malformed
+    // answer, and it costs a repair call every time.
+    for (const key of ['speech', 'action', 'plan', 'journal', 'reconsider_at'] as const) {
+      const parsed = TurnSchema.safeParse({ ...validTurn, [key]: null })
+      expect(parsed.success, key).toBe(true)
+    }
+  })
+
+  it('a null optional field reads as absent, so nothing downstream acts on it', () => {
+    const t = TurnSchema.parse({
+      thought: 'nothing to add', importance: 2,
+      speech: null, action: null, plan: null, journal: null, reconsider_at: null,
+    })
+    expect(t.speech ?? undefined).toBeUndefined()
+    expect(t.action ?? undefined).toBeUndefined()
+    expect(t.plan ?? undefined).toBeUndefined()
+    expect(t.journal ?? undefined).toBeUndefined()
+    expect(t.reconsider_at ?? undefined).toBeUndefined()
+  })
+
+  it('still names exactly two required fields, and no transform blocks the emitted grammar', () => {
+    // A `.transform()` that normalised null to absent would read better and cannot be used:
+    // `z.toJSONSchema(..., { io: 'output' })` throws on one, and that is the direction the
+    // SDK converts an output schema in.
+    for (const io of ['input', 'output'] as const) {
+      const emitted = z.toJSONSchema(TurnSchema, { io }) as { required: string[] }
+      expect(emitted.required, io).toEqual(['thought', 'importance'])
+    }
+  })
+
   it('every field carries a diegetic description the mind can learn from (finding 8)', () => {
     const shape = TurnSchema.shape
     for (const key of Object.keys(shape) as Array<keyof typeof shape>) {
@@ -54,6 +88,45 @@ describe('TurnSchema', () => {
       expect(desc).not.toMatch(FORBIDDEN_FRAMING)
     }
     expect((shape.reconsider_at as z.ZodType).description).toMatch(/\d{2}:\d{2}/)
+  })
+})
+
+// Every `*Params` schema the engine exports, which is every parameter shape a registered
+// Tier-1 verb reads. The arbiter's `ExpressiveParams` is not reachable from here — @sj/arbiter
+// depends on @sj/agents — so its single key is named explicitly below.
+const enginePlaces = Object.entries(engine as Record<string, unknown>)
+  .filter(([name]) => name.endsWith('Params'))
+  .map(([name, schema]) => [name, Object.keys((schema as z.ZodObject).shape)] as const)
+
+describe('IntentSchema.params emits a grammar a constrained decoder can compile', () => {
+  it('names every parameter every registered verb reads', () => {
+    expect(enginePlaces.length).toBeGreaterThan(20)
+    const named = new Set(Object.keys(IntentParamsSchema.shape))
+    for (const [verbSchema, keys] of enginePlaces) {
+      for (const key of keys) expect(named, `${verbSchema}.${key}`).toContain(key)
+    }
+    // @sj/arbiter's ExpressiveParams, which a coined verb is validated against.
+    expect(named).toContain('targetId')
+  })
+
+  it('carries no propertyNames key, in either direction', () => {
+    for (const io of ['input', 'output'] as const) {
+      const json = JSON.stringify(z.toJSONSchema(TurnSchema, { io, unrepresentable: 'any' }))
+      expect(json, io).not.toContain('propertyNames')
+    }
+  })
+
+  it('still carries a parameter nobody has written down yet, for a verb minted at runtime', () => {
+    const parsed = IntentSchema.parse({ verb: 'recipe:spoon', params: { whittledFrom: 'ash' } })
+    expect(parsed.params).toEqual({ whittledFrom: 'ash' })
+  })
+
+  it('keeps the params every real act passes', () => {
+    expect(IntentSchema.parse({ verb: 'walk', params: { x: 62, y: 70 } }).params).toEqual({ x: 62, y: 70 })
+    expect(IntentSchema.parse({ verb: 'give', params: { itemId: 'i1', targetId: 'omar' } }).params)
+      .toEqual({ itemId: 'i1', targetId: 'omar' })
+    expect(IntentSchema.parse({ verb: 'build', params: { kind: 'hut', x: 1, y: 2 } }).params)
+      .toEqual({ kind: 'hut', x: 1, y: 2 })
   })
 })
 
@@ -88,6 +161,40 @@ describe('parseTurnWithRepair', () => {
     expect(alert).toHaveBeenCalledTimes(1)
     const detail = alert.mock.calls[0]![0] as string
     expect(detail).toContain('importance')
+  })
+})
+
+describe('reconsiderTick on an absolute day and phase', () => {
+  const day = (n: number): number => MINUTES_PER_DAY * (n - 1)
+
+  it('resolves a named day and phase to the exact tick that phase begins', () => {
+    expect(reconsiderTick(day(11) + 9 * 60, { day: 12, phase: 'dusk' })).toBe(day(12) + 19 * 60)
+    expect(reconsiderTick(day(11) + 9 * 60, { day: 12, phase: 'day' })).toBe(day(12) + 7 * 60)
+    expect(reconsiderTick(day(11) + 9 * 60, { day: 12, phase: 'night' })).toBe(day(12) + 21 * 60)
+  })
+
+  it('every anchor it resolves to is genuinely that phase of the day', () => {
+    for (const phase of ['day', 'dusk', 'night'] as const) {
+      expect(dayPhaseFromTick(reconsiderTick(0, { day: 3, phase }))).toBe(phase)
+    }
+  })
+
+  it('a day already gone becomes the next time that phase comes round', () => {
+    expect(reconsiderTick(day(14) + 9 * 60, { day: 12, phase: 'dusk' })).toBe(day(14) + 19 * 60)
+    expect(reconsiderTick(day(14) + 20 * 60, { day: 12, phase: 'dusk' })).toBe(day(15) + 19 * 60)
+  })
+
+  it('is strictly future when now is exactly the anchor', () => {
+    expect(reconsiderTick(day(12) + 19 * 60, { day: 12, phase: 'dusk' })).toBe(day(13) + 19 * 60)
+  })
+
+  it('rides the turn schema, and the model is shown the words it must answer with', () => {
+    const t = TurnSchema.parse({ ...validTurn, reconsider_at: { day: 12, phase: 'dusk' } })
+    expect(t.reconsider_at).toEqual({ day: 12, phase: 'dusk' })
+    expect(TurnSchema.safeParse({ ...validTurn, reconsider_at: { day: 12, phase: 'teatime' } }).success).toBe(false)
+    expect(TurnSchema.safeParse({ ...validTurn, reconsider_at: { day: 12 } }).success).toBe(false)
+    const desc = (TurnSchema.shape.reconsider_at as z.ZodType).description ?? ''
+    for (const word of ['day', 'dusk', 'night']) expect(desc).toContain(word)
   })
 })
 
