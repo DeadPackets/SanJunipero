@@ -161,3 +161,30 @@ describe('the opacity habit, at every ink-on-paper site it produced', () => {
     }
   })
 })
+
+// ── ★ THE BADGE THAT RAISES ITS VOICE, MEASURED ───────────────────────────────────────────
+//
+// R8 gave the tick badge a stale state and painted it `--cream` on `--rose`. That is 3.12:1,
+// and the badge is 12.48px in the desktop chrome — normal text, so AA is 4.5 and it FAILS.
+// `.link-pill`, which wears the same rose beside it, had `--deep` on it all along: 4.82:1.
+// The one surface whose whole job is to tell a viewer the clock is no longer being told to us
+// was the one they could not read. Fourth time opacity-or-colour has been asserted rather
+// than measured on this project.
+
+describe('a stale clock is legible, not just loud', () => {
+  const ROSE_SITES = ['.tick-badge.stale', '.link-pill']
+
+  it.each(ROSE_SITES)('%s clears AA on the rose it wears', (selector) => {
+    const body = ruleBody(CSS, selector)
+    const fg = /color:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    const bg = /background:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
+    expect(bg, `${selector} sets no background token`).toBe('rose')
+    expect(fg, `${selector} sets no colour token`).toBeDefined()
+    expect(contrast(T[fg!]!, T['rose']!), `${selector}`).toBeGreaterThanOrEqual(AA)
+  })
+
+  it('records the pair it rejected, so it cannot come back', () => {
+    expect(contrast(T['cream']!, T['rose']!)).toBeCloseTo(3.12, 2)
+    expect(contrast(T['deep']!, T['rose']!)).toBeCloseTo(4.82, 2)
+  })
+})

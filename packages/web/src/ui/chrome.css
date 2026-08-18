@@ -269,7 +269,10 @@ body {
 /* R8 / audit M9: with the socket down the badge went on reading `Now` in its live colour. It
    says "Last seen" now, and it wears the rose the link pill wears — a stale figure is stated,
    never implied by the absence of something. Colour is the SECOND signal; the word is first. */
-.tick-badge.stale { background: var(--rose); color: var(--cream); }
+/* `--deep`, not `--cream`: cream on rose is 3.12:1 and this badge is 12.48px, so it failed AA
+   on the one surface whose job is to say the clock is stale. The pill beside it always wore
+   the darker ink — 4.82:1 — and now they agree. */
+.tick-badge.stale { background: var(--rose); color: var(--deep); }
 
 /* link trouble is the only time the chrome raises its voice */
 .link-pill {
