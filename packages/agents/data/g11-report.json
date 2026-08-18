@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-17T22:35:22.154Z",
+  "generatedAt": "2026-08-18T00:25:30.590Z",
   "partial": false,
   "model": "deepseek/deepseek-v4-flash-0731",
   "totalTicks": 5760,
@@ -15,22 +15,19 @@
     "provider": "Baidu",
     "hardAllowList": false,
     "model": "deepseek/deepseek-v4-flash-0731",
-    "calls": 9,
-    "answered": 8,
-    "actions": 6,
-    "speeches": 7,
-    "speechAdvisory": "speech 7/9 — ADVISORY, not gated (it measures a mind's choice, not a provider's capability)",
-    "roundsRun": 3,
+    "calls": 3,
+    "answered": 3,
+    "actions": 3,
+    "speeches": 3,
+    "speechAdvisory": "speech 3/3 — ADVISORY, not gated (it measures a mind's choice, not a provider's capability)",
+    "roundsRun": 1,
     "roundsPassed": 1,
     "passed": true,
-    "costUsd": 0.0030383920000000004,
+    "costUsd": 0.001127224,
     "servedProviders": [
-      "Baidu",
-      "DeepInfra"
+      "Baidu"
     ],
-    "failures": [
-      "No object generated: could not parse the response. :: thought: The berries are right here. I'll eat before I do anything else. Then water. Nadia can wait a moment.\nimportance: 7\naction:\n  verb: forage\n  params:\n    nodeId: node_e14\nspeech: Morning, Nadia."
-    ]
+    "failures": []
   },
   "opsPlane": {
     "runConstructPass": "wired",
@@ -43,31 +40,30 @@
     "mapWidth": 128,
     "mapHeight": 160,
     "growths": 2,
-    "trafficKeys": 191,
-    "faunaCount": 19,
+    "trafficKeys": 29,
+    "faunaCount": 18,
     "forageableCount": 23,
-    "snapshotBytes": 56400,
-    "foldMsFromGenesis": 179.57,
-    "foldEvents": 133698,
-    "medianTickMs": 1.1469,
-    "p99TickMs": 2.0159
+    "snapshotBytes": 54682,
+    "foldMsFromGenesis": 135.57,
+    "foldEvents": 105547,
+    "medianTickMs": 0.6591,
+    "p99TickMs": 1.7803
   },
   "spend": {
-    "totalCostUsd": 0.6790885640000001,
-    "llmCallCount": 456,
+    "totalCostUsd": 0.5146233400000001,
+    "llmCallCount": 496,
     "costByCaller": {
-      "constructs": 0.001046052,
-      "narrator": 0.017583944000000004,
-      "preflight": 0.0030383920000000004,
-      "reflection": 0.22417206,
-      "semantic": 0.031514,
-      "turn": 0.40173411600000003
+      "narrator": 0.005840128000000001,
+      "preflight": 0.001127224,
+      "reflection": 0.09792918800000001,
+      "semantic": 0.0020253800000000002,
+      "turn": 0.40770142000000004
     },
-    "inputTokens": 3537959,
-    "outputTokens": 1290500,
-    "cacheReadTokens": 1585408,
-    "cacheReadShare": 0.4481137288476209,
-    "costPerMindPerSimDay": 0.033954428200000004,
+    "inputTokens": 4123479,
+    "outputTokens": 353737,
+    "cacheReadTokens": 1443840,
+    "cacheReadShare": 0.35015092837868217,
+    "costPerMindPerSimDay": 0.025731167000000006,
     "requestedProviderOrder": [
       "Baidu"
     ],
@@ -75,53 +71,89 @@
     "providerMix": [
       {
         "provider": null,
-        "calls": 13,
-        "ok": 0,
-        "failed": 13,
+        "calls": 24,
+        "ok": 8,
+        "failed": 16,
         "emptyOutput": 1,
-        "unparseable": 12,
-        "costUsd": 0
+        "unparseable": 15,
+        "costUsd": 0.010852380000000002
       },
       {
         "provider": "Baidu",
-        "calls": 431,
-        "ok": 431,
+        "calls": 54,
+        "ok": 54,
         "failed": 0,
         "emptyOutput": 0,
         "unparseable": 0,
-        "costUsd": 0.6634551840000006
+        "costUsd": 0.08386218399999999
+      },
+      {
+        "provider": "Decart",
+        "calls": 23,
+        "ok": 23,
+        "failed": 0,
+        "emptyOutput": 0,
+        "unparseable": 0,
+        "costUsd": 0.02947574
       },
       {
         "provider": "DeepInfra",
-        "calls": 10,
-        "ok": 10,
+        "calls": 380,
+        "ok": 380,
         "failed": 0,
         "emptyOutput": 0,
         "unparseable": 0,
-        "costUsd": 0.013183380000000001
+        "costUsd": 0.37024825599999983
+      },
+      {
+        "provider": "DigitalOcean",
+        "calls": 1,
+        "ok": 1,
+        "failed": 0,
+        "emptyOutput": 0,
+        "unparseable": 0,
+        "costUsd": 0.0012642
       },
       {
         "provider": "Inceptron",
-        "calls": 1,
-        "ok": 1,
+        "calls": 2,
+        "ok": 2,
         "failed": 0,
         "emptyOutput": 0,
         "unparseable": 0,
-        "costUsd": 0.0008570800000000002
+        "costUsd": 0.0016620520000000002
+      },
+      {
+        "provider": "Morph",
+        "calls": 2,
+        "ok": 2,
+        "failed": 0,
+        "emptyOutput": 0,
+        "unparseable": 0,
+        "costUsd": 0.00301868
       },
       {
         "provider": "Sail Research",
-        "calls": 1,
-        "ok": 1,
+        "calls": 2,
+        "ok": 2,
         "failed": 0,
         "emptyOutput": 0,
         "unparseable": 0,
-        "costUsd": 0.00159292
+        "costUsd": 0.001617308
+      },
+      {
+        "provider": "StreamLake",
+        "calls": 8,
+        "ok": 8,
+        "failed": 0,
+        "emptyOutput": 0,
+        "unparseable": 0,
+        "costUsd": 0.012622540000000003
       }
     ]
   },
   "excerpts": {
-    "darkPerception": "It is day 1, night, early spring. You stand at (69, 68). Your legs tremble — you can barely stand; you must sleep. The night is overcast. The air is cool. The night is close around you. Amara (amara) stands at (67, 68). Salma (salma) stands at (69, 68), flushed with fever. A fire_pit (structure_10) stands at (68, 71), one tile wide; you could stand beside it at (69, 70). A well (structure_9) stands at (68, 69), one tile wide; you could stand beside it at (69, 68). You see the berry bushes are picked bare (node_81) at (70, 67). You hear Amara say: \"Water first.\" (from nearby) You hear Salma say: \"Water first, then your look.\" (from nearby)",
+    "darkPerception": "It is day 1, night, early spring. You stand at (61, 70). Your legs tremble — you can barely stand; you must sleep. The night is overcast. The air is cool. The night is close around you. Carts and feet reach this spot easily. A storehouse (structure_6) stands at (61, 68), 2 tiles wide and 2 tiles tall; its doorway is at (61, 70) — stand there and you can go in. You can see 20 wood (item_42) at (61, 68). You can see 12 stone (item_43) at (61, 68). You can see 4 rope (item_44) at (61, 68). You can see 4 cloth (item_45) at (61, 68).",
     "chronicleLine": "Salma has fallen ill.",
     "constructName": null,
     "tendedProse": "Omar cared for Salma."
@@ -129,60 +161,46 @@
   "evidence": {
     "ticksRun": 5760,
     "crashAlerts": 0,
-    "drainedIntents": 2,
+    "drainedIntents": 0,
     "drainedAgainCount": 0,
     "minds": [
       {
         "agentId": "amara",
-        "turns": 62,
-        "reflections": 3
+        "turns": 90,
+        "reflections": 2
       },
       {
         "agentId": "yusuf",
-        "turns": 58,
-        "reflections": 4
+        "turns": 79,
+        "reflections": 2
       },
       {
         "agentId": "nadia",
-        "turns": 64,
-        "reflections": 4
+        "turns": 86,
+        "reflections": 2
       },
       {
         "agentId": "omar",
-        "turns": 68,
-        "reflections": 4
+        "turns": 67,
+        "reflections": 2
       },
       {
         "agentId": "salma",
-        "turns": 60,
+        "turns": 65,
         "reflections": 3
       }
     ],
     "overBudgetTicks": 0,
-    "unpromptedDrinks": 29,
-    "foodGathered": 19,
-    "gatheredFoodEaten": 15,
+    "unpromptedDrinks": 2,
+    "foodGathered": 2,
+    "gatheredFoodEaten": 2,
     "stagedAfflictionAgentId": "salma",
     "stagedAfflictionResponses": [
-      "agent_spoke at tick 465",
-      "agent_tended at tick 471",
-      "agent_spoke at tick 496",
-      "agent_spoke at tick 542",
-      "agent_spoke at tick 584",
-      "agent_tended at tick 603",
-      "item_moved at tick 642",
-      "item_moved at tick 643",
-      "item_moved at tick 644",
-      "item_moved at tick 645",
-      "agent_spoke at tick 839",
-      "agent_spoke at tick 853",
-      "agent_spoke at tick 953",
-      "agent_tended at tick 956",
-      "agent_spoke at tick 977",
-      "agent_spoke at tick 1088",
-      "agent_tended at tick 1149",
-      "agent_spoke at tick 1289",
-      "agent_spoke at tick 1390"
+      "item_moved at tick 715",
+      "item_moved at tick 716",
+      "agent_tended at tick 952",
+      "agent_spoke at tick 1040",
+      "agent_spoke at tick 1380"
     ],
     "stagedAfflictionResolved": "died",
     "c11EventTypes": [
@@ -194,23 +212,21 @@
       "fauna_moved",
       "fauna_spawned",
       "fire_extinguished",
-      "forageable_depleted",
       "forageable_regrown",
       "forageable_spawned",
       "forageable_stock_changed",
       "grave_placed",
       "hp_changed",
-      "item_filled",
       "thirst_changed",
       "tile_changed",
       "traffic_decayed",
       "world_grown"
     ],
-    "chronicleLines": 49,
+    "chronicleLines": 52,
     "chronicleViolations": [],
     "wearThreshold": 1,
-    "maxTileTraffic": 9,
-    "tilesWorn": 85,
+    "maxTileTraffic": 0,
+    "tilesWorn": 7,
     "worldLawPaths": [
       "reproduction.enabled",
       "spoilage.enabled",
@@ -242,15 +258,15 @@
     ],
     "lawHistoryEntries": 1,
     "replayHashMatches": true,
-    "reflectionsStarted": 18,
-    "reflectionsResolved": 18,
+    "reflectionsStarted": 11,
+    "reflectionsResolved": 11,
     "deadCalls": {
-      "calls": 13,
+      "calls": 16,
       "emptyOutput": 1,
-      "unparseable": 12,
+      "unparseable": 15,
       "otherFailures": 0
     },
-    "deadCallAlertRows": 66,
+    "deadCallAlertRows": 84,
     "constructs": {
       "expressiveVerbs": [],
       "firstExpressiveBy": null,
@@ -258,34 +274,30 @@
       "reuseArbiterCalls": 0,
       "passRan": true,
       "passErrors": 0,
-      "recognized": 1,
+      "recognized": 0,
       "named": 0,
       "namingLawHolds": true,
-      "viewerCopy": [
-        "a gathering not yet named"
-      ]
+      "viewerCopy": []
     },
     "tier1Milestones": [
       "first_structure",
       "first_hut",
       "first_infection",
       "first_speech",
-      "first_meal",
       "first_fire",
-      "first_trade",
+      "first_meal",
       "first_death",
       "first_death_hunger",
       "first_grave",
-      "first_world_grown"
+      "first_world_grown",
+      "first_death_thirst"
     ],
-    "darkPerceptions": 118,
+    "darkPerceptions": 147,
     "semanticPassRan": true,
-    "semanticHits": [
-      "first_multi_day_plan",
-      "first_justice_claim"
-    ],
-    "semanticPassErrors": 2,
-    "semanticUnreadableNights": 0,
+    "semanticHits": [],
+    "semanticPassErrors": 0,
+    "semanticUnreadableNights": 4,
+    "semanticSkippedNights": 0,
     "fordBridge": {
       "x": 48,
       "y": 66,
@@ -302,242 +314,187 @@
       {
         "agentId": "amara",
         "day": 0,
-        "turns": 23,
-        "survival": 13,
-        "production": 0,
-        "social": 5,
-        "other": 5,
-        "mealsEaten": 0,
-        "fullNeedTicks": 750
-      },
-      {
-        "agentId": "amara",
-        "day": 1,
-        "turns": 15,
-        "survival": 10,
-        "production": 0,
-        "social": 4,
-        "other": 1,
-        "mealsEaten": 0,
-        "fullNeedTicks": 310
-      },
-      {
-        "agentId": "amara",
-        "day": 2,
         "turns": 7,
-        "survival": 4,
+        "survival": 3,
         "production": 0,
-        "social": 1,
+        "social": 2,
         "other": 2,
         "mealsEaten": 0,
-        "fullNeedTicks": 0
-      },
-      {
-        "agentId": "yusuf",
-        "day": 0,
-        "turns": 17,
-        "survival": 4,
-        "production": 0,
-        "social": 5,
-        "other": 8,
-        "mealsEaten": 0,
-        "fullNeedTicks": 770
-      },
-      {
-        "agentId": "yusuf",
-        "day": 1,
-        "turns": 24,
-        "survival": 11,
-        "production": 0,
-        "social": 3,
-        "other": 10,
-        "mealsEaten": 1,
-        "fullNeedTicks": 840
-      },
-      {
-        "agentId": "yusuf",
-        "day": 2,
-        "turns": 12,
-        "survival": 5,
-        "production": 0,
-        "social": 6,
-        "other": 1,
-        "mealsEaten": 2,
-        "fullNeedTicks": 450
-      },
-      {
-        "agentId": "yusuf",
-        "day": 3,
-        "turns": 10,
-        "survival": 3,
-        "production": 0,
-        "social": 6,
-        "other": 1,
-        "mealsEaten": 0,
-        "fullNeedTicks": 0
-      },
-      {
-        "agentId": "yusuf",
-        "day": 4,
-        "turns": 3,
-        "survival": 1,
-        "production": 0,
-        "social": 1,
-        "other": 1,
-        "mealsEaten": 0,
-        "fullNeedTicks": 0
-      },
-      {
-        "agentId": "nadia",
-        "day": 0,
-        "turns": 37,
-        "survival": 20,
-        "production": 1,
-        "social": 11,
-        "other": 5,
-        "mealsEaten": 5,
         "fullNeedTicks": 750
       },
       {
-        "agentId": "nadia",
+        "agentId": "amara",
         "day": 1,
-        "turns": 22,
-        "survival": 12,
-        "production": 0,
-        "social": 2,
-        "other": 8,
-        "mealsEaten": 3,
-        "fullNeedTicks": 1050
-      },
-      {
-        "agentId": "nadia",
-        "day": 2,
-        "turns": 19,
-        "survival": 10,
-        "production": 0,
-        "social": 8,
-        "other": 1,
-        "mealsEaten": 3,
-        "fullNeedTicks": 820
-      },
-      {
-        "agentId": "nadia",
-        "day": 3,
-        "turns": 19,
-        "survival": 16,
-        "production": 0,
-        "social": 2,
-        "other": 1,
-        "mealsEaten": 1,
-        "fullNeedTicks": 560
-      },
-      {
-        "agentId": "nadia",
-        "day": 4,
-        "turns": 5,
-        "survival": 3,
-        "production": 0,
-        "social": 1,
-        "other": 1,
-        "mealsEaten": 0,
-        "fullNeedTicks": 50
-      },
-      {
-        "agentId": "omar",
-        "day": 0,
-        "turns": 30,
+        "turns": 8,
         "survival": 8,
         "production": 0,
-        "social": 19,
-        "other": 3,
+        "social": 0,
+        "other": 0,
+        "mealsEaten": 0,
+        "fullNeedTicks": 0
+      },
+      {
+        "agentId": "amara",
+        "day": 2,
+        "turns": 3,
+        "survival": 3,
+        "production": 0,
+        "social": 0,
+        "other": 0,
+        "mealsEaten": 0,
+        "fullNeedTicks": 0
+      },
+      {
+        "agentId": "yusuf",
+        "day": 0,
+        "turns": 4,
+        "survival": 2,
+        "production": 0,
+        "social": 1,
+        "other": 1,
+        "mealsEaten": 0,
+        "fullNeedTicks": 750
+      },
+      {
+        "agentId": "yusuf",
+        "day": 1,
+        "turns": 12,
+        "survival": 12,
+        "production": 0,
+        "social": 0,
+        "other": 0,
+        "mealsEaten": 0,
+        "fullNeedTicks": 0
+      },
+      {
+        "agentId": "yusuf",
+        "day": 2,
+        "turns": 1,
+        "survival": 1,
+        "production": 0,
+        "social": 0,
+        "other": 0,
+        "mealsEaten": 0,
+        "fullNeedTicks": 0
+      },
+      {
+        "agentId": "nadia",
+        "day": 0,
+        "turns": 3,
+        "survival": 2,
+        "production": 0,
+        "social": 0,
+        "other": 1,
+        "mealsEaten": 0,
+        "fullNeedTicks": 750
+      },
+      {
+        "agentId": "nadia",
+        "day": 1,
+        "turns": 4,
+        "survival": 4,
+        "production": 0,
+        "social": 0,
+        "other": 0,
+        "mealsEaten": 1,
+        "fullNeedTicks": 0
+      },
+      {
+        "agentId": "nadia",
+        "day": 2,
+        "turns": 10,
+        "survival": 8,
+        "production": 0,
+        "social": 1,
+        "other": 1,
+        "mealsEaten": 1,
+        "fullNeedTicks": 10
+      },
+      {
+        "agentId": "omar",
+        "day": 0,
+        "turns": 7,
+        "survival": 3,
+        "production": 0,
+        "social": 3,
+        "other": 1,
         "mealsEaten": 0,
         "fullNeedTicks": 750
       },
       {
         "agentId": "omar",
         "day": 1,
-        "turns": 12,
-        "survival": 5,
+        "turns": 3,
+        "survival": 2,
         "production": 0,
-        "social": 5,
-        "other": 2,
+        "social": 1,
+        "other": 0,
         "mealsEaten": 0,
-        "fullNeedTicks": 530
+        "fullNeedTicks": 970
       },
       {
         "agentId": "omar",
         "day": 2,
-        "turns": 10,
-        "survival": 6,
+        "turns": 2,
+        "survival": 2,
         "production": 0,
-        "social": 4,
+        "social": 0,
         "other": 0,
-        "mealsEaten": 1,
-        "fullNeedTicks": 180
-      },
-      {
-        "agentId": "omar",
-        "day": 3,
-        "turns": 13,
-        "survival": 9,
-        "production": 0,
-        "social": 3,
-        "other": 1,
         "mealsEaten": 0,
-        "fullNeedTicks": 60
+        "fullNeedTicks": 0
       },
       {
         "agentId": "salma",
         "day": 0,
-        "turns": 31,
-        "survival": 15,
-        "production": 0,
-        "social": 10,
-        "other": 6,
+        "turns": 9,
+        "survival": 4,
+        "production": 1,
+        "social": 2,
+        "other": 2,
         "mealsEaten": 0,
         "fullNeedTicks": 0
       },
       {
         "agentId": "salma",
         "day": 1,
-        "turns": 17,
-        "survival": 11,
+        "turns": 5,
+        "survival": 4,
         "production": 0,
-        "social": 4,
-        "other": 2,
+        "social": 1,
+        "other": 0,
         "mealsEaten": 0,
-        "fullNeedTicks": 710
+        "fullNeedTicks": 990
       },
       {
         "agentId": "salma",
         "day": 2,
-        "turns": 22,
-        "survival": 18,
+        "turns": 4,
+        "survival": 4,
         "production": 0,
-        "social": 3,
-        "other": 1,
-        "mealsEaten": 5,
-        "fullNeedTicks": 40
+        "social": 0,
+        "other": 0,
+        "mealsEaten": 1,
+        "fullNeedTicks": 0
       },
       {
         "agentId": "salma",
         "day": 3,
-        "turns": 9,
-        "survival": 5,
+        "turns": 1,
+        "survival": 1,
         "production": 0,
-        "social": 3,
-        "other": 1,
-        "mealsEaten": 0,
+        "social": 0,
+        "other": 0,
+        "mealsEaten": 1,
         "fullNeedTicks": 0
       }
     ],
     "mealsNeededPerMindPerDay": 0.84,
-    "fullNeedMoments": 8620,
+    "fullNeedMoments": 4970,
     "socialSurvivalActs": {
-      "tends": 9,
-      "gives": 2,
+      "tends": 1,
+      "gives": 0,
       "jointBuilds": 0,
-      "sharedFireMeals": 6
+      "sharedFireMeals": 0
     }
   }
 }
