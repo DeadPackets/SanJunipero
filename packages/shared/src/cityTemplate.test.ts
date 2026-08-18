@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ROAD_AUTOTILE_KEYS } from './autotile.js'
+import { DEFAULT_CONFIG } from './config.js'
 import {
   CityTemplateSchema, DISTRICTS, DISTRICT_NAMES, CITY_ANCHOR_DEFAULT, CITY_W, CITY_H,
   WORLD_SIZE_GENESIS, inExtent, inRect, key, cityTerrainTiles, cityRoadTiles, cityRoadKeys,
@@ -7,7 +8,11 @@ import {
   cityStructures, doorTile, structureTiles, FOUNDER_IDS, CITY_INTERIOR_SLOTS,
   CITY_FURNISHING_KINDS, CITY_BED_KIND, CITY_HEARTH_KIND,
   makeCityTemplate, templateFits, growthPlots, T_GRASS,
-  HUT_ORIGINS, WELL_AT, FIRE_PIT_AT, danglingRoadEnds, frontages,
+  DWELLINGS, WELL_AT, FIRE_PIT_AT, danglingRoadEnds, frontages,
+  CITY_DWELLING_KINDS, CITY_HOUSE_KINDS, DWELLING_FOOTPRINTS, LEGACY_HOME_KIND,
+  isDwellingKind, isHouseKind,
+  touchingStructures, structureComponents, plazaArrivals, dwellingRanks, longestKindRun,
+  dwellingGaps,
 } from './cityTemplate.js'
 
 const MINIMAL = {
@@ -206,6 +211,47 @@ describe('city roads', () => {
   })
 })
 
+describe('the three dwelling kinds', () => {
+  it('names exactly the contracted list, in order', () => {
+    expect([...CITY_DWELLING_KINDS]).toEqual(['cottage', 'farmhouse', 'cabin'])
+  })
+
+  // `hut` is retired as a NAME and still load-bearing as an ID: it is the only kind
+  // `enterableKinds` admits, and that list is inside the pinned config hash.
+  it('keeps the legacy home id out of the contract and inside the house set', () => {
+    expect((CITY_DWELLING_KINDS as readonly string[])).not.toContain(LEGACY_HOME_KIND)
+    expect(isDwellingKind(LEGACY_HOME_KIND)).toBe(false)
+    expect(isHouseKind(LEGACY_HOME_KIND)).toBe(true)
+    expect([...CITY_HOUSE_KINDS].sort()).toEqual(['cabin', 'cottage', 'farmhouse', 'hut'])
+  })
+
+  it('gives each one a footprint, and no two the same mass', () => {
+    const areas = CITY_DWELLING_KINDS.map((k) => {
+      const f = DWELLING_FOOTPRINTS[k]
+      expect(f, k).toBeDefined()
+      return f.w * f.h
+    })
+    expect(new Set(areas).size, 'two dwellings share a mass').toBe(areas.length)
+    for (const k of CITY_DWELLING_KINDS) {
+      expect(DWELLING_FOOTPRINTS[k].w).toBeLessThanOrEqual(4)
+      expect(DWELLING_FOOTPRINTS[k].h).toBeLessThanOrEqual(4)
+    }
+  })
+
+  it('is the one place that answers "is this a dwelling"', () => {
+    expect(isDwellingKind('cottage')).toBe(true)
+    expect(isDwellingKind('storehouse')).toBe(false)
+    expect(isHouseKind('storehouse')).toBe(false)
+  })
+
+  it('stands every dwelling it places on its contracted footprint', () => {
+    for (const s of cityStructures()) {
+      if (!isDwellingKind(s.kind)) continue
+      expect({ w: s.w, h: s.h }, s.kind).toEqual(DWELLING_FOOTPRINTS[s.kind])
+    }
+  })
+})
+
 describe('city structures', () => {
   const structures = cityStructures()
   const roads = cityRoadTiles()
@@ -228,6 +274,18 @@ describe('city structures', () => {
       expect(s.owner, s.kind).toBeNull()
   })
 
+  // ONLY A HUT IS A HOME, and the reason is a pinned gate: `enterableKinds` and
+  // `sleepableKinds` live in SimConfigSchema, whose hash is the `forge` pin. A founder housed
+  // in a cottage could not open their own door.
+  it('houses every founder in a kind the engine can let them into', () => {
+    const enterable = new Set(DEFAULT_CONFIG.structures.enterableKinds)
+    const sleepable = new Set(DEFAULT_CONFIG.structures.sleepableKinds)
+    for (const s of structures.filter(x => x.owner !== null)) {
+      expect(enterable.has(s.kind), `${s.owner} cannot enter their ${s.kind}`).toBe(true)
+      expect(sleepable.has(s.kind), `${s.owner} cannot sleep in their ${s.kind}`).toBe(true)
+    }
+  })
+
   it('never overlaps another structure', () => {
     const seen = new Set<string>()
     for (const s of structures)
@@ -246,8 +304,11 @@ describe('city structures', () => {
       const holds = DISTRICT_NAMES.filter(d => tiles.every(t => inRect(DISTRICTS[d]!, t.dx, t.dy)))
       expect(holds, `${s.kind} at ${key(s.dx, s.dy)}`).toHaveLength(1)
     }
-    // and the five huts all share the homes district
-    for (const h of huts) expect(inRect(DISTRICTS.homes, h.dx, h.dy), h.owner!).toBe(true)
+    // Most of the town lives on the yard street; ONE household does not, because a town with
+    // a single address is a row of houses rather than a place.
+    const atHome = huts.filter(h => inRect(DISTRICTS.homes, h.dx, h.dy))
+    expect(atHome.length).toBe(4)
+    expect(huts.length - atHome.length, 'nobody lives away from the yard street').toBe(1)
   })
 
   it('never occupies a road, a path or a water tile', () => {
@@ -274,7 +335,7 @@ describe('city structures', () => {
     expect(structures.some(s => s.kind === 'standing_stone')).toBe(false)
   })
 
-  it('gives every hut exactly one bed and one hearth', () => {
+  it('gives every home exactly one bed and one hearth', () => {
     for (const h of huts) {
       expect(h.furnishings.filter(f => f.kind === CITY_BED_KIND), 'bed').toHaveLength(1)
       expect(h.furnishings.filter(f => f.kind === CITY_HEARTH_KIND), 'hearth').toHaveLength(1)
@@ -297,12 +358,16 @@ describe('city structures', () => {
   })
 
   // The stand-in for the cross-package check; Task 28 asserts this list against the library.
+  // The list is the LIBRARY's vocabulary, not an inventory of the current eleven buildings:
+  // the anvil and the workbench went out of the plan with the two sheds and stay declared.
   it('furnishes only kinds the stand-in list declares', () => {
     for (const s of structures)
       for (const f of s.furnishings)
         expect(CITY_FURNISHING_KINDS, `${s.kind} ${f.kind}`).toContain(f.kind)
     const used = new Set(structures.flatMap(s => s.furnishings.map(f => f.kind)))
-    expect([...used].sort()).toEqual([...CITY_FURNISHING_KINDS].sort())
+    expect([...used].sort()).toEqual(['barrel', 'bed', 'chair', 'crate', 'hearth', 'rug', 'shelf', 'table'])
+    expect([...CITY_FURNISHING_KINDS].sort())
+      .toEqual(['anvil', 'barrel', 'bed', 'bench', 'chair', 'crate', 'hearth', 'rug', 'shelf', 'table'])
   })
 
   it('is deterministic', () => {
@@ -422,7 +487,10 @@ describe('a centre that reads as a centre', () => {
   })
 })
 
-describe('frontage', () => {
+// ★ THE FIVE PROPERTIES. "It does not look like a town" is a feeling; these are the five
+// things that feeling is made of, each one a function of the template and nothing else.
+
+describe('PROPERTY 1 — buildings front onto something', () => {
   const t = makeCityTemplate()
 
   it('opens every single door onto a road', () => {
@@ -431,36 +499,112 @@ describe('frontage', () => {
     for (const x of f)
       expect(x.onto, `${x.kind} at ${x.door.dx},${x.door.dy} faces nothing`).not.toBeNull()
   })
+
+  // Not the back of a neighbour: every building has ground on every side of it.
+  it('never lets one building touch another', () => {
+    expect(touchingStructures(t)).toEqual([])
+  })
+
+  it('finds a touch when one is planted, so the check is not vacuous', () => {
+    const s = t.structures.find(x => x.kind === 'storehouse')!
+    const stub = { ...t, structures: [...t.structures, { ...s, dx: s.dx + s.w, kind: 'shed', w: 1, h: 1 }] }
+    expect(touchingStructures(stub).length).toBeGreaterThan(0)
+  })
+
+  it('staggers the two ranks so no door looks straight down another', () => {
+    const doorsOn = (dy: number): number[] => t.structures
+      .filter(s => doorTile(s).dy === dy).map(s => doorTile(s).dx).sort((a, b) => a - b)
+    expect(doorsOn(5).some(dx => doorsOn(8).includes(dx)), 'a door faces a door').toBe(false)
+  })
 })
 
-describe('a street, not a row', () => {
+describe('PROPERTY 2 — roads connect the places people go', () => {
   const t = makeCityTemplate()
 
-  it('stands the five huts in two facing ranks, not one line', () => {
-    expect(HUT_ORIGINS).toEqual([[14, 4], [18, 4], [22, 4], [19, 7], [23, 7]])
-    expect(HUT_ORIGINS.filter(([, dy]) => dy === 4)).toHaveLength(3)
-    expect(HUT_ORIGINS.filter(([, dy]) => dy === 7)).toHaveLength(2)
+  it('puts every structure in ONE road-connected group', () => {
+    const groups = structureComponents(t)
+    expect(groups).toHaveLength(1)
+    expect(groups[0]).toHaveLength(t.structures.length)
   })
 
-  it('runs the shared yard street between the two ranks', () => {
-    const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
-    for (let dx = 14; dx <= 22; dx++) expect(roads.has(key(dx, 6)), `yard ${dx},6`).toBe(true)
+  it('splits the group when a building is stranded, so the check is not vacuous', () => {
+    const stub = { ...t, structures: [...t.structures, {
+      kind: 'shed', dx: 31, dy: 27, w: 1, h: 1, owner: null, furnishings: [],
+    }] }
+    expect(structureComponents(stub).length).toBeGreaterThan(1)
   })
 
-  it('staggers the ranks so no two doors look straight down each other', () => {
-    const huts = cityStructures().filter(s => s.kind === 'hut')
-    const doorsAt = (dy: number): number[] =>
-      huts.filter(s => s.dy === dy).map(s => doorTile(s).dx).sort((a, b) => a - b)
-    expect(doorsAt(4).some(dx => doorsAt(7).includes(dx)), 'a door faces a door').toBe(false)
+  it('never ends a road in the grass', () => {
+    expect(danglingRoadEnds(t)).toEqual([])
+  })
+})
+
+describe('PROPERTY 3 — variety of mass', () => {
+  const t = makeCityTemplate()
+  const houses = t.structures.filter(s => isHouseKind(s.kind))
+
+  it('stands all three contracted kinds, not one building repeated', () => {
+    expect(new Set(t.structures.filter(s => isDwellingKind(s.kind)).map(s => s.kind)))
+      .toEqual(new Set(CITY_DWELLING_KINDS))
+  })
+
+  // N = 2. A pair of a kind reads as two neighbours; three reads as a terrace, and five
+  // identical in a line was the user's complaint.
+  it('never stands more than two of one kind in a row on a street', () => {
+    expect(longestKindRun(t)).toBeLessThanOrEqual(2)
+  })
+
+  it('counts a longer run when one is planted, so the ruling is not vacuous', () => {
+    const rank = dwellingRanks(t).find(r => r.dwellings.length >= 3)!
+    expect(rank.dwellings.map(d => d.kind).join(' ')).not.toMatch(/(\w+) \1 \1/)
+  })
+
+  it('gives the town three different house masses to look at', () => {
+    const areas = new Set(houses.map(s => s.w * s.h))
+    expect(areas.size, 'every house covers the same ground').toBe(3)
+  })
+})
+
+describe('PROPERTY 4 — a centre streets arrive at', () => {
+  const t = makeCityTemplate()
+
+  it('is reached from all four sides, once each', () => {
+    const arrivals = plazaArrivals(t)
+    expect(arrivals.map(a => a.side).sort()).toEqual(['e', 'n', 's', 'w'])
+  })
+
+  it('lands each arrival on the square itself, not beside it', () => {
+    for (const a of plazaArrivals(t)) {
+      expect(inRect(PLAZA, a.from.dx, a.from.dy), `${a.side} arrival is inside the square`).toBe(false)
+      const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
+      expect(roads.has(key(a.from.dx, a.from.dy))).toBe(true)
+    }
+  })
+})
+
+describe('PROPERTY 5 — plots and gaps', () => {
+  const t = makeCityTemplate()
+
+  it('leaves ground between every pair of neighbours on a street', () => {
+    for (const g of dwellingGaps(t)) expect(g).toBeGreaterThanOrEqual(1)
+  })
+
+  // Equal spacing is what makes a grid read as a spreadsheet.
+  it('does not space them all the same', () => {
+    expect(new Set(dwellingGaps(t)).size, 'every gap is the same width').toBeGreaterThanOrEqual(2)
+  })
+
+  it('clears at least eight plots of buildable ground beside a road', () => {
+    expect(growthPlots(t).length).toBeGreaterThanOrEqual(8)
+  })
+
+  it('puts a house somewhere other than the one street', () => {
+    expect(dwellingRanks(t).length, 'every dwelling shares one street').toBeGreaterThanOrEqual(3)
   })
 })
 
 describe('paths that lead somewhere', () => {
   const t = makeCityTemplate()
-
-  it('never ends a road in the grass', () => {
-    expect(danglingRoadEnds(t)).toEqual([])
-  })
 
   it('finds a dangling end when one is planted, so the check is not vacuous', () => {
     const stub = {
@@ -480,9 +624,17 @@ describe('districts you can point at', () => {
       expect(t.structures.some(s => districtOf(s) === d), `${d} has no building`).toBe(true)
   })
 
-  it('no longer stands the two sheds in one district as a matched pair', () => {
-    const sheds = t.structures.filter(s => s.kind === 'shed')
-    expect(sheds).toHaveLength(2)
-    expect(districtOf(sheds[0]!)).not.toBe(districtOf(sheds[1]!))
+  // The old plan stood two identical 1×1 sheds four rows apart. Repetition inside one
+  // district is what "the buildings are all the same" is made of, so the rule is general
+  // now: only the five founders' huts may repeat, and only because five people need five
+  // roofs the engine will let them into.
+  it('never stands the same kind twice in one district, except the founders roofs', () => {
+    const seen = new Map<string, number>()
+    for (const s of t.structures) {
+      if (s.kind === 'hut') continue
+      const k = `${districtOf(s)}/${s.kind}`
+      seen.set(k, (seen.get(k) ?? 0) + 1)
+    }
+    expect([...seen.entries()].filter(([, n]) => n > 1)).toEqual([])
   })
 })

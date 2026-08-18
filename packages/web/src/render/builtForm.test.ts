@@ -29,10 +29,24 @@ const MASTER_PALETTE = [
 // Every structure kind this product can raise today. The well and the fire pit are the two
 // the C12a batch-1 town put in the DEAD CENTRE of the plaza with no art in any root.
 const ALL_KINDS = [...new Set([...TOWN_KINDS, ...INTERIOR_KINDS, 'grave', 'bridge', 'cottage'])]
-const SHAPES: Array<[number, number]> = [[1, 1], [2, 2], [1, 2], [2, 1], [3, 2], [2, 3]]
+const SHAPES: Array<[number, number]> = [[1, 1], [2, 2], [1, 2], [2, 1], [3, 2], [2, 3], [4, 2]]
 
 const xsOf = (poly: number[]): number[] => poly.filter((_, i) => i % 2 === 0)
 const ysOf = (poly: number[]): number[] => poly.filter((_, i) => i % 2 === 1)
+
+// Art for the two new dwellings may land days after the template places them. Until it does
+// the fallback IS the building, so it has to say something different about each one.
+describe('the three dwellings read as three buildings even with no art', () => {
+  it('gives each a distinct volume — no two share both a material and a height', () => {
+    const seen = new Set<string>()
+    for (const kind of ['hut', 'cottage', 'longhouse']) {
+      const h = BUILT_FORM_HEIGHT_TILES[kind] ?? BUILT_FORM_DEFAULT_HEIGHT_TILES
+      const ramp = builtFormSpec(kind, 2, 2).faces[2].color
+      expect(seen.has(`${ramp}:${h}`), kind).toBe(false)
+      seen.add(`${ramp}:${h}`)
+    }
+  })
+})
 
 describe('footprintDiamond — the one ground-shape both the hit area and the form are cut from', () => {
   it('is the tile diamond for a 1×1, north vertex at the local origin', () => {

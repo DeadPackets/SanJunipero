@@ -1,5 +1,5 @@
 import {
-  CITY_ANCHOR_DEFAULT, FOUNDER_IDS, makeCityTemplate,
+  CITY_ANCHOR_DEFAULT, FOUNDER_IDS, LEGACY_HOME_KIND, makeCityTemplate,
   type CityStructure, type SimConfig,
 } from '@sj/shared'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
@@ -36,11 +36,25 @@ const inFord = (x: number, y: number): boolean =>
 // Structures the world places and nobody built. The template is the single source of every
 // footprint; `structures.recipes` is the single source for the kinds that can also be built.
 export const GENESIS_BUILDER_ID = 'genesis'
-const GENESIS_STRUCTURE_DEFS: Readonly<Record<string, { maxHp: number; flammable: boolean }>> = {
+export type Durability = { maxHp: number; flammable: boolean }
+const GENESIS_STRUCTURE_DEFS: Readonly<Record<string, Durability>> = {
   storehouse: { maxHp: 40, flammable: true },
   shed: { maxHp: 20, flammable: true },
   wagon: { maxHp: 15, flammable: true },
   fire_pit: { maxHp: 10, flammable: false },
+  // The three dwellings the template places and nobody builds (CITY_DWELLING_KINDS). More
+  // roof than the legacy home's 50, in proportion to the ground each stands on; all burn.
+  cabin: { maxHp: 50, flammable: true },
+  cottage: { maxHp: 60, flammable: true },
+  farmhouse: { maxHp: 80, flammable: true },
+}
+
+/** What a genesis-placed structure is made of: a buildable kind takes its recipe, a placed-only
+ *  kind takes the table above. `null` means nothing in the world knows how tough a `kind` is. */
+export function genesisDurability(config: SimConfig, kind: string): Durability | null {
+  const recipe = config.structures.recipes[kind]
+  if (recipe !== undefined) return { maxHp: recipe.maxHp, flammable: recipe.flammable }
+  return GENESIS_STRUCTURE_DEFS[kind] ?? null
 }
 
 // Integer ellipse test, so nothing here depends on floating-point rounding.
@@ -98,13 +112,12 @@ const STOREHOUSE_STOCK: ReadonlyArray<{ kind: string; qty: number }> = [
 function plannedPayload(
   config: SimConfig, s: CityStructure, id: string, anchor: { x: number; y: number },
 ): Record<string, unknown> {
-  const recipe = config.structures.recipes[s.kind]
-  const def = GENESIS_STRUCTURE_DEFS[s.kind]
-  if (recipe === undefined && def === undefined) throw new Error(`genesis: no durability known for a ${s.kind}`)
+  const durability = genesisDurability(config, s.kind)
+  if (durability === null) throw new Error(`genesis: no durability known for a ${s.kind}`)
   return {
     id, kind: s.kind, x: anchor.x + s.dx, y: anchor.y + s.dy, w: s.w, h: s.h,
-    maxHp: recipe?.maxHp ?? def!.maxHp,
-    flammable: recipe?.flammable ?? def!.flammable,
+    maxHp: durability.maxHp,
+    flammable: durability.flammable,
     builderId: GENESIS_BUILDER_ID,
     // Absent, never null: an unowned building is the hash-stable shape C9 landed.
     ...(s.owner === null ? {} : { owner: s.owner }),
@@ -132,9 +145,10 @@ export function makeGenesisWorld(config: SimConfig, opts: { anchor?: { x: number
     events.push({ type: 'structure_completed', payload: { id } })
   })
 
+  // The kind is READ from the template, never retyped here (C8 global constraint C14).
   const hutIdByOwner = new Map<string, string>()
   template.structures.forEach((s, i) => {
-    if (s.kind === 'hut' && s.owner !== null) hutIdByOwner.set(s.owner, structureIdByIndex[i]!)
+    if (s.kind === LEGACY_HOME_KIND && s.owner !== null) hutIdByOwner.set(s.owner, structureIdByIndex[i]!)
   })
   const storehouseIndex = template.structures.findIndex((s) => s.kind === 'storehouse')
   if (storehouseIndex < 0) throw new Error('genesis: the city template has no storehouse to stock')
