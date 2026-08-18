@@ -17,7 +17,9 @@ import { createLandmarkLayer, type LandmarkLayer } from './landmarks.js'
 export function StageMount(
   { store, onScene, onInterior }: {
     store: WorldStore
-    onScene?: (scene: Scene) => void
+    /** The live scene, and `null` the moment it is torn down — React must never be left
+     *  holding a destroyed one, whose `app.ticker` is null and throws on the next touch. */
+    onScene?: (scene: Scene | null) => void
     /** the interior sub-scene opened or closed — App draws the back-to-town chrome from it */
     onInterior?: (structureId: string | null) => void
   },
@@ -45,6 +47,7 @@ export function StageMount(
     if (rootEl === null) return
     let scene: Scene | null = null
     let disposed = false
+    let published = false
     let offSync: (() => void) | null = null
     let chars: CharacterLayer | null = null
     let bubbles: BubbleLayer | null = null
@@ -135,10 +138,14 @@ export function StageMount(
         }
       }
       s.app.ticker.add(tickFn)
+      published = true
       onScene?.(s)
     })
     return () => {
       disposed = true
+      // Fast Refresh remounts this component and the effect below destroys the scene; without
+      // this line the chrome upstream keeps the dead one and throws on its next ticker call.
+      if (published) onScene?.(null)
       offSync?.()
       offEvents?.()
       offCamera?.()

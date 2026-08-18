@@ -263,8 +263,7 @@ export function App() {
   // the bonds graph replaces the canvas; pause the Pixi ticker while hidden (60fps budget honesty)
   useEffect(() => {
     if (scene === null) return
-    if (shownLens === 'society') scene.app.ticker.stop()
-    else scene.app.ticker.start()
+    scene.setTicking(shownLens !== 'society')
   }, [shownLens, scene])
 
   // The Moments lens has two readings: the live town televised (the C6 auto-cut) and a

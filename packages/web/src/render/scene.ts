@@ -186,8 +186,34 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
   }
 }
 
+/**
+ * A SCENE'S CLOCK, HELD BY THE SCENE RATHER THAN REACHED FOR THROUGH `app.ticker`.
+ *
+ * Pixi's `Application.destroy()` nulls that field, so an effect queued before a teardown lands
+ * after it and throws `Cannot read properties of null (reading 'start')` — the load-time error
+ * R1 forbids. A closed scene does nothing when it is asked to tick, because that is the truth
+ * about it; it is not a null-check standing in for one.
+ */
+export function sceneClock(app: { ticker: { start(): void; stop(): void } | null }): {
+  set(on: boolean): void
+  close(): void
+} {
+  let closed = false
+  return {
+    set: (on) => {
+      if (closed) return
+      if (on) app.ticker!.start()
+      else app.ticker!.stop()
+    },
+    close: () => { closed = true },
+  }
+}
+
 export type Scene = {
   app: Application
+  /** Run or pause the scene's own clock. The ONLY way to do it: `app.ticker` is null on a
+   *  destroyed scene, and a caller upstream of the teardown cannot know which it is holding. */
+  setTicking(on: boolean): void
   world: Container
   /** the eight named layers — the one place that decides what is drawn over what */
   layers: LayerSet
@@ -507,8 +533,11 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     fitToTown()
   }
 
+  const clock = sceneClock(app)
+
   return {
     app,
+    setTicking: clock.set,
     world,
     layers,
     entities: layers.entities,
@@ -566,6 +595,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       tileCbs.push(cb)
     },
     destroy: () => {
+      clock.close()
       offSub()
       offEvents()
       ro.disconnect()
