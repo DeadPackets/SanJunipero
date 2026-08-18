@@ -87,9 +87,14 @@ export function alphaBinaryGate(
 
 // ---------------------------------------------------------------- 4. palette conformance
 
-export function paletteGate(img: RawImage): GateResult & {
-  offPalette: number; offenders: { hex: string; count: number }[]
-} {
+// Off-palette colour is allowed for exactly one thing: the portrait class. The master
+// palette is forty colours sized for a 32x16 world tile, and snapping a 128 px bust to it
+// flattens the hair to one tone and the skin shading to two. A portrait's palette law is
+// paletteJaccard — every expression of one person shares one palette — not conformance to
+// the world's forty.
+export function paletteGate(
+  img: RawImage, opts: { allowOffPalette?: boolean } = {},
+): GateResult & { offPalette: number; offenders: { hex: string; count: number }[] } {
   const counts = new Map<number, number>()
   let offPalette = 0
   for (let i = 0; i < img.data.length; i += 4) {
@@ -101,7 +106,7 @@ export function paletteGate(img: RawImage): GateResult & {
   }
   const offenders = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 8)
     .map(([rgb, count]) => ({ hex: hex(rgb), count }))
-  const failures = offPalette === 0 ? []
+  const failures = offPalette === 0 || opts.allowOffPalette === true ? []
     : [`palette: ${offPalette} opaque pixels off the master palette in ${counts.size} colours ` +
       `(worst ${offenders.map(o => `${o.hex} x${o.count}`).join(', ')})`]
   return { ok: ok(failures), failures, offPalette, offenders }
@@ -219,6 +224,7 @@ export type PixelBarArgs = {
   footprint?: Footprint
   tile?: Size
   allowSoftAlpha?: boolean
+  allowOffPalette?: boolean
   seam?: boolean
 }
 
@@ -227,7 +233,7 @@ export async function pixelBarReport(a: PixelBarArgs): Promise<GateResult & { na
   if (a.raw) failures.push(...integerScaleGate(a.raw, { w: a.img.width, h: a.img.height }).failures)
   if (a.artPx !== undefined) failures.push(...pixelGridGate(a.img, a.artPx).failures)
   failures.push(...alphaBinaryGate(a.img, { allowSoftAlpha: a.allowSoftAlpha }).failures)
-  failures.push(...paletteGate(a.img).failures)
+  failures.push(...paletteGate(a.img, { allowOffPalette: a.allowOffPalette }).failures)
   if (a.footprint && a.tile) failures.push(...nativeDensityGate({
     name: a.name, canvas: { w: a.img.width, h: a.img.height }, footprint: a.footprint, tile: a.tile,
   }).failures)

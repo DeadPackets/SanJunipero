@@ -86,6 +86,19 @@ describe('paletteGate', () => {
     expect(r.offenders[0]!.count).toBeGreaterThan(0)
     expect(r.offenders.length).toBeLessThanOrEqual(8)
   })
+  // The master palette is forty colours sized for a 32x16 world tile. A 128 px bust models
+  // a face with them, and snapping it flattens the hair to one tone and the skin shading to
+  // two — measurably conformant, visibly worse art. Portraits answer to paletteJaccard
+  // instead: every expression of one person shares one palette, which is the property that
+  // actually matters. See out/fqc/portrait-quantize.png for the pair.
+  it('a class that is allowed off-palette colour reports the count and passes', async () => {
+    const r = paletteGate(await fixture('portrait-neutral-128.png'), { allowOffPalette: true })
+    expect(r.ok).toBe(true)
+    expect(r.offPalette).toBe(6412)
+  })
+  it('RED on that same portrait when the class is NOT exempt', async () => {
+    expect(paletteGate(await fixture('portrait-neutral-128.png')).ok).toBe(false)
+  })
   it('GREEN on the real chair sprite, which was quantized to the palette', async () => {
     const r = paletteGate(await fixture('chair-128.png'))
     expect(r.ok).toBe(true)
