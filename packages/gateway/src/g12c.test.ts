@@ -95,12 +95,21 @@ const git = (...args: string[]): string =>
 const gitBytes = (...args: string[]): Buffer =>
   execFileSync('git', args, { cwd: REPO, maxBuffer: 64 * 1024 * 1024 })
 
-describe('G12c read-only proof — this batch touched the presentation and nothing else', () => {
-  it('leaves the two golden pins exactly where they were', () => {
-    const g1 = readFileSync(join(REPO, 'packages', 'engine', 'src', 'golden.test.ts'), 'utf8')
-    const g2 = readFileSync(join(REPO, 'packages', 'engine', 'src', 'g2.test.ts'), 'utf8')
-    expect(g1, 'G1 pin moved').toContain(GOLDEN_G1)
-    expect(g2, 'G2 pin moved').toContain(GOLDEN_G2)
+// The config hash. `structures.enterableKinds` and `sleepableKinds` live inside it, which is
+// why the town's five homes still carry the `hut` id: naming them for the contemporary set
+// would move THIS literal, and that is a cross-lane decision, not a layout tweak.
+const FORGE_CONFIG_HASH = 'a90bd7471668eea6e8a8e7932129ef7905ae2477b396d5c7b792df539065c4d8'
+const BLOCK1_SHA256 = '28c1fce0781ec9019416c234a9eae47401ff4b9dc4a96b91c371335fbad97bd6'
+
+describe('G12c read-only proof — the four pins are where they were', () => {
+  it('leaves all four pins exactly where they were', () => {
+    const at = (...p: string[]): string => readFileSync(join(REPO, ...p), 'utf8')
+    expect(at('packages', 'engine', 'src', 'golden.test.ts'), 'G1 pin moved').toContain(GOLDEN_G1)
+    expect(at('packages', 'engine', 'src', 'g2.test.ts'), 'G2 pin moved').toContain(GOLDEN_G2)
+    expect(at('packages', 'forge', 'src', 'forgeConfig.test.ts'), 'forge config pin moved')
+      .toContain(FORGE_CONFIG_HASH)
+    expect(at('packages', 'agents', 'src', 'prompt', 'rulesOfBeing.test.ts'), 'BLOCK1 pin moved')
+      .toContain(BLOCK1_SHA256)
   })
 
   // ★ AGAINST THE MERGE BASE, NOT AGAINST MAIN'S TIP. `main` has moved on since this branch
@@ -116,23 +125,11 @@ describe('G12c read-only proof — this batch touched the presentation and nothi
     }
   })
 
-  it('touched nothing under engine, arbiter, agents or forge since main', () => {
-    const changed = git('diff', '--name-only', 'main...HEAD').split('\n').filter((l) => l.length > 0)
-    const forbidden = changed.filter((f) =>
-      f.startsWith('packages/engine/src')
-      || f.startsWith('packages/arbiter')
-      || f.startsWith('packages/agents/src')
-      || f.startsWith('packages/forge'))
-    expect(forbidden, 'C12a is WEB + GATEWAY only').toEqual([])
-  })
-
-  // `cityTemplate.ts` IS changed on this branch — by C12a task 61, which designed the town as
-  // a place. It is the contested file merge train 4/5 has to reconcile, so from batch 6's base
-  // onward it is FROZEN: this asserts it has not moved since, rather than pretending the
-  // branch never touched it.
-  it('has not moved cityTemplate.ts since this batch began', () => {
-    const BATCH_BASE = 'e681f8c'
-    const changed = git('diff', '--name-only', `${BATCH_BASE}..HEAD`).split('\n')
-    expect(changed.filter((f) => f.includes('cityTemplate'))).toEqual([])
-  })
+  // DELIBERATELY NOT RESTORED: two branch-scoped clauses used to live here — "touched nothing
+  // under engine, arbiter, agents or forge since main" and a freeze on `cityTemplate.ts` from
+  // batch 6's base. Both were true statements about C12a while C12a was an unmerged branch.
+  // C12a has merged, so `main...HEAD` no longer means "this chunk's diff": it means "whatever
+  // the current branch is", and the clauses fired on every later branch that legitimately
+  // touched another package — including the lane whose whole job was to re-author
+  // `cityTemplate.ts`. The pin guard above is the permanent protection and it stays.
 })
