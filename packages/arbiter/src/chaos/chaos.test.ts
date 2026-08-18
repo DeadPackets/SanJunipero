@@ -97,9 +97,9 @@ async function makeRig(llm: ScriptedExploitLlm): Promise<{ db: Database.Database
   const db = openArbiterDb(':memory:')
   const codex = new CodexStore(db)
   const ladder: CodexEntry[] = [
-    { id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null },
-    { id: 'pottery', era: 'agriculture', name: 'Pottery', prerequisiteId: null },
-    { id: 'brewing', era: 'crafts', name: 'Brewing', prerequisiteId: 'pottery' },
+    { id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null },
+    { id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null },
+    { id: 'brewing', era: 'arrangement', name: 'Brewing', prerequisiteId: 'pottery' },
   ]
   for (const entry of ladder) codex.insert(entry)
   const embedder = await FakeEmbedder.create()

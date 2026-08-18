@@ -260,8 +260,8 @@ describe('codify', () => {
       const rulebook = new RulebookStore(db)
       const review = new ReviewStore(db)
       const codex = new CodexStore(db)
-      codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
-      codex.insert({ id: 'pottery', era: 'agriculture', name: 'Pottery', prerequisiteId: null })
+      codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
+      codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
       const recipe = { ...boilSaltRecipe, id: 'recipe:salt_idem', name: 'Salt Idem', rngStream: 'recipe:salt_idem' }
 
       const first = codify(recipe, { rulebook, review, codex, tick: 200 })
@@ -277,8 +277,8 @@ describe('codify', () => {
       const rulebook = new RulebookStore(db)
       const review = new ReviewStore(db)
       const codex = new CodexStore(db)
-      codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
-      codex.insert({ id: 'pottery', era: 'agriculture', name: 'Pottery', prerequisiteId: null })
+      codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
+      codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
       const recipe = { ...boilSaltRecipe, id: 'recipe:salt_revive', name: 'Salt Revive', rngStream: 'recipe:salt_revive' }
 
       const { ruleId } = codify(recipe, { rulebook, review, codex, tick: 200 })
@@ -303,8 +303,8 @@ describe('codify', () => {
       const rulebook = new RulebookStore(db)
       const review = new ReviewStore(db)
       const codex = new CodexStore(db)
-      codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
-      codex.insert({ id: 'pottery', era: 'agriculture', name: 'Pottery', prerequisiteId: null })
+      codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
+      codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
       const { ruleId, verb } = codify(boilSaltRecipe, { rulebook, review, codex, tick: 200 })
       expect(ruleId).toBeTypeOf('number')
       expect(verb).toBe('recipe:boil_salt')

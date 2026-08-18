@@ -27,7 +27,7 @@ export class CodexStore {
 
   knownEra(): Era {
     const rows = this.db.prepare('SELECT era FROM codex WHERE known = 1').all() as Array<{ era: string }>
-    let best: Era = 'agriculture'
+    let best: Era = 'handwork'
     let bestOrder = 0
     for (const row of rows) {
       const order = ERA_ORDER[row.era as Era]

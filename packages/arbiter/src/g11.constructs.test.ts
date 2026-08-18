@@ -71,7 +71,7 @@ const BEX: AgentCtx = { ...ADA, agentId: 'bex', name: 'Bex' }
 
 async function rig(llm: ScriptedLlm): Promise<Arbiter> {
   const db = openArbiterDb(':memory:')
-  new CodexStore(db).insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
+  new CodexStore(db).insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
   return makeArbiter({ db, llm: llm as unknown as LlmClient, embedder: await FakeEmbedder.create(), tick: () => 100 })
 }
 

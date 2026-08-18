@@ -107,8 +107,8 @@ function makeWorld(): WorldState {
 async function makeRig(llm: ScriptedLlm): Promise<{ db: Database.Database; arbiter: Arbiter }> {
   const db = openArbiterDb(':memory:')
   const codex = new CodexStore(db)
-  codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
-  codex.insert({ id: 'pottery', era: 'agriculture', name: 'Pottery', prerequisiteId: null })
+  codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
+  codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
   const embedder = await FakeEmbedder.create()
   const arbiter = makeArbiter({ db, llm: llm as unknown as LlmClient, embedder, tick: () => 100 })
   return { db, arbiter }

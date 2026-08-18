@@ -37,7 +37,7 @@ function makeReview() {
   const rulebook = new RulebookStore(db)
   const review = new ReviewStore(db)
   const codex = new CodexStore(db)
-  codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
+  codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
   return { db, rulebook, review, codex }
 }
 
