@@ -18,7 +18,7 @@ const TIER1 = [
 ]
 
 // The exploit the scripted LLM tries to sneak past the gate: gunpowder is not
-// in the agriculture-era codex, and a gun is not something the town can make.
+// on any rung of this town's codex, and a gun is not something the town can make.
 const EXPLOIT_RECIPE: Recipe = {
   id: 'recipe:gunpowder',
   name: 'Craft Black Powder and a Gun',
@@ -33,7 +33,7 @@ const EXPLOIT_RECIPE: Recipe = {
   canon: ['gunpowder'],
 }
 
-// The legitimate novel intent's recipe: canon fire+pottery is earned, so it is
+// The legitimate novel intent's recipe: canon cooking is earned, so it is
 // the only attempt the gate may let through.
 const EARNED_RECIPE: Recipe = {
   id: 'recipe:boil_salt',
@@ -47,7 +47,7 @@ const EARNED_RECIPE: Recipe = {
   ],
   rngStream: 'recipe:boil_salt',
   interruptible: true,
-  canon: ['fire', 'pottery'],
+  canon: ['cooking'],
 }
 
 // The exploit script: physics-breaking for everything except free will, which
@@ -97,9 +97,9 @@ async function makeRig(llm: ScriptedExploitLlm): Promise<{ db: Database.Database
   const db = openArbiterDb(':memory:')
   const codex = new CodexStore(db)
   const ladder: CodexEntry[] = [
-    { id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null },
-    { id: 'pottery', era: 'agriculture', name: 'Pottery', prerequisiteId: null },
-    { id: 'brewing', era: 'crafts', name: 'Brewing', prerequisiteId: 'pottery' },
+    { id: 'cooking', era: 'handwork', name: 'Cooking', prerequisiteId: null },
+    { id: 'farming', era: 'handwork', name: 'Farming', prerequisiteId: null },
+    { id: 'food_preserving', era: 'arrangement', name: 'Keeping food past its week', prerequisiteId: 'cooking' },
   ]
   for (const entry of ladder) codex.insert(entry)
   const embedder = await FakeEmbedder.create()
@@ -182,7 +182,7 @@ describe('runChaos exploit corpus', () => {
     expect(boil.physicsBreaking).toBe(false)
     expect(boil.verdict.kind).toBe('attempt')
     if (boil.verdict.kind === 'attempt') {
-      expect(boil.verdict.recipe.canon).toEqual(['fire', 'pottery'])
+      expect(boil.verdict.recipe.canon).toEqual(['cooking'])
     }
   })
 })

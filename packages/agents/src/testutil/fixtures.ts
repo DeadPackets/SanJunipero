@@ -93,7 +93,7 @@ export function fixtureBlocks(overrides: Partial<PromptBlocks> = {}): PromptBloc
     makeMemory(3, 'A heron stood still in the shallows.', 4),
     makeMemory(4, 'The roof creaked under the wind.', 7),
     makeMemory(5, 'I traded two planks for a sack of flour.', 8),
-    makeMemory(6, 'The fire in the hearth burned low and warm.', 5),
+    makeMemory(6, 'The fire in the stove burned low and warm.', 5),
     makeMemory(7, 'Footprints crossed the far path before dawn.', 6),
     makeMemory(8, 'The plum tree has begun to flower.', 4),
   ]

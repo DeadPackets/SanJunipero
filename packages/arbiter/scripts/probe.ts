@@ -4,16 +4,16 @@ import { z } from 'zod'
 
 // The never-changing canon block, repeated to ~1.5k tokens so DeepSeek's
 // prefix cache stays warm across adjudications (byte-stable across calls).
-const CANON = ('The town of San Junipero sits on a forking river in a stone-age meadow. ' +
-  'No metal has been smelted, no gunpowder mixed, no electricity known. ' +
-  'People have fire, clay pots, wood, fiber, stone tools, and the river. ').repeat(29)
+const CANON = ('The town of San Junipero sits where two branches of a river meet, in a wide valley of field and forest. ' +
+  'There is no factory within reach, no yard that pours metal, and nothing arrives from outside. ' +
+  'People have fire, current from a generator, wood, fiber, stone, what the sheds hold, and the river. ').repeat(29)
 
 // Operator-facing adjudication instruction (Task 4's "system = CANON + instruction"
 // shape). Without it the bare lore prompt makes the model default to 'impossible'.
 const SYSTEM = CANON + '\n\n' +
   'You are the physics arbiter of San Junipero. An agent proposes an action. Reply with one verdict: ' +
   '"map" only if the town already performs this exact action as a routine; ' +
-  '"attempt" if the action is new but the agent can physically try it with the town\'s fire, clay pots, wood, fiber, stone tools, and river — whether it succeeds is decided later, never by you; ' +
+  '"attempt" if the action is new but the agent can physically try it with the town\'s fire, current, wood, fiber, stone, the stock and scrap its sheds already hold, and the river — whether it succeeds is decided later, never by you; ' +
   '"impossible" only if the action cannot even be started because it needs something the town wholly lacks.'
 
 const CAP_USD = 5.0
@@ -66,7 +66,7 @@ console.log(`[probe] model=${MIND_MODEL} budget=$${CAP_USD.toFixed(2)} caller=pr
 {
   const call = (userMsg: string) =>
     llm.object({ system: SYSTEM, messages: [{ role: 'user', content: userMsg }], schema: VerdictProbe })
-  await call('Agent intent: "I fire a clay pot in the kiln." Return a verdict.')
+  await call('Agent intent: "I pack the pump bearing with grease from the shed." Return a verdict.')
   budget()
   let r2 = await call('Agent intent: "I weave a basket from river fiber." Return a verdict.')
   let cin = r2.usage.cacheReadTokens

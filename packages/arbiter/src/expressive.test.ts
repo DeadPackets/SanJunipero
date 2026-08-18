@@ -60,7 +60,7 @@ class ScriptedLlm {
 async function makeRig(llm: ScriptedLlm): Promise<Arbiter> {
   const db = openArbiterDb(':memory:')
   const codex = new CodexStore(db)
-  codex.insert({ id: 'fire', era: 'agriculture', name: 'Fire', prerequisiteId: null })
+  codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
   return makeArbiter({
     db, llm: llm as unknown as LlmClient, embedder: await FakeEmbedder.create(), tick: () => 100,
   })
