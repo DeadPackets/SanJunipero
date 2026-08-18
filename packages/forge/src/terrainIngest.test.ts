@@ -16,6 +16,7 @@ import {
   BORDER_TOLERANCE, MATERIAL_PX, ROAD_MATERIAL_ID, SEAM_TOLERANCE, borderReport, seamReport,
   terrainAssetId,
 } from './terrainGen.js'
+import { tileSeamGate } from './pixelGates.js'
 import {
   MATERIALS_DIR, VARIANT_TONE_TOLERANCE, cohereVariants, groundTile, loadMaterialBook,
   registerGeneratedTerrain, seasonSheetFrom, seasonSheets, variantSpread,
@@ -209,6 +210,18 @@ describe('the shipped materials', () => {
       const limit = deframed ? DEFRAMED_SEAM_TOLERANCE : SEAM_TOLERANCE
       expect(Math.max(seam.horizontalDelta, seam.verticalDelta),
         `${assetId}${deframed ? ' (deframed)' : ''}: ${seam.note}`).toBeLessThanOrEqual(limit)
+    }
+  })
+
+  // The absolute check above is blind on smooth ground: terrain_earth wrapped at 2.9 against
+  // a tolerance of 14 and the line was plainly there, because the tile's own interior only
+  // varies by 2.1. Every shipped material now closes its wrap by construction, so the wrap
+  // has to be as quiet as the grain — not merely quiet in absolute terms.
+  it('wraps as quietly as its own grain, which is the only bar a smooth material can fail', async () => {
+    const book = await loadMaterialBook()
+    for (const [assetId, img] of book) {
+      const bar = tileSeamGate(img)
+      expect(bar.failures.join('; '), assetId).toBe('')
     }
   })
 

@@ -1,80 +1,108 @@
 {
   "terrain:earth:0": {
-    "h": 2.92,
-    "v": 0.08,
-    "ring": 0.53,
-    "deframed": 0
+    "h": 2.42,
+    "v": 0.75,
+    "ring": 0.25,
+    "deframed": 0,
+    "wrapH": 0,
+    "wrapV": 0
   },
   "terrain:farmland:0": {
-    "h": 11.73,
-    "v": 17.68,
-    "ring": 8.31,
-    "deframed": 3
+    "h": 2.09,
+    "v": 0.9,
+    "ring": 0.42,
+    "deframed": 0,
+    "wrapH": 0,
+    "wrapV": 0,
+    "source": "terrain_earth_0 graded to damp soil, furrow imposed by scripts/build-farmland.ts",
+    "note": "the generated farmland was a picture of the style-anchor cottage (user rejected); regenerating against a ground reference fixed the subject and blocked on the wrap at 3 attempts"
   },
   "terrain:forest:0": {
-    "h": 7.25,
-    "v": 6.95,
-    "ring": 2.07,
-    "deframed": 0
+    "h": 0.66,
+    "v": 3.31,
+    "ring": 5.58,
+    "deframed": 0,
+    "wrapH": 0.13,
+    "wrapV": 0.36
   },
   "terrain:grass:0": {
-    "h": 2.23,
-    "v": 0.58,
-    "ring": 0.65,
-    "deframed": 0
+    "h": 2.06,
+    "v": 0.95,
+    "ring": 1.29,
+    "deframed": 0,
+    "wrapH": 0,
+    "wrapV": 0
   },
   "terrain:road-calm:0": {
-    "h": 1.67,
-    "v": 0.87,
-    "ring": 8.09,
-    "deframed": 0
+    "h": 1.19,
+    "v": 0.46,
+    "ring": 1.03,
+    "deframed": 0,
+    "wrapH": 0,
+    "wrapV": 0
   },
   "terrain:road:0": {
-    "h": 3.87,
-    "v": 9.16,
-    "ring": 2.82,
-    "deframed": 0
+    "h": 0.22,
+    "v": 0.61,
+    "ring": 13.29,
+    "deframed": 0,
+    "wrapH": 0.47,
+    "wrapV": 0.18
   },
   "terrain:rock:0": {
-    "h": 9.5,
-    "v": 6.98,
-    "ring": 2.17,
-    "deframed": 0
+    "h": 0.16,
+    "v": 4.39,
+    "ring": 0.73,
+    "deframed": 0,
+    "wrapH": 0.28,
+    "wrapV": 0.24
   },
   "terrain:sand:0": {
-    "h": 2.81,
-    "v": 4.24,
-    "ring": 0.48,
-    "deframed": 0
+    "h": 0.59,
+    "v": 2.52,
+    "ring": 2.97,
+    "deframed": 0,
+    "wrapH": 0.88,
+    "wrapV": 1.04
   },
   "terrain:season:autumn": {
-    "h": 0.91,
-    "v": 12.52,
-    "ring": 1.42,
-    "deframed": 0
+    "h": 5.05,
+    "v": 1.39,
+    "ring": 1.63,
+    "deframed": 0,
+    "wrapH": 0.38,
+    "wrapV": 0
   },
   "terrain:season:spring": {
-    "h": 2.55,
-    "v": 1.95,
-    "ring": 5.08,
-    "deframed": 0
+    "h": 2.36,
+    "v": 3.63,
+    "ring": 1.48,
+    "deframed": 0,
+    "wrapH": 11.54,
+    "wrapV": 10.39
   },
   "terrain:season:summer": {
-    "h": 2.41,
-    "v": 1.95,
-    "ring": 7.95,
-    "deframed": 0
+    "h": 5.35,
+    "v": 1.91,
+    "ring": 6.39,
+    "deframed": 0,
+    "wrapH": 10.71,
+    "wrapV": 10.15
   },
   "terrain:season:winter": {
-    "h": 3.21,
-    "v": 2.88,
-    "ring": 0.32,
-    "deframed": 0
+    "h": 0.32,
+    "v": 2.56,
+    "ring": 0.79,
+    "deframed": 0,
+    "wrapH": 5.75,
+    "wrapV": 5.75
   },
   "terrain:water:0": {
-    "h": 1.77,
-    "v": 2.52,
-    "ring": 0.5,
-    "deframed": 0
+    "h": 0.3,
+    "v": 1.03,
+    "ring": 0.65,
+    "deframed": 0,
+    "wrapH": 0,
+    "wrapV": 0
   }
 }

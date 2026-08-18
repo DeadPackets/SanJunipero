@@ -13,10 +13,9 @@ export const ForgeConfigSchema = z.object({
     rubricVersion: z.string().default('v1'),
   }).strict().prefault({}),
   library: z.object({
-    // 16 was the plan's split for non-furniture; the controller icon ruling closed it after
-    // the library sheet — a 16 px cell has no reading for a needle or a rod.
-    iconSizePx: z.literal(24).default(24),
-    furnitureIconSizePx: z.literal(24).default(24),
+    // Was a literal 24. The C-level bar puts icons on 64, an exact 8th of the generation.
+    iconSizePx: z.number().int().min(16).max(128).default(64),
+    furnitureIconSizePx: z.number().int().min(16).max(128).default(64),
   }).strict().prefault({}),
   alignment: z.object({
     feetTolerancePx: z.number().int().min(0).default(2),

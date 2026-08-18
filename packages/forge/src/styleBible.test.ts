@@ -47,7 +47,10 @@ describe('style bible prompts', () => {
   it('targetSize: 1x1 building is 64px, per Style Bible', () => {
     expect(targetSize('building', { w: 1, h: 1 })).toEqual({ w: 64, h: 64 })
     expect(targetSize('building', { w: 4, h: 4 })).toEqual({ w: 256, h: 256 })
-    expect(targetSize('item', { w: 1, h: 1 })).toEqual({ w: 24, h: 24 })
+    // The 24 px item ceiling moved to the C-level bar: 128 px is an exact quarter of the
+    // 512 generation, where 24 px never divided it at all.
+    expect(targetSize('item', { w: 1, h: 1 })).toEqual({ w: 128, h: 128 })
+    expect(targetSize('item', { w: 1, h: 2 })).toEqual({ w: 192, h: 192 })
     expect(targetSize('crop', { w: 1, h: 1 })).toEqual({ w: 128, h: 32 })
     expect(targetSize('rig-part', { w: 1, h: 1 })).toEqual({ w: 128, h: 32 })
     expect(targetSize('terrain', { w: 1, h: 1 })).toEqual({ w: 128, h: 64 })

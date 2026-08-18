@@ -1,9 +1,10 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES_V2, mirrorX } from './sheet.js'
+import { decodePng, type RawImage } from './post/raw.js'
+import { FACINGS, POSES_V2, mirrorX, opaqueBbox } from './sheet.js'
 import {
   AUTHORED_FACINGS, CELL_NAMES_V4, STRIP_POSES_V4, WALK_CYCLE_V4,
-  deriveSheet, type AuthoredSet,
+  deriveSheet, sleepAxisDeg, sleepAxisGate, type AuthoredSet,
 } from './mirror.js'
 
 // 4×4 with a single opaque marker pixel — asymmetric so flips are detectable.
@@ -69,5 +70,54 @@ describe('deriveSheet', () => {
 describe('WALK_CYCLE_V4', () => {
   it('plays contact-a → passing → contact-b → passing (F1-F2-F1-F3)', () => {
     expect(WALK_CYCLE_V4).toEqual(['contact-a', 'passing', 'contact-b', 'passing'])
+  })
+})
+
+// The five shipped sleep-se cells, at an exact /4. omar and salma are the poses the user
+// approved; amara, nadia and yusuf are the three they rejected.
+const sleeper = (id: string): Promise<RawImage> =>
+  decodePng(readFileSync(new URL(`./fixtures/pixel-gates/sleep-${id}-64.png`, import.meta.url)))
+
+describe('sleepAxisDeg', () => {
+  it('puts the two approved sleepers inside one narrow band', async () => {
+    expect(sleepAxisDeg(await sleeper('omar'))).toBeCloseTo(-36.4, 0)
+    expect(sleepAxisDeg(await sleeper('salma'))).toBeCloseTo(-38.9, 0)
+  })
+
+  it('separates the three rejected cells from that band, and says how each is wrong', async () => {
+    // mirrored: the sign flips, the magnitude is right
+    expect(sleepAxisDeg(await sleeper('amara'))).toBeCloseTo(31.5, 0)
+    // flat: drawn across the screen instead of along the ground
+    expect(sleepAxisDeg(await sleeper('nadia'))).toBeCloseTo(-11.8, 0)
+    // flat AND mirrored
+    expect(sleepAxisDeg(await sleeper('yusuf'))).toBeCloseTo(6.6, 0)
+  })
+})
+
+describe('sleepAxisGate', () => {
+  it('passes the two the user approved', async () => {
+    for (const id of ['omar', 'salma']) expect(sleepAxisGate(await sleeper(id))).toEqual([])
+  })
+
+  // RED proof: every one of these shipped, and `aspect > 1` passed all three.
+  it('RED on all three the user rejected', async () => {
+    for (const id of ['amara', 'nadia', 'yusuf']) {
+      const f = sleepAxisGate(await sleeper(id))
+      expect(f, id).toHaveLength(1)
+      expect(f[0]!.gate).toBe('lying-axis')
+    }
+  })
+
+  it('★ the old aspect check cannot see any of it — that is why three of five shipped', async () => {
+    for (const id of ['amara', 'nadia', 'yusuf']) {
+      const bb = opaqueBbox(await sleeper(id))!
+      expect((bb.x1 - bb.x0 + 1) / (bb.y1 - bb.y0 + 1), id).toBeGreaterThan(1)
+    }
+  })
+
+  it('the band is signed, so a mirrored body fails even at the right magnitude', async () => {
+    const amara = await sleeper('amara')
+    expect(sleepAxisGate(amara)).toHaveLength(1)
+    expect(sleepAxisGate(mirrorX(amara))).toEqual([])
   })
 })

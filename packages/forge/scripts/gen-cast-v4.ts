@@ -160,7 +160,13 @@ function framePrompt(m: CastMember, f: AuthoredFacing, p: WalkPose): string {
 function sleepPrompt(m: CastMember): string {
   return `${STYLE_PROMPT} A single character sprite, exactly one figure — exactly the same character, costume and ` +
     `colors as the figures in the last reference image, at the same chunky pixel scale. The character is lying ` +
-    `on the ground fast asleep, body fully horizontal, eyes closed, relaxed peaceful face, same outfit. ` +
+    // "body fully horizontal" asked for a body flat across the SCREEN and got it: three of the
+    // five shipped that way. On a 2:1 dimetric ground the body runs along the ground diagonal.
+    `curled on their side fast asleep, seen from the same high three-quarter angle as the ` +
+    `reference figures, the body lying ALONG THE GROUND going away up to the right — head at ` +
+    `the upper right, knees drawn up and both feet at the lower left, NOT flat across the ` +
+    `picture. Head resting on the ground in profile, cheek down, eyes closed, relaxed peaceful ` +
+    `face; arms tucked in front of the chest and NOT propping the head up. Same outfit. ` +
     `NO text, NO labels. NO shadow under the figure. NO bed, NO pillow, NO props. ` +
     `NO buildings, NO houses, NO scenery, NO ground plane — do NOT draw the building from the first ` +
     `reference image (it is a STYLE reference only). The ONLY content is the single sleeping figure ` +

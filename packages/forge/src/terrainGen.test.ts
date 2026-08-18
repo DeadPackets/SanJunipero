@@ -1,12 +1,13 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { ROAD_AUTOTILE_KEYS, SEASONS, TERRAIN_TILE_KINDS } from '@sj/shared'
 import { MASTER_PALETTE } from './palette.js'
-import type { RawImage } from './post/raw.js'
+import { decodePng, type RawImage } from './post/raw.js'
 import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js'
 import {
   BORDER_TOLERANCE, CALM_ROAD_ID, CANDIDATE_MARGIN, MATERIAL_PX, ROAD_MATERIAL_ID, SEAM_TOLERANCE,
   DEFRAME_MAX_PASSES, TERRAIN_COMMISSIONS, TILING_CRITERION_PROMPT, borderReport, cropMargin,
-  deframe, toMaterialGrid,
+  deframe, toMaterialGrid, materialVeto, seamlessMaterial,
   diamondFromMaterial, generationItems, materialFromCandidate, planTerrainProgram, seamReport,
   seasonTintFrom, selfTile3x3, stencilRoadTile, terrainAssetId, terrainBoilerplate,
 } from './terrainGen.js'
@@ -141,6 +142,66 @@ describe('seamReport', () => {
   it('is deterministic', () => {
     const m = asMaterial(seamlessSquare(MATERIAL_PX))
     expect(seamReport(m)).toEqual(seamReport(m))
+  })
+})
+
+describe('materialVeto', () => {
+  it('passes a material whose opposing edges meet', () => {
+    expect(materialVeto(asMaterial(seamlessSquare(MATERIAL_PX)))).toBeNull()
+  })
+
+  it('speaks the seam note when the absolute wrap breaks', () => {
+    expect(materialVeto(asMaterial(seamedSquare(MATERIAL_PX)))).toMatch(/left|right|horizontal/i)
+  })
+
+  // The one the absolute check cannot see. terrain_earth is a near-uniform material: its wrap
+  // delta is 2.9 against a tolerance of 14, so seamReport calls it clean — and the wrap is
+  // still 5x its own interior noise, which is a visible line on smooth ground.
+  it('vetoes a wrap that is quiet in absolute terms and loud against its own grain', async () => {
+    const earth = await decodePng(readFileSync(
+      new URL('./fixtures/pixel-gates/terrain-earth-seamed.png', import.meta.url)))
+    expect(seamReport(earth).pass).toBe(true)
+    expect(borderReport(earth).framed).toBe(false)
+    expect(materialVeto(earth)).toMatch(/interior noise/)
+  })
+})
+
+// Three live rounds on eight materials came back 0/8: an image model does not return a
+// torus, and asking it three more times costs money to learn the same thing. The wrap is
+// made true by CONSTRUCTION instead, the way the pixel grid was.
+describe('seamlessMaterial', () => {
+  // The four offenders as they shipped BEFORE the construction landed. Frozen as fixtures:
+  // a gate proven against the live content directory stops being proven the moment the
+  // content is fixed.
+  const offender = async (name: string): Promise<RawImage> => decodePng(readFileSync(
+    new URL(`./fixtures/pixel-gates/terrain-${name}-seamed.png`, import.meta.url)))
+
+  it('closes the wrap on the material with the loudest seam of the thirteen', async () => {
+    const rock = await offender('rock')
+    expect(materialVeto(rock)).toMatch(/interior noise/)
+    expect(materialVeto(seamlessMaterial(rock))).toBeNull()
+  })
+
+  // road is cobbles, not grain: rolling by exactly half lands its border mid-course and the
+  // wrap stays broken at 16 and 26. The offset has to be chosen, not assumed.
+  it('closes a structured material too, where a half roll does not', async () => {
+    const road = await offender('road')
+    expect(materialVeto(road)).not.toBeNull()
+    expect(materialVeto(seamlessMaterial(road))).toBeNull()
+  })
+
+  it('keeps the material palette-true, opaque and the same size', async () => {
+    const m = seamlessMaterial(await offender('farmland'))
+    expect([m.width, m.height]).toEqual([MATERIAL_PX, MATERIAL_PX])
+    for (let i = 0; i < m.data.length; i += 4) {
+      expect(m.data[i + 3]).toBe(255)
+      expect(PALETTE_HEXES).toContain((m.data[i]! << 16) | (m.data[i + 1]! << 8) | m.data[i + 2]!)
+    }
+  })
+
+  it('is deterministic', async () => {
+    const m = await offender('sand')
+    expect(Buffer.from(seamlessMaterial(m).data)).toEqual(Buffer.from(seamlessMaterial(m).data))
   })
 })
 

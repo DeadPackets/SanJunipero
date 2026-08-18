@@ -5,8 +5,8 @@ export const LibraryEntrySchema = z.object({
   kind: z.string().min(1),
   category: z.enum(LIBRARY_CATEGORIES),
   desc: z.string().min(1),
-  spritePx: z.number().int().min(16).max(24),
-  iconPx: z.union([z.literal(16), z.literal(24)]),
+  spritePx: z.number().int().min(16).max(256),
+  iconPx: z.number().int().min(16).max(128),
   interior: InteriorMetaSchema.optional(),
 }).strict().refine(e => (e.category === 'furniture') === (e.interior !== undefined),
   { message: 'furniture entries require meta.interior; non-furniture entries must omit it' })
@@ -15,12 +15,10 @@ export type LibraryEntry = z.infer<typeof LibraryEntrySchema>
 export const LIBRARY_COUNTS: Record<LibraryCategory, number> =
   { tool: 10, food: 10, material: 9, ritual: 6, furniture: 15 }
 
-// Every world sprite is drawn at 24 px: measured against paid candidates, a 16 px cell
-// loses the object (a pail's handle and staves dissolve).
-export const WORLD_SPRITE_PX = 24
-// Controller icon ruling: every icon is 24 px too. At 16 px a needle and a fishing rod have
-// no reading at all, and 7 of the 20 batch-B blocks were a clean sprite failing only its icon.
-export const ICON_PX = 24
+// The C-level bar owns both numbers now. 24 px was never a divisor of the 512 generation
+// (512/24 = 21.33), so every sprite in the library came off a fractional downscale.
+export { WORLD_SPRITE_PX, ICON_PX } from '../assetResolution.js'
+import { WORLD_SPRITE_PX, ICON_PX } from '../assetResolution.js'
 
 const tool = (kind: string, desc: string): LibraryEntry =>
   ({ kind, category: 'tool', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX })
@@ -39,7 +37,12 @@ const TOOLS: LibraryEntry[] = [
   tool('knife', 'a kitchen knife lying flat, a long straight warm-grey blade with a keen straight edge and a pointed tip, set into a short honey-wood handle'),
   tool('hammer', 'a carpenter hammer with a stubby honey-wood handle and a square warm-grey head'),
   tool('shovel', 'a digging shovel with a honey-wood shaft, a small crossbar grip and a rounded warm-grey scoop'),
-  tool('fishing_rod', 'a long thin rod of pale springy wood with a wound sage-green line trailing from its tip and a small barbed hook'),
+  // A line TRAILING off the tip is a 1-px thread across empty space; three rounds came back
+  // with it broken into dashes. Keep every strand of line touching the rod.
+  tool('fishing_rod', 'a long thin rod of pale springy wood with a sage-green line wound thick ' +
+    'on a small wooden reel at its grip, one unbroken strand of that line running straight ' +
+    'along the shaft to the tip and no line at all past the tip, and a small barbed warm-grey ' +
+    'hook hanging against the shaft just below the tip'),
   tool('bucket', 'a wooden pail of honey-wood staves bound by two warm-grey bands, with a rope handle across the top'),
   tool('waterskin', 'a plump leather water flask the colour of tanned hide, stoppered with a carved wooden plug on a cord'),
   tool('needle', 'a long sewing needle of polished warm-grey metal with a thread of dusty rose looped through its eye'),
@@ -49,13 +52,17 @@ const TOOLS: LibraryEntry[] = [
 const FOODS: LibraryEntry[] = [
   food('bread', 'a round cottage loaf with a crisp golden-brown crust and a cross scored across its top'),
   food('berries', 'a small heap of round dusty-rose berries with two sage-green leaves tucked underneath'),
-  food('fish', 'a fresh river fish lying on its side, pale silver-blue scales and a soft sage-green back'),
+  // "river" put a riverside cottage in the frame. Name the animal and nothing around it.
+  food('fish', 'one whole raw fish, a single trout, lying flat on its side with its head to the left ' +
+    'and its tail to the right, pale silver-blue scales, a soft sage-green back and one round eye'),
   food('venison', 'a cut of deer meat, deep rose flesh with a rim of cream fat, tied with a loop of twine'),
   food('rabbit_meat', 'a small dressed rabbit cut, pale rose flesh on a short bone, ready for the pot'),
   food('stew', 'a shallow bowl of thick stew, honey-brown broth with chunks of root vegetable showing'),
   // The two caps differ by one word and nothing else — the picture never tells the town what it knows.
-  food('field_mushroom', 'a single squat mushroom with a rounded chestnut cap and a short cream stalk, drawn from the side'),
-  food('pale_mushroom', 'a single squat mushroom with a rounded ivory cap and a short cream stalk, drawn from the side'),
+  // The anti-spot clause is on BOTH caps: the one that came back a red toadstool needed it,
+  // and the pair may only ever differ by the colour word.
+  food('field_mushroom', 'a single squat mushroom with a rounded unmarked chestnut cap, no spots and no speckles, and a short cream stalk, drawn from the side'),
+  food('pale_mushroom', 'a single squat mushroom with a rounded unmarked ivory cap, no spots and no speckles, and a short cream stalk, drawn from the side'),
   food('herb_bundle', 'a tied bunch of green herbs, sage and pale mint leaves gathered by a strip of dusty-rose cloth'),
   food('wheat_sheaf', 'a small sheaf of golden wheat stalks with heavy heads, bound in the middle with a twist of straw'),
 ]
@@ -63,7 +70,10 @@ const FOODS: LibraryEntry[] = [
 const MATERIALS: LibraryEntry[] = [
   material('timber', 'a short stack of squared honey-wood planks, three high, with visible end grain'),
   material('stone', 'two rough quarried blocks of warm-grey stone stacked one on the other, flat faces chipped at the corners, darker grey in the shadows and no other colour'),
-  material('clay', 'a wet slab of red-brown clay squared off by hand, slumping at its edges, with deep thumb grooves pressed across the top'),
+  // Came back as timber planks twice; "slab" reads as a board unless the material is louder.
+  material('clay', "a lump of wet red-brown potter's clay, soft and earthen with no wood grain " +
+    'anywhere, patted into a rough squared block that slumps at its edges, deep thumb grooves ' +
+    'pressed across the top and a damp sheen on the high faces'),
   material('fiber', 'a neat hank of straw-coloured plant fibre folded once and tied at the middle with a thin cord, its two ends fanning out'),
   material('hide', 'a folded animal skin, tan on the outside and cream on the underside, edges left ragged'),
   material('cloth', 'a folded square of woven cloth in soft cream with a thin dusty-rose stripe along one edge'),
@@ -96,7 +106,12 @@ const FURNITURE: LibraryEntry[] = [
     { slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['storehouse', 'shed'] }),
   furniture('barrel', 'a squat barrel of honey-wood staves with two warm-grey hoops and a flat lid',
     { slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['storehouse'] }),
-  furniture('rug', 'a woven floor mat in dusty rose and cream with a simple repeating border',
+  // The furniture hint kept building a piece of furniture out of this: first a wicker
+  // armchair, then a dresser. Deny the third dimension outright.
+  furniture('rug', 'a rug and nothing else: a flat woven textile lying face-up on the ground, ' +
+    'ZERO height, no legs, no frame, no shelves, no back, no upright part of any kind, ' +
+    'a plain rectangle of cloth seen from above in dusty rose and cream with a simple ' +
+    'repeating border and short fringe at its two short ends',
     { slots: { w: 1, h: 2 }, placement: 'floor', interiorKinds: ['hut'] }),
   furniture('hearth', 'a cream-stone fireplace set against a wall, with a low fire of honey-gold flames and a warm-grey chimney hood',
     { slots: { w: 1, h: 1 }, placement: 'wall', interiorKinds: ['hut'], isHearth: true, providesLight: true }),

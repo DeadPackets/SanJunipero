@@ -1,4 +1,5 @@
 import type { AssetClass, Footprint } from '@sj/shared'
+import { nativeSizeFor } from './assetResolution.js'
 export type { AssetClass, Footprint } from '@sj/shared'
 
 export const STYLE_PROMPT = [
@@ -35,7 +36,7 @@ export function buildAssetPrompt(desc: string, footprint: Footprint, klass: Asse
 export function targetSize(klass: AssetClass, fp: Footprint): { w: number; h: number } {
   switch (klass) {
     case 'building': return { w: 32 * (fp.w + fp.h), h: 32 * (fp.w + fp.h) }
-    case 'item': return { w: 24, h: 24 }
+    case 'item': return nativeSizeFor('item', fp)
     case 'crop': return { w: 128, h: 32 }
     case 'rig-part': return { w: 128, h: 32 }
     case 'terrain': return { w: 128, h: 64 }

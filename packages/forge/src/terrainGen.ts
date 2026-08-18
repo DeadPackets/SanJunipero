@@ -7,6 +7,7 @@ import { downscaleNearest, type RawImage } from './post/raw.js'
 import { quantize } from './post/quantize.js'
 import { TERRAIN_TILE_H, TERRAIN_TILE_W, inTileDiamond } from './terrainTiles.js'
 import { paintRoadAutotile } from './roadTiles.js'
+import { tileSeamGate } from './pixelGates.js'
 
 // USER RULING 2026-08-17: "I want properly generated repeating tiling textures from an image
 // model." This supersedes C10 T1's code-painted tiles and C13's code-painted road strip. The
@@ -96,7 +97,11 @@ export const TERRAIN_COMMISSIONS: Record<string, string> = {
   'forest:0': 'Shaded forest floor: uniform dark sage and moss with an even fine litter grain, no ferns, no branches, no bright spots.',
   'rock:0': 'Weathered warm-grey bedrock: uniform stone grain with an even fine crack mottle at a small scale, no large slabs and no single big fissure.',
   'sand:0': 'A wet river bank: uniform pale cream damp sand with an even fine ripple grain, evenly mixed darker and lighter at small scale, no pebbles and no water. The shore surface itself.',
-  'farmland:0': 'Ploughed soil: uniform rich damp brown with fine even parallel furrow grain running corner to corner at a small, regular pitch, no headland and no gaps.',
+  // The first farmland came back as a picture of the style-anchor COTTAGE — the reference
+  // bled in whole, and it passed every mechanical gate because a cottage wraps as well as
+  // soil does. The reference is now another ground material (REFS=), and the commission
+  // names the furrow as the only structure in the square.
+  'farmland:0': 'Ploughed soil seen from directly above: rich damp brown, covered corner to corner with straight parallel furrow ridges at a small even pitch, every ridge the same width and the same length as every other, running in ONE direction across the whole square. The furrows are the only structure in the picture. No building, no roof, no wall, no window, no door, no fence, no crop, no plant, no path, no headland, no field boundary, no bare patch.',
 }
 
 export const SEASON_COMMISSIONS: Record<Season, string> = {
@@ -291,6 +296,82 @@ export function borderReport(m: RawImage, ring: number = BORDER_RING_PX): Border
       ? `the outer edge is drawn as a border or frame (edge differs from the middle by ${ringDelta.toFixed(1)}); remove it — the texture must run right off all four sides with no outline, no rim and no darker margin`
       : `no frame (edge matches the middle within ${ringDelta.toFixed(1)})`,
   }
+}
+
+// The one veto the generator answers to. seamReport reads the wrap in ABSOLUTE tone, which
+// is blind on smooth ground: terrain_earth wraps at 2.9 against a tolerance of 14 and the
+// line is still plainly there, because the material's own interior only varies by 2.1.
+// tileSeamGate reads the same wrap RELATIVE to that grain and catches it.
+export function materialVeto(m: RawImage): string | null {
+  const seam = seamReport(m)
+  if (!seam.pass) return seam.note
+  const border = borderReport(m)
+  if (border.framed) return border.note
+  const bar = tileSeamGate(m)
+  if (!bar.ok) return `${bar.failures.join('; ')}; make the wrap as quiet as the middle of the tile`
+  return null
+}
+
+// ---------------------------------------------------------------- making the wrap true
+//
+// Three live rounds on eight materials returned 0/8: an image model does not draw a torus,
+// and the shipped set only ever passed because the absolute tolerance was loose enough to
+// miss a quiet line on smooth ground. So the wrap is made true by CONSTRUCTION, the way the
+// pixel grid was — not by asking the model again.
+//
+// Layer A is the material. Layer B is A rolled by (ox, oy). A's seam is at the border and
+// B's is wherever the roll put it, so the two never break in the same place: take B at the
+// border, A in the middle, and smoothstep between. B's border columns were ADJACENT columns
+// inside A, so the wrap comes out as quiet as ordinary grain.
+
+const wrapIndex = (m: RawImage, x: number, y: number): number =>
+  ((((y % m.height) + m.height) % m.height) * m.width + (((x % m.width) + m.width) % m.width)) * 4
+
+function bandDelta(m: RawImage, axis: 'col' | 'row', a: number, b: number): number {
+  const outer = axis === 'col' ? m.height : m.width
+  let s = 0
+  for (let o = 0; o < outer; o++) {
+    const i = axis === 'col' ? wrapIndex(m, a, o) : wrapIndex(m, o, a)
+    const j = axis === 'col' ? wrapIndex(m, b, o) : wrapIndex(m, o, b)
+    for (let k = 0; k < 3; k++) s += Math.abs(m.data[i + k]! - m.data[j + k]!)
+  }
+  return s / (outer * 3)
+}
+
+// The border has to fall between two lines that are ALREADY quiet neighbours — rolling by
+// exactly half lands farmland's border on a furrow edge and the road's mid-cobble-course,
+// and the wrap stays broken at 25 and 26. It also has to stay clear of the tile's own edges
+// so both layers have room to fade.
+export function bestRollOffsets(m: RawImage): { ox: number; oy: number } {
+  const pick = (axis: 'col' | 'row', span: number): number => {
+    const margin = Math.max(8, span >> 3)
+    let best = span >> 1, bestDelta = Infinity
+    for (let k = margin; k < span - margin; k++) {
+      const d = bandDelta(m, axis, k - 1, k)
+      if (d < bestDelta) { bestDelta = d; best = k }
+    }
+    return best
+  }
+  return { ox: pick('col', m.width), oy: pick('row', m.height) }
+}
+
+export function seamlessMaterial(m: RawImage): RawImage {
+  const w = m.width, h = m.height
+  const { ox, oy } = bestRollOffsets(m)
+  const out: RawImage = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
+  const ramp = (d: number, half: number): number => {
+    const t = Math.min(1, d / half)
+    return t * t * (3 - 2 * t)
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const a = Math.min(ramp(Math.min(x + 1, w - x), w >> 1), ramp(Math.min(y + 1, h - y), h >> 1))
+    const i = wrapIndex(m, x, y), j = wrapIndex(m, x + ox, y + oy), o = (y * w + x) * 4
+    for (let k = 0; k < 3; k++) out.data[o + k] = Math.round(m.data[i + k]! * a + m.data[j + k]! * (1 - a))
+    out.data[o + 3] = 255
+  }
+  const q = quantize(out, paletteRgb())
+  for (let i = 3; i < q.data.length; i += 4) q.data[i] = 255
+  return q
 }
 
 // A material that is ALREADY PAID FOR and still carries a rim gets the rim cut off rather

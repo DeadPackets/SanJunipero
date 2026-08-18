@@ -35,10 +35,17 @@ export type PlannedItem = {
   candidates: number
 }
 
+// At 24 px the instruction was "few colours, no hair-thin detail" — survival advice for a
+// cell that could not hold detail. At the C-level 128 px cell the cell CAN hold it, and an
+// under-detailed sprite is the failure mode instead.
 export function itemBoilerplate(e: LibraryEntry): string {
-  return `${STYLE_PROMPT} ${CATEGORY_HINT[e.category]} Style: ${STYLE_ANCHOR_CLAUSE}.` +
-    ` The artwork must stay readable when shown at ${e.spritePx} pixels across:` +
-    ' bold silhouette, few colours, no hair-thin detail.'
+  const density = e.spritePx >= 64
+    ? `The artwork is drawn at ${e.spritePx} pixels across, so it carries real detail: ` +
+      'visible grain and joinery, three or four tones per material with a clear light side ' +
+      'and shade side, a crisp one-pixel outline, and no soft or blurred edges anywhere.'
+    : `The artwork must stay readable when shown at ${e.spritePx} pixels across: ` +
+      'bold silhouette, few colours, no hair-thin detail.'
+  return `${STYLE_PROMPT} ${CATEGORY_HINT[e.category]} Style: ${STYLE_ANCHOR_CLAUSE}. ${density}`
 }
 
 export function itemCommission(e: LibraryEntry): string {

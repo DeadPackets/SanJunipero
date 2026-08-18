@@ -4,6 +4,8 @@ import {
   renderCheckerGuide, renderStripFrameGuide,
 } from './guides.js'
 
+const bytes = (a: Uint8ClampedArray): Buffer => Buffer.from(a.buffer, a.byteOffset, a.byteLength)
+
 describe('renderCheckerGuide', () => {
   const g = renderCheckerGuide()
   it('is a 1024×1024 fully opaque image', () => {
@@ -20,8 +22,10 @@ describe('renderCheckerGuide', () => {
     expect(lum(1, 1)).toBe(255)
     expect(lum(511, 512)).not.toBe(lum(512, 512))
   })
-  it('is deterministic', () => {
-    expect(renderCheckerGuide().data).toEqual(g.data)
+  // 1 s, not the 5 s default: vitest's structural toEqual walked all 4,194,304 bytes and took
+  // ~3.4 s idle, so under a loaded batch it crossed the default and failed as a timeout.
+  it('is deterministic', { timeout: 1000 }, () => {
+    expect(bytes(renderCheckerGuide().data).equals(bytes(g.data))).toBe(true)
   })
 })
 
