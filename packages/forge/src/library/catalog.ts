@@ -37,7 +37,12 @@ const TOOLS: LibraryEntry[] = [
   tool('knife', 'a kitchen knife lying flat, a long straight warm-grey blade with a keen straight edge and a pointed tip, set into a short honey-wood handle'),
   tool('hammer', 'a carpenter hammer with a stubby honey-wood handle and a square warm-grey head'),
   tool('shovel', 'a digging shovel with a honey-wood shaft, a small crossbar grip and a rounded warm-grey scoop'),
-  tool('fishing_rod', 'a long thin rod of pale springy wood with a wound sage-green line trailing from its tip and a small barbed hook'),
+  // A line TRAILING off the tip is a 1-px thread across empty space; three rounds came back
+  // with it broken into dashes. Keep every strand of line touching the rod.
+  tool('fishing_rod', 'a long thin rod of pale springy wood with a sage-green line wound thick ' +
+    'on a small wooden reel at its grip, one unbroken strand of that line running straight ' +
+    'along the shaft to the tip and no line at all past the tip, and a small barbed warm-grey ' +
+    'hook hanging against the shaft just below the tip'),
   tool('bucket', 'a wooden pail of honey-wood staves bound by two warm-grey bands, with a rope handle across the top'),
   tool('waterskin', 'a plump leather water flask the colour of tanned hide, stoppered with a carved wooden plug on a cord'),
   tool('needle', 'a long sewing needle of polished warm-grey metal with a thread of dusty rose looped through its eye'),
