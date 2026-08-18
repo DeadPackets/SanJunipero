@@ -17,8 +17,9 @@ import {
 } from '../src/terrainTiles.js'
 import {
   MATERIAL_GRADES, ROAD_MATERIAL_ID, borderReport, deframe, gradeMaterial, materialContrast,
-  materialMean, seamReport, stencilRoadTile,
+  materialMean, seamReport, seamlessMaterial, stencilRoadTile,
 } from '../src/terrainGen.js'
+import { tileSeamGate } from '../src/pixelGates.js'
 import { MATERIALS_DIR, seasonSheets } from '../src/terrainIngest.js'
 import { paintRoadAutotile } from '../src/roadTiles.js'
 
@@ -52,27 +53,33 @@ for (const stale of readdirSync(MATERIALS_DIR)) {
     console.log(`  pruned stale ${stale}`)
   }
 }
-const provenance: Record<string, { h: number; v: number; ring: number; deframed: number }> = {}
+const provenance: Record<string,
+  { h: number; v: number; ring: number; deframed: number; wrapH: number; wrapV: number }> = {}
 for (const [assetId, raw] of [...book]) {
   const { material: deframed, passes } = deframe(raw)
   // tone grading, measured against the v1 materials the user accepted structurally
   const kindOf = /^terrain:([a-z-]+):0$/.exec(assetId)?.[1] ?? ''
   const grade = MATERIAL_GRADES[kindOf]
-  const material = grade === undefined ? deframed : gradeMaterial(deframed, grade)
+  const graded = grade === undefined ? deframed : gradeMaterial(deframed, grade)
+  // Last, because the crop and the grade both move the edges: close the wrap by
+  // construction. Three live rounds proved the model will not draw one that closes itself.
+  const material = seamlessMaterial(graded)
   if (grade !== undefined) {
     console.log(`  ${assetId.padEnd(24)} graded  mean ${materialMean(deframed).map((v) => Math.round(v)).join(',')}` +
       ` -> ${materialMean(material).map((v) => Math.round(v)).join(',')}` +
       `  contrast ${materialContrast(deframed).toFixed(0)} -> ${materialContrast(material).toFixed(0)}`)
   }
   book.set(assetId, material)
-  const seam = seamReport(material), border = borderReport(material)
+  const seam = seamReport(material), border = borderReport(material), bar = tileSeamGate(material)
   provenance[assetId] = {
     h: Number(seam.horizontalDelta.toFixed(2)), v: Number(seam.verticalDelta.toFixed(2)),
     ring: Number(border.ringDelta.toFixed(2)), deframed: passes,
+    wrapH: Number(bar.wrapH.toFixed(2)), wrapV: Number(bar.wrapV.toFixed(2)),
   }
   writeFileSync(join(MATERIALS_DIR, `${assetId.replace(/:/g, '_')}.png`), await encodePng(material))
   console.log(`  ${assetId.padEnd(24)} h=${seam.horizontalDelta.toFixed(1)} v=${seam.verticalDelta.toFixed(1)} ` +
-    `ring=${border.ringDelta.toFixed(1)}${passes > 0 ? ` (deframed x${passes})` : ''}${border.framed ? '  STILL FRAMED' : ''}`)
+    `ring=${border.ringDelta.toFixed(1)} wrap=${bar.wrapH.toFixed(1)}/${bar.wrapV.toFixed(1)}` +
+    `${passes > 0 ? ` (deframed x${passes})` : ''}${bar.ok ? '' : '  SEAM'}${border.framed ? '  STILL FRAMED' : ''}`)
 }
 // The shipped state describes itself: what each material measured and how hard it had to be
 // cropped to lose its frame. A deframed material is ALLOWED a looser wrap, because the crop

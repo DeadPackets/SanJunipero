@@ -308,6 +308,68 @@ export function materialVeto(m: RawImage): string | null {
   return null
 }
 
+// ---------------------------------------------------------------- making the wrap true
+//
+// Three live rounds on eight materials returned 0/8: an image model does not draw a torus,
+// and the shipped set only ever passed because the absolute tolerance was loose enough to
+// miss a quiet line on smooth ground. So the wrap is made true by CONSTRUCTION, the way the
+// pixel grid was — not by asking the model again.
+//
+// Layer A is the material. Layer B is A rolled by (ox, oy). A's seam is at the border and
+// B's is wherever the roll put it, so the two never break in the same place: take B at the
+// border, A in the middle, and smoothstep between. B's border columns were ADJACENT columns
+// inside A, so the wrap comes out as quiet as ordinary grain.
+
+const wrapIndex = (m: RawImage, x: number, y: number): number =>
+  ((((y % m.height) + m.height) % m.height) * m.width + (((x % m.width) + m.width) % m.width)) * 4
+
+function bandDelta(m: RawImage, axis: 'col' | 'row', a: number, b: number): number {
+  const outer = axis === 'col' ? m.height : m.width
+  let s = 0
+  for (let o = 0; o < outer; o++) {
+    const i = axis === 'col' ? wrapIndex(m, a, o) : wrapIndex(m, o, a)
+    const j = axis === 'col' ? wrapIndex(m, b, o) : wrapIndex(m, o, b)
+    for (let k = 0; k < 3; k++) s += Math.abs(m.data[i + k]! - m.data[j + k]!)
+  }
+  return s / (outer * 3)
+}
+
+// The border has to fall between two lines that are ALREADY quiet neighbours — rolling by
+// exactly half lands farmland's border on a furrow edge and the road's mid-cobble-course,
+// and the wrap stays broken at 25 and 26. It also has to stay clear of the tile's own edges
+// so both layers have room to fade.
+export function bestRollOffsets(m: RawImage): { ox: number; oy: number } {
+  const pick = (axis: 'col' | 'row', span: number): number => {
+    const margin = Math.max(8, span >> 3)
+    let best = span >> 1, bestDelta = Infinity
+    for (let k = margin; k < span - margin; k++) {
+      const d = bandDelta(m, axis, k - 1, k)
+      if (d < bestDelta) { bestDelta = d; best = k }
+    }
+    return best
+  }
+  return { ox: pick('col', m.width), oy: pick('row', m.height) }
+}
+
+export function seamlessMaterial(m: RawImage): RawImage {
+  const w = m.width, h = m.height
+  const { ox, oy } = bestRollOffsets(m)
+  const out: RawImage = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
+  const ramp = (d: number, half: number): number => {
+    const t = Math.min(1, d / half)
+    return t * t * (3 - 2 * t)
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const a = Math.min(ramp(Math.min(x + 1, w - x), w >> 1), ramp(Math.min(y + 1, h - y), h >> 1))
+    const i = wrapIndex(m, x, y), j = wrapIndex(m, x + ox, y + oy), o = (y * w + x) * 4
+    for (let k = 0; k < 3; k++) out.data[o + k] = Math.round(m.data[i + k]! * a + m.data[j + k]! * (1 - a))
+    out.data[o + 3] = 255
+  }
+  const q = quantize(out, paletteRgb())
+  for (let i = 3; i < q.data.length; i += 4) q.data[i] = 255
+  return q
+}
+
 // A material that is ALREADY PAID FOR and still carries a rim gets the rim cut off rather
 // than regenerated: sand:0 came back framed at ring 24.7 even through the 8% crop, because
 // the model drew a thick one. Cutting is free; another attempt is not.
