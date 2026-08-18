@@ -47,13 +47,17 @@ const TOOLS: LibraryEntry[] = [
 const FOODS: LibraryEntry[] = [
   food('bread', 'a round cottage loaf with a crisp golden-brown crust and a cross scored across its top'),
   food('berries', 'a small heap of round dusty-rose berries with two sage-green leaves tucked underneath'),
-  food('fish', 'a fresh river fish lying on its side, pale silver-blue scales and a soft sage-green back'),
+  // "river" put a riverside cottage in the frame. Name the animal and nothing around it.
+  food('fish', 'one whole raw fish, a single trout, lying flat on its side with its head to the left ' +
+    'and its tail to the right, pale silver-blue scales, a soft sage-green back and one round eye'),
   food('venison', 'a cut of deer meat, deep rose flesh with a rim of cream fat, tied with a loop of twine'),
   food('rabbit_meat', 'a small dressed rabbit cut, pale rose flesh on a short bone, ready for the pot'),
   food('stew', 'a shallow bowl of thick stew, honey-brown broth with chunks of root vegetable showing'),
   // The two caps differ by one word and nothing else — the picture never tells the town what it knows.
-  food('field_mushroom', 'a single squat mushroom with a rounded chestnut cap and a short cream stalk, drawn from the side'),
-  food('pale_mushroom', 'a single squat mushroom with a rounded ivory cap and a short cream stalk, drawn from the side'),
+  // The anti-spot clause is on BOTH caps: the one that came back a red toadstool needed it,
+  // and the pair may only ever differ by the colour word.
+  food('field_mushroom', 'a single squat mushroom with a rounded unmarked chestnut cap, no spots and no speckles, and a short cream stalk, drawn from the side'),
+  food('pale_mushroom', 'a single squat mushroom with a rounded unmarked ivory cap, no spots and no speckles, and a short cream stalk, drawn from the side'),
   food('herb_bundle', 'a tied bunch of green herbs, sage and pale mint leaves gathered by a strip of dusty-rose cloth'),
   food('wheat_sheaf', 'a small sheaf of golden wheat stalks with heavy heads, bound in the middle with a twist of straw'),
 ]
@@ -61,7 +65,10 @@ const FOODS: LibraryEntry[] = [
 const MATERIALS: LibraryEntry[] = [
   material('timber', 'a short stack of squared honey-wood planks, three high, with visible end grain'),
   material('stone', 'two rough quarried blocks of warm-grey stone stacked one on the other, flat faces chipped at the corners, darker grey in the shadows and no other colour'),
-  material('clay', 'a wet slab of red-brown clay squared off by hand, slumping at its edges, with deep thumb grooves pressed across the top'),
+  // Came back as timber planks twice; "slab" reads as a board unless the material is louder.
+  material('clay', "a lump of wet red-brown potter's clay, soft and earthen with no wood grain " +
+    'anywhere, patted into a rough squared block that slumps at its edges, deep thumb grooves ' +
+    'pressed across the top and a damp sheen on the high faces'),
   material('fiber', 'a neat hank of straw-coloured plant fibre folded once and tied at the middle with a thin cord, its two ends fanning out'),
   material('hide', 'a folded animal skin, tan on the outside and cream on the underside, edges left ragged'),
   material('cloth', 'a folded square of woven cloth in soft cream with a thin dusty-rose stripe along one edge'),
@@ -94,7 +101,12 @@ const FURNITURE: LibraryEntry[] = [
     { slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['storehouse', 'shed'] }),
   furniture('barrel', 'a squat barrel of honey-wood staves with two warm-grey hoops and a flat lid',
     { slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['storehouse'] }),
-  furniture('rug', 'a woven floor mat in dusty rose and cream with a simple repeating border',
+  // The furniture hint kept building a piece of furniture out of this: first a wicker
+  // armchair, then a dresser. Deny the third dimension outright.
+  furniture('rug', 'a rug and nothing else: a flat woven textile lying face-up on the ground, ' +
+    'ZERO height, no legs, no frame, no shelves, no back, no upright part of any kind, ' +
+    'a plain rectangle of cloth seen from above in dusty rose and cream with a simple ' +
+    'repeating border and short fringe at its two short ends',
     { slots: { w: 1, h: 2 }, placement: 'floor', interiorKinds: ['hut'] }),
   furniture('hearth', 'a cream-stone fireplace set against a wall, with a low fire of honey-gold flames and a warm-grey chimney hood',
     { slots: { w: 1, h: 1 }, placement: 'wall', interiorKinds: ['hut'], isHearth: true, providesLight: true }),
