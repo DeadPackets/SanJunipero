@@ -64,7 +64,7 @@
    · TYPE      --font-px for the day stamp, the speed pill and LIVE; --font-body for the
                day's title and cast; --font-data (tabular) for the running clock, so a
                ticking playhead cannot shift the bar it sits in.
-   · SPACE     --moment-rail: 15rem and --player-h: 56px, both tokens because the stage
+   · SPACE     --strip-card: 168px and --player-h: 56px, both tokens because the stage
                measures against them. Every transport control is 40px.
    · MOTION    the playhead is positioned, never transitioned — a transition would lag a
                scrub and lie about where the town is. One 240ms entrance on the rail, and
@@ -127,8 +127,10 @@
   /* status strip: one fixed band so a ticking clock can never shift the stage */
   --strip-h: 30px;
 
-  /* moments: the postcard rail and the transport bar are both fixed, for the same reason */
-  --moment-rail: 15rem;
+  /* moments: the filmstrip IS the bottom letterbox band (U16), so its card width and its
+     floor are tokens the pure `frame.ts` layout and the sheet both answer to. */
+  --strip-card: 168px;
+  --film-h: 104px;   /* frame.ts BAND_MIN_PX — the band has to hold a whole postcard */
   --player-h: 56px;
 
   /* interiors: the escape hatch is a touch target before it is a decoration */
@@ -997,24 +999,42 @@ body {
 
 /* ── director mode + catch-up digest (Task 19) ── */
 /* ── the days the town kept: postcard rail + transport ── */
-.moments-lens { position: absolute; inset: 0; pointer-events: none; z-index: 18; }
-.moments-rail {
+/* U16: ONE picture, three boxes (frame.ts). `--letterbox-h` is the only number that says how
+   deep a band is, so nothing can measure it by hand and land half in and half out. The rail
+   used to run the full height of the stage over both bars; the bottom band is now the strip
+   itself, so the picture between them is genuinely unobstructed. */
+.moments-frame { position: absolute; inset: 0; pointer-events: none; z-index: 18; }
+.moments-lens { position: absolute; inset: 0; --letterbox-h: 0px; }
+/* max(), not min-height on the strip alone: that gave a 71px top band over an 88px strip on a
+   594px stage, and a lopsided frame is not a frame. One number, both bands. */
+.moments-lens[data-letterboxed='true'] { --letterbox-h: max(12%, var(--film-h)); }
+.film-strip {
   pointer-events: auto;
-  position: absolute; top: 0.8rem; left: 0.8rem; bottom: 0.8rem;
-  width: var(--moment-rail); overflow-y: auto; overflow-x: hidden;
-  background-color: var(--cream); background-image: var(--grain); color: var(--ink);
-  border: 10px solid transparent; border-image: var(--px-cream);
-  box-shadow: var(--ledge);
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: var(--letterbox-h);   /* the strip IS the band: one number, never two that drift */
+  display: flex; align-items: center; overflow: hidden;
+  background: #171420; color: var(--cream);
+  border-top: 2px solid var(--deep);
 }
-.moments-rail :focus-visible { outline-offset: -2px; }   /* the rail scrolls; keep the ring inside */
+.film-strip :focus-visible { outline-offset: -2px; }  /* the strip clips; keep the ring inside */
+.film-strip .feed-empty { margin: 0 0 0 0.8rem; color: var(--cream-quiet); font-style: italic; }
+/* The OL is the scroller, not the band: native scrolling is what carries a tabbed-to card
+   into view, and `stripLayout` drives that scrollLeft rather than replacing it. */
+.strip-list {
+  list-style: none; margin: 0; padding: 6px 0.8rem;
+  flex: 1; height: 100%; display: flex; gap: 8px; align-items: stretch;
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+}
+.strip-list > li { display: flex; flex: none; scroll-margin-inline: 0.8rem; }
 @media (prefers-reduced-motion: no-preference) {
-  .moments-rail { animation: panel-in var(--t-med) var(--ease-enter); }
+  .film-strip { animation: box-in var(--t-med) var(--ease-enter); transform-origin: bottom; }
+  .strip-list { scroll-behavior: smooth; }
 }
-.moments-list { list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
 .moment-card {
-  display: flex; gap: 0.5rem; align-items: flex-start;
-  width: 100%; min-height: 40px; padding: 0.4rem;
-  text-align: left; font: inherit; color: inherit; cursor: pointer;
+  display: flex; gap: 0.4rem; align-items: flex-start;
+  width: var(--strip-card); height: 100%; min-height: 40px; padding: 0.35rem 0.4rem;
+  overflow: hidden;
+  text-align: left; font: inherit; color: var(--ink); cursor: pointer;
   background: var(--parchment);
   border: 2px solid var(--ink); border-left: 4px solid var(--sand); border-radius: 0;
   box-shadow: var(--ledge);
@@ -1025,25 +1045,37 @@ body {
 .moment-card.open { background: var(--cream); border-left-color: var(--ember); }
 @media (prefers-reduced-motion: no-preference) {
   .moment-card { transition: background-color var(--t-fast) var(--ease-enter), border-left-color var(--t-fast); }
-  .moments-list li { animation: feed-in var(--t-fast) var(--ease-enter) backwards; }
-  .moments-list li:nth-child(1) { animation-delay: 0ms; }
-  .moments-list li:nth-child(2) { animation-delay: 30ms; }
-  .moments-list li:nth-child(3) { animation-delay: 60ms; }
-  .moments-list li:nth-child(4) { animation-delay: 90ms; }
+  .strip-list li { animation: feed-in var(--t-fast) var(--ease-enter) backwards; }
+  .strip-list li:nth-child(1) { animation-delay: 0ms; }
+  .strip-list li:nth-child(2) { animation-delay: 30ms; }
+  .strip-list li:nth-child(3) { animation-delay: 60ms; }
+  .strip-list li:nth-child(4) { animation-delay: 90ms; }
 }
 .thumb-motif { flex: none; display: block; }
-.thumb-body { display: grid; gap: 0.05rem; min-width: 0; }
+/* A filmstrip card is a fixed frame, so its content is trimmed to fit rather than clipped by
+   the band: the title takes two lines at most and the cast and the place share one. Nothing is
+   lost to a reader who cannot see it — the aria-label still says the whole postcard. */
+.thumb-body { display: grid; gap: 0.05rem; min-width: 0; align-content: start; }
 .thumb-day {
   font-family: var(--font-px); font-size: 0.75rem; color: var(--ink-quiet);
   font-variant-numeric: tabular-nums;
 }
-.thumb-title { font-size: 0.875rem; font-weight: 600; text-wrap: balance; }
-.thumb-cast, .thumb-where { font-size: 0.75rem; color: var(--ink-quiet); overflow-wrap: anywhere; }
-.thumb-where { font-style: italic; }
+.thumb-title {
+  font-size: 0.875rem; font-weight: 600; line-height: 1.2;   /* the 14px prose floor holds */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.thumb-meta {
+  display: flex; gap: 0.3rem; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.thumb-cast, .thumb-where { font-size: 0.75rem; color: var(--ink-quiet); }
+.thumb-cast { overflow: hidden; text-overflow: ellipsis; }
+.thumb-where { flex: none; font-style: italic; }
 
 .moment-player {
   pointer-events: auto;
-  position: absolute; left: calc(var(--moment-rail) + 2.4rem); right: 0.8rem; bottom: 0.8rem;
+  position: absolute; left: 0.8rem; right: 0.8rem;
+  bottom: calc(var(--letterbox-h) + 0.6rem);
   height: var(--player-h);
   display: flex; align-items: center; gap: 0.6rem; padding: 0 0.7rem;
   background: var(--night); color: var(--cream);
@@ -1075,15 +1107,9 @@ body {
   flex: none; font-family: var(--font-data); font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
-@media (max-width: 44rem) {
-  .moments-rail { width: auto; right: 0.8rem; bottom: auto; max-height: 40%; }
-  .moment-player { left: 0.8rem; }
-}
-
 .director { position: absolute; inset: 0; pointer-events: none; z-index: 15; }
-.letterbox { position: absolute; left: 0; right: 0; height: 12%; background: #171420; }
+.letterbox { position: absolute; left: 0; right: 0; height: var(--letterbox-h); background: #171420; }
 .letterbox.top { top: 0; }
-.letterbox.bottom { bottom: 0; }
 @media (prefers-reduced-motion: no-preference) {
   .letterbox { animation: box-in var(--t-med) var(--ease-enter); }
   @keyframes box-in {
@@ -1096,10 +1122,9 @@ body {
     to { scale: 1 0; }
   }
   .letterbox.top { transform-origin: top; }
-  .letterbox.bottom { transform-origin: bottom; }
 }
 .subtitle {
-  position: absolute; bottom: calc(12% + 0.8rem); left: 50%; translate: -50%;
+  position: absolute; bottom: calc(var(--letterbox-h) + 0.8rem); left: 50%; translate: -50%;
   max-width: 46rem; text-align: center;
   background-color: var(--deep); color: var(--cream);
   font-size: 0.95rem; padding: 0.1rem 0.4rem;

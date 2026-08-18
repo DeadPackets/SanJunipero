@@ -7,9 +7,14 @@ import { CUT_MIN_MS, pickCut, type HeatWindow } from './directorCut.js'
 export const HEAT_POLL_MS = 5000
 export const DIRECTOR_ZOOM = 3 as const
 
-export function DirectorMode({ store, scene, leaving = false }: {
+// THE CAMERA AND THE CAPTION, AND NOTHING ELSE (U16, audit M7). The letterbox bands used to
+// live here, which is why they were a sibling of the Moments rail rather than the frame around
+// it; `MomentsFrameView` owns them now. `autoCut` is the other half of M7: the heat-driven cut
+// is the LIVE town being televised, and it must not fight a recorded day's playback.
+export function DirectorMode({ store, scene, autoCut, leaving = false }: {
   store: WorldStore
   scene: Scene | null
+  autoCut: boolean
   leaving?: boolean
 }) {
   const [followed, setFollowed] = useState<string | null>(null)
@@ -20,6 +25,11 @@ export function DirectorMode({ store, scene, leaving = false }: {
 
   // heat poll → sticky cut, never faster than CUT_MIN_MS
   useEffect(() => {
+    if (!autoCut) {
+      followedRef.current = null
+      setFollowed(null)
+      return
+    }
     let alive = true
     const poll = (): void => {
       void fetch('/api/heat')
@@ -46,15 +56,15 @@ export function DirectorMode({ store, scene, leaving = false }: {
       alive = false
       clearInterval(timer)
     }
-  }, [store])
+  }, [store, autoCut])
 
   // camera: the scene's follow rig eases toward the followed agent's SPRITE
   // (glide-interpolated), so cuts and tracking are smooth; a drag interrupts it
   useEffect(() => {
-    if (scene === null) return
+    if (scene === null || !autoCut) return
     scene.setZoom(DIRECTOR_ZOOM)
     return () => scene.setFollow(null)
-  }, [scene])
+  }, [scene, autoCut])
   useEffect(() => {
     if (scene === null) return
     if (leaving || followed === null) {
@@ -90,8 +100,6 @@ export function DirectorMode({ store, scene, leaving = false }: {
 
   return (
     <div className={leaving ? 'director leaving' : 'director'} aria-label="Moments — the town, televised">
-      <div className={leaving ? 'letterbox top leaving' : 'letterbox top'} />
-      <div className={leaving ? 'letterbox bottom leaving' : 'letterbox bottom'} />
       {!leaving && name !== null && (
         <div className={subtitle?.kind === 'thought' ? 'subtitle thought' : 'subtitle'} role="status">
           <span className="subtitle-name">{name}</span>

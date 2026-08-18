@@ -12,7 +12,6 @@ import { RosterPanel } from './ui/RosterPanel.js'
 import { expandReducer } from './ui/roster/expand.js'
 import { ChroniclePanel } from './ui/ChroniclePanel.js'
 import { SocietyLens } from './ui/SocietyLens.js'
-import { DirectorMode } from './ui/DirectorMode.js'
 import { MomentsLens } from './ui/MomentsLens.js'
 import { DigestModal } from './ui/DigestModal.js'
 import { StageVeil } from './ui/StageVeil.js'
@@ -286,11 +285,16 @@ export function App() {
             <Timeline store={store} handle={handle} onView={onView} />
           )}
           {route.lens === 'society' && <SocietyLens store={store} onPick={pickAgent} />}
-          {(televised || directorLeaving) && (
-            <DirectorMode store={store} scene={scene} leaving={!televised} />
-          )}
-          {route.lens === 'director' && (
-            <MomentsLens store={store} handle={handle} momentId={route.momentId} onOpen={openMoment} />
+          {(route.lens === 'director' || directorLeaving) && (
+            <MomentsLens
+              store={store}
+              handle={handle}
+              scene={scene}
+              momentId={route.momentId}
+              televised={televised}
+              leaving={route.lens !== 'director'}
+              onOpen={openMoment}
+            />
           )}
           </div>
           <HudDock
