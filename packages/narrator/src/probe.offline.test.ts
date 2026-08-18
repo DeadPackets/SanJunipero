@@ -16,6 +16,11 @@ describe('Task 1 offline part — probe mechanics pinned without a live call', (
     expect(/\b(AI|assistant|chatbot)\b/i.test(NARRATOR_CANON)).toBe(false)
   })
 
+  it('places the chronicler in the century the town actually lives in', () => {
+    expect(NARRATOR_CANON).not.toMatch(/\bstone[- ]age\b/i)
+    expect(NARRATOR_CANON).toMatch(/farm town/i)
+  })
+
   it('probe script wires LlmClient with caller narrator and a $5 hard cap', () => {
     const src = readFileSync(join(pkgDir, 'scripts', 'probe.ts'), 'utf8')
     expect(src).toContain("caller: 'narrator'")
