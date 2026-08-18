@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { GEN_SIZE } from './imageClient.js'
 import { integerScaleGate } from './pixelGates.js'
 import {
-  C_LEVEL, MIN_DOWNSCALE_FACTOR, TOWN_TILE, INTERIOR_TILE, WORLD_SPRITE_PX,
+  C_LEVEL, MIN_DOWNSCALE_FACTOR, TOWN_TILE, INTERIOR_TILE, WORLD_SPRITE_PX, GENERATION_PX,
   resolveScale, nativeSizeFor, resolutionTable,
 } from './assetResolution.js'
 
@@ -25,6 +25,12 @@ describe('resolveScale', () => {
   })
   it('refuses a native size that cannot be halved out of one generation', () => {
     expect(() => resolveScale({ w: 512, h: 512 })).toThrow(/factor 1/)
+  })
+  it('takes the generation size, because buildings and characters ask for 1024', () => {
+    expect(GENERATION_PX.building).toBe(1024)
+    expect(GENERATION_PX.item).toBe(GEN_SIZE)
+    expect(resolveScale({ w: 256, h: 256 }, 1024)).toMatchObject({ factor: 4, rawCrop: { w: 1024, h: 1024 } })
+    expect(resolveScale({ w: 512, h: 512 }, 1024)).toMatchObject({ factor: 2 })
   })
 
   it('every scale it returns passes the integer-scale gate', () => {
@@ -58,6 +64,8 @@ describe('the C-level bar', () => {
     for (const r of rows) {
       expect(integerScaleGate(r.rawCrop, r.native), `${r.klass}`).toMatchObject({ ok: true })
       expect(r.factor).toBeGreaterThanOrEqual(MIN_DOWNSCALE_FACTOR)
+      expect(r.rawCrop.w, r.klass).toBeLessThanOrEqual(r.genPx)
+      expect(r.rawCrop.h, r.klass).toBeLessThanOrEqual(r.genPx)
     }
   })
   it('every class is at least twice the resolution it ships at today', () => {
