@@ -1309,13 +1309,50 @@ body {
 }
 .laws-lede { margin: 0 0 0.8rem; font-style: italic; color: var(--ink-quiet); }
 .laws-list, .laws-edit-list { list-style: none; margin: 0; padding: 0; }
+/* U17: seventeen rows read as four subjects rather than an alphabetical dump */
+.law-group + .law-group { margin-top: 1.1rem; }
+.law-group-name {
+  margin: 0 0 0.4rem; font-family: var(--font-px); font-size: 0.75rem;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink);
+  background: var(--sand); padding: 0.25rem 0.45rem; box-shadow: 0 0 0 2px var(--ink);
+}
 .law-row, .law-edit {
   display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 0.5rem;
   padding: 0.4rem 0; border-bottom: 2px dotted var(--sand);
 }
+.law-row { grid-template-columns: minmax(0, 1fr) auto; }
 .law-row.changed { background: var(--honey) var(--grain); box-shadow: 0 0 0 2px var(--ink); padding: 0.4rem; }
-.law-path, .law-edit label { font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em; word-break: break-all; }
-.law-value { font-family: var(--font-px); font-size: 0.75rem; }
+/* the human title leads; the machine path is the operator's subtitle underneath it */
+.law-title { grid-column: 1 / -1; margin: 0; font-size: 1rem; line-height: 1.3; }
+.law-says { grid-column: 1 / -1; margin: 0.15rem 0 0; font-size: 0.875rem; text-wrap: pretty; }
+/* AUDIT M2: `word-break: break-all` on a dotted path collapsed the label column to one
+   character per line and pushed 77px off the viewport. A path wraps at its own joints. */
+/* WHAT THE BROWSER CAUGHT: Silkscreen has no lowercase, so the pixel face rendered
+   `aging.deathOfOldAgeEnabled` as AGING.DEATHOFOLDAGEENABLED — every word boundary gone, and
+   less readable than the key it replaced. The operator's path is set in the data face. */
+.law-path {
+  font-family: var(--font-data); font-size: 0.75rem; letter-spacing: 0;
+  color: var(--ink-quiet); overflow-wrap: anywhere; min-width: 0;
+}
+.law-edit label {
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
+  color: var(--ink-quiet); overflow-wrap: anywhere; min-width: 0;
+}
+.law-path { grid-column: 1 / -1; margin-top: 0.3rem; }
+/* AUDIT M2, the other half: an unwrappable value pushed the row 77px past the viewport. The
+   operator's dashboard still prints a raw value, so it wraps too. */
+.law-value { font-family: var(--font-px); font-size: 0.75rem; min-width: 0; overflow-wrap: anywhere; }
+/* In the viewer's panel the value is the law's OWN small table, never a JSON blob. */
+.law-row .law-value {
+  grid-column: 1 / -1; margin: 0.35rem 0 0; font-family: var(--font-body); font-size: 0.875rem;
+  display: flex; flex-wrap: wrap; gap: 0.3rem;
+}
+.law-cell {
+  display: flex; align-items: baseline; gap: 0.35rem; min-width: 0;
+  background: var(--cream); box-shadow: 0 0 0 2px var(--ink); padding: 0.15rem 0.4rem;
+}
+.law-cell dt { font-family: var(--font-px); font-size: 0.75rem; color: var(--ink-quiet); }
+.law-cell dd { margin: 0; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
 .law-history {
   grid-column: 1 / -1; margin: 0.3rem 0 0; padding-left: 1.1rem;
   font-size: 0.875rem; color: var(--ink-quiet);
