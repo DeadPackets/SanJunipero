@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { TOGGLABLE_PATHS } from '@sj/engine/laws'
 import type { WorldState } from '@sj/engine/state'
-import type { SimEvent } from '@sj/shared'
+import { chronicleIcon, type SimEvent } from '@sj/shared'
 
 // GATE G12c — THE CHROME HALF. The other two files are:
 //   packages/web/src/render/g12c.test.ts   — the canvas (U3–U11, U18, U19)
@@ -25,15 +25,29 @@ import { actionFor, controlItems } from './controlBar.js'
 import { MOTION, MOTIONS, MOTION_CEILING_MS, untokenisedDurations } from './motion.js'
 import { SCENE_TOTAL_MS, idleScene, sceneAlpha, sceneReducer } from './sceneTransition.js'
 import {
-  MACHINE_CHECKABLE, READINESS, captionShortfall, layoutOffenders, machineWordOffenders,
-  tickBadgeState,
+  MACHINE_CHECKABLE, READINESS, captionFloorPx, captionShortfall, layoutOffenders,
+  machineWordOffenders, tickBadgeState,
 } from './broadcastReady.js'
+import { BROADCAST_CAPTIONS } from './broadcast.js'
+import { subjectFor } from './directorCut.js'
 import { authoredIdentityOffenders, substanceOf } from './becoming.js'
 import { TEXT_MIN_PX } from '../textFloor.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB_SRC = join(HERE, '..')
 const CSS = readFileSync(join(HERE, 'chrome.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+
+/** The broadcast frame's captions come off the shipped sheet, so a token change moves them. */
+function broadcastSheetPx(selector: string): number {
+  const hits: number[] = []
+  for (const [, list, body] of CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!(list ?? '').split(',').some((x) => x.trim() === selector)) continue
+    const raw = /font-size:\s*([^;}]+)/.exec(body ?? '')?.[1]?.trim()
+    if (raw !== undefined) hits.push(Number.parseFloat(raw) * (raw.endsWith('rem') ? 16 : 1))
+  }
+  if (hits.length === 0) throw new Error(`no font-size for ${selector}`)
+  return hits.at(-1)!
+}
 
 function sources(dir = WEB_SRC): Array<{ path: string; source: string }> {
   const out: Array<{ path: string; source: string }> = []
@@ -384,14 +398,36 @@ describe('U24 — "it really feels a very far distance from being that ready"', 
     expect(tickBadgeState('reconnecting', true, true)).toBe('stale')
   })
 
-  // ★ R2 IS OPEN AND THE GATE SAYS SO. Every caption is 12–16px against a 22px floor on a
-  // 480-wide mobile player. The fix is a broadcast layout, which this batch does not build.
-  it('reports R2 as OPEN, with the number it is open by', () => {
-    const short = captionShortfall([
+  // ★ R2 CLOSES ON A SECOND COMPOSITION, NOT ON A BIGGER DESKTOP. The desktop shortfall is
+  // still 3.00–4.00px against 5.4 and stays measured; the broadcast frame's captions are read
+  // off the shipped sheet at the same true 0.25 and there is no shortfall left in them.
+  it('reports R2 as CLOSED by the broadcast layout, and the desktop as still short', () => {
+    const desktop = captionShortfall([
       { what: 'speech bubble', px: 16 }, { what: 'filmstrip title', px: 14 },
     ])
-    expect(short).toHaveLength(2)
-    expect(short[0]).toContain('4.00px of 5.4px')
+    expect(desktop).toHaveLength(2)
+    expect(desktop[0]).toContain('4.00px of 5.4px')
+
+    const broadcast = BROADCAST_CAPTIONS.map((c) => ({
+      what: c.what,
+      px: c.from === 'canvas' ? c.px : broadcastSheetPx(c.selector),
+    }))
+    expect(captionShortfall(broadcast)).toEqual([])
+    for (const c of broadcast) expect(c.px, c.what).toBeGreaterThanOrEqual(captionFloorPx())
+  })
+
+  // R1 and R3 do not close here, but the preconditions they rest on are arithmetic and both
+  // were false before this batch: the director had no subject whenever the town was quiet.
+  it('leaves the frame with a subject at every tick of a quiet town', () => {
+    const town = ['amara', 'omar', 'salma', 'yusuf']
+    for (let tick = 0; tick < 200; tick++) expect(subjectFor([], null, tick, town)).not.toBeNull()
+  })
+
+  // R5's necessary condition, which was recorded as "not machine-decidable" whole.
+  it('draws a death, a birth and a build as three different pictures', () => {
+    const icons = ['agent_died', 'agent_born', 'structure_completed'].map((t) => chronicleIcon(t))
+    expect(icons).toEqual(['cross', 'spark', 'house'])
+    expect(new Set(icons).size).toBe(3)
   })
 
   it('carries a measured value in every row of the report, including the failures', () => {

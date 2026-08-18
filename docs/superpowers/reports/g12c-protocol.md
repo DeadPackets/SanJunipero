@@ -48,7 +48,7 @@ U1, U2 and U26–U31 are the society lane's and were never in this gate's scope.
 | **U20 / U21** | *"controls out of the way… I must be able to move or hide them"* | `hudReducer` reaches a fully hidden layout and returns; the keyboard way back is registered in `App.tsx`; the dock is not itself dockable; the layout round-trips through storage. **CLOSED** |
 | **U22** | *"controls at the bottom to let me do what I want"* | `actionFor` is total over every id the bar can produce across **6 lenses × live/past × inside/outside**; every control has a spoken label and **no pictographic character**. **CLOSED** |
 | **U23** | *"missing transitions and that extra shine"* | One `MOTION` table, total and inside the 300 ms ceiling; **no raw duration anywhere in the sheet**; `sceneReducer` completes and retargets without restarting; **all twelve finish lines pass — nine of which failed on the landed sheet.** **CLOSED** |
-| **U24** | *"a very far distance from being that ready"* | **R4, R7 and R8 pass with numbers. R2 fails by 1.4–2.4 px and the report carries the figure. R1, R3, R5 and R6 are unmeasured with a protocol each.** See `twitch-readiness.md`. **OPEN — see below.** |
+| **U24** | *"a very far distance from being that ready"* | **R2, R4, R7 and R8 pass with numbers — every machine-checkable line.** R2 closed on a **broadcast layout** (`?broadcast=1`): 7.00 / 7.00 / 8.00 / 8.00 px against a 5.4 px floor at the true 0.25, read off the shipped sheet, `captionShortfall` `[]`. R1's two failure modes are fixed and guarded (the load `TypeError`; the subject-less frame). **R1, R3, R5 and R6 keep a human verdict** — their decidable halves are measured, and each is one named step in `twitch-readiness.md`. **OPEN — see below.** |
 | **U25** | *"all of the humans were sleeping inside of one house"* | Five huts, **five distinct owners**, five distinct doors; `founders.test.ts` drives 400 real ticks with every founder kept spent and lands **five distinct `insideId`s**. **CLOSED** |
 | **P22** | personality is an output, not an input | `authoredIdentityOffenders` `[]`; `substanceOf` reads the LOG; two people with identical genesis and different logs render differently. **CLOSED** |
 
@@ -65,13 +65,30 @@ pile of art on it, and it is not what *"way too under detailed"* was asking to c
 cannot make an interior tileset class either — there is nothing for it to generate *for*. The
 gate asserts the absence of any interior tileset, so U4 can be reassessed the moment one lands.
 
-### U24 — Twitch readiness. OPEN, and measured.
+### U24 — Twitch readiness. OPEN on a HUMAN VERDICT, and nothing else.
 
-Three of the eight conditions pass. **R2 fails by a measured 1.4–2.4 px** and no token fixes
-it: every caption is 12–16 px against a 22 px floor at the honest 0.25 downscale, and the
-answer is a broadcast layout this batch does not build. **R1, R3, R5 and R6 are unmeasured** —
-they need a person and ten foregrounded minutes, and a frame rate read from a background tab is
-not a frame rate. The protocol for all four is in `twitch-readiness.md`.
+**Five of the eight pass. None fail.** Every line a machine can decide is decided:
+
+- **R2 CLOSED.** Not by raising the desktop — 22 px chrome on a 1920 stage is absurd for the
+  person in front of it, and the desktop shortfall stays pinned at 3.00–4.00 px on purpose.
+  Closed by a **second composition**: `?broadcast=1` removes fourteen operator surfaces from
+  the frame and leaves the picture, a 28 px clock and a 28/32 px caption, with the town's own
+  speech doubled to 32 px by a whole multiple so the nearest-sampled atlas stays exact.
+  **7.00 / 7.00 / 8.00 / 8.00 px against 5.4.** Read off the shipped stylesheet, so a token
+  change moves the number rather than passing quietly.
+- **R1's two failure modes are fixed**, both found by looking: the load-time `TypeError` on a
+  destroyed scene's ticker, and a broadcast that opened on empty grass because `/api/heat` is
+  legitimately `[]` in a town where nobody speaks. Both are guarded by tests.
+- **R3 and R5 keep a human verdict**, but their decidable halves are now measured — the frame
+  always names its subject (200 consecutive quiet ticks, 0 subject-less), and a death, a birth
+  and a build are pairwise distinct in icon, pixels, sentence and timeline mark. One collision
+  recorded: a birth and a narrator "first" share the `spark` glyph.
+- **R6 cannot be measured from an agent lane, and that is now proved rather than assumed**:
+  `requestAnimationFrame` did not fire once in 45 s in a tab reporting
+  `document.visibilityState: 'hidden'`. A frame rate from a tab that is not painting is fiction.
+
+**The four steps a person has to run are written out, with what to record, in
+`twitch-readiness.md`.** U24 stays OPEN until they are run.
 
 ### Out of this gate's scope entirely
 
