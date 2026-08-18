@@ -87,28 +87,30 @@ export function alphaBinaryGate(
 
 // ---------------------------------------------------------------- 4. palette conformance
 
-// Off-palette colour is allowed for exactly one thing: the portrait class. The master
-// palette is forty colours sized for a 32x16 world tile, and snapping a 128 px bust to it
-// flattens the hair to one tone and the skin shading to two. A portrait's palette law is
-// paletteJaccard — every expression of one person shares one palette — not conformance to
-// the world's forty.
+// USER RULING 2026-08-18: the blanket portrait exemption this gate once carried is REVOKED.
+// A class may answer to a WIDER palette, never to none. `palette` is how it says which —
+// portraits pass `derivedPalette()`, which is MASTER_PALETTE plus the tones interpolated
+// between adjacent members of the same ramp. Faces keep their range, the world keeps its
+// harmony, and the gate stays mechanical.
 export function paletteGate(
-  img: RawImage, opts: { allowOffPalette?: boolean } = {},
+  img: RawImage, opts: { palette?: readonly (readonly number[])[] } = {},
 ): GateResult & { offPalette: number; offenders: { hex: string; count: number }[] } {
+  const allowed = opts.palette === undefined ? PALETTE_SET
+    : new Set(opts.palette.map((p) => (p[0]! << 16) | (p[1]! << 8) | p[2]!))
   const counts = new Map<number, number>()
   let offPalette = 0
   for (let i = 0; i < img.data.length; i += 4) {
     if (img.data[i + 3] === 0) continue
     const rgb = (img.data[i]! << 16) | (img.data[i + 1]! << 8) | img.data[i + 2]!
-    if (PALETTE_SET.has(rgb)) continue
+    if (allowed.has(rgb)) continue
     offPalette++
     counts.set(rgb, (counts.get(rgb) ?? 0) + 1)
   }
   const offenders = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 8)
     .map(([rgb, count]) => ({ hex: hex(rgb), count }))
-  const failures = offPalette === 0 || opts.allowOffPalette === true ? []
-    : [`palette: ${offPalette} opaque pixels off the master palette in ${counts.size} colours ` +
-      `(worst ${offenders.map(o => `${o.hex} x${o.count}`).join(', ')})`]
+  const failures = offPalette === 0 ? []
+    : [`palette: ${offPalette} opaque pixels off the ${allowed.size}-colour palette in ` +
+      `${counts.size} colours (worst ${offenders.map(o => `${o.hex} x${o.count}`).join(', ')})`]
   return { ok: ok(failures), failures, offPalette, offenders }
 }
 
@@ -224,7 +226,7 @@ export type PixelBarArgs = {
   footprint?: Footprint
   tile?: Size
   allowSoftAlpha?: boolean
-  allowOffPalette?: boolean
+  palette?: readonly (readonly number[])[]
   seam?: boolean
 }
 
@@ -233,7 +235,7 @@ export async function pixelBarReport(a: PixelBarArgs): Promise<GateResult & { na
   if (a.raw) failures.push(...integerScaleGate(a.raw, { w: a.img.width, h: a.img.height }).failures)
   if (a.artPx !== undefined) failures.push(...pixelGridGate(a.img, a.artPx).failures)
   failures.push(...alphaBinaryGate(a.img, { allowSoftAlpha: a.allowSoftAlpha }).failures)
-  failures.push(...paletteGate(a.img, { allowOffPalette: a.allowOffPalette }).failures)
+  failures.push(...paletteGate(a.img, a.palette === undefined ? {} : { palette: a.palette }).failures)
   if (a.footprint && a.tile) failures.push(...nativeDensityGate({
     name: a.name, canvas: { w: a.img.width, h: a.img.height }, footprint: a.footprint, tile: a.tile,
   }).failures)

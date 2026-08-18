@@ -6,6 +6,8 @@ import {
   nativeDensityGate, classDensityGate, tileSeamGate, tilesetVarietyGate,
   pixelBarReport, SEAM_RATIO_MAX, SEAM_ABSOLUTE_FLOOR,
 } from './pixelGates.js'
+import { derivedPalette } from './ramps.js'
+import { quantize } from './post/quantize.js'
 
 const fixture = (name: string): Promise<RawImage> =>
   decodePng(readFileSync(new URL(`./fixtures/pixel-gates/${name}`, import.meta.url)))
@@ -86,18 +88,22 @@ describe('paletteGate', () => {
     expect(r.offenders[0]!.count).toBeGreaterThan(0)
     expect(r.offenders.length).toBeLessThanOrEqual(8)
   })
-  // The master palette is forty colours sized for a 32x16 world tile. A 128 px bust models
-  // a face with them, and snapping it flattens the hair to one tone and the skin shading to
-  // two — measurably conformant, visibly worse art. Portraits answer to paletteJaccard
-  // instead: every expression of one person shares one palette, which is the property that
-  // actually matters. See out/fqc/portrait-quantize.png for the pair.
-  it('a class that is allowed off-palette colour reports the count and passes', async () => {
-    const r = paletteGate(await fixture('portrait-neutral-128.png'), { allowOffPalette: true })
-    expect(r.ok).toBe(true)
+  // USER RULING 2026-08-18: the blanket exemption this gate used to grant portraits is
+  // REVOKED. A class may answer to a WIDER palette, never to none — so the option is the
+  // palette itself, and the shipped bust fails against every one of them until it is
+  // re-quantized. See src/ramps.ts.
+  it('RED on the shipped bust against the master palette', async () => {
+    const r = paletteGate(await fixture('portrait-neutral-128.png'))
+    expect(r.ok).toBe(false)
     expect(r.offPalette).toBe(6412)
   })
-  it('RED on that same portrait when the class is NOT exempt', async () => {
-    expect(paletteGate(await fixture('portrait-neutral-128.png')).ok).toBe(false)
+  it('and RED against the derived ramps too — wider is not open', async () => {
+    expect(paletteGate(await fixture('portrait-neutral-128.png'), { palette: derivedPalette() }).ok)
+      .toBe(false)
+  })
+  it('GREEN once the bust is quantized onto the derived ramps', async () => {
+    const q = quantize(await fixture('portrait-neutral-128.png'), derivedPalette())
+    expect(paletteGate(q, { palette: derivedPalette() }).ok).toBe(true)
   })
   it('GREEN on the real chair sprite, which was quantized to the palette', async () => {
     const r = paletteGate(await fixture('chair-128.png'))
