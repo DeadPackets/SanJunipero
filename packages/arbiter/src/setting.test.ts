@@ -4,7 +4,9 @@
 // anchor (Stardew Valley) always implied.
 import { describe, expect, it } from 'vitest'
 import { scanPromptForGlassLeak } from '@sj/agents'
-import { CANON, ERAS, ERA_ORDER } from './canon.js'
+import { CANON, ERAS, ERA_ORDER, GENESIS_CODEX } from './canon.js'
+import { CodexStore } from './codex.js'
+import { openArbiterDb } from './schema.js'
 import { ADJUDICATION_INSTRUCTION, FORBIDDEN_FRAMING } from './prompt.js'
 
 // Words that only belong to a town with no metal and no machine. A canon that names one
@@ -65,5 +67,57 @@ describe('the era ladder', () => {
 
   it('never names an era with a word the one-way glass bans', () => {
     for (const era of ERAS) expect(scanPromptForGlassLeak(era)).toEqual([])
+  })
+})
+
+describe('GENESIS_CODEX — what this town already practises, and what stands one step out', () => {
+  const known = GENESIS_CODEX.filter((e) => e.known !== false)
+  const frontier = GENESIS_CODEX.filter((e) => e.known === false)
+
+  it('practises eight crafts, every one of them a thing hands do here', () => {
+    expect(known.map((e) => e.id)).toEqual([
+      'farming', 'fishing', 'foraging', 'carpentry',
+      'masonry', 'tailoring', 'cooking', 'machine_repair',
+    ])
+  })
+
+  it('has earned nothing the canon denies — no metal drawn, no craft that needs a factory', () => {
+    for (const e of GENESIS_CODEX) {
+      expect(e.id, e.id).not.toMatch(/smelt|foundry|pottery|knapp|cordage|weaving/)
+    }
+  })
+
+  it('starts every practised craft on the first rung and every unearned one above it', () => {
+    for (const e of known) {
+      expect(e.era, e.id).toBe('handwork')
+      expect(e.prerequisiteId, e.id).toBeNull()
+    }
+    for (const e of frontier) expect(e.era, e.id).toBe('arrangement')
+  })
+
+  it('reaches for arrangements between people, not only for crafts', () => {
+    expect(frontier.map((e) => e.id).sort()).toEqual(
+      ['bridging', 'common_store', 'food_preserving', 'memorial', 'work_rota'],
+    )
+  })
+
+  it('hangs every unearned rung on a craft the town actually practises', () => {
+    const practised = new Set(known.map((e) => e.id))
+    for (const e of frontier) expect(practised.has(e.prerequisiteId!), e.id).toBe(true)
+  })
+
+  it('leaks no ops vocabulary through an id or a name the arbiter will read', () => {
+    for (const e of GENESIS_CODEX) {
+      expect(scanPromptForGlassLeak(e.id), e.id).toEqual([])
+      expect(scanPromptForGlassLeak(e.name), e.id).toEqual([])
+    }
+  })
+
+  it('seeds a store whose frontier is exactly the unearned rungs', () => {
+    const store = new CodexStore(openArbiterDb(':memory:'))
+    for (const e of GENESIS_CODEX) store.insert(e)
+    expect(store.known()).toEqual(known.map((e) => e.id))
+    expect(store.frontier()).toEqual(frontier.map((e) => e.id).sort())
+    expect(store.knownEra()).toBe('handwork')
   })
 })

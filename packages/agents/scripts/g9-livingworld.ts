@@ -17,6 +17,7 @@ import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimConfig } from '@sj/
 // Cross-package by relative path on purpose: @sj/arbiter, @sj/gateway and @sj/web
 // all depend on @sj/agents, so a package-level dependency here would close a cycle.
 import { makeArbiter } from '../../arbiter/src/adjudicate.js'
+import { GENESIS_CODEX } from '../../arbiter/src/canon.js'
 import { CodexStore } from '../../arbiter/src/codex.js'
 import { migrateArbiterTables } from '../../arbiter/src/schema.js'
 import type { Recipe } from '../../arbiter/src/verdict.js'
@@ -159,7 +160,7 @@ const MINDS: Mind[] = [
     id: 'dov', sex: 'm', ageDays: 36 * 364, hut: HUTS[3]!, ...hutDoor(HUTS[3]!),
     identity: {
       name: 'Dov', age: 36,
-      backstory: 'Keeps the hearth. Spends his evenings putting things into the fire to see what comes out, which the others find either useful or tiresome.',
+      backstory: 'Keeps the stove. Spends his evenings putting things into the fire to see what comes out, which the others find either useful or tiresome.',
       temperament: 'patient, tinkering, talks himself through his work',
       voiceCard: voice(
         'thinking aloud, half to himself', 'long threads that wander before they land',
@@ -173,10 +174,10 @@ const MINDS: Mind[] = [
       beliefs: ['everything leaves something behind when it boils away'],
       current: {
         mood: 'set on it',
-        worries: ['the pot will crack before he learns anything'],
+        worries: ['the pan will boil dry before he learns anything'],
         goals: [
-          'boil river water down in a clay pot beside the hearth until only salt is left — nobody here has ever done it',
-          'keep the hearth alight',
+          'boil river water down in a pan on the stove until only salt is left — nobody here has ever done it',
+          'keep the stove alight',
         ],
       },
     },
@@ -185,7 +186,7 @@ const MINDS: Mind[] = [
     id: 'esen', sex: 'f', ageDays: 27 * 364, hut: HUTS[4]!, ...hutDoor(HUTS[4]!),
     identity: {
       name: 'Esen', age: 27,
-      backstory: 'Fishes the river and hates waste. Has taken to hanging fish over the hearth smoke and has started calling it smoking, though nobody taught her the word.',
+      backstory: 'Fishes the river and hates waste. Has taken to hanging fish over the stove smoke and has started calling it smoking, though nobody taught her the word.',
       temperament: 'quick, talkative, impatient with things going bad',
       voiceCard: voice(
         'bright and fast, jumps between things', 'runs sentences together when she is excited',
@@ -201,7 +202,7 @@ const MINDS: Mind[] = [
         mood: 'in a hurry',
         worries: ['the catch will turn before anyone eats it'],
         goals: [
-          'smoke the fish over the hearth so it keeps — you have started saying "smoke" for it, though it is your own word',
+          'smoke the fish over the stove so it keeps — you have started saying "smoke" for it, though it is your own word',
           'get to the water early',
         ],
       },
@@ -217,22 +218,7 @@ const NAMES = MINDS.map((m) => m.identity.name)
 // adjudicated recipe has a canon to stand on (adjacency doctrine).
 function seedCodex(db: Database.Database): void {
   const codex = new CodexStore(db)
-  const known: Array<[string, string]> = [
-    ['fire', 'Fire'], ['pottery', 'Pottery'], ['cordage', 'Cordage'], ['weaving', 'Weaving'],
-    ['woodworking', 'Woodworking'], ['stone_knapping', 'Stone knapping'], ['farming', 'Farming'],
-    ['hearth_cooking', 'Hearth cooking'], ['fishing', 'Fishing'], ['foraging', 'Foraging'],
-  ]
-  for (const [id, name] of known) codex.insert({ id, era: 'agriculture', name, prerequisiteId: null })
-  const adjacent: Array<[string, string, string]> = [
-    ['salt_extraction', 'Salt extraction', 'fire'],
-    ['smoking_food', 'Smoking food', 'fire'],
-    ['drying_food', 'Drying food', 'fire'],
-    ['basketry', 'Basketry', 'weaving'],
-    ['glazing', 'Glazing', 'pottery'],
-  ]
-  for (const [id, name, prerequisiteId] of adjacent) {
-    codex.insert({ id, era: 'crafts', name, prerequisiteId, known: false })
-  }
+  for (const entry of GENESIS_CODEX) codex.insert(entry)
 }
 
 // ------------------------------------------------------------ instrumentation ---
@@ -327,7 +313,7 @@ async function main(): Promise<void> {
     // A hearth is a fire someone keeps: relight it rather than let the gate
     // depend on whether a recipe's "beside a fire" still holds at hour ten.
     if (loop.tick % 60 === 0 && loop.state.structures[HEARTH.id]?.burning === false) {
-      e('fire_ignited', { structureId: HEARTH.id, cause: 'the hearth is fed' })
+      e('fire_ignited', { structureId: HEARTH.id, cause: 'the stove is fed' })
     }
     for (const ev of worldTick(loop.state).events) e(ev.type, ev.payload)
   })

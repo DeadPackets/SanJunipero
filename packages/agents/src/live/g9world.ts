@@ -140,7 +140,7 @@ export function townGenesisEvents(opts: {
   emit('structure_completed', { id: STOREHOUSE.id })
   emit('structure_planned', { ...HEARTH, maxHp: 100000, flammable: true, builderId: 'dov' })
   emit('structure_completed', { id: HEARTH.id })
-  emit('fire_ignited', { structureId: HEARTH.id, cause: 'the hearth is lit' })
+  emit('fire_ignited', { structureId: HEARTH.id, cause: 'the stove is lit' })
   emit('structure_planned', { ...WEIR, maxHp: 30, flammable: false, builderId: 'esen' })
   emit('structure_completed', { id: WEIR.id })
 

@@ -403,7 +403,7 @@ export function checkG11Report(report: G11Report): Record<string, string | null>
     'D.the-far-bank-stops-at-the-water': e.farBankWalk.refused && e.farBankWalk.stoppedAtWaterEdge
       ? null : `refused=${e.farBankWalk.refused} reason=${e.farBankWalk.reason} edge=${e.farBankWalk.stoppedAtWaterEdge}`,
     'E.the-clothed-come-through-the-night': e.clothedSurviveLadder
-      ? null : 'a clothed, sheltered or hearth-side body did not come through the winter night',
+      ? null : 'a clothed, sheltered or fireside body did not come through the winter night',
     // Reported, never gated: the controller wants the numbers read, not a threshold guessed.
     'F.discretionary-time-reported': e.discretion.length >= 1
       ? null : 'no per-mind, per-day breakdown was recorded',

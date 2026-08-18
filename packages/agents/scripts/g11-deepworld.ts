@@ -24,6 +24,7 @@ import {
 // Cross-package by relative path on purpose: @sj/arbiter and @sj/narrator both depend on
 // @sj/agents, so a package-level dependency here would close a cycle.
 import { makeArbiter } from '../../arbiter/src/adjudicate.js'
+import { GENESIS_CODEX } from '../../arbiter/src/canon.js'
 import { CodexStore } from '../../arbiter/src/codex.js'
 import { ConstructStore } from '../../arbiter/src/constructStore.js'
 import { runConstructPass } from '../../arbiter/src/constructs.js'
@@ -275,19 +276,7 @@ const PARCHED_ONE = 'amara'
 
 function seedCodex(db: Database.Database): void {
   const codex = new CodexStore(db)
-  const known: Array<[string, string]> = [
-    ['fire', 'Fire'], ['pottery', 'Pottery'], ['cordage', 'Cordage'], ['weaving', 'Weaving'],
-    ['woodworking', 'Woodworking'], ['stone_knapping', 'Stone knapping'], ['farming', 'Farming'],
-    ['hearth_cooking', 'Hearth cooking'], ['fishing', 'Fishing'], ['foraging', 'Foraging'],
-  ]
-  for (const [id, name] of known) codex.insert({ id, era: 'agriculture', name, prerequisiteId: null })
-  for (const [id, name, prerequisiteId] of [
-    ['bridging', 'Bridging', 'woodworking'],
-    ['tanning', 'Tanning', 'cordage'],
-    ['smoking_food', 'Smoking food', 'fire'],
-  ] as Array<[string, string, string]>) {
-    codex.insert({ id, era: 'crafts', name, prerequisiteId, known: false })
-  }
+  for (const entry of GENESIS_CODEX) codex.insert(entry)
 }
 
 // ------------------------------------------------------------ instrumentation ---
