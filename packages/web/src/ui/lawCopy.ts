@@ -52,6 +52,18 @@ const share = (tail: string) => (value: unknown): LawRow[] => {
   return [{ label: 'Compared with usual', value: `${word} ${tail}` }]
 }
 
+const people = (value: unknown): LawRow[] =>
+  typeof value === 'number'
+    ? [{ label: 'Set to', value: `${value} ${value === 1 ? 'person' : 'people'}` }]
+    : UNKNOWN
+
+/** Rounding a chance under half a percent to "0 in a hundred" reads as "never", which is the
+ *  opposite of what a fire risk means. Say the odds instead. */
+const rare = (per: string) => (value: unknown): LawRow[] =>
+  typeof value === 'number' && value > 0
+    ? [{ label: 'About', value: `once in ${Math.round(1 / value)} ${per}` }]
+    : UNKNOWN
+
 const capitalise = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** AUDIT M2, CLOSED AT THE SOURCE. An object-valued law is a table of its own keys. */
@@ -151,6 +163,133 @@ export const LAW_COPY: Readonly<Record<keyof typeof TOGGLABLE_PATHS, LawCopy>> =
     sentence: 'Cold empties a stomach faster, so the winter asks for more food than the summer.',
     unit: null, render: share('as fast'),
   },
+  // MERGE TRAIN 5. C11 opened twenty-five more of the deep world to an operator after this
+  // table was written; U17 is only kept if every one of them says what it does to people.
+  'mortality.enabled': {
+    title: 'Whether a body can die',
+    sentence: 'A body that runs out of what it needs stops, and the town has to go on without it.',
+    unit: null, render: yesNo,
+  },
+  'mortality.poisonChanceSpoiled': {
+    title: 'How often bad food poisons',
+    sentence: 'Eating something that has turned does not always harm a body, but often enough it does.',
+    unit: null, render: chance('meals'),
+  },
+  'illness.enabled': {
+    title: 'Whether people fall ill',
+    sentence: 'A body can sicken here, and an illness left alone gets worse before it gets better.',
+    unit: null, render: yesNo,
+  },
+  'illness.dailyWorsenChance': {
+    title: 'How fast an illness deepens',
+    sentence: 'An illness left untended does not hold still; some days it takes a turn for the worse.',
+    unit: null, render: chance('days'),
+  },
+  'illness.contagionEnabled': {
+    title: 'Whether illness spreads',
+    sentence: 'Standing close to somebody who is sick can leave you sick as well.',
+    unit: null, render: yesNo,
+  },
+  'illness.contagionChance': {
+    title: 'How easily illness passes on',
+    sentence: 'Being near a sick body is not the same as catching it; most meetings pass harmlessly.',
+    unit: null, render: chance('meetings'),
+  },
+  'thirst.enabled': {
+    title: 'Whether people get thirsty',
+    sentence: 'A body needs water as well as food, and going without it tells sooner.',
+    unit: null, render: yesNo,
+  },
+  'thirst.decayFactorOfHunger': {
+    title: 'How fast thirst comes on',
+    sentence: 'Thirst is measured against hunger: this is how quickly a body dries out beside it.',
+    unit: null, render: share('as fast'),
+  },
+  'fertility.enabled': {
+    title: 'Whether the ground tires',
+    sentence: 'Ground worked season after season gives less back, until it is left to rest.',
+    unit: null, render: yesNo,
+  },
+  'foodVariety.enabled': {
+    title: 'Whether the same meal palls',
+    sentence: 'Eating one thing every day stops satisfying, so a table wants more than one crop.',
+    unit: null, render: yesNo,
+  },
+  'roads.enabled': {
+    title: 'Whether the town lays roads',
+    sentence: 'People can put stone down where they walk most, and the walking gets easier.',
+    unit: null, render: yesNo,
+  },
+  'desirePaths.enabled': {
+    title: 'Whether feet wear a track',
+    sentence: 'Enough crossings over the same ground beat a path into it without anyone deciding to.',
+    unit: null, render: yesNo,
+  },
+  'desirePaths.wearThreshold': {
+    title: 'How much walking makes a path',
+    sentence: 'The number of crossings the same ground takes before the grass gives up and a track shows.',
+    unit: 'crossings', render: count('crossing'),
+  },
+  'fauna.enabled': {
+    title: 'Whether animals live here',
+    sentence: 'There are creatures in the woods and the water, and somebody may go out after them.',
+    unit: null, render: yesNo,
+  },
+  'regrowth.enabled': {
+    title: 'Whether the woods come back',
+    sentence: 'A felled tree is not gone forever; in time something grows where it stood.',
+    unit: null, render: yesNo,
+  },
+  'regrowth.saplingChancePerDay': {
+    title: 'How fast a sapling appears',
+    sentence: 'Ground that has been cleared puts up something new now and then, given long enough.',
+    unit: null, render: chance('days'),
+  },
+  'mapGrowth.enabled': {
+    title: 'Whether the world gets bigger',
+    sentence: 'The land beyond the edge opens up as the town reaches for it.',
+    unit: null, render: yesNo,
+  },
+  'warmth.enabled': {
+    title: 'Whether the cold is felt',
+    sentence: 'A body out in the cold with no fire and no roof pays for it.',
+    unit: null, render: yesNo,
+  },
+  'light.enabled': {
+    title: 'Whether the dark matters',
+    sentence: 'Work goes slower after sunset, and a flame left burning at night can catch.',
+    unit: null, render: yesNo,
+  },
+  'light.nightWorkPenalty': {
+    title: 'How much slower the night is',
+    sentence: 'Work done by firelight takes longer than the same work done under the sun.',
+    unit: null, render: share('as long'),
+  },
+  'light.fireRiskPerTick': {
+    title: 'How often a flame gets loose',
+    sentence: 'A fire left burning is mostly harmless, but now and then it finds something it should not.',
+    unit: null, render: rare('moments'),
+  },
+  'nightWitness.enabled': {
+    title: 'Whether the dark hides things',
+    sentence: 'What happens after dark is harder to see, so fewer people notice it.',
+    unit: null, render: yesNo,
+  },
+  'nightWitness.nightFactor': {
+    title: 'How much the dark hides',
+    sentence: 'How likely somebody is to notice a thing after dark, set against noticing it at noon.',
+    unit: null, render: share('as likely'),
+  },
+  'constructs.enabled': {
+    title: 'Whether people build together',
+    sentence: 'Some things are too big for one pair of hands, so several people raise them at once.',
+    unit: null, render: yesNo,
+  },
+  'constructs.minParticipants': {
+    title: 'How many hands a great work needs',
+    sentence: 'The smallest crowd that can raise something no one person could.',
+    unit: 'people', render: people,
+  },
 }
 
 export function lawCopyFor(path: string): LawCopy | null {
@@ -166,7 +305,7 @@ export function lawReadingRank(path: string): number {
   return at === -1 ? READING_ORDER.length : at
 }
 
-/** Grouping, so seventeen rows read as four subjects rather than an alphabetical dump. */
+/** Grouping, so forty-two rows read as four subjects rather than an alphabetical dump. */
 export const LAW_GROUPS = ['the body', 'the land', 'the weather', 'living together'] as const
 export type LawGroup = (typeof LAW_GROUPS)[number]
 
@@ -188,6 +327,31 @@ const GROUP_OF: Readonly<Record<string, LawGroup>> = {
   'mystery.chancePerDay': 'living together',
   'reproduction.coSleepNightsToPartner': 'living together',
   'reproduction.partnerWindowDays': 'living together',
+  'mortality.enabled': 'the body',
+  'mortality.poisonChanceSpoiled': 'the body',
+  'illness.enabled': 'the body',
+  'illness.dailyWorsenChance': 'the body',
+  'illness.contagionEnabled': 'the body',
+  'illness.contagionChance': 'the body',
+  'thirst.enabled': 'the body',
+  'thirst.decayFactorOfHunger': 'the body',
+  'fertility.enabled': 'the land',
+  'foodVariety.enabled': 'the land',
+  'roads.enabled': 'the land',
+  'desirePaths.enabled': 'the land',
+  'desirePaths.wearThreshold': 'the land',
+  'fauna.enabled': 'the land',
+  'regrowth.enabled': 'the land',
+  'regrowth.saplingChancePerDay': 'the land',
+  'mapGrowth.enabled': 'the land',
+  'warmth.enabled': 'the weather',
+  'light.enabled': 'the weather',
+  'light.nightWorkPenalty': 'the weather',
+  'light.fireRiskPerTick': 'the weather',
+  'nightWitness.enabled': 'living together',
+  'nightWitness.nightFactor': 'living together',
+  'constructs.enabled': 'living together',
+  'constructs.minParticipants': 'living together',
 }
 
 /** A law nobody has grouped yet still has to land somewhere a viewer can find it. */

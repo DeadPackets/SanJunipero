@@ -98,7 +98,7 @@ describe('R21 candidate 4 — "distance makes gathering irrational": REFUTED', (
       const d = authored.map((b) => walk(s, id, b.x, b.y)).filter((n): n is number => n !== null)
       return Math.min(...d)
     })
-    expect(nearest).toEqual([20, 18, 17, 18, 21])
+    expect(nearest).toEqual([20, 17, 17, 21, 21])
     expect(CFG.movement.baseTicksPerTile).toBe(1)
     // The worst round trip is under 5% of a sixteen-hour waking day. Distance is not what
     // stopped them, so this is an effectiveness defect before it is an abundance one.
@@ -109,8 +109,8 @@ describe('R21 candidate 4 — "distance makes gathering irrational": REFUTED', (
     const s = genesisTown()
     // Every founder is a quarter-hour from a bush and the healer from his herbs, where before
     // the nearest bush was seventeen steps and every near herb patch was over the water.
-    expect(FOUNDER_IDS.map((id) => nearestOfKind(s, id, 'berry_bush'))).toEqual([11, 10, 7, 6, 9])
-    expect(FOUNDER_IDS.map((id) => nearestOfKind(s, id, 'herb_patch'))).toEqual([15, 12, 9, 6, 5])
+    expect(FOUNDER_IDS.map((id) => nearestOfKind(s, id, 'berry_bush'))).toEqual([11, 9, 5, 5, 3])
+    expect(FOUNDER_IDS.map((id) => nearestOfKind(s, id, 'herb_patch'))).toEqual([15, 11, 7, 13, 9])
     // And nothing over the water moved: the west bank answers a capped search, as it always did.
     for (const [x, y] of [[45, 62], [46, 66], [47, 70], [22, 100]] as Array<[number, number]>) {
       expect(walk(s, 'amara', x, y)).toBeNull()
@@ -120,10 +120,10 @@ describe('R21 candidate 4 — "distance makes gathering irrational": REFUTED', (
   it('before R14 the healer had no herbs at all: every near patch is over the water', () => {
     const s = genesisTown()
     // The three authored herb patches. Two are on the far bank and answer a capped search;
-    // the one that is reachable is fifty-four steps south, most of a working morning.
+    // the one that is reachable is fifty steps south, most of a working morning.
     expect(walk(s, 'amara', 46, 33)).toBeNull()
     expect(walk(s, 'amara', 46, 66)).toBeNull()
-    expect(walk(s, 'amara', 52, 100)).toBe(54)
+    expect(walk(s, 'amara', 52, 100)).toBe(50)
     // Seven of the twenty authored nodes are across the river — two herb patches, both clay
     // banks, all three stone outcrops and a reed bed. Nothing R14 adds is over there.
     const unreachable = Object.keys(s.forageables ?? {}).filter((id) => {
@@ -176,10 +176,10 @@ describe('R21 candidate 2 — "perception omits it": CONFIRMED', () => {
     // R21-C. A pair of eyes used to get a name, a place, a verb, asleep, collapsed and an age
     // band, and nothing about the body under it. It now gets the ailment too, in words.
     expect(salma!.condition).toBe('flushed with fever')
-    expect(proseFor(sick, 'omar')).toContain('salma (salma) stands at (74, 62), flushed with fever.')
+    expect(proseFor(sick, 'omar')).toContain('salma (salma) stands at (71, 65), flushed with fever.')
 
     // And a town with nothing wrong with it reads exactly as it always did.
-    expect(proseFor(s, 'omar')).toContain('salma (salma) stands at (74, 62).')
+    expect(proseFor(s, 'omar')).toContain('salma (salma) stands at (71, 65).')
   })
 })
 
@@ -197,9 +197,9 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     // R21-A. The defect was that no line said she was under a roof, and the one line about
     // the roof she was under told her to walk to its doorway and go in — 59 of the run's 222
     // refusals. Both halves are now said the other way round.
-    expect(prose).toContain(`You stand inside the hut (${hut.id}) at (68, 60).`)
+    expect(prose).toContain(`You stand inside the hut (${hut.id}) at (70, 60).`)
     expect(prose).toContain('Four walls are around you')
-    expect(prose).toContain('this is the roof you are under; the way out is at (68, 62).')
+    expect(prose).toContain('this is the roof you are under; the way out is at (70, 62).')
     expect(prose).not.toContain('stand there and you can go in')
     // The world's answer to the instruction that used to be given, twice over.
     expect(submitIntent(inside, CFG, 'nadia', 'enter', { structureId: hut.id })).toEqual(
@@ -335,8 +335,8 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
     ['craft', { recipe: 'stew' }, 'not enough meat — meat comes off an animal you have hunted, or a fish out of the water'],
     ['craft', { recipe: 'garment' }, 'not enough cloth — cloth is woven from fiber'],
     ['build', { kind: 'hut', x: 66, y: 66 }, 'not close enough to build — stand within reach of (66, 66)'],
-    ['tend', { targetId: 'yusuf' }, 'not adjacent to the patient — they are at (65, 62)'],
-    ['give', { itemId: 'item_17', targetId: 'yusuf' }, 'not adjacent to give — they are at (65, 62)'],
+    ['tend', { targetId: 'yusuf' }, 'not adjacent to the patient — they are at (66, 62)'],
+    ['give', { itemId: 'item_17', targetId: 'yusuf' }, 'not adjacent to give — they are at (66, 62)'],
     ['pave', { x: 62, y: 63 }, 'not enough stone — stone comes from the loose rock at the foot of an outcrop'],
   ]
 
@@ -381,11 +381,13 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
 // ------------------------------------------------- the town the diagnosis is about
 
 describe('R21 — the shape of the founding site, so the abundance pass has a baseline', () => {
-  it('five doorways in a row, and the anchor the template was laid from', () => {
+  // C12a task 61 laid the huts out as a place rather than a line, so the five doorways are
+  // no longer a row. The anchor did not move; only where the template puts the huts under it.
+  it('five doorways, and the anchor the template was laid from', () => {
     const s = genesisTown()
     expect(CITY_ANCHOR_DEFAULT).toEqual({ x: 48, y: 56 })
     expect(FOUNDER_IDS.map((id) => [s.agents[id]!.x, s.agents[id]!.y])).toEqual(
-      [[62, 62], [65, 62], [68, 62], [71, 62], [74, 62]],
+      [[62, 62], [66, 62], [70, 62], [67, 65], [71, 65]],
     )
   })
 })
