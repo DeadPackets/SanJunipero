@@ -38,6 +38,16 @@ export const FACE_SIZES = [8, 16, 24] as const
  *  pixels and nothing is resampled. 8 would be crisper still and is under the 12px floor. */
 export const FACE_INSTALL_PX = 16
 
+/**
+ * ★ THE BROADCAST MULTIPLIER: TWO, NOT 1.5. R2 needs a 22px source to survive the 0.25
+ * downscale to a 480px player, and `FACE_INSTALL_PX` is 16. But these faces are nearest-sampled
+ * off an atlas baked at the install size, so only a WHOLE multiple keeps one texel on one
+ * pixel — 1.5 would give the town a caption with alternating one- and two-pixel strokes, which
+ * is the resampling fault the whole nearest law exists to forbid. 32 on screen is 8.00px on the
+ * player. Applied by `bubbles.ts` through `Scene.textScale`.
+ */
+export const BROADCAST_TEXT_SCALE = 2
+
 export const FACE_ROLES = ['name', 'speech', 'thought', 'label'] as const
 export type FaceRole = (typeof FACE_ROLES)[number]
 

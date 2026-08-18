@@ -220,7 +220,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     },
     tick: (nowMs) => {
       const state = store.getState()
-      const inv = worldTextScale(scene.getZoom())
+      // The reader's size, times whatever the frame asks for: 1 at a desk, 2 in a broadcast,
+      // where 16px of speech is 4.00px on a 480-wide player and nobody can read it.
+      const inv = worldTextScale(scene.getZoom()) * scene.textScale
       for (let i = bubbles.length - 1; i >= 0; i--) {
         const b = bubbles[i]!
         if (nowMs >= b.dieMs || state?.agents[b.agentId] === undefined) {

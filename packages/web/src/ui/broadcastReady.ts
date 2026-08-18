@@ -102,8 +102,14 @@ export function captionFloorPx(scale = TWITCH_SCALE, frameH = TWITCH_FRAME_H): n
 
 export type Caption = { what: string; px: number }
 
-/** `what — Npx of Mpx` for every caption that does NOT survive the downscale. R2 is the one
- *  readiness line this batch leaves OPEN, and this is the number it is open by. */
+/**
+ * `what — Npx of Mpx` for every caption that does NOT survive the downscale.
+ *
+ * Run over the DESKTOP chrome this is a standing measurement, not a failure: 22px type on a
+ * 1920 stage is absurd for the person sitting in front of it, and the four numbers below are
+ * exactly why `ui/broadcast.ts` exists. Run over `BROADCAST_CAPTIONS` it is empty, and that is
+ * what closes R2 — see `broadcast.test.ts`.
+ */
 export function captionShortfall(captions: readonly Caption[]): string[] {
   return captions
     .filter((c) => !captionReads(c.px))

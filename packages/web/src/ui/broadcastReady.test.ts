@@ -179,12 +179,13 @@ describe('R2 · every caption survives the downscale to a 480px mobile player', 
     for (const c of CAPTIONS) expect(c.px, c.what).toBeGreaterThan(0)
   })
 
-  // ★ R2 IS OPEN, AND THIS IS THE NUMBER IT IS OPEN BY. Every burned-in caption in the
-  // product is 14–16 px against a 22 px floor, so on a 480-wide phone they land at 3.5–4.0 px
-  // where 5.4 px is needed. No token can fix this: 22 px chrome on a 1920 stage is absurd, and
-  // the real answer is a BROADCAST LAYOUT that renders the chrome at a larger logical size —
-  // which this batch does not build. Pinned exactly, so any change to a caption size moves it.
-  it('MEASURES the shortfall rather than asserting it away', () => {
+  // ★ THE NUMBER THAT BOUGHT THE SECOND LAYOUT, AND IT STAYS PINNED. Every burned-in caption
+  // in the DESKTOP chrome is 12–16 px against a 22 px floor, so on a 480-wide phone they land
+  // at 3.0–4.0 px where 5.4 px is needed. No token fixes it — 22 px chrome on a 1920 stage is
+  // absurd for the person sitting in front of it — so `ui/broadcast.ts` is a second
+  // composition rather than a bigger desktop, and `broadcast.test.ts` measures ITS captions at
+  // the same 0.25 and finds no shortfall. This row is what the desktop still is, on purpose.
+  it('MEASURES the desktop shortfall rather than asserting it away', () => {
     expect(captionShortfall(CAPTIONS)).toEqual([
       'speech bubble — 4.00px of 5.4px',
       'director subtitle — 3.80px of 5.4px',

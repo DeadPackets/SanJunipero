@@ -214,6 +214,9 @@ export type Scene = {
   /** Run or pause the scene's own clock. The ONLY way to do it: `app.ticker` is null on a
    *  destroyed scene, and a caller upstream of the teardown cannot know which it is holding. */
   setTicking(on: boolean): void
+  /** How much larger than the reader's size a world caption is drawn — 1 for a person at a
+   *  desk, `BROADCAST_TEXT_SCALE` for the frame a stream viewer sees at a quarter scale. */
+  textScale: number
   world: Container
   /** the eight named layers — the one place that decides what is drawn over what */
   layers: LayerSet
@@ -538,6 +541,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   return {
     app,
     setTicking: clock.set,
+    textScale: 1,
     world,
     layers,
     entities: layers.entities,

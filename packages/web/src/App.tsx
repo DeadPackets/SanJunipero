@@ -25,6 +25,7 @@ import {
 } from './ui/hudLayout.js'
 import { SCENE_TOTAL_MS, idleScene, sceneReducer, type SceneState } from './ui/sceneTransition.js'
 import { BADGE_WORD, tickBadgeState } from './ui/broadcastReady.js'
+import { BROADCAST_TEXT_SCALE } from './render/textFaces.js'
 import { stepZoom } from './render/cameraNav.js'
 import type { ZoomStop } from './render/camera.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
@@ -266,6 +267,13 @@ export function App() {
     scene.setTicking(shownLens !== 'society')
   }, [shownLens, scene])
 
+  // The stream frame's half of R2 that CSS cannot reach: the town's own speech is a bitmap
+  // face in the canvas, and 16px of it is 4.00px on a 480-wide player.
+  useEffect(() => {
+    if (scene === null) return
+    scene.textScale = route.broadcast ? BROADCAST_TEXT_SCALE : 1
+  }, [scene, route.broadcast])
+
   // The Moments lens has two readings: the live town televised (the C6 auto-cut) and a
   // recorded day playing back. Opening a day retires the auto-cut so its heat-driven camera
   // cannot fight the playback; LIVE brings it back.
@@ -285,7 +293,7 @@ export function App() {
   }, [televised])
 
   return (
-    <div className="app">
+    <div className="app" data-broadcast={route.broadcast ? 'on' : undefined}>
       <header className="topbar">
         <h1 className="px-title">San Junipero</h1>
         <LensTabs store={store} lens={route.lens} onNav={nav} />

@@ -1510,3 +1510,63 @@ body {
   scrollbar-color: var(--ink) var(--sand);
   scrollbar-width: thin;
 }
+
+/* ══ ★ THE BROADCAST LAYOUT — R2 ═══════════════════════════════════════════════════════════
+   A second composition for a second audience: 1080p downscaled to a 480px phone is a scale of
+   0.25, and at 0.25 every caption in the sheet above lands at 3.0–4.0px against a 5.4px floor.
+   No token fixes that — 22px chrome is absurd for the person at the desk — so the frame a
+   stream viewer gets is a DIFFERENT frame. `ui/broadcast.ts` states the whole design and its
+   trigger; the sizes below are the ones `broadcast.test.ts` measures at 0.25.
+
+   Turned on by `?broadcast=1` and by nothing else. Never a media query: a layout this large
+   firing on a narrow desktop window would be a regression for the ordinary viewer. */
+
+/* A stream has no operator. Every surface here is navigation a viewer can neither press nor
+   read, so it leaves the frame rather than shrinking inside it. */
+[data-broadcast='on'] .px-title,
+[data-broadcast='on'] .lens-tabs,
+[data-broadcast='on'] .link-pill,
+[data-broadcast='on'] .status-strip,
+[data-broadcast='on'] .control-bar,
+[data-broadcast='on'] .hud-dock,
+[data-broadcast='on'] #panel-outlet,
+[data-broadcast='on'] .timeline,
+[data-broadcast='on'] .film-strip,
+[data-broadcast='on'] .moment-player,
+[data-broadcast='on'] .fps-overlay,
+[data-broadcast='on'] .scrub-banner,
+[data-broadcast='on'] .room-card,
+[data-broadcast='on'] .digest-scrim { display: none; }
+
+/* The grid rows frame the picture now, so the overlaid bands would be a second frame inside
+   the first. The bottom band WAS the filmstrip, and the filmstrip has gone. */
+[data-broadcast='on'] .moments-lens[data-letterboxed='true'] { --letterbox-h: 0px; }
+
+/* The top band: the clock, and nothing else in the world. */
+[data-broadcast='on'] .topbar {
+  padding: 0.55rem 1.4rem;
+  background: var(--night);
+  border-bottom: 2px solid var(--deep);
+  box-shadow: none;
+}
+[data-broadcast='on'] .tick-badge {
+  font-size: 1.75rem;           /* 28px -> 7.00px on a 480 player, floor 5.4 */
+  padding: 0.3rem 0.9rem;
+  letter-spacing: 0.04em;
+}
+
+/* The caption, burned into the lower third the way a broadcast burns one in. `--cream` on
+   `--deep` measures 15.02:1 and `--honey` on `--deep` 10.19:1 — both AAA, and neither of them
+   asks alpha to carry any of it. */
+[data-broadcast='on'] .subtitle {
+  bottom: 5%;
+  max-width: min(84%, 62rem);
+  font-size: 2rem;              /* 32px -> 8.00px */
+  line-height: 1.3;
+  padding: 0.45rem 1.1rem;
+  box-shadow: var(--ledge);
+}
+[data-broadcast='on'] .subtitle-name {
+  font-size: 1.75rem;           /* 28px -> 7.00px */
+  margin-bottom: 0.3rem;
+}
