@@ -168,6 +168,39 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
       { id: 3, day: 2, startTick: 2880, endTick: 2900, title: 'Day 2', cast: [], location: 'the riverbank' },
     ])
   })
+
+  // U14 — the timeline's marks used to come from a 400-entry ring that only holds what arrived
+  // since the viewer connected, so a mature world had none. They come from the record now.
+  it('hands the timeline every source a mark can come from', async () => {
+    const res = await fetch(`${base}/api/timeline/marks`)
+    expect(res.status).toBe(200)
+    const body = await res.json() as {
+      throughTick: number
+      chapters: Array<{ day: number; title: string }>
+      milestones: Array<{ label: string; day: number; tick: number }>
+      moments: Array<{ day: number; startTick: number }>
+      changes: Array<{ tick: number }>
+      events: Array<{ tick: number; type: string }>
+    }
+    expect(body.throughTick).toBeGreaterThanOrEqual(60)
+    expect(body.chapters).toEqual([{ day: 0, title: 'The First Morning' }, { day: 1, title: 'What the Fire Took' }])
+    expect(body.milestones).toEqual([{ label: 'The first death', day: 0, tick: 50 }])
+    expect(body.moments).toEqual([{ day: 0, startTick: 10 }, { day: 1, startTick: 1440 }, { day: 2, startTick: 2880 }])
+    expect(body.changes).toEqual([])   // no agent memory dir on this world
+  })
+
+  it('sends only the events the town would remember, and nothing else', async () => {
+    const body = await (await fetch(`${base}/api/timeline/marks`)).json() as
+      { events: Array<{ tick: number; type: string }> }
+    expect(body.events).toEqual([
+      { tick: 1, type: 'agent_spawned' }, { tick: 1, type: 'agent_spawned' },
+      { tick: 1, type: 'agent_spawned' }, { tick: 20, type: 'structure_completed' },
+      { tick: 50, type: 'agent_died' },
+    ])
+    for (const noise of ['agent_spoke', 'agent_moved', 'structure_planned', 'co_slept', 'fire_ignited']) {
+      expect(body.events.some((e) => e.type === noise), noise).toBe(false)
+    }
+  })
 })
 
 describe('narrator-backed observer apis, before a single day is narrated', () => {
@@ -198,6 +231,18 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
     const moments = await fetch(`${base}/api/moments`)
     expect(moments.status).toBe(200)
     expect(MomentsResponseSchema.parse(await moments.json()).moments).toEqual([])
+  })
+
+  it('answers the marks endpoint with 200 and typed empties, never a 500', async () => {
+    const res = await fetch(`${base}/api/timeline/marks`)
+    expect(res.status).toBe(200)
+    const body = await res.json() as Record<string, unknown>
+    expect(body['chapters']).toEqual([])
+    expect(body['milestones']).toEqual([])
+    expect(body['moments']).toEqual([])
+    expect(body['changes']).toEqual([])
+    // the world's own log survives the narrator's absence — those are the town's, not C7's
+    expect((body['events'] as unknown[]).length).toBeGreaterThan(0)
   })
 
   it('still keeps the chronicle — the events are the town’s, not the narrator’s', async () => {

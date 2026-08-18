@@ -50,6 +50,10 @@ export async function startDevWorld(
     /** dev/demo only (G10 human pass): tired founders go indoors and come out again.
      *  Off by default, so every existing gate folds exactly the events it always did. */
     interiors?: boolean
+    /** C7's narrator.db. Absent, every narrated surface — chapters, milestones, moments —
+     *  answers typed-empty, which is why the timeline marks and the filmstrip had never been
+     *  seen with data. The gateway already opens it readonly; the dev world could not ask. */
+    narratorDbPath?: string
   } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH
@@ -101,7 +105,9 @@ export async function startDevWorld(
     }),
   })
 
-  const gateway = await createGateway({ dbPath, port: opts.port ?? DEV_PORT, terrain, config, db })
+  const gateway = await createGateway({
+    dbPath, port: opts.port ?? DEV_PORT, terrain, config, db, narratorDbPath: opts.narratorDbPath,
+  })
 
   // Scripted thoughts: when an actor's chosen intent verb changes, it "thinks" a line.
   let lastSeq = 0

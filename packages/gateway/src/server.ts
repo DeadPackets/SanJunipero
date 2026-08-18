@@ -67,7 +67,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
   mountAssetRoutes(router, { getCodex })
   mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
-  mountNarratorApi(router, { db, mirror, narratorDb })
+  mountNarratorApi(router, { db, mirror, narratorDb, agentDbDir: opts.agentDbDir })
   mountBondsApi(router, { db, mirror, config })
   mountLineageApi(router, { db, mirror })
 

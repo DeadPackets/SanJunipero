@@ -657,24 +657,47 @@ body {
     to { opacity: 1; translate: 0 0; }
   }
 }
+/* U14: the marks are their own row ABOVE the track, so a 24px pointer target does not sit
+   inside a slider and steal its keyboard, and a busy day does not crowd the playhead. */
+.timeline-body { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.timeline-marks { position: relative; height: 28px; }
 .timeline-track {
-  position: relative; flex: 1; height: 22px;
+  position: relative; flex: none; height: 26px;
   background: var(--sand); border-radius: 4px; box-shadow: inset 0 0 0 1.5px var(--ink);
   cursor: pointer;
 }
 .timeline-day { position: absolute; top: 0; bottom: 0; border-left: 1px solid rgba(67, 57, 74, 0.35); }
-/* The label was cream from when the timeline sat on the night ground. The slab is cream now,
-   so it was painting the label in its own background: ink reads on the slab (10.2:1) and on
-   the sand track it overhangs (7.6:1). */
+/* U14 said the font was too small to read. It was 0.75rem — the bare floor, not a reading
+   size. Ink on the sand track it sits in is 7.63:1. */
 .timeline-day em {
-  position: absolute; top: -1.15rem; left: 2px; font-style: normal;
-  font-size: 0.75rem; letter-spacing: 0.05em; color: var(--ink);
+  position: absolute; top: 3px; left: 3px; font-style: normal;
+  font-size: 0.875rem; line-height: 1.2; letter-spacing: 0.04em; color: var(--ink);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.mark { position: absolute; top: 50%; translate: -50% -50%; width: 6px; height: 6px; border-radius: 1px; }
-.mark.death { background: var(--deep); }
-.mark.done { background: var(--honey); box-shadow: 0 0 0 1px var(--ink); }
-.mark.chapter { background: var(--ember); rotate: 45deg; width: 7px; height: 7px; }
+.mark {
+  position: absolute; bottom: 0; translate: -50% 0;
+  display: grid; place-items: center; width: 26px; height: 26px; padding: 0;
+  background: transparent; border: 0; cursor: pointer;
+}
+.mark-glyph { display: block; }
+.mark:hover .mark-glyph, .mark:focus-visible .mark-glyph { translate: 0 -2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .mark-glyph { transition: translate var(--t-fast) var(--ease-enter); }
+}
+/* the word for the mark: hidden until the mark is asked about, and then a real slab */
+.mark-tip {
+  position: absolute; bottom: 100%; left: 50%; translate: -50% -4px; z-index: 2;
+  display: none; white-space: nowrap; max-width: 22rem; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--font-px); font-size: 0.75rem; letter-spacing: 0.03em;
+  color: var(--ink); background: var(--cream);
+  border: 2px solid var(--ink); box-shadow: 2px 2px 0 0 var(--deep);
+  padding: 0.2rem 0.4rem; pointer-events: none;
+}
+/* WHAT THE BROWSER CAUGHT: centred on the first mark, the tip ran off the left of the
+   viewport and lost its first three words. Near an edge it hangs from that edge instead. */
+.mark-tip[data-side='start'] { left: 0; translate: 0 -4px; }
+.mark-tip[data-side='end'] { left: auto; right: 0; translate: 0 -4px; }
+.mark:hover .mark-tip, .mark:focus-visible .mark-tip { display: block; }
 .playhead {
   position: absolute; top: -3px; bottom: -3px; width: 3px; translate: -50%;
   background: var(--ember); border-radius: 1px; box-shadow: 0 0 0 1px var(--ink);
