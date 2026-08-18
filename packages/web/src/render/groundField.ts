@@ -7,9 +7,12 @@ import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { TILE_COLORS } from './ground.js'
 import { ROAD_TILE_ID, TILE_KIND, roadNeighborsAt, tileKind } from './tileset.js'
 
-const ID_OF_KIND = new Map<TerrainTileKind, TileId>(
-  (Object.entries(TILE_KIND) as Array<[string, TerrainTileKind]>).map(([id, k]) => [k, Number(id) as TileId]),
-)
+// First id wins: C11's path/sapling/channel (8/9/10) alias onto earth/forest/water, and a
+// later duplicate would hand the kind its alias's palette colour instead of its own.
+const ID_OF_KIND = new Map<TerrainTileKind, TileId>()
+for (const [id, k] of Object.entries(TILE_KIND) as Array<[string, TerrainTileKind]>) {
+  if (!ID_OF_KIND.has(k)) ID_OF_KIND.set(k, Number(id) as TileId)
+}
 
 // TERRAIN V2 — user directive 2026-08-17: "why are they not high fidelity textures? You
 // should have just generated a square and placed it on the grid. It also looks unsettling to
