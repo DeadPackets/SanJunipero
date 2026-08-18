@@ -1,4 +1,4 @@
-import { Container } from 'pixi.js'
+import { Container, Graphics } from 'pixi.js'
 // the deep path, never the package root: @sj/engine's index reaches db.ts and therefore
 // better-sqlite3, which the browser graph guard forbids
 import type { WorldState } from '@sj/engine/state'
@@ -6,7 +6,9 @@ import type { WorldStore } from '../state/worldStore.js'
 import { tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
-import { faceFor, worldTextScale } from './textFaces.js'
+import { FACE_SIZES, THOUGHT_FILL, faceFor, worldTextScale } from './textFaces.js'
+import { placeTag, type Rect } from './tooltip.js'
+import { LANDMARK_EDGE, LANDMARK_INK, LANDMARK_PLATE } from './legibility.js'
 
 // A good plan is not a legible picture. At the default zoom the viewer sees roofs and roads
 // and cannot tell the square from a wide street. These are the reading aids a real town has:
@@ -49,9 +51,15 @@ const SINGLE_NAME: Partial<Record<TownKind, string>> = {
   fire_pit: 'the fire pit', well: 'the well', storehouse: 'the storehouse',
 }
 
-/** Labels are a map legend at the widest view and clutter at 4x, so they fade out on the way in. */
-export const LANDMARK_SHOW_BELOW_SCALE = 1.5
-const LANDMARK_FULL_BELOW_SCALE = 0.5
+/**
+ * Labels are a map legend at the widest view and clutter on the way in, so the whole layer
+ * fades out. The band is chosen so that at EVERY resting `ZOOM_STOP` the layer is 1 or 0 and
+ * never between: a plate drawn at 0.5 has a contrast ratio nobody can state, which is the
+ * de-emphasis-by-transparency habit this batch measured out of the bubbles. The fade happens
+ * during the transit between stops, which is motion, not a state a viewer reads in.
+ */
+export const LANDMARK_SHOW_BELOW_SCALE = 1
+const LANDMARK_FULL_BELOW_SCALE = 0.75
 
 /** The chrome type floor is 12px and a world label is chrome. */
 export const LANDMARK_LABEL_PX = faceFor('label').size
@@ -103,11 +111,58 @@ export function landmarksOf(state: WorldState): Landmark[] {
 
 // ---------------------------------------------------------------- drawing the names
 
-/** Ink for a place name. --stone, so a label reads as chrome over the world, never as art. */
-export const LANDMARK_INK = 0x5d5751
-const RANK_ALPHA: Record<1 | 2 | 3, number> = { 1: 1, 2: 0.9, 3: 0.75 }
+/**
+ * ★ A LABEL WITH NO GROUND UNDER IT IS NOT A LABEL.
+ *
+ * `#5D5751` painted straight on the terrain measured **1.26–4.98:1 by day and 1.11–2.85:1 at
+ * night** depending on which tile it fell across — worst over forest, and never once clearing
+ * AA after dark. It also had no rule about the other names, so at the overview stop "the
+ * storehouse", "the well", "the houses" and "the fire pit" composited into one smear.
+ *
+ * A place name gets a PLATE, the same cream paper every other floating slab in the town wears,
+ * and `--deep` ink on it: **15.02:1 by day and 5.19:1 at night**, against a night ceiling of
+ * 6.37:1. Not the material's ratio — the viewer's, through the multiply quad (legibility.ts).
+ */
+// `export { X }` for an X that arrived through an `import` is dropped by a per-file transpile
+// — tsc, vitest and the bundler all accepted it and the dev ESM graph threw
+// "Export 'LANDMARK_EDGE' is not defined in module", which blanked every place name on screen.
+// A re-export names its source.
+export { LANDMARK_EDGE, LANDMARK_INK, LANDMARK_PLATE } from './legibility.js'
+export const LANDMARK_PAD_X = 5, LANDMARK_PAD_Y = 3
+
+/**
+ * WHICH NAME MATTERS, SAID IN SIZE AND PAPER RATHER THAN IN TRANSPARENCY. The centre is set a
+ * rung larger on the same 8px em, and a notable single building sits on parchment instead of
+ * cream — two channels a viewer can see and a test can measure. Both papers clear AA under the
+ * night multiply (legibility.ts); an alpha would clear nothing knowable.
+ */
+export function landmarkStyle(rank: 1 | 2 | 3): { size: number; plate: number } {
+  if (rank === 1) return { size: FACE_SIZES[2], plate: LANDMARK_PLATE }
+  if (rank === 2) return { size: FACE_SIZES[1], plate: LANDMARK_PLATE }
+  return { size: FACE_SIZES[1], plate: THOUGHT_FILL }
+}
 
 export type LandmarkLayer = { sync(): void; destroy(): void }
+
+/**
+ * Where each plate goes, in rank order, so the centre keeps its place and the districts move
+ * around it. `placeTag` is the product's one placement rule (task 74) and it already knows how
+ * to step clear of something already there — the same audit-M8 mechanism the tags use.
+ */
+export function placeLandmarks(
+  marks: ReadonlyArray<{ id: string; sx: number; sy: number; size: { w: number; h: number } }>,
+  view: Rect,
+): Array<{ id: string; sx: number; sy: number; rect: Rect }> {
+  const taken: Rect[] = []
+  const out: Array<{ id: string; sx: number; sy: number; rect: Rect }> = []
+  for (const m of marks) {
+    const at = placeTag({ sx: m.sx, sy: m.sy, halfW: m.size.w / 2, topY: m.sy }, m.size, view, taken)
+    const rect = { x: at.sx - m.size.w / 2, y: at.sy, w: m.size.w, h: m.size.h }
+    taken.push(rect)
+    out.push({ id: m.id, sx: at.sx, sy: at.sy, rect })
+  }
+  return out
+}
 
 /**
  * Place names in the scene's overlay: above everything, hit-testable by nothing. The whole
@@ -118,9 +173,8 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
   const node = new Container()
   node.eventMode = 'none'
   scene.layers.overlay.addChild(node)
-  // createWorldLabel, never `new BitmapText`: a bitmap glyph with no installed font blanks the
-  // entire canvas, so the choice is made once from the font cache (worldLabel.ts, ruling R3).
-  const labels = new Map<string, WorldLabel>()
+  type Plate = { node: Container; plate: Graphics; label: WorldLabel; drawn: string }
+  const labels = new Map<string, Plate>()
 
   function sync(): void {
     const alpha = landmarkAlpha(scene.getZoom())
@@ -133,27 +187,55 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
     const seen = new Set<string>()
     const inv = worldTextScale(scene.world.scale.x)
 
+    // Build (or reuse) every plate first, THEN place them together: a name cannot know it is
+    // landing on another name until every size is known.
+    const wanted: Array<{ id: string; sx: number; sy: number; size: { w: number; h: number } }> = []
     for (const m of marks) {
       seen.add(m.id)
+      const style = landmarkStyle(m.rank)
       let t = labels.get(m.id)
       if (t === undefined) {
-        t = createWorldLabel(m.name, {
-          fontFamily: faceFor('label').family, fontSize: LANDMARK_LABEL_PX, fill: LANDMARK_INK,
+        const box = new Container()
+        box.eventMode = 'none'
+        const plate = new Graphics()
+        // createWorldLabel, never `new BitmapText`: a bitmap glyph with no installed font
+        // blanks the entire canvas, so the choice is made once from the font cache (ruling R3).
+        const label = createWorldLabel(m.name, {
+          fontFamily: faceFor('label').family, fontSize: style.size, fill: LANDMARK_INK,
         })
-        t.anchor.set(0.5, 1)
-        t.eventMode = 'none'
+        label.anchor.set(0.5, 0)
+        label.eventMode = 'none'
+        box.addChild(plate, label)
+        node.addChild(box)
+        t = { node: box, plate, label, drawn: '' }
         labels.set(m.id, t)
-        node.addChild(t)
       }
-      if (t.text !== m.name) t.text = m.name
+      if (t.label.text !== m.name) t.label.text = m.name
+      if (t.drawn !== m.name) {
+        t.drawn = m.name
+        const w = t.label.width + LANDMARK_PAD_X * 2, h = t.label.height + LANDMARK_PAD_Y * 2
+        t.plate.clear()
+        t.plate.rect(-w / 2, -LANDMARK_PAD_Y, w, h)
+        t.plate.fill(style.plate)
+        t.plate.stroke({ width: 1, color: LANDMARK_EDGE })
+      }
+      t.node.scale.set(inv)
       const { sx, sy } = tileToScreen(m.x, m.y)
-      t.position.set(Math.round(sx), Math.round(sy))
-      t.alpha = RANK_ALPHA[m.rank]
-      t.scale.set(inv)
+      wanted.push({
+        id: m.id, sx, sy,
+        size: { w: (t.label.width + LANDMARK_PAD_X * 2) * inv, h: (t.label.height + LANDMARK_PAD_Y * 2) * inv },
+      })
     }
+
+    for (const at of placeLandmarks(wanted, scene.viewRect())) {
+      const t = labels.get(at.id)
+      if (t === undefined) continue
+      t.node.position.set(Math.round(at.sx), Math.round(at.sy + LANDMARK_PAD_Y * inv))
+    }
+
     for (const [id, t] of labels) {
       if (seen.has(id)) continue
-      t.destroy()
+      t.node.destroy({ children: true })
       labels.delete(id)
     }
   }

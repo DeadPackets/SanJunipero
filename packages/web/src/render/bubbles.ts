@@ -3,9 +3,10 @@ import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { createWorldLabel } from './worldLabel.js'
 import {
   BUBBLE_EDGE, BUBBLE_FRAME_PX, BUBBLE_SLICE, SPEECH_FILL, SPEECH_INK, THOUGHT_FILL,
-  THOUGHT_INK, THOUGHT_SCALLOP_R, faceFor, nineSlice, tailPoly, worldTextScale, wrapCharsFor,
+  THOUGHT_INK, faceFor, nineSlice, scallopTrail, tailPoly, worldTextScale, wrapCharsFor,
   type BubbleSide,
 } from './textFaces.js'
+import { placeTag, type Rect } from './tooltip.js'
 import { tileToScreen } from './iso.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import type { WorldStore } from '../state/worldStore.js'
@@ -59,6 +60,30 @@ export function wrapBubble(text: string, maxChars = WRAP_CHARS): string[] {
   return lines
 }
 
+/**
+ * ★ TWO SPEAKERS STANDING TOGETHER USED TO COMPOSITE INTO ONE PILE (audit M8, carried in from
+ * batch 5). Bubbles published their boxes to `scene.tags.setOccupied`, so a TOOLTIP knew to
+ * avoid them and no bubble knew to avoid another bubble. `placeTag` is the product's one
+ * placement rule and it already solves this; the only thing missing was calling it.
+ *
+ * Order is the layer's own arrival order, so the answer is deterministic and a bubble does not
+ * jump about while the one beside it is dying.
+ */
+export function placeBubbles(
+  want: ReadonlyArray<{ id: string; sx: number; sy: number; size: { w: number; h: number } }>,
+  view: Rect,
+): Array<{ id: string; sx: number; sy: number; side: BubbleSide; rect: Rect }> {
+  const taken: Rect[] = []
+  const out: Array<{ id: string; sx: number; sy: number; side: BubbleSide; rect: Rect }> = []
+  for (const b of want) {
+    const at = placeTag({ sx: b.sx, sy: b.sy, halfW: b.size.w / 2, topY: b.sy }, b.size, view, taken)
+    const rect = { x: at.sx - b.size.w / 2, y: at.sy, w: b.size.w, h: b.size.h }
+    taken.push(rect)
+    out.push({ id: b.id, sx: at.sx, sy: at.sy, side: at.side, rect })
+  }
+  return out
+}
+
 export type BubbleLayer = {
   spawnSpeech(agentId: string, text: string): void
   spawnThought(agentId: string, text: string): void
@@ -67,7 +92,11 @@ export type BubbleLayer = {
   destroy(): void
 }
 
-type Bubble = { agentId: string; node: Container; bornMs: number; dieMs: number; isThought: boolean }
+type Bubble = {
+  agentId: string; node: Container; bornMs: number; dieMs: number; isThought: boolean
+  /** the box, in the node's local space, and the tail that has to point out of it */
+  box: Container; tail: Graphics; w: number; h: number; side: BubbleSide
+}
 
 /** Nine sub-textures cut once from one frame, so a bubble of any length costs no new art. */
 const sliceCache = new Map<string, Texture[] | null>()
@@ -117,7 +146,23 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     })
   }
 
-  const build = (text: string, isThought: boolean): Container => {
+  /** The tail is redrawn when the box changes side, so it always points at its own speaker
+   *  even after de-confliction has moved the bubble somewhere else. */
+  const drawTail = (tail: Graphics, isThought: boolean, side: BubbleSide, w: number, h: number): void => {
+    tail.clear()
+    if (isThought) {
+      for (const d of scallopTrail(side, w, h)) tail.circle(d.cx, d.cy, d.r)
+      tail.fill(THOUGHT_FILL)
+    } else {
+      tail.poly(tailPoly(side, w, h))
+      tail.fill(SPEECH_FILL)
+    }
+    tail.stroke({ width: 1, color: BUBBLE_EDGE })
+  }
+
+  const build = (text: string, isThought: boolean): {
+    node: Container; box: Container; tail: Graphics; w: number; h: number
+  } => {
     const node = new Container()
     node.eventMode = 'none' // bubbles float over heads — never block a character click
     const role = isThought ? 'thought' : 'speech'
@@ -131,32 +176,20 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const w = Math.ceil(label.width) + 2 * pad
     const h = Math.ceil(label.height) + 2 * pad
 
-    // A THOUGHT IS A DIFFERENT MATERIAL, NEVER A THINNER ONE. Parchment under quiet ink, and a
-    // scalloped edge instead of a tail — shape and ink, not `alpha: 0.55`.
+    // A THOUGHT IS A DIFFERENT MATERIAL, NEVER A THINNER ONE. Different paper, a different
+    // frame and a scalloped trail instead of a tail — shape and paper, not `alpha: 0.55`.
     const box = new Container()
     box.position.set(-Math.round(w / 2), -h)
     frame(box, isThought ? THOUGHT_FRAME_URL : SPEECH_FRAME_URL, w, h, isThought ? THOUGHT_FILL : SPEECH_FILL)
 
     const tail = new Graphics()
-    if (isThought) {
-      // three shrinking dots trailing down to the thinker — the cloud edge, read downward
-      for (let i = 0; i < 3; i++) {
-        const r = THOUGHT_SCALLOP_R - i
-        tail.circle(Math.round(w / 2) - i * 2, h + 3 + i * (THOUGHT_SCALLOP_R + 2), Math.max(1, r))
-      }
-      tail.fill(THOUGHT_FILL)
-      tail.stroke({ width: 1, color: BUBBLE_EDGE })
-    } else {
-      tail.poly(tailPoly('above' satisfies BubbleSide, w, h))
-      tail.fill(SPEECH_FILL)
-      tail.stroke({ width: 1, color: BUBBLE_EDGE })
-    }
+    drawTail(tail, isThought, 'above', w, h)
     box.addChild(tail)
 
     label.position.set(pad, pad)
     box.addChild(label)
     node.addChild(box)
-    return node
+    return { node, box, tail, w, h }
   }
 
   const spawn = (agentId: string, text: string, isThought: boolean): void => {
@@ -164,9 +197,11 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const state = store.getState()
     if (state === null || state.agents[agentId] === undefined) return // visible agents only
     const now = performance.now()
-    const node = build(text, isThought)
-    scene.layers.bubbles.addChild(node)
-    bubbles.push({ agentId, node, bornMs: now, dieMs: now + bubbleLife(text), isThought })
+    const built = build(text, isThought)
+    scene.layers.bubbles.addChild(built.node)
+    bubbles.push({
+      agentId, ...built, bornMs: now, dieMs: now + bubbleLife(text), isThought, side: 'above',
+    })
   }
 
   return {
@@ -186,23 +221,37 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     tick: (nowMs) => {
       const state = store.getState()
       const inv = worldTextScale(scene.getZoom())
-      const boxes: Array<{ x: number; y: number; w: number; h: number }> = []
       for (let i = bubbles.length - 1; i >= 0; i--) {
         const b = bubbles[i]!
-        const a = state?.agents[b.agentId]
-        if (nowMs >= b.dieMs || a === undefined) {
+        if (nowMs >= b.dieMs || state?.agents[b.agentId] === undefined) {
           b.node.destroy({ children: true })
           bubbles.splice(i, 1)
-          continue
         }
+      }
+      // Where each one WANTS to be, then one placement pass over the whole live set: a bubble
+      // that does not know about the bubble beside it is the pile the user saw.
+      const want = bubbles.map((b, i) => {
+        const a = state!.agents[b.agentId]!
         const { sx, sy } = tileToScreen(a.x, a.y)
         const drift = b.isThought ? (THOUGHT_DRIFT_PX * (nowMs - b.bornMs)) / (b.dieMs - b.bornMs) : 0
-        b.node.scale.set(inv) // the bubble is the reader's size, not the camera's
-        b.node.position.set(sx, sy - CHAR_TARGET_PX - 18 - drift)
-        // audit M8: a tag and a bubble used to composite into an unreadable pile
-        const w = b.node.width, h = b.node.height
-        boxes.push({ x: b.node.position.x - w / 2, y: b.node.position.y - h, w, h })
+        return {
+          id: String(i), sx, sy: sy - CHAR_TARGET_PX - 18 - drift,
+          size: { w: b.w * inv, h: b.h * inv },
+        }
+      })
+      const boxes: Rect[] = []
+      for (const at of placeBubbles(want, scene.viewRect())) {
+        const b = bubbles[Number(at.id)]!
+        b.node.scale.set(inv)     // the bubble is the reader's size, not the camera's
+        // the box is drawn from (-w/2, -h), so the node sits at the box's bottom centre
+        b.node.position.set(Math.round(at.sx), Math.round(at.rect.y + at.rect.h))
+        if (b.side !== at.side) {
+          b.side = at.side
+          drawTail(b.tail, b.isThought, at.side, b.w, b.h)
+        }
+        boxes.push(at.rect)
       }
+      // audit M8: a tag and a bubble used to composite into an unreadable pile
       scene.tags.setOccupied(boxes)
     },
     destroy: () => {

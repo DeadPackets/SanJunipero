@@ -2,9 +2,15 @@ import { describe, it, expect } from 'vitest'
 import type { WorldState } from '@sj/engine'
 import { GAMIFICATION_BAN } from '../ui/townStats.js'
 import {
-  LANDMARK_LABEL_PX, LANDMARK_SHOW_BELOW_SCALE, SILHOUETTE_RANK, TOWN_KINDS,
-  landmarkAlpha, landmarksOf,
+  LANDMARK_INK, LANDMARK_LABEL_PX, LANDMARK_PLATE, LANDMARK_SHOW_BELOW_SCALE, SILHOUETTE_RANK,
+  TOWN_KINDS, landmarkAlpha, landmarkStyle, landmarksOf, placeLandmarks,
 } from './landmarks.js'
+import { AA_RATIO, bandRatios } from './legibility.js'
+import { ZOOM_STOPS } from './camera.js'
+import { FACE_DESIGN_PX } from './textFaces.js'
+import { TEXT_MIN_PX } from '../textFloor.js'
+import { readFileSync } from 'node:fs'
+import type { Rect } from './tooltip.js'
 
 type S = { id: string; kind: string; x: number; y: number; w: number; h: number; stage: string }
 
@@ -114,5 +120,92 @@ describe('SILHOUETTE_RANK', () => {
 describe('the label type floor', () => {
   it('never draws a label below the 12px chrome floor', () => {
     expect(LANDMARK_LABEL_PX).toBeGreaterThanOrEqual(12)
+  })
+})
+
+// ★ CARRY-IN FROM BATCH 5. At the overview stop "the storehouse", "the well", "the houses" and
+// "the fire pit" all landed within a few pixels of each other and composited into one smear —
+// the same audit-M8 fault that was fixed for tag-vs-bubble and never applied here. `placeTag`
+// is the product's one placement rule and it already knows how to step clear.
+describe('two place names never land on each other', () => {
+  const VIEW = { x: 0, y: 0, w: 800, h: 600 }
+  const overlaps = (a: Rect, b: Rect): boolean =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+
+  it('separates four names asking for the same point', () => {
+    const size = { w: 120, h: 22 }
+    const placed = placeLandmarks(
+      ['a', 'b', 'c', 'd'].map((id) => ({ id, sx: 400, sy: 300, size })), VIEW,
+    )
+    expect(placed).toHaveLength(4)
+    for (let i = 0; i < placed.length; i++) {
+      for (let j = i + 1; j < placed.length; j++) {
+        expect(overlaps(placed[i]!.rect, placed[j]!.rect), `${i} vs ${j}`).toBe(false)
+      }
+    }
+  })
+
+  it('keeps every plate inside the view, wherever the landmark is', () => {
+    const size = { w: 140, h: 22 }
+    const marks = [
+      { id: 'nw', sx: -50, sy: -50, size }, { id: 'ne', sx: 900, sy: 5, size },
+      { id: 'sw', sx: 4, sy: 700, size }, { id: 'se', sx: 1200, sy: 900, size },
+    ]
+    for (const p of placeLandmarks(marks, VIEW)) {
+      expect(p.rect.x, p.id).toBeGreaterThanOrEqual(VIEW.x)
+      expect(p.rect.y, p.id).toBeGreaterThanOrEqual(VIEW.y)
+      expect(p.rect.x + p.rect.w, p.id).toBeLessThanOrEqual(VIEW.x + VIEW.w)
+      expect(p.rect.y + p.rect.h, p.id).toBeLessThanOrEqual(VIEW.y + VIEW.h)
+    }
+  })
+
+  it('is deterministic — two calls with the same marks agree', () => {
+    const marks = [
+      { id: 'a', sx: 100, sy: 100, size: { w: 90, h: 20 } },
+      { id: 'b', sx: 108, sy: 104, size: { w: 90, h: 20 } },
+    ]
+    expect(placeLandmarks(marks, VIEW)).toEqual(placeLandmarks(marks, VIEW))
+  })
+})
+
+describe('a place name is legible over any ground, in both light bands', () => {
+  it('is deep ink on a cream plate, and clears AA under the night multiply', () => {
+    const r = bandRatios(LANDMARK_INK, LANDMARK_PLATE)
+    expect(r.day).toBeGreaterThanOrEqual(AA_RATIO)
+    expect(r.night).toBeGreaterThanOrEqual(AA_RATIO)
+  })
+})
+
+// ★ WHAT THE BROWSER CAUGHT AND THE CONTRAST TEST DID NOT. The plate measured 15.02:1 as a
+// MATERIAL and then the layer drew it at `RANK_ALPHA` 0.75 over grass, at a camera stop whose
+// own `landmarkAlpha` was 0.5 — so the number the test proved was never the number on screen.
+// It is the same fault as quoting a bubble's ratio without the night tint: a ratio belongs to
+// a viewer, and alpha is a de-emphasis channel whose ratio is unknowable at the call site.
+describe('a place name is never de-emphasised by transparency', () => {
+  it('is fully opaque or absent at every resting stop — never half there', () => {
+    for (const stop of ZOOM_STOPS) {
+      const a = landmarkAlpha(stop)
+      expect(a === 0 || a === 1, `stop ${stop} draws the plate at alpha ${a}`).toBe(true)
+    }
+  })
+
+  it('says which name matters by SIZE and PAPER, both of which are measurable', () => {
+    const seen = new Set<string>()
+    for (const rank of [1, 2, 3] as const) {
+      const s = landmarkStyle(rank)
+      expect(bandRatios(LANDMARK_INK, s.plate).night).toBeGreaterThanOrEqual(AA_RATIO)
+      expect(s.size % FACE_DESIGN_PX, 'a size off the 8px em resamples the face').toBe(0)
+      expect(s.size).toBeGreaterThanOrEqual(TEXT_MIN_PX)
+      seen.add(`${s.size}:${s.plate}`)
+    }
+    expect(seen.size, 'three ranks that look the same are not a hierarchy').toBe(3)
+  })
+
+  it('leaves no alpha on a landmark node', () => {
+    const text = readFileSync(new URL('./landmarks.ts', import.meta.url), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    expect(text).not.toMatch(/RANK_ALPHA/)
+    // the LAYER still fades with the camera; nothing inside it has an opacity of its own
+    expect([...text.matchAll(/\.alpha\s*=/g)]).toHaveLength(1)
   })
 })

@@ -14,6 +14,7 @@ import {
   wrapCharsFor,
 } from './textFaces.js'
 import { ZOOM_STOPS } from './camera.js'
+import { bandRatios } from './legibility.js'
 import { TEXT_MIN_PX, WORLD_TEXT_PX } from '../textFloor.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -221,17 +222,23 @@ describe('a thought is a different material, never a thinner one', () => {
     expect(text).not.toMatch(/alpha:\s*0\.\d/)
   })
 
-  it('paints a thought on its own paper, in its own ink', () => {
+  // ★ AMENDED BY MEASUREMENT (C12a batch 6). This used to require a different INK as well as
+  // different paper. The night quad is a multiply over the whole stage, and under it the
+  // ceiling is 6.37:1 — only three palette pairs clear AA in BOTH bands, and two of them share
+  // `--deep`. The distinction is therefore carried by the paper, the frame art and the edge
+  // shape; requiring a second ink would have meant one of the two bubbles failing AA at night.
+  it('paints a thought on its own paper', () => {
     expect(THOUGHT_FILL).not.toBe(SPEECH_FILL)
-    expect(THOUGHT_INK).not.toBe(SPEECH_INK)
   })
 
-  it('clears AA both ways, computed rather than asserted as a hex', () => {
+  it('clears AA both ways AND IN BOTH LIGHT BANDS, computed rather than asserted as a hex', () => {
     expect(contrast(THOUGHT_INK, THOUGHT_FILL)).toBeGreaterThanOrEqual(4.5)
     expect(contrast(SPEECH_INK, SPEECH_FILL)).toBeGreaterThanOrEqual(4.5)
+    expect(bandRatios(THOUGHT_INK, THOUGHT_FILL).night).toBeGreaterThanOrEqual(4.5)
+    expect(bandRatios(SPEECH_INK, SPEECH_FILL).night).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('is still quieter than speech, by ink rather than by transparency', () => {
+  it('is still quieter than speech — by the paper now, never by transparency', () => {
     expect(contrast(THOUGHT_INK, THOUGHT_FILL)).toBeLessThan(contrast(SPEECH_INK, SPEECH_FILL))
   })
 })

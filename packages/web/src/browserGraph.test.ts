@@ -193,3 +193,57 @@ describe('the browser graph', () => {
     expect(config).toContain('shims/nodeCrypto.ts')
   })
 })
+
+// ★ WHAT THE BROWSER CAUGHT AND NOTHING ELSE DID (C12a batch 6). `landmarks.ts` wrote
+//
+//     import { LANDMARK_EDGE } from './legibility.js'
+//     export { LANDMARK_EDGE }
+//
+// `tsc -b` accepted it, all 2842 tests accepted it, and `@sj/web build` accepted it — the
+// bundler concatenates modules, so the binding was there. The DEV ESM graph, which is what a
+// person actually looks at, threw `Export 'LANDMARK_EDGE' is not defined in module` and every
+// place name in the town vanished. A per-file transpile cannot know the name came from
+// somewhere else, so a re-export has to NAME ITS SOURCE.
+
+/** The names one source re-exports through a bare `export { … }` after importing them. */
+export function bareReexports(source: string): string[] {
+  const src = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+  const imported = new Set<string>()
+  for (const [, names] of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][^'"]+['"]/g)) {
+    for (const raw of (names ?? '').split(',')) {
+      const n = raw.trim().split(/\s+as\s+/).pop()?.trim()
+      if (n !== undefined && n.length > 0) imported.add(n)
+    }
+  }
+  const out: string[] = []
+  if (imported.size === 0) return out
+  for (const m of src.matchAll(/(?:^|\n)\s*export\s*\{([^}]*)\}\s*(from\s*['"][^'"]+['"])?/g)) {
+    if (m[2] !== undefined) continue            // `export { … } from '…'` names its source
+    for (const raw of (m[1] ?? '').split(',')) {
+      const n = raw.trim().split(/\s+as\s+/)[0]?.trim()
+      if (n !== undefined && imported.has(n)) out.push(n)
+    }
+  }
+  return out
+}
+
+/** The same sweep over every bundlable source, as `path — name`. */
+export function reexportsWithoutSource(files: readonly string[]): string[] {
+  return files.flatMap((f) =>
+    bareReexports(readFileSync(f, 'utf8')).map((n) => `${f.slice(WEB.length + 1)} — ${n}`))
+}
+
+describe('a re-export names its source', () => {
+  it('catches the exact shape that blanked every place name', () => {
+    expect(bareReexports("import { A, B } from './x.js'\nexport { A }\n")).toEqual(['A'])
+  })
+
+  it('leaves a proper re-export and a locally declared one alone', () => {
+    expect(bareReexports("export { A } from './x.js'\n")).toEqual([])
+    expect(bareReexports("import { B } from './x.js'\nconst A = 1\nexport { A }\n")).toEqual([])
+  })
+
+  it('has no bare re-export of an imported binding anywhere under src', () => {
+    expect(reexportsWithoutSource(webSourceFiles())).toEqual([])
+  })
+})

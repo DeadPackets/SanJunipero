@@ -29,7 +29,7 @@ export const INTERIOR_VEIL = 0x322b38
 export const INTERIOR_VEIL_ALPHA = 0.62
 export const INTERIOR_HEARTH_GLOW = ROOM_SHELL_PAINT.hearthPool
 
-export { ROOM_SLOTS, SLOT_TILES }
+export { ROOM_SLOTS, SLOT_TILES } from './roomShell.js'
 export const ROOM_ZOOM = 3             // integer zoom only (spec §15)
 export const ROOM_OFFSET_Y = 40        // lifts the room clear of the transport bar
 export const HEARTH_GLOW_PX = 26

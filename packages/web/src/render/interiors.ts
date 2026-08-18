@@ -10,7 +10,7 @@ import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 
 // The vocabulary is @sj/shared's (C13 interiorMeta.ts) — one source, so a kind added there
 // cannot go missing here. Re-exported because Task 11 and the gate read it off this module.
-export { INTERIOR_KINDS }
+export { INTERIOR_KINDS } from '@sj/shared'
 export type { InteriorKind }
 
 export type FurnishingKind = 'bed' | 'hearth' | 'table' | 'shelf' | 'crate' | 'tools'

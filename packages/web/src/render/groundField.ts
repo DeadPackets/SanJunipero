@@ -433,4 +433,4 @@ export function roadRibbonPolys(key: RoadAutotileKey): number[][] {
   return polys
 }
 
-export { roadAutotileKind }
+export { roadAutotileKind } from '@sj/shared'

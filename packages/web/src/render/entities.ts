@@ -14,7 +14,7 @@ import {
   BUILDING_PX_PER_TILE, TextureBook, buildingArt, smoothSource, textureUrlFor, type BuildingArt,
 } from './textures.js'
 
-export { BUILDING_PX_PER_TILE }
+export { BUILDING_PX_PER_TILE } from './textures.js'
 
 export const CONSTRUCTION_TINT = 0xcfc6bc
 export const WITHERED_TINT = 0x857d75

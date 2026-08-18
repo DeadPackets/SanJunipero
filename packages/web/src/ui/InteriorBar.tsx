@@ -10,7 +10,7 @@ import { ROOM_WORDS, roomCard, type Provenance, type RoomCard } from './interior
 // single answer to "what is this room"; the caption pair it replaces is retired rather than
 // left beside it, because two descriptions of one room is the defect this task is fixing.
 
-export { ROOM_WORDS as INTERIOR_ROOM_WORDS }
+export { ROOM_WORDS as INTERIOR_ROOM_WORDS } from './interiorModel.js'
 
 export function RoomCardView(
   { card, onBack, backRef }: {

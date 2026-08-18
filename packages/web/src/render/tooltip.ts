@@ -1,9 +1,10 @@
 import { Container, Graphics } from 'pixi.js'
 import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
-import { BUBBLE_FILL, BUBBLE_INK } from './bubbles.js'
 import type { LayerSet } from './layers.js'
 import { createWorldLabel } from './worldLabel.js'
-import { faceFor, worldTextScale } from './textFaces.js'
+// the tag's material is the SPEECH material, taken from its owner rather than through
+// bubbles.ts — bubbles.ts now needs `placeTag` from here, and an alias is not worth a cycle
+import { SPEECH_FILL as BUBBLE_FILL, SPEECH_INK as BUBBLE_INK, faceFor, worldTextScale } from './textFaces.js'
 
 // TOOLTIPS THAT LAND WHERE THEY POINT (U10, plan task 74).
 //

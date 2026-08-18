@@ -180,10 +180,38 @@ export function tailPoly(side: BubbleSide, w: number, h: number): number[] {
 
 // ── the two materials ─────────────────────────────────────────────────────────────────────
 
-export const SPEECH_FILL = 0xfff6e9        // --cream
-export const SPEECH_INK = 0x43394a         // --ink: 10.2:1 on cream
-export const THOUGHT_FILL = 0xf6e8d5       // --parchment, so it is visibly a different paper
-export const THOUGHT_INK = 0x5f5568        // --ink-quiet: 5.83:1 on parchment
+// ★ THE NIGHT TINT IS THE VIEWER'S, AND IT DECIDES THESE TWO VALUES.
+// `--ink` on cream is 10.2:1 as a MATERIAL and **4.41:1 to a viewer** under the deep-night
+// multiply — below AA on the surface where the town is literally speaking. The night ceiling
+// is 6.37:1 (black on white), and only three palette pairs clear AA inside it, so BOTH bubbles
+// take `--deep` and the difference between them is carried by the PAPER, the frame art and the
+// edge shape — never by a thinner ink, and never by alpha. Measured in legibility.ts.
+export const SPEECH_FILL = 0xfff6e9        // --cream:     15.02:1 day / 5.19:1 night
+export const SPEECH_INK = 0x241f2b         // --deep
+export const THOUGHT_FILL = 0xf6e8d5       // --parchment: 13.34:1 day / 4.67:1 night
+export const THOUGHT_INK = 0x241f2b        // --deep, on visibly different paper
 export const BUBBLE_EDGE = 0x241f2b        // --deep, the stepped ledge under every slab
 /** The cloud edge on a thought: a different SHAPE, which is the channel alpha was misusing. */
 export const THOUGHT_SCALLOP_R = 3
+export const SCALLOP_COUNT = 3
+
+/** The three shrinking dots that trail from a thought toward its thinker. It points the same
+ *  four ways the speech tail does, because a bubble that de-conflicts can end up on any side
+ *  of the head and a trail that always ran downward would point at the wrong person. */
+export function scallopTrail(
+  side: BubbleSide, w: number, h: number,
+): Array<{ cx: number; cy: number; r: number }> {
+  const cx = Math.round(w / 2), cy = Math.round(h / 2)
+  const out: Array<{ cx: number; cy: number; r: number }> = []
+  for (let i = 0; i < SCALLOP_COUNT; i++) {
+    const r = Math.max(1, THOUGHT_SCALLOP_R - i)
+    const step = 3 + i * (THOUGHT_SCALLOP_R + 2)
+    switch (side) {
+      case 'above': out.push({ cx: cx - i * 2, cy: h + step, r }); break
+      case 'below': out.push({ cx: cx - i * 2, cy: -step, r }); break
+      case 'left': out.push({ cx: w + step, cy: cy - i * 2, r }); break
+      case 'right': out.push({ cx: -step, cy: cy - i * 2, r }); break
+    }
+  }
+  return out
+}
