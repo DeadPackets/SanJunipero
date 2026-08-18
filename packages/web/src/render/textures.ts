@@ -1,4 +1,5 @@
 import { Assets, type Texture } from 'pixi.js'
+import { progress, type MotionName } from '../ui/motion.js'
 import {
   parseBuildingManifest, parseCharacterAtlasManifest,
   type AssetClass, type AssetRecord, type CharacterAtlasManifest,
@@ -100,4 +101,29 @@ export class TextureBook {
     }
     return next
   }
+}
+
+// ── NOTHING POPS IN (U23 finish line 8) ───────────────────────────────────────────────────
+//
+// The codex hot-swap HARD-SWAPPED the texture: a building standing as a placeholder became a
+// finished sprite between one frame and the next, in the middle of a shot. Art arriving is a
+// reveal, so it takes MOTION.reveal like every other reveal in the product — one vocabulary,
+// two runtimes (motion.ts).
+
+/** The motion a swapped-in texture arrives on. */
+export const ART_FADE: MotionName = 'reveal'
+
+/** Fades a node from nothing to itself over `ART_FADE`. Node-safe: with no rAF (a test, a
+ *  worker) the art simply arrives, which is the old behaviour and never a hole. */
+export function fadeArtIn(node: { alpha: number; destroyed: boolean }): void {
+  if (typeof requestAnimationFrame !== 'function') return
+  const started = performance.now()
+  node.alpha = 0
+  const step = (): void => {
+    if (node.destroyed) return
+    const t = progress(ART_FADE, started, performance.now())
+    node.alpha = t
+    if (t < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
 }

@@ -153,11 +153,18 @@ export function durationsIn(css: string): Array<{ selector: string; value: strin
 
 const TOKEN_NAMES = new Set(Object.values(CSS_DURATION_TOKEN))
 
+/** ZERO IS NOT A MOTION, it is the absence of one, so it cannot come from a table of motions.
+ *  The one legitimate use is finish line 6: a hover arrives over `--t-fast` and leaves the
+ *  instant the pointer does, because a hover that fades OUT goes on claiming the pointer is
+ *  somewhere it already left. Stated here rather than quietly skipped by the regex. */
+const ZERO = /^0m?s$/
+
 /** A duration written as a number rather than as a name from this table. The report is the
  *  selector, so a regression says where it lives. */
 export function untokenisedDurations(css: string): string[] {
   return durationsIn(css)
     .filter((d) => {
+      if (ZERO.test(d.value)) return false
       const v = /var\((--[\w-]+)\)/.exec(d.value)?.[1]
       return v === undefined || !TOKEN_NAMES.has(v)
     })

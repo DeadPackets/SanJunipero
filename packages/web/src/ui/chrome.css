@@ -1445,3 +1445,64 @@ body {
   border: 10px solid transparent; border-image: var(--px-night);
   padding: 0.5rem 0.7rem; margin: 0 0 0.8rem;
 }
+
+/* ══ THE FINISH PASS (U23, task 92) ════════════════════════════════════════════════════════
+   Twelve lines, each with a test in `finish.test.ts`. NINE of the twelve failed on the landed
+   sheet; that number is the honest size of "the last five percent". Everything here is the
+   fix for a named line, and nothing here is decoration. */
+
+/* 2 · a ticking number never shifts the box it sits in */
+.tick-badge { font-variant-numeric: tabular-nums; }
+
+/* 3 · a state arriving does not move the row it arrives in. The three roster cells that fill
+   in from live data reserve their width, so a founder who starts walking does not shove the
+   place-name column sideways on the tick they set off. */
+.rr-state { min-width: 6.5rem; }
+.rr-mood { min-width: 1.75rem; }
+.rr-place { min-width: 9rem; }
+
+/* 4 · a focus ring inside a clipping box is drawn INSIDE it. An outline offset outward at the
+   edge of an `overflow: hidden` box is painted into the overflow and simply lost, so a
+   keyboard viewer tabs into something they cannot see. */
+.stage-cell :focus-visible,
+.hud-menu :focus-visible,
+.strip-list :focus-visible,
+.digest-modal :focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
+
+/* 5 · press has weight — every control moves and drops a shadow step, not just the camera's */
+.tab:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.legend-chip:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+.hud-slot:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
+
+/* 6 · hover arrives in 150ms and leaves the instant the pointer does. A hover that FADES OUT
+   goes on claiming the pointer is somewhere it already left, which is the single most common
+   way a UI feels laggy while every frame is on time. */
+.tab, .ctl-btn, .feed-tab, .live-pill, .legend-chip, .hud-slot, .roster-back, .interior-back {
+  transition-duration: var(--t-fast);
+}
+.tab:hover, .ctl-btn:hover, .feed-tab:hover, .live-pill:hover, .legend-chip:hover,
+.hud-slot:hover, .roster-back:hover, .interior-back:hover { transition-duration: 0s; }
+
+/* 7 · a loading surface has a SHAPE, not a spinner. A slab at the real row height tells the
+   viewer what is coming and stops the panel jumping when it lands. */
+.skeleton-row {
+  height: 40px; margin: 0.25rem 0;
+  background: linear-gradient(90deg, var(--sand) 0 60%, var(--parchment) 60% 100%);
+  box-shadow: inset 0 0 0 2px var(--parchment);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-row { animation: skeleton-breathe var(--t-ambient) ease-in-out infinite alternate; }
+  @keyframes skeleton-breathe { from { opacity: 0.75; } to { opacity: 1; } }
+}
+
+/* 11 · text never widows. A title that leaves one word alone on its second line reads as a
+   mistake; a paragraph that does it reads as sloppy. */
+.px-title, .veil-title, .thumb-title, .tab-body article h4 { text-wrap: balance; }
+.room-who, .veil-sub { text-wrap: pretty; }
+
+/* 12 · the scrollbars are the town's, and they are ALWAYS THERE on a scrollable region — an
+   overlay bar that only appears on hover hides the fact that there is more to read. */
+#panel-outlet, .hud-menu, .strip-list, .digest-modal {
+  scrollbar-color: var(--ink) var(--sand);
+  scrollbar-width: thin;
+}

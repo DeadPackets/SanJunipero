@@ -114,3 +114,14 @@ describe('the stylesheet speaks the same vocabulary', () => {
     expect(untokenisedDurations(CSS)).toEqual([])
   })
 })
+
+describe('zero is the absence of a motion, and the scan says so out loud', () => {
+  it('accepts 0s, which is finish line 6\'s instant hover-out', () => {
+    expect(untokenisedDurations('.x:hover { transition-duration: 0s; }')).toEqual([])
+  })
+
+  it('still catches every other raw number', () => {
+    expect(untokenisedDurations('.x { transition-duration: 200ms; }')).toEqual(['.x — 200ms'])
+    expect(untokenisedDurations('.y { animation: a 1.4s linear; }')).toEqual(['.y — 1.4s'])
+  })
+})

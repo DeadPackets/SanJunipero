@@ -132,7 +132,17 @@ export function RosterPanel(
     return () => { alive = false; clearInterval(timer) }
   }, [])
 
-  if (state === null) return null // boot is the veil's moment, not the roster's
+  // A LOADING SURFACE HAS A SHAPE (finish line 7). The veil covers the stage, not the aside,
+  // so this used to be 23rem of blank parchment: five slabs at the real row height say what
+  // is coming and stop the panel jumping when it lands.
+  if (state === null) {
+    return (
+      <div className="roster-panel" aria-busy="true">
+        <h2 className="px-title">Townsfolk</h2>
+        {[0, 1, 2, 3, 4].map((i) => <div key={i} className="skeleton-row" />)}
+      </div>
+    )
+  }
 
   const rows = sortRoster(
     rosterRows2(state, store.assetRecords(), bonds, tick, store.recentEvents()),
