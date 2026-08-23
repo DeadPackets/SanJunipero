@@ -44,7 +44,7 @@ import { watchBirths, type AgentBornPayload } from '../src/family/watchBirths.js
 import { captureSocialName, migrateFamilyTables, promptBirthLine } from '../src/family/socialName.js'
 import { G9ReportSchema, checkG9Report, median, type G9Report } from '../src/live/g9report.js'
 import {
-  HEARTH, HUTS, STOREHOUSE, hutDoor, makeTerrain, townGenesisEvents, type Box,
+  HEARTH, HOUSES, STOREHOUSE, houseDoor, makeTerrain, townGenesisEvents, type Box,
 } from '../src/live/g9world.js'
 import type { DiscoveryCredit } from '@sj/shared'
 
@@ -75,7 +75,7 @@ type Mind = {
   personality: PersonalityDoc
   sex: 'f' | 'm'
   ageDays: number
-  hut: Box
+  house: Box
   x: number
   y: number
 }
@@ -89,7 +89,7 @@ function voice(
 
 const MINDS: Mind[] = [
   {
-    id: 'ada', sex: 'f', ageDays: 30 * 364, hut: HUTS[1]!, ...hutDoor(HUTS[1]!),
+    id: 'ada', sex: 'f', ageDays: 30 * 364, house: HOUSES[1]!, ...houseDoor(HOUSES[1]!),
     identity: {
       name: 'Ada', age: 30,
       backstory: 'Grew up in this valley, learned bread from her mother, and has kept the same hut since the year the river rose. Heavy with child now, and near her time.',
@@ -112,7 +112,7 @@ const MINDS: Mind[] = [
     },
   },
   {
-    id: 'bex', sex: 'm', ageDays: 32 * 364, hut: HUTS[0]!, ...hutDoor(HUTS[0]!),
+    id: 'bex', sex: 'm', ageDays: 32 * 364, house: HOUSES[0]!, ...houseDoor(HOUSES[0]!),
     identity: {
       name: 'Bex', age: 32,
       backstory: 'A joiner. Splits planks better than anyone here and knows it. Ada\'s man since two winters, and he keeps his mark on what he makes.',
@@ -135,7 +135,7 @@ const MINDS: Mind[] = [
     },
   },
   {
-    id: 'cass', sex: 'f', ageDays: 41 * 364, hut: HUTS[2]!, ...hutDoor(HUTS[2]!),
+    id: 'cass', sex: 'f', ageDays: 41 * 364, house: HOUSES[2]!, ...houseDoor(HOUSES[2]!),
     identity: {
       name: 'Cass', age: 41,
       backstory: 'Came down the valley eight summers ago with nothing and has eaten well ever since. Notices who owns what, and remembers it.',
@@ -158,7 +158,7 @@ const MINDS: Mind[] = [
     },
   },
   {
-    id: 'dov', sex: 'm', ageDays: 36 * 364, hut: HUTS[3]!, ...hutDoor(HUTS[3]!),
+    id: 'dov', sex: 'm', ageDays: 36 * 364, house: HOUSES[3]!, ...houseDoor(HOUSES[3]!),
     identity: {
       name: 'Dov', age: 36,
       backstory: 'Keeps the stove. Spends his evenings putting things into the fire to see what comes out, which the others find either useful or tiresome.',
@@ -184,7 +184,7 @@ const MINDS: Mind[] = [
     },
   },
   {
-    id: 'esen', sex: 'f', ageDays: 27 * 364, hut: HUTS[4]!, ...hutDoor(HUTS[4]!),
+    id: 'esen', sex: 'f', ageDays: 27 * 364, house: HOUSES[4]!, ...houseDoor(HOUSES[4]!),
     identity: {
       name: 'Esen', age: 27,
       backstory: 'Fishes the river and hates waste. Has taken to hanging fish over the stove smoke and has started calling it smoking, though nobody taught her the word.',
@@ -288,7 +288,7 @@ async function main(): Promise<void> {
     unbornMinds: 1,
     minds: MINDS.map((m) => ({
       id: m.id, name: m.identity.name, sex: m.sex, ageDays: m.ageDays, x: m.x, y: m.y,
-      hutIndex: HUTS.findIndex((h) => h.id === m.hut.id),
+      houseIndex: HOUSES.findIndex((h) => h.id === m.house.id),
     })),
   })) emit(e.type, e.payload)
 
@@ -377,11 +377,15 @@ async function main(): Promise<void> {
   for (const runtime of runtimes.values()) wireArbiter(runtime, watchedArbiter)
 
   // --- A birth builds a mind (user ruling 2026-08-16: hybrid naming). ---
-  let child: {
+  type BornChild = {
     id: string; registryName: string; socialName: string | null; bornTick: number
     personaNamesBothParents: boolean; seedEntries: number; seedAllPublic: boolean
     motherBirthMemoryTick: number | null
-  } | null = null
+  }
+  // A box, not a bare `let`: the only assignment is inside an async callback, so control-flow
+  // analysis narrows a plain binding to `null` at every read below and every field on it comes
+  // out `never`. Eleven errors that only became visible when `scripts/` started being checked.
+  const childBox: { value: BornChild | null } = { value: null }
   const namingLlm = new LlmClient({ db, caller: 'naming', agentId: MOTHER.id, budgetUsd: CAP_USD })
 
   const onBorn = (born: AgentBornPayload): void => {
@@ -392,7 +396,7 @@ async function main(): Promise<void> {
       const derived = derivePersona({ id: born.id, name: born.name, sex: born.sex }, parents)
       const seed = buildHouseholdSeed(store, {
         childId: born.id, motherId: born.motherId, fatherId: born.fatherId,
-        homeStructureId: MOTHER.hut.id, upToTick: bornTick,
+        homeStructureId: MOTHER.house.id, upToTick: bornTick,
       })
       boot({ id: born.id, identity: derived.identity, personality: derived.personality })
       const childMem = memories.get(born.id)!
@@ -414,7 +418,7 @@ async function main(): Promise<void> {
         born, motherPersona: personaOf.get(born.motherId) ?? null, tick: bornTick,
       })
       const backstory = derived.identity.backstory
-      child = {
+      childBox.value = {
         id: born.id,
         registryName: born.name,
         socialName,
@@ -570,11 +574,12 @@ async function main(): Promise<void> {
     ).map((r) => [r.caller, r.total]),
   )
 
+  const child = childBox.value
   const childTurns = child === null ? 0 : (runtimes.get(child.id)?.stats().turns ?? 0)
-  const childThought = child === null ? null : thoughts.find((t) => t.agentId === child!.id)?.text ?? null
+  const childThought = child === null ? null : thoughts.find((t) => t.agentId === child.id)?.text ?? null
   const motherTurnTickAfterBirth = child === null
     ? null
-    : thoughts.find((t) => t.agentId === MOTHER.id && t.tick > child!.bornTick)?.tick ?? null
+    : thoughts.find((t) => t.agentId === MOTHER.id && t.tick > child.bornTick)?.tick ?? null
 
   const report: G9Report = {
     generatedAt: new Date().toISOString(),

@@ -18,7 +18,7 @@ import {
   type LawQueue, type TickHandler, type TileId, type WorldState,
 } from '@sj/engine'
 import {
-  chronicleLine, DEFAULT_CONFIG, DISCOVERY_EVENT, MINUTES_PER_DAY, stateHash,
+  chronicleLine, DEFAULT_CONFIG, DISCOVERY_EVENT, MINUTES_PER_DAY, stateHash, WORLD_MARGIN,
   type SimConfig, type SimEvent,
 } from '@sj/shared'
 // Cross-package by relative path on purpose: @sj/arbiter and @sj/narrator both depend on
@@ -986,11 +986,14 @@ async function main(): Promise<void> {
   // --- the measurements (batch-3 r5, batch-4 r5), taken on a GROWN map ---
   const grown = (() => {
     const w = finalState.terrain[0]!.length
-    const strip = Array.from({ length: config.mapGrowth.step }, () =>
+    // WORLD_MARGIN, not `mapGrowth.step`: the ceiling and the pace it was guessed against were
+    // deleted when growth became a clearance, and this line kept compiling only because
+    // `packages/agents/scripts` was never typechecked. One block pitch is the derived unit.
+    const strip = Array.from({ length: WORLD_MARGIN }, () =>
       Array.from({ length: w }, (): TileId => 0))
     return fold(finalState, {
       seq: -1, tick: finalState.tick, type: 'world_grown',
-      payload: { edge: 'n', depth: config.mapGrowth.step, tiles: strip },
+      payload: { edge: 'n', depth: WORLD_MARGIN, tiles: strip },
     }, config)
   })()
   const snapshotBytes = JSON.stringify(grown).length
