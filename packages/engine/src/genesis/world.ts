@@ -1,5 +1,5 @@
 import {
-  CITY_ANCHOR_DEFAULT, FOUNDER_IDS, LEGACY_HOME_KIND, makeCityTemplate,
+  CITY_ANCHOR_DEFAULT, FOUNDER_IDS, makeCityTemplate,
   type CityStructure, type SimConfig,
 } from '@sj/shared'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
@@ -42,8 +42,9 @@ const GENESIS_STRUCTURE_DEFS: Readonly<Record<string, Durability>> = {
   shed: { maxHp: 20, flammable: true },
   wagon: { maxHp: 15, flammable: true },
   fire_pit: { maxHp: 10, flammable: false },
-  // The three dwellings the template places and nobody builds (CITY_DWELLING_KINDS). More
-  // roof than the legacy home's 50, in proportion to the ground each stands on; all burn.
+  // The three dwellings the template places and nobody builds. `house` is absent on purpose:
+  // it is buildable, so `genesisDurability` reads its 50 hp from `structures.recipes` instead.
+  // More roof than a house, in proportion to the ground each stands on; all burn.
   cabin: { maxHp: 50, flammable: true },
   cottage: { maxHp: 60, flammable: true },
   farmhouse: { maxHp: 80, flammable: true },
@@ -148,7 +149,7 @@ export function makeGenesisWorld(config: SimConfig, opts: { anchor?: { x: number
   // The kind is READ from the template, never retyped here (C8 global constraint C14).
   const houseIdByOwner = new Map<string, string>()
   template.structures.forEach((s, i) => {
-    if (s.kind === LEGACY_HOME_KIND && s.owner !== null) houseIdByOwner.set(s.owner, structureIdByIndex[i]!)
+    if (s.kind === 'house' && s.owner !== null) houseIdByOwner.set(s.owner, structureIdByIndex[i]!)
   })
   const storehouseIndex = template.structures.findIndex((s) => s.kind === 'storehouse')
   if (storehouseIndex < 0) throw new Error('genesis: the city template has no storehouse to stock')

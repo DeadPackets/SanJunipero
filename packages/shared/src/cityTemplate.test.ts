@@ -9,8 +9,7 @@ import {
   CITY_FURNISHING_KINDS, CITY_BED_KIND, CITY_HEARTH_KIND,
   makeCityTemplate, templateFits, growthPlots, T_GRASS,
   DWELLINGS, WELL_AT, FIRE_PIT_AT, danglingRoadEnds, frontages,
-  CITY_DWELLING_KINDS, CITY_HOUSE_KINDS, DWELLING_FOOTPRINTS, LEGACY_HOME_KIND,
-  isDwellingKind, isHouseKind,
+  CITY_DWELLING_KINDS, DWELLING_FOOTPRINTS, isDwellingKind,
   touchingStructures, structureComponents, plazaArrivals, dwellingRanks, longestKindRun,
   dwellingGaps,
 } from './cityTemplate.js'
@@ -211,27 +210,30 @@ describe('city roads', () => {
   })
 })
 
-describe('the three dwelling kinds', () => {
+describe('the four dwelling kinds', () => {
   it('names exactly the contracted list, in order', () => {
-    expect([...CITY_DWELLING_KINDS]).toEqual(['cottage', 'farmhouse', 'cabin'])
+    expect([...CITY_DWELLING_KINDS]).toEqual(['cottage', 'farmhouse', 'cabin', 'house'])
   })
 
-  // `house` is retired as a NAME and still load-bearing as an ID: it is the only kind
-  // `enterableKinds` admits, and that list is inside the pinned config hash.
-  it('keeps the legacy home id out of the contract and inside the house set', () => {
-    expect((CITY_DWELLING_KINDS as readonly string[])).not.toContain(LEGACY_HOME_KIND)
-    expect(isDwellingKind(LEGACY_HOME_KIND)).toBe(false)
-    expect(isHouseKind(LEGACY_HOME_KIND)).toBe(true)
-    expect([...CITY_HOUSE_KINDS].sort()).toEqual(['cabin', 'cottage', 'farmhouse', 'house'])
+  // The `hut` id is gone and with it the scaffold that kept the founders' home outside this
+  // list: `house` is a first-class dwelling kind, and one list answers for all four.
+  it('holds the founders home kind as a first-class member', () => {
+    expect((CITY_DWELLING_KINDS as readonly string[])).toContain('house')
+    expect(isDwellingKind('house')).toBe(true)
+    expect((CITY_DWELLING_KINDS as readonly string[])).not.toContain('hut')
+    expect(isDwellingKind('hut')).toBe(false)
   })
 
-  it('gives each one a footprint, and no two the same mass', () => {
+  // `house` and `cabin` deliberately share the smallest mass — the street's variety comes from
+  // never standing two of a KIND together, which PROPERTY 3 measures.
+  it('gives each one a footprint, and at least three distinct masses', () => {
     const areas = CITY_DWELLING_KINDS.map((k) => {
       const f = DWELLING_FOOTPRINTS[k]
       expect(f, k).toBeDefined()
       return f.w * f.h
     })
-    expect(new Set(areas).size, 'two dwellings share a mass').toBe(areas.length)
+    expect(areas.sort((a, b) => a - b)).toEqual([4, 4, 6, 8])
+    expect(new Set(areas).size, 'the town has fewer than three house masses').toBe(3)
     for (const k of CITY_DWELLING_KINDS) {
       expect(DWELLING_FOOTPRINTS[k].w).toBeLessThanOrEqual(4)
       expect(DWELLING_FOOTPRINTS[k].h).toBeLessThanOrEqual(4)
@@ -241,7 +243,6 @@ describe('the three dwelling kinds', () => {
   it('is the one place that answers "is this a dwelling"', () => {
     expect(isDwellingKind('cottage')).toBe(true)
     expect(isDwellingKind('storehouse')).toBe(false)
-    expect(isHouseKind('storehouse')).toBe(false)
   })
 
   it('stands every dwelling it places on its contracted footprint', () => {
@@ -541,9 +542,9 @@ describe('PROPERTY 2 — roads connect the places people go', () => {
 
 describe('PROPERTY 3 — variety of mass', () => {
   const t = makeCityTemplate()
-  const houses = t.structures.filter(s => isHouseKind(s.kind))
+  const houses = t.structures.filter(s => isDwellingKind(s.kind))
 
-  it('stands all three contracted kinds, not one building repeated', () => {
+  it('stands all four contracted kinds, not one building repeated', () => {
     expect(new Set(t.structures.filter(s => isDwellingKind(s.kind)).map(s => s.kind)))
       .toEqual(new Set(CITY_DWELLING_KINDS))
   })

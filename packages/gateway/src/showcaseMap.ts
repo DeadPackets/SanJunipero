@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import {
-  CITY_HOUSE_KINDS, CITY_H, CITY_W, PLAZA, PLAZA_CENTRE, T_PATH, T_ROAD, doorTile,
+  CITY_DWELLING_KINDS, CITY_H, CITY_W, PLAZA, PLAZA_CENTRE, T_PATH, T_ROAD, doorTile,
   makeCityTemplate, structureTiles, type CityStructure,
 } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
@@ -35,7 +35,7 @@ export const PLAZA_TILE = {
 // The city template's kinds, not a smaller invented set — dropping the well, the fire pit or
 // the wagon would make the showcase a different town from the one genesis builds.
 export const ShowcaseStructureSchema = z.object({
-  kind: z.enum([...CITY_HOUSE_KINDS, 'storehouse', 'shed', 'well', 'fire_pit', 'wagon']),
+  kind: z.enum([...CITY_DWELLING_KINDS, 'storehouse', 'shed', 'well', 'fire_pit', 'wagon']),
   x: z.number().int().min(0), y: z.number().int().min(0),
   w: z.number().int().min(1).max(4), h: z.number().int().min(1).max(4),
 }).strict()

@@ -141,39 +141,25 @@ export const isRoadTile = (t: CityTile): boolean => t.to === T_ROAD || t.to === 
 
 // ---------------------------------------------------------------- structures
 
-// ★ THE THREE DWELLING KINDS — a shared contract with the art lane, for the CONTEMPORARY
+// ★ THE FOUR DWELLING KINDS — a shared contract with the art lane, for the CONTEMPORARY
 // RURAL setting. These are FIXTURES this template places, never new buildable verbs:
-// `structures.recipes` is the buildable set and it is C8's business, not this file's.
-export const CITY_DWELLING_KINDS = ['cottage', 'farmhouse', 'cabin'] as const
+// `structures.recipes` is the buildable set and it is C8's business, not this file's. `house`
+// is the exception that proves it — the founders' homes are also the one buildable dwelling.
+export const CITY_DWELLING_KINDS = ['cottage', 'farmhouse', 'cabin', 'house'] as const
 export type DwellingKind = (typeof CITY_DWELLING_KINDS)[number]
 export const isDwellingKind = (kind: string): kind is DwellingKind =>
   (CITY_DWELLING_KINDS as readonly string[]).includes(kind)
 
-// ★ `house` IS RETIRED AS A NAME AND STILL LOAD-BEARING AS AN ID.
-//
-// The five founders' homes are the only buildings a person can walk into and sleep in, and
-// the kinds that may be entered and slept in are `structures.enterableKinds` and
-// `sleepableKinds` — inside SimConfigSchema, whose `stateHash(DEFAULT_CONFIG)` is a PINNED
-// gate (packages/forge/src/forgeConfig.test.ts:79). Naming a founder's house `cottage` would
-// move that pin, so the homes keep the id until the cross-lane rename commit retires it
-// everywhere at once. What the template CAN do — and does below — is stop the town being
-// eight copies of that one building.
-export const LEGACY_HOME_KIND = 'house'
-
-/** Every kind that reads as somebody's house: the three contracted dwellings and the legacy
- *  home id the founders still live under. The layout properties are measured over these. */
-export const CITY_HOUSE_KINDS = [...CITY_DWELLING_KINDS, LEGACY_HOME_KIND] as const
-export const isHouseKind = (kind: string): boolean =>
-  (CITY_HOUSE_KINDS as readonly string[]).includes(kind)
-
-// Three masses, not three palettes. In isometric a change of DEPTH is nearly invisible and a
-// change of WIDTH along the street is not, so the kinds differ where the eye can see it:
-// four, six and eight ground tiles.
+// Mass, not palette. In isometric a change of DEPTH is nearly invisible and a change of WIDTH
+// along the street is not, so the kinds differ where the eye can see it: four, four, six and
+// eight ground tiles. Two kinds share the smallest mass; what the street never does is stand
+// two of the SAME kind side by side, which is the property the layout tests measure.
 export const DWELLING_FOOTPRINTS: Readonly<Record<DwellingKind, { w: number; h: number }>> = {
   cabin: { w: 2, h: 2 }, cottage: { w: 3, h: 2 }, farmhouse: { w: 4, h: 2 },
+  // 2×2 is the footprint every landed gate measured a founder's home at, and `houseSize` in
+  // SimConfigSchema still says so; this row and that dial must not drift apart.
+  house: { w: 2, h: 2 },
 }
-/** The legacy home keeps the 2×2 footprint every landed gate measured it at. */
-export const LEGACY_HOME_FOOTPRINT = { w: 2, h: 2 } as const
 
 // Assumption A-2: the five locked founders (design spec §10). Template data, not engine truth
 // — genesis binds them, and different id strings are one data edit with no code change.
@@ -231,18 +217,18 @@ const STOREHOUSE_FURNISHINGS: CityFurnishing[] = [
 // A door is the south-centre tile of a footprint, so a rank's door row is its bottom row.
 // The yard street's rank opens onto dy 6, the back lane's rank onto dy 9, and the two door
 // sets are disjoint so no door looks straight down another.
-export const DWELLINGS: readonly { kind: string; dx: number; dy: number; owner: string | null }[] = [
+export const DWELLINGS: readonly { kind: DwellingKind; dx: number; dy: number; owner: string | null }[] = [
   // The yard street, west to east.
-  { kind: LEGACY_HOME_KIND, dx: 14, dy: 4, owner: 'amara' },
+  { kind: 'house', dx: 14, dy: 4, owner: 'amara' },
   { kind: 'cottage', dx: 19, dy: 4, owner: null },
-  { kind: LEGACY_HOME_KIND, dx: 26, dy: 4, owner: 'yusuf' },
+  { kind: 'house', dx: 26, dy: 4, owner: 'yusuf' },
   // The back lane behind them.
-  { kind: LEGACY_HOME_KIND, dx: 16, dy: 7, owner: 'nadia' },
+  { kind: 'house', dx: 16, dy: 7, owner: 'nadia' },
   { kind: 'cabin', dx: 21, dy: 7, owner: null },
-  { kind: LEGACY_HOME_KIND, dx: 25, dy: 7, owner: 'omar' },
+  { kind: 'house', dx: 25, dy: 7, owner: 'omar' },
   // The landing, on the river path — a house where the town meets its water. Its nearest
   // neighbour is inside its line of sight, so nobody wakes up alone.
-  { kind: LEGACY_HOME_KIND, dx: 5, dy: 11, owner: 'salma' },
+  { kind: 'house', dx: 5, dy: 11, owner: 'salma' },
   // The farmhouse stands at its own field, north of the headland it fronts. It is the largest
   // roof in the parish and the only building out here, which is what a farm looks like.
   { kind: 'farmhouse', dx: 24, dy: 18, owner: null },
@@ -251,24 +237,25 @@ export const DWELLINGS: readonly { kind: string; dx: number; dy: number; owner: 
 // Eleven structures, the count C13 pinned. The STANDING STONE is deliberately absent: it
 // stands beyond the edge of town, unexplained (C11 §9).
 //
-// Eleven is a hard budget and every slot is spoken for: five founders' homes, the three
-// contracted dwellings, the storehouse genesis stocks, and the two monuments in the square.
+// Eleven is a hard budget and every slot is spoken for: five founders' houses, the three
+// other dwellings, the storehouse genesis stocks, and the two monuments in the square.
 // What that budget bought the layout, it paid for by dropping the two 1×1 sheds and the river
 // wagon — a matched pair of identical boxes and a parked cart, in exchange for a cottage, a
 // cabin and a farmhouse. (Deviation from C13's open question 2, which kept the wagon;
 // reversible the moment the count may be twelve.)
 //
 // ONLY A HOUSE IS A HOME. `structures.enterableKinds` and `sleepableKinds` name `house` and
-// nothing else, and that list lives in `SimConfigSchema` — whose hash is a pinned gate. So the
-// five founders keep five houses, one each, and the hall and the cottage stand as fixtures the
-// eye reads and nobody walks into, exactly as the wagon and the well already do.
+// nothing else, so the five founders keep five houses, one each, and the cottage, cabin and
+// farmhouse stand as fixtures the eye reads and nobody walks into, exactly as the wagon and
+// the well already do. Widening that list is a config decision with a pinned hash behind it,
+// not a layout one.
 export function cityStructures(): CityStructure[] {
   return [
     ...DWELLINGS.map(({ kind, dx, dy, owner }) => {
-      const f = isDwellingKind(kind) ? DWELLING_FOOTPRINTS[kind] : LEGACY_HOME_FOOTPRINT
+      const f = DWELLING_FOOTPRINTS[kind]
       return {
         kind, dx, dy, w: f.w, h: f.h, owner,
-        furnishings: kind === LEGACY_HOME_KIND ? [...HOUSE_FURNISHINGS] : [],
+        furnishings: kind === 'house' ? [...HOUSE_FURNISHINGS] : [],
       }
     }),
     // The storehouse fronts the main street where it arrives at the square, so the first
@@ -444,7 +431,7 @@ export function dwellingRanks(t: CityTemplate): StreetRank[] {
   const byStreet = new Map<string, StreetRank['dwellings']>()
   const onto0 = frontages(t)
   t.structures.forEach((s, i) => {
-    if (!isHouseKind(s.kind)) return
+    if (!isDwellingKind(s.kind)) return
     const onto = onto0[i]!.onto
     if (onto === null) return
     const horizontal = roads.has(key(onto.dx - 1, onto.dy)) || roads.has(key(onto.dx + 1, onto.dy))
