@@ -1,4 +1,4 @@
-// ★ THE COVERAGE LAW: A KIND THAT STANDS IN THE TOWN HAS A CELL.
+// ★ THE COVERAGE LAW: EVERY KIND THE WORLD CAN CREATE HAS A CELL.
 //
 // No test asserted this, and that is why a farmhouse stood with no art for a whole merge
 // train while CI stayed green, and why `ingestArt` could register the founders' home under
@@ -8,9 +8,16 @@
 // codex, and never on the screen: `builtForm` always answers, so a gate that asks the
 // renderer whether something drew has measured nothing.
 //
+// ★ AND THE FIRST VERSION OF THIS LAW HAD A BLIND SPOT, WHICH IS WHY IT IS NOW WORDED THAT WAY.
+// It asked only about `makeCityTemplate()`. Four kinds — wagon, shed, scaffolding and standing
+// stone — are stood by the gateway's `TOWN_STRUCTURES` dev town, `bridge` is raised by an agent
+// at runtime through the `build` verb, and `grave` is placed by the world when somebody dies.
+// None of the six is in the template, so the gate never looked at any of them, stayed green,
+// and every one of them drew a grey prism. The template is one SOURCE of kinds, not the set.
+//
 // Two directions, because task 1's defect had both:
-//   MISSING   a kind the template places, in a facing it can be placed in, with no cell.
-//   ORPHAN    a registered cell whose kind nothing places. `hut` was one for a whole train.
+//   MISSING   a kind the world can create, in a facing it can stand in, with no cell.
+//   ORPHAN    a registered cell whose kind nothing can ever create. `hut` was one for a train.
 import {
   CITY_DWELLING_KINDS, isDwellingKind, type CityStructure,
 } from '@sj/shared'
@@ -22,25 +29,79 @@ import type { RawImage } from './post/raw.js'
  *  non-dwelling structure the user asked to be turned, so it carries the same two facings. */
 export const STOREHOUSE_KIND = 'storehouse'
 
-/** ★ THE CLOSED EXEMPTION. These two kinds are MEANT to draw `builtForm`: `builtForm.ts` says
- *  so in as many words — the well and the fire pit have no art in any root until the structure
- *  set is commissioned, and a prism in the plaza is the deliberate stand-in, not a hole.
+/** ★ THE EXEMPTION IS GONE, AND THAT IS THE FIX.
  *
- *  It is closed on purpose. `exemptionIsClosed` asserts that nothing which must carry art can
- *  ever be listed here, so the way to make this gate green is to draw the missing cell, never
- *  to add a name to this line. */
-export const BUILT_FORM_ONLY: readonly string[] = ['well', 'fire_pit']
+ *  `BUILT_FORM_ONLY = ['well', 'fire_pit']` stood here, and `exemptionIsClosed()` was supposed
+ *  to keep it honest. It did not: it only refused to waive a kind on `TWO_FACING_KINDS`, so it
+ *  was satisfiable with the property broken — guard family #12 — and the well and the fire pit
+ *  sat on that line, exempted, for a whole merge train, until a human looked at the running
+ *  product and found two bare grey prisms in the middle of the town square.
+ *
+ *  There is now no lever. Every kind the world can create carries art; the only way to make
+ *  this gate green is to draw the cell. */
 
-/** USER RULING: two facings, SW and SE. Every dwelling turns, and so does the storehouse. */
-export const TWO_FACING_KINDS: readonly string[] = [...CITY_DWELLING_KINDS, STOREHOUSE_KIND]
+/** USER RULING: two facings, SW and SE, for everything that can stand in both. Dwellings and
+ *  the storehouse turn; so do the shed (it has a door) and the wagon (wheels and a tailgate
+ *  along a 1×2 long axis). */
+export const TWO_FACING_KINDS: readonly string[] =
+  [...CITY_DWELLING_KINDS, STOREHOUSE_KIND, 'shed', 'wagon']
 
-/** Every kind that must carry art, and never a kind that must not. */
-export function exemptionIsClosed(): string[] {
-  return BUILT_FORM_ONLY.filter((k) => TWO_FACING_KINDS.includes(k))
-    .map((k) => `${k} must carry art and cannot be exempted into builtForm`)
+/** The kinds that ship ONE cell, each with the reason it cannot turn. This is NOT an exemption
+ *  from art — every one of these ships a cell — it is an exemption from the SECOND cell, and
+ *  `facingPartitionIsTotal` refuses to let a kind fall outside both lists unnoticed. */
+export const ONE_CELL_KINDS: Readonly<Record<string, string>> = {
+  well: 'a circular stone ring: the same object from every angle',
+  fire_pit: 'a ring of stones round a fire: the same object from every angle',
+  standing_stone: 'a monolith — no front, no door, no ridge to reverse',
+  grave: 'a headstone and a mound; the stone faces the reader whichever way the world turns',
+  scaffolding: 'a cage of poles around nothing; its two visible faces are the same face',
+  bridge: 'a deck, not a building. It turns by SWAPPING ITS FOOTPRINT — `buildFootprint` tries '
+    + '1×2 and then 2×1 — and a footprint turn is not a facing, so a second cell here would be '
+    + 'the wrong shape rather than the right one turned.',
 }
 
-// ── what the template asks for ──────────────────────────────────────────────────────────────
+/** Every creatable kind belongs to exactly one of the two lists above. This is what the old
+ *  `exemptionIsClosed` should have been: it names what fell through instead of passing. */
+export function facingPartitionIsTotal(creatable: readonly string[]): string[] {
+  const out: string[] = []
+  for (const k of creatable) {
+    const two = TWO_FACING_KINDS.includes(k), one = k in ONE_CELL_KINDS
+    if (two && one) out.push(`${k} is on BOTH the two-facing list and the one-cell list`)
+    if (!two && !one) {
+      out.push(`${k} is on neither list — say whether it turns, and if it does not, say why`)
+    }
+  }
+  return out
+}
+
+// ── every kind the world can create ─────────────────────────────────────────────────────────
+
+/**
+ * The union of every source that can put a structure in the world. The gate's blind spot was
+ * that it knew only the first of these:
+ *
+ *  · `structures` — the city template, the town the world wakes with;
+ *  · `recipes` — `config.structures.recipes`. A row WITH materials is a kind an agent raises
+ *    through the `build` verb (house, well, bridge); a row with EMPTY inputs is a kind the
+ *    world places and nobody builds (the grave, laid when somebody dies). Both are kinds the
+ *    world creates, so the whole table counts, not the buildable half of it;
+ *  · `extra` — the dev world's own fixture town. `TOWN_STRUCTURES` lives in `@sj/gateway`,
+ *    which `@sj/forge` must not import, so the gateway passes its kinds in and asserts the
+ *    same law on its own side (`ingestArt.test.ts`).
+ */
+export function worldStructureKinds(a: {
+  structures: readonly (CityStructure | { kind: string })[]
+  recipes: Readonly<Record<string, unknown>>
+  extra?: readonly string[]
+}): string[] {
+  return [...new Set([
+    ...a.structures.map((s) => s.kind),
+    ...Object.keys(a.recipes),
+    ...(a.extra ?? []),
+  ])].sort()
+}
+
+// ── what the world asks for ─────────────────────────────────────────────────────────────────
 
 /** The template has no facing column today, so everything it places stands SW. When the
  *  template lane grows one, this reads it and the gate tightens with no edit here. */
@@ -62,14 +123,18 @@ export function placedFacings(
   return out
 }
 
-/** kind → every facing that kind must ship: the ones the town stands it in, plus both facings
- *  for the kinds the user's two-facing ruling covers. */
+/** kind → every facing that kind must ship: the ones the town stands it in, the default facing
+ *  for every other kind the world can create, plus both facings for the kinds the user's
+ *  two-facing ruling covers. */
 export function requiredFacings(
   structures: readonly (CityStructure | { kind: string })[],
+  creatable: readonly string[] = [],
 ): Map<string, Set<StructureFacing>> {
   const out = placedFacings(structures)
+  // A kind nothing stands TODAY can still be created tomorrow — an agent builds a bridge, the
+  // world lays a grave — and it stands the way everything stands until a facing column exists.
+  for (const kind of creatable) if (!out.has(kind)) out.set(kind, new Set([DEFAULT_FACING]))
   for (const [kind, set] of out) {
-    if (BUILT_FORM_ONLY.includes(kind)) { out.delete(kind); continue }
     if (TWO_FACING_KINDS.includes(kind)) for (const f of STRUCTURE_FACINGS) set.add(f)
   }
   return out
@@ -78,21 +143,23 @@ export function requiredFacings(
 // ── the measurement ─────────────────────────────────────────────────────────────────────────
 
 export type ArtCoverage = {
-  /** `farmhouse facing sw` — the town stands it and no cell answers */
+  /** `farmhouse facing sw` — the world can create it and no cell answers */
   missing: string[]
-  /** `hut` — a cell is registered and nothing places it */
+  /** `hut` — a cell is registered and nothing can ever create that kind */
   orphans: string[]
   /** every kind × facing that IS covered, for the report table */
   covered: string[]
 }
 
-/** `registered` is the codex `kind` column of every ready class-`building` record. */
+/** `registered` is the codex `kind` column of every ready class-`building` record.
+ *  `creatable` is `worldStructureKinds(...)` — pass it, or the gate is the blind one again. */
 export function structureArtCoverage(a: {
   structures: readonly (CityStructure | { kind: string })[]
   registered: readonly string[]
+  creatable?: readonly string[]
 }): ArtCoverage {
   const have = new Set(a.registered)
-  const required = requiredFacings(a.structures)
+  const required = requiredFacings(a.structures, a.creatable ?? [])
   const missing: string[] = [], covered: string[] = []
   for (const [kind, facings] of [...required].sort((x, y) => x[0].localeCompare(y[0]))) {
     for (const f of STRUCTURE_FACINGS) {
@@ -100,10 +167,10 @@ export function structureArtCoverage(a: {
       ;(have.has(facingKind(kind, f)) ? covered : missing).push(`${kind} facing ${f}`)
     }
   }
-  const placedKinds = new Set(a.structures.map((s) => s.kind))
+  const known = new Set([...a.structures.map((s) => s.kind), ...(a.creatable ?? [])])
   const orphans = [...have]
     .map((k) => ({ codexKind: k, ...splitFacingKind(k) }))
-    .filter((k) => !placedKinds.has(k.kind))
+    .filter((k) => !known.has(k.kind))
     .map((k) => k.codexKind)
     .sort()
   return { missing, orphans, covered }

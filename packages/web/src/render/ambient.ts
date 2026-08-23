@@ -3,6 +3,7 @@ import { CITY_HEARTH_KIND, cityStructures, simTimeFromTick } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { tileToScreen, TILE_H } from './iso.js'
+import { rectOnGround, type ScreenRect } from './ground.js'
 import type { Scene } from './scene.js'
 import type { WeatherLayer } from './weatherFx.js'
 import type { BubbleLayer } from './bubbles.js'
@@ -51,6 +52,87 @@ export const FIRE_FROZEN_ALPHA = 0.6
 const WATER: TileId = 2
 const FOREST: TileId = 3
 
+/** The two ground decorations, at the size they are painted. Named because the law below is a
+ *  statement about these rectangles and a test that measured different ones would measure
+ *  nothing. A canopy is anchored bottom-centre on its tile's CENTRE; a shimmer is anchored
+ *  top-left one pixel to the left of it. */
+export const CANOPY_PX = { w: 12, h: 20 } as const
+export const SHIMMER_PX = { w: 2, h: 2 } as const
+
+// ★ AND IT WAS A BARE RECTANGLE. `canopyTex` was `px(12, 20, 0x6f9455)` — one flat fill, no
+// silhouette, no trunk — so eighty untextured green slabs stood along the forest edge. Proved
+// by tinting this constant red in the running product and watching every slab turn red.
+//
+// The fix is code-painted rather than commissioned: this is scenery, not a structure kind, so
+// it is outside the codex the coverage gate measures, and `terrainTiles.paintScaffolding()`
+// already sets the precedent for a palette-true decoration drawn in code. It costs $0 and it
+// cannot go missing from a scratchpad, which is the defect the rest of this branch is about.
+// Same 12×20 box, so every number the ground law measures is unchanged.
+export const CANOPY_TRUNK = 0x7e512b
+export const CANOPY_BODY = 0x6f9455
+export const CANOPY_LIT = 0x93b573    // lit from the upper left, like everything else
+export const CANOPY_SHADE = 0x4f7040
+
+/** Half-width of the canopy per row, top to bottom: a round crown over a two-pixel trunk. */
+const CANOPY_ROWS: readonly number[] = [2, 3, 4, 5, 5, 6, 6, 6, 5, 5, 4, 3, 2]
+
+/** The tree, as flat blocks with hard edges — one row of the crown at a time. */
+export function canopyBlocks(): Array<{ x: number; y: number; w: number; h: number; color: number }> {
+  const out: Array<{ x: number; y: number; w: number; h: number; color: number }> = []
+  const mid = CANOPY_PX.w / 2
+  for (const [y, half] of CANOPY_ROWS.entries()) {
+    out.push({ x: mid - half, y, w: half * 2, h: 1, color: CANOPY_BODY })
+    if (y >= 1 && y <= 6) out.push({ x: mid - half, y, w: Math.min(3, half), h: 1, color: CANOPY_LIT })
+    if (y >= 7) out.push({ x: mid + half - Math.min(3, half), y, w: Math.min(3, half), h: 1, color: CANOPY_SHADE })
+  }
+  out.push({ x: mid - 1, y: CANOPY_ROWS.length, w: 2, h: CANOPY_PX.h - CANOPY_ROWS.length, color: CANOPY_TRUNK })
+  return out
+}
+
+export type Decoration = { kind: 'tree' | 'shimmer'; x: number; y: number; sx: number; sy: number }
+
+/** The screen rectangle a decoration paints — the same numbers `sampleTerrain` gives Pixi. */
+export function decorationQuad(d: Decoration): ScreenRect {
+  const size = d.kind === 'tree' ? CANOPY_PX : SHIMMER_PX
+  return d.kind === 'tree'
+    ? { x0: d.sx - size.w / 2, y0: d.sy - size.h, x1: d.sx + size.w / 2, y1: d.sy }
+    : { x0: d.sx, y0: d.sy, x1: d.sx + size.w, y1: d.sy + size.h }
+}
+
+/**
+ * ★ WHAT THE DECORATION LAYER PLACES — AND THE RULE THAT WAS MISSING.
+ *
+ * A canopy is 20 px tall and stands on its tile's CENTRE, so it reaches 12 px ABOVE that tile's
+ * top vertex — over the neighbour up-left. On row 0 and column 0 there is no neighbour up-left:
+ * there is the void past the edge of the drawn ground, and the canopy hangs over it. Measured
+ * on the genesis world, which is the one the product wakes into: **38 of the 140 quads this
+ * function used to place left the painted ground, by up to 0.9375 tiles = 15 world px.** On the
+ * showcase dev map none do, but the closest clears the edge by 0.0 px — which is why a human
+ * looking at the running product read the whole row as standing on nothing.
+ *
+ * Pure, and separated from the Pixi sprites on purpose: the law is measured on these
+ * rectangles, so the thing the test checks and the thing the renderer draws are one function.
+ */
+export function sampleDecorations(terrain: TileId[][]): Decoration[] {
+  const out: Decoration[] = []
+  const place = (kind: Decoration['kind'], x: number, y: number): boolean => {
+    const { sx, sy } = tileToScreen(x, y)
+    const d: Decoration = { kind, x, y, sx, sy: sy + TILE_H / 2 }
+    if (kind === 'shimmer') d.sx = sx - 1
+    if (!rectOnGround(terrain, decorationQuad(d))) return false
+    out.push(d)
+    return true
+  }
+  let trees = 0, shimmers = 0
+  for (let y = 0; y < terrain.length && shimmers < SHIMMER_MAX; y++)
+    for (let x = 0; x < terrain[y]!.length && shimmers < SHIMMER_MAX; x++)
+      if (terrain[y]![x] === WATER && place('shimmer', x, y)) shimmers++
+  for (let y = 0; y < terrain.length && trees < TREES_MAX; y++)
+    for (let x = 0; x < terrain[y]!.length && trees < TREES_MAX; x++)
+      if (terrain[y]![x] === FOREST && place('tree', x, y)) trees++
+  return out
+}
+
 export type AmbientDirector = { tick(dtMs: number): void; setTone(grave: boolean): void; destroy(): void }
 
 export function createAmbient(
@@ -76,14 +158,20 @@ export function createAmbient(
   puffG.fill(SMOKE_COLOR)
   const puffTex = scene.app.renderer.generateTexture(puffG)
   puffG.destroy()
-  const shimmerTex = px(2, 2, 0xffffff)
+  const shimmerTex = px(SHIMMER_PX.w, SHIMMER_PX.h, 0xffffff)
   const glowG = new Graphics()
   glowG.circle(GLOW_R, GLOW_R, GLOW_R)
   glowG.fill(GLOW_COLOR)
   const glowTex = scene.app.renderer.generateTexture(glowG)
   glowG.destroy()
   const birdTex = px(3, 2, 0x241f2b)
-  const canopyTex = px(12, 20, 0x6f9455)
+  const canopyG = new Graphics()
+  for (const b of canopyBlocks()) {
+    canopyG.rect(b.x, b.y, b.w, b.h)
+    canopyG.fill(b.color)
+  }
+  const canopyTex = scene.app.renderer.generateTexture(canopyG)
+  canopyG.destroy()
   const fireTex = px(10, 12, FIRE_COLOR)
 
   let t = 0 // director clock — freezes under grave tone, so every animator stills mid-frame
@@ -117,25 +205,16 @@ export function createAmbient(
     for (const s of trees) s.sprite.destroy()
     shimmers.length = 0
     trees.length = 0
-    for (let y = 0; y < terrain.length && shimmers.length < SHIMMER_MAX; y++)
-      for (let x = 0; x < terrain[y]!.length && shimmers.length < SHIMMER_MAX; x++)
-        if (terrain[y]![x] === WATER) {
-          const sprite = new Sprite(shimmerTex)
-          const { sx, sy } = tileToScreen(x, y)
-          sprite.position.set(sx - 1, sy + TILE_H / 2)
-          under.addChild(sprite)
-          shimmers.push({ sprite, phase: ((x * 7 + y * 13) % 628) / 100 }) // deterministic phase, no RNG
-        }
-    for (let y = 0; y < terrain.length && trees.length < TREES_MAX; y++)
-      for (let x = 0; x < terrain[y]!.length && trees.length < TREES_MAX; x++)
-        if (terrain[y]![x] === FOREST) {
-          const sprite = new Sprite(canopyTex)
-          sprite.anchor.set(0.5, 1)
-          const { sx, sy } = tileToScreen(x, y)
-          sprite.position.set(sx, sy + TILE_H / 2)
-          under.addChild(sprite)
-          trees.push({ sprite, phase: ((x * 7 + y * 13) % 628) / 100 })
-        }
+    // `sampleDecorations` is the whole placement decision, caps and ground law included, so
+    // there is nothing here for a test to be unable to see.
+    for (const d of sampleDecorations(terrain)) {
+      const sprite = new Sprite(d.kind === 'tree' ? canopyTex : shimmerTex)
+      if (d.kind === 'tree') sprite.anchor.set(0.5, 1)
+      sprite.position.set(d.sx, d.sy)
+      under.addChild(sprite)
+      const phase = ((d.x * 7 + d.y * 13) % 628) / 100 // deterministic phase, no RNG
+      ;(d.kind === 'tree' ? trees : shimmers).push({ sprite, phase })
+    }
   }
 
   // ── birds: a 3-sprite V gliding the sky band (viewer-side random — presentation only) ──
