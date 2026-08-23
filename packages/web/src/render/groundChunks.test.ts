@@ -314,6 +314,30 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
       .toBeLessThan(wholeMapTextureBytes(gridFor(10).fieldW, gridFor(10).fieldH))
   })
 
+  it('the chunk size is near the bottom of its own cost curve, not a round number', () => {
+    // A chunk grid pays twice: rounding — a view that straddles a boundary drags in a whole
+    // extra column and row — and DRAW CALLS, one per resident chunk, because each carries its
+    // own texture and nothing batches across them. Small chunks waste less and cost more calls.
+    // Measured over the widest stop at ten rings, which is the worst case for both.
+    const side = 2 * 10 * 19 + 19
+    const rows: string[] = []
+    for (const [w, h] of [[256, 128], [512, 256], [1024, 512], [2048, 1024]] as const) {
+      // one phase, not the swept peak above — this is a comparison BETWEEN sizes, and the
+      // phase penalty is the same shape for all four
+      const vw = STAGE.w / 0.25 + 2 * CULL_MARGIN_PX, vh = STAGE.h / 0.25 + 2 * CULL_MARGIN_PX
+      const cols = Math.floor(vw / w) + 1, rowsN = Math.floor(vh / h) + 1
+      const chunks = cols * rowsN
+      const bytes = chunks * (w + CHUNK_BLEED_PX) * (h + CHUNK_BLEED_PX) * CHUNK_BYTES_PER_PX
+      const waste = bytes / (vw * vh * CHUNK_BYTES_PER_PX) - 1
+      rows.push(`${`${w}x${h}`.padStart(9)}: ${String(chunks).padStart(4)} draw calls, `
+        + `${(bytes / MB).toFixed(1).padStart(6)} MB, ${(waste * 100).toFixed(1).padStart(5)}% over the view`)
+    }
+    // eslint-disable-next-line no-console
+    console.log(`CHUNK SIZE, ten rings (side ${side}) at the 0.25 stop\n  ${rows.join('\n  ')}`)
+    expect(CHUNK_PX_W / CHUNK_PX_H).toBe(TILE_W / TILE_H)   // one chunk is a square of tiles
+    expect(rows).toHaveLength(4)
+  })
+
   it('★ CLAIM 2 — the working set is a function of the VIEWPORT, and stops growing', () => {
     // Ten, twenty and forty rings. Past the point where the town exceeds the view at a stop,
     // the town's size stops appearing in the answer at all — which is the wall removed.
