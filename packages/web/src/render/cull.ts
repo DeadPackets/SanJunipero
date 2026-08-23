@@ -25,10 +25,20 @@ export type ViewRect = { x: number; y: number; w: number; h: number }
 
 export const CULL_MARGIN_PX = 2 * BUILDING_PX_PER_TILE
 
+/** Does a painted screen rectangle reach the view, with the margin's slack? The ground's chunk
+ *  residency asks exactly this question about a chunk and the depth sort asks it about a
+ *  drawable, so they ask it of ONE function — two things that decide what is on screen and
+ *  disagree by a pixel is a hole in the picture at the edge of the stage. */
+export function rectInView(
+  sx0: number, sy0: number, sx1: number, sy1: number, view: ViewRect, margin = CULL_MARGIN_PX,
+): boolean {
+  return sx1 >= view.x - margin && sx0 <= view.x + view.w + margin
+    && sy1 >= view.y - margin && sy0 <= view.y + view.h + margin
+}
+
 /** Does this drawable's painted rectangle reach the view, with the margin's slack? */
 export function boxInView(b: DepthBox, view: ViewRect, margin = CULL_MARGIN_PX): boolean {
-  return b.sx1 >= view.x - margin && b.sx0 <= view.x + view.w + margin
-    && b.sy1 >= view.y - margin && b.sy0 <= view.y + view.h + margin
+  return rectInView(b.sx0, b.sy0, b.sx1, b.sy1, view, margin)
 }
 
 export type Culled<T> = { drawn: T[]; hidden: T[] }

@@ -14,7 +14,13 @@ import {
 import {
   OCTAVE_ALPHA, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField,
   isRoadMass, materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
+  type FieldLayer,
 } from './groundField.js'
+import {
+  CHUNK_BYTES_PER_PX, bucketLayers, bucketPolys, createChunkResidency, groundGrid,
+  type ChunkGrid, type ChunkKey, type ChunkRect,
+} from './groundChunks.js'
+import type { ViewRect } from './cull.js'
 import {
   applyDepthOrder, createLayers, type DepthCounts, type DepthEntry, type LayerSet,
 } from './layers.js'
@@ -33,16 +39,43 @@ export const BACKGROUND = 0x322b38
 export const ZOOM_MIN: ZoomStop = ZOOM_STOPS[0]
 export const ZOOM_MAX: ZoomStop = ZOOM_STOPS[ZOOM_STOPS.length - 1]!
 
-// THE BAKE SEAM (C11 §9 supersession point). One whole-map pass is correct at the 48×48
-// showcase scale; C11's 128×128 growth map replaces this with a chunked, dirty-rebake baker.
-// Everything above talks to `GroundBaker`, so that swap touches this factory and nothing else.
+// ★ THE BAKE SEAM (C11 §9 supersession point), TAKEN. The whole-map pass this factory used to
+// run allocated ONE render texture the size of the entire field: `(w+h)·16 × (w+h)·8`, which
+// grows as the SQUARE of the ring count. At ten rings that is 12 768 × 6 384 px — 326 MB, and a
+// dimension past `MAX_TEXTURE_SIZE` on a great many GPUs, where the allocation does not merely
+// cost memory, it FAILS and the ground is not drawn at all.
+//
+// It is a grid of fixed-size chunks now. `groundChunks.ts` owns every decision — the grid, what
+// is resident, and the seam law that keeps NEAREST honest across a boundary — and holds the
+// numbers. This factory is the glue that turns those decisions into textures, and the shape of
+// the picture it paints into each chunk is the whole-map pass unchanged: same layer order, same
+// material matrices in the same bake space, same shoulders, same kerb and furrows.
 export type GroundBaker = {
   rebake(terrain: TileId[][], records: AssetRecord[]): void
+  /** Which chunks are worth holding — the view is in world space, as `viewRect()` gives it. */
+  setView(view: ViewRect): void
+  /** What is on the GPU right now. A bound nobody can count is a claim, not a bound. */
+  vram(): { chunks: number; bytes: number; maxDimPx: number }
   destroy(): void
 }
 
-export function createGroundBaker(app: Application, sprite: Sprite, book: TextureBook): GroundBaker {
-  let target: RenderTexture | null = null
+/** The one thing the baker needs a live GPU for, named so a test can drive the real baker. */
+export type BakeRenderer = {
+  render(opts: { container: Container; target: RenderTexture; clear: boolean }): void
+}
+
+export function createGroundBaker(
+  renderer: BakeRenderer, root: Container, book: TextureBook,
+): GroundBaker {
+  let grid: ChunkGrid | null = null
+  /** the field's layers, cut per chunk — one O(shapes) pass per terrain, never per chunk */
+  let buckets = new Map<ChunkKey, FieldLayer[]>()
+  let kerbPolys = new Map<ChunkKey, number[][]>()
+  let headlandPolys = new Map<ChunkKey, number[][]>()
+  let furrowPolys = new Map<ChunkKey, number[][]>()
+  const live = new Map<ChunkKey, { rect: ChunkRect; tex: RenderTexture; sprite: Sprite }>()
+  const residency = createChunkResidency()
+  let view: ViewRect = { x: 0, y: 0, w: 0, h: 0 }
   // one Texture per TERRAIN now — at most eight, whatever the size of the map
   const loaded = new Map<string, Texture>()
   let generation = 0
@@ -57,10 +90,21 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
   // V2.2 (U6): the fill matrix is no longer the identity. An identity tiled one 256px material
   // on an axis-aligned lattice across the whole map, so the pattern the eye found had simply
   // moved from tile frequency to material frequency.
-  function draw(terrain: TileId[][], records: AssetRecord[], offX: number): void {
-    if (target === null) return
+  //
+  // ★ WHAT CHUNKING CHANGED HERE, AND WHAT IT DELIBERATELY DID NOT. Geometry is still built in
+  // BAKE space — `sx + offX` — and only the container is translated onto the chunk's origin, so
+  // every material matrix samples the coordinates it always sampled and a continuous ground
+  // flows across a boundary exactly as it flowed across the middle of the old single texture.
+  // The shapes handed in are the chunk's bucket, and a shape that straddles a boundary is in
+  // BOTH buckets, submitted whole to each: the render target's own bounds do the cutting, which
+  // is a framebuffer edge rather than a geometry edge and therefore has no edge of its own.
+  function drawChunk(rect: ChunkRect, target: RenderTexture, offX: number): void {
     const layer = new Container()
-    for (const [li, l] of groundField(terrain, records).layers.entries()) {
+    layer.position.set(-rect.x, -rect.y)
+    const stack = buckets.get(rect.key) ?? []
+    for (let li = 0; li < stack.length; li++) {
+      const l = stack[li]!
+      if (l.shapes.length === 0) continue   // its index is still its index — see bucketLayers
       // A road needs a rim or it disappears into the grass at 1x — v1's art carried a painted
       // edge and the material does not. Every shoulder is laid down BEFORE any ribbon, so a
       // neighbour's rim can never sit on top of this tile's surface.
@@ -127,15 +171,8 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
     // U7: a patch was only ever the union of its tiles' diamonds under one material — a shape
     // with no edge, which is what read as an amorphous blob. Paved ground gets a kerb, a field
     // gets a headland and furrows. All of it lands in the BAKE, so it costs nothing per frame.
-    const plaza: Tile[] = [], farmland: Tile[] = []
-    for (let y = 0; y < terrain.length; y++) {
-      const row = terrain[y]!
-      for (let x = 0; x < row.length; x++) {
-        if (tileKind(row[x]!) === 'farmland') farmland.push({ x, y })
-        else if (isRoadMass(terrain, x, y)) plaza.push({ x, y })
-      }
-    }
-
+    // The tile scan that finds the patches moved to the terrain pass: it is O(the map), and
+    // running it once per chunk would have put the whole map back into every chunk's bake.
     const strokeAt = (polys: number[][], color: number, alpha: number, close: boolean): void => {
       if (polys.length === 0) return
       const g = new Graphics()
@@ -149,44 +186,104 @@ export function createGroundBaker(app: Application, sprite: Sprite, book: Textur
       layer.addChild(g)
     }
 
-    strokeAt(furrowLines(farmland), HEADLAND_COLOR, OCTAVE_ALPHA, false)
-    strokeAt(patchOutline(farmland), HEADLAND_COLOR, 1, true)
-    strokeAt(patchOutline(plaza), KERB_COLOR, 1, true)
+    strokeAt(furrowPolys.get(rect.key) ?? [], HEADLAND_COLOR, OCTAVE_ALPHA, false)
+    strokeAt(headlandPolys.get(rect.key) ?? [], HEADLAND_COLOR, 1, true)
+    strokeAt(kerbPolys.get(rect.key) ?? [], KERB_COLOR, 1, true)
 
-    app.renderer.render({ container: layer, target, clear: true })
+    renderer.render({ container: layer, target, clear: true })
     layer.destroy({ children: true })
+  }
+
+  let offsetX = 0
+
+  function bake(rect: ChunkRect): void {
+    // resolution 1 and NEAREST, stated rather than inherited: a chunk baked at the device ratio
+    // would resample the pixel art the whole `nearest` law exists to keep unresampled.
+    const tex = RenderTexture.create({
+      width: rect.texW, height: rect.texH, scaleMode: 'nearest', resolution: 1,
+    })
+    const sprite = new Sprite(tex)
+    sprite.position.set(rect.x - offsetX, rect.y)
+    root.addChild(sprite)
+    live.set(rect.key, { rect, tex, sprite })
+    drawChunk(rect, tex, offsetX)
+  }
+
+  function release(key: ChunkKey): void {
+    const held = live.get(key)
+    if (held === undefined) return
+    live.delete(key)
+    held.sprite.destroy()
+    held.tex.destroy(true)
+  }
+
+  function applyResidency(): void {
+    const step = residency.update(view)
+    for (const rect of step.bake) bake(rect)
+    for (const key of step.evict) release(key)
+  }
+
+  function releaseAll(): void {
+    for (const key of [...live.keys()]) release(key)
+    residency.clear()
   }
 
   return {
     rebake(terrain, records) {
-      const h = terrain.length
-      const w = terrain[0]?.length ?? 0
-      const texW = (w + h) * (TILE_W / 2)
-      const texH = (w + h) * (TILE_H / 2)
-      const offX = h * (TILE_W / 2) // sx can go negative down to -h*16; shift into texture space
-      if (target === null || target.width !== texW || target.height !== texH) {
-        target?.destroy(true)
-        target = RenderTexture.create({ width: texW, height: texH })
-        sprite.texture = target
-        sprite.position.set(-offX, 0)
+      const field = groundField(terrain, records)
+      offsetX = field.offsetX
+      grid = groundGrid(field.widthPx, field.heightPx, field.offsetX)
+      buckets = bucketLayers(grid, field.layers)
+
+      const plaza: Tile[] = [], farmland: Tile[] = []
+      for (let y = 0; y < terrain.length; y++) {
+        const row = terrain[y]!
+        for (let x = 0; x < row.length; x++) {
+          if (tileKind(row[x]!) === 'farmland') farmland.push({ x, y })
+          else if (isRoadMass(terrain, x, y)) plaza.push({ x, y })
+        }
       }
-      draw(terrain, records, offX)
+      furrowPolys = bucketPolys(grid, furrowLines(farmland))
+      headlandPolys = bucketPolys(grid, patchOutline(farmland))
+      kerbPolys = bucketPolys(grid, patchOutline(plaza))
+
+      // a new terrain is a new grid: every texture on the GPU belongs to the old one
+      releaseAll()
+      residency.setGrid(grid)
+      applyResidency()
 
       // Textures load async. Paint the flat fallback now, then repaint once the tile art is
       // in — a viewer never waits on a blank map, and a stale load never overwrites a newer bake.
       // one material per terrain — at most eight urls for the whole map
-      const urls = [...new Set(groundField(terrain, records).layers.map((l) => l.url))]
+      const urls = [...new Set(field.layers.map((l) => l.url))]
         .filter((u): u is string => u !== null && !loaded.has(u))
       if (urls.length === 0) return
       const gen = ++generation
       void Promise.all(urls.map(async (u) => { loaded.set(u, await book.get(u)) }))
-        .then(() => { if (gen === generation) draw(terrain, records, offX) })
+        .then(() => {
+          if (gen !== generation) return
+          for (const held of live.values()) drawChunk(held.rect, held.tex, offsetX)
+        })
         .catch(() => { /* art is optional — the flat diamonds already rendered */ })
+    },
+    setView(next) {
+      if (next.x === view.x && next.y === view.y && next.w === view.w && next.h === view.h) return
+      view = next
+      applyResidency()
+    },
+    vram() {
+      let bytes = 0, maxDimPx = 0
+      for (const held of live.values()) {
+        bytes += held.rect.texW * held.rect.texH * CHUNK_BYTES_PER_PX
+        maxDimPx = Math.max(maxDimPx, held.rect.texW, held.rect.texH)
+      }
+      return { chunks: live.size, bytes, maxDimPx }
     },
     destroy() {
       generation++
-      target?.destroy(true)
-      target = null
+      releaseAll()
+      grid = null
+      buckets = new Map()
       loaded.clear()
     },
   }
@@ -322,8 +419,10 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   // the building it names.
   const layers = createLayers(world)
 
-  const groundSprite = new Sprite()
-  layers.ground.addChild(groundSprite)
+  // The ground is a grid of chunk sprites now, not one sprite the size of the map. `layers.ground`
+  // is their only parent, so nothing else in the scene had to learn that the bake was cut up.
+  const groundChunkRoot = new Container()
+  layers.ground.addChild(groundChunkRoot)
   app.stage.addChild(world)
 
   const viewRect = (): { x: number; y: number; w: number; h: number } => {
@@ -344,9 +443,11 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   let lastCounts: DepthCounts = { drawn: 0, culled: 0 }
 
   const book = new TextureBook()
-  const baker = createGroundBaker(app, groundSprite, book)
+  const baker = createGroundBaker(app.renderer, groundChunkRoot, book)
 
   function rebakeGround(terrain: TileId[][], records?: AssetRecord[]): void {
+    // the view first: a bake with a stale view bakes chunks nobody is looking at
+    baker.setView(viewRect())
     baker.rebake(terrain, records ?? store.assetRecords())
   }
 
@@ -582,6 +683,12 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   // fractions of a frame per second. Mark dirty, bake once on the next tick.
   let dirty = false
   const bakeTick = (): void => {
+    // ★ THE GROUND FOLLOWS THE CAMERA NOW. The bake is chunked, so what is resident is a
+    // function of the view, and the view moves on a frame — a drag, a glide, a follow, an eased
+    // zoom. Asking here rather than from `place()` means one question a frame however many
+    // times the camera moved inside it, and it happens before the renderer draws because
+    // Application adds its own render at a lower priority than a ticker callback.
+    baker.setView(viewRect())
     if (!dirty || bakedTerrain === null) return
     dirty = false
     rebakeGround(bakedTerrain)
