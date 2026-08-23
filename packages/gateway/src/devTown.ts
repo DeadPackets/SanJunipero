@@ -1,4 +1,4 @@
-import { makeCityTemplate, type CityStructure } from '@sj/shared'
+import { TOWN_RINGS_GENESIS, makeCityTemplate, type CityStructure } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 import { SHOWCASE_ANCHOR, makeShowcaseMap } from './showcaseMap.js'
 
@@ -35,9 +35,16 @@ export function devStructureId(kind: string, x: number, y: number): string {
   return `structure_${kind}_${x}_${y}`
 }
 
-export function devTown(anchor: { x: number; y: number } = SHOWCASE_ANCHOR): DevTown {
-  const template = makeCityTemplate(anchor)
-  const { terrain } = makeShowcaseMap(anchor)   // the SAME anchor, so tiles and walls agree
+/** `rings` grows the LATTICE — the blocks, the streets and the ground the next ring needs.
+ *  It does not stand more buildings: `cityStructures` is genesis's eleven at every count, and
+ *  wiring an agent's build to a plot claim is the world-growth lane's open C-2. So a ring-3
+ *  showcase is the same town in a town-sized road grid, which is exactly the case the chunked
+ *  ground baker exists for and nobody had seen on a screen. */
+export function devTown(
+  anchor: { x: number; y: number } = SHOWCASE_ANCHOR, rings: number = TOWN_RINGS_GENESIS,
+): DevTown {
+  const template = makeCityTemplate(anchor, rings)
+  const { terrain } = makeShowcaseMap(anchor, rings)   // the SAME anchor and rings, so tiles and walls agree
   const structures = template.structures.map((s: CityStructure): DevStructure => {
     const x = anchor.x + s.dx, y = anchor.y + s.dy
     return {

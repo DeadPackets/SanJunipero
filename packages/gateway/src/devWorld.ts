@@ -1,7 +1,7 @@
 import { mkdirSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { DEFAULT_CONFIG, type SimConfig } from '@sj/shared'
+import { DEFAULT_CONFIG, TOWN_RINGS_GENESIS, type SimConfig } from '@sj/shared'
 import {
   EventStore, RngStreams, TickLoop, genesisState, makeFixtureMap, openDb,
 } from '@sj/engine'
@@ -33,20 +33,47 @@ export const THOUGHT_LINES: Record<string, string> = {
 
 export type DevWorld = { gateway: Gateway; loop: TickLoop; stop(): Promise<void> }
 
-// 'scripted' is the G6 fixture map and stays the default, so every existing gate is unchanged.
-// 'showcase' folds C13's city template (see showcaseMap.ts). A third 'city' value — genesis
-// taking the template directly, at 128×128 — is a one-line addition here when C11 §9 lands.
+/**
+ * ★ THE TWO DEV WORLDS, AND WHICH ONE IS THE PRODUCT.
+ *
+ * | kind | terrain | town | what it is |
+ * |---|---|---|---|
+ * | `scripted` | `makeFixtureMap()`, 64×64 | 6 hand-placed buildings (`TOWN_STRUCTURES`) | **A FROZEN TEST FIXTURE.** G1, G2 and G6 hash the world it folds, so it may never change. Four of its six kinds — `wagon`, `shed`, `scaffolding`, `standing_stone` — are the four the art ingest reports `NO ART` for, so two thirds of this town draws as untextured placeholder. |
+ * | `showcase` | `showcaseTerrain()`, 76×76 at one ring | the 11 the grammar plats | **THE PRODUCT.** Same `makeCityTemplate` genesis calls, same anchor, same eleven buildings, real art on all of them but the well and the fire pit. |
+ *
+ * ★ AND THE DEFAULT USED TO BE THE FIXTURE. `startDevWorld()` with no `map:` handed a caller
+ * the frozen G6 town, silently. The three-defects lane found the cost: it measured the ambient
+ * canopy at 38 of 140 quads outside the ground on the fixture and 0 outside on the showcase —
+ * same code, opposite verdicts, decided entirely by which map had loaded. Several lanes met the
+ * looking law honestly and may have been looking at a fixture.
+ *
+ * The LIBRARY default stays `scripted`, because `g6.test.ts` and `devWorld.test.ts` call
+ * `startDevWorld()` bare and their gates hash exactly that world. The HUMAN-FACING default — the
+ * CLI at the bottom of this file — is the product, and the boot line now says which map loaded
+ * and why in every case. A fixture must be asked for by name, not received by silence.
+ */
 export type DevMapKind = 'scripted' | 'showcase'
+/** For `startDevWorld()` called as a library, i.e. by the gates. Never by a person. */
 export const DEV_MAP_DEFAULT: DevMapKind = 'scripted'
+/** For anyone starting a world to LOOK at it. */
+export const DEV_MAP_HUMAN: DevMapKind = 'showcase'
 
-export function devTerrain(map: DevMapKind = DEV_MAP_DEFAULT): ReturnType<typeof makeFixtureMap> {
-  return map === 'showcase' ? showcaseTerrain() : makeFixtureMap()
+export function devTerrain(
+  map: DevMapKind = DEV_MAP_DEFAULT, rings: number = TOWN_RINGS_GENESIS,
+): ReturnType<typeof makeFixtureMap> {
+  return map === 'showcase' ? showcaseTerrain(undefined, rings) : makeFixtureMap()
 }
 
 export async function startDevWorld(
   opts: {
     dbPath?: string; port?: number; realMsPerTick?: number; seed?: string; ingest?: boolean
     map?: DevMapKind
+    /** ★ HOW MANY RINGS OF BLOCKS THE SHOWCASE TOWN IS PLATTED FOR. Ignored by `scripted`,
+     *  which is frozen. Every dimension of the map derives from it — the world-growth lane
+     *  removed the ceiling and nothing in the running app could reach past ring 1 until this
+     *  existed. Ring 3 is 136 + 16 = 152 tiles square, which bakes past 2048 px and is the
+     *  case the chunked ground was written for. */
+    rings?: number
     /** dev/demo only (G10 human pass): tired founders go indoors and come out again.
      *  Off by default, so every existing gate folds exactly the events it always did. */
     interiors?: boolean
@@ -89,10 +116,18 @@ export async function startDevWorld(
 
   const config = SHOWCASE_CONFIG
   const map = opts.map ?? DEV_MAP_DEFAULT
-  const terrain = devTerrain(map)
-  // Terrain and buildings are read from the SAME map kind, so the town can never again be an
-  // overlay of two unrelated layouts.
-  const structures = townStructuresFor(map)
+  const rings = opts.rings ?? TOWN_RINGS_GENESIS
+  const terrain = devTerrain(map, rings)
+  // Terrain and buildings are read from the SAME map kind AND the same ring count, so the town
+  // can never again be an overlay of two unrelated layouts.
+  const structures = townStructuresFor(map, rings)
+  // Said out loud on every boot, in every path, because a lane that does not know which world
+  // it is looking at reports a finding about the wrong one.
+  console.log(
+    `dev world: map=${map} rings=${map === 'showcase' ? rings : 'n/a (frozen fixture)'} `
+    + `terrain=${terrain[0]?.length ?? 0}x${terrain.length} structures=${structures.length}`
+    + (map === 'scripted' ? '  ← THE FROZEN G6 TEST FIXTURE, not the product town' : ''),
+  )
   const rng = new RngStreams(opts.seed ?? DEV_SEED)
   const store = new EventStore(db)
   const loop: TickLoop = new TickLoop({
@@ -147,13 +182,21 @@ export async function startDevWorld(
 }
 
 // CLI switches, read HERE and nowhere else, so no test's world can drift with an env var:
-//   SJ_DEV_MAP=showcase   fold C13's city template instead of the G6 fixture map
+//   SJ_DEV_MAP=scripted   ask for the frozen G6 fixture BY NAME (the product town otherwise)
+//   SJ_DEV_RINGS=3        plat the showcase town for three rings of blocks instead of one
 //   SJ_DEV_INTERIORS=1    tired founders go indoors and come out again (the G10 human pass)
+//
+// ★ THE HUMAN PATH DEFAULTS TO THE PRODUCT. It used to default to the fixture, and a lane that
+// ran `pnpm --filter @sj/gateway dev:world` and looked at what came up was looking at six
+// hand-placed buildings, four of them with no art, on a 64×64 map the grammar never drew.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const map: DevMapKind = process.env['SJ_DEV_MAP'] === 'showcase' ? 'showcase' : DEV_MAP_DEFAULT
+  const map: DevMapKind = process.env['SJ_DEV_MAP'] === 'scripted' ? 'scripted' : DEV_MAP_HUMAN
   const interiors = process.env['SJ_DEV_INTERIORS'] === '1'
-  void startDevWorld({ ingest: true, map, interiors }).then(({ gateway }) => {
-    console.log(`dev world: map=${map} interiors=${interiors ? 'on' : 'off'} structures=${townStructuresFor(map).length}`)
+  const asked = Number(process.env['SJ_DEV_RINGS'] ?? TOWN_RINGS_GENESIS)
+  const rings = Number.isInteger(asked) && asked >= 1 ? asked : TOWN_RINGS_GENESIS
+  if (rings !== asked) console.log(`dev world: SJ_DEV_RINGS=${process.env['SJ_DEV_RINGS']} is not a ring count; using ${rings}`)
+  void startDevWorld({ ingest: true, map, interiors, rings }).then(({ gateway }) => {
+    console.log(`dev world: interiors=${interiors ? 'on' : 'off'}`)
     console.log(`dev world: the town is awake on ws://localhost:${gateway.port}/ws`)
   })
 }

@@ -348,6 +348,9 @@ body {
 #stage-root[data-dock-controls="right"] .control-bar {
   grid-row: 1; grid-column: 1;
   flex-direction: column; align-items: stretch;
+  /* a column that wraps makes a second COLUMN, which a 12rem dock has no room for; this
+     edge scrolls on its long axis instead, as it always did */
+  flex-wrap: nowrap;
   min-height: 0; max-width: 12rem;
   overflow-x: hidden; overflow-y: auto;
   border-top: 0; border-right: 2px solid var(--ink); box-shadow: 4px 0 0 0 var(--deep);
@@ -437,14 +440,30 @@ body {
 .control-bar {
   grid-row: 2;
   display: flex; align-items: stretch; gap: 0.9rem;
+  /* ★ A CONTROL THAT VANISHES WHEN A PANEL OPENS IS UNREACHABLE (composition lane).
+     Measured at a 1440 px window with the Townsfolk panel open: the bar is 1072 px, its
+     content 1435 px, and MOMENTS, WORLD LAWS and HIDE THE CONTROLS were 363 px past the
+     right edge — HIDE THE CONTROLS being the escape hatch, the worst one to lose. The bar
+     scrolled, in the sense that `overflow-x: auto` says it did, with no affordance any
+     viewer or any stream frame can use.
+     The bar WRAPS instead. It is a grid row of the stage, so a second row costs the canvas
+     56 px and costs the viewer no control at all. */
+  flex-wrap: wrap;
+  /* and it is a SIZE CONTAINER, because the thing that narrows this bar is a panel, not the
+     window — see the @container rule below */
+  container-type: inline-size; container-name: control-bar;
+  min-width: 0;
   min-height: var(--control-bar-h);
-  padding: 0.3rem 0.8rem;
+  /* 52px on the right, not 0.8rem: the dock handle is 44px pinned to this same corner and it
+     sits ON the bar (measured: handle 1420..1464, bar bottom row 730..774). A control under
+     the handle is as unreachable as one past the edge. */
+  padding: 0.3rem 52px 0.3rem 0.8rem;
   overflow-x: auto; overflow-y: hidden;
   background: var(--cream) var(--grain);
   border-top: 2px solid var(--ink);
   box-shadow: 0 -4px 0 0 var(--deep);
 }
-.ctl-group { display: flex; align-items: stretch; gap: 0.25rem; }
+.ctl-group { display: flex; align-items: stretch; gap: 0.25rem; flex-wrap: wrap; }
 /* the groups read as groups: a hairline between them, never a heading nobody asked for */
 .ctl-group + .ctl-group { padding-left: 0.9rem; border-left: 2px solid var(--sand); }
 .ctl-btn {
@@ -471,8 +490,18 @@ body {
     transition-duration: var(--t-fast); transition-timing-function: var(--ease-enter);
   }
 }
-/* a narrow stage keeps the buttons and drops the words — the label is still spoken */
-@media (max-width: 1100px) {
+/* A NARROW BAR keeps the buttons and drops the words — the label is still spoken.
+   ★ KEYED TO THE BAR, NOT THE WINDOW, and that swap is the defect. This was
+   `@media (max-width: 1100px)`: the only responsive rule the bar had watched the VIEWPORT,
+   and the thing that narrows this bar is a 23rem panel sliding in beside it. At a 1440 px
+   window with a panel open the bar is 1072 px and the media query never fires, so the bar
+   kept full labels it had 363 px too little room for. A container query asks the question
+   the bar is actually in.
+   1500 px is the MEASURED width a labelled bar needs — 1435 px of controls plus the 52 px the
+   dock handle takes out of the same corner is 1487 — rounded up to the next 50. Below it the
+   same twelve controls are 678 px of glyphs and fit in one row down to about 730; below THAT
+   the wrap above takes over and the bar grows a row. Nothing is ever cut. */
+@container control-bar (max-width: 1500px) {
   .ctl-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 

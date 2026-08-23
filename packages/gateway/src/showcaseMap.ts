@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import {
-  CITY_DWELLING_KINDS, CITY_H, CITY_W, PLAZA_CENTRE, T_PATH, T_ROAD, doorFrontTile,
-  makeCityTemplate, structureTiles, type CityStructure,
+  CITY_DWELLING_KINDS, CITY_H, CITY_W, PLAZA_CENTRE, TOWN_RINGS_GENESIS, T_PATH, T_ROAD,
+  doorFrontTile, makeCityTemplate, plazaCentreOf, structureTiles, townSpan,
+  type CityStructure,
 } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 
@@ -14,29 +15,50 @@ import type { TileId } from '@sj/engine/state'
  *  a fixture that pinned its own 48 would clip the next ring off. `SHOWCASE_MARGIN` is the
  *  wild the town is set in — forest, hill and the ground the standing stone waits on. */
 export const SHOWCASE_MARGIN = 8
-export const SHOWCASE_W = CITY_W + 2 * SHOWCASE_MARGIN
-export const SHOWCASE_H = CITY_H + 2 * SHOWCASE_MARGIN
+
+/**
+ * ★★ AND "THE TOWN" IS A RING COUNT, WHICH THIS FIXTURE USED TO REFUSE TO ASK ABOUT.
+ *
+ * `SHOWCASE_W = CITY_W + 16` reads as a derivation and is a constant: `CITY_W` is
+ * `townSpan(TOWN_RINGS_GENESIS)`, so the dev world's only town was pinned at one ring. The
+ * world-growth lane removed the world's ceiling and proved rings 5 and 6, the town-generator
+ * proved ring 3 renders at 1904 × 816, and NEITHER was reachable in the running app: merge
+ * train 2 could not stand one up and declined to fake it by editing this line. Every showcase
+ * dimension below is now a function of the ring count, and the ring-1 answers are unchanged
+ * to the tile — which is what keeps every landed gate folding the world it always folded.
+ */
+export const showcaseSpan = (rings: number): number => townSpan(rings) + 2 * SHOWCASE_MARGIN
+export const SHOWCASE_W = showcaseSpan(TOWN_RINGS_GENESIS)
+export const SHOWCASE_H = showcaseSpan(TOWN_RINGS_GENESIS)
 export const ROAD_TILE = 7    // C9 Task 1b TileId
 export const GRASS_TILE = 0, WATER_TILE = 2, FOREST_TILE = 3, ROCK_TILE = 4
 
 export const SHOWCASE_ANCHOR = { x: SHOWCASE_MARGIN, y: SHOWCASE_MARGIN } as const
-export const FOREST_BAND_X0 = SHOWCASE_ANCHOR.x + CITY_W + 4          // spec §10 forest edge, east
-export const ROCK_HILL = {                                             // spec §10 rocky hill, NE
-  x0: FOREST_BAND_X0, y0: 0, x1: SHOWCASE_W - 1, y1: SHOWCASE_MARGIN - 5,
-} as const
+
+// spec §10 forest edge, east
+export const forestBandX0 = (rings: number): number => SHOWCASE_ANCHOR.x + townSpan(rings) + 4
+export const FOREST_BAND_X0 = forestBandX0(TOWN_RINGS_GENESIS)
+
+// spec §10 rocky hill, NE
+export const rockHill = (rings: number): { x0: number; y0: number; x1: number; y1: number } => ({
+  x0: forestBandX0(rings), y0: 0, x1: showcaseSpan(rings) - 1, y1: SHOWCASE_MARGIN - 5,
+})
+export const ROCK_HILL = rockHill(TOWN_RINGS_GENESIS)
 
 // Reserved, not placed: the standing stone is C8 content (C11 §9 — it stands BEYOND the edge
 // of town, unexplained). The fixture only keeps its meadow tile clear, in the open ground
 // between the last street and the forest.
-export const STANDING_STONE_TILE = {
-  x: SHOWCASE_ANCHOR.x + CITY_W + 1,
+export const standingStoneTile = (rings: number): { x: number; y: number } => ({
+  x: SHOWCASE_ANCHOR.x + townSpan(rings) + 1,
   y: SHOWCASE_ANCHOR.y + 1,
-} as const
+})
+export const STANDING_STONE_TILE = standingStoneTile(TOWN_RINGS_GENESIS)
 
-export const PLAZA_TILE = {
-  x: SHOWCASE_ANCHOR.x + PLAZA_CENTRE.dx,
-  y: SHOWCASE_ANCHOR.y + PLAZA_CENTRE.dy,
-} as const
+export const plazaTile = (rings: number): { x: number; y: number } => ({
+  x: SHOWCASE_ANCHOR.x + plazaCentreOf(rings).dx,
+  y: SHOWCASE_ANCHOR.y + plazaCentreOf(rings).dy,
+})
+export const PLAZA_TILE = plazaTile(TOWN_RINGS_GENESIS)
 
 // The city template's kinds, not a smaller invented set — dropping the well, the fire pit or
 // the wagon would make the showcase a different town from the one genesis builds.
@@ -63,25 +85,29 @@ export function toTileId(to: number): number {
   return to === T_PATH ? ROAD_TILE : to
 }
 
-function baseTerrain(): number[][] {
+function baseTerrain(rings: number): number[][] {
+  const span = showcaseSpan(rings), hill = rockHill(rings), forestX0 = forestBandX0(rings)
   const rows: number[][] = []
-  for (let y = 0; y < SHOWCASE_H; y++) {
+  for (let y = 0; y < span; y++) {
     const row: number[] = []
-    for (let x = 0; x < SHOWCASE_W; x++) {
-      const rock = x >= ROCK_HILL.x0 && x <= ROCK_HILL.x1 && y >= ROCK_HILL.y0 && y <= ROCK_HILL.y1
-      row.push(rock ? ROCK_TILE : x >= FOREST_BAND_X0 ? FOREST_TILE : GRASS_TILE)
+    for (let x = 0; x < span; x++) {
+      const rock = x >= hill.x0 && x <= hill.x1 && y >= hill.y0 && y <= hill.y1
+      row.push(rock ? ROCK_TILE : x >= forestX0 ? FOREST_TILE : GRASS_TILE)
     }
     rows.push(row)
   }
   return rows
 }
 
-export function makeShowcaseMap(anchor: { x: number; y: number } = SHOWCASE_ANCHOR): ShowcaseMap {
-  const template = makeCityTemplate(anchor)
-  const terrain = baseTerrain()
+export function makeShowcaseMap(
+  anchor: { x: number; y: number } = SHOWCASE_ANCHOR, rings: number = TOWN_RINGS_GENESIS,
+): ShowcaseMap {
+  const span = showcaseSpan(rings)
+  const template = makeCityTemplate(anchor, rings)
+  const terrain = baseTerrain(rings)
   for (const t of template.tiles) {
     const x = anchor.x + t.dx, y = anchor.y + t.dy
-    if (x < 0 || y < 0 || x >= SHOWCASE_W || y >= SHOWCASE_H) continue
+    if (x < 0 || y < 0 || x >= span || y >= span) continue
     terrain[y]![x] = toTileId(t.to)
   }
   const structures = template.structures.map((s: CityStructure) => ({
@@ -90,8 +116,10 @@ export function makeShowcaseMap(anchor: { x: number; y: number } = SHOWCASE_ANCH
   return ShowcaseMapSchema.parse({ terrain, structures })
 }
 
-export function showcaseTerrain(anchor: { x: number; y: number } = SHOWCASE_ANCHOR): TileId[][] {
-  return makeShowcaseMap(anchor).terrain as TileId[][]
+export function showcaseTerrain(
+  anchor: { x: number; y: number } = SHOWCASE_ANCHOR, rings: number = TOWN_RINGS_GENESIS,
+): TileId[][] {
+  return makeShowcaseMap(anchor, rings).terrain as TileId[][]
 }
 
 // ------------------------------------------------------------------ invariants (tests + gate)
@@ -111,7 +139,7 @@ export const showcaseStructureTiles = (s: ShowcaseStructure): { x: number; y: nu
   structureTiles({ w: s.w, h: s.h, dx: s.x, dy: s.y }).map((t) => ({ x: t.dx, y: t.dy }))
 
 /** Every road tile reachable from the plaza centre, walking road to road. */
-export function roadReach(map: ShowcaseMap, from: { x: number; y: number } = PLAZA_TILE): Set<string> {
+export function roadReach(map: ShowcaseMap, from: { x: number; y: number } = plazaTile(TOWN_RINGS_GENESIS)): Set<string> {
   const seen = new Set<string>()
   const isRoad = (x: number, y: number): boolean => map.terrain[y]?.[x] === ROAD_TILE
   if (!isRoad(from.x, from.y)) return seen

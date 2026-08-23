@@ -45,9 +45,11 @@ const SCRIPTED_STRUCTURES: readonly DevStructure[] = TOWN_STRUCTURES.map((s) => 
   ...s, owner: null, facing: 'sw' as const, flammable: s.kind !== 'standing_stone',
 }))
 
-/** 'scripted' keeps the frozen G6 fixture set; 'showcase' serves the town the roads were drawn for. */
-export function townStructuresFor(map: DevMapKind): readonly DevStructure[] {
-  return map === 'showcase' ? devTown().structures : SCRIPTED_STRUCTURES
+/** 'scripted' keeps the frozen G6 fixture set; 'showcase' serves the town the roads were drawn
+ *  for. `rings` only means anything to the showcase — the scripted fixture is frozen by the
+ *  gate hashes and has no grammar to grow. */
+export function townStructuresFor(map: DevMapKind, rings?: number): readonly DevStructure[] {
+  return map === 'showcase' ? devTown(undefined, rings).structures : SCRIPTED_STRUCTURES
 }
 
 // ── WHAT THE BUILDINGS HOLD ────────────────────────────────────────────────────────────────

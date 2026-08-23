@@ -276,7 +276,9 @@ describe('U10 — "tooltips are out of place"', () => {
   })
 
   it('places the world\'s OWN words clear of each other too (carry-in A4.2)', () => {
-    const marks = [0, 1, 2, 3].map((i) => ({ id: `m${i}`, sx: 640, sy: 360, size }))
+    const marks = [0, 1, 2, 3].map((i) => ({
+      id: `m${i}`, sx: 640, sy: 360, size, of: [{ x: 624, y: 328, w: 32, h: 40 }],
+    }))
     const placed = placeLandmarks(marks, view)
     for (let i = 0; i < placed.length; i++) {
       for (let j = i + 1; j < placed.length; j++) {
