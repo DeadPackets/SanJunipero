@@ -185,6 +185,55 @@ describe('a place name is legible over any ground, in both light bands', () => {
 // eleven-building town is 320 px across while six counter-scaled plates are 140 px each — the
 // legend covered the map it explains, stacked into a column taller than the settlement. A name
 // is a legend for a view in which you can still see the place; below that the town is a shape.
+// ── ★ A NAME FOR A PLACE THAT IS NOT ON SCREEN ────────────────────────────────────────────
+//
+// `placeTag` CLAMPS every plate into the visible rect and then steps it clear of the plates
+// already there — which is right for a tag whose subject is on screen and catastrophic for one
+// whose subject is not. Handed every landmark in a town that does not fit the viewport, it
+// drags all of them into the view and stacks them into a column: a wall of names for places
+// the viewer cannot see, hiding the few that are actually there. It is also O(n²) in a number
+// that now grows without bound.
+//
+// A place name belongs to a place. If the place is off screen, so is its name.
+
+describe('placeLandmarks culls to the view', () => {
+  const VIEW = { x: 0, y: 0, w: 800, h: 600 }
+  const size = { w: 90, h: 20 }
+
+  it('places a name whose place is on screen', () => {
+    const out = placeLandmarks([{ id: 'here', sx: 400, sy: 300, size }], VIEW)
+    expect(out.map((o) => o.id)).toEqual(['here'])
+  })
+
+  it('★ drops a name whose place is far outside the view instead of dragging it in', () => {
+    const out = placeLandmarks([{ id: 'far', sx: 9000, sy: 9000, size }], VIEW)
+    expect(out).toEqual([])
+  })
+
+  it('keeps one just past the edge, so a name does not blink at the boundary', () => {
+    const out = placeLandmarks([{ id: 'edge', sx: VIEW.w + 10, sy: 300, size }], VIEW)
+    expect(out.map((o) => o.id)).toEqual(['edge'])
+  })
+
+  it('★ the count it places follows the VIEW, not the size of the town', () => {
+    const spread = (n: number): Parameters<typeof placeLandmarks>[0] =>
+      Array.from({ length: n }, (_, i) => ({ id: `m${i}`, sx: i * 400, sy: (i % 7) * 300, size }))
+    const few = placeLandmarks(spread(10), VIEW).length
+    const many = placeLandmarks(spread(400), VIEW).length
+    expect(many).toBe(few)
+    expect(many).toBeLessThan(10)
+  })
+
+  it('an off-screen name never takes a placement slot from an on-screen one', () => {
+    const alone = placeLandmarks([{ id: 'a', sx: 400, sy: 300, size }], VIEW)
+    const crowded = placeLandmarks([
+      ...Array.from({ length: 50 }, (_, i) => ({ id: `off${i}`, sx: 5000 + i, sy: 5000, size })),
+      { id: 'a', sx: 400, sy: 300, size },
+    ], VIEW)
+    expect(crowded.find((o) => o.id === 'a')).toEqual(alone[0])
+  })
+})
+
 describe('the legend gives way when it is bigger than the map', () => {
   it('is absent at the widest stop and full at the one above it', () => {
     expect(landmarkAlpha(0.25)).toBe(0)

@@ -119,3 +119,54 @@ describe('nothing in the renderer assumes a fixed map size', () => {
     }
   })
 })
+
+// ── ★ GOING SOMEWHERE, ON A TOWN THAT DOES NOT FIT ────────────────────────────────────────
+//
+// Following a person, jumping to a place and clicking a name all end in the same move: put a
+// world point in the middle of the stage. Every one of them then goes through the clamp, so
+// "can a viewer reach X" is one question with one answer, asked here of every building in a
+// town three rings out and of a body walking past the end of the tile array.
+
+const centreOn = (
+  sx: number, sy: number, scale: number, bounds: ReturnType<typeof reachableBoundsOf>,
+): { x: number; y: number } =>
+  clampCamera(
+    { x: STAGE.w / 2 - sx * scale, y: STAGE.h / 2 - sy * scale }, scale, bounds, STAGE,
+  )
+
+/** Is this world point inside the stage at this camera position? */
+const onScreen = (sx: number, sy: number, scale: number, pos: { x: number; y: number }): boolean => {
+  const x = sx * scale + pos.x, y = sy * scale + pos.y
+  return x >= 0 && x <= STAGE.w && y >= 0 && y <= STAGE.h
+}
+
+describe('every place in the town can be got to', () => {
+  const terrain = terrainOf(48, 48)
+  const town = bigTown(3)
+  const bounds = reachableBoundsOf(terrain, town)
+
+  for (const scale of [0.25, 1, 4] as const) {
+    it(`${scale}x: all ${town.length} buildings land on the stage when the camera is sent to them`, () => {
+      const unreachable: string[] = []
+      for (const b of town) {
+        const c = drawnBoundsOf([b])
+        const sx = (c.minX + c.maxX) / 2, sy = (c.minY + c.maxY) / 2
+        if (!onScreen(sx, sy, scale, centreOn(sx, sy, scale, bounds))) unreachable.push(b.id)
+      }
+      expect(unreachable.slice(0, 5), `${unreachable.length} of ${town.length} out of reach`).toEqual([])
+    })
+  }
+
+  it('★ and so does a body that has walked past the end of the tile array', () => {
+    const { sx, sy } = { sx: (400 - 12) * 16, sy: (400 + 12) * 8 }   // tileToScreen(400, 12)
+    const withBody = reachableBoundsOf(terrain, [...town, { x: 400, y: 12, w: 1, h: 1 }])
+    expect(onScreen(sx, sy, 1, centreOn(sx, sy, 1, withBody))).toBe(true)
+  })
+
+  it('the landed clamp could not do it — this is the difference, not a restatement', () => {
+    const far = { x: 400, y: 12, w: 1, h: 1 }
+    const { sx, sy } = { sx: (400 - 12) * 16, sy: (400 + 12) * 8 }
+    expect(onScreen(sx, sy, 1, centreOn(sx, sy, 1, cameraBoundsOf(terrain)))).toBe(false)
+    expect(onScreen(sx, sy, 1, centreOn(sx, sy, 1, reachableBoundsOf(terrain, [far])))).toBe(true)
+  })
+})
