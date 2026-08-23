@@ -1,0 +1,7 @@
+{
+  "version": "v1-library-item",
+  "kind": "fishing_rod",
+  "category": "tool",
+  "spritePx": 128,
+  "iconPx": 64
+}

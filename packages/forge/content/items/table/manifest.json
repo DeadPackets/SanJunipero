@@ -1,0 +1,18 @@
+{
+  "version": "v1-library-item",
+  "kind": "table",
+  "category": "furniture",
+  "spritePx": 128,
+  "iconPx": 64,
+  "interior": {
+    "slots": {
+      "w": 1,
+      "h": 1
+    },
+    "placement": "floor",
+    "interiorKinds": [
+      "house",
+      "shed"
+    ]
+  }
+}
