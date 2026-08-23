@@ -112,6 +112,7 @@ export class EngineBridge {
   readonly #simConfig: SimConfig
   readonly #recentWindowTicks: number
   #queue: QueuedSubmit[] = []
+  #announcements: Array<{ type: string; payload: Record<string, unknown> }> = []
   #tickCallbacks: Array<(tick: number) => void> = []
   #window: SimEvent[] = []
   #lastSeq = 0
@@ -129,10 +130,17 @@ export class EngineBridge {
     this.#recentWindowTicks = opts.recentWindowTicks ?? DEFAULT_RECENT_WINDOW_TICKS
   }
 
-  // Drain queued intents in arrival order, then run the world systems, then
-  // notify per-tick subscribers. Never awaits anything: intents are pure.
+  // Drain announcements, then queued intents in arrival order, then run the world systems,
+  // then notify per-tick subscribers. Never awaits anything: intents are pure.
   wrapTickHandler(world: TickHandler): TickHandler {
     return (ctx) => {
+      // ANNOUNCEMENTS FIRST. A discovery is what made the intent behind it possible, and the
+      // runtime codifies then submits in one synchronous stretch — drain the other way round
+      // and the log reads "used the verb" before "the verb existed".
+      const announced = this.#announcements
+      this.#announcements = []
+      for (const a of announced) ctx.emit(a.type, a.payload)
+
       const queue = this.#queue
       this.#queue = []
       for (const item of queue) {
@@ -155,6 +163,12 @@ export class EngineBridge {
       world(ctx)
       for (const cb of this.#tickCallbacks) cb(ctx.tick)
     }
+  }
+
+  // A fact that is already true and has no verb to ride in on. Not a promise: nothing waits on
+  // an announcement, and a caller that has already changed the rulebook cannot be told "no".
+  announce(type: string, payload: Record<string, unknown>): void {
+    this.#announcements.push({ type, payload })
   }
 
   submit(agentId: string, intent: Intent, onResult?: (result: SubmitResult) => void): Promise<SubmitResult> {

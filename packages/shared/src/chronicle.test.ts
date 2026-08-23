@@ -236,3 +236,49 @@ describe('the C11 vocabulary', () => {
     expect(chronicleIcon('never_heard_of_it')).toBe(CHRONICLE_FALLBACK_ICON)
   })
 })
+
+describe('a discovery, in the town’s own words', () => {
+  const craft = ev('discovery_made', {
+    recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
+    byId: 'a1', intent: 'i want to carry water in a stitched hide', makes: ['waterskin'],
+  })
+  const word = ev('discovery_made', {
+    recipeId: 'express:dance', name: 'dance', kind: 'word',
+    byId: 'a1', intent: 'i want to dance by the fire', makes: [],
+  })
+
+  it('sits second in the feed — under a death, over a birth', () => {
+    expect(CHRONICLE_WEIGHTS['discovery_made']).toBe(19)
+    expect(CHRONICLE_WEIGHTS['agent_died']).toBeGreaterThan(19)
+    expect(CHRONICLE_WEIGHTS['agent_born']).toBeLessThan(19)
+  })
+
+  it('has a glyph of its own, shared with nothing else', () => {
+    expect(chronicleIcon('discovery_made')).toBe('key')
+    const others = Object.entries(CHRONICLE_ICONS).filter(([t]) => t !== 'discovery_made')
+    expect(others.map(([, i]) => i)).not.toContain('key')
+  })
+
+  it('credits the person by name and says what they worked out', () => {
+    expect(chronicleLine(craft, look)).toBe('Rahel found the way of it — stitch a waterskin.')
+    expect(chronicleLine(word, look)).toBe('Rahel gave the town a word for it — dance.')
+  })
+
+  it('NEVER puts the mind’s own words into a line a mind can read', () => {
+    for (const line of [chronicleLine(craft, look), chronicleLine(word, look)]) {
+      expect(line).not.toContain('i want to')
+      expect(line).not.toContain('stitched hide')
+      expect(line).not.toContain('by the fire')
+    }
+  })
+
+  it('says nothing rather than something wrong when the payload is not one', () => {
+    expect(chronicleLine(ev('discovery_made', { kind: 'craft', byId: 'a1' }), look)).toBeNull()
+  })
+
+  it('keeps the machinery out of both sentences', () => {
+    for (const line of [chronicleLine(craft, look), chronicleLine(word, look)]) {
+      expect(line).not.toMatch(/\b(ai|llm|model|prompt|token|agent|recipe|verb)\b/i)
+    }
+  })
+})

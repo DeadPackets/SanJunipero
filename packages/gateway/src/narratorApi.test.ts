@@ -30,7 +30,7 @@ function openNarratorFixtureDb(path: string): Database.Database {
 
 const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0 as TileId))
 
-function scriptedWorld(dbPath: string): Database.Database {
+function scriptedWorld(dbPath: string, withDiscoveries = true): Database.Database {
   const db = openDb(dbPath)
   const loop = new TickLoop({
     store: new EventStore(db),
@@ -54,9 +54,22 @@ function scriptedWorld(dbPath: string): Database.Database {
       if (tick === 40) emit('fire_ignited', { structureId: 's1', cause: 'hearth' })
       if (tick === 50) emit('agent_died', { agentId: 'cara', cause: 'hunger' })
       if (tick === 60) emit('mystery_event', { kind: 'far_bell' })
+      if (!withDiscoveries) return
+      if (tick === 40) {
+        emit('discovery_made', {
+          recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
+          byId: 'alice', intent: 'i want to carry water in a stitched hide', makes: ['waterskin'],
+        })
+      }
+      if (tick === 90) {
+        emit('discovery_made', {
+          recipeId: 'express:dance', name: 'dance', kind: 'word',
+          byId: 'bob', intent: 'i want to dance by the fire', makes: [],
+        })
+      }
     },
   })
-  for (let i = 0; i < 70; i++) loop.step()
+  for (let i = 0; i < 100; i++) loop.step()
   return db
 }
 
@@ -105,9 +118,11 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
       [20, 'structure_completed'],
       [30, 'co_slept'],
       [40, 'fire_ignited'],
+      [40, 'discovery_made'],
       [50, 'agent_died'],
       [50, 'first'],
       [60, 'mystery_event'],
+      [90, 'discovery_made'],
     ])
   })
 
@@ -118,6 +133,13 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     expect(byType.get('fire_ignited')).toBe('Fire! The house is burning.')
     expect(byType.get('agent_died')).toBe('Cara starved.')
     expect(byType.get('first')).toBe('The first death')
+    // The mind's own words never reach a sentence a mind can read; the name does.
+    const said = (await chronicle()).filter((e) => e.type === 'discovery_made').map((e) => e.label)
+    expect(said).toEqual([
+      'Alice found the way of it — stitch a waterskin.',
+      'Bob gave the town a word for it — dance.',
+    ])
+    for (const line of said) expect(line).not.toContain('i want to')
   })
 
   it('tells a mystery in the engine’s authored prose', async () => {
@@ -139,7 +161,8 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
   })
 
   it('narrows to a tick window when asked', async () => {
-    expect((await chronicle('?fromTick=30&toTick=45')).map((e) => e.type)).toEqual(['co_slept', 'fire_ignited'])
+    expect((await chronicle('?fromTick=30&toTick=45')).map((e) => e.type))
+      .toEqual(['co_slept', 'fire_ignited', 'discovery_made'])
     expect(await chronicle('?fromTick=1000&toTick=2000')).toEqual([])
   })
 
@@ -210,7 +233,7 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
 
   beforeAll(async () => {
     const dbPath = join(dir, 'world.db')
-    const db = scriptedWorld(dbPath)
+    const db = scriptedWorld(dbPath, false)
     // narratorDbPath points at a file that was never written — the ordinary early-town case
     gw = await createGateway({
       dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db, narratorDbPath: join(dir, 'absent.db'),
@@ -263,5 +286,54 @@ describe('the one-way glass the gateway reads through', () => {
       expect(schema, table).toContain(`CREATE TABLE IF NOT EXISTS ${table}`)
       for (const col of columns) expect(schema, `${table}.${col}`).toContain(col)
     }
+  })
+})
+
+describe('the scrub bar can aim at a discovery', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-narrapi-disc-'))
+  const bareDir = mkdtempSync(join(tmpdir(), 'sj-narrapi-nodisc-'))
+  let gw: Gateway, bareGw: Gateway
+  let base: string, bareBase: string
+
+  beforeAll(async () => {
+    const dbPath = join(dir, 'world.db')
+    gw = await createGateway({
+      dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db: scriptedWorld(dbPath),
+    })
+    base = `http://127.0.0.1:${gw.port}`
+    const barePath = join(bareDir, 'world.db')
+    bareGw = await createGateway({
+      dbPath: barePath, port: 0, terrain: GRASS, pollMs: 3_600_000,
+      db: scriptedWorld(barePath, false),
+    })
+    bareBase = `http://127.0.0.1:${bareGw.port}`
+  })
+  afterAll(async () => {
+    await gw.close(); await bareGw.close()
+    rmSync(dir, { recursive: true, force: true })
+    rmSync(bareDir, { recursive: true, force: true })
+  })
+
+  it('ships discoveries as their own source, with words already in them', async () => {
+    const res = await fetch(`${base}/api/timeline/marks`)
+    const body = await res.json() as { discoveries?: Array<{ tick: number; words: string }> }
+    expect(body.discoveries).toBeDefined()
+    expect(body.discoveries).toEqual([
+      { tick: 40, words: 'Alice worked out stitch a waterskin' },
+      { tick: 90, words: 'Bob found a word: dance' },
+    ])
+  })
+
+  it('keeps the five event marks it already had, unchanged', async () => {
+    const body = await (await fetch(`${base}/api/timeline/marks`)).json() as
+      { events: Array<{ type: string }> }
+    expect(body.events.length).toBeGreaterThan(0)
+    expect(new Set(body.events.map((e) => e.type))).not.toContain('discovery_made')
+  })
+
+  it('is a typed empty on a world that invented nothing, never absent', async () => {
+    const body = await (await fetch(`${bareBase}/api/timeline/marks`)).json() as
+      { discoveries: unknown }
+    expect(body.discoveries).toEqual([])
   })
 })

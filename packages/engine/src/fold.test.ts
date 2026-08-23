@@ -107,3 +107,28 @@ describe('fold', () => {
     expect(s.counters.nextEntityId).toBe(8)
   })
 })
+
+describe('discovery_made — the record, and nothing in the state', () => {
+  const base = genesisState(DEFAULT_CONFIG)
+  const payload = {
+    recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
+    byId: 'a1', intent: 'carry water in a stitched hide', makes: ['waterskin'],
+  }
+  const evt: SimEvent = { seq: 1, tick: 7, type: 'discovery_made', payload }
+
+  it('folds to a state IDENTICAL to the one it started from', () => {
+    const after = fold(base, evt, DEFAULT_CONFIG)
+    expect(stateHash(after)).toBe(stateHash(base))
+    expect(after).toBe(base)
+  })
+
+  it('refuses a discovery with no inventor', () => {
+    const { byId: _byId, ...noCredit } = payload
+    expect(() => fold(base, { ...evt, payload: noCredit }, DEFAULT_CONFIG)).toThrow()
+  })
+
+  it('refuses a kind the archive has no words for', () => {
+    expect(() => fold(base, { ...evt, payload: { ...payload, kind: 'vibe' } }, DEFAULT_CONFIG))
+      .toThrow()
+  })
+})

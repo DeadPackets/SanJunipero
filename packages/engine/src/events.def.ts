@@ -107,6 +107,13 @@ export const AgentExpressed = z.object({
   x: z.number(), y: z.number(), sense: z.enum(['sight', 'sound']).optional(),
   insideId: z.string().optional(),
 }).strict()
+// A mind worked something out that nobody wrote down. `byId` is the inventor, `intent` the
+// words they used, `makes` the item kinds the new verb can produce (empty for a coined word).
+// The tick is the envelope's; nothing here is duplicated from it.
+export const DiscoveryMade = z.object({
+  recipeId: z.string().min(1), name: z.string().min(1), kind: z.enum(['craft', 'word']),
+  byId: z.string().min(1), intent: z.string().min(1), makes: z.array(z.string().min(1)),
+}).strict()
 export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
 // `cause` stays a free string so every recorded C1-C10 log still parses; DEATH_CAUSES is the
 // vocabulary emitters are held to (controller ruling 6).

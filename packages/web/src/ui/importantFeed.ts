@@ -103,6 +103,15 @@ export const CHRONICLE_GLYPH: Record<string, ChronicleGlyph> = {
       ...px(INK, [1, 3], [2, 3], [5, 3], [6, 3]),
     ],
   },
+  key: {
+    label: 'a discovery',
+    pixels: [
+      // the ward, INK — the whole silhouette survives the warm pixel being removed
+      ...px(INK, [2, 1], [3, 1], [4, 1], [1, 2], [5, 2], [1, 3], [5, 3],
+        [2, 4], [3, 4], [4, 4], [3, 5], [3, 6], [4, 6], [3, 7]),
+      ...px(HONEY, [3, 2], [3, 3]),
+    ],
+  },
   star: {
     label: 'something the town cannot explain',
     pixels: [

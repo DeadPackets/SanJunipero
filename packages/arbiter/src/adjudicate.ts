@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/agents'
 import { registerVerb, VERBS } from '@sj/engine'
+import type { DiscoveryCredit, DiscoveryKind } from '@sj/shared'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import { codify as codifyRecipe, verbFromRecipe } from './codify.js'
@@ -47,6 +48,12 @@ function framingTainted(v: Verdict): boolean {
   return texts.some((t) => FORBIDDEN_FRAMING.test(t))
 }
 
+// The other half of the same law. `framingTainted` only ever sees an `attempt`, so the coined
+// word — which becomes a permanent verb AND an agent-visible chronicle line — went unchecked.
+export function wordTainted(word: string): boolean {
+  return FORBIDDEN_FRAMING.test(word)
+}
+
 export type AgentCtx = {
   agentId: string
   name: string
@@ -61,6 +68,16 @@ export type AgentCtx = {
   }
 }
 
+// What a codification just minted. Fired once, on the first insert, from BOTH paths — the
+// recipe half and the coined-word half (F-B). The runner turns it into a world event.
+export type Codified = {
+  recipeId: string
+  name: string
+  kind: DiscoveryKind
+  makes: string[]
+  credit: DiscoveryCredit
+}
+
 export type ArbiterDeps = {
   db: Database.Database
   llm: LlmClient
@@ -70,11 +87,14 @@ export type ArbiterDeps = {
   // against the answer, so the two can never disagree (canon-vocabulary law). A caller that
   // shows no table gets the checks that need no table; the rest wait for one.
   vocabulary?: { itemKinds: readonly string[]; structureKinds: readonly string[] }
+  // Told what was just minted, so a caller that owns a world can put it in the record. The
+  // arbiter itself never touches the world log — it does not have one.
+  onCodified?: (d: Codified) => void
 }
 
 export type Arbiter = {
   adjudicate(intent: string, agentCtx: AgentCtx): Promise<Verdict>
-  codify(recipe: Recipe): { ruleId: number; verb: string }
+  codify(recipe: Recipe, credit: DiscoveryCredit): { ruleId: number; verb: string }
   // Why this recipe may never become a verb, or null. The same gate adjudicate applies,
   // exposed so an operator queue can say what it refused and why.
   sanity(recipe: Recipe, agentCtx: AgentCtx): string | null
@@ -100,7 +120,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
 
   // The cheap approval: a word for an act that changes nothing. One small call, one rulebook
   // row, and thereafter the whole town has the verb for free.
-  function codifyExpressive(ruling: ExpressiveRuling, tick: number): string {
+  function codifyExpressive(ruling: ExpressiveRuling, tick: number, credit: DiscoveryCredit): string {
     const row = expressiveRow(ruling)
     const existing = rulebook.byId(row.id)
     if (existing !== null && existing.revertedAtTick === null) return row.id
@@ -113,6 +133,9 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     const ruleId = rulebook.insert(row, tick)
     if (!VERBS[row.id]) registerVerb(expressiveVerbFromRuling(row.name, row))
     review.queue(ruleId, row.id, tick)
+    // F-B: the coined word is the second codification path and it reports too. A record that
+    // hooked only codify() would leave the town inventing a name for dancing with no trace.
+    deps.onCodified?.({ recipeId: row.id, name: row.name, kind: 'word', makes: [], credit })
     return row.id
   }
 
@@ -191,8 +214,12 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         const cheap = assembleExpressivePrompt({ canon: CANON, agent: agentCtx, intent })
         const r = await deps.llm.object({ schema: ExpressiveRulingSchema, ...cheap })
         const ruling = ExpressiveRulingSchema.safeParse(r.value)
-        if (ruling.success) {
-          const verdict: Verdict = { kind: 'map', verb: codifyExpressive(ruling.data, tick()), params: {} }
+        if (ruling.success && !wordTainted(ruling.data.word)) {
+          const verdict: Verdict = {
+            kind: 'map',
+            verb: codifyExpressive(ruling.data, tick(), { agentId: agentCtx.agentId, intent }),
+            params: {},
+          }
           await rulings.record(intent, verdict, tick())
           return verdict
         }
@@ -248,8 +275,11 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       return verdict
     },
 
-    codify(recipe) {
-      return codifyRecipe(recipe, { rulebook, review, codex, tick: tick() })
+    codify(recipe, credit) {
+      return codifyRecipe(recipe, credit, {
+        rulebook, review, codex, tick: tick(),
+        ...(deps.onCodified === undefined ? {} : { onCodified: deps.onCodified }),
+      })
     },
 
     sanity(recipe, agentCtx) {

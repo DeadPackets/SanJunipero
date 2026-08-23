@@ -6,11 +6,12 @@ import {
   genesisState,
   openDb,
   RngStreams,
+  replayFromGenesis,
   TickLoop,
   type TickHandler,
   type TileId,
 } from '@sj/engine'
-import { SimConfigSchema } from '@sj/shared'
+import { DISCOVERY_EVENT, SimConfigSchema, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 import { DEFAULT_RECENT_WINDOW_TICKS, EngineBridge } from './bridge.js'
 
@@ -218,5 +219,93 @@ describe('nearestFood: the nearest thing worth walking to for a meal', () => {
   it('nothing beyond the horizon is a meal', () => {
     const bridge = larder()
     expect(bridge.nearestFood(20, 20, 2)).toBeNull()
+  })
+})
+
+// A bare world with no systems running, so the only thing in the log is what the bridge put
+// there. Same `let handler` wiring the harnesses above use — TickLoop takes onTick once.
+function announceHarness(): {
+  store: EventStore; loop: TickLoop; bridge: EngineBridge; config: SimConfig; terrain: TileId[][]
+} {
+  const config = SimConfigSchema.parse({})
+  const terrain: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, (): TileId => 0))
+  const store = new EventStore(openDb(':memory:'))
+  let state = genesisState(config, terrain)
+  state = fold(state, store.append(state.tick, 'agent_spawned',
+    { id: AGENT, name: 'Tamar', x: 3, y: 3, ageDays: 7300 }), config)
+  let handler: TickHandler = () => {}
+  const loop = new TickLoop({
+    store, state, rng: new RngStreams('bridge-announce'), config, onTick: (ctx) => handler(ctx),
+  })
+  const bridge = new EngineBridge({ loop, store, simConfig: config })
+  handler = bridge.wrapTickHandler(() => {})
+  return { store, loop, bridge, config, terrain }
+}
+const typesOf = (store: EventStore): string[] => store.readFrom(0).map((e: SimEvent) => e.type)
+
+describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
+  it('puts the announcement in the world log at the next tick', () => {
+    const { store, loop, bridge } = announceHarness()
+    bridge.announce(DISCOVERY_EVENT, {
+      recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
+      byId: 'a1', intent: 'carry water in a hide', makes: ['waterskin'],
+    })
+    expect(typesOf(store)).not.toContain(DISCOVERY_EVENT)  // nothing before the tick
+    loop.step()
+    expect(typesOf(store)).toContain(DISCOVERY_EVENT)
+  })
+
+  it('drains ONCE — a second tick does not re-announce', () => {
+    const { store, loop, bridge } = announceHarness()
+    bridge.announce(DISCOVERY_EVENT, {
+      recipeId: 'recipe:a', name: 'a', kind: 'word', byId: 'a1', intent: 'a', makes: [],
+    })
+    loop.step(); loop.step(); loop.step()
+    expect(typesOf(store).filter((t) => t === DISCOVERY_EVENT)).toHaveLength(1)
+  })
+
+  it('keeps arrival order between two announcements in the same tick', () => {
+    const { store, loop, bridge } = announceHarness()
+    for (const n of ['first', 'second']) {
+      bridge.announce(DISCOVERY_EVENT, {
+        recipeId: `express:${n}`, name: n, kind: 'word', byId: 'a1', intent: n, makes: [],
+      })
+    }
+    loop.step()
+    const names = store.readFrom(0)
+      .filter((e: SimEvent) => e.type === DISCOVERY_EVENT)
+      .map((e: SimEvent) => (e.payload as { name: string }).name)
+    expect(names).toEqual(['first', 'second'])
+  })
+
+  it('an announcement lands BEFORE the intent it made possible', () => {
+    // The whole argument for draining announcements first: the runtime codifies and then
+    // submits in one synchronous stretch, so the other order writes a log that lies about
+    // causality — "used the verb" recorded before "the verb existed".
+    const { store, loop, bridge } = announceHarness()
+    void bridge.submit(AGENT, { verb: 'walk', params: { x: 4, y: 3 } })
+    bridge.announce(DISCOVERY_EVENT, {
+      recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
+      byId: AGENT, intent: 'carry water in a hide', makes: ['waterskin'],
+    })
+    loop.step()
+    const log = store.readFrom(0)
+    const discovery = log.findIndex((e: SimEvent) => e.type === DISCOVERY_EVENT)
+    const acted = log.findIndex((e: SimEvent) => e.type === 'action_started')
+    expect(discovery).toBeGreaterThanOrEqual(0)
+    expect(acted).toBeGreaterThan(discovery)
+  })
+
+  it('folds and replays without moving the state — the archive is the log, not the state', () => {
+    const { store, loop, bridge, config, terrain } = announceHarness()
+    const before = stateHash(loop.state)
+    bridge.announce(DISCOVERY_EVENT, {
+      recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
+      byId: 'a1', intent: 'carry water in a hide', makes: ['waterskin'],
+    })
+    loop.step()
+    expect(stateHash(replayFromGenesis(store, config, terrain))).toBe(stateHash(loop.state))
+    expect(loop.state.tick).toBe(1)
+    expect(before).not.toBe('')
   })
 })
