@@ -1,7 +1,7 @@
 // Founders dev world script: the five approved founders walk the town among the
 // approved building set. Deterministic (no Math.random) — same laws as the engine's
 // scripted module: policies are pure functions of perception, timeline is tick-keyed.
-import type { SimConfig } from '@sj/shared'
+import { doorFrontTile, type SimConfig } from '@sj/shared'
 import {
   composePerception, createWorldTick, doorTile, submitIntent,
   type PerceptionPacket, type RngStreams, type Structure, type WorldState,
@@ -42,7 +42,7 @@ export const TOWN_STRUCTURES: readonly TownStructure[] = [
 // The scripted fixture keeps its own unowned, unburnable-by-kind shape so every landed gate
 // folds exactly the events it always folded.
 const SCRIPTED_STRUCTURES: readonly DevStructure[] = TOWN_STRUCTURES.map((s) => ({
-  ...s, owner: null, flammable: s.kind !== 'standing_stone',
+  ...s, owner: null, facing: 'sw' as const, flammable: s.kind !== 'standing_stone',
 }))
 
 /** 'scripted' keeps the frozen G6 fixture set; 'showcase' serves the town the roads were drawn for. */
@@ -151,9 +151,14 @@ export function foundersFor(structures: readonly DevStructure[]): readonly Found
   return FOUNDERS.map((f) => {
     const home = byOwner.get(f.id)
     if (home === undefined) return f
-    // The south-centre tile just outside the footprint — the same tile engine doorTile picks
-    // first, and on this template it is the yard road the rank faces.
-    const spawn = { x: home.x + ((home.w - 1) >> 1), y: home.y + home.h }
+    // The tile the door opens onto, on the face the building presents — the same tile engine
+    // `doorTile` picks, because both now answer "the street this building fronts". Computing
+    // the south-centre by hand was right only while every building faced one way.
+    const d = doorFrontTile({
+      kind: home.kind, dx: home.x, dy: home.y, w: home.w, h: home.h,
+      facing: home.facing, owner: null, furnishings: [],
+    })
+    const spawn = { x: d.dx, y: d.dy }
     return { ...f, spawn, patrol: [spawn, f.patrol[1]] as FounderDef['patrol'] }
   })
 }
