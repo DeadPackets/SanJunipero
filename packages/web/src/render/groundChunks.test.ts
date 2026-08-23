@@ -1,4 +1,4 @@
-import { Container, Sprite } from 'pixi.js'
+import { Container, Sprite, type Bounds, type RenderTexture } from 'pixi.js'
 import { describe, expect, it } from 'vitest'
 import {
   CHUNK_BLEED_PX, CHUNK_BYTES_PER_PX, CHUNK_PX_H, CHUNK_PX_W, CHUNK_RETAIN,
@@ -334,9 +334,19 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
 // Not a source read and not a re-implementation: `createGroundBaker` itself, with a stub for the
 // one thing it needs a GPU for. Everything it allocates is the production path.
 
+type Bake = { at: { x: number; y: number }; texW: number; texH: number; kids: number; bounds: Bounds }
+
 function drive(rings: number) {
-  const renders: number[] = []
-  const renderer = { render: () => { renders.push(1) } }
+  const renders: Bake[] = []
+  const renderer = {
+    render: (o: { container: Container; target: RenderTexture; clear: boolean }) => {
+      renders.push({
+        at: { x: o.container.position.x, y: o.container.position.y },
+        texW: o.target.width, texH: o.target.height,
+        kids: o.container.children.length, bounds: o.container.getBounds(),
+      })
+    },
+  }
   const root = new Container()
   const baker = createGroundBaker(renderer, root, new TextureBook())
   const grid = gridFor(rings)
@@ -397,6 +407,80 @@ describe('★ what the real baker puts on the GPU', () => {
     expect(wide.chunks).toBeGreaterThan(tight.chunks)
     expect(back.chunks).toBeLessThanOrEqual(tight.chunks + CHUNK_RETAIN)
     expect(back.bytes).toBeLessThan(wide.bytes)
+  })
+
+  /**
+   * ★ THE ONE THING A BROWSER WOULD HAVE CAUGHT, CHECKED WITHOUT ONE.
+   *
+   * The whole-map baker put ONE sprite at `(-offX, 0)` holding geometry drawn at bake
+   * coordinates, so a bake-space point B landed at world `(B.x - offX, B.y)`. Every chunk has
+   * to land in exactly the same place, and it is reached the other way round — the geometry is
+   * translated onto the chunk's origin and the sprite is translated back off it. Two sign
+   * errors that cancel look identical to two that do not, and the difference is the entire
+   * ground shifted by a chunk. There is no test for "the picture is right", so this is the
+   * arithmetic stated as a claim: for a probe point in every resident chunk, the world position
+   * of the texel holding it is the world position the single texture gave it.
+   */
+  it('★ a chunk lands exactly where the one whole-map texture put the same pixel', () => {
+    const d = drive(3)
+    d.baker.setView(viewAt(0.5, d.grid.fieldW / 2, d.grid.fieldH / 2, d.grid.offsetX))
+    d.baker.rebake(d.terrain, [])
+    expect(d.root.children.length).toBeGreaterThan(1)
+    let probes = 0
+    for (const s of d.root.children as Sprite[]) {
+      // default anchor: a chunk whose texture hangs off its own origin shifts the whole ground
+      expect(s.anchor.x).toBe(0)
+      expect(s.anchor.y).toBe(0)
+      // the sprite's top-left IS its chunk's top-left in bake space, less the offset
+      const bakeX = s.position.x + d.grid.offsetX, bakeY = s.position.y
+      expect(bakeX % CHUNK_PX_W).toBe(0)
+      expect(bakeY % CHUNK_PX_H).toBe(0)
+      for (const [dx, dy] of [[0, 0], [1, 1], [CHUNK_PX_W - 1, CHUNK_PX_H - 1]] as const) {
+        // where the single whole-map sprite put bake point B, against where this chunk puts it
+        const whole = { x: bakeX + dx - d.grid.offsetX, y: bakeY + dy }
+        const chunked = { x: s.position.x + dx, y: s.position.y + dy }
+        expect(chunked).toEqual(whole)
+        probes++
+      }
+    }
+    expect(probes).toBeGreaterThan(9)
+  })
+
+  /**
+   * ★ AND THE OTHER HALF OF THE SAME ARITHMETIC: the geometry has to be translated ONTO the
+   * chunk's origin before it is rendered, or every chunk paints the same corner of the map into
+   * its own texture and only the first one is right. The sprite positions above would be
+   * perfect and the picture would be twelve copies of one chunk.
+   */
+  it('★ each chunk renders the geometry translated onto its own origin, inside its target', () => {
+    const d = drive(3)
+    d.baker.setView(viewAt(0.5, d.grid.fieldW / 2, d.grid.fieldH / 2, d.grid.offsetX))
+    d.baker.rebake(d.terrain, [])
+    expect(d.renders.length).toBeGreaterThan(1)
+    const seen = new Set<string>()
+    let painted = 0
+    for (const r of d.renders) {
+      // the translation is a chunk origin, negated — nothing else is
+      expect(Math.abs(r.at.x % CHUNK_PX_W)).toBe(0)
+      expect(Math.abs(r.at.y % CHUNK_PX_H)).toBe(0)
+      expect(r.at.x).toBeLessThanOrEqual(0)
+      expect(r.at.y).toBeLessThanOrEqual(0)
+      seen.add(`${r.at.x}:${r.at.y}`)
+      // A chunk in the corner of the field's AABB can be outside the world diamond entirely
+      // and legitimately draw nothing; every chunk that DOES carry ground must land on its own
+      // target, which is the half of this the translation can get wrong.
+      if (r.kids === 0) continue
+      painted++
+      expect(r.bounds.maxX, `${r.at.x},${r.at.y} draws entirely left of its target`)
+        .toBeGreaterThan(0)
+      expect(r.bounds.minX, `${r.at.x},${r.at.y} draws entirely right of its target`)
+        .toBeLessThan(r.texW)
+      expect(r.bounds.maxY).toBeGreaterThan(0)
+      expect(r.bounds.minY).toBeLessThan(r.texH)
+    }
+    expect(painted).toBeGreaterThan(1)
+    // every chunk got its OWN translation; two chunks sharing one is the defect
+    expect(seen.size).toBe(d.renders.length)
   })
 
   it('destroy leaves nothing on the GPU and nothing in the ground layer', () => {
