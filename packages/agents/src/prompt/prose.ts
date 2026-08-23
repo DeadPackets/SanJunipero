@@ -263,12 +263,18 @@ function roadPhrase(r: MakeableRoad): string {
 
 // Block 6, not block 1: the static prefix is byte-frozen and prompt caching rides on it, so
 // the vocabulary a mind needs rides the same breath as what it can see (C11 R-H).
-export function makeablesLine(m: Makeables): string {
+export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: number } | null): string {
   const parts: string[] = []
   if (m.builds.length > 0) {
     parts.push(`What your hands know how to raise, given the stuff and a spot to put it: ${
       m.builds.map((b) => `a ${b.kind.replace(/_/g, ' ')} (${costPhrase(b.inputs)})`).join(', ')
     }.`)
+    // The spot, named — the line has always promised one and never said where. A mind that
+    // has to be refused before it can learn where to go wastes a waking hour on it, which is
+    // the same complaint R21 candidate 3 settled about every other refusal in the world.
+    if (groundForBuilding !== undefined && groundForBuilding !== null) {
+      parts.push(`The town keeps ground for a new roof at (${groundForBuilding.x}, ${groundForBuilding.y}); you must be standing there to raise one.`)
+    }
   }
   if (m.crafts.length > 0) {
     parts.push(`What they know how to shape: ${

@@ -2,7 +2,8 @@ import {
   edgesOwed, simTimeFromTick, TOWN_RINGS_GENESIS, WORLD_MARGIN, worldSizeForRings,
 } from '@sj/shared'
 import { genesisTerrainAt } from '../genesis/world.js'
-import type { WorldState } from '../state.js'
+import { authoredOrigin, type WorldState } from '../state.js'
+import { townGroundBox } from '../town.js'
 import type { TickCtx } from '../worldTick.js'
 
 // ★ THE WORLD IS AS BIG AS WHAT STANDS IN IT, PLUS A BLOCK PITCH OF WILD.
@@ -43,10 +44,7 @@ export function growthsSoFar(state: WorldState): number {
   return state.growths ?? 0
 }
 
-/** Where the array's (0, 0) stands in the frame `genesisTerrainAt` is written in. */
-export function authoredOrigin(state: WorldState): { x: number; y: number } {
-  return state.origin ?? { x: 0, y: 0 }
-}
+export { authoredOrigin }
 
 /** The tile box of everything built, in array coordinates. `null` when nothing stands: an
  *  empty world owes nobody ground. Structures only — agents walk, and a world that widened
@@ -87,13 +85,39 @@ export function grownStrip(
     Array.from({ length: cols }, (_, c) => genesisTerrainAt(atX + c + ox, atY + r + oy) as number))
 }
 
+/**
+ * ★ WHAT THE WORLD OWES CLEARANCE TO: everything standing, AND the ground the town has laid.
+ *
+ * This lane measured it from the built set alone and it under-measured by exactly `STREET`.
+ * The outermost roof stands three tiles inside its own kerb, so a world that owes one pitch
+ * past the last roof owes three tiles less than one pitch past the last street — and the next
+ * ring's far street band lands in precisely those three tiles. Measured, ring 1 → ring 2: the
+ * last roof is at y 112 and ring 2's far band ends at 134, which is PITCH + STREET beyond it.
+ * The town could plat a ring it could then never lay.
+ *
+ * That is this file's own C-5, and it is paid here rather than by rounding `WORLD_MARGIN` up:
+ * the margin is still exactly one block pitch, the thing it is measured FROM is now the whole
+ * town rather than its roofs. A world with no town in it is unchanged, which is why every
+ * fixture and G2 hash exactly where they did.
+ */
+export function owedBox(state: WorldState): { dx0: number; dy0: number; dx1: number; dy1: number } | null {
+  const built = builtBox(state)
+  const town = townGroundBox(state)
+  if (built === null) return town
+  if (town === null) return built
+  return {
+    dx0: Math.min(built.dx0, town.dx0), dy0: Math.min(built.dy0, town.dy0),
+    dx1: Math.max(built.dx1, town.dx1), dy1: Math.max(built.dy1, town.dy1),
+  }
+}
+
 export function mapGrowthSystem(ctx: TickCtx): void {
   if (!ctx.config.mapGrowth.enabled) return
   const state = ctx.state()
   const time = simTimeFromTick(state.tick)
   if (time.hour !== 0 || time.minute !== 0 || state.tick === 0) return
 
-  const box = builtBox(state)
+  const box = owedBox(state)
   if (box === null) return
   const w = state.terrain[0]!.length, h = state.terrain.length
   if (w < GROWABLE_FLOOR || h < GROWABLE_FLOOR) return

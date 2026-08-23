@@ -355,7 +355,10 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
     ['forage', {}, 'no forest nearby — berries, mushrooms and herbs grow in patches, and a patch is gathered by name once you can see one'],
     ['craft', { recipe: 'stew' }, 'not enough meat — meat comes off an animal you have hunted, or a fish out of the water'],
     ['craft', { recipe: 'garment' }, 'not enough cloth — cloth is woven from fiber'],
-    ['build', { kind: 'house', x: 66, y: 66 }, 'not close enough to build — stand within reach of (66, 66)'],
+    // The build refusal used to answer a coordinate the mind chose. It cannot any more — a
+    // roof goes on the plot the town has ground for — so the door it leaves open is the place
+    // itself, which is strictly more than the old one gave.
+    ['build', { kind: 'house' }, 'the town keeps ground for a house — go and stand at (100, 87)'],
     ['tend', { targetId: 'yusuf' }, 'not adjacent to the patient — they are at (67, 75)'],
     ['give', { itemId: 'item_17', targetId: 'yusuf' }, 'not adjacent to give — they are at (67, 75)'],
     ['pave', { x: 80, y: 67 }, 'not enough stone — stone comes from the loose rock at the foot of an outcrop'],

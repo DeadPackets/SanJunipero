@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import { assemblePrompt } from './assemble.js'
 import {
-  assertQuotedName, CONSTRUCT_VOCABULARY, scanPromptForGlassLeak, UNNAMED_CONSTRUCT_COPY,
+  assertQuotedName, CONSTRUCT_VOCABULARY, scanForLayoutLeak, scanPromptForGlassLeak,
+  TOWN_LAYOUT_VOCABULARY, UNNAMED_CONSTRUCT_COPY,
 } from './glassScan.js'
-import { perceptionToProse } from './prose.js'
+import { makeablesLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
 import { conversationPacket, fixtureBlocks, quietMeadowPacket } from '../testutil/fixtures.js'
 
@@ -88,6 +89,34 @@ describe('the naming law', () => {
     expect(assertQuotedName('The Long Turn', [said])).toBeNull()
     expect(assertQuotedName('long turning', [said])).toBeNull()
     expect(assertQuotedName('Long Turning', [])).toBeNull()
+  })
+
+  it('★ the layout vocabulary reaches no authored surface a mind reads', () => {
+    for (const block of [RULES_OF_BEING, CAPABILITIES, SPEECH_RULES]) {
+      expect(scanForLayoutLeak(block)).toEqual([])
+    }
+    expect(scanForLayoutLeak(perceptionToProse(quietMeadowPacket))).toEqual([])
+    expect(scanForLayoutLeak(perceptionToProse(conversationPacket))).toEqual([])
+    // The one line that DOES say something about the layout says only a place.
+    const line = makeablesLine(
+      { builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] }, { x: 67, y: 94 })
+    expect(line).toContain('The town keeps ground for a new roof at (67, 94)')
+    expect(scanForLayoutLeak(line)).toEqual([])
+    expect(scanPromptForGlassLeak(line)).toEqual([])
+    // And it says nothing at all when there is nowhere left, rather than an empty phrase.
+    expect(makeablesLine({ builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] }, null))
+      .not.toContain('keeps ground')
+    expect(makeablesLine({ builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] }))
+      .not.toContain('keeps ground')
+  })
+
+  it('★ and the scan is not vacuous: it catches every one of our own words for the grammar', () => {
+    for (const word of TOWN_LAYOUT_VOCABULARY) {
+      expect(scanForLayoutLeak(`Stand on the ${word} by the road.`), word).toContain(word)
+    }
+    // A sentence that leaks the rule rather than the place is exactly what this refuses.
+    expect(scanForLayoutLeak('The next ring of blocks will be platted when this one fills.'))
+      .toEqual(['blocks', 'ring', 'platted'])
   })
 
   it('has one copy for the unnamed case, and it is not a label', () => {

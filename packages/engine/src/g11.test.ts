@@ -99,8 +99,10 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
 
   // ★ THE WORLD WIDENS THE EDGE THE TOWN IS CROWDING, AND ONLY THAT ONE. The genesis town's
   // southernmost roof stands four rows inside its own margin in a 128-tile world — the very
-  // shortfall the generator lane raised — so the first midnight grows south by exactly four,
-  // and then the world owes nothing and stops.
+  // shortfall the generator lane raised — and its southernmost KERB stands three rows further
+  // out again, because a building sits three tiles inside its own street. The clearance is
+  // owed to the ground the town has laid, not to its roofs, so the first midnight grows south
+  // by seven, and then the world owes nothing and stops.
   it('widens the one edge the town crowds, by exactly the ground it owes, and then stops', () => {
     const { state: town } = genesisTown(GROWS)
     const grown = pass(town, GROWS, MINUTES_PER_DAY)
@@ -108,8 +110,8 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
     expect(growth).toBeDefined()
     const p = growth!.payload as { edge: string; depth: number }
     expect(GROWTH_EDGES).toContain(p.edge)
-    expect({ edge: p.edge, depth: p.depth }).toEqual({ edge: 's', depth: 4 })
-    expect(grown.state.terrain.length).toBe(town.terrain.length + 4)
+    expect({ edge: p.edge, depth: p.depth }).toEqual({ edge: 's', depth: 7 })
+    expect(grown.state.terrain.length).toBe(town.terrain.length + 7)
     expect(grown.state.terrain[0]!.length).toBe(town.terrain[0]!.length)
     expect(grown.state.growths).toBe(1)
     // A south growth moves no stored coordinate, so nothing standing has to be carried.
