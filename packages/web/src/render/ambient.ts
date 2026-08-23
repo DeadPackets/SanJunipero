@@ -19,7 +19,7 @@ export const SMOKE_COLOR = 0xcfc6bc    // warm grey, MASTER_PALETTE — cream re
 
 // Smoke rises from a FIRE and a window glows because something is burning inside it, so both
 // effects answer to the same question: does this building have a hearth? The C13 city
-// template says which kinds are furnished with one (the hut), and a fire pit is an open fire
+// template says which kinds are furnished with one (the house), and a fire pit is an open fire
 // whether or not anything furnished it. EVERY completed structure used to do both, which is
 // why pale squares hung over the wagon and the shed — neither has a chimney or a window.
 export const HEARTH_KINDS: ReadonlySet<string> = new Set([

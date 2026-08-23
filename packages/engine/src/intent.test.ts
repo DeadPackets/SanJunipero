@@ -160,7 +160,7 @@ describe('walk progression (stepWalk)', () => {
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     s = applyAll(s, stepWalk(s, 'a1')) // a1 now at (1,0)
-    s = fold(s, ev(seq++, 'structure_planned', { id: 'structure_1', kind: 'hut', x: 2, y: 0, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'a1' }))
+    s = fold(s, ev(seq++, 'structure_planned', { id: 'structure_1', kind: 'house', x: 2, y: 0, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'a1' }))
     const blocked = stepWalk(s, 'a1')
     expect(blocked).toEqual([{ type: 'action_interrupted', payload: { agentId: 'a1', reason: 'blocked' } }])
     s = applyAll(s, blocked)

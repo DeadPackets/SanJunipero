@@ -18,7 +18,7 @@ function fixture(): WorldState {
     },
     structures: {
       s1: {
-        id: 's1', kind: 'hut', x: 0, y: 0, w: 1, h: 1, hp: 5, maxHp: 5, flammable: true,
+        id: 's1', kind: 'house', x: 0, y: 0, w: 1, h: 1, hp: 5, maxHp: 5, flammable: true,
         stage: 'complete', progressTicks: 0, builtBy: 'a2', burning: false, burnTicks: 0,
       },
     },
@@ -46,9 +46,9 @@ describe('chronicleLabel', () => {
       .toBe('Mira was born.')
     expect(chronicleLabel(ev('co_slept', { aId: 'a1', bId: 'a2', day: 1 }), state))
       .toBe('Rahel and Tomas kept house together.')
-    expect(chronicleLabel(ev('structure_completed', { id: 's1' }), state)).toBe('The hut is finished.')
+    expect(chronicleLabel(ev('structure_completed', { id: 's1' }), state)).toBe('The house is finished.')
     expect(chronicleLabel(ev('structure_inscribed', { structureId: 's1', text: 'ours', agentId: 'a1' }), state))
-      .toBe('New words carved on the hut.')
+      .toBe('New words carved on the house.')
   })
 
   it('says nothing about a type it has no words for', () => {

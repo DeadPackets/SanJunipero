@@ -88,7 +88,7 @@ describe('ControlBar — an honest refusal', () => {
 
   it('grows and shrinks with what the viewer can currently do', () => {
     const plain = (render().match(/<button/g) ?? []).length
-    const inside = (render({ insideId: 'hut1', following: 'amara' }).match(/<button/g) ?? []).length
+    const inside = (render({ insideId: 'house1', following: 'amara' }).match(/<button/g) ?? []).length
     expect(inside).toBe(plain + 2)
   })
 

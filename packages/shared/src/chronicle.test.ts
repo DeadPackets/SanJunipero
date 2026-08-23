@@ -9,7 +9,7 @@ import {
 import type { SimEvent } from './events.js'
 
 const NAMES: Record<string, string> = { a1: 'Rahel', a2: 'Tomas' }
-const KINDS: Record<string, string> = { s1: 'hut', s2: 'storehouse' }
+const KINDS: Record<string, string> = { s1: 'house', s2: 'storehouse' }
 const look: ChronicleLookup = {
   agentName: (id) => NAMES[id] ?? id,
   structureKind: (id) => KINDS[id] ?? 'building',
@@ -66,9 +66,9 @@ describe('chronicleLine', () => {
   })
 
   it('writes the buildings — finished, burning, spreading, inscribed', () => {
-    expect(chronicleLine(ev('structure_completed', { id: 's1' }), look)).toBe('The hut is finished.')
+    expect(chronicleLine(ev('structure_completed', { id: 's1' }), look)).toBe('The house is finished.')
     expect(chronicleLine(ev('fire_ignited', { structureId: 's1', cause: 'hearth' }), look))
-      .toBe('Fire! The hut is burning.')
+      .toBe('Fire! The house is burning.')
     expect(chronicleLine(ev('fire_spread', { fromId: 's1', toId: 's2' }), look))
       .toBe('The fire has spread to the storehouse.')
     expect(chronicleLine(ev('structure_inscribed', { structureId: 's2', text: 'ours', agentId: 'a1' }), look))

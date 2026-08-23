@@ -75,8 +75,13 @@ describe('forge config', () => {
     // `mortality.drainPerTick.injury` 0.05 → 0.025, so an untended wound outlasts the walk of
     // whoever might tend it. C11 has no third re-pin; later tuning belongs to C8's keystone.
     // Previous value (C11 Task 2): 482f12038e542e54d9cb5a5add1e4556c4e40457bd5300dc7e66ae8e341dbf70
+    // Moved a third time by the `hut` → `house` rename lane, the authorized retirement of the
+    // `hut` id. It renames four `construction` keys and the `hut` strings in
+    // `structures.enterableKinds`, `privateKinds`, `sleepableKinds` and `recipes`, and changes
+    // NO value: every number and every boolean in this config is what it was.
+    // Previous value (C11 Task 37b): a90bd7471668eea6e8a8e7932129ef7905ae2477b396d5c7b792df539065c4d8
     expect(stateHash(DEFAULT_CONFIG)).toBe(
-      'a90bd7471668eea6e8a8e7932129ef7905ae2477b396d5c7b792df539065c4d8')
+      '02f295ad603483998c2e85a641f6aa35372ddf630614a46648cd1f95b284ba5b')
     expect(stateHash(SimConfigSchema.parse({}))).toBe(stateHash(DEFAULT_CONFIG))
     expect(Object.keys(DEFAULT_CONFIG)).not.toContain('visionQa')
   })

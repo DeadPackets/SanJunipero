@@ -43,7 +43,7 @@ export const BUILT_FORM_MATERIALS: Readonly<Record<string, RampName>> = {
   well: 'stone', fire_pit: 'stone', standing_stone: 'stone', grave: 'stone',
   wagon: 'timber', scaffolding: 'timber', bridge: 'timber', shed: 'timber',
   cabin: 'timber',
-  hut: 'clay', cottage: 'clay', farmhouse: 'clay', storehouse: 'clay',
+  house: 'clay', cottage: 'clay', farmhouse: 'clay', storehouse: 'clay',
 }
 
 /** The one mark that says a person made this and meant it: water in the well's mouth, embers

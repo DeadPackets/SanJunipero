@@ -924,10 +924,10 @@ export function buildableRecipe(config: SimConfig, kind: string): StructureRecip
   return row !== undefined && Object.keys(row.inputs).length > 0 ? row : null
 }
 
-// The hut keeps its C9 dial as the duration source; every other kind reads its row. The two
+// The house keeps its C9 dial as the duration source; every other kind reads its row. The two
 // are asserted equal in config.test.ts, so this is one number under two names, not two numbers.
 export function buildTicks(config: SimConfig, kind: string): number {
-  return kind === 'hut' ? config.construction.hutTicks : (config.structures.recipes[kind]?.durationTicks ?? 0)
+  return kind === 'house' ? config.construction.houseTicks : (config.structures.recipes[kind]?.durationTicks ?? 0)
 }
 
 function buildableGroundRefusal(state: WorldState, x: number, y: number, w: number, h: number): string | null {

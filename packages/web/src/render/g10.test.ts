@@ -140,13 +140,13 @@ function c9Fixture(): WorldState {
   return {
     ...s,
     agents: {
-      amara: body('amara', { insideId: 'hut1', asleep: true }),
-      yusuf: body('yusuf', { insideId: 'hut1', asleep: true }),
+      amara: body('amara', { insideId: 'house1', asleep: true }),
+      yusuf: body('yusuf', { insideId: 'house1', asleep: true }),
       nadia: body('nadia', {}),
     },
     structures: {
-      hut1: {
-        id: 'hut1', kind: 'hut', x: 2, y: 2, w: 2, h: 2, hp: 50, maxHp: 50, flammable: true,
+      house1: {
+        id: 'house1', kind: 'house', x: 2, y: 2, w: 2, h: 2, hp: 50, maxHp: 50, flammable: true,
         stage: 'complete', progressTicks: 0, builtBy: 'yusuf', burning: false, burnTicks: 0,
         owner: 'amara',
       },
@@ -156,7 +156,7 @@ function c9Fixture(): WorldState {
         burning: false, burnTicks: 0,
       },
     },
-    items: { i1: { id: 'i1', kind: 'bread', qty: 2, loc: { t: 'structure', id: 'hut1' } } },
+    items: { i1: { id: 'i1', kind: 'bread', qty: 2, loc: { t: 'structure', id: 'house1' } } },
     crops: {},
   }
 }
@@ -165,25 +165,25 @@ describe('GATE G10 — 4. interior purity', () => {
   const state = c9Fixture()
 
   it('reads the room off engine truth, and never off the viewer', () => {
-    const room = interiorOf(state, 'hut1')!
-    expect(room.kind).toBe('hut')
+    const room = interiorOf(state, 'house1')!
+    expect(room.kind).toBe('house')
     expect(room.occupants).toEqual(['amara', 'yusuf'])
     expect(room.items).toEqual(['i1'])
     expect(interiorOf(state, 'stone')).toBeNull()
     // reading the room did not touch the state it read
-    expect(interiorOf(state, 'hut1')).toEqual(room)
-    expect(state.agents['amara']!.insideId).toBe('hut1')
+    expect(interiorOf(state, 'house1')).toEqual(room)
+    expect(state.agents['amara']!.insideId).toBe('house1')
   })
 
   it('furnishes the room from the C13 template and keeps the plan\'s minimum intact', () => {
-    expect(INTERIOR_LAYOUTS.hut.map((f) => f.kind)).toEqual(['bed', 'hearth', 'table'])
-    const kinds = roomFurnishings('hut').map((f) => f.kind)
+    expect(INTERIOR_LAYOUTS.house.map((f) => f.kind)).toEqual(['bed', 'hearth', 'table'])
+    const kinds = roomFurnishings('house').map((f) => f.kind)
     for (const must of ['bed', 'hearth', 'table']) expect(kinds).toContain(must)
-    expect(roomPlan('hut', []).every((p) => p.url === null)).toBe(true)   // art independence
+    expect(roomPlan('house', []).every((p) => p.url === null)).toBe(true)   // art independence
   })
 
   it('lays both sleepers on the bed at distinct cells, and nobody in a bedless room', () => {
-    const room = interiorOf(state, 'hut1')!
+    const room = interiorOf(state, 'house1')!
     const sleeping = room.occupants.filter((id) => state.agents[id]!.asleep)
     const slots = bedSlots(room.kind, sleeping)
     expect(Object.keys(slots)).toEqual(['amara', 'yusuf'])

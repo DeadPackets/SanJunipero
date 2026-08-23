@@ -90,7 +90,7 @@ describe('exposure: what the cold takes, and who it cannot reach', () => {
     const inside = (): WorldState => {
       let s = bodyAt(WINTER_NIGHT)
       s = fold(s, ev('structure_planned', {
-        id: 'structure_1', kind: 'hut', x: 4, y: 4, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
+        id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
       }, s.tick), CFG)
       s = fold(s, ev('structure_completed', { id: 'structure_1' }, s.tick), CFG)
       return { ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, insideId: 'structure_1' } } }

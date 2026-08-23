@@ -125,8 +125,8 @@ describe('IntentSchema.params emits a grammar a constrained decoder can compile'
     expect(IntentSchema.parse({ verb: 'walk', params: { x: 62, y: 70 } }).params).toEqual({ x: 62, y: 70 })
     expect(IntentSchema.parse({ verb: 'give', params: { itemId: 'i1', targetId: 'omar' } }).params)
       .toEqual({ itemId: 'i1', targetId: 'omar' })
-    expect(IntentSchema.parse({ verb: 'build', params: { kind: 'hut', x: 1, y: 2 } }).params)
-      .toEqual({ kind: 'hut', x: 1, y: 2 })
+    expect(IntentSchema.parse({ verb: 'build', params: { kind: 'house', x: 1, y: 2 } }).params)
+      .toEqual({ kind: 'house', x: 1, y: 2 })
   })
 })
 

@@ -19,11 +19,11 @@ const stand = (id: string, kind: string, x: number, y: number, w = 1, h = 1): S 
 
 // The Task-59 town, in world coordinates at the showcase anchor {x:0,y:9}.
 const TOWN: S[] = [
-  stand('structure_hut_14_13', 'hut', 14, 13, 2, 2),
-  stand('structure_hut_18_13', 'hut', 18, 13, 2, 2),
-  stand('structure_hut_22_13', 'hut', 22, 13, 2, 2),
-  stand('structure_hut_19_16', 'hut', 19, 16, 2, 2),
-  stand('structure_hut_23_16', 'hut', 23, 16, 2, 2),
+  stand('structure_house_14_13', 'house', 14, 13, 2, 2),
+  stand('structure_house_18_13', 'house', 18, 13, 2, 2),
+  stand('structure_house_22_13', 'house', 22, 13, 2, 2),
+  stand('structure_house_19_16', 'house', 19, 16, 2, 2),
+  stand('structure_house_23_16', 'house', 23, 16, 2, 2),
   stand('structure_storehouse_13_21', 'storehouse', 13, 21, 2, 2),
   stand('structure_shed_18_26', 'shed', 18, 26),
   stand('structure_shed_27_30', 'shed', 27, 30),
@@ -111,9 +111,9 @@ describe('SILHOUETTE_RANK', () => {
   })
 
   it('reads a public building heavier than a dwelling', () => {
-    expect(SILHOUETTE_RANK['fire_pit']).toBeLessThan(SILHOUETTE_RANK['hut'])
-    expect(SILHOUETTE_RANK['storehouse']).toBeLessThan(SILHOUETTE_RANK['hut'])
-    expect(SILHOUETTE_RANK['well']).toBeLessThan(SILHOUETTE_RANK['hut'])
+    expect(SILHOUETTE_RANK['fire_pit']).toBeLessThan(SILHOUETTE_RANK['house'])
+    expect(SILHOUETTE_RANK['storehouse']).toBeLessThan(SILHOUETTE_RANK['house'])
+    expect(SILHOUETTE_RANK['well']).toBeLessThan(SILHOUETTE_RANK['house'])
   })
 })
 

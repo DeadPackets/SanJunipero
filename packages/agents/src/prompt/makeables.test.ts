@@ -14,10 +14,10 @@ const C = DEFAULT_CONFIG
 describe('the makeable vocabulary comes off the tables the verbs already read', () => {
   it('names every kind a pair of hands can raise, and nothing the world places itself', () => {
     const m = makeables(C)
-    expect(m.builds.map((b) => b.kind)).toEqual(['bridge', 'hut', 'well'])
+    expect(m.builds.map((b) => b.kind)).toEqual(['bridge', 'house', 'well'])
     // A grave has no inputs: the world digs it, and `build` refuses it. It is not vocabulary.
     expect(m.builds.some((b) => b.kind === 'grave')).toBe(false)
-    expect(m.builds.find((b) => b.kind === 'hut')!.inputs).toEqual({ wood: 10 })
+    expect(m.builds.find((b) => b.kind === 'house')!.inputs).toEqual({ wood: 10 })
   })
 
   it('names one word per product, so the word reaches every road to it', () => {
@@ -45,7 +45,7 @@ describe('the sentence a mind reads', () => {
   const line = makeablesLine(makeables(C))
 
   it('says the thing and what it costs, for raising and for shaping alike', () => {
-    expect(line).toContain('a hut (10 wood)')
+    expect(line).toContain('a house (10 wood)')
     expect(line).toContain('a well (8 stone)')
     expect(line).toContain('cloth (2 fiber)')
     expect(line).toContain('garment (2 cloth, or 2 hide)')

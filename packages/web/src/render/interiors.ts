@@ -19,7 +19,7 @@ export type Furnishing = { kind: FurnishingKind; slot: { x: number; y: number } 
 // The C10 plan's declared minimum room. It is the floor the renderer can always draw, and
 // the contract the gate re-asserts; roomFurnishings() serves the richer C13 set on top.
 export const INTERIOR_LAYOUTS: Record<InteriorKind, Furnishing[]> = {
-  hut: [
+  house: [
     { kind: 'bed', slot: { x: 2, y: 1 } },
     { kind: 'hearth', slot: { x: 0, y: 2 } },
     { kind: 'table', slot: { x: 1, y: 2 } },
@@ -37,7 +37,7 @@ export const INTERIOR_LAYOUTS: Record<InteriorKind, Furnishing[]> = {
 
 export type RoomFurnishing = { kind: string; slot: { x: number; y: number } }
 
-// The city template furnishes each of its eleven buildings; every hut is furnished alike, so
+// The city template furnishes each of its eleven buildings; every house is furnished alike, so
 // one structure per kind is the whole vocabulary. Built once — this runs per interior open.
 const CITY_FURNISHINGS: Record<InteriorKind, RoomFurnishing[]> = (() => {
   const out = {} as Record<InteriorKind, RoomFurnishing[]>

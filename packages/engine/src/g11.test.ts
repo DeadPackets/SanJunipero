@@ -63,7 +63,7 @@ describe('G11a-M1: the genesis town folds, and it is the size the world says it 
     const structures = Object.values(state.structures)
     expect(structures).toHaveLength(11)
     expect(structures.every((s) => s.stage === 'complete')).toBe(true)
-    expect(structures.filter((s) => s.kind === 'hut')).toHaveLength(5)
+    expect(structures.filter((s) => s.kind === 'house')).toHaveLength(5)
     expect(structures.some((s) => s.kind === 'well')).toBe(true)
     expect(structures.some((s) => s.kind === 'storehouse')).toBe(true)
 
@@ -393,7 +393,7 @@ describe('G11a-P1: the perf gate on a full 128x128 town', () => {
 // have lived" — one that eats when there is food, sleeps when there is a bed, drinks when there
 // is water. This is that body, on the world's own defaults, for the golden's own three days.
 describe('G11a-D1: a competent body comes through three days on the default world, untouched', () => {
-  const HUT = { id: 'structure_1', kind: 'hut', x: 6, y: 6, w: 2, h: 2 }
+  const HOUSE = { id: 'structure_1', kind: 'house', x: 6, y: 6, w: 2, h: 2 }
   const DAYS = 3
   const WAKE_AT = 6 * 60
   const EAT_AT = 8 * 60
@@ -402,11 +402,11 @@ describe('G11a-D1: a competent body comes through three days on the default worl
 
   function competent(): { state: WorldState; deaths: SimEvent[]; collapses: number } {
     let s = genesisState(CFG, MAP())
-    s = fold(s, ev('structure_planned', { ...HUT, maxHp: 50, flammable: true, builderId: 'script' }), CFG)
-    s = fold(s, ev('structure_completed', { id: HUT.id }), CFG)
-    const door = doorTile(s, s.structures[HUT.id]!)!
+    s = fold(s, ev('structure_planned', { ...HOUSE, maxHp: 50, flammable: true, builderId: 'script' }), CFG)
+    s = fold(s, ev('structure_completed', { id: HOUSE.id }), CFG)
+    const door = doorTile(s, s.structures[HOUSE.id]!)!
     s = fold(s, ev('agent_spawned', { id: 'ada', name: 'ada', x: door.x, y: door.y, ageDays: 7300 }), CFG)
-    s = fold(s, ev('agent_entered', { agentId: 'ada', structureId: HUT.id }), CFG)
+    s = fold(s, ev('agent_entered', { agentId: 'ada', structureId: HOUSE.id }), CFG)
     // She goes to bed on the night before day one. A body that starts a run awake at midnight
     // has been up twenty-two hours by its first bedtime, which is a fixture artifact and not
     // a fact about the world.

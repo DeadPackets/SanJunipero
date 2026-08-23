@@ -27,7 +27,7 @@ function* contexts(): Generator<ControlCtx> {
     for (const live of [true, false]) {
       for (const zoom of ZOOM_STOPS) {
         for (const following of [null, 'amara']) {
-          for (const insideId of [null, 'hut1']) {
+          for (const insideId of [null, 'house1']) {
             for (const hudHidden of [true, false]) {
               yield { lens, live, zoom, following, insideId, hudHidden }
             }
@@ -51,7 +51,7 @@ describe('controlItems — the bar can only offer what the viewer can do', () =>
 
   it('offers the way out of a room ONLY when the camera is in one', () => {
     expect(controlItems(base).map((i) => i.id)).not.toContain('exit-interior')
-    expect(controlItems({ ...base, insideId: 'hut1' }).map((i) => i.id)).toContain('exit-interior')
+    expect(controlItems({ ...base, insideId: 'house1' }).map((i) => i.id)).toContain('exit-interior')
   })
 
   it('offers to stop following ONLY when it is following somebody', () => {
@@ -124,7 +124,7 @@ describe('actionFor — total over everything the bar can render', () => {
     expect(of('zoom-in')).toEqual({ kind: 'zoom', dir: 1 })
     expect(of('fit')).toEqual({ kind: 'fit' })
     expect(of('unfollow', { ...base, following: 'amara' })).toEqual({ kind: 'follow', agentId: null })
-    expect(of('exit-interior', { ...base, insideId: 'hut1' })).toEqual({ kind: 'exit-interior' })
+    expect(of('exit-interior', { ...base, insideId: 'house1' })).toEqual({ kind: 'exit-interior' })
     for (const lens of LENSES) expect(of(`lens-${lens}`)).toEqual({ kind: 'lens', lens })
   })
 

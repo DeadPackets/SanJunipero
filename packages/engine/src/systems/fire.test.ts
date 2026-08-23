@@ -12,20 +12,20 @@ const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 
 let seq = 12000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
 
-function hut(id: string, x: number, y: number, flammable = true): SimEvent[] {
+function house(id: string, x: number, y: number, flammable = true): SimEvent[] {
   return [
-    ev('structure_planned', { id, kind: 'hut', x, y, w: 2, h: 2, maxHp: 50, flammable, builderId: 'a1' }),
+    ev('structure_planned', { id, kind: 'house', x, y, w: 2, h: 2, maxHp: 50, flammable, builderId: 'a1' }),
     ev('structure_completed', { id }),
   ]
 }
 
-// Row of touching huts 1-2-3, hut 4 far away, non-flammable structure 5 touching hut 1.
+// Row of touching houses 1-2-3, house 4 far away, non-flammable structure 5 touching house 1.
 function rowWorld(config = CFG): WorldState {
   let s = genesisState(config)
   s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }), config)
   const all = [
-    ...hut('structure_1', 2, 2), ...hut('structure_2', 4, 2), ...hut('structure_3', 6, 2),
-    ...hut('structure_4', 20, 2), ...hut('structure_5', 0, 2, false),
+    ...house('structure_1', 2, 2), ...house('structure_2', 4, 2), ...house('structure_3', 6, 2),
+    ...house('structure_4', 20, 2), ...house('structure_5', 0, 2, false),
   ]
   for (const e of all) s = fold(s, e, config)
   return s
@@ -136,15 +136,15 @@ describe('fire: spread', () => {
 describe('fire: burn damage and burnout', () => {
   const fast = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, fire: { burnTicksToDestroy: 4 } })
 
-  function loneHut(): WorldState {
+  function loneHouse(): WorldState {
     let s = genesisState(fast)
     s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }), fast)
-    for (const e of hut('structure_1', 2, 2)) s = fold(s, e, fast)
+    for (const e of house('structure_1', 2, 2)) s = fold(s, e, fast)
     return atTick(s, 1)
   }
 
   it('destroys the structure after exactly burnTicksToDestroy ticks', () => {
-    let s = ignite(loneHut(), 'structure_1', fast)
+    let s = ignite(loneHouse(), 'structure_1', fast)
     for (let i = 0; i < 3; i++) {
       const r = tickOnce(s, fast)
       expect(r.events).toContainEqual({ type: 'structure_damaged', payload: { id: 'structure_1', amount: 12.5 } })
@@ -159,7 +159,7 @@ describe('fire: burn damage and burnout', () => {
   })
 
   it('burnout destruction drops contained items onto the structure origin tile', () => {
-    let s = ignite(loneHut(), 'structure_1', fast)
+    let s = ignite(loneHouse(), 'structure_1', fast)
     s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 5, loc: { t: 'structure', id: 'structure_1' } }, s.tick), fast)
     s = fold(s, ev('item_spawned', { id: 'item_2', kind: 'wheat', qty: 2, loc: { t: 'structure', id: 'structure_1' } }, s.tick), fast)
     for (let i = 0; i < 3; i++) s = tickOnce(s, fast).state
@@ -172,7 +172,7 @@ describe('fire: burn damage and burnout', () => {
   })
 
   it('rain douses every burning structure before it takes damage', () => {
-    const s = withWeather(ignite(loneHut(), 'structure_1', fast), 'rain')
+    const s = withWeather(ignite(loneHouse(), 'structure_1', fast), 'rain')
     const r = tickOnce(s, fast)
     expect(r.events).toContainEqual({ type: 'fire_extinguished', payload: { structureId: 'structure_1', cause: 'rain' } })
     expect(r.events.map((e) => e.type)).not.toContain('structure_damaged')
@@ -263,7 +263,7 @@ describe('a carried flame is both the light and the hazard', () => {
     weather: { hourlyChangeChance: 0 }, light: { fireRiskPerTick: 1, enabled: false },
   })
 
-  // A torch on the ground at (1,2), which touches the flammable hut structure_1 at (2,2) and
+  // A torch on the ground at (1,2), which touches the flammable house structure_1 at (2,2) and
   // lies inside the unburnable structure_5 at (0,2).
   const torch = (config: SimConfig): WorldState => {
     const s = atTick(rowWorld(config), 1)
@@ -276,7 +276,7 @@ describe('a carried flame is both the light and the hazard', () => {
     return fold(s, ev('item_lit', { itemId: 'item_1', burnsUntilTick: until }, s.tick), config)
   }
 
-  it('sets the hut it lies against alight on a certain roll, and nothing else', () => {
+  it('sets the house it lies against alight on a certain roll, and nothing else', () => {
     const r = tickOnce(alight(SURE, 9999), SURE)
     expect(r.events).toContainEqual({
       type: 'fire_ignited', payload: { structureId: 'structure_1', cause: 'a carried flame' },

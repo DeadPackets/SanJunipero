@@ -29,7 +29,7 @@ function town(config = CFG, structures = 2): WorldState {
   s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 6, ageDays: 7300 }), config)
   for (let i = 0; i < structures; i++) {
     s = fold(s, ev('structure_planned', {
-      id: `structure_${i + 1}`, kind: 'hut', x: 10 + i * 3, y: 20, w: 2, h: 2,
+      id: `structure_${i + 1}`, kind: 'house', x: 10 + i * 3, y: 20, w: 2, h: 2,
       maxHp: 50, flammable: true, builderId: 'a1',
     }), config)
     s = fold(s, ev('structure_completed', { id: `structure_${i + 1}` }), config)

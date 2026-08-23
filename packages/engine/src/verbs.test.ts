@@ -255,7 +255,7 @@ describe('tend: an hour of another body\'s hands', () => {
   it('refuses across a wall, however close the two bodies stand', () => {
     let s = pair()
     s = fold(s, ev(3, 'structure_planned', {
-      id: 'structure_1', kind: 'hut', x: 2, y: 2, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a2',
+      id: 'structure_1', kind: 'house', x: 2, y: 2, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a2',
     }), CFG)
     s = fold(s, ev(4, 'structure_completed', { id: 'structure_1' }), CFG)
     s = fold(s, ev(5, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
@@ -605,10 +605,10 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
   })
   const MIDNIGHT = 30
   const NOON = 12 * 60 + 30
-  const HUT = CFG.construction.hutTicks
+  const HOUSE = CFG.construction.houseTicks
   const PENALTY = CFG.light.nightWorkPenalty
 
-  // Wide enough for a hut beside the builder, with stone and wood in hand for the other verbs.
+  // Wide enough for a house beside the builder, with stone and wood in hand for the other verbs.
   function site(tick: number, config = CFG): WorldState {
     let s = genesisState(config, Array.from({ length: 8 }, () => Array.from({ length: 8 }, (): TileId => 0)))
     s = { ...s, tick }
@@ -631,22 +631,22 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
     return (started.payload as { duration: number }).duration
   }
 
-  it('a hut raised in the dark takes half again as long, and one raised by a torch does not', () => {
-    expect(durationOf(site(MIDNIGHT), 'build', { kind: 'hut', x: 2, y: 1 })).toBe(Math.ceil(HUT * PENALTY))
-    expect(durationOf(withTorch(site(MIDNIGHT), 1, 2), 'build', { kind: 'hut', x: 2, y: 1 })).toBe(HUT)
-    expect(durationOf(site(NOON), 'build', { kind: 'hut', x: 2, y: 1 })).toBe(HUT)
+  it('a house raised in the dark takes half again as long, and one raised by a torch does not', () => {
+    expect(durationOf(site(MIDNIGHT), 'build', { kind: 'house', x: 2, y: 1 })).toBe(Math.ceil(HOUSE * PENALTY))
+    expect(durationOf(withTorch(site(MIDNIGHT), 1, 2), 'build', { kind: 'house', x: 2, y: 1 })).toBe(HOUSE)
+    expect(durationOf(site(NOON), 'build', { kind: 'house', x: 2, y: 1 })).toBe(HOUSE)
   })
 
   it('the torch has to be within workRadius: three tiles off is still fumbling', () => {
     expect(CFG.light.workRadius).toBe(2)
-    expect(durationOf(withTorch(site(MIDNIGHT), 3, 1), 'build', { kind: 'hut', x: 2, y: 1 })).toBe(HUT)
-    expect(durationOf(withTorch(site(MIDNIGHT), 4, 1), 'build', { kind: 'hut', x: 2, y: 1 }))
-      .toBe(Math.ceil(HUT * PENALTY))
+    expect(durationOf(withTorch(site(MIDNIGHT), 3, 1), 'build', { kind: 'house', x: 2, y: 1 })).toBe(HOUSE)
+    expect(durationOf(withTorch(site(MIDNIGHT), 4, 1), 'build', { kind: 'house', x: 2, y: 1 }))
+      .toBe(Math.ceil(HOUSE * PENALTY))
   })
 
   it('slows exactly the five working verbs, and leaves everything else at its own pace', () => {
     const slowed: Array<[string, Record<string, unknown>]> = [
-      ['build', { kind: 'hut', x: 2, y: 1 }], ['craft', { recipe: 'plank' }],
+      ['build', { kind: 'house', x: 2, y: 1 }], ['craft', { recipe: 'plank' }],
       ['till', { x: 1, y: 2 }], ['pave', { x: 1, y: 2 }], ['dig_channel', { x: 1, y: 2 }],
     ]
     for (const [verb, params] of slowed) {
@@ -674,7 +674,7 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
 
   it('never refuses, and says so in the body\'s own words — only while the penalty is on', () => {
     const dark = site(MIDNIGHT)
-    const r = submitIntent(dark, CFG, 'a1', 'build', { kind: 'hut', x: 2, y: 1 })
+    const r = submitIntent(dark, CFG, 'a1', 'build', { kind: 'house', x: 2, y: 1 })
     expect(r.ok).toBe(true)
     let working = dark
     if (r.ok) for (const e of r.events) working = fold(working, ev(740, e.type, e.payload), CFG)
@@ -688,7 +688,7 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
   })
 
   it('with the light law off, the night costs nothing at all', () => {
-    expect(durationOf(site(MIDNIGHT, OFF), 'build', { kind: 'hut', x: 2, y: 1 }, OFF)).toBe(HUT)
+    expect(durationOf(site(MIDNIGHT, OFF), 'build', { kind: 'house', x: 2, y: 1 }, OFF)).toBe(HOUSE)
   })
 })
 

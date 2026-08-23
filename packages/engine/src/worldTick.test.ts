@@ -13,7 +13,7 @@ const FAST: SimConfig = SimConfigSchema.parse({
     socialDecayPerTick: 2, warmthEqualizeFactorPerTick: 0.5,
     collapseThreshold: 5, deathAfterZeroHungerTicks: 3, eatRestoreHunger: 60,
   },
-  // Bare 8x4 worlds with no hut: the bed law (C9 T2b) is not what these rows test.
+  // Bare 8x4 worlds with no house: the bed law (C9 T2b) is not what these rows test.
   structures: { sleepIndoorsOnly: false },
 })
 

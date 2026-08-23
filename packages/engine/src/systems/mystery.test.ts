@@ -127,7 +127,7 @@ describe('perception: mysteries', () => {
   it('four walls hide a located mystery outside them', () => {
     let s = world(CERTAIN)
     s = fold(s, ev('structure_planned', {
-      id: 'structure_1', kind: 'hut', x: 4, y: 4, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'a1',
+      id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'a1',
     }), CERTAIN)
     s = fold(s, ev('structure_completed', { id: 'structure_1' }), CERTAIN)
     s = fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CERTAIN)

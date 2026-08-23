@@ -4,7 +4,7 @@ import type { AssetRecord } from '@sj/shared'
 import { AssetCodex, encodePng, openForgeDb, paletteRgb, type RawImage, type Rgb } from '@sj/forge'
 import { DEV_DB_PATH } from './devWorld.js'
 
-export const HUT_PX = 64
+export const HOUSE_PX = 64
 
 // master-palette picks: cream wall, honey-wood gable, dark ink outline, honey door
 const P = paletteRgb()
@@ -26,9 +26,9 @@ function fillRect(img: RawImage, x0: number, y0: number, w: number, h: number, [
   }
 }
 
-// a deterministic timber hut: honey gable roof over a cream body, ink base line, wood door
-export function drawHut(): RawImage {
-  const img: RawImage = { width: HUT_PX, height: HUT_PX, data: new Uint8ClampedArray(HUT_PX * HUT_PX * 4) }
+// a deterministic timber house: honey gable roof over a cream body, ink base line, wood door
+export function drawHouse(): RawImage {
+  const img: RawImage = { width: HOUSE_PX, height: HOUSE_PX, data: new Uint8ClampedArray(HOUSE_PX * HOUSE_PX * 4) }
   fillRect(img, 0, 0, 64, 64, CREAM)
   // gable: rows 0..27 step inward one px per row from each side
   for (let y = 0; y < 28; y++) fillRect(img, Math.max(0, 27 - y), y, Math.min(64, 64 - 2 * Math.max(0, 27 - y)), 1, WOOD)
@@ -41,12 +41,12 @@ export function drawHut(): RawImage {
   return img
 }
 
-export async function registerDemoHut(db: Database.Database): Promise<AssetRecord> {
+export async function registerDemoHouse(db: Database.Database): Promise<AssetRecord> {
   const codex = new AssetCodex(db)
-  const png = await encodePng(drawHut())
+  const png = await encodePng(drawHouse())
   return codex.register({
-    class: 'building', desc: 'hut: timber dwelling', kind: 'hut',
-    footprint: { w: 2, h: 2 }, png, widthPx: HUT_PX, heightPx: HUT_PX,
+    class: 'building', desc: 'house: timber dwelling', kind: 'house',
+    footprint: { w: 2, h: 2 }, png, widthPx: HOUSE_PX, heightPx: HOUSE_PX,
     status: 'ready', score: 9, attempts: 1, costUsd: 0,
   })
 }
@@ -54,9 +54,9 @@ export async function registerDemoHut(db: Database.Database): Promise<AssetRecor
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const dbPath = process.argv[2] ?? DEV_DB_PATH // the dev world db carries the forge tables too
   const db = openForgeDb(dbPath)
-  registerDemoHut(db)
+  registerDemoHouse(db)
     .then((rec) => {
-      console.log(`the hut is raised: ${rec.id} (kind ${rec.kind}) → viewers swap on the next pump`)
+      console.log(`the house is raised: ${rec.id} (kind ${rec.kind}) → viewers swap on the next pump`)
       db.close()
     })
     .catch((err: unknown) => {

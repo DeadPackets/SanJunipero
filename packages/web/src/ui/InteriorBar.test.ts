@@ -9,7 +9,7 @@ const GAMIFICATION_BAN = /\b(progress|score|level|quest|points?|badge|streak|ran
 const MACHINERY = /\b(ai|llm|model|prompt|token|agent|api)\b/i
 
 const FULL: RoomCard = {
-  title: 'Amara’s hut',
+  title: 'Amara’s house',
   built: 'Raised by Yusuf, Day 3',
   lives: ['Amara'],
   holds: [
@@ -36,14 +36,14 @@ describe('RoomCardView — a room that is somebody’s', () => {
   const html = render(FULL)
 
   it('gives the room a spoken name and a real button out', () => {
-    expect(html).toContain('aria-label="Inside Amara’s hut"')
+    expect(html).toContain('aria-label="Inside Amara’s house"')
     expect(html).toContain('<button')
     expect(html).toContain('type="button"')
     expect(html).toContain('Back to town')
   })
 
   it('shows whose it is, who raised it, who lives there and who is in', () => {
-    expect(html).toContain('Amara’s hut')
+    expect(html).toContain('Amara’s house')
     expect(html).toContain('Raised by Yusuf, Day 3')
     expect(html).toContain('Home to')
     expect(html).toContain('Weaving')

@@ -8,7 +8,7 @@ import { RngStreams } from './rng.js'
 import { createWorldTick, type WorldTickResult } from './worldTick.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
-const FAST: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, construction: { hutTicks: 3 } })
+const FAST: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, construction: { houseTicks: 3 } })
 
 let seq = 13000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
@@ -32,33 +32,33 @@ function tickOnce(s: WorldState, config = CFG, rng = new RngStreams('t')): World
   return wt(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
 }
 function startBuild(s: WorldState, config = CFG): WorldState {
-  const r = submitIntent(s, config, 'a1', 'build', { kind: 'hut', x: 1, y: 1 })
+  const r = submitIntent(s, config, 'a1', 'build', { kind: 'house', x: 1, y: 1 })
   if (!r.ok) throw new Error(r.reason)
   return applyAll(s, r.events, config)
 }
 
 describe('verb: build', () => {
   it('validates kind, reach, placement, and materials', () => {
-    expect(submitIntent(makeWorld(CFG, 0), CFG, 'a1', 'build', { kind: 'hut', x: 1, y: 1 }).ok).toBe(false) // no wood
-    expect(submitIntent(makeWorld(CFG, 9), CFG, 'a1', 'build', { kind: 'hut', x: 1, y: 1 }).ok).toBe(false) // short on wood
+    expect(submitIntent(makeWorld(CFG, 0), CFG, 'a1', 'build', { kind: 'house', x: 1, y: 1 }).ok).toBe(false) // no wood
+    expect(submitIntent(makeWorld(CFG, 9), CFG, 'a1', 'build', { kind: 'house', x: 1, y: 1 }).ok).toBe(false) // short on wood
     expect(submitIntent(makeWorld(), CFG, 'a1', 'build', { kind: 'castle', x: 1, y: 1 }).ok).toBe(false)
-    expect(submitIntent(makeWorld(), CFG, 'a1', 'build', { kind: 'hut', x: 10, y: 10 }).ok).toBe(false) // out of reach
-    expect(submitIntent(makeWorld(), CFG, 'a1', 'build', { kind: 'hut', x: 0, y: 0 }).ok).toBe(false) // builder in the footprint
-    expect(submitIntent(makeWorld(), CFG, 'a1', 'build', { kind: 'hut', x: 1, y: 1 }).ok).toBe(true)
+    expect(submitIntent(makeWorld(), CFG, 'a1', 'build', { kind: 'house', x: 10, y: 10 }).ok).toBe(false) // out of reach
+    expect(submitIntent(makeWorld(), CFG, 'a1', 'build', { kind: 'house', x: 0, y: 0 }).ok).toBe(false) // builder in the footprint
+    expect(submitIntent(makeWorld(), CFG, 'a1', 'build', { kind: 'house', x: 1, y: 1 }).ok).toBe(true)
   })
 
   it('consumes materials and plans the structure at action start', () => {
     const s = makeWorld()
-    const r = submitIntent(s, CFG, 'a1', 'build', { kind: 'hut', x: 1, y: 1 })
+    const r = submitIntent(s, CFG, 'a1', 'build', { kind: 'house', x: 1, y: 1 })
     if (!r.ok) throw new Error(r.reason)
     expect(r.events).toContainEqual({
       type: 'action_started',
-      payload: { agentId: 'a1', verb: 'build', params: { kind: 'hut', x: 1, y: 1 }, duration: CFG.construction.hutTicks },
+      payload: { agentId: 'a1', verb: 'build', params: { kind: 'house', x: 1, y: 1 }, duration: CFG.construction.houseTicks },
     })
     expect(r.events).toContainEqual({ type: 'item_qty_changed', payload: { id: 'item_1', delta: -10 } })
     expect(r.events).toContainEqual({
       type: 'structure_planned',
-      payload: { id: 'structure_2', kind: 'hut', x: 1, y: 1, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1', owner: 'a1' },
+      payload: { id: 'structure_2', kind: 'house', x: 1, y: 1, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1', owner: 'a1' },
     })
     const w = applyAll(s, r.events)
     expect(w.items.item_1).toBeUndefined()
@@ -69,7 +69,7 @@ describe('verb: build', () => {
     const w = startBuild(makeWorld())
     const s = fold(w, ev('item_spawned', { id: 'item_9', kind: 'wood', qty: 10, loc: { t: 'agent', id: 'a1' } }), CFG)
     const idle = fold(s, ev('action_interrupted', { agentId: 'a1', reason: 'test' }), CFG)
-    expect(submitIntent(idle, CFG, 'a1', 'build', { kind: 'hut', x: 2, y: 2 }).ok).toBe(false)
+    expect(submitIntent(idle, CFG, 'a1', 'build', { kind: 'house', x: 2, y: 2 }).ok).toBe(false)
   })
 
   it('progresses the structure one tick per worked tick', () => {
@@ -77,23 +77,23 @@ describe('verb: build', () => {
     expect(r.events).toContainEqual({ type: 'action_progressed', payload: { agentId: 'a1', ticks: 1 } })
     expect(r.events).toContainEqual({ type: 'structure_progressed', payload: { id: 'structure_2', ticks: 1 } })
     expect(r.state.structures.structure_2!.progressTicks).toBe(1)
-    expect(r.state.agents.a1!.activity!.ticksRemaining).toBe(CFG.construction.hutTicks - 1)
+    expect(r.state.agents.a1!.activity!.ticksRemaining).toBe(CFG.construction.houseTicks - 1)
   })
 
-  it('interrupt preserves progress; resume needs no new materials and completes after hutTicks total', () => {
+  it('interrupt preserves progress; resume needs no new materials and completes after houseTicks total', () => {
     let s = tickOnce(startBuild(makeWorld(FAST), FAST), FAST).state
     s = fold(s, ev('action_interrupted', { agentId: 'a1', reason: 'collapsed' }, s.tick), FAST)
     expect(s.agents.a1!.activity).toBeNull()
     expect(s.structures.structure_2!.progressTicks).toBe(1)
 
-    const resume = submitIntent(s, FAST, 'a1', 'build', { kind: 'hut', x: 1, y: 1 })
+    const resume = submitIntent(s, FAST, 'a1', 'build', { kind: 'house', x: 1, y: 1 })
     if (!resume.ok) throw new Error(resume.reason)
     const types = resume.events.map((e) => e.type)
     expect(types).not.toContain('item_qty_changed')
     expect(types).not.toContain('structure_planned')
     expect(resume.events).toContainEqual({
       type: 'action_started',
-      payload: { agentId: 'a1', verb: 'build', params: { kind: 'hut', x: 1, y: 1 }, duration: 2 },
+      payload: { agentId: 'a1', verb: 'build', params: { kind: 'house', x: 1, y: 1 }, duration: 2 },
     })
 
     s = applyAll(s, resume.events, FAST)
@@ -150,12 +150,12 @@ describe('verb: build reads structures.recipes', () => {
     if (!r.ok) expect(r.reason).toBe('cannot build a grave')
   })
 
-  it('leaves the hut byte-identical to C9: same row, same dials, same number', () => {
-    const hut = CFG.structures.recipes.hut!
-    expect(hut.inputs).toEqual(CFG.construction.hutMaterials)
-    expect({ w: hut.w, h: hut.h }).toEqual(CFG.construction.hutSize)
-    expect(hut.maxHp).toBe(CFG.construction.hutMaxHp)
-    expect(hut.durationTicks).toBe(CFG.construction.hutTicks)
+  it('leaves the house byte-identical to C9: same row, same dials, same number', () => {
+    const house = CFG.structures.recipes.house!
+    expect(house.inputs).toEqual(CFG.construction.houseMaterials)
+    expect({ w: house.w, h: house.h }).toEqual(CFG.construction.houseSize)
+    expect(house.maxHp).toBe(CFG.construction.houseMaxHp)
+    expect(house.durationTicks).toBe(CFG.construction.houseTicks)
   })
 })
 

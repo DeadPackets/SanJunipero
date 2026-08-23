@@ -41,7 +41,7 @@ function openNarratorFixtureDb(path: string): Database.Database {
 }
 
 // One scripted day the whole read surface can be measured against: a birth of a household,
-// a completed hut, a night shared, a death, and two people who went indoors and stayed.
+// a completed house, a night shared, a death, and two people who went indoors and stayed.
 function scriptedWorld(dbPath: string): Database.Database {
   const db = openDb(dbPath)
   const loop = new TickLoop({
@@ -57,13 +57,13 @@ function scriptedWorld(dbPath: string): Database.Database {
       }
       if (tick === 4) {
         emit('structure_planned', {
-          id: 'hut1', kind: 'hut', x: 2, y: 2, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'yusuf',
+          id: 'house1', kind: 'house', x: 2, y: 2, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'yusuf',
         })
       }
-      if (tick === 8) emit('structure_completed', { id: 'hut1' })
-      if (tick === 12) emit('item_spawned', { id: 'i1', kind: 'bread', qty: 2, loc: { t: 'structure', id: 'hut1' } })
-      if (tick === 16) emit('agent_entered', { agentId: 'amara', structureId: 'hut1' })
-      if (tick === 17) emit('agent_entered', { agentId: 'yusuf', structureId: 'hut1' })
+      if (tick === 8) emit('structure_completed', { id: 'house1' })
+      if (tick === 12) emit('item_spawned', { id: 'i1', kind: 'bread', qty: 2, loc: { t: 'structure', id: 'house1' } })
+      if (tick === 16) emit('agent_entered', { agentId: 'amara', structureId: 'house1' })
+      if (tick === 17) emit('agent_entered', { agentId: 'yusuf', structureId: 'house1' })
       if (tick === 20) emit('agent_slept', { agentId: 'amara' })
       if (tick === 24) emit('co_slept', { aId: 'amara', bId: 'yusuf', day: 0 })
       if (tick === 30) emit('agent_died', { agentId: 'nadia', cause: 'hunger' })
@@ -91,7 +91,7 @@ describe('GATE G10 — automated half, gateway side', () => {
     ndb.prepare('INSERT INTO milestones (kind, label, event_seq, day, tick) VALUES (?, ?, ?, ?, ?)')
       .run('first_death', 'The first death', 9000, 0, 30)
     ndb.prepare('INSERT INTO scenes (day, start_tick, end_tick, event_ids, "cast", location) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(0, 8, 30, '[1,2]', '["amara","yusuf"]', 'the hut')
+      .run(0, 8, 30, '[1,2]', '["amara","yusuf"]', 'the house')
     ndb.close()
 
     gw = await createGateway({
@@ -219,7 +219,7 @@ describe('GATE G10 — automated half, gateway side', () => {
     it('turns the narrator\'s recorded scene into an openable moment', async () => {
       const body = MomentsResponseSchema.parse(await get('/api/moments'))
       expect(body.moments).toHaveLength(1)
-      expect(body.moments[0]).toMatchObject({ day: 0, startTick: 8, endTick: 30, location: 'the hut' })
+      expect(body.moments[0]).toMatchObject({ day: 0, startTick: 8, endTick: 30, location: 'the house' })
       expect(body.moments[0]!.cast).toEqual(['amara', 'yusuf'])
     })
 
@@ -235,15 +235,15 @@ describe('GATE G10 — automated half, gateway side', () => {
 
   // ── 4. interior purity (engine side; the pure renderer half is the web g10 file) ─────
   describe('4. interiors are engine truth, never a viewer write', () => {
-    it('folds two occupants and a stored item into the hut, and reads them back', () => {
+    it('folds two occupants and a stored item into the house, and reads them back', () => {
       const db = openDb(join(dir, 'world.db'))
       try {
         const state = new WorldMirror({ db, config: DEFAULT_CONFIG, terrain: GRASS }).state()
-        expect(state.structures['hut1']!.kind).toBe('hut')
-        expect(state.agents['amara']!.insideId).toBe('hut1')
-        expect(state.agents['yusuf']!.insideId).toBe('hut1')
+        expect(state.structures['house1']!.kind).toBe('house')
+        expect(state.agents['amara']!.insideId).toBe('house1')
+        expect(state.agents['yusuf']!.insideId).toBe('house1')
         expect(state.agents['nadia']!.insideId).toBeUndefined()
-        expect(state.items['i1']!.loc).toEqual({ t: 'structure', id: 'hut1' })
+        expect(state.items['i1']!.loc).toEqual({ t: 'structure', id: 'house1' })
         // this is the fixture the web-side g10 file re-asserts interiorOf/bedSlots against
         expect(state.agents['amara']!.asleep).toBe(true)
       } finally { db.close() }

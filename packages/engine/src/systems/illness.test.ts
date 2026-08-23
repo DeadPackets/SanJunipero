@@ -75,7 +75,7 @@ describe('illnessSystem: contagion, once a night, on the illness stream', () => 
   it('crosses a shared roof to every co-occupant and stops at the walls', () => {
     let s = town(SPREADS, [['a1', 2, 2], ['a2', 2, 3], ['a3', 3, 2], ['a4', 4, 4]])
     s = fold(s, ev('structure_planned', {
-      id: 'structure_1', kind: 'hut', x: 2, y: 2, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
+      id: 'structure_1', kind: 'house', x: 2, y: 2, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
     }), SPREADS)
     s = fold(s, ev('structure_completed', { id: 'structure_1' }), SPREADS)
     for (const id of ['a1', 'a2', 'a3']) s = fold(s, ev('agent_entered', { agentId: id, structureId: 'structure_1' }), SPREADS)

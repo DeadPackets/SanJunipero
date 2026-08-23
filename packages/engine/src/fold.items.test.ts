@@ -6,7 +6,7 @@ import { fold } from './fold.js'
 const ev = (seq: number, type: string, payload: unknown, tick = 0): SimEvent => ({ seq, tick, type, payload })
 const spawnItem = (id: string, qty = 5) => ev(1, 'item_spawned', { id, kind: 'wood', qty, loc: { t: 'tile', x: 1, y: 1 } })
 const plan = (id: string, x = 0, y = 0, w = 2, h = 2) =>
-  ev(1, 'structure_planned', { id, kind: 'hut', x, y, w, h, maxHp: 50, flammable: true, builderId: 'a1' })
+  ev(1, 'structure_planned', { id, kind: 'house', x, y, w, h, maxHp: 50, flammable: true, builderId: 'a1' })
 
 describe('fold items', () => {
   it('spawns an item', () => {
@@ -61,7 +61,7 @@ describe('fold structures', () => {
   it('plans a structure at stage construction with hp 1', () => {
     const s = fold(genesisState(DEFAULT_CONFIG), plan('structure_1'))
     expect(s.structures.structure_1).toEqual({
-      id: 'structure_1', kind: 'hut', x: 0, y: 0, w: 2, h: 2,
+      id: 'structure_1', kind: 'house', x: 0, y: 0, w: 2, h: 2,
       hp: 1, maxHp: 50, flammable: true, stage: 'construction',
       progressTicks: 0, builtBy: 'a1', burning: false, burnTicks: 0,
     })
@@ -108,7 +108,7 @@ describe('fold structures', () => {
   })
   it('strict payloads reject extra keys on structure events', () => {
     const s = fold(genesisState(DEFAULT_CONFIG), plan('structure_1'))
-    expect(() => fold(s, ev(2, 'structure_planned', { id: 'structure_2', kind: 'hut', x: 9, y: 9, w: 1, h: 1, maxHp: 10, flammable: false, builderId: 'a1', extra: 1 }))).toThrow()
+    expect(() => fold(s, ev(2, 'structure_planned', { id: 'structure_2', kind: 'house', x: 9, y: 9, w: 1, h: 1, maxHp: 10, flammable: false, builderId: 'a1', extra: 1 }))).toThrow()
     expect(() => fold(s, ev(2, 'structure_progressed', { id: 'structure_1', ticks: 1, extra: 1 }))).toThrow()
     expect(() => fold(s, ev(2, 'structure_completed', { id: 'structure_1', extra: 1 }))).toThrow()
     expect(() => fold(s, ev(2, 'structure_damaged', { id: 'structure_1', amount: 1, extra: 1 }))).toThrow()

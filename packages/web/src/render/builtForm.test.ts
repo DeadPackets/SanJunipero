@@ -39,7 +39,7 @@ const ysOf = (poly: number[]): number[] => poly.filter((_, i) => i % 2 === 1)
 describe('the three dwellings read as three buildings even with no art', () => {
   it('gives each a distinct volume — no two share both a material and a height', () => {
     const seen = new Set<string>()
-    for (const kind of ['hut', 'cottage', 'longhouse']) {
+    for (const kind of ['house', 'cottage', 'longhouse']) {
       const h = BUILT_FORM_HEIGHT_TILES[kind] ?? BUILT_FORM_DEFAULT_HEIGHT_TILES
       const ramp = builtFormSpec(kind, 2, 2).faces[2].color
       expect(seen.has(`${ramp}:${h}`), kind).toBe(false)
@@ -136,11 +136,11 @@ describe('a structure kind with no art still reads as a built thing', () => {
     expect(builtFormSpec('obelisk', 1, 1)).toEqual(builtFormSpec('obelisk', 1, 1))
   })
 
-  it('reads the two plaza monuments as low civic stonework, not as huts', () => {
+  it('reads the two plaza monuments as low civic stonework, not as houses', () => {
     const well = builtFormSpec('well', 1, 1)
     const firePit = builtFormSpec('fire_pit', 1, 1)
-    const hut = builtFormSpec('hut', 1, 1)
-    expect(well.heightPx).toBeLessThan(hut.heightPx)
+    const house = builtFormSpec('house', 1, 1)
+    expect(well.heightPx).toBeLessThan(house.heightPx)
     expect(firePit.heightPx).toBeLessThan(well.heightPx)
     expect(well.plinth.color).toBe(BUILT_FORM_RAMPS.stone.plinth)
     expect(well.accent.color).toBe(BUILT_FORM_ACCENTS.well)

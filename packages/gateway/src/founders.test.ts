@@ -129,7 +129,7 @@ describe('homeOf', () => {
     const homes = FOUNDER_IDS.map((id) => homeOf(town, id))
     for (const h of homes) expect(h).not.toBeNull()
     expect(new Set(homes.map((h) => h!.id)).size).toBe(5)
-    expect(new Set(homes.map((h) => h!.kind))).toEqual(new Set(['hut']))
+    expect(new Set(homes.map((h) => h!.kind))).toEqual(new Set(['house']))
   })
 
   it('says nothing about someone who owns nothing', () => {
@@ -183,7 +183,7 @@ describe('homeIntent routes an owner to their own door', () => {
     expect(new Set(doors.map((d) => `${d.x},${d.y}`)).size).toBe(5)
   })
 
-  it('enters their OWN hut from one tile away', () => {
+  it('enters their OWN house from one tile away', () => {
     for (const id of FOUNDER_IDS) {
       const mine = homeOf(town, id)!
       const door = doorTile(town, mine)!
@@ -281,7 +281,7 @@ describe('the storerooms hold something', () => {
     }
   })
 
-  it('marks a hut’s things as its owner’s, and leaves the public store unowned', () => {
+  it('marks a house’s things as its owner’s, and leaves the public store unowned', () => {
     const state = showcaseAtTick1()
     for (const s of Object.values(state.structures)) {
       for (const it of held(state, s.id)) expect(it.owner, `${s.id}/${it.kind}`).toBe(s.owner)

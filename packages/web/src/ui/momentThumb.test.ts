@@ -51,7 +51,7 @@ describe('thumbMotif', () => {
     expect(thumbMotif(moment({ location: 'the plaza' })).name).toBe('stone')
     expect(thumbMotif(moment({ location: 'the riverbank' })).name).toBe('water')
     expect(thumbMotif(moment({ location: 'the north field' })).name).toBe('field')
-    expect(thumbMotif(moment({ location: "Rahel's hut" })).name).toBe('hearth')
+    expect(thumbMotif(moment({ location: "Rahel's house" })).name).toBe('hearth')
     expect(thumbMotif(moment({ location: 'the forest edge' })).name).toBe('tree')
   })
 

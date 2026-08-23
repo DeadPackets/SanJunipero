@@ -151,7 +151,7 @@ describe('forageables: what a body can see of them', () => {
     expect(seen(fold(genesisState(CFG, [[0]]), ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)))
       .toEqual([])
     const roofed = fold(fold(patch('berry_bush', 2, [1, 0], ['...', '...', 'fff']), ev('structure_planned', {
-      id: 'structure_1', kind: 'hut', x: 0, y: 1, w: 3, h: 2, maxHp: 30, flammable: true, builderId: 'a1',
+      id: 'structure_1', kind: 'house', x: 0, y: 1, w: 3, h: 2, maxHp: 30, flammable: true, builderId: 'a1',
     }), CFG), ev('agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
     expect(seen(roofed)).toEqual([])
   })

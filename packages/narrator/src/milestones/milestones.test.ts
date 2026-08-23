@@ -57,7 +57,7 @@ describe('tier 1 — the engine firsts', () => {
     const streams: Record<string, SimEvent[]> = {
       first_speech: [ev(1, 'agent_spoke', { agentId: 'a', text: 'oi', x: 0, y: 0 })],
       first_structure: [ev(1, 'structure_completed', { id: 's1' })],
-      first_hut: [ev(0, 'structure_planned', { id: 's1', kind: 'hut' }), ev(1, 'structure_completed', { id: 's1' })],
+      first_house: [ev(0, 'structure_planned', { id: 's1', kind: 'house' }), ev(1, 'structure_completed', { id: 's1' })],
       first_bridge: [ev(0, 'structure_planned', { id: 's2', kind: 'bridge' }), ev(1, 'structure_completed', { id: 's2' })],
       first_meal: [ev(1, 'action_completed', { agentId: 'a', verb: 'eat' })],
       first_fish: [ev(1, 'action_completed', { agentId: 'a', verb: 'fish' })],

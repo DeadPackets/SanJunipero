@@ -33,8 +33,8 @@ describe('describeEvent', () => {
   })
 
   it('covers the remaining viewer-worthy subset', () => {
-    expect(describeEvent(ev('structure_planned', { id: 's2', kind: 'hut', x: 0, y: 0, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'farmer' }), state))
-      .toBe('Wren began a hut.')
+    expect(describeEvent(ev('structure_planned', { id: 's2', kind: 'house', x: 0, y: 0, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'farmer' }), state))
+      .toBe('Wren began a house.')
     expect(describeEvent(ev('crop_planted', { id: 'c1', kind: 'wheat', x: 0, y: 0, plantedDay: 0 }), state))
       .toBe('wheat was planted.')
     expect(describeEvent(ev('fire_ignited', { structureId: 's1', cause: 'lightning' }), state))

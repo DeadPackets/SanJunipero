@@ -97,7 +97,7 @@ describe('rosterRows2 — the five required fields, on a person who has done not
 
 // ── P22.3: THE DAY-0 / DAY-5 ARC ──────────────────────────────────────────────────────────
 describe('the same person, five days apart, is not the same row', () => {
-  const structures = [struct({ id: 'hut', kind: 'hut', x: 10, y: 12, w: 2, h: 2, owner: 'amara' })]
+  const structures = [struct({ id: 'house', kind: 'house', x: 10, y: 12, w: 2, h: 2, owner: 'amara' })]
   const day0 = world([{ id: 'amara', name: 'Amara', x: 10, y: 10 }], structures)
   const day5 = world([
     { id: 'amara', name: 'Amara', x: 10, y: 12, skills: { farming: 9, carpentry: 4 }, activity: { verb: 'build', ticksRemaining: 20 } },

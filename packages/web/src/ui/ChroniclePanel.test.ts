@@ -11,7 +11,7 @@ const EMOJI = /\p{Extended_Pictographic}/u
 
 const entries: ChronicleEntry[] = [
   { seq: 9, tick: 50, type: 'agent_died', icon: 'cross', label: 'Cara has died (hunger).' },
-  { seq: 4, tick: 20, type: 'structure_completed', icon: 'house', label: 'The hut is finished.' },
+  { seq: 4, tick: 20, type: 'structure_completed', icon: 'house', label: 'The house is finished.' },
 ]
 
 const render = (node: Parameters<typeof renderToStaticMarkup>[0]): string => renderToStaticMarkup(node)

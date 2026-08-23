@@ -35,8 +35,8 @@ function genesisTown(): WorldState {
   let s = genesisState(CFG, g.terrain)
   for (const e of g.events) s = fold(s, ev(e.type, e.payload), CFG)
   for (const id of FOUNDER_IDS) {
-    const hut = Object.values(s.structures).find((st) => st.kind === 'hut' && st.owner === id)
-    const door = hut === undefined ? null : doorTile(s, hut)
+    const house = Object.values(s.structures).find((st) => st.kind === 'house' && st.owner === id)
+    const door = house === undefined ? null : doorTile(s, house)
     if (door === null) throw new Error(`no doorway for ${id}`)
     s = fold(s, ev('agent_spawned', { id, name: id, x: door.x, y: door.y, ageDays: 10000 }), CFG)
   }
@@ -203,21 +203,21 @@ describe('R21 candidate 2 — "perception omits it": CONFIRMED', () => {
 describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED', () => {
   it('a body indoors is told to go indoors: the prose gives an instruction the world refuses', () => {
     const s = genesisTown()
-    const hut = Object.values(s.structures).find((st) => st.kind === 'hut' && st.owner === 'nadia')!
+    const house = Object.values(s.structures).find((st) => st.kind === 'house' && st.owner === 'nadia')!
     const inside: WorldState = {
       ...s,
-      agents: { ...s.agents, nadia: { ...s.agents.nadia!, insideId: hut.id, x: hut.x, y: hut.y } },
+      agents: { ...s.agents, nadia: { ...s.agents.nadia!, insideId: house.id, x: house.x, y: house.y } },
     }
     const prose = proseFor(inside, 'nadia')
     // R21-A. The defect was that no line said she was under a roof, and the one line about
     // the roof she was under told her to walk to its doorway and go in — 59 of the run's 222
     // refusals. Both halves are now said the other way round.
-    expect(prose).toContain(`You stand inside the hut (${hut.id}) at (64, 63).`)
+    expect(prose).toContain(`You stand inside the house (${house.id}) at (64, 63).`)
     expect(prose).toContain('Four walls are around you')
     expect(prose).toContain('this is the roof you are under; the way out is at (64, 65).')
     expect(prose).not.toContain('stand there and you can go in')
     // The world's answer to the instruction that used to be given, twice over.
-    expect(submitIntent(inside, CFG, 'nadia', 'enter', { structureId: hut.id })).toEqual(
+    expect(submitIntent(inside, CFG, 'nadia', 'enter', { structureId: house.id })).toEqual(
       { ok: false, reason: 'already inside' },
     )
     expect(submitIntent(inside, CFG, 'nadia', 'walk', { x: 68, y: 47 })).toEqual(
@@ -292,7 +292,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     const s = genesisTown()
     const p = composePerception(s, CFG, 'amara', [])
     expect(p.self.inventory).toHaveLength(0)
-    // Six things, all of them on the hut's shelf; the doorway peek shows them and the hands
+    // Six things, all of them on the house's shelf; the doorway peek shows them and the hands
     // hold none of them. R21-D: `eat` used to answer "not holding that" and stop there.
     expect(p.visible.items).toHaveLength(6)
     const bread = p.visible.items.find((i) => i.kind === 'bread')!
@@ -312,7 +312,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     // a mind is never given is a word it never uses. Nothing in the prompt names one.
     const buildable = Object.keys(CFG.structures.recipes).sort()
     const craftable = Object.keys(CFG.crafting.recipes).sort()
-    expect(buildable).toEqual(['bridge', 'grave', 'hut', 'well'])
+    expect(buildable).toEqual(['bridge', 'grave', 'house', 'well'])
     expect(craftable).toEqual(['cloth', 'garment', 'plank'])
     // The one place a mind is taught its verbs asks for both nouns and names neither, and
     // nothing else in the prompt fills the gap. `well` is the exception that proves it: the
@@ -332,12 +332,12 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     // The id is READ from the world, not retyped: a template edit renumbers the mints.
     const wellId = Object.values(s.structures).find((x) => x.kind === 'well')!.id
     expect(everyProse).toContain(`A well (${wellId}) stands at`)
-    for (const noun of ['hut', 'bridge', 'grave', ...craftable, 'stew', 'torch']) {
+    for (const noun of ['house', 'bridge', 'grave', ...craftable, 'stew', 'torch']) {
       expect(everyProse).not.toMatch(new RegExp(`(build|craft|raise|shape|make)[^.]{0,40}${noun}`, 'i'))
     }
     // R-H closed it, and neither of these two places is where: block 1 is byte-frozen and the
     // perception is the day log. `makeablesLine` speaks it in block 6, once per turn.
-    expect(makeablesLine(makeables(CFG))).toContain('a hut (10 wood)')
+    expect(makeablesLine(makeables(CFG))).toContain('a house (10 wood)')
   })
 })
 
@@ -351,7 +351,7 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
     ['forage', {}, 'no forest nearby — berries, mushrooms and herbs grow in patches, and a patch is gathered by name once you can see one'],
     ['craft', { recipe: 'stew' }, 'not enough meat — meat comes off an animal you have hunted, or a fish out of the water'],
     ['craft', { recipe: 'garment' }, 'not enough cloth — cloth is woven from fiber'],
-    ['build', { kind: 'hut', x: 66, y: 66 }, 'not close enough to build — stand within reach of (66, 66)'],
+    ['build', { kind: 'house', x: 66, y: 66 }, 'not close enough to build — stand within reach of (66, 66)'],
     ['tend', { targetId: 'yusuf' }, 'not adjacent to the patient — they are at (74, 62)'],
     ['give', { itemId: 'item_17', targetId: 'yusuf' }, 'not adjacent to give — they are at (74, 62)'],
     ['pave', { x: 62, y: 63 }, 'not enough stone — stone comes from the loose rock at the foot of an outcrop'],

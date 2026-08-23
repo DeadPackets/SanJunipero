@@ -175,7 +175,7 @@ describe('createTooltipLayer — one owner, so nothing is ever left behind', () 
 
   it('hideAll clears every owner — the interior transition calls this', () => {
     const l = createTooltipLayer(layers() as never, view)
-    l.show('hover', 'a hut', anchor(100, 100))
+    l.show('hover', 'a house', anchor(100, 100))
     l.show('door', 'Look inside', anchor(300, 300))
     expect(l.boxes()).toHaveLength(2)
     l.hideAll()
@@ -184,7 +184,7 @@ describe('createTooltipLayer — one owner, so nothing is ever left behind', () 
 
   it('hide clears exactly one owner', () => {
     const l = createTooltipLayer(layers() as never, view)
-    l.show('hover', 'a hut', anchor(100, 100))
+    l.show('hover', 'a house', anchor(100, 100))
     l.show('door', 'Look inside', anchor(300, 300))
     l.hide('hover')
     expect(l.boxes()).toHaveLength(1)

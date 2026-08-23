@@ -13,7 +13,7 @@ function fixture(): WorldState {
       builder: { ...blankAgent('builder', 'Tomas') },
     },
     structures: {
-      h1: structure('h1', 'hut', 'builder'),
+      h1: structure('h1', 'house', 'builder'),
       h2: { ...structure('h2', 'storehouse', null) },
       h3: { ...structure('h3', 'shed', 'ghost') }, // builder id no longer in the roster
     },
@@ -52,7 +52,7 @@ describe('hoverLabel', () => {
   })
 
   it('credits the builder of a structure, and stays quiet when no one is remembered', () => {
-    expect(hoverLabel(state, 'structure', 'h1')).toBe('hut — built by Tomas')
+    expect(hoverLabel(state, 'structure', 'h1')).toBe('house — built by Tomas')
     expect(hoverLabel(state, 'structure', 'h2')).toBe('storehouse')
   })
 

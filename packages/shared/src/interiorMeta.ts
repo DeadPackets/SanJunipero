@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 // The single source for interior placement vocabulary. C10 T10's FurnishingKind union is
 // structurally identical, so that lane compiles untouched and may import this at its leisure.
-export const INTERIOR_KINDS = ['hut', 'storehouse', 'shed'] as const
+export const INTERIOR_KINDS = ['house', 'storehouse', 'shed'] as const
 export type InteriorKind = (typeof INTERIOR_KINDS)[number]
 export const InteriorKindSchema = z.enum(INTERIOR_KINDS)
 

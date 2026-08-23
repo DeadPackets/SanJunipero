@@ -102,15 +102,15 @@ const FireSchema = z.object({
 }).strict()
 
 const ConstructionSchema = z.object({
-  hutTicks: z.number().default(2880),
-  hutMaterials: z.object({
+  houseTicks: z.number().default(2880),
+  houseMaterials: z.object({
     wood: z.number().default(10),
   }).strict().prefault({}),
-  hutSize: z.object({
+  houseSize: z.object({
     w: z.number().int().default(2),
     h: z.number().int().default(2),
   }).strict().prefault({}),
-  hutMaxHp: z.number().default(50),
+  houseMaxHp: z.number().default(50),
 }).strict()
 
 // `weaponKinds` is optional and carries NO default, which is the whole of it: absent from
@@ -147,13 +147,13 @@ export const StructureRecipeSchema = z.object({
 }).strict()
 
 const StructuresSchema = z.object({
-  enterableKinds: z.array(z.string()).default(['hut', 'storehouse']),
-  privateKinds: z.array(z.string()).default(['hut']),
+  enterableKinds: z.array(z.string()).default(['house', 'storehouse']),
+  privateKinds: z.array(z.string()).default(['house']),
   sleepIndoorsOnly: z.boolean().default(true),
-  sleepableKinds: z.array(z.string()).default(['hut']),
+  sleepableKinds: z.array(z.string()).default(['house']),
   // An empty `inputs` marks a kind the world places and nobody builds.
   recipes: z.record(z.string(), StructureRecipeSchema).default({
-    hut: { inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880 },
+    house: { inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880 },
     well: { inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720 },
     bridge: { inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480 },
     grave: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1 },

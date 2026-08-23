@@ -58,7 +58,7 @@ describe('dev world server', () => {
       expect(Object.keys(state.agents).sort()).toEqual(['amara', 'nadia', 'omar', 'salma', 'yusuf'])
       expect(state.agents['omar']?.name).toBe('Omar')
       const kinds = Object.values(state.structures).map((s) => s.kind).sort()
-      expect(kinds).toEqual(['hut', 'scaffolding', 'shed', 'standing_stone', 'storehouse', 'wagon'])
+      expect(kinds).toEqual(['house', 'scaffolding', 'shed', 'standing_stone', 'storehouse', 'wagon'])
       for (const s of Object.values(state.structures)) expect(s.stage).toBe('complete')
 
       await until(() => dw.loop.state.tick >= 40)

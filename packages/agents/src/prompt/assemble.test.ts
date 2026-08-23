@@ -297,7 +297,7 @@ describe('perceptionToProse', () => {
       ...quietMeadowPacket,
       visible: {
         agents: [],
-        structures: [{ id: 's1', kind: 'hut', x: 14, y: 9, w: 1, h: 1, burning: true, stage: 'complete' as const }],
+        structures: [{ id: 's1', kind: 'house', x: 14, y: 9, w: 1, h: 1, burning: true, stage: 'complete' as const }],
         items: [],
         crops: [{ id: 'c1', kind: 'wheat', x: 12, y: 8, stage: 0, withered: true }],
       },
@@ -497,7 +497,7 @@ describe('perceptionToProse', () => {
       ...quietMeadowPacket,
       visible: {
         agents: [],
-        structures: [{ id: 's1', kind: 'hut', x: 10, y: 10, w: 1, h: 2, burning: false, stage: 'complete' as const }],
+        structures: [{ id: 's1', kind: 'house', x: 10, y: 10, w: 1, h: 2, burning: false, stage: 'complete' as const }],
         items: [],
         crops: [],
       },

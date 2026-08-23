@@ -18,7 +18,7 @@ import { EngineBridge } from './bridge.js'
 // reads the tile out of the words it was given, walks there, and `enter` lets it in. Nothing in
 // this test knows the door tile except the sentence the mind read.
 const AGENT = 'tamar'
-const HUT = 'structure_1'
+const HOUSE = 'structure_1'
 
 function town(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
   const config = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
@@ -31,10 +31,10 @@ function town(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
   }
   put('agent_spawned', { id: AGENT, name: 'Tamar', x: 10, y: 10, ageDays: 7300 })
   put('structure_planned', {
-    id: HUT, kind: 'hut', x: 5, y: 5, w: 2, h: 2, maxHp: 50, flammable: true, builderId: AGENT,
+    id: HOUSE, kind: 'house', x: 5, y: 5, w: 2, h: 2, maxHp: 50, flammable: true, builderId: AGENT,
   })
-  put('structure_completed', { id: HUT })
-  // Noon: after C11 Task 26 the sight horizon shrinks with the light, and a hut seven tiles
+  put('structure_completed', { id: HOUSE })
+  // Noon: after C11 Task 26 the sight horizon shrinks with the light, and a house seven tiles
   // off is a shape in the dark at midnight.
   state = { ...state, tick: 720 }
 
@@ -70,11 +70,11 @@ describe('the door seam — prose, intent, verb, interior', () => {
     for (let i = 0; i < 200 && loop.state.agents[AGENT]!.activity !== null; i++) step()
     expect({ x: loop.state.agents[AGENT]!.x, y: loop.state.agents[AGENT]!.y }).toEqual({ x, y })
 
-    const entering = bridge.submit(AGENT, { verb: 'enter', params: { structureId: HUT } })
+    const entering = bridge.submit(AGENT, { verb: 'enter', params: { structureId: HOUSE } })
     step()
     expect(await entering).toEqual({ ok: true })
     for (let i = 0; i < 20 && loop.state.agents[AGENT]!.insideId === undefined; i++) step()
-    expect(loop.state.agents[AGENT]!.insideId).toBe(HUT)
+    expect(loop.state.agents[AGENT]!.insideId).toBe(HOUSE)
   })
 
   it('never offers a tile beside the wall for a building it could walk into', () => {

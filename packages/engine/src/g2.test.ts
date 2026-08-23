@@ -31,7 +31,13 @@ import { nutritionOf } from './verbs.js'
 // drain) are inert on three spring days in which nobody owns a coat or is wounded.
 // The attribution table, change by change, is in docs/superpowers/reports/g2-regen-c11-37b.md.
 // Previous value (C11 Task 37): 665a824948155304d7dcc1131e821e89299dd73d6cb5c976287955edc5a5fa11
-const GOLDEN_G2_HASH = 'c1c51b42aa340f0e5ae0d8cc321b602345f6ec4fee4e4d20b48f7e692b946d9c'
+//
+// Moved again by the `hut` → `house` rename lane, and by nothing else in it: the fixture
+// builds one dwelling, the kind string is part of the structure the state hash covers, so
+// renaming the kind moves this literal and no world law with it. G1 and BLOCK1 were measured
+// against the same rename and did not move.
+// Previous value (C11 Task 37b): c1c51b42aa340f0e5ae0d8cc321b602345f6ec4fee4e4d20b48f7e692b946d9c
+const GOLDEN_G2_HASH = '00d724345c37104d6c93f10398b96eded080b58db78108746e2a037fce836a10'
 
 // Task 16 Step 0 took C9's four pins off. Task 37 took C11's fourteen off in one act: this
 // world has nothing suppressed in it at all. Every C11 law — mortality, thirst, fauna,
@@ -85,9 +91,9 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(state.agents[IDLER]!.hp).toBeLessThanOrEqual(G2_CONFIG.health.deathHp)
     expect(diedEv!.tick).toBeLessThan(zeroTick! + G2_CONFIG.needs.deathAfterZeroHungerTicks + 1)
 
-    // 3. Builder's hut completes.
-    const hut = Object.values(state.structures).find((s) => s.kind === 'hut')
-    expect(hut?.stage).toBe('complete')
+    // 3. Builder's house completes.
+    const house = Object.values(state.structures).find((s) => s.kind === 'house')
+    expect(house?.stage).toBe('complete')
 
     // 4. Day-2 fire: ignited, spreads to the adjacent shed, doused by rain; count unchanged.
     expect(evs.some((e) => e.type === 'fire_ignited' && (e.payload as Payload).structureId === STOREHOUSE.id)).toBe(true)
@@ -145,9 +151,9 @@ describe('GATE G2: 3-day scripted world run', () => {
   it('C9 is live in this run: things are owned, a body sleeps under a roof, food turns', () => {
     const { state, evs } = runScenario()
 
-    // Ownership: the Builder owns the hut he raised, and the Fisher owns what he pulled out.
-    const hut = Object.values(state.structures).find((s) => s.kind === 'hut')!
-    expect(hut.owner).toBe(BUILDER)
+    // Ownership: the Builder owns the house he raised, and the Fisher owns what he pulled out.
+    const house = Object.values(state.structures).find((s) => s.kind === 'house')!
+    expect(house.owner).toBe(BUILDER)
     const caught = Object.values(state.items).filter((i) => i.kind === 'fish')
     expect(caught.length).toBeGreaterThan(0)
     for (const f of caught) expect(f.owner).toBe(FISHER)
@@ -160,8 +166,8 @@ describe('GATE G2: 3-day scripted world run', () => {
     const slept = evs.find((e) => e.type === 'agent_slept' && (e.payload as Payload).agentId === BUILDER)
     expect(slept).toBeDefined()
     expect(inside.tick).toBeLessThan(slept!.tick)
-    expect((inside.payload as Payload).structureId).toBe(hut.id)
-    expect(state.agents[BUILDER]!.insideId).toBe(hut.id)
+    expect((inside.payload as Payload).structureId).toBe(house.id)
+    expect(state.agents[BUILDER]!.insideId).toBe(house.id)
 
     // Spoilage: a two-day fish does not survive a three-day run.
     const spoiled = evs.filter((e) => e.type === 'item_spoiled')

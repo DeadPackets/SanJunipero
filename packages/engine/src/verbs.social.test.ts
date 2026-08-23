@@ -84,7 +84,7 @@ describe('verb: take', () => {
 
   it('takes an item from an adjacent structure', () => {
     let s = makeWorld()
-    s = fold(s, ev('structure_planned', { id: 'structure_1', kind: 'hut', x: 1, y: 0, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1' }), CFG)
+    s = fold(s, ev('structure_planned', { id: 'structure_1', kind: 'house', x: 1, y: 0, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1' }), CFG)
     s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'structure', id: 'structure_1' } }), CFG)
     const r = submitIntent(s, CFG, 'a1', 'take', { itemId: 'item_1' })
     if (!r.ok) throw new Error(r.reason)

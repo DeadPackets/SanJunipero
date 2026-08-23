@@ -6,9 +6,9 @@ import { BUILDING_PX_PER_TILE } from './textures.js'
 //
 // U8 asked for a review of the layering, not a patch, and the review found THREE independent
 // faults in one scalar:
-//   (a) a footprint was treated as a SCALAR — a 2×2 hut sorted from its far corner only, so
+//   (a) a footprint was treated as a SCALAR — a 2×2 house sorted from its far corner only, so
 //       the four tiles it actually occupies had no say;
-//   (b) the `+x` tiebreak produced EXACT TIES — a body at tile (20,22) and a 2×2 hut at
+//   (b) the `+x` tiebreak produced EXACT TIES — a body at tile (20,22) and a 2×2 house at
 //       (20,20) both computed 42021, and a tie in a sortableChildren container is resolved by
 //       insertion order, i.e. by nothing;
 //   (c) a body's depth was ROUNDED (`depthKey(Math.round(px), Math.round(py))`) while its
@@ -40,7 +40,7 @@ export type DepthBox = {
 
 /** `a` is strictly nearer the viewer than `b`. In dimetric both +x and +y run toward the
  *  camera, so "nearer" is "past the far edge on either world axis". Touching edges count:
- *  a body on the tile immediately south of a hut IS in front of it. */
+ *  a body on the tile immediately south of a house IS in front of it. */
 export function inFrontOf(a: DepthBox, b: DepthBox): boolean {
   return a.x0 >= b.x1 || a.y0 >= b.y1
 }

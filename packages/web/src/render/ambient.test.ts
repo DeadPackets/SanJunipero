@@ -17,8 +17,8 @@ describe('HEARTH_KINDS', () => {
     for (const kind of furnished) expect(HEARTH_KINDS).toContain(kind)
   })
 
-  it('smokes and glows from a hut and an open fire, and from nothing else', () => {
-    expect(HEARTH_KINDS).toContain('hut')
+  it('smokes and glows from a house and an open fire, and from nothing else', () => {
+    expect(HEARTH_KINDS).toContain('house')
     expect(HEARTH_KINDS).toContain('fire_pit')
     // the kinds the controller actually saw pale squares on
     for (const kind of ['wagon', 'shed', 'storehouse', 'well', 'standing_stone', 'scaffolding']) {

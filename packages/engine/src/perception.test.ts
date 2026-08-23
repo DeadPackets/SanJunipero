@@ -97,7 +97,7 @@ describe('composePerception: structure visibility by nearest tile', () => {
 // the prose named a tile beside the wall and the verb measured against the doorway. The packet
 // now carries the doorway itself, from the same `doorTile` the verb uses.
 describe('composePerception: the doorway a body must stand on', () => {
-  const hut = (s: WorldState, id: string, kind: string, x: number, y: number, complete: boolean): WorldState => {
+  const house = (s: WorldState, id: string, kind: string, x: number, y: number, complete: boolean): WorldState => {
     let out = fold(s, ev('structure_planned', {
       id, kind, x, y, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'script',
     }), DEFAULT_CONFIG)
@@ -106,14 +106,14 @@ describe('composePerception: the doorway a body must stand on', () => {
   }
 
   it('names the same tile enter measures against', () => {
-    const s = hut(makeWorld([{ id: 'a', x: 6, y: 6 }]), 'structure_1', 'hut', 2, 1, true)
+    const s = house(makeWorld([{ id: 'a', x: 6, y: 6 }]), 'structure_1', 'house', 2, 1, true)
     const seen = composePerception(s, DEFAULT_CONFIG, 'a', []).visible.structures[0]!
     expect(seen.door).toEqual(doorTile(s, s.structures.structure_1!))
   })
 
   it('is absent on a kind with no way in, and on a building still going up', () => {
-    let s = hut(makeWorld([{ id: 'a', x: 6, y: 6 }]), 'structure_1', 'shed', 2, 1, true)
-    s = hut(s, 'structure_2', 'hut', 8, 1, false)
+    let s = house(makeWorld([{ id: 'a', x: 6, y: 6 }]), 'structure_1', 'shed', 2, 1, true)
+    s = house(s, 'structure_2', 'house', 8, 1, false)
     const seen = composePerception(s, DEFAULT_CONFIG, 'a', []).visible.structures
     expect(seen.map((st) => st.door)).toEqual([undefined, undefined])
   })
@@ -235,20 +235,20 @@ describe('composePerception: structure contents', () => {
 
 // --- C9 Task 3: occlusion, interior sight, witnessed channel ---------------
 
-// A complete 2x2 hut anchored at (10,10); its door is the tile south of centre, (10,12).
-const HUT = { id: 'structure_1', kind: 'hut', x: 10, y: 10, w: 2, h: 2 }
+// A complete 2x2 house anchored at (10,10); its door is the tile south of centre, (10,12).
+const HOUSE = { id: 'structure_1', kind: 'house', x: 10, y: 10, w: 2, h: 2 }
 const DOOR = { x: 10, y: 12 }
 
-function withHut(s: WorldState): WorldState {
+function withHouse(s: WorldState): WorldState {
   let out = fold(s, ev('structure_planned', {
-    id: HUT.id, kind: HUT.kind, x: HUT.x, y: HUT.y, w: HUT.w, h: HUT.h,
+    id: HOUSE.id, kind: HOUSE.kind, x: HOUSE.x, y: HOUSE.y, w: HOUSE.w, h: HOUSE.h,
     maxHp: 50, flammable: true, builderId: 'script',
   }), DEFAULT_CONFIG)
-  return fold(out, ev('structure_completed', { id: HUT.id }), DEFAULT_CONFIG)
+  return fold(out, ev('structure_completed', { id: HOUSE.id }), DEFAULT_CONFIG)
 }
 
-// Put an already-spawned agent inside the hut, body parked on the door tile.
-function goInside(s: WorldState, id: string, structureId = HUT.id): WorldState {
+// Put an already-spawned agent inside the house, body parked on the door tile.
+function goInside(s: WorldState, id: string, structureId = HOUSE.id): WorldState {
   const moved = fold(s, ev('agent_moved', { id, x: DOOR.x, y: DOOR.y }), DEFAULT_CONFIG)
   return fold(moved, ev('agent_entered', { agentId: id, structureId }), DEFAULT_CONFIG)
 }
@@ -257,40 +257,40 @@ const spoke = (agentId: string, text: string, x: number, y: number, insideId?: s
   ev('agent_spoke', insideId === undefined ? { agentId, text, x, y } : { agentId, text, x, y, insideId })
 
 describe('composePerception: earshot occlusion', () => {
-  it('co-occupants hear each other regardless of where the hut sits', () => {
-    let s = withHut(makeWorld([{ id: 'a', x: 9, y: 12 }, { id: 'b', x: 11, y: 12 }]))
+  it('co-occupants hear each other regardless of where the house sits', () => {
+    let s = withHouse(makeWorld([{ id: 'a', x: 9, y: 12 }, { id: 'b', x: 11, y: 12 }]))
     s = goInside(goInside(s, 'a'), 'b')
-    const p = composePerception(s, DEFAULT_CONFIG, 'a', [spoke('b', 'inside words', DOOR.x, DOOR.y, HUT.id)])
+    const p = composePerception(s, DEFAULT_CONFIG, 'a', [spoke('b', 'inside words', DOOR.x, DOOR.y, HOUSE.id)])
     expect(p.heard.map(h => h.text)).toEqual(['inside words'])
   })
 
-  it('two agents in different huts do not hear each other', () => {
-    let s = withHut(makeWorld([{ id: 'a', x: 9, y: 12 }, { id: 'b', x: 11, y: 12 }]))
+  it('two agents in different houses do not hear each other', () => {
+    let s = withHouse(makeWorld([{ id: 'a', x: 9, y: 12 }, { id: 'b', x: 11, y: 12 }]))
     s = fold(s, ev('structure_planned', {
-      id: 'structure_2', kind: 'hut', x: 14, y: 10, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'script',
+      id: 'structure_2', kind: 'house', x: 14, y: 10, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'script',
     }), DEFAULT_CONFIG)
     s = fold(s, ev('structure_completed', { id: 'structure_2' }), DEFAULT_CONFIG)
     s = goInside(s, 'a')
     s = fold(s, ev('agent_moved', { id: 'b', x: 14, y: 12 }), DEFAULT_CONFIG)
     s = fold(s, ev('agent_entered', { agentId: 'b', structureId: 'structure_2' }), DEFAULT_CONFIG)
-    const p = composePerception(s, DEFAULT_CONFIG, 'a', [spoke('b', 'other hut', 14, 12, 'structure_2')])
+    const p = composePerception(s, DEFAULT_CONFIG, 'a', [spoke('b', 'other house', 14, 12, 'structure_2')])
     expect(p.heard).toEqual([])
   })
 
   it('speech from inside reaches the doorway and no further', () => {
-    let s = withHut(makeWorld([
+    let s = withHouse(makeWorld([
       { id: 'inside', x: 9, y: 12 },
       { id: 'atDoor', x: 11, y: 13 },   // Chebyshev 1 from the door
       { id: 'nearby', x: 10, y: 14 },   // Chebyshev 2 — well inside earshot 8, still deaf
     ]))
     s = goInside(s, 'inside')
-    const events = [spoke('inside', 'a whisper', DOOR.x, DOOR.y, HUT.id)]
+    const events = [spoke('inside', 'a whisper', DOOR.x, DOOR.y, HOUSE.id)]
     expect(composePerception(s, DEFAULT_CONFIG, 'atDoor', events).heard.map(h => h.text)).toEqual(['a whisper'])
     expect(composePerception(s, DEFAULT_CONFIG, 'nearby', events).heard).toEqual([])
   })
 
   it('the doorway rule is symmetric — outside speech reaches an insider only from the door', () => {
-    let s = withHut(makeWorld([
+    let s = withHouse(makeWorld([
       { id: 'inside', x: 9, y: 12 },
       { id: 'atDoor', x: 11, y: 13 },
       { id: 'nearby', x: 10, y: 14 },
@@ -304,15 +304,15 @@ describe('composePerception: earshot occlusion', () => {
 
   it('leaves the open-air rule alone — plain earshot both ways', () => {
     const earshot = DEFAULT_CONFIG.movement.earshotRadius
-    const s = withHut(makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: earshot, y: 0 }]))
+    const s = withHouse(makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: earshot, y: 0 }]))
     expect(composePerception(s, DEFAULT_CONFIG, 'a', [spoke('b', 'across the field', earshot, 0)])
       .heard.map(h => h.text)).toEqual(['across the field'])
   })
 
   it('hears() is the pure rule the packet is built from', () => {
-    let s = withHut(makeWorld([{ id: 'a', x: 9, y: 12 }, { id: 'b', x: 11, y: 13 }]))
+    let s = withHouse(makeWorld([{ id: 'a', x: 9, y: 12 }, { id: 'b', x: 11, y: 13 }]))
     s = goInside(s, 'a')
-    const fromInside = spoke('a', 'hush', DOOR.x, DOOR.y, HUT.id)
+    const fromInside = spoke('a', 'hush', DOOR.x, DOOR.y, HOUSE.id)
     expect(hears(s, DEFAULT_CONFIG, fromInside, 'b')).toBe(true)
     expect(hears(s, DEFAULT_CONFIG, fromInside, 'a')).toBe(true) // the rule itself is speaker-agnostic
     const far = spoke('b', 'oi', 20, 20)
@@ -321,45 +321,45 @@ describe('composePerception: earshot occlusion', () => {
 
   it('speak stamps the speaker insideId, and only when indoors', () => {
     const rng = RngStream.seed('perception-test', 'actions')
-    let s = withHut(makeWorld([{ id: 'a', x: 9, y: 12 }]))
+    let s = withHouse(makeWorld([{ id: 'a', x: 9, y: 12 }]))
     expect(VERBS.speak!.onComplete(s, DEFAULT_CONFIG, 'a', { text: 'out here' }, rng))
       .toEqual([{ type: 'agent_spoke', payload: { agentId: 'a', text: 'out here', x: 9, y: 12 } }])
     s = goInside(s, 'a')
     expect(VERBS.speak!.onComplete(s, DEFAULT_CONFIG, 'a', { text: 'in here' }, rng))
-      .toEqual([{ type: 'agent_spoke', payload: { agentId: 'a', text: 'in here', x: DOOR.x, y: DOOR.y, insideId: HUT.id } }])
+      .toEqual([{ type: 'agent_spoke', payload: { agentId: 'a', text: 'in here', x: DOOR.x, y: DOOR.y, insideId: HOUSE.id } }])
   })
 })
 
 describe('composePerception: interior sight', () => {
-  function peopledHut(): WorldState {
-    let s = withHut(makeWorld([
+  function peopledHouse(): WorldState {
+    let s = withHouse(makeWorld([
       { id: 'a', x: 9, y: 12 },
       { id: 'mate', x: 11, y: 12 },
       { id: 'passerby', x: 13, y: 13 },
     ]))
     s = goInside(goInside(s, 'a'), 'mate')
-    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'bread', qty: 2, loc: { t: 'structure', id: HUT.id } }), DEFAULT_CONFIG)
+    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'bread', qty: 2, loc: { t: 'structure', id: HOUSE.id } }), DEFAULT_CONFIG)
     s = fold(s, ev('item_spawned', { id: 'item_2', kind: 'stone', qty: 1, loc: { t: 'tile', x: 13, y: 13 } }), DEFAULT_CONFIG)
     s = fold(s, ev('crop_planted', { id: 'crop_1', kind: 'wheat', x: 13, y: 12, plantedDay: 0 }), DEFAULT_CONFIG)
     return s
   }
 
-  it('an insider sees co-occupants and the hut contents, never the meadow', () => {
-    const p = composePerception(peopledHut(), DEFAULT_CONFIG, 'a', [])
+  it('an insider sees co-occupants and the house contents, never the meadow', () => {
+    const p = composePerception(peopledHouse(), DEFAULT_CONFIG, 'a', [])
     expect(p.visible.agents.map(g => g.id)).toEqual(['mate'])
     expect(p.visible.items.map(i => i.id)).toEqual(['item_1'])
-    expect(p.visible.structures.map(st => st.id)).toEqual([HUT.id])
+    expect(p.visible.structures.map(st => st.id)).toEqual([HOUSE.id])
     expect(p.visible.crops).toEqual([])
   })
 
   it('an outsider standing right there sees no one inside', () => {
-    const p = composePerception(peopledHut(), DEFAULT_CONFIG, 'passerby', [])
+    const p = composePerception(peopledHouse(), DEFAULT_CONFIG, 'passerby', [])
     expect(p.visible.agents).toEqual([])
-    expect(p.visible.items.map(i => i.id)).toEqual(['item_2']) // not adjacent to the hut: no peek
+    expect(p.visible.items.map(i => i.id)).toEqual(['item_2']) // not adjacent to the house: no peek
   })
 
   it('weather and own body still reach an insider', () => {
-    const s = peopledHut()
+    const s = peopledHouse()
     const p = composePerception(s, DEFAULT_CONFIG, 'a', [ev('weather_changed', { kind: 'rain', temperatureC: 8 })])
     expect(p.feltEvents).toEqual(['rain_started'])
     expect(p.self).toMatchObject({ x: DOOR.x, y: DOOR.y })
@@ -457,7 +457,7 @@ describe('composePerception: witnessed takings', () => {
   })
 
   it('walls block the view — indoors you see only what happens in the room', () => {
-    let s = withHut(theftWorld())
+    let s = withHouse(theftWorld())
     s = goInside(s, 'bystander')
     expect(composePerception(s, DEFAULT_CONFIG, 'bystander', [taken('omar', 'salma', 4, 4)]).seen).toEqual([])
     s = goInside(s, 'omar')
@@ -596,15 +596,15 @@ describe('night-witness: a torch does not let you see, it lets the dark see you'
 // restated the same journey in forty-four turns without ever setting off.
 describe('composePerception: the body knows where it is and what it is doing', () => {
   it('names the roof overhead, and says nothing at all under open sky', () => {
-    const outside = withHut(makeWorld([{ id: 'a', x: 9, y: 12 }]))
+    const outside = withHouse(makeWorld([{ id: 'a', x: 9, y: 12 }]))
     expect(composePerception(outside, DEFAULT_CONFIG, 'a', []).self.inside).toBeUndefined()
     const inside = goInside(outside, 'a')
     expect(composePerception(inside, DEFAULT_CONFIG, 'a', []).self.inside)
-      .toEqual({ id: HUT.id, kind: HUT.kind })
+      .toEqual({ id: HOUSE.id, kind: HOUSE.kind })
   })
 
   it('names where the legs are already going, and only while they are walking', () => {
-    const s = withHut(makeWorld([{ id: 'a', x: 9, y: 12 }]))
+    const s = withHouse(makeWorld([{ id: 'a', x: 9, y: 12 }]))
     const busy = (activity: unknown): WorldState =>
       ({ ...s, agents: { ...s.agents, a: { ...s.agents.a!, activity } } } as WorldState)
 

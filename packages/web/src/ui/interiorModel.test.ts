@@ -36,14 +36,14 @@ function world(over: Partial<WorldState> = {}): WorldState {
   return {
     ...s,
     agents: {
-      amara: agent('amara', 'Amara', { insideId: 'hut1', asleep: true }),
+      amara: agent('amara', 'Amara', { insideId: 'house1', asleep: true }),
       yusuf: agent('yusuf', 'Yusuf', {
-        insideId: 'hut1', activity: { verb: 'weave', ticksRemaining: 4 },
+        insideId: 'house1', activity: { verb: 'weave', ticksRemaining: 4 },
       } as Partial<WorldState['agents'][string]>),
       nadia: agent('nadia', 'Nadia', { insideId: 'store1' }),
     },
     structures: {
-      hut1: structure('hut1', 'hut', 'amara'),
+      house1: structure('house1', 'house', 'amara'),
       store1: structure('store1', 'storehouse'),
       stone: structure('stone', 'standing_stone'),
     },
@@ -51,7 +51,7 @@ function world(over: Partial<WorldState> = {}): WorldState {
       i1: item('i1', 'grain', 3, 'store1'),
       i2: item('i2', 'grain', 5, 'store1'),
       i3: item('i3', 'plank', 2, 'store1'),
-      i4: item('i4', 'bowl', 1, 'hut1'),
+      i4: item('i4', 'bowl', 1, 'house1'),
       i5: { id: 'i5', kind: 'grain', qty: 99, loc: { t: 'tile', x: 0, y: 0 } },
     },
     crops: {},
@@ -65,12 +65,12 @@ const rec = (id: string, kind: string): AssetRecord => ({
 
 const RECORDS = [rec('a1', 'grain#icon'), rec('a2', 'plank#icon')]
 
-const PROV: Provenance = { id: 'hut1', kind: 'hut', plannedTick: 1, builderId: 'yusuf', completedTick: 4320 }
+const PROV: Provenance = { id: 'house1', kind: 'house', plannedTick: 1, builderId: 'yusuf', completedTick: 4320 }
 
 describe('roomCard — whose room this is', () => {
-  it('names an owned hut after its resident, with a typographic apostrophe', () => {
-    const c = roomCard(world(), 'hut1', RECORDS, null)!
-    expect(c.title).toBe('Amara’s hut')
+  it('names an owned house after its resident, with a typographic apostrophe', () => {
+    const c = roomCard(world(), 'house1', RECORDS, null)!
+    expect(c.title).toBe('Amara’s house')
     expect(c.title).not.toContain("'")
   })
 
@@ -81,42 +81,42 @@ describe('roomCard — whose room this is', () => {
   it('is null for a structure with no interior, an unknown id, and no world', () => {
     expect(roomCard(world(), 'stone', RECORDS, null)).toBeNull()
     expect(roomCard(world(), 'nope', RECORDS, null)).toBeNull()
-    expect(roomCard(null, 'hut1', RECORDS, null)).toBeNull()
+    expect(roomCard(null, 'house1', RECORDS, null)).toBeNull()
   })
 })
 
 describe('roomCard — who built it', () => {
   it('reads the provenance as a sentence about a person and a day', () => {
-    expect(roomCard(world(), 'hut1', RECORDS, PROV)!.built).toBe('Raised by Yusuf, Day 3')
+    expect(roomCard(world(), 'house1', RECORDS, PROV)!.built).toBe('Raised by Yusuf, Day 3')
   })
 
   it('is NULL when provenance is absent — never the string "null", never "unknown"', () => {
-    const c = roomCard(world(), 'hut1', RECORDS, null)!
+    const c = roomCard(world(), 'house1', RECORDS, null)!
     expect(c.built).toBeNull()
     expect(c.built).not.toBe('null')
     expect(c.built).not.toBe('unknown')
   })
 
   it('names a builder the world has forgotten by the only name it has', () => {
-    const c = roomCard(world(), 'hut1', RECORDS, { ...PROV, builderId: 'ghost' })!
+    const c = roomCard(world(), 'house1', RECORDS, { ...PROV, builderId: 'ghost' })!
     expect(c.built).toBe('Raised by ghost, Day 3')
   })
 
   it('says the day it was begun when it is still rising', () => {
-    const c = roomCard(world(), 'hut1', RECORDS, { ...PROV, completedTick: null })!
+    const c = roomCard(world(), 'house1', RECORDS, { ...PROV, completedTick: null })!
     expect(c.built).toBe('Begun by Yusuf, Day 0 — still rising')
   })
 })
 
 describe('roomCard — who lives here and who is in', () => {
   it('lists the owner under lives, and everyone present under present', () => {
-    const c = roomCard(world(), 'hut1', RECORDS, null)!
+    const c = roomCard(world(), 'house1', RECORDS, null)!
     expect(c.lives).toEqual(['Amara'])
     expect(c.present.map((p) => p.name)).toEqual(['Amara', 'Yusuf'])
   })
 
   it('uses one word per state, and never a synonym of another', () => {
-    const c = roomCard(world(), 'hut1', RECORDS, null)!
+    const c = roomCard(world(), 'house1', RECORDS, null)!
     expect(c.present.find((p) => p.id === 'amara')!.state).toBe(ROOM_STATE_ASLEEP)
     expect(c.present.find((p) => p.id === 'yusuf')!.state).toBe('Weaving')
     for (const p of c.present) expect(p.state, p.state).not.toMatch(SYNONYM_BAN)
@@ -145,7 +145,7 @@ describe('roomCard — what it holds', () => {
   })
 
   it('gives a kind with no icon in the codex a null, not a broken url', () => {
-    expect(roomCard(world(), 'hut1', RECORDS, null)!.holds)
+    expect(roomCard(world(), 'house1', RECORDS, null)!.holds)
       .toEqual([{ kind: 'bowl', words: 'bowl', qty: 1, iconUrl: null }])
   })
 
@@ -177,7 +177,7 @@ describe('roomCard — the empty line', () => {
     const quiet = world()
     delete quiet.agents['amara']
     delete quiet.agents['yusuf']
-    const c = roomCard(quiet, 'hut1', RECORDS, null)!
+    const c = roomCard(quiet, 'house1', RECORDS, null)!
     expect(c.present).toEqual([])
     expect(c.empty).toContain('now')
     expect(c.empty.toLowerCase()).not.toContain('yet')
@@ -195,7 +195,7 @@ describe('roomCard — the empty line', () => {
 
 describe('roomCard — the house style', () => {
   it('carries no gamification and no emoji anywhere in the card', () => {
-    for (const id of ['hut1', 'store1']) {
+    for (const id of ['house1', 'store1']) {
       const c = roomCard(world(), id, RECORDS, PROV)!
       const text = [c.title, c.built ?? '', c.empty, ...c.lives,
         ...c.holds.map((h) => h.words), ...c.present.map((p) => `${p.name} ${p.state}`)].join(' ')
@@ -205,6 +205,6 @@ describe('roomCard — the house style', () => {
   })
 
   it('is pure — the same world twice gives the same card', () => {
-    expect(roomCard(world(), 'hut1', RECORDS, PROV)).toEqual(roomCard(world(), 'hut1', RECORDS, PROV))
+    expect(roomCard(world(), 'house1', RECORDS, PROV)).toEqual(roomCard(world(), 'house1', RECORDS, PROV))
   })
 })

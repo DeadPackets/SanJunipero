@@ -18,8 +18,8 @@ function world(rows: string[] = OPEN, config = DEFAULT_CONFIG): WorldState {
   return genesisState(config, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
 }
 
-// A complete 2x2 hut at (2,1): footprint rows 1-2, cols 2-3; door lands at (2,3).
-function withHut(s: WorldState, kind = 'hut', stage: 'construction' | 'complete' = 'complete'): WorldState {
+// A complete 2x2 house at (2,1): footprint rows 1-2, cols 2-3; door lands at (2,3).
+function withHouse(s: WorldState, kind = 'house', stage: 'construction' | 'complete' = 'complete'): WorldState {
   let out = fold(s, ev(1, 'structure_planned', {
     id: 'structure_1', kind, x: 2, y: 1, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
   }))
@@ -33,25 +33,25 @@ function withAgent(s: WorldState, id: string, x: number, y: number): WorldState 
 
 describe('doorTile', () => {
   it('is the tile south of the footprint centre', () => {
-    const s = withHut(world())
+    const s = withHouse(world())
     expect(doorTile(s, s.structures.structure_1!)).toEqual({ x: 2, y: 3 })
   })
 
   it('falls back clockwise when the south centre is impassable', () => {
     // Water across the whole southern approach: the ring scan walks on to the left column.
-    const s = withHut(world(['........', '........', '........', '~~~~~~~~', '........', '........']))
+    const s = withHouse(world(['........', '........', '........', '~~~~~~~~', '........', '........']))
     expect(doorTile(s, s.structures.structure_1!)).toEqual({ x: 1, y: 2 })
   })
 
   it('is null when no perimeter tile is passable', () => {
-    const s = withHut(world(['.~~~~...', '.~..~...', '.~..~...', '.~~~~...', '........', '........']))
+    const s = withHouse(world(['.~~~~...', '.~..~...', '.~..~...', '.~~~~...', '........', '........']))
     expect(doorTile(s, s.structures.structure_1!)).toBeNull()
   })
 })
 
 describe('enter / exit', () => {
   it('round-trips insideId and parks the body on the door tile', () => {
-    let s = withAgent(withHut(world()), 'a1', 4, 4)
+    let s = withAgent(withHouse(world()), 'a1', 4, 4)
     // Stand within reach of the door at (2,3).
     s = fold(s, ev(11, 'agent_moved', { id: 'a1', x: 3, y: 4 }))
     const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'enter', { structureId: 'structure_1' })
@@ -70,7 +70,7 @@ describe('enter / exit', () => {
   })
 
   it('enter emits the move to the door then the entry', () => {
-    const s = withAgent(withHut(world()), 'a1', 3, 4)
+    const s = withAgent(withHouse(world()), 'a1', 3, 4)
     expect(VERBS.enter!.onComplete(s, DEFAULT_CONFIG, 'a1', { structureId: 'structure_1' }, RNG)).toEqual([
       { type: 'agent_moved', payload: { id: 'a1', x: 2, y: 3 } },
       { type: 'agent_entered', payload: { agentId: 'a1', structureId: 'structure_1' } },
@@ -78,7 +78,7 @@ describe('enter / exit', () => {
   })
 
   it('exit emits the exit event', () => {
-    let s = withAgent(withHut(world()), 'a1', 2, 3)
+    let s = withAgent(withHouse(world()), 'a1', 2, 3)
     s = fold(s, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     expect(VERBS.exit!.onComplete(s, DEFAULT_CONFIG, 'a1', {}, RNG)).toEqual([
       { type: 'agent_exited', payload: { agentId: 'a1', structureId: 'structure_1' } },
@@ -86,28 +86,28 @@ describe('enter / exit', () => {
   })
 
   it('refuses a construction site, an unenterable kind, out of reach, and a second entry', () => {
-    const site = withAgent(withHut(world(), 'hut', 'construction'), 'a1', 3, 4)
+    const site = withAgent(withHouse(world(), 'house', 'construction'), 'a1', 3, 4)
     expect(submitIntent(site, DEFAULT_CONFIG, 'a1', 'enter', { structureId: 'structure_1' }))
       .toMatchObject({ ok: false, reason: 'it is not finished' })
 
-    const stone = withAgent(withHut(world(), 'standing_stone'), 'a1', 3, 4)
+    const stone = withAgent(withHouse(world(), 'standing_stone'), 'a1', 3, 4)
     expect(submitIntent(stone, DEFAULT_CONFIG, 'a1', 'enter', { structureId: 'structure_1' }))
       .toMatchObject({ ok: false, reason: 'there is no way into a standing_stone' })
 
-    const far = withAgent(withHut(world()), 'a1', 7, 5)
+    const far = withAgent(withHouse(world()), 'a1', 7, 5)
     expect(submitIntent(far, DEFAULT_CONFIG, 'a1', 'enter', { structureId: 'structure_1' }))
       .toMatchObject({ ok: false, reason: 'not close enough to the door' })
 
-    let inside = withAgent(withHut(world()), 'a1', 2, 3)
+    let inside = withAgent(withHouse(world()), 'a1', 2, 3)
     inside = fold(inside, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     expect(submitIntent(inside, DEFAULT_CONFIG, 'a1', 'enter', { structureId: 'structure_1' }))
       .toMatchObject({ ok: false, reason: 'already inside' })
-    expect(submitIntent(withAgent(withHut(world()), 'a1', 3, 4), DEFAULT_CONFIG, 'a1', 'exit', {}))
+    expect(submitIntent(withAgent(withHouse(world()), 'a1', 3, 4), DEFAULT_CONFIG, 'a1', 'exit', {}))
       .toMatchObject({ ok: false, reason: 'not inside anything' })
   })
 
   it('walk is refused while indoors', () => {
-    let s = withAgent(withHut(world()), 'a1', 2, 3)
+    let s = withAgent(withHouse(world()), 'a1', 2, 3)
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 5, y: 5 }).ok).toBe(true)
     s = fold(s, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 5, y: 5 }))
@@ -117,7 +117,7 @@ describe('enter / exit', () => {
 
 describe('sameInterior', () => {
   it('pairs co-occupants and pairs the outdoors, never across a wall', () => {
-    let s = withAgent(withAgent(withHut(world()), 'a1', 2, 3), 'a2', 3, 3)
+    let s = withAgent(withAgent(withHouse(world()), 'a1', 2, 3), 'a2', 3, 3)
     s = withAgent(s, 'a3', 6, 5)
     expect(sameInterior(s, 'a1', 'a3')).toBe(true) // both outside
     s = fold(s, ev(20, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
@@ -129,7 +129,7 @@ describe('sameInterior', () => {
 
 describe('destruction ejects occupants', () => {
   it('fold refuses to destroy a structure with someone still inside', () => {
-    let s = withAgent(withHut(world()), 'a1', 2, 3)
+    let s = withAgent(withHouse(world()), 'a1', 2, 3)
     s = fold(s, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     expect(() => fold(s, ev(13, 'structure_destroyed', { id: 'structure_1' })))
       .toThrow(/occupant/i)
@@ -143,21 +143,21 @@ describe('destruction ejects occupants', () => {
 describe('sleep is indoors-only (C9 T2b)', () => {
   const OUTDOORS = 'there is no bed here; find somewhere to lie down — weary enough and the bare ground will do'
 
-  it('refuses a bed under the sky, allows one inside a hut', () => {
-    let s = withAgent(withHut(world()), 'a1', 2, 3)
+  it('refuses a bed under the sky, allows one inside a house', () => {
+    let s = withAgent(withHouse(world()), 'a1', 2, 3)
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {})).toMatchObject({ ok: false, reason: OUTDOORS })
     s = fold(s, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
   })
 
   it('checks the kind, not the owner — a storehouse is enterable but has no bed', () => {
-    let s = withAgent(withHut(world(), 'storehouse'), 'a1', 2, 3)
+    let s = withAgent(withHouse(world(), 'storehouse'), 'a1', 2, 3)
     s = fold(s, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {})).toMatchObject({ ok: false, reason: OUTDOORS })
 
-    // Another agent's hut is a legal bed: ownership is witnessed, never enforced.
+    // Another agent's house is a legal bed: ownership is witnessed, never enforced.
     let owned = fold(world(), ev(1, 'structure_planned', {
-      id: 'structure_1', kind: 'hut', x: 2, y: 1, w: 2, h: 2,
+      id: 'structure_1', kind: 'house', x: 2, y: 1, w: 2, h: 2,
       maxHp: 50, flammable: true, builderId: 'a2', owner: 'a2',
     }))
     owned = fold(owned, ev(2, 'structure_completed', { id: 'structure_1' }))
@@ -169,7 +169,7 @@ describe('sleep is indoors-only (C9 T2b)', () => {
   // R15 half 2: the law is about a bed, not about a punishment. A body under the sky that is
   // weary enough to be walking badly may lie down on the ground without falling over first.
   it('a body weary enough to stumble may lie down under the sky', () => {
-    let s = withAgent(withHut(world()), 'a1', 2, 3)
+    let s = withAgent(withHouse(world()), 'a1', 2, 3)
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {})).toMatchObject({ ok: false, reason: OUTDOORS })
     s = fold(s, ev(12, 'need_changed', { id: 'a1', need: 'energy', delta: -75 }))
     expect(s.agents.a1!.needs.energy).toBeLessThan(DEFAULT_CONFIG.needs.debuffThreshold)
@@ -177,7 +177,7 @@ describe('sleep is indoors-only (C9 T2b)', () => {
   })
 
   it('a collapsed body sleeps where it fell', () => {
-    let s = withAgent(withHut(world()), 'a1', 6, 5)
+    let s = withAgent(withHouse(world()), 'a1', 6, 5)
     s = fold(s, { seq: 12, tick: 4, type: 'agent_collapsed', payload: { agentId: 'a1' } })
     expect(s.agents.a1!.collapsedSinceTick).toBe(4)
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
@@ -185,31 +185,31 @@ describe('sleep is indoors-only (C9 T2b)', () => {
 
   it('the flag turns the law off entirely', () => {
     const off = SimConfigSchema.parse({ structures: { sleepIndoorsOnly: false } })
-    const s = withAgent(withHut(world(), 'hut', 'complete'), 'a1', 6, 5)
+    const s = withAgent(withHouse(world(), 'house', 'complete'), 'a1', 6, 5)
     expect(submitIntent(s, off, 'a1', 'sleep', {}).ok).toBe(true)
-    expect(off.structures.sleepableKinds).toEqual(['hut'])
+    expect(off.structures.sleepableKinds).toEqual(['house'])
   })
 })
 
 describe('structure ownership (deep-world POST-REVIEW RULING 1)', () => {
   it('is absent until set — public by default', () => {
-    const s = withHut(world())
+    const s = withHouse(world())
     expect(s.structures.structure_1!).not.toHaveProperty('owner')
   })
 
   it('the builder owns what they build, and the flag governs it', () => {
     const owned = fold(world(), ev(1, 'structure_planned', {
-      id: 'structure_1', kind: 'hut', x: 2, y: 1, w: 2, h: 2,
+      id: 'structure_1', kind: 'house', x: 2, y: 1, w: 2, h: 2,
       maxHp: 50, flammable: true, builderId: 'a1', owner: 'a1',
     }))
     expect(owned.structures.structure_1!.owner).toBe('a1')
 
     const s = withAgent(world(), 'a1', 2, 4)
-    const built = VERBS.build!.onStart!(s, DEFAULT_CONFIG, 'a1', { kind: 'hut', x: 2, y: 2 })
+    const built = VERBS.build!.onStart!(s, DEFAULT_CONFIG, 'a1', { kind: 'house', x: 2, y: 2 })
     expect(built.at(-1)).toMatchObject({ type: 'structure_planned', payload: { owner: 'a1' } })
 
     const off = SimConfigSchema.parse({ ownership: { enabled: false } })
-    const plain = VERBS.build!.onStart!(s, off, 'a1', { kind: 'hut', x: 2, y: 2 })
+    const plain = VERBS.build!.onStart!(s, off, 'a1', { kind: 'house', x: 2, y: 2 })
     expect((plain.at(-1)!.payload as Record<string, unknown>).owner).toBeUndefined()
   })
 })

@@ -19,7 +19,7 @@ const MINIMAL = {
   anchor: { x: 0, y: 0 },
   tiles: [{ dx: 1, dy: 2, to: T_ROAD }],
   structures: [{
-    kind: 'hut', dx: 3, dy: 4, w: 2, h: 2, owner: 'amara',
+    kind: 'house', dx: 3, dy: 4, w: 2, h: 2, owner: 'amara',
     furnishings: [{ kind: 'bed', slot: { x: 1, y: 1 } }],
   }],
 }
@@ -216,13 +216,13 @@ describe('the three dwelling kinds', () => {
     expect([...CITY_DWELLING_KINDS]).toEqual(['cottage', 'farmhouse', 'cabin'])
   })
 
-  // `hut` is retired as a NAME and still load-bearing as an ID: it is the only kind
+  // `house` is retired as a NAME and still load-bearing as an ID: it is the only kind
   // `enterableKinds` admits, and that list is inside the pinned config hash.
   it('keeps the legacy home id out of the contract and inside the house set', () => {
     expect((CITY_DWELLING_KINDS as readonly string[])).not.toContain(LEGACY_HOME_KIND)
     expect(isDwellingKind(LEGACY_HOME_KIND)).toBe(false)
     expect(isHouseKind(LEGACY_HOME_KIND)).toBe(true)
-    expect([...CITY_HOUSE_KINDS].sort()).toEqual(['cabin', 'cottage', 'farmhouse', 'hut'])
+    expect([...CITY_HOUSE_KINDS].sort()).toEqual(['cabin', 'cottage', 'farmhouse', 'house'])
   })
 
   it('gives each one a footprint, and no two the same mass', () => {
@@ -257,24 +257,24 @@ describe('city structures', () => {
   const roads = cityRoadTiles()
   const roadSet = new Set(roads.filter(isRoadTile).map(t => key(t.dx, t.dy)))
   const water = new Set(cityTerrainTiles().filter(t => t.to === T_WATER).map(t => key(t.dx, t.dy)))
-  const huts = structures.filter(s => s.kind === 'hut')
+  const houses = structures.filter(s => s.kind === 'house')
 
   it('places exactly eleven structures', () => {
     expect(structures).toHaveLength(11)
   })
 
   // USER RULING 1, both halves.
-  it('gives each of the five huts a distinct founder owner', () => {
-    expect(huts).toHaveLength(5)
-    expect(huts.map(h => h.owner).sort()).toEqual([...FOUNDER_IDS].sort())
+  it('gives each of the five houses a distinct founder owner', () => {
+    expect(houses).toHaveLength(5)
+    expect(houses.map(h => h.owner).sort()).toEqual([...FOUNDER_IDS].sort())
   })
 
-  it('leaves every non-hut public — owner null, never absent', () => {
-    for (const s of structures.filter(x => x.kind !== 'hut'))
+  it('leaves every non-house public — owner null, never absent', () => {
+    for (const s of structures.filter(x => x.kind !== 'house'))
       expect(s.owner, s.kind).toBeNull()
   })
 
-  // ONLY A HUT IS A HOME, and the reason is a pinned gate: `enterableKinds` and
+  // ONLY A HOUSE IS A HOME, and the reason is a pinned gate: `enterableKinds` and
   // `sleepableKinds` live in SimConfigSchema, whose hash is the `forge` pin. A founder housed
   // in a cottage could not open their own door.
   it('houses every founder in a kind the engine can let them into', () => {
@@ -306,9 +306,9 @@ describe('city structures', () => {
     }
     // Most of the town lives on the yard street; ONE household does not, because a town with
     // a single address is a row of houses rather than a place.
-    const atHome = huts.filter(h => inRect(DISTRICTS.homes, h.dx, h.dy))
+    const atHome = houses.filter(h => inRect(DISTRICTS.homes, h.dx, h.dy))
     expect(atHome.length).toBe(4)
-    expect(huts.length - atHome.length, 'nobody lives away from the yard street').toBe(1)
+    expect(houses.length - atHome.length, 'nobody lives away from the yard street').toBe(1)
   })
 
   it('never occupies a road, a path or a water tile', () => {
@@ -336,7 +336,7 @@ describe('city structures', () => {
   })
 
   it('gives every home exactly one bed and one hearth', () => {
-    for (const h of huts) {
+    for (const h of houses) {
       expect(h.furnishings.filter(f => f.kind === CITY_BED_KIND), 'bed').toHaveLength(1)
       expect(h.furnishings.filter(f => f.kind === CITY_HEARTH_KIND), 'hearth').toHaveLength(1)
     }
@@ -457,7 +457,7 @@ describe('makeCityTemplate', () => {
 //
 // U3: "doesn't have an actual genuine structure. It just looks like chaos." Read as a plan the
 // old template was not chaos, but it was a grid with no centre and no frontage: five identical
-// huts in one straight line, a well and a fire pit sitting BESIDE the square rather than in it,
+// houses in one straight line, a well and a fire pit sitting BESIDE the square rather than in it,
 // two identical sheds four rows apart, and roads that stopped in the grass. Each design move
 // below is stated as an invariant a test can check.
 
@@ -626,12 +626,12 @@ describe('districts you can point at', () => {
 
   // The old plan stood two identical 1×1 sheds four rows apart. Repetition inside one
   // district is what "the buildings are all the same" is made of, so the rule is general
-  // now: only the five founders' huts may repeat, and only because five people need five
+  // now: only the five founders' houses may repeat, and only because five people need five
   // roofs the engine will let them into.
   it('never stands the same kind twice in one district, except the founders roofs', () => {
     const seen = new Map<string, number>()
     for (const s of t.structures) {
-      if (s.kind === 'hut') continue
+      if (s.kind === 'house') continue
       const k = `${districtOf(s)}/${s.kind}`
       seen.set(k, (seen.get(k) ?? 0) + 1)
     }

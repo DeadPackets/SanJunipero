@@ -74,17 +74,17 @@ describe('makeGenesisWorld: the ground', () => {
 })
 
 describe('makeGenesisWorld: the town', () => {
-  it('plants exactly five huts, one owned by each founder', () => {
+  it('plants exactly five houses, one owned by each founder', () => {
     const s = foldAll()
-    const huts = Object.values(s.structures).filter((x) => x.kind === 'hut')
-    expect(huts).toHaveLength(5)
-    expect(huts.map((h) => h.owner).sort()).toEqual([...FOUNDER_IDS].sort())
+    const houses = Object.values(s.structures).filter((x) => x.kind === 'house')
+    expect(houses).toHaveLength(5)
+    expect(houses.map((h) => h.owner).sort()).toEqual([...FOUNDER_IDS].sort())
   })
 
   it('leaves every public building unowned — absent, not null', () => {
     const { events } = makeGenesisWorld(DEFAULT_CONFIG)
     const planned = events.filter((e) => e.type === 'structure_planned').map((e) => e.payload as Payload)
-    const publics = planned.filter((p) => p['kind'] !== 'hut')
+    const publics = planned.filter((p) => p['kind'] !== 'house')
     expect(publics.length).toBeGreaterThan(0)
     for (const p of publics) expect(Object.keys(p)).not.toContain('owner')
     for (const p of planned) expect(p['builderId']).toBe(GENESIS_BUILDER_ID)
@@ -99,10 +99,10 @@ describe('makeGenesisWorld: the town', () => {
 
   it('takes footprint from the template and durability from the one table that knows', () => {
     const s = foldAll()
-    const hut = Object.values(s.structures).find((x) => x.kind === 'hut')!
-    expect({ w: hut.w, h: hut.h }).toEqual({ w: 2, h: 2 })
-    expect(hut.maxHp).toBe(DEFAULT_CONFIG.structures.recipes['hut']!.maxHp)
-    expect(hut.flammable).toBe(true)
+    const house = Object.values(s.structures).find((x) => x.kind === 'house')!
+    expect({ w: house.w, h: house.h }).toEqual({ w: 2, h: 2 })
+    expect(house.maxHp).toBe(DEFAULT_CONFIG.structures.recipes['house']!.maxHp)
+    expect(house.flammable).toBe(true)
     const well = Object.values(s.structures).find((x) => x.kind === 'well')!
     expect(well.maxHp).toBe(DEFAULT_CONFIG.structures.recipes['well']!.maxHp)
     expect(well.flammable).toBe(false)
@@ -142,8 +142,8 @@ describe('makeGenesisWorld: the town', () => {
     for (const id of FOUNDER_IDS) {
       const kit = Object.values(s.items).filter((i) => i.owner === id)
       expect(kit.map((i) => i.kind).sort()).toEqual(['axe', 'bread', 'hoe', 'knife', 'seed_pouch', 'waterskin'])
-      const hut = Object.values(s.structures).find((x) => x.kind === 'hut' && x.owner === id)!
-      for (const item of kit) expect(item.loc).toEqual({ t: 'structure', id: hut.id })
+      const house = Object.values(s.structures).find((x) => x.kind === 'house' && x.owner === id)!
+      for (const item of kit) expect(item.loc).toEqual({ t: 'structure', id: house.id })
       expect(kit.find((i) => i.kind === 'bread')!.qty).toBe(3)
     }
     const store = Object.values(s.structures).find((x) => x.kind === 'storehouse')!

@@ -21,7 +21,7 @@ const base: Recipe = {
 
 const vocab = {
   itemKinds: new Set(['hide', 'wood', 'fiber', 'clay', 'stone']),
-  structureKinds: new Set(['hut', 'storehouse', 'weir']),
+  structureKinds: new Set(['house', 'storehouse', 'weir']),
   knownProducts: new Set(['waterskin', 'basket']),
   knownRecipeIds: new Set(['recipe:waterskin']),
 }
@@ -133,10 +133,10 @@ describe('the materials the arbiter is shown', () => {
 
   it('names every kind it will hold the answer to, and says a rule outlives a thing', () => {
     const withTable = assembleAdjudicationPrompt({
-      ...blocks, materials: { itemKinds: ['hide', 'wood'], structureKinds: ['hut'] },
+      ...blocks, materials: { itemKinds: ['hide', 'wood'], structureKinds: ['house'] },
     })
     expect(withTable.system).toContain('hide, wood')
-    expect(withTable.system).toContain('hut')
+    expect(withTable.system).toContain('house')
     expect(withTable.system).toMatch(/a recipe is a rule and outlives every one of them/i)
   })
 

@@ -66,7 +66,7 @@ describe('observer data apis', () => {
           emit('agent_spoke', { agentId: 'cara', text: 'To the river.', x: 20, y: 20 }) // in tick window, out of earshot
         }
         if (tick === 10) {
-          emit('structure_planned', { id: 's1', kind: 'hut', x: 2, y: 2, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'bob' })
+          emit('structure_planned', { id: 's1', kind: 'house', x: 2, y: 2, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'bob' })
           emit('structure_planned', { id: 's2', kind: 'shed', x: 10, y: 10, w: 1, h: 1, maxHp: 40, flammable: true, builderId: 'cara' })
         }
         if (tick === 21) emit('agent_spoke', { agentId: 'bob', text: 'Morning to you.', x: 0, y: 3 }) // 19 ticks after alice, dist 3 → talk
@@ -129,7 +129,7 @@ describe('observer data apis', () => {
 
   it('provenance from the events scan, completedTick null while building', async () => {
     expect(await (await fetch(`${base}/api/structure/s1/provenance`)).json()).toEqual({
-      id: 's1', kind: 'hut', plannedTick: 10, builderId: 'bob', completedTick: 40,
+      id: 's1', kind: 'house', plannedTick: 10, builderId: 'bob', completedTick: 40,
     })
     expect(await (await fetch(`${base}/api/structure/s2/provenance`)).json()).toEqual({
       id: 's2', kind: 'shed', plannedTick: 10, builderId: 'cara', completedTick: null,
@@ -171,7 +171,7 @@ describe('observer data apis', () => {
       days: [0],
       deaths: [{ agentId: 'dan', tick: 70, cause: 'hunger' }],
       births: [],
-      structuresCompleted: [{ id: 's1', kind: 'hut', tick: 40 }],
+      structuresCompleted: [{ id: 's1', kind: 'house', tick: 40 }],
       topMoments: [
         { tick: 60, agentId: 'dan', score: 20, moment: { day: 0, time: '01:00' } },
         { tick: 0, agentId: 'alice', score: 4, moment: { day: 0, time: '00:00' } },

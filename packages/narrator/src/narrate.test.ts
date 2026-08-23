@@ -229,7 +229,7 @@ describe('narrateWeek', () => {
   })
 })
 
-// C11 R18: `first_hut` and `first_bridge` read a structure's kind, and a hut takes two sim-days
+// C11 R18: `first_house` and `first_bridge` read a structure's kind, and a house takes two sim-days
 // to raise — so the day the roof goes on, the plan that named it is in a stream this pass never
 // sees. `narrateDay` passed no `structureKind` at all, so both firsts missed every building the
 // town actually built.
@@ -244,12 +244,12 @@ describe('narrateDay: a roof finished on a day whose plan it never read', () => 
     state: { agents: {}, structures: { structure_9: { id: 'structure_9', kind } }, pairNights: {} } as never,
   })
 
-  it('names the hut from the world in reach, though the plan was three days ago', async () => {
+  it('names the house from the world in reach, though the plan was three days ago', async () => {
     const { milestones } = await narrateDay({
       store: memStore(), llm: scriptedLlm([1]), events: FINISH, rulebookCount: 0,
-      privateCounts: { thoughts: 0, journals: 0 }, world: worldWith('hut'),
+      privateCounts: { thoughts: 0, journals: 0 }, world: worldWith('house'),
     })
-    expect(milestones.map((m) => m.kind)).toContain('first_hut')
+    expect(milestones.map((m) => m.kind)).toContain('first_house')
     expect(milestones.map((m) => m.kind)).not.toContain('first_bridge')
   })
 
@@ -267,6 +267,6 @@ describe('narrateDay: a roof finished on a day whose plan it never read', () => 
       privateCounts: { thoughts: 0, journals: 0 },
     })
     expect(milestones.map((m) => m.kind)).toContain('first_structure')
-    expect(milestones.map((m) => m.kind)).not.toContain('first_hut')
+    expect(milestones.map((m) => m.kind)).not.toContain('first_house')
   })
 })

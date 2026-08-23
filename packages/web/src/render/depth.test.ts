@@ -7,22 +7,22 @@ import {
   type EdgeRule,
 } from './depth.js'
 
-const HUT = { x: 20, y: 20, w: 2, h: 2 }
-const hut = structureDepthBox('hut', HUT)
+const HOUSE = { x: 20, y: 20, w: 2, h: 2 }
+const house = structureDepthBox('house', HOUSE)
 const before = (order: string[], a: string, b: string): boolean => order.indexOf(a) < order.indexOf(b)
 
 beforeEach(() => resetDepthFallbacks())
 
 describe('F-3(b) — the exact tie the old scalar produced', () => {
-  it('LANDED BUG: a body at tile (20,22) and a 2×2 hut at (20,20) both computed 42021', () => {
-    expect(structureZIndex(HUT)).toBe(42021)
+  it('LANDED BUG: a body at tile (20,22) and a 2×2 house at (20,20) both computed 42021', () => {
+    expect(structureZIndex(HOUSE)).toBe(42021)
     expect(depthKey(20, 22) + 1).toBe(42021)   // characters.ts wrote depthKey(...) + 1
   })
 
-  it('puts the body in front of the hut it is standing south of', () => {
+  it('puts the body in front of the house it is standing south of', () => {
     const body = bodyDepthBox('body', 20, 22)
-    expect(before(depthOrder([hut, body]), 'hut', 'body')).toBe(true)
-    expect(before(depthOrder([body, hut]), 'hut', 'body')).toBe(true)  // input order is irrelevant
+    expect(before(depthOrder([house, body]), 'house', 'body')).toBe(true)
+    expect(before(depthOrder([body, house]), 'house', 'body')).toBe(true)  // input order is irrelevant
   })
 })
 
@@ -56,7 +56,7 @@ describe('F-3(c) — a rounded depth against an unrounded position', () => {
     let prev: boolean | null = null
     for (let i = 0; i <= 400; i++) {
       const py = 16 + i / 100
-      const front = before(depthOrder([hut, bodyDepthBox('body', 20, py)]), 'hut', 'body')
+      const front = before(depthOrder([house, bodyDepthBox('body', 20, py)]), 'house', 'body')
       if (prev !== null && front !== prev) flips.push({ py, front })
       prev = front
     }
@@ -76,14 +76,14 @@ describe('F-3(a) — a footprint is a range, not a corner', () => {
     ['w', 17.5, 20.5], ['nw', 18.5, 18.5], ['n', 20.5, 17.5], ['ne', 22.5, 18.5],
   ]
 
-  it('answers every decisive tile on a ring around the hut from the geometry', () => {
+  it('answers every decisive tile on a ring around the house from the geometry', () => {
     const decisive: Record<string, boolean> = {}
     for (const [name, x, y] of RING) {
       const b = bodyDepthBox(name, x, y)
-      const bodyFront = inFrontOf(b, hut), hutFront = inFrontOf(hut, b)
-      if (bodyFront === hutFront) continue          // mutually diagonal — the seed decides
+      const bodyFront = inFrontOf(b, house), houseFront = inFrontOf(house, b)
+      if (bodyFront === houseFront) continue          // mutually diagonal — the seed decides
       decisive[name] = bodyFront
-      expect(before(depthOrder([hut, b]), 'hut', name), name).toBe(bodyFront)
+      expect(before(depthOrder([house, b]), 'house', name), name).toBe(bodyFront)
     }
     expect(decisive).toEqual({ e: true, se: true, s: true, w: false, nw: false, n: false })
   })
@@ -91,17 +91,17 @@ describe('F-3(a) — a footprint is a range, not a corner', () => {
   it('names the two genuinely ambiguous diagonals and resolves them the same way twice', () => {
     const ambiguous = RING.filter(([name, x, y]) => {
       const b = bodyDepthBox(name, x, y)
-      return inFrontOf(b, hut) === inFrontOf(hut, b)
+      return inFrontOf(b, house) === inFrontOf(house, b)
     }).map(([name]) => name)
     expect(ambiguous).toEqual(['sw', 'ne'])
     for (const [name, x, y] of RING) {
       const b = bodyDepthBox(name, x, y)
-      expect(depthOrder([hut, b])).toEqual(depthOrder([b, hut]))
+      expect(depthOrder([house, b])).toEqual(depthOrder([b, house]))
     }
   })
 
-  it('a 2×2 hut occupies four tiles of ground, not one corner', () => {
-    expect([hut.x0, hut.y0, hut.x1, hut.y1]).toEqual([19.5, 19.5, 21.5, 21.5])
+  it('a 2×2 house occupies four tiles of ground, not one corner', () => {
+    expect([house.x0, house.y0, house.x1, house.y1]).toEqual([19.5, 19.5, 21.5, 21.5])
   })
 })
 
@@ -200,9 +200,9 @@ describe('the counted deterministic fallback', () => {
   })
 
   it('puts a body standing IN a doorway in front of the building, never inside it', () => {
-    const inDoorway = bodyDepthBox('body', 20, 21)   // the south-centre tile of the 2×2 hut
-    expect(before(depthOrder([hut, inDoorway]), 'hut', 'body')).toBe(true)
-    expect(before(depthOrder([inDoorway, hut]), 'hut', 'body')).toBe(true)
+    const inDoorway = bodyDepthBox('body', 20, 21)   // the south-centre tile of the 2×2 house
+    expect(before(depthOrder([house, inDoorway]), 'house', 'body')).toBe(true)
+    expect(before(depthOrder([inDoorway, house]), 'house', 'body')).toBe(true)
   })
 
   it('counts a frame that blows the budget and still returns everything', () => {

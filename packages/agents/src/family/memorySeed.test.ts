@@ -20,7 +20,7 @@ function seedWorld(): EventStore {
     store.append(t, type, payload)
   }
   at(10, 'structure_planned', {
-    id: HOME, kind: 'hut', x: 4, y: 4, w: 2, h: 2, maxHp: 40, flammable: true, builderId: FATHER, owner: FATHER,
+    id: HOME, kind: 'house', x: 4, y: 4, w: 2, h: 2, maxHp: 40, flammable: true, builderId: FATHER, owner: FATHER,
   })
   at(20, 'structure_completed', { id: HOME })
   at(25, 'structure_inscribed', { structureId: HOME, text: 'we raised this in the rain', agentId: MOTHER })
@@ -83,7 +83,7 @@ describe('buildHouseholdSeed (T25)', () => {
     const parentDb = openAgentDb(':memory:')
     const parentMem = new MemoryStore(parentDb, MOTHER, await FakeEmbedder.create())
     const SECRET = 'I have never told anyone that I hid the last of the seed corn.'
-    await parentMem.insertMemory({ tick: 35, kind: 'journal', text: SECRET, importance: 9, tags: { people: [], place: 'hut', objects: [], topics: [] } })
+    await parentMem.insertMemory({ tick: 35, kind: 'journal', text: SECRET, importance: 9, tags: { people: [], place: 'house', objects: [], topics: [] } })
 
     const seed = buildHouseholdSeed(store, OPTS)
     for (const entry of seed) expect(entry.text).not.toContain('hid the last of the seed corn')

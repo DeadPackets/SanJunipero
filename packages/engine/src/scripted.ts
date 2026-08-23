@@ -29,8 +29,8 @@ export const ACTORS = [FARMER, FISHER, IDLER, BUILDER, THIEF, KEEPER] as const
 export const MAP_W = 64
 export const MAP_H = 64
 export const FARM_PLOT = { x: 26, y: 20 }
-export const HUT_SITE = { x: 30, y: 20 } // 2x2 footprint
-export const HUT_WORK = { x: 30, y: 22 } // adjacent, outside footprint
+export const HOUSE_SITE = { x: 30, y: 20 } // 2x2 footprint
+export const HOUSE_WORK = { x: 30, y: 22 } // adjacent, outside footprint
 export const STOREHOUSE = { id: 'structure_1', x: 20, y: 20, w: 2, h: 2 }
 export const SHED = { id: 'structure_2', x: 22, y: 20, w: 1, h: 1 }
 export const STOREHOUSE_NEAR = { x: 22, y: 21 } // passable tile adjacent to storehouse
@@ -73,7 +73,7 @@ const held = (p: PerceptionPacket, kind: string): number =>
 
 const nearStorehouse = (p: PerceptionPacket): boolean => isAdjacentToRect(p.self.x, p.self.y, STOREHOUSE)
 
-const nearHutSite = (p: PerceptionPacket): boolean => isAdjacentToRect(p.self.x, p.self.y, { ...HUT_SITE, w: 2, h: 2 })
+const nearHouseSite = (p: PerceptionPacket): boolean => isAdjacentToRect(p.self.x, p.self.y, { ...HOUSE_SITE, w: 2, h: 2 })
 
 // Farmer: till + plant wheat on day 1, then eat wheat from the storehouse and sleep.
 export function makeFarmerPolicy(config: SimConfig): Policy {
@@ -133,7 +133,7 @@ export function makeIdlerPolicy(_config: SimConfig): Policy {
   }
 }
 
-// Builder: provision wood + wheat from the storehouse, build the hut (with rest breaks),
+// Builder: provision wood + wheat from the storehouse, build the house (with rest breaks),
 // then sleep only.
 export function makeBuilderPolicy(config: SimConfig): Policy {
   return (p) => {
@@ -141,23 +141,23 @@ export function makeBuilderPolicy(config: SimConfig): Policy {
     const wood = held(p, 'wood')
     const wheat = held(p, 'wheat')
     const food = p.self.inventory.find((i) => isFoodKind(config, i.kind))
-    const hut = p.visible.structures.find((s) => s.kind === 'hut')
+    const house = p.visible.structures.find((s) => s.kind === 'house')
 
-    if (hut && hut.stage === 'complete') return { verb: 'sleep', params: {} }
+    if (house && house.stage === 'complete') return { verb: 'sleep', params: {} }
 
     if (needs.hunger < 60 && food) return { verb: 'eat', params: { itemId: food.id } }
 
     // Wood is spent once, at the first build; only provision before the site exists.
-    if (!hut && (wood < config.construction.hutMaterials.wood || wheat < 1)) {
+    if (!house && (wood < config.construction.houseMaterials.wood || wheat < 1)) {
       if (nearStorehouse(p)) {
-        if (wood < config.construction.hutMaterials.wood) return { verb: 'take', params: { itemId: WOOD_ITEM } }
+        if (wood < config.construction.houseMaterials.wood) return { verb: 'take', params: { itemId: WOOD_ITEM } }
         return { verb: 'take', params: { itemId: WHEAT_BUILDER } }
       }
       return { verb: 'walk', params: { x: STOREHOUSE_NEAR.x, y: STOREHOUSE_NEAR.y } }
     }
 
-    if (!nearHutSite(p)) return { verb: 'walk', params: { x: HUT_WORK.x, y: HUT_WORK.y } }
-    return { verb: 'build', params: { kind: 'hut', x: HUT_SITE.x, y: HUT_SITE.y } }
+    if (!nearHouseSite(p)) return { verb: 'walk', params: { x: HOUSE_WORK.x, y: HOUSE_WORK.y } }
+    return { verb: 'build', params: { kind: 'house', x: HOUSE_SITE.x, y: HOUSE_SITE.y } }
   }
 }
 

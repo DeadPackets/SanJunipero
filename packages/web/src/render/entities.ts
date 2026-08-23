@@ -24,7 +24,7 @@ export const CROP_SCALE_BASE = 0.4
 export const CROP_SCALE_PER_STAGE = 0.15
 export const PIP_COUNT = 4
 export const PIP_COLOR = 0xf2c879
-export const BUILD_TICKS_FULL = 2880 // pip denominator — DEFAULT_CONFIG construction.hutTicks; presentation only
+export const BUILD_TICKS_FULL = 2880 // pip denominator — DEFAULT_CONFIG construction.houseTicks; presentation only
 
 // The door a resident walks out of: south face, centre of the frontage. The same rule the
 // C13 city template applies in template space (`doorTile`), read here in world tiles.
@@ -51,7 +51,7 @@ export function structureZIndex(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): numb
 // A building sprite is ~1.85x wider than the ground it stands on, and Pixi hit-tests a
 // sprite's full RECTANGULAR bounds — transparent margin included. So a wagon one depth row
 // south of the storehouse was intercepting hits on the storehouse's door with nothing but
-// its empty canopy padding, and the scaffolding was doing the same to the hut.
+// its empty canopy padding, and the scaffolding was doing the same to the house.
 //
 // The honest target for "tell me about this building" is the ground it occupies, so the
 // hit area is the footprint DIAMOND: it can never reach past the tiles the building stands

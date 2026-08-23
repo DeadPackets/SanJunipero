@@ -77,7 +77,7 @@ const world = (over: Record<string, unknown> = {}): WorldState => ({
     a3: agent('a3', 'Nadia', 0, 2, { activity: { verb: 'till' } }),
   },
   structures: {
-    s_hut: { id: 's_hut', kind: 'hut', x: 1, y: 0, w: 1, h: 1, stage: 'complete', owner: 'a1', builtBy: null },
+    s_house: { id: 's_house', kind: 'house', x: 1, y: 0, w: 1, h: 1, stage: 'complete', owner: 'a1', builtBy: null },
     s_fire: { id: 's_fire', kind: 'fire_pit', x: 0, y: 0, w: 1, h: 1, stage: 'complete', builtBy: null },
   },
   items: {}, crops: {}, weather: { kind: 'clear' },
@@ -159,9 +159,9 @@ describe('U14 — "the timeline is missing MARKS; the font is hard to read and t
   const marks = marksFrom({
     events: [
       ev(100, 'agent_died', { agentId: 'a1' }),
-      ev(200, 'structure_completed', { id: 's_hut' }),
+      ev(200, 'structure_completed', { id: 's_house' }),
       ev(300, 'agent_born', { agentId: 'a4' }),
-      ev(400, 'fire_ignited', { structureId: 's_hut' }),
+      ev(400, 'fire_ignited', { structureId: 's_house' }),
     ],
     chapters: [], milestones: [], moments: [], changes: [{ tick: 250 }],
   })
@@ -330,7 +330,7 @@ describe('U22 — "I should have controls at the bottom to let me do what I want
   it('turns every id the bar can produce into an action', () => {
     for (const lens of ['map', 'inspector', 'chronicle', 'society', 'director', 'laws'] as const) {
       for (const live of [true, false]) {
-        for (const inside of [null, 's_hut']) {
+        for (const inside of [null, 's_house']) {
           for (const item of controlItems({ lens, live, zoom: 1, following: null, insideId: inside, hudHidden: false })) {
             expect(() => actionFor(item), `${lens}/${item.id}`).not.toThrow()
             expect(actionFor(item).kind, `${lens}/${item.id}`).toBeTypeOf('string')

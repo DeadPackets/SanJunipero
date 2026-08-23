@@ -42,7 +42,7 @@ const DIRT: TileId = 1
 
 const nameOf = (state: WorldState, id: string): string => state.agents[id]?.name ?? id
 
-/** "Amara’s hut" | "the well". A kind is a slug in the engine and prose here — the underscore
+/** "Amara’s house" | "the well". A kind is a slug in the engine and prose here — the underscore
  *  never reaches a viewer. */
 export function structureWords(state: WorldState, s: Structure): string {
   const words = s.kind.replace(/_/g, ' ')

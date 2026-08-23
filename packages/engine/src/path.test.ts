@@ -88,7 +88,7 @@ describe('isPassable', () => {
     expect(isPassable(s, 0, 2)).toBe(false)
     expect(isPassable(s, 2, 0)).toBe(false) // water
     expect(isPassable(s, 0, 0)).toBe(true)
-    s = fold(s, ev(1, 'structure_planned', { id: 'structure_1', kind: 'hut', x: 0, y: 0, w: 2, h: 1, maxHp: 50, flammable: true, builderId: 'a1' }))
+    s = fold(s, ev(1, 'structure_planned', { id: 'structure_1', kind: 'house', x: 0, y: 0, w: 2, h: 1, maxHp: 50, flammable: true, builderId: 'a1' }))
     expect(isPassable(s, 0, 0)).toBe(false)
     expect(isPassable(s, 1, 0)).toBe(false)
     expect(isPassable(s, 0, 1)).toBe(true)
@@ -147,7 +147,7 @@ describe('findPath (A*)', () => {
 
   it('treats structure footprints as impassable', () => {
     let s = world(['.....', '.....', '.....'])
-    s = fold(s, ev(1, 'structure_planned', { id: 'structure_1', kind: 'hut', x: 2, y: 0, w: 1, h: 2, maxHp: 50, flammable: true, builderId: 'a1' }))
+    s = fold(s, ev(1, 'structure_planned', { id: 'structure_1', kind: 'house', x: 2, y: 0, w: 1, h: 2, maxHp: 50, flammable: true, builderId: 'a1' }))
     const path = findPath(s, { x: 0, y: 0 }, { x: 4, y: 0 })!
     expect(path).toHaveLength(8)
     for (const [x, y] of path) expect(x === 2 && y <= 1).toBe(false)
@@ -155,15 +155,15 @@ describe('findPath (A*)', () => {
 
   it('corner rule: a diagonal step between two blocked corners is rejected', () => {
     let s = world(['....', '....', '....', '....'])
-    s = fold(s, ev(1, 'structure_planned', { id: 'a', kind: 'hut', x: 1, y: 1, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'x' }))
-    s = fold(s, ev(2, 'structure_planned', { id: 'b', kind: 'hut', x: 2, y: 2, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'x' }))
-    // (1,2)→(2,1) squeezes between the two diagonally-adjacent huts: illegal
+    s = fold(s, ev(1, 'structure_planned', { id: 'a', kind: 'house', x: 1, y: 1, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'x' }))
+    s = fold(s, ev(2, 'structure_planned', { id: 'b', kind: 'house', x: 2, y: 2, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'x' }))
+    // (1,2)→(2,1) squeezes between the two diagonally-adjacent houses: illegal
     expect(canStep(s, 1, 2, 1, -1)).toBe(false)
     // (2,1)→(3,2) has only one blocked corner: still legal
     expect(canStep(s, 2, 1, 1, 1)).toBe(true)
     // cardinal steps ignore the corner rule and just check the destination
     expect(canStep(s, 0, 0, 1, 0)).toBe(true)
-    expect(canStep(s, 1, 0, 0, 1)).toBe(false) // (1,1) is a hut footprint
+    expect(canStep(s, 1, 0, 0, 1)).toBe(false) // (1,1) is a house footprint
   })
 
   it('returns [] when already at the goal', () => {
@@ -347,7 +347,7 @@ describe('bridges: the one structure that grants passage', () => {
   it('any other structure over water still blocks', () => {
     let s = world(RIVER)
     s = fold(s, ev(50, 'structure_planned', {
-      id: 'structure_1', kind: 'hut', x: 1, y: 1, w: 3, h: 1, maxHp: 50, flammable: true, builderId: 'a1',
+      id: 'structure_1', kind: 'house', x: 1, y: 1, w: 3, h: 1, maxHp: 50, flammable: true, builderId: 'a1',
     }))
     s = fold(s, ev(51, 'structure_completed', { id: 'structure_1' }))
     expect(isPassable(s, 2, 1)).toBe(false)

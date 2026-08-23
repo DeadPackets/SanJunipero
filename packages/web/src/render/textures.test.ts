@@ -3,7 +3,7 @@ import type { AssetRecord } from '@sj/shared'
 import { buildingArt, characterArt, resolveAssetId, textureUrlFor } from './textures.js'
 
 const rec = (over: Partial<AssetRecord>): AssetRecord => ({
-  id: 'asset_x', seq: 1, class: 'building', desc: 'hut: timber dwelling', kind: 'hut',
+  id: 'asset_x', seq: 1, class: 'building', desc: 'house: timber dwelling', kind: 'house',
   footprint: { w: 2, h: 2 }, widthPx: 64, heightPx: 64, status: 'ready',
   score: 9, attempts: 1, costUsd: 0, createdAt: '2026-08-16 00:00:00', meta: null,
   ...over,
@@ -12,31 +12,31 @@ const rec = (over: Partial<AssetRecord>): AssetRecord => ({
 describe('resolveAssetId', () => {
   it('picks the newest ready record for the kind over an older one', () => {
     const records = [rec({ id: 'old', seq: 1 }), rec({ id: 'new', seq: 7 }), rec({ id: 'other', seq: 9, kind: 'barn' })]
-    expect(resolveAssetId(records, 'building', 'hut')).toBe('new')
+    expect(resolveAssetId(records, 'building', 'house')).toBe('new')
   })
 
   it('ignores placeholder-status records', () => {
     const records = [rec({ id: 'ready1', seq: 1 }), rec({ id: 'ph', seq: 5, status: 'placeholder', score: null })]
-    expect(resolveAssetId(records, 'building', 'hut')).toBe('ready1')
+    expect(resolveAssetId(records, 'building', 'house')).toBe('ready1')
   })
 
   it('resolves by the kind column, never by desc parsing', () => {
-    // desc mentions hut, kind says otherwise: no match; null kind never matches either
-    const records = [rec({ id: 'a', kind: 'shed', desc: 'hut lookalike' }), rec({ id: 'b', kind: null, desc: 'hut: timber' })]
-    expect(resolveAssetId(records, 'building', 'hut')).toBeNull()
+    // desc mentions house, kind says otherwise: no match; null kind never matches either
+    const records = [rec({ id: 'a', kind: 'shed', desc: 'house lookalike' }), rec({ id: 'b', kind: null, desc: 'house: timber' })]
+    expect(resolveAssetId(records, 'building', 'house')).toBeNull()
   })
 
   it('requires the class to match', () => {
-    expect(resolveAssetId([rec({ class: 'item', footprint: { w: 1, h: 1 } })], 'building', 'hut')).toBeNull()
+    expect(resolveAssetId([rec({ class: 'item', footprint: { w: 1, h: 1 } })], 'building', 'house')).toBeNull()
   })
 })
 
 describe('textureUrlFor', () => {
   it('serves the resolved asset png', () => {
-    expect(textureUrlFor([rec({ id: 'asset_9' })], 'building', 'hut')).toBe('/assets/asset_9.png')
+    expect(textureUrlFor([rec({ id: 'asset_9' })], 'building', 'house')).toBe('/assets/asset_9.png')
   })
   it('falls back to the class placeholder', () => {
-    expect(textureUrlFor([], 'building', 'hut')).toBe('/assets/placeholder/building.png')
+    expect(textureUrlFor([], 'building', 'house')).toBe('/assets/placeholder/building.png')
   })
 })
 
@@ -82,11 +82,11 @@ describe('buildingArt (v4-hires-building manifest)', () => {
   })
 
   it('v2/no-meta records draw at natural size with the bottom-center law', () => {
-    expect(buildingArt([rec({ id: 'hutv2', kind: 'hut' })], 'hut', 2, 2)).toEqual({ url: '/assets/hutv2.png', anchor: null, scale: null })
+    expect(buildingArt([rec({ id: 'housev2', kind: 'house' })], 'house', 2, 2)).toEqual({ url: '/assets/housev2.png', anchor: null, scale: null })
   })
 
   it('reports NO ART rather than a checkerboard, so the renderer can draw a built form', () => {
-    expect(buildingArt([], 'hut', 2, 2)).toEqual({ url: null, anchor: null, scale: null })
+    expect(buildingArt([], 'house', 2, 2)).toEqual({ url: null, anchor: null, scale: null })
     expect(buildingArt([], 'well', 1, 1).url).toBeNull()
   })
 })

@@ -42,7 +42,7 @@ export function readinessReport(lines: readonly ReadinessLine[]): string {
 const SLUG = /\b[a-z]+_[a-z_]+\b/
 /** A dotted path: `spoilage.days`, `weather.hourlyChangeChance`. */
 const DOTTED = /\b[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*){1,}\b/i
-/** An id shape: a uuid, or `structure_hut_14_13`. */
+/** An id shape: a uuid, or `structure_house_14_13`. */
 const IDLIKE = /\b[0-9a-f]{8}-[0-9a-f]{4}|\b(?:structure|agent|item|crop)_[a-z0-9_]+/i
 /** A big bare integer: no unit after it, not a clock, not a day. `4820` on screen tells a
  *  viewer nothing; `Day 120`, `82%`, `19:31` and `3 days` all tell them something. */

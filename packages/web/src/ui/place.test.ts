@@ -48,17 +48,17 @@ const struct = (over: Partial<Structure> & { id: string; kind: string; x: number
 describe('placeOf — indoors', () => {
   const state = world({
     structures: [
-      struct({ id: 'hut_a', kind: 'hut', x: 10, y: 10, w: 2, h: 2, owner: 'amara' }),
+      struct({ id: 'house_a', kind: 'house', x: 10, y: 10, w: 2, h: 2, owner: 'amara' }),
       struct({ id: 'store', kind: 'storehouse', x: 20, y: 20, w: 2, h: 2 }),
     ],
     agents: [
-      { id: 'amara', name: 'Amara', x: 10, y: 10, insideId: 'hut_a' },
+      { id: 'amara', name: 'Amara', x: 10, y: 10, insideId: 'house_a' },
       { id: 'omar', name: 'Omar', x: 20, y: 20, insideId: 'store' },
     ],
   })
 
-  it('names an owned hut with its owner, and a typographic apostrophe', () => {
-    expect(placeOf(state, 'amara')).toEqual({ words: 'inside Amara’s hut', kind: 'inside' })
+  it('names an owned house with its owner, and a typographic apostrophe', () => {
+    expect(placeOf(state, 'amara')).toEqual({ words: 'inside Amara’s house', kind: 'inside' })
     expect(placeOf(state, 'amara').words).toContain('’')
     expect(placeOf(state, 'amara').words).not.toContain("'")
   })
@@ -77,7 +77,7 @@ describe('placeOf — beside something', () => {
   const state = world({
     structures: [
       struct({ id: 'well', kind: 'well', x: 10, y: 10 }),
-      struct({ id: 'hut_y', kind: 'hut', x: 30, y: 30, w: 2, h: 2, owner: 'yusuf' }),
+      struct({ id: 'house_y', kind: 'house', x: 30, y: 30, w: 2, h: 2, owner: 'yusuf' }),
     ],
     agents: [
       { id: 'a', x: 11, y: 10 }, { id: 'b', x: 12, y: 10 }, { id: 'c', x: 13, y: 10 },
@@ -93,7 +93,7 @@ describe('placeOf — beside something', () => {
   })
 
   it('an owned building is somebody’s, and the preposition says so', () => {
-    expect(placeOf(state, 'yusuf')).toEqual({ words: 'by Yusuf’s hut', kind: 'at' })
+    expect(placeOf(state, 'yusuf')).toEqual({ words: 'by Yusuf’s house', kind: 'at' })
   })
 
   it('a tie between two equidistant buildings resolves the same way twice', () => {
@@ -161,8 +161,8 @@ describe('structureWords', () => {
   const state = world({ agents: [{ id: 'amara', name: 'Amara' }] })
 
   it('is the owner’s when it is owned and the kind’s when it is not', () => {
-    expect(structureWords(state, struct({ id: 'h', kind: 'hut', x: 0, y: 0, owner: 'amara' })))
-      .toBe('Amara’s hut')
+    expect(structureWords(state, struct({ id: 'h', kind: 'house', x: 0, y: 0, owner: 'amara' })))
+      .toBe('Amara’s house')
     expect(structureWords(state, struct({ id: 'w', kind: 'well', x: 0, y: 0 }))).toBe('the well')
   })
 

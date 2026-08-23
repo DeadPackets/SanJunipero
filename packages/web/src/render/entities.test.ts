@@ -13,7 +13,7 @@ import { rendersOnMap } from './characters.js'
 // a sortableChildren container the top-most child takes the pointer, so the building's
 // (wider than its own diamond) sprite swallowed every hover and the door never lit.
 
-const box = (x: number, y: number, w: number, h: number, kind = 'hut'): Structure => ({
+const box = (x: number, y: number, w: number, h: number, kind = 'house'): Structure => ({
   id: `s-${x}-${y}`, kind, x, y, w, h, hp: 50, maxHp: 50, flammable: true,
   stage: 'complete', progressTicks: 0, builtBy: null, burning: false, burnTicks: 0,
 })
@@ -113,7 +113,7 @@ describe('the door is part of the building', () => {
 
 describe('ENTERABLE_KINDS', () => {
   it('is exactly the three interior kinds — a well or a wagon grows no door', () => {
-    expect([...ENTERABLE_KINDS].sort()).toEqual(['hut', 'shed', 'storehouse'])
+    expect([...ENTERABLE_KINDS].sort()).toEqual(['house', 'shed', 'storehouse'])
     for (const kind of ['well', 'fire_pit', 'wagon', 'standing_stone', 'scaffolding']) {
       expect(ENTERABLE_KINDS.has(kind), kind).toBe(false)
     }
@@ -124,7 +124,7 @@ describe('ENTERABLE_KINDS', () => {
 // FIX ROUND 3. Pixi hit-tests a sprite's full RECTANGULAR bounds, transparent margin and
 // all, and a building sprite is ~1.85x wider than the ground it stands on. Live repros at 3x
 // in the showcase dev world: hovering the STOREHOUSE door reported "wagon", and hovering the
-// HUT door reported nothing — in both cases a structure one depth row south was intercepting
+// HOUSE door reported nothing — in both cases a structure one depth row south was intercepting
 // the pointer with empty padding. The hit area is now the footprint diamond, which cannot
 // reach past the tiles the building occupies.
 
@@ -167,16 +167,16 @@ describe('a structure hit-tests its ground, never its padding', () => {
     expect(contains(worldHitPolygon(wagon), px, py)).toBe(false)
   })
 
-  it('LIVE REPRO: the scaffolding does not intercept the hut door', () => {
-    const hut = box(30, 20, 2, 2, 'hut')
+  it('LIVE REPRO: the scaffolding does not intercept the house door', () => {
+    const house = box(30, 20, 2, 2, 'house')
     const scaffolding = box(34, 23, 1, 1, 'scaffolding')
-    const [px, py] = doorPoint(hut)
+    const [px, py] = doorPoint(house)
     expect(contains(worldHitPolygon(scaffolding), px, py)).toBe(false)
   })
 
   it('no structure anywhere in the dev town reaches another structure\'s door', () => {
     const town = [
-      box(20, 20, 2, 2, 'storehouse'), box(23, 20, 1, 1, 'shed'), box(30, 20, 2, 2, 'hut'),
+      box(20, 20, 2, 2, 'storehouse'), box(23, 20, 1, 1, 'shed'), box(30, 20, 2, 2, 'house'),
       box(26, 25, 1, 2, 'wagon'), box(34, 23, 1, 1, 'scaffolding'), box(15, 28, 1, 1, 'standing_stone'),
     ]
     for (const target of town) {
@@ -222,7 +222,7 @@ describe('a structure hit-tests its ground, never its padding', () => {
 })
 
 
-// FINAL ROUND. The controller saw a founder "sleeping OUTDOORS next to the hut with a
+// FINAL ROUND. The controller saw a founder "sleeping OUTDOORS next to the house with a
 // blanket". A 5500-tick measurement of the dev world says nobody ever sleeps or collapses
 // outdoors — so that was an occupant asleep INSIDE the cottage, still being drawn on the town
 // map at the door tile they walked in through, because the character layer only ever checked

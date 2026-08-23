@@ -47,14 +47,14 @@ describe('parentEdges — the payload the gateway actually folds', () => {
 describe('householdsOf — who is under which roof tonight', () => {
   it('groups by the roof and sorts both levels, so two reads agree', () => {
     const a = agents([
-      { id: 'yusuf', insideId: 'hut_y' },
-      { id: 'amara', insideId: 'hut_a' },
-      { id: 'omar', insideId: 'hut_a' },
+      { id: 'yusuf', insideId: 'house_y' },
+      { id: 'amara', insideId: 'house_a' },
+      { id: 'omar', insideId: 'house_a' },
       { id: 'nadia' },
     ])
     expect(householdsOf(a)).toEqual([
-      { structureId: 'hut_a', memberIds: ['amara', 'omar'] },
-      { structureId: 'hut_y', memberIds: ['yusuf'] },
+      { structureId: 'house_a', memberIds: ['amara', 'omar'] },
+      { structureId: 'house_y', memberIds: ['yusuf'] },
     ])
     expect(householdsOf(a)).toEqual(householdsOf(a))
   })
@@ -67,12 +67,12 @@ describe('buildLineage', () => {
       agents([
         { id: 'yusuf', name: 'Yusuf' },
         { id: 'amara', name: 'Amara', alive: false },
-        { id: 'kid', name: 'Kid', insideId: 'hut_a' },
+        { id: 'kid', name: 'Kid', insideId: 'house_a' },
       ]),
     )
     expect(l.people.map((p) => p.id)).toEqual(['amara', 'kid', 'yusuf'])
     expect(l.people.find((p) => p.id === 'amara')!.alive).toBe(false)
     expect(l.parentOf.length).toBe(2)
-    expect(l.households).toEqual([{ structureId: 'hut_a', memberIds: ['kid'] }])
+    expect(l.households).toEqual([{ structureId: 'house_a', memberIds: ['kid'] }])
   })
 })

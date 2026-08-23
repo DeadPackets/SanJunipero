@@ -146,9 +146,9 @@ export function makeGenesisWorld(config: SimConfig, opts: { anchor?: { x: number
   })
 
   // The kind is READ from the template, never retyped here (C8 global constraint C14).
-  const hutIdByOwner = new Map<string, string>()
+  const houseIdByOwner = new Map<string, string>()
   template.structures.forEach((s, i) => {
-    if (s.kind === LEGACY_HOME_KIND && s.owner !== null) hutIdByOwner.set(s.owner, structureIdByIndex[i]!)
+    if (s.kind === LEGACY_HOME_KIND && s.owner !== null) houseIdByOwner.set(s.owner, structureIdByIndex[i]!)
   })
   const storehouseIndex = template.structures.findIndex((s) => s.kind === 'storehouse')
   if (storehouseIndex < 0) throw new Error('genesis: the city template has no storehouse to stock')
@@ -165,9 +165,9 @@ export function makeGenesisWorld(config: SimConfig, opts: { anchor?: { x: number
   }
 
   for (const founder of FOUNDER_IDS) {
-    const hutId = hutIdByOwner.get(founder)
-    if (hutId === undefined) throw new Error(`genesis: no hut for founder ${founder}`)
-    for (const item of FOUNDER_KIT) spawnItem(item.kind, item.qty, hutId, founder)
+    const houseId = houseIdByOwner.get(founder)
+    if (houseId === undefined) throw new Error(`genesis: no house for founder ${founder}`)
+    for (const item of FOUNDER_KIT) spawnItem(item.kind, item.qty, houseId, founder)
   }
   for (const item of STOREHOUSE_STOCK) spawnItem(item.kind, item.qty, structureIdByIndex[storehouseIndex]!)
 

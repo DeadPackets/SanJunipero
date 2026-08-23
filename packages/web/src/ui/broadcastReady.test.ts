@@ -70,7 +70,7 @@ const TOWN = {
   structures: {
     s_fire: S('s_fire', 'fire_pit', 0, 0),
     s_stone: S('s_stone', 'standing_stone', 1, 0),
-    s_hut: S('s_hut', 'hut', 2, 0, 'a1'),
+    s_house: S('s_house', 'house', 2, 0, 'a1'),
     s_store: S('s_store', 'storehouse', 0, 1),
     s_wagon: S('s_wagon', 'wagon', 1, 2),
     s_scaf: S('s_scaf', 'scaffolding', 2, 1),
@@ -126,7 +126,7 @@ describe('R4 · nothing on screen is a machine word, an id, or a number without 
   it('catches the shapes it is looking for', () => {
     expect(machineWordOffenders([{ where: 'x', text: 'The fire_pit is finished.' }])).toHaveLength(1)
     expect(machineWordOffenders([{ where: 'x', text: 'spoilage.days' }])).toHaveLength(1)
-    expect(machineWordOffenders([{ where: 'x', text: 'structure_hut_14_13' }]).length).toBeGreaterThan(0)
+    expect(machineWordOffenders([{ where: 'x', text: 'structure_house_14_13' }]).length).toBeGreaterThan(0)
     expect(machineWordOffenders([{ where: 'x', text: 'It reached 4820 before dawn' }])).toHaveLength(1)
   })
 
@@ -136,7 +136,7 @@ describe('R4 · nothing on screen is a machine word, an id, or a number without 
       { where: 'x', text: 'Day 4 19:31' },
       { where: 'x', text: 'Food keeps for 3 days' },
       { where: 'x', text: '82% of the harvest' },
-      { where: 'x', text: 'Amara is asleep in her own hut' },
+      { where: 'x', text: 'Amara is asleep in her own house' },
     ])).toEqual([])
   })
 
@@ -151,7 +151,7 @@ describe('R4 · nothing on screen is a machine word, an id, or a number without 
   it('has ONE owner for turning a kind into prose', () => {
     expect(kindWords('fire_pit')).toBe('fire pit')
     expect(kindWords('standing_stone')).toBe('standing stone')
-    expect(kindWords('hut')).toBe('hut')
+    expect(kindWords('house')).toBe('house')
   })
 })
 

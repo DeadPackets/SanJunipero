@@ -6,7 +6,7 @@ import {
 
 const BED = {
   slots: { w: 1, h: 2 }, placement: 'floor' as const,
-  interiorKinds: ['hut' as const], isBed: true as const,
+  interiorKinds: ['house' as const], isBed: true as const,
 }
 const MANIFEST = {
   version: 'v1-library-item' as const, kind: 'bed', category: 'furniture' as const,
@@ -17,7 +17,7 @@ describe('InteriorMetaSchema', () => {
   it('parses a full furniture meta', () => {
     expect(InteriorMetaSchema.parse(BED)).toEqual(BED)
     expect(InteriorMetaSchema.parse({
-      slots: { w: 1, h: 1 }, placement: 'wall', interiorKinds: ['hut', 'storehouse', 'shed'],
+      slots: { w: 1, h: 1 }, placement: 'wall', interiorKinds: ['house', 'storehouse', 'shed'],
       isHearth: true, providesLight: true,
     }).providesLight).toBe(true)
   })
@@ -37,9 +37,9 @@ describe('InteriorMetaSchema', () => {
     expect(() => InteriorMetaSchema.parse({ ...BED, interiorKinds: ['barn'] })).toThrow()
   })
 
-  // C10 T10 declares `type InteriorKind = 'hut' | 'storehouse' | 'shed'`; the two must not drift.
+  // C10 T10 declares `type InteriorKind = 'house' | 'storehouse' | 'shed'`; the two must not drift.
   it('INTERIOR_KINDS is exactly C10 T10 s literal list, in order', () => {
-    expect([...INTERIOR_KINDS]).toEqual(['hut', 'storehouse', 'shed'])
+    expect([...INTERIOR_KINDS]).toEqual(['house', 'storehouse', 'shed'])
   })
 })
 

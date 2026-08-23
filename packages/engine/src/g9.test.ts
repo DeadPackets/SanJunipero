@@ -43,7 +43,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++
 const MAP = (n = 24): TileId[][] => Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
 
 type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }
-const HUT: Box = { id: 'structure_1', kind: 'hut', x: 4, y: 4, w: 2, h: 2 }        // door (4,6)
+const HOUSE: Box = { id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2 }        // door (4,6)
 const STORE: Box = { id: 'structure_2', kind: 'storehouse', x: 10, y: 4, w: 2, h: 2 } // door (10,6)
 
 function raise(s: WorldState, config: SimConfig, box: Box, owner?: string): WorldState {
@@ -94,12 +94,12 @@ const typed = (events: PendingEvent[], type: string): PendingEvent[] => events.f
 // The config the tick wrapper would hand a verb: base ⊕ whatever the world has legislated.
 const live = (s: WorldState, base = CFG): SimConfig => effectiveConfig(base, s.laws)
 
-// A couple in their own hut, asleep — the only shape the co-sleeping pass ever reads.
+// A couple in their own house, asleep — the only shape the co-sleeping pass ever reads.
 function couple(config: SimConfig): WorldState {
-  let s = raise(genesisState(config, MAP()), config, HUT)
+  let s = raise(genesisState(config, MAP()), config, HOUSE)
   s = spawn(s, config, { id: 'ada', x: 4, y: 6, sex: 'f', ageDays: 30 * DAYS_PER_YEAR })
   s = spawn(s, config, { id: 'bex', x: 4, y: 6, sex: 'm', ageDays: 32 * DAYS_PER_YEAR })
-  for (const id of ['ada', 'bex']) { s = indoors(s, config, id, HUT); s = asleep(s, config, id) }
+  for (const id of ['ada', 'bex']) { s = indoors(s, config, id, HOUSE); s = asleep(s, config, id) }
   return s
 }
 
@@ -156,7 +156,7 @@ describe('G9a-2: conception, gestation and a child born at twelve', () => {
     expect(ageBand(FERTILE, child.ageDays)).toBe('child')
     expect(child.parents).toEqual(['ada', 'bex'])
     expect(child.sex).toBe(p.sex)
-    expect(child.insideId).toBe(HUT.id) // born where the mother lay
+    expect(child.insideId).toBe(HOUSE.id) // born where the mother lay
     expect(delivery.state.agents.ada!.pregnant).toBeUndefined()
   })
 
@@ -171,7 +171,7 @@ describe('G9a-2: conception, gestation and a child born at twelve', () => {
 describe('G9a-3: the ownership chain — craft, give, and a taking the town can see', () => {
   // 24x24 of grass; the storehouse at (10,4) is the shelf everything moves through.
   function town(): WorldState {
-    let s = raise(genesisState(CFG, MAP()), CFG, HUT)
+    let s = raise(genesisState(CFG, MAP()), CFG, HOUSE)
     s = raise(s, CFG, STORE)
     s = spawn(s, CFG, { id: 'maker', x: 8, y: 5 })
     s = spawn(s, CFG, { id: 'owner', x: 9, y: 5 })
@@ -179,7 +179,7 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
     s = spawn(s, CFG, { id: 'near', x: 12, y: 8 })    // 4.5 tiles from the shelf: in sight
     s = spawn(s, CFG, { id: 'far', x: 10, y: 20 })    // 16 tiles away: out of sight
     s = spawn(s, CFG, { id: 'shut', x: 4, y: 6 })     // behind a wall
-    s = indoors(s, CFG, 'shut', HUT)
+    s = indoors(s, CFG, 'shut', HOUSE)
     // A hand expert enough to leave a mark on what it makes.
     s = fold(s, ev('skill_gained', { agentId: 'maker', track: 'carpentry', xp: 500 }), CFG)
     s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 4, loc: { t: 'agent', id: 'maker' } }), CFG)
@@ -261,13 +261,13 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
 
 describe('G9a-4: a wall stops sound', () => {
   function room(): WorldState {
-    let s = raise(genesisState(CFG, MAP()), CFG, HUT)
+    let s = raise(genesisState(CFG, MAP()), CFG, HOUSE)
     for (const a of [
       { id: 'speaker', x: 4, y: 6 }, { id: 'roommate', x: 4, y: 6 },
       { id: 'doorway', x: 4, y: 7 }, { id: 'outside', x: 7, y: 6 },
     ]) s = spawn(s, CFG, a)
-    s = indoors(s, CFG, 'speaker', HUT)
-    return indoors(s, CFG, 'roommate', HUT)
+    s = indoors(s, CFG, 'speaker', HOUSE)
+    return indoors(s, CFG, 'roommate', HOUSE)
   }
 
   const said = (s: WorldState): SimEvent => {
@@ -278,7 +278,7 @@ describe('G9a-4: a wall stops sound', () => {
   it('inside speech is heard by a co-occupant and at the doorway, and nowhere else', () => {
     const s = room()
     const spoke = said(s)
-    expect((spoke.payload as { insideId?: string }).insideId).toBe(HUT.id)
+    expect((spoke.payload as { insideId?: string }).insideId).toBe(HOUSE.id)
 
     const heardBy = (id: string) => composePerception(s, CFG, id, [spoke]).heard.map((h) => h.speakerId)
     expect(heardBy('roommate')).toEqual(['speaker'])
@@ -365,7 +365,7 @@ describe('G9a-7: what is carved can be read back', () => {
   const TEXT = 'here the first roof went up, and it held'
 
   function wall(config = CFG): WorldState {
-    let s = raise(genesisState(config, MAP()), config, HUT)
+    let s = raise(genesisState(config, MAP()), config, HOUSE)
     s = spawn(s, config, { id: 'carver', x: 4, y: 6 })
     s = spawn(s, config, { id: 'passerby', x: 12, y: 6 })  // in sight, out of arm's reach
     // By daylight, for the same reason the ownership chain above is: what "in sight" means
@@ -375,22 +375,22 @@ describe('G9a-7: what is carved can be read back', () => {
 
   it('an inscription is written, and read at arm\'s length only', () => {
     let s = wall()
-    const params = { structureId: HUT.id, text: TEXT }
+    const params = { structureId: HOUSE.id, text: TEXT }
     const started = submitIntent(s, CFG, 'carver', 'inscribe', params)
     expect(started.ok).toBe(true)
     s = apply(s, CFG, VERBS.inscribe!.onComplete(s, CFG, 'carver', params, RNG))
-    expect(s.structures[HUT.id]!.inscription).toEqual({ text: TEXT, by: 'carver' })
+    expect(s.structures[HOUSE.id]!.inscription).toEqual({ text: TEXT, by: 'carver' })
 
-    const close = composePerception(s, CFG, 'carver', []).visible.structures.find((x) => x.id === HUT.id)!
+    const close = composePerception(s, CFG, 'carver', []).visible.structures.find((x) => x.id === HOUSE.id)!
     expect(close.inscription).toEqual({ text: TEXT, by: 'carver' })
-    const across = composePerception(s, CFG, 'passerby', []).visible.structures.find((x) => x.id === HUT.id)!
+    const across = composePerception(s, CFG, 'passerby', []).visible.structures.find((x) => x.id === HOUSE.id)!
     expect(across.hasInscription).toBe(true)
     expect(across.inscription).toBeUndefined()
   })
 
   it('with the inscription law off the hands find no way to mark it', () => {
     const s = fold(wall(), ev('config_changed', { path: 'inscription.enabled', value: false }), CFG)
-    const r = submitIntent(s, CFG, 'carver', 'inscribe', { structureId: HUT.id, text: TEXT })
+    const r = submitIntent(s, CFG, 'carver', 'inscribe', { structureId: HOUSE.id, text: TEXT })
     expect(r).toEqual({ ok: false, reason: 'your hands find no way to mark this' })
   })
 })
@@ -399,12 +399,12 @@ describe('G9a-8: the world keeps one hand hidden', () => {
   const CERTAIN: SimConfig = SimConfigSchema.parse({ ...QUIET, mystery: { chancePerDay: 1 } })
 
   function watchers(config: SimConfig): WorldState {
-    let s = raise(genesisState(config, MAP()), config, HUT)
+    let s = raise(genesisState(config, MAP()), config, HOUSE)
     s = spawn(s, config, { id: 'awake', x: 6, y: 6 })
     s = spawn(s, config, { id: 'dozing', x: 7, y: 6 })
     s = spawn(s, config, { id: 'distant', x: 20, y: 20 })
     s = spawn(s, config, { id: 'indoors', x: 4, y: 6 })
-    s = indoors(s, config, 'indoors', HUT)
+    s = indoors(s, config, 'indoors', HOUSE)
     return asleep(s, config, 'dozing')
   }
 
@@ -491,10 +491,10 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
       onTick: ({ tick, emit }) => {
         const record = (type: string, payload: unknown) => { events.push({ tick, type, payload }); emit(type, payload) }
         if (tick === 1) {
-          record('structure_planned', { ...HUT, maxHp: 50, flammable: true, builderId: 'script' })
-          record('structure_completed', { id: HUT.id })
+          record('structure_planned', { ...HOUSE, maxHp: 50, flammable: true, builderId: 'script' })
+          record('structure_completed', { id: HOUSE.id })
           record('agent_spawned', { id: 'ada', name: 'ada', x: 4, y: 6, ageDays: 7300 })
-          record('agent_entered', { agentId: 'ada', structureId: HUT.id })
+          record('agent_entered', { agentId: 'ada', structureId: HOUSE.id })
           record('agent_slept', { agentId: 'ada' })
           record('item_spawned', {
             id: 'item_1', kind: 'fish', qty: 1, loc: { t: 'tile', x: 6, y: 6 },
@@ -578,14 +578,17 @@ describe('G9a-11: the goldens are where the single deliberate regen left them', 
   // authorized regen, so moving a pin means coming here and saying why.
   //   G2 regen #4 (C9 Task 16):  6f2529fb…
   //   G2 regen #5 (C11 Task 37): 665a8249…
-  //   G2 regen #6 (C11 Task 37b, the gate-remediation regen, ruling R-G): the value below.
+  //   G2 regen #6 (C11 Task 37b, the gate-remediation regen, ruling R-G): c1c51b42…
+  //   G2 regen #7 (the `hut` → `house` rename lane): the value below.
   // G1 HAS NEVER MOVED and must not: it is the replay proof, and it is not a world run —
   // `TickLoop` folds the events it is handed and runs no world system, so no dial reaches it.
+  // The rename lane measured it and it held, which is the check that says the rename touched
+  // no law.
   const source = (name: string): string =>
     readFileSync(fileURLToPath(new URL(name, import.meta.url)), 'utf8')
 
   it('G1 and G2 still pin the post-regen hashes', () => {
     expect(source('golden.test.ts')).toContain('f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac')
-    expect(source('g2.test.ts')).toContain('c1c51b42aa340f0e5ae0d8cc321b602345f6ec4fee4e4d20b48f7e692b946d9c')
+    expect(source('g2.test.ts')).toContain('00d724345c37104d6c93f10398b96eded080b58db78108746e2a037fce836a10')
   })
 })

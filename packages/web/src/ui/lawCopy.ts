@@ -120,7 +120,7 @@ export const LAW_COPY: Readonly<Record<keyof typeof TOGGLABLE_PATHS, LawCopy>> =
   },
   'spoilage.storehouseMultiplier': {
     title: 'What a storehouse is worth',
-    sentence: 'Food kept under a proper roof lasts longer than food left lying in a hut.',
+    sentence: 'Food kept under a proper roof lasts longer than food left lying in a house.',
     unit: null, render: share('as long'),
   },
   'tools.wearEnabled': {
@@ -135,7 +135,7 @@ export const LAW_COPY: Readonly<Record<keyof typeof TOGGLABLE_PATHS, LawCopy>> =
   },
   'ownership.enabled': {
     title: 'Whether a thing can belong to someone',
-    sentence: 'A hut, a bed and a tool can each have an owner, and the town remembers who.',
+    sentence: 'A house, a bed and a tool can each have an owner, and the town remembers who.',
     unit: null, render: yesNo,
   },
   'inscription.enabled': {

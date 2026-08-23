@@ -34,13 +34,13 @@ function fixture(): WorldState {
   return {
     ...s,
     agents: {
-      amara: agent('amara', { insideId: 'hut1', asleep: true }),
-      yusuf: agent('yusuf', { insideId: 'hut1' }),
+      amara: agent('amara', { insideId: 'house1', asleep: true }),
+      yusuf: agent('yusuf', { insideId: 'house1' }),
       nadia: agent('nadia'),                                  // outside
       omar: agent('omar', { insideId: 'store1' }),
     },
     structures: {
-      hut1: structure('hut1', 'hut'),
+      house1: structure('house1', 'house'),
       store1: structure('store1', 'storehouse'),
       shed1: structure('shed1', 'shed'),
       stone: structure('stone', 'standing_stone'),
@@ -66,12 +66,12 @@ const libraryRecord = (kind: string, interior: LibraryItemManifest['interior']):
 
 describe('interiorOf', () => {
   it('reads occupancy and stored items off C9 engine truth', () => {
-    const hut = interiorOf(fixture(), 'hut1')
-    expect(hut).not.toBeNull()
-    expect(hut!.kind).toBe('hut')
-    expect(hut!.structure.id).toBe('hut1')
-    expect(hut!.occupants).toEqual(['amara', 'yusuf'])
-    expect(hut!.items).toEqual([])
+    const house = interiorOf(fixture(), 'house1')
+    expect(house).not.toBeNull()
+    expect(house!.kind).toBe('house')
+    expect(house!.structure.id).toBe('house1')
+    expect(house!.occupants).toEqual(['amara', 'yusuf'])
+    expect(house!.items).toEqual([])
 
     const store = interiorOf(fixture(), 'store1')!
     expect(store.kind).toBe('storehouse')
@@ -97,13 +97,13 @@ describe('interiorOf', () => {
       ...s,
       agents: { yusuf: s.agents['yusuf']!, amara: s.agents['amara']! },
     }
-    expect(interiorOf(reversed, 'hut1')!.occupants).toEqual(interiorOf(s, 'hut1')!.occupants)
+    expect(interiorOf(reversed, 'house1')!.occupants).toEqual(interiorOf(s, 'house1')!.occupants)
   })
 })
 
 describe('INTERIOR_LAYOUTS and roomFurnishings', () => {
   it('keeps the plan\'s three declared layouts intact', () => {
-    expect(INTERIOR_LAYOUTS.hut).toEqual([
+    expect(INTERIOR_LAYOUTS.house).toEqual([
       { kind: 'bed', slot: { x: 2, y: 1 } },
       { kind: 'hearth', slot: { x: 0, y: 2 } },
       { kind: 'table', slot: { x: 1, y: 2 } },
@@ -113,8 +113,8 @@ describe('INTERIOR_LAYOUTS and roomFurnishings', () => {
   })
 
   it('furnishes every interior kind from the C13 city template, resolving `tools`', () => {
-    const hut = roomFurnishings('hut')
-    expect(hut.map((f) => f.kind)).toEqual(['bed', 'hearth', 'table', 'chair', 'rug'])
+    const house = roomFurnishings('house')
+    expect(house.map((f) => f.kind)).toEqual(['bed', 'hearth', 'table', 'chair', 'rug'])
     expect(roomFurnishings('storehouse').map((f) => f.kind))
       .toEqual(['shelf', 'shelf', 'crate', 'crate', 'barrel'])
     // The town plan no longer stands a shed, so the room falls back to INTERIOR_LAYOUTS —
@@ -134,12 +134,12 @@ describe('INTERIOR_LAYOUTS and roomFurnishings', () => {
 describe('roomPlan', () => {
   it('attaches the C13 library\'s meta.interior and sprite url to each furnishing', () => {
     const records = [
-      libraryRecord('bed', { slots: { w: 1, h: 2 }, placement: 'floor', interiorKinds: ['hut'], isBed: true }),
+      libraryRecord('bed', { slots: { w: 1, h: 2 }, placement: 'floor', interiorKinds: ['house'], isBed: true }),
       libraryRecord('hearth', {
-        slots: { w: 1, h: 1 }, placement: 'wall', interiorKinds: ['hut'], isHearth: true, providesLight: true,
+        slots: { w: 1, h: 1 }, placement: 'wall', interiorKinds: ['house'], isHearth: true, providesLight: true,
       }),
     ]
-    const plan = roomPlan('hut', records)
+    const plan = roomPlan('house', records)
     const bed = plan.find((p) => p.kind === 'bed')!
     expect(bed.meta?.isBed).toBe(true)
     expect(bed.meta?.slots).toEqual({ w: 1, h: 2 })
@@ -161,8 +161,8 @@ describe('roomPlan', () => {
 })
 
 describe('bedSlots', () => {
-  it('lays two sleepers down on the hut bed at distinct slots', () => {
-    const slots = bedSlots('hut', ['amara', 'yusuf'])
+  it('lays two sleepers down on the house bed at distinct slots', () => {
+    const slots = bedSlots('house', ['amara', 'yusuf'])
     expect(Object.keys(slots).sort()).toEqual(['amara', 'yusuf'])
     expect(slots['amara']).not.toEqual(slots['yusuf'])
     // the bed sits at (2,1) and is 1×2, so its cells are (2,1) and (2,2)
@@ -176,21 +176,21 @@ describe('bedSlots', () => {
   })
 
   it('leaves a sleeper past the last bed cell unmapped rather than stacking bodies', () => {
-    const slots = bedSlots('hut', ['a', 'b', 'c'])
+    const slots = bedSlots('house', ['a', 'b', 'c'])
     expect(Object.keys(slots)).toEqual(['a', 'b'])
     expect(BED_FOOTPRINT).toEqual({ w: 1, h: 2 })
   })
 
   it('takes the bed footprint from the library record when the codex has one', () => {
     const records = [libraryRecord('bed', {
-      slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['hut'], isBed: true,
+      slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['house'], isBed: true,
     })]
-    const slots = bedSlots('hut', ['a', 'b'], records)
+    const slots = bedSlots('house', ['a', 'b'], records)
     expect(Object.keys(slots)).toEqual(['a'])         // a one-cell bed sleeps one
   })
 
   it('is pure — the same call twice returns the same mapping', () => {
-    expect(bedSlots('hut', ['amara', 'yusuf'])).toEqual(bedSlots('hut', ['amara', 'yusuf']))
+    expect(bedSlots('house', ['amara', 'yusuf'])).toEqual(bedSlots('house', ['amara', 'yusuf']))
   })
 })
 
@@ -249,10 +249,10 @@ describe('advanceInterior', () => {
 // ── TASK 67: furniture that touches the floor, and bodies that lie IN the bed (U4) ────────
 
 const im = (over: Partial<InteriorMeta> = {}): InteriorMeta => ({
-  slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['hut'], ...over,
+  slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['house'], ...over,
 })
 
-const HUT_ITEMS = [
+const HOUSE_ITEMS = [
   { kind: 'bed', slot: { x: 2, y: 1 }, meta: im({ slots: { w: 1, h: 2 }, isBed: true }) },
   { kind: 'hearth', slot: { x: 0, y: 2 }, meta: im({ placement: 'wall', providesLight: true }) },
   { kind: 'table', slot: { x: 1, y: 2 }, meta: im() },
@@ -284,7 +284,7 @@ describe('interiorOrder — a sleeper is IN the bed', () => {
   const sleeper = [{ id: 'amara', slot: { x: 2, y: 1 }, inside: 'bed:2,1' }]
 
   it('splits an "in" furnishing into a back half and a front half, and nothing else', () => {
-    const ids = interiorPieces(HUT_ITEMS, []).map((p) => p.id)
+    const ids = interiorPieces(HOUSE_ITEMS, []).map((p) => p.id)
     expect(ids).toContain('bed:2,1#back')
     expect(ids).toContain('bed:2,1#front')
     expect(ids).toContain('chair:1,1#back')
@@ -306,7 +306,7 @@ describe('interiorOrder — a sleeper is IN the bed', () => {
   })
 
   it('sorts the sleeper AFTER the bed’s back half and BEFORE its front half', () => {
-    const order = interiorOrder(interiorPieces(HUT_ITEMS, sleeper))
+    const order = interiorOrder(interiorPieces(HOUSE_ITEMS, sleeper))
     const back = order.indexOf('bed:2,1#back')
     const body = order.indexOf('amara')
     const front = order.indexOf('bed:2,1#front')
@@ -317,15 +317,15 @@ describe('interiorOrder — a sleeper is IN the bed', () => {
 
   it('a body standing AT a table is behind it', () => {
     const atTable = [{ id: 'yusuf', slot: { x: 1, y: 2 }, inside: 'table:1,2' }]
-    const order = interiorOrder(interiorPieces(HUT_ITEMS, atTable))
+    const order = interiorOrder(interiorPieces(HOUSE_ITEMS, atTable))
     expect(order.indexOf('yusuf')).toBeLessThan(order.indexOf('table:1,2'))
   })
 
   it('is deterministic — two calls agree, and arrival order does not matter', () => {
-    const a = interiorOrder(interiorPieces(HUT_ITEMS, sleeper))
-    const b = interiorOrder(interiorPieces(HUT_ITEMS, sleeper))
+    const a = interiorOrder(interiorPieces(HOUSE_ITEMS, sleeper))
+    const b = interiorOrder(interiorPieces(HOUSE_ITEMS, sleeper))
     expect(a).toEqual(b)
-    expect(interiorOrder(interiorPieces([...HUT_ITEMS].reverse(), sleeper))).toEqual(a)
+    expect(interiorOrder(interiorPieces([...HOUSE_ITEMS].reverse(), sleeper))).toEqual(a)
   })
 
   it('two furnishings on the same diagonal settle by id, not by arrival', () => {
@@ -338,8 +338,8 @@ describe('interiorOrder — a sleeper is IN the bed', () => {
   })
 
   it('an empty room renders the same order twice, and no items is no order', () => {
-    const a = interiorOrder(interiorPieces(HUT_ITEMS, []))
-    expect(interiorOrder(interiorPieces(HUT_ITEMS, []))).toEqual(a)
+    const a = interiorOrder(interiorPieces(HOUSE_ITEMS, []))
+    expect(interiorOrder(interiorPieces(HOUSE_ITEMS, []))).toEqual(a)
     expect(interiorOrder(interiorPieces([], []))).toEqual([])
   })
 })
@@ -362,7 +362,7 @@ describe('furniture stands on its own ground', () => {
         ((size.w - 1) + (size.h - 1)) * (SLOT_TILES * TILE_H / 4),
       ))
     }
-    // the hut's bed is 1×2: 16 world px sideways and 8 down, which is 48 × 24 at ROOM_ZOOM 3
+    // the house's bed is 1×2: 16 world px sideways and 8 down, which is 48 × 24 at ROOM_ZOOM 3
     const bed = slotSpanCentre({ x: 2, y: 1 }, { w: 1, h: 2 })
     expect(bed.sx - landedFoot({ x: 2, y: 1 }).sx).toBe(-SLOT_TILES * TILE_W / 4)
     expect(bed.sy - landedFoot({ x: 2, y: 1 }).sy).toBe(SLOT_TILES * TILE_H / 4)

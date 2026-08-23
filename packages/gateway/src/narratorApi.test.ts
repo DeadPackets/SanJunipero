@@ -46,7 +46,7 @@ function scriptedWorld(dbPath: string): Database.Database {
       if (tick === 5) emit('agent_spoke', { agentId: 'alice', text: 'Morning.', x: 0, y: 0 })
       if (tick === 10) {
         emit('structure_planned', {
-          id: 's1', kind: 'hut', x: 2, y: 2, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'bob',
+          id: 's1', kind: 'house', x: 2, y: 2, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'bob',
         })
       }
       if (tick === 20) emit('structure_completed', { id: 's1' })
@@ -113,9 +113,9 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
 
   it('writes each entry as a sentence, never as a payload', async () => {
     const byType = new Map((await chronicle()).map((e) => [e.type, e.label]))
-    expect(byType.get('structure_completed')).toBe('The hut is finished.')
+    expect(byType.get('structure_completed')).toBe('The house is finished.')
     expect(byType.get('co_slept')).toBe('Alice and Bob kept house together.')
-    expect(byType.get('fire_ignited')).toBe('Fire! The hut is burning.')
+    expect(byType.get('fire_ignited')).toBe('Fire! The house is burning.')
     expect(byType.get('agent_died')).toBe('Cara starved.')
     expect(byType.get('first')).toBe('The first death')
   })

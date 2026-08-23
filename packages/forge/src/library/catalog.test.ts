@@ -52,11 +52,11 @@ describe('the library catalog', () => {
         expect(INTERIOR_KINDS, e.kind).toContain(k)
   })
 
-  // The C10 bedSlots law: only a hut can hold a bed.
-  it('a hut has at least one bed available; a shed and a storehouse have none', () => {
+  // The C10 bedSlots law: only a house can hold a bed.
+  it('a house has at least one bed available; a shed and a storehouse have none', () => {
     const beds = byCategory('furniture').filter(e => e.interior!.isBed === true)
     expect(beds.length).toBeGreaterThan(0)
-    for (const b of beds) expect(b.interior!.interiorKinds).toEqual(['hut'])
+    for (const b of beds) expect(b.interior!.interiorKinds).toEqual(['house'])
   })
 
   // C12 §10: the art never labels the danger. Knowledge is the town's, not the picture's.

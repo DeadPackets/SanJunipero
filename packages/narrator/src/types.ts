@@ -48,7 +48,7 @@ export type Milestone = MilestoneRow
 export type FirstCtx = {
   seenKinds: Set<string>
   rulebookCount: number
-  // What kind of thing a completed structure is. Injected, because a hut may have been
+  // What kind of thing a completed structure is. Injected, because a house may have been
   // planned on a day this pass never sees; the detector falls back to its own stream.
   structureKind?: (id: string) => string | undefined
   // Souls alive as the pass runs. The detector counts spawns, births and deaths onto it.

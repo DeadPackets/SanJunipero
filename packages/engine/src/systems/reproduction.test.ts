@@ -16,10 +16,10 @@ const OFF: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 
 let seq = 50000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
 
-const HUT = { id: 'structure_1', kind: 'hut', x: 2, y: 2, w: 3, h: 3 }
+const HOUSE = { id: 'structure_1', kind: 'house', x: 2, y: 2, w: 3, h: 3 }
 const STORE = { id: 'structure_2', kind: 'storehouse', x: 8, y: 2, w: 3, h: 3 }
 
-function room(config: SimConfig, box: typeof HUT): (s: WorldState) => WorldState {
+function room(config: SimConfig, box: typeof HOUSE): (s: WorldState) => WorldState {
   return (s) => {
     const planned = fold(s, ev('structure_planned', {
       ...box, maxHp: 50, flammable: true, builderId: 'a1',
@@ -31,7 +31,7 @@ function room(config: SimConfig, box: typeof HUT): (s: WorldState) => WorldState
 // Agents indoors and (by default) asleep, which is all the midnight pass looks at.
 type WorldOpts = { awake?: string[]; sexes?: Record<string, 'f' | 'm'>; ages?: Record<string, number> }
 
-function world(ids: string[], config = CFG, box = HUT, opts: WorldOpts = {}): WorldState {
+function world(ids: string[], config = CFG, box = HOUSE, opts: WorldOpts = {}): WorldState {
   let s = genesisState(config, Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0)))
   s = room(config, box)(s)
   for (const id of ids) {
@@ -64,14 +64,14 @@ function nights(s: WorldState, days: number[], config = CFG): WorldState {
 }
 
 describe('the midnight co-sleeping pass', () => {
-  it('records the pair asleep in one hut', () => {
+  it('records the pair asleep in one house', () => {
     const { state, coSlept } = midnight(world(['a1', 'a2']), 1)
     expect(coSlept).toEqual([{ type: 'co_slept', payload: { aId: 'a1', bId: 'a2', day: 1 } }])
     expect(partnershipOf(state, 'a1', 'a2')).toEqual({ nights: 1, lastNightDay: 1, formedTick: null, dissolvedTick: null })
   })
 
   it('ignores an occupant who is awake', () => {
-    expect(midnight(world(['a1', 'a2'], CFG, HUT, { awake: ['a2'] }), 1).coSlept).toEqual([])
+    expect(midnight(world(['a1', 'a2'], CFG, HOUSE, { awake: ['a2'] }), 1).coSlept).toEqual([])
   })
 
   it('never counts a storehouse — a night together needs a private room', () => {
@@ -167,7 +167,7 @@ describe('conception', () => {
 
   // Three nights together, then the fourth midnight is the one that can conceive.
   function couple(config = CFG, opts: WorldOpts = {}): WorldState {
-    return nights(world(['a1', 'a2'], config, HUT, { sexes: { ...SEXES }, ...opts }), [1, 2, 3], config)
+    return nights(world(['a1', 'a2'], config, HOUSE, { sexes: { ...SEXES }, ...opts }), [1, 2, 3], config)
   }
 
   const conceptions = (s: WorldState, seed: string, config = CFG, day = 4) =>
@@ -186,7 +186,7 @@ describe('conception', () => {
   })
 
   it('does not fire before the pair is partnered — two nights in is still two nights in', () => {
-    const one = nights(world(['a1', 'a2'], CFG, HUT, { sexes: { ...SEXES } }), [1])
+    const one = nights(world(['a1', 'a2'], CFG, HOUSE, { sexes: { ...SEXES } }), [1])
     expect(conceptions(one, CONCEIVES, CFG, 2)).toEqual([])
     // The third night both partners them and can conceive, in that order.
     expect(conceptions(nights(one, [2]), CONCEIVES, CFG, 3)).toHaveLength(1)
@@ -224,7 +224,7 @@ describe('gestation and birth', () => {
 
   // A pregnancy backdated so the term completes exactly on the day under test.
   function carrying(sinceDay: number, config = CFG): WorldState {
-    const s = world(['a1', 'a2'], config, HUT, { sexes: { a1: 'f', a2: 'm' } })
+    const s = world(['a1', 'a2'], config, HOUSE, { sexes: { a1: 'f', a2: 'm' } })
     return fold(s, ev('agent_conceived', { motherId: 'a1', fatherId: 'a2', day: sinceDay }), config)
   }
 
@@ -248,7 +248,7 @@ describe('gestation and birth', () => {
     const child = Object.values(born.agents).find(a => a.id !== 'a1' && a.id !== 'a2')!
     expect(child.ageDays).toBe(12 * DAYS_PER_YEAR + 1) // agingSystem runs after this midnight's birth
     expect(child.parents).toEqual(['a1', 'a2'])
-    expect(child.insideId).toBe(HUT.id)
+    expect(child.insideId).toBe(HOUSE.id)
     expect([child.x, child.y]).toEqual([born.agents.a1!.x, born.agents.a1!.y])
     expect(child.needs).toEqual({ hunger: 100, energy: 100, warmth: 100, social: 100 })
     expect(child.skills).toEqual({})
@@ -285,7 +285,7 @@ describe('gestation and birth', () => {
 
 describe('sex', () => {
   it('rides the spawn payload and defaults to f when it is omitted', () => {
-    const s = world(['a1', 'a2'], CFG, HUT, { sexes: { a2: 'm' } })
+    const s = world(['a1', 'a2'], CFG, HOUSE, { sexes: { a2: 'm' } })
     expect(s.agents.a1).not.toHaveProperty('sex')
     expect(sexOf(s.agents.a1!)).toBe('f')
     expect(s.agents.a2!.sex).toBe('m')

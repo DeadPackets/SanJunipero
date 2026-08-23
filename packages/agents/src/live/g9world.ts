@@ -13,18 +13,18 @@ export const MAP_N = 32
 
 export type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }
 
-// A hut apiece, in a row at y=10, each 2x2, each door the tile south of its
-// centre. Five founders, five owned huts: run 4 refused 93 sleeps 82 times for
+// A house apiece, in a row at y=10, each 2x2, each door the tile south of its
+// centre. Five founders, five owned houses: run 4 refused 93 sleeps 82 times for
 // want of a bed, and an exhaustion run is no fairer an emergence sample than a
 // famine one.
-export function hut(n: number): Box {
-  return { id: `structure_${n}`, kind: 'hut', x: 2 + n * 4, y: 10, w: 2, h: 2 }
+export function house(n: number): Box {
+  return { id: `structure_${n}`, kind: 'house', x: 2 + n * 4, y: 10, w: 2, h: 2 }
 }
-export const HUTS: Box[] = [hut(1), hut(2), hut(3), hut(4), hut(5)]
+export const HOUSES: Box[] = [house(1), house(2), house(3), house(4), house(5)]
 
 // The tile a body stands on to step through a door — the engine derives the same
 // one from the footprint; `g9world.test.ts` holds the two together.
-export function hutDoor(box: Box): { x: number; y: number } {
+export function houseDoor(box: Box): { x: number; y: number } {
   return { x: box.x + Math.floor((box.w - 1) / 2), y: box.y + box.h }
 }
 
@@ -46,7 +46,7 @@ export const COPSE: Array<[number, number]> = [
   [25, 9], [25, 10], [25, 11], [25, 12], [26, 9], [26, 10], [26, 11], [26, 12],
 ]
 
-// The field south of the huts. `plantedDaysAgo` backdates the sowing: the town has
+// The field south of the houses. `plantedDaysAgo` backdates the sowing: the town has
 // been farming, so the run opens on standing grain and the rest comes ripe during it.
 // `null` is tilled ground left open — somewhere to put the next handful of seed.
 export const PLOTS: Array<{ x: number; y: number; plantedDaysAgo: number | null }> = [
@@ -61,7 +61,7 @@ export const PLOTS: Array<{ x: number; y: number; plantedDaysAgo: number | null 
 
 export const CROP_KIND = 'wheat'
 
-// Materials in the open, each within sight of a hut and on ground a body can stand on.
+// Materials in the open, each within sight of a house and on ground a body can stand on.
 export const MATERIAL_PILES: Array<{ kind: string; qty: number; x: number; y: number }> = [
   { kind: 'clay', qty: 12, x: 17, y: 16 },
   { kind: 'clay', qty: 8, x: 20, y: 16 },
@@ -111,7 +111,7 @@ export function storehouseBread(
 export type GenesisEvent = { type: string; payload: Record<string, unknown> }
 
 export type GenesisMind = {
-  id: string; name: string; sex: 'f' | 'm'; ageDays: number; x: number; y: number; hutIndex: number
+  id: string; name: string; sex: 'f' | 'm'; ageDays: number; x: number; y: number; houseIndex: number
 }
 
 // The town as it stands on the morning of day zero. Ordered: ground first, then
@@ -127,8 +127,8 @@ export function townGenesisEvents(opts: {
   const events: GenesisEvent[] = []
   const emit = (type: string, payload: Record<string, unknown>): void => { events.push({ type, payload }) }
 
-  for (const box of HUTS) {
-    const owner = minds.find((m) => HUTS[m.hutIndex]?.id === box.id)?.id ?? null
+  for (const box of HOUSES) {
+    const owner = minds.find((m) => HOUSES[m.houseIndex]?.id === box.id)?.id ?? null
     emit('structure_planned', { ...box, maxHp: 50, flammable: true, builderId: owner, ...(owner === null ? {} : { owner }) })
     emit('structure_completed', { id: box.id })
   }

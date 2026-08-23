@@ -17,7 +17,7 @@ const ev = (type: string, payload: unknown): SimEvent => ({ seq: seq++, tick: 0,
 const MAP = (): TileId[][] => Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
 
 // A 2x2 structure at (2,1); its door is the tile south of centre, (2,3).
-function world(kind = 'hut', stage: 'construction' | 'complete' = 'complete'): WorldState {
+function world(kind = 'house', stage: 'construction' | 'complete' = 'complete'): WorldState {
   let s = genesisState(DEFAULT_CONFIG, MAP())
   s = fold(s, ev('structure_planned', {
     id: 'structure_1', kind, x: 2, y: 1, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'a1',
@@ -44,7 +44,7 @@ describe('verb: inscribe', () => {
     expect(VERBS.inscribe!.duration(world(), DEFAULT_CONFIG, 'a1', {})).toBe(3)
   })
 
-  it('carves a hut wall from just outside it', () => {
+  it('carves a house wall from just outside it', () => {
     const s = withCarver(world(), 4, 2)
     const params = { structureId: 'structure_1', text: 'here we kept the winter out' }
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'inscribe', params).ok).toBe(true)
@@ -77,7 +77,7 @@ describe('verb: inscribe', () => {
 
   it('refuses an unfinished building, an absent one, and a wall out of reach', () => {
     const text = 'anything'
-    expect(submitIntent(withCarver(world('hut', 'construction'), 4, 2), DEFAULT_CONFIG, 'a1', 'inscribe', { structureId: 'structure_1', text }))
+    expect(submitIntent(withCarver(world('house', 'construction'), 4, 2), DEFAULT_CONFIG, 'a1', 'inscribe', { structureId: 'structure_1', text }))
       .toMatchObject({ ok: false, reason: 'it is not finished' })
     expect(submitIntent(withCarver(world(), 4, 2), DEFAULT_CONFIG, 'a1', 'inscribe', { structureId: 'ghost', text }))
       .toMatchObject({ ok: false, reason: 'there is nothing there to mark' })
@@ -97,7 +97,7 @@ describe('verb: inscribe', () => {
   it('a wall stops the chisel — indoors you can only mark the room you are in', () => {
     let s = withCarver(world(), 2, 4)
     s = fold(s, ev('structure_planned', {
-      id: 'structure_2', kind: 'hut', x: 8, y: 1, w: 1, h: 1, maxHp: 20, flammable: true, builderId: 'a1',
+      id: 'structure_2', kind: 'house', x: 8, y: 1, w: 1, h: 1, maxHp: 20, flammable: true, builderId: 'a1',
     }))
     s = fold(s, ev('structure_completed', { id: 'structure_2' }))
     s = goInside(s)

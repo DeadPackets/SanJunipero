@@ -44,7 +44,7 @@ export const CityStructureSchema = z.object({
   kind: z.string(),
   dx: z.number().int(), dy: z.number().int(),
   w: z.number().int().min(1).max(4), h: z.number().int().min(1).max(4),
-  // USER RULING 1: the five huts are owned, one founder each; every public building is null.
+  // USER RULING 1: the five houses are owned, one founder each; every public building is null.
   // The field is REQUIRED; only its value may be null.
   owner: z.string().min(1).nullable(),
   furnishings: z.array(CityFurnishingSchema),
@@ -149,7 +149,7 @@ export type DwellingKind = (typeof CITY_DWELLING_KINDS)[number]
 export const isDwellingKind = (kind: string): kind is DwellingKind =>
   (CITY_DWELLING_KINDS as readonly string[]).includes(kind)
 
-// ★ `hut` IS RETIRED AS A NAME AND STILL LOAD-BEARING AS AN ID.
+// ★ `house` IS RETIRED AS A NAME AND STILL LOAD-BEARING AS AN ID.
 //
 // The five founders' homes are the only buildings a person can walk into and sleep in, and
 // the kinds that may be entered and slept in are `structures.enterableKinds` and
@@ -158,7 +158,7 @@ export const isDwellingKind = (kind: string): kind is DwellingKind =>
 // move that pin, so the homes keep the id until the cross-lane rename commit retires it
 // everywhere at once. What the template CAN do — and does below — is stop the town being
 // eight copies of that one building.
-export const LEGACY_HOME_KIND = 'hut'
+export const LEGACY_HOME_KIND = 'house'
 
 /** Every kind that reads as somebody's house: the three contracted dwellings and the legacy
  *  home id the founders still live under. The layout properties are measured over these. */
@@ -191,7 +191,7 @@ export const CITY_FURNISHING_KINDS =
 export const CITY_BED_KIND = 'bed'
 export const CITY_HEARTH_KIND = 'hearth'
 
-const HUT_FURNISHINGS: CityFurnishing[] = [
+const HOUSE_FURNISHINGS: CityFurnishing[] = [
   { kind: 'bed', slot: { x: 2, y: 1 } },
   { kind: 'hearth', slot: { x: 0, y: 2 } },
   { kind: 'table', slot: { x: 1, y: 2 } },
@@ -258,9 +258,9 @@ export const DWELLINGS: readonly { kind: string; dx: number; dy: number; owner: 
 // cabin and a farmhouse. (Deviation from C13's open question 2, which kept the wagon;
 // reversible the moment the count may be twelve.)
 //
-// ONLY A HUT IS A HOME. `structures.enterableKinds` and `sleepableKinds` name `hut` and
+// ONLY A HOUSE IS A HOME. `structures.enterableKinds` and `sleepableKinds` name `house` and
 // nothing else, and that list lives in `SimConfigSchema` — whose hash is a pinned gate. So the
-// five founders keep five huts, one each, and the hall and the cottage stand as fixtures the
+// five founders keep five houses, one each, and the hall and the cottage stand as fixtures the
 // eye reads and nobody walks into, exactly as the wagon and the well already do.
 export function cityStructures(): CityStructure[] {
   return [
@@ -268,7 +268,7 @@ export function cityStructures(): CityStructure[] {
       const f = isDwellingKind(kind) ? DWELLING_FOOTPRINTS[kind] : LEGACY_HOME_FOOTPRINT
       return {
         kind, dx, dy, w: f.w, h: f.h, owner,
-        furnishings: kind === LEGACY_HOME_KIND ? [...HUT_FURNISHINGS] : [],
+        furnishings: kind === LEGACY_HOME_KIND ? [...HOUSE_FURNISHINGS] : [],
       }
     }),
     // The storehouse fronts the main street where it arrives at the square, so the first

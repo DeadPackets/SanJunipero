@@ -2,21 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import { doorTile, fold, genesisState, isPassable, submitIntent, type WorldState } from '@sj/engine'
 import {
-  CARRIED_MATERIALS, COPSE, CREEK, HUTS, MAP_N, MATERIAL_PILES, PLOTS, WEIR, WORN_TOOL,
-  hutDoor, mealsPerMind, makeTerrain, storehouseBread, townGenesisEvents,
+  CARRIED_MATERIALS, COPSE, CREEK, HOUSES, MAP_N, MATERIAL_PILES, PLOTS, WEIR, WORN_TOOL,
+  houseDoor, mealsPerMind, makeTerrain, storehouseBread, townGenesisEvents,
 } from './g9world.js'
 
 const FOUR_DAYS = 4 * MINUTES_PER_DAY
 
 // The five founders as the harness spawns them: only the body facts the world
-// needs. Each stands on the doorstep of the hut they own.
+// needs. Each stands on the doorstep of the house they own.
 const MINDS = [
-  { id: 'ada', name: 'Ada', sex: 'f' as const, ageDays: 30 * 364, hutIndex: 1 },
-  { id: 'bex', name: 'Bex', sex: 'm' as const, ageDays: 32 * 364, hutIndex: 0 },
-  { id: 'cass', name: 'Cass', sex: 'f' as const, ageDays: 41 * 364, hutIndex: 2 },
-  { id: 'dov', name: 'Dov', sex: 'm' as const, ageDays: 36 * 364, hutIndex: 3 },
-  { id: 'esen', name: 'Esen', sex: 'f' as const, ageDays: 27 * 364, hutIndex: 4 },
-].map((m) => ({ ...m, ...hutDoor(HUTS[m.hutIndex]!) }))
+  { id: 'ada', name: 'Ada', sex: 'f' as const, ageDays: 30 * 364, houseIndex: 1 },
+  { id: 'bex', name: 'Bex', sex: 'm' as const, ageDays: 32 * 364, houseIndex: 0 },
+  { id: 'cass', name: 'Cass', sex: 'f' as const, ageDays: 41 * 364, houseIndex: 2 },
+  { id: 'dov', name: 'Dov', sex: 'm' as const, ageDays: 36 * 364, houseIndex: 3 },
+  { id: 'esen', name: 'Esen', sex: 'f' as const, ageDays: 27 * 364, houseIndex: 4 },
+].map((m) => ({ ...m, ...houseDoor(HOUSES[m.houseIndex]!) }))
 
 function town(totalTicks = FOUR_DAYS): WorldState {
   let state = genesisState(DEFAULT_CONFIG, makeTerrain())
@@ -50,7 +50,7 @@ describe('the G9b world — a town that can feed itself', () => {
     expect(map[0]).toHaveLength(MAP_N)
     for (const [x, y] of CREEK) expect(map[y]![x]).toBe(2)
     for (const [x, y] of COPSE) expect(map[y]![x]).toBe(3)
-    // The huts, the hearth and the ground the founders stand on stay open.
+    // The houses, the hearth and the ground the founders stand on stay open.
     for (const m of MINDS) expect(map[m.y]![m.x]).toBe(0)
     expect(map[15]![17]).toBe(0)
     // The far river and the northern treeline the town has always had.
@@ -124,12 +124,12 @@ describe('the G9b world — a town that can feed itself', () => {
 
   // Run 4 refused `sleep` 82 times against 93 attempts — "there is no bed here" —
   // and ended as an exhaustion run. The bed law is right; the town had no beds.
-  it('gives every founder a hut of their own, standing on its doorstep', () => {
+  it('gives every founder a house of their own, standing on its doorstep', () => {
     const state = town()
-    expect(HUTS, 'one hut per founder').toHaveLength(MINDS.length)
+    expect(HOUSES, 'one house per founder').toHaveLength(MINDS.length)
 
     for (const m of MINDS) {
-      const box = HUTS[m.hutIndex]!
+      const box = HOUSES[m.houseIndex]!
       const s = state.structures[box.id]!
       expect(s.owner, `${box.id} belongs to ${m.id}`).toBe(m.id)
       expect(s.stage, `${box.id} is built`).toBe('complete')
@@ -137,8 +137,8 @@ describe('the G9b world — a town that can feed itself', () => {
 
       // The engine's own door, and the body already standing on it: the commute
       // to a bed is one `enter`.
-      expect(doorTile(state, s), `${box.id} door`).toEqual(hutDoor(box))
-      expect({ x: m.x, y: m.y }, `${m.id} on the doorstep`).toEqual(hutDoor(box))
+      expect(doorTile(state, s), `${box.id} door`).toEqual(houseDoor(box))
+      expect({ x: m.x, y: m.y }, `${m.id} on the doorstep`).toEqual(houseDoor(box))
       expect(submitIntent(state, DEFAULT_CONFIG, m.id, 'enter', { structureId: box.id }).ok).toBe(true)
 
       const inside = fold(state, {

@@ -189,7 +189,7 @@ describe('fauna: what a body can see of it', () => {
     expect(seen(withAgent(world(MEADOW), 2, 2))).toEqual([])
     const s = withAgent(withFauna(world(MEADOW), [{ id: 'fauna_1', kind: 'rabbit', x: 2, y: 3 }]), 2, 2)
     const roofed = fold(fold(s, ev('structure_planned', {
-      id: 'structure_1', kind: 'hut', x: 1, y: 1, w: 3, h: 3, maxHp: 30, flammable: true, builderId: 'a1',
+      id: 'structure_1', kind: 'house', x: 1, y: 1, w: 3, h: 3, maxHp: 30, flammable: true, builderId: 'a1',
     }), CFG), ev('agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
     expect(seen(roofed)).toEqual([])
   })

@@ -22,7 +22,7 @@ describe('SimConfigSchema', () => {
     expect(c.weather.seasonTemps.winter).toBe(-4)
     expect(c.crops['wheat']!.growthDays).toBe(8)
     expect(c.fire.burnTicksToDestroy).toBe(120)
-    expect(c.construction.hutMaterials.wood).toBe(10)
+    expect(c.construction.houseMaterials.wood).toBe(10)
   })
 
   it('rejects unknown keys at the top level', () => {
@@ -46,8 +46,8 @@ describe('SimConfigSchema: C9 living-world sections', () => {
   const c = SimConfigSchema.parse({})
 
   it('structures: interiors', () => {
-    expect(c.structures.enterableKinds).toEqual(['hut', 'storehouse'])
-    expect(c.structures.privateKinds).toEqual(['hut'])
+    expect(c.structures.enterableKinds).toEqual(['house', 'storehouse'])
+    expect(c.structures.privateKinds).toEqual(['house'])
   })
 
   it('reproduction: partnership, conception, gestation, fertility', () => {
@@ -193,16 +193,16 @@ describe('SimConfigSchema: C9 living-world sections', () => {
 
   it('structures.recipes is the one table that knows what a building costs and measures', () => {
     const r = SimConfigSchema.parse({}).structures.recipes
-    expect(r['hut']).toEqual({ inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880 })
+    expect(r['house']).toEqual({ inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880 })
     expect(r['well']).toEqual({ inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720 })
     expect(r['bridge']).toEqual({ inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480 })
     expect(r['grave']).toEqual({ inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1 })
-    // The hut row must agree with the C9 dials it replaces, or Task 12's generalisation drifts.
-    expect(r['hut']!.inputs).toEqual(DEFAULT_CONFIG.construction.hutMaterials)
-    expect(r['hut']!.durationTicks).toBe(DEFAULT_CONFIG.construction.hutTicks)
-    expect(r['hut']!.maxHp).toBe(DEFAULT_CONFIG.construction.hutMaxHp)
+    // The house row must agree with the C9 dials it replaces, or Task 12's generalisation drifts.
+    expect(r['house']!.inputs).toEqual(DEFAULT_CONFIG.construction.houseMaterials)
+    expect(r['house']!.durationTicks).toBe(DEFAULT_CONFIG.construction.houseTicks)
+    expect(r['house']!.maxHp).toBe(DEFAULT_CONFIG.construction.houseMaxHp)
     // Enterability stays in structures.enterableKinds, its one landed home (G4).
-    expect(r['hut']).not.toHaveProperty('enterable')
+    expect(r['house']).not.toHaveProperty('enterable')
   })
 
   it('the clothing chain and the rabbit are on the tables their tasks read', () => {

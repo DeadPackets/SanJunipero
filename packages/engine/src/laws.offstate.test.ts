@@ -34,7 +34,7 @@ function tickAt(state: WorldState, tick: number, config: SimConfig, seed = 'off'
 }
 
 describe('§19 off-state: reproduction.enabled', () => {
-  // Two sleepers in one complete hut: co_slept fires at every midnight when the flag is on.
+  // Two sleepers in one complete house: co_slept fires at every midnight when the flag is on.
   function couple(config: SimConfig): WorldState {
     let s = genesisState(config, MAP())
     for (const [id, sex] of [['a1', 'f'], ['a2', 'm']] as const) {
@@ -42,7 +42,7 @@ describe('§19 off-state: reproduction.enabled', () => {
       s = fold(s, ev('agent_slept', { agentId: id }), config)
     }
     s = fold(s, ev('structure_planned', {
-      id: 'structure_1', kind: 'hut', x: 4, y: 4, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'a1',
+      id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'a1',
     }), config)
     s = fold(s, ev('structure_completed', { id: 'structure_1' }), config)
     for (const id of ['a1', 'a2']) s = fold(s, ev('agent_entered', { agentId: id, structureId: 'structure_1' }), config)
@@ -152,13 +152,13 @@ describe('§19 off-state: mystery.enabled', () => {
 })
 
 describe('§19 off-state: occlusion.enabled', () => {
-  // a1 inside a complete hut; a2 four tiles south in the open, well inside earshot 8.
+  // a1 inside a complete house; a2 four tiles south in the open, well inside earshot 8.
   function acrossAWall(config: SimConfig): WorldState {
     let s = genesisState(config, MAP())
     s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }), config)
     s = fold(s, ev('agent_spawned', { id: 'a2', name: 'a2', x: 4, y: 8, ageDays: 7300 }), config)
     s = fold(s, ev('structure_planned', {
-      id: 'structure_1', kind: 'hut', x: 4, y: 4, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'a1',
+      id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'a1',
     }), config)
     s = fold(s, ev('structure_completed', { id: 'structure_1' }), config)
     return fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'structure_1' }), config)

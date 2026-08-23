@@ -65,7 +65,7 @@ export const TIER1_DEFS: MilestoneDef[] = [
   { kind: 'first_law', label: 'the first law', tier: 1, domain: 'engine', match: () => false }, // emitted from rulebookCount
 
   // C11's deep world, in the same shape.
-  { kind: 'first_hut', label: 'the first roof of their own', tier: 1, domain: 'engine', match: (ev, ctx) => ev.type === 'structure_completed' && ctx.structureKind?.(String(p(ev).id)) === 'hut' },
+  { kind: 'first_house', label: 'the first roof of their own', tier: 1, domain: 'engine', match: (ev, ctx) => ev.type === 'structure_completed' && ctx.structureKind?.(String(p(ev).id)) === 'house' },
   { kind: 'first_bridge', label: 'the first crossing', tier: 1, domain: 'engine', match: (ev, ctx) => ev.type === 'structure_completed' && ctx.structureKind?.(String(p(ev).id)) === 'bridge' },
   { kind: 'first_meal', label: 'the first meal eaten', tier: 1, domain: 'engine', match: (ev) => ev.type === 'action_completed' && verbOf(ev) === 'eat', agentIds: one('agentId') },
   { kind: 'first_fish', label: 'the first fish taken', tier: 1, domain: 'engine', match: (ev) => ev.type === 'action_completed' && verbOf(ev) === 'fish', agentIds: one('agentId') },

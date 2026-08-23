@@ -317,9 +317,9 @@ describe('G11a-M4: a blow struck by a hand, a death that names the hand, and a t
     expect(packet.visible.agents.map((a) => a.id).sort()).toEqual(['bruiser', 'victim'])
 
     // Take the same two bodies indoors and the witness outside sees neither of them.
-    let walled = raise(brawl(), CFG, { id: 'structure_9', kind: 'hut', x: 4, y: 4, w: 2, h: 2 })
-    walled = indoors(walled, CFG, 'bruiser', { id: 'structure_9', kind: 'hut', x: 4, y: 4, w: 2, h: 2 })
-    walled = indoors(walled, CFG, 'victim', { id: 'structure_9', kind: 'hut', x: 4, y: 4, w: 2, h: 2 })
+    let walled = raise(brawl(), CFG, { id: 'structure_9', kind: 'house', x: 4, y: 4, w: 2, h: 2 })
+    walled = indoors(walled, CFG, 'bruiser', { id: 'structure_9', kind: 'house', x: 4, y: 4, w: 2, h: 2 })
+    walled = indoors(walled, CFG, 'victim', { id: 'structure_9', kind: 'house', x: 4, y: 4, w: 2, h: 2 })
     expect(composePerception(walled, CFG, 'witness', []).visible.agents).toEqual([])
   })
 
@@ -434,13 +434,13 @@ describe('G11a-M7: a fever crosses a room, respects the radius, and stops at a w
     ...QUIET, aging: { deathOfOldAgeEnabled: false },
     illness: { dailyWorsenChance: 0, contagionEnabled: false },
   })
-  const HUT: Box = { id: 'structure_1', kind: 'hut', x: 4, y: 4, w: 2, h: 2 }
+  const HOUSE: Box = { id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2 }
 
   // A carrier and three others: one in the same room, one just inside the radius outdoors,
   // one just outside it.
   function ward(config: SimConfig): WorldState {
     const radius = config.illness.contagionRadius
-    let s = raise(genesisState(config, MAP()), config, HUT)
+    let s = raise(genesisState(config, MAP()), config, HOUSE)
     s = spawn(s, config, { id: 'carrier', x: 10, y: 10 })
     s = spawn(s, config, { id: 'roommate', x: 10, y: 10 })
     s = spawn(s, config, { id: 'near', x: 10 + radius, y: 10 })
@@ -463,9 +463,9 @@ describe('G11a-M7: a fever crosses a room, respects the radius, and stops at a w
   it('four walls are the air: a co-occupant catches it at any distance, and nobody outside does', () => {
     // The carrier and one other share a room; the near body is a tile from the doorway.
     let s = ward(SURE)
-    s = indoors(s, SURE, 'carrier', HUT)
-    s = indoors(s, SURE, 'roommate', HUT)
-    const door = doorTile(s, s.structures[HUT.id]!)!
+    s = indoors(s, SURE, 'carrier', HOUSE)
+    s = indoors(s, SURE, 'roommate', HOUSE)
+    const door = doorTile(s, s.structures[HOUSE.id]!)!
     s = fold(s, ev('agent_moved', { id: 'near', x: door.x + 1, y: door.y }, MINUTES_PER_DAY - 1), SURE)
     const out = pass(s, SURE, MINUTES_PER_DAY)
     expect(sickIds(out.state)).toEqual(['carrier', 'roommate'])

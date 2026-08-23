@@ -33,7 +33,7 @@ export type TownStructure = { id: string; kind: string; x: number; y: number; w:
 export const TOWN_STRUCTURES: readonly TownStructure[] = [
   { id: 'structure_storehouse', kind: 'storehouse', x: 20, y: 20, w: 2, h: 2 },
   { id: 'structure_shed', kind: 'shed', x: 23, y: 20, w: 1, h: 1 },
-  { id: 'structure_cottage', kind: 'hut', x: 30, y: 20, w: 2, h: 2 },
+  { id: 'structure_cottage', kind: 'house', x: 30, y: 20, w: 2, h: 2 },
   { id: 'structure_wagon', kind: 'wagon', x: 26, y: 25, w: 1, h: 2 },
   { id: 'structure_scaffolding', kind: 'scaffolding', x: 34, y: 23, w: 1, h: 1 },
   { id: 'structure_stone', kind: 'standing_stone', x: 15, y: 28, w: 1, h: 1 },
@@ -69,12 +69,12 @@ const SHED_STOCK: ReadonlyArray<readonly [string, number]> = [
   ['axe', 1], ['saw', 1], ['hammer', 1], ['gravel', 8], ['timber', 4],
 ]
 /** A home holds a household's things, not a warehouse's — three kinds and few of each. */
-const HUT_STOCK: ReadonlyArray<readonly [string, number]> = [
+const HOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
   ['bread', 2], ['waterskin', 1], ['herb_bundle', 3],
 ]
 
 const STOCK_FOR: Readonly<Record<string, ReadonlyArray<readonly [string, number]>>> = {
-  storehouse: STOREHOUSE_STOCK, shed: SHED_STOCK, hut: HUT_STOCK,
+  storehouse: STOREHOUSE_STOCK, shed: SHED_STOCK, house: HOUSE_STOCK,
 }
 
 /**
@@ -135,7 +135,7 @@ export type FoundersOpts = {
   holdings?: boolean
 }
 
-/** The hut this person owns, or null. Ownership is a fact of the world (Structure.owner) —
+/** The house this person owns, or null. Ownership is a fact of the world (Structure.owner) —
  *  this reads it, it does not invent it. */
 export function homeOf(state: WorldState, agentId: string): Structure | null {
   for (const s of Object.values(state.structures)) {

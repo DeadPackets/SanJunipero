@@ -104,10 +104,10 @@ export async function narrateDay(deps: {
 
   const scenes = segmentScenes(events, deps.segmentCfg)
   const seenKinds = store.milestoneKinds()
-  // The world in reach answers what the day's own events cannot: a hut planned on a Tuesday
+  // The world in reach answers what the day's own events cannot: a house planned on a Tuesday
   // and finished on a Friday is `structure_completed` with no kind on it, and narrating day by
-  // day the Friday pass has never seen the plan. Without this, first_hut and first_bridge miss
-  // every building that took more than a day to raise — which is every hut (C11 R18).
+  // day the Friday pass has never seen the plan. Without this, first_house and first_bridge miss
+  // every building that took more than a day to raise — which is every house (C11 R18).
   const structures = deps.world?.state?.structures
   const tier1 = detectFirsts(events, {
     seenKinds,

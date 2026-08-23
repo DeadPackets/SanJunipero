@@ -13,7 +13,7 @@ import { resolveAssetId } from '../render/textures.js'
 /** The town's word for each enterable kind. Chrome copy speaks about townsfolk, never
  *  machinery (spec §5), and observes rather than scores (living-documentary law). */
 export const ROOM_WORDS: Record<string, string> = {
-  hut: 'hut', storehouse: 'storehouse', shed: 'shed',
+  house: 'house', storehouse: 'storehouse', shed: 'shed',
 }
 
 /** At most this many holdings get a row; the rest are counted honestly. */
@@ -56,7 +56,7 @@ export type RoomHolding = { kind: string; words: string; qty: number; iconUrl: s
 export type RoomPresence = { id: string; name: string; state: string }
 
 export type RoomCard = {
-  /** "Amara’s hut" | "the storehouse" — owner-aware, P12-clean */
+  /** "Amara’s house" | "the storehouse" — owner-aware, P12-clean */
   title: string
   /** "Raised by Yusuf, Day 3" — null when nobody recorded it, so the panel omits the line */
   built: string | null

@@ -16,7 +16,7 @@ const tilesOf = (s: DevStructure): { x: number; y: number }[] => {
 const FROZEN_TOWN_STRUCTURES = [
   { id: 'structure_storehouse', kind: 'storehouse', x: 20, y: 20, w: 2, h: 2 },
   { id: 'structure_shed', kind: 'shed', x: 23, y: 20, w: 1, h: 1 },
-  { id: 'structure_cottage', kind: 'hut', x: 30, y: 20, w: 2, h: 2 },
+  { id: 'structure_cottage', kind: 'house', x: 30, y: 20, w: 2, h: 2 },
   { id: 'structure_wagon', kind: 'wagon', x: 26, y: 25, w: 1, h: 2 },
   { id: 'structure_scaffolding', kind: 'scaffolding', x: 34, y: 23, w: 1, h: 1 },
   { id: 'structure_stone', kind: 'standing_stone', x: 15, y: 28, w: 1, h: 1 },
@@ -44,14 +44,14 @@ describe('devTown — one town, not two', () => {
     // Six kinds over eleven roofs, where the eleven used to be five copies of one home and a
     // matched pair of sheds. The cottage, the cabin and the farmhouse are unowned fixtures.
     expect(count(town.structures)).toEqual({
-      hut: 5, cottage: 1, cabin: 1, farmhouse: 1, storehouse: 1, well: 1, fire_pit: 1,
+      house: 5, cottage: 1, cabin: 1, farmhouse: 1, storehouse: 1, well: 1, fire_pit: 1,
     })
   })
 
-  it('gives five huts one founder owner each, and leaves every other building public', () => {
+  it('gives five houses one founder owner each, and leaves every other building public', () => {
     const owned = town.structures.filter((s) => s.owner !== null)
     expect(owned).toHaveLength(5)
-    expect(new Set(owned.map((s) => s.kind))).toEqual(new Set(['hut']))
+    expect(new Set(owned.map((s) => s.kind))).toEqual(new Set(['house']))
     expect(new Set(owned.map((s) => s.owner))).toEqual(new Set(FOUNDER_IDS))
     expect(new Set(owned.map((s) => s.owner)).size).toBe(owned.length) // nobody twice
   })

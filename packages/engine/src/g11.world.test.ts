@@ -216,7 +216,7 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
   const WINTER_DUSK = 3 * DAYS_PER_SEASON * MINUTES_PER_DAY + 19 * 60 // −8
   const WINTER_NIGHT = 3 * DAYS_PER_SEASON * MINUTES_PER_DAY + 22 * 60 // −12
   const HEARTH: Box = { id: 'structure_1', kind: 'hearth', x: 8, y: 8, w: 1, h: 1 }
-  const HUT: Box = { id: 'structure_2', kind: 'hut', x: 14, y: 14, w: 2, h: 2 }
+  const HOUSE: Box = { id: 'structure_2', kind: 'house', x: 14, y: 14, w: 2, h: 2 }
   const NIGHT_TICKS = 8 * 60 // 21:00 to 05:00, the whole of a winter night
 
   it('the three winter bands are the ones the controller ratified', () => {
@@ -232,7 +232,7 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
   } {
     const start = WINTER_NIGHT
     let s = raise(genesisState(CFG, MAP()), CFG, HEARTH, false)
-    s = raise(s, CFG, HUT)
+    s = raise(s, CFG, HOUSE)
     s = spawn(s, CFG, 'body', opts.hearth === true ? 9 : 4, opts.hearth === true ? 8 : 4)
     if (opts.garment === true) {
       s = give(s, CFG, 'body', 'item_coat', 'garment')
@@ -240,7 +240,7 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
     }
     if (opts.indoors === true) {
       s = fold(s, ev('agent_moved', { id: 'body', x: 14, y: 16 }, start - 1), CFG)
-      s = fold(s, ev('agent_entered', { agentId: 'body', structureId: HUT.id }, start - 1), CFG)
+      s = fold(s, ev('agent_entered', { agentId: 'body', structureId: HOUSE.id }, start - 1), CFG)
     }
     if (opts.hearth === true) {
       s = fold(s, ev('structure_fueled', {

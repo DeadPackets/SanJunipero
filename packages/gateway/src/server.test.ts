@@ -108,7 +108,7 @@ describe('gateway server', () => {
     // asset push (record only — png stays on HTTP)
     const codex = new AssetCodex(db)
     codex.register({
-      class: 'building', desc: 'hut: timber dwelling', footprint: { w: 2, h: 2 },
+      class: 'building', desc: 'house: timber dwelling', footprint: { w: 2, h: 2 },
       png: Buffer.from([0x89, 0x50, 0x4e, 0x47]), widthPx: 4, heightPx: 4,
       status: 'placeholder', score: null, attempts: 1, costUsd: 0,
     })

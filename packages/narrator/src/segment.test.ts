@@ -71,9 +71,9 @@ describe('segmentScenes', () => {
 
   it('bare id on structure/item/crop events never enters the cast', () => {
     const events = [
-      ev(1, 0, 'structure_completed', { id: 'hut-1' }),
+      ev(1, 0, 'structure_completed', { id: 'house-1' }),
       ev(2, 1, 'crop_harvested', { cropId: 'crop-1' }),
-      ev(3, 2, 'structure_planned', { id: 'hut-2', kind: 'hut', x: 1, y: 1, w: 1, h: 1, maxHp: 10, flammable: true, builderId: 'omar' }),
+      ev(3, 2, 'structure_planned', { id: 'house-2', kind: 'house', x: 1, y: 1, w: 1, h: 1, maxHp: 10, flammable: true, builderId: 'omar' }),
       ev(4, 3, 'need_changed', { id: 'nadia', need: 'hunger', delta: -1 }),
     ]
     const scenes = segmentScenes(events)

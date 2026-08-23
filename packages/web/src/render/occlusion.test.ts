@@ -86,7 +86,7 @@ describe('the walk-around, on the eleven buildings of the real town', () => {
     expect(town.structures).toHaveLength(11)
     expect(town.structures.filter((s) => s.owner !== null)).toHaveLength(5)
     expect([...new Set(town.structures.map((s) => s.kind))].sort())
-      .toEqual(['cabin', 'cottage', 'farmhouse', 'fire_pit', 'hut', 'storehouse', 'well'])
+      .toEqual(['cabin', 'cottage', 'farmhouse', 'fire_pit', 'house', 'storehouse', 'well'])
   })
 
   it('MEASURES U8: the landed rule disagreed with the geometry on this many tiles', () => {
@@ -98,14 +98,14 @@ describe('the walk-around, on the eleven buildings of the real town', () => {
     // because the town now stands wider buildings: a 3× and a 4×-wide frontage ties on every
     // tile across its face, not only on the one in front of a 2×2 door.
     expect(disagreements.map((d) => `${d.structure} ${d.tile} oracle=${d.oracle} got=${d.got}`)).toEqual([
-      'structure_hut_14_13 (14,15) oracle=true got=false',
+      'structure_house_14_13 (14,15) oracle=true got=false',
       'structure_cottage_19_13 (19,15) oracle=true got=false',
       'structure_cottage_19_13 (20,15) oracle=true got=false',
-      'structure_hut_26_13 (26,15) oracle=true got=false',
-      'structure_hut_16_16 (16,18) oracle=true got=false',
+      'structure_house_26_13 (26,15) oracle=true got=false',
+      'structure_house_16_16 (16,18) oracle=true got=false',
       'structure_cabin_21_16 (21,18) oracle=true got=false',
-      'structure_hut_25_16 (25,18) oracle=true got=false',
-      'structure_hut_5_20 (5,22) oracle=true got=false',
+      'structure_house_25_16 (25,18) oracle=true got=false',
+      'structure_house_5_20 (5,22) oracle=true got=false',
       'structure_farmhouse_24_27 (24,29) oracle=true got=false',
       'structure_farmhouse_24_27 (25,29) oracle=true got=false',
       'structure_farmhouse_24_27 (25,30) oracle=true got=false',

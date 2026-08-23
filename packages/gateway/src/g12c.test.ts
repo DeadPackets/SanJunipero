@@ -34,10 +34,10 @@ describe('U3 — the dev showcase is the REAL town, not a four-building stub', (
     expect(src).toContain('the SAME anchor')
   })
 
-  it('gives the five huts five different owners', () => {
-    const huts = town.structures.filter((s) => s.kind === 'hut')
-    expect(huts).toHaveLength(5)
-    const owners = huts.map((h) => h.owner)
+  it('gives the five houses five different owners', () => {
+    const houses = town.structures.filter((s) => s.kind === 'house')
+    expect(houses).toHaveLength(5)
+    const owners = houses.map((h) => h.owner)
     expect(owners.filter((o) => o !== null)).toHaveLength(5)
     expect(new Set(owners).size).toBe(5)
   })
@@ -52,15 +52,15 @@ describe('U25 — "all of the humans were sleeping inside of one house"', () => 
     const founders = foundersFor(town.structures)
     expect(founders.length).toBeGreaterThanOrEqual(5)
     const homes = founders
-      .map((f) => town.structures.find((s) => s.kind === 'hut' && s.owner === f.id)?.id)
+      .map((f) => town.structures.find((s) => s.kind === 'house' && s.owner === f.id)?.id)
       .filter((id): id is string => id !== undefined)
     expect(homes).toHaveLength(5)
     expect(new Set(homes).size, 'two founders share a roof').toBe(5)
   })
 
-  it('puts each owner\'s door on their OWN hut, never on a shared one', () => {
+  it('puts each owner\'s door on their OWN house, never on a shared one', () => {
     const t = makeCityTemplate({ x: 0, y: 9 })
-    const doors = t.structures.filter((s) => s.kind === 'hut').map((s) => {
+    const doors = t.structures.filter((s) => s.kind === 'house').map((s) => {
       const d = doorTile(s)
       return `${d.dx},${d.dy}`
     })
@@ -87,7 +87,9 @@ describe('U25 — "all of the humans were sleeping inside of one house"', () => 
 const GOLDEN_G1 = 'f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac'
 // C11's Task 37b regenerated G2 after this branch forked; the older value is not a competing
 // decision, so the merge re-pins it to main's.
-const GOLDEN_G2 = 'c1c51b42aa340f0e5ae0d8cc321b602345f6ec4fee4e4d20b48f7e692b946d9c'
+// Re-pinned again by the `hut` → `house` rename lane (previous: c1c51b42…), whose scripted
+// fixture builds a dwelling and therefore carries the kind string into the state hash.
+const GOLDEN_G2 = '00d724345c37104d6c93f10398b96eded080b58db78108746e2a037fce836a10'
 
 const git = (...args: string[]): string =>
   execFileSync('git', args, { cwd: REPO, encoding: 'utf8' }).trim()
@@ -96,9 +98,9 @@ const gitBytes = (...args: string[]): Buffer =>
   execFileSync('git', args, { cwd: REPO, maxBuffer: 64 * 1024 * 1024 })
 
 // The config hash. `structures.enterableKinds` and `sleepableKinds` live inside it, which is
-// why the town's five homes still carry the `hut` id: naming them for the contemporary set
-// would move THIS literal, and that is a cross-lane decision, not a layout tweak.
-const FORGE_CONFIG_HASH = 'a90bd7471668eea6e8a8e7932129ef7905ae2477b396d5c7b792df539065c4d8'
+// why retiring the `hut` id had to be its own authorized cross-lane act rather than a layout
+// tweak. That act has landed; this literal is its re-pin (previous: a90bd747…).
+const FORGE_CONFIG_HASH = '02f295ad603483998c2e85a641f6aa35372ddf630614a46648cd1f95b284ba5b'
 const BLOCK1_SHA256 = '28c1fce0781ec9019416c234a9eae47401ff4b9dc4a96b91c371335fbad97bd6'
 
 describe('G12c read-only proof — the four pins are where they were', () => {
@@ -116,13 +118,28 @@ describe('G12c read-only proof — the four pins are where they were', () => {
   // forked — its `g2.test.ts` is 122 lines shorter — and a branch cannot be blamed for a file
   // somebody else edited. The claim this gate makes is "THIS BRANCH did not touch the
   // goldens", and the merge base is the only commit that states it.
-  it('has the two golden files byte-identical to the commit this branch forked from', () => {
+  //
+  // G2 LEFT THIS CLAUSE, G1 DID NOT. G2 hashes a world the fixture builds, so any authorized
+  // change to what stands in that world moves it — the `hut` → `house` rename did, and the
+  // freeze would have made the rename unlandable while proving nothing the literal pin above
+  // does not already prove. G1 is the replay proof: `TickLoop` folds handed-in events and runs
+  // no world system, so nothing legitimate reaches it and a byte freeze is the right claim.
+  it('has the G1 golden file byte-identical to the commit this branch forked from', () => {
     const base = git('merge-base', 'main', 'HEAD')
-    for (const p of ['packages/engine/src/golden.test.ts', 'packages/engine/src/g2.test.ts']) {
-      const here = createHash('sha256').update(readFileSync(join(REPO, p))).digest('hex')
-      const atBase = createHash('sha256').update(gitBytes('show', `${base}:${p}`)).digest('hex')
-      expect(here, `${p} moved on this branch`).toBe(atBase)
-    }
+    const p = 'packages/engine/src/golden.test.ts'
+    const here = createHash('sha256').update(readFileSync(join(REPO, p))).digest('hex')
+    const atBase = createHash('sha256').update(gitBytes('show', `${base}:${p}`)).digest('hex')
+    expect(here, `${p} moved on this branch`).toBe(atBase)
+  })
+
+  // Not vacuous: the comparison finds a difference when there is one to find.
+  it('sees a byte change in the G1 golden when one is planted', () => {
+    const base = git('merge-base', 'main', 'HEAD')
+    const p = 'packages/engine/src/golden.test.ts'
+    const tampered = createHash('sha256')
+      .update(Buffer.concat([readFileSync(join(REPO, p)), Buffer.from('\n')])).digest('hex')
+    const atBase = createHash('sha256').update(gitBytes('show', `${base}:${p}`)).digest('hex')
+    expect(tampered).not.toBe(atBase)
   })
 
   // DELIBERATELY NOT RESTORED: two branch-scoped clauses used to live here — "touched nothing

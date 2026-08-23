@@ -110,9 +110,9 @@ describe('U4 — "interiors are way too low quality, way too under detailed" —
   })
 
   it('orders a sleeping body BETWEEN a bed\'s two halves', () => {
-    const bed = INTERIOR_LAYOUTS.hut.find((f) => f.kind === 'bed')!
+    const bed = INTERIOR_LAYOUTS.house.find((f) => f.kind === 'bed')!
     expect(occupancyOf(bed.kind)).toBe('in')
-    expect(roomFurnishings('hut').some((f) => f.kind === 'bed')).toBe(true)
+    expect(roomFurnishings('house').some((f) => f.kind === 'bed')).toBe(true)
   })
 
   // ★ THE HONEST LINE. Everything above is the code-painted polygon working as designed. The

@@ -39,8 +39,8 @@ describe('G11a-L1: the engine firsts fire once each, and a second death of a new
     const events: SimEvent[] = [
       ...thrice((n) => [ev(day(n) + 10, 'agent_spoke', { agentId: 'ada', text: 'oi', x: 0, y: 0 })]),
       ...thrice((n) => [
-        ev(day(n), 'structure_planned', { id: `hut_${n}`, kind: 'hut' }),
-        ev(day(n) + 20, 'structure_completed', { id: `hut_${n}` }),
+        ev(day(n), 'structure_planned', { id: `house_${n}`, kind: 'house' }),
+        ev(day(n) + 20, 'structure_completed', { id: `house_${n}` }),
       ]),
       ...thrice((n) => [ev(day(n) + 30, 'action_completed', { agentId: 'ada', verb: 'eat' })]),
       ...thrice((n) => [ev(day(n) + 40, 'tile_changed', { x: n, y: 0, from: 0, to: 7, reason: 'paved', byId: 'ada' })]),
@@ -54,7 +54,7 @@ describe('G11a-L1: the engine firsts fire once each, and a second death of a new
     const kinds = found.map((m) => m.kind)
     expect(new Set(kinds).size).toBe(kinds.length) // once each, never twice
     for (const want of [
-      'first_speech', 'first_structure', 'first_hut', 'first_meal', 'first_road', 'first_channel',
+      'first_speech', 'first_structure', 'first_house', 'first_meal', 'first_road', 'first_channel',
       'first_hunt', 'first_fire_out', 'first_expression', 'first_infection',
     ]) expect(kinds).toContain(want)
   })

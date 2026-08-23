@@ -229,7 +229,7 @@ describe('what stands around the asker', () => {
   const seeing = (): AdjudicationBlocks => fixtureBlocks({
     agent: {
       ...fixtureBlocks().agent,
-      visible: { structures: [{ kind: 'well', x: 14, y: 8 }, { kind: 'hut', x: 10, y: 6 }], ground: ['grass', 'water'] },
+      visible: { structures: [{ kind: 'well', x: 14, y: 8 }, { kind: 'house', x: 10, y: 6 }], ground: ['grass', 'water'] },
     },
   })
 
@@ -237,7 +237,7 @@ describe('what stands around the asker', () => {
     const user = assembleAdjudicationPrompt(seeing()).messages[0].content
     expect(user).toContain('Standing nearby:')
     expect(user).toContain('a well at 14, 8')
-    expect(user).toContain('a hut at 10, 6')
+    expect(user).toContain('a house at 10, 6')
     expect(user).toContain('The ground here: grass, water')
   })
 

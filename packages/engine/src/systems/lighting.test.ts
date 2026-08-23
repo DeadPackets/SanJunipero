@@ -115,12 +115,12 @@ describe('stoke: a fire is warm for as long as somebody feeds it', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toBe('not close enough to the fire')
 
-    let hut = holding(bodyAt(0), 'item_1', 'wood')
-    hut = fold(hut, ev('structure_planned', {
-      id: 'structure_2', kind: 'hut', x: 5, y: 4, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
-    }, hut.tick), CFG)
-    hut = fold(hut, ev('structure_completed', { id: 'structure_2' }, hut.tick), CFG)
-    const wrong = submitIntent(hut, CFG, 'a1', 'stoke', { structureId: 'structure_2' })
+    let house = holding(bodyAt(0), 'item_1', 'wood')
+    house = fold(house, ev('structure_planned', {
+      id: 'structure_2', kind: 'house', x: 5, y: 4, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
+    }, house.tick), CFG)
+    house = fold(house, ev('structure_completed', { id: 'structure_2' }, house.tick), CFG)
+    const wrong = submitIntent(house, CFG, 'a1', 'stoke', { structureId: 'structure_2' })
     expect(wrong.ok).toBe(false)
     if (!wrong.ok) expect(wrong.reason).toBe('there is no fire there to feed')
   })

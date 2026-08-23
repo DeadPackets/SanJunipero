@@ -8,7 +8,7 @@ import { EventStore, fold, genesisState, makeFixtureMap, openDb } from '@sj/engi
 import { openForgeDb } from '@sj/forge'
 import { startDevWorld } from './devWorld.js'
 import { publishThought } from './observer.js'
-import { drawHut, registerDemoHut } from './hotswapDemo.js'
+import { drawHouse, registerDemoHouse } from './hotswapDemo.js'
 import { WorldMirror } from './worldMirror.js'
 
 const until = async (cond: () => boolean, timeoutMs = 30_000): Promise<void> => {
@@ -130,9 +130,9 @@ describe('GATE G6 — automated half', () => {
         if (laterTickIdx >= 0) expect(thoughtIdx).toBeLessThan(laterTickIdx)
       }
 
-      // 4. hot swap: register the demo hut → both clients get the push; bytes served exactly
+      // 4. hot swap: register the demo house → both clients get the push; bytes served exactly
       const fdb = openForgeDb(dbPath)
-      const rec = await registerDemoHut(fdb)
+      const rec = await registerDemoHouse(fdb)
       fdb.close()
       dw.gateway.pump()
       await until(() => a.frames.some((f) => f.includes(rec.id)) && b.frames.some((f) => f.includes(rec.id)), 10_000)
@@ -145,7 +145,7 @@ describe('GATE G6 — automated half', () => {
       expect(res.status).toBe(200)
       const served = new Uint8Array(await res.arrayBuffer())
       const { encodePng } = await import('@sj/forge')
-      const expected = await encodePng(drawHut())
+      const expected = await encodePng(drawHouse())
       expect(Buffer.from(served).equals(Buffer.from(expected))).toBe(true)
 
       a.sock.close()
