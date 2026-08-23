@@ -44,9 +44,9 @@ import { watchBirths, type AgentBornPayload } from '../src/family/watchBirths.js
 import { captureSocialName, migrateFamilyTables, promptBirthLine } from '../src/family/socialName.js'
 import { G9ReportSchema, checkG9Report, median, type G9Report } from '../src/live/g9report.js'
 import {
-import type { DiscoveryCredit } from '@sj/shared'
   HEARTH, HUTS, STOREHOUSE, hutDoor, makeTerrain, townGenesisEvents, type Box,
 } from '../src/live/g9world.js'
+import type { DiscoveryCredit } from '@sj/shared'
 
 const CAP_USD = 8.0
 const WARN_USD = 5.0

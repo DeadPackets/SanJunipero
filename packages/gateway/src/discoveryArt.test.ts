@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AssetRecord } from '@sj/shared'
-import { artNeededFor, itemCommissionText, watchDiscoveryArt } from './discoveryArt.js'
+import { artNeededFor, itemCommissionText, noDiscoveryArt, watchDiscoveryArt } from './discoveryArt.js'
 
 const stubCodex = (kinds: string[]) => ({
   listSince: (): AssetRecord[] =>
@@ -111,5 +111,18 @@ describe('the watcher', () => {
     w.onDiscovery({ name: 'two', makes: ['waterskin'] })
     await w.settle()
     expect(commission).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('the watcher that draws nothing', () => {
+  it('accepts a discovery, commissions nothing, and settles', async () => {
+    const w = noDiscoveryArt()
+    expect(() => w.onDiscovery({ name: 'stitch a waterskin', makes: ['waterskin'] })).not.toThrow()
+    await expect(w.settle()).resolves.toBeUndefined()
+  })
+
+  it('answers the same shape the real watcher does, so a caller can swap them', () => {
+    const real = watchDiscoveryArt({ forge: { commission: vi.fn() }, codex: stubCodex([]) })
+    expect(Object.keys(noDiscoveryArt()).sort()).toEqual(Object.keys(real).sort())
   })
 })

@@ -78,3 +78,17 @@ export function watchDiscoveryArt(deps: {
     },
   }
 }
+
+/**
+ * A watcher that draws nothing, and says so.
+ *
+ * A run with no image budget — and a run whose forge is not yet standing — must still record
+ * every discovery. The record is the feature; the picture is decoration on it. This exists so
+ * the caller picks between two watchers instead of growing an `if` around the recording.
+ */
+export function noDiscoveryArt(): DiscoveryArtWatcher {
+  return {
+    onDiscovery() { /* the record is already in the world log; a picture is not owed */ },
+    async settle() { /* nothing was ever in flight */ },
+  }
+}

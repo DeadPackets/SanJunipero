@@ -18,12 +18,15 @@ import {
   type LawQueue, type TickHandler, type TileId, type WorldState,
 } from '@sj/engine'
 import {
-  chronicleLine, DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash,
+  chronicleLine, DEFAULT_CONFIG, DISCOVERY_EVENT, MINUTES_PER_DAY, stateHash,
   type SimConfig, type SimEvent,
 } from '@sj/shared'
 // Cross-package by relative path on purpose: @sj/arbiter and @sj/narrator both depend on
 // @sj/agents, so a package-level dependency here would close a cycle.
-import { makeArbiter } from '../../arbiter/src/adjudicate.js'
+import { makeArbiter, type Codified } from '../../arbiter/src/adjudicate.js'
+// Same relative-path convention as the arbiter imports above. The discovery-art watcher lives
+// on the gateway side because `packages/forge` belongs to another lane (controller ruling).
+import { noDiscoveryArt } from '../../gateway/src/discoveryArt.js'
 import { GENESIS_CODEX } from '../../arbiter/src/canon.js'
 import { CodexStore } from '../../arbiter/src/codex.js'
 import { ConstructStore } from '../../arbiter/src/constructStore.js'
@@ -538,8 +541,27 @@ async function main(): Promise<void> {
     structureKinds: ['hut', 'storehouse', 'shed', 'wagon', 'well', 'fire_pit', 'bridge', 'grave'],
   }
   const arbiterLlm = makeClient(db, 'arbiter')
+
+  // ART IS NOT WIRED HERE YET, AND THAT IS DELIBERATE. `createForge` needs a reference sheet,
+  // and `loadReferenceSheet()` requires content/reference/ref-1..3.png, which are not in the
+  // tree — `gen-rigs.ts`, the only script that builds a Forge, cannot run today either. The
+  // record does not wait on a picture: this watcher draws nothing and every discovery is
+  // still credited, announced and archived. Swapping in `watchDiscoveryArt({ forge, codex })`
+  // is the whole of the remaining work, and its tests are already green.
+  const discoveryArt = noDiscoveryArt()
+
   const arbiter = makeArbiter({
     db, llm: arbiterLlm, embedder, tick: () => loop.tick, vocabulary: VOCABULARY,
+    // THE SEAM. A codification is a world fact, so it goes into the world's log; and if it
+    // names a thing nobody has drawn, the forge is asked for a picture. Neither can fail the
+    // codification, which has already happened by the time this runs.
+    onCodified: (d: Codified) => {
+      bridge.announce(DISCOVERY_EVENT, {
+        recipeId: d.recipeId, name: d.name, kind: d.kind,
+        byId: d.credit.agentId, intent: d.credit.intent, makes: d.makes,
+      })
+      discoveryArt.onDiscovery({ name: d.name, makes: d.makes })
+    },
   })
   const adjudications: Array<{ tick: number; agentId: string; intent: string; kind: string; verb: string | null }>
     = saved?.sidecar.adjudications ?? []
