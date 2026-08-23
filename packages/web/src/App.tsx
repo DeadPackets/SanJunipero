@@ -11,6 +11,7 @@ import { InspectorPanel } from './ui/InspectorPanel.js'
 import { RosterPanel } from './ui/RosterPanel.js'
 import { expandReducer } from './ui/roster/expand.js'
 import { ChroniclePanel } from './ui/ChroniclePanel.js'
+import { DiscoveryPanel } from './ui/DiscoveryPanel.js'
 import { SocietyLens } from './ui/SocietyLens.js'
 import { MomentsLens } from './ui/MomentsLens.js'
 import { DigestModal } from './ui/DigestModal.js'
@@ -352,7 +353,7 @@ export function App() {
         </main>
         <aside
           id="panel-outlet"
-          className={shownLens === 'inspector' || shownLens === 'chronicle' || shownLens === 'laws' ? 'open' : undefined}
+          className={shownLens === 'inspector' || shownLens === 'chronicle' || shownLens === 'discoveries' || shownLens === 'laws' ? 'open' : undefined}
         >
           {shownLens === 'inspector' && route.agentId !== null && (
             <InspectorPanel store={store} agentId={route.agentId} scene={scene} onBack={showRoster} />
@@ -361,6 +362,7 @@ export function App() {
             <RosterPanel store={store} openId={route.openId} onToggle={toggleRow} onOpenFull={pickAgent} />
           )}
           {shownLens === 'chronicle' && <ChroniclePanel store={store} handle={handle} onView={onView} />}
+          {shownLens === 'discoveries' && <DiscoveryPanel store={store} onView={onView} />}
           {shownLens === 'laws' && (
             <>
               <WorldLaws store={store} />

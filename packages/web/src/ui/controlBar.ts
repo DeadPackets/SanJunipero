@@ -40,11 +40,11 @@ export type ControlCtx = {
 
 /** The town's own word for each lens, so the bar and the top nav name one thing once. */
 export const LENS_LABEL: Readonly<Record<Lens, string>> = {
-  map: 'The town', inspector: 'Townsfolk', chronicle: 'Chronicle',
+  map: 'The town', inspector: 'Townsfolk', chronicle: 'Chronicle', discoveries: 'What they made',
   society: 'Bonds', director: 'Moments', laws: 'World laws',
 }
 export const LENS_GLYPH: Readonly<Record<Lens, string>> = {
-  map: 'tile', inspector: 'folk', chronicle: 'scroll',
+  map: 'tile', inspector: 'folk', chronicle: 'scroll', discoveries: 'find',
   society: 'bond', director: 'reel', laws: 'book',
 }
 
@@ -295,6 +295,17 @@ export const CONTROL_GLYPH: Readonly<Record<string, GlyphPixel[]>> = {
     '.ieiiii.',
     '.iesssi.',
     '.iiiiii.',
+  ),
+  // a key, the same silhouette the timeline mark draws, so the two surfaces name one thing once
+  find: art(
+    '..iiii..',
+    '.ii..ii.',
+    '.ii..ii.',
+    '..iiii..',
+    '...ii...',
+    '...iih..',
+    '...ii...',
+    '...iih..',
   ),
 }
 

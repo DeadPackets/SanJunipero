@@ -13,7 +13,7 @@ export const BOND_COUNT_REFETCH_MS = 60_000
 
 // chrome copy speaks about townsfolk, never machinery (spec §5)
 export const LENS_LABELS: Record<Lens, string> = {
-  map: 'Town', inspector: 'Townsfolk', chronicle: 'Chronicle',
+  map: 'Town', inspector: 'Townsfolk', chronicle: 'Chronicle', discoveries: 'What they made',
   society: 'Bonds', director: 'Moments', laws: 'World Laws',
 }
 

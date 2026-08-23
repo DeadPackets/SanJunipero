@@ -1,7 +1,7 @@
 import { momentToTick } from '@sj/shared'
 import { BROADCAST_PARAM, broadcastFromSearch } from './broadcast.js'
 
-export const LENSES = ['map', 'inspector', 'chronicle', 'society', 'director', 'laws'] as const
+export const LENSES = ['map', 'inspector', 'chronicle', 'discoveries', 'society', 'director', 'laws'] as const
 export type Lens = typeof LENSES[number]
 export type Route = {
   lens: Lens
