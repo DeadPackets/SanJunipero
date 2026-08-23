@@ -12,8 +12,19 @@ export function screenToTile(sx: number, sy: number): { x: number; y: number } {
   return { x: Math.round((a + b) / 2), y: Math.round((b - a) / 2) }
 }
 
-/** @deprecated for sorting — depth.ts owns the painter's order (U8). Kept because it is the
- *  minimap's cheap draw order and C10's landed tests still pin it. */
+/**
+ * @deprecated for sorting — depth.ts owns the painter's order (U8). Kept as the BEFORE-STATE
+ * the U8 tests measure against: `depth.test.ts` and `occlusion.test.ts` reproduce the landed
+ * ordering with it and assert what the topological pass fixed.
+ *
+ * ★ THIS COMMENT USED TO NAME THE MINIMAP as the reason it was kept. There was no minimap. It
+ * was a fossil describing a thing nobody built, and it cost the camera lane real time — it read
+ * the sentence, believed a minimap existed, and planned around one. There is a
+ * minimap now (`render/minimap.ts`) and it does not use this: it has its own raster and never
+ * sorts anything. A comment asserting a fact nothing enforces is the defect this project keeps
+ * finding, and a comment asserting a fact that was never true is the same defect with a longer
+ * fuse. `iso.test.ts` holds the line.
+ */
 export function depthKey(x: number, y: number): number {
   return (x + y) * 1000 + x
 }

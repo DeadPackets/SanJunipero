@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { FLING_MAX_MS } from '../render/fling.js'
 import {
   AMBIENT_EXEMPT, CSS_DURATION_TOKEN, CSS_EASE_TOKEN, MOTION, MOTIONS, MOTION_CEILING_MS,
-  MOTION_FLOOR_MS, durationsIn, easeFn, motionCss, progress, reduced, untokenisedDurations,
+  MOTION_EXEMPT, MOTION_FLOOR_MS, durationsIn, easeFn, motionCss, progress, reduced,
+  untokenisedDurations,
 } from './motion.js'
 
 const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
@@ -123,5 +125,38 @@ describe('zero is the absence of a motion, and the scan says so out loud', () =>
   it('still catches every other raw number', () => {
     expect(untokenisedDurations('.x { transition-duration: 200ms; }')).toEqual(['.x — 200ms'])
     expect(untokenisedDurations('.y { animation: a 1.4s linear; }')).toEqual(['.y — 1.4s'])
+  })
+})
+
+// ── ★ EVERY LONG MOTION IN THE PRODUCT HAS A WRITTEN REASON ───────────────────────────────
+//
+// The controller's ruling after the camera lane shipped a 700ms drag glide against a 150–300ms
+// band: the argument was accepted, but it lived only in a source comment in `render/fling.ts`,
+// so the MOTION table showed a band nothing declared an exception to. An unwritten exception is
+// a bug with a delay fuse — the next reader "fixes" the deliberate thing, or adds a long motion
+// of their own because one already exists unexplained.
+
+describe('the exemptions from the motion band', () => {
+  it('★ names every long motion, with a reason, in one table', () => {
+    for (const e of MOTION_EXEMPT) {
+      expect(e.ms, `${e.what} is exempt but is not actually long`).toBeGreaterThan(MOTION_CEILING_MS)
+      expect(e.because.length, `${e.what} has no reason`).toBeGreaterThan(24)
+    }
+    expect(MOTION_EXEMPT.map((e) => e.what)).toEqual(['ambient', 'fling'])
+  })
+
+  it('★ the drag glide is one of them, at the number fling.ts actually enforces', () => {
+    const fling = MOTION_EXEMPT.find((e) => e.what === 'fling')
+    expect(fling, 'the 700ms glide is over the ceiling with no row here').toBeDefined()
+    expect(fling!.ms).toBe(FLING_MAX_MS)
+    expect(FLING_MAX_MS).toBeGreaterThan(MOTION_CEILING_MS)
+  })
+
+  it('the ceiling check skips exactly the exempt NAMES, derived from the same table', () => {
+    expect(AMBIENT_EXEMPT).toEqual(['ambient'])
+    for (const name of MOTIONS) {
+      if (AMBIENT_EXEMPT.includes(name)) continue
+      expect(MOTION[name].ms, name).toBeLessThanOrEqual(MOTION_CEILING_MS)
+    }
   })
 })
