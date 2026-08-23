@@ -8,7 +8,7 @@ import { mintId, type Affliction, type Item, type TileId, type WorldState } from
 import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
 import { bridgeAt, BRIDGE_KIND, findPath, isPassable, searchPath } from './path.js'
-import { claimInWorld, townSquareOf } from './town.js'
+import { claimInWorld, layBlock, townSquareOf, type TileChange } from './town.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 import { fleeTo } from './systems/fauna.js'
 import { HEAT_SOURCE_KINDS } from './systems/warmth.js'
@@ -1051,6 +1051,8 @@ export type BuildSiteAnswer = {
   site: { x: number; y: number; w: number; h: number } | null
   /** The standing construction this build continues, if any: its materials are already spent. */
   resume: { id: string; progressTicks: number } | null
+  /** The ground the town must lay before anything can stand here — empty when it already has. */
+  lay: TileChange[]
   refusal: string | null
 }
 
@@ -1071,7 +1073,7 @@ export function buildSiteOf(
   const recipe = buildableRecipe(config, params.kind)!
   if (!buildIsPlotted(state, params.kind)) {
     if (params.x === undefined || params.y === undefined) {
-      return { site: null, resume: null, refusal: `build needs {kind, x, y}` }
+      return { site: null, resume: null, lay: [], refusal: `build needs {kind, x, y}` }
     }
     const d = { kind: params.kind, x: params.x, y: params.y }
     const { w, h, refusal } = buildFootprint(state, config, agentId, d)
@@ -1079,27 +1081,39 @@ export function buildSiteOf(
     return {
       site: { x: d.x, y: d.y, w, h },
       resume: at !== null && at.kind === d.kind ? { id: at.id, progressTicks: at.progressTicks } : null,
+      lay: [],
       refusal,
     }
   }
+  const square = townSquareOf(state)!
   const mine = ownSite(state, agentId, params.kind)
   const claim = claimInWorld(state, { along: recipe.w, deep: recipe.h })
   const site = mine !== null ? { x: mine.x, y: mine.y, w: mine.w, h: mine.h } : claim?.site ?? null
-  if (site === null) {
-    return { site: null, resume: null, refusal: `there is nowhere left in the town for a ${words(params.kind)}` }
+  if (site === null || claim === null) {
+    return { site, resume: null, lay: [], refusal: `there is nowhere left in the town for a ${words(params.kind)}` }
+  }
+  // ★ AND THE GROUND IT STANDS ON HAS TO EXIST. The town lays the block the first time
+  // somebody builds on it; if the array does not reach that far yet the answer says so out
+  // loud, because a plot silently withheld for want of a bigger world is the ring-1 clamp all
+  // over again. The world widens at midnight and the same build lands the next morning.
+  const lay = layBlock(state, square, claim.block)
+  if (lay === 'off the map') {
+    return {
+      site, resume: null, lay: [],
+      refusal: `the ground a ${words(params.kind)} needs is past the edge of the known country`,
+    }
   }
   const resume = mine === null ? null : { id: mine.id, progressTicks: mine.progressTicks }
   // ★ THE DOOR TILE, not the corner of the footprint — the spot on the street the new frontage
   // will face. It is a road, it is passable, and it is adjacent to EVERY mass the plot can
   // hold, so one number answers the question whatever is being raised. The same number
   // `groundForBuilding` puts in the perception, so a mind is never told two places.
-  const stand = claim?.door ?? { x: site.x, y: site.y + site.h }
-  const go = `go and stand at (${stand.x}, ${stand.y})`
+  const go = `go and stand at (${claim.door.x}, ${claim.door.y})`
   if (!nearRect(state, agentId, site.x, site.y, site.w, site.h)) {
-    return { site, resume, refusal: `the town keeps ground for a ${words(params.kind)} — ${go}` }
+    return { site, resume, lay, refusal: `the town keeps ground for a ${words(params.kind)} — ${go}` }
   }
   return {
-    site, resume,
+    site, resume, lay,
     refusal: resume !== null ? null : plottedRefusal(state, config, agentId, params.kind, site, go),
   }
 }
@@ -1160,6 +1174,9 @@ const build: VerbDef = makeVerb({
     if (answer.resume !== null || answer.site === null) return []
     const { x, y, w, h } = answer.site
     return [
+      // The ground first: a roof cannot stand on a block the town has not cleared, and a door
+      // cannot open onto a street nobody laid.
+      ...answer.lay.map((t) => ({ type: 'tile_changed', payload: { ...t, byId: agentId } })),
       ...Object.entries(recipe.inputs).flatMap(([kind, qty]) => consumeHeld(state, agentId, kind, qty)),
       {
         type: 'structure_planned',

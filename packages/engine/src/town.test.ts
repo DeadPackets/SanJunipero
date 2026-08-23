@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CITY_ANCHOR_DEFAULT, DEFAULT_CONFIG, GENESIS_WANTED, TOWN_SQUARE, cityPlacements,
-  plazaOf, townOrigin, worldOf,
+  CITY_ANCHOR_DEFAULT, CITY_GROUND, DEFAULT_CONFIG, GENESIS_WANTED, TOWN_SQUARE, blockIsPlattable,
+  cityPlacements, freePlots, place, placedTiles, plazaOf, townOrigin, worldOf,
 } from '@sj/shared'
-import { claimInWorld, standingRects, townGroundBox, townSquareOf } from './town.js'
+import { claimInWorld, standingRects, townGroundBox, townGroundOf, townSquareOf } from './town.js'
 import { makeGenesisWorld } from './genesis/world.js'
 import { genesisState, type WorldState } from './state.js'
 import { makeFixtureMap } from './scripted.js'
@@ -84,5 +84,48 @@ describe('★ where the town is, in a world that moves under it', () => {
     expect(box.dy1).toBeGreaterThan(Math.max(...roofs.map((s) => s.y + s.h - 1)))
     expect(box.dx1).toBeGreaterThan(Math.max(...roofs.map((s) => s.x + s.w - 1)))
     expect(box.dy0).toBeLessThan(Math.min(...roofs.map((s) => s.y)))
+  })
+})
+
+
+// ★ THE GRAMMAR KNOWS ONE RIVER; THE WORLD HAS A LAKE AS WELL.
+//
+// This guard passed its first mutation — deleting the world half of the ground changed
+// nothing, because rings 1 and 2 hold no water the grammar does not already know about. It is
+// ring 3 that needs it, and only running the mutation said so.
+describe('★ the plat rule reads the world s water too, not only the grammar s', () => {
+  const WET = new Set([2, 10])
+
+  it('block (0,-3) stands in the fork that feeds the lake, and only the world can see it', () => {
+    const s = genesisWorld()
+    const world = townGroundOf(s, TOWN_SQUARE)
+    // The grammar would plat it: its one channel is nowhere near.
+    expect(blockIsPlattable(0, -3, CITY_GROUND)).toBe(true)
+    // The world refuses it, because the fork runs across its northern rows.
+    expect(blockIsPlattable(0, -3, world)).toBe(false)
+    expect(blockIsPlattable(1, -3, CITY_GROUND)).toBe(true)
+    expect(blockIsPlattable(1, -3, world)).toBe(false)
+    // And the two agree everywhere the town has actually reached, which is why nothing at
+    // rings 1 and 2 could ever have caught this.
+    for (let r = 1; r <= 2; r++)
+      expect(freePlots(r, world).length, `ring ${r}`).toBe(freePlots(r, CITY_GROUND).length)
+  })
+
+  it('so no building the claim can hand out at ring 3 ever stands in open water', () => {
+    const s = genesisWorld()
+    const world = townGroundOf(s, TOWN_SQUARE)
+    const plots = freePlots(3, world)
+    // Non-vacuous: the grammar alone would offer eight more, and those eight are the wet ones.
+    expect(freePlots(3, CITY_GROUND).length - plots.length).toBe(8)
+    let checked = 0
+    for (const plot of plots)
+      for (let along = 1; along <= plot.maxAlong; along++)
+        for (let deep = 1; deep <= plot.maxDeep; deep++)
+          for (const t of placedTiles(place(plot, 'x', along, deep, null))) {
+            const tile = s.terrain[TOWN_SQUARE.y + t.dy]?.[TOWN_SQUARE.x + t.dx]
+            expect(tile === undefined || !WET.has(tile), `${t.dx},${t.dy}`).toBe(true)
+            checked++
+          }
+    expect(checked).toBe(plots.length * 30)
   })
 })

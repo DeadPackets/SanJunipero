@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, MIN_SEP, TOWN_SQUARE, centreOf, type SimEvent } from '@sj/shared'
+import {
+  DEFAULT_CONFIG, MIN_SEP, PITCH, STREET, TOWN_SQUARE, T_GRASS, T_ROAD, WORLD_MARGIN,
+  blockGroundOf, centreOf, edgesOwed, type SimEvent,
+} from '@sj/shared'
 import { fold } from './fold.js'
 import { genesisState, type WorldState } from './state.js'
 import { makeGenesisWorld, GENESIS_FORD } from './genesis/world.js'
 import { submitIntent } from './intent.js'
 import { makeFixtureMap } from './scripted.js'
 import { buildIsPlotted, buildSiteOf, isPlottedKind } from './verbs.js'
-import { claimInWorld, standingRects, townSquareOf } from './town.js'
+import { claimInWorld, layBlock, standingRects, townGroundBox, townSquareOf } from './town.js'
+import { builtBox, owedBox } from './systems/mapGrowth.js'
 
 const CFG = DEFAULT_CONFIG
+const T_FOREST = 3
 let seq = 0
 const ev = (type: string, payload: unknown): SimEvent =>
   ({ seq: ++seq, tick: 0, type, payload } as unknown as SimEvent)
@@ -194,5 +199,100 @@ describe('★ the town grows only where the lattice lets it', () => {
     const a = standingRects(raiseThrough(12))
     const b = standingRects(raiseThrough(12))
     expect(a).toEqual(b)
+  })
+})
+
+
+describe('★ a block is laid out when its first building is raised', () => {
+  /** Raise houses through the real verb until the claim crosses into ring `r`. */
+  function raiseUntilRing(r: number): { before: WorldState; after: WorldState; block: { i: number; j: number } } {
+    let s = genesisTown()
+    for (let i = 0; i < 40; i++) {
+      const claim = claimInWorld(s, { along: 2, deep: 2 })!
+      if (claim.rings >= r) {
+        const before = withBuilder(s, 'x', claim.door)
+        const res = submitIntent(before, CFG, 'x', 'build', { kind: 'house' })
+        expect(res.ok, res.ok ? '' : res.reason).toBe(true)
+        return { before, after: apply(before, res.ok ? res.events : []), block: claim.block }
+      }
+      s = withBuilder(s, `b${i}`, claim.door)
+      const res = submitIntent(s, CFG, `b${i}`, 'build', { kind: 'house' })
+      expect(res.ok, res.ok ? '' : res.reason).toBe(true)
+      s = apply(s, res.ok ? res.events : [])
+      const planned = Object.values(s.structures).find((v) => v.builtBy === `b${i}`)!
+      s = apply(s, [{ type: 'structure_completed', payload: { id: planned.id } }])
+    }
+    throw new Error('never reached that ring')
+  }
+
+  it('★ the first ring-2 build clears its block and paves its streets, and the door opens on one', () => {
+    const { before, after, block } = raiseUntilRing(2)
+    const claim = claimInWorld(before, { along: 2, deep: 2 })!
+    expect(claim.block).toEqual(block)
+    // NON-VACUITY: before the build this was the world's own untouched ground, not a street.
+    expect(before.terrain[claim.door.y]![claim.door.x]).not.toBe(T_ROAD)
+    const ground = blockGroundOf(TOWN_SQUARE, block)
+    expect(ground.paved.filter((t) => before.terrain[t.y]![t.x] !== T_ROAD).length).toBeGreaterThan(100)
+    // After: the block is open ground, its ring is paved, and the door opens onto the paving.
+    for (const t of ground.cleared) expect(after.terrain[t.y]![t.x], `${t.x},${t.y}`).toBe(T_GRASS)
+    for (const t of ground.paved) expect(after.terrain[t.y]![t.x], `${t.x},${t.y}`).toBe(T_ROAD)
+    expect(after.terrain[claim.door.y]![claim.door.x]).toBe(T_ROAD)
+  })
+
+  it('★ and it really does clear: the eastern blocks stand in the wood', () => {
+    // The first ring-2 block is west of the square, where the world is already meadow — so the
+    // clearing half of the rule does no work there and an assertion about it would be vacuous.
+    // Block (2, 0) is the one that meets the forest, and there the wood comes down.
+    const s = genesisTown()
+    const lay = layBlock(s, TOWN_SQUARE, { i: 2, j: 0 })
+    expect(lay).not.toBe('off the map')
+    const changes = lay as Array<{ from: number; reason: string }>
+    expect(changes.filter((c) => c.reason === 'cleared' && c.from === T_FOREST).length).toBeGreaterThan(200)
+    expect(changes.filter((c) => c.reason === 'paved').length).toBeGreaterThan(100)
+  })
+
+  it('lays the ground before it plants the roof, in that order', () => {
+    const { before } = raiseUntilRing(2)
+    const r = submitIntent(before, CFG, 'x', 'build', { kind: 'house' })
+    const types = r.ok ? r.events.map((e) => e.type) : []
+    expect(types.filter((t) => t === 'tile_changed').length).toBeGreaterThan(0)
+    expect(types.lastIndexOf('tile_changed')).toBeLessThan(types.indexOf('structure_planned'))
+  })
+
+  it('costs nothing at ring 1, where genesis already laid every street', () => {
+    const s = genesisTown()
+    const claim = claimInWorld(s, { along: 2, deep: 2 })!
+    expect(claim.rings).toBe(1)
+    expect(layBlock(s, TOWN_SQUARE, claim.block)).toEqual([])
+  })
+
+  it('★ refuses loudly, in words, when the ground it needs is off the end of the array', () => {
+    const full = genesisTown()
+    const short: WorldState = { ...full, terrain: full.terrain.slice(0, 95) }
+    const claim = claimInWorld(short, { along: 2, deep: 2 })!
+    expect(layBlock(short, TOWN_SQUARE, claim.block)).toBe('off the map')
+    const s = withBuilder(short, 'a', claim.door)
+    expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house' })).toEqual({
+      ok: false, reason: 'the ground a house needs is past the edge of the known country',
+    })
+    // The same claim, on the world that does reach that far, goes up.
+    const ok = withBuilder(full, 'a', claim.door)
+    expect(submitIntent(ok, CFG, 'a', 'build', { kind: 'house' }).ok).toBe(true)
+  })
+
+  it('★ and the world then owes ground it did not owe before', () => {
+    const genesis = genesisTown()
+    const size = { w: genesis.terrain[0]!.length, h: genesis.terrain.length }
+    // The roofs alone say the world owes four rows south; the ground the town has LAID says
+    // seven, and the three between them are where ring 2's far street band would fall.
+    expect(edgesOwed(builtBox(genesis)!, size, WORLD_MARGIN)).toEqual([{ edge: 's', owed: 4 }])
+    expect(edgesOwed(owedBox(genesis)!, size, WORLD_MARGIN)).toEqual([{ edge: 's', owed: 7 }])
+    expect(owedBox(genesis)!.dy1 - builtBox(genesis)!.dy1).toBe(STREET)
+
+    const { after } = raiseUntilRing(2)
+    const grown = owedBox(after)!
+    expect(grown.dy1 - owedBox(genesis)!.dy1).toBe(PITCH)
+    expect(edgesOwed(grown, size, WORLD_MARGIN).map((e) => e.edge)).toEqual(['e', 's'])
+    expect(townGroundBox(after)!.dx1 - townGroundBox(genesis)!.dx1).toBe(PITCH)
   })
 })
