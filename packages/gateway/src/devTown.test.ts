@@ -16,7 +16,7 @@ const tilesOf = (s: DevStructure): { x: number; y: number }[] => {
 const FROZEN_TOWN_STRUCTURES = [
   { id: 'structure_storehouse', kind: 'storehouse', x: 20, y: 20, w: 2, h: 2 },
   { id: 'structure_shed', kind: 'shed', x: 23, y: 20, w: 1, h: 1 },
-  { id: 'structure_cottage', kind: 'house', x: 30, y: 20, w: 2, h: 2 },
+  { id: 'structure_house', kind: 'house', x: 30, y: 20, w: 2, h: 2 },
   { id: 'structure_wagon', kind: 'wagon', x: 26, y: 25, w: 1, h: 2 },
   { id: 'structure_scaffolding', kind: 'scaffolding', x: 34, y: 23, w: 1, h: 1 },
   { id: 'structure_stone', kind: 'standing_stone', x: 15, y: 28, w: 1, h: 1 },

@@ -33,7 +33,7 @@ export type TownStructure = { id: string; kind: string; x: number; y: number; w:
 export const TOWN_STRUCTURES: readonly TownStructure[] = [
   { id: 'structure_storehouse', kind: 'storehouse', x: 20, y: 20, w: 2, h: 2 },
   { id: 'structure_shed', kind: 'shed', x: 23, y: 20, w: 1, h: 1 },
-  { id: 'structure_cottage', kind: 'house', x: 30, y: 20, w: 2, h: 2 },
+  { id: 'structure_house', kind: 'house', x: 30, y: 20, w: 2, h: 2 },
   { id: 'structure_wagon', kind: 'wagon', x: 26, y: 25, w: 1, h: 2 },
   { id: 'structure_scaffolding', kind: 'scaffolding', x: 34, y: 23, w: 1, h: 1 },
   { id: 'structure_stone', kind: 'standing_stone', x: 15, y: 28, w: 1, h: 1 },
@@ -93,7 +93,7 @@ export function devHoldings(structures: readonly DevStructure[]): DevHolding[] {
 }
 
 // The one dwelling in the fixture town — where a tired founder goes when interiors are on.
-export const FOUNDERS_HOME_ID = 'structure_cottage'
+export const FOUNDERS_HOME_ID = 'structure_house'
 // Above the patrol policy's own outdoor-sleep threshold (20), so home always wins first —
 // measured over 5500 dev ticks, no founder ever sleeps or collapses out of doors.
 export const GO_HOME_BELOW = 25

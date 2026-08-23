@@ -234,11 +234,11 @@ describe('rendersOnMap', () => {
   })
 
   it('does NOT draw someone who has gone inside — the interior scene has them', () => {
-    expect(rendersOnMap({ alive: true, insideId: 'structure_cottage' })).toBe(false)
+    expect(rendersOnMap({ alive: true, insideId: 'structure_house' })).toBe(false)
   })
 
   it('still does not draw the dead', () => {
     expect(rendersOnMap({ alive: false })).toBe(false)
-    expect(rendersOnMap({ alive: false, insideId: 'structure_cottage' })).toBe(false)
+    expect(rendersOnMap({ alive: false, insideId: 'structure_house' })).toBe(false)
   })
 })
