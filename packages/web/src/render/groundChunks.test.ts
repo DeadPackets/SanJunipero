@@ -338,18 +338,78 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
     expect(rows).toHaveLength(4)
   })
 
+  /**
+   * ★ THE WORLD HAS NO CEILING ANY MORE, so neither may this.
+   *
+   * The world-growth lane deleted the world's fixed size: `genesisTerrainAt(x, y)` was always
+   * pure arithmetic with no bounds, and the 128-tile array was only how much of it had been
+   * written down. The terrain now widens to owe the built set a block pitch on every side —
+   * 250² at five rings, 440² at ten, against today's 128². So the chunked bake is not an
+   * optimisation, it is what decides whether a grown town renders at all, and a working set
+   * that still contained the size of the world would be wrong against a branch that exists.
+   *
+   * These are that lane's own numbers, plus one far past anything planned.
+   */
+  const GROWN_SIDES: ReadonlyArray<[string, number]> = [
+    ['today, 128²', 128],
+    ['world-growth, 5 rings, 250²', 250],
+    ['world-growth, 10 rings, 440²', 440],
+    ['bigTown, 40 rings, 1539²', 2 * 40 * 19 + 19],
+    ['far past anything planned, 4000²', 4000],
+  ]
+
   it('★ CLAIM 2 — the working set is a function of the VIEWPORT, and stops growing', () => {
-    // Ten, twenty and forty rings. Past the point where the town exceeds the view at a stop,
-    // the town's size stops appearing in the answer at all — which is the wall removed.
-    const sides = [10, 20, 40].map((r) => 2 * r * 19 + 19)
     const rows: string[] = []
     for (const z of ZOOM_STOPS) {
-      const got = sides.map((s) => peakVisible(gridForSide(s), z))
-      rows.push(`z=${z}: ${got.map((g) => `${(g.bytes / MB).toFixed(1)}MB/${g.chunks}`).join('  ')}`)
-      for (const g of got) expect(g.bytes).toBe(got[0]!.bytes)
+      const got = GROWN_SIDES.map(([, s]) => peakVisible(gridForSide(s), z))
+      rows.push(`z=${String(z).padEnd(5)} ${got.map((g) => `${(g.bytes / MB).toFixed(1)}MB/${g.chunks}`.padStart(12)).join('')}`)
+      // ★ IT CONVERGES, AND THE SMALL SIDES ARE CHEAPER RATHER THAN EQUAL. A field that is not
+      // much bigger than the view runs off its own edge, and the clipped last column and row
+      // cost less than full chunks — so 128² and 250² sit UNDER the asymptote rather than on
+      // it. From 440² up, where the peak view sits entirely in the interior, the answer stops
+      // moving: 440, 1539 and 4000 are the same number. That is the claim — the size of the
+      // world is not a term in it — and it has to be stated as convergence, not equality,
+      // because equality would be false for exactly the towns that exist today.
+      const asymptote = got[got.length - 1]!.bytes
+      for (const g of got.slice(2)) expect(g.bytes).toBe(asymptote)
+      for (const g of got) expect(g.bytes).toBeLessThanOrEqual(asymptote)
     }
     // eslint-disable-next-line no-console
-    console.log(`WORKING SET AT 10 / 20 / 40 RINGS (side 399 / 779 / 1539 tiles)\n  ${rows.join('\n  ')}`)
+    console.log(`WORKING SET vs WORLD SIZE — ${GROWN_SIDES.map(([n]) => n).join(' | ')}\n  ${rows.join('\n  ')}`)
+  })
+
+  it('★ nothing here knows a world size: an arbitrary terrain grids and tiles exactly', () => {
+    // Not ring counts and not powers of two — sizes nobody would pick, so a constant hiding in
+    // the arithmetic has nothing to agree with.
+    for (const side of [7, 63, 129, 250, 251, 440, 1001]) {
+      const fieldW = (side + side) * (TILE_W / 2), fieldH = (side + side) * (TILE_H / 2)
+      const grid = groundGrid(fieldW, fieldH, side * (TILE_W / 2))
+      expect(grid.cols).toBe(Math.ceil(fieldW / CHUNK_PX_W))
+      expect(grid.rows).toBe(Math.ceil(fieldH / CHUNK_PX_H))
+      let covered = 0
+      for (const k of allChunks(grid)) {
+        expect(Math.max(k.texW, k.texH)).toBeLessThanOrEqual(GPU_MIN_MAX_TEXTURE_PX)
+        covered += k.w * k.h
+      }
+      expect(covered, `side ${side} is not tiled exactly`).toBe(fieldW * fieldH)
+    }
+  })
+
+  it('★ the baker takes its extent from the terrain it is handed, never from a constant', () => {
+    // Two terrains of different sizes through the SAME baker: the grid must follow the array.
+    const d = drive(1)
+    const wide = gridForSide(250)
+    for (const [rings, want] of [[1, gridFor(1)], [3, gridFor(3)]] as const) {
+      d.baker.setView(viewAt(1, want.fieldW / 2, want.fieldH / 2, want.offsetX))
+      d.baker.rebake(bigTownTerrain(rings) as never, [])
+      // every resident chunk is inside the grid THIS terrain implies
+      for (const s of d.root.children as Sprite[]) {
+        expect(s.position.x + want.offsetX).toBeLessThan(want.fieldW)
+        expect(s.position.y).toBeLessThan(want.fieldH)
+      }
+      expect(d.baker.vram().chunks).toBeGreaterThan(0)
+    }
+    expect(wide.fieldW).toBe(250 * 2 * (TILE_W / 2))
   })
 })
 
