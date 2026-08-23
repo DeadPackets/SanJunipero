@@ -81,7 +81,7 @@ const MOTIF_WORDS: ReadonlyArray<readonly [RegExp, string]> = [
   [/plaza|square|road|street|stone|wall/, 'stone'],
   [/river|water|bank|well|lake|shore/, 'water'],
   [/field|farm|crop|meadow|garden/, 'field'],
-  [/house|house|home|hearth|storehouse|shed|inside/, 'hearth'],
+  [/house|home|hearth|storehouse|shed|inside/, 'hearth'],
   [/forest|tree|wood|grove/, 'tree'],
 ]
 

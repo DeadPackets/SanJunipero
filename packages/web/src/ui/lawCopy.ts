@@ -120,7 +120,7 @@ export const LAW_COPY: Readonly<Record<keyof typeof TOGGLABLE_PATHS, LawCopy>> =
   },
   'spoilage.storehouseMultiplier': {
     title: 'What a storehouse is worth',
-    sentence: 'Food kept under a proper roof lasts longer than food left lying in a house.',
+    sentence: 'Food kept in the storehouse lasts longer than food left on a shelf at home.',
     unit: null, render: share('as long'),
   },
   'tools.wearEnabled': {
