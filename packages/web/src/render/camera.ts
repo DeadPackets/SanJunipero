@@ -29,90 +29,228 @@ export type ZoomStop = (typeof ZOOM_STOPS)[number]
 
 export const ZOOM_SETTLE_MS = 180
 
-/**
- * A trackpad sends many small deltas; a mouse sends one notch. Steps fire on ACCUMULATED
- * delta crossing the threshold WITHIN a gesture, and the accumulator resets between gestures.
- *
- * WHAT THE BROWSER CAUGHT: "one notch of a wheel is 120" is a convention, not a fact — Chrome
- * commonly reports 100, and some mice report 53. With a 120 threshold and nothing else, a
- * real mouse never zoomed AT ALL: each notch arrived as its own gesture, 100 < 120, and the
- * accumulator reset before the next one. So a gesture's FIRST event is itself a deliberate
- * act and takes one step, whatever that mouse calls a notch; the threshold governs continued
- * travel inside one gesture, and the cooldown governs the rate.
- */
-export const WHEEL_STEP_DELTA = 120
-export const WHEEL_GESTURE_GAP_MS = 140
-/** Below this, a fresh event is a graze rather than a gesture: it accumulates, it never steps. */
-export const WHEEL_MIN_DELTA = 8
+// ── ★ THE HAND ASKS CONTINUOUSLY; THE CAMERA MUST ANSWER CONTINUOUSLY ──────────────────────
+//
+// THE COMPLAINT, verbatim: "Zooming is not smooth at all and very hard to control."
+//
+// THE DEFECT, MEASURED on the landed handler in the running page. The ladder was climbed one
+// rung per COOLDOWN WINDOW, so what the camera did was a function of how LONG the gesture took
+// rather than how FAR the hand moved:
+//
+//   322 px of deltaY over  297 ms (34 events)  ->  ONE rung; 22 of the 34 events did nothing
+//   322 px of deltaY over 1400 ms (34 events)  ->  THREE rungs, to the top of the ladder
+//   500 px of deltaY over  360 ms (5 notches)  ->  ONE rung; 4 of the 5 notches did nothing
+//    40 px of pinch over   320 ms (40 events)  ->  NOTHING AT ALL
+//
+// Same hand distance, one rung or the whole range. That is what "can't control it" means, and
+// no amount of tuning a cooldown fixes it: a rate limiter cannot make a response proportional.
+//
+// ★ AND THE CRISP-VERSUS-SMOOTH TENSION, RESOLVED RATHER THAN TRADED.
+//
+// P18 needs EXACT stops so every texture lands on a whole-pixel grid under NEAREST, and three
+// lanes have paid for that: the camera lane refused a continuous FIT scale ("it would resample
+// every sprite into shimmer"), the render lane refused a new rung, the minimap lane found the
+// hit floor that killed 0.125. All of that is about where the camera COMES TO REST.
+//
+// This is about where it is WHILE A HAND IS ON IT, which is a different question, and the
+// renderer already answers it: an eased transit has always passed through fractional scales,
+// and `groundChunks` carries a bleed pixel that exists for exactly "the fractional scales an
+// eased zoom passes through". So the machinery for fractional scale IN MOTION is landed and
+// proved. What changes is how long it lasts — a gesture rather than 180 ms — and the resting
+// frame is untouched: it is a member of ZOOM_STOPS, always, by construction.
+//
+// The one thing that does NOT survive a longer fractional window is the ground seam, so the
+// live scale is quantised — see ZOOM_LIVE_QUANTUM.
 
-/** No second step may fire inside this window however hard the wheel is spun. This is the
- *  line that makes "I can't control my zoom at all" impossible. */
-export const ZOOM_STEP_COOLDOWN_MS = 200
+/**
+ * ★ HOW FAR THE HAND MOVES FOR A FACTOR OF TWO.
+ *
+ * This is the ONE number in this lane chosen from feel rather than derived, and it is stated
+ * as such. It cannot be measured without a hand on a real trackpad and this lane had no way
+ * to produce one — a CDP-synthesised wheel is not a device. What it IS calibrated against:
+ * the ladder spans four octaves (0.25 to 4), and one comfortable two-finger swipe on a Mac
+ * trackpad delivers roughly 300-500 px of deltaY, so 220 px/octave puts "most of the range"
+ * inside one decisive swipe and one rung inside a small one. Retune here, nowhere else.
+ */
+export const WHEEL_PX_PER_OCTAVE = 220
+
+/**
+ * A PINCH IS NOT A SCROLL, and the landed handler could not tell them apart.
+ *
+ * On macOS and Windows, Chrome delivers a trackpad pinch as a `wheel` event with `ctrlKey`
+ * set, `deltaMode` 0, and per-event deltas of one to three pixels at gesture rate. Against
+ * `WHEEL_MIN_DELTA = 8` every one of those was a graze, and against `WHEEL_STEP_DELTA = 120`
+ * a whole comfortable pinch was under the bar: measured, 40 px of pinch moved the camera NOT
+ * AT ALL. A pinch spends far less delta than a scroll for the same intent, so it gets its own
+ * gain. (The ctrlKey contract is the platform's; the magnitudes here are the same calibration
+ * the constant above is, and carry the same caveat.)
+ */
+export const PINCH_PX_PER_OCTAVE = 90
+
+/** No wheel event for this long and the hand has left: the camera settles onto a stop. */
+export const WHEEL_GESTURE_GAP_MS = 140
+
+/**
+ * A gesture that moved the scale less than this was a GRAZE and the camera returns to the stop
+ * it started from. Above it the gesture COMMITS: it lands at least one rung away in the
+ * direction it was going, even when the nearest stop is the one it left.
+ *
+ * That second half is what keeps the landed guarantee the browser bought — "ONE NOTCH IS ONE
+ * STEP, whatever that mouse calls a notch". A 53 px notch is 0.24 of an octave, which snaps
+ * back to where it started on nearest-stop alone; a mouse whose notch does nothing is the
+ * defect the landed code already fixed once, and it is not being reintroduced.
+ */
+export const ZOOM_COMMIT_OCTAVES = 1 / 8
+
+/**
+ * ★ THE LIVE SCALE IS QUANTISED, AND THIS IS WHAT KEEPS THE GROUND SEAMS SHUT.
+ *
+ * The render-at-scale lane proved 0 px of seam error at all six stops, and the first of its
+ * three mechanisms is that a chunk is a WHOLE NUMBER OF SCREEN PIXELS at every rest stop, so
+ * the renderer's global `roundPixels` rounds two neighbours by the same fraction and they stay
+ * exactly a chunk apart. At a fractional scale that does not hold, which is why the second
+ * mechanism — one pixel of bleed — exists to cover the ~200 ms an eased transit spends there.
+ *
+ * A GESTURE IS NOT 200 MS, so this lane may not lean on the bleed. It restores the first
+ * mechanism instead: the live scale is snapped to a multiple of 1/512, which makes a chunk of
+ * 1024 x 512 world px an exact whole number of screen pixels again at EVERY scale the gesture
+ * passes through. `camera.test.ts` reads `CHUNK_PX_W`/`CHUNK_PX_H` off `groundChunks.ts` and
+ * asserts this quantum divides both, so a chunk that changes shape turns the law red rather
+ * than opening a hairline nobody is looking for.
+ *
+ * The cost to the hand is nothing: 1/512 is 0.2 % of scale at 1x, far under the eye and far
+ * under the finest movement a trackpad reports. Every rest stop is already a multiple of it.
+ */
+export const ZOOM_LIVE_QUANTUM = 1 / 512
+
+export const ZOOM_SCALE_MIN: number = ZOOM_STOPS[0]
+export const ZOOM_SCALE_MAX: number = ZOOM_STOPS[ZOOM_STOPS.length - 1]!
 
 export type ZoomState = {
-  /** where it is going, and where it will be at rest */
+  /** where it comes to rest — always a member of ZOOM_STOPS, and what the chrome reads */
   stop: ZoomStop
-  /** the scale it left */
+  /** the scale the current settle left from */
   from: number
   startedMs: number
-  /** wheel delta since the gesture began */
-  accum: number
+  /**
+   * The scale a hand is holding it at RIGHT NOW, or null when no gesture is in flight. While
+   * this is set it outranks the eased transit entirely: the camera is not going anywhere, it
+   * is where the hand put it.
+   */
+  live: number | null
+  /** the scale the gesture in flight started from, so a graze knows where to go back to */
+  gestureFrom: number
   lastWheelMs: number
-  lastStepMs: number
 }
 
 export function initialZoom(stop: ZoomStop = 1): ZoomState {
-  return { stop, from: stop, startedMs: 0, accum: 0, lastWheelMs: -Infinity, lastStepMs: -Infinity }
+  return { stop, from: stop, startedMs: 0, live: null, gestureFrom: stop, lastWheelMs: -Infinity }
 }
 
 export const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3)
 
-/** The scale to apply this frame. EXACTLY `stop` at and after `startedMs + ZOOM_SETTLE_MS` —
- *  the pixel law holds at rest, and only at rest. */
+/** The scale to apply this frame. A hand on the camera wins; otherwise the eased transit,
+ *  which is EXACTLY `stop` at and after `startedMs + ZOOM_SETTLE_MS` — the pixel law holds at
+ *  rest, and only at rest. */
 export function zoomScaleAt(s: ZoomState, nowMs: number): number {
+  if (s.live !== null) return s.live
   const t = (nowMs - s.startedMs) / ZOOM_SETTLE_MS
   if (t >= 1) return s.stop
   if (t <= 0) return s.from
   return s.from + (s.stop - s.from) * easeOutCubic(t)
 }
 
+/** At rest on an exact stop. A gesture in flight is never settled, however long it is held. */
 export function zoomSettled(s: ZoomState, nowMs: number): boolean {
-  return nowMs - s.startedMs >= ZOOM_SETTLE_MS
+  return s.live === null && nowMs - s.startedMs >= ZOOM_SETTLE_MS
 }
 
 /** A move to a named stop, leaving from wherever the camera is at this instant — so a stop
- *  chosen mid-transit continues rather than jumps. */
+ *  chosen mid-transit, or mid-gesture, continues rather than jumps. */
 export function zoomTo(prev: ZoomState, stop: ZoomStop, nowMs: number): ZoomState {
+  const at = zoomScaleAt(prev, nowMs)
   return {
-    stop, from: zoomScaleAt(prev, nowMs), startedMs: nowMs,
-    accum: 0, lastWheelMs: prev.lastWheelMs, lastStepMs: nowMs,
+    stop, from: at, startedMs: nowMs,
+    live: null, gestureFrom: at, lastWheelMs: prev.lastWheelMs,
   }
 }
 
-export function zoomWheel(prev: ZoomState, deltaY: number, nowMs: number): ZoomState {
+const clampScale = (v: number): number => Math.min(ZOOM_SCALE_MAX, Math.max(ZOOM_SCALE_MIN, v))
+
+/** Snap to the grid that keeps a ground chunk a whole number of screen pixels, then clamp. */
+export function quantiseScale(v: number): number {
+  return clampScale(Math.round(v / ZOOM_LIVE_QUANTUM) * ZOOM_LIVE_QUANTUM)
+}
+
+/**
+ * One wheel event, applied CONTINUOUSLY. `pinch` is `e.ctrlKey` — the platform's own flag for
+ * a trackpad pinch, which spends a different amount of delta for the same intent.
+ *
+ * Scale moves in LOG space, so the same push zooms by the same FACTOR wherever you are: from
+ * 0.25 and from 2 a swipe feels identical, which it does not when a step is a rung of a ladder
+ * whose rungs are 2x apart at the bottom and 1.33x apart at the top.
+ */
+export function zoomWheel(
+  prev: ZoomState, deltaY: number, nowMs: number, pinch = false,
+): ZoomState {
   if (deltaY === 0) return prev
-  // a new gesture starts with a clean accumulator, so a flick cannot inherit the last one
-  const fresh = nowMs - prev.lastWheelMs > WHEEL_GESTURE_GAP_MS
-  const accum = (fresh ? 0 : prev.accum) + deltaY
-  const cooling = nowMs - prev.lastStepMs < ZOOM_STEP_COOLDOWN_MS
-  const wants = (fresh && Math.abs(deltaY) >= WHEEL_MIN_DELTA) || Math.abs(accum) >= WHEEL_STEP_DELTA
-  if (cooling || !wants) {
-    return { ...prev, accum, lastWheelMs: nowMs }
-  }
-  const dir = accum < 0 ? 1 : -1                        // wheel up zooms in
-  const i = ZOOM_STOPS.indexOf(prev.stop)
-  const next = ZOOM_STOPS[Math.min(ZOOM_STOPS.length - 1, Math.max(0, i + dir))]!
-  if (next === prev.stop) return { ...prev, accum: 0, lastWheelMs: nowMs }
+  const fresh = prev.live === null || nowMs - prev.lastWheelMs > WHEEL_GESTURE_GAP_MS
+  const base = fresh ? zoomScaleAt(prev, nowMs) : prev.live!
+  const gestureFrom = fresh ? base : prev.gestureFrom
+  const perOctave = pinch ? PINCH_PX_PER_OCTAVE : WHEEL_PX_PER_OCTAVE
+  const octaves = -deltaY / perOctave              // wheel up (negative deltaY) zooms in
   return {
-    stop: next, from: zoomScaleAt(prev, nowMs), startedMs: nowMs,
-    accum: 0, lastWheelMs: nowMs, lastStepMs: nowMs,
+    ...prev,
+    live: quantiseScale(base * Math.pow(2, octaves)),
+    gestureFrom,
+    lastWheelMs: nowMs,
   }
 }
 
-/** The nearest named stop to an arbitrary scale — the bridge from a landed integer zoom. */
+/** The hand has been off the camera for longer than a gesture's own gap. */
+export function zoomGestureEnded(s: ZoomState, nowMs: number): boolean {
+  return s.live !== null && nowMs - s.lastWheelMs > WHEEL_GESTURE_GAP_MS
+}
+
+/**
+ * ★ THE HAND LETS GO, AND THE FRAME BECOMES EXACT AGAIN.
+ *
+ * `instant` is what `prefers-reduced-motion: reduce` gets: the camera arrives at the stop
+ * rather than easing to it. The tracking during the gesture is NOT removed for that viewer —
+ * it is their own hand, the same ground the fling exemption stands on — only the 180 ms of
+ * motion they did not ask for.
+ */
+export function zoomRelease(prev: ZoomState, nowMs: number, instant = false): ZoomState {
+  if (prev.live === null) return prev
+  const at = prev.live
+  const nearest = nearestStop(at)
+  const moved = Math.abs(Math.log2(at / prev.gestureFrom))
+  let stop = nearest
+  if (moved >= ZOOM_COMMIT_OCTAVES && nearest === nearestStop(prev.gestureFrom)) {
+    // a deliberate push that nearest-stop alone would throw away: commit one rung its way
+    stop = stepStop(nearest, at > prev.gestureFrom ? 1 : -1)
+  }
+  return {
+    stop, from: at, startedMs: instant ? nowMs - ZOOM_SETTLE_MS : nowMs,
+    live: null, gestureFrom: stop, lastWheelMs: prev.lastWheelMs,
+  }
+}
+
+/**
+ * The nearest named stop to an arbitrary scale, measured in LOG space — the bridge from a
+ * landed integer zoom and the landing point of every gesture.
+ *
+ * Log, not linear, because the rungs are ratios: linearly, 1.9 is "nearer" to 2 than 1.4 is to
+ * 1, but the halfway point between 1 and 2 that the eye agrees with is sqrt(2) = 1.414, not
+ * 1.5. A linear snap biases every release downward on the wide rungs and upward on the narrow
+ * ones, which reads as the camera arguing with the hand.
+ */
 export function nearestStop(scale: number): ZoomStop {
+  const l = Math.log2(Math.max(1e-9, scale))
   let best: ZoomStop = ZOOM_STOPS[0]
-  for (const z of ZOOM_STOPS) if (Math.abs(z - scale) < Math.abs(best - scale)) best = z
+  for (const z of ZOOM_STOPS) {
+    if (Math.abs(Math.log2(z) - l) < Math.abs(Math.log2(best) - l)) best = z
+  }
   return best
 }
 
