@@ -5,6 +5,9 @@ import type { SimEvent } from './events.js'
 // it decides what surfaces in a curated feed, and nothing else reads it.
 export const CHRONICLE_WEIGHTS: Record<string, number> = {
   agent_died: 20,
+  // §3: under a death and over a birth. A person dying is the peak of a life simulation; what
+  // that life can now DO is second, and it is the only entry here that is permanent.
+  discovery_made: 19,
   agent_born: 18,
   world_grown: 15,
   grave_placed: 12,
@@ -27,6 +30,7 @@ export const CHRONICLE_WEIGHTS: Record<string, number> = {
 
 export const CHRONICLE_ICONS: Record<string, string> = {
   agent_died: 'cross',
+  discovery_made: 'key',
   agent_born: 'spark',
   world_grown: 'star',
   grave_placed: 'cross',
@@ -208,6 +212,18 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
       const witness = p.sense === 'sound' ? 'was heard' : 'was seen'
       const forWhom = typeof p.targetId === 'string' ? ` for ${look.agentName(p.targetId)}` : ''
       return verb === '' ? null : `${who} ${witness} to ${verb}${forWhom}.`
+    }
+    // Who and what, never the words they used: the intent is free text a mind wrote and this
+    // sentence is one a mind can read. The archive keeps the quote (gateway `/api/discoveries`),
+    // and no agent can reach the archive.
+    case 'discovery_made': {
+      const name = str(p.name)
+      const kind = str(p.kind)
+      if (name === '' || (kind !== 'craft' && kind !== 'word')) return null
+      const who = look.agentName(str(p.byId))
+      return kind === 'word'
+        ? `${who} gave the town a word for it — ${name}.`
+        : `${who} found the way of it — ${name}.`
     }
     case 'agent_born':
       return `${str(p.name)} was born.`

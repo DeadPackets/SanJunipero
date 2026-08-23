@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHRONICLE_ICONS, MILESTONE_ICON, type SimEvent } from '@sj/shared'
+import { CHRONICLE_FALLBACK_ICON, CHRONICLE_ICONS, MILESTONE_ICON, chronicleIcon, type SimEvent } from '@sj/shared'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import {
@@ -98,5 +98,30 @@ describe('the chronicle glyphs', () => {
   it('names each glyph for a reader who cannot see it', () => {
     expect(chronicleGlyph('cross').label).toMatch(/death|died/i)
     expect(chronicleGlyph('flame').label).toMatch(/fire/i)
+  })
+})
+
+describe('the discovery glyph', () => {
+  it('exists under the icon the chronicle names, and is not the fallback', () => {
+    expect(chronicleGlyph('key').pixels).not.toEqual(chronicleGlyph(CHRONICLE_FALLBACK_ICON).pixels)
+    expect(chronicleGlyph(chronicleIcon('discovery_made')).pixels)
+      .toEqual(chronicleGlyph('key').pixels)
+  })
+
+  it('is 8×8 and paints only the palette', () => {
+    for (const [x, y, fill] of chronicleGlyph('key').pixels) {
+      expect(x).toBeGreaterThanOrEqual(0); expect(x).toBeLessThan(8)
+      expect(y).toBeGreaterThanOrEqual(0); expect(y).toBeLessThan(8)
+      expect(GLYPH_PALETTE).toContain(fill)
+    }
+  })
+
+  it('is a shape no other chronicle glyph draws', () => {
+    const all = Object.entries(CHRONICLE_GLYPH).map(([, g]) => JSON.stringify(g.pixels))
+    expect(new Set(all).size).toBe(all.length)
+  })
+
+  it('says what it is, for a reader who cannot see it', () => {
+    expect(chronicleGlyph('key').label).toBe('a discovery')
   })
 })

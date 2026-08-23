@@ -80,3 +80,22 @@ describe('isNarratable — the predicate the recent-event ring is filtered by (M
     }
   })
 })
+
+describe('a discovery in the live feed', () => {
+  const ev: SimEvent = {
+    seq: 9, tick: 40, type: 'discovery_made',
+    payload: {
+      recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
+      byId: 'a1', intent: 'i want to carry water in a stitched hide', makes: ['waterskin'],
+    },
+  }
+
+  it('reads as the same sentence the chronicle prints — one formatter, not two', () => {
+    const state = { agents: { a1: { name: 'Maret' } }, structures: {} } as never
+    expect(describeEvent(ev, state)).toBe('Maret found the way of it — stitch a waterskin.')
+  })
+
+  it('never leaks the mind’s own words into the ticker', () => {
+    expect(describeEvent(ev, null)).not.toContain('i want to')
+  })
+})
