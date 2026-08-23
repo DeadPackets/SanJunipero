@@ -83,6 +83,9 @@ export function App() {
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStorage))
   // what the bottom bar reads: the camera's own stop, and whether the chrome is put away
   const [zoomStop, setZoomStop] = useState<ZoomStop>(1)
+  // The town grows without bound and the stop ladder does not, so eventually the overview
+  // cannot hold the whole of it. The bar reads this and names what it will actually do.
+  const [townFits, setTownFits] = useState(true)
   // WHERE THE CHROME SITS. Slot-based, persisted per viewer, and never able to hide its own
   // way back — HudDock is not itself a Dockable.
   const [hud, setHud] = useState(() => {
@@ -245,8 +248,12 @@ export function App() {
   // the bar mirrors the camera's rest stop; the camera owns the truth, this follows it
   useEffect(() => {
     if (scene === null) return
-    setZoomStop(scene.getZoomStop())
-    return scene.onCamera(() => setZoomStop(scene.getZoomStop()))
+    const read = (): void => {
+      setZoomStop(scene.getZoomStop())
+      setTownFits(scene.fitsWholeTown())
+    }
+    read()
+    return scene.onCamera(read)
   }, [scene])
 
   // ONE place where a control becomes a thing that happens. The bar has no logic of its own.
@@ -346,6 +353,7 @@ export function App() {
             <ControlBar
               items={controlItems({
                 lens: route.lens, live, zoom: zoomStop, following: null, insideId, hudHidden,
+                townFits,
               })}
               onAction={onControl}
             />

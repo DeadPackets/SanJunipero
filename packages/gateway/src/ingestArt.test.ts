@@ -2,10 +2,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { AssetCodex, CELL_NAMES_V4, encodePng, openForgeDb, type RawImage } from '@sj/forge'
 import {
-  ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, parseBuildingManifest, parseCharacterAtlasManifest,
-  roadAutotileKind,
+  AssetCodex, CELL_NAMES_V4, encodePng, listCommittedBuildings, openForgeDb, type RawImage,
+} from '@sj/forge'
+import {
+  DWELLING_FOOTPRINTS, ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, parseBuildingManifest,
+  parseCharacterAtlasManifest, roadAutotileKind,
 } from '@sj/shared'
 import { INTERIOR_KINDS, cityStructures, parseLibraryItemManifest, resolveFurnishingKind } from '@sj/shared'
 import { LIBRARY } from '@sj/forge'
@@ -20,15 +22,6 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }))
 function cell(w: number, h: number, r: number): RawImage {
   const data = new Uint8ClampedArray(w * h * 4)
   for (let i = 0; i < w * h; i++) data.set([r, 80, 60, 255], i * 4)
-  return { width: w, height: h, data }
-}
-
-// magenta-background "cottage" for the style-anchor chain
-function magentaCottage(): RawImage {
-  const w = 40, h = 40
-  const data = new Uint8ClampedArray(w * h * 4)
-  for (let i = 0; i < w * h; i++) data.set([255, 0, 255, 255], i * 4)
-  for (let y = 10; y < 34; y++) for (let x = 8; x < 32; x++) data.set([200, 150, 90, 255], (y * w + x) * 4)
   return { width: w, height: h, data }
 }
 
@@ -57,20 +50,21 @@ async function buildArtRoot(root: string, mark: number): Promise<void> {
 }
 
 describe('ingestProductionArt', () => {
-  it('registers 5 founder atlases + 5 buildings + the anchor cottage, idempotently', async () => {
+  it('registers the committed cells + 5 founder atlases + 5 scratchpad buildings, idempotently', async () => {
     const root = join(dir, 'art')
     await buildArtRoot(root, 100)
-    const anchor = join(dir, 'style-anchor.png')
-    writeFileSync(anchor, await encodePng(magentaCottage()))
     const db = openForgeDb(join(dir, 'codex.db'))
     const codex = new AssetCodex(db)
 
-    const first = await ingestProductionArt(db, { artRoot: root, styleAnchorPath: anchor })
-    expect(first).toHaveLength(11)
+    const committed = listCommittedBuildings().length
+    const first = await ingestProductionArt(db, { artRoot: root })
+    expect(first).toHaveLength(committed + FOUNDER_ART.length + BUILDING_ART_DIRS.length)
     expect(first.every((e) => e.action === 'registered')).toBe(true)
     expect(first.map((e) => e.kind)).toContain('character:omar')
     expect(first.map((e) => e.kind)).toContain('standing_stone')
-    expect(first.map((e) => e.kind)).toContain('hut')
+    // ★ `house`, not `hut`. This line asserted `hut` for a whole merge train after the template
+    // renamed the kind, which is how a test can codify the very seam it was meant to hold.
+    expect(first.map((e) => e.kind)).toContain('house')
 
     // character record carries a parseable v4 atlas manifest with all 24 cells
     const omar = codex.listSince(0).find((r) => r.kind === 'character:omar')!
@@ -83,27 +77,62 @@ describe('ingestProductionArt', () => {
     const shed = codex.listSince(0).find((r) => r.kind === 'shed')!
     expect(parseBuildingManifest(shed.meta)?.cell.feetY).toBe(23)
 
-    // cottage: keyed, trimmed, ground-anchored, kind = the buildable 'hut'
-    const hut = codex.listSince(0).find((r) => r.kind === 'hut')!
-    const hutManifest = parseBuildingManifest(hut.meta)!
-    expect(hutManifest.footprint).toEqual({ w: 2, h: 2 })
-    expect(hutManifest.cell.feetY).toBeLessThan(hutManifest.cell.h)
+    // the founders' home: an authored, committed cell, at the footprint the template gives it
+    const home = codex.listSince(0).find((r) => r.kind === 'house')!
+    const homeManifest = parseBuildingManifest(home.meta)!
+    expect(homeManifest.footprint).toEqual(DWELLING_FOOTPRINTS.house)
+    expect(homeManifest.cell.feetY).toBeLessThan(homeManifest.cell.h)
+    expect(codex.listSince(0).some((r) => r.kind === 'hut'), 'nothing places `hut`').toBe(false)
+    // and its turned twin, which nothing places yet and everything is ready for
+    expect(codex.listSince(0).some((r) => r.kind === 'house:se')).toBe(true)
 
     // second run: nothing new
-    const second = await ingestProductionArt(db, { artRoot: root, styleAnchorPath: anchor })
+    const second = await ingestProductionArt(db, { artRoot: root })
     expect(second.every((e) => e.action === 'unchanged')).toBe(true)
-    expect(codex.listSince(0)).toHaveLength(11)
+    expect(codex.listSince(0)).toHaveLength(first.length)
 
     // regen (changed bytes) → a NEW record that wins by seq
     await buildArtRoot(root, 200)
-    const third = await ingestProductionArt(db, { artRoot: root, styleAnchorPath: anchor })
-    expect(third.filter((e) => e.action === 'registered')).toHaveLength(10) // all but the untouched cottage
+    const third = await ingestProductionArt(db, { artRoot: root })
+    // only the scratchpad art changed bytes; the committed cells are untouched
+    expect(third.filter((e) => e.action === 'registered'))
+      .toHaveLength(FOUNDER_ART.length + BUILDING_ART_DIRS.length)
     const omars = codex.listSince(0).filter((r) => r.kind === 'character:omar')
     expect(omars).toHaveLength(2)
     expect(omars.at(-1)!.seq).toBeGreaterThan(omars[0]!.seq)
 
     db.close()
   }, 30_000)
+
+  // ★ THE REASON THE TOWN HAD NO ART AT ALL. The art root is a session scratchpad; on the
+  // round-4 tip it held the whole directory tree and zero files. One ENOENT on the first
+  // founder aborted the loop, so the four founders behind it, all five buildings and the
+  // anchor home never registered either.
+  it('steps over art the scratchpad no longer holds instead of losing the rest', async () => {
+    const root = join(dir, 'art-gapped')
+    await buildArtRoot(root, 100)
+    rmSync(join(root, FOUNDER_ART[0]!.dir, 'manifest.json'), { force: true })
+    const db = openForgeDb(join(dir, 'gapped.db'))
+
+    const entries = await ingestProductionArt(db, { artRoot: root })
+    const missing = entries.filter((e) => e.action === 'missing')
+    expect(missing.map((e) => e.kind)).toEqual([`character:${FOUNDER_ART[0]!.id}`])
+    expect(missing[0]!.detail).toMatch(/ENOENT/)
+    // everything downstream of the gap still landed — including the home the gap used to eat
+    const kinds = new Set(new AssetCodex(db).listSince(0).map((r) => r.kind))
+    expect(kinds).toContain('house')
+    expect(kinds).toContain('standing_stone')
+    expect(kinds).toContain(`character:${FOUNDER_ART[4]!.id}`)
+    db.close()
+  }, 30_000)
+
+  it('gives each kind exactly one root, so two roots never fight over it', () => {
+    const committed = new Set(listCommittedBuildings().map((c) => c.codexKind))
+    const scratch = BUILDING_ART_DIRS.map((d) =>
+      d.replace('production/building-', '').replace('standing-stone', 'standing_stone'))
+    expect(scratch.filter((k) => committed.has(k)),
+      'a kind in both roots re-registers on every boot, forever').toEqual([])
+  })
 })
 
 describe('ingestTerrainArt', () => {

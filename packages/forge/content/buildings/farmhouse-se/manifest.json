@@ -1,0 +1,14 @@
+{
+  "version": "v4-hires-building",
+  "kind": "farmhouse:se",
+  "footprint": {
+    "w": 4,
+    "h": 2
+  },
+  "cell": {
+    "w": 768,
+    "h": 768,
+    "feetX": 384,
+    "feetY": 767
+  }
+}

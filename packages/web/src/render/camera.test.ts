@@ -5,7 +5,7 @@ import { TILE_H, TILE_W } from './iso.js'
 import {
   FIT_MARGIN_PX, STAGE_FILL_MIN,
   WHEEL_GESTURE_GAP_MS, WHEEL_MIN_DELTA, WHEEL_STEP_DELTA, ZOOM_SETTLE_MS, ZOOM_STEP_COOLDOWN_MS,
-  ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, easeOutCubic, fitStop, initialZoom,
+  ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, easeOutCubic, fitStop, fitsAt, initialZoom,
   drawnBoundsOf, resizeIntent, stageFill, structureBoundsOf, zoomScaleAt, zoomSettled, zoomTo,
   zoomWheel, type ZoomStop,
 } from './camera.js'
@@ -154,10 +154,11 @@ describe('the transit — damped, and exact at rest', () => {
 })
 
 describe('the stop set is never left', () => {
-  it('holds at 0.5 however far out you scroll, and at 4 however far in', () => {
-    let out = initialZoom(0.5)
+  it('holds at the floor however far out you scroll, and at 4 however far in', () => {
+    let out = initialZoom(ZOOM_STOPS[0])
     for (let i = 0; i < 50; i++) out = zoomWheel(out, WHEEL_STEP_DELTA, 1000 + i * 1000)
-    expect(out.stop).toBe(0.5)
+    expect(out.stop).toBe(ZOOM_STOPS[0])
+    expect(out.stop).toBe(0.25)
 
     let inn = initialZoom(4)
     for (let i = 0; i < 50; i++) inn = zoomWheel(inn, -WHEEL_STEP_DELTA, 1000 + i * 1000)
@@ -176,8 +177,10 @@ describe('the stop set is never left', () => {
     }
   })
 
-  it('0.5 is in the set, and it is the reciprocal of an integer so NEAREST samples exactly', () => {
-    expect(ZOOM_STOPS[0]).toBe(0.5)
+  it('the floor is a reciprocal of an integer, so NEAREST samples exactly', () => {
+    // 0.25 since the camera lane: 0.5 held two rings of the block grammar and the town keeps
+    // going. Both are exact reciprocals, so P18 is untouched by the move.
+    expect(ZOOM_STOPS[0]).toBe(0.25)
     expect(ZOOM_STOPS.at(-1)).toBe(4)
     for (const z of ZOOM_STOPS) expect(Number.isInteger(z) || Number.isInteger(1 / z)).toBe(true)
     // and the set is strictly increasing, so an index step is always a zoom step
@@ -313,9 +316,11 @@ describe('fitStop — a view of the whole thing, with a margin', () => {
     }
   })
 
-  it('the 48x48 world fits at 1x; a 128x128 world does not fit at all and takes the floor', () => {
+  it('the 48x48 world fits at 1x; a 128x128 world takes the wider stop the lane added', () => {
     expect(fitStop(cameraBoundsOf(terrainOf(48, 48)), STAGE)).toBe(1)
-    expect(fitStop(cameraBoundsOf(terrainOf(128, 128)), STAGE)).toBe(0.5)
+    expect(fitStop(cameraBoundsOf(terrainOf(128, 128)), STAGE)).toBe(0.25)
+    // 0.5 held a 128x128 world only by falling to a floor it did not fit at; 0.25 holds it
+    expect(fitsAt(cameraBoundsOf(terrainOf(128, 128)), STAGE, 0.25)).toBe(true)
   })
 
   it('never leaves the stop set, and never returns a stop that does not exist', () => {

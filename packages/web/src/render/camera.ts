@@ -15,7 +15,16 @@ import { TILE_H, TILE_W } from './iso.js'
 // no resampling — and because the audit measured the settlement occupying a small fraction of
 // the stage at the old `ZOOM_MIN = 1` (R8).
 
-export const ZOOM_STOPS = [0.5, 1, 2, 3, 4] as const
+// 0.25 JOINS THE LADDER, AND NOTHING BELOW IT DOES. Measured on the ring grammar, 0.5 holds
+// two rings of blocks and no more, and the town keeps going. 0.25 is 1/4 — four world px
+// become one screen px with no resampling, so P18 holds exactly as it does at 0.5 — and it
+// holds a four-ring town, 640 buildings, in one view.
+//
+// The ladder stops there because the INTERFACE fails before the picture does: the >=24 screen
+// px hit floor is a WORLD size of 24 / z, so at 0.125 a door's target is 192 world px, six
+// tiles wide, swallowing its neighbours. Past four rings the answer is not a wider view, it is
+// navigation, and `tooBigToFit` is how the control says so out loud.
+export const ZOOM_STOPS = [0.25, 0.5, 1, 2, 3, 4] as const
 export type ZoomStop = (typeof ZOOM_STOPS)[number]
 
 export const ZOOM_SETTLE_MS = 180
@@ -180,6 +189,36 @@ export function drawnBoundsOf(
   return { minX, maxX, minY, maxY }
 }
 
+/**
+ * ★ THE BOX THE CAMERA MAY TRAVEL OVER, ON A TOWN WITH NO FIXED SIZE.
+ *
+ * `cameraBoundsOf` measures the TILE ARRAY, and every write to the camera goes through a clamp
+ * against it. That was right while the town was a 48 × 48 fixture. Under the ring grammar the
+ * built area is sparse and unbounded — blocks plat outward and agents claim plots forever — so
+ * a building can stand past the end of the array, and a clamp that knows only the array does
+ * not make that building hard to reach, it makes it UNREACHABLE.
+ *
+ * So the reachable box is the ground that EXISTS union the town as it is DRAWN, and only the
+ * first half has a size anybody wrote down. Drawn, not footprint: the clamp has to admit the
+ * roof, or the outermost building is cut in half at the limit of travel.
+ */
+export const REACH_MARGIN_PX = 96
+
+export function reachableBoundsOf(
+  terrain: readonly (readonly unknown[])[],
+  structures: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
+): CameraBounds {
+  const t = cameraBoundsOf(terrain)
+  if (structures.length === 0) return t
+  const d = drawnBoundsOf(structures)
+  return {
+    minX: Math.min(t.minX, d.minX - REACH_MARGIN_PX),
+    maxX: Math.max(t.maxX, d.maxX + REACH_MARGIN_PX),
+    minY: Math.min(t.minY, d.minY - REACH_MARGIN_PX),
+    maxY: Math.max(t.maxY, d.maxY + REACH_MARGIN_PX),
+  }
+}
+
 export function boundsCentre(b: CameraBounds): { sx: number; sy: number } {
   return { sx: (b.minX + b.maxX) / 2, sy: (b.minY + b.maxY) / 2 }
 }
@@ -217,15 +256,31 @@ export function clampCamera(
  */
 export const FIT_MARGIN_PX = 24
 
+/** Does the whole of `bounds` sit inside the stage at this scale, margin kept? The one
+ *  predicate the fit and its refusal are both derived from, so they cannot disagree. */
+export function fitsAt(
+  bounds: CameraBounds, screen: { w: number; h: number }, scale: number,
+): boolean {
+  const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY
+  return w * scale <= Math.max(1, screen.w - 2 * FIT_MARGIN_PX)
+    && h * scale <= Math.max(1, screen.h - 2 * FIT_MARGIN_PX)
+}
+
 /** The largest stop at which `bounds` fits inside the stage with a margin — the overview
  *  control, and the first frame. Falls to the smallest stop when nothing fits. */
 export function fitStop(bounds: CameraBounds, screen: { w: number; h: number }): ZoomStop {
-  const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY
-  const availW = Math.max(1, screen.w - 2 * FIT_MARGIN_PX)
-  const availH = Math.max(1, screen.h - 2 * FIT_MARGIN_PX)
   let best: ZoomStop = ZOOM_STOPS[0]
-  for (const z of ZOOM_STOPS) if (w * z <= availW && h * z <= availH) best = z
+  for (const z of ZOOM_STOPS) if (fitsAt(bounds, screen, z)) best = z
   return best
+}
+
+/**
+ * The town has outgrown the widest stop: "The whole town" will show as much of it as the
+ * ladder can and the rest is off screen. A control that quietly does most of what it says is
+ * worse than one that says what it cannot do, so the bar reads this and tells the viewer.
+ */
+export function tooBigToFit(bounds: CameraBounds, screen: { w: number; h: number }): boolean {
+  return !fitsAt(bounds, screen, ZOOM_STOPS[0])
 }
 
 /**
