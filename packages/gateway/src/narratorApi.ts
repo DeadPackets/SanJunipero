@@ -3,10 +3,11 @@ import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import Database from 'better-sqlite3'
 import {
-  CHRONICLE_TYPES, MILESTONE_ICON, MILESTONE_TYPE, chronicleIcon, chronicleLine,
+  CHRONICLE_TYPES, MILESTONE_ICON, MILESTONE_TYPE, chronicleIcon, chronicleLine, discoveryHeadline,
   type ChronicleEntry, type ChronicleLookup, type Moment, type SimEvent,
 } from '@sj/shared'
 import { MYSTERY_BY_KIND } from '@sj/engine'
+import { readDiscoveries } from './discoveries.js'
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 
@@ -185,6 +186,10 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       moments: readOrEmpty<{ day: number; startTick: number }>(
         deps.narratorDb, 'SELECT day, start_tick AS startTick FROM scenes ORDER BY day, id'),
       changes: changeDays(),
+      // Its own source, not a sixth MARK_EVENT_TYPE: the events source carries only tick and
+      // type, and a discovery mark that cannot name its inventor is a mark not worth aiming at.
+      discoveries: readDiscoveries(deps.db, (id) => deps.mirror.state().agents[id]?.name ?? id)
+        .map((d) => ({ tick: d.tick, words: discoveryHeadline(d) })),
       events: selMarkEvents.all(...MARK_EVENT_TYPES) as Array<{ tick: number; type: string }>,
     })
   })

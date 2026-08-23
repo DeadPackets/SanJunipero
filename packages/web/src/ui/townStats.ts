@@ -29,6 +29,7 @@ export function lensHints(stats: TownStats, recentEvents: SimEvent[], counts: Le
     map: { count: null, hint: 'Walk the town' },
     inspector: { count: stats.alive, hint: `Townsfolk (${stats.alive})` },
     chronicle: { count: recentEvents.length, hint: `Chronicle (${recentEvents.length})` },
+    discoveries: { count: null, hint: 'What the townsfolk worked out for themselves' },
     society: { count: null, hint: 'Who the town has tied itself to' },
     director: { count: null, hint: 'The days the town kept' },
     laws: { count: null, hint: 'The rules the town lives under' },
@@ -49,6 +50,7 @@ export const EMPTY_COPY = {
   chronicleQuiet: 'Nothing has happened since you arrived. The whole record is under “What mattered”.',
   bonds: 'No bonds recorded yet — watch long enough and the town will braid its own ties.',
   moments: 'Nothing worth replaying yet — the first recorded day is still ahead.',
+  discoveries: 'The town has not worked anything out yet.',
 } as const
 
 // ------------------------------------------------------------------ weather glyphs

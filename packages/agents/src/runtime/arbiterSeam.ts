@@ -1,4 +1,5 @@
 import type { EngineBridge } from './bridge.js'
+import type { DiscoveryCredit } from '@sj/shared'
 
 // @sj/arbiter depends on @sj/agents, so this seam cannot import the arbiter's
 // own types back without a package cycle. These are the structural minimums
@@ -24,7 +25,12 @@ export type Verdict =
   | { kind: 'impossible'; reason: string; class: string }
 
 export type Adjudicator = (intent: string, ctx: AgentCtx) => Promise<Verdict>
-export type Codifier = (recipe: { id: string }) => { ruleId: number; verb: string }
+/** Who worked it out, and the words they used. The arbiter never knows who is asking at
+ *  codify time; the runtime always does, so the credit is threaded rather than guessed. */
+export type Codifier = (
+  recipe: { id: string },
+  credit: DiscoveryCredit,
+) => { ruleId: number; verb: string }
 
 // Both halves of the arbiter the runtime needs: rule on it, then make it law.
 export type SeamArbiter = { adjudicate: Adjudicator; codify: Codifier }

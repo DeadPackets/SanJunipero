@@ -7,6 +7,7 @@ import {
   AgentInjured, AgentMoved,
   AgentEntered, AgentExited,
   AgentExpressed,
+  DiscoveryMade,
   AgentRecovered, AgentSlept, AgentSpoke, AgentSpawned, AgentTended, AgentWoke,
   CoSlept, CropGrew, CropHarvested, CropPlanted, CropWithered,
   AgentDrank, FireExtinguished, FireIgnited, FireSpread, GravePlaced, HpChanged, ThirstChanged,
@@ -157,6 +158,13 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
     // means is the town's to decide, and the world state is not where that lives.
     case 'agent_expressed': {
       AgentExpressed.parse(event.payload)
+      return state
+    }
+    // The record, and only the record. A discovery changes what the town CAN do — which lives
+    // in the verb registry, not in the state — so the state this fold returns is the one it was
+    // given, by identity. That is also why no golden can move.
+    case 'discovery_made': {
+      DiscoveryMade.parse(event.payload)
       return state
     }
     case 'item_worn': {

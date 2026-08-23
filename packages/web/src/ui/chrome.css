@@ -1639,3 +1639,41 @@ body {
 /* A stream has no operator: navigation a viewer can neither press nor read leaves the frame
    rather than shrinking inside it, exactly as the control bar and the dock do. */
 [data-broadcast='on'] .minimap { display: none; }
+
+/* ── the Discovery Record: a chain of museum labels, one per thing the town worked out ──
+   PER-BAND COLOUR, and the reason is measured: no palette token clears AA on both a light
+   ground and a dark one. The dual-band set is EMPTY. So the leaf's light ground carries
+   --ink (10.20 on cream) and --ink-quiet (6.57 on cream, 5.83 on parchment), and the quote
+   block's dark ground carries --cream-quiet (8.28 on deep). Opacity is never the strategy. */
+.discovery-record { padding: 12px 14px; background: var(--parchment); }
+.discovery-summary { font-size: 14px; color: var(--ink); margin: 0 0 12px; }
+.discovery-chain {
+  /* WHAT THE BROWSER CAUGHT: --sand on --parchment is 1.19:1. The rule that is supposed to
+     make the panel read as one history was invisible, and it looked like three loose cards.
+     --ink-quiet is 5.83 on parchment: a line a viewer can actually follow down the page. */
+  list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--ink-quiet);
+}
+.discovery-leaf {
+  display: flex; gap: 12px; width: 100%; min-height: 64px; padding: 10px;
+  text-align: left; background: var(--cream); border: 1px solid var(--sand); border-radius: 3px;
+  margin: 0 0 10px; cursor: pointer;
+  transition: background var(--t-fast) var(--ease-tap), border-color var(--t-fast) var(--ease-tap);
+}
+.discovery-leaf:hover, .discovery-leaf:focus-visible {
+  background: var(--parchment); border-color: var(--ink-quiet);
+}
+.discovery-leaf[aria-current='true'] { border-color: var(--ember); }
+.discovery-leaf h3 { font-size: 14px; color: var(--ink); margin: 0 0 4px; }
+.discovery-leaf p { font-size: 12px; color: var(--ink-quiet); margin: 0 0 4px; }
+.discovery-body { min-width: 0; }
+.discovery-credit { color: var(--ink); }
+.discovery-quote {
+  font-size: 12px; color: var(--cream-quiet); background: var(--deep);
+  padding: 6px 8px; border-radius: 2px; margin: 6px 0;
+}
+.discovery-makes { color: var(--ink-quiet); }
+.discovery-art {
+  width: 48px; height: 48px; image-rendering: pixelated; flex: 0 0 48px;
+}
+.discovery-art-none { background: var(--sand); border: 1px dashed var(--ink-quiet); }
+@media (prefers-reduced-motion: reduce) { .discovery-leaf { transition: none; } }

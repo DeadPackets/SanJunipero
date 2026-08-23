@@ -16,7 +16,7 @@ import {
   type TickHandler,
   type TileId,
 } from '@sj/engine'
-import { SimConfigSchema, stateHash, type SimConfig } from '@sj/shared'
+import { SimConfigSchema, stateHash, type DiscoveryCredit, type SimConfig } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
 import { AgentRuntime, CRAFT_HINT, refusalMemoryText } from './agentRuntime.js'
 import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
@@ -972,6 +972,37 @@ describe('arbiter wiring expansion (T20)', () => {
     expect(codified).toEqual([RECIPE_VERB])
     expect(startedVerbs(world.engineDb)).toContain(RECIPE_VERB)
     expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+  })
+
+  it('names the asking mind and its own words where the recipe becomes law (F-A)', async () => {
+    const calls: Array<{ recipeId: string; credit: DiscoveryCredit | undefined }> = []
+    const INTENT = 'weave reeds into a mat'
+    let asked = ''
+    const arbiter: SeamArbiter = {
+      adjudicate: async (intent) => {
+        asked = intent
+        return { kind: 'attempt', recipe: { id: RECIPE_VERB }, summary: 'Weave reeds into a mat.' }
+      },
+      codify: (recipe, credit) => {
+        calls.push({ recipeId: recipe.id, credit })
+        registerVerb({
+          kind: RECIPE_VERB, validate: () => null, duration: () => 1,
+          onComplete: () => [], interruptible: true,
+        })
+        return { ruleId: 1, verb: recipe.id }
+      },
+    }
+    const { loop, runtime, world } = await setup({
+      model: turnModel([{ thought: 'A mat.', action: { freeform: INTENT }, importance: 5 }]),
+      mindConfig: FAST_MIND,
+    })
+    wireArbiter(runtime, arbiter)
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes(RECIPE_VERB), 100)
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]!.credit).toEqual({ agentId: AGENT, intent: INTENT })
+    // The SAME words the arbiter was asked, never a paraphrase.
+    expect(calls[0]!.credit!.intent).toBe(asked)
   })
 
   it('falls back to the world when an attempt arrives with no way to codify it', async () => {

@@ -46,6 +46,7 @@ import { G9ReportSchema, checkG9Report, median, type G9Report } from '../src/liv
 import {
   HEARTH, HUTS, STOREHOUSE, hutDoor, makeTerrain, townGenesisEvents, type Box,
 } from '../src/live/g9world.js'
+import type { DiscoveryCredit } from '@sj/shared'
 
 const CAP_USD = 8.0
 const WARN_USD = 5.0
@@ -366,8 +367,8 @@ async function main(): Promise<void> {
       if (verdict.kind === 'attempt' && firstCodifiedIntent === null) firstCodifiedIntent = intent
       return verdict
     },
-    codify: (recipe: { id: string }) => {
-      const out = arbiter.codify(recipe as Recipe)
+    codify: (recipe: { id: string }, credit: DiscoveryCredit) => {
+      const out = arbiter.codify(recipe as Recipe, credit)
       codified.push(out.verb)
       return out
     },

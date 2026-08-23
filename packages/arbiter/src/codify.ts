@@ -1,12 +1,13 @@
 import { crafterStamp, RECIPE_TILE_IDS, registerVerb, shortOf, skillLevel, VERBS } from '@sj/engine'
 import type { PendingEvent, Structure, VerbDef, WorldState } from '@sj/engine'
-import type { SimConfig } from '@sj/shared'
+import type { DiscoveryCredit, SimConfig } from '@sj/shared'
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
 import type { RulebookStore } from './rulebook.js'
 import { recipeSanityRefusal } from './sanity.js'
 import { rollOutcomeTable, skillFactor } from './verdict.js'
 import type { OutcomeEffect, Recipe } from './verdict.js'
+import type { Codified } from './adjudicate.js'
 
 function heldStacks(state: WorldState, agentId: string, kind: string) {
   return Object.keys(state.items).sort()
@@ -165,9 +166,23 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
   }
 }
 
+// What a recipe unlocked, as item kinds. Sorted and deduped so the same recipe always yields
+// the same array — the forge keys off it and a byte-unstable list would re-commission art.
+export function productsOf(recipe: Recipe): string[] {
+  const kinds = new Set<string>()
+  for (const row of recipe.outcomeTable) {
+    for (const e of row.effects) if (e.op === 'spawn_item') kinds.add(e.kind)
+  }
+  return [...kinds].sort()
+}
+
 export function codify(
   recipe: Recipe,
-  deps: { rulebook: RulebookStore; review: ReviewStore; codex: CodexStore; tick: number },
+  credit: DiscoveryCredit,
+  deps: {
+    rulebook: RulebookStore; review: ReviewStore; codex: CodexStore; tick: number
+    onCodified?: (d: Codified) => void
+  },
 ): { ruleId: number; verb: string } {
   // Belt and suspenders: even a caller who bypasses adjudicate must not be
   // able to codify a recipe the codex has not earned.
@@ -193,5 +208,10 @@ export function codify(
   const ruleId = deps.rulebook.insert(recipe, deps.tick)
   registerVerb(verbFromRecipe(recipe))
   deps.review.queue(ruleId, recipe.id, deps.tick)
+  // First insert only. A reactivation above is an operator re-opening a reverted rule, and the
+  // admin is not its inventor — the original event is already in the log and stays there.
+  deps.onCodified?.({
+    recipeId: recipe.id, name: recipe.name, kind: 'craft', makes: productsOf(recipe), credit,
+  })
   return { ruleId, verb: recipe.id }
 }

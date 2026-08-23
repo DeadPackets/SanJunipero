@@ -6,9 +6,11 @@ import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
 import { ReviewStore } from './review.js'
 import type { Recipe } from './verdict.js'
-import { codify, emitOutcomeEffects, isExpertRecipe, verbFromRecipe } from './codify.js'
+import { codify, emitOutcomeEffects, isExpertRecipe, productsOf, verbFromRecipe } from './codify.js'
+import type { Codified } from './adjudicate.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
+const CREDIT_FIXTURE = { agentId: 'a1', intent: 'i try to boil the river water down' }
 
 const boilSaltRecipe: Recipe = {
   id: 'recipe:boil_salt',
@@ -264,8 +266,8 @@ describe('codify', () => {
       codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
       const recipe = { ...boilSaltRecipe, id: 'recipe:salt_idem', name: 'Salt Idem', rngStream: 'recipe:salt_idem' }
 
-      const first = codify(recipe, { rulebook, review, codex, tick: 200 })
-      const second = codify(recipe, { rulebook, review, codex, tick: 300 })
+      const first = codify(recipe, CREDIT_FIXTURE, { rulebook, review, codex, tick: 200 })
+      const second = codify(recipe, CREDIT_FIXTURE, { rulebook, review, codex, tick: 300 })
 
       expect(second).toEqual(first)
       const rows = db.prepare('SELECT COUNT(*) AS n FROM rulebook WHERE recipe_id = ?').get('recipe:salt_idem') as { n: number }
@@ -281,11 +283,11 @@ describe('codify', () => {
       codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
       const recipe = { ...boilSaltRecipe, id: 'recipe:salt_revive', name: 'Salt Revive', rngStream: 'recipe:salt_revive' }
 
-      const { ruleId } = codify(recipe, { rulebook, review, codex, tick: 200 })
+      const { ruleId } = codify(recipe, CREDIT_FIXTURE, { rulebook, review, codex, tick: 200 })
       review.revertByRecipe('recipe:salt_revive', 'physics wrong', 250)
       expect(rulebook.byId('recipe:salt_revive')!.revertedAtTick).toBe(250)
 
-      const revived = codify({ ...recipe, durationTicks: 7 }, { rulebook, review, codex, tick: 300 })
+      const revived = codify({ ...recipe, durationTicks: 7 }, CREDIT_FIXTURE, { rulebook, review, codex, tick: 300 })
       expect(revived.ruleId).toBe(ruleId)
 
       const row = rulebook.byId('recipe:salt_revive')!
@@ -305,12 +307,95 @@ describe('codify', () => {
       const codex = new CodexStore(db)
       codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
       codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
-      const { ruleId, verb } = codify(boilSaltRecipe, { rulebook, review, codex, tick: 200 })
+      const { ruleId, verb } = codify(boilSaltRecipe, CREDIT_FIXTURE, { rulebook, review, codex, tick: 200 })
       expect(ruleId).toBeTypeOf('number')
       expect(verb).toBe('recipe:boil_salt')
       expect(rulebook.byId('recipe:boil_salt')).not.toBeNull()
       const res = submitIntent(burningFireAdjacent(), CFG, 'a1', 'recipe:boil_salt', {})
       expect(res).toMatchObject({ ok: true })
     })
+  })
+})
+
+describe('productsOf — what a recipe unlocked', () => {
+  const recipe = (kinds: string[]): Recipe => ({
+    ...boilSaltRecipe,
+    outcomeTable: [
+      { weight: 7, success: true, label: 'it holds', effects: kinds.map((kind) => ({
+        op: 'spawn_item' as const, kind, qty: 1, to: 'agent' as const })) },
+      { weight: 3, success: false, label: 'it leaks', effects: [{ op: 'none' as const }] },
+    ],
+  })
+
+  it('reads every item kind the table can spawn', () => {
+    expect(productsOf(recipe(['waterskin', 'cord']))).toEqual(['cord', 'waterskin'])
+  })
+
+  it('dedupes and sorts, so two calls are byte-equal', () => {
+    const r = recipe(['waterskin', 'waterskin'])
+    expect(productsOf(r)).toEqual(['waterskin'])
+    expect(JSON.stringify(productsOf(r))).toBe(JSON.stringify(productsOf(r)))
+  })
+
+  it('is empty for a recipe that spawns nothing', () => {
+    expect(productsOf({ ...boilSaltRecipe, outcomeTable: [
+      { weight: 1, success: true, label: 'a knack', effects: [{ op: 'gain_skill', track: 'craft', xp: 5 }] },
+    ] })).toEqual([])
+  })
+})
+
+describe('codify reports the mint — once, and only for a new one', () => {
+  const CREDIT = { agentId: 'a1', intent: 'carry water in a stitched hide' }
+
+  function makeCodifyDeps(extra: { onCodified?: (d: Codified) => void } = {}): {
+    rulebook: RulebookStore; review: ReviewStore; codex: CodexStore; tick: number
+    onCodified?: (d: Codified) => void
+  } {
+    const db = openArbiterDb(':memory:')
+    const codex = new CodexStore(db)
+    codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
+    codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
+    return {
+      rulebook: new RulebookStore(db), review: new ReviewStore(db), codex, tick: 5, ...extra,
+    }
+  }
+  // A fresh id and a name that carries its words: the sanity gate refuses an id whose
+  // words are nowhere in the name, and VERBS is a global registry across this file.
+  // A fresh id per test: VERBS is a global registry, and the sanity gate refuses an id whose
+  // words are nowhere in the name.
+  let n = 0
+  const salt = (): Recipe => {
+    n += 1
+    return { ...boilSaltRecipe, id: `recipe:salt_credit${n}`, name: `Salt Credit${n}`, rngStream: `recipe:salt_credit${n}` }
+  }
+
+  it('calls onCodified on the first insert, with the credit and the products', () => {
+    const seen: Codified[] = []
+    const deps = makeCodifyDeps({ onCodified: (d) => seen.push(d) })
+    const SALT = salt()
+    codify(SALT, CREDIT, deps)
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toEqual({
+      recipeId: SALT.id, name: SALT.name, kind: 'craft', makes: ['salt'], credit: CREDIT,
+    })
+  })
+
+  it('does NOT call it again when the same recipe is codified twice', () => {
+    const seen: Codified[] = []
+    const deps = makeCodifyDeps({ onCodified: (d) => seen.push(d) })
+    const SALT = salt()
+    codify(SALT, CREDIT, deps)
+    codify(SALT, CREDIT, deps)
+    expect(seen).toHaveLength(1)
+  })
+
+  it('does NOT call it when a reverted rule is re-opened — the town did not invent it twice', () => {
+    const seen: Codified[] = []
+    const deps = makeCodifyDeps({ onCodified: (d) => seen.push(d) })
+    const SALT = salt()
+    codify(SALT, CREDIT, deps)
+    deps.review.revertByRecipe(SALT.id, 'admin test', 10)
+    codify(SALT, CREDIT, deps)
+    expect(seen).toHaveLength(1)
   })
 })

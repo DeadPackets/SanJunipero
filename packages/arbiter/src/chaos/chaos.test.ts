@@ -9,6 +9,10 @@ import type { Recipe, Verdict } from '../verdict.js'
 import { EXPLOIT_CORPUS } from './corpus.js'
 import { runChaos } from './run.js'
 
+// A credit for a test that is not about the credit; the two-argument codify is required so
+// an uncredited discovery cannot be minted in silence.
+const CODIFY_CREDIT = { agentId: 'a1', intent: 'a mind asked for this' }
+
 // The original engine verbs — a "physics verb" (a codified recipe:*) is NOT
 // one of these; the free-will intent must resolve into this Tier-1 set.
 const TIER1 = [
@@ -169,7 +173,7 @@ describe('runChaos exploit corpus', () => {
     const llm = new ScriptedExploitLlm(exploitVerdict)
     const { arbiter } = await makeRig(llm)
 
-    expect(() => arbiter.codify(EXPLOIT_RECIPE)).toThrow(/beyond adjacency/)
+    expect(() => arbiter.codify(EXPLOIT_RECIPE, CODIFY_CREDIT)).toThrow(/beyond adjacency/)
   })
 
   it('lets through only an attempt whose canon is within adjacency', async () => {

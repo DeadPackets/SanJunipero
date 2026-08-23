@@ -1,13 +1,16 @@
+import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import type Database from 'better-sqlite3'
 import { FakeEmbedder, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
 import {
   composePerception, fold, genesisState, registerVerb, RngStream, submitIntent, unregisterVerb, VERBS,
   type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
-import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
+import { makeArbiter, wordTainted, type AgentCtx, type Arbiter, type Codified } from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { CodexStore } from './codex.js'
+import { RulebookStore } from './rulebook.js'
 import {
   EXPRESSIVE_INSTRUCTION, ExpressiveRulingSchema, expressiveVerbFromRuling, isExpressive,
   type ExpressiveRuling,
@@ -220,5 +223,135 @@ describe('who witnesses it', () => {
   it('nobody watches themselves', () => {
     const s = world()
     expect(composePerception(s, DEFAULT_CONFIG, 'a1', [expressedAt(20, 20, 'sight')]).seen).toEqual([])
+  })
+})
+
+describe('F-C — a coined word is held to the framing law, like a recipe name', () => {
+  // makeRig above keeps its db private; this one hands it back so the rulebook can be read.
+  async function riggedDb(llm: ScriptedLlm): Promise<{ arbiter: Arbiter; db: Database.Database }> {
+    const db = openArbiterDb(':memory:')
+    new CodexStore(db).insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
+    const arbiter = makeArbiter({
+      db, llm: llm as unknown as LlmClient, embedder: await FakeEmbedder.create(), tick: () => 100,
+    })
+    return { arbiter, db }
+  }
+
+  it('refuses every machinery word the schema would otherwise admit', () => {
+    for (const w of ['ai', 'model', 'models', 'token', 'tokens', 'tool', 'tools',
+      'prompt', 'neural', 'chatbot', 'simulation']) {
+      expect(wordTainted(w), w).toBe(true)
+    }
+  })
+
+  it('admits the words the town actually coins', () => {
+    for (const w of ['dance', 'sing', 'mourn', 'salute', 'bow', 'keen', 'hum']) {
+      expect(wordTainted(w), w).toBe(false)
+    }
+  })
+
+  it('does not codify a tainted word — no rulebook row, no verb, no ruling', async () => {
+    const tainted: ExpressiveRuling = { ...DANCE, word: 'model' }
+    const llm = new ScriptedLlm(script(tainted))
+    const { arbiter, db } = await riggedDb(llm)
+    try {
+      const v = await arbiter.adjudicate('I dance by the fire', ctx)
+      // The harm, asserted first: a machinery word became a PERMANENT verb and a permanent
+      // rulebook row, and the chronicle would have printed "Tamar was seen to model."
+      expect(VERBS['express:model']).toBeUndefined()
+      expect(new RulebookStore(db).byId('express:model')).toBeNull()
+      expect(v).toEqual(impossible)
+    } finally {
+      unregisterVerb('express:model')
+    }
+  })
+
+  it('still codifies the clean word the same run would have coined', async () => {
+    const llm = new ScriptedLlm(script(DANCE))
+    const { arbiter, db } = await riggedDb(llm)
+    try {
+      const v = await arbiter.adjudicate('I dance by the fire', ctx)
+      expect(v).toEqual({ kind: 'map', verb: 'express:dance', params: {} })
+      expect(new RulebookStore(db).byId('express:dance')).not.toBeNull()
+    } finally {
+      unregisterVerb('express:dance')
+    }
+  })
+})
+
+describe('F-B — BOTH codification paths report their mint, and a third could not hide', () => {
+  async function rigWithSpy(llm: ScriptedLlm, seen: Codified[]): Promise<Arbiter> {
+    const db = openArbiterDb(':memory:')
+    new CodexStore(db).insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
+    return makeArbiter({
+      db, llm: llm as unknown as LlmClient, embedder: await FakeEmbedder.create(), tick: () => 100,
+      onCodified: (d) => seen.push(d),
+    })
+  }
+
+  it('calls onCodified for a coined word, with kind "word" and no products', async () => {
+    const seen: Codified[] = []
+    const arbiter = await rigWithSpy(new ScriptedLlm(script(DANCE)), seen)
+    try {
+      await arbiter.adjudicate('I dance by the fire', ctx)
+      expect(seen).toEqual([{
+        recipeId: 'express:dance', name: 'dance', kind: 'word', makes: [],
+        credit: { agentId: ctx.agentId, intent: 'I dance by the fire' },
+      }])
+    } finally {
+      unregisterVerb('express:dance')
+    }
+  })
+
+  it('does not report a word the town already has', async () => {
+    const seen: Codified[] = []
+    const arbiter = await rigWithSpy(new ScriptedLlm(script(DANCE)), seen)
+    try {
+      await arbiter.adjudicate('I dance by the fire', ctx)
+      await arbiter.adjudicate('I dance in the rain', ctx2)
+      expect(seen).toHaveLength(1)
+    } finally {
+      unregisterVerb('express:dance')
+    }
+  })
+
+  it('does not report a tainted word, because a tainted word is never codified', async () => {
+    const seen: Codified[] = []
+    const arbiter = await rigWithSpy(new ScriptedLlm(script({ ...DANCE, word: 'prompt' })), seen)
+    try {
+      await arbiter.adjudicate('I dance by the fire', ctx)
+      expect(seen).toEqual([])
+    } finally {
+      unregisterVerb('express:prompt')
+    }
+  })
+
+  // R2. A discovery record that hooked only codify() would silently miss every coined word.
+  // This is the guard against the same mistake being made a THIRD time: a new row in the
+  // rulebook is a new codification, and every one of them must report it.
+  it('every rulebook INSERT in the arbiter reports its mint — a third path could not be silent', () => {
+    const dir = new URL('.', import.meta.url)
+    const sources = readdirSync(dir)
+      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+      .map((f) => [f, readFileSync(new URL(f, dir), 'utf8')] as const)
+
+    const mints: Array<{ file: string; line: number; text: string }> = []
+    for (const [file, src] of sources) {
+      src.split('\n').forEach((text, i) => {
+        if (/\brulebook\.insert\(/.test(text)) mints.push({ file, line: i + 1, text: text.trim() })
+      })
+    }
+
+    // Two today: codifyExpressive() for a coined word, codify() for a craft. A third arriving
+    // is the whole point — the count fails and the author must come here and look. Counted by
+    // file rather than by line so an unrelated edit above does not cry wolf.
+    expect(mints.map((m) => m.file)).toEqual(['adjudicate.ts', 'codify.ts'])
+
+    for (const mint of mints) {
+      const src = sources.find(([f]) => f === mint.file)![1].split('\n')
+      const after = src.slice(mint.line, mint.line + 12).join('\n')
+      expect(after, `${mint.file}:${mint.line} mints a permanent verb and never reports it`)
+        .toContain('onCodified')
+    }
   })
 })
