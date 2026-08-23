@@ -103,15 +103,44 @@ const gitBytes = (...args: string[]): Buffer =>
 const FORGE_CONFIG_HASH = '02f295ad603483998c2e85a641f6aa35372ddf630614a46648cd1f95b284ba5b'
 const BLOCK1_SHA256 = '28c1fce0781ec9019416c234a9eae47401ff4b9dc4a96b91c371335fbad97bd6'
 
+// ★ THE LIVE ASSIGNMENT, NOT THE FILE. `toContain` was satisfied by any occurrence of the
+// hash, and every one of these files keeps its superseded values in a "Previous value:"
+// comment — so reverting a pin to a value the file still mentions passed the guard. Each row
+// now reads the hash out of the statement that DECIDES it, and the row below plants a wrong
+// value to prove the extraction bites.
+const pinAt = (rx: RegExp, ...p: string[]): string | null =>
+  rx.exec(readFileSync(join(REPO, ...p), 'utf8'))?.[1] ?? null
+
+const G1_AT = ['packages', 'engine', 'src', 'golden.test.ts'] as const
+const G2_AT = ['packages', 'engine', 'src', 'g2.test.ts'] as const
+const FORGE_AT = ['packages', 'forge', 'src', 'forgeConfig.test.ts'] as const
+const BLOCK1_AT = ['packages', 'agents', 'src', 'prompt', 'rulesOfBeing.test.ts'] as const
+const G1_RX = /const GOLDEN_DAY_HASH = '([0-9a-f]{64})'/
+const G2_RX = /const GOLDEN_G2_HASH = '([0-9a-f]{64})'/
+const FORGE_RX = /stateHash\(DEFAULT_CONFIG\)\)\.toBe\(\s*'([0-9a-f]{64})'/
+const BLOCK1_RX = /const BLOCK1_SHA256 = '([0-9a-f]{64})'/
+
 describe('G12c read-only proof — the four pins are where they were', () => {
   it('leaves all four pins exactly where they were', () => {
-    const at = (...p: string[]): string => readFileSync(join(REPO, ...p), 'utf8')
-    expect(at('packages', 'engine', 'src', 'golden.test.ts'), 'G1 pin moved').toContain(GOLDEN_G1)
-    expect(at('packages', 'engine', 'src', 'g2.test.ts'), 'G2 pin moved').toContain(GOLDEN_G2)
-    expect(at('packages', 'forge', 'src', 'forgeConfig.test.ts'), 'forge config pin moved')
-      .toContain(FORGE_CONFIG_HASH)
-    expect(at('packages', 'agents', 'src', 'prompt', 'rulesOfBeing.test.ts'), 'BLOCK1 pin moved')
-      .toContain(BLOCK1_SHA256)
+    expect(pinAt(G1_RX, ...G1_AT), 'G1 pin moved').toBe(GOLDEN_G1)
+    expect(pinAt(G2_RX, ...G2_AT), 'G2 pin moved').toBe(GOLDEN_G2)
+    expect(pinAt(FORGE_RX, ...FORGE_AT), 'forge config pin moved').toBe(FORGE_CONFIG_HASH)
+    expect(pinAt(BLOCK1_RX, ...BLOCK1_AT), 'BLOCK1 pin moved').toBe(BLOCK1_SHA256)
+  })
+
+  // Not vacuous, twice over: each pattern must find a hash at all (a renamed constant would
+  // otherwise read as `null` on both sides of nothing), and it must read the live one rather
+  // than a superseded value the same file still carries in a comment.
+  it('reads the live assignment, not a superseded value the file still mentions', () => {
+    for (const [rx, at] of [[G1_RX, G1_AT], [G2_RX, G2_AT], [FORGE_RX, FORGE_AT],
+      [BLOCK1_RX, BLOCK1_AT]] as const) {
+      expect(pinAt(rx, ...at), `${at.at(-1)} has no pin the pattern can find`).toMatch(/^[0-9a-f]{64}$/)
+    }
+    const g2 = readFileSync(join(REPO, ...G2_AT), 'utf8')
+    const superseded = '665a824948155304d7dcc1131e821e89299dd73d6cb5c976287955edc5a5fa11'
+    expect(g2, 'g2.test.ts no longer records its superseded pin — pick another').toContain(superseded)
+    expect(pinAt(G2_RX, ...G2_AT), 'the guard read a comment instead of the assignment')
+      .not.toBe(superseded)
   })
 
   // ★ AGAINST THE MERGE BASE, NOT AGAINST MAIN'S TIP. `main` has moved on since this branch
