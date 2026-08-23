@@ -354,6 +354,10 @@ export type Scene = {
   setZoomAt(stop: ZoomStop, screenX: number, screenY: number): void
   /** the scale being drawn this frame — animated during a transit */
   getZoom(): number
+  /** ONE owner of `prefers-reduced-motion` for the whole canvas. The glide, the zoom settle
+   *  and the walk's bob all ask this, so a viewer who opted out cannot be honoured by two of
+   *  the three and forgotten by the fourth thing somebody adds next. */
+  wantsMotion(): boolean
   /** where the camera is going, and where it will be at rest. The HUD reads THIS, so a label
    *  never shows a number the stop set does not contain. */
   getZoomStop(): ZoomStop
@@ -778,6 +782,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     setZoom,
     setZoomAt,
     getZoom: () => world.scale.x,
+    wantsMotion,
     getZoomStop: () => zoom.stop,
     panBy: (dx, dy) => {
       stopGlide()

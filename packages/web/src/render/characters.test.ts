@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorldState } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
@@ -107,7 +107,8 @@ vi.mock('pixi.js', () => {
   return { Assets, BitmapText, Cache, Container, Graphics, Point, Polygon, Rectangle, Sprite, Text, Texture }
 })
 
-import { Container as MockContainer, Sprite as MockSprite } from 'pixi.js'
+import { Container as MockContainer, Sprite as MockSprite, Texture as MockTexture } from 'pixi.js'
+import { CELL, SHEET_ROWS } from './charAnim.js'
 import { createCharacterLayer } from './characters.js'
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
@@ -151,6 +152,7 @@ function makeScene(): Scene & { sortDepth: () => void } {
     layers,
     entities: layers.entities,
     getZoom: () => 1,
+    wantsMotion: () => true,
     viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
     addDepthSource: (fn: () => Array<{ box: { id: string }; node: unknown }>) => {
       sources.add(fn)
@@ -293,5 +295,213 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(placed(scene)).toHaveLength(4)
     expect(sprite.destroyed).toBe(true)
     expect(layer.getSprite('omar')).toBeNull()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// ★ THE WALK, DRIVEN THROUGH THE REAL LAYER
+//
+// `charAnim.test.ts` proves the rules. These prove the LAYER CALLS THEM — which is a different
+// claim, and the one a source scan can only gesture at. The book resolves a texture here, so
+// the posed cell actually reaches the sprite and the frame rectangle says which row is drawn.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+
+const NEEDS_WELL = { hunger: 90, energy: 90, warmth: 90, social: 90 }
+const NEEDS_HUNGRY = { hunger: 5, energy: 90, warmth: 90, social: 90 }
+
+function makeBodyAgent(id: string, x: number, y: number, needs = NEEDS_WELL): MutableAgents[string] {
+  return { ...makeAgent(id, x, y), needs } as MutableAgents[string]
+}
+
+/** A book whose sheets are already loaded, so the pose reaches the sprite. */
+function loadedBook(): TextureBook {
+  const tex = new MockTexture({ source: { label: 'sheet' } as never })
+  return { get: () => Promise.resolve(tex), swap: () => Promise.resolve(tex) } as unknown as TextureBook
+}
+
+/** Which of the six sheet rows a body is drawn on, read off the slice rectangle. */
+function drawnRow(layer: ReturnType<typeof createCharacterLayer>, id: string): string | null {
+  const s = layer.getSprite(id) as unknown as { texture: { frame?: { y: number } } } | null
+  const y = s?.texture?.frame?.y
+  return y === undefined ? null : (SHEET_ROWS[y / CELL] ?? null)
+}
+
+/** Where the layer is DRAWING the body, in tiles, read back off its published depth box. */
+function drawnTile(scene: Scene, id: string): { x: number; y: number } {
+  const b = (publishedBoxes(scene) as unknown as Array<{ id: string; x0: number; y0: number }>)
+    .find((q) => q.id === id)!
+  return { x: b.x0 + 0.5, y: b.y0 + 0.5 }
+}
+
+describe('★ the layer walks each body at the record\'s pace, not a stopwatch\'s', () => {
+  const config = {
+    needs: { debuffThreshold: 30 },
+    movement: { baseTicksPerTile: 1, debuffTicksPerTile: 2 },
+  }
+
+  // The layer reads the wall clock in `onEvents` (a socket message has no frame time) and the
+  // frame's own clock in `tick`. StageMount drives the second with `performance.now()`, so in
+  // the product they are ONE clock; the test makes that true by owning it.
+  let clockMs = 0
+  beforeEach(() => {
+    clockMs = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clockMs)
+  })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  async function rig(agents: MutableAgents): Promise<{
+    scene: Scene; layer: ReturnType<typeof createCharacterLayer>
+    emit: (evts: SimEvent[]) => void
+    at: (ms: number, evts?: SimEvent[]) => void
+  }> {
+    const scene = makeScene()
+    const { store, emit } = makeStore(agents)
+    ;(store as unknown as { getConfig: () => unknown }).getConfig = () => config
+    const layer = createCharacterLayer(scene, loadedBook(), store, () => {})
+    await Promise.resolve(); await Promise.resolve()   // let the sheets land on the entries
+    layer.tick(0)
+    await Promise.resolve(); await Promise.resolve()
+    const at = (ms: number, evts?: SimEvent[]): void => {
+      clockMs = ms
+      if (evts !== undefined) emit(evts)
+      layer.tick(ms)
+    }
+    return { scene, layer, emit, at }
+  }
+
+  const moved = (id: string, x: number, y: number, tick: number): SimEvent =>
+    ({ type: 'agent_moved', tick, payload: { id, x, y } } as unknown as SimEvent)
+
+
+  it('★ a body that stood still for a minute does NOT spend four seconds on its next tile', () => {
+    return (async () => {
+      const agents: MutableAgents = { nadia: makeBodyAgent('nadia', 0, 0) }
+      const { scene, at } = await rig(agents)
+      // two ticks so the clock learns 400 ms
+      agents.nadia!.x = 1; at(400, [moved('nadia', 1, 0, 1)])
+      agents.nadia!.x = 2; at(800, [moved('nadia', 2, 0, 2)])
+      for (let t = 800; t <= 60_000; t += 400) at(t)          // then a minute of standing still
+      expect(drawnTile(scene, 'nadia').x).toBeCloseTo(2, 3)
+      // and it walks again: ONE tick later it has arrived, where the landed glide would have
+      // put it a tenth of the way along a four-second crawl
+      agents.nadia!.x = 3; at(60_000, [moved('nadia', 3, 0, 150)])
+      at(60_400)
+      expect(drawnTile(scene, 'nadia').x).toBeCloseTo(3, 3)
+    })()
+  })
+
+  it('★ a hungry body walks at half speed, because the record already said it does', () => {
+    return (async () => {
+      const agents: MutableAgents = {
+        well: makeBodyAgent('well', 0, 0, NEEDS_WELL),
+        weak: makeBodyAgent('weak', 0, 0, NEEDS_HUNGRY),
+      }
+      const { scene, at } = await rig(agents)
+      at(400, [moved('well', 1, 0, 1), moved('weak', 1, 0, 1)])
+      at(800, [moved('well', 2, 0, 2), moved('weak', 2, 0, 2)])
+      at(1200, [moved('well', 3, 0, 3), moved('weak', 3, 0, 3)])
+      at(1400)                                    // half way through the next leg
+      const wellGone = drawnTile(scene, 'well').x - drawnTile(scene, 'weak').x
+      expect(wellGone).toBeGreaterThan(0.2)       // the well body is measurably further along
+    })()
+  })
+
+  it('★ three bodies walking at the same instant are NOT on the same frame', () => {
+    return (async () => {
+      const ids = ['nadia', 'omar', 'yusuf']
+      const agents: MutableAgents = Object.fromEntries(
+        ids.map((id) => [id, makeBodyAgent(id, 0, 0)])) as MutableAgents
+      const { layer, at } = await rig(agents)
+      let differed = 0, sampled = 0
+      for (let i = 1; i <= 14; i++) {
+        for (const id of ids) agents[id]!.x = i
+        at(i * 400, ids.map((id) => moved(id, i, 0, i)))
+        for (let f = 1; f < 6; f++) {
+          at(i * 400 + f * 66)
+          const rows = ids.map((id) => drawnRow(layer, id))
+          if (rows.every((r) => r !== null && r !== 'idle')) {
+            sampled++
+            if (new Set(rows).size > 1) differed++
+          }
+        }
+      }
+      expect(sampled).toBeGreaterThan(20)
+      // the landed layer scores exactly 0 here: one clock, one frame, every body, always
+      expect(differed / sampled).toBeGreaterThan(0.5)
+    })()
+  })
+
+  it('★ and the same three are on the same frames on a SECOND run — nothing is random', () => {
+    return (async () => {
+      const ids = ['nadia', 'omar', 'yusuf']
+      const run = async (): Promise<string[]> => {
+        const agents: MutableAgents = Object.fromEntries(
+          ids.map((id) => [id, makeBodyAgent(id, 0, 0)])) as MutableAgents
+        const { layer, at } = await rig(agents)
+        const out: string[] = []
+        for (let i = 1; i <= 8; i++) {
+          for (const id of ids) agents[id]!.x = i
+          at(i * 400, ids.map((id) => moved(id, i, 0, i)))
+          for (let f = 1; f < 4; f++) {
+            at(i * 400 + f * 100)
+            out.push(ids.map((id) => drawnRow(layer, id)).join(','))
+          }
+        }
+        return out
+      }
+      const a = await run()
+      clockMs = 0
+      const b = await run()
+      expect(a).toEqual(b)
+      expect(new Set(a).size).toBeGreaterThan(1)      // and it is not one frozen frame
+    })()
+  })
+
+  it('the walk never drifts more than two ticks behind the record, on a jittery socket', () => {
+    return (async () => {
+      const agents: MutableAgents = { nadia: makeBodyAgent('nadia', 0, 0) }
+      const { scene, at } = await rig(agents)
+      let worst = 0
+      for (let i = 1; i <= 40; i++) {
+        agents.nadia!.x = i
+        at(i * 400 + (i % 5 === 0 ? 260 : 0), [moved('nadia', i, 0, i)])
+        worst = Math.max(worst, i - drawnTile(scene, 'nadia').x)
+      }
+      expect(worst).toBeLessThanOrEqual(3)
+    })()
+  })
+
+  it('★ reduced motion reaches the layer: the bob goes, the walk does not', () => {
+    return (async () => {
+      const agents: MutableAgents = { nadia: makeBodyAgent('nadia', 0, 0) }
+      const scene = makeScene()
+      ;(scene as unknown as { wantsMotion: () => boolean }).wantsMotion = () => false
+      const { store, emit } = makeStore(agents)
+      ;(store as unknown as { getConfig: () => unknown }).getConfig = () => config
+      const layer = createCharacterLayer(scene, loadedBook(), store, () => {})
+      // the sheet load starts on the first tick, so the await has to come after it
+      layer.tick(0)
+      await Promise.resolve(); await Promise.resolve()
+      layer.tick(0)
+      const rows = new Set<string | null>()
+      for (let i = 1; i <= 10; i++) {
+        agents.nadia!.x = i
+        clockMs = i * 400
+        emit([moved('nadia', i, 0, i)])
+        for (let f = 0; f < 5; f++) {
+          clockMs = i * 400 + f * 70
+          layer.tick(clockMs)
+          rows.add(drawnRow(layer, 'nadia'))
+          // the shadow is placed at the body's own sy with no bob, so the gap between them IS
+          // the hop. Under reduced motion it is zero on every frame of the loop.
+          const s = layer.getSprite('nadia') as unknown as { position: { y: number } }
+          const l = scene.layers as unknown as Record<string, { children: Array<{ position: { y: number } }> }>
+          expect(s.position.y - l.shadow!.children[0]!.position.y).toBe(0)
+        }
+      }
+      rows.delete(null)
+      rows.delete('idle')
+      expect(rows.size).toBeGreaterThan(1)          // the person is still walking
+    })()
   })
 })
