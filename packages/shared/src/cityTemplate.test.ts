@@ -8,7 +8,7 @@ import {
   WORLD_MARGIN, worldSizeForRings, worldForRings, edgesOwed,
   WORLD_SIZE_GENESIS, inExtent, inRect, key, cityTerrainTiles, cityRoadTiles, cityRoadKeys,
   isRoadTile, PLAZA, PLAZA_CENTRE, T_ROAD, T_WATER, T_EARTH,
-  cityStructures, cityPlacements, cityBlocks, cityFreePlots, doorTile, doorFrontTile,
+  cityStructures, cityPlacements, cityBlocks, genesisEmptyPlots, plattedPlots, doorTile, doorFrontTile,
   structureTiles, FOUNDER_IDS, CITY_INTERIOR_SLOTS,
   CITY_FURNISHING_KINDS, CITY_BED_KIND, CITY_HEARTH_KIND,
   makeCityTemplate, templateFits, growthPlots, T_GRASS, footprintFor,
@@ -573,13 +573,41 @@ describe('★ the town still stands at ring 5', () => {
     })
   }
 
-  // The clamp the lane removed. `cityFreePlots` filtered every plot through a ring-1 extent, so
-  // an agent standing in a ring-2 town would have been offered nothing at all to build on.
+  // The clamp the lane removed. The old `cityFreePlots` filtered every plot through a ring-1
+  // extent, so an agent standing in a ring-2 town would have been offered nothing at all.
   it('offers the plots of the ring it is asked about, not the ring genesis platted', () => {
-    const t = makeCityTemplate()
-    expect(cityFreePlots(t, 1)).toHaveLength(11)
-    expect(cityFreePlots(t, 5)).toHaveLength(436 - GENESIS_WANTED.length)
-    for (const p of cityFreePlots(t, 5)) expect(inExtent(p.dx, p.dy, 5), key(p.dx, p.dy)).toBe(true)
+    expect(genesisEmptyPlots(1)).toHaveLength(11)
+    expect(genesisEmptyPlots(5)).toHaveLength(436 - GENESIS_WANTED.length)
+    for (const p of genesisEmptyPlots(5)) expect(inExtent(p.dx, p.dy, 5), key(p.dx, p.dy)).toBe(true)
+  })
+
+  // ★ THE THIRD DEFECT, AND THE SHAPE THAT ANSWERS ALL THREE. Every one of them returned a
+  // plausible wrong answer instead of an error, so the new shape has no quiet failure in it.
+  it('★ refuses the wrong question out loud, instead of answering it with a short list', () => {
+    // A town of no rings has no plots. It used to be an empty array, which reads as "the town
+    // is full" — the exact silence the ring-1 clamp hid behind.
+    expect(() => plattedPlots(0)).toThrow(/no plots/)
+    expect(() => plattedPlots(-1)).toThrow(/no plots/)
+    expect(() => genesisEmptyPlots(0)).toThrow(/no plots/)
+    // A template built for one ring count, asked about another, is the clamp itself.
+    expect(() => growthPlots(makeCityTemplate(), 5)).toThrow(/is not a town of 5 ring/)
+    expect(() => growthPlots(makeCityTemplate(worldForRings(3).anchor, 3))).toThrow(/is not a town of 1 ring/)
+    // And the right question still answers: the template and the ring count agree.
+    expect(growthPlots(makeCityTemplate(worldForRings(3).anchor, 3), 3).length)
+      .toBe(genesisEmptyPlots(3).length)
+  })
+
+  // ★ THE SPLIT, MEASURED. "What could ever be built on" and "what genesis leaves empty" are
+  // different lists, and the difference is exactly the nine buildings the template stands.
+  it('★ what could ever be built on, and what genesis leaves empty, are two lists', () => {
+    for (const rings of [1, 2, 5]) {
+      expect(plattedPlots(rings).length - genesisEmptyPlots(rings).length,
+        `${rings} rings`).toBe(GENESIS_WANTED.length)
+    }
+    // Neither takes a template, so neither can be mistaken for the running-world question —
+    // and `genesisEmptyPlots` answering the same eleven forever is now its contract, not a bug.
+    expect(genesisEmptyPlots(1)).toEqual(genesisEmptyPlots(1))
+    expect(plattedPlots(1)).toHaveLength(20)
   })
 
   // A whole ring-5 town, assembled and parsed — ground, streets and all — inside the world its
@@ -702,7 +730,7 @@ describe('the plots agents will build on', () => {
   const t = makeCityTemplate()
 
   it('offers every plot the town has not built on, and no others', () => {
-    const plots = cityFreePlots(t)
+    const plots = genesisEmptyPlots()
     expect(plots).toHaveLength(freePlots(TOWN_RINGS_GENESIS, CITY_GROUND).length - GENESIS_WANTED.length)
     expect(plots).toHaveLength(11)
     const built = new Set(cityPlacements().map(plotKey))
@@ -710,7 +738,7 @@ describe('the plots agents will build on', () => {
   })
 
   it('gives each one a facing, so what gets built there already knows which way it turns', () => {
-    for (const p of cityFreePlots(t))
+    for (const p of genesisEmptyPlots())
       expect(TOWN_FACINGS as readonly string[]).toContain(p.facing)
   })
 

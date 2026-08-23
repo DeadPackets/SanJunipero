@@ -449,33 +449,87 @@ export function templateFits(
     && anchor.x + span <= worldSize && anchor.y + span <= worldSize
 }
 
-/**
- * ★ A PLOT IS A CLAIMABLE THING, AND THIS IS THE LIST OF THE FREE ONES.
- *
- * Not "grass that happens to be beside a road" — the grammar's own unclaimed plots, each one a
- * frontage on a street with a known facing and a known maximum mass. The tile returned is the
- * plot's street corner, the tile a 1×1 building would take, so a viewer can point at it. The
- * spacing of whatever gets built here is already proven; nothing needs to check it again.
- */
-export function cityFreePlots(t: CityTemplate, rings: number = TOWN_RINGS_GENESIS): Array<{
+// ★ ONE FUNCTION, THREE DEFECTS, AND NOBODY COULD STATE ITS CONTRACT.
+//
+// `cityFreePlots(t, rings)` was wrong three times in three lanes. It clamped every plot through
+// a RING-1 extent, so an agent in a ring-2 town was offered nothing at all, silently. It read
+// "taken" off the hard-coded genesis nine and not off the world, so it answered ELEVEN however
+// many houses stood. And it took a `CityTemplate` it never once read, which is the whole reason
+// the other two were believable: a function handed the world looks like it is answering about
+// the world.
+//
+// Every one of the three failed by returning a PLAUSIBLE WRONG ANSWER instead of an error. So
+// the shape below is loud, and the two questions that were hiding in one function are two:
+//
+//   plattedPlots(rings)       WHAT COULD EVER BE BUILT ON — a fact about the lattice.
+//   genesisEmptyPlots(rings)  WHAT GENESIS LEAVES EMPTY   — a fact about THE TEMPLATE, which
+//                             is why it answers the same thing forever, correctly.
+//   claimTownPlot(...)        WHAT IS FREE RIGHT NOW      — townPlot.ts, and it takes the
+//                             rectangles actually standing, because only the world knows.
+//
+// Neither of the two here takes a template, so neither can be mistaken for the third.
+
+export type PlotTile = {
   dx: number; dy: number; facing: 'sw' | 'se'; block: { i: number; j: number }; slot: string
-}> {
-  const taken = takenPlots(cityPlacements())
+}
+
+/**
+ * ★ EVERY PLOT THE GRAMMAR PLATS OUT TO `rings`, in TEMPLATE coordinates. The tile returned is
+ * the plot's street corner — the tile a 1×1 building would take — so a viewer can point at it.
+ *
+ * A plot outside the extent THROWS rather than being quietly dropped: the silent filter is how
+ * the ring-1 clamp hid for as long as it did, and a caller who has mismatched its ring count
+ * needs to be told, not handed a shorter list.
+ */
+export function plattedPlots(rings: number = TOWN_RINGS_GENESIS): PlotTile[] {
+  if (!Number.isInteger(rings) || rings < 1) {
+    throw new Error(`plattedPlots: a town of ${rings} ring(s) has no plots — ask for at least 1`)
+  }
   const o = townOrigin(rings)
-  return freePlots(rings, CITY_GROUND)
-    .filter((p) => !taken.has(plotKey(p)))
-    .map((p) => ({
+  return freePlots(rings, CITY_GROUND).map((p) => {
+    const at: PlotTile = {
       ...(p.face === 'sw'
         ? { dx: p.dx + o, dy: p.anchorY - 1 + o }
         : { dx: p.anchorX - 1 + o, dy: p.dy + o }),
       facing: p.face, block: p.block, slot: p.slot,
-    }))
-    .filter((p) => inExtent(p.dx, p.dy, rings))
+    }
+    if (!inExtent(at.dx, at.dy, rings)) {
+      throw new Error(`plattedPlots: plot ${plotKey(p)} at ${key(at.dx, at.dy)} falls outside a ${rings}-ring town`)
+    }
+    return at
+  })
 }
 
-/** The plots as bare tiles, the shape older callers ask for. */
+/**
+ * ★ THE PLOTS THE GENESIS TEMPLATE LEAVES EMPTY — a fact about the TEMPLATE, and deliberately
+ * not about any running world. It answers eleven on day one and eleven on day one hundred,
+ * because the template is the same template; that is now the documented contract rather than
+ * a bug wearing the word "free".
+ *
+ * What is free in a world where agents have been building is `claimTownPlot`, which reads the
+ * rectangles that stand. Nothing in this file can answer that and nothing here pretends to.
+ */
+export function genesisEmptyPlots(rings: number = TOWN_RINGS_GENESIS): PlotTile[] {
+  const taken = takenPlots(cityPlacements())
+  return plattedPlots(rings).filter((p) => !taken.has(plotKey(p)))
+}
+
+/** How many tiles across the template actually is, read off its own ground. */
+const templateSpan = (t: CityTemplate): number =>
+  t.tiles.reduce((m, x) => Math.max(m, x.dx + 1, x.dy + 1), 0)
+
+/**
+ * The empty plots of THIS template, as bare tiles. `t` is CHECKED and no longer decorative: a
+ * template built for one ring count asked about another is exactly the ring-1 clamp, and it
+ * now throws instead of quietly answering with a shorter list.
+ */
 export function growthPlots(t: CityTemplate, rings: number = TOWN_RINGS_GENESIS): { dx: number; dy: number }[] {
-  return cityFreePlots(t, rings).map(({ dx, dy }) => ({ dx, dy }))
+  const span = templateSpan(t)
+  if (span !== townSpan(rings)) {
+    throw new Error(`growthPlots: a template ${span} tiles across is not a town of ${rings} ring(s)`
+      + ` — that wants ${townSpan(rings)}`)
+  }
+  return genesisEmptyPlots(rings).map(({ dx, dy }) => ({ dx, dy }))
 }
 
 /** The blocks the town has platted, for a viewer that wants to draw them. */
