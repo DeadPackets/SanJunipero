@@ -2,7 +2,7 @@ import {
   edgesOwed, simTimeFromTick, TOWN_RINGS_GENESIS, WORLD_MARGIN, worldSizeForRings,
 } from '@sj/shared'
 import { genesisTerrainAt } from '../genesis/world.js'
-import type { WorldState } from '../state.js'
+import { authoredOrigin, type WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 
 // ★ THE WORLD IS AS BIG AS WHAT STANDS IN IT, PLUS A BLOCK PITCH OF WILD.
@@ -43,10 +43,7 @@ export function growthsSoFar(state: WorldState): number {
   return state.growths ?? 0
 }
 
-/** Where the array's (0, 0) stands in the frame `genesisTerrainAt` is written in. */
-export function authoredOrigin(state: WorldState): { x: number; y: number } {
-  return state.origin ?? { x: 0, y: 0 }
-}
+export { authoredOrigin }
 
 /** The tile box of everything built, in array coordinates. `null` when nothing stands: an
  *  empty world owes nobody ground. Structures only — agents walk, and a world that widened

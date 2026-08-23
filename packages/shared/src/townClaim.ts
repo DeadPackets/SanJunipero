@@ -37,19 +37,19 @@ export function takenPlots(standing: readonly PlotRef[]): Set<string> {
 }
 
 export function isClaimable(plot: Plot, need: Need, taken: ReadonlySet<string>): boolean {
-  if (need.along < 1 || need.deep < 1) return false
-  if (need.along > plot.maxAlong || need.deep > plot.maxDeep) return false
-  return !taken.has(plotKey(plot))
+  return holds(plot, need) && !taken.has(plotKey(plot))
 }
+
+/** Big enough, before anything is asked about who holds it. */
+const holds = (plot: Plot, need: Need): boolean =>
+  need.along >= 1 && need.deep >= 1 && need.along <= plot.maxAlong && need.deep <= plot.maxDeep
 
 const fits = (need: Need): boolean =>
   need.along >= 1 && need.deep >= 1 && need.along <= MAX_ALONG && need.deep <= MAX_DEEP
 
 /** How many rings the town must have platted for this builder to have somewhere to go. */
 export function ringsPlatted(taken: ReadonlySet<string>, ground: Ground, need: Need): number {
-  for (let r = 1; r < CLAIM_RING_LIMIT; r++)
-    if (freePlots(r, ground).some((p) => isClaimable(p, need, taken))) return r
-  return CLAIM_RING_LIMIT
+  return ringsPlattedWhere((p) => taken.has(plotKey(p)), ground, need)
 }
 
 /** The plot the next building goes on, and the ring count the town stands at once it does. */
@@ -58,9 +58,30 @@ export function claimPlot(a: {
   ground: Ground
   need: Need
 }): { plot: Plot; rings: number } | null {
+  return claimPlotWhere({ isTaken: (p) => a.taken.has(plotKey(p)), ground: a.ground, need: a.need })
+}
+
+// ★ WHO HOLDS A PLOT IS A QUESTION, NOT A REGISTER.
+//
+// `claimAll` knows the plots it has just handed out and can answer with a set of keys. A
+// RUNNING WORLD cannot: what stands in it is a list of rectangles, some of them raised by the
+// grammar and some of them — a bridge, a grave, a thing an arbiter minted — never platted at
+// all. So the claim takes a PREDICATE and the caller answers however it can see. The two
+// callers below and `townPlot.ts` are the whole of it, and the set-of-keys reading is now one
+// predicate among several rather than the only shape a claim understands.
+
+export type IsTaken = (plot: Plot) => boolean
+
+export function ringsPlattedWhere(isTaken: IsTaken, ground: Ground, need: Need): number {
+  for (let r = 1; r < CLAIM_RING_LIMIT; r++)
+    if (freePlots(r, ground).some((p) => holds(p, need) && !isTaken(p))) return r
+  return CLAIM_RING_LIMIT
+}
+
+export function claimPlotWhere(a: { isTaken: IsTaken; ground: Ground; need: Need }): { plot: Plot; rings: number } | null {
   if (!fits(a.need)) return null
-  const rings = ringsPlatted(a.taken, a.ground, a.need)
-  const plot = freePlots(rings, a.ground).find((p) => isClaimable(p, a.need, a.taken))
+  const rings = ringsPlattedWhere(a.isTaken, a.ground, a.need)
+  const plot = freePlots(rings, a.ground).find((p) => holds(p, a.need) && !a.isTaken(p))
   return plot === undefined ? null : { plot, rings }
 }
 

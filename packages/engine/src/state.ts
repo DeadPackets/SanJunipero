@@ -160,6 +160,13 @@ export function genesisState(config: SimConfig, terrain?: TileId[][]): WorldStat
   }
 }
 
+/** Where the array's (0, 0) stands in the frame `genesisTerrainAt` is written in. Homed here
+ *  beside the field rather than in `mapGrowth`, because the town has to ask it too and the
+ *  growth system already imports the town. */
+export function authoredOrigin(state: { origin?: { x: number; y: number } }): { x: number; y: number } {
+  return state.origin ?? { x: 0, y: 0 }
+}
+
 // The one reader of the field (G4). A body that has never been thirsty is a full one, which
 // is what lets every pre-C11 log fold to the hash it always had.
 export function thirstOf(a: { thirst?: number }): number {
