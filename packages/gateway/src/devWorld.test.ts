@@ -1,11 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 import { PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
 import { RngStreams, createWorldTick, genesisState } from '@sj/engine'
-import { SHOWCASE_CONFIG, THOUGHT_LINES, startDevWorld } from './devWorld.js'
+import {
+  DEV_MAP_DEFAULT, DEV_MAP_HUMAN, SHOWCASE_CONFIG, THOUGHT_LINES, devTerrain, startDevWorld,
+} from './devWorld.js'
+import { townStructuresFor } from './founders.js'
 
 const until = async (cond: () => boolean, timeoutMs = 12_000): Promise<void> => {
   const t0 = Date.now()
@@ -27,6 +31,52 @@ describe('showcase weather', () => {
       s = worldTick(s).state
       expect(s.weather.kind).toBe('sunny')
     }
+  })
+})
+
+// ★★ WHICH WORLD DOES A PERSON GET, AND WHICH DOES A GATE GET?
+//
+// They must be different, and the difference must not be a silence. `startDevWorld()` with no
+// `map:` handed everyone the frozen G6 fixture — six hand-placed buildings, four of them with
+// no art, on a 64×64 map the grammar never drew. G1, G2 and G6 hash exactly that world so it
+// cannot change; but a lane that ran `pnpm --filter @sj/gateway dev:world` to LOOK at the
+// product got it too, and had no way to know. The three-defects lane measured the cost: the
+// ambient canopy is 38 of 140 quads outside the ground on the fixture and 0 outside on the
+// showcase — same code, opposite verdicts, decided by which map loaded.
+describe('★ the fixture world must be asked for by name, never received by silence', () => {
+  const CLI = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'devWorld.ts'), 'utf8')
+
+  it('keeps the LIBRARY default on the fixture, because the gates hash that world', () => {
+    expect(DEV_MAP_DEFAULT).toBe('scripted')
+    expect(devTerrain()).toEqual(devTerrain('scripted'))
+  })
+
+  it('★ points the HUMAN path at the product town instead', () => {
+    expect(DEV_MAP_HUMAN).toBe('showcase')
+    expect(DEV_MAP_HUMAN).not.toBe(DEV_MAP_DEFAULT)
+    // and the CLI at the bottom of the module reads the human one, with the fixture opt-IN
+    expect(CLI).toMatch(/SJ_DEV_MAP'\] === 'scripted' \? 'scripted' : DEV_MAP_HUMAN/)
+  })
+
+  it('★ says which map it loaded, on every boot, in every path', () => {
+    // not in the CLI block — in startDevWorld, where a test harness and a person both pass
+    const cli = CLI.indexOf('import.meta.url === pathToFileURL')
+    const announce = CLI.indexOf('`dev world: map=${map} rings=')
+    expect(announce, 'no boot line naming the map').toBeGreaterThan(0)
+    expect(announce, 'the boot line is inside the CLI block, so a library caller never sees it')
+      .toBeLessThan(cli)
+    expect(CLI).toContain('THE FROZEN G6 TEST FIXTURE, not the product town')
+  })
+
+  it('the two worlds really are different towns, and the fixture is the one with no art', () => {
+    const fixture = townStructuresFor('scripted').map((s) => s.kind)
+    const product = townStructuresFor('showcase').map((s) => s.kind)
+    // the four kinds the art ingest reports NO ART for
+    const noArt = ['wagon', 'shed', 'scaffolding', 'standing_stone']
+    expect(fixture.filter((k) => noArt.includes(k)).length,
+      'the fixture is meant to be the one full of placeholders').toBeGreaterThanOrEqual(4)
+    expect(product.filter((k) => noArt.includes(k))).toEqual([])
+    expect(product.length).toBeGreaterThan(fixture.length)
   })
 })
 

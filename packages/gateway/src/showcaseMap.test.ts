@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { CITY_H, CITY_W, RIVER_LOCAL_DX, T_PATH, makeCityTemplate } from '@sj/shared'
+import { CITY_H, CITY_W, RIVER_LOCAL_DX, T_PATH, makeCityTemplate, townSpan } from '@sj/shared'
 import { TERRAIN_COST, makeFixtureMap } from '@sj/engine'
 import { DEV_MAP_DEFAULT, devTerrain } from './devWorld.js'
 import {
   FOREST_BAND_X0, GRASS_TILE, PLAZA_TILE, ROAD_TILE, ROCK_HILL, SHOWCASE_ANCHOR, SHOWCASE_H,
-  SHOWCASE_W, STANDING_STONE_TILE, ShowcaseMapSchema, WATER_TILE, makeShowcaseMap, roadReach,
-  showcaseDoorTile, showcaseStructureTiles, showcaseTerrain, toTileId,
+  SHOWCASE_MARGIN, SHOWCASE_W, STANDING_STONE_TILE, ShowcaseMapSchema, WATER_TILE,
+  forestBandX0, makeShowcaseMap, plazaTile, roadReach, rockHill, showcaseDoorTile,
+  showcaseSpan, showcaseStructureTiles, showcaseTerrain, standingStoneTile, toTileId,
 } from './showcaseMap.js'
 
 const map = makeShowcaseMap()
@@ -108,10 +109,88 @@ describe('showcaseTerrain', () => {
 })
 
 describe('devTerrain', () => {
-  it('keeps the G6 scripted fixture as the default and only swaps on an explicit opt-in', () => {
+  it('keeps the G6 scripted fixture as the LIBRARY default and only swaps on an explicit opt-in', () => {
     expect(devTerrain()).toEqual(makeFixtureMap())
     expect(devTerrain(DEV_MAP_DEFAULT)).toEqual(makeFixtureMap())
     expect(devTerrain('showcase')).toEqual(showcaseTerrain())
     expect(devTerrain('showcase')).not.toEqual(makeFixtureMap())
+  })
+})
+
+// ★★ THERE IS NO WAY TO LOOK AT A GROWN TOWN, AND THE LINE THAT SAYS SO READS LIKE A DERIVATION.
+//
+// `SHOWCASE_W = CITY_W + 2 * SHOWCASE_MARGIN` looks derived and is a constant: `CITY_W` is
+// `townSpan(TOWN_RINGS_GENESIS)`. The world-growth lane removed the world's ceiling and proved
+// rings 5 and 6; the town-generator proved ring 3 renders at 1904 × 816; merge train 2 could
+// reach neither in a browser and refused to fake one by editing this line. Every dimension is a
+// function of the ring count now, and the property below is the one that matters: it never asks
+// for a number, it asks that the map be the size the GRAMMAR says, at any ring count.
+describe('★ the showcase map is sized by the ring count, not by a constant', () => {
+  const RINGS = [1, 2, 3, 4, 5, 6]
+
+  it('is exactly the grammar\'s span plus two margins, at every ring count', () => {
+    for (const r of RINGS) {
+      const m = makeShowcaseMap(SHOWCASE_ANCHOR, r)
+      const want = townSpan(r) + 2 * SHOWCASE_MARGIN
+      expect(showcaseSpan(r), `rings ${r}`).toBe(want)
+      expect(m.terrain, `rings ${r} rows`).toHaveLength(want)
+      for (const row of m.terrain) expect(row, `rings ${r} cols`).toHaveLength(want)
+    }
+  })
+
+  it('★ grows strictly with the ring count — nothing here is pinned', () => {
+    const spans = RINGS.map((r) => showcaseSpan(r))
+    for (let i = 1; i < spans.length; i++) {
+      expect(spans[i]!, `ring ${RINGS[i]}`).toBeGreaterThan(spans[i - 1]!)
+    }
+    // and the numbers a lane needs to reach the chunked baker's own case
+    expect(showcaseSpan(1)).toBe(76)
+    expect(showcaseSpan(3)).toBe(152)
+  })
+
+  it('★ holds the whole platted town inside the map at every ring count', () => {
+    for (const r of RINGS) {
+      const m = makeShowcaseMap(SHOWCASE_ANCHOR, r)
+      const span = showcaseSpan(r)
+      for (const s of m.structures) {
+        for (const t of showcaseStructureTiles(s)) {
+          expect(t.x, `rings ${r}: ${s.kind} runs off the east edge`).toBeLessThan(span)
+          expect(t.y, `rings ${r}: ${s.kind} runs off the south edge`).toBeLessThan(span)
+          expect(Math.min(t.x, t.y), `rings ${r}: ${s.kind} runs off the origin`).toBeGreaterThanOrEqual(0)
+        }
+      }
+      // and every road tile the grammar drew is on the map it was drawn for
+      const roads = makeCityTemplate(SHOWCASE_ANCHOR, r).tiles
+        .filter((t) => toTileId(t.to) === ROAD_TILE)
+      expect(roads.length, `rings ${r} has no roads`).toBeGreaterThan(0)
+      for (const t of roads) {
+        expect(SHOWCASE_ANCHOR.x + t.dx, `rings ${r} road off the map`).toBeLessThan(span)
+        expect(SHOWCASE_ANCHOR.y + t.dy, `rings ${r} road off the map`).toBeLessThan(span)
+      }
+    }
+  })
+
+  it('leaves ring 1 byte-identical, so every landed gate folds the world it always did', () => {
+    expect(makeShowcaseMap(SHOWCASE_ANCHOR, 1)).toEqual(makeShowcaseMap())
+    expect(showcaseSpan(1)).toBe(SHOWCASE_W)
+    expect(showcaseSpan(1)).toBe(SHOWCASE_H)
+    expect(forestBandX0(1)).toBe(FOREST_BAND_X0)
+    expect(rockHill(1)).toEqual(ROCK_HILL)
+    expect(standingStoneTile(1)).toEqual(STANDING_STONE_TILE)
+    expect(plazaTile(1)).toEqual(PLAZA_TILE)
+  })
+
+  it('★ puts the plaza where a GROWN town keeps it, not where a one-ring town kept it', () => {
+    // the whole reason the map has to grow: the town's own origin walks a pitch north-west per
+    // ring, so a plaza pinned at ring 1's offset would be in a street by ring 2
+    const centres = [1, 2, 3].map((r) => plazaTile(r))
+    expect(new Set(centres.map((c) => `${c.x},${c.y}`)).size, 'the plaza did not move').toBe(3)
+    for (const r of [1, 2, 3]) {
+      const m = makeShowcaseMap(SHOWCASE_ANCHOR, r)
+      const p = plazaTile(r)
+      expect(m.terrain[p.y]![p.x], `rings ${r}: the plaza centre is not paved`).toBe(ROAD_TILE)
+      // and every road tile is still reachable from it, walking road to road
+      expect(roadReach(m, p).size, `rings ${r}: the plaza reaches no road`).toBeGreaterThan(0)
+    }
   })
 })
