@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { AssetCodex, CELL_NAMES_V4, encodePng, openForgeDb, type RawImage } from '@sj/forge'
 import {
-  ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, parseBuildingManifest, parseCharacterAtlasManifest,
-  roadAutotileKind,
+  DWELLING_FOOTPRINTS, ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, parseBuildingManifest,
+  parseCharacterAtlasManifest, roadAutotileKind,
 } from '@sj/shared'
 import { INTERIOR_KINDS, cityStructures, parseLibraryItemManifest, resolveFurnishingKind } from '@sj/shared'
 import { LIBRARY } from '@sj/forge'
@@ -70,7 +70,9 @@ describe('ingestProductionArt', () => {
     expect(first.every((e) => e.action === 'registered')).toBe(true)
     expect(first.map((e) => e.kind)).toContain('character:omar')
     expect(first.map((e) => e.kind)).toContain('standing_stone')
-    expect(first.map((e) => e.kind)).toContain('hut')
+    // ★ `house`, not `hut`. This line asserted `hut` for a whole merge train after the template
+    // renamed the kind, which is how a test can codify the very seam it was meant to hold.
+    expect(first.map((e) => e.kind)).toContain('house')
 
     // character record carries a parseable v4 atlas manifest with all 24 cells
     const omar = codex.listSince(0).find((r) => r.kind === 'character:omar')!
@@ -83,11 +85,13 @@ describe('ingestProductionArt', () => {
     const shed = codex.listSince(0).find((r) => r.kind === 'shed')!
     expect(parseBuildingManifest(shed.meta)?.cell.feetY).toBe(23)
 
-    // cottage: keyed, trimmed, ground-anchored, kind = the buildable 'hut'
-    const hut = codex.listSince(0).find((r) => r.kind === 'hut')!
-    const hutManifest = parseBuildingManifest(hut.meta)!
-    expect(hutManifest.footprint).toEqual({ w: 2, h: 2 })
-    expect(hutManifest.cell.feetY).toBeLessThan(hutManifest.cell.h)
+    // the anchor home: keyed, trimmed, ground-anchored, kind = the buildable dwelling the
+    // template actually stands, at the footprint the template gives it
+    const home = codex.listSince(0).find((r) => r.kind === 'house')!
+    const homeManifest = parseBuildingManifest(home.meta)!
+    expect(homeManifest.footprint).toEqual(DWELLING_FOOTPRINTS.house)
+    expect(homeManifest.cell.feetY).toBeLessThan(homeManifest.cell.h)
+    expect(codex.listSince(0).some((r) => r.kind === 'hut'), 'nothing places `hut`').toBe(false)
 
     // second run: nothing new
     const second = await ingestProductionArt(db, { artRoot: root, styleAnchorPath: anchor })
@@ -102,6 +106,30 @@ describe('ingestProductionArt', () => {
     expect(omars).toHaveLength(2)
     expect(omars.at(-1)!.seq).toBeGreaterThan(omars[0]!.seq)
 
+    db.close()
+  }, 30_000)
+
+  // ★ THE REASON THE TOWN HAD NO ART AT ALL. The art root is a session scratchpad; on the
+  // round-4 tip it held the whole directory tree and zero files. One ENOENT on the first
+  // founder aborted the loop, so the four founders behind it, all five buildings and the
+  // anchor home never registered either.
+  it('steps over art the scratchpad no longer holds instead of losing the rest', async () => {
+    const root = join(dir, 'art-gapped')
+    await buildArtRoot(root, 100)
+    rmSync(join(root, FOUNDER_ART[0]!.dir, 'manifest.json'), { force: true })
+    const anchor = join(dir, 'style-anchor.png')
+    writeFileSync(anchor, await encodePng(magentaCottage()))
+    const db = openForgeDb(join(dir, 'gapped.db'))
+
+    const entries = await ingestProductionArt(db, { artRoot: root, styleAnchorPath: anchor })
+    const missing = entries.filter((e) => e.action === 'missing')
+    expect(missing.map((e) => e.kind)).toEqual([`character:${FOUNDER_ART[0]!.id}`])
+    expect(missing[0]!.detail).toMatch(/ENOENT/)
+    // everything downstream of the gap still landed — including the home the gap used to eat
+    const kinds = new Set(new AssetCodex(db).listSince(0).map((r) => r.kind))
+    expect(kinds).toContain('house')
+    expect(kinds).toContain('standing_stone')
+    expect(kinds).toContain(`character:${FOUNDER_ART[4]!.id}`)
     db.close()
   }, 30_000)
 })
