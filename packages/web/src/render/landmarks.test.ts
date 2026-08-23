@@ -2,11 +2,15 @@ import { describe, it, expect } from 'vitest'
 import type { WorldState } from '@sj/engine'
 import { GAMIFICATION_BAN } from '../ui/townStats.js'
 import {
-  LANDMARK_INK, LANDMARK_LABEL_PX, LANDMARK_PLATE, LANDMARK_SHOW_BELOW_SCALE, SILHOUETTE_RANK,
-  TOWN_KINDS, landmarkAlpha, landmarkStyle, landmarksOf, placeLandmarks,
+  LANDMARK_INK, LANDMARK_LABEL_PX, LANDMARK_PAD_X, LANDMARK_PAD_Y, LANDMARK_PLATE,
+  LANDMARK_SHOW_BELOW_SCALE, LEGEND_INK_SHARE, SILHOUETTE_RANK,
+  TOWN_KINDS, landmarkAlpha, landmarkStyle, landmarksOf, leashOf, legendFits, placeLandmarks,
+  rectOfBounds, standingOf, type PlaceableMark,
 } from './landmarks.js'
 import { AA_RATIO, bandRatios } from './legibility.js'
-import { ZOOM_STOPS } from './camera.js'
+import { ZOOM_STOPS, drawnBoundsOf } from './camera.js'
+import { bigTown } from './bigTown.js'
+import { anchorFor, makeCityTemplate } from '@sj/shared'
 import { FACE_DESIGN_PX } from './textFaces.js'
 import { TEXT_MIN_PX } from '../textFloor.js'
 import { readFileSync } from 'node:fs'
@@ -34,6 +38,13 @@ const TOWN: S[] = [
 
 const worldOf = (list: S[]): WorldState =>
   ({ structures: Object.fromEntries(list.map((s) => [s.id, s])) }) as unknown as WorldState
+
+/** A placeable name whose subject is a small building standing where the name points. Every
+ *  call site has to name a subject now: a plate that does not know what it labels cannot be
+ *  kept off it, and that omission is exactly how the legend came to cover the map. */
+const mk = (
+  id: string, sx: number, sy: number, size: { w: number; h: number },
+): PlaceableMark => ({ id, sx, sy, size, of: [{ x: sx - 16, y: sy - 32, w: 32, h: 40 }] })
 
 const town = landmarksOf(worldOf(TOWN))
 
@@ -132,12 +143,18 @@ describe('two place names never land on each other', () => {
   const overlaps = (a: Rect, b: Rect): boolean =>
     a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
-  it('separates four names asking for the same point', () => {
+  // This used to assert all four were placed. It cannot any more, and the reason is the fix:
+  // four names pointing at ONE building, which is itself keep-out now and holds one plate's
+  // worth of clear ground inside a leash of itself. The three that cannot be that building's
+  // caption are dropped instead of marching off across the map. Separation is the law; the
+  // count never was — and the count is exactly what the old picture's stack satisfied.
+  it('separates the names that ask for the same point, and drops the ones with no room', () => {
     const size = { w: 120, h: 22 }
     const placed = placeLandmarks(
-      ['a', 'b', 'c', 'd'].map((id) => ({ id, sx: 400, sy: 300, size })), VIEW,
+      ['a', 'b', 'c', 'd'].map((id) => mk(id, 400, 300, size)), VIEW,
     )
-    expect(placed).toHaveLength(4)
+    expect(placed.length).toBeGreaterThanOrEqual(1)
+    expect(placed.length, 'four captions for one building is not four captions').toBeLessThan(4)
     for (let i = 0; i < placed.length; i++) {
       for (let j = i + 1; j < placed.length; j++) {
         expect(overlaps(placed[i]!.rect, placed[j]!.rect), `${i} vs ${j}`).toBe(false)
@@ -148,8 +165,8 @@ describe('two place names never land on each other', () => {
   it('keeps every plate inside the view, wherever the landmark is', () => {
     const size = { w: 140, h: 22 }
     const marks = [
-      { id: 'nw', sx: -50, sy: -50, size }, { id: 'ne', sx: 900, sy: 5, size },
-      { id: 'sw', sx: 4, sy: 700, size }, { id: 'se', sx: 1200, sy: 900, size },
+      mk('nw', -50, -50, size), mk('ne', 900, 5, size),
+      mk('sw', 4, 700, size), mk('se', 1200, 900, size),
     ]
     for (const p of placeLandmarks(marks, VIEW)) {
       expect(p.rect.x, p.id).toBeGreaterThanOrEqual(VIEW.x)
@@ -161,8 +178,8 @@ describe('two place names never land on each other', () => {
 
   it('is deterministic — two calls with the same marks agree', () => {
     const marks = [
-      { id: 'a', sx: 100, sy: 100, size: { w: 90, h: 20 } },
-      { id: 'b', sx: 108, sy: 104, size: { w: 90, h: 20 } },
+      mk('a', 100, 100, { w: 90, h: 20 }),
+      mk('b', 108, 104, { w: 90, h: 20 }),
     ]
     expect(placeLandmarks(marks, VIEW)).toEqual(placeLandmarks(marks, VIEW))
   })
@@ -201,23 +218,23 @@ describe('placeLandmarks culls to the view', () => {
   const size = { w: 90, h: 20 }
 
   it('places a name whose place is on screen', () => {
-    const out = placeLandmarks([{ id: 'here', sx: 400, sy: 300, size }], VIEW)
+    const out = placeLandmarks([mk('here', 400, 300, size)], VIEW)
     expect(out.map((o) => o.id)).toEqual(['here'])
   })
 
   it('★ drops a name whose place is far outside the view instead of dragging it in', () => {
-    const out = placeLandmarks([{ id: 'far', sx: 9000, sy: 9000, size }], VIEW)
+    const out = placeLandmarks([mk('far', 9000, 9000, size)], VIEW)
     expect(out).toEqual([])
   })
 
   it('keeps one just past the edge, so a name does not blink at the boundary', () => {
-    const out = placeLandmarks([{ id: 'edge', sx: VIEW.w + 10, sy: 300, size }], VIEW)
+    const out = placeLandmarks([mk('edge', VIEW.w + 10, 300, size)], VIEW)
     expect(out.map((o) => o.id)).toEqual(['edge'])
   })
 
   it('★ the count it places follows the VIEW, not the size of the town', () => {
     const spread = (n: number): Parameters<typeof placeLandmarks>[0] =>
-      Array.from({ length: n }, (_, i) => ({ id: `m${i}`, sx: i * 400, sy: (i % 7) * 300, size }))
+      Array.from({ length: n }, (_, i) => mk(`m${i}`, i * 400, (i % 7) * 300, size))
     const few = placeLandmarks(spread(10), VIEW).length
     const many = placeLandmarks(spread(400), VIEW).length
     expect(many).toBe(few)
@@ -225,18 +242,158 @@ describe('placeLandmarks culls to the view', () => {
   })
 
   it('an off-screen name never takes a placement slot from an on-screen one', () => {
-    const alone = placeLandmarks([{ id: 'a', sx: 400, sy: 300, size }], VIEW)
+    const alone = placeLandmarks([mk('a', 400, 300, size)], VIEW)
     const crowded = placeLandmarks([
-      ...Array.from({ length: 50 }, (_, i) => ({ id: `off${i}`, sx: 5000 + i, sy: 5000, size })),
-      { id: 'a', sx: 400, sy: 300, size },
+      ...Array.from({ length: 50 }, (_, i) => mk(`off${i}`, 5000 + i, 5000, size)),
+      mk('a', 400, 300, size),
     ], VIEW)
     expect(crowded.find((o) => o.id === 'a')).toEqual(alone[0])
   })
 })
 
-describe('the legend gives way when it is bigger than the map', () => {
-  it('is absent at the widest stop and full at the one above it', () => {
-    expect(landmarkAlpha(0.25)).toBe(0)
+// ★★ WHAT TWO MORE BROWSER SESSIONS CAUGHT, WITH THE PREVIOUS FIX LIVE AND THE SUITE GREEN.
+//
+// The camera lane answered the covered map with a bottom end on `landmarkAlpha`: gone at 0.25,
+// full at 0.5. That is true of ONE town at ONE stop. At 0.5 the same eleven-building showcase
+// still put THE WELL, THE HOUSES, THE SQUARE and THE FIRE PIT into a stepped stack over the
+// square, the well and the fire pit — photographed by merge train 2 and again by this lane —
+// because `placeTag` stepped each plate clear of the other PLATES and of nothing else. And in
+// the other direction the ramp was wrong too: a four-ring town at 0.25 is 1056 px across and
+// has ample room for its names, and the hard-coded 0.25 would have hidden them anyway.
+//
+// So neither end is a zoom number. Both are geometry:
+//   1. a name is drawn only where it covers no named place and no other name;
+//   2. the legend as a whole is drawn only while its ink is a small share of the settlement's
+//      drawn area ON SCREEN — the one quantity that moves with the zoom AND with the town.
+// The tests below assert those two relationships over ring counts and zoom stops, never a
+// plate count and never a scale.
+
+describe('★ the legend never covers the map it explains', () => {
+  const VIEW = { x: -4000, y: -4000, w: 8000, h: 8000 }
+  const overlaps = (a: Rect, b: Rect): boolean =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+
+  /** THE TOWN A VIEWER OPENS — the grammar's own output at the showcase anchor, not a fixture
+   *  written beside it. Its six names and its 1136 × 520 drawn box are the numbers in the two
+   *  browser reports this rule answers. */
+  const templateTown = (rings: number): S[] => {
+    const a = anchorFor(rings)
+    return makeCityTemplate(a, rings).structures.map((s, i) =>
+      stand(`s${i}_${s.kind}`, s.kind, a.x + s.dx, a.y + s.dy, s.w, s.h))
+  }
+
+  /** Every name the town derives, with the drawn box of what it names and a plate sized off
+   *  the face this product really sets it in. `size` is in WORLD units, as the layer computes
+   *  it: a plate counter-scales, so it holds a constant SCREEN size and grows as you zoom out. */
+  const legendOf = (list: S[], zoom: number): PlaceableMark[] =>
+    landmarksOf(worldOf(list)).map((m) => {
+      const style = landmarkStyle(m.rank)
+      // monospace on an 8px em, the advance textFaces declares for the pixel face
+      const w = m.name.length * 0.65 * style.size + LANDMARK_PAD_X * 2
+      const h = style.size + LANDMARK_PAD_Y * 2
+      const b = drawnBoundsOf(m.of)
+      return {
+        id: m.id, sx: (b.minX + b.maxX) / 2, sy: (b.minY + b.maxY) / 2,
+        size: { w: w / zoom, h: h / zoom },
+        of: m.of.map((f) => rectOfBounds(drawnBoundsOf([f]))),
+      }
+    })
+
+  const inkAt = (list: S[], zoom: number): number =>
+    legendOf(list, zoom).reduce((n, m) => n + m.size.w * m.size.h, 0) * zoom * zoom
+  const townAt = (list: S[], zoom: number): number => {
+    const b = rectOfBounds(drawnBoundsOf(standingOf(worldOf(list))))
+    return b.w * zoom * (b.h * zoom)
+  }
+
+  // Three towns with nothing in common but the grammar: the one a viewer opens, the hand-built
+  // fixture the older tests use, and the ruler with a building on every plot of every block.
+  const TOWNS: Array<[string, S[]]> = [
+    ['template ring 1', templateTown(1)],
+    ['template ring 3', templateTown(3)],
+    ['the task-59 town', TOWN],
+    ['the ruler, 2 rings', bigTown(2).map((s) => stand(s.id, s.kind, s.x, s.y, s.w, s.h))],
+  ]
+
+  it('★ places no name over any named place, at any stop, in any town', () => {
+    for (const [what, list] of TOWNS) {
+      for (const zoom of ZOOM_STOPS) {
+        const marks = legendOf(list, zoom)
+        const places = marks.flatMap((m) => m.of)
+        for (const p of placeLandmarks(marks, VIEW)) {
+          for (const s of places) {
+            expect(overlaps(p.rect, s), `${what} at ${zoom}: ${p.id} covers a place`).toBe(false)
+          }
+        }
+      }
+    }
+  })
+
+  it('★ places no name over another name either, over the same sweep', () => {
+    for (const [what, list] of TOWNS) {
+      for (const zoom of ZOOM_STOPS) {
+        const out = placeLandmarks(legendOf(list, zoom), VIEW)
+        for (let i = 0; i < out.length; i++) {
+          for (let j = i + 1; j < out.length; j++) {
+            expect(overlaps(out[i]!.rect, out[j]!.rect), `${what} at ${zoom}`).toBe(false)
+          }
+        }
+      }
+    }
+  })
+
+  it('★ never puts a name further from its place than the name is big', () => {
+    for (const [what, list] of TOWNS) {
+      for (const zoom of ZOOM_STOPS) {
+        const marks = legendOf(list, zoom)
+        const by = new Map(marks.map((m) => [m.id, m]))
+        for (const p of placeLandmarks(marks, VIEW)) {
+          const m = by.get(p.id)!
+          expect(overlaps(p.rect, leashOf(m.of, m.size)), `${what} at ${zoom}: ${p.id} walked off its place`)
+            .toBe(true)
+        }
+      }
+    }
+  })
+
+  it('★ gives way at the stop where the legend outgrows the town, and not before', () => {
+    const town = templateTown(1)
+    // The two pictures on file: 12.8 % of the settlement at 0.5, which two lanes approved,
+    // and 51.2 % at 0.25, which two lanes photographed and called a defect.
+    expect(legendFits(inkAt(town, 0.5), townAt(town, 0.5)), 'the approved 0.5 picture').toBe(true)
+    expect(legendFits(inkAt(town, 0.25), townAt(town, 0.25)), 'the covered 0.25 picture').toBe(false)
+  })
+
+  it('★ it is the RATIO, not the stop: hold the legend, grow the town, the names come back', () => {
+    const town = templateTown(1)
+    const ink = inkAt(town, 0.25), map = townAt(town, 0.25)
+    expect(legendFits(ink, map)).toBe(false)
+    // The same legend over a settlement four times the drawn area — two rings of growth — at
+    // the same stop. Nothing about the camera changed; the map got big enough to caption.
+    expect(legendFits(ink, map * 4), 'a grown town keeps its names at the widest stop').toBe(true)
+  })
+
+  it('the rule is monotone in the zoom: what gives way stays given way, going wider', () => {
+    const town = templateTown(1)
+    let gone = false
+    for (const z of [...ZOOM_STOPS].sort((a, b) => b - a)) {
+      const fits = legendFits(inkAt(town, z), townAt(town, z))
+      if (fits && gone) expect.unreachable(`stop ${z} took the legend back after it gave way`)
+      if (!fits) gone = true
+    }
+    expect(gone, 'no stop in the ladder is wide enough to lose the legend').toBe(true)
+  })
+
+  it('the share is the only number in the rule, and an empty town has no map to explain', () => {
+    expect(LEGEND_INK_SHARE).toBeGreaterThan(0)
+    expect(LEGEND_INK_SHARE).toBeLessThan(1)
+    expect(legendFits(1, 0)).toBe(false)
+  })
+})
+
+describe('landmarkAlpha is only the fade on the way IN now', () => {
+  it('is full across every stop wide enough to want a legend', () => {
+    expect(landmarkAlpha(0.25)).toBe(1)
     expect(landmarkAlpha(0.5)).toBe(1)
   })
 
@@ -245,8 +402,8 @@ describe('the legend gives way when it is bigger than the map', () => {
     expect(landmarkAlpha(2)).toBe(0)
   })
 
-  it('the fade sits strictly between the two stops, so no rest stop is caught mid-band', () => {
-    const mid = landmarkAlpha(0.375)
+  it('the fade sits strictly between two stops, so no rest stop is caught mid-band', () => {
+    const mid = landmarkAlpha(0.875)
     expect(mid).toBeGreaterThan(0)
     expect(mid).toBeLessThan(1)
   })

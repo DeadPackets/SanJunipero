@@ -4,6 +4,7 @@ import { Container, Graphics } from 'pixi.js'
 import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { tileToScreen } from './iso.js'
+import { drawnBoundsOf, type CameraBounds } from './camera.js'
 import type { Scene } from './scene.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
 import { FACE_SIZES, THOUGHT_FILL, faceFor, worldTextScale } from './textFaces.js'
@@ -18,7 +19,15 @@ import { LANDMARK_EDGE, LANDMARK_INK, LANDMARK_PLATE } from './legibility.js'
 // Every name is DERIVED from what is standing. Nothing here is authored twice, and nothing
 // here is machine vocabulary — a person reads "the square", never "structure_well_17_21".
 
-export type Landmark = { id: string; name: string; x: number; y: number; rank: 1 | 2 | 3 }
+export type Footprint = { x: number; y: number; w: number; h: number }
+
+export type Landmark = {
+  id: string; name: string; x: number; y: number; rank: 1 | 2 | 3
+  /** ★ WHAT THIS NAME IS FOR — every footprint it speaks about, so the layer can keep the
+   *  plate off them. A district's name belongs to all its members; a single building's to
+   *  itself. A name that does not know what it names cannot be kept from hiding it. */
+  of: readonly Footprint[]
+}
 
 /** Every kind the town can stand, dev fixture included. A new kind with no rank is a type error. */
 export const TOWN_KINDS = [
@@ -63,25 +72,24 @@ const SINGLE_NAME: Partial<Record<TownKind, string>> = {
  * bubbles. Both fades happen during the transit between stops, which is motion, not a state a
  * viewer reads in.
  *
- * ★ WHY THERE IS A BOTTOM END NOW. The camera lane added 0.25 for a town two rings of blocks
- * cannot fit inside. At that stop the eleven-building showcase is 320 px across and each
- * counter-scaled plate is about 140 px — six of them stacked into a column taller than the
- * settlement, hiding the map they explain. A name is a legend for a view in which you can
- * still see the place it names; wider than that, the town is a shape and wants no caption.
+ * ★ THE BOTTOM END IS NOT HERE ANY MORE, AND THAT IS THE POINT. It used to be a second pair of
+ * hard-coded scales — full at 0.5, gone at 0.25 — added when 0.25 joined the ladder and the
+ * legend covered the eleven-building showcase. Two lanes then looked at 0.5 in a browser and
+ * saw four plates stacked on the town centre with that fix live and green: the ramp had cured
+ * one stop of one town and named neither the relationship nor the other stop. Alpha was being
+ * asked to solve a layout problem, which is the habit this project has now unlearned three
+ * times. `legendFits` and `placeLandmarks` own the wide end, on geometry; this function is only
+ * the fade on the way IN, where a name is clutter over art a viewer can already read.
  */
 export const LANDMARK_SHOW_BELOW_SCALE = 1
 const LANDMARK_FULL_BELOW_SCALE = 0.75
-/** Full at 0.5, gone at 0.25 — the fade lives strictly between the two stops. */
-const LANDMARK_FULL_ABOVE_SCALE = 0.45
-export const LANDMARK_HIDE_BELOW_SCALE = 0.3
 
 /** The chrome type floor is 12px and a world label is chrome. */
 export const LANDMARK_LABEL_PX = faceFor('label').size
 
 export function landmarkAlpha(scale: number): number {
   const inward = (LANDMARK_SHOW_BELOW_SCALE - scale) / (LANDMARK_SHOW_BELOW_SCALE - LANDMARK_FULL_BELOW_SCALE)
-  const outward = (scale - LANDMARK_HIDE_BELOW_SCALE) / (LANDMARK_FULL_ABOVE_SCALE - LANDMARK_HIDE_BELOW_SCALE)
-  return Math.min(1, Math.max(0, Math.min(inward, outward)))
+  return Math.min(1, Math.max(0, inward))
 }
 
 type Standing = { id: string; kind: string; x: number; y: number; w: number; h: number }
@@ -89,22 +97,34 @@ type Standing = { id: string; kind: string; x: number; y: number; w: number; h: 
 const centreOf = (s: Standing): { x: number; y: number } =>
   ({ x: s.x + ((s.w - 1) >> 1), y: s.y + ((s.h - 1) >> 1) })
 
+/** The settlement as it stands, in one order. The legend and its size rule read the same list,
+ *  so the names and the map they are measured against can never be two different towns. */
+export function standingOf(state: WorldState | null): Standing[] {
+  return Object.values(state?.structures ?? {})
+    .filter((s) => s.stage === 'complete')
+    .sort((a, b) => a.id.localeCompare(b.id))
+}
+
+/** A `CameraBounds` as the `Rect` every placement rule in the product speaks. */
+export const rectOfBounds = (b: CameraBounds): Rect =>
+  ({ x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY })
+
 /** Derived from what is standing, never authored twice. rank 1 = the centre, 2 = a district
  *  anchor, 3 = a notable single building. Sorted by rank then id, so two calls agree. */
 export function landmarksOf(state: WorldState): Landmark[] {
-  const standing: Standing[] = Object.values(state.structures ?? {})
-    .filter((s) => s.stage === 'complete')
-    .sort((a, b) => a.id.localeCompare(b.id))
+  const standing = standingOf(state)
 
   const out: Landmark[] = []
+
+  const boxOf = (s: Standing): Footprint => ({ x: s.x, y: s.y, w: s.w, h: s.h })
 
   for (const s of standing) {
     const kind = s.kind as TownKind
     // The fire pit is the one thing a town gathers around, so it is the centre and the only
     // rank 1. The other named singles are landmarks you navigate by, not the middle.
-    if (kind === 'fire_pit') out.push({ id: s.id, name: SINGLE_NAME[kind]!, x: s.x, y: s.y, rank: 1 })
+    if (kind === 'fire_pit') out.push({ id: s.id, name: SINGLE_NAME[kind]!, x: s.x, y: s.y, rank: 1, of: [boxOf(s)] })
     else if (SINGLE_NAME[kind] !== undefined)
-      out.push({ id: s.id, name: SINGLE_NAME[kind]!, x: s.x, y: s.y, rank: 3 })
+      out.push({ id: s.id, name: SINGLE_NAME[kind]!, x: s.x, y: s.y, rank: 3, of: [boxOf(s)] })
   }
 
   for (const district of DISTRICT_ORDER) {
@@ -117,6 +137,7 @@ export function landmarksOf(state: WorldState): Landmark[] {
       x: Math.round(cs.reduce((n, c) => n + c.x, 0) / cs.length),
       y: Math.round(cs.reduce((n, c) => n + c.y, 0) / cs.length),
       rank: 2,
+      of: members.map(boxOf),
     })
   }
 
@@ -164,6 +185,38 @@ export type LandmarkLayer = { sync(): void; destroy(): void }
  */
 export const LANDMARK_CULL_MARGIN_PX = 120
 
+/** The one predicate two rects touch. `tooltip.ts` keeps its own copy private; a legend that
+ *  must not cover the map cannot ask a module that does not export the question. */
+const hits = (a: Rect, b: Rect): boolean =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+
+export type PlaceableMark = {
+  id: string
+  sx: number
+  sy: number
+  size: { w: number; h: number }
+  /** The DRAWN box of every place this name is for, in the same space as `sx`/`sy`. Required,
+   *  not optional: a caller that does not say what a name names cannot be told to keep off it,
+   *  and that omission is precisely how the legend came to cover the map.
+   *
+   *  ONE BOX PER BUILDING, never the bounding box of a district. The square's three buildings
+   *  stand around a plaza, and the paving between them is where its caption belongs; a union
+   *  box swallows the plaza, the town centre becomes keep-out and THE FIRE PIT — the one rank-1
+   *  name in the product — is the first thing dropped. */
+  of: readonly Rect[]
+}
+
+/** The extent of what a name is for. Its leash is measured from here, so a district's caption
+ *  may sit anywhere along the district and a single building's may not wander. */
+const extentOf = (of: readonly Rect[]): Rect => {
+  const x = Math.min(...of.map((r) => r.x)), y = Math.min(...of.map((r) => r.y))
+  return {
+    x, y,
+    w: Math.max(...of.map((r) => r.x + r.w)) - x,
+    h: Math.max(...of.map((r) => r.y + r.h)) - y,
+  }
+}
+
 /**
  * Where each plate goes, in rank order, so the centre keeps its place and the districts move
  * around it. `placeTag` is the product's one placement rule (task 74) and it already knows how
@@ -176,24 +229,77 @@ export const LANDMARK_CULL_MARGIN_PX = 120
  * places that are actually there. It is O(n²) in that wall, and under the ring grammar n has
  * no bound. A name belongs to a place; if the place is off screen, so is the name.
  *
+ * ★★ AND EVERY NAMED PLACE IS GROUND A PLATE MAY NOT TAKE. The plates already stepped clear of
+ * EACH OTHER and of nothing else, so at the wide stops they stepped clear of one another into
+ * a tidy stack sitting on the square, the well, the fire pit and the storehouse — the four
+ * things the legend was there to point at. A caption over its own subject is not a caption.
+ * The places of names that will NOT be drawn count too: hiding a place is the defect, and
+ * whether that place's own plate survived has nothing to do with it.
+ *
+ * `placeTag` clamps into the view and gives up after `MAX_STACK_STEPS`, so its answer is a best
+ * effort and never a promise. A plate that still lands on a place or on another name is not
+ * drawn: a missing name costs a viewer one word, a covered place costs them the map.
+ *
+ * ★★★ AND A NAME IS ON A LEASH. Making the places keep-out turns a stack into a MARCH: each
+ * plate steps away from the pile and the next one steps past it, until the four names of the
+ * town centre are a block of type over the river with nothing under them they describe. That
+ * is the same defect wearing a different hat. A caption that has walked further than its own
+ * size from what it captions is no longer that thing's caption, so it is not drawn — and the
+ * leash is the plate's own size, which scales with the plate and is not a number anybody chose.
+ *
  * Only the ids it returns are drawn. The caller hides the rest.
  */
+export const leashOf = (of: readonly Rect[], size: { w: number; h: number }): Rect => {
+  const e = extentOf(of)
+  return { x: e.x - size.w, y: e.y - size.h, w: e.w + size.w * 2, h: e.h + size.h * 2 }
+}
+
 export function placeLandmarks(
-  marks: ReadonlyArray<{ id: string; sx: number; sy: number; size: { w: number; h: number } }>,
+  marks: readonly PlaceableMark[],
   view: Rect,
 ): Array<{ id: string; sx: number; sy: number; rect: Rect }> {
   const m0 = LANDMARK_CULL_MARGIN_PX
+  const places = marks.flatMap((m) => m.of)
   const taken: Rect[] = []
   const out: Array<{ id: string; sx: number; sy: number; rect: Rect }> = []
   for (const m of marks) {
     if (m.sx < view.x - m0 || m.sx > view.x + view.w + m0) continue
     if (m.sy < view.y - m0 || m.sy > view.y + view.h + m0) continue
-    const at = placeTag({ sx: m.sx, sy: m.sy, halfW: m.size.w / 2, topY: m.sy }, m.size, view, taken)
+    const at = placeTag({ sx: m.sx, sy: m.sy, halfW: m.size.w / 2, topY: m.sy }, m.size, view, [...places, ...taken])
     const rect = { x: at.sx - m.size.w / 2, y: at.sy, w: m.size.w, h: m.size.h }
+    if (places.some((p) => hits(rect, p)) || taken.some((t) => hits(rect, t))) continue
+    if (!hits(rect, leashOf(m.of, m.size))) continue
     taken.push(rect)
     out.push({ id: m.id, sx: at.sx, sy: at.sy, rect })
   }
   return out
+}
+
+/**
+ * ★ THE LEGEND MUST BE SMALLER THAN THE MAP IT EXPLAINS, AND THAT IS NOT A ZOOM NUMBER.
+ *
+ * The bottom end of `landmarkAlpha` used to be a pair of hard-coded scales — full at 0.5, gone
+ * at 0.25. That is only ever true of ONE town: it says nothing about a settlement four rings
+ * wide, which at 0.25 is 1056 px across and has ample room for its names, and it would say the
+ * wrong thing again the moment the stop ladder grows a rung.
+ *
+ * The quantity that actually decides is scale-free and size-free. A plate holds a CONSTANT
+ * screen size (worldTextScale counter-scales it) while the settlement shrinks with the camera,
+ * so the legend's ink measured against the settlement's drawn area ON SCREEN is right for any
+ * zoom, any stop ladder, any plate count and any town.
+ *
+ * MEASURED on the showcase town (drawn box 1136 × 520 world px, six plates, 18 912 px² of ink):
+ *   1×    3.2 % — shown (and the inward fade has already taken it by then)
+ *   0.5  12.8 % — shown; this is the picture the camera lane approved
+ *   0.25 51.2 % — hidden; this is the picture merge train 2 photographed and called a defect
+ * The two cases are four times apart. `1 / 6` sits between them with 30 % of headroom below
+ * and a factor of three above, and it is the only number in this rule.
+ */
+export const LEGEND_INK_SHARE = 1 / 6
+
+/** Both areas in SCREEN px². A settlement with no drawn area has no map to explain. */
+export function legendFits(inkPx2: number, townPx2: number): boolean {
+  return townPx2 > 0 && inkPx2 <= townPx2 * LEGEND_INK_SHARE
 }
 
 /**
@@ -217,11 +323,12 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
     const state = store.getState()
     const marks = state === null ? [] : landmarksOf(state)
     const seen = new Set<string>()
-    const inv = worldTextScale(scene.world.scale.x)
+    const z = scene.world.scale.x
+    const inv = worldTextScale(z)
 
     // Build (or reuse) every plate first, THEN place them together: a name cannot know it is
     // landing on another name until every size is known.
-    const wanted: Array<{ id: string; sx: number; sy: number; size: { w: number; h: number } }> = []
+    const wanted: PlaceableMark[] = []
     for (const m of marks) {
       seen.add(m.id)
       const style = landmarkStyle(m.rank)
@@ -256,18 +363,30 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
       wanted.push({
         id: m.id, sx, sy,
         size: { w: (t.label.width + LANDMARK_PAD_X * 2) * inv, h: (t.label.height + LANDMARK_PAD_Y * 2) * inv },
+        // The same drawn box the camera fits and the cull tests, one per building, so the
+        // legend and the picture cannot disagree about where a building is.
+        of: m.of.map((f) => rectOfBounds(drawnBoundsOf([f]))),
       })
     }
 
+    // ★ A LEGEND BIGGER THAN ITS MAP IS NOT A LEGEND. Ink and settlement are compared on
+    // SCREEN, where the plate holds a constant size and the town does not.
+    const town = rectOfBounds(drawnBoundsOf(standingOf(state)))
+    const ink = wanted.reduce((n, w) => n + w.size.w * w.size.h, 0) * z * z
+    const fits = legendFits(ink, town.w * z * (town.h * z))
+
     // Only what was placed is drawn. A plate left visible at its last position would be a name
-    // sitting over a place that is no longer under it.
+    // sitting over a place that is no longer under it — and the sweep below still has to run,
+    // so a legend that gave way must not take an early return out of it and leak its plates.
     const placed = new Set<string>()
-    for (const at of placeLandmarks(wanted, scene.viewRect())) {
-      const t = labels.get(at.id)
-      if (t === undefined) continue
-      placed.add(at.id)
-      t.node.visible = true
-      t.node.position.set(Math.round(at.sx), Math.round(at.sy + LANDMARK_PAD_Y * inv))
+    if (fits) {
+      for (const at of placeLandmarks(wanted, scene.viewRect())) {
+        const t = labels.get(at.id)
+        if (t === undefined) continue
+        placed.add(at.id)
+        t.node.visible = true
+        t.node.position.set(Math.round(at.sx), Math.round(at.sy + LANDMARK_PAD_Y * inv))
+      }
     }
     for (const [id, t] of labels) if (!placed.has(id)) t.node.visible = false
 
