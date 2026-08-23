@@ -8,9 +8,10 @@ import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import { TILE_COLORS } from './ground.js'
 import { ROAD, WATER, bigTownPlaced, bigTownSide, bigTownTerrain } from './bigTown.js'
 import {
+  MARK_GROUNDS, MARK_HALO, MARK_MIN_CONTRAST, MARK_PERSON, MARK_VIEW, MARK_WATCHED,
   MINIMAP_H, MINIMAP_PAGE, MINIMAP_W, VIEW_MIN_PX,
-  mapToWorld, minimapActionFor, minimapFit, minimapPixels, minimapShown, minimapViewBox,
-  overlayOps, pageTarget, peopleDots, travelTargetAt, viewHoldsTown, worldToMap,
+  dotOps, mapToWorld, minimapActionFor, minimapFit, minimapPixels, minimapShown, minimapViewBox,
+  overlayOps, pageTarget, peopleDots, travelTargetAt, viewHoldsTown, viewOps, worldToMap,
   type MinimapFit,
 } from './minimap.js'
 
@@ -486,6 +487,93 @@ describe('what one frame of the overlay costs, counted', () => {
   })
 })
 
+// ── 5b · ★ EVERY MARK IS LEGIBLE ON EVERY GROUND, AND IT IS MEASURED ──────────────────────
+//
+// The chrome's mandate is that no single palette token clears AA in both bands, so per-band
+// tokens are mandatory. The same is true one level down, on this canvas: the grounds run from
+// `forest` #4F7040 to `sand` #E8D5BC and include the ink of the buildings, and NO ONE COLOUR
+// clears 3:1 on all of them. So every mark is layered, and the law is: for each ground, at
+// least one tone of the mark must clear 3:1 against it.
+//
+// This caught a real failure. The watched marker was two tones, and on `forest` the ember read
+// 1.95 and its own `--deep` halo 2.85 — both under the floor, on the one mark a viewer is
+// hunting for. It is three tones now. Opacity is not a contrast strategy and is not used here.
+
+const channel = (v: number): number => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+const luminance = (c: number): number => {
+  const [r, g, b] = [(c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff].map((v) => channel(v / 255))
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!
+}
+const contrast = (a: number, b: number): number => {
+  const [x, y] = [luminance(a), luminance(b)]
+  const [hi, lo] = x > y ? [x, y] : [y, x]
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+describe('the marks a viewer reads, against every ground under them', () => {
+  const { bounds } = townOf(3)
+  const f = minimapFit(bounds)
+  const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`
+
+  /** The tones one mark is drawn in, outermost first — read off the display list itself, so a
+   *  mark that changes shape cannot quietly leave this check behind. */
+  const tonesOf = (dot: { mx: number; my: number; focus: boolean }): number[] =>
+    dotOps([dot], f).map((o) => o.color)
+
+  it('prints the table this rule is enforced from', () => {
+    const marks: Array<[string, number[]]> = [
+      ['the camera rectangle', [...new Set(viewOps({ x: 0, y: 0, w: 2000, h: 1000 }, f).map((o) => o.color))]],
+      ['a person', tonesOf({ mx: 40, my: 40, focus: false })],
+      ['the one you are watching', tonesOf({ mx: 40, my: 40, focus: true })],
+    ]
+    console.log(`\n  mark                     tones                          worst ground   best tone there`)
+    for (const [name, tones] of marks) {
+      let worst = Infinity, where = 0
+      for (const g of MARK_GROUNDS) {
+        const best = Math.max(...tones.map((t) => contrast(t, g)))
+        if (best < worst) { worst = best; where = g }
+      }
+      console.log(
+        `  ${name.padEnd(24)} ${tones.map(hex).join(' ').padEnd(30)} ${hex(where).padEnd(14)} ${worst.toFixed(2)}`,
+      )
+    }
+    expect(MARK_GROUNDS.length).toBeGreaterThan(8)
+  })
+
+  it('★ every mark clears 3:1 on every ground the raster can draw', () => {
+    const marks: Array<[string, number[]]> = [
+      ['camera rectangle', [...new Set(viewOps({ x: 0, y: 0, w: 2000, h: 1000 }, f).map((o) => o.color))]],
+      ['person', tonesOf({ mx: 40, my: 40, focus: false })],
+      ['watched', tonesOf({ mx: 40, my: 40, focus: true })],
+    ]
+    for (const [name, tones] of marks) {
+      expect(tones.length, `${name} is a single tone — no ground-independent colour exists`)
+        .toBeGreaterThan(1)
+      for (const g of MARK_GROUNDS) {
+        const best = Math.max(...tones.map((t) => contrast(t, g)))
+        expect(best, `${name} on ${hex(g)}: best tone is only ${best.toFixed(2)}`)
+          .toBeGreaterThanOrEqual(MARK_MIN_CONTRAST)
+      }
+    }
+  })
+
+  it('records the pair it rejected, so two tones cannot come back for the watched marker', () => {
+    const FOREST = 0x4f7040
+    expect(contrast(MARK_WATCHED, FOREST)).toBeCloseTo(1.95, 2)
+    expect(contrast(MARK_HALO, FOREST)).toBeCloseTo(2.85, 2)
+    // and the ring that rescued it
+    expect(contrast(MARK_PERSON, FOREST)).toBeGreaterThanOrEqual(MARK_MIN_CONTRAST)
+  })
+
+  it('★ no single palette colour would have done, which is why they are layered', () => {
+    for (const tone of [MARK_HALO, MARK_VIEW, MARK_PERSON, MARK_WATCHED]) {
+      const fails = MARK_GROUNDS.filter((g) => contrast(tone, g) < MARK_MIN_CONTRAST)
+      expect(fails.length, `${hex(tone)} clears every ground alone — the layering could be dropped`)
+        .toBeGreaterThan(0)
+    }
+  })
+})
+
 // ── 6 · getting out of the way ────────────────────────────────────────────────────────────
 
 describe('a minimap that covers the town it explains is worse than none', () => {
@@ -557,9 +645,10 @@ describe('the minimap in one number per ring count', () => {
     expect(new Set(rows.map((r) => r.raster)).size).toBe(1)
     expect(rows[0]!.raster).toBe(MINIMAP_W * MINIMAP_H)
     // ★ AND THE ONE THAT MATTERS FOR A FRAME: what a camera MOVE costs is set by the crowd and
-    // the widget, never by the town. Two rectangles per person plus eight for the rectangle is
-    // the ceiling, and a ten-ring town does not cost one op more than a three-ring one.
-    const CEILING = 8 + 2 * 24
+    // the widget, never by the town. Eight rectangles for the camera, two per person, and one
+    // more for the third tone the watched marker needs to clear forest — and a ten-ring town
+    // does not cost one op more than a three-ring one.
+    const CEILING = 8 + 2 * 24 + 1
     for (const r of rows) expect(r.ops, `${r.rings} rings`).toBeLessThanOrEqual(CEILING)
     expect(rows[rows.length - 1]!.ops).toBeLessThanOrEqual(rows[2]!.ops)
     expect(TILE_W).toBe(32)

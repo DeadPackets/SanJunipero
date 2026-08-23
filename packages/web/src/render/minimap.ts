@@ -349,8 +349,26 @@ export const MARK_VIEW = 0xf2c879     // --honey: where the camera is
 export const MARK_PERSON = 0xfff6e9   // --cream: somebody
 export const MARK_WATCHED = 0xe8785a  // --ember: the one you are following
 
+/**
+ * ★ AND TWO TONES ARE NOT ALWAYS ENOUGH — WHICH TOOK MEASURING, NOT ASSUMING.
+ *
+ * The halo/core pair works because whatever the ground is, one of the two is against it. That
+ * holds for the rectangle (worst ground `forest`, 3.57 via the honey) and for an ordinary person
+ * (worst ground `farmland`, 3.99 via the cream). It does NOT hold for the watched marker:
+ * `--ember` on `forest` is 1.95 and `--deep` on `forest` is 2.85, so on a wooded tile BOTH tones
+ * of the one mark a viewer is hunting for fall under 3:1. Nothing in the design predicted that;
+ * the table did. So the watched marker is THREE tones — a `--deep` halo, a `--cream` ring, and
+ * the ember core that carries its identity — and `minimap.test.ts` now asserts the whole rule
+ * over every ground the raster can draw, so the next mark cannot be added without clearing it.
+ */
+export const MARK_GROUNDS: readonly number[] = [
+  ...new Set([...Object.values(TILE_COLORS), GROUND_FALLBACK_COLOR, MINIMAP_BUILT]),
+]
+export const MARK_MIN_CONTRAST = 3
+
 export const PERSON_PX = 2
 export const WATCHED_PX = 5
+export const WATCHED_RING_PX = 7
 
 export type MapOp = { x: number; y: number; w: number; h: number; color: number }
 
@@ -397,9 +415,14 @@ export function viewOps(view: ViewRect, f: MinimapFit): MapOp[] {
 export function dotOps(dots: readonly PersonDot[], f: MinimapFit): MapOp[] {
   const out: MapOp[] = []
   for (const d of dots) {
-    const size = d.focus ? WATCHED_PX : PERSON_PX
-    blob(out, d.mx, d.my, size + 2, MARK_HALO, f)
-    blob(out, d.mx, d.my, size, d.focus ? MARK_WATCHED : MARK_PERSON, f)
+    if (d.focus) {
+      blob(out, d.mx, d.my, WATCHED_RING_PX + 2, MARK_HALO, f)
+      blob(out, d.mx, d.my, WATCHED_RING_PX, MARK_PERSON, f)
+      blob(out, d.mx, d.my, WATCHED_PX, MARK_WATCHED, f)
+      continue
+    }
+    blob(out, d.mx, d.my, PERSON_PX + 2, MARK_HALO, f)
+    blob(out, d.mx, d.my, PERSON_PX, MARK_PERSON, f)
   }
   return out
 }
