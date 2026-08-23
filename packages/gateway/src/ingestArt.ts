@@ -5,9 +5,10 @@
 // Re-running registers nothing when bytes+manifest are unchanged; regenerated art gets a
 // new record that wins by seq (the renderer's newest-ready law).
 //
-// TWO ROOTS, ONE OF WHICH IS DURABLE. The town's buildings come from `forge/content/buildings`,
-// which is COMMITTED. The cast still comes from a session scratchpad, and that scratchpad has
-// already been emptied once with every character cell in it — see `tryIngest`.
+// ONE ROOT FOR BUILDINGS, AND IT IS COMMITTED. Every structure kind the world can create now
+// comes from `forge/content/buildings`, which is in git. The cast is the last thing still
+// coming from a session scratchpad, and that scratchpad has already been emptied once with
+// every character cell in it — see `tryIngest`.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -18,8 +19,7 @@ import {
   type LibraryEntry, type RawImage,
 } from '@sj/forge'
 import {
-  ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, roadAutotileKind,
-  type BuildingManifest, type CellAnchor,
+  ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, roadAutotileKind, type CellAnchor,
 } from '@sj/shared'
 
 // durable session scratchpad (same precedent as the forge production scripts);
@@ -35,13 +35,17 @@ export const FOUNDER_ART: readonly { id: string; dir: string }[] = [
   { id: 'salma', dir: 'production/salma' },
 ]
 
-// The scratchpad structures that have NO committed cell. The storehouse left this list when it
-// got an authored one: two roots registering the same kind fight over `latestByKind` and each
-// re-registers on every boot, so a kind belongs to exactly one root.
-export const BUILDING_ART_DIRS: readonly string[] = [
-  'production/building-wagon', 'production/building-shed',
-  'production/building-scaffolding', 'production/building-standing-stone',
-]
+// ★ THE SCRATCHPAD BUILDING ROOT IS GONE, AND THAT WAS THE DEFECT.
+//
+// `BUILDING_ART_DIRS` stood here naming four directories under `scratchpad/c5/production` —
+// wagon, shed, scaffolding, standing-stone. That scratchpad has held zero files since round 3,
+// so every boot printed four `NO ART … ENOENT` lines and four kinds drew a grey prism. It was
+// the THIRD time on this project that art lived only in a scratchpad and was lost with it.
+//
+// All four now ship committed cells under `forge/content/buildings`, registered by
+// `registerCommittedBuildings` with everything else, so there is one root for buildings and it
+// is in git. A kind belongs to exactly one root — two roots fight over `latestByKind` and
+// re-register on every boot forever — and that root is now the committed one for every kind.
 
 export type IngestEntry = {
   kind: string
@@ -95,19 +99,6 @@ async function ingestCharacter(codex: AssetCodex, root: string, id: string, dir:
     klass: 'rig-part', kind: `character:${id}`, desc: `character sheet v4: ${id}`,
     png, widthPx: image.width, heightPx: image.height,
     meta: JSON.stringify(atlas), footprint: { w: 1, h: 1 },
-  })
-}
-
-async function ingestBuilding(codex: AssetCodex, root: string, dir: string): Promise<IngestEntry> {
-  const base = join(root, dir)
-  const manifest = JSON.parse(readFileSync(join(base, 'manifest.json'), 'utf8')) as BuildingManifest
-  if (manifest.version !== 'v4-hires-building') throw new Error(`${dir}: manifest version is not v4-hires-building`)
-  const png = readFileSync(join(base, 'cell.png'))
-  const img = await decodePng(png)
-  return upsert(codex, {
-    klass: 'building', kind: manifest.kind, desc: `building v4: ${manifest.kind}`,
-    png, widthPx: img.width, heightPx: img.height,
-    meta: JSON.stringify(manifest), footprint: manifest.footprint,
   })
 }
 
@@ -214,9 +205,6 @@ export async function ingestProductionArt(
   const out: IngestEntry[] = [...registerCommittedBuildings(codex)]
   for (const f of FOUNDER_ART) {
     out.push(await tryIngest(`character:${f.id}`, () => ingestCharacter(codex, root, f.id, f.dir)))
-  }
-  for (const dir of BUILDING_ART_DIRS) {
-    out.push(await tryIngest(dir, () => ingestBuilding(codex, root, dir)))
   }
   return out
 }

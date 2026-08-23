@@ -11,10 +11,13 @@ import {
 } from '@sj/shared'
 import { INTERIOR_KINDS, cityStructures, parseLibraryItemManifest, resolveFurnishingKind } from '@sj/shared'
 import { LIBRARY } from '@sj/forge'
+import { structureArtCoverage, worldStructureKinds } from '@sj/forge'
+import { DEFAULT_CONFIG, makeCityTemplate } from '@sj/shared'
 import {
-  BUILDING_ART_DIRS, FOUNDER_ART, ingestLibraryArt, ingestProductionArt, ingestTerrainArt,
+  FOUNDER_ART, ingestLibraryArt, ingestProductionArt, ingestTerrainArt,
   libraryArtRoot, libraryEntriesOnDisk,
 } from './ingestArt.js'
+import { townStructuresFor } from './founders.js'
 
 const dir = mkdtempSync(join(tmpdir(), 'sj-ingest-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
@@ -37,20 +40,10 @@ async function buildArtRoot(root: string, mark: number): Promise<void> {
     }
     writeFileSync(join(base, 'manifest.json'), JSON.stringify({ version: 'v4-hires', figureH: 12, cells }))
   }
-  for (const d of BUILDING_ART_DIRS) {
-    const base = join(root, d)
-    mkdirSync(base, { recursive: true })
-    const kind = d.replace('production/building-', '').replace('standing-stone', 'standing_stone')
-    writeFileSync(join(base, 'cell.png'), await encodePng(cell(20, 24, mark)))
-    writeFileSync(join(base, 'manifest.json'), JSON.stringify({
-      version: 'v4-hires-building', kind, footprint: { w: 1, h: 1 },
-      cell: { w: 20, h: 24, feetX: 10, feetY: 23 },
-    }))
-  }
 }
 
 describe('ingestProductionArt', () => {
-  it('registers the committed cells + 5 founder atlases + 5 scratchpad buildings, idempotently', async () => {
+  it('registers the committed cells + 5 founder atlases, idempotently', async () => {
     const root = join(dir, 'art')
     await buildArtRoot(root, 100)
     const db = openForgeDb(join(dir, 'codex.db'))
@@ -58,7 +51,7 @@ describe('ingestProductionArt', () => {
 
     const committed = listCommittedBuildings().length
     const first = await ingestProductionArt(db, { artRoot: root })
-    expect(first).toHaveLength(committed + FOUNDER_ART.length + BUILDING_ART_DIRS.length)
+    expect(first).toHaveLength(committed + FOUNDER_ART.length)
     expect(first.every((e) => e.action === 'registered')).toBe(true)
     expect(first.map((e) => e.kind)).toContain('character:omar')
     expect(first.map((e) => e.kind)).toContain('standing_stone')
@@ -73,9 +66,12 @@ describe('ingestProductionArt', () => {
     expect(Object.keys(atlas.cells)).toHaveLength(24)
     expect(atlas.figureH).toBe(12)
 
-    // building record carries the v4-hires-building manifest as-is
+    // building record carries the v4-hires-building manifest as-is — and the shed's cell is a
+    // COMMITTED one now, not the scratchpad fixture the old version of this test wrote
     const shed = codex.listSince(0).find((r) => r.kind === 'shed')!
-    expect(parseBuildingManifest(shed.meta)?.cell.feetY).toBe(23)
+    const shedManifest = parseBuildingManifest(shed.meta)!
+    expect(shedManifest.footprint).toEqual({ w: 1, h: 1 })
+    expect(shedManifest.cell.feetY).toBeLessThan(shedManifest.cell.h)
 
     // the founders' home: an authored, committed cell, at the footprint the template gives it
     const home = codex.listSince(0).find((r) => r.kind === 'house')!
@@ -94,9 +90,8 @@ describe('ingestProductionArt', () => {
     // regen (changed bytes) → a NEW record that wins by seq
     await buildArtRoot(root, 200)
     const third = await ingestProductionArt(db, { artRoot: root })
-    // only the scratchpad art changed bytes; the committed cells are untouched
-    expect(third.filter((e) => e.action === 'registered'))
-      .toHaveLength(FOUNDER_ART.length + BUILDING_ART_DIRS.length)
+    // only the scratchpad cast changed bytes; the committed cells are untouched
+    expect(third.filter((e) => e.action === 'registered')).toHaveLength(FOUNDER_ART.length)
     const omars = codex.listSince(0).filter((r) => r.kind === 'character:omar')
     expect(omars).toHaveLength(2)
     expect(omars.at(-1)!.seq).toBeGreaterThan(omars[0]!.seq)
@@ -126,12 +121,73 @@ describe('ingestProductionArt', () => {
     db.close()
   }, 30_000)
 
+  // ★ THE DEV TOWN'S HALF OF THE COVERAGE LAW.
+  //
+  // `structureArt.ts` asks whether every kind the WORLD can create resolves to committed art,
+  // and it can see two of the three sources: the city template and `config.structures.recipes`.
+  // The third is `TOWN_STRUCTURES` in `founders.ts` — the frozen G6 fixture town, which is the
+  // DEFAULT dev map — and `@sj/forge` must not import `@sj/gateway` to reach it. So the same
+  // law is asked here, next to the source that can see it.
+  //
+  // This is the arm that was missing. Four kinds — wagon, shed, scaffolding, standing_stone —
+  // are stood by this town and by nothing else, so the template-only gate never looked at them,
+  // stayed green, and all four drew a grey prism while the boot log printed four ENOENTs.
+  describe('the dev town half of the coverage law', () => {
+    const TEMPLATE = makeCityTemplate()
+
+    it.each(['scripted', 'showcase'] as const)(
+      'every kind the %s dev town stands resolves to committed art', (map) => {
+        const town = townStructuresFor(map)
+        expect(town.length).toBeGreaterThan(0)
+        const { missing } = structureArtCoverage({
+          structures: town,
+          registered: listCommittedBuildings().map((c) => c.codexKind),
+          creatable: worldStructureKinds({
+            structures: [...TEMPLATE.structures, ...town],
+            recipes: DEFAULT_CONFIG.structures.recipes,
+          }),
+        })
+        expect(missing, `the ${map} town stands these and no codex cell answers:\n  ${missing.join('\n  ')}`)
+          .toEqual([])
+      })
+
+    it('★ and it NAMES a kind the town stands with no art — the mutation', () => {
+      // A DELTA, so it proves the same thing whether the tree is whole or already broken:
+      // standing one more kind in the fixture town adds exactly one failure and no other.
+      const registered = listCommittedBuildings().map((c) => c.codexKind)
+      const coverage = (town: readonly { kind: string }[]): string[] => structureArtCoverage({
+        structures: town,
+        registered,
+        creatable: worldStructureKinds({
+          structures: [...TEMPLATE.structures, ...town],
+          recipes: DEFAULT_CONFIG.structures.recipes,
+        }),
+      }).missing
+      const before = coverage(townStructuresFor('scripted'))
+      const after = coverage([...townStructuresFor('scripted'), { kind: 'watchtower' }])
+      expect(after.filter((m) => !before.includes(m))).toEqual(['watchtower facing sw'])
+    })
+
+    it('the four kinds the boot log named are this town\'s, and their footprints are its own', () => {
+      const byKind = new Map(townStructuresFor('scripted').map((s) => [s.kind, s]))
+      expect([...byKind.keys()].sort())
+        .toEqual(['house', 'scaffolding', 'shed', 'standing_stone', 'storehouse', 'wagon'])
+      // the footprints `structureArt.test.ts` cannot see from inside @sj/forge
+      const cells = new Map(listCommittedBuildings().map((c) => [c.codexKind, c]))
+      for (const kind of ['wagon', 'shed', 'scaffolding', 'standing_stone']) {
+        const s = byKind.get(kind)!
+        expect(cells.get(kind)!.manifest.footprint, kind).toEqual({ w: s.w, h: s.h })
+      }
+    })
+  })
+
   it('gives each kind exactly one root, so two roots never fight over it', () => {
-    const committed = new Set(listCommittedBuildings().map((c) => c.codexKind))
-    const scratch = BUILDING_ART_DIRS.map((d) =>
-      d.replace('production/building-', '').replace('standing-stone', 'standing_stone'))
-    expect(scratch.filter((k) => committed.has(k)),
-      'a kind in both roots re-registers on every boot, forever').toEqual([])
+    // There is only one building root now, and that is the whole of it: the scratchpad list
+    // this test used to compare against named four kinds whose art had not existed for three
+    // rounds. `ingestProductionArt` registers buildings from `registerCommittedBuildings` and
+    // from nowhere else, so no kind can be claimed twice.
+    const kinds = listCommittedBuildings().map((c) => c.codexKind)
+    expect(new Set(kinds).size, 'two committed cells claim one codex kind').toBe(kinds.length)
   })
 })
 
