@@ -48,6 +48,11 @@ export function splitFacingKind(codexKind: string): { kind: string; facing: Stru
 export const BUILDINGS_CONTENT_DIR =
   fileURLToPath(new URL('../content/buildings', import.meta.url))
 
+/** The style anchor and the identity anchors: the human-designated look, kept as the craft
+ *  record. `referenceSheet.ts` says why nothing attaches them to a generation. */
+export const REFERENCE_CONTENT_DIR =
+  fileURLToPath(new URL('../content/reference', import.meta.url))
+
 export type CommittedBuilding = {
   /** `house-se` — the directory name, and the label the reports use */
   dir: string

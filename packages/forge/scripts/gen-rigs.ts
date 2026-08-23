@@ -13,7 +13,7 @@ import { BudgetGuard } from '../src/budget.js'
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
 const budget = new BudgetGuard(4)
-const refs = loadReferenceSheet()
+const refs = await loadReferenceSheet()
 const codex = new AssetCodex(openForgeDb('packages/forge/out/rigs.db'))
 const forge = createForge({ client: makeImageClient({ apiKey: KEY, budget }), judge: makeVlmJudge({ apiKey: KEY, refSheets: refs }), codex, refs })
 const OUT = 'packages/forge/out/rig-candidates'

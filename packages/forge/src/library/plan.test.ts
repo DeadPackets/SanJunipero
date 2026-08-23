@@ -4,7 +4,9 @@ import { EST_COST_PER_IMAGE } from '../imageClient.js'
 import { EST_COST_PER_VISION_CALL } from '../visionQa/visionJudge.js'
 import { STYLE_ANCHOR_CLAUSE, STYLE_PROMPT } from '../styleBible.js'
 import { LIBRARY } from './catalog.js'
-import { LIBRARY_BATCHES, planBatch, estimateBatchCost, DEFAULT_CANDIDATES } from './plan.js'
+import {
+  LIBRARY_BATCHES, PALETTE_WORDS, SWATCH_CLAUSE, planBatch, estimateBatchCost, DEFAULT_CANDIDATES,
+} from './plan.js'
 
 describe('planBatch', () => {
   it('plans the furniture batch in catalog order at the 24 px icon size', () => {
@@ -38,11 +40,16 @@ describe('planBatch', () => {
     expect(union).toEqual(LIBRARY.map(e => e.kind))
   })
 
-  it('every prompt carries the style boilerplate, the anchor clause and the entry prose', () => {
+  // ★ NOT the anchor clause. Round 4 measured the style anchor returning itself recoloured
+  // against a prompt that banned its architecture by name; a swatch has nothing to copy.
+  it('every prompt carries the style boilerplate, the SWATCH clause and the entry prose', () => {
     for (const b of LIBRARY_BATCHES)
       for (const i of planBatch(b)) {
         expect(i.prompt, i.entry.kind).toContain(i.entry.desc)
-        expect(i.prompt, i.entry.kind).toContain(STYLE_ANCHOR_CLAUSE)
+        expect(i.prompt, i.entry.kind).toContain(SWATCH_CLAUSE)
+        expect(i.prompt, i.entry.kind).toContain(PALETTE_WORDS)
+        expect(i.prompt, i.entry.kind).not.toContain(STYLE_ANCHOR_CLAUSE)
+        expect(i.boilerplate, 'no reference object may be named').not.toMatch(/reference image exactly/)
         expect(i.prompt, i.entry.kind).toContain(STYLE_PROMPT)
         // Feedback position law: the gate rebuilds `boilerplate + feedback + commission`.
         expect(i.prompt).toBe(`${i.boilerplate} ${i.commissionText}`)

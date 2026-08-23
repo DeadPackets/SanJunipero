@@ -13,7 +13,7 @@ import { BudgetGuard } from '../src/budget.js'
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
 const budget = new BudgetGuard(3)
-const refs = loadReferenceSheet()
+const refs = await loadReferenceSheet()
 const OUT = 'packages/forge/out/terrain-candidates'
 mkdirSync(OUT, { recursive: true })
 
