@@ -317,7 +317,10 @@ describe('R5 · the three the town cannot say out loud', () => {
   const glyphs = icons.map((i) => JSON.stringify(chronicleGlyph(i).pixels))
   const lines = R5_EVENTS.map((t) => chronicleLine(ev(t, R5_PAYLOAD[t]!), R5_LOOK))
   const marks = R5_EVENTS.map((t) =>
-    marksFrom({ chapters: [], milestones: [], moments: [], changes: [], events: [{ tick: 100, type: t }] })[0]!)
+    marksFrom({
+      chapters: [], milestones: [], moments: [], changes: [], discoveries: [],
+      events: [{ tick: 100, type: t }],
+    })[0]!)
 
   it('gives each of the three a glyph of its own, and a different SHAPE, not just a name', () => {
     expect(icons).toEqual(['cross', 'spark', 'house'])

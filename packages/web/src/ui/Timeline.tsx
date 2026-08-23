@@ -14,7 +14,9 @@ export const KEY_PAGE_TICKS = MINUTES_PER_DAY
  *  thing that already happened and re-folding it per frame would buy nothing. */
 export const MARKS_REFETCH_MS = 30_000
 
-const EMPTY_SOURCES: MarkSources = { chapters: [], milestones: [], moments: [], changes: [], events: [] }
+const EMPTY_SOURCES: MarkSources = {
+  chapters: [], milestones: [], moments: [], changes: [], events: [], discoveries: [],
+}
 
 function MarkGlyph({ mark }: { mark: Mark }) {
   return (
@@ -150,6 +152,7 @@ export function Timeline({ store, handle, onView }: {
           setSources({
             chapters: body.chapters ?? [], milestones: body.milestones ?? [],
             moments: body.moments ?? [], changes: body.changes ?? [], events: body.events ?? [],
+            discoveries: body.discoveries ?? [],
           })
         })
         .catch(() => { /* the scrubber still scrubs without its marks */ })

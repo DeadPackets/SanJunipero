@@ -163,7 +163,7 @@ describe('U14 — "the timeline is missing MARKS; the font is hard to read and t
       ev(300, 'agent_born', { agentId: 'a4' }),
       ev(400, 'fire_ignited', { structureId: 's_house' }),
     ],
-    chapters: [], milestones: [], moments: [], changes: [{ tick: 250 }],
+    chapters: [], milestones: [], moments: [], changes: [{ tick: 250 }], discoveries: [],
   })
 
   it('puts marks on a mature day at all', () => {
@@ -177,7 +177,9 @@ describe('U14 — "the timeline is missing MARKS; the font is hard to read and t
 
   it('coalesces rather than piling, so a busy hour is still readable', () => {
     const dense = [0, 1, 2, 3, 4].map((i) => ev(100 + i, 'structure_completed', { id: `s${i}` }))
-    const all = marksFrom({ events: dense, chapters: [], milestones: [], moments: [], changes: [] })
+    const all = marksFrom({
+      events: dense, chapters: [], milestones: [], moments: [], changes: [], discoveries: [],
+    })
     expect(coalesceMarks(all, 500).length).toBeLessThanOrEqual(all.length)
   })
 

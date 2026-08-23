@@ -11,14 +11,18 @@
  */
 
 export const MARK_KINDS = [
-  'death', 'birth', 'built', 'first', 'chapter', 'changed', 'quarrel', 'joined',
+  'death', 'birth', 'built', 'first', 'chapter', 'changed', 'quarrel', 'joined', 'discovery',
 ] as const
 export type MarkKind = (typeof MARK_KINDS)[number]
 
 export type Mark = { tick: number; kind: MarkKind; words: string; weight: number }
 
-/** The weighting the controller ruling asks for, written as a table rather than as a habit. */
+/** The weighting the controller ruling asks for, written as a table rather than as a habit.
+ *  `discovery` sits above the old ceiling on two arguments: it is rarer than every other kind,
+ *  so a high weight costs them almost nothing; and it is the only PERMANENT one — a death
+ *  removes one person, a discovery changes what everyone can do for the rest of the run. */
 export const MARK_WEIGHT: Readonly<Record<MarkKind, number>> = {
+  discovery: 18,
   changed: 16, first: 16, death: 14, birth: 14, joined: 12, quarrel: 12, chapter: 10, built: 8,
 }
 export const MARK_MIN_WEIGHT = 8
@@ -171,6 +175,17 @@ export const MARK_GLYPH: Readonly<Record<MarkKind, MarkPixel[]>> = {
     '.......',
     'iiiiiii',
   ),
+  // a key — the day a door opened. HONEY is the ward; INK carries the whole silhouette, so the
+  // shape survives the colour being taken away (7.63:1 on the sand track).
+  discovery: art(
+    '..iii..',
+    '.ii.ii.',
+    '.ii.ii.',
+    '..iii..',
+    '...i...',
+    '...ihi.',
+    '...ih..',
+  ),
 }
 
 // ── the sources ───────────────────────────────────────────────────────────────────────────
@@ -185,7 +200,7 @@ const EVENT_MARK: Readonly<Record<string, MarkKind>> = {
 }
 
 /** One phrase for one of a thing, one for several. `n` is filled in by the coalescer. */
-const MARK_WORDS: Readonly<Record<MarkKind, { one: string; many: (n: number) => string }>> = {
+export const MARK_WORDS: Readonly<Record<MarkKind, { one: string; many: (n: number) => string }>> = {
   death: { one: 'Someone died', many: (n) => `${n} people died` },
   birth: { one: 'A child was born', many: (n) => `${n} children were born` },
   built: { one: 'A building was finished', many: (n) => `${n} buildings were finished` },
@@ -195,6 +210,11 @@ const MARK_WORDS: Readonly<Record<MarkKind, { one: string; many: (n: number) => 
   // these two carry the narrator's own words, so the fallback is only ever a safety net
   first: { one: 'Something happened for the first time', many: (n) => `${n} firsts` },
   chapter: { one: 'A day the town kept', many: (n) => `${n} days the town kept` },
+  // carries the gateway's own credited words, so the fallback is only ever a safety net
+  discovery: {
+    one: 'Somebody worked something out',
+    many: (n) => `${n} things were worked out`,
+  },
 }
 
 export type MarkSources = {
@@ -206,6 +226,9 @@ export type MarkSources = {
   changes: ReadonlyArray<{ tick: number }>
   /** The world's own log. Anything not in EVENT_MARK is noise here. */
   events: ReadonlyArray<{ tick: number; type: string }>
+  /** Already credited and already prose — the gateway owns the sentence, because only the
+   *  gateway can turn an agent id into a name. */
+  discoveries: ReadonlyArray<{ tick: number; words: string }>
 }
 
 const MINUTES_PER_DAY = 1440
@@ -230,6 +253,7 @@ export function marksFrom(sources: MarkSources): Mark[] {
   }
   for (const m of sources.milestones) push(m.tick, 'first', m.label)
   for (const c of sources.changes) push(c.tick, 'changed')
+  for (const d of sources.discoveries) push(d.tick, 'discovery', d.words)
   for (const ev of sources.events) {
     const kind = EVENT_MARK[ev.type]
     if (kind !== undefined) push(ev.tick, kind)

@@ -45,6 +45,7 @@ const MARKS: Mark[] = coalesceMarks(marksFrom({
     { tick: 3 * DAY + 30, type: 'agent_died' },
     { tick: 4 * DAY + 200, type: 'agent_born' },
   ],
+  discoveries: [],
 }), 6 * DAY)
 
 const view = (over: Partial<Parameters<typeof TimelineView>[0]> = {}): string =>

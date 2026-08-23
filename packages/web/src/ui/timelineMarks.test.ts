@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   MARK_COALESCE_TICKS, MARK_GLYPH, MARK_GLYPH_PALETTE, MARK_GLYPH_PX, MARK_KINDS,
-  MARK_MIN_WEIGHT, MARK_SLOTS, MARK_STRUCTURE_INKS, MARK_WEIGHT,
-  coalesceMarks, marksFrom, type Mark, type MarkKind,
+  MARK_MIN_WEIGHT, MARK_SLOTS, MARK_STRUCTURE_INKS, MARK_WEIGHT, MARK_WORDS,
+  coalesceMarks, marksFrom, type Mark, type MarkKind, type MarkSources,
 } from './timelineMarks.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 
@@ -30,6 +30,7 @@ const MATURE = {
     { tick: 0, type: 'agent_spawned' },
     { tick: 5 * DAY, type: 'agent_moved' },   // noise: nothing the town would remember
   ],
+  discoveries: [{ tick: 2 * DAY + 400, words: 'Maret worked out stitch a waterskin' }],
 }
 
 describe('U14 — the marks come from the record, not from the ring', () => {
@@ -44,7 +45,7 @@ describe('U14 — the marks come from the record, not from the ring', () => {
   })
 
   it('answers an unlived town with nothing rather than with invention', () => {
-    expect(marksFrom({ chapters: [], milestones: [], moments: [], changes: [], events: [] })).toEqual([])
+    expect(marksFrom({ chapters: [], milestones: [], moments: [], changes: [], events: [], discoveries: [] })).toEqual([])
   })
 
   it('ignores an event the town would not remember', () => {
@@ -225,5 +226,77 @@ describe('what a mark says out loud', () => {
 
   it('says a milestone in the narrator own words', () => {
     expect(marks.find((m) => m.kind === 'first')?.words).toBe('The first fire was lit')
+  })
+})
+
+describe('the ninth mark — a discovery', () => {
+  const SOURCES: MarkSources = {
+    chapters: [], milestones: [], moments: [], changes: [], events: [],
+    discoveries: [{ tick: 40, words: 'Maret worked out stitch a waterskin' }],
+  }
+
+  it('is a kind of its own', () => {
+    expect(MARK_KINDS).toContain('discovery')
+    expect(new Set(MARK_KINDS).size).toBe(MARK_KINDS.length)
+  })
+
+  it('outranks every other kind — §3: rare, and the only permanent one', () => {
+    expect(MARK_WEIGHT.discovery).toBe(18)
+    for (const k of MARK_KINDS) {
+      if (k !== 'discovery') expect(MARK_WEIGHT.discovery).toBeGreaterThan(MARK_WEIGHT[k])
+    }
+    expect(MARK_WEIGHT.discovery).toBeGreaterThanOrEqual(MARK_MIN_WEIGHT)
+  })
+
+  it('draws a SHAPE nobody else draws, not just a colour', () => {
+    const shapes = MARK_KINDS.map((k) => JSON.stringify(MARK_GLYPH[k]))
+    expect(new Set(shapes).size).toBe(MARK_KINDS.length)
+    expect(MARK_GLYPH.discovery.length).toBeGreaterThan(0)
+  })
+
+  it('fits the 7×7 grid and paints only the palette', () => {
+    for (const [x, y, fill] of MARK_GLYPH.discovery) {
+      expect(x).toBeGreaterThanOrEqual(0); expect(x).toBeLessThan(MARK_GLYPH_PX)
+      expect(y).toBeGreaterThanOrEqual(0); expect(y).toBeLessThan(MARK_GLYPH_PX)
+      expect(MARK_GLYPH_PALETTE).toContain(fill)
+    }
+  })
+
+  it('carries its SHAPE in an ink that clears 3:1 on the sand track', () => {
+    const structure = MARK_GLYPH.discovery.filter(([, , f]) => MARK_STRUCTURE_INKS.includes(f))
+    expect(structure.length, 'no legible ink in the glyph').toBeGreaterThanOrEqual(12)
+    // and it is still a key with the warm pixels taken away
+    expect(structure.length).toBeGreaterThan(MARK_GLYPH.discovery.length - structure.length)
+  })
+
+  it('reads as a mark, with the gateway’s own words', () => {
+    const [mark] = marksFrom(SOURCES)
+    expect(mark).toEqual({
+      tick: 40, kind: 'discovery', weight: 18,
+      words: 'Maret worked out stitch a waterskin',
+    })
+  })
+
+  it('has a fallback phrase for one and for several', () => {
+    expect(MARK_WORDS.discovery.one).toBe('Somebody worked something out')
+    expect(MARK_WORDS.discovery.many(3)).toBe('3 things were worked out')
+  })
+
+  it('SURVIVES a crowded window — it is the mark a viewer wants to land on', () => {
+    const crowded = marksFrom({
+      ...SOURCES,
+      events: [{ tick: 41, type: 'agent_died' }, { tick: 42, type: 'structure_completed' }],
+    })
+    expect(crowded.map((m) => m.kind).sort()).toEqual(['built', 'death', 'discovery'])
+    const kept = coalesceMarks(crowded, 5000)
+    expect(kept.map((m) => m.kind)).toEqual(['discovery'])
+  })
+
+  it('a source with no discoveries changes nothing about the other eight', () => {
+    const without = marksFrom({
+      chapters: [], milestones: [], moments: [], changes: [], discoveries: [],
+      events: [{ tick: 10, type: 'agent_died' }],
+    })
+    expect(without.map((m) => m.kind)).toEqual(['death'])
   })
 })
