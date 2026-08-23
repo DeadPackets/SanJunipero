@@ -1,39 +1,34 @@
 // Idempotent ingest of the APPROVED production art → the forge codex.
-// Characters pack into one v4-hires-atlas record each (kind character:<id>); buildings
-// register their hi-res cell + v4-hires-building manifest (kind = engine structure kind,
-// with the facing riding in it: `house`, `house:se`).
+// Characters register one packed v4-hires-atlas record each (class rig-part, kind
+// `character:<id>`); buildings register their hi-res cell + v4-hires-building manifest (kind =
+// engine structure kind, with the facing riding in it: `house`, `house:se`); library items
+// register a world sprite and an icon each (class item, kinds `bed` and `bed#icon`).
 // Re-running registers nothing when bytes+manifest are unchanged; regenerated art gets a
 // new record that wins by seq (the renderer's newest-ready law).
 //
-// TWO ROOTS, ONE OF WHICH IS DURABLE. The town's buildings come from `forge/content/buildings`,
-// which is COMMITTED. The cast still comes from a session scratchpad, and that scratchpad has
-// already been emptied once with every character cell in it — see `tryIngest`.
+// ★ EVERY ROOT IS COMMITTED NOW. This file used to read three session scratchpads. Every one
+// of them was emptied with the art inside it, twice over, and each time the measurement was
+// the same: `class building: 0`, `class item: 0`, `class rig-part: 0` — a town of procedural
+// prisms, checkerboard furniture and checkerboard villagers, with CI green throughout. The
+// terrain survived every wipe because terrain art is code-painted or committed.
+// So the buildings (round 4), the fifty items and the five founder sheets all come out of
+// `packages/forge/content/` now, and `@sj/forge` owns reading them. What is left below is the
+// four structures that have never had art in any root at all.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
 import {
-  AssetCodex, CELL_NAMES_V4, LIBRARY, decodePng, encodePng, loadMaterialBook, packCharacterAtlas,
-  registerCommittedBuildings, registerGeneratedTerrain, registerLibraryEntry,
-  type LibraryEntry, type RawImage,
+  AssetCodex, decodePng, loadMaterialBook, registerCommittedBuildings, registerCommittedCast,
+  registerCommittedItems, registerGeneratedTerrain,
 } from '@sj/forge'
 import {
-  ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, roadAutotileKind,
-  type BuildingManifest, type CellAnchor,
+  ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, roadAutotileKind, type BuildingManifest,
 } from '@sj/shared'
 
 // durable session scratchpad (same precedent as the forge production scripts);
 // override with SJ_ART_ROOT for other machines
 export const DEFAULT_ART_ROOT =
   '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c5'
-
-export const FOUNDER_ART: readonly { id: string; dir: string }[] = [
-  { id: 'omar', dir: 'character-v4' }, // the approved reference character
-  { id: 'amara', dir: 'production/amara' },
-  { id: 'yusuf', dir: 'production/yusuf' },
-  { id: 'nadia', dir: 'production/nadia' },
-  { id: 'salma', dir: 'production/salma' },
-]
 
 // The scratchpad structures that have NO committed cell. The storehouse left this list when it
 // got an authored one: two roots registering the same kind fight over `latestByKind` and each
@@ -52,8 +47,6 @@ export type IngestEntry = {
   id: string
   detail?: string
 }
-
-type CharManifestFile = { version: string; figureH: number; cells: Record<string, CellAnchor> }
 
 function latestByKind(codex: AssetCodex, klass: string, kind: string) {
   return codex.listSince(0).filter(r => r.status === 'ready' && r.class === klass && r.kind === kind).at(-1) ?? null
@@ -79,23 +72,6 @@ function upsert(
     status: 'ready', score: null, attempts: 1, costUsd: 0,
   })
   return { kind: input.kind, action: 'registered', id: rec.id }
-}
-
-async function ingestCharacter(codex: AssetCodex, root: string, id: string, dir: string): Promise<IngestEntry> {
-  const base = join(root, dir)
-  const manifest = JSON.parse(readFileSync(join(base, 'manifest.json'), 'utf8')) as CharManifestFile
-  if (manifest.version !== 'v4-hires') throw new Error(`${id}: manifest version ${manifest.version} is not v4-hires`)
-  const cells = new Map<string, RawImage>()
-  for (const name of CELL_NAMES_V4) {
-    cells.set(name, await decodePng(readFileSync(join(base, 'cells', `${name}.png`))))
-  }
-  const { image, manifest: atlas } = packCharacterAtlas(cells, manifest.figureH)
-  const png = await encodePng(image)
-  return upsert(codex, {
-    klass: 'rig-part', kind: `character:${id}`, desc: `character sheet v4: ${id}`,
-    png, widthPx: image.width, heightPx: image.height,
-    meta: JSON.stringify(atlas), footprint: { w: 1, h: 1 },
-  })
 }
 
 async function ingestBuilding(codex: AssetCodex, root: string, dir: string): Promise<IngestEntry> {
@@ -139,61 +115,38 @@ export async function ingestTerrainArt(db: Database.Database): Promise<IngestEnt
   return records.map((r) => ({ kind: r.kind ?? '', action: 'registered' as const, id: r.id }))
 }
 
-// C13's premade library — 50 painted items, fifteen of them the furniture the interior
-// scenes place on their slots. Without this a room draws every furnishing as the item
-// placeholder, which is what the storehouse was showing. Same convention as the production
-// art above: the art lives in the durable scratchpad, overridable for another machine.
-export const DEFAULT_LIBRARY_ROOT =
-  '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad/c13/library'
-
-export function libraryArtRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return env['SJ_LIBRARY_ROOT'] ?? DEFAULT_LIBRARY_ROOT
+// The premade library — 50 painted items, fifteen of them the furniture the interior scenes
+// place on their slots. Without this a room draws every furnishing as the item placeholder,
+// which is what the storehouse was showing.
+//
+// ★ THE LIBRARY ROOT IS GONE, AND THAT IS THE FIX. This read `$C13/library`, a session
+// scratchpad, through a `libraryEntriesOnDisk` filter that treated an absent sprite as "not an
+// error — the renderer falls back to the placeholder". When the scratchpad emptied, all fifty
+// were absent, the filter returned [], the ingest reported success, and every item in the
+// world became a checkerboard with nothing red anywhere. Tolerating a missing file is right
+// for art that might not be made yet and wrong for art that has been paid for and shipped.
+// `registerCommittedItems` reads `forge/content/items` and THROWS on a half-present item.
+export async function ingestLibraryArt(db: Database.Database): Promise<IngestEntry[]> {
+  return registerCommittedItems(new AssetCodex(db))
 }
 
-// The entries whose art is actually on disk. A missing sprite is not an error — the renderer
-// falls back to the placeholder, the same art independence the ground bake lives by.
-export function libraryEntriesOnDisk(root: string): LibraryEntry[] {
-  return LIBRARY.filter((e) => existsSync(join(root, e.kind, 'sprite.png'))
-    && existsSync(join(root, e.kind, 'icon.png')))
-}
-
-export async function ingestLibraryArt(
-  db: Database.Database, opts: { libraryRoot?: string } = {},
-): Promise<IngestEntry[]> {
-  const root = opts.libraryRoot ?? libraryArtRoot()
-  const codex = new AssetCodex(db)
-  const out: IngestEntry[] = []
-  for (const entry of libraryEntriesOnDisk(root)) {
-    const sprite = readFileSync(join(root, entry.kind, 'sprite.png'))
-    const existing = latestByKind(codex, 'item', entry.kind)
-    if (existing !== null) {
-      const stored = codex.get(existing.id)
-      if (stored !== null && stored.png.equals(sprite)) {
-        out.push({ kind: entry.kind, action: 'unchanged', id: existing.id })
-        continue
-      }
-    }
-    // C13 already booked what this art cost in its own ledger; re-booking here would
-    // double-count the spend, so the ingest is free by construction.
-    const { spriteRecord } = registerLibraryEntry(codex, entry, {
-      sprite, icon: readFileSync(join(root, entry.kind, 'icon.png')),
-      score: 10, attempts: 1, costUsd: 0,
-    })
-    out.push({ kind: entry.kind, action: 'registered', id: spriteRecord.id })
-  }
-  return out
+// The five founder sheets, one packed atlas each. Same story, same fix: these lived in
+// `$C5/production`, the scratchpad emptied, and `class rig-part: 0` is what that measured to.
+export async function ingestCastArt(db: Database.Database): Promise<IngestEntry[]> {
+  return registerCommittedCast(new AssetCodex(db))
 }
 
 // ★ ONE ABSENT FILE USED TO COST THE WHOLE TOWN ITS ART.
 //
-// This function's art lives in a session scratchpad, and on this tip that scratchpad holds the
-// whole directory tree and ZERO files. The first founder threw ENOENT, the throw escaped the
-// loop, and neither the four founders behind it nor the five buildings nor the anchor home
-// after them ever registered — so every structure drew `builtForm` and every founder drew the
-// checkerboard. Art that is committed (the terrain, and now the buildings) survived it.
+// The five founders and five structures below all read one session scratchpad, and when it
+// emptied the first ENOENT escaped the loop and nothing behind it registered either — not the
+// other founders, not the buildings, not the anchor home. So a per-item failure is REPORTED
+// and stepped over, and the committed roots register first because they cannot go missing.
 //
-// So a per-item failure is now REPORTED and stepped over. The committed cells register first,
-// because they are the ones that cannot go missing.
+// Four structures still live here. Unlike the founders they have never had art in ANY root:
+// the wagon, the shed, the scaffolding and the standing stone were never commissioned, so
+// there is nothing committed to move. They are also not placed by `cityTemplate`, which is why
+// round 4's structure gate stays green without them.
 async function tryIngest(
   kind: string, run: () => Promise<IngestEntry>,
 ): Promise<IngestEntry> {
@@ -211,10 +164,10 @@ export async function ingestProductionArt(
   const root = opts.artRoot ?? process.env['SJ_ART_ROOT'] ?? DEFAULT_ART_ROOT
   if (!existsSync(root)) throw new Error(`ingestProductionArt: art root not found: ${root}`)
   const codex = new AssetCodex(db)
-  const out: IngestEntry[] = [...registerCommittedBuildings(codex)]
-  for (const f of FOUNDER_ART) {
-    out.push(await tryIngest(`character:${f.id}`, () => ingestCharacter(codex, root, f.id, f.dir)))
-  }
+  const out: IngestEntry[] = [
+    ...registerCommittedBuildings(codex),
+    ...registerCommittedCast(codex),
+  ]
   for (const dir of BUILDING_ART_DIRS) {
     out.push(await tryIngest(dir, () => ingestBuilding(codex, root, dir)))
   }
