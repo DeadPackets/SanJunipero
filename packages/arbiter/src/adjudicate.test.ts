@@ -12,6 +12,10 @@ import { RulingsStore } from './rulings.js'
 import { FORBIDDEN_FRAMING } from './prompt.js'
 import type { Recipe, Verdict } from './verdict.js'
 
+// A credit for a test that is not about the credit; the two-argument codify is required so
+// an uncredited discovery cannot be minted in silence.
+const CODIFY_CREDIT = { agentId: 'a1', intent: 'a mind asked for this' }
+
 const boilSaltRecipe: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil River Water for Salt',
@@ -181,7 +185,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const llm = new ScriptedLlm(() => basketVerdict)
     const { arbiter } = await makeRig(llm)
 
-    arbiter.codify(boilSaltRecipe)
+    arbiter.codify(boilSaltRecipe, CODIFY_CREDIT)
 
     const verdict = await arbiter.adjudicate('I try to boil river water for salt', ctx)
     expect(verdict).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: {} })
@@ -229,7 +233,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
 
     await new RulingsStore(db, embedder).record('weave reeds to basket', basketVerdict, 100)
-    arbiter.codify(basketRecipe)
+    arbiter.codify(basketRecipe, CODIFY_CREDIT)
 
     const verdict = await arbiter.adjudicate('basket weave reeds', ctx)
     expect(verdict).toEqual({ kind: 'map', verb: 'recipe:basket', params: {} })
@@ -241,7 +245,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', ropeVerdict, 100)
-    arbiter.codify(ropeRecipe)
+    arbiter.codify(ropeRecipe, CODIFY_CREDIT)
     arbiter.revert('recipe:rope', 'physics wrong')
 
     const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
@@ -334,7 +338,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const stored: Verdict = { kind: 'map', verb: 'recipe:rope', params: {} }
 
     await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
-    arbiter.codify(ropeRecipe)
+    arbiter.codify(ropeRecipe, CODIFY_CREDIT)
     arbiter.revert('recipe:rope', 'physics wrong')
 
     const verdict = await arbiter.adjudicate('rope twist reeds', ctx)
@@ -348,7 +352,7 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     const { db, arbiter } = await makeRig(llm)
     const review = new ReviewStore(db)
 
-    const { ruleId } = arbiter.codify(boilSaltRecipe)
+    const { ruleId } = arbiter.codify(boilSaltRecipe, CODIFY_CREDIT)
     expect(review.pending()).toHaveLength(1)
 
     arbiter.revert('recipe:boil_salt', 'physics wrong')
@@ -590,8 +594,8 @@ describe('rulebook rehydration on construction', () => {
     const llm = new ScriptedLlm(() => basketVerdict)
     const { db, arbiter, embedder } = await makeRig(llm)
 
-    arbiter.codify(rehydrateRecipe)
-    arbiter.codify(revertedRecipe)
+    arbiter.codify(rehydrateRecipe, CODIFY_CREDIT)
+    arbiter.codify(revertedRecipe, CODIFY_CREDIT)
     arbiter.revert('recipe:rehydrate_gone', 'physics wrong')
     // Simulate restart: the in-memory registry forgets, the db remembers.
     unregisterVerb('recipe:rehydrate_basket')
@@ -631,7 +635,7 @@ describe('live codification round trip (T20)', () => {
 
       // Codify: the recipe becomes a verb the engine itself answers for.
       expect(VERBS[matRecipe.id]).toBeUndefined()
-      expect(arbiter.codify(matRecipe)).toEqual({ ruleId: expect.any(Number), verb: matRecipe.id })
+      expect(arbiter.codify(matRecipe, CODIFY_CREDIT)).toEqual({ ruleId: expect.any(Number), verb: matRecipe.id })
       expect(VERBS[matRecipe.id]).toBeDefined()
 
       const state = fold(

@@ -17,6 +17,10 @@ import { RulebookStore } from './rulebook.js'
 import { CodexStore } from './codex.js'
 import type { Recipe, Verdict } from './verdict.js'
 
+// A credit for a test that is not about the credit; the two-argument codify is required so
+// an uncredited discovery cannot be minted in silence.
+const CODIFY_CREDIT = { agentId: 'a1', intent: 'a mind asked for this' }
+
 // Pinned golden hashes — regenerating these is a deliberate, reviewed act.
 const GOLDEN_DAY_HASH = 'f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac'
 
@@ -162,7 +166,7 @@ describe('GATE G4: "boil river water for salt" adjudicates once, then runs Tier-
     expect(llm.objectCalls).toBe(1)
 
     // 4. Codify lands the recipe in the rulebook and hot-registers the verb.
-    const { verb } = arbiter.codify(r1.recipe)
+    const { verb } = arbiter.codify(r1.recipe, CODIFY_CREDIT)
     expect(verb).toBe('recipe:boil_salt')
     expect(new RulebookStore(db).byId('recipe:boil_salt')).not.toBeNull()
     expect(VERBS['recipe:boil_salt']).toBeDefined()

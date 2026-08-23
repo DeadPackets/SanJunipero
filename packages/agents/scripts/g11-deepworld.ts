@@ -58,6 +58,7 @@ import {
   type G11Checkpoint, type G11Fingerprint, type G11Sidecar,
 } from '../src/live/g11checkpoint.js'
 import { PREFLIGHT_ROUNDS, preflightRefusal, runPreflight } from '../src/live/providerPreflight.js'
+import type { DiscoveryCredit } from '@sj/shared'
 
 // The user has ratified Baidu Qianfan as the v1 provider (cleanup/c8-cost-plan.md L1).
 // OpenRouter's `provider.order` is a PREFERENCE, not an allow-list: `defaultExtraBody` sends
@@ -551,7 +552,8 @@ async function main(): Promise<void> {
       })
       return verdict
     },
-    codify: (recipe: { id: string }) => arbiter.codify(recipe as Recipe),
+    codify: (recipe: { id: string }, credit: DiscoveryCredit) =>
+      arbiter.codify(recipe as Recipe, credit),
   }
   seam = watched
   for (const runtime of runtimes.values()) wireArbiter(runtime, watched)

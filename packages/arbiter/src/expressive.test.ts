@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { FakeEmbedder, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
@@ -6,7 +7,7 @@ import {
   type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
-import { makeArbiter, wordTainted, type AgentCtx, type Arbiter } from './adjudicate.js'
+import { makeArbiter, wordTainted, type AgentCtx, type Arbiter, type Codified } from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
@@ -274,6 +275,83 @@ describe('F-C — a coined word is held to the framing law, like a recipe name',
       expect(new RulebookStore(db).byId('express:dance')).not.toBeNull()
     } finally {
       unregisterVerb('express:dance')
+    }
+  })
+})
+
+describe('F-B — BOTH codification paths report their mint, and a third could not hide', () => {
+  async function rigWithSpy(llm: ScriptedLlm, seen: Codified[]): Promise<Arbiter> {
+    const db = openArbiterDb(':memory:')
+    new CodexStore(db).insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
+    return makeArbiter({
+      db, llm: llm as unknown as LlmClient, embedder: await FakeEmbedder.create(), tick: () => 100,
+      onCodified: (d) => seen.push(d),
+    })
+  }
+
+  it('calls onCodified for a coined word, with kind "word" and no products', async () => {
+    const seen: Codified[] = []
+    const arbiter = await rigWithSpy(new ScriptedLlm(script(DANCE)), seen)
+    try {
+      await arbiter.adjudicate('I dance by the fire', ctx)
+      expect(seen).toEqual([{
+        recipeId: 'express:dance', name: 'dance', kind: 'word', makes: [],
+        credit: { agentId: ctx.agentId, intent: 'I dance by the fire' },
+      }])
+    } finally {
+      unregisterVerb('express:dance')
+    }
+  })
+
+  it('does not report a word the town already has', async () => {
+    const seen: Codified[] = []
+    const arbiter = await rigWithSpy(new ScriptedLlm(script(DANCE)), seen)
+    try {
+      await arbiter.adjudicate('I dance by the fire', ctx)
+      await arbiter.adjudicate('I dance in the rain', ctx2)
+      expect(seen).toHaveLength(1)
+    } finally {
+      unregisterVerb('express:dance')
+    }
+  })
+
+  it('does not report a tainted word, because a tainted word is never codified', async () => {
+    const seen: Codified[] = []
+    const arbiter = await rigWithSpy(new ScriptedLlm(script({ ...DANCE, word: 'prompt' })), seen)
+    try {
+      await arbiter.adjudicate('I dance by the fire', ctx)
+      expect(seen).toEqual([])
+    } finally {
+      unregisterVerb('express:prompt')
+    }
+  })
+
+  // R2. A discovery record that hooked only codify() would silently miss every coined word.
+  // This is the guard against the same mistake being made a THIRD time: a new row in the
+  // rulebook is a new codification, and every one of them must report it.
+  it('every rulebook INSERT in the arbiter reports its mint — a third path could not be silent', () => {
+    const dir = new URL('.', import.meta.url)
+    const sources = readdirSync(dir)
+      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+      .map((f) => [f, readFileSync(new URL(f, dir), 'utf8')] as const)
+
+    const mints: Array<{ file: string; line: number; text: string }> = []
+    for (const [file, src] of sources) {
+      src.split('\n').forEach((text, i) => {
+        if (/\brulebook\.insert\(/.test(text)) mints.push({ file, line: i + 1, text: text.trim() })
+      })
+    }
+
+    // Two today: codifyExpressive() for a coined word, codify() for a craft. A third arriving
+    // is the whole point — the count fails and the author must come here and look. Counted by
+    // file rather than by line so an unrelated edit above does not cry wolf.
+    expect(mints.map((m) => m.file)).toEqual(['adjudicate.ts', 'codify.ts'])
+
+    for (const mint of mints) {
+      const src = sources.find(([f]) => f === mint.file)![1].split('\n')
+      const after = src.slice(mint.line, mint.line + 12).join('\n')
+      expect(after, `${mint.file}:${mint.line} mints a permanent verb and never reports it`)
+        .toContain('onCodified')
     }
   })
 })

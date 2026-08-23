@@ -55,7 +55,7 @@ describe('ReviewStore', () => {
 
   it('codify auto-queues a pending review for every codified rule', () => {
     const { review, rulebook, codex } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, codex, tick: 200 })
+    const { ruleId } = codify(boilSaltRecipe, { agentId: 'a1', intent: 'i try to boil the river water down' }, { rulebook, review, codex, tick: 200 })
     expect(review.pending()).toEqual([
       expect.objectContaining({ ruleId, recipeId: 'recipe:boil_salt', status: 'pending', reason: null, tick: 200 }),
     ])
@@ -73,7 +73,7 @@ describe('ReviewStore', () => {
 
   it('revert tombstones the rulebook, unregisters the verb, and marks the row reverted', () => {
     const { db, review, rulebook, codex } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, codex, tick: 200 })
+    const { ruleId } = codify(boilSaltRecipe, { agentId: 'a1', intent: 'i try to boil the river water down' }, { rulebook, review, codex, tick: 200 })
     review.revert(ruleId, 'physics wrong', 500)
 
     const row = db.prepare('SELECT status, reason FROM ruling_reviews WHERE rule_id = ?').get(ruleId) as ReviewStatusRow
@@ -89,7 +89,7 @@ describe('ReviewStore', () => {
 
   it('reverting an already-approved rule re-queues idempotently: a single reverted disposition', () => {
     const { db, review, rulebook, codex } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, codex, tick: 200 })
+    const { ruleId } = codify(boilSaltRecipe, { agentId: 'a1', intent: 'i try to boil the river water down' }, { rulebook, review, codex, tick: 200 })
     review.approve(ruleId)
     review.revert(ruleId, 'physics wrong', 500)
 
@@ -104,7 +104,7 @@ describe('ReviewStore', () => {
 
   it('approve throws on a tombstoned rule', () => {
     const { db, review, rulebook, codex } = makeReview()
-    const { ruleId } = codify(boilSaltRecipe, { rulebook, review, codex, tick: 200 })
+    const { ruleId } = codify(boilSaltRecipe, { agentId: 'a1', intent: 'i try to boil the river water down' }, { rulebook, review, codex, tick: 200 })
     review.revert(ruleId, 'physics wrong', 500)
     review.queue(ruleId, 'recipe:boil_salt', 600) // re-queue a reverted rule
     expect(() => review.approve(ruleId)).toThrow(/reverted/)

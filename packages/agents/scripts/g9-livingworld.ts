@@ -44,6 +44,7 @@ import { watchBirths, type AgentBornPayload } from '../src/family/watchBirths.js
 import { captureSocialName, migrateFamilyTables, promptBirthLine } from '../src/family/socialName.js'
 import { G9ReportSchema, checkG9Report, median, type G9Report } from '../src/live/g9report.js'
 import {
+import type { DiscoveryCredit } from '@sj/shared'
   HEARTH, HUTS, STOREHOUSE, hutDoor, makeTerrain, townGenesisEvents, type Box,
 } from '../src/live/g9world.js'
 
@@ -366,8 +367,8 @@ async function main(): Promise<void> {
       if (verdict.kind === 'attempt' && firstCodifiedIntent === null) firstCodifiedIntent = intent
       return verdict
     },
-    codify: (recipe: { id: string }) => {
-      const out = arbiter.codify(recipe as Recipe)
+    codify: (recipe: { id: string }, credit: DiscoveryCredit) => {
+      const out = arbiter.codify(recipe as Recipe, credit)
       codified.push(out.verb)
       return out
     },
