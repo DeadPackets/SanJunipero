@@ -87,12 +87,12 @@ export function showcaseTerrain(anchor: { x: number; y: number } = SHOWCASE_ANCH
 // ------------------------------------------------------------------ invariants (tests + gate)
 
 export const showcaseDoorTile = (s: ShowcaseStructure, anchor = SHOWCASE_ANCHOR): { x: number; y: number } => {
-  const d = doorTile({ ...s, dx: s.x - anchor.x, dy: s.y - anchor.y, owner: null, furnishings: [] })
+  const d = doorTile({ w: s.w, h: s.h, dx: s.x - anchor.x, dy: s.y - anchor.y })
   return { x: anchor.x + d.dx, y: anchor.y + d.dy }
 }
 
 export const showcaseStructureTiles = (s: ShowcaseStructure): { x: number; y: number }[] =>
-  structureTiles({ ...s, dx: s.x, dy: s.y, owner: null, furnishings: [] }).map((t) => ({ x: t.dx, y: t.dy }))
+  structureTiles({ w: s.w, h: s.h, dx: s.x, dy: s.y }).map((t) => ({ x: t.dx, y: t.dy }))
 
 /** Every road tile reachable from the plaza centre, walking road to road. */
 export function roadReach(map: ShowcaseMap, from: { x: number; y: number } = PLAZA_TILE): Set<string> {

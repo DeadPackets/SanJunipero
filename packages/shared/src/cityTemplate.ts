@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { roadAutotile, type RoadAutotileKey } from './autotile.js'
+import { TOWN_FACINGS } from './townGrammar.js'
 
 // The genesis city as pure data. Its consumer is genesis (engine/gateway), so it lives in
 // shared: homing it in forge would make the engine depend on sharp and better-sqlite3 to read
@@ -47,6 +48,11 @@ export const CityStructureSchema = z.object({
   // USER RULING 1: the five houses are owned, one founder each; every public building is null.
   // The field is REQUIRED; only its value may be null.
   owner: z.string().min(1).nullable(),
+  // ★ FACING IS DATA. `facingFrom(dx, dy)` derives a facing from a delta and can answer `ne`
+  // or `nw`, for which the forge has no art — right for a walking body, which turns four ways,
+  // never right for a building, which the user ruled turns two. Because this is a two-value
+  // enum and it is REQUIRED, NE and NW are not merely unused: they are unrepresentable.
+  facing: z.enum(TOWN_FACINGS),
   furnishings: z.array(CityFurnishingSchema),
 }).strict()
 
@@ -254,24 +260,29 @@ export function cityStructures(): CityStructure[] {
     ...DWELLINGS.map(({ kind, dx, dy, owner }) => {
       const f = DWELLING_FOOTPRINTS[kind]
       return {
-        kind, dx, dy, w: f.w, h: f.h, owner,
+        kind, dx, dy, w: f.w, h: f.h, owner, facing: 'sw' as const,
         furnishings: kind === 'house' ? [...HOUSE_FURNISHINGS] : [],
       }
     }),
     // The storehouse fronts the main street where it arrives at the square, so the first
     // building you pass coming from the river is the one the town keeps its food in.
-    { kind: 'storehouse', dx: 13, dy: 12, w: 2, h: 2, owner: null, furnishings: [...STOREHOUSE_FURNISHINGS] },
-    { kind: 'well', dx: WELL_AT.dx, dy: WELL_AT.dy, w: 1, h: 1, owner: null, furnishings: [] },
-    { kind: 'fire_pit', dx: FIRE_PIT_AT.dx, dy: FIRE_PIT_AT.dy, w: 1, h: 1, owner: null, furnishings: [] },
+    { kind: 'storehouse', dx: 13, dy: 12, w: 2, h: 2, owner: null, facing: 'sw' as const, furnishings: [...STOREHOUSE_FURNISHINGS] },
+    { kind: 'well', dx: WELL_AT.dx, dy: WELL_AT.dy, w: 1, h: 1, owner: null, facing: 'sw' as const, furnishings: [] },
+    { kind: 'fire_pit', dx: FIRE_PIT_AT.dx, dy: FIRE_PIT_AT.dy, w: 1, h: 1, owner: null, facing: 'sw' as const, furnishings: [] },
   ]
 }
 
+// Geometry only, so a caller holding a footprint and nothing else can ask. Both take the four
+// numbers they read rather than a whole `CityStructure`: a schema field added for the art lane
+// is not a reason for the showcase rasteriser to stop compiling.
+export type StructureBox = { dx: number; dy: number; w: number; h: number }
+
 // The tile a resident walks out of, on the south face, at the centre of the frontage.
-export function doorTile(s: CityStructure): { dx: number; dy: number } {
+export function doorTile(s: StructureBox): { dx: number; dy: number } {
   return { dx: s.dx + ((s.w - 1) >> 1), dy: s.dy + s.h - 1 }
 }
 
-export function structureTiles(s: CityStructure): { dx: number; dy: number }[] {
+export function structureTiles(s: StructureBox): { dx: number; dy: number }[] {
   const out: { dx: number; dy: number }[] = []
   for (let dy = s.dy; dy < s.dy + s.h; dy++)
     for (let dx = s.dx; dx < s.dx + s.w; dx++) out.push({ dx, dy })

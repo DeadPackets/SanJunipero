@@ -13,12 +13,13 @@ import {
   touchingStructures, structureComponents, plazaArrivals, dwellingRanks, longestKindRun,
   dwellingGaps,
 } from './cityTemplate.js'
+import { TOWN_FACINGS } from './townGrammar.js'
 
 const MINIMAL = {
   anchor: { x: 0, y: 0 },
   tiles: [{ dx: 1, dy: 2, to: T_ROAD }],
   structures: [{
-    kind: 'house', dx: 3, dy: 4, w: 2, h: 2, owner: 'amara',
+    kind: 'house', dx: 3, dy: 4, w: 2, h: 2, owner: 'amara', facing: 'sw',
     furnishings: [{ kind: 'bed', slot: { x: 1, y: 1 } }],
   }],
 }
@@ -56,6 +57,33 @@ describe('CityTemplateSchema', () => {
       structures: [{ ...MINIMAL.structures[0], furnishings: [{ kind: 'bed' }] }],
     })).toThrow()
   })
+})
+
+// ★ FACING IS DATA, NOT INFERENCE.
+//
+// `facingFrom(dx, dy)` derives a facing from a delta and can answer `ne` or `nw`, for which
+// the forge has no art at all. That function is right for a WALKING BODY, which turns four
+// ways; it was never right for a building, which the user ruled turns two. So the template
+// carries the answer in a column and nothing infers it — and because the column is a two-value
+// enum, NE and NW are not merely unused here, they are unrepresentable.
+describe('every building says which way it faces', () => {
+  it('carries a facing on every structure, and only ever one of the two', () => {
+    for (const s of cityStructures())
+      expect(TOWN_FACINGS as readonly string[], `${s.kind} at ${key(s.dx, s.dy)}`).toContain(s.facing)
+  })
+
+  it('refuses a facing the forge has no art for', () => {
+    for (const bad of ['ne', 'nw', 'north', ''])
+      expect(() => CityTemplateSchema.parse({
+        ...MINIMAL, structures: [{ ...MINIMAL.structures[0], facing: bad }],
+      }), bad).toThrow()
+  })
+
+  it('refuses a structure with no facing at all — the column is required', () => {
+    const { facing: _drop, ...noFacing } = MINIMAL.structures[0]!
+    expect(() => CityTemplateSchema.parse({ ...MINIMAL, structures: [noFacing] })).toThrow()
+  })
+
 })
 
 describe('district geometry', () => {
@@ -530,7 +558,7 @@ describe('PROPERTY 2 — roads connect the places people go', () => {
 
   it('splits the group when a building is stranded, so the check is not vacuous', () => {
     const stub = { ...t, structures: [...t.structures, {
-      kind: 'shed', dx: 31, dy: 27, w: 1, h: 1, owner: null, furnishings: [],
+      kind: 'shed', dx: 31, dy: 27, w: 1, h: 1, owner: null, facing: 'sw' as const, furnishings: [],
     }] }
     expect(structureComponents(stub).length).toBeGreaterThan(1)
   })
