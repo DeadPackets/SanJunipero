@@ -1,0 +1,14 @@
+{
+  "version": "v4-hires-building",
+  "kind": "house",
+  "footprint": {
+    "w": 2,
+    "h": 2
+  },
+  "cell": {
+    "w": 512,
+    "h": 512,
+    "feetX": 255,
+    "feetY": 511
+  }
+}

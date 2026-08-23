@@ -1,16 +1,21 @@
-// Idempotent ingest of the APPROVED production art (durable scratchpad → forge codex).
+// Idempotent ingest of the APPROVED production art → the forge codex.
 // Characters pack into one v4-hires-atlas record each (kind character:<id>); buildings
-// register their hi-res cell + v4-hires-building manifest (kind = engine structure kind).
+// register their hi-res cell + v4-hires-building manifest (kind = engine structure kind,
+// with the facing riding in it: `house`, `house:se`).
 // Re-running registers nothing when bytes+manifest are unchanged; regenerated art gets a
 // new record that wins by seq (the renderer's newest-ready law).
+//
+// TWO ROOTS, ONE OF WHICH IS DURABLE. The town's buildings come from `forge/content/buildings`,
+// which is COMMITTED. The cast still comes from a session scratchpad, and that scratchpad has
+// already been emptied once with every character cell in it — see `tryIngest`.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
 import {
-  AssetCodex, CELL_NAMES_V4, LIBRARY, cellAnchor, chromaKey, decodePng, encodePng,
-  loadMaterialBook, packCharacterAtlas, processHiResCell, registerGeneratedTerrain,
-  registerLibraryEntry, type LibraryEntry, type RawImage,
+  AssetCodex, CELL_NAMES_V4, LIBRARY, decodePng, encodePng, loadMaterialBook, packCharacterAtlas,
+  registerCommittedBuildings, registerGeneratedTerrain, registerLibraryEntry,
+  type LibraryEntry, type RawImage,
 } from '@sj/forge'
 import {
   ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, roadAutotileKind,
@@ -30,12 +35,23 @@ export const FOUNDER_ART: readonly { id: string; dir: string }[] = [
   { id: 'salma', dir: 'production/salma' },
 ]
 
+// The scratchpad structures that have NO committed cell. The storehouse left this list when it
+// got an authored one: two roots registering the same kind fight over `latestByKind` and each
+// re-registers on every boot, so a kind belongs to exactly one root.
 export const BUILDING_ART_DIRS: readonly string[] = [
-  'production/building-storehouse', 'production/building-wagon', 'production/building-shed',
+  'production/building-wagon', 'production/building-shed',
   'production/building-scaffolding', 'production/building-standing-stone',
 ]
 
-export type IngestEntry = { kind: string; action: 'registered' | 'unchanged'; id: string }
+export type IngestEntry = {
+  kind: string
+  /** `missing` is art the scratchpad no longer holds. It is REPORTED, never thrown: one absent
+   *  founder used to abort the whole function, so the buildings after it in the loop never
+   *  registered either and the town woke with no art at all. */
+  action: 'registered' | 'unchanged' | 'missing'
+  id: string
+  detail?: string
+}
 
 type CharManifestFile = { version: string; figureH: number; cells: Record<string, CellAnchor> }
 
@@ -95,38 +111,11 @@ async function ingestBuilding(codex: AssetCodex, root: string, dir: string): Pro
   })
 }
 
-// The previously-approved anchor cottage serves the engine's one buildable kind ('hut').
-// Its committed source is the raw magenta-keyed style anchor; the same hi-res cell chain
-// the v4 buildings used makes it codex-resolvable with a mechanical ground-anchor manifest.
-export async function cottageCell(styleAnchorPng: Buffer): Promise<{ cell: RawImage; anchor: CellAnchor }> {
-  const raw = await decodePng(styleAnchorPng)
-  let keyed = raw
-  let transparent = 0
-  for (let i = 3; i < raw.data.length; i += 4) if (raw.data[i] === 0) transparent++
-  if (transparent / (raw.width * raw.height) < 0.1) {
-    for (const tolerance of [72, 110]) {
-      keyed = chromaKey(raw, { tolerance })
-      let clear = 0
-      for (let i = 3; i < keyed.data.length; i += 4) if (keyed.data[i] === 0) clear++
-      if (clear / (keyed.width * keyed.height) >= 0.1) break
-    }
-  }
-  const cell = processHiResCell(keyed)
-  return { cell, anchor: cellAnchor(cell) }
-}
-
-async function ingestCottage(codex: AssetCodex, styleAnchorPath: string): Promise<IngestEntry> {
-  const { cell, anchor } = await cottageCell(readFileSync(styleAnchorPath))
-  const manifest: BuildingManifest = {
-    version: 'v4-hires-building', kind: 'hut', footprint: { w: 2, h: 2 }, cell: anchor,
-  }
-  const png = await encodePng(cell)
-  return upsert(codex, {
-    klass: 'building', kind: 'hut', desc: 'building v4: anchor cottage (hut dwelling)',
-    png, widthPx: cell.width, heightPx: cell.height,
-    meta: JSON.stringify(manifest), footprint: manifest.footprint,
-  })
-}
+// ★ THE ANCHOR-DERIVED HOME IS RETIRED. The founders' home used to be the committed style
+// anchor, chroma-keyed and re-celled at ingest time — first under kind `hut`, which nothing
+// places, and the anchor's own architecture is the medieval one the user rejected. `house` is
+// now an authored cell in `forge/content/buildings`, alongside the cottage, the cabin, the
+// farmhouse and the storehouse, in both facings. `registerCommittedBuildings` puts all ten in.
 
 // Terrain art is code-painted, so it needs no art root and costs nothing: the flat kind ×
 // variant tiles AND C13's 15-tile road strip (kind `road:<key>`). Until this runs the codex
@@ -195,18 +184,39 @@ export async function ingestLibraryArt(
   return out
 }
 
+// ★ ONE ABSENT FILE USED TO COST THE WHOLE TOWN ITS ART.
+//
+// This function's art lives in a session scratchpad, and on this tip that scratchpad holds the
+// whole directory tree and ZERO files. The first founder threw ENOENT, the throw escaped the
+// loop, and neither the four founders behind it nor the five buildings nor the anchor home
+// after them ever registered — so every structure drew `builtForm` and every founder drew the
+// checkerboard. Art that is committed (the terrain, and now the buildings) survived it.
+//
+// So a per-item failure is now REPORTED and stepped over. The committed cells register first,
+// because they are the ones that cannot go missing.
+async function tryIngest(
+  kind: string, run: () => Promise<IngestEntry>,
+): Promise<IngestEntry> {
+  try {
+    return await run()
+  } catch (e) {
+    return { kind, action: 'missing', id: '', detail: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 export async function ingestProductionArt(
   db: Database.Database,
-  opts: { artRoot?: string; styleAnchorPath?: string } = {},
+  opts: { artRoot?: string } = {},
 ): Promise<IngestEntry[]> {
   const root = opts.artRoot ?? process.env['SJ_ART_ROOT'] ?? DEFAULT_ART_ROOT
   if (!existsSync(root)) throw new Error(`ingestProductionArt: art root not found: ${root}`)
   const codex = new AssetCodex(db)
-  const out: IngestEntry[] = []
-  for (const f of FOUNDER_ART) out.push(await ingestCharacter(codex, root, f.id, f.dir))
-  for (const dir of BUILDING_ART_DIRS) out.push(await ingestBuilding(codex, root, dir))
-  const anchorPath = opts.styleAnchorPath
-    ?? fileURLToPath(new URL('../../forge/content/reference/style-anchor.png', import.meta.url))
-  if (existsSync(anchorPath)) out.push(await ingestCottage(codex, anchorPath))
+  const out: IngestEntry[] = [...registerCommittedBuildings(codex)]
+  for (const f of FOUNDER_ART) {
+    out.push(await tryIngest(`character:${f.id}`, () => ingestCharacter(codex, root, f.id, f.dir)))
+  }
+  for (const dir of BUILDING_ART_DIRS) {
+    out.push(await tryIngest(dir, () => ingestBuilding(codex, root, dir)))
+  }
   return out
 }
