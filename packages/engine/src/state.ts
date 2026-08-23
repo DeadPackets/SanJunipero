@@ -122,6 +122,13 @@ export type WorldState = {
   // How many times the map has grown. Absent until the first world_grown, so a world that
   // never widens hashes as it always did. Read only through growthsSoFar().
   growths?: number
+  // Where the array's (0, 0) stands in the AUTHORED frame — the frame `genesisTerrainAt` is
+  // written in. Growing north or west moves every stored coordinate, so it moves this too;
+  // growing south or east never does. Absent while the two frames agree, which is why a world
+  // that has only ever widened south and east hashes exactly as it did. Read through
+  // authoredOrigin(); it is what lets a new strip CONTINUE the world's river and forest edge
+  // rather than roll noise beside them.
+  origin?: { x: number; y: number }
   // Footfalls per tile, keyed "x,y" — sparse, because a 128x128 array of zeroes is a hash of
   // nothing. Absent until the first step anybody takes.
   traffic?: Record<string, number>

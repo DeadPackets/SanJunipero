@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { makeCityTemplate, CITY_DWELLING_KINDS, DWELLING_FOOTPRINTS, parseBuildingManifest } from '@sj/shared'
+import {
+  makeCityTemplate, CITY_DWELLING_KINDS, DWELLING_FOOTPRINTS, footprintFor, parseBuildingManifest,
+} from '@sj/shared'
 import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
 import { decodePng } from './post/raw.js'
@@ -129,8 +131,14 @@ describe('the committed cells', () => {
 
   it.each(cells.map((c) => [c.dir, c] as const))('%s clears the pixel bar', async (_dir, c) => {
     const img = await decodePng(c.png)
-    const fp = c.kind === STOREHOUSE_KIND ? { w: 2, h: 2 } : DWELLING_FOOTPRINTS[c.kind as never]
-    expect(c.manifest.footprint, 'the manifest footprint is the template footprint').toEqual(fp)
+    // ★ A TURNED BUILDING TURNS ITS GROUND. `DWELLING_FOOTPRINTS` is the UNTURNED mass — `w`
+    // along the street, `h` into the block — and reading it straight for an SE cell is the
+    // mistake `footprintFor` exists to prevent. It is the mistake this line used to make:
+    // `farmhouse-se` declared 4×2 and stands on 2×4, and every gate downstream graded the
+    // diamond it was told about rather than the one the building covers.
+    const mass = c.kind === STOREHOUSE_KIND ? { w: 2, h: 2 } : DWELLING_FOOTPRINTS[c.kind as never]
+    const fp = footprintFor(mass, c.facing)
+    expect(c.manifest.footprint, `${c.dir} declares the ground it does not stand on`).toEqual(fp)
     const cellPx = buildingCellPx(c.manifest.footprint)
     expect([img.width, img.height], 'authored at the size the 4x stop draws').toEqual([cellPx, cellPx])
     expect(alphaBinaryGate(img).failures).toEqual([])

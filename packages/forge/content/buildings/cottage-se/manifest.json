@@ -2,8 +2,8 @@
   "version": "v4-hires-building",
   "kind": "cottage:se",
   "footprint": {
-    "w": 3,
-    "h": 2
+    "w": 2,
+    "h": 3
   },
   "cell": {
     "w": 640,

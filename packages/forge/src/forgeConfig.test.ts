@@ -80,8 +80,15 @@ describe('forge config', () => {
     // `structures.enterableKinds`, `privateKinds`, `sleepableKinds` and `recipes`, and changes
     // NO value: every number and every boolean in this config is what it was.
     // Previous value (C11 Task 37b): a90bd7471668eea6e8a8e7932129ef7905ae2477b396d5c7b792df539065c4d8
+    // Moved a fourth time by the world-growth lane, which deleted `mapGrowth.maxSize` and the
+    // two dials that served it. The town's grammar plats rings forever, so a 192-tile ceiling
+    // was the same bug as the 128-tile world with a later fuse; `step` and `structuresPerStep`
+    // were a pace guessed against that ceiling. What the world owes is a CLEARANCE — one block
+    // pitch of ground beyond everything standing — which names its own edge and its own depth,
+    // so the section is one key wide now. Three keys removed, none added, no value changed.
+    // Previous value (hut → house rename): 02f295ad603483998c2e85a641f6aa35372ddf630614a46648cd1f95b284ba5b
     expect(stateHash(DEFAULT_CONFIG)).toBe(
-      '02f295ad603483998c2e85a641f6aa35372ddf630614a46648cd1f95b284ba5b')
+      'da065752366c812c531b1eaa0f8537781bc6f5859e5a4bf6647aa5edc37cd472')
     expect(stateHash(SimConfigSchema.parse({}))).toBe(stateHash(DEFAULT_CONFIG))
     expect(Object.keys(DEFAULT_CONFIG)).not.toContain('visionQa')
   })

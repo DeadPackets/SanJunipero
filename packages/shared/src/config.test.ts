@@ -157,7 +157,12 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(c.fauna.fishSchoolBonus).toBe(2)
     expect(c.foodVariety).toEqual({ enabled: true, windowDays: 3, bonusPerKind: 0.05, maxBonus: 0.2 })
     expect(c.regrowth).toEqual({ enabled: true, saplingChancePerDay: 0.02, saplingDays: 30 })
-    expect(c.mapGrowth).toEqual({ enabled: true, step: 16, structuresPerStep: 12, maxSize: 192 })
+    // ★ ONE KEY. `maxSize` was a ceiling on a grammar that plats rings forever and `step` and
+    // `structuresPerStep` were a pace guessed against it. The world owes a CLEARANCE now —
+    // `WORLD_MARGIN` of ground beyond everything standing — and a clearance names its own edge
+    // and its own depth. All that is left to decide is whether the world may widen at all.
+    expect(c.mapGrowth).toEqual({ enabled: true })
+    expect(() => SimConfigSchema.parse({ mapGrowth: { maxSize: 192 } })).toThrow()
   })
 
   // Controller ruling 4 ratified these numbers: they decide whether the first winter is survivable.

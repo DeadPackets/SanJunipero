@@ -12,16 +12,30 @@ export type AlignmentConfig = ForgeConfig['alignment']   // one source; never a 
 // Without it nothing can sit BELOW the near vertex and the sunken check is unreachable.
 export type AlignmentCell = { w: number; h: number; feetY?: number }
 
+// ★ THE DIAMOND IS SKEWED, AND FOR A WHOLE MERGE THIS FUNCTION SAID IT WAS NOT.
+//
+// `leftX`/`rightX` were `centerX ± span/2` with `span = (w + h)·TILE_W/2` — a function of
+// `w + h` ALONE, so a footprint and its transpose produced the identical window. That is the
+// whole reason `farmhouse-se` shipped declaring 4×2 while standing on 2×4 and no gate said a
+// word: `spriteDensity` is `(w + h)·TILE_W/2` too, and so is `targetSize('building')`. All
+// three measured the diamond's SIZE. None of them measured which way it is TURNED.
+//
+// The real geometry, from the projection: the footprint's four tile corners land at (0,0),
+// (w,0), (0,h) and (w,h), so measured from the NEAR vertex — the (w,h) corner the feet anchor
+// sits on — the west vertex is `w·TILE_W/2` to the left and the east vertex is `h·TILE_W/2` to
+// the right. Those are equal only when `w === h`, which is why the three square kinds were
+// never affected and the two rectangular ones were.
 export function footprintDiamond(fp: Footprint, cell: AlignmentCell): {
   nearVertexY: number; centerX: number; leftX: number; rightX: number
 } {
-  const span = (fp.w + fp.h) * TILE_W / 2
+  // `toTargetCell` puts the manifest's `feetX` at the cell's horizontal centre, so the centre
+  // IS the near vertex and the two reaches are measured from it.
   const centerX = cell.w / 2
   return {
     nearVertexY: cell.feetY ?? cell.h - 1,
     centerX,
-    leftX: centerX - span / 2,
-    rightX: centerX + span / 2,
+    leftX: centerX - fp.w * TILE_W / 2,
+    rightX: centerX + fp.h * TILE_W / 2,
   }
 }
 

@@ -4,6 +4,8 @@ import { DEFAULT_CONFIG } from './config.js'
 import {
   CityTemplateSchema, CITY_ANCHOR_DEFAULT, CITY_W, CITY_H, TOWN_ORIGIN, TOWN_RINGS_GENESIS,
   townOrigin, townSpan, RIVER_LOCAL_DX, RIVER_HALF, BANK_HALF, cityGroundAt, CITY_GROUND,
+  TOWN_SQUARE, anchorFor, riverLocalDx, RIVER_GRAMMAR_DX,
+  WORLD_MARGIN, worldSizeForRings, worldForRings, edgesOwed,
   WORLD_SIZE_GENESIS, inExtent, inRect, key, cityTerrainTiles, cityRoadTiles, cityRoadKeys,
   isRoadTile, PLAZA, PLAZA_CENTRE, T_ROAD, T_WATER, T_EARTH,
   cityStructures, cityPlacements, cityBlocks, cityFreePlots, doorTile, doorFrontTile,
@@ -459,6 +461,181 @@ describe('★ the town this grammar builds, measured', () => {
     }
     expect([...water]).toEqual([])
     expect(doorless).toEqual([])
+  })
+})
+
+// ★ THE WORLD MUST BE BIGGER THAN THE TOWN — AT EVERY RING, FOREVER.
+//
+// The generator lane closed on this: "ring 2 is 98 tiles and ring 3 is 136 against a 128-tile
+// world, so the world will need to grow before the town does." Two numbers decided the world's
+// size and both were round: 128 at genesis and a 192 ceiling on growth. Neither survives here.
+// What decides it now is the town: `worldSizeForRings` is `townSpan` plus a block pitch of wild
+// on each side, and it is unbounded in the ring count because the grammar is.
+describe('★ the world a town of R rings needs', () => {
+  it('is the town plus one block pitch of wild on every side, and has no ceiling', () => {
+    expect(WORLD_MARGIN).toBe(PITCH)
+    for (const r of [1, 2, 3, 5, 8, 13, 21])
+      expect(worldSizeForRings(r), `ring ${r}`).toBe(townSpan(r) + 2 * PITCH)
+    // Strictly increasing and unbounded: there is no number this function stops at.
+    for (let r = 1; r < 60; r++)
+      expect(worldSizeForRings(r + 1)).toBeGreaterThan(worldSizeForRings(r))
+    expect(worldSizeForRings(1000)).toBe(townSpan(1000) + 2 * PITCH)
+  })
+
+  // ★ THE RED. This is the state the lane inherited, asserted as the thing that is wrong: a
+  // world pinned at 128 with the town pinned at the genesis anchor refuses ring 2 onward. The
+  // proof below is not vacuous because THIS is what it is measured against.
+  it('is exactly what a fixed 128-tile world at a fixed anchor could not give', () => {
+    expect(templateFits(CITY_ANCHOR_DEFAULT, WORLD_SIZE_GENESIS, 1)).toBe(true)
+    for (const r of [2, 3, 4, 5])
+      expect(templateFits(CITY_ANCHOR_DEFAULT, WORLD_SIZE_GENESIS, r), `ring ${r} in a 128 world`).toBe(false)
+    expect(townSpan(2)).toBe(98)
+    expect(townSpan(3)).toBe(136)
+    expect(worldSizeForRings(2)).toBeGreaterThan(WORLD_SIZE_GENESIS)
+  })
+
+  // ★ THE SQUARE IS THE FIXED POINT, so growing the town moves its CORNER and never its
+  // CENTRE — and never the river. This is what lets the world extend rather than be repainted:
+  // the ford, the lake fork and the forage nodes are placed against a channel that does not
+  // move, at any ring count.
+  it('leaves the square and the channel exactly where they are, at every ring', () => {
+    for (let r = 1; r <= 12; r++) {
+      const a = anchorFor(r)
+      expect({ x: a.x + townOrigin(r), y: a.y + townOrigin(r) }, `ring ${r} square`).toEqual(TOWN_SQUARE)
+      expect(a.x + riverLocalDx(r), `ring ${r} channel`).toBe(49)
+      expect(TOWN_SQUARE.x + RIVER_GRAMMAR_DX).toBe(49)
+    }
+    expect(anchorFor(TOWN_RINGS_GENESIS)).toEqual(CITY_ANCHOR_DEFAULT)
+    // The plat rule reads the same ground whatever the ring count, so ring 1's five blocks are
+    // still ring 1's five blocks inside a ring-5 town.
+    const inner = plattedBlocks(1, CITY_GROUND).map(b => `${b.i},${b.j}`)
+    for (const b of inner) expect(plattedBlocks(5, CITY_GROUND).map(x => `${x.i},${x.j}`)).toContain(b)
+  })
+
+  it('grows the platted lattice monotonically, so a ring never withdraws what it offered', () => {
+    let last = 0
+    for (let r = 1; r <= 6; r++) {
+      const plots = freePlots(r, CITY_GROUND).length
+      expect(plots, `ring ${r}`).toBeGreaterThan(last)
+      last = plots
+    }
+    expect(plattedBlocks(5, CITY_GROUND)).toHaveLength(109)
+    expect(freePlots(5, CITY_GROUND)).toHaveLength(436)
+  })
+})
+
+// ★ THE THREE INVARIANTS, HELD AT RING 5 AND RING 6. The generator lane proved dry and
+// road-fronted out to ring 4 and could go no further, because past ring 1 there was no world to
+// stand the town in. IN-WORLD is the third, and it is the one this lane exists for.
+describe('★ the town still stands at ring 5', () => {
+  for (const rings of [5, 6]) {
+    it(`puts every legal building on every plot of ring ${rings} on dry, in-world, road-fronted ground`, () => {
+      const world = worldForRings(rings)
+      const o = townOrigin(rings)
+      const road = new Set(streetTiles(rings, CITY_GROUND).map(t => key(t.dx, t.dy)))
+      const wet: string[] = [], doorless: string[] = [], outside: string[] = []
+      let closest = Infinity, buildings = 0, tiles = 0
+      for (const p of freePlots(rings, CITY_GROUND))
+        for (let along = 1; along <= MAX_ALONG; along++)
+          for (let deep = 1; deep <= MAX_DEEP; deep++) {
+            const s = place(p, 'x', along, deep, null)
+            buildings++
+            for (const c of placedTiles(s)) {
+              tiles++
+              if (CITY_GROUND(c.dx, c.dy) === 'water') wet.push(key(c.dx, c.dy))
+              // grammar → template → the world's own frame
+              const wx = world.anchor.x + c.dx + o, wy = world.anchor.y + c.dy + o
+              if (wx < 0 || wy < 0 || wx >= world.size || wy >= world.size) outside.push(`${wx},${wy}`)
+              closest = Math.min(closest, wx, wy, world.size - 1 - wx, world.size - 1 - wy)
+            }
+            const d = doorFrontTile({ ...s, furnishings: [] })
+            if (!road.has(key(d.dx, d.dy))) doorless.push(`${plotKey(p)} ${along}×${deep}`)
+          }
+      expect(buildings).toBe(freePlots(rings, CITY_GROUND).length * MAX_ALONG * MAX_DEEP)
+      expect(tiles).toBeGreaterThan(10000)
+      expect(wet, 'a building on water').toEqual([])
+      expect(doorless, 'a door that is not on a road').toEqual([])
+      expect(outside, 'a building off the edge of the world').toEqual([])
+      // Not merely inside: the whole TOWN — its streets, not only its walls — keeps a block
+      // pitch of wild on every side. Measured on the box rather than on the building tiles,
+      // because the outermost buildings stand three tiles in from their own street and that
+      // slack would swallow a shrunken margin without a single assertion noticing.
+      const span = townSpan(rings)
+      const box = {
+        dx0: world.anchor.x, dy0: world.anchor.y,
+        dx1: world.anchor.x + span - 1, dy1: world.anchor.y + span - 1,
+      }
+      expect(edgesOwed(box, { w: world.size, h: world.size }), 'the world owes the town ground')
+        .toEqual([])
+      expect(edgesOwed(box, { w: world.size - 1, h: world.size }), 'one tile narrower must not do')
+        .toEqual([{ edge: 'e', owed: 1 }])
+      expect(closest).toBeGreaterThanOrEqual(WORLD_MARGIN)
+    })
+  }
+
+  // The clamp the lane removed. `cityFreePlots` filtered every plot through a ring-1 extent, so
+  // an agent standing in a ring-2 town would have been offered nothing at all to build on.
+  it('offers the plots of the ring it is asked about, not the ring genesis platted', () => {
+    const t = makeCityTemplate()
+    expect(cityFreePlots(t, 1)).toHaveLength(11)
+    expect(cityFreePlots(t, 5)).toHaveLength(436 - GENESIS_WANTED.length)
+    for (const p of cityFreePlots(t, 5)) expect(inExtent(p.dx, p.dy, 5), key(p.dx, p.dy)).toBe(true)
+  })
+
+  // A whole ring-5 town, assembled and parsed — ground, streets and all — inside the world its
+  // own ring count asks for.
+  it('assembles a ring-5 template that lands inside the world ring 5 asks for', () => {
+    const rings = 5
+    const world = worldForRings(rings)
+    const t = makeCityTemplate(world.anchor, rings)
+    expect(t.tiles.length).toBe(townSpan(rings) * townSpan(rings))
+    expect(templateFits(world.anchor, world.size, rings)).toBe(true)
+    for (const x of t.tiles) {
+      expect(inExtent(x.dx, x.dy, rings), key(x.dx, x.dy)).toBe(true)
+      expect(world.anchor.x + x.dx).toBeLessThan(world.size)
+      expect(world.anchor.y + x.dy).toBeLessThan(world.size)
+    }
+    expect(danglingRoadEnds(t, rings)).toEqual([])
+    expect(townErrors(cityPlacements(), streetTiles(rings, CITY_GROUND), CITY_GROUND)).toEqual([])
+  })
+})
+
+// ★ HOW MUCH GROUND THE WORLD OWES, read off the built set and nothing else — no ring count, no
+// map size, no anchor. The same measurement the camera's bounds and the cull already derive.
+describe('edgesOwed', () => {
+  const box = { dx0: 50, dy0: 50, dx1: 60, dy1: 60 }
+
+  it('is empty exactly when every side of the built set has its margin', () => {
+    expect(edgesOwed(box, { w: 200, h: 200 })).toEqual([])
+    expect(edgesOwed({ dx0: WORLD_MARGIN, dy0: WORLD_MARGIN, dx1: 60, dy1: 60 },
+      { w: 60 + WORLD_MARGIN + 1, h: 60 + WORLD_MARGIN + 1 })).toEqual([])
+  })
+
+  it('names the edge and the shortfall when one tile is missing, on each of the four', () => {
+    expect(edgesOwed({ ...box, dy0: WORLD_MARGIN - 1 }, { w: 200, h: 200 })).toEqual([{ edge: 'n', owed: 1 }])
+    expect(edgesOwed({ ...box, dx0: WORLD_MARGIN - 1 }, { w: 200, h: 200 })).toEqual([{ edge: 'w', owed: 1 }])
+    expect(edgesOwed(box, { w: 200, h: 60 + WORLD_MARGIN })).toEqual([{ edge: 's', owed: 1 }])
+    expect(edgesOwed(box, { w: 60 + WORLD_MARGIN, h: 200 })).toEqual([{ edge: 'e', owed: 1 }])
+  })
+
+  it('names all four, in n-e-s-w order, for a world with nothing to spare', () => {
+    expect(edgesOwed({ dx0: 0, dy0: 0, dx1: 9, dy1: 9 }, { w: 10, h: 10 }))
+      .toEqual([{ edge: 'n', owed: 19 }, { edge: 'e', owed: 19 }, { edge: 's', owed: 19 }, { edge: 'w', owed: 19 }])
+  })
+
+  // The genesis world is not a counter-example to the rule, it is the first thing the rule
+  // finds: 128 tiles leave the genesis town four rows short of its southern margin, which is
+  // the same shortfall the generator lane reported and the reason growth exists.
+  it('finds the genesis world four rows short to the south, and short nowhere else', () => {
+    const built = cityStructures()
+    const a = CITY_ANCHOR_DEFAULT
+    const world = {
+      dx0: a.x + Math.min(...built.map(s => s.dx)), dy0: a.y + Math.min(...built.map(s => s.dy)),
+      dx1: a.x + Math.max(...built.map(s => s.dx + s.w - 1)),
+      dy1: a.y + Math.max(...built.map(s => s.dy + s.h - 1)),
+    }
+    expect(edgesOwed(world, { w: WORLD_SIZE_GENESIS, h: WORLD_SIZE_GENESIS }))
+      .toEqual([{ edge: 's', owed: 4 }])
   })
 })
 
