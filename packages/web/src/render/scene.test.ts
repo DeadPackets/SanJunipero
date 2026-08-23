@@ -124,12 +124,29 @@ describe('the frame culls against the camera it is actually looking through', ()
 // running while a zoom captures its anchor, or while a follow is steering, is not a slow bug —
 // it is two owners writing the same position every frame.
 
+/**
+ * ★ ONE FUNCTION'S BODY, AND NOT ITS NEIGHBOUR'S.
+ *
+ * This read `src.slice(i, i + 420)`. Four hundred and twenty characters is longer than most of
+ * the movers, so a short one's window spilled into whatever was declared next — and `panBy`,
+ * `centerHome` and `setFollow` all sit in one list of camera writers that each begin with
+ * `stopGlide()`. Caught while adding the fifth: with `travelTo`'s own `stopGlide()` DELETED,
+ * "travelTo stops it" still passed, on the line belonging to the function below it. A guard
+ * that can be satisfied by its neighbour is not a guard, and this one was one deletion away
+ * from being discovered by a viewer instead of by a test.
+ *
+ * A body now ends where its indentation says it ends.
+ */
+export function functionBody(src: string, name: string): string {
+  const i = src.indexOf(name)
+  if (i < 0) return ''
+  const ends = ['\n    },', '\n  }'].map((e) => src.indexOf(e, i)).filter((n) => n > 0)
+  return src.slice(i, ends.length === 0 ? src.length : Math.min(...ends))
+}
+
 describe('a glide is ended by anything that says where the camera should be', () => {
   const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
-  const body = (name: string): string => {
-    const i = src.indexOf(name)
-    return i < 0 ? '' : src.slice(i, i + 420)
-  }
+  const body = (name: string): string => functionBody(src, name)
 
   it('the wheel stops it before it captures a zoom anchor', () => {
     const wheel = body('const onWheel =')
@@ -137,7 +154,10 @@ describe('a glide is ended by anything that says where the camera should be', ()
     expect(wheel.indexOf('stopGlide()')).toBeLessThan(wheel.indexOf('captureAnchor'))
   })
 
-  for (const mover of ['function fitTo(', 'panBy: (dx, dy) =>', 'centerHome: () =>', 'setFollow: (target) =>']) {
+  for (const mover of [
+    'function fitTo(', 'panBy: (dx, dy) =>', 'centerHome: () =>', 'setFollow: (target) =>',
+    'travelTo: (sx, sy) =>',
+  ]) {
     it(`${mover.replace(/[(:].*/, '')} stops it`, () => {
       expect(body(mover)).toContain('stopGlide()')
     })
@@ -160,6 +180,57 @@ describe('a glide is ended by anything that says where the camera should be', ()
 
   it('gives the glide back its ticker slot on teardown', () => {
     expect(src).toContain('app.ticker.remove(glideTick)')
+  })
+})
+
+// ── ★ THE MINIMAP DOES NOT OPEN A FIFTH DOOR ONTO THE CAMERA ──────────────────────────────
+//
+// Four things already outrank a running throw, and each does the same four steps in the same
+// order. A minimap that wrote `world.position` itself, or that called `centerOnScreen` without
+// the other three, would be a way to move the camera that skips every guard the camera lane
+// proved bites — and it would look right in the browser until the day somebody clicked the map
+// while a throw was still in the air. So the ONE new mover is asserted to be the same shape as
+// the four, in order, and the chrome is scanned for anyone reaching past it.
+
+describe('going somewhere from the map takes the same road as going home', () => {
+  const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
+  const body = (name: string): string => functionBody(src, name)
+
+  it('★ the reader stops at the end of the function it was asked for', () => {
+    const fake = [
+      'const a = () => {', '  first()', '}', 'const b = () => {', '  second()', '}', '',
+    ].join('\n  ')
+    expect(functionBody(`  ${fake}`, 'const a =')).toContain('first()')
+    expect(functionBody(`  ${fake}`, 'const a ='), 'read into the next function')
+      .not.toContain('second()')
+  })
+
+  it('★ does the same four things, in the same order, as centerHome', () => {
+    const travel = body('travelTo: (sx, sy) =>')
+    const home = body('centerHome: () =>')
+    const steps = ['stopGlide()', 'fitted = false', 'breakFollow()', 'centerOnScreen(']
+    const at = (s: string): number[] => steps.map((step) => s.indexOf(step))
+    for (const [i, step] of steps.entries()) {
+      expect(at(travel)[i], `travelTo is missing ${step}`).toBeGreaterThan(-1)
+    }
+    // the ORDER, by index — a guard that runs after the thing it guards is not a guard
+    expect(at(travel)).toEqual([...at(travel)].sort((a, b) => a - b))
+    expect(at(home)).toEqual([...at(home)].sort((a, b) => a - b))
+    expect(travel).toContain('notifyCamera()')
+  })
+
+  it('is the only new way in: nothing outside the renderer writes a camera position', () => {
+    const offenders = tsFilesUnder(WEB_SRC)
+      .filter((f) => !f.startsWith(join(WEB_SRC, 'render')))
+      .filter((f) => /world\.position|centerOnScreen\(/.test(readFileSync(f, 'utf8')))
+      .map((f) => f.slice(WEB_SRC.length + 1))
+    expect(offenders).toEqual([])
+  })
+
+  it('the map is drawn over the SAME box the clamp uses, from one accessor', () => {
+    expect(src).toContain('reachableBox: () => bounds')
+    // and `bounds` is the thing every write to the camera is clamped against
+    expect(src).toMatch(/clampCamera\(\{ x, y \}, world\.scale\.x, bounds, screenBox\(\)\)/)
   })
 })
 

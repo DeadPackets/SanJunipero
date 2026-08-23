@@ -236,6 +236,11 @@ export type Scene = {
   depthCounts(): DepthCounts
   /** the visible world rectangle, in the space labels are drawn in (tooltip.ts places in it) */
   viewRect(): { x: number; y: number; w: number; h: number }
+  /** ★ THE BOX THE CAMERA MAY TRAVEL OVER — the ground that exists union the town as it is
+   *  drawn, recomputed every time the town grows. The minimap draws exactly this and nothing
+   *  else, so "every point on the map is a place the camera can go" is true by construction
+   *  rather than by two modules agreeing about the size of a town neither of them fixes. */
+  reachableBox(): CameraBounds
   /** THE label layer. One owner for every world tag, so two can never be up by accident and
    *  a torn-down sprite cannot leave one behind. */
   tags: TooltipLayer
@@ -256,6 +261,11 @@ export type Scene = {
    *  never shows a number the stop set does not contain. */
   getZoomStop(): ZoomStop
   panBy(dx: number, dy: number): void
+  /** ★ GO THERE. A press on the minimap, in the space `tileToScreen` returns. It is a CUT, not
+   *  a glide: a glide is the continuation of a hand the viewer moved, and nobody's hand crossed
+   *  a ten-ring town. It is also the FIFTH thing that outranks a running throw, and it takes the
+   *  same four steps in the same order as `centerHome` for exactly that reason. */
+  travelTo(sx: number, sy: number): void
   centerHome(): void
   /** a view of the whole settlement, at the largest stop it fits at (task 76) */
   fitToTown(): void
@@ -619,6 +629,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       return () => depthSources.delete(fn)
     },
     viewRect,
+    reachableBox: () => bounds,
     tags,
     sortDepth: () => {
       const entries: DepthEntry[] = []
@@ -638,6 +649,13 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       fitted = false
       breakFollow()
       place(world.position.x + dx, world.position.y + dy)
+    },
+    travelTo: (sx, sy) => {
+      stopGlide()
+      fitted = false
+      breakFollow()
+      centerOnScreen(sx, sy)
+      notifyCamera()
     },
     centerHome: () => {
       stopGlide()
