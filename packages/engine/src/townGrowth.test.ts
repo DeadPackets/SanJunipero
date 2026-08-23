@@ -13,8 +13,8 @@
 // Scripted policies only. No LLM, no network, $0.
 import { describe, expect, it } from 'vitest'
 import {
-  MINUTES_PER_DAY, SimConfigSchema, TOWN_SQUARE, T_ROAD, centreOf, doorFrontOf, freePlots,
-  grammarOf, place, plotExtent, ringsStanding, stateHash, type SimConfig,
+  MINUTES_PER_DAY, SimConfigSchema, TOWN_SQUARE, T_ROAD, doorFrontOf, freePlots,
+  grammarOf, latticeFloor, place, plotExtent, ringsStanding, stateHash, townSpacing, type SimConfig,
 } from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
@@ -129,16 +129,16 @@ const ringOf = (s: { x: number; y: number }): number => {
   return Math.max(Math.abs(Math.floor(g.dx / 19)), Math.abs(Math.floor(g.dy / 19)))
 }
 
-const closestPairOf = (all: ReadonlyArray<{ x: number; y: number; w: number; h: number }>): number => {
-  let closest = Infinity
-  for (let i = 0; i < all.length; i++)
-    for (let j = i + 1; j < all.length; j++) {
-      const p = centreOf({ dx: all[i]!.x, dy: all[i]!.y, w: all[i]!.w, h: all[i]!.h })
-      const q = centreOf({ dx: all[j]!.x, dy: all[j]!.y, w: all[j]!.w, h: all[j]!.h })
-      closest = Math.min(closest, Math.hypot(p.sx - q.sx, p.sy - q.sy))
-    }
-  return closest
-}
+const massOf = (s: { x: number; y: number; w: number; h: number }) =>
+  ({ dx: s.x, dy: s.y, w: s.w, h: s.h })
+
+/** ★ THE TWO NUMBERS, and what decides which set a building falls in: BEING ON A PLOT. The
+ *  proxy this used to use — bigger than 1×1 — happens to agree here and does not agree in
+ *  `farBank.test.ts`, where a 2×1 deck stands on water the lattice never platted. */
+const spacingOf = (state: WorldState, all: readonly Structure[]) => townSpacing(
+  all.filter((s) => plotOf(state, s) !== null).map(massOf),
+  all.filter((s) => plotOf(state, s) === null).map(massOf),
+)
 
 describe('★ agents build until the town reaches ring 2, and everything in it is still right', () => {
   const run = runTown()
@@ -152,7 +152,8 @@ describe('★ agents build until the town reaches ring 2, and everything in it i
     console.log(`[claim-seam] ${DAYS * MINUTES_PER_DAY} ticks, ${MASONS} masons: ${built.length} agent builds`
       + ` (ring 1: ${built.filter((s) => ringOf(s) === 1).length}, ring 2: ${built.filter((s) => ringOf(s) === 2).length}),`
       + ` ${all.length} standing, world ${size.w}x${size.h}, ${run.growths} growths,`
-      + ` closest pair ${closestPairOf(all.filter((s) => s.w > 1 || s.h > 1)).toFixed(4)} px`)
+      + ` lattice floor ${spacingOf(state, all).latticeFloor.toFixed(4)} px`
+      + ` / whole town ${spacingOf(state, all).wholeTown.toFixed(4)} px`)
     expect(built.length).toBeGreaterThanOrEqual(20)
     expect(built.filter((s) => ringOf(s) === 2).length).toBeGreaterThanOrEqual(5)
     expect(ringsStanding(TOWN_SQUARE, standingRects(state), townGroundOf(state, TOWN_SQUARE))).toBe(2)
@@ -195,12 +196,24 @@ describe('★ agents build until the town reaches ring 2, and everything in it i
     expect(all.filter((s) => plotOf(state, s) === null).map((s) => s.kind).sort()).toEqual(['fire_pit', 'well'])
   })
 
-  it('★ and no two of them are closer than the floor the grammar proved', () => {
-    // 86.1626 px is the exhaustive floor over 2 496 pairings of BUILDINGS ON PLOTS. The two
-    // monuments are 1x1 things standing in the paved square, which the lattice never platted
-    // and the survey never measured; they are 73.7564 px apart and have been since genesis.
-    expect(closestPairOf(all.filter((s) => s.w > 1 || s.h > 1))).toBeGreaterThanOrEqual(86.1626)
-    expect(closestPairOf(all.filter((s) => s.w === 1 && s.h === 1))).toBeCloseTo(73.7564, 3)
+  // ★ TWO NUMBERS, NAMED APART. 86.1626 px is the exhaustive floor over 2 496 pairings of
+  // BUILDINGS ON PLOTS, and it is a claim about those pairs and no others. The whole-town
+  // minimum is smaller and always was: the well and the fire pit are 1×1 monuments standing in
+  // the paved square, which the lattice never platted and the survey never measured. Quoting
+  // one for the other would one day hide a real regression behind a monument.
+  it('★ and no two PLOT-SEATED buildings are closer than the floor the grammar proved', () => {
+    const sp = spacingOf(state, all)
+    expect(sp.latticeFloor).toBeGreaterThanOrEqual(latticeFloor().closest)
+    expect(latticeFloor().closest).toBeCloseTo(86.1626, 3)
+    expect(sp.governed).toBe(all.length - 2)
+  })
+
+  it('★ and the WHOLE-TOWN minimum is a different, smaller number — the two monuments', () => {
+    const sp = spacingOf(state, all)
+    expect(sp.ungoverned).toBe(2)
+    expect(sp.wholeTown).toBeCloseTo(73.7564, 3)
+    expect(sp.wholeTown).toBeLessThan(sp.latticeFloor)
+    expect(sp.wholeTown).toBeLessThan(latticeFloor().closest)
   })
 
   it('★ and not one tile in the town holds two buildings, nor one plot two roofs', () => {
