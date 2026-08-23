@@ -464,10 +464,10 @@ async function main(): Promise<void> {
 
     // The five founders, each at their own doorway.
     for (const m of MINDS) {
-      const hut = Object.values(state.structures).find((s) => s.kind === 'hut' && s.owner === m.id)
-      if (hut === undefined) throw new Error(`genesis: no hut owned by ${m.id}`)
-      const door = doorTile(state, hut)
-      if (door === null) throw new Error(`genesis: no doorway on ${m.id}'s hut`)
+      const home = Object.values(state.structures).find((s) => s.kind === 'house' && s.owner === m.id)
+      if (home === undefined) throw new Error(`genesis: no house owned by ${m.id}`)
+      const door = doorTile(state, home)
+      if (door === null) throw new Error(`genesis: no doorway on ${m.id}'s house`)
       emit('agent_spawned', { id: m.id, name: m.identity.name, x: door.x, y: door.y, sex: m.sex, ageDays: m.ageDays })
     }
     // The staged affliction: one founder wakes on day zero with a fever nobody has been told
@@ -538,7 +538,7 @@ async function main(): Promise<void> {
       'seed_pouch', 'waterskin', 'bucket', 'torch', 'garment', 'plank', 'bread', 'wheat',
       'fish', 'venison', 'rabbit_meat', 'berries', 'mushroom', 'herb', 'stew',
     ],
-    structureKinds: ['hut', 'storehouse', 'shed', 'wagon', 'well', 'fire_pit', 'bridge', 'grave'],
+    structureKinds: ['house', 'storehouse', 'shed', 'wagon', 'well', 'fire_pit', 'bridge', 'grave'],
   }
   const arbiterLlm = makeClient(db, 'arbiter')
 
@@ -949,10 +949,10 @@ async function main(): Promise<void> {
   // three fresh bodies, one deep-winter night, and the cold ticks each of them was billed.
   const clothedSurvive = (() => {
     const NIGHT = 3 * 91 * MINUTES_PER_DAY + 22 * 60
-    const hut = Object.values(finalState.structures).find((x) => x.kind === 'hut')
+    const home = Object.values(finalState.structures).find((x) => x.kind === 'house')
     const fire = Object.values(finalState.structures).find((x) => x.kind === 'fire_pit')
-    if (hut === undefined || fire === undefined) return false
-    const door = doorTile(finalState, hut)
+    if (home === undefined || fire === undefined) return false
+    const door = doorTile(finalState, home)
     if (door === null) return false
     let s: WorldState = { ...finalState, tick: NIGHT - 1 }
     const put = (type: string, payload: unknown): void => {
@@ -961,7 +961,7 @@ async function main(): Promise<void> {
     put('agent_spawned', { id: 'probe_bare', name: 'probe_bare', x: door.x + 3, y: door.y + 3, ageDays: 7300 })
     put('agent_spawned', { id: 'probe_inside', name: 'probe_inside', x: door.x, y: door.y, ageDays: 7300 })
     put('agent_spawned', { id: 'probe_hearth', name: 'probe_hearth', x: fire.x + 1, y: fire.y, ageDays: 7300 })
-    put('agent_entered', { agentId: 'probe_inside', structureId: hut.id })
+    put('agent_entered', { agentId: 'probe_inside', structureId: home.id })
     put('structure_fueled', { structureId: fire.id, burnsUntilTick: NIGHT + 8 * 60 + 1 })
     for (const id of ['probe_bare', 'probe_inside', 'probe_hearth']) {
       put('item_spawned', { id: `probe_coat_${id}`, kind: 'garment', qty: 1, loc: { t: 'agent', id } })

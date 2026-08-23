@@ -52,12 +52,19 @@ const CAP_USD = 8.0
 const WARN_USD = 5.0
 const TOTAL_TICKS = Number(process.env.G9_TICKS ?? 2 * MINUTES_PER_DAY)
 const REAL_MS_PER_TICK = Number(process.env.G9_MS_PER_TICK ?? 250)
-const FLIP_TICK = Math.min(1800, Math.floor(TOTAL_TICKS * 0.62))
-const FORCED_ALERT_TICK = Math.min(1200, Math.floor(TOTAL_TICKS * 0.4))
 const ADMIN_PORT = Number(process.env.G9_ADMIN_PORT ?? 8791)
 // The town wakes at seven, not at midnight: a world that opens in the dark
 // spends its first hours deciding where to lie down.
 const START_TICK = 7 * 60
+// ★ A STAGED TICK IS A FRACTION OF THE RUN, MEASURED FROM WHERE THE RUN STARTS. These are
+// compared against `loop.tick`, which begins at START_TICK — so without the offset they are a
+// fraction of the run measured from midnight, and any run shorter than ~1 050 ticks skips both
+// operator actions ENTIRELY. Found by running it: a 240-tick slice reported `adminStatus=null`
+// and `forcedAlert=false`, which reads as a broken admin channel rather than one never called.
+const stagedTick = (fraction: number, cap: number): number =>
+  START_TICK + Math.min(cap, Math.floor(TOTAL_TICKS * fraction))
+const FLIP_TICK = stagedTick(0.62, 1800)
+const FORCED_ALERT_TICK = stagedTick(0.4, 1200)
 
 const DATA_DIR = fileURLToPath(new URL('../data/', import.meta.url))
 const DB_PATH = path.join(DATA_DIR, 'g9.db')
