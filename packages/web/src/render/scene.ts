@@ -368,9 +368,21 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   }
   const screenBox = (): { w: number; h: number } => ({ w: app.screen.width, h: app.screen.height })
 
+  /**
+   * ★ THE ONE WRITER OF THE CAMERA'S POSITION, AND THEREFORE THE ONE THAT ANNOUNCES IT.
+   *
+   * `onCamera` is how every surface off the canvas learns the view moved. Four of the ways it
+   * moves never fired it: a drag, a follow, a resize and `panBy` — the arrow keys. The four
+   * that did (zoom, throw, fit, `centerHome`) were simply the ones the landed chrome happened
+   * to depend on, so nothing had noticed. Task 76 already made this the single point every
+   * write passes through; the announcement belongs here, where a mover that has not been
+   * written yet cannot forget it.
+   */
   function place(x: number, y: number): void {
     const p = clampCamera({ x, y }, world.scale.x, bounds, screenBox())
+    if (p.x === world.position.x && p.y === world.position.y) return
     world.position.set(p.x, p.y)
+    notifyCamera()
   }
 
   function centerOnScreen(sx: number, sy: number): void {

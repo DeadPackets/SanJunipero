@@ -127,7 +127,7 @@ export function minimapPixels(
   terrain: readonly (readonly number[])[],
   structures: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
   f: MinimapFit,
-): Uint8ClampedArray {
+): Uint8ClampedArray<ArrayBuffer> {
   const px = new Uint8ClampedArray(f.w * f.h * 4)
   const rank = new Uint8Array(f.w * f.h).fill(WEAKEST + 1)
 
@@ -202,6 +202,32 @@ export function minimapViewBox(
   return { x, y, w, h }
 }
 
+/**
+ * ★ THE VIEW ALREADY HOLDS THE WHOLE TOWN, SO THE MAP HAS NOTHING TO SAY.
+ *
+ * WHAT THE FOREGROUNDED BROWSER CAUGHT, and no test here could have. At the 0.25 stop on the
+ * showcase town the settlement is 370 x 190 px in the middle of the stage — and the minimap sat
+ * in the corner showing THE SAME PICTURE, smaller and with less in it, under a rectangle that
+ * covered the whole map because the camera really was seeing everything. A second, worse copy of
+ * the image behind it. Every per-element law passed; the composition was the defect. That is the
+ * same shape as the camera lane's legend covering the map it explained.
+ *
+ * A minimap is for a town you cannot see all of. When you can, it leaves — the same judgement
+ * `landmarkAlpha` makes about a place name at a scale where the place is a shape.
+ *
+ * The question is asked of the TOWN'S box, not of the canvas: the canvas carries a letterbox,
+ * and a view that covers the settlement exactly is a view that holds the settlement — which is
+ * precisely what "The whole town" gives you. There is no boundary a resting camera can flicker
+ * across, because the zoom stops either side of it are a factor of two apart.
+ */
+export const IDLE_SLOP_PX = 1
+
+export function viewHoldsTown(view: ViewRect, f: MinimapFit): boolean {
+  const b = minimapViewBox(view, f), s = IDLE_SLOP_PX
+  return b.x <= f.ox + s && b.y <= f.oy + s
+    && b.x + b.w >= f.ox + f.mw - s && b.y + b.h >= f.oy + f.mh - s
+}
+
 // ── going there ───────────────────────────────────────────────────────────────────────────
 
 /** The world-screen point a press at (`mx`, `my`) means. A press in the letterbox is pulled onto
@@ -245,6 +271,33 @@ export function minimapActionFor(key: string): MinimapAction | null {
 
 export type PersonDot = { mx: number; my: number; focus: boolean }
 
+/** What the map is handed about a person. `alive` and `insideId` are the two facts that decide
+ *  whether the town is drawing them, and therefore whether the map should be. */
+export type MapPerson = { id: string; x: number; y: number; alive?: boolean; insideId?: string }
+
+/**
+ * ★ WHO IS ON THE MAP — AND THE ONE THE BROWSER CAUGHT.
+ *
+ * A dead agent is not removed from `state.agents`; it is marked `alive: false` and the roster
+ * counts it under "remembered". The first version of this map drew the dead as living dots, and
+ * NO TEST COULD HAVE SEEN IT: every fixture here is `{ id, x, y }`, so the field that decides it
+ * was not in the shape being tested. It took a dev world running to day 3 with all five founders
+ * gone and five white dots still standing in the square.
+ *
+ * `characters.rendersOnMap` is the town's own answer to the same question, and this must not
+ * become a second one — `minimap.test.ts` reads that file and asserts the two rules are the same
+ * expression, because the map contradicting the town about who is standing in it would be worse
+ * than either being wrong alone.
+ *
+ * THE ONE DEPARTURE, DELIBERATE: the person being WATCHED keeps her dot when she steps indoors.
+ * The town stops drawing her because she is behind a wall; the map is being asked "where is
+ * she", and "nowhere" is the one answer it must never give to that question.
+ */
+export function onMinimap(p: MapPerson, focusId: string | null): boolean {
+  if (p.alive === false) return false
+  return p.insideId === undefined || p.id === focusId
+}
+
 /**
  * ★ ONE DOT PER PERSON, DEDUPLICATED TO THE MAP'S OWN PIXEL GRID — and the answer to whether
  * that is noise.
@@ -259,13 +312,13 @@ export type PersonDot = { mx: number; my: number; focus: boolean }
  * one that lost the pixel.
  */
 export function peopleDots(
-  people: ReadonlyArray<{ id: string; x: number; y: number }>,
-  f: MinimapFit, focusId: string | null,
+  people: ReadonlyArray<MapPerson>, f: MinimapFit, focusId: string | null,
 ): PersonDot[] {
   const seen = new Set<number>()
   const out: PersonDot[] = []
   let her: PersonDot | null = null
   for (const p of people) {
+    if (!onMinimap(p, focusId)) continue
     const s = tileToScreen(p.x, p.y)
     const m = worldToMap(s.sx, s.sy, f)
     const mx = Math.round(m.mx), my = Math.round(m.my)
@@ -321,21 +374,39 @@ function blob(out: MapOp[], mx: number, my: number, size: number, color: number,
 }
 
 /**
- * Everything drawn over the raster, as rectangles. The view executes this list and decides
- * nothing; the list is what a test can count, which is how "what does a frame cost" is a
- * measurement here rather than a claim.
+ * THE TWO HALVES OF THE OVERLAY MOVE AT DIFFERENT RATES, SO THEY ARE BUILT SEPARATELY.
+ *
+ * The rectangle follows the camera and changes on a FRAME. People walk on a TICK, two and a
+ * half seconds apart. Building one list for both would make the per-frame cost `O(people)` for
+ * no reason — a town of two hundred would rebuild two hundred dots sixty times a second to
+ * redraw eight rectangles. So a frame builds `viewOps` (always eight) and repaints the dot list
+ * it already had.
+ *
+ * They are rectangles rather than canvas calls because the view must decide nothing (P6), and
+ * because a list is a thing a test can count. That is how "what does a frame cost" is a
+ * measurement here instead of a claim.
  */
-export function overlayOps(view: ViewRect, dots: readonly PersonDot[], f: MinimapFit): MapOp[] {
+export function viewOps(view: ViewRect, f: MinimapFit): MapOp[] {
   const out: MapOp[] = []
   const b = minimapViewBox(view, f)
   ring(out, b.x - 1, b.y - 1, b.w + 2, b.h + 2, 1, MARK_HALO, f)
   ring(out, b.x, b.y, b.w, b.h, 1, MARK_VIEW, f)
+  return out
+}
+
+export function dotOps(dots: readonly PersonDot[], f: MinimapFit): MapOp[] {
+  const out: MapOp[] = []
   for (const d of dots) {
     const size = d.focus ? WATCHED_PX : PERSON_PX
     blob(out, d.mx, d.my, size + 2, MARK_HALO, f)
     blob(out, d.mx, d.my, size, d.focus ? MARK_WATCHED : MARK_PERSON, f)
   }
   return out
+}
+
+/** Both halves, for the tests that count the whole frame. */
+export function overlayOps(view: ViewRect, dots: readonly PersonDot[], f: MinimapFit): MapOp[] {
+  return [...viewOps(view, f), ...dotOps(dots, f)]
 }
 
 // ── getting out of the way ────────────────────────────────────────────────────────────────

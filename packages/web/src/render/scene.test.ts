@@ -227,6 +227,25 @@ describe('going somewhere from the map takes the same road as going home', () =>
     expect(offenders).toEqual([])
   })
 
+  // ★ THE CAMERA MOVED AND NOTHING WAS TOLD.
+  //
+  // `onCamera` is how every surface off the canvas learns the view changed — the place-name
+  // cull, the bar's stop readout, and now the rectangle on the map. Four of the ways the camera
+  // moves never fired it: a DRAG (`pointermove` places and returns), a FOLLOW (`followTick`
+  // places every frame), a RESIZE, and `panBy` — the arrow keys. Only the zoom, the throw, the
+  // fit and `centerHome` announced themselves, which is why nothing had noticed: those four are
+  // the ones the landed chrome happened to depend on.
+  //
+  // There is exactly one writer of the camera's position and it already exists, because "every
+  // write goes through the clamp" was the task-76 rule. So the announcement belongs THERE, and
+  // then it cannot be forgotten by a fifth mover that has not been written yet.
+  it('★ the one writer of the camera position is the one that announces it', () => {
+    expect(src.match(/world\.position\.set\(/g), 'more than one camera writer').toHaveLength(1)
+    const p = functionBody(src, 'function place(')
+    expect(p).toContain('world.position.set(')
+    expect(p, 'place() moves the camera without telling anybody').toContain('notifyCamera()')
+  })
+
   it('the map is drawn over the SAME box the clamp uses, from one accessor', () => {
     expect(src).toContain('reachableBox: () => bounds')
     // and `bounds` is the thing every write to the camera is clamped against

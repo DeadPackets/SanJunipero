@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { ZOOM_STOPS, clampCamera, reachableBoundsOf, type CameraBounds } from './camera.js'
+import {
+  ZOOM_STOPS, clampCamera, fitsAt, reachableBoundsOf, tooBigToFit, type CameraBounds,
+} from './camera.js'
 import type { ViewRect } from './cull.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import { TILE_COLORS } from './ground.js'
@@ -7,7 +10,7 @@ import { ROAD, WATER, bigTownPlaced, bigTownSide, bigTownTerrain } from './bigTo
 import {
   MINIMAP_H, MINIMAP_PAGE, MINIMAP_W, VIEW_MIN_PX,
   mapToWorld, minimapActionFor, minimapFit, minimapPixels, minimapShown, minimapViewBox,
-  overlayOps, pageTarget, peopleDots, travelTargetAt, worldToMap,
+  overlayOps, pageTarget, peopleDots, travelTargetAt, viewHoldsTown, worldToMap,
   type MinimapFit,
 } from './minimap.js'
 
@@ -281,6 +284,38 @@ describe('the rectangle that says where the camera is', () => {
   })
 })
 
+// ── 3b · the map leaves when the town is already all on screen ────────────────────────────
+//
+// ★ WHAT THE FOREGROUNDED BROWSER CAUGHT. At 0.25 on the showcase town the whole settlement was
+// 370 x 190 px in the middle of the stage, and the map sat in the corner drawing the same thing
+// smaller, under a rectangle that covered its whole self. This asserts the rule against CLAMPED
+// views — the ones a real camera can actually be in — rather than against invented rectangles.
+
+describe('the map is only there when the town is bigger than the view', () => {
+  it('★ is away exactly when the town fits, at every stop and at every ring count', () => {
+    for (const rings of [1, 3, 10]) {
+      const { bounds } = townOf(rings)
+      const f = minimapFit(bounds)
+      const centre = { sx: (bounds.minX + bounds.maxX) / 2, sy: (bounds.minY + bounds.maxY) / 2 }
+      for (const z of ZOOM_STOPS) {
+        const fits = fitsAt(bounds, STAGE, z)
+        const away = viewHoldsTown(viewAfterTravel(centre, bounds, z), f)
+        expect(away, `${rings} rings at ${z}: fits=${fits} away=${away}`).toBe(fits)
+      }
+    }
+  })
+
+  it('★ a town too big for the widest stop never loses its map', () => {
+    const { bounds } = townOf(10)
+    const f = minimapFit(bounds)
+    expect(tooBigToFit(bounds, STAGE)).toBe(true)
+    for (const z of ZOOM_STOPS) {
+      const centre = { sx: (bounds.minX + bounds.maxX) / 2, sy: (bounds.minY + bounds.maxY) / 2 }
+      expect(viewHoldsTown(viewAfterTravel(centre, bounds, z), f), `zoom ${z}`).toBe(false)
+    }
+  })
+})
+
 // ── 4 · going there ───────────────────────────────────────────────────────────────────────
 
 describe('a click is a promise that you will be looking at what you clicked', () => {
@@ -372,6 +407,34 @@ describe('people on a map the size of a postcard', () => {
     const spread = Array.from({ length: 300 }, (_, i) => person(`p${i}`, 20 + i * 3, 20 + i * 3))
     expect(peopleDots(spread, f, null).length).toBeLessThanOrEqual(spread.length)
     expect(peopleDots(spread, f, null).length).toBeGreaterThan(10)
+  })
+
+  // ★ WHAT THE FOREGROUNDED BROWSER CAUGHT AND NOTHING HERE COULD HAVE.
+  //
+  // A dead agent stays in `state.agents` with `alive: false`; the roster counts it as
+  // "remembered". Every fixture above is `{ id, x, y }`, so the field that decides this was not
+  // in the shape being tested — and the dev world showed five white dots standing in the square
+  // under a status strip reading TOWNSFOLK 0.
+  it('★ does not draw the dead, whose bodies are still in the state', () => {
+    const alive = { id: 'a', x: 40, y: 40, alive: true }
+    const dead = { id: 'b', x: 60, y: 60, alive: false }
+    expect(peopleDots([alive, dead], f, null)).toHaveLength(1)
+    expect(peopleDots([dead], f, 'b'), 'not even the one being watched').toHaveLength(0)
+    // absent means alive, the way every optional field in this world's state means its default
+    expect(peopleDots([{ id: 'c', x: 40, y: 40 }], f, null)).toHaveLength(1)
+  })
+
+  it('★ agrees with the town about who is standing in it — one rule, not two', () => {
+    const src = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
+    const townRule = /export function rendersOnMap\([\s\S]*?\n\}/.exec(src)?.[0] ?? ''
+    const flat = townRule.replace(/\s+/g, ' ')
+    expect(flat, 'characters.ts no longer decides this the way the map does')
+      .toContain('return a.alive && a.insideId === undefined')
+    // and the map's own departure from it is exactly one clause, stated where it is made
+    expect(peopleDots([{ id: 'in', x: 40, y: 40, alive: true, insideId: 's1' }], f, null))
+      .toHaveLength(0)
+    expect(peopleDots([{ id: 'in', x: 40, y: 40, alive: true, insideId: 's1' }], f, 'in'))
+      .toHaveLength(1)
   })
 
   it('★ the person you are following is never the one that got deduplicated away', () => {

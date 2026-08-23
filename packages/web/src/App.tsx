@@ -7,6 +7,8 @@ import {
 } from './ui/route.js'
 import { lensFromKey, lensKeyAllowed } from './ui/interaction.js'
 import { StageMount } from './render/StageMount.js'
+import { Minimap } from './render/MinimapView.js'
+import { minimapShown } from './render/minimap.js'
 import { InspectorPanel } from './ui/InspectorPanel.js'
 import { RosterPanel } from './ui/RosterPanel.js'
 import { expandReducer } from './ui/roster/expand.js'
@@ -325,6 +327,12 @@ export function App() {
             onBack={() => scene?.interior?.setActive(null)}
           />
           <ScrubBanner store={store} />
+          {/* The map leaves whenever another surface owns the stage, and whenever the viewer
+              is standing inside a room. One predicate decides it, so the composition cannot be
+              settled by z-index luck — see minimap.ts. */}
+          {minimapShown(shownLens, insideId, hud.minimap === 'hidden') && (
+            <Minimap scene={scene} store={store} focusAgentId={route.agentId} />
+          )}
           {hud.fps !== 'hidden' && <FpsOverlay />}
           {shownLens === 'chronicle' && hud.timeline !== 'hidden' && (
             <Timeline store={store} handle={handle} onView={onView} />

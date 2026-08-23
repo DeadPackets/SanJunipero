@@ -1583,3 +1583,59 @@ body {
   font-size: 1.75rem;           /* 28px -> 7.00px */
   margin-bottom: 0.35rem;
 }
+
+/* ══ ★ THE LITTLE MAP ══════════════════════════════════════════════════════════════════════
+   The one instrument a streamed town cannot do without: at 4x a viewer sees 5 % of a three-ring
+   town, and the grammar keeps platting outward. `render/minimap.ts` states the whole design.
+
+   · SURFACE   the same floating slab every other reading aid wears — a 9-slice --px-cream frame
+               over --deep, which is the void beyond the world showing through a canvas that is
+               transparent wherever the town is not. No new material.
+   · SIZE      NONE HERE. The canvas carries its own width and height attributes from
+               MINIMAP_W / MINIMAP_H, so the widget is sized by the one place that number lives
+               and the sheet cannot drift from it.
+   · COLOUR    the ground is TILE_COLORS, the renderer's own palette-true fallback, so the map
+               and the town can never disagree about what water looks like. Every MARK over it
+               is two tone — a --deep halo under a light core — because no single token clears
+               3:1 on grounds running from forest #4F7040 to sand #E8D5BC. Measured, not assumed.
+   · TYPE      none. The map is a picture; its whole label is spoken.
+   · SPACE     bottom left of the stage cell, the one corner nothing else claims: the frame
+               counter is top right, the dock handle bottom right, the scrub banner top centre.
+   · MOTION    ONE, and it is a reveal. A press is a CUT — a glide continues a hand the viewer
+               moved, and nobody's hand crossed a ten-ring town. The only thing that moves is
+               the map arriving and leaving as the view stops and starts holding the whole town
+               (`viewHoldsTown`), and that is `--t-fast` / `reveal`, 150ms, opacity only, inside
+               the band and inside the reduced-motion guard. A slab this size appearing without
+               one is a jump cut in the corner of the picture.
+   · STATE     focus lands on the whole map, which is the target; the ring comes from the
+               stage-cell rule that draws it INSIDE a clipping box. It docks like every other
+               surface and `H` puts it away with them. */
+.minimap {
+  position: absolute; left: 0.8rem; bottom: 0.8rem; z-index: 25;
+  padding: 0;
+  background: var(--deep);
+  border: 10px solid transparent; border-image: var(--px-cream);
+  background-clip: padding-box;
+  box-shadow: var(--ledge);
+  cursor: crosshair;
+  touch-action: none;   /* a sweep across the map is a sweep, never the page scrolling */
+}
+.minimap-canvas { display: block; image-rendering: pixelated; }
+
+/* ★ A MAP OF A TOWN YOU CAN ALREADY SEE ALL OF IS A SMALLER COPY OF THE PICTURE BEHIND IT.
+   Caught in a foregrounded browser at the 0.25 stop, where the whole settlement was 370 x 190 px
+   in the middle of the stage and this sat in the corner saying the same thing with less in it,
+   under a rectangle that covered the whole map. `visibility` goes with the opacity so a map that
+   is not there is not a tab stop either. */
+.minimap[data-idle='true'] { opacity: 0; visibility: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .minimap {
+    transition-property: opacity, visibility;
+    transition-duration: var(--t-fast);
+    transition-timing-function: var(--ease-enter);
+  }
+}
+
+/* A stream has no operator: navigation a viewer can neither press nor read leaves the frame
+   rather than shrinking inside it, exactly as the control bar and the dock do. */
+[data-broadcast='on'] .minimap { display: none; }
