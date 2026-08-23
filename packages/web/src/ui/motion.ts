@@ -1,4 +1,5 @@
 import { FLING_MAX_MS } from '../render/fling.js'
+import { TICK_PERIOD_MAX_MS, WALK_LEAD_TICKS } from '../render/charAnim.js'
 
 export { easeOutCubic } from '../render/camera.js'
 
@@ -50,6 +51,19 @@ export const MOTION_FLOOR_MS = 90
  *    `FLING_STOP_PX_PER_MS`, which at any speed a hand produces comes first.
  *    (Ruled on by the controller after the camera lane shipped it. `render/fling.ts` carries the
  *    physics; this row is the reason it is allowed to.)
+ *
+ *  · `walk` is THE WORLD'S OWN CLOCK. A body crosses a tile in one tick of the simulation —
+ *    2500 ms by the declared default, 400 in the dev world — and the renderer carries it
+ *    across that interval so it arrives as the next tick lands. The duration is not the
+ *    product's opinion about how long a viewer waits; it is how long the person takes, and the
+ *    only alternative to spending it is teleporting the body 2.5 times a second, which is the
+ *    defect the interpolation exists to prevent. The exempted number is `TICK_PERIOD_MAX_MS`,
+ *    the widest cadence the clock will believe at all — a real leg is one tick plus at most one
+ *    tick of buffer, and both are the world's numbers rather than ours.
+ *
+ *    This one was ALREADY over the ceiling before the motion lane touched it — the landed
+ *    glide ran to 4000 ms — and had no row. An unwritten exception is a bug with a delay fuse
+ *    whether or not the lane that wrote it noticed.
  */
 export type MotionExemption = { what: string; ms: number; because: string }
 
@@ -63,6 +77,12 @@ export const MOTION_EXEMPT: readonly MotionExemption[] = [
     what: 'fling',
     ms: FLING_MAX_MS,
     because: 'the continuation of the viewer’s own hand; its length is their throw, not ours',
+  },
+  {
+    what: 'walk',
+    ms: TICK_PERIOD_MAX_MS * (1 + WALK_LEAD_TICKS),
+    because: 'the world’s own clock — a body crosses a tile in a tick of the simulation, and '
+      + 'the alternative to spending it is teleporting the body 2.5 times a second',
   },
 ]
 

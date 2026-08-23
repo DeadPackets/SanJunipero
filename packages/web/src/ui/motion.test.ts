@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { FLING_MAX_MS } from '../render/fling.js'
+import { TICK_PERIOD_MAX_MS, TICK_PERIOD_SEED_MS, WALK_LEAD_TICKS } from '../render/charAnim.js'
 import {
   AMBIENT_EXEMPT, CSS_DURATION_TOKEN, CSS_EASE_TOKEN, MOTION, MOTIONS, MOTION_CEILING_MS,
   MOTION_EXEMPT, MOTION_FLOOR_MS, durationsIn, easeFn, motionCss, progress, reduced,
@@ -142,7 +143,24 @@ describe('the exemptions from the motion band', () => {
       expect(e.ms, `${e.what} is exempt but is not actually long`).toBeGreaterThan(MOTION_CEILING_MS)
       expect(e.because.length, `${e.what} has no reason`).toBeGreaterThan(24)
     }
-    expect(MOTION_EXEMPT.map((e) => e.what)).toEqual(['ambient', 'fling'])
+    expect(MOTION_EXEMPT.map((e) => e.what)).toEqual(['ambient', 'fling', 'walk'])
+  })
+
+  it('★ the walk is one of them, and it was over the ceiling before anyone wrote it down', () => {
+    const walk = MOTION_EXEMPT.find((e) => e.what === 'walk')
+    expect(walk, 'a body spends a whole sim tick crossing a tile, with no row here').toBeDefined()
+    // the exempted number is the world's, not ours: the widest cadence the renderer's clock
+    // will believe, plus the one tick of interpolation buffer that rides on it
+    expect(walk!.ms).toBe(TICK_PERIOD_MAX_MS * (1 + WALK_LEAD_TICKS))
+    expect(walk!.ms).toBeGreaterThan(MOTION_CEILING_MS)
+    // and the shipped default really is past the ceiling, so this is not a hypothetical
+    expect(TICK_PERIOD_SEED_MS).toBeGreaterThan(MOTION_CEILING_MS)
+  })
+
+  it('every exemption is a CANVAS motion — the sheet still has none', () => {
+    // the band governs the chrome absolutely; the three exceptions are all things whose
+    // duration belongs to the viewer's hand or to the world, and none of them is CSS
+    expect(untokenisedDurations(CSS)).toEqual([])
   })
 
   it('★ the drag glide is one of them, at the number fling.ts actually enforces', () => {
