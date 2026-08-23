@@ -70,6 +70,47 @@ export function bigTown(rings: number): FixtureStructure[] {
   return out
 }
 
+// ── the same platting, as GROUND ─────────────────────────────────────────────────────────
+//
+// A terrain array cannot hold a negative index, so the ruler above is offered a second time in
+// a frame shifted to the origin: `bigTownTerrain` lays the streets, the square and a channel,
+// and `bigTownPlaced` moves the structures to match. The two agree by construction — both are
+// `bigTownTileExtent(rings)` shifted by the same `lo` — so a fixture cannot drift apart.
+
+export const ROAD = 7, WATER = 2, GRASS = 0
+
+/** One tile of the pitch is street; the channel is ONE tile wide on purpose — the thinnest
+ *  feature the grammar produces, and the thing a map that point-samples loses first. */
+export const CHANNEL_X = 2
+
+export function bigTownSide(rings: number): number {
+  const e = bigTownTileExtent(rings)
+  return e.x1 - e.x0 + 1
+}
+
+export function bigTownTerrain(rings: number): number[][] {
+  const n = bigTownSide(rings)
+  const out: number[][] = []
+  for (let y = 0; y < n; y++) {
+    const row = new Array<number>(n).fill(GRASS)
+    for (let x = 0; x < n; x++) {
+      if (x % BLOCK_PITCH === BLOCK_SIDE || y % BLOCK_PITCH === BLOCK_SIDE) row[x] = ROAD
+    }
+    row[CHANNEL_X] = WATER          // the channel runs unbroken; the streets bridge it
+    out.push(row)
+  }
+  // ring 0 is the square: the whole central block is paved, and nothing stands on it
+  const s = rings * BLOCK_PITCH
+  for (let y = s; y < s + BLOCK_SIDE; y++) for (let x = s; x < s + BLOCK_SIDE; x++) out[y]![x] = ROAD
+  return out
+}
+
+/** `bigTown` in the same origin-shifted frame `bigTownTerrain` indexes. */
+export function bigTownPlaced(rings: number): FixtureStructure[] {
+  const lo = -rings * BLOCK_PITCH
+  return bigTown(rings).map((s) => ({ ...s, x: s.x - lo, y: s.y - lo }))
+}
+
 /** The tile box the ring grammar plats into at this ring count, streets included. */
 export function bigTownTileExtent(rings: number): { x0: number; y0: number; x1: number; y1: number } {
   const lo = -rings * BLOCK_PITCH

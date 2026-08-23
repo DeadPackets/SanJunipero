@@ -1,3 +1,5 @@
+import { FLING_MAX_MS } from '../render/fling.js'
+
 export { easeOutCubic } from '../render/camera.js'
 
 /**
@@ -23,11 +25,52 @@ export const MOTION: Readonly<Record<MotionName, Motion>> = {
   ambient: { ms: 1200, ease: 'linear' },                                // breathing, drift
 }
 
-/** The band the UI mandate sets. `ambient` is exempt BECAUSE it is never a response to an
- *  input — it is scenery — and the exemption is stated here rather than hidden by omission. */
+/** The band the UI mandate sets. */
 export const MOTION_CEILING_MS = 300
 export const MOTION_FLOOR_MS = 90
-export const AMBIENT_EXEMPT: readonly MotionName[] = ['ambient']
+
+/**
+ * ★ EVERY MOTION IN THIS PRODUCT THAT RUNS PAST THE CEILING, AND WHY IT MAY.
+ *
+ * AN UNWRITTEN EXCEPTION IS A BUG WITH A DELAY FUSE. The next person to read the table sees a
+ * number over 300 with nothing beside it, calls it a violation, and "fixes" a thing that was
+ * deliberate — or, worse, adds their own long motion because one already exists. So an exemption
+ * is a row here with its reason, and a test asserts that every long motion in the product has
+ * one. Two do:
+ *
+ *  · `ambient` is SCENERY. It is never a response to an input, so there is no viewer waiting on
+ *    it and no duration the band could be an opinion about.
+ *
+ *  · `fling` is THE HAND, STILL ARRIVING. The camera lane's drag glide runs to 700 ms and it is
+ *    exempt for the mirror of ambient's reason. The band governs a TRANSITION, where the
+ *    duration is the product's opinion about how long a viewer waits for an answer. A glide is
+ *    not an answer to an input — it is the continuation of a movement the viewer made with their
+ *    own hand, and its length is their throw, not our choice. `FLING_MAX_MS` is a safety cut, so
+ *    the exempted number is a ceiling nothing normally reaches: a throw ends when it drops under
+ *    `FLING_STOP_PX_PER_MS`, which at any speed a hand produces comes first.
+ *    (Ruled on by the controller after the camera lane shipped it. `render/fling.ts` carries the
+ *    physics; this row is the reason it is allowed to.)
+ */
+export type MotionExemption = { what: string; ms: number; because: string }
+
+export const MOTION_EXEMPT: readonly MotionExemption[] = [
+  {
+    what: 'ambient',
+    ms: MOTION.ambient.ms,
+    because: 'scenery — never a response to an input, so nobody is waiting on it',
+  },
+  {
+    what: 'fling',
+    ms: FLING_MAX_MS,
+    because: 'the continuation of the viewer’s own hand; its length is their throw, not ours',
+  },
+]
+
+/** The exempt entries that are names in the table above — derived, so the two can never
+ *  disagree about which of them the ceiling check should skip. */
+export const AMBIENT_EXEMPT: readonly MotionName[] = MOTION_EXEMPT
+  .map((e) => e.what)
+  .filter((w): w is MotionName => (MOTIONS as readonly string[]).includes(w))
 
 /**
  * The sheet's spelling for each motion. `--t-fast`, `--t-med` and `--t-slow` are the landed
