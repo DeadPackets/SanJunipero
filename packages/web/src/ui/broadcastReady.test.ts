@@ -116,7 +116,7 @@ export function broadcastStrings(state: WorldState): StringSite[] {
     push(`law ${path} unit`, copy.unit)
   }
   for (const [k, v] of Object.entries(EMPTY_COPY)) push(`empty ${k}`, v)
-  for (const item of controlItems({ lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false })) {
+  for (const item of controlItems({ lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false, townFits: true })) {
     push(`control ${item.id}`, item.label)
   }
   return out

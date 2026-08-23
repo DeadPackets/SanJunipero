@@ -56,22 +56,32 @@ const SINGLE_NAME: Partial<Record<TownKind, string>> = {
 }
 
 /**
- * Labels are a map legend at the widest view and clutter on the way in, so the whole layer
- * fades out. The band is chosen so that at EVERY resting `ZOOM_STOP` the layer is 1 or 0 and
- * never between: a plate drawn at 0.5 has a contrast ratio nobody can state, which is the
- * de-emphasis-by-transparency habit this batch measured out of the bubbles. The fade happens
- * during the transit between stops, which is motion, not a state a viewer reads in.
+ * Labels are a map legend for the wide view and clutter on the way in, so the whole layer
+ * fades out at both ends. Every threshold is chosen so that at EVERY resting `ZOOM_STOP` the
+ * layer is 1 or 0 and never between: a plate drawn at 0.5 has a contrast ratio nobody can
+ * state, which is the de-emphasis-by-transparency habit this batch measured out of the
+ * bubbles. Both fades happen during the transit between stops, which is motion, not a state a
+ * viewer reads in.
+ *
+ * ★ WHY THERE IS A BOTTOM END NOW. The camera lane added 0.25 for a town two rings of blocks
+ * cannot fit inside. At that stop the eleven-building showcase is 320 px across and each
+ * counter-scaled plate is about 140 px — six of them stacked into a column taller than the
+ * settlement, hiding the map they explain. A name is a legend for a view in which you can
+ * still see the place it names; wider than that, the town is a shape and wants no caption.
  */
 export const LANDMARK_SHOW_BELOW_SCALE = 1
 const LANDMARK_FULL_BELOW_SCALE = 0.75
+/** Full at 0.5, gone at 0.25 — the fade lives strictly between the two stops. */
+const LANDMARK_FULL_ABOVE_SCALE = 0.45
+export const LANDMARK_HIDE_BELOW_SCALE = 0.3
 
 /** The chrome type floor is 12px and a world label is chrome. */
 export const LANDMARK_LABEL_PX = faceFor('label').size
 
 export function landmarkAlpha(scale: number): number {
-  const span = LANDMARK_SHOW_BELOW_SCALE - LANDMARK_FULL_BELOW_SCALE
-  const t = (LANDMARK_SHOW_BELOW_SCALE - scale) / span
-  return Math.min(1, Math.max(0, t))
+  const inward = (LANDMARK_SHOW_BELOW_SCALE - scale) / (LANDMARK_SHOW_BELOW_SCALE - LANDMARK_FULL_BELOW_SCALE)
+  const outward = (scale - LANDMARK_HIDE_BELOW_SCALE) / (LANDMARK_FULL_ABOVE_SCALE - LANDMARK_HIDE_BELOW_SCALE)
+  return Math.min(1, Math.max(0, Math.min(inward, outward)))
 }
 
 type Standing = { id: string; kind: string; x: number; y: number; w: number; h: number }

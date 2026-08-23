@@ -7,7 +7,8 @@ import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import {
   ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, fitStop, initialZoom, nearestStop,
-  drawnBoundsOf, resizeIntent, zoomScaleAt, zoomSettled, zoomTo, zoomWheel,
+  drawnBoundsOf, fitsAt, reachableBoundsOf, resizeIntent, tooBigToFit, zoomScaleAt, zoomSettled,
+  zoomTo, zoomWheel,
   type CameraBounds, type ZoomState, type ZoomStop,
 } from './camera.js'
 import {
@@ -255,6 +256,9 @@ export type Scene = {
   centerHome(): void
   /** a view of the whole settlement, at the largest stop it fits at (task 76) */
   fitToTown(): void
+  /** False once the town has outgrown the widest stop, so the bar can name what the overview
+   *  control will actually do instead of promising the whole town. */
+  fitsWholeTown(): boolean
   onCamera(cb: () => void): () => void
   setFollow(target: (() => { x: number; y: number } | null) | null): void
   /** fires when a user gesture (drag, pan, recenter) takes the camera back */
@@ -335,7 +339,20 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
 
   // THE EDGES (task 76). Every write to `world.position` goes through the clamp, so there is
   // no path by which a drag, a pan, a follow or a zoom can push the town off the screen.
+  //
+  // The box is the ground that exists UNION the town as it is drawn (`reachableBoundsOf`),
+  // because under the ring grammar a building can stand past the end of the tile array and a
+  // clamp that knows only the array would make it unreachable. It is recomputed whenever the
+  // world changes — the built extent is what moves, and nothing here knows its size.
   let bounds: CameraBounds = cameraBoundsOf([])
+
+  const structureList = (): Array<{ x: number; y: number; w: number; h: number }> => {
+    const s = store.getState()
+    return s === null ? [] : Object.values(s.structures)
+  }
+  const recomputeBounds = (terrain: TileId[][]): void => {
+    bounds = reachableBoundsOf(terrain, structureList())
+  }
   const screenBox = (): { w: number; h: number } => ({ w: app.screen.width, h: app.screen.height })
 
   function place(x: number, y: number): void {
@@ -385,6 +402,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   function fitToTown(): void {
     fitTo(fitStop(townBox(), screenBox()))
   }
+
+  const fitsWholeTown = (): boolean => !tooBigToFit(townBox(), screenBox())
 
   // smooth follow: eases the camera toward a moving world-space anchor each frame
   let followFn: (() => { x: number; y: number } | null) | null = null
@@ -510,13 +529,16 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const offSub = store.subscribe(() => {
     const s = store.getState()
     if (s === null) return
+    // A building that went up is an edge that moved. The bake is gated on the terrain, but the
+    // reachable box is not: it must follow the town every time the town grows, or the newest
+    // house on the outermost ring is the one the camera cannot get to.
+    recomputeBounds(s.terrain)
     // terrain art arriving is a rebake trigger too — the flat ground hot-swaps to materials
     const sig = groundArtSignature(store.assetRecords())
     if (s.terrain === bakedTerrain && sig === bakedArtSig) return
     const first = bakedTerrain === null
     bakedTerrain = s.terrain
     bakedArtSig = sig
-    bounds = cameraBoundsOf(s.terrain)
     if (first) {
       // the very first map appears immediately; every later one waits for the frame
       rebakeGround(s.terrain)
@@ -537,7 +559,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const boot = store.getState()
   if (boot !== null) {
     bakedTerrain = boot.terrain
-    bounds = cameraBoundsOf(boot.terrain)
+    recomputeBounds(boot.terrain)
     rebakeGround(boot.terrain)
     fitToTown()
   }
@@ -584,6 +606,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       notifyCamera()
     },
     fitToTown,
+    fitsWholeTown,
     onCamera: (cb) => {
       cameraCbs.push(cb)
       return () => {

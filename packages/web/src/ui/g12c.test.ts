@@ -325,13 +325,13 @@ describe('U20/U21 — "I need controls out of the way… I must be able to move 
 // ── U22 · a proper bottom control bar ─────────────────────────────────────────────────────
 
 describe('U22 — "I should have controls at the bottom to let me do what I want"', () => {
-  const items = controlItems({ lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false })
+  const items = controlItems({ lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false, townFits: true })
 
   it('turns every id the bar can produce into an action', () => {
     for (const lens of ['map', 'inspector', 'chronicle', 'society', 'director', 'laws'] as const) {
       for (const live of [true, false]) {
         for (const inside of [null, 's_house']) {
-          for (const item of controlItems({ lens, live, zoom: 1, following: null, insideId: inside, hudHidden: false })) {
+          for (const item of controlItems({ lens, live, zoom: 1, following: null, insideId: inside, hudHidden: false, townFits: true })) {
             expect(() => actionFor(item), `${lens}/${item.id}`).not.toThrow()
             expect(actionFor(item).kind, `${lens}/${item.id}`).toBeTypeOf('string')
           }

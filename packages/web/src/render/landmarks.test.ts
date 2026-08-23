@@ -181,6 +181,28 @@ describe('a place name is legible over any ground, in both light bands', () => {
 // own `landmarkAlpha` was 0.5 — so the number the test proved was never the number on screen.
 // It is the same fault as quoting a bubble's ratio without the night tint: a ratio belongs to
 // a viewer, and alpha is a de-emphasis channel whose ratio is unknowable at the call site.
+// ★ WHAT THE BROWSER CAUGHT AT THE NEW WIDEST STOP. The camera lane added 0.25, and there the
+// eleven-building town is 320 px across while six counter-scaled plates are 140 px each — the
+// legend covered the map it explains, stacked into a column taller than the settlement. A name
+// is a legend for a view in which you can still see the place; below that the town is a shape.
+describe('the legend gives way when it is bigger than the map', () => {
+  it('is absent at the widest stop and full at the one above it', () => {
+    expect(landmarkAlpha(0.25)).toBe(0)
+    expect(landmarkAlpha(0.5)).toBe(1)
+  })
+
+  it('still disappears on the way in, exactly as it did', () => {
+    expect(landmarkAlpha(1)).toBe(0)
+    expect(landmarkAlpha(2)).toBe(0)
+  })
+
+  it('the fade sits strictly between the two stops, so no rest stop is caught mid-band', () => {
+    const mid = landmarkAlpha(0.375)
+    expect(mid).toBeGreaterThan(0)
+    expect(mid).toBeLessThan(1)
+  })
+})
+
 describe('a place name is never de-emphasised by transparency', () => {
   it('is fully opaque or absent at every resting stop — never half there', () => {
     for (const stop of ZOOM_STOPS) {

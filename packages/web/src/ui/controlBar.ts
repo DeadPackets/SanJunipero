@@ -36,6 +36,10 @@ export type ControlCtx = {
   following: string | null
   insideId: string | null
   hudHidden: boolean
+  /** Does the whole settlement fit on the stage at the widest stop? The stop ladder ends at
+   *  0.25 and the town grows without bound, so eventually it does not — and the overview
+   *  control says what it will actually do rather than promising the whole town. */
+  townFits: boolean
 }
 
 /** The town's own word for each lens, so the bar and the top nav name one thing once. */
@@ -73,7 +77,13 @@ export function controlItems(ctx: ControlCtx): ControlItem[] {
     glyph: 'in',
     ...(atMax ? { disabled: true, disabledReason: 'This is as close as the camera goes.' } : {}),
   })
-  out.push({ id: 'fit', group: 'camera', label: 'The whole town', glyph: 'fit' })
+  out.push({
+    id: 'fit',
+    group: 'camera',
+    // Not disabled: it still does the most useful thing it can. It just stops over-promising.
+    label: ctx.townFits ? 'The whole town' : 'As much of the town as fits',
+    glyph: 'fit',
+  })
   if (ctx.following !== null) {
     out.push({ id: 'unfollow', group: 'camera', label: 'Stop following', glyph: 'eye' })
   }
