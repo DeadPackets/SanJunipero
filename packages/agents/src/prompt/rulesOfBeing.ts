@@ -23,6 +23,16 @@ choose echoes in the lives around you. Live as yourself.`
 // C11 Tier-1 verbs were registered and nameable but shown to nobody, and by the
 // canon-vocabulary law a word a mind is never given is a word it never uses.
 // `BLOCK1_SHA256` re-pins in the same commit. The prefix is static again after it.
+//
+// AMENDED A SECOND TIME, by the claim-seam lane, for one line and one reason: `build` no
+// longer accepts a coordinate in a town. A roof goes on a plot of the town's lattice, which
+// is the whole of why no sequence of agent builds can break the spacing floor — so a block
+// that told a mind to "give x and y as two numbers for where" was telling it to do a thing
+// the verb now refuses. Leaving it would have been a trap in the one place a mind is taught
+// its own hands. The line says what a mind is allowed to know and no more: that the town
+// keeps ground, and that it must go and stand there. It does not say plot, block, ring or
+// lattice — those are OUR words for the machinery, and a mind that could reason about the
+// lattice would be a mind reasoning about the world's construction rather than living in it.
 export const CAPABILITIES = `What your hands and voice can do. Name each act by its exact word, and give it exactly what it asks:
 
 walk — name it walk; give x and y as two numbers, the spot you go to
@@ -51,7 +61,7 @@ fish — name it fish; give x and y as two numbers for the water at your side
 forage — name it forage; give nodeId, the mark of a patch you can see, or nothing at all when trees stand at your elbow
 hunt — name it hunt; give faunaId, the mark of the animal beside you, with something to kill it with in hand
 chop — name it chop; give x and y as two numbers for the tree or sapling within reach
-build — name it build; give kind, the thing to raise, and x and y as two numbers for where
+build — name it build; give kind, the thing to raise. Where it stands is not yours to choose: the town keeps ground for such things, and you must be standing at that ground to begin. A span laid over water is the one exception, and takes x and y for what it crosses
 craft — name it craft; give recipe, the name of what you shape
 pave — name it pave; give x and y as two numbers for ground within reach, with stone in hand
 dig_channel — name it dig_channel; give x and y as two numbers for grass or dirt within reach that water already touches

@@ -1,5 +1,6 @@
 import {
   composePerception,
+  groundForBuilding,
   FORAGEABLE_YIELD,
   isFoodKind,
   isPassable,
@@ -210,6 +211,12 @@ export class EngineBridge {
   // not change inside a run and a mind that is never given a word never uses it (C11 R-H).
   makeables(): Makeables {
     return makeables(this.#simConfig)
+  }
+
+  // Where the town has room for the next roof. Read off the engine's own claim, so the place
+  // the prose names is the place `build` accepts and no other — a mind is never told two.
+  groundForBuilding(): { x: number; y: number } | null {
+    return groundForBuilding(this.#loop.state)
   }
 
   // Water is terrain, and terrain is the one thing perception never projects: a body that

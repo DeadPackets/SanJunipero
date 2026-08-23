@@ -103,7 +103,7 @@ const gitBytes = (...args: string[]): Buffer =>
 // the two dials that served it — a ceiling has no place in a grammar that plats rings forever.
 // Previous: 02f295ad… (hut → house), a90bd747… (C11 Task 37b).
 const FORGE_CONFIG_HASH = 'da065752366c812c531b1eaa0f8537781bc6f5859e5a4bf6647aa5edc37cd472'
-const BLOCK1_SHA256 = '28c1fce0781ec9019416c234a9eae47401ff4b9dc4a96b91c371335fbad97bd6'
+const BLOCK1_SHA256 = '4205d892c18a91de4c9c3a50f0122abaad0d6170488455419dc045bfc4d50065'
 
 // ★ THE LIVE ASSIGNMENT, NOT THE FILE. `toContain` was satisfied by any occurrence of the
 // hash, and every one of these files keeps its superseded values in a "Previous value:"

@@ -12,7 +12,14 @@ import { fixtureBlocks, quietMeadowPacket, tamarIdentity } from '../testutil/fix
 // Moved once since, by C11 batch-7 controller ruling 5 — the one-time authorized
 // amendment adding the twelve C11 Tier-1 verbs to CAPABILITIES. Re-pinned in that
 // same commit; the prefix is frozen again from here.
-const BLOCK1_SHA256 = '28c1fce0781ec9019416c234a9eae47401ff4b9dc4a96b91c371335fbad97bd6'
+//
+// MOVED A SECOND TIME by the claim-seam lane, for one line: `build` no longer takes a
+// coordinate in a town, and the block was still telling minds to give one. It is the one
+// place a mind is taught its own hands, so a line that names a parameter the verb refuses is
+// a trap rather than a stale comment. Nothing else in the block changed; the diff is the
+// `build` row alone, and the reasoning is on CAPABILITIES itself.
+// Previous value (C11 batch-7 ruling 5): 28c1fce0781ec9019416c234a9eae47401ff4b9dc4a96b91c371335fbad97bd6
+const BLOCK1_SHA256 = '4205d892c18a91de4c9c3a50f0122abaad0d6170488455419dc045bfc4d50065'
 
 function block1(): string {
   return [RULES_OF_BEING, CAPABILITIES, SPEECH_RULES].join('\n\n---\n\n')

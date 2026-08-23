@@ -8,6 +8,7 @@ import { mintId, type Affliction, type Item, type TileId, type WorldState } from
 import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
 import { bridgeAt, BRIDGE_KIND, findPath, isPassable, searchPath } from './path.js'
+import { claimInWorld, townSquareOf } from './town.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 import { fleeTo } from './systems/fauna.js'
 import { HEAT_SOURCE_KINDS } from './systems/warmth.js'
@@ -877,7 +878,25 @@ export function crafterStamp(
   return skillLevel(state, agentId, track, config) >= config.crafting.expertLevel ? { crafterMark: agentId } : {}
 }
 
-export const BuildParams = z.object({ kind: z.string(), x: z.number().int(), y: z.number().int() }).strict()
+// ★ A BUILD DOES NOT TAKE A COORDINATE — NOT IN A TOWN.
+//
+// The grammar's spacing floor (86.1626 px, proven exhaustively over 2 496 pairings) holds
+// BECAUSE every building goes on a plot of the lattice. An agent that can name a coordinate
+// can break it, so the two shapes below are the whole of the seam: in a town, `build` accepts
+// `{kind}` and NOTHING ELSE — a strict object with no `x` and no `y` in it, so a coordinate is
+// not a thing the act can be given. `onStart` reads the site from `claimInWorld` and never
+// from the params, so even a hand-written event cannot seat a roof off the lattice.
+//
+// A world with no town in it is the other shape. Every fixture in the repository is a meadow
+// with a shed on it, and a meadow has no plots; there, a build names its own ground exactly as
+// it always has. That is not a hole in the invariant, it is the invariant's domain — a world
+// with no lattice has no lattice to break.
+export const SitedBuildParams = z.object({ kind: z.string(), x: z.number().int(), y: z.number().int() }).strict()
+export const PlottedBuildParams = z.object({ kind: z.string() }).strict()
+/** The loose reader for the stages after `validate`, which has already judged the shape. */
+export const BuildParams = z.object({
+  kind: z.string(), x: z.number().int().optional(), y: z.number().int().optional(),
+}).strict()
 export const CraftParams = z.object({ recipe: z.string() }).strict()
 export const ExtinguishParams = z.object({ structureId: z.string() }).strict()
 
@@ -1007,39 +1026,154 @@ export function buildFootprint(
   return turned === null ? { w: h, h: w, refusal: null } : { w, h, refusal: written }
 }
 
+/** A bridge stands on the water and the water decides where it can stand; everything else a
+ *  pair of hands raises stands on the town's ground, and the town decides. Those are the only
+ *  two site rules this file has ever had — `bridgeSiteRefusal` is the older one. */
+export const isPlottedKind = (kind: string): boolean => kind !== BRIDGE_KIND
+
+/** Whether THIS world seats THIS kind on a plot. It takes a town to seat one. */
+export function buildIsPlotted(state: WorldState, kind: string): boolean {
+  return isPlottedKind(kind) && townSquareOf(state) !== null
+}
+
+/** The site this agent already has half-raised, so a build that was interrupted goes back to
+ *  the same walls instead of claiming a second plot. Keyed on the BUILDER, because on a plot
+ *  there is no coordinate to look one up by. */
+function ownSite(state: WorldState, agentId: string, kind: string) {
+  for (const id of Object.keys(state.structures).sort()) {
+    const s = state.structures[id]!
+    if (s.stage === 'construction' && s.kind === kind && s.builtBy === agentId) return s
+  }
+  return null
+}
+
+export type BuildSiteAnswer = {
+  site: { x: number; y: number; w: number; h: number } | null
+  /** The standing construction this build continues, if any: its materials are already spent. */
+  resume: { id: string; progressTicks: number } | null
+  refusal: string | null
+}
+
+const words = (kind: string): string => kind.replace(/_/g, ' ')
+
+/**
+ * ★ THE ONE ANSWER TO "WHERE DOES THIS GO", and the reason a mind cannot choose.
+ *
+ * On a plot, nothing about the asker reaches the site: it is the free plot nearest the square,
+ * `claimInWorld` decides it, and the params are not consulted at all. The builder still has to
+ * be standing at it — a house is not raised by wishing — and the refusal SAYS WHERE, which is
+ * the addendum §9 shape every other refusal in this file already uses. A seam that fails by
+ * offering nothing is invisible; this one fails by naming a place to walk to.
+ */
+export function buildSiteOf(
+  state: WorldState, config: SimConfig, agentId: string, params: { kind: string; x?: number; y?: number },
+): BuildSiteAnswer {
+  const recipe = buildableRecipe(config, params.kind)!
+  if (!buildIsPlotted(state, params.kind)) {
+    if (params.x === undefined || params.y === undefined) {
+      return { site: null, resume: null, refusal: `build needs {kind, x, y}` }
+    }
+    const d = { kind: params.kind, x: params.x, y: params.y }
+    const { w, h, refusal } = buildFootprint(state, config, agentId, d)
+    const at = siteAt(state, d.x, d.y)
+    return {
+      site: { x: d.x, y: d.y, w, h },
+      resume: at !== null && at.kind === d.kind ? { id: at.id, progressTicks: at.progressTicks } : null,
+      refusal,
+    }
+  }
+  const mine = ownSite(state, agentId, params.kind)
+  const claim = claimInWorld(state, { along: recipe.w, deep: recipe.h })
+  const site = mine !== null ? { x: mine.x, y: mine.y, w: mine.w, h: mine.h } : claim?.site ?? null
+  if (site === null) {
+    return { site: null, resume: null, refusal: `there is nowhere left in the town for a ${words(params.kind)}` }
+  }
+  const resume = mine === null ? null : { id: mine.id, progressTicks: mine.progressTicks }
+  // ★ THE DOOR TILE, not the corner of the footprint — the spot on the street the new frontage
+  // will face. It is a road, it is passable, and it is adjacent to EVERY mass the plot can
+  // hold, so one number answers the question whatever is being raised. The same number
+  // `groundForBuilding` puts in the perception, so a mind is never told two places.
+  const stand = claim?.door ?? { x: site.x, y: site.y + site.h }
+  const go = `go and stand at (${stand.x}, ${stand.y})`
+  if (!nearRect(state, agentId, site.x, site.y, site.w, site.h)) {
+    return { site, resume, refusal: `the town keeps ground for a ${words(params.kind)} — ${go}` }
+  }
+  return {
+    site, resume,
+    refusal: resume !== null ? null : plottedRefusal(state, config, agentId, params.kind, site, go),
+  }
+}
+
+/** Where the town has room for the next roof, as a place to walk to — the plot's own street
+ *  corner. `null` for a world with no town, or a town with nothing left to offer. Every plot
+ *  in the lattice holds every legal mass, so this is one answer for every buildable kind. */
+export function groundForBuilding(state: WorldState): { x: number; y: number } | null {
+  return claimInWorld(state, { along: 1, deep: 1 })?.door ?? null
+}
+
+/** Everything that can still be wrong once the town has named the ground. */
+function plottedRefusal(
+  state: WorldState, config: SimConfig, agentId: string, kind: string,
+  site: { x: number; y: number; w: number; h: number }, go: string,
+): string | null {
+  const ground = buildableGroundRefusal(state, site.x, site.y, site.w, site.h)
+  if (ground) return ground
+  for (const a of Object.values(state.agents)) {
+    if (!a.alive) continue
+    if (a.x < site.x || a.x >= site.x + site.w || a.y < site.y || a.y >= site.y + site.h) continue
+    // A body inside the footprint would be walled in by its own walls. Standing ON the ground
+    // is the near miss the door tile exists to prevent, so that refusal points at the door.
+    return a.id === agentId ? `you are standing on the ground itself — ${go}` : 'someone is in the way'
+  }
+  for (const [k, qty] of Object.entries(buildableRecipe(config, kind)!.inputs)) {
+    if (heldQty(state, agentId, k) < qty) return shortOf(k)
+  }
+  return null
+}
+
 const build: VerbDef = makeVerb({
   kind: 'build',
   validate(state, config, agentId, params) {
-    const p = BuildParams.safeParse(params)
-    if (!p.success) return 'build needs {kind, x, y}'
-    if (buildableRecipe(config, p.data.kind) === null) return `cannot build a ${p.data.kind}`
-    return buildFootprint(state, config, agentId, p.data).refusal
+    const kind = (params as { kind?: unknown }).kind
+    if (typeof kind !== 'string') return 'build needs {kind, x, y}'
+    if (buildableRecipe(config, kind) === null) return `cannot build a ${kind}`
+    const plotted = buildIsPlotted(state, kind)
+    const p = (plotted ? PlottedBuildParams : SitedBuildParams).safeParse(params)
+    // ★ THE LOUD HALF. The prompt tells a mind that a roof goes where the town has ground for
+    // it; a mind that names a coordinate anyway is told plainly that it does not get to.
+    if (!p.success) {
+      return plotted
+        ? `build needs {kind} — where a ${words(kind)} stands is the town's to say, not yours`
+        : 'build needs {kind, x, y}'
+    }
+    return buildSiteOf(state, config, agentId, p.data).refusal
   },
-  duration(state, config, _agentId, params) {
+  duration(state, config, agentId, params) {
     const p = BuildParams.parse(params)
-    return buildTicks(config, p.kind) - (siteAt(state, p.x, p.y)?.progressTicks ?? 0)
+    return buildTicks(config, p.kind) - (buildSiteOf(state, config, agentId, p).resume?.progressTicks ?? 0)
   },
   onStart(state, config, agentId, params) {
     const p = BuildParams.parse(params)
-    if (siteAt(state, p.x, p.y)) return []
     const recipe = buildableRecipe(config, p.kind)
     if (recipe === null) return []
-    const { w, h } = buildFootprint(state, config, agentId, p)
+    const answer = buildSiteOf(state, config, agentId, p)
+    if (answer.resume !== null || answer.site === null) return []
+    const { x, y, w, h } = answer.site
     return [
       ...Object.entries(recipe.inputs).flatMap(([kind, qty]) => consumeHeld(state, agentId, kind, qty)),
       {
         type: 'structure_planned',
         payload: {
-          id: mintId(state, 'structure'), kind: p.kind, x: p.x, y: p.y, w, h,
+          id: mintId(state, 'structure'), kind: p.kind, x, y, w, h,
           maxHp: recipe.maxHp, flammable: recipe.flammable, builderId: agentId,
           ...(config.ownership.enabled ? { owner: agentId } : {}),
         },
       },
     ]
   },
-  onComplete(state, _config, _agentId, params) {
+  onComplete(state, config, agentId, params) {
     const p = BuildParams.parse(params)
-    const site = siteAt(state, p.x, p.y)
+    const site = buildSiteOf(state, config, agentId, p).resume
     return site ? [{ type: 'structure_completed', payload: { id: site.id } }] : []
   },
   skill: { track: 'carpentry', xp: 1 },
@@ -1687,7 +1821,11 @@ export function stepBuild(state: WorldState, agentId: string): PendingEvent[] {
   const act = a?.activity
   if (!a || !act || act.verb !== 'build') throw new Error(`stepBuild: agent ${agentId} has no build in progress`)
   const p = BuildParams.parse(act.params)
-  const site = siteAt(state, p.x, p.y)
+  // On a plot there is no coordinate to look the walls up by, so the site is the one THIS
+  // agent has half-raised — which is also the honest reading of the sited case.
+  const site = p.x === undefined || p.y === undefined
+    ? ownSite(state, agentId, p.kind)
+    : siteAt(state, p.x, p.y)
   if (!site) return [{ type: 'action_interrupted', payload: { agentId, reason: 'gone' } }]
   return [
     { type: 'action_progressed', payload: { agentId, ticks: 1 } },

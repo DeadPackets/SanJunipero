@@ -14,6 +14,28 @@ export const CONSTRUCT_VOCABULARY: readonly string[] = [
   'semantic first', 'semantic firsts',
 ]
 
+// ★ THE SECOND ONE-WAY GLASS: HOW THE TOWN IS LAID OUT.
+//
+// `plot`, `block`, `ring`, `lattice`, `plat` and `frontage` are the words THIS PROJECT uses
+// for the grammar that decides where a building can stand. They are exactly as much a
+// taxonomy as `milestone` is: a mind that could reason about the lattice would be reasoning
+// about how the world is assembled instead of living in it, and it would start optimising
+// against a rule rather than wanting a roof.
+//
+// So the ruling is: A MIND MAY KNOW THAT THE TOWN KEEPS GROUND FOR A NEW ROOF, AND WHERE THAT
+// GROUND IS. Nothing else. A place is a world fact and eyes report places; the rule that
+// chose the place is ours. That is why `build` names a coordinate to walk to and never says
+// why it is that one, and why block 1 says "the town keeps ground for such things" rather
+// than anything a mind could reason forward from.
+//
+// Every one of these is ordinary English as well — a plot of land, a block of wood, a ring of
+// stones — so they are scanned on the AUTHORED surfaces this gate reads, exactly like the
+// four ambiguous construct words below, and never enforced mid-run against something a person
+// in the town happened to say.
+export const TOWN_LAYOUT_VOCABULARY: readonly string[] = [
+  'plot', 'plots', 'block', 'blocks', 'ring', 'rings', 'lattice', 'plat', 'platted', 'frontage',
+]
+
 // Four of those five words are also ordinary nouns for real things — the genesis map has a
 // market district, a town holds councils, a body keeps faith, a place has customs — so a mind
 // may hear them from another mouth. They stay in the scan the G11a gate runs over authored
@@ -47,6 +69,13 @@ function scan(prompt: string, patterns: ReadonlyArray<{ term: string; re: RegExp
 // the only acceptable answer for anything an agent will read.
 export function scanPromptForGlassLeak(prompt: string): string[] {
   return scan(prompt, ALL_PATTERNS)
+}
+
+const LAYOUT_PATTERNS = patternsFor(TOWN_LAYOUT_VOCABULARY)
+
+/** Every layout word an authored agent-visible surface uses. Empty is the only answer. */
+export function scanForLayoutLeak(text: string): string[] {
+  return LAYOUT_PATTERNS.filter(({ re }) => re.test(text)).map(({ term }) => term)
 }
 
 // Thrown, not logged: a word that exists only on the ops plane can only have got into a
