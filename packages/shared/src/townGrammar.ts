@@ -242,7 +242,11 @@ export function closestPair(structures: readonly PlacedStructure[]): number {
 /** Everything that can be wrong with a town, in one list: two buildings on one tile, a
  *  building in the river, a building on a road, two centres closer than the floor, a door
  *  that opens onto something that is not a road. An empty list is the whole claim. */
-export function townErrors(structures: readonly PlacedStructure[], roads: readonly TileXY[]): string[] {
+export function townErrors(
+  structures: readonly PlacedStructure[],
+  roads: readonly TileXY[],
+  ground: Ground = RIVER_GROUND,
+): string[] {
   const errs: string[] = []
   const road = new Set(roads.map((t) => `${t.dx},${t.dy}`))
   const occupied = new Set<string>()
@@ -251,7 +255,7 @@ export function townErrors(structures: readonly PlacedStructure[], roads: readon
       const k = `${t.dx},${t.dy}`
       if (occupied.has(k)) errs.push(`two buildings on ${k}`)
       occupied.add(k)
-      if (RIVER_GROUND(t.dx, t.dy) === 'water') errs.push(`${s.kind} in water at ${k}`)
+      if (ground(t.dx, t.dy) === 'water') errs.push(`${s.kind} in water at ${k}`)
       if (road.has(k)) errs.push(`${s.kind} on a road at ${k}`)
     }
   for (let a = 0; a < structures.length; a++)

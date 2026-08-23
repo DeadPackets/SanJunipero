@@ -92,27 +92,30 @@ describe('the walk-around, on the eleven buildings of the real town', () => {
   it('MEASURES U8: the landed rule disagreed with the geometry on this many tiles', () => {
     const { decided, disagreements } = sweep((_b, i, tile) => landedInFront(town.structures[i]!, tile))
     expect(decided).toBe(432)
-    // THE MEASURED SIZE OF U8 on the real town: one row of tiles per building, all of them
-    // the exact tie — a body standing on the tile directly in front of a door was drawn
-    // BEHIND the building. That is U8's sentence, in coordinates. Thirteen rather than six
-    // because the town now stands wider buildings: a 3× and a 4×-wide frontage ties on every
-    // tile across its face, not only on the one in front of a 2×2 door.
+    // THE MEASURED SIZE OF U8 on the real town: the tiles where the landed rule drew a body
+    // standing at a door BEHIND the building it was standing in front of. That is U8's
+    // sentence, in coordinates.
+    //
+    // RE-MEASURED once the town became a grammar. It is twelve rather than thirteen and the
+    // coordinates all moved, because the buildings are now platted on the block lattice and
+    // half of them face SE — a turned building presents its +x wall, so its tie row runs down
+    // a column instead of across a row. The SHAPE of the defect is unchanged: one tie per
+    // frontage face, wider frontages tying on more tiles.
     expect(disagreements.map((d) => `${d.structure} ${d.tile} oracle=${d.oracle} got=${d.got}`)).toEqual([
-      'structure_house_14_13 (14,15) oracle=true got=false',
-      'structure_cottage_19_13 (19,15) oracle=true got=false',
-      'structure_cottage_19_13 (20,15) oracle=true got=false',
-      'structure_house_26_13 (26,15) oracle=true got=false',
-      'structure_house_16_16 (16,18) oracle=true got=false',
-      'structure_cabin_21_16 (21,18) oracle=true got=false',
-      'structure_house_25_16 (25,18) oracle=true got=false',
-      'structure_house_5_20 (5,22) oracle=true got=false',
-      'structure_farmhouse_24_27 (24,29) oracle=true got=false',
-      'structure_farmhouse_24_27 (25,29) oracle=true got=false',
-      'structure_farmhouse_24_27 (25,30) oracle=true got=false',
-      'structure_farmhouse_24_27 (26,29) oracle=true got=false',
-      'structure_storehouse_13_21 (13,23) oracle=true got=false',
+      'structure_storehouse_36_14 (36,16) oracle=true got=false',
+      'structure_house_36_21 (36,23) oracle=true got=false',
+      'structure_house_24_26 (24,28) oracle=true got=false',
+      'structure_cottage_31_26 (31,28) oracle=true got=false',
+      'structure_cottage_31_26 (32,28) oracle=true got=false',
+      'structure_house_36_52 (36,54) oracle=true got=false',
+      'structure_cabin_36_59 (36,61) oracle=true got=false',
+      'structure_house_24_64 (24,66) oracle=true got=false',
+      'structure_house_31_64 (31,66) oracle=true got=false',
+      'structure_farmhouse_55_33 (55,37) oracle=true got=false',
+      'structure_farmhouse_55_33 (57,33) oracle=true got=false',
+      'structure_farmhouse_55_33 (57,34) oracle=true got=false',
     ])
-    expect(disagreements).toHaveLength(13)
+    expect(disagreements).toHaveLength(12)
   })
 
   it('the new sort disagrees with the geometry on NO tile', () => {

@@ -17,6 +17,10 @@ export type DevStructure = {
   h: number
   /** null = public. The template's own ownership assignment, not an invention of this module. */
   owner: string | null
+  /** The face the building presents, straight off the template. A spawn computed from the
+   *  south face put half the founders through a side wall once the town started turning
+   *  buildings to suit their plot. */
+  facing: 'sw' | 'se'
   flammable: boolean
 }
 
@@ -39,7 +43,7 @@ export function devTown(anchor: { x: number; y: number } = SHOWCASE_ANCHOR): Dev
     return {
       id: devStructureId(s.kind, x, y),
       kind: s.kind, x, y, w: s.w, h: s.h,
-      owner: s.owner,
+      owner: s.owner, facing: s.facing,
       flammable: s.kind !== 'standing_stone' && s.kind !== 'well',
     }
   })

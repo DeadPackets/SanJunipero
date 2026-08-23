@@ -1,30 +1,36 @@
 import { z } from 'zod'
 import {
-  CITY_DWELLING_KINDS, CITY_H, CITY_W, PLAZA, PLAZA_CENTRE, T_PATH, T_ROAD, doorTile,
+  CITY_DWELLING_KINDS, CITY_H, CITY_W, PLAZA_CENTRE, T_PATH, T_ROAD, doorFrontTile,
   makeCityTemplate, structureTiles, type CityStructure,
 } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 
-// The designed showcase town. C13's `makeCityTemplate()` is the single authored source of the
-// plaza, the road lattice, the river bank and the eleven buildings (AMENDMENT, 2026-08-16
-// evening): this module rasterises that template onto a 48×48 dev world rather than
-// hand-authoring a rival layout. It is a dev/gate fixture — genesis proper takes the template.
+// The designed showcase town. `makeCityTemplate()` is the single authored source of the plaza,
+// the road lattice, the river and the eleven buildings (AMENDMENT, 2026-08-16 evening): this
+// module rasterises that template onto a dev world rather than hand-authoring a rival layout.
+// It is a dev/gate fixture — genesis proper takes the template.
 
-export const SHOWCASE_W = 48, SHOWCASE_H = 48
+/** ★ THE MAP IS SIZED BY THE TOWN, NOT THE OTHER WAY ROUND. The town plats rings and grows;
+ *  a fixture that pinned its own 48 would clip the next ring off. `SHOWCASE_MARGIN` is the
+ *  wild the town is set in — forest, hill and the ground the standing stone waits on. */
+export const SHOWCASE_MARGIN = 8
+export const SHOWCASE_W = CITY_W + 2 * SHOWCASE_MARGIN
+export const SHOWCASE_H = CITY_H + 2 * SHOWCASE_MARGIN
 export const ROAD_TILE = 7    // C9 Task 1b TileId
 export const GRASS_TILE = 0, WATER_TILE = 2, FOREST_TILE = 3, ROCK_TILE = 4
 
-// The template lands flush to the west edge so its river IS the map's west river; the free
-// rows north and south of it stay meadow.
-export const SHOWCASE_ANCHOR = { x: 0, y: 9 } as const
-export const FOREST_BAND_X0 = 44                                  // spec §10 forest edge, east
-export const ROCK_HILL = { x0: 42, y0: 0, x1: 47, y1: 5 } as const // spec §10 rocky hill, north-east
+export const SHOWCASE_ANCHOR = { x: SHOWCASE_MARGIN, y: SHOWCASE_MARGIN } as const
+export const FOREST_BAND_X0 = SHOWCASE_ANCHOR.x + CITY_W + 4          // spec §10 forest edge, east
+export const ROCK_HILL = {                                             // spec §10 rocky hill, NE
+  x0: FOREST_BAND_X0, y0: 0, x1: SHOWCASE_W - 1, y1: SHOWCASE_MARGIN - 5,
+} as const
 
-// Reserved, not placed: the standing stone is C8 content. C10 only keeps the meadow tile at
-// the plaza's north-east shoulder clear for it.
+// Reserved, not placed: the standing stone is C8 content (C11 §9 — it stands BEYOND the edge
+// of town, unexplained). The fixture only keeps its meadow tile clear, in the open ground
+// between the last street and the forest.
 export const STANDING_STONE_TILE = {
-  x: SHOWCASE_ANCHOR.x + PLAZA.dx1,
-  y: SHOWCASE_ANCHOR.y + PLAZA.dy0 - 1,
+  x: SHOWCASE_ANCHOR.x + CITY_W + 1,
+  y: SHOWCASE_ANCHOR.y + 1,
 } as const
 
 export const PLAZA_TILE = {
@@ -38,6 +44,10 @@ export const ShowcaseStructureSchema = z.object({
   kind: z.enum([...CITY_DWELLING_KINDS, 'storehouse', 'shed', 'well', 'fire_pit', 'wagon']),
   x: z.number().int().min(0), y: z.number().int().min(0),
   w: z.number().int().min(1).max(4), h: z.number().int().min(1).max(4),
+  // The facing rides along because a door is on the face the building says it presents, and
+  // half this town's buildings present the +x one. A rasteriser that assumed south found the
+  // storehouse's door in its own back wall.
+  facing: z.enum(['sw', 'se']),
 }).strict()
 export type ShowcaseStructure = z.infer<typeof ShowcaseStructureSchema>
 
@@ -75,7 +85,7 @@ export function makeShowcaseMap(anchor: { x: number; y: number } = SHOWCASE_ANCH
     terrain[y]![x] = toTileId(t.to)
   }
   const structures = template.structures.map((s: CityStructure) => ({
-    kind: s.kind, x: anchor.x + s.dx, y: anchor.y + s.dy, w: s.w, h: s.h,
+    kind: s.kind, x: anchor.x + s.dx, y: anchor.y + s.dy, w: s.w, h: s.h, facing: s.facing,
   }))
   return ShowcaseMapSchema.parse({ terrain, structures })
 }
@@ -86,8 +96,14 @@ export function showcaseTerrain(anchor: { x: number; y: number } = SHOWCASE_ANCH
 
 // ------------------------------------------------------------------ invariants (tests + gate)
 
+/** The tile the door OPENS ONTO, on the face the structure's facing names. The well and the
+ *  fire pit have no door and answer with their own tile — they stand in the paving. */
 export const showcaseDoorTile = (s: ShowcaseStructure, anchor = SHOWCASE_ANCHOR): { x: number; y: number } => {
-  const d = doorTile({ w: s.w, h: s.h, dx: s.x - anchor.x, dy: s.y - anchor.y })
+  if (s.w === 1 && s.h === 1) return { x: s.x, y: s.y }
+  const d = doorFrontTile({
+    kind: s.kind, w: s.w, h: s.h, dx: s.x - anchor.x, dy: s.y - anchor.y,
+    facing: s.facing, owner: null, furnishings: [],
+  })
   return { x: anchor.x + d.dx, y: anchor.y + d.dy }
 }
 

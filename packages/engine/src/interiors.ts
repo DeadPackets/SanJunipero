@@ -1,3 +1,4 @@
+import { T_ROAD } from '@sj/shared'
 import type { Structure, WorldState } from './state.js'
 import { isPassable, type Point } from './path.js'
 
@@ -14,16 +15,31 @@ export function perimeter(s: { x: number; y: number; w: number; h: number }): Po
   return ring
 }
 
-// South-centre first, then clockwise around the ring; null when nothing is passable.
+// ★ A DOOR OPENS ONTO THE STREET. The town plats every building against a street and the
+// template guarantees the face it presents is a road — so a doorway found by walking the ring
+// from the south-centre put half the town's bodies out through a side wall onto the grass, on
+// exactly the buildings the grammar had turned to face east. The road ring is preferred and
+// the passable ring is the fallback, so a building standing in open country still has a door.
+//
+// Read off the TERRAIN, not off a facing column: the world state carries no facing, and it
+// does not need one for this — the street is already there to be seen.
 export function doorTile(state: WorldState, s: Structure): Point | null {
   const ring = perimeter(s)
   const start = ring.findIndex((p) => p.x === s.x + Math.floor((s.w - 1) / 2) && p.y === s.y + s.h)
+  let passable: Point | null = null
   for (let i = 0; i < ring.length; i++) {
     const p = ring[(start + i) % ring.length]!
-    if (isPassable(state, p.x, p.y)) return p
+    if (!isPassable(state, p.x, p.y)) continue
+    // A door is on a FACE, never at a corner: a corner touches the building diagonally, and a
+    // body standing there is beside the building rather than at its door.
+    if (!onCorner(s, p) && state.terrain[p.y]?.[p.x] === T_ROAD) return p
+    passable ??= p
   }
-  return null
+  return passable
 }
+
+const onCorner = (s: { x: number; y: number; w: number; h: number }, p: Point): boolean =>
+  (p.x < s.x || p.x >= s.x + s.w) && (p.y < s.y || p.y >= s.y + s.h)
 
 export function insideOf(state: WorldState, agentId: string): string | null {
   return state.agents[agentId]?.insideId ?? null

@@ -6,7 +6,8 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   ROAD_AUTOTILE_KEYS, roadAutotile, resolveFurnishingKind,
-  makeCityTemplate, growthPlots, structureTiles, doorTile, isRoadTile, key,
+  makeCityTemplate, growthPlots, structureTiles, doorTile, doorFrontTile, isRoadTile, key,
+  PLAZA_CENTRE,
   CITY_FURNISHING_KINDS, CITY_BED_KIND, CITY_HEARTH_KIND, CITY_INTERIOR_SLOTS,
   WORLD_SIZE_GENESIS, T_WATER, parseLibraryItemManifest,
   type RoadAutotileKey,
@@ -115,10 +116,10 @@ describe('G13a.3 — the city template', () => {
   // The town has to WORK: every door must be walkable-to from the square.
   it('reaches every building door from the market square over the road grid', () => {
     const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
-    const start = key(17, 14)
+    const start = key(PLAZA_CENTRE.dx, PLAZA_CENTRE.dy)
     expect(roads.has(start)).toBe(true)
     const seen = new Set([start])
-    const stack: [number, number][] = [[17, 14]]
+    const stack: [number, number][] = [[PLAZA_CENTRE.dx, PLAZA_CENTRE.dy]]
     while (stack.length) {
       const [dx, dy] = stack.pop()!
       for (const [nx, ny] of [[dx, dy - 1], [dx + 1, dy], [dx, dy + 1], [dx - 1, dy]] as [number, number][]) {
@@ -126,10 +127,13 @@ describe('G13a.3 — the city template', () => {
         if (roads.has(k) && !seen.has(k)) { seen.add(k); stack.push([nx, ny]) }
       }
     }
+    // The door is on the face the structure's FACING names, and half this town faces +x — a
+    // reach test that only looked south found the storehouse's door in its own back wall.
     for (const s of t.structures) {
-      const d = doorTile(s)
-      const reached = [[d.dx, d.dy - 1], [d.dx + 1, d.dy], [d.dx, d.dy + 1], [d.dx - 1, d.dy]]
-        .some(([x, y]) => seen.has(key(x!, y!)))
+      const d = s.w === 1 && s.h === 1 ? doorTile(s) : doorFrontTile(s)
+      const reached = seen.has(key(d.dx, d.dy))
+        || [[d.dx, d.dy - 1], [d.dx + 1, d.dy], [d.dx, d.dy + 1], [d.dx - 1, d.dy]]
+          .some(([x, y]) => seen.has(key(x!, y!)))
       expect(reached, `${s.kind} at ${key(s.dx, s.dy)} is cut off from the square`).toBe(true)
     }
   })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { T_PATH, makeCityTemplate } from '@sj/shared'
+import { CITY_H, CITY_W, RIVER_LOCAL_DX, T_PATH, makeCityTemplate } from '@sj/shared'
 import { TERRAIN_COST, makeFixtureMap } from '@sj/engine'
 import { DEV_MAP_DEFAULT, devTerrain } from './devWorld.js'
 import {
@@ -12,10 +12,14 @@ const map = makeShowcaseMap()
 const tileAt = (x: number, y: number): number => map.terrain[y]![x]!
 
 describe('makeShowcaseMap', () => {
-  it('is a 48x48 grid that parses under its own schema', () => {
+  // ★ THE MAP IS SIZED BY THE TOWN. It was a hard-coded 48 and the town outgrew it the moment
+  // the layout became a grammar — a fixture that pins its own size clips the next ring off.
+  it('is a grid the whole town fits in, and it parses under its own schema', () => {
     expect(() => ShowcaseMapSchema.parse(map)).not.toThrow()
     expect(map.terrain).toHaveLength(SHOWCASE_H)
     for (const row of map.terrain) expect(row).toHaveLength(SHOWCASE_W)
+    expect(SHOWCASE_W).toBeGreaterThan(CITY_W)
+    expect(SHOWCASE_H).toBeGreaterThan(CITY_H)
   })
 
   it('is deterministic — two calls deep-equal', () => {
@@ -42,11 +46,15 @@ describe('makeShowcaseMap', () => {
 })
 
 describe('the founders landscape (spec §10)', () => {
-  it('runs a contiguous river down the west edge', () => {
-    const column = map.terrain.map((row) => row[0]!)
+  // The channel is where the TOWN says it is — the town paints the water it is built beside,
+  // and the map takes it. A river column asserted at x = 0 was a fact about the old template's
+  // geometry, not about a river.
+  it('runs a contiguous river down the town west side', () => {
+    const column = map.terrain.map((row) => row[SHOWCASE_ANCHOR.x + RIVER_LOCAL_DX]!)
     const first = column.indexOf(WATER_TILE)
     const last = column.lastIndexOf(WATER_TILE)
     expect(first).toBeGreaterThanOrEqual(0)
+    expect(last - first + 1).toBe(CITY_H)
     for (let y = first; y <= last; y++) expect(column[y]).toBe(WATER_TILE)
   })
 
@@ -56,7 +64,7 @@ describe('the founders landscape (spec §10)', () => {
     expect(tileAt(ROCK_HILL.x1, ROCK_HILL.y0)).toBe(4)
   })
 
-  it('reserves an open meadow tile at the plaza shoulder for the standing stone', () => {
+  it('reserves an open meadow tile beyond the edge of town for the standing stone', () => {
     expect(tileAt(STANDING_STONE_TILE.x, STANDING_STONE_TILE.y)).toBe(GRASS_TILE)
     const built = new Set(map.structures.flatMap(showcaseStructureTiles).map((t) => `${t.x},${t.y}`))
     expect(built.has(`${STANDING_STONE_TILE.x},${STANDING_STONE_TILE.y}`)).toBe(false)
@@ -68,14 +76,17 @@ describe('the road lattice', () => {
     expect(tileAt(PLAZA_TILE.x, PLAZA_TILE.y)).toBe(ROAD_TILE)
   })
 
+  // The door tile IS the road it opens onto now, on the face the structure's facing names —
+  // so this asks the strict question rather than "is a road somewhere next to the back wall".
   it('connects the plaza to the door of every structure', () => {
     const reached = roadReach(map)
     expect(reached.size).toBeGreaterThan(50)
     for (const s of map.structures) {
       const d = showcaseDoorTile(s)
-      const touching = ([[0, -1], [1, 0], [0, 1], [-1, 0]] as const)
-        .some(([dx, dy]) => reached.has(`${d.x + dx},${d.y + dy}`))
-      expect(touching, `${s.kind} at ${s.x},${s.y} has no reachable road at its door`).toBe(true)
+      const at = s.w === 1 && s.h === 1
+        ? ([[0, -1], [1, 0], [0, 1], [-1, 0]] as const).some(([dx, dy]) => reached.has(`${d.x + dx},${d.y + dy}`))
+        : reached.has(`${d.x},${d.y}`)
+      expect(at, `${s.kind} at ${s.x},${s.y} has no reachable road at its door`).toBe(true)
     }
   })
 
