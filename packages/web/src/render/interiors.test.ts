@@ -8,7 +8,8 @@ import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { SLOT_TILES, slotSpanCentre } from './roomShell.js'
 import {
   BED_FOOTPRINT, CONTACT_SHADOW_ALPHA, FURNITURE_OCCUPANCY, INTERIOR_FADE_MS, INTERIOR_LAYOUTS,
-  LIBRARY_MAX_SPRITE_PX, advanceInterior, bedSlots, contactShadow, furnishingScale, interiorOf,
+  LIBRARY_TILE_PX, advanceInterior, bedSlots, contactShadow, furnishingDivisor, furnishingScale,
+  interiorOf,
   interiorOrder, interiorPieces, interiorTransition, isFlat, occupancyOf, roomFurnishings,
   roomPlan, type InteriorPhase,
 } from './interiors.js'
@@ -377,24 +378,36 @@ describe('furniture stands on its own ground', () => {
 
 // WHAT THE BROWSER CAUGHT: the room drew library furniture at NATIVE size and bodies at
 // CHAR_TARGET_PX, so a sleeper was three times the length of the bed he was lying in.
+// ★ AND THEN THE LIBRARY SHIPPED AT 128 AND THE FACTOR WAS POINTING THE WRONG WAY. These three
+// assertions were written for 24 px art and each one encoded that as a law. They are re-stated
+// against the size the art is actually authored at, not weakened to let a number through:
+// the factor is still ONE whole number for the whole room, it is now a divisor.
 describe('furnishingScale — one room, one scale', () => {
-  it('is the largest INTEGER factor that keeps the biggest library sprite inside a slot', () => {
-    expect(furnishingScale(SLOT_TILES)).toBe(2)
-    expect(Number.isInteger(furnishingScale(SLOT_TILES))).toBe(true)
-    expect(LIBRARY_MAX_SPRITE_PX * furnishingScale(SLOT_TILES))
-      .toBeLessThanOrEqual(SLOT_TILES * TILE_W)
+  it('is the whole-number DIVISOR between the authored tile and the slot it lands on', () => {
+    expect(furnishingDivisor(SLOT_TILES)).toBe(2)
+    expect(Number.isInteger(furnishingDivisor(SLOT_TILES))).toBe(true)
+    expect(furnishingScale(SLOT_TILES)).toBe(1 / furnishingDivisor(SLOT_TILES))
+    // ON the slot's ground, not inside it and not over it — the art is authored for exactly
+    // this span, so "fits" and "fills" are the same claim now.
+    expect(LIBRARY_TILE_PX * furnishingScale(SLOT_TILES)).toBe(SLOT_TILES * TILE_W)
   })
 
   it('puts a bed within reach of the person lying in it', () => {
     const CHAR_TARGET_PX = 52   // charAnim's own target, quoted so the mismatch is measured
-    const bed = LIBRARY_MAX_SPRITE_PX * furnishingScale(SLOT_TILES)
-    expect(LIBRARY_MAX_SPRITE_PX / CHAR_TARGET_PX).toBeLessThan(0.5)   // the landed mismatch
-    expect(bed / CHAR_TARGET_PX).toBeGreaterThan(0.8)                  // and after
+    const bed = LIBRARY_TILE_PX * furnishingScale(SLOT_TILES)
+    expect(24 / CHAR_TARGET_PX).toBeLessThan(0.5)              // the first mismatch: too small
+    expect(LIBRARY_TILE_PX * 2 / CHAR_TARGET_PX).toBeGreaterThan(4)  // the second: 4.00x oversized
+    expect(bed / CHAR_TARGET_PX).toBeGreaterThan(0.8)          // and after
+    expect(bed / CHAR_TARGET_PX).toBeLessThan(1.5)
   })
 
-  it('never shrinks anything, however small the grid', () => {
-    expect(furnishingScale(1)).toBe(1)
-    expect(furnishingScale(0)).toBe(1)
+  it('never inflates anything, however small the grid', () => {
+    expect(furnishingDivisor(1)).toBe(4)
+    expect(furnishingDivisor(0)).toBe(4)
+    for (const tiles of [0, 1, 2, 4, 8]) {
+      expect(Number.isInteger(furnishingDivisor(tiles))).toBe(true)
+      expect(furnishingScale(tiles)).toBeLessThanOrEqual(1)
+    }
   })
 
   it('a rug lies on the floor; a bed stands on it', () => {
