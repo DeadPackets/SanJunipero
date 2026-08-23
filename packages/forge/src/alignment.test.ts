@@ -5,6 +5,8 @@ import {
   footprintDiamond, validateBuildingAlignment, testGridRender, toTargetCell,
   SEAT_CRITERION_PROMPT, GRID_MARGIN, DIAMOND_STROKE, type AlignmentConfig,
 } from './alignment.js'
+import { nativeDensityGate, spriteDensity } from './pixelGates.js'
+import { targetSize } from './styleBible.js'
 
 const CFG: AlignmentConfig = DEFAULT_FORGE_CONFIG.alignment
 const FP = { w: 1, h: 1 }
@@ -36,6 +38,45 @@ describe('footprintDiamond', () => {
   })
   it('honours an explicit feet line when the cell declares one', () => {
     expect(footprintDiamond(FP, CELL).nearVertexY).toBe(56)
+  })
+
+  // ★ THE DIAMOND IS SKEWED, AND THIS IS THE ASSERTION THAT SAYS SO.
+  //
+  // `farmhouse-se` shipped declaring 4×2 while standing on 2×4 and not one gate said a word.
+  // The reason is here: this function used to return `centerX ± (w + h)·TILE_W/4`, a function
+  // of `w + h` ALONE, so a footprint and its transpose got the identical window. From the near
+  // vertex the west corner is `w` tiles away and the east corner is `h` — equal only when the
+  // footprint is square, which is exactly why the three square kinds were never affected.
+  it('turns with the footprint: a transpose is a DIFFERENT diamond, not the same one', () => {
+    const cell = { w: 192, h: 192 }
+    const sw = footprintDiamond({ w: 4, h: 2 }, cell)
+    const se = footprintDiamond({ w: 2, h: 4 }, cell)
+    expect([sw.leftX, sw.rightX]).toEqual([32, 128])
+    expect([se.leftX, se.rightX]).toEqual([64, 160])
+    expect(sw).not.toEqual(se)
+    // A square footprint is its own transpose, and must not move.
+    expect(footprintDiamond({ w: 2, h: 2 }, cell)).toEqual(footprintDiamond({ w: 2, h: 2 }, cell))
+    const sq = footprintDiamond({ w: 3, h: 3 }, cell)
+    expect(sq.centerX - sq.leftX).toBe(sq.rightX - sq.centerX)
+  })
+
+  // ★ AND THE THREE MEASURES THAT CANNOT SEE IT, NAMED SO NOBODY TRUSTS THEM FOR IT AGAIN.
+  // Each is a function of `w + h`, so each is literally the same number for a footprint and
+  // its transpose. They are not wrong — a diamond's total span and a square cell's side really
+  // are symmetric — they simply are not, and can never be, the check for orientation.
+  it('names the size-only measures that a transpose slips straight past', () => {
+    const a = { w: 4, h: 2 }, b = { w: 2, h: 4 }
+    const tile = { w: 32, h: 16 }
+    expect(spriteDensity({ canvas: { w: 192, h: 192 }, footprint: a, tile }))
+      .toBe(spriteDensity({ canvas: { w: 192, h: 192 }, footprint: b, tile }))
+    expect(nativeDensityGate({ name: 'x', canvas: { w: 192, h: 192 }, footprint: a, tile }).failures)
+      .toEqual(nativeDensityGate({ name: 'x', canvas: { w: 192, h: 192 }, footprint: b, tile }).failures)
+    expect(targetSize('building', a)).toEqual(targetSize('building', b))
+    // The width of the diamond really is symmetric; where its near vertex sits is not.
+    const cell = { w: 192, h: 192 }
+    const sw = footprintDiamond(a, cell), se = footprintDiamond(b, cell)
+    expect(sw.rightX - sw.leftX).toBe(se.rightX - se.leftX)
+    expect(sw.leftX).not.toBe(se.leftX)
   })
 })
 

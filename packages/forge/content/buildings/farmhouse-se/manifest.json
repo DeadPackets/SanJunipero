@@ -2,8 +2,8 @@
   "version": "v4-hires-building",
   "kind": "farmhouse:se",
   "footprint": {
-    "w": 4,
-    "h": 2
+    "w": 2,
+    "h": 4
   },
   "cell": {
     "w": 768,
