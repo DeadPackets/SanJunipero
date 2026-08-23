@@ -82,6 +82,8 @@ console.log(`[SOCIAL]: ${social} of ${nodes.length} (${(100 * social / nodes.len
 console.log(`social by era: ${ERAS.map((e) => `${e}=${nodes.filter((n) => n.era === e && n.social).length}`).join(' ')}`)
 console.log(`handwork rung (8 landed): ${handwork.map((n) => n.id).join(', ')}`)
 console.log(`genesis frontier (5 landed): ${genesisReachable.join(', ')}`)
-console.log(`DAG: acyclic, no forward citations, ${nodes.length} nodes topologically ordered`)
+// Claims are printed only once they have survived. A summary line above a FAIL block is the
+// kind of guard that asserts nothing, which is the failure mode this file exists to avoid.
 if (fail.length) { console.log('\nFAIL:'); for (const f of fail) console.log(`  - ${f}`); process.exit(1) }
+console.log(`DAG: acyclic, no forward citations, ${nodes.length} nodes topologically ordered`)
 console.log('\nPASS: every check above holds.')
