@@ -47,6 +47,12 @@ function framingTainted(v: Verdict): boolean {
   return texts.some((t) => FORBIDDEN_FRAMING.test(t))
 }
 
+// The other half of the same law. `framingTainted` only ever sees an `attempt`, so the coined
+// word — which becomes a permanent verb AND an agent-visible chronicle line — went unchecked.
+export function wordTainted(word: string): boolean {
+  return FORBIDDEN_FRAMING.test(word)
+}
+
 export type AgentCtx = {
   agentId: string
   name: string
@@ -191,7 +197,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         const cheap = assembleExpressivePrompt({ canon: CANON, agent: agentCtx, intent })
         const r = await deps.llm.object({ schema: ExpressiveRulingSchema, ...cheap })
         const ruling = ExpressiveRulingSchema.safeParse(r.value)
-        if (ruling.success) {
+        if (ruling.success && !wordTainted(ruling.data.word)) {
           const verdict: Verdict = { kind: 'map', verb: codifyExpressive(ruling.data, tick()), params: {} }
           await rulings.record(intent, verdict, tick())
           return verdict
