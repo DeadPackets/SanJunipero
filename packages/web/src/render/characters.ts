@@ -13,8 +13,9 @@ import { createWorldLabel, type WorldLabel } from './worldLabel.js'
 import { faceFor, worldTextScale } from './textFaces.js'
 import {
   CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, NAME_TAG_ABOVE_HEAD_PX,
-  SHEET_COLS, SHEET_ROWS, WALK_FRAME_MS_V4, charPose, emoteFor, interpolatePos,
-  legFacing, nameTagText, prunePath, type Waypoint,
+  SHEET_COLS, SHEET_ROWS, WALK_LEAD_TICKS, charPose, emoteFor, gaitOf, initialTickClock,
+  interpolatePos, legFacing, nameTagText, observeTick, prunePath, scheduleLeg, strideFrameMs,
+  ticksPerTileOf, type Gait, type TickClock, type Waypoint,
 } from './charAnim.js'
 
 export const EMOTE_MS = 2000
@@ -23,9 +24,14 @@ export const EMOTE_ABOVE_HEAD_PX = 12
 export const CHAR_TAG_FONT_PX = faceFor('name').size
 export const CHAR_TAG_LINE_H = Math.max(WORLD_TEXT_LINE_H, CHAR_TAG_FONT_PX + 2)
 export const SHADOW_ALPHA = 0.25
-export const GLIDE_MIN_MS = 200
-export const GLIDE_MAX_MS = 4000
 export const EMOTE_PX = 16
+
+/**
+ * The movement law's shape, and its defaults, restated where the renderer can reach them for a
+ * world whose snapshot has not arrived yet. `charAnim.test.ts` reads `shared/src/config.ts` and
+ * asserts these are the numbers the schema actually defaults to.
+ */
+export const MOVEMENT_FALLBACK = { debuffThreshold: 30, base: 1, debuff: 2 } as const
 
 type CharArt = ReturnType<typeof characterArt>
 type Sheet = { art: CharArt; texture: Texture | null }
@@ -44,7 +50,10 @@ type CharEntry = {
   emoteUntil: number
   facing: Facing
   path: Waypoint[]
-  lastMoveArrival: number
+  /** this body's own phase and stride, derived once from its id and never again */
+  gait: Gait
+  /** what the record says the leg in flight costs, so the legs can match the ground */
+  legMs: number
   /** the tile the body is standing on RIGHT NOW — interpolated, never rounded (F-3c) */
   box: DepthBox
 }
@@ -129,6 +138,9 @@ export function createCharacterLayer(
   let lastAssetsSeq = store.assetsSeq()
   let emoteAtlas: Texture | null = null
   let emotesHidden = false
+  /** ONE clock for the whole town: the world ticks for everybody at once, so a per-body
+   *  estimate would be five noisy copies of one number. */
+  let clock: TickClock = initialTickClock()
   void book.get('/assets/emotes.png').then((t) => {
     emoteAtlas = t
   })
@@ -223,8 +235,8 @@ export function createCharacterLayer(
     const now = performance.now()
     e = {
       sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, figureH: 0, hitScale: 0,
-      emoteUntil: 0, facing: 'sw',
-      path: [{ x, y, atMs: now }], lastMoveArrival: now, box: bodyDepthBox(agentId, x, y),
+      emoteUntil: 0, facing: 'sw', gait: gaitOf(agentId), legMs: clock.periodMs,
+      path: [{ x, y, atMs: now }], box: bodyDepthBox(agentId, x, y),
     }
     setHitScale(e, CHAR_TARGET_PX / 64, 64)
     entries.set(agentId, e)
@@ -236,6 +248,17 @@ export function createCharacterLayer(
     const state = store.getState()
     if (state === null) return
     const now = performance.now()
+    // ★ THE WORLD'S CADENCE, MEASURED RATHER THAN ASSUMED. One `onEvents` call is one delta
+    // message; the ticks inside it are what the world advanced by, so a catch-up burst is not
+    // mistaken for the world suddenly running fast.
+    const ticks = new Set(evts.map((ev) => ev.tick)).size
+    clock = observeTick(clock, now, Math.max(1, ticks))
+    const conf = store.getConfig()
+    const cfg = {
+      debuffThreshold: conf?.needs.debuffThreshold ?? MOVEMENT_FALLBACK.debuffThreshold,
+      base: conf?.movement.baseTicksPerTile ?? MOVEMENT_FALLBACK.base,
+      debuff: conf?.movement.debuffTicksPerTile ?? MOVEMENT_FALLBACK.debuff,
+    }
     for (const ev of evts) {
       if (ev.type !== 'agent_moved') continue
       const p = ev.payload as { id: string; x: number; y: number }
@@ -245,9 +268,14 @@ export function createCharacterLayer(
       const dx = p.x - last.x
       const dy = p.y - last.y
       if (dx !== 0 || dy !== 0) e.facing = facingFrom(dx, dy)
-      const glide = Math.min(GLIDE_MAX_MS, Math.max(GLIDE_MIN_MS, now - e.lastMoveArrival))
-      e.path.push({ x: p.x, y: p.y, atMs: Math.max(now, last.atMs) + glide })
-      e.lastMoveArrival = now
+      // ★ THE LEG'S LENGTH COMES FROM THE RECORD, NOT FROM A STOPWATCH ON THE SOCKET.
+      // `ticksPerTileOf` is the engine's own rule: a body whose needs have fallen under the
+      // debuff threshold takes twice as many ticks per tile, and always has.
+      const perTile = ticksPerTileOf(state.agents[p.id]?.needs ?? {}, cfg)
+      e.legMs = clock.periodMs * perTile
+      e.path = scheduleLeg(e.path, p.x, p.y, {
+        nowMs: now, legMs: e.legMs, leadMs: clock.periodMs * WALK_LEAD_TICKS,
+      })
     }
     // emote triggers ride the same delta batches (one batch per tick)
     for (const [agentId, e] of entries) {
@@ -292,9 +320,13 @@ export function createCharacterLayer(
       if (walking) e.facing = legFacing(e.path) ?? e.facing
       const sheet = sheets.get(a.id)
       const hires = sheet !== undefined && sheet.texture !== null && sheet.art.manifest !== null
+      // ★ THE LEGS FOLLOW THE GROUND AND THE PERSON. `legMs` is what the record says this leg
+      // costs; `gait.stride` is how long this body's own step is; `gait.phase` is where in the
+      // loop it happens to be. All three are derived — none of them is a clock nobody set.
       const pose = charPose(
         { asleep: a.asleep, collapsed: a.collapsedSinceTick !== null, walking, facing: e.facing, nowMs },
-        hires ? WALK_FRAME_MS_V4 : undefined,
+        strideFrameMs(e.legMs, e.gait.stride),
+        { phase: e.gait.phase, bob: scene.wantsMotion() },
       )
       if (sheet !== undefined && sheet.texture !== null) {
         if (hires) {

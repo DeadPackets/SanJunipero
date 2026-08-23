@@ -15,7 +15,8 @@ import type { WorldState } from '@sj/engine/state'
 // reported in the user's own vocabulary.
 
 import {
-  ZOOM_SETTLE_MS, ZOOM_STOPS, fitStop, initialZoom, nearestStop, stageFill, stageFillFloor,
+  ZOOM_SETTLE_MS, ZOOM_STOPS, WHEEL_GESTURE_GAP_MS, fitStop, initialZoom, nearestStop, stageFill, stageFillFloor,
+  zoomRelease,
   zoomScaleAt, zoomTo, zoomWheel,
 } from './camera.js'
 import { landmarkAlpha, landmarksOf, placeLandmarks } from './landmarks.js'
@@ -342,12 +343,16 @@ describe('U18 — "text boxes are not vibrant, not stylized, not clear enough"',
 
 // ── U19 · smooth, damped, bounded zoom ────────────────────────────────────────────────────
 
+// The gate's own reading of U19 is unchanged — a flick may not cross the range by accident —
+// but the gesture now RELEASES, so what the gate reads is the resting stop after the hand has
+// lifted. That is the whole of the motion lane's amendment: the camera is continuous under a
+// hand and exact the moment it is let go.
 describe('U19 — "I zoom way too much by accident and I can\'t control my zoom at all"', () => {
   it('advances exactly one stop under thirty trackpad events', () => {
     let z = initialZoom(1)
     let now = 0
     for (let i = 0; i < 30; i++) { now += 8; z = zoomWheel(z, -4, now) }
-    expect(z.stop).toBe(2)
+    expect(zoomRelease(z, now + WHEEL_GESTURE_GAP_MS + 1).stop).toBe(2)
   })
 
   it('always settles on a member of the stop set, over a 500-event random walk', () => {
@@ -358,9 +363,11 @@ describe('U19 — "I zoom way too much by accident and I can\'t control my zoom 
       seed = (seed * 1103515245 + 12345) & 0x7fffffff
       now += (seed % 300)
       z = zoomWheel(z, ((seed >> 8) % 2 === 0 ? -1 : 1) * (20 + (seed % 200)), now)
+      if (now - z.lastWheelMs > WHEEL_GESTURE_GAP_MS) z = zoomRelease(z, now)
       expect(ZOOM_STOPS as readonly number[]).toContain(z.stop)
     }
-    expect(zoomScaleAt(z, now + ZOOM_SETTLE_MS)).toBe(z.stop)
+    z = zoomRelease(z, now + WHEEL_GESTURE_GAP_MS + 1)
+    expect(zoomScaleAt(z, now + WHEEL_GESTURE_GAP_MS + 1 + ZOOM_SETTLE_MS)).toBe(z.stop)
   })
 
   it('lands on a stop from any arbitrary scale, and eases rather than jumping', () => {

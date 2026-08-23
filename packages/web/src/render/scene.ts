@@ -8,7 +8,7 @@ import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import {
   ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, fitStop, initialZoom, nearestStop,
   drawnBoundsOf, fitsAt, reachableBoundsOf, resizeIntent, tooBigToFit, zoomScaleAt, zoomSettled,
-  zoomTo, zoomWheel,
+  zoomTo, zoomWheel, zoomGestureEnded, zoomRelease, WHEEL_GESTURE_GAP_MS,
   type CameraBounds, type ZoomState, type ZoomStop,
 } from './camera.js'
 import {
@@ -354,6 +354,10 @@ export type Scene = {
   setZoomAt(stop: ZoomStop, screenX: number, screenY: number): void
   /** the scale being drawn this frame — animated during a transit */
   getZoom(): number
+  /** ONE owner of `prefers-reduced-motion` for the whole canvas. The glide, the zoom settle
+   *  and the walk's bob all ask this, so a viewer who opted out cannot be honoured by two of
+   *  the three and forgotten by the fourth thing somebody adds next. */
+  wantsMotion(): boolean
   /** where the camera is going, and where it will be at rest. The HUD reads THIS, so a label
    *  never shows a number the stop set does not contain. */
   getZoomStop(): ZoomStop
@@ -578,9 +582,17 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const setZoom = (stop: ZoomStop): void =>
     setZoomAt(stop, app.screen.width / 2, app.screen.height / 2)
 
-  // One ticker step applies the eased scale. A settled camera costs one comparison a frame.
+  // One ticker step applies the scale — a hand's, or the ease that follows it. A settled
+  // camera costs one comparison a frame.
+  //
+  // THE RELEASE LIVES HERE and not in `onWheel`, because the end of a gesture is the ABSENCE
+  // of an event: nothing arrives to notice it. The frame is the only thing still running.
   const zoomTick = (): void => {
-    const s = zoomScaleAt(zoom, performance.now())
+    const now = performance.now()
+    // reduced motion gets the exact stop immediately; the tracking during the gesture stays,
+    // because that was the viewer's own hand and not motion we chose for them.
+    if (zoomGestureEnded(zoom, now)) zoom = zoomRelease(zoom, now, !wantsMotion())
+    const s = zoomScaleAt(zoom, now)
     if (s === world.scale.x) return
     world.scale.set(s)
     // While a follow is running it owns the position; otherwise the anchor stays put.
@@ -660,15 +672,23 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   }
   app.ticker.add(glideTick)
 
-  // Six lines: read the delta, ask the pure rule, store. The DOM half has no logic (P6).
+  // Read the delta, ask the pure rule, store. The DOM half has no logic (P6) — except for the
+  // one thing only the DOM knows: `ctrlKey` is how the platform says "this was a pinch".
   const onWheel = (e: WheelEvent): void => {
     e.preventDefault()
     // A zoom pins the world point under the cursor; a camera still gliding would tear it out
     // from under the anchor, which is the class of defect the wheel gate already exists for.
     stopGlide()
-    const next = zoomWheel(zoom, e.deltaY, performance.now())
-    if (next.stop !== zoom.stop) captureAnchor(e.offsetX, e.offsetY)
-    zoom = next
+    const now = performance.now()
+    // ★ THE ANCHOR IS CAPTURED ONCE PER GESTURE, NOT ONCE PER STEP. The landed code re-pinned
+    // whenever the stop changed, which was fine when the scale only moved at those moments.
+    // A continuous zoom moves it on every event, and re-pinning each time makes the town swim
+    // under the cursor instead of growing beneath it.
+    if (zoom.live === null || now - zoom.lastWheelMs > WHEEL_GESTURE_GAP_MS) {
+      fitted = false
+      captureAnchor(e.offsetX, e.offsetY)
+    }
+    zoom = zoomWheel(zoom, e.deltaY, now, e.ctrlKey)
   }
   app.canvas.addEventListener('wheel', onWheel, { passive: false })
   app.ticker.add(zoomTick)
@@ -762,6 +782,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     setZoom,
     setZoomAt,
     getZoom: () => world.scale.x,
+    wantsMotion,
     getZoomStop: () => zoom.stop,
     panBy: (dx, dy) => {
       stopGlide()

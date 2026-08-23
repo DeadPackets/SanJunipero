@@ -183,6 +183,46 @@ describe('a glide is ended by anything that says where the camera should be', ()
   })
 })
 
+// ── ★ THE GESTURE MUST BE RELEASED, OR THE CAMERA NEVER RESTS ON AN EXACT STOP ────────────
+//
+// The pure rules are proved in `camera.test.ts`, but a pure rule nobody calls is a decoration.
+// The END of a wheel gesture is the ABSENCE of an event: no handler fires to notice it, so the
+// release lives on the frame. Delete that one line and the camera holds whatever fractional
+// scale the hand left it at, forever — every texture off the pixel grid, P18 broken, and a
+// green suite. That is precisely the failure this lane must not introduce.
+describe('★ the wheel gesture is released on the frame, so the resting frame stays exact', () => {
+  const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
+  const body = (name: string): string => functionBody(src, name)
+
+  it('zoomTick asks whether the hand has left, and releases when it has', () => {
+    const tick = body('const zoomTick =')
+    expect(tick).toContain('zoomGestureEnded(zoom, now)')
+    expect(tick).toContain('zoomRelease(zoom, now')
+    // and it does so BEFORE it reads the scale, or the release lands a frame late
+    expect(tick.indexOf('zoomRelease')).toBeLessThan(tick.indexOf('zoomScaleAt'))
+  })
+
+  it('reduced motion reaches the release, so the settle is instant for a viewer who asked', () => {
+    expect(body('const zoomTick =')).toContain('!wantsMotion()')
+  })
+
+  it('★ the anchor is captured ONCE PER GESTURE, not once per event', () => {
+    const wheel = body('const onWheel =')
+    // guarded by the gesture test, not fired unconditionally: re-pinning on every event makes
+    // the town swim under the cursor instead of growing beneath it
+    expect(wheel).toMatch(/if \(zoom\.live === null \|\| now - zoom\.lastWheelMs > WHEEL_GESTURE_GAP_MS\)/)
+    expect(wheel.indexOf('captureAnchor')).toBeGreaterThan(wheel.indexOf('zoom.live === null'))
+  })
+
+  it('the pinch flag reaches the rule — a trackpad pinch is not a scroll', () => {
+    expect(body('const onWheel =')).toContain('e.ctrlKey')
+  })
+
+  it('gives the zoom back its ticker slot on teardown', () => {
+    expect(src).toContain('app.ticker.remove(zoomTick)')
+  })
+})
+
 // ── ★ THE MINIMAP DOES NOT OPEN A FIFTH DOOR ONTO THE CAMERA ──────────────────────────────
 //
 // Four things already outrank a running throw, and each does the same four steps in the same

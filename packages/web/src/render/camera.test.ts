@@ -4,21 +4,24 @@ import type { TileId } from '@sj/engine/state'
 import { TILE_H, TILE_W } from './iso.js'
 import {
   FIT_MARGIN_PX, ZOOM_STOP_MAX_RATIO,
-  WHEEL_GESTURE_GAP_MS, WHEEL_MIN_DELTA, WHEEL_STEP_DELTA, ZOOM_SETTLE_MS, ZOOM_STEP_COOLDOWN_MS,
+  WHEEL_GESTURE_GAP_MS, WHEEL_PX_PER_OCTAVE, PINCH_PX_PER_OCTAVE, ZOOM_COMMIT_OCTAVES,
+  ZOOM_LIVE_QUANTUM, ZOOM_SETTLE_MS,
   ZOOM_STOPS, boundsCentre, boxAspect, cameraBoundsOf, clampCamera, easeOutCubic, fitStop, fitsAt,
-  initialZoom, drawnBoundsOf, resizeIntent, stageFill, stageFillCeiling, stageFillFloor,
-  structureBoundsOf, tooBigToFit, zoomScaleAt, zoomSettled, zoomTo,
-  zoomWheel, type ZoomStop,
+  initialZoom, drawnBoundsOf, nearestStop, quantiseScale, resizeIntent, stageFill,
+  stageFillCeiling, stageFillFloor,
+  structureBoundsOf, tooBigToFit, zoomGestureEnded, zoomRelease, zoomScaleAt, zoomSettled, zoomTo,
+  zoomWheel, type ZoomState, type ZoomStop,
 } from './camera.js'
+import { CHUNK_PX_H, CHUNK_PX_W } from './groundChunks.js'
+import { boxInView, type ViewRect } from './cull.js'
+import { structureDepthBox, type DepthBox } from './depth.js'
 import { bigTown } from './bigTown.js'
 
-// THE LANDED RULE, quoted so the before-state is measured and not remembered
-// (scene.ts `onWheel`: one integer step per EVENT, no accumulation, no gate, no animation).
-const LANDED_MIN = 1, LANDED_MAX = 4
-function landedWheel(events: number): number {
-  let z = LANDED_MIN
-  for (let i = 0; i < events; i++) z = Math.min(LANDED_MAX, Math.max(LANDED_MIN, z + 1))
-  return z
+/** The AABB the renderer will actually paint — the cull's own margin plays no part in it.
+ *  The same predicate `cull.test.ts` sweeps with, so the two cannot come to different
+ *  answers about what "on screen" means. */
+function drawnIntersectsView(b: DepthBox, v: ViewRect): boolean {
+  return b.sx1 >= v.x && b.sx0 <= v.x + v.w && b.sy1 >= v.y && b.sy0 <= v.y + v.h
 }
 
 /** mulberry32 — a seeded walk, so a random test that fails fails the same way twice */
@@ -32,72 +35,140 @@ function rng(seed: number): () => number {
   }
 }
 
-describe('the complaint, as a test — "I zoom way too much by accident"', () => {
-  it('a thirty-event trackpad flick advances EXACTLY ONE stop', () => {
-    // the landed handler takes this to 4 — three stops in one flick, which is U19
-    expect(landedWheel(30)).toBe(4)
+// ── ★ THE ZOOM: CONTINUOUS UNDER THE HAND, EXACT THE MOMENT IT LETS GO ────────────────────
+//
+// The landed rule is quoted here as a function, so the before-state is MEASURED rather than
+// remembered — one rung per 200 ms cooldown window, whatever the hand actually did.
+const LANDED_COOLDOWN_MS = 200, LANDED_STEP_DELTA = 120, LANDED_GAP_MS = 140, LANDED_MIN_DELTA = 8
+function landedLadder(events: ReadonlyArray<{ dy: number; at: number }>, from: number): number {
+  const idx = (z: number): number => ZOOM_STOPS.indexOf(z as ZoomStop)
+  let stop = from, accum = 0, lastWheel = -Infinity, lastStep = -Infinity
+  for (const e of events) {
+    const fresh = e.at - lastWheel > LANDED_GAP_MS
+    accum = (fresh ? 0 : accum) + e.dy
+    const wants = (fresh && Math.abs(e.dy) >= LANDED_MIN_DELTA) || Math.abs(accum) >= LANDED_STEP_DELTA
+    lastWheel = e.at
+    if (e.at - lastStep < LANDED_COOLDOWN_MS || !wants) continue
+    stop = ZOOM_STOPS[Math.min(ZOOM_STOPS.length - 1, Math.max(0, idx(stop) + (accum < 0 ? 1 : -1)))]!
+    accum = 0; lastStep = e.at
+  }
+  return stop
+}
 
-    let s = initialZoom(1)
-    for (let i = 0; i < 30; i++) s = zoomWheel(s, -12, 1000 + i * (100 / 30))
-    expect(s.stop).toBe(2)
+/** One gesture, delivered as `n` events of `dy` spaced `gapMs` apart, then the hand lifts. */
+function gesture(
+  from: ZoomStop, n: number, dy: number, gapMs: number, opts: { pinch?: boolean } = {},
+): { state: ZoomState; events: Array<{ dy: number; at: number }>; endMs: number } {
+  let s = initialZoom(from)
+  const events: Array<{ dy: number; at: number }> = []
+  let t = 1000
+  for (let i = 0; i < n; i++) {
+    events.push({ dy, at: t })
+    s = zoomWheel(s, dy, t, opts.pinch)
+    t += gapMs
+  }
+  const endMs = t + WHEEL_GESTURE_GAP_MS + 1
+  return { state: zoomRelease(s, endMs), events, endMs }
+}
+
+describe('★ the complaint, as a test — "zooming is very hard to control"', () => {
+  // Measured on the landed handler in the running page, 2026-08-24. Reproduced here against
+  // the landed RULE so the numbers do not depend on a browser being available.
+  it('★ THE DEFECT: what the camera did depended on how LONG the gesture took, not how FAR', () => {
+    // one trackpad gesture, 34 events, 322 px of deltaY — the SAME hand distance both times
+    const shape = (i: number): number => -(i < 4 ? 2 + i * 3 : i < 24 ? 12 : Math.max(1, 12 - (i - 24) * 1.5))
+    const at = (span: number) => Array.from({ length: 34 }, (_, i) => ({ dy: shape(i), at: 1000 + i * (span / 34) }))
+    const total = at(300).reduce((s, e) => s + e.dy, 0)
+    expect(Math.round(total)).toBe(-322)
+
+    expect(landedLadder(at(300), 1)).toBe(2)       // fast: ONE rung, 22 of 34 events swallowed
+    expect(landedLadder(at(1400), 1)).toBe(3)      // slow: THREE rungs, from the same hand
+    // and five deliberate mouse notches, 500 px in 360 ms, moved it TWO rungs — three of the
+    // five were eaten by the cooldown, which is why a brisk hand on a wheel feels dead
+    expect(landedLadder([0, 1, 2, 3, 4].map((i) => ({ dy: -100, at: 1000 + i * 90 })), 1)).toBe(3)
+    // the same five notches now go by distance: 500 px is 2.27 octaves, 1 -> 4 and clamped
+    let m = initialZoom(1)
+    for (let i = 0; i < 5; i++) m = zoomWheel(m, -100, 1000 + i * 90)
+    expect(zoomRelease(m, 1000 + 4 * 90 + WHEEL_GESTURE_GAP_MS + 1).stop).toBe(4)
   })
 
-  it('two deliberate notches 300 ms apart advance two stops', () => {
-    let s = initialZoom(1)
-    s = zoomWheel(s, -120, 1000)
-    s = zoomWheel(s, -120, 1300)
-    expect(s.stop).toBe(3)
+  it('★ THE FIX: the same hand distance lands in the same place however it is paced', () => {
+    const spans = [200, 400, 900, 1400]
+    const landed = spans.map((sp) => {
+      let s = initialZoom(1)
+      let t = 1000
+      for (let i = 0; i < 34; i++) { s = zoomWheel(s, -9.47, t); t += sp / 34 }
+      return zoomRelease(s, t + WHEEL_GESTURE_GAP_MS + 1).stop
+    })
+    // every pacing of the same ~322 px lands on ONE stop, and it is not the ladder's end
+    expect(new Set(landed).size).toBe(1)
+    expect(landed[0]).toBe(3)
   })
 
-  it('the same two 50 ms apart advance ONE — the cooldown is the line', () => {
-    let s = initialZoom(1)
-    s = zoomWheel(s, -120, 1000)
-    s = zoomWheel(s, -120, 1050)
-    expect(s.stop).toBe(2)
-    expect(ZOOM_STEP_COOLDOWN_MS).toBeGreaterThan(50)
+  it('the live scale is proportional to the delta, in LOG space, wherever you start from', () => {
+    // an octave of push is a factor of two, from 0.25 as from 2
+    for (const from of [0.25, 0.5, 1, 2] as ZoomStop[]) {
+      const s = zoomWheel(initialZoom(from), -WHEEL_PX_PER_OCTAVE, 1000)
+      expect(s.live! / from).toBeCloseTo(2, 2)
+    }
   })
 
-  // WHAT THE BROWSER CAUGHT: "one notch is 120" is a convention, not a fact. Chrome commonly
-  // reports 100. With a bare 120 threshold and a gesture reset, a real mouse never zoomed at
-  // all: every notch was its own gesture, 100 < 120, and the accumulator reset before the next.
-  it('ONE NOTCH IS ONE STEP, whatever that mouse calls a notch', () => {
+  it('A NOTCH ALWAYS MOVES, whatever that mouse calls a notch — the landed guarantee, kept', () => {
+    // The landed code learned the hard way that "one notch is 120" is a convention, not a
+    // fact: Chrome commonly reports 100 and some mice report 53. The guarantee is that a
+    // deliberate notch is never swallowed. It is `ZOOM_COMMIT_OCTAVES` that keeps it: 53 px
+    // is 0.24 of an octave, which nearest-stop alone would snap straight back.
+    for (const notch of [53, 100, 120]) {
+      expect(gesture(2, 1, -notch, 0).state.stop, `in ${notch}`).toBe(3)
+      expect(gesture(2, 1, notch, 0).state.stop, `out ${notch}`).toBe(1)
+    }
+    // A mouse that reports 240 per notch is pushing twice as hard and gets twice as much.
+    // That is the point of a proportional response and it is stated rather than hidden.
+    expect(gesture(2, 1, -240, 0).state.stop).toBe(4)
     for (const notch of [53, 100, 120, 240]) {
-      expect(zoomWheel(initialZoom(2), -notch, 1000).stop, `${notch}`).toBe(3)
+      expect(gesture(2, 1, -notch, 0).state.stop, `moves ${notch}`).toBeGreaterThan(2)
     }
   })
 
-  it('the plan’s bare threshold never zooms a 100-delta mouse AT ALL', () => {
-    // the rule as written: accumulate, reset between gestures, step at WHEEL_STEP_DELTA
-    const bare = (prev: ReturnType<typeof initialZoom>, dy: number, now: number) => {
-      const fresh = now - prev.lastWheelMs > WHEEL_GESTURE_GAP_MS
-      const accum = (fresh ? 0 : prev.accum) + dy
-      if (Math.abs(accum) < WHEEL_STEP_DELTA) return { ...prev, accum, lastWheelMs: now }
-      return zoomWheel(prev, dy, now)
-    }
-    let plan = initialZoom(1), shipped = initialZoom(1)
-    for (let i = 0; i < 5; i++) {
-      const t = 1000 + i * 400        // five deliberate notches, well clear of the cooldown
-      plan = bare(plan, -100, t)
-      shipped = zoomWheel(shipped, -100, t)
-    }
-    expect(plan.stop).toBe(1)         // never moved. RED.
-    expect(shipped.stop).toBe(4)
+  it('★ A PINCH ZOOMS. The 40 px pinch that moved the camera NOT AT ALL now moves a rung', () => {
+    // Chrome delivers a macOS trackpad pinch as a wheel event with ctrlKey and 1-3 px deltas.
+    // Against WHEEL_MIN_DELTA = 8 every one of those was a graze, and against
+    // WHEEL_STEP_DELTA = 120 a whole comfortable pinch was under the bar.
+    const asPinch = gesture(1, 40, -1, 8, { pinch: true })
+    expect(landedLadder(asPinch.events, 1)).toBe(1)              // the landed rule: NOTHING
+    expect(asPinch.state.stop).toBe(2)                           // now: one rung in
   })
 
-  it('a graze under the dead zone accumulates but never steps', () => {
-    let s = initialZoom(2)
-    for (let i = 0; i < 5; i++) {
-      s = zoomWheel(s, -(WHEEL_MIN_DELTA - 1), 1000 + i * (WHEEL_GESTURE_GAP_MS + 10))
-      expect(s.stop).toBe(2)
-    }
+  it('★ and a PINCH is not a SCROLL — the same delta means more from a pinching hand', () => {
+    // The first version of this guard compared a 40 px pinch with a 40 px scroll and both
+    // landed on 2, because ZOOM_COMMIT_OCTAVES carries either one rung. It passed with the
+    // ctrlKey flag IGNORED ENTIRELY. Found by running the mutation, not by reading the test.
+    expect(PINCH_PX_PER_OCTAVE).toBeLessThan(WHEEL_PX_PER_OCTAVE)
+    const big = 180
+    expect(gesture(1, big, -1, 6, { pinch: true }).state.stop).toBe(4)   // 2 octaves
+    expect(gesture(1, big, -1, 6).state.stop).toBe(2)                    // 0.82 of one
+    // stated as the ratio, so a retune of either constant keeps the two apart
+    expect(gesture(1, big, -1, 6, { pinch: true }).state.stop)
+      .toBeGreaterThan(gesture(1, big, -1, 6).state.stop)
   })
 
-  it('a gesture that has gone quiet starts its accumulator clean', () => {
-    let s = initialZoom(2)
-    s = zoomWheel(s, -4, 1000)                                // under the dead zone
-    s = zoomWheel(s, -4, 1000 + WHEEL_GESTURE_GAP_MS + 1)     // a NEW gesture, not the old one's tail
-    expect(Math.abs(s.accum)).toBe(4)
-    expect(s.stop).toBe(2)
+  it('a graze is not a gesture: under the commit threshold the camera goes back where it was', () => {
+    const tiny = ZOOM_COMMIT_OCTAVES * WHEEL_PX_PER_OCTAVE * 0.5
+    const g = gesture(2, 1, -tiny, 0)
+    expect(g.state.stop).toBe(2)
+    expect(zoomScaleAt(g.state, g.endMs + ZOOM_SETTLE_MS)).toBe(2)
+  })
+
+  it('a push and an equal push back return to the stop they started from', () => {
+    let s = initialZoom(1)
+    let t = 1000
+    for (let i = 0; i < 20; i++) { s = zoomWheel(s, -15, t); t += 8 }
+    const out = zoomRelease(s, t + WHEEL_GESTURE_GAP_MS + 1)
+    expect(out.stop).not.toBe(1)
+    let b = out
+    t += 400
+    for (let i = 0; i < 20; i++) { b = zoomWheel(b, 15, t); t += 8 }
+    expect(zoomRelease(b, t + WHEEL_GESTURE_GAP_MS + 1).stop).toBe(1)
   })
 
   it('deltaY 0 is not an event at all', () => {
@@ -106,8 +177,157 @@ describe('the complaint, as a test — "I zoom way too much by accident"', () =>
   })
 
   it('scrolling down zooms out, scrolling up zooms in', () => {
-    expect(zoomWheel(initialZoom(2), -WHEEL_STEP_DELTA, 1000).stop).toBe(3)
-    expect(zoomWheel(initialZoom(2), WHEEL_STEP_DELTA, 1000).stop).toBe(1)
+    expect(zoomWheel(initialZoom(2), -100, 1000).live!).toBeGreaterThan(2)
+    expect(zoomWheel(initialZoom(2), 100, 1000).live!).toBeLessThan(2)
+  })
+})
+
+describe('★ the resting frame is EXACT — P18 is untouched by a continuous gesture', () => {
+  it('every stop is a multiple of the live quantum, so a release is never a rounding', () => {
+    for (const z of ZOOM_STOPS) expect(Number.isInteger(z / ZOOM_LIVE_QUANTUM)).toBe(true)
+  })
+
+  it('★ the quantum keeps a GROUND CHUNK a whole number of screen pixels at ANY live scale', () => {
+    // read off the render lane's own constants, so a chunk that changes shape turns this red
+    // rather than opening a hairline seam nobody is looking for
+    expect(Number.isInteger(CHUNK_PX_W * ZOOM_LIVE_QUANTUM)).toBe(true)
+    expect(Number.isInteger(CHUNK_PX_H * ZOOM_LIVE_QUANTUM)).toBe(true)
+    // and therefore every scale the gesture can produce keeps both whole
+    const r = rng(0x5eed)
+    for (let i = 0; i < 400; i++) {
+      const z = quantiseScale(0.25 + r() * 3.75)
+      expect(Number.isInteger(Math.round(CHUNK_PX_W * z * 1e6) / 1e6), `w at ${z}`).toBe(true)
+      expect(Number.isInteger(Math.round(CHUNK_PX_H * z * 1e6) / 1e6), `h at ${z}`).toBe(true)
+    }
+  })
+
+  it('never rests off the ladder, over a 500-gesture seeded walk with real releases', () => {
+    const r = rng(0xc12a3)
+    let s = initialZoom(1)
+    let now = 1000
+    for (let i = 0; i < 500; i++) {
+      const events = 1 + Math.floor(r() * 20)
+      const dy = (r() < 0.5 ? -1 : 1) * (1 + Math.floor(r() * 140))
+      for (let e = 0; e < events; e++) { now += 4 + Math.floor(r() * 30); s = zoomWheel(s, dy, now, r() < 0.3) }
+      now += WHEEL_GESTURE_GAP_MS + 1
+      s = zoomRelease(s, now)
+      expect(ZOOM_STOPS as readonly number[]).toContain(s.stop)
+      expect(zoomScaleAt(s, now + ZOOM_SETTLE_MS)).toBe(s.stop)
+      expect(zoomSettled(s, now + ZOOM_SETTLE_MS)).toBe(true)
+      now += Math.floor(r() * 600)
+    }
+  })
+
+  it('a gesture in flight is NEVER settled, however long the hand holds it', () => {
+    const s = zoomWheel(initialZoom(1), -40, 1000)
+    expect(s.live).not.toBeNull()
+    expect(zoomSettled(s, 1000 + 60_000)).toBe(false)
+    expect(zoomScaleAt(s, 1000 + 60_000)).toBe(s.live)
+  })
+
+  it('holds at the floor however far out you push, and at the ceiling however far in', () => {
+    expect(gesture(ZOOM_STOPS[0], 40, 200, 8).state.stop).toBe(ZOOM_STOPS[0])
+    expect(gesture(4, 40, -200, 8).state.stop).toBe(4)
+    // and the live scale is clamped too, so the world never scales past the ladder
+    let s = initialZoom(4)
+    for (let i = 0; i < 40; i++) s = zoomWheel(s, -200, 1000 + i * 8)
+    expect(s.live).toBe(4)
+  })
+
+  it('the floor is a reciprocal of an integer, so NEAREST samples exactly', () => {
+    expect(ZOOM_STOPS[0]).toBe(0.25)
+    expect(ZOOM_STOPS.at(-1)).toBe(4)
+    for (const z of ZOOM_STOPS) expect(Number.isInteger(z) || Number.isInteger(1 / z)).toBe(true)
+    for (let i = 1; i < ZOOM_STOPS.length; i++) expect(ZOOM_STOPS[i]!).toBeGreaterThan(ZOOM_STOPS[i - 1]!)
+  })
+})
+
+// ── ★ WHAT A LONGER FRACTIONAL WINDOW DOES TO THE CULL AND THE SEAMS ──────────────────────
+//
+// The render lane's warning, taken seriously: a continuous zoom is the most likely way this
+// lane breaks something real, because the renderer's two scale-sensitive systems were only
+// ever asked to survive a fractional scale for the ~200 ms of an eased transit.
+//
+// THE CULL DOES NOT SEE THE ZOOM AT ALL, and that is the answer rather than an excuse. It is
+// handed a view RECTANGLE in world space — `viewRect()` divides the screen by the scale — and
+// it does float geometry against it. A fractional scale makes that rectangle a fractional
+// size, which is the same arithmetic on different numbers. Proved here rather than argued.
+describe('★ the cull holds at every scale a gesture passes through', () => {
+  const boxes = bigTown(2).map((s) => structureDepthBox(s.id, s))
+  const STAGE_PX = { w: 1728, h: 824 }
+  const viewAt = (z: number, camX: number, camY: number): ViewRect =>
+    ({ x: -camX / z, y: -camY / z, w: STAGE_PX.w / z, h: STAGE_PX.h / z })
+
+  it('nothing pops at a fractional scale, swept across a two-ring town', () => {
+    const offenders: string[] = []
+    // every scale the gesture can rest a frame on between two stops, at 1/32-octave steps
+    for (let oct = -2; oct <= 2; oct += 1 / 32) {
+      const z = quantiseScale(Math.pow(2, oct))
+      for (let camX = -2400; camX <= 2400; camX += 311) {
+        const view = viewAt(z, camX, camX / 2)
+        for (const b of boxes) {
+          if (drawnIntersectsView(b, view) && !boxInView(b, view)) offenders.push(`${b.id} z=${z}`)
+        }
+      }
+    }
+    expect(offenders.slice(0, 5), `${offenders.length} pops`).toEqual([])
+  })
+
+  it('the drawn count moves smoothly with the scale — no cliff between two stops', () => {
+    const drawnAt = (z: number): number =>
+      boxes.filter((b) => boxInView(b, viewAt(z, -400, -900))).length
+    // walking 1 -> 2 in 32 steps, no single step may change the drawn set by more than the
+    // whole 1 -> 2 change: a cliff would be the cull disagreeing with itself mid-gesture
+    const span = Math.abs(drawnAt(1) - drawnAt(2))
+    let worst = 0
+    for (let i = 0; i < 32; i++) {
+      const a = drawnAt(quantiseScale(Math.pow(2, i / 32)))
+      const b = drawnAt(quantiseScale(Math.pow(2, (i + 1) / 32)))
+      worst = Math.max(worst, Math.abs(a - b))
+    }
+    expect(worst).toBeLessThanOrEqual(span)
+  })
+
+  it('★ a ground chunk lands on whole screen pixels at every one of those scales', () => {
+    // The render lane's mechanism 1 — the one that lets the global `roundPixels` round two
+    // neighbours by the same fraction — restored for the whole gesture, not just at rest.
+    // A chunk boundary sits at `n · CHUNK_PX_W · z` from the bake origin; if that is an
+    // integer for every n, every chunk carries the same fractional part and rounds alike.
+    let worst = 0
+    for (let oct = -2; oct <= 2; oct += 1 / 64) {
+      const z = quantiseScale(Math.pow(2, oct))
+      for (let n = 0; n <= 13; n++) {
+        worst = Math.max(worst,
+          Math.abs(n * CHUNK_PX_W * z - Math.round(n * CHUNK_PX_W * z)),
+          Math.abs(n * CHUNK_PX_H * z - Math.round(n * CHUNK_PX_H * z)))
+      }
+    }
+    expect(worst).toBeLessThan(1e-9)
+  })
+
+  it('and an UNQUANTISED live scale would break exactly that, so the quantum is not decoration', () => {
+    let worst = 0
+    for (let oct = -2; oct <= 2; oct += 1 / 64) {
+      const z = Math.pow(2, oct)                      // the mutation: no quantiseScale
+      for (let n = 0; n <= 13; n++) {
+        worst = Math.max(worst, Math.abs(n * CHUNK_PX_W * z - Math.round(n * CHUNK_PX_W * z)))
+      }
+    }
+    expect(worst).toBeGreaterThan(0.4)                // half a screen pixel of seam, or worse
+  })
+})
+
+describe('nearestStop snaps in log space, because the rungs are ratios', () => {
+  it('the boundary between 1 and 2 is sqrt(2), not 1.5', () => {
+    expect(nearestStop(Math.SQRT2 - 0.01)).toBe(1)
+    expect(nearestStop(Math.SQRT2 + 0.01)).toBe(2)
+    expect(nearestStop(1.5)).toBe(2)             // linear would have said 1
+  })
+
+  it('always returns a member of the set, from any scale at all', () => {
+    for (const s of [0, 1e-9, 0.3, 0.9, 1.4, 2.6, 9, 1e9]) {
+      expect(ZOOM_STOPS as readonly number[]).toContain(nearestStop(s))
+    }
   })
 })
 
@@ -145,55 +365,45 @@ describe('the transit — damped, and exact at rest', () => {
     expect(ZOOM_SETTLE_MS).toBeLessThanOrEqual(300)
   })
 
-  it('a reversal mid-transit leaves from the CURRENT scale, so the camera never jumps', () => {
-    const mid = zoomScaleAt(s, 1090)
-    expect(mid).toBeGreaterThan(1)
-    expect(mid).toBeLessThan(4)
-    const back = zoomWheel({ ...s, lastStepMs: 0 }, WHEEL_STEP_DELTA, 1090)
-    expect(back.from).toBe(mid)
-    expect(zoomScaleAt(back, 1090)).toBe(mid)
+  it('a stop chosen mid-gesture continues from the hand, so the camera never jumps', () => {
+    const held = zoomWheel(initialZoom(1), -150, 1000)
+    const to = zoomTo(held, 4, 1090)
+    expect(to.from).toBe(held.live)
+    expect(zoomScaleAt(to, 1090)).toBe(held.live)
+    expect(to.live).toBeNull()                            // a named stop ends the gesture
+  })
+
+  it('★ reduced motion gets the exact stop AT ONCE, and keeps the tracking that was its hand', () => {
+    let s2 = initialZoom(1)
+    let t = 1000
+    for (let i = 0; i < 10; i++) { s2 = zoomWheel(s2, -30, t); t += 8 }
+    const tracked = s2.live!
+    expect(tracked).toBeGreaterThan(1)                    // the hand still moved the picture
+    const end = t + WHEEL_GESTURE_GAP_MS + 1
+    expect(zoomScaleAt(zoomRelease(s2, end, true), end)).toBe(3)        // arrives, no ease
+    expect(zoomScaleAt(zoomRelease(s2, end, false), end)).toBe(tracked) // eases from the hand
   })
 })
 
-describe('the stop set is never left', () => {
-  it('holds at the floor however far out you scroll, and at 4 however far in', () => {
-    let out = initialZoom(ZOOM_STOPS[0])
-    for (let i = 0; i < 50; i++) out = zoomWheel(out, WHEEL_STEP_DELTA, 1000 + i * 1000)
-    expect(out.stop).toBe(ZOOM_STOPS[0])
-    expect(out.stop).toBe(0.25)
-
-    let inn = initialZoom(4)
-    for (let i = 0; i < 50; i++) inn = zoomWheel(inn, -WHEEL_STEP_DELTA, 1000 + i * 1000)
-    expect(inn.stop).toBe(4)
+describe('the gesture boundary', () => {
+  it('a fresh event after the gap starts a new gesture from where the camera rests', () => {
+    const first = gesture(1, 10, -30, 8)
+    expect(first.state.stop).toBe(3)
+    const second = zoomWheel(first.state, -30, first.endMs + ZOOM_SETTLE_MS + 5000)
+    // the new gesture leaves from the RESTING stop, not from the old live scale
+    expect(second.gestureFrom).toBe(3)
   })
 
-  it('never settles on a scale outside ZOOM_STOPS, over a 500-event seeded walk', () => {
-    const r = rng(0xc12a3)
-    let s = initialZoom(1)
-    let now = 1000
-    for (let i = 0; i < 500; i++) {
-      now += Math.floor(r() * 400)
-      s = zoomWheel(s, (r() < 0.5 ? -1 : 1) * Math.floor(r() * 200), now)
-      expect(ZOOM_STOPS as readonly number[]).toContain(s.stop)
-      expect(zoomScaleAt(s, now + ZOOM_SETTLE_MS)).toBe(s.stop)
-    }
+  it('zoomGestureEnded is false while events keep arriving and true once they stop', () => {
+    const s = zoomWheel(initialZoom(1), -30, 1000)
+    expect(zoomGestureEnded(s, 1000 + WHEEL_GESTURE_GAP_MS)).toBe(false)
+    expect(zoomGestureEnded(s, 1000 + WHEEL_GESTURE_GAP_MS + 1)).toBe(true)
+    expect(zoomGestureEnded(initialZoom(1), 1e9)).toBe(false)   // no gesture, nothing to end
   })
 
-  it('the floor is a reciprocal of an integer, so NEAREST samples exactly', () => {
-    // 0.25 since the camera lane: 0.5 held two rings of the block grammar and the town keeps
-    // going. Both are exact reciprocals, so P18 is untouched by the move.
-    expect(ZOOM_STOPS[0]).toBe(0.25)
-    expect(ZOOM_STOPS.at(-1)).toBe(4)
-    for (const z of ZOOM_STOPS) expect(Number.isInteger(z) || Number.isInteger(1 / z)).toBe(true)
-    // and the set is strictly increasing, so an index step is always a zoom step
-    for (let i = 1; i < ZOOM_STOPS.length; i++) expect(ZOOM_STOPS[i]!).toBeGreaterThan(ZOOM_STOPS[i - 1]!)
-  })
-
-  it('zoomTo lands on a named stop and starts from where the camera actually is', () => {
-    const mid = zoomTo(initialZoom(1), 4, 1000)
-    const jumped = zoomTo(mid, 2 as ZoomStop, 1090)
-    expect(jumped.stop).toBe(2)
-    expect(jumped.from).toBe(zoomScaleAt(mid, 1090))
+  it('releasing twice is a no-op — the second release has nothing to do', () => {
+    const s = zoomRelease(zoomWheel(initialZoom(1), -300, 1000), 1200)
+    expect(zoomRelease(s, 1300)).toBe(s)
   })
 })
 
@@ -204,6 +414,8 @@ describe('every function is pure', () => {
     expect(zoomTo(s, 4, 1000)).toEqual(zoomTo(s, 4, 1000))
     expect(zoomScaleAt(s, 1000)).toBe(zoomScaleAt(s, 1000))
     expect(initialZoom()).toEqual(initialZoom())
+    const held = zoomWheel(s, -130, 1000)
+    expect(zoomRelease(held, 2000)).toEqual(zoomRelease(held, 2000))
   })
 
   it('does not mutate the state it was given', () => {
@@ -211,6 +423,7 @@ describe('every function is pure', () => {
     const before = { ...s }
     zoomWheel(s, -300, 5000)
     zoomTo(s, 4, 5000)
+    zoomRelease(zoomWheel(s, -300, 5000), 6000)
     expect(s).toEqual(before)
   })
 })
