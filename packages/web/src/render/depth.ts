@@ -60,10 +60,18 @@ export function depthSeed(b: DepthBox): number {
   return (b.x1 + b.y1) * 1000 + b.x1
 }
 
-/** Above this many drawables in one frame the topological pass is skipped and the seed order
- *  stands. Culling keeps the live count far below it; the cap exists so a pathological frame
- *  degrades instead of stalling. */
-export const DEPTH_BUDGET = 256
+/**
+ * Above this many drawables in one frame the topological pass is skipped and the seed order
+ * stands. The cap exists so a pathological frame degrades instead of stalling.
+ *
+ * 256 WAS A GUESS MADE WHEN THE COMMENT HERE CLAIMED A CULL THAT DID NOT EXIST. With
+ * `cull.ts` the input is bounded by the VIEWPORT rather than by the settlement, so the number
+ * can be set to what a viewport-sized frame actually costs. Timed on the ring-grammar fixture:
+ * 256 boxes is 0.27 ms a frame, 512 is 0.96 ms — 5.7 % of a 60 fps budget — and 640 is 1.53 ms.
+ * 512 is the stop that keeps a three-ring town inside the topological pass at every zoom stop
+ * from 1× in, which is every stop where an occlusion error is a thing a viewer can see.
+ */
+export const DEPTH_BUDGET = 512
 
 // THE COUNTED FALLBACK (ratified substitute for "cycles are impossible"). With sprites that
 // overhang their footprint by 1.85×, three of them CAN overlap in a pinwheel whose

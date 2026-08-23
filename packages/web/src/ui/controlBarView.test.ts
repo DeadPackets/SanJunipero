@@ -10,7 +10,7 @@ const EMOJI = /\p{Extended_Pictographic}/u
 
 const render = (over: Partial<ControlCtx> = {}): string => {
   const ctx: ControlCtx = {
-    lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false, ...over,
+    lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false, townFits: true, ...over,
   }
   return renderToStaticMarkup(
     createElement(ControlBar, { items: controlItems(ctx), onAction: () => {} }),
@@ -23,10 +23,10 @@ describe('ControlBar — one button per control, all of them spoken', () => {
 
   it('renders one button per item, every one with a spoken label', () => {
     expect(buttons.length).toBe(controlItems({
-      lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false,
+      lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false, townFits: true,
     }).length)
     for (const item of controlItems({
-      lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false,
+      lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false, townFits: true,
     })) {
       expect(html, item.id).toContain(`aria-label="${item.label}"`)
     }
@@ -41,7 +41,7 @@ describe('ControlBar — one button per control, all of them spoken', () => {
 
   it('puts aria-pressed on exactly the toggles, and nowhere else', () => {
     const items = controlItems({
-      lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false,
+      lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false, townFits: true,
     })
     const toggles = items.filter((i) => i.state !== undefined).length
     expect((html.match(/aria-pressed=/g) ?? []).length).toBe(toggles)
@@ -72,7 +72,7 @@ describe('ControlBar — one button per control, all of them spoken', () => {
 
 describe('ControlBar — an honest refusal', () => {
   it('disables what it cannot do and shows the reason rather than implying it', () => {
-    const wide = render({ zoom: 0.5 })
+    const wide = render({ zoom: 0.25 })
     expect(wide).toContain('data-ctl="zoom-out"')
     expect(wide).toMatch(/data-ctl="zoom-out"[^>]*disabled/)
     expect(wide).toContain('This is as wide as the camera goes.')
@@ -80,7 +80,7 @@ describe('ControlBar — an honest refusal', () => {
   })
 
   it('a disabled control is never the tab stop', () => {
-    const wide = render({ zoom: 0.5 })
+    const wide = render({ zoom: 0.25 })
     const stop = wide.match(/data-ctl="([^"]+)"(?:(?!<button)[\s\S])*?tabindex="0"/)
     expect(stop?.[1]).not.toBe('zoom-out')
     expect((wide.match(/tabindex="0"/g) ?? []).length).toBe(1)

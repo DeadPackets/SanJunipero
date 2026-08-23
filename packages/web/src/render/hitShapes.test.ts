@@ -137,8 +137,8 @@ describe('the 24 px floor at the new ZOOM_MIN', () => {
   const FOOTPRINT = { w: 1, h: 1 }
   const ART = 0.25   // a hi-res building sprite's applied scale
 
-  it('ZOOM_MIN is the bottom of the stop set, and it is 0.5', () => {
-    expect(ZOOM_MIN).toBe(0.5)
+  it('ZOOM_MIN is the bottom of the stop set, and it is 0.25', () => {
+    expect(ZOOM_MIN).toBe(0.25)
     expect(ZOOM_MIN).toBe(ZOOM_STOPS[0])
     expect(ZOOM_MAX).toBe(4)
   })

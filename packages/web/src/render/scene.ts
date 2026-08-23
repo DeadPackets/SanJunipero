@@ -7,14 +7,20 @@ import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import {
   ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, fitStop, initialZoom, nearestStop,
-  drawnBoundsOf, resizeIntent, zoomScaleAt, zoomSettled, zoomTo, zoomWheel,
+  drawnBoundsOf, fitsAt, reachableBoundsOf, resizeIntent, tooBigToFit, zoomScaleAt, zoomSettled,
+  zoomTo, zoomWheel,
   type CameraBounds, type ZoomState, type ZoomStop,
 } from './camera.js'
 import {
   OCTAVE_ALPHA, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField,
   isRoadMass, materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
 } from './groundField.js'
-import { applyDepthOrder, createLayers, type DepthEntry, type LayerSet } from './layers.js'
+import {
+  applyDepthOrder, createLayers, type DepthCounts, type DepthEntry, type LayerSet,
+} from './layers.js'
+import {
+  flingFrom, flingStep, isDrag, trackDrag, type DragTrack, type Fling,
+} from './fling.js'
 import { createTooltipLayer, type TooltipLayer } from './tooltip.js'
 import { HEADLAND_COLOR, KERB_COLOR, furrowLines, patchOutline, type Tile } from './patches.js'
 import { tileKind } from './tileset.js'
@@ -226,6 +232,8 @@ export type Scene = {
   addDepthSource(fn: () => DepthEntry[]): () => void
   /** one painter's order for the whole frame — called once per tick, by StageMount */
   sortDepth(): void
+  /** what the last `sortDepth` drew and what the viewport let it skip */
+  depthCounts(): DepthCounts
   /** the visible world rectangle, in the space labels are drawn in (tooltip.ts places in it) */
   viewRect(): { x: number; y: number; w: number; h: number }
   /** THE label layer. One owner for every world tag, so two can never be up by accident and
@@ -251,6 +259,9 @@ export type Scene = {
   centerHome(): void
   /** a view of the whole settlement, at the largest stop it fits at (task 76) */
   fitToTown(): void
+  /** False once the town has outgrown the widest stop, so the bar can name what the overview
+   *  control will actually do instead of promising the whole town. */
+  fitsWholeTown(): boolean
   onCamera(cb: () => void): () => void
   setFollow(target: (() => { x: number; y: number } | null) | null): void
   /** fires when a user gesture (drag, pan, recenter) takes the camera back */
@@ -319,6 +330,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   // The depth sort has ONE owner and runs ONCE a frame over the whole live set. Modules
   // publish the ground they stand on; nobody publishes an opinion about who is in front.
   const depthSources = new Set<() => DepthEntry[]>()
+  // what the last frame drew and what it skipped — a cull nobody can count is a claim
+  let lastCounts: DepthCounts = { drawn: 0, culled: 0 }
 
   const book = new TextureBook()
   const baker = createGroundBaker(app, groundSprite, book)
@@ -329,7 +342,20 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
 
   // THE EDGES (task 76). Every write to `world.position` goes through the clamp, so there is
   // no path by which a drag, a pan, a follow or a zoom can push the town off the screen.
+  //
+  // The box is the ground that exists UNION the town as it is drawn (`reachableBoundsOf`),
+  // because under the ring grammar a building can stand past the end of the tile array and a
+  // clamp that knows only the array would make it unreachable. It is recomputed whenever the
+  // world changes — the built extent is what moves, and nothing here knows its size.
   let bounds: CameraBounds = cameraBoundsOf([])
+
+  const structureList = (): Array<{ x: number; y: number; w: number; h: number }> => {
+    const s = store.getState()
+    return s === null ? [] : Object.values(s.structures)
+  }
+  const recomputeBounds = (terrain: TileId[][]): void => {
+    bounds = reachableBoundsOf(terrain, structureList())
+  }
   const screenBox = (): { w: number; h: number } => ({ w: app.screen.width, h: app.screen.height })
 
   function place(x: number, y: number): void {
@@ -364,6 +390,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   let fitted = false
 
   function fitTo(stop: ZoomStop): void {
+    stopGlide()
     breakFollow()
     const c = boundsCentre(townBox())
     anchor = { sx: app.screen.width / 2, sy: app.screen.height / 2, wx: c.sx, wy: c.sy }
@@ -379,6 +406,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   function fitToTown(): void {
     fitTo(fitStop(townBox(), screenBox()))
   }
+
+  const fitsWholeTown = (): boolean => !tooBigToFit(townBox(), screenBox())
 
   // smooth follow: eases the camera toward a moving world-space anchor each frame
   let followFn: (() => { x: number; y: number } | null) | null = null
@@ -441,43 +470,79 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   app.stage.eventMode = 'static'
   app.stage.hitArea = app.screen
   app.renderer.events.cursorStyles.default = 'grab'
+  // DRAG, AND THE THROW THAT MAKES IT REACH (fling.ts owns the physics; this owns the wiring).
+  //
+  // One tracker answers both questions the pointer raises. `isDrag` is what tells a tile pick
+  // from a pan, exactly as the landed 2 px test did, and it is the SAME answer the throw reads
+  // — so a click can never become a fling and the two can never disagree about one gesture.
+  //
+  // A viewer who asked for less motion gets a drag that stops where their hand stopped. That is
+  // the sheet's own reading of reduced motion: not "no motion" but no motion they did not ask
+  // for, and a glide is the one part of this the hand did not do.
+  const wantsMotion = (): boolean =>
+    typeof matchMedia !== 'function' || !matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  let drag: DragTrack | null = null
   let dragging = false
-  let moved = false
   let last = { x: 0, y: 0 }
+  let glide: Fling | null = null
+
+  /** Anything that says where the camera should be outranks something still deciding. */
+  const stopGlide = (): void => {
+    glide = null
+  }
+
   app.stage.on('pointerdown', (e: FederatedPointerEvent) => {
+    stopGlide()                       // catching a moving camera stops it, as a hand would
     dragging = true
-    moved = false
+    drag = trackDrag(null, e.global.x, e.global.y, performance.now())
     last = { x: e.global.x, y: e.global.y }
     app.canvas.style.cursor = 'grabbing'
   })
   app.stage.on('pointermove', (e: FederatedPointerEvent) => {
     if (!dragging) return
-    const dx = e.global.x - last.x
-    const dy = e.global.y - last.y
-    if (Math.abs(dx) + Math.abs(dy) > 2) {
-      moved = true
+    drag = trackDrag(drag, e.global.x, e.global.y, performance.now())
+    if (isDrag(drag)) {
       fitted = false
       breakFollow() // the viewer takes the camera back
     }
-    place(world.position.x + dx, world.position.y + dy)
+    place(world.position.x + (e.global.x - last.x), world.position.y + (e.global.y - last.y))
     last = { x: e.global.x, y: e.global.y }
   })
   const endDrag = (): void => {
+    if (dragging && wantsMotion()) glide = flingFrom(drag, performance.now())
     dragging = false
     app.canvas.style.cursor = 'grab'
   }
   app.stage.on('pointerup', endDrag)
   app.stage.on('pointerupoutside', endDrag)
   app.stage.on('pointertap', (e: FederatedPointerEvent) => {
-    if (moved) return // a drag is not a tile pick
+    if (isDrag(drag)) return // a drag is not a tile pick
     const wx = (e.global.x - world.position.x) / world.scale.x
     const wy = (e.global.y - world.position.y) / world.scale.y
     const t = screenToTile(wx, wy)
     for (const cb of tileCbs) cb(t)
   })
+
+  // The glide, one frame at a time. A throw that reaches the edge of the world is over: the
+  // clamp refused the move, and a camera grinding against a wall it cannot cross is not motion.
+  const glideTick = (): void => {
+    if (glide === null) return
+    const step = flingStep(glide, app.ticker.deltaMS)
+    glide = step.next
+    const before = { x: world.position.x, y: world.position.y }
+    place(before.x + step.dx, before.y + step.dy)
+    if (world.position.x === before.x && world.position.y === before.y) stopGlide()
+    else notifyCamera()
+  }
+  app.ticker.add(glideTick)
+
   // Six lines: read the delta, ask the pure rule, store. The DOM half has no logic (P6).
   const onWheel = (e: WheelEvent): void => {
     e.preventDefault()
+    // A zoom pins the world point under the cursor; a camera still gliding would tear it out
+    // from under the anchor, which is the class of defect the wheel gate already exists for.
+    stopGlide()
     const next = zoomWheel(zoom, e.deltaY, performance.now())
     if (next.stop !== zoom.stop) captureAnchor(e.offsetX, e.offsetY)
     zoom = next
@@ -504,13 +569,16 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const offSub = store.subscribe(() => {
     const s = store.getState()
     if (s === null) return
+    // A building that went up is an edge that moved. The bake is gated on the terrain, but the
+    // reachable box is not: it must follow the town every time the town grows, or the newest
+    // house on the outermost ring is the one the camera cannot get to.
+    recomputeBounds(s.terrain)
     // terrain art arriving is a rebake trigger too — the flat ground hot-swaps to materials
     const sig = groundArtSignature(store.assetRecords())
     if (s.terrain === bakedTerrain && sig === bakedArtSig) return
     const first = bakedTerrain === null
     bakedTerrain = s.terrain
     bakedArtSig = sig
-    bounds = cameraBoundsOf(s.terrain)
     if (first) {
       // the very first map appears immediately; every later one waits for the frame
       rebakeGround(s.terrain)
@@ -531,7 +599,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const boot = store.getState()
   if (boot !== null) {
     bakedTerrain = boot.terrain
-    bounds = cameraBoundsOf(boot.terrain)
+    recomputeBounds(boot.terrain)
     rebakeGround(boot.terrain)
     fitToTown()
   }
@@ -555,8 +623,9 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     sortDepth: () => {
       const entries: DepthEntry[] = []
       for (const fn of depthSources) entries.push(...fn())
-      applyDepthOrder(entries)
+      lastCounts = applyDepthOrder(entries, viewRect())
     },
+    depthCounts: () => lastCounts,
     rebakeGround,
     centerOn,
     centerOnScreen,
@@ -565,11 +634,13 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     getZoom: () => world.scale.x,
     getZoomStop: () => zoom.stop,
     panBy: (dx, dy) => {
+      stopGlide()
       fitted = false
       breakFollow()
       place(world.position.x + dx, world.position.y + dy)
     },
     centerHome: () => {
+      stopGlide()
       fitted = false
       breakFollow()
       const c = boundsCentre(townBox())
@@ -577,6 +648,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       notifyCamera()
     },
     fitToTown,
+    fitsWholeTown,
     onCamera: (cb) => {
       cameraCbs.push(cb)
       return () => {
@@ -585,7 +657,10 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       }
     },
     setFollow: (target) => {
-      if (target !== null) fitted = false
+      if (target !== null) {
+        fitted = false
+        stopGlide()   // a follow owns the camera; a leftover throw would fight it
+      }
       followFn = target
     },
     onFollowEnd: (cb) => {
@@ -605,6 +680,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       ro.disconnect()
       app.ticker.remove(followTick)
       app.ticker.remove(zoomTick)
+      app.ticker.remove(glideTick)
       app.ticker.remove(bakeTick)
       app.canvas.removeEventListener('wheel', onWheel)
       tags.destroy()

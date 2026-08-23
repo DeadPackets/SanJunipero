@@ -19,7 +19,35 @@ const EMOJI = /\p{Extended_Pictographic}/u
 
 const base: ControlCtx = {
   lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false,
+  townFits: true,
 }
+
+// ── ★ the overview control tells the truth about a town it cannot hold ────────────────────
+//
+// The stop ladder ends at 0.25, which holds four rings of the block grammar. Past that "The
+// whole town" shows as much of the town as the ladder can and the rest is off screen. A
+// control that quietly does most of what it says is worse than one that says what it can do.
+
+describe('"The whole town" on a town that does not fit', () => {
+  const fitItem = (townFits: boolean) =>
+    controlItems({ ...base, townFits }).find((i) => i.id === 'fit')!
+
+  it('offers the whole town while the whole town fits', () => {
+    expect(fitItem(true).label).toBe('The whole town')
+  })
+
+  it('★ names what it will actually do once the town has outgrown the widest stop', () => {
+    expect(fitItem(false).label).toBe('As much of the town as fits')
+  })
+
+  it('stays enabled either way — it still does the most useful thing it can', () => {
+    for (const fits of [true, false]) expect(fitItem(fits).disabled).toBeUndefined()
+  })
+
+  it('is not a toggle, whichever it is saying', () => {
+    for (const fits of [true, false]) expect(fitItem(fits).state).toBeUndefined()
+  })
+})
 
 /** every context the bar can be asked about, as a small product */
 function* contexts(): Generator<ControlCtx> {
@@ -29,7 +57,9 @@ function* contexts(): Generator<ControlCtx> {
         for (const following of [null, 'amara']) {
           for (const insideId of [null, 'house1']) {
             for (const hudHidden of [true, false]) {
-              yield { lens, live, zoom, following, insideId, hudHidden }
+              for (const townFits of [true, false]) {
+                yield { lens, live, zoom, following, insideId, hudHidden, townFits }
+              }
             }
           }
         }
@@ -144,7 +174,8 @@ describe('actionFor — total over everything the bar can render', () => {
 
   it('a zoom action lands on a real stop and clamps at the ends', () => {
     expect(zoomTargetOf(1, 1)).toBe(2)
-    expect(zoomTargetOf(0.5 as ZoomStop, -1)).toBe(0.5)
+    expect(zoomTargetOf(0.5 as ZoomStop, -1)).toBe(0.25)
+    expect(zoomTargetOf(0.25 as ZoomStop, -1)).toBe(0.25)
     expect(zoomTargetOf(4, 1)).toBe(4)
     for (const z of ZOOM_STOPS) {
       for (const d of [1, -1] as const) {

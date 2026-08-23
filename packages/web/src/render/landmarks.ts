@@ -56,22 +56,32 @@ const SINGLE_NAME: Partial<Record<TownKind, string>> = {
 }
 
 /**
- * Labels are a map legend at the widest view and clutter on the way in, so the whole layer
- * fades out. The band is chosen so that at EVERY resting `ZOOM_STOP` the layer is 1 or 0 and
- * never between: a plate drawn at 0.5 has a contrast ratio nobody can state, which is the
- * de-emphasis-by-transparency habit this batch measured out of the bubbles. The fade happens
- * during the transit between stops, which is motion, not a state a viewer reads in.
+ * Labels are a map legend for the wide view and clutter on the way in, so the whole layer
+ * fades out at both ends. Every threshold is chosen so that at EVERY resting `ZOOM_STOP` the
+ * layer is 1 or 0 and never between: a plate drawn at 0.5 has a contrast ratio nobody can
+ * state, which is the de-emphasis-by-transparency habit this batch measured out of the
+ * bubbles. Both fades happen during the transit between stops, which is motion, not a state a
+ * viewer reads in.
+ *
+ * ★ WHY THERE IS A BOTTOM END NOW. The camera lane added 0.25 for a town two rings of blocks
+ * cannot fit inside. At that stop the eleven-building showcase is 320 px across and each
+ * counter-scaled plate is about 140 px — six of them stacked into a column taller than the
+ * settlement, hiding the map they explain. A name is a legend for a view in which you can
+ * still see the place it names; wider than that, the town is a shape and wants no caption.
  */
 export const LANDMARK_SHOW_BELOW_SCALE = 1
 const LANDMARK_FULL_BELOW_SCALE = 0.75
+/** Full at 0.5, gone at 0.25 — the fade lives strictly between the two stops. */
+const LANDMARK_FULL_ABOVE_SCALE = 0.45
+export const LANDMARK_HIDE_BELOW_SCALE = 0.3
 
 /** The chrome type floor is 12px and a world label is chrome. */
 export const LANDMARK_LABEL_PX = faceFor('label').size
 
 export function landmarkAlpha(scale: number): number {
-  const span = LANDMARK_SHOW_BELOW_SCALE - LANDMARK_FULL_BELOW_SCALE
-  const t = (LANDMARK_SHOW_BELOW_SCALE - scale) / span
-  return Math.min(1, Math.max(0, t))
+  const inward = (LANDMARK_SHOW_BELOW_SCALE - scale) / (LANDMARK_SHOW_BELOW_SCALE - LANDMARK_FULL_BELOW_SCALE)
+  const outward = (scale - LANDMARK_HIDE_BELOW_SCALE) / (LANDMARK_FULL_ABOVE_SCALE - LANDMARK_HIDE_BELOW_SCALE)
+  return Math.min(1, Math.max(0, Math.min(inward, outward)))
 }
 
 type Standing = { id: string; kind: string; x: number; y: number; w: number; h: number }
@@ -149,17 +159,35 @@ export function landmarkStyle(rank: 1 | 2 | 3): { size: number; plate: number } 
 export type LandmarkLayer = { sync(): void; destroy(): void }
 
 /**
+ * How far past the edge of the view a place may be and still be named. One plate's width, so a
+ * name whose anchor has just left the screen fades out with its subject rather than blinking.
+ */
+export const LANDMARK_CULL_MARGIN_PX = 120
+
+/**
  * Where each plate goes, in rank order, so the centre keeps its place and the districts move
  * around it. `placeTag` is the product's one placement rule (task 74) and it already knows how
  * to step clear of something already there — the same audit-M8 mechanism the tags use.
+ *
+ * ★ IT IS ONLY ASKED ABOUT PLACES THAT ARE ON SCREEN. `placeTag` CLAMPS a plate into the
+ * visible rect and then steps it clear of its neighbours, which is right for a subject the
+ * viewer can see and catastrophic for one they cannot: handed every name in a town larger than
+ * the viewport it drags all of them into view and stacks them into a wall, hiding the few
+ * places that are actually there. It is O(n²) in that wall, and under the ring grammar n has
+ * no bound. A name belongs to a place; if the place is off screen, so is the name.
+ *
+ * Only the ids it returns are drawn. The caller hides the rest.
  */
 export function placeLandmarks(
   marks: ReadonlyArray<{ id: string; sx: number; sy: number; size: { w: number; h: number } }>,
   view: Rect,
 ): Array<{ id: string; sx: number; sy: number; rect: Rect }> {
+  const m0 = LANDMARK_CULL_MARGIN_PX
   const taken: Rect[] = []
   const out: Array<{ id: string; sx: number; sy: number; rect: Rect }> = []
   for (const m of marks) {
+    if (m.sx < view.x - m0 || m.sx > view.x + view.w + m0) continue
+    if (m.sy < view.y - m0 || m.sy > view.y + view.h + m0) continue
     const at = placeTag({ sx: m.sx, sy: m.sy, halfW: m.size.w / 2, topY: m.sy }, m.size, view, taken)
     const rect = { x: at.sx - m.size.w / 2, y: at.sy, w: m.size.w, h: m.size.h }
     taken.push(rect)
@@ -231,11 +259,17 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
       })
     }
 
+    // Only what was placed is drawn. A plate left visible at its last position would be a name
+    // sitting over a place that is no longer under it.
+    const placed = new Set<string>()
     for (const at of placeLandmarks(wanted, scene.viewRect())) {
       const t = labels.get(at.id)
       if (t === undefined) continue
+      placed.add(at.id)
+      t.node.visible = true
       t.node.position.set(Math.round(at.sx), Math.round(at.sy + LANDMARK_PAD_Y * inv))
     }
+    for (const [id, t] of labels) if (!placed.has(id)) t.node.visible = false
 
     for (const [id, t] of labels) {
       if (seen.has(id)) continue

@@ -29,10 +29,12 @@ describe('stepZoom', () => {
     expect(stepZoom(3, -1)).toBe(2)
     // task 75 added the 0.5 overview stop below 1; stepping out from 1 now reaches it
     expect(stepZoom(1, -1)).toBe(0.5)
-    expect(stepZoom(0.5, -1)).toBe(0.5)
+    // the camera lane added 0.25 below it, for a town two rings of blocks cannot fit inside
+    expect(stepZoom(0.5, -1)).toBe(0.25)
+    expect(stepZoom(0.25, -1)).toBe(0.25)
   })
   it('snaps a camera caught mid-transit to its nearest stop before stepping', () => {
     expect(stepZoom(2.4, 1)).toBe(3)
-    expect(stepZoom(0.7, -1)).toBe(0.5)
+    expect(stepZoom(0.7, -1)).toBe(0.25)
   })
 })
