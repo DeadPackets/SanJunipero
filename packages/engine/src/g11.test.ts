@@ -95,10 +95,37 @@ describe('G11a-M1: the genesis town folds, and it is the size the world says it 
 // ------------------------------------------------------------------ the map that widens
 
 describe('G11a-M2: the map grows, everything on it moves with it, and the log replays it', () => {
-  // Eleven roofs stand at genesis, so a step of four is what makes the first midnight grow.
-  const GROWS: SimConfig = SimConfigSchema.parse({ ...QUIET, mapGrowth: { structuresPerStep: 4 } })
+  const GROWS: SimConfig = SimConfigSchema.parse(QUIET)
 
-  it('a midnight past the threshold widens the world and moves everything standing on it', () => {
+  // ★ THE WORLD WIDENS THE EDGE THE TOWN IS CROWDING, AND ONLY THAT ONE. The genesis town's
+  // southernmost roof stands four rows inside its own margin in a 128-tile world — the very
+  // shortfall the generator lane raised — so the first midnight grows south by exactly four,
+  // and then the world owes nothing and stops.
+  it('widens the one edge the town crowds, by exactly the ground it owes, and then stops', () => {
+    const { state: town } = genesisTown(GROWS)
+    const grown = pass(town, GROWS, MINUTES_PER_DAY)
+    const growth = grown.events.find((e) => e.type === 'world_grown')
+    expect(growth).toBeDefined()
+    const p = growth!.payload as { edge: string; depth: number }
+    expect(GROWTH_EDGES).toContain(p.edge)
+    expect({ edge: p.edge, depth: p.depth }).toEqual({ edge: 's', depth: 4 })
+    expect(grown.state.terrain.length).toBe(town.terrain.length + 4)
+    expect(grown.state.terrain[0]!.length).toBe(town.terrain[0]!.length)
+    expect(grown.state.growths).toBe(1)
+    // A south growth moves no stored coordinate, so nothing standing has to be carried.
+    for (const id of Object.keys(town.structures))
+      expect(grown.state.structures[id]).toEqual(town.structures[id])
+    // The two frames still agree, so the key is absent and the hash is what it always was.
+    expect(grown.state.origin).toBeUndefined()
+
+    // Fed once, the world is quiet: the second midnight finds every side clear.
+    const again = pass(grown.state, GROWS, 2 * MINUTES_PER_DAY)
+    expect(again.events.filter((e) => e.type === 'world_grown')).toHaveLength(0)
+  })
+
+  // The other half: an edge that DOES move the origin. Nothing in the genesis town crowds the
+  // north, so one is planted there — and then everything standing moves with the ground.
+  it('carries every stored coordinate when the edge it widens is the north one', () => {
     const { state: town } = genesisTown(GROWS)
     let s = fold(town, ev('agent_spawned', { id: 'walker', name: 'walker', x: 30, y: 70, ageDays: 7300 }, 0), GROWS)
     // A real walk, so the traffic map has keys in it before the ground shifts under them.
@@ -106,22 +133,20 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
     expect(started.ok).toBe(true)
     s = apply({ ...s, tick: 600 }, GROWS, (started as { events: PendingEvent[] }).events, 600)
     for (let t = 601; t <= 620; t++) s = pass(s, GROWS, t).state
+    s = apply(s, GROWS, [{ type: 'structure_planned', payload: {
+      id: 'outpost', kind: 'shed', x: 30, y: 5, w: 2, h: 2, maxHp: 20, flammable: true, builderId: 'genesis',
+    } }, { type: 'structure_completed', payload: { id: 'outpost' } }], 600)
     const before = { ...s }
     expect(Object.keys(before.traffic ?? {}).length).toBeGreaterThan(0)
 
     const grown = pass(before, GROWS, MINUTES_PER_DAY)
-    const growth = grown.events.find((e) => e.type === 'world_grown')
-    expect(growth).toBeDefined()
-    const edge = (growth!.payload as { edge: string; depth: number })
-    expect(GROWTH_EDGES).toContain(edge.edge)
-    expect(edge.depth).toBe(GROWS.mapGrowth.step)
-
-    // The first edge in the cycle is the north one, so the origin moves and every stored
-    // coordinate moves with it — bodies, buildings, the herd, the bushes and the traffic.
-    expect(edge.edge).toBe('n')
-    expect(grown.state.terrain.length).toBe(before.terrain.length + GROWS.mapGrowth.step)
+    const p = grown.events.find((e) => e.type === 'world_grown')!.payload as { edge: string; depth: number }
+    // Five rows short of the margin to the north, and the north comes first in n-e-s-w.
+    expect({ edge: p.edge, depth: p.depth }).toEqual({ edge: 'n', depth: 14 })
+    const dy = p.depth
+    expect(grown.state.terrain.length).toBe(before.terrain.length + dy)
     expect(grown.state.growths).toBe(1)
-    const dy = GROWS.mapGrowth.step
+    expect(grown.state.origin).toEqual({ x: 0, y: -dy })
     expect(grown.state.agents.walker!.y).toBe(before.agents.walker!.y + dy)
     for (const id of Object.keys(before.structures)) {
       expect(grown.state.structures[id]!.y).toBe(before.structures[id]!.y + dy)
@@ -131,6 +156,24 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
       return `${x},${y! + dy}`
     }).sort()
     expect(Object.keys(grown.state.traffic!).sort()).toEqual(shifted)
+  })
+
+  // ★ THE GROUND THAT ARRIVES IS THE WORLD CONTINUED. The river is a reason for the town's
+  // shape, not a stripe: it must not stop dead at the old edge with noise below it.
+  it('lays the world down beyond the edge, river and all, and moves nothing already there', () => {
+    // The wood also seeds itself at midnight, and a sapling in an old row would read as the
+    // world being repainted underneath the town when it is nothing of the kind.
+    const STILL: SimConfig = SimConfigSchema.parse({ ...QUIET, regrowth: { enabled: false } })
+    const { state: town } = genesisTown(STILL)
+    const before = town.terrain.map((r) => [...r])
+    const grown = pass(town, STILL, MINUTES_PER_DAY).state
+    // Every row that was there is the row that was there.
+    for (let y = 0; y < before.length; y++) expect(grown.terrain[y]).toEqual(before[y])
+    // And the channel runs on through every new row, in the same three columns.
+    for (let y = before.length; y < grown.terrain.length; y++) {
+      const row = grown.terrain[y]!
+      expect([...row.keys()].filter((x) => row[x] === 2)).toEqual([48, 49, 50])
+    }
   })
 
   it('the same run replays identically from genesis and from a pre-growth snapshot', () => {
@@ -161,7 +204,7 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
     const preGrowth = { ...state }
     const preSeq = store.lastSeq()
     step(MINUTES_PER_DAY)
-    expect(state.terrain.length).toBe(terrain.length + GROWS.mapGrowth.step)
+    expect(state.terrain.length).toBeGreaterThan(terrain.length)
     const live = stateHash(state)
 
     // From genesis, event for event.

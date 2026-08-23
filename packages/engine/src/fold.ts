@@ -853,8 +853,11 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
           const at = fromSaplingKey(k)
           return [saplingKey(at.x + dx, at.y + dy), v]
         }))
+      // The array's origin walked with everything else, so the AUTHORED frame is now that much
+      // further back — which is what lets the next strip continue the same river.
+      const origin = { x: (state.origin?.x ?? 0) - dx, y: (state.origin?.y ?? 0) - dy }
       return {
-        ...state, terrain, growths, agents, structures, items, crops,
+        ...state, terrain, growths, agents, structures, items, crops, origin,
         ...(fauna === undefined ? {} : { fauna }),
         ...(forageables === undefined ? {} : { forageables }),
         ...(state.traffic === undefined ? {} : { traffic: shiftKeys(state.traffic) }),

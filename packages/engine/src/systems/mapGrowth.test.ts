@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { CHUNK_TILES, MINUTES_PER_DAY, SimConfigSchema, chunkOf, chunksTouched, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  CHUNK_TILES, MINUTES_PER_DAY, SimConfigSchema, TOWN_RINGS_GENESIS, WORLD_MARGIN, chunkOf,
+  chunksTouched, edgesOwed, stateHash, worldSizeForRings, type SimConfig, type SimEvent,
+} from '@sj/shared'
 import { fold } from '../fold.js'
+import { genesisTerrainAt } from '../genesis/world.js'
 import { findPath } from '../path.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick } from '../worldTick.js'
-import { growthsSoFar } from './mapGrowth.js'
+import { GROWABLE_FLOOR, authoredOrigin, builtBox, grownStrip, growthsSoFar } from './mapGrowth.js'
 
 // A 32x32 world on a config whose world.size says 128 — the ordinary shape of a fixture, and
 // the case the plan's size-derived growth counter got wrong.
@@ -15,21 +19,25 @@ const base = (over: Record<string, unknown> = {}): SimConfig => SimConfigSchema.
   mystery: { chancePerDay: 0 },
   // Nothing else may write terrain at midnight: from C11 Task 28 the wood seeds itself there.
   regrowth: { enabled: false },
-  mapGrowth: { structuresPerStep: 2, step: 4, maxSize: 40 },
   ...over,
 })
 const CFG = base()
 
+// The world the SYSTEM is measured in. A fixture below `GROWABLE_FLOOR` is a fixture and the
+// rule says nothing about it by design; the fold tests below keep the small map on purpose.
+const TOWN_SIZE = 128
+
 let seq = 90000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
-const map = (): TileId[][] => Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, (): TileId => 0))
+const map = (n = SIZE): TileId[][] =>
+  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
 
-function town(config = CFG, structures = 2): WorldState {
-  let s = genesisState(config, map())
+function town(config = CFG, structures = 2, size = SIZE, at = { x: 10, y: 20 }): WorldState {
+  let s = genesisState(config, map(size))
   s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 6, ageDays: 7300 }), config)
   for (let i = 0; i < structures; i++) {
     s = fold(s, ev('structure_planned', {
-      id: `structure_${i + 1}`, kind: 'house', x: 10 + i * 3, y: 20, w: 2, h: 2,
+      id: `structure_${i + 1}`, kind: 'house', x: at.x + i * 3, y: at.y, w: 2, h: 2,
       maxHp: 50, flammable: true, builderId: 'a1',
     }), config)
     s = fold(s, ev('structure_completed', { id: `structure_${i + 1}` }), config)
@@ -38,6 +46,11 @@ function town(config = CFG, structures = 2): WorldState {
   s = fold(s, ev('crop_planted', { id: 'crop_1', kind: 'wheat', x: 3, y: 3, plantedDay: 0 }), config)
   return s
 }
+
+/** A pair of roofs in the north-west of a world big enough for the rule to have an opinion:
+ *  nine rows short of its northern margin and ten columns short of its western one, clear to
+ *  the south and the east. */
+const bigTown = (config = CFG): WorldState => town(config, 2, TOWN_SIZE, { x: 10, y: 9 })
 
 // Midnight of day 1: hour 0, minute 0, and past tick 0 so the world has actually run.
 const MIDNIGHT = MINUTES_PER_DAY
@@ -50,47 +63,153 @@ function tickAt(s: WorldState, tick: number, config = CFG, seed = 'grow') {
 const grown = (r: { events: Array<{ type: string; payload: unknown }> }) =>
   r.events.filter((e) => e.type === 'world_grown')
 
+// ★ THE WORLD IS AS BIG AS WHAT STANDS IN IT, PLUS A BLOCK PITCH OF WILD.
+//
+// There is no `maxSize` here any more and there is no counter. The rule is a clearance: the
+// world owes every side of the built set `WORLD_MARGIN` of ground, and it widens whichever side
+// it is short on. The two things that used to decide growth — twelve buildings per step and a
+// 192-tile ceiling — are both gone from the config, because a clearance says by itself which
+// edge to widen and by how much, and it has no maximum.
 describe('mapGrowthSystem', () => {
-  it('grows once at midnight when the town has earned it, and not twice', () => {
-    const r = tickAt(town(), MIDNIGHT)
+  // Two roofs at 10..14 x 9..10 in a 128-tile world: ten short to the north, nine to the west,
+  // and a hundred clear on the other two.
+  const OWED = [{ edge: 'n', owed: 10 }, { edge: 'w', owed: 9 }]
+
+  it('reads what it owes off the built set, and off nothing else', () => {
+    const s = bigTown()
+    expect(builtBox(s)).toEqual({ dx0: 10, dy0: 9, dx1: 14, dy1: 10 })
+    expect(edgesOwed(builtBox(s)!, { w: TOWN_SIZE, h: TOWN_SIZE }, WORLD_MARGIN)).toEqual(OWED)
+    // An empty world owes nobody ground, however large it is.
+    const empty = genesisState(CFG, map(TOWN_SIZE))
+    expect(builtBox(empty)).toBeNull()
+    expect(grown(tickAt(empty, MIDNIGHT))).toHaveLength(0)
+  })
+
+  // ★ A WORLD TOO SMALL TO HOLD A TOWN IS A FIXTURE, NOT A WORLD. The floor is the smallest
+  // world a one-ring town needs — derived, not chosen — and below it the rule stays silent
+  // rather than widening every test map in the repository forever.
+  it('says nothing at all about a world that could not hold a town of one ring', () => {
+    expect(GROWABLE_FLOOR).toBe(worldSizeForRings(TOWN_RINGS_GENESIS))
+    expect(SIZE).toBeLessThan(GROWABLE_FLOOR)
+    // The small fixture is owed ground on three sides and is not given a tile of it.
+    expect(edgesOwed(builtBox(town())!, { w: SIZE, h: SIZE }, WORLD_MARGIN).length).toBe(3)
+    expect(grown(tickAt(town(), MIDNIGHT))).toHaveLength(0)
+    // One tile under the floor is silent; the floor itself is not.
+    const under = town(CFG, 2, GROWABLE_FLOOR - 1, { x: 10, y: 9 })
+    expect(grown(tickAt(under, MIDNIGHT))).toHaveLength(0)
+    const at = town(CFG, 2, GROWABLE_FLOOR, { x: 10, y: 9 })
+    expect(grown(tickAt(at, MIDNIGHT))).toHaveLength(1)
+  })
+
+  it('widens the first edge it owes, by exactly the ground it owes', () => {
+    const r = tickAt(bigTown(), MIDNIGHT)
     expect(grown(r)).toHaveLength(1)
-    expect(r.state.terrain).toHaveLength(SIZE + 4)
-    const again = tickAt(r.state, MIDNIGHT + MINUTES_PER_DAY)
-    expect(grown(again)).toHaveLength(0) // 2 structures no longer clears 2 x (1 + 1)
+    expect(grown(r)[0]!.payload).toMatchObject({ edge: 'n', depth: 10 })
+    expect(r.state.terrain).toHaveLength(TOWN_SIZE + 10)
+    expect(r.state.terrain[0]).toHaveLength(TOWN_SIZE)
   })
 
-  it('does not grow before the town has earned it, or away from midnight', () => {
-    expect(grown(tickAt(town(CFG, 1), MIDNIGHT))).toHaveLength(0)
-    expect(grown(tickAt(town(), MIDNIGHT + 60))).toHaveLength(0)
-  })
-
-  it('a flag off never grows', () => {
-    const off = base({ mapGrowth: { structuresPerStep: 2, step: 4, maxSize: 40, enabled: false } })
-    expect(grown(tickAt(town(off), MIDNIGHT, off))).toHaveLength(0)
-  })
-
-  it('cycles n, e, s, w by growth index and stops at maxSize', () => {
-    let s = town(CFG, 40)
-    const edges: string[] = []
+  // One edge a night until it owes nothing, then quiet — and it never widens an edge twice
+  // over, because the debt it just paid is gone from the next night's reading.
+  it('works through every edge it owes, one a night, and then stops for good', () => {
+    let s = bigTown()
+    const steps: Array<{ edge: string; depth: number }> = []
     for (let day = 1; day <= 6; day++) {
       const r = tickAt(s, day * MINUTES_PER_DAY)
-      for (const e of grown(r)) edges.push((e.payload as { edge: string }).edge)
+      for (const e of grown(r)) {
+        const p = e.payload as { edge: string; depth: number }
+        steps.push({ edge: p.edge, depth: p.depth })
+      }
       s = r.state
     }
-    expect(edges).toEqual(['n', 'e', 's', 'w'])
-    expect(s.terrain).toHaveLength(40)
-    expect(s.terrain[0]).toHaveLength(40)
+    expect(steps).toEqual([{ edge: 'n', depth: 10 }, { edge: 'w', depth: 9 }])
+    expect(s.terrain).toHaveLength(TOWN_SIZE + 10)
+    expect(s.terrain[0]).toHaveLength(TOWN_SIZE + 9)
+    expect(edgesOwed(builtBox(s)!, { w: s.terrain[0]!.length, h: s.terrain.length }, WORLD_MARGIN))
+      .toEqual([])
   })
 
-  it('carries the rolled strip in the payload, sized to the edge it grew', () => {
-    const north = grown(tickAt(town(CFG, 40), MINUTES_PER_DAY))[0]!.payload as { depth: number; tiles: number[][] }
-    expect(north.depth).toBe(4)
-    expect(north.tiles).toHaveLength(4)
-    for (const row of north.tiles) expect(row).toHaveLength(SIZE)
-    const afterN = tickAt(town(CFG, 40), MINUTES_PER_DAY).state
-    const east = grown(tickAt(afterN, 2 * MINUTES_PER_DAY))[0]!.payload as { tiles: number[][] }
-    expect(east.tiles).toHaveLength(SIZE + 4)
-    for (const row of east.tiles) expect(row).toHaveLength(4)
+  // ★ NO CEILING. The old rule stopped at 192 tiles; this one is asked for a world an order of
+  // magnitude past that and answers with the ground, because a clearance has no maximum.
+  it('has no size it refuses to grow past', () => {
+    const wide = 2048
+    let s = genesisState(CFG, Array.from({ length: wide }, () => Array.from({ length: wide }, (): TileId => 0)))
+    s = fold(s, ev('structure_planned', {
+      id: 'far', kind: 'house', x: wide - 4, y: wide - 4, w: 2, h: 2,
+      maxHp: 50, flammable: true, builderId: 'a1',
+    }), CFG)
+    s = fold(s, ev('structure_completed', { id: 'far' }), CFG)
+    const r = tickAt(s, MIDNIGHT)
+    expect(grown(r)[0]!.payload).toMatchObject({ edge: 'e', depth: 17 })
+    expect(r.state.terrain[0]).toHaveLength(wide + 17)
+  })
+
+  it('does not grow away from midnight, and a flag off never grows at all', () => {
+    expect(grown(tickAt(bigTown(), MIDNIGHT + 60))).toHaveLength(0)
+    const off = base({ mapGrowth: { enabled: false } })
+    expect(grown(tickAt(bigTown(off), MIDNIGHT, off))).toHaveLength(0)
+  })
+
+  it('carries the strip in the payload, sized to the edge it grew', () => {
+    const north = grown(tickAt(bigTown(), MIDNIGHT))[0]!.payload as { depth: number; tiles: number[][] }
+    expect(north.depth).toBe(10)
+    expect(north.tiles).toHaveLength(10)
+    for (const row of north.tiles) expect(row).toHaveLength(TOWN_SIZE)
+    const afterN = tickAt(bigTown(), MIDNIGHT).state
+    const west = grown(tickAt(afterN, 2 * MINUTES_PER_DAY))[0]!.payload as { tiles: number[][] }
+    expect(west.tiles).toHaveLength(TOWN_SIZE + 10)
+    for (const row of west.tiles) expect(row).toHaveLength(9)
+  })
+
+  // ★ THE STRIP IS THE WORLD CONTINUED, NOT NOISE BESIDE IT. `genesisTerrainAt` has no bounds
+  // in it — the world was always infinite and the array is only how much of it is written down
+  // — so the ground that arrives is the ground that was always going to be there.
+  it('fills the strip from the authored world, in the frame the world will be in', () => {
+    // ★ WIDE ENOUGH TO SEE THE DIFFERENCE. The channel at columns 48-50 runs at every row, so
+    // a strip addressed in the WRONG frame still finds a river there — the frame only shows in
+    // the forest edge, whose ragged line is a function of y. A narrower fixture, or an
+    // all-grass one, would pass this test with the shift deleted.
+    const W = 100
+    const wide = genesisState(CFG, Array.from({ length: SIZE }, () =>
+      Array.from({ length: W }, (): TileId => 0)))
+    const edgeOf = (row: number[]): number => row.findIndex((t) => t === 3)
+    const north = grownStrip(wide, 'n', 3)
+    expect(north).toHaveLength(3)
+    for (let y = 0; y < 3; y++) {
+      const row = north[y]!
+      // The river is there, in the three columns it has always run in.
+      expect([...row.keys()].filter((x) => row[x] === 2), `row ${y - 3}`).toEqual([48, 49, 50])
+      // Growing north moves the array's origin, so index 0 is authored row -3, not row 0.
+      for (let x = 0; x < W; x++) expect(row[x], `${x},${y - 3}`).toBe(genesisTerrainAt(x, y - 3))
+    }
+    // And the wood really does come in at a different column in a row behind the origin than
+    // in the row that shares its index — which is the whole of what the frame decides.
+    expect(north.map(edgeOf)).toEqual([88, 90, 87])
+    expect([0, 1, 2].map((y) => edgeOf(Array.from({ length: W }, (_, x) => genesisTerrainAt(x, y)))))
+      .toEqual([90, 92, 94])
+
+    const east = grownStrip(wide, 'e', 3)
+    for (let y = 0; y < SIZE; y++)
+      for (let x = 0; x < 3; x++)
+        expect(east[y]![x], `${W + x},${y}`).toBe(genesisTerrainAt(W + x, y))
+  })
+
+  it('tracks the authored frame across a shift, so a second strip continues the first', () => {
+    const s = town()
+    const first = fold(s, ev('world_grown', { edge: 'n', depth: 3, tiles: grownStrip(s, 'n', 3) }), CFG)
+    expect(authoredOrigin(s)).toEqual({ x: 0, y: 0 })
+    expect(authoredOrigin(first)).toEqual({ x: 0, y: -3 })
+    // Every row of the grown world is the authored row it should be, old and new alike.
+    for (let y = 0; y < first.terrain.length; y++)
+      for (let x = 0; x < SIZE; x++)
+        expect(first.terrain[y]![x], `${x},${y - 3}`).toBe(genesisTerrainAt(x, y - 3))
+    const second = fold(first, ev('world_grown', {
+      edge: 'n', depth: 2, tiles: grownStrip(first, 'n', 2),
+    }), CFG)
+    expect(authoredOrigin(second)).toEqual({ x: 0, y: -5 })
+    for (let y = 0; y < second.terrain.length; y++)
+      for (let x = 0; x < SIZE; x++)
+        expect(second.terrain[y]![x], `${x},${y - 5}`).toBe(genesisTerrainAt(x, y - 5))
   })
 })
 
@@ -186,7 +305,7 @@ describe('fold: world_grown', () => {
 
 describe('world_grown: replay', () => {
   it('folding the tick\'s own events over the input reproduces the state it returned', () => {
-    const s = town(CFG, 40)
+    const s = bigTown()
     const advanced = fold({ ...s, tick: MIDNIGHT - 1 }, ev('tick_advanced', {}, MIDNIGHT), CFG)
     const out = createWorldTick(CFG, new RngStreams('grow'))(advanced)
     expect(grown(out)).toHaveLength(1)
@@ -195,15 +314,20 @@ describe('world_grown: replay', () => {
     expect(stateHash(replayed)).toBe(stateHash(out.state))
   })
 
-  it('replays identically from the payload alone, without re-rolling the stream', () => {
-    const s = town(CFG, 40)
+  // Growth is no longer a roll at all: it is the authored world continued, so a different seed
+  // reaches the same map for a stronger reason than it used to. The tiles still ride in the
+  // payload, because a log must replay without re-deriving anything.
+  it('replays identically from the payload alone, and does not consult a stream', () => {
+    const s = bigTown()
     const live = tickAt(s, MIDNIGHT).state
     const payload = grown(tickAt(s, MIDNIGHT))[0]!.payload
-    // A different seed reaches the same map, because the roll travelled in the event.
     const advanced = fold({ ...s, tick: MIDNIGHT - 1 }, ev('tick_advanced', {}, MIDNIGHT), CFG)
     const fromLog = fold(advanced, ev('world_grown', payload, MIDNIGHT), CFG)
     expect(fromLog.terrain).toEqual(live.terrain)
-    expect(stateHash(tickAt(s, MIDNIGHT, CFG, 'other').state)).not.toBe(stateHash(live))
+    expect(stateHash(tickAt(s, MIDNIGHT, CFG, 'other').state)).toBe(stateHash(live))
+    // And the payload is not merely reproducible, it is the world: the same tiles the authored
+    // function gives for the ground the strip covers.
+    expect((payload as { tiles: number[][] }).tiles).toEqual(grownStrip(s, 'n', 10))
   })
 })
 

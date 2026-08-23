@@ -1,14 +1,38 @@
-import { simTimeFromTick } from '@sj/shared'
+import {
+  edgesOwed, simTimeFromTick, TOWN_RINGS_GENESIS, WORLD_MARGIN, worldSizeForRings,
+} from '@sj/shared'
+import { genesisTerrainAt } from '../genesis/world.js'
 import type { WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 
-// The map grows because the town does. Growth is triggered by completed buildings, not by
-// population: births make population a lagging, noisier signal (addendum deviation 7).
+// ★ THE WORLD IS AS BIG AS WHAT STANDS IN IT, PLUS A BLOCK PITCH OF WILD.
+//
+// The map grows because the town does — the landed ruling, and it holds. What changed is the
+// rule underneath it. Growth used to be a COUNTER against a CEILING: sixteen more tiles every
+// twelve buildings, on an n-e-s-w cycle, stopping dead at 192. Both halves were wrong. The
+// cycle widened edges the town was nowhere near while the edge it was crowding waited three
+// nights for its turn, and the ceiling was a round number in a grammar that plats rings
+// forever — the same bug with a later fuse.
+//
+// What decides it now is a CLEARANCE, read off the built set: the world owes every side of
+// everything standing one block pitch of ground, and it widens whichever side it is short on.
+// There is no maximum, because a clearance has none. It is also the same measurement the
+// camera's bounds, the minimap's scale and the cull already derive, so nothing in this file
+// knows a map size either.
 
 export const GROWTH_EDGES = ['n', 'e', 's', 'w'] as const
 export type GrowthEdge = (typeof GROWTH_EDGES)[number]
 
 export const growsHeight = (edge: GrowthEdge): boolean => edge === 'n' || edge === 's'
+
+// ★ A WORLD TOO SMALL TO HOLD A TOWN AT ALL IS A FIXTURE, NOT A WORLD. Every landed test map is
+// a few dozen tiles on a side with a roof in the middle, and a clearance read literally would
+// widen every one of them, forever, because they can never pay a block pitch on four sides.
+// This is the same trap `growthsSoFar` below documents — the plan's size-derived counter went
+// negative on fixtures and grew maps nobody asked to grow — so the floor is DERIVED and not
+// guessed: the smallest world a town of one ring needs is the smallest world this rule has
+// anything to say about.
+export const GROWABLE_FLOOR = worldSizeForRings(TOWN_RINGS_GENESIS)
 
 // The one reader of the growth count (G4). The plan derived it from the map's size against
 // `world.size`; that is only meaningful for a world that started at genesis size, and every
@@ -19,40 +43,66 @@ export function growthsSoFar(state: WorldState): number {
   return state.growths ?? 0
 }
 
-// Wilderness beyond the edge: mostly open ground, some trees, the odd outcrop. Rolled at
-// emission from the `worldgen` stream and carried in the payload, so replay never re-rolls.
-function rollTile(roll: number): number {
-  if (roll < 70) return 0
-  if (roll < 90) return 3
-  if (roll < 97) return 4
-  return 1
+/** Where the array's (0, 0) stands in the frame `genesisTerrainAt` is written in. */
+export function authoredOrigin(state: WorldState): { x: number; y: number } {
+  return state.origin ?? { x: 0, y: 0 }
+}
+
+/** The tile box of everything built, in array coordinates. `null` when nothing stands: an
+ *  empty world owes nobody ground. Structures only — agents walk, and a world that widened
+ *  because somebody wandered to the edge would widen forever. */
+export function builtBox(state: WorldState): { dx0: number; dy0: number; dx1: number; dy1: number } | null {
+  const all = Object.values(state.structures)
+  if (all.length === 0) return null
+  let dx0 = Infinity, dy0 = Infinity, dx1 = -Infinity, dy1 = -Infinity
+  for (const s of all) {
+    dx0 = Math.min(dx0, s.x); dy0 = Math.min(dy0, s.y)
+    dx1 = Math.max(dx1, s.x + s.w - 1); dy1 = Math.max(dy1, s.y + s.h - 1)
+  }
+  return { dx0, dy0, dx1, dy1 }
+}
+
+/** ★ THE STRIP IS THE WORLD CONTINUED, NOT NOISE BESIDE IT. `genesisTerrainAt` is a pure
+ *  function of an authored coordinate with no bounds in it at all — the world was always
+ *  infinite and the array was only ever how much of it had been written down. So the river
+ *  runs on past the old edge, the forest keeps its ragged line, and nothing already standing
+ *  is regenerated: the ford, the lake fork and the forage nodes are never recomputed, only
+ *  carried by the same shift that carries every other coordinate. */
+export function grownStrip(
+  state: WorldState, edge: GrowthEdge, depth: number,
+): number[][] {
+  const h = state.terrain.length
+  const w = state.terrain[0]!.length
+  const before = authoredOrigin(state)
+  // The array's origin moves before the strip is laid, so the strip is addressed in the frame
+  // the world will be in once it has grown.
+  const ox = before.x - (edge === 'w' ? depth : 0)
+  const oy = before.y - (edge === 'n' ? depth : 0)
+  const rows = growsHeight(edge) ? depth : h
+  const cols = growsHeight(edge) ? w : depth
+  // Where the strip's own (0, 0) sits in the grown array.
+  const atX = edge === 'e' ? w : 0
+  const atY = edge === 's' ? h : 0
+  return Array.from({ length: rows }, (_, r) =>
+    Array.from({ length: cols }, (_, c) => genesisTerrainAt(atX + c + ox, atY + r + oy) as number))
 }
 
 export function mapGrowthSystem(ctx: TickCtx): void {
-  const cfg = ctx.config.mapGrowth
-  if (!cfg.enabled) return
+  if (!ctx.config.mapGrowth.enabled) return
   const state = ctx.state()
   const time = simTimeFromTick(state.tick)
   if (time.hour !== 0 || time.minute !== 0 || state.tick === 0) return
 
-  const done = Object.values(state.structures).filter((s) => s.stage === 'complete').length
-  const index = growthsSoFar(state)
-  if (done < cfg.structuresPerStep * (index + 1)) return
-
-  const h = state.terrain.length
-  const w = state.terrain[0]!.length
-  // The cycle is n -> e -> s -> w by growth index; a capped axis is skipped, not waited on,
-  // so a world that has hit maxSize on one axis can still grow on the other.
-  let edge: GrowthEdge | null = null
-  for (let i = 0; i < GROWTH_EDGES.length; i++) {
-    const candidate = GROWTH_EDGES[(index + i) % GROWTH_EDGES.length]!
-    if ((growsHeight(candidate) ? h : w) + cfg.step <= cfg.maxSize) { edge = candidate; break }
-  }
-  if (edge === null) return
-
-  const rng = ctx.rng.get('worldgen')
-  const rows = growsHeight(edge) ? cfg.step : h
-  const cols = growsHeight(edge) ? w : cfg.step
-  const tiles = Array.from({ length: rows }, () => Array.from({ length: cols }, () => rollTile(rng.int(100))))
-  ctx.emit('world_grown', { edge, depth: cfg.step, tiles })
+  const box = builtBox(state)
+  if (box === null) return
+  const w = state.terrain[0]!.length, h = state.terrain.length
+  if (w < GROWABLE_FLOOR || h < GROWABLE_FLOOR) return
+  const owed = edgesOwed(box, { w, h }, WORLD_MARGIN)
+  // One edge a night. The margin is a whole block pitch, so the world is never short of the
+  // ground the next ring needs while it works through more than one of them.
+  const first = owed[0]
+  if (first === undefined) return
+  ctx.emit('world_grown', {
+    edge: first.edge, depth: first.owed, tiles: grownStrip(state, first.edge, first.owed),
+  })
 }

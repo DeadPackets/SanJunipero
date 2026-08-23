@@ -355,11 +355,13 @@ const RegrowthSchema = z.object({
   saplingDays: z.number().int().positive().default(30),
 }).strict()
 
+// ★ NO CEILING, NO PACE, NO STEP. `maxSize` was a round number in a world whose grammar plats
+// rings forever, and `step`/`structuresPerStep` were a pace guessed against it. What the world
+// owes is a clearance — `WORLD_MARGIN` of ground beyond everything standing — and a clearance
+// says by itself which edge to widen and by how much. The one thing left to decide is whether
+// the world may widen at all.
 const MapGrowthSchema = z.object({
   enabled: z.boolean().default(true),
-  step: z.number().int().positive().default(16),
-  structuresPerStep: z.number().int().positive().default(12),
-  maxSize: z.number().int().positive().default(192),
 }).strict()
 
 // `custom` exists precisely so the taxonomy is open-ended: the arbiter may recognize a type
