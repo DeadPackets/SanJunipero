@@ -358,4 +358,58 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     expect(raising.length, 'no building was under construction to draw').toBeGreaterThan(0)
     for (const s of raising) expect(['house', BRIDGE_KIND]).toContain(s.kind)
   })
+
+  // ★ THE ONE-COMPONENT PROPERTY, RESTATED OVER THE WALK GRAPH — merge train 3's ruling.
+  //
+  // `cityTemplate.test.ts` PROPERTY 2 says every structure sits in one road-connected group.
+  // It asks that of `makeCityTemplate()`, a one-bank plan with no crossing in it, and nothing
+  // has ever asked it of a running world. Measured on this one, the ROAD TILES are two
+  // components — 1664 tiles at x 62..121 east of the channel, 390 at x 24..45 west — and the
+  // deck cannot join them: its tiles are 48,51 and 49,51, whose four neighbours are water,
+  // water, water, grass and sand. Not one is a road. Counting the deck as a road gives THREE
+  // components, not one, because a two-plank deck five rows north of the far bank's nearest
+  // street touches neither network.
+  //
+  // So the property was mis-stated, not violated. What a person can actually do is the walk
+  // graph, and on that the town is ONE piece: 20999 tiles reachable from the square with the
+  // deck standing, 13619 without — and all six far-bank houses are cut by pulling it. That is
+  // the claim below, and the deck is load-bearing on it rather than incidental to it.
+  it('★ the town is ONE piece on the walk graph, and the deck is what makes it one', () => {
+    const H = state.terrain.length, W = state.terrain[0]!.length
+    const reachedFromSquare = (s: WorldState): Set<string> => {
+      const walk = townWalkOf(s, square)
+      const seen = new Set([`${square.x},${square.y}`])
+      const stack: Array<readonly [number, number]> = [[square.x, square.y]]
+      while (stack.length > 0) {
+        const [cx, cy] = stack.pop()!
+        for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const nx = cx + ox, ny = cy + oy, k = `${nx},${ny}`
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H || seen.has(k)) continue
+          if (!walk(nx - square.x, ny - square.y)) continue
+          seen.add(k); stack.push([nx, ny])
+        }
+      }
+      return seen
+    }
+    /** A building is joined to the town when a body can stand on any tile against its wall. */
+    const cutOff = (reached: Set<string>): string[] => all
+      .filter((s) => s.kind !== BRIDGE_KIND)
+      .filter((s) => !(function touches() {
+        for (let x = s.x - 1; x <= s.x + s.w; x++)
+          for (let y = s.y - 1; y <= s.y + s.h; y++) if (reached.has(`${x},${y}`)) return true
+        return false
+      })())
+      .map((s) => `${s.kind}@${s.x},${s.y}`)
+
+    expect(cutOff(reachedFromSquare(state)),
+      'a building nobody in town can walk to').toEqual([])
+
+    // NOT VACUOUS, and it names the far bank: pull the deck out of the same finished world and
+    // exactly the six houses west of the channel fall out of the one piece.
+    const withoutDeck: WorldState = { ...state,
+      structures: Object.fromEntries(
+        Object.entries(state.structures).filter(([, s]) => s.kind !== BRIDGE_KIND)) }
+    expect(cutOff(reachedFromSquare(withoutDeck)).sort())
+      .toEqual(west.map((s) => `${s.kind}@${s.x},${s.y}`).sort())
+  })
 })
