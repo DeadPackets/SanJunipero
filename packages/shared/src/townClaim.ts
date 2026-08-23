@@ -73,16 +73,18 @@ export function claimPlot(a: {
 export type IsTaken = (plot: Plot) => boolean
 
 export function ringsPlattedWhere(isTaken: IsTaken, ground: Ground, need: Need): number {
-  for (let r = 1; r < CLAIM_RING_LIMIT; r++)
-    if (freePlots(r, ground).some((p) => holds(p, need) && !isTaken(p))) return r
-  return CLAIM_RING_LIMIT
+  return claimPlotWhere({ isTaken, ground, need })?.rings ?? CLAIM_RING_LIMIT
 }
 
+/** One walk outward, not two: the ring the town has to reach and the plot it offers there are
+ *  the same answer, and `plattedBlocks` is the expensive part of asking. */
 export function claimPlotWhere(a: { isTaken: IsTaken; ground: Ground; need: Need }): { plot: Plot; rings: number } | null {
   if (!fits(a.need)) return null
-  const rings = ringsPlattedWhere(a.isTaken, a.ground, a.need)
-  const plot = freePlots(rings, a.ground).find((p) => holds(p, a.need) && !a.isTaken(p))
-  return plot === undefined ? null : { plot, rings }
+  for (let r = 1; r < CLAIM_RING_LIMIT; r++) {
+    const plot = freePlots(r, a.ground).find((p) => holds(p, a.need) && !a.isTaken(p))
+    if (plot !== undefined) return { plot, rings: r }
+  }
+  return null
 }
 
 export type Wanted = { kind: string; along: number; deep: number; owner: string | null }

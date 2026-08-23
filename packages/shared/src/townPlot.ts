@@ -18,7 +18,7 @@
 // says about one column, and `townPlot.test.ts` says about the whole frame.
 
 import {
-  BLOCK, PITCH, STREET, blockIsPlattable, doorFrontOf, place, plotsOf,
+  BLOCK, PITCH, STREET, blockIsPlattable, doorFrontOf, place, plattedBlocks, plotsOf,
   type Ground, type Plot, type TileXY, type TownFacing,
 } from './townGrammar.js'
 import { CLAIM_RING_LIMIT, claimPlotWhere, type Need } from './townClaim.js'
@@ -63,6 +63,58 @@ export const plotIsTaken = (square: WorldXY, standing: readonly WorldRect[]) => 
   return standing.some((s) => overlaps(ext, s, square))
 }
 
+const blockKey = (b: { i: number; j: number }): string => `${b.i},${b.j}`
+
+/**
+ * ★ A PLOT YOU CANNOT WALK TO IS NOT GROUND THE TOWN KEEPS FOR YOU.
+ *
+ * The blocks the town's own streets can reach from the square, walking block to block and
+ * never crossing water. `plattedBlocks` does not ask this and never had to, because nothing
+ * ever built past ring 1 — and the first plot ring 2 offers is block (-2, 0), which is on the
+ * FAR BANK. Measured in a running world: twelve masons walked at the door of a house they
+ * could never reach and were refused twenty-one thousand times, and the town stopped at ring 1
+ * for good. That is the shape of failure this project keeps finding — a seam that offers
+ * something and then quietly never delivers it.
+ *
+ * The far bank is an earned milestone (C11 §2) and this keeps it one: the west of the river
+ * joins the town when somebody can get there, and not before. It is also the town-generator
+ * lane's own connectivity property — one road component — made true of a grown town rather
+ * than only of the genesis one.
+ */
+export function connectedBlocks(rings: number, ground: Ground): Set<string> {
+  const platted = new Set(plattedBlocks(rings, ground).map(blockKey))
+  const seen = new Set<string>([blockKey({ i: 0, j: 0 })])
+  const queue: Array<{ i: number; j: number }> = [{ i: 0, j: 0 }]
+  while (queue.length > 0) {
+    const b = queue.shift()!
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const n = { i: b.i + di, j: b.j + dj }
+      const k = blockKey(n)
+      if (seen.has(k) || !platted.has(k)) continue
+      if (!bandIsWalkable(b, n, ground)) continue
+      seen.add(k)
+      queue.push(n)
+    }
+  }
+  seen.delete(blockKey({ i: 0, j: 0 }))
+  return seen
+}
+
+/** The street band two neighbouring blocks share, and whether any of it is dry enough to walk.
+ *  A band entirely in the channel is a bank, not a street. */
+function bandIsWalkable(a: { i: number; j: number }, b: { i: number; j: number }, ground: Ground): boolean {
+  const lo = { i: Math.min(a.i, b.i), j: Math.min(a.j, b.j) }
+  const along = a.i === b.i
+  for (let s = 0; s < STREET; s++) {
+    const fixed = (along ? lo.j : lo.i) * PITCH + BLOCK + s
+    for (let t = 0; t < BLOCK; t++) {
+      const moving = (along ? lo.i : lo.j) * PITCH + t
+      if (ground(along ? moving : fixed, along ? fixed : moving) !== 'water') return true
+    }
+  }
+  return false
+}
+
 export type TownClaim = {
   /** The ground the building covers, in world tiles, already turned to its facing. */
   site: WorldRect
@@ -88,7 +140,19 @@ export function claimTownPlot(a: {
   ground?: Ground
 }): TownClaim | null {
   const ground = a.ground ?? CITY_GROUND
-  const claim = claimPlotWhere({ isTaken: plotIsTaken(a.square, a.standing), ground, need: a.need })
+  const taken = plotIsTaken(a.square, a.standing)
+  // Cheap, and computed once per ring the search looks at rather than once per plot.
+  const reach = new Map<number, Set<string>>()
+  const claim = claimPlotWhere({
+    ground,
+    need: a.need,
+    isTaken: (p) => {
+      const r = Math.max(Math.abs(p.block.i), Math.abs(p.block.j))
+      let ok = reach.get(r)
+      if (ok === undefined) { ok = connectedBlocks(r, ground); reach.set(r, ok) }
+      return !ok.has(blockKey(p.block)) || taken(p)
+    },
+  })
   if (claim === null) return null
   const s = place(claim.plot, '', a.need.along, a.need.deep, null)
   const door = doorFrontOf(s)

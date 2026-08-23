@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  blockGroundOf, claimTownPlot, grammarOf, plotExtent, plotIsTaken, ringsStanding, townBoxOf,
-  worldOf, type WorldRect,
+  blockGroundOf, claimTownPlot, connectedBlocks, grammarOf, plotExtent, plotIsTaken,
+  ringsStanding, townBoxOf, worldOf, type WorldRect,
 } from './townPlot.js'
 import {
   CITY_GROUND, DWELLING_FOOTPRINTS, GENESIS_WANTED, TOWN_RINGS_GENESIS, TOWN_SQUARE,
@@ -9,7 +9,7 @@ import {
 } from './cityTemplate.js'
 import {
   BLOCK, MIN_SEP, PITCH, STREET, blockIsPlattable, centreOf, doorFrontOf, freePlots, place,
-  placedTiles, plotsOf, streetTiles,
+  placedTiles, plattedBlocks, plotsOf, streetTiles,
 } from './townGrammar.js'
 
 const key = (p: { x: number; y: number }): string => `${p.x},${p.y}`
@@ -266,6 +266,59 @@ describe('the masses the town actually builds', () => {
       const c = claimTownPlot({ square: TOWN_SQUARE, standing: genesisStanding(), need: { along: m.w, deep: m.h } })
       expect(c, kind).not.toBeNull()
       expect(c!.site.w * c!.site.h, kind).toBe(m.w * m.h)
+    }
+  })
+})
+
+
+// ★ THE FAR BANK IS NOT THE TOWN UNTIL SOMEBODY CAN GET THERE.
+//
+// Found by running a world, not by reading the grammar: the first plot ring 2 offers is block
+// (-2,0), which is across the channel. Masons walked to its door and were refused twenty-one
+// thousand times, and the town stopped at ring 1 for good.
+describe('★ a plot you cannot walk to is not ground the town keeps for you', () => {
+  it('the west of the river is platted, and it is not connected', () => {
+    const platted = plattedBlocks(2, CITY_GROUND).map((b) => `${b.i},${b.j}`)
+    const reachable = connectedBlocks(2, CITY_GROUND)
+    // Every block with i <= -2 lies wholly west of the channel, and the column between them
+    // and the square — i = -1 — stands in it, so nothing can step across.
+    const west = platted.filter((k) => Number(k.split(',')[0]) <= -2)
+    expect(west).toHaveLength(5)
+    for (const k of west) expect(reachable.has(k), k).toBe(false)
+    for (const k of platted) if (!west.includes(k)) expect(reachable.has(k), k).toBe(true)
+    expect(reachable.size).toBe(platted.length - west.length)
+  })
+
+  it('so the claim skips them, and the twelfth building lands east of the water', () => {
+    const { built } = raise(12)
+    const twelfth = built[11]!
+    expect(twelfth.rings).toBe(2)
+    expect(grammarOf(TOWN_SQUARE, twelfth.site).dx).toBeGreaterThan(0)
+    // Non-vacuity: the grammar on its own WOULD have offered a west plot first.
+    const westFirst = freePlots(2, CITY_GROUND).find((p) => p.block.i <= -2)!
+    expect(westFirst.block).toEqual({ i: -2, j: 0 })
+    expect(built.every((b) => grammarOf(TOWN_SQUARE, b.site).dx > -19)).toBe(true)
+  })
+
+  it('every block it does offer can be walked to from the square, block by block', () => {
+    const reachable = connectedBlocks(4, CITY_GROUND)
+    const step = (a: string): string[] => {
+      const [i, j] = a.split(',').map(Number) as [number, number]
+      return [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([di, dj]) => `${i + di!},${j + dj!}`)
+    }
+    // Walk back to the square from each one, only through blocks the set holds (or the square).
+    for (const k of reachable) {
+      const seen = new Set([k])
+      const q = [k]
+      let home = false
+      while (q.length > 0 && !home) {
+        for (const n of step(q.pop()!)) {
+          if (n === '0,0') { home = true; break }
+          if (seen.has(n) || !reachable.has(n)) continue
+          seen.add(n); q.push(n)
+        }
+      }
+      expect(home, k).toBe(true)
     }
   })
 })
