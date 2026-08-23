@@ -18,6 +18,9 @@ import {
 import {
   applyDepthOrder, createLayers, type DepthCounts, type DepthEntry, type LayerSet,
 } from './layers.js'
+import {
+  flingFrom, flingStep, isDrag, trackDrag, type DragTrack, type Fling,
+} from './fling.js'
 import { createTooltipLayer, type TooltipLayer } from './tooltip.js'
 import { HEADLAND_COLOR, KERB_COLOR, furrowLines, patchOutline, type Tile } from './patches.js'
 import { tileKind } from './tileset.js'
@@ -387,6 +390,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   let fitted = false
 
   function fitTo(stop: ZoomStop): void {
+    stopGlide()
     breakFollow()
     const c = boundsCentre(townBox())
     anchor = { sx: app.screen.width / 2, sy: app.screen.height / 2, wx: c.sx, wy: c.sy }
@@ -466,43 +470,79 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   app.stage.eventMode = 'static'
   app.stage.hitArea = app.screen
   app.renderer.events.cursorStyles.default = 'grab'
+  // DRAG, AND THE THROW THAT MAKES IT REACH (fling.ts owns the physics; this owns the wiring).
+  //
+  // One tracker answers both questions the pointer raises. `isDrag` is what tells a tile pick
+  // from a pan, exactly as the landed 2 px test did, and it is the SAME answer the throw reads
+  // — so a click can never become a fling and the two can never disagree about one gesture.
+  //
+  // A viewer who asked for less motion gets a drag that stops where their hand stopped. That is
+  // the sheet's own reading of reduced motion: not "no motion" but no motion they did not ask
+  // for, and a glide is the one part of this the hand did not do.
+  const wantsMotion = (): boolean =>
+    typeof matchMedia !== 'function' || !matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  let drag: DragTrack | null = null
   let dragging = false
-  let moved = false
   let last = { x: 0, y: 0 }
+  let glide: Fling | null = null
+
+  /** Anything that says where the camera should be outranks something still deciding. */
+  const stopGlide = (): void => {
+    glide = null
+  }
+
   app.stage.on('pointerdown', (e: FederatedPointerEvent) => {
+    stopGlide()                       // catching a moving camera stops it, as a hand would
     dragging = true
-    moved = false
+    drag = trackDrag(null, e.global.x, e.global.y, performance.now())
     last = { x: e.global.x, y: e.global.y }
     app.canvas.style.cursor = 'grabbing'
   })
   app.stage.on('pointermove', (e: FederatedPointerEvent) => {
     if (!dragging) return
-    const dx = e.global.x - last.x
-    const dy = e.global.y - last.y
-    if (Math.abs(dx) + Math.abs(dy) > 2) {
-      moved = true
+    drag = trackDrag(drag, e.global.x, e.global.y, performance.now())
+    if (isDrag(drag)) {
       fitted = false
       breakFollow() // the viewer takes the camera back
     }
-    place(world.position.x + dx, world.position.y + dy)
+    place(world.position.x + (e.global.x - last.x), world.position.y + (e.global.y - last.y))
     last = { x: e.global.x, y: e.global.y }
   })
   const endDrag = (): void => {
+    if (dragging && wantsMotion()) glide = flingFrom(drag, performance.now())
     dragging = false
     app.canvas.style.cursor = 'grab'
   }
   app.stage.on('pointerup', endDrag)
   app.stage.on('pointerupoutside', endDrag)
   app.stage.on('pointertap', (e: FederatedPointerEvent) => {
-    if (moved) return // a drag is not a tile pick
+    if (isDrag(drag)) return // a drag is not a tile pick
     const wx = (e.global.x - world.position.x) / world.scale.x
     const wy = (e.global.y - world.position.y) / world.scale.y
     const t = screenToTile(wx, wy)
     for (const cb of tileCbs) cb(t)
   })
+
+  // The glide, one frame at a time. A throw that reaches the edge of the world is over: the
+  // clamp refused the move, and a camera grinding against a wall it cannot cross is not motion.
+  const glideTick = (): void => {
+    if (glide === null) return
+    const step = flingStep(glide, app.ticker.deltaMS)
+    glide = step.next
+    const before = { x: world.position.x, y: world.position.y }
+    place(before.x + step.dx, before.y + step.dy)
+    if (world.position.x === before.x && world.position.y === before.y) stopGlide()
+    else notifyCamera()
+  }
+  app.ticker.add(glideTick)
+
   // Six lines: read the delta, ask the pure rule, store. The DOM half has no logic (P6).
   const onWheel = (e: WheelEvent): void => {
     e.preventDefault()
+    // A zoom pins the world point under the cursor; a camera still gliding would tear it out
+    // from under the anchor, which is the class of defect the wheel gate already exists for.
+    stopGlide()
     const next = zoomWheel(zoom, e.deltaY, performance.now())
     if (next.stop !== zoom.stop) captureAnchor(e.offsetX, e.offsetY)
     zoom = next
@@ -594,11 +634,13 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     getZoom: () => world.scale.x,
     getZoomStop: () => zoom.stop,
     panBy: (dx, dy) => {
+      stopGlide()
       fitted = false
       breakFollow()
       place(world.position.x + dx, world.position.y + dy)
     },
     centerHome: () => {
+      stopGlide()
       fitted = false
       breakFollow()
       const c = boundsCentre(townBox())
@@ -615,7 +657,10 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       }
     },
     setFollow: (target) => {
-      if (target !== null) fitted = false
+      if (target !== null) {
+        fitted = false
+        stopGlide()   // a follow owns the camera; a leftover throw would fight it
+      }
       followFn = target
     },
     onFollowEnd: (cb) => {
@@ -635,6 +680,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       ro.disconnect()
       app.ticker.remove(followTick)
       app.ticker.remove(zoomTick)
+      app.ticker.remove(glideTick)
       app.ticker.remove(bakeTick)
       app.canvas.removeEventListener('wheel', onWheel)
       tags.destroy()

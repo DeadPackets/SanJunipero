@@ -118,6 +118,51 @@ describe('the frame culls against the camera it is actually looking through', ()
   })
 })
 
+// ── the throw, and the four things that outrank it ────────────────────────────────────────
+//
+// fling.ts is pure and fully tested; what it cannot test is that the scene ASKED. A glide left
+// running while a zoom captures its anchor, or while a follow is steering, is not a slow bug —
+// it is two owners writing the same position every frame.
+
+describe('a glide is ended by anything that says where the camera should be', () => {
+  const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
+  const body = (name: string): string => {
+    const i = src.indexOf(name)
+    return i < 0 ? '' : src.slice(i, i + 420)
+  }
+
+  it('the wheel stops it before it captures a zoom anchor', () => {
+    const wheel = body('const onWheel =')
+    expect(wheel.indexOf('stopGlide()')).toBeGreaterThan(-1)
+    expect(wheel.indexOf('stopGlide()')).toBeLessThan(wheel.indexOf('captureAnchor'))
+  })
+
+  for (const mover of ['function fitTo(', 'panBy: (dx, dy) =>', 'centerHome: () =>', 'setFollow: (target) =>']) {
+    it(`${mover.replace(/[(:].*/, '')} stops it`, () => {
+      expect(body(mover)).toContain('stopGlide()')
+    })
+  }
+
+  it('catching the camera with a pointer stops it, as a hand would', () => {
+    expect(body("app.stage.on('pointerdown'")).toContain('stopGlide()')
+  })
+
+  it('★ a tap and a throw read ONE tracker, so a click can never become a fling', () => {
+    expect(src).toMatch(/if \(isDrag\(drag\)\) return \/\/ a drag is not a tile pick/)
+    // and no second, hand-rolled slop test survives anywhere in the scene
+    expect(src).not.toMatch(/Math\.abs\(dx\) \+ Math\.abs\(dy\) >/)
+  })
+
+  it('asks about reduced motion before it starts one', () => {
+    expect(src).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
+    expect(body('const endDrag =')).toContain('wantsMotion()')
+  })
+
+  it('gives the glide back its ticker slot on teardown', () => {
+    expect(src).toContain('app.ticker.remove(glideTick)')
+  })
+})
+
 describe('StageMount never leaves React holding a destroyed scene', () => {
   const src = readFileSync(join(WEB_SRC, 'render', 'StageMount.tsx'), 'utf8')
 
