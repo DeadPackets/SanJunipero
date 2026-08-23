@@ -1,4 +1,5 @@
 import { Container } from 'pixi.js'
+import { cullByBox, type ViewRect } from './cull.js'
 import { depthOrder, type DepthBox } from './depth.js'
 
 // ONE TABLE, ONE AUTHORITY (U8, plan task 69).
@@ -52,15 +53,33 @@ export function createLayers(world: Container): LayerSet {
 /** A drawable inside `entities`, and the ground it stands on. */
 export type DepthEntry = { box: DepthBox; node: Container }
 
+/** What one frame cost, and what it did not. Read by the FPS overlay and asserted by tests —
+ *  a cull nobody can count is a claim, not a measurement. */
+export type DepthCounts = { drawn: number; culled: number }
+
 /**
- * THE ONLY PLACE A DEPTH IS WRITTEN. Every drawable in `entities` publishes a DepthBox each
- * frame; depth.ts turns the set into a painter's order; the index in that order IS the
- * zIndex. No module invents a number, so no two modules can disagree about one.
+ * THE ONLY PLACE A DEPTH IS WRITTEN, AND THE ONLY PLACE A DRAWABLE IS HIDDEN. Every drawable
+ * in `entities` publishes a DepthBox each frame; what the viewport cannot reach is switched
+ * off, and depth.ts turns the rest into a painter's order whose index IS the zIndex.
+ *
+ * The cull belongs HERE and not at the call sites because the pairwise sort is what a large
+ * town actually costs: `depthOrder` is O(n²) in the boxes it is handed and degrades to seed
+ * order above `DEPTH_BUDGET`. Culling first is what keeps the town it sorts a viewport's
+ * worth rather than a settlement's, so the order stays correct as the town grows.
+ *
+ * A hidden node keeps the zIndex it had. It is not being drawn, so its depth is not a
+ * question, and re-numbering it would only churn `sortableChildren`.
  */
-export function applyDepthOrder(entries: readonly DepthEntry[]): void {
-  const order = depthOrder(entries.map((e) => e.box))
+export function applyDepthOrder(entries: readonly DepthEntry[], view: ViewRect): DepthCounts {
+  const { drawn, hidden } = cullByBox(entries, view)
+  for (const e of hidden) e.node.visible = false
+  const order = depthOrder(drawn.map((e) => e.box))
   const index = new Map(order.map((id, i) => [id, i]))
-  for (const e of entries) e.node.zIndex = index.get(e.box.id) ?? 0
+  for (const e of drawn) {
+    e.node.visible = true
+    e.node.zIndex = index.get(e.box.id) ?? 0
+  }
+  return { drawn: drawn.length, culled: hidden.length }
 }
 
 // ── P16's mechanical guard ───────────────────────────────────────────────────────────────

@@ -1,0 +1,85 @@
+import { TILE_H, TILE_W } from './iso.js'
+
+// A TOWN LARGER THAN THE VIEWPORT, BUILT WITHOUT THE GENERATOR.
+//
+// The approved layout plats blocks in rings around a square and agents claim plots forever, so
+// the renderer has to be ready for an extent nobody wrote down. This module is that extent: the
+// same 19-tile block pitch the grammar uses, laid out to any ring count, with a structure on
+// every plot. It is a measuring instrument for the camera and the cull — the numbers in the
+// camera report come from here — and it stands in no shipped scene.
+//
+// It lives here rather than in `cityTemplate.ts` because the template is a place agents live in
+// and this is a ruler. Nothing imports it but tests.
+
+/** 18 tiles of block and one of road between them, the pitch the ring grammar plats on. */
+export const BLOCK_PITCH = 19
+/** The plot side inside one block; the remaining tile of the pitch is the street. */
+export const BLOCK_SIDE = BLOCK_PITCH - 1
+
+export type FixtureStructure = {
+  id: string
+  kind: string
+  x: number
+  y: number
+  w: number
+  h: number
+  stage: 'complete'
+}
+
+/** The footprints the town actually stands, smallest to largest — a 4×2 roof is the one that
+ *  reaches furthest past its own ground, which is what a cull margin has to survive. */
+const FOOTPRINTS: ReadonlyArray<{ kind: string; w: number; h: number }> = [
+  { kind: 'well', w: 1, h: 1 },
+  { kind: 'house', w: 2, h: 2 },
+  { kind: 'cottage', w: 2, h: 2 },
+  { kind: 'storehouse', w: 3, h: 2 },
+  { kind: 'farmhouse', w: 4, h: 2 },
+]
+
+/** Eight plots around one block's perimeter, the way a street rank claims frontage. */
+const PLOT_OFFSETS: ReadonlyArray<{ dx: number; dy: number }> = [
+  { dx: 1, dy: 1 }, { dx: 7, dy: 1 }, { dx: 13, dy: 1 },
+  { dx: 1, dy: 8 }, { dx: 13, dy: 8 },
+  { dx: 1, dy: 15 }, { dx: 7, dy: 15 }, { dx: 13, dy: 15 },
+]
+
+/**
+ * Every block in `rings` rings about the square, each with eight claimed plots. Ring 0 is the
+ * square itself and stands nothing, so a town of R rings holds `((2R+1)² − 1) · 8` structures.
+ * Deterministic: the same ring count always yields the same list, in the same order.
+ */
+export function bigTown(rings: number): FixtureStructure[] {
+  const out: FixtureStructure[] = []
+  for (let by = -rings; by <= rings; by++) {
+    for (let bx = -rings; bx <= rings; bx++) {
+      if (bx === 0 && by === 0) continue
+      PLOT_OFFSETS.forEach((p, i) => {
+        const f = FOOTPRINTS[(Math.abs(bx) * 3 + Math.abs(by) * 5 + i) % FOOTPRINTS.length]!
+        out.push({
+          id: `s_${bx}_${by}_${i}`,
+          kind: f.kind,
+          x: bx * BLOCK_PITCH + p.dx,
+          y: by * BLOCK_PITCH + p.dy,
+          w: f.w,
+          h: f.h,
+          stage: 'complete',
+        })
+      })
+    }
+  }
+  return out
+}
+
+/** The tile box the ring grammar plats into at this ring count, streets included. */
+export function bigTownTileExtent(rings: number): { x0: number; y0: number; x1: number; y1: number } {
+  const lo = -rings * BLOCK_PITCH
+  const hi = rings * BLOCK_PITCH + BLOCK_SIDE
+  return { x0: lo, y0: lo, x1: hi, y1: hi }
+}
+
+/** What that extent measures on screen at scale 1 — the number the brief's 992 × 496 is one of. */
+export function bigTownScreenSize(rings: number): { w: number; h: number } {
+  const e = bigTownTileExtent(rings)
+  const span = e.x1 - e.x0 + (e.y1 - e.y0)
+  return { w: span * (TILE_W / 2), h: span * (TILE_H / 2) }
+}

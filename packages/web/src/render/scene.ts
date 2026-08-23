@@ -14,7 +14,9 @@ import {
   OCTAVE_ALPHA, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField,
   isRoadMass, materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
 } from './groundField.js'
-import { applyDepthOrder, createLayers, type DepthEntry, type LayerSet } from './layers.js'
+import {
+  applyDepthOrder, createLayers, type DepthCounts, type DepthEntry, type LayerSet,
+} from './layers.js'
 import { createTooltipLayer, type TooltipLayer } from './tooltip.js'
 import { HEADLAND_COLOR, KERB_COLOR, furrowLines, patchOutline, type Tile } from './patches.js'
 import { tileKind } from './tileset.js'
@@ -226,6 +228,8 @@ export type Scene = {
   addDepthSource(fn: () => DepthEntry[]): () => void
   /** one painter's order for the whole frame — called once per tick, by StageMount */
   sortDepth(): void
+  /** what the last `sortDepth` drew and what the viewport let it skip */
+  depthCounts(): DepthCounts
   /** the visible world rectangle, in the space labels are drawn in (tooltip.ts places in it) */
   viewRect(): { x: number; y: number; w: number; h: number }
   /** THE label layer. One owner for every world tag, so two can never be up by accident and
@@ -319,6 +323,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   // The depth sort has ONE owner and runs ONCE a frame over the whole live set. Modules
   // publish the ground they stand on; nobody publishes an opinion about who is in front.
   const depthSources = new Set<() => DepthEntry[]>()
+  // what the last frame drew and what it skipped — a cull nobody can count is a claim
+  let lastCounts: DepthCounts = { drawn: 0, culled: 0 }
 
   const book = new TextureBook()
   const baker = createGroundBaker(app, groundSprite, book)
@@ -555,8 +561,9 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     sortDepth: () => {
       const entries: DepthEntry[] = []
       for (const fn of depthSources) entries.push(...fn())
-      applyDepthOrder(entries)
+      lastCounts = applyDepthOrder(entries, viewRect())
     },
+    depthCounts: () => lastCounts,
     rebakeGround,
     centerOn,
     centerOnScreen,

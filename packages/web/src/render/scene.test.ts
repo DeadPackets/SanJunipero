@@ -93,6 +93,31 @@ describe('nobody outside the renderer reaches through app.ticker', () => {
   })
 })
 
+// ── the cull's one wire ───────────────────────────────────────────────────────────────────
+//
+// The type says `applyDepthOrder` takes a view; it cannot say the view is THIS FRAME'S. A rect
+// captured once at boot would typecheck, pass every unit test, and cull against a camera that
+// has since moved — the whole town would blink out the moment a viewer panned. That is the
+// green-suite-blank-screen failure this project keeps meeting, so the wire is scanned.
+
+describe('the frame culls against the camera it is actually looking through', () => {
+  const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
+
+  it('calls the depth order with a freshly read viewRect, not a stored one', () => {
+    expect(src).toMatch(/applyDepthOrder\(\s*entries,\s*viewRect\(\)\s*\)/)
+  })
+
+  it('derives viewRect from the live camera every call', () => {
+    const body = /const viewRect = [\s\S]*?\n {2}\}/.exec(src)?.[0] ?? ''
+    expect(body).toContain('world.position.x')
+    expect(body).toContain('app.screen.width')
+  })
+
+  it('has exactly one caller — the per-frame sort, and nowhere else', () => {
+    expect(src.match(/applyDepthOrder\(/g)).toHaveLength(1)
+  })
+})
+
 describe('StageMount never leaves React holding a destroyed scene', () => {
   const src = readFileSync(join(WEB_SRC, 'render', 'StageMount.tsx'), 'utf8')
 

@@ -17,8 +17,10 @@ vi.mock('pixi.js', () => {
 
 const { Container: MockContainer } = await import('pixi.js')
 const {
-  LAYERS, SORTED_LAYER, Z_AUTHORISED, createLayers, literalZIndexOffenders,
+  LAYERS, SORTED_LAYER, Z_AUTHORISED, applyDepthOrder, createLayers, literalZIndexOffenders,
 } = await import('./layers.js')
+const { structureDepthBox } = await import('./depth.js')
+const { bigTown } = await import('./bigTown.js')
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB_SRC = join(HERE, '..')
@@ -66,6 +68,59 @@ describe('createLayers', () => {
   it('hands back a distinct container per layer', () => {
     const set = createLayers(new MockContainer() as never)
     expect(new Set(LAYERS.map((n) => set[n])).size).toBe(LAYERS.length)
+  })
+})
+
+// ── the cull lives inside the one depth writer ────────────────────────────────────────────
+
+type FakeNode = { zIndex: number; visible: boolean }
+const nodeFor = (): FakeNode => ({ zIndex: -1, visible: true })
+
+describe('applyDepthOrder culls to the viewport', () => {
+  const VIEW = { x: 0, y: 0, w: 800, h: 600 }
+
+  it('hides what the view cannot reach and shows what it can', () => {
+    const near = { box: structureDepthBox('near', { x: 8, y: 8, w: 2, h: 2 }), node: nodeFor() }
+    const far = { box: structureDepthBox('far', { x: 900, y: 900, w: 2, h: 2 }), node: nodeFor() }
+    applyDepthOrder([near, far] as never, VIEW)
+    expect(near.node.visible).toBe(true)
+    expect(far.node.visible).toBe(false)
+  })
+
+  it('brings a node back the moment the view reaches it again', () => {
+    const e = { box: structureDepthBox('e', { x: 300, y: 300, w: 2, h: 2 }), node: nodeFor() }
+    applyDepthOrder([e] as never, VIEW)
+    expect(e.node.visible).toBe(false)
+    applyDepthOrder([e] as never, { x: -8000, y: 0, w: 16000, h: 16000 })
+    expect(e.node.visible).toBe(true)
+  })
+
+  it('★ keeps the sorted set under DEPTH_BUDGET on a town that would blow past it', () => {
+    const entries = bigTown(3).map((s) => ({ box: structureDepthBox(s.id, s), node: nodeFor() }))
+    expect(entries.length).toBeGreaterThan(256)      // the fallback would fire without a cull
+    const counts = applyDepthOrder(entries as never, VIEW)
+    expect(counts.drawn).toBeLessThan(256)
+    expect(counts.drawn + counts.culled).toBe(entries.length)
+  })
+
+  it('gives a depth only to what it drew — a hidden node keeps the one it had', () => {
+    const near = { box: structureDepthBox('near', { x: 8, y: 8, w: 2, h: 2 }), node: nodeFor() }
+    const far = { box: structureDepthBox('far', { x: 900, y: 900, w: 2, h: 2 }), node: nodeFor() }
+    applyDepthOrder([near, far] as never, VIEW)
+    expect(near.node.zIndex).toBe(0)
+    expect(far.node.zIndex).toBe(-1)
+  })
+
+  it('orders the survivors exactly as it would have with nothing else in the frame', () => {
+    const all = bigTown(1).map((s) => ({ box: structureDepthBox(s.id, s), node: nodeFor() }))
+    const view = { x: -200, y: 0, w: 800, h: 600 }
+    applyDepthOrder(all as never, view)
+    const withCull = all.filter((e) => e.node.visible).map((e) => [e.box.id, e.node.zIndex] as const)
+    const only = all
+      .filter((e) => e.node.visible)
+      .map((e) => ({ box: e.box, node: nodeFor() }))
+    applyDepthOrder(only as never, { x: -1e6, y: -1e6, w: 2e6, h: 2e6 })
+    expect(only.map((e, i) => [e.box.id, e.node.zIndex] as const)).toEqual(withCull)
   })
 })
 
