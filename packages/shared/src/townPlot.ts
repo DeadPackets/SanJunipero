@@ -18,7 +18,7 @@
 // says about one column, and `townPlot.test.ts` says about the whole frame.
 
 import {
-  BLOCK, PITCH, STREET, blockIsPlattable, doorFrontOf, place, plattedBlocks, plotsOf,
+  BLOCK, PITCH, STREET, blockIsPlattable, doorFrontOf, place, plotsOf,
   type Ground, type Plot, type TileXY, type TownFacing,
 } from './townGrammar.js'
 import { CLAIM_RING_LIMIT, claimPlotWhere, type Need } from './townClaim.js'
@@ -63,56 +63,78 @@ export const plotIsTaken = (square: WorldXY, standing: readonly WorldRect[]) => 
   return standing.some((s) => overlaps(ext, s, square))
 }
 
-const blockKey = (b: { i: number; j: number }): string => `${b.i},${b.j}`
+/**
+ * ★ WHERE A BODY CAN PUT ITS FEET — which is not the same question as where the town may plat.
+ *
+ * The plat ground is conservative on purpose: it unions the grammar's channel with the world's
+ * water, so no roof ever stands on either. Walking is the opposite question and takes the
+ * opposite answer — the world's own ford is dry sand the grammar has never heard of, and a
+ * DECK LAID OVER WATER IS NOT WATER. Asking one function both questions is how the far bank
+ * stayed shut: a bridge cannot open ground that the plat rule has already called wet.
+ */
+export type Walk = (dx: number, dy: number) => boolean
+
+/** The walk a bare ground allows, and the default when nobody has built anything: every tile
+ *  but the water. No bridge exists in a grammar with no world under it. */
+export const walkOnGround = (ground: Ground): Walk => (dx, dy) => ground(dx, dy) !== 'water'
+
+/** The tiles a walk reached, as a question rather than a collection: this is asked once per
+ *  candidate plot in a loop that runs every tick, so it is a flat byte grid and not a Set of
+ *  strings. Measured: the string form cost the end-to-end run 42 seconds. */
+export type Reach = { has: (dx: number, dy: number) => boolean; size: number }
 
 /**
- * ★ A PLOT YOU CANNOT WALK TO IS NOT GROUND THE TOWN KEEPS FOR YOU.
+ * ★ A PLOT YOU CANNOT WALK TO IS NOT GROUND THE TOWN KEEPS FOR YOU — AND THE WALK IS A WALK.
  *
- * The blocks the town's own streets can reach from the square, walking block to block and
- * never crossing water. `plattedBlocks` does not ask this and never had to, because nothing
- * ever built past ring 1 — and the first plot ring 2 offers is block (-2, 0), which is on the
- * FAR BANK. Measured in a running world: twelve masons walked at the door of a house they
- * could never reach and were refused twenty-one thousand times, and the town stopped at ring 1
- * for good. That is the shape of failure this project keeps finding — a seam that offers
- * something and then quietly never delivers it.
+ * Every grammar tile a body can reach from the square on foot, four-connected, inside the
+ * town's own box at `rings`. Found by running a world, not by reading the grammar: the first
+ * plot ring 2 offers is block (-2, 0), which is across the channel. Masons walked to its door
+ * and were refused twenty-one thousand times, and the town stopped at ring 1 for good.
  *
- * The far bank is an earned milestone (C11 §2) and this keeps it one: the west of the river
- * joins the town when somebody can get there, and not before. It is also the town-generator
- * lane's own connectivity property — one road component — made true of a grown town rather
- * than only of the genesis one.
+ * ★ THIS USED TO BE A WALK OVER BLOCKS, AND THAT WAS BOTH TOO STRICT AND VACUOUS. Too strict,
+ * because a block-to-block hop can only step between PLATTED blocks and the river runs down
+ * the middle of block column i = -1, which is never plattable — so no bridge anywhere could
+ * ever have opened the far bank, whatever it was told. Vacuous, because its own water test
+ * (`bandIsWalkable`) never fired: measured over 659 adjacent platted pairs at rings 1 to 6,
+ * ZERO shared street bands are wet. Deleting that test changed no answer. A tile walk has
+ * neither defect — it crosses unplatted ground the way feet do, and every tile it steps on is
+ * a tile it actually stepped on.
+ *
+ * The far bank stays an earned milestone (C11 §2): the west of the river joins the town when
+ * somebody can get there, and not before. What changed is that now somebody CAN — by building
+ * the bridge, which is the whole of the mechanism and is derived fresh on every ask.
+ *
+ * Bounded by the town's box, because the town's reach is the town's own ground; the box grows
+ * with the ring the claim is looking at, so a town that grows reaches further by construction.
  */
-export function connectedBlocks(rings: number, ground: Ground): Set<string> {
-  const platted = new Set(plattedBlocks(rings, ground).map(blockKey))
-  const seen = new Set<string>([blockKey({ i: 0, j: 0 })])
-  const queue: Array<{ i: number; j: number }> = [{ i: 0, j: 0 }]
-  while (queue.length > 0) {
-    const b = queue.shift()!
-    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-      const n = { i: b.i + di, j: b.j + dj }
-      const k = blockKey(n)
-      if (seen.has(k) || !platted.has(k)) continue
-      if (!bandIsWalkable(b, n, ground)) continue
-      seen.add(k)
-      queue.push(n)
-    }
+export function reachOnFoot(rings: number, walk: Walk): Reach {
+  const lo = -townOrigin(rings), span = townSpan(rings)
+  const inBox = (ix: number, iy: number): boolean => ix >= 0 && ix < span && iy >= 0 && iy < span
+  const seen = new Uint8Array(span * span)
+  const queue = new Int32Array(span * span)
+  let head = 0, tail = 0
+  const push = (dx: number, dy: number): void => {
+    const ix = dx - lo, iy = dy - lo
+    if (!inBox(ix, iy)) return
+    const k = iy * span + ix
+    if (seen[k] === 1 || !walk(dx, dy)) return
+    seen[k] = 1
+    queue[tail++] = k
   }
-  seen.delete(blockKey({ i: 0, j: 0 }))
-  return seen
-}
-
-/** The street band two neighbouring blocks share, and whether any of it is dry enough to walk.
- *  A band entirely in the channel is a bank, not a street. */
-function bandIsWalkable(a: { i: number; j: number }, b: { i: number; j: number }, ground: Ground): boolean {
-  const lo = { i: Math.min(a.i, b.i), j: Math.min(a.j, b.j) }
-  const along = a.i === b.i
-  for (let s = 0; s < STREET; s++) {
-    const fixed = (along ? lo.j : lo.i) * PITCH + BLOCK + s
-    for (let t = 0; t < BLOCK; t++) {
-      const moving = (along ? lo.i : lo.j) * PITCH + t
-      if (ground(along ? moving : fixed, along ? fixed : moving) !== 'water') return true
-    }
+  // The square itself is where everybody starts, and block (0, 0) is the square.
+  for (let dy = 0; dy < BLOCK; dy++) for (let dx = 0; dx < BLOCK; dx++) push(dx, dy)
+  while (head < tail) {
+    const k = queue[head++]!
+    const dx = (k % span) + lo, dy = ((k - (k % span)) / span) + lo
+    push(dx + 1, dy); push(dx - 1, dy); push(dx, dy + 1); push(dx, dy - 1)
   }
-  return false
+  return {
+    size: tail,
+    has: (dx, dy) => {
+      const ix = dx - lo, iy = dy - lo
+      return inBox(ix, iy) && seen[iy * span + ix] === 1
+    },
+  }
 }
 
 export type TownClaim = {
@@ -138,19 +160,25 @@ export function claimTownPlot(a: {
   standing: readonly WorldRect[]
   need: Need
   ground?: Ground
+  walk?: Walk
 }): TownClaim | null {
   const ground = a.ground ?? CITY_GROUND
+  const walk = a.walk ?? walkOnGround(ground)
   const taken = plotIsTaken(a.square, a.standing)
   // Cheap, and computed once per ring the search looks at rather than once per plot.
-  const reach = new Map<number, Set<string>>()
+  const reach = new Map<number, Reach>()
   const claim = claimPlotWhere({
     ground,
     need: a.need,
     isTaken: (p) => {
       const r = Math.max(Math.abs(p.block.i), Math.abs(p.block.j))
-      let ok = reach.get(r)
-      if (ok === undefined) { ok = connectedBlocks(r, ground); reach.set(r, ok) }
-      return !ok.has(blockKey(p.block)) || taken(p)
+      let reached = reach.get(r)
+      if (reached === undefined) { reached = reachOnFoot(r, walk); reach.set(r, reached) }
+      // ★ THE DOOR, not the block. The builder has to stand on this exact tile to raise
+      // anything, so it is the tile that has to be walkable-to — and a claim that offered a
+      // plot whose door nobody can stand at would be the old defect wearing a new coat.
+      const door = doorFrontOf(place(p, '', a.need.along, a.need.deep, null))
+      return !reached.has(door.dx, door.dy) || taken(p)
     },
   })
   if (claim === null) return null

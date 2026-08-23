@@ -1,7 +1,8 @@
 import {
   CITY_GROUND, T_GRASS, T_ROAD, TOWN_SQUARE, blockGroundOf, claimTownPlot, ringsStanding,
-  townBoxOf, type Ground, type TownClaim, type WorldBox, type WorldRect, type WorldXY,
+  townBoxOf, type Ground, type TownClaim, type Walk, type WorldBox, type WorldRect, type WorldXY,
 } from '@sj/shared'
+import { bridgeAt } from './path.js'
 import { authoredOrigin, type WorldState } from './state.js'
 
 // ★ WHERE THE TOWN IS, IN A WORLD THAT MOVES UNDER IT.
@@ -63,12 +64,41 @@ export function townGroundOf(state: WorldState, square: WorldXY): Ground {
   }
 }
 
+/**
+ * ★ A BRIDGE OPENS THE FAR BANK, AND THIS IS THE WHOLE OF THE MECHANISM.
+ *
+ * Where a body can put its feet in a running world: any tile the array actually holds that is
+ * not water — or a COMPLETED bridge deck over water, which is the one structure that opens
+ * ground instead of closing it. So a block across the channel becomes claimable BECAUSE a
+ * deck stands on the tiles between here and there, and stops being claimable the moment it is
+ * gone. Nothing is cached and no flag is stored: this is read off the structures every time.
+ *
+ * ★ IT READS THE WORLD'S WATER AND NOT THE PLAT GROUND, deliberately. `townGroundOf` unions
+ * the grammar's channel with the world's so that no roof ever stands on either — three columns
+ * wide, always. The world's ford is two, with a spit of dry sand where the grammar insists on
+ * water. A crossing measured against the plat ground could never be laid, because a six-plank
+ * deck cannot span a channel the grammar has widened by a column it does not have.
+ *
+ * A tile the array does not reach is not walkable. Absent ground is not somewhere to stand,
+ * and `layBlock` already says "past the edge of the known country" out loud when it matters.
+ */
+export function townWalkOf(state: WorldState, square: WorldXY): Walk {
+  return (dx, dy) => {
+    const x = square.x + dx, y = square.y + dy
+    const tile = state.terrain[y]?.[x]
+    if (tile === undefined) return false
+    return !WET.has(tile) || bridgeAt(state, x, y)
+  }
+}
+
 /** The plot the next building of this mass takes, in array coordinates. `null` when this world
  *  has no town, or when the town has nowhere for a thing that size. */
 export function claimInWorld(state: WorldState, need: { along: number; deep: number }): TownClaim | null {
   const square = townSquareOf(state)
-  return square === null ? null
-    : claimTownPlot({ square, standing: standingRects(state), need, ground: townGroundOf(state, square) })
+  return square === null ? null : claimTownPlot({
+    square, standing: standingRects(state), need,
+    ground: townGroundOf(state, square), walk: townWalkOf(state, square),
+  })
 }
 
 /** How many rings of the town are standing, and the ground it has laid to hold them. `null`

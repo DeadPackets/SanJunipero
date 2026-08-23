@@ -229,7 +229,9 @@ export function streetTiles(rings: number, ground: Ground): TileXY[] {
 
 // ---------------------------------------------------------------- the measurements
 
-export function closestPair(structures: readonly PlacedStructure[]): number {
+export type Massed = { dx: number; dy: number; w: number; h: number }
+
+export function closestPair(structures: readonly Massed[]): number {
   let worst = Infinity
   for (let a = 0; a < structures.length; a++)
     for (let b = a + 1; b < structures.length; b++) {
@@ -237,6 +239,38 @@ export function closestPair(structures: readonly PlacedStructure[]): number {
       worst = Math.min(worst, Math.hypot(p.sx - q.sx, p.sy - q.sy))
     }
   return worst
+}
+
+/**
+ * ★ TWO NUMBERS, NEVER ONE — because the whole-town "closest pair" does not measure the floor.
+ *
+ * `latticeFloor` proves 86.1626 px over 2 496 pairings of every legal building on every plot.
+ * But the well and the fire pit are 1×1 monuments standing in the paved square, which the
+ * lattice never platted and the survey never measured, and they are 73.7564 px apart — closer
+ * than any pair the grammar governs. A bridge is the same: it stands on the water where the
+ * water decides, not on a plot.
+ *
+ * So a single whole-town figure silently mixes governed and ungoverned pairs, and one day it
+ * will hide a real regression behind a monument. Report both, name both, assert both. The
+ * caller decides what is governed — being SEATED ON A PLOT is the test, never "bigger than
+ * 1×1", which a two-tile bridge deck passes and a plot never seated.
+ */
+export type TownSpacing = {
+  /** Closest pair among plot-seated buildings. The invariant, and the only claim the floor makes. */
+  latticeFloor: number
+  /** Closest pair in the whole town, monuments and decks included. NOT the invariant. */
+  wholeTown: number
+  governed: number
+  ungoverned: number
+}
+
+export function townSpacing(governed: readonly Massed[], ungoverned: readonly Massed[]): TownSpacing {
+  return {
+    latticeFloor: closestPair(governed),
+    wholeTown: closestPair([...governed, ...ungoverned]),
+    governed: governed.length,
+    ungoverned: ungoverned.length,
+  }
 }
 
 /** Everything that can be wrong with a town, in one list: two buildings on one tile, a

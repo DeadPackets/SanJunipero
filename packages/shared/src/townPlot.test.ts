@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  blockGroundOf, claimTownPlot, connectedBlocks, grammarOf, plotExtent, plotIsTaken,
-  ringsStanding, townBoxOf, worldOf, type WorldRect,
+  blockGroundOf, claimTownPlot, grammarOf, plotExtent, plotIsTaken, reachOnFoot,
+  ringsStanding, townBoxOf, walkOnGround, worldOf, type Walk, type WorldRect,
 } from './townPlot.js'
 import {
   CITY_GROUND, DWELLING_FOOTPRINTS, GENESIS_WANTED, TOWN_RINGS_GENESIS, TOWN_SQUARE,
@@ -276,49 +276,118 @@ describe('the masses the town actually builds', () => {
 // Found by running a world, not by reading the grammar: the first plot ring 2 offers is block
 // (-2,0), which is across the channel. Masons walked to its door and were refused twenty-one
 // thousand times, and the town stopped at ring 1 for good.
-describe('★ a plot you cannot walk to is not ground the town keeps for you', () => {
-  it('the west of the river is platted, and it is not connected', () => {
-    const platted = plattedBlocks(2, CITY_GROUND).map((b) => `${b.i},${b.j}`)
-    const reachable = connectedBlocks(2, CITY_GROUND)
-    // Every block with i <= -2 lies wholly west of the channel, and the column between them
-    // and the square — i = -1 — stands in it, so nothing can step across.
-    const west = platted.filter((k) => Number(k.split(',')[0]) <= -2)
-    expect(west).toHaveLength(5)
-    for (const k of west) expect(reachable.has(k), k).toBe(false)
-    for (const k of platted) if (!west.includes(k)) expect(reachable.has(k), k).toBe(true)
-    expect(reachable.size).toBe(platted.length - west.length)
+// The channel the grammar knows is three columns wide — dx -17, -16, -15 — and it runs at
+// every dy, so it is a wall and not an obstacle. Measured, not assumed, by the first test here.
+const CHANNEL = [-17, -16, -15] as const
+
+/** A walk with a deck laid over the named grammar tiles. A deck over water is not water; a
+ *  deck anywhere else is a plank on the grass and changes nothing. */
+const deck = (base: Walk, tiles: ReadonlyArray<{ dx: number; dy: number }>): Walk => {
+  const on = new Set(tiles.map((t) => `${t.dx},${t.dy}`))
+  return (dx, dy) => base(dx, dy) || on.has(`${dx},${dy}`)
+}
+
+const span = (dy: number, cols: readonly number[] = CHANNEL): Array<{ dx: number; dy: number }> =>
+  cols.map((dx) => ({ dx, dy }))
+
+/** The blocks the claim will actually offer, in order, for a 2×2 — read off the claim itself
+ *  rather than off a second notion of "reachable", so a test cannot pass on a rule the running
+ *  world does not use. */
+const offered = (walk: Walk, n = 40, standing = genesisStanding()): string[] =>
+  raiseWith(walk, n, standing).built.map((b) => {
+    const g = grammarOf(TOWN_SQUARE, b.site)
+    return `${Math.floor(g.dx / PITCH)},${Math.floor(g.dy / PITCH)}`
   })
 
-  it('so the claim skips them, and the twelfth building lands east of the water', () => {
+function raiseWith(walk: Walk, n: number, standing: WorldRect[] = genesisStanding(), need = { along: 2, deep: 2 }) {
+  const built: Array<{ site: WorldRect; door: { x: number; y: number }; rings: number }> = []
+  for (let i = 0; i < n; i++) {
+    const c = claimTownPlot({ square: TOWN_SQUARE, standing, need, walk })
+    if (c === null) break
+    standing = [...standing, c.site]
+    built.push({ site: c.site, door: c.door, rings: c.rings })
+  }
+  return { built, standing }
+}
+
+describe('★ a plot you cannot walk to is not ground the town keeps for you', () => {
+  const dry = walkOnGround(CITY_GROUND)
+
+  it('the channel is a WALL, not an obstacle: there is no way round it inside the town', () => {
+    // The whole reason a bridge has to be the mechanism. If any row of the town's box were
+    // dry across the channel, the far bank would already be reachable and every test below
+    // would pass with the bridge doing nothing.
+    const lo = -townOrigin(2), hi = lo + townSpan(2) - 1
+    for (let dy = lo; dy <= hi; dy++)
+      for (const dx of CHANNEL) expect(CITY_GROUND(dx, dy), `${dx},${dy}`).toBe('water')
+    const reached = reachOnFoot(2, dry)
+    expect(reached.has(-18, 0)).toBe(false)
+    // And it is not that nothing is reached: the east of the town plainly is.
+    expect(reached.size).toBeGreaterThan(2000)
+  })
+
+  it('the west of the river is platted, and the claim never offers it', () => {
+    const platted = plattedBlocks(2, CITY_GROUND).map((b) => `${b.i},${b.j}`)
+    const west = platted.filter((k) => Number(k.split(',')[0]) <= -2)
+    expect(west).toHaveLength(5)
+    // From an EMPTY town, so a block the genesis nine happen to have filled still shows up.
+    const blocks = new Set(offered(dry, 80, []))
+    for (const k of west) expect(blocks.has(k), k).toBe(false)
+    for (const k of platted) if (!west.includes(k)) expect(blocks.has(k), k).toBe(true)
+    // Non-vacuity: the grammar on its own WOULD have offered a west plot first at ring 2.
+    expect(freePlots(2, CITY_GROUND).find((p) => p.block.i <= -2)!.block).toEqual({ i: -2, j: 0 })
+  })
+
+  it('so the twelfth building lands east of the water', () => {
     const { built } = raise(12)
     const twelfth = built[11]!
     expect(twelfth.rings).toBe(2)
     expect(grammarOf(TOWN_SQUARE, twelfth.site).dx).toBeGreaterThan(0)
-    // Non-vacuity: the grammar on its own WOULD have offered a west plot first.
-    const westFirst = freePlots(2, CITY_GROUND).find((p) => p.block.i <= -2)!
-    expect(westFirst.block).toEqual({ i: -2, j: 0 })
     expect(built.every((b) => grammarOf(TOWN_SQUARE, b.site).dx > -19)).toBe(true)
   })
 
-  it('every block it does offer can be walked to from the square, block by block', () => {
-    const reachable = connectedBlocks(4, CITY_GROUND)
-    const step = (a: string): string[] => {
-      const [i, j] = a.split(',').map(Number) as [number, number]
-      return [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([di, dj]) => `${i + di!},${j + dj!}`)
+  // ★ THE RULING: A BRIDGE OPENS THE FAR BANK. The river stops being a wall and becomes a
+  // problem the town can solve — which is the thing this world exists to watch.
+  it('★ a deck across the channel opens the far bank, and it is the FIRST plot ring 2 offers', () => {
+    const crossing = deck(dry, span(-3))
+    const blocks = offered(crossing, 80)
+    expect(blocks.slice(0, 11).every((k) => Number(k.split(',')[0]) > -2)).toBe(true)
+    expect(blocks[11]).toBe('-2,0')
+    // Every one of the five west blocks joins the town, not just the one the deck touches —
+    // and the deck stands beside block (-1,-1), none of them.
+    for (const k of ['-2,0', '-2,-1', '-2,1', '-2,-2', '-2,2']) expect(blocks, k).toContain(k)
+  })
+
+  it('★ and it is a CROSSING, not a teleport: a deck that stops short of the far bank opens nothing', () => {
+    // Two of the three columns, laid from the near bank out. Feet reach the middle of the
+    // river and stop there, which is what a deck one plank short of the far side is.
+    const short = deck(dry, span(-3, [-15, -16]))
+    expect(offered(short, 80).some((k) => Number(k.split(',')[0]) <= -2)).toBe(false)
+    expect(reachOnFoot(2, short).has(-16, -3)).toBe(true)
+    expect(reachOnFoot(2, short).has(-17, -3)).toBe(false)
+    // A deck laid on dry ground is a plank in a meadow.
+    expect(offered(deck(dry, span(-3, [10, 11, 12])), 80).some((k) => Number(k.split(',')[0]) <= -2)).toBe(false)
+  })
+
+  it('★ and reachability is DERIVED: take the deck away and the far bank closes again', () => {
+    const crossing = deck(dry, span(-3))
+    expect(offered(crossing)).toContain('-2,0')
+    expect(offered(dry)).not.toContain('-2,0')
+    // Same call, same inputs but for the deck — nothing anywhere remembers that it was open.
+    expect(reachOnFoot(2, crossing).has(-18, -3)).toBe(true)
+    expect(reachOnFoot(2, dry).has(-18, -3)).toBe(false)
+  })
+
+  it('★ every plot the claim offers has a DOOR a body can stand on, over the water or not', () => {
+    const crossing = deck(dry, span(-3))
+    const reached = reachOnFoot(3, crossing)
+    const { built } = raiseWith(crossing, 40)
+    expect(built.length).toBeGreaterThanOrEqual(30)
+    for (const b of built) {
+      const g = grammarOf(TOWN_SQUARE, b.door)
+      expect(reached.has(g.dx, g.dy), `door ${b.door.x},${b.door.y}`).toBe(true)
     }
-    // Walk back to the square from each one, only through blocks the set holds (or the square).
-    for (const k of reachable) {
-      const seen = new Set([k])
-      const q = [k]
-      let home = false
-      while (q.length > 0 && !home) {
-        for (const n of step(q.pop()!)) {
-          if (n === '0,0') { home = true; break }
-          if (seen.has(n) || !reachable.has(n)) continue
-          seen.add(n); q.push(n)
-        }
-      }
-      expect(home, k).toBe(true)
-    }
+    // …and at least eight of them are on the far side, so the loop above is not all east bank.
+    expect(built.filter((b) => grammarOf(TOWN_SQUARE, b.site).dx < -17).length).toBeGreaterThanOrEqual(8)
   })
 })
