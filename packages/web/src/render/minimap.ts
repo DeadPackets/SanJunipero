@@ -1,4 +1,6 @@
 import type { TerrainTileKind } from '@sj/shared'
+// type-only: the lens set is the route's, and there must not be a second copy of it here
+import type { Lens } from '../ui/route.js'
 import type { CameraBounds } from './camera.js'
 import type { ViewRect } from './cull.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
@@ -443,9 +445,34 @@ export function overlayOps(view: ViewRect, dots: readonly PersonDot[], f: Minima
  * already owns the stage — the society graph replaces the canvas, the film strip and the moment
  * player take the bottom band, the chronicle's timeline takes it too. And a map of the town is
  * not a thing a viewer standing inside a room needs.
+ *
+ * ★ AND IT IS A DECISION PER LENS, NOT A WHITELIST. This was `['map', 'inspector', 'laws']`, a
+ * list written before the Discovery Record existed. `discoveries` arrived afterwards, was never
+ * mentioned in this module or either of its test files, and therefore fell to "no map" — not
+ * because anyone weighed it but because a whitelist's default is silence. It is the SAME
+ * right-hand slide-over as `inspector`, which is on the list: the canvas keeps 1072 px, the
+ * bottom band is free and the map lives bottom-LEFT, so the two coexist with no conflict at all.
+ * Measured in a browser with both open, at every stop.
+ *
+ * A `Record<Lens, …>` cannot be written without an answer for every lens, so the next surface
+ * somebody adds is a TYPE ERROR until it decides, and `everyLensDecides` below is the same
+ * claim at runtime for anyone reading the list rather than compiling it.
  */
-export const MINIMAP_LENSES: readonly string[] = ['map', 'inspector', 'laws']
+export const MINIMAP_ON_LENS: Readonly<Record<Lens, boolean>> = {
+  map: true,           // the map's own lens
+  inspector: true,     // a right-hand slide-over; the bottom-left corner stays free
+  discoveries: true,   // the same slide-over, the same free corner — measured, not assumed
+  laws: true,          // the same again
+  society: false,      // the graph REPLACES the canvas: a map of a town nobody is drawing
+  director: false,     // the film strip and the moment player take the bottom band
+  chronicle: false,    // the timeline takes it too
+}
 
-export function minimapShown(lens: string, insideId: string | null, hidden: boolean): boolean {
-  return !hidden && insideId === null && MINIMAP_LENSES.includes(lens)
+/** The lenses that get a map, for a reader rather than a compiler. Derived, never transcribed:
+ *  a list beside the table is a second place for a lens to go missing. */
+export const MINIMAP_LENSES: readonly Lens[] =
+  (Object.keys(MINIMAP_ON_LENS) as Lens[]).filter((l) => MINIMAP_ON_LENS[l])
+
+export function minimapShown(lens: Lens, insideId: string | null, hidden: boolean): boolean {
+  return !hidden && insideId === null && MINIMAP_ON_LENS[lens]
 }

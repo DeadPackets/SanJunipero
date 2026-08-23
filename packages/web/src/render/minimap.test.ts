@@ -10,10 +10,12 @@ import { ROAD, WATER, bigTownPlaced, bigTownSide, bigTownTerrain } from './bigTo
 import {
   MARK_GROUNDS, MARK_HALO, MARK_MIN_CONTRAST, MARK_PERSON, MARK_VIEW, MARK_WATCHED,
   MINIMAP_H, MINIMAP_PAGE, MINIMAP_W, VIEW_MIN_PX,
+  MINIMAP_LENSES, MINIMAP_ON_LENS,
   dotOps, mapToWorld, minimapActionFor, minimapFit, minimapPixels, minimapShown, minimapViewBox,
   overlayOps, pageTarget, peopleDots, travelTargetAt, viewHoldsTown, viewOps, worldToMap,
   type MinimapFit,
 } from './minimap.js'
+import { LENSES } from '../ui/route.js'
 
 // ── THE MINIMAP, MEASURED ON A TOWN NOBODY WROTE A SIZE FOR ───────────────────────────────
 //
@@ -581,6 +583,8 @@ describe('a minimap that covers the town it explains is worse than none', () => 
     expect(minimapShown('map', null, false)).toBe(true)
     expect(minimapShown('inspector', null, false)).toBe(true)
     expect(minimapShown('laws', null, false)).toBe(true)
+    // the same right-hand slide-over as the inspector, and it was missing from the whitelist
+    expect(minimapShown('discoveries', null, false)).toBe(true)
     // the society graph replaces the canvas; the film strip and the timeline own the bottom
     expect(minimapShown('society', null, false)).toBe(false)
     expect(minimapShown('director', null, false)).toBe(false)
@@ -590,6 +594,36 @@ describe('a minimap that covers the town it explains is worse than none', () => 
   it('leaves when the viewer is inside a room, and when they put it away', () => {
     expect(minimapShown('map', 's_house_1', false)).toBe(false)
     expect(minimapShown('map', null, true)).toBe(false)
+  })
+
+  // ★ THE WHITELIST WAS THE BUG, NOT THE MISSING WORD IN IT.
+  //
+  // `MINIMAP_LENSES = ['map', 'inspector', 'laws']` was written before the Discovery Record
+  // existed. `discoveries` then arrived, was never once mentioned in this module or in either
+  // of its two test files, and got "no map" by silence — the SAME right-hand slide-over as
+  // `inspector`, which is on the list. Nobody decided; a list defaulted.
+  //
+  // These two close it. The first says every lens the route can produce has an answer written
+  // down, so a lens added later fails HERE rather than shipping a default. The second is the
+  // same claim at compile time, and it is the stronger of the two: `Record<Lens, boolean>`
+  // cannot be written at all without an entry per lens.
+  it('★ every lens the route can reach has an explicit answer — no lens defaults', () => {
+    for (const lens of LENSES) {
+      expect(
+        Object.prototype.hasOwnProperty.call(MINIMAP_ON_LENS, lens),
+        `${lens} has no minimap decision: a new lens must choose, not inherit silence`,
+      ).toBe(true)
+      expect(typeof MINIMAP_ON_LENS[lens], lens).toBe('boolean')
+    }
+    // and no answer for a lens that does not exist, which is how a rename goes unnoticed
+    expect(Object.keys(MINIMAP_ON_LENS).sort()).toEqual([...LENSES].sort())
+  })
+
+  it('the reader\'s list is derived from the table, never transcribed beside it', () => {
+    expect([...MINIMAP_LENSES].sort())
+      .toEqual(LENSES.filter((l) => MINIMAP_ON_LENS[l]).sort())
+    expect(MINIMAP_LENSES.length).toBeGreaterThan(0)
+    expect(MINIMAP_LENSES.length).toBeLessThan(LENSES.length)
   })
 })
 
