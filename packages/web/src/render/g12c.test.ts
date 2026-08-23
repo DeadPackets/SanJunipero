@@ -15,7 +15,7 @@ import type { WorldState } from '@sj/engine/state'
 // reported in the user's own vocabulary.
 
 import {
-  STAGE_FILL_MIN, ZOOM_SETTLE_MS, ZOOM_STOPS, fitStop, initialZoom, nearestStop, stageFill,
+  ZOOM_SETTLE_MS, ZOOM_STOPS, fitStop, initialZoom, nearestStop, stageFill, stageFillFloor,
   zoomScaleAt, zoomTo, zoomWheel,
 } from './camera.js'
 import { landmarkAlpha, landmarksOf, placeLandmarks } from './landmarks.js'
@@ -75,7 +75,7 @@ describe('U3 — "it just looks like chaos… no genuine structure"', () => {
     const drawn = { minX: -520, maxX: 520, minY: -300, maxY: 300 }
     const stage = { w: 1280, h: 720 }
     const fit = fitStop(drawn, stage)
-    expect(stageFill(drawn, fit, stage)).toBeGreaterThanOrEqual(STAGE_FILL_MIN)
+    expect(stageFill(drawn, fit, stage)).toBeGreaterThanOrEqual(stageFillFloor(drawn, stage))
   })
 
   it('names a rank-1 centre a viewer can navigate by', () => {

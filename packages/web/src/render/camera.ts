@@ -313,4 +313,60 @@ export function stageFill(
   return (w * h) / (screen.w * screen.h)
 }
 
-export const STAGE_FILL_MIN = 0.45
+/**
+ * ★ 0.45 WAS UNREACHABLE, AND THE REASON IS THE LADDER RATHER THAN THE CAMERA.
+ *
+ * The generator lane stood the real plotted town and measured **38.85 %** at the only stop it
+ * fits at — 2.5× what R8 measured on the hand-placed town, and still under a threshold nobody
+ * had derived. It declined to nudge the constant, which was right. This is the resolution, and
+ * it is a re-derivation rather than a smaller number: **a fixed area fraction cannot be a law,
+ * because neither term in it is the camera's to choose.**
+ *
+ * THE FIRST TERM — the town's aspect. `tileToScreen` maps any rectangle of tiles to a box of
+ * exactly `TILE_W : TILE_H` = 2:1, and then `drawnBoundsOf` adds `(w+h)·32` of roof upward and
+ * half that to each side, so a DRAWN town is always taller than 2:1 and how much taller depends
+ * on how large the town is against its own buildings. A town cannot be asked to be a shape.
+ *
+ * THE SECOND TERM — the ladder's own coarseness. `fitStop` returns the largest rest stop that
+ * fits, and the rungs below 1× are a FACTOR OF TWO apart. A town wanting 1.99 gets 1, and area
+ * goes as the square, so it lands at a quarter of the fill it asked for. **That gap cannot be
+ * closed by adding a stop**: P18 requires exact stops so the pixel grid stays exact, which
+ * leaves only integers above 1 (the ladder already has 1, 2, 3, 4) and halvings below it, and
+ * the camera lane refused 0.125 on the ≥24 px hit floor. The ladder is as fine as the laws allow.
+ *
+ * So the floor is computed, per town and per stage, from those two terms — and what it asserts
+ * is the thing that IS the camera's to get right: **the fit gives away nothing the ladder did
+ * not take.** On the C12 audit stage it is 0.21 for a large town and 0.16 for the
+ * eleven-building fixture, and R8's unfitted first frame is below both.
+ */
+
+/** How far short of the scale it wanted a fit can land, because the ladder has no rung there.
+ *  Derived from the stops, so a new rung raises the floor by itself. */
+export const ZOOM_STOP_MAX_RATIO: number = ZOOM_STOPS.reduce<number>(
+  (worst, z, i) => (i === 0 ? worst : Math.max(worst, z / ZOOM_STOPS[i - 1]!)), 1)
+
+export function boxAspect(bounds: CameraBounds): number {
+  const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY
+  return h <= 0 ? 0 : w / h
+}
+
+/** The most of the stage this box could ever cover, if the scale were free: it touches the
+ *  binding side of the usable stage exactly, and the margin and its own aspect take the rest. */
+export function stageFillCeiling(
+  bounds: CameraBounds, screen: { w: number; h: number },
+): number {
+  const a = boxAspect(bounds)
+  if (a <= 0 || screen.w <= 0 || screen.h <= 0) return 0
+  const uw = Math.max(1, screen.w - 2 * FIT_MARGIN_PX)
+  const uh = Math.max(1, screen.h - 2 * FIT_MARGIN_PX)
+  const [dw, dh] = a >= uw / uh ? [uw, uw / a] : [a * uh, uh]
+  return (dw * dh) / (screen.w * screen.h)
+}
+
+/** The fill a fit is guaranteed to reach for THIS box on THIS stage: the ceiling, less the one
+ *  rung the ladder may cost it. A first frame below this is a camera fault, not a town fault. */
+export function stageFillFloor(
+  bounds: CameraBounds, screen: { w: number; h: number },
+): number {
+  return stageFillCeiling(bounds, screen) / (ZOOM_STOP_MAX_RATIO * ZOOM_STOP_MAX_RATIO)
+}

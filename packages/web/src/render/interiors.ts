@@ -198,10 +198,25 @@ export type SlotSize = { w: number; h: number }
  * biggest sprite inside a single slot's ground. Integer, because a fractional factor resamples
  * pixel art; one factor for the whole room, because two pieces must never disagree about how
  * big the room is.
+ *
+ * ★ AND IT WAS THE WRONG WAY ROUND. The rule above was written for 24 px art and multiplied it
+ * UP; the library ships 128 px art now, authored against the 128×64 interior tile
+ * (`assetResolution.INTERIOR_TILE`). Multiplied by 2 that is **256 px in a 64 px slot — 4.00×
+ * oversized**, which the art lane measured and could not fix from its own tree.
+ *
+ * The factor is a DIVISOR, and it is derived rather than searched for: the art spans
+ * `(w + h)` half-INTERIOR-tiles and the room lays the same footprint out over `(w + h)`
+ * half-slots of `SLOT_TILES` town tiles, so the ratio is `128 / (SLOT_TILES · TILE_W)` = 2 and
+ * it is the SAME whole number for every footprint — a bed and a bowl cannot disagree about how
+ * big the room is. `drawScale.test.ts` proves that over five footprints.
  */
-export const LIBRARY_MAX_SPRITE_PX = 24
+/** The tile the library authors against — `assetResolution.INTERIOR_TILE.w`. */
+export const LIBRARY_TILE_PX = 128
+export function furnishingDivisor(slotTiles: number): number {
+  return Math.max(1, Math.round(LIBRARY_TILE_PX / (Math.max(1, slotTiles) * TILE_W)))
+}
 export function furnishingScale(slotTiles: number): number {
-  return Math.max(1, Math.floor((slotTiles * TILE_W) / LIBRARY_MAX_SPRITE_PX))
+  return 1 / furnishingDivisor(slotTiles)
 }
 
 /** Furnishings that LIE on the floor rather than stand on it. A flat piece is anchored at the

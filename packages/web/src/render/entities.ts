@@ -19,7 +19,19 @@ export { BUILDING_PX_PER_TILE } from './textures.js'
 
 export const CONSTRUCTION_TINT = 0xcfc6bc
 export const WITHERED_TINT = 0x857d75
-export const ITEM_PX = 24
+/**
+ * ★ THE PRE-C-LEVEL CEILING, MOVED. `assetResolution.ts` says it moved and lists four places it
+ * lived; this was a fifth it missed, and the art lane measured what it cost: the 100 item
+ * records it shipped are authored at `WORLD_SPRITE_PX` = 128, and 128 / 24 is **5.333** — a
+ * fractional downscale against a law that says whole numbers only. Every item in the town was
+ * resampled onto a grid it was not drawn on.
+ *
+ * 32, and it is two derivations that had to agree: 128 / 4 puts the deepest zoom stop at 1:1,
+ * exactly as `CHAR_FIGURE_PX = 52 * 4` does for a cast cell; and (1+1) half-tiles of a 32 px
+ * tile is the world span of the 1×1 ground an item stands on. Either alone would be a constant
+ * fitted to make a division come out. `drawScale.test.ts` holds both.
+ */
+export const ITEM_PX = 32
 export const CROP_SCALE_BASE = 0.4
 export const CROP_SCALE_PER_STAGE = 0.15
 export const PIP_COUNT = 4

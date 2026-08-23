@@ -3,12 +3,14 @@ import { makeCityTemplate } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 import { TILE_H, TILE_W } from './iso.js'
 import {
-  FIT_MARGIN_PX, STAGE_FILL_MIN,
+  FIT_MARGIN_PX, ZOOM_STOP_MAX_RATIO,
   WHEEL_GESTURE_GAP_MS, WHEEL_MIN_DELTA, WHEEL_STEP_DELTA, ZOOM_SETTLE_MS, ZOOM_STEP_COOLDOWN_MS,
-  ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, easeOutCubic, fitStop, fitsAt, initialZoom,
-  drawnBoundsOf, resizeIntent, stageFill, structureBoundsOf, zoomScaleAt, zoomSettled, zoomTo,
+  ZOOM_STOPS, boundsCentre, boxAspect, cameraBoundsOf, clampCamera, easeOutCubic, fitStop, fitsAt,
+  initialZoom, drawnBoundsOf, resizeIntent, stageFill, stageFillCeiling, stageFillFloor,
+  structureBoundsOf, tooBigToFit, zoomScaleAt, zoomSettled, zoomTo,
   zoomWheel, type ZoomStop,
 } from './camera.js'
+import { bigTown } from './bigTown.js'
 
 // THE LANDED RULE, quoted so the before-state is measured and not remembered
 // (scene.ts `onWheel`: one integer step per EVENT, no accumulation, no gate, no animation).
@@ -373,6 +375,76 @@ describe('resizeIntent — a resize keeps the view the viewer asked for', () => 
   })
 })
 
+// ★ AND THE FLOOR IS NO LONGER A CONSTANT. `STAGE_FILL_MIN = 0.45` was a number nobody had
+// derived, and the generator lane proved it unreachable at 38.85 % on the real plotted town.
+// `stageFillFloor(box, stage)` is what replaced it — see the derivation in `camera.ts`. Every
+// assertion below that used to read `STAGE_FILL_MIN` now reads the floor for its OWN box, which
+// is what the sentence was always trying to say.
+describe('★ the fill floor is derived per town and per stage, because both terms are', () => {
+  it('publishes the ceiling and the floor for the boxes this project measures', () => {
+    const rows: Array<[string, typeof TOWN_DRAWN, { w: number; h: number }]> = [
+      ['the eleven-building fixture, drawn', TOWN_DRAWN, STAGE],
+      ['the same, its ground with no roofs', TOWN_BOX, STAGE],
+    ]
+    for (const rings of [1, 2, 3, 4, 5, 10]) {
+      rows.push([`the ring grammar, ${rings} ring(s)`, drawnBoundsOf(bigTown(rings)), STAGE])
+    }
+    const out = rows.map(([name, box, stage]) => {
+      const refused = tooBigToFit(box, stage)
+      const fit = fitStop(box, stage)
+      return `${name.padEnd(36)} aspect ${boxAspect(box).toFixed(3)}`
+        + `  ceiling ${(stageFillCeiling(box, stage) * 100).toFixed(2).padStart(6)}%`
+        + `  floor ${(stageFillFloor(box, stage) * 100).toFixed(2).padStart(6)}%`
+        + (refused
+          ? '  fits at NO stop — "as much of the town as fits", no floor applies'
+          : `  fit ${fit}x -> ${(stageFill(box, fit, stage) * 100).toFixed(2)}%`)
+    })
+    // eslint-disable-next-line no-console
+    console.log(
+      'STAGE FILL — ceiling is what a FREE scale would reach; floor is that less the one rung\n'
+      + `the ladder may cost it (${ZOOM_STOP_MAX_RATIO}x, so a quarter of the area). `
+      + `Stage ${STAGE.w}x${STAGE.h}.\n${out.join('\n')}`)
+    expect(out.length).toBeGreaterThan(4)
+  })
+
+  it('★ the worst rung is a factor of two, and it is read off the ladder', () => {
+    expect(ZOOM_STOP_MAX_RATIO).toBe(2)
+    for (const [i, z] of ZOOM_STOPS.entries()) {
+      if (i === 0) continue
+      expect(z / ZOOM_STOPS[i - 1]!).toBeLessThanOrEqual(ZOOM_STOP_MAX_RATIO)
+    }
+  })
+
+  it('★ a fit gives away nothing the ladder did not take — over every ring count', () => {
+    for (const rings of [1, 2, 3, 4, 5, 6, 10]) {
+      const box = drawnBoundsOf(bigTown(rings))
+      for (const stage of [STAGE, { w: 1280, h: 720 }]) {
+        if (tooBigToFit(box, stage)) continue      // the ladder refuses it; no floor applies
+        const fit = fitStop(box, stage)
+        expect(stageFill(box, fit, stage), `${rings} rings on ${stage.w}x${stage.h}`)
+          .toBeGreaterThanOrEqual(stageFillFloor(box, stage))
+        expect(fitsAt(box, stage, fit)).toBe(true)
+        const next = ZOOM_STOPS[ZOOM_STOPS.indexOf(fit) + 1]
+        if (next !== undefined) expect(fitsAt(box, stage, next)).toBe(false)
+      }
+    }
+  })
+
+  it('the ceiling is the stage itself when a box is the stage’s own shape', () => {
+    const stage = { w: 1728, h: 824 }
+    const usable = { w: stage.w - 2 * FIT_MARGIN_PX, h: stage.h - 2 * FIT_MARGIN_PX }
+    const shaped = { minX: 0, maxX: usable.w, minY: 0, maxY: usable.h }
+    expect(stageFillCeiling(shaped, stage))
+      .toBeCloseTo((usable.w * usable.h) / (stage.w * stage.h), 9)
+  })
+
+  it('a box with no extent has no ceiling and no floor', () => {
+    const none = { minX: 0, maxX: 0, minY: 0, maxY: 0 }
+    expect(stageFillCeiling(none, STAGE)).toBe(0)
+    expect(stageFillFloor(none, STAGE)).toBe(0)
+  })
+})
+
 describe('stageFill — the number R8 is about', () => {
   // ★ RE-MEASURED ON THE TOWN THE GRAMMAR GROWS. R8 was about a town so small on the stage
   // that it read as a model on a table: eleven buildings in 576 × 376 px of drawing, 14.8 % of
@@ -389,16 +461,18 @@ describe('stageFill — the number R8 is about', () => {
   })
 
   // ★ AND THE LADDER IS NOW WHAT LIMITS IT, NOT THE CAMERA. The town wants 1.48× to fill the
-  // stage and the stops go 1, 2 — so the camera takes 1 and leaves 38.8 %, short of the 45 %
-  // `STAGE_FILL_MIN` a smaller town happened to clear. That floor is the CAMERA LANE's ruling
-  // and this lane has not moved it; what is asserted here is that the camera is doing the best
-  // the ladder allows, which is the part the town can be held to.
+  // stage and the stops go 1, 2 — so the camera takes 1 and leaves 38.8 %. The flat 45 %
+  // `STAGE_FILL_MIN` this line used to read no longer exists: the render lane derived
+  // `stageFillFloor(box, stage)` per town and per stage in its place, and 38.8 % clears this
+  // town's own floor of 21.2 %. What is asserted is that the camera does the best the ladder
+  // allows, which is the part the town can be held to.
   it('takes the largest stop that fits, and no larger one does', () => {
     const at = fitStop(TOWN_DRAWN, STAGE)
     expect(at).toBe(1)
     expect(fitsAt(TOWN_DRAWN, STAGE, at)).toBe(true)
     expect(fitsAt(TOWN_DRAWN, STAGE, 2), 'a stop above the fit would cut the town off').toBe(false)
-    expect(stageFill(TOWN_DRAWN, at, STAGE)).toBeLessThan(STAGE_FILL_MIN)
+    expect(stageFill(TOWN_DRAWN, at, STAGE), 'a fit gives away nothing the ladder did not take')
+      .toBeGreaterThanOrEqual(stageFillFloor(TOWN_DRAWN, STAGE))
   })
 
   // WHAT THE BROWSER CAUGHT: fitting the FOOTPRINT box rather than the drawing puts the camera
