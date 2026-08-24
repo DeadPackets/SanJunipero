@@ -144,9 +144,26 @@ Read it as a sentence: **a genome makes a drive, the drive gains a person, the p
 
 > **New in v6, and it is not a changelog.** Everything above this line describes work. This section describes **the plan's own defects**, found by reading all 9 981 lines of v5b against `main` @ `9d76b97`. It is here rather than in a report because an executor who dispatches wave 1 tomorrow needs it, and because a plan that knows what is wrong with it is worth more than one that does not.
 
-### 1. ★★ DOES C8 MEASURE MOTIVE, OR ONLY ACTIVITY? **ONLY ACTIVITY. A REHEARSAL CAN SCORE FULL MARKS ON A TOWN THAT IS MERELY BUSY.**
+### 1. ★★ DID C8 MEASURE MOTIVE, OR ONLY ACTIVITY? **ONLY ACTIVITY — AND THE CONTROLLER RULED, SO IT NOW MEASURES BOTH.**
 
-**This is the largest finding in the revision and it is not a stale reference — it is a hole in the instrument.** The project's own standing question is that *no mind has a motive: every capability exists, no want does.* **Phase C builds the wants. Nothing in Phases E, K or the gate ever asks whether one was answered.**
+> ### ★★★ RULED (controller, 2026-08-24): **the answer rate goes in, as a GATED criterion with a stated threshold.**
+>
+> *"A criterion that reports a number nobody fails is another vacuous guard."* **Criterion 18** is the result, and it is the first criterion in this plan's history that asks whether a mind wanted anything:
+>
+> ```
+> wants.answerRate >= 0.15      PROVISIONAL — anchored to T15's own arithmetic
+> wants.lift       >= 2.0       PROVISIONAL — the design's own 15:1, made computable
+> ```
+>
+> **Both gated, because either alone is satisfiable without the property holding** — a lift of 0/0 is undefined, and a floor alone passes a town that was walking past the target anyway. **Both marked provisional in the plan text**, because no run in this project's history has measured a want-answer rate and a number invented for the first run that could meet it is what C23 forbids.
+>
+> **The mechanism, in three edits and no new task:** T18's `Want` gains a structured `target` beside its prose road (a sentence cannot be joined against an event log — **that is how the loop came to be open**); T8 adds two nullable columns to the `llm_calls` row the turn writes anyway; and T18's new `suppressedWants` keeps the three drives that cleared their rung and lost. **Those three are a control arm for free** — same mind, same tick, same body, same world, the only difference being that one was said out loud in block 6 — and they are what turns an absolute rate with no baseline into a contrast that baselines itself.
+>
+> **And the 15:1 is computed rather than remembered.** *"The need that was given a road was answered 15 times and the need that was not was answered once"* was measured by hand, in one run, and never again. **`wants.lift` is that number, every run, for nothing.**
+>
+> **A sibling lane (`motivation`) is live in `packages/agents` building the want itself.** This lane did not touch it and must not: **the plan is written to measure whatever lands there.** `wants.bySource` is per-drive and reported, so a drive that arrives and is never answered is visible as itself rather than averaged into an aggregate.
+
+**The finding that produced that ruling, kept because a decision with its reasoning deleted is a decision somebody re-opens.** The project's own standing question is that *no mind has a motive: every capability exists, no want does.* **Phase C builds the wants. Nothing in Phases E, K or the gate ever asks whether one was answered.**
 
 **Read the gated criteria as a set and the shape is unmistakable — every one of them is satisfiable by a town that does each thing once and then stops for three weeks:**
 
@@ -159,23 +176,25 @@ Read it as a sentence: **a genome makes a drive, the drive gains a person, the p
 | `D_b ≥ 0.15`, `D_c ≥ 0.12`, `unisonBuckets ≤ 0.34` | **five minds each stuck in a DIFFERENT rut score perfectly.** Divergence measures difference, and five stable ruts are maximally different |
 | the seamcheck's eleven rows | **all eleven are `boolean` or `≥ 1`** |
 
-**There is no criterion anywhere in this plan for persistence, for return, or for cost paid.** A town of five stopped clocks, each stopped at a different hour, passes G8.
+**There was no criterion anywhere in this plan for persistence, for return, or for cost paid. A town of five stopped clocks, each stopped at a different hour, passed G8.** ★ **v6: criterion 18 is the return, and criterion 6's two new within-mind numbers are the persistence. Cost paid is still unmeasured** — see the three below.
 
-**★ AND THE SHARPEST FORM OF IT, WHICH IS A ONE-LINE FACT ABOUT THE ARCHITECTURE.** `chooseWantLine` (T18) is **the only place in the entire plan where a want is produced**. It computes a magnitude, picks the loudest drive above its rung, and renders a line and a road. **No task, no report field, no criterion and no seamcheck row ever reads whether the mind walked the road.** The drives layer is a want generator with no closed loop: it can be completely inert — every road offered, every road ignored, every day — and **every number in this plan is unchanged.**
+**★ AND THE SHARPEST FORM OF IT, WHICH IS A ONE-LINE FACT ABOUT THE ARCHITECTURE.** `chooseWantLine` (T18) is **the only place in the entire plan where a want is produced**. It computes a magnitude, picks the loudest drive above its rung, and renders a line and a road. **In v5b, no task, no report field, no criterion and no seamcheck row ever read whether the mind walked the road.** The drives layer was a want generator with no closed loop: it could be completely inert — every road offered, every road ignored, every day — and **every number in the plan would be unchanged.** ★ **v6 closes it: `report.wants` reads it, `checkRehearsal` fails `want-answer-rate` and `want-lift` on it, and criterion 18 gates it.**
 
 The measured precedent is already in the document and points the other way: *"in one run, with the same five minds, the need that was given a road in block 6 was answered **15 times** and the need that was not was answered **once**."* **That 15:1 is a motive measurement, it is the single strongest piece of evidence in the design, and C8 does not compute it.**
 
-**★ THREE THINGS THAT WOULD MEASURE MOTIVE, ALL COMPUTABLE FROM THE LOG THIS PLAN ALREADY WRITES, NONE OF THEM SCHEDULED.** Named here, not added as tasks — the numbering rule forbids it and the controller should choose:
+**★ THREE THINGS THAT WOULD MEASURE MOTIVE. ONE IS NOW GATED; THE OTHER TWO ARE STILL NOT SCHEDULED, AND THAT IS THE HONEST REMAINDER.**
 
-1. **Answer rate.** Of the wants that crossed a rung and were given a road, what share were followed within N ticks by the act that road named. **`chooseWantLine` already returns `{source, magnitude, line, road}` and the turn is already recorded**; this is a join between two tables that both exist. *A drive with a road nobody walks is a drive that does not exist, and today it reads identically to one that works.*
-2. **Cost paid.** A mind that walks twenty tiles to a grave, or spends 500 ticks joint-building where 100 alone would have done, **has revealed a preference.** Distance and time spent on a **discretionary** act is the cheapest possible motive signal and appears nowhere in T49's schema.
-3. **Persistence under interruption.** `reconsider_at` is landed and `action_interrupted` is an event. **A mind that re-forms the same intention after being interrupted wanted it**; a mind that does not was passing time.
+1. **★ RULED IN, AND IT IS CRITERION 18. Answer rate.** Of the wants that crossed a rung and were given a road, what share were followed within N ticks by the act that road named. **`chooseWantLine` already returns `{source, magnitude, line, road}` and the turn is already recorded**; this is a join between two tables that both exist. *A drive with a road nobody walks is a drive that does not exist, and today it reads identically to one that works.*
+2. **Cost paid — STILL UNMEASURED.** A mind that walks twenty tiles to a grave, or spends 500 ticks joint-building where 100 alone would have done, **has revealed a preference.** Distance and time spent on a **discretionary** act is the cheapest possible motive signal and appears nowhere in T49's schema. **Criterion 18 counts whether the road was walked, not what walking it cost**, so a want answered from two tiles away and one answered from twenty score identically. **This is the largest thing still missing, and it is one more column on a row `report.wants` now writes.**
+3. **Persistence under interruption — STILL UNMEASURED.** `reconsider_at` is landed and `action_interrupted` is an event. **A mind that re-forms the same intention after being interrupted wanted it**; a mind that does not was passing time. **`D_s` (criterion 6) catches a mind that never changes; nothing catches a mind that never persists**, and those are opposite failures.
 
-**Why this matters more than any stale signature in this document:** the plan can pass G8, ship, and the read-through can report a lively town — and **we would still not know whether the drives layer did anything at all.** T50's step 4 asks a human *"whether the discretionary time produced anything worth watching"*, and that question is currently the **only** instrument pointed at motive in the entire chunk. **If exactly one of the three above is added, make it the answer rate**: it is a join over two existing tables, it costs no live spend, and it is the direct test of the sentence Phase C was built on.
+**Why this mattered more than any stale signature in this document:** the plan could have passed G8, shipped, and the read-through could have reported a lively town — and **we would still not have known whether the drives layer did anything at all.** T50's step 4 asks a human *"whether the discretionary time produced anything worth watching"*, and in v5b that question was the **only** instrument pointed at motive in the entire chunk. **It is now the third of three**, behind criterion 18 and criterion 6's within-mind half.
+
+**★ AND THE LIMIT OF WHAT WAS FIXED, SO NOBODY READS CRITERION 18 AS THE WHOLE ANSWER.** The answer rate measures whether the road was walked. **It does not measure what walking it cost, and it cannot tell a want that was felt from one that was convenient** — a mind already walking past the unseen tile answers a tedium want for free. **The lift is the guard against that** (a convenient answer is equally convenient for a suppressed want, so the control arm absorbs it), and it is a partial guard rather than a complete one. **If lift and rate disagree — a healthy rate at a lift near 1 — the roads are naming places minds were going anyway**, which is a finding about the roads and not about the minds, and the read-through is where it surfaces.
 
 ### 2. Vacuous, contradictory or dead — by number
 
-**Seven were fixed in place in v6 because they would stop an executor dead. Five are named and left, because fixing them is a judgement the controller should make.**
+★★ **v6, after the controller's rulings: TWELVE of the fourteen are fixed or addressed. Two remain, and neither is an executor's to fix** — one is blocked by a user ruling and one is not a defect.
 
 | # | Task | What is wrong | v6 |
 |---|---|---|---|
@@ -188,17 +207,17 @@ The measured precedent is already in the document and points the other way: *"in
 | 7 | **T49 / T50 criterion 13** | `elder-death-unexpected` **fails the run if an elder dies.** Phase F2 exists to make an elder death possible, distinguishable and ceremonial. It is inert today — 21 sim-days of thirty-year-olds cannot produce one — and **becomes wrong the moment aging works**, which is the worst kind of dormant guard | **FIXED** — reported, not gated. `births: 1` stays a failure: 72-day gestation makes a birth *impossible*, not merely unexpected, and the two are different cases |
 | 8 | **T49** | `expect(bare.furnishings.placed).toBe(0)` asserts a property of the fixture the line above just wrote. **True whatever `checkRehearsal` does** | **FIXED** |
 | 9 | **T22** | `it('★ BOTH HEAVY KINDS ALREADY STAND IN THE TOWN')` checks one. **The town stands no `shed`** — T62's own box records it — and OD19's argument rests on `storehouse` alone | **FIXED** |
-| 10 | **T30** | Four of its five rows are declared to PASS on the first run. The task calls this correct and it is — they assert landed guarantees — but **T30 is one real step and four assertions**, and it is scheduled as a task | **LEFT.** It is honest work and cheap; it is named so nobody counts it as a fifth of Phase G |
-| 11 | **T48 step 1, item 10** | *"median and p99 tick compute measured ON THE BOX"* with **no threshold stated in the task and no gate in T51.** The G11a numbers (<50 ms median, <250 ms p99) are quoted as the reason to measure and then never compared against | **LEFT** — the threshold is a ruling, not an executor's call. **If the box misses it, nothing in this plan notices** |
-| 12 | **T50 criterion 3, and the survival tax generally** | Reported, never gated, by a correct ruling (C26). But the plan prints **two** classifiers in **three** reports across **21 days** and gates on neither. **That is six numbers a reader must interpret with no bar** | **LEFT** — C10 requires both and the ruling is the user's |
-| 13 | **T24** | Four unrelated changes in four packages: prose phrases, a `teach` mint, an `isExpressive` inversion, an arbiter context. **They share no file and no symbol**, and one of them (the inversion) is described as *"the biggest wall"* and *"the largest single source of Discovery Records in the run"* | **LEFT** — splitting it renumbers, which is forbidden. **The wave table treats it as one wave-1 task, and a lane may take its four steps as four commits** |
-| 14 | **T51 checks 1–5** | Re-assert `checkRehearsal` offline against committed reports. **That duplicates T49 exactly**, on purpose, so the gate re-runs for ever | **LEFT — and it is correct.** The user kept re-runnable file tests as *"just good tests"* |
+| 10 | **T30** | Four of its five rows are declared to PASS on the first run — which looks like the thing C24 forbids | **★ v6 FIXED by reframing.** They are **REGRESSION ASSERTIONS, not TDD**: C24 forbids celebrating a green with no implementation, not asserting a landed guarantee you are about to build on. The box now says so, says the value is entirely in the STOP (**T32 gives the arbiter its first production caller and the seam has one caller today**), and says plainly that T30 is one step of work plus four cheap assertions |
+| 11 | **T48 step 1, item 10** | *"median and p99 tick compute measured ON THE BOX"* with **no threshold in the task and no gate in T51** — a number measured and discarded | **★ v6 FIXED.** No threshold is invented: **G11a's own ratified bar (`median < 50 ms`, `p99 < 250 ms`) is written into the step and gated by G8 check 6.** The only new fact was ever that an Ampere core is not the machine it was measured on. **A miss is a STOP** |
+| 12 | **T50 criterion 3, and the survival tax generally** | Reported, never gated. The plan prints **two** classifiers in **three** reports across **21 days** and gates on none of it — six numbers a reader must interpret with no bar | **BLOCKED, and it is not mine to unblock.** **C26 is a specification change the user made in writing**, demoting the tax to a secondary indicator, and **C10 requires both classifiers in every report.** Gating it would overturn a user ruling with a commit. **The bar it lacks is the user's to set, and the honest cost is that the tax is now six unfalsifiable numbers** |
+| 13 | **T24** | Four unrelated changes in four packages sharing no file and no symbol, one of them described as *"the biggest wall"* | **★ v6 PARTIALLY FIXED — as far as docs scope reaches.** **Renumbering is forbidden**, so the task keeps its number; **its Step 5 becomes four commits, one per wall, printed.** A lane may take them in any order, in parallel, or stop after two and have landed something whole. **Wall 4 owns criterion 9's debt and is the smallest** |
+| 14 | **T51 checks 1–5** | Re-assert `checkRehearsal` offline against committed reports, duplicating T49 | **NOT A DEFECT, and left deliberately.** The duplication is the point — it makes the gate re-runnable for ever — and the user kept re-runnable file tests as *"just good tests"* |
 
 ### 3. Which tasks assume a capability that does not exist, or has since been built differently
 
 **Nine. Eight are fixed above or in their tasks; the ninth is a live hazard.**
 
-Already answered by a landed lane: **T21 Step 0** (OD22 landed at `8056f1f` — deleted), **T22's hand counter** (`handsOnSite` is landed and exported — consumed rather than written), **T22's `stepBuild` arity** (**three** at `9d76b97`, not the two v5b corrected it to — the fourth revision in a row to get this one signature wrong), **T7's `BLOCK1_SHA256` import** (symbol deleted), **T29's nine re-pin sites** (all deleted), **T51 check 9** (its subject deleted), **T43/T50's live runner** (deleted).
+Already answered by a landed lane: **T21 Step 0** (OD22 landed at `8056f1f` — deleted), **T22's hand counter** (`handsOnSite` is landed and exported — consumed rather than written), **T22's `stepBuild` arity** (**THREE** at `9d76b97` — settled in the plan with its verification command beside it, because v5 wrote three, v5b "corrected" it to two *with a measurement that was true at the time*, and it is three again: **`git grep -n "stepBuild(" -- packages/engine/` returns seven landed call sites and every one passes three**), **T7's `BLOCK1_SHA256` import** (symbol deleted), **T29's nine re-pin sites** (all deleted), **T51 check 9** (its subject deleted), **T43/T50's live runner** (deleted).
 
 **Not one of the 66 tasks is already done.** `packages/agents/src/{founders,genome,drives}`, `packages/engine/src/{discovery,rescue,furnishings,deathTaxonomy,testFixtures,ageing.prose}`, `packages/supervisor/`, `packages/gateway/src/staticSpa.ts`, `packages/shared/src/canon.ts` and `deploy/` **all do not exist**; `TickLoop` has no `pause`. **What has landed is prerequisites, not tasks** — `groundForBuilding`, `makeablesLine`'s second parameter, `joinableSite`, `handsOnSite`, the mason, the first night — and each is a task's *foundation* rather than its content.
 
@@ -215,6 +234,8 @@ Already answered by a landed lane: **T21 Step 0** (OD22 landed at `8056f1f` — 
 **One candidate was examined and KEPT, and it is listed rather than deleted because the brief's rule is that ambiguity keeps the work: T27's `comparableRuns`.** It refuses a comparison unless every HELD field matches, which is reproducibility machinery, and the user cut cross-run reproducibility. **It stays**, for two reasons: `D_r` measures whether two towns **differ**, which is the opposite of reproducibility and is U31's explicit ask; and a `D_r` computed across two runs on different prompt versions is a number that means nothing, so the guard is what makes the measurement honest rather than what makes it provable. **If the controller reads it the other way, it is one function and its four test rows, and deleting it is a ten-minute follow-up.**
 
 **The honest recommendation: keep 66, and split three of them at execution time without renumbering.** T24 into its four walls, T32 into wire / genesis-or-resume / births, T50 into runs A, B and C. Each is already stepped that way. **The plan's own numbering rule permits it: a task number is an identity, not a unit of work.**
+
+**★ v6 — ONE OF THE THREE IS DONE: T24's Step 5 is now four commits, printed, one per wall.** T32 and T50 are left as they stand — their steps already read as separable, and neither sits on a lane's critical path in a way a commit boundary would change. **Still 66. Still 15 phases. Still nothing renumbered.**
 
 **Goal:** Turn the town from a place that subsists into a place that builds, gives, ages and differs — five minds that start **neutral** and acquire character through play, measured against a mode-collapse number that can fail a gate, in a world where **death is punctuation rather than attrition** — then ship it as an arm64 Docker Compose stack, pass **GATE G8**, and put it on a subdomain last.
 
@@ -4021,12 +4042,33 @@ function handedTown(ids: readonly string[], kind = 'storehouse'): WorldState {
 // It takes no coordinate, and `siteAt(state, 61, 68)` becomes `theSite(state)`, because
 // (61, 68) was a coordinate v3 chose and no lattice would ever offer. The fixture returns the
 // world it seated so the assertions read the site rather than retyping it (C14).
-// ★★ v6 — AND NOW IT TAKES THREE AGAIN. `export function stepBuild(state: WorldState, config:
-// SimConfig, agentId: string): PendingEvent[]` at `verbs.ts:1902` on `main` @ `9d76b97`. The
-// config came back with the build-ledger cap, which needs `buildTicks(config, p.kind)` to know
-// how much work the walls still owe. v5 passed three and was wrong; v5b corrected it to two and
-// is now wrong the other way. THREE. The rows below pass `CFG`, and `buildSeam.test.ts:249`
-// on `main` is the landed call to copy: `stepBuild(s, CFG, id)`.
+// ★★★ v6 — `stepBuild` TAKES THREE ARGUMENTS. SETTLED, WITH THE COMMAND, SO THIS IS NOT
+// RE-LITIGATED A FIFTH TIME.
+//
+//   export function stepBuild(state: WorldState, config: SimConfig, agentId: string): PendingEvent[]
+//   packages/engine/src/verbs.ts:1902   @ main 9d76b97
+//
+// Verify it rather than trusting this comment — that is the whole lesson of the four revisions
+// below, and it costs one command:
+//
+//   git grep -n "export function stepBuild" -- packages/engine/src/verbs.ts
+//   git grep -n "stepBuild(" -- packages/engine/ | grep -v "export function"
+//
+// The second command returns SEVEN landed call sites at `9d76b97` and every one passes three:
+// `buildSeam.test.ts` at 219 (twice), 222, 248, 513, 625, 635 and `worldTick.ts:50`
+// (`stepBuild(ctx.state(), ctx.config, id)`). A signature with seven agreeing callers is not
+// a judgement call.
+//
+// THE HISTORY, because it is the reason this comment is nine lines and not one:
+//   v3/v4  wrote three            — correct at the time
+//   v5     wrote three            — correct at the time
+//   v5b    "corrected" it to TWO, and printed a measurement: "stepBuild.length === 2".
+//          That was TRUE at 645a8d9. The `many-hands` lane then put the config back, because
+//          the build-ledger cap needs `buildTicks(config, p.kind)` to know how much work the
+//          walls still owe, and a stale measurement reads exactly like a fresh one.
+//   v6     THREE, verified at 9d76b97 by the two commands above.
+//
+// The rows below pass `CFG`. `buildSeam.test.ts:248` is the landed call to copy.
 describe('a beam that does not go up with two', () => {
   it('MAKES NO PROGRESS AT ALL below the hand count — not slow progress', () => {
     const state = siteUnderConstruction('storehouse', ['amara', 'yusuf'])
@@ -4218,6 +4260,21 @@ git commit -m "fix(engine): a starving neighbour reads as starving, not as injur
 
 Four reachability walls, closed together because each is one small change and they all serve the same sentence: **the arbiter exists to admit what we did not author, and today it refuses in five places.**
 
+> ### ★ v6 — THIS IS FOUR TASKS WEARING ONE NUMBER, AND ITS FOUR WALLS GET FOUR COMMITS.
+>
+> The four changes **share no file and no symbol**: prose phrases in `prompt/prose.ts`, a mint branch in `engine/src/verbs.ts`, a rewrite of `arbiter/src/expressive.ts`, and an assertion over `runtime/arbiterSeam.ts`. **They are in four packages and they are independent of each other.** One of them — the expressive inversion — is described in this task's own text as *"the biggest wall"* and *"the largest single source of Discovery Records in the run"*, and it is sharing a number with two prose sentences.
+>
+> **The task is NOT split and NOT renumbered** — eleven rulings and five delta documents cite tasks by number, and a task number is an identity. **What changes is that its Step 5 is four commits rather than one**, so a lane may take the four walls in any order, in parallel, or stop after two and have landed something whole:
+>
+> ```
+> git commit -m "feat(agents): what your hands know, and what another pair looks like"      # wall 1
+> git commit -m "feat(engine): a town can pass on the craft it invented"                     # wall 2
+> git commit -m "feat(arbiter): sitting still stops being impossible"                        # wall 3
+> git commit -m "feat(agents): the arbiter can see the well it keeps denying"                # wall 4
+> ```
+>
+> **Wall 4 is the one that owns criterion 9's inherited debt** (see the box above), and it is the smallest of the four. **A lane short of time takes wall 4 and wall 3 and leaves the prose.**
+
 1. **A mind is never told what it is good at, and never told what anyone else is good at**, so `teach` has never had a reason. Two prose additions, in words and never numbers: *"Your hands know the needle better than anything else you do."* and, on `PerceivedAgent` exactly as R21-C did for `condition`: *"She works the fire like someone who has done it a thousand times."* **★ v4: the tailoring phrase said "the loom" in v3.** The phrase names the SKILL, not the machine, and *"the needle"* is what a contemporary hand at that track actually holds (C29). **Every phrase in the skill-word table is checked the same way: it must name something a 2026 rural adult would recognise in their own hands.**
 2. **A new craft tradition is refused by name.** `teach` returns `no such skill: <track>` against a closed list of twelve, so **a town that invents a practice cannot pass it on.** Mint an unknown track on first `skill_gained` — which is exactly how a tradition starts.
 3. **Postures and gestures are refused as crafts — the biggest wall.** `isExpressive` requires a word from a **closed 22-stem list**, and everything else goes to the full adjudicator, which answered *"this would need a craft the town has not yet reached"* to `sit`, `wait`, `kneel and bind Amara's cut`, and *"I plant my feet wider, keep the axe raised… 'Who hit me?'"* — **seven of eleven `impossible` verdicts.** The refusal is a lie about the world and it is the string the mind reads. **Invert the test:** an act is expressive if it names **no mutating stem and no known verb**, rather than if it matches a blessed word.
@@ -4311,8 +4368,18 @@ Expected: PASS, full suite green (phase boundary), goldens unmoved.
 - [ ] **Step 5: Commit.**
 
 ```bash
-git add packages/engine/src packages/agents/src packages/arbiter/src
-git commit -m "feat: what your hands know, a tradition that can be taught, and an arbiter that can see (U30)"
+# ★ v6 — FOUR COMMITS, ONE PER WALL. They share no file; see the box at the head of this task.
+git add packages/agents/src/prompt/
+git commit -m "feat(agents): what your hands know, and what another pair of hands looks like (U30)"
+
+git add packages/engine/src/verbs.ts packages/engine/src/verbs.test.ts
+git commit -m "feat(engine): a town can pass on the craft it invented — an unknown track is minted (U30)"
+
+git add packages/arbiter/src/expressive.ts packages/arbiter/src/expressive.test.ts
+git commit -m "feat(arbiter): sitting still stops being impossible — the expressive test inverts (U30)"
+
+git add packages/agents/src/runtime/arbiterSeam.ts packages/agents/src/runtime/arbiterSeam.test.ts
+git commit -m "feat(agents): the arbiter can see the well it keeps denying (U30, criterion 9's debt)"
 ```
 
 ---
@@ -7419,6 +7486,10 @@ describe('the seam, as landed', () => {
 Run: `pnpm vitest run packages/agents/src/runtime/arbiterSeam.verify.test.ts`
 Expected: the four seam rows PASS immediately; the subpath row FAILS with `ERR_PACKAGE_PATH_NOT_EXPORTED`. **If a seam row fails, STOP** — something regressed in C11 and T32 rests on it.
 
+> **★ v6 — WHAT THIS TASK IS, SAID PLAINLY, BECAUSE FOUR OF ITS FIVE ROWS PASS ON THE FIRST RUN AND THAT LOOKS LIKE THE THING C24 FORBIDS.** It is not. **C24 forbids celebrating a green that had no implementation; it does not forbid asserting a landed guarantee you are about to build on top of** — the same distinction T19 Step 2 draws for `groundForBuilding`. **These four rows are REGRESSION ASSERTIONS, not TDD**, and their value is entirely in the STOP: T32 wires the arbiter into a production process for the first time in this project's history, and **the seam has exactly one caller today, C11's gate script.** If any of the four is red, T32 is being built on something that has already moved.
+>
+> **So the honest accounting, which the wave table uses: T30 is one step of work — two barrels and four subpath entries — plus four assertions that cost a minute and buy a STOP.** It is scheduled as a task because it produces the four subpaths T32 imports through, not because it is a task-sized amount of work.
+
 - [ ] **Step 3: Add the two barrels and the subpaths.** Do not widen `src/index.ts`.
 
 - [ ] **Step 4:** `pnpm vitest run packages/agents/ && pnpm typecheck` — PASS.
@@ -8709,7 +8780,7 @@ executed = any marker matched
 
 **Run it against the neutral arm as well as the authored one, and report both.** A mind with no authored values is a mind with no authored *refusals*, and whether neutral minds are more suggestible is exactly the kind of thing this experiment should be able to answer. The gate's pass bar applies to **both** arms.
 
-- [ ] **Step 1: Write the failing livetest.**
+- [ ] **Step 1: Write the failing test.** ★ **v6 — an ordinary `.test.ts` in the main suite, not a `.livetest.ts`.** It reads a committed report and makes no live call; the spend is in `g8-run.ts`, which is a script.
 
 ```ts
 // packages/agents/src/live/injection/g8-injection.report.test.ts
@@ -9191,7 +9262,7 @@ git commit -m "chore(deploy): hourly copies, kept for two days, and a drill that
 7. one backup directory exists after the interval;
 8. `docker compose restart sim` and the log says **`resumed`** with the tick preserved and **still five agents** — T32's resume branch, proved in the environment that will actually restart it;
 9. `/api/health` reports `arm: "neutral"`;
-10. **median and p99 tick compute measured ON THE BOX** — the G11a perf gate (<50 ms median, <250 ms p99) was measured on a developer machine, and an Ampere core is not that machine.
+10. **median and p99 tick compute measured ON THE BOX, AND COMPARED AGAINST THE THRESHOLD THAT ALREADY EXISTS** — **`median < 50 ms` and `p99 < 250 ms`, which are G11a's own numbers.** *★ v6: v5b told this step to measure both and named G11a's bar as the reason to bother, and then compared against nothing and gated nothing — a number measured and discarded. **No threshold is invented here: the bar is the one the project already ratified**, and the only new fact is that an Ampere core is not the machine it was measured on. **If the box misses it, that is a finding about the box and it is a STOP**, not a number to write down and walk past.* **G8 check 6 asserts both.**
 
 - [ ] **Step 2:** Run it against nothing — FAIL.
 - [ ] **Step 3:** `docker compose up -d` on linux/arm64 and drive it.
@@ -9881,7 +9952,7 @@ git commit -m "test(supervisor): G8 dress rehearsal — 21 sim-days neutral, a s
 3. **The cost gate holds** — `cost-after.json` against `cost-baseline.json`, every row of T41's table.
 4. **★ The town builds, the town differs, and ★★ v6 SOMEBODY IN IT WANTED SOMETHING** — `production.structuresCompleted ≥ 1`, `modeCollapse.pass === true` (**both halves: between-mind AND `D_s` / `minDiscretionaryVerbEntropy`**), and **`wants.answerRate ≥ 0.15` with `wants.lift ≥ 2.0`**, in run A. *These are the whole point of the chunk and they get their own check rather than hiding inside criterion lists.* **★★ v6, RULING 3 — and the check reads `manifest.held.scriptedPolicies` first: `{devMason: false, devJointBuild: false}`, or the build number is scaffolding and the check has measured nothing.*
 5. **★ THE TOWN DOES NOT LOSE ANYONE IT SHOULD HAVE SAVED, AND IT DOES NOT GO QUIET DOING IT.** `classifyDeaths(report.deaths).pass === true` in **all three runs**, and `socialVerbDiversity ≥ 3` in all three. *These are the user's directive and its paired trap, and they get their own check for the same reason check 4 does: a gentler world that produced an emptier town would pass every other line on this page.*
-6. **The stack is alive on arm64** — `deploy/smoke.sh` output, including the restart-resume line, the retrieval-index line, and the on-box tick figures.
+6. **The stack is alive on arm64, AND FAST ENOUGH ON IT** — `deploy/smoke.sh` output, including the restart-resume line, the retrieval-index line, and the on-box tick figures **compared against G11a's ratified bar: `median < 50 ms`, `p99 < 250 ms`.** *★ v6: v5b recorded the figures and gated on neither. The bar is not invented here — it is G11a's, and the only thing new is the machine. **A miss is a STOP and a finding about the box.***
 7. **The restore drill replays** — `deploy/restore-drill.sh` printed `RESTORE DRILL OK` **and** the replay hash matched.
 8. **The observatory serves from the stack** — `curl -fsS http://127.0.0.1:8787/ | grep -q '<div id="root">'`. *The base draft's check was "public URL serves the observatory"; the public URL belongs to Phase L by ruling, so G8 gates on the stack serving locally and Phase L signs off the public one.*
 9. **★ v6 — REPLACED. `git grep -cE "[0-9a-f]{64}" -- 'packages/**/*.ts'` RETURNS ZERO.** *v5b's check 9 was a seventeen-line census: read eleven hash literals out of seven files, quote them with their line numbers, match them against Phase F's commit body, and STOP on any count other than twelve. **Its expected count was already wrong** — it asserted twelve and the tree returned nineteen — so it was a false STOP waiting to happen at the launch gate, which is precisely the defect it accused v4 of. **The `unpin` lane deleted every literal it counted.***
