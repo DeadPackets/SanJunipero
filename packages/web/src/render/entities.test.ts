@@ -1,12 +1,63 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// ★ THE WIRING HAS TO BE TESTED, NOT THE FUNCTION. Every assertion in this file about the
+// prism's SHAPE passes if `structureHitPoints` is never called — that is the vacuous-guard
+// family's whole shape, and this project has now found sixteen of them. So the layer is driven
+// for real against a structural Pixi, and what is read back is the hitArea the SPRITE carries.
+vi.mock('pixi.js', () => {
+  class Point {
+    x = 0; y = 0
+    set(x: number, y: number = x): void { this.x = x; this.y = y }
+  }
+  class Container {
+    children: Container[] = []
+    parent: Container | null = null
+    visible = true; zIndex = 0; destroyed = false; eventMode = ''; cursor = ''; tint = 0xffffff
+    alpha = 1
+    position = new Point(); scale = new Point()
+    handlers = new Map<string, (e: unknown) => void>()
+    hitArea: unknown = null
+    addChild(...cs: Container[]): void {
+      for (const c of cs) { c.parent = this; this.children.push(c) }
+    }
+    on(name: string, fn: (e: unknown) => void): this { this.handlers.set(name, fn); return this }
+    fire(name: string, e: unknown = { client: { x: 0, y: 0 } }): void { this.handlers.get(name)?.(e) }
+    destroy(): void { this.destroyed = true }
+  }
+  class Sprite extends Container {
+    anchor = new Point()
+    texture: unknown = null
+  }
+  class Graphics extends Container {
+    clear(): this { return this }
+    poly(): this { return this }
+    fill(): this { return this }
+    stroke(): this { return this }
+    rect(): this { return this }
+  }
+  class Texture { static EMPTY = new Texture() }
+  class Polygon {
+    points: number[]
+    constructor(points: number[] = []) { this.points = points }
+  }
+  class Rectangle {
+    constructor(public x = 0, public y = 0, public width = 0, public height = 0) {}
+  }
+  return { Container, Graphics, Point, Polygon, Rectangle, Sprite, Texture }
+})
 import type { Structure, WorldState } from '@sj/engine/state'
+import type { AssetRecord } from '@sj/shared'
 import { depthKey, tileToScreen } from './iso.js'
+import { Container as MockContainer } from 'pixi.js'
 import {
   BUILDING_PX_PER_TILE, BUILD_TICKS_FULL, ENTERABLE_KINDS, LOOK_INSIDE, PIP_COUNT, doorTileOf,
-  entersOnClick, footprintHitPoints, pipsFilled, structureHitPoints, structureHoverText,
-  structureZIndex,
+  entersOnClick, entitySpriteOf, footprintHitPoints, pipsFilled, structureHitPoints,
+  structureHoverText, structureZIndex, syncEntities,
 } from './entities.js'
+import type { Scene } from './scene.js'
+import type { TextureBook } from './textures.js'
+import type { WorldStore } from '../state/worldStore.js'
 import { polygonBounds, resolveHit } from './hitShapes.js'
 import { builtFormSpec } from './builtForm.js'
 import { inFrontOf, structureDepthBox } from './depth.js'
@@ -232,6 +283,120 @@ describe('a structure hit-tests the structure', () => {
     expect(footprintHitPoints(1, 1)).toEqual([0, 0, 16, 8, 0, 16, -16, 8])
     expect(footprintHitPoints(2, 2)).toEqual([0, -8, 32, 8, 0, 24, -32, 8])
     expect(footprintHitPoints(1, 1, 2)).toEqual([0, 0, 8, 4, 0, 8, -8, 4])
+  })
+})
+
+// ── ★ AND THE SPRITE IS ACTUALLY CARRYING IT ─────────────────────────────────────────────
+
+describe('★ the layer puts the prism on the sprite, and keeps it there', () => {
+  type Cam = () => void
+  /** One codex root for `house`, shaped exactly as the town's own: a 512 px cell fitted to the
+   *  (w+h)·32 square, feet at its bottom centre. `scale` is 0.25 and known synchronously. */
+  const HOUSE_ART = {
+    id: 'asset_house', seq: 1, class: 'building', desc: 'a house', kind: 'house',
+    meta: JSON.stringify({
+      version: 'v4-hires-building', kind: 'house', footprint: { w: 2, h: 2 },
+      cell: { w: 512, h: 512, feetX: 256, feetY: 511 },
+    }),
+    footprint: { w: 2, h: 2 }, widthPx: 512, heightPx: 512, status: 'ready', score: null,
+    attempts: 1, costUsd: 0, createdAt: '',
+  } as unknown as AssetRecord
+
+  function harness(structures: Structure[], records: AssetRecord[] = []): {
+    scene: Scene; store: WorldStore; book: TextureBook
+    zoom: { at: number }; cameras: Cam[]; doors: string[]
+  } {
+    const zoom = { at: 1 }
+    const cameras: Cam[] = []
+    const doors: string[] = []
+    const scene = {
+      layers: { entities: new (MockContainer as never as typeof Object)() as { addChild: () => void } },
+      tags: { show: () => {}, hide: () => {}, hideAll: () => {} },
+      getZoom: () => zoom.at,
+      onCamera: (cb: Cam) => { cameras.push(cb); return () => {} },
+      addDepthSource: () => () => {},
+    } as unknown as Scene
+    const store = {
+      getState: () => ({
+        structures: Object.fromEntries(structures.map((s) => [s.id, s])), items: {}, crops: {},
+      }) as unknown as WorldState,
+      getConfig: () => null,
+      assetsSeq: () => 0,
+      assetRecords: () => records,
+    } as unknown as WorldStore
+    const book = {
+      get: () => new Promise<never>(() => {}),
+      swap: () => new Promise<never>(() => {}),
+    } as unknown as TextureBook
+    return { scene, store, book, zoom, cameras, doors }
+  }
+
+  const house = box(20, 20, 2, 2, 'house')
+  const cottage = box(30, 30, 3, 2, 'cottage')
+
+  // The harness hands the layer no asset records, so these buildings take the no-art path and
+  // draw a `builtFormSpec` volume — which is a real product state (the well and the fire pit
+  // stood like that until the structure set was commissioned) and the one whose hit prism can
+  // be checked without a texture round trip.
+  it('★ the sprite\'s hitArea IS the prism — not the diamond, and not nothing', () => {
+    const h = harness([house])
+    syncEntities(h.scene, h.book, h.store, (id) => h.doors.push(id))
+    const sprite = entitySpriteOf(h.scene, 'structure', house.id)!
+    expect(sprite).not.toBeNull()
+    const pts = (sprite.hitArea as unknown as { points: number[] }).points
+    expect(pts).toEqual(structureHitPoints('house', 2, 2, 1, 1, false))
+    expect(pts).toHaveLength(12)                                   // six points, not four
+    expect(pts).not.toEqual(footprintHitPoints(2, 2))
+  })
+
+  it('★ and it is re-cut when the camera settles, because the floor is a SCREEN size', () => {
+    const h = harness([house])
+    syncEntities(h.scene, h.book, h.store, () => {})
+    const sprite = entitySpriteOf(h.scene, 'structure', house.id)!
+    const before = [...(sprite.hitArea as unknown as { points: number[] }).points]
+    h.zoom.at = 0.25
+    for (const cb of h.cameras) cb()
+    const after = (sprite.hitArea as unknown as { points: number[] }).points
+    expect(after).not.toEqual(before)
+    expect(after).toEqual(structureHitPoints('house', 2, 2, 1, 0.25, false))
+    expect(polygonBounds(after).w * 0.25).toBeGreaterThanOrEqual(24 - 1e-9)
+  })
+
+  it('★ a building WITH art gets the art prism in the frame it appears, not a round trip later', () => {
+    // the book never resolves in this harness, so anything set inside a `.then` is not set at
+    // all — which is the point: the manifest's scale is known synchronously and so is the shape
+    const h = harness([house], [HOUSE_ART])
+    syncEntities(h.scene, h.book, h.store, () => {})
+    const pts = (entitySpriteOf(h.scene, 'structure', house.id)!
+      .hitArea as unknown as { points: number[] }).points
+    expect(pts).toEqual(structureHitPoints('house', 2, 2, 0.25, 1, true))
+    // 128 world px across at an art scale of 0.25 — the drawn cell, not the 32 px built volume
+    expect(polygonBounds(pts).w * 0.25).toBe(128)
+  })
+
+  it('and the art path re-cuts AGAIN when the texture lands and applies the scale', () => {
+    const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
+    const applied = src.slice(src.indexOf('function applyBuildingArt('), src.indexOf('function cutHitPrism('))
+    expect(applied.match(/cutHitPrism\(/g)).toHaveLength(3)  // no-art, art-synchronous, art-landed
+  })
+
+  it('★ a tap on an enterable building GOES IN; a tap on anything else does not', () => {
+    // the provenance popover fetches and then reaches for the DOM; the point here is only
+    // which of the two answers the tap chose, so both are stubbed rather than exercised
+    vi.stubGlobal('fetch', () => Promise.resolve({ ok: false }))
+    vi.stubGlobal('document', {
+      createElement: () => ({ setAttribute: () => {}, style: {}, className: '', textContent: '' }),
+      body: { appendChild: () => {} },
+      addEventListener: () => {},
+    })
+    const h = harness([house, cottage])
+    syncEntities(h.scene, h.book, h.store, (id) => h.doors.push(id))
+    ;(entitySpriteOf(h.scene, 'structure', cottage.id) as never as { fire: (n: string) => void })
+      .fire('pointertap')
+    expect(h.doors).toEqual([])                                    // a cottage has no room
+    ;(entitySpriteOf(h.scene, 'structure', house.id) as never as { fire: (n: string) => void })
+      .fire('pointertap')
+    expect(h.doors).toEqual([house.id])
   })
 })
 

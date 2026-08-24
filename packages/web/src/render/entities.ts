@@ -216,6 +216,9 @@ function applyBuildingArt(
     entry.form = null
   }
   entry.url = art.url
+  // The manifest's scale is known NOW, so the prism is cut now: a building is clickable at its
+  // real shape from the frame it appears, not a texture round trip later.
+  cutHitPrism(entry, entry.hitZoom, art.scale ?? 1)
   const swapping = swapFrom !== null && swapFrom !== art.url
   const p = swapping ? book.swap(swapFrom, art.url) : book.get(art.url)
   void p.then((t) => {
@@ -234,10 +237,9 @@ function applyBuildingArt(
  * Re-cut the structure's hit prism. Called when the art's scale lands, when the footprint
  * changes and when the camera settles at a new zoom — never per frame.
  */
-function cutHitPrism(entry: Entry, zoom = entry.hitZoom): void {
+function cutHitPrism(entry: Entry, zoom = entry.hitZoom, scale = entry.sprite.scale.x || 1): void {
   entry.hitZoom = zoom
   const { w, h } = entry.footprint
-  const scale = entry.sprite.scale.x || 1
   entry.sprite.hitArea = new Polygon(
     structureHitPoints(entry.kind, w, h, scale, zoom, entry.url !== NO_ART),
   )
@@ -378,9 +380,10 @@ export function syncEntities(
         footprint: { w: s.w, h: s.h }, hitZoom: sync.hitZoom,
         box: structureDepthBox(key, s),
       }
-      sprite.hitArea = new Polygon(structureHitPoints(s.kind, s.w, s.h, 1, sync.hitZoom))
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
+      // This is what cuts the prism — both of its branches do, and there is no frame between
+      // the sprite existing and the shape being right.
       applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h, s.facing), null, s, s.kind)
     }
     const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)

@@ -185,9 +185,13 @@ describe('a glide is ended by anything that says where the camera should be', ()
   })
 
   it('★ and the stage hit area survives, because the camera is standing on it', () => {
-    expect(src).toContain('app.stage.hitArea = app.screen')
+    // CODE, not the file: the comment above the handler quotes this very line, and a guard
+    // that reads its own explanation is satisfied by the explanation. Caught by mutation.
+    const code = src.split('\n').map((l) => l.trim())
+      .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*')).join('\n')
+    expect(code).toContain('app.stage.hitArea = app.screen')
     for (const gesture of ['pointerdown', 'pointermove', 'pointerup']) {
-      expect(src, gesture).toContain(`app.stage.on('${gesture}'`)
+      expect(code, gesture).toContain(`app.stage.on('${gesture}'`)
     }
   })
 
