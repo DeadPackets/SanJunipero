@@ -13,6 +13,7 @@ import { mountNarratorApi } from './narratorApi.js'
 import { mountBondsApi } from './bonds.js'
 import { mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
+import { makeStaticSite } from './staticSite.js'
 
 export type GatewayOpts = {
   dbPath: string; port?: number                 // default 8787
@@ -21,6 +22,7 @@ export type GatewayOpts = {
   db?: Database.Database                        // in-process override (dev world); else opened readonly
   agentDbDir?: string                           // per-agent memory DBs (`<id>.db`); absent → [] tab responses
   narratorDbPath?: string                       // C7's narrator.db; absent or unwritten → typed empties
+  staticDir?: string                            // built @sj/web; absent → API/socket only (the dev split)
 }
 export type Gateway = { port: number; close(): Promise<void>; pump(): void }  // pump exposed for tests
 
@@ -73,6 +75,9 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   mountLineageApi(router, { db, mirror })
   mountDiscoveryApi(router, { db, mirror })
 
+  // The built client, served from the world's own origin so the stream is one address.
+  const site = opts.staticDir === undefined ? null : makeStaticSite(opts.staticDir)
+
   const httpServer = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const segs = url.pathname.split('/').filter(Boolean)
@@ -87,6 +92,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       }
       if (ok) { r.fn(req, res, params); return }
     }
+    if (site !== null && site(req, res, url.pathname)) return
     res.writeHead(404, { 'content-type': 'application/json' })
     res.end('{"error":"not found"}')
   })
