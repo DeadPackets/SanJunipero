@@ -978,6 +978,10 @@ function banked(state: WorldState, x: number, y: number): boolean {
 
 // Two or three tiles of deck, every one of them over water, and a foot on solid ground at each
 // end. Longer than that and it is a causeway, which is more than six planks can hold up.
+//
+// The span is the RECIPE's shape, so this bounds a dial and not a constant: the shipped
+// `bridge` is 1×2, and both ends of the range are exercised by configs that are not
+// (`path.test.ts` "build: planning a bridge" — a 3×1 deck is accepted, a 4×1 is refused).
 const BRIDGE_SPAN = { min: 2, max: 3 }
 
 function bridgeSiteRefusal(state: WorldState, x: number, y: number, w: number, h: number): string | null {
