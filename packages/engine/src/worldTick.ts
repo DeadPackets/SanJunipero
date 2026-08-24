@@ -47,7 +47,7 @@ function actionsSystem(ctx: TickCtx): void {
       }
       for (const e of stepWalk(ctx.state(), id)) ctx.emit(e.type, e.payload)
     } else if (a.activity.verb === 'build') {
-      for (const e of stepBuild(ctx.state(), id)) ctx.emit(e.type, e.payload)
+      for (const e of stepBuild(ctx.state(), ctx.config, id)) ctx.emit(e.type, e.payload)
     } else {
       ctx.emit('action_progressed', { agentId: id, ticks: 1 })
     }

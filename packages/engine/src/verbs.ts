@@ -1898,10 +1898,11 @@ export function handsOnSite(state: WorldState, siteId: string): number {
 }
 
 // One tick of an in-progress build: the agent works, the site advances in step.
-export function stepBuild(state: WorldState, agentId: string): PendingEvent[] {
+export function stepBuild(state: WorldState, config: SimConfig, agentId: string): PendingEvent[] {
   const a = state.agents[agentId]
   const act = a?.activity
   if (!a || !act || act.verb !== 'build') throw new Error(`stepBuild: agent ${agentId} has no build in progress`)
+  const p = BuildParams.parse(act.params)
   const site = siteOfBuild(state, agentId)
   if (!site) return [{ type: 'action_interrupted', payload: { agentId, reason: 'gone' } }]
   // ★ THE HANDS ARE THE RATE, AND THIS IS THE WHOLE OF "HELP MUST HELP". A builder's clock is
@@ -1913,10 +1914,16 @@ export function stepBuild(state: WorldState, agentId: string): PendingEvent[] {
   // clock ignored the crowd: five hands took exactly as long as one and cost five times as
   // much, and cooperation was a net penalty in the one measurement G8 asks for.
   const hands = handsOnSite(state, site.id)
-  return [
-    { type: 'action_progressed', payload: { agentId, ticks: hands } },
-    { type: 'structure_progressed', payload: { id: site.id, ticks: 1 } },
-  ]
+  // ★ AND THE WALLS NEVER RECORD MORE WORK THAN THE BUILDING IS. `workPenalty` lengthens a
+  // night builder's clock without slowing the walls, so the ledger ran half again past
+  // `durationTicks` in the dark — G2's own pinned world books 2 903 ticks of work into a
+  // 2 880-tick house. It reads back as a NEGATIVE duration when such a build is resumed, and
+  // it fills the renderer's pips a third of a house early. The dark still costs the builder
+  // the time; it no longer costs the ledger its meaning.
+  const left = buildTicks(config, p.kind) - site.progressTicks
+  const events: PendingEvent[] = [{ type: 'action_progressed', payload: { agentId, ticks: hands } }]
+  if (left > 0) events.push({ type: 'structure_progressed', payload: { id: site.id, ticks: 1 } })
+  return events
 }
 
 // One tick of an in-progress walk. Returns the events to append this tick:

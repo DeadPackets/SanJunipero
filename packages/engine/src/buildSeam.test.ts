@@ -216,10 +216,10 @@ describe('★ two bodies raise one building — the second pair of hands joins t
     const { s } = aWallAndTwoBodies()
     const joined = raising(s, 'b')
     const site = sitesIn(joined)[0]!
-    expect(apply(joined, [...stepBuild(joined, 'a'), ...stepBuild(joined, 'b')])
+    expect(apply(joined, [...stepBuild(joined, CFG, 'a'), ...stepBuild(joined, CFG, 'b')])
       .structures[site.id]!.progressTicks).toBe(site.progressTicks + 2)
     // One hand alone gives one, which is the number the other half of this claim rests on.
-    expect(apply(joined, stepBuild(joined, 'a'))
+    expect(apply(joined, stepBuild(joined, CFG, 'a'))
       .structures[site.id]!.progressTicks).toBe(site.progressTicks + 1)
   })
 
@@ -245,7 +245,7 @@ describe('★ two bodies raise one building — the second pair of hands joins t
     expect(sitesIn(s)).toHaveLength(1)
     const site = sitesIn(s)[0]!
     const hands = ['h0', 'h1', 'h2', 'h3', 'h4']
-    const next = apply(s, hands.flatMap((id) => stepBuild(s, id)))
+    const next = apply(s, hands.flatMap((id) => stepBuild(s, CFG, id)))
     expect(next.structures[site.id]!.progressTicks).toBe(site.progressTicks + hands.length)
   })
 
@@ -510,7 +510,7 @@ describe('★ help must help — what a second pair of hands buys the calendar',
         if (!act || act.verb !== 'build') continue
         worked = true
         bodyTicks++
-        s = foldWith(s, stepBuild(s, id), s.tick)
+        s = foldWith(s, stepBuild(s, FAST, id), s.tick)
         const now = s.agents[id]!.activity
         if (!now || now.ticksRemaining > 0) continue
         s = foldWith(s, [{ type: 'action_completed', payload: { agentId: id, verb: 'build' } }], s.tick)
@@ -561,14 +561,41 @@ describe('★ help must help — what a second pair of hands buys the calendar',
     }
   })
 
-  // ★ AND THE DARK IS THE ONE PLACE THE TWO CLOCKS STILL DISAGREE. `submitIntent` multiplies a
-  // night builder's duration by `light.nightWorkPenalty` while `structure_progressed` still
-  // adds one a tick, so the ledger runs half again past what the building needs. That is a
-  // second, older bug and it needs only one builder; the commit after this one deals with it.
-  it('a house raised blind still takes half again as long', () => {
-    const { s, ids } = crewOf(1, NIGHT)
-    expect(dayPhaseFromTick(NIGHT)).toBe('night')
-    expect(workPenalty(s, FAST, 'h0', 'build')).toBe(FAST.light.nightWorkPenalty)
-    expect(raise(s, ids).ticks).toBe(Math.ceil(HOUSE_TICKS * FAST.light.nightWorkPenalty))
+  // ★ THE SECOND BUG, WHICH WAS THERE BEFORE THE FIRST AND NEEDS ONLY ONE BUILDER.
+  // `submitIntent` multiplies a night builder's duration by `light.nightWorkPenalty` while
+  // `structure_progressed` still adds one a tick, so the ledger runs half again past what the
+  // building needs. G2's own pinned world books 2 903 ticks of work into a 2 880-tick house.
+  describe('and the dark charges the clock, not the ledger', () => {
+    it('a house raised blind still takes half again as long', () => {
+      const { s, ids } = crewOf(1, NIGHT)
+      expect(dayPhaseFromTick(NIGHT)).toBe('night')
+      expect(workPenalty(s, FAST, 'h0', 'build')).toBe(FAST.light.nightWorkPenalty)
+      expect(raise(s, ids).ticks).toBe(Math.ceil(HOUSE_TICKS * FAST.light.nightWorkPenalty))
+    })
+
+    it('★ but the walls never record more work than a house is', () => {
+      const { s, ids } = crewOf(1, NIGHT)
+      expect(raise(s, ids).raised.progressTicks).toBe(HOUSE_TICKS)
+    })
+
+    it('★ so a night build that stops halfway never resumes on a negative clock', () => {
+      const { s } = crewOf(1, NIGHT)
+      const r = submitIntent(s, FAST, 'h0', 'build', { kind: 'house' })
+      let w = foldWith(s, r.ok ? r.events : [], NIGHT)
+      for (let t = 0; t < HOUSE_TICKS + 20; t++) w = foldWith(w, stepBuild(w, FAST, 'h0'), NIGHT)
+      w = foldWith(w, [{ type: 'action_interrupted', payload: { agentId: 'h0', reason: 'rest' } }], NIGHT)
+      const site = Object.values(w.structures).find((x) => x.stage === 'construction')!
+      expect(site.progressTicks).toBeLessThanOrEqual(HOUSE_TICKS)
+      const again = submitIntent({ ...w, tick: NOON }, FAST, 'h0', 'build', { kind: 'house' })
+      expect(again.ok, again.ok ? '' : again.reason).toBe(true)
+      const started = again.ok ? again.events.find((e) => e.type === 'action_started')! : null
+      // Zero, not negative: the walls are up, and going back to them finishes them.
+      expect((started!.payload as { duration: number }).duration).toBeGreaterThanOrEqual(0)
+      let z = foldWith({ ...w, tick: NOON }, again.ok ? again.events : [], NOON)
+      z = foldWith(z, stepBuild(z, FAST, 'h0'), NOON)
+      expect(z.agents.h0!.activity!.ticksRemaining).toBeLessThanOrEqual(0)
+      z = foldWith(z, [{ type: 'structure_completed', payload: { id: site.id } }], NOON)
+      expect(z.structures[site.id]!.stage).toBe('complete')
+    })
   })
 })
