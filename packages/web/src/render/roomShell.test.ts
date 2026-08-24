@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import { furnishingScale } from './interiors.js'
 import { ZOOM_SCALE_MAX } from './camera.js'
+import { TILE_W } from './iso.js'
 import {
-  INTERIOR_PX_SCALE, INTERIOR_TILE, ROOM_TILES, WALL_FACING, WALL_H_PX, WALL_KINDS,
-  interiorToScreen,
+  INTERIOR_BODY_PX, INTERIOR_PX_SCALE, INTERIOR_TILE, ROOM_TILES, WALL_FACING, WALL_H_PX,
+  WALL_KINDS, interiorToScreen,
 } from './interiorMap.js'
 import {
   DOORWAY_POOL_ALPHA, HEARTH_POOL_ALPHA, ROOM_MARGIN_Y, ROOM_SHELL_INK, ROOM_SHELL_PAINT,
@@ -428,13 +429,25 @@ describe('roomShell — the room fits the stage', () => {
 // is visible to `drawScale.test.ts`, which measures WORLD size and leaves the zoom on top to
 // the camera's own law.
 describe('★ the room is drawn at the same pixel density as the town at its closest', () => {
-  it('★ a body is exactly as tall indoors as it is out of doors', () => {
-    // `CHAR_TARGET_PX` is the TOWN-px height of a figure and `ZOOM_SCALE_MAX` is the town's
-    // deepest stop, so out of doors a body is 52 x 4 = 208 px on the glass. Indoors the scene
-    // zoom is 1 and `INTERIOR_PX_SCALE` carries the same factor, so it is 208 px there too.
+  // ★ THIS TEST USED TO ASSERT THE DEFECT AS A LAW, and it was green while the user was
+  // looking at a man taller than his own wall. It said "a body is exactly as tall indoors as
+  // it is out of doors" and pinned `CHAR_TARGET_PX x INTERIOR_PX_SCALE x ROOM_ZOOM` at 208.
+  //
+  // The claim is false, and the reason is the whole of the scale defect: `INTERIOR_PX_SCALE`
+  // is the PIXEL factor between the two views and the WORLD factor is a different number. An
+  // interior tile is a metre of floor — the library authors a bed at 1x2 and a table at 1x1 —
+  // where a town tile is a corner of a plot. Carrying a body across on the pixel factor alone
+  // keeps the town's body-to-tile ratio in a room where a tile means something else.
+  //
+  // What IS true, and is what this pair of tests was for, is the PIXEL DENSITY: one interior
+  // tile reaches the glass at exactly the size the town's deepest stop draws a town tile, so
+  // nothing in the room is resampled. `interiorScale.test.ts` owns the body's own law.
+  it('★ one interior tile is on the glass at the town\'s own deepest density', () => {
     expect(INTERIOR_PX_SCALE).toBe(ZOOM_SCALE_MAX)
-    expect(CHAR_TARGET_PX * INTERIOR_PX_SCALE * ROOM_ZOOM).toBe(CHAR_TARGET_PX * ZOOM_SCALE_MAX)
-    expect(CHAR_TARGET_PX * INTERIOR_PX_SCALE * ROOM_ZOOM).toBe(208)
+    expect(INTERIOR_TILE.w * ROOM_ZOOM).toBe(TILE_W * ZOOM_SCALE_MAX)
+    // and the body does NOT take that factor: it is the room's own height, and it is smaller
+    expect(INTERIOR_BODY_PX).toBeLessThan(CHAR_TARGET_PX * INTERIOR_PX_SCALE * ROOM_ZOOM)
+    expect(INTERIOR_BODY_PX).toBeLessThan(WALL_H_PX)
   })
 
   it('★ and a furnishing reaches the screen at exactly the pixels it was drawn on', () => {

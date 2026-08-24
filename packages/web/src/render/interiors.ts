@@ -4,7 +4,8 @@ import {
 } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import { OVERLAP_RANK, depthOrder, type DepthBox } from './depth.js'
-import { INTERIOR_TILE, interiorToScreen, slotToTile } from './interiorMap.js'
+import { INTERIOR_BODY_PX, INTERIOR_TILE, interiorToScreen, slotToTile } from './interiorMap.js'
+import { CHAR_TARGET_PX } from './charAnim.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 
 // The vocabulary is @sj/shared's (C13 interiorMeta.ts) — one source, so a kind added there
@@ -214,6 +215,26 @@ export function furnishingDivisor(): number {
 }
 export function furnishingScale(): number {
   return 1 / furnishingDivisor()
+}
+
+/**
+ * ★ AND THE SAME QUESTION FOR A BODY, WHICH IS WHERE OPTION C BROKE.
+ *
+ * `characterCell` hands back `CHAR_TARGET_PX / figureH` — the town's own scale. The room used
+ * that `× INTERIOR_PX_SCALE`, and the browser showed a person a third taller than the wall he
+ * stood against, longer than the bed he slept in, towering over a table.
+ *
+ * ★ `INTERIOR_PX_SCALE` IS THE PIXEL FACTOR AND IT IS NOT THE WORLD FACTOR. Furniture is
+ * authored against a tile that means a METRE; the town's tile means a corner of a plot. A body
+ * carried across on the pixel factor alone keeps a ratio that belongs to the other scale. The
+ * room asks for the height the ROOM says a person is (`interiorMap.INTERIOR_BODY_PX`), and the
+ * factor between the two scales is the factor between the two heights and nothing else.
+ *
+ * This is a DOWNSCALE of the cast atlas (a 954 px figure to 109 px, from 208), so it takes the
+ * room further from resampled-up art rather than nearer to it.
+ */
+export function interiorBodyScale(townCellScale: number): number {
+  return townCellScale * (INTERIOR_BODY_PX / CHAR_TARGET_PX)
 }
 
 /** Furnishings that LIE on the floor rather than stand on it. A flat piece is anchored at the

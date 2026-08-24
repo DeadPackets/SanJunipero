@@ -40,6 +40,41 @@ export const SLOT_ORIGIN_OFFSET = { x: 1, y: 0 } as const
  *  authored at (`wall-*.png` is 256 × 160). */
 export const WALL_H_PX = 160
 
+// ── ★ THE ROOM'S HUMAN SCALE — AND WHY THE BODY WAS TWICE THE SIZE IT SHOULD BE ──────────
+//
+// WHAT THE BROWSER SHOWED: a sleeper dwarfs his own bed and the table beside him reads as a
+// footstool. Measured off the glass: a body is 208 px against a 192 px bed, and against a
+// 160 px WALL — a person a third taller than the room he is standing in.
+//
+// WHY, AND IT IS NOT AN 8% MISMATCH. Going indoors is TWO changes at once and only one of them
+// ever reached a body:
+//   1. PIXEL DENSITY — one interior pixel is `INTERIOR_PX_SCALE` town pixels.
+//   2. WORLD SCALE — an interior tile is NOT a quarter of a town tile of ground. The library
+//      authors furniture against it in the dimensions furniture actually has: a bed is 1×2, a
+//      table 1×1, a chair 1×1. ONE INTERIOR TILE IS ONE METRE OF FLOOR, where a town tile is
+//      a whole corner of a house's plot. Going through a door is a zoom in the WORLD, not only
+//      in the pixels.
+// The renderer multiplied a body by (1) alone, so it kept the town's body-to-tile ratio inside
+// a room whose tile means something else entirely. Nothing showed it while the furniture was
+// resampled to the town's own scale; Option C drew the furniture at its authored size and the
+// disagreement became the picture.
+
+/** ★ ONE METRE OF HEIGHT, IN INTERIOR PIXELS. In a 2:1 dimetric the vertical edge of a unit
+ *  cube projects to exactly the tile's own height, so the room's height scale is not a taste
+ *  call: it is `INTERIOR_TILE.h`. It is corroborated by the only two authored things in the
+ *  room that have a known real size — the 160 px wall is 2.5 m, which is a cottage wall, and
+ *  a 1×2 bed's 2-tile run is 2 m, which is a bed. */
+export const INTERIOR_PX_PER_M = INTERIOR_TILE.h
+/** A grown townsperson, standing. */
+export const ADULT_HEIGHT_M = 1.7
+/** How tall a standing body is drawn in the room, in interior px at `ROOM_ZOOM`. */
+export const INTERIOR_BODY_PX = Math.round(ADULT_HEIGHT_M * INTERIOR_PX_PER_M)
+
+/** The screen length of a run of `tiles` along one of the room's ground axes — how long a bed
+ *  or a table is on the glass, as opposed to how wide its sprite is. */
+export const groundRunPx = (tiles: number): number =>
+  Math.hypot(tiles * (INTERIOR_TILE.w / 2), tiles * (INTERIOR_TILE.h / 2))
+
 /** Interior tile → room space, the town's projection with the interior tile's own size. */
 export function interiorToScreen(x: number, y: number): { sx: number; sy: number } {
   return { sx: (x - y) * (INTERIOR_TILE.w / 2), sy: (x + y) * (INTERIOR_TILE.h / 2) }

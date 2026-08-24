@@ -7,7 +7,7 @@ import { characterArt, type TextureBook } from './textures.js'
 import { characterCell } from './characters.js'
 import {
   advanceInterior, bedSlots, contactShadow, furnishingId, furnishingScale,
-  interiorOf, interiorOrder, interiorPieces, isFlat, roomPlan,
+  interiorBodyScale, interiorOf, interiorOrder, interiorPieces, isFlat, roomPlan,
   type InteriorPhaseState, type PlacedBody, type RoomItem,
 } from './interiors.js'
 import {
@@ -521,10 +521,10 @@ export function createInteriorScene(
         if (cell !== null) {
           sprite.texture = cell.texture
           sprite.anchor.set(cell.anchor.x, cell.anchor.y)
-          // The town draws a body `CHAR_TARGET_PX` tall in TOWN px and the camera puts the zoom
-          // on top. The room's zoom is 1, so the interior pixel scale carries it — a body is
-          // exactly as tall indoors as it is out of doors at the town's deepest stop.
-          sprite.scale.set(cell.scale * INTERIOR_PX_SCALE)
+          // ★ THE ROOM'S OWN SCALE, NOT THE TOWN'S. This was `cell.scale × INTERIOR_PX_SCALE`,
+          // which carries a body across on the PIXEL factor and leaves the WORLD factor behind
+          // — and a room whose tile is a metre then shows a person taller than its own wall.
+          sprite.scale.set(interiorBodyScale(cell.scale))
         }
       }
     }

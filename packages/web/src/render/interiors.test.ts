@@ -401,13 +401,19 @@ describe('furnishingScale — one room, one scale', () => {
     expect(LIBRARY_TILE_PX * furnishingScale()).toBe(INTERIOR_TILE.w)
   })
 
-  it('puts a bed within reach of the person lying in it', () => {
-    const CHAR_TARGET_PX = 52   // charAnim's own target, in TOWN px
-    const bedTownPx = LIBRARY_TILE_PX * furnishingScale() / 4   // the interior is 4x the town
-    expect(24 / CHAR_TARGET_PX).toBeLessThan(0.5)               // the first mismatch: too small
-    expect(LIBRARY_TILE_PX * 2 / CHAR_TARGET_PX).toBeGreaterThan(4)  // the second: 4.00x over
-    expect(bedTownPx / CHAR_TARGET_PX).toBeGreaterThan(0.5)     // and after
-    expect(bedTownPx / CHAR_TARGET_PX).toBeLessThan(1.5)
+  // ★ THIS ASSERTION WAS GREEN WHILE THE SLEEPER WAS HALF AGAIN THE LENGTH OF HIS BED.
+  //
+  // It divided the bed's INTERIOR sprite width by 4 to compare it with a body's TOWN height —
+  // the exact conflation of the pixel factor with the world factor that caused the defect —
+  // and then bounded the answer between 0.5 and 1.5, which is wide enough to hold both the bug
+  // and the fix. The relationship it was reaching for is real, so it is re-stated in the space
+  // the viewer actually sees, in `interiorScale.test.ts`. What survives here is the part that
+  // is genuinely about `furnishingScale`: the bed's sprite covers its own ground and no more.
+  it('puts a bed on exactly the ground a bed covers', () => {
+    const bedSpanPx = (BED_FOOTPRINT.w + BED_FOOTPRINT.h) * (INTERIOR_TILE.w / 2)
+    expect(bedSpanPx).toBe(192)                                      // what the library authors
+    expect(bedSpanPx * furnishingScale()).toBe(192)                  // and what reaches the glass
+    expect(24 / LIBRARY_TILE_PX).toBeLessThan(0.5)                   // the first mismatch: too small
   })
 
   it('never inflates anything', () => {
