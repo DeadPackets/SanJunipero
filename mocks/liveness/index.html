@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Town liveness — four treatments of one street</title>
+<style>
+  :root {
+    --ink: #f4ece0; --ink-dim: #c4b8a6; --ink-faint: #9b8f7e;
+    --bg: #191419; --panel: #221b22; --line: #3a2f3a; --accent: #f2c879; --rose: #e09e9b;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header { padding: 30px 32px 20px; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0 0 8px; font-size: 25px; letter-spacing: -0.015em; font-weight: 620; }
+  .lede { margin: 0; max-width: 82ch; color: var(--ink-dim); font-size: 14.5px; }
+  .lede + .lede { margin-top: 9px; }
+  .lede b { color: var(--ink); font-weight: 600; }
+  code { font: 12.5px var(--mono); color: var(--rose); }
+  .facts { margin: 15px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 8px 10px; }
+  .facts li {
+    font: 12px/1 var(--mono); color: var(--ink-dim);
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 11px;
+  }
+  .facts b { color: var(--accent); font-weight: 500; }
+
+  .bar {
+    position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+    padding: 11px 32px; background: rgba(25,20,25,.96); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line); font: 13px/1 var(--mono); color: var(--ink-dim);
+  }
+  .bar label { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+  .bar input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; }
+  .bar select {
+    font: inherit; color: var(--ink); background: #2b232b; border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px;
+  }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .seg button { font: inherit; color: var(--ink-dim); background: transparent; border: 0; padding: 7px 12px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed=true] { background: var(--accent); color: #241c12; }
+  .hint { color: var(--ink-faint); font-size: 12px; }
+
+  main { padding: 10px 32px 90px; display: flex; flex-direction: column; gap: 22px; }
+  .card { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
+  .card[hidden] { display: none; }
+  .card > .head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; padding: 16px 20px 13px; }
+  .tag {
+    font: 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    color: #241c12; background: var(--accent); border-radius: 5px; padding: 5px 8px;
+  }
+  .card.baseline .tag { background: var(--rose); }
+  .card.mix .tag { background: #a8cfe0; }
+  .head h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .head p { margin: 0; flex: 1 1 40ch; color: var(--ink-dim); font-size: 13.5px; }
+
+  .nums { display: flex; flex-wrap: wrap; margin: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .num { flex: 1 1 112px; padding: 10px 14px 12px; border-right: 1px solid var(--line); }
+  .num:last-child { border-right: 0; }
+  .num dt { font: 10.5px/1.3 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-faint); }
+  .num dd { margin: 5px 0 0; font: 16px/1.15 var(--mono); color: var(--ink); }
+  .num.hot dd { color: var(--accent); }
+  .num .delta { font: 11px/1 var(--mono); color: var(--ink-faint); }
+  .num .up { color: #b9d19a; } .num .down { color: var(--rose); }
+
+  .stage {
+    overflow: auto; background: repeating-conic-gradient(#1d181d 0 25%, #211b21 0 50%) 0 0 / 22px 22px;
+    padding: 14px; display: flex; align-items: center; justify-content: center;
+  }
+  .stage canvas { image-rendering: pixelated; display: block; flex: 0 0 auto; }
+  .foot { padding: 11px 20px 14px; font: 12px/1.55 var(--mono); color: var(--ink-faint); }
+  .foot b { color: var(--ink-dim); font-weight: 500; }
+  .warn { color: var(--rose); }
+
+  .sheet { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 18px 20px 20px; }
+  .sheet h3 { margin: 0 0 4px; font-size: 15px; font-weight: 620; }
+  .sheet p { margin: 0 0 12px; color: var(--ink-dim); font-size: 13.5px; max-width: 90ch; }
+  .sheet + .sheet { margin-top: -6px; }
+  table { border-collapse: collapse; width: 100%; font: 12.5px/1.5 var(--mono); }
+  th, td { text-align: left; padding: 7px 12px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink-faint); font-weight: 500; text-transform: uppercase; font-size: 10.5px; letter-spacing: .07em; }
+  td { color: var(--ink-dim); }
+  td b { color: var(--ink); font-weight: 500; }
+  td .ok { color: #b9d19a; } td .no { color: var(--rose); }
+  .wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Town liveness — four treatments of one street</h1>
+  <p class="lede">
+    The same street, the same eleven buildings, the same camera, in every panel. The town is
+    <b>11 structures on a 76×76 terrain — 5 776 tiles, one built thing per 525</b> — and the ground
+    decoration the renderer already has is capped at <b>80 trees and 60 water shimmers, every one of
+    them outside the town</b>: <code>sampleDecorations</code> places a canopy on FOREST tiles only, and
+    the forest is a four-column band on the far east edge. Inside the street grid there is nothing
+    at all between the houses.
+  </p>
+  <p class="lede">
+    Everything here is drawn from the product's own modules — the projection, the ground layers, the
+    material sampling matrices, the road silhouettes, the building anchors and scales all come out of
+    <code>scene.json</code>, which <code>gen.ts</code> read out of <code>devTown()</code>,
+    <code>groundField()</code> and the committed cells. <b>No committed sprite is touched, nothing is
+    upscaled, no art was generated and nothing was spent.</b> Scatter props are drawn in code out of
+    <code>MASTER_PALETTE</code>.
+  </p>
+  <ul class="facts" id="facts"></ul>
+</header>
+
+<div class="bar">
+  <span class="seg" id="mode">
+    <button data-m="compare" aria-pressed="true">flip one at a time</button>
+    <button data-m="stack">stack all</button>
+  </span>
+  <span class="seg" id="pick"></span>
+  <span class="seg" id="zoom">
+    <button data-z="0.5">½×</button>
+    <button data-z="1">1×</button>
+    <button data-z="2" aria-pressed="true">2×</button>
+    <button data-z="3">3×</button>
+    <button data-z="4">4×</button>
+  </span>
+  <label>camera
+    <select id="cam">
+      <option value="street">the street</option>
+      <option value="square">the square</option>
+      <option value="north">the north row</option>
+      <option value="town">the whole town</option>
+    </select>
+  </label>
+  <label>scatter
+    <select id="dens">
+      <option value="0.12">12 %</option>
+      <option value="0.28" selected>28 %</option>
+      <option value="0.45">45 %</option>
+    </select>
+  </label>
+  <span class="hint">mix: <label><input type="checkbox" id="ma"> A</label>
+    <label><input type="checkbox" id="mb"> B</label>
+    <label><input type="checkbox" id="mc"> C</label>
+    <label><input type="checkbox" id="mm"> M</label></span>
+  <span class="hint" id="hint">keys 1–6 flip · a b c m drive the mix</span>
+</div>
+
+<main id="main"><p class="lede" id="boot" style="padding:20px 0">baking the ground…</p></main>
+
+<script type="module">
+import {
+  SUN, SHADOW_STEP, FACE_MULT, PALETTE_MAP, CONTACT_SHADOW_ALPHA, CAST_SHADOW_ALPHA,
+  VERGE_BOOST, COBBLE_RATE, loadScene, bakeGround, bakeWorn, wornPlan, scatterPlan, drawFrame,
+  frameStats,
+} from './town.js'
+
+const CAMS = {
+  street: { cx: 60, cy: 560, w: 640, h: 360, z: 2 },
+  square: { cx: -10, cy: 588, w: 640, h: 360, z: 3 },
+  north:  { cx: 330, cy: 496, w: 640, h: 360, z: 2 },
+  town:   { cx: 0, cy: 608, w: 2432, h: 1216, z: 0.5 },
+}
+
+const TREATMENTS = [
+  { id: 'today', tag: 'baseline', name: 'What ships today',
+    blurb: 'Untouched. The ground field, the road silhouettes and the eleven committed cells, exactly as the renderer bakes them.',
+    t: { a: 0, b: 0, c: 0, m: 0 } },
+  { id: 'a', tag: 'A', name: 'Ground scatter',
+    blurb: 'Tufts, clumps, stones, flowers, ferns and twigs on grass tiles, placed from a position hash — stable across reloads, no state, no new buildings. Verges carry 1.9× the open field.',
+    t: { a: 1, b: 0, c: 0, m: 0 } },
+  { id: 'b', tag: 'B', name: 'Widened value range',
+    blurb: 'One curve on luma, applied to every source texture at load. Same hues, same saturation; the frame’s own 2nd–98th percentile band is stretched off the middle third of the range.',
+    t: { a: 0, b: 1, c: 0, m: 0 } },
+  { id: 'c', tag: 'C', name: 'One sun',
+    blurb: 'A contact shadow where every object meets the ground, its silhouette cast along one agreed light, and a multiply on the faces turned away from it.',
+    t: { a: 0, b: 0, c: 1, m: 0 } },
+  { id: 'abc', tag: 'A+B+C', name: 'All three together',
+    blurb: 'The combination. More things per screen, a real value range, and one light that every one of them answers to.',
+    t: { a: 1, b: 1, c: 1, m: 0 } },
+  { id: 'mix', tag: 'mix', name: 'Your mix',
+    blurb: 'Drive it from the checkboxes in the bar, or the a / b / c keys. M adds the one thing the four treatments do not test: something always moving.',
+    t: null },
+]
+
+const state = { mode: 'compare', pick: 0, zoom: 2, cam: 'street', dens: 0.28,
+  mix: { a: 0, b: 0, c: 0, m: 0 } }
+let scene = null, base = null, raf = 0
+
+const LABELS = [
+  ['things', 'things on screen', v => v],
+  ['per100', 'per 100 tiles', v => v.toFixed(1), true],
+  ['band', 'value p2–p98', v => v],
+  ['sd', 'value σ', v => v.toFixed(1), true],
+  ['dark', 'below 25 %', v => (v * 100).toFixed(1) + ' %'],
+  ['lite', 'above 78 %', v => (v * 100).toFixed(1) + ' %'],
+  ['sun', 'sun', v => v],
+  ['casters', 'shadow casters', v => v],
+  ['sprites', 'new sprites', v => v],
+  ['touched', 'committed art', v => v],
+]
+
+const fmtDelta = (k, v, b) => {
+  if (base === null || b === undefined || typeof v !== 'number' || typeof b !== 'number') return ''
+  const d = v - b
+  if (Math.abs(d) < 0.05) return ''
+  const cls = d > 0 ? 'up' : 'down'
+  const s = k === 'per100' ? d.toFixed(1) : k === 'sd' ? d.toFixed(1)
+    : k === 'dark' || k === 'lite' ? (d * 100).toFixed(1) + ' pt' : Math.round(d)
+  return `<span class="delta ${cls}">${d > 0 ? '+' : ''}${s}</span>`
+}
+
+function card(tr, i) {
+  const el = document.createElement('section')
+  el.className = 'card' + (tr.id === 'today' ? ' baseline' : tr.id === 'mix' ? ' mix' : '')
+  el.dataset.id = tr.id
+  el.innerHTML = `
+    <div class="head">
+      <span class="tag">${tr.tag}</span>
+      <h2>${tr.name}</h2>
+      <p>${tr.blurb}</p>
+    </div>
+    <dl class="nums">${LABELS.map(([k, label, , hot]) =>
+      `<div class="num${hot ? ' hot' : ''}" data-k="${k}"><dt>${label}</dt><dd>—</dd></div>`).join('')}</dl>
+    <div class="stage"><canvas></canvas></div>
+    <div class="foot" data-foot></div>`
+  return el
+}
+
+function tOf(tr) { return tr.t === null ? state.mix : tr.t }
+
+function render(tr, el, timeMs, withStats = true) {
+  const t = tOf(tr)
+  const cam = CAMS[state.cam]
+  const cv = el.querySelector('canvas')
+  if (cv.width !== cam.w || cv.height !== cam.h) { cv.width = cam.w; cv.height = cam.h }
+  const x = cv.getContext('2d', { willReadFrequently: true })
+  x.imageSmoothingEnabled = false
+  x.setTransform(1, 0, 0, 1, 0, 0)
+  x.clearRect(0, 0, cam.w, cam.h)
+  x.save()
+  x.translate(Math.round(cam.w / 2 - cam.cx), Math.round(cam.h / 2 - cam.cy))
+  drawFrame(scene, x, t, timeMs)
+  x.restore()
+  cv.style.width = cam.w * state.zoom + 'px'
+  cv.style.height = cam.h * state.zoom + 'px'
+
+  // Reading a 2432x1216 frame back per animation frame is the one thing on this page that
+  // could cost real time, and it buys a number nobody can read at 60 Hz. The strip is measured
+  // on state changes and four times a second while M is running.
+  if (!withStats) return null
+  const st = frameStats(x.getImageData(0, 0, cam.w, cam.h))
+  const view = { x0: cam.cx - cam.w / 2, x1: cam.cx + cam.w / 2, y0: cam.cy - cam.h / 2, y1: cam.cy + cam.h / 2 }
+  const inView = (sx, sy) => sx > view.x0 - 40 && sx < view.x1 + 40 && sy > view.y0 - 60 && sy < view.y1 + 40
+  let things = scene.structures.filter(s => inView(s.sx, s.sy)).length
+    + scene.decorations.filter(d => inView(d.sx, d.sy)).length
+  if (t.a) things += scene.scatter.filter(p => inView(p.sx, p.sy)).length
+  const tilesOnScreen = (cam.w * cam.h) / (scene.tileW * scene.tileH / 2)
+  const casters = t.c
+    ? scene.structures.filter(s => inView(s.sx, s.sy)).length
+      + scene.decorations.filter(d => d.kind === 'tree' && inView(d.sx, d.sy)).length
+      + (t.a ? scene.scatter.filter(p => inView(p.sx, p.sy)).length : 0)
+    : 0
+
+  const vals = {
+    things, per100: things / tilesOnScreen * 100,
+    band: `${st.p2}–${st.p98}`, bandSpan: st.p98 - st.p2, sd: st.sd,
+    dark: st.darkFrac, lite: st.liteFrac,
+    sun: t.c ? `${SUN.azimuthDeg}° / ${SUN.elevationDeg}°` : 'none',
+    casters, sprites: 0, touched: 'untouched',
+  }
+  if (tr.id === 'today') base = vals
+
+  for (const [k, , fmt] of LABELS) {
+    const dd = el.querySelector(`[data-k="${k}"] dd`)
+    const raw = vals[k]
+    const d = k === 'band' ? fmtDelta('bandSpan', vals.bandSpan, base?.bandSpan) : fmtDelta(k, raw, base?.[k])
+    dd.innerHTML = `${fmt(raw)} ${d}`
+  }
+  el.querySelector('[data-foot]').innerHTML = footFor(tr, t, st, things)
+  return vals
+}
+
+function footFor(tr, t, st, things) {
+  const cam = CAMS[state.cam]
+  const bits = [
+    `native ${cam.w}×${cam.h} px · on screen ${cam.w * state.zoom}×${cam.h * state.zoom} at ${state.zoom}× · <b>nothing upscaled</b>`,
+  ]
+  if (t.a) bits.push(`scatter <b>${(state.dens * 100).toFixed(0)} %</b> of the ${scene.grassFree} free grass tiles = <b>${scene.scatter.length}</b> props town-wide, ${things} things in this view · verge boost <b>${VERGE_BOOST}×</b>, cobble cracks <b>${COBBLE_RATE}×</b> · <b>${scene.worn.length}</b> worn-path tiles, baked into the ground · 6 prop kinds, all drawn in code, 0 forged`)
+  if (t.b) bits.push(`palette map: luma pivot <b>${PALETTE_MAP.pivot}</b>, gain <b>${PALETTE_MAP.gain}</b>, soft knees at ${(PALETTE_MAP.knee * 100).toFixed(0)} % · hue and saturation untouched · applied to <b>${scene.images.size}</b> source textures at load`)
+  if (t.c) bits.push(`sun <b>${SUN.azimuthDeg}° azimuth, ${SUN.elevationDeg}° elevation</b> · shadow walks <b>${SHADOW_STEP.x.toFixed(2)}, ${SHADOW_STEP.y.toFixed(2)}</b> px per px of height · faces roof 1.00 / SW <b>${FACE_MULT.left.toFixed(2)}</b> / SE <b>${FACE_MULT.right.toFixed(2)}</b> · contact ${CONTACT_SHADOW_ALPHA}, cast ${CAST_SHADOW_ALPHA}`)
+  if (t.m) bits.push(`<span class="warn">M is not one of the four</span> — it is the third leg of the thesis (“something is always moving”): grass sway, canopy sway, water shimmer. No timing is reported; a Chrome tab driven by the extension gets no animation frames.`)
+  return bits.join('<br>')
+}
+
+function bakeSheet() {
+  const el = document.createElement('section')
+  el.className = 'sheet'
+  const wornRects = scene.wornA.quads        // counted, not estimated
+  const rows = scene.bake.map(b => {
+    const props = Math.round(b.grass * state.dens + b.road * state.dens * COBBLE_RATE)
+    return `<tr>
+      <td><b>ring ${b.rings}</b></td>
+      <td>${b.showcaseSpanTiles}×${b.showcaseSpanTiles} = ${b.tiles}</td>
+      <td>${b.fieldW}×${b.fieldH}</td>
+      <td>${b.wholeMapMB.toFixed(1)} MB <span class="${b.wholeMapFitsGpuFloor ? 'ok' : 'no'}">${b.wholeMapFitsGpuFloor ? 'fits' : 'FAILS — ' + b.fieldW + ' px > 2048'}</span></td>
+      <td>${b.chunks} × ${b.chunkTexMB.toFixed(2)} MB<br><span class="ok">largest dim 1025 px</span></td>
+      <td><b>${b.groundShapes}</b> diamonds</td>
+      <td>+${Math.round(b.rings === 1 ? wornRects : wornRects * b.tiles / scene.bake[0].tiles)} quads baked<br>+${props} props, NOT baked</td>
+    </tr>`
+  }).join('')
+  el.innerHTML = `
+    <h3>The ground-bake budget, and what scatter does to it</h3>
+    <p>The brief's warning was that scatter is exactly the kind of thing that blows the bake.
+    <b>It cannot, and the reason is structural</b>: the largest single allocation is one chunk
+    (<code>CHUNK_PX_W+1 × CHUNK_PX_H+1</code>), which does not contain the town's size or the prop
+    count. What scatter can cost is bake TIME per chunk and a rebake whenever a prop moves — which
+    is why the props here are ground-decal sprites and only the worn paths, which are ground, go
+    into the bake at all. The separate finding is in the fourth column.</p>
+    <div class="wrap"><table>
+      <tr><th>rings</th><th>terrain</th><th>field px</th><th>whole-map bake (the superseded one)</th>
+        <th>chunked bake</th><th>ground geometry today</th><th>what A adds</th></tr>
+      ${rows}
+    </table></div>`
+  return el
+}
+
+function costSheet() {
+  const el = document.createElement('section')
+  el.className = 'sheet'
+  el.innerHTML = `
+    <h3>What shipping each one actually costs</h3>
+    <p>The mock is throwaway; this is not. Every row was written after building the thing it
+    describes, and the two corrections to the going estimate are marked.</p>
+    <div class="wrap"><table>
+      <tr><th></th><th>files touched</th><th>new assets</th><th>committed sprites changed</th>
+        <th>effort</th><th>reversible</th></tr>
+      <tr><td><b>A</b> scatter</td>
+        <td>1 new <code>render/scatter.ts</code> + ~15 lines in <code>ambient.ts</code> to mount it
+          in <code>groundDecal</code>; worn paths need ~20 lines in <code>scene.ts</code>'
+          <code>drawChunk</code></td>
+        <td><b class="ok">none</b> — 6 prop kinds drawn in <code>Graphics</code> out of
+          <code>MASTER_PALETTE</code>, the precedent <code>canopyBlocks()</code> already set</td>
+        <td>0</td>
+        <td><b>a day</b> — the estimate holds</td><td>yes, one flag</td></tr>
+      <tr><td><b>B</b> value range</td>
+        <td><b class="no">2, not 1</b>: a new <code>post/valueMap.ts</code> AND the ingest that runs
+          it. It is a TEXTURE transform, so it belongs where textures are made, not where they are
+          drawn — a Pixi <code>ColorMatrixFilter</code> is per-frame and cannot do a knee.</td>
+        <td>none — the same cells, remapped</td>
+        <td>0 on disk; <b class="no">every one of them is rewritten in the codex</b></td>
+        <td><b>half a day</b> — the estimate holds</td>
+        <td>yes, but by re-ingesting, not by a flag</td></tr>
+      <tr><td><b>C</b> one sun</td>
+        <td><code>entities.ts</code> (a shadow + a multiply child per structure) and
+          <code>characters.ts</code> (the cast shadow bodies do not have). <b class="ok">The
+          <code>shadow</code> layer already exists and <code>layers.ts:21</code> already says it is
+          "for every body and every structure" — nothing draws the structure half.</b></td>
+        <td>none — the shadow is the sprite's own alpha, sheared</td>
+        <td>0</td>
+        <td><b class="no">half a day for 90 % of it, not a day</b> — the contact shadow and the
+          cast shear are ~40 lines into a layer that is already there. The last 10 % is the face
+          multiply, which has no honest cheap version: see below.</td>
+        <td>yes, one flag</td></tr>
+    </table></div>
+    <p style="margin-top:12px"><b>The one thing C cannot do honestly at draw time.</b> A multiply
+    on “away-facing faces” needs to know which pixels are a face, and a committed cell does not
+    say. What this page draws is a ramp across the silhouette, split at the row where the
+    silhouette is widest — roof above, wall below. It reads well on a gabled house and it would
+    read badly on an L-plan or a porch. Shipping it properly is either a one-bit face mask beside
+    each <code>cell.png</code> (cheap to generate, +20 files) or the light authored into the cells
+    (a forge run, real money). <b>The contact and cast shadows have no such caveat and carry most
+    of the effect.</b></p>`
+  return el
+}
+
+let lastStats = -1e9
+
+function paint(timeMs = performance.now(), animating = false) {
+  const stats = !animating || timeMs - lastStats > 250
+  if (stats) lastStats = timeMs
+  const cards = [...document.querySelectorAll('.card')]
+  // BASELINE always renders first — every delta in every other strip is measured against it
+  const order = [0, ...cards.map((_, i) => i).filter(i => i !== 0)]
+  for (const i of order) {
+    const el = cards[i], tr = TREATMENTS[i]
+    const show = state.mode === 'stack' || i === state.pick || i === 0
+    el.hidden = state.mode === 'compare' && i !== state.pick
+    if (!show) continue
+    if (animating && i === 0 && state.mode === 'compare') continue  // still, and off screen
+    render(tr, el, timeMs, stats)
+  }
+  for (const b of document.getElementById('pick').children)
+    b.setAttribute('aria-pressed', String(Number(b.dataset.p) === state.pick))
+  document.getElementById('pick').hidden = state.mode !== 'compare'
+}
+
+function loop() {
+  const anyM = state.mode === 'stack' ? state.mix.m : tOf(TREATMENTS[state.pick]).m
+  if (anyM) { paint(performance.now(), true); raf = requestAnimationFrame(loop) } else raf = 0
+}
+function kick() { lastStats = -1e9; paint(); if (raf === 0) raf = requestAnimationFrame(loop) }
+
+function rescatter() {
+  scene.scatter = scatterPlan(scene, state.dens)
+}
+
+loadScene().then((s) => {
+  scene = s
+  scene.groundA = bakeGround(scene, false)
+  scene.groundB = bakeGround(scene, true)
+  scene.worn = wornPlan(scene)
+  scene.wornA = bakeWorn(scene, false)
+  scene.wornB = bakeWorn(scene, true)
+  scene.grassFree = scene.terrainGrid.flat().filter((v, i) => v === 0).length
+    - [...scene.built].filter(k => {
+      const [x, y] = k.split(',').map(Number)
+      return scene.terrainGrid[y]?.[x] === 0
+    }).length
+  rescatter()
+
+  const M = document.getElementById('main')
+  M.innerHTML = ''
+  TREATMENTS.forEach((tr, i) => M.appendChild(card(tr, i)))
+  document.getElementById('pick').innerHTML = TREATMENTS.map((tr, i) =>
+    `<button data-p="${i}">${tr.tag}</button>`).join('')
+  document.getElementById('facts').innerHTML = [
+    ['terrain', `${scene.w}×${scene.h} = ${scene.w * scene.h} tiles`],
+    ['structures', `${scene.structures.length}, all with committed art`],
+    ['built density', `1 per ${Math.round(scene.w * scene.h / scene.structures.length)} tiles`],
+    ['decoration today', `${scene.decorations.length} (${scene.decorations.filter(d => d.kind === 'tree').length} trees + ${scene.decorations.filter(d => d.kind === 'shimmer').length} shimmers), 0 inside the town`],
+    ['free grass', `${scene.grassFree} tiles`],
+    ['projection', '2:1 dimetric, unchanged'],
+    ['forge spend', '$0.00 — no art generated'],
+  ].map(([k, v]) => `<li>${k} <b>${v}</b></li>`).join('')
+
+  M.appendChild(bakeSheet())
+  M.appendChild(costSheet())
+
+  document.getElementById('pick').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return
+    state.pick = Number(b.dataset.p); kick()
+  }
+  document.getElementById('mode').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return
+    for (const x of e.currentTarget.children) x.setAttribute('aria-pressed', String(x === b))
+    state.mode = b.dataset.m; kick()
+  }
+  document.getElementById('zoom').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return
+    for (const x of e.currentTarget.children) x.setAttribute('aria-pressed', String(x === b))
+    state.zoom = Number(b.dataset.z); kick()
+  }
+  document.getElementById('cam').onchange = e => {
+    state.cam = e.target.value
+    state.zoom = CAMS[state.cam].z          // the preset's own rest stop; override it freely
+    for (const x of document.getElementById('zoom').children)
+      x.setAttribute('aria-pressed', String(Number(x.dataset.z) === state.zoom))
+    kick()
+  }
+  document.getElementById('dens').onchange = e => {
+    state.dens = Number(e.target.value); rescatter(); kick()
+  }
+  for (const k of ['a', 'b', 'c', 'm']) {
+    document.getElementById('m' + k).onchange = e => {
+      state.mix[k] = e.target.checked ? 1 : 0
+      state.pick = TREATMENTS.length - 1
+      kick()
+    }
+  }
+  addEventListener('keydown', e => {
+    if (e.key >= '1' && e.key <= String(TREATMENTS.length)) { state.pick = Number(e.key) - 1; state.mode = 'compare' }
+    else if (e.key === 'ArrowRight') state.pick = (state.pick + 1) % TREATMENTS.length
+    else if (e.key === 'ArrowLeft') state.pick = (state.pick + TREATMENTS.length - 1) % TREATMENTS.length
+    else if ('abcm'.includes(e.key)) {
+      state.mix[e.key] ^= 1
+      document.getElementById('m' + e.key).checked = !!state.mix[e.key]
+      state.pick = TREATMENTS.length - 1; state.mode = 'compare'
+    } else return
+    for (const x of document.getElementById('mode').children)
+      x.setAttribute('aria-pressed', String(x.dataset.m === state.mode))
+    kick()
+  })
+  kick()
+}).catch((err) => {
+  document.getElementById('boot').textContent = 'failed: ' + err.message
+  console.error(err)
+})
+</script>
+</body>
+</html>
