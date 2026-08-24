@@ -161,6 +161,32 @@ export const alongWall = (wall: WallKind, t: Tile): number =>
  */
 export const WALL_PIECES_THAT_STAND: ReadonlySet<string> = new Set(['hearth', 'dresser'])
 
+/**
+ * ★ A BODY IN A BED IS ON THE MATTRESS, NOT ON THE FLOORBOARDS UNDER IT.
+ *
+ * A body is anchored at its FEET, and its feet are on the ground it stands on — which is right
+ * everywhere except inside a furnishing you get INTO. At the old, wrong body scale a sleeper
+ * stuck out well above the bed and the error was invisible under a much larger one. At the
+ * room's real scale she is the right size and disappears: anchored on the floor, almost all of
+ * her lands behind the bed's own front half, and the browser shows a bed with a sliver of hair
+ * at one end of it.
+ *
+ * Measured off the shipped art in the running app: the bed's mattress surface is 44 px above
+ * the near vertex of the ground it stands on, and the chair's seat 34. Lifting a body by that
+ * puts her head and shoulders clear of the blanket and the rest of her under it, which is what
+ * a person in a bed looks like.
+ *
+ * ★ HANDED BACK: `InteriorMeta` has no field for the height of the surface a piece offers —
+ * the same gap `WALL_PIECES_THAT_STAND` names, and it belongs in the library manifest beside
+ * `placement`. Until it does, it lives here as one table, total over the 'in' kinds.
+ */
+export const FURNISHING_SEAT_PX: Readonly<Record<string, number>> = { bed: 44, chair: 34, bench: 30 }
+
+/** How far above the floor a body drawn INSIDE `kind` is lifted. 0 for anything else, so a
+ *  body standing on the floor is untouched. */
+export const seatLiftPx = (kind: string | null): number =>
+  kind === null ? 0 : FURNISHING_SEAT_PX[kind] ?? 0
+
 // ── THE PIECES, AND THE MAP THEY MAKE ────────────────────────────────────────────────────
 
 /** A furnishing placed on the room map. `size` is in INTERIOR TILES, which is what the library

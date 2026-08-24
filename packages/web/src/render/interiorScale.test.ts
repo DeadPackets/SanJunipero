@@ -3,11 +3,12 @@ import { INTERIOR_KINDS } from '@sj/shared'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import {
   ADULT_HEIGHT_M, INTERIOR_BODY_PX, INTERIOR_PX_PER_M, INTERIOR_PX_SCALE, INTERIOR_TILE,
-  ROOM_TILES, WALL_H_PX, groundRunPx, slotToTile,
+  ROOM_TILES, WALL_H_PX, groundRunPx, interiorToScreen, seatLiftPx, slotToTile,
 } from './interiorMap.js'
 import { ROOM_ZOOM, roomCropPx, roomZoomFor } from './roomShell.js'
 import {
-  BED_FOOTPRINT, interiorBodyScale, interiorPieces, roomFurnishings, type PlacedItem,
+  BED_FOOTPRINT, FURNITURE_OCCUPANCY, interiorBodyScale, interiorPieces, roomFurnishings,
+  type PlacedItem,
 } from './interiors.js'
 
 // ★ THE COMPOSITION GUARD — the laws a per-element test cannot see.
@@ -32,6 +33,8 @@ import {
  *  `cast/omar/manifest.json` has `figureH` 954 and a `sleep` cell 962 px across. Rounded up, so
  *  the laws below are stated against the longest a body can be drawn. */
 const LYING_OVER_STANDING = 1.05
+/** And how much SHORTER it is: the same cell is 846 px tall against a 954 px standing figure. */
+const LYING_H_OVER_STANDING = 846 / 954
 
 /** A body's drawn height, in interior px on the glass, at the room's own zoom. */
 const bodyPx = (): number => INTERIOR_BODY_PX * ROOM_ZOOM
@@ -184,6 +187,43 @@ describe('★ A FURNISHING A BODY LIES IN IS CUT IN TWO AND PUT BACK EXACTLY', (
       expect(frontBottom).toBe(foot)                    // the bottom of it
       expect((frontBottom - frontTop) + (backBottom - backTop)).toBe(texH)
     }
+  })
+})
+
+describe('★ AND A BODY IN A BED IS ON THE MATTRESS', () => {
+  it('★ every furnishing a body gets INTO offers it a surface, and nothing else does', () => {
+    // Total over the 'in' kinds: a kind added to FURNITURE_OCCUPANCY as 'in' with no seat
+    // height fails here rather than dropping a body through the furniture onto the boards.
+    for (const [kind, mode] of Object.entries(FURNITURE_OCCUPANCY)) {
+      if (mode === 'in') expect(seatLiftPx(kind), kind).toBeGreaterThan(0)
+      else expect(seatLiftPx(kind), kind).toBe(0)
+    }
+    expect(seatLiftPx(null)).toBe(0)
+    // and a seat is a seat, not a shelf: you sit below your own waist
+    for (const kind of ['bed', 'chair']) {
+      expect(seatLiftPx(kind), kind).toBeLessThan(INTERIOR_BODY_PX / 2)
+    }
+  })
+
+  it('★ you can SEE the sleeper: most of her clears the blanket, and some of her does not', () => {
+    // THE DEFECT THIS CLOSES, and the scale fix is what created it. A body is anchored at its
+    // FEET, on the ground it stands on — right everywhere except inside something you get INTO.
+    // At the old, wrong body scale a sleeper stuck a long way out of the bed and the error was
+    // invisible under a much larger one. At the room's real scale she lands almost entirely
+    // behind the bed's own front half: the browser showed a made bed with a sliver of hair at
+    // one end of it.
+    const bedFootSy = interiorToScreen(9 + BED_FOOTPRINT.w / 2, 2 + BED_FOOTPRINT.h / 2).sy
+    const bedTexH = (BED_FOOTPRINT.w + BED_FOOTPRINT.h) * (INTERIOR_TILE.w / 2)   // 192, authored
+    const blanket = bedFootSy - (bedTexH - Math.round(bedTexH / 2))   // top edge of the front half
+    const lyingH = INTERIOR_BODY_PX * LYING_H_OVER_STANDING
+    // she lies in the bed's FAR cell, feet-anchored, lifted onto the mattress
+    const cell = interiorToScreen(9.5, 2.5).sy
+    const seen = (lift: number): number => (blanket - (cell - lift - lyingH)) / lyingH
+
+    expect(seen(seatLiftPx('bed')), 'buried').toBeGreaterThanOrEqual(0.4)
+    expect(seen(seatLiftPx('bed')), 'lying ON the bed, not IN it').toBeLessThanOrEqual(0.85)
+    // ★ AND IT FAILS WITHOUT THE LIFT — the picture the scale fix produced showed a sixth of her
+    expect(seen(0)).toBeLessThan(0.25)
   })
 })
 

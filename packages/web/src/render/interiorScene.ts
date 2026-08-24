@@ -11,7 +11,8 @@ import {
   type InteriorPhaseState, type PlacedBody, type RoomItem,
 } from './interiors.js'
 import {
-  INTERIOR_PX_SCALE, ROOM_TILES, WALL_PIECES_THAT_STAND, interiorPath, roomMapOf, standingTiles,
+  INTERIOR_PX_SCALE, ROOM_TILES, WALL_PIECES_THAT_STAND, interiorPath, roomMapOf, seatLiftPx,
+  standingTiles,
   type MapPiece, type RoomMap, type Tile,
 } from './interiorMap.js'
 import {
@@ -540,18 +541,23 @@ export function createInteriorScene(
     }))
     const pieces = interiorPieces(items, placed)
     const index = new Map(interiorOrder(pieces).map((id, i) => [id, i]))
+    // What each body is INSIDE, by kind — a bed lifts a sleeper onto its mattress.
+    const hostKind = new Map(placed.map((b) =>
+      [b.id, b.inside === null ? null : b.inside.slice(0, b.inside.indexOf(':'))]))
     shadows.clear()
     for (const p of pieces) {
       const node = p.kind === 'body' ? bodies.get(p.id) : furniture.get(p.id)
       if (node === undefined) continue
       node.zIndex = index.get(p.id) ?? 0
+      const lift = p.kind === 'body' ? seatLiftPx(hostKind.get(p.id) ?? null) : 0
       if (p.kind === 'body') {
         const foot = advanceWalk(p.id, dtMs)
-        node.position.set(foot.sx, foot.sy)
+        node.position.set(foot.sx, foot.sy - lift)
       }
       // A split furnishing casts ONE shadow, under its front half, not two; a flat one casts
-      // none, because it IS on the floor.
-      if (p.half === 'back' || node.texture.width <= 1) continue
+      // none, because it IS on the floor — and neither does a body that is off the floor, in a
+      // bed. A contact shadow says "this thing touches the ground here", and it does not.
+      if (p.half === 'back' || node.texture.width <= 1 || lift > 0) continue
       if (p.kind === 'furniture' && isFlat(p.id.slice(0, p.id.indexOf(':')))) continue
       const s = contactShadow(node.texture.width * node.scale.x)
       // A body is anchored at its FEET, which already is the ground centre; a furnishing is
