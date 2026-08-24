@@ -4,8 +4,9 @@ import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { composePerception } from './perception.js'
-import { doorTile, occupantsOf, roomCapacity, roomIsFull } from './interiors.js'
+import { doorTile, occupantsOf, roomCapacity, roomIsFull, shelterLedger } from './interiors.js'
 import { makeGenesisWorld } from './genesis/world.js'
+import { FOUNDER_IDS } from '@sj/shared'
 
 // ★ THE SCENERY AND THE ROOM. Two abundance defects the motive probe measured on a live night:
 // the valley's cabins, cottages and farmhouses were buildings nobody could get into (278 wasted
@@ -211,5 +212,60 @@ describe('★ full reaches the packet, so nobody pays a turn to find out', () =>
     const s = withAgentAtDoor(withBuilding(world(), 'well'), 'a1')
     expect(packetFor(s, 'a1').door).toBeUndefined()
     expect(packetFor(s, 'a1').full).toBeUndefined()
+  })
+})
+
+// ---------------------------------------- R5: the fixtures pre-satisfy the only want we model ---
+
+describe('★ the shelter ledger — roofs against bodies, which nobody was counting', () => {
+  function genesisTown(bodies: number): WorldState {
+    const g = makeGenesisWorld(CFG)
+    let s = genesisState(CFG, g.terrain)
+    let seq = 0
+    for (const e of g.events) s = fold(s, ev(++seq, e.type, e.payload), CFG)
+    for (let i = 0; i < bodies; i++) {
+      s = fold(s, ev(++seq + 1000, 'agent_spawned',
+        { id: `b${i}`, name: `b${i}`, x: 60 + i, y: 90, ageDays: 7300 }), CFG)
+    }
+    return s
+  }
+
+  it('counts only what is finished and has a roof over it', () => {
+    let s = withBuilding(world(), 'house')
+    s = withAgentAtDoor(s, 'a1')
+    expect(shelterLedger(s, CFG)).toEqual({ roofs: 1, slots: 2, bodies: 1, per: 2 })
+    // A well is finished and roofless; a half-raised house has a roof nowhere yet.
+    s = fold(s, ev(39, 'structure_planned', {
+      id: 'structure_2', kind: 'well', x: 7, y: 1, w: 1, h: 1,
+      maxHp: 30, flammable: false, builderId: 'a1',
+    }))
+    s = fold(s, ev(39, 'structure_completed', { id: 'structure_2' }))
+    s = fold(s, ev(40, 'structure_planned', {
+      id: 'structure_3', kind: 'house', x: 6, y: 6, w: 2, h: 2,
+      maxHp: 50, flammable: true, builderId: 'a1',
+    }))
+    expect(shelterLedger(s, CFG)).toMatchObject({ roofs: 1, slots: 2 })
+  })
+
+  // ★ THE NUMBER. This is why every production figure this project has reported is suspect.
+  it('says out loud that the genesis valley is four times the shelter its cast needs', () => {
+    const led = shelterLedger(genesisTown(FOUNDER_IDS.length), CFG)
+    expect(led.bodies).toBe(5)
+    expect(led.roofs).toBe(9)   // five houses, a storehouse, a cottage, a cabin, a farmhouse
+    expect(led.slots).toBe(21)
+    expect(led.per).toBeGreaterThan(4)
+    // And it is not the five OWNED houses that do it. Delete every one of them and the village
+    // the founders walked into still holds eleven — more than twice the cast. Shelter in
+    // genesis is abundant because the village is big, which is canon, and not because somebody
+    // handed each founder a deed.
+    const unowned = 21 - 5 * 2
+    expect(unowned).toBe(11)
+    expect(unowned / FOUNDER_IDS.length).toBeGreaterThan(2)
+  })
+
+  it('is the thing a run has to get below 1.0 before it can watch a town answer the cold', () => {
+    const short = shelterLedger(genesisTown(30), CFG)
+    expect(short.per).toBeLessThan(1)
+    expect(shelterLedger(genesisTown(21), CFG).per).toBe(1)
   })
 })

@@ -12,7 +12,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import {
   createWorldTick, doorTile, EventStore, fold, genesisState, makeGenesisWorld, RngStreams,
-  TickLoop, type LawQueue, type TickHandler, type WorldState,
+  shelterLedger, TickLoop, type LawQueue, type TickHandler, type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, isRoofedKind, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
 import { EngineBridge, type Intent, type SubmitResult } from '../src/runtime/bridge.js'
@@ -114,16 +114,31 @@ const MINDS: Mind[] = [
 
 // ------------------------------------------------------------------ the world ---
 // The genesis valley exactly as it is — its ground, its river, its trees and the ground the
-// town keeps for a new roof — with every ROOF taken out of it. Nothing else is touched: the
-// question is what five bodies do about a cold night when there is nowhere to go in out of it.
-const ROOFED = new Set(Object.keys(config.structures.recipes).filter((k) => isRoofedKind(config, k)))
-// ARM C: the valley also loses the buildings that LOOK like shelter and are not. `cabin`,
-// `cottage` and `farmhouse` are not in `enterableKinds`, so arm B's minds spent a whole night
-// walking to their doors and being told "there is no way into a cabin" — eighty refusals.
-// With them gone there is genuinely nowhere to go in, and the question is finally the one
-// this lane is asking: does a felt cold with no existing answer produce a built one?
-const FAKE_SHELTER = new Set(['cabin', 'cottage', 'farmhouse'])
-const REMOVED = new Set([...ROOFED, ...(ARM === 'c' ? FAKE_SHELTER : [])])
+// town keeps for a new roof — with some of its buildings taken out of it. Nothing else is
+// touched.
+//
+// ★ THE ARM WORLDS ARE NAMED KINDS AND NOT A PROPERTY LOOKUP, ON PURPOSE. The motivation lane
+// wrote `new Set(config.structures.enterableKinds)`, which was `['house','storehouse']` on the
+// day it ran. `roofed` has since made cabins, cottages and farmhouses shelter too, and reading
+// the property here would silently gut arms A and B and make this run incomparable with the
+// nine nights already on record. These four sets are frozen so the table can be stacked.
+//
+//   a  control — main's prose. house + storehouse gone; the three fixture dwellings stand.
+//   b  the cold felt, the SAME valley as a. Before `roofed` those three dwellings were painted
+//      scenery and the minds spent the night walking into them: 278 wasted acts, 0 builds.
+//   c  the cold felt, and nowhere at all to go in — the motivation lane's clean valley.
+//   d  ★ THE FOUNDING. One cabin left standing: 2 bodies' worth of floor for a cast of 5. The
+//      fixtures this project has always measured on hand five founders 21 roof-slots, so the
+//      only want we model was answered before the first tick. This is the arm where it is not.
+const SPAWN_KINDS = new Set(['house', 'storehouse'])
+const REMOVED_BY_ARM: Record<string, string[]> = {
+  a: ['house', 'storehouse'],
+  b: ['house', 'storehouse'],
+  c: ['house', 'storehouse', 'cabin', 'cottage', 'farmhouse'],
+  d: ['house', 'storehouse', 'cottage', 'farmhouse'],
+}
+const REMOVED = new Set(REMOVED_BY_ARM[ARM] ?? REMOVED_BY_ARM['b']!)
+void isRoofedKind
 
 function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: number; y: number }> } {
   const g = makeGenesisWorld(config)
@@ -136,7 +151,7 @@ function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: n
       dropped.add(String(p['id']))
       // Remember the doorways of the HOUSES only, so every arm spawns its five founders on
       // exactly the same five tiles and the arms differ in nothing but what stands around them.
-      if (ROOFED.has(String(p['kind']))) doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
+      if (SPAWN_KINDS.has(String(p['kind']))) doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
       continue
     }
     if (e.type === 'structure_completed' && dropped.has(String(p['id']))) continue
@@ -253,6 +268,13 @@ async function main(): Promise<void> {
 
   const warmth = Object.fromEntries(MINDS.map((m) =>
     [m.id, Number((loop.state.agents[m.id]?.needs.warmth ?? -1).toFixed(1))]))
+  // The two things arm B's failure was actually made of, counted rather than inferred: bodies
+  // that went down in the street, and acts spent on a door that could never open.
+  const collapsed = MINDS.filter((m) => loop.state.agents[m.id]?.collapsedSinceTick != null).length
+  const sheltered = MINDS.filter((m) => loop.state.agents[m.id]?.insideId !== undefined).length
+  const noWayIn = refusals.filter((r) => /no way into|has no roof/.test(r.reason)).length
+  const noFloor = refusals.filter((r) => /no floor left/.test(r.reason)).length
+  const ledger = shelterLedger(loop.state, config)
 
   const report = {
     arm: ARM, label: LABEL, ticks: TOTAL_TICKS, startTick: START_TICK,
@@ -264,6 +286,11 @@ async function main(): Promise<void> {
     structuresCompleted: completed.length,
     structureProgressed: progressed.length,
     entered: entered.length,
+    shelterLedger: { ...ledger, per: Number(ledger.per.toFixed(2)) },
+    collapsedAtEnd: collapsed,
+    shelteredAtEnd: sheltered,
+    refusedNoWayIn: noWayIn,
+    refusedNoFloor: noFloor,
     spoke: spoke.length,
     refusals: refusals.length,
     refusalsByReason: Object.entries(refusals.reduce<Record<string, number>>((acc, r) => {

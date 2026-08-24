@@ -1,4 +1,4 @@
-import { T_ROAD } from '@sj/shared'
+import { isRoofedKind, T_ROAD, type SimConfig } from '@sj/shared'
 import type { Structure, WorldState } from './state.js'
 import { isPassable, type Point } from './path.js'
 
@@ -69,4 +69,23 @@ export function roomIsFull(state: WorldState, s: { id: string; w: number; h: num
 // Two agents can reach each other only from the same side of a wall.
 export function sameInterior(state: WorldState, aId: string, bId: string): boolean {
   return insideOf(state, aId) === insideOf(state, bId)
+}
+
+/** ★ THE ONE ARITHMETIC NOBODY WAS DOING: how many bodies the standing roofs hold, against how
+ *  many bodies there are. Every "production was zero" number this project has reported was
+ *  measured in a town whose only modelled want was already answered — the genesis valley holds
+ *  21 and the cast is 5. A run that wants to watch a town build shelter has to start below 1.0,
+ *  and this is the one place to ask whether it does. */
+export type ShelterLedger = { roofs: number; slots: number; bodies: number; per: number }
+
+export function shelterLedger(state: WorldState, config: SimConfig): ShelterLedger {
+  let roofs = 0
+  let slots = 0
+  for (const s of Object.values(state.structures)) {
+    if (s.stage !== 'complete' || !isRoofedKind(config, s.kind)) continue
+    roofs++
+    slots += roomCapacity(s)
+  }
+  const bodies = Object.values(state.agents).filter((a) => a.alive).length
+  return { roofs, slots, bodies, per: bodies === 0 ? Infinity : slots / bodies }
 }
