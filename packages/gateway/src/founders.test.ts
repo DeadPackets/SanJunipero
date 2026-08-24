@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RngStreams, doorTile, fold, genesisState, makeFixtureMap } from '@sj/engine'
+import { RngStreams, doorTile, findPath, fold, genesisState, makeFixtureMap } from '@sj/engine'
 import type { WorldState } from '@sj/engine'
 import { FOUNDER_IDS, INTERIOR_KINDS } from '@sj/shared'
 import { libraryEntry } from '@sj/forge'
@@ -7,8 +7,10 @@ import { SHOWCASE_CONFIG } from './devWorld.js'
 import { devTown } from './devTown.js'
 import { showcaseTerrain } from './showcaseMap.js'
 import {
-  DEV_FAST_FORWARD_FOR_INTERIORS, FOUNDERS_HOME_ID, GO_HOME_BELOW, LEAVE_HOME_ABOVE,
-  devHoldings, foundersFor, homeIntent, homeOf, makeFoundersOnTick, townStructuresFor,
+  DEV_FAST_FORWARD_FOR_INTERIORS, FOUNDERS, FOUNDERS_HOME_ID, GO_HOME_BELOW, LEAVE_HOME_ABOVE,
+  type FounderDef,
+  arrivesStanding, devHoldings, foundersFor, homeIntent, homeOf, makeFoundersOnTick,
+  townStructuresFor, walkEnergyCost,
 } from './founders.js'
 
 // The dev world after its first tick: five founders, six finished buildings.
@@ -42,28 +44,90 @@ describe('homeIntent', () => {
   const door = doorTile(base, base.structures[FOUNDERS_HOME_ID]!)!
 
   it('leaves a rested founder to the patrol', () => {
-    expect(homeIntent(spend(base, 'omar', 90), 'omar')).toBeNull()
-    expect(homeIntent(spend(base, 'omar', GO_HOME_BELOW), 'omar')).toBeNull()
+    expect(homeIntent(spend(base, 'omar', 90), SHOWCASE_CONFIG, 'omar')).toBeNull()
   })
 
+  // Energy 10 used to stand here. It is now a body that CANNOT reach this door — 54 tiles at
+  // the tired rate costs 10.04 — and the rule below says such a body lies down where it is.
+  // The property this test is for is "a tired founder heads for the one dwelling", so it is
+  // asked of a founder who can still get there.
   it('walks a spent founder to the door of the one dwelling', () => {
-    const s = putAt(spend(base, 'omar', 10), 'omar', 6, 32)
-    expect(homeIntent(s, 'omar')).toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
+    const s = putAt(spend(base, 'omar', 20), 'omar', 6, 32)
+    expect(homeIntent(s, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
   })
 
   it('goes in once the founder is standing at the door', () => {
     const s = putAt(spend(base, 'omar', 10), 'omar', door.x, door.y)
-    expect(homeIntent(s, 'omar')).toEqual({ verb: 'enter', params: { structureId: FOUNDERS_HOME_ID } })
+    expect(homeIntent(s, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'enter', params: { structureId: FOUNDERS_HOME_ID } })
   })
 
   it('sleeps indoors, then comes out again once rested', () => {
     const inside = putInside(base, 'omar', FOUNDERS_HOME_ID)
-    expect(homeIntent(spend(inside, 'omar', 10), 'omar')).toEqual({ verb: 'sleep', params: {} })
-    expect(homeIntent(spend(inside, 'omar', LEAVE_HOME_ABOVE + 1), 'omar')).toEqual({ verb: 'exit', params: {} })
+    expect(homeIntent(spend(inside, 'omar', 10), SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'sleep', params: {} })
+    expect(homeIntent(spend(inside, 'omar', LEAVE_HOME_ABOVE + 1), SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'exit', params: {} })
   })
 
   it('says nothing about someone who is not there', () => {
-    expect(homeIntent(base, 'nobody')).toBeNull()
+    expect(homeIntent(base, SHOWCASE_CONFIG, 'nobody')).toBeNull()
+  })
+})
+
+// ★ THE RESERVE IS THE JOURNEY, NOT A NUMBER — the rule the first night turned on.
+//
+// `GO_HOME_BELOW` says how tired you must be to want your own bed. It never said how EARLY you
+// have to leave to reach it, so a founder with 24 energy set out on a walk that cost 31 and
+// fell over 200 ticks short of the door. Both halves are asserted here, on the same body and
+// the same house, separated only by how far away it is standing.
+describe('a founder leaves for home while the legs can still pay for the walk', () => {
+  const base = townAtTick1()
+  const door = doorTile(base, base.structures[FOUNDERS_HOME_ID]!)!
+  const at = (x: number, y: number, energy: number): WorldState =>
+    putAt(spend(base, 'omar', energy), 'omar', x, y)
+
+  it('costs a walk out of the world’s own numbers — path × tiles-per-tick × decay', () => {
+    const s = at(door.x + 10, door.y, 50)
+    const cost = walkEnergyCost(s, SHOWCASE_CONFIG, 'omar', door)!
+    const path = findPath(s, s.agents['omar']!, door, SHOWCASE_CONFIG)!
+    const tired = Math.max(SHOWCASE_CONFIG.movement.baseTicksPerTile, SHOWCASE_CONFIG.movement.debuffTicksPerTile)
+    expect(cost).toBeCloseTo(path.length * tired * SHOWCASE_CONFIG.needs.energyDecayAwakePerTick, 10)
+    // Priced at the TIRED rate: a body that sets out fresh is under the debuff threshold long
+    // before it arrives, and quoting today's speed under-prices exactly the long late journeys.
+    expect(tired).toBeGreaterThan(SHOWCASE_CONFIG.movement.baseTicksPerTile)
+    expect(walkEnergyCost(at(door.x, door.y, 50), SHOWCASE_CONFIG, 'omar', door)).toBe(0)
+  })
+
+  it('★ turns for home EARLY when home is far, and not yet when home is under its nose', () => {
+    // One energy short of the threshold at the door, so `GO_HOME_BELOW` ALONE says "carry on"
+    // in both halves and only the journey can tell them apart.
+    const energy = GO_HOME_BELOW + 1
+    expect(homeIntent(at(door.x, door.y, energy), SHOWCASE_CONFIG, 'omar')).toBeNull()
+    // The same body, the same energy, thirty tiles out: the walk has already eaten the margin.
+    const far = at(6, 32, energy)
+    expect(walkEnergyCost(far, SHOWCASE_CONFIG, 'omar', door)!).toBeGreaterThan(1)
+    expect(homeIntent(far, SHOWCASE_CONFIG, 'omar'))
+      .toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
+  })
+
+  it('★ AND LIES DOWN WHERE IT IS when the walk home is no longer affordable at all', () => {
+    // The deadlock merge train 3 photographed: `homeIntent` answered a body on the ground with
+    // a WALK for ever, and `submitIntent` refuses every verb but eat and sleep to a collapsed
+    // body — so nothing ever offered the one verb that could have got it up again.
+    const stranded = at(6, 32, SHOWCASE_CONFIG.needs.collapseThreshold + 1)
+    expect(arrivesStanding(stranded, SHOWCASE_CONFIG, 'omar', door)).toBe(false)
+    expect(homeIntent(stranded, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'sleep', params: {} })
+  })
+
+  it('★ and a body with NO path home lies down too, rather than answering nothing', () => {
+    // Walled in by the river on every side: the door is still a door, there is simply no way
+    // to it. `walkEnergyCost` says null and the body must still be given an answer.
+    const moat = (s: WorldState, x: number, y: number): WorldState => ({
+      ...s,
+      terrain: s.terrain.map((row, ty) => row.map((t, tx) =>
+        Math.abs(tx - x) <= 1 && Math.abs(ty - y) <= 1 && !(tx === x && ty === y) ? 2 : t)),
+    })
+    const s = moat(putAt(spend(base, 'omar', 10), 'omar', 6, 32), 6, 32)
+    expect(walkEnergyCost(s, SHOWCASE_CONFIG, 'omar', door)).toBeNull()
+    expect(homeIntent(s, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'sleep', params: {} })
   })
 })
 
@@ -101,6 +165,31 @@ describe('makeFoundersOnTick interiors switch', () => {
 
   it('sends a spent founder through the door when it is on', () => {
     expect(verbsStarted(true)).toContain('enter')
+  })
+
+  // ★ THE PATROL COSTS ITS OWN LEG TOO, and this is the arm with no `homeIntent` behind it to
+  // catch a body that overreaches. On the showcase town the leg is the well and back — 18 to 39
+  // tiles — so the check never bites there and would be inert if this were the only world. It
+  // is asked here on the FIXTURE waypoints, which are the long ones the defect was made of.
+  it('★ will not set out on a leg the legs cannot pay for — it lies down instead', () => {
+    const HERE = { x: 5, y: 5 }, YONDER = { x: 58, y: 60 }   // opposite corners of the fixture
+    const far = FOUNDERS.map((f) => ({ ...f, patrol: [HERE, YONDER] as FounderDef['patrol'] }))
+    const started = (energy: number): string[] => {
+      const state = putAt(spend(townAtTick1(), 'omar', energy), 'omar', HERE.x, HERE.y)
+      const out: string[] = []
+      makeFoundersOnTick(SHOWCASE_CONFIG, new RngStreams('leg'), () => state, { founders: far })({
+        tick: 2,
+        emit: (type, payload) => {
+          const p = payload as { agentId: string; verb: string }
+          if (type === 'action_started' && p.agentId === 'omar') out.push(p.verb)
+        },
+      })
+      return out
+    }
+    // Rested, the same leg is simply a walk — so it is the affordability that decides, not the
+    // distance and not the threshold (24 is above the policy's own PATROL_SLEEP_BELOW of 20).
+    expect(started(100)).toEqual(['walk'])
+    expect(started(24)).toEqual(['sleep'])
   })
 })
 
@@ -157,7 +246,10 @@ describe('U25 — the humans were all sleeping inside one house', () => {
     )
     let seq = 1000
     for (let tick = 2; tick <= 400; tick++) {
-      for (const id of FOUNDER_IDS) state = spend(state, id, 10)   // nobody rests their way out
+      // Tired enough that home is the only errand, rested enough that home is still reachable
+      // — a body that cannot pay for the walk now lies down where it is instead, which is a
+      // different property and is proved above.
+      for (const id of FOUNDER_IDS) state = spend(state, id, GO_HOME_BELOW - 5)
       const evs: Array<{ type: string; payload: unknown }> = []
       onTick({ tick, emit: (type, payload) => evs.push({ type, payload }) })
       for (const e of evs) state = fold(state, { seq: ++seq, tick, ...e }, SHOWCASE_CONFIG)
@@ -177,7 +269,7 @@ describe('homeIntent routes an owner to their own door', () => {
       const mine = homeOf(town, id)!
       const door = doorTile(town, mine)!
       const s = putAt(spend(town, id, 10), id, door.x + 4, door.y)
-      expect(homeIntent(s, id)).toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
+      expect(homeIntent(s, SHOWCASE_CONFIG, id)).toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
     }
     const doors = FOUNDER_IDS.map((id) => doorTile(town, homeOf(town, id)!)!)
     expect(new Set(doors.map((d) => `${d.x},${d.y}`)).size).toBe(5)
@@ -188,16 +280,16 @@ describe('homeIntent routes an owner to their own door', () => {
       const mine = homeOf(town, id)!
       const door = doorTile(town, mine)!
       const s = putAt(spend(town, id, 10), id, door.x, door.y)
-      expect(homeIntent(s, id)).toEqual({ verb: 'enter', params: { structureId: mine.id } })
+      expect(homeIntent(s, SHOWCASE_CONFIG, id)).toEqual({ verb: 'enter', params: { structureId: mine.id } })
     }
   })
 
   it('leaves the unhoused scripted fixture exactly as it was', () => {
     const base = townAtTick1()
     const door = doorTile(base, base.structures[FOUNDERS_HOME_ID]!)!
-    const s = putAt(spend(base, 'omar', 10), 'omar', 6, 32)
+    const s = putAt(spend(base, 'omar', 20), 'omar', 6, 32)
     expect(homeOf(base, 'omar')).toBeNull()
-    expect(homeIntent(s, 'omar')).toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
+    expect(homeIntent(s, SHOWCASE_CONFIG, 'omar')).toEqual({ verb: 'walk', params: { x: door.x, y: door.y } })
   })
 })
 
@@ -223,9 +315,10 @@ describe('foundersFor', () => {
 
 describe('the interiors demo window', () => {
   it('starts before the first measured trip indoors, not after it', () => {
-    // measured: first entries at ticks 820-875. 1200 lands after them, which is why the
-    // controller watched from Day 0 20:00 to Day 1 03:12 and saw nobody go in.
-    expect(DEV_FAST_FORWARD_FOR_INTERIORS).toBeLessThan(820)
+    // re-measured after the first-night fix: first entries at ticks 814/827/853/866/970.
+    // 1200 lands after them, which is why the controller watched from Day 0 20:00 to Day 1
+    // 03:12 and saw nobody go in.
+    expect(DEV_FAST_FORWARD_FOR_INTERIORS).toBeLessThan(814)
     expect(DEV_FAST_FORWARD_FOR_INTERIORS).toBeGreaterThan(600)   // not a whole day of waiting
   })
 

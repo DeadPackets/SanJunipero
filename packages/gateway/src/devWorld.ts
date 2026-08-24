@@ -184,14 +184,20 @@ export async function startDevWorld(
 // CLI switches, read HERE and nowhere else, so no test's world can drift with an env var:
 //   SJ_DEV_MAP=scripted   ask for the frozen G6 fixture BY NAME (the product town otherwise)
 //   SJ_DEV_RINGS=3        plat the showcase town for three rings of blocks instead of one
-//   SJ_DEV_INTERIORS=1    tired founders go indoors and come out again (the G10 human pass)
+//   SJ_DEV_INTERIORS=0    keep the founders out of doors (they go home and sleep otherwise)
+//
+// ★ AND INTERIORS DEFAULT ON FOR A PERSON, for the same reason `showcase` does. Three
+// integration trains in a row reported no interior seen; two of them had the surface switched
+// off by silence and the third watched the cast collapse before reaching a door. A viewer who
+// runs this is here to see the town live in itself. The LIBRARY default stays off — `g6` and
+// `devWorld.test.ts` hash exactly the world they always folded.
 //
 // ★ THE HUMAN PATH DEFAULTS TO THE PRODUCT. It used to default to the fixture, and a lane that
 // ran `pnpm --filter @sj/gateway dev:world` and looked at what came up was looking at six
 // hand-placed buildings, four of them with no art, on a 64×64 map the grammar never drew.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const map: DevMapKind = process.env['SJ_DEV_MAP'] === 'scripted' ? 'scripted' : DEV_MAP_HUMAN
-  const interiors = process.env['SJ_DEV_INTERIORS'] === '1'
+  const interiors = process.env['SJ_DEV_INTERIORS'] !== '0'
   const asked = Number(process.env['SJ_DEV_RINGS'] ?? TOWN_RINGS_GENESIS)
   const rings = Number.isInteger(asked) && asked >= 1 ? asked : TOWN_RINGS_GENESIS
   if (rings !== asked) console.log(`dev world: SJ_DEV_RINGS=${process.env['SJ_DEV_RINGS']} is not a ring count; using ${rings}`)
