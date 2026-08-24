@@ -7,7 +7,7 @@ import {
 
 /** Absent means this. The same convention `forge/buildingArt.facingKind` uses for a cell id. */
 const DEFAULT_TOWN_FACING: TownFacing = 'sw'
-import { mintId, type Affliction, type Item, type TileId, type WorldState } from './state.js'
+import { mintId, type Affliction, type Item, type Structure, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
 import { bridgeAt, BRIDGE_KIND, findPath, isPassable, searchPath } from './path.js'
@@ -1058,6 +1058,26 @@ function ownSite(state: WorldState, agentId: string, kind: string) {
   return null
 }
 
+/** ★ THE HALF `ownSite` CANNOT ANSWER: somebody else's walls, within reach. Keyed on the
+ *  GROUND, exactly as the sited branch has always been through `siteAt` — without it
+ *  `claimInWorld` hands the second body the next FREE plot and five bodies raise five houses.
+ *  There is never a choice to make: the lattice holds plots four tiles apart, so no tile in a
+ *  town is within reach of two half-raised roofs, and `buildSeam.test.ts` asserts it. */
+function joinableSite(state: WorldState, agentId: string, kind: string): Structure | null {
+  for (const id of Object.keys(state.structures).sort()) {
+    const s = state.structures[id]!
+    if (s.stage === 'construction' && s.kind === kind && nearRect(state, agentId, s.x, s.y, s.w, s.h)) return s
+  }
+  return null
+}
+
+/** The walls this body should be raising: its own half-finished ones first, then a neighbour's
+ *  within reach, and only then does the town claim new ground. Because `ownSite` is asked
+ *  first, `joinableSite` is never looking at walls this body began. */
+function siteToRaise(state: WorldState, agentId: string, kind: string) {
+  return ownSite(state, agentId, kind) ?? joinableSite(state, agentId, kind)
+}
+
 export type BuildSiteAnswer = {
   /** `facing` rides along ONLY when the plot turned the building — absent is `sw`, and a
    *  bridge has no door and no facing at all. */
@@ -1099,7 +1119,7 @@ export function buildSiteOf(
     }
   }
   const square = townSquareOf(state)!
-  const mine = ownSite(state, agentId, params.kind)
+  const mine = siteToRaise(state, agentId, params.kind)
   const claim = claimInWorld(state, { along: recipe.w, deep: recipe.h })
   const site = mine !== null
     ? { x: mine.x, y: mine.y, w: mine.w, h: mine.h, ...(mine.facing === undefined ? {} : { facing: mine.facing }) }
@@ -1855,10 +1875,10 @@ export function stepBuild(state: WorldState, agentId: string): PendingEvent[] {
   const act = a?.activity
   if (!a || !act || act.verb !== 'build') throw new Error(`stepBuild: agent ${agentId} has no build in progress`)
   const p = BuildParams.parse(act.params)
-  // On a plot there is no coordinate to look the walls up by, so the site is the one THIS
-  // agent has half-raised — which is also the honest reading of the sited case.
+  // On a plot there is no coordinate to look the walls up by, so the site is the one this
+  // agent has half-raised — or, if it joined somebody, the walls it is standing at.
   const site = p.x === undefined || p.y === undefined
-    ? ownSite(state, agentId, p.kind)
+    ? siteToRaise(state, agentId, p.kind)
     : siteAt(state, p.x, p.y)
   if (!site) return [{ type: 'action_interrupted', payload: { agentId, reason: 'gone' } }]
   return [

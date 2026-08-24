@@ -8,7 +8,7 @@ import { genesisState, type WorldState } from './state.js'
 import { makeGenesisWorld, GENESIS_FORD } from './genesis/world.js'
 import { submitIntent } from './intent.js'
 import { makeFixtureMap } from './scripted.js'
-import { buildIsPlotted, buildSiteOf, isPlottedKind } from './verbs.js'
+import { buildIsPlotted, buildSiteOf, isAdjacentToRect, isPlottedKind, stepBuild } from './verbs.js'
 import { claimInWorld, layBlock, standingRects, townGroundBox, townSquareOf } from './town.js'
 import { builtBox, owedBox } from './systems/mapGrowth.js'
 
@@ -157,6 +157,141 @@ describe('a build that stops halfway goes back to the same walls', () => {
     // No second structure, and no second bill.
     expect(again.ok ? again.events.filter((e) => e.type === 'structure_planned') : null).toEqual([])
     expect(buildSiteOf(s, CFG, 'a', { kind: 'house' }).site).toEqual(seatedAs(claim))
+  })
+})
+
+// ★ OD22. `ownSite` is keyed on the BUILDER, so before this the town handed the second body a
+// different plot and five bodies raised five houses. The meadow never lost the behaviour —
+// `siteAt` is keyed on the ground — so the only joint-build coverage in the tree passed
+// throughout. Everything below asks the question of a TOWN.
+describe('★ two bodies raise one building — the second pair of hands joins the walls', () => {
+  /** The plot's north-west shoulder: within reach of the walls, and NOT the door tile, so what
+   *  these prove is reach rather than a shared tile. */
+  const shoulderOf = (claim: TownClaim) => ({ x: claim.site.x - 1, y: claim.site.y - 1 })
+  /** The other three corners of the ring around a 2×2 plot. */
+  const cornersOf = (c: TownClaim) => [
+    { x: c.site.x + c.site.w, y: c.site.y - 1 },
+    { x: c.site.x - 1, y: c.site.y + c.site.h },
+    { x: c.site.x + c.site.w, y: c.site.y + c.site.h },
+  ]
+
+  const sitesIn = (s: WorldState) => Object.values(s.structures).filter((x) => x.stage === 'construction')
+  const woodOf = (s: WorldState, id: string) => Object.values(s.items)
+    .filter((i) => i.kind === 'wood' && i.loc.t === 'agent' && i.loc.id === id)
+    .reduce((n, i) => n + i.qty, 0)
+
+  /** Put a body's hands on a house, through the real verb, and keep the activity. */
+  function raising(s: WorldState, id: string): WorldState {
+    const r = submitIntent(s, CFG, id, 'build', { kind: 'house' })
+    expect(r.ok, r.ok ? '' : `${id}: ${r.reason}`).toBe(true)
+    return apply(s, r.ok ? r.events : [])
+  }
+
+  /** `a` has begun a house on the town's next plot; `b` is standing beside the same walls. */
+  function aWallAndTwoBodies(bWood = 10): { s: WorldState; claim: TownClaim } {
+    const base = genesisTown()
+    const claim = claimInWorld(base, { along: 2, deep: 2 })!
+    let s = withBuilder(base, 'a', claim.door)
+    s = withBuilder(s, 'b', shoulderOf(claim), bWood)
+    return { s: raising(s, 'a'), claim }
+  }
+
+  it('★ the second body is not handed a different plot', () => {
+    const { s, claim } = aWallAndTwoBodies()
+    // NON-VACUITY: `b` really is beside the first body's walls, and the town really does have
+    // somewhere else it would rather send it.
+    expect(isAdjacentToRect(s.agents.b!.x, s.agents.b!.y, claim.site)).toBe(true)
+    expect(shoulderOf(claim)).not.toEqual(claim.door)
+    expect(claimInWorld(s, { along: 2, deep: 2 })!.site).not.toEqual(claim.site)
+
+    const after = raising(s, 'b')
+    expect(sitesIn(after)).toHaveLength(1)
+    expect(sitesIn(after)[0]!.builtBy).toBe('a')
+    expect(buildSiteOf(s, CFG, 'b', { kind: 'house' }).site).toEqual(seatedAs(claim))
+  })
+
+  it('★ AND THE WALLS GO UP TWICE AS FAST — two hands, one tick, two ticks of progress', () => {
+    const { s } = aWallAndTwoBodies()
+    const joined = raising(s, 'b')
+    const site = sitesIn(joined)[0]!
+    expect(apply(joined, [...stepBuild(joined, 'a'), ...stepBuild(joined, 'b')])
+      .structures[site.id]!.progressTicks).toBe(site.progressTicks + 2)
+    // One hand alone gives one, which is the number the other half of this claim rests on.
+    expect(apply(joined, stepBuild(joined, 'a'))
+      .structures[site.id]!.progressTicks).toBe(site.progressTicks + 1)
+  })
+
+  it('★ THE JOINER PAYS NOTHING TWICE — no second pile, no second plot, no second plan', () => {
+    const { s } = aWallAndTwoBodies()
+    const r = submitIntent(s, CFG, 'b', 'build', { kind: 'house' })
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    const events = r.ok ? r.events : []
+    expect(events.map((e) => e.type).filter((t) => t !== 'action_started')).toEqual([])
+    const after = apply(s, events)
+    expect(woodOf(after, 'b')).toBe(10)
+    // The plot the town was keeping is still on offer to whoever comes next.
+    expect(claimInWorld(after, { along: 2, deep: 2 })!.site)
+      .toEqual(claimInWorld(s, { along: 2, deep: 2 })!.site)
+  })
+
+  it('★ five pairs of hands, one house — the number `minHands` was always counting', () => {
+    const base = genesisTown()
+    const claim = claimInWorld(base, { along: 2, deep: 2 })!
+    let s = raising(withBuilder(base, 'h0', claim.door), 'h0')
+    const spots = [shoulderOf(claim), ...cornersOf(claim)]
+    for (const [i, at] of spots.entries()) s = raising(withBuilder(s, `h${i + 1}`, at), `h${i + 1}`)
+    expect(sitesIn(s)).toHaveLength(1)
+    const site = sitesIn(s)[0]!
+    const hands = ['h0', 'h1', 'h2', 'h3', 'h4']
+    const next = apply(s, hands.flatMap((id) => stepBuild(s, id)))
+    expect(next.structures[site.id]!.progressTicks).toBe(site.progressTicks + hands.length)
+  })
+
+  it('★ a body across town is still sent to its own ground — joining is a fact about REACH', () => {
+    const { s, claim } = aWallAndTwoBodies()
+    const far = withBuilder(s, 'c', { x: TOWN_SQUARE.x + 7, y: TOWN_SQUARE.y + 7 })
+    expect(isAdjacentToRect(far.agents.c!.x, far.agents.c!.y, claim.site)).toBe(false)
+    expect(buildSiteOf(far, CFG, 'c', { kind: 'house' }).resume).toBeNull()
+    expect(submitIntent(far, CFG, 'c', 'build', { kind: 'house' })).toEqual({
+      ok: false,
+      reason: expect.stringContaining('the town keeps ground for a house'),
+    })
+  })
+
+  it('other walls are not these walls: a well is not joined to a half-built house', () => {
+    const { s } = aWallAndTwoBodies()
+    expect(buildSiteOf(s, CFG, 'b', { kind: 'well' }).resume).toBeNull()
+  })
+
+  it('★ finished walls are not a site: a body beside a standing house still gets its own ground', () => {
+    const base = genesisTown()
+    const done = Object.values(base.structures).find((x) => x.kind === 'house' && x.stage === 'complete')!
+    const s = withBuilder(base, 'd', { x: done.x - 1, y: done.y - 1 })
+    expect(isAdjacentToRect(s.agents.d!.x, s.agents.d!.y, done)).toBe(true)
+    const ans = buildSiteOf(s, CFG, 'd', { kind: 'house' })
+    expect(ans.resume).toBeNull()
+    expect(ans.site).not.toMatchObject({ x: done.x, y: done.y })
+    // A roof already up is not a job, so this body is still sent to the plot the town keeps.
+    expect(submitIntent(s, CFG, 'd', 'build', { kind: 'house' })).toEqual({
+      ok: false,
+      reason: expect.stringContaining('the town keeps ground for a house'),
+    })
+  })
+
+  it('★ and there is never a choice of walls: no tile in the town reaches two of them', () => {
+    let s = genesisTown()
+    for (let i = 0; i < 8; i++) {
+      const claim = claimInWorld(s, { along: 2, deep: 2 })!
+      s = raising(withBuilder(s, `b${i}`, claim.door), `b${i}`)
+    }
+    const open = sitesIn(s)
+    expect(open).toHaveLength(8)
+    // Every tile of the world, against every half-raised roof in it.
+    let mostInReach = 0
+    for (let y = 0; y < s.terrain.length; y++)
+      for (let x = 0; x < s.terrain[0]!.length; x++)
+        mostInReach = Math.max(mostInReach, open.filter((r) => isAdjacentToRect(x, y, r)).length)
+    expect(mostInReach).toBe(1)
   })
 })
 
