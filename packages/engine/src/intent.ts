@@ -16,18 +16,27 @@ export function submitIntent(
   // Sleep is allowed while collapsed: energy only regens asleep, so an
   // energy collapse would otherwise be unrecoverable.
   if (a.collapsedSinceTick !== null && verb !== 'eat' && verb !== 'sleep') return { ok: false, reason: 'collapsed and unable to act' }
-  if (a.activity) return { ok: false, reason: `already busy with ${a.activity.verb}` }
   const def = VERBS[verb]
   if (!def) return { ok: false, reason: `unknown verb: ${verb}` }
+  // ★ THE ONE INTERRUPT POLICY STILL HOLDS, AND IT IS ABOUT THE HANDS. A verb that declares
+  // `atOnce` does not use them: it never takes the activity slot and is never refused for
+  // busy-ness. `speak` is the whole of that list. Everything else waits its turn exactly as it
+  // always has, and nothing here can end a running activity early.
+  const usesHands = def.atOnce === undefined
+  if (a.activity && usesHands) return { ok: false, reason: `already busy with ${a.activity.verb}` }
   const invalid = def.validate(state, config, agentId, params)
   if (invalid) return { ok: false, reason: invalid }
+  const events: PendingEvent[] = []
+  if (a.asleep && verb !== 'sleep') events.push({ type: 'agent_woke', payload: { agentId } })
+  if (def.atOnce !== undefined) {
+    events.push(...def.atOnce(state, config, agentId, params))
+    return { ok: true, events }
+  }
   // The one place a duration is settled, so the dark can charge for work without every verb
   // having to remember that it is night (G4).
   const penalty = workPenalty(state, config, agentId, verb)
   const base = def.duration(state, config, agentId, params)
   const duration = penalty === 1 ? base : Math.ceil(base * penalty)
-  const events: PendingEvent[] = []
-  if (a.asleep && verb !== 'sleep') events.push({ type: 'agent_woke', payload: { agentId } })
   events.push({ type: 'action_started', payload: { agentId, verb, params, duration } })
   if (def.onStart) events.push(...def.onStart(state, config, agentId, params))
   return { ok: true, events }

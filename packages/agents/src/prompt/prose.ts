@@ -301,6 +301,16 @@ export function howFarUp(raised?: { done: number; needs: number }): string {
 
 // Block 6, not block 1: the static prefix is byte-frozen and prompt caching rides on it, so
 // the vocabulary a mind needs rides the same breath as what it can see (C11 R-H).
+/** ★ THE OTHER PLACE WORK CAN GO, SAID PLAINLY AND WITH NO COUNSEL IN IT. Where walls already
+ *  stand and how far up they are. It names no act, asks for nothing, and points at no remedy —
+ *  the pair (ground to begin on, walls already standing) is the whole of what there is to learn,
+ *  and the inference is the mind's, exactly as it is for the cold. */
+export function standingWallsLine(w?: { kind: string; at: { x: number; y: number }; done: number; needs: number } | null): string {
+  if (w === undefined || w === null) return ''
+  return `Walls already stand at (${w.at.x}, ${w.at.y}) — a ${w.kind.replace(/_/g, ' ')}, ${
+    howFarUp({ done: w.done, needs: w.needs }).replace(/^its walls are /, '')}.`
+}
+
 export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: number } | null): string {
   const parts: string[] = []
   if (m.builds.length > 0) {
@@ -310,8 +320,14 @@ export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: 
     // The spot, named — the line has always promised one and never said where. A mind that
     // has to be refused before it can learn where to go wastes a waking hour on it, which is
     // the same complaint R21 candidate 3 settled about every other refusal in the world.
+    //
+    // ★ "to BEGIN a new one", not "to raise one", and the difference is the whole of R3's
+    // remainder. This ground is where a roof STARTS. Walls that already stand are raised where
+    // they stand, and a mind sent to the town's next free plot while a half-raised house waited
+    // two streets away read the old wording as the only place work could go — measured, in
+    // yusuf's own words, twelve ticks apart.
     if (groundForBuilding !== undefined && groundForBuilding !== null) {
-      parts.push(`The town keeps ground for a new roof at (${groundForBuilding.x}, ${groundForBuilding.y}); you must be standing there to raise one.`)
+      parts.push(`The town keeps ground for a new roof at (${groundForBuilding.x}, ${groundForBuilding.y}); you must be standing there to begin a new one.`)
     }
   }
   if (m.crafts.length > 0) {

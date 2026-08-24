@@ -33,14 +33,50 @@ function atTick(s: WorldState, tick: number): WorldState {
 }
 
 describe('verb: speak', () => {
-  it('emits agent_spoke with position and stamps lastSpokeTick', () => {
+  // ★ THE MOUTH IS NOT THE HANDS. A word lands the moment it is said: no `action_started`, no
+  // activity slot, no tick. It used to take one of each, which is why a working body was mute.
+  it('emits agent_spoke at once, with position, and stamps lastSpokeTick', () => {
     let s = makeWorld()
     const r = submitIntent(s, CFG, 'a1', 'speak', { text: 'hello' })
     if (!r.ok) throw new Error(r.reason)
+    expect(r.events.map((e) => e.type)).toEqual(['agent_spoke'])
+    expect(r.events).toContainEqual({ type: 'agent_spoke', payload: { agentId: 'a1', text: 'hello', x: 0, y: 0 } })
     s = applyAll(s, r.events)
-    const res = tickOnce(s)
-    expect(res.events).toContainEqual({ type: 'agent_spoke', payload: { agentId: 'a1', text: 'hello', x: 0, y: 0 } })
-    expect(res.state.agents.a1!.lastSpokeTick).toBe(res.state.tick)
+    expect(s.agents.a1!.activity, 'a word took the hands').toBeNull()
+    // Stamped where the word landed — this tick, not the next one.
+    expect(s.agents.a1!.lastSpokeTick).toBe(s.tick)
+  })
+
+  // ★ 159 REFUSALS ACROSS TWELVE LIVE NIGHTS WERE THIS, 39% of every refusal in the run. The
+  // runtime submits speech directly while `submitIntent` refused every act during an activity,
+  // so a body raising a 2 880-tick house was mute for two sim-days — in the one arm where the
+  // town most needed to talk to itself.
+  it('★ a body with its hands full can still answer when it is spoken to', () => {
+    let s = makeWorld()
+    const busy = submitIntent(s, CFG, 'a1', 'build', { kind: 'house', x: 2, y: 2 })
+    // Whatever this fixture makes of the build, put the body into SOME activity and check.
+    s = applyAll(s, busy.ok ? busy.events : [{ type: 'action_started', payload: { agentId: 'a1', verb: 'build', params: {}, duration: 500 } }])
+    expect(s.agents.a1!.activity, 'the fixture did not make the body busy').not.toBeNull()
+    const before = s.agents.a1!.activity!.ticksRemaining
+    const r = submitIntent(s, CFG, 'a1', 'speak', { text: 'over here' })
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    expect(r.ok && r.events).toContainEqual(
+      { type: 'agent_spoke', payload: { agentId: 'a1', text: 'over here', x: 0, y: 0 } })
+    // And the word did not cost the work: the hands are on the same job, at the same point.
+    const after = applyAll(s, r.ok ? r.events : [])
+    expect(after.agents.a1!.activity!.verb).toBe('build')
+    expect(after.agents.a1!.activity!.ticksRemaining).toBe(before)
+  })
+
+  // The exemption is the mouth and nothing else — everything with hands in it still waits.
+  it('and every other verb is still refused while the hands are full', () => {
+    let s = makeWorld()
+    s = applyAll(s, [{ type: 'action_started', payload: { agentId: 'a1', verb: 'build', params: {}, duration: 500 } }])
+    for (const [verb, params] of [['sleep', {}], ['eat', { itemId: 'x' }], ['walk', { x: 3, y: 3 }],
+      ['enter', { structureId: 'y' }], ['give', { itemId: 'x', targetId: 'a2' }]] as const) {
+      expect(submitIntent(s, CFG, 'a1', verb, params), verb)
+        .toEqual({ ok: false, reason: 'already busy with build' })
+    }
   })
 
   it('rejects empty text', () => {

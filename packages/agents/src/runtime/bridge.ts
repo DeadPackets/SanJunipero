@@ -2,6 +2,8 @@ import {
   ambientTempAt,
   composePerception,
   groundForBuilding,
+  unfinishedWork,
+  type StandingWalls,
   FORAGEABLE_YIELD,
   insulationOf,
   isExposed,
@@ -245,6 +247,14 @@ export class EngineBridge {
   // the prose names is the place `build` accepts and no other — a mind is never told two.
   groundForBuilding(): { x: number; y: number } | null {
     return groundForBuilding(this.#loop.state)
+  }
+
+  // The other place work can go. Free ground was the only answer the world ever gave, and it
+  // moves to a fresh plot the moment somebody plants walls — so the second body to ask was sent
+  // away from the first body's house, every time.
+  unfinishedWork(agentId: string): StandingWalls | null {
+    const a = this.#loop.state.agents[agentId]
+    return a === undefined ? null : unfinishedWork(this.#loop.state, this.#simConfig, a)
   }
 
   // Water is terrain, and terrain is the one thing perception never projects: a body that

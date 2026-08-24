@@ -200,6 +200,19 @@ describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () =
   const busyWith = (verb: string): WorldState =>
     applyAll(makeWorld(), [{ type: 'action_started', payload: { agentId: 'a1', verb, params: {}, duration: 100 } }])
 
+  // ★ ONE EXEMPTION, AND IT IS THE MOUTH. The policy is about the HANDS. `speak` declares
+  // `atOnce`: it takes no activity slot and is never refused for busy-ness, because a body with
+  // an axe in its hands can still answer when it is spoken to. 159 refusals across twelve live
+  // nights — 39% of every refusal in the run — were this, and every one of them was a mind
+  // trying to talk while it built. Widening this set is a visible edit, not a quiet one.
+  it('★ the mouth is the only thing that does not wait for the hands', () => {
+    const exempt = Object.keys(VERBS).filter((k) => VERBS[k]!.atOnce !== undefined).sort()
+    expect(exempt).toEqual(['speak'])
+    const r = submitIntent(busyWith('build'), CFG, 'a1', 'speak', { text: 'over here' })
+    expect(r.ok).toBe(true)
+    expect(r.ok && r.events.some((e) => e.type === 'action_started'), 'a word took the slot').toBe(false)
+  })
+
   it('★ refuses a second intent while ANY verb in the registry is running — all of them', () => {
     // `walk` is excluded because `fold` re-plans its path from the params and this fixture
     // gives it none; its refusal is asserted by name in the busy-agent test above.

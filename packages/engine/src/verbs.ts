@@ -30,6 +30,16 @@ export type VerbDef = {
   validate(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): string | null
   duration(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): number
   onStart?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): PendingEvent[]
+  /** ★ THE MOUTH IS NOT THE HANDS. A verb that declares this never takes the activity slot and
+   *  is never refused for busy-ness: its events land the moment it is asked for. `speak` is the
+   *  whole of the list, and it is there because a body with an axe in its hands can still answer
+   *  when it is spoken to. Before this, `submitIntent` refused EVERY act while an activity ran
+   *  and the runtime submits speech directly, so 159 utterances across twelve live nights were
+   *  swallowed by `already busy with build` — 39% of every refusal in the run, and a 2 880-tick
+   *  house is two sim-days of silence in the arm where the town most needed to talk to itself.
+   *  It takes no rng, on purpose: a thing that happens at intent time cannot draw from a stream
+   *  the tick loop is keeping. */
+  atOnce?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): PendingEvent[]
   onComplete(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>, rng: RngStream): PendingEvent[]
   results?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): Record<string, unknown>
   skill?: { track: string; xp: number }
@@ -1167,9 +1177,42 @@ export function buildSiteOf(
 
 /** Where the town has room for the next roof, as a place to walk to — the plot's own street
  *  corner. `null` for a world with no town, or a town with nothing left to offer. Every plot
- *  in the lattice holds every legal mass, so this is one answer for every buildable kind. */
+ *  in the lattice holds every legal mass, so this is one answer for every buildable kind.
+ *
+ *  ★ IT NAMES FREE GROUND, AND THAT IS BOTH FACES OF ONE DEFECT. Before anybody starts, the
+ *  lattice's first free plot is the same plot for everyone, so masons converge on it — the dev
+ *  world's finding. The moment one body plants walls there that plot stops being free, so
+ *  everyone who asks next is sent somewhere else — the live probe's finding: five founders,
+ *  ten separate houses, none finished. Same rule, opposite behaviour either side of the first
+ *  wall. The fix is not to change which plot this names. It is that free ground was the ONLY
+ *  answer the world ever gave to "where does work go", and `unfinishedWork` is the other one. */
 export function groundForBuilding(state: WorldState): { x: number; y: number } | null {
   return claimInWorld(state, { along: 1, deep: 1 })?.door ?? null
+}
+
+/** ★ THE OTHER PLACE WORK CAN GO: walls that already stand, unfinished, and the tile a body
+ *  reaches them from. Nearest first, ties by id so two minds asked in the same tick are told
+ *  the same thing. Only kinds a pair of hands can actually carry on — a wall nobody can finish
+ *  is the cottage-that-was-not-a-cottage all over again, and naming one would be worse than
+ *  silence. `null` when the town has nothing half-raised in it. */
+export type StandingWalls = { id: string; kind: string; at: { x: number; y: number }; done: number; needs: number }
+
+export function unfinishedWork(state: WorldState, config: SimConfig, from: { x: number; y: number }): StandingWalls | null {
+  let best: StandingWalls | null = null
+  let bestDist = Infinity
+  for (const id of Object.keys(state.structures).sort()) {
+    const s = state.structures[id]!
+    if (s.stage !== 'construction' || buildableRecipe(config, s.kind) === null) continue
+    const needs = buildTicks(config, s.kind)
+    if (needs <= 0) continue
+    const door = doorTile(state, s)
+    const at = door ?? { x: s.x, y: s.y + s.h }
+    const d = Math.abs(at.x - from.x) + Math.abs(at.y - from.y)
+    if (d >= bestDist) continue
+    bestDist = d
+    best = { id: s.id, kind: s.kind, at, done: Math.min(s.progressTicks, needs), needs }
+  }
+  return best
 }
 
 /** Everything that can still be wrong once the town has named the ground. */
@@ -1602,6 +1645,19 @@ export const TeachParams = z.object({ targetId: z.string(), track: z.string() })
 export const AttackParams = z.object({ targetId: z.string() }).strict()
 export const ExperimentParams = z.object({ description: z.string() }).strict()
 
+// One function under two names, so the word a busy body says and the word an idle one says are
+// composed in exactly one place (G4).
+const spoken = (
+  state: WorldState, _config: SimConfig, agentId: string, params: Record<string, unknown>,
+): PendingEvent[] => {
+  const p = SpeakParams.parse(params)
+  const a = state.agents[agentId]!
+  return [{
+    type: 'agent_spoke',
+    payload: { agentId, text: p.text, x: a.x, y: a.y, ...(a.insideId === undefined ? {} : { insideId: a.insideId }) },
+  }]
+}
+
 const speak: VerbDef = makeVerb({
   kind: 'speak',
   validate(_state, _config, _agentId, params) {
@@ -1609,14 +1665,8 @@ const speak: VerbDef = makeVerb({
     if (!p.success) return 'speak needs a {text}'
     return null
   },
-  onComplete(state, _config, agentId, params) {
-    const p = SpeakParams.parse(params)
-    const a = state.agents[agentId]!
-    return [{
-      type: 'agent_spoke',
-      payload: { agentId, text: p.text, x: a.x, y: a.y, ...(a.insideId === undefined ? {} : { insideId: a.insideId }) },
-    }]
-  },
+  atOnce: spoken,
+  onComplete: spoken,
 })
 
 const give: VerbDef = makeVerb({

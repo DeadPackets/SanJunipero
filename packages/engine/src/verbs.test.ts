@@ -654,9 +654,15 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
       const day = durationOf(site(NOON), verb, params)
       expect([verb, dark]).toEqual([verb, Math.ceil(day * PENALTY)])
     }
-    for (const [verb, params] of [['speak', { text: 'hi' }], ['walk', { x: 4, y: 4 }]] as const) {
+    for (const [verb, params] of [['walk', { x: 4, y: 4 }]] as const) {
       expect([verb, durationOf(site(MIDNIGHT), verb, params)])
         .toEqual([verb, durationOf(site(NOON), verb, params)])
+    }
+    // `speak` is off this list because it no longer has a duration to slow: the mouth is not
+    // the hands, so a word takes no activity slot and no tick, in the dark or in the day.
+    for (const at of [MIDNIGHT, NOON]) {
+      const r = submitIntent(site(at), CFG, 'a1', 'speak', { text: 'hi' })
+      expect(r.ok && r.events.some((e) => e.type === 'action_started'), String(at)).toBe(false)
     }
   })
 
