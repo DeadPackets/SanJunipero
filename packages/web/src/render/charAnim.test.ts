@@ -7,9 +7,9 @@ import type { SimEvent } from '@sj/shared'
 import {
   BOB_PX, EMOTE_KINDS, GAIT_STRIDE_SPREAD, HIT_AREA_H, HIT_AREA_W, NAME_TAG_MAX_CHARS,
   STRIDE_TILES, TICK_PERIOD_MAX_MS, TICK_PERIOD_SEED_MS, WALK_FRAME_MAX_MS, WALK_FRAME_MIN_MS,
-  WALK_FRAME_MS_V4, WALK_LEAD_TICKS, WALK_LOOP, charPose, emoteFor, gaitOf, hash32, hitRect,
-  initialTickClock, interpolatePos, legFacing, nameTagText, observeTick, prunePath, scheduleLeg,
-  strideFrameMs, ticksPerTileOf, type Waypoint,
+  SHEET_ROWS, WALK_FRAME_MS_V4, WALK_LEAD_TICKS, WALK_LOOP, cellRowLadder, charPose, emoteFor,
+  gaitOf, hash32, hitRect, initialTickClock, interpolatePos, legFacing, nameTagText, observeTick,
+  prunePath, scheduleLeg, strideFrameMs, ticksPerTileOf, type Waypoint,
 } from './charAnim.js'
 import { MOVEMENT_FALLBACK } from './characters.js'
 
@@ -108,6 +108,118 @@ describe('legFacing', () => {
   it('is null for a single waypoint or an empty path', () => {
     expect(legFacing([wp(3, 3)])).toBeNull()
     expect(legFacing([])).toBeNull()
+  })
+
+  // ★ AND NULL FOR A LEG OF NO LENGTH. `scheduleLeg`'s catch-up branch anchors the queue on the
+  // body's interpolated position AT THIS INSTANT, and that position lands exactly on the next
+  // waypoint whenever the compression factor is 1 — at which point the leg has zero delta.
+  // `facingFrom` used to answer `se` for that, so a body caught up mid-walk turned to face the
+  // bottom-right of the screen for a frame whichever way it was actually going.
+  it('★ is null for a zero-length leg, instead of naming a direction', () => {
+    expect(legFacing([wp(2, 2), wp(2, 2, 100)])).toBeNull()
+  })
+})
+
+// ── ★ EVERY DIRECTION OF TRAVEL, THROUGH THE PIPELINE THE PRODUCT ACTUALLY RUNS ───────────
+//
+// `facingFrom` is unit-tested against the projection in `iso.test.ts`. This is the other half:
+// that a body walked through `scheduleLeg` → `prunePath` → `legFacing` → `charPose` comes out
+// pointing the way it is going, on every leg, including the pure-depth diagonals the two-axis
+// engine reaches by taking two cardinal legs in a row, and including a corner turn.
+
+describe('a body walked through the queue points where it is going', () => {
+  const LEGS: Array<[string, number, number]> = [
+    ['+x', 1, 0], ['-x', -1, 0], ['+y', 0, 1], ['-y', 0, -1],
+  ]
+  const EXPECT: Record<string, string> = { '+x': 'se', '-x': 'nw', '+y': 'sw', '-y': 'ne' }
+  const LEG_MS = 400, LEAD_MS = 400
+
+  // one leg at a time, the way `agent_moved` arrives: append, prune, read the facing
+  const walk = (steps: Array<[number, number]>): string[] => {
+    let path: Waypoint[] = [{ x: 0, y: 0, atMs: 0 }]
+    let x = 0, y = 0, now = 0
+    const seen: string[] = []
+    for (const [dx, dy] of steps) {
+      x += dx; y += dy
+      path = scheduleLeg(path, x, y, { nowMs: now, legMs: LEG_MS, leadMs: LEAD_MS })
+      now += LEG_MS
+      // mid-leg is where the renderer reads it: the body is part way along, still walking
+      const mid = prunePath(path, now - LEG_MS / 2)
+      seen.push(String(legFacing(mid)))
+    }
+    return seen
+  }
+
+  it.each(LEGS)('walks %s facing the right way', (name, dx, dy) => {
+    expect(walk([[dx, dy], [dx, dy], [dx, dy]])).toEqual([EXPECT[name], EXPECT[name], EXPECT[name]])
+  })
+
+  // ★ PURE DEPTH. The engine's paths are four-neighbour (`engine/src/path.ts` NEIGHBORS), so a
+  // body travelling +dx +dy does it as alternating cardinal legs — and THAT is where the two
+  // facings must not flap between a front view and a back view frame to frame.
+  it('★ crosses a pure-depth diagonal toward the camera without turning its back', () => {
+    expect(walk([[1, 0], [0, 1], [1, 0], [0, 1]])).toEqual(['se', 'sw', 'se', 'sw'])
+  })
+
+  it('★ and away from the camera without turning to face it', () => {
+    expect(walk([[-1, 0], [0, -1], [-1, 0], [0, -1]])).toEqual(['nw', 'ne', 'nw', 'ne'])
+  })
+
+  it('turns the corner on the leg it is walking, not the one it has queued', () => {
+    // both legs queued before either is walked — the body must still face the FIRST one first
+    let path: Waypoint[] = [{ x: 0, y: 0, atMs: 0 }]
+    path = scheduleLeg(path, 0, 1, { nowMs: 0, legMs: LEG_MS, leadMs: LEAD_MS })
+    path = scheduleLeg(path, 1, 1, { nowMs: 0, legMs: LEG_MS, leadMs: LEAD_MS })
+    expect(legFacing(prunePath(path, 200))).toBe('sw')
+    expect(legFacing(prunePath(path, 600))).toBe('se')
+  })
+
+  it('holds its facing when it stops, rather than snapping to a default', () => {
+    let path: Waypoint[] = [{ x: 0, y: 0, atMs: 0 }]
+    path = scheduleLeg(path, 0, -1, { nowMs: 0, legMs: LEG_MS, leadMs: LEAD_MS })
+    expect(legFacing(prunePath(path, 200))).toBe('ne')
+    const arrived = prunePath(path, 5000)
+    expect(arrived).toHaveLength(1)
+    expect(legFacing(arrived)).toBeNull() // the caller keeps the last facing on null
+  })
+
+  // Not vacuous: the four legs must give FOUR answers, or a rule that answers 'se' always
+  // satisfies half the assertions above by coincidence.
+  it('uses a different facing for each of the four legs', () => {
+    const all = LEGS.map(([, dx, dy]) => walk([[dx, dy]])[0])
+    expect(new Set(all).size).toBe(4)
+  })
+})
+
+describe('cellRowLadder — what a body draws when its cell is not in the sheet', () => {
+  it('walks the loop BACKWARDS from the frame before this one — the one just drawn', () => {
+    expect(cellRowLadder('contact-b'))
+      .toEqual(['contact-b', 'passing-a', 'contact-a', 'passing-b', 'idle', 'sleep'])
+    expect(cellRowLadder('contact-a'))
+      .toEqual(['contact-a', 'passing-b', 'contact-b', 'passing-a', 'idle', 'sleep'])
+  })
+
+  it('sends a still body to the walk frames, and a lying one to standing first', () => {
+    expect(cellRowLadder('idle')[1]).toBe('contact-a')
+    expect(cellRowLadder('sleep')[1]).toBe('idle')
+  })
+
+  // ★ THE WHOLE POINT. The ladder is a list of ROWS; it can never name a facing, so a missing
+  // cell cannot be answered with another direction's art. That is the property, not the list.
+  it('★ is every row of THIS sheet, itself first, and never names a facing', () => {
+    for (const row of SHEET_ROWS) {
+      const ladder = cellRowLadder(row)
+      expect(ladder[0], `${row} must try itself first`).toBe(row)
+      expect([...ladder].sort(), `${row} does not cover the sheet exactly once`)
+        .toEqual([...SHEET_ROWS].sort())
+    }
+  })
+
+  it('★ never prefers a lying body over a standing one', () => {
+    for (const row of SHEET_ROWS) {
+      if (row === 'sleep') continue
+      expect(cellRowLadder(row).at(-1), `${row} would rather lie down`).toBe('sleep')
+    }
   })
 })
 

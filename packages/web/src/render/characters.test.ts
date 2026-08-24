@@ -109,7 +109,7 @@ vi.mock('pixi.js', () => {
 
 import { Container as MockContainer, Sprite as MockSprite, Texture as MockTexture } from 'pixi.js'
 import { CELL, SHEET_ROWS } from './charAnim.js'
-import { createCharacterLayer } from './characters.js'
+import { characterCell, createCharacterLayer } from './characters.js'
 import { CROWD_SETTLE_MS } from './crowd.js'
 import { BODY_SPRITE_W } from './depth.js'
 import { tileToScreen } from './iso.js'
@@ -591,5 +591,62 @@ describe('★ four people on one tile, through the real layer', () => {
       .entities!.children.map((c) => c.position.x)
     expect(new Set(at).size).toBe(4)   // arrived on the very first frame
     l2.destroy()
+  })
+})
+
+// ── ★ A MISSING CELL MUST NOT POINT A BODY THE WRONG WAY ──────────────────────────────────
+//
+// The landed draw path read the cell, and if it was not there it did NOTHING — `sprite.texture`
+// kept whatever was in it, which is the frame from the last time a cell WAS found, of whatever
+// facing the body was pointing then. A body that turned into a facing with a hole in its sheet
+// therefore walked on wearing the art for the direction it came from, silently, with no error
+// anywhere. `characterCell` degrades inside the facing instead (`charAnim.cellRowLadder`).
+
+describe('characterCell degrades inside its own facing, never across one', () => {
+  const CELLS = ['idle', 'contact-a', 'passing-a', 'contact-b', 'passing-b', 'sleep'] as const
+  const FACES = ['sw', 'se', 'ne', 'nw'] as const
+
+  // a manifest whose rects encode which cell they are, so the texture handed back is identifiable
+  const artWithout = (absent: readonly string[]): Parameters<typeof characterCell>[1] => {
+    const cells: Record<string, { x: number; y: number; w: number; h: number; feetX: number; feetY: number }> = {}
+    FACES.forEach((f, fi) => CELLS.forEach((p, pi) => {
+      if (absent.includes(`${p}-${f}`)) return
+      cells[`${p}-${f}`] = { x: pi * 100, y: fi * 200, w: 100, h: 200, feetX: 50, feetY: 199 }
+    }))
+    return { url: '/a.png', manifest: { version: 'v4-hires-atlas', figureH: 180, cells }, size: { w: 600, h: 800 } }
+  }
+  const sheet = new MockTexture() as unknown as Parameters<typeof characterCell>[0]
+  const nameOf = (t: unknown): string => {
+    const f = (t as { frame: { x: number; y: number } }).frame
+    return `${CELLS[f.x / 100]}-${FACES[f.y / 200]}`
+  }
+
+  it('hands back the cell it was asked for when the sheet has it', () => {
+    expect(nameOf(characterCell(sheet, artWithout([]), 'contact-b', 'ne')!.texture)).toBe('contact-b-ne')
+  })
+
+  it('★ falls back to another frame of the SAME facing, for every facing and every row', () => {
+    for (const f of FACES) for (const p of CELLS) {
+      const c = characterCell(sheet, artWithout([`${p}-${f}`]), p, f)
+      expect(c, `${p}-${f} with a hole draws nothing at all`).not.toBeNull()
+      expect(nameOf(c!.texture).endsWith(`-${f}`), `${p}-${f} borrowed ${nameOf(c!.texture)}`).toBe(true)
+    }
+  })
+
+  it('★ keeps the facing even when a whole walk loop is missing and only idle is left', () => {
+    const gutted = ['contact-a-ne', 'passing-a-ne', 'contact-b-ne', 'passing-b-ne'] as const
+    for (const name of gutted) {
+      const row = name.slice(0, -3) as (typeof CELLS)[number]
+      expect(nameOf(characterCell(sheet, artWithout(gutted), row, 'ne')!.texture)).toBe('idle-ne')
+    }
+  })
+
+  it('is null — not another direction — when the facing has nothing at all', () => {
+    const none = CELLS.map((p) => `${p}-ne`)
+    expect(characterCell(sheet, artWithout(none), 'idle', 'ne')).toBeNull()
+  })
+
+  it("carries the sheet's own figure height, so a caller sizes off the art", () => {
+    expect(characterCell(sheet, artWithout([]), 'idle', 'sw')!.figureH).toBe(180)
   })
 })
