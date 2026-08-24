@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import {
-  buildTicks, composePerception, fold, genesisState, makeGenesisWorld,
+  buildTicks, composePerception, fold, genesisState, makeables, makeGenesisWorld, unfinishedWork,
   type TileId, type WorldState,
 } from '@sj/engine'
-import { howFarUp, perceptionToProse, type PerceptionPacket } from './prose.js'
+import {
+  howFarUp, makeablesLine, perceptionToProse, standingWallsLine, type PerceptionPacket,
+} from './prose.js'
 
 // ★ R3 — TIME-COST, AND IT WAS NEVER THE PRICE.
 //
@@ -90,17 +92,28 @@ describe('★ the packet carries how far up the walls are', () => {
     expect(seen(siteWorld(9000)).raised).toEqual({ done: 2880, needs: 2880 })
   })
 
-  // Not a made-up fixture: the valley's own buildings, seen by a body standing in the town.
-  it('says nothing about the standing town, which is all complete', () => {
+  // ★ NOT A MADE-UP FIXTURE: the founding valley itself, seen by a founder at their own door.
+  // Seven of its dwellings stand roofless, and every one of them says how far up it is; the two
+  // roofs that held say nothing, because a standing building is not a site.
+  it('reads the founding valley: walls on the roofless, silence on the sound', () => {
     const g = makeGenesisWorld(CFG)
     let s = genesisState(CFG, g.terrain)
     for (const e of g.events) s = fold(s, ev(1, e.type, e.payload), CFG)
     const house = Object.values(s.structures).find((x) => x.kind === 'house')!
     s = fold(s, ev(2, 'agent_spawned',
       { id: 'a1', name: 'a1', x: house.x, y: house.y + house.h, ageDays: 7300 }), CFG)
-    const packet = composePerception(s, CFG, 'a1', [])
-    expect(packet.visible.structures.length).toBeGreaterThan(0)
-    for (const st of packet.visible.structures) expect(st.raised, st.kind).toBeUndefined()
+    const seen = composePerception(s, CFG, 'a1', []).visible.structures
+    expect(seen.length).toBeGreaterThan(0)
+    const roofless = seen.filter((st) => st.stage === 'construction')
+    expect(roofless.length, 'the valley stood nothing roofless').toBeGreaterThan(0)
+    for (const st of roofless) {
+      expect(st.raised, st.kind).toBeDefined()
+      expect(st.raised!.done / st.raised!.needs, st.kind).toBeCloseTo(0.75, 5)
+      expect(howFarUp(st.raised)).toBe('its walls are three quarters up')
+    }
+    for (const st of seen.filter((x) => x.stage === 'complete')) {
+      expect(st.raised, st.kind).toBeUndefined()
+    }
   })
 })
 
@@ -186,5 +199,79 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
     for (const hint of ['build', 'raise a', 'you should', 'a roof would', 'go inside', 'wait for']) {
       expect(said).not.toContain(hint)
     }
+  })
+})
+
+// ------------------------------------------- R3's remainder: the OTHER place work can go ---
+//
+// `groundForBuilding` names the town's next FREE plot. Before anybody starts, that is the same
+// plot for everyone and masons converge on it; the moment one body plants walls there it stops
+// being free, so everyone who asks next is sent somewhere else. Same rule, opposite behaviour
+// either side of the first wall — and free ground was the ONLY answer the world ever gave to
+// "where does work go". Measured, in one mind's own words, twelve ticks apart:
+//   t=1315 yusuf: "That house is barely started — I'll stand beside it..."
+//   t=1327 yusuf: "The town keeps ground at (81,68) ... I'll build it there tonight."
+
+describe('* walls already standing are a place the world can name', () => {
+  const rows = () => Array.from({ length: 14 }, () => Array.from({ length: 14 }, () => 0 as TileId))
+  const ev2 = (seq: number, type: string, payload: unknown) => ({ seq, tick: 0, type, payload } as SimEvent)
+
+  function townWith(sites: Array<{ id: string; kind: string; x: number; y: number; progress: number }>): WorldState {
+    let s = genesisState(CFG, rows())
+    let seq = 0
+    for (const site of sites) {
+      const row = CFG.structures.recipes[site.kind]!
+      s = fold(s, ev2(++seq, 'structure_planned', {
+        id: site.id, kind: site.kind, x: site.x, y: site.y, w: row.w, h: row.h,
+        maxHp: row.maxHp, flammable: row.flammable, builderId: 'g',
+      }), CFG)
+      if (site.progress > 0) {
+        s = fold(s, ev2(++seq, 'structure_progressed', { id: site.id, ticks: site.progress }), CFG)
+      }
+    }
+    return fold(s, ev2(++seq, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }), CFG)
+  }
+
+  it('names the nearest half-raised building, and how far up it is', () => {
+    const s = townWith([
+      { id: 'structure_1', kind: 'house', x: 9, y: 9, progress: 2160 },
+      { id: 'structure_2', kind: 'house', x: 2, y: 2, progress: 1440 },
+    ])
+    const w = unfinishedWork(s, CFG, { x: 1, y: 1 })!
+    expect(w.id).toBe('structure_2')
+    expect(standingWallsLine(w)).toBe('Walls already stand at (2, 4) - a house, half up.'.replace(' - ', ' — '))
+  })
+
+  it('is silent when the town has nothing half-raised in it', () => {
+    let done = townWith([{ id: 'structure_1', kind: 'house', x: 2, y: 2, progress: 2880 }])
+    done = fold(done, ev2(90, 'structure_completed', { id: 'structure_1' }), CFG)
+    expect(unfinishedWork(done, CFG, { x: 1, y: 1 })).toBeNull()
+    expect(standingWallsLine(null)).toBe('')
+    expect(standingWallsLine(undefined)).toBe('')
+  })
+
+  // * NEVER NAME A WALL NOBODY CAN FINISH. That is the cottage-that-was-not-a-cottage all over
+  // again: a building that looks like an answer and refuses in words a mind cannot use.
+  it('says nothing about walls no pair of hands could carry on', () => {
+    const s = townWith([{ id: 'structure_1', kind: 'cabin', x: 2, y: 2, progress: 1 }])
+    expect(CFG.structures.recipes['cabin']!.inputs).toEqual({})
+    expect(unfinishedWork(s, CFG, { x: 1, y: 1 }), 'named an unfinishable wall').toBeNull()
+  })
+
+  it('names no remedy and no act', () => {
+    const s = townWith([{ id: 'structure_1', kind: 'house', x: 2, y: 2, progress: 720 }])
+    const said = standingWallsLine(unfinishedWork(s, CFG, { x: 1, y: 1 })).toLowerCase()
+    expect(said.length).toBeGreaterThan(0)
+    for (const hint of ['build', 'raise', 'you should', 'you must', 'go and', 'help', 'join']) {
+      expect(said, said).not.toContain(hint)
+    }
+  })
+
+  // The other half of the pair, and it must not contradict the first: one is where a roof
+  // BEGINS, the other is where one already stands.
+  it('the town ground now says "begin a new one", not "raise one"', () => {
+    const line = makeablesLine(makeables(CFG), { x: 7, y: 7 })
+    expect(line).toContain('you must be standing there to begin a new one.')
+    expect(line).not.toContain('to raise one')
   })
 })

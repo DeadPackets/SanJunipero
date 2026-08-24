@@ -1,12 +1,12 @@
 import {
-  CITY_ANCHOR_DEFAULT, FOUNDER_IDS, makeCityTemplate,
+  CITY_ANCHOR_DEFAULT, FOUNDER_IDS, isRoofedKind, makeCityTemplate,
   type CityStructure, type SimConfig,
 } from '@sj/shared'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { spoilageFor } from '../systems/spoilage.js'
-import type { PendingEvent } from '../verbs.js'
+import { buildableRecipe, buildTicks, type PendingEvent } from '../verbs.js'
 
 // The world on the morning of day one: ground authored from (x, y) arithmetic alone, then the
 // city template baked in, then the ordered events that plant the town. NO RNG anywhere here —
@@ -94,6 +94,42 @@ function makeTerrain(config: SimConfig, anchor: { x: number; y: number }): TileI
 
 export type GenesisWorld = { terrain: TileId[][]; events: PendingEvent[] }
 
+// ★ THE ABANDONED VILLAGE IS ABANDONED, AND THAT IS WHY THE FOUNDING HAS A WANT IN IT.
+//
+// Canon: the five walked up a single track into a village of eight dwellings, a storehouse, a
+// well and a fire pit that somebody else built and left. What canon never said is how long ago
+// they left. Every dwelling stood sound, so the valley handed five founders 21 bodies' worth of
+// floor before the first tick — 4.2 times what the cast could use — and the only want this
+// project models was answered at tick zero. Every production figure ever reported from here was
+// measured in that town.
+//
+// So the roofs are down on all but two. What stands is walls, three quarters of the way up, on
+// buildings a pair of hands can finish in a night — which is the whole reason this shape was
+// chosen over shrinking the village: the founders' answer to the cold is the village itself,
+// half-mended, and every tick of work pays back the same night.
+//
+// ★ WHY THESE TWO AND NOT THREE. The bar is `shelterLedger(...).per < 1.0`. Sound storehouse and
+// sound cabin is 4 slots against 5 bodies — 0.8 — and it is the LOWEST value reachable without
+// standing up a wall nobody can finish. Every fallen kind must be one `build` accepts, and the
+// only other 2-slot kinds are the cabin and the storehouse themselves, both 2x2: making either
+// buildable would mint a second name for `house`. A one-body want is worth more than a building
+// that looks like an answer and refuses in words a mind cannot use.
+export const GENESIS_SOUND_ROOFS: ReadonlySet<string> = new Set(['storehouse', 'cabin'])
+
+/** Three quarters. A house is 2 880 ticks, so 720 are left — one night for one pair of hands,
+ *  six sim-hours for two. A cottage leaves 1 080 and a farmhouse 1 440. */
+export const GENESIS_ROOF_STOOD = 3 / 4
+
+/** Did this kind's roof come down while the village stood empty? Only roofed kinds have a roof
+ *  to lose, and only buildable ones may lose it — see the note above. */
+export function roofFell(config: SimConfig, kind: string): boolean {
+  if (!isRoofedKind(config, kind) || GENESIS_SOUND_ROOFS.has(kind)) return false
+  if (buildableRecipe(config, kind) === null) {
+    throw new Error(`genesis: a ${kind} would stand roofless and nobody could finish it`)
+  }
+  return true
+}
+
 // Six things a founder wakes up owning. The bread is three sim-days of food and is stamped
 // like any other loaf, so the storehouse multiplier and the spoilage clock apply from tick 0.
 const FOUNDER_KIT: ReadonlyArray<{ kind: string; qty: number }> = [
@@ -139,7 +175,16 @@ export function makeGenesisWorld(config: SimConfig, opts: { anchor?: { x: number
     const id = mint('structure')
     structureIdByIndex[i] = id
     events.push({ type: 'structure_planned', payload: plannedPayload(config, s, id, anchor) })
-    events.push({ type: 'structure_completed', payload: { id } })
+    if (!roofFell(config, s.kind)) {
+      events.push({ type: 'structure_completed', payload: { id } })
+      return
+    }
+    // Walls, and no roof on them. `structure_progressed` is the same event a builder's own
+    // hands emit, so what a founder finds standing and what a founder leaves standing are the
+    // same thing, and finishing one costs labour and NOTHING ELSE — resuming a site never
+    // spends materials a second time.
+    const stood = Math.floor(buildTicks(config, s.kind) * GENESIS_ROOF_STOOD)
+    if (stood > 0) events.push({ type: 'structure_progressed', payload: { id, ticks: stood } })
   })
 
   // The kind is READ from the template, never retyped here (C8 global constraint C14).

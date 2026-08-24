@@ -14,10 +14,18 @@ const C = DEFAULT_CONFIG
 describe('the makeable vocabulary comes off the tables the verbs already read', () => {
   it('names every kind a pair of hands can raise, and nothing the world places itself', () => {
     const m = makeables(C)
-    expect(m.builds.map((b) => b.kind)).toEqual(['bridge', 'house', 'well'])
+    expect(m.builds.map((b) => b.kind)).toEqual(['bridge', 'cottage', 'farmhouse', 'house', 'well'])
     // A grave has no inputs: the world digs it, and `build` refuses it. It is not vocabulary.
     expect(m.builds.some((b) => b.kind === 'grave')).toBe(false)
+    // Neither is a cabin or a storehouse: both are 2x2, exactly a house's mass, so a buildable
+    // one would be a second name for the same building.
+    expect(m.builds.some((b) => b.kind === 'cabin')).toBe(false)
+    expect(m.builds.some((b) => b.kind === 'storehouse')).toBe(false)
     expect(m.builds.find((b) => b.kind === 'house')!.inputs).toEqual({ wood: 10 })
+    // ★ THE THREE ROOFS PRICE AT ONE RATE: 2.5 wood a tile of floor, off the house's own row.
+    for (const [kind, tiles] of [['house', 4], ['cottage', 6], ['farmhouse', 8]] as const) {
+      expect(m.builds.find((b) => b.kind === kind)!.inputs, kind).toEqual({ wood: tiles * 2.5 })
+    }
   })
 
   it('names one word per product, so the word reaches every road to it', () => {

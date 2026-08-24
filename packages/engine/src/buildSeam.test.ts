@@ -5,11 +5,12 @@ import {
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { genesisState, type WorldState } from './state.js'
-import { makeGenesisWorld, GENESIS_FORD } from './genesis/world.js'
+import { makeGenesisWorld, GENESIS_BUILDER_ID, GENESIS_FORD } from './genesis/world.js'
 import { submitIntent } from './intent.js'
 import { makeFixtureMap } from './scripted.js'
 import {
-  buildIsPlotted, buildSiteOf, handsOnSite, isAdjacentToRect, isPlottedKind, stepBuild, workPenalty,
+  buildIsPlotted, buildSiteOf, groundForBuilding, handsOnSite, isAdjacentToRect, isPlottedKind,
+  stepBuild, workPenalty,
 } from './verbs.js'
 import { claimInWorld, layBlock, standingRects, townGroundBox, townSquareOf } from './town.js'
 import { builtBox, owedBox } from './systems/mapGrowth.js'
@@ -111,6 +112,23 @@ describe('★ how an agent builds: the plot, never the coordinate', () => {
   })
 })
 
+// ★ THE PROSE NAMES ONE TILE FOR EVERY KIND, AND THERE ARE THREE ROOFS TO RAISE NOW.
+// `groundForBuilding` answers with a 1x1 claim's door; a cottage and a farmhouse claim the same
+// PLOT but present a different frontage, so their own door tile is one row further south. A
+// mind told a tile that then refuses it is exactly the wasted act this lane exists to kill, so
+// the tile is asserted to work for every buildable roof rather than assumed to.
+describe('the one tile the prose names works for every roof a mind can raise', () => {
+  it('accepts a house, a cottage and a farmhouse from the tile groundForBuilding gives', () => {
+    const base = genesisTown()
+    const told = groundForBuilding(base)!
+    for (const [kind, wood] of [['house', 10], ['cottage', 15], ['farmhouse', 20]] as const) {
+      const s = withBuilder(base, `b_${kind}`, told, wood)
+      const r = submitIntent(s, CFG, `b_${kind}`, 'build', { kind })
+      expect(r.ok, `${kind}: ${r.ok ? '' : r.reason}`).toBe(true)
+    }
+  })
+})
+
 describe('the bridge is the one thing a builder still sites', () => {
   it('a deck over the ford takes {kind, x, y} and stands where it is named', () => {
     const base = genesisTown()
@@ -177,7 +195,10 @@ describe('★ two bodies raise one building — the second pair of hands joins t
     { x: c.site.x + c.site.w, y: c.site.y + c.site.h },
   ]
 
-  const sitesIn = (s: WorldState) => Object.values(s.structures).filter((x) => x.stage === 'construction')
+  // ★ THE WALLS THESE HANDS RAISED, and not the seven the founding valley now stands roofless
+  // of its own accord. `builtBy` is the whole of the difference: genesis signs its own work.
+  const sitesIn = (s: WorldState) => Object.values(s.structures)
+    .filter((x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID)
   const woodOf = (s: WorldState, id: string) => Object.values(s.items)
     .filter((i) => i.kind === 'wood' && i.loc.t === 'agent' && i.loc.id === id)
     .reduce((n, i) => n + i.qty, 0)
@@ -266,8 +287,13 @@ describe('★ two bodies raise one building — the second pair of hands joins t
   })
 
   it('★ finished walls are not a site: a body beside a standing house still gets its own ground', () => {
-    const base = genesisTown()
-    const done = Object.values(base.structures).find((x) => x.kind === 'house' && x.stage === 'complete')!
+    // The valley's own houses stand roofless now, so this test puts a roof on one: the claim is
+    // about a FINISHED building, and there has to be one for it to be about anything.
+    const roofless = Object.values(genesisTown().structures)
+      .find((x) => x.kind === 'house' && x.stage === 'construction')!
+    const base = apply(genesisTown(), [{ type: 'structure_completed', payload: { id: roofless.id } }])
+    const done = base.structures[roofless.id]!
+    expect(done.stage).toBe('complete')
     const s = withBuilder(base, 'd', { x: done.x - 1, y: done.y - 1 })
     expect(isAdjacentToRect(s.agents.d!.x, s.agents.d!.y, done)).toBe(true)
     const ans = buildSiteOf(s, CFG, 'd', { kind: 'house' })
@@ -535,7 +561,8 @@ describe('★ help must help — what a second pair of hands buys the calendar',
     for (const [hands, calendar] of [[2, HOUSE_TICKS / 2], [4, HOUSE_TICKS / 4], [5, HOUSE_TICKS / 5]] as const) {
       const { s, ids } = crewOf(hands)
       const run = raise(s, ids)
-      expect(Object.values(run.s.structures).filter((x) => x.stage === 'construction'), `${hands}`).toEqual([])
+      expect(Object.values(run.s.structures)
+        .filter((x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID), `${hands}`).toEqual([])
       expect(run.ticks, `${hands} hands`).toBe(calendar)
     }
   })
@@ -588,14 +615,16 @@ describe('★ help must help — what a second pair of hands buys the calendar',
     // building" would make four hands of two and finish both houses twice as fast.
     const two = alsoRaising(crewOf(0).s, 2, 'h')
     const four = alsoRaising(two.s, 2, 'k')
-    const sites = Object.values(four.s.structures).filter((x) => x.stage === 'construction')
+    const sites = Object.values(four.s.structures)
+      .filter((x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID)
     expect(sites).toHaveLength(2)
     for (const site of sites) expect(handsOnSite(four.s, site.id), site.id).toBe(2)
   })
 
   it('a body that has died is not a pair of hands', () => {
     const { s, ids } = alsoRaising(crewOf(0).s, 2, 'h')
-    const site = Object.values(s.structures).find((x) => x.stage === 'construction')!
+    const site = Object.values(s.structures)
+      .find((x) => x.stage === 'construction' && x.builtBy !== GENESIS_BUILDER_ID)!
     expect(handsOnSite(s, site.id)).toBe(2)
     const after = foldWith(s, [{ type: 'agent_died', payload: { agentId: ids[1]!, cause: 'hunger' } }], s.tick)
     expect(handsOnSite(after, site.id)).toBe(1)

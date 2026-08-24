@@ -6,6 +6,7 @@ import { submitIntent } from './intent.js'
 import { composePerception } from './perception.js'
 import { doorTile, occupantsOf, roomCapacity, roomIsFull, shelterLedger } from './interiors.js'
 import { makeGenesisWorld } from './genesis/world.js'
+import { buildableRecipe } from './verbs.js'
 import { FOUNDER_IDS } from '@sj/shared'
 
 // ★ THE SCENERY AND THE ROOM. Two abundance defects the motive probe measured on a live night:
@@ -247,25 +248,52 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     expect(shelterLedger(s, CFG)).toMatchObject({ roofs: 1, slots: 2 })
   })
 
-  // ★ THE NUMBER. This is why every production figure this project has reported is suspect.
-  it('says out loud that the genesis valley is four times the shelter its cast needs', () => {
+  // ★ THE NUMBER, AND IT IS THE WHOLE OF WHY THE ROOFS CAME DOWN. Sound, this village handed
+  // five founders 21 bodies' worth of floor before the first tick — 4.2x — and the only want
+  // this project models was answered at tick zero. Every production figure ever reported from
+  // here was measured in that town. Two roofs held; the other seven are walls.
+  it('★ puts the founding valley below 1.0, which sound it never was', () => {
     const led = shelterLedger(genesisTown(FOUNDER_IDS.length), CFG)
     expect(led.bodies).toBe(5)
-    expect(led.roofs).toBe(9)   // five houses, a storehouse, a cottage, a cabin, a farmhouse
-    expect(led.slots).toBe(21)
-    expect(led.per).toBeGreaterThan(4)
-    // And it is not the five OWNED houses that do it. Delete every one of them and the village
-    // the founders walked into still holds eleven — more than twice the cast. Shelter in
-    // genesis is abundant because the village is big, which is canon, and not because somebody
-    // handed each founder a deed.
-    const unowned = 21 - 5 * 2
-    expect(unowned).toBe(11)
-    expect(unowned / FOUNDER_IDS.length).toBeGreaterThan(2)
+    expect(led.roofs).toBe(2)                 // the storehouse and the cabin
+    expect(led.slots).toBe(4)
+    expect(led.per).toBe(0.8)
+    expect(led.per, 'the founding cannot host the want it means to measure').toBeLessThan(1)
+
+    // WHAT IT WAS. Put every roof back on and the same arithmetic gives the old town.
+    let sound = genesisTown(FOUNDER_IDS.length)
+    for (const st of Object.values(sound.structures)) {
+      if (st.stage !== 'construction') continue
+      sound = fold(sound, ev(500 + Number(st.id.split('_')[1]), 'structure_completed', { id: st.id }))
+    }
+    const before = shelterLedger(sound, CFG)
+    expect(before).toMatchObject({ roofs: 9, slots: 21, bodies: 5 })
+    expect(before.per).toBeCloseTo(4.2, 5)
+
+    // And it was never the five OWNED houses that did it — structure ownership is not even in
+    // the perception packet. Delete all five and the village still holds eleven against five.
+    expect(21 - 5 * 2).toBe(11)
+  })
+
+  // 0.8 and not lower, and the reason is a hard constraint rather than a taste: every roof that
+  // comes down has to be one a pair of hands can put back. The only other 2-slot kinds are the
+  // cabin and the storehouse, both 2x2 — exactly a house's mass — so making either buildable
+  // would mint a second name for `house`. A one-body want beats a wall that lies.
+  it('is the floor reachable without standing up a wall nobody could finish', () => {
+    for (const st of Object.values(genesisTown(0).structures)) {
+      if (st.stage !== 'construction') continue
+      expect(buildableRecipe(CFG, st.kind), `${st.kind} cannot be finished`).not.toBeNull()
+    }
+    for (const kind of ['cabin', 'storehouse']) {
+      const row = CFG.structures.recipes[kind]!
+      expect(row.w * row.h, kind).toBe(CFG.structures.recipes['house']!.w * CFG.structures.recipes['house']!.h)
+      expect(buildableRecipe(CFG, kind), `${kind} became a second name for a house`).toBeNull()
+    }
   })
 
   it('is the thing a run has to get below 1.0 before it can watch a town answer the cold', () => {
-    const short = shelterLedger(genesisTown(30), CFG)
-    expect(short.per).toBeLessThan(1)
-    expect(shelterLedger(genesisTown(21), CFG).per).toBe(1)
+    expect(shelterLedger(genesisTown(30), CFG).per).toBeLessThan(1)
+    expect(shelterLedger(genesisTown(4), CFG).per).toBe(1)
+    expect(shelterLedger(genesisTown(2), CFG).per).toBe(2)
   })
 })

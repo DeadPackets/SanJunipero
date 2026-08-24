@@ -215,11 +215,22 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(r['well']).toEqual({ inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false })
     expect(r['bridge']).toEqual({ inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false })
     expect(r['grave']).toEqual({ inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false })
-    // The four the world plants and nobody raises: a row each, and an empty `inputs` is still
-    // the whole of what "nobody builds this" means.
-    for (const k of ['storehouse', 'cabin', 'cottage', 'farmhouse']) {
-      expect(r[k]!.inputs, k).toEqual({})
-      expect(r[k]!.roofed, k).toBe(true)
+    // The four the town template plants. All four are roofed; an empty `inputs` is still the
+    // whole of what "nobody builds this" means, and only the two 2x2 ones keep it — a buildable
+    // cabin or storehouse would be a second name for `house`.
+    for (const k of ['storehouse', 'cabin', 'cottage', 'farmhouse']) expect(r[k]!.roofed, k).toBe(true)
+    expect(r['storehouse']!.inputs).toEqual({})
+    expect(r['cabin']!.inputs).toEqual({})
+    // ★ ONE RATE, NOT THREE AUTHORED NUMBERS. A house is 4 tiles of floor for 10 wood and 2 880
+    // ticks. Everything else with a roof that a mind can raise is priced off that: 2.5 wood and
+    // 720 ticks a tile. They had to be buildable for genesis to stand them up roofless.
+    const perTileWood = r['house']!.inputs['wood']! / (r['house']!.w * r['house']!.h)
+    const perTileTicks = r['house']!.durationTicks / (r['house']!.w * r['house']!.h)
+    expect([perTileWood, perTileTicks]).toEqual([2.5, 720])
+    for (const k of ['cottage', 'farmhouse']) {
+      const tiles = r[k]!.w * r[k]!.h
+      expect(r[k]!.inputs, k).toEqual({ wood: tiles * perTileWood })
+      expect(r[k]!.durationTicks, k).toBe(tiles * perTileTicks)
     }
     // The house row must agree with the C9 dials it replaces, or Task 12's generalisation drifts.
     expect(r['house']!.inputs).toEqual(DEFAULT_CONFIG.construction.houseMaterials)

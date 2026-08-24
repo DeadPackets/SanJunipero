@@ -167,13 +167,25 @@ const StructuresSchema = z.object({
     well: { inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false },
     bridge: { inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false },
     grave: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false },
-    // The four the town template plants and nobody raises. Their mass and their hp were already
-    // authored — the footprints in `cityTemplate`, the hp in the engine's genesis table — and
-    // this is the row both now read, so a cottage is one building and not three descriptions.
+    // The four the town template plants. Their mass and their hp were already authored — the
+    // footprints in `cityTemplate`, the hp in the engine's genesis table — and this is the row
+    // both now read, so a cottage is one building and not three descriptions.
+    //
+    // ★ THE COTTAGE AND THE FARMHOUSE ARE BUILDABLE, AND THE PRICE IS THE HOUSE'S OWN RATE.
+    // A house is 4 tiles of floor for 10 wood and 2 880 ticks: 2.5 wood and 720 ticks a tile.
+    // A cottage is 6 tiles and a farmhouse is 8, so they cost 15/4 320 and 20/5 760 — one
+    // derivation, not three authored numbers, and `config.test.ts` holds them to it. They had
+    // to become buildable for genesis to stand them up ROOFLESS: a wall nobody can finish is
+    // the cabin-that-was-not-a-cabin all over again, and standing seven of them in the founding
+    // valley would have rebuilt arm B at nine times the scale.
+    //
+    // The cabin stays unbuildable on purpose. It is 2x2, exactly a house's mass, so a buildable
+    // one would be the same building under a second name — a word in every mind's vocabulary
+    // that buys nothing. It is the one dwelling whose roof held.
     storehouse: { inputs: {}, w: 2, h: 2, maxHp: 40, flammable: true, durationTicks: 1, roofed: true },
     cabin: { inputs: {}, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 1, roofed: true },
-    cottage: { inputs: {}, w: 3, h: 2, maxHp: 60, flammable: true, durationTicks: 1, roofed: true },
-    farmhouse: { inputs: {}, w: 4, h: 2, maxHp: 80, flammable: true, durationTicks: 1, roofed: true },
+    cottage: { inputs: { wood: 15 }, w: 3, h: 2, maxHp: 60, flammable: true, durationTicks: 4320, roofed: true },
+    farmhouse: { inputs: { wood: 20 }, w: 4, h: 2, maxHp: 80, flammable: true, durationTicks: 5760, roofed: true },
   }),
 }).strict()
 
