@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { SimConfigSchema, type SimConfig } from './config.js'
 import { MINUTES_PER_DAY } from './time.js'
 import {
-  glowRadiusFor, LIGHT_GLOW_RADIUS, lightBandAt, lightLevelAt, visionRadiusAt, type LitWorld,
+  glowRadiusFor, isDark, LIGHT_GLOW_RADIUS, lightBandAt, lightLevelAt, visionRadiusAt, type LitWorld,
 } from './light.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
 const DARK: SimConfig = SimConfigSchema.parse({ nightWitness: { enabled: false } })
+const NO_LIGHT_LAW: SimConfig = SimConfigSchema.parse({ light: { enabled: false } })
 
 const NOON = 12 * 60
 const DUSK = 19 * 60 + 30
@@ -125,6 +126,52 @@ describe('lightBandAt: three words, never a number', () => {
     expect(lightBandAt(torchAt(0, 0, MIDNIGHT + 1), 0, 0, MIDNIGHT, CFG)).toBe('bright')
     for (const tick of [NOON, DUSK, MIDNIGHT]) {
       expect(['bright', 'dim', 'dark']).toContain(lightBandAt(world(), 0, 0, tick, CFG))
+    }
+  })
+
+  // ★ TWO LAWS, TWO QUESTIONS. The band used to be read off `lightLevelAt`, which answers the
+  // witness dial — so a world with `nightWitness` off read "bright" at midnight while the same
+  // midnight still charged 1.5x for the work. The dark belongs to the light law.
+  it('is still dark at midnight with the WITNESS law off, and bright with the LIGHT law off', () => {
+    expect(lightBandAt(world(), 0, 0, MIDNIGHT, DARK)).toBe('dark')
+    expect(lightBandAt(world(), 0, 0, DUSK, DARK)).toBe('dim')
+    expect(lightBandAt(world(), 0, 0, MIDNIGHT, NO_LIGHT_LAW)).toBe('bright')
+  })
+
+  it('does not turn dusk into deep night when the two factors are set equal', () => {
+    const flat = SimConfigSchema.parse({ nightWitness: { duskFactor: 0.35, nightFactor: 0.35 } })
+    expect(lightBandAt(world(), 0, 0, DUSK, flat)).toBe('dim')
+    expect(lightBandAt(world(), 0, 0, MIDNIGHT, flat)).toBe('dark')
+  })
+})
+
+describe('isDark: the one answer to "is it dark here"', () => {
+  // ★ NOT VACUOUS. Every assertion below is paired: one place that IS dark and one that is NOT,
+  // in the SAME world at the SAME tick. A build that lit the whole map, or one that darkened it,
+  // fails this — a single-sided assertion would pass either.
+  it('tells a lamp-lit tile from the street beside it, at one instant in one world', () => {
+    const lit = torchAt(10, 10, MIDNIGHT + 100)
+    expect(isDark(lit, 13, 10, MIDNIGHT, CFG)).toBe(false)  // inside the glow
+    expect(isDark(lit, 14, 10, MIDNIGHT, CFG)).toBe(true)   // one tile past it
+  })
+
+  it('is false all day and true all night on the same unlit tile', () => {
+    expect(isDark(world(), 0, 0, NOON, CFG)).toBe(false)
+    expect(isDark(world(), 0, 0, MIDNIGHT, CFG)).toBe(true)
+  })
+
+  it('calls dusk not-dark, because the dark is what the work penalty charges for', () => {
+    expect(isDark(world(), 0, 0, DUSK, CFG)).toBe(false)
+    expect(lightBandAt(world(), 0, 0, DUSK, CFG)).toBe('dim')
+  })
+
+  it('is exactly the band saying "dark" — one derivation, not a second threshold', () => {
+    const lit = torchAt(10, 10, MIDNIGHT + 100)
+    for (const tick of [NOON, DUSK, MIDNIGHT]) {
+      for (const [x, y] of [[10, 10], [13, 10], [14, 10], [40, 40]] as const) {
+        expect([tick, x, y, isDark(lit, x, y, tick, CFG)])
+          .toEqual([tick, x, y, lightBandAt(lit, x, y, tick, CFG) === 'dark'])
+      }
     }
   })
 })

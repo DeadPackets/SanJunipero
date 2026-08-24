@@ -501,6 +501,7 @@ describe('the ground underfoot: a benefit stated, never a rule given', () => {
 describe('night-witness: a torch does not let you see, it lets the dark see you', () => {
   const CFG = DEFAULT_CONFIG
   const DAY_CFG = SimConfigSchema.parse({ nightWitness: { enabled: false } })
+  const LIGHTLESS_CFG = SimConfigSchema.parse({ light: { enabled: false } })
   const MIDNIGHT = 0
   const NIGHT_R = Math.round(CFG.movement.sightRadius * CFG.nightWitness.nightFactor)
 
@@ -577,10 +578,15 @@ describe('night-witness: a torch does not let you see, it lets the dark see you'
     expect(said(makeWorld([{ id: 'a', x: 0, y: 0 }, { id: 'thief', x: 6, y: 0 }]))).toBe(1)
   })
 
-  it('with the law off, midnight witnesses exactly what noon does', () => {
+  it('with the law off, midnight witnesses exactly what noon does — but is still dark', () => {
     expect(composePerception(world(), DAY_CFG, 'a', takingAt(6, 0)).seen).toHaveLength(1)
     expect(composePerception(world(), DAY_CFG, 'a', []).visible.agents.map((g) => g.id)).toEqual(['thief'])
-    expect(composePerception(world(), DAY_CFG, 'a', []).light).toBe('bright')
+    // ★ THE WITNESS LAW AND THE LIGHT LAW ARE TWO LAWS. This line used to read 'bright', which
+    // made a mind read broad daylight at midnight while `light.nightWorkPenalty` — a different
+    // dial, still on — charged it half again for the same hour's work. Who sees a theft is
+    // `nightWitness`; whether the ground is dark is `light`.
+    expect(composePerception(world(), DAY_CFG, 'a', []).light).toBe('dark')
+    expect(composePerception(world(), LIGHTLESS_CFG, 'a', []).light).toBe('bright')
   })
 
   it('is a pure projection: the same state and log give the same witness set twice', () => {
