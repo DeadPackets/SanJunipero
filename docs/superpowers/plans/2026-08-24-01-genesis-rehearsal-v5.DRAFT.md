@@ -1,26 +1,29 @@
-# Genesis & Rehearsal (C8) Implementation Plan — v4 DRAFT for controller review
+# Genesis & Rehearsal (C8) Implementation Plan — v5 DRAFT for controller review
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** DRAFT **v4**, superseding `2026-08-18-08-genesis-rehearsal-v3.DRAFT.md` (66 tasks / 15 phases, branch `c8-plan-v3` @ `51a98a2`, **RATIFIED as the plan of record** by `c8-v3-controller-rulings.md`), which superseded v2 (54 tasks / 12 phases, `c8-plan-v2` @ `4924709`) and the base draft (39 tasks / 9 phases). **v4 keeps every one of v3's 66 task numbers, all 15 phases and every document position.** It is written against local `main` @ **`cd845bc`** — merge trains 5 **and 6** have landed, carrying C12a, the contemporary canon, the town layout and the forge repairs. Every value in Global Constraint C3 was grepped out of `cd845bc`, not copied from v3.
+**Status:** DRAFT **v5**, superseding `2026-08-23-01-genesis-rehearsal-v4.DRAFT.md` (66 tasks / 15 phases, branch `c8-plan-v4` @ `50d1bfc`, written against `main` @ `cd845bc`), which superseded v3 (66 / 15, `c8-plan-v3` @ `51a98a2`, **RATIFIED as the plan of record** by `c8-v3-controller-rulings.md`), v2 (54 / 12, `c8-plan-v2` @ `4924709`) and the base draft (39 / 9). **v5 keeps every one of v3's 66 task numbers, all 15 phases and every document position.** It is written against local `main` @ **`645a8d9`** — merge trains 1, 2 **and 3** of the 2026-08-23/24 sprint have landed, carrying the town grammar, the claim seam, unbounded world growth, the far bank, the Discovery Record and the recovered art. Every value in Global Constraint C3 was grepped out of `645a8d9`, not copied from v4.
 
-> ### ★ WHY v4 EXISTS — ONE REASON, AND IT IS NOT A REFACTOR
+> ### ★ WHY v5 EXISTS — ONE REASON, AND IT IS NOT A REFACTOR
 >
-> **v3's genesis prose was written against a neolithic world, and that world is gone.** The old canon said in as many words that nobody in this valley had *"ever drawn metal from stone, mixed the black powder, or caught the sky's lightning in a jar"*, and that stone was the hardest implement the town had. **The user set the setting to modern-day countryside — rural, hands-on, contemporary** — and the setting lane landed it in `packages/arbiter/src/canon.ts` on train 6. The user's instruction was to settle the setting **now** and rewrite C8's genesis against it, **so the work is not done twice.**
+> **v4 described a town that was placed and a `build` verb that was given a coordinate. Neither exists any more.** Between `cd845bc` and `645a8d9`, fourteen lanes landed and three of them went straight through the middle of Phase D: `cityTemplate.ts` became a **plotter** rather than a list, `build` became **`{kind}` and nothing else**, and the world lost its size. **A plan that names a signature that no longer exists is worse than no plan** — v4's own delta document exists because v3 did exactly that, and it catalogues five separate places where v3's code "typechecks as never" or "passes vacuously".
 >
-> **That is the whole of v4.** Every mind-facing string, every material, every verb of work, and every thing the founders are surprised by is re-read against the contemporary canon. **Global Constraint C29 is the law; the setting sweep at the end of the Self-Review is the check.**
+> **That is the whole of v5.** Every interface claim, every coordinate, every pin and every count is re-grepped out of `645a8d9`. **Fourteen of the 66 tasks were stale; each one is amended in place and each amendment is one line in `c8-v4-to-v5-delta.md`.**
 >
-> **Three landed facts v3 could not have seen, and each one changes a task:**
+> **Six landed facts v4 could not have seen, and each one changes a task:**
 >
-> | Landed on trains 5–6 | What it invalidates in v3 | Where v4 answers it |
+> | Landed on the 2026-08-23/24 sprint | What it invalidates in v4 | Where v5 answers it |
 > |---|---|---|
-> | **The contemporary canon and `GENESIS_CODEX`** (`arbiter/src/canon.ts`) — `ERAS` is now `handwork · arrangement · works · machinery · industry`, and the genesis codex is **13 entries**, not 104 | **T14 in full** — `CODEX_ERAS`, `PRACTICED_AT_GENESIS` and its flint-and-clay derivation are all gone, and **T13's 104-node content draft is neolithic** | **T14 rewritten**, **T13 gated**, **OD16** |
-> | **`cityTemplate.ts`'s eleven structures across four districts, with roads** | v3's five-identical-homes town, and every coordinate helper's signature | **C14 rewritten**, **T11**, **T19**, **T57** |
-> | **`warmth.insulation.garment` is ALREADY `12`** — C11 Task 37b moved it and `c11.findings.test.ts:60` pins it | **T29's third bundle member is a no-op, and its proposed test contradicts a landed one** | **T29 rewritten**, **OD17** |
+> | **★ `build` TAKES `{kind}` AND NOTHING ELSE.** `PlottedBuildParams = z.object({ kind }).strict()`; 225 named coordinates all refused; **there is no code path from the params to the position** (`verbs.ts:894-895`, `buildSiteOf` at `1070`) | **T19's `nearestBuildSpot` returns `null` for every tile in a town; T22's refusal test can never see its refusal** | **T19 rewritten**, **T22 rewritten**, **C14 rewritten** |
+> | **★ `makeablesLine` ALREADY TAKES A SECOND ARGUMENT, AND IT IS THE BUILD ROAD.** `makeablesLine(m, groundForBuilding?)` at `prose.ts:266`, wired at `agentRuntime.ts:444` | **T20 would overwrite it with `reachable` and silently delete the landed road** — green, and a production regression | **T20 rewritten** |
+> | **`cityTemplate.ts` is a PLOTTER.** Blocks plat on a 19-tile pitch, plots on block edges, **spacing floor 86.1626 px proven over 2 496 pairings**; `cityFreePlots` is gone, split into `plattedPlots` / `genesisEmptyPlots`; `CITY_ANCHOR_DEFAULT` is `anchorFor(rings)`, not a constant; **there are no districts** | **C14's coordinate table, its anchor and its district row are all wrong** | **C14 rewritten**, **T9**, **T11** |
+> | **The world has no size.** `mapGrowth` is one key wide (`{ enabled }`); `maxSize`, `step` and `structuresPerStep` are deleted from `DEFAULT_CONFIG`, **which is why the forge pin moved** | **C3's forge value** | **C3 re-derived** |
+> | **The Discovery Record**, and **art for every kind the world can create** with a gate that enforces it (`worldStructureKinds` = template ∪ **every recipe key** ∪ extra) | **T22's `barn`, `pump_house` and `long_bridge` have no art cell; T44's whole finding was falsified by merge train 3** | **T22**, **T44 rewritten**, **OD19** |
+> | **The content drafts landed, re-authored and checked** — `docs/superpowers/content/`, **103 nodes and 52 social**, era written as a **name** | **T12's numeric era, T13's 104 / [27,31,18,16,12] / 11, T14's `ERAS[era - 1]`** | **T12**, **T13**, **T14**; **OD16 CLOSED**, **OD18 raised** |
 
 > ### HOW THIS PLAN IS NUMBERED — read this before executing anything
 >
-> **Tasks execute in DOCUMENT ORDER, not in numeric order.** v2's Task 1–54 keep their numbers and their positions unchanged, because eleven rulings, four delta documents and two other lanes' plans cite them by number ("T24 owns criterion 9", "T29 is the keystone regen", "T50 run C"). Renumbering would silently break every one of those references. **v4 adds and deletes no task, moves no task, and renumbers nothing: it is 66 tasks and 15 phases, exactly as v3 was ratified.**
+> **Tasks execute in DOCUMENT ORDER, not in numeric order.** v2's Task 1–54 keep their numbers and their positions unchanged, because eleven rulings, five delta documents and two other lanes' plans cite them by number ("T24 owns criterion 9", "T29 is the keystone regen", "T50 run C"). Renumbering would silently break every one of those references. **v5 adds and deletes no task, moves no task, and renumbers nothing: it is 66 tasks and 15 phases, exactly as v3 was ratified.** Said loudly because the brief asked for it to be said loudly: **no task was added and no task was deleted.** Two came close and neither was — **T19's build hook** is superseded by a landed mechanism and the task survives with three hooks instead of four, and **T44's finding was falsified outright** and the task survives as the bootstrap the deployment still needs. Deleting either would have broken a numbered citation to buy nothing.
 >
 > **The twelve tasks new in v3 are numbered 55–66 and are placed where they execute** — inside Phases D, D2, F2 and F3 — so a reader going top to bottom reads them in the order they are done. A task number is an identity, not a sequence.
 >
@@ -71,20 +74,26 @@
 | **`c8-v3-controller-rulings.md` R0–R5** | **BINDING, and this is the ratification of v3** | R0→Phase F2 scope, R1→T55, R2→T50/G8, **OD12→T29**, **OD13→T50 criterion 2**, **OD14→T62**, **OD15→T57/OD15**, R4→C3/T55–T66 re-verification |
 | **`setting-lane-report.md` + `setting-lane-controller-rulings.md` R0–R5 (2026-08-18)** | **BINDING, and the headline of v4** | R0→the regen budget, **R1→C29 and T14**, R2→T14's era ladder, **R3→C30 (the home kind)**, R4→C31, R5→T50's first-live-run brief |
 | **`rename-home-kind-brief.md` (parallel lane, lands before C8 executes)** | **BINDING** | **C30 — the home kind is `house`**, and C8 inherits whatever pin values that lane leaves on `main` |
-| **merge trains 5 and 6** | **landed; `main` = `cd845bc`** | C3's four pins and their five copies, C14's rewritten town, T14's canon, T29's struck coat |
+| **merge trains 5 and 6** | landed; superseded | carried into `645a8d9` |
+| **★ the 2026-08-23/24 sprint — fourteen lanes, merge trains 1–3** | **landed; `main` = `645a8d9`, 311 files / 4637 tests / tsc 0** | **C3's four pins and their eleven copies, C14's rewritten town, C32's layout glass, T19–T22's seam, T44's art** |
+| **`town-generator-report.md`, `world-growth-report.md`, `claim-seam-report.md`, `far-bank-report.md`, `merge-train-3-report.md`** | **BINDING, and the headline of v5** | the plotter→C14; the clearance→C3's forge pin; the claim seam→T19/T20/T21/T22; the walk graph→C14; the running-product findings→the `first-night` contingency box |
+| **`canon-story-decisions.md` (USER RULINGS, 2026-08-23) — four rulings and one settlement** | **BINDING** | reach ceiling, the landslide, the abandoned village, Omar's generator → T3/T4's content is now landed; **"the tree is a YARDSTICK, never a gate"** → **T13**, **T14**, **OD18** |
+| **`docs/superpowers/content/` (landed on `main`, docs-only)** | **the two frozen drafts, RE-AUTHORED and checked** | **OD16 CLOSED**; T3, T4, T13, T14 |
 
-**★ WHAT CHANGED FROM v3, IN ONE TABLE.** Everything not listed here is carried forward unaltered. **Nothing is renumbered and nothing is deleted.**
+**★ WHAT CHANGED FROM v4, IN ONE TABLE.** Everything not listed here is carried forward unaltered. **Nothing is renumbered and nothing is deleted.**
 
 | # | Amendment | Where it lands |
 |---|---|---|
-| **A** | **The setting is contemporary rural, and every mind-facing string is rewritten to it** | **C29**; T3, T4, T12, **T13**, **T14**, T15, T20, T24, T56, T57, T58, T59, T61; the setting sweep in the Self-Review |
-| **B** | **The home kind is `house`** — never `hut`, and never `cabin`, which is a distinct fixture the template already stands | **C30**; T4, T9, T10, T11, T19, T20, T21, T22, T57, T58, T61, T62, T63, T64 |
-| **C** | **The town v3 never saw: eleven structures, four districts, roads** | **C14 rewritten**; T9, T11, T19, T22, T57, T62 |
-| **D** | **T14 is rewritten against the landed `GENESIS_CODEX`; T13's content draft is neolithic and is GATED** | **T13**, **T14**, T12; **OD16** |
-| **E** | **T29's coat is struck — `garment` is already 12 on `main`, and v3's proposed test contradicts a landed one** | **T29 rewritten**; **OD17** |
-| **F** | **Nine interface claims re-verified against `cd845bc` and corrected** | T4, T9, T11, T14, T21, T22, T24, T55, T56 — each named in `c8-v3-to-v4-delta.md` |
+| **A** | **★ A MIND CANNOT NAME WHERE IT BUILDS, AND THE WORLD ALREADY TELLS IT WHERE** | **C14 rewritten**; **T19**, **T20**, **T21**, **T22** |
+| **B** | **The four pins are re-derived and two of them moved; the census is eleven literals across seven files, not nine across six** | **C3 rewritten**; **T1**, **T29**, **T51** |
+| **C** | **The town is a grammar, not a layout: no district, no typed coordinate, a moved anchor, and `cityFreePlots` is gone** | **C14 rewritten**; T9, T11, T57, T62 |
+| **D** | **The content landed; the tree is 103 nodes, 52 social, and its era is a NAME** | **T12**, **T13**, **T14**; **OD16 CLOSED**, **OD18 raised** |
+| **E** | **Art exists for every kind the world can create, and a gate enforces it — which is why T22's three heavy kinds cannot ship as written and T44's finding is false** | **T22**, **T44 rewritten**; **OD19** |
+| **F** | **★ NEW — the layout glass.** `TOWN_LAYOUT_VOCABULARY` bans `plot`/`block`/`ring`/`lattice`/`plat`/`frontage` from every authored surface a mind reads | **C32**; T20, T21, T56, T57, T61, and the Self-Review sweep |
+| **G** | **Fourteen interface claims re-verified against `645a8d9` and corrected** | T1, T10, T12, T13, T14, T19, T20, T21, T22, T29, T33, T44, T51, T56, T60, T62 — each named in `c8-v4-to-v5-delta.md` |
+| **H** | **OD16 and OD17 both CLOSE; OD18–OD21 are raised with a recommendation each** | the Open Decisions section |
 
-**Content inputs (approved, frozen — transcribe, do NOT rewrite): ★ AND BOTH ARE NOW PERIOD-WRONG.** `c8-founders.DRAFT.md` and `c8-discovery-tree.DRAFT.md`, archived at `.claude/scratch/archive/physics-verbs-superpowers/c11-c8-handoff/` and `…/drafts/`. Neither is in the repo. **The controller MUST copy both into the executing worktree before Task 3 begins — and MUST re-author both against the contemporary canon first.** The discovery tree's 104 nodes open `fire-craft`, `stone-tools`, `cordage`, `hide-curing`, `sun-brick`, `pit-kiln`, `fired-pottery`; the founders' backstories are set in a world of hedge-healers, wagons, grain barges and land agents' handbills. **Task 1 Step 2 gates on this and STOPs.** See **OD16**.
+**Content inputs (approved, frozen — transcribe, do NOT rewrite): ★ v5 — BOTH ARE NOW IN THE REPO, RE-AUTHORED, AND OD16 IS CLOSED.** `docs/superpowers/content/c8-discovery-tree.md` (**103 nodes**, era written as a **name**, **52 social**) and `docs/superpowers/content/c8-founders.md`, both on `main` at `645a8d9`, docs-only, with `README.md` beside them recording how they were checked. **v4's Task 1 Step 2 gate is retained and now PASSES rather than STOPs** — its period grep returns nothing on either file, verified against the landed text — and it is kept precisely because a gate that has started passing is the only kind worth keeping. **The controller no longer copies anything: the drafts are files the executing worktree already has.** The four canon story facts the content rests on (`canon-story-decisions.md`, ruled 2026-08-23) are binding and are not re-litigated here: the reach ceiling is **asymptotic, not empty**; the pass came down in a slide six weeks after they arrived; **they walked into a village somebody else built and left**; and Omar is the only one who can keep the generator running. See **OD16 (CLOSED)** and **OD18 (raised)**.
 
 ---
 
@@ -94,36 +103,47 @@ Every task's requirements implicitly include this section.
 
 - **C1. arm64 is a hard constraint, verified per task, never assumed.** The production target is an Oracle Ampere (linux/arm64) box. No image tag is used unless `docker manifest inspect` lists `linux/arm64`; every native module (`better-sqlite3`, `sqlite-vec`, `onnxruntime-node`, `sharp`, `@rollup/rollup-linux-arm64-gnu`, `@esbuild/linux-arm64`) must resolve a **glibc** prebuild for `linux/arm64` or build from source in the deps stage. "It should work on ARM" is not done. **A task that cannot prove arm64 STOPS and reports.**
 - **C2. There is no build step, and the image must respect that** (R2). Every workspace package exports raw TypeScript (`"exports": {".": "./src/index.ts"}`); only `@sj/web` has a `build` script. The server runs TS through `packages/agents/scripts/ts-loader.mjs`, so **`typescript` is a production dependency** and `pnpm install --prod` would break the image. No `dist/`, no bundler, no `pnpm build` outside `@sj/web`.
-- **C3. THE KEYSTONE IS PHASE F AND NOWHERE ELSE — and here are the four pins, RE-READ FROM THE MERGED TIP, WITH ALL FIVE OF THEIR COPIES.** C8 re-pins deliberately, once. **v4 grepped each hash literal out of the working tree at `main` = `cd845bc` and quotes the file and line it was found on** (C17). Every value below belongs to **branch `main` @ `cd845bc`** and to no other branch. **All four are byte-identical to v3's — trains 5 and 6 moved none of them — and that is a measured result, not an assumption carried forward.**
+- **C3. THE KEYSTONE IS PHASE F AND NOWHERE ELSE — and here are the four pins, RE-READ FROM THE MERGED TIP, WITH ALL SEVEN FILES THEY LIVE IN.** C8 re-pins deliberately, once. **v5 grepped each hash literal out of the working tree at `main` = `645a8d9` and quotes the file and line it was found on** (C17). Every value below belongs to **branch `main` @ `645a8d9`** and to no other branch. **Two of the four MOVED since v4, both for reasons that have nothing to do with any rename, and that is a measured result rather than an assumption carried forward.**
 
-  | Pin | Value at `main` @ `cd845bc` | Where the literal lives | Every other copy of the same literal |
+  | Pin | Value at `main` @ `645a8d9` | Where the literal lives | Every other copy of the same literal |
   |---|---|---|---|
-  | **G1 `GOLDEN_DAY_HASH`** | `f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac` | `packages/engine/src/golden.test.ts:14` | `packages/arbiter/src/g4.test.ts:21`; **`packages/gateway/src/g12c.test.ts:87`**; **`packages/engine/src/g9.test.ts:588` reads `golden.test.ts` AS SOURCE TEXT** |
-  | **G2 `GOLDEN_G2_HASH`** | `c1c51b42aa340f0e5ae0d8cc321b602345f6ec4fee4e4d20b48f7e692b946d9c` | `packages/engine/src/g2.test.ts:34` | **`packages/gateway/src/g12c.test.ts:90`**; **`packages/engine/src/g9.test.ts:589` reads `g2.test.ts` AS SOURCE TEXT** |
-  | **forge `stateHash(DEFAULT_CONFIG)`** | `a90bd7471668eea6e8a8e7932129ef7905ae2477b396d5c7b792df539065c4d8` | `packages/forge/src/forgeConfig.test.ts:79` | **`packages/gateway/src/g12c.test.ts:101`**; **`packages/agents/src/live/g11checkpoint.test.ts:15`** (as a fixture `configHash`); previous value in the comment at line 77 |
-  | **`BLOCK1_SHA256`** | `28c1fce0781ec9019416c234a9eae47401ff4b9dc4a96b91c371335fbad97bd6` | `packages/agents/src/prompt/rulesOfBeing.test.ts:15` | asserted at `rulesOfBeing.test.ts:123`; **`packages/gateway/src/g12c.test.ts:102`** |
+  | **G1 `GOLDEN_DAY_HASH`** | `f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac` — **never moved, in the project's whole history** | `packages/engine/src/golden.test.ts:14` | `packages/arbiter/src/g4.test.ts:25`; **`packages/gateway/src/g12c.test.ts:87`**; **`packages/engine/src/g9.test.ts:591` reads `golden.test.ts` AS SOURCE TEXT** |
+  | **G2 `GOLDEN_G2_HASH`** | `00d724345c37104d6c93f10398b96eded080b58db78108746e2a037fce836a10` | `packages/engine/src/g2.test.ts:40` | **`packages/gateway/src/g12c.test.ts:92`**; **`packages/engine/src/g9.test.ts:592` reads `g2.test.ts` AS SOURCE TEXT** |
+  | **forge `stateHash(DEFAULT_CONFIG)`** | **`da065752366c812c531b1eaa0f8537781bc6f5859e5a4bf6647aa5edc37cd472` ← MOVED** | `packages/forge/src/forgeConfig.test.ts:91` | **`packages/gateway/src/g12c.test.ts:105`**; previous values in the comments at lines 77, 82 and 89 |
+  | **`BLOCK1_SHA256`** | **`4205d892c18a91de4c9c3a50f0122abaad0d6170488455419dc045bfc4d50065` ← MOVED** | `packages/agents/src/prompt/rulesOfBeing.test.ts:22` | asserted at `rulesOfBeing.test.ts:130`; **`packages/gateway/src/g12c.test.ts:106`**; previous value in the comment at line 21 |
 
-  **★ NEW IN v4, AND IT IS THE THING THAT WILL BITE T28 AND T29: THERE ARE NOW NINE PLACES, NOT FIVE.** Train 5 landed `packages/gateway/src/g12c.test.ts`, which carries **its own copy of all four pins** at lines 87, 90, 101 and 102, and train 4 had already landed `g9.test.ts:588-589`, which asserts the two golden literals **by reading the other test files as source text**. **A re-pin that updates `golden.test.ts` and `g2.test.ts` alone leaves four red tests in three other packages.** T29's re-pin step names every one of them. v3's table listed two copies and would have discovered the rest by watching them fail.
+  **★ WHY THE TWO MOVED, IN ONE LINE EACH, BECAUSE NEITHER IS A RENAME AND v4's CLOSING PARAGRAPH SAID THEY WOULD BE.**
+  **forge** — the `world-growth` lane deleted **three keys** from `SimConfigSchema`: `mapGrowth.maxSize`, `.step` and `.structuresPerStep`. `maxSize` was a 192-tile ceiling on a grammar that plats rings forever; the other two were a pace guessed against it. Three keys removed, none added, no value changed. `MapGrowthSchema` is now one key wide.
+  **BLOCK1** — the `claim-seam` lane changed **one line** of block 1. Its `build` line still said *"give kind, the thing to raise, and x and y as two numbers for where"*, a parameter the verb now refuses, so the block that teaches a mind its own hands was teaching it a refusal. Nothing else in the block changed.
 
-  **★ THE STALE-PIN TRAP, NAMED, BECAUSE IT ALMOST BIT TWICE.** Quoting a hash off the wrong branch produces a pin test that fails for a reason nobody can explain:
+  **★ THE CENSUS, RE-DERIVED, AND v4's NUMBER WAS WRONG.** v4's C3 said *"nine copies across six files"* and its T51 check 9 asserted that count. **Run v4's own grep against `cd845bc` and it returns thirteen lines across eight files** — so an executor following v4 would have STOPped on a correct tree, which is the same class of defect as a missed copy and the reason this paragraph exists. The honest number at `645a8d9`:
 
-  | Branch | `GOLDEN_G2_HASH` there | forge `stateHash(DEFAULT_CONFIG)` there |
-  |---|---|---|
-  | **`main` @ `cd845bc`** (the only correct source) | `c1c51b42…` | `a90bd747…` |
-  | `c12a-work` @ `aefe0e3` | **`6f2529fb…`** — the PRE-REGEN G2 | not moved by C12a |
-  | `c11-work` @ `545ee38` | `c1c51b42…` | `a90bd747…`, with `482f1203…` in the comment as its own predecessor |
+  > **ELEVEN full 64-hex literals across SEVEN files.** G1 ×4 (`golden.test.ts:14`, `g4.test.ts:25`, `g12c.test.ts:87`, `g9.test.ts:591`), G2 ×3 (`g2.test.ts:40`, `g12c.test.ts:92`, `g9.test.ts:592`), forge ×2 (`forgeConfig.test.ts:91`, `g12c.test.ts:105`), BLOCK1 ×2 (`rulesOfBeing.test.ts:22`, `g12c.test.ts:106`).
+  > **The eight-character prefix grep returns TWELVE lines**, because `arbiter/src/g4.test.ts:208` carries `f487a26b` **inside a test name**. It is not a pin and re-pinning it is a documentation edit, not a correctness one — but it is what makes the count differ from eleven, so it is named here rather than discovered as an off-by-one.
 
-  **A branch cut from `c12a-work` still carries `6f2529fb…`.** An executor who copies literals out of a plan, out of a brief, or off the wrong worktree pins the wrong value; **the only legal source is a grep of the merged tip in the worktree the task is executing in** (C17). Three verification commands, and the task runs all three before touching anything:
+  **★ AND THE DECOY, WHICH v4 NAMED AS A COPY AND IS NOT ONE.** `packages/agents/src/live/g11checkpoint.test.ts:15` carries `a90bd7471668eea6e8a8e7932129ef7905ae2477b396d5c7b792df539065c4d8` as a `configHash` inside a frozen `G11Fingerprint` **test fixture**. **Nothing compares it to `stateHash(DEFAULT_CONFIG)`** — the only production reader of a `configHash` is `scripts/g11-deepworld.ts:355`, which computes its own. The forge pin has moved **twice** since that literal was written (`a90bd747` → `02f295ad` → `da065752`) and no test has ever gone red for it. **It is a decoy, C8 does not touch it, and T29's re-pin step must not list it** — editing it changes nothing and invites the reader to believe the checkpointer is pinned to the config when it is not.
+
+  **★ THE STALE-PIN TRAP, NAMED, BECAUSE IT HAS NOW ALMOST BITTEN THREE TIMES.** Quoting a hash off the wrong branch produces a pin test that fails for a reason nobody can explain:
+
+  | Branch | `GOLDEN_G2_HASH` there | forge `stateHash(DEFAULT_CONFIG)` there | `BLOCK1_SHA256` there |
+  |---|---|---|---|
+  | **`main` @ `645a8d9`** (the only correct source) | `00d72434…` | `da065752…` | `4205d892…` |
+  | `main` @ `cd845bc` — **what v4 quotes** | **`c1c51b42…`** | **`a90bd747…`** | **`28c1fce0…`** |
+  | `town-generator` @ `68ef602` | `00d72434…` | **`02f295ad…`** | `28c1fce0…` |
+  | `c12a-work` @ `aefe0e3` | **`6f2529fb…`** — the PRE-REGEN G2 | not moved by C12a | `28c1fce0…` |
+
+  **All three of v4's non-G1 values are now stale, and a branch cut from `c12a-work` still carries `6f2529fb…`.** An executor who copies literals out of a plan, out of a brief, or off the wrong worktree pins the wrong value; **the only legal source is a grep of the merged tip in the worktree the task is executing in** (C17). Four verification commands, and the task runs all four before touching anything:
 
   ```bash
-  git rev-parse HEAD                       # must be a descendant of cd845bc
+  git rev-parse HEAD                       # must be a descendant of 645a8d9
   grep -rn "GOLDEN_DAY_HASH = \|GOLDEN_G2_HASH = \|BLOCK1_SHA256 = " --include='*.ts' packages/
   grep -rnE "'[0-9a-f]{64}'" --include='*.ts' packages/forge/src/forgeConfig.test.ts
-  # every copy of every pin, wherever it lives — this is the command that finds the other four
-  grep -rn "f487a26b\|c1c51b42\|a90bd747\|28c1fce0" --include='*.ts' packages/
+  # every copy of every pin, wherever it lives — ELEVEN full literals across SEVEN files, plus
+  # ONE prefix inside a test name at arbiter/src/g4.test.ts:208. Twelve lines is the right answer.
+  grep -rn "f487a26b\|00d72434\|da065752\|4205d892" --include='*.ts' packages/
   ```
 
-  **★ AND THE ONE PIN C8 DOES NOT OWN.** The parallel rename lane (`rename-home-kind`) is authorised to move the forge pin, and possibly G2, on its own authority (C30). **C8 inherits whatever values are on `main` when it starts and re-derives none of them.** Task 1 Step 0 reads the four literals off the executing worktree and writes them into the ledger; if any differs from this table, **that is the rename lane's landed regen and is NOT a defect** — record the new value and carry on. Any *other* movement is a STOP.
+  **★ v4's CLOSING PARAGRAPH IS RESTATED AGAINST REALITY, AND IT WAS STALE IN THE OTHER DIRECTION.** v4 said *"C8 inherits whatever pin values the rename lane leaves on `main` and re-derives none"*, on the reasoning that the `rename-home-kind` lane was the only thing authorised to move one. **The rename lane has landed, and it is not what moved either pin.** The forge pin moved for a deleted config section and BLOCK1 for a line of prompt text, both on lanes that had nothing to do with any rename. The instruction survives with its reason replaced: **C8 inherits whatever the four literals say on the tip it executes against, re-derives none of them, and Task 1 Step 0 writes them into the ledger.** If any differs from this table, that is a lane that landed after this draft and is **NOT a defect** — record the new value, say which lane, and carry on. Any movement C8 itself causes outside Phase F is a STOP. **And there is one live case: the `first-night` lane is running now and is the one lane authorised to move G1** — see the contingency box at the end of this document.
 
   **Every task outside Phase F that moves any of them is a defect: STOP and report, never re-pin.** Every task inside Phase F re-pins in the same commit as the change that moved it, with the old and new values in the commit body. Any tuning after Phase F travels as `config_changed` through the law channel, never as a schema edit. **Phases F2 and F3 are AFTER the keystone and therefore add no `SimConfig` key and change no `DEFAULT_CONFIG` value** — every number they need either already exists in `SimConfig` or lives outside it, and each task says which.
 - **C4. THE DETERMINISM CONTRACT — replay determinism, not regeneration determinism** (U28). A recorded run replays to the same bytes forever; re-running the protocol from the same seed does **not** reproduce it, because the minds are sampled and the humans are not in the engine. Four rules bind every task: **(a)** no RNG in the drive fold — drive state is a pure fold over `(genome, recorded packets, own recorded turns)`, and every tiebreak is by id order; **(b)** everything a mind's output touches lands as an event first, through `submitIntent`; **(c)** goldens stay scripted and contain no mind; **(d)** every per-call sampling parameter is **recorded** — `llm_calls` gains a `temperature` column beside `provider` (T8). No part of the engine becomes non-deterministic, ever: the alternative costs every golden, `stateHash` as an oracle, 2,602 assertion rows and log-based bug reproduction, to buy variance the model already gives for free.
@@ -138,23 +158,36 @@ Every task's requirements implicitly include this section.
 - **C11. TDD per task, commit per task, clean tree.** RED before GREEN; `pnpm vitest run <files>` named in each task; `pnpm typecheck` (exit 0) before every commit; full-suite green before every phase boundary. The suite count never goes down.
 - **C12. No new cross-package cycle.** `@sj/arbiter`, `@sj/gateway`, `@sj/narrator` and `@sj/web` all depend on `@sj/agents`, so none may be imported back into it. `@sj/supervisor` is new and sits **above everything** — nothing imports it — so it is the only legal home for wiring that needs arbiter + agents + gateway + narrator at once.
 - **C13. Secrets stay out of the world.** A founder's `secret` is mind-side content only; it never enters `WorldState`, an event payload, a perception packet or the gateway's read-only surface. Asserted per founder module and again in T43's injection gate.
-- **C14. ★ REWRITTEN IN v4 — THE TOWN IS NOT THE ONE v3 SAW, AND EVERY HELPER SIGNATURE CHANGED WITH IT.** The town-layout lane landed on train 6 and `cityStructures()` now returns **eleven structures across four districts, with roads**. Any task that assumed five identical homes in two ranks is wrong.
+- **C14. ★ REWRITTEN IN v5 — THE TOWN IS A GRAMMAR THAT PLATS ITSELF, AND A MIND CANNOT SAY WHERE IT BUILDS.** v4 described eleven placed structures in four districts and quoted their coordinates. **`cityTemplate.ts` no longer places anything: it asks a grammar for nine buildings and the grammar claims the plots.** Any task that types a town coordinate is wrong, and any task that hands `build` an `x` and a `y` is refused.
 
-  | What is there now | Detail, read off `packages/shared/src/cityTemplate.ts` at `cd845bc` |
+  **★ THE ONE PARAGRAPH EVERY TASK IN PHASE D MUST READ.** In a town, `build` is validated against **`PlottedBuildParams = z.object({ kind }).strict()`** (`verbs.ts:895`). Naming an `x` is a refusal in world words — *"the town keeps ground for a house — go and stand at (100, 87)"* (`verbs.ts:1113`). `buildSiteOf` (`verbs.ts:1070`) reads `params.kind` and **never reads `params.x` or `params.y` on the plotted branch**; the claim-seam lane measured 225 different coordinates, refused every one, and asserted `buildSiteOf(...).site` identical for all 225. **There is no code path from the params to the position, so even a hand-written event stream through `submitIntent` cannot seat a roof off the lattice.** Two exemptions, both deliberate: **the bridge** (`isPlottedKind(kind) = kind !== BRIDGE_KIND`, `verbs.ts:1032` — the water decides where a span goes, so it keeps `SitedBuildParams`), and **a world with no town in it** (`buildIsPlotted` also requires `townSquareOf(state) !== null`, so every meadow fixture in the repository builds exactly as it always did — which is also why G2 did not move).
+
+  | What is there now | Read off `packages/shared/src/{cityTemplate,townGrammar,townPlot,townClaim}.ts` at `645a8d9` |
   |---|---|
-  | **Five founders' homes** | the home kind (C30), 2×2, one owner each, on the **yard street** (dy 4) and the **back lane** (dy 7), plus one at **the landing** (dx 5, dy 11) on the river path |
-  | **Three fixture dwellings nobody owns** | `cottage` **3×2** at (19,4), `cabin` **2×2** at (21,7), `farmhouse` **4×2** at (24,18) — `CITY_DWELLING_KINDS`, masses 6/4/8, so no two of a kind stand adjacent |
-  | **Three public** | `storehouse` 2×2 at (13,12), `well` 1×1 at (17,12), `fire_pit` 1×1 at (17,16) — the two monuments stand **inside** the plaza, on its north–south axis, with their tiles **cut from the road set** |
-  | **Four districts** | `riverfront · market · homes · farm` — **planner and viewer vocabulary only; nothing reads them at runtime** |
-  | **Roads** | plaza, main street west, starter spine east, two approaches, the yard street, the back lane, the farm headland, and the bank path (`T_PATH`) down `dx 4` |
+  | **The lattice** | `BLOCK = 16`, `STREET = 3`, `PITCH = 19`, `PLOT_OFFSETS = [2, 9]`, `MAX_ALONG = 4`, `MAX_DEEP = 2`, `MIN_SEP = 72`. **Closest any two plot-seated buildings can EVER be: 86.1626 px**, proven exhaustively over **2 496 pairings** on a 3×3 patch, which settles the infinite lattice because the lattice is periodic on `PITCH` and a building's tiles are a subset of its block's |
+  | **Genesis, and it is a LIST OF BUILDINGS, NOT POSITIONS** | `GENESIS_WANTED` — nine rows in the order they are raised: `storehouse`, `house`(amara), `house`(yusuf), `cottage`, `house`(nadia), `cabin`, `house`(omar), `house`(salma), `farmhouse`. Each claims **the free plot nearest the square**, so moving a line moves a building and cannot move it onto a road, into the river or on top of a neighbour |
+  | **Eleven structures, still** | the nine above **plus two monuments** — `well` at `WELL_AT` and `fire_pit` at `FIRE_PIT_AT`, standing **inside** the plaza, which is block (0,0) and is never platted |
+  | **Four dwelling kinds, and `house` is one of them** | `CITY_DWELLING_KINDS = ['cottage', 'farmhouse', 'cabin', 'house']` — **four, not three**; `DWELLING_FOOTPRINTS` is `cabin 2×2, cottage 3×2, farmhouse 4×2, house 2×2`, masses **4 / 6 / 8 / 4** |
+  | **NO DISTRICTS** | `riverfront · market · homes · farm` **do not exist.** There is no `district` field, no district constant and no district vocabulary anywhere in `cityTemplate.ts`. A task that names one is naming nothing |
+  | **NO `cityFreePlots`** | it was wrong three ways and is **split into two functions that cannot be misread**: `plattedPlots(rings)` — what could ever be built on — and `genesisEmptyPlots(rings)` — what genesis leaves empty, answering the same eleven for ever **as its contract**. What is free *right now* is `claimTownPlot({standing, …})` in `townPlot.ts`, which takes the rectangles that actually stand. All three **throw** rather than return a plausible wrong answer |
+  | **Growth, and the far bank** | a ring plats the moment the platted area holds no plot the builder can use; **the claim tests reach as a WALK** (`reachOnFoot`), not a block hop, so **a completed bridge deck opens the far bank on the tick it completes**. `townGroundOf` (what may be built on) and `townWalkOf` (what may be walked on) are **two different questions** — the grammar's channel is three columns and the world's ford is two, so a crossing measured against the plat ground could never be built |
 
-  **Three signature facts a task will get wrong if it does not read them here.** **(a)** `cityRoadTiles()` and `cityTerrainTiles()` take **NO arguments** and return `CityTile { dx, dy, to }` — **template-relative `dx`/`dy`, never world `x`/`y`.** World coordinates are `anchor + d`, and `CITY_ANCHOR_DEFAULT` is `{ x: 48, y: 56 }`. **(b)** `cityTemplate.doorTile(s: CityStructure)` takes a **structure**, not an id, and so does the engine's own `interiors.doorTile(state, s: Structure): Point | null`, **which returns null.** **(c)** `PLAZA`, `PLAZA_CENTRE`, `WELL_AT` and `FIRE_PIT_AT` are all `{dx, dy}`.
+  **Six signature facts a task will get wrong if it does not read them here.**
+  **(a)** `cityRoadTiles(rings = TOWN_RINGS_GENESIS)` and `cityTerrainTiles(rings)` now **take an optional ring count** — calling them bare still works and still means ring 1 — and return `CityTile { dx, dy, to }`, **template-relative, never world `x`/`y`**. Ten template functions gained the same defaulted parameter.
+  **(b)** **`CITY_ANCHOR_DEFAULT` IS NOT A CONSTANT AND IS NOT `{x: 48, y: 56}`.** It is `anchorFor(TOWN_RINGS_GENESIS)`, which is `TOWN_SQUARE − townOrigin(rings)` = **`{ x: 43, y: 56 }`** at one ring and moves one pitch north-west per ring. **The square is the fixed point of the world, not the template's corner** — `TOWN_SQUARE = { x: 65, y: 78 }` never moves, at any ring, which is what keeps the channel, the ford, the lake fork and the twelve forage nodes where they are. **Read the anchor; never type it.**
+  **(c)** `cityTemplate.doorTile(s: StructureBox)` takes **four numbers** (`{dx, dy, w, h}`), not a `CityStructure` and not an id. Beside it is the new **`doorFrontTile(s: CityStructure)`** — the tile the door opens **onto**, on the face the `facing` names. The engine's own `interiors.doorTile(state, s: Structure): Point | null` is unchanged, **still returns null**, and now **prefers a road on a face** rather than always the south wall.
+  **(d)** `PLAZA`, `PLAZA_CENTRE`, `WELL_AT` and `FIRE_PIT_AT` are all `{dx, dy}` and all derived: `PLAZA = plazaOf(1) = {dx0: 22, dy0: 22, dx1: 37, dy1: 37}`, `WELL_AT = {dx: 26, dy: 27}`, `FIRE_PIT_AT = {dx: 31, dy: 31}`, `PLAZA_CENTRE = {dx: 29, dy: 29}`. **These are the ring-1 values and they move with the ring count** — the constants exist for the fixtures that only ever ask about genesis.
+  **(e)** **Facing is DATA.** `CityStructure.facing` is `'sw' | 'se'` and there is no third answer. A building on an east plot stands on its footprint **turned**, so a farmhouse is 4×2 on a south plot and 2×4 on an east one. **`footprintFor(mass, facing)` is the only correct way to ask what ground a placed building covers**; reading `w`/`h` off `DWELLING_FOOTPRINTS` for an SE building is the mistake that table's comment exists to prevent.
+  **(f)** **The world has no size.** `mapGrowth` is `{ enabled }` and nothing else. Size is a **clearance** — `WORLD_MARGIN = PITCH = 19`, owed on every side of the union of the built set and the ground the town has laid — so a task that reads `maxSize`, `step` or `structuresPerStep` is reading a key that was deleted.
 
-  **The rule is unchanged and now matters more: any fixture that pins a home, well, storehouse or road coordinate must read it from `@sj/shared`'s `cityTemplate`, and never retype it.** Anything that assumed "every plaza tile is a road" must read the road set instead — **two plaza tiles are monuments and are not roads.** `cityTemplate.ts` itself is **not edited by C8** (Open Decision 6 is closed; the fire-pit occlusion went with the sheds).
+  **The rule is unchanged and now matters more than it ever has: any fixture that pins a home, well, storehouse, plot or road coordinate must read it from `@sj/shared`, and never retype it.** Anything that assumed "every plaza tile is a road" must read the road set instead — **two plaza tiles are monuments and are not roads.** `cityTemplate.ts`, `townGrammar.ts`, `townPlot.ts` and `townClaim.ts` are **not edited by C8** (Open Decision 6 is closed).
+- **C32. ★ NEW IN v5 — THE LAYOUT GLASS. A MIND MAY KNOW THAT THE TOWN KEEPS GROUND FOR A ROOF, AND WHERE THAT GROUND IS. NOTHING ELSE.** *A place is a world fact and eyes report places; the rule that chose the place is ours.* The claim-seam lane landed `TOWN_LAYOUT_VOCABULARY = ['plot', 'plots', 'block', 'blocks', 'ring', 'rings', 'lattice', 'plat', 'platted', 'frontage']` and `scanForLayoutLeak` beside `CONSTRUCT_VOCABULARY` in `packages/agents/src/prompt/glassScan.ts`, and it runs over **every authored surface a mind reads** — `RULES_OF_BEING`, `CAPABILITIES`, `SPEECH_RULES`, the moment prose and the makeables line.
+  **Why it is a law and not a preference:** a mind that could reason about the lattice would be reasoning about **how the world is assembled** instead of living in it, and would start optimising against a rule rather than wanting a roof. That is the same argument the one-way glass makes about `milestone`, and it is the same enforcement.
+  **The binding rule for C8: every new agent-visible string this plan writes is scanned, and the only answer is empty.** T20, T21, T56, T57 and T61 each write one; the Self-Review's sweep runs `scanForLayoutLeak` over all of them. Like the four world-ambiguous construct words, it is scanned on **authored** surfaces and never enforced mid-run against something a person in the town happened to say — a ring of stones, a block of wood and a plot of land are all real things and a mind may speak of any of them.
 - **C29. ★ THE SETTING IS MODERN-DAY COUNTRYSIDE, AND NOTHING A MIND READS MAY IMPLY OTHERWISE.** *The old canon told the town nobody there had ever drawn metal from stone or caught the sky's lightning in a jar. That canon is gone and the user replaced it in writing.* `packages/arbiter/src/canon.ts` at `cd845bc` says the town farms, fishes and **keeps its own machinery in repair**, that **a generator gives them light and current for as long as somebody feeds it**, and that what breaks there is mended there **out of what the sheds already hold**. The frontier moved from technology to **arrangement**: `ERAS` is `handwork · arrangement · works · machinery · industry`, era-1 `handwork` is eight practised crafts including **`machine_repair`**, and the five unearned rungs are `work_rota`, `common_store`, `food_preserving`, `memorial`, `bridging` — **two of the five are arrangements between people.**
   **The binding rule: a 2026 rural adult knows what a road, a tool, a kettle and a neighbour are, and no genesis string may be surprised by one.** No stone-age material, no absent technology, no "primitive" and no "rudimentary" reaches a founding scene, a seeded memory, an opening chronicle, an authored backstory, a discovery node, a prose road or a refusal string. **Two existing laws constrain how this is said and both survive the rewrite:** `FORBIDDEN_FRAMING` bans the word **"tool"** (which is why the canon says *"keep their own machinery in repair"*), and the one-way glass bans **`custom`, `market`, `council`, `festival`, `faith`** over `CANON` (which is why the canon describes *"a turn agreed at the well, a store held in common, a name that sticks to a place"* and **never names the institution**). **The town must invent its own word for a thing; we may only describe the shape of it.** The Self-Review's setting sweep is the check, and a miss there is the single failure this revision exists to prevent.
-- **C30. ★ THE HOME KIND IS `house`. NOT `hut`, AND NOT `cabin`.** The parallel `rename-home-kind` lane retires `hut` as an id across 116 files and lands **before C8 executes**. **This plan writes `house` throughout and assumes the rename has landed.** `cabin` is **already taken**: `CITY_DWELLING_KINDS = ['cottage', 'farmhouse', 'cabin']` and the template stands a real cabin at (21,7) — renaming into a live kind would collapse the mass variety the layout was built to create. The four dwelling kinds stay distinct at masses **4 / 4 / 6 / 8**.
-  **C8 spends nothing on this.** The rename lane moves the forge pin, and possibly G2, on its own authority; **C8 inherits whatever pin values are on `main` when it starts and re-derives none of them** (C3's closing paragraph). **No task in this plan may add a task, a step or a side effect that moves a pin for the rename** — if `house` is not on `main` when Task 1 runs, that is a scheduling failure and Task 1 Step 0 STOPs on it.
+- **C30. ★ THE HOME KIND IS `house`, AND THE RENAME HAS LANDED.** *v4 wrote this as a precondition on a parallel lane; that lane merged and this is now a fact about `main`.* `hut` is gone as an id, `structures.recipes.house` is the one buildable dwelling, and `structures.enterableKinds` / `sleepableKinds` name `house` and nothing else. **`CITY_DWELLING_KINDS` is `['cottage', 'farmhouse', 'cabin', 'house']` — FOUR kinds, and `house` is one of them** (v4 said three and it was already wrong at `cd845bc`'s successor). `cabin` remains a live fixture kind and renaming into it would still collapse the mass variety the grammar exists to create. The four masses are **cabin 4, house 4, cottage 6, farmhouse 8** ground tiles.
+  **C8 spends nothing on this.** Task 1 Step 0 keeps its `hut` grep as a **regression guard** rather than a scheduling gate: the answer is now zero and the check is cheap, and the one place `hut` survives is a persona's backstory prose in two unexercised gate scripts, which is content and not an id. **The one landed exception a task will trip over: `packages/agents/scripts/g9-livingworld.ts` and `g11-deepworld.ts` each still say "hut" inside a person's own words about their own home.** Both are declared, both are prose, and neither is renamed here.
 - **C31. A scope assertion written against `main...HEAD` is scaffolding, and scaffolding comes down when the chunk merges.** *`packages/gateway/src/g12c.test.ts` asserted "C12a is WEB + GATEWAY only" by diffing `main...HEAD`; C12a then merged, and the assertion began firing on every branch that touched engine, arbiter, agents or forge.* Sixth member of the family this project keeps finding: a guard that was true in one context and became false the moment the context changed. **Any chunk-scope guard C8 writes must carry a note naming the merge that retires it**, and C8 writes none it does not retire itself.
 - **C15. The sex guard.** `AgentSpawned.sex` is optional and `sexOf()` reads absent as `'f'` (ledger D-11-1), so a roster that forgets `sex` silently produces a town of five women, no conception, and no error anywhere. `FounderSchema` makes `sex` **required with no default** (T2) and the roster row (T4) plus the spawn row (T9) are the only other guards.
 - **C16. The walk-gate law is permanent** (delta §7). `countsAsFootfall` counts a step only when `activity.verb === 'walk'`. Any new source of `agent_moved` that is not a walk gets no ground wear by design; anything that gives G1's scripted agents an `activity` moves the G1 golden and is therefore forbidden outside Phase F.
@@ -173,7 +206,7 @@ Each is one line and its reason. Every one was paid for by a real failure in thi
 - **C24. A test that passes against the broken code has measured nothing.** Every task's RED step is run and its failure message is read. "Expected FAIL" written next to a step that was never executed is a plan failure, and a test that goes green without its implementation is deleted and rewritten, not celebrated.
 - **C25. ★ EVERY HARSHNESS REDUCTION SHIPS WITH A SOCIAL PULL IN THE SAME CHANGE.** *A gentler world does not produce a social one — it produces an idle one.* The social need is measurably **inert**: it decays at 25.9/day against +30 per utterance and is oversatisfied roughly **34×**, so one conversation a day saturates it. **Freed time flows to whatever has a road, and today only survival has roads.** Therefore no task in this plan may lower a survival pressure without, in the same commit, adding a named social road — giving, sharing, joint work, being missed, being sought out — that the perception speaks on the same terms it speaks thirst. **The success measure is `socialVerbDiversity` and `discretionaryActRate`, never social-need satisfaction**, which is saturated and therefore says nothing whatever.
 - **C26. ★ THE PRIMARY LAW IS THE DEATH TAXONOMY. THE SURVIVAL TAX IS A SECONDARY INDICATOR.** Only four things may kill: **sustained dysfunction** (after escalating signals and an unanswered rescue window), **old age**, **harm between agents including murder**, and **illness**. **Starvation, thirst and exposure remain real states — hunger must bite and cold must matter — but reaching DEATH by them is an UNFORCED death and a gate failure**, because it means the world failed to offer a road or the town failed to answer, and both are defects the gate exists to catch. The survival tax is **the share of acts spent on survival, and it is not a death rate and never was**; every report from here prints deaths and survival tax as **separate lines**, and no document may imply the tax is mortality. The retired 28.5% prediction stays retired; the measured range **35–41%** stands as history, with **52.9% / 40.6% at n=357/283 the honest run**. **This is a specification change taken by the user on 2026-08-18, in writing, before the runs it judges — it is not a gate accommodation, and C23's distinction is the reason both can be true at once.**
-- **C27. `TileId` runs 0–10, and `groundField.ts:10` stays a first-wins loop.** New from merge train 4: `packages/engine/src/state.ts:6` now declares `export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10`, so **every exhaustive `Record<TileId, …>` must cover 8, 9 and 10** or it will not typecheck — `packages/web/src/render/tileset.ts:18`'s `TILE_KIND` is the live example. And the `ID_OF_KIND` build at `packages/web/src/render/groundField.ts:12-15` must stay **first-id-wins**: C11's `path`/`sapling`/`channel` (8/9/10) alias onto `earth`/`forest`/`water`, and a later duplicate would hand the kind its alias's palette colour instead of its own.
+- **C27. `TileId` runs 0–10, and `groundField.ts:10` stays a first-wins loop.** New from merge train 4: `packages/engine/src/state.ts:6` now declares `export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10`, so **every exhaustive `Record<TileId, …>` must cover 8, 9 and 10** or it will not typecheck — `packages/web/src/render/tileset.ts:18`'s `TILE_KIND` is the live example. And the `ID_OF_KIND` build at `packages/web/src/render/groundField.ts:13-15` must stay **first-id-wins**: C11's `path`/`sapling`/`channel` (8/9/10) alias onto `earth`/`forest`/`water`, and a later duplicate would hand the kind its alias's palette colour instead of its own.
 - **C28. A run served by a disqualified back end is a provider artefact and is quarantined from every baseline.** **C11 batch 16's run is named here so nobody has to rediscover it**: 83 acts, five deaths, 76.6% DeepInfra, on configuration identical to a run that had performed well. It is **never averaged into a tuning baseline, a survival-tax figure, a cost-per-mind-day, or a mode-collapse distribution**, and any table in this plan or in any report that quotes a survival number **states which runs it drew on**. The comparable-runs rule from ruling R1 stands and gains a clause: *same request, **same deny-list**, reported mix* — never *same served provider*.
 
 ---
@@ -195,7 +228,7 @@ Each is one line and its reason. Every one was paid for by a real failure in thi
 | `packages/agents/src/drives/wantLine.ts` | `chooseWantLine` — exactly one drive line per turn, deterministic |
 | `packages/agents/src/prompt/prose.ts` | **modified**: block 6 reorder, production roads, joint-build phrases, skill words |
 | `packages/agents/src/prompt/rulesOfBeing.ts` | **modified once, in Phase F**: the makeable vocabulary and one sentence permitting acts for their own sake |
-| `packages/agents/src/runtime/bridge.ts` | **modified**: `nearestUnseen`, `nearestBuildSpot`, `nearestTimber`, `nearestTillable`, `nearestFarmland`, `reachableMakeables` |
+| `packages/agents/src/runtime/bridge.ts` | **modified**: `nearestUnseen`, `nearestTimber`, `nearestTillable`, `nearestFarmland`, `reachableMakeables`. **★ v5: NOT `nearestBuildSpot`** — the site is not a function of anything a mind can say (C14), and `groundForBuilding()` is landed on this class already |
 | `packages/agents/src/turn.ts` | **modified in Phase F**: `action` REQUIRED, `WaitIntent` |
 | `packages/agents/src/llm/{client,callLog}.ts` | **modified**: `temperature` option and column |
 | `packages/agents/src/live/discretionary.ts` | the corrected classifier, the overlap column, `discretionaryActRate` |
@@ -255,20 +288,21 @@ Each is one line and its reason. Every one was paid for by a real failure in thi
 
 > ### ★ PRECONDITIONS ON EXECUTION — v3's two are both DISCHARGED, and v4 names the two that replaced them
 >
-> | Precondition | v3 state | **v4 state at `main` = `cd845bc`** |
+> | Precondition | v4 state | **v5 state at `main` = `645a8d9`** |
 > |---|---|---|
-> | **1. Merge train 4 must land** (R7) | landed | **★ DISCHARGED, and trains 5 and 6 have landed on top of it.** C11, C12a, the contemporary canon, the town layout and the forge repairs are all on `main`. |
-> | **2. Re-read all four pins from the merged tip** (R7) | discharged at `99693ff` | **★ RE-DISCHARGED at `cd845bc`. C3 carries all four with all nine copies**, grepped, each with its `file:line`. All four are unmoved by trains 5 and 6 — **measured, not assumed.** |
-> | **3. ★ NEW — the `house` rename must have landed** | — | **OPEN.** The `rename-home-kind` lane retires `hut` as an id across 116 files and moves the forge pin on its own authority (C30). **This plan is written as though it has landed.** Task 1 Step 0 greps for the kind and STOPs if it has not. |
-> | **4. ★ NEW — the two frozen content drafts must be re-authored against the contemporary canon** | — | **OPEN, and it is the largest one.** `c8-discovery-tree.DRAFT.md`'s 104 nodes and `c8-founders.DRAFT.md`'s five backstories are both pre-industrial. **Task 1 Step 2 gates on it and STOPs.** See **OD16**. |
+> | **1. Merge train 4 must land** (R7) | discharged | **★ STILL DISCHARGED, and the whole 2026-08-23/24 sprint has landed on top of it** — trains 1, 2 and 3, fourteen lanes, 311 files / 4637 tests / tsc 0, fresh-checkout verified. |
+> | **2. Re-read all four pins from the merged tip** (R7) | discharged at `cd845bc` | **★ RE-DISCHARGED at `645a8d9`, AND TWO OF THEM MOVED.** C3 carries all four with **eleven literals across seven files**, grepped, each with its `file:line`, plus the one prefix inside a test name and the one decoy that is not a copy. |
+> | **3. the `house` rename must have landed** | OPEN | **★ DISCHARGED.** The lane merged. Task 1 Step 0's grep becomes a regression guard whose answer is zero (C30). |
+> | **4. the two frozen content drafts must be re-authored** | **OPEN, the largest one** | **★ DISCHARGED. OD16 IS CLOSED.** Both live at `docs/superpowers/content/`, re-authored against the contemporary canon, checked by a script whose output is in their `README.md`. **v4's own period grep returns nothing on either file** — run against the landed text, not assumed. Task 1 Step 2's gate is kept and now passes. |
+> | **5. ★ NEW — the `first-night` lane must land, or its outcome must be ruled** | — | **OPEN, and it is the only one left.** It is fixing a cast that collapses in the street on night one, a dev world with no mason, and two lying counters — and **it is the one lane authorised to move G1.** Nine tasks in this plan are contingent on it. **See the contingency box at the end of this document; it names them and does not guess the answer.** |
 >
 > **Three further facts, each of which changes what a later task may assume.**
 >
-> - **`cityTemplate.ts` is no longer the file v3 knew.** The layout lane rewrote it on train 6: **eleven structures, four districts, roads, and four distinct dwelling masses.** **Global Constraint C14 is rewritten to match, and C8 still does not edit the file** — every fixture reads its coordinates from `@sj/shared`.
+> - **`cityTemplate.ts` is no longer a layout at all.** It is a plotter: it asks `townGrammar` for nine buildings and the grammar claims the plots. **Global Constraint C14 is rewritten to match, and C8 still edits none of the four town files** — every fixture reads from `@sj/shared`, and **no task types a town coordinate.**
 > - **`gate-g11-partial` is tagged at 16 of 17.** **Criterion 9 is UNMET and travels into G8 as a named debt owned by Task 24** — see the box in Phase D. It is not a failure carried forward; it is an untested criterion carried forward, and the difference is the whole point of the box.
-> - **The keystone's single regen is still UNSPENT.** The setting lane needed none — every period-wrong word lived in a prose constant, not in `SimConfigSchema` — so the one re-pin C8 is allowed is still Phase F's to spend, and **no task outside Phase F may move a pin as a side effect.**
+> - **The keystone's single regen is still UNSPENT.** The two pins that moved were moved by other lanes on their own evidence, not by C8, so **the one re-pin C8 is allowed is still Phase F's to spend**, and no task outside Phase F may move a pin as a side effect.
 >
-> **Nothing in Phase A may begin until `git rev-parse HEAD` is a descendant of `cd845bc`, the `house` kind is on the tip, and both content drafts are contemporary.** Every other precondition in this plan is a task.
+> **Nothing in Phase A may begin until `git rev-parse HEAD` is a descendant of `645a8d9` and the `first-night` lane's outcome is on the tip or ruled.** Every other precondition in this plan is a task.
 
 ### Task 1: Ratify this plan, and fix the roadmap it hangs from
 
@@ -276,55 +310,75 @@ Each is one line and its reason. Every one was paid for by a real failure in thi
 
 **Interfaces — Produces:** nothing importable. This is the ratification commit C11's own first act had, and it exists so that every later task can cite a path inside the repo rather than a scratchpad.
 
-- [ ] **Step 0: Prove the FOUR preconditions, and STOP if any is unmet.**
+- [ ] **Step 0: Prove the SIX preconditions, and STOP if any is unmet.**
 
 ```bash
-# (a) trains 5 and 6 have landed and this worktree descends from them
-git merge-base --is-ancestor cd845bc HEAD && echo "TIP ANCESTOR OK"
+# (a) ★ v5 — the 2026-08-23/24 sprint has landed and this worktree descends from it
+git merge-base --is-ancestor 645a8d9 HEAD && echo "TIP ANCESTOR OK"
 git log --oneline -1
 # (b) the four pins, grepped as literals, never diffed as a path (C17) — and every copy of each
 grep -rn "GOLDEN_DAY_HASH = \|GOLDEN_G2_HASH = \|BLOCK1_SHA256 = " --include='*.ts' packages/
 grep -rnE "'[0-9a-f]{64}'" --include='*.ts' packages/forge/src/forgeConfig.test.ts
-grep -rn "f487a26b\|c1c51b42\|a90bd747\|28c1fce0" --include='*.ts' packages/
-# (c) ★ the house rename has landed (C30): the kind is `house`, and `hut` is gone as an id
+# ★ v5 — the CURRENT four prefixes. Twelve lines: eleven literals across seven files, plus one
+# prefix inside a test name at arbiter/src/g4.test.ts. See C3 for the census and the decoy.
+grep -rn "f487a26b\|00d72434\|da065752\|4205d892" --include='*.ts' packages/ | tee /tmp/c8-pins.txt | wc -l
+# (c) the house rename landed long ago; this is now a REGRESSION GUARD (C30)
 grep -rn "sleepableKinds" packages/shared/src/config.ts
-grep -rln "hut" packages/*/src | grep -vi shut || echo "NO hut ANYWHERE — RENAME LANDED"
-# (d) ★ the contemporary canon is the one on this tip (C29)
+grep -rln "hut" packages/*/src | grep -vi shut || echo "NO hut IN src — RENAME HOLDING"
+# (d) the contemporary canon is the one on this tip (C29)
 grep -n "generator\|machine_repair\|arrangement" packages/arbiter/src/canon.ts
+# (e) ★ v5 — the claim seam is on this tip: `build` takes {kind} and nothing else (C14)
+grep -n "PlottedBuildParams\|SitedBuildParams\|isPlottedKind" packages/engine/src/verbs.ts
+# (f) ★ v5 — the makeables line already carries the build road, and T20 must not overwrite it
+grep -n "export function makeablesLine" packages/agents/src/prompt/prose.ts
+grep -n "makeablesLine(" packages/agents/src/runtime/agentRuntime.ts
 ```
 
 Expected, in order:
 
 1. `TIP ANCESTOR OK`.
-2. The four literals. **They must match C3's table OR carry the rename lane's landed regen** — C30 says C8 inherits whatever is there. Record the four values you actually read into the ledger before anything else; that record is the "from" side of T28's and T29's re-pins. **A `GOLDEN_G2_HASH` of `6f2529fb…` means this worktree was cut from `c12a-work` and not from the merged tip: STOP and report.**
-3. `sleepableKinds` defaults to `['house']` and the `hut` grep prints `NO hut ANYWHERE — RENAME LANDED`. **If `hut` is still an id, STOP: the rename lane has not landed and this plan is written for a world that does not exist yet** (C30). Do not rename it yourself — that would spend the keystone regen outside Phase F.
-4. `canon.ts` names the generator, `machine_repair` and the `arrangement` era. **If it still says the town has never drawn metal from stone, STOP: this worktree predates train 6 and every genesis string in this plan is wrong for it** (C29).
+2. The four literals, and the copy grep prints **12**. **They must match C3's table OR carry a landed regen from a lane that merged after this draft** — record the four values you actually read into the ledger before anything else; that record is the "from" side of T28's and T29's re-pins. **A `GOLDEN_G2_HASH` of `6f2529fb…` means this worktree was cut from `c12a-work`; a `c1c51b42…` means it predates the town-generator lane; a forge pin of `a90bd747…` or `02f295ad…` means it predates `world-growth`; a `BLOCK1` of `28c1fce0…` means it predates `claim-seam`. Any of the four: STOP and report.** A count other than 12 means a lane added or removed a copy — **do not proceed on a count you have not accounted for**, because a missed copy is a stale hash that nothing runs (C17).
+3. `sleepableKinds` defaults to `['house']` and the `hut` grep prints `NO hut IN src`. **If an `id` or a kind is `hut`, STOP** — but note that `packages/agents/scripts/` is outside this grep and legitimately carries `hut` inside two personas' own words about their own homes; that is content, it is declared in C30, and it is not renamed here.
+4. `canon.ts` names the generator, `machine_repair` and the `arrangement` era.
+5. **`PlottedBuildParams` exists.** If `BuildParams` is the only shape and it carries `x` and `y`, **STOP: this worktree predates the claim seam and Phase D is written for a world that does not exist here.**
+6. **`makeablesLine` takes a second parameter and `agentRuntime` passes `groundForBuilding()` into it.** If it takes one, STOP for the same reason. **If it takes a second parameter with any other name, STOP AND REPORT** — a lane has moved the build road and T20 is written against the shape you just read.
 
 - [ ] **Step 1: Copy this DRAFT to its ratified path.**
 
 ```bash
-git mv docs/superpowers/plans/2026-08-23-01-genesis-rehearsal-v4.DRAFT.md \
-       docs/superpowers/plans/2026-08-23-01-genesis-rehearsal.md
+git mv docs/superpowers/plans/2026-08-24-01-genesis-rehearsal-v5.DRAFT.md \
+       docs/superpowers/plans/2026-08-24-01-genesis-rehearsal.md
 ```
 
-- [ ] **Step 2: ★ THE CONTENT GATE — the two frozen drafts must be present AND contemporary, and this step STOPs on either.** (The controller copies them in; this step verifies both halves.)
+- [ ] **Step 2: ★ THE CONTENT GATE — kept, and it now PASSES. Record the three counts it prints.**
+
+> **★ v5 — OD16 IS CLOSED AND THIS GATE IS RETAINED ANYWAY.** v4 wrote this step as a STOP on user-signed content that had been authored against the neolithic canon. **The `content-contemporary` branch merged; both documents are on `main` at `docs/superpowers/content/`, re-authored, with a `README.md` beside them recording how they were checked.** Run against the landed text, **v4's own period grep returns nothing on either file** — measured, not assumed. **The gate is kept because a gate that has started passing is the cheapest kind there is, and because a lane could put a period-wrong word back.** What changes is that Step 2 now also **records three counts the rest of Phase B is written against**, so a truncated or re-edited tree fails at T13 with a number rather than at T14 with a parse error.
 
 ```bash
 test -f docs/superpowers/content/c8-founders.md && \
 test -f docs/superpowers/content/c8-discovery-tree.md && echo CONTENT PRESENT
-# ★ NEW IN v4 — the period gate. Both drafts were authored against the OLD neolithic canon.
+# the period gate, unchanged from v4 and now expected to print the second line
 grep -inE "flint|knapp|pottery|kiln|cordage|thatch|hide-curing|sun-brick|stone.tool|hedge-healer|by wagon|handbill|land agent|apothecar|grain barge" \
   docs/superpowers/content/c8-founders.md docs/superpowers/content/c8-discovery-tree.md \
   && echo "PERIOD-WRONG CONTENT — STOP" || echo "CONTENT IS CONTEMPORARY"
+# ★ NEW IN v5 — the three counts T12, T13 and T14 are written against
+grep -c "^### node" docs/superpowers/content/c8-discovery-tree.md           # expect 103
+grep -c "^### node \[SOCIAL\]" docs/superpowers/content/c8-discovery-tree.md # expect 52
+grep -oE "^- era: [a-z]+" docs/superpowers/content/c8-discovery-tree.md | sort | uniq -c
+# expect: 26 arrangement · 8 handwork · 12 industry · 22 machinery · 35 works
 ```
 
-Expected: `CONTENT PRESENT` **and** `CONTENT IS CONTEMPORARY`.
+Expected: `CONTENT PRESENT`, `CONTENT IS CONTEMPORARY`, **103**, **52**, and the five-era histogram above.
 
 **If the first fails, STOP** — Tasks 3, 4 and 13 transcribe from these and must not paraphrase from memory.
 
-**If the second fails, STOP AND REPORT TO THE CONTROLLER. This is not an executor's edit to make.** The archived drafts are **user-signed content authored against the canon that train 6 replaced**: the discovery tree opens `fire-craft`, `stone-tools`, `cordage`, `lean-to`, `hide-curing`, `sun-brick`, `pit-kiln`, `fired-pottery`, and the five backstories are set in a world of hedge-healers, ten-day wagon journeys, grain barges and a land agent's handbill. **A town with a generator does not discover pottery** (C29), and a mind handed either draft would read a stone-age life in a contemporary valley. **Re-authoring signed content is the controller's call, and it is Open Decision 16.** Tasks 3, 4, 13 and 14 each carry their own period test so this cannot pass silently downstream.
+**If the second fails, STOP AND REPORT TO THE CONTROLLER. This is not an executor's edit to make.** Re-authoring signed content is the controller's call. Tasks 3, 4, 13 and 14 each carry their own period test so this cannot pass silently downstream.
 
-- [ ] **Step 3: Fix the roadmap.** `2026-08-15-00-master-roadmap.md` goes C7 → C8 with no C9, C10, C11, C12 or C13 row, and points at `08-genesis-rehearsal.md`, a file that has not existed until this commit. Insert the five missing rows, state the executed order plainly — **C6/C7 → C9 → C10 → C13 → C11 → C12a → the setting, layout and forge lanes → the `house` rename → C8** — and repoint the C8 row at the file Step 1 created. Correct the C8 description to drop Caddy and Litestream and to name the Oracle ARM Compose stack.
+**★ If any of the three counts differs, STOP AND WRITE THE NEW NUMBER INTO THE PLAN BEFORE T13 RUNS (C23).** They are a **truncation guard, not a target**: content may move, and when it does the number moves with it **in the same commit as the content**, in writing, before the task that reads it. What may never happen is T13 asserting 103 against a file that holds 97 and an executor deleting the assertion to make it green.
+
+**★ AND THE ONE THING THE LANDED CONTENT SETTLES THAT THIS PLAN MUST NOT RE-LITIGATE.** `canon-story-decisions.md` records four user rulings of 2026-08-23 that the founders' document rests on — the reach ceiling is **asymptotic and not empty**, the pass came down in a slide six weeks after they arrived, **they walked into a village somebody else built and left**, and Omar is the only one who can keep the generator running. **T3 and T4 transcribe those as they stand.** The fifth item on that page is not a story fact and is the reason **OD18** exists: *"the 103-node discovery tree is a YARDSTICK, never a gate."*
+
+- [ ] **Step 3: Fix the roadmap.** `2026-08-15-00-master-roadmap.md` goes C7 → C8 with no C9, C10, C11, C12 or C13 row, and points at `08-genesis-rehearsal.md`, a file that has not existed until this commit. Insert the five missing rows, state the executed order plainly — **C6/C7 → C9 → C10 → C13 → C11 → C12a → the setting, layout and forge lanes → the `house` rename → the 2026-08-23/24 sprint (town grammar, world growth, claim seam, far bank, Discovery Record, art recovery, camera/minimap/motion; merge trains 1–3) → `first-night` → C8** — and repoint the C8 row at the file Step 1 created. Correct the C8 description to drop Caddy and Litestream and to name the Oracle ARM Compose stack.
 
 - [ ] **Step 4: Assert the roadmap is honest.** Add `docs/superpowers/plans/roadmap.test.ts` — no new production code:
 
@@ -1488,7 +1542,7 @@ Expected: FAIL with `Cannot find module './founders.js'`.
 - [ ] **Step 4: Green, and both goldens unmoved.**
 
 Run: `pnpm vitest run packages/engine/ && pnpm typecheck`
-Expected: PASS; `golden.test.ts` reports `f487a26b…` and `g2.test.ts` reports `c1c51b42…`. Neither golden calls `makeGenesisWorld`.
+Expected: PASS; `golden.test.ts` reports `f487a26b…` and `g2.test.ts` reports `00d72434…`. Neither golden calls `makeGenesisWorld`.
 
 - [ ] **Step 5: Commit.**
 
@@ -1501,7 +1555,7 @@ git commit -m "feat(engine): spawnFounders — five bodies on their own doorstep
 
 **Files:** Create `packages/engine/src/genesis/endowment.ts`, `packages/engine/src/genesis/endowment.test.ts`; Modify `packages/engine/src/genesis/world.ts`, `packages/engine/src/genesis/world.test.ts`.
 
-**Why.** `FOUNDER_KIT` today is `axe, hoe, knife, seed_pouch, waterskin, bread ×3` (`packages/engine/src/genesis/world.ts:102-106`) — **the same six things for all five**. Five identical kits is a designed-in symmetry, and symmetry on day 0 is the worst mode-collapse window there is. Deal instead: **one implement each**, dealt from the seed, plus a full belly for the one who gets nothing. The consequence is mechanical rather than authored — **`give`, `teach` and `take` become useful on day 1**, and those are the verbs that fired 1 / 0 / 7 times in the measured run.
+**Why.** `FOUNDER_KIT` today is `axe, hoe, knife, seed_pouch, waterskin, bread ×3` (`packages/engine/src/genesis/world.ts:103-106`) — **the same six things for all five**. Five identical kits is a designed-in symmetry, and symmetry on day 0 is the worst mode-collapse window there is. Deal instead: **one implement each**, dealt from the seed, plus a full belly for the one who gets nothing. The consequence is mechanical rather than authored — **`give`, `teach` and `take` become useful on day 1**, and those are the verbs that fired 1 / 0 / 7 times in the measured run.
 
 > **★ v4 — `waterskin` IS A PERIOD NAME AND C8 DOES NOT RENAME IT.** The setting lane's R3 ruling put `waterskin`, alongside the home kind and `torch`, into **one cross-lane commit** that carries every art-bound period name at once, precisely because each of them is bound to a codex record and a rename that moves one without the art orphans a sprite. **This task keeps the id it finds on `main` and reads it from `FOUNDER_KIT` rather than retyping it**, so whichever name the cross-lane commit leaves behind is the name this deal deals. **`ENDOWMENT_TOOLS` is therefore DERIVED, not typed** — see the implementation. That is also why the prose here says *"implement"* and never *"tool"*: `FORBIDDEN_FRAMING` bans the word (C29).
 
@@ -1663,7 +1717,7 @@ for (const [i, founder] of FOUNDER_IDS.entries()) {
 - [ ] **Step 4: Green, and the pins unmoved.**
 
 Run: `pnpm vitest run packages/engine/ && pnpm typecheck`
-Expected: PASS; G1 `f487a26b…`, G2 `c1c51b42…`, forge `a90bd747…` all reported unmoved (neither golden nor the forge pin calls `makeGenesisWorld`).
+Expected: PASS; G1 `f487a26b…`, G2 `00d72434…`, forge `da065752…` all reported unmoved (neither golden nor the forge pin calls `makeGenesisWorld`).
 
 - [ ] **Step 5: Commit.**
 
@@ -1776,7 +1830,7 @@ Expected: FAIL — no `standing_stone`, and 15 loaves against a required 42.
 - [ ] **Step 4: Green, pins unmoved.**
 
 Run: `pnpm vitest run packages/engine/ && pnpm typecheck`
-Expected: PASS; state G1 `f487a26b…` and G2 `c1c51b42…` unmoved in the commit body.
+Expected: PASS; state G1 `f487a26b…` and G2 `00d72434…` unmoved in the commit body.
 
 - [ ] **Step 5: Commit.**
 
@@ -1801,7 +1855,14 @@ export const DiscoveryNodeSchema = z.object({
   // parse failure at import, on content that is correct, for a rule nobody meant to write.
   id: z.string().regex(/^[a-z0-9_-]+$/),
   name: z.string().min(1),
-  era: z.number().int().min(1).max(5),
+  // ★ v5: THE ERA IS A NAME, NOT A NUMBER. v4 wrote `z.number().int().min(1).max(5)` against
+  // an archived draft that numbered its eras 1–5. The landed tree at
+  // `docs/superpowers/content/c8-discovery-tree.md` writes `- era: handwork`, and says why in
+  // its own conventions block: "`ERA_ORDER` still ranks them 1–5, but the value written here
+  // is the name, because that is what the type accepts." A numeric schema rejects all 103
+  // nodes at parse time — and T14's `ERAS[node.era - 1]` would then be `ERAS[NaN]`, which is
+  // `undefined`, which is a codex row with no era in it.
+  era: z.enum(ERAS),
   prereqs: z.array(z.string()),
   skill: z.object({ track: z.string().min(1), rung: z.number().int().min(1).max(5) }).strict(),
   conditions: z.string().min(1),                 // '(none)' or engine-checkable text
@@ -1817,7 +1878,19 @@ export type ValidationIssue = {
 export function validateDiscoveryTree(nodes: readonly DiscoveryNode[]): ValidationIssue[]
 ```
 
-Rules, one per issue kind: acyclic by DFS back-edge (`cycle`); every prereq exists (`unknown-prereq`); a node cites only same-or-earlier eras (`era-mismatch`); every unlock matches `UNLOCK_RE` (`bad-unlock`); `skill.track` is one of `DEFAULT_CONFIG.skills.tracks` (`bad-skill`); every node reachable from an era-1 root with no prereqs (`unreachable`); ids unique (`duplicate-id`). Issues are returned sorted by `(kind, node)` so the output is stable.
+Rules, one per issue kind: acyclic by DFS back-edge (`cycle`); every prereq exists (`unknown-prereq`); a node cites only same-or-earlier eras (`era-mismatch`); every unlock matches `UNLOCK_RE` (`bad-unlock`); `skill.track` is one of `DEFAULT_CONFIG.skills.tracks` (`bad-skill`); every node reachable from a `handwork` root with no prereqs (`unreachable`); ids unique (`duplicate-id`). Issues are returned sorted by `(kind, node)` so the output is stable.
+
+**★ v5 — `era-mismatch` AND `unreachable` BOTH COMPARE THROUGH `ERA_ORDER`, NEVER THROUGH THE STRING.** The era is now a name (`z.enum(ERAS)`), and `'arrangement' < 'handwork'` is true in JavaScript and false in the world. **The comparison is `ERA_ORDER[a] <= ERA_ORDER[b]`**, with `ERA_ORDER` imported from the canon beside `ERAS` and never redeclared here — a second copy of that map is exactly the drift the setting lane deleted. `ERA_ORDER` is `handwork 1 · arrangement 2 · works 3 · machinery 4 · industry 5`, so the ranks v4's numbers meant are still available; what is gone is the assumption that the *content* carries them.
+
+**Interfaces — Consumes:** **`ERAS` and `ERA_ORDER` from `@sj/shared`.**
+
+> ### ★ v5 — THE CANON MOVE IS NOW **T12 STEP 0**, NOT T14's, AND THIS IS THE ONE PIECE OF WORK THIS REVISION MOVES BETWEEN TASKS
+>
+> **v4 put the `arbiter/src/canon.ts` → `shared/src/canon.ts` move inside T14, because T14 was the first task that needed `ERAS`. Making the era a name makes T12 the first task that needs it**, and T12 executes first in document order. Leaving the move in T14 would make T12's schema import `@sj/arbiter` from inside `@sj/engine`, **which is the cycle C12 forbids** (`@sj/arbiter` depends on `@sj/engine`) — measured, not assumed.
+>
+> **So the move, its re-export and its `CANON` sha256 assertion become T12 Step 0, verbatim as T14 wrote them, as their own commit before anything else in Phase B.** T14 keeps every one of its own steps and simply finds the canon already where it needs it; **T14's Step 0 becomes a one-line assertion that the move happened.** No task is added, none is deleted, and no number moves — one commit changes owner and the delta says so loudly.
+
+- [ ] **Step 0: Move the canon to `@sj/shared`, as its own commit.** Execute T14's Step 0 exactly as written there — `git mv packages/arbiter/src/canon.ts packages/shared/src/canon.ts`, re-export from `packages/arbiter/src/index.ts` so its four consumers compile untouched, export from `packages/shared/src/index.ts`, and keep the `CANON` sha256 assertion that proves the prose crossed the package boundary byte-for-byte. `pnpm typecheck` and the full suite are green before the next step begins.
 
 - [ ] **Step 1: Write the failing test.**
 
@@ -1905,23 +1978,31 @@ git add packages/engine/src/discovery/ packages/engine/src/index.ts
 git commit -m "feat(engine): the discovery tree's shape, and the seven ways it can be wrong"
 ```
 
-### Task 13: `DISCOVERY_TREE` — 104 nodes, transcribed
+### Task 13: `DISCOVERY_TREE` — 103 nodes, transcribed
 
 **Files:** Create `packages/engine/src/discovery/tree.ts`, `packages/engine/src/discovery/tree.test.ts`.
 
-> ### ★ v4 — THIS TASK IS BLOCKED ON A CONTENT RE-AUTHOR, AND THE BLOCK IS NOT A FORMALITY
+> ### ★ v5 — THE BLOCK IS LIFTED. THE RE-AUTHOR LANDED, AND EVERY NUMBER IN THIS TASK MOVED WITH IT
 >
-> **The archived draft's 104 nodes are neolithic, and the canon they were written against no longer exists.** Read off `c8-discovery-tree.DRAFT.md` at the head of era 1, in draft order: `fire-craft`, `forage-lore`, **`stone-tools`**, `fishing-line`, `camp-hygiene`, `seed-saving`, **`cordage`**, `open-fire-cooking`, **`lean-to`**, `felling`, `herb-poultice`, `snares`, **`hide-curing`**, `basketry` — and, one rung out, **`sun-brick`**, **`clay-oven`**, **`pit-kiln`**, **`fired-pottery`**, **`tanning-vats`**, **`quern`**, `log-cabin`.
+> **v4 blocked this task because the archived draft's 104 nodes were neolithic. The `content-contemporary` branch merged, the tree was re-thought from the canon up, and it is on `main` at `docs/superpowers/content/c8-discovery-tree.md`.** v4's own period grep returns **nothing** on the landed file — run, not assumed. **OD16 is CLOSED.**
 >
-> **A town with a generator, a shed of machinery it keeps in repair, and a farmhouse does not discover pottery.** The canon says so in as many words, and `arbiter/src/canon.ts` says it twice — once in the prose and once in the comment above `GENESIS_CODEX`: *"A town with a generator does not discover pottery; what it finds one step out is as often an arrangement between its people."*
+> **What v4 asked the re-author to preserve, and what it actually did:**
 >
-> **Task 1 Step 2 STOPs on this and the controller owns the re-author (OD16).** This task's own Step 1 carries a period test as the second line of defence, because the whole failure mode being guarded against is a faithful transcription of a stale source.
+> | v4's requirement | The landed tree |
+> |---|---|
+> | the five-era shape with `ERA_ORDER` 1–5 | **kept, but the value written per node is the ERA'S NAME**, not its rank — the file says why in its own conventions block, and **T12's schema is amended to `z.enum(ERAS)` because of it** |
+> | the eight `handwork` crafts and the five `arrangement` rungs the canon names | **kept exactly.** The tree opens on those thirteen ids and no others, snake_case preserved (`machine_repair`, `work_rota`, `common_store`, `food_preserving`) because `setting.test.ts` asserts them |
+> | `skill.track` drawn only from `DEFAULT_CONFIG.skills.tracks` | **kept**, and the file names the twelve tracks in its conventions block |
+> | 104 nodes | **103**, in the proportion **`handwork 8 · arrangement 26 · works 35 · machinery 22 · industry 12`** |
+> | 11 social | **52 — a bare majority, and it is the point.** The canon says the new thing this town finds *"is far more often an arrangement between its people"*; the old draft's one-in-ten said the opposite |
 >
-> **Three things the re-author must preserve, so the rest of this plan still fits it:** the **five-era shape** with `ERA_ORDER` 1–5 (the schema's `era` is `1..5` and T14 maps it onto the landed `ERAS`); at least the **eight era-1 handwork crafts and the five arrangement rungs** the landed `GENESIS_CODEX` already names, so `PRACTICED_AT_GENESIS` needs no separate authority (T14); and **`skill.track` drawn only from `DEFAULT_CONFIG.skills.tracks`**, which is inside the pinned hash and cannot move for it.
+> **Two things the re-author settled that this task inherits rather than decides.** The **genesis frontier is enforced, not claimed**: a node is reachable on the first morning only if every prereq is one of the eight practised crafts, and the author's own script proves **exactly five** nodes in 103 satisfy that — the five the canon names, with the exact parents the canon gives them. And the **reach ceiling is asymptotic, not empty** (user ruling, 2026-08-23): `machinery` and `industry` hold 34 nodes between them, reached only by salvage, substitution and agreement, never by making anything new from raw material. `machine_repair` is already a genesis craft, so a hard wall just above it would have contradicted the landed `GENESIS_CODEX`.
 >
-> **The node count is content, not a contract.** If the re-authored tree is not 104 nodes, the counts below move with it and **the plan states the new numbers before the run that reads them** (C23). They are asserted here so that a truncated transcription fails loudly; they are not a target the content must hit.
+> **★ AND THE ONE THING THIS TASK NO LONGER DECIDES: WHETHER ANY OF IT REACHES THE ARBITER.** The same ruling page records that **"the 103-node discovery tree is a YARDSTICK, never a gate"** and that no code reads it. v4's T14 seeds every node into the arbiter's `CodexStore`, whose `frontier()` feeds the adjudication prompt and whose `withinAdjacency()` decides whether a novel intent may be codified — **which is the tree being the gate.** That contradiction is **OD18** and it is the controller's to rule. **This task is unaffected either way**: transcribing the tree into typed, validated data is what makes it a yardstick *or* a seed, and T14 is where the two answers diverge.
+>
+> **The node count is content, not a contract.** If the tree moves again, the counts below move with it and **the plan states the new numbers before the run that reads them** (C23) — Task 1 Step 2 now prints all three so the executor has them before this task starts. They are asserted here so that a truncated transcription fails loudly; they are not a target the content must hit.
 
-Transcribe every `### node` block from `docs/superpowers/content/c8-discovery-tree.md` in draft order. The mapping is 1:1: `prereqs` splits the comma list (`(none)` → `[]`); `skill` parses `"track rung>=N"`; `unlocks` splits on `", "`; `social` is true iff the block header is `### node [SOCIAL]`; everything else verbatim.
+Transcribe every `### node` block from `docs/superpowers/content/c8-discovery-tree.md` in draft order. The mapping is 1:1: `prereqs` splits the comma list (`(none)` → `[]`); `skill` parses `"track rung>=N"`; `unlocks` splits on `", "`; `social` is true iff the block header is `### node [SOCIAL]`; **`era` is the name as written, never converted to a rank**; everything else verbatim.
 
 - [ ] **Step 0: Prove the source is contemporary, and STOP if it is not.**
 
@@ -1929,33 +2010,58 @@ Transcribe every `### node` block from `docs/superpowers/content/c8-discovery-tr
 grep -inE "flint|knapp|pottery|kiln|cordage|thatch|hide-curing|sun-brick|stone.tool|lean-to|quern|tanning|basketry|bronze|smelt" \
   docs/superpowers/content/c8-discovery-tree.md \
   && echo "PERIOD-WRONG TREE — STOP, see OD16" || echo "TREE IS CONTEMPORARY"
-grep -c "^### node" docs/superpowers/content/c8-discovery-tree.md   # record N; the counts below use it
+grep -c "^### node" docs/superpowers/content/c8-discovery-tree.md            # expect 103
+grep -c "^### node \[SOCIAL\]" docs/superpowers/content/c8-discovery-tree.md  # expect 52
+grep -oE "^- era: [a-z]+" docs/superpowers/content/c8-discovery-tree.md | sort | uniq -c
+# expect: 26 arrangement · 8 handwork · 12 industry · 22 machinery · 35 works
 ```
 
-Expected: `TREE IS CONTEMPORARY`. **If it prints the other line, STOP and report — do not transcribe, and do not edit the draft yourself.**
+Expected: `TREE IS CONTEMPORARY`, **103**, **52**, and the histogram. **If it prints the other line, STOP and report — do not transcribe, and do not edit the draft yourself.** **If a count differs, STOP and write the new number into this task before Step 1** (C23); do not discover it by deleting an assertion that went red.
 
 - [ ] **Step 1: Write the failing test.**
 
 ```ts
 // packages/engine/src/discovery/tree.test.ts
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG } from '@sj/shared'
+// ★ v5: `ERAS` and `GENESIS_CODEX` come from `@sj/shared` because T12 Step 0 moved the canon
+// there. `@sj/engine` importing `@sj/arbiter` would be the cycle C12 forbids.
+import { DEFAULT_CONFIG, ERAS, GENESIS_CODEX } from '@sj/shared'
 import { validateDiscoveryTree } from './schema.js'
 import { DISCOVERY_TREE } from './tree.js'
 
 describe('DISCOVERY_TREE', () => {
-  // The four numbers below are the ARCHIVED draft's, recorded by Step 0's `grep -c`. They are
-  // a truncation guard, not a target: if the re-author (OD16) changes the content, these move
-  // with it IN THE SAME COMMIT AS THE CONTENT, and the new numbers are written into the plan
-  // before Task 14 reads them (C23 — derived in writing, before the run that tests them).
-  it('is 104 nodes across five eras in the authored proportion', () => {
-    expect(DISCOVERY_TREE).toHaveLength(104)
-    expect([1, 2, 3, 4, 5].map((e) => DISCOVERY_TREE.filter((n) => n.era === e).length))
-      .toEqual([27, 31, 18, 16, 12])
+  // ★ v5: the LANDED tree's numbers, recorded by Task 1 Step 2's three greps and re-recorded
+  // by Step 0 below. They are a truncation guard, not a target: if the content changes, these
+  // move with it IN THE SAME COMMIT AS THE CONTENT, and the new numbers are written into the
+  // plan before Task 14 reads them (C23 — derived in writing, before the run that tests them).
+  it('is 103 nodes across five eras in the authored proportion', () => {
+    expect(DISCOVERY_TREE).toHaveLength(103)
+    expect(ERAS.map((e) => DISCOVERY_TREE.filter((n) => n.era === e).length))
+      .toEqual([8, 26, 35, 22, 12])   // handwork · arrangement · works · machinery · industry
   })
 
-  it('marks eleven of them social', () => {
-    expect(DISCOVERY_TREE.filter((n) => n.social)).toHaveLength(11)
+  // ★ v5: FIFTY-TWO, not eleven — and the change of proportion IS the re-author. The canon
+  // says what this town finds is "far more often an arrangement between its people"; the old
+  // draft's 11-in-104 said the opposite of the canon it was supposed to serve.
+  it('marks a bare majority of them social', () => {
+    expect(DISCOVERY_TREE.filter((n) => n.social)).toHaveLength(52)
+    expect(DISCOVERY_TREE.filter((n) => n.social).length * 2).toBeGreaterThan(DISCOVERY_TREE.length)
+  })
+
+  // ★ v5: the frontier is a PROPERTY of the tree, not a hope about it. A node is reachable on
+  // the first morning iff every prereq is one of the eight practised crafts, and exactly five
+  // nodes satisfy that — the five `GENESIS_CODEX` names, with the parents it gives them.
+  it('★ LEAVES EXACTLY FIVE NODES REACHABLE ON THE FIRST MORNING, AND THEY ARE THE CANON S FIVE', () => {
+    const practised = new Set(GENESIS_CODEX.filter((e) => e.known !== false).map((e) => e.id))
+    expect(practised.size).toBe(8)
+    const reachable = DISCOVERY_TREE
+      .filter((n) => n.prereqs.length > 0 && n.prereqs.every((p) => practised.has(p)))
+      .map((n) => n.id).sort()
+    expect(reachable).toEqual(['bridging', 'common_store', 'food_preserving', 'memorial', 'work_rota'])
+    const byId = new Map(DISCOVERY_TREE.map((n) => [n.id, n]))
+    for (const e of GENESIS_CODEX.filter((x) => x.known === false)) {
+      expect(byId.get(e.id)!.prereqs[0], e.id).toBe(e.prerequisiteId)
+    }
   })
 
   it('has no id twice', () => {
@@ -2022,7 +2128,21 @@ git commit -m "feat(engine): the discovery tree, transcribed — five rungs of r
 
 ### Task 14: The tree's one consumer — the codex the arbiter rules by
 
-**Files:** **Move** `packages/arbiter/src/canon.ts` → `packages/shared/src/canon.ts` (and leave a re-export behind); Create `packages/engine/src/discovery/codexSeed.ts`, `packages/engine/src/discovery/codexSeed.test.ts`; Modify `packages/engine/src/index.ts`, `packages/shared/src/index.ts`.
+**Files:** Create `packages/engine/src/discovery/codexSeed.ts`, `packages/engine/src/discovery/codexSeed.test.ts`; Modify `packages/engine/src/index.ts`. *(★ v5 — the canon move is **T12 Step 0** now, for the reason written there; this task's Step 0 is a one-line assertion that it happened.)*
+
+> ### ★ v5 — THIS TASK IS THE ONE PLACE OD18 BITES, AND IT MUST NOT BE ANSWERED BY AN EXECUTOR
+>
+> **Two things changed under this task and they point in opposite directions.**
+>
+> **(1) The era is a name.** v4's row `expect(r.era).toBe(ERAS[byId.get(r.id)!.era - 1])` reads `ERAS[<a string> - 1]`, which is `ERAS[NaN]`, which is `undefined` — **so every codex row would carry an undefined era and the test that was supposed to catch it would compare `undefined` to `undefined` and pass.** That is the exact shape v4's own delta document exists to prevent. **The mapping is now the identity**: a node's era already IS one of `ERAS`, so `codexEntriesFromTree` copies it and asserts membership rather than indexing.
+>
+> **(2) `codexEntriesFromTree()` seeds ALL 103 NODES into the arbiter's `CodexStore` — and a landed user ruling says the tree is a yardstick, never a gate.** `CodexStore.frontier()` feeds the adjudication prompt and `withinAdjacency()` decides whether a novel intent may be codified. Seeding 103 authored nodes makes the authored tree **the thing that decides what a mind is allowed to have invented** — which is the tree being the gate, in the one place it would matter most. The ruling of 2026-08-23 says the opposite in as many words, and records that **no code reads the tree and none should**; its stated purpose is to let a finished run be graded — *"they found 14 of the 103 we anticipated, plus 9 we did not"* — **and the 9 are the result.**
+>
+> **This is OD18 and the recommendation is in the Open Decisions section. Until it is ruled, this task builds `codexEntriesFromTree` and DOES NOT WIRE IT** — the function, its tests and its determinism are all real work either way, and the one line that inserts its output into a live `CodexStore` is the line that waits. **An executor who wires it has answered a controller's question with a commit.**
+
+**Interfaces — Consumes (★ v5):** `ERAS`, `Era`, `ERA_ORDER`, `GENESIS_CODEX` and `CodexEntry` **from `@sj/shared`** (T12 Step 0 put them there); `CodexStore` and `migrateArbiterTables` from `@sj/arbiter` **test-side only** (C12 — `@sj/arbiter` depends on `@sj/engine`, so a production import here is the cycle); `DiscoveryNode` from T12 and `DISCOVERY_TREE` from T13.
+
+- [ ] **Step 0: Assert the canon move already happened.** `test -f packages/shared/src/canon.ts && grep -q "from './canon.js'" packages/shared/src/index.ts && echo CANON IN SHARED`. If it prints nothing, **T12 Step 0 was skipped — go and do it, as its own commit, before this task.**
 
 > ### ★ v4 REWROTE THIS TASK, AND IT IS THE ONE PLACE WHERE THE SETTING CHANGE IS A CODE CHANGE
 >
@@ -2057,10 +2177,11 @@ export function codexEntriesFromTree(tree?: readonly DiscoveryNode[]): CodexEntr
 
 ```ts
 // packages/engine/src/discovery/codexSeed.test.ts
+import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
-import { ERAS, GENESIS_CODEX } from '@sj/shared'
+import { ERAS, ERA_ORDER, GENESIS_CODEX } from '@sj/shared'
 import { CodexStore, migrateArbiterTables } from '@sj/arbiter'   // test-only, C12
 import { DISCOVERY_TREE } from './tree.js'
 import { CODEX_ERAS, PRACTICED_AT_GENESIS, codexEntriesFromTree } from './codexSeed.js'
@@ -2089,19 +2210,44 @@ describe('codexEntriesFromTree', () => {
     expect(source).not.toMatch(/'agriculture'|'crafts'|'metallurgy'|'chemistry'|'engineering'/)
   })
 
-  it('maps era numbers onto the five era names in order', () => {
-    for (const r of rows) expect(ERAS).toContain(r.era)
+  // ★ v5: THE MAPPING IS THE IDENTITY, AND v4's ROW WAS A VACUOUS GUARD. The tree's `era` is
+  // already one of `ERAS` (T12's `z.enum(ERAS)`), so `ERAS[node.era - 1]` is `ERAS[NaN]` is
+  // `undefined` — and a row copying `undefined` into the codex would have compared equal to
+  // it and passed. The mutation that proves this one bites: return `ERAS[0]` for every row and
+  // watch the histogram assertion below fail with 103 handwork against 8.
+  it('★ CARRIES EACH NODE S OWN ERA ACROSS, UNCHANGED, AND THE HISTOGRAM PROVES IT', () => {
     const byId = new Map(DISCOVERY_TREE.map((n) => [n.id, n]))
-    for (const r of rows) expect(r.era).toBe(ERAS[byId.get(r.id)!.era - 1])
+    for (const r of rows) {
+      expect(ERAS, r.id).toContain(r.era)
+      expect(r.era, r.id).toBe(byId.get(r.id)!.era)
+    }
+    expect(ERAS.map((e) => rows.filter((r) => r.era === e).length)).toEqual([8, 26, 35, 22, 12])
   })
 
   it('picks a canonical parent that exists and never comes later', () => {
-    const eraOf = new Map(rows.map((r) => [r.id, ERAS.indexOf(r.era)]))
+    // ★ v5: rank through ERA_ORDER, never through the string. 'arrangement' < 'handwork' is
+    // true in JavaScript and false in the world, so a lexical compare would let an era-2 node
+    // parent an era-1 one and call it fine.
+    const rankOf = new Map(rows.map((r) => [r.id, ERA_ORDER[r.era]]))
     for (const r of rows) {
       if (r.prerequisiteId === null) continue
-      expect(eraOf.has(r.prerequisiteId)).toBe(true)
-      expect(eraOf.get(r.prerequisiteId)!).toBeLessThanOrEqual(eraOf.get(r.id)!)
+      expect(rankOf.has(r.prerequisiteId)).toBe(true)
+      expect(rankOf.get(r.prerequisiteId)!).toBeLessThanOrEqual(rankOf.get(r.id)!)
     }
+  })
+
+  // ★ v5, AND IT IS THE ROW OD18 TURNS ON. Whatever the controller rules, the SEED FUNCTION is
+  // allowed to exist; what waits on the ruling is whether anything calls it against a live
+  // store. This asserts the wiring is absent so nobody can land it by accident.
+  it('★ IS NOT WIRED INTO A LIVE CODEX ANYWHERE — OD18 IS UNRULED', () => {
+    const wired = execSync(
+      'grep -rln "codexEntriesFromTree" packages/ --include=*.ts || true', { encoding: 'utf8' },
+    ).split('\n').filter(Boolean).sort()
+    expect(wired, 'codexEntriesFromTree has a caller outside its own module and test — see OD18')
+      .toEqual([
+        'packages/engine/src/discovery/codexSeed.test.ts',
+        'packages/engine/src/discovery/codexSeed.ts',
+      ])
   })
 
   // ★ v4 — this row replaces v3's "derived from CANON" prose with the derivation itself, and
@@ -2216,7 +2362,7 @@ git add packages/shared/src/canon.ts packages/arbiter/src/canon.ts packages/shar
 git commit -m "refactor(shared): the canon moves to shared so the engine may read it without a cycle (C12)
 
 CANON sha256 <before> -> <after>   (MUST BE IDENTICAL)
-BLOCK1_SHA256 28c1fce0... UNMOVED  (the canon never reaches a mind's prompt)"
+BLOCK1_SHA256 4205d892... UNMOVED  (the canon never reaches a mind's prompt)"
 
 git add packages/engine/src/discovery/ packages/engine/src/index.ts
 git commit -m "feat(engine): the discovery tree becomes the codex the arbiter rules by"
@@ -2870,25 +3016,49 @@ git commit -m "feat(agents): block 6 stops teaching triage — an intention, a q
 >
 > **Every verb the town used takes a target the perception names. Every verb it never used takes a coordinate the perception never names.**
 >
-> | verb | what it asks for | did the perception supply it | used in 4 days |
-> |---|---|---|---:|
-> | `drink` | a place to stand | *"…you could stand beside it at (67, 68)"* | 16 |
-> | `forage` | a `nodeId` | *"berry bushes heavy with fruit (node_80) at (66, 55)"* | 18 |
-> | `enter` | a `structureId` | *"its doorway is at (62, 62)"* | 17 |
-> | **`build`** | **`{kind, x, y}`** | **no spot to build on is ever named** | **0** |
-> | **`chop`** | **`{x, y}` on forest** | **no tree, forest or timber is ever named** | **0** |
-> | **`till`** | **`{x, y}` on grass or dirt** | **no tillable tile is ever named** | **0** |
-> | **`plant`** | **`{x, y, kind}` on farmland** | **no farmland is ever named, and none existed** | **0** |
+> | verb | what it asked for **in the measured run** | did the perception supply it | used in 4 days | **state at `645a8d9`** |
+> |---|---|---|---:|---|
+> | `drink` | a place to stand | *"…you could stand beside it at (67, 68)"* | 16 | unchanged |
+> | `forage` | a `nodeId` | *"berry bushes heavy with fruit (node_80) at (66, 55)"* | 18 | unchanged |
+> | `enter` | a `structureId` | *"its doorway is at (62, 62)"* | 17 | unchanged |
+> | **`build`** | **`{kind, x, y}`** | **no spot to build on is ever named** | **0** | **★ FIXED, AND NOT BY THIS PLAN.** `build` takes **`{kind}`**; `groundForBuilding` names the ground; the makeables line says it. **This row's diagnosis is discharged — see the box below** |
+> | **`chop`** | **`{x, y}` on forest** | **no tree, forest or timber is ever named** | **0** | unchanged — **T19 still owns it** |
+> | **`till`** | **`{x, y}` on grass or dirt** | **no tillable tile is ever named** | **0** | unchanged — **T19 still owns it** |
+> | **`plant`** | **`{x, y, kind}` on farmland** | **no farmland is ever named, and none existed** | **0** | unchanged — **T19 still owns it** |
+>
+> ### ★ v5 — HALF OF THIS PHASE'S DIAGNOSIS HAS BEEN DISCHARGED BY THE CLAIM SEAM, AND THE OTHER HALF IS WHAT C8 MEASURES
+>
+> **The claim-seam lane did not give `build` a coordinate the perception names. It removed the coordinate.** `build` validates against `z.object({ kind }).strict()`, the site is claimed from the lattice, and the perception carries *"The town keeps ground for a new roof at (100, 87); you must be standing there to raise one."* **The measured cause of zero builds is gone, and it was proved gone by a run rather than by a reading: 6 masons, 4 320 ticks, 25 agent builds, ring 2 reached, the world grown twice, replay hash equal, a second run tile-identical.**
+>
+> **So the sentence this whole chunk was written under has changed, and it is worth stating exactly.** Before: *a mind was asked for a coordinate and nothing consulted the lattice, so a zero could not be read.* Now: **a mind is asked for a kind, told where the ground is, and can raise a house.** A zero in production from here can only mean **the minds did not choose to build** — which is not a defect, it is the finding, and it is precisely what G8's criterion 5 is for.
+>
+> **Three consequences for this phase, and none of them is a task deletion.** **T19** loses its build hook and keeps its three; **T20** must carry the landed build road through rather than overwrite it; **T22** must stop naming coordinates and stop naming kinds with no art. **T21, T23 and T24 are unaffected by the seam** — a half-raised house, a wound that eats a famine, and skills in words are all the same questions they were.
+>
+> **And one thing that has NOT been discharged and must not be assumed:** the seam is proved on engine fixtures with a scripted mason. Merge train 3 ran the product and found **the dev world has no mason at all** — `makeFoundersOnTick` offers only `walk / sleep / enter / exit` — so *"a town with agents building in it"* has never been seen outside a test. **That is the `first-night` lane's, not C8's**, and it is in the contingency box at the end of this document.
 >
 > Counted over all 378 perceptions: **212** named a place to stand beside a thing, **214** a doorway, **225** a forageable with a mark and a place, and **0** named a tile you could till, a spot you could build on, a tree, or the stuff you hold matched to a thing you could make. The materials were there twice over — 20 wood, 12 stone, 4 rope, 4 cloth in the storehouse, printed in 66 perceptions and recited by Amara in fourteen separate thoughts — and **0 of 378 perceptions ever said "You are carrying wood."** Yusuf the carpenter formed the intent to build a bridge on four separate days, had an axe, and the store held 20 wood six tiles from his door; he walked north to survey a river every day instead, **because a river is a place the perception names and a build site is not.**
 >
 > The other three hypotheses: **economics is real but downstream** (planting is strictly worthless on a 4-day horizon at `wheat.growthDays: 8`, and a house is 2880 ticks — but no mind ever got far enough to weigh it, and Yusuf's bridge was favourable and still never begun). **Vocabulary is refuted** — the makeables line was in every prompt and the minds quoted its neighbouring content back verbatim. **Society is a real second fault, independent of H1**, and T23 owns it.
 
-### Task 19: The bridge answers where to build, what to fell, what to till
+### Task 19: The bridge answers what to fell and what to till — and the build road has already landed
 
 **Files:** Modify `packages/agents/src/runtime/bridge.ts`, `packages/agents/src/runtime/bridge.test.ts`.
 
-Four hooks, each mirroring `nearestWater`'s exact shape — a bounded scan, Manhattan distance, ties broken by `(y, x)`, **kind and place named and never an id**, so the mark is still earned by going and looking. Each hook answers the question its verb actually validates against, read off the landed verb definitions: `till` accepts tiles 0 (grass) and 1 (dirt); `plant` needs tile 6 (farmland) and a crop kind in `config.crops`; `chop` needs `SAPLING_TILE` or `FOREST_TILE` (3); `build` needs `{kind, x, y}` where `buildFootprint` returns no refusal.
+> ### ★ v5 — THE FOURTH HOOK IS DELETED. A MIND CANNOT NAME WHERE IT BUILDS, AND THE WORLD ALREADY TELLS IT WHERE
+>
+> **v4's `nearestBuildSpot(agentId, kind, radius)` scanned tiles outward and returned the first for which `VERBS.build.validate(state, config, agentId, {kind, x, y})` returned `null`. In a town that is now `null` for every tile on the map**, because `PlottedBuildParams = z.object({ kind }).strict()` refuses the extra keys before any site rule is consulted (C14). The task's own headline row — *"NAMES A SPOT A HOUSE WOULD ACTUALLY FIT ON, by asking the verb"* — would fail on the first assertion, and its `wouldBuildRefuse` wrapper asks a question the verb no longer answers.
+>
+> **And it is not merely broken; it is unnecessary, because the thing it was for has landed.** The claim seam ships **`groundForBuilding(state)`** (`verbs.ts:1124`), which returns the door tile of the free plot nearest the square, and `EngineBridge.groundForBuilding()` (`bridge.ts:218`) already exposes it, and `makeablesLine` already puts it in the prompt:
+>
+> ```
+> The town keeps ground for a new roof at (100, 87); you must be standing there to raise one.
+> ```
+>
+> **One number, not two, and it is deliberately the DOOR tile** — a road, passable, and adjacent to every mass the plot can hold, so one answer serves whatever is being raised. Batch 14's verdict was *"every verb the town never used takes a coordinate the perception never names"*; **for `build` that sentence is now false, and it was made false by removing the coordinate rather than by naming one.**
+>
+> **So this task ships THREE hooks, not four**, and the fourth becomes an assertion that the landed road is present and reaches the prompt — because a road that exists and is not wired is the same as no road, and T20 is where it could most easily be unwired. **The task is not deleted and it is not renumbered.** `chop`, `till` and `plant` still take coordinates the perception never named, and they are still zero-use.
+
+Three hooks, each mirroring `nearestWater`'s exact shape — a bounded scan, Manhattan distance, ties broken by `(y, x)`, **kind and place named and never an id**, so the mark is still earned by going and looking. Each hook answers the question its verb actually validates against, read off the landed verb definitions: `till` accepts tiles 0 (grass) and 1 (dirt); `plant` needs tile 6 (farmland) and a crop kind in `config.crops`; `chop` needs `SAPLING_TILE` or `FOREST_TILE` (3). **`build` needs nothing from this task.**
 
 **Interfaces — Produces:**
 
@@ -2897,8 +3067,13 @@ Four hooks, each mirroring `nearestWater`'s exact shape — a bounded scan, Manh
 nearestTillable(x: number, y: number, radius?: number): { x: number; y: number } | null
 nearestFarmland(x: number, y: number, radius?: number): { x: number; y: number } | null
 nearestTimber(x: number, y: number, radius?: number): { x: number; y: number; kind: 'forest' | 'sapling' } | null
-nearestBuildSpot(agentId: string, kind: string, radius?: number): { x: number; y: number } | null
+// ★ v5 — NOT PRODUCED, AND NOT BY OVERSIGHT:
+//   nearestBuildSpot  — the site is not a function of anything a mind can say (C14)
+//   wouldBuildRefuse  — `build.validate` no longer takes an x and a y to ask about
+// LANDED and consumed instead: EngineBridge.groundForBuilding(): {x, y} | null
 ```
+
+**Interfaces — Consumes (★ v5):** **`groundForBuilding` from `@sj/engine`**, already re-exported on `EngineBridge` at `bridge.ts:218`. **T20 and T21 consume the same method and neither redeclares it.**
 
 - [ ] **Step 1: Write the failing test.**
 
@@ -2926,28 +3101,40 @@ describe('the roads production never had', () => {
     expect(['forest', 'sapling']).toContain(timber!.kind)
   })
 
-  it('NAMES A SPOT A HOUSE WOULD ACTUALLY FIT ON, by asking the verb', () => {
-    const b = fixtureBridge()
-    const spot = b.nearestBuildSpot('amara', 'house')
-    expect(spot).not.toBeNull()
-    expect(b.wouldBuildRefuse('amara', 'house', spot!.x, spot!.y)).toBeNull()
+  // ★ v5 — THE BUILD ROAD IS LANDED, AND THIS IS THE ROW THAT KEEPS IT LANDED. It replaces
+  // v4's two `nearestBuildSpot` rows, which asked a question `build.validate` stopped
+  // answering: `PlottedBuildParams` is `.strict()` over `{kind}`, so naming an x is refused
+  // before any site rule runs and the scan would return null for every tile in the world.
+  it('★ ANSWERS WHERE THE TOWN KEEPS GROUND, AND IT IS A DOOR TILE ON A ROAD', () => {
+    const b = townBridge()                       // a fixture with a paved square in it
+    const ground = b.groundForBuilding()
+    expect(ground).not.toBeNull()
+    expect(b.tileAt(ground!.x, ground!.y)).toBe(T_ROAD)
   })
 
-  it('returns null rather than a spot the verb would refuse', () => {
-    const packed = fixtureBridge({ fillWithStructures: true })
-    expect(packed.nearestBuildSpot('amara', 'house', 4)).toBeNull()
+  it('★ AND IT IS NULL IN A WORLD WITH NO TOWN, WHICH IS WHY EVERY MEADOW FIXTURE STILL BUILDS', () => {
+    expect(fixtureBridge().groundForBuilding()).toBeNull()
+  })
+
+  // The seam's own proof, restated at the bridge so this package cannot regress it: the site
+  // is not a function of anything a mind says. 225 coordinates, one answer.
+  it('★ REFUSES A NAMED COORDINATE, IN WORLD WORDS, AND SEATS THE ROOF ANYWAY', () => {
+    const b = townBridge()
+    const refusal = b.submitAndValidate('amara', 'build', { kind: 'house', x: 61, y: 68 })
+    expect(refusal).toMatch(/^build needs \{kind\}/)
+    expect(refusal).not.toMatch(/plot|block|ring|lattice|plat|frontage/)   // C32
   })
 
   it('NAMES A PLACE AND NEVER AN ID', () => {
     const b = fixtureBridge()
-    for (const answer of [b.nearestTillable(61, 68), b.nearestTimber(61, 68), b.nearestBuildSpot('amara', 'house')]) {
+    for (const answer of [b.nearestTillable(61, 68), b.nearestTimber(61, 68), b.nearestFarmland(61, 68)]) {
       expect(JSON.stringify(answer)).not.toMatch(/structure_|node_|item_|crop_/)
     }
   })
 
   it('IS DETERMINISTIC — the same question twice, the same answer', () => {
-    const b = fixtureBridge()
-    expect(b.nearestBuildSpot('amara', 'house')).toEqual(b.nearestBuildSpot('amara', 'house'))
+    const b = townBridge()
+    expect(b.groundForBuilding()).toEqual(b.groundForBuilding())
     expect(b.nearestTimber(61, 68)).toEqual(b.nearestTimber(61, 68))
   })
 })
@@ -2956,30 +3143,29 @@ describe('the roads production never had', () => {
 - [ ] **Step 2: Run it — FAIL.**
 
 Run: `pnpm vitest run packages/agents/src/runtime/bridge.test.ts`
-Expected: FAIL — none of the four methods exist.
+Expected: FAIL — the three scan methods do not exist, and `townBridge()` does not exist. **The `groundForBuilding` rows PASS from the first run, and that is correct and must be stated in the ledger rather than treated as a bad RED** (C24 forbids celebrating a green that had no implementation; it does not forbid asserting a landed guarantee you are about to build on top of). If either of them is red, **STOP** — the seam this whole phase now rests on is not on this tip.
 
-- [ ] **Step 3: Implement.** `nearestBuildSpot` is the only non-trivial one: it must not reimplement `buildFootprint`'s rules, it must **ask** them. Scan candidate tiles outward from the agent and return the first for which the landed `build` verb's `validate` returns `null` for `{kind, x, y}`, which also gets rotation and material checks for free:
+- [ ] **Step 3: Implement.** All three are the same bounded outward scan `nearestWater` already uses, reading the terrain array and nothing else. Ties break by `(y, x)` so two calls agree, and `Math.random` is never consulted — the drives fold is a pure fold and a road that rolled a die would break replay (C4a).
 
 ```ts
-nearestBuildSpot(agentId: string, kind: string, radius = 12): { x: number; y: number } | null {
-  const a = this.#loop.state.agents[agentId]
-  if (a === undefined) return null
-  // Ask the verb rather than re-deriving its rules: footprint, rotation, road tiles and
-  // material cost are all already decided in one place, and a second copy would drift.
+// packages/agents/src/runtime/bridge.ts — the shared scan the three hooks share
+#scan<T>(x0: number, y0: number, radius: number, at: (x: number, y: number) => T | null): T | null {
   for (let r = 1; r <= radius; r++) {
+    const ring: Array<[number, number]> = []
     for (let dy = -r; dy <= r; dy++) {
       for (let dx = -r; dx <= r; dx++) {
         if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue
-        const x = a.x + dx, y = a.y + dy
-        if (this.wouldBuildRefuse(agentId, kind, x, y) === null) return { x, y }
+        ring.push([x0 + dx, y0 + dy])
       }
     }
+    ring.sort((a, b) => a[1] - b[1] || a[0] - b[0])     // ties by (y, x), never by scan order
+    for (const [x, y] of ring) { const hit = at(x, y); if (hit !== null) return hit }
   }
   return null
 }
 ```
 
-`wouldBuildRefuse` is a thin public wrapper over `VERBS.build.validate(state, config, agentId, {kind, x, y})`, exported for the test above and reused by the refusal-teaching line in T21.
+**`groundForBuilding` is NOT implemented here — it is landed, and this task only proves it is reachable.** `EngineBridge.groundForBuilding()` at `bridge.ts:218` already returns `groundForBuilding(this.#loop.state)`. **Do not add a second answer beside it**: two functions that both claim to say where a house goes is the drift C14's read-it-never-retype-it rule exists to prevent, and the site is decided in exactly one place (`buildSiteOf`).
 
 - [ ] **Step 4: Green.**
 
@@ -3001,9 +3187,24 @@ git commit -m "feat(agents): the world can finally say where to build, what to f
 
 > *"What your hands know how to raise, **given the stuff and a spot to put it**: a bridge (6 wood), a house (10 wood), a well (8 stone)…"*
 
-**The world names neither the stuff nor the spot.** *"There are 20 wood in the storehouse at (61, 68) — enough for a house"* is a different sentence from *"a house (10 wood)"*, and it is the sentence a mind can act on.
+**The world named neither the stuff nor the spot.** *"There are 20 wood in the storehouse at (61, 68) — enough for a house"* is a different sentence from *"a house (10 wood)"*, and it is the sentence a mind can act on.
 
-**Interfaces — Produces:**
+> ### ★ v5 — HALF OF THIS TASK HAS LANDED, AND WRITING v4's VERSION WOULD SILENTLY UNDO IT
+>
+> **`makeablesLine` already takes a second argument on `main`, and it is the spot.**
+>
+> ```ts
+> // packages/agents/src/prompt/prose.ts:266, landed on the claim-seam lane
+> export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: number } | null): string
+> // packages/agents/src/runtime/agentRuntime.ts:444
+> const nowProse = `${prose} ${makeablesLine(this.#bridge.makeables(), this.#bridge.groundForBuilding())}`
+> ```
+>
+> **v4's Step 3 says in as many words: *"In `agentRuntime`, `nowProse` becomes `${prose} ${makeablesLine(this.#bridge.makeables(), this.#bridge.reachableMakeables(this.#agentId))}`."*** An executor who does that **deletes the landed build road from every prompt**, and **it compiles, it goes green, and no test in the repository catches it** — the parameter is optional, the line still renders, and the only thing missing is the sentence that tells a mind where a house can go. **That is a silent re-creation of the exact defect Phase D exists to fix**, and it is the most dangerous single line in v4.
+>
+> **So the second parameter becomes ONE object with BOTH halves in it, and the landed field keeps its landed name.** `ground` is not renamed, not made required, and not moved: whatever `groundForBuilding()` returns goes into the same sentence it already produces, byte-for-byte, and this task adds the *stuff* beside it. **The regression test below is the point of the amendment** — it asserts the road sentence is still in the output when a ground is passed, so nobody can drop it twice.
+
+**Interfaces — Produces (★ v5, and the second parameter is a SUPERSET of the landed one):**
 
 ```ts
 // on EngineBridge:
@@ -3015,10 +3216,16 @@ export type ReachableMakeables = {
   nearby: Array<{ kind: string; qty: number; x: number; y: number; where: string | null; enoughFor: string[] }>
   // Everything the hands know how to make, unchanged — the config half stays.
   all: Makeables
+  // ★ v5: THE LANDED BUILD ROAD, CARRIED THROUGH UNCHANGED. Same value, same sentence, same
+  // source (`EngineBridge.groundForBuilding()`); it rides in this object so that `makeablesLine`
+  // keeps exactly one optional parameter and no caller can pass one half and drop the other.
+  ground: { x: number; y: number } | null
 }
-// prose.ts:
+// prose.ts — ONE optional parameter, widened, never replaced:
 export function makeablesLine(m: Makeables, reachable?: ReachableMakeables): string
 ```
+
+**Interfaces — Consumes (★ v5):** `EngineBridge.groundForBuilding()` (landed; **asserted present by T19**) and `EngineBridge.makeables()` (landed). **This task declares neither and redeclares neither.**
 
 - [ ] **Step 1: Write the failing test.**
 
@@ -3026,45 +3233,79 @@ export function makeablesLine(m: Makeables, reachable?: ReachableMakeables): str
 // packages/agents/src/prompt/makeables.test.ts — appended
 describe('the makeables line, about this mind', () => {
   const all = { builds: [{ kind: 'house', inputs: { wood: 10 } }, { kind: 'bridge', inputs: { wood: 6 } }], crafts: [] }
+  // ★ v5: every fixture carries `ground`, because the landed second parameter carried it and
+  // this task widens that parameter rather than replacing it.
+  const R = (over: Partial<ReachableMakeables> = {}): ReachableMakeables =>
+    ({ held: [], nearby: [], all, ground: null, ...over })
 
   it('SAYS WHAT THE HANDS HOLD when they hold something', () => {
-    const line = makeablesLine(all, { held: [{ kind: 'wood', qty: 12, enoughFor: ['house', 'bridge'] }], nearby: [], all })
+    const line = makeablesLine(all, R({ held: [{ kind: 'wood', qty: 12, enoughFor: ['house', 'bridge'] }] }))
     expect(line).toContain('You are carrying 12 wood')
     expect(line).toContain('enough for a house')
   })
 
   it('SAYS WHERE THE STUFF IS when the hands are empty', () => {
-    const line = makeablesLine(all, {
-      held: [],
+    const line = makeablesLine(all, R({
       nearby: [{ kind: 'wood', qty: 20, x: 61, y: 68, where: 'the storehouse', enoughFor: ['house', 'bridge'] }],
-      all,
-    })
+    }))
     expect(line).toContain('There are 20 wood in the storehouse at (61, 68)')
     expect(line).toContain('enough for a house')
   })
 
   it('DOES NOT PROMISE WHAT THE STUFF CANNOT PAY FOR', () => {
-    const line = makeablesLine(all, {
-      held: [], nearby: [{ kind: 'wood', qty: 7, x: 61, y: 68, where: 'the storehouse', enoughFor: ['bridge'] }], all,
-    })
+    const line = makeablesLine(all, R({
+      nearby: [{ kind: 'wood', qty: 7, x: 61, y: 68, where: 'the storehouse', enoughFor: ['bridge'] }],
+    }))
     expect(line).toContain('enough for a bridge')
     expect(line).not.toContain('enough for a house')
   })
 
   it('keeps the config half, so a mind still knows what its hands know', () => {
-    const line = makeablesLine(all, { held: [], nearby: [], all })
-    expect(line).toContain('a house (10 wood)')
+    expect(makeablesLine(all, R())).toContain('a house (10 wood)')
   })
 
   it('is byte-identical to today when no reachable half is supplied', () => {
     expect(makeablesLine(all)).toBe(makeablesLine(all, undefined))
   })
 
+  // ★★ v5 — THE REGRESSION ROW. THIS TASK EXISTS AS MUCH TO KEEP A SENTENCE AS TO ADD ONE.
+  // The claim-seam lane landed `makeablesLine(m, groundForBuilding)` and wired it at
+  // agentRuntime.ts:444. v4's Step 3 replaced that second argument outright, which compiles,
+  // goes green, and deletes the only sentence that tells a mind where a house may go — the
+  // precise defect Phase D exists to fix, re-created by the task that fixes it.
+  it('★ STILL SAYS WHERE THE TOWN KEEPS GROUND — byte-for-byte the landed sentence', () => {
+    const line = makeablesLine(all, R({ ground: { x: 100, y: 87 } }))
+    expect(line).toContain('The town keeps ground for a new roof at (100, 87); you must be standing there to raise one.')
+  })
+
+  it('★ AND SAYS BOTH HALVES AT ONCE, WHICH IS THE WHOLE POINT OF ONE PARAMETER', () => {
+    const line = makeablesLine(all, R({
+      held: [{ kind: 'wood', qty: 12, enoughFor: ['house', 'bridge'] }], ground: { x: 100, y: 87 },
+    }))
+    expect(line).toContain('You are carrying 12 wood')
+    expect(line).toContain('ground for a new roof at (100, 87)')
+  })
+
+  it('★ SAYS NOTHING ABOUT GROUND WHERE THERE IS NO TOWN', () => {
+    expect(makeablesLine(all, R({ ground: null }))).not.toContain('keeps ground')
+  })
+
   it('NAMES NO IDS — C5', () => {
-    const line = makeablesLine(all, {
-      held: [], nearby: [{ kind: 'wood', qty: 20, x: 61, y: 68, where: 'the storehouse', enoughFor: ['house'] }], all,
-    })
+    const line = makeablesLine(all, R({
+      nearby: [{ kind: 'wood', qty: 20, x: 61, y: 68, where: 'the storehouse', enoughFor: ['house'] }],
+    }))
     expect(line).not.toMatch(/item_|structure_/)
+  })
+
+  // ★ v5 — C32, the layout glass. This line is an authored surface a mind reads.
+  it('★ LEAKS NO LAYOUT VOCABULARY — C32', () => {
+    const line = makeablesLine(all, R({
+      held: [{ kind: 'wood', qty: 12, enoughFor: ['house'] }],
+      nearby: [{ kind: 'stone', qty: 8, x: 61, y: 68, where: 'the storehouse', enoughFor: ['well'] }],
+      ground: { x: 100, y: 87 },
+    }))
+    expect(scanForLayoutLeak(line)).toEqual([])
+    expect(scanPromptForGlassLeak(line)).toEqual([])
   })
 })
 ```
@@ -3072,14 +3313,29 @@ describe('the makeables line, about this mind', () => {
 - [ ] **Step 2: Run it — FAIL.**
 
 Run: `pnpm vitest run packages/agents/src/prompt/makeables.test.ts`
-Expected: FAIL — `makeablesLine` takes one argument.
+Expected: FAIL — **`ReachableMakeables` does not exist and `makeablesLine`'s second parameter is a `{x, y} | null`, not an object with a `held` on it.** ★ **The two `keeps ground` rows must be RED for a TYPE reason and GREEN the moment the type widens** — if they are red because the sentence is absent, **STOP**: the landed road is not on this tip and T19 Step 2 should already have caught it.
 
-- [ ] **Step 3: Implement.** `reachableMakeables` reads the agent's inventory and `state.items` within the sight radius, matches each kind against `makeables(config).builds` and `craftRoutes`, and names the containing structure's **kind** (`'the storehouse'`) and never its id. In `agentRuntime`, `nowProse` becomes `${prose} ${makeablesLine(this.#bridge.makeables(), this.#bridge.reachableMakeables(this.#agentId))}`.
+- [ ] **Step 3: Implement.** `reachableMakeables` reads the agent's inventory and `state.items` within the sight radius, matches each kind against `makeables(config).builds` and `craftRoutes`, names the containing structure's **kind** (`'the storehouse'`) and never its id, **and sets `ground` from `this.groundForBuilding()` — the landed method, called, never re-derived.**
+
+```ts
+// packages/agents/src/prompt/prose.ts — the landed clause, moved one field deeper and NOT reworded
+if (r?.ground != null) {
+  parts.push(`The town keeps ground for a new roof at (${r.ground.x}, ${r.ground.y}); you must be standing there to raise one.`)
+}
+```
+
+```ts
+// packages/agents/src/runtime/agentRuntime.ts:444 — ONE argument changes, and `groundForBuilding`
+// is still what fills the road; it now travels inside the object instead of beside it.
+const nowProse = `${prose} ${makeablesLine(this.#bridge.makeables(), this.#bridge.reachableMakeables(this.#agentId))}`
+```
+
+★ **`reachableMakeables` MUST call `groundForBuilding()`, and the test above is what proves it did.** An implementation that returns `ground: null` unconditionally passes six of the nine rows and fails the two starred ones — which is exactly what those rows are for.
 
 - [ ] **Step 4: Green.**
 
 Run: `pnpm vitest run packages/agents/ && pnpm typecheck`
-Expected: PASS. BLOCK1 unmoved — the makeables line is block 6 and always has been.
+Expected: PASS. BLOCK1 unmoved — the makeables line is block 6 and always has been. **★ v5: run `packages/agents/src/prompt/` in full, all 110 tests, because `scanForLayoutLeak` and `scanPromptForGlassLeak` sweep every authored surface and this task adds two sentences to one (C32).**
 
 - [ ] **Step 5: Commit.**
 
@@ -3104,7 +3360,10 @@ git commit -m "feat(agents): twenty wood in the storehouse at (61, 68) — enoug
 // perception.ts — PerceivedStructure gains, absent on a finished building:
 progress?: 'barely begun' | 'a third of the way up' | 'half-raised' | "a morning's work from finished"
 // prose.ts:
-export function jointBuildLine(s: PerceptionStructure, withinReach: boolean): string | null
+// ★ v5: THE TYPE IS `PerceivedStructure`, and `perception.ts:83` is where it is declared.
+// There has never been a `PerceptionStructure` in this tree; v4's signature typechecks as
+// never — the fifth instance of that shape this plan's delta documents have had to correct.
+export function jointBuildLine(s: PerceivedStructure, withinReach: boolean): string | null
 ```
 
 - [ ] **Step 1: Write the failing test.**
@@ -3139,6 +3398,25 @@ it('THE REFUSAL TEACHES THE RESUME', () => {
   expect(buildRefusalHint('house', { alreadyPlanned: true }))
     .toBe('A house is already going up here; setting your hands to it carries it on from where it stands.')
 })
+
+// ★ v5 — C32, and it matters most here because a joint-build line is ABOUT A SITE, and a site
+// is the thing the lattice governs. The word "plot" would be the most natural word in English
+// for what this sentence is describing, which is exactly why the scan is run over it.
+it('★ LEAKS NO LAYOUT VOCABULARY — C32', () => {
+  const site: PerceivedStructure = { id: 'structure_9', kind: 'house', x: 61, y: 68, w: 2, h: 2, burning: false, stage: 'construction', progress: 'half-raised' }
+  for (const s of [jointBuildLine(site, true), buildRefusalHint('house', { alreadyPlanned: true })]) {
+    expect(scanForLayoutLeak(s!)).toEqual([])
+  }
+})
+
+// ★ v5 — THE RESUME IS NOW A LATTICE FACT, NOT A COORDINATE FACT, AND THE ENGINE ALREADY SAYS
+// SO. `buildSiteOf` reads `ownSite(builder, kind)` FIRST — the walls this body already
+// half-raised — and only then claims a new plot. So "carries it on from where it stands" is
+// true by construction and needs no coordinate in it; the claim-seam lane's mutation 14
+// ("a half-raised house is forgotten and claims a second plot") is the guard that proves it.
+it('★ THE RESUME SENTENCE NAMES NO PLACE, BECAUSE THE BODY IS ALREADY AT ONE', () => {
+  expect(buildRefusalHint('house', { alreadyPlanned: true })).not.toMatch(/\(\d+, ?\d+\)/)
+})
 ```
 
 - [ ] **Step 2: Run them — FAIL.**
@@ -3151,7 +3429,7 @@ Expected: FAIL — no `progress` field, no `jointBuildLine`.
 - [ ] **Step 4: Green, and the goldens unmoved.**
 
 Run: `pnpm vitest run packages/engine/ packages/agents/ && pnpm typecheck`
-Expected: PASS; G1 `f487a26b…` and G2 `c1c51b42…` reported unmoved in the commit body.
+Expected: PASS; G1 `f487a26b…` and G2 `00d72434…` reported unmoved in the commit body.
 
 - [ ] **Step 5: Commit.**
 
@@ -3185,15 +3463,23 @@ export function structureRecipeFor(config: SimConfig, kind: string): SeedStructu
 export function minHandsFor(config: SimConfig, kind: string): number
 ```
 
-| kind | `minHands` | why it is heavy, physically |
-|---|---:|---|
-| `barn` | 3 | the roof beam does not go up with two |
-| `long_bridge` | 3 | the span |
-| `pump_house` | 2 | the lift |
+| kind | `minHands` | why it is heavy, physically | art cell on `main` |
+|---|---:|---|---|
+| `storehouse` | 3 | the roof beam does not go up with two | **`storehouse` + `storehouse-se`, committed** |
+| `shed` | 2 | the lift — a shed for the pump is where the town puts a thing too heavy to carry twice | **`shed` + `shed-se`, committed** |
 
-**★ v4 CHANGED TWO OF THESE THREE NAMES, AND THE REASON IS THE SETTING AND NOT TASTE (C29).** v3's heavy things were `granary`, `long_bridge` and **`kiln`** — and a kiln is a pottery kiln, which is the single most recognisable thing the new canon puts out of this valley's reach (*"a town with a generator does not discover pottery"*). `granary` is not wrong so much as archaic: a contemporary farm stores grain in a **barn**, and the barn is also the building the farmhouse the layout lane stood at (24,18) would actually want beside it. **`pump_house`** replaces the kiln and keeps the physical argument exactly: it is a lift, two pairs of hands, and it is the kind of thing a town that feeds a generator builds next.
+> ### ★ v5 — THIS TASK COULD NOT RUN AND WOULD HAVE REDDED A GATE, AND BOTH FAULTS ARE THE SAME SPRINT'S DOING
+>
+> **Fault 1 — the refusal test can never see its refusal.** v4's row is
+> `VERBS.build.validate(twoHanded(), DEFAULT_CONFIG, 'amara', { kind: 'barn', x: 61, y: 68 })` and expects `'The beam will not go up with two.'` **In any world with a paved square, `PlottedBuildParams` is `.strict()` over `{kind}` and the extra keys are refused before `minHands` is ever consulted** (C14) — so the assertion reads a refusal about parameters and never reaches the one the task exists to write. Every `{kind, x, y}` in this task is corrected to `{kind}`, and the fixture is a town rather than a meadow, because a meadow takes the sited branch and would prove the wrong thing.
+>
+> **Fault 2 — three kinds with no art, against a gate that now covers every recipe key.** The art lane landed `worldStructureKinds({structures, recipes, extra})` at `packages/forge/src/structureArt.ts:92` — *"a row WITH materials is a kind an agent raises through the `build` verb; a row with EMPTY inputs is a kind the world places and nobody builds. **Both are kinds the world creates, so the whole table counts.**"* — and `structureArt.test.ts:81` asserts **every one of them has a cell in every facing it can stand in.** The twenty committed cells are `bridge, cabin(+se), cottage(+se), farmhouse(+se), fire_pit, grave, house(+se), scaffolding, shed(+se), standing_stone, storehouse(+se), wagon(+se), well`. **`barn`, `pump_house` and `long_bridge` are not among them**, so `SEED_STRUCTURES` as v4 wrote it turns a green gate red on the commit that adds it, in a package this task does not own.
+>
+> **Fault 3, and it is the one nobody would have predicted — `long_bridge` would claim a LAND PLOT.** `isPlottedKind(kind) = kind !== BRIDGE_KIND`, and `BRIDGE_KIND` is the single string `'bridge'`. **A kind called `long_bridge` is a plotted kind**, so the claim would hand it the free plot nearest the square and the span would be raised on dry ground in the middle of town. A longer bridge is not a different kind; it is the same deck over more water, and the far-bank lane already proved a deck completing and opening the west bank on the same tick.
+>
+> **★ THE ANSWER IS OD19 AND THE CONTROLLER OWNS IT. The recommendation, taken here so the task is executable, is to use TWO KINDS THE TOWN ALREADY STANDS AND TO DELETE THE THIRD.** `storehouse` for the three-hand mass and `shed` for the two-hand lift: both have committed cells in both facings, both are kinds a founder has walked past on the first morning, and the physical argument survives word for word. **It costs `minHands` its most vivid example and I would rather that than a red gate in somebody else's package.** `long_bridge` is deleted outright — **the plan says so loudly, and no task is added or renumbered for it.** If the controller would rather spend on three new cells, OD19's option (a) restores v4's three names unchanged and this table is the only thing that moves.
 
-**The three are still NEW KINDS ONLY and that is what keeps the pins still** — `grep -n "recipes:" -A 6 packages/shared/src/config.ts` shows the landed set is `house`, `well`, `bridge`, `grave` and nothing else, so none of these three collides. **Verify that grep rather than trusting this sentence**, because the rename lane touches that block.
+**Both are still NEW RECIPE ROWS and that is what keeps the pins still.** `storehouse` and `shed` are **template and fixture kinds, not `structures.recipes` keys** — verify with `grep -n "recipes:" -A 8 packages/shared/src/config.ts`, which shows the landed buildable set is `house`, `well`, `bridge`, `grave` and nothing else. **Run that grep rather than trusting this sentence.** Adding them to `SEED_STRUCTURES` (not to `DEFAULT_CONFIG`) makes them buildable **without touching the pinned hash at all**, which is the whole reason `SEED_STRUCTURES` exists — and because both already have art, the coverage gate stays green on the same commit.
 
 **The rule:** with fewer than `minHands` bodies *simultaneously building the same site*, the site makes **no progress at all** — not slow progress. And the refusal teaches: *"The beam will not go up with two."*
 
@@ -3202,7 +3488,9 @@ export function minHandsFor(config: SimConfig, kind: string): number
 ```ts
 // packages/engine/src/structures/seedStructures.test.ts
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { DEFAULT_CONFIG, cityStructures } from '@sj/shared'
+import { isPlottedKind } from '../verbs.js'                              // landed, verbs.ts:1032
+import { listCommittedBuildingKinds } from './committedArt.fixture.js'   // see Step 1b
 import { SEED_STRUCTURES, minHandsFor, structureRecipeFor } from './seedStructures.js'
 
 describe('SEED_STRUCTURES', () => {
@@ -3213,13 +3501,13 @@ describe('SEED_STRUCTURES', () => {
   })
 
   it('lets a config row win over a seed row, exactly as SEED_RECIPES does', () => {
-    const config = { ...DEFAULT_CONFIG, structures: { ...DEFAULT_CONFIG.structures, recipes: { ...DEFAULT_CONFIG.structures.recipes, pump_house: { inputs: { stone: 30 }, maxHp: 1, flammable: false, durationTicks: 1, w: 1, h: 1 } } } }
-    expect(structureRecipeFor(config, 'pump_house')!.inputs).toEqual({ stone: 30 })
+    const config = { ...DEFAULT_CONFIG, structures: { ...DEFAULT_CONFIG.structures, recipes: { ...DEFAULT_CONFIG.structures.recipes, shed: { inputs: { stone: 30 }, maxHp: 1, flammable: false, durationTicks: 1, w: 1, h: 1 } } } }
+    expect(structureRecipeFor(config, 'shed')!.inputs).toEqual({ stone: 30 })
   })
 
   it('says how many hands each heavy thing needs, and one for everything else', () => {
-    expect(minHandsFor(DEFAULT_CONFIG, 'barn')).toBe(3)
-    expect(minHandsFor(DEFAULT_CONFIG, 'pump_house')).toBe(2)
+    expect(minHandsFor(DEFAULT_CONFIG, 'storehouse')).toBe(3)
+    expect(minHandsFor(DEFAULT_CONFIG, 'shed')).toBe(2)
     expect(minHandsFor(DEFAULT_CONFIG, 'house')).toBe(1)
   })
 
@@ -3230,36 +3518,99 @@ describe('SEED_STRUCTURES', () => {
       expect(kind, kind).not.toMatch(/kiln|forge|foundry|smelt|tannery|granary|midden/)
     }
   })
+
+  // ★★ NEW IN v5, AND IT IS THE ROW THAT WOULD HAVE CAUGHT v4 IN ANOTHER PACKAGE'S GATE.
+  // `worldStructureKinds` unions the template's kinds with EVERY key of the recipe table, and
+  // `structureArt.test.ts` requires a committed cell for each. A seed row is reachable through
+  // `structureRecipeFor`, so a seed kind with no art is a kind the world can create and cannot
+  // draw. Asserted HERE, in the package that adds the kind, so the failure names the cause
+  // rather than surfacing three packages away as "farmhouse-se clears the pixel bar".
+  it('★ EVERY SEED KIND HAS COMMITTED ART, IN EVERY FACING THE TOWN CAN STAND IT IN', () => {
+    const cells = new Set(listCommittedBuildingKinds())     // 20 cells, 14 kinds, from disk
+    for (const kind of Object.keys(SEED_STRUCTURES)) {
+      expect(cells.has(kind), `${kind} has no committed art cell — see OD19`).toBe(true)
+      expect(cells.has(`${kind}-se`), `${kind} has no turned cell — see OD19`).toBe(true)
+    }
+  })
+
+  // ★★ NEW IN v5. `isPlottedKind(kind) = kind !== BRIDGE_KIND`, so EVERY seed kind except the
+  // one bridge is claimed onto a land plot. v4's `long_bridge` would have been handed the free
+  // plot nearest the square and raised a span on dry ground in the middle of town. There is
+  // no second bridge kind, and this row is why there will not be one by accident.
+  it('★ NO SEED KIND IS A SPAN — a thing that stands on water is the bridge and only the bridge', () => {
+    for (const kind of Object.keys(SEED_STRUCTURES)) {
+      expect(isPlottedKind(kind), `${kind} is plotted but reads like a crossing`).toBe(true)
+      expect(kind, kind).not.toMatch(/bridge|span|crossing|ford|causeway/)
+    }
+  })
+
+  // ★ v5: both heavy kinds are things a founder has walked past on the first morning, which is
+  // why "the beam" is a sentence a mind can picture. Not decoration — it is the argument for
+  // choosing these two over three commissioned cells (OD19).
+  it('★ BOTH HEAVY KINDS ALREADY STAND IN THE TOWN', () => {
+    const standing = new Set(cityStructures().map((s) => s.kind))
+    expect(standing.has('storehouse')).toBe(true)
+    expect(Object.keys(SEED_STRUCTURES).sort()).toEqual(['shed', 'storehouse'])
+  })
 })
 ```
 
+- [ ] **Step 1b: The art fixture, and it reads DISK rather than a list.** `packages/engine/src/structures/committedArt.fixture.ts` exports `listCommittedBuildingKinds(): string[]` = `readdirSync('packages/forge/content/buildings')`, sorted. **It is a `readdirSync`, not a typed array, because a typed array is a second copy of the art lane's contract and would go stale the first time a cell is commissioned.** `@sj/engine` must not import `@sj/forge` (C12 — nothing outside the forge may depend on `sharp`), so this reads the directory rather than the package. Four lines, test-only, and asserted test-only by the same source-level check T55 Step 0 uses.
+
 ```ts
 // packages/engine/src/verbs.test.ts — appended
+//
+// ★ v5: `siteUnderConstruction(kind, builders)` now stands its site through the REAL claim —
+// it builds a town world, calls `claimTownPlot`, and seats the site at `answer.site`. It no
+// longer takes a coordinate, and `siteAt(state, 61, 68)` becomes `theSite(state)`, because
+// (61, 68) was a coordinate v3 chose and no lattice would ever offer. The fixture returns the
+// site it seated so the assertions read it rather than retyping it (C14).
 describe('a beam that does not go up with two', () => {
   it('MAKES NO PROGRESS AT ALL below the hand count — not slow progress', () => {
-    const state = siteUnderConstruction('barn', ['amara', 'yusuf'])
-    const before = siteAt(state, 61, 68)!.progressTicks
+    const state = siteUnderConstruction('storehouse', ['amara', 'yusuf'])
+    const before = theSite(state)!.progressTicks
     const next = foldAll(state, stepBuild(state, DEFAULT_CONFIG, 'amara'), DEFAULT_CONFIG)
-    expect(siteAt(next, 61, 68)!.progressTicks).toBe(before)
+    expect(theSite(next)!.progressTicks).toBe(before)
   })
 
   it('goes up the moment the third pair arrives', () => {
-    const state = siteUnderConstruction('barn', ['amara', 'yusuf', 'nadia'])
-    const before = siteAt(state, 61, 68)!.progressTicks
+    const state = siteUnderConstruction('storehouse', ['amara', 'yusuf', 'nadia'])
+    const before = theSite(state)!.progressTicks
     let next = state
     for (const id of ['amara', 'yusuf', 'nadia']) next = foldAll(next, stepBuild(next, DEFAULT_CONFIG, id), DEFAULT_CONFIG)
-    expect(siteAt(next, 61, 68)!.progressTicks).toBe(before + 3)
+    expect(theSite(next)!.progressTicks).toBe(before + 3)
   })
 
   it('a house still goes up alone, exactly as it always did', () => {
     const state = siteUnderConstruction('house', ['amara'])
     const next = foldAll(state, stepBuild(state, DEFAULT_CONFIG, 'amara'), DEFAULT_CONFIG)
-    expect(siteAt(next, 61, 68)!.progressTicks).toBe(siteAt(state, 61, 68)!.progressTicks + 1)
+    expect(theSite(next)!.progressTicks).toBe(theSite(state)!.progressTicks + 1)
   })
 
+  // ★★ v5 — THE REFUSAL TEST, CORRECTED, AND THE CORRECTION IS THE WHOLE FAULT. v4 asked
+  // `validate(..., { kind: 'storehouse', x: 61, y: 68 })`, and in a town `PlottedBuildParams`
+  // is `.strict()` over `{kind}`: the extra keys are refused BEFORE `minHands` is consulted,
+  // so the assertion would have read "build needs {kind} — where a house stands is the town's
+  // to say, not yours" and never once reached the sentence this task exists to write.
   it('THE REFUSAL SAYS WHY', () => {
-    expect(VERBS.build.validate(twoHanded(), DEFAULT_CONFIG, 'amara', { kind: 'barn', x: 61, y: 68 }))
+    expect(VERBS.build.validate(twoHandedTown(), DEFAULT_CONFIG, 'amara', { kind: 'storehouse' }))
       .toBe('The beam will not go up with two.')
+  })
+
+  // ★ v5 — and the guard that keeps the two refusals apart, because they are answered by two
+  // different rules and an executor who merges them loses one. Naming a coordinate is refused
+  // for the shape; too few hands is refused for the beam. Both, on the same kind, in order.
+  it('★ NAMING A COORDINATE IS A DIFFERENT REFUSAL, AND IT COMES FIRST', () => {
+    const refusal = VERBS.build.validate(
+      threeHandedTown(), DEFAULT_CONFIG, 'amara', { kind: 'storehouse', x: 61, y: 68 },
+    )
+    expect(refusal).toMatch(/^build needs \{kind\}/)
+    expect(refusal).not.toBe('The beam will not go up with two.')
+  })
+
+  // ★ v5 — C32. "The beam will not go up with two" is a sentence a mind reads.
+  it('★ THE REFUSAL LEAKS NO LAYOUT VOCABULARY — C32', () => {
+    expect(scanForLayoutLeak('The beam will not go up with two.')).toEqual([])
   })
 
   it('THE TIER-1 REGISTRY IS UNCHANGED — no new verb was added here', () => {
@@ -3275,10 +3626,20 @@ Expected: FAIL — `Cannot find module './seedStructures.js'`.
 
 - [ ] **Step 3: Implement.** `stepBuild` counts the bodies whose current `activity` is a `build` on this site and returns `[]` when the count is below `minHandsFor`. `build.validate` returns the refusal string when the count would still be short **at the moment the mind sets to work**, so a mind is told rather than left to fail silently.
 
-- [ ] **Step 4: Green, pins verified unmoved.**
+**★ v5 — WHERE THE HAND CHECK GOES, AND IT IS AFTER THE SHAPE AND BEFORE THE SITE.** The order inside `build.validate` is now: **(1)** `buildIsPlotted` chooses the params shape and `safeParse` refuses an extra key; **(2)** the hand count; **(3)** `buildSiteOf`, which claims the plot. **The hand check must sit at (2) and not at (3)**, because a refusal that fires after the claim would have already reserved ground for a beam nobody can lift — and `claimInWorld` reads *"free"* off what stands, so the reservation would not even be visible to unwind. Two hands short is a fact about the bodies present, not about the ground, and it is answered before any ground is asked for.
+
+- [ ] **Step 4: Green, pins verified unmoved, AND THE ART GATE STILL GREEN.**
 
 Run: `pnpm vitest run packages/engine/ && pnpm typecheck`
 Expected: PASS; **run `golden.test.ts`, `g2.test.ts` and `forgeConfig.test.ts` explicitly and paste their three hashes into the commit body.** If any moved, **STOP** — a seed row leaked into a kind the goldens exercise.
+
+**★ v5 — AND RUN THE ART COVERAGE GATE IN THE SAME BREATH, BECAUSE THIS IS THE TASK THAT CAN RED IT:**
+
+```bash
+pnpm vitest run packages/forge/src/structureArt.test.ts packages/gateway/src/ingestArt.test.ts
+```
+
+Expected: PASS, **20 committed cells, zero uncovered kinds.** `worldStructureKinds` unions the template's kinds with every recipe key, so **if a later ruling on OD19 puts a kind with no cell into `SEED_STRUCTURES`, this is where it goes red** — and it goes red in `packages/forge`, which C8 does not own. **A red here is a STOP, not a cell to commission on the spot** (C20: the user's eye is the only art gate).
 
 - [ ] **Step 5: Commit.**
 
@@ -3397,6 +3758,17 @@ Four reachability walls, closed together because each is one small change and th
 2. **A new craft tradition is refused by name.** `teach` returns `no such skill: <track>` against a closed list of twelve, so **a town that invents a practice cannot pass it on.** Mint an unknown track on first `skill_gained` — which is exactly how a tradition starts.
 3. **Postures and gestures are refused as crafts — the biggest wall.** `isExpressive` requires a word from a **closed 22-stem list**, and everything else goes to the full adjudicator, which answered *"this would need a craft the town has not yet reached"* to `sit`, `wait`, `kneel and bind Amara's cut`, and *"I plant my feet wider, keep the axe raised… 'Who hit me?'"* — **seven of eleven `impossible` verdicts.** The refusal is a lie about the world and it is the string the mind reads. **Invert the test:** an act is expressive if it names **no mutating stem and no known verb**, rather than if it matches a blessed word.
 4. **The arbiter rules on a world it cannot see.** It ruled **three times** that the town has no well while five minds drank from one, and overturned its own precedent to do it — and `rulings` is immutable and FTS-matched, so **a wrong ruling becomes shared precedent for every mind for ever.** C11 batch 8 widened `buildAgentCtx` with `visible.structures` and `ground`; this task asserts it end to end and adds the ground the arbiter still cannot see.
+
+> ### ★ v5 — ITEM 3 NOW HAS A CONSEQUENCE v4 COULD NOT HAVE SEEN: EVERY INVENTION IS RECORDED, WITH CREDIT
+>
+> **`isExpressive(intent: string): boolean` is unchanged** — `packages/arbiter/src/expressive.ts:30`, one argument, exactly as v4 corrected it. **What changed is what happens after it says yes.**
+>
+> The discovery lane landed **the Discovery Record**: `DISCOVERY_EVENT = 'discovery_made'`, `DiscoveryRecordSchema` (`seq`, `tick`, `recipeId`, `name`, `kind: 'craft' | 'word'`, `byId`, `by`, `intent`, `makes`), a `DiscoveryCredit` that travels from the runtime to the arbiter and back out onto the event, and a `discoveryHeadline` that reaches the chronicle. **Crucially it fires from BOTH codification paths** — `codifyExpressive` mints verbs **inside `adjudicate`** (`adjudicate.ts:123`, called at `:220`), never through `codify()`, and a record that only watched `codify()` would have missed every expressive verb this task's item 3 is about to unlock.
+>
+> **So item 3 is now the largest single source of Discovery Records in the run.** Inverting the expressive test turns *"an act is expressive if it matches one of 22 blessed stems"* into *"an act is expressive if it names no mutating stem and no known verb"* — which is a much wider door, and **every mind that walks through it gets a `word` credited to it by name.** Two things follow:
+>
+> 1. **The credit is a world fact and the one-way glass still binds it.** `discoveryHeadline` deliberately omits `intent` — *"a headline reaches the chronicle, the chronicle is agent-visible, and a mind reading its own sentence back is a loop the one-way glass exists to prevent."* **This task adds no string that undoes that**, and the Self-Review's glass sweep covers the skill-word table it does add.
+> 2. **G8 does not currently look at any of it, and OD21 asks whether it should.** The recommendation is **report, never gate** — a discovery *count* has no baseline, and a threshold with no baseline is the thing C23 forbids. What the report should carry is `discoveries` by `kind` and by `byId`, plus the identity **`discoveries.length === craftsCodified + wordsMinted`**, which is the assertion that keeps the two codification paths from drifting apart. **T49's schema is where it lands if the controller says yes; nothing here is written on the assumption that they will.**
 
 - [ ] **Step 1: Write the failing test.**
 
@@ -3830,7 +4202,7 @@ pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.t
 pnpm typecheck
 ```
 
-Expected: all PASS. **The three pin tests must still be green at `f487a26b…`, `c1c51b42…` and `a90bd747…`** — this task adds no state field, no config key and no RNG draw, so a moved pin means something else changed and is a STOP-and-report (C3).
+Expected: all PASS. **The three pin tests must still be green at `f487a26b…`, `00d72434…` and `da065752…`** — this task adds no state field, no config key and no RNG draw, so a moved pin means something else changed and is a STOP-and-report (C3).
 
 - [ ] **Step 5: Commit.**
 
@@ -3848,11 +4220,11 @@ git commit -m "feat(engine): a dying body calls for thirty-one hours instead of 
 
 **The measured hole.** Across four sim-days: **0 gives**. Nadia ate **9 meals**; three others ate **1 each** and died. The storehouse held 20 wood, 12 stone, 4 rope, 4 cloth and bread, printed in 66 perceptions. And Amara, two days from starving, reasoned herself away from the only food she could reach because **the ownership was legible and the hunger was not**.
 
-`give` is the same shape as every verb the town never used: it takes `{itemId, targetId}`, and **the perception has never once named a person as a target for something you are holding.** T19 gave `build`, `chop`, `till` and `plant` their coordinates; this gives `give` its person.
+`give` is the same shape as every verb the town never used: it takes `{itemId, targetId}`, and **the perception has never once named a person as a target for something you are holding.** T19 gave `chop`, `till` and `plant` their coordinates and the landed claim seam gave `build` its ground; this gives `give` its person.
 
 **Worth doing, not merely possible.** The *road* is here; the *reason* is already built and this task wires to it rather than inventing a second one — **T17's OBLIGATION** records the debt a gift creates and prompts it back for three days, and **T17's RECOGNITION** raises `regard` when the gift is witnessed. A gift in this town is remembered by the receiver and seen by the neighbours, and that is what makes it a move rather than a loss.
 
-**Interfaces — Consumes:** `distressOf`, `distressProse` (T55); `EngineBridge.nearestWater`'s scan shape and `wouldBuildRefuse` (T19); `VERBS.give.validate` (landed, refusals `self` / `gone` / `far`); `driveState.obligation` (T17).
+**Interfaces — Consumes (★ v5):** `distressOf`, `distressProse` (T55); **`EngineBridge`'s shared `#scan` helper (T19)** — v4 cited `wouldBuildRefuse` here and **T19 no longer produces it**, because `build.validate` has no `x` and `y` to ask about; what this task actually reuses is the bounded outward scan with its `(y, x)` tiebreak, and `wouldGiveRefuse` below is the same *shape* asking a different verb; `VERBS.give.validate` (landed, refusals `self` / `gone` / `far`); `driveState.obligation` (T17).
 
 **Interfaces — Produces:**
 
@@ -3881,9 +4253,9 @@ export const WANT_SATISFIED_BY: Readonly<Record<DistressCause, readonly string[]
 >
 > | v3 kind | On `cd845bc` |
 > |---|---|
-> | `bread`, `berries`, `fish`, `stew` | **real** — `FOOD_KINDS`, `packages/engine/src/verbs.ts:118-121` |
+> | `bread`, `berries`, `fish`, `stew` | **real** — `FOOD_KINDS`, `packages/engine/src/verbs.ts:119-123` |
 > | **`meat`**, **`grain`** | **DO NOT EXIST.** The real ids are `rabbit_meat`, `venison` and `wheat`, so a mind holding venison beside a starving neighbour would be told nothing |
-> | `waterskin` | real as an **item**, but **`drink` takes no item** — it validates `waterWithinReach(state, agentId)` (`verbs.ts:396`). Handing somebody a waterskin quenches nobody |
+> | `waterskin` | real as an **item**, but **`drink` takes no item** — it validates `waterWithinReach(state, agentId)` (`verbs.ts:397`; the function itself is declared at `:368`). Handing somebody a waterskin quenches nobody |
 > | **`gourd`**, **`cloak`**, **`firewood`** | **DO NOT EXIST anywhere in the tree** |
 >
 > **Four of the eleven kinds are fictional and one whole cause has no giving answer at all.** The plan's own law is *"no false roads, ever"* and its own discipline is *"ask the verb rather than re-deriving its rules"* (T19), so:
@@ -4948,7 +5320,7 @@ Expected: FAIL — `action` is optional, `CAPABILITIES` says neither sentence, `
 - [ ] **Step 4: Green, and the pin move is deliberate and stated.**
 
 Run: `pnpm vitest run packages/ && pnpm typecheck`
-Expected: PASS. `BLOCK1_SHA256` **moves from `28c1fce0…` to its new value**; G1, G2 and the forge pin are **unmoved** (block 1 is prompt text and folds nothing) — assert all three in the commit body.
+Expected: PASS. `BLOCK1_SHA256` **moves from `4205d892…` to its new value**; G1, G2 and the forge pin are **unmoved** (block 1 is prompt text and folds nothing) — assert all three in the commit body.
 
 - [ ] **Step 5: Commit.**
 
@@ -4956,16 +5328,16 @@ Expected: PASS. `BLOCK1_SHA256` **moves from `28c1fce0…` to its new value**; G
 git add packages/agents/src packages/engine/src/verbs.ts packages/engine/src/verbs.test.ts
 git commit -m "feat: doing nothing becomes a choice — action is required, and block 1 is amended once
 
-BLOCK1_SHA256 28c1fce0781ec9019416c234a9eae47401ff4b9dc4a96b91c371335fbad97bd6
+BLOCK1_SHA256 4205d892c18a91de4c9c3a50f0122abaad0d6170488455419dc045bfc4d50065
            -> <new value from rulesOfBeing.test.ts>
 G1    f487a26b… UNMOVED
-G2    c1c51b42… UNMOVED
-forge a90bd747… UNMOVED"
+G2    00d72434… UNMOVED
+forge da065752… UNMOVED"
 ```
 
 ### Task 29: The bundled physics regen — the energy residue, the resentment, the crop, the years
 
-**Files:** Modify `packages/shared/src/config.ts`, `packages/engine/src/systems/needs.ts`, `packages/engine/src/g11.test.ts`, `packages/engine/src/golden.test.ts`, `packages/engine/src/g2.test.ts`, `packages/arbiter/src/g4.test.ts`, `packages/gateway/src/g12c.test.ts`, `packages/agents/src/live/g11checkpoint.test.ts`, `packages/forge/src/forgeConfig.test.ts`, and their sibling tests.
+**Files:** Modify `packages/shared/src/config.ts`, `packages/engine/src/systems/needs.ts`, `packages/engine/src/g11.test.ts`, `packages/engine/src/golden.test.ts`, `packages/engine/src/g2.test.ts`, `packages/engine/src/g9.test.ts`, `packages/arbiter/src/g4.test.ts`, `packages/gateway/src/g12c.test.ts`, `packages/forge/src/forgeConfig.test.ts`, and their sibling tests. *(★ v5 — `packages/agents/src/live/g11checkpoint.test.ts` is REMOVED from this list; see the re-pin box below. `packages/engine/src/g9.test.ts` is ADDED, because its two source-text assertions were never in v4's file list even though its box named them.)*
 
 **FOUR changes, one regen, three pins.** Two are level 3 (`config.ts` → the forge pin **and** both goldens) and two are level 2 (goldens only). Since a level-3 change moves both goldens anyway, doing all four together costs exactly what doing one costs — and that is the whole argument for bundling and for not spending the regen on anything else.
 
@@ -5094,7 +5466,7 @@ pnpm vitest run packages/engine/src/g11.test.ts packages/engine/src/systems/need
 pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts packages/forge/src/forgeConfig.test.ts 2>&1 | tee /tmp/pins-before.txt
 ```
 
-Expected: the four new describes FAIL; the three pin tests PASS at `f487a26b…`, `c1c51b42…`, `a90bd747…`. **Paste those three into the commit body as the "from" side.**
+Expected: the four new describes FAIL; the three pin tests PASS at `f487a26b…`, `00d72434…`, `da065752…`. **Paste those three into the commit body as the "from" side.**
 
 - [ ] **Step 3: Implement all four, then regenerate the three pins in the same commit.**
 
@@ -5136,21 +5508,25 @@ grep -rnE "'[0-9a-f]{64}'" --include='*.ts' packages/forge/src/forgeConfig.test.
 
 > ### ★ v4 — THERE ARE NINE PLACES TO RE-PIN, NOT THREE. v3 NAMED TWO OF THEM.
 >
-> A regen that edits `golden.test.ts`, `g2.test.ts` and `forgeConfig.test.ts` alone leaves **six** red assertions in **four** other packages. Every one of these was grepped out of `cd845bc` (C3):
+> A regen that edits `golden.test.ts`, `g2.test.ts` and `forgeConfig.test.ts` alone leaves **five** red assertions in **three** other packages. **★ v5 — every line number below was re-grepped out of `645a8d9`, and every one of them had moved** (C3):
 >
 > | Pin | Files that must move in the SAME commit |
 > |---|---|
-> | **G1** | `engine/src/golden.test.ts:14` · `arbiter/src/g4.test.ts:21` · **`gateway/src/g12c.test.ts:87`** · **`engine/src/g9.test.ts:588`, which asserts the literal by READING `golden.test.ts` AS SOURCE TEXT** |
-> | **G2** | `engine/src/g2.test.ts:34` · **`gateway/src/g12c.test.ts:90`** · **`engine/src/g9.test.ts:589`, same source-text trick** |
-> | **forge** | `forge/src/forgeConfig.test.ts:79` · **`gateway/src/g12c.test.ts:101`** · **`agents/src/live/g11checkpoint.test.ts:15`**, where it is a fixture `configHash` and not obviously a pin at all |
-> | **BLOCK1** | unmoved here (T28 moved it); its copies are `agents/src/prompt/rulesOfBeing.test.ts:15` and **`gateway/src/g12c.test.ts:102`** — **T28 must move both** |
+> | **G1** | `engine/src/golden.test.ts:14` · `arbiter/src/g4.test.ts:25` · **`gateway/src/g12c.test.ts:87`** · **`engine/src/g9.test.ts:591`, which asserts the literal by READING `golden.test.ts` AS SOURCE TEXT** |
+> | **G2** | `engine/src/g2.test.ts:40` · **`gateway/src/g12c.test.ts:92`** · **`engine/src/g9.test.ts:592`, same source-text trick** |
+> | **forge** | `forge/src/forgeConfig.test.ts:91` · **`gateway/src/g12c.test.ts:105`** — **TWO places, not three** |
+> | **BLOCK1** | unmoved here (T28 moved it); its copies are `agents/src/prompt/rulesOfBeing.test.ts:22` and **`gateway/src/g12c.test.ts:106`** — **T28 must move both** |
 >
-> **`g9.test.ts:588-589` is the one that will waste an afternoon.** It does not import the hash; it reads the other test file's bytes and asserts the literal appears in them. A regen that updates `golden.test.ts` makes it pass automatically and a regen that forgets to makes it fail with a message about a *file*, not a hash. **`g11checkpoint.test.ts:15` is the opposite trap** — it is a fixture that happens to carry the forge hash, so it fails with a checkpoint-fingerprint error that reads like a bug in the checkpointer.
+> **★ v5 — `agents/src/live/g11checkpoint.test.ts:15` IS STRUCK FROM THIS LIST, AND STRIKING IT IS THE POINT.** v4 named it as the forge pin's third copy and called it a trap. **It is not a copy of anything.** It is a `configHash` inside a frozen `G11Fingerprint` **test fixture**, nothing compares it to `stateHash(DEFAULT_CONFIG)`, and the forge pin has moved **twice** since that literal was written (`a90bd747` → `02f295ad` → `da065752`) without a single test going red. **Do not edit it.** Re-pinning it changes no behaviour and leaves the next reader believing the checkpointer is pinned to the config when it is not — which is a worse defect than the stale string, because it is a false belief instead of a dead one. If the checkpointer should be pinned to the live config, that is a task and not a `sed`.
 >
-> **The command that finds all nine is in C3 and is run again here, before and after:**
+> **`g9.test.ts:591-592` is the one that will waste an afternoon.** It does not import the hash; it reads the other test file's bytes and asserts the literal appears in them. A regen that updates `golden.test.ts` makes it pass automatically and a regen that forgets to makes it fail with a message about a *file*, not a hash.
+>
+> **★ AND THE ONE THAT IS NOT A PIN AT ALL: `arbiter/src/g4.test.ts:208` CARRIES `f487a26b` INSIDE A TEST NAME** — *"G1 golden day still replays bit-identically to the pinned hash f487a26b"*. It is why the prefix grep returns twelve lines and the literal count is eleven. **It has no assertion behind it, so it cannot go red**, which is exactly what makes it worth naming: a regen that leaves it behind ships a test whose name says one hash and whose body checks another. **Update it for honesty, and never count it toward the census.**
+>
+> **The command that finds all eleven is in C3 and is run again here, before and after. It prints TWELVE lines:**
 >
 > ```bash
-> grep -rn "f487a26b\|c1c51b42\|a90bd747\|28c1fce0" --include='*.ts' packages/
+> grep -rn "f487a26b\|00d72434\|da065752\|4205d892" --include='*.ts' packages/
 > ```
 
 - [ ] **Step 4: Green, whole suite, and the attribution table written.**
@@ -5165,8 +5541,8 @@ git add packages/shared/src/config.ts packages/engine/src packages/forge/src
 git commit -m "feat: THE KEYSTONE REGEN — a day a body can finish, resentment with a floor, a crop, the years
 
 G1    f487a26b… -> <new>   (which change: …)
-G2    c1c51b42… -> <new>   (which change: …)
-forge a90bd747… -> <new>   (which change: …)
+G2    00d72434… -> <new>   (which change: …)
+forge da065752… -> <new>   (which change: …)
 BLOCK1 unmoved from Task 28's value.
 Attribution, per change, including any that moved a hash by exactly zero."
 ```
@@ -5577,7 +5953,7 @@ export function chronicleWeightOf(ev: SimEvent): number {
 
 **`TIER1_DEFS` gains `first_elder_death`**, raised the first time an `agent_died` with `cause: 'old_age'` is folded. **`detectFirsts` already dedupes by kind across the run** (`firsts.ts:11-30`), so "can only happen once" needs no new machinery — which is the whole reason this is a data row and not code.
 
-**★ AND ONE THING THIS TASK MUST NOT QUIETLY DO.** `TIER1_DEFS` also carries `first_hut` at `tier1.ts:68`, matching `structureKind(id) === 'hut'`. **The rename lane changes that matched string to `'house'`; whether the milestone's own `kind` id becomes `first_house` is the rename lane's call, not this task's** — a milestone kind is written into `milestones` rows in every recorded database, and renaming one here would orphan the history for a cosmetic gain. **Leave `first_hut`'s id alone whatever it says on `main`, and say so in the commit body** so the next reader knows it was seen and not missed.
+**★ v5 — THE `first_hut` EXCEPTION IS RETIRED, BECAUSE THE RENAME LANE ALREADY MADE THE CALL AND MADE IT THE OTHER WAY.** v4 told this task to leave a milestone kind called `first_hut` alone whatever `main` said. **`main` says `first_house`** — `tier1.ts:68` is `{ kind: 'first_house', label: 'the first roof of their own', tier: 1, domain: 'engine', match: (ev, ctx) => … ctx.structureKind?.(String(p(ev).id)) === 'house' }`, and `g11.milestones.test.ts:57`, `narrate.test.ts:252` and `milestones.test.ts:60` all name `first_house` too. **v4's amendment would have reverted a landed rename inside an assertion, gone red against four tests, and been "fixed" by whoever hit it first.** So: **the milestone kind is `first_house`, this task adds `first_elder_death` beside it, and neither is renamed.** The argument v4 made — that a milestone kind is a primary key in recorded databases — is sound and is why **no task in this plan renames one**; it simply arrived after the rename lane had already paid the cost and moved the history.
 
 - [ ] **Step 4: Green.**
 
@@ -5764,7 +6140,7 @@ git commit -m "feat: a grave is a place a mind who knew them can go, and the cha
 >
 > 1. **A new kind can already be minted by a ruling.** `OutcomeEffectSchema.spawn_item.kind` is `z.string().min(1)` (`packages/arbiter/src/verdict.ts:7`) and nothing validates it against a catalog. An agent can already own a thing whose kind string has never existed.
 > 2. **The codex takes arbitrary kinds.** `AssetCodex.register` (`packages/forge/src/codex.ts:52`) accepts a free-string `kind`, append-only with a monotone `seq`.
-> 3. **★ New art hot-swaps into a live room TODAY.** `gateway/src/server.ts:160` polls `codex.listSince(lastAssetSeq)` every pump and broadcasts `{t:'asset', record}`; the web store bumps `assetsSeq` and `interiorScene.layoutRoom` re-plans. **No renderer work is needed for any of this.**
+> 3. **★ New art hot-swaps into a live room TODAY.** `gateway/src/server.ts` polls `codex.listSince(lastAssetSeq)` every pump and broadcasts `{t:'asset', record}`; the web store bumps `assetsSeq` and `interiorScene.layoutRoom` re-plans. **No renderer work is needed for any of this.**
 > 4. **Art independence already holds.** `roomPlan` resolves `class:'item' && kind === f.kind`, latest `seq` wins, and falls back to `/assets/placeholder/item.png`. **A furnishing with no art still lays out.** The world never waits for a picture.
 > 5. **The whole commission chain is written and tested** — `commission` → `mechanicalGate` → VLM judge → `register`, with `JobsQueue` doing atomic claim, attempt fencing and retry.
 >
@@ -5789,15 +6165,17 @@ git commit -m "feat: a grave is a place a mind who knew them can go, and the cha
 
 **Files:** Create `packages/engine/src/furnishings.ts`, `packages/engine/src/furnishings.test.ts`; Modify `packages/engine/src/state.ts`, `packages/engine/src/events.def.ts`, `packages/engine/src/fold.ts`, `packages/engine/src/fold.test.ts`, `packages/web/src/render/interiors.ts`, `packages/web/src/render/interiors.test.ts`.
 
-**The largest gap in the survey, and it has no art in it at all.** `roomFurnishings()` builds `CITY_FURNISHINGS` **once at module load** from `cityStructures()`, keyed by interior **kind** and not by structure **id** (`packages/web/src/render/interiors.ts:42-55`). **Every house in the world is furnished identically, for ever.** There is no `Structure.furnishings`, no `furnishing_placed` event, and although `interiorOf()` returns the loose items sitting inside a structure the renderer ignores them. **An agent has nowhere to put their own chair.**
+**The largest gap in the survey, and it has no art in it at all.** `roomFurnishings()` builds `CITY_FURNISHINGS` **once at module load** from `cityStructures()`, keyed by interior **kind** and not by structure **id** (`packages/web/src/render/interiors.ts:42` builds it; `roomFurnishings` is at `:54`). **Every house in the world is furnished identically, for ever.** There is no `Structure.furnishings`, no `furnishing_placed` event, and although `interiorOf()` returns the loose items sitting inside a structure the renderer ignores them. **An agent has nowhere to put their own chair.**
 
-**Interfaces — Consumes:** `Structure` (landed, `state.ts:67`), `CityFurnishingSchema` (landed, `cityTemplate.ts:38` — the `{kind, slot:{x,y}}` shape this reuses verbatim so two vocabularies cannot drift), `INTERIOR_KINDS`, `roomFurnishings` (landed).
+**Interfaces — Consumes:** `Structure` (landed, `state.ts:67`), `CityFurnishingSchema` (landed, `cityTemplate.ts:116` — the `{kind, slot:{x,y}}` shape this reuses verbatim so two vocabularies cannot drift), `INTERIOR_KINDS`, `roomFurnishings` (landed).
 
-> ### ★ v4 — THE FALLBACK v3 WROTE RETURNS `undefined` FOR THREE OF THE TOWN'S EIGHT DWELLINGS
+> ### ★ v5 — v4 WAS RIGHT, THE TREE AGREES WITH IT ALREADY, AND THE AMENDMENT IS NOW A NO-OP TO BE VERIFIED RATHER THAN APPLIED
 >
-> v3's `roomFurnishingsFor` ends `return roomFurnishings(structure.kind as InteriorKind)`. **That cast is a lie and the town v3 never saw is what makes it bite.** `roomFurnishings` is a lookup into `CITY_FURNISHINGS`, which is built over **`INTERIOR_KINDS = ['house', 'storehouse', 'shed']`** — three keys. The layout lane then stood a **`cottage`, a `cabin` and a `farmhouse`**, none of which is an `InteriorKind`. So an unfurnished cottage returns `undefined`, and the next line does `.map` on it.
+> v3's `roomFurnishingsFor` ended `return roomFurnishings(structure.kind as InteriorKind)`, and v4 called the cast a lie: `roomFurnishings` is a lookup into `CITY_FURNISHINGS`, built over **`INTERIOR_KINDS = ['house', 'storehouse', 'shed']`** — three keys — while the town stands a **`cottage`, a `cabin` and a `farmhouse`**, none of which is an `InteriorKind`. An unfurnished cottage returned `undefined` and the next line did `.map` on it.
 >
-> **Two further facts from the same file, both of which change what the fallback should say.** `CITY_FURNISHINGS` builds each entry from `cityStructures().find(c => c.kind === kind)` and falls back to `INTERIOR_LAYOUTS[kind]` when the template has none — **and the template's three fixture dwellings all carry `furnishings: []`**, so even a `cottage` key would find an empty list. And **`shed` is still an `InteriorKind` with a layout, while the layout lane removed both sheds from the town** — a live example of the same class of staleness, left alone here because `packages/web` interiors are C12b's and this task touches only what it must.
+> **★ On `645a8d9` there is no cast to remove.** `grep -rn "as InteriorKind" packages/` returns **nothing**, and `packages/web/src/render/interiors.ts:91` already declares `isInteriorKind` and line 98 already guards `interiorOf` with it. **v4's headline amendment describes a tree that has been fixed.** The code below is therefore what the executor should find, not what they should write — **verify it and move on**, and if a cast is there after all, the tree is older than this plan and Task 1 Step 0 should have said so.
+>
+> **The two supporting facts are unchanged and both still hold.** `CITY_FURNISHINGS` builds each entry from `cityStructures().find(c => c.kind === kind)` and falls back to `INTERIOR_LAYOUTS[kind]` when the template has none — **and the template's fixture dwellings all carry `furnishings: []`**, so even a `cottage` key would find an empty list. And **`shed` is still an `InteriorKind` with a layout while the town stands no shed** — a live example of the same class of staleness, left alone here because `packages/web` interiors are C12b's and this task touches only what it must. **★ v5 note: `shed` is now also one of T22's two heavy seed kinds, so a mind can raise one — which makes the stale layout a thing that could suddenly become reachable.** That is a `packages/web` concern and it is flagged, not fixed.
 >
 > **So `roomFurnishingsFor` takes the widened shape, and it never casts:**
 >
@@ -5808,7 +6186,7 @@ git commit -m "feat: a grave is a place a mind who knew them can go, and the cha
 >     return own.map((f) => ({ kind: resolveFurnishingKind(f.kind), slot: { ...f.slot } }))
 >   }
 >   // No cast: a kind the layouts do not know is a real case now, and an empty room is the
->   // honest answer for one. `isInteriorKind` is already exported from this file (line 92).
+>   // honest answer for one. `isInteriorKind` is already declared in this file at line 91 and already guards `interiorOf` at line 98.
 >   return isInteriorKind(structure.kind) ? roomFurnishings(structure.kind) : []
 > }
 > ```
@@ -6642,7 +7020,7 @@ git commit -m "feat(supervisor): createSim — genesis or resume, five neutral m
 
 Delta §8 adds three data-only fixes that belong here because C7 will not be reopened:
 
-- **`first_hut` / `first_bridge` can miss a structure planned on a day the pass never read.** `detectFirsts` falls back to an injected `ctx.structureKind` and **`narrateDay` does not supply one**, so a house planned on day 3 and finished on day 5 has no kind in the day-5 pass. `narrateDay` gains the passthrough from the world it already takes.
+- **`first_house` / `first_bridge` can miss a structure planned on a day the pass never read.** `detectFirsts` falls back to an injected `ctx.structureKind` and **`narrateDay` does not supply one**, so a house planned on day 3 and finished on day 5 has no kind in the day-5 pass. `narrateDay` gains the passthrough from the world it already takes.
 - **No tier-1 first for a poisoning or a body worn through.** Two data rows in `tier1.ts`; no code.
 - **`heat.ts` scores C11's sickness at zero.** `CONFLICT_WEIGHT` carries `agent_infected` and `agent_fell_ill`, **neither of which has an emitter any more**, and no weight exists for `agent_afflicted`, `affliction_worsened`, `affliction_recovered`, `agent_tended`, `grave_placed` or `hp_changed`. A day in which somebody was poisoned, worsened for three nights, was tended twice and was buried scores exactly as a quiet one. Six rows in two tables; no code.
 
@@ -6733,7 +7111,9 @@ describe('the milestones and the heat that C11 made blind', () => {
 
   it('FINDS THE FIRST HOUSE EVEN WHEN IT WAS PLANNED ON A DAY THE PASS NEVER READ', async () => {
     const out = await runNightly(housePlannedDay3FinishedDay5())
-    expect(out.milestones.map((m) => m.kind)).toContain('first_hut')   // the milestone KIND keeps its id (T60)
+    // ★ v5: the landed kind is `first_house` (tier1.ts:68). v4 asserted `first_hut` here,
+    // which would have gone red against four landed tests in `packages/narrator`.
+    expect(out.milestones.map((m) => m.kind)).toContain('first_house')
   })
 })
 ```
@@ -7704,57 +8084,95 @@ git commit -m "test(agents): GATE G8 injection — fourteen attacks, two arms, n
 
 ## Phase J — The box: arm64, Docker Compose, nothing else
 
-### Task 44: The art the town is made of, vendored
+### Task 44: The art already travels with the repo — so this task proves a cold box boots with pictures
 
-**Files:** Create `deploy/art/` (vendored PNGs and manifests), `packages/supervisor/src/bootstrap.ts`, `bootstrap.test.ts`; Modify `packages/gateway/src/ingestArt.ts` (root resolution only).
+**Files:** Create `packages/supervisor/src/bootstrap.ts`, `bootstrap.test.ts`. *(★ v5 — `deploy/art/` is NOT created, and `packages/gateway/src/ingestArt.ts` is NOT modified. Both were consequences of a finding that is now false.)*
 
-**The finding:** `ingestProductionArt` reads `DEFAULT_ART_ROOT = /private/tmp/claude-501/…/scratchpad/c5` and the library reads `…/scratchpad/c13/library`. **The approved art lives in a session scratchpad, not in the repo.** On the Oracle box those paths do not exist and the observatory would render the whole town as placeholders. Measured: the ingest reads only the manifests and cells — **~6 MB of character cells (5 × ~1.1 MB), ~8 MB of building cells, ~16 MB of library sprites and icons ≈ 30 MB**, not the 337 MB the scratchpad holds. That is vendorable.
+> ### ★ v5 — v4's FINDING WAS FALSIFIED BY MERGE TRAIN 3, AND EVERY SYMBOL ITS TESTS NAMED HAS BEEN DELETED
+>
+> **v4's finding:** *"`ingestProductionArt` reads `DEFAULT_ART_ROOT = /private/tmp/…/scratchpad/c5`… the approved art lives in a session scratchpad, not in the repo."* **That was true, and it is the reason three separate rounds of art had already been lost.** The art-recovery lane and the three-defects lane each fixed half of it, and **merge train 3's car 2 resolved the collision by taking the union of the two deletions: no scratchpad art root remains anywhere.** The landed signature is four lines:
+>
+> ```ts
+> // packages/gateway/src/ingestArt.ts:93 at 645a8d9 — NO OPTIONS, NO ROOTS
+> export async function ingestProductionArt(db: Database.Database): Promise<IngestEntry[]> {
+>   const codex = new AssetCodex(db)
+>   return [...registerCommittedBuildings(codex), ...registerCommittedCast(codex)]
+> }
+> ```
+>
+> **`DEFAULT_ART_ROOT`, the `artRoot` option, `BUILDING_ART_DIRS`, `ingestBuilding`, `tryIngest`, `upsert` and `latestByKind` are all gone.** Every one of v4's four test bodies passes `{ artRoot, libraryRoot }` into a function whose signature takes a `Database` and nothing else, so **all four fail to compile**, and Step 3's *"set `SJ_ART_ROOT` / `SJ_LIBRARY_ROOT` defaults when the scratchpad is absent"* configures a mechanism that no longer exists — a shape `packages/forge/scripts/recell-buildings.ts` is still documenting and which merge train 3 flagged as its concern 4.
+>
+> **The art is committed**: `packages/forge/content/buildings/` holds **20 cells across 14 kinds**, `registerCommittedCast` holds the five rigs, and the library holds 100 item records. The running product boots **`ingested production art (25 of 25 assets)`** with **zero `NO ART` lines**, where trains 1 and 2 both got 15 of 19 with four ENOENTs.
+>
+> **★ SO THE TASK IS NOT DELETED, BECAUSE THE THING IT WAS FOR IS STILL NOT PROVED.** *"The art is in the repo"* and *"a cold arm64 box comes up with pictures"* are different claims, and only the first has been measured. What remains, and what this task now does: **a `bootstrap` that is idempotent across a restart, that brings the API and the world up when the art is unreadable, and that is exercised on the deployment image rather than on a developer's laptop.** It gets smaller, it stops vendoring anything, and it stops naming a root.
 
-**Two ledgered art gaps travel with this and are NOT closed here** (C12a batch 3, R4.4 → C12b Phase D Task 17): a sleeper still slightly overhangs the bed, and **`interior-floor` has no material in any root**, so the interior floor ships as a palette-true plane with board seams. Both are art, not code. `deploy/art/` is laid out so that dropping those files in later needs no code change.
+**Two ledgered art gaps travel with this and are NOT closed here** (C12a batch 3, R4.4 → C12b Phase D Task 17): a sleeper still slightly overhangs the bed, and **`interior-floor` has no material**, so the interior floor ships as a palette-true plane with board seams. Both are art, not code.
+
+**Interfaces — Consumes (★ v5):** **`ingestProductionArt(db)` and `ingestLibraryArt(db)` from `@sj/gateway`, exactly as landed, with no options object.** This task adds no parameter to either — **a root option added back here is the scratchpad returning by another door.**
 
 - [ ] **Step 1: Write the failing test.**
 
 ```ts
 // packages/supervisor/src/bootstrap.test.ts
+import { chmodSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
+import { bootstrap } from './bootstrap.js'
+import { assetCount, freshCodex } from './testDb.js'
+
 describe('bootstrap', () => {
+  // ★ v5: no roots. `ingestProductionArt(db)` takes a database and reads committed content.
   it('registers the town s art on a cold database', async () => {
     const db = freshCodex()
-    const out = await bootstrap(db, { artRoot: 'deploy/art', libraryRoot: 'deploy/art/library' })
+    const out = await bootstrap(db)
     expect(out.characters).toBe(5)
-    expect(out.buildings).toBeGreaterThan(0)
-    expect(out.library).toBeGreaterThan(0)
+    expect(out.buildings).toBe(20)      // packages/forge/content/buildings, 14 kinds
+    expect(out.library).toBe(100)
     expect(assetCount(db)).toBeGreaterThan(0)
   })
 
   it('IS IDEMPOTENT — a restart registers nothing twice', async () => {
     const db = freshCodex()
-    await bootstrap(db, roots)
-    const second = await bootstrap(db, roots)
+    await bootstrap(db)
+    const second = await bootstrap(db)
     expect(second.unchanged).toBe(true)
     expect(second.characters + second.buildings + second.library).toBe(0)
   })
 
-  it('a missing library sprite is not an error — the renderer has a placeholder law', async () => {
-    await expect(bootstrap(freshCodex(), { ...roots, libraryRoot: 'deploy/art/library-partial' })).resolves.toBeDefined()
+  // ★ v5: the successor to v4's "a missing library sprite is not an error". `three-defects`
+  // landed the opposite guarantee for BUILDINGS — `listCommittedBuildings` THROWS on half a
+  // cell and names the directory — so the two are asserted apart rather than merged.
+  it('★ A HALF-WRITTEN BUILDING CELL THROWS, AND NAMES THE DIRECTORY', async () => {
+    await expect(bootstrap(freshCodex(), { root: 'packages/forge/content/buildings-partial' }))
+      .rejects.toThrow(/buildings-partial/)
   })
 
-  it('AN EMPTY ART ROOT STILL BOOTS — the API and the world must come up without pictures', async () => {
-    const out = await bootstrap(freshCodex(), { artRoot: 'deploy/art-empty', libraryRoot: 'deploy/art-empty' })
-    expect(out.characters).toBe(0)
-    expect(out.warnings).toContain('no art root')
+  // ★ v5: the row that replaces "AN EMPTY ART ROOT STILL BOOTS", asked in the only way that is
+  // still possible now that there is no root to empty: make the committed content unreadable.
+  // The API and the world must come up without pictures — that is a deployment guarantee, and
+  // it is the whole reason this task survives the finding that was false.
+  it('★ AN UNREADABLE ART DIRECTORY STILL BOOTS THE WORLD, WITH A WARNING AND NO PICTURES', async () => {
+    chmodSync('packages/forge/content/buildings', 0o000)
+    try {
+      const out = await bootstrap(freshCodex(), { tolerateUnreadableArt: true })
+      expect(out.buildings).toBe(0)
+      expect(out.warnings).toContain('art unreadable')
+      expect(out.worldReady).toBe(true)
+    } finally { chmodSync('packages/forge/content/buildings', 0o755) }
   })
 })
 ```
 
-- [ ] **Step 2:** Run — FAIL.
-- [ ] **Step 3:** Copy the exact files the ingest reads into `deploy/art/{characters,buildings,library}/`, preserving the directory shape the loaders expect; set `SJ_ART_ROOT` / `SJ_LIBRARY_ROOT` defaults to those paths when the scratchpad is absent. **arm64 note:** the ingest calls `decodePng` / `encodePng` / `chromaKey` from `@sj/forge`, which pulls **sharp**. This is the first place sharp runs in production, so **T45 must prove sharp on arm64, not merely install it.**
-- [ ] **Step 4:** `pnpm vitest run packages/supervisor/ && pnpm typecheck` — PASS; run `bootstrap` against a scratch DB and confirm a non-zero asset count.
+- [ ] **Step 2:** Run — FAIL: `Cannot find module './bootstrap.js'`.
+- [ ] **Step 3:** Implement `bootstrap(db, opts?)` as a thin, idempotent wrapper over the two landed ingests, counting what each registered and swallowing an unreadable directory **only** under `tolerateUnreadableArt`. **Vendor nothing and copy nothing** — the content is a package file and ships in the image because the image ships the workspace. **arm64 note, unchanged and still the load-bearing one:** the ingest calls `decodePng` / `encodePng` / `chromaKey` from `@sj/forge`, which pulls **sharp**. This is the first place sharp runs in production, so **T45 must prove sharp on arm64, not merely install it.**
+- [ ] **Step 4:** `pnpm vitest run packages/supervisor/ && pnpm typecheck` — PASS; run `bootstrap` against a scratch DB and confirm a non-zero asset count. **★ v5: also boot the dev world once and paste its art line** — `dev world: ingested production art (25 of 25 assets)` with **zero `NO ART` lines** is the number this task is claiming, and it is cheap to read (C8: measured, not asserted).
 - [ ] **Step 5: Commit.**
 
 ```bash
-git add deploy/art packages/supervisor/src/bootstrap.ts packages/supervisor/src/bootstrap.test.ts packages/gateway/src/ingestArt.ts
-git commit -m "chore(deploy): the approved art travels with the deployment, not with a session"
+git add packages/supervisor/src/bootstrap.ts packages/supervisor/src/bootstrap.test.ts
+git commit -m "feat(supervisor): a cold box comes up with pictures, or comes up and says why"
 ```
+
+**★ ONE THING THIS TASK REPORTS AND DOES NOT FIX** (merge train 3, concern 4): `packages/forge/scripts/recell-buildings.ts` still tells its reader to point `SJ_ART_ROOT` at a lean art root, and **`ingestProductionArt` no longer reads any root**. It is a script in a package C8 does not own, it is documentation rather than behaviour, and it is named here so the next reader of that file is not sent looking for a mechanism that was deleted.
 
 ### Task 45: The Dockerfile, proved on arm64 — and the sqlite-vec fallback that is BUILT (R1)
 
@@ -8518,6 +8936,24 @@ All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throt
 | **15** | **★ THE RESCUE WINDOW WAS ANSWERED AT LEAST ONCE.** `rescueWindowsOpened ≥ 1` and `rescueWindowsAnswered ≥ 1`; if `opened === 0` the run reports **no coverage** and criterion 2 carries the verdict alone | **gate, conditional** | **lever 2, T55** |
 | **16** | **★ THE FURNITURE SEAM IS EXERCISED:** `furnishings.placed`, `distinctKinds`, `sharedKinds`, `capRefusals` all counted, and `commissionsRequested === 0` | **REPORTED — except `commissionsRequested === 0`, which is GATED** | **Phase F3, user directive** |
 
+> ### ★★ v5 — DO G8's CRITERIA STILL MEASURE THE RIGHT THINGS? THE ANSWER IS MOSTLY YES, AND **NOTHING IS CHANGED HERE**
+>
+> **The criteria are NOT amended by this revision.** A gate whose criteria move to match what the code now does has measured nothing, and this project has found that shape thirteen times. What follows is a recommendation with its evidence; **the controller rules, and until they do, the sixteen above are the gate.**
+>
+> **★ CRITERION 5 GOT STRONGER WITHOUT MOVING, AND THAT IS THE HEADLINE.** *"Production is non-zero"* was written when `build` took `{kind, x, y}` and nothing consulted the lattice — so a zero was **ambiguous** between *the minds would not* and *the minds could not*, and the criterion could not distinguish the finding from the bug. **The claim seam removed the ambiguity by removing the coordinate.** A mind is now asked for a kind, told where the ground is, and 25 builds through the real verb are on the record. **So a zero in criterion 5 can now only mean the minds did not choose to build** — which is exactly the thing C8 exists to measure. **Criterion 5 measures the right thing more cleanly than on the day it was written. Do not touch it.**
+>
+> **Three gaps, and each is a tightening or a reported column, never a loosening.**
+>
+> | # | The gap | Recommendation |
+> |---|---|---|
+> | **OD20** | **Criterion 5 is a disjunction and `crafts` is its cheap member.** `builds + crafts + chops + tills + plants ≥ 1 per town-day` passes on **one craft a day and no buildings**, plus one structure in twenty-one days. **`craft` takes a recipe name, not a coordinate — it was never in batch 14's zero-use table and was never the blocked verb.** A town that makes a torch a day and raises one shed in three weeks would pass a criterion written against a town that did nothing | **Split it. Gate `builds ≥ 1 across the run` as its own row; keep the sum as it stands.** A tightening derived in writing before the run is exactly what C23 permits, and building is the verb the seam unblocked |
+> | **OD21** | **The Discovery Record is unmeasured.** Criterion 8 gates `codifiedVerbs ≥ 1` and canon validity — the arbiter's half. The record adds **credit**, from both paths, and G8 reads none of it | **Report, never gate.** Count discoveries by `kind` and by `byId`, and assert `discoveries.length === craftsCodified + wordsMinted`. A discovery *count* has no baseline and a threshold with no baseline is what C23 forbids |
+> | **—** | **A run that builds now changes the MAP, and nothing records that it did.** `ringsStanding`, plots claimed and `world_grown` count are all real observables the sprint created; criterion 5's *"≥ 1 structure completed"* is satisfied by a shed and says nothing about whether a town outgrew its first ring in three sim-weeks | **Report `ringsStanding`, `plotsClaimed` and `worldGrowths` in T49's schema. No gate and no threshold** — there is no prior run to derive one from, and a 21-day soak that never leaves ring 1 is a fact worth having on the record rather than a bar to clear |
+>
+> **★ AND ONE THING G8 MUST NOT GAIN: A BRIDGE CRITERION.** The far-bank lane delivered the ruling — a completed deck opens the west bank on the tick it completes — and then said plainly that **nothing gives a mind a reason to build one.** `CLAIM_RING_LIMIT` is 24 and the east bank holds hundreds of plots before the town needs the west; the only pressure that exists is the refusal *"there is nowhere left in the town for a house"*, and it will not fire for a very long time. **A criterion nothing in the world motivates measures the author's hope, not the town.** If C8 wants to see a bridge, that is a **society-design lever** — the fauna and forageables already across the water are the obvious one — and it is flagged here and solved nowhere in this plan.
+>
+> **★ AND CRITERION 2 IS NOT A CRITERIA PROBLEM BUT IT IS CURRENTLY UNREACHABLE.** Merge train 3 ran the product and found **all five founders ill at 17:02 on day 0 and prone in the street by 23:19.** Under criterion 2 as written, every run fails on day 0 before a mind has done anything. **That is the `first-night` lane's to answer and the answer is not guessed here** — see the contingency box at the end of this document.
+
 **★ WHY CRITERION 2 IS NOW THE WHOLE RUN AND NOT JUST THE FIRST THREE DAYS.** v2's criterion 2 was *"zero unforced deaths through sim-day 3, every later death carries a verdict that a competent actor would have died too"*. **The user's directive removes the escape clause**: under C26, a starvation on day 15 is the same defect as one on day 2 — the world failed to name the food, or the town failed to answer a window it could see. There is no day on which starving is acceptable.
 
 **And the honest consequence, stated before the run rather than after it: run A is now a HARDER bar than the directive names.** The directive specifies a **7-day, 5-founder** run; run A is **21 sim-days**, three times the exposure, and every extra day is another chance for an unforced death. **This plan gates run A at zero anyway**, because the alternative is a criterion that means different things in different runs. **If run A alone fails on a late day, that is a finding about the 21-day soak** and the response is C23 — measure it, re-derive the target in writing, and run again — **never a threshold lowered after a red gate.**
@@ -8556,16 +8992,20 @@ git commit -m "test(supervisor): G8 dress rehearsal — 21 sim-days neutral, a s
 6. **The stack is alive on arm64** — `deploy/smoke.sh` output, including the restart-resume line, the retrieval-index line, and the on-box tick figures.
 7. **The restore drill replays** — `deploy/restore-drill.sh` printed `RESTORE DRILL OK` **and** the replay hash matched.
 8. **The observatory serves from the stack** — `curl -fsS http://127.0.0.1:8787/ | grep -q '<div id="root">'`. *The base draft's check was "public URL serves the observatory"; the public URL belongs to Phase L by ruling, so G8 gates on the stack serving locally and Phase L signs off the public one.*
-9. **★ THE FOUR PINS ARE WHERE PHASE F LEFT THEM, IN ALL NINE PLACES, PROVED BY GREP AND NOT BY A PATH DIFF (C17).** The gate reads the literals out of the files, quotes them with their line numbers, and matches them against Phase F's commit body:
+9. **★ THE FOUR PINS ARE WHERE PHASE F LEFT THEM, IN ALL ELEVEN PLACES, PROVED BY GREP AND NOT BY A PATH DIFF (C17).** The gate reads the literals out of the files, quotes them with their line numbers, and matches them against Phase F's commit body:
 
 ```bash
 grep -rn "GOLDEN_DAY_HASH = \|GOLDEN_G2_HASH = \|BLOCK1_SHA256 = " --include='*.ts' packages/
 grep -rnE "'[0-9a-f]{64}'" --include='*.ts' packages/forge/src/forgeConfig.test.ts
-# ★ v4 — the command that finds the OTHER FIVE copies. Substitute Phase F's four values.
+# ★ v5 — the command that finds the OTHER SEVEN copies. Substitute Phase F's four values.
 grep -rn "<G1>\|<G2>\|<forge>\|<BLOCK1>" --include='*.ts' packages/
 ```
 
-**The third command is the one that is new, and C3's table says what it must return.** Nine matches across six files: `engine/src/golden.test.ts`, `engine/src/g2.test.ts`, `engine/src/g9.test.ts` (**twice, as source text**), `arbiter/src/g4.test.ts`, `forge/src/forgeConfig.test.ts`, `agents/src/prompt/rulesOfBeing.test.ts`, `agents/src/live/g11checkpoint.test.ts`, and `gateway/src/g12c.test.ts` (**all four, at 87/90/101/102**). **A count below nine means a copy was missed by Phase F and is carrying a stale hash that nothing currently runs** — which is the same class of defect as a stale pin and is a STOP.
+**★ v5 — THE EXPECTED COUNT IS ELEVEN LITERALS ACROSS SEVEN FILES, PLUS ONE TEST NAME, AND v4's NUMBER WAS WRONG.** v4 asserted *"nine matches across six files"* and listed eight files. **Run v4's own grep against the tree it was written for and it returns thirteen lines across eight**, so this gate as v4 wrote it would have STOPped on a correct tree — a false red at the launch gate, which is the same class of defect as the missed copy it was guarding against and is why the census in C3 was re-derived line by line.
+
+The eleven, at `645a8d9`: `engine/src/golden.test.ts:14` · `arbiter/src/g4.test.ts:25` · `gateway/src/g12c.test.ts:87` · `engine/src/g9.test.ts:591` (**source text**) · `engine/src/g2.test.ts:40` · `gateway/src/g12c.test.ts:92` · `engine/src/g9.test.ts:592` (**source text**) · `forge/src/forgeConfig.test.ts:91` · `gateway/src/g12c.test.ts:105` · `agents/src/prompt/rulesOfBeing.test.ts:22` · `gateway/src/g12c.test.ts:106`. **The twelfth line is `arbiter/src/g4.test.ts:208`, an eight-character prefix inside a test name with no assertion behind it** — count it in the grep's output and never in the census. **`agents/src/live/g11checkpoint.test.ts:15` must NOT appear**: it is a frozen fixture two forge pins out of date, and if Phase F touched it, that is a defect to report rather than a copy to celebrate.
+
+**A count below twelve means a copy was missed by Phase F and is carrying a stale hash that nothing currently runs. A count above twelve means a lane added a copy this checklist does not know about.** Both are a STOP, and in both cases the answer is to name the file, not to adjust the number.
 
 *A path-diff over a path that does not exist returns empty and reads as a clean pin. This gate has been within one command of signing off a broken pin twice, and the command that would have caught it is the one above.*
 
@@ -8669,7 +9109,7 @@ git commit -m "docs: San Junipero is live — the checklist, signed"
 **0. ★ THE SETTING SWEEP — the check this whole revision exists for (C29).** Run over the finished plan file; every one is reported with its count, and a non-zero on any row is a defect in this document, not a matter of taste.
 
 ```bash
-F=docs/superpowers/plans/2026-08-23-01-genesis-rehearsal.md
+F=docs/superpowers/plans/2026-08-24-01-genesis-rehearsal.md
 
 # (a) the home kind. Every surviving `hut` must be a PROHIBITION or a GATE, never a usage —
 #     print them and read them, because a bare count cannot tell those apart.
@@ -8690,33 +9130,57 @@ grep -in "'.*\btool\b.*'" $F
 
 # (e) the one-way glass over CANON: these five may not be spoken to the town.
 grep -inE "'(custom|market|council|festival|faith)'" $F
+
+# (f) ★ NEW IN v5 — THE LAYOUT GLASS (C32). `TOWN_LAYOUT_VOCABULARY` is landed and
+#     `scanForLayoutLeak` runs over every authored surface a mind reads. This sweep is the
+#     document-level half: every NEW agent-visible string this plan writes, read out and
+#     checked by eye, because the code-level scan cannot see a string that is still prose.
+grep -inE "\\b(plot|plots|block|blocks|ring|rings|lattice|plat|platted|frontage)\\b" $F | \
+  grep -iE "(said|says|reads|line|prose|refusal|perception|told|\"|')"
 ```
+
+**★ v5 — ROW (f) IS THE ONE A READER SHOULD CHECK BY HAND, AND IT WILL NOT BE ZERO.** This plan discusses the lattice constantly — C14 is almost nothing else — so a bare count is meaningless and the grep is deliberately narrowed to lines that also look like speech. **What must be zero is the set of strings this plan proposes to put in front of a mind that contain one of those ten words.** The four new agent-visible strings v5 adds or amends are T20's two makeables clauses, T21's joint-build line and resume hint, T22's `"The beam will not go up with two."`, and T56/T57/T61's social roads — **and each of those tasks carries its own `scanForLayoutLeak` assertion**, which is the check that actually binds. The document sweep is a second pair of eyes on the prose that describes them.
 
 **The result, as run against this draft, hit by hit.**
 
 | Row | Count | Every hit accounted for |
 |---|---:|---|
-| **(a) `hut`** | **12** | **Not one is a world-facing usage.** Four are C30 and the amendment table **forbidding** the word; three are Task 1 Step 0's precondition grep and its two STOP conditions; two are this sweep. **The remaining three are one deliberate exception, and it is the interesting one:** the tier-1 milestone whose `kind` is the literal string `first_hut` (`tier1.ts:68`). **A milestone kind is a primary key written into `milestones` rows in every recorded database.** Renaming it would orphan C1–C13's history for a cosmetic gain, so **T60 leaves it alone and says so in its commit body** — and the string it *matches* on becomes `'house'` with everything else. **Nothing a mind reads and nothing a viewer sees says `hut`.** |
+| **(a) `hut`** | **★ v5: 10, and NONE of them is an exception any more** | **Not one is a world-facing usage, and the last deliberate one is gone.** Four are C30 and the amendment table **forbidding** the word; three are Task 1 Step 0's regression grep and its STOP conditions; two are this sweep; one is the v4→v5 delta recording that the exception was retired. **v4's three-hit exception — the milestone kind `first_hut` — no longer exists: `tier1.ts:68` is `first_house` on `main`, and v4's amendment would have reverted it against four landed tests.** The argument stands and is now a general rule rather than a carve-out: **no task in this plan renames a milestone kind**, because a milestone kind is a primary key written into `milestones` rows in every recorded database. **Nothing a mind reads, nothing a viewer sees, and now nothing a database keys on says `hut`.** The two survivors outside `packages/*/src` are two personas' own words about their own homes, in `packages/agents/scripts/`, and they are content (C30). |
 | **(a) `cabin`** | 10 | C14's dwelling table, C30's collision argument, T9's unowned-dwelling row, T11's wagon note, T62's `InteriorKind` finding and its test — **all describing a FIXTURE the founders do not live in**, which is exactly the distinction C30 exists to keep. One more is `log-cabin` inside the quoted list of the archived draft's neolithic ids. |
 | **(b) stone-age materials** | 6 lines | Task 1 Step 2's grep, T13 Step 0's grep, T13's period test, T3's `preIndustrial` regex, T22's deny-regex, and the three passages quoting the archived drafts as the reason they are blocked. **Every one is a gate or a citation of what is being gated.** |
 | **(c) contempt vocabulary** | 2 real | `neolithic` ×9, each naming the canon train 6 replaced or the drafts written against it. `primitive`/`rudimentary` inside three deny-regexes and C29's own prohibition. **Two hits are not period words at all** — `RngStream` is *"the same primitive the world already trusts"* (T5) and *"the primitive already exists"* (T38), both the software sense. **Left as they are, and named here so a future sweep does not read them as misses.** |
 | **(d) `tool` in a mind-facing string** | **0** | T10 says *"implement"* and its prose says why (`FORBIDDEN_FRAMING`). The two hits are T13's grep pattern (`stone.?tool`) and the amendment table recording the change. |
 | **(e) the five glass words** | **0** | The plan names no institution. |
 
-**★ AND THE THREE PLACES THE SWEEP CANNOT REACH, NAMED SO NOBODY READS A CLEAN GREP AS A CLEAN WORLD.** The sweep greps **this document**. It does not grep `c8-founders.md`, `c8-discovery-tree.md`, or `packages/`. **Both content drafts are period-wrong today** (Task 1 Step 2, T13 Step 0, OD16), and the plan's defence against them is four independent period tests in T3, T4, T13 and T14 rather than a grep of a file that does not yet exist in the repo. **`packages/web`'s period sites are the setting lane's listed leftovers and belong to its owner**, and `lawCopy.ts` #20 — *"Work done by firelight…"*, in a town with a generator — is the one the setting lane logged for the user by name.
+**★ AND THE PLACES THE SWEEP CANNOT REACH, NAMED SO NOBODY READS A CLEAN GREP AS A CLEAN WORLD.** The sweep greps **this document**. **★ v5: it can now also grep the content, and it does — the two drafts are in the repo and both are clean.** Run v4's period regex against `docs/superpowers/content/c8-founders.md` and `c8-discovery-tree.md` and it returns **nothing**, which is the measurement that closes OD16; the four independent period tests in T3, T4, T13 and T14 are kept anyway as the second line. **What the sweep still cannot reach is `packages/`.** `packages/web`'s period sites are the setting lane's listed leftovers and belong to its owner; `lawCopy.ts` #20 — *"Work done by firelight…"*, in a town with a generator — is the one the setting lane logged for the user by name; and **two personas in `packages/agents/scripts/` still say "hut" about their own homes**, which two lanes in a row have judged content rather than debris and left alone (C30).
 
 
 **1. Spec coverage.** §5 prompt anatomy → T7, T18, T20, T28, **T55–T58** (distress, giving, the four other social roads, age). §10 genesis content → T2–T4 (the authored arm), T9–T11, T12–T14 (the discovery tree), with the **declared deviation** that neutral start is the default. §11 hardening → T42, T43, T51. §12 deployment → T44–T48, T52–T54, with the **declared deviation** dropping Caddy, Litestream and S3. §13 data model → T8 (the `temperature` column), T27 (the manifest), T32 (genesis-or-resume), **T62 (`Structure.furnishings`), T40 (`llm_calls.raw_text`)**. §15 stack → the Tech Stack line and T45, with **one honest amendment**: sqlite-vec may not be present on arm64 and the brute-force fallback is built rather than described (R1).
+
+**1a-00. ★★ v5 AMENDMENT COVERAGE — every one of the eight, to a task or a constraint, with nothing left as prose.**
+
+| Amendment | Requirement | Where it became executable |
+|---|---|---|
+| **A** | A mind cannot name where it builds, and the world already tells it where | **C14 rewritten** (the paragraph every Phase D task must read); **T19**'s three hooks and its two `groundForBuilding` rows; **T20**'s two regression rows; **T21**'s coordinate-free resume row; **T22**'s corrected refusal and its "the coordinate refusal comes first" guard |
+| **B** | The four pins re-derived; the census is eleven literals across seven files | **C3 rewritten** with the census, the decoy and the four-branch stale table; **T1 Step 0**'s copy count of 12; **T29**'s corrected file list with `g11checkpoint` struck; **T51 check 9**'s corrected expected count |
+| **C** | The town is a grammar; no district, no typed coordinate, a moved anchor, no `cityFreePlots` | **C14's six signature facts**; **T9** reads the door off the template; **T11** already read `CITY_ANCHOR_DEFAULT` rather than typing it and is therefore unchanged — **which is the discipline working, and it is worth saying so** |
+| **D** | The tree is 103 nodes, 52 social, and its era is a NAME | **T12**'s `z.enum(ERAS)` and its `ERA_ORDER` comparison; **T13**'s three counts and its frontier property; **T14**'s identity mapping and histogram; **T1 Step 2** prints all three before any of them runs |
+| **E** | Art exists for every kind the world can create, and a gate enforces it | **T22**'s `committedArt.fixture.ts` row, asserted in the package that adds the kind; **T22 Step 4**'s explicit run of `structureArt.test.ts`; **T44 rewritten** against `ingestProductionArt(db)`; **OD19** |
+| **F** | The layout glass | **C32**; assertions inside **T19**, **T20**, **T21**, **T22**, and named for **T56**, **T57**, **T61**; **sweep row (f)** |
+| **G** | Fourteen interface claims re-verified and corrected | **the interface table in §5**, re-run in full against `645a8d9` |
+| **H** | OD16 and OD17 close; OD18–OD21 are raised with a recommendation each | **the Open Decisions section**; **T13**, **T14** and **T22** each carry the guard that keeps their OD unruled rather than silently answered |
+
+**★ AND THE ONE PIECE OF WORK v5 MOVES BETWEEN TASKS, SAID LOUDLY BECAUSE THE FORMAT DEMANDS IT: the canon move from `packages/arbiter/src/canon.ts` to `packages/shared/src/canon.ts` is now T12 Step 0 rather than T14 Step 0.** Making the era a name makes T12 the first task that needs `ERAS`, and T12 executes first; leaving the move in T14 would have made T12 import `@sj/arbiter` from inside `@sj/engine`, **which is the cycle C12 forbids because `@sj/arbiter` depends on `@sj/engine`.** One commit changes owner. **No task is added, no task is deleted, no task is renumbered, and T14 keeps every one of its own steps** — its Step 0 becomes a one-line assertion that the move happened.
 
 **1a-0. ★ v4 AMENDMENT COVERAGE — every one of the six, to a task or a constraint, with nothing left as prose.**
 
 | Amendment | Requirement | Where it became executable |
 |---|---|---|
 | **A** | Every genesis prose string a mind will ever read is contemporary | **C29**; period tests in **T3**, **T4**, **T13**, **T22**; corrected phrases in **T12**, **T14**, **T20**, **T24**; the **setting sweep** at the head of this Self-Review |
-| **A** | Anything pre-industrial *by implication* — materials, verbs, what the founders are surprised by | **T22**'s `barn`/`pump_house`, **T24**'s *"the needle"*, **T10**'s *"implement"* for *"tool"* (`FORBIDDEN_FRAMING`), **T11**'s standing-stone exemption and its one binding limit |
+| **A** | Anything pre-industrial *by implication* — materials, verbs, what the founders are surprised by | **T22**'s heavy kinds (**v5: `storehouse` and `shed`, for the art reason in OD19 — the setting argument v4 made for `barn`/`pump_house` still holds and is why `kiln`, `granary` and `forge` remain in T22's deny-regex**), **T24**'s *"the needle"*, **T10**'s *"implement"* for *"tool"* (`FORBIDDEN_FRAMING`), **T11**'s standing-stone exemption and its one binding limit |
 | **B** | `house` throughout; never `hut`, never `cabin` | **C30**; fourteen tasks; the sweep's row (a), reporting **0** |
-| **C** | The town v3 never saw — eleven structures, four districts, roads | **C14 rewritten**; **T9**'s unowned-dwelling row, **T11**'s road-set fix, **T62**'s `InteriorKind` fix |
-| **D** | Re-verify every code block against the current tip (R4) | **the interface table in §5** — nine corrections, each grepped, each fixed in place |
+| **C** | The town v3 never saw — eleven structures, four districts, roads | **C14 rewritten** (**v5: rewritten again — there are no districts, and the eleven are plotted rather than placed**); **T9**'s unowned-dwelling row, **T11**'s road-set fix, **T62**'s `InteriorKind` fix (**v5: already landed**) |
+| **D** | Re-verify every code block against the current tip (R4) | **the interface table in §5** — nine corrections in v4, **fourteen more in v5**, each grepped, each fixed in place |
 | **E** | The threshold law: any number asserted is derived in writing, before the run | **T29**'s struck member and its four survivors, each re-grepped; **T13**'s counts re-framed as a truncation guard; **T55**'s three rungs unchanged and still derived from `debuffThreshold` and `collapseThreshold` rather than invented beside them |
 
 **1a. v3 AMENDMENT COVERAGE — every one of the six, to a task or a constraint, with nothing left as prose.**
@@ -8801,13 +9265,13 @@ grep -inE "'(custom|market|council|festival|faith)'" $F
 | **T12** | **AMENDED** — the id regex admits `_`; the fixture ids stop being `fire` and `hearth`; the bad-unlock fixture stops being a spear |
 | **T13** | **AMENDED, AND BLOCKED** — Step 0's period grep, a `preIndustrial` test row, a row asserting every `GENESIS_CODEX` id is a node, and the count assertions re-framed as a truncation guard (OD16) |
 | **T14** | **REWRITTEN** — the landed `ERAS` and `GENESIS_CODEX` replace `CODEX_ERAS` and a derived `PRACTICED_AT_GENESIS`; `frontier()` returns ids; the canon moves to `@sj/shared` first, because the engine importing the arbiter is a cycle; **OD2 closes** |
-| **T19, T20, T21, T22, T24** | **AMENDED** — `house`; `durationTicks` for `buildTicks`; `isExpressive`'s real arity; `barn` and `pump_house` for `granary` and `kiln`; *"the needle"* for *"the loom"*; a row forbidding an out-of-reach seed kind |
-| **T29** | **REWRITTEN** — the coat struck (already 12, and v3's test contradicted a landed one); five members become four; the re-pin step names all nine copies of the four pins; two new non-members (`garment`, the rename lane's keys); **OD17** |
+| **T19, T20, T21, T22, T24** | **AMENDED in v4** — `house`; `durationTicks` for `buildTicks`; `isExpressive`'s real arity; `barn` and `pump_house` for `granary` and `kiln`; *"the needle"* for *"the loom"*; a row forbidding an out-of-reach seed kind. **★ AMENDED AGAIN IN v5** — all five sit on the claim seam; see `c8-v4-to-v5-delta.md` |
+| **T29** | **REWRITTEN** — the coat struck (already 12, and v3's test contradicted a landed one); five members become four; the re-pin step names all eleven copies of the four pins (v5: eleven, and `g11checkpoint` struck); two new non-members (`garment`, the rename lane's keys); **OD17** |
 | **T55** | **AMENDED** — Step 0 builds `testFixtures.ts`, the module four later tasks were already importing from a file that does not export it |
 | **T56** | **AMENDED** — `WANT_SATISFIED_BY` derived from `FOOD_KINDS`; four fictional kinds removed; `thirst` deliberately empty with the reason; a per-cause closing clause so a coat does not "feed" anybody |
 | **T57, T58, T59, T60, T61** | **AMENDED** — `house` throughout; the fixture imports retargeted |
 | **T62, T63, T64** | **AMENDED** — `house`; the `roomFurnishingsFor` cast that returns `undefined` for three of the town's eight dwellings, corrected with its own test; three stale `file:line` citations |
-| **T51** | **AMENDED** — check 9's grep finds all nine pin copies, not three |
+| **T51** | **AMENDED** — check 9's grep finds all the pin copies, not three (v5: **eleven across seven files, twelve grep lines**; v4's nine-across-six was wrong and would have STOPped on a correct tree) |
 | **T2, T5–T8, T15–T18, T23, T25–T28, T30–T50, T52–T54, T65, T66** | **CARRIED FORWARD UNCHANGED — 45 of 66 tasks are not touched by v4 at all.** Their code, tests, interfaces, commit messages and step counts are byte-identical to the ratified v3 |
 
 **3. U-id coverage — U26–U31 are the headline and every one is now tasks, not prose.**
@@ -8823,11 +9287,11 @@ grep -inE "'(custom|market|council|festival|faith)'" $F
 
 U1/U2 are covered by Phases C and D. U3–U25 belong to C12/C12a; **14 of the 31 are already closed there** and G8 does not re-gate them (R7).
 
-**4. Placeholder scan.** No "TBD", no "implement later", no "add validation", no "similar to Task N" — Task 4's four founders and Task 40's retry cases are each written out with their own values. **★ Re-run over every v4 amendment:** T14's `codexEntriesFromTree` is written out in full, T55 Step 0's fixture surface names all nine functions and its own four tests, T56's `WANT_SATISFIED_BY` derivation and its `WOULD` map are both code, T62's corrected `roomFurnishingsFor` is code, T22's three renamed kinds each carry their physical reason, and T29's struck member carries the two contradicting assertions side by side. **The one thing v4 deliberately leaves unwritten is the re-authored content of the two frozen drafts** — that is signed content, it is the controller's to commission (OD16), and the plan's answer is four gates rather than a paraphrase from memory. **Re-run over v3's twelve new tasks:** every one of T55–T66 carries its own test bodies and its own implementation, and none of them says "as in Task N" — T55's three-rung table, T56's `WANT_SATISFIED_BY`, T57's four prose emitters, T59's `elderTicksFor`, T62's two fold cases, T63's normaliser, T64's budget and T66's nine-cause mapping are each spelled out where they are used. The one deliberate repetition is the pin-verification `grep` block, which appears in **Task 1 Step 0**, **Task 29 Step 3** and **Task 51 check 9** in full each time, because C17 exists precisely because somebody once assumed the check had been done elsewhere. Every code step carries real code. Two deliberate content pointers remain, `c8-founders.md` and `c8-discovery-tree.md`, because those drafts **are** the content and the controller mandated them as inputs; T3's transcription law makes the mapping mechanical and the tests check the result rather than the process. Task 1 Step 2 fails loudly if either is absent.
+**4. Placeholder scan.** No "TBD", no "implement later", no "add validation", no "similar to Task N" — Task 4's four founders and Task 40's retry cases are each written out with their own values. **★ Re-run over every v5 amendment, and every one of them carries real code:** T12's `z.enum(ERAS)` and its `ERA_ORDER` comparison, T13's frontier property with the `GENESIS_CODEX` derivation written out, T14's identity mapping and its unwired-guard `execSync`, T19's shared `#scan` and its four new rows, T20's `R()` fixture helper and the two starred regression rows, T21's three added rows, T22's art fixture and its two structural guards, T44's four rewritten rows including the `chmodSync` one. **★ v4's amendments are re-checked too and all still carry their code:** `codexEntriesFromTree` in full, T55 Step 0's nine builders and four tests, T56's `WANT_SATISFIED_BY` and `WOULD` map, T62's `roomFurnishingsFor`, T29's struck member with both contradicting assertions side by side. **The one thing v4 deliberately left unwritten — the re-authored content — is now IN THE REPO**, so the placeholder that was a deliberate pointer is a real file with three counts asserted against it (T1 Step 2, T13 Step 0). **Re-run over v3's twelve new tasks:** every one of T55–T66 carries its own test bodies and its own implementation, and none of them says "as in Task N" — T55's three-rung table, T56's `WANT_SATISFIED_BY`, T57's four prose emitters, T59's `elderTicksFor`, T62's two fold cases, T63's normaliser, T64's budget and T66's nine-cause mapping are each spelled out where they are used. The one deliberate repetition is the pin-verification `grep` block, which appears in **Task 1 Step 0**, **Task 29 Step 3** and **Task 51 check 9** in full each time, because C17 exists precisely because somebody once assumed the check had been done elsewhere. Every code step carries real code. Two deliberate content pointers remain, `c8-founders.md` and `c8-discovery-tree.md`, because those drafts **are** the content and the controller mandated them as inputs; T3's transcription law makes the mapping mechanical and the tests check the result rather than the process. Task 1 Step 2 fails loudly if either is absent.
 
 **5. Type consistency.** `Founder`/`FounderSchema` defined once (T2), consumed by T3, T4, T9, T32, T42. `Genome`/`genomeOf`/`weightOf`/`temperatureOf` defined once (T5), extended once (T6), consumed by T7, T8, T15–T18, T32. `DriveState`/`foldDrives` defined once (T15), extended by T16 and T17, consumed by T18. `FounderSpawn` (T9) is the only bridge from agents-side content to engine-side events and carries **XP, never rungs**. `DayRow`/`emergenceVerdict` (T25) are consumed unchanged by T34, T49, T50, T51. `ModeCollapseReport` (T26) likewise. `RunManifest` (T27) is produced by T32 and consumed by T49 and T51. `CostReport` (T36) is consumed unchanged by T41, T49, T51. `jsd` has exactly one implementation (T26) used at both granularities (T26, T27). `buildAgentCtx(bridge, agentId)` is the landed C9/C11 signature everywhere and the base draft's misquote is never restored. `DAYS_PER_YEAR = 364`, everywhere.
 
-**★ v4's INTERFACE RE-VERIFICATION, EVERY ROW GREPPED OUT OF `cd845bc` (R4's instruction, discharged).** R4 recorded that *"every code block in T55–T66 is unexecuted TypeScript"* and that its interfaces were read off a tip that has since moved twice. **v4 re-read them. Nine were wrong, and each is corrected in place:**
+**★ v4's INTERFACE RE-VERIFICATION, EVERY ROW GREPPED OUT OF `cd845bc` (R4's instruction, discharged). KEPT VERBATIM, AND RE-CHECKED AGAINST `645a8d9` DIRECTLY BELOW IT.** R4 recorded that *"every code block in T55–T66 is unexecuted TypeScript"* and that its interfaces were read off a tip that has since moved twice. **v4 re-read them. Nine were wrong, and each is corrected in place:**
 
 | # | v3 wrote | `cd845bc` says | Fixed in |
 |---|---|---|---|
@@ -8841,42 +9305,70 @@ U1/U2 are covered by Phases C and D. U3–U25 belong to C12/C12a; **14 of the 31
 | 8 | `isExpressive(attempt, KNOWN_VERBS)` | `isExpressive(intent: string): boolean` — **one argument** | **T24** |
 | 9 | `roomFurnishings(structure.kind as InteriorKind)` | returns `undefined` for `cottage`, `cabin`, `farmhouse`; `.map` throws | **T62** |
 
-**And two that are not signature errors but would have cost as much:** the nine copies of the four pins (**C3**, **T29**), and **`warmth.insulation.garment` already being 12** (**T29**, **OD17**). **Three names are new and each is defined exactly once:** `ENDOWMENT_KIT` in T10 (derived from `FOUNDER_KIT`, never typed), `CodexSeedRow` in T14, and the nine `testFixtures` builders in T55 Step 0 — imported by T58, T59, T60 and T62 and **redeclared by none of them**.
+**And two that are not signature errors but would have cost as much:** the copies of the four pins (**C3**, **T29**), and **`warmth.insulation.garment` already being 12** (**T29**, **OD17**). **Three names are new and each is defined exactly once:** `ENDOWMENT_KIT` in T10 (derived from `FOUNDER_KIT`, never typed), `CodexSeedRow` in T14, and the nine `testFixtures` builders in T55 Step 0 — imported by T58, T59, T60 and T62 and **redeclared by none of them**.
+
+**★★ v5's INTERFACE RE-VERIFICATION, EVERY ROW GREPPED OUT OF `645a8d9`. FOURTEEN OF v4's 66 TASKS WERE STALE, AND EACH IS CORRECTED IN PLACE.** v4's nine rows above were re-checked first: **rows 1, 2, 3, 5, 6, 7 and 8 still hold on `645a8d9`** — the corrections are right and the tree has not moved under them. **Row 4 is half-stale** (`cityRoadTiles` now takes an optional `rings`, so v4's bare call still works but its "takes NO arguments" claim does not), and **row 9 is a no-op** (`as InteriorKind` returns zero hits; `isInteriorKind` was landed at `interiors.ts:91` and already guards `interiorOf` at `:98`). The fourteen new ones:
+
+| # | v4 wrote | `645a8d9` says | Fixed in |
+|---|---|---|---|
+| 1 | Step 0's tip is `cd845bc`; the copy grep uses `c1c51b42`/`a90bd747`/`28c1fce0`; two preconditions are OPEN | the tip is `645a8d9`; **three of the four literals moved**; both preconditions are **discharged** | **T1** |
+| 2 | `world.ts:102-106` for `FOUNDER_KIT` | `103-106`; the endowment loop is at `149-173` | **T10** |
+| 3 | `DiscoveryNodeSchema.era: z.number().int().min(1).max(5)` | the landed tree writes `- era: handwork` — **a NAME**; a numeric schema rejects all 103 nodes at parse time | **T12** |
+| 4 | 104 nodes, eras `[27, 31, 18, 16, 12]`, **11** social | **103** nodes, `handwork 8 · arrangement 26 · works 35 · machinery 22 · industry 12`, **52** social | **T13** |
+| 5 | `expect(r.era).toBe(ERAS[byId.get(r.id)!.era - 1])` | `ERAS[<string> - 1]` is `ERAS[NaN]` is `undefined` — **and a row copying `undefined` would have compared equal to it and passed** | **T14** |
+| 6 | `nearestBuildSpot` scans tiles and asks `VERBS.build.validate(…, {kind, x, y})` | `PlottedBuildParams = z.object({ kind }).strict()` refuses the extra keys **before any site rule runs**, so the scan returns `null` for every tile in a town — and **`groundForBuilding` has already landed and does the job** | **T19** |
+| 7 | `makeablesLine(m, reachable)`, and Step 3 rewires `agentRuntime.ts:444` to pass it | `makeablesLine(m, groundForBuilding?)` is **landed and wired**; v4's line **compiles, goes green, and deletes the build road from every prompt** | **T20** |
+| 8 | `jointBuildLine(s: PerceptionStructure, …)` | the exported type is **`PerceivedStructure`** (`perception.ts:83`); there has never been a `PerceptionStructure` | **T21** |
+| 9 | `build.validate(…, { kind: 'barn', x: 61, y: 68 })` expecting the beam refusal | the coordinate refusal fires first and the beam refusal is never reached | **T22** |
+| 10 | heavy kinds `barn`, `pump_house`, `long_bridge` | **none has a committed art cell**, and `worldStructureKinds` now covers **every recipe key**; `long_bridge` would also be a **plotted** kind and claim a land plot | **T22**, **OD19** |
+| 11 | the forge pin's third copy is `agents/src/live/g11checkpoint.test.ts:15` | it is a **frozen fixture two forge pins out of date** that nothing compares to anything — **a decoy, not a copy** | **C3**, **T29** |
+| 12 | `first_house` reverts to `first_hut` in the milestone-kind assertion | `tier1.ts:68` is **`first_house`**, and three more landed tests name it — v4's amendment would have gone red against four of them | **T33**, **T60** |
+| 13 | `ingestProductionArt` reads `DEFAULT_ART_ROOT`, and `bootstrap(db, {artRoot, libraryRoot})` | **`ingestProductionArt(db)` — no options.** `DEFAULT_ART_ROOT`, `artRoot`, `BUILDING_ART_DIRS`, `ingestBuilding`, `tryIngest`, `upsert` and `latestByKind` were all **deleted by merge train 3**; the art is committed and boots 25 of 25 | **T44** |
+| 14 | check 9 expects **nine** matches across **six** files | **eleven literals across seven files, twelve grep lines** — and **v4's own grep against `cd845bc` returns thirteen across eight**, so v4's gate would have STOPped on a correct tree | **C3**, **T51** |
+
+**And two that are not signature errors but would have cost as much:** **`CITY_ANCHOR_DEFAULT` is `{x: 43, y: 56}` and derived**, not the `{x: 48, y: 56}` constant C14 quoted (every fixture that reads it rather than typing it — T9, T11 — survives, **which is the read-never-retype rule paying for itself in a way that can be pointed at**); and **the town has no districts at all**, where C14 named four.
+
+**★ THREE NAMES ARE NEW IN v5 AND EACH IS DEFINED EXACTLY ONCE.** `ReachableMakeables.ground` in **T20** — the landed build road, carried through, never renamed and never re-derived, consumed by `prose.ts` and by nothing else. `listCommittedBuildingKinds` in **T22 Step 1b** — a four-line `readdirSync` over `packages/forge/content/buildings`, test-only, **read from disk rather than typed so it cannot go stale when a cell is commissioned**, and imported by T22's art row alone. `bootstrap` in **T44** — one wrapper over the two landed ingests, taking no root.
+
+**★ AND THE `Consumes` LEDGER FOR EVERY v5 AMENDMENT, EACH CITING SOMETHING A PREVIOUS TASK OR THE LANDED TREE PRODUCES.** T12 consumes `ERAS`/`ERA_ORDER` from `@sj/shared` — **produced by its own Step 0**, which is the canon move. T13 consumes `validateDiscoveryTree` (T12) and `GENESIS_CODEX` (T12 Step 0). T14 consumes `DISCOVERY_TREE` (T13), `ERA_ORDER` (T12 Step 0) and `CodexStore` **test-side only** (C12). T19 consumes `groundForBuilding` — **landed, not produced by any task here**, and its Step 2 asserts it present rather than assuming it. T20 consumes `EngineBridge.groundForBuilding()` and `makeables()`, both landed, and **produces the `ground` field T19 asserted**. T21 consumes `PerceivedStructure` (landed) and `durationTicks` (landed). T22 consumes `isPlottedKind` (landed, `verbs.ts:1032`), `cityStructures` (landed) and `listCommittedBuildingKinds` (its own Step 1b). T44 consumes `ingestProductionArt(db)` and `ingestLibraryArt(db)`, both landed with the signatures quoted. **No `Consumes` in this revision cites a symbol that does not exist on `645a8d9` or is not produced by a task earlier in document order** — which is the check v3 failed nine times and v4 failed fourteen.
+
+
 
 **v3's own type-consistency pass, checked rather than asserted.** `DistressCause` and `distressOf`/`distressProse` are defined once in **T55**'s `engine/src/rescue.ts` and consumed by T56 (`PersonInNeed.want`), T56's `WANT_SATISFIED_BY` key type, and T49's report. `PersonInNeed` is defined once on the bridge in **T56** and imported by `prompt/social.ts` — never redeclared. `socialVerbDiversity` and `discretionarySocialShare` are defined once in **T57**'s `live/social.ts` and imported by T25's `DayRow` and T49's schema; **T25 does not reimplement them**, which is what keeps "a joint build counts, a solo one does not" true in exactly one place. `yearsOf` is defined once in **T58** and used by T58, T59 and T61. `elderSlowdownFactor`/`elderTicksFor` are defined once in **T59** and read `config.aging.elderWorkSlowdown`, which is created in **T29** and nowhere else. `PlacedFurnishing` is defined once in **T62** and is the shape `furnishing_placed`, `roomFurnishingsFor` and T49's counter all read; it reuses `CityFurnishingSchema`'s `{kind, slot:{x,y}}` verbatim so the template and the world cannot drift. `normaliseFurnishingKind` lives once in **T63** and is the reason two minds asking for a stool get the same record. `DEATH_CAUSES` stays **T66**'s only input vocabulary and is the landed engine constant, not a copy. `DENIED_PROVIDERS`/`defaultExtraBody` are defined once in **T65** and consumed by T37's tests and the client — `DISQUALIFIED_FOR_TURNS` from v2 is **renamed to `DENIED_PROVIDERS` in exactly one place** and does not survive anywhere else.
 
 **6. What this plan deliberately does not do.** It adds no atomic `trade` verb (the deliberate non-feature — trust asymmetry is drama). It wires no discovery `unlocks` into the crafting tables (T14 seeds the codex and stops). **It builds no forge worker and commissions no image** — Phase F3 runs with `commissionsEnabled: false` and the placeholder, and piece 4 of the furniture plan is deliberately somebody else's. **It does not raise the sprite-resolution bound**, which is C12b's renderer question. **It does not build the kind registry with fts5 and embeddings** (piece 3), because it saves duplicate spend and this slice spends nothing. **It does not lengthen the rescue window** — 1440 ticks was never the problem. **It does not script a mourning behaviour**: the grave is a road and a record, and what a mind does there is the town's business. It builds no hierarchical pathing (FW-3, deferred with numbers: 0.05 ms median against a 50 ms budget). It does not switch to Pro (FW-1, user-parked) or to bf16 (FW-2). It edits `cityTemplate.ts` not at all. It touches no C12 UI surface. And **outside Phase F it moves no pin** — every tuning act after that travels as `config_changed`.
 
-**7. What is honestly unresolved and is named rather than hidden.** **★ v4's own three come first, because they are the ones that can stop this plan starting.** **The two frozen content drafts are period-wrong and neither has been re-authored** (OD16) — Task 1 Step 2 STOPs on it and T13 cannot begin. **The `house` rename has not landed** as this draft is written; the plan is written as though it has, and Task 1 Step 0 STOPs if it has not (C30). **And whether the minds actually SOUND contemporary is untested and untestable offline** — the setting lane's R0 recorded that the canon never reaches a mind's prompt at all, so the minds' sense of period comes only from block 6's makeables line and the perception prose; **if a live run still sounds pre-industrial, that is where to look, and this plan has changed both but measured neither.** Carried forward from v3: the arbiter has been wired in exactly one place — C11's gate script — and **has never had a production caller**; T32 is the second, and **criterion 9 has had exactly one honest test and is UNMET at `gate-g11-partial` (16/17)**. **The old-age death path will get zero live coverage** — 21 sim-days of thirty-year-olds cannot produce an elder — and its only proof is T60's offline test, recorded as no coverage rather than as a pass. **Whether any mind ever chooses to furnish its house is unknown**, which is why T50's criterion 16 counts it and does not gate it. **Whether the five social roads are enough to beat an oversatisfied need is the open question of the whole chunk**, and criterion 7 is where we find out; if `socialVerbDiversity` stays at 1 while production and survival both improve, **C25 was right about the trap and wrong about the cure**, and that is a finding rather than a failure to hide. **Run A's 21 days is a harder bar than the directive's 7**, stated at T50. `weather.hourlyChangeChance` is **not** in `TOGGLABLE_PATHS`, so one of the six named divergence levers cannot be flipped live. The `D_l` floor of 0.20 is **provisional until first measurement** and is reported rather than gated. Whether neutral minds are more suggestible than authored ones is unknown and T43 measures it rather than assuming it.
+**7. What is honestly unresolved and is named rather than hidden.** **★ v5's own four come first, because they are the ones that can stop this plan starting.** **The `first-night` lane is live and nine tasks depend on its outcome** — it is the only precondition still open, it is the one lane authorised to move G1, and **the contingency box at the end of this document names the nine and does not guess the answer.** **OD18 blocks nothing but decides what T14's function is for** — the codex either rules by thirteen entries or by 103 authored nodes, and a landed user ruling says the tree is a yardstick and never a gate. **OD19 must be ruled before T22 commits**, or a green art gate in a package C8 does not own goes red. **And the two v4 blockers are both discharged:** the content drafts are re-authored and on `main` (**OD16 CLOSED**), and the `house` rename landed long ago (C30's grep is a regression guard now, not a gate). **And whether the minds actually SOUND contemporary is untested and untestable offline** — the setting lane's R0 recorded that the canon never reaches a mind's prompt at all, so the minds' sense of period comes only from block 6's makeables line and the perception prose; **if a live run still sounds pre-industrial, that is where to look, and this plan has changed both but measured neither.** Carried forward from v3: the arbiter has been wired in exactly one place — C11's gate script — and **has never had a production caller**; T32 is the second, and **criterion 9 has had exactly one honest test and is UNMET at `gate-g11-partial` (16/17)**. **The old-age death path will get zero live coverage** — 21 sim-days of thirty-year-olds cannot produce an elder — and its only proof is T60's offline test, recorded as no coverage rather than as a pass. **Whether any mind ever chooses to furnish its house is unknown**, which is why T50's criterion 16 counts it and does not gate it. **Whether the five social roads are enough to beat an oversatisfied need is the open question of the whole chunk**, and criterion 7 is where we find out; if `socialVerbDiversity` stays at 1 while production and survival both improve, **C25 was right about the trap and wrong about the cure**, and that is a finding rather than a failure to hide. **Run A's 21 days is a harder bar than the directive's 7**, stated at T50. `weather.hourlyChangeChance` is **not** in `TOGGLABLE_PATHS`, so one of the six named divergence levers cannot be flipped live. The `D_l` floor of 0.20 is **provisional until first measurement** and is reported rather than gated. Whether neutral minds are more suggestible than authored ones is unknown and T43 measures it rather than assuming it.
 
 ---
 
 ## OPEN DECISIONS — put to the controller, with a recommendation each
 
-> **★ SIX ARE NOW CLOSED, FOUR WERE NEW IN v3, AND TWO ARE NEW IN v4.**
+> **★ EIGHT ARE NOW CLOSED, AND FOUR ARE NEW IN v5.**
 >
 > **Closed by ruling:** **OD1** (neutral-default with the authored arm preserved, R0), **OD3** (superseded — the provider is a **deny-list**, not a request), **OD12** (the fifth bundle member, ACCEPTED by v3's R3), **OD13** (run A at zero unforced deaths over the full 21 days, ACCEPTED), **OD14** (T62's decline to seed furnishings, ACCEPTED).
 >
-> **★ CLOSED BY MEASUREMENT IN v4, WHICH IS A DIFFERENT THING AND IS MARKED AS SUCH:** **OD2** — the genesis frontier is no longer C8's to propose. **`GENESIS_CODEX` landed on train 6, the setting lane derived it from a canon the user ratified, and `arbiter/src/setting.test.ts` asserts the two agree.** T14 imports it and proposes nothing. **OD6** — the fire pit's occluding shed was removed by the layout lane along with the other shed and the wagon, so the question has no subject; `cityTemplate.ts` remains C8-frozen (C14).
+> **★ CLOSED BY MEASUREMENT, WHICH IS A DIFFERENT THING AND IS MARKED AS SUCH:** **OD2** — the genesis frontier is not C8's to propose; `GENESIS_CODEX` landed, the setting lane derived it from a canon the user ratified, and `arbiter/src/setting.test.ts` asserts the two agree. **OD6** — the fire pit's occluding shed was removed along with the other shed and the wagon, so the question has no subject. **★ NEW IN v5: OD16 — CLOSED BY A MERGE**, and **OD17 — CLOSED BY A GREP**. Both are written out below with the evidence, because a decision with its reasoning deleted is a decision somebody re-opens.
 >
-> They are kept below with their rulings written in, because a decision with its reasoning deleted is a decision somebody re-opens.
+> **★ FOUR ARE NEW IN v5: OD18, OD19, OD20 and OD21.** None of them is decided here. Two of them (**OD18**, **OD19**) block a task, and **OD19 has a recommendation taken provisionally so T22 is executable** — say so if you would rather it were the other option, and one table moves.
 
-**16. ★ NEW IN v4, AND IT IS THE LARGEST OPEN ITEM IN THIS PLAN — BOTH FROZEN CONTENT DRAFTS ARE PERIOD-WRONG AND SOMEBODY MUST RE-AUTHOR THEM.**
+**16. ★ CLOSED IN v5, BY A MERGE. THE TWO FROZEN CONTENT DRAFTS WERE RE-AUTHORED AND ARE ON `main`.**
 
-The two signed inputs were written against the canon train 6 replaced, and **neither can be transcribed as it stands**:
+v4 raised this as the largest open item in the plan: both signed inputs were written against the canon train 6 replaced, and neither could be transcribed as it stood. **The `content-contemporary` branch merged, docs-only, and both live at `docs/superpowers/content/`.**
 
-| Draft | What is wrong with it |
-|---|---|
-| `c8-discovery-tree.DRAFT.md`, **104 nodes** | era 1 opens `fire-craft`, `stone-tools`, `cordage`, `lean-to`, `hide-curing`, `basketry`; one rung out sits `sun-brick`, `clay-oven`, `pit-kiln`, `fired-pottery`, `tanning-vats`, `quern`. **A town with a generator does not discover pottery**, and the canon says so in as many words |
-| `c8-founders.DRAFT.md`, **five backstories** | a hedge-healer paid in eggs and mended boots; **ten days by wagon** behind a land agent's handbill; a **grain barge**; apothecaries locking cabinets; dock cranes. It is a good eighteenth-century town and it is not this one |
+| What v4 asked for | What landed | Verified how |
+|---|---|---|
+| the tree re-authored from the canon up | **103 nodes**, era arc **`handwork · arrangement · works · machinery · industry`**, **52 of 103 social** because the canon says the new thing is *"far more often an arrangement between its people"* | **v4's own period grep, run against the landed file: no matches.** Node and social counts by `grep -c`. Genesis frontier proved by the author's own script: **exactly five** reachable nodes, and they are the canon's five with the canon's parents |
+| the five backstories re-authored | same five people, same temperaments, grudges, skills and secrets; only what the century forced was changed | the same grep, and the `README.md` beside them records the check |
+| the shape preserved so the plan still fits | one node per block, the same eight fields in the same order, the same unlock namespaces, the same DAG rule, `skill.track` from `DEFAULT_CONFIG.skills.tracks`, the canon's thirteen ids spelled exactly as `setting.test.ts` asserts | **one thing was NOT preserved and it is a real amendment: the era is written as a NAME, not a rank.** T12's schema moves to `z.enum(ERAS)` and T14's `ERAS[era - 1]` is deleted |
 
-**Four things make this a controller decision and not an executor's edit.** The content is **user-signed**. Re-authoring it is **days of writing, not an afternoon's grep**. The tree's shape is load-bearing on T14, which now imports the canon's thirteen ids and asserts every one is a node. And the founders' draft **only reaches a mind in the `authored` arm** — run C of T50, one flag, ≈$1.51 of the ≈$18.3 envelope — so its urgency is genuinely lower than the tree's and the two can be commissioned separately.
+**Four story facts were ruled at the same time** (`canon-story-decisions.md`, 2026-08-23) and are carried into T3, T4 and T13 as given: the reach ceiling is **asymptotic, not empty**; the pass came down in a slide six weeks after they arrived; **they walked into a village somebody else built and left** — which was already true of `cityTemplate.ts` and had simply never been written down; and Omar is the only one who can keep the generator running.
 
-- **Recommendation: commission the TREE now and the FOUNDERS before run C, and gate both.** The tree blocks T13 and T14, which are Phase B; the founders block only T3, T4 and run C. **Splitting them lets C8 start.** Task 1 Step 2's grep and the period tests in T3, T4, T13 and T14 are the gates either way, and they fail loudly rather than letting a stale paragraph reach a prompt.
-- **The alternative, stated so it is a choice and not an oversight: drop the authored arm from v1.** U26 already made neutral the default and R0 ratified it; run C exists to measure *how much of the town's character was authored*. **If the founders are not re-authored, run C measures a period mismatch instead**, which is a worse experiment than not running it. **Say which**, because T50's criterion set and the live envelope both change if run C goes.
-- **The risk if neither is commissioned and C8 starts anyway:** Task 1 Step 2 STOPs, and C8 does not start. That is the design. **The failure mode this guards against is the quiet one** — an executor transcribing 104 faithful neolithic nodes into the codex the arbiter rules by, every other test green, and a live run in which five contemporary minds are told their frontier is fired pottery.
+- **Verdict: OD16 is CLOSED. The blocker comes out of T13 and out of Task 1's precondition table.** Task 1 Step 2's gate is **kept anyway** and now passes, because a gate that has started passing is the cheapest one there is.
+- **The alternative v4 named — dropping the authored arm from v1 — is moot.** The founders are re-authored, so run C measures what it was designed to measure and the ≈$18.3 envelope is unchanged.
+- **★ AND THE ONE THING THE RE-AUTHOR OPENED RATHER THAN CLOSED IS `OD18`.** The tree's own `README.md` asks a question the merge did not settle, and the ruling page answers half of it.
 
-**17. ★ NEW IN v4 — THE KEYSTONE BUNDLE LOSES A MEMBER RULING R6 COUNTED, BECAUSE IT IS ALREADY DONE.**
+**17. ★ CLOSED IN v5, BY A GREP. THE PIN HOLDS AND NO LANE MOVED IT.**
 
 v3's T29 bundled five changes. **`warmth.insulation.garment` 2 → 12 is not one of them any more: it is already 12 on `main`**, moved by C11 Task 37b, recorded in the forge pin's own comment at `forgeConfig.test.ts:72-74`, and pinned by `c11.findings.test.ts:60`.
 
@@ -8884,7 +9376,63 @@ v3's T29 bundled five changes. **`warmth.insulation.garment` 2 → 12 is not one
 
 - **Recommendation: strike it. The bundle is four.** The regen is unchanged, the three surviving members were each re-read from the tip and all three still hold, and T29 keeps one row asserting `garment === 12` so a future bundle cannot quietly reopen it.
 - **What you are giving up: nothing.** The coat already decides four bands including a winter day. The only thing lost is a line in a commit message.
-- **The general point, and the reason this is an open decision rather than a silent correction:** **R6 ratified "one regen per named set", and this changes the named set.** v3 was written against the tip *after* C11 merged and still carried the member, which means the bundle was never re-read against the tree — only against v2's prose. **Confirm the four, and confirm that a bundle member is re-grepped from the tip at the moment the bundle is opened** (C17 already says a pin is; this says a *value* is too).
+- **The general point, and the reason this WAS an open decision rather than a silent correction:** **R6 ratified "one regen per named set", and this changes the named set.** v3 was written against the tip *after* C11 merged and still carried the member, which means the bundle was never re-read against the tree — only against v2's prose. **Confirm the four, and confirm that a bundle member is re-grepped from the tip at the moment the bundle is opened** (C17 already says a pin is; this says a *value* is too).
+
+**★ v5 — RE-VERIFIED AT `645a8d9`, AND THE PIN HOLDS. NO LANE HAS MOVED `garment`.** Six independent places on `main` say twelve, and they were grepped, not remembered:
+
+| Where | What it says |
+|---|---|
+| `packages/shared/src/config.ts:310` | `insulation: z.object({ garment: z.number().default(12) }).strict().prefault({})` |
+| `packages/shared/src/config.test.ts:174` | `expect(c.warmth.insulation).toEqual({ garment: 12 })` |
+| `packages/engine/src/c11.findings.test.ts:60` | `expect(C.warmth.insulation.garment).toBe(12)` |
+| **`packages/engine/src/c11.findings.test.ts:75`** | **the contradicting assertion, unchanged** — `expect(C.warmth.ambient.winter[phase] + C.warmth.insulation.garment).toBeLessThan(C.warmth.comfortBand)` |
+| `packages/engine/src/g11.world.test.ts:226` | `expect(C.warmth.insulation.garment).toBe(12)` |
+| `packages/forge/src/forgeConfig.test.ts:73` | the forge pin's own comment recording the `2 → 12` move as C11 Task 37b's |
+
+**Verdict: OD17 is CLOSED. The coat stays struck, the bundle is four, and T29's `garment === 12` row is now a regression guard on a value three separate packages depend on.** The general clause — that a bundle **value** is re-grepped from the tip at the moment the bundle is opened — **is adopted as standing practice, and this verification is what it looks like**: it cost one grep, and it is why this can be closed in writing rather than carried into a third revision.
+
+**18. ★ NEW IN v5, AND IT IS THE LARGEST OPEN ITEM — DOES THE 103-NODE TREE REACH THE ARBITER, OR ONLY THE SCOREBOARD?**
+
+**Two landed things disagree, and T14 is where they meet.**
+
+| | says |
+|---|---|
+| **v4's T14, carried into v5** | `codexEntriesFromTree()` produces **one `CodexEntry` per node** and seeds them into the arbiter's `CodexStore`. `frontier()` then feeds the adjudication prompt and `withinAdjacency()` decides whether a novel intent may be codified |
+| **The user ruling of 2026-08-23**, on the same page as the four story facts | *"The 103-node discovery tree is a **YARDSTICK, never a gate**. No code reads it and none should… Agents invent freely; the arbiter rules `map` / `attempt` / `impossible` at runtime and an `attempt` mints a permanent verb. The tree exists so a finished run can be graded — 'they found 14 of the 103 we anticipated, **plus 9 we did not**' — and the 9 are the result"* |
+
+**They cannot both hold.** Seeding 103 authored nodes into the store the arbiter rules by makes the authored tree the thing that decides what a mind is allowed to have invented — the tree as gate, in the one place where being a gate matters most. **And the nine-we-did-not-anticipate, which the ruling calls the result, is the exact population `withinAdjacency` is most likely to refuse.**
+
+- **Recommendation: the codex keeps `GENESIS_CODEX`'s thirteen, and the tree becomes a SCORING INSTRUMENT.** Concretely: **T13 is unchanged** — transcribing the tree into typed, validated data is what makes it usable as either — **T14 builds `codexEntriesFromTree` and its tests and wires it to nothing**, and the tree is read in **exactly one place**: T49's rehearsal report, which prints *anticipated found*, *unanticipated found*, and the ids of both. That delivers the ruling's own sentence as a number, costs one function that is being written anyway, and leaves the arbiter ruling by the thirteen entries two live gate scripts already import.
+- **The alternative, stated so it is a choice: seed all 103 and accept that the tree is the adjacency rule.** It is not absurd — a 103-node DAG is a richer adjacency map than thirteen entries, and `withinAdjacency` would refuse *less* often, not more, because there is more to be adjacent to. **But it makes an authored document load-bearing on what counts as a discovery**, and the run's most interesting output becomes the thing most likely to be ruled out of existence.
+- **What it costs to decide late: almost nothing, and that is deliberate.** T14 as written here builds the function and asserts, in a test, that **nothing calls it** — *"★ IS NOT WIRED INTO A LIVE CODEX ANYWHERE — OD18 IS UNRULED"*. Wiring it is one line plus deleting that guard. **An executor who wires it has answered a controller's question with a commit**, which is why the guard is a test and not a comment.
+- **A supporting fact worth having: nothing reads the tree today.** `grep -rn "discoveryTree\|DISCOVERY_TREE\|TECH_TREE" packages/` returns nothing at `645a8d9`. This is a decision about what to *start* doing, not about what to stop.
+
+**19. ★ NEW IN v5 — T22's THREE HEAVY KINDS HAVE NO ART, AND THE GATE NOW COVERS EVERY RECIPE KEY.**
+
+The art lane landed `worldStructureKinds({structures, recipes, extra})` and a test that **every kind the world can create has a committed cell in every facing it can stand in** — explicitly including *"a row with EMPTY inputs is a kind the world places and nobody builds. Both are kinds the world creates, so the whole table counts."* The twenty committed cells are `bridge, cabin(+se), cottage(+se), farmhouse(+se), fire_pit, grave, house(+se), scaffolding, shed(+se), standing_stone, storehouse(+se), wagon(+se), well`. **v4's `barn`, `pump_house` and `long_bridge` are none of them**, so `SEED_STRUCTURES` as v4 wrote it reds a gate in `packages/forge`, a package C8 does not own. **And `long_bridge` has a second, worse problem: `isPlottedKind(kind) = kind !== BRIDGE_KIND`, so a kind called `long_bridge` is a plotted kind — it would be claimed onto a land plot and the span raised on dry ground in the middle of town.**
+
+- **Recommendation, and it is TAKEN PROVISIONALLY IN T22 SO THE TASK IS EXECUTABLE: use two kinds the town already stands, and delete the third.** **`storehouse` at three hands** (the roof beam) and **`shed` at two** (the lift). Both have committed cells in both facings; both are things a founder has walked past on the first morning, so *"the beam will not go up with two"* is a sentence a mind can picture; **zero art spend, and the coverage gate stays green on the same commit.** `long_bridge` goes entirely — a longer bridge is the same deck over more water, and `bridge` is landed, plotted-exempt and proved end to end.
+- **Option (a), if you would rather spend: commission the cells and restore v4's names.** `barn` and `pump_house` in `sw` and `se` is four cells; a second span kind needs two more **and** a change to `isPlottedKind`. It buys better words — *a barn* and *a pump house* are more evocative than *a storehouse* and *a shed* — at the cost of an art commission and one engine rule. **If you take this, T22's table is the only thing that moves.**
+- **Option (c), named only so it is visibly rejected: ship the names with no art and take the red.** C20 is explicit that a mechanical gate is necessary and never sufficient; **turning one off because it is inconvenient is the shape this project has found thirteen times.**
+- **What (b) costs, honestly:** `minHands` loses its most vivid example. A barn's roof beam is a better story than a storehouse's, and this whole task is an argument from physics that a mind has to feel. **I would still take it over a red gate in somebody else's package.**
+
+**20. ★ NEW IN v5 — G8's CRITERION 5 PASSES ON CRAFTING ALONE, AND CRAFTING WAS NEVER THE BLOCKED VERB.**
+
+Criterion 5 gates `builds + crafts + chops + tills + plants ≥ 1 per town-day from day 2, and ≥ 1 structure completed across the run`. **`craft` takes a recipe name, not a coordinate.** It was not in batch 14's zero-use table, it was never the blocked verb, and it is the cheapest member of the sum by a wide margin. **A town that makes one torch a day and raises one shed in twenty-one days passes a criterion written against a town that built nothing.**
+
+- **Recommendation: split it, before the run.** Keep the sum exactly as it is and add **`builds ≥ 1 across the run`** as its own gated row. Building is the verb the seam unblocked, it is the verb batch 14's verdict named, and it is the one whose zero is now unambiguous — which is the whole reason criterion 5 is worth sharpening rather than rewriting.
+- **This is a TIGHTENING and C23 permits it explicitly** — *"a threshold the principal moves because the specification moved is a spec change and is recorded as one; a threshold I move after seeing my own red result is the thing this law forbids."* This is the first kind, and it is in writing before the run rather than after it.
+- **If you decline: say so, and criterion 5 stays a disjunction.** It is still a real gate — zero across all five verbs for a whole day fails it — and the report carries the per-verb breakdown regardless, so the finding is recoverable from the evidence either way. **Declining costs a clean signal, not the data.**
+
+**21. ★ NEW IN v5 — EVERY INVENTION IS NOW RECORDED WITH CREDIT, AND G8 READS NONE OF IT.**
+
+The Discovery Record landed: `DISCOVERY_EVENT = 'discovery_made'`, a `DiscoveryRecord` carrying `kind: 'craft' | 'word'`, `byId`, `by` — **a name, because an id is not a credit** — `intent` and `makes`, minted from **both** codification paths, `codifyExpressive` inside `adjudicate` as well as `codify()`. **T24's item 3 will make it fire far more often**, because inverting the expressive test widens the door every minted word comes through. G8's criterion 8 gates `codifiedVerbs ≥ 1` and canon validity, and reads nothing about credit, kind or distribution.
+
+- **Recommendation: REPORT, and do not gate.** T49's schema gains `discoveries: { total, byKind, byFinder }` and **one assertion, which is the part that earns its place: `discoveries.length === craftsCodified + wordsMinted`.** Two codification paths that disagree about how many discoveries happened is a defect nothing else in the report would catch, and it is exactly the shape that lands green and drifts.
+- **Why not a gate: there is no baseline.** No run has ever produced a Discovery Record. A threshold invented for the first run that could meet it is a number with nothing behind it, and C23 forbids exactly that. **After the rehearsal there is a distribution, and gating it is then a real option with real evidence.**
+- **A second reason to report rather than gate, and it is the more interesting one:** `byFinder` is a **mode-collapse signal that costs nothing to collect.** Five minds, and every discovery credited to one of them, says something `D_b` and `D_c` do not measure directly. It may turn out to be the most informative column in the report.
+
+---
 
 ---
 
@@ -8946,3 +9494,30 @@ I have provisionally ruled **neutral-default with `authored` as a named second a
 **10. Does C8 launch on the current UI?** C12a has closed 14 of the review's 31 items and keeps advancing; C12b has not run. G8's check 7 and Phase L would publish that interface. **Recommendation: G8 gates on the stack serving locally (it does), and Phase L waits for the user's word rather than for a gate** — Phase L is independently executable precisely so either answer works.
 
 **11. One process or two for the ops plane?** `createSim` runs the nightly narrator, construct and semantic passes inside the sim process, so a slow narrator night can delay ticks. The alternative is a fourth Compose service reading the log. **Recommendation: accept the single process for v1** — the nightly pass is wrapped so a failure alerts and the night continues, and a fourth service is a second place for the world to be half-written.
+
+---
+
+## ★★ THE `first-night` LANE IS LIVE, AND NINE TASKS DEPEND ON WHAT IT FINDS
+
+**This section does not guess the answer. It names the tasks whose acceptance criteria change depending on it, so that when the lane reports, the reader can go straight to them.**
+
+`first-night` is running in `packages/engine`, `packages/gateway`, `packages/agents` and `packages/web/src/ui`, against `main` @ `645a8d9` — the same tip this plan is written against. **It cannot conflict with this document, which writes only under `docs/`. It can and probably will change three things this document rests on.** What it is fixing, from its own brief:
+
+1. **The whole cast collapses in the street on night one.** `map=showcase`, `rings=3`: **all five founders fall ill at Day 0 17:02** and are **`COLLAPSED · WORN OUT` on the road by Day 0 23:19**, bodies drawn prone. Five at once within hours is not five bad decisions; it is systemic. **The lane is instructed to diagnose before it tunes, and it is the one lane authorised to move G1 if the fix changes the world's rules.**
+2. **The dev world has no mason.** `makeFoundersOnTick` offers only `walk / sleep / enter / exit`, so nothing builds in a running world and everything the claim seam proved is proved only on engine fixtures.
+3. **Two nav counters read 0 while their panels hold data** — `CHRONICLE 0` beside sixteen entries, `BONDS 0` beside two pairs.
+
+| Task | What depends on the lane, and what changes if it lands differently |
+|---|---|
+| **T29** — the keystone regen | **The only structural dependency, and the sharpest.** C3 records four pin values and T29 re-pins from them. **Defect 1's fix may move G1, which has never moved in this project's history.** If it does, C3's table and T29's "from" side are both wrong and Task 1 Step 0 will STOP on the mismatch — **which is correct behaviour, and the answer is to record the lane's value, not to re-derive one.** C8's single regen is unaffected either way: the lane spends its own. |
+| **T50 criterion 2** — zero unforced deaths, every day, all three runs | **Currently unreachable, and not because the criterion is wrong.** Five founders ill on day 0 and prone by 23:19 fails criterion 2 before a mind has decided anything. **Do not weaken the criterion** (C23, and this project has found that shape thirteen times). If the lane's answer is that this was a bug, criterion 2 becomes measurable for the first time. **If the answer is that the world is meant to be this hard, that is a specification question for the principal and criterion 2 is where it surfaces.** |
+| **T66** — the death taxonomy | `illness` is one of the four things permitted to kill. **Five simultaneous illnesses at 17:02 on day 0 is either a bug — in which case the taxonomy is untouched — or it is the world, in which case a permitted cause can wipe the town and pass the gate.** T66's mapping table does not change; what changes is whether `illness` needs the same rescue-window qualification `fatigue` already carries. **Read the lane's mechanism before writing T66's `illness` row.** |
+| **T55** — the rescue window | **Its entire subject is a body in sustained distress and whether anyone answers.** Five bodies down at once is the worst case for a window that assumes a neighbour is upright to see it. If the lane changes when or how a body goes down, T55's three-rung escalation table and its 1440-tick window are measured against a different curve. **The window length is not the thing to adjust** — v4 already says so — but the rungs may need re-reading. |
+| **T23** — a wound may not eat a famine | `conditionProse` reads `afflictions` first, then `a.ill`, then hunger, then hp. **The collapse presents as `WORN OUT` and is preceded by `has fallen ill`, so the `a.ill` rung fires before the hunger rungs T23 is inserting.** If the lane changes what sets `ill`, T23's ordering argument is about a different branch. The fix itself — hunger outranking a wound — is unaffected. |
+| **T59** — ageing reads as ageing, never as illness | **The most direct collision of all: T59's whole purpose is that an old body must not read as an ill one, and the lane is inside the illness mechanism.** If `ill` gains or loses a trigger, `agedProse`'s "never one of `CONDITION_PROSE`'s four" claim is about a different four. **Write T59 after the lane reports, not before.** |
+| **T62, T63** — furnishings and the placement arm | **Three integration trains in a row have failed to reach an interior**, and the cause is now known: they collapse before reaching a door, so `enter` never fires. **No room, no furnishings and no `ROOM_ZOOM` verdict has ever been seen.** T62 and T63 are written against an interior nobody has looked at. The lane is expected to produce the first one; **T62's fold and T63's placement arm are sound either way, but their acceptance is "a mind put a chair in a room and somebody saw it", and that sentence is not currently possible.** |
+| **T19, T20** — the production roads | **Soft, but worth naming.** The lane will add a mason to `makeFoundersOnTick`. That is a **scripted demonstration policy**, and its brief says so in as many words — *"be explicit in the code about which behaviour is scripted and which is emergent, so nobody later mistakes a demo for a result."* **C8's minds must not be given the scripted policy's decision rule**, and G8's criterion 5 must never be scored against a run in which a scripted mason was building. **T50 asserts the arm it ran; if the lane's mason is reachable from the supervisor, T32 must not wire it.** |
+
+**Two things this plan does NOT do about any of it.** It does not pre-empt the diagnosis — **no task here assumes the collapse is a bug, and none assumes it is balance.** And it does not soften anything in anticipation: **the harshness order is legibility → rescue window → giving → softened decay LAST** (C25, and the binding ruling behind Phases D, D2 and F), and a lane fixing night one does not reorder it.
+
+**If `first-night` reports before this plan is ratified, the nine rows above are the re-read list.** If it reports after, they are the amendment list for v6 — and the honest expectation is that **T59, T66 and T50's criterion 2 are the three that will actually need words changed**, because all three make a claim about what illness is.
