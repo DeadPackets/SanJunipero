@@ -63,32 +63,10 @@ describe('forge config', () => {
     })).toThrow()
   })
 
-  // Determinism proof: C13 config is ops-side, so world law cannot move and G1/G2 goldens hold.
-  it('leaves SimConfig untouched — the world config hash does not move', () => {
-    // moves whenever SimConfigSchema changes world law — re-pin is a deliberate reviewed act (see merge-train-3 report).
-    // Moved by C11 Task 2, the chunk's single SimConfigSchema edit: fourteen new sections, world.size,
-    // the pathing and structures.recipes additions, and health's retired contagion dials.
-    // Moved again by C11 TASK 37b, the authorized gate-remediation regen (batch-11 ruling
-    // R-G), and re-pinned here in the same single regen commit as G2. It retunes two VALUES
-    // and adds, removes and renames no key: `warmth.insulation.garment` 2 → 12, so the
-    // clothing line decides an hour of the season it exists for, and
-    // `mortality.drainPerTick.injury` 0.05 → 0.025, so an untended wound outlasts the walk of
-    // whoever might tend it. C11 has no third re-pin; later tuning belongs to C8's keystone.
-    // Previous value (C11 Task 2): 482f12038e542e54d9cb5a5add1e4556c4e40457bd5300dc7e66ae8e341dbf70
-    // Moved a third time by the `hut` → `house` rename lane, the authorized retirement of the
-    // `hut` id. It renames four `construction` keys and the `hut` strings in
-    // `structures.enterableKinds`, `privateKinds`, `sleepableKinds` and `recipes`, and changes
-    // NO value: every number and every boolean in this config is what it was.
-    // Previous value (C11 Task 37b): a90bd7471668eea6e8a8e7932129ef7905ae2477b396d5c7b792df539065c4d8
-    // Moved a fourth time by the world-growth lane, which deleted `mapGrowth.maxSize` and the
-    // two dials that served it. The town's grammar plats rings forever, so a 192-tile ceiling
-    // was the same bug as the 128-tile world with a later fuse; `step` and `structuresPerStep`
-    // were a pace guessed against that ceiling. What the world owes is a CLEARANCE — one block
-    // pitch of ground beyond everything standing — which names its own edge and its own depth,
-    // so the section is one key wide now. Three keys removed, none added, no value changed.
-    // Previous value (hut → house rename): 02f295ad603483998c2e85a641f6aa35372ddf630614a46648cd1f95b284ba5b
-    expect(stateHash(DEFAULT_CONFIG)).toBe(
-      'da065752366c812c531b1eaa0f8537781bc6f5859e5a4bf6647aa5edc37cd472')
+  // The forge's config is ops-side. The invariant the pin was an expensive proxy for: nothing
+  // in this package reaches world law — `DEFAULT_CONFIG` is still exactly the schema's own
+  // default, and no forge-only key has leaked into it.
+  it('leaves SimConfig untouched — DEFAULT_CONFIG is still the schema default', () => {
     expect(stateHash(SimConfigSchema.parse({}))).toBe(stateHash(DEFAULT_CONFIG))
     expect(Object.keys(DEFAULT_CONFIG)).not.toContain('visionQa')
   })

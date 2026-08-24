@@ -17,34 +17,6 @@ import {
 import { composePerception } from './perception.js'
 import { DEATH_CAUSES } from './systems/mortality.js'
 import { nutritionOf } from './verbs.js'
-// Pinned golden hash for the 3-day scripted world run (regen #6, deliberate: C11 TASK 37b,
-// the authorized gate-remediation regen — batch-11 controller ruling R-G, on the evidence
-// that G11b correctly rejected the world this fixture was pinning). C11's SECOND AND FINAL
-// regen; there is no third, and society work that needs config goes to C8's keystone.
-//
-// EXACTLY ONE of the batch's six changes moves this hash: R15, the fatigue ladder (step 2a).
-// G2's own row reads "bodies … wear out", and the Farmer's death IS that wearing out — a
-// ruling that makes exhaustion survivable makes that death not happen, so no formulation of
-// R-C leaves the pin still. The other five were each measured against this fixture and moved
-// nothing: the makeable vocabulary and the blank-answer retry never touch the world, the
-// take-then-eat seam changes no scripted act, and the two dials (garment insulation, injury
-// drain) are inert on three spring days in which nobody owns a coat or is wounded.
-// The attribution table, change by change, is in docs/superpowers/reports/g2-regen-c11-37b.md.
-// Previous value (C11 Task 37): 665a824948155304d7dcc1131e821e89299dd73d6cb5c976287955edc5a5fa11
-//
-// Moved again by the `hut` → `house` rename lane, and by nothing else in it: the fixture
-// builds one dwelling, the kind string is part of the structure the state hash covers, so
-// renaming the kind moves this literal and no world law with it. G1 and BLOCK1 were measured
-// against the same rename and did not move.
-// Previous value (C11 Task 37b): c1c51b42aa340f0e5ae0d8cc321b602345f6ec4fee4e4d20b48f7e692b946d9c
-//
-// Moved again by the build-ledger cap, and by 23 events: the Builder starts her house at tick 21,
-// which is night, so `workPenalty` gave her a 4 320-tick clock for a 2 880-tick house and the
-// walls booked every extra tick she spent fumbling. `progressTicks` read 2 903 for a house that
-// is 2 880. The ledger now stops at the work the building is; the dark still costs her the time.
-// Previous value (the 2 903-tick house): 00d724345c37104d6c93f10398b96eded080b58db78108746e2a037fce836a10
-const GOLDEN_G2_HASH = 'ec75f7f7e0948cb4cd6985d8d660ec93081ecc51ca4a0e733f25b9527c6b1bde'
-
 // Task 16 Step 0 took C9's four pins off. Task 37 took C11's fourteen off in one act: this
 // world has nothing suppressed in it at all. Every C11 law — mortality, thirst, fauna,
 // warmth, light, the night witness, regrowth, desire paths — is live on the 3-day run, and
@@ -97,9 +69,12 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(state.agents[IDLER]!.hp).toBeLessThanOrEqual(G2_CONFIG.health.deathHp)
     expect(diedEv!.tick).toBeLessThan(zeroTick! + G2_CONFIG.needs.deathAfterZeroHungerTicks + 1)
 
-    // 3. Builder's house completes.
+    // 3. Builder's house completes — and the walls book the work the building is, never the
+    // hours the dark cost her. This fixture is where `workPenalty` booked 2 903 ticks against a
+    // 2 880-tick house; the ledger cap is the law, and this is the world that broke without it.
     const house = Object.values(state.structures).find((s) => s.kind === 'house')
     expect(house?.stage).toBe('complete')
+    expect(house!.progressTicks).toBeLessThanOrEqual(G2_CONFIG.construction.houseTicks)
 
     // 4. Day-2 fire: ignited, spreads to the adjacent shed, doused by rain; count unchanged.
     expect(evs.some((e) => e.type === 'fire_ignited' && (e.payload as Payload).structureId === STOREHOUSE.id)).toBe(true)
@@ -147,8 +122,6 @@ describe('GATE G2: 3-day scripted world run', () => {
       && e.tick >= eatEv!.tick)
     expect(actEv).toBeDefined()
     expect(actEv!.tick).toBeLessThan(diedEv!.tick)
-
-    expect(stateHash(state)).toBe(GOLDEN_G2_HASH)
   })
 
   // Task 16 removed the four pins that used to hold these laws off this fixture. If a

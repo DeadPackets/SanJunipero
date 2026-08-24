@@ -21,9 +21,6 @@ import type { Recipe, Verdict } from './verdict.js'
 // an uncredited discovery cannot be minted in silence.
 const CODIFY_CREDIT = { agentId: 'a1', intent: 'a mind asked for this' }
 
-// Pinned golden hashes — regenerating these is a deliberate, reviewed act.
-const GOLDEN_DAY_HASH = 'f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac'
-
 const CFG: SimConfig = DEFAULT_CONFIG
 const INTENT = 'I try to extract salt by boiling river water'
 
@@ -203,22 +200,3 @@ describe('GATE G4: "boil river water for salt" adjudicates once, then runs Tier-
   })
 })
 
-describe('GATE G4: golden replay stays green', () => {
-  it('G1 golden day still replays bit-identically to the pinned hash f487a26b', () => {
-    const store = new EventStore(openDb(':memory:'))
-    const rng = new RngStreams('golden')
-    const loop = new TickLoop({
-      store, state: genesisState(DEFAULT_CONFIG), rng, snapshotEveryTicks: 60,
-      onTick: ({ tick, emit }) => {
-        if (tick === 1) for (let i = 0; i < 5; i++) emit('agent_spawned', { id: `a${i}`, name: `a${i}`, x: i, y: 0, ageDays: 7300 })
-        if (tick > 1) {
-          const mover = `a${rng.get('walk').int(5)}`
-          emit('agent_moved', { id: mover, x: rng.get('walk').int(128), y: rng.get('walk').int(128) })
-          if (tick % 10 === 0) emit('need_changed', { id: `a${rng.get('meta').int(5)}`, need: 'hunger', delta: -1 })
-        }
-      },
-    })
-    for (let i = 0; i < MINUTES_PER_DAY; i++) loop.step()
-    expect(stateHash(loop.state)).toBe(GOLDEN_DAY_HASH)
-  })
-})

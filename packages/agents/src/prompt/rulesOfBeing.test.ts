@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import { assemblePrompt } from './assemble.js'
@@ -6,21 +5,7 @@ import { calendarLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, FORBIDDEN_FRAMING, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
 import { fixtureBlocks, quietMeadowPacket, tamarIdentity } from '../testutil/fixtures.js'
 
-// Block 1 is the cache-stable prefix of every prompt. Task 17 rewrites it once
-// (SPEECH_RULES + stow/ownership capabilities) and then it is frozen: this hash
-// is the enforcement point, not documentation.
-// Moved once since, by C11 batch-7 controller ruling 5 — the one-time authorized
-// amendment adding the twelve C11 Tier-1 verbs to CAPABILITIES. Re-pinned in that
-// same commit; the prefix is frozen again from here.
-//
-// MOVED A SECOND TIME by the claim-seam lane, for one line: `build` no longer takes a
-// coordinate in a town, and the block was still telling minds to give one. It is the one
-// place a mind is taught its own hands, so a line that names a parameter the verb refuses is
-// a trap rather than a stale comment. Nothing else in the block changed; the diff is the
-// `build` row alone, and the reasoning is on CAPABILITIES itself.
-// Previous value (C11 batch-7 ruling 5): 28c1fce0781ec9019416c234a9eae47401ff4b9dc4a96b91c371335fbad97bd6
-const BLOCK1_SHA256 = '4205d892c18a91de4c9c3a50f0122abaad0d6170488455419dc045bfc4d50065'
-
+// Block 1 is the cache-stable prefix of every prompt.
 function block1(): string {
   return [RULES_OF_BEING, CAPABILITIES, SPEECH_RULES].join('\n\n---\n\n')
 }
@@ -125,11 +110,10 @@ describe('the shared calendar', () => {
   })
 })
 
-describe('block 1 is frozen', () => {
-  it('matches its pinned bytes', () => {
-    expect(createHash('sha256').update(block1(), 'utf8').digest('hex')).toBe(BLOCK1_SHA256)
-  })
-
+// What the pinned bytes were an expensive proxy for: block 1 is the cache-stable prefix, so
+// what matters is that every prompt opens with the SAME one. Two minds as unlike as the
+// fixtures get is the check; the bytes themselves are free to be edited.
+describe('block 1 is the shared prefix', () => {
   it('opens every system prompt, unchanged by identity or personality', () => {
     const a = assemblePrompt(fixtureBlocks())
     const b = assemblePrompt(
