@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { ITEM_PX } from './entities.js'
 import { LIBRARY_TILE_PX, furnishingDivisor, furnishingScale } from './interiors.js'
-import { SLOT_TILES } from './roomShell.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import { BUILDING_PX_PER_TILE } from './textures.js'
 import { TILE_W } from './iso.js'
@@ -96,7 +95,7 @@ function drawTable(): Row[] {
       authoredPx: spanOn(w, h, INTERIOR_TILE.w),
       // WHAT THE RENDERER ACTUALLY DOES, not what it ought to: the sprite is scaled by
       // `furnishingScale`, so this row goes red on the multiplier the tree carried.
-      drawnPx: spanOn(w, h, INTERIOR_TILE.w) * furnishingScale(SLOT_TILES),
+      drawnPx: spanOn(w, h, INTERIOR_TILE.w) * furnishingScale(),
       where: 'interiors.ts furnishingScale',
     })
     rows.push({
@@ -160,34 +159,37 @@ describe('★ every item and every cast cell reaches the screen at a whole-numbe
   })
 })
 
-describe('★ the room draws library art through an integer DIVISOR, never an upscale', () => {
-  it('the divisor is the interior tile over the town tiles a slot is laid out on', () => {
+// ★ OPTION C RETIRED THE DIVISOR. It was 2 against a scene zoom of 4 — a composite of 2, so
+// every 128 px library sprite was pixel-DOUBLED by the camera on its way to the glass. The
+// room's unit is now the interior tile the art is already authored against, at a scene zoom of
+// 1, so the factor is 1 and nothing in the room is resampled at all.
+describe('★ the room draws library art at NATIVE size — no upscale and no downscale', () => {
+  it('the divisor is the authored tile over the tile the room lays it on, and it is one', () => {
     expect(LIBRARY_TILE_PX).toBe(INTERIOR_TILE.w)
-    expect(furnishingDivisor(SLOT_TILES)).toBe(INTERIOR_TILE.w / (SLOT_TILES * TOWN_TILE.w))
-    expect(furnishingDivisor(SLOT_TILES)).toBe(2)
-    expect(furnishingScale(SLOT_TILES)).toBe(0.5)
+    expect(furnishingDivisor()).toBe(LIBRARY_TILE_PX / INTERIOR_TILE.w)
+    expect(furnishingDivisor()).toBe(1)
+    expect(furnishingScale()).toBe(1)
   })
 
-  it('★ it is the SAME divisor for every footprint — a bed and a bowl agree about the room', () => {
+  it('★ it is the SAME factor for every footprint — a bed and a bowl agree about the room', () => {
     for (const [w, h] of [[1, 1], [1, 2], [2, 1], [2, 2], [3, 2]] as const) {
       const authored = spanOn(w, h, INTERIOR_TILE.w)
-      const slot = spanOn(w, h, SLOT_TILES * TILE_W)
-      expect(authored / slot).toBe(furnishingDivisor(SLOT_TILES))
-      expect(authored * furnishingScale(SLOT_TILES)).toBe(slot)
+      const ground = spanOn(w, h, INTERIOR_TILE.w)
+      expect(authored / ground).toBe(furnishingDivisor())
+      expect(authored * furnishingScale()).toBe(ground)
     }
   })
 
-  it('a furnishing lands ON its slot, neither over nor inside it', () => {
-    const authored = spanOn(1, 1, INTERIOR_TILE.w)
-    const slotGround = SLOT_TILES * TILE_W
-    expect(authored * furnishingScale(SLOT_TILES)).toBe(slotGround)
+  it('a furnishing lands ON its own ground, neither over nor inside it', () => {
+    expect(spanOn(1, 1, INTERIOR_TILE.w) * furnishingScale()).toBe(INTERIOR_TILE.w)
+    // and the town tile is still the interior tile's own quarter, so the doorway is a push-in
+    expect(INTERIOR_TILE.w / TOWN_TILE.w).toBe(4)
+    expect(TILE_W).toBe(TOWN_TILE.w)
   })
 
-  it('the divisor is whole and at least one at every slot size the room could use', () => {
-    for (const tiles of [1, 2, 4]) {
-      expect(Number.isInteger(furnishingDivisor(tiles))).toBe(true)
-      expect(furnishingDivisor(tiles)).toBeGreaterThanOrEqual(1)
-      expect(furnishingScale(tiles)).toBe(1 / furnishingDivisor(tiles))
-    }
+  it('the factor is whole and at least one, so the room can never inflate art', () => {
+    expect(Number.isInteger(furnishingDivisor())).toBe(true)
+    expect(furnishingDivisor()).toBeGreaterThanOrEqual(1)
+    expect(furnishingScale()).toBeLessThanOrEqual(1)
   })
 })

@@ -2,7 +2,7 @@
   "version": "v1-library-item",
   "kind": "bed",
   "category": "furniture",
-  "spritePx": 128,
+  "spritePx": 192,
   "iconPx": 64,
   "interior": {
     "slots": {

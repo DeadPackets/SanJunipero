@@ -56,7 +56,7 @@ describe('planBatch', () => {
         expect(i.commissionText).toContain(i.entry.desc)
         expect(i.boilerplate).not.toContain(i.entry.desc)
         // At the C-level cell the prompt asks FOR detail instead of warning against it.
-        expect(i.boilerplate, i.entry.kind).toContain('128 pixels across')
+        expect(i.boilerplate, i.entry.kind).toContain(`${i.entry.spritePx} pixels across`)
         expect(i.boilerplate, i.entry.kind).toContain('carries real detail')
         expect(i.boilerplate, i.entry.kind).not.toContain('no hair-thin detail')
       }

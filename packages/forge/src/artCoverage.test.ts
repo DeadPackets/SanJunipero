@@ -160,19 +160,20 @@ describe('the committed items', () => {
   it.each(items.map((i) => [i.kind, i] as const))('%s clears the pixel bar', async (_kind, item) => {
     const sprite = await decodePng(item.sprite)
     const icon = await decodePng(item.icon)
-    expect([sprite.width, sprite.height], 'the world sprite is the C-level cell')
-      .toEqual([WORLD_SPRITE_PX, WORLD_SPRITE_PX])
+    // the entry's OWN size: a 1x2 bed covers 192 px of the interior tile, a 1x1 chair 128
+    expect([sprite.width, sprite.height], 'the world sprite is the size its footprint covers')
+      .toEqual([item.entry.spritePx, item.entry.spritePx])
     expect([icon.width, icon.height], 'the icon is the C-level icon').toEqual([ICON_PX, ICON_PX])
     // INTEGER DOWNSCALE ONLY: the icon must be a whole divide of the sprite, or it came off
     // a fractional resample and ships the mush this bar exists to keep out.
-    expect(WORLD_SPRITE_PX % ICON_PX, 'the icon is a whole divide of the sprite').toBe(0)
+    expect(item.entry.spritePx % ICON_PX, 'the icon is a whole divide of the sprite').toBe(0)
     for (const img of [sprite, icon]) {
       expect(alphaBinaryGate(img).failures).toEqual([])
       expect(paletteGate(img).failures).toEqual([])
     }
     // the renderer needs the manifest to parse, or the room draws the placeholder anyway
     expect(parseLibraryItemManifest(JSON.stringify(item.manifest))).not.toBeNull()
-    expect(item.manifest.spritePx).toBe(WORLD_SPRITE_PX)
+    expect(item.manifest.spritePx).toBe(item.entry.spritePx)
     expect(item.manifest.iconPx).toBe(ICON_PX)
     expect((item.manifest.interior !== undefined))
       .toBe(item.entry.category === 'furniture')

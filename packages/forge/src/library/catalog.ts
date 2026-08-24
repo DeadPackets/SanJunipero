@@ -18,7 +18,7 @@ export const LIBRARY_COUNTS: Record<LibraryCategory, number> =
 // The C-level bar owns both numbers now. 24 px was never a divisor of the 512 generation
 // (512/24 = 21.33), so every sprite in the library came off a fractional downscale.
 export { WORLD_SPRITE_PX, ICON_PX } from '../assetResolution.js'
-import { WORLD_SPRITE_PX, ICON_PX } from '../assetResolution.js'
+import { ICON_PX, WORLD_SPRITE_PX, nativeSizeFor } from '../assetResolution.js'
 
 const tool = (kind: string, desc: string): LibraryEntry =>
   ({ kind, category: 'tool', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX })
@@ -28,8 +28,26 @@ const material = (kind: string, desc: string): LibraryEntry =>
   ({ kind, category: 'material', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX })
 const ritual = (kind: string, desc: string): LibraryEntry =>
   ({ kind, category: 'ritual', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX })
-const furniture = (kind: string, desc: string, interior: LibraryEntry['interior']): LibraryEntry =>
-  ({ kind, category: 'furniture', desc, spritePx: WORLD_SPRITE_PX, iconPx: ICON_PX, interior })
+/**
+ * ★ A FURNISHING IS AUTHORED FOR THE GROUND IT COVERS, NOT FOR A SINGLE SIZE.
+ *
+ * `WORLD_SPRITE_PX` is the 1×1 answer. A 1×2 bed spans `(1 + 2) × 64` = 192 px of the 128×64
+ * interior tile — `assetResolution.nativeSizeFor` has said so since the C-level bar landed —
+ * and shipping it at 128 draws a bed two-thirds the length of the person lying in it, which is
+ * what the browser showed the moment the room stopped scaling everything up.
+ *
+ * `SHORT_OF_FOOTPRINT` is the honest half: two 1×2 kinds have no 192 px art yet. They keep the
+ * size their art actually is — nothing is ever declared bigger than the pixels behind it — and
+ * `catalog.test.ts` names them, so closing the gap is one deletion per kind.
+ */
+export const SHORT_OF_FOOTPRINT: ReadonlySet<string> = new Set(['bench', 'loom'])
+
+const furniture = (kind: string, desc: string, interior: LibraryEntry['interior']): LibraryEntry => ({
+  kind, category: 'furniture', desc, iconPx: ICON_PX, interior,
+  spritePx: interior === undefined || SHORT_OF_FOOTPRINT.has(kind)
+    ? WORLD_SPRITE_PX
+    : nativeSizeFor('item', interior.slots).w,
+})
 
 const TOOLS: LibraryEntry[] = [
   tool('axe', 'a woodcutter axe with a honey-wood haft and a warm-grey iron head, the blade edge kept bright and keen'),

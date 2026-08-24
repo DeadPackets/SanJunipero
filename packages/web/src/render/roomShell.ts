@@ -1,10 +1,13 @@
-import { TILE_H, TILE_W, tileToScreen } from './iso.js'
+import {
+  INTERIOR_TILE, ROOM_TILES, WALL_H_PX, WALL_KINDS, alongWall, interiorToScreen, wallOfTile,
+  type Tile, type WallKind,
+} from './interiorMap.js'
 
-// THE ROOM SHELL — WALLS, A BACK PLANE, A THRESHOLD (U4, plan task 66).
+// THE ROOM SHELL — WALLS, A BACK PLANE, A THRESHOLD (U4, plan task 66; Option C, task 84).
 //
 // THE COMPLAINT: interiors are "way too low quality, way too under detailed". The room was a
 // flat cream diamond with a 2 px rim, one shaded far row and up to five sprites standing on
-// it. There were NO WALLS — `interiors.ts` even carries a `placement: 'wall'` meta whose only
+// it. There were NO WALLS — `interiors.ts` even carried a `placement: 'wall'` meta whose only
 // effect was a 0 px offset, because there was nothing to hang anything on.
 //
 // A room is three planes, not one: the floor a body stands on and the two back walls a
@@ -12,27 +15,44 @@ import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 // stop a plane reading as a coloured card — the courses that give a wall its grain and the
 // pools of light that say where the light comes from. Pure functions and palette tokens only:
 // no Pixi, no pixels, so every number here is measurable offline.
+//
+// ★ THE UNIT IS NOW THE INTERIOR TILE, AND THAT IS THE WHOLE OF OPTION C. Every length below
+// was a count of 32×16 TOWN tiles, drawn at a scene zoom of 3 or 4. It is now interior pixels
+// on the 128×64 interior tile at a scene zoom of ONE — the same pixel density on the glass, a
+// room twice as wide, and art that lands 1:1 instead of being doubled by the camera.
+// `interiorMap.ts` owns the lattice; this module owns what is painted on it.
 
-/** Every room is a 3×3 grid of slots (C13 CITY_INTERIOR_SLOTS). */
-export const ROOM_SLOTS = 3
-/** One slot is a 2×2 tile diamond. */
-export const SLOT_TILES = 2
+export { ROOM_TILES, WALL_H_PX, WALL_KINDS, type WallKind } from './interiorMap.js'
 
-/** A room's walls rise three tile-heights behind the floor. One tile of HEIGHT is TILE_W px,
- *  the same convention the built form uses, so a wall and a building share one scale. */
-export const WALL_H_TILES = 3
-export const WALL_KINDS = ['back-left', 'back-right'] as const
-export type WallKind = (typeof WALL_KINDS)[number]
+/** The room's size, in interior tiles. */
+export type RoomSize = { w: number; h: number }
 
-/** Eye height: where a wall piece hangs, in tiles up the wall. */
-export const WALL_MOUNT_H_TILES = 1.5
+/**
+ * ★ THE SCENE ZOOM IS ONE, AND THAT IS NOT A DEMOTION.
+ *
+ * It was 4, over a 6×6 room of 32×16 town tiles: one tile reached the glass 128 px across and
+ * a 128 px library sprite was drawn at 256 — a clean doubling, but a DOUBLING, so half the
+ * pixels on the screen were invented by the sampler. Option C keeps the tile exactly 128 px
+ * wide on the glass and makes the TILE the authored unit instead of the camera. The room is
+ * 12×6 of those, the furniture lands at its own native size, and nothing is upscaled.
+ *
+ * There is no smaller integer, so a stage too short for the box crops it rather than
+ * resampling it — `roomOriginY` spends what headroom there is on the wall top first.
+ */
+export const ROOM_ZOOM = 1
+/** Stage left above the wall top and below the near floor vertex. A room flush to the edge of
+ *  the screen reads as a room that has been cut off. */
+export const ROOM_MARGIN_Y = 8
 
-/** A course of the wall's own material, every half tile of height — the grain that stops a
- *  wall reading as a flat trapezoid at 3× zoom. */
-export const WALL_COURSE_TILES = 0.5
+/** A course of the wall's own material, every 32 interior px of height — the grain that stops
+ *  a wall reading as a flat trapezoid. */
+export const WALL_COURSE_PX = 32
 /** The board at the foot of a wall, where it meets the floor. */
-export const SKIRTING_TILES = 0.28
-/** Floor boards run one tile apart, along the room's +x axis. */
+export const SKIRTING_PX = 18
+/** Where a wall piece hangs when the codex has no wall ELEVATION art for it: up the wall,
+ *  clear of the skirting. The art path never uses this — an elevation piece IS the wall. */
+export const WALL_MOUNT_H_PX = 96
+/** Floor boards run one interior tile apart, along the room's +x axis. */
 export const FLOOR_BOARD_TILES = 1
 
 export const DOORWAY_POOL_ALPHA = 0.18
@@ -40,40 +60,19 @@ export const HEARTH_POOL_ALPHA = 0.26
 export const DOORWAY_POOL_R_TILES = 2.2
 export const HEARTH_POOL_R_TILES = 1.8
 
-/** The threshold plate, in tiles across. Matched to the exterior door sill so entering and
- *  leaving are visibly the same place. */
+/** The threshold plate, in interior tiles across. Matched to the exterior door sill so
+ *  entering and leaving are visibly the same place. */
 export const THRESHOLD_TILES = 1.6
-
-/**
- * ★ HOW CLOSE THE ROOM IS DRAWN, AND WHY IT IS FOUR.
- *
- * It was 3, on a line whose comment says "integer zoom only". `room.scale.set(3)` IS an
- * integer, but the sprites inside carry `furnishingScale(SLOT_TILES)` = 0.5 of their own, so
- * what reached the screen was 1.5 — 128 px library art resampled at one and a half under
- * NEAREST, duplicating every other source column. And a body was drawn 156 px tall indoors
- * (`CHAR_TARGET_PX` 52 × 3) against 208 px at the town's own closest stop: **a person 25%
- * SMALLER in the surface whose whole purpose is to be closer.** At 4 the composite is 2.0, a
- * clean pixel doubling, and a body is exactly the size it is out of doors.
- *
- * ★ AND IT IS THE STAGE THAT DECIDES WHETHER 4 IS ON, because the fit check says so rather
- * than my eye. The drawn box is `WALL_H_TILES × TILE_W + ROOM_SLOTS × SLOT_TILES × TILE_H` =
- * 192 px, so 4 needs 768 px of stage against 3's 576. MEASURED in the running app on this
- * machine's maximised window: 1728 × 963 gives `app.screen.height` = 818 — 4 fits, and would
- * not have with the old unconditional 40 px lift (that needed 848). A stage shorter than
- * 768 + two margins cannot hold it at all and keeps 3, which is exactly what it draws today.
- */
-export const ROOM_ZOOM_CLOSE = 4
-export const ROOM_ZOOM_SHORT = 3
-/** Stage left above the wall top and below the near floor vertex. A room flush to the edge of
- *  the screen reads as a room that has been cut off. */
-export const ROOM_MARGIN_Y = 8
 
 /** How deep the walls' shade falls across the row of floor nearest them. */
 export const FAR_ROW_SHADE_ALPHA = 0.22
 
 /** Every colour the shell paints. All MASTER_PALETTE members, asserted as a set by the test.
  *  The two walls are a light and a shade of one material so the corner reads as a corner;
- *  the floor is a third step, so no two adjacent planes share a tone. */
+ *  the floor is a third step, so no two adjacent planes share a tone.
+ *
+ *  This is the ART-INDEPENDENT shell: what the room is when the codex holds no interior
+ *  tileset. With one, the walls and the floor are drawn from it and only the light is code. */
 export const ROOM_SHELL_PAINT = {
   floor: 0xf6e8d5,        // warm paper — the landed INTERIOR_FLOOR, kept
   floorSeam: 0xd4bc9e,    // board seams
@@ -89,104 +88,122 @@ export const ROOM_SHELL_PAINT = {
 /** --ink. Every silhouette rim in the room. */
 export const ROOM_SHELL_INK = 0x43394a
 
+/** The shade a wall face is drawn in, as a multiplier on its art. Light falls from the north
+ *  west, so the left-hand face sits in its own shade — the mock's `NW_TINT`. */
+export const WALL_TINT: Record<WallKind, number> = { 'back-right': 1, 'back-left': 0.86 }
+
 export type Line4 = [number, number, number, number]
 
-/** The floor diamond: the whole slot grid, as a closed polygon in room space. Origin is the
+/** The floor diamond: the whole tile grid, as a closed polygon in room space. Origin is the
  *  far vertex, exactly where the room container is positioned. */
-export function floorPolyOf(slots: number, slotTiles: number): number[] {
-  const w = slots * slotTiles
-  const c = [tileToScreen(0, 0), tileToScreen(w, 0), tileToScreen(w, w), tileToScreen(0, w)]
+export function floorPolyOf(room: RoomSize = ROOM_TILES): number[] {
+  const c = [
+    interiorToScreen(0, 0), interiorToScreen(room.w, 0),
+    interiorToScreen(room.w, room.h), interiorToScreen(0, room.h),
+  ]
+  return c.flatMap((p) => [p.sx, p.sy])
+}
+
+/** A rectangle of the tile map as a closed diamond in room space — a patch of one floor
+ *  material laid over another, like the flagstone under a hearth. */
+export function floorRegionPoly(r: { x0: number; y0: number; x1: number; y1: number }): number[] {
+  const c = [
+    interiorToScreen(r.x0, r.y0), interiorToScreen(r.x1, r.y0),
+    interiorToScreen(r.x1, r.y1), interiorToScreen(r.x0, r.y1),
+  ]
   return c.flatMap((p) => [p.sx, p.sy])
 }
 
 /**
  * The centre of the ground a piece stands on, in room space — the point its sprite's feet
- * belong at. A furnishing two slots deep has its foot TWO slots from its origin, not one; the
- * landed room offset every sprite by a single tile whatever its footprint, so anything bigger
- * than one slot stood half outside its own ground.
+ * belong at. A furnishing two tiles deep has its foot TWO tiles from its origin, not one.
  */
-export function slotSpanCentre(
-  slot: { x: number; y: number }, size: { w: number; h: number }, slotTiles: number = SLOT_TILES,
+export function tileSpanCentre(
+  tile: Tile, size: { w: number; h: number },
 ): { sx: number; sy: number } {
-  return tileToScreen((slot.x + size.w / 2) * slotTiles, (slot.y + size.h / 2) * slotTiles)
+  return interiorToScreen(tile.x + size.w / 2, tile.y + size.h / 2)
 }
 
-/** The centre of a single slot, in room space. */
-export function slotCentreScreen(x: number, y: number, slotTiles: number = SLOT_TILES): { sx: number; sy: number } {
-  return slotSpanCentre({ x, y }, { w: 1, h: 1 }, slotTiles)
+/** The centre of a single interior tile, in room space. */
+export function tileCentreScreen(x: number, y: number): { sx: number; sy: number } {
+  return tileSpanCentre({ x, y }, { w: 1, h: 1 })
 }
 
 /** The base edge of a wall, from the far vertex outward. `back-right` runs along +x, which is
  *  the edge that goes down and to the RIGHT on screen; `back-left` runs along +y. */
-function wallBase(kind: WallKind, slots: number, slotTiles: number): { sx: number; sy: number } {
-  const w = slots * slotTiles
-  return kind === 'back-right' ? tileToScreen(w, 0) : tileToScreen(0, w)
+function wallBase(kind: WallKind, room: RoomSize): { sx: number; sy: number } {
+  return kind === 'back-right' ? interiorToScreen(room.w, 0) : interiorToScreen(0, room.h)
 }
 
 /**
  * The two back walls, as closed quads in room space: the base edge, then the same edge raised
- * by `wallH` tiles of height. The pair shares exactly one edge — the far vertical column at
+ * by `wallH` interior pixels. The pair shares exactly one edge — the far vertical column at
  * the room's origin — which is what makes the corner a corner.
  */
-export function wallPolys(slots: number, slotTiles: number, wallH: number): Record<WallKind, number[]> {
-  const rise = wallH * TILE_W
+export function wallPolys(
+  room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+): Record<WallKind, number[]> {
   const out = {} as Record<WallKind, number[]>
   for (const kind of WALL_KINDS) {
-    const e = wallBase(kind, slots, slotTiles)
-    out[kind] = [0, 0, e.sx, e.sy, e.sx, e.sy - rise, 0, -rise]
+    const e = wallBase(kind, room)
+    out[kind] = [0, 0, e.sx, e.sy, e.sx, e.sy - wallH, 0, -wallH]
   }
   return out
 }
 
 /** Horizontal courses up each wall, parallel to its own base edge. */
-export function wallCourses(slots: number, slotTiles: number, wallH: number): Record<WallKind, Line4[]> {
-  const rise = wallH * TILE_W
-  const step = WALL_COURSE_TILES * TILE_W
+export function wallCourses(
+  room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+): Record<WallKind, Line4[]> {
   const out = {} as Record<WallKind, Line4[]>
   for (const kind of WALL_KINDS) {
-    const e = wallBase(kind, slots, slotTiles)
+    const e = wallBase(kind, room)
     const lines: Line4[] = []
-    for (let up = step; up < rise; up += step) lines.push([0, -up, e.sx, e.sy - up])
+    for (let up = WALL_COURSE_PX; up < wallH; up += WALL_COURSE_PX) {
+      lines.push([0, -up, e.sx, e.sy - up])
+    }
     out[kind] = lines
   }
   return out
 }
 
-/** The board at the foot of each wall: the base edge, raised by SKIRTING_TILES. */
-export function skirtingPolys(slots: number, slotTiles: number): Record<WallKind, number[]> {
-  const rise = SKIRTING_TILES * TILE_W
+/** The board at the foot of each wall: the base edge, raised by SKIRTING_PX. */
+export function skirtingPolys(room: RoomSize = ROOM_TILES): Record<WallKind, number[]> {
   const out = {} as Record<WallKind, number[]>
   for (const kind of WALL_KINDS) {
-    const e = wallBase(kind, slots, slotTiles)
-    out[kind] = [0, 0, e.sx, e.sy, e.sx, e.sy - rise, 0, -rise]
+    const e = wallBase(kind, room)
+    out[kind] = [0, 0, e.sx, e.sy, e.sx, e.sy - SKIRTING_PX, 0, -SKIRTING_PX]
   }
   return out
 }
 
 /** Board seams across the floor, running along the room's +x axis. */
-export function floorBoards(slots: number, slotTiles: number): Line4[] {
-  const w = slots * slotTiles
+export function floorBoards(room: RoomSize = ROOM_TILES): Line4[] {
   const lines: Line4[] = []
-  for (let y = FLOOR_BOARD_TILES; y < w; y += FLOOR_BOARD_TILES) {
-    const a = tileToScreen(0, y), b = tileToScreen(w, y)
+  for (let y = FLOOR_BOARD_TILES; y < room.h; y += FLOOR_BOARD_TILES) {
+    const a = interiorToScreen(0, y), b = interiorToScreen(room.w, y)
     lines.push([a.sx, a.sy, b.sx, b.sy])
   }
   return lines
 }
 
 /**
- * Where a `placement: 'wall'` furnishing hangs: on the wall plane behind its slot, at eye
- * height. A slot nearer the +x edge hangs on the right-hand wall, nearer +y on the left;
- * the far corner slot (0,0) belongs to the left, which is one arbitrary but fixed call.
+ * ★ WHERE A WALL PIECE HANGS — AND WHICH WAY IT THEN FACES.
+ *
+ * This used to pick the wall with `slot.x > slot.y` and say nothing at all about facing, which
+ * is how a fireplace authored SW came to be mounted on the SE-facing wall. The wall is now the
+ * one the piece's TILE is actually against (`interiorMap.wallOfTile`), and the facing is that
+ * wall's own — there is no third answer, because `TownFacing` has no third member.
+ *
+ * `null` for a tile against no wall: a wall piece in the middle of the floor is a placement
+ * error and reads as one instead of hanging in mid-air.
  */
-export function wallMount(
-  slot: { x: number; y: number }, slots: number, slotTiles: number = SLOT_TILES,
-): { sx: number; sy: number; wall: WallKind } {
-  const wall: WallKind = slot.x > slot.y ? 'back-right' : 'back-left'
-  const base = wall === 'back-right'
-    ? tileToScreen((slot.x + 0.5) * slotTiles, 0)
-    : tileToScreen(0, (slot.y + 0.5) * slotTiles)
-  return { sx: base.sx, sy: base.sy - WALL_MOUNT_H_TILES * TILE_W, wall }
+export function wallMount(tile: Tile): { sx: number; sy: number; wall: WallKind } | null {
+  const wall = wallOfTile(tile)
+  if (wall === null) return null
+  const along = alongWall(wall, tile) + 0.5
+  const base = wall === 'back-right' ? interiorToScreen(along, 0) : interiorToScreen(0, along)
+  return { sx: base.sx, sy: base.sy - WALL_MOUNT_H_PX, wall }
 }
 
 /**
@@ -194,12 +211,41 @@ export function wallMount(
  * sits on, so entering and leaving are the same place. Half of it lies inside the room and
  * half outside — which is what a threshold is.
  */
-export function thresholdPoly(slots: number, slotTiles: number): number[] {
-  const w = slots * slotTiles
-  const c = tileToScreen(w, w)
-  const hx = (THRESHOLD_TILES * TILE_W) / 2
-  const hy = (THRESHOLD_TILES * TILE_H) / 2
+export function thresholdPoly(room: RoomSize = ROOM_TILES): number[] {
+  const c = interiorToScreen(room.w, room.h)
+  const hx = (THRESHOLD_TILES * INTERIOR_TILE.w) / 2
+  const hy = (THRESHOLD_TILES * INTERIOR_TILE.h) / 2
   return [c.sx, c.sy - hy, c.sx + hx, c.sy, c.sx, c.sy + hy, c.sx - hx, c.sy]
+}
+
+// ── ★ THE CEILING, SEEN THE ONLY WAY A DIMETRIC CAMERA CAN SEE IT ────────────────────────
+//
+// A room drawn from above has no ceiling on the screen, and the mock the user approved solves
+// that the way a painter does: three joists, drawn as the shadows they cast down the floor.
+// It is the cheapest thing in the picture and it is most of what stops a big floor reading as
+// an empty one. The lane before this one ran out of room before them and said so.
+//
+// The spacing is the WALL BAY, not a number: a joist lands over the joint between two wall
+// strips, which is where a joist actually goes, so the ceiling and the walls are the same
+// building. `WALL_STRIP_TILES` lives in `interiorTileset.ts`, so it is passed in.
+
+/** How far a joist reaches either side of its own centre line, in interior tiles. */
+export const BEAM_HALF_TILES = 0.22
+/** The shadow a joist lays on the floor. Ink, barely — a beam is a darkening, not a stripe. */
+export const BEAM_ALPHA = 0.13
+
+/** One quad per ceiling joist, in room space, running the full depth of the floor. */
+export function ceilingBeams(bayTiles: number, room: RoomSize = ROOM_TILES): number[][] {
+  const out: number[][] = []
+  for (let i = 0; (i + 0.5) * bayTiles < room.w; i++) {
+    const cx = (i + 0.5) * bayTiles
+    const c = [
+      interiorToScreen(cx - BEAM_HALF_TILES, 0), interiorToScreen(cx + BEAM_HALF_TILES, 0),
+      interiorToScreen(cx + BEAM_HALF_TILES, room.h), interiorToScreen(cx - BEAM_HALF_TILES, room.h),
+    ]
+    out.push(c.flatMap((p) => [p.sx, p.sy]))
+  }
+  return out
 }
 
 export type FloorPool = { sx: number; sy: number; radius: number; alpha: number }
@@ -210,20 +256,20 @@ export type FloorPool = { sx: number; sy: number; radius: number; alpha: number 
  * returned first, so the painter lays the ambient light down before any fire.
  */
 export function floorPools(
-  items: ReadonlyArray<{ slot: { x: number; y: number }; light: boolean }>,
-  slots: number,
-  slotTiles: number = SLOT_TILES,
+  items: ReadonlyArray<{ tile: Tile; light: boolean }>, room: RoomSize = ROOM_TILES,
 ): FloorPool[] {
-  const w = slots * slotTiles
-  const door = tileToScreen(w, w)
+  const door = interiorToScreen(room.w, room.h)
   const pools: FloorPool[] = [{
     sx: door.sx, sy: door.sy,
-    radius: DOORWAY_POOL_R_TILES * TILE_W, alpha: DOORWAY_POOL_ALPHA,
+    radius: DOORWAY_POOL_R_TILES * INTERIOR_TILE.w, alpha: DOORWAY_POOL_ALPHA,
   }]
   for (const item of items) {
     if (!item.light) continue
-    const c = slotCentreScreen(item.slot.x, item.slot.y, slotTiles)
-    pools.push({ sx: c.sx, sy: c.sy, radius: HEARTH_POOL_R_TILES * TILE_W, alpha: HEARTH_POOL_ALPHA })
+    const c = tileCentreScreen(item.tile.x, item.tile.y)
+    pools.push({
+      sx: c.sx, sy: c.sy,
+      radius: HEARTH_POOL_R_TILES * INTERIOR_TILE.w, alpha: HEARTH_POOL_ALPHA,
+    })
   }
   return pools
 }
@@ -236,13 +282,12 @@ export function floorPools(
  * nothing drawn inside it belongs outside it. One mask on the room container settles that for
  * every prop, present and future, instead of one clamp per light.
  */
-export function roomMaskPoly(slots: number, slotTiles: number, wallH: number): number[] {
-  const rise = wallH * TILE_W
-  const e = wallBase('back-right', slots, slotTiles)
-  const w = wallBase('back-left', slots, slotTiles)
-  const near = tileToScreen(slots * slotTiles, slots * slotTiles)
+export function roomMaskPoly(room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX): number[] {
+  const e = wallBase('back-right', room)
+  const w = wallBase('back-left', room)
+  const near = interiorToScreen(room.w, room.h)
   return [
-    w.sx, w.sy - rise, 0, -rise, e.sx, e.sy - rise,
+    w.sx, w.sy - wallH, 0, -wallH, e.sx, e.sy - wallH,
     e.sx, e.sy, near.sx, near.sy, w.sx, w.sy,
   ]
 }
@@ -253,41 +298,80 @@ export function roomMaskPoly(slots: number, slotTiles: number, wallH: number): n
  * as the thing the landed code was centring, so the top of the room went off the stage.
  */
 export function roomBox(
-  slots: number, slotTiles: number, wallH: number,
+  room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
 ): { top: number; bottom: number; height: number } {
-  const top = -wallH * TILE_W
-  const bottom = slots * slotTiles * TILE_H
+  const top = -wallH
+  const bottom = (room.w + room.h) * (INTERIOR_TILE.h / 2)
   return { top, bottom, height: bottom - top }
 }
 
-/** ★ HOW CLOSE THIS STAGE CAN HOLD THE WHOLE ROOM: `ROOM_ZOOM_CLOSE` when the box and its two
- *  margins fit, `ROOM_ZOOM_SHORT` — today's behaviour — when they do not. A short window gets
- *  the room it already gets; it never gets a wall cut off by the top of the screen. */
-export function roomZoomFor(
-  screenH: number, slots: number = ROOM_SLOTS, slotTiles: number = SLOT_TILES,
-  wallH: number = WALL_H_TILES,
-): number {
-  const h = roomBox(slots, slotTiles, wallH).height
-  return h * ROOM_ZOOM_CLOSE + 2 * ROOM_MARGIN_Y <= screenH ? ROOM_ZOOM_CLOSE : ROOM_ZOOM_SHORT
+/**
+ * ★ HOW CLOSE THIS STAGE HOLDS THE ROOM — and why the answer no longer depends on the stage.
+ *
+ * It used to choose between 4 and 3 by whether the box fitted. Option C has ONE integer scene
+ * zoom and it is 1: the interior tile is authored at the size it reaches the glass, so any
+ * other factor resamples pixel art, and there is no integer below 1 to fall back to. A stage
+ * that cannot hold the box CROPS it — `roomCropPx` says by how much — because a cropped room
+ * of real pixels beats a whole room of invented ones.
+ *
+ * It stays a function of the stage so the scene keeps asking rather than writing a constant.
+ */
+export function roomZoomFor(_screenH: number): number {
+  return ROOM_ZOOM
+}
+
+/**
+ * How much of the room's box a stage this tall cannot show. 0 when it all fits — the number the
+ * crop costs, so "it does not fit" is measured rather than asserted.
+ *
+ * ★ THE MARGIN IS NOT PART OF THE BOX. It was counted here, so a stage that could hold the room
+ * exactly was told it was 16 px short and threw away the near corner — the threshold, which is
+ * the way out — to buy two strips of nothing. A courtesy is paid out of slack or it is not paid:
+ * `roomOriginY` clamps it to the headroom that exists, and this counts only the picture.
+ */
+export function roomCropPx(screenH: number, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX): number {
+  return Math.max(0, roomBox(room, wallH).height * ROOM_ZOOM - screenH)
+}
+
+/**
+ * ★ WHERE THE ROOM'S ORIGIN GOES ACROSS THE STAGE — and it is NOT the middle of it.
+ *
+ * The origin is the room's FAR corner, and the room only spreads evenly around it while it is
+ * square. Option C's room is 12 × 6, so its west vertex is 384 px to the left of the origin
+ * and its east vertex 768 px to the right: dropping the origin on the middle of the stage
+ * hangs the room 192 px off to the right, which is what the browser showed.
+ */
+export function roomOriginX(screenW: number, zoom: number, room: RoomSize = ROOM_TILES): number {
+  const west = interiorToScreen(0, room.h).sx
+  const east = interiorToScreen(room.w, 0).sx
+  return screenW / 2 - ((west + east) / 2) * zoom
 }
 
 /**
  * Where the room container's origin goes so the whole box is centred in a stage `screenH`
  * tall, lifted clear of the chrome at the bottom by `offsetY`.
  *
- * ★ THE LIFT IS A COURTESY, NOT A LICENCE. It was subtracted unconditionally, which is fine
- * while the box is half the stage and pushes a wall off the top the moment it is not: at zoom
- * 4 on an 818 px stage the box has 25 px of headroom and the flat 40 px lift spent 40 of it.
- * It is clamped to the headroom the stage actually has, less the margin, so the invariant the
- * landed test states — every wall point on the stage — holds at every zoom and every height
- * instead of at the one pair it was written for.
+ * ★ THE LIFT IS A COURTESY, NOT A LICENCE. It was subtracted unconditionally, which pushes a
+ * wall off the top the moment the box is not half the stage. It is clamped to the headroom the
+ * stage actually has, less the margin, so the invariant the landed test states — every wall
+ * point on the stage — holds at every height that can hold the box at all.
  */
 export function roomOriginY(
-  screenH: number, offsetY: number, zoom: number, slots: number, slotTiles: number, wallH: number,
+  screenH: number, offsetY: number, zoom: number, room: RoomSize = ROOM_TILES,
+  wallH: number = WALL_H_PX,
 ): number {
-  const box = roomBox(slots, slotTiles, wallH)
+  const box = roomBox(room, wallH)
   const centred = screenH / 2 - ((box.top + box.bottom) / 2) * zoom
   const headroom = centred + box.top * zoom     // stage above the wall top, centred
+  // ★ A SHORT STAGE LOSES THE NEAR CORNER, NOT THE WALL TOP. Centring split the overflow
+  // evenly, which spends half of it on the windows, the chimney breast and the beams and the
+  // other half on a corner of bare boards. The walls are where the room's detail is.
+  //
+  // ★ AND IT LOSES AS LITTLE OF IT AS IT CAN. This pinned the wall top a full `ROOM_MARGIN_Y`
+  // down whatever the stage had, so a room that overflowed by 2 px lost 10 — the margin taken
+  // out of the picture instead of out of the slack. Clamped to the headroom that exists, which
+  // is the same rule the lift above it already answers to.
+  if (headroom < ROOM_MARGIN_Y) return Math.max(0, headroom) - box.top * zoom
   return centred - Math.max(0, Math.min(offsetY, headroom - ROOM_MARGIN_Y))
 }
 
@@ -313,11 +397,13 @@ const strokeLines = (g: ShellPainter, lines: Line4[], color: number, alpha: numb
 }
 
 /** The back plane: two walls, their grain, their skirting and the corner they meet in. */
-export function drawWalls(g: ShellPainter, slots: number, slotTiles: number, wallH: number): void {
+export function drawWalls(
+  g: ShellPainter, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+): void {
   g.clear()
-  const walls = wallPolys(slots, slotTiles, wallH)
-  const courses = wallCourses(slots, slotTiles, wallH)
-  const skirt = skirtingPolys(slots, slotTiles)
+  const walls = wallPolys(room, wallH)
+  const courses = wallCourses(room, wallH)
+  const skirt = skirtingPolys(room)
   for (const kind of WALL_KINDS) {
     g.poly(walls[kind])
     g.fill(kind === 'back-right' ? ROOM_SHELL_PAINT.wallLit : ROOM_SHELL_PAINT.wallShade)
@@ -337,16 +423,17 @@ export function drawWalls(g: ShellPainter, slots: number, slotTiles: number, wal
  * so a floor with art and a floor without differ in one fill and nothing else.
  */
 export function drawFloorBase(
-  g: ShellPainter, slots: number, slotTiles: number, surface: number | null = ROOM_SHELL_PAINT.floor,
+  g: ShellPainter, room: RoomSize = ROOM_TILES,
+  surface: number | null = ROOM_SHELL_PAINT.floor,
 ): void {
   if (surface !== null) {
-    g.poly(floorPolyOf(slots, slotTiles))
+    g.poly(floorPolyOf(room))
     g.fill(surface)
   }
   // the far row sits in the walls' shade, so the plane reads as receding rather than face-on
-  g.poly(farRowShade(slots, slotTiles, 0))
+  g.poly(farRowShade(room, 0))
   g.fill({ color: ROOM_SHELL_PAINT.wallShade, alpha: FAR_ROW_SHADE_ALPHA })
-  strokeLines(g, floorBoards(slots, slotTiles), ROOM_SHELL_PAINT.floorSeam, 0.4)
+  strokeLines(g, floorBoards(room), ROOM_SHELL_PAINT.floorSeam, 0.4)
 }
 
 /**
@@ -355,12 +442,15 @@ export function drawFloorBase(
  *
  * THE CALLER MUST MASK THIS TO `floorPolyOf`. Both the doorway pool and the threshold are
  * centred ON the near vertex, so half of each lies outside the room BY CONSTRUCTION.
- * Unclipped, the pool painted a pale smear across the town and the threshold hung in the air
- * below the floor like a tab — which is what the browser showed.
  */
 export function drawFloorLight(
-  g: ShellPainter, pools: readonly FloorPool[], slots: number, slotTiles: number,
+  g: ShellPainter, pools: readonly FloorPool[], room: RoomSize = ROOM_TILES,
+  beams: readonly number[][] = [],
 ): void {
+  for (const beam of beams) {
+    g.poly(beam)
+    g.fill({ color: ROOM_SHELL_INK, alpha: BEAM_ALPHA })
+  }
   for (const [i, p] of pools.entries()) {
     g.ellipse(p.sx, p.sy, p.radius, p.radius / 2)
     g.fill({
@@ -368,24 +458,22 @@ export function drawFloorLight(
       alpha: p.alpha,
     })
   }
-  g.poly(thresholdPoly(slots, slotTiles))
+  g.poly(thresholdPoly(room))
   g.fill({ color: ROOM_SHELL_PAINT.threshold, alpha: 0.5 })
 }
 
 /** The rim that closes the plane, over everything that lies on it. */
-export function drawFloorTop(g: ShellPainter, slots: number, slotTiles: number): void {
-  g.poly(floorPolyOf(slots, slotTiles))
+export function drawFloorTop(g: ShellPainter, room: RoomSize = ROOM_TILES): void {
+  g.poly(floorPolyOf(room))
   g.stroke({ width: 2, color: ROOM_SHELL_INK, alignment: 1 })
 }
 
 /** A far-row shade, kept from the landed room: the floor darkens toward the back wall so the
  *  plane reads as receding rather than as a card seen face-on. */
-export function farRowShade(slots: number, slotTiles: number, row: number): number[] {
-  const n = slotTiles
-  const Y = row * n
+export function farRowShade(room: RoomSize = ROOM_TILES, row: number): number[] {
   const corners = [
-    tileToScreen(0, Y), tileToScreen(slots * n, Y),
-    tileToScreen(slots * n, Y + n), tileToScreen(0, Y + n),
+    interiorToScreen(0, row), interiorToScreen(room.w, row),
+    interiorToScreen(room.w, row + 1), interiorToScreen(0, row + 1),
   ]
   return corners.flatMap((p) => [p.sx, p.sy])
 }
