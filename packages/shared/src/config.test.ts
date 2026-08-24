@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, DEFAULT_CONFIG, isHearthKind, isRoofedKind, SPAWN_AGE_YEARS, thirstDecayPerTick } from './config.js'
-import { CITY_HEARTH_KIND, cityStructures } from './cityTemplate.js'
+import {
+  SimConfigSchema, DEFAULT_CONFIG, isBeddedKind, isHearthKind, isRoofedKind, SPAWN_AGE_YEARS,
+  thirstDecayPerTick,
+} from './config.js'
+import { CITY_BED_KIND, CITY_HEARTH_KIND, cityStructures } from './cityTemplate.js'
 
 // Every C11 section flag, in the order Task 37 will unpin them.
 const C11_FLAGS = [
@@ -81,21 +84,38 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(isRoofedKind(c, 'fire_pit')).toBe(false)
   })
 
-  // ★ THE SEAM THAT MUST NOT DRIFT: the engine's hearth IS the hearth the room draws. The city
-  // template furnishes a house with a hearth and furnishes nothing else with one, and if these
-  // two ever disagree then a mind can feed a fire nobody can see, or see one nobody can feed.
+  // ★ THE SEAM THAT MUST NOT DRIFT: the engine's furnishings ARE the ones the room draws. The
+  // city template furnishes a house with a hearth and a bed and furnishes nothing else with
+  // either, and if these two halves ever disagree then a mind can feed a fire nobody can see,
+  // or sleep in a bed that is not in the picture.
   //
-  // Only `house` is on both sides today. A cottage and a farmhouse are dwellings a mind can
+  // Only `house` is on either side today. A cottage and a farmhouse are dwellings a mind can
   // raise and the template gives them no furnishings at all — the day it does, this test says
   // so out loud instead of letting the two halves part company in silence.
-  it('the kinds the engine says hold a fire are exactly the kinds the room furnishes with one', () => {
-    const furnished = cityStructures()
-      .filter((s) => s.furnishings.some((f) => f.kind === CITY_HEARTH_KIND))
-      .map((s) => s.kind)
-    expect([...new Set(furnished)].sort()).toEqual(['house'])
-    const dwellingsWithFire = Object.keys(c.structures.recipes)
-      .filter((k) => isHearthKind(c, k) && isRoofedKind(c, k)).sort()
-    expect(dwellingsWithFire).toEqual([...new Set(furnished)].sort())
+  it('the furnishings the engine acts on are exactly the ones the room is drawn with', () => {
+    const furnishedWith = (kind: string): string[] => [...new Set(cityStructures()
+      .filter((s) => s.furnishings.some((f) => f.kind === kind))
+      .map((s) => s.kind))].sort()
+    expect(furnishedWith(CITY_HEARTH_KIND)).toEqual(['house'])
+    expect(furnishedWith(CITY_BED_KIND)).toEqual(['house'])
+    const dwellingsWith = (has: (c: typeof DEFAULT_CONFIG, k: string) => boolean): string[] =>
+      Object.keys(c.structures.recipes).filter((k) => has(c, k) && isRoofedKind(c, k)).sort()
+    expect(dwellingsWith(isHearthKind)).toEqual(furnishedWith(CITY_HEARTH_KIND))
+    expect(dwellingsWith(isBeddedKind)).toEqual(furnishedWith(CITY_BED_KIND))
+  })
+
+  // ★ AND A FURNISHING FLAG EXISTS ONLY WHERE A LAW ASKS FOR ONE. A house also holds a table, a
+  // chair and a rug; none of the three is here, because nothing in the world reads them and a
+  // mind handed a word with no verb behind it spends turns being refused. This test is what
+  // stops the row quietly becoming a copy of the renderer's furniture list.
+  it('the row carries the two furnishings a law reads and not the room\'s whole inventory', () => {
+    const row = c.structures.recipes['house']!
+    expect(Object.keys(row).filter((k) => !['inputs', 'w', 'h', 'maxHp', 'flammable', 'durationTicks'].includes(k)).sort())
+      .toEqual(['bed', 'hearth', 'roofed'])
+    // and every one of those three IS in the room the template draws
+    const inTheRoom = cityStructures().find((s) => s.kind === 'house')!.furnishings.map((f) => f.kind)
+    expect(inTheRoom).toContain(CITY_HEARTH_KIND)
+    expect(inTheRoom).toContain(CITY_BED_KIND)
   })
 
   it('reproduction: partnership, conception, gestation, fertility', () => {
@@ -246,10 +266,10 @@ describe('SimConfigSchema: C9 living-world sections', () => {
 
   it('structures.recipes is the one table that knows what a building costs and measures', () => {
     const r = SimConfigSchema.parse({}).structures.recipes
-    expect(r['house']).toEqual({ inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880, roofed: true, hearth: true })
-    expect(r['well']).toEqual({ inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false, hearth: false })
-    expect(r['bridge']).toEqual({ inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false, hearth: false })
-    expect(r['grave']).toEqual({ inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false, hearth: false })
+    expect(r['house']).toEqual({ inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880, roofed: true, hearth: true, bed: true })
+    expect(r['well']).toEqual({ inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false, hearth: false, bed: false })
+    expect(r['bridge']).toEqual({ inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false, hearth: false, bed: false })
+    expect(r['grave']).toEqual({ inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false, hearth: false, bed: false })
     // The four the town template plants. All four are roofed; an empty `inputs` is still the
     // whole of what "nobody builds this" means, and only the two 2x2 ones keep it — a buildable
     // cabin or storehouse would be a second name for `house`.

@@ -103,6 +103,29 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     expect(proseFor(bridge)).not.toContain('hearth')
   })
 
+  // ★ AND WHICH ROOF HAS BEDS IN IT, SAID BEFORE THE WALK. Two 2x2 roofs are not the same
+  // night: the house has beds and the cabin has a floor. A body that can only learn which by
+  // lying down in both has spent two nights finding out — the lesson `full` already taught.
+  it('★ the two 2x2 roofs read differently, and only one of them has beds', () => {
+    const { bridge, loop, homeId } = town(NIGHT - 3)
+    loop.step()
+    const said = bridge.perception('amara').visible.structures
+    const cabin = Object.values(loop.state.structures).find((s) => s.kind === 'cabin')!
+    // Same mass, same roof, same way in — and one of them is somewhere to sleep well.
+    expect(loop.state.structures[homeId]!.w * loop.state.structures[homeId]!.h)
+      .toBe(cabin.w * cabin.h)
+    expect(said.find((x) => x.id === homeId)?.bed).toBe(true)
+    expect(said.find((x) => x.id === cabin.id)?.bed).toBeUndefined()
+  })
+
+  it('and the sentence for it says what is there and never that it is better', () => {
+    const { bridge, loop, homeId } = town(NIGHT - 3)
+    void bridge.submit('amara', { verb: 'enter', params: { structureId: homeId } })
+    loop.step()
+    loop.step()
+    expect(proseFor(bridge)).toContain('There are beds in here.')
+  })
+
   it('it names no remedy and no act, exactly as the cold and the walls do', () => {
     const { bridge, loop, homeId } = town(NIGHT - 3)
     void bridge.submit('amara', { verb: 'enter', params: { structureId: homeId } })
@@ -114,7 +137,10 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     loop.step()
     const lit = proseFor(bridge).toLowerCase()
     for (const said of [cold, lit]) {
-      for (const hint of ['stoke', 'you should', 'you must', 'you could feed', 'go inside', 'light it', 'feed it']) {
+      for (const hint of [
+        'stoke', 'you should', 'you must', 'you could feed', 'go inside', 'light it', 'feed it',
+        'sleep here', 'better than', 'you would rest',
+      ]) {
         expect(said, hint).not.toContain(hint)
       }
     }

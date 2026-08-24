@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  isHearthKind, lightBandAt, MINUTES_PER_DAY, SimConfigSchema, structureGlowRadius,
+  isBeddedKind, isHearthKind, lightBandAt, MINUTES_PER_DAY, SimConfigSchema, structureGlowRadius,
   type SimConfig, type SimEvent,
 } from '@sj/shared'
 import { fold } from './fold.js'
@@ -9,6 +9,7 @@ import { composePerception } from './perception.js'
 import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fumblesInTheDark, VERBS } from './verbs.js'
+import { sleepRegenPerTick } from './systems/needs.js'
 import { isExposed, warmthTargetFor } from './systems/warmth.js'
 
 // ★ A BODY CAN WALK TO THE CHAIR AND THERE IS NOTHING IT CAN DO THERE.
@@ -199,5 +200,62 @@ describe('★ the hearth in a house is a fire, and four laws already knew what t
     site = fold(site, ev('agent_moved', { id: 'a1', x: 3, y: 3 }, site.tick), CFG)
     expect(composePerception(site, CFG, 'a1', []).visible.structures
       .find((x) => x.id === 'site_1')?.hearth).toBeUndefined()
+  })
+})
+
+// ★ THE BED WAS FURNITURE THE RENDERER DREW. `sleep` validates that a body is under a roof and
+// has never named the bed under it: one flat `energyRegenAsleepPerTick` answered the bare
+// ground, a storehouse floor and a founder's own bed alike. A roof said a body MAY lie down.
+// Nothing in the world had ever said where it lies down WELL.
+describe('★ a bed is worth something, and it was worth nothing', () => {
+  const REGEN = CFG.needs.energyRegenAsleepPerTick
+
+  /** A body asleep inside `kind`, having gone in from (4, 4) beside it. */
+  function asleepIn(kind: string): WorldState {
+    const row = CFG.structures.recipes[kind]!
+    let s = genesisState(CFG, map())
+    s = fold(s, ev('tick_advanced', {}, WINTER_NIGHT), CFG)
+    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }, WINTER_NIGHT), CFG)
+    s = fold(s, ev('structure_planned', {
+      id: 'roof_1', kind, x: 5, y: 4, w: row.w, h: row.h, maxHp: row.maxHp, flammable: row.flammable,
+      builderId: 'a1',
+    }, WINTER_NIGHT), CFG)
+    s = fold(s, ev('structure_completed', { id: 'roof_1' }, WINTER_NIGHT), CFG)
+    return fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'roof_1' }, WINTER_NIGHT), CFG)
+  }
+
+  it('★ a house sleeps a body faster than a roof with nothing but a floor under it', () => {
+    expect(isBeddedKind(CFG, 'house')).toBe(true)
+    // ★ VACUOUS GUARD: passes for the wrong reason if EVERY roof counts as a bed. The cabin and
+    // the storehouse are 2x2, exactly a house's mass, and both are somewhere a body may lie down
+    // — so the difference this measures cannot be the roof, the floor area or the way in.
+    expect(isBeddedKind(CFG, 'storehouse')).toBe(false)
+    expect(isBeddedKind(CFG, 'cabin')).toBe(false)
+
+    const inBed = sleepRegenPerTick(asleepIn('house'), CFG, 'a1')
+    const onBoards = sleepRegenPerTick(asleepIn('storehouse'), CFG, 'a1')
+    expect([onBoards, inBed]).toEqual([REGEN, REGEN * CFG.needs.bedRegenMultiplier])
+    expect(inBed).toBeGreaterThan(onBoards)
+  })
+
+  it('★ and the boards are exactly as good as they always were — nothing got worse', () => {
+    // The one number the whole world used before this change, unmoved for everybody without a
+    // bed: out under the sky, in a storehouse, in the cabin. Only the bed is new.
+    let outside = genesisState(CFG, map())
+    outside = fold(outside, ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }, 0), CFG)
+    expect(sleepRegenPerTick(outside, CFG, 'a1')).toBe(REGEN)
+    for (const kind of ['storehouse', 'cabin']) {
+      expect(sleepRegenPerTick(asleepIn(kind), CFG, 'a1'), kind).toBe(REGEN)
+    }
+  })
+
+  it('★ and a mind can SEE which roof has beds in it, before it walks to one', () => {
+    const seen = (kind: string) => {
+      const s = fold(asleepIn(kind), ev('agent_exited', { agentId: 'a1', structureId: 'roof_1' }, WINTER_NIGHT), CFG)
+      return composePerception(s, CFG, 'a1', []).visible.structures.find((x) => x.id === 'roof_1')
+    }
+    expect(seen('house')?.bed).toBe(true)
+    expect(seen('storehouse')?.bed).toBeUndefined()
+    expect(seen('cabin')?.bed).toBeUndefined()
   })
 })

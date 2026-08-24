@@ -1,4 +1,4 @@
-import { simTimeFromTick, type SimConfig } from '@sj/shared'
+import { isBeddedKind, simTimeFromTick, type SimConfig } from '@sj/shared'
 import type { AgentBody, WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 import { ageBand } from './aging.js'
@@ -15,6 +15,17 @@ export function warmthTarget(state: WorldState, _config: SimConfig): number {
  *  `warmth.ts` is the one caller that has a body to ask about; both land here (G4). */
 export function warmthTargetFromAir(temperatureC: number): number {
   return clamp(0, 100, 50 + 2 * (temperatureC - 10))
+}
+
+// ★ HOW WELL THIS BODY IS SLEEPING, and it is the first time the world has asked. One flat rate
+// answered the bare ground, a storehouse floor and a bed alike — `sleep` validated the HOUSE and
+// nothing ever named the bed in it, so the five founders' beds were furniture the renderer drew.
+// A bed is a property of the kind, the same shape as the roof over it (G4).
+export function sleepRegenPerTick(state: WorldState, config: SimConfig, agentId: string): number {
+  const insideId = state.agents[agentId]?.insideId
+  const kind = insideId === undefined ? undefined : state.structures[insideId]?.kind
+  const inBed = kind !== undefined && isBeddedKind(config, kind)
+  return config.needs.energyRegenAsleepPerTick * (inBed ? config.needs.bedRegenMultiplier : 1)
 }
 
 // What standing up and doing something costs, per tick. An old frame gives out sooner.
@@ -53,7 +64,9 @@ export function needsSystem(ctx: TickCtx): void {
     if (!a.alive) continue
     if (a.needs.hunger > 0) ctx.emit('need_changed', { id, need: 'hunger', delta: -hungerDecay })
     if (a.asleep) {
-      if (a.needs.energy < 100) ctx.emit('need_changed', { id, need: 'energy', delta: cfg.energyRegenAsleepPerTick })
+      if (a.needs.energy < 100) {
+        ctx.emit('need_changed', { id, need: 'energy', delta: sleepRegenPerTick(ctx.state(), ctx.config, id) })
+      }
     } else if (a.needs.energy > 0) {
       ctx.emit('need_changed', { id, need: 'energy', delta: -awakeEnergyDecay(ctx.config, a) })
     }

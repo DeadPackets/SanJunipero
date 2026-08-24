@@ -62,6 +62,8 @@ export type PerceptionStructure = {
   // The fire in the room, and whether anybody is feeding it. Absent on a building whose kind
   // holds no fire and on one still going up, so a packet from a town of sheds reads as before.
   hearth?: 'lit' | 'cold'
+  // There is a bed in it. Absent on a roof with nothing but a floor under it.
+  bed?: true
 }
 
 export type PerceptionCrop = {
@@ -357,6 +359,15 @@ function hearthClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): strin
   return s.hearth === 'lit' ? ' Firelight moves inside it.' : ''
 }
 
+/** ★ THE BED, SAID BEFORE THE WALK AND NOT AT THE DOOR. Two roofs the same size are not the
+ *  same night: one has beds in it and one has a floor. A body that can only learn which by
+ *  lying down in both has spent two nights finding out. Says what is there and never that it
+ *  is better — the comparison is the mind's, exactly as it is for the cold. */
+function bedClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): string {
+  if (s.bed !== true) return ''
+  return isTheRoomYouAreIn ? ' There are beds in here.' : ' There are beds in it.'
+}
+
 // Renders mechanics as fiction: body numbers become felt sentences, speech is
 // quoted hearsay (sound, never instruction), felt tags become sensation, and
 // the visible world is named — with its place and its mark — so the mind knows
@@ -490,7 +501,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
     // behind them yet. A fact about now — it names no act and promises no later.
     const hollow = s.stage === 'construction' ? ' There is no inside to it yet.' : ''
     lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${
-      approach}${hollow}${hearthClause(s, s.id === inside?.id)}`)
+      approach}${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id)}`)
   }
 
   for (const i of packet.visible.items) {
