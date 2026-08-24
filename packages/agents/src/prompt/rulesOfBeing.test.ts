@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
+import { DEFAULT_CONFIG, MINUTES_PER_DAY, simTimeFromTick, type SimEvent } from '@sj/shared'
+import { fold, genesisState, submitIntent, type TileId, type WorldState } from '@sj/engine'
 import { assemblePrompt } from './assemble.js'
 import { calendarLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, FORBIDDEN_FRAMING, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
@@ -80,6 +81,65 @@ describe('CAPABILITIES — the twelve C11 Tier-1 verbs', () => {
     for (const verb of ['walk', 'sleep', 'enter', 'stow', 'craft', 'experiment']) {
       expect(CAPABILITIES).toMatch(new RegExp(`^${verb} — name it ${verb}`, 'm'))
     }
+  })
+})
+
+// ★ R4 — BLOCK 1 WAS LYING, AND THIS IS THE CHECK THAT IT IS NOT ANY MORE.
+//
+// The line said "sleep — name it sleep when weary; nothing more is needed" while
+// `sleepIndoorsOnly` refused every bed under the open sky. Thirty sleeps in one live night were
+// turned down on a rule the one place a mind is taught its own hands had told it did not exist.
+//
+// Asserting the new WORDS on their own would be vacuous — any sentence contains itself. So each
+// half of what block 1 now claims is run through `submitIntent` on a real world, and the words
+// are only allowed to say what the verb does.
+describe('★ block 1 tells the truth about sleep', () => {
+  const CFG = DEFAULT_CONFIG
+  const ev = (seq: number, type: string, payload: unknown): SimEvent =>
+    ({ seq, tick: 0, type, payload })
+  const sleepLine = CAPABILITIES.split('\n').find((l) => l.startsWith('sleep — '))!
+
+  /** One roofed building at (2,1), one body, and a way to put it inside or leave it out. */
+  function body(opts: { indoors: boolean; energy?: number }): WorldState {
+    const rows = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId))
+    let s = genesisState(CFG, rows)
+    s = fold(s, ev(1, 'structure_planned', {
+      id: 'structure_1', kind: 'house', x: 2, y: 1, w: 2, h: 2,
+      maxHp: 50, flammable: true, builderId: 'b',
+    }), CFG)
+    s = fold(s, ev(2, 'structure_completed', { id: 'structure_1' }), CFG)
+    s = fold(s, ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: 7300 }), CFG)
+    if (opts.indoors) {
+      s = fold(s, ev(4, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
+    }
+    if (opts.energy !== undefined) {
+      s = fold(s, ev(5, 'need_changed', { id: 'a1', need: 'energy', delta: opts.energy - 100 }), CFG)
+    }
+    return s
+  }
+  const trySleep = (s: WorldState) => submitIntent(s, CFG, 'a1', 'sleep', {})
+
+  it('no longer says the thing that was false', () => {
+    expect(sleepLine).not.toContain('nothing more is needed')
+  })
+
+  it('a roof over you is what it takes — and the verb agrees, both ways', () => {
+    expect(sleepLine).toContain('a roof over you is what it takes')
+    expect(trySleep(body({ indoors: true })).ok).toBe(true)
+    expect(trySleep(body({ indoors: false })).ok).toBe(false)
+  })
+
+  it('worn down far enough, the bare ground will do — and the verb agrees, both ways', () => {
+    expect(sleepLine).toContain('the bare ground will do')
+    const spare = CFG.needs.debuffThreshold + 10
+    const spent = CFG.needs.debuffThreshold - 1
+    expect(trySleep(body({ indoors: false, energy: spare })).ok).toBe(false)
+    expect(trySleep(body({ indoors: false, energy: spent })).ok).toBe(true)
+  })
+
+  it('is still a fact about the hands and never counsel', () => {
+    expect(sleepLine).not.toMatch(FORBIDDEN_FRAMING)
+    expect(sleepLine).not.toMatch(/\b(festival|faith|council|market|should|gather|build)\b/i)
   })
 })
 

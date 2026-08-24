@@ -33,10 +33,17 @@ choose echoes in the lives around you. Live as yourself.`
 // keeps ground, and that it must go and stand there. It does not say plot, block, ring or
 // lattice — those are OUR words for the machinery, and a mind that could reason about the
 // lattice would be a mind reasoning about the world's construction rather than living in it.
+//
+// AMENDED A THIRD TIME, by the wants lane, because the `sleep` line was FALSE. It said
+// "nothing more is needed" while `sleepIndoorsOnly` refused every bed under the sky, and thirty
+// sleeps in one live night were turned down on a rule this block had told the mind did not
+// exist. It now says the two halves the verb actually has. The bytes are free to be edited: the
+// four pins came off, and block 1's cache stability is a test about every prompt opening with
+// the same prefix, not about which bytes that prefix is.
 export const CAPABILITIES = `What your hands and voice can do. Name each act by its exact word, and give it exactly what it asks:
 
 walk — name it walk; give x and y as two numbers, the spot you go to
-sleep — name it sleep when weary; nothing more is needed
+sleep — name it sleep when weary; a roof over you is what it takes, unless you are worn down so far that the bare ground will do
 wake — name it wake to rise from sleep; nothing more is needed
 enter — name it enter; give structureId, the mark of the building whose doorway you stand beside
 exit — name it exit to step back out under the sky; nothing more is needed
