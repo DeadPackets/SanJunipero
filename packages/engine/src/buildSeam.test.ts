@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_CONFIG, MIN_SEP, PITCH, STREET, TOWN_SQUARE, T_GRASS, T_ROAD, WORLD_MARGIN,
-  blockGroundOf, centreOf, edgesOwed, type SimEvent, type TownClaim,
+  blockGroundOf, centreOf, dayPhaseFromTick, edgesOwed, type SimEvent, type TownClaim,
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { genesisState, type WorldState } from './state.js'
 import { makeGenesisWorld, GENESIS_FORD } from './genesis/world.js'
 import { submitIntent } from './intent.js'
 import { makeFixtureMap } from './scripted.js'
-import { buildIsPlotted, buildSiteOf, isAdjacentToRect, isPlottedKind, stepBuild } from './verbs.js'
+import {
+  buildIsPlotted, buildSiteOf, isAdjacentToRect, isPlottedKind, stepBuild, workPenalty,
+} from './verbs.js'
 import { claimInWorld, layBlock, standingRects, townGroundBox, townSquareOf } from './town.js'
 import { builtBox, owedBox } from './systems/mapGrowth.js'
 
@@ -436,5 +438,137 @@ describe('★ a block is laid out when its first building is raised', () => {
     expect(grown.dy1 - owedBox(genesis)!.dy1).toBe(PITCH)
     expect(edgesOwed(grown, size, WORLD_MARGIN).map((e) => e.edge)).toEqual(['e', 's'])
     expect(townGroundBox(after)!.dx1 - townGroundBox(genesis)!.dx1).toBe(PITCH)
+  })
+})
+
+// ★ THE WORLD COUNTS HANDS AND CANNOT SPEND THEM. Everything above proves the hands land on
+// one set of walls; nothing above asks what the walls got for them. Measured over 4 320
+// showcase ticks by the lane that wired joining: 29 roofs with one pair of hands, 16 with
+// five, 293 body-ticks per roof against 591. A joiner's own clock is set at intent time to
+// `buildTicks − progressTicks` and counts down one a tick whatever else is happening, so five
+// hands finish on the same tick one hand would and the site's ledger races past what the
+// building needs. Below, the two halves of that, and the night overshoot underneath them.
+describe('★ help must help — what a second pair of hands buys the calendar', () => {
+  const HOUSE_TICKS = 120
+  const FAST = {
+    ...DEFAULT_CONFIG,
+    construction: { ...DEFAULT_CONFIG.construction, houseTicks: HOUSE_TICKS },
+  }
+  // Tick 0 is midnight, so a run left at genesis measures the night penalty by accident.
+  const NOON = 12 * 60
+  const NIGHT = 22 * 60
+
+  const foldWith = (
+    s: WorldState, events: ReadonlyArray<{ type: string; payload: unknown }>, tick = 0,
+  ): WorldState =>
+    events.reduce((acc, e) =>
+      fold(acc, { seq: ++seq, tick, type: e.type, payload: e.payload } as unknown as SimEvent, FAST), s)
+
+  const ringOf = (c: TownClaim) => [
+    { x: c.site.x - 1, y: c.site.y - 1 },
+    { x: c.site.x + c.site.w, y: c.site.y - 1 },
+    { x: c.site.x - 1, y: c.site.y + c.site.h },
+    { x: c.site.x + c.site.w, y: c.site.y + c.site.h },
+  ]
+
+  /** A town, its next plot, and `n` bodies with wood standing round it — the planter on the
+   *  door tile, the joiners on the corners. Nobody has started yet. */
+  function crewOf(n: number, atTick = NOON): { s: WorldState; ids: string[] } {
+    const g = makeGenesisWorld(FAST)
+    let s = foldWith(genesisState(FAST, g.terrain), g.events)
+    s = { ...s, tick: atTick }
+    const claim = claimInWorld(s, { along: 2, deep: 2 })!
+    const spots = [claim.door, ...ringOf(claim)]
+    const ids: string[] = []
+    for (let i = 0; i < n; i++) {
+      const id = `h${i}`
+      ids.push(id)
+      s = foldWith(s, [
+        { type: 'agent_spawned', payload: { id, name: id, x: spots[i]!.x, y: spots[i]!.y, ageDays: 10000 } },
+        { type: 'item_spawned', payload: { id: `wood_${id}`, kind: 'wood', qty: 10, loc: { t: 'agent', id } } },
+      ], atTick)
+    }
+    return { s, ids }
+  }
+
+  /** `actionsSystem`'s build branch and nothing else — no needs, no weather, no walking — run
+   *  until every one of these bodies has stopped working. `ticks` is the CALENDAR: how long
+   *  the town waited. `bodyTicks` is the wage: how much of somebody's life it cost. */
+  function raise(s0: WorldState, ids: readonly string[], cap = 4000) {
+    let s = s0
+    let ticks = 0
+    let bodyTicks = 0
+    for (const id of [...ids].sort()) {
+      const r = submitIntent(s, FAST, id, 'build', { kind: 'house' })
+      expect(r.ok, r.ok ? '' : `${id}: ${r.reason}`).toBe(true)
+      s = foldWith(s, r.ok ? r.events : [], s.tick)
+    }
+    for (let t = 1; t <= cap; t++) {
+      let worked = false
+      for (const id of [...ids].sort()) {
+        const act = s.agents[id]!.activity
+        if (!act || act.verb !== 'build') continue
+        worked = true
+        bodyTicks++
+        s = foldWith(s, stepBuild(s, id), s.tick)
+        const now = s.agents[id]!.activity
+        if (!now || now.ticksRemaining > 0) continue
+        s = foldWith(s, [{ type: 'action_completed', payload: { agentId: id, verb: 'build' } }], s.tick)
+        const resume = buildSiteOf(s, FAST, id, { kind: 'house' }).resume
+        if (resume) s = foldWith(s, [{ type: 'structure_completed', payload: { id: resume.id } }], s.tick)
+      }
+      if (!worked) break
+      ticks = t
+    }
+    const roofs = Object.values(s.structures).filter((x) => x.kind === 'house' && x.stage === 'complete')
+    return { s, ticks, bodyTicks, raised: roofs.at(-1)! }
+  }
+
+  it('one pair of hands takes the whole of what the recipe asks for', () => {
+    const { s, ids } = crewOf(1)
+    const run = raise(s, ids)
+    expect(run.ticks).toBe(HOUSE_TICKS)
+    expect(run.bodyTicks).toBe(HOUSE_TICKS)
+  })
+
+  it('★ TWO PAIRS OF HANDS RAISE IT IN HALF THE TIME, AND FIVE IN A FIFTH', () => {
+    for (const [hands, calendar] of [[2, HOUSE_TICKS / 2], [4, HOUSE_TICKS / 4], [5, HOUSE_TICKS / 5]] as const) {
+      const { s, ids } = crewOf(hands)
+      const run = raise(s, ids)
+      expect(Object.values(run.s.structures).filter((x) => x.stage === 'construction'), `${hands}`).toEqual([])
+      expect(run.ticks, `${hands} hands`).toBe(calendar)
+    }
+  })
+
+  it('★ and the help is free — the same body-ticks buy the same roof', () => {
+    // The other half of the ruling. Hands that halved the calendar and doubled the wage would
+    // be a different lie: the point is that a joiner's tick is worth exactly a planter's.
+    for (const hands of [1, 2, 4, 5]) {
+      const { s, ids } = crewOf(hands)
+      expect(raise(s, ids).bodyTicks, `${hands} hands`).toBe(HOUSE_TICKS)
+    }
+  })
+
+  it('★ the site\'s ledger stops at the work the building needs, however many hands', () => {
+    for (const hands of [1, 2, 4, 5]) {
+      const { s, ids } = crewOf(hands)
+      const pt = raise(s, ids).raised.progressTicks
+      expect(pt, `${hands} hands`).toBeLessThanOrEqual(HOUSE_TICKS)
+      // Short of the target by at most one tick per extra hand, and for a reason worth
+      // knowing: `actionsSystem` steps and then completes ONE BODY AT A TIME, so the first
+      // hand whose clock runs out finishes the walls before the rest have worked that tick.
+      expect(pt, `${hands} hands`).toBeGreaterThan(HOUSE_TICKS - hands)
+    }
+  })
+
+  // ★ AND THE DARK IS THE ONE PLACE THE TWO CLOCKS STILL DISAGREE. `submitIntent` multiplies a
+  // night builder's duration by `light.nightWorkPenalty` while `structure_progressed` still
+  // adds one a tick, so the ledger runs half again past what the building needs. That is a
+  // second, older bug and it needs only one builder; the commit after this one deals with it.
+  it('a house raised blind still takes half again as long', () => {
+    const { s, ids } = crewOf(1, NIGHT)
+    expect(dayPhaseFromTick(NIGHT)).toBe('night')
+    expect(workPenalty(s, FAST, 'h0', 'build')).toBe(FAST.light.nightWorkPenalty)
+    expect(raise(s, ids).ticks).toBe(Math.ceil(HOUSE_TICKS * FAST.light.nightWorkPenalty))
   })
 })

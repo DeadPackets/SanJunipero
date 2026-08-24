@@ -1873,20 +1873,48 @@ export function unregisterVerb(kind: string): void {
   delete VERBS[kind]
 }
 
+/** The walls an in-progress build is raising, resolved the one way `stepBuild` resolves them:
+ *  on a plot there is no coordinate to look them up by, so it is the walls this body began or
+ *  the neighbour's it is standing at; a bridge is looked up by the water it was named on. */
+function siteOfBuild(state: WorldState, agentId: string): Structure | null {
+  const act = state.agents[agentId]?.activity
+  if (!act || act.verb !== 'build') return null
+  const p = BuildParams.safeParse(act.params)
+  if (!p.success) return null
+  return p.data.x === undefined || p.data.y === undefined
+    ? siteToRaise(state, agentId, p.data.kind)
+    : siteAt(state, p.data.x, p.data.y)
+}
+
+/** ★ HOW MANY PAIRS OF HANDS ARE ON THESE WALLS THIS TICK — the number the world could count
+ *  and could not spend. Live bodies only: the dead and the collapsed have stopped working. */
+export function handsOnSite(state: WorldState, siteId: string): number {
+  let n = 0
+  for (const id of Object.keys(state.agents)) {
+    if (!state.agents[id]!.alive) continue
+    if (siteOfBuild(state, id)?.id === siteId) n++
+  }
+  return n
+}
+
 // One tick of an in-progress build: the agent works, the site advances in step.
 export function stepBuild(state: WorldState, agentId: string): PendingEvent[] {
   const a = state.agents[agentId]
   const act = a?.activity
   if (!a || !act || act.verb !== 'build') throw new Error(`stepBuild: agent ${agentId} has no build in progress`)
-  const p = BuildParams.parse(act.params)
-  // On a plot there is no coordinate to look the walls up by, so the site is the one this
-  // agent has half-raised — or, if it joined somebody, the walls it is standing at.
-  const site = p.x === undefined || p.y === undefined
-    ? siteToRaise(state, agentId, p.kind)
-    : siteAt(state, p.x, p.y)
+  const site = siteOfBuild(state, agentId)
   if (!site) return [{ type: 'action_interrupted', payload: { agentId, reason: 'gone' } }]
+  // ★ THE HANDS ARE THE RATE, AND THIS IS THE WHOLE OF "HELP MUST HELP". A builder's clock is
+  // settled once, at intent time, as the work the walls still needed then — so it is only
+  // honest if it runs down exactly as fast as the walls go up. Every hand on the site adds one
+  // to the walls, so every hand's clock loses `hands`. That keeps `ticksRemaining` equal to
+  // `durationTicks − progressTicks` for every builder however many arrive or leave, and five
+  // hands raise a house in a fifth of the time for the same five hands' wages. Before this the
+  // clock ignored the crowd: five hands took exactly as long as one and cost five times as
+  // much, and cooperation was a net penalty in the one measurement G8 asks for.
+  const hands = handsOnSite(state, site.id)
   return [
-    { type: 'action_progressed', payload: { agentId, ticks: 1 } },
+    { type: 'action_progressed', payload: { agentId, ticks: hands } },
     { type: 'structure_progressed', payload: { id: site.id, ticks: 1 } },
   ]
 }
