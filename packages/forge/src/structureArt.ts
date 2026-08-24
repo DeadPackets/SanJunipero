@@ -55,6 +55,8 @@ export const ONE_CELL_KINDS: Readonly<Record<string, string>> = {
   standing_stone: 'a monolith — no front, no door, no ridge to reverse',
   grave: 'a headstone and a mound; the stone faces the reader whichever way the world turns',
   scaffolding: 'a cage of poles around nothing; its two visible faces are the same face',
+  lamp_post: 'a post with a lantern on it: a vertical axis of rotation and nothing to face. '
+    + 'It stands on the verge rather than on a plot, so no street ever tells it which way to look.',
   bridge: 'a deck, not a building. It turns by SWAPPING ITS FOOTPRINT — `buildFootprint` tries '
     + '1×2 and then 2×1 — and a footprint turn is not a facing, so a second cell here would be '
     + 'the wrong shape rather than the right one turned.',

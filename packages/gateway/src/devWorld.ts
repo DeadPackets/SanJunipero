@@ -160,6 +160,9 @@ export async function startDevWorld(
      *  real `build` verb. Off by default; the frozen fixture has no lattice to build on and
      *  every existing gate folds exactly the events it always did. */
     builders?: boolean
+    /** dev/demo only: how many lamp posts one founder raises along the street and keeps fed.
+     *  ABSENT by default — the stream asks for them; no gate does. */
+    lamps?: number
     /** dev/demo only: one founder lays a deck over the ford before it joins the masons, and the
      *  fourteen plattable blocks across the water join the town. Off by default; only the
      *  showcase has a ford, and every existing gate folds exactly the events it always did. */
@@ -306,6 +309,9 @@ export async function startDevWorld(
       builders: opts.builders === true && map === 'showcase',
       // two pairs of hands on one roof — reachable, and off unless asked for
       jointBuild: opts.jointBuild === true && map === 'showcase',
+      // the streets, lit: one founder raises lamp posts on the verge and keeps them fed.
+      // ABSENT unless asked for, so every landed gate folds exactly the world it always did.
+      ...(opts.lamps !== undefined && opts.lamps > 0 && map === 'showcase' ? { lamps: opts.lamps } : {}),
       // the crossing: derived from the ford the map lays, so the two cannot disagree
       ...(opts.bridge === true && map === 'showcase' ? { deck: showcaseDeck(undefined, rings) } : {}),
     }),

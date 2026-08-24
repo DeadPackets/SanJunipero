@@ -26,10 +26,11 @@
 //
 // Neither is a dial. `walkEnergyCost` is the world's own path, the world's own tiles-per-tick
 // and the world's own decay, multiplied.
-import { doorFrontTile, type SimConfig } from '@sj/shared'
+import { doorFrontTile, T_PATH, T_ROAD, type SimConfig } from '@sj/shared'
 import {
   BRIDGE_KIND, awakeEnergyDecay, bridgeAt, buildSiteOf, buildTicks, claimInWorld,
-  composePerception, createWorldTick, doorTile, findPath, isAdjacentToRect, submitIntent,
+  composePerception, createWorldTick, doorTile, findPath, isAdjacentToRect, isPassable,
+  submitIntent, townSquareOf,
   type PerceptionPacket, type RngStreams, type Structure, type WorldState,
 } from '@sj/engine'
 import { devTown, type DevStructure } from './devTown.js'
@@ -311,6 +312,124 @@ export function bridgewrightIntent(
     : { verb: 'walk', params: stand }
 }
 
+// ── THE LAMPLIGHTER ────────────────────────────────────────────────────────────────────────
+//
+// ★ ANOTHER DEMONSTRATION PUPPET, AND THE SAME HONEST LABEL THE BRIDGEWRIGHT WEARS. Nothing
+// here is evidence that a MIND wants a lit street; it is evidence that the seam works, because
+// every step of it goes through `submitIntent` under the engine's own refusals. It exists
+// because a viewer opening the stream at midnight should see the thing the town can now do.
+//
+// What it does NOT do is choose the ground for you: `lamp_post` is `sited`, so the sites come
+// off the town's own street ring — the door tiles of the buildings already standing, stepped
+// one tile off the way, because a post in the road would close the road.
+
+export const LAMP_KIND = 'lamp_post'
+
+export type LampSite = { x: number; y: number; stand: { x: number; y: number } }
+
+/** How far off a door the search will walk to find ground that is not the way itself. Three
+ *  tiles, because the grammar's streets are two wide with a shoulder and a lamp beyond that is
+ *  not a street lamp any more. */
+export const LAMP_VERGE_REACH = 3
+
+/**
+ * Where a town's lamps go: the nearest patch of NOT-STREET beside each building's own door,
+ * nearest the square first, so a town of any size lights its centre before its edges.
+ *
+ * ★ IT HAS TO SEARCH, and that surprised this lane. The obvious rule — one step off the door —
+ * returned NOTHING on the showcase town: the grammar paves a wide street ring, so all four
+ * neighbours of every door tile are more road. `roadBlockRefusal` would have refused every one
+ * of them, correctly, and a lamplighter that walks to a refused site all night is arm B in a
+ * new costume. So the site is the first passable non-street tile within `LAMP_VERGE_REACH`,
+ * and `stand` is where a body puts its feet to raise it. Pure and deterministic.
+ */
+export function lampSites(state: WorldState, want: number): LampSite[] {
+  const square = townSquareOf(state)
+  if (square === null) return []
+  const isWay = (x: number, y: number): boolean => {
+    const t = state.terrain[y]?.[x]
+    return t === T_ROAD || t === T_PATH
+  }
+  const seen = new Set<string>()
+  const out: Array<LampSite & { d: number }> = []
+  for (const id of Object.keys(state.structures).sort()) {
+    const s = state.structures[id]!
+    if (s.stage !== 'complete' || s.kind === LAMP_KIND) continue
+    const door = doorTile(state, s)
+    if (door === null) continue
+    let found: LampSite | null = null
+    for (let r = 1; r <= LAMP_VERGE_REACH && found === null; r++) {
+      for (let dy = -r; dy <= r && found === null; dy++) {
+        for (let dx = -r; dx <= r && found === null; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue   // this ring only
+          const p = { x: door.x + dx, y: door.y + dy }
+          if (isWay(p.x, p.y) || !isPassable(state, p.x, p.y)) continue
+          if (seen.has(`${p.x},${p.y}`)) continue
+          // a body has to be able to stand beside it, and standing IN the street is fine —
+          // the street is where feet belong; it is the POST that must keep off it.
+          const stand = [[0, 1], [1, 0], [0, -1], [-1, 0]]
+            .map(([sx, sy]) => ({ x: p.x + sx!, y: p.y + sy! }))
+            .find((q) => isPassable(state, q.x, q.y))
+          if (stand === undefined) continue
+          found = { x: p.x, y: p.y, stand }
+        }
+      }
+    }
+    if (found === null) continue
+    seen.add(`${found.x},${found.y}`)
+    out.push({ ...found, d: Math.abs(found.x - square.x) + Math.abs(found.y - square.y) })
+  }
+  return out.sort((a, b) => a.d - b.d || a.x - b.x || a.y - b.y).slice(0, want)
+    .map(({ x, y, stand }) => ({ x, y, stand }))
+}
+
+/** The first founder is the wright and the LAST one is the lamplighter, so the two errands
+ *  never land on the same pair of hands. */
+export const lamplighterOf = (cast: readonly FounderDef[]): string | null => cast.at(-1)?.id ?? null
+
+/** Raise the next lamp the town is short of, or go and feed the one that has burned down.
+ *  `null` once every site is standing and lit — a lamplighter with nothing to do walks. */
+export function lamplighterIntent(
+  state: WorldState, config: SimConfig, agentId: string, want: number,
+): Intent | null {
+  const a = state.agents[agentId]
+  if (a === undefined || a.insideId !== undefined) return null
+  const sites = lampSites(state, want)
+  const standing = new Map(Object.values(state.structures)
+    .filter((s) => s.kind === LAMP_KIND).map((s) => [`${s.x},${s.y}`, s]))
+
+  // ★ FEEDING COMES FIRST, AND IT WALKS THE LAMPS THAT EXIST — never the sites. A dark lamp is
+  // worse than a missing one, because it looks like a lamp. The first version of this loop read
+  // the site list instead, and `lampSites` is recomputed each tick against the buildings
+  // standing NOW: the masons raise houses, the sites move, and every post the lamplighter had
+  // already raised fell off the list it was being fed from. Six lamps stood all night, unlit.
+  for (const s of [...standing.values()].sort((p, q) => p.id.localeCompare(q.id))) {
+    if (s.stage !== 'complete') continue
+    if ((s.fueledUntilTick ?? -1) >= state.tick + config.light.fuelBurnTicks / 4) continue
+    if (isAdjacentToRect(a.x, a.y, s)) return { verb: 'stoke', params: { structureId: s.id } }
+    const stand = [[0, 1], [1, 0], [0, -1], [-1, 0]]
+      .map(([dx, dy]) => ({ x: s.x + dx!, y: s.y + dy! }))
+      .find((q) => isPassable(state, q.x, q.y))
+    if (stand === undefined) continue
+    return arrivesStanding(state, config, agentId, stand)
+      ? { verb: 'walk', params: { x: stand.x, y: stand.y } }
+      : null
+  }
+  // ★ AND THE COUNT IS A CEILING, NOT A TARGET. `lampSites` is recomputed every tick against
+  // the buildings standing NOW, and the masons keep raising more — so a lamplighter that only
+  // asked "is this site free" would light a growing town forever, one post per new door.
+  if (standing.size >= want) return null
+  for (const site of sites) {
+    if (standing.has(`${site.x},${site.y}`)) continue
+    const box = { x: site.x, y: site.y, w: 1, h: 1 }
+    if (isAdjacentToRect(a.x, a.y, box)) return { verb: 'build', params: { kind: LAMP_KIND, x: site.x, y: site.y } }
+    return arrivesStanding(state, config, agentId, site.stand)
+      ? { verb: 'walk', params: { x: site.stand.x, y: site.stand.y } }
+      : null
+  }
+  return null
+}
+
 // patrol like the G2 idler: ping-pong between two fixed waypoints, sleep when spent — and
 // never set out on a leg the legs cannot pay for (rule B in the header).
 function makePatrolPolicy(f: FounderDef) {
@@ -354,6 +473,9 @@ export type FoundersOpts = {
    *  4 320 showcase ticks: 29 roofs at 293 body-ticks each with it off, 16 at 591 with it on.
    *  The world can count hands now; it still cannot spend them. */
   jointBuild?: boolean
+  /** dev/demo only: one founder raises lamp posts along the street and keeps them fed.
+   *  ABSENT by default — every existing gate folds exactly the events it always did. */
+  lamps?: number
 }
 
 /** The house this person owns, or null. Ownership is a fact of the world (Structure.owner) —
@@ -441,6 +563,7 @@ export function makeFoundersOnTick(
 ): FoundersOnTick {
   const cast = opts.founders ?? FOUNDERS
   const wright = opts.deck === undefined ? null : bridgewrightOf(cast)
+  const lighter = opts.lamps === undefined || opts.lamps <= 0 ? null : lamplighterOf(cast)
   const policies = new Map(cast.map(f => [f.id, makePatrolPolicy(f)]))
   const worldTick = createWorldTick(config, rng)
   const structures = opts.structures ?? SCRIPTED_STRUCTURES
@@ -485,7 +608,7 @@ export function makeFoundersOnTick(
       if (a.needs.warmth < NEED_TOPUP_BELOW) emit('need_changed', { id: f.id, need: 'warmth', delta: WARMTH_TOPUP })
       // Scripted timber, on the same footing and for the same declared reason. The id never
       // ends in a digit, because `fold` advances the world's entity counter off any that does.
-      if ((opts.builders === true || f.id === wright) && a.activity === null
+      if ((opts.builders === true || f.id === wright || f.id === lighter) && a.activity === null
         && heldWood(getState(), f.id) < (config.structures.recipes[MASON_KIND]?.inputs[MASON_WOOD_KIND] ?? 0)) {
         emit('item_spawned', {
           id: `item_${MASON_WOOD_KIND}_${f.id}_${tick}_load`, kind: MASON_WOOD_KIND,
@@ -510,6 +633,7 @@ export function makeFoundersOnTick(
       // the deck comes before the houses because until it stands half the town is unreachable.
       const intent = (opts.interiors === true ? homeIntent(state, config, f.id) : null)
         ?? (f.id === wright ? bridgewrightIntent(state, config, f.id, opts.deck!) : null)
+        ?? (f.id === lighter ? lamplighterIntent(state, config, f.id, opts.lamps!) : null)
         ?? (opts.builders === true ? masonIntent(state, config, f.id, opts.jointBuild === true) : null)
         ?? policies.get(f.id)!(state, config, packet)
       if (!intent) continue

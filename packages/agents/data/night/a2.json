@@ -1,0 +1,119 @@
+{
+  "arm": "a",
+  "label": "a2",
+  "ticks": 300,
+  "startTick": 1200,
+  "llmCalls": 52,
+  "costUsd": 0.026,
+  "intents": 64,
+  "byVerb": {
+    "speak": 29,
+    "walk": 11,
+    "eat": 11,
+    "give": 5,
+    "build": 4,
+    "sleep": 3,
+    "take": 1
+  },
+  "builds": 4,
+  "structuresPlanned": 2,
+  "structuresCompleted": 0,
+  "structureProgressed": 321,
+  "entered": 0,
+  "spoke": 21,
+  "refusals": 24,
+  "refusalsByReason": [
+    [
+      "already busy with build",
+      7
+    ],
+    [
+      "someone is holding that",
+      3
+    ],
+    [
+      "already at that spot",
+      2
+    ],
+    [
+      "no path to that spot",
+      2
+    ],
+    [
+      "there is no bed here; find somewhere to lie down — weary enough and the bare ground will do",
+      2
+    ],
+    [
+      "not holding that",
+      2
+    ],
+    [
+      "already busy with walk",
+      1
+    ],
+    [
+      "no such item",
+      1
+    ],
+    [
+      "build needs {kind, x, y}",
+      1
+    ],
+    [
+      "build needs {kind} — where a house stands is the town's to say, not yours",
+      1
+    ],
+    [
+      "not adjacent to give — they are at (81, 68)",
+      1
+    ],
+    [
+      "the moment passes",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 0,
+    "yusuf": 0,
+    "nadia": 0,
+    "omar": 0,
+    "salma": 0
+  },
+  "buildIntents": [
+    {
+      "tick": 1251,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1397,
+      "id": "amara",
+      "verb": "build",
+      "params": "{}"
+    },
+    {
+      "tick": 1408,
+      "id": "salma",
+      "verb": "build",
+      "params": "{\"x\":81,\"y\":68,\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1428,
+      "id": "salma",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 28,
+  "thoughts": 50,
+  "lampsPlanned": 0,
+  "lampsCompleted": 0,
+  "lampBuildIntents": 0,
+  "houseBuildIntents": 3,
+  "stoked": 0,
+  "kindled": 0,
+  "torchCrafts": 0,
+  "lightActs": 0,
+  "thoughtsMentioningDark": 31
+}

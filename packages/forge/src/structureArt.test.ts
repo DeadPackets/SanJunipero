@@ -84,11 +84,12 @@ describe('every kind the WORLD CAN CREATE has a cell, in every facing it can sta
       .toEqual(['cabin', 'cottage', 'farmhouse', 'fire_pit', 'house', 'storehouse', 'well'])
     // the buildable half and the world-places-it half of the recipe table
     expect(Object.keys(RECIPES).sort()).toEqual([
-      'bridge', 'cabin', 'cottage', 'farmhouse', 'fire_pit', 'grave', 'house', 'storehouse', 'well',
+      'bridge', 'cabin', 'cottage', 'farmhouse', 'fire_pit', 'grave', 'house', 'lamp_post',
+      'storehouse', 'well',
     ])
     expect(CREATABLE).toEqual([
-      'bridge', 'cabin', 'cottage', 'farmhouse', 'fire_pit', 'grave', 'house', 'scaffolding',
-      'shed', 'standing_stone', 'storehouse', 'wagon', 'well',
+      'bridge', 'cabin', 'cottage', 'farmhouse', 'fire_pit', 'grave', 'house', 'lamp_post',
+      'scaffolding', 'shed', 'standing_stone', 'storehouse', 'wagon', 'well',
     ])
     // and the per-kind mass above is a fact, not a coin toss: every instance of a kind must
     // un-turn to the SAME mass, or keying a map by kind silently keeps whichever came last.
@@ -105,7 +106,7 @@ describe('every kind the WORLD CAN CREATE has a cell, in every facing it can sta
     // Named, so widening either list is a visible edit and not a quiet one.
     expect(TWO_FACING_KINDS).toEqual([...CITY_DWELLING_KINDS, STOREHOUSE_KIND, 'shed', 'wagon'])
     expect(Object.keys(ONE_CELL_KINDS).sort())
-      .toEqual(['bridge', 'fire_pit', 'grave', 'scaffolding', 'standing_stone', 'well'])
+      .toEqual(['bridge', 'fire_pit', 'grave', 'lamp_post', 'scaffolding', 'standing_stone', 'well'])
     // and every reason is a sentence somebody wrote, not an empty string
     for (const [k, why] of Object.entries(ONE_CELL_KINDS)) {
       expect(why.length, `${k} has no reason`).toBeGreaterThan(20)
@@ -207,6 +208,7 @@ describe('the pre-fix trees, as fixtures', () => {
       'bridge facing sw',      // an agent builds this at the ford
       'fire_pit facing sw',    // EXEMPTED by name, and bare in the middle of the town square
       'grave facing sw',       // the world lays this when somebody dies
+      'lamp_post facing sw',   // the night-light lane added a kind, and the gate found it
       'scaffolding facing sw', // the dev town stands these four
       'shed facing sw', 'shed facing se',
       'standing_stone facing sw',

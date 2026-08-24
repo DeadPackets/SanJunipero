@@ -138,8 +138,8 @@ describe('the bridge is the one thing a builder still sites', () => {
     const s = apply(withBuilder(base, 'a', { x: at.x - 1, y: at.y }, 0), [
       { type: 'item_spawned', payload: { id: 'wood_a', kind: 'wood', qty: 6, loc: { t: 'agent', id: 'a' } } },
     ])
-    expect(isPlottedKind('bridge')).toBe(false)
-    expect(buildIsPlotted(s, 'bridge')).toBe(false)
+    expect(isPlottedKind(CFG, 'bridge')).toBe(false)
+    expect(buildIsPlotted(s, CFG, 'bridge')).toBe(false)
     const r = submitIntent(s, CFG, 'a', 'build', { kind: 'bridge', x: at.x, y: at.y })
     expect(r.ok, r.ok ? '' : r.reason).toBe(true)
     const planned = r.ok ? r.events.find((e) => e.type === 'structure_planned')! : null
@@ -154,7 +154,7 @@ describe('a world with no town in it builds the way it always did', () => {
   it('the fixture meadow takes a coordinate, and has no plot to offer', () => {
     const s = withBuilder(genesisState(CFG, makeFixtureMap()), 'a', { x: 30, y: 22 })
     expect(townSquareOf(s)).toBeNull()
-    expect(buildIsPlotted(s, 'house')).toBe(false)
+    expect(buildIsPlotted(s, CFG, 'house')).toBe(false)
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house', x: 30, y: 20 }).ok).toBe(true)
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house' }))
       .toEqual({ ok: false, reason: 'build needs {kind, x, y}' })

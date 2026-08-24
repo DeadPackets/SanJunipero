@@ -173,6 +173,11 @@ export const StructureRecipeSchema = z.object({
   // spends turns being refused. A flag exists here because a law asks for it, and for no other
   // reason. The room the renderer draws is the wider truth; this is the part the world acts on.
   bed: z.boolean().default(false),
+  // ★ WHO CHOOSES THE GROUND. Absent means the town does: the kind is a mass, it takes a plot,
+  // and `claimInWorld` seats it. `sited` means the builder names x and y, because the thing is
+  // not a mass — a deck belongs to the water it crosses, a lamp to the spot somebody wanted lit.
+  // This replaced `kind !== BRIDGE_KIND`, which was the roster form of the same question.
+  sited: z.boolean().default(false),
 }).strict()
 
 const StructuresSchema = z.object({
@@ -182,10 +187,10 @@ const StructuresSchema = z.object({
   // places has a row here now, because a kind with no row is a kind nothing can say `roofed`
   // about — which is exactly how three dwellings became scenery.
   recipes: z.record(z.string(), StructureRecipeSchema).default({
-    house: { inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880, roofed: true, hearth: true, bed: true },
-    well: { inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false, hearth: false, bed: false },
-    bridge: { inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false, hearth: false, bed: false },
-    grave: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false, hearth: false, bed: false },
+    house: { inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880, roofed: true, hearth: true, bed: true, sited: false },
+    well: { inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false, hearth: false, bed: false, sited: false },
+    bridge: { inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false, hearth: false, bed: false, sited: true },
+    grave: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false, hearth: false, bed: false, sited: false },
     // The four the town template plants. Their mass and their hp were already authored — the
     // footprints in `cityTemplate`, the hp in the engine's genesis table — and this is the row
     // both now read, so a cottage is one building and not three descriptions.
@@ -201,10 +206,10 @@ const StructuresSchema = z.object({
     // The cabin stays unbuildable on purpose. It is 2x2, exactly a house's mass, so a buildable
     // one would be the same building under a second name — a word in every mind's vocabulary
     // that buys nothing. It is the one dwelling whose roof held.
-    storehouse: { inputs: {}, w: 2, h: 2, maxHp: 40, flammable: true, durationTicks: 1, roofed: true, hearth: false, bed: false },
-    cabin: { inputs: {}, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 1, roofed: true, hearth: false, bed: false },
-    cottage: { inputs: { wood: 15 }, w: 3, h: 2, maxHp: 60, flammable: true, durationTicks: 4320, roofed: true, hearth: false, bed: false },
-    farmhouse: { inputs: { wood: 20 }, w: 4, h: 2, maxHp: 80, flammable: true, durationTicks: 5760, roofed: true, hearth: false, bed: false },
+    storehouse: { inputs: {}, w: 2, h: 2, maxHp: 40, flammable: true, durationTicks: 1, roofed: true, hearth: false, bed: false, sited: false },
+    cabin: { inputs: {}, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 1, roofed: true, hearth: false, bed: false, sited: false },
+    cottage: { inputs: { wood: 15 }, w: 3, h: 2, maxHp: 60, flammable: true, durationTicks: 4320, roofed: true, hearth: false, bed: false, sited: false },
+    farmhouse: { inputs: { wood: 20 }, w: 4, h: 2, maxHp: 80, flammable: true, durationTicks: 5760, roofed: true, hearth: false, bed: false, sited: false },
     // The town's open fire, here for the same reason the storehouse and the dwellings came off
     // `GENESIS_STRUCTURE_DEFS` when `roofed` landed: a kind with no row is a kind nothing can
     // say `hearth` about, and hp written in two places is hp that drifts. Nobody builds it —
@@ -214,7 +219,15 @@ const StructuresSchema = z.object({
     // was `['hearth', 'fire_pit']` and NOTHING IN THIS WORLD HAS EVER STOOD A STRUCTURE OF KIND
     // `hearth`: the template has no such building and genesis places none. A hearth is not a
     // building at all — it is a thing a house HAS, which is exactly what the flag above says.
-    fire_pit: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false, hearth: true, bed: false },
+    fire_pit: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false, hearth: true, bed: false, sited: false },
+    // ★ THE CHEAPEST THING IN THE WORLD, ON PURPOSE. The dark has charged 1.5x for work since
+    // C11 and the only fixed answer was the square's own fire pit; a torch is 240 ticks in one
+    // hand. 2 wood and 120 ticks is two hours of one night, so the want that arrives at dusk
+    // can be answered before dawn — which a house at 2 880 cannot. Wood, not stone: the only
+    // outcrops are on the hill fifty tiles south-west, and a road that far is not a road.
+    // `flammable: false` matches the bridge, which is also six planks that do not burn: what
+    // burns here is the fuel in the basket, and `fueledUntilTick` already puts that out.
+    lamp_post: { inputs: { wood: 2 }, w: 1, h: 1, maxHp: 15, flammable: false, durationTicks: 120, roofed: false, hearth: false, bed: false, sited: true },
   }),
 }).strict()
 
@@ -398,6 +411,9 @@ const LightSchema = z.object({
     lantern: z.number().default(5),
     hearth: z.number().default(3),
     fire_pit: z.number().default(4),
+    // A standing light: shorter reach than the square's fire, and it is not a heat source, so
+    // this table is the whole of what makes it a lamp — glow, and a structure that takes fuel.
+    lamp_post: z.number().default(4),
   }).strict().prefault({}),
 }).strict()
 

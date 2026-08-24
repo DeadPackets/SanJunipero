@@ -1,0 +1,95 @@
+{
+  "arm": "b",
+  "label": "b2",
+  "ticks": 300,
+  "startTick": 1200,
+  "llmCalls": 64,
+  "costUsd": 0.0272,
+  "intents": 40,
+  "byVerb": {
+    "speak": 25,
+    "walk": 7,
+    "build": 5,
+    "forage": 2,
+    "plan": 1
+  },
+  "builds": 5,
+  "structuresPlanned": 2,
+  "structuresCompleted": 0,
+  "structureProgressed": 926,
+  "entered": 0,
+  "spoke": 8,
+  "refusals": 22,
+  "refusalsByReason": [
+    [
+      "already busy with build",
+      16
+    ],
+    [
+      "not close enough to gather — the patch is at (76, 107); stand beside it",
+      2
+    ],
+    [
+      "already at that spot",
+      2
+    ],
+    [
+      "unknown verb: plan",
+      1
+    ],
+    [
+      "already busy with walk",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 0,
+    "yusuf": 0,
+    "nadia": 0,
+    "omar": 0,
+    "salma": 0
+  },
+  "buildIntents": [
+    {
+      "tick": 1254,
+      "id": "nadia",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1262,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1279,
+      "id": "amara",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1298,
+      "id": "salma",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1481,
+      "id": "omar",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 33,
+  "thoughts": 59,
+  "lampsPlanned": 0,
+  "lampsCompleted": 0,
+  "lampBuildIntents": 0,
+  "houseBuildIntents": 5,
+  "stoked": 0,
+  "kindled": 0,
+  "torchCrafts": 0,
+  "lightActs": 0,
+  "thoughtsMentioningDark": 23
+}

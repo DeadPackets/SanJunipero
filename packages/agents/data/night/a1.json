@@ -1,0 +1,112 @@
+{
+  "arm": "a",
+  "label": "a1",
+  "ticks": 300,
+  "startTick": 1200,
+  "llmCalls": 58,
+  "costUsd": 0.0255,
+  "intents": 67,
+  "byVerb": {
+    "speak": 40,
+    "walk": 16,
+    "build": 4,
+    "forage": 3,
+    "move": 1,
+    "stow": 1,
+    "sleep": 1,
+    "give": 1
+  },
+  "builds": 4,
+  "structuresPlanned": 2,
+  "structuresCompleted": 0,
+  "structureProgressed": 401,
+  "entered": 0,
+  "spoke": 20,
+  "refusals": 29,
+  "refusalsByReason": [
+    [
+      "already busy with build",
+      13
+    ],
+    [
+      "already at that spot",
+      7
+    ],
+    [
+      "already busy with walk",
+      2
+    ],
+    [
+      "not close enough to gather — the patch is at (76, 107); stand beside it",
+      1
+    ],
+    [
+      "unknown verb: move",
+      1
+    ],
+    [
+      "there is nothing there to put it in",
+      1
+    ],
+    [
+      "the town keeps ground for a house — go and stand at (81, 68)",
+      1
+    ],
+    [
+      "there is no bed here; find somewhere to lie down — weary enough and the bare ground will do",
+      1
+    ],
+    [
+      "speak needs a {text}",
+      1
+    ],
+    [
+      "the moment passes",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 0,
+    "yusuf": 0,
+    "nadia": 0,
+    "omar": 0,
+    "salma": 0
+  },
+  "buildIntents": [
+    {
+      "tick": 1307,
+      "id": "nadia",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1307,
+      "id": "amara",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1369,
+      "id": "omar",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1485,
+      "id": "omar",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 37,
+  "thoughts": 57,
+  "lampsPlanned": 0,
+  "lampsCompleted": 0,
+  "lampBuildIntents": 0,
+  "houseBuildIntents": 4,
+  "stoked": 0,
+  "kindled": 0,
+  "torchCrafts": 0,
+  "lightActs": 0,
+  "thoughtsMentioningDark": 29
+}

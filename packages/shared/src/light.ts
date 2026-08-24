@@ -112,10 +112,29 @@ export function visionRadiusAt(
 }
 
 // The same fact in the three words a body would use for it. Never a number (G10).
+//
+// ★ IT ASKS THE LIGHT LAW, NOT THE WITNESS LAW. Reading this off `lightLevelAt` made the dark
+// answer `nightWitness.enabled` — a dial about who sees a theft — so switching that off left a
+// mind reading "bright" at midnight while the same midnight still charged it 1.5x for the work.
+// Two laws, two questions. Identical at world defaults; the phase and the glow decide, and no
+// factor is compared against another, so a config that sets `nightFactor === duskFactor` no
+// longer turns dusk into deep night.
 export function lightBandAt(
   state: LitWorld, x: number, y: number, tick: number, config: SimConfig,
 ): 'bright' | 'dim' | 'dark' {
-  const level = lightLevelAt(state, x, y, tick, config)
-  if (level >= 1) return 'bright'
-  return level <= config.nightWitness.nightFactor ? 'dark' : 'dim'
+  if (!config.light.enabled) return 'bright'
+  const phase = dayPhaseFromTick(tick)
+  if (phase === 'day') return 'bright'
+  if (flamesAt(state, tick, config).some((f) => distanceToFlame(f, x, y) <= f.radius)) return 'bright'
+  return phase === 'dusk' ? 'dim' : 'dark'
+}
+
+// ★ THE ONE ANSWER TO "IS IT DARK HERE". A boolean, and it is the band's own word — not a
+// second threshold. Dusk is not dark: a body can still work by it, and `fumblesInTheDark` has
+// always charged for `night` alone. The threshold is therefore not a number anybody chose. It
+// is the phase boundary the clock already keeps, and the reach of a flame's own glow radius.
+export function isDark(
+  state: LitWorld, x: number, y: number, tick: number, config: SimConfig,
+): boolean {
+  return lightBandAt(state, x, y, tick, config) === 'dark'
 }

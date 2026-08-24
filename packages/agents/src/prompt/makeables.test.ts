@@ -14,7 +14,7 @@ const C = DEFAULT_CONFIG
 describe('the makeable vocabulary comes off the tables the verbs already read', () => {
   it('names every kind a pair of hands can raise, and nothing the world places itself', () => {
     const m = makeables(C)
-    expect(m.builds.map((b) => b.kind)).toEqual(['bridge', 'cottage', 'farmhouse', 'house', 'well'])
+    expect(m.builds.map((b) => b.kind)).toEqual(['bridge', 'cottage', 'farmhouse', 'house', 'lamp_post', 'well'])
     // A grave has no inputs: the world digs it, and `build` refuses it. It is not vocabulary.
     expect(m.builds.some((b) => b.kind === 'grave')).toBe(false)
     // Neither is a cabin or a storehouse: both are 2x2, exactly a house's mass, so a buildable
