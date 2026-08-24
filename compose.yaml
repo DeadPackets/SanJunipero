@@ -1,0 +1,28 @@
+# One shared world, many viewers. There is deliberately no `scale:` here — a second replica is
+# a SECOND TOWN, not more capacity for this one, because each container ticks its own world from
+# its own sqlite file. Serving more viewers means a bigger box or a CDN, never another replica.
+services:
+  town:
+    build: .
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      # How far the town is platted. Ring 3 is a 152-tile square and is the case the chunked
+      # ground was written for; ring 1 is the 76-tile showcase.
+      SJ_RINGS: "${SJ_RINGS:-1}"
+      SJ_INTERIORS: "${SJ_INTERIORS:-0}"
+    volumes:
+      - town-data:/app/packages/gateway/data
+    restart: unless-stopped
+    stop_grace_period: 20s
+    healthcheck:
+      # `/api/timeline/marks` answers only once the world mirror has folded a state, so it
+      # reports the WORLD being up rather than the port being open.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/timeline/marks').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+
+volumes:
+  town-data:
