@@ -2,7 +2,7 @@
 
 `c8-plan-v5b` off `c8-plan-v5` @ `ee5d1c5`, re-verified against `main` @ **`645a8d9`**.
 Input: `docs/superpowers/plans/2026-08-24-01-genesis-rehearsal-v5.DRAFT.md` (9 523 lines), `c8-v4-to-v5-delta.md`.
-Output: `docs/superpowers/plans/2026-08-24-02-genesis-rehearsal-v5b.DRAFT.md` (9 980 lines).
+Output: `docs/superpowers/plans/2026-08-24-02-genesis-rehearsal-v5b.DRAFT.md` (9 981 lines).
 
 **66 tasks, 15 phases, unchanged** — `grep -c "^### Task "` = 66, distinct numbers = 66, `grep -c "^## Phase "` = 15. No task added, deleted, renumbered or moved. **One task gains a Step 0** (T21, for OD22) and **one gains a Step 1c** (T22, the printed fixture).
 
