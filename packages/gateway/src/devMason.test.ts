@@ -20,12 +20,14 @@ import {
   CITY_GROUND, TOWN_SQUARE, T_ROAD, freePlots, grammarOf, plotExtent, stateHash, townOrigin,
 } from '@sj/shared'
 import {
-  EventStore, RngStreams, TickLoop, claimInWorld, openDb, standingRects, townGroundOf, townSquareOf,
-  type WorldState,
+  EventStore, RngStreams, TickLoop, claimInWorld, fold, openDb, standingRects, submitIntent,
+  townGroundOf, townSquareOf, type WorldState,
 } from '@sj/engine'
 import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
 import { devTownSquare, devWorldOrigin } from './devTown.js'
-import { FOUNDERS, foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.js'
+import {
+  FOUNDERS, GO_HOME_BELOW, foundersFor, makeFoundersOnTick, masonIntent, townStructuresFor,
+} from './founders.js'
 
 const TICKS = 4320
 const RINGS = 3
@@ -202,9 +204,14 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
 // houses. `joinableSite` restored the other half. `buildSeam.test.ts` proves it on the engine's
 // own town; this proves it in the world a viewer boots, through a real `TickLoop`.
 //
-// ★ AND IT IS OFF BY DEFAULT, WHICH IS A MEASUREMENT AND NOT A TASTE. See the table below: the
-// hands are real and the calendar does not know it, because a building completes off the
-// BUILDER's activity clock and not off the site's `progressTicks`.
+// ★ AND IT IS OFF BY DEFAULT, WHICH IS A MEASUREMENT AND NOT A TASTE — see `jointBuild` on
+// `FoundersOpts`: the hands are real and the calendar does not know it, because a building
+// completes off the BUILDER's activity clock and not off the site's `progressTicks`.
+//
+// The DEFAULT is guarded by the describe above and not by anything here. A "with the flag off
+// this is the landed world" row would compare two runs of the same mutated policy and pass —
+// mutation M8 (the policy ignores the flag) reds `nothing was built: expected 18 to be greater
+// than 20` up there, and would have gone green on such a row. It is not written.
 describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickLoop', () => {
   const TICKS_J = 1440
   const on = runDevWorld(true, RINGS, TICKS_J, true)
@@ -285,6 +292,53 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
     for (const f of FOUNDERS) expect(on.state.agents[f.id]!.alive, f.id).toBe(true)
   })
 
+  // ★ TWO THINGS THE RUN CANNOT SEE, asked of the pure function instead — the shape the
+  // wright's M5 needed. Mutation M8 (the policy ignores its flag) is caught by the describe
+  // above; mutation M9 (a joiner never prices the work) came back BYTE IDENTICAL from 1 440
+  // ticks, because a founder only ever decides with its hands free and `homeIntent` has
+  // already taken it to bed by then. Asked with a spent body, the reserve is not inert.
+  describe('the mason, asked directly', () => {
+    /** A showcase town with `a` raising a house and `b` standing at the same walls. */
+    function twoAtOneSite(): WorldState {
+      const cfg = SHOWCASE_CONFIG
+      let n = 0
+      const put = (s: WorldState, type: string, payload: unknown): WorldState =>
+        fold(s, { seq: ++n, tick: 1, type, payload } as never, cfg)
+      const body = (s: WorldState, id: string, at: { x: number; y: number }): WorldState =>
+        put(put(s, 'agent_spawned', { id, name: id, x: at.x, y: at.y, ageDays: 7300 }),
+          'item_spawned', { id: `item_wood_${id}`, kind: 'wood', qty: 99, loc: { t: 'agent', id } })
+
+      const base = devGenesisState(cfg, devTerrain('showcase', RINGS), 'showcase', RINGS)
+      const claim = claimInWorld(base, { along: 2, deep: 2 })!
+      let s = body(body(base, 'a', claim.door), 'b', { x: claim.site.x - 1, y: claim.site.y - 1 })
+      const r = submitIntent(s, cfg, 'a', 'build', { kind: 'house' })
+      expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+      for (const e of r.ok ? r.events : []) s = put(s, e.type, e.payload)
+      return s
+    }
+    const spend = (s: WorldState, id: string, energy: number): WorldState => ({
+      ...s,
+      agents: { ...s.agents, [id]: { ...s.agents[id]!, needs: { ...s.agents[id]!.needs, energy } } },
+    })
+
+    it('★ the DEFAULT walks away from a neighbour’s walls — this lane changed no default', () => {
+      const s = twoAtOneSite()
+      // Away to the town's NEXT plot, which is the whole of OD22 in one line.
+      const next = claimInWorld(s, { along: 2, deep: 2 })!
+      expect(masonIntent(s, SHOWCASE_CONFIG, 'b'))
+        .toEqual({ verb: 'walk', params: { x: next.door.x, y: next.door.y } })
+      expect(masonIntent(s, SHOWCASE_CONFIG, 'b', true)).toEqual({ verb: 'build', params: { kind: 'house' } })
+    })
+
+    it('★ and a spent body does not take on work it cannot finish, joining or not', () => {
+      const s = twoAtOneSite()
+      expect(masonIntent(spend(s, 'b', 100), SHOWCASE_CONFIG, 'b', true))
+        .toEqual({ verb: 'build', params: { kind: 'house' } })
+      expect(masonIntent(spend(s, 'b', GO_HOME_BELOW + 1), SHOWCASE_CONFIG, 'b', true),
+        'a spent body lent hands it does not have').toBeNull()
+    })
+  })
+
   it('★ deterministic: a second run reaches the same town, roof for roof and tile for tile', () => {
     const twin = runDevWorld(true, RINGS, TICKS_J, true)
     expect(standingRects(twin.state)).toEqual(standingRects(on.state))
@@ -292,7 +346,4 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
     expect(stateHash(twin.state)).toBe(stateHash(on.state))
   }, 180_000)
 
-  it('★ OFF is the landed world byte for byte — this lane changed no default', () => {
-    expect(stateHash(off.state)).toBe(stateHash(runDevWorld(true, RINGS, TICKS_J).state))
-  }, 180_000)
 })
