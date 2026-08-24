@@ -290,11 +290,17 @@ export function roomZoomFor(_screenH: number): number {
   return ROOM_ZOOM
 }
 
-/** How much of the room's box a stage this tall cannot show. 0 when it all fits — the number
- *  the crop costs, so "it does not fit" is measured rather than asserted. */
+/**
+ * How much of the room's box a stage this tall cannot show. 0 when it all fits — the number the
+ * crop costs, so "it does not fit" is measured rather than asserted.
+ *
+ * ★ THE MARGIN IS NOT PART OF THE BOX. It was counted here, so a stage that could hold the room
+ * exactly was told it was 16 px short and threw away the near corner — the threshold, which is
+ * the way out — to buy two strips of nothing. A courtesy is paid out of slack or it is not paid:
+ * `roomOriginY` clamps it to the headroom that exists, and this counts only the picture.
+ */
 export function roomCropPx(screenH: number, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX): number {
-  const need = roomBox(room, wallH).height * ROOM_ZOOM + 2 * ROOM_MARGIN_Y
-  return Math.max(0, need - screenH)
+  return Math.max(0, roomBox(room, wallH).height * ROOM_ZOOM - screenH)
 }
 
 /**
@@ -330,7 +336,12 @@ export function roomOriginY(
   // ★ A SHORT STAGE LOSES THE NEAR CORNER, NOT THE WALL TOP. Centring split the overflow
   // evenly, which spends half of it on the windows, the chimney breast and the beams and the
   // other half on a corner of bare boards. The walls are where the room's detail is.
-  if (headroom < ROOM_MARGIN_Y) return ROOM_MARGIN_Y - box.top * zoom
+  //
+  // ★ AND IT LOSES AS LITTLE OF IT AS IT CAN. This pinned the wall top a full `ROOM_MARGIN_Y`
+  // down whatever the stage had, so a room that overflowed by 2 px lost 10 — the margin taken
+  // out of the picture instead of out of the slack. Clamped to the headroom that exists, which
+  // is the same rule the lift above it already answers to.
+  if (headroom < ROOM_MARGIN_Y) return Math.max(0, headroom) - box.top * zoom
   return centred - Math.max(0, Math.min(offsetY, headroom - ROOM_MARGIN_Y))
 }
 

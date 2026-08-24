@@ -375,8 +375,15 @@ describe('roomShell — the room fits the stage', () => {
       // measured against `roomCropPx` and never against the zoom under test, or a zoom that
       // ignored the stage would excuse itself from this check (mutation M9).
       if (roomCropPx(h) > 0) continue
-      expect(y + box.top * z, `wall top off the stage at ${h} px`).toBeGreaterThanOrEqual(ROOM_MARGIN_Y)
-      expect(y + box.bottom * z, `floor off the stage at ${h} px`).toBeLessThanOrEqual(h - ROOM_MARGIN_Y)
+      // ★ TWO INVARIANTS, NOT ONE, because the margin is a courtesy and the box is not. The
+      // whole box is on the stage the moment it fits at all; the margin is honoured the moment
+      // there is slack to pay it out of. Stating only the second is what made a stage 2 px
+      // short throw away 18 px of the near corner.
+      expect(y + box.top * z, `wall top off the stage at ${h} px`).toBeGreaterThanOrEqual(0)
+      expect(y + box.bottom * z, `floor off the stage at ${h} px`).toBeLessThanOrEqual(h)
+      if (h < box.height * z + 2 * ROOM_MARGIN_Y) continue
+      expect(y + box.top * z, `no top margin at ${h} px`).toBeGreaterThanOrEqual(ROOM_MARGIN_Y)
+      expect(y + box.bottom * z, `no bottom margin at ${h} px`).toBeLessThanOrEqual(h - ROOM_MARGIN_Y)
     }
   })
 
@@ -403,22 +410,28 @@ describe('roomShell — the room fits the stage', () => {
 
   it('★ a stage too short loses the near corner, never the wall top', () => {
     // MEASURED in the running app: 1728 x 823 window gives a canvas 678 CSS px tall, and the
-    // box needs 736 + two 8 px margins. 74 px do not fit and every one of them comes off the
-    // bottom, because the walls carry the window, the chimney breast and the beams.
+    // box is 736. 58 px do not fit and every one of them comes off the bottom, because the
+    // walls carry the window, the chimney breast and the beams.
     const short = 678
-    expect(roomCropPx(short)).toBe(74)
+    expect(roomCropPx(short)).toBe(58)
     const box = roomBox()
     const y = roomOriginY(short, OFFSET, ROOM_ZOOM)
-    expect(y + box.top * ROOM_ZOOM).toBe(ROOM_MARGIN_Y)          // the wall top is kept
+    // ★ THE MARGIN IS NOT PAID OUT OF THE PICTURE. It used to pin the wall top a full 8 px
+    // down however short the stage was, which bought two strips of nothing with 16 px of room.
+    expect(y + box.top * ROOM_ZOOM).toBe(0)                      // the wall top is kept, flush
     expect(y + box.bottom * ROOM_ZOOM).toBeGreaterThan(short)    // the near corner is what goes
+    expect(y + box.bottom * ROOM_ZOOM - short).toBe(roomCropPx(short))   // and it is the measured number
   })
 
   it('★ the crop is measured, not asserted — and it is zero on the stage the app reports', () => {
-    // MEASURED in the running app on this machine's maximised window: 1728 x 1000 gives
-    // `app.screen.height` = 855, and the box needs 736 + 2 x 8 = 752.
+    // MEASURED in the running app on this machine's window: 1728 x 879 gives
+    // `app.screen.height` = 734, and the box is 736 — 2 px, where the counted-in margins made
+    // it 18 and cost the threshold.
     expect(roomCropPx(855)).toBe(0)
     expect(roomCropPx(752)).toBe(0)
-    expect(roomCropPx(700)).toBe(52)
+    expect(roomCropPx(736)).toBe(0)
+    expect(roomCropPx(734)).toBe(2)
+    expect(roomCropPx(700)).toBe(36)
     // and the zoom never drops below 1, because there is no integer under it
     expect(roomZoomFor(400)).toBe(ROOM_ZOOM)
     expect(roomZoomFor(2000)).toBe(ROOM_ZOOM)

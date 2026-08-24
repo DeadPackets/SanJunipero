@@ -5,7 +5,7 @@ import {
   ADULT_HEIGHT_M, INTERIOR_BODY_PX, INTERIOR_PX_PER_M, INTERIOR_PX_SCALE, INTERIOR_TILE,
   ROOM_TILES, WALL_H_PX, groundRunPx, slotToTile,
 } from './interiorMap.js'
-import { ROOM_ZOOM, roomZoomFor } from './roomShell.js'
+import { ROOM_ZOOM, roomCropPx, roomZoomFor } from './roomShell.js'
 import {
   BED_FOOTPRINT, interiorBodyScale, interiorPieces, roomFurnishings, type PlacedItem,
 } from './interiors.js'
@@ -186,3 +186,16 @@ describe('★ A FURNISHING A BODY LIES IN IS CUT IN TWO AND PUT BACK EXACTLY', (
   })
 })
 
+describe('★ THE NEAR CORNER — how much of the room this stage cannot show', () => {
+  it('★ a stage that cannot hold the box says by how much, and spends nothing on courtesy', () => {
+    // The box is 736 px (160 of wall over 576 of floor). A stage shorter than that CROPS,
+    // because there is no integer zoom under 1 and a fractional one resamples the pixel art
+    // this room exists to stop resampling. What it must not do is crop MORE than it has to:
+    // the two 8 px margins are a courtesy and a courtesy is not paid out of the picture.
+    expect(roomCropPx(2000)).toBe(0)
+    // the margins are given back the moment the box does not fit
+    expect(roomCropPx(736)).toBe(0)
+    expect(roomCropPx(700)).toBe(36)
+    expect(roomCropPx(678)).toBe(58)
+  })
+})
