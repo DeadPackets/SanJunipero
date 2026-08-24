@@ -123,6 +123,10 @@ const MINDS: Mind[] = [
 // the property here would silently gut arms A and B and make this run incomparable with the
 // nine nights already on record. These four sets are frozen so the table can be stacked.
 //
+// The nine nights the motivation lane ran are `a1..c3` in `data/motive/`, left untouched. This
+// lane's twelve are `wa1..wd3` — pass MOTIVE_LABEL=w<arm><round> to add to them rather than
+// overwrite the record.
+//
 //   a  control — main's prose. house + storehouse gone; the three fixture dwellings stand.
 //   b  the cold felt, the SAME valley as a. Before `roofed` those three dwellings were painted
 //      scenery and the minds spent the night walking into them: 278 wasted acts, 0 builds.

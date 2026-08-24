@@ -143,3 +143,48 @@ describe('★ and the prose says it where the mind will read it', () => {
     expect(say(undefined)).toContain('still being built')
   })
 })
+
+// ---------------------------------------------------- what a mind READS at a full door ---
+
+describe('★ a full room, said in the prose and not in a refusal', () => {
+  const seeing = (extra: Record<string, unknown>): string => perceptionToProse({
+    time: { tick: 0, year: 0, season: 'spring', dayOfSeason: 1, dayOfYear: 0, hour: 12, minute: 0, isNight: false },
+    self: {
+      body: { needs: { hunger: 90, energy: 90, warmth: 90, social: 90 }, hp: 100, injuries: [], ill: false },
+      x: 2, y: 4, asleep: false, collapsed: false, activity: null, inventory: [],
+    },
+    weather: { kind: 'sunny', temperatureC: 14 },
+    light: 'bright',
+    visible: {
+      agents: [],
+      structures: [{
+        id: 'structure_1', kind: 'cabin', x: 2, y: 1, w: 2, h: 2,
+        burning: false, stage: 'complete', door: { x: 2, y: 3 }, ...extra,
+      }],
+      items: [], crops: [], fauna: [], forageables: [],
+    },
+    heard: [], seen: [], feltEvents: [],
+  } as unknown as PerceptionPacket, undefined, { isWalkable: () => true })
+
+  it('names the doorway either way — a full room is not a wall', () => {
+    expect(seeing({})).toContain('its doorway is at (2, 3) — stand there and you can go in.')
+    expect(seeing({ full: true })).toContain('its doorway is at (2, 3), and there is no floor left in it.')
+  })
+
+  // The distinction the whole of R2 turns on: a mind that cannot tell "full now" from "no way
+  // through, ever" walks back to the same door all night. That was arm B's defect.
+  it('reads differently from a wall with no way in at all', () => {
+    const full = seeing({ full: true })
+    const solid = seeing({ door: undefined })
+    expect(full).not.toEqual(solid)
+    expect(full).toContain('(2, 3)')
+    expect(solid).not.toContain('doorway')
+  })
+
+  it('names no remedy and gives no counsel', () => {
+    const said = seeing({ full: true }).toLowerCase()
+    for (const hint of ['build', 'raise a', 'you should', 'a roof would', 'go inside', 'wait for']) {
+      expect(said).not.toContain(hint)
+    }
+  })
+})
