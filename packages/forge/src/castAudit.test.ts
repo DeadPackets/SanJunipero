@@ -13,13 +13,32 @@
 //
 // ★ AND ONLY THE AUTHORED FACINGS ARE JUDGED, for a reason that is itself a finding. `sw` is
 // an EXACT flip of `se` — measured below, 0 pixels different across all five characters — and
-// yet `frameCoherenceGate` returns DIFFERENT verdicts for the two on 4 of 10 pairs: `omar/sw`
-// reds on palette 0.6875 while `omar/se` is clean, on the same image mirrored. The cause is
-// `gateView`: `downscaleMajority` and `anchorToCanvas` break ties one way on an odd-width
-// source and the other way on its mirror, and `paletteJaccard`'s minimum-share floor turns
-// those few pixels into a whole cluster appearing or vanishing. A derived-facing verdict
-// therefore measures the gate's own rounding, not the art. The generator never sees this
-// because it only ever gates `AUTHORED_FACINGS`; it bites an auditor.
+// yet `frameCoherenceGate` returns DIFFERENT verdicts for the two on 3 of 10 pairs.
+//
+// ★ THE CAUSE THIS FILE USED TO NAME IS NOT THE CAUSE. It said `downscaleMajority` and
+// `anchorToCanvas` break ties one way on an odd-width source and the other way on its mirror.
+// Both were removed in a scratchpad build and measured against the committed cast:
+//
+//   as shipped              3/10 disagreements   gateView(flip) vs flip(gateView): 30 635 px
+//   canonical tie-break     3/10                                                   30 456 px
+//   + even-parity centring  3/10                                                   30 456 px
+//   + palindromic boxes     3/10                                                   27 994 px
+//
+// An 8.6 % reduction on an error that covers ~6.6 % of every 96x96 gate canvas, and the count
+// does not move. The palindromic variant only changes WHICH pairs disagree — omar drops out
+// and nadia comes in — which is the worst outcome of all: it looks like progress and is not.
+//
+// The real cause is majority downscale at a NON-INTEGER factor. A 954 px figure becomes ~90 px,
+// factor ~10.6, so the source boxes alternate 10 and 11 columns wide. Mirroring the source
+// re-partitions it, and the modal colour of a 10-wide box is honestly not the modal colour of
+// the 11-wide box its mirror lands in. No tie-break rule reaches that; only an integer factor
+// would, and the figure heights come from the model.
+//
+// SO IT IS RECORDED AND NOT FIXED — see the report. Judging a derived facing carries ZERO
+// information anyway: `deriveSheet` builds `sw` as `mirrorX(se)` and the test below asserts
+// the two are identical to the pixel, so a derived verdict is the authored art measured a
+// second time through a lossy asymmetric lens. The generator never sees this because it only
+// ever gates `AUTHORED_FACINGS`; it bites an auditor who forgets the mirror law.
 //
 // THIS FILE PINS THE DEBT, IT DOES NOT BLESS IT. Every entry is a cell that would not pass
 // today. Fixing one turns this red, which is the point: the list may only get shorter, and it
@@ -151,6 +170,10 @@ describe('the derived facings are exact mirrors, and the gate still disagrees ac
 
   // If this ever goes green, `gateView` has been made mirror-safe and the sweep above can be
   // widened to all four facings. Until then a derived-facing verdict is not evidence.
+  //
+  // Do not "fix" this by changing a tie-break: three candidate fixes were measured and none
+  // moved the count (see the header). It needs an integer downscale factor, which is a
+  // recalibration of every threshold in the cast pipeline, not a bug fix.
   it('★ yet the same image mirrored gets a different verdict, on at least one character', async () => {
     const disagreements: string[] = []
     for (const c of cast) {
