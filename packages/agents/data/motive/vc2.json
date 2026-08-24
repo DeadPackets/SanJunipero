@@ -1,0 +1,149 @@
+{
+  "arm": "c",
+  "label": "vc2",
+  "ticks": 720,
+  "startTick": 1080,
+  "llmCalls": 229,
+  "costUsd": 0.1747,
+  "intents": 154,
+  "byVerb": {
+    "speak": 106,
+    "walk": 18,
+    "sleep": 10,
+    "forage": 9,
+    "build": 7,
+    "harvest": 2,
+    "walk_now": 1,
+    "wake": 1
+  },
+  "builds": 7,
+  "structuresPlanned": 4,
+  "structuresCompleted": 0,
+  "structureProgressed": 2686,
+  "entered": 0,
+  "shelterLedger": {
+    "roofs": 0,
+    "slots": 0,
+    "bodies": 5,
+    "per": 0
+  },
+  "collapsedAtEnd": 0,
+  "shelteredAtEnd": 0,
+  "refusedNoWayIn": 0,
+  "refusedNoFloor": 0,
+  "spoke": 104,
+  "refusals": 13,
+  "refusalsByReason": [
+    [
+      "already at that spot",
+      5
+    ],
+    [
+      "no such crop",
+      2
+    ],
+    [
+      "already asleep",
+      2
+    ],
+    [
+      "not close enough to gather — the patch is at (72, 105); stand beside it",
+      1
+    ],
+    [
+      "the town keeps ground for a house — go and stand at (81, 68)",
+      1
+    ],
+    [
+      "unknown verb: walk_now",
+      1
+    ],
+    [
+      "the moment passes",
+      1
+    ]
+  ],
+  "refusalsByVerb": [
+    [
+      "walk: already at that spot",
+      5
+    ],
+    [
+      "harvest: no such crop",
+      2
+    ],
+    [
+      "sleep: already asleep",
+      2
+    ],
+    [
+      "forage: not close enough to gather — the patch is at (72, 105); stand beside it",
+      1
+    ],
+    [
+      "build: the town keeps ground for a house — go and stand at (81, 68)",
+      1
+    ],
+    [
+      "walk_now: unknown verb: walk_now",
+      1
+    ],
+    [
+      "build: the moment passes",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 44.6,
+    "yusuf": 44.6,
+    "nadia": 44.6,
+    "omar": 44.6,
+    "salma": 44.6
+  },
+  "buildIntents": [
+    {
+      "tick": 1147,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1153,
+      "id": "amara",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1175,
+      "id": "amara",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1261,
+      "id": "nadia",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1300,
+      "id": "salma",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1316,
+      "id": "omar",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1800,
+      "id": "omar",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 156,
+  "thoughts": 193
+}

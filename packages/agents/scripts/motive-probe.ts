@@ -11,8 +11,8 @@ import { fileURLToPath } from 'node:url'
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import {
-  createWorldTick, doorTile, EventStore, fold, genesisState, makeGenesisWorld, RngStreams,
-  shelterLedger, TickLoop, type LawQueue, type TickHandler, type WorldState,
+  buildTicks, createWorldTick, doorTile, EventStore, fold, genesisState, makeGenesisWorld,
+  RngStreams, shelterLedger, TickLoop, type LawQueue, type TickHandler, type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, isRoofedKind, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
 import { EngineBridge, type Intent, type SubmitResult } from '../src/runtime/bridge.js'
@@ -127,40 +127,61 @@ const MINDS: Mind[] = [
 // lane's twelve are `wa1..wd3` — pass MOTIVE_LABEL=w<arm><round> to add to them rather than
 // overwrite the record.
 //
-//   a  control — main's prose. house + storehouse gone; the three fixture dwellings stand.
-//   b  the cold felt, the SAME valley as a. Before `roofed` those three dwellings were painted
-//      scenery and the minds spent the night walking into them: 278 wasted acts, 0 builds.
-//   c  the cold felt, and nowhere at all to go in — the motivation lane's clean valley.
-//   d  ★ THE FOUNDING. One cabin left standing: 2 bodies' worth of floor for a cast of 5. The
-//      fixtures this project has always measured on hand five founders 21 roof-slots, so the
-//      only want we model was answered before the first tick. This is the arm where it is not.
+//   a  control — the founding valley, and main's prose: the `cold` field stripped at the seam.
+//   b  the cold felt, and the valley SOUND — every roof back on, which is the town every
+//      production figure this project ever reported was measured in. 21 slots for 5 bodies.
+//   c  the cold felt, and nowhere at all to go in: no roof of any kind, nothing half-raised.
+//   g  ★ THE FOUNDING, EXACTLY AS IT SHIPS. Nothing added, nothing taken away. Two sound roofs
+//      and seven dwellings standing at three quarters. `per` 0.8.
+//
+// Arms `a`, `b` and `c` are the founding valley with something DONE to it; `g` is the founding
+// valley. The nine nights of the motivation lane (`a1..c3`) and the twelve of the wants lane's
+// first pass (`wa1..wd3`) both ran on a valley whose roofs were all sound, so neither stacks on
+// this table run for run — what stacks is the question each arm asks.
 const SPAWN_KINDS = new Set(['house', 'storehouse'])
 const REMOVED_BY_ARM: Record<string, string[]> = {
-  a: ['house', 'storehouse'],
-  b: ['house', 'storehouse'],
+  a: [],
+  b: [],
   c: ['house', 'storehouse', 'cabin', 'cottage', 'farmhouse'],
-  d: ['house', 'storehouse', 'cottage', 'farmhouse'],
+  g: [],
 }
-const REMOVED = new Set(REMOVED_BY_ARM[ARM] ?? REMOVED_BY_ARM['b']!)
+// Arm B puts the roofs back on: the valley as it stood before the ruling, and the only arm
+// where the want is answered before the first tick.
+const ROOFS_BACK_ON = ARM === 'b'
+const REMOVED = new Set(REMOVED_BY_ARM[ARM] ?? REMOVED_BY_ARM['g']!)
 void isRoofedKind
 
 function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: number; y: number }> } {
   const g = makeGenesisWorld(config)
   let state = genesisState(config, g.terrain)
   const dropped = new Set<string>()
+  const roofless = new Set<string>()
   const doors: Array<{ x: number; y: number }> = []
+  const emit = (type: string, payload: unknown): void => {
+    state = fold(state, store.append(state.tick, type, payload), config)
+  }
   for (const e of g.events) {
     const p = e.payload as Record<string, unknown>
-    if (e.type === 'structure_planned' && REMOVED.has(String(p['kind']))) {
-      dropped.add(String(p['id']))
-      // Remember the doorways of the HOUSES only, so every arm spawns its five founders on
-      // exactly the same five tiles and the arms differ in nothing but what stands around them.
+    if (e.type === 'structure_planned') {
+      // Every arm spawns its five founders on exactly the same five tiles, so the arms differ
+      // in nothing but what stands around them.
       if (SPAWN_KINDS.has(String(p['kind']))) doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
+      if (REMOVED.has(String(p['kind']))) {
+        dropped.add(String(p['id']))
+        continue
+      }
+      roofless.add(String(p['id']))
+      emit(e.type, e.payload)
       continue
     }
-    if (e.type === 'structure_completed' && dropped.has(String(p['id']))) continue
-    state = fold(state, store.append(state.tick, e.type, e.payload), config)
+    if (dropped.has(String(p['id']))) continue
+    if (e.type === 'structure_completed') roofless.delete(String(p['id']))
+    // ARM B ONLY: the progress genesis books into a roofless dwelling is skipped and the
+    // building is completed instead — the sound village, as every earlier run measured it.
+    if (ROOFS_BACK_ON && e.type === 'structure_progressed') continue
+    emit(e.type, e.payload)
   }
+  if (ROOFS_BACK_ON) for (const id of [...roofless].sort()) emit('structure_completed', { id })
   return { state, doors }
 }
 
@@ -301,7 +322,23 @@ async function main(): Promise<void> {
       acc[r.reason] = (acc[r.reason] ?? 0) + 1
       return acc
     }, {})).sort((a, b) => b[1] - a[1]),
+    // ★ WHICH VERB WAS TURNED AWAY, not just what it was told. The last pass reported 159
+    // `already busy with build` and had to read the runtime's source to find out they were all
+    // speech. A refusal count whose composition is a guess has measured half of nothing.
+    refusalsByVerb: Object.entries(refusals.reduce<Record<string, number>>((acc, r) => {
+      const k = `${r.verb}: ${r.reason}`
+      acc[k] = (acc[k] ?? 0) + 1
+      return acc
+    }, {})).sort((a, b) => b[1] - a[1]).slice(0, 12),
     warmthAtEnd: warmth,
+    // Every wall in the town at dawn, and how far up it is. "No house finished" is a claim
+    // about a distance, and a report that cannot say the distance cannot say what is missing.
+    sitesAtEnd: Object.values(loop.state.structures)
+      .filter((s) => s.stage === 'construction')
+      .map((s) => `${s.kind} ${s.id} ${s.progressTicks}/${buildTicks(config, s.kind)} by ${s.builtBy}`)
+      .sort(),
+    roofsAtEnd: Object.values(loop.state.structures)
+      .filter((s) => s.stage === 'complete' && isRoofedKind(config, s.kind)).length,
     buildIntents: attempts.filter((a) => a.verb === 'build'),
     thoughtsMentioningCold: thoughts.filter((t) => /\bcold|shiver|freez|warm|roof|shelter|walls|night air\b/i.test(t.text)).length,
     thoughts: thoughts.length,

@@ -1,0 +1,186 @@
+{
+  "arm": "g",
+  "label": "vlong1",
+  "ticks": 1440,
+  "startTick": 1080,
+  "llmCalls": 186,
+  "costUsd": 0.1422,
+  "intents": 176,
+  "byVerb": {
+    "speak": 63,
+    "walk": 27,
+    "sleep": 27,
+    "wake": 12,
+    "forage": 10,
+    "enter": 10,
+    "eat": 10,
+    "exit": 4,
+    "build": 3,
+    "stow": 2,
+    "experiment": 2,
+    "wait": 2,
+    "harvest": 1,
+    "plan": 1,
+    "give": 1,
+    "take": 1
+  },
+  "builds": 3,
+  "structuresPlanned": 0,
+  "structuresCompleted": 1,
+  "structureProgressed": 720,
+  "entered": 7,
+  "shelterLedger": {
+    "roofs": 3,
+    "slots": 6,
+    "bodies": 5,
+    "per": 1.2
+  },
+  "collapsedAtEnd": 0,
+  "shelteredAtEnd": 3,
+  "refusedNoWayIn": 0,
+  "refusedNoFloor": 0,
+  "spoke": 63,
+  "refusals": 32,
+  "refusalsByReason": [
+    [
+      "already at that spot",
+      6
+    ],
+    [
+      "already asleep",
+      6
+    ],
+    [
+      "already inside",
+      3
+    ],
+    [
+      "there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      3
+    ],
+    [
+      "you are indoors; step outside first",
+      3
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      2
+    ],
+    [
+      "not holding that",
+      2
+    ],
+    [
+      "unknown verb: wait",
+      2
+    ],
+    [
+      "no such crop",
+      1
+    ],
+    [
+      "unknown verb: plan",
+      1
+    ],
+    [
+      "collapsed and unable to act",
+      1
+    ],
+    [
+      "not close enough to gather — the patch is at (76, 107); stand beside it",
+      1
+    ],
+    [
+      "not asleep",
+      1
+    ]
+  ],
+  "refusalsByVerb": [
+    [
+      "walk: already at that spot",
+      6
+    ],
+    [
+      "sleep: already asleep",
+      6
+    ],
+    [
+      "enter: already inside",
+      3
+    ],
+    [
+      "sleep: there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      3
+    ],
+    [
+      "walk: you are indoors; step outside first",
+      3
+    ],
+    [
+      "experiment: You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      2
+    ],
+    [
+      "wait: unknown verb: wait",
+      2
+    ],
+    [
+      "harvest: no such crop",
+      1
+    ],
+    [
+      "plan: unknown verb: plan",
+      1
+    ],
+    [
+      "build: collapsed and unable to act",
+      1
+    ],
+    [
+      "eat: not holding that",
+      1
+    ],
+    [
+      "forage: not close enough to gather — the patch is at (76, 107); stand beside it",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 58,
+    "yusuf": 58,
+    "nadia": 58,
+    "omar": 58,
+    "salma": 58
+  },
+  "sitesAtEnd": [
+    "cottage structure_4 3240/4320 by genesis",
+    "farmhouse structure_9 4320/5760 by genesis",
+    "house structure_3 2160/2880 by genesis",
+    "house structure_5 2160/2880 by genesis",
+    "house structure_7 2160/2880 by genesis",
+    "house structure_8 2160/2880 by genesis"
+  ],
+  "roofsAtEnd": 3,
+  "buildIntents": [
+    {
+      "tick": 1138,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1778,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 2010,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 77,
+  "thoughts": 144
+}
