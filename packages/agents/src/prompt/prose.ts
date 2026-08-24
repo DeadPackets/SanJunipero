@@ -53,6 +53,9 @@ export type PerceptionStructure = {
   // The tile `enter` measures against. Absent when there is no way in at all, and then the
   // prose falls back to the nearest open ground beside the wall.
   door?: { x: number; y: number }
+  // No more bodies fit. Said at the door rather than at the refusal, because a mind that has
+  // to be turned away to learn it has already spent the turn.
+  full?: true
 }
 
 export type PerceptionCrop = {
@@ -416,7 +419,11 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
         ? 'this is the roof you are under.'
         : `this is the roof you are under; the way out is at (${s.door.x}, ${s.door.y}).`
     } else if (s.door !== undefined) {
-      approach = `its doorway is at (${s.door.x}, ${s.door.y}) — stand there and you can go in.`
+      // ★ FULL IS A FACT, NOT A REFUSAL. It names the doorway either way, so a mind can tell a
+      // room that is full now from a wall with no way through it ever — and can come back.
+      approach = s.full === true
+        ? `its doorway is at (${s.door.x}, ${s.door.y}), and there is no floor left in it.`
+        : `its doorway is at (${s.door.x}, ${s.door.y}) — stand there and you can go in.`
     } else if (world?.isWalkable) {
       const t = besideTile(s, packet.self, world.isWalkable)
       approach = t === null ? 'no open ground lies beside it.' : `you could stand beside it at (${t.x}, ${t.y}).`

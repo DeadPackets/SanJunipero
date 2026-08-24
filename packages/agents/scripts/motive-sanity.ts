@@ -4,12 +4,12 @@ import {
   createWorldTick, EventStore, fold, genesisState, groundForBuilding, isExposed, makeGenesisWorld,
   openDb, RngStreams, TickLoop, type LawQueue, type TickHandler, type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, type SimConfig } from '@sj/shared'
+import { DEFAULT_CONFIG, isRoofedKind, type SimConfig } from '@sj/shared'
 import { EngineBridge } from '../src/runtime/bridge.js'
 import { makeablesLine, perceptionToProse } from '../src/prompt/prose.js'
 
 const config: SimConfig = DEFAULT_CONFIG
-const ROOFED = new Set(config.structures.enterableKinds)
+const ROOFED = new Set(Object.keys(config.structures.recipes).filter((k) => isRoofedKind(config, k)))
 const START_TICK = 18 * 60
 
 const db = openDb(':memory:')

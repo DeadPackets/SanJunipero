@@ -37,17 +37,13 @@ const inFord = (x: number, y: number): boolean =>
 // footprint; `structures.recipes` is the single source for the kinds that can also be built.
 export const GENESIS_BUILDER_ID = 'genesis'
 export type Durability = { maxHp: number; flammable: boolean }
+// The storehouse and the three dwellings came OFF this table when `roofed` landed: they need a
+// `structures.recipes` row to say they have a roof, and a row already carries hp and flammable,
+// so keeping them here would have been the same two numbers written twice (G4).
 const GENESIS_STRUCTURE_DEFS: Readonly<Record<string, Durability>> = {
-  storehouse: { maxHp: 40, flammable: true },
   shed: { maxHp: 20, flammable: true },
   wagon: { maxHp: 15, flammable: true },
   fire_pit: { maxHp: 10, flammable: false },
-  // The three dwellings the template places and nobody builds. `house` is absent on purpose:
-  // it is buildable, so `genesisDurability` reads its 50 hp from `structures.recipes` instead.
-  // More roof than a house, in proportion to the ground each stands on; all burn.
-  cabin: { maxHp: 50, flammable: true },
-  cottage: { maxHp: 60, flammable: true },
-  farmhouse: { maxHp: 80, flammable: true },
 }
 
 /** What a genesis-placed structure is made of: a buildable kind takes its recipe, a placed-only

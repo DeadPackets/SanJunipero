@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
-  classMembers, dayPhaseFromTick, fertilityAt, glowRadiusFor, inputName, litSourceWithin,
-  MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
+  classMembers, dayPhaseFromTick, fertilityAt, glowRadiusFor, inputName, isRoofedKind,
+  litSourceWithin, MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
   type RecipeDef, type SimConfig, type StructureRecipeDef, type TownFacing,
 } from '@sj/shared'
 
@@ -9,7 +9,7 @@ import {
 const DEFAULT_TOWN_FACING: TownFacing = 'sw'
 import { mintId, type Affliction, type Item, type Structure, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
-import { doorTile, sameInterior } from './interiors.js'
+import { doorTile, occupantsOf, roomIsFull, sameInterior } from './interiors.js'
 import { bridgeAt, BRIDGE_KIND, findPath, isPassable, searchPath } from './path.js'
 import { claimInWorld, layBlock, townSquareOf, type TileChange } from './town.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
@@ -188,8 +188,8 @@ const sleep: VerbDef = makeVerb({
     if (a.asleep) return 'already asleep'
     if (!config.structures.sleepIndoorsOnly || mayLieDownRough(state, config, agentId)) return null
     const s = a.insideId === undefined ? undefined : state.structures[a.insideId]
-    if (!s || s.stage !== 'complete' || !config.structures.sleepableKinds.includes(s.kind)) {
-      return 'there is no bed here; find somewhere to lie down — weary enough and the bare ground will do'
+    if (!s || s.stage !== 'complete' || !isRoofedKind(config, s.kind)) {
+      return 'there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do'
     }
     return null
   },
@@ -216,11 +216,19 @@ const enter: VerbDef = makeVerb({
     if (a.insideId !== undefined) return 'already inside'
     const s = state.structures[p.data.structureId]
     if (!s) return 'there is nothing there to enter'
-    if (!config.structures.enterableKinds.includes(s.kind)) return `there is no way into a ${s.kind}`
+    if (!isRoofedKind(config, s.kind)) return `a ${words(s.kind)} has no roof to get under`
     if (s.stage !== 'complete') return 'it is not finished'
     const door = doorTile(state, s)
     if (!door) return 'there is no way in'
     if (Math.abs(a.x - door.x) > 1 || Math.abs(a.y - door.y) > 1) return 'not close enough to the door'
+    // ★ FULL IS NOT IMPOSSIBLE, AND THE WORDS HAVE TO SAY WHICH. A mind that cannot tell one
+    // from the other spends the night walking back to the same door — that is arm B's defect in
+    // a new costume. This one names the bodies and it names the floor, so it reads as a thing
+    // that changes when somebody steps out.
+    if (roomIsFull(state, s)) {
+      const n = occupantsOf(state, s.id).length
+      return `there is no floor left in there — ${n === 1 ? 'one body fills' : `${n} bodies fill`} it`
+    }
     return null
   },
   onComplete(state, _config, agentId, params) {

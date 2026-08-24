@@ -135,8 +135,15 @@ const CraftingSchema = z.object({
   expertDifficulty: z.number().int().default(4),
 }).strict()
 
-// What a building costs, how big it stands, how hard it is to knock down and how long it takes.
-// Enterability is NOT here: `structures.enterableKinds` is its one landed home.
+// What a building costs, how big it stands, how hard it is to knock down, how long it takes —
+// and whether it has a roof.
+//
+// ★ `roofed` REPLACED TWO ROSTERS. `structures.enterableKinds` and `structures.sleepableKinds`
+// were hand-written lists of kind names, and the valley's cabins, cottages and farmhouses were
+// missing from both — so a mind walked to a cottage door, was told "there is no way into a
+// cottage", and learned nothing it could use. A roster says which names somebody remembered;
+// a property says what a building IS. Ask the kind whether it has a roof over it, and the
+// answer is the same for the way in, the cold it holds off, and lying down out of the weather.
 export const StructureRecipeSchema = z.object({
   inputs: z.record(z.string(), z.number()),
   w: z.number().int().positive(),
@@ -144,19 +151,29 @@ export const StructureRecipeSchema = z.object({
   maxHp: z.number().positive(),
   flammable: z.boolean(),
   durationTicks: z.number().int().positive(),
+  // Defaults to false, so a kind the arbiter codifies is a thing in the world and not a shelter
+  // until somebody says it is one.
+  roofed: z.boolean().default(false),
 }).strict()
 
 const StructuresSchema = z.object({
-  enterableKinds: z.array(z.string()).default(['house', 'storehouse']),
   privateKinds: z.array(z.string()).default(['house']),
   sleepIndoorsOnly: z.boolean().default(true),
-  sleepableKinds: z.array(z.string()).default(['house']),
-  // An empty `inputs` marks a kind the world places and nobody builds.
+  // An empty `inputs` marks a kind the world places and nobody builds. Every kind the world
+  // places has a row here now, because a kind with no row is a kind nothing can say `roofed`
+  // about — which is exactly how three dwellings became scenery.
   recipes: z.record(z.string(), StructureRecipeSchema).default({
-    house: { inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880 },
-    well: { inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720 },
-    bridge: { inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480 },
-    grave: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1 },
+    house: { inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880, roofed: true },
+    well: { inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false },
+    bridge: { inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false },
+    grave: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false },
+    // The four the town template plants and nobody raises. Their mass and their hp were already
+    // authored — the footprints in `cityTemplate`, the hp in the engine's genesis table — and
+    // this is the row both now read, so a cottage is one building and not three descriptions.
+    storehouse: { inputs: {}, w: 2, h: 2, maxHp: 40, flammable: true, durationTicks: 1, roofed: true },
+    cabin: { inputs: {}, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 1, roofed: true },
+    cottage: { inputs: {}, w: 3, h: 2, maxHp: 60, flammable: true, durationTicks: 1, roofed: true },
+    farmhouse: { inputs: {}, w: 4, h: 2, maxHp: 80, flammable: true, durationTicks: 1, roofed: true },
   }),
 }).strict()
 
@@ -431,6 +448,13 @@ export type SimConfig = z.infer<typeof SimConfigSchema>
 export type CropDef = z.infer<typeof CropDefSchema>
 export type RecipeDef = z.infer<typeof RecipeSchema>
 export type StructureRecipeDef = z.infer<typeof StructureRecipeSchema>
+
+/** Does a building of this kind have a roof over it? The one derivation (G4) behind every
+ *  question that used to be answered by a roster: the way in, the cold held off, and whether a
+ *  body can lie down out of the weather. A kind with no row is not a shelter. */
+export function isRoofedKind(config: SimConfig, kind: string): boolean {
+  return config.structures.recipes[kind]?.roofed === true
+}
 
 // The one derivation of the slower clock (G4): 0.021/tick at defaults, 0.6x hunger by ruling D4.
 export function thirstDecayPerTick(config: SimConfig): number {

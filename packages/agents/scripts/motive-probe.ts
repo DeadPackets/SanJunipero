@@ -14,7 +14,7 @@ import {
   createWorldTick, doorTile, EventStore, fold, genesisState, makeGenesisWorld, RngStreams,
   TickLoop, type LawQueue, type TickHandler, type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, isRoofedKind, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
 import { EngineBridge, type Intent, type SubmitResult } from '../src/runtime/bridge.js'
 import { AgentRuntime } from '../src/runtime/agentRuntime.js'
 import { openAgentDb } from '../src/memory/schema.js'
@@ -116,7 +116,7 @@ const MINDS: Mind[] = [
 // The genesis valley exactly as it is — its ground, its river, its trees and the ground the
 // town keeps for a new roof — with every ROOF taken out of it. Nothing else is touched: the
 // question is what five bodies do about a cold night when there is nowhere to go in out of it.
-const ROOFED = new Set(config.structures.enterableKinds)
+const ROOFED = new Set(Object.keys(config.structures.recipes).filter((k) => isRoofedKind(config, k)))
 // ARM C: the valley also loses the buildings that LOOK like shelter and are not. `cabin`,
 // `cottage` and `farmhouse` are not in `enterableKinds`, so arm B's minds spent a whole night
 // walking to their doors and being told "there is no way into a cabin" — eighty refusals.

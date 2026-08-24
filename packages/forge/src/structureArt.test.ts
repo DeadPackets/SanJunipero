@@ -83,7 +83,9 @@ describe('every kind the WORLD CAN CREATE has a cell, in every facing it can sta
     expect([...new Set(TEMPLATE.structures.map((s) => s.kind))].sort())
       .toEqual(['cabin', 'cottage', 'farmhouse', 'fire_pit', 'house', 'storehouse', 'well'])
     // the buildable half and the world-places-it half of the recipe table
-    expect(Object.keys(RECIPES).sort()).toEqual(['bridge', 'grave', 'house', 'well'])
+    expect(Object.keys(RECIPES).sort()).toEqual([
+      'bridge', 'cabin', 'cottage', 'farmhouse', 'grave', 'house', 'storehouse', 'well',
+    ])
     expect(CREATABLE).toEqual([
       'bridge', 'cabin', 'cottage', 'farmhouse', 'fire_pit', 'grave', 'house', 'scaffolding',
       'shed', 'standing_stone', 'storehouse', 'wagon', 'well',

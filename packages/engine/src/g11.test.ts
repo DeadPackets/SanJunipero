@@ -572,7 +572,7 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     // its own weariness will open.
     expect(submitIntent({ ...s, tick: 1 }, CFG, 'ada', 'sleep', {})).toEqual({
       ok: false,
-      reason: 'there is no bed here; find somewhere to lie down — weary enough and the bare ground will do',
+      reason: 'there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do',
     })
 
     // HALF 2 — weary enough, and the bare ground will do. No fall is required to earn it.

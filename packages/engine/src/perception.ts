@@ -1,7 +1,10 @@
-import { lightBandAt, simTimeFromTick, visionRadiusAt, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
+import {
+  isRoofedKind, lightBandAt, simTimeFromTick, visionRadiusAt,
+  type SimConfig, type SimEvent, type SimTime,
+} from '@sj/shared'
 import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
-import { doorTile } from './interiors.js'
+import { doorTile, roomIsFull } from './interiors.js'
 import { effectiveConfig } from './laws.js'
 import { thirstOf, type AfflictionKind, type Item, type Structure, type WorldState } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
@@ -86,6 +89,10 @@ export type PerceivedStructure = {
   hasInscription?: true
   inscription?: { text: string; by: string }
   door?: { x: number; y: number }
+  // ★ FULL, SAID BEFORE THE WALK. A room holds only so many bodies, and a mind that has to be
+  // refused at the door to learn it has already spent the turn. Present only alongside `door`
+  // and only when no more fit, so a packet from a town with room in it reads as it always did.
+  full?: true
 }
 
 // Whose it is, and whose hands made it — the two things prose needs to say
@@ -322,10 +329,11 @@ export function composePerception(
 
   // The way in, from the same function the verb uses. A body that reads this and stands there
   // is a body `enter` accepts (C11 batch-8 R7).
-  const wayIn = (s: Structure): { door: { x: number; y: number } } | Record<string, never> => {
-    if (s.stage !== 'complete' || !config.structures.enterableKinds.includes(s.kind)) return {}
+  const wayIn = (s: Structure): { door?: { x: number; y: number }; full?: true } => {
+    if (s.stage !== 'complete' || !isRoofedKind(config, s.kind)) return {}
     const door = doorTile(state, s)
-    return door === null ? {} : { door: { x: door.x, y: door.y } }
+    if (door === null) return {}
+    return { door: { x: door.x, y: door.y }, ...(roomIsFull(state, s) ? { full: true as const } : {}) }
   }
 
   const visibleStructures: PerceivedStructure[] = Object.values(state.structures)

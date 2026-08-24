@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, DEFAULT_CONFIG, SPAWN_AGE_YEARS, thirstDecayPerTick } from './config.js'
+import { SimConfigSchema, DEFAULT_CONFIG, isRoofedKind, SPAWN_AGE_YEARS, thirstDecayPerTick } from './config.js'
 
 // Every C11 section flag, in the order Task 37 will unpin them.
 const C11_FLAGS = [
@@ -46,8 +46,21 @@ describe('SimConfigSchema: C9 living-world sections', () => {
   const c = SimConfigSchema.parse({})
 
   it('structures: interiors', () => {
-    expect(c.structures.enterableKinds).toEqual(['house', 'storehouse'])
     expect(c.structures.privateKinds).toEqual(['house'])
+  })
+
+  // ★ THE ROSTERS ARE GONE. `enterableKinds` and `sleepableKinds` were two hand-written lists
+  // of kind names and both said `house` (plus a storehouse) — so the valley's own cabins,
+  // cottages and farmhouses were buildings nobody could get into or lie down in. The kind's own
+  // row answers it now, and nothing may reintroduce a list of names beside it.
+  it('a roof is a property of the kind, not a roster of names', () => {
+    expect(c.structures).not.toHaveProperty('enterableKinds')
+    expect(c.structures).not.toHaveProperty('sleepableKinds')
+    const roofed = Object.keys(c.structures.recipes).filter((k) => isRoofedKind(c, k)).sort()
+    expect(roofed).toEqual(['cabin', 'cottage', 'farmhouse', 'house', 'storehouse'])
+    for (const k of ['well', 'bridge', 'grave']) expect(isRoofedKind(c, k), k).toBe(false)
+    // A kind nothing has ever heard of is not a shelter by accident.
+    expect(isRoofedKind(c, 'standing_stone')).toBe(false)
   })
 
   it('reproduction: partnership, conception, gestation, fertility', () => {
@@ -198,15 +211,21 @@ describe('SimConfigSchema: C9 living-world sections', () => {
 
   it('structures.recipes is the one table that knows what a building costs and measures', () => {
     const r = SimConfigSchema.parse({}).structures.recipes
-    expect(r['house']).toEqual({ inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880 })
-    expect(r['well']).toEqual({ inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720 })
-    expect(r['bridge']).toEqual({ inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480 })
-    expect(r['grave']).toEqual({ inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1 })
+    expect(r['house']).toEqual({ inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880, roofed: true })
+    expect(r['well']).toEqual({ inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false })
+    expect(r['bridge']).toEqual({ inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false })
+    expect(r['grave']).toEqual({ inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false })
+    // The four the world plants and nobody raises: a row each, and an empty `inputs` is still
+    // the whole of what "nobody builds this" means.
+    for (const k of ['storehouse', 'cabin', 'cottage', 'farmhouse']) {
+      expect(r[k]!.inputs, k).toEqual({})
+      expect(r[k]!.roofed, k).toBe(true)
+    }
     // The house row must agree with the C9 dials it replaces, or Task 12's generalisation drifts.
     expect(r['house']!.inputs).toEqual(DEFAULT_CONFIG.construction.houseMaterials)
     expect(r['house']!.durationTicks).toBe(DEFAULT_CONFIG.construction.houseTicks)
     expect(r['house']!.maxHp).toBe(DEFAULT_CONFIG.construction.houseMaxHp)
-    // Enterability stays in structures.enterableKinds, its one landed home (G4).
+    // Enterability is `roofed` on this row, and there is nowhere else to say it (G4).
     expect(r['house']).not.toHaveProperty('enterable')
   })
 
