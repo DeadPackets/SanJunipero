@@ -145,7 +145,8 @@ export function RosterPanel(
   }
 
   const rows = sortRoster(
-    rosterRows2(state, store.assetRecords(), bonds, tick, store.recentEvents()),
+    rosterRows2(state, store.assetRecords(), bonds, tick, store.recentEvents(),
+      store.getConfig()?.movement.earshotRadius),
     sort,
   )
   const gone = Object.values(state.agents).filter((a) => !a.alive).length

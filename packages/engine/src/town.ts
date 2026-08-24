@@ -1,6 +1,7 @@
 import {
-  CITY_GROUND, T_GRASS, T_ROAD, TOWN_SQUARE, blockGroundOf, claimTownPlot, ringsStanding,
-  townBoxOf, type Ground, type TownClaim, type Walk, type WorldBox, type WorldRect, type WorldXY,
+  CITY_GROUND, T_GRASS, T_ROAD, TOWN_SQUARE, blockGroundOf, claimTownPlot, firePitAt,
+  plazaOf, ringsStanding, townBoxOf, wellAt,
+  type Ground, type TownClaim, type Walk, type WorldBox, type WorldRect, type WorldXY,
 } from '@sj/shared'
 import { bridgeAt } from './path.js'
 import { authoredOrigin, type WorldState } from './state.js'
@@ -20,13 +21,50 @@ import { authoredOrigin, type WorldState } from './state.js'
 // ever paved, is not a town — and in a world with no town a build has nowhere to go but the
 // ground the builder names, which is exactly how the fixtures have always worked.
 
-/** The square's array coordinate, or `null` for a world with no town standing in it. */
+/**
+ * ★ THE PLAZA, IN OFFSETS FROM `TOWN_SQUARE` — which is its north-west CORNER, not its middle
+ * (`plazaCentreOf` is the corner plus seven) — less the two tiles the grammar leaves bare under
+ * the well and the fire pit. **254 of 256.**
+ *
+ * Ring-independent by construction: every offset is a difference between two
+ * `plazaOf(rings)`-relative points, so the ring count cancels. Measured at rings 1, 2, 3 and 4:
+ * the same 254 offsets every time, and the genesis world's own terrain agrees with all 256.
+ */
+const PLAZA_PAVED: ReadonlyArray<{ dx: number; dy: number }> = (() => {
+  const r = plazaOf(), w = wellAt(), f = firePitAt()
+  const skip = new Set([`${w.dx - r.dx0},${w.dy - r.dy0}`, `${f.dx - r.dx0},${f.dy - r.dy0}`])
+  const out: { dx: number; dy: number }[] = []
+  for (let dy = r.dy0; dy <= r.dy1; dy++) {
+    for (let dx = r.dx0; dx <= r.dx1; dx++) {
+      const o = { dx: dx - r.dx0, dy: dy - r.dy0 }
+      if (!skip.has(`${o.dx},${o.dy}`)) out.push(o)
+    }
+  }
+  return out
+})()
+
+/**
+ * The square's array coordinate, or `null` for a world with no town standing in it.
+ *
+ * ★ AND IT USED TO ANSWER ABOUT A TOWN THAT WAS NOT THERE — the vacuous-guard family's
+ * fourteenth member, and this is it closed. The test was `terrain[TOWN_SQUARE − origin] is
+ * paved`: a passing condition (one tile is road) satisfiable without the property (this
+ * world's town is centred here) holding. The dev world carried no origin, so the engine looked
+ * ten rows north of the showcase's real square, landed on a paved tile of the plaza's own
+ * street ring, and answered CONFIDENTLY. Every plot it then offered sat off the lattice that is
+ * drawn. It did not fail; it lied, and the dev world had to be told the truth from outside.
+ *
+ * A square is the centre of a PLAZA, so the whole plaza is what is asked about: 254 tiles of
+ * paving and the two the grammar leaves bare for its monuments. One road crossing cannot pass
+ * that, and a lattice shifted by anything less than a block cannot either.
+ */
 export function townSquareOf(state: WorldState): WorldXY | null {
   const o = authoredOrigin(state)
   const at = { x: TOWN_SQUARE.x - o.x, y: TOWN_SQUARE.y - o.y }
-  const row = state.terrain[at.y]
-  if (row === undefined || at.x < 0 || at.x >= row.length) return null
-  return row[at.x] === T_ROAD ? at : null
+  for (const p of PLAZA_PAVED) {
+    if (state.terrain[at.y + p.dy]?.[at.x + p.dx] !== T_ROAD) return null
+  }
+  return at
 }
 
 /** Everything standing, as bare rectangles — the only thing a claim is allowed to read about

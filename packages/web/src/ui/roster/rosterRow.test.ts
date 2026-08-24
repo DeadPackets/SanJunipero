@@ -7,6 +7,7 @@ import { EXPRESSIONS, moodOf, type MoodView } from '../../render/mood.js'
 import { GAMIFICATION_BAN } from '../townStats.js'
 import { RosterRowView, rowLabel } from './RosterRowView.js'
 import {
+  EARSHOT_TILES,
   MOOD_GLYPH, MOOD_GLYPH_PALETTE, MOOD_GLYPH_PX, MOOD_WORD, ROSTER_SORTS, ROSTER_SORT_WORD,
   rosterRows2, sortRoster, type RosterRow2, type RosterSort,
 } from './rosterRow.js'
@@ -112,6 +113,23 @@ describe('the same person, five days apart, is not the same row', () => {
     expect(a5.substance).toBeGreaterThan(a0.substance)
     expect(a0.with).toEqual([])
     expect(a5.with).toEqual(['Yusuf'])
+  })
+
+  // ★ "NEAR" IS THE WORLD'S OWN EARSHOT, NOT THE VIEWER'S COPY OF IT. `EARSHOT_TILES = 8` was
+  // a transcription of `DEFAULT_CONFIG.movement.earshotRadius` and also the AUTHORITY, which
+  // is exactly the shape `BUILD_TICKS_FULL` had when it went stale unnoticed. It is a fallback
+  // now and the snapshot's own figure wins, so a world that hears further — or less far — has
+  // a roster that says so.
+  it('★ a world with a different earshot has a different idea of who is near', () => {
+    const at = (earshot?: number): string[] =>
+      rosterRows2(day5, [], bonds, 5 * DAY_TICKS, [], earshot).find((r) => r.id === 'amara')!.with
+    expect(at(EARSHOT_TILES)).toEqual(['Yusuf'])
+    expect(at(undefined), 'the fallback is not the landed number').toEqual(at(EARSHOT_TILES))
+    // they are one tile apart, so an earshot under one puts them out of it
+    expect(at(0.5), 'the roster ignored the world and used its own copy').toEqual([])
+    // and a nonsense figure falls back rather than emptying the roster
+    expect(at(0)).toEqual(['Yusuf'])
+    expect(at(-3)).toEqual(['Yusuf'])
   })
 
   it('the RENDERED row differs — a row that reads the same on both is the defect', () => {

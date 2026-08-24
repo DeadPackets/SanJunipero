@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CITY_ANCHOR_DEFAULT, CITY_GROUND, DEFAULT_CONFIG, GENESIS_WANTED, TOWN_SQUARE, blockIsPlattable,
-  cityPlacements, freePlots, place, placedTiles, plazaOf, townOrigin, worldOf,
+  cityPlacements, freePlots, place, placedTiles, plazaOf, townOrigin, worldOf, T_ROAD,
 } from '@sj/shared'
 import { claimInWorld, standingRects, townGroundBox, townGroundOf, townSquareOf } from './town.js'
 import { makeGenesisWorld } from './genesis/world.js'
@@ -51,6 +51,39 @@ describe('★ where the town is, in a world that moves under it', () => {
     const big = genesisState(DEFAULT_CONFIG, Array.from({ length: 128 }, () => Array.from({ length: 128 }, () => 0 as const)))
     expect(big.terrain[TOWN_SQUARE.y]![TOWN_SQUARE.x]).toBe(0)
     expect(townSquareOf(big)).toBeNull()
+  })
+
+  // ★ THE VACUOUS-GUARD FAMILY'S FOURTEENTH MEMBER, CLOSED. The test used to be "the tile at
+  // TOWN_SQUARE is paved", whose passing condition is satisfiable without its property (this
+  // world's town is centred there) holding. The dev world carried no origin, so the engine
+  // looked ten rows north of the showcase's real square, found a paved tile of the plaza's own
+  // street ring, and answered confidently about a town that is not there — offering plots off
+  // the lattice a viewer can see. It did not fail; it lied.
+  it('★ A ROAD THROUGH THE SQUARE IS NOT A TOWN — one paved tile, and a whole paved crossing', () => {
+    const blank = (): number[][] => Array.from({ length: 128 }, () => Array.from({ length: 128 }, () => 0))
+
+    const oneTile = blank()
+    oneTile[TOWN_SQUARE.y]![TOWN_SQUARE.x] = T_ROAD
+    expect(townSquareOf(genesisState(DEFAULT_CONFIG, oneTile as never)),
+      'one paved tile passed for a town').toBeNull()
+
+    // A crossroads: two full roads meeting on the square. Every check that reads a line
+    // through it passes; it is still not a plaza.
+    const cross = blank()
+    for (let i = 0; i < 128; i++) { cross[TOWN_SQUARE.y]![i] = T_ROAD; cross[i]![TOWN_SQUARE.x] = T_ROAD }
+    expect(townSquareOf(genesisState(DEFAULT_CONFIG, cross as never)),
+      'a crossroads passed for a town').toBeNull()
+
+    // ★ AND THE SHIFT THAT CAUSED IT: the genesis plaza, moved by ONE tile. Every question
+    // about a single tile still answers yes; the plaza is no longer centred where it says.
+    const shifted = genesisWorld()
+    const rows = shifted.terrain.map((r) => [...r])
+    rows.unshift(rows.pop()!)
+    expect(townSquareOf({ ...shifted, terrain: rows as never }),
+      'the plaza shifted a row and the engine did not notice').toBeNull()
+
+    // and the unshifted world it was cut from still answers, so this is not vacuous either
+    expect(townSquareOf(shifted)).toEqual({ x: TOWN_SQUARE.x, y: TOWN_SQUARE.y })
   })
 
   it('the square walks with the array when the world grows west', () => {

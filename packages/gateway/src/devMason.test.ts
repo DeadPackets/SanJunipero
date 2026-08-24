@@ -87,12 +87,16 @@ describe('★ the dev world says where its array stands, so the engine can find 
     const terrain = devTerrain('showcase', rings)
     const state = devGenesisState(SHOWCASE_CONFIG, terrain, 'showcase', rings)
     expect(townSquareOf(state)).toEqual(devTownSquare(rings))
-    // THE BEFORE-STATE, kept because it is the whole defect: with no origin the engine did not
-    // fail, it answered — a different tile, ten rows north, that happens to be paved.
-    const blind = townSquareOf({ ...state, origin: undefined })
-    expect(blind).not.toBeNull()
-    expect(blind).not.toEqual(devTownSquare(rings))
-    expect(blind).toEqual({ x: TOWN_SQUARE.x, y: TOWN_SQUARE.y })
+    // ★ THE BEFORE-STATE, AND THE ENGINE HAZARD BEHIND IT, NOW CLOSED. With no origin the
+    // engine did not fail, it ANSWERED — `(65, 78)`, a different tile ten rows north of the
+    // square that is drawn, which happens to be paved. That was the vacuous-guard family's
+    // fourteenth member: a passing condition (one tile is road) satisfiable without the
+    // property (this world's town is centred here). `townSquareOf` asks about the whole
+    // plaza now, so the blind lookup REFUSES instead of lying, and the origin below is what
+    // makes it answer.
+    expect(townSquareOf({ ...state, origin: undefined }),
+      'the engine still answers about a town that is not there').toBeNull()
+    expect(devTownSquare(rings)).not.toEqual({ x: TOWN_SQUARE.x, y: TOWN_SQUARE.y })
   })
 
   it('leaves the frozen fixture with no origin and no town, which is the truth about it', () => {

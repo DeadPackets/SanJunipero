@@ -1,7 +1,7 @@
 import type { ServerResponse } from 'node:http'
 import type Database from 'better-sqlite3'
 import {
-  bondId, strongerBondKind,
+  BOND_NOTES, bondId, strongerBondKind,
   type Bond, type BondEvent, type BondKind, type BondsResponse, type SimConfig, type SimEvent,
 } from '@sj/shared'
 import type { Router } from './server.js'
@@ -10,15 +10,9 @@ import { TALK_WINDOW_TICKS } from './api.js'
 
 // What the town did, read as what the town became. Each rule is one observable act; the
 // SEMANTICS (trust, debt, grudge, love from the ledgers) stay C9 T11/T12's job — when they
-// land this reader swaps and BondSchema does not move.
-export const BOND_NOTES: Readonly<Record<string, string>> = {
-  spoke: 'spoke together',
-  give: 'gave something away',
-  teach: 'taught something',
-  attack: 'came to blows',
-  co_slept: 'kept house together',
-  born: 'parent and child',
-}
+// land this reader swaps and BondSchema does not move. `BOND_NOTES` moved to `@sj/shared` so
+// the viewer can name the six acts without reading the server — see the Bonds empty state.
+export { BOND_NOTES } from '@sj/shared'
 
 const VERB_BONDS: Readonly<Record<string, BondKind>> = { give: 'owe', teach: 'work', attack: 'rival' }
 

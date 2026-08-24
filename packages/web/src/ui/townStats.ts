@@ -89,7 +89,16 @@ export const EMPTY_COPY = {
   // The live feed holds what has arrived since you joined. On a town that is days old, saying
   // day one is unwritten is a lie about the world rather than a description of the feed.
   chronicleQuiet: 'Nothing has happened since you arrived. The whole record is under “What mattered”.',
-  bonds: 'No bonds recorded yet — watch long enough and the town will braid its own ties.',
+  // ★ IT USED TO PROMISE, AND IN THE DEV WORLD THE PROMISE WAS FALSE. "Watch long enough and
+  // the town will braid its own ties" is not true of a world whose cast cannot form one:
+  // `buildBonds` derives every tie from six acts, and the scripted founders perform none of
+  // them, so the ledger is permanently and correctly empty. A demo surface may show an empty
+  // ledger; it may not tell a viewer to wait for something that will never arrive. The copy
+  // DESCRIBES now — and describing is exactly true whenever this panel is on screen, because
+  // a bond count of zero IS "none of those six things has been recorded".
+  bonds: 'No bonds yet. A town braids its ties out of what people do to one another — a word, '
+    + 'a gift, a lesson, a blow, a night under one roof, a child — and none of that is in the '
+    + 'record here.',
   moments: 'Nothing worth replaying yet — the first recorded day is still ahead.',
   discoveries: 'The town has not worked anything out yet.',
 } as const

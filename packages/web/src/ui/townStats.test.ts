@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { BOND_NOTES } from '@sj/shared'
 import type { AgentBody, WorldState } from '@sj/engine/state'
 import { LENSES } from './route.js'
 import {
@@ -115,10 +116,34 @@ describe('lensHints', () => {
 describe('EMPTY_COPY', () => {
   it('tells the viewer what has not happened yet, in the town’s own voice', () => {
     expect(EMPTY_COPY.chronicle).toBe('Day one is still unwritten. The town’s ledger fills as the townsfolk live it.')
-    expect(EMPTY_COPY.bonds).toBe('No bonds recorded yet — watch long enough and the town will braid its own ties.')
+    expect(EMPTY_COPY.bonds).toContain('No bonds yet.')
     expect(EMPTY_COPY.moments).toBe('Nothing worth replaying yet — the first recorded day is still ahead.')
     expect(EMPTY_COPY.roster).toBe('No one walks the town yet — the first footsteps are still to come.')
     expect(EMPTY_COPY.rosterSub).toBe('The founders arrive at dawn.')
+  })
+
+  // ★ AND THE BONDS COPY NAMES EVERY ACT A BOND IS MADE OF — derived from `BOND_NOTES`, the
+  // list `buildBonds` actually reads, so a seventh act turns this red instead of leaving the
+  // panel describing five sixths of the truth.
+  //
+  // It used to say "watch long enough and the town will braid its own ties", and in the dev
+  // world that was FALSE: the scripted founders perform none of the six, so the ledger is
+  // permanently and correctly empty. The tab could not populate and the copy told a viewer to
+  // wait. Describing what a tie is made of is true whenever the panel is on screen — zero
+  // bonds IS none of these recorded — and it shows a viewer of the demo why it is empty.
+  it('★ names every act a bond is derived from, and there are six', () => {
+    const acts = Object.keys(BOND_NOTES)
+    expect(acts).toHaveLength(6)
+    const words: Record<string, RegExp> = {
+      spoke: /\bword\b/, give: /\bgift\b/, teach: /\blesson\b/,
+      attack: /\bblow\b/, co_slept: /night under one roof/, born: /\bchild\b/,
+    }
+    for (const act of acts) {
+      expect(words[act], `${act} is a bond-forming act with no word in the empty state`).toBeDefined()
+      expect(EMPTY_COPY.bonds, act).toMatch(words[act]!)
+    }
+    // and it does not tell the viewer to wait for something this world may never do
+    expect(EMPTY_COPY.bonds).not.toMatch(/watch|wait|will\s/i)
   })
 
   it('never nags and never gamifies', () => {
