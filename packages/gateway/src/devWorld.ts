@@ -129,6 +129,10 @@ export async function startDevWorld(
      *  fourteen plattable blocks across the water join the town. Off by default; only the
      *  showcase has a ford, and every existing gate folds exactly the events it always did. */
     bridge?: boolean
+    /** dev/demo only: a mason beside somebody's half-raised walls lends a hand instead of
+     *  walking to the next plot. Off by default — the hands are real and the calendar does not
+     *  know it; see `jointBuild` on `FoundersOpts` for the numbers. */
+    jointBuild?: boolean
     /** C7's narrator.db. Absent, every narrated surface — chapters, milestones, moments —
      *  answers typed-empty, which is why the timeline marks and the filmstrip had never been
      *  seen with data. The gateway already opens it readonly; the dev world could not ask. */
@@ -194,6 +198,8 @@ export async function startDevWorld(
       holdings: map === 'showcase',
       // and a lattice nobody ever builds in is why merge train 3 called a ring-3 town empty
       builders: opts.builders === true && map === 'showcase',
+      // two pairs of hands on one roof — reachable, and off unless asked for
+      jointBuild: opts.jointBuild === true && map === 'showcase',
       // the crossing: derived from the ford the map lays, so the two cannot disagree
       ...(opts.bridge === true && map === 'showcase' ? { deck: showcaseDeck(undefined, rings) } : {}),
     }),
@@ -243,6 +249,9 @@ export async function startDevWorld(
 //   SJ_DEV_INTERIORS=0    keep the founders out of doors (they go home and sleep otherwise)
 //   SJ_DEV_BUILDERS=0     stop the founders raising houses (they build on claimed plots otherwise)
 //   SJ_DEV_BRIDGE=0       leave the river uncrossed (one founder decks the ford otherwise)
+//   SJ_DEV_JOINT=1        let a mason lend a hand at a neighbour's walls (OFF by default, and
+//                         the only default here that is off for a MEASURED reason rather than
+//                         a conservative one — see `jointBuild` on `FoundersOpts`)
 //
 // ★ AND INTERIORS DEFAULT ON FOR A PERSON, for the same reason `showcase` does. Three
 // integration trains in a row reported no interior seen; two of them had the surface switched
@@ -258,12 +267,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const interiors = process.env['SJ_DEV_INTERIORS'] !== '0'
   const builders = process.env['SJ_DEV_BUILDERS'] !== '0'
   const bridge = process.env['SJ_DEV_BRIDGE'] !== '0'
+  const jointBuild = process.env['SJ_DEV_JOINT'] === '1'
   const asked = Number(process.env['SJ_DEV_RINGS'] ?? TOWN_RINGS_GENESIS)
   const rings = Number.isInteger(asked) && asked >= 1 ? asked : TOWN_RINGS_GENESIS
   if (rings !== asked) console.log(`dev world: SJ_DEV_RINGS=${process.env['SJ_DEV_RINGS']} is not a ring count; using ${rings}`)
-  void startDevWorld({ ingest: true, map, interiors, builders, bridge, rings }).then(({ gateway }) => {
+  void startDevWorld({ ingest: true, map, interiors, builders, bridge, jointBuild, rings }).then(({ gateway }) => {
     console.log(`dev world: interiors=${interiors ? 'on' : 'off'} builders=${builders && map === 'showcase' ? 'on (SCRIPTED masons, real build verb)' : 'off'}`
-      + ` bridge=${bridge && map === 'showcase' ? `on (a deck at the ford ${JSON.stringify(showcaseDeck(undefined, rings))})` : 'off'}`)
+      + ` bridge=${bridge && map === 'showcase' ? `on (a deck at the ford ${JSON.stringify(showcaseDeck(undefined, rings))})` : 'off'}`
+      + ` joint=${jointBuild && map === 'showcase' ? 'on (a mason lends a hand at walls in reach)' : 'off'}`)
     console.log(`dev world: the town is awake on ws://localhost:${gateway.port}/ws`)
   })
 }
