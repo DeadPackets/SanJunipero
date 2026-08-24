@@ -352,7 +352,9 @@ export function createInteriorScene(
     for (const p of interiorPieces(placed, [])) {
       const item = byId.get(p.half === null ? p.id : p.id.slice(0, p.id.indexOf('#')))
       if (item === undefined) continue
-      const foot = tileSpanCentre(p.tile, p.size)
+      // ★ `p.anchor`, NOT `p.tile`. The split tile is the DEPTH box; spending it on the
+      // position as well tore every 'in' furnishing in two — see `RoomPiece.anchor`.
+      const foot = tileSpanCentre(p.anchor.tile, p.anchor.size)
       addPiece(p.id, item, p.half, foot.sx, foot.sy, 0)
     }
   }

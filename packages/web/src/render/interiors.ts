@@ -251,6 +251,18 @@ export type RoomPiece = {
   size: TileSize
   /** which half of an 'in' furnishing this is; `null` for anything drawn whole */
   half: 'back' | 'front' | null
+  /**
+   * ★ THE GROUND THE SPRITE IS ANCHORED ON — and for a split piece it is the WHOLE piece's.
+   *
+   * `tile`/`size` are the DEPTH box: the front half's tile is pushed half a footprint nearer
+   * the viewer so a body sorts BETWEEN the halves. That is a depth fact, and the renderer was
+   * spending it a second time as a POSITION. The browser showed the result — a chair whose
+   * back floated a tile clear of its own seat, with the cushion drawn twice, in every room.
+   * Both halves are cut from ONE texture, so both stand where that texture stands; `applyHalf`
+   * lifts the back one by the front one's own pixel height, which is the only offset that puts
+   * the upper frame back exactly where it was cut from.
+   */
+  anchor: { tile: Tile; size: TileSize }
 }
 
 export const furnishingId = (kind: string, tile: Tile): string => `${kind}:${tile.x},${tile.y}`
@@ -284,22 +296,28 @@ export function interiorPieces(
     const size = item.meta?.slots ?? { w: 1, h: 1 }
     const id = furnishingId(item.kind, item.tile)
     byId.set(id, item)
+    const anchor = { tile: item.tile, size }
     if (occupancyOf(item.kind) !== 'in') {
-      out.push({ id, kind: 'furniture', tile: item.tile, size, half: null })
+      out.push({ id, kind: 'furniture', tile: item.tile, size, half: null, anchor })
       continue
     }
     const halfH = size.h / 2
-    out.push({ id: `${id}#back`, kind: 'furniture', tile: item.tile, size: { w: size.w, h: halfH }, half: 'back' })
+    out.push({
+      id: `${id}#back`, kind: 'furniture',
+      tile: item.tile, size: { w: size.w, h: halfH }, half: 'back', anchor,
+    })
     out.push({
       id: `${id}#front`, kind: 'furniture',
-      tile: { x: item.tile.x, y: item.tile.y + halfH }, size: { w: size.w, h: halfH }, half: 'front',
+      tile: { x: item.tile.x, y: item.tile.y + halfH }, size: { w: size.w, h: halfH },
+      half: 'front', anchor,
     })
   }
   for (const b of bodies) {
     const host = b.inside === null ? undefined : byId.get(b.inside)
     const mode = host === undefined ? 'beside' : occupancyOf(host.kind)
     const tile = occupantTile(mode, b.tile, host?.tile ?? null)
-    out.push({ id: b.id, kind: 'body', tile, size: { w: 1, h: 1 }, half: null })
+    const size = { w: 1, h: 1 }
+    out.push({ id: b.id, kind: 'body', tile, size, half: null, anchor: { tile, size } })
   }
   return out
 }

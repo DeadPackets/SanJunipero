@@ -7,7 +7,7 @@ import {
 } from './interiorMap.js'
 import { ROOM_ZOOM, roomZoomFor } from './roomShell.js'
 import {
-  BED_FOOTPRINT, interiorBodyScale, roomFurnishings,
+  BED_FOOTPRINT, interiorBodyScale, interiorPieces, roomFurnishings, type PlacedItem,
 } from './interiors.js'
 
 // ★ THE COMPOSITION GUARD — the laws a per-element test cannot see.
@@ -143,3 +143,46 @@ describe('★ AND IT HOLDS FOR A SECOND BODY, EVERY ROOM KIND AND EVERY ZOOM', (
     }
   })
 })
+describe('★ A FURNISHING A BODY LIES IN IS CUT IN TWO AND PUT BACK EXACTLY', () => {
+  const item = (kind: string, h: number): PlacedItem =>
+    ({ kind, tile: { x: 5, y: 2 }, meta: { slots: { w: 1, h }, placement: 'floor', interiorKinds: ['house'] } })
+
+  it('★ both halves are anchored on the WHOLE piece, not on their own half', () => {
+    // THE DEFECT, and the browser had it in every room: `interiorPieces` pushes the front
+    // half's TILE half a footprint nearer the viewer so a body sorts between the halves, and
+    // the renderer spent that a SECOND time as a position. A chair's back floated a tile clear
+    // of its own seat and the cushion was drawn twice.
+    for (const [kind, h] of [['chair', 1], ['bed', 2]] as const) {
+      const pieces = interiorPieces([item(kind, h)], [])
+      const back = pieces.find((p) => p.half === 'back')!
+      const front = pieces.find((p) => p.half === 'front')!
+      expect(back.anchor, `${kind}: the halves share one anchor`).toEqual(front.anchor)
+      expect(back.anchor).toEqual({ tile: { x: 5, y: 2 }, size: { w: 1, h } })
+      // and the depth boxes still differ, which is what lets a body come between them
+      expect(front.tile).not.toEqual(back.tile)
+      expect(front.tile.y).toBeGreaterThan(back.tile.y)
+    }
+  })
+
+  it('★ a whole piece anchors on itself', () => {
+    const [table] = interiorPieces([item('table', 1)], [])
+    expect(table!.half).toBeNull()
+    expect(table!.anchor).toEqual({ tile: table!.tile, size: table!.size })
+  })
+
+  it('★ the two frames tile the whole texture — no gap, no overlap, no doubled cushion', () => {
+    // `applyHalf` cuts at `round(h/2)` and lifts the back half by the FRONT half's height.
+    // Both halves are bottom-anchored at the same foot, so the spans must butt exactly.
+    for (const texH of [128, 192, 193, 96]) {
+      const cut = Math.round(texH / 2)
+      const foot = 0
+      const frontTop = foot - (texH - cut), frontBottom = foot
+      const backBottom = foot - (texH - cut), backTop = backBottom - cut
+      expect(backBottom).toBe(frontTop)                 // butt, not gap and not overlap
+      expect(backTop).toBe(foot - texH)                 // the top of the whole sprite
+      expect(frontBottom).toBe(foot)                    // the bottom of it
+      expect((frontBottom - frontTop) + (backBottom - backTop)).toBe(texH)
+    }
+  })
+})
+
