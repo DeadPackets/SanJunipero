@@ -962,6 +962,9 @@ describe('a torch is a thing hands can make', () => {
 
   it('what it makes will take a flame, which is the whole point of making it', () => {
     expect(isKindleable(CFG, 'torch')).toBe(true)
+    // ★ AND THE THREE THINGS IN THE GLOW TABLE THAT ARE NOT IN A HAND STAY OUT. `hearth` is
+    // there so the house that holds one can borrow its reach, and it is not a thing you carry.
+    for (const kind of ['hearth', 'fire_pit', 'house']) expect(isKindleable(CFG, kind), kind).toBe(false)
     const lit = fold(bench([]), ev(1200, 'item_spawned', {
       id: 'torch_1', kind: 'torch', qty: 1, loc: { t: 'agent', id: 'a1' },
     }), CFG)

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
-  classMembers, dayPhaseFromTick, fertilityAt, glowRadiusFor, inputName, isRoofedKind,
-  litSourceWithin, MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
+  CITY_HEARTH_KIND, classMembers, dayPhaseFromTick, fertilityAt, glowRadiusFor, inputName,
+  isRoofedKind, litSourceWithin, MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
   type RecipeDef, type SimConfig, type StructureRecipeDef, type TownFacing,
 } from '@sj/shared'
 
@@ -507,10 +507,16 @@ const doff: VerbDef = makeVerb({
 export const KindleParams = z.object({ itemId: z.string() }).strict()
 export const StokeParams = z.object({ structureId: z.string() }).strict()
 
-// A thing you can carry and set alight: it glows, and it is not a building. One table of what
-// glows (`light.glowRadius`) answers both halves, so a codified lantern needs no second list.
+// A thing you can carry and set alight: it glows, and it is neither a building nor the fire
+// built into one. One table of what glows (`light.glowRadius`) answers the first half, so a
+// codified lantern needs no second list.
+//
+// `CITY_HEARTH_KIND` is named here because the glow table holds it and `structures.recipes` does
+// NOT: a hearth is a furnishing, not a building, so `isHeatSource` cannot speak for it and the
+// glow row exists only to give the house that holds one its reach (`structureGlowRadius`).
 export function isKindleable(config: SimConfig, kind: string): boolean {
-  return glowRadiusFor(config, kind) !== undefined && !isHeatSource(config, kind)
+  return glowRadiusFor(config, kind) !== undefined
+    && !isHeatSource(config, kind) && kind !== CITY_HEARTH_KIND
 }
 
 // What is left in this torch: a full one has never been struck, a snuffed one remembers.
