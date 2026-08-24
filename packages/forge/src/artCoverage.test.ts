@@ -6,7 +6,7 @@ import { loadReferenceSheet, paletteSwatchPng } from './referenceSheet.js'
 import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
 import { decodePng } from './post/raw.js'
-import { alphaBinaryGate, paletteGate } from './pixelGates.js'
+import { alphaBinaryGate, paletteGate, soleSilhouetteGate } from './pixelGates.js'
 import { ICON_PX, WORLD_SPRITE_PX } from './assetResolution.js'
 import { LIBRARY, LIBRARY_COUNTS } from './library/catalog.js'
 import { ICON_SUFFIX } from './library/register.js'
@@ -200,5 +200,29 @@ describe('the committed cast', () => {
     }
     expect(alphaBinaryGate(atlas).failures).toEqual([])
     expect(paletteGate(atlas).failures).toEqual([])
+  })
+
+  // ★ AND EVERY CELL IS ONE PERSON, WHICH IS THE ONE THING NOTHING ABOVE ASKS.
+  //
+  // `amara/contact-b-ne` shipped a figure in a tactical harness with TACTICAL GEAR set beside
+  // her in silver, and its mirror shipped the caption backwards. A viewer saw it in the running
+  // product. It cleared the alpha gate (hard-edged letters), the palette gate (MASTER_PALETTE
+  // silver), the manifest gate (a legal rect) and the generator's own coherence gate (1.1855
+  // against a 1.18 tolerance, shipped as the least-bad of three failures).
+  //
+  // Two cells is not a list to keep up to date — the gate is the PROPERTY, and it holds over
+  // all 120 cells with the whole detached mass measuring 0.0000 % once these two are repaired.
+  it.each(cast.map((c) => [c.id, c] as const))('%s draws one body per cell and nothing else', async (id, c) => {
+    const atlas = await decodePng(c.atlas)
+    const bad: string[] = []
+    for (const [name, r] of Object.entries(c.manifest.cells)) {
+      const cell = { width: r.w, height: r.h, data: new Uint8ClampedArray(r.w * r.h * 4) }
+      for (let y = 0; y < r.h; y++) {
+        const src = ((r.y + y) * atlas.width + r.x) * 4
+        cell.data.set(atlas.data.subarray(src, src + r.w * 4), y * r.w * 4)
+      }
+      for (const f of soleSilhouetteGate(cell).failures) bad.push(`${id}/${name}: ${f}`)
+    }
+    expect(bad).toEqual([])
   })
 })

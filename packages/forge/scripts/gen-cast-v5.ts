@@ -52,7 +52,7 @@ import {
 } from '../src/mirror.js'
 import { processHiResCell } from '../src/hires.js'
 import { packCharacterAtlas } from '../src/atlasV4.js'
-import { alphaBinaryGate, paletteGate } from '../src/pixelGates.js'
+import { alphaBinaryGate, paletteGate, soleSilhouetteGate } from '../src/pixelGates.js'
 import { CAST_CONTENT_DIR } from '../src/castArt.js'
 import { BIG_PIXEL } from './character.js'
 import { CAST_V5, PROPORTION_ANCHOR_ID, type CastMember } from './cast-v5.js'
@@ -314,6 +314,13 @@ async function runCharacter(m: CastMember): Promise<void> {
     try { sliceStrip(keyed, 2); two = true } catch { /* one cluster — good */ }
     if (two) throw new Error('slices into 2 figure clusters — multi-figure frame')
     const hi = processHiResCell(keyed, TARGET_H)
+    // ★ AND ONE BODY, NOTHING ELSE. `sliceStrip` above catches a SECOND FIGURE, which is what
+    // it was written for; it does not catch the model captioning its own work. Amara's
+    // contact-b-ne shipped with TACTICAL GEAR set beside her in silver, and the caption sat
+    // inside the figure's own column, so the strip slicer saw one cluster. This is a hard
+    // reject like the two above it: the candidate is dropped and another is drawn.
+    const sole = soleSilhouetteGate(hi)
+    if (!sole.ok) throw new Error(sole.failures.join('; '))
     const b = opaqueBbox(hi)!
     const aspect = (b.x1 - b.x0 + 1) / (b.y1 - b.y0 + 1)
     if (aspect > 1.15) throw new Error(`aspect ${aspect.toFixed(2)} > 1.15 — multi-figure or lying`)

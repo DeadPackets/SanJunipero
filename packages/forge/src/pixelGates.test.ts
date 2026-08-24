@@ -4,7 +4,7 @@ import { decodePng, type RawImage } from './post/raw.js'
 import {
   integerScaleGate, pixelGridGate, alphaBinaryGate, paletteGate,
   nativeDensityGate, classDensityGate, tileSeamGate, tilesetVarietyGate,
-  pixelBarReport, SEAM_RATIO_MAX, SEAM_ABSOLUTE_FLOOR,
+  pixelBarReport, soleSilhouetteGate, SEAM_RATIO_MAX, SEAM_ABSOLUTE_FLOOR,
 } from './pixelGates.js'
 import { derivedPalette } from './ramps.js'
 import { quantize } from './post/quantize.js'
@@ -194,5 +194,54 @@ describe('pixelBarReport', () => {
     expect(r.failures.length).toBeGreaterThanOrEqual(3)
     expect(r.failures.join(' ')).toContain('anisotropic')
     expect(r.failures.join(' ')).toContain('seam')
+  })
+})
+
+describe('soleSilhouetteGate — a person is ONE shape', () => {
+  const body = (w: number, h: number): RawImage => {
+    const img = solid(w, h, [0, 0, 0, 0])
+    for (let y = h >> 2; y < h - (h >> 2); y++)
+      for (let x = w >> 2; x < w - (w >> 2); x++) img.data.set([0x43, 0x39, 0x4a, 255], (y * w + x) * 4)
+    return img
+  }
+  // a detached rectangle in the corner — a caption, a prop, a baked shadow, a second figure
+  const withIsland = (img: RawImage, iw: number, ih: number): RawImage => {
+    const out: RawImage = { ...img, data: new Uint8ClampedArray(img.data) }
+    for (let y = 0; y < ih; y++)
+      for (let x = 0; x < iw; x++) out.data.set([0xcf, 0xc6, 0xbc, 255], (y * img.width + x) * 4)
+    return out
+  }
+
+  it('GREEN on one connected mass', () => {
+    const r = soleSilhouetteGate(body(64, 96))
+    expect(r.ok).toBe(true)
+    expect(r.islands).toBe(1)
+    expect(r.detachedFraction).toBe(0)
+  })
+
+  // the shipped cell measured 230410 px of body against 24095 + 15279 px of lettering
+  it('RED on a detached island the size of the real "TACTICAL GEAR" block', () => {
+    const r = soleSilhouetteGate(withIsland(body(400, 600), 90, 60)) // 5400 of 65400 = 8.26%
+    expect(r.ok).toBe(false)
+    expect(r.islands).toBe(2)
+    expect(r.detachedFraction).toBeCloseTo(5400 / 65400, 4)
+    expect(r.failures[0]).toContain('does not touch the body')
+  })
+
+  it("tolerates a speck inside despeckle's own 1% contract, and nothing past it", () => {
+    expect(soleSilhouetteGate(withIsland(body(400, 600), 20, 20)).ok).toBe(true)  // 0.66%
+    expect(soleSilhouetteGate(withIsland(body(400, 600), 30, 30)).ok).toBe(false) // 1.48%
+  })
+
+  it('RED on an empty cell, which no other gate calls a failure', () => {
+    const r = soleSilhouetteGate(solid(32, 32, [0, 0, 0, 0]))
+    expect(r.ok).toBe(false)
+    expect(r.failures[0]).toContain('no opaque pixels')
+  })
+
+  it('counts diagonal-only contact as detached — a pixel body is 4-connected', () => {
+    const img = solid(8, 8, [0, 0, 0, 0])
+    for (const [x, y] of [[1, 1], [2, 2], [3, 3]]) img.data.set([0, 0, 0, 255], (y! * 8 + x!) * 4)
+    expect(soleSilhouetteGate(img).islands).toBe(3)
   })
 })
