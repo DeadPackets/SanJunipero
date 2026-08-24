@@ -24,7 +24,6 @@ const boilSaltRecipe: Recipe = {
     { weight: 1, success: false, label: 'The water boils to nothing; the pot is bare.', effects: [{ op: 'none' }] },
   ],
   rngStream: 'recipe:boil_salt',
-  interruptible: true,
   canon: ['fire', 'pottery'],
 }
 
@@ -51,10 +50,9 @@ function twoWoodStacks(): WorldState {
 
 describe('codify', () => {
   describe('verbFromRecipe', () => {
-    it('maps the recipe onto the VerbDef shape (kind, interruptible, skill, rngStream, duration)', () => {
+    it('maps the recipe onto the VerbDef shape (kind, skill, rngStream, duration)', () => {
       const def = verbFromRecipe(boilSaltRecipe)
       expect(def.kind).toBe('recipe:boil_salt')
-      expect(def.interruptible).toBe(true)
       expect(def.skill).toEqual({ track: 'cooking', xp: 10 })
       expect(def.rngStream).toBe('recipe:boil_salt')
       expect(def.duration(agentState(), CFG, 'a1', {})).toBe(5)

@@ -29,14 +29,22 @@ export type VerbDef = {
   onStart?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): PendingEvent[]
   onComplete(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>, rng: RngStream): PendingEvent[]
   results?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): Record<string, unknown>
-  interruptible: boolean
   skill?: { track: string; xp: number }
   rngStream?: string
 }
 
-// Fills the defaults nearly every verb repeats: one-tick duration, interruptible.
-function makeVerb(spec: Omit<VerbDef, 'duration' | 'interruptible'> & Partial<Pick<VerbDef, 'duration' | 'interruptible'>>): VerbDef {
-  return { duration: () => 1, interruptible: true, ...spec }
+// Fills the one default nearly every verb repeats: a one-tick duration.
+//
+// ★ THERE IS NO `interruptible` HERE ANY MORE, AND THAT IS THE HONEST SHAPE. Every verb in the
+// registry declared it `true`, `codify` mapped it off every recipe the arbiter authored, and
+// NOTHING EVER READ IT: `submitIntent` refuses every intent while an activity runs, whatever
+// the running verb says about itself. Measured — two verbs differing only in that field are
+// refused in the same words, and all 37 verbs answer a second intent identically. Interruption
+// in this world is something the WORLD does to a body (`action_interrupted` {blocked, gone,
+// collapsed, rest}), never something a mind can ask for, and `intent.test.ts` now proves that
+// over the whole registry instead of asserting that a dead field is set.
+function makeVerb(spec: Omit<VerbDef, 'duration'> & Partial<Pick<VerbDef, 'duration'>>): VerbDef {
+  return { duration: () => 1, ...spec }
 }
 
 // Adjacent = Chebyshev distance <= 1 to any footprint tile (standing on it counts).

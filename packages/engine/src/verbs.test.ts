@@ -30,7 +30,6 @@ const testVerb: VerbDef = {
   validate() { return null },
   duration() { return 1 },
   onComplete() { return [] },
-  interruptible: true,
 }
 
 const TIER1 = [
@@ -80,7 +79,6 @@ describe('verb registry seam', () => {
       validate: () => null,
       duration: () => 1,
       onComplete: () => [],
-      interruptible: true,
     }
     expect(def.kind).toBe('walk')
   })

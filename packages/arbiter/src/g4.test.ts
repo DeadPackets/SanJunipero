@@ -40,7 +40,6 @@ const boilSaltRecipe: Recipe = {
     { weight: 1, success: false, label: 'The water boils to nothing; the pot is bare.', effects: [{ op: 'none' }] },
   ],
   rngStream: 'recipe:boil_salt',
-  interruptible: true,
   canon: ['fire', 'pottery'],
 }
 

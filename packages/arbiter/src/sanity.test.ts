@@ -15,7 +15,6 @@ const base: Recipe = {
     { weight: 1, success: true, label: 'The seams hold water.', effects: [{ op: 'spawn_item', kind: 'waterskin', qty: 1, to: 'agent' }] },
   ],
   rngStream: 'recipe:waterskin',
-  interruptible: true,
   canon: ['fire'],
 }
 
