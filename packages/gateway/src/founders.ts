@@ -28,7 +28,8 @@
 // and the world's own decay, multiplied.
 import { doorFrontTile, type SimConfig } from '@sj/shared'
 import {
-  awakeEnergyDecay, composePerception, createWorldTick, doorTile, findPath, submitIntent,
+  awakeEnergyDecay, claimInWorld, composePerception, createWorldTick, doorTile, findPath,
+  isAdjacentToRect, submitIntent,
   type PerceptionPacket, type RngStreams, type Structure, type WorldState,
 } from '@sj/engine'
 import { devTown, type DevStructure } from './devTown.js'
@@ -160,8 +161,9 @@ export function walkEnergyCost(
 ): number | null {
   const a = state.agents[agentId]
   if (a === undefined) return null
-  if (a.x === to.x && a.y === to.y) return 0
-  const path = findPath(state, a, to, config)
+  const at = { x: a.x, y: a.y }
+  if (at.x === to.x && at.y === to.y) return 0
+  const path = findPath(state, at, to, config)
   if (path === null) return null
   const tired = Math.max(config.movement.baseTicksPerTile, config.movement.debuffTicksPerTile)
   return path.length * tired * awakeEnergyDecay(config, a)
@@ -176,6 +178,82 @@ export function arrivesStanding(
   const a = state.agents[agentId]
   if (cost === null || a === undefined) return false
   return a.needs.energy - cost > config.needs.collapseThreshold
+}
+
+/** What `ticks` of standing up and working costs a body. The same law as `walkEnergyCost`,
+ *  asked of work rather than of walking: a house is 240 ticks of swinging a hammer and the
+ *  body is charged for every one of them. */
+export function workEnergyCost(state: WorldState, config: SimConfig, agentId: string, ticks: number): number | null {
+  const a = state.agents[agentId]
+  return a === undefined ? null : ticks * awakeEnergyDecay(config, a)
+}
+
+// ── THE MASON ──────────────────────────────────────────────────────────────────────────────
+//
+// ★ WHAT IS SCRIPTED HERE, AND WHAT IS EMPHATICALLY NOT.
+//
+// SCRIPTED: the DECISION to build. A founder with hands free and energy to spare raises a
+// house, every time, because a demonstration surface has to demonstrate. Whether a MIND would
+// choose to build is the open question C8's rehearsal exists to answer, and nothing this
+// policy does is evidence about it. Do not quote a house count from the dev world as emergence.
+//
+// NOT SCRIPTED, and the whole reason this exists: WHERE the house goes. Nobody in this file
+// names a coordinate for a roof and nobody CAN — in a town, `build` validates against
+// `PlottedBuildParams`, a strict Zod object of `{ kind }` with no x and no y in it, and the
+// site is `claimInWorld`'s answer: a function of the square, everything standing and the
+// recipe's mass, and of nothing the asker said. This is the identical seam `townGrowth.test.ts`
+// and `farBank.test.ts` prove on engine fixtures, reached for the first time from the running
+// app. The claim seam made naming a coordinate unrepresentable; this does not smuggle one back.
+//
+// The only thing the policy computes is where to STAND: `claim.door`, the tile on the street
+// the new frontage will face, which is the tile the builder has to be on to begin.
+
+/** The one thing the dev masons raise. A dwelling, so the town it grows is a town of homes. */
+export const MASON_KIND = 'house'
+/** The mass of it. `claimInWorld` answers for a rectangle, not for a kind. */
+const MASON_NEED = { along: 2, deep: 2 }
+/** SCRIPTED SUPPLY, said out loud — the same device as the need top-ups above and the same
+ *  device the two engine proofs use. This is a demo town with no economy in it, so a mason out
+ *  of timber is handed more. It changes how OFTEN a house goes up and nothing whatever about
+ *  WHERE: the site is settled before `footprintRefusal` ever looks at materials. */
+export const MASON_WOOD_KIND = 'wood'
+
+export function heldWood(state: WorldState, agentId: string): number {
+  let n = 0
+  for (const i of Object.values(state.items)) {
+    if (i.kind === MASON_WOOD_KIND && i.loc.t === 'agent' && i.loc.id === agentId) n += i.qty
+  }
+  return n
+}
+
+/** The whole errand: the walk out to the ground, and the raising once you are on it. `null`
+ *  when there is no way to reach the ground at all. */
+export function masonErrandCost(
+  state: WorldState, config: SimConfig, agentId: string, claim: { door: { x: number; y: number } },
+): number | null {
+  const out = walkEnergyCost(state, config, agentId, claim.door)
+  const work = workEnergyCost(state, config, agentId, config.construction.houseTicks)
+  return out === null || work === null ? null : out + work
+}
+
+/** Stand at the ground the town keeps, then raise a roof on it. `null` when the town has
+ *  nowhere left for a house of this mass, or when this body cannot pay for the errand. */
+export function masonIntent(state: WorldState, config: SimConfig, agentId: string): Intent | null {
+  const a = state.agents[agentId]
+  if (a === undefined || a.insideId !== undefined) return null
+  const claim = claimInWorld(state, MASON_NEED)
+  if (claim === null) return null
+  const errand = masonErrandCost(state, config, agentId, claim)
+  // ★ AND THE RESERVE FOR WORK IS BEDTIME, NOT THE FLOOR. Going home is the last thing a body
+  // does, so `arrivesStanding` rightly measures it against the collapse threshold. Taking on a
+  // day's work is a CHOICE, and a body does not choose an errand it will finish face-down.
+  // Measured with the floor as the bar: four masons finished a roof, walked home on the last of
+  // it, and went down on the tick they lay in their own bed at energy 4.9. Arriving home merely
+  // ready for bed is the same sentence the rest of this policy already speaks.
+  if (errand === null || a.needs.energy - errand <= GO_HOME_BELOW) return null
+  return isAdjacentToRect(a.x, a.y, claim.site)
+    ? { verb: 'build', params: { kind: MASON_KIND } }   // ★ {kind} ONLY. No x. No y.
+    : { verb: 'walk', params: { x: claim.door.x, y: claim.door.y } }
 }
 
 // patrol like the G2 idler: ping-pong between two fixed waypoints, sleep when spent — and
@@ -204,6 +282,10 @@ export type FoundersOpts = {
   /** dev/demo only: the buildings start with something in them, so the room card's holdings
    *  grid renders against data. OFF by default — every existing gate folds what it always did. */
   holdings?: boolean
+  /** dev/demo only: the founders raise houses on plots the town claims for them, through the
+   *  real `build` verb with `{kind}` and no coordinate. OFF by default — every existing gate
+   *  folds exactly the events it always did, and the frozen fixture has no lattice to build on. */
+  builders?: boolean
 }
 
 /** The house this person owns, or null. Ownership is a fact of the world (Structure.owner) —
@@ -328,6 +410,16 @@ export function makeFoundersOnTick(
       if (!a || !a.alive) continue
       if (a.needs.hunger < NEED_TOPUP_BELOW) emit('need_changed', { id: f.id, need: 'hunger', delta: HUNGER_TOPUP })
       if (a.needs.warmth < NEED_TOPUP_BELOW) emit('need_changed', { id: f.id, need: 'warmth', delta: WARMTH_TOPUP })
+      // Scripted timber, on the same footing and for the same declared reason. The id never
+      // ends in a digit, because `fold` advances the world's entity counter off any that does.
+      if (opts.builders === true && a.activity === null
+        && heldWood(getState(), f.id) < (config.structures.recipes[MASON_KIND]?.inputs[MASON_WOOD_KIND] ?? 0)) {
+        emit('item_spawned', {
+          id: `item_${MASON_WOOD_KIND}_${f.id}_${tick}_load`, kind: MASON_WOOD_KIND,
+          qty: config.structures.recipes[MASON_KIND]?.inputs[MASON_WOOD_KIND] ?? 0,
+          loc: { t: 'agent', id: f.id },
+        })
+      }
     }
 
     for (const f of cast) {
@@ -340,7 +432,10 @@ export function makeFoundersOnTick(
       // why every landed gate folds exactly the world it always did.
       if (a.activity) continue
       const packet = composePerception(state, config, f.id, [])
+      // The order of a day: rest first, then work, then walk the town. Home comes before the
+      // mason because a body that is spent has no business starting a house.
       const intent = (opts.interiors === true ? homeIntent(state, config, f.id) : null)
+        ?? (opts.builders === true ? masonIntent(state, config, f.id) : null)
         ?? policies.get(f.id)!(state, config, packet)
       if (!intent) continue
       const r = submitIntent(state, config, f.id, intent.verb, intent.params)

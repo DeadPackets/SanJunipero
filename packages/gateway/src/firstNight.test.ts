@@ -29,10 +29,8 @@
 // same structures, same `makeFoundersOnTick`. Scripted policies only. No LLM, no network, $0.
 import { describe, expect, it } from 'vitest'
 import { stateHash } from '@sj/shared'
-import {
-  EventStore, RngStreams, TickLoop, genesisState, openDb, replayFromGenesis, type WorldState,
-} from '@sj/engine'
-import { SHOWCASE_CONFIG, devTerrain } from './devWorld.js'
+import { EventStore, RngStreams, TickLoop, fold, openDb, type WorldState } from '@sj/engine'
+import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
 import { FOUNDERS, foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.js'
 
 /** Three sim days, the far-bank lane's standard, so a night is a thing this test has seen
@@ -54,7 +52,8 @@ function runDevWorld(interiors: boolean, ticks = TICKS): Run {
     interiors, structures, founders: foundersFor(structures), holdings: true,
   })
   const loop: TickLoop = new TickLoop({
-    store, state: genesisState(config, terrain), rng, config, snapshotEveryTicks: 720,
+    store, state: devGenesisState(config, terrain, 'showcase', RINGS), rng, config,
+    snapshotEveryTicks: 720,
     onTick: (ctx) => inner({
       tick: ctx.tick,
       emit: (type, payload) => {
@@ -110,8 +109,12 @@ describe('★ THE FIRST NIGHT — the showcase town on rings=3, three sim days',
   })
 
   it('★ and the whole run replays from genesis, event for event, to the same hash', () => {
-    expect(stateHash(replayFromGenesis(run.store, SHOWCASE_CONFIG, run.terrain)))
-      .toBe(stateHash(run.state))
+    // `replayFromGenesis` rebuilds from a BARE `genesisState`, which is a world that has not
+    // said where its array stands. The dev world's genesis has, so the replay starts from the
+    // same one it did — still every event of the run folded from nothing, which is the claim.
+    const from = devGenesisState(SHOWCASE_CONFIG, run.terrain, 'showcase', RINGS)
+    const replayed = run.store.readFrom(0).reduce((s, ev) => fold(s, ev, SHOWCASE_CONFIG), from)
+    expect(stateHash(replayed)).toBe(stateHash(run.state))
   })
 
   it('★ and a second run of the same world reaches the same town, tick for tick', () => {
