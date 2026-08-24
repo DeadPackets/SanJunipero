@@ -173,6 +173,28 @@ describe('a glide is ended by anything that says where the camera should be', ()
     expect(src).not.toMatch(/Math\.abs\(dx\) \+ Math\.abs\(dy\) >/)
   })
 
+  // ★ THE STAGE'S SCREEN-SIZED SQUARE IS THE THIRD GROUND SQUARE, AND IT HAS A SECOND JOB.
+  //
+  // The tap on it turned the pointer into a TILE, which was the pointer's tile and not the
+  // clicked thing's — the open defect on a shoulder rank, where a body is drawn up to 1.3
+  // tiles from the tile the record puts it on. What is retired is that claim. The hit area
+  // itself STAYS: drag-to-pan, the fling and the wheel-zoom anchor are all stage handlers and
+  // every one of them needs a target under the pointer.
+  it('★ a tile pick means the pointer landed on the GROUND, not on a body or a building', () => {
+    expect(body("app.stage.on('pointertap'")).toContain('e.target !== app.stage')
+  })
+
+  it('★ and the stage hit area survives, because the camera is standing on it', () => {
+    // CODE, not the file: the comment above the handler quotes this very line, and a guard
+    // that reads its own explanation is satisfied by the explanation. Caught by mutation.
+    const code = src.split('\n').map((l) => l.trim())
+      .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*')).join('\n')
+    expect(code).toContain('app.stage.hitArea = app.screen')
+    for (const gesture of ['pointerdown', 'pointermove', 'pointerup']) {
+      expect(code, gesture).toContain(`app.stage.on('${gesture}'`)
+    }
+  })
+
   it('asks about reduced motion before it starts one', () => {
     expect(src).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
     expect(body('const endDrag =')).toContain('wantsMotion()')

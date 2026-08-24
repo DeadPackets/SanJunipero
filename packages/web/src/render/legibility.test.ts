@@ -4,10 +4,6 @@ import {
   AA_RATIO, LANDMARK_INK, LANDMARK_PLATE, LIGHT_BANDS, UI_BOUNDARY_RATIO, WORLD_TEXT_PAIRS,
   bandRatios, groundMarkOffenders, over, readableRatio, tintedBy, worldTextOffenders,
 } from './legibility.js'
-import {
-  DOOR_HOVER_FILL_ALPHA, DOOR_LINTEL, DOOR_RIM_ALPHA, DOOR_RIM_INK, DOOR_RIM_LIT, DOOR_SILL,
-  DOOR_SILL_FILL_ALPHA,
-} from './entities.js'
 import { TILE_COLORS } from './ground.js'
 import { SPEECH_FILL, SPEECH_INK, THOUGHT_FILL, THOUGHT_INK } from './textFaces.js'
 import { clockTint } from './tints.js'
@@ -63,16 +59,37 @@ describe('every word the world says clears AA in BOTH bands, not just in dayligh
   })
 })
 
-// ── ★ THE DOOR SILL: A MARK WITH NO PAPER OF ITS OWN ──────────────────────────────────────
+// ── ★ THE DOOR SILL WAS A MARK WITH NO PAPER, AND NOW IT IS NOT DRAWN AT ALL ──────────────
+//
+// `web-polish` measured this mark honestly and improved it as far as a ground mark can go: a
+// dimmed rim fails 1.4.11 on every ground it can be laid on, an opaque one fails after dark,
+// and NO single colour clears both bands — so the sill was given the stepped ledge, whose
+// contrast is with itself. Every one of those numbers still holds and they are kept below.
+//
+// ★ WHAT CHANGED IS THE QUESTION. The user retired the affordance itself: *"the 'click to
+// inspect or enter building' squares [must] be retired and instead replaced with accurate
+// hitboxes of the actual structures themselves."* A honey slab lying on the grass is not the
+// door of a house that is drawn standing up out of the grass — and in the running product it
+// does not even land under the drawn door, because the art's lowest row sits at the sprite's
+// own anchor while the sill is cut from the true ground plan below it. The building's own
+// doorway is the mark; the hover tag says what a click will do.
+//
+// So the measurements below are the standing reason nobody may put a mark back on the GROUND,
+// and the last case is the guard that nobody has.
 
 /** The tile tones the block lattice can plat under a doorway: grass, the bare earth and rock
  *  of a yard, sand, the road strip and the path the feet made. Water, forest, farmland and
  *  the channel are not door ground and are not held to this. */
 const DOOR_GROUNDS = ([0, 1, 4, 5, 7, 8] as const).map((t) => TILE_COLORS[t])
 
-describe('★ the one affordance for "you can go in here"', () => {
+/** The retired sill's own colours — `--ink` and `--honey`, what `DOOR_LINTEL` and `DOOR_SILL`
+ *  were. They live here because they are a measurement of a thing that is gone, and a constant
+ *  exported from the product for a test to cite is a fact nothing enforces. */
+const RETIRED_RIM = 0x43394a, RETIRED_FILL = 0xf2c879
+
+describe('★ why "you can go in here" is not a mark on the ground', () => {
   it('reproduces what shipped: a 45 % rim fails the boundary floor on EVERY door ground', () => {
-    const dimmed = DOOR_GROUNDS.map((g) => over(DOOR_LINTEL, g, 0.45))
+    const dimmed = DOOR_GROUNDS.map((g) => over(RETIRED_RIM, g, 0.45))
     for (const [i, g] of DOOR_GROUNDS.entries()) {
       expect(readableRatio(dimmed[i]!, g, LIGHT_BANDS.day)).toBeLessThan(UI_BOUNDARY_RATIO)
       expect(readableRatio(dimmed[i]!, g, LIGHT_BANDS.night)).toBeLessThan(UI_BOUNDARY_RATIO)
@@ -81,54 +98,40 @@ describe('★ the one affordance for "you can go in here"', () => {
 
   it('★ and OPAQUE was not the fix either — the night multiply takes it back under', () => {
     const grass = TILE_COLORS[0]
-    expect(readableRatio(DOOR_LINTEL, grass, LIGHT_BANDS.day)).toBeGreaterThan(UI_BOUNDARY_RATIO)
-    expect(readableRatio(DOOR_LINTEL, grass, LIGHT_BANDS.night)).toBeLessThan(UI_BOUNDARY_RATIO)
+    expect(readableRatio(RETIRED_RIM, grass, LIGHT_BANDS.day)).toBeGreaterThan(UI_BOUNDARY_RATIO)
+    expect(readableRatio(RETIRED_RIM, grass, LIGHT_BANDS.night)).toBeLessThan(UI_BOUNDARY_RATIO)
   })
 
-  it('★★ THE DUAL-BAND SET FOR A GROUND-DEPENDENT RIM IS EMPTY, which is why there is a ledge', () => {
+  it('★★ THE DUAL-BAND SET FOR A GROUND-DEPENDENT MARK IS EMPTY, at any colour', () => {
     // Every colour a lane might reach for, over the six grounds, in both bands. Not one of
-    // them clears — the dark ones die at night, the light ones die on sand. This is the
-    // measurement that makes the two-tone edge a conclusion rather than a taste, and it is
-    // the test that goes red if somebody flattens the ledge back to one line.
+    // them clears — the dark ones die at night, the light ones die on sand. A mark whose
+    // legibility is a function of the ground cannot be an affordance on ground this varied.
     const candidates = [0x43394a, 0x241f2b, 0xfff6e9, 0xf8dca2, 0xffffff, 0xf2c879, 0x000000]
     for (const c of candidates) {
       expect(
         groundMarkOffenders(`#${c.toString(16)}`, c, DOOR_GROUNDS),
-        `a single rim colour cleared both bands: #${c.toString(16)}`,
+        `a single mark colour cleared both bands: #${c.toString(16)}`,
       ).not.toEqual([])
     }
   })
 
-  it('★ so the sill wears the stepped ledge, whose contrast is with ITSELF and not the ground', () => {
-    expect(DOOR_RIM_INK).toBe(LANDMARK_INK)
-    expect(DOOR_RIM_LIT).toBe(LANDMARK_PLATE)
-    const r = bandRatios(DOOR_RIM_INK, DOOR_RIM_LIT)
-    expect(r.day).toBeGreaterThanOrEqual(UI_BOUNDARY_RATIO)
-    expect(r.night).toBeGreaterThanOrEqual(UI_BOUNDARY_RATIO)
-    // and it clears AA, not merely the boundary floor, in both bands
-    expect(Math.min(r.day, r.night)).toBeGreaterThanOrEqual(AA_RATIO)
-  })
-
-  it('★ and the node is NEVER dimmed — an alpha on the graphics takes the rim with the fill', () => {
-    const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
-    const body = src.slice(src.indexOf('function layoutDoor('), src.indexOf('function drawPips('))
-    expect(body).not.toMatch(/door\.alpha\s*=/)
-    expect(body).toMatch(/color: DOOR_RIM_INK, alignment: 0\.5, alpha: DOOR_RIM_ALPHA/)
-    expect(body).toMatch(/color: DOOR_RIM_LIT, alignment: 0\.5, alpha: DOOR_RIM_ALPHA/)
-    expect(DOOR_RIM_ALPHA).toBe(1)
-    // hover brightens the STEP; the outline is already at full strength and has nowhere to go
-    expect(DOOR_HOVER_FILL_ALPHA).toBeGreaterThan(DOOR_SILL_FILL_ALPHA)
-    // nowhere else either — the hover handlers used to set it. Comments may quote the old
-    // line, and one above this very function does.
-    const code = src.split('\n').map((l) => l.trim()).filter((l) => !l.startsWith('//') && !l.startsWith('*'))
-    expect(code.filter((l) => /door\.alpha\s*=(?!=)/.test(l))).toEqual([])
-  })
-
-  it('the honey fill is warmth and was never the affordance, at any alpha', () => {
+  it('the honey fill was warmth and was never the affordance, at any alpha', () => {
     for (const a of [0.45, 0.85, 1]) {
       const grass = TILE_COLORS[0]
-      expect(readableRatio(over(DOOR_SILL, grass, a), grass, LIGHT_BANDS.day))
+      expect(readableRatio(over(RETIRED_FILL, grass, a), grass, LIGHT_BANDS.day))
         .toBeLessThan(UI_BOUNDARY_RATIO)
     }
+  })
+
+  it('★ AND THE MARK IS GONE: entities.ts paints nothing on a door tile', () => {
+    const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
+    const code = src.split('\n').map((l) => l.trim())
+      .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
+      .join('\n')
+    for (const gone of ['doorSillPolygon', 'DOOR_SILL', 'DOOR_LINTEL', 'DOOR_RIM', 'layoutDoor']) {
+      expect(code, gone).not.toContain(gone)
+    }
+    // the ledge pair itself is still proved above for the landmarks that DO use it
+    expect(bandRatios(LANDMARK_INK, LANDMARK_PLATE).night).toBeGreaterThanOrEqual(AA_RATIO)
   })
 })

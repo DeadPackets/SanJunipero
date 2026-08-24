@@ -151,7 +151,7 @@ export function minimapPixels(
       const i = my * f.w + mx
       if (rank[i]! <= WEAKEST) continue
       const p = mapToWorld(mx + 0.5, my + 0.5, f)
-      const t = screenToTile(p.sx, p.sy - TILE_H / 2)
+      const t = screenToTile(p.sx, p.sy)
       const id = terrain[t.y]?.[t.x]
       if (id === undefined) continue
       put(px, rank, i, TILE_COLORS[id as 0] ?? GROUND_FALLBACK_COLOR, RANK.get(tileKind(id)) ?? WEAKEST)

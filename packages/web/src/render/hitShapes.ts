@@ -71,11 +71,27 @@ export function polygonBounds(poly: number[]): { w: number; h: number; cx: numbe
  * Grow a capsule about its own centroid until it is at least `minPx` on screen in both axes.
  * `screenScale` is the TOTAL on-screen scale — sprite scale times camera zoom — so a tiny
  * sprite at the 0.5 overview stop stays clickable without carrying an oversized box at 4×.
+ *
+ * ★ `maxWidthPx` IS WHERE ACCURACY AND THE FLOOR ARE RECONCILED, AND IT IS THE WHOLE DESIGN
+ * TENSION OF THIS LANE. The floor exists so a lone target stays findable; it is a Fitts's-law
+ * rule about a target in open space. It says nothing about a target with a NEIGHBOUR 14 px
+ * away, and applied there it is actively harmful: five bodies in a shoulder rank, each grown
+ * to 24 px, are one 24 px-wide contest that the depth sort settles — the viewer can no longer
+ * choose which of the five they meant. **Hitting the wrong person is a worse failure than a
+ * small target**, because a small target misses loudly and the wrong person answers quietly.
+ *
+ * So the floor is capped by the distance to the nearest neighbour of the same class. A lone
+ * body keeps the whole 24/z; a body in a rank grows to at most one pitch, which is the widest
+ * it can be while still being the one thing under the pointer. `crowd.test.ts` owns the pitch
+ * and `characters.test.ts` proves the five stay five at every zoom stop.
  */
-export function inflateToMin(poly: number[], minPx: number, screenScale: number): number[] {
+export function inflateToMin(
+  poly: number[], minPx: number, screenScale: number, maxWidthPx = Infinity,
+): number[] {
   const k = screenScale === 0 ? 1 : screenScale
   const { w, h, cx, cy } = polygonBounds(poly)
-  const fx = w * k >= minPx || w === 0 ? 1 : minPx / (w * k)
+  const wantW = Math.min(minPx, Math.max(maxWidthPx, w * k))
+  const fx = w * k >= wantW || w === 0 ? 1 : wantW / (w * k)
   const fy = h * k >= minPx || h === 0 ? 1 : minPx / (h * k)
   if (fx === 1 && fy === 1) return [...poly]
   return poly.map((v, i) => (i % 2 === 0 ? cx + (v - cx) * fx : cy + (v - cy) * fy))
@@ -90,71 +106,97 @@ export function hitTightness(poly: number[], figureW: number, figureH: number, s
   return (polygonArea(poly) * k * k) / (figureW * k * (figureH * k))
 }
 
-// ── the door, as part of the building it belongs to (U11, plan task 73) ──────────────────
+// ── ★ A BUILDING IS A VOLUME, AND THE TARGET WAS THE GROUND UNDER IT ─────────────────────
 //
-// THE DEFECT: the door was a Graphics rounded rect in ink at 50 % alpha, 10 × 13 world px,
-// drawn as a SIBLING of its building at `structureZIndex + 1` — so it painted over anyone
-// standing in the doorway (U11's dark rectangle) and its tiny target lost every contest with
-// the 52 × 72 body box. P9d is repealed: the door is a CHILD of its building sprite, so it
-// inherits the building's depth and can never sort against it.
+// THE RULING: *"the 'click to inspect or enter building' squares [must] be retired and instead
+// replaced with accurate hitboxes of the actual structures themselves."*
+//
+// ★ THE DEFECT, MEASURED RATHER THAN DESCRIBED. The landed target was `footprintHitPoints` —
+// the FLAT ground diamond a building stands on. Every building's art was decoded and its
+// opaque pixels counted against that diamond (`scratchpad/hb/alpha.mts`, twenty codex roots):
+//
+//   the flat footprint diamond contains 0.0 % – 0.8 % of the building's DRAWN pixels
+//
+// The click target and the picture were disjoint. Clicking a roof, a wall, a chimney or a
+// doorway did nothing at all; the only place a house answered was the strip of grass its
+// plinth touches. That is not a tight hitbox, it is a hitbox for a different object.
+//
+// ★ AND THE DRAWN BUILDING IS TWICE THE WIDTH OF THE GROUND IT STANDS ON. `buildingArt` fits
+// every root to a `(w + h) · BUILDING_PX_PER_TILE` SQUARE, and the art fills it: measured
+// `drawnW / diamondW` is 1.90 – 2.00 for every dwelling in the town. So a hit prism raised over
+// the TRUE footprint is not the answer either — it contains only 58 % – 68 % of the drawn
+// pixels, because the eaves, the porch and half the frontage hang outside the ground plan.
+//
+// ★ SO THE SHAPE IS THE DIAMOND FOOTPRINT OF WHAT IS **DRAWN**, EXTRUDED TO WHAT IS DRAWN.
+// Three arguments, and one measurement each:
+//
+//  1. IT IS THE GEOMETRY, NOT A GUESS. A dimetric building is a diamond ground plan with a
+//     body standing out of it; the art is authored that way and `builtFormSpec` already
+//     extrudes exactly this prism for the kinds that have no art. The hexagon is six points
+//     and every one of them comes from `(w + h) · BUILDING_PX_PER_TILE` — the SAME constant
+//     `depth.ts` and `cull.ts` already compute a building's screen box from. No new table.
+//
+//  2. THE PIXEL-EXACT SILHOUETTE IS NOT AVAILABLE AND WOULD NOT PAY. Pixi has no per-pixel hit
+//     test, so it means an alpha read-back per root, re-run on every codex hot-swap and every
+//     scale change. Measured against the prism it buys 89.1 %→~99 % coverage on the six narrow
+//     kinds whose art does not fill its cell (well, standing stone, scaffolding, wagon, grave,
+//     bridge) and nothing at all on the fourteen that do.
+//
+//  3. A PER-KIND ROSTER IS THE THING THIS PROJECT KEEPS DELETING. `BUILT_FORM_MATERIALS`
+//     already hashes unknown kinds onto a ramp precisely because the roster is open — the world
+//     learns to raise new things and no table can be ahead of it. The prism IS the shape: give
+//     it (w, h) and it is correct for a kind nobody has drawn yet.
+//
+// MEASURED, all twenty roots: the prism contains 89.1 % – 99.7 % of the drawn pixels at a
+// tightness of 0.754 – 1.116 against the drawn bounding box — comparable to the body capsule's
+// 0.935 and inside `HIT_TIGHTNESS_MAX` everywhere.
 
-/** The frontage plate, in tiles. Inflated to HIT_MIN_PX where a 1×1 frontage would be
- *  smaller than a pointer can reliably find. */
-export const DOOR_W_TILES = 0.55, DOOR_H_TILES = 0.85
-const TILE_PX = 32   // iso.TILE_W — a tile of width is also a tile of height up a wall
+/** One tile of width is also one tile of height up a wall (`BUILT_FORM_UNIT_PX` says the same
+ *  thing for the drawn volumes). Restated here so `hitShapes` stays free of the art modules. */
+export const BUILDING_UNIT_PX = 32
 
-/** The door tile's CENTRE in the parent sprite's local space, before scaling. The same
- *  south-face, centre-of-frontage rule `doorTileOf` applies in world tiles. */
-export function doorLocalCentre(footprint: { w: number; h: number }): { x: number; y: number } {
-  const ddx = ((footprint.w - 1) >> 1) - (footprint.w / 2 - 0.5)
-  const ddy = footprint.h - 1 - (footprint.h / 2 - 0.5)
-  return { x: (ddx - ddy) * (TILE_PX / 2), y: (ddx + ddy) * (TILE_PX / 4) + TILE_PX / 4 }
+/**
+ * A ground diamond swept upward — the one primitive both structure shapes are cut from.
+ *
+ * `base` is a four-point diamond in N, E, S, W order (what `footprintDiamond` returns). The
+ * result is the SIX-point outer silhouette of the solid: up the west side, across the bottom,
+ * up the east side, then back over the raised top. Six points and not eight, because the
+ * raised south vertex is inside the shape — the same reason `builtFormSpec.silhouette` has six.
+ */
+export function extrudeDiamond(base: number[], heightPx: number): number[] {
+  const [nx, ny, ex, ey, sx, sy, wx, wy] = base as [number, number, number, number, number, number, number, number]
+  const h = Math.max(0, heightPx)
+  return [wx, wy, sx, sy, ex, ey, ex, ey - h, nx, ny - h, wx, wy - h]
 }
 
 /**
- * The door's TARGET in the PARENT sprite's local space, derived from the footprint rather than
- * from two hardcoded pixel constants, and centred on the threshold it names. A child inherits
- * the parent's scale, so the local rect is divided by it and the SCREEN size is constant at any
- * art resolution.
+ * The hit prism for a building drawn from ART, in the sprite's LOCAL space.
  *
- * `zoom` is the CAMERA's scale, and the floor is a SCREEN size. Task 75 adds the 0.5 overview
- * stop, at which a 24-world-px target is 12 screen px — half the floor. The floor was
- * unexercised while `ZOOM_MIN` was 1; it is live now, so it has to know the zoom.
+ * `buildingArt` fits every root to a `(w + h) · BUILDING_UNIT_PX` square anchored at its feet
+ * point, and every root's lowest opaque row IS that feet row (measured: `below feet` is 0.0 px
+ * on all twenty). So the drawn ground diamond has its SOUTH vertex at the local origin, is
+ * `side` wide and `side / 2` tall, and the body rises to `side` — which makes the prism's
+ * bounding box exactly the drawn cell, with the four corners cut off by the diamond.
+ *
+ * Points are pre-divided by `scale` because Pixi scales `hitArea` with the sprite.
  */
-export function doorLocalRect(
-  footprint: { w: number; h: number }, scale: number, zoom = 1,
-): { x: number; y: number; w: number; h: number } {
+export function artPrismPolygon(w: number, h: number, scale: number): number[] {
   const k = scale === 0 ? 1 : scale
-  const z = zoom > 0 ? zoom : 1
-  const floor = Math.max(HIT_MIN_PX, HIT_MIN_PX / z)
-  const w = Math.max(DOOR_W_TILES * TILE_PX, floor)
-  const h = Math.max(DOOR_H_TILES * TILE_PX, floor)
-  const c = doorLocalCentre(footprint)
-  return { x: (c.x - w / 2) / k, y: (c.y - h / 2) / k, w: w / k, h: h / k }
+  const side = (w + h) * BUILDING_UNIT_PX
+  const halfW = side / 2, halfH = side / 4
+  // N, E, S, W of the DRAWN ground diamond, south vertex on the feet point
+  const base = [0, -halfH * 2, halfW, -halfH, 0, 0, -halfW, -halfH]
+  return extrudeDiamond(base, side - halfH * 2).map((v) => v / k)
 }
 
-/** The threshold itself: the door tile's own ground diamond, inset so it reads as a sill laid
- *  in front of the doorway rather than as a slab painted over the wall (U11). */
-export const DOOR_SILL_INSET = 0.16
-/** How much further in the sill's LIT inner line sits — one screen pixel of step at zoom 1,
- *  which is what makes the rim a ledge rather than a line. */
-export const DOOR_SILL_STEP = 0.075
-export function doorSillPolygon(
-  footprint: { w: number; h: number }, scale: number, inset = DOOR_SILL_INSET,
-): number[] {
-  const k = scale === 0 ? 1 : scale
-  const c = doorLocalCentre(footprint)
-  const halfW = (TILE_PX / 2) * (1 - inset)
-  const halfH = (TILE_PX / 4) * (1 - inset)
-  return [c.x, c.y - halfH, c.x + halfW, c.y, c.x, c.y + halfH, c.x - halfW, c.y]
-    .map((v, i) => (i % 2 === 0 ? (v - 0) / k : v / k))
-}
+/** How tall a drawn building stands above its feet, in local screen px. The number the prism
+ *  and `structureDepthBox`'s screen AABB both mean by "a building is this tall". */
+export const artPrismHeightPx = (w: number, h: number): number => (w + h) * BUILDING_UNIT_PX
 
-/** Priority when two hit-testable things genuinely overlap. Lower wins. A door beats a body
- *  BECAUSE a door is a destination and a body has a whole panel of its own; a body beats a
- *  building because a building's story is one popover. */
-export const HIT_PRIORITY: Readonly<Record<'door' | 'agent' | 'item' | 'crop' | 'structure', number>> =
-  { door: 0, agent: 1, item: 2, crop: 3, structure: 4 }
+/** Priority when two hit-testable things genuinely overlap. Lower wins. A body beats a
+ *  building because a person is the smaller, more specific claim on the pointer. */
+export const HIT_PRIORITY: Readonly<Record<'agent' | 'item' | 'crop' | 'structure', number>> =
+  { agent: 0, item: 1, crop: 2, structure: 3 }
 
 export function resolveHit(
   candidates: ReadonlyArray<{ kind: keyof typeof HIT_PRIORITY; id: string }>,
@@ -164,6 +206,13 @@ export function resolveHit(
     if (best === null || HIT_PRIORITY[c.kind] < HIT_PRIORITY[best.kind]) best = c
   }
   return best?.id ?? null
+}
+
+/** The landed FLAT ground diamond, so the before-state is measured rather than remembered.
+ *  `entities.footprintHitPoints` was this, and it was the whole click target for a building. */
+export function legacyFootprintPolygon(base: number[], scale: number): number[] {
+  const k = scale === 0 ? 1 : scale
+  return base.map((v) => v / k)
 }
 
 /** The landed rectangle, as a polygon, so the before-state can be measured not remembered. */

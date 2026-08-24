@@ -377,6 +377,8 @@ export type Scene = {
   setFollow(target: (() => { x: number; y: number } | null) | null): void
   /** fires when a user gesture (drag, pan, recenter) takes the camera back */
   onFollowEnd(cb: () => void): () => void
+  /** A click that landed on the GROUND, as a tile. A click that landed on a person, a
+   *  building, an item or a crop is not a tile pick and does not fire this — see the handler. */
   onTilePointer(cb: (t: { x: number; y: number }) => void): void
   /** world-space anchor for an agent's sprite; wired by StageMount once layers exist */
   anchorOf?: (agentId: string) => { x: number; y: number } | null
@@ -651,8 +653,25 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   }
   app.stage.on('pointerup', endDrag)
   app.stage.on('pointerupoutside', endDrag)
+  // ★ THE THIRD GROUND SQUARE, AND THE ONE WITH A SECOND JOB.
+  //
+  // `app.stage.hitArea = app.screen` is a screen-sized rectangle that catches every pointer
+  // event the town does not — and the tap on it turned the pointer into a TILE. That tile was
+  // the pointer's, not the clicked thing's, which is the open defect handed to this lane: a
+  // body in a shoulder rank is drawn up to 1.3 tiles from the tile the record puts it on, so a
+  // click on a fanned body reported ground the body is not standing on.
+  //
+  // ★ BUT THE STAGE HIT AREA ITSELF STAYS, BECAUSE IT IS DOING A SECOND JOB NOBODY REMEMBERS:
+  // drag-to-pan, the fling, and the wheel-zoom anchor are all `app.stage` handlers and every
+  // one of them needs a target under the pointer. Removing the square would take the camera
+  // with it. What is retired is the CLAIM the tap made on top of it.
+  //
+  // A tile pick now means what it says: the pointer landed on the ground. `e.target` is the
+  // object Pixi hit, and if that is anything but the stage the viewer clicked a THING — which
+  // has its own handler, its own answer, and its own tile if it ever needs one.
   app.stage.on('pointertap', (e: FederatedPointerEvent) => {
     if (isDrag(drag)) return // a drag is not a tile pick
+    if (e.target !== app.stage) return // nor is a click that landed on a body or a building
     const wx = (e.global.x - world.position.x) / world.scale.x
     const wy = (e.global.y - world.position.y) / world.scale.y
     const t = screenToTile(wx, wy)

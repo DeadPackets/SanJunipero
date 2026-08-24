@@ -1,4 +1,4 @@
-import { Graphics, Polygon, Rectangle, Sprite, Texture, type FederatedPointerEvent } from 'pixi.js'
+import { Graphics, Polygon, Sprite, Texture, type FederatedPointerEvent } from 'pixi.js'
 import { INTERIOR_KINDS, tickToMoment } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
@@ -7,8 +7,7 @@ import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
 import { structureDepthBox, tileDepthBox, type DepthBox } from './depth.js'
 import { TILE_H, depthKey, tileToScreen } from './iso.js'
 import type { DepthEntry } from './layers.js'
-import { DOOR_SILL_INSET, DOOR_SILL_STEP, doorLocalRect, doorSillPolygon } from './hitShapes.js'
-import { LANDMARK_INK, LANDMARK_PLATE } from './legibility.js'
+import { HIT_MIN_PX, artPrismPolygon, extrudeDiamond, inflateToMin } from './hitShapes.js'
 import { anchorForSprite } from './tooltip.js'
 import type { Scene } from './scene.js'
 import {
@@ -61,47 +60,60 @@ export function pipsFilled(progressTicks: number, houseTicks: number | undefined
 }
 
 // The door a resident walks out of: south face, centre of the frontage. The same rule the
-// C13 city template applies in template space (`doorTile`), read here in world tiles.
+// C13 city template applies in template space (`doorTile`), read here in world tiles. Read by
+// `interiorScene`, which needs to know where a room's occupants came in.
 export const ENTERABLE_KINDS: ReadonlySet<string> = new Set(INTERIOR_KINDS)
 
-// A THRESHOLD, NOT A DARK RECTANGLE (U11). The affordance is a SILL laid on the door tile —
-// a warm step in front of the doorway — never a slab painted over the building's own face.
-// A dark plate on the wall was exactly the artefact the user reported.
-export const DOOR_SILL = 0xf2c879         // --honey, the lit step
-/** @deprecated the rim is a two-tone ledge now (`DOOR_RIM_INK` / `DOOR_RIM_LIT`). Kept because
- *  `entities.test.ts` cites it as the single-line before-state. */
-export const DOOR_LINTEL = 0x43394a       // --ink, its 1px rim
+// ★ THE "CLICK TO ENTER" SQUARE IS RETIRED, AND SO IS THE SLAB THAT DREW IT.
+//
+// THE RULING: *"the 'click to inspect or enter building' squares [must] be retired and instead
+// replaced with accurate hitboxes of the actual structures themselves."*
+//
+// There were TWO squares on a building and both were on the GROUND rather than on the thing:
+//
+//  · INSPECT — `footprintHitPoints`, the flat ground diamond. Measured against every codex
+//    root's decoded alpha, it contained 0.0 % – 0.8 % of the building's DRAWN pixels. Clicking
+//    a roof, a wall or a doorway did nothing; the house answered only on the grass it touches.
+//
+//  · ENTER — a `Rectangle` hitArea over the door tile, floored to 24 px, under a honey sill
+//    drawn flat on that tile. An axis-aligned screen rectangle over a diamond, and the sill it
+//    marked reads in the running product as a paving slab lying in the yard: the art is fitted
+//    to a `(w + h) · 32` square whose lowest row sits at the sprite's own anchor, so the DRAWN
+//    house stands about a footprint's half-height north of the ground plan the sill is cut
+//    from. The affordance and the door in the picture were not in the same place.
+//
+// ★ AND ONE HITBOX REPLACES BOTH, WHICH IS WHAT THE RULING ASKS FOR. A building is one object,
+// so it takes one pointer: the prism of what is drawn. What the click MEANS is then a property
+// of the building rather than of where inside it you landed —
+//
+//   enterable and complete → go in.      anything else → its provenance popover.
+//
+// Nothing is lost by dropping the popover on the nine enterable buildings: `InteriorBar` puts
+// the same `/api/structure/:id/provenance` line at the top of the room you have just walked
+// into. The hover tag says which of the two a click will do, before you make it.
 
-// ★ THE ONE AFFORDANCE FOR "YOU CAN GO IN HERE" WAS BEHIND AN OPACITY, AND THE BAR SAYS
-// OPACITY IS NOT A CONTRAST STRATEGY.
-//
-// The sill was drawn whole and then dimmed — `door.alpha = 0.45` over the fill AND its rim —
-// so the boundary, the part that has to be seen, was 45 % of itself. Measured through
-// `legibility.readableRatio` against the six tones `ground.ts` can paint under a doorway
-// (grass, earth, rock, sand, road, path), in BOTH light bands, worst case of the six:
-//
-//                                day    night
-//   --ink rim at 0.45            1.74    1.35     what shipped — fails 1.4.11 in both bands
-//   --ink rim at 1.00            3.71    1.83     opaque is not enough AFTER DARK
-//   --honey fill at any alpha    1.05    1.02     honey and mid grass share a luminance
-//
-// ★ AND NO SINGLE COLOUR FIXES IT. Every candidate was measured over the same six grounds in
-// both bands and the dual-band set is EMPTY, exactly as it is for the chrome's palette: the
-// best dark (`--deep`) is 5.46 / 2.16 and the best light (`--cream`) is 1.34 / 1.30, because
-// the night multiply compresses every pair toward the tint. A mark whose legibility is a
-// function of the ground cannot clear 3:1 on ground this varied under a tint this deep.
-//
-// So the rim does not depend on the ground: it is the STEPPED LEDGE every floating slab in
-// this town already wears, an ink line with a lit line one pixel inside it. Its contrast is
-// the contrast of the two lines with EACH OTHER — `LANDMARK_INK` on `LANDMARK_PLATE`, which
-// `legibility.ts` has already proved at 15.02:1 by day and 5.19:1 at night — and that number
-// is the same on grass, on sand and on the road. The honey stays as the warmth of the step,
-// which is all it was ever contributing.
-export const DOOR_RIM_INK = LANDMARK_INK
-export const DOOR_RIM_LIT = LANDMARK_PLATE
-export const DOOR_SILL_FILL_ALPHA = 0.45
-export const DOOR_RIM_ALPHA = 1
-export const DOOR_HOVER_FILL_ALPHA = 0.85
+/** Whether clicking this building walks into it. A shell still going up has no room to walk
+ *  into, and a well has no room at all — both answer with their story instead. */
+export function entersOnClick(state: WorldState | null, structureId: string): boolean {
+  const s = state?.structures[structureId]
+  return s !== undefined && s.stage === 'complete' && ENTERABLE_KINDS.has(s.kind)
+}
+
+/**
+ * What the pointer promises: the same building, said two ways, because a click on it does two
+ * different things. The tag is the affordance now that the ground slab is gone.
+ *
+ * The building is named FIRST and the offer follows on a middot, which is a composition fix
+ * found by eye: `hoverLabel` already spends an em-dash on "house — built by script", so the
+ * landed `Look inside — {name}` read as LOOK INSIDE — HOUSE — BUILT BY SCRIPT, three phrases
+ * on two identical separators with the least important one in the middle.
+ */
+export const LOOK_INSIDE = 'Look inside'
+export function structureHoverText(state: WorldState | null, structureId: string): string | null {
+  const name = hoverLabel(state, 'structure', structureId)
+  if (name === null) return null
+  return entersOnClick(state, structureId) ? `${name} · ${LOOK_INSIDE}` : name
+}
 
 export function doorTileOf(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): { x: number; y: number } {
   return { x: s.x + ((s.w - 1) >> 1), y: s.y + s.h - 1 }
@@ -113,36 +125,47 @@ export function structureZIndex(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): numb
   return depthKey(s.x + s.w - 1, s.y + s.h - 1)
 }
 
-// A building sprite is ~1.85x wider than the ground it stands on, and Pixi hit-tests a
-// sprite's full RECTANGULAR bounds — transparent margin included. So a wagon one depth row
-// south of the storehouse was intercepting hits on the storehouse's door with nothing but
-// its empty canopy padding, and the scaffolding was doing the same to the house.
-//
-// The honest target for "tell me about this building" is the ground it occupies, so the
-// hit area is the footprint DIAMOND: it can never reach past the tiles the building stands
-// on, and therefore can never cover a neighbour's door.
-//
-// Local sprite space has its origin at the sprite's position — the TOP vertex of the centre
-// tile — and Pixi scales hitArea with the sprite, so the points are divided by the applied
-// scale exactly as `hitRect` does for characters.
+/**
+ * @deprecated as a hit area — it is the BASE of the hit prism now, and on its own it is the
+ * defect the ruling names. Still the shape `builtForm` cuts its plinth from, and
+ * `entities.test.ts` cites it as the before-state whose coverage of the drawn art was measured
+ * at 0.0 % – 0.8 %.
+ */
 export function footprintHitPoints(w: number, h: number, scale = 1): number[] {
   const k = scale === 0 ? 1 : scale
   return footprintDiamond(w, h).map((v) => v / k)
 }
 
+/**
+ * ★ THE HITBOX OF THE STRUCTURE ITSELF, in the sprite's local space.
+ *
+ * Two sources, because a building is drawn two ways and the hitbox follows WHAT IS DRAWN:
+ *
+ *  · with ART — `artPrismPolygon`, the drawn cell's diamond footprint swept up the drawn cell's
+ *    own height. Coverage of the decoded alpha is 89.1 % – 99.7 % over all twenty codex roots.
+ *  · with NO art — `builtFormSpec` draws a plinth and a volume out of the palette, so the prism
+ *    is that plinth's diamond swept up that volume's own `heightPx`. Exact, by construction.
+ *
+ * The 24 px floor is a SCREEN size, so the shape is re-cut when the camera scale moves — a
+ * 1 × 1 shed is 64 world px across, which is 16 px at the 0.25 overview stop.
+ */
+export function structureHitPoints(
+  kind: string, w: number, h: number, scale: number, zoom = 1, hasArt = true,
+): number[] {
+  const k = scale === 0 ? 1 : scale
+  const local = hasArt
+    ? artPrismPolygon(w, h, k)
+    : extrudeDiamond(footprintDiamond(w, h), builtFormSpec(kind, w, h).heightPx).map((v) => v / k)
+  return inflateToMin(local, HIT_MIN_PX, k * (zoom > 0 ? zoom : 1))
+}
+
 type Entry = {
   sprite: Sprite; url: string; pips: Graphics | null; form: Graphics | null
-  /** the look-inside threshold, a CHILD of the sprite so it shares the building's depth */
-  door: Graphics | null
-  /** the ground plan the door and the hit diamond are both cut from */
+  /** the kind and ground plan the hit prism is cut from */
+  kind: string
   footprint: { w: number; h: number }
-  /** the camera scale this door's target was last cut for — the 24 px floor is a SCREEN size */
-  doorZoom: number
-  /** the sill's own fill strength. Lives on the entry rather than on the node because the rim
-   *  must NOT follow it: a node alpha dims the boundary too, which is the thing that has to
-   *  be seen. Hover brightens the step; it never brightens the outline, which is already at
-   *  full strength. */
-  doorFill: number
+  /** the camera scale this prism was last cut for — the 24 px floor is a SCREEN size */
+  hitZoom: number
   /** the ground this drawable stands on, republished every sync for the frame's depth sort */
   box: DepthBox
 }
@@ -153,8 +176,8 @@ const NO_ART = ''
 type SyncState = {
   entries: Map<string, Entry>; lastAssetsSeq: number
   onDoor: ((structureId: string) => void) | null
-  /** the camera scale every door target was last cut for */
-  doorZoom: number
+  /** the camera scale every structure prism was last cut for */
+  hitZoom: number
 }
 const syncStates = new WeakMap<Scene, SyncState>()
 
@@ -179,7 +202,7 @@ function applyBuildingArt(
     entry.sprite.texture = Texture.EMPTY
     entry.sprite.anchor.set(0.5, 1.0)
     entry.sprite.scale.set(1)
-    entry.sprite.hitArea = new Polygon(footprintHitPoints(footprint.w, footprint.h))
+    cutHitPrism(entry)
     if (entry.form === null) {
       entry.form = new Graphics()
       entry.form.eventMode = 'none' // the volume is a picture; the sprite owns the pointer
@@ -193,6 +216,9 @@ function applyBuildingArt(
     entry.form = null
   }
   entry.url = art.url
+  // The manifest's scale is known NOW, so the prism is cut now: a building is clickable at its
+  // real shape from the frame it appears, not a texture round trip later.
+  cutHitPrism(entry, entry.hitZoom, art.scale ?? 1)
   const swapping = swapFrom !== null && swapFrom !== art.url
   const p = swapping ? book.swap(swapFrom, art.url) : book.get(art.url)
   void p.then((t) => {
@@ -203,39 +229,20 @@ function applyBuildingArt(
     else entry.sprite.anchor.set(0.5, 1.0)
     const scale = art.scale ?? 1
     entry.sprite.scale.set(scale)
-    // the hit area is scaled with the sprite, so it is re-cut whenever the scale moves
-    entry.sprite.hitArea = new Polygon(footprintHitPoints(footprint.w, footprint.h, scale))
-    layoutDoor(entry)   // a child inherits the new scale; the threshold follows it
+    cutHitPrism(entry)   // the prism is scaled with the sprite, so a new scale re-cuts it
   })
 }
 
 /**
- * The threshold, in the parent sprite's local space: the door tile's own ground diamond, lit
- * in honey with a 1 px ink rim. It is a step you can see from any angle, and because it lies
- * on the ground it never punches a hole in the building's own art. Re-cut whenever the
- * sprite's scale moves, so it stays one size on screen at any art resolution.
+ * Re-cut the structure's hit prism. Called when the art's scale lands, when the footprint
+ * changes and when the camera settles at a new zoom — never per frame.
  */
-function layoutDoor(entry: Entry, zoom = entry.doorZoom, fillAlpha = entry.doorFill): void {
-  const door = entry.door
-  if (door === null) return
-  entry.doorZoom = zoom
-  entry.doorFill = fillAlpha
-  const footprint = entry.footprint
-  const scale = entry.sprite.scale.x || 1
-  door.clear()
-  door.poly(doorSillPolygon(footprint, scale))
-  door.fill({ color: DOOR_SILL, alpha: fillAlpha })
-  // The ledge, lit line first and ink line over it, both at full strength. The node is never
-  // dimmed: a node alpha takes the boundary down with the fill, which is the defect the table
-  // above measures.
-  door.poly(doorSillPolygon(footprint, scale, DOOR_SILL_INSET + DOOR_SILL_STEP))
-  door.stroke({ width: 1 / scale, color: DOOR_RIM_LIT, alignment: 0.5, alpha: DOOR_RIM_ALPHA })
-  door.poly(doorSillPolygon(footprint, scale))
-  door.stroke({ width: 1 / scale, color: DOOR_RIM_INK, alignment: 0.5, alpha: DOOR_RIM_ALPHA })
-  door.position.set(0, 0)
-  // The 24 px floor is a SCREEN size, so the target is re-cut on a zoom change, not per frame.
-  const r = doorLocalRect(footprint, scale, zoom)
-  door.hitArea = new Rectangle(r.x, r.y, r.w, r.h)
+function cutHitPrism(entry: Entry, zoom = entry.hitZoom, scale = entry.sprite.scale.x || 1): void {
+  entry.hitZoom = zoom
+  const { w, h } = entry.footprint
+  entry.sprite.hitArea = new Polygon(
+    structureHitPoints(entry.kind, w, h, scale, zoom, entry.url !== NO_ART),
+  )
 }
 
 function drawPips(g: Graphics, filled: number): void {
@@ -305,19 +312,20 @@ export function syncEntities(
   if (sync === undefined) {
     sync = {
       entries: new Map(), lastAssetsSeq: store.assetsSeq(), onDoor: null,
-      doorZoom: scene.getZoom(),
+      hitZoom: scene.getZoom(),
     }
     syncStates.set(scene, sync)
-    // A door's 24 px floor is a SCREEN size, and task 75's 0.5 overview stop makes that floor
-    // live. Re-cut every target when the camera settles, not on a 2.5s world tick.
+    // The 24 px floor is a SCREEN size, and the 0.25 overview stop makes it live: a 1 × 1 shed
+    // is 64 world px across, 16 px there. Re-cut every prism when the camera settles, not on a
+    // 2.5 s world tick and not per frame.
     const cut = sync
     scene.onCamera(() => {
       const z = scene.getZoom()
-      if (z === cut.doorZoom) return
-      cut.doorZoom = z
-      for (const e of cut.entries.values()) {
-        if (e.door !== null) layoutDoor(e, z)
-      }
+      if (z === cut.hitZoom) return
+      cut.hitZoom = z
+      // Items and crops are in this map too and take Pixi's own sprite bounds; only a
+      // structure carries a prism.
+      for (const [key, e] of cut.entries) if (key.startsWith('structure:')) cutHitPrism(e, z)
     })
     // Publish the ground every structure, item and crop stands on. One owner sorts the whole
     // frame from these; nothing here writes a depth of its own.
@@ -336,7 +344,9 @@ export function syncEntities(
     sprite.eventMode = 'static'
     sprite.cursor = 'pointer'
     sprite.on('pointerover', () => {
-      const text = hoverLabel(store.getState(), kind, id)
+      const text = kind === 'structure'
+        ? structureHoverText(store.getState(), id)
+        : hoverLabel(store.getState(), kind, id)
       // the anchor comes from the sprite's DRAWN bounds — for a base-anchored 1.85× building
       // `sprite.y - sprite.height` landed above the roof and off nobody's screen in particular
       if (text !== null) tags.show('hover', text, anchorForSprite(sprite, sprite.getLocalBounds()))
@@ -355,17 +365,25 @@ export function syncEntities(
       sprite.anchor.set(0.5, 1.0) // bottom-center pinned to the ground point (manifest law)
       const sid = s.id
       nameOnHover(sprite, 'structure', sid)
+      // ONE TARGET, TWO MEANINGS, AND THE BUILDING DECIDES WHICH. A door you can walk through
+      // is the reason to click a house; everything else answers with its story. The hover tag
+      // says which one this click will do before it is made.
       sprite.on('pointertap', (e: FederatedPointerEvent) => {
+        if (entersOnClick(store.getState(), sid)) {
+          sync!.onDoor?.(sid)
+          return
+        }
         void provenanceText(sid, store.getState()).then((text) => showPopover(text, e.client.x, e.client.y))
       })
-      sprite.hitArea = new Polygon(footprintHitPoints(s.w, s.h))   // until the art sets its scale
       entry = {
-        sprite, url: '', pips: null, form: null, door: null,
-        footprint: { w: s.w, h: s.h }, doorZoom: sync.doorZoom, doorFill: DOOR_SILL_FILL_ALPHA,
+        sprite, url: '', pips: null, form: null, kind: s.kind,
+        footprint: { w: s.w, h: s.h }, hitZoom: sync.hitZoom,
         box: structureDepthBox(key, s),
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
+      // This is what cuts the prism — both of its branches do, and there is no frame between
+      // the sprite existing and the shape being right.
       applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h, s.facing), null, s, s.kind)
     }
     const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
@@ -390,47 +408,11 @@ export function syncEntities(
       }
     }
 
-    // THE DOOR IS PART OF THE BUILDING (U11, P9d repealed). As a CHILD of the building
-    // sprite it inherits its depth, so it can never paint over somebody standing in the
-    // doorway, and Pixi hit-tests children before parents, so it wins its own click without
-    // a priority table. It scales with the sprite, so it is re-cut for free when art swaps.
-    const enterable = s.stage === 'complete' && ENTERABLE_KINDS.has(s.kind)
-    if (enterable && entry.door === null) {
-      const door = new Graphics()
-      door.eventMode = 'static'
-      door.cursor = 'pointer'
-      const sid = s.id
-      const self = entry
-      const sw = s.w, sh = s.h
-      door.on('pointerover', (e: FederatedPointerEvent) => {
-        e.stopPropagation()   // one pointer names ONE thing: the door, not also its building
-        layoutDoor(self, self.doorZoom, DOOR_HOVER_FILL_ALPHA)
-        const name = hoverLabel(store.getState(), 'structure', sid)
-        const k = self.sprite.scale.x || 1
-        const r = doorLocalRect({ w: sw, h: sh }, k)
-        if (name !== null) {
-          tags.show('door', `Look inside — ${name}`, {
-            sx: self.sprite.x + (r.x + r.w / 2) * k, sy: self.sprite.y + (r.y + r.h) * k,
-            halfW: (r.w * k) / 2, topY: self.sprite.y + r.y * k,
-          })
-        }
-      })
-      door.on('pointerout', (e: FederatedPointerEvent) => {
-        e.stopPropagation()
-        layoutDoor(self, self.doorZoom, DOOR_SILL_FILL_ALPHA)
-        tags.hide('door')
-      })
-      door.on('pointertap', (e: FederatedPointerEvent) => {
-        e.stopPropagation()   // the building's provenance popover is a different question
-        sync!.onDoor?.(sid)
-      })
-      entry.door = door
-      entry.sprite.addChild(door)
-    }
-    if (entry.door !== null) {
-      entry.door.visible = enterable
+    // A building that has changed shape or kind is a building whose prism is out of date.
+    if (entry.footprint.w !== s.w || entry.footprint.h !== s.h || entry.kind !== s.kind) {
       entry.footprint = { w: s.w, h: s.h }
-      layoutDoor(entry, sync.doorZoom)
+      entry.kind = s.kind
+      cutHitPrism(entry, sync.hitZoom)
     }
   }
 
@@ -449,8 +431,8 @@ export function syncEntities(
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
       entry = {
-        sprite, url: '', pips: null, form: null, door: null,
-        footprint: { w: 1, h: 1 }, doorZoom: 1, doorFill: DOOR_SILL_FILL_ALPHA,
+        sprite, url: '', pips: null, form: null, kind: it.kind,
+        footprint: { w: 1, h: 1 }, hitZoom: 1,
         box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX),
       }
       sync.entries.set(key, entry)
@@ -480,8 +462,8 @@ export function syncEntities(
         if (text !== null) showPopover(text, e.client.x, e.client.y)
       })
       entry = {
-        sprite, url: '', pips: null, form: null, door: null,
-        footprint: { w: 1, h: 1 }, doorZoom: 1, doorFill: DOOR_SILL_FILL_ALPHA,
+        sprite, url: '', pips: null, form: null, kind: c.kind,
+        footprint: { w: 1, h: 1 }, hitZoom: 1,
         box: tileDepthBox(key, c.x, c.y),
       }
       sync.entries.set(key, entry)
