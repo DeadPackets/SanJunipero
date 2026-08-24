@@ -91,6 +91,16 @@ export function wallOfTile(t: Tile): WallKind | null {
 export const alongWall = (wall: WallKind, t: Tile): number =>
   wall === 'back-right' ? t.x : t.y
 
+/**
+ * A `placement: 'wall'` furnishing either STANDS at the foot of its wall — a hearth, a dresser:
+ * masonry or joinery that reaches the ground — or HANGS on the wall face above it, like a shelf
+ * or a lantern. The room hung all of them, which is what put a fireplace halfway up a wall.
+ *
+ * ★ HANDED BACK: `InteriorMeta` has no field for this, so the answer lives here as one table
+ * rather than being guessed per piece. It belongs in the library manifest beside `placement`.
+ */
+export const WALL_PIECES_THAT_STAND: ReadonlySet<string> = new Set(['hearth', 'dresser'])
+
 // ── THE PIECES, AND THE MAP THEY MAKE ────────────────────────────────────────────────────
 
 /** A furnishing placed on the room map. `size` is in INTERIOR TILES, which is what the library

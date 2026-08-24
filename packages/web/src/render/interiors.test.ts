@@ -4,8 +4,8 @@ import {
   type AssetRecord, type InteriorMeta, type LibraryItemManifest,
 } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
-import { TILE_H, TILE_W, tileToScreen } from './iso.js'
-import { SLOT_TILES, slotSpanCentre } from './roomShell.js'
+import { INTERIOR_TILE, interiorToScreen, slotToTile } from './interiorMap.js'
+import { tileSpanCentre } from './roomShell.js'
 import {
   BED_FOOTPRINT, CONTACT_SHADOW_ALPHA, FURNITURE_OCCUPANCY, INTERIOR_FADE_MS, INTERIOR_LAYOUTS,
   LIBRARY_TILE_PX, advanceInterior, bedSlots, contactShadow, furnishingDivisor, furnishingScale,
@@ -167,8 +167,10 @@ describe('bedSlots', () => {
     expect(Object.keys(slots).sort()).toEqual(['amara', 'yusuf'])
     expect(slots['amara']).not.toEqual(slots['yusuf'])
     // the bed sits at (2,1) and is 1×2, so its cells are (2,1) and (2,2)
-    expect(slots['amara']).toEqual({ x: 2, y: 1 })
-    expect(slots['yusuf']).toEqual({ x: 2, y: 2 })
+    // INTERIOR TILES now, not template slots: `slotToTile` puts slot (2,1) on tile (9,2) and
+    // the bed is 1x2, so the second sleeper takes the tile behind the first.
+    expect(slots['amara']).toEqual(slotToTile({ x: 2, y: 1 }))
+    expect(slots['yusuf']).toEqual({ x: 9, y: 3 })
   })
 
   it('maps nobody in a kind with no bed', () => {
@@ -253,13 +255,19 @@ const im = (over: Partial<InteriorMeta> = {}): InteriorMeta => ({
   slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['house'], ...over,
 })
 
+// The house, on the interior tile lattice — `slotToTile` is the boundary between what the
+// city template says (a 3x3 slot) and where the room actually puts it (a 12x6 tile map).
 const HOUSE_ITEMS = [
-  { kind: 'bed', slot: { x: 2, y: 1 }, meta: im({ slots: { w: 1, h: 2 }, isBed: true }) },
-  { kind: 'hearth', slot: { x: 0, y: 2 }, meta: im({ placement: 'wall', providesLight: true }) },
-  { kind: 'table', slot: { x: 1, y: 2 }, meta: im() },
-  { kind: 'chair', slot: { x: 1, y: 1 }, meta: im() },
-  { kind: 'rug', slot: { x: 0, y: 0 }, meta: im({ slots: { w: 1, h: 2 } }) },
+  { kind: 'bed', tile: slotToTile({ x: 2, y: 1 }), meta: im({ slots: { w: 1, h: 2 }, isBed: true }) },
+  { kind: 'hearth', tile: slotToTile({ x: 0, y: 2 }), meta: im({ placement: 'wall', providesLight: true }) },
+  { kind: 'table', tile: slotToTile({ x: 1, y: 2 }), meta: im() },
+  { kind: 'chair', tile: slotToTile({ x: 1, y: 1 }), meta: im() },
+  { kind: 'rug', tile: slotToTile({ x: 0, y: 0 }), meta: im({ slots: { w: 1, h: 2 } }) },
 ]
+const BED_ID = `bed:${slotToTile({ x: 2, y: 1 }).x},${slotToTile({ x: 2, y: 1 }).y}`
+const TABLE_ID = `table:${slotToTile({ x: 1, y: 2 }).x},${slotToTile({ x: 1, y: 2 }).y}`
+const CHAIR_ID = `chair:${slotToTile({ x: 1, y: 1 }).x},${slotToTile({ x: 1, y: 1 }).y}`
+const RUG_ID = `rug:${slotToTile({ x: 0, y: 0 }).x},${slotToTile({ x: 0, y: 0 }).y}`
 
 describe('occupancyOf — what standing "in" a thing means', () => {
   it('names the three ways a body meets a furnishing', () => {
@@ -282,16 +290,16 @@ describe('occupancyOf — what standing "in" a thing means', () => {
 })
 
 describe('interiorOrder — a sleeper is IN the bed', () => {
-  const sleeper = [{ id: 'amara', slot: { x: 2, y: 1 }, inside: 'bed:2,1' }]
+  const sleeper = [{ id: 'amara', tile: slotToTile({ x: 2, y: 1 }), inside: BED_ID }]
 
   it('splits an "in" furnishing into a back half and a front half, and nothing else', () => {
     const ids = interiorPieces(HOUSE_ITEMS, []).map((p) => p.id)
-    expect(ids).toContain('bed:2,1#back')
-    expect(ids).toContain('bed:2,1#front')
-    expect(ids).toContain('chair:1,1#back')
-    expect(ids).toContain('table:1,2')          // 'at' — one piece
-    expect(ids).toContain('rug:0,0')            // 'beside' — one piece
-    expect(ids).not.toContain('table:1,2#back')
+    expect(ids).toContain(`${BED_ID}#back`)
+    expect(ids).toContain(`${BED_ID}#front`)
+    expect(ids).toContain(`${CHAIR_ID}#back`)
+    expect(ids).toContain(TABLE_ID)             // 'at' — one piece
+    expect(ids).toContain(RUG_ID)               // 'beside' — one piece
+    expect(ids).not.toContain(`${TABLE_ID}#back`)
   })
 
   it('THE DEFECT, AS A TEST: the landed rule draws a sleeper ON TOP of the whole bed', () => {
@@ -308,18 +316,18 @@ describe('interiorOrder — a sleeper is IN the bed', () => {
 
   it('sorts the sleeper AFTER the bed’s back half and BEFORE its front half', () => {
     const order = interiorOrder(interiorPieces(HOUSE_ITEMS, sleeper))
-    const back = order.indexOf('bed:2,1#back')
+    const back = order.indexOf(`${BED_ID}#back`)
     const body = order.indexOf('amara')
-    const front = order.indexOf('bed:2,1#front')
+    const front = order.indexOf(`${BED_ID}#front`)
     expect(back).toBeGreaterThanOrEqual(0)
     expect(back).toBeLessThan(body)
     expect(body).toBeLessThan(front)
   })
 
   it('a body standing AT a table is behind it', () => {
-    const atTable = [{ id: 'yusuf', slot: { x: 1, y: 2 }, inside: 'table:1,2' }]
+    const atTable = [{ id: 'yusuf', tile: slotToTile({ x: 1, y: 2 }), inside: TABLE_ID }]
     const order = interiorOrder(interiorPieces(HOUSE_ITEMS, atTable))
-    expect(order.indexOf('yusuf')).toBeLessThan(order.indexOf('table:1,2'))
+    expect(order.indexOf('yusuf')).toBeLessThan(order.indexOf(TABLE_ID))
   })
 
   it('is deterministic — two calls agree, and arrival order does not matter', () => {
@@ -331,8 +339,8 @@ describe('interiorOrder — a sleeper is IN the bed', () => {
 
   it('two furnishings on the same diagonal settle by id, not by arrival', () => {
     const diag = [
-      { kind: 'crate', slot: { x: 2, y: 0 }, meta: im() },
-      { kind: 'barrel', slot: { x: 0, y: 2 }, meta: im() },
+      { kind: 'crate', tile: slotToTile({ x: 2, y: 0 }), meta: im() },
+      { kind: 'barrel', tile: slotToTile({ x: 0, y: 2 }), meta: im() },
     ]
     const one = interiorOrder(interiorPieces(diag, []))
     expect(interiorOrder(interiorPieces([...diag].reverse(), []))).toEqual(one)
@@ -346,32 +354,33 @@ describe('interiorOrder — a sleeper is IN the bed', () => {
 })
 
 describe('furniture stands on its own ground', () => {
-  // the landed rule was `slotToScreen(x, y) + TILE_H` for EVERYTHING, whatever its footprint
-  const landedFoot = (s: { x: number; y: number }): { sx: number; sy: number } => {
-    const p = tileToScreen(s.x * SLOT_TILES, s.y * SLOT_TILES)
-    return { sx: p.sx, sy: p.sy + TILE_H }
+  // the landed rule was the FIRST cell's centre for EVERYTHING, whatever its footprint
+  const landedFoot = (t: { x: number; y: number }): { sx: number; sy: number } => {
+    const p = interiorToScreen(t.x, t.y)
+    return { sx: p.sx, sy: p.sy + INTERIOR_TILE.h / 2 }
   }
 
-  it('THE DEFECT, AS A TEST: the landed foot is the FIRST slot’s centre, whatever the size', () => {
+  it('THE DEFECT, AS A TEST: the landed foot is the FIRST cell’s centre, whatever the size', () => {
+    const at = { x: 9, y: 2 }
     for (const size of [{ w: 1, h: 1 }, { w: 1, h: 2 }, { w: 2, h: 2 }]) {
-      expect(landedFoot({ x: 2, y: 1 })).toEqual(slotSpanCentre({ x: 2, y: 1 }, { w: 1, h: 1 }))
-      // …so anything bigger than one slot stood off its own ground, and by how much:
-      const off = slotSpanCentre({ x: 2, y: 1 }, size)
-      const d = Math.hypot(off.sx - landedFoot({ x: 2, y: 1 }).sx, off.sy - landedFoot({ x: 2, y: 1 }).sy)
+      expect(landedFoot(at)).toEqual(tileSpanCentre(at, { w: 1, h: 1 }))
+      // …so anything bigger than one tile stood off its own ground, and by how much:
+      const off = tileSpanCentre(at, size)
+      const d = Math.hypot(off.sx - landedFoot(at).sx, off.sy - landedFoot(at).sy)
       expect(d, `${size.w}x${size.h}`).toBe(size.w === 1 && size.h === 1 ? 0 : Math.hypot(
-        ((size.w - 1) - (size.h - 1)) * (SLOT_TILES * TILE_W / 4),
-        ((size.w - 1) + (size.h - 1)) * (SLOT_TILES * TILE_H / 4),
+        ((size.w - 1) - (size.h - 1)) * (INTERIOR_TILE.w / 4),
+        ((size.w - 1) + (size.h - 1)) * (INTERIOR_TILE.h / 4),
       ))
     }
-    // the house's bed is 1×2: 16 world px sideways and 8 down, before the room's own zoom
-    const bed = slotSpanCentre({ x: 2, y: 1 }, { w: 1, h: 2 })
-    expect(bed.sx - landedFoot({ x: 2, y: 1 }).sx).toBe(-SLOT_TILES * TILE_W / 4)
-    expect(bed.sy - landedFoot({ x: 2, y: 1 }).sy).toBe(SLOT_TILES * TILE_H / 4)
+    // the house's bed is 1x2: 32 px sideways and 16 down on the interior lattice
+    const bed = tileSpanCentre(at, { w: 1, h: 2 })
+    expect(bed.sx - landedFoot(at).sx).toBe(-INTERIOR_TILE.w / 4)
+    expect(bed.sy - landedFoot(at).sy).toBe(INTERIOR_TILE.h / 4)
   })
 
-  it('a one-slot piece is unchanged, so nothing that was already right has moved', () => {
-    for (const s of [{ x: 0, y: 0 }, { x: 1, y: 2 }, { x: 2, y: 2 }]) {
-      expect(slotSpanCentre(s, { w: 1, h: 1 })).toEqual(landedFoot(s))
+  it('a one-tile piece is unchanged, so nothing that was already right has moved', () => {
+    for (const t of [{ x: 0, y: 0 }, { x: 5, y: 4 }, { x: 9, y: 4 }]) {
+      expect(tileSpanCentre(t, { w: 1, h: 1 })).toEqual(landedFoot(t))
     }
   })
 })
@@ -383,31 +392,27 @@ describe('furniture stands on its own ground', () => {
 // against the size the art is actually authored at, not weakened to let a number through:
 // the factor is still ONE whole number for the whole room, it is now a divisor.
 describe('furnishingScale — one room, one scale', () => {
-  it('is the whole-number DIVISOR between the authored tile and the slot it lands on', () => {
-    expect(furnishingDivisor(SLOT_TILES)).toBe(2)
-    expect(Number.isInteger(furnishingDivisor(SLOT_TILES))).toBe(true)
-    expect(furnishingScale(SLOT_TILES)).toBe(1 / furnishingDivisor(SLOT_TILES))
-    // ON the slot's ground, not inside it and not over it — the art is authored for exactly
-    // this span, so "fits" and "fills" are the same claim now.
-    expect(LIBRARY_TILE_PX * furnishingScale(SLOT_TILES)).toBe(SLOT_TILES * TILE_W)
+  it('is the whole-number factor between the authored tile and the ground it lands on', () => {
+    expect(furnishingDivisor()).toBe(1)
+    expect(Number.isInteger(furnishingDivisor())).toBe(true)
+    expect(furnishingScale()).toBe(1 / furnishingDivisor())
+    // ON its ground, not inside it and not over it — the art is authored for exactly this
+    // span, so "fits" and "fills" are the same claim now, and no sampler invents a pixel.
+    expect(LIBRARY_TILE_PX * furnishingScale()).toBe(INTERIOR_TILE.w)
   })
 
   it('puts a bed within reach of the person lying in it', () => {
-    const CHAR_TARGET_PX = 52   // charAnim's own target, quoted so the mismatch is measured
-    const bed = LIBRARY_TILE_PX * furnishingScale(SLOT_TILES)
-    expect(24 / CHAR_TARGET_PX).toBeLessThan(0.5)              // the first mismatch: too small
-    expect(LIBRARY_TILE_PX * 2 / CHAR_TARGET_PX).toBeGreaterThan(4)  // the second: 4.00x oversized
-    expect(bed / CHAR_TARGET_PX).toBeGreaterThan(0.8)          // and after
-    expect(bed / CHAR_TARGET_PX).toBeLessThan(1.5)
+    const CHAR_TARGET_PX = 52   // charAnim's own target, in TOWN px
+    const bedTownPx = LIBRARY_TILE_PX * furnishingScale() / 4   // the interior is 4x the town
+    expect(24 / CHAR_TARGET_PX).toBeLessThan(0.5)               // the first mismatch: too small
+    expect(LIBRARY_TILE_PX * 2 / CHAR_TARGET_PX).toBeGreaterThan(4)  // the second: 4.00x over
+    expect(bedTownPx / CHAR_TARGET_PX).toBeGreaterThan(0.5)     // and after
+    expect(bedTownPx / CHAR_TARGET_PX).toBeLessThan(1.5)
   })
 
-  it('never inflates anything, however small the grid', () => {
-    expect(furnishingDivisor(1)).toBe(4)
-    expect(furnishingDivisor(0)).toBe(4)
-    for (const tiles of [0, 1, 2, 4, 8]) {
-      expect(Number.isInteger(furnishingDivisor(tiles))).toBe(true)
-      expect(furnishingScale(tiles)).toBeLessThanOrEqual(1)
-    }
+  it('never inflates anything', () => {
+    expect(furnishingScale()).toBeLessThanOrEqual(1)
+    expect(furnishingDivisor()).toBeGreaterThanOrEqual(1)
   })
 
   it('a rug lies on the floor; a bed stands on it', () => {

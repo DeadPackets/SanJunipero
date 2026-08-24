@@ -10,13 +10,17 @@ import {
   interiorOf, interiorOrder, interiorPieces, isFlat, roomPlan,
   type InteriorPhaseState, type PlacedBody, type RoomItem,
 } from './interiors.js'
+import {
+  INTERIOR_PX_SCALE, ROOM_TILES, WALL_PIECES_THAT_STAND, interiorPath, roomMapOf, standingTiles,
+  type MapPiece, type RoomMap, type Tile,
+} from './interiorMap.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 import { doorTileOf } from './entities.js'
 import type { ZoomStop } from './camera.js'
 import {
-  ROOM_SHELL_INK, ROOM_SHELL_PAINT, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES,
+  ROOM_SHELL_INK, ROOM_SHELL_PAINT, WALL_H_PX,
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorPolyOf, floorPools,
-  roomMaskPoly, roomOriginY, roomZoomFor, slotCentreScreen, slotSpanCentre, wallMount,
+  roomMaskPoly, roomOriginY, roomZoomFor, tileCentreScreen, tileSpanCentre, wallMount,
 } from './roomShell.js'
 
 // Palette-true: the room is cut from the same warm paper the chrome is (Style Bible §7).
@@ -29,11 +33,12 @@ export const INTERIOR_VEIL = 0x322b38
 export const INTERIOR_VEIL_ALPHA = 0.62
 export const INTERIOR_HEARTH_GLOW = ROOM_SHELL_PAINT.hearthPool
 
-export { ROOM_SLOTS, ROOM_ZOOM_CLOSE, ROOM_ZOOM_SHORT, SLOT_TILES, roomZoomFor } from './roomShell.js'
+export { ROOM_ZOOM, roomZoomFor } from './roomShell.js'
+export { ROOM_TILES } from './interiorMap.js'
 /** How far the room is lifted clear of the transport bar AT MOST — `roomOriginY` clamps it to
  *  the headroom the stage has, because a courtesy that pushes a wall off the top is not one. */
 export const ROOM_OFFSET_Y = 40
-export const HEARTH_GLOW_PX = 26
+export const HEARTH_GLOW_PX = 26 * INTERIOR_PX_SCALE
 export const PLACEHOLDER_URL = '/assets/placeholder/item.png'
 /** A hung piece is on the back plane, so it draws behind everything standing on the floor
  *  and in front of the wall itself — one depth, because a wall has no depth of its own. */
@@ -42,6 +47,10 @@ export const WALL_PIECE_Z = -1
 // Awake occupants stand where the room's life is: the hearth first, then the table, then
 // whatever else is furnished. Deterministic, so two viewers see the same room.
 const AWAKE_PREFERENCE = ['hearth', 'table', 'bench', 'chair', 'anvil', 'shelf'] as const
+/** Where a body goes when the room furnishes it nowhere to be: just inside the threshold. */
+const SPARE_TILE = { x: ROOM_TILES.w - 1, y: ROOM_TILES.h - 1 }
+/** How long a body takes to cross one interior tile. A step, not a glide. */
+export const WALK_MS_PER_TILE = 420
 
 type Sheet = { art: ReturnType<typeof characterArt>; texture: Texture | null }
 
@@ -74,7 +83,7 @@ export function createInteriorScene(
   // every prop: a hearth's glow is a child of its sprite and grew with the furniture scale
   // until it was painting a pale disc across the town.
   const roomMask = new Graphics()
-  roomMask.poly(roomMaskPoly(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES))
+  roomMask.poly(roomMaskPoly(ROOM_TILES, WALL_H_PX))
   roomMask.fill(0xffffff)
   room.addChild(roomMask)
   room.mask = roomMask
@@ -94,7 +103,7 @@ export function createInteriorScene(
   const floorLight = new Graphics()
   floorLight.zIndex = -2.25
   const floorMask = new Graphics()
-  floorMask.poly(floorPolyOf(ROOM_SLOTS, SLOT_TILES))
+  floorMask.poly(floorPolyOf(ROOM_TILES))
   floorMask.fill(0xffffff)
   floorLight.mask = floorMask
   const floorTop = new Graphics()
@@ -116,7 +125,12 @@ export function createInteriorScene(
   let plannedFor: string | null = null          // the kind the furniture map was built for
   let plannedSeq = -1
   let plan: RoomItem[] = []
-  let perches: Array<{ x: number; y: number }> = []
+  let map: RoomMap = roomMapOf([])
+  let lightKinds: ReadonlySet<string> = new Set()
+  let perches: Tile[] = []
+  /** Where each body is on the room map, and the tiles it still has to cross to get where it
+   *  is going. The engine has no interior position, so this is the renderer's own. */
+  const walking = new Map<string, { at: Tile; path: Tile[]; t: number }>()
   const changeCbs: Array<(id: string | null) => void> = []
 
   // A cut, not a fade, for a viewer who asked for less motion — the destination is the
@@ -129,11 +143,11 @@ export function createInteriorScene(
   // ART INDEPENDENCE, the interior's half. The floor takes a continuous material the moment
   // the codex holds one and reads as a palette-true plane until then — the same hot-swap law
   // the outdoor ground answers to, and the same reason a missing texture is never a hole.
-  const pools = (items: RoomItem[]): ReturnType<typeof floorPools> =>
-    floorPools(items.map((i) => ({ slot: i.slot, light: i.meta?.providesLight === true })), ROOM_SLOTS)
+  const pools = (m: RoomMap): ReturnType<typeof floorPools> =>
+    floorPools(m.pieces.map((p) => ({ tile: p.tile, light: lightKinds.has(p.kind) })), ROOM_TILES)
 
   let floorMaterial: string | null = null
-  function paintFloor(items: RoomItem[], records: AssetRecord[]): void {
+  function paintFloor(m: RoomMap, records: AssetRecord[]): void {
     const url = resolveMaterial(records, 'interior-floor')
     if (url === null) {
       floorMaterial = null
@@ -145,31 +159,39 @@ export function createInteriorScene(
         if (floorMaterial !== url || floorArt.destroyed) return
         t.source.addressMode = 'repeat'
         floorArt.clear()
-        floorArt.poly(floorPolyOf(ROOM_SLOTS, SLOT_TILES))
+        floorArt.poly(floorPolyOf(ROOM_TILES))
         floorArt.fill({ texture: t, matrix: materialMatrix('interior-floor', 0) })
         floorArt.visible = true
       })
     }
     floor.clear()
-    drawFloorBase(floor, ROOM_SLOTS, SLOT_TILES, url === null ? ROOM_SHELL_PAINT.floor : null)
+    drawFloorBase(floor, ROOM_TILES, url === null ? ROOM_SHELL_PAINT.floor : null)
     floorLight.clear()
-    drawFloorLight(floorLight, pools(items), ROOM_SLOTS, SLOT_TILES)
+    drawFloorLight(floorLight, pools(m), ROOM_TILES)
   }
 
-  drawWalls(walls, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-  drawFloorTop(floorTop, ROOM_SLOTS, SLOT_TILES)
-  paintFloor([], [])
+  drawWalls(walls, ROOM_TILES, WALL_H_PX)
+  drawFloorTop(floorTop, ROOM_TILES)
+  paintFloor(roomMapOf([]), [])
 
   function clearRoom(): void {
     for (const s of furniture.values()) s.destroy()
     furniture.clear()
     for (const s of bodies.values()) s.destroy()
     bodies.clear()
+    walking.clear()
     plannedFor = null
   }
 
   const onWall = (item: RoomItem): boolean => item.meta?.placement === 'wall'
   const sizeOf = (item: RoomItem): { w: number; h: number } => item.meta?.slots ?? { w: 1, h: 1 }
+
+  /** The room's furnishings as map pieces, in the plan's own order — index for index, so a
+   *  piece and the library record that draws it can never come apart. */
+  const mapOf = (items: RoomItem[]): RoomMap => roomMapOf(items.map((i) => ({
+    kind: i.kind, slot: i.slot, size: sizeOf(i),
+    placement: onWall(i) ? 'wall' : 'floor', flat: isFlat(i.kind),
+  })))
 
   /**
    * A furnishing a body lies IN is drawn as TWO sprites cut from ONE texture, split at its
@@ -191,21 +213,38 @@ export function createInteriorScene(
     if (half === 'back') sprite.position.y -= (f.height - cut) * sprite.scale.y
   }
 
-  function placeFurniture(items: RoomItem[]): void {
-    const floorItems = items.filter((i) => !onWall(i))
-    const byId = new Map(floorItems.map((i) => [furnishingId(i.kind, i.slot), i]))
+  /**
+   * ★ A WALL FURNISHING IS DRAWN ONCE, AND THE WALL DECIDES WHICH WAY IT FACES (task 84 §2).
+   *
+   * The landed room hung EVERY `placement: 'wall'` piece at eye height, on a wall chosen by
+   * `slot.x > slot.y`, with nothing anywhere saying which way the piece then faced. That is
+   * what put a fireplace halfway up a wall, and it is the same defect the mock showed as two
+   * fireplaces in one corner. Now: the wall is the one the piece's TILE is actually against,
+   * its facing is that wall's own (`WALL_FACING`, and the type has no third member), and a
+   * piece that reaches the ground STANDS at the foot of its wall instead of hanging over it.
+   */
+  function placeFurniture(m: RoomMap, items: RoomItem[]): void {
+    const onFloor: Array<{ piece: MapPiece; item: RoomItem }> = []
+    m.pieces.forEach((piece, i) => {
+      const item = items[i]
+      if (item === undefined) return
+      if (piece.placement !== 'wall' || WALL_PIECES_THAT_STAND.has(piece.kind)) {
+        onFloor.push({ piece, item })
+        return
+      }
+      const at = wallMount(piece.tile)
+      if (at === null) return          // a wall piece against no wall is a placement error
+      addPiece(furnishingId(piece.kind, piece.tile), item, null, at.sx, at.sy, WALL_PIECE_Z)
+    })
 
-    for (const item of items.filter(onWall)) {
-      // A wall piece now HANGS: `placement: 'wall'` used to mean a 0 px offset because there
-      // was nothing to hang it on. It mounts on the wall plane behind its slot, at eye height.
-      const at = wallMount(item.slot, ROOM_SLOTS, SLOT_TILES)
-      addPiece(furnishingId(item.kind, item.slot), item, null, at.sx, at.sy, WALL_PIECE_Z)
-    }
-
-    for (const p of interiorPieces(floorItems, [])) {
+    const placed = onFloor.map(({ piece, item }) =>
+      ({ kind: piece.kind, tile: piece.tile, meta: item.meta }))
+    const byId = new Map(onFloor.map(({ piece, item }) =>
+      [furnishingId(piece.kind, piece.tile), item]))
+    for (const p of interiorPieces(placed, [])) {
       const item = byId.get(p.half === null ? p.id : p.id.slice(0, p.id.indexOf('#')))
       if (item === undefined) continue
-      const foot = slotSpanCentre(item.slot, sizeOf(item), SLOT_TILES)
+      const foot = tileSpanCentre(p.tile, p.size)
       addPiece(p.id, item, p.half, foot.sx, foot.sy, 0)
     }
   }
@@ -219,7 +258,11 @@ export function createInteriorScene(
     // its texture, which is the near vertex of the ground it stands on.
     sprite.anchor.set(0.5, isFlat(item.kind) ? 0.5 : 1)
     sprite.eventMode = 'none'
-    sprite.scale.set(furnishingScale(SLOT_TILES))
+    // ★ NATIVE. `furnishingScale()` is 1 under Option C: the art is authored at exactly the
+    // span its footprint covers on the 128×64 interior tile and the scene zoom is 1, so
+    // nothing in this room is resampled on its way to the glass. It used to be 0.5 against a
+    // zoom of 4 — a composite of 2, i.e. every 128 px sprite pixel-doubled by the camera.
+    sprite.scale.set(furnishingScale())
     sprite.position.set(sx, sy)
     sprite.zIndex = z
     // ★ THE ROOM AND ITS FURNITURE ARRIVE IN THE SAME FRAME. `book.get(...).then(...)` alone
@@ -230,7 +273,7 @@ export function createInteriorScene(
     // `peek` closes it for a warm book; a cold one still takes the round trip and the fade.
     const url = item.url ?? PLACEHOLDER_URL
     const inHand = book.peek(url)
-    if (inHand !== null) applyHalf(sprite, inHand, half)   // native px; the room's zoom is the only scale
+    if (inHand !== null) applyHalf(sprite, inHand, half)   // native px; the room's zoom is 1
     else {
       void book.get(url).then((t) => {
         if (!sprite.destroyed) applyHalf(sprite, t, half)
@@ -274,7 +317,47 @@ export function createInteriorScene(
     return sheet
   }
 
-  function layoutRoom(): void {
+  /**
+   * ★ A BODY WALKS TO WHERE IT IS GOING, AND WALKS ROUND WHAT IS IN THE WAY.
+   *
+   * The engine has NO interior position — an agent indoors carries `insideId` and nothing else
+   * — so where a body stands in the room is the renderer's own truth, and this is not invented
+   * world behaviour: the room says which tile a body belongs on, and this is how it gets
+   * there. `interiorPath` is the four-neighbour law the town walks by, run over the room's
+   * blocked tiles, so a body crosses AROUND the table instead of through it.
+   */
+  function retarget(id: string, goal: Tile, m: RoomMap): void {
+    const w = walking.get(id)
+    if (w === undefined) {
+      walking.set(id, { at: goal, path: [], t: 0 })
+      return
+    }
+    const end = w.path.at(-1) ?? w.at
+    if (end.x === goal.x && end.y === goal.y) return
+    w.path = interiorPath(m, w.at, goal) ?? []
+    w.t = 0
+    if (w.path.length === 0) w.at = goal    // nowhere to walk to: be there
+  }
+
+  /** One step of the walk, in room space — where the body is drawn this frame. */
+  function advanceWalk(id: string, dtMs: number): { sx: number; sy: number } {
+    const w = walking.get(id)
+    if (w === undefined) return { sx: 0, sy: 0 }
+    const next = w.path[0]
+    if (next === undefined) return tileCentreScreen(w.at.x, w.at.y)
+    w.t = Math.min(1, w.t + dtMs / WALK_MS_PER_TILE)
+    const a = tileCentreScreen(w.at.x, w.at.y)
+    const b = tileCentreScreen(next.x, next.y)
+    if (w.t >= 1) {
+      w.at = next
+      w.path.shift()
+      w.t = 0
+      return b
+    }
+    return { sx: a.sx + (b.sx - a.sx) * w.t, sy: a.sy + (b.sy - a.sy) * w.t }
+  }
+
+  function layoutRoom(dtMs: number): void {
     const state = store.getState()
     if (activeId === null || state === null) return
     const room2 = interiorOf(state, activeId)
@@ -287,31 +370,38 @@ export function createInteriorScene(
       plannedFor = room2.kind
       plannedSeq = seq
       plan = roomPlan(room2.kind, records)
+      lightKinds = new Set(plan.filter((p) => p.meta?.providesLight === true).map((p) => p.kind))
+      map = mapOf(plan)
+      // ★ AN AWAKE BODY STANDS BESIDE THE THING IT IS USING, NOT ON IT. There is floor to stand
+      // on now, so "at the hearth" is a real tile a real body occupies.
       perches = AWAKE_PREFERENCE
-        .flatMap((kind) => plan.filter((p) => p.kind === kind))
-        .map((p) => p.slot)
-      placeFurniture(plan)
-      paintFloor(plan, records)   // the light on the floor is the room's own fires
+        .flatMap((kind) => map.pieces.filter((p) => p.kind === kind))
+        .flatMap((p) => standingTiles(map, p).slice(0, 1))
+      placeFurniture(map, plan)
+      paintFloor(map, records)   // the light on the floor is the room's own fires
     }
 
     const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true)
     const beds = bedSlots(room2.kind, sleeping, records)
-    const floorItems = plan.filter((i) => !onWall(i))
+    const standing = map.pieces.filter(
+      (p) => p.placement !== 'wall' || WALL_PIECES_THAT_STAND.has(p.kind))
     let awakeIdx = 0
 
     // Whom each body is with. A sleeper is IN the furnishing whose cells it was given; an
-    // awake body is AT its perch. `interiorPieces` turns that into where it stands.
+    // awake body is AT a tile BESIDE its perch, and walks there.
     const placed: PlacedBody[] = []
     const live = new Set(room2.occupants)
     for (const id of room2.occupants) {
       const agent = state.agents[id]
       if (agent === undefined) continue
       const asleep = agent.asleep
-      const own = asleep
-        ? beds[id] ?? { x: ROOM_SLOTS - 1, y: ROOM_SLOTS - 1 }
-        : perches[awakeIdx++ % Math.max(1, perches.length)] ?? { x: 1, y: 1 }
-      const host = floorItems.find((i) => hosts(i, own)) ?? null
-      placed.push({ id, slot: own, inside: host === null ? null : furnishingId(host.kind, host.slot) })
+      const goal = asleep
+        ? beds[id] ?? SPARE_TILE
+        : perches[awakeIdx++ % Math.max(1, perches.length)] ?? SPARE_TILE
+      retarget(id, goal, map)
+      const own = asleep ? goal : walking.get(id)?.at ?? goal
+      const host = standing.find((p) => hosts(p, own)) ?? null
+      placed.push({ id, tile: own, inside: host === null ? null : furnishingId(host.kind, host.tile) })
       const sprite = bodyFor(id)
       const sheet = sheetFor(id, records)
       if (sheet.texture !== null) {
@@ -319,14 +409,21 @@ export function createInteriorScene(
         if (cell !== null) {
           sprite.texture = cell.texture
           sprite.anchor.set(cell.anchor.x, cell.anchor.y)
-          sprite.scale.set(cell.scale)
+          // The town draws a body `CHAR_TARGET_PX` tall in TOWN px and the camera puts the zoom
+          // on top. The room's zoom is 1, so the interior pixel scale carries it — a body is
+          // exactly as tall indoors as it is out of doors at the town's deepest stop.
+          sprite.scale.set(cell.scale * INTERIOR_PX_SCALE)
         }
       }
     }
 
     // ONE painter's order for the room, from the same authority the town answers to. No
     // module invents a number, so a sleeper can no longer sit on top of the bed it is in.
-    const pieces = interiorPieces(floorItems, placed)
+    const items = standing.map((p) => ({
+      kind: p.kind, tile: p.tile,
+      meta: plan.find((i) => i.kind === p.kind)?.meta ?? null,
+    }))
+    const pieces = interiorPieces(items, placed)
     const index = new Map(interiorOrder(pieces).map((id, i) => [id, i]))
     shadows.clear()
     for (const p of pieces) {
@@ -334,7 +431,7 @@ export function createInteriorScene(
       if (node === undefined) continue
       node.zIndex = index.get(p.id) ?? 0
       if (p.kind === 'body') {
-        const foot = slotCentreScreen(p.slot.x, p.slot.y, SLOT_TILES)
+        const foot = advanceWalk(p.id, dtMs)
         node.position.set(foot.sx, foot.sy)
       }
       // A split furnishing casts ONE shadow, under its front half, not two; a flat one casts
@@ -345,7 +442,7 @@ export function createInteriorScene(
       // A body is anchored at its FEET, which already is the ground centre; a furnishing is
       // anchored at its texture's bottom, which is the near vertex of the ground it stands on.
       const foot = p.kind === 'body'
-        ? slotCentreScreen(p.slot.x, p.slot.y, SLOT_TILES)
+        ? { sx: node.position.x, sy: node.position.y }
         : { sx: node.position.x, sy: node.position.y - s.lift }
       shadows.ellipse(foot.sx, foot.sy, s.rx, s.ry)
       shadows.fill({ color: ROOM_SHELL_INK, alpha: s.alpha })
@@ -355,14 +452,14 @@ export function createInteriorScene(
       if (live.has(id)) continue
       sprite.destroy()
       bodies.delete(id)
+      walking.delete(id)
     }
   }
 
-  /** The furnishing a body at `slot` is with: the one whose footprint covers that slot. */
-  function hosts(item: RoomItem, slot: { x: number; y: number }): boolean {
-    const size = sizeOf(item)
-    return slot.x >= item.slot.x && slot.x < item.slot.x + size.w
-      && slot.y >= item.slot.y && slot.y < item.slot.y + size.h
+  /** The furnishing a body on `tile` is with: the one whose footprint covers that tile. */
+  function hosts(piece: MapPiece, tile: Tile): boolean {
+    return tile.x >= piece.tile.x && tile.x < piece.tile.x + piece.size.w
+      && tile.y >= piece.tile.y && tile.y < piece.tile.y + piece.size.h
   }
 
   // ★ A CARD APPEARING IS NOT GOING INSIDE. The veil used to rise over a town that never
@@ -413,8 +510,11 @@ export function createInteriorScene(
     }
   })
 
+  let lastTickMs = 0
   const tick = (): void => {
     const now = app.ticker.lastTime
+    const dtMs = lastTickMs === 0 ? 0 : Math.min(100, now - lastTickMs)
+    lastTickMs = now
     const entered = activeId !== null
     phase = reduced()
       ? { phase: entered ? 'inside' : 'town', sinceMs: now }
@@ -431,18 +531,19 @@ export function createInteriorScene(
     veil.clear()
     veil.rect(0, 0, app.screen.width, app.screen.height)
     veil.fill({ color: INTERIOR_VEIL, alpha: INTERIOR_VEIL_ALPHA })
-    // ★ AS CLOSE AS THIS STAGE CAN HOLD THE WHOLE ROOM — never a bare constant. At 4 a body
-    // is the height it is out of doors and library art doubles cleanly; at 3 it was 156 px
-    // against 208 and a 1.5x composite. `roomZoomFor` answers 3 on a stage too short for it.
+    // ★ NEVER A BARE CONSTANT. Option C has one integer scene zoom and it is 1: the interior
+    // tile is authored at the size it reaches the glass, so every other factor resamples pixel
+    // art. `roomZoomFor` is still asked, because the day the room has a second answer this is
+    // where it arrives.
     const zoom = roomZoomFor(app.screen.height)
     room.scale.set(zoom)
     // The whole box, walls included — centring the floor alone put the top of the walls off
     // the top of the stage, which is what the browser showed.
     room.position.set(
       app.screen.width / 2,
-      roomOriginY(app.screen.height, ROOM_OFFSET_Y, zoom, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES),
+      roomOriginY(app.screen.height, ROOM_OFFSET_Y, zoom, ROOM_TILES, WALL_H_PX),
     )
-    if (activeId !== null) layoutRoom()
+    if (activeId !== null) layoutRoom(dtMs)
   }
   app.ticker.add(tick)
 

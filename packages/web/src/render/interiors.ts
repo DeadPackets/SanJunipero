@@ -4,8 +4,7 @@ import {
 } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import { OVERLAP_RANK, depthOrder, type DepthBox } from './depth.js'
-import { TILE_H, TILE_W, tileToScreen } from './iso.js'
-import { SLOT_TILES } from './roomShell.js'
+import { INTERIOR_TILE, interiorToScreen, slotToTile } from './interiorMap.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 
 // The vocabulary is @sj/shared's (C13 interiorMeta.ts) — one source, so a kind added there
@@ -107,8 +106,9 @@ export function interiorOf(state: WorldState, structureId: string): Interior | n
   return { structure, kind: structure.kind, occupants, items }
 }
 
-// The C13 library's bed is one slot wide and two deep; a partnered pair (C9 §3 co_slept)
-// takes one cell each, and the third sleeper gets no cell rather than lying on someone.
+// The C13 library's bed is one interior tile wide and two deep; a partnered pair (C9 §3
+// co_slept) takes one cell each, and the third sleeper gets no cell rather than lying on
+// someone. The cells are INTERIOR TILES: `slotToTile` puts the template's slot on the map.
 export const BED_FOOTPRINT = { w: 1, h: 2 } as const
 
 function bedCells(kind: InteriorKind, records: AssetRecord[]): Array<{ x: number; y: number }> {
@@ -116,13 +116,15 @@ function bedCells(kind: InteriorKind, records: AssetRecord[]): Array<{ x: number
   for (const f of roomPlan(kind, records)) {
     if (f.meta === null ? f.kind !== 'bed' : f.meta.isBed !== true) continue
     const size = f.meta?.slots ?? BED_FOOTPRINT
+    const at = slotToTile(f.slot)
     for (let dy = 0; dy < size.h; dy++) {
-      for (let dx = 0; dx < size.w; dx++) cells.push({ x: f.slot.x + dx, y: f.slot.y + dy })
+      for (let dx = 0; dx < size.w; dx++) cells.push({ x: at.x + dx, y: at.y + dy })
     }
   }
   return cells
 }
 
+/** Which interior tile each sleeper lies in. */
 export function bedSlots(
   kind: InteriorKind, sleeping: string[], records: AssetRecord[] = [],
 ): Record<string, { x: number; y: number }> {
@@ -185,38 +187,33 @@ export function contactShadow(
   return { rx, ry, alpha: CONTACT_SHADOW_ALPHA, lift: ry }
 }
 
-export type Slot = { x: number; y: number }
-export type SlotSize = { w: number; h: number }
+/** A cell of the room grid. Since Option C that grid IS the 128x64 interior tile lattice
+ *  (`interiorMap.ROOM_TILES`), NOT the template's 3x3 slots — `slotToTile` is the boundary. */
+export type Tile = { x: number; y: number }
+export type TileSize = { w: number; h: number }
 
 /**
  * WHAT THE BROWSER CAUGHT: the room drew library furniture at NATIVE size while a body drew at
  * `CHAR_TARGET_PX`. A sleeper was three times the length of the bed he was in, and three 24 px
  * objects rattled around a 192 px floor — which is a large part of what "way too under
- * detailed" is looking at.
+ * detailed" is looking at. The fix at the time was a DIVISOR of 2 against a scene zoom of 4:
+ * a composite of 2.0, i.e. every 128 px sprite pixel-DOUBLED on its way to the glass.
  *
- * The room takes ONE integer factor for every furnishing: the largest that keeps the library's
- * biggest sprite inside a single slot's ground. Integer, because a fractional factor resamples
- * pixel art; one factor for the whole room, because two pieces must never disagree about how
- * big the room is.
- *
- * ★ AND IT WAS THE WRONG WAY ROUND. The rule above was written for 24 px art and multiplied it
- * UP; the library ships 128 px art now, authored against the 128×64 interior tile
- * (`assetResolution.INTERIOR_TILE`). Multiplied by 2 that is **256 px in a 64 px slot — 4.00×
- * oversized**, which the art lane measured and could not fix from its own tree.
- *
- * The factor is a DIVISOR, and it is derived rather than searched for: the art spans
- * `(w + h)` half-INTERIOR-tiles and the room lays the same footprint out over `(w + h)`
- * half-slots of `SLOT_TILES` town tiles, so the ratio is `128 / (SLOT_TILES · TILE_W)` = 2 and
- * it is the SAME whole number for every footprint — a bed and a bowl cannot disagree about how
- * big the room is. `drawScale.test.ts` proves that over five footprints.
+ * ★ OPTION C RETIRES THE DIVISOR, AND THAT IS THE POINT OF OPTION C. The room's unit is now
+ * the 128×64 INTERIOR tile the library already authors against, drawn at a scene zoom of 1.
+ * A footprint of `(w, h)` interior tiles covers `(w + h) × 64` px of ground and the art for it
+ * is authored at exactly `(w + h) × 64` px (`forge/assetResolution.nativeSizeFor`), so the
+ * factor is 1 for every footprint and NOTHING is resampled anywhere in the room. It is derived,
+ * not chosen: `LIBRARY_TILE_PX / INTERIOR_TILE.w`. `drawScale.test.ts` proves it over five
+ * footprints.
  */
 /** The tile the library authors against — `assetResolution.INTERIOR_TILE.w`. */
 export const LIBRARY_TILE_PX = 128
-export function furnishingDivisor(slotTiles: number): number {
-  return Math.max(1, Math.round(LIBRARY_TILE_PX / (Math.max(1, slotTiles) * TILE_W)))
+export function furnishingDivisor(): number {
+  return Math.max(1, Math.round(LIBRARY_TILE_PX / INTERIOR_TILE.w))
 }
-export function furnishingScale(slotTiles: number): number {
-  return 1 / furnishingDivisor(slotTiles)
+export function furnishingScale(): number {
+  return 1 / furnishingDivisor()
 }
 
 /** Furnishings that LIE on the floor rather than stand on it. A flat piece is anchored at the
@@ -229,20 +226,20 @@ export const isFlat = (kind: string): boolean => FLAT_FURNISHINGS.has(kind)
 export type RoomPiece = {
   id: string
   kind: 'furniture' | 'body'
-  slot: Slot
-  size: SlotSize
+  tile: Tile
+  size: TileSize
   /** which half of an 'in' furnishing this is; `null` for anything drawn whole */
   half: 'back' | 'front' | null
 }
 
-export const furnishingId = (kind: string, slot: Slot): string => `${kind}:${slot.x},${slot.y}`
+export const furnishingId = (kind: string, tile: Tile): string => `${kind}:${tile.x},${tile.y}`
 
-/** Broad phase only: how far a room sprite may rise above the ground it stands on, in slots.
- *  Generous on purpose — it decides whether two pieces CAN overlap, never who wins. */
-export const ROOM_SPRITE_RISE_SLOTS = 2
+/** Broad phase only: how far a room sprite may rise above the ground it stands on, in interior
+ *  tiles. Generous on purpose — it decides whether two pieces CAN overlap, never who wins. */
+export const ROOM_SPRITE_RISE_TILES = 3
 
-export type PlacedItem = { kind: string; slot: Slot; meta: InteriorMeta | null }
-export type PlacedBody = { id: string; slot: Slot; inside: string | null }
+export type PlacedItem = { kind: string; tile: Tile; meta: InteriorMeta | null }
+export type PlacedBody = { id: string; tile: Tile; inside: string | null }
 
 /**
  * Where a body actually stands, given what it is doing.
@@ -251,7 +248,7 @@ export type PlacedBody = { id: string; slot: Slot; inside: string | null }
  * inside it — so the body takes the slot BEHIND the furnishing, and the depth then falls out
  * of the geometry instead of out of a special case. Anything else stands where it stands.
  */
-export function occupantSlot(mode: OccupancyMode, own: Slot, at: Slot | null): Slot {
+export function occupantTile(mode: OccupancyMode, own: Tile, at: Tile | null): Tile {
   if (mode !== 'at' || at === null) return own
   return { x: at.x, y: Math.max(0, at.y - 1) }
 }
@@ -264,36 +261,36 @@ export function interiorPieces(
   const byId = new Map<string, PlacedItem>()
   for (const item of items) {
     const size = item.meta?.slots ?? { w: 1, h: 1 }
-    const id = furnishingId(item.kind, item.slot)
+    const id = furnishingId(item.kind, item.tile)
     byId.set(id, item)
     if (occupancyOf(item.kind) !== 'in') {
-      out.push({ id, kind: 'furniture', slot: item.slot, size, half: null })
+      out.push({ id, kind: 'furniture', tile: item.tile, size, half: null })
       continue
     }
     const halfH = size.h / 2
-    out.push({ id: `${id}#back`, kind: 'furniture', slot: item.slot, size: { w: size.w, h: halfH }, half: 'back' })
+    out.push({ id: `${id}#back`, kind: 'furniture', tile: item.tile, size: { w: size.w, h: halfH }, half: 'back' })
     out.push({
       id: `${id}#front`, kind: 'furniture',
-      slot: { x: item.slot.x, y: item.slot.y + halfH }, size: { w: size.w, h: halfH }, half: 'front',
+      tile: { x: item.tile.x, y: item.tile.y + halfH }, size: { w: size.w, h: halfH }, half: 'front',
     })
   }
   for (const b of bodies) {
     const host = b.inside === null ? undefined : byId.get(b.inside)
     const mode = host === undefined ? 'beside' : occupancyOf(host.kind)
-    const slot = occupantSlot(mode, b.slot, host?.slot ?? null)
-    out.push({ id: b.id, kind: 'body', slot, size: { w: 1, h: 1 }, half: null })
+    const tile = occupantTile(mode, b.tile, host?.tile ?? null)
+    out.push({ id: b.id, kind: 'body', tile, size: { w: 1, h: 1 }, half: null })
   }
   return out
 }
 
-/** A piece's box in SLOT space, plus a generous screen box for the broad phase. */
+/** A piece's box in TILE space, plus a generous screen box for the broad phase. */
 export function roomDepthBox(p: RoomPiece): DepthBox {
-  const x0 = p.slot.x, y0 = p.slot.y, x1 = p.slot.x + p.size.w, y1 = p.slot.y + p.size.h
-  const near = tileToScreen(x1 * SLOT_TILES, y1 * SLOT_TILES)
-  const far = tileToScreen(x0 * SLOT_TILES, y0 * SLOT_TILES)
-  const east = tileToScreen(x1 * SLOT_TILES, y0 * SLOT_TILES)
-  const west = tileToScreen(x0 * SLOT_TILES, y1 * SLOT_TILES)
-  const rise = ROOM_SPRITE_RISE_SLOTS * SLOT_TILES * TILE_W
+  const x0 = p.tile.x, y0 = p.tile.y, x1 = p.tile.x + p.size.w, y1 = p.tile.y + p.size.h
+  const near = interiorToScreen(x1, y1)
+  const far = interiorToScreen(x0, y0)
+  const east = interiorToScreen(x1, y0)
+  const west = interiorToScreen(x0, y1)
+  const rise = ROOM_SPRITE_RISE_TILES * INTERIOR_TILE.w
   return {
     id: p.id,
     rank: p.kind === 'body' ? OVERLAP_RANK.body : OVERLAP_RANK.structure,
@@ -303,7 +300,7 @@ export function roomDepthBox(p: RoomPiece): DepthBox {
 }
 
 /** Painter's order for the room, back to front, as piece ids. The town's authority, applied
- *  to slot space — one depth rule for the whole product, not two. */
+ *  to the interior tile lattice — one depth rule for the whole product, not two. */
 export function interiorOrder(pieces: readonly RoomPiece[]): string[] {
   return depthOrder(pieces.map(roomDepthBox))
 }

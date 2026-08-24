@@ -25,7 +25,7 @@ import { ROAD_GROUND_LUMA_DELTA_MIN, LATTICE_PEAK_MAX, latticePeak, luma, roadRe
 import { TILE_COLORS } from './ground.js'
 import { patchOutline } from './patches.js'
 import { FURNITURE_OCCUPANCY, INTERIOR_LAYOUTS, occupancyOf, roomFurnishings } from './interiors.js'
-import { ROOM_SLOTS, SLOT_TILES, WALL_H_TILES, wallPolys } from './roomShell.js'
+import { ROOM_TILES, WALL_H_PX, wallPolys } from './roomShell.js'
 import {
   OVERLAP_RANK, bodyDepthBox, depthOrder, structureDepthBox, tileDepthBox, type DepthBox,
 } from './depth.js'
@@ -95,7 +95,7 @@ describe('U3 — "it just looks like chaos… no genuine structure"', () => {
 
 describe('U4 — "interiors are way too low quality, way too under detailed" — OPEN', () => {
   it('has the room shell the code-painted polygon can draw', () => {
-    const polys = wallPolys(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+    const polys = wallPolys(ROOM_TILES, WALL_H_PX)
     expect(Object.keys(polys).length).toBeGreaterThanOrEqual(2)
     for (const [kind, poly] of Object.entries(polys)) {
       expect(poly.length, kind).toBeGreaterThanOrEqual(6)

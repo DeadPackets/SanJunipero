@@ -1,15 +1,17 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import { furnishingScale } from './interiors.js'
 import { ZOOM_SCALE_MAX } from './camera.js'
 import {
+  INTERIOR_PX_SCALE, INTERIOR_TILE, ROOM_TILES, WALL_FACING, WALL_H_PX, WALL_KINDS,
+  interiorToScreen,
+} from './interiorMap.js'
+import {
   DOORWAY_POOL_ALPHA, HEARTH_POOL_ALPHA, ROOM_MARGIN_Y, ROOM_SHELL_INK, ROOM_SHELL_PAINT,
-  ROOM_SLOTS, ROOM_ZOOM_CLOSE, ROOM_ZOOM_SHORT, SLOT_TILES, WALL_H_TILES, WALL_KINDS,
-  WALL_MOUNT_H_TILES,
+  ROOM_ZOOM, WALL_MOUNT_H_PX,
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorBoards, floorPolyOf, floorPools,
-  roomBox, roomMaskPoly, roomOriginY, roomZoomFor, skirtingPolys, slotCentreScreen,
+  roomBox, roomCropPx, roomMaskPoly, roomOriginY, roomZoomFor, skirtingPolys, tileCentreScreen,
   thresholdPoly, wallCourses, wallMount, wallPolys, type ShellPainter,
 } from './roomShell.js'
 
@@ -59,7 +61,7 @@ const luma = (rgb: number): number => {
 
 describe('roomShell — the two back walls', () => {
   it('returns exactly two closed quads, one per WALL_KIND', () => {
-    const w = wallPolys(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+    const w = wallPolys()
     expect(Object.keys(w).sort()).toEqual([...WALL_KINDS].sort())
     for (const kind of WALL_KINDS) {
       expect(w[kind], kind).toHaveLength(8)          // four points, closed by construction
@@ -68,34 +70,38 @@ describe('roomShell — the two back walls', () => {
   })
 
   it('the pair shares exactly one edge — the room’s far vertical column', () => {
-    const w = wallPolys(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+    const w = wallPolys()
     const shared = edges(w['back-left']).filter((e) => edges(w['back-right']).includes(e))
     expect(shared).toHaveLength(1)
-    // the far vertex (0,0) rising by WALL_H_TILES tiles of height
-    expect(shared[0]).toBe(edgeKey([0, -WALL_H_TILES * TILE_W], [0, 0]))
+    // the far vertex (0,0) rising by the wall's own authored height, in interior px
+    expect(shared[0]).toBe(edgeKey([0, -WALL_H_PX], [0, 0]))
   })
 
   it('neither wall covers the floor — the floor’s centroid is outside both', () => {
-    const w = wallPolys(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-    const floor = pts(floorPolyOf(ROOM_SLOTS, SLOT_TILES))
+    const w = wallPolys()
+    const floor = pts(floorPolyOf())
     const cx = floor.reduce((s, p) => s + p[0], 0) / floor.length
     const cy = floor.reduce((s, p) => s + p[1], 0) / floor.length
-    expect([cx, cy]).toEqual([0, (ROOM_SLOTS * SLOT_TILES * TILE_H) / 2])
+    // the centroid of the 12x6 diamond — off the origin's column, because the room is not square
+    expect([cx, cy]).toEqual([
+      ((ROOM_TILES.w - ROOM_TILES.h) * INTERIOR_TILE.w) / 4,
+      ((ROOM_TILES.w + ROOM_TILES.h) * INTERIOR_TILE.h) / 4,
+    ])
     for (const kind of WALL_KINDS) expect(pointInPoly(w[kind], cx, cy), kind).toBe(false)
   })
 
   it('the walls rise BEHIND the floor: every wall point is at or above the floor’s far edges', () => {
-    const w = wallPolys(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-    const near = tileToScreen(ROOM_SLOTS * SLOT_TILES, ROOM_SLOTS * SLOT_TILES)
+    const w = wallPolys()
+    const near = interiorToScreen(ROOM_TILES.w, ROOM_TILES.h)
     for (const kind of WALL_KINDS) {
       for (const [, y] of pts(w[kind])) expect(y, kind).toBeLessThan(near.sy)
     }
   })
 
   it('courses and skirting are cut from the wall they belong to', () => {
-    const w = wallPolys(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-    const courses = wallCourses(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-    const skirt = skirtingPolys(ROOM_SLOTS, SLOT_TILES)
+    const w = wallPolys()
+    const courses = wallCourses()
+    const skirt = skirtingPolys()
     for (const kind of WALL_KINDS) {
       expect(courses[kind].length, kind).toBeGreaterThan(2)
       for (const [x0, y0, x1, y1] of courses[kind]) {
@@ -111,37 +117,56 @@ describe('roomShell — the two back walls', () => {
   })
 })
 
-describe('roomShell — where a wall piece hangs', () => {
-  it('the far-left slots hang on back-left and the far-right slots on back-right', () => {
-    expect(wallMount({ x: 0, y: 0 }, ROOM_SLOTS).wall).toBe('back-left')
-    expect(wallMount({ x: 0, y: 2 }, ROOM_SLOTS).wall).toBe('back-left')
-    expect(wallMount({ x: 2, y: 0 }, ROOM_SLOTS).wall).toBe('back-right')
-    expect(wallMount({ x: 1, y: 0 }, ROOM_SLOTS).wall).toBe('back-right')
+// ★ TASK 84 §2 — THE TWO FIREPLACES. A wall piece used to be sent to a wall by
+// `slot.x > slot.y`, from a slot that need not touch a wall at all, with nothing saying which
+// way the piece then faced. The wall is now the one the TILE is against, the facing is that
+// wall's own, and a tile against no wall gets no mount instead of an arbitrary one.
+describe('roomShell — where a wall piece hangs, and which way it then faces', () => {
+  it('a tile on the x=0 column takes back-left; a tile on the y=0 row takes back-right', () => {
+    expect(wallMount({ x: 0, y: 4 })!.wall).toBe('back-left')
+    expect(wallMount({ x: 0, y: 2 })!.wall).toBe('back-left')
+    expect(wallMount({ x: 9, y: 0 })!.wall).toBe('back-right')
+    expect(wallMount({ x: 1, y: 0 })!.wall).toBe('back-right')
   })
 
-  it('a mount is at eye height ABOVE the floor’s far edge, and on its own wall plane', () => {
-    const w = wallPolys(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-    for (const slot of [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 0, y: 2 }, { x: 1, y: 1 }]) {
-      const m = wallMount(slot, ROOM_SLOTS)
+  it('★ a tile against NO wall gets no mount — a placement error, not a guess', () => {
+    expect(wallMount({ x: 5, y: 3 })).toBeNull()
+    expect(wallMount({ x: 1, y: 1 })).toBeNull()
+  })
+
+  it('★ and the wall it lands on has exactly one facing, SW or SE, never NE or NW', () => {
+    for (const tile of [{ x: 0, y: 4 }, { x: 9, y: 0 }]) {
+      const m = wallMount(tile)!
+      expect(['sw', 'se']).toContain(WALL_FACING[m.wall])
+    }
+    expect(WALL_FACING['back-left']).toBe('se')
+    expect(WALL_FACING['back-right']).toBe('sw')
+  })
+
+  it('a mount is above the floor’s far edge, and on its own wall plane', () => {
+    const w = wallPolys()
+    for (const tile of [{ x: 0, y: 0 }, { x: 9, y: 0 }, { x: 0, y: 4 }]) {
+      const m = wallMount(tile)!
+      const along = (m.wall === 'back-right' ? tile.x : tile.y) + 0.5
       const base = m.wall === 'back-right'
-        ? tileToScreen((slot.x + 0.5) * SLOT_TILES, 0)
-        : tileToScreen(0, (slot.y + 0.5) * SLOT_TILES)
+        ? interiorToScreen(along, 0)
+        : interiorToScreen(0, along)
       expect(m.sx).toBeCloseTo(base.sx, 6)
-      expect(m.sy).toBeCloseTo(base.sy - WALL_MOUNT_H_TILES * TILE_W, 6)
+      expect(m.sy).toBeCloseTo(base.sy - WALL_MOUNT_H_PX, 6)
       expect(m.sy).toBeLessThan(base.sy)                      // above the far edge
       expect(pointInPoly(w[m.wall], m.sx, m.sy)).toBe(true)   // on the plane it hangs from
     }
   })
 
   it('is pure: two calls agree', () => {
-    expect(wallMount({ x: 1, y: 2 }, ROOM_SLOTS)).toEqual(wallMount({ x: 1, y: 2 }, ROOM_SLOTS))
+    expect(wallMount({ x: 0, y: 2 })).toEqual(wallMount({ x: 0, y: 2 }))
   })
 })
 
 describe('roomShell — the threshold', () => {
   it('sits on the NEAR face, centred on the floor’s near vertex', () => {
-    const t = thresholdPoly(ROOM_SLOTS, SLOT_TILES)
-    const near = tileToScreen(ROOM_SLOTS * SLOT_TILES, ROOM_SLOTS * SLOT_TILES)
+    const t = thresholdPoly()
+    const near = interiorToScreen(ROOM_TILES.w, ROOM_TILES.h)
     const p = pts(t)
     const cx = p.reduce((s, q) => s + q[0], 0) / p.length
     const cy = p.reduce((s, q) => s + q[1], 0) / p.length
@@ -153,8 +178,8 @@ describe('roomShell — the threshold', () => {
   })
 
   it('is the only gap: it lies on the near half, never against a back wall', () => {
-    const w = wallPolys(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-    for (const [x, y] of pts(thresholdPoly(ROOM_SLOTS, SLOT_TILES))) {
+    const w = wallPolys()
+    for (const [x, y] of pts(thresholdPoly())) {
       for (const kind of WALL_KINDS) expect(pointInPoly(w[kind], x, y), kind).toBe(false)
     }
   })
@@ -162,30 +187,30 @@ describe('roomShell — the threshold', () => {
 
 describe('roomShell — light on the floor', () => {
   const lit = [
-    { slot: { x: 0, y: 2 }, light: true },
-    { slot: { x: 1, y: 2 }, light: false },
-    { slot: { x: 2, y: 1 }, light: true },
+    { tile: { x: 0, y: 4 }, light: true },
+    { tile: { x: 5, y: 4 }, light: false },
+    { tile: { x: 9, y: 2 }, light: true },
   ]
 
   it('one pool per light source, plus exactly one doorway pool', () => {
-    expect(floorPools(lit, ROOM_SLOTS)).toHaveLength(3)
-    const dark = floorPools([{ slot: { x: 1, y: 1 }, light: false }], ROOM_SLOTS)
+    expect(floorPools(lit)).toHaveLength(3)
+    const dark = floorPools([{ tile: { x: 5, y: 2 }, light: false }])
     expect(dark).toHaveLength(1)                                  // the doorway, and nothing else
     expect(dark[0]!.alpha).toBe(DOORWAY_POOL_ALPHA)
-    expect(floorPools([], ROOM_SLOTS)).toHaveLength(1)
+    expect(floorPools([])).toHaveLength(1)
   })
 
-  it('the doorway pool is at the near vertex; a hearth pool is at its own slot', () => {
-    const pools = floorPools(lit, ROOM_SLOTS)
-    const near = tileToScreen(ROOM_SLOTS * SLOT_TILES, ROOM_SLOTS * SLOT_TILES)
+  it('the doorway pool is at the near vertex; a hearth pool is at its own tile', () => {
+    const pools = floorPools(lit)
+    const near = interiorToScreen(ROOM_TILES.w, ROOM_TILES.h)
     expect([pools[0]!.sx, pools[0]!.sy]).toEqual([near.sx, near.sy])
-    const hearth = slotCentreScreen(0, 2)
+    const hearth = tileCentreScreen(0, 4)
     expect([pools[1]!.sx, pools[1]!.sy]).toEqual([hearth.sx, hearth.sy])
     expect(pools[1]!.alpha).toBe(HEARTH_POOL_ALPHA)
   })
 
   it('no pool is brighter than a hearth, and every radius is positive', () => {
-    for (const p of floorPools(lit, ROOM_SLOTS)) {
+    for (const p of floorPools(lit)) {
       expect(p.alpha).toBeLessThanOrEqual(HEARTH_POOL_ALPHA)
       expect(p.alpha).toBeGreaterThan(0)
       expect(p.radius).toBeGreaterThan(0)
@@ -193,15 +218,15 @@ describe('roomShell — light on the floor', () => {
   })
 
   it('is pure and deterministic', () => {
-    expect(floorPools(lit, ROOM_SLOTS)).toEqual(floorPools(lit, ROOM_SLOTS))
+    expect(floorPools(lit)).toEqual(floorPools(lit))
   })
 })
 
 describe('roomShell — the floor is a surface, not a card', () => {
   it('board seams run the length of the floor and stay inside it', () => {
-    const floor = floorPolyOf(ROOM_SLOTS, SLOT_TILES)
-    const boards = floorBoards(ROOM_SLOTS, SLOT_TILES)
-    expect(boards.length).toBeGreaterThanOrEqual(ROOM_SLOTS * SLOT_TILES - 1)
+    const floor = floorPolyOf()
+    const boards = floorBoards()
+    expect(boards.length).toBeGreaterThanOrEqual(ROOM_TILES.h - 1)
     for (const [x0, y0, x1, y1] of boards) {
       const mx = (x0 + x1) / 2, my = (y0 + y1) / 2
       expect(pointInPoly(floor, mx, my)).toBe(true)
@@ -227,7 +252,7 @@ describe('roomShell — what the painter is asked to draw', () => {
 
   it('drawWalls fills both planes, grains them and rims them in ink', () => {
     const { ops, g } = recorder()
-    drawWalls(g, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+    drawWalls(g)
     const fills = ops.filter((o) => o.op === 'fill').map((o) => o.arg)
     expect(fills).toContain(ROOM_SHELL_PAINT.wallLit)
     expect(fills).toContain(ROOM_SHELL_PAINT.wallShade)
@@ -239,8 +264,8 @@ describe('roomShell — what the painter is asked to draw', () => {
 
   it('drawFloorLight draws one ellipse per pool, then the threshold over them', () => {
     const { ops, g } = recorder()
-    const pools = floorPools([{ slot: { x: 0, y: 2 }, light: true }], ROOM_SLOTS)
-    drawFloorLight(g, pools, ROOM_SLOTS, SLOT_TILES)
+    const pools = floorPools([{ tile: { x: 0, y: 4 }, light: true }])
+    drawFloorLight(g, pools)
     const ellipses = ops.filter((o) => o.op === 'ellipse')
     expect(ellipses).toHaveLength(2)
     for (const e of ellipses) {
@@ -258,18 +283,18 @@ describe('roomShell — what the painter is asked to draw', () => {
   // and the threshold hung below the floor like a tab. Both straddle the near vertex BY
   // CONSTRUCTION, which is why one masked node holds them — and why that is now an assertion.
   it('both the doorway pool and the threshold overflow the floor, so both must be masked', () => {
-    const floor = floorPolyOf(ROOM_SLOTS, SLOT_TILES)
-    const p = floorPools([], ROOM_SLOTS)[0]!
+    const floor = floorPolyOf()
+    const p = floorPools([])[0]!
     expect(pointInPoly(floor, p.sx, p.sy + p.radius / 2)).toBe(false)
-    expect(p.radius).toBeGreaterThan((ROOM_SLOTS * SLOT_TILES * TILE_W) / 4)
-    const t = pts(thresholdPoly(ROOM_SLOTS, SLOT_TILES))
+    expect(p.radius).toBeGreaterThan(INTERIOR_TILE.w)
+    const t = pts(thresholdPoly())
     expect(t.some(([x, y]) => !pointInPoly(floor, x, y))).toBe(true)
   })
 
   it('drawFloorBase with a material under it skips its own fill and nothing else', () => {
     const flat = recorder(), material = recorder()
-    drawFloorBase(flat.g, ROOM_SLOTS, SLOT_TILES)
-    drawFloorBase(material.g, ROOM_SLOTS, SLOT_TILES, null)
+    drawFloorBase(flat.g)
+    drawFloorBase(material.g, ROOM_TILES, null)
     expect(flat.ops.length - material.ops.length).toBe(2)   // one poly, one fill
     expect(flat.ops.filter((o) => o.op === 'fill').map((o) => o.arg))
       .toContain(ROOM_SHELL_PAINT.floor)
@@ -279,7 +304,7 @@ describe('roomShell — what the painter is asked to draw', () => {
 
   it('drawFloorTop closes the plane in ink and nothing else', () => {
     const { ops, g } = recorder()
-    drawFloorTop(g, ROOM_SLOTS, SLOT_TILES)
+    drawFloorTop(g)
     expect(ops.filter((o) => o.op === 'fill')).toHaveLength(0)
     const rim = ops.filter(
       (o) => o.op === 'stroke' && (o.arg as { color: number }).color === ROOM_SHELL_INK,
@@ -291,106 +316,109 @@ describe('roomShell — what the painter is asked to draw', () => {
 // WHAT THE BROWSER CAUGHT: a hearth's glow is a child of its sprite, so it grew with the
 // furniture scale and painted a pale disc across the town OUTSIDE the room.
 describe('roomShell — the room is a closed box', () => {
-  const mask = roomMaskPoly(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+  const mask = roomMaskPoly()
 
   it('is the union of both walls and the floor, and holds every point of all three', () => {
     expect(mask).toHaveLength(12)              // a hexagon
-    const walls = wallPolys(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+    const walls = wallPolys()
     const inside = (x: number, y: number): boolean =>
       pointInPoly(mask, x, y) || pts(mask).some(([mx, my]) => mx === x && my === y)
     for (const kind of WALL_KINDS) {
       for (const [x, y] of pts(walls[kind])) expect(inside(x, y), `${kind} ${x},${y}`).toBe(true)
     }
-    for (const [x, y] of pts(floorPolyOf(ROOM_SLOTS, SLOT_TILES))) expect(inside(x, y)).toBe(true)
+    for (const [x, y] of pts(floorPolyOf())) expect(inside(x, y)).toBe(true)
   })
 
   it('excludes the space a spilling light would reach', () => {
-    const near = tileToScreen(ROOM_SLOTS * SLOT_TILES, ROOM_SLOTS * SLOT_TILES)
+    const near = interiorToScreen(ROOM_TILES.w, ROOM_TILES.h)
     expect(pointInPoly(mask, 0, near.sy + 200)).toBe(false)
-    expect(pointInPoly(mask, -600, 0)).toBe(false)
-    expect(pointInPoly(mask, 0, -WALL_H_TILES * TILE_W - 50)).toBe(false)
+    expect(pointInPoly(mask, -2000, 0)).toBe(false)
+    expect(pointInPoly(mask, 0, -WALL_H_PX - 50)).toBe(false)
   })
 })
 
 // WHAT THE BROWSER CAUGHT: the landed camera centred the FLOOR. Walls doubled the height of
 // the drawn box, so the top of the room was cut off by the top of the stage.
 describe('roomShell — the room fits the stage', () => {
-  const STAGE_H = 737, ZOOM = 3, OFFSET = 40
+  const OFFSET = 40
 
   it('the box is the walls plus the floor, not the floor alone', () => {
-    const box = roomBox(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-    expect(box.top).toBe(-WALL_H_TILES * TILE_W)
-    expect(box.bottom).toBe(ROOM_SLOTS * SLOT_TILES * TILE_H)
-    expect(box.height).toBe(WALL_H_TILES * TILE_W + ROOM_SLOTS * SLOT_TILES * TILE_H)
+    const box = roomBox()
+    expect(box.top).toBe(-WALL_H_PX)
+    expect(box.bottom).toBe(((ROOM_TILES.w + ROOM_TILES.h) * INTERIOR_TILE.h) / 2)
+    expect(box.height).toBe(WALL_H_PX + ((ROOM_TILES.w + ROOM_TILES.h) * INTERIOR_TILE.h) / 2)
+    expect(box.height).toBe(736)   // 160 px of wall over an 18-half-tile floor
   })
 
   it('centring the whole box keeps every wall point on the stage', () => {
-    const y = roomOriginY(STAGE_H, OFFSET, ZOOM, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-    const box = roomBox(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-    expect(y + box.top * ZOOM).toBeGreaterThan(0)
-    expect(y + box.bottom * ZOOM).toBeLessThan(STAGE_H)
+    const STAGE_H = 900
+    const y = roomOriginY(STAGE_H, OFFSET, ROOM_ZOOM)
+    const box = roomBox()
+    expect(y + box.top * ROOM_ZOOM).toBeGreaterThan(0)
+    expect(y + box.bottom * ROOM_ZOOM).toBeLessThan(STAGE_H)
     // the landed rule centred the floor only, and put the wall top off the top of the stage
-    const landed = STAGE_H / 2 - OFFSET - ((ROOM_SLOTS * SLOT_TILES * TILE_H) / 2) * ZOOM
-    expect(landed + box.top * ZOOM).toBeLessThan(0)
+    const landed = STAGE_H / 2 - OFFSET - (box.bottom / 2) * ROOM_ZOOM
+    expect(landed + box.top * ROOM_ZOOM).toBeLessThan(0)
   })
 
-  // ★ THE SAME INVARIANT, TOTALLY: at the zoom the stage itself chooses, over every stage a
-  // viewer could have. The landed test above asserts it at ONE pair of numbers, which is how
-  // a 40 px lift that spends more headroom than a stage has could sit there unnoticed.
-  it('★ the whole box is on the stage at every height from 600 to 1600, at the chosen zoom', () => {
-    const box = roomBox(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+  // ★ THE SAME INVARIANT, TOTALLY: over every stage a viewer could have. The landed test
+  // asserted it at ONE pair of numbers, which is how a 40 px lift that spends more headroom
+  // than a stage has could sit there unnoticed.
+  it('★ the whole box is on the stage at every height that can hold it, 600 to 1600', () => {
+    const box = roomBox()
     for (let h = 600; h <= 1600; h += 1) {
-      const z = roomZoomFor(h, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-      const y = roomOriginY(h, OFFSET, z, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-      // A stage too short for even the short zoom clips, exactly as it always has. The skip
-      // is measured against ROOM_ZOOM_SHORT and never against the zoom under test, or a zoom
-      // that ignored the stage would excuse itself from this check (mutation M9).
-      if (box.height * ROOM_ZOOM_SHORT + 2 * ROOM_MARGIN_Y > h) continue
-      expect(y + box.top * z, `wall top off the stage at ${h} px, zoom ${z}`).toBeGreaterThanOrEqual(ROOM_MARGIN_Y)
-      expect(y + box.bottom * z, `floor off the stage at ${h} px, zoom ${z}`).toBeLessThanOrEqual(h - ROOM_MARGIN_Y)
+      const z = roomZoomFor(h)
+      const y = roomOriginY(h, OFFSET, z)
+      // A stage too short for the one zoom there is crops, and says by how much. The skip is
+      // measured against `roomCropPx` and never against the zoom under test, or a zoom that
+      // ignored the stage would excuse itself from this check (mutation M9).
+      if (roomCropPx(h) > 0) continue
+      expect(y + box.top * z, `wall top off the stage at ${h} px`).toBeGreaterThanOrEqual(ROOM_MARGIN_Y)
+      expect(y + box.bottom * z, `floor off the stage at ${h} px`).toBeLessThanOrEqual(h - ROOM_MARGIN_Y)
     }
   })
 
   it('★ and it still lifts the full offset when the stage can afford it', () => {
     const tall = 1400
-    const z = roomZoomFor(tall)
-    const centred = tall / 2
-    expect(roomOriginY(tall, OFFSET, z, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)).toBe(centred - OFFSET)
+    const box = roomBox()
+    const centred = tall / 2 - ((box.top + box.bottom) / 2) * ROOM_ZOOM
+    expect(roomOriginY(tall, OFFSET, roomZoomFor(tall))).toBe(centred - OFFSET)
   })
 
-  it('★ takes the close zoom on the stage the running app actually reports, and not below it', () => {
-    // MEASURED in the browser: 1728 x 963 window, `app.screen.height` = 818.
-    const box = roomBox(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
-    expect(roomZoomFor(818)).toBe(ROOM_ZOOM_CLOSE)
-    const need = box.height * ROOM_ZOOM_CLOSE + 2 * ROOM_MARGIN_Y
-    expect(need).toBe(784)
-    expect(roomZoomFor(need)).toBe(ROOM_ZOOM_CLOSE)
-    expect(roomZoomFor(need - 1)).toBe(ROOM_ZOOM_SHORT)
+  it('★ the crop is measured, not asserted — and it is zero on the stage the app reports', () => {
+    // MEASURED in the running app on this machine's maximised window: 1728 x 1000 gives
+    // `app.screen.height` = 855, and the box needs 736 + 2 x 8 = 752.
+    expect(roomCropPx(855)).toBe(0)
+    expect(roomCropPx(752)).toBe(0)
+    expect(roomCropPx(700)).toBe(52)
+    // and the zoom never drops below 1, because there is no integer under it
+    expect(roomZoomFor(400)).toBe(ROOM_ZOOM)
+    expect(roomZoomFor(2000)).toBe(ROOM_ZOOM)
   })
 })
 
-// ★ WHAT THE ZOOM IS FOR. Both of these are about the picture, not the geometry: they are the
-// two things that were wrong at 3, and neither is visible to `drawScale.test.ts`, which
-// measures WORLD size and leaves the zoom on top to the camera's own law.
-describe('★ the room is drawn at the same scale as the town at its closest', () => {
+// ★ WHAT THE SCALE IS FOR. Both of these are about the picture, not the geometry, and neither
+// is visible to `drawScale.test.ts`, which measures WORLD size and leaves the zoom on top to
+// the camera's own law.
+describe('★ the room is drawn at the same pixel density as the town at its closest', () => {
   it('★ a body is exactly as tall indoors as it is out of doors', () => {
-    // `CHAR_TARGET_PX` is the world height of a figure and `ZOOM_SCALE_MAX` is the town's own
-    // deepest stop, so this is 52 x 4 = 208 px on both sides. At the landed ROOM_ZOOM of 3 it
-    // was 156 against 208 — a person a quarter smaller in the surface meant to be CLOSER.
-    expect(CHAR_TARGET_PX * ROOM_ZOOM_CLOSE).toBe(CHAR_TARGET_PX * ZOOM_SCALE_MAX)
-    expect(CHAR_TARGET_PX * ROOM_ZOOM_CLOSE).toBe(208)
-    expect(CHAR_TARGET_PX * ROOM_ZOOM_SHORT).toBe(156)
+    // `CHAR_TARGET_PX` is the TOWN-px height of a figure and `ZOOM_SCALE_MAX` is the town's
+    // deepest stop, so out of doors a body is 52 x 4 = 208 px on the glass. Indoors the scene
+    // zoom is 1 and `INTERIOR_PX_SCALE` carries the same factor, so it is 208 px there too.
+    expect(INTERIOR_PX_SCALE).toBe(ZOOM_SCALE_MAX)
+    expect(CHAR_TARGET_PX * INTERIOR_PX_SCALE * ROOM_ZOOM).toBe(CHAR_TARGET_PX * ZOOM_SCALE_MAX)
+    expect(CHAR_TARGET_PX * INTERIOR_PX_SCALE * ROOM_ZOOM).toBe(208)
   })
 
-  it('★ and a furnishing reaches the screen at a whole multiple of the pixels it was drawn on', () => {
+  it('★ and a furnishing reaches the screen at exactly the pixels it was drawn on', () => {
     // `furnishingScale` is the world-space half; the zoom is the other half, and the COMPOSITE
-    // is what the sampler sees. 0.5 x 3 = 1.5 duplicated every other source column under
-    // NEAREST; 0.5 x 4 = 2 is a clean doubling. `drawScale.test.ts` cannot see this: it
-    // measures WORLD size and leaves the zoom on top to the camera's own law.
-    const composite = furnishingScale(SLOT_TILES) * ROOM_ZOOM_CLOSE
+    // is what the sampler sees. It was 0.5 x 4 = 2 — a clean doubling, but a DOUBLING, so half
+    // the pixels on the glass were invented. Option C makes it 1 x 1.
+    const composite = furnishingScale() * ROOM_ZOOM
     expect(Number.isInteger(composite), `composite is ${composite}`).toBe(true)
-    expect(composite).toBe(2)
-    expect(furnishingScale(SLOT_TILES) * ROOM_ZOOM_SHORT).toBe(1.5)
+    expect(composite).toBe(1)
+    // one interior tile is 128 px on the glass, exactly as it was at the old zoom of 4
+    expect(INTERIOR_TILE.w * ROOM_ZOOM).toBe(128)
   })
 
   it('★ and the zoom the scene uses is the one the stage chose, never a bare constant', () => {
