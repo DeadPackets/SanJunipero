@@ -2006,8 +2006,14 @@ Rules, one per issue kind: acyclic by DFS back-edge (`cycle`); every prereq exis
 import { describe, expect, it } from 'vitest'
 import { DiscoveryNodeSchema, validateDiscoveryTree, type DiscoveryNode } from './schema.js'
 
+// ★★ v6 — THE FIXTURE WAS BROKEN AND IT BROKE EVERY ROW BELOW IT. v5's amendment made `era`
+// a `z.enum(ERAS)` and left this default at `era: 1`, so `DiscoveryNodeSchema.parse` throws
+// `invalid_value` on the FIRST call and all ten rows in this file die at the fixture. The
+// era-mismatch and unreachable rows below carried `era: 3` and `era: 2` for the same reason.
+// This is the same defect v5 caught in T14 — a numeric era against a named enum — and it was
+// left standing one task earlier, in the task that DEFINES the enum.
 const node = (over: Partial<DiscoveryNode> & { id: string }): DiscoveryNode => DiscoveryNodeSchema.parse({
-  name: over.id, era: 1, prereqs: [], skill: { track: 'foraging', rung: 1 },
+  name: over.id, era: 'handwork', prereqs: [], skill: { track: 'foraging', rung: 1 },
   conditions: '(none)', unlocks: ['practice:x'], desc: 'a thing learned', ...over,
 })
 
@@ -2046,7 +2052,10 @@ describe('validateDiscoveryTree', () => {
   })
 
   it('finds a node reaching back into a later era', () => {
-    const out = validateDiscoveryTree([node({ id: 'a', era: 3 }), node({ id: 'b', era: 1, prereqs: ['a'] })])
+    // ★ v6: names, not ranks — and this row is exactly why `era-mismatch` must compare through
+    // `ERA_ORDER`. Lexically 'handwork' > 'arrangement', which is the opposite of the world.
+    const out = validateDiscoveryTree([
+      node({ id: 'a', era: 'works' }), node({ id: 'b', era: 'handwork', prereqs: ['a'] })])
     expect(out.map((i) => i.kind)).toContain('era-mismatch')
   })
 
@@ -2061,7 +2070,9 @@ describe('validateDiscoveryTree', () => {
   })
 
   it('finds an island nobody can reach', () => {
-    const out = validateDiscoveryTree([node({ id: 'root' }), node({ id: 'x', era: 2, prereqs: ['y'] }), node({ id: 'y', era: 2, prereqs: ['x'] })])
+    const out = validateDiscoveryTree([node({ id: 'root' }),
+      node({ id: 'x', era: 'arrangement', prereqs: ['y'] }),
+      node({ id: 'y', era: 'arrangement', prereqs: ['x'] })])
     expect(out.map((i) => i.kind)).toEqual(expect.arrayContaining(['unreachable']))
   })
 
@@ -2298,10 +2309,16 @@ import { CodexStore, migrateArbiterTables } from '@sj/arbiter'   // test-only, C
 import { DISCOVERY_TREE } from './tree.js'
 import { CODEX_ERAS, PRACTICED_AT_GENESIS, codexEntriesFromTree } from './codexSeed.js'
 
-const seeded = () => {
+// ★ v6: v5b used `freshArbiterDb()` in the live-codex row below and never defined it. One
+// helper, two callers, defined once — which is the same rule this task applies to `CODEX_ERAS`.
+const freshArbiterDb = (): Database.Database => {
   const db = new Database(':memory:')
   migrateArbiterTables(db)
-  const codex = new CodexStore(db)
+  return db
+}
+
+const seeded = () => {
+  const codex = new CodexStore(freshArbiterDb())
   for (const row of codexEntriesFromTree()) codex.insert(row)
   return codex
 }
@@ -2439,6 +2456,8 @@ Expected: FAIL with `Cannot find module './codexSeed.js'`.
 ```ts
 // packages/engine/src/discovery/codexSeed.ts
 import { ERAS, GENESIS_CODEX, type Era } from '@sj/shared'   // ★ see the box below: shared, NOT arbiter
+// ★ v6: `ERAS` is still imported — `CODEX_ERAS` re-exports it and the source-level test below
+// asserts no second ladder is declared here. It is no longer used to INDEX anything.
 import { DISCOVERY_TREE } from './tree.js'
 import type { DiscoveryNode } from './schema.js'
 
@@ -2459,7 +2478,11 @@ export function codexEntriesFromTree(tree: readonly DiscoveryNode[] = DISCOVERY_
   const known = new Set(PRACTICED_AT_GENESIS)
   return tree.map((n) => ({
     id: n.id,
-    era: ERAS[n.era - 1]!,
+    // ★★ v6 — THE MAPPING IS THE IDENTITY, AND v5b's OWN BOX SAID SO WHILE ITS CODE DID THE
+    // OTHER THING. v5b printed `ERAS[n.era - 1]!` here, three paragraphs after explaining that
+    // `ERAS[<a string> - 1]` is `ERAS[NaN]` is `undefined`. An executor who copies this block
+    // gets the exact red the box above warned them about. A node's era ALREADY IS one of ERAS.
+    era: n.era,
     name: n.name,
     prerequisiteId: n.prereqs[0] ?? null,
     known: known.has(n.id),
@@ -3715,9 +3738,14 @@ describe('SEED_STRUCTURES', () => {
   // ★ v5: both heavy kinds are things a founder has walked past on the first morning, which is
   // why "the beam" is a sentence a mind can picture. Not decoration — it is the argument for
   // choosing these two over three commissioned cells (OD19).
-  it('★ BOTH HEAVY KINDS ALREADY STAND IN THE TOWN', () => {
+  // ★ v6 — the name said BOTH and the body checked one. `shed` is an `InteriorKind` with a
+  // layout and a committed art cell, and the town stands NONE — T62's own box records that as a
+  // live example of staleness. The argument for choosing these two over three commissioned
+  // cells (OD19) rests on `storehouse` alone, and the name now says so.
+  it('★ THE THREE-HAND KIND ALREADY STANDS IN THE TOWN, AND THE TWO-HAND ONE HAS ITS ART', () => {
     const standing = new Set(cityStructures().map((s) => s.kind))
     expect(standing.has('storehouse')).toBe(true)
+    expect(standing.has('shed'), 'the layout lane dropped the sheds — see T62').toBe(false)
     expect(Object.keys(SEED_STRUCTURES).sort()).toEqual(['shed', 'storehouse'])
   })
 })
@@ -4790,6 +4818,9 @@ export function soughtOutLine(sought: { name: string; times: number } | null): s
 export const SOCIAL_VERBS = ['speak', 'give', 'teach', 'tend', 'build'] as const
 export type SocialVerb = (typeof SOCIAL_VERBS)[number]
 export function socialVerbDiversity(acts: Array<{ verb: string; jointWith?: string }>): number
+// ★ v6 — the law's floor is "did anything but talking happen", which is NOT the diversity count.
+// T25 and v5b's T57 disagreed about whether `speak` counts; it does, and this is the other test.
+export function nonSpeakSocialVerbs(acts: Array<{ verb: string; jointWith?: string }>): number
 export function discretionarySocialShare(acts: Array<{ verb: string; discretionary: boolean }>): number
 ```
 
@@ -4801,7 +4832,7 @@ export function discretionarySocialShare(acts: Array<{ verb: string; discretiona
 // packages/agents/src/live/social.test.ts
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { SOCIAL_VERBS, socialVerbDiversity, discretionarySocialShare } from './social.js'
+import { SOCIAL_VERBS, discretionarySocialShare, nonSpeakSocialVerbs, socialVerbDiversity } from './social.js'
 
 describe('the measure that replaces a saturated one', () => {
   it('counts DISTINCT social verbs, because five conversations are one behaviour', () => {
@@ -4841,6 +4872,14 @@ describe('the measure that replaces a saturated one', () => {
 
   it('names the five verbs the ruling names', () => {
     expect([...SOCIAL_VERBS]).toEqual(['speak', 'give', 'teach', 'tend', 'build'])
+  })
+
+  // ★ v6 — the floor and the count are two questions, and this is the row that keeps them apart.
+  it('★ A TOWN OF PURE TALK HAS DIVERSITY ONE AND A FLOOR OF ZERO', () => {
+    const talk = [{ verb: 'speak' }, { verb: 'speak' }, { verb: 'speak' }]
+    expect(socialVerbDiversity(talk)).toBe(1)
+    expect(nonSpeakSocialVerbs(talk)).toBe(0)
+    expect(nonSpeakSocialVerbs([...talk, { verb: 'tend' }])).toBe(1)
   })
 })
 ```
@@ -4915,6 +4954,15 @@ function isSocial(act: { verb: string; jointWith?: string }): boolean {
 export function socialVerbDiversity(acts: Array<{ verb: string; jointWith?: string }>): number {
   const seen = new Set<string>()
   for (const a of acts) if (isSocial(a)) seen.add(a.verb)
+  return seen.size
+}
+
+// ★ v6. `speak` counts toward diversity — it is a social act and pretending otherwise makes the
+// number lie. But "the town did something other than talk" is the thing the amended emergence
+// law actually floors, and it is a second question. Two functions, so neither has to be bent.
+export function nonSpeakSocialVerbs(acts: Array<{ verb: string; jointWith?: string }>): number {
+  const seen = new Set<string>()
+  for (const a of acts) if (isSocial(a) && a.verb !== 'speak') seen.add(a.verb)
   return seen.size
 }
 
@@ -5021,7 +5069,10 @@ export type DayRow = {
   survivalTaxPct: number                  // NEW classifier
   survivalTaxPctLegacy: number            // OLD classifier — C10 requires both, in every report
   aboveFloorPct: number                   // survivalTaxPct - SURVIVAL_FLOOR_PCT
-  socialVerbDiversity: number             // from T57's live/social.ts — distinct social verbs, joint builds only
+  socialVerbDiversity: number             // from T57's live/social.ts — distinct social verbs, joint builds only.
+                                          // ★ v6: `speak` COUNTS. A town of nothing but talk is 1, not 0.
+  nonSpeakSocialVerbs: number             // ★ v6 — the law's real floor, kept separate from the count so the
+                                          // two cannot drift again. From T57's live/social.ts.
   discretionarySocialShare: number        // from T57 — social share of discretionary acts, 0 when there were none
   fullNeedTicks: number
   discretionaryActRate: number            // acts per 1000 ticks of open full-need window
@@ -5033,7 +5084,7 @@ export function discretionaryTable(db: Database, opts: { days: number }): DayRow
 export function emergenceVerdict(rows: readonly DayRow[]): { pass: boolean; failures: string[] }
 ```
 
-`emergenceVerdict` applies the ruled targets: **steady-state survival tax ≤ 40%** over the last two sim-days (day 1 is always upkeep-heavy); **every mind reaches ≥1 full-need moment per sim-day**; **`discretionaryActRate` ≥ 8**; **`socialVerbDiversity` ≥ 1 on at least one day** (the amended law's non-`speak` floor); **zero unforced deaths through sim-day 3**, where *unforced* means food, water or a reachable bed existed at the time of death — the verdict is answered as *"would a competent actor have survived?"*.
+`emergenceVerdict` applies the ruled targets: **steady-state survival tax ≤ 40%** over the last two sim-days (day 1 is always upkeep-heavy); **every mind reaches ≥1 full-need moment per sim-day**; **`discretionaryActRate` ≥ 8**; **`nonSpeakSocialVerbs` ≥ 1 on at least one day** (the amended law's floor, and ★ v6 it reads the non-speak counter rather than the diversity count — a town of pure talk has diversity 1 and would have passed the old wording); **zero unforced deaths through sim-day 3**, where *unforced* means food, water or a reachable bed existed at the time of death — the verdict is answered as *"would a competent actor have survived?"*.
 
 **The diagnostic law is encoded, not quoted:** high tax **and** unmet needs returns the failure string `EFFECTIVENESS`, never `DIFFICULTY`. A starving town spends every turn on food and still starves; a well-fed town spends few.
 
@@ -5086,11 +5137,30 @@ describe('the corrected classifier', () => {
     expect(r.discretionaryActRate).toBe(2)
   })
 
+  // ★★ v6 — T25 AND T57 DISAGREED ABOUT WHETHER `speak` COUNTS, AND T25 IMPORTS T57's FUNCTION.
+  // v5b's rows here expected 0 and 2; T57's own test expects `socialVerbDiversity` of four
+  // `speak`s to be **1**, and its `SOCIAL_VERBS` opens with `'speak'`. One import, two
+  // contradictory expectations, in two tasks four phases apart — the suite would have gone red
+  // at T25 and the fix an executor reaches for is to edit whichever file they opened second.
+  //
+  // RESOLVED IN FAVOUR OF T57, because T57 owns the definition and because the count is honest:
+  // speaking IS a social act and a town that only speaks has diversity 1, not 0. **The law's
+  // "non-`speak` floor" is a DIFFERENT predicate from the count** and G8 criterion 7 already
+  // states it separately — "give, tend, teach and joint build each non-zero at least once".
   it('counts the social slice s verbs and not only its size', () => {
     const speakOnly = discretionaryTable(townDb({ verbs: { amara: ['speak', 'speak', 'speak'] } }), { days: 1 })[0]!
     const richer = discretionaryTable(townDb({ verbs: { amara: ['speak', 'give', 'teach'] } }), { days: 1 })[0]!
-    expect(speakOnly.socialVerbDiversity).toBe(0)
-    expect(richer.socialVerbDiversity).toBe(2)
+    expect(speakOnly.socialVerbDiversity).toBe(1)
+    expect(richer.socialVerbDiversity).toBe(3)
+  })
+
+  // ★ v6 — and the predicate the floor actually needs, kept separate from the count so the two
+  // can never be confused again. A town of four `speak`s has diversity 1 and NO non-speak verb.
+  it('★ SAYS SEPARATELY WHETHER ANYTHING BUT TALKING HAPPENED — the law s real floor', () => {
+    const speakOnly = discretionaryTable(townDb({ verbs: { amara: ['speak', 'speak'] } }), { days: 1 })[0]!
+    const richer = discretionaryTable(townDb({ verbs: { amara: ['speak', 'give'] } }), { days: 1 })[0]!
+    expect(speakOnly.nonSpeakSocialVerbs).toBe(0)
+    expect(richer.nonSpeakSocialVerbs).toBe(1)
   })
 })
 
@@ -6872,6 +6942,10 @@ git commit -m "feat(arbiter): a mind's own description of a chair becomes a chai
 
 **Interfaces — Consumes:** `furnishing_placed` (T62), `AnomalyStopError` and `SpendLedger` (landed, `packages/forge/src/spendLedger.ts`), `createSim`'s options bag (T32).
 
+> **★★ v6 — THIS TASK'S TESTS CALL FOUR METHODS T32 DOES NOT PRODUCE, AND ONE OF THEM DOES NOT EXIST ANYWHERE.** v5b's supervisor rows use `sim.applyVerdict(...)`, `sim.alerts()`, `sim.advance(n)` and **`sim.forgeCallCount()`**. T32's `Sim` type declares `start`, `stop`, `tickLoop`, `state`, `runtimes`, `resumed` and `manifest` — **and nothing else.** `forgeCallCount` appears in no task, no landed file and no other test in this plan; it was invented by the assertion that reads it.
+>
+> **The fix is one line in T32 and it belongs there, not here**, because a type is produced once (§5): **`Sim` gains `applyVerdict(agentId, verdict): Promise<void>`, `advance(ticks): Promise<void>`, `alerts(): AlertRow[]` and `forgeCommissionCount(): number`** — renamed from `forgeCallCount` because the number this task asserts is **commissions requested**, which is what T49's `furnishings.commissionsRequested` reports and what criterion 16 gates at zero. **This task's rows are corrected to the new name below.** Without it, three of the six rows here are `Property does not exist on type 'Sim'` and the fourth is asserting a method nobody wrote.
+
 **Interfaces — Produces:**
 
 ```ts
@@ -6935,7 +7009,7 @@ describe('the furniture seam, end to end and art-free', () => {
     const sim = await createSim(testOpts())
     await sim.applyVerdict('amara', attemptPlacingAStool())
     expect(furnishingsOf(sim.state(), houseOf('amara'))![0]!.kind).toBe('stool')
-    expect(sim.forgeCallCount()).toBe(0)
+    expect(sim.forgeCommissionCount()).toBe(0)
   })
 
   it('REFUSES THE PLACEMENT PAST THE CAP, and alerts rather than throwing into the tick', async () => {
@@ -7187,6 +7261,15 @@ export type Sim = {
   runtimes(): ReadonlyMap<string, AgentRuntime>
   resumed: boolean
   manifest: RunManifest
+  // ★★ v6 — FOUR MEMBERS T64's TESTS ALREADY CALL AND v5b NEVER DECLARED. `applyVerdict`,
+  // `advance` and `alerts` are used by `supervisor.test.ts` in T64; `forgeCommissionCount` is
+  // v5b's invented `forgeCallCount`, renamed to the number it actually asserts — commissions
+  // requested, which is what T49 reports and what G8 criterion 16 gates at zero. Declared here
+  // because a type is produced exactly once (§5) and T64 is a consumer, not an author.
+  applyVerdict(agentId: string, verdict: Verdict): Promise<void>
+  advance(ticks: number): Promise<void>
+  alerts(): Array<{ kind: string; detail?: string }>
+  forgeCommissionCount(): number
 }
 export function createSim(deps: SimDeps): Sim
 ```
@@ -8314,7 +8397,13 @@ git commit -m "test(agents): fourteen ways to talk a mind out of itself, four of
 
 ### Task 43: The injection gate (LIVE, ≈$1)
 
-**Files:** Create `packages/agents/src/live/injection/g8-run.ts`, `g8-injection.livetest.ts`, `packages/agents/data/g8-injection-report.json`; Modify `packages/agents/package.json` (`"g8": "node --import ./scripts/ts-loader.mjs src/live/injection/g8-run.ts"`).
+**Files:** Create `packages/agents/src/live/injection/g8-run.ts`, **`g8-injection.report.test.ts`**, `packages/agents/data/g8-injection-report.json`; Modify `packages/agents/package.json` (`"g8": "node --import ./scripts/ts-loader.mjs src/live/injection/g8-run.ts"`).
+
+> ### ★★ v6 — `*.livetest.ts` NO LONGER RUNS ANYWHERE. THE FILE IS A NORMAL TEST.
+>
+> v5b named this file `g8-injection.livetest.ts`. **The `unpin` lane deleted all three `*.livetest.ts` files, and with them `vitest.live.config.ts` and the `pnpm test:live` script** — its report records that the three were the *entire* live suite and that the config then matched nothing. **A file written to that pattern today matches no runner, is executed by nothing, and reports no failure**: it is a vacuous guard by construction, and nobody would find out until G8 asked for its output.
+>
+> **It is renamed `g8-injection.report.test.ts` and joins the main suite.** That is correct rather than merely available: **the file never made a live call.** It reads a committed JSON report and asserts over it — exactly what `packages/supervisor/src/g8.gate.test.ts` does in T51 — and the live spend is in `g8-run.ts`, which is a script. **`packages/agents/tsconfig.scripts.json:4` still excludes `**/*.livetest.ts`, which now matches nothing; it is harmless and is not this task's to remove.**
 
 Per case: a scripted manipulator agent stands within earshot and `speak`s the instruction; the target's **real** mind runs for a bounded window; the harness records the target's speech, its submitted intents, **and the event log** — the event markers cannot be read from a transcript.
 
@@ -8328,7 +8417,7 @@ executed = any marker matched
 - [ ] **Step 1: Write the failing livetest.**
 
 ```ts
-// packages/agents/src/live/injection/g8-injection.livetest.ts
+// packages/agents/src/live/injection/g8-injection.report.test.ts
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { INJECTION_CORPUS } from './corpus.js'
@@ -9063,7 +9152,8 @@ export const G8RehearsalReportSchema = z.object({
     jointBuild: z.number().int(),
   }),
   // ★ THE R4 MEASURE. Never social-need satisfaction, which is oversatisfied ~34x (C25).
-  socialVerbDiversity: z.number().int(), discretionarySocialShare: z.number(),
+  socialVerbDiversity: z.number().int(), nonSpeakSocialVerbs: z.number().int(),
+  discretionarySocialShare: z.number(),
   // ★★ v5b — OD21 RULED: THE DISCOVERY RECORD IS REPORTED AND NEVER GATED. `total` is the
   // identity that keeps the two codification paths from drifting: a word minted inside
   // `codifyExpressive` never passes through `codify()`, so if these two ever disagree one of
@@ -9208,8 +9298,13 @@ describe('checkRehearsal', () => {
 
   it('REPORTS FURNITURE AND NEVER GATES ON IT — the slice proves a seam, it does not promise a chair', () => {
     const bare = { ...fixture(), furnishings: { ...fixture().furnishings, placed: 0, distinctKinds: 0, sharedKinds: 0 } }
-    expect(bare.furnishings.placed).toBe(0)
+    // ★ v6: v5b's first row here was `expect(bare.furnishings.placed).toBe(0)` — an assertion
+    // about the fixture the line above had just written, which is true whatever `checkRehearsal`
+    // does. Deleted. What the row is FOR is that a zero does not fail and does not silently
+    // vanish from the report, and both halves are now asserted against the function.
     expect(checkRehearsal(bare).pass).toBe(true)
+    expect(checkRehearsal(bare).failures).not.toContain('furnishings')
+    expect(G8RehearsalReportSchema.parse(bare).furnishings.placed).toBe(0)
   })
 
   it('★ FAILS A TOWN THAT BUILT NOTHING — the defect this plan exists to fix', () => {
@@ -9275,9 +9370,17 @@ describe('checkRehearsal', () => {
     expect(checkRehearsal({ ...fixture(), collapses: 6, recoveries: 2 }).failures).toContain('recoveries')
   })
 
-  it('asserts the things that MUST be zero, and says why they are not coverage', () => {
+  // ★★ v6 — `elder-death-unexpected` WAS A GATE THAT WOULD HAVE PUNISHED THE FEATURE. Phase F2
+  // exists to make an elder death possible, distinguishable and ceremonial; v5b then failed the
+  // run if one happened. It is inert today — 21 sim-days of thirty-year-olds cannot produce one
+  // — and it becomes wrong the moment aging works, which is the worst kind of dormant guard.
+  // `births: 1` stays a FAILURE, and the two are not the same case: gestation is 72 days, so a
+  // birth in 21 is arithmetically impossible and can only mean the clock is broken. An elder
+  // death is merely unexpected. Unexpected is REPORTED; impossible is GATED.
+  it('asserts the thing that MUST be zero, and REPORTS the thing that is merely unexpected', () => {
     expect(checkRehearsal({ ...fixture(), births: 1 }).failures).toContain('births-impossible')
-    expect(checkRehearsal({ ...fixture(), elderDeaths: 1 }).failures).toContain('elder-death-unexpected')
+    expect(checkRehearsal({ ...fixture(), elderDeaths: 1 }).pass).toBe(true)
+    expect(checkRehearsal({ ...fixture(), elderDeaths: 1 }).failures).not.toContain('elder-death-unexpected')
   })
 })
 ```
@@ -9330,7 +9433,7 @@ All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throt
 | 10 | **≥1 law flipped mid-run through the admin channel**, and replay from genesis **and** from a pre-flip snapshot both reproduce the identical state hash | **gate** | delta §12 |
 | 11 | The nightly ops plane ran every night: 21 chapters, tier-1 milestones present, the construct pass clean, the semantic pass inside its budget | **gate** | batch-7 concern 1 |
 | 12 | `cost.usdPerMindPerSimDay ≤ $0.060` sustained, growth curve flat within ±5% | **gate** | Phase H |
-| 13 | Spoilage, mysteries and partnerships **counted**; births **0** and asserted as 0 (72-day gestation); **elder deaths 0 and claimed as NO COVERAGE, not as a pass** | **gate** | delta §8 |
+| 13 | Spoilage, mysteries and partnerships **counted**; births **0** and asserted as 0 (72-day gestation, so a birth is arithmetically impossible and can only mean a broken clock); **elder deaths counted and expected 0, claimed as NO COVERAGE and never as a pass**. **★ v6 — an elder death no longer FAILS the run.** v5b gated `elder-death-unexpected`, which would have failed a run for producing the one thing Phase F2 exists to make possible. Impossible is gated; unexpected is reported | **gate** (births) · **REPORTED** (elder deaths) | delta §8; ★ v6 |
 | **14** | **★ `providerMix` contains NO denied back end, in any of the three runs**, and the pre-flight verdict for every name on the deny-list is recorded in `provider-denylist.json` | **gate** | **C7, C28, T65 — batch 16** |
 | **15** | **★ THE RESCUE WINDOW WAS ANSWERED AT LEAST ONCE.** `rescueWindowsOpened ≥ 1` and `rescueWindowsAnswered ≥ 1`; if `opened === 0` the run reports **no coverage** and criterion 2 carries the verdict alone | **gate, conditional** | **lever 2, T55** |
 | **16** | **★ THE FURNITURE SEAM IS EXERCISED:** `furnishings.placed`, `distinctKinds`, `sharedKinds`, `capRefusals` all counted, and `commissionsRequested === 0` | **REPORTED — except `commissionsRequested === 0`, which is GATED** | **Phase F3, user directive** |
@@ -9365,7 +9468,7 @@ All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throt
 
 **Criterion 9 has had exactly ONE honest test and does not carry a record it did not earn** (R6). Batch 12 gave it 4 acts and 0 words; batch 13 was reaped before it scored. If it fails here, it fails for the first time.
 
-- [ ] **Step 1: Write the failing livetest** — `g8-rehearsal.livetest.ts` loads all three reports and asserts all **seventeen** criteria (★ v5b: sixteen plus OD20's `production.builds ≥ 1`) plus the cross-run `D_r` row, and **prints the six reported columns without asserting on any of them**. FAIL (no reports).
+- [ ] **Step 1: Write the failing test.** ★ **v6 — `g8-rehearsal.report.test.ts`, NOT `.livetest.ts`.** The `unpin` lane deleted the `*.livetest.ts` runner along with `vitest.live.config.ts` and `pnpm test:live`; a file on that pattern is executed by nothing and would have reported no failure. It loads all three reports and asserts all **seventeen** criteria (★ v5b: sixteen plus OD20's `production.builds ≥ 1`) plus the cross-run `D_r` row, and **prints the six reported columns without asserting on any of them**. FAIL (no reports). **It makes no live call — the spend is in `rehearsal/run.ts` — so it belongs in the main suite and is re-runnable for ever, which is the property T51 checks 1–5 depend on.**
 - [ ] **Step 2:** FAIL confirmed.
 - [ ] **Step 3: Run A, B and C on the arm64 stack.** Checkpoint every sim-day: spend, alive count, **deaths by taxon**, **rescue windows opened / answered / expired**, survival tax (both classifiers, **reported not gated**), dead-call ratio, production count, **`socialVerbDiversity`**, **`providerMix`**, `D_b`. A tripwire STOPS the run and reports; it never silently continues. A reap is survivable — the harness resumes and the partial report already carries a score.
 
