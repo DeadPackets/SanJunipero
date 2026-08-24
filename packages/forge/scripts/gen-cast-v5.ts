@@ -28,11 +28,17 @@
 // 4. SPEND GOES THROUGH SpendLedger, so the $5 per-asset anomaly stop is live on every call
 //    instead of a hand-rolled counter.
 //
+// 5. ★ NO CANDIDATE THAT FAILS A GATE IS EVER SHIPPED (user ruling). `bestOf` chooses; it does
+//    not decide. See `refuseFailing` — the run fails loudly, names every candidate, every gate
+//    and every margin, and writes nothing for that character. The stride trio and the packed
+//    atlas pixel bar are binding too; both used to be computed, logged and ignored.
+//
 // UNCHANGED, because it is the calibrated part: the mirror standard. 9 authored cells derive
 // the 24-cell contract in code — 2 facings x 4 strip poses + 1 sleep — and SW/NW are flips of
 // SE/NE. `mirror.ts` owns that and this script does not second-guess it.
 //
-// Controls: CAST=<comma ids>, CAST_ATTEMPTS, CAST_DRY=1, CAST_REJECTED=<raw keys the eye refused>.
+// Controls: CAST=<comma ids>, CAST_ATTEMPTS=<n, default 3>, CAST_DRY=1,
+//           CAST_REJECTED=<raw keys the eye refused>.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { BudgetGuard } from '../src/budget.js'
@@ -53,6 +59,7 @@ import {
 import { processHiResCell } from '../src/hires.js'
 import { packCharacterAtlas } from '../src/atlasV4.js'
 import { alphaBinaryGate, paletteGate, soleSilhouetteGate } from '../src/pixelGates.js'
+import { refusalMessage } from '../src/gate.js'
 import { CAST_CONTENT_DIR } from '../src/castArt.js'
 import { BIG_PIXEL } from './character.js'
 import { CAST_V5, PROPORTION_ANCHOR_ID, type CastMember } from './cast-v5.js'
@@ -248,6 +255,25 @@ function gateView(img: RawImage): RawImage {
 }
 
 const CALIBRATED_MEDIAN = 0.310
+
+// The ruling, and why it exists, live in `src/gate.ts` beside `refusalMessage`. This is the
+// cast generator's adapter onto it: a `GateFailure` rendered with its margin, because the
+// margin is what tells an operator a threshold from a bad drawing.
+const said = (x: GateFailure): string =>
+  `${x.gate}: ${x.a} vs ${x.b} — ${x.value.toFixed(4)} against ${x.limit.toFixed(4)} `
+  + `(off by ${Math.abs(x.value - x.limit).toFixed(4)})`
+
+function refuseFailing(what: string, cands: readonly { key: string; failures: GateFailure[] }[]): void {
+  const msg = refusalMessage(what, cands.map((c) => ({ key: c.key, failures: c.failures.map(said) })))
+  if (msg === '') return
+  throw new Error(`${msg}\n  Raise CAST_ATTEMPTS to draw more, CAST_REJECTED to refuse a `
+    + `candidate by eye, or change the threshold on purpose. Nothing is written for this character.`)
+}
+
+/** How many candidates a cell may be drawn as before the run gives up. Documented in this
+ *  file's header since v4 and read nowhere until now; it is the knob the ruling above creates
+ *  the need for, because every extra attempt is a paid generation. */
+const ATTEMPTS = Math.max(1, Number(process.env['CAST_ATTEMPTS'] ?? '3'))
 const PALETTE_HARD_FLOOR = 0.6
 const MASTER_MIN_PITCH = 6
 
@@ -268,8 +294,8 @@ async function runCharacter(m: CastMember): Promise<void> {
   type Master = { key: string; raw: Buffer; se: RawImage; ne: RawImage; pitch: number }
   const masters: Master[] = []
   const refs = proportionRef ? [swatch, proportionRef] : [swatch]
-  for (let i = 0; i < 3; i++) {
-    if (i === 2 && masters.some((x) => x.pitch >= MASTER_MIN_PITCH)) break
+  for (let i = 0; i < ATTEMPTS; i++) {
+    if (i === ATTEMPTS - 1 && masters.some((x) => x.pitch >= MASTER_MIN_PITCH)) break
     const key = `master-${m.id}-c${i}`
     if (REJECTED.has(key)) { push(`${key}: REFUSED BY EYE`); continue }
     const raw = await candidate(DIR, key, masterPrompt(m, proportionRef !== null), refs, '1024x1024', 0.08, assetId)
@@ -353,7 +379,7 @@ async function runCharacter(m: CastMember): Promise<void> {
   for (const f of AUTHORED_FACINGS) {
     for (const p of WALK_POSES) {
       const cands: FrameCand[] = []
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < ATTEMPTS; i++) {
         const c = await genFrame(f, p, i)
         if (c) cands.push(c)
         const best = bestOf(cands)
@@ -361,8 +387,13 @@ async function runCharacter(m: CastMember): Promise<void> {
       }
       const best = bestOf(cands)
       if (!best) throw new Error(`${m.id} ${f}/${p}: every candidate failed processing`)
+      refuseFailing(`${m.id} ${f}/${p}`, cands.map((c) => ({ key: c.key, failures: c.failures })))
       chosen[f][p] = best
     }
+    // ★ THE STRIDE TRIO IS BINDING. It used to `push` a FLAGGED line and go on — a gate that
+    // computes a verdict beside a caller that discards it, which is what the whole of this
+    // block's ruling is about. There is no candidate to re-roll here: the trio is a property
+    // of three frames already chosen, so the failure is the character's, loudly.
     const stride = strideGateV4(f, {
       'idle': masterGate[f],
       'contact-a': chosen[f]['contact-a'].gate,
@@ -370,13 +401,16 @@ async function runCharacter(m: CastMember): Promise<void> {
       'contact-b': chosen[f]['contact-b'].gate,
     }, CALIBRATED_MEDIAN)
     for (const x of stride) push(`${f} stride: ${x.gate} ${x.a}~${x.b} ${x.value.toFixed(3)} < ${x.limit.toFixed(3)}`)
-    push(`${f} trio ${stride.length === 0 ? 'PASS' : 'FLAGGED'}`)
+    push(`${f} trio ${stride.length === 0 ? 'PASS' : 'FAILED'}`)
+    refuseFailing(`${m.id} ${f}/stride-trio`, [{
+      key: `${f}: contact-a + passing + contact-b as chosen`, failures: stride,
+    }])
   }
 
   // sleep
   type SleepCand = { key: string; hi: RawImage; failures: GateFailure[] }
   const sleeps: SleepCand[] = []
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < ATTEMPTS; i++) {
     const key = `sleep-${m.id}-c${i}`
     if (REJECTED.has(key)) { push(`${key}: REFUSED BY EYE`); continue }
     const raw = await candidate(DIR, key, sleepPrompt(m), [soloRef.se], '1024x1024', 0.08, assetId)
@@ -400,6 +434,7 @@ async function runCharacter(m: CastMember): Promise<void> {
   }
   const sleep = sleeps.reduce<SleepCand | null>((a, c) => (!a || c.failures.length < a.failures.length ? c : a), null)
   if (!sleep) throw new Error(`${m.id}: every sleep candidate failed processing`)
+  refuseFailing(`${m.id} sleep`, sleeps.map((c) => ({ key: c.key, failures: c.failures })))
 
   // derivation (zero spend) → the 24-cell contract → ONE packed atlas, committed
   const cells = deriveSheet({
@@ -415,6 +450,9 @@ async function runCharacter(m: CastMember): Promise<void> {
 
   const bar = [...alphaBinaryGate(image).failures, ...paletteGate(image).failures]
   push(`atlas ${image.width}x${image.height}: ${bar.length === 0 ? 'pixel bar clean' : bar.join('; ')}`)
+  // the same ruling: the packed atlas is measured here and was written whatever it said
+  if (bar.length > 0) throw new Error(`${m.id}: the packed atlas FAILS the pixel bar and may not `
+    + `be shipped.\n    ${bar.join('\n    ')}\n  Nothing is written for this character.`)
 
   const dir = join(CAST_CONTENT_DIR, m.id)
   mkdirSync(dir, { recursive: true })
