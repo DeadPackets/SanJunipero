@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AssetRecord } from '@sj/shared'
-import { buildingArt, characterArt, resolveAssetId, textureUrlFor } from './textures.js'
+import { buildingArt, characterArt, facingCellKind, resolveAssetId, textureUrlFor } from './textures.js'
 
 const rec = (over: Partial<AssetRecord>): AssetRecord => ({
   id: 'asset_x', seq: 1, class: 'building', desc: 'house: timber dwelling', kind: 'house',
@@ -88,5 +88,29 @@ describe('buildingArt (v4-hires-building manifest)', () => {
   it('reports NO ART rather than a checkerboard, so the renderer can draw a built form', () => {
     expect(buildingArt([], 'house', 2, 2)).toEqual({ url: null, anchor: null, scale: null })
     expect(buildingArt([], 'well', 1, 1).url).toBeNull()
+  })
+
+  // ★ A TURNED BUILDING DRAWS ITS TURNED FACE. The claim seam seats a house sw or se and the
+  // world now carries which; a turned 2x2 is byte-identical to an unturned one, so `w`/`h`
+  // could never have answered. Seven kinds have a committed `-se` cell.
+  describe('★ the face the building presents', () => {
+    const sw = rec({ id: 'asset_house_sw', kind: 'house' })
+    const se = rec({ id: 'asset_house_se', kind: 'house:se' })
+
+    it('resolves the bare kind for sw and for a building with no facing at all', () => {
+      expect(facingCellKind('house')).toBe('house')
+      expect(facingCellKind('house', 'sw')).toBe('house')
+      expect(buildingArt([sw, se], 'house', 2, 2).url).toBe('/assets/asset_house_sw.png')
+      expect(buildingArt([sw, se], 'house', 2, 2, 'sw').url).toBe('/assets/asset_house_sw.png')
+    })
+
+    it('★ and the TURNED cell for se — the whole point of carrying the field', () => {
+      expect(facingCellKind('house', 'se')).toBe('house:se')
+      expect(buildingArt([sw, se], 'house', 2, 2, 'se').url).toBe('/assets/asset_house_se.png')
+    })
+
+    it('falls back to the bare cell when no turned one is committed — an art gap, not a hole', () => {
+      expect(buildingArt([sw], 'house', 2, 2, 'se').url).toBe('/assets/asset_house_sw.png')
+    })
   })
 })

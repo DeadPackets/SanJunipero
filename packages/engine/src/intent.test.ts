@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
@@ -170,10 +171,61 @@ describe('walk progression (stepWalk)', () => {
 })
 
 describe('verb registry', () => {
-  it('walk is registered, interruptible, and has no skill track', () => {
+  it('walk is registered and has no skill track', () => {
     expect(VERBS.walk).toBeDefined()
     expect(VERBS.walk!.kind).toBe('walk')
-    expect(VERBS.walk!.interruptible).toBe(true)
     expect(VERBS.walk!.skill).toBeUndefined()
+  })
+})
+
+// ★ THE INTERRUPT POLICY, STATED OVER THE WHOLE REGISTRY INSTEAD OF DECLARED PER VERB.
+//
+// `VerbDef` used to carry `interruptible: boolean`. Every verb set it true, `makeVerb`
+// defaulted it, `codify` mapped it off every recipe the arbiter authored — and NOTHING READ
+// IT. The guard that stood here asserted `VERBS.walk.interruptible === true`: a check whose
+// passing condition (the field is set) is satisfiable without its property (a walk can
+// actually be interrupted) holding. The engine stated an interrupt policy it did not
+// implement, and the arbiter was required to decide a boolean the world discarded.
+//
+// Measured before the field went: two verbs differing ONLY in that flag are refused in the
+// same words; all 37 registered verbs answer a second intent identically. And implementing it
+// instead — `submitIntent` honouring the flag — moves the G2 pin
+// (00d72434… → 6bfe8bb8…), which is a ruling and not a lane's call.
+//
+// So the truth is written down here, where it can fail: there is ONE policy, it applies to
+// every verb, and interruption is something the WORLD does to a body — never something a
+// mind can ask for.
+describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () => {
+  const CFG = DEFAULT_CONFIG
+  const busyWith = (verb: string): WorldState =>
+    applyAll(makeWorld(), [{ type: 'action_started', payload: { agentId: 'a1', verb, params: {}, duration: 100 } }])
+
+  it('★ refuses a second intent while ANY verb in the registry is running — all of them', () => {
+    // `walk` is excluded because `fold` re-plans its path from the params and this fixture
+    // gives it none; its refusal is asserted by name in the busy-agent test above.
+    const kinds = Object.keys(VERBS).filter((k) => k !== 'walk')
+    expect(kinds.length, 'the registry emptied out').toBeGreaterThan(30)
+    const answers = new Set<string>()
+    for (const kind of kinds) {
+      const r = submitIntent(busyWith(kind), CFG, 'a1', 'sleep', {})
+      answers.add(r.ok ? `ACCEPTED while ${kind}` : r.reason.replace(` ${kind}`, ' <verb>'))
+    }
+    expect([...answers], 'a verb got a different answer from the rest').toEqual(['already busy with <verb>'])
+  })
+
+  it('★ and the only thing that ends an activity early is the world, not another intent', () => {
+    // Every `action_interrupted` the engine emits, and who emits it. A mind is on none of
+    // these lists: `submitIntent` has no path that produces one.
+    const s = busyWith('sleep')
+    expect(s.agents.a1!.activity).not.toBeNull()
+    const byIntent = submitIntent(s, CFG, 'a1', 'eat', {})
+    expect(byIntent.ok).toBe(false)
+    const src = readFileSync(new URL('./intent.ts', import.meta.url), 'utf8')
+    expect(src, 'submitIntent learned to interrupt without a ruling').not.toContain('action_interrupted')
+    // and the world's own four reasons still clear it
+    for (const reason of ['blocked', 'gone', 'collapsed', 'rest']) {
+      const cleared = applyAll(s, [{ type: 'action_interrupted', payload: { agentId: 'a1', reason } }])
+      expect(cleared.agents.a1!.activity, reason).toBeNull()
+    }
   })
 })

@@ -1,4 +1,4 @@
-import { TOWN_RINGS_GENESIS, makeCityTemplate, type CityStructure } from '@sj/shared'
+import { TOWN_RINGS_GENESIS, TOWN_SQUARE, makeCityTemplate, townOrigin, type CityStructure } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 import { SHOWCASE_ANCHOR, makeShowcaseMap } from './showcaseMap.js'
 
@@ -33,6 +33,43 @@ export type DevTown = {
 /** Deterministic, collision-free, and readable in a log. Two calls are byte-equal. */
 export function devStructureId(kind: string, x: number, y: number): string {
   return `structure_${kind}_${x}_${y}`
+}
+
+/** ★ THE SHOWCASE TOWN'S SQUARE, in world coordinates. The town grows outward around the
+ *  square, so it is the one town coordinate that has a world coordinate — and it is a FUNCTION
+ *  of the ring count, because the template's own corner walks one PITCH north-west per ring.
+ *  (68, 68) at three rings; (30, 30) at one. */
+export function devTownSquare(
+  rings: number = TOWN_RINGS_GENESIS, anchor: { x: number; y: number } = SHOWCASE_ANCHOR,
+): { x: number; y: number } {
+  return { x: anchor.x + townOrigin(rings), y: anchor.y + townOrigin(rings) }
+}
+
+/**
+ * ★ WHERE THIS ARRAY'S (0, 0) STANDS IN THE AUTHORED FRAME — and why the dev world has to say.
+ *
+ * The engine finds the town by reading the AUTHORED constant `TOWN_SQUARE` (65, 78) and
+ * subtracting `state.origin` (`town.ts` `townSquareOf`). Everything the claim seam does hangs
+ * off that one tile: the blocks, the plots, the street rings, the plat rule's river.
+ *
+ * The showcase lays the same `makeCityTemplate` town at its OWN anchor, so its square is
+ * (68, 68) at ring 3. With no origin the engine looked for a square at (65, 78) — and found
+ * one, because (65, 78) lands on a paved tile of the plaza's own street ring. Not null, not an
+ * error: a confident answer about a town three tiles west and ten north of the one that is
+ * drawn. Every plot it offered sat off the lattice a viewer can see, and `layBlock` would have
+ * paved a second, misaligned grid over the first.
+ *
+ * The field's own meaning is the whole fix. The array's (0, 0) really does stand at authored
+ * (-3, 10), because the showcase array IS the authored frame at a different offset. The check
+ * that this is a derivation and not a fudge: under it the showcase's channel reads as authored
+ * columns 48, 49 and 50 — exactly the channel `CITY_GROUND` knows — at EVERY ring count, and
+ * `devTown.test.ts` asserts that agreement rather than trusting it.
+ */
+export function devWorldOrigin(
+  rings: number = TOWN_RINGS_GENESIS, anchor: { x: number; y: number } = SHOWCASE_ANCHOR,
+): { x: number; y: number } {
+  const square = devTownSquare(rings, anchor)
+  return { x: TOWN_SQUARE.x - square.x, y: TOWN_SQUARE.y - square.y }
 }
 
 /** `rings` grows the LATTICE — the blocks, the streets and the ground the next ring needs.

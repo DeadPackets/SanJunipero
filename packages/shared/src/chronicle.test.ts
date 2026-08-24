@@ -110,6 +110,10 @@ const DEATH_CAUSES = [
   'injury', 'poison', 'illness', 'fatigue', 'exposure', 'hunger', 'thirst', 'slain', 'old_age',
 ]
 
+// The four ways a body can be afflicted (engine state.ts AFFLICTION_KINDS), held here for the
+// same reason DEATH_CAUSES is: shared sits under the engine and cannot import it.
+const AFFLICTION_KINDS = ['fatigue', 'illness', 'injury', 'poison']
+
 describe('the C11 vocabulary', () => {
   it('covers every event the fold knows — weighted, or silent on purpose', () => {
     const fold = readFileSync(new URL('../../engine/src/fold.ts', import.meta.url), 'utf8')
@@ -133,6 +137,29 @@ describe('the C11 vocabulary', () => {
       expect(line).not.toMatch(/[0-9]/)
     }
     expect(chronicleLine(ev('agent_died', { agentId: 'a1', cause: 'exposure' }), look)).toBe('Rahel froze.')
+  })
+
+  // ★ EVERY WAY OF BEING AFFLICTED GETS ITS OWN SENTENCE — the twin of the death-cause law
+  // above, and it was missing.
+  //
+  // `agent_afflicted` used to render everything that was not poison as "has fallen ill", and
+  // the test below only ever asked it about `illness` and `poison` — a check whose passing
+  // condition held while two of the four kinds were narrated as a disease nobody had. It cost
+  // a whole lane: the dev world's first night showed `Day 0 17:02  all five founders have
+  // fallen ill`, five times over, and not one of them was ill. Every one of those was
+  // `escalateFatigue` minting `agent_afflicted{kind:"fatigue"}` after a collapse. The town was
+  // exhausted, and the chronicle told the viewer it had an epidemic.
+  it('gives every way of being afflicted its own human sentence', () => {
+    const said = AFFLICTION_KINDS.map((kind) =>
+      chronicleLine(ev('agent_afflicted', { agentId: 'a1', kind, severity: 1 }), look))
+    expect(new Set(said).size).toBe(AFFLICTION_KINDS.length)
+    for (const line of said) {
+      expect(line).toMatch(/^Rahel /)
+      expect(line).not.toMatch(/[0-9]/)
+    }
+    // Named, not merely distinct: exhaustion must not be able to read as sickness.
+    expect(chronicleLine(ev('agent_afflicted', { agentId: 'a1', kind: 'fatigue', severity: 1 }), look))
+      .not.toMatch(/ill|sick|fever/i)
   })
 
   it('says the body plainly — hurt, ill, poisoned, worse, mending, cared for, buried', () => {

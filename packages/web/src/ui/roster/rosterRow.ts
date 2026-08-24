@@ -45,8 +45,10 @@ export type RosterRow2 = {
 
 export const BUST_PX = 48
 
-/** The viewer's own copy of the world's earshot, because P1 keeps it out of the engine's config
- *  loader. Same number as `DEFAULT_CONFIG.movement.earshotRadius`. */
+/** The FALLBACK earshot, for the frames before the snapshot's config has arrived — the same
+ *  shape `pipsFilled` uses for `BUILD_TICKS_FULL`, and for the same reason: a transcribed copy
+ *  that is also the authority goes stale in silence. Same number as
+ *  `DEFAULT_CONFIG.movement.earshotRadius`, and `configCopies.test.ts` asserts it still is. */
 export const EARSHOT_TILES = 8
 
 /** A bond this warm or warmer is a relationship the run actually made. */
@@ -89,7 +91,8 @@ function substanceFor(
 
 /** Who is close enough to hear. A person indoors keeps company only with the people in the
  *  room with them — a wall is not earshot. */
-function companyOf(state: WorldState, agentId: string): string[] {
+function companyOf(state: WorldState, agentId: string, earshot: number | undefined): string[] {
+  const radius = earshot !== undefined && earshot > 0 ? earshot : EARSHOT_TILES
   const a = state.agents[agentId]
   if (a === undefined) return []
   const out: string[] = []
@@ -97,7 +100,7 @@ function companyOf(state: WorldState, agentId: string): string[] {
     if (other.id === agentId || !other.alive) continue
     if (a.insideId !== undefined || other.insideId !== undefined) {
       if (a.insideId !== other.insideId) continue
-    } else if (Math.hypot(other.x - a.x, other.y - a.y) > EARSHOT_TILES) continue
+    } else if (Math.hypot(other.x - a.x, other.y - a.y) > radius) continue
     out.push(other.name)
   }
   return out.sort()
@@ -109,6 +112,8 @@ export function rosterRows2(
   bonds: BondsResponse | null,
   nowTick: number,
   recent: readonly SimEvent[] = [],
+  /** The world's own `movement.earshotRadius`, off the snapshot. Absent falls back. */
+  earshot?: number,
 ): RosterRow2[] {
   if (state === null) return []
   const rows: RosterRow2[] = []
@@ -130,7 +135,7 @@ export function rosterRows2(
       state: stateWord(a, nowTick),
       conditions: conditionsOf(a),
       place: placeOf(state, a.id),
-      with: companyOf(state, a.id),
+      with: companyOf(state, a.id, earshot),
       substance: substanceFor(state, a.id, bonds, nowTick),
     })
   }

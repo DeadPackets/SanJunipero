@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { CITY_H, CITY_W, RIVER_LOCAL_DX, T_PATH, makeCityTemplate, townSpan } from '@sj/shared'
+import {
+  CITY_H, CITY_W, RIVER_HALF, RIVER_LOCAL_DX, T_PATH, cityGroundAt, makeCityTemplate, townSpan,
+} from '@sj/shared'
 import { TERRAIN_COST, makeFixtureMap } from '@sj/engine'
 import { DEV_MAP_DEFAULT, devTerrain } from './devWorld.js'
 import {
-  FOREST_BAND_X0, GRASS_TILE, PLAZA_TILE, ROAD_TILE, ROCK_HILL, SHOWCASE_ANCHOR, SHOWCASE_H,
-  SHOWCASE_MARGIN, SHOWCASE_W, STANDING_STONE_TILE, ShowcaseMapSchema, WATER_TILE,
-  forestBandX0, makeShowcaseMap, plazaTile, roadReach, rockHill, showcaseDoorTile,
-  showcaseSpan, showcaseStructureTiles, showcaseTerrain, standingStoneTile, toTileId,
+  FORD_ROWS, FOREST_BAND_X0, GRASS_TILE, PLAZA_TILE, ROAD_TILE, ROCK_HILL, SAND_TILE,
+  SHOWCASE_ANCHOR, SHOWCASE_H, SHOWCASE_MARGIN, SHOWCASE_W, STANDING_STONE_TILE,
+  ShowcaseMapSchema, WATER_TILE, forestBandX0, makeShowcaseMap, plazaTile, roadReach, rockHill,
+  showcaseDeck, showcaseDoorTile, showcaseFord, showcaseFordStand, showcaseSpan,
+  showcaseStructureTiles, showcaseTerrain, standingStoneTile, toTileId,
 } from './showcaseMap.js'
 
 const map = makeShowcaseMap()
@@ -32,10 +35,20 @@ describe('makeShowcaseMap', () => {
   })
 
   it('rasterises C13 makeCityTemplate rather than a rival hand-authored layout', () => {
+    // ★ WITH EXACTLY ONE AUTHORED EXCEPTION, NAMED, AND COUNTED. The ford is the only tile in
+    // this map that is not the template's, and it is four of them. The count is asserted so a
+    // second exception cannot arrive quietly under the first one's licence.
     const template = makeCityTemplate(SHOWCASE_ANCHOR)
+    const ford = showcaseFord()
+    const differs: string[] = []
     for (const t of template.tiles) {
-      expect(tileAt(SHOWCASE_ANCHOR.x + t.dx, SHOWCASE_ANCHOR.y + t.dy)).toBe(toTileId(t.to))
+      const x = SHOWCASE_ANCHOR.x + t.dx, y = SHOWCASE_ANCHOR.y + t.dy
+      if (tileAt(x, y) !== toTileId(t.to)) differs.push(`${x},${y}`)
     }
+    const fordTiles = Array.from({ length: FORD_ROWS }, (_, i) => `${ford.x},${ford.y0 + i}`)
+    expect(differs, 'the map disagrees with the template somewhere other than the ford')
+      .toEqual(fordTiles)
+    for (const y of [ford.y0, ford.y1]) expect(tileAt(ford.x, y)).toBe(SAND_TILE)
     expect(map.structures).toHaveLength(template.structures.length)
     expect(new Set(map.structures.map((s) => s.kind))).toContain('well')
   })
@@ -57,6 +70,49 @@ describe('the founders landscape (spec §10)', () => {
     expect(first).toBeGreaterThanOrEqual(0)
     expect(last - first + 1).toBe(CITY_H)
     for (let y = first; y <= last; y++) expect(column[y]).toBe(WATER_TILE)
+  })
+
+  // ★ THE FORD. `devBridge.test.ts` proves the engine accepts a deck here and nowhere else in
+  // the channel; these are the map's own facts about the spit, at every ring count.
+  it('★ reaches a spit of sand out from the town bank, four rows, at every ring count', () => {
+    for (const rings of [1, 2, 3, 4]) {
+      const t = showcaseTerrain(SHOWCASE_ANCHOR, rings)
+      const f = showcaseFord(SHOWCASE_ANCHOR, rings)
+      expect(f.y1 - f.y0 + 1, `rings ${rings}`).toBe(FORD_ROWS)
+      for (let y = f.y0; y <= f.y1; y++) {
+        expect(t[y]![f.x], `rings ${rings}: the spit at y=${y}`).toBe(SAND_TILE)
+        expect(t[y]![f.x - 1], `rings ${rings}: the channel beside the spit`).toBe(WATER_TILE)
+        expect(t[y]![f.x - 2], `rings ${rings}: the channel beside the spit`).toBe(WATER_TILE)
+        expect(t[y]![f.x - 3], `rings ${rings}: the west bank`).not.toBe(WATER_TILE)
+      }
+      // one row above and one below it, the channel is three again
+      for (const y of [f.y0 - 1, f.y1 + 1]) expect(t[y]![f.x], `rings ${rings}: y=${y}`).toBe(WATER_TILE)
+    }
+  })
+
+  it('★ and the spit is on the eastmost column of the channel, which the GRAMMAR still calls water', () => {
+    for (const rings of [1, 2, 3, 4]) {
+      const f = showcaseFord(SHOWCASE_ANCHOR, rings)
+      // The plat rule must go on refusing to seat anything here — `townGroundOf` unions the
+      // grammar's channel with the world's, so the spit is walkable ground and never a plot.
+      expect(cityGroundAt(f.x - SHOWCASE_ANCHOR.x, rings), `rings ${rings}`).toBe('water')
+      expect(cityGroundAt(f.x - SHOWCASE_ANCHOR.x + 1, rings), `rings ${rings}: east of the spit`).toBe('bank')
+      // and it is due west of the square, so the reach fill's box can never exclude it
+      expect(f.y0 + 1, `rings ${rings}`).toBe(plazaTile(rings).y)
+    }
+  })
+
+  it('★ and the deck the crossing needs spans the water the spit leaves, and stands on it', () => {
+    for (const rings of [1, 2, 3, 4]) {
+      const t = showcaseTerrain(SHOWCASE_ANCHOR, rings)
+      const d = showcaseDeck(SHOWCASE_ANCHOR, rings)
+      const stand = showcaseFordStand(SHOWCASE_ANCHOR, rings)
+      expect(d.w * d.h, `rings ${rings}: a deck that is not two planks`).toBe(2 * RIVER_HALF)
+      for (let dx = 0; dx < d.w; dx++) expect(t[d.y]![d.x + dx], `rings ${rings}`).toBe(WATER_TILE)
+      expect(t[d.y]![d.x - 1], `rings ${rings}: the west end`).not.toBe(WATER_TILE)
+      expect(t[stand.y]![stand.x], `rings ${rings}: the tile a wright stands on`).toBe(SAND_TILE)
+      expect(stand).toEqual({ x: d.x + d.w, y: d.y })
+    }
   })
 
   it('carries a forest band on the east edge and a rocky hill in the north-east', () => {

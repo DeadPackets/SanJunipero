@@ -1,4 +1,4 @@
-import type { SimConfig } from '@sj/shared'
+import type { SimConfig, TownFacing } from '@sj/shared'
 import type { FaunaKind } from './data/faunaDefs.js'
 import type { ForageableKind } from './data/forageables.js'
 
@@ -69,6 +69,13 @@ export type Structure = {
   hp: number; maxHp: number; flammable: boolean; stage: 'construction' | 'complete'
   progressTicks: number; builtBy: string | null; burning: boolean; burnTicks: number
   owner?: string                          // absent = public; the hash-stable form of `agentId | null`
+  // ★ WHICH FACE THE BUILDING PRESENTS, and absent means `sw`. The claim seam TURNS a building
+  // to suit its plot and a turned 2x2 is byte-identical to an unturned one, so `w`/`h` cannot
+  // answer for a house the way they answer for a deck — `doorFrontOf` had one option, the
+  // default, and on an SE plot that answer is a wall. Absent-means-default is the same
+  // convention `forge/buildingArt.facingKind` already uses (the bare kind IS sw), and it is
+  // what keeps every world that never turns one hashing exactly what it always hashed.
+  facing?: TownFacing
   inscription?: { text: string; by: string }  // absent = unmarked; only the latest layer, the log keeps the rest
   // The tick a fed fire burns down to. Absent until somebody stokes it, so an unlit hearth is
   // a hearth that was never lit — and the same field answers "is it warm" and "is it bright".

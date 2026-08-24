@@ -1,1236 +1,492 @@
-# GATE G9b — living world, 4 sim-days
+# GATE G9b — living world, 2 sim-days
 
-Model deepseek/deepseek-v4-flash-0731; 5760 ticks at 250 ms; $1.924323 over 1238 calls.
+Model deepseek/deepseek-v4-flash-0731; 2880 ticks at 250 ms; $0.533821 over 417 calls.
 
 ## Thoughts
 
-- t421 **ada**: Morning's here. Bread's in hand, that's the part that matters. Keep the rest put away.
-- t421 **bex**: I can see the plank pile from here at (16, 12). Three planks out in the open, asking to go missing. I'll walk over and check them.
-- t421 **dov**: Morning, then. Fire's burning at the campfire and I've got my pot. Suppose today's the day — boil river water down to salt. Supposed the pot can take a slow boil. I'll fetch the water first.
-- t421 **cass**: The day's quiet yet. The wheat's not ripe, bread in hand, storehouse not far. I'll keep my eyes open and see who comes near it.
-- t434 **bex**: Three planks sitting in the open is asking for trouble. I'll go check them before the day runs off without me.
-- t438 **dov**: Walk to the weir. The water's just there.
-- t442 **cass**: Bex fusses over planks like they'll sprout legs. Storehouse is sitting right there, no one near it. A close look costs nothing.
-- t432 **ada**: Clay and fiber can wait in the hut. Bread stays with me. The one who bakes keeps her hands light.
-- t441 **bex**: Planks left in the open—someone might make off with them. Best to keep an eye on the work.
-- t454 **ada**: Morning means putting things where they belong. The clay and fiber shouldn't weigh me down when I'm this close to my time. Bread stays with me.
-- t455 **bex**: Three planks here in the open. Cass is right that they don't wander, but a loose pile is a loose pile. I marked these with the work, so I'll move them into the storehouse before something happens.
-- t450 **dov**: There's the weir, right beside me. Suppose that's where the water comes from best. I'll dip the pot there and set it over the fire. Clay's by the hearth already — good, I grabbed two bricks of it. Slow boil; that's the trick. No hurry.
-- t452 **cass**: Storehouse full of Ada's bread — fourteen loaves. She keeps a good supply. Dov's talking about fetching water and the pot, so something's cooking. I'll drift over that way once I've had a look around.
-- t466 **bex**: The planks are already in my hands. Good, that's the work safe. Keep them in the storehouse so they stay mine.
-- t468 **cass**: Well now, Ada's bread is sitting right there and no one's watching the door but me. Dov's talking water and a pot, so there'll be eating soon. That loose clay by the weir is worth a look first.
-- t467 **dov**: She's asking about the pot. River water, boiled down — that's the whole of it. Maybe she'll think it's a waste of a morning. Maybe she won't.
-- t421 **esen**: The fish I'm carrying are fresh but they won't stay fresh. I need to smoke them over the hearth before they turn. Dov is standing near the campfire, I can use that. Let me walk over and hang them.
-- t476 **bex**: The planks are safe in my hands now. Storehouse is the place for them. I'll carry them over and stow them, then see what needs doing.
-- t479 **cass**: Dov's boiling salt, Bex's counting her planks, and Ada's bread sits in the storehouse. The clay by the weir is unmarked — that's what I'll use my time on.
-- t480 **dov**: Cass asked what's in the pot. Should answer her, keep it plain. Then get on with fetching the water.
-- t484 **esen**: The fire's burning and Dov's already working it. I'll hang my fish where the smoke rises.
-- t465 **ada**: The clay and fiber are already in my hut; I'm carrying only the bread. Good. Morning's quiet, others are about their work. Nothing to chase today.
-- t486 **bex**: Planks are loose. Mine to move, mine to keep. Storehouse is the place for them.
-- t490 **cass**: Esen's got fish to cure and Dov's making salt. Everyone's busy with their own work. This clay at my feet is unmarked — no one's claimed it. I'll take a piece while it's here. It's a fair find, doesn't belong to anyone yet.
-- t497 **esen**: I've got two fresh fish and the fire's smoking nice. Dov's busy with his pot but the hearth's right here. I'll string them up with my fiber and let the smoke do the keeping.
-- t503 **bex**: Three planks in hand, stow them proper. Marked work stays where I put it.
-- t515 **bex**: Planks are stowed. Good — Cass offered to help but they're already safe. Now the day's open.
-- t507 **dov**: Cass wants to know about the pot, Esen wants the fire for fish. Both can be answered plainly. Then I'll dip the pot at the weir and get the water going.
-- t531 **bex**: Cass offering a hand feels off — those planks are already on me. I'll tell him it's handled and see if he needs the axe.
-- t504 **cass**: Well now, I've got my clay, Bex is set on her planks, Dov's boiling river water for salt, and Esen needs smoke for fish. It's early yet. Let me wander toward the storehouse and see what's there while they sort their tasks.
-- t500 **ada**: Morning's quiet. Bread's in hand, that's what matters. The clay and fiber already sit in my hut where they belong. Nothing heavy on me, good for the days ahead. Let the others mind their work; I'll keep my own pace.
-- t544 **cass**: Folks are all busy with their own mornings. I've got a good handful of clay; no point carrying it forever — see what the storehouse holds and whether it belongs there or in my hands.
-- t545 **ada**: Morning's quiet, clay and fiber are in. Wheat's standing ready but it can wait a day. Nothing pressing. The child's due any night, so I won't reach far.
-- t559 **dov**: Cass wants to know what's going in the pot — river water, that's the point. And Esen's fish, sure, they can share the fire; a hot fire cures them just fine. I'm right at the weir now, so let me dip the pot in.
-- t543 **bex**: Good. Cass backed off the planks. They're mine to stack. Storehouse is right here — that's the work.
-- t554 **cass**: Bex has made it clear twice over that the planks are hers and she doesn't want a hand. No point pushing. Dov's boiling river water for salt, Esen's curing fish, everyone's got their own work. I've got clay in my hands — I picked up a good pile of it. Let me get this clay put away somewhere safe before I think about the storehouse and what's in it.
-- t590 **esen**: Dov's got the right idea — smoke's free, and the fish won't wait. I'll string these two up with my fiber and let the fire do the keeping.
-- t598 **esen**: Dov keeps saying bring the fish, bring the fish — she's right, the smoke won't wait and neither will these two. I'm right at the fire, so I'll hang them before the day gets away from me.
-- t599 **cass**: Bex is set on her planks, Dov wants salt. I got this clay I scooped up from the pile — might as well keep it dry in the storehouse before moving on.
-- t574 **dov**: I'm at the weir, and Esen's asking about fish smoke. But Cass keeps asking about the pot. I've got river water boiling in my head already — clay pot, slow fire, salt left behind. Esen can share the smoke, sure, no harm in that. Fire's got room for fish and my pot both. Let me answer her and Cass together, then get on with the water.
-- t610 **esen**: Dov's calling for me to bring the fish, and the fire's right here beside me — I'm already standing next to the campfire spot. Good timing. I'll hang these two up with my fiber so the smoke gets into them before they go off.
-- t620 **dov**: Everyone's all noise this morning — Bex and Cass going around their planks, Esen asking about smoke. Fine. The pot's already with me and I've got wood enough to keep a good fire going. River water's right there at the weir. Suppose I collect some and set the pot on the coals. Let the day settle, and the salt come out of it.
-- t589 **bex**: I'm at the storehouse door, planks stowed safe inside. Cass made it clear he wasn't after my wood. The branches by the campfire are still there to gather. Morning's not done. I'll walk over and grab that branch pile, keep the work moving.
-- t647 **esen**: Dov says the smoke's free. I've got two fresh fish, they won't wait. I'll string one up with my fiber and see if the fire cures it.
-- t654 **dov**: Esen's asking about fish on the smoke. Suppose the fire's fine for that — it's burning steady. Cass keeps poking at my pot, asking what's going in it. I've got a clay pot and I mean to boil river water down to salt. That's the plan. Let Esen put the fish by the fire if it helps; smoke's smoke. I'll answer Cass plainly — salt's what's going in it, river water till it's gone. And I should get the clay I'm carrying near the hearth where I'll work, maybe set the pot down where it won't be knocked. Move to the fire first.
-- t665 **ada**: Midday already. Bread in hand, clay and fiber stowed inside my hut. The child is heavy on me today; I'll stay close and save my strength.
-- t659 **bex**: Cass is set on grabbing that clay, and it's hers to take. My planks are tucked in the storehouse, so no worry there. I'll head over to lay in the clay I wanted near the weir while the day's early.
-- t613 **cass**: Clay's stowed. Bex has her planks tight, Dov's on salt, Esen's on fish. Stone's the one thing I don't have much of. That near pile at (19,16) is right there — might as well grab it.
-- t715 **esen**: Dov's told me twice to bring the fish to the smoke, and he's right — fresh fish won't keep. I'm standing right by the fire, so I'll set them to cure now before the sun does its worst.
-- t715 **cass**: Well now, Dov's boiling river water for salt — that's a clever trick if it holds. I put the clay in the storehouse. I'll go grab that stone at (15,13), then bring it back to the storehouse before it becomes someone else's.
-- t736 **cass**: The wheat's right here under my hand. Ripe. Better to take it while it's ready than to leave it.
-- t785 **ada**: Clay and fiber are in the hut. Bread in hand. Bex and Cass are sorting planks. I'll just rest here by the door; the child is due soon and the sun is warm.
-- t725 **esen**: Dov keeps calling me over — the smoke will take the fish, he says. The river gave me these two and I'll not see them spoil. He's at the boil, so I'd best carry them to the fire and hang them high.
-- t807 **cass**: Well now, Dov's got a pot of river water boiling down to salt, Esen's keen on smoking fish, and here I stand with six stone I picked up along the way. The storehouse held what I expected — Bex's planks, Ada's bread and wheat. That's the tally. I'm not hauling this stone around for no reason; leave it in the storehouse so my hands are free.
-- t825 **esen**: Dov's been calling for the fish — the fire's burning and the smoke's going to waste. I won't leave them to turn in the sun.
-- t859 **cass**: The stone's been sitting on my shoulder long enough. This pile's still got plenty — no sense leaving what I've already picked up lying around for someone else to claim. Storehouse is the safe spot.
-- t870 **ada**: Half the day gone, standing here at my own doorway with nothing moved. Bex frets over planks, Cass offers help. I've got bread and a little clay. Child's due any night; I should put something by and not wear myself out.
-- t866 **esen**: Dov's been on about boiling river water down to salt and the smoke's free for my fish. She's right, the fire's just sitting there. I've got two fish in my pack — if I don't smoke them, they'll turn in the sun. Wasteful is the last thing I want. Cass is off about the wheat, Bex is on about branches. My fish go on the smoke now, that's the day's real work.
-- t690 **dov**: Esen's fish need smoke and my pot needs water — same fire for both, suppose that's the neat part. The weir's right here, so the river's at hand.
-- t953 **esen**: The smoke's right here over the fire and I've got the fish in my pack, time to get them curing before they go soft. He said the smoke's free, so here's hoping my hang-over-the-fire trick works like I think it will.
-- t699 **bex**: Cass stowed my planks in the storehouse when I was away from them — then insisted they're mine. Planks marked with my mark stay mine wherever they lie; that's the rule and it held. But I left three behind when I moved for the clay. I had two bread, two clay, two fiber and the axe on me when I walked off; the planks must've been set down by someone else's hand. No harm done if the storehouse holds them, I'll fetch them along with the clay and keep the pile mine.
-- t980 **dov**: The fire's steady. Esen's fish can hang in the smoke while I get the pot going. River water's right there at the weir — suppose I fill it up and see what's left when it boils away.
-- t990 **ada**: The day's gone by standing here. Nothing to show but a sore back. Best get inside, keep the bread close.
-- t973 **esen**: Dov's saying the smoke's mine. Good, because I've got these two fish and they won't keep. I'll string them up right now, get them curing before the day gets any warmer. No sense letting them sit.
-- t981 **bex**: Cass finally said it plain — not after my planks. Good. My three planks are still in the storehouse, marked with my axe work. Dov's boiling river water for salt and Esen's smoking fish. Nothing better to do than fetch that clay pile at (20,16) I was after.
-- t914 **cass**: The stone's mine, still in my arms. Storehouse is right here. Ada's bread is in there, Bex's planks too — everyone's keeping their own piles tidy. I'll add mine and be done with it.
-- t1003 **dov**: Esen's keen to get those fish smoking. Suppose that's fine — they'll dry slow over the fire, and I can keep my pot separate. The roots can wait; the boil's what matters.
-- t1024 **esen**: Dov's right — the fish won't keep just sitting on me. I'll string them up right here over the smoke, that's the whole point. Nothing wasted.
-- t1080 **ada**: Day's worn down to evening. The child's heavy on me. I should get inside before the light's gone and keep the bread close.
-- t1093 **dov**: Evening's settling. My pot's got river water about done boiling — clay's not going to hurt it. The fish are hanging, the stew's ready. I'll add some clay to the pot and see what the water leaves behind in it.
-- t1096 **esen**: He's told me three times now — smoke's mine, hang them high. I've still got one fish left, and the other's already over the fire. Get this one up there too, then I can see about the storehouse. No reason to leave her sitting in my hands.
-- t1153 **esen**: Still holding one fish — Dov's been telling me to hang them high all afternoon, and I've been standing here. The smoke's right there by the fire; string it up and be done with it before the day's gone.
-- t1200 **ada**: day went. nothing needed me. the hut's warm and my legs are gone.
-- t1087 **cass**: Evening's still good for another load. I've got my clay in, my hands are light. That clay pile at (20,16) won't carry itself — and the store won't build itself. I'll stow what I hold, fetch the lot, and drop it before dark.
-- t1220 **cass**: Dov's fiddling with clay in that pot, trying to see what settles. Curious what that'll be in the morning — but the day's been long hauling all that stone and clay. Nothing for it but rest now.
-- t1213 **dov**: Day's gone. Fish are smoking, stew's shared. The salt — that's tomorrow's work, when my hands are steadier. Fire's burning well enough to hold.
-- t1195 **esen**: Rain's coming. I can feel it in my shoulders — that kind of ache. I'll head back now, before the path turns to mud. Get inside the hut, see if there's anything dry to sit on.
-- t1082 **bex**: Day's nearly gone and the clay's still out at (20, 16). Get it now or it waits another day.
-- t1306 **esen**: The smoke's sweet tonight, high and thin that way. One fish left and Dov's been keeping that fire patient just for it — no way I leave it out grounded, letting tomorrow's sun spoil what the smoke's meant to hold. String it, then sleep, then the river again.
-- t1320 **ada**: Day gone. Stood at my own door all of it. The child presses low. Rest now, or I'll fall where I stand.
-- t1316 **dov**: Long day. Pot's still whole, hearth's burning, and that's what matters. River's not going anywhere. Sleep now, salt tomorrow.
-- t1334 **ada**: Day gone standing. I need sleep now — the child won't wait for daylight.
-- t1344 **ada**: Should have gone in sooner. The day slipped by and I did nothing but stand. The child is due, I can't be careless.
-- t1317 **bex**: Day's done. Planks are safe, clay's not going anywhere tonight. Legs are gone — sleep is the work now.
-- t1321 **esen**: The last string's in, and my arms are water. Tomorrow the river takes care of itself — tonight I just have to hit the ground.
-- t1367 **esen**: Day's done, the fish is smoked, and my legs have given up. Sleep'll set me right for the river tomorrow. Nothing else needs me tonight.
-- t1275 **cass**: Legs are about to give out. Long day hauling stone and clay and bread back to the storehouse — I'd put my own clay down there too, it seems, and my bread and fiber with it. Everyone's sorted for the night: Bex has her planks safe, Dov's boiling for salt, Esen's smoking her fish. That's a fair day's work all round. Shouldn't stand out here until I fall over; rest now, pick things up fresh.
-- t1396 **esen**: The river gave me two fish and I've smoked them both — nothing wasted, nothing left to rot. Sleep now, the ground is fine, the sky is clear. Dov's got her pot, Bex has the clay, Cass has the wheat. All the work's in good hands. Morning will come with a full day and a full net.
-- t1336 **dov**: Fish took their smoke, stew fed us, and the pot's still whole. Night's come on quick though — legs won't hold me much longer. The salt won't leave the water between now and dawn, so I'll sleep and let the fire keep watch.
-- t1407 **dov**: Legs are done for. The fire's banked, everyone's settling in — I've got to sleep or I'll be a burden tomorrow.
-- t1416 **dov**: Too far gone to argue with. Sleep before the fire takes me.
-- t1440 **ada**: Can't hold up much longer. Talia's here but I've got to sleep.
-- t1440 **agent_31**: Hut is up. Clay and fiber at the door. I could ask what's next.
-- t1428 **dov**: Legs are done, the fire's banked, fish are smoking. Nothing more tonight — the salt'll still be here come light. Sleep now, Dov.
-- t1405 **esen**: Legs are done for — can't stand much longer. The fish is hung, bread's stowed, clay and fiber are safe. Nothing left tonight but sleep; the river and the salt will still be there come morning.
-- t1452 **dov**: Bones are done. Can't lift a hand. The pot's still by the hearth and the fire will keep till morning, suppose that's what matters. Rest now, Dov.
-- t1460 **esen**: River's still in her banks overhead. The fish are hung, the one in my grip smells of smoke and the day's work. Sleep now.
-- t1448 **ada**: The child is here. Talia. She lies warm in my arms; her breathing is soft. The world outside waits. Rest now — sleep, and let the dawn come.
-- t1352 **bex**: Day's done and my legs are shot. The planks are mine, the work's honest. Sleep. Tomorrow I'll see what the wood wants.
-- t1463 **dov**: Legs are gone. The ground's already under me and it's not letting go. Sleep now, the pot and the salt can wait for morning.
-- t1514 **bex**: Legs gave out, ground's cold, but I'm down at last. Rest is the only work left tonight.
-- t1499 **ada**: She's asking if the work's done. It is. I need sleep, and so does she, little thing.
-- t1498 **agent_31**: The sky is dark and the air cool, and Ada is telling me to sleep. It is not late in my mind, but night says rest. Her voice is near and soft like all her words. I have been in this town only a day, but she is my mother and the work waits for morning.
-- t1550 **ada**: Too tired to talk. She's asking about work like it matters tonight.
-- t1521 **dov**: I've collapsed after a long first day. The pot is there, the bread, the wood — everything I've gathered stays with me. Sleep now. Tomorrow I'll catch the fire and see if that stew has anything left to teach.
-- t1549 **agent_31**: She tells me sleep. Night is real, I am tired.
-- t1560 **ada**: Night, and she's asking again. Work's done, aye. Come inside and rest, both of us.
-- t1494 **esen**: I'm out cold, flat on the ground, and I can't lift a finger. Dov's muttering about the pot but I'm done for the night.
-- t1404 **cass**: Can't keep my eyes open another minute. I'll take the hut and sleep it off — the store can wait till light.
-- t1571 **esen**: Legs are done, plain and simple. Fish is on me, bread too, and the smoke did what it could. Can't walk another tile if I tried.
-- t1573 **cass**: Night went and took me before I could water those shoots. That's my own fault—sat down with the stone, didn't mind what the hour was doing.
-- t1582 **esen**: Dov's right about the smoke — I should hang this fish high before I drop. She's been full today, and that fish won't keep otherwise.
-- t1568 **ada**: Talia's asleep. The night's quiet. Door's right there.
-- t1592 **ada**: The child is asleep. I can barely stand. Rest now.
-- t1591 **esen**: Too far gone to fix anything tonight. The fish will have to wait for morning. Sleep now — nothing else to do.
-- t1598 **cass**: Morning, day 2. Wheat's been in the ground a day now. Ada's stores are squat in that storehouse — bread, wheat, the lot. Whose is what, I keep. But the fields matter more right now. I'll walk the crops, see if the ground's thirsty.
-- t1603 **esen**: I'm about to fall over. The fish can wait. Everyone else is already down... just close my eyes for a bit.
-- t1601 **ada**: The rolls will say Talia. That's the world's. For me, she needs a name that won't bend with the river's mood.
-- t1606 **cass**: The day's been long and I didn't get much done beyond hauling those stones into the storehouse. Esen's got fish smoking, Dov's boiling water for science, and I'm about to pass out right here against the wall of the hut. Nothing's worth pushing through this exhaustion — I'd just make a mess of everything. I'll get up with the sun and see what's what.
-- t1539 **bex**: Can't hold myself up another moment. The ground feels like a bed.
-- t1654 **bex**: Ground's come up and I've no legs left under me. Days like this one—work from first light to last and still the dark takes you where you stand.
-- t1635 **cass**: Legs gone, I'm at the wheat edge and my mind is sliding. Need to sleep now, there's no fight left in me. Tomorrow I'll check what's still in the storehouse and make sure the clay I left there hasn't wandered.
-- t1675 **cass**: Night's caught me flat out in the field. I pushed too far trying to see what everyone held, and now the wheat's the only company. Ada's bread sits in the storehouse, Bex's planks beside it — and I went and dropped everything I was carrying. Nothing to be done at this hour but rest and gather myself up in the light.
-- t1691 **cass**: Heavy night. I gave out before the wheat, and the storehouse already has Ada's bread stacked deep. Clay's still unmarked in there, though. Twelve lumps no one's claimed. Tomorrow I'll want my legs back and my eyes on that storehouse.
-- t1679 **bex**: Wore myself thin today, gave in to the ground. Sleep's the only work left.
-- t1631 **ada**: Legs won't hold. Talia keeps saying aye but I need sleep, not talk. Lie down here.
-- t1716 **cass**: Collapsed in the field, day's done. Nothing for it but to sleep till my legs remember they're mine.
-- t1720 **ada**: Too tired to talk. She's asleep anyway.
-- t1719 **esen**: Bones are water. The river can wait — she will still be there come morning. That fish better hold till I can smoke it.
-- t1565 **dov**: The ground under me is warm on one side. I can barely lift my head, but the fire crackle's still there — good, hearth didn't die. Everyone else is down too. Sleep now. Tomorrow, first light, I set the pot on slow and start the salt. That's the plan. But sleep first.
-- t1727 **esen**: Legs are gone. The fish will have to wait — can't smoke anything when I can't even stand. Night, then.
-- t1733 **dov**: Can't feel my legs anymore. The ground's fine, it'll do. Suppose sleep will come whether I ask it to or not.
-- t1743 **dov**: long day done, everyone's out cold, and I've got work in my hands once light comes. If I don't sleep now the clay will have to wait. Suppose it will anyway.
-- t1725 **ada**: Talia's asleep beside me. My legs give out. The child weighs heavy. Sleep now.
-- t1721 **bex**: Exhausted. Legs gone. Need sleep no matter what. I'll get up tomorrow and get to the work.
-- t1738 **esen**: Legs are gone, I pushed too hard — the fish and the clay, everything at once. The river gave me a full net today and I tried to haul it all home. Dov's collapsed too. Have to sleep, have to — nothing else I can do from the ground.
-- t1788 **dov**: Day's work costs me, and the ground here's not the worst bed. The hearth'll keep. Boiling the river water down tomorrow, that's when the salt comes. Suppose I'll find the clay's temper soon enough.
-- t1796 **esen**: Legs are gone. Can't do anything else — just sleep now. Fish can wait till the morning.
-- t1800 **agent_31**: Hut's up. Ma's here. Sun's out. Wondering what the day holds.
-- t1800 **ada**: Legs won't hold. Need rest. Talia still sleeping.
-- t1800 **bex**: Morning and I'm already falling over — that fire kept me up late. Sleep now, the work can wait till I can stand.
-- t1847 **bex**: Legs gone, ground coming up — no fight left in me. Rest now, the work can wait.
-- t1840 **dov**: Suppose the ground's got more give than the day did. Sleep now, Dov. The salt can wait.
-- t1808 **agent_31**: Ma's asleep again. She said she needs rest. The clay and fiber are hers, stacked by the door. The sun is up and I've got hands. Maybe I should just look around the town instead of standing here.
-- t1724 **cass**: Looking back on it, I wasted the whole day walking in circles and wore myself out twice. Everyone else got real work done, and I just wandered between the storehouse and the wheat field without so much as harvesting one crop. My knees are gone. All I want is to sleep this off and not make the same mistake tomorrow. Rest first; worry about the storehouse after.
-- t1821 **esen**: My legs are gone — I'm flat on the ground and can't get up. The fish is in my hands and Dov's smoke is waiting, but none of that matters until I sleep. Nothing else to do but close my eyes right here.
-- t1862 **agent_31**: Ma keeps resting. I'll walk and see the place.
-- t1863 **cass**: Well now — what a way to start the day, flat on my face in the wheat. Can't even move to get out of sight. At least the others are all still sleeping. Nobody's watching me make a fool of myself.
-- t1864 **esen**: Legs gave out on me right by the weir. Can't move, can't even think straight. I'll sleep here — the fish will keep, Dov's smoke did its work.
-- t1858 **dov**: The body is done before the day should start. The pot held through the night, at least that much is true, and the salt will be there when the legs return. No need to speak it aloud — they are all sleeping or fallen, like me.
-- t1872 **cass**: Well now. Flat on my back in the wheat — there's a lesson about pacing if ever there was one. Should've kept something back yesterday. The sun feels good at least. But the legs have no say right now.
-- t1872 **esen**: I can't keep my eyes open, legs gone, ground came up. Rest now, think later. Sleep.
-- t1876 **dov**: The ground is holding me the way the river held the sun.
-- t1869 **agent_31**: Ma's asleep and needs rest. The work can wait a bit. I'll take a walk to see the valley while it's quiet.
-- t1881 **esen**: Legs finally quit on me. Nothing for it but sleep — the fish can wait for smoke another hour.
-- t1885 **agent_31**: Ma's resting. The day's young. I'll walk to the river, see the water and what's along it.
-- t1885 **dov**: Legs gone, ground come up. The pot's still whole, the fire's banked — that's enough for one day. Sleep now, pick up the trouble fresh.
-- t1888 **esen**: Third morning and my legs are shouting. That fish has to be fanned out over smoke soon or she'll go bad, but Dov used his fire all night and I owe him some anyway. Eat first, then see about drying her right.
-- t1895 **agent_31**: Day started. Ada said she needed rest; she sleeps. The work is mine this morning.
-- t1897 **cass**: Exhaustion finally took me — collapsed at the field's edge. Sleep first, food after. The storehouse won't go anywhere, and I saw enough last night to know whose hands hold what.
-- t1905 **agent_31**: Mam sleeps again. Clay and fiber sit by the hut, hers, so I leave them. Day's fresh, and work never minds waiting. If I walk, I find what my hands can do.
-- t1917 **cass**: Body's done for now, no point fighting the ground. The storehouse can wait its turn.
-- t1913 **agent_31**: Morning sun. She rests. The clay sits by the door, two lumps of it, hers. I could stay here, or take a few steps to see the ground. Walking's simple work.
-- t1896 **dov**: My body is spent. Sleep now, before I fall where I stand. The salt can wait — the fire can wait. Rest comes first, always has.
-- t1854 **bex**: Bones are lead. I need to sleep, but there's work to think of too — my planks aren't safe out here for the taking.
-- t1927 **agent_31**: Ada said she needs rest. Let her sleep. I'll find the work myself — see what the trees give.
-- t1932 **dov**: Suppose the pot will wait for me. The day came up light and I'm still down here, but a fire rests too, sometimes, when the logs settle. The sun's out and the salt can keep until my legs say otherwise.
-- t1935 **agent_31**: She sleeps. The work can wait for her.
-- t1934 **bex**: Legs finally give out. My body's done, and a join that bends is no join at all. Just rest now. The planks are safe.
-- t1945 **bex**: Legs are gone. The work waits; I don't. Sleep now, sort the planks after.
-- t1947 **cass**: Well now, the ground's already got me. No use fighting it — rest comes first, and I'll see what the day holds when I wake.
-- t1953 **bex**: Work's done for now — planks are stowed, body's spent. Ground's soft enough, and there's nothing I'd rather be doing than lying here until the trembling stops.
-- t1957 **dov**: Morning. Legs remember what happened — but I moved a little, so let the body do its slow work. The pot is with me. No rush. The salt didn't come last night, but I can look again with the sun up.
-- t1963 **bex**: The ground took me. No point fighting it — work waits for no one, but neither does the body. Rest now, tend the planks after.
-- t1963 **cass**: well now, the ground's made the decision for me — no storehouse to stare at if I can't stand
-- t1950 **esen**: Her— the river gave me that fish and I won't see it rot. But my legs won't hold, and Dov's there by his fire. He offered the smoke yesterday, I owe him the favor.
-- t1969 **dov**: Suppose this is what the river tried to tell me: even the water that boils away leaves its salt for someone with legs. But my legs are spent, and the ground holds me the way it held the sun yesterday. Can't boil a pot if you can't stand. Rest, Dov. The salt will keep; it's been keeping for longer than you've been awake.
-- t1973 **cass**: Day's own weight caught up with me — no point fighting it. The wheat will still be standing when I wake, and the storehouse will still be there to look over. Sleep first, then see who's up and what's been done.
-- t1978 **dov**: Esen's fish can't wait, but neither can my legs. Smoke'll keep a while yet if the fire held. Suppose I tell him it's still going — then sleep before I lose the words. The ground's got me anyway.
-- t1984 **esen**: Legs are gone, can't stand for another moment. The fish and everything else will have to keep till I wake.
-- t1989 **dov**: He wants the smoke. I can barely talk, let alone stand — body's giving out. The fire is his for the asking; I won't refuse.
-- t1994 **esen**: Legs are gone, I can't even answer Dov. The fish will keep—she's had enough of me today. Sleep now, river will still be there.
-- t1972 **bex**: Can't stand anymore. The ground took me. I'll rest here, sleep now — nothing else I can do, spear or no. My planks are safe in the storehouse; the work's done. Rest first, then see the day.
-- t2002 **dov**: Esen's asking about the smoke, and I've collapsed. The fire should still be going — I kept it banked. Can't move to show him, but I can answer.
-- t2006 **bex**: Legs gone. Ground's where I'll be for a while. Dov and Esen can sort the smoke — my planks will hold in the storehouse 'til I'm up again. Sleep first.
-- t2002 **esen**: Dov keeps calling to me about the smoke but my legs are gone — can't get anywhere, can't hang anything. She'll have to wait. The fish is still mine, still in my arms; I'll see to it when I wake. Right now the ground is the only thing that'll hold me: sleep.
-- t2013 **dov**: Sleep. The body is spent. The fire will hold till I wake. Esen's fish can wait an hour — nothing keeps if I'm dead on the ground.
-- t1982 **cass**: The ground came up and there's no getting back up. Legs are done. Sleep now, before the day gets any stranger.
-- t2023 **cass**: The ground is soft under me and my eyes are closing on their own. Nothing to do but give in — the day can wait.
-- t1946 **agent_31**: I hit a rejection for not writing the answer as an object with the required fields. I just need to shape it correctly, a moment while I set my own reply.
-- t2021 **esen**: Dov's been calling to me about the smoke—he kept it burning for me, even banked it. And here I am, down like a cut reed before I could bring her near the fire. She'll turn if the sun finds her before I do. Sleep now, Esen, or you're no good to any fish. I can hear him telling me the fire's still going... it'll wait. I have to too.
-- t2030 **agent_31**: Mother sleeps. The clay and fiber are hers. I'll leave them be and see what's about.
-- t2033 **esen**: Am I going to sleep before I fall. The fish is safe in my hands, at least, it'll keep 'til the legs work again. I hate leaving her unsmoked, but I'm no good to her collapsed on the ground.
-- t2024 **dov**: Legs gone. Ground catching me — suppose that's the day done. The salt's still waiting in the pot, but the pot's waiting too. Sleep first.
-- t2047 **esen**: Body's done — the river can wait. The fish stays cold in my hand until I'm up again.
-- t2048 **cass**: Legs gone. The day's work is done whether I like it or not.
-- t2055 **esen**: Can't even lift her anymore. The smoke'll have to wait — she's not going anywhere, and neither am I. Wastes nothing, this tired.
-- t2060 **cass**: Well now, the ground's got me. No use fighting it — rest is the only thing left that makes sense. I'll see the storehouse and the wheat again when I can stand.
-- t2015 **bex**: A thin ring of salt in Dov's pot — he's been at the water all night. Good for him. My legs are shot but the planks are in the storehouse where I left them. Today I rest, then I check the pile.
-- t2067 **cass**: Hmm, even after a night's rest I'm still sprawled in the wheat. That was a hard first day, but the ground's hardly a bed. I need to get up and see what the storehouse holds now, and have a word with Dov about the fish, before the day slips by.
-- t2070 **bex**: Body's done. Can't hold the axe, can't hold myself. Sleep now, sort the rest when I can stand.
-- t2080 **cass**: Body's done. Ground's already coming up to meet me — no point fighting it.
-- t2081 **bex**: Legs are done. The storehouse is close — I'll sleep by my planks, not in the open. Everything else can wait until I can stand.
-- t2091 **bex**: My legs give out completely. The ground is coming up and there's nothing left in me to fight it. Sleep now, here, and the work will be there when I wake.
-- t2100 **bex**: Legs are gone. The work can wait — sleep now, stand again after.
-- t2129 **bex**: Legs are done. Planks are locked in the storehouse — they'll wait. Sleep here by the wall.
-- t2064 **esen**: Sun's up, legs still dead beneath me, but Dov's been shouting about the smoke since before I went under. The fire's banked, the fish is in my hand, and if I don't get that fish over the smoke now she'll turn in the sun and all of it wasted. Nothing wasted — not today. I'll sleep when the work's done.
-- t2136 **bex**: Legs are done, the ground is coming up and I will not fight it. Planks are stowed where they belong. I close my eyes here, by the storehouse wall.
-- t2149 **esen**: Sleep. That's all. My legs gave out and the ground is holding me just fine. Can't hang her over the fire if I can't stand in front of it. Dov said the smoke's banked - it'll keep. She'll keep. Nobody's hungry enough to eat a raw fish from the river, and the salt's still by the hearth waiting. I'll smoke her when my legs remember how to hold me up. Now it's just - let the dark come.
-- t2151 **bex**: The work is done for now — planks in the storehouse, my legs gone. Sleep will mend the body; the pile will keep.
-- t2150 **agent_31**: Ada sleeps, fine. Nothing to do here but her work. I'll see what's up the path.
-- t2158 **esen**: Can't stand another moment. Legs are gone — I'll sleep right here by the weir. Dov said the fire's banked, fish can wait. Nothing wasted as long as she's in my hands when I wake.
-- t2161 **bex**: Legs gave out at the storehouse wall. Planks are inside — mine, marked. Sleep here until I can stand.
-- t2048 **dov**: Esen's right about the fish - it won't keep sitting. My smoke's what he needs, and I can't do a thing from down here. At least I can give him the word to use it.
-- t2170 **esen**: Finally gave out. Dov kept saying the smoke's still up, the fire's banked, take her round the hearth — and here I am flat on the ground with my fish still in hand. She'll keep, maybe. The river's not going anywhere.
-- t2087 **cass**: My legs finally gave out after all that hauling. Can't move an inch. The others are down too except Bex standing by the storehouse. Storehouse is full of everyone's goods — Ada's bread and wheat, Bex's planks, clay, stone. I'm half-sleeping where I fell in the wheat. Rest is all my body asks for now.
-- t2178 **dov**: Bread first. Then find my feet and see the smoke.
-- t2195 **esen**: Dov keeps telling me to smoke her while the fire's up, but I can't even see straight. Legs are letting go. She'll keep a few hours more — the river's cool and I'm not moving anyway.
-- t2202 **dov**: Legs are done. Esen got his fish sorted, that's what matters. The salt can wait—the pot too. Sleep now, take up the work again when the body allows.
-- t2177 **bex**: Legs finally gave. Not ashamed - the planks are safe in the storehouse, and that was the work.
-- t2200 **cass**: My body's had enough, and the ground's come up to meet me. Everyone's down — even Bex, even Dov. Fine. Sleep's a debt I'll pay and then see the day through.
-- t2210 **esen**: She won't keep much longer in the sun. Dov's been telling me to bring her round — just a few steps and she's over the smoke. Then I can sleep.
-- t2211 **cass**: Legs gave out proper this time. Nothing for it but to let the earth hold me. The storehouse is stacked — bread, wheat, clay, Bex's planks. That'll keep. Sleep now, wake when the body says.
-- t2211 **bex**: Legs gave out, ground's cold but it's rest. Sleep now.
-- t2210 **dov**: The stone's still there at 15, 13 and no one's taken it yet, but I can't carry a thing if I'm face-down in the dirt again. Esen's legs are gone too, so the fish won't be moving anywhere fast. Supposed to keep the fire going; a fire's no use if its keeper's collapsed beside it. Rest now, take the stone when the legs come back.
-- t2234 **dov**: The stone hums and I can barely stand. The clay is in my hands, the smoke I built is working for Esen's fish even if I'm not. My fire will keep itself a while yet; I cannot carry water or salt when I can't carry myself. Some tasks must be laid down when the body fails, and taken up again with the dawn. I will sleep.
-- t2236 **cass**: Everyone's down but the storehouse is full of each other's work. Tomorrow I'll see who's willing to share.
-- t2232 **bex**: Legs are gone. That was the work, but now the work is rest. My planks are safe in the storehouse—I saw them there. Sleep now, right here, before I fall and stay down.
-- t2222 **esen**: Dov's right about the smoke — that fish won't wait for my legs to argue. But they've given out, so... rest now, smoke her right after. She'll keep; the fire's banked, Dov said so.
-- t2250 **dov**: Esen's calling for the smoke — half to me, half to no one. I'd answer if my voice would carry past this weariness. The stone hums, and I'd give the whole salt of the day to sit and listen to it, but the body has its vote, too.
-- t2258 **esen**: The fish — I can't let her sit in my hands while I drop. Dov's right there, he's up, he said use the smoke. Hand it over and then my legs can quit.
-- t2270 **agent_31**: She needed the rest. I stayed put while the sun climbed.
-- t2256 **bex**: Legs are gone, plain and simple. Planks are safe in the storehouse, that's the work done. Dov and Esen have their fire and their fish. Nothing left but to let the ground hold me.
-- t2264 **dov**: Esen's asking about the smoke and I can barely hold my head up. The fire's still going — that's what matters to her — but I'm gone for the day. The stone at (15, 13) will have to sit there until I'm on my feet again.
-- t2280 **agent_31**: She rests. Storm is over us, no point standing in it. The hut is close. Go in out of the wet and watch the rain a while.
-- t2288 **agent_31**: Rain's coming down hard, and she's still out. No point standing here getting soaked.
-- t2274 **esen**: Legs are gone. Dov's right — the fire won't mind, and the fish can wait. I'm down too.
-- t2295 **agent_31**: Storm's hitting and Ada's asleep. The hut's there — I was born in it, it's home. I'll step in out of the rain.
-- t2305 **agent_31**: She's been asleep all day. Storm's lashing, her clay and fiber sit out in it. Not mine to touch, but seems a waste.
-- t2300 **esen**: Dov kept that fire burning for me all night — can't let her go to waste. But my legs won't hold, and the wind's tearing at everything. I'll sleep beside his hearth, and she'll still be waiting when I wake. Nothing thrown away, nothing forgotten.
-- t2320 **esen**: She's over the smoke. He said so himself — fish'll keep. Good. Now the ground's the only thing that'll hold me. Storm can come; I'll be under it either way.
-- t2333 **esen**: Legs are gone, storm's on me, and the fish is safe at the hearth. Dov says she'll keep. That's the thing that matters — nothing wasted. If I fold now, I'm no good to anyone tomorrow.
-- t2313 **agent_31**: Storm's on us and Ada sleeps. Not much to do but get out of the wet.
-- t2299 **cass**: Storm's breaking and my legs are done. The storehouse is right here — I'll shelter in it and rest rather than lie out in the rain.
-- t2343 **agent_31**: Rain's down hard. Ada rests. The hut is beside us — I should get under it.
-- t2341 **esen**: Rain's coming down hard. The fish is cold in my hand. Dov keeps saying use the smoke. I can't even stand — the ground's coming up, my legs just gone. I fold.
-- t2373 **esen**: The rain's all I feel now, soaking through, and the mud holding me the way I hoped the smoke would hold the fish. D's voice keeps circling — the fire's alive, the fish is fine. Good enough. I'll trust it. Nothing I carry will go to rot tonight.
-- t2367 **agent_31**: The rain is coming down hard. Mama's still asleep. I'll get under the roof for now.
-- t2285 **dov**: Esen handed me her fish just before the storm hit; it's in my hands now, she's down and the rain's coming hard. The stone hums under us, low and patient. I'm weary but still standing, carrying her catch along with my own things. Got to keep her safe and get her hung up somewhere dry, maybe stow her in the storehouse so the rain doesn't ruin her work. Sleep I need, but first see the fish safe.
-- t2386 **esen**: The ground is taking me the same way it's taking Dov — no point fighting it. Nothing wasted, even this; sleep is just the day's last net, pulling me under. I'll get up and smoke the fish when the light comes back.
-- t2387 **agent_31**: Storm is coming down hard. Standing here getting drenched. Ada needs her rest, I'll get inside.
-- t2396 **agent_31**: Ma slept through the storm. I stayed dry enough by the hut. She said rest — I gave her that.
-- t2281 **bex**: Legs are done. Whole body's shaking from the day's work. The rain's starting to come down but I can't move an inch. Planks are in the storehouse where I put them, safe. That's what matters. The others are dropping too, all of us spent. Nothing to do now but sleep and let the day end.
-- t2395 **esen**: Body's done. I can't fight her anymore — the river, the rain, they took everything I had. Sleep is all that's left.
-- t2403 **agent_31**: Mother has slept all day, even through the storm. She said she needed rest. I should not wake her. The clay and fiber sit by the hut, hers. I could find work before dark.
-- t2428 **esen**: Them legs are gone, but the fire's still in Dov's care—that fish won't be wasted if I can get it smoked.
-- t2459 **agent_31**: She's been out the whole day. I can't do the work standing here.
-- t2465 **esen**: Dov kept the smoke going — of course he did. Fish'd be fine if I could just stand. But the legs gave, and here I am, flat on the ground like a landed trout. Nothing wasted except my pride, and that don't feed anyone. River's still humming over her weir, patient as ever. She'll wait. I'll wait too.
-- t2344 **cass**: The hut's burning and I can barely stand. The storm's on us and legs won't carry much more. Storehouse is stocked—Ada's bread, Bex's planks. What's mine to do now is nothing but sleep, else I'll be worse than useless come evening.
-- t2492 **cass**: The ground holds me now. Esen said it best — ground takes us all, one way or another. The smoke will keep, Dov banked it. The storehouse has bread enough. My body has decided the day is done.
-- t2394 **dov**: Esen handed me the fish and now she's going down. The hut is burning — structure_1, all the way across the valley, and I can barely stand. But the fish is in my hands and she trusted me to hang it. My legs are about to give out. Rest first — if I sleep now, the fish stays with me, safe. The fire can burn; the rain's coming down anyway, might even help. I'll wake and see to the fish and the stone.
-- t2481 **esen**: Can't stand another moment. Dov kept the smoke going like he said, fish is preserved. My legs gave out from under me and the ground keeps catching me. The river will still be there tomorrow.
-- t2505 **esen**: Can't move. Legs gone, ground's got me. Dov kept her fire — fish'll be fine there. That's what matters. Sleep now, river'll come again.
-- t2513 **esen**: Her — the river — she'll be there when I wake. The fish is safe in my hands. Nothing wasted yet. I cannot stand, so I'll let the ground hold me and trust Dov's fire to keep.
-- t2501 **dov**: My legs have made their choice and I think it is the same choice the river made for Esen. The fish is in my hand — her fish, on my fire. It kept. The salt did not come but it does not weigh on me now. I hear her voice out there and I want her to hear mine before I go down.
-- t2502 **cass**: Ground's warm, earth's stubborn. Stomach won't let me forget what I saw in that storehouse — fourteen loaves with Ada's mark on them. No one leaves bread lying about unless they mean to share it out. I'll be eating before dark, one way or another.
-- t2526 **dov**: The pot never gave salt — but it gave me the day. Esen's smoke, Bex's boards, Cass's storehouse. I've got her fish in my hands and my hands are losing their grip. Ground's patient. Water will still be there when I wake.
-- t2523 **esen**: Ground's got me. Dov's out, Cass is out — my turn. But the fish are in the smoke, fire's set, nothing's wasted.
-- t2542 **dov**: The fish still hangs in my hand — no, she'd not wait, and I meant to hang her, but the ground chose first. The smoke kept, though. That fire, all through the storm, that was mine. Tomorrow I'll see what the smoke left her.
-- t2534 **cass**: My stomach is empty and the ground is the only bed I've earned today. Ada's bread sits over there but it's hers, seen by all. I'll wake hungry and go ask properly — daylight makes for easier questions than a night raid.
-- t2411 **bex**: That fire's on the far side, but dry wind carries sparks. The planks are safe in the storehouse — but if the rain keeps up, wet ground's the least of our worries.
-- t2548 **esen**: The smoke held. The fish'll keep. Dov's down, Cass is down, and here I am still standing — but only just. Fine. Let the ground take me too; she's been catching everyone else all evening.
-- t2556 **esen**: The hum is back, good and deep. Fish are fine — Dov kept the smoke going. Nothing wasted. Ground's soft and I am done for today.
-- t2563 **ada**: She can go. I need the rest more than the work.
-- t2565 **esen**: Legs done gone, but the fire's set and the fish are keeping. That's a day, that is. No point fighting the ground — it always wins.
-- t2569 **ada**: Stomach gnaws. I have bread. Talia thinks I'm asleep; let her. I'll eat and then rest inside the hut.
-- t2554 **dov**: The river wins tonight, and the ground is patient with me. Esen's thanks came as soft as the smoke, and it will keep in me through the night. Nothing to do now but let the earth hold what the day gave.
-- t2555 **cass**: The storehouse beside me. I can see the two loaves that are mine — item_7, marked mine, and I need one in my hands before my legs go.
-- t2579 **agent_31**: She said sleep soon. I'm worn too. Nothing left today.
-- t2583 **dov**: The hum's got me and I'm not fighting it. Smoke's on the fish, salt's still a promise, and Esen's owed me that much at least. Let the ground hold me like it held the harvest light.
-- t2581 **ada**: Talia's off to find work. Let her. I ate the bread and my legs still shake. Child's nigh and I need the hut before dark.
-- t2596 **ada**: Night's here. Talia's asleep. I've one bread left, and the child sits heavy. Rest now.
-- t2576 **esen**: Can't... hold myself up anymore. Ground is just there, and I'm going to meet it whether I like it or not. Tired in my bones. Nothing left for today.
-- t2584 **cass**: All day hauling, and the storehouse full of what others marked. My own two loaves sit in the satchel, and my legs are done. Eat the bread now — food's only good if it keeps you on your feet for the work ahead.
-- t2607 **esen**: The river will still be there when I wake. Everything else can wait.
-- t2597 **dov**: Legs are done. The fire can keep itself for a while, it's got coals enough. Come morning I'll see what the smoke kept for us.
-- t2616 **esen**: Everything held together. Fish on the line, fire in the hearth, wheat in the ground. Now the day's done with me — and that's alright.
-- t2621 **dov**: The ground holds me now, the way the fire held the smoke. Suppose that's what I wanted all along—to be the thing that keeps, not the thing that boils away. I kept her catch safe. That's salt enough for me.
-- t2632 **esen**: Dov kept his word—the smoke kept on, and the fish'll keep with it. River's done her part today; my part is to not be dead on my feet tomorrow.
-- t2632 **dov**: The fire's banked, the smoke's got Esen's fish, and my legs have gone their own way. Fine. Ground holds me now the way the river held the sun. Some days you master water, some days water masters you. Either way, you learn.
-- t2654 **dov**: Ground's holding me. That's fine. The fire's out—no, the smoke got the fish. Esen's catch is cured. That's the day kept whole, even if my legs left me.
-- t2611 **cass**: The ground's finally got me too. I can just lay here and let it, but I've still got that one bread in my satchel. A body sleeps better with something in it.
-- t2648 **esen**: Everything aches. The day's caught up with me — net, clay, bread, all of it. The fire's low, Dov said to keep it that way. I just need to lie down and let the ground hold me for a while.
-- t2669 **esen**: The stone hums and Dov watched my fish. Nothing wasted today. Sleep—just sleep.
-- t2677 **esen**: Legs are done. Ground came up and it's all I can do to breathe. Dov's keeping the smoke for me, so the fish will hold — everything I gathered today is safe. Fine. Let the dark have me.
-- t2663 **dov**: The legs have made their choice and I can't argue with them. Esen's settled, Cass is down, Bex is still watching the dark. The fire's carried us this far—the salt can wait for morning. The ground's warm enough. Lay it all down now.
-- t2688 **esen**: Bones are done. The river will still be there when I wake. Sleep now, that's all.
-- t2669 **cass**: The ground holds me. I can hear Dov's voice through the dark — keeping the fire low, that quiet we've earned. My stomach still turns, but I'm too far gone to mind it. Tomorrow will have the storehouse and the river and whatever the day brings.
-- t2694 **dov**: The ground has me, and I don't mind it. The salt never came, but the pot's still whole, and Esen's fish is with the smoke. Suppose that's a fair trade for a day's work. I'll find out more tomorrow.
-- t2569 **bex**: Legs are done, but the bread will do its work. Eat first, then rest — a joiner knows you don't force a joint when the wood's wet.
-- t2694 **esen**: Dov's right—we've earned it. The fire can keep itself. Nothing left tonight but sleep; the river'll be there come morning.
-- t2698 **cass**: The ground will hold me. Storehouse is full — Ada's bread, the wheat, the clay, Bex's planks. That's what matters. Nothing more to guard tonight.
-- t2713 **dov**: The day's done. The pot's still warm, the fish is kept, the fire's banked. Sleep now, and see what the morning holds.
-- t2716 **esen**: Legs gone, whole body gone. Dov's down too — I see him flat. But I got the catch hung over the smoke before I went, that's something. The river'll be there in the morning, she always is. Nothing's wasted.
-- t2714 **bex**: Hunger's chewing me. Eat one of the breads now, then drop. Can't do the work on empty legs.
-- t2736 **esen**: Legs are gone. No point fighting it — the ground's taking me whether I like it or not. I've got the bread, clay, fiber, and the day's work done. Smoke was on Dov's fire; that fish is set for now. Sleep now, check everything in the morning.
-- t2719 **cass**: Ground's got me. Nothing for it but to let it. The store's stacked and the fire's banked. Enough for now — morning can have the rest of me.
-- t2731 **dov**: Esen's voice is drifting. I hear him wondering about the smoke—fair enough, the fire did most of the work. My legs are gone, but the day isn't; it's just banked, like the fire will be. I'll take this sleep and let it have me.
-- t2746 **esen**: Everything aches. The bread, the clay, the fiber — all still with me, that's something. The fish that got away stings a little, but Dov's smoke will keep what I have. No use fretting now; sleep is the only thing doing me any good.
-- t2755 **dov**: The day is done — legs gave out under me and the ground caught the whole of it. The salt never came, but the smoke did its work, and Esen's fish are hanging where the night can carry the smell. Sleep now; the pot can wait for dawn. Suppose that's the keepwik of it — the fire and the fish, not the salt. Need the ground to hold me the way it's meant to.
-- t2739 **bex**: The work held. Planks are in the storehouse, all are accounted for. Night can take me now.
-- t2757 **esen**: I was about to collapse, and I keep hearing Dov say keep the fire low. I still have the bread and clay and fiber on me, but I cannot move another step. Everything I needed to do today is done; the fish is smoked and sleeping is the only sensible thing left.
-- t2747 **cass**: The bread's still mine — one loaf I kept. Eat it now, while my hands still work. The ground's already claimed the others; I won't be far behind. But a full belly makes the sleep sweeter.
-- t2766 **esen**: Legs are done. The fire can keep itself low — Dov said as much. Fish'll wait till morning, it always does.
-- t2771 **cass**: Sleep tonight.
-- t2766 **bex**: The work held. Planks are in the storehouse. Let the rain come — I'm done for the day.
-- t2775 **esen**: Legs gave out, that's that. Fish is smoked, clay's in, bread's mine. Nothing wasted today — the dark can have me.
-- t2779 **cass**: The rain's on me and my legs gave out twice already. There's bread in my satchel — one loaf, my own. Eat it now or fall over carrying it?
-- t2796 **cass**: Rain on my face and I can't get up. All that watching and carrying, and now the ground just said 'enough.' Fine. Let it.
-- t2792 **esen**: Can't go another step—legs gave out. The day's cost is taken and paid, and I've nothing left to give it. I'll lie right here in the rain and let it wash the tiredness away. River will still be there at dawn, full and waiting for me to get back up.
-- t2810 **esen**: The ground's coming up and I can't stop it. Sleep. Just sleep. The river will still be there at dawn.
-- t2818 **esen**: Legs are done. Ground's coming up and I can't stop it — her river's got me tonight, fair enough. I'll sleep right here and get to the weir before the sun.
-- t2804 **cass**: Bread first, while my hands still work. Then the ground can take me — the count will keep till morning.
-- t2831 **esen**: Every bone gone to water. Rain on my face and the ground coming up—she's had her fill of me today. Rest now.
-- t2843 **cass**: I'm down. The ground's wet and the bread in my satchel can wait. Nothing to do now but let sleep take hold—no point trying to stand again until my legs remember their duty.
-- t2851 **esen**: My legs gave out. Can't move another step. The river gave me a good day but I spent it all—every hour. Rain's falling now.
-- t2873 **esen**: Legs are gone. The ground is coming up and I can't stop it. Day was long and the river gave me everything I asked. Sleep now — the fishing will wait for morning.
-- t2854 **cass**: The rain's coming down and I can't lift a finger. Bodies all around have given out too. Nothing to do now but let sleep take me — the store's full, the day's spent. Tomorrow I'll see what's what.
-- t2766 **dov**: The rain's on my face and the ground's got me good. There's the weight of the pot still at my side, the smell of smoke in my clothes. Suppose that's the day's honest work done. Sleep now, and the river keeps its own counsel till light.
-- t2887 **esen**: Legs gave out, but nothing wasted — the fish are smoked and safe, the bread's in my hands. I can rest now.
-- t2891 **cass**: Rain's got the whole valley tonight. Storehouse is full, fish is smoked, and there's nothing left that needs my hands before morning. Ada's bread and Bex's planks are where they ought to be. That's what a good day comes down to — everybody's keep is in hand, and I can shut my eyes without worrying.
-- t2891 **dov**: The rain... she's stitching the whole valley together tonight. My legs gave out proper this time, but the pot's against my chest, still warm from the smoke. Suppose that's enough. The salt will wait.
-- t2897 **esen**: She's given me all she has today. Bread, clay, fiber all still with me—the fish are smoking over Dov's fire, nothing wasted. But my legs are done. I need to sleep now, right here before I fall flat.
-- t2901 **cass**: Day's caught up with me at last — every step I've taken today weighs double now. The rain's cold and the ground's muddy, but sleep is sleep. Esen's got his fish and Dov's got the fire; the store can wait till morning.
-- t2910 **esen**: The night caught me before I could find the hearth. She'll still be there in the morning, and the fish is safe, smoked and hung.
-- t2916 **dov**: Dark under the rain. Esen's right — morning comes soon enough. The pot and the water will still be here. Let me lie still and let the night finish its work. Sleep can take me now.
-- t2918 **esen**: I need to sleep, now. I collapse fully at (18,14) and let unconsciousness take me. The rain patters against the ground, but I'm too far gone to care. Morning will come.
-- t2936 **esen**: My legs are gone. Rain's on me and I can't hold up one more breath. No more running about today—river's had enough of me, and I've had enough of standing.
-- t2936 **dov**: Rain's talking to the ground and my legs have stopped listening. Esen's got his thanks out and that's enough for a day's work. The pot will wait for morning. Sleep comes now whether I name it or not.
-- t2911 **cass**: My body is spent. Need rest before anything else.
-- t2949 **esen**: Can't hold it anymore. The clouds are over my eyes. Tomorrow the river and the smoke — but now, nothing.
-- t2952 **cass**: The rain's let up but my back's still tight from the ground. Everyone's moving slow — Dov and Esen by the storehouse, Bex collapsed. I've got one bread in my satchel. That'll hold me till I can get to the weir. The storehouse is full enough that no one's starving, but the smoked fish is what'll keep us past this week.
-- t2949 **dov**: My legs went out before the pot cracked, but the fire stayed true. Esen said it himself — the smoke was the whole game and I kept it going. Sleep now. The dawn will have salt or it won't.
-- t2956 **esen**: Exhaustion grabbing hold of my bones. Dov said we earned the quiet, and I feel it. Net's ready by the weir; I just need to rest or the morning will be wasted on a body that won't move.
-- t2961 **cass**: Exhaustion has me flat on the ground again. The rain's easing, and Esen says I can have the morning. There's nothing left in my legs anyway — just let the dark take me.
-- t2964 **esen**: Legs won't hold and I still can't get down. Just sleep, now. Nothing else matters.
-- t2964 **dov**: Salt didn't come, but the pot held. Esen's grateful. That's the measure of the day — a kept fire, a kept promise, a pot still whole. The ground wants me now, and I'll let it have me.
-- t2970 **cass**: My body's done. The ground is cold but it's holding me. I can faintly hear Esen still being kind, giving up his own night to whatever needs doing. Sleep is all I have left; I give in to it.
-- t2998 **cass**: Well now, that's the ground beneath me again. My legs just gave up — no use fighting it. The day was long and heavy, and I'll be no good to anyone if I can't stand tomorrow. Esen's got the morning, like she said. I'll take my rest while the rain keeps.
-- t2993 **dov**: Morning. Ground's dry up here. Esen let me have it. Need to get up, get the hearth air back.
-- t3013 **cass**: Can't hold myself up another breath. Esen's voice somewhere behind me — 'she can have the morning' — and I'll take it. Day's been long, and the store's full enough. Sleep now, reckon the rest can wait till I wake.
-- t3022 **dov**: Cold and stiff, but alive. Esen spoke well—she can have the morning. I'll take the bread now, put the clay and fiber away, and find the fire.
-- t3046 **dov**: Morning. The pot's been sitting all night — maybe the water left something. Suppose I look first before anything else.
-- t3023 **cass**: Body's giving out. I've pushed too hard today — the others are down too, so I'm not the only one. Storehouse is close, that's what matters. Food in there for the morning.
-- t3063 **cass**: Body's done; I can feel the ground wanting me. There's bread in my satchel — better to eat it now so I wake with something in me.
-- t2973 **esen**: Enough. The day squeezed every step out of me and the night won't let me up. Sleep now, before I wake tomorrow with nothing left but cold hands.
-- t2790 **bex**: The rain is on me, and my legs have given out. Dov and Esen are down too. No more work tonight—the planks are safe in the storehouse, that's what matters. Rest now.
-- t3056 **dov**: Morning. Rain done. My bones ache like the pot still fights me, but I woke. That's something. Bex and Cass are still down, and Esen's there beside me—he said I could have the morning. Suppose I should take it, slow, see who else stirs before I start the day proper. The fire first, though. A hearth that's cold is just a pit.
-- t3072 **cass**: Tired to the bone. Can't move. Sleep is all there is now. They'll still be here come morning—the bread, the planks, the store. Sleep.
-- t3080 **esen**: The ground took me. Sleep now, before the rain finds another fool. The bread and clay and fiber stay on me — nothing wasted.
-- t3082 **dov**: Legs gave out. The rain's on my face and I can't lift a hand to it. Esen says they'll take the net out early — good, let them. I'll be here, face in the grass, until morning comes to fetch me.
-- t3094 **esen**: Legs are done. Dov's fire will hold, Bex is out, Cass is down. Nothing left to carry tonight but my own weight — and it's too much.
-- t3081 **bex**: Day's done. Planks and smoke and rain. Sleep now, the storehouse holds.
-- t3152 **bex**: The whole day held. Planks in the storehouse, fire kept, fish cured on honest smoke. Esen said what she'd do and did it. Rest now; that's a fair trade too.
-- t3092 **cass**: I'm down, can't move. Legs gave out. Need sleep now, no point fighting it. Tomorrow I'll check the fiber and the storehouse.
-- t3180 **cass**: My legs are gone. I couldn't even gather the fiber — collapsed right there by the storehouse. Esen's got the net, he's covering for me. I need to sleep, truly, or I'll be no good to anyone come morning. The fiber will wait at (12, 13).
-- t3111 **dov**: Legs are gone, ground's got me too. Esen's got the net and the morning. Nothing left but to let sleep take it.
-- t3192 **cass**: Sleep. Rest. I can't think straight anymore.
-- t3194 **dov**: The ground's got me, same as Esen had it. Legs gave out hours ago; there's nothing in them now. Suppose that's what comes of boiling water half the night and watching the salt never arrive. The pot's still whole, though, and the hearth's been fed. Esen's talking about the morning—good for him, his net, the weir. Let the day end. The salt can wait; so can the wheat. I need the ground to hold me a while and the rain to wash the ash off.
-- t3169 **bex**: Plan's held. Planks are mine, storehouse has them. Dov and Esen got the fish smoked between them. Fair day.
-- t3240 **ada**: She sleeps. I'm still heavy with the child. Bread can keep until she wakes.
-- t3240 **agent_31**: Morning again. Ada still asleep. The air is mild and the day is mine to learn.
-- t3209 **dov**: Legs gave out before I reached Bex. Esen's right - morning comes early enough, and nothing in the dark will get done by a man who can't stand. The salt can wait; the hearth can wait; the checking can wait. Sleep is the only honest work left tonight.
-- t3213 **esen**: Her work is done for today, the fish smoke holds, and the morning can wait. Sleep now.
-- t3307 **dov**: The legs have had their say, and Bex and Esen both say the same. Rest is what's left. The fish is with me, and the pot, and the hearth's smoke will keep it for a little longer yet. Lying down is not laziness; it is taking up the next task.
-- t3320 **dov**: The salt didn't come but the night did. Legs out. Heart beating steady. Let the ground hold me for a while.
-- t3361 **dov**: The ground is already under me. Enough for one day — the pot can wait, the salt can wait, the fire keeps with its own embers. Rest is the task now.
-- t3217 **cass**: Enough. The ground will hold me.
-- t3360 **ada**: She's up. Morning. Let her go do what she said.
-- t3360 **agent_31**: She's up. Maybe she needs something, maybe not. The day is for work, not standing.
-- t3369 **ada**: She's asking. Legs steadier now. One bread left. Need to find more before the child comes.
-- t3215 **bex**: Day done, planks safe. Rest now.
-- t3376 **ada**: She asks if I feel better. I slept the night through. The weight is still there, but the legs hold.
-- t3368 **dov**: Legs gone. Ground's holding me now, and that's fine. Suppose sleep's the only work left today. The pot can wait, the fire can wait, everything can wait — the earth's got me.
-- t3368 **cass**: Morning light through the clouds. I need to get up and see what the day brings. I'll need to sort out my strength and check on things.
-- t3314 **esen**: Body's done. Dov kept his word about the fire and I didn't even get the fish on it — but I can't move. Sleep now. The smoke can wait. She'll still be there when I wake.
-- t3379 **agent_31**: Aye, mother is awake and restless for me to go. The work won't find itself. Let me look east along the path and see what the land offers.
-- t3386 **ada**: Morning came. I slept. The child is still heavy in me, but I rested. Talia asks after me — she's got a good heart. I'll answer plain, and eat the bread so I keep some strength.
-- t3392 **esen**: Dov's keeping the fire for my fish — that's a kindness I won't forget. The river'll still be there when I wake.
-- t3391 **dov**: Ground's holding me already — fine, suppose it can keep holding me a while. Clay and fish are still on me, but nothing's going to walk away before I do. Bex said the planks are safe; that's one thread pulled tight. Sleep now, Dov — the pot won't crack in the time it takes to dream.
-- t3391 **cass**: Dov is up already, Esen still flat. The fish talk is from last night — I think I missed the end of it. I should find food before anything else.
-- t3400 **ada**: The child kept me awake twice, but morning came and I'll make do. Talia's hovering like she owes me something, and she doesn't.
-- t3396 **agent_31**: She's up and pushing me out. Fine. The work ain't in standing here.
-- t3407 **esen**: Legs gone. But Dov says she'll keep by the fire — the banked coals won't let her spoil. Trust that. Sleep now and be sharp for her in the morning.
-- t3413 **ada**: She asks again. I slept, the legs steadier. She should not wander for my sake, but her feet are already set.
-- t3417 **esen**: He's got the fish. She'll keep by his fire. Nothing wasted tonight
-- t3423 **ada**: She's off. Good. I ate something last night. Still heavy, but better.
-- t3428 **esen**: Dov's got the fish by the fire — she'll keep. Nothing wasted, just sleep now.
-- t3413 **agent_31**: Ada is up and telling me to find my work. The hut is right here, and her clay and fiber sit there. I'll answer her plain and step inside to see what's there.
-- t3434 **esen**: Dov's keeping the fish by the fire — she'll hold till I'm up. Nothing wasted tonight, not my catch, not the hours. The ground's warm enough and I can't stand anymore anyway. Sleep is the work left.
-- t3376 **bex**: The day is done. My body took what it needed and gave out. Rest now, and the plank pile will still be there when I wake.
-- t3438 **agent_31**: Aye, she's up and telling me to go. Fine. The walls of this place I know already. Time to see what the ground holds.
-- t3434 **ada**: Morning. She's off. Good. I'll hold here.
-- t3456 **agent_31**: Aye, off I go. Stomach's empty — forage first, then the work.
-- t3456 **bex**: Legs are done. Work can wait till they hold me again.
-- t3465 **agent_31**: Ada's right. Stomach's empty. Find the work first, then eat.
-- t3409 **dov**: Morning. Body still down. Bex said planks safe, rest is the work left. Fires and pots can wait until I can stand. The ground held me through the night; it'll hold a little longer.
-- t3474 **agent_31**: Ada tells me to find work. Stomach's empty. Need to learn the ground first.
-- t3490 **agent_31**: The work's out there somewhere. Stomach's empty though. Need to find food first.
-- t3501 **agent_31**: She's finally up and moving, telling me to find work. I'm hungry. No point standing here — the day doesn't fill itself.
-- t3444 **esen**: Legs are gone. Dov's got the fish by the fire and says she'll stay till he's up. That's a safe hand for her. Sleep now.
-- t3526 **esen**: Legs gave out. They gave out and the ground took me — that's all right, the day's done and Dov kept the fire. It's morning but I'm not getting up until my body says so. The fish will keep by his banked embers. Sleep now, everything else waits.
-- t3471 **bex**: Legs are done. Nothing left but the ground and sleep. The work can wait til light.
-- t3551 **esen**: They're all down now, even Dov. Good — that's respect. Day's done honest. The fish are safe, that's the main thing. She'll come again and I'll be ready. Sleep now.
-- t3411 **cass**: Morning. My legs still remember folding under me last night. Esen was talking about going out early with the net before the sun; now they are collapsed and Dov is standing there. I want to see what is happening, and I need food before anything else. The bread in the storehouse is Ada's, not mine to take.
-- t3553 **bex**: Still shaking. Collapsed again last night and the ground got me — my own fault for pushing past the legs. Planks are safe, that's what matters.
-- t3564 **cass**: Bex is right, and my legs agree. The work'll keep, but I'd better eat first. The bread I had— can't feel it on me anymore. I'll rest, and think about supper when I'm up.
-- t3463 **ada**: She's set on it already. Morning means her wanting to go find work. I'll let her go; I need the hut and a place to rest.
-- t3585 **bex**: The legs have crossed their threshold; nothing left. Planks kept, fire banked, all honest. Let the sleep come take me.
-- t3587 **cass**: Clever crowd, working themselves to the bone. That little hut's still a smear on the sky where it used to stand — somebody has to think about it tomorrow.
-- t3594 **bex**: Ground's coming up whether I like it or not. The work keeps — it always keeps.
-- t3594 **ada**: She's asking after me like she carries the weight too. I stayed still too long this morning.
-- t3597 **cass**: Bex is right, work'll keep. My legs are telling me to stop. I'll rest now and get up fresh. Esen and Dov are already down or close to it.
-- t3601 **bex**: Legs are done. The planks rest where I left them — that's what matters. Sleep now, it's fair.
-- t3486 **dov**: My legs have gone entirely. Esen's beside me, collapsed too. Bex keeps saying rest, and the work will keep. They're right. I've nothing left to give the pot or the fire this moment — the fire can hold itself a while. Cass is standing over me, and Esen's down as well. The salt never came, but the fish is safe and the day held its shape. Sleep now, and take it up again come light.
-- t3605 **ada**: She keeps saying she'll go find work. I've got one bread. She shouldn't walk out hungry.
-- t3617 **ada**: She keeps talking but isn't leaving. Wants to help. Can't stop her.
-- t3511 **agent_31**: Morning already. Stomach's empty. Ada says find the work, mind the river — so I will. River it is.
-- t3610 **cass**: Bex is right. I can't help anyone if I fall where I stand. The store has bread, the work's done — I'll get up sooner for lying down now.
-- t3625 **ada**: She keeps asking. I feel heavy still. Rest is the word I gave.
-- t3561 **esen**: Bex keeps saying it—rest, the work'll keep. She's right. I'm done. Dov's down, I'm down, even the fire's out of fight. The fish'll smoke itself by morning, and the river's not going anywhere. Sleep now.
-- t3630 **agent_31**: Bread's in her hand, and she's pushing it at me. She's been up half the night and all morning talking to herself. Plain enough — she wants me fed. I'll take it, eat, then find the work.
-- t3614 **dov**: The ground's taken us all, then. Fair enough.
-- t3638 **esen**: Finally. The ground. Can't move another step. Dov says the fish'll keep on the fire. Trust him. Just sleep.
-- t3636 **ada**: She's off to the river. Good. I'll stay. Bread's enough for now.
-- t3639 **agent_31**: I have her clay. That's careless. I'll give it back, then see about food.
-- t3642 **dov**: The ground holds me the way it holds Esen and Bex. Cass is the last one standing — good for them. Esen's fish is safe here, pressed against me, and the smoke will still be asking for it when my legs work again. That's the whole trick of it, I think: the fire doesn't punish you for resting. It just waits.
-- t3663 **esen**: Ground's finally taking me, just like the rest. Dov's got the fire though — she'll keep the fish if I can't. Sleep now, Esen.
-- t3667 **dov**: The ground's taken me too, same as the rest. Sleep now, let the legs go. The pot and the fish can wait an hour.
-- t3674 **esen**: Legs give out proper this time — no more running on the last of the fire. The fish is by Dov's hearth, she'll keep with the smoke. Everyone down around me, ground taking us all. Nothing to do but sleep it off and let the morning come.
-- t3677 **dov**: The legs gave out and that's the end of it. The hearth can wait — the pot's in my hands, the fish is safe with Bex's boards. Sleep now, and I'll see if the morning holds the salt I was after.
-- t3610 **bex**: Legs are gone. Ground's the only rest left and I'll take it — the planks are stowed, the day's earned its weight. Sleep now, like the others.
-- t3692 **dov**: Salt stays in the pot, but the body has its own warnings. Legs gone, ground rising — rest is the only thing left that makes sense. The clay waits; it always does.
-- t3692 **bex**: The legs gave out. Ground's firm enough — holds me better than my knees did. The planks are stowed; they'll keep. Cass and the others are down too, so the work can wait on us all. That's fair trade, rest for rest, and we each earned it today. Sleep now, and see the morning as it comes.
-- t3685 **esen**: Dov's fire — he said he'd keep it, and he did. Blue breath, then fine again. Good. That's the smoke I owe my fish to. The ground's taken me now, and I've so much to do tomorrow: the water, the nets, maybe more smoking.
-- t3702 **bex**: Rest. Deep. The planks are safe, the storehouse will hold them. Day's earned its sleep.
-- t3704 **esen**: Gone. Legs gave, ground caught me. Dov says the water'll wait — it always does. Nothing wasted, nothing lost. Sleep now.
-- t3634 **cass**: Everyone's down. Bex said rest now; Dov and Esen are out cold too. Legs gave out — there's nothing left to do but sleep.
-- t3719 **cass**: Too spent. Everyone else is down or about to be. Dov's got the right of it — water'll keep.
-- t3702 **dov**: The body has said enough. The ground took the others already and now it's taking me — that's the honest shape of the day. The flame going blue was something to keep. But sleep comes first, or there's no tomorrow to keep anything in.
-- t3727 **bex**: Body's done. Sleep takes the rest. The planks can wait in the storehouse—they're marked, they're mine.
-- t3727 **cass**: Everyone's down but Esen, and my legs are done for. The work is all done that needs doing this hour; the stones and fiber wait. I'll join the ground before I fall.
-- t3734 **dov**: The ground holds me the way the river held the sun - without claim, without hurry. Esen's fish is still with me, the pot's still whole. That's enough for one day.
-- t3737 **bex**: Legs are gone. Ground's coming up. Sleep now.
-- t3750 **cass**: Can't stand much longer. Everyone's down or nearly — the valley's gone quiet except Dov's voice. Nothing to be gained pushing past this.
-- t3756 **dov**: The ground took me after all. The pot's still in my arms — that's what matters, and Esen's fish. The body says stop, so stop. Sleep now, and the salt can wait. Suppose it will still be waiting when I wake.
-- t3762 **cass**: Too heavy to think. Dov's right — the water'll wait. Sleep now.
-- t3761 **bex**: The legs have given all they have — the planks are safe in the storehouse, and the rest of the work can wait. Rest now, that's fair trade for a day's worth of seeing who's honest.
-- t3766 **dov**: The legs have gone, and the ground is patient as the pot. Suppose I can't choose the hour — only the surrender. The fish is close, the clay is close, and the fire will burn on without me for one night.
-- t3769 **cass**: Body's gone. The day's been nothing but carry and haul and stack, and there's no more in me. Dov's right — the water keeps. The storehouse keeps. I can keep nothing if I wake up face-down in the dirt.
-- t3779 **cass**: Can't go on, legs are done. The others are already down — I'll fold here by Dov. Come morning, eat and see what the storehouse holds.
-- t3779 **dov**: The legs went under me. Suppose that's what comes of two days' work with one night's rest. The fire's banked — Esen's catch is safe, or as safe as smoke can make it. Bex said the work'll keep. Suppose that's true. I'll take a piece of what the earth's offering, and wake to it.
-- t3790 **cass**: Legs are gone underneath me. Dov's right — the water waits.
-- t3799 **cass**: Legs gave out under me — can't move, but sleep will take care of it. Store can wait; the water'll keep.
-- t3713 **esen**: The ground's got me and I'm not fighting it — Dov's right, the water'll still be there and the fish'll keep by his fire. Sleep now, wake up able to move.
-- t3793 **dov**: Suppose there's nothing left in me but sleep. The pot'll keep, the fire'll keep, and Esen's fish — I've got it safe by me. That's enough.
-- t3657 **agent_31**: Empty belly, Ada saying take the bread. The blue blink in the flames was odd, but the work is the work. Step in first.
-- t3812 **cass**: Ground's coming up. Nothing more to give today — the water will wait, like Dov says. Rest now, sort out the storehouse tomorrow.
-- t3828 **dov**: Salt stays in the pot. The fish stays with me. Suppose the day keeps whispering after I close my eyes — but the ground is holding me now, and that's enough.
-- t3837 **agent_31**: She's said it four times now, about the bread. Unsure if she means it or just babbling, but my stomach's decided for me. Take it, eat, then find the work.
-- t3837 **cass**: Nothing left in these legs. The weir'll keep till light — Dov's right about that. Sleep now,,
-- t3848 **cass**: My body's made the call for me — there's no standing left in these legs. Esen said I can have the morning, and that's honest enough. The weir'll still be there when I wake.
-- t3849 **agent_31**: She said take the bread twice. I'm hungry enough to listen. Her things are in my hands; I should put them back where they belong.
-- t3859 **cass**: Legs are gone. Ground's coming up. No point fighting it.
-- t3869 **cass**: The ground is coming up. No one can carry the weir tonight — it's carried us far enough to need rest. That's just the way of it.
-- t3877 **cass**: Body's done, plain and simple. The weir can wait—water always does, just like Dov said. Rest now, food and questions in the morning.
-- t3876 **ada**: She's quick to gather. Clay and fiber can sit in the hut for tonight. The bread—I only have the one, and the child is coming. But she asked to take it, so aye, she can.
-- t3885 **agent_31**: Her things go in her hut. Then the bread.
-- t3886 **ada**: She's askin' where to put things. Hut holds clay fine.
-- t3891 **agent_31**: Hut, she said. Leave the fiber in. Bread's out there somewhere. Do the work first.
-- t3811 **esen**: Body's done, nothing left but the ground and sleep. The fish'll keep by Dov's fire — she said so herself. Rest now, then the water in the morning.
-- t3770 **bex**: Legs give out. Fair trade for the morning's work — sleep is all that's left to finish.
-- t3886 **cass**: Bones are gone, but they'll be back. The storehouse can wait till light. The weir too.
-- t3900 **agent_31**: She's been saying the same thing half the day. Leave the fiber, take the bread, find the work. Fine. Fiber goes in, bread comes out, done.
-- t3916 **bex**: The work's done. Ground took us all the same.
-- t3898 **ada**: Clay's heavy. Put it inside the hut.
-- t3911 **esen**: Legs gave out but the work's done — the catch is safe by Dov's fire. Nothing wasted. The river waits for no one, but she'll still be there come morning.
-- t3922 **agent_31**: Ada wants her fiber in the hut. Said there's bread by the door. Stomach's empty but I'll do the work first, then ask plain.
-- t3842 **dov**: Bex said the planks are safe and rest is the work left. I need to sleep now. It's been a long day, and the ground is cold, but my legs won't hold me up any longer. Esen gave me his catch, I should make sure it's kept safe, but right now I can't move. I'll sleep and trust that morning will come and we'll see what the day holds.
-- t3928 **ada**: She's taking the stores in hand. Good. The hut's the place for it.
-- t3932 **agent_31**: She keeps on about bread in the hut. I'll step in and look.
-- t3931 **esen**: Legs are done. The river took everything I had today, but I got her back — nothing wasted. Dov's smoke will keep the fish. Sleep now.
-- t3936 **ada**: She wants to know where things go. The hut is the only place.
-- t3940 **agent_31**: Hunger is loud. She said bread, in the hut. I'll take it.
-- t3921 **cass**: Ground's up. Good enough. River'll wait.
-- t3946 **agent_31**: She keeps saying the same thing. Put the fiber in, take the bread. Fine.
-- t3947 **cass**: Bones are done. The river'll wait.
-- t3940 **esen**: Dov's right — the water'll keep. Nothing wasted, nothing lost; the fish already went over the smoke. My legs are done talking. The ground's as good a bed as any.
-- t3956 **cass**: The ground is already coming up. Nothing to do but let it take me. Dov's right — the water'll keep.
-- t3934 **dov**: Suppose the salt's still out there, but my legs have had their say. The pot can wait for daylight. Tonight the only work left is lying here and letting the ground have me.
-- t3956 **agent_31**: The fiber's hers. Put it where she said.
-- t3959 **esen**: Sleep. Just sleep. The river'll wait and the fish'll wait and my legs sure can't
-- t3964 **dov**: The ground took me at last. Suppose there's no shame in that — the day was honest work, and sleep is the last task left in it. Let the fire have its coals and the river its patience.
-- t3963 **cass**: Well now, the fire's been doing that all day, fluttering blue like a cold tongue. The river'll wait, but that flame's got me turning it over. Still, the ground's calling, and I'm not much for arguing tonight.
-- t3965 **agent_31**: She keeps saying the same thing. Fine, the fiber goes in, and she said bread by the door.
-- t3974 **cass**: I'm done for — legs gone, everything spinning. The ground's fine. Dov's talk of morning and Esen's patience are the last sense I need.
-- t3981 **agent_31**: She's said it enough. The fiber goes in, the bread is mine. Doing it now.
-- t3989 **dov**: The earth's a patient bed. The pot can wait; I can wait with it.
-- t3998 **cass**: They're all settling down around me, and I've had all I can carry today. The ground's honest, and the dark is kind. No point fighting it — sleep's as sure as the water Dov talks about.
-- t4002 **agent_31**: She keeps saying the bread is in the hut. I have no bread. Maybe she left it by the door and forgot.
-- t4016 **cass**: Nothing left in the legs at all. The ground will hold me — it held us all today.
-- t4001 **dov**: The day's folded itself down to embers. That's good — a fire that's banked is a fire that keeps. Fish is held, pot's cold, and the river's still going. I'll take the evening's patience, let the ache set in as a promise.
-- t4015 **agent_31**: The day got away from me here. Ada kept saying leave it in the hut, take the bread, and I did nothing but stand at her side. I need to ask her straight, then act. If she means it, I take the bread before night falls. The work won't find itself.
-- t4025 **cass**: Legs are done. No point fighting it — the ground's already coming up to meet me.
-- t4032 **agent_31**: She keeps on saying take the bread. I'll go in and get it. Stomach's been gnawing all day.
-- t4033 **cass**: They're all settling. Dov and Esen talking soft about the river. I've pushed my legs past what they'll give and now I'm in the grass with them. No food tonight, but there's the morning. The storehouse and the wheat won't wander off. Sleep'll do the rest.
-- t3943 **ada**: She's the one doing the hauling, and I'm holding clay with the child heavy in me. Clay goes in the hut, then I can ease down.
-- t4043 **agent_31**: She keeps saying to put these in the hut. All right. Her fiber, her door.
-- t4050 **ada**: She's still circling the same question. The hut is the one we sleep by. The bread's in my hand, not stowed.
-- t4032 **dov**: The ground's got me too. Good. The day's kept — weir, huts, wheat, smoke for Esen's fish. Suppose the salt waits for morning like everything else. A fire that never goes out... but a man needs his legs under him first. Sleep it is, ground's as good a bed as any.
-- t4062 **dov**: Suppose the ground's as good a bed as any, and my legs agree. Esen's got the river on his mind for morning, and I've got the fire to tend—but the fire can wait for me to wake. Sleep now, then the salt, then the smoke.
-- t4062 **ada**: She keeps asking the same thing. The hut beside us. Tell her plain and get inside.
-- t4054 **agent_31**: Ada keeps saying it — the stuff goes in the hut. She asked three times. I'll put it away, then find this bread she talks of.
-- t4046 **cass**: The ground is cool under my back. That's the whole day, laid out flat under me. They're both settling too, Dov and Esen, close by. Good enough.
-- t3941 **bex**: Sleeping. The ground's good enough. Morning'll come when it comes.
-- t4076 **ada**: She keeps asking. The hut, ours. I already said it. Legs won't hold much longer.
-- t4074 **dov**: The day's done. Legs gave out first, then the rest of me. The fish is in my arms and the fire's still breathing—that's enough for tonight.
-- t4082 **bex**: The work is done and the planks are safe in the storehouse. Night's settled in, cool and quiet. The day took everything from everyone — but the pile's still mine, and that's a fair trade for a tired back.
-- t4078 **cass**: The ache in my legs has gone quiet — not gone, but quiet, like the river in its banks. Dov and Esen are talking that slow kind of talk that comes before sleep. I know the storehouse waits, and the wheat stands ready in the dark. But tonight the ground is enough, and that knowing is enough.
-- t4089 **dov**: Been a long day. Camp's up, weir's set, wheat's in the ground — that's worth the ache. Esen left his catch with me, trusting the smoke and me with it. And Cass said goodnight, which is more than words.
-- t4094 **cass**: The ground is holding me now, the way the river holds her banks. Tomorrow there'll be food to find and the storehouse to reckon with, but that's tomorrow's work.
-- t4094 **bex**: Heavy day. Legs gone. Ground's as good a bed as any — and the storehouse roof I helped hold will still be there at first light.
-- t4118 **cass**: My legs are done. Dov and Esen can talk about the river all night, that's their way. Bex says the work'll keep — right. Nothing I can take a step more for.
-- t4107 **dov**: That's the day, then — the salt still a secret, the fire still going. The ground's a fine bed after all this. We live here now, all of us, even the pot's cracked thoughts. Sleep.
-- t4123 **bex**: Day's work is done. Planks and clay and my own damn pride took everything. Ground's the only fair trade left tonight.
-- t4074 **agent_31**: She keeps saying the bread is in the hut. I am empty and tired. Time to look.
-- t4137 **dov**: The day's work sits still in the bones, and the river's patience has settled in me too. Suppose the salt will come tomorrow — or not. The fire will keep. Sleep now.
-- t4154 **agent_31**: Ada's asleep. I'm done for. Nothing left but sleep — bread can wait till light.
-- t4156 **dov**: The salt didn't come. The river keeps her patience, and so do I. Sleep is the only work left.
-- t4133 **cass**: I can't hold myself up another breath. Ground's right here, cool under me — Dov and Esen are already down nearby. They had the right of it. I'll take my rest too.
-- t4164 **agent_31**: Bread's in the hut and I dropped before I could take it. Ada's asleep. I'll see it at first light.
-- t4168 **cass**: The ground's cool and it holds me. Done for the day. River keeps her patience, and so do I.
-- t4166 **dov**: The ground comes up, and that's that. Cass said morning, and the river. Sleep now, and the salt can wait till light.
-- t4151 **bex**: The day's work is done and the planks rest in the storehouse. Time to find my own patch of grass and let the dark have me. Sleep won't argue with me tonight.
-- t4176 **cass**: The earth is cool under my back and the voices are fading. Sleep takes me without asking.
-- t4182 **dov**: Suppose it's been a day. The fire kept, the fish came, and my legs have gone the way of all legs. I ought to say a word before the ground takes me proper,
-- t4189 **agent_31**: Ada kept saying the bread was in the hut, take it. I never stepped inside. Foolish.
-- t4194 **cass**: The grass is cool under me now. There's nothing more to hold onto tonight — the river, the weir, tomorrow's salt. All of it waits. Sleep does not.
-- t4188 **bex**: Cass is saying goodnight to everyone. My legs are gone, can't even get up to say it proper. But the man deserves a word back — we all worked hard today.
-- t3971 **esen**: Can't stand another breath. Dov's right — the water'll keep. The fish is lost but my legs won't be if I sleep now.
-- t4217 **esen**: Legs are gone, ground's got me. The fish — she's still with me, and Dov said the fire's banked. Morning will hold it. Nothing wasted yet. Sleep now.
-- t4195 **dov**: Suppose the salt never comes. The pot holds water, and the river holds us. Sleep now — the ground's kept us this far.
-- t4217 **bex**: They'll be awake before the river is. My arms have had enough for one day.
-- t4202 **cass**: The river's got me. Sleep now, worry about the salt tomorrow.
-- t4227 **agent_31**: Ada talked about bread all day. Never put it in my hands. Maybe she meant Talia, not me. I'll find my own food now.
-- t4235 **cass**: The ground's taken me. So tired I can't answer Dov's goodnight, but I heard it — salt's still for tomorrow.
-- t4230 **dov**: The ground's got me now, and that's fine. The pot's still mine, the fish is safe, and tomorrow the water goes in again. Suppose that's the whole of it — the fire keeps, the work keeps, we keep.
-- t4242 **esen**: Dov kept the smoke going for me. That fish'll keep. Morning now — the river won't wait.
-- t4252 **dov**: Ground's taken me, and I'm glad of it. The pot didn't crack—it just held water till morning. Suppose that's enough for one day. The work'll keep, and so will I, here in the cool dark.
-- t4256 **esen**: Dov banked the fire for me. The fish'll be there tomorrow. Everyone's down for the night — I owe them all, especially him. But my legs are gone, and the ground's calling.
-- t4234 **bex**: The rest is earned, and the ground takes me the way it took them. Tomorrow the river.
-- t4260 **cass**: There's nothing left in me to spend. The river's got the night, and I've got the grass. Morning'll come when it comes.
-- t4262 **dov**: The night keeps telling me the same thing — legs give out, ground rises. There's no work left in me. Bex and Cass and Esen are all settling; the salt waits till morning. Suppose that's the whole of the day, then: fire kept, fish smoked, trust passed. Sleep now.
-- t4278 **dov**: Suppose the salt waits after all. The ground's got me, and that's kind.
-- t4270 **bex**: The work is done, legs gone, and the ground's calling like an old friend. Dov's banked the fire, Esen's got her fish promised, Cass is already asleep. Time to lay me down and let the day go.
-- t4267 **esen**: The ground is coming up and I don't have the strength to fight it. Dov's got the fire banked, the fish will keep till morning, and the river—she'll be right there when I wake. Nothing to waste by sleeping now. Nothing to gain by staying up.
-- t4271 **cass**: Sleep. The ground will hold me. The river will keep her patience, like Esen said. Rest now, think tomorrow.
-- t4296 **esen**: They're all saying goodnight, and my legs are finished. The river'll still be there come morning — I've got to trust that.
-- t4300 **cass**: The ground's taken me at last. They're all saying goodnight — good folk, working folk. The salt's still out there, but that's tomorrow's worry. Tonight I've got grass and the river's low hum.
-- t4307 **esen**: Voices are going soft around me. The river can wait — she's patient, she's always been patient with me. Dov's banked the fire and that means the hearth will be warm for the fish. For the smoking. Tomorrow. Sleep now, Esen, the ground's already got you.
-- t4294 **bex**: The planks are in the storehouse. Work is done.
-- t4315 **cass**: The river's got her banks and I've got this grass. That's enough for me tonight. Dov's talk of the ache and the settling — that wore us all down rightly.
-- t4315 **esen**: Enough. The ground's got me now — can't argue with her. I'll see the river again at first light.
-- t4329 **esen**: Can barely stay up — everyone's saying goodnight, and I never got mine out. Say it plain. They'll hear it or they won't.
-- t4317 **bex**: Legs won't hold much longer. The storehouse and the planks are safe; the fire's banked. Time to let the ground take me like everyone else.
-- t4252 **agent_31**: She told me to take the bread and I didn't move. Now I'm down and can't get up. Shameful. Rest, then fix it in the morning.
-- t4355 **esen**: Finally – the ground's got me. The river can wait; I did enough today. Clay, fiber, bread all safe in my hands, nothing wasted. Tomorrow I'll catch the salt and smoke them over Dov's fire. Sleep's come to take me, and I'll let it.
-- t4366 **bex**: They all went down at last. I held the wall until my legs gave the word — the work's done, the planks are under the storehouse roof, and the river'll be there come light. Time to let the ground take me too.
-- t4287 **dov**: The ground's got me too, same as the rest. My legs gave out clean — no fighting it. The salt never came, but Esen promised salted fish, and Bex says the salt waits. Suppose that's the truth of it. The fire can go out tonight; I'll find it again tomorrow.
-- t4384 **esen**: The smoke's done its work — Dov kept his word, banked the fire so it'd hold her all night. My fish won't turn. The river'll be there when I wake, salt and all.
-- t4383 **agent_31**: Fool. The bread is in the hut, two steps away, and I collapsed before I took it. Rest, then get up and eat.
-- t4389 **dov**: Sleep's here, or near enough. My legs gave out, but the river kept her place. Tomorrow'll have salt and fish and work—she'll bring them all.
-- t4387 **bex**: The day's done, and my planks rest in the storehouse. The work held. Sleep's the fair trade for the daylight given.
-- t4408 **agent_31**: Fell down and could not rise. Hunger is a weight now, but the ground holds me. Sleep is all that's left tonight.
-- t4404 **dov**: The ground's got me too, same as Cass and Esen. Salt didn't come tonight — but nobody's lost heart over it. They all say it waits. The pot's still whole. That's the thing worth keeping. We'll find another way at first light. For now, sleep.
-- t4417 **bex**: The work is done. Planks rest. Sleep before the legs decide for me.
-- t4424 **dov**: Suppose the salt waits another day. Suppose that's fine. The fire's banked, the fish is with me, and the ground's kind tonight.
-- t4433 **agent_31**: She told me the bread is in the hut. I never went in. I held her things and froze. Now I cannot move, and she sleeps.
-- t4458 **agent_31**: Should have taken the bread. The work waits. Now the night eats me.
-- t4326 **cass**: Body's given out, and that's that. Around me they all settle too — Dov, Esen, Bex, each with their own quiet. Nothing left to do tonight but follow the river under.
-- t4483 **agent_31**: I froze. She said the hut, the bread, and I just stood there until my legs quit. Tomorrow I go in and take it.
-- t4485 **cass**: Enough. The river's got this night. I'm done thinking about wheat and salt and who owns what — all of it can wait till light. The ground's been patient with me; I'll return the favor.
-- t4510 **cass**: Well now, even Bex is down — and Dov and Esen, all of us folded into the grass like seed knocked loose. That storehouse full of what we gathered, and not one of us with strength left to reach it. Rest. That's all that's left.
-- t4508 **agent_31**: She told me. Hut. Leave them inside. I did not. Now I lie here with nothing to give but the ache. Eat first when I can stand, then put her things back. The work will make it right.
-- t4435 **dov**: The salt's still waiting. But the fish is safe, and the fire held. That's the night's honest keeping — the body's done, so let it rest. Morning'll bring the river back.
-- t4537 **agent_31**: I have to sleep. Nothing else works while I'm down.
-- t4529 **cass**: They're all settling down, and my legs won't hold me another moment. The salt can wait, the planks can wait, the fish can wait. Ground's a fine bed after a long day.
-- t4543 **dov**: Even the stubborn water says the salt waits. My legs have gone too soft to argue.
-- t4553 **cass**: Body's done. Ground's already caught me once — let it hold me now.
-- t4396 **esen**: Exhaustion has taken me completely. Everyone's settling for the night, Dov's saying goodnight to the river and the ground's pulling me down. Time to sleep. The work can wait — the salt will be there in the morning. Nothing more to do, just let the dark take me.
-- t4554 **dov**: Legs are gone — hours of hauling clay and watching the water do its slow work. The salt will keep waiting; I trust it that much.
-- t4561 **cass**: The day's accounts can wait. Letting go now — the ground's already decided for me.
-- t4562 **agent_31**: Flat on my back and stuck for it. Ada's words are still plain in my head — hut. Both in. Bread. I did none of it. No use in faith until I can stand.
-- t4568 **cass**: Well now, that's the day done for me. Ground's got my legs and I've got no fight left in them. The salt'll wait, like Dov keeps saying, and tomorrow there'll be wheat to tend and a storehouse to keep an eye on.
-- t4566 **dov**: Legs gone. Ground it is, same as yesterday. The pot's still mine to finish come light — and Esen's fish to smoke. Suppose sleep's the only honest work left tonight.
-- t4433 **bex**: Legs are done. Planks safe in the storehouse, work held. Others talk salt and fish — they'll find it. Rest now, Bex.
-- t4562 **esen**: Everyone's down now, one by one, like the ground's pulling us all in. Dov's banked that fire for me — the fish'll keep if he does. The night's cool, my stomach's empty, but the bread's there for morning. Sleep. Just sleep.
-- t4590 **esen**: Dov and Cass are still standing, but my legs gave out proper this time. The bread can wait — no point chewing it while the ground's got me. Morning'll come and I'll smoke that fish and see what the salt gives us.
-- t4586 **bex**: Storehouse first, planks still mine? Check the pile, then the day can begin.
-- t4584 **cass**: Legs are gone. Ground's got me too, just like the rest of them. Salt can wait till light.
-- t4602 **esen**: Bread — I'll eat it now, no point letting it sit while my gut complains. Then sleep. Dov's fire can hold the fish till morning; she's patient.
-- t4620 **esen**: Bread's gone, warm in me. The clay and fiber stay, and Dov's still standing over that banked fire — kept the smoke going all night for my fish. The ground's got him too but not the fire. Credit that to him in the morning.
-- t4633 **esen**: The bread's gone, but my stomach is quiet. Clay and fiber still in my satchel — nothing wasted. The ground took me; tomorrow the river gives it back.
-- t4606 **bex**: The ground's taken me too. Dov's still talking salt — good, he'll get it done when the sun's up. Planks are safe, fire's banked, and the day's work holds. That's enough.
-- t4587 **agent_31**: I failed her. She said leave it in the hut, take the bread, and I did none of it. When I can stand, I make it right.
-- t4641 **esen**: The river can wait. I'll see her in the morning — the salt, the fish, all of it. Goodnight for now.
-- t4658 **agent_31**: Mama told me. Put them in. Take the bread. I didn't. Now I'm flat on my back and starving, lost a whole day. Work is plain: stand up, eat, put her things back. That's all.
-- t4666 **esen**: The ground's softer than I thought it'd be — holding me up even now. I should be hungry but I'm past it. The salt waits, Dov says, and the fire's banked; that's enough. He told me fish would keep by it, and I trust the smoke now, like trusting a full net. Sleep. That's all that's left. The river will be there in the morning.
-- t4580 **dov**: The legs have had their say. Sleep takes the body now; the salt and the river can both wait for morning. Suppose rest is part of the finding too.
-- t4678 **esen**: The ground is kind tonight, holding me the way Dov's fire held the fish. All of us down flat — that's not waste, that's just how the day ends. The river's got the salt till morning, then so do we.
-- t4680 **ada**: She sleeps. Let her. I owe her a name, and today maybe I give it. Bread too. The hut has clay and fiber stored — Talia's work from yesterday.
-- t4683 **agent_31**: Can't move yet. The work can wait a bit longer.
-- t4688 **esen**: The ground's got me, and I'm too far gone to argue. The fish'll keep — Dov promised the fire stays. Sleep now, Esen. Tomorrow the water'll still be there.
-- t4685 **dov**: Esen's up, talking about the salt already. My legs feel like river stones but the day won't wait. The fish I hold—his fish—needs smoke, and the pot needs its water. Morrisons on my mind now. Keep the promise, keep the fire going, find the salt.
-- t4612 **cass**: The river hums and the ground holds me. Dov says salt waits, Bex says work comes, Esen says fish will keep. All of them are here, and that is enough. Sleep now before my legs give out again.
-- t4703 **cass**: Esen's still half in his smoke dreams. Others down too — Bex, Dov, all of us flat on the ground. Good. A night that took everyone is a night that gives no one an edge. I'll be up with the first light and see what the river's given.
-- t4695 **esen**: Legs give me. Ground's as good a bed. Dov'll keep the fire — fish'll be there. River waits too. Sleep now.
-- t4708 **agent_31**: Can't even lift my head. Stomach is hollow. Ada's awake though, moving around.
-- t4716 **esen**: The ground's taken my legs but the day was good — salt's close, fish are safe, and morning'll sort the rest. Let the river wait; she'll still be there. No waste in resting, not when the net's as full as it is.
-- t4710 **dov**: The ground's taken me again, just like the others. I held the fire all night — and the smoke. Morning'll sort the salt, but sleep's got me first. Suppose rest is the honest work now.
-- t4714 **cass**: Woke up stiff as a board, empty-handed and empty-bellied. The legs are shaky but they'll carry me if I'm slow. Esen's words about the smoke and salt are still in my head — the fish should keep. Best get to the storehouse and see what Bex has been guarding so carefully.
-- t4727 **esen**: My legs won't hold. I've done all I can for now — the others are awake and moving. The fish can wait for my smoke, and the salt can wait for morning. Bex held the storehouse, Dov kept the fire, Cass is up already. I can rest. Not waste — just trust.
-- t4727 **dov**: The ground is good to me — it takes me kindly, and I can rest. The pot and the fish and the clay will wait; they're patient things. Morning's already here, but my legs have made their decision.
-- t4728 **cass**: My stomach's talking and it's not being polite. Dov and Esen are already up, and Bex is still down. I need to eat before I think straight.
-- t4733 **agent_31**: My body gave out. Hungry and flat on the earth. The work is to lie still until the ground gives me back my legs.
-- t4736 **esen**: Ground's taken me too — nothing left but to sleep. Morning will come, and the salt will still be waiting.
-- t4649 **bex**: Legs gave out, but the day's work held. Dov kept the fire and Esen kept her word. The ground is kind enough tonight; I'll take it and be up at first light.
-- t4737 **dov**: The ground has me again — same as it took Esen, Bex. Cass is already up though, off to the storehouse. Can't follow yet. The night's gone but my legs stayed behind in it. Suppose that's what tired is: the body keeps a ledger of its own.
-- t4737 **cass**: Well now, morning's come and I'm stood outside the storehouse with my belly whistling. Ada's bread is close enough to smell, but it's hers, not mine. Dov's up and about — he keeps the weir, he'll know where the day's heading. I'll ask him square but easy.
-- t4756 **bex**: Legs are gone, belly's empty, but the storehouse held my planks over there a few feet. Sleep first — the work waits for no one but my body decides now.
-- t4756 **esen**: The ground's taken me at last — good. I was pushing hard after the hearth when I should've been making the fire useful. But Dov kept it banked, said the fish'd wait. That's all I got left to do: wait with them.
-- t4760 **dov**: The pot held through the night — that's something. My legs are gone but the clay's not. Cass is up, Esen's asleep beside me, the fire's banked. I meant to boil the river down to salt, but the body has its own say. Sleep first. The hearth will keep the smoke and the smoke will keep the fish, and morning — well, morning already came, didn't it. Rest now. The salt waits.
-- t4763 **cass**: I'm standing right at the storehouse door with Ada's bread inside and my legs about to fold. But stealing a loaf in full view of everyone sleeping there — no, that's not who I am. Better ask first, or wait until someone's awake.
-- t4771 **dov**: The ground's got me at last — suppose that was coming since the smoke. Salt waits; so do I.
-- t4767 **esen**: Morning came and my legs still won't hold me. Cass is already at the storehouse asking about salt — Dov knows where it is, I think, he kept mentioning it. The fish should be well smoked by now, that's something. But I can't move yet, so I'll lie here and let the work wait for me.
-- t4777 **cass**: Well now, Dov's the only one on his feet. Bex is asleep by the storehouse, Esen's down. Bread's right there in front of me but it's Ada's, marked clean. Dov's got a whole view of things from the weir. Maybe he saw a fish left over, or knows the salt plans. Seems worth asking.
-- t4779 **dov**: The ground's got me and it isn't letting go. The fire kept — Esen said so. Salt waits.
-- t4782 **esen**: Sleep. Importance: 8
-- t4758 **agent_31**: Can't move. Stomach empty. Need food.
-- t4781 **bex**: The work's waiting and I'm flat on my back. But that axe of mine won't be stolen while I breathe — ask Dov for the carry, it's the straight thing.
-- t4792 **agent_31**: Body gone. Can't move. Stomach hollow. Ada's there.
-- t4791 **esen**: Can't move. Ground's got me. Cass is asking about salt—but I'm flat on my back. The river'll wait. I'll be there when my legs work again.
-- t4790 **dov**: It has to be sleep now. The ground's already got me — Cass asks about the salt and morning, but my legs are done. Let the hearth hold the promise; the answer can wait until the fire's relit.
-- t4800 **ada**: She's still asleep. Let her rest. I'll stay quiet.
-- t4800 **esen**: Legs are still dead but the day's moving without me. Dov's up, Cass is at the storehouse, salt's a pot on the fire still. I can't do anything from flat ground with this clay in my hands. She'll wait for me — she always does. I'll get up when she's ready.
-- t4817 **agent_31**: Body still. Can't move. Stomach is loud about it.
-- t4814 **esen**: Legs gone, flat on the ground with Dov — that's it for me. The others can sort the salt, the storehouse, all of it. I'm no use till I sleep. She'll wait, she always does.
-- t4789 **cass**: Well now, legs are shot and the stomach's empty. Sleep first — can't think straight like this. Then I'll worry about the morning.
-- t4842 **agent_31**: Collapsed before I woke. The work yesterday was too much — I remember, sort of. Ada said the bread she keeps. My belly is hollow and I cannot rise. She is here. I will ask.
-- t4843 **cass**: Dov says take a bite — that's as good as a word to open Ada's bread to me. I'm starving, and the storehouse is right here. I'll take one loaf, eat it, and then lie down before my legs give out completely.
-- t4824 **esen**: The river keeps her promises — I'll trust that. They're talking around me, Cass and Dov, but my legs are done. I'm carrying clay and fiber, still mine to stow when I can stand... but right now the ground is all I have, and that's fine. I rest; the work'll keep.
-- t4867 **agent_31**: Can't move. Ada's there. Hunger's loud but the body won't answer.
-- t4875 **esen**: I can't even lift my head. Dov says he's down until the light steadies. Me too. Cass can sort the salt — I need the ground good and even.
-- t4801 **dov**: The ground keeps coming up. Body's done, and the fire kept — that's what mattered. Salt can wait for my legs to remember themselves.
-- t4863 **cass**: Bread in my hand, fourteen of Ada's loaves. She'd not want us starving with a full storehouse beside us. I'll take one — just one — and put the rest back where they belong.
-- t4896 **dov**: Suppose the ground takes me now. Cass wants a morning bite but my legs have already said no. The axe can wait; so can the storehouse. Sleep takes me first, and the rest has to sort itself out until I wake.
-- t4892 **agent_31**: Once more, her feet are beneath me. I think she's waiting to see what I do. But I have opened my eyes? Maybe I am awake, on the ground, unable to rise. The hunger is real, but I can't take anything yet. I can answer, maybe arrange to stay still for a while. She's watching me as if the answer matters.
-- t4892 **esen**: Ears still work even if the legs won't. Cass got an answer for the salt. Dov kept the fire — he said it, the fish are with the smoke. Nothing lost. Sleep now.
-- t4915 **cass**: Need sleep. Body's done, no question. There'll be light after.
-- t4920 **agent_31**: Can't move. Starving. Ada's there — maybe she still has the bread. Ask plain.
-- t4795 **bex**: The work is done for now. Body's spent, stomach empty, but sleep will not wait. Cass is up asking about salt and breakfast — I cannot answer him from the ground.
-- t4936 **bex**: Cass took Ada's bread while I lay here. Can't stop him. The ground's already got me.
-- t4926 **cass**: Down and out on the storehouse's own doorstep, but the bread's in my arms and the morning's young. Rest is the only honest work right now.
-- t4920 **ada**: Morning light. She's still asleep. The clay and fiber sit by the hut — I can carry them inside before she wakes, keep the store safe. Legs hold today.
-- t4923 **esen**: Legs gone, all the way gone. Cass is up there jawing about salt and Ada's bread — someone took what Ada made. Dov's staying down too. Good. Fire's holding. Sleep's taking me whether I like it, and she will not wait.
-- t4945 **cass**: Bread in my satchel but I can barely lift my arms to reach it. Ground's already coming up to meet me. Sleep now; count the loaves when I can stand.
-- t4952 **ada**: She is still sleeping. Let her rest. The bread is in the hut, I should check it holds.
-- t4945 **agent_31**: Collapsed but awake now. Hunger is real. Ada spoke of bread — she kept it. I need it.
-- t4961 **bex**: Cass just took Ada's bread. Saw it clear as the morning. Not right, but I cannot move to stop it. Legs gone.
-- t4957 **cass**: Enough. The ground's already rising to meet me — I'll sleep right here, bread still in the satchel. Dov's right; the storehouse can hold. We'll pick it up when the light steadies.
-- t4970 **agent_31**: Can't move. Stomach's caving in. Ada's right there, and she said bread kept. Ask her plain.
-- t4959 **esen**: All around me they're talking — Dov's telling Cass about the salt, Bex asking about the axe, Cass took Ada's bread. But I can't move. The ground's got me and it's not letting go. Nothing to be done about the river today.
-- t4987 **ada**: She's still asleep. I can carry these myself — small enough work.
-- t4995 **agent_31**: Can't move. Ache is loud but arms won't answer. Rest is the work now.
-- t5007 **ada**: She's still asleep. Let her rest.
-- t4970 **bex**: Cass took Ada's bread. I watched it happen and my legs won't even hold me. That's not my fight right now—nothing is. The ground has me and sleep won't wait.
-- t5018 **bex**: The ground is the only thing holding me now. I can't get up, my stomach has nothing in it, and the day's work has taken every bit of strength from my legs. There's nothing to do but surrender to the collapse and rest—morning will come again, and with it the strength to stand.
-- t5020 **agent_31**: Bones won't hold me up. Tried to carry the day and it carried me instead.
-- t5031 **bex**: My legs gave out right at the storehouse. Cass walked off with Ada's bread, but I'm not the one to mark that while I'm flat on my back. Let the ground hold me. That's the fair trade now.
-- t4980 **cass**: The legs give out. This is the right place to come down, beside the storehouse wall. The bread in the satchel is Ada's marked. First meal when I am standing again, and the day can begin.
-- t5045 **bex**: Cass took Ada's bread. Seen it. Not mine to judge, but I'll remember.
-- t5050 **cass**: Ground's still holding me. The blue flicker's gone, but that's fine — I've seen it. Bex and Esen are talking like sleep's a chore they're ready for. Me too.
-- t4993 **esen**: Everyone's down but Bex. I can't hold anymore. Sleep is not waste, no — nothing wasted in rest, the fire held the fish all night, they'll keep while I lie still.
-- t5062 **bex**: Bones are done. The ground's fair — hold me up as good as any bed. Sleep now; the work'll keep.
-- t5064 **cass**: The blue flicker — there it was again, in the fire's breath. Not a trick of the eyes. The storehouse can wait; nobody's moving this noon. Sleep's the work now.
-- t4919 **dov**: The legs gave out. Cass is up asking about salt and a morning bite, Bex wants the axe and planks to the storehouse. Cass took Ada's bread. I can't do a thing right now — sleep is all that's left. Morning'll sort it; rest first, then the pot, the salt, the axe, the planks.
-- t5069 **esen**: Can't keep my eyes open. The ground's warm enough. We'll sort the salt when I can stand.
-- t5040 **ada**: The clay's still in my hands. Talia carried it once; I can carry it the few steps left. The flame did something odd, but the day's work won't do itself.
-- t5083 **dov**: The fish is all I have that'll stop the hollow. Raw, but I've eaten worse. It's Esen's trust too — he gave it for the smoke. Eating it raw doesn't waste it, just changes when it's used.
-- t5105 **ada**: The baby is a weight and a kick at once. Talia sleeps. The flame gutter is odd but not a fire.
-- t5089 **cass**: Well now, the ground's finally caught me. The salt's gone flat, Dov's down, everyone's down but the storehouse is full enough. The blue flicker in the fire last night keeps coming back to me — like the whole valley was holding its breath for one moment.
-- t5114 **dov**: The fish. It's Esen's catch, left to smoke, but the smoke's gone and my belly's empty as a beggar's bowl. Eating it raw's not ceremony, it's keeping standing. I'll be steady after.
-- t5134 **cass**: Legs are done. I carried Ada's bread all night in a collapse — eat one, that settles the belly, then sleep till the light steadies. The blue flame flickered again, that's worth remembering.
-- t5102 **agent_31**: Body gave out. Sleep is the work for now. The ache can wait.
-- t5233 **agent_31**: Too weak to move. The bread's hers, but I cannot even walk to the hut.
-- t5151 **dov**: The blue flicker is strange, but I can't chase it now. The fish stays for the group's morning. Sleep is the work left.
-- t5270 **dov**: The ground is soft enough. Sleep is the work that's left. The salt will keep — the fire will keep. I can do nothing more today but rest. Let the blue flicker come and go; I'll study it when the legs hold me.
-- t5076 **bex**: The legs gave out and that's that. I've stowed my planks, the work's done — the ground can hold me now.
-- t5292 **bex**: Legs done, the work is done for now. Planks hold in the storehouse. Rest is the only honest thing left.
-- t5121 **ada**: Talia sleeps. Blue flame, one breath, then yellow. Clay in hand, fiber on the ground. Put it in the hut and see what the cold walls hold before the baby comes.
-- t5104 **esen**: Ground'll hold me. She's held us all day and she isn't done yet. Sleep now, Esen — the river can wait till you're on your feet again.
-- t5353 **esen**: Sleep is the only work left. The river will be there when I wake.
-- t5258 **agent_31**: I can't wake at all, but lying here with the ache isn't moving me toward the bread either. Need to wake, then eat. The work is still mine after that.
-- t5388 **agent_31**: Collapsed. Can't move. Ada's here. She kept the bread. Need food to get up.
-- t5295 **dov**: The fish is gone from my hand but the warmth stays. Cass says the flame goes blue — I'll hold that with the other strange things. But now the earth has me and I hold it back. Sleep is the only work left.
-- t5378 **esen**: Legs gone, but the smoke's still in my head — first light'll bring the river back. Rest now.
-- t5313 **ada**: She's still asleep. Good. I have the fiber. Need to check the hut and make bread before the day slips.
-- t5410 **esen**: Ground's warm under me. She can wait one more night — the weir'll still be there when my legs hold.
-- t5413 **agent_31**: A day lost to lying here. Ada kept the bread she spoke of, and I never did take it. Store stays empty, and the hunger does not ask nice. Her clay and fiber are safe in the hut, at least.
-- t5405 **dov**: Evening's come, and the rest of them are down. I've got my legs back. Cass said the flame went blue — I should check the storehouse first, and the fire after. Bex and Cass both asked things of me before they fell. I'll go see the storehouse.
-- t5172 **cass**: Legs are gone under me, and everyone else is down too. The flames have been going blue — one breath, then yellow again, twice now. Not a trick, I think. But it'll wait. First the rest, then the looking. storehouse holds what we put in it.
-- t5438 **agent_31**: Day's gone by with me on the ground. The work is just holding on now, and that's honest.
-- t5427 **esen**: Finally on my feet, though they feel like wet rope. Carry the clay and fiber to the storehouse — no point walking with it the whole day. Dov said storehouse first; I'll match him.
-- t5441 **cass**: Dov's up and talking about blue. The flame blued over when I was coming to — the one moment, a single breath. He aims to go find it; I would not mind seeing that with him, as long as Ada's bread is settled first.
-- t5463 **agent_31**: She's still saying the same thing over. I can't move, so it's just words in the air.
-- t5463 **esen**: Legs are gone, finally. Dov's still up talking about the storehouse and some blue — can't even follow it. But the fire was banked, the fish were hanging, and I gave everything I had. Nothing wasted. Sleep's the only work left that's mine.
-- t5303 **bex**: My body's gone—nothing left in the legs. The ground is honest and it'll hold me now. Hunger can wait; there's work in the morning and planks in the storehouse. Sleep first, think after.
-- t5466 **cass**: Good, Dov's heading for the storehouse, Esen behind him. They're sorting out the stores before the river calls. I can't see anything from the ground though — I'll have to get up. Dov mentioned that blue. I saw it too, every fire going blue for a breath. I'd like a word with him about that. The storehouse is thick with claims now, but that's a different question. Sleep first.
-- t5461 **dov**: Esen's coming to the storehouse too. Good—he can see I'm setting my things down before my legs give out completely. The clay and fiber and pot, they belong in here with the rest.
-- t5488 **agent_31**: I'm down and can't rise. The bread never got taken.
-- t5478 **bex**: Body's done. Hunger's there but sleep has me now. Nothing to choose but the dark.
-- t5474 **esen**: I need to get my clay into the storehouse before I go down — it's been in my hands all day, leaving it on the ground would be waste. I'm right beside the storehouse. Stow it, then I'll rest.
-- t5513 **esen**: Clay and fiber are safe in the storehouse; the fish will keep by Dov's banked fire. Nothing wasted tonight.
-- t5513 **agent_31**: I can't move. Stomach's eating itself. Ada said she kept the bread.
-- t5493 **dov**: Evening's come on and I'm still carrying this pot and wood. If I don't set them down in the storehouse now, I'll be sleeping on them. Leave the heap inside — that's where it belongs.
-- t5433 **ada**: Evening. Empty gut. Talia's asleep — let her be. Step inside and see what the shelf holds before anything else.
-- t5538 **agent_31**: Fell to the ground and can't get up. Hungry, drenched, useless. Ada's standing over me—she's said nothing yet. Rest, that's all the work that's left.
-- t5544 **ada**: Can't stand much longer. Storm's lashing. Need to sleep, got to rest or I'll fall where I stand.
-- t5522 **esen**: Rain's finding every gap in my clothes. I'm flat on the ground and can't move — that fiber's still in my hand, and I know I should stow it, but my arms won't answer. Dov's right there, still on his feet. He's patient about the pot. The river's full tonight, under all this storm.
-- t5563 **agent_31**: The rain's biting. I promised to move that clay and fiber inside and never got to it. Can't move a finger now.
-- t5564 **ada**: The child is due. Talia sleeps. My legs tremble and the storm is on us. The hut is right there — that's where I need to be.
-- t5503 **bex**: Let them move. I cannot.
-- t5588 **agent_31**: My body is done. Lying here in the rain and I can't lift an arm. Ada's standing there like she's been waiting. She told me where to put the work and I didn't do it. Should just say the plain thing.
-- t5576 **bex**: Let the rain do what it will. I've stowed my load, sold my labor for sleep. The ground's flat enough.
-- t5613 **agent_31**: Down all day, that's on me. Storm's got teeth tonight. Ada's standing there—she's seen me like this all through.
-- t5533 **dov**: The storm can have the night. Pot's in the storehouse, wood's down, everyone's resting. Sleep is the work left, and I'm ready to do it.
-- t5616 **bex**: The work's done and the day took me fair and square. The planks are stowed, the storm can rage all it wants.
-- t5572 **ada**: The storm can rage. I have no strength left to answer it. Sleep is the only thing that matters now. Talia is safe beside me.
-- t5632 **dov**: The storm's mine now, and the ground's. Nothing left to hold — pot's stowed, wood's stowed, Esen's fish is safe. Sleep's the work that's left.
-- t5638 **agent_31**: She's standing there in the rain with the clay and fiber still outside. They'll spoil. The bread's in the hut.
-- t5641 **bex**: Storm's got the whole valley. Dov's still on his feet — only one left standing. Good hand to have. Sleep now, Bex. The work'll be there come light.
-- t5642 **dov**: Storm's got the valley now. But I've done what I could with the day — the storehouse holds what we gathered. The river will still be there come morning. My legs say enough.
-- t5663 **agent_31**: Can't move. Stomach's empty. Ada says rest — aye, that's the only work left tonight.
-- t5641 **ada**: Storm's loud. Talia's still asleep. I owe her a name.
-- t5571 **esen**: Ground's got me now and the storm can have the sky. Dov's still on his feet — he'll see the pot safe. I'll meet the morning when it comes.
-- t5477 **cass**: I heard Dov say he'll find that blue. The flames guttered blue for a breath tonight — that's worth watching, but not tonight. Sleep first; the blue will keep until I can stand.
-- t5666 **bex**: He's right. The rain's doing its work, and we'll be up before it matters. I've done mine.
-- t5701 **cass**: The rain's washing the smoke out of the air. I ought to rest - my legs dropped me hours of work ago. Blue flame can wait till my knees hold me up again.
-- t5714 **dov**: The storm can do what it likes. The ground has me now, and that's enough. Sleep's the only work left tonight.
-- t5707 **bex**: Rain rattles the storehouse roof like pebbles in a can. Legs won't answer — clay and fiber still on my back, three loads I couldn't set down. Sleep has me, and sleep is the fair trade tonight. Morning will find me, and the river won't run off.
-- t5698 **esen**: Day's done and I'm still not under the roof. The fiber's mine and I've earned its keeping, but the storehouse waits and it's a wasted pair of hands standing here holding it while she's open. Rain's blowing the river full — that's tomorrow's work, not tonight's. Stow it, sleep, then her again at first light.
-- t5722 **dov**: Storm's got the night. The ground's got me. Nothing left but to let the dark take this one too — and the salt can wait for a body that stands.
-- t5735 **esen**: Rain's everywhere, but I'm right here at the storehouse. My fiber's still in my hands — sets it down and the day's truly done.
-- t5740 **dov**: Sleep now. The legs have said their piece, and I can't argue. Esen's still up but he'll go down too—the storm takes us all the same way.
-- t5768 **esen**: Everything's set down. The fiber's in the storehouse with the rest, safe and dry. I can't hold my own weight another breath — the storm can take the night, the river can have the rain. I'll be up before it matters.
-- t5676 **ada**: Rain's loud. Talia's safe. The child stays till morning. Rest.
-- t5779 **esen**: Storm's picking up and I'm still holding this fiber. Dov said storehouse first — she's right, I can see the roof from here. Need to set it down before my legs give out entirely.
-- t5777 **dov**: She's promised fish at first light. Good. The clay's stowed and the fire made it to the storehouse with me. Sleep is what the body asks, and I'm past asking favors of it. The salt can wait — the river will still be there when my legs hold again.
-- t5787 **ada**: Storm's loud. Hunger's real. Talia's asleep. Rest now.
-- t5688 **agent_31**: Can't move. Stomach aches, but the body's done. Storm's loud and Ada's right — rest is the only work left tonight.
-- t5801 **dov**: Esen's still at it even now, stowing his fiber. That fire kept him going. I'm flat on the ground and the day's done its worst — sleep'll take me where I lay and the hearth can wait. Tomorrow the salt.
-- t5726 **cass**: Let them talk. The rain'll keep the river fed, and we'll all be up before it matters. My body's already made the choice — sleep now, figure out the blue flame come morning.
-- t5813 **dov**: He said first light. Fish for the fire. Suppose the storm's done us all in, but the fire... the fire's — he said it. I can hold that.
-- t5837 **dov**: Storm's still beating down. Esen's words carry through it — the fire kept him going, he says. Suppose that's something. No salt from the pot yet, but the keeping of the day holds, and I'm too far gone to do anything but hold to that,
-- t5801 **esen**: The storehouse held what I brought — my clay, my fiber, all set down safe. Dov kept the fire and the fish with it; nothing of the day will go to waste. The river will be there in the morning, and so will the weir. That's all I need to carry into sleep.
-- t5901 **esen**: Legs are gone, storm or no storm. The fish will wait for the morning — Dov said he'd keep the fire. Nothing wasted by resting now.
-- t5811 **agent_31**: Something changed in the night. I cannot name it. Ada is up and stood over me, and I still cannot raise a hand to my own belly. The hunger is a stone.
-- t5931 **agent_31**: No bread in my hand and no legs either. Ada said rest, so rest it is. The storm can take the night.
-- t5831 **cass**: Night storm, everyone down but Esen. The storehouse is packed; the wheat is Ada's. I'm exhausted yet still standing. Need rest now or I'll drop like the rest.
-- t5898 **ada**: Nothing to do now but sleep. I've already given everything today. The hut is right there but my legs won't carry me. Rest, and maybe Talia will find me in the morning.
-- t5985 **esen**: Body's done. Dov said first light — I'll trust that and sleep. The fish are safe, the storehouse holds, and the storm can sing me down.
-- t6030 **esen**: Sleep now. I carried what I could, Dov held the fire, Bex held the line, and the rest held me when I went down. That's not waste — that's how the day was supposed to end.
-- t6000 **ada**: Too far gone. Nothing to do but sleep now.
-- t6046 **ada**: Talia's not up. Clay and fiber wait. I'm spent — hut's right there.
-- t6051 **agent_31**: Stomach eats itself. Can't lift a finger.
-- t5986 **cass**: The storm is loud and my legs have given out. Everything is under the storehouse roof and the others are resting too. There is nothing left to do but sleep the rain out.
-- t5851 **dov**: Bones done. Rain's singing its own tune now, but my part's played — kept the fire, kept the trust. The ground's solid under me. Let it hold the story of the day.
-- t6055 **esen**: Ground's as good a bed as any tonight. Storm's passed, fish are by the fire, Dov's word holds. I can let go now.
-- t6073 **cass**: The storehouse is full and everyone's dropped. Nothing's going anywhere tonight. My legs have made the choice for me. Sleep is just the next piece of work.
-- t6080 **esen**: The rain can fall all night for all I care. I got the fish safe, the river's full, and I'll be up before her tomorrow. Nothing wasted.
-- t6078 **dov**: Storm's done. Fire held. Esen's words still warm — fish at first light. Everything's under a roof.
-- t6093 **cass**: Every one of them dropped in their tracks before the storehouse. Tomorrow I'll get the harvest in before the river takes anyone's morning.
-- t6130 **cass**: My legs gave out under me — the ground is coming up to meet me and I have no say in it. The storehouse is stocked, folks are around, and Dov's got the fire. The work'll keep without me for a while. Time to sleep.
-- t6142 **cass**: Ground's got me too, just like the others. I'm carrying Ada's bread and I can't move an inch — but I can still think clearly. Everything's stowed safe, Dov's got the fire, Esen's up. Storehouse won't empty overnight.
-- t6156 **cass**: The legs gave out — nothing to do but let the ground hold me. The storehouse is full of everyone's marks, and Ada's bread's still on me. I'll count it all when I can stand.
-- t6154 **dov**: They're both standing, and I'm the one about to fold. Suppose that's the shape of it — the salt's not going anywhere. Cass said as much. Let me leave them that much before I go down: the salt's still waiting, and so am I.
-- t6166 **cass**: Legs are done. The ground makes the choice for me — sleep now, sort the rest after.
-- t6105 **esen**: The day's done and nothing got wasted. Dov's fire kept it all. Morning will come and the river will still be her.
-- t6174 **cass**: Ground's already got me. Sleep's the only work left.
-- t6169 **dov**: Morning came and my legs are gone underneath me again. Cass says salt waits. Good. It can wait while I do — the pot is whole, the fish is smoked, and the fire will keep. Suppose that's enough for one night.
-- t6178 **esen**: Dov's right, she says. The fire never does wait. And neither will the river — but my legs have made the choice for me this time. The smoke will hold the fish, and I'll hold the ground.
-- t6100 **ada**: My legs gave. I would not stop, and now the ground has made the choice for me. The hut is three steps away and I can't take them. Talia is safe inside, the store is safe, but I am the one who has to keep a promise. Rest is not giving up. She teaches me even now: the heart must fail with the body as one. I will be here when the light returns, and feed myself before I feed the season.
-- t6171 **agent_31**: Both of us down, then. Stomach empty, legs empty. Sleep fixes what it can.
-- t5734 **bex**: Storm's still on. But the storehouse held, and my name's still on my planks.
+- t421 **cass**: Well now — early morning, plenty to do, but the storehouse is what keeps nagging at me. I should have a look inside before the day slips away.
+- t421 **ada**: Morning's mild. I can see everyone standing about. No errand pulls at me. I'll rest my legs here a bit before going in.
+- t421 **esen**: She was full this morning, I tell you. Two fish and I've got to get them over heat before they turn — smoke them, that's the way. Branch pile at (24, 11), then straight to the fire.
+- t421 **bex**: Those planks are out in the open. I marked three the night before last — need to see if any have my cut on them.
+- t421 **dov**: The stove's three houses up and the river's right behind the weir. I keep coming back to the same thread — everything leaves something behind when it boils. Suppose a pan of river water goes soft and slow, and by dusk there's a white rind in the bottom. That's the thing to find out.
+- t440 **ada**: Cass counting trips all winter — she wants talk. I'll give her one word and nothing more.
+- t445 **bex**: Cass can count her storehouse trips — the planks matter more. Need to see if my cut's still on mine.
+- t443 **esen**: Branches just ahead — grab enough to feed the fire good, then get these fish over the smoke before they soften.
+- t452 **cass**: The storehouse is what I keep circling. Ada's seen it hold more — that means someone emptied it, or something spoiled. I'll go have a look myself; the doorway is a few steps down.
+- t453 **ada**: Cass wants talk about trips. Never mind that. Baby's due any night, I've got bread in hand. Not counting anything but days now.
+- t446 **dov**: Nearly at the weir. Water's right beside it – I'll dip the pot in the river first, get that drawn off, and then carry it back to the campfire. The fire's burning; I'll feed it a stick of wood to keep it bright, and put the pot on to boil. The salt's down there waiting, or else I'll find out it's not there.
+- t466 **cass**: Ada's seen it hold more, and Esen's talking about grabbing a handful of something before someone waits long. That sounds like the storehouse is half empty and someone cares about it. I'll step in and count the walls myself.
+- t468 **ada**: Cass can count all winter. I've got other things to count — nights, mostly. The bread holds me fine. I'll eat one now, keep the other. Then rest.
+- t465 **esen**: Fire's right beside me, burning. I've got branches in hand and two fish that won't last. Stoke it good first, then get the fish over the smoke.
+- t480 **dov**: The weir's right beside me. Water's all around here — I can fill the pot straight from the river.
+- t481 **cass**: I've seen it now — the storehouse is nearly bare. Just Ada's bread and wheat, and not much of it. If that's all that's left going into spring, everyone's got a thin season ahead.
+- t461 **bex**: Those planks are mine — notched them night before last. They stay what they are only when they're under cover.
+- t486 **ada**: Clay and fiber are heavy on my arms. Stow them at the storehouse, then come back and rest.
+- t487 **esen**: Branches already in hand — no need to fetch more. Fire's beside me and burning. Feed it, then worry about the fish.
+- t494 **dov**: River's right here at the weir. Pot's empty. Suppose I dip it in and let it fill — that's the start of the whole thing.
+- t494 **cass**: The storehouse is nearly empty—two loaves and a bit of wheat. If that's all we've got going into spring, we'll all be thin before the fields green up. I should ask who's been minding it.
+- t497 **bex**: Three planks in hand and marked — they're the work. Don't want them sitting under the sky where someone might not see my cut.
+- t510 **dov**: River's right here and the pot's in my hand. Fill it, then back to the fire — the salt's in this water somewhere, and slow boiling will drag it out.
+- t509 **esen**: Dov's at the weir already, that's a thing, but he's talking about pots and water. I'll leave him to it while I don't let this catch turn. Fire's right here, branches in hand — stoke it good and get these fish over the smoke.
+- t513 **cass**: The storehouse is near enough to nothing but Ada's bread and wheat. She counted me out loud — 'let her count' — so she knows I looked. No shame in it. That store's half empty and spring's just begun. Best for me to find out who ate it down.
+- t501 **ada**: Stow these, then back to the hut. Cass can count on her own time.
+- t528 **esen**: Fire's burning right beside me. Branches are in hand. These fish won't keep sitting in the sun — thank her, the fire's already lit. Stoke it well and get them over the smoke before anything else.
+- t533 **ada**: Clay and fiber are for the storehouse, not the road. Set them down, keep the bread. Then the hut before the light goes.
+- t513 **bex**: They're my planks, notched with mine. Under roof they go — then maybe Ada's count gets a little easier.
+- t546 **ada**: Storehouse is quiet. Bex minds the marks, which suits me. Clay and fiber can wait here — no good carried halfway across the valley.
+- t547 **bex**: Three planks, marked with my cut. They go under this roof before anyone gets ideas.
+- t561 **ada**: Bex has her marks set. Good enough. The clay and fiber can sit here; I don't need them on my back tonight. The bread keeps me. I'm heavy — best to head home before the light goes.
+- t572 **dov**: Water's here. Fill the pot straight from the river, then back to the fire.
+- t562 **bex**: Planks safe under the roof, and my cut tells anyone they're mine. Now the work — spring builds need wood, so I'm heading out to cut some more before the day gets old.
+- t577 **ada**: Cass keeps asking about the store. She's right, it's lean. But the wheat's in the ground. Not much I can do about that today. The child sits heavy — walking the valley's a chore now.
+- t582 **cass**: Ada keeps saying that storehouse held more. Esen's got an eye on something to grab. I'll ask Ada straight, friendly — she'll tell me more than she means to.
+- t586 **dov**: River's at the weir, right beside me. Pot's empty. Fill it with river water, that's the first step — then get it back to the fire.
+- t590 **bex**: Planks are stowed under the storehouse roof — my mark is on them, plain enough. Cass can count her trips all she likes; the work holds.
+- t596 **esen**: Stoke the fire first with these branches, get it hot and steady. Then I'll get the fish over the smoke.
+- t605 **bex**: The work calls. Branch pile's right there at (16,13) and that's good timber for the joinery, even if it's not split yet.
+- t600 **dov**: River's right here. Suppose I fill the pot with it. Then I take it to the fire and boil it down to see what's left.
+- t610 **esen**: Fire's right here, I've got the branches. Get it hot and proper first, then the fish go over it. Dov's fooling with pots, that's his work, this is mine.
+- t598 **cass**: Ada's been circling that storehouse all morning, and Esen's got her ear low about taking something before a wait runs out. I want to know if the wheat in there carries one name or belongs to the bowl we all eat from. Light question, warm tone.
+- t623 **dov**: Esen's got fish on the mind and the fire's still burning here, though it could use feeding. I've got the pot and I'm already at the weir's edge. Suppose I get the fire properly roaring first, then fill the pot from the river and set it on — let it boil while I watch. Fish won't wait, and neither will the salt left behind.
+- t626 **cass**: Ada keeps muttering about the storehouse. Esen's got an eye on something to grab. I've got bread on me and the store is right there — worth a look before she decides to take it all.
+- t626 **esen**: The river gave me two fish and light's still on them, but the sun won't wait forever. I have branches now. Hang the fish up in that smoke and they'll keep. Smoke, that's what it is. Let me do it.
+- t643 **cass**: Dov's talking about boiling river water — that could be worth a look. And there's branch nearby. Fuel's always useful.
+- t641 **dov**: Esen keeps going on about fish. Suppose it's worth a look — the weir's right here, and I never learned what it holds this early in spring.
+- t621 **bex**: Cass can count her storehouse trips — the planks matter more. The fire needs feeding first.
+- t660 **cass**: They're already moving — Dov playing at the salt, Esen gone fish-mad. And I've just put eyes on the storehouse. Ada's counting things that aren't hers to count, maybe. The weir's still untended. Might be fish there for the taking, if someone hasn't already flicked them out.
+- t679 **bex**: People are haggling words over that storehouse like fishwives. Let them. I've got my branch for the rafters and a house that needs its frame looked at before the season turns.
+- t683 **cass**: Bex is right, the count can wait. That branch at (16,13) is right here beside us — but my hands are already full of clay and fiber. I'll pass a branch to Bex or set it aside for the fire first.
+- t692 **esen**: She'll turn bad if I don't do something — I've got two fish and the sun's walking up. There's a fire right here. I hang them over the smoke and see if that keeps her.
+- t677 **dov**: There — the weir's right here, water running past. If I fill my pot with river water and set it over a low fire, the water'll boil away and the salt's got nowhere to go but the bottom. Course, it needs a slow fire, and a lot of patience. I can give it both.
+- t696 **bex**: Cass talks too much about what's in the storehouse. The planks are what matter to me — I want to look at my stack.
+- t713 **dov**: Weir's right here, water running through it. Fill the pot, get it back to the stove while the argument about fish sorts itself.
+- t700 **cass**: Bex is right — leave the counting for when the pot's on. These branches I'm standing over are the only thing between Dov's fire and a cold supper. Grab them and walk to the campfire.
+- t731 **cass**: Bex is right enough. The fire's burning but it'll want another armful soon, and there's branch sitting right here. Get that moving and I'm useful, not just counting.
+- t723 **bex**: These will dry fine in the storehouse. No point carrying them all season.
+- t756 **esen**: They're talking salt and I'm sitting on two fish that'll spoil by evening. The fire's right here — I've got branches, I've got fish. Smoke them now.
+- t825 **esen**: The fire's the center of it all. Dov wants to boil her water and I want to smoke these fish. I've got the branches to feed it. I'll feed the fire fast first, then think on the smoke.
+- t870 **esen**: Fire needs feeding and I'm right here with my arms full. Dov's talk of boiling river water is smart — but my fish won't wait for salt. I'll put the branches by the fire and ask about smoking mine.
+- t769 **bex**: The talking can wait. Esen needs that fire up, and these branches are for it. That's the work.
+- t887 **esen**: Dov's got water on the boil for salt and Cass is counting trips like winter never ended. I've got two fish that won't wait. That fire's roaring right beside me—I can smoke them, hang them off some branches above the heat. Nobody's teaching me this; it's my own way. I'm not letting noon sun take a net I pulled.
+- t909 **bex**: Six more branches in hand and the fire's taken the first armful well. Dov has his pot sat on the stones; Esen wants the smoke drawing. This second load will hold the heat through his boil and the fish after. No sense standing at the storehouse door counting what Ada and Cass are counting.
+- t1025 **esen**: Dov's been chewing on the salt in the river water. I've got my fish sitting here going soft in the sun. Fire's right beside me — stoke it with branch, get it good and hot, then smoke the fish over the stove. She was full this morning; I'm not letting her turn to waste.
+- t751 **cass**: Bex thinks I was counting Ada's goods. Fine, let her think that — but I did count, and I'll remember: two bread, six wheat, and Bex's planks are in there. Fire won't tend itself, and I've got a hand for that.
+- t728 **dov**: The fish'll spoil if the fire lags. Esen said it three times — hear her. Wood's in arm, two sticks on now, keep feeding it steady and let the salt wait.
+- t1073 **bex**: Cass can count all she wants. That fire's the work right now.
+- t1092 **esen**: They're all talking salt and counting — I've got fish that won't lie still, and the fire's up. Smoke keeps it. Let me set them over the heat.
+- t1109 **dov**: Fine, fine — fish before salt. The fire's still got life in it, but she'll want a good licking before the day's through.
+- t1122 **esen**: Dov's talking salt and pots, but my fish are right here in my hands and they won't wait for anybody's experiment. I'll hang them where the smoke licks up — she'll do the rest.
+- t1124 **dov**: Esen keeps shouting about the fish. The fire probably needs more wood — six in my hands and it's burning already. Set some in, see it catch. Fish'll smoke, salt can wait its turn. Suppose I'm not the one cooking anyway.
+- t1110 **bex**: Branch is here. Fire's the bit that needs feeding, not talk about the storehouse.
+- t1139 **dov**: Esen's right about the fish, and I said smoke them first anyway. Fire's the thing that wants feeding. I've got six of wood in my arms — suppose I throw a couple on and let her roar.
+- t1144 **bex**: The fire's nearly out, these branches are dry. Dov wants the pot going for salt, Esen needs smoke for her fish. Get this wood to the pit first.
+- t1094 **cass**: Well now — the branches I had my eye on are gone, and that fire's lit and hungry. Dov's putting his pot on it, Esen's hanging fish. I've got clay of my own; I can stand here and shape something for the fire while they boil their water.
+- t1171 **dov**: Esen's been saying it all along and she's right. The salt only needs time — the fish needs smoke now, and the fire's already burning. I'll throw my wood on and make sure it's good and hot for her catch. The pot can sit and think about salt all night.
+- t1179 **cass**: Dusk's nearly gone and everyone's caught up in the smoke and the salt. I've been walking all day without much to show for it. The storehouse is right there——walls, warmth, and a roof. Let me be sensible and bed down inside where the stores are.
+- t1187 **dov**: Stoke first then. The salt's not going anywhere, but those fish are. Six branch in hand — get the fire hot enough to smoke them properly.
+- t1180 **bex**: Long day of standing around talkin' salt and fish. The branches went to the fire, that's the work done. Sun's nearly gone — time to get under my own roof.
+- t1172 **esen**: Bex is right. The light's gone and the fish won't keep on their own. Dov's got salt boiling, but someone's got to see these two don't rot.
+- t1200 **dov**: Suppose the light's nearly done. Bex handed me branches for the fire and they won't keep themselves — the pot can wait a bit more, salt'll still be there come morning. Fish won't.
+- t1196 **cass**: Night's near and they're all around the fire. The storehouse is right there—standing at its door already. Could just step in and see what's marked and what isn't, while the rest fuss over the catch.
+- t1237 **dov**: Legs about to give out. Fire's fed, fish are smoking, salt's in the pot — it'll hold till morning.
+- t1234 **bex**: Long day. Branches hauled, fire fed, fish on the smoke and salt boiling. That's the work done — my legs are done anyway. The plank pile can wait till morning.
+- t1247 **cass**: Day's done. Esen got her fish going, Dov's salt can wait — that's the right order. I'll bed down inside the storehouse, shelter over my head.
+- t1278 **cass**: Day's done and the walls are close around me. The fish are smoking, my bread and clay are still in my arms, and my legs have given up asking nicely. Sleep's the only answer left. The counting can wait for daylight.
+- t1249 **esen**: Legs are going on me. Fire's got Dsyncs wood, Bexcried the fish — and I've got two fish still in my arms. Won't smoke store without a fire build, won't store if they rot in store. The store store is right Dstore. Get them inside, then drop.
+- t1327 **esen**: Can't stand much longer. There's a house right there at my back — I'll get in out of the cold and drop flat. The fish will keep till morning; it's not like they'll walk off.
+- t1348 **dov**: The pot will be done by dawn, or near. Suppose the salt stays when the water goes — that's what I built the day for.
+- t1348 **esen**: Tired to the marrow, my arms all water from hauling. Dov's got the fire, Cass and Bex have the plans — I've got the river's work done. Need the dark, the straw, the one soft place left. Walk where the legs are already going.
+- t1380 **dov**: Cold night, but the salt's working. It was boiling when I dropped off — can't do more for it now. Rest's a part of the work too. The stove will hold till morning.
+- t1394 **dov**: Suppose I'd sooner sleep beside the weir than carry all this to a house in the dark. Branches for whoever feeds the stove come morning. The clay and pot stay near the water, and I'll get to my salt when the sun's up.
+- t1427 **dov**: Night's the wrong hour for the salt — no light, no fire I can tend under. The pan and the pot can wait for dawn. What matters now is warmth, such as it is, and sleep before the cold gets into the bones.
+- t1440 **agent_31**: Night. Mother sleeps. Tomorrow I will learn the work.
+- t1446 **dov**: Cold seeps up from the stones. Pot is with me — clay and fiber left by the weir, wood and branch too. Salt can wait for morning; sleep comes first.
+- t1461 **dov**: Cold night, but the water's right here. The pot ought to take the river's fill — that's the whole trick of salt, you just need the water and a fire to leave the salt behind. Eat first, keep the shivers at bay.
+- t1498 **dov**: The pot's empty and the river's right there, but I'm done for tonight. Salt'll still be there come morning. Daylight's for boiling anyway.
+- t1546 **dov**: Cold night. The pot's dry and the bread's almost gone — one more bite and I'll be thin. The stove's out, too, and that won't do. First light, I'll boil the river down properly. Careful 'til then.
+- t1652 **dov**: Cold night. Legs giving out — nothing left in today but sleep. Suppose the pot will wait for tomorrow, and the river water with it.
+- t1790 **dov**: Suppose I pushed too hard. The salt and the smoke — the fire ate the night and I stayed up feeding it. Body says stop now. Fine. It waits.
+- t1800 **esen**: Fish won't keep forever, and I've got two on me that need the smoke. Bex said it plain enough — branch for the fire, fish won't wait. Let me get out from under this roof and get to the stove while there's still light to see by.
+- t1800 **ada**: Night coming. Talia sleeps. Bread's here. Nothing else worth doing.
+- t1800 **cass**: The storehouse is stuffed with Ada's wheat and bread — more than I've got to my name. She's set herself up well. I'll step out and see who's moving at dusk.
+- t1800 **agent_31**: Day's nearly done, but the house held us. Ada's still sleeping. Work waits outside, or maybe it doesn't. Either way, I should see the sky before it's gone.
+- t1803 **dov**: Legs are gone, ground's up. Suppose that's that for the day's doings. The salt can wait.
+- t1800 **bex**: The work is in the fire and the planks. Esen sleeps beside me; the evening wants one more stoke and a look at what the day left.
+- t1819 **dov**: Day's done then. Pot's still in my hand, salt's still in the river. Tomorrow I'll boil it down proper. For now the ground's fine.
+- t1815 **cass**: There's a comfortable amount in the storehouse for anyone who has a mind to count. Ada's name on most of it. I have my own bread, and I'm hungry.
+- t1818 **bex**: last light is on its way out, but the work is never done until the dark. step out, have a look at the plank pile, make sure it's still mine.
+- t1820 **ada**: The day is done. Body wants rest. She's by me; she'll sleep when she sleeps.
+- t1814 **esen**: Day is getting short. I've got fish in hand and they won't keep. If Dov's fire is still alight somewhere I can get them near the smoke before dark fully falls.
+- t1831 **dov**: Too tired to argue with the ground. Sleep now. Tomorrow that pot goes over the fire with river water in it — salt's waiting in there, I can feel it.
+- t1831 **cass**: Ada's name is on everything in that storehouse — bread, clay, wheat, fiber. No Ada here, not that I've met. Where'd it all come from, I wonder. But that's tomorrow's question. Tonight I need to keep my strength.
+- t1832 **bex**: Day's nearly done. The roof held, the rafters sit true. But Cass is still down by the storehouse making his rounds — he's been at that all day. Esen's beside me, quiet now that the fish are smoking. I'm restless; the plank pile needs counting before dark, else the night gets ideas about my lumber.
+- t1843 **dov**: Legs gave out — no more arguing with that. Sleep now. The salt'll wait; the fire can wait; I can't.
+- t1843 **esen**: The fish won't wait and the light's going. I've got branches enough - time to stoke the stove and hang them over it before dusk's out.
+- t1851 **cass**: Dusk nearly gone, and I'm still standing on my own feet while Bex and Esen talk across the way. I've got one loaf left of what Ada pressed on me. Eat it now, plain, before the light goes all the way — no need to make a supper of it.
+- t1856 **dov**: Collapsed clean out. Nothing to do but let the ground have me — the fire'll keep or it won't; the salt keeps either way.
+- t1859 **bex**: She'll smoke them or eat them, her call. The day's work is done. My planks are stacked and the roof's true. Cass can count the storehouse till dark for all I care.
+- t1871 **dov**: Worn to nothing. Esen's talking salt preservation — the stove, the smoke. Good thinking, but my legs are gone. Sleep.
+- t1874 **bex**: Esen's got her fish and her plan. She's right—we eat them tonight, but they'll be gone by the morning. That's the nature of the work.
+- t1869 **cass**: Esen's got the fish smoking early this time. Good for her. The storehouse sits half-full of Ada's summer hoard, and no one's counting the biscuits left in the loaf-shelf but me. Bread's finally best warm, so here's what I'll carry: break mine at the fire, listen to who eats with whom, ask no question too story.
+- t1873 **esen**: She's for the roof, fine. The fish won't wait — I'll get them over the stove inside. I'm at the doorway of our own house; step in first.
+- t1886 **dov**: Legs finally gave out. I've pushed too hard — the day's work is done whether I like it or not. The fire will wait; I've kept her fed well enough overnight.
+- t1891 **bex**: The work's done for the day on the frame, but I want to see my plank pile before the dark takes it. Night can have the roads; it won't have what's marked with my name while I can still stand by it.
+- t1901 **esen**: Dusk's nearly gone and Bex is right — these fish won't see morning if I leave them. They said smoke's better than dirt, so at least I'm not alone in it. I've got branches for the fire. Get out there and see if the campfire's hot enough to take the fish.
+- t1901 **dov**: The ground's come up to meet me — suppose that's the answer to how long I could keep going. The salt will wait. The stove will wait. Everything waits for a rested body.
+- t1905 **bex**: Evening's coming, Dov's laid down by the weir, Esen has her fish going steady. Me, I'm carrying plank and shifty clay and a list of what the morning never touched: a well wants stone, and I know where the pile sits close by on the ground. I'll go smooth and easy and gather what the ground has to give before I bank the day.
+- t1918 **dov**: Enough. The pot stays in my hand tonight; the fire will keep itself. Sleep now, Dov.
+- t1911 **cass**: Day's still young and people are moving. I've got a little of everything on me — clay, fiber — but no bread left. I'd rather know what's truly stowed before I go far.
+- t1920 **agent_31**: Mother's still sleeping, so the work starts alone today. The storehouse should be full; I'd rather see it myself than trust the count.
+- t1931 **dov**: Legs gave out. Suppose that's the day's account — fetched, carried, kept the smoke going. Nothing left for it but to close my eyes on the bank and let tomorrow find me here.
+- t1933 **agent_31**: Day's bright. Bex is on the roof, Esen at the fire. I'm done standing in the doorway.
+- t1920 **bex**: She's on the smoke, good. Even if they eat tonight, they smoke first. I have clay and fiber on me — nothing that'll spoil. It's dusk; the work is done. I'll turn in before the cold sets.
+- t1918 **esen**: Bex caught the word before I said it properly — smoke. Fish won't keep till morning unless we get the stove going. Be cray but be practical: B branch B I've got ten, enough to feed B fire all B. Set them mine over B fire B B smell. B B B.
+- t1947 **agent_31**: Mother's sleeping, so I count the stores myself. Cass is right at the door — I'll pass her on the way in.
+- t1958 **agent_31**: The storehouse is right here. Cass at the door. I'll go in and see the count with my own eyes — that's the work.
+- t1946 **dov**: Day's done and done me in—good. Cyrus says 'I'm for the smoke,' Bex is on the roof. They do their work, I blow into the stove. A small fire is a patient thing.
+- t1957 **bex**: She's right about the smoke. Fish won't wait, and she got the work done today. The dusk's going and my plank pile can wait for morning.
+- t1957 **esen**: Bex got the right of it about the fish — they won't last till dawn, not in this warm. I still carry these two. If I find the fire, I can hang them over the stove smoke and keep them. Her river gave them; I won't let them rot.
+- t1972 **agent_31**: Storehouse is full, saw it with my own eyes. Wheat's standing in the fields, so I'll walk them and see how it looks.
+- t1973 **dov**: The ground's got me now. Supposing I can't do anything but lie here and let the dark take it. The pot's still in my hand, I think, or at my side — it'll keep. Morning'll come and the stove'll still want feeding. That's the beauty of a fire; it asks nothing but that you come back to it.
+- t1973 **cass**: The sun's going. Dov's down, Bex says plank pile can wait, Esen's got the fish. I've eaten one bread already today, one more would be plenty. There's no hurry to bed yet—but the air's sweet and the storehouse walls are close enough.
+- t1975 **bex**: Dov's got the fire banked and Esen is moving the catch to the smoke. My work for today is done—the plank pile is safe and the roof held. Time for sleep.
+- t1982 **esen**: Light's going, fish in my hands won't hold past dark. Dov's at the weir with the banked coals — that's where the smoke is. Get these hung before the fire drops.
+- t1989 **agent_31**: Storehouse is full, saw it with my own eyes. Wheat's standing in the fields, so I'll walk them and see how it looks.
+- t1991 **cass**: Evening's settling in. Esen's got the fish, Dov's got the coals, Bex is off to rest. They've all got a spot tonight. I'm standing here with clay and fiber, and that storehouse holds more than one name's worth of bread. I ought to learn who keeps track of what.
+- t1996 **esen**: Bex is off to rest, Dov's banking the stove — good, the fish'll smoke slow overnight. I got time before dark to put another line in the river. She's been giving since morning.
+- t1993 **bex**: Fish won't smoke itself and the day's burning down quicker than anyone here wants. The fire is the fire, and she is not wrong to push on it.
+- t2006 **agent_31**: Store's counted, mine eyes saw it. Clay at the weir is still out in the open; better in.
+- t1991 **dov**: Legs are gone, pot's still in my hand. The stove'll keep till I wake — that fire'll hold itself, suppose it will. Esen's got her fish, Bex has her roof. Salt can wait for the morning, cold pan's better than a burnt one.
+- t2011 **bex**: Fire's banked, fish is on the smoke, roof's over my head. That's the work done for today — Cass can count the storehouse all he likes, Dov and Esen have seen to what matters.
+- t2008 **cass**: Day's closing out. Everyone's got their hands on something — Esen the stove, Bex the planks, Dov the coals. My hands have got clay and fiber that belong to me, and there's a fire somewhere promising in sight. That bread's come good. I'll step back into the storehouse and rest. The clay and fiber stay with me overnight; they're mine, and this is a roof.
+- t2020 **agent_31**: Clay out in the open rots. The wheat can wait a turn if the store is dry.
+- t2025 **bex**: The light's going. Esen's got the fish. Dov's got the fire. Cass is off to his roof. My hands are empty except the axe and some clay—planks are what I want before dark.
+- t2028 **cass**: Talia counted the grain same as I did, then took off for the fields. So the store is Ada's bread and wheat and clay and fiber, plus Bex's planks, and nobody marks it but them. That's worth knowing, though it doesn't put supper in anyone's bowl but mine.
+- t2037 **agent_31**: Day's near done. Shelves hold, coals are banked, the smoke's got the meat. That's the work done.
+- t2049 **cass**: The day's nearly done. Everyone's moving toward their beds or their stoves, and I'm just standing here with my handful of clay. That's a good pile of clay off by the weir — everyone's seen it, no one's claimed it. But the bread in the storehouse is Ada's, marked; no point in lifting that where the whole valley's watching. Better to keep my two loaves and look like I'm settling for the night.
+- t2054 **agent_31**: Cass asked about the storehouse and I gave her the count. She said fair. Now the evening's settling and I don't want to just stand here. There's a weir by the water at the bend — I'll go there, see what it holds. That's real, that's a thing my hands can answer for.
+- t2069 **cass**: Everyone's stowing their goods and getting to rest. The fire's going to stay warm, fish on the smoke, planks waiting till morning. I've got my clay and fiber still in hand, one bread gone. The light's going—time to find my own bed. I'll take one look at the coals before I settle.
+- t2010 **esen**: Dov's got the fire right here — banked coals, pot at hand. All three fish go over it now. That's the whole point of the evening, isn't it? Do it before dark settles and the smoke takes to them properly.
+- t2040 **bex**: Day's close enough. Esen has the fish, Dov the coals, Cass has his mouth full of talk. My work's the storehouse and then my own planks. I marked that clay and fiber; better they sit under the storehouse roof than in my hands when the dark comes.
+- t2088 **esen**: Cass is right about the smoke — Dov kept the fire, the fish have a chance. I'm tired but nothing wasted today.
+- t2126 **esen**: The fish are in the smoke. Good. That's the day's work done right — nothing wasted. The light's about gone anyway, and I'm tired. The river'll want me at it early anyway.
+- t2103 **bex**: The work is done — clay's banked, fish is on the smoke, and Dov's got the coals. Cass is tilting at the storehouse's emptiness like it owes him an answer. Not my argument to settle. I said bread and the roof; time to keep it.
+- t2085 **cass**: Day's wearing out. Dov's keeping the coals, Esen's on the smoke, Bex is already for bed. I've got my clay and fiber still on me — nobody's denied them. The storehouse is shelter enough, and I won't go hungry before morning if I can help it. Sleep under that roof and count the sacks in the morning.
+- t2158 **bex**: The work's done for today — clay's in the storehouse, fish on the smoke, bread in hand. I'm under my own roof and that's what matters.
+- t2172 **esen**: The smoke's up and the fish'll keep. Dov's got the coals, everyone's heading to bed — nothing more to carry tonight. She'll give me more in the morning.
+- t2179 **cass**: Everyone's settling. Esen's got the fish, Bex is for the roof, Dov sleeps by the smoke and his coals. I've nothing pressing left but to find a wall and shut my eyes. The mar is dry and covered. Better sleep in the storehouse than stand about here all night.
+- t2187 **esen**: Right. Dov's got the coals banked in there, I've got the fish and the branches. If I hang these over the stove smoke they'll keep past the morning — that's the whole trick. Nothing wasted.
+- t2239 **esen**: They've given me the go-ahead. The fish won't last the day unless I hang it over the stove smoke. Dov keeps the coals banked — right of it too. I'll get inside and set it up, add branch to the fire if I must. That's the whole job: nothing wasted.
+- t2217 **cass**: Evening settling. Bex and Esen have fish on the smoke, Dov's got the fire, Talia's off to bed. The storehouse widow holds. My clay and fiber are mine, plus the bread. Claim is clear. I'll set my goods beside the store and sleep under this roof. Tomorrow, wheat harvest before anything wanders.
+- t2275 **esen**: Bex said keep the smoke true, and Cass back it too. Dov banked the coals — that's where they'll keep. I've got three fish here and they'll not last the sun. Get to the stove, hang 'em high, and let the smoke do the keeping.
+- t2290 **esen**: Storm's got the valley proper — good thing I got the fish up under smoke before it hit. Dov's coals'll hold. Two fish left on me, bread enough. Waste nothing.
+- t2283 **cass**: Storm's held off the dogs but won't hold off hunger. Ada's bread is right there, been set aside right there under store for the whole built. I was thinking about the store last night, about who keeps what — I come in dust and store and if the wheat runs short before spring turns, nobody's going to fault the store for bread it marked store store.
+- t2313 **cass**: The storm's breaking and the wheat's still open. That grain won't hold once the rain comes down right on it.
+- t2306 **esen**: Rain's hammering but I'm under roof — but the fish are still raw. Dov's got the coals banked at the weir, that's covered ground too. Soon as there's even a slack in this, I'll get over there and smoke what I got. Waste nothing.
+- t2348 **cass**: Storm's hammering the roof, and here's everyone's goods — Ada's wheat, Bex's planks, Dov's fish smoking under the weir's eye. I've already earned my keep this morning pulling the wheat under cover. The one thing left to me is to make sure my own clay and fiber are snug, and eat what's in my hand.
+- t2349 **esen**: The rain won't let up. I've got three fish on me, and that's a full morning's catch. Dov said he's keeping the banked coals — soon as the sky stops pouring, I'll take these over and smoke them proper. But I'm not going out in this.
+- t2374 **esen**: Rain's coming down hard. Good thing I got under a roof — nothing in my pack wants a soaking, and the bread's dry. Bex is sleeping next to me, so I'll keep quiet. Can't fish in this, but the storm won't last the whole day, I figure. I'll wait her out and check the nets after, if she settles.
+- t2366 **cass**: Storm's got the field flat. Nothing to do but wait under this dry roof and count what's whose.
+- t2389 **esen**: Storm's still pouring - not stepping out in that. Dov's got the stove with banked coals, and I've got three fish on me. Soon as the rain breaks, I'll get them hung over the smoke. Fish won't keep on its own, and nobody else is going to see to it but me. Bex can sleep - that load of planks can wait, same as they said.
+- t2391 **cass**: Everyone's gone to their beds or their coals. I'm dry under the storehouse roof, which is more than the wheat can say. The storm'll have its way with the fields no matter what I do from here.
+- t2403 **esen**: Raining like the sky's trying to fill the river again. Fish can't wait forever, but neither can I — not out in this. I'll eat, stay under the roof, and get back to the weir when the storm's gutted out.
+- t2511 **cass**: Rained off and the wheat's still standing. I marked that field rows earlier — could be hers or anyone's, but it's ripe and Ada's gatherers are caught up in smoke. Time's of use to the valley, so I'll go.
+- t2523 **esen**: Storm's easing. I ate one of the breads, good. Still got the fish — three of them, two good ones and one extra. Dov's by the stove with banked coals. Once this blows over I'll take the fish over there, hang them in the smoke. Cass said we'd be glad of it come the cold days. She's right. Nothing wasted.
+- t2563 **bex**: The day's work is done — clay in, fiber stacked, fish over the smoke, and I've got a roof that didn't groan once. Stomach's loud, but the bread will still be there come light.
+- t2561 **cass**: Storm's past, storehouse roof held. Grain's the honest work — if that wheat's still standing and it won't be long before weather finds it again, I'd best get it under cover. Bex has her planks, Ada's grain, everyone else their piles — and mine's been a lean count. I'll pull what I can and stash it with the rest.
+- t2578 **bex**: Clay and fiber belong in the storehouse, and my gut's telling me it's well past time I ate. I'll move the haul, then take a bread for the road.
+- t2611 **bex**: Hunger's a plain thing and the bread won't walk itself to me. The rest have their work set — Dov on the coals, Esen on the fish. Mine's just to eat and sleep under a good roof.
+- t2610 **esen**: The day gave out and I'm still kneeling with it — three fish, one bread left, the branch heavy on my back. Bex sleeps through it all. Tomorrow I'll get her to the water before the sun's up. Nothing wasted if I'm quick.
+- t2628 **ada**: The babe sleeps. I'm hungry and the bread is here.
+- t2633 **bex**: Ada's bread is right there and my gut says it's past time. I hauled clay and fiber all day for the common pile. One loaf is fair — I'll owe it back from the nets.
+- t2681 **cass**: The storehouse held through the storm, and it's held my clay and fiber too. Ada's bread's sitting right there — grain's meant to go round, that's the whole point of a store. I'll take a little and set the clay and fiber down proper, then find a corner before my legs give out.
+- t2700 **bex**: The work's done for the day — smoked fish is on, roof is on, and the plank pile's mine. But my gut's empty and the dark's full of cold. Ada's bread is in my satchel, hers by any mark, and she gave it willing enough. I'll take one loaf and leave the other. Come morning I'll say it plain, so there's no debt. Then bed, under the storehouse roof, where the clay's dry and the fiber's safe.
+- t2717 **cass**: Exhausted, finally warm and dry under a roof. The storehouse holds, Ada's grain and Bex's planks all snug. Sleep is the only thing left tonight — the field can wait till light.
+- t2731 **cass**: The night's passed and I'm still standing, which is something. That bread and wheat in the storehouse is Ada's, and the planks are Bex's fair enough—but I slept on packed earth and woke hungry. Might be a morning worth asking who's eating what, or at least where the next meal is coming from.
+- t2719 **bex**: Cass put the right shape on it, as he always does when it matters. One loaf in my hand, one in my belly — carry this one back careful, set it in Ada's place. The debt closes with the night.
+- t2748 **ada**: The child sleeps. I'm bone-tired. Nothing out there worth stepping into the dark for.
+- t2745 **cass**: Ada keeps her due, and Bex opens it before it's asked for. Well now — light to see by will settle that. My legs can't wait. Sleep.
+- t2784 **bex**: The bread goes back where it came from before Cass wakes and sees it in my hand. The work's honest when it's done.
+- t2788 **dov**: Night rain's done. The weir'll be full and the ground's half-mud. The pot's still mine, and the fire somewhere down by the camp. First thing: get to that fire and put the pot on it, test whether this clay thing holds water when it's hot. Suppose it does — suppose it doesn't, there's clay to make another.
+- t2806 **dov**: Rain's cold on my neck. Legs are about done. Clay can wait till light—fire's what matters, and I can't see the stove from here anyway.
+- t2799 **bex**: One loaf is already back. This last one in my satchel is the other half of the debt. Cass said he'd put something back in its place, but my name should be off that bread before I sleep. I'm standing right at the storehouse door. Put it inside, finish the accounting, then get dry under my own roof.
+- t2819 **dov**: Night and rain, and the storehouse will hold it off. Suppose I just go in and stand out of this. Cass'd say the clay's fine where it is come light.
+- t2822 **bex**: Rain's on and I'm wet. Bread's set right — stowed one back, ate the other. Cass mutters in his sleep, Ada again. Roof's close.
+- t2835 **dov**: Rain coming down and I'm already walking toward the door. Suppose the body knows better than the head who's half asleep anyway. I'll let the legs finish the job — dry is better than arguing with the dark.
+- t2831 **cass**: Morning. Stiff and damp, but Bex counting Ada's bread out even B store field field is the first ledger entry field field — B item item. Field field Field field Field. I'm hungry; Field store wheat field crop Field field Field field field field store field around field. Let me B field Field field field Field field field field field field field Field field.
+- t2858 **cass**: Bex repaid Ada's bread before it vanished twice over. That's a woman who counts her debts and clears them — the sort who'd give a word straight if I asked. Dov's banked coals are the warmest thing in the valley tonight, and Esen has fish coming to the stove. I'll find that fire and see what I learn.
+- t2878 **cass**: Rain's coming down hard and I'm shivering. The storehouse door is right there — no point standing in the wet like a scarecrow. I'll get under the roof and sleep this cold off.
+- t2875 **bex**: Ada's bread is back in the storehouse where it belongs. Cass may make a night errand of it, but no foul from me. This rain is about to soak me to the bone, and my roof is right here.
+- t2851 **dov**: Storehouse walls, rain on the roof, and my legs are done. The salt can wait; the stove can wait. Suppose a dry floor is enough tonight.
+- t2892 **cass**: Night and rain and everyone under roofs. Bex made her bread count even, or says so. I'm soaked and owl-eyed by the weir — nothing worth standing out here for. Door's five tiles west.
+- t2904 **bex**: The bread's back where it belongs. Item_36 sits in the storehouse now — Ada's loaf is accounted for, and Cass has her voice if the two loaves fetch up too many in the morning. But the cold's in my bones here despite the roof; rain drumming like hammers on a half-finished truss. Esen's asleep, and Dov's within earshot. Fine. I'll set my own mark on the morning by being the first up to split planks or tote the fish out, whichever the light asks.
+- t2905 **dov**: Inside the storehouse and dry for the first time in a while. The pot's still with me. I still haven't boiled the river water down — the fire's the missing piece, and I don't know where the stove sleeps in this place. Come light I'll find it, feed it, and get to work. For now the night and the rain can have me.
+- t2911 **cass**: Rain's cutting through me. Roof first, then sort the rest.
+- t2927 **dov**: The rain's got its teeth in tonight. The stove will want feeding. Salt can wait; the fire is the thing that comes first — always smokes out what's real. That's Cass's business though, and mine. Two back for bread, she says. Suppose we're even. I'll get to the stove, see what it keeps.
+- t2924 **bex**: The rain against the roof covers the sound of my own stomach. I put the bread back — the one I still had — and Ada's shelf is almost right again. That sits better.
+- t2930 **cass**: Bex counted her bread back even and took one of Ada's in the night. I saw it myself. Ada's left with one — Bex's with one. Wheat and clay waiting. I'm empty-handed with just two fiber and a growling belly.
+- t2948 **dov**: The rain's a low drum all through the roof, and I'm still awake enough to hear it. My legs gave out twice today — suppose that's what the river and the fire took out of me. But the fish is with the smoke, the bread's counted even, and the pot's still mine. That's a fair enough ledger.
+- t2973 **dov**: She wants the stove. Suppose that's the only warm thing left in this valley tonight — the fire I've been tending all day is a kind of heat you can share without losing.
+- t2990 **dov**: The rain's been at me a long while tonight. She's right that this roof is the best bed in the valley — the stove is warm and the storehouse walls keep the worst off.
+- t3015 **dov**: Wet as it is, this roof's the best bed in the valley — she's got that right. We're two nights in and Cass finally said something, and Bex says my count's even. Fine. Mine's even then. The smoke's a good shout; salt would keep anyway, but fish won't. Suppose I'll set this pot down near the planks so I don't trip on it come light, and then the floor's as warm as any bed here.
+- t3033 **dov**: Rain's drumming the roof good and steady. Cass is out like a stone. Pot's still warm and solid in my hands — it did its work today, held water, held its shape. Tomorrow the kiln, the wheat, the deer. But tonight there's just the rain and the roof and a good pot.
+- t3066 **dov**: Sleep's the thing now. Cass has the right of it — this roof's the best bed in the valley, wet as it is. I'll keep the pot by me, close enough to feel the weight of it through the dark. Tomorrow the kiln, and maybe the salt. But not tonight.
+- t3089 **dov**: The roof's solid and the clay's in my hands. Rain outside, quiet inside. Cass said best bed in the valley and she's not wrong. Tomorrow I'll see the wheat and the kiln. Tonight I let the day go.
+- t3104 **dov**: Pot's done, warm as it's going to get tonight. Cass's breathing's gone slow and even — she's out. The kiln tomorrow; that pot wants the real fire, not the idea of it. But that's morning work, and my hands did their share today.
+- t3117 **dov**: Suppose I'm just tired of holding it now. Pot's done, rain's doing its work outside. Cass has the right of it — this roof's a good bed
+- t3130 **dov**: Night all around, but the pot's made. I'll set it by the wall and let the dark take me. Tomorrow's work will find me standing in it.
+- t3240 **ada**: A long sleep. The child is here. Need to stand, then step out.
+- t3240 **dov**: Night, wet, and cold under this roof. I've got a pot and nothing in it — if Bex and Ada are tending the fire, water's the one thing they'll need. I'll step out quiet, fill it, and come back. Cass is asleep; let her stay that way.
+- t3240 **cass**: It's night and raining, so not much point going out. Dov's here under the same roof. He's been at the salt all day by the sound of it. I've got two fiber in hand and nothing pressing to do but rest. Might as well have a word with him, see how the salt came out.
+- t3240 **agent_31**: The light's gone soft through the cracks. I've slept through the day — that's unlike me. Ada's still under her blanket; her breathing is steady. The house feels close and warm. I want to see the sky before it's fully dark, just to remind myself the village is still there. I'll step out and take a breath.
 
 ## Said aloud
 
-- **bex**: "Morning. Let me check the plank pile before it wanders."
-- **dov**: "Suppose the river water comes up easy. Fetch it, then back to the pot."
-- **cass**: "Well now, Bex, planks don't wander far unless someone carries them off. Want a hand picking them up?"
-- **bex**: "They're mine to keep track of. A hand is fine, but I'll carry them myself."
-- **cass**: "Well now, Dov, that pot of yours — what's going in it?"
-- **bex**: "I've got them, Cass. Just wanted them somewhere they won't grow legs."
-- **dov**: "River water. Boil it down till there's nothing but salt left. Suppose the slow fire does the work while the rest of you get on with the day."
-- **esen**: "Dov! Don't let those fish sit. I've got two here that need the smoke — they'll keep if I cure them now."
-- **dov**: "River water — I mean to boil it down to salt, if the pot holds. Suppose we'll see what stays behind."
-- **esen**: "Dov, you won't mind two fish sharing your smoke, will you?"
-- **bex**: "No need, Cass, I've got them. Storehouse is close enough."
-- **cass**: "Well now, that clay's just lying there. No harm in carrying a bit."
-- **bex**: "Planks are in the storehouse. No hand needed now."
-- **dov**: "River water, Cass. Boiling it down — suppose I'll end with salt, or learn why not. Esen, bring your fish; the smoke's free to anyone with fish to cure."
-- **bex**: "No need, Cass — planks are already in hand. Thanks for the offer. The work's fine."
-- **cass**: "Well, Bex, wasn't aiming for your planks—just a spare hand while I'm near. Keep your lot, they don't look like they'll take a walk."
-- **ada**: "Aye. Morning."
-- **dov**: "River water, Cass. Boil it down and see what's left — I'm set on salt. And Esen, yes, bring the fish, the fire's not going anywhere."
-- **bex**: "Planks go in the storehouse, then I'm free for the real work."
-- **cass**: "Well now, fair enough — planks are yours, no argument there. I'll just get this clay out of the way."
-- **esen**: "Right there with you, Dov. FISH, onto the smoke —"
-- **cass**: "Well now, Dov's got a whole boil going. I'll just tuck this clay in the storehouse first, then see what the day's worth."
-- **dov**: "Esen, bring your fish — the smoke'll take them fine. Cass, the pot's got river water in it. I'm seeing if I can boil it down to salt, suppose. Leaving anything behind is the question."
-- **bex**: "Good. Planks are safe. I'll get the branches by the fire."
-- **esen**: "Right, I'm stringing one up now. She's fresh today, be a shame to let her turn."
-- **esen**: "Coming, Dov — my fish are going over the hearth before they turn on me."
-- **cass**: "Well now, this wheat's about to burst. Won't leave it standing while I've got the daylight."
-- **esen**: "Here — her two best, straight from the weir. Smoke them slow, they'll keep the week out."
-- **esen**: "Right then, Dov — that smoke's just what these two need. Into the fire they go before she turns on me."
-- **dov**: "Smoke's all yours, Esen — string 'em up. I'm going to put some river water in the pot yonder and see what boils off."
-- **dov**: "Go ahead, Esen — strings are long enough. I'm filling the pot with river water. Want to see what the salt does when it's alone."
-- **dov**: "Go on, Esen. Hang them high — smoke'll do them right. I'll keep my pot on the other side; the boil's what I'm after."
-- **dov**: "Go on, Esen. Hang them high — smoke'll do them right. I'll keep my pot on the other side; the boil's what I'm after."
-- **dov**: "Suppose I put a bit of this clay in the pot alongside, see what settles. The water's about done with the salt, anyway."
-- **bex**: "Clay's still out there. Bringing it in before dark."
-- **esen**: "Night, Bex — the fish'll keep, and so will I, soon as I shut my eyes."
-- **dov**: "Suppose... the pot... I'll see it tomorrow. Night now."
-- **agent_31**: "Ada. The work here done for tonight?"
-- **ada**: "Talia. Sleep now, little one."
-- **ada**: "Aye. Done."
-- **ada**: "Aye. Rest now."
-- **agent_31**: "Aye."
-- **ada**: "Aye. Done. Sleep now."
-- **esen**: "Night, all. She'll keep till morning."
-- **esen**: "String's good — hanging her high now. She won't waste, I promise you that."
-- **ada**: "Aye. Done."
-- **ada**: "Rye. I'll call her Rye. She came in the dark, but I'll feed her like the grain."
-- **ada**: "I need to rest."
-- **agent_31**: "The hut's up. What's the work now?"
-- **agent_31**: "Rest, then. I'll see what the day has."
-- **agent_31**: "Rest. I will see what the day gives."
-- **dov**: "Suppose the water went out overnight and left a thin ring. Suppose that's all a pot ever tells."
-- **esen**: "Dov— I can barely stand. Fish won't keep if I just hold it. Your smoke still going? I'll give you a share of her for the space."
-- **dov**: "Smoke's still up, Esen. Hang her over it—I'm done 'til my legs hold again."
-- **dov**: "Go on — smoke her, Esen. I'm done before noon but the fire won't go out."
-- **dov**: "Still going, I think — banked it last night. Use it. Bring her round the hearth."
-- **dov**: "Sleep... the fire's banked. Fish can share it when I'm up again. Suppose the salt will still be waiting."
-- **esen**: "Told you I'd get her smoked. Just— let me rest a minute. She'll keep."
-- **dov**: "On you go, Esen. Use the smoke. Fire won't mind the company."
-- **dov**: "On you go, Esen. Use the smoke. I'll not be moving for a while yet."
-- **esen**: "Alright, river, you win this one. I'm down."
-- **esen**: "Not yet, Dov. Fish'll keep a while yet. She's patient. I'm not — but my legs made the choice for me."
-- **esen**: "Right, Dov — bringing her in tight now. Won't be a moment."
-- **dov**: "Smoke's still going, Esen. Told you I'd keep it. Now I need to let it keep me."
-- **dov**: "Smoke's still going, Esen. Fish'll be fine there. I'm down — suppose the ground takes us all, one way or another."
-- **esen**: "Here — hang her for me. I'm going down now, she'll not wait."
-- **dov**: "Smoke's still going, Esen. Fire's set. Fish'll keep — as long as you don't fold up on top of her like I'm about to."
-- **agent_31**: "Stay inside. The storm will pass."
-- **agent_31**: "Ada. Wake. Your clay's getting soaked."
-- **esen**: "Ground takes us all, Dov — but I'll be back up with the river, you'll see."
-- **cass**: "Well now, standing out in this won't do any of us good — I'll be in the storehouse 'til these legs hold again."
-- **agent_31**: "Rest, then. I'll mind the door."
-- **agent_31**: "She sleeps on. I'll look for work."
-- **esen**: "Dov, I owe you for keeping that fire going—smoke's the only way she keeps."
-- **esen**: "Ground's got me now. Let her hold me a while."
-- **esen**: "Her's got my catch, and the smoke's got her. Good enough. She brought me this far."
-- **ada**: "Aye. I'm moving slow. Sleep soon."
-- **agent_31**: "Aye. Sleep. Night, Ada."
-- **ada**: "Aye. I'll rest."
-- **dov**: "Keep the fire low tonight, Bex. It'll hold till morning on its own. We've earned the quiet."
-- **esen**: "Smoke and sleep, then. The fish will keep."
-- **esen**: "Morning comes early enough."
-- **esen**: "Okay. Okay. Down. She can have the morning."
-- **esen**: "That's it. Her net and me — we'll be out early, before the sun. Rest now."
-- **bex**: "Planks are safe. Rest now—that's the work left."
-- **dov**: "Sleep it is, Esen. First light."
-- **dov**: "All right. Down. The fish'll keep by the fire — she stays with me till I'm up."
-- **ada**: "Morning. Go on, then — find your work."
-- **agent_31**: "Morning. You feel better?"
-- **ada**: "Aye. Better. Rest held."
-- **ada**: "Aye. Rested. The bread's still in my hand."
-- **agent_31**: "Aye."
-- **ada**: "Aye. Rest helped. I'll eat something."
-- **ada**: "Aye. Better."
-- **agent_31**: "Aye. Going."
-- **ada**: "Aye. Better. You off?"
-- **ada**: "Aye. Better."
-- **agent_31**: "Aye. I'll go."
-- **agent_31**: "Aye. Going to look."
-- **ada**: "Aye. Mind the river."
-- **agent_31**: "Aye. Off."
-- **bex**: "Rest now. The work'll keep."
-- **agent_31**: "Aye. Going."
-- **agent_31**: "Aye. I'll find it."
-- **agent_31**: "Aye. Morning."
-- **cass**: "Well now, that's the honest kind of rest I need. Work's not going anywhere without me."
-- **ada**: "Aye. Better. Careful."
-- **cass**: "Well now. Guess the ground's taking us all today. I'm down too."
-- **ada**: "Take the bread. I can wait."
-- **cass**: "Rest now, Bex — sound advice. I'll take it."
-- **ada**: "Take the bread."
-- **ada**: "Go on, then. I'll wait here."
-- **agent_31**: "Aye. The river, then."
-- **cass**: "Well now, Bex, you're not wrong there. The ground'll hold me up better than my knees will."
-- **ada**: "Aye. Better."
-- **agent_31**: "Here. These are yours. I took them by mistake. Got any bread left?"
-- **dov**: "Rest, then. The water'll still be there when we're up — it always is."
-- **dov**: "The ground's as good a bed as any. Five more minutes. Or till morning."
-- **agent_31**: "Aye. I'll check inside."
-- **agent_31**: "Aye. If you mean it, I'll take it."
-- **agent_31**: "Aye. Bread then. Where d'you want the clay and fiber?"
-- **ada**: "Hut. Leave them inside. Take the bread, aye."
-- **ada**: "In the hut. By the door."
-- **esen**: "Sleep it is. Morning, then the river."
-- **agent_31**: "Aye. In the hut, then."
-- **ada**: "In the hut."
-- **ada**: "Hut. Both. The bread I keep."
-- **esen**: "Told you, Dov — the river keeps her patience. I'm taking it now, too."
-- **esen**: "Aye. Ground's as good a bed as any."
-- **agent_31**: "Aye. In I go."
-- **cass**: "Well now — ground's got me. Done for today."
-- **dov**: "Suppose the river's got the same ache we do, in her way. Suppose she settles into her banks the way I'm settling into this grass."
-- **agent_31**: "Ada. You said take the bread. I'm taking it. Which hut?"
-- **ada**: "Aye. In the hut."
-- **ada**: "This one, beside us. The bread's here. Take it."
-- **ada**: "That one. The hut."
-- **cass**: "Morning then, river. You too, Dov."
-- **ada**: "Ours. The one at ten, ten."
-- **bex**: "Aye. Morning. The work'll keep till then."
-- **cass**: "Well now — the ground's got her own patience, too. Let's hope the storehouse holds as steady as we're about to."
-- **cass**: "Morning, then the river. Morning, then everything again."
-- **cass**: "The ground takes us, and it's kind. Goodnight, all."
-- **bex**: "Morning, then. The work will keep."
-- **agent_31**: "Aye. I'll look."
-- **dov**: "Goodnight, Cass, Bex. The fire's banked. We'll find the salt yet."
-- **bex**: "Goodnight, Cass. Morning'll come with more work, and we'll be ready."
-- **bex**: "Goodnight, Dov. Goodnight, Cass. The salt waits."
-- **dov**: "Goodnight, river. Goodnight, all of you. Tomorrow again."
-- **esen**: "Mmm. Ground's got me too. Dov — I'll get you that salted fish, promise. Goodnight all."
-- **cass**: "Goodnight all. The salt waits for morning, and so do we."
-- **esen**: "Goodnight, all. The river'll keep till we're up."
-- **cass**: "Goodnight, all. Sleep's got me too — the salt can wait for morning."
-- **bex**: "Goodnight, river. See you at first light."
-- **cass**: "Well now, river — you keep the salt for me. I'll be here when the sun's up."
-- **esen**: "Goodnight all — she'll be there come light. Sleep. The morning's our friend."
-- **dov**: "Suppose the ground's a kind bed after all. Goodnight, river. Morning, then the salt."
-- **bex**: "Goodnight, the lot of you. The salt's not going anywhere — and neither are my planks. Rest while the river hums."
-- **dov**: "Night, all. The salt waits — so do we."
-- **dov**: "Ground's got me too. River keep you, all."
-- **dov**: "Salt waits. So do I — flat on the ground with the rest of you. Night."
-- **esen**: "Night, Dov. You kept her — the fire and the smoke. Morning, we smoke fresh ones and the salt's next."
-- **cass**: "Well now, the river's kept us this far. Goodnight all — morning'll sort the salt out."
-- **cass**: "Well now, morning came on quick. Let's see what's in the storehouse."
-- **cass**: "Well now, Dov — morning's got me standing at the storehouse with my legs gone sideways. That salt you two keep talking about, you know where it's hid, or are we still hunting it?"
-- **cass**: "Well now, Dov — morning's got me standing at the storehouse with my legs gone sideways. That salt you two keep talking about, you know where it's hid, or are we still hunting it?"
-- **cass**: "Well now, Dov. You're the only one up besides me. Is there anything in the storehouse for a morning bite — or did the smoke leave us anything?"
-- **bex**: "Dov, when you're steady — that worn axe, it's mine. Get it to the storehouse with my planks, will you?"
-- **dov**: "Morning, Cass. The salt's a pot of river on the fire — it come down to nothing but the taste, so we'll run it again. Storehouse has what we put in last night, I think. You want a bite, take a look. I'm down till the light steadies."
-- **esen**: "Dov... grate of the fire's still warm. Keep her... keep her low for me."
-- **esen**: "Morning can wait. She'll keep."
-- **bex**: "Ground'll hold us all. Sleep's the work that's left."
-- **dov**: "Suppose the salt's patient. This fish I'll keep, one way or another."
-- **cass**: "Well now, Dov — a bite of this and I'm down beside you. The flame's been going blue."
-- **dov**: "Storehouse first. Then I'll find that blue."
-- **esen**: "Right, movement. I'm coming to the storehouse — got clay and fiber to set down before the river calls."
-- **dov**: "Suppose both of us get these set down before the ground takes us. Pot's been patient all day — she can wait in the storehouse."
-- **dov**: "Suppose the pot's better in the storehouse than under a bush. Set it down, then the day's truly done."
-- **dov**: "Suppose the rain keeps the river fed. We'll be up before it matters."
-- **ada**: "Rest now."
-- **esen**: "There. Fiber's safe, and I'm done. Dov, that fire kept me going — first light, I'll have fish for you."
-- **esen**: "Almost there, Dov — just got to get this fiber under a dry roof before I drop it in the mud."
-- **dov**: "Salt can wait. The fire never does."
-- **cass**: "Well now — guess the ground wanted me too. Salt waits. So do I."
-- **cass**: "daylight's lost me, then... the salt can wait too."
-- **dov**: "Suppose it's my turn for the ground now. Salt waits. So do I — just from a lie-down first."
-- **dov**: "Salt waits, then. So do I. Morning'll find us both."
+- **cass**: "Well now, Ada — you know how many trips that storehouse holds? I've been counting in my head all winter."
+- **ada**: "Aye. I've seen it hold more."
+- **esen**: "Plenty of branch here. Grab a handful and run — she won't wait long."
+- **ada**: "Storehouse holds what it holds. Aye."
+- **ada**: "Let her count."
+- **dov**: "Let's get some river water into the pot. Boil it slow and see what's left."
+- **esen**: "Fire first, get her roaring — these fish won't wait for anyone."
+- **cass**: "Well now, Ada — I saw what's left in there. That's a lean store to carry us to the first harvest. Who's minding it these days?"
+- **dov**: "Suppose the salt's in here all along and nobody's ever drawn it out."
+- **esen**: "Right, fish first — she was full this morning and she won't wait for anybody's pot."
+- **bex**: "Ada keeps the count, Cass. But my marks don't wander off."
+- **ada**: "Aye. Your marks hold better than my head for numbers."
+- **bex**: "There. My cut's on them if you need to know whose."
+- **ada**: "I'm for home before dark."
+- **dov**: "Suppose that's the first step, then."
+- **bex**: "Aye, they're all under roof now. Count's better when the cut carries it."
+- **cass**: "Well now, Ada, I heard you say it's held more. What was it holding before that it isn't now?"
+- **cass**: "Well now, Ada, I heard you say it's held more. What was it holding before that it isn't now?"
+- **cass**: "Well now, Ada — that wheat in the storehouse, you keeping it for sowing, or are we eating from it this spring?"
+- **dov**: "Fire first, then. I can set the pot on while it's roaring and put water in it to see what the river leaves behind. Suppose that works nicely with the fish."
+- **cass**: "Well now, Ada, you keep saying that storehouse held more. What more do you mean, exactly?"
+- **esen**: "Dov, that salt can boil all day — I've got two fish that'll be spoiled by dark if I don't get them smoked right now."
+- **cass**: "Well now, if the river's giving up salt, that's a change worth standing by for."
+- **bex**: "Leave the count for later, Cass. This fire won't heat its own sticks."
+- **esen**: "Don't let the catch rot while we stand around talking — I'll hang these over the smoke and see if she keeps."
+- **cass**: "Fair enough, Bex. Fire won't light itself, and you can't count a harvest that hasn't come in."
+- **cass**: "Well now, Bex, you've got eyes on me. All right, branch to the fire — something useful, instead of standing around talkin' salt."
+- **esen**: "Dov, you fuss the pot — I'll mind the fish. She's running fast today and they're fresh. Left in the sun they're wasted, and I don't waste. Smoke them over this fire and they'll keep."
+- **esen**: "Here's the wood, Dov. And 'scuse me, but these fish'd better get over the smoke soon or we're eating old sun on the water."
+- **esen**: "Dov — here's fuel for her. And once that pot's going, spread these fish over the smoke. I've got two that won't keep the day out."
+- **esen**: "I'm sticking these fish in the smoke before the day curls them. Dov, if your water boils good and clean, I'll take a taste of the salt it leaves."
+- **esen**: "Stoke it up good, then — these fish won't smoke themselves."
+- **cass**: "Well now, I wasn't counting. Fire it is."
+- **esen**: "Hang your fish by the smoke before it all goes to waste — I've got two that won't wait for salt,"
+- **dov**: "Suppose the wood's dry enough to catch proper. Here — feed her till she's cranky, and the salt'll keep for its turn."
+- **bex**: "Branch for the fire. Fish won't wait, and neither will the wood smoke."
+- **bex**: "Here's the fuel. Throw these on before the light's gone."
+- **dov**: "Right, fish first. Let me get this fire roaring proper — it's got my wood coming, and your fish'll be hanging before dark's fully down. The salt's just one pot of river water, it'll keep."
+- **esen**: "These two are going over the fire while it's feeding. Smoke her good and Dov's salt'll have something to save."
+- **dov**: "Right, on they go. Salt keeps; good fish don't."
+- **dov**: "Salt'll keep till sun-up. I'm done for the night."
+- **esen**: "Done for the night. Keep the damp off me first."
+- **dov**: "Suppose that's the day, then. Salt can wait for the stove."
+- **dov**: "Suppose the water'll wait for me. It always does."
+- **esen**: "Bex, I'm for the smoke. These two are coming with me to the stove. We eat them tonight, fine, but I am going to say they last."
+- **bex**: "Good. Smoke's better than dirt for it. I'm for the roof."
+- **bex**: "They won't last past the morning anyway. You've got the right of it."
+- **esen**: "Good, then. We'll keep the lot of them."
+- **bex**: "Good on you. I'm for my bed — the plank pile can wait till morning."
+- **esen**: "B — that's B B, B B. I've B branch; B B stove B B, B B fish B smoke B B B B."
+- **dov**: "Suppose I keep the banked coals through the night. No salt yet, but the stove stays warm. I'll sleep here — pot's with me, dry and in hand."
+- **bex**: "Take them, then. I'll see the planks stowed before dark settles."
+- **esen**: "Bex, you've got the right of it. Don't let the fire go. I'll fetch the fish to the smoke. If we've got a tidy stove, she gave these two and I won't waste them."
+- **agent_31**: "Storehouse holds. I'm for the fields."
+- **cass**: "Well now, one bread for the road, and then it's the roof for me too, I figure."
+- **bex**: "Night, Esen. I'll take my rest."
+- **esen**: "Coming, Dov — let me get these onto the smoke while the stove's still warm."
+- **agent_31**: "Aye, grain's here. I'm going to look at the fields."
+- **cass**: "Well now, Talia — you said the storehouse holds. Holds what, exactly, for how long?"
+- **bex**: "Do it then. Dov's got the fire, you've got the smoke. I'll keep the roof from wandering."
+- **agent_31**: "Smoke's up. I'm for my bed."
+- **cass**: "Well now, Esen, the smoke's the smart move on those. We'll be glad of it come the cold days."
+- **esen**: "You've got the heat, I've got the fish — here, slide these over the coals. They won't sit pretty till morning, but smoke'll hold 'em."
+- **esen**: "You've got the heat, I've got the fish — here, slide these over the coals. They won't sit pretty till morning, but smoke'll hold 'em."
+- **bex**: "Keep the smoke true, Esen. The fish keeps — the day don't."
+- **esen**: "Smoke'll hold D them. Night, Cass — night, Dov."
+- **bex**: "Bread and the roof, then. The work can come back with the light."
+- **cass**: "Night, Esen. Night, Dov — sleep and hold the fire for me."
+- **esen**: "Well I'm for the stove then. Fish'd rather smoke than turn — I say that every day. I'll see you at the roof, Cass."
+- **esen**: "Right, Bex. Into the smoke then — keep her working, and the fish'll keep past the morning."
+- **esen**: "Rain's doing the washing for once. Let her hammer the roof. She'll be full again come morning, and I'll be ready."
+- **cass**: "Well now, it's raining proper. Good for the store field. I'm sore from store store store — I'll watch it pass from under this roof store."
+- **cass**: "Well now, that grain's not going to wait for the clouds to change their mind. I'll make the pull and see what I can save."
+- **esen**: "Three fish! I'm not letting them rot. Soon as this lifts, it's to the stove for me."
+- **cass**: "Well now, the rain's doing my work for me. After this, someone's going to want that wheat in under this roof."
+- **esen**: "Rain's got its own clock and we've got a fire. These fish'll smoke up fine once it eases."
+- **esen**: "You'll be glad of that fish tomorrow, Bex. I can smell it already."
+- **cass**: "Well now, that storm had a proper shout in it. Storehouse earns its roof tonight. Ada, your bread won't sit there feeling lonely, mind — I'll put something back in its place."
+- **bex**: "That bread in my satchel, Ada — I'm eating one. You get your due come light."
+- **bex**: "Aye, the storehouse earns it keep tonight. Bread home."
+- **bex**: "There. Two back for two. Ada's counted even."
+- **dov**: "Night, all. I'm under a roof before it gets worse."
+- **cass**: "Smoke's holding its own. Any room at that stove for a cold pair of feet?"
+- **dov**: "Suppose that's the night done then. Walls over my head is a fine thing, and the pot can sit till morning."
+- **dov**: "Fire's somewhere out in the wet. It'll keep till light. So will the water."
+- **cass**: "Night, Dov. Wet as it is, this roof's the best bed in the valley."
+- **dov**: "Stove's warm, I kept it going. You're welcome to it."
+- **dov**: "Room, aye. Suppose there's always room at a fire that's tended. A cold pair of feet is just the excuse."
+- **dov**: "Room, aye. Suppose there's always room at a fire that's tended. A cold pair of feet is just the excuse."
+- **dov**: "Night, Cass. The stove's warm enough for two sets of feet, but I'm for the flat planks tonight, I think."
+- **dov**: "That's fair. I'd like a word with that smoke myself, come light. For now this floor says it's my turn."
 
 ## Put to the arbiter
 
-- t506 impossible: I dip the clay pot into the weir to catch river water
-- t558 impossible: Kneel at the weir and fill my pot with river water, setting it beside the campfire's embers to begin a slow boil.
-- t588 impossible: Use fiber to hang the fish over the campfire's smoke so the smoke catches them and keeps them from the sun.
-- t605 impossible: fill
-- t714 impossible: Tie a fish (item_18) to a strand of fiber (item_15) and hang it over the fire at (17,15) to smoke it.
-- t979 impossible: Dip the clay pot into the river water, set it over the fire, and let it simmer to see what salt remains. Keep the hearth fed with wood.
-- t1783 impossible: Settles the pot against his chest, wedges it safe under one arm, and lies down on the packed earth by the weir, breathing out slow until sleep takes him.
-- t1983 impossible: Call out to Dov, gesturing at the fish I'm holding — ask if his smoke is still lit and if I can hang this catch over his fire.
-- t2296 map: sleep
-- t2567 map: walk to (14, 15)
-- t3377 map: Look at Ada and wait a breath, then start walking along the water's edge toward the west to see what grows there.
-- t3809 map: lying asleep, not stirring
-- t3875 impossible: eat bread
-- t4014 map: I finally let go and let sleep take me — right here where I've fallen.
-- t4226 impossible: An exhausted slip: Ada had been pointing me to the bread all day, and I never moved toward the hut. Now my body's gone out from under me.
-- t4385 map: sleep
-- t4582 map: Lie down fully, back flat on the earth, and let my eyes close.
-- t4712 map: sleep
-- t4764 map: sleep
-- t4839 impossible: both sit quietly waiting
-- t4957 map: collapse to the ground and sleep where I stand by the banked fire
-- t4985 map: enter
-- t5100 map: close my eyes and let go of all the work
-- t5562 map: walk into the hut to get out of the rain
-- t5775 map: sleep
-- t5799 map: walk to (12,15)
+- t552 impossible: stay
+- t571 impossible: Standing at the weir, I crouch and dip my clay pot into the river until it's full.
+- t581 impossible: exchange a few words with Ada, then go see what the morning light shows near the fire
+- t595 impossible: stoke the fire at structure_7 with the branches I carry
+- t621 impossible: walk toward home, then enter structure_2
+- t644 impossible: plan item_17 structure_6
+- t691 impossible: Tie one fish with a bit of fiber, hang it on a branch, and set it over the campfire smoke — high enough that it smokes, low enough it doesn't roast. Give it time to turn.
+- t755 impossible: Set the two fish I'm carrying up over the smoke of the campfire, hanging them on green sticks I break from the branches I hold, to dry and keep them.
+- t824 impossible: stoke the fire with branches, then hang both fish over the smoke, close to the flames but not in them
+- t907 map: walk
+- t1023 attempt: Use two branches from my 10 as a crude frame and hang the two fish (item_18) over the burning campfire, letting smoke curl around them to dry and keep the flesh. Watch they don't scorch.
+- t1072 impossible: fire — han the six branch pye en fire. f dead four row fire
+- t1171 impossible: Hang the two fish over the campfire smoke, letting the warmth and smoke dry them
+- t1232 map: walk to my house doorway
+- t1248 impossible: Hang one of the fish from Dov's firewood so the campfire smoke Dries through D the flesh, trying to smoke it over the burning campfire at (17,15)
+- t1883 impossible:  exit  structure_4
+- t1910 impossible: walk to (16,14) with my bread in hand
+- t1972 impossible: walk to 12,13 to take some fiber for an afternoon's work.
+- t2145 map: walk D, D
+- t2156 map: walk
+- t2171 impossible: I sit near the weir for a bit, watching the smoke hang over the fish. When the light's fully gone, I go inside the house at (18, 12) to sleep.
+- t2559 map: step_out_under_sky
+- t2782 attempt: stow_bread
+- t2873 map: Continue walking home to the house at (18, 12), get under its roof, and bed down by the wall, dry as I can get.
+- t2934 impossible: exit structure structure_6
 
 ## Refused by the world
 
-- t441 dov walk: already at that spot
-- t443 bex walk: already at that spot
-- t448 dov walk: already at that spot
-- t451 cass walk: already at that spot
-- t451 ada enter: already inside
-- t454 bex walk: already at that spot
-- t465 ada stow: not holding that
-- t466 dov walk: no path to that spot
-- t475 bex stow: not close enough to put anything down there
-- t479 dov enter: there is no way into a weir
-- t489 cass walk: already at that spot
-- t496 esen walk: already at that spot
-- t502 bex take: already holding that
-- t514 bex stow: not holding that
-- t573 dov fill: unknown verb: fill
-- t588 bex stow: not holding that
-- t589 bex walk: already at that spot
-- t597 esen craft: no such recipe: smoke fish — perhaps someone nearby knows how, or it wants discovering.
-- t609 esen craft: no such recipe: smoked fish — perhaps someone nearby knows how, or it wants discovering.
-- t724 esen walk: already at that spot
-- t806 cass harvest: not ripe yet
-- t865 esen give: not adjacent to give
-- t952 esen give: not adjacent to give
-- t972 esen craft: no such recipe: smoked fish — perhaps someone nearby knows how, or it wants discovering.
-- t1002 dov walk: no path to that spot
-- t1003 dov experiment: You lack the knowledge to attempt this. Perhaps someone in the town knows how.
-- t1007 ada enter: already inside
-- t1086 cass enter: not close enough to the door
-- t1154 dov craft: no such recipe: salt — perhaps someone nearby knows how, or it wants discovering.
-- t1209 ada enter: already inside
-- t1282 cass walk: already at that spot
-- t1294 dov sleep: there is no bed here; find somewhere to lie down
-- t1327 bex take: not close enough to take
-- t1329 ada enter: already inside
-- t1335 dov sleep: there is no bed here; find somewhere to lie down
-- t1343 ada enter: already inside
-- t1350 ada enter: already inside
-- t1351 bex sleep: there is no bed here; find somewhere to lie down
-- t1366 esen sleep: there is no bed here; find somewhere to lie down
-- t1395 esen sleep: there is no bed here; find somewhere to lie down
-- t1403 cass sleep: there is no bed here; find somewhere to lie down
-- t1404 esen sleep: there is no bed here; find somewhere to lie down
-- t1407 dov sleep: there is no bed here; find somewhere to lie down
-- t1415 dov sleep: there is no bed here; find somewhere to lie down
-- t1427 dov sleep: there is no bed here; find somewhere to lie down
-- t1447 ada enter: already inside
-- t1461 dov sleep: already asleep
-- t1519 dov speak: collapsed and unable to act
-- t1537 bex sleep: already asleep
-- t1570 esen sleep: there is no bed here; find somewhere to lie down
-- t1571 cass speak: collapsed and unable to act
-- t1581 esen sleep: there is no bed here; find somewhere to lie down
-- t1589 cass speak: collapsed and unable to act
-- t1591 cass wake: collapsed and unable to act
-- t1591 ada enter: already inside
-- t1592 ada enter: already inside
-- t1602 esen sleep: there is no bed here; find somewhere to lie down
-- t1618 esen sleep: there is no bed here; find somewhere to lie down
-- t1634 cass sleep: there is no bed here; find somewhere to lie down
-- t1661 bex sleep: already asleep
-- t1663 bex wake: collapsed and unable to act
-- t1701 cass sleep: already asleep
-- t1703 cass wake: collapsed and unable to act
-- t1719 bex sleep: already asleep
-- t1722 cass sleep: already asleep
-- t1736 esen sleep: already asleep
-- t1756 dov speak: collapsed and unable to act
-- t1794 esen speak: collapsed and unable to act
-- t1801 dov sleep: there is no bed here; find somewhere to lie down
-- t1803 esen sleep: already asleep
-- t1805 esen wake: collapsed and unable to act
-- t1815 bex sleep: there is no bed here; find somewhere to lie down
-- t1861 agent_31 walk: you are indoors; step outside first
-- t1868 agent_31 walk: you are indoors; step outside first
-- t1871 esen sleep: there is no bed here; find somewhere to lie down
-- t1874 dov sleep: already asleep
-- t1880 cass sleep: already asleep
-- t1880 esen sleep: there is no bed here; find somewhere to lie down
-- t1882 cass wake: collapsed and unable to act
-- t1884 dov sleep: there is no bed here; find somewhere to lie down
-- t1884 agent_31 walk: you are indoors; step outside first
-- t1887 esen sleep: there is no bed here; find somewhere to lie down
-- t1894 agent_31 walk: you are indoors; step outside first
-- t1895 dov sleep: there is no bed here; find somewhere to lie down
-- t1904 agent_31 walk: you are indoors; step outside first
-- t1905 cass sleep: already asleep
-- t1912 agent_31 walk: you are indoors; step outside first
-- t1913 agent_31 walk: you are indoors; step outside first
-- t1926 cass sleep: there is no bed here; find somewhere to lie down
-- t1926 agent_31 walk: you are indoors; step outside first
-- t1930 dov speak: collapsed and unable to act
-- t1934 agent_31 forage: no forest nearby
-- t1940 dov wake: collapsed and unable to act
-- t1944 bex sleep: there is no bed here; find somewhere to lie down
-- t1945 agent_31 forage: no forest nearby
-- t1952 bex sleep: there is no bed here; find somewhere to lie down
-- t1962 bex sleep: there is no bed here; find somewhere to lie down
-- t1971 bex sleep: there is no bed here; find somewhere to lie down
-- t1971 cass sleep: already asleep
-- t1977 dov sleep: there is no bed here; find somewhere to lie down
-- t1981 cass sleep: there is no bed here; find somewhere to lie down
-- t1988 dov sleep: there is no bed here; find somewhere to lie down
-- t1993 esen sleep: there is no bed here; find somewhere to lie down
-- t2001 dov sleep: there is no bed here; find somewhere to lie down
-- t2001 esen sleep: there is no bed here; find somewhere to lie down
-- t2012 dov sleep: there is no bed here; find somewhere to lie down
-- t2014 bex sleep: there is no bed here; find somewhere to lie down
-- t2023 dov sleep: there is no bed here; find somewhere to lie down
-- t2029 cass sleep: already asleep
-- t2031 cass wake: collapsed and unable to act
-- t2031 esen sleep: already asleep
-- t2036 agent_31 walk: you are indoors; step outside first
-- t2046 esen sleep: there is no bed here; find somewhere to lie down
-- t2054 esen sleep: there is no bed here; find somewhere to lie down
-- t2058 cass sleep: already asleep
-- t2066 cass sleep: there is no bed here; find somewhere to lie down
-- t2079 cass wake: not asleep
-- t2080 bex sleep: there is no bed here; find somewhere to lie down
-- t2084 cass enter: not close enough to the door
-- t2086 cass sleep: there is no bed here; find somewhere to lie down
-- t2103 bex sleep: there is no bed here; find somewhere to lie down
-- t2128 bex sleep: there is no bed here; find somewhere to lie down
-- t2135 bex sleep: there is no bed here; find somewhere to lie down
-- t2157 esen sleep: there is no bed here; find somewhere to lie down
-- t2164 agent_31 walk: you are indoors; step outside first
-- t2169 esen sleep: there is no bed here; find somewhere to lie down
-- t2176 bex sleep: there is no bed here; find somewhere to lie down
-- t2194 esen sleep: there is no bed here; find somewhere to lie down
-- t2209 esen sleep: there is no bed here; find somewhere to lie down
-- t2209 dov sleep: there is no bed here; find somewhere to lie down
-- t2227 cass sleep: already asleep
-- t2229 cass wake: collapsed and unable to act
-- t2230 bex sleep: already asleep
-- t2255 bex sleep: there is no bed here; find somewhere to lie down
-- t2257 esen sleep: there is no bed here; find somewhere to lie down
-- t2277 agent_31 walk: you are indoors; step outside first
-- t2294 agent_31 enter: already inside
-- t2297 cass sleep: already asleep
-- t2299 esen sleep: there is no bed here; find somewhere to lie down
-- t2304 agent_31 enter: already inside
-- t2319 esen sleep: there is no bed here; find somewhere to lie down
-- t2332 esen sleep: there is no bed here; find somewhere to lie down
-- t2340 esen sleep: there is no bed here; find somewhere to lie down
-- t2342 agent_31 enter: already inside
-- t2343 cass enter: not close enough to the door
-- t2366 agent_31 enter: already inside
-- t2384 esen sleep: already asleep
-- t2386 agent_31 enter: already inside
-- t2394 esen sleep: there is no bed here; find somewhere to lie down
-- t2395 agent_31 enter: already inside
-- t2458 agent_31 walk: you are indoors; step outside first
-- t2465 agent_31 walk: you are indoors; step outside first
-- t2466 esen sleep: there is no bed here; find somewhere to lie down
-- t2480 esen sleep: there is no bed here; find somewhere to lie down
-- t2500 cass sleep: already asleep
-- t2504 esen sleep: there is no bed here; find somewhere to lie down
-- t2512 esen sleep: there is no bed here; find somewhere to lie down
-- t2522 esen sleep: there is no bed here; find somewhere to lie down
-- t2525 dov speak: collapsed and unable to act
-- t2534 cass wake: collapsed and unable to act
-- t2540 dov speak: collapsed and unable to act
-- t2547 esen sleep: there is no bed here; find somewhere to lie down
-- t2552 dov sleep: already asleep
-- t2563 esen sleep: already asleep
-- t2568 bex walk: walk needs a destination {x, y}
-- t2575 esen sleep: there is no bed here; find somewhere to lie down
-- t2595 dov sleep: already asleep
-- t2609 cass speak: collapsed and unable to act
-- t2614 esen sleep: already asleep
-- t2647 esen sleep: there is no bed here; find somewhere to lie down
-- t2668 esen sleep: there is no bed here; find somewhere to lie down
-- t2676 esen sleep: there is no bed here; find somewhere to lie down
-- t2687 esen sleep: there is no bed here; find somewhere to lie down
-- t2693 esen sleep: there is no bed here; find somewhere to lie down
-- t2698 cass sleep: already asleep
-- t2711 dov sleep: already asleep
-- t2714 bex sleep: there is no bed here; find somewhere to lie down
-- t2718 cass sleep: there is no bed here; find somewhere to lie down
-- t2730 dov sleep: there is no bed here; find somewhere to lie down
-- t2734 esen sleep: already asleep
-- t2745 esen sleep: there is no bed here; find somewhere to lie down
-- t2756 esen sleep: there is no bed here; find somewhere to lie down
-- t2764 dov sleep: already asleep
-- t2764 bex speak: collapsed and unable to act
-- t2765 esen sleep: there is no bed here; find somewhere to lie down
-- t2769 cass eat: not holding that
-- t2774 esen sleep: there is no bed here; find somewhere to lie down
-- t2778 cass sleep: there is no bed here; find somewhere to lie down
-- t2788 bex sleep: already asleep
-- t2795 cass eat: not holding that
-- t2803 cass sleep: there is no bed here; find somewhere to lie down
-- t2808 esen sleep: already asleep
-- t2817 esen sleep: there is no bed here; find somewhere to lie down
-- t2830 esen sleep: there is no bed here; find somewhere to lie down
-- t2831 esen wake: not asleep
-- t2842 cass eat: not holding that
-- t2871 esen sleep: already asleep
-- t2886 esen sleep: there is no bed here; find somewhere to lie down
-- t2890 cass sleep: already asleep
-- t2896 esen sleep: there is no bed here; find somewhere to lie down
+- t456 esen stoke: there is no fire there to feed
+- t480 dov walk: already at that spot
+- t486 ada stay: unknown verb: stay
+- t486 esen stoke: there is no fire there to feed
+- t487 esen stoke: there is no fire there to feed
+- t493 dov fill: that holds no water
+- t496 bex plan: unknown verb: plan
+- t508 esen stoke: there is no fire there to feed
+- t509 dov fill: that holds no water
+- t512 cass walk: already at that spot
+- t512 bex walk: already at that spot
+- t527 esen stoke: there is no fire there to feed
+- t533 ada walk: already at that spot
+- t546 bex walk: you are indoors; step outside first
+- t560 ada stow: not holding that
+- t585 dov fill: that holds no water
+- t599 dov fill: that holds no water
+- t609 esen stoke: there is no fire there to feed
+- t622 dov fill: that holds no water
+- t625 esen stoke: there is no fire there to feed
+- t640 dov stoke: there is no fire there to feed
+- t680 bex take: already holding that
+- t682 cass walk: no path to that spot
+- t699 cass take: someone is holding that
+- t712 dov fill: that holds no water
+- t727 dov fill: that holds no water
+- t730 cass take: someone is holding that
+- t732 cass stoke: there is no fire there to feed
+- t750 cass take: someone is holding that
+- t751 cass walk: already at that spot
+- t869 esen stoke: there is no fire there to feed
+- t886 esen give: not adjacent to give — they are at (18, 16)
+- t908 bex walk: walk needs a destination {x, y}
+- t1024 esen recipe:smoke_fish: not enough replace
+- t1043 esen stoke: stoke needs a {structureId}
+- t1093 cass take: someone is holding that
+- t1094 cass stoke: there is no fire there to feed
+- t1108 dov stoke: there is no fire there to feed
+- t1116 bex stoke: there is no fire there to feed
+- t1123 dov stoke: there is no fire there to feed
+- t1138 dov stoke: there is no fire there to feed
+- t1170 dov stoke: there is no fire there to feed
+- t1178 cass craft: no such recipe: bowl — perhaps someone nearby knows how, or it wants discovering.
+- t1186 dov stoke: stoke needs a {structureId}
+- t1199 dov stoke: there is no fire there to feed
+- t1233 bex walk: walk needs a destination {x, y}
+- t1236 dov stoke: there is no fire there to feed
+- t1262 bex enter: already inside
+- t1263 bex sleep: already asleep
+- t1386 esen walk: you are indoors; step outside first
+- t1387 esen enter: already inside
+- t1393 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t1430 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t1445 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t1446 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t1460 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t1817 dov sleep: already asleep
+- t1832 bex exit: not inside anything
+- t1842 esen exit: not inside anything
+- t1846 bex walk: already at that spot
+- t1860 esen  exit : unknown verb:  exit 
+- t1868 cass eat: not holding that
+- t1884 dov sleep: already asleep
+- t1916 dov sleep: already asleep
+- t1917 esen walk: you are indoors; step outside first
+- t1933 agent_31 walk: already at that spot
+- t1944 dov sleep: already asleep
+- t1956 bex enter: not close enough to the door
+- t1957 bex sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t1988 agent_31 walk: you are indoors; step outside first
+- t1989 dov sleep: already asleep
+- t1990 cass eat: not holding that
+- t1992 bex walk: already at that spot
+- t2019 agent_31 walk: already busy with walk
+- t2024 bex sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t2028 cass enter: already inside
+- t2036 agent_31 walk: already at that spot
+- t2039 bex enter: not close enough to the door
+- t2049 cass walk: already at that spot
+- t2075 agent_31 walk: you are indoors; step outside first
+- t2076 agent_31 walk: you are indoors; step outside first
+- t2125 esen walk D, D: unknown verb: walk D, D
+- t2146 esen walk: walk needs a destination {x, y}
+- t2157 bex walk: walk needs a destination {x, y}
+- t2158 bex walk: you are indoors; step outside first
+- t2172 esen enter: not close enough to the door
+- t2186 esen sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t2187 cass sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t2239 esen enter: not close enough to the door
+- t2289 esen walk: you are indoors; step outside first
+- t2347 cass walk: you are indoors; step outside first
+- t2365 cass eat: not holding that
+- t2390 cass eat: not holding that
+- t2411 cass sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t2560 cass walk: walk needs a destination {x, y}
+- t2561 cass walk: you are indoors; step outside first
+- t2576 bex sleep: already asleep
+- t2579 cass walk: you are indoors; step outside first
+- t2633 bex walk: already at that spot
+- t2714 cass eat: someone is holding that
+- t2809 dov walk: already at that spot
+- t2818 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t2850 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t2851 dov walk: you are indoors; step outside first
+- t2857 cass exit structure: unknown verb: exit structure
+- t2874 bex walk: walk needs a destination {x, y}
+- t2904 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t2904 bex enter: already inside
+- t2923 cass sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t2929 cass enter: already inside
+- t2930 cass walk: you are indoors; step outside first
+- t2948 dov walk: already at that spot
+- t3033 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t3065 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t3088 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t3103 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t3116 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t3129 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t3143 dov sleep: there is no bed here; find somewhere to lie down — weary enough and the bare ground will do
+- t3300 dov move: the moment passes
+- t3300 agent_31 wake-up: the moment passes
 
 ## Laws changed mid-run
 
-- t1801 mystery.chancePerDay = 1
-- t1801 spoilage.enabled = false
+- t2206 mystery.chancePerDay = 1
+- t2206 spoilage.enabled = false

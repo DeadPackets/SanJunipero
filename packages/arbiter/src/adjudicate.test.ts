@@ -28,7 +28,6 @@ const boilSaltRecipe: Recipe = {
     { weight: 1, success: false, label: 'The water boils to nothing; the pot is bare.', effects: [{ op: 'none' }] },
   ],
   rngStream: 'recipe:boil_salt',
-  interruptible: true,
   canon: ['fire', 'pottery'],
 }
 
@@ -48,7 +47,6 @@ const basketRecipe: Recipe = {
     { weight: 1, success: true, label: 'The reeds weave into a tight basket.', effects: [{ op: 'spawn_item', kind: 'basket', qty: 1, to: 'agent' }] },
   ],
   rngStream: 'recipe:basket',
-  interruptible: true,
   canon: ['fire'],
 }
 
@@ -68,7 +66,6 @@ const ropeRecipe: Recipe = {
     { weight: 1, success: true, label: 'The reeds twist into a strong rope.', effects: [{ op: 'spawn_item', kind: 'rope', qty: 1, to: 'agent' }] },
   ],
   rngStream: 'recipe:rope',
-  interruptible: true,
   canon: ['fire'],
 }
 
@@ -393,7 +390,6 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
       { weight: 1, success: false, label: 'The fish scorch and fall into the ash.', effects: [{ op: 'none' }] },
     ],
     rngStream: 'recipe:smoked_fish',
-    interruptible: true,
     canon: ['smoking_food'],
   }
   const smokedFish: Verdict = { kind: 'attempt', recipe: smokedFishRecipe, summary: 'Hang two fish in the hearth smoke.' }
@@ -620,7 +616,6 @@ describe('live codification round trip (T20)', () => {
       { weight: 1, success: true, label: 'The reeds lie flat as a mat.', effects: [{ op: 'spawn_item', kind: 'mat', qty: 1, to: 'agent' }] },
     ],
     rngStream: 'recipe:reed_mat',
-    interruptible: true,
     canon: ['fire'],
   }
   const matVerdict: Verdict = { kind: 'attempt', recipe: matRecipe, summary: 'Weave reeds into a mat.' }

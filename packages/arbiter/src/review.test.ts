@@ -21,7 +21,6 @@ const boilSaltRecipe: Recipe = {
     { weight: 1, success: false, label: 'The pot cracks and the water is lost.', effects: [{ op: 'none' }] },
   ],
   rngStream: 'craft',
-  interruptible: true,
   canon: ['fire'],
 }
 

@@ -33,7 +33,6 @@ const EXPLOIT_RECIPE: Recipe = {
     { weight: 1, success: true, label: 'A gun appears in your hands.', effects: [{ op: 'spawn_item', kind: 'gun', qty: 1, to: 'agent' }] },
   ],
   rngStream: 'recipe:gunpowder',
-  interruptible: true,
   canon: ['gunpowder'],
 }
 
@@ -50,7 +49,6 @@ const EARNED_RECIPE: Recipe = {
     { weight: 1, success: true, label: 'A crust of salt forms as the water boils away.', effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }] },
   ],
   rngStream: 'recipe:boil_salt',
-  interruptible: true,
   canon: ['cooking'],
 }
 

@@ -2,9 +2,12 @@ import { z } from 'zod'
 import {
   classMembers, dayPhaseFromTick, fertilityAt, glowRadiusFor, inputName, litSourceWithin,
   MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
-  type RecipeDef, type SimConfig, type StructureRecipeDef,
+  type RecipeDef, type SimConfig, type StructureRecipeDef, type TownFacing,
 } from '@sj/shared'
-import { mintId, type Affliction, type Item, type TileId, type WorldState } from './state.js'
+
+/** Absent means this. The same convention `forge/buildingArt.facingKind` uses for a cell id. */
+const DEFAULT_TOWN_FACING: TownFacing = 'sw'
+import { mintId, type Affliction, type Item, type Structure, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
 import { bridgeAt, BRIDGE_KIND, findPath, isPassable, searchPath } from './path.js'
@@ -29,14 +32,22 @@ export type VerbDef = {
   onStart?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): PendingEvent[]
   onComplete(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>, rng: RngStream): PendingEvent[]
   results?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): Record<string, unknown>
-  interruptible: boolean
   skill?: { track: string; xp: number }
   rngStream?: string
 }
 
-// Fills the defaults nearly every verb repeats: one-tick duration, interruptible.
-function makeVerb(spec: Omit<VerbDef, 'duration' | 'interruptible'> & Partial<Pick<VerbDef, 'duration' | 'interruptible'>>): VerbDef {
-  return { duration: () => 1, interruptible: true, ...spec }
+// Fills the one default nearly every verb repeats: a one-tick duration.
+//
+// ★ THERE IS NO `interruptible` HERE ANY MORE, AND THAT IS THE HONEST SHAPE. Every verb in the
+// registry declared it `true`, `codify` mapped it off every recipe the arbiter authored, and
+// NOTHING EVER READ IT: `submitIntent` refuses every intent while an activity runs, whatever
+// the running verb says about itself. Measured — two verbs differing only in that field are
+// refused in the same words, and all 37 verbs answer a second intent identically. Interruption
+// in this world is something the WORLD does to a body (`action_interrupted` {blocked, gone,
+// collapsed, rest}), never something a mind can ask for, and `intent.test.ts` now proves that
+// over the whole registry instead of asserting that a dead field is set.
+function makeVerb(spec: Omit<VerbDef, 'duration'> & Partial<Pick<VerbDef, 'duration'>>): VerbDef {
+  return { duration: () => 1, ...spec }
 }
 
 // Adjacent = Chebyshev distance <= 1 to any footprint tile (standing on it counts).
@@ -967,6 +978,10 @@ function banked(state: WorldState, x: number, y: number): boolean {
 
 // Two or three tiles of deck, every one of them over water, and a foot on solid ground at each
 // end. Longer than that and it is a causeway, which is more than six planks can hold up.
+//
+// The span is the RECIPE's shape, so this bounds a dial and not a constant: the shipped
+// `bridge` is 1×2, and both ends of the range are exercised by configs that are not
+// (`path.test.ts` "build: planning a bridge" — a 3×1 deck is accepted, a 4×1 is refused).
 const BRIDGE_SPAN = { min: 2, max: 3 }
 
 function bridgeSiteRefusal(state: WorldState, x: number, y: number, w: number, h: number): string | null {
@@ -1047,8 +1062,30 @@ function ownSite(state: WorldState, agentId: string, kind: string) {
   return null
 }
 
+/** ★ THE HALF `ownSite` CANNOT ANSWER: somebody else's walls, within reach. Keyed on the
+ *  GROUND, exactly as the sited branch has always been through `siteAt` — without it
+ *  `claimInWorld` hands the second body the next FREE plot and five bodies raise five houses.
+ *  There is never a choice to make: the lattice holds plots four tiles apart, so no tile in a
+ *  town is within reach of two half-raised roofs, and `buildSeam.test.ts` asserts it. */
+function joinableSite(state: WorldState, agentId: string, kind: string): Structure | null {
+  for (const id of Object.keys(state.structures).sort()) {
+    const s = state.structures[id]!
+    if (s.stage === 'construction' && s.kind === kind && nearRect(state, agentId, s.x, s.y, s.w, s.h)) return s
+  }
+  return null
+}
+
+/** The walls this body should be raising: its own half-finished ones first, then a neighbour's
+ *  within reach, and only then does the town claim new ground. Because `ownSite` is asked
+ *  first, `joinableSite` is never looking at walls this body began. */
+function siteToRaise(state: WorldState, agentId: string, kind: string) {
+  return ownSite(state, agentId, kind) ?? joinableSite(state, agentId, kind)
+}
+
 export type BuildSiteAnswer = {
-  site: { x: number; y: number; w: number; h: number } | null
+  /** `facing` rides along ONLY when the plot turned the building — absent is `sw`, and a
+   *  bridge has no door and no facing at all. */
+  site: { x: number; y: number; w: number; h: number; facing?: TownFacing } | null
   /** The standing construction this build continues, if any: its materials are already spent. */
   resume: { id: string; progressTicks: number } | null
   /** The ground the town must lay before anything can stand here — empty when it already has. */
@@ -1086,9 +1123,11 @@ export function buildSiteOf(
     }
   }
   const square = townSquareOf(state)!
-  const mine = ownSite(state, agentId, params.kind)
+  const mine = siteToRaise(state, agentId, params.kind)
   const claim = claimInWorld(state, { along: recipe.w, deep: recipe.h })
-  const site = mine !== null ? { x: mine.x, y: mine.y, w: mine.w, h: mine.h } : claim?.site ?? null
+  const site = mine !== null
+    ? { x: mine.x, y: mine.y, w: mine.w, h: mine.h, ...(mine.facing === undefined ? {} : { facing: mine.facing }) }
+    : claim === null ? null : { ...claim.site, ...(claim.facing === DEFAULT_TOWN_FACING ? {} : { facing: claim.facing }) }
   if (site === null || claim === null) {
     return { site, resume: null, lay: [], refusal: `there is nowhere left in the town for a ${words(params.kind)}` }
   }
@@ -1172,7 +1211,7 @@ const build: VerbDef = makeVerb({
     if (recipe === null) return []
     const answer = buildSiteOf(state, config, agentId, p)
     if (answer.resume !== null || answer.site === null) return []
-    const { x, y, w, h } = answer.site
+    const { x, y, w, h, facing } = answer.site
     return [
       // The ground first: a roof cannot stand on a block the town has not cleared, and a door
       // cannot open onto a street nobody laid.
@@ -1184,6 +1223,8 @@ const build: VerbDef = makeVerb({
           id: mintId(state, 'structure'), kind: p.kind, x, y, w, h,
           maxHp: recipe.maxHp, flammable: recipe.flammable, builderId: agentId,
           ...(config.ownership.enabled ? { owner: agentId } : {}),
+          // The plot decided this; nothing downstream should have to infer it back.
+          ...(facing === undefined ? {} : { facing }),
         },
       },
     ]
@@ -1832,22 +1873,58 @@ export function unregisterVerb(kind: string): void {
   delete VERBS[kind]
 }
 
+/** The walls an in-progress build is raising, resolved the one way `stepBuild` resolves them:
+ *  on a plot there is no coordinate to look them up by, so it is the walls this body began or
+ *  the neighbour's it is standing at; a bridge is looked up by the water it was named on. */
+function siteOfBuild(state: WorldState, agentId: string): Structure | null {
+  const act = state.agents[agentId]?.activity
+  if (!act || act.verb !== 'build') return null
+  const p = BuildParams.safeParse(act.params)
+  if (!p.success) return null
+  return p.data.x === undefined || p.data.y === undefined
+    ? siteToRaise(state, agentId, p.data.kind)
+    : siteAt(state, p.data.x, p.data.y)
+}
+
+/** ★ HOW MANY PAIRS OF HANDS ARE ON THESE WALLS THIS TICK — the number the world could count
+ *  and could not spend. An ACTIVITY is asked for, not a body: dying and collapsing both null
+ *  the activity, so the dead and the fallen are already not counted and a liveness test here
+ *  would be a condition nothing can satisfy. */
+export function handsOnSite(state: WorldState, siteId: string): number {
+  let n = 0
+  for (const id of Object.keys(state.agents)) {
+    if (siteOfBuild(state, id)?.id === siteId) n++
+  }
+  return n
+}
+
 // One tick of an in-progress build: the agent works, the site advances in step.
-export function stepBuild(state: WorldState, agentId: string): PendingEvent[] {
+export function stepBuild(state: WorldState, config: SimConfig, agentId: string): PendingEvent[] {
   const a = state.agents[agentId]
   const act = a?.activity
   if (!a || !act || act.verb !== 'build') throw new Error(`stepBuild: agent ${agentId} has no build in progress`)
   const p = BuildParams.parse(act.params)
-  // On a plot there is no coordinate to look the walls up by, so the site is the one THIS
-  // agent has half-raised — which is also the honest reading of the sited case.
-  const site = p.x === undefined || p.y === undefined
-    ? ownSite(state, agentId, p.kind)
-    : siteAt(state, p.x, p.y)
+  const site = siteOfBuild(state, agentId)
   if (!site) return [{ type: 'action_interrupted', payload: { agentId, reason: 'gone' } }]
-  return [
-    { type: 'action_progressed', payload: { agentId, ticks: 1 } },
-    { type: 'structure_progressed', payload: { id: site.id, ticks: 1 } },
-  ]
+  // ★ THE HANDS ARE THE RATE, AND THIS IS THE WHOLE OF "HELP MUST HELP". A builder's clock is
+  // settled once, at intent time, as the work the walls still needed then — so it is only
+  // honest if it runs down exactly as fast as the walls go up. Every hand on the site adds one
+  // to the walls, so every hand's clock loses `hands`. That keeps `ticksRemaining` equal to
+  // `durationTicks − progressTicks` for every builder however many arrive or leave, and five
+  // hands raise a house in a fifth of the time for the same five hands' wages. Before this the
+  // clock ignored the crowd: five hands took exactly as long as one and cost five times as
+  // much, and cooperation was a net penalty in the one measurement G8 asks for.
+  const hands = handsOnSite(state, site.id)
+  // ★ AND THE WALLS NEVER RECORD MORE WORK THAN THE BUILDING IS. `workPenalty` lengthens a
+  // night builder's clock without slowing the walls, so the ledger ran half again past
+  // `durationTicks` in the dark — G2's own pinned world books 2 903 ticks of work into a
+  // 2 880-tick house. It reads back as a NEGATIVE duration when such a build is resumed, and
+  // it fills the renderer's pips a third of a house early. The dark still costs the builder
+  // the time; it no longer costs the ledger its meaning.
+  const left = buildTicks(config, p.kind) - site.progressTicks
+  const events: PendingEvent[] = [{ type: 'action_progressed', payload: { agentId, ticks: hands } }]
+  if (left > 0) events.push({ type: 'structure_progressed', payload: { id: site.id, ticks: 1 } })
+  return events
 }
 
 // One tick of an in-progress walk. Returns the events to append this tick:

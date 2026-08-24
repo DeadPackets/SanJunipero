@@ -29,6 +29,21 @@ export const BondsResponseSchema = z.object({
 }).strict()
 export type BondsResponse = z.infer<typeof BondsResponseSchema>
 
+/**
+ * ★ THE SIX ACTS A TIE IS DERIVED FROM, and the whole of them. `buildBonds` reads the record
+ * for exactly these; a bond count of zero IS "none of these six has been recorded", which is
+ * what lets the Bonds panel's empty state DESCRIBE instead of promise. Here rather than in the
+ * gateway because the viewer has to be able to name them without reading the server.
+ */
+export const BOND_NOTES: Readonly<Record<string, string>> = {
+  spoke: 'spoke together',
+  give: 'gave something away',
+  teach: 'taught something',
+  attack: 'came to blows',
+  co_slept: 'kept house together',
+  born: 'parent and child',
+}
+
 export function bondId(a: string, b: string): string {
   return [a, b].sort().join('|')
 }

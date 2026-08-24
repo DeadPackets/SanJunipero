@@ -115,6 +115,5 @@ export function expressiveVerbFromRuling(name: string, ruling: ExpressiveRuling)
       }
       return events
     },
-    interruptible: true,
   }
 }

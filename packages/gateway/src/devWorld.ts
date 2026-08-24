@@ -10,7 +10,8 @@ import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
 import { foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.js'
 import { ingestLibraryArt, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
-import { showcaseTerrain } from './showcaseMap.js'
+import { showcaseDeck, showcaseTerrain } from './showcaseMap.js'
+import { devWorldOrigin } from './devTown.js'
 
 export const DEV_DB_PATH = 'data/dev-world.db'
 export const DEV_PORT = 8787
@@ -18,9 +19,29 @@ export const DEV_MS_PER_TICK = 2500
 export const DEV_SEED = 'g6'
 export const DEV_SNAPSHOT_EVERY_TICKS = 60
 
+// ★ A HOUSE YOU CAN WATCH GO UP. `construction.houseTicks` is two sim days by default, which
+// at the dev world's 2.5 s tick is two REAL HOURS for one roof — a builder nobody would ever
+// see. 240 is the declared fixture dial `townGrowth.test.ts` and `farBank.test.ts` both use,
+// for the same reason and to the same number, so the dev world and the two landed proofs speak
+// one figure. It changes how LONG a build takes and nothing about WHERE it goes: `buildTicks`
+// is read after the site is settled. `config.test.ts` requires the dial and the recipe's
+// `durationTicks` to stay equal, so they move together.
+export const DEV_HOUSE_TICKS = 240
+
 // The founders showcase is an art demo: freeze weather to sunny so the storm
 // grading matrix never greys the town (seed g6 rolls rain within the first day).
-export const SHOWCASE_CONFIG: SimConfig = { ...DEFAULT_CONFIG, weather: { ...DEFAULT_CONFIG.weather, hourlyChangeChance: 0 } }
+export const SHOWCASE_CONFIG: SimConfig = {
+  ...DEFAULT_CONFIG,
+  weather: { ...DEFAULT_CONFIG.weather, hourlyChangeChance: 0 },
+  construction: { ...DEFAULT_CONFIG.construction, houseTicks: DEV_HOUSE_TICKS },
+  structures: {
+    ...DEFAULT_CONFIG.structures,
+    recipes: {
+      ...DEFAULT_CONFIG.structures.recipes,
+      house: { ...DEFAULT_CONFIG.structures.recipes['house']!, durationTicks: DEV_HOUSE_TICKS },
+    },
+  },
+}
 
 // The G6 "live thought" source — human framing, no AI vocabulary.
 export const THOUGHT_LINES: Record<string, string> = {
@@ -64,6 +85,29 @@ export function devTerrain(
   return map === 'showcase' ? showcaseTerrain(undefined, rings) : makeFixtureMap()
 }
 
+/**
+ * ★ THE DEV WORLD'S GENESIS, WHICH HAS TO SAY WHERE IT STANDS.
+ *
+ * `state.origin` is where the array's (0, 0) sits in the AUTHORED frame, and the engine's whole
+ * claim seam hangs off it: `townSquareOf` reads `TOWN_SQUARE − origin`. The showcase town is
+ * the same `makeCityTemplate` town at a different array offset, so without an origin the engine
+ * looked for the square ten rows north of where it is, landed on a paved tile of the plaza's
+ * street ring, and answered confidently about a town that is not there. `devWorldOrigin`
+ * derives the offset; `devTown.ts` carries the proof that it is a derivation.
+ *
+ * ★ THE FROZEN FIXTURE GETS NO ORIGIN, deliberately. `makeFixtureMap` is 64 tiles of meadow
+ * with six buildings on it and no lattice anywhere — a world with no town in it, which is
+ * exactly the domain `townSquareOf` returns null for. Leaving the field absent is what keeps
+ * G1, G2 and G6 folding byte-identical worlds.
+ */
+export function devGenesisState(
+  config: SimConfig, terrain: ReturnType<typeof makeFixtureMap>,
+  map: DevMapKind = DEV_MAP_DEFAULT, rings: number = TOWN_RINGS_GENESIS,
+) {
+  const base = genesisState(config, terrain)
+  return map === 'showcase' ? { ...base, origin: devWorldOrigin(rings) } : base
+}
+
 export async function startDevWorld(
   opts: {
     dbPath?: string; port?: number; realMsPerTick?: number; seed?: string; ingest?: boolean
@@ -77,6 +121,18 @@ export async function startDevWorld(
     /** dev/demo only (G10 human pass): tired founders go indoors and come out again.
      *  Off by default, so every existing gate folds exactly the events it always did. */
     interiors?: boolean
+    /** dev/demo only: the founders raise houses on plots the town claims for them, through the
+     *  real `build` verb. Off by default; the frozen fixture has no lattice to build on and
+     *  every existing gate folds exactly the events it always did. */
+    builders?: boolean
+    /** dev/demo only: one founder lays a deck over the ford before it joins the masons, and the
+     *  fourteen plattable blocks across the water join the town. Off by default; only the
+     *  showcase has a ford, and every existing gate folds exactly the events it always did. */
+    bridge?: boolean
+    /** dev/demo only: a mason beside somebody's half-raised walls lends a hand instead of
+     *  walking to the next plot. Off by default — the hands are real and the calendar does not
+     *  know it; see `jointBuild` on `FoundersOpts` for the numbers. */
+    jointBuild?: boolean
     /** C7's narrator.db. Absent, every narrated surface — chapters, milestones, moments —
      *  answers typed-empty, which is why the timeline marks and the filmstrip had never been
      *  seen with data. The gateway already opens it readonly; the dev world could not ask. */
@@ -131,7 +187,7 @@ export async function startDevWorld(
   const rng = new RngStreams(opts.seed ?? DEV_SEED)
   const store = new EventStore(db)
   const loop: TickLoop = new TickLoop({
-    store, state: genesisState(config, terrain), rng, config,
+    store, state: devGenesisState(config, terrain, map, rings), rng, config,
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
     // the founders showcase town
     onTick: makeFoundersOnTick(config, rng, () => loop.state, {
@@ -140,6 +196,12 @@ export async function startDevWorld(
       // the showcase town is what a viewer opens, and an empty storeroom is why the room
       // card's holdings grid had never been seen
       holdings: map === 'showcase',
+      // and a lattice nobody ever builds in is why merge train 3 called a ring-3 town empty
+      builders: opts.builders === true && map === 'showcase',
+      // two pairs of hands on one roof — reachable, and off unless asked for
+      jointBuild: opts.jointBuild === true && map === 'showcase',
+      // the crossing: derived from the ford the map lays, so the two cannot disagree
+      ...(opts.bridge === true && map === 'showcase' ? { deck: showcaseDeck(undefined, rings) } : {}),
     }),
   })
 
@@ -184,19 +246,35 @@ export async function startDevWorld(
 // CLI switches, read HERE and nowhere else, so no test's world can drift with an env var:
 //   SJ_DEV_MAP=scripted   ask for the frozen G6 fixture BY NAME (the product town otherwise)
 //   SJ_DEV_RINGS=3        plat the showcase town for three rings of blocks instead of one
-//   SJ_DEV_INTERIORS=1    tired founders go indoors and come out again (the G10 human pass)
+//   SJ_DEV_INTERIORS=0    keep the founders out of doors (they go home and sleep otherwise)
+//   SJ_DEV_BUILDERS=0     stop the founders raising houses (they build on claimed plots otherwise)
+//   SJ_DEV_BRIDGE=0       leave the river uncrossed (one founder decks the ford otherwise)
+//   SJ_DEV_JOINT=1        let a mason lend a hand at a neighbour's walls (OFF by default, and
+//                         the only default here that is off for a MEASURED reason rather than
+//                         a conservative one — see `jointBuild` on `FoundersOpts`)
+//
+// ★ AND INTERIORS DEFAULT ON FOR A PERSON, for the same reason `showcase` does. Three
+// integration trains in a row reported no interior seen; two of them had the surface switched
+// off by silence and the third watched the cast collapse before reaching a door. A viewer who
+// runs this is here to see the town live in itself. The LIBRARY default stays off — `g6` and
+// `devWorld.test.ts` hash exactly the world they always folded.
 //
 // ★ THE HUMAN PATH DEFAULTS TO THE PRODUCT. It used to default to the fixture, and a lane that
 // ran `pnpm --filter @sj/gateway dev:world` and looked at what came up was looking at six
 // hand-placed buildings, four of them with no art, on a 64×64 map the grammar never drew.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const map: DevMapKind = process.env['SJ_DEV_MAP'] === 'scripted' ? 'scripted' : DEV_MAP_HUMAN
-  const interiors = process.env['SJ_DEV_INTERIORS'] === '1'
+  const interiors = process.env['SJ_DEV_INTERIORS'] !== '0'
+  const builders = process.env['SJ_DEV_BUILDERS'] !== '0'
+  const bridge = process.env['SJ_DEV_BRIDGE'] !== '0'
+  const jointBuild = process.env['SJ_DEV_JOINT'] === '1'
   const asked = Number(process.env['SJ_DEV_RINGS'] ?? TOWN_RINGS_GENESIS)
   const rings = Number.isInteger(asked) && asked >= 1 ? asked : TOWN_RINGS_GENESIS
   if (rings !== asked) console.log(`dev world: SJ_DEV_RINGS=${process.env['SJ_DEV_RINGS']} is not a ring count; using ${rings}`)
-  void startDevWorld({ ingest: true, map, interiors, rings }).then(({ gateway }) => {
-    console.log(`dev world: interiors=${interiors ? 'on' : 'off'}`)
+  void startDevWorld({ ingest: true, map, interiors, builders, bridge, jointBuild, rings }).then(({ gateway }) => {
+    console.log(`dev world: interiors=${interiors ? 'on' : 'off'} builders=${builders && map === 'showcase' ? 'on (SCRIPTED masons, real build verb)' : 'off'}`
+      + ` bridge=${bridge && map === 'showcase' ? `on (a deck at the ford ${JSON.stringify(showcaseDeck(undefined, rings))})` : 'off'}`
+      + ` joint=${jointBuild && map === 'showcase' ? 'on (a mason lends a hand at walls in reach)' : 'off'}`)
     console.log(`dev world: the town is awake on ws://localhost:${gateway.port}/ws`)
   })
 }

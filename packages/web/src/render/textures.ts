@@ -48,8 +48,21 @@ export type BuildingArt = { url: string | null; anchor: { x: number; y: number }
 
 // v4 hi-res building → feet-anchored, scaled to fit the Style Bible's 32·(w+h) px
 // square; anything else draws at natural size with the bottom-center anchor law.
-export function buildingArt(records: AssetRecord[], kind: string, fw: number, fh: number): BuildingArt {
-  const rec = resolveAsset(records, 'building', kind)
+/**
+ * ★ THE CODEX KIND A TURNED BUILDING DRAWS AS. SW is the bare kind by design — the same
+ * convention `forge/buildingArt.facingKind` registers cells under, restated here because
+ * `@sj/web` does not depend on `@sj/forge` and `drawScale.test.ts` proves that boundary is
+ * real. A kind with no turned cell committed falls back to the bare one rather than drawing
+ * nothing: a missing cell is an art gap, not a reason for a hole in the town.
+ */
+export const facingCellKind = (kind: string, facing?: 'sw' | 'se'): string =>
+  facing === 'se' ? `${kind}:se` : kind
+
+export function buildingArt(
+  records: AssetRecord[], kind: string, fw: number, fh: number, facing?: 'sw' | 'se',
+): BuildingArt {
+  const rec = resolveAsset(records, 'building', facingCellKind(kind, facing))
+    ?? resolveAsset(records, 'building', kind)
   if (rec === null) return { url: null, anchor: null, scale: null }
   const m = parseBuildingManifest(rec.meta)
   if (m === null) return { url: `/assets/${rec.id}.png`, anchor: null, scale: null }

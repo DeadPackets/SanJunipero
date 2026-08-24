@@ -957,7 +957,6 @@ describe('arbiter wiring expansion (T20)', () => {
           validate: () => null,
           duration: () => 1,
           onComplete: () => [],
-          interruptible: true,
         })
         return { ruleId: 1, verb: recipe.id }
       },
@@ -987,7 +986,7 @@ describe('arbiter wiring expansion (T20)', () => {
         calls.push({ recipeId: recipe.id, credit })
         registerVerb({
           kind: RECIPE_VERB, validate: () => null, duration: () => 1,
-          onComplete: () => [], interruptible: true,
+          onComplete: () => [],
         })
         return { ruleId: 1, verb: recipe.id }
       },

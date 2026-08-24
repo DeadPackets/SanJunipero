@@ -124,6 +124,16 @@ const DEATH_SENTENCES: Readonly<Record<string, (who: string) => string>> = {
   fatigue: (who) => `${who} was worn out past mending.`,
 }
 
+// The same table for the four ways a body can be afflicted (engine AFFLICTION_KINDS). Fatigue
+// is the one that matters: `escalateFatigue` mints it after every collapse, so it is by far the
+// commonest affliction a town produces and it is not a sickness.
+const AFFLICTION_SENTENCES: Readonly<Record<string, (who: string) => string>> = {
+  illness: (who) => `${who} has fallen ill.`,
+  poison: (who) => `${who} was poisoned.`,
+  fatigue: (who) => `${who} is worn out.`,
+  injury: (who) => `${who} is carrying a wound.`,
+}
+
 // Only two of the eight reasons ground changes are anybody's doing. A path worn by feet, a
 // path going back to grass, a seeded stump, a sapling grown and a tilled field are all
 // noticed by whoever is looking at the ground — never announced.
@@ -176,10 +186,14 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
     }
     case 'agent_harmed':
       return `${look.agentName(str(p.agentId))} was hurt.`
-    case 'agent_afflicted':
-      return str(p.kind) === 'poison'
-        ? `${look.agentName(str(p.agentId))} was poisoned.`
-        : `${look.agentName(str(p.agentId))} has fallen ill.`
+    case 'agent_afflicted': {
+      const who = look.agentName(str(p.agentId))
+      // One sentence per affliction kind. This used to be "poison, or else illness", and
+      // `escalateFatigue` mints a fatigue affliction after EVERY collapse — so a town that had
+      // simply walked itself into the ground was chronicled as five people falling ill within
+      // the same minute. An unnamed kind is not silently a fever; it says what it is.
+      return AFFLICTION_SENTENCES[str(p.kind)]?.(who) ?? `${who} is unwell.`
+    }
     case 'affliction_worsened':
       return `${look.agentName(str(p.agentId))} grows worse.`
     case 'affliction_recovered':

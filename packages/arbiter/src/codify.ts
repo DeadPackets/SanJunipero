@@ -160,7 +160,6 @@ export function verbFromRecipe(recipe: Recipe): VerbDef {
         ...wearTools(state, config, agentId, recipe),
       ]
     },
-    interruptible: recipe.interruptible,
     skill: recipe.skillCheck ? { track: recipe.skillCheck.track, xp: 10 } : undefined,
     rngStream: recipe.rngStream,
   }

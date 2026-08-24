@@ -363,7 +363,7 @@ describe('furniture stands on its own ground', () => {
         ((size.w - 1) + (size.h - 1)) * (SLOT_TILES * TILE_H / 4),
       ))
     }
-    // the house's bed is 1×2: 16 world px sideways and 8 down, which is 48 × 24 at ROOM_ZOOM 3
+    // the house's bed is 1×2: 16 world px sideways and 8 down, before the room's own zoom
     const bed = slotSpanCentre({ x: 2, y: 1 }, { w: 1, h: 2 })
     expect(bed.sx - landedFoot({ x: 2, y: 1 }).sx).toBe(-SLOT_TILES * TILE_W / 4)
     expect(bed.sy - landedFoot({ x: 2, y: 1 }).sy).toBe(SLOT_TILES * TILE_H / 4)

@@ -38,7 +38,6 @@ export const RecipeSchema = z.object({
   requires: z.array(RecipeRequirementSchema),
   outcomeTable: OutcomeTableSchema,
   rngStream: z.string().min(1),
-  interruptible: z.boolean(),
   canon: z.array(z.string()).min(1),                    // codex tech ids this recipe depends on (adjacency doctrine)
 }).strict()
 export type Recipe = z.infer<typeof RecipeSchema>

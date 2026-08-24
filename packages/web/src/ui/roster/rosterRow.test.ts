@@ -7,6 +7,7 @@ import { EXPRESSIONS, moodOf, type MoodView } from '../../render/mood.js'
 import { GAMIFICATION_BAN } from '../townStats.js'
 import { RosterRowView, rowLabel } from './RosterRowView.js'
 import {
+  EARSHOT_TILES,
   MOOD_GLYPH, MOOD_GLYPH_PALETTE, MOOD_GLYPH_PX, MOOD_WORD, ROSTER_SORTS, ROSTER_SORT_WORD,
   rosterRows2, sortRoster, type RosterRow2, type RosterSort,
 } from './rosterRow.js'
@@ -112,6 +113,23 @@ describe('the same person, five days apart, is not the same row', () => {
     expect(a5.substance).toBeGreaterThan(a0.substance)
     expect(a0.with).toEqual([])
     expect(a5.with).toEqual(['Yusuf'])
+  })
+
+  // ★ "NEAR" IS THE WORLD'S OWN EARSHOT, NOT THE VIEWER'S COPY OF IT. `EARSHOT_TILES = 8` was
+  // a transcription of `DEFAULT_CONFIG.movement.earshotRadius` and also the AUTHORITY, which
+  // is exactly the shape `BUILD_TICKS_FULL` had when it went stale unnoticed. It is a fallback
+  // now and the snapshot's own figure wins, so a world that hears further — or less far — has
+  // a roster that says so.
+  it('★ a world with a different earshot has a different idea of who is near', () => {
+    const at = (earshot?: number): string[] =>
+      rosterRows2(day5, [], bonds, 5 * DAY_TICKS, [], earshot).find((r) => r.id === 'amara')!.with
+    expect(at(EARSHOT_TILES)).toEqual(['Yusuf'])
+    expect(at(undefined), 'the fallback is not the landed number').toEqual(at(EARSHOT_TILES))
+    // they are one tile apart, so an earshot under one puts them out of it
+    expect(at(0.5), 'the roster ignored the world and used its own copy').toEqual([])
+    // and a nonsense figure falls back rather than emptying the roster
+    expect(at(0)).toEqual(['Yusuf'])
+    expect(at(-3)).toEqual(['Yusuf'])
   })
 
   it('the RENDERED row differs — a row that reads the same on both is the defect', () => {
@@ -278,6 +296,24 @@ describe('the rendered row', () => {
     expect(label).toContain(row.place.words)
     expect(label).toContain('Yusuf')
     expect(html).toContain(`aria-label="${label.replace(/"/g, '&quot;')}"`)
+  })
+
+  // ★ PROXIMITY IS NOT A BOND, AND THE ROW MUST NOT SAY IT IS.
+  //
+  // `row.with` is `companyOf` — who is inside earshot right now. It printed as "with Yusuf",
+  // and the nav tab beside it is labelled BONDS. Merge train 3 read the two as one claim and
+  // filed `BONDS 0` as a counter that lies. The count was right — the scripted founders never
+  // speak, give, teach or share a roof, so the bond ledger genuinely holds nothing — and the
+  // word was borrowed from a surface that means something else.
+  it('★ says who is NEAR, never who someone is "with" — that word belongs to the bonds', () => {
+    expect(row.with).toEqual(['Yusuf'])          // they are one tile apart, and that is all
+    expect(html).toContain('near Yusuf')
+    expect(html).not.toMatch(/\bwith Yusuf\b/)
+    expect(rowLabel(row)).toContain('near Yusuf')
+    expect(rowLabel(row)).not.toMatch(/\bwith Yusuf\b/)
+    // and a body on its own still reads as a body on its own
+    const alone = rosterRows2(world([{ id: 'amara', name: 'Amara', x: 10, y: 10 }], [], DAY_TICKS), [], null, DAY_TICKS)[0]!
+    expect(rowLabel(alone)).toContain('alone')
   })
 
   it('draws the mood, and never borrows a glyph from the reader’s font', () => {
