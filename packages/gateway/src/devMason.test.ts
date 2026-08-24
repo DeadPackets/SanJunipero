@@ -34,7 +34,7 @@ const GENESIS_STRUCTURES = 11
 type Seen = { type: string; tick: number; payload: Record<string, unknown> }
 type Run = { state: WorldState; events: Seen[] }
 
-function runDevWorld(builders: boolean, rings = RINGS, ticks = TICKS): Run {
+function runDevWorld(builders: boolean, rings = RINGS, ticks = TICKS, jointBuild = false): Run {
   const config = SHOWCASE_CONFIG
   const terrain = devTerrain('showcase', rings)
   const structures = townStructuresFor('showcase', rings)
@@ -43,6 +43,7 @@ function runDevWorld(builders: boolean, rings = RINGS, ticks = TICKS): Run {
   const events: Seen[] = []
   const inner = makeFoundersOnTick(config, rng, () => loop.state, {
     interiors: true, builders, structures, founders: foundersFor(structures), holdings: true,
+    jointBuild,
   })
   const loop: TickLoop = new TickLoop({
     store, state: devGenesisState(config, terrain, 'showcase', rings), rng, config,
@@ -192,4 +193,106 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
     expect(off.events.filter((e) => e.type === 'structure_planned' && e.tick > 1)).toEqual([])
     expect(standingRects(off.state).length).toBe(GENESIS_STRUCTURES)
   })
+})
+
+// ── ★ TWO MASONS, ONE HOUSE ──────────────────────────────────────────────────────────────────
+//
+// OD22: `buildSiteOf` and `stepBuild` both resolved a plotted site off `ownSite`, keyed on the
+// BUILDER, so the second body was handed the next FREE plot and a town of five raised five
+// houses. `joinableSite` restored the other half. `buildSeam.test.ts` proves it on the engine's
+// own town; this proves it in the world a viewer boots, through a real `TickLoop`.
+//
+// ★ AND IT IS OFF BY DEFAULT, WHICH IS A MEASUREMENT AND NOT A TASTE. See the table below: the
+// hands are real and the calendar does not know it, because a building completes off the
+// BUILDER's activity clock and not off the site's `progressTicks`.
+describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickLoop', () => {
+  const TICKS_J = 1440
+  const on = runDevWorld(true, RINGS, TICKS_J, true)
+  const off = runDevWorld(true, RINGS, TICKS_J, false)
+
+  /** How many pairs of hands were on one site in one tick, at the most. */
+  const mostHands = (r: Run): number => {
+    const perTick = new Map<string, number>()
+    for (const e of r.events) {
+      if (e.type !== 'structure_progressed') continue
+      const k = `${e.tick}:${String(e.payload['id'])}`
+      perTick.set(k, (perTick.get(k) ?? 0) + 1)
+    }
+    return Math.max(0, ...perTick.values())
+  }
+  const builds = (r: Run) => r.events.filter((e) => e.type === 'action_started' && e.payload['verb'] === 'build')
+  const planted = (r: Run) => r.events.filter((e) => e.type === 'structure_planned' && e.tick > 1)
+
+  it('★ more than one pair of hands lands on one house, and they are different people', () => {
+    // A build that planted nothing is a build that joined somebody.
+    const joins = builds(on).length - planted(on).length
+    expect(joins, 'nobody joined anybody').toBeGreaterThan(0)
+    expect(mostHands(on), 'no two hands were ever on one site in one tick').toBeGreaterThanOrEqual(2)
+
+    // The same run with the policy off: the town this lane did not change.
+    expect(builds(off).length - planted(off).length).toBe(0)
+    expect(mostHands(off)).toBe(1)
+
+    // ★ AND THEY ARE DIFFERENT PEOPLE, not one body counted twice. `stepBuild` emits the
+    // worker's `action_progressed` immediately before the site's `structure_progressed`, in
+    // that agent's own turn of `actionsSystem`, so the pairing reads straight off the log.
+    const bodiesOn = new Map<string, Set<string>>()   // `${tick}:${siteId}` -> agent ids
+    let worker = ''
+    for (const e of on.events) {
+      if (e.type === 'action_progressed') worker = String(e.payload['agentId'])
+      if (e.type !== 'structure_progressed') continue
+      const k = `${e.tick}:${String(e.payload['id'])}`
+      const who = bodiesOn.get(k) ?? new Set<string>()
+      who.add(worker)
+      bodiesOn.set(k, who)
+    }
+    let peak = { key: '', who: new Set<string>() }
+    for (const [k, who] of [...bodiesOn].sort()) if (who.size > peak.who.size) peak = { key: k, who }
+    expect(peak.who.size, 'no site had two different bodies on it in one tick').toBeGreaterThanOrEqual(2)
+    // Every one of them is a founder, and every one of them is alive and distinct.
+    for (const id of peak.who) expect(FOUNDERS.map((f) => f.id)).toContain(id)
+    const [peakTick, peakId] = peak.key.split(':')
+    expect(planted(on).some((e) => String(e.payload['id']) === peakId),
+      'the busiest site was never planned').toBe(true)
+    console.log(`[joint-hands] showcase rings=${RINGS}, ${TICKS_J} ticks: ${joins} builds joined walls`
+      + ` somebody else began; ${peak.who.size} bodies on ${peakId} at tick ${peakTick}`
+      + ` (${[...peak.who].sort().join(', ')}); ${planted(on).length} roofs begun`
+      + ` (${planted(off).length} with the policy off)`)
+  })
+
+  it('★ and the joiner pays nothing twice — no second plan, no second plot, no roof off the lattice', () => {
+    // Every roof in the world was planted exactly once, and the count of standing things is
+    // the genesis eleven plus what was planted — a join adds a pair of hands, never a building.
+    const ids = planted(on).map((e) => String(e.payload['id']))
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(standingRects(on.state).length).toBe(GENESIS_STRUCTURES + ids.length)
+    const seats = new Set(planted(on).map((e) => `${String(e.payload['x'])},${String(e.payload['y'])}`))
+    expect(seats.size).toBe(ids.length)
+    for (const b of builds(on)) {
+      expect(Object.keys(b.payload['params'] as object).sort(), 'a coordinate reached the verb')
+        .toEqual(['kind'])
+    }
+  })
+
+  it('★ the house they raised together finished, and nobody went down doing it', () => {
+    const done = on.events.filter((e) => e.type === 'structure_completed' && e.tick > 1)
+    expect(done.length, 'nothing was finished').toBeGreaterThan(0)
+    const plannedAt = new Map(planted(on).map((e) => [String(e.payload['id']), e.tick]))
+    for (const e of done) {
+      expect(plannedAt.get(String(e.payload['id'])), 'finished without being planned').toBeDefined()
+    }
+    expect(on.events.filter((e) => e.type === 'agent_collapsed')).toEqual([])
+    for (const f of FOUNDERS) expect(on.state.agents[f.id]!.alive, f.id).toBe(true)
+  })
+
+  it('★ deterministic: a second run reaches the same town, roof for roof and tile for tile', () => {
+    const twin = runDevWorld(true, RINGS, TICKS_J, true)
+    expect(standingRects(twin.state)).toEqual(standingRects(on.state))
+    expect(twin.state.terrain).toEqual(on.state.terrain)
+    expect(stateHash(twin.state)).toBe(stateHash(on.state))
+  }, 180_000)
+
+  it('★ OFF is the landed world byte for byte — this lane changed no default', () => {
+    expect(stateHash(off.state)).toBe(stateHash(runDevWorld(true, RINGS, TICKS_J).state))
+  }, 180_000)
 })

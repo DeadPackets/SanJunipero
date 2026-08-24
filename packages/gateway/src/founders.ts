@@ -28,8 +28,8 @@
 // and the world's own decay, multiplied.
 import { doorFrontTile, type SimConfig } from '@sj/shared'
 import {
-  BRIDGE_KIND, awakeEnergyDecay, bridgeAt, claimInWorld, composePerception, createWorldTick,
-  doorTile, findPath, isAdjacentToRect, submitIntent,
+  BRIDGE_KIND, awakeEnergyDecay, bridgeAt, buildSiteOf, buildTicks, claimInWorld,
+  composePerception, createWorldTick, doorTile, findPath, isAdjacentToRect, submitIntent,
   type PerceptionPacket, type RngStreams, type Structure, type WorldState,
 } from '@sj/engine'
 import { devTown, type DevStructure } from './devTown.js'
@@ -237,10 +237,28 @@ export function masonErrandCost(
 }
 
 /** Stand at the ground the town keeps, then raise a roof on it. `null` when the town has
- *  nowhere left for a house of this mass, or when this body cannot pay for the errand. */
-export function masonIntent(state: WorldState, config: SimConfig, agentId: string): Intent | null {
+ *  nowhere left for a house of this mass, or when this body cannot pay for the errand.
+ *
+ *  `lendHands` OFF is the landed policy exactly. It is off by default because of what the run
+ *  measures, not because of what it shows: see `jointBuild` on `FoundersOpts`. */
+export function masonIntent(
+  state: WorldState, config: SimConfig, agentId: string, lendHands = false,
+): Intent | null {
   const a = state.agents[agentId]
   if (a === undefined || a.insideId !== undefined) return null
+  // ★ HANDS ALREADY AT SOMEBODY'S WALLS LEND THEM, AND THIS IS NOT A COORDINATE EITHER.
+  // Two masons sent to the same plot arrive a few ticks apart; the loser used to be told the
+  // ground was taken and walk to the next plot, so a town of five raised five houses one pair
+  // of hands at a time. The ENGINE decides which walls — `buildSiteOf` answers `resume` from
+  // where this body is standing — and the ask is still `{kind}` with no x and no y in it.
+  const join = lendHands ? buildSiteOf(state, config, agentId, { kind: MASON_KIND }).resume : null
+  if (join !== null) {
+    // Only the work that is LEFT: a joiner has no walk to pay for and no fresh house to raise.
+    const left = workEnergyCost(state, config, agentId, buildTicks(config, MASON_KIND) - join.progressTicks)
+    return left !== null && a.needs.energy - left > GO_HOME_BELOW
+      ? { verb: 'build', params: { kind: MASON_KIND } }
+      : null
+  }
   const claim = claimInWorld(state, MASON_NEED)
   if (claim === null) return null
   const errand = masonErrandCost(state, config, agentId, claim)
@@ -327,6 +345,15 @@ export type FoundersOpts = {
    *  ABSENT by default — a world with no ford has nowhere to put one, and every existing gate
    *  folds exactly the events it always did. */
   deck?: { x: number; y: number; w: number; h: number }
+  /** dev/demo only: a mason who finds itself beside somebody's half-raised walls lends a hand
+   *  instead of walking to the next plot.
+   *
+   *  ★ OFF BY DEFAULT, AND THE REASON IS A NUMBER, NOT A TASTE. It works — five pairs of hands
+   *  on one house, measured — but a building completes off the BUILDER's activity clock and
+   *  not off the site's `progressTicks`, so the extra hands buy no calendar time at all. Over
+   *  4 320 showcase ticks: 29 roofs at 293 body-ticks each with it off, 16 at 591 with it on.
+   *  The world can count hands now; it still cannot spend them. */
+  jointBuild?: boolean
 }
 
 /** The house this person owns, or null. Ownership is a fact of the world (Structure.owner) —
@@ -483,7 +510,7 @@ export function makeFoundersOnTick(
       // the deck comes before the houses because until it stands half the town is unreachable.
       const intent = (opts.interiors === true ? homeIntent(state, config, f.id) : null)
         ?? (f.id === wright ? bridgewrightIntent(state, config, f.id, opts.deck!) : null)
-        ?? (opts.builders === true ? masonIntent(state, config, f.id) : null)
+        ?? (opts.builders === true ? masonIntent(state, config, f.id, opts.jointBuild === true) : null)
         ?? policies.get(f.id)!(state, config, packet)
       if (!intent) continue
       const r = submitIntent(state, config, f.id, intent.verb, intent.params)
