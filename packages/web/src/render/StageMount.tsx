@@ -10,6 +10,7 @@ import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
 import { createAtmosphere, type Atmosphere } from './atmosphere.js'
 import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 import { createAmbient, type AmbientDirector } from './ambient.js'
+import { createLightPools, type LightPools } from './lightPools.js'
 import { createInteriorScene, type InteriorScene } from './interiorScene.js'
 import { createLandmarkLayer, type LandmarkLayer } from './landmarks.js'
 
@@ -54,6 +55,7 @@ export function StageMount(
     let atmosphere: Atmosphere | null = null
     let weather: WeatherLayer | null = null
     let ambient: AmbientDirector | null = null
+    let lightPools: LightPools | null = null
     let interior: InteriorScene | null = null
     let landmarks: LandmarkLayer | null = null
     let offCamera: (() => void) | null = null
@@ -94,6 +96,7 @@ export function StageMount(
       atmosphere = createAtmosphere(s)
       weather = createWeatherLayer(s)
       ambient = createAmbient(s, store, { weather, bubbles, chars })
+      lightPools = createLightPools(s, store)
       sceneRef.current = s
       const charLayer = chars
       s.anchorOf = (agentId) => {
@@ -126,6 +129,7 @@ export function StageMount(
         bubbles?.tick(now)
         weather?.tick(dt)
         ambient?.tick(dt)
+        lightPools?.tick(dt)
         const state = store.getState()
         if (state !== null) {
           atmosphere?.update(state)
@@ -157,6 +161,7 @@ export function StageMount(
       chars?.destroy()
       bubbles?.destroy()
       ambient?.destroy()
+      lightPools?.destroy()
       weather?.destroy()
       atmosphere?.destroy()
       scene?.destroy()

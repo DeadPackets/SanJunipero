@@ -10,6 +10,7 @@
 //   pnpm stream                 RESUME the town that was running (a new one if there is none)
 //   SJ_FRESH=1 pnpm stream      throw that town away and start a new day 0
 //   PORT=9000 SJ_RINGS=3 …      pick the port and how far the town is platted
+//   SJ_LAMPS=0 pnpm stream      leave the streets dark (a lamplighter raises eight otherwise)
 //
 // ★ RESUME IS THE DEFAULT, AND THAT IS THE WHOLE POINT OF THIS FILE EXISTING. A stream is
 // watched because day 12 follows days 1 to 11. Until now `startDevWorld` deleted the world db
@@ -25,6 +26,7 @@ import { TOWN_RINGS_GENESIS } from '@sj/shared'
 import { startDevWorld, type DevMapKind } from './devWorld.js'
 
 export const STREAM_PORT = 8080
+export const STREAM_LAMPS = 8
 export const CLIENT_DIST = fileURLToPath(new URL('../../web/dist/', import.meta.url))
 
 /** The one instruction a person needs when the viewer has not been built yet. */
@@ -48,10 +50,16 @@ export async function main(): Promise<void> {
   const map: DevMapKind = process.env['SJ_MAP'] === 'scripted' ? 'scripted' : 'showcase'
   const interiors = process.env['SJ_INTERIORS'] === '1'
   const fresh = process.env['SJ_FRESH'] === '1'
+  // The streets, lit. A viewer who opens the stream at midnight should see what the town can
+  // now do; `SJ_LAMPS=0` turns it off, and any other integer sets how many.
+  const lamps = intEnv('SJ_LAMPS', STREAM_LAMPS, 0)
 
   let world
   try {
-    world = await startDevWorld({ ingest: true, map, rings, interiors, port, fresh, staticDir: CLIENT_DIST })
+    world = await startDevWorld({
+      ingest: true, map, rings, interiors, port, fresh, builders: true, lamps,
+      staticDir: CLIENT_DIST,
+    })
   } catch (e) {
     // A taken port is the single most common way this command fails, and a raw EADDRINUSE
     // stack says nothing an operator can act on.
