@@ -85,7 +85,8 @@
 | **`setting-lane-report.md` + `setting-lane-controller-rulings.md` R0–R5 (2026-08-18)** | **BINDING, and the headline of v4** | R0→the regen budget, **R1→C29 and T14**, R2→T14's era ladder, **R3→C30 (the home kind)**, R4→C31, R5→T50's first-live-run brief |
 | **`rename-home-kind-brief.md` (parallel lane, lands before C8 executes)** | **BINDING** | **C30 — the home kind is `house`**, and C8 inherits whatever pin values that lane leaves on `main` |
 | **merge trains 5 and 6** | landed; superseded | carried into `645a8d9` |
-| **★ the 2026-08-23/24 sprint — fourteen lanes, merge trains 1–3** | **landed; `main` = `645a8d9`, 311 files / 4637 tests / tsc 0** | **C3's four pins and their eleven copies, C14's rewritten town, C32's layout glass, T19–T22's seam, T44's art** |
+| **★ the 2026-08-23/24 sprint — fourteen lanes, merge trains 1–3** | **landed; carried into `main` = `9d76b97`** | C14's rewritten town, C32's layout glass, T19–T22's seam, T44's art |
+| **★★ `many-hands`, `first-night` and `unpin` — landed since v5b; `main` = `9d76b97`, 316 files / 4 730 tests / tsc 0** | **BINDING, AND THE HEADLINE OF v6** | **`unpin` → C3 deleted, C4 promoted, T28/T29/T51 rewritten; `first-night` → precondition 5 discharged and the contingency box closed; `many-hands` → OD22 landed, T21 Step 0 deleted, `handsOnSite` given to T22** |
 | **`town-generator-report.md`, `world-growth-report.md`, `claim-seam-report.md`, `far-bank-report.md`, `merge-train-3-report.md`** | **BINDING, and the headline of v5** | the plotter→C14; the clearance→C3's forge pin; the claim seam→T19/T20/T21/T22; the walk graph→C14; the running-product findings→the `first-night` contingency box |
 | **`canon-story-decisions.md` (USER RULINGS, 2026-08-23) — four rulings and one settlement** | **BINDING** | reach ceiling, the landslide, the abandoned village, Omar's generator → T3/T4's content is now landed; **"the tree is a YARDSTICK, never a gate"** → **T13**, **T14**, **OD18** |
 | **`docs/superpowers/content/` (landed on `main`, docs-only)** | **the two frozen drafts, RE-AUTHORED and checked** | **OD16 CLOSED**; T3, T4, T13, T14 |
@@ -95,7 +96,7 @@
 | # | Amendment | Where it lands |
 |---|---|---|
 | **A** | **★ A MIND CANNOT NAME WHERE IT BUILDS, AND THE WORLD ALREADY TELLS IT WHERE** | **C14 rewritten**; **T19**, **T20**, **T21**, **T22** |
-| **B** | **The four pins are re-derived and two of them moved; the census is eleven literals across seven files, not nine across six** | **C3 rewritten**; **T1**, **T29**, **T51** |
+| **B** | **★ SUPERSEDED IN v6 — THE FOUR PINS ARE GONE.** The `unpin` lane deleted every hash literal and the seven-file census with them | **C3 DELETED, C4 promoted**; **T1 Step 0 inverted**, **T29 rewritten**, **T51 check 9 deleted** |
 | **C** | **The town is a grammar, not a layout: no district, no typed coordinate, a moved anchor, and `cityFreePlots` is gone** | **C14 rewritten**; T9, T11, T57, T62 |
 | **D** | **The content landed; the tree is 103 nodes, 52 social, and its era is a NAME** | **T12**, **T13**, **T14**; **OD16 CLOSED**, **OD18 raised** |
 | **E** | **Art exists for every kind the world can create, and a gate enforces it — which is why T22's three heavy kinds cannot ship as written and T44's finding is false** | **T22**, **T44 rewritten**; **OD19** |
@@ -113,50 +114,26 @@ Every task's requirements implicitly include this section.
 
 - **C1. arm64 is a hard constraint, verified per task, never assumed.** The production target is an Oracle Ampere (linux/arm64) box. No image tag is used unless `docker manifest inspect` lists `linux/arm64`; every native module (`better-sqlite3`, `sqlite-vec`, `onnxruntime-node`, `sharp`, `@rollup/rollup-linux-arm64-gnu`, `@esbuild/linux-arm64`) must resolve a **glibc** prebuild for `linux/arm64` or build from source in the deps stage. "It should work on ARM" is not done. **A task that cannot prove arm64 STOPS and reports.**
 - **C2. There is no build step, and the image must respect that** (R2). Every workspace package exports raw TypeScript (`"exports": {".": "./src/index.ts"}`); only `@sj/web` has a `build` script. The server runs TS through `packages/agents/scripts/ts-loader.mjs`, so **`typescript` is a production dependency** and `pnpm install --prod` would break the image. No `dist/`, no bundler, no `pnpm build` outside `@sj/web`.
-- **C3. THE KEYSTONE IS PHASE F AND NOWHERE ELSE — and here are the four pins, RE-READ FROM THE MERGED TIP, WITH ALL SEVEN FILES THEY LIVE IN.** C8 re-pins deliberately, once. **v5 grepped each hash literal out of the working tree at `main` = `645a8d9` and quotes the file and line it was found on** (C17). Every value below belongs to **branch `main` @ `645a8d9`** and to no other branch. **Two of the four MOVED since v4, both for reasons that have nothing to do with any rename, and that is a measured result rather than an assumption carried forward.**
+- **C4. ★ PROMOTED INTO THE KEYSTONE'S OLD SLOT. THE DETERMINISM CONTRACT IS THE ONLY DETERMINISM LAW LEFT, AND IT IS REPLAY DETERMINISM, NOT REGENERATION DETERMINISM** (U28). *v5b's C3 stood here: four hash pins, a seven-file census, a decoy, a stale-branch table and a once-only regen — the single largest global constraint in the plan. **The `unpin` lane deleted all four pins and the machinery that maintained them**, and C4, written before the user's ruling, already said the thing that survives it.*
 
-  | Pin | Value at `main` @ `645a8d9` | Where the literal lives | Every other copy of the same literal |
-  |---|---|---|---|
-  | **G1 `GOLDEN_DAY_HASH`** | `f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac` — **never moved, in the project's whole history** | `packages/engine/src/golden.test.ts:14` | `packages/arbiter/src/g4.test.ts:25`; **`packages/gateway/src/g12c.test.ts:87`**; **`packages/engine/src/g9.test.ts:591` reads `golden.test.ts` AS SOURCE TEXT** |
-  | **G2 `GOLDEN_G2_HASH`** | `00d724345c37104d6c93f10398b96eded080b58db78108746e2a037fce836a10` | `packages/engine/src/g2.test.ts:40` | **`packages/gateway/src/g12c.test.ts:92`**; **`packages/engine/src/g9.test.ts:592` reads `g2.test.ts` AS SOURCE TEXT** |
-  | **forge `stateHash(DEFAULT_CONFIG)`** | **`da065752366c812c531b1eaa0f8537781bc6f5859e5a4bf6647aa5edc37cd472` ← MOVED** | `packages/forge/src/forgeConfig.test.ts:91` | **`packages/gateway/src/g12c.test.ts:105`**; previous values in the comments at lines 77, 82 and 89 |
-  | **`BLOCK1_SHA256`** | **`4205d892c18a91de4c9c3a50f0122abaad0d6170488455419dc045bfc4d50065` ← MOVED** | `packages/agents/src/prompt/rulesOfBeing.test.ts:22` | asserted at `rulesOfBeing.test.ts:130`; **`packages/gateway/src/g12c.test.ts:106`**; previous value in the comment at line 21 |
+  > *"LLMs by their nature are non-deterministic, and this experiment is not trying to showcase deterministic outcomes. All we want when we implement new tasks is to make sure the world/project does not break, so minimal guards."* — the user, 2026-08-24. **C4 is that ruling, written into this plan before it was made.**
 
-  **★ WHY THE TWO MOVED, IN ONE LINE EACH, BECAUSE NEITHER IS A RENAME AND v4's CLOSING PARAGRAPH SAID THEY WOULD BE.**
-  **forge** — the `world-growth` lane deleted **three keys** from `SimConfigSchema`: `mapGrowth.maxSize`, `.step` and `.structuresPerStep`. `maxSize` was a 192-tile ceiling on a grammar that plats rings forever; the other two were a pace guessed against it. Three keys removed, none added, no value changed. `MapGrowthSchema` is now one key wide.
-  **BLOCK1** — the `claim-seam` lane changed **one line** of block 1. Its `build` line still said *"give kind, the thing to raise, and x and y as two numbers for where"*, a parameter the verb now refuses, so the block that teaches a mind its own hands was teaching it a refusal. Nothing else in the block changed.
+  **The contract.** A recorded run replays to the same bytes forever; re-running the protocol from the same seed does **not** reproduce it, because the minds are sampled and the humans are not in the engine. Four rules bind every task: **(a)** no RNG in the drive fold — drive state is a pure fold over `(genome, recorded packets, own recorded turns)`, and every tiebreak is by a **declared** order, never by insertion order; **(b)** everything a mind's output touches lands as an event first, through `submitIntent`; **(c)** goldens stay scripted and contain no mind; **(d)** every per-call sampling parameter is **recorded** — `llm_calls` gains a `temperature` column beside `provider` (T8).
 
-  **★ THE CENSUS, RE-DERIVED, AND v4's NUMBER WAS WRONG.** v4's C3 said *"nine copies across six files"* and its T51 check 9 asserted that count. **Run v4's own grep against `cd845bc` and it returns thirteen lines across eight files** — so an executor following v4 would have STOPped on a correct tree, which is the same class of defect as a missed copy and the reason this paragraph exists. The honest number at `645a8d9`:
+  **★ WHAT REPLACED THE FOUR PINS, AND WHY IT IS STRONGER THAN WHAT IT REPLACED.** Three of the four hashes were protecting an invariant **already asserted, hash-free, within five lines of the pin**. The lane deleted the hash and kept the assertion; only G2's needed a new line.
 
-  > **ELEVEN full 64-hex literals across SEVEN files.** G1 ×4 (`golden.test.ts:14`, `g4.test.ts:25`, `g12c.test.ts:87`, `g9.test.ts:591`), G2 ×3 (`g2.test.ts:40`, `g12c.test.ts:92`, `g9.test.ts:592`), forge ×2 (`forgeConfig.test.ts:91`, `g12c.test.ts:105`), BLOCK1 ×2 (`rulesOfBeing.test.ts:22`, `g12c.test.ts:106`).
-  > **The eight-character prefix grep returns TWELVE lines**, because `arbiter/src/g4.test.ts:208` carries `f487a26b` **inside a test name**. It is not a pin and re-pinning it is a documentation edit, not a correctness one — but it is what makes the count differ from eleven, so it is named here rather than discovered as an off-by-one.
+  | Was pinned | The invariant behind it | What guards it now, on `main` |
+  |---|---|---|
+  | `GOLDEN_DAY_HASH` (G1) | `fold(events) → state` is total and deterministic | `stateHash(replayFromGenesis(store)) === stateHash(live.state)` — **the line that already sat directly under the pin** — plus a fold-twice and a fold-to-a-mid-tick row |
+  | `GOLDEN_G2_HASH` (G2) | the named-law rows, and the build-ledger defect | `progressTicks <= construction.houseTicks` on G2's own fixture — the world that booked 2 903 ticks against a 2 880-tick house |
+  | forge `stateHash(DEFAULT_CONFIG)` | the forge is ops-side and cannot reach world law | `stateHash(SimConfigSchema.parse({})) === stateHash(DEFAULT_CONFIG)` — **already one line below the pin** |
+  | `BLOCK1_SHA256` | block 1 is the cache-stable prefix every prompt opens with | `a.system.startsWith(block1())` for two unlike identities — **already the second test in the same describe** |
 
-  **★ AND THE DECOY, WHICH v4 NAMED AS A COPY AND IS NOT ONE.** `packages/agents/src/live/g11checkpoint.test.ts:15` carries `a90bd7471668eea6e8a8e7932129ef7905ae2477b396d5c7b792df539065c4d8` as a `configHash` inside a frozen `G11Fingerprint` **test fixture**. **Nothing compares it to `stateHash(DEFAULT_CONFIG)`** — the only production reader of a `configHash` is `scripts/g11-deepworld.ts:355`, which computes its own. The forge pin has moved **twice** since that literal was written (`a90bd747` → `02f295ad` → `da065752`) and no test has ever gone red for it. **It is a decoy, C8 does not touch it, and T29's re-pin step must not list it** — editing it changes nothing and invites the reader to believe the checkpointer is pinned to the config when it is not.
+  **★ AND THE MEASURED FINDING THAT CHANGES WHAT A TASK MUST ASSERT.** The unpin lane mutated `fold` with an ambient parity impurity and ran both replacement rows. **The whole-log fold-twice test DID NOT BITE** — an even number of events cancels a parity fault, and both passes land on the same final state. Only the **mid-log** row caught it, and mid-log is exactly where `WorldMirror.stateAt()` scrubs. **A task in this plan that wants to prove it did not break the fold asserts a fold to a mid-log tick, never a whole-log fold.**
 
-  **★ THE STALE-PIN TRAP, NAMED, BECAUSE IT HAS NOW ALMOST BITTEN THREE TIMES.** Quoting a hash off the wrong branch produces a pin test that fails for a reason nobody can explain:
+  **The standing law, with the ceremony removed.** No part of the engine becomes non-deterministic, ever: the alternative costs `stateHash` as an oracle, 2 602 assertion rows and log-based bug reproduction, to buy variance the model already gives for free. **But no task in this plan re-pins anything, quotes a hash in a commit body, or greps for one.** There is no census, no decoy, no stale-branch table and no keystone regen. **A task whose only remaining verification step was "the pins are unmoved" has no verification step left: it runs `pnpm vitest run <its own files>` and `pnpm typecheck`, and that is the whole of it.**
 
-  | Branch | `GOLDEN_G2_HASH` there | forge `stateHash(DEFAULT_CONFIG)` there | `BLOCK1_SHA256` there |
-  |---|---|---|---|
-  | **`main` @ `645a8d9`** (the only correct source) | `00d72434…` | `da065752…` | `4205d892…` |
-  | `main` @ `cd845bc` — **what v4 quotes** | **`c1c51b42…`** | **`a90bd747…`** | **`28c1fce0…`** |
-  | `town-generator` @ `68ef602` | `00d72434…` | **`02f295ad…`** | `28c1fce0…` |
-  | `c12a-work` @ `aefe0e3` | **`6f2529fb…`** — the PRE-REGEN G2 | not moved by C12a | `28c1fce0…` |
-
-  **All three of v4's non-G1 values are now stale, and a branch cut from `c12a-work` still carries `6f2529fb…`.** An executor who copies literals out of a plan, out of a brief, or off the wrong worktree pins the wrong value; **the only legal source is a grep of the merged tip in the worktree the task is executing in** (C17). Four verification commands, and the task runs all four before touching anything:
-
-  ```bash
-  git rev-parse HEAD                       # must be a descendant of 645a8d9
-  grep -rn "GOLDEN_DAY_HASH = \|GOLDEN_G2_HASH = \|BLOCK1_SHA256 = " --include='*.ts' packages/
-  grep -rnE "'[0-9a-f]{64}'" --include='*.ts' packages/forge/src/forgeConfig.test.ts
-  # every copy of every pin, wherever it lives — ELEVEN full literals across SEVEN files, plus
-  # ONE prefix inside a test name at arbiter/src/g4.test.ts:208. Twelve lines is the right answer.
-  grep -rn "f487a26b\|00d72434\|da065752\|4205d892" --include='*.ts' packages/
-  ```
-
-  **★ v4's CLOSING PARAGRAPH IS RESTATED AGAINST REALITY, AND IT WAS STALE IN THE OTHER DIRECTION.** v4 said *"C8 inherits whatever pin values the rename lane leaves on `main` and re-derives none"*, on the reasoning that the `rename-home-kind` lane was the only thing authorised to move one. **The rename lane has landed, and it is not what moved either pin.** The forge pin moved for a deleted config section and BLOCK1 for a line of prompt text, both on lanes that had nothing to do with any rename. The instruction survives with its reason replaced: **C8 inherits whatever the four literals say on the tip it executes against, re-derives none of them, and Task 1 Step 0 writes them into the ledger.** If any differs from this table, that is a lane that landed after this draft and is **NOT a defect** — record the new value, say which lane, and carry on. Any movement C8 itself causes outside Phase F is a STOP. **And there is one live case: the `first-night` lane is running now and is the one lane authorised to move G1** — see the contingency box at the end of this document.
-
-  **Every task outside Phase F that moves any of them is a defect: STOP and report, never re-pin.** Every task inside Phase F re-pins in the same commit as the change that moved it, with the old and new values in the commit body. Any tuning after Phase F travels as `config_changed` through the law channel, never as a schema edit. **Phases F2 and F3 are AFTER the keystone and therefore add no `SimConfig` key and change no `DEFAULT_CONFIG` value** — every number they need either already exists in `SimConfig` or lives outside it, and each task says which.
-- **C4. THE DETERMINISM CONTRACT — replay determinism, not regeneration determinism** (U28). A recorded run replays to the same bytes forever; re-running the protocol from the same seed does **not** reproduce it, because the minds are sampled and the humans are not in the engine. Four rules bind every task: **(a)** no RNG in the drive fold — drive state is a pure fold over `(genome, recorded packets, own recorded turns)`, and every tiebreak is by id order; **(b)** everything a mind's output touches lands as an event first, through `submitIntent`; **(c)** goldens stay scripted and contain no mind; **(d)** every per-call sampling parameter is **recorded** — `llm_calls` gains a `temperature` column beside `provider` (T8). No part of the engine becomes non-deterministic, ever: the alternative costs every golden, `stateHash` as an oracle, 2,602 assertion rows and log-based bug reproduction, to buy variance the model already gives for free.
+  **★ ONE THING THAT SURVIVES AND IS NOT A PIN.** `stateHash` and `configHash` are **identities**, not pins: the fold's own equality oracle (`g9-livingworld.ts`'s `replayHashMatches`), `g11-deepworld.ts`'s resume fingerprint, and a `web/src/shims/nodeCrypto.ts` that **throws** — *"stateHash is server-side only; the observatory never hashes in the browser"*. **Every one stays.** What died was the practice of writing a hash literal into a test and maintaining it across seven files.
 - **C5. One-way glass, the naming law, and the genome's silence.** No ops-plane vocabulary (construct types, milestone kinds, tiers, `hp`, `severity`, `config`, `roll`, drive names, axis names, temperament numbers) reaches a prompt, a perception packet, a memory or a viewer string. `assertNoGlassLeak` guards prompt assembly; every new world-facing string in C8 is scanned by a test. **The genome reaches a mind through exactly three doors and no fourth: the rates and thresholds of its drives, its word budget, and its sampling temperature.** A construct's name comes from a mouth or is null.
 - **C6. Live-API discipline.** Live tasks are T36–T41, T43, T50, and the pre-flights inside them. Each names its expected spend, runs with `node --env-file=.env` only, and **never prints, copies, logs or commits the key**. Per the user's no-cap ruling there is no hard budget cap; each live task carries a **STOP-and-report tripwire**: `$20/mind/sim-hour` sustained over 15 real minutes, or >5 identical retries, or `checkSpend().alerted` twice in a row. `reportDeadCalls` runs at the end of every live task. Planned total live envelope: **≈$18.3, or ≈$20.1 with a 10% margin** (itemised in T41).
 - **C7. ★ A PREFERENCE THE ROUTER CAN IGNORE IS NOT A CONTROL. C8 SHIPS A PROVIDER DENY-LIST.** *(This supersedes ruling R1 of `c8-revision-controller-rulings.md`, which replaced the pin with a **request** on the evidence that the router chooses better than we do.)* **C11 batch 16 measured the router sending 76.6% of traffic to DeepInfra** — the back end disqualified for returning required-properties-only — **on configuration identical to a run that had performed well.** Acts collapsed 357 → 83 and all five founders died. The request was made and the router ignored it, which is the whole finding: *asking* is not *controlling*.
@@ -202,13 +179,13 @@ Every task's requirements implicitly include this section.
   **C8 spends nothing on this.** Task 1 Step 0 keeps its `hut` grep as a **regression guard** rather than a scheduling gate: the answer is now zero and the check is cheap, and the one place `hut` survives is a persona's backstory prose in two unexercised gate scripts, which is content and not an id. **The one landed exception a task will trip over: `packages/agents/scripts/g9-livingworld.ts` and `g11-deepworld.ts` each still say "hut" inside a person's own words about their own home.** Both are declared, both are prose, and neither is renamed here.
 - **C31. A scope assertion written against `main...HEAD` is scaffolding, and scaffolding comes down when the chunk merges.** *`packages/gateway/src/g12c.test.ts` asserted "C12a is WEB + GATEWAY only" by diffing `main...HEAD`; C12a then merged, and the assertion began firing on every branch that touched engine, arbiter, agents or forge.* Sixth member of the family this project keeps finding: a guard that was true in one context and became false the moment the context changed. **Any chunk-scope guard C8 writes must carry a note naming the merge that retires it**, and C8 writes none it does not retire itself.
 - **C15. The sex guard.** `AgentSpawned.sex` is optional and `sexOf()` reads absent as `'f'` (ledger D-11-1), so a roster that forgets `sex` silently produces a town of five women, no conception, and no error anywhere. `FounderSchema` makes `sex` **required with no default** (T2) and the roster row (T4) plus the spawn row (T9) are the only other guards.
-- **C16. The walk-gate law is permanent** (delta §7). `countsAsFootfall` counts a step only when `activity.verb === 'walk'`. Any new source of `agent_moved` that is not a walk gets no ground wear by design; anything that gives G1's scripted agents an `activity` moves the G1 golden and is therefore forbidden outside Phase F.
+- **C16. The walk-gate law is permanent** (delta §7). `countsAsFootfall` counts a step only when `activity.verb === 'walk'`. Any new source of `agent_moved` that is not a walk gets no ground wear by design. *v5b's trailing clause — "anything that gives G1's scripted agents an `activity` moves the G1 golden and is therefore forbidden outside Phase F" — is struck: there is no G1 golden hash to move, and `golden.test.ts` now asserts the fold rather than a recorded value.*
 
 ### The laws learned since v2 — C17 to C24, and C25 to C31 above
 
 Each is one line and its reason. Every one was paid for by a real failure in this project, and every one is a check a task must actually run, not a sentiment.
 
-- **C17. A pin is verified by GREPPING THE HASH LITERAL and quoting `file:line` — never by diffing a path.** *A path-diff over a path that does not exist returns empty and reads as a clean pin.* `git diff main -- packages/some/wrong/path.ts` is silent when the path is wrong, when the file moved, and when the pin is broken; the three cases are indistinguishable. The verification is `grep -rn "<literal>" --include='*.ts' packages/` and the evidence is the matched line with its number. C3's table is written that way and every re-pin in Phase F reproduces it.
+- **C17. ★ STRUCK. A pin is verified by GREPPING THE HASH LITERAL.** *No pins, nothing to grep, nothing to verify.* **The law it replaces, and which still binds, is C17′:** *a check whose subject may not exist must fail loudly when it does not.* `git diff main -- some/wrong/path.ts` was silent when the path was wrong, when the file moved, and when the thing was broken, and the three cases were indistinguishable — **that shape is the defect, and it outlives the hashes.** Any task in this plan whose check could pass against a missing subject says so and asserts the subject's presence first: **T19 Step 2** (`groundForBuilding` must be reachable or STOP), **T22 Step 1c** (`siteUnderConstruction` throws rather than returning a plausible world), **T44** (an absent art root is silence and a half-written cell throws). **A green that never ran is the only thing C17 was ever really about.**
 - **C18. Never re-run a red suite before saving its output.** *Two separate agents destroyed the identity of a failing test this way, and we still cannot say whether it was one flake or two.* Any red run is captured first — `pnpm vitest run <files> 2>&1 | tee /tmp/<label>.txt` — and the file is quoted in the report before a second run is started. A re-run is a new observation, never a replacement for the one it overwrote.
 - **C19. A merge is proven by BYTE IDENTITY **plus** a green suite on the merged tree.** *Merge train 4 found two files, each byte-identical to its sole parent, that broke when composed.* Byte identity proves nothing was lost; it does not prove the pieces agree. Both halves, or the merge is unproven.
 - **C20. Mechanical gates are necessary and never sufficient — the user's eye is the only art gate.** *Standing exhibit: `farmland_0` self-tiles into rows of cottages instead of ploughed soil and passes every gate we have.* No task in this plan may report an art result as accepted on a gate score alone; it reports the score **and** says the art is unreviewed until a human has looked at it.
@@ -303,7 +280,7 @@ Each is one line and its reason. Every one was paid for by a real failure in thi
 > | Precondition | v4 state | **v5 state at `main` = `645a8d9`** |
 > |---|---|---|
 > | **1. Merge train 4 must land** (R7) | discharged | **★ STILL DISCHARGED, and the whole 2026-08-23/24 sprint has landed on top of it** — trains 1, 2 and 3, fourteen lanes, 311 files / 4637 tests / tsc 0, fresh-checkout verified. |
-> | **2. Re-read all four pins from the merged tip** (R7) | discharged at `cd845bc` | **★ RE-DISCHARGED at `645a8d9`, AND TWO OF THEM MOVED.** C3 carries all four with **eleven literals across seven files**, grepped, each with its `file:line`, plus the one prefix inside a test name and the one decoy that is not a copy. |
+> | **2. Re-read all four pins from the merged tip** (R7) | discharged at `cd845bc` | **★ RETIRED, NOT DISCHARGED. THERE ARE NO PINS.** The `unpin` lane deleted all four and the census that maintained them; `git grep -cE "[0-9a-f]{64}" -- 'packages/**/*.ts'` returns **zero** at `9d76b97`. C4 carries what each pin was protecting and what asserts it now. |
 > | **3. the `house` rename must have landed** | OPEN | **★ DISCHARGED.** The lane merged. Task 1 Step 0's grep becomes a regression guard whose answer is zero (C30). |
 > | **4. the two frozen content drafts must be re-authored** | **OPEN, the largest one** | **★ DISCHARGED. OD16 IS CLOSED.** Both live at `docs/superpowers/content/`, re-authored against the contemporary canon, checked by a script whose output is in their `README.md`. **v4's own period grep returns nothing on either file** — run against the landed text, not assumed. Task 1 Step 2's gate is kept and now passes. |
 > | **5. ★ NEW — the `first-night` lane must land, or its outcome must be ruled** | — | **OPEN, and it is the only one left.** It is fixing a cast that collapses in the street on night one, a dev world with no mason, and two lying counters — and **it is the one lane authorised to move G1.** Nine tasks in this plan are contingent on it. **See the contingency box at the end of this document; it names them and does not guess the answer.** |
@@ -328,12 +305,12 @@ Each is one line and its reason. Every one was paid for by a real failure in thi
 # (a) ★ v5 — the 2026-08-23/24 sprint has landed and this worktree descends from it
 git merge-base --is-ancestor 645a8d9 HEAD && echo "TIP ANCESTOR OK"
 git log --oneline -1
-# (b) the four pins, grepped as literals, never diffed as a path (C17) — and every copy of each
-grep -rn "GOLDEN_DAY_HASH = \|GOLDEN_G2_HASH = \|BLOCK1_SHA256 = " --include='*.ts' packages/
-grep -rnE "'[0-9a-f]{64}'" --include='*.ts' packages/forge/src/forgeConfig.test.ts
-# ★ v5 — the CURRENT four prefixes. Twelve lines: eleven literals across seven files, plus one
-# prefix inside a test name at arbiter/src/g4.test.ts. See C3 for the census and the decoy.
-grep -rn "f487a26b\|00d72434\|da065752\|4205d892" --include='*.ts' packages/ | tee /tmp/c8-pins.txt | wc -l
+# (b) ★ v6 — THE INVERSE OF v5b's CENSUS. There are no pins, and the check is that there are
+# still none: a lane that reintroduces one has reintroduced the maintenance the user cut.
+git grep -cE "[0-9a-f]{64}" -- 'packages/**/*.ts' || echo "NO HASH LITERALS — CORRECT"
+git grep -n "GOLDEN_DAY_HASH\|GOLDEN_G2_HASH\|BLOCK1_SHA256" -- packages/ || echo "NO PIN CONSTANTS — CORRECT"
+# and the two replacements the unpin lane left, which ARE the guard now
+grep -n "folding to a mid-log tick" packages/engine/src/golden.test.ts
 # (c) the house rename landed long ago; this is now a REGRESSION GUARD (C30)
 grep -rn "sleepableKinds" packages/shared/src/config.ts
 grep -rln "hut" packages/*/src | grep -vi shut || echo "NO hut IN src — RENAME HOLDING"
@@ -349,7 +326,7 @@ grep -n "makeablesLine(" packages/agents/src/runtime/agentRuntime.ts
 Expected, in order:
 
 1. `TIP ANCESTOR OK`.
-2. The four literals, and the copy grep prints **12**. **They must match C3's table OR carry a landed regen from a lane that merged after this draft** — record the four values you actually read into the ledger before anything else; that record is the "from" side of T28's and T29's re-pins. **A `GOLDEN_G2_HASH` of `6f2529fb…` means this worktree was cut from `c12a-work`; a `c1c51b42…` means it predates the town-generator lane; a forge pin of `a90bd747…` or `02f295ad…` means it predates `world-growth`; a `BLOCK1` of `28c1fce0…` means it predates `claim-seam`. Any of the four: STOP and report.** A count other than 12 means a lane added or removed a copy — **do not proceed on a count you have not accounted for**, because a missed copy is a stale hash that nothing runs (C17).
+2. **Both greps return nothing, and the mid-log fold row is present.** `git grep -cE "[0-9a-f]{64}"` over `packages/**/*.ts` returned **zero** at `9d76b97`, measured. **If a 64-hex literal has come back, STOP and name the file** — it is a lane re-pinning something, and the user's ruling is that the only gate we need is that the project works. **If the mid-log fold row is missing, STOP**: it is the one replacement guard that bit under mutation, and C4 says why.
 3. `sleepableKinds` defaults to `['house']` and the `hut` grep prints `NO hut IN src`. **If an `id` or a kind is `hut`, STOP** — but note that `packages/agents/scripts/` is outside this grep and legitimately carries `hut` inside two personas' own words about their own homes; that is content, it is declared in C30, and it is not renamed here.
 4. `canon.ts` names the generator, `machine_repair` and the `arrangement` era.
 5. **`PlottedBuildParams` exists.** If `BuildParams` is the only shape and it carries `x` and `y`, **STOP: this worktree predates the claim seam and Phase D is written for a world that does not exist here.**
@@ -732,7 +709,7 @@ Four transcriptions under Task 3's law, and then the invariants the whole town d
 
 **★ EVERY ONE OF THE FOUR CARRIES TASK 3'S PERIOD ROW TOO (C29), WRITTEN OUT PER FILE.** The same `preIndustrial` regex, the same four assertions over `backstory`, `secret`, `exampleLines`, `values` and `beliefs`. **Do not extract it into a shared helper** — the reason is the one already stated for the rest of these tests, and it applies with more force here: a single helper edited once would defang the setting gate on all five founders at the same moment, which is exactly the failure this revision exists to prevent.
 
-**Two values in the table are period-checked and kept, and the check is recorded so nobody re-litigates it.** `omar.smithing` is a landed `DEFAULT_CONFIG.skills.tracks` member and the signed draft glosses it as *"a tinkerer's feel for tools, fittings, and contraptions; no forge-craft yet"* — which is a modern rural tinkerer and agrees with the canon's *"keep their own machinery in repair"*. `salma.brewing` is likewise a landed track and period-neutral. **Neither track may be renamed here: `skills.tracks` lives in `SimConfigSchema` and renaming one would move the forge pin outside Phase F** (C3).
+**Two values in the table are period-checked and kept, and the check is recorded so nobody re-litigates it.** `omar.smithing` is a landed `DEFAULT_CONFIG.skills.tracks` member and the signed draft glosses it as *"a tinkerer's feel for tools, fittings, and contraptions; no forge-craft yet"* — which is a modern rural tinkerer and agrees with the canon's *"keep their own machinery in repair"*. `salma.brewing` is likewise a landed track and period-neutral. **Neither track may be renamed here: `skills.tracks` lives in `SimConfigSchema`, so a rename changes the config every recorded run replays against, for a cosmetic reason** (C4).
 
 - [ ] **Step 1: Write the failing roster test.**
 
@@ -1143,7 +1120,7 @@ git commit -m "feat(agents): a child is not an average — heritability ~0.85 wi
 
 **Files:** Create `packages/agents/src/genome/neutral.ts`, `packages/agents/src/genome/neutral.test.ts`; Modify `packages/agents/src/prompt/assemble.ts`, `packages/agents/src/prompt/assemble.test.ts`.
 
-**This is free of every pin, and the reason is exact.** `BLOCK1_SHA256` covers `RULES_OF_BEING + CAPABILITIES + SPEECH_RULES` only (`rulesOfBeing.test.ts:123`). `renderIdentity` and `renderPersonality` live in `assemble.ts`, outside that pin. Making their fields optional-absent costs one sha256 of nothing.
+**This touches nothing block 1 is made of, and the reason is exact.** Block 1 is `RULES_OF_BEING + CAPABILITIES + SPEECH_RULES`. `renderIdentity` and `renderPersonality` live in `assemble.ts`, **outside** it. Making their fields optional-absent cannot change a byte of the cached prefix — which is the property the deleted `BLOCK1_SHA256` was standing for and which the row below asserts directly.
 
 **What "neutral" means, block by block.** Block 1 is unchanged — it is a world, not a person. Block 2 becomes **name and age only**. Block 3 becomes `values: []`, `beliefs: []`, `mood: 'newly awake'`, `worries: []`, `goals: []`. The autobiography and the scene ledgers are unchanged, because they are already the formation machinery and have never been given an empty start to grow from.
 
@@ -1240,9 +1217,19 @@ describe('the neutral arm', () => {
     expect(system).toContain('You usually say about 14 words at a time; when truly moved, up to 40.')
   })
 
-  it('DOES NOT MOVE BLOCK 1 — the pin covers rules+capabilities+speech only', async () => {
-    const { BLOCK1_SHA256, block1Sha256 } = await import('../prompt/rulesOfBeing.js')
-    expect(block1Sha256()).toBe(BLOCK1_SHA256)
+  // ★ v6: v5b asserted `block1Sha256() === BLOCK1_SHA256` here. Both symbols were deleted by
+  // the `unpin` lane, so that row is `Cannot find module`-adjacent — it imports two names that
+  // no longer exist. The invariant it stood for is that block 1 is the CACHE-STABLE PREFIX, and
+  // the hash-free assertion the lane left in `rulesOfBeing.test.ts` is the one to mirror: two
+  // unlike identities open with the same block 1. That is what this task must not break.
+  it('LEAVES BLOCK 1 THE SAME CACHE-STABLE PREFIX FOR TWO UNLIKE PEOPLE', () => {
+    const other = neutralIdentity({ name: 'Yusuf', age: 52, genome: genomeOf('s', 'yusuf') })
+    const a = assemblePrompt(blocksFor(id)).system
+    const b = assemblePrompt(blocksFor(other)).system
+    expect(a.startsWith(RULES_OF_BEING)).toBe(true)
+    expect(b.startsWith(RULES_OF_BEING)).toBe(true)
+    const prefix = (s: string) => s.slice(0, s.indexOf('Name: '))
+    expect(prefix(a)).toBe(prefix(b))
   })
 })
 ```
@@ -1559,10 +1546,10 @@ Expected: FAIL with `Cannot find module './founders.js'`.
 
 - [ ] **Step 3: Implement.** Derive each house from `state.structures` by `kind === 'house' && owner === id`; throw `new Error(\`spawnFounders: ${id} has no house in the template\`)` when there is none — a silent fallback would hide a template edit, and the layout lane has already made one. **Throw the same way on a null door**: `new Error(\`spawnFounders: ${id}'s house has no doorstep\`)`. Iterate `Object.keys(state.structures).sort()` rather than `Object.values`, so the spawn order is a declared order and not an insertion order (C4 rule (a)).
 
-- [ ] **Step 4: Green, and both goldens unmoved.**
+- [ ] **Step 4: Green.**
 
 Run: `pnpm vitest run packages/engine/ && pnpm typecheck`
-Expected: PASS; `golden.test.ts` reports `f487a26b…` and `g2.test.ts` reports `00d72434…`. Neither golden calls `makeGenesisWorld`.
+Expected: PASS. *(v5b required `golden.test.ts` and `g2.test.ts` to report two hashes here. There are no hashes; `pnpm vitest run packages/engine/` runs both files and that is the whole check.)*
 
 - [ ] **Step 5: Commit.**
 
@@ -1734,10 +1721,10 @@ for (const [i, founder] of FOUNDER_IDS.entries()) {
 
 `skillBonus` is carried out of `dealEndowment` and applied by `spawnFounders` (T9) as extra `skill_gained` XP; add the row to `founders.test.ts` asserting a bonus track lands.
 
-- [ ] **Step 4: Green, and the pins unmoved.**
+- [ ] **Step 4: Green.**
 
-Run: `pnpm vitest run packages/engine/ && pnpm typecheck`
-Expected: PASS; G1 `f487a26b…`, G2 `00d72434…`, forge `da065752…` all reported unmoved (neither golden nor the forge pin calls `makeGenesisWorld`).
+Run: `pnpm vitest run packages/engine/ packages/forge/ && pnpm typecheck`
+Expected: PASS.
 
 - [ ] **Step 5: Commit.**
 
@@ -1854,10 +1841,10 @@ Expected: FAIL — no `standing_stone`, and 15 loaves against a required 42.
 
 **Deliberately not done here:** no `spoilage.preservingKinds` edit to add `'wagon'`. That is a `SimConfigSchema` change; it belongs to the Phase F bundle or to a live law flip, and it is Open Decision 5. **★ v4 notes that the wagon is gone from the town anyway** — the layout lane dropped it along with the two sheds to pay for the cottage, the cabin and the farmhouse — so OD5 is now about a structure kind that stands nowhere. It is left open rather than closed because `GENESIS_STRUCTURE_DEFS` still knows what a wagon is made of and a later template may stand one again.
 
-- [ ] **Step 4: Green, pins unmoved.**
+- [ ] **Step 4: Green.**
 
 Run: `pnpm vitest run packages/engine/ && pnpm typecheck`
-Expected: PASS; state G1 `f487a26b…` and G2 `00d72434…` unmoved in the commit body.
+Expected: PASS.
 
 - [ ] **Step 5: Commit.**
 
@@ -2393,7 +2380,7 @@ export function codexEntriesFromTree(tree: readonly DiscoveryNode[] = DISCOVERY_
 >
 > **So Step 3 begins with a pure move, and it is the smallest one that works.** `ERAS`, `ERA_ORDER`, `Era`, `CANON` and `GENESIS_CODEX` move from `packages/arbiter/src/canon.ts` to **`packages/shared/src/canon.ts`**, and `arbiter/src/canon.ts` becomes `export * from '@sj/shared/canon.js'`. `@sj/shared` is where `interiorMeta`, `cityTemplate` and `chronicle` already live **for this exact reason**, and both packages already depend on it.
 >
-> **It is behaviour-free and it must be proved so, not asserted.** Nothing is renamed, no byte of `CANON` changes, and the four existing consumers — `arbiter/src/setting.test.ts`, `arbiter/src/codex.ts`, `agents/scripts/g9-livingworld.ts:20`, `agents/scripts/g11-deepworld.ts:27` — compile untouched through the re-export. **`CANON` is a string the arbiter's prompts embed, so a stray whitespace edit here is a live-behaviour change wearing a refactor's clothes:** the move commit asserts `createHash('sha256').update(CANON).digest('hex')` is the same before and after, and quotes both in the body. **`BLOCK1_SHA256` cannot move** — the setting lane's R0 recorded that the canon never reaches a mind's system prompt at all, only the arbiter's — but run `rulesOfBeing.test.ts` and say so anyway (C3).
+> **It is behaviour-free and it must be proved so, not asserted.** Nothing is renamed, no byte of `CANON` changes, and the four existing consumers — `arbiter/src/setting.test.ts`, `arbiter/src/codex.ts`, `agents/scripts/g9-livingworld.ts:20`, `agents/scripts/g11-deepworld.ts:27` — compile untouched through the re-export. **`CANON` is a string the arbiter's prompts embed, so a stray whitespace edit here is a live-behaviour change wearing a refactor's clothes:** the move commit asserts `createHash('sha256').update(CANON).digest('hex')` is the same before and after, and quotes both in the body. **Block 1 cannot move** — the setting lane's R0 recorded that the canon never reaches a mind's system prompt at all, only the arbiter's — and `rulesOfBeing.test.ts` runs anyway. **The `CANON` sha256 here is a MOVE PROOF and not a pin**: it is computed on both sides of one commit and thrown away, never written into a file, which is the distinction the `unpin` lane's whole report turns on.
 >
 > **Do the move as its own commit, before the seed.** A cross-package move and a new module in one commit is two things to bisect.
 
@@ -2407,8 +2394,7 @@ Then the seed itself: the engine gains **no** dependency on `@sj/arbiter`. Asser
 git add packages/shared/src/canon.ts packages/arbiter/src/canon.ts packages/shared/src/index.ts
 git commit -m "refactor(shared): the canon moves to shared so the engine may read it without a cycle (C12)
 
-CANON sha256 <before> -> <after>   (MUST BE IDENTICAL)
-BLOCK1_SHA256 4205d892... UNMOVED  (the canon never reaches a mind's prompt)"
+CANON sha256 <before> -> <after>   (MUST BE IDENTICAL — this one is a MOVE PROOF, not a pin)"
 
 git add packages/engine/src/discovery/ packages/engine/src/index.ts
 git commit -m "feat(engine): the discovery tree becomes the codex the arbiter rules by"
@@ -3043,10 +3029,10 @@ Expected: FAIL — no `wantLine.js`, and the body still leads.
 
 - [ ] **Step 3: Implement.** Magnitude is normalised per source into `[0,100]` so they compare: tedium is its own value; attachment is `max(closeness × daysSilent / 4)`; obligation is `100 × weightOf(genome,'wariness') / 1.6` for the oldest open one inside its window; recognition is `10 × unwitnessedStreak × weightOf(genome,'pride') / 1.6`. Wire it through `agentRuntime`'s existing `ProseWorld` object — the same seam `nearestWater` already uses — so `prose.ts` gains three optional hooks and no dependency on the drives package.
 
-- [ ] **Step 4: Green, and block 1 unmoved.**
+- [ ] **Step 4: Green.**
 
 Run: `pnpm vitest run packages/agents/ && pnpm typecheck`
-Expected: PASS, and `rulesOfBeing.test.ts`'s `BLOCK1_SHA256` row still green — **block 6 is regenerated every turn and is outside the pin** (batch-11 D1 precedent).
+Expected: PASS, and `rulesOfBeing.test.ts` still green — **block 6 is regenerated every turn and is not part of the cached prefix at all** (batch-11 D1 precedent).
 
 - [ ] **Step 5: Commit.**
 
@@ -3509,13 +3495,14 @@ describe('★ OD22 — a second pair of hands joins the walls rather than starti
     expect(buildSiteOf(s, CFG, 'c', { kind: 'house' }).resume).toBeNull()
   })
 
-  it('THE GOLDENS DO NOT MOVE — this changes site resolution, never a fold', () => {
-    expect(stateHash(replayFromGenesis(goldenStore(), CFG))).toBe(GOLDEN_DAY_HASH)
+  it('THE FOLD IS UNTOUCHED — this changes site resolution, never a fold', () => {
+    const store = goldenStore()
+    expect(stateHash(replayFromGenesis(store))).toBe(stateHash(replayFromGenesis(store)))
   })
 })
 ```
 
-- [ ] **Step 0b:** `pnpm vitest run packages/engine/ && pnpm typecheck` — PASS, **and `golden.test.ts` and `g2.test.ts` run explicitly with their two hashes pasted into the commit body.** Site resolution is not folded; if either pin moves, **STOP**.
+- [ ] **Step 0b:** `pnpm vitest run packages/engine/ && pnpm typecheck` — PASS.
 
 ```bash
 git add packages/engine/src/verbs.ts packages/engine/src/buildSeam.test.ts
@@ -3602,10 +3589,10 @@ Expected: FAIL — no `progress` field, no `jointBuildLine`.
 
 - [ ] **Step 3: Implement.** The four progress bands are `< 0.2` / `< 0.45` / `< 0.75` / else, computed from `site.progressTicks / config.structures.recipes[kind].durationTicks`. **The home's duration is `2880`, and the arithmetic in this task's header depends on it** — read it, do not retype it. `perception.ts` is not folded and not hashed, so no golden moves — **verify it, do not assume it**.
 
-- [ ] **Step 4: Green, and the goldens unmoved.**
+- [ ] **Step 4: Green.**
 
 Run: `pnpm vitest run packages/engine/ packages/agents/ && pnpm typecheck`
-Expected: PASS; G1 `f487a26b…` and G2 `00d72434…` reported unmoved in the commit body.
+Expected: PASS.
 
 - [ ] **Step 5: Commit.**
 
@@ -3620,7 +3607,7 @@ git commit -m "feat: the world says a house is half-raised and that a second pai
 
 **Ruled PHYSICS, ship it.** A thing too heavy for one pair of hands is physics, not an institution — the institution would be deciding *who* must help, and we author none of that. The world never says what the building is **for**, and the town names it. `constructs.minParticipants` is read by the recognizer and **no structure or project requires anybody**; this is the first thing in the world that does.
 
-**Golden-safe by construction: NEW KINDS ONLY.** `SEED_STRUCTURES` mirrors the landed `SEED_RECIPES` precedent exactly and is read as `structureRecipeFor(config, kind) = config.structures.recipes[kind] ?? SEED_STRUCTURES[kind]`. The goldens build `house`, `well`, `bridge` and `grave`, none of which appear here, so **no pin moves — and `stateHash` is verified per change rather than assumed** (the R14 precedent).
+**Config-safe by construction: NEW KINDS ONLY.** `SEED_STRUCTURES` mirrors the landed `SEED_RECIPES` precedent exactly and is read as `structureRecipeFor(config, kind) = config.structures.recipes[kind] ?? SEED_STRUCTURES[kind]`. The landed buildable set is `house`, `well`, `bridge`, `grave` and nothing else, and no seed kind may collide with one — **asserted by this task's first row, which is the guard v5b expressed as three hashes**.
 
 **Interfaces — Produces:**
 
@@ -3657,7 +3644,7 @@ export function minHandsFor(config: SimConfig, kind: string): number
 >
 > **★ AND ONE CORRECTION TO FAULT 2's MECHANISM, WHICH DOES NOT MOVE THE RULING.** v5 said a seed kind with no art *"turns a green gate red on the commit that adds it."* **Executed: it does not.** `CREATABLE` in `structureArt.test.ts` is `worldStructureKinds({structures: TEMPLATE.structures, recipes: DEFAULT_CONFIG.structures.recipes, extra: DEV_TOWN_KINDS})`, and a `SEED_STRUCTURES` key is in **none of those three** — `worldStructureKinds({…}).includes('barn')` is `false`. **So `barn` and `pump_house` would have shipped a kind the world can create and cannot draw, silently, with every gate green.** That is worse than the red v5 predicted, and it is why the coverage row below is asserted **in this task's own test** rather than left to the forge's. The ruling stands on faults 1 and 3, which are unaffected, and on this one, which is stronger than stated.
 
-**Both are still NEW RECIPE ROWS and that is what keeps the pins still.** `storehouse` and `shed` are **template and fixture kinds, not `structures.recipes` keys** — verify with `grep -n "recipes:" -A 8 packages/shared/src/config.ts`, which shows the landed buildable set is `house`, `well`, `bridge`, `grave` and nothing else. **Run that grep rather than trusting this sentence.** Adding them to `SEED_STRUCTURES` (not to `DEFAULT_CONFIG`) makes them buildable **without touching the pinned hash at all**, which is the whole reason `SEED_STRUCTURES` exists — and because both already have art, the coverage gate stays green on the same commit.
+**Both are still NEW RECIPE ROWS, and that is what keeps them out of the config the forge hashes for its identity.** `storehouse` and `shed` are **template and fixture kinds, not `structures.recipes` keys** — verify with `grep -n "recipes:" -A 8 packages/shared/src/config.ts`, which shows the landed buildable set is `house`, `well`, `bridge`, `grave` and nothing else. **Run that grep rather than trusting this sentence.** Adding them to `SEED_STRUCTURES` (not to `DEFAULT_CONFIG`) makes them buildable **without touching `DEFAULT_CONFIG` at all**, which is the whole reason `SEED_STRUCTURES` exists — and because both already have art, the coverage gate stays green on the same commit.
 
 **The rule:** with fewer than `minHands` bodies *simultaneously building the same site*, the site makes **no progress at all** — not slow progress. And the refusal teaches: *"The beam will not go up with two."*
 
@@ -3905,10 +3892,10 @@ Expected: FAIL — `Cannot find module './seedStructures.js'`.
 
 **★ v5 — WHERE THE HAND CHECK GOES, AND IT IS AFTER THE SHAPE AND BEFORE THE SITE.** The order inside `build.validate` is now: **(1)** `buildIsPlotted` chooses the params shape and `safeParse` refuses an extra key; **(2)** the hand count; **(3)** `buildSiteOf`, which claims the plot. **The hand check must sit at (2) and not at (3)**, because a refusal that fires after the claim would have already reserved ground for a beam nobody can lift — and `claimInWorld` reads *"free"* off what stands, so the reservation would not even be visible to unwind. Two hands short is a fact about the bodies present, not about the ground, and it is answered before any ground is asked for.
 
-- [ ] **Step 4: Green, pins verified unmoved, AND THE ART GATE STILL GREEN.**
+- [ ] **Step 4: Green, AND THE ART GATE STILL GREEN.**
 
 Run: `pnpm vitest run packages/engine/ && pnpm typecheck`
-Expected: PASS; **run `golden.test.ts`, `g2.test.ts` and `forgeConfig.test.ts` explicitly and paste their three hashes into the commit body.** If any moved, **STOP** — a seed row leaked into a kind the goldens exercise.
+Expected: PASS. *(v5b pasted three hashes into the commit body here. The invariant they stood for — **a seed row must not leak into a kind `DEFAULT_CONFIG.structures.recipes` already names** — is asserted directly by this task's first row, `DEFAULT_CONFIG.structures.recipes[kind]` is `undefined` for every seed kind. That row is the guard; the hashes were a proxy for it.)*
 
 **★ v5 — AND RUN THE ART COVERAGE GATE IN THE SAME BREATH, BECAUSE THIS IS THE TASK THAT CAN RED IT:**
 
@@ -4175,7 +4162,7 @@ The arithmetic, read off `packages/shared/src/config.ts` at the merged tip:
 
 **So the town already gets 24 sim-hours to answer a starving neighbour, and is only told about it for the last 2.4 hours before the clock even starts.** The rescue window is not too short. **The call is.** And it is worse than the numbers suggest, because `conditionProse` returns **one phrase, worst thing first**, and a wound outranks an empty belly — which is exactly how all three who starved read as *"badly hurt"*.
 
-**Therefore this task adds NO `SimConfig` key and moves NO pin** (C3). It adds a second, independent perception field that a wound cannot eat, escalating over ~31 sim-hours instead of 2.4, plus the pure function that says how long this body has been calling and whether anybody came.
+**Therefore this task adds NO `SimConfig` key** (C4 — the world stays replayable, and adding a key is the one edit that changes every recorded world at once). It adds a second, independent perception field that a wound cannot eat, escalating over ~31 sim-hours instead of 2.4, plus the pure function that says how long this body has been calling and whether anybody came.
 
 **Interfaces — Consumes:** `conditionProse` (T23, already reordered so hunger outranks a wound *inside* that phrase), `PerceivedAgent` (landed), `AgentBody.zeroHungerSinceTick`, `AgentBody.coldTicksSinceRecovery`, `AgentBody.tendedTick`, `thirstOf` (all landed).
 
@@ -4473,15 +4460,15 @@ and the same field on the packet's own `self`, so a mind hears its own body befo
 
 In `packages/agents/src/prompt/prose.ts`, the neighbour sentence gains the distress clause **after** the condition clause, so both survive: *"Nadia is here, favouring a hurt, and going, and will not last the day."*
 
-- [ ] **Step 4: Green, AND the two goldens proved unmoved.**
+- [ ] **Step 4: Green.**
 
 ```bash
 pnpm vitest run packages/engine/src/rescue.test.ts packages/engine/src/perception.test.ts packages/agents/src/prompt/prose.test.ts
-pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts packages/forge/src/forgeConfig.test.ts
+pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts
 pnpm typecheck
 ```
 
-Expected: all PASS. **The three pin tests must still be green at `f487a26b…`, `00d72434…` and `da065752…`** — this task adds no state field, no config key and no RNG draw, so a moved pin means something else changed and is a STOP-and-report (C3).
+Expected: all PASS. *(v5b required three hash literals to be re-read here. The reason those files are still run is unchanged and is a real one: this task adds no state field, no config key and no RNG draw, so `golden.test.ts`'s **mid-log fold** row is the thing that would go red if it accidentally did — see C4.)*
 
 - [ ] **Step 5: Commit.**
 
@@ -4752,10 +4739,9 @@ In `prose.ts`, `givingLine` is emitted in **block 6 beside the production roads*
 
 ```bash
 pnpm vitest run packages/agents/src/runtime/ packages/agents/src/prompt/ && pnpm typecheck
-pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts
 ```
 
-Expected: PASS, pins unmoved — this task is agents-side and reads the engine without writing to it.
+Expected: PASS. This task is agents-side and reads the engine without writing to it, so it runs no engine file.
 
 - [ ] **Step 5: Commit.**
 
@@ -4976,10 +4962,9 @@ export function soughtOutLine(sought: { name: string; times: number } | null): s
 
 ```bash
 pnpm vitest run packages/agents/ && pnpm typecheck
-pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts packages/forge/src/forgeConfig.test.ts
 ```
 
-Expected: PASS. Pins unmoved.
+Expected: PASS.
 
 - [ ] **Step 5: Commit.**
 
@@ -5505,24 +5490,44 @@ git commit -m "feat(agents): two runs become an experiment — a manifest, and D
 
 ---
 
-## Phase F — The keystone: the one re-pin C8 is allowed
+## Phase F — Two independent changes: a required action, and four physics numbers
 
-> **This is the only phase in this plan that may move a pin, and it moves all four in two commits.** A level-3 change moves both goldens anyway, so bundling costs exactly what one costs. Nothing is added to the bundle after Phase F begins; anything discovered later becomes a live law flip or v1.x.
+> ### ★★ v6 — PHASE F IS NO LONGER A KEYSTONE. IT IS AN ORDINARY PHASE, AND THAT IS THE LARGEST STRUCTURAL CHANGE IN THIS REVISION.
+>
+> **v5b's header read: *"This is the only phase in this plan that may move a pin, and it moves all four in two commits."*** That sentence was the load-bearing beam of the whole document. It forced four unrelated physics changes and one prompt amendment into **two commits in one phase**, and it hung a *"must not move a pin"* side condition on **every other task in the plan**.
+>
+> **The `unpin` lane deleted all four pins.** With no pin to move, the bundle has no reason to be a bundle:
+>
+> | v5b | v6 |
+> |---|---|
+> | T28 and T29 are two commits in one keystone phase, ordered by the regen | **T28 and T29 are independent and may run in either order, in parallel, in separate lanes** |
+> | Every task outside Phase F carries a "must not move a pin" side condition | **No task carries one.** A task's verification is its own tests and `typecheck` |
+> | T29's four physics changes are bundled because a level-3 change moves both goldens anyway | **T29's four changes are bundled only because they are four lines of the same file.** Splitting them is now legal and cheap — see the wave table |
+> | Phases F2 and F3 "are AFTER the keystone and therefore add no `SimConfig` key" | **Phases F2 and F3 may run beside Phase F.** The one key F2 needs (`aging.elderWorkSlowdown`) still lands in T29 — not because a keystone forbids a second one, but because **one file, one editor** is a merge rule and this plan has four lanes in `packages/` |
+>
+> **What survives, and it is the honest half:** a `SimConfig` schema edit changes the config **every recorded run replays against**, so it is still the most expensive kind of change in this codebase and it is still done deliberately and in one place (C4). What is gone is the *ceremony* — the census, the attribution table, the nine re-pin sites, the commit-body hash rows and the grep read-back. **≈66 lines of this phase were ceremony and are deleted.**
 
-### Task 28: `action` becomes REQUIRED with an explicit `{verb:'wait'}` — and block 1 is amended once
+### Task 28: `action` becomes REQUIRED with an explicit `{verb:'wait'}`, and block 1 gains two sentences
 
 **Files:** Modify `packages/agents/src/turn.ts`, `turn.test.ts`, `packages/agents/src/prompt/rulesOfBeing.ts`, `rulesOfBeing.test.ts`, `packages/agents/src/runtime/agentRuntime.ts`, `packages/engine/src/verbs.ts` (the `wait` verb), `verbs.test.ts`, `packages/agents/src/live/providerPreflight.ts`.
 
-**Two changes, one commit, one re-pin.**
+> **★ v6 — WHAT THIS TASK LOST, AND WHY WHAT IS LEFT READS AS A WHOLE TASK.** v5b's title ended *"and block 1 is amended once"*, and the word doing the work was **once**: block 1 was pinned by `BLOCK1_SHA256`, so an amendment cost a re-pin and the whole design fought to spend it exactly one time. **The pin is gone.** What is left is not a diminished task — it is the same two changes with the accounting removed, and the reason to make them was never the pin:
+>
+> - **`action` becomes required** because *doing nothing should be a choice a mind makes rather than a field it omits*, and because a provider that emits required-properties-only killed a whole gate. Neither reason was ever about a hash.
+> - **Block 1 gains two sentences** because the world's kinds and recipes are spoken to nobody in the cached prefix, and because nothing tells a mind it may do a thing simply because it wants to.
+>
+> **What genuinely changes: `CAPABILITIES` is no longer a scarce resource.** The *"do not amend block 1 for anything else, ever"* rule survives, and its reason is now the honest one — **block 1 is the cache-stable prefix, and a prefix that changes stops being cached** (T37 measures a 46.4% cache-read share and T41 gates on ≥40%). **That is a cost measured in dollars per run, which is a better reason than a hash was.** The rule stands; it is enforced by the cost gate rather than by ceremony.
+
+**Two changes, one commit.**
 
 **(a) `action` becomes REQUIRED with an explicit idle member.** The justification goes well beyond provider portability: **it makes doing nothing a choice a mind makes rather than a field it omits**, which is the right model for minds that are supposed to have agency. It also removes the failure that killed a whole gate — DeepInfra's structured-output path returns *required properties only*, so ~400 turns came back with `thought` and `importance` and nothing else, the town took 4 acts in four sim-days, and all five founders died. Every provider emits a required field.
 
-**(b) The one block-1 amendment worth its re-pin**, bundling two things and nothing else:
+**(b) The block-1 amendment**, two sentences and nothing else:
 
 1. **The makeable vocabulary.** `build` asks for a `kind` and `craft` for a `recipe`, and the world's kinds and recipes are spoken to nobody in the cached prefix. Batch 11's own caveat is the reason this cannot live only in block 6: a volatile-block capability is weighted differently by the model than a cached-prefix one.
 2. **One sentence permitting acts done for their own sake.** The expressive path *works* — `express:hum` was coined for Salma and reused by Amara at zero arbiter cost — and nothing tells a mind it may simply do a thing because it wants to. One sentence unlocks the only culture verb the world has.
 
-**Do not amend block 1 for anything else. Ever.** Every other prompt change belongs in block 6.
+**Do not amend block 1 for anything else. Ever** — not because a pin forbids it, but because **block 1 is the cached prefix and every byte that changes there is paid for on every call for the rest of the run** (T37, T41). Every other prompt change belongs in block 6, which is regenerated every turn and costs nothing to change.
 
 **Interfaces — Produces:**
 
@@ -5531,7 +5536,6 @@ export const WAIT_INTENT = { verb: 'wait', params: {} } as const
 export const TurnSchema: z.ZodType<Turn>          // `action` loses `.nullish()`, keeps the union, gains `wait`
 export type Turn = { thought: string; action: Intent | { freeform: string }; importance: number
   speech?: string | null; plan?: Intent[] | null; journal?: string | null; reconsider_at?: ReconsiderAt | null }
-export const BLOCK1_SHA256: string                // RE-PINNED IN THIS COMMIT
 // engine:
 VERBS.wait: VerbDef                                // duration 1 tick, always valid, emits nothing but the activity
 ```
@@ -5569,8 +5573,16 @@ describe('doing nothing is a choice a mind makes', () => {
 
 ```ts
 // packages/agents/src/prompt/rulesOfBeing.test.ts — modified
-it('THE BLOCK 1 PIN MOVES EXACTLY ONCE, HERE, AND IS RE-PINNED IN THIS COMMIT', () => {
-  expect(block1Sha256()).toBe(BLOCK1_SHA256)
+// ★ v6: v5b's first row here was `expect(block1Sha256()).toBe(BLOCK1_SHA256)`. Both symbols
+// were deleted by the `unpin` lane. What block 1 IS — the cache-stable prefix, identical for
+// every mind — is asserted hash-free by the row the lane left in this file, and this task must
+// not break it. Restated here because this is the one task in the plan that edits block 1.
+it('★ IS STILL THE SAME PREFIX FOR TWO UNLIKE PEOPLE — the property the hash stood for', () => {
+  const a = assemblePrompt(blocksFor(amaraIdentity())).system
+  const b = assemblePrompt(blocksFor(yusufIdentity())).system
+  const prefix = (s: string) => s.slice(0, s.indexOf('Name: '))
+  expect(prefix(a)).toBe(prefix(b))
+  expect(prefix(a)).toContain(CAPABILITIES)
 })
 
 it('names what hands can raise and shape, in the cached prefix where the model weighs it', () => {
@@ -5606,31 +5618,36 @@ it('IS IN THE TIER-1 REGISTRY, both ways', () => {
 Run: `pnpm vitest run packages/agents/src/turn.test.ts packages/agents/src/prompt/rulesOfBeing.test.ts packages/engine/src/verbs.test.ts`
 Expected: FAIL — `action` is optional, `CAPABILITIES` says neither sentence, `wait` is not a verb.
 
-- [ ] **Step 3: Implement.** Drop `.nullish()` from `action` only — **the other four optional fields keep it**, because C11 batch 14 fix 2 proved a provider writes `null` for a field it has nothing to put in and a strict optional throws away a whole turn carrying real speech. Add `wait` to `VERBS` and to `TIER1`. Add the two sentences to `CAPABILITIES` and **re-pin `BLOCK1_SHA256` in the same commit**, with the old and new values in the body. Update `scorePreflight` so the pre-flight's `action` bar reads the now-required field. Update `classifyVerb` so `wait` lands in `other`, not `survival`.
+- [ ] **Step 3: Implement.** Drop `.nullish()` from `action` only — **the other four optional fields keep it**, because C11 batch 14 fix 2 proved a provider writes `null` for a field it has nothing to put in and a strict optional throws away a whole turn carrying real speech. Add `wait` to `VERBS` and to `TIER1`. Add the two sentences to `CAPABILITIES`. Update `scorePreflight` so the pre-flight's `action` bar reads the now-required field. Update `classifyVerb` so `wait` lands in `other`, not `survival`.
 
-- [ ] **Step 4: Green, and the pin move is deliberate and stated.**
+- [ ] **Step 4: Green.**
 
 Run: `pnpm vitest run packages/ && pnpm typecheck`
-Expected: PASS. `BLOCK1_SHA256` **moves from `4205d892…` to its new value**; G1, G2 and the forge pin are **unmoved** (block 1 is prompt text and folds nothing) — assert all three in the commit body.
+Expected: PASS, full suite. **Block 1 is prompt text and folds nothing**, so `packages/engine`'s replay tests are untouched — but the suite runs them anyway and a red in `golden.test.ts` here would mean this task reached the engine, which it must not.
 
 - [ ] **Step 5: Commit.**
 
 ```bash
 git add packages/agents/src packages/engine/src/verbs.ts packages/engine/src/verbs.test.ts
-git commit -m "feat: doing nothing becomes a choice — action is required, and block 1 is amended once
+git commit -m "feat: doing nothing becomes a choice — action is required, and block 1 gains two sentences
 
-BLOCK1_SHA256 4205d892c18a91de4c9c3a50f0122abaad0d6170488455419dc045bfc4d50065
-           -> <new value from rulesOfBeing.test.ts>
-G1    f487a26b… UNMOVED
-G2    00d72434… UNMOVED
-forge da065752… UNMOVED"
+Block 1 changed: the cached prefix moves once, and T37/T41 measure what that costs.
+Nothing in packages/engine was touched; the fold is unchanged."
 ```
 
-### Task 29: The bundled physics regen — the energy residue, the resentment, the crop, the years
+### Task 29: Four physics numbers — the energy residue, the resentment, the crop, the years
 
-**Files:** Modify `packages/shared/src/config.ts`, `packages/engine/src/systems/needs.ts`, `packages/engine/src/g11.test.ts`, `packages/engine/src/golden.test.ts`, `packages/engine/src/g2.test.ts`, `packages/engine/src/g9.test.ts`, `packages/arbiter/src/g4.test.ts`, `packages/gateway/src/g12c.test.ts`, `packages/forge/src/forgeConfig.test.ts`, and their sibling tests. *(★ v5 — `packages/agents/src/live/g11checkpoint.test.ts` is REMOVED from this list; see the re-pin box below. `packages/engine/src/g9.test.ts` is ADDED, because its two source-text assertions were never in v4's file list even though its box named them.)*
+**Files:** Modify `packages/shared/src/config.ts`, `packages/shared/src/config.test.ts`, `packages/engine/src/systems/needs.ts`, `packages/engine/src/systems/needs.test.ts`, `packages/engine/src/g11.test.ts`.
 
-**FOUR changes, one regen, three pins.** Two are level 3 (`config.ts` → the forge pin **and** both goldens) and two are level 2 (goldens only). Since a level-3 change moves both goldens anyway, doing all four together costs exactly what doing one costs — and that is the whole argument for bundling and for not spending the regen on anything else.
+> ### ★★ v6 — THIS TASK WAS A REGEN. IT IS NOW FOUR NUMBERS, AND ITS ORGANIZING PRINCIPLE IS GONE.
+>
+> **v5b's title was *"The bundled physics regen"* and its subject was the regen: nine re-pin sites across five packages, an attribution table pairing each change to the hash it moved, a grep read-back, a load-bearing `Previous value:` comment in another package's fixture, and a warning that `g9.test.ts` reads two other test files **as source text**. **All of it existed to maintain four hash literals, and the `unpin` lane deleted them.** ≈46 lines of this task were ceremony.
+>
+> **What survives is not a task with a hole in it. It is a smaller and plainer task**: four values move in `packages/shared/src/config.ts` and one function changes in `packages/engine/src/systems/needs.ts`, and the tests that judge them are **arithmetic assertions about the world**, which is what they always were. The attribution table is gone because there is nothing to attribute to. **Six of v5b's nine files leave this task's file list**, and they leave because they contained nothing but hashes.
+>
+> **★ AND ONE THING THE BUNDLE LOSES THAT IS WORTH SAYING OUT LOUD: THE FOUR CHANGES NO LONGER HAVE TO TRAVEL TOGETHER.** v5b bundled them because *"a level-3 change moves both goldens anyway, so doing all four together costs exactly what doing one costs."* **That argument is void.** They are bundled now for one weaker but real reason — **three of the four are lines in the same 40-line region of `config.ts`, and four lanes are live in `packages/`** — and a lane that wants to take one of them alone may, provided it takes the whole of it: the value, its test, and its arithmetic. **Change (2), resented company, touches a different file entirely (`systems/needs.ts`) and is the obvious one to split.** The wave table treats T29 as splittable and says so.
+
+**FOUR changes.** Three are one line each in `config.ts`; the fourth is a function in `needs.ts`.
 
 > ### ★ v4 STRUCK v3'S THIRD MEMBER, AND THE REASON IS THE SHARPEST FINDING IN THIS REVISION
 >
@@ -5646,15 +5663,17 @@ forge da065752… UNMOVED"
 >
 > **And the general lesson, which is why this is in a box and not a footnote:** v3 was written against `99693ff`, the tip *after* C11 merged, and still carried this member. **A bundle member is a claim about a value, and a claim about a value is re-read from the tip or it is not a claim** (C17, C3). The other three were re-read the same way and all three still hold: `energyDecayAwakePerTick` is `0.093` at `config.ts:5`, `crops.wheat.growthDays` is `8` at `config.ts:81`, and `aging` has no `elderWorkSlowdown` key at all (`config.ts:40-47`).
 
-> ### ★ v3 AMENDMENT: THIS IS ALSO LEVER 4, AND IT IS DELIBERATELY LAST
+> ### ★ THIS IS ALSO LEVER 4, AND IT IS DELIBERATELY LAST — AND THAT ORDER IS NOW THE ONLY THING FIXING T29's POSITION
 >
 > **The four levers, in the binding order, land like this:** legibility in Phase D (T19–T24), the rescue window in **T55**, giving in **T56** — **and softened decay here, after all three.** Softening first would have hidden the real faults under a gentler curve. Everything in this bundle is therefore a number moved **only after the world was made legible enough to prove the number was the problem.**
 >
-> **Global Constraint C25 binds this task: no harshness reduction ships without a social pull in the same change.** T57's five roads are that pull, and **they are already merged when this task runs**, so the pairing is satisfied by sequence rather than by a promise. Change (1) below is a harshness reduction; changes (2) and (4) are not; change (3) is content.
+> **Global Constraint C25 binds this task: no harshness reduction ships without a social pull in the same change.** T57's five roads are that pull, and **they must already be merged when this task runs**, so the pairing is satisfied by sequence rather than by a promise. Change (1) below is a harshness reduction; changes (2) and (4) are not; change (3) is content. **★ v6 — `T57 → T29` is therefore a REAL dependency and is the only edge holding T29 late in the plan.** It is in the critical path for that reason and for no other.
 >
-> ### ★ AND ONE MEMBER IS NEW IN v3, WHICH ENLARGES A BUNDLE RULING R6 RATIFIED AT FOUR
+> ### ★ THE FOURTH MEMBER, AND v6 CHANGES WHY IT IS HERE
 >
-> **(4) `aging.elderWorkSlowdown`, default `1.25`.** Phase F2 needs an elder to *feel* old, and the only elder effect that exists today is `elderEnergyDecayMultiplier: 1.2` — whose visible symptom is tiredness, which the world already speaks as *"grey with a tiredness sleep has not lifted"*. **Shipping aging with no felt slowing is exactly the "config dial" the user's directive forbids**, and Phase F2 is after the keystone and may not add a config key of its own (C3). So the key lands here or it does not land at all. It costs **nothing extra** — the regen is already being spent — which is this task's own argument for bundling, applied once more. **This enlargement is flagged for the controller as Open Decision 12**, with a recommendation to accept and a one-line consequence if it is struck.
+> **(4) `aging.elderWorkSlowdown`, default `1.25`.** Phase F2 needs an elder to *feel* old, and the only elder effect that exists today is `elderEnergyDecayMultiplier: 1.2` — whose visible symptom is tiredness, which the world already speaks as *"grey with a tiredness sleep has not lifted"*. **Shipping aging with no felt slowing is exactly the "config dial" the user's directive forbids.**
+>
+> **★ v6 — v5b's reason for putting it HERE was "Phase F2 is after the keystone and may not add a config key of its own (C3)". That reason is void.** T59 could add it directly. **It stays here anyway, for a smaller and honest reason: one file, one editor.** Four lanes are live in `packages/`, `config.ts` is the highest-contention file in the repository, and two tasks adding two keys to it in two lanes is a merge conflict for nothing. **If T29 and T59 run in the same lane, moving the key into T59 is legal and is a one-line change to both.** OD12's ruling (ACCEPTED) is unaffected either way.
 
 **(1) The energy residue — what R15 left behind.** At `energyDecayAwakePerTick` 0.093 a body awake for a 16-hour day ends on **10.72**, under `debuffThreshold` 30, so **every body spends its last ~3.2 hours in debuff, every single day.** R15 was the sleep half of this and it landed; this is the arithmetic that remains. `0.093 × 960 = 89.28`, leaving 10.72 of 100. Setting it to **0.072** ends the same day on **30.9** — one point clear of the debuff line, still leaving a 24-hour vigil at `1728 × 0.072 = 124.4` and therefore still lethal. **The body is not made safe; it is made able to finish its day standing up.**
 
@@ -5664,7 +5683,7 @@ forge da065752… UNMOVED"
 
 **(4) `aging.elderWorkSlowdown` — NEW at `1.25`.** An elder takes a quarter longer over work, applied through `elderTicksFor` in T59 and excluded from `walk`, which already has its own debuff path. Below 1.5 by test, because a slowing that stops an old body finishing anything is not ageing, it is an affliction — and the whole point of Phase F2 is that the two must never be confused.
 
-**Explicitly NOT in the bundle**, and each for a stated reason: **`warmth.insulation.garment`** — ★ v4, **already 12, landed by C11 Task 37b, and reopening it would undo a measured finding** (see the box above and OD17); `spoilage.preservingKinds` gaining `'wagon'` (Open Decision 5 — and the layout lane has since removed the wagon from the town, so it is a rule about a building that stands nowhere); per-pair social regen (low priority precisely because the scalar is inert); **a longer rescue window** — `deathAfterZeroHungerTicks` is already **1440 ticks, a full sim-day**, and T55 proved the window was never the problem, the *call* was, so lengthening it would soften a number that was not costing us anything; **any furniture or commission cap** — those live in the supervisor by design (T64), outside `SimConfig` and outside the state hash; **`structures.enterableKinds` / `privateKinds` / `sleepableKinds` and the `construction.house*` keys** — ★ v4, **the rename lane owns those and spends its own regen on them** (C30), and C8 touching one would be two lanes re-pinning the same hash; anything discovered after Phase F begins.
+**Explicitly NOT in this task**, and each for a stated reason: **`warmth.insulation.garment`** — ★ v4, **already 12, landed by C11 Task 37b, and reopening it would undo a measured finding** (see the box above and OD17); `spoilage.preservingKinds` gaining `'wagon'` (Open Decision 5 — and the layout lane has since removed the wagon from the town, so it is a rule about a building that stands nowhere); per-pair social regen (low priority precisely because the scalar is inert); **a longer rescue window** — `deathAfterZeroHungerTicks` is already **1440 ticks, a full sim-day**, and T55 proved the window was never the problem, the *call* was, so lengthening it would soften a number that was not costing us anything; **any furniture or commission cap** — those live in the supervisor by design (T64), outside `SimConfig` and therefore outside replay; **`structures.enterableKinds` / `privateKinds` / `sleepableKinds` and the `construction.house*` keys** — the rename lane landed those and C8 has no business in them (C30). **★ v6 — the last clause, *"anything discovered after Phase F begins"*, is struck: Phase F does not "begin" any more, it is a phase like every other, and a late discovery is scheduled by the wave table rather than refused by a keystone.**
 
 **★ AND ONE THING THAT LOOKS LIKE A NON-MEMBER AND IS NOT A DECISION AT ALL.** `skills.tracks` still carries `smithing` and `brewing`, and a reader who has just read the canon's *"no yard that pours metal"* will reach for this bundle to rename one. **Do not.** They are period-plausible for a contemporary rural tinkerer (T4 records the check), renaming a `skills.tracks` member moves the forge pin for a **cosmetic** reason, and the regen is spent on four things that change behaviour. If the live run shows a mind confused by the word, that is a **prose** fix in block 6, not a schema fix.
 
@@ -5750,16 +5769,15 @@ describe('company you resent', () => {
 })
 ```
 
-- [ ] **Step 2: Run them — FAIL, and record the three hashes BEFORE the change.**
+- [ ] **Step 2: Run them — FAIL, and SAVE THE OUTPUT BEFORE RE-RUNNING ANYTHING (C18).**
 
 ```bash
-pnpm vitest run packages/engine/src/g11.test.ts packages/engine/src/systems/needs.test.ts
-pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts packages/forge/src/forgeConfig.test.ts 2>&1 | tee /tmp/pins-before.txt
+pnpm vitest run packages/engine/src/g11.test.ts packages/engine/src/systems/needs.test.ts 2>&1 | tee /tmp/t29-red.txt
 ```
 
-Expected: the four new describes FAIL; the three pin tests PASS at `f487a26b…`, `00d72434…`, `da065752…`. **Paste those three into the commit body as the "from" side.**
+Expected: the four new describes FAIL. *(v5b's Step 2 also recorded three hash literals as the "from" side of a regen. There is no regen and no "from" side.)*
 
-- [ ] **Step 3: Implement all four, then regenerate the three pins in the same commit.**
+- [ ] **Step 3: Implement all four.**
 
 ```ts
 // packages/shared/src/config.ts — THREE edited lines and ONE new key. `warmth.insulation.garment`
@@ -5767,7 +5785,7 @@ Expected: the four new describes FAIL; the three pin tests PASS at `f487a26b…`
 energyDecayAwakePerTick: z.number().default(0.072),   // was 0.093 — see the arithmetic in the plan
 // crops.wheat
 growthDays: z.number().int().default(4),               // was 8 — no run could ever show a harvest
-// aging — NEW: Phase F2 is after the keystone and may not add a key of its own (C3)
+// aging — NEW: Phase F2 adds no key of its own, so the one it needs lands here
 elderWorkSlowdown: z.number().default(1.25),           // an elder takes a quarter longer over work
 ```
 
@@ -5788,56 +5806,29 @@ function resentmentFactor(state: WorldState, config: SimConfig, self: string, ot
 }
 ```
 
-Then regenerate: run the golden regeneration script the C11 batches used, re-pin `GOLDEN_DAY_HASH`, `GOLDEN_G2_HASH` and the forge `stateHash(DEFAULT_CONFIG)`, and put the **four** attribution rows in the commit body — **which change moved which hash by how much.** A null attribution (a change that moved a hash by exactly zero) is a real result and is recorded as one, exactly as batch 12 recorded the garment and wound nulls. **`elderWorkSlowdown` is expected to be a null against both goldens and a real move against the forge pin**, because the scripted agents are adults and the forge pin hashes the whole config — and predicting that in advance is how the attribution table proves itself rather than merely recording what happened.
+> ### ★★ v6 — WHERE THE REGEN USED TO BE, AND THE ONE THING WORTH KEEPING FROM IT
+>
+> v5b spent ≈46 lines here on: a golden regeneration script, a re-pin of three literals, an **attribution table** pairing each of the four changes with the hash it moved and by how much, a warning that **nine** places needed editing in **five** packages, a note that `g9.test.ts:591-592` asserts a hash **by reading another test file's bytes**, a note that `g2.test.ts:33`'s `Previous value:` comment was **asserted by `g12c.test.ts:142`** and must not be tidied, and a grep read-back. **Every line of it maintained four literals that no longer exist. It is deleted, not summarised.**
+>
+> **★ THE ONE IDEA IN IT THAT WAS NOT CEREMONY, KEPT AND RESTATED.** The attribution table's real content was: *"a change that moved a hash by exactly zero is a real result and is recorded as one."* **That is a fact about the world, not about a hash**, and it survives as a plain instruction:
+>
+> **Predict, before you run them, which of the four changes each new assertion will move — and record any prediction that was wrong.** `elderWorkSlowdown` is expected to change **no** behaviour in any existing test (the scripted worlds are adults); `growthDays` is expected to change **no** existing test (no fixture plants wheat and waits eight days); `energyDecayAwakePerTick` is expected to move the day-end energy figure in `g11.test.ts` and **nothing else**; the resentment factor is expected to move only `socialRegenFor` on a world with a witnessed wrong in it. **A surprise in that list is the finding this step exists to produce** — batch 12 recorded two null attributions and both were informative.
+>
+> **★ AND ONE CHECK THE REGEN USED TO PROVIDE BY ACCIDENT, WHICH MUST NOW BE ASKED FOR DELIBERATELY.** Editing `config.ts` moved the forge hash, which forced a human to look at the whole config diff. Nothing forces that now. **So: `git diff packages/shared/src/config.ts` is read line by line before the commit, and the commit body says how many lines changed.** Four is the expected answer. **Five is a STOP.**
 
-**Re-pin by grepping, never by editing from memory (C17).** After the regen, the three new literals are read back out of the files and quoted in the commit body with their line numbers, exactly as Global Constraint C3's table does:
-
-```bash
-grep -rn "GOLDEN_DAY_HASH = \|GOLDEN_G2_HASH = " --include='*.ts' packages/
-grep -rnE "'[0-9a-f]{64}'" --include='*.ts' packages/forge/src/forgeConfig.test.ts
-```
-
-> ### ★ v4 — THERE ARE NINE PLACES TO RE-PIN, NOT THREE. v3 NAMED TWO OF THEM.
->
-> A regen that edits `golden.test.ts`, `g2.test.ts` and `forgeConfig.test.ts` alone leaves **five** red assertions in **three** other packages. **★ v5 — every line number below was re-grepped out of `645a8d9`, and every one of them had moved** (C3):
->
-> | Pin | Files that must move in the SAME commit |
-> |---|---|
-> | **G1** | `engine/src/golden.test.ts:14` · `arbiter/src/g4.test.ts:25` · **`gateway/src/g12c.test.ts:87`** · **`engine/src/g9.test.ts:591`, which asserts the literal by READING `golden.test.ts` AS SOURCE TEXT** |
-> | **G2** | `engine/src/g2.test.ts:40` · **`gateway/src/g12c.test.ts:92`** · **`engine/src/g9.test.ts:592`, same source-text trick** |
-> | **forge** | `forge/src/forgeConfig.test.ts:91` · **`gateway/src/g12c.test.ts:105`** — **TWO places, not three** |
-> | **BLOCK1** | unmoved here (T28 moved it); its copies are `agents/src/prompt/rulesOfBeing.test.ts:22` and **`gateway/src/g12c.test.ts:106`** — **T28 must move both** |
->
-> **★ v5 — `agents/src/live/g11checkpoint.test.ts:15` IS STRUCK FROM THIS LIST, AND STRIKING IT IS THE POINT.** v4 named it as the forge pin's third copy and called it a trap. **It is not a copy of anything.** It is a `configHash` inside a frozen `G11Fingerprint` **test fixture**, nothing compares it to `stateHash(DEFAULT_CONFIG)`, and the forge pin has moved **twice** since that literal was written (`a90bd747` → `02f295ad` → `da065752`) without a single test going red. **Do not edit it.** Re-pinning it changes no behaviour and leaves the next reader believing the checkpointer is pinned to the config when it is not — which is a worse defect than the stale string, because it is a false belief instead of a dead one. If the checkpointer should be pinned to the live config, that is a task and not a `sed`.
->
-> **`g9.test.ts:591-592` is the one that will waste an afternoon.** It does not import the hash; it reads the other test file's bytes and asserts the literal appears in them. A regen that updates `golden.test.ts` makes it pass automatically and a regen that forgets to makes it fail with a message about a *file*, not a hash.
->
-> **★ AND THE ONE THAT IS NOT A PIN AT ALL: `arbiter/src/g4.test.ts:208` CARRIES `f487a26b` INSIDE A TEST NAME** — *"G1 golden day still replays bit-identically to the pinned hash f487a26b"*. It is why the prefix grep returns twelve lines and the literal count is eleven. **It has no assertion behind it, so it cannot go red**, which is exactly what makes it worth naming: a regen that leaves it behind ships a test whose name says one hash and whose body checks another. **Update it for honesty, and never count it toward the census.**
->
-> **★★ v5b — AND ONE THING THE REGEN MUST NOT TIDY, WHICH NO REVISION HAS NAMED: `g2.test.ts:33`'s `Previous value (C11 Task 37)` COMMENT IS LOAD-BEARING.** `gateway/src/g12c.test.ts:142` asserts `expect(g2, 'g2.test.ts no longer records its superseded pin — pick another').toContain('665a8249…')` — it plants a known-stale value in the file **on purpose**, to prove that `pinAt`'s regex reads the live assignment and not a comment. **A regen that deletes the superseded-value comments while updating the pin turns a green anti-vacuity guard red in another package**, and the failure message is about picking a different value rather than about the thing that was deleted. **Keep every `Previous value:` line and append to them; that is the convention those files already follow, and one of them is now a test fixture.** Twelve grep lines is the census; **`git grep -nE "[0-9a-f]{64}" -- 'packages/**/*.ts'` returns NINETEEN**, and the other seven are six `Previous value:` comments plus the `g11checkpoint.test.ts:15` decoy. **None of the seven is a pin and one of them is asserted.**
->
-> **The command that finds all eleven is in C3 and is run again here, before and after. It prints TWELVE lines:**
->
-> ```bash
-> grep -rn "f487a26b\|00d72434\|da065752\|4205d892" --include='*.ts' packages/
-> ```
-
-- [ ] **Step 4: Green, whole suite, and the attribution table written.**
+- [ ] **Step 4: Green, whole suite, and the four predictions checked against what happened.**
 
 Run: `pnpm vitest run packages/ && pnpm typecheck`
-Expected: PASS. The three pins carry new values; `BLOCK1_SHA256` is **unmoved from T28's value** (no prompt text changed here).
+Expected: PASS, **full suite** — this is a `SimConfig` edit and every package folds against that config, so a partial run proves nothing here. **Write the four predictions and their outcomes into the commit body**, including any that were wrong.
 
 - [ ] **Step 5: Commit.**
 
 ```bash
 git add packages/shared/src/config.ts packages/engine/src packages/forge/src
-git commit -m "feat: THE KEYSTONE REGEN — a day a body can finish, resentment with a floor, a crop, the years
+git commit -m "feat: four physics numbers — a day a body can finish, resentment with a floor, a crop, the years
 
-G1    f487a26b… -> <new>   (which change: …)
-G2    00d72434… -> <new>   (which change: …)
-forge da065752… -> <new>   (which change: …)
-BLOCK1 unmoved from Task 28's value.
-Attribution, per change, including any that moved a hash by exactly zero."
+config.ts: N lines changed (expected 4).
+Predicted vs observed, per change, including any prediction that was wrong."
 ```
 
 ---
@@ -5975,14 +5966,13 @@ export const AGE_BAND_PROSE: Readonly<Record<AgeBand,
 
 `self.ageYears` is `yearsOf(a.ageDays)` and is **always present** — unlike every optional field in this codebase, an age has no "absent means default" reading, and perception is derived rather than stored so no hash moves.
 
-- [ ] **Step 4: Green, pins unmoved.**
+- [ ] **Step 4: Green.**
 
 ```bash
 pnpm vitest run packages/agents/ packages/engine/src/perception.test.ts packages/supervisor/ && pnpm typecheck
-pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts packages/forge/src/forgeConfig.test.ts
 ```
 
-Expected: PASS. Perception is derived, not stored — **no pin may move here** (C3).
+Expected: PASS. Perception is derived, not stored, so nothing in the fold changes.
 
 - [ ] **Step 5: Commit.**
 
@@ -6111,14 +6101,13 @@ export function elderTicksFor(baseTicks: number, config: SimConfig, ageDays: num
 
 In `verbs.ts`, the one place `ticksRemaining` is set from a verb's declared duration calls `elderTicksFor(base, config, agent.ageDays)`. **`walk` is excluded** — movement already has its own debuff path through `movement.debuffTicksPerTile`, and stacking two slowdowns on the same body is how an elder becomes unable to cross the square rather than slow to.
 
-- [ ] **Step 4: Green — and the goldens are EXPECTED to hold, because the scripted agents are adults.**
+- [ ] **Step 4: Green — and the scripted worlds are EXPECTED to be untouched, because their agents are adults.**
 
 ```bash
 pnpm vitest run packages/engine/ && pnpm typecheck
-pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts
 ```
 
-Expected: PASS with **pins unmoved**. G1 and G2 script adult bodies, so `elderSlowdownFactor` returns 1 for every one of them and no duration changes. **If either golden moves, a scripted agent is over 60 and the fixture is wrong** — STOP and report, do not re-pin (C3).
+Expected: PASS. `golden.test.ts` and `g2.test.ts` script adult bodies, so `elderSlowdownFactor` returns 1 for every one of them and no duration changes. **A red in either is a real finding, not a hash to update: it means a scripted agent is over 60 and the fixture is wrong.** *(v5b said "do not re-pin"; there is nothing to re-pin, and the instruction is now simply "read the failure".)*
 
 - [ ] **Step 5: Commit.**
 
@@ -6409,10 +6398,9 @@ function mourningFactor(daysSinceDeath: number): number {
 
 ```bash
 pnpm vitest run packages/agents/ packages/narrator/ && pnpm typecheck
-pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts
 ```
 
-Expected: PASS, pins unmoved — the drives layer is mind-side and the milestone is narrator-side.
+Expected: PASS — the drives layer is mind-side and the milestone is narrator-side, so no engine file is touched.
 
 - [ ] **Step 5: Commit.**
 
@@ -6452,7 +6440,7 @@ git commit -m "feat: a grave is a place a mind who knew them can go, and the cha
 >
 > **CROSS-LANE DEPENDENCY, STATED AND NOT SCHEDULED:** fully mapped Stardew-grade interiors need a renderer **C12b** owns. C8 does not build it, does not wait for it, and does not raise the sprite bound in front of it.
 >
-> **AND THE CONSTRAINT THAT SHAPES T62 (C3).** Phase F is closed behind us. The survey's piece 1 says to *"seed `furnishings` from the city template at genesis"* — **this plan declines that half, deliberately.** Seeding eleven buildings' furnishings into `WorldState` at genesis changes the genesis state hash and **would move both goldens**, for zero behavioural gain, because `roomPlan` already falls back to `roomFurnishings(kind)` for a structure that carries none. So: **`Structure.furnishings` is OPTIONAL and ABSENT until the first agent places something** — the same idiom `equipped`, `tendedTick`, `insideId` and `recentFoods` already use, and the reason a town that never furnishes anything hashes exactly as it always did. **Deviation from the survey, recorded here rather than discovered in a red golden.**
+> **AND THE CONSTRAINT THAT SHAPES T62 (C4).** The survey's piece 1 says to *"seed `furnishings` from the city template at genesis"* — **this plan declines that half, deliberately.** Seeding eleven buildings' furnishings into `WorldState` at genesis changes the genesis state for every recorded world, for zero behavioural gain, because `roomPlan` already falls back to `roomFurnishings(kind)` for a structure that carries none. So: **`Structure.furnishings` is OPTIONAL and ABSENT until the first agent places something** — the same idiom `equipped`, `tendedTick`, `insideId` and `recentFoods` already use, and the reason a town that never furnishes anything hashes exactly as it always did. **Deviation from the survey, recorded here rather than discovered in a red golden.**
 
 ### Task 62: Furnishings become world state
 
@@ -6498,8 +6486,8 @@ git commit -m "feat: a grave is a place a mind who knew them can go, and the cha
 
 ```ts
 // packages/engine/src/state.ts — Structure gains ONE optional field
-//   // Absent until an agent places something, so a town that furnishes nothing hashes exactly
-//   // as it always did (C3) and the renderer keeps its template fallback.
+//   // Absent until an agent places something, so a town that furnishes nothing folds exactly
+//   // as it always did (C4) and the renderer keeps its template fallback.
 //   furnishings?: Array<{ kind: string; slot: { x: number; y: number }; byId: string; desc?: string }>
 
 // packages/engine/src/events.def.ts
@@ -6556,7 +6544,7 @@ describe('an agent finally has somewhere to put their own chair', () => {
     expect(furnishingsOf(s, 'structure_2')).toBeNull()
   })
 
-  it('★ A TOWN THAT PLACES NOTHING HASHES EXACTLY AS IT ALWAYS DID (C3)', () => {
+  it('★ A TOWN THAT PLACES NOTHING HASHES EXACTLY AS IT ALWAYS DID (C4)', () => {
     const before = oneHouse('structure_1')
     expect(before.structures.structure_1!.furnishings).toBeUndefined()
     expect(stateHash(before)).toBe(stateHash(fold(before, ev('tick_advanced', {}))))
@@ -6624,7 +6612,8 @@ import type { WorldState } from './state.js'
 
 // Six is the room grid's own capacity at 3x2 minus a walkway, and it is a cap rather than a
 // dial: it stops one mind filling a house, and it lives here rather than in SimConfig because
-// Phase F is closed and a new config key would move all three pins (C3).
+// a room's furniture limit is not a law of the world and does not belong in the replayed
+// config every recorded run is folded against (C4).
 export const FURNISHING_SLOT_LIMIT = 6
 
 export type PlacedFurnishing = { kind: string; slot: { x: number; y: number }; byId: string; desc?: string }
@@ -6693,14 +6682,13 @@ export function roomFurnishingsFor(structure: Structure): RoomFurnishing[] {
 
 `roomPlan` takes the structure rather than the kind. **`roomFurnishings(kind)` stays exported and stays the fallback** — it is what makes an unfurnished house render, and deleting it would make the whole town blank on the first boot after this task.
 
-- [ ] **Step 4: Green, and the goldens proved unmoved.**
+- [ ] **Step 4: Green, and the genesis state proved unchanged.**
 
 ```bash
 pnpm vitest run packages/engine/ packages/web/src/render/ && pnpm typecheck
-pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts packages/forge/src/forgeConfig.test.ts
 ```
 
-Expected: PASS with **all three pins unmoved**. The field is absent at genesis and the goldens place no furniture. **A moved golden here means the genesis seed crept in after all** — STOP and report (C3).
+Expected: PASS. **The task's own third row is the guard, and it is a better one than a hash was**: `stateHash(oneHouse(...))` must equal the hash of the same world after a bare `tick_advanced`, and `structure_1.furnishings` must be `undefined`. **A red there means the genesis seed crept in after all** — STOP and report. *(v5b asked for three pin files here; the assertion in this task's own test is what actually detects the defect, because it names the structure that would have gained the field.)*
 
 - [ ] **Step 5: Commit.**
 
@@ -6857,10 +6845,9 @@ export function normaliseFurnishingKind(raw: string): string {
 
 ```bash
 pnpm vitest run packages/arbiter/ packages/engine/ && pnpm typecheck
-pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts
 ```
 
-Expected: PASS, pins unmoved — the arbiter has no scripted caller in either golden.
+Expected: PASS — the arbiter has no scripted caller in either replay fixture.
 
 - [ ] **Step 5: Commit.**
 
@@ -6875,7 +6862,7 @@ git commit -m "feat(arbiter): a mind's own description of a chair becomes a chai
 
 **The survey's own question: what stops a town inventing forty chairs overnight?** `SpendLedger`, `BudgetGuard` and `AnomalyStopError` all exist and are all **script-time** constructs — a live sim has no per-agent quota, no per-day cap, and no circuit breaker.
 
-**Two caps and one breaker, and none of them is in `SimConfig`** (C3 — Phase F is closed, and a config key would move all three pins). They are supervisor options, exactly like `SJ_ADMIN_TOKEN` and the spend tripwires, because **a commission budget is an operator's concern and not a law of the world** — and that placement is also what keeps it out of the state hash and out of replay.
+**Two caps and one breaker, and none of them is in `SimConfig`** (C4 — a commission budget is an operator's concern and does not belong in the config a recorded run replays against). They are supervisor options, exactly like `SJ_ADMIN_TOKEN` and the spend tripwires, because **a commission budget is an operator's concern and not a law of the world** — and that placement is also what keeps it out of the state hash and out of replay.
 
 **★ THE FORGE IS STUBBED TO THE PLACEHOLDER IN THIS SLICE, AND THE ART INDEPENDENCE IS WHAT MAKES THAT SAFE.** `roomPlan` already falls back to `/assets/placeholder/item.png` for a kind with no record, so **the chair exists in the sim the moment the ruling lands and the picture arrives later, or never.** Zero image spend, and the seam proved before a dollar of art.
 
@@ -6977,9 +6964,8 @@ Expected: FAIL — `furnitureBudget.js` does not exist and `createSim` has no fu
 
 ```ts
 // packages/supervisor/src/furnitureBudget.ts
-// NOT in SimConfig, and deliberately: Phase F is closed (C3), a commission budget is an
-// operator's concern rather than a law of the world, and keeping it out of the config keeps
-// it out of the state hash and out of replay.
+// NOT in SimConfig, and deliberately: a commission budget is an operator's concern rather
+// than a law of the world, and keeping it out of the config keeps it out of replay.
 export type FurnitureBudgetOpts = {
   perAgentPerDay: number
   perTownPerDay: number
@@ -7019,10 +7005,9 @@ In `supervisor.ts`, the verdict path consults `allow` **before** the effect reac
 
 ```bash
 pnpm vitest run packages/supervisor/ packages/arbiter/ packages/engine/ && pnpm typecheck
-pnpm vitest run packages/engine/src/golden.test.ts packages/engine/src/g2.test.ts packages/forge/src/forgeConfig.test.ts
 ```
 
-Expected: PASS. **The forge pin must be unmoved** — this task adds no `SimConfig` key, which is the whole reason the budget lives where it does.
+Expected: PASS. **`forgeConfig.test.ts` must stay green** — this task adds no `SimConfig` key, which is the whole reason the budget lives where it does, and that file is where a stray one would surface.
 
 - [ ] **Step 5: Commit.**
 
@@ -9406,22 +9391,22 @@ git commit -m "test(supervisor): G8 dress rehearsal — 21 sim-days neutral, a s
 6. **The stack is alive on arm64** — `deploy/smoke.sh` output, including the restart-resume line, the retrieval-index line, and the on-box tick figures.
 7. **The restore drill replays** — `deploy/restore-drill.sh` printed `RESTORE DRILL OK` **and** the replay hash matched.
 8. **The observatory serves from the stack** — `curl -fsS http://127.0.0.1:8787/ | grep -q '<div id="root">'`. *The base draft's check was "public URL serves the observatory"; the public URL belongs to Phase L by ruling, so G8 gates on the stack serving locally and Phase L signs off the public one.*
-9. **★ THE FOUR PINS ARE WHERE PHASE F LEFT THEM, IN ALL ELEVEN PLACES, PROVED BY GREP AND NOT BY A PATH DIFF (C17).** The gate reads the literals out of the files, quotes them with their line numbers, and matches them against Phase F's commit body:
+9. **★ v6 — REPLACED. `git grep -cE "[0-9a-f]{64}" -- 'packages/**/*.ts'` RETURNS ZERO.** *v5b's check 9 was a seventeen-line census: read eleven hash literals out of seven files, quote them with their line numbers, match them against Phase F's commit body, and STOP on any count other than twelve. **Its expected count was already wrong** — it asserted twelve and the tree returned nineteen — so it was a false STOP waiting to happen at the launch gate, which is precisely the defect it accused v4 of. **The `unpin` lane deleted every literal it counted.***
+
+   What the gate asks instead is the inverse, and it is one line:
 
 ```bash
-grep -rn "GOLDEN_DAY_HASH = \|GOLDEN_G2_HASH = \|BLOCK1_SHA256 = " --include='*.ts' packages/
-grep -rnE "'[0-9a-f]{64}'" --include='*.ts' packages/forge/src/forgeConfig.test.ts
-# ★ v5 — the command that finds the OTHER SEVEN copies. Substitute Phase F's four values.
-grep -rn "<G1>\|<G2>\|<forge>\|<BLOCK1>" --include='*.ts' packages/
+git grep -cE "[0-9a-f]{64}" -- 'packages/**/*.ts' || echo "NO HASH LITERALS — CORRECT"
 ```
 
-**★ v5 — THE EXPECTED COUNT IS ELEVEN LITERALS ACROSS SEVEN FILES, PLUS ONE TEST NAME, AND v4's NUMBER WAS WRONG.** v4 asserted *"nine matches across six files"* and listed eight files. **Run v4's own grep against the tree it was written for and it returns thirteen lines across eight**, so this gate as v4 wrote it would have STOPped on a correct tree — a false red at the launch gate, which is the same class of defect as the missed copy it was guarding against and is why the census in C3 was re-derived line by line.
+   **Zero is the pass.** A non-zero means a lane re-pinned something during C8 and reintroduced the maintenance the user's ruling cut — **name the file, do not adjust the number.** And because a check whose subject may not exist must fail loudly when it does not (C17′), the gate asserts the two replacements are still there:
 
-The eleven, at `645a8d9`: `engine/src/golden.test.ts:14` · `arbiter/src/g4.test.ts:25` · `gateway/src/g12c.test.ts:87` · `engine/src/g9.test.ts:591` (**source text**) · `engine/src/g2.test.ts:40` · `gateway/src/g12c.test.ts:92` · `engine/src/g9.test.ts:592` (**source text**) · `forge/src/forgeConfig.test.ts:91` · `gateway/src/g12c.test.ts:105` · `agents/src/prompt/rulesOfBeing.test.ts:22` · `gateway/src/g12c.test.ts:106`. **The twelfth line is `arbiter/src/g4.test.ts:208`, an eight-character prefix inside a test name with no assertion behind it** — count it in the grep's output and never in the census. **`agents/src/live/g11checkpoint.test.ts:15` must NOT appear**: it is a frozen fixture two forge pins out of date, and if Phase F touched it, that is a defect to report rather than a copy to celebrate.
+```bash
+grep -q "folding to a mid-log tick" packages/engine/src/golden.test.ts && echo "MID-LOG FOLD ROW PRESENT"
+```
 
-**A count below twelve means a copy was missed by Phase F and is carrying a stale hash that nothing currently runs. A count above twelve means a lane added a copy this checklist does not know about.** Both are a STOP, and in both cases the answer is to name the file, not to adjust the number.
+   **That row is the one that bit under mutation** (C4). A census that passes over a `golden.test.ts` with no fold row in it has measured nothing, which is the same shape as the thing check 9 was originally written to catch.
 
-*A path-diff over a path that does not exist returns empty and reads as a clean pin. This gate has been within one command of signing off a broken pin twice, and the command that would have caught it is the one above.*
 
 **★ WHAT G8 DOES NOT GATE, SAID PLAINLY SO NOBODY READS SILENCE AS A PASS.**
 
