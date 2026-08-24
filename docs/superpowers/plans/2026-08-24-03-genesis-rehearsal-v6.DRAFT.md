@@ -1487,6 +1487,18 @@ temperature?: number            // absent leaves the provider default, so every 
 // LlmCallInsert gains:
 temperature: number | null
 // llm_calls gains a nullable REAL column `temperature`, added in place by migrateLlmTables
+
+// ★★ v6, RULING 1 — TWO MORE NULLABLE COLUMNS, AND THEY ARE WHAT MAKES MOTIVE MEASURABLE.
+// A want is produced once per turn by `chooseWantLine` (T18) and, in v5b, was rendered into
+// prose and then discarded. Nothing anywhere read whether the mind walked the road, so the
+// entire drives layer could be inert and every number in this plan would be unchanged.
+// These two columns are the whole fix on the recording side: the turn call already exists, so
+// the cost is two nullable fields on a row that is being written regardless.
+wantSource: string | null       // 'tedium' | 'attachment' | 'obligation' | 'recognition', or null
+wantTarget: string | null       // JSON of T18's `WantTarget`, or null when the road named no place
+                                // and no person. NEVER the prose road: a sentence cannot be joined against.
+// llm_calls gains `want_source TEXT` and `want_target TEXT`, added in place by migrateLlmTables
+// beside the `provider` migration, exactly as `temperature` and T40's `raw_text` are.
 ```
 
 - [ ] **Step 1: Write the failing test.**
@@ -1510,6 +1522,15 @@ describe('the call ledger records how the mind was sampled', () => {
     const cols = (db.prepare('PRAGMA table_info(llm_calls)').all() as Array<{ name: string }>).map((c) => c.name)
     expect(cols).toContain('temperature')
     expect(cols).toContain('provider')
+  })
+
+  // ★ v6, RULING 1: the two want columns migrate the same way, in the same call, and are
+  // asserted here rather than in T18 because THIS is the task that owns the ledger's shape.
+  it('★ ADDS THE TWO WANT COLUMNS TOO — a ledger that cannot say what was wanted cannot score it', () => {
+    const db = new Database(':memory:')
+    migrateLlmTables(db)
+    const cols = (db.prepare('PRAGMA table_info(llm_calls)').all() as Array<{ name: string }>).map((c) => c.name)
+    expect(cols).toEqual(expect.arrayContaining(['want_source', 'want_target']))
   })
 
   it('writes the temperature it was told, and null when it was told none', () => {
@@ -1562,7 +1583,9 @@ it('sends nothing when no temperature was set, so every existing caller is uncha
 Run: `pnpm vitest run packages/agents/src/llm/`
 Expected: FAIL — `temperature` is not a column and not an option.
 
-- [ ] **Step 3: Implement.** In `callLog.ts`, add `temperature: number | null` to `LlmCallInsert`, the column to the `CREATE TABLE`, the in-place `ALTER TABLE` beside the `provider` one, and the value to `insertLlmCall`'s statement. In `client.ts`, add `temperature?: number` to `LlmClientOpts`, hold it on the instance, pass `temperature: this.temperature` to both `generateText` call sites, and pass it to `insertLlmCall`.
+- [ ] **Step 3: Implement.** In `callLog.ts`, add `temperature: number | null`, **`wantSource: string | null` and `wantTarget: string | null`** to `LlmCallInsert`, the three columns to the `CREATE TABLE`, three in-place `ALTER TABLE`s beside the `provider` one, and the values to `insertLlmCall`'s statement. In `client.ts`, add `temperature?: number` to `LlmClientOpts`, hold it on the instance, pass `temperature: this.temperature` to both `generateText` call sites, and pass it to `insertLlmCall`.
+
+★ **`wantSource` and `wantTarget` are written by `agentRuntime`, not by the client** — the client does not know what a want is and must not learn. **T18 is where they are filled**, and T8's only job is that the columns exist and migrate. **This is deliberate ordering: T8 is wave 1 and T18 is wave 4, and a nullable column added early costs nothing while a column added late costs a migration on a live ledger.**
 
 - [ ] **Step 4: Green.**
 
@@ -3125,8 +3148,25 @@ git commit -m "feat(agents): a debt that is remembered, and a thing done in comp
 ```ts
 export const WANT_ORDER = ['tedium','attachment','obligation','recognition'] as const
 export type WantSource = (typeof WANT_ORDER)[number]
-export type Want = { source: WantSource; magnitude: number; line: string; road: string | null }
+
+// ★★ v6, RULING 1 — THE STRUCTURED HALF OF THE ROAD, AND IT IS THE WHOLE OF WHAT MAKES A WANT
+// MEASURABLE. v5b's `Want` carried the road as PROSE only. A sentence cannot be joined against
+// an event log, so nothing could ever ask "did the mind go there" — and nothing did, which is
+// how the drives layer came to be a want generator with no closed loop. The prose is unchanged
+// and is still what a mind reads; the target rides beside it and is read by nobody in the town.
+export type WantTarget =
+  | { kind: 'place'; x: number; y: number }        // tedium's unseen tile or unfinished work
+  | { kind: 'person'; id: string }                 // attachment, obligation, recognition
+export type Want = {
+  source: WantSource; magnitude: number; line: string; road: string | null
+  target: WantTarget | null                        // null iff `road` is null — asserted below
+}
+// The three wants that were computed, cleared their rung, and LOST. They are the control arm
+// (T49), they cost nothing to keep, and discarding them was what left the answer rate with no
+// baseline to be measured against.
+export type SuppressedWant = { source: WantSource; magnitude: number; target: WantTarget | null }
 export function chooseWantLine(s: DriveState, genome: Genome, packet: PerceptionPacket, world: DriveWorld, tick: number): Want | null
+export function suppressedWants(s: DriveState, genome: Genome, packet: PerceptionPacket, world: DriveWorld, tick: number): SuppressedWant[]
 // prose.ts gains, on ProseWorld:
 want?(): { line: string; road: string | null } | null
 intention?(): string | null
@@ -3177,6 +3217,39 @@ describe('chooseWantLine', () => {
     const want = chooseWantLine({ ...emptyDriveState(), tedium: 70 }, g, packet, world, 3000)!
     expect(want.road).toBe('There is a patch of something over at (73, 58) you have never put a hand in.')
   })
+
+  // ★★ v6, RULING 1. The prose is for the mind; the target is for the report. A road that
+  // cannot be joined against the event log is a road nobody can prove was walked, and that is
+  // the defect the whole answer rate exists to close.
+  it('★ CARRIES A STRUCTURED TARGET BESIDE THE PROSE, AND THE TWO AGREE', () => {
+    const want = chooseWantLine({ ...emptyDriveState(), tedium: 70 }, g, packet, world, 3000)!
+    expect(want.target).toEqual({ kind: 'place', x: 73, y: 58 })
+    expect(want.road).toContain('(73, 58)')
+  })
+
+  it('★ A NULL ROAD AND A NULL TARGET TRAVEL TOGETHER — never one without the other', () => {
+    const nowhere = { nearestUnseen: () => null, nearestUnfinished: () => null, lastSeenAt: () => null }
+    const want = chooseWantLine({ ...emptyDriveState(), tedium: 70 }, g, packet, nowhere, 3000)
+    if (want !== null) expect(want.road === null).toBe(want.target === null)
+  })
+
+  // ★★ v6, RULING 1 — THE CONTROL ARM, AND IT IS FREE. `chooseWantLine` computes four
+  // magnitudes and returns one. The three that lost are the baseline the answer rate is
+  // measured against: if the offered want is answered no more often than the suppressed ones,
+  // the line in block 6 is decoration. v5b threw them away.
+  it('★ RETURNS THE WANTS THAT LOST, so the answer rate has something to be compared with', () => {
+    const s = {
+      ...emptyDriveState(), tedium: 70,
+      closeness: { nadia: 90 }, lastHeardTick: { nadia: 0 },
+      obligations: [{ toId: 'salma', toName: 'Salma', what: 'given' as const, tick: 0, discharged: false }],
+      unwitnessedStreak: 9,
+    }
+    const chosen = chooseWantLine(s, g, packet, world, 3000)!
+    const lost = suppressedWants(s, g, packet, world, 3000)
+    expect(lost.map((w) => w.source)).not.toContain(chosen.source)
+    expect(lost.length).toBeGreaterThan(0)
+    for (const w of lost) expect(w.magnitude).toBeLessThanOrEqual(chosen.magnitude)
+  })
 })
 ```
 
@@ -3222,6 +3295,19 @@ Run: `pnpm vitest run packages/agents/src/drives/wantLine.test.ts packages/agent
 Expected: FAIL — no `wantLine.js`, and the body still leads.
 
 - [ ] **Step 3: Implement.** Magnitude is normalised per source into `[0,100]` so they compare: tedium is its own value; attachment is `max(closeness × daysSilent / 4)`; obligation is `100 × weightOf(genome,'wariness') / 1.6` for the oldest open one inside its window; recognition is `10 × unwitnessedStreak × weightOf(genome,'pride') / 1.6`. Wire it through `agentRuntime`'s existing `ProseWorld` object — the same seam `nearestWater` already uses — so `prose.ts` gains three optional hooks and no dependency on the drives package.
+
+★★ **v6, RULING 1 — AND `agentRuntime` RECORDS THE WANT ON THE TURN CALL.** The two columns exist from T8; this is where they are filled:
+
+```ts
+// packages/agents/src/runtime/agentRuntime.ts — where the turn's LlmClient is built
+const want = chooseWantLine(this.#drives, genome, packet, driveWorld, tick)
+// ... the want's `line` and `road` go into block 6, exactly as before ...
+// and the two facts a report can join on go into the ledger row this turn writes anyway:
+wantSource: want?.source ?? null,
+wantTarget: want?.target === undefined || want?.target === null ? null : JSON.stringify(want.target),
+```
+
+**The one-way glass is untouched: nothing here reaches a prompt.** `want_source` is a drive name, which C5 forbids a mind from ever reading, and it is written to an ops-side ledger a mind cannot see — the same door `temperature` and `provider` already go through. **The suppressed wants are NOT written to `llm_calls`** (one row, one turn, one want); T49 recomputes them by re-folding, and the note in its schema says so.
 
 - [ ] **Step 4: Green.**
 
@@ -5319,26 +5405,42 @@ git commit -m "feat(agents): the instrument tells the truth — an overlap colum
 | **`D_c`** | **decision divergence under matched conditions — the strongest of the four** | bucket every accepted act by situation key `(ringing-need set × light band × company present)`; within each qualifying bucket take the mean pairwise JSD between minds' verb distributions; weight by act count. **This is the one that would have caught "norm formed <1h"** |
 | **`unisonBuckets`** | the legible tripwire | the fraction of qualifying buckets in which **the same single verb is the modal choice for every mind**. 1.0 is total collapse |
 
-**THE GATE, with its numbers:**
+**THE GATE, with its numbers. ★ v6 — THE FIRST FOUR ARE BETWEEN-MIND AND ARE NECESSARY AND NOT SUFFICIENT; THE LAST TWO ARE WITHIN-MIND AND ARE WHY:**
 
 ```
-D_b        (last sim-day)         >= 0.15
-D_c        (weighted, last 2 days)>= 0.12
-unisonBuckets                     <= 0.34
-qualifyingBuckets                 >= 3      — fewer is 'insufficient-evidence', which FAILS
-D_l        (last sim-day)         reported, floor 0.20 PROVISIONAL until first measurement
+--- BETWEEN MINDS: are they the same as each other? (necessary, NOT sufficient) ---
+D_b        (last sim-day)          >= 0.15
+D_c        (weighted, last 2 days) >= 0.12
+unisonBuckets                      <= 0.34
+qualifyingBuckets                  >= 3      — fewer is 'insufficient-evidence', which FAILS
+D_l        (last sim-day)          reported, floor 0.20 PROVISIONAL until first measurement
+
+--- ★ v6, WITHIN A MIND: is any of them alive? (the half that was missing) ---
+D_s        (min across minds)      >= 0.10   PROVISIONAL — see the derivation below
+minDiscretionaryVerbEntropy        >= 0.25   PROVISIONAL — see the derivation below
+qualifyingMindDays                 >= 5      — fewer is 'insufficient-evidence', which FAILS
 ```
 
-A bucket qualifies at **≥ 8 acts from ≥ 3 distinct minds** — below that the JSD is measuring sample noise and would pass or fail on nothing.
+A bucket qualifies at **≥ 8 acts from ≥ 3 distinct minds** — below that the JSD is measuring sample noise and would pass or fail on nothing. **A mind-day qualifies for the entropy floor at `ENTROPY_MIN_ACTS = 10` discretionary acts**, for the same reason and by the same argument.
+
+**★ BOTH NEW THRESHOLDS ARE PROVISIONAL, DERIVED IN WRITING BEFORE THE RUN THAT JUDGES THEM (C23), AND THE DERIVATION IS PRINTED SO NOBODY HAS TO GUESS AT IT LATER.**
+
+- **`minDiscretionaryVerbEntropy >= 0.25`.** `TIER1` holds 37 verbs, so the normaliser is `log2(37) = 5.21`. A mind with **one** discretionary verb scores **0.00**; with **two, evenly**, `1 / 5.21 = 0.19`; with **three, evenly**, `1.585 / 5.21 = 0.30`. **0.25 sits between two and three**, so the bar reads: *more than two discretionary verbs, in real proportion.* **It is a floor on rigidity, not a target for variety** — a mind with a settled life it genuinely chose clears it easily, and only a mind doing one or two things over and over does not.
+- **`D_s >= 0.10`.** No run has ever measured a day-over-day self-divergence, so **this number has no empirical baseline and is marked provisional in the plan text, exactly as `D_l`'s 0.20 is.** What it is anchored to: `jsd` returns 0 for two identical distributions and 1 for two with nothing in common, so **0.10 is "a tenth of a bit of change between consecutive days"** — a bar a mind that ate breakfast in a different order clears, and a mind that repeated itself exactly does not. **After the rehearsal there is a distribution and re-deriving it is a real option with real evidence; before it, a higher number would be a bar invented to be cleared.**
+
+**★ AND THE HONEST LIMIT OF BOTH, STATED RATHER THAN DISCOVERED.** `D_s` and the entropy floor detect a **rut**. They do not detect a mind that varies its acts pointlessly — the two-verb alternation, the busy-work loop. **Nothing here measures whether the variety MEANT anything; that is the answer rate (T49, criterion 18), and these two are its companions rather than its replacement.** Three numbers, three questions: are they the same as each other, is any of them changing, and does any of them get what it wanted.
 
 **Interfaces — Produces:**
 
 ```ts
 export const MODE_COLLAPSE_TARGETS = {
   dbMin: 0.15, dcMin: 0.12, unisonMax: 0.34, minQualifyingBuckets: 3, dlFloorProvisional: 0.20,
+  // ★ v6, RULING 1 — both PROVISIONAL, both derived in the box below, neither measured.
+  dsMinProvisional: 0.10, entropyMinProvisional: 0.25, minQualifyingMindDays: 5,
 } as const
 export const BUCKET_MIN_ACTS = 8
 export const BUCKET_MIN_MINDS = 3
+export const ENTROPY_MIN_ACTS = 10
 export function jsd(p: ReadonlyMap<string, number>, q: ReadonlyMap<string, number>): number   // base 2, [0,1]
 export function behaviouralDivergence(db: Database, day: number): number
 export function lexicalDivergence(db: Database, day: number): number
@@ -5348,10 +5450,43 @@ export function decisionDivergence(db: Database, days: readonly number[]): {
 export type ModeCollapseReport = {
   perDay: Array<{ day: number; dB: number; dL: number }>
   dC: number; qualifyingBuckets: number; unisonBuckets: number
+  // ★★ v6, RULING 1 — THE TWO WITHIN-MIND NUMBERS, AND THEY EXIST BECAUSE THE FOUR ABOVE ARE
+  // MAXIMISED BY THE THING THEY WERE MEANT TO CATCH. See the box below.
+  dS: number                        // self-divergence, MIN across minds
+  minDiscretionaryVerbEntropy: number
+  qualifyingMindDays: number        // mind-days with >= ENTROPY_MIN_ACTS discretionary acts
   pass: boolean; failures: string[]
+}
+export function selfDivergence(db: Database, days: readonly number[]): number
+export function discretionaryVerbEntropy(db: Database, days: readonly number[]): {
+  min: number; perMind: Array<{ agentId: string; entropy: number }>; qualifyingMindDays: number
 }
 export function modeCollapseVerdict(db: Database, opts: { days: number }): ModeCollapseReport
 ```
+
+> ### ★★★ v6, RULING 1 — `D_b`, `D_l`, `D_c` AND `unisonBuckets` ARE MAXIMISED BY FIVE STOPPED CLOCKS. THEY ARE **REWRITTEN, NOT STRUCK**, AND TWO WITHIN-MIND NUMBERS ARE GATED BESIDE THEM.
+>
+> **The finding, and it is arithmetic rather than opinion.** Take five minds, each of which does exactly one verb, for ever, and a different one each. Every mind's daily distribution is a point mass on a different verb, so **every pairwise JSD is 1**:
+>
+> | Number | Five stopped clocks, each stopped differently | Its gate |
+> |---|---:|---|
+> | `D_b` | **1.00** | `≥ 0.15` — passed at nearly seven times the bar |
+> | `D_c` | **1.00** in every qualifying bucket | `≥ 0.12` — passed at eight times the bar |
+> | `unisonBuckets` | **0.00** — no bucket has one modal verb for everybody | `≤ 0.34` — passed perfectly |
+> | `D_l` | **1.00** if they also each say one unlike thing | floor 0.20, reported |
+>
+> **A town of five rigid, unchanging, mutually-unlike minds is the MAXIMUM SCORE on the entire mode-collapse gate.** That is not a stale reference; it is the instrument reading its own opposite as a pass.
+>
+> **★ WHY THEY ARE REWRITTEN AND NOT STRUCK.** They are **correct at what they measure**, and what they measure is real: U29 names mode collapse a first-class failure, the pre-C11 probe found *"norm formed <1h but zero conflict all day"*, and **five minds converging on one verb is exactly what `D_c` and `unisonBuckets` catch and nothing else would.** Striking them removes the only instrument pointed at the failure the genome, the temperature spread and the asymmetric deal were all bought to prevent. **The defect is not that they measure difference. It is that difference alone is satisfiable by rigidity, and v5b presented them as "THE mode-collapse gate" full stop.**
+>
+> **So: they are relabelled BETWEEN-MIND measures, declared NECESSARY AND NOT SUFFICIENT, and two WITHIN-MIND numbers are gated beside them.** A rut is a low-entropy distribution that does not move; both properties are cheap to measure and neither is visible to a pairwise comparison.
+>
+> | New number | What it is | Fails |
+> |---|---|---|
+> | **`D_s` — self-divergence** | for each mind, the mean JSD between its day-`d` and day-`d+1` verb distributions; **reported as the MINIMUM across minds** | **a mind that does the same thing on day 20 as on day 1.** `D_s = 0` is a stopped clock. The minimum, not the mean, because one frozen mind among four lively ones is the finding |
+> | **`minDiscretionaryVerbEntropy`** | normalised Shannon entropy of a mind's **discretionary** verb distribution on a day, `H / log2(TIER1.length)`; **minimum across qualifying mind-days** | **a mind whose discretionary life is one verb.** Computed over discretionary acts ONLY — a body must eat, drink, sleep and walk, so four survival verbs would inflate a whole-log entropy to ~0.38 and the number would discriminate nothing |
+>
+> **It reuses `jsd`, which has exactly one implementation (T26) and now three granularities** — between minds (`D_b`, `D_c`), across runs (`D_r`, T27) and **across a mind's own days (`D_s`)**. One metric, three questions.
 
 - [ ] **Step 1: Write the failing test.**
 
@@ -5437,6 +5572,39 @@ describe('modeCollapseVerdict', () => {
     const v = modeCollapseVerdict(townOfClones(), { days: 2 })
     expect(v.pass).toBe(false)
     expect(v.failures).toEqual(expect.arrayContaining(['D_b', 'D_c', 'unisonBuckets']))
+  })
+
+  // ★★★ v6, RULING 1 — THE ROW THAT WOULD HAVE CAUGHT THE INSTRUMENT READING ITS OWN OPPOSITE
+  // AS A PASS. Five minds, one verb each, a different one each, unchanged for the whole run:
+  // D_b = 1, D_c = 1, unisonBuckets = 0. v5b's gate passes it at seven times the bar. It is
+  // five stopped clocks and it is the thing the whole chunk exists to NOT produce.
+  it('★★ FAILS FIVE STOPPED CLOCKS, EACH STOPPED DIFFERENTLY — and the four between-mind numbers all PASS it', () => {
+    const db = townOfRuts()   // amara only forages, yusuf only chops, ... every day, unchanged
+    const v = modeCollapseVerdict(db, { days: 3 })
+    // the between-mind half is maximised, which is exactly the defect:
+    expect(behaviouralDivergence(db, 3)).toBeGreaterThan(MODE_COLLAPSE_TARGETS.dbMin)
+    expect(decisionDivergence(db, [2, 3]).unisonBuckets).toBeLessThanOrEqual(MODE_COLLAPSE_TARGETS.unisonMax)
+    // and the within-mind half is what fails it:
+    expect(v.pass).toBe(false)
+    expect(v.failures).toEqual(expect.arrayContaining(['D_s', 'minDiscretionaryVerbEntropy']))
+  })
+
+  it('★ PASSES A TOWN OF FIVE PEOPLE WHOSE DAYS DIFFER FROM THEIR OWN YESTERDAYS', () => {
+    const v = modeCollapseVerdict(townOfIndividuals(), { days: 3 })
+    expect(v.dS).toBeGreaterThanOrEqual(MODE_COLLAPSE_TARGETS.dsMinProvisional)
+    expect(v.minDiscretionaryVerbEntropy).toBeGreaterThanOrEqual(MODE_COLLAPSE_TARGETS.entropyMinProvisional)
+    expect(v.pass).toBe(true)
+  })
+
+  it('★ REFUSES TO SCORE A MIND-DAY IT CANNOT SEE — fewer than ten discretionary acts', () => {
+    expect(discretionaryVerbEntropy(townWithThreeActs(), [1]).qualifyingMindDays).toBe(0)
+    expect(modeCollapseVerdict(townWithThreeActs(), { days: 1 }).failures).toContain('insufficient-evidence')
+  })
+
+  // ★ v6 — the minimum and not the mean, and this row is the whole argument for it. One frozen
+  // mind among four lively ones is a finding about that mind, and a mean would bury it.
+  it('★ ONE FROZEN MIND AMONG FOUR LIVELY ONES FAILS THE RUN', () => {
+    expect(modeCollapseVerdict(townOfIndividualsPlusOneRut(), { days: 3 }).failures).toContain('D_s')
   })
 
   it('PASSES A TOWN OF INDIVIDUALS', () => {
@@ -5547,6 +5715,15 @@ export type RunManifest = {
     engineSha: string; configHash: string; genesisTemplateId: string; model: string
     providerOrder: readonly string[]; allowProviderFallbacks: boolean
     promptTemplateVersion: string; driveLawVersion: string; arm: 'neutral' | 'authored'
+    // ★★ v6, RULING 3 — THE SCAFFOLDING THE RUN WAS STANDING ON, RECORDED BEFORE THE FIRST TURN.
+    // The `first-night` lane landed `masonIntent` (`gateway/src/founders.ts:244`) and
+    // `SJ_DEV_JOINT=1` (`gateway/src/devWorld.ts:270`). Both are SCRIPTED DEMONSTRATION POLICY
+    // — the lane's own brief says to be explicit about which behaviour is scripted so nobody
+    // later mistakes a demo for a result. **A scripted mason building during a scored run
+    // satisfies G8 criterion 5, which is the criterion this whole chunk exists to measure**:
+    // the run would be grading its own scaffolding and no field anywhere would say so.
+    // HELD rather than reported, because a run cannot acquire its own description afterwards.
+    scriptedPolicies: { devMason: boolean; devJointBuild: boolean }
   }
   seeded: { worldSeed: string }
   startedAt: number
@@ -5570,6 +5747,7 @@ const manifest = (over: Record<string, unknown> = {}) => ({
     engineSha: 'abc123', configHash: 'cfg1', genesisTemplateId: 'city-v2', model: 'deepseek/deepseek-v4-flash-0731',
     providerOrder: ['Baidu'], allowProviderFallbacks: true,
     promptTemplateVersion: 'c8-block6-2', driveLawVersion: 'c8-drives-1', arm: 'neutral' as const,
+    scriptedPolicies: { devMason: false, devJointBuild: false },   // ★ v6, RULING 3
   },
   seeded: { worldSeed: 'seed-1' },
   startedAt: 1,
@@ -5597,6 +5775,15 @@ describe('the manifest', () => {
   it('REFUSES A COMPARISON ACROSS ARMS, and names the field', () => {
     const authored = manifest({ runId: 'r2', held: { ...manifest().held, arm: 'authored' as const } })
     expect(comparableRuns(manifest(), authored)).toEqual({ comparable: false, differing: ['arm'] })
+  })
+
+  // ★★ v6, RULING 3. A run in which a scripted mason was building is not comparable with one
+  // in which the town built for itself, and it is not scorable on criterion 5 at all.
+  it('★ REFUSES A COMPARISON ACROSS SCAFFOLDING, and names the field', () => {
+    const scaffolded = manifest({ runId: 'r2',
+      held: { ...manifest().held, scriptedPolicies: { devMason: true, devJointBuild: false } } })
+    expect(comparableRuns(manifest(), scaffolded))
+      .toEqual({ comparable: false, differing: ['scriptedPolicies'] })
   })
 
   it('refuses a comparison across engine shas, prompt versions or drive laws', () => {
@@ -9232,6 +9419,27 @@ export const G8RehearsalReportSchema = z.object({
   // ★ THE R4 MEASURE. Never social-need satisfaction, which is oversatisfied ~34x (C25).
   socialVerbDiversity: z.number().int(), nonSpeakSocialVerbs: z.number().int(),
   discretionarySocialShare: z.number(),
+  // ★★★ v6, RULING 1 — THE WANT LEDGER. THIS IS THE ONLY BLOCK IN THE REPORT THAT MEASURES
+  // MOTIVE RATHER THAN ACTIVITY, AND WITHOUT IT THE DRIVES LAYER CAN BE WHOLLY INERT AND EVERY
+  // OTHER NUMBER ON THIS PAGE IS UNCHANGED. `chooseWantLine` produces exactly one want a turn;
+  // v5b rendered it into prose and read it back nowhere. These eight fields close the loop.
+  //
+  // `offered` / `answered` are the offered arm. `suppressed` / `suppressedAnswered` are the
+  // CONTROL: the wants that cleared their rung, lost the tiebreak, and were never spoken. They
+  // cost nothing to compute — `suppressedWants` (T18) already has them — and they are what
+  // turns an absolute rate with no baseline into a CONTRAST that baselines itself.
+  //
+  // `lift` is `answerRate / suppressedAnswerRate`, and it is the design's own 15:1 figure made
+  // computable: "the need that was given a road was answered 15 times and the need that was not
+  // was answered once" was measured by hand, in one run, and never again. This is that number.
+  wants: z.object({
+    offered: z.number().int(), answered: z.number().int(), answerRate: z.number(),
+    suppressed: z.number().int(), suppressedAnswered: z.number().int(), suppressedAnswerRate: z.number(),
+    lift: z.number().nullable(),                       // null when the control arm is empty
+    bySource: z.record(z.string(), z.object({          // per drive, because one dead drive is a finding
+      offered: z.number().int(), answered: z.number().int(), answerRate: z.number(),
+    })),
+  }),
   // ★★ v5b — OD21 RULED: THE DISCOVERY RECORD IS REPORTED AND NEVER GATED. `total` is the
   // identity that keeps the two codification paths from drifting: a word minted inside
   // `codifyExpressive` never passes through `codify()`, so if these two ever disagree one of
@@ -9314,6 +9522,7 @@ export const SeamcheckSchema = z.object({
 
 | Block | Source, named | Notes |
 |---|---|---|
+| **★★ `wants`** | **a join of two tables that both already exist.** The offered arm is `llm_calls.want_source` / `want_target` (T8's columns, filled by T18) for every `caller = 'turn'` row. The answer is the **event log**: for `{kind:'place'}`, an `agent_moved` putting the mind within reach of `(x, y)`; for `{kind:'person'}`, a `speak` / `give` / `tend` / `teach` naming that `targetId`. The control arm is recomputed by re-folding drives over the recorded packets, which `foldDrives` is pure over by construction (C4) | **`ANSWER_WINDOW_TICKS = 240`** — four sim-hours, one waking quarter-day: long enough that a mind may finish what its body is already doing, short enough that "it got there eventually on day 9" is not counted as an answer. **Provisional, and derived rather than picked: it is two `TEDIUM_SAMENESS_TICKS` (120), which is the window the drive itself uses to decide that nothing has changed.** A want answered after its own drive has already re-fired was not answered |
 | `discoveries` | **the `discovery_made` events in the world log** — `DISCOVERY_EVENT` at `packages/shared/src/discovery.ts:3`, parsed with the landed `DiscoveryRecordSchema`. `byKind` groups on `kind` (`'craft' \| 'word'`), `byFinder` on `byId`; `craftsCodified` and `wordsMinted` are the two `kind` counts | **`discoveryHeadline` deliberately omits `intent`, so the one-way glass holds** (T24). The identity is asserted, not assumed |
 | `tree` | **`DISCOVERY_TREE` (T13)** ∩ the run's `codifiedVerbIds`. `anticipatedFound` is the intersection; `unanticipatedFound` is everything codified that the tree does not name | **This is the ONLY read of the tree in the whole plan (OD18).** `codexEntriesFromTree` is not read here or anywhere |
 | `mapChange` | `ringsStanding` from the plat state at run end; `plotsClaimed` from the `structure_planned` count; **`worldGrowths` from `tile_changed` events carrying `reason: 'grown'`** (★ v5b: there is no `world_grown` event — `events.def.ts:216` is the enum that names it) | All three are event-log counts, so a resumed run recovers them by replay |
@@ -9383,6 +9592,49 @@ describe('checkRehearsal', () => {
     expect(checkRehearsal(bare).pass).toBe(true)
     expect(checkRehearsal(bare).failures).not.toContain('furnishings')
     expect(G8RehearsalReportSchema.parse(bare).furnishings.placed).toBe(0)
+  })
+
+  // ★★★ v6, RULING 1 — THE ROWS THAT MAKE THE DRIVES LAYER FALSIFIABLE. Everything else in
+  // this file can pass on a town that did each thing once and stopped. These cannot.
+  it('★★ FAILS A TOWN THAT WAS OFFERED WANTS AND ANSWERED NONE OF THEM', () => {
+    const deaf = { ...fixture(), wants: { ...fixture().wants, offered: 400, answered: 12, answerRate: 0.03 } }
+    expect(checkRehearsal(deaf).failures).toContain('want-answer-rate')
+  })
+
+  it('★★ FAILS A TOWN THAT ANSWERED THE OFFERED WANT NO MORE OFTEN THAN THE ONES IT NEVER HEARD', () => {
+    // The road is decoration if this is 1.0: the mind was going there anyway.
+    const noLift = { ...fixture(), wants: { ...fixture().wants,
+      offered: 400, answered: 88, answerRate: 0.22,
+      suppressed: 900, suppressedAnswered: 189, suppressedAnswerRate: 0.21, lift: 1.05 } }
+    expect(checkRehearsal(noLift).failures).toContain('want-lift')
+  })
+
+  it('★ PASSES A TOWN THAT WALKED THE ROADS IT WAS GIVEN', () => {
+    const alive = { ...fixture(), wants: { ...fixture().wants,
+      offered: 400, answered: 132, answerRate: 0.33,
+      suppressed: 900, suppressedAnswered: 108, suppressedAnswerRate: 0.12, lift: 2.75 } }
+    expect(checkRehearsal(alive).pass).toBe(true)
+  })
+
+  // ★ v6 — the honest 0/0 case, and it is why the floor and the lift are BOTH gated. A town
+  // that answered nothing has a lift of 0/0; a ratio alone would divide by zero and a floor
+  // alone would let a town pass for answering wants it was never offered.
+  it('★ A TOWN THAT ANSWERED NOTHING AT ALL FAILS ON THE FLOOR, NOT ON A DIVISION BY ZERO', () => {
+    const dead = { ...fixture(), wants: { ...fixture().wants,
+      offered: 400, answered: 0, answerRate: 0, suppressed: 900, suppressedAnswered: 0,
+      suppressedAnswerRate: 0, lift: null } }
+    const out = checkRehearsal(dead)
+    expect(out.failures).toContain('want-answer-rate')
+    expect(out.failures).not.toContain('want-lift')     // null lift is not a lift failure
+  })
+
+  // ★ v6 — one dead drive among four is a finding, and a whole-run rate would bury it. This is
+  // REPORTED and not gated: four drives is a small sample and a mind may honestly never feel
+  // one of them, but a drive at zero across 21 sim-days and five minds is worth a paragraph.
+  it('★ CARRIES A PER-DRIVE BREAKDOWN AND GATES ON NONE OF IT', () => {
+    const oneDead = { ...fixture(), wants: { ...fixture().wants,
+      bySource: { ...fixture().wants.bySource, recognition: { offered: 60, answered: 0, answerRate: 0 } } } }
+    expect(checkRehearsal(oneDead).pass).toBe(true)
   })
 
   it('★ FAILS A TOWN THAT BUILT NOTHING — the defect this plan exists to fix', () => {
@@ -9455,6 +9707,21 @@ describe('checkRehearsal', () => {
   // `births: 1` stays a FAILURE, and the two are not the same case: gestation is 72 days, so a
   // birth in 21 is arithmetically impossible and can only mean the clock is broken. An elder
   // death is merely unexpected. Unexpected is REPORTED; impossible is GATED.
+  // ★★ v6, RULING 3 — THE RUN MAY NOT GRADE ITS OWN SCAFFOLDING. `masonIntent` and
+  // `SJ_DEV_JOINT` are the dev world's scripted demonstration policy; a run in which either was
+  // on satisfies criterion 5 without a mind having decided anything, and v5b had no field that
+  // could even have said so. This fails BEFORE any production number is read, because a
+  // production number from a scaffolded run is not a wrong answer — it is not an answer.
+  it('★★ FAILS A RUN THAT WAS STANDING ON THE DEV MASON', () => {
+    for (const policies of [{ devMason: true, devJointBuild: false },
+                            { devMason: false, devJointBuild: true }]) {
+      const scaffolded = { ...fixture(),
+        manifest: { ...fixture().manifest, held: { ...fixture().manifest.held, scriptedPolicies: policies } } }
+      expect(checkRehearsal(scaffolded).failures).toContain('scaffolding-on')
+    }
+    expect(checkRehearsal(fixture()).failures).not.toContain('scaffolding-on')
+  })
+
   it('asserts the thing that MUST be zero, and REPORTS the thing that is merely unexpected', () => {
     expect(checkRehearsal({ ...fixture(), births: 1 }).failures).toContain('births-impossible')
     expect(checkRehearsal({ ...fixture(), elderDeaths: 1 }).pass).toBe(true)
@@ -9487,7 +9754,7 @@ git commit -m "feat(supervisor): the rehearsal's report — everything the world
 
 All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throttles turns and would make every number a fiction), on the arm64 stack, C7 pre-flight first, tripwire per C6. Cost at the re-derived rate: **A ≈$4.52, B ≈$1.51, C ≈$1.51 — ≈$7.54 total.**
 
-**PASS CRITERIA — written before the run, never decided after it. SIXTEEN in v3; ★ v5b makes it SEVENTEEN, and the seventeenth is a TIGHTENING.** Criterion 2 is still the headline.
+**PASS CRITERIA — written before the run, never decided after it. SIXTEEN in v3; v5b made it SEVENTEEN; ★★ v6 makes it EIGHTEEN, and BOTH additions are TIGHTENINGS.** Criterion 2 is still the headline, and **criterion 18 is the first criterion in this plan's history that measures whether a mind wanted anything.**
 
 > ### ★★ v5b — OD20 IS RULED, AND THE RECORD OF WHY MATTERS MORE THAN THE ROW
 >
@@ -9503,8 +9770,8 @@ All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throt
 | **2** | **★ ZERO UNFORCED DEATHS, ON EVERY DAY, IN ALL THREE RUNS. `classifyDeaths(report.deaths).pass === true`. Any death by starvation, thirst or exposure FAILS THE RUN, and so does a `fatigue` death with no rescue window or an answered one.** | **gate** | **USER DIRECTIVE 2026-08-18, C26, T66** |
 | 3 | Steady-state survival tax over the last two sim-days, **reported against the ~18% floor with both classifiers printed** (C10), against the measured 35–41% history | **REPORTED, NOT GATED — demoted in v3** | C26 — the primary law is the taxonomy |
 | 4 | **Every mind reaches ≥1 full-need moment per sim-day** from day 2, and **`discretionaryActRate` ≥ 8** | **gate** | emergence law — *that window is where culture happens* |
-| 5 | **★ PRODUCTION IS NON-ZERO.** `builds + crafts + chops + tills + plants ≥ 1 per town-day from day 2, and ≥ 1 structure completed across the run | **gate** | **batch 14 — the central defect** |
-| 6 | **★ THE MODE-COLLAPSE GATE PASSES**: `D_b ≥ 0.15`, `D_c ≥ 0.12`, `unisonBuckets ≤ 0.34`, `≥3` qualifying buckets — **and, across A and B, `D_r ≥ D_b`** | **gate** | **U29, U31** |
+| 5 | **★ PRODUCTION IS NON-ZERO.** `builds + crafts + chops + tills + plants ≥ 1 per town-day from day 2, and ≥ 1 structure completed across the run. **★★ v6, RULING 3 — AND THE RUN WAS NOT STANDING ON THE DEV MASON.** `manifest.held.scriptedPolicies` is `{devMason: false, devJointBuild: false}` in all three runs. `masonIntent` and `SJ_DEV_JOINT=1` landed with the `first-night` lane and are a **scripted demonstration policy**; a run in which either was on satisfies this criterion without a mind having decided anything, which is **the run grading its own scaffolding.** A production number from a scaffolded run is not a wrong answer — it is not an answer, and `checkRehearsal` fails `scaffolding-on` before it reads one | **gate** | **batch 14 — the central defect; ★ v6 RULING 3** |
+| **6** | **★ THE MODE-COLLAPSE GATE PASSES, AND ★★ v6 IT HAS TWO HALVES.** **Between minds** — `D_b ≥ 0.15`, `D_c ≥ 0.12`, `unisonBuckets ≤ 0.34`, `≥3` qualifying buckets — and, across A and B, `D_r ≥ D_b`. **Within a mind — NEW, and the reason the first half is not enough** — `D_s ≥ 0.10` (min across minds) and `minDiscretionaryVerbEntropy ≥ 0.25`, both **PROVISIONAL** and derived in T26, with `≥5` qualifying mind-days. **Five minds each doing one verb, a different one each, score 1.00 on `D_b` and `D_c` and 0.00 on `unisonBuckets` — the maximum on every between-mind number.** That is five stopped clocks, and the between-mind half alone reads it as a perfect pass | **gate** | **U29, U31; ★ v6 RULING 1** |
 | **7** | **★ `socialVerbDiversity ≥ 3` across the run, and `discretionarySocialShare` reported per day.** Give, tend, teach and joint build each non-zero at least once. **Social-need satisfaction is NOT a criterion and may not be quoted as evidence.** **★★ v6 — THE JOINT-BUILD CLAUSE IS PASSABLE. OD22 LANDED (`8056f1f`) and `many-hands` also made joint building RATIONAL**, so a mind that tries it is not punished for it. **The clause is unchanged and was never weakened**, which is the point worth recording: v5b named it unpassable and refused to soften it, and the fix arrived instead | **gate** | **C25 — the paired pull, made enforceable** |
 | 8 | `codifiedVerbs ≥ 1`, every recorded `attempt` carries a `recipe.canon` the codex holds, **and a repeat of a codified intent resolves with zero arbiter calls** | **gate** | delta §8 / G9 §17.3. **Non-negotiable** |
 | 9 | The arbiter is world-sighted: **zero** rulings denying a structure visible at ask time. **UNMET at `gate-g11-partial` (16/17) and carried here as T24's debt — see the box on Task 24. If it fails, it fails for the FIRST time** | **gate** | mini-rehearsal W2 / batch-8 R9, ruling R8 |
@@ -9516,7 +9783,18 @@ All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throt
 | **15** | **★ THE RESCUE WINDOW WAS ANSWERED AT LEAST ONCE.** `rescueWindowsOpened ≥ 1` and `rescueWindowsAnswered ≥ 1`; if `opened === 0` the run reports **no coverage** and criterion 2 carries the verdict alone | **gate, conditional** | **lever 2, T55** |
 | **16** | **★ THE FURNITURE SEAM IS EXERCISED:** `furnishings.placed`, `distinctKinds`, `sharedKinds`, `capRefusals` all counted, and `commissionsRequested === 0` | **REPORTED — except `commissionsRequested === 0`, which is GATED** | **Phase F3, user directive** |
 | **17** | **★★ THE TOWN BUILT SOMETHING. `production.builds ≥ 1` across the run, in all three runs.** Split out of criterion 5's disjunction because `craft` was never the blocked verb and satisfies it alone. **A TIGHTENING — see the box above: the bar went up, not down** | **gate** | **OD20 RULED 2026-08-24, C23** |
+| **18** | **★★★ THE WANTS WERE ANSWERED, AND MORE OFTEN THAN THE ONES NOBODY WAS TOLD ABOUT.** `wants.answerRate ≥ 0.15` **and** `wants.lift ≥ 2.0`, in all three runs — an absolute floor **and** a contrast, because either alone is satisfiable without the property holding: a lift of 0/0 is undefined and a floor alone passes a town that was going there anyway. **Both PROVISIONAL; no run has ever measured an answer rate, and the derivation is printed below rather than left to be guessed at.** `bySource` is reported per drive and gated on none of it | **gate** | **★ v6 RULING 1 — the only criterion in G8 that measures motive rather than activity** |
 | **—** | **★ REPORTED AND NEVER GATED (OD21 RULED, and the ratified G8 verdict).** `discoveries.total / byKind / byFinder`, with the identity **`discoveries.total === craftsCodified + wordsMinted`** — the assertion that keeps the two codification paths from drifting; and the map-change columns `ringsStanding`, `plotsClaimed`, `worldGrowths`. **No run has produced a baseline for any of the six, and a threshold with no baseline is what C23 forbids** | **REPORTED** | **OD21, T49** |
+
+> ### ★★★ v6, RULING 1 — CRITERION 18's TWO THRESHOLDS, DERIVED IN WRITING BEFORE THE RUN THAT JUDGES THEM (C23)
+>
+> **Both are PROVISIONAL and the plan says so in its own text, because no run in this project's history has ever measured a want-answer rate.** A number invented for the first run that could meet it is a number with nothing behind it, and C23 forbids exactly that. What follows is what each is anchored to.
+>
+> **`wants.lift ≥ 2.0` — the contrast, and it is the load-bearing half.** `chooseWantLine` computes four magnitudes and speaks one. **The three that cleared their rung and lost are a control arm that costs nothing**: same mind, same tick, same body, same world — the only difference is that one was said out loud in block 6 and three were not. **If the offered want is answered no more often than the suppressed ones, the line in block 6 is decoration and the drives layer is a want generator nobody listens to.** 2.0 means *twice as often*, which is the smallest contrast that cannot be read as noise at the sample sizes a 21-day run produces (~400 offered wants across five minds). **This is the design's own 15:1 figure made computable** — *"the need that was given a road was answered 15 times and the need that was not was answered once"* was measured by hand, once, and never again. **15:1 is a lift of 15. The bar is 2.**
+>
+> **`wants.answerRate ≥ 0.15` — the floor, and it exists so a ratio of two zeros cannot pass.** Anchored to the plan's own arithmetic rather than picked: T15 states that holding tedium under 30 across a 960-tick waking day costs **3–4 novel acts**, against the **~17 discretionary turns** this design is trying to fill. **3.5 of 17 is 0.21.** 0.15 is one notch below the design's own stated intent — **a floor the plan's own arithmetic clears, which is the right shape for a provisional bar.** A town under it is not answering the wants it is given, whatever the lift says.
+>
+> **★ AND THE HONEST LIMIT, STATED RATHER THAN DISCOVERED.** The answer rate cannot tell a want that was *felt* from a want that was *convenient* — a mind already walking past the unseen tile answers a tedium want for free. **The lift is what protects against that**, because a convenient answer is equally convenient for a suppressed want, and the control arm absorbs it. **If lift and rate disagree — a healthy rate with a lift near 1 — the honest reading is that the roads are naming places minds were going anyway, which is a finding about the roads and not about the minds.**
 
 > ### ★★ v5 — DO G8's CRITERIA STILL MEASURE THE RIGHT THINGS? THE ANSWER IS MOSTLY YES, AND **NOTHING IS CHANGED HERE**
 >
@@ -9568,10 +9846,10 @@ git commit -m "test(supervisor): G8 dress rehearsal — 21 sim-days neutral, a s
 
 **GATE G8 (LAUNCH) — NINE checks, each with observed evidence.** Checks 1–5 are re-asserted **offline against committed reports**, so the gate is re-runnable forever; 6–9 are ops commands recorded with their output in the checklist.
 
-1. **The rehearsal passed all SEVENTEEN criteria, in all three runs** (★ v5b — OD20 split `builds ≥ 1` out of criterion 5 as criterion 17; **it is a tightening and the count went up with it**) — the three reports through `checkRehearsal`, plus the cross-run `D_r` row.
+1. **The rehearsal passed all EIGHTEEN criteria, in all three runs** (v5b's OD20 split `builds ≥ 1` out of criterion 5 as criterion 17; **★ v6 adds criterion 18, the want-answer rate** — **both are tightenings and the count went up with each**) — the three reports through `checkRehearsal`, plus the cross-run `D_r` row.
 2. **Nothing was injected** — `g8-injection-report.json`, all 14 cases `executed === false`, **in both arms**.
 3. **The cost gate holds** — `cost-after.json` against `cost-baseline.json`, every row of T41's table.
-4. **★ The town builds and the town differs** — `production.structuresCompleted ≥ 1` and `modeCollapse.pass === true` in run A. *These two are the whole point of the chunk and they get their own check rather than hiding inside criterion lists.*
+4. **★ The town builds, the town differs, and ★★ v6 SOMEBODY IN IT WANTED SOMETHING** — `production.structuresCompleted ≥ 1`, `modeCollapse.pass === true` (**both halves: between-mind AND `D_s` / `minDiscretionaryVerbEntropy`**), and **`wants.answerRate ≥ 0.15` with `wants.lift ≥ 2.0`**, in run A. *These are the whole point of the chunk and they get their own check rather than hiding inside criterion lists.* **★★ v6, RULING 3 — and the check reads `manifest.held.scriptedPolicies` first: `{devMason: false, devJointBuild: false}`, or the build number is scaffolding and the check has measured nothing.*
 5. **★ THE TOWN DOES NOT LOSE ANYONE IT SHOULD HAVE SAVED, AND IT DOES NOT GO QUIET DOING IT.** `classifyDeaths(report.deaths).pass === true` in **all three runs**, and `socialVerbDiversity ≥ 3` in all three. *These are the user's directive and its paired trap, and they get their own check for the same reason check 4 does: a gentler world that produced an emptier town would pass every other line on this page.*
 6. **The stack is alive on arm64** — `deploy/smoke.sh` output, including the restart-resume line, the retrieval-index line, and the on-box tick figures.
 7. **The restore drill replays** — `deploy/restore-drill.sh` printed `RESTORE DRILL OK` **and** the replay hash matched.
@@ -9601,6 +9879,7 @@ grep -q "folding to a mid-log tick" packages/engine/src/golden.test.ts && echo "
 | **Elder death and the ceremony** | 21 sim-days of thirty-year-olds cannot produce one. **No coverage, never a pass** | **T60's offline test** against a seeded ninety-year-old, and T61's milestone unit tests |
 | **Furniture placement** | the slice proves a seam; whether a mind chooses to furnish its house is the town's business | **counted** in `report.furnishings`, with `commissionsRequested === 0` gated by criterion 16 |
 | **★ v5b — the Discovery Record, and the tree score** | **OD21 and OD18, both ruled 2026-08-24. Gating on discoveries makes the arbiter's openness a target, and a target is not a measurement**; and the tree is a yardstick, never a gate | **counted** in `report.discoveries` and `report.tree`. The only assertion is the ledger identity `total === craftsCodified + wordsMinted`, which catches a path that stopped recording and never judges the town |
+| **★ v6 — the per-drive answer breakdown** | `wants.bySource` — four drives is a small sample and a mind may honestly never feel one of them. **The aggregate rate and the lift ARE gated (criterion 18); the split is not** | **counted** in `report.wants.bySource`. **A drive at zero across 21 sim-days and five minds is a paragraph in the read-through**, and the most likely single thing to say that Phase C built a drive nobody has |
 | **★ v5b — what the town did to the map** | `ringsStanding`, `plotsClaimed`, `worldGrowths` are real observables with **no prior run to derive a threshold from** | **counted** in `report.mapChange`. A 21-day soak that never leaves ring 1 is a finding for the read-through |
 | **Art quality of anything** | **mechanical gates are necessary and never sufficient — the user's eye is the only art gate (C20).** `farmland_0` self-tiles into rows of cottages and passes every gate we have | the checklist records that the art is unreviewed and by whom it must be reviewed |
 | **★ Whether the town SOUNDS contemporary** | **no gate can score a period.** C29 is enforced by unit tests over authored strings, and a unit test cannot tell whether five minds in a live run reasoned like farmers or like foragers | **the chronicle read-through, T50 step 4.** The setting lane's R0 named the exact place to look if a live run still sounds pre-industrial: **not the canon — the minds never see it — but block 6's makeables line and the perception prose.** The read-through reports it in one paragraph, and it is a **finding, not a gate** |
