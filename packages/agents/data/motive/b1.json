@@ -1,0 +1,93 @@
+{
+  "arm": "b",
+  "label": "b1",
+  "ticks": 720,
+  "startTick": 1080,
+  "llmCalls": 165,
+  "costUsd": 0.1179,
+  "intents": 237,
+  "byVerb": {
+    "enter": 82,
+    "speak": 81,
+    "sleep": 20,
+    "stow": 17,
+    "walk": 15,
+    "forage": 9,
+    "experiment": 5,
+    "wake": 4,
+    "harvest": 2,
+    "plan": 1,
+    "eat": 1
+  },
+  "builds": 0,
+  "structuresPlanned": 0,
+  "structuresCompleted": 0,
+  "structureProgressed": 0,
+  "entered": 0,
+  "spoke": 80,
+  "refusals": 111,
+  "refusalsByReason": [
+    [
+      "there is no way into a cabin",
+      42
+    ],
+    [
+      "there is no way into a cottage",
+      38
+    ],
+    [
+      "there is no bed here; find somewhere to lie down — weary enough and the bare ground will do",
+      12
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      5
+    ],
+    [
+      "not holding that",
+      4
+    ],
+    [
+      "already at that spot",
+      2
+    ],
+    [
+      "no such crop",
+      2
+    ],
+    [
+      "not close enough to put anything down there",
+      1
+    ],
+    [
+      "unknown verb: plan",
+      1
+    ],
+    [
+      "not close enough to gather — the patch is at (76, 107); stand beside it",
+      1
+    ],
+    [
+      "no path to that spot",
+      1
+    ],
+    [
+      "already asleep",
+      1
+    ],
+    [
+      "collapsed and unable to act",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 44.6,
+    "yusuf": 44.6,
+    "nadia": 44.6,
+    "omar": 44.6,
+    "salma": 44.6
+  },
+  "buildIntents": [],
+  "thoughtsMentioningCold": 106,
+  "thoughts": 146
+}

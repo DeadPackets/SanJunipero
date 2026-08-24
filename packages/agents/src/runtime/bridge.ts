@@ -1,7 +1,10 @@
 import {
+  ambientTempAt,
   composePerception,
   groundForBuilding,
   FORAGEABLE_YIELD,
+  insulationOf,
+  isExposed,
   isFoodKind,
   isPassable,
   makeables,
@@ -13,6 +16,7 @@ import {
   type EventStore,
   type TickHandler,
   type TickLoop,
+  type WorldState,
 } from '@sj/engine'
 import type { Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
 import type { SimConfig, SimEvent } from '@sj/shared'
@@ -45,19 +49,41 @@ type QueuedSubmit = {
 // The engine names an owner for everything it can; a mind needs telling only
 // when the thing is not its own. Names, not ids — the packet carries no ids to
 // compare, and two people in one town do not share a name.
+// `spoiling` rides along: the engine composes it and the mapping used to drop it, the same
+// way it dropped fauna and forageables, so nobody was ever told their fish was going over.
 function claims(
-  i: { ownerName?: string; crafterMarkName?: string },
+  i: { ownerName?: string; crafterMarkName?: string; spoiling?: true },
   selfName: string,
-): { ownerName?: string; crafterMarkName?: string } {
+): { ownerName?: string; crafterMarkName?: string; spoiling?: true } {
   return {
     ...(i.ownerName === undefined || i.ownerName === selfName ? {} : { ownerName: i.ownerName }),
     ...(i.crafterMarkName === undefined || i.crafterMarkName === selfName ? {} : { crafterMarkName: i.crafterMarkName }),
+    ...(i.spoiling === undefined ? {} : { spoiling: i.spoiling }),
   }
+}
+
+// How the cold stands against a body, read straight off the engine's own law. `isExposed`
+// decides in one order — a roof, then what is on your back, then a fire — and this reads that
+// same order forward, so the sentence a mind gets and the number its body loses cannot
+// disagree. Absent whenever the air is warm enough that nothing is standing between anything.
+function coldOf(
+  state: WorldState, config: SimConfig, agentId: string,
+): { biting: true } | { keptOffBy: 'walls' | 'coat' | 'fire' } | undefined {
+  if (!config.warmth.enabled) return undefined
+  const a = state.agents[agentId]
+  if (a === undefined || !a.alive) return undefined
+  const ambient = ambientTempAt(state, config)
+  if (ambient >= config.warmth.comfortBand) return undefined
+  if (isExposed(state, config, agentId)) return { biting: true }
+  if (a.insideId !== undefined) return { keptOffBy: 'walls' }
+  if (ambient + insulationOf(state, config, agentId) >= config.warmth.comfortBand) return { keptOffBy: 'coat' }
+  return { keptOffBy: 'fire' }
 }
 
 function reconcile(
   raw: EnginePerceptionPacket,
   self: { name: string; asleep: boolean; collapsedSinceTick: number | null } | undefined,
+  cold: ReturnType<typeof coldOf>,
 ): PerceptionPacket {
   const selfName = self?.name ?? ''
   return {
@@ -84,6 +110,7 @@ function reconcile(
     ...(raw.ground === undefined ? {} : { ground: raw.ground }),
     ...(raw.fumbling === undefined ? {} : { fumbling: raw.fumbling }),
     ...(raw.wayUnclear === undefined ? {} : { wayUnclear: raw.wayUnclear }),
+    ...(cold === undefined ? {} : { cold }),
     light: raw.light,
     visible: {
       agents: raw.visible.agents,
@@ -194,6 +221,7 @@ export class EngineBridge {
     return reconcile(
       composePerception(this.#loop.state, this.#simConfig, agentId, this.#recentEvents()),
       this.#loop.state.agents[agentId],
+      coldOf(this.#loop.state, this.#simConfig, agentId),
     )
   }
 

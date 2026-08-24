@@ -1,0 +1,97 @@
+{
+  "arm": "b",
+  "label": "b2",
+  "ticks": 720,
+  "startTick": 1080,
+  "llmCalls": 163,
+  "costUsd": 0.0923,
+  "intents": 244,
+  "byVerb": {
+    "enter": 102,
+    "speak": 62,
+    "sleep": 24,
+    "walk": 18,
+    "forage": 10,
+    "stow": 8,
+    "wake": 7,
+    "give": 5,
+    "harvest": 4,
+    "experiment": 3,
+    "move": 1
+  },
+  "builds": 0,
+  "structuresPlanned": 0,
+  "structuresCompleted": 0,
+  "structureProgressed": 0,
+  "entered": 0,
+  "spoke": 60,
+  "refusals": 138,
+  "refusalsByReason": [
+    [
+      "there is no way into a cottage",
+      62
+    ],
+    [
+      "there is no way into a cabin",
+      37
+    ],
+    [
+      "there is no bed here; find somewhere to lie down — weary enough and the bare ground will do",
+      13
+    ],
+    [
+      "already at that spot",
+      4
+    ],
+    [
+      "no such crop",
+      4
+    ],
+    [
+      "not holding that",
+      4
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      3
+    ],
+    [
+      "already asleep",
+      3
+    ],
+    [
+      "collapsed and unable to act",
+      3
+    ],
+    [
+      "not close enough to gather — the patch is at (72, 105); stand beside it",
+      1
+    ],
+    [
+      "not close enough to gather — the patch is at (72, 68); stand beside it",
+      1
+    ],
+    [
+      "not adjacent to give — they are at (78, 106)",
+      1
+    ],
+    [
+      "stow needs {itemId, structureId}",
+      1
+    ],
+    [
+      "unknown verb: move",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 44.6,
+    "yusuf": 44.6,
+    "nadia": 44.6,
+    "omar": 44.6,
+    "salma": 44.6
+  },
+  "buildIntents": [],
+  "thoughtsMentioningCold": 91,
+  "thoughts": 149
+}

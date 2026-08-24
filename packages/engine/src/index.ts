@@ -22,6 +22,9 @@ export * from './systems/desirePaths.js'
 export * from './systems/thirst.js'
 export * from './systems/aging.js'
 export * from './systems/weather.js'
+// The one system whose facts never reached the public surface, so nothing outside the engine
+// could ask whether a body was cold — which is why perception could not say it.
+export * from './systems/warmth.js'
 export * from './systems/fire.js'
 export * from './systems/crops.js'
 export * from './systems/wildlife.js'
