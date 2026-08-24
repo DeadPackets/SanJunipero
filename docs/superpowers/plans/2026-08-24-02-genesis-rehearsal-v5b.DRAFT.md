@@ -136,6 +136,84 @@ Read it as a sentence: **a genome makes a drive, the drive gains a person, the p
 
 ---
 
+---
+
+## ★★★ THE HONEST READ — WHAT IS WRONG WITH THIS PLAN, AND THE ONE THING IT CANNOT SEE
+
+> **New in v6, and it is not a changelog.** Everything above this line describes work. This section describes **the plan's own defects**, found by reading all 9 981 lines of v5b against `main` @ `9d76b97`. It is here rather than in a report because an executor who dispatches wave 1 tomorrow needs it, and because a plan that knows what is wrong with it is worth more than one that does not.
+
+### 1. ★★ DOES C8 MEASURE MOTIVE, OR ONLY ACTIVITY? **ONLY ACTIVITY. A REHEARSAL CAN SCORE FULL MARKS ON A TOWN THAT IS MERELY BUSY.**
+
+**This is the largest finding in the revision and it is not a stale reference — it is a hole in the instrument.** The project's own standing question is that *no mind has a motive: every capability exists, no want does.* **Phase C builds the wants. Nothing in Phases E, K or the gate ever asks whether one was answered.**
+
+**Read the gated criteria as a set and the shape is unmistakable — every one of them is satisfiable by a town that does each thing once and then stops for three weeks:**
+
+| Gated on | Passing town |
+|---|---|
+| `discretionaryActRate ≥ 8` — acts per 1 000 ticks of open full-need window | **walks in circles.** `walk` is an act; the rate counts acts, not their content |
+| `socialVerbDiversity ≥ 3` | gives **once**, tends **once**, teaches **once**. Day 1. Then silence for twenty days |
+| criterion 7's *"give, tend, teach and joint build each non-zero at least once"* | the words are *at least once* |
+| criterion 5 + criterion 17, `builds ≥ 1 across the run` | **one house in twenty-one sim-days** |
+| `D_b ≥ 0.15`, `D_c ≥ 0.12`, `unisonBuckets ≤ 0.34` | **five minds each stuck in a DIFFERENT rut score perfectly.** Divergence measures difference, and five stable ruts are maximally different |
+| the seamcheck's eleven rows | **all eleven are `boolean` or `≥ 1`** |
+
+**There is no criterion anywhere in this plan for persistence, for return, or for cost paid.** A town of five stopped clocks, each stopped at a different hour, passes G8.
+
+**★ AND THE SHARPEST FORM OF IT, WHICH IS A ONE-LINE FACT ABOUT THE ARCHITECTURE.** `chooseWantLine` (T18) is **the only place in the entire plan where a want is produced**. It computes a magnitude, picks the loudest drive above its rung, and renders a line and a road. **No task, no report field, no criterion and no seamcheck row ever reads whether the mind walked the road.** The drives layer is a want generator with no closed loop: it can be completely inert — every road offered, every road ignored, every day — and **every number in this plan is unchanged.**
+
+The measured precedent is already in the document and points the other way: *"in one run, with the same five minds, the need that was given a road in block 6 was answered **15 times** and the need that was not was answered **once**."* **That 15:1 is a motive measurement, it is the single strongest piece of evidence in the design, and C8 does not compute it.**
+
+**★ THREE THINGS THAT WOULD MEASURE MOTIVE, ALL COMPUTABLE FROM THE LOG THIS PLAN ALREADY WRITES, NONE OF THEM SCHEDULED.** Named here, not added as tasks — the numbering rule forbids it and the controller should choose:
+
+1. **Answer rate.** Of the wants that crossed a rung and were given a road, what share were followed within N ticks by the act that road named. **`chooseWantLine` already returns `{source, magnitude, line, road}` and the turn is already recorded**; this is a join between two tables that both exist. *A drive with a road nobody walks is a drive that does not exist, and today it reads identically to one that works.*
+2. **Cost paid.** A mind that walks twenty tiles to a grave, or spends 500 ticks joint-building where 100 alone would have done, **has revealed a preference.** Distance and time spent on a **discretionary** act is the cheapest possible motive signal and appears nowhere in T49's schema.
+3. **Persistence under interruption.** `reconsider_at` is landed and `action_interrupted` is an event. **A mind that re-forms the same intention after being interrupted wanted it**; a mind that does not was passing time.
+
+**Why this matters more than any stale signature in this document:** the plan can pass G8, ship, and the read-through can report a lively town — and **we would still not know whether the drives layer did anything at all.** T50's step 4 asks a human *"whether the discretionary time produced anything worth watching"*, and that question is currently the **only** instrument pointed at motive in the entire chunk. **If exactly one of the three above is added, make it the answer rate**: it is a join over two existing tables, it costs no live spend, and it is the direct test of the sentence Phase C was built on.
+
+### 2. Vacuous, contradictory or dead — by number
+
+**Seven were fixed in place in v6 because they would stop an executor dead. Five are named and left, because fixing them is a judgement the controller should make.**
+
+| # | Task | What is wrong | v6 |
+|---|---|---|---|
+| 1 | **T12** | `node()`'s default is `era: 1` against a `z.enum(ERAS)` schema. **`DiscoveryNodeSchema.parse` throws on the first call and all ten rows die at the fixture.** Two more rows carry `era: 3` and `era: 2`. This is the identical defect v5 caught in T14 — a numeric era against a named enum — left standing in the task that *defines* the enum | **FIXED** |
+| 2 | **T14** | The printed implementation is `era: ERAS[n.era - 1]!`, **three paragraphs after the task's own box explains that `ERAS[<a string> - 1]` is `ERAS[NaN]` is `undefined`.** An executor who copies the block gets the exact red they were warned about | **FIXED** |
+| 3 | **T14** | `freshArbiterDb()` is called and never defined; the file defines `seeded()` only | **FIXED** |
+| 4 | **T25 / T57** | **They disagree about whether `speak` counts, and T25 imports T57's function.** T25 expects diversity 0 for three `speak`s; T57 expects 1 for four. Red at T25, and the fix an executor reaches for is to edit whichever file they opened second | **FIXED** — the count keeps `speak`, and the law's floor becomes `nonSpeakSocialVerbs`, a second function |
+| 5 | **T43, T50** | Both write a **`*.livetest.ts`**. The `unpin` lane deleted all three of those files, `vitest.live.config.ts` and `pnpm test:live`. **A file on that pattern matches no runner, is executed by nothing, and reports no failure** — vacuous by construction, and undiscoverable until G8 asks for its output. Neither file makes a live call | **FIXED** — both become ordinary `.test.ts` in the main suite |
+| 6 | **T64** | Calls `sim.applyVerdict`, `sim.advance`, `sim.alerts` and **`sim.forgeCallCount()`**. T32's `Sim` declares none of the four, and `forgeCallCount` exists nowhere in the plan, the tree or any other test — **it was invented by the assertion that reads it** | **FIXED** — declared on `Sim` in T32, where a type is produced once, and renamed `forgeCommissionCount` to the number it asserts |
+| 7 | **T49 / T50 criterion 13** | `elder-death-unexpected` **fails the run if an elder dies.** Phase F2 exists to make an elder death possible, distinguishable and ceremonial. It is inert today — 21 sim-days of thirty-year-olds cannot produce one — and **becomes wrong the moment aging works**, which is the worst kind of dormant guard | **FIXED** — reported, not gated. `births: 1` stays a failure: 72-day gestation makes a birth *impossible*, not merely unexpected, and the two are different cases |
+| 8 | **T49** | `expect(bare.furnishings.placed).toBe(0)` asserts a property of the fixture the line above just wrote. **True whatever `checkRehearsal` does** | **FIXED** |
+| 9 | **T22** | `it('★ BOTH HEAVY KINDS ALREADY STAND IN THE TOWN')` checks one. **The town stands no `shed`** — T62's own box records it — and OD19's argument rests on `storehouse` alone | **FIXED** |
+| 10 | **T30** | Four of its five rows are declared to PASS on the first run. The task calls this correct and it is — they assert landed guarantees — but **T30 is one real step and four assertions**, and it is scheduled as a task | **LEFT.** It is honest work and cheap; it is named so nobody counts it as a fifth of Phase G |
+| 11 | **T48 step 1, item 10** | *"median and p99 tick compute measured ON THE BOX"* with **no threshold stated in the task and no gate in T51.** The G11a numbers (<50 ms median, <250 ms p99) are quoted as the reason to measure and then never compared against | **LEFT** — the threshold is a ruling, not an executor's call. **If the box misses it, nothing in this plan notices** |
+| 12 | **T50 criterion 3, and the survival tax generally** | Reported, never gated, by a correct ruling (C26). But the plan prints **two** classifiers in **three** reports across **21 days** and gates on neither. **That is six numbers a reader must interpret with no bar** | **LEFT** — C10 requires both and the ruling is the user's |
+| 13 | **T24** | Four unrelated changes in four packages: prose phrases, a `teach` mint, an `isExpressive` inversion, an arbiter context. **They share no file and no symbol**, and one of them (the inversion) is described as *"the biggest wall"* and *"the largest single source of Discovery Records in the run"* | **LEFT** — splitting it renumbers, which is forbidden. **The wave table treats it as one wave-1 task, and a lane may take its four steps as four commits** |
+| 14 | **T51 checks 1–5** | Re-assert `checkRehearsal` offline against committed reports. **That duplicates T49 exactly**, on purpose, so the gate re-runs for ever | **LEFT — and it is correct.** The user kept re-runnable file tests as *"just good tests"* |
+
+### 3. Which tasks assume a capability that does not exist, or has since been built differently
+
+**Nine. Eight are fixed above or in their tasks; the ninth is a live hazard.**
+
+Already answered by a landed lane: **T21 Step 0** (OD22 landed at `8056f1f` — deleted), **T22's hand counter** (`handsOnSite` is landed and exported — consumed rather than written), **T22's `stepBuild` arity** (**three** at `9d76b97`, not the two v5b corrected it to — the fourth revision in a row to get this one signature wrong), **T7's `BLOCK1_SHA256` import** (symbol deleted), **T29's nine re-pin sites** (all deleted), **T51 check 9** (its subject deleted), **T43/T50's live runner** (deleted).
+
+**Not one of the 66 tasks is already done.** `packages/agents/src/{founders,genome,drives}`, `packages/engine/src/{discovery,rescue,furnishings,deathTaxonomy,testFixtures,ageing.prose}`, `packages/supervisor/`, `packages/gateway/src/staticSpa.ts`, `packages/shared/src/canon.ts` and `deploy/` **all do not exist**; `TickLoop` has no `pause`. **What has landed is prerequisites, not tasks** — `groundForBuilding`, `makeablesLine`'s second parameter, `joinableSite`, `handsOnSite`, the mason, the first night — and each is a task's *foundation* rather than its content.
+
+**The live hazard, and it is T19/T20's, restated because the lane that created it has now landed:** `masonIntent` exists in `packages/gateway/src/founders.ts:244` and `SJ_DEV_JOINT=1` makes two dev masons raise one house. **That is a scripted demonstration policy.** C8's minds must not be given its decision rule, **T32 must not wire it**, and **G8 criterion 5 must never be scored against a run in which a scripted mason was building.** T50 asserts which arm it ran; it must also assert that the dev mason and `SJ_DEV_JOINT` were off.
+
+### 4. Is 66 the right size?
+
+**Yes in count, no in shape, and "make it 30" would be the wrong surgery.**
+
+**The count is not the problem — the variance is.** **T32** wires ten things and is the join of nine tasks. **T50** is three live runs, a $7.54 spend and a human read-through of 21 chapters. **T24** is four unrelated changes in four packages. Against those, **T31** is five methods on a class, **T35** is one static handler, and **T23** is a five-branch function. **A wave table cannot fix a task that is secretly ten tasks**, and the three that are — T24, T32, T50 — are the three most likely to be reported as *"done"* while one of their halves was skipped.
+
+**What would actually cut the plan: nothing that builds.** Read against the user's ruling — *does this make the town more watchable, or only more provable?* — the scope reduction has already been paid, in this revision, and it came to **≈150 lines of pin ceremony and one 43-line global constraint, not to tasks.** **Zero of the 66 die.**
+
+**One candidate was examined and KEPT, and it is listed rather than deleted because the brief's rule is that ambiguity keeps the work: T27's `comparableRuns`.** It refuses a comparison unless every HELD field matches, which is reproducibility machinery, and the user cut cross-run reproducibility. **It stays**, for two reasons: `D_r` measures whether two towns **differ**, which is the opposite of reproducibility and is U31's explicit ask; and a `D_r` computed across two runs on different prompt versions is a number that means nothing, so the guard is what makes the measurement honest rather than what makes it provable. **If the controller reads it the other way, it is one function and its four test rows, and deleting it is a ten-minute follow-up.**
+
+**The honest recommendation: keep 66, and split three of them at execution time without renumbering.** T24 into its four walls, T32 into wire / genesis-or-resume / births, T50 into runs A, B and C. Each is already stepped that way. **The plan's own numbering rule permits it: a task number is an identity, not a unit of work.**
+
 **Goal:** Turn the town from a place that subsists into a place that builds, gives, ages and differs — five minds that start **neutral** and acquire character through play, measured against a mode-collapse number that can fail a gate, in a world where **death is punctuation rather than attrition** — then ship it as an arm64 Docker Compose stack, pass **GATE G8**, and put it on a subdomain last.
 
 **Architecture:** Three things sit on top of the finished world. **A genome** — seven temperament axes, a pure function of `(worldSeed, agentId)`, stored nowhere and therefore pinning nothing — supplies the per-agent variation that authored personas used to supply. **A mind-side drives layer** in `packages/agents/src/drives/` turns satisfaction from a terminal state into four gradients (tedium, attachment, obligation, recognition), each with a felt line and a **road** — a named place, person or thing the mind can walk to. **A production road** gives `build`, `chop`, `till` and `plant` the coordinates that `drink`, `forage` and `enter` already have, which is the measured cause of zero production across seventeen mind-days. Above them, a new top-of-stack package `@sj/supervisor` wires TickLoop + five `AgentRuntime`s + the real arbiter + the nightly ops plane + the spend monitor + the law channel into one process; `@sj/gateway` grows a static handler and serves the observatory itself. Deployment is a three-service Compose stack of one multi-arch Node image on **linux/arm64**.
