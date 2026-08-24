@@ -1,8 +1,22 @@
-# Genesis & Rehearsal (C8) Implementation Plan — v5b DRAFT for controller review
+# Genesis & Rehearsal (C8) Implementation Plan — v6 DRAFT for controller review
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> ### ★★ WHY v5b EXISTS — FOUR RULINGS LANDED, AND THE PLAN WAS COMPILED FOR THE FIRST TIME
+> ### ★★★ WHY v6 EXISTS — THE PINS ARE GONE, THE KEYSTONE IS GONE, AND THE PLAN IS A GRAPH INSTEAD OF A QUEUE
+>
+> **v5b was written against `645a8d9`. Three lanes have landed since, and each one deletes something this plan was built around.**
+>
+> | Lane | What it did | What it costs this plan |
+> |---|---|---|
+> | **`unpin`** | deleted **all four hash pins** and the seven-file census that maintained them; replaced three of the four with the hash-free assertion that already sat beside them | **C3 dies outright** (43 lines, the largest global constraint in the document). **C4 is promoted into its slot.** C17 is struck. T28 and T29 lose their ceremony, T51's check 9 goes, T1's census greps invert, and **seventeen tasks lose a cross-package verification step that could only ever pass** |
+> | **`first-night`** | fixed the cast that collapsed in the street on night one, gave the dev world a mason, and repaired two lying counters | **The last open precondition is discharged.** The nine-task contingency box at the foot of this document becomes a record. **G8 criterion 2 is reachable for the first time** |
+> | **`many-hands`** | landed **OD22** — `joinableSite`, so two bodies raise one building in a town — and then went further: **the hands are the RATE**, so five hands raise a house in a fifth of the time for a fifth of each builder's clock | **T21 Step 0 is deleted** (the code it printed is on `main`). **T22 is unblocked** and gains `handsOnSite` rather than writing its own counter. **G8 criterion 7's joint-build clause is passable.** And `stepBuild`'s arity is **three** again, which is the fourth revision in a row to get that one signature wrong |
+>
+> **★★ AND THE THING THAT FALLS OUT OF ALL THREE AT ONCE, WHICH IS THE HEADLINE.** v5b's Phase F was a **keystone**: one re-pin, spent once, with every other task in the plan carrying a *"must not move a pin"* side condition and four unrelated physics changes queued behind one commit. **With no pins there is no keystone**, and underneath it the plan turns out to be a graph **twelve deep and twenty-five wide at its first layer**. **v6's wave table is new, is directly below, and is the section a controller dispatches from.**
+>
+> **★ WHAT v6 DOES NOT DO.** It adds no task, deletes no task and renumbers nothing — **still 66 tasks and 15 phases**, for the reason the numbering box gives. It changes no code: this revision is docs-only and `git diff --stat main -- packages/` is empty.
+
+> ### ★★ WHY v5b EXISTED — FOUR RULINGS LANDED, AND THE PLAN WAS COMPILED FOR THE FIRST TIME
 >
 > **v5's every claim was a claim about source text.** Its own closing concern said so: *"none of the code in v5's amended steps has been compiled."* v5b lifted that limit. Every signature, arity, count and constant this plan names was **executed** against `645a8d9` — `tsc --noEmit` over probe files that import `packages/` directly, and `tsx` runs that build a genesis town and submit real intents through the real verb.
 >
@@ -12,7 +26,7 @@
 >
 > **★ AND ONE NEW OPEN DECISION, WHICH IS THE LARGEST THING THIS REVISION FOUND: OD22 — TWO BODIES CANNOT RAISE ONE BUILDING IN A TOWN.** Executed, not read: on the sited branch two builders on one site give `progressTicks + 2` in a tick; **in a town the second builder is handed a different plot** and `stepBuild` only ever advances `ownSite(builder)`. T21's headline arithmetic, T22's whole `minHands` rule, T49's `jointBuildTicks` and **G8's criterion 7** all assume a mechanism that the claim seam removed and no test covers. See OD22.
 
-**Status:** DRAFT **v5b**, superseding `2026-08-24-01-genesis-rehearsal-v5.DRAFT.md` (66 tasks / 15 phases, branch `c8-plan-v5` @ `ee5d1c5`), which superseded `2026-08-23-01-genesis-rehearsal-v4.DRAFT.md` (66 tasks / 15 phases, branch `c8-plan-v4` @ `50d1bfc`, written against `main` @ `cd845bc`), which superseded v3 (66 / 15, `c8-plan-v3` @ `51a98a2`, **RATIFIED as the plan of record** by `c8-v3-controller-rulings.md`), v2 (54 / 12, `c8-plan-v2` @ `4924709`) and the base draft (39 / 9). **v5 keeps every one of v3's 66 task numbers, all 15 phases and every document position.** It is written against local `main` @ **`645a8d9`** — merge trains 1, 2 **and 3** of the 2026-08-23/24 sprint have landed, carrying the town grammar, the claim seam, unbounded world growth, the far bank, the Discovery Record and the recovered art. Every value in Global Constraint C3 was grepped out of `645a8d9`, not copied from v4.
+**Status:** DRAFT **v6**, superseding **v5b** (66 tasks / 15 phases, branch `c8-plan-v5b` @ `11ba67a`, written against `main` @ `645a8d9`), which superseded `2026-08-24-01-genesis-rehearsal-v5.DRAFT.md` (66 tasks / 15 phases, branch `c8-plan-v5` @ `ee5d1c5`), which superseded `2026-08-23-01-genesis-rehearsal-v4.DRAFT.md` (66 tasks / 15 phases, branch `c8-plan-v4` @ `50d1bfc`, written against `main` @ `cd845bc`), which superseded v3 (66 / 15, `c8-plan-v3` @ `51a98a2`, **RATIFIED as the plan of record** by `c8-v3-controller-rulings.md`), v2 (54 / 12, `c8-plan-v2` @ `4924709`) and the base draft (39 / 9). **v5 keeps every one of v3's 66 task numbers, all 15 phases and every document position.** **★ v6 is written against local `main` @ `9d76b97`** — `645a8d9` plus twenty-five commits: `many-hands`, `first-night` and `unpin`. 316 test files, 4 730 tests, `tsc` 0. Every claim v6 makes about the tree was re-derived from `9d76b97` rather than carried from v5b, and the three that had moved are corrected in place and listed in `c8-v5b-to-v6-delta.md`.
 
 > ### ★ WHY v5 EXISTS — ONE REASON, AND IT IS NOT A REFACTOR
 >
@@ -46,6 +60,81 @@
 > | **Phase K** (extended) | **T66** | between T48 and T49 | the death-taxonomy auditor T49's report and G8 both consume |
 >
 > **The lever order is enforced by document position, not by task number.** Legibility is Phase D (T19–T24), the rescue window is **T55**, giving is **T56**, and **softened decay is Phase F's T29 and comes LAST**. An executor who works in numeric order would soften the world before making it legible, which is precisely the mistake the ruling forbids — **work the document, not the numbers.**
+
+---
+
+## ★★★ THE WAVE TABLE — WHAT MAY RUN AT THE SAME TIME, AND WHAT MAY NOT
+
+> **This is the section the controller dispatches from, and it is new in v6.** v5b had no such table because it did not need one: **every task in it carried a "must not move a pin" side condition, Phase F was a keystone that four unrelated changes had to queue behind, and C11's "full-suite green before every phase boundary" turned fifteen phases into fifteen barriers.** The `unpin` lane deleted the pins and `many-hands` landed OD22, and what is left underneath is a graph that is **twelve deep and twenty-five wide at its first layer.**
+>
+> **The wave is a DEPENDENCY layer, not a phase.** Document order still says what a reader should read first and still encodes the binding lever order (legibility → rescue → giving → softened decay). **A wave says what may be dispatched at once.** Where the two disagree, the lever order wins for anything that changes the world's difficulty — that is C25 and it is a ruling — and the wave wins for everything else.
+
+### 1. The waves
+
+**Read the two right-hand columns before dispatching.** *Needs from the wave before* is the real dependency. *Contends on* is a **merge** problem and never a scheduling one: two tasks in the same wave that edit one file can both be written at once and must be landed in some order, which is a train's job, not a graph's.
+
+| Wave | Tasks | Needs from the wave before | Contends on |
+|---:|---|---|---|
+| **1** | **T1, T2, T5, T8, T9, T11, T12, T19, T21, T22, T23, T24, T26, T28, T31, T35, T36(a), T37, T38, T39, T40, T44, T45, T55, T66** — **twenty-five** | **nothing.** Every one consumes only what is already on `main` | `perception.ts` (T21, T23, T55) · `bridge.ts` (T19) · `verbs.ts` (T22, T24, T28) · `genesis/world.ts` (T9, T11) · `llm/` (T8, T37, T38, T39, T40) |
+| **2** | **T3, T6, T7, T10, T13, T15, T20, T27, T30, T46, T47, T56, T58, T60, T62, T65** — sixteen | T2 → T3 · T5 → T6, T7, T15 · T9 → T10 · T12 → T13 · T19 → T20 *(assertion only)* · T26 → T27 · T2+T5 → T30 · T45 → T46, T47 · T55 → T56, T58, T60, T62 · T37 → T65 | `bridge.ts` (T15, T20, T56) · `prose.ts` (T7, T20, T56, T58) · `pins.ts` (T65 after T37) |
+| **3** | **T4, T14, T16, T17, T42, T57, T63** — seven | T3 → T4 · T13 → T14 · T15 → T16, T17 · T4+T11 → T42 · T56 → T57 · T62 → T63 | `drives/state.ts` (T16, T17) · `prompt/social.ts` (T57) |
+| **4** | **T18, T25, T29, T61** — four | T16+T17 → T18 · T57 → T25 **and** T57 → T29 (C25's pairing, and the only edge holding T29 late) · T16+T60 → T61 | `config.ts` (T29 alone, deliberately) |
+| **5** | **T32, T59** | T4, T7, T8, T10, T11, T18, T27, T30, T31 → **T32** · T29+T58 → T59 | `supervisor.ts` (T32) |
+| **6** | **T33, T34, T36(b), T43, T48, T64** — six | T32 → all six · T25 → T34 · T42 → T43 · T44–T47 → T48 · T63 → T64 | `supervisor.ts` (T32, T33, T34, T64) |
+| **7** | **T41, T49** | T36(b) + T37–T40 + T65 → T41 · T13, T25, T26, T27, T32, T36(b), T57, T62, T64, T66 → **T49** | — |
+| **8** | **T50** — the dress rehearsal, three live runs | T33, T41, T43, T48, T49, T59, T61 | — |
+| **9** | **T51** — GATE G8 | T50 | — |
+| **10–12** | **T52 → T53 → T54** | strictly serial, and deferred by ruling | the box |
+
+**Twelve waves, and the first three hold forty-eight of the sixty-six tasks.**
+
+### 2. The true critical path
+
+**Fourteen tasks as the plan stands. Twelve after two splits this revision names but does not take.**
+
+```
+T5 → T15 → T16 → T18 → T32 → T36 → T34 → T58 → T59 → T50 → T51 → T52 → T53 → T54      (14)
+```
+
+Read it as a sentence: **a genome makes a drive, the drive gains a person, the person reaches the prompt, the prompt is wired into a process, the process is measured, the measurement gets a dashboard, the dashboard shows an age, the age slows a body, and only then can the town be run, gated and shipped.**
+
+**★ TWO EDGES ON THAT PATH ARE ACCIDENTS OF TASK BOUNDARIES, NOT OF THE WORK. Cutting them takes the path to twelve, and both cuts are inside a single task.**
+
+| Edge | Why it exists | The cut |
+|---|---|---|
+| **T36 → T34** | T34's `GET /api/cost` calls `costReport(db)`, which T36 produces. **But T36's Steps 1–3 build the instrument against a seeded ledger and need nothing; only Step 4 is the $4.61 live baseline, and only Step 4 needs T32.** As written, an admin panel waits on a live run | **Treat T36 Steps 1–3 as wave 1 and Step 4 as wave 6.** The task is not split and not renumbered; its steps are dispatched to two waves, which the step list already permits |
+| **T34 → T58** | T58 adds two columns to `GET /api/roster`, and T34 creates the file that route lives in. **Three lines of a nine-step task pull the whole of Phase F2 behind the whole of Phase G** | **Move T58's roster columns into T34's route.** It is `ageYears` and `ageBand` on a row T34 is already building, T34 already imports the world state, and T58 keeps its prose and perception halves. **This one is a real edit and this revision does not make it** — it changes two tasks' file lists, and the wave table is more useful naming it than quietly assuming it |
+
+**With both: `T5 → T15 → T16 → T18 → T32 → T36(b) → T49 → T50 → T51 → T52 → T53 → T54` — twelve.** No further cut is available: **T32 is a genuine join of nine tasks and T50 is a genuine join of seven**, and both are joins for the right reason — one wires the town together and the other runs it.
+
+**The path is 18% of the plan. The other 82% is schedulable around it.**
+
+### 3. Every task that is now parallelisable and was not, named
+
+**Nineteen, in four groups.**
+
+**(a) The keystone's queue — four tasks, and this is the largest single win.**
+**T28** and **T29** were *"two commits in one phase, and it moves all four pins."* They share no file, no symbol and no test. **They are wave 4 and wave 1 respectively and may run in either order, in two lanes.** **T29's own four changes** are splittable for the same reason — change (2), resented company, is in `systems/needs.ts` and touches nothing the other three touch. And **Phases F2 and F3** were held behind the keystone by the rule *"they add no `SimConfig` key"*; **T55, T60 and T62 are wave 1–2, and T62 and T63 are the two earliest F3 tasks in the plan.**
+
+**(b) The seventeen tasks that carried a cross-package pin verification, and now carry none.**
+**T7, T9, T10, T11, T14, T18, T21, T22, T55, T56, T57, T58, T59, T61, T62, T63, T64** each ended with a step that ran `golden.test.ts`, `g2.test.ts` and/or `forgeConfig.test.ts` **from another package** to prove a null result. **Seventeen tasks lose a step that could only ever pass.** The scheduling consequence is not the minutes; it is that **a task in `packages/agents` no longer has a reason to have `packages/engine` and `packages/forge` green in its worktree**, which is what made a lane feel like it needed the whole tree.
+
+**(c) OD22's two dependents, released by `many-hands`.**
+**T22** was *"BLOCKED outright"* on a controller ruling. **It is wave 1.** **T21** loses its Step 0 entirely and is wave 1 with it. **G8 criterion 7's joint-build clause goes from unpassable to passable**, which is a scheduling fact as well as a gate one: T49 and T50 no longer carry a known-failing row.
+
+**(d) Six tasks whose phase position hid that they depend on nothing.**
+**T66** (Phase K, wave 1) is pure classification over recorded rows. **T26** (Phase E, wave 1) is a pure function of the event log. **T44** and **T45** (Phase J, wave 1) are a bootstrap wrapper and a Dockerfile. **T24** (Phase D, wave 1) is four unrelated changes in four packages and consumes nothing from C8 at all. **T36's instrument** (Phase H, wave 1) reads a seeded ledger.
+
+### 4. What is NOT parallelisable, and it is worth saying which
+
+**Four edges are real and load-bearing, and a lane that breaks one has broken the plan, not the schedule.**
+
+1. **T57 → T29.** C25 is a ruling: **no harshness reduction ships without a social pull in the same change.** T29's change (1) is a harshness reduction and T57's five roads are the pull. This is the only edge holding T29 out of wave 1, and it is not negotiable.
+2. **The lever order — legibility (Phase D) → rescue (T55) → giving (T56) → softened decay (T29).** Enforced by document position and by the C25 edge above. **Softening first hides the real faults under a gentler curve.** T55 and T56 are wave 1 and 2 by dependency; they must still *merge* before T29.
+3. **T32 is a join and stays one.** Nine tasks feed it and it is the first moment the town exists as a process.
+4. **T36 → T38/T39/T40 → T41, as MEASUREMENTS.** The *code* halves of the four levers are independent and are wave 1. **The measurements are strictly ordered — baseline, then lever, then re-measure — because a lever measured before the baseline has measured nothing** (C8's own constraint). **Dispatch the code in one wave and the runs in a queue.**
+
+---
 
 **Goal:** Turn the town from a place that subsists into a place that builds, gives, ages and differs — five minds that start **neutral** and acquire character through play, measured against a mode-collapse number that can fail a gate, in a world where **death is punctuation rather than attrition** — then ship it as an arm64 Docker Compose stack, pass **GATE G8**, and put it on a subdomain last.
 
