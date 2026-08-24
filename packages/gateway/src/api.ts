@@ -70,7 +70,7 @@ const gerund = (verb: string): string => (verb.endsWith('e') ? `${verb.slice(0, 
 
 export function mountDataApi(router: Router, deps: DataApiDeps): void {
   const cache = makeSeqCache(() => deps.mirror.seq())
-  const selEvents = deps.db.prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq')
+  const selEventsAfter = deps.db.prepare('SELECT seq, tick, type, payload FROM events WHERE seq > ? ORDER BY seq')
 
   /**
    * ★ THE RESPONSE CACHE IS NOT ENOUGH ON ITS OWN, BECAUSE `/api/digest` LETS THE STRANGER PICK
@@ -85,15 +85,31 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
    *
    * Callers MUST treat the result as frozen; every one of them filters or folds rather than
    * mutating, and `heatWindows` only reads.
+   *
+   * ★ AND ONCE PER GENERATION IS STILL O(WORLD AGE), WHICH IS THE CEILING ON A TOWN THAT NEVER
+   * RESTARTS. The generation changes EVERY tick, so re-reading the whole table per generation
+   * costs the tick thread a full re-parse of all of history, every 2.5 seconds. Measured on
+   * this machine at 185 ns and 123 B per event against a real town's payloads: 48 ms/tick at
+   * sim-day 10, 250 ms at sim-day 52, 485 ms at sim-day 100. Nobody had ever hit it because
+   * nobody could keep a town alive past a few hours — resume is what makes it reachable.
+   *
+   * The log is append-only, so the fix is to append. The array is retained across generations
+   * and only the rows after the highest seq already held are read and parsed: O(events this
+   * tick), flat in world age. What remains O(age) is the RESIDENT array, and that is the part
+   * this cannot fix from here — see the report.
    */
-  let eventsSeq = -1
-  let eventsMemo: readonly SimEvent[] = []
+  type EventRow = { seq: number; tick: number; type: string; payload: string }
+  let eventsGen = -1
+  let eventsCursor = 0
+  const eventsMemo: SimEvent[] = []
   const readEvents = (): readonly SimEvent[] => {
-    const seq = deps.mirror.seq()
-    if (seq !== eventsSeq) {
-      eventsSeq = seq
-      eventsMemo = (selEvents.all() as Array<{ seq: number; tick: number; type: string; payload: string }>)
-        .map(r => ({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }) as SimEvent)
+    const gen = deps.mirror.seq()
+    if (gen !== eventsGen) {
+      eventsGen = gen
+      for (const r of selEventsAfter.all(eventsCursor) as EventRow[]) {
+        eventsMemo.push({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) } as SimEvent)
+        eventsCursor = r.seq
+      }
     }
     return eventsMemo
   }
