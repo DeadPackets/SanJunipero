@@ -44,6 +44,30 @@ export const HEARTH_POOL_R_TILES = 1.8
  *  leaving are visibly the same place. */
 export const THRESHOLD_TILES = 1.6
 
+/**
+ * ★ HOW CLOSE THE ROOM IS DRAWN, AND WHY IT IS FOUR.
+ *
+ * It was 3, on a line whose comment says "integer zoom only". `room.scale.set(3)` IS an
+ * integer, but the sprites inside carry `furnishingScale(SLOT_TILES)` = 0.5 of their own, so
+ * what reached the screen was 1.5 — 128 px library art resampled at one and a half under
+ * NEAREST, duplicating every other source column. And a body was drawn 156 px tall indoors
+ * (`CHAR_TARGET_PX` 52 × 3) against 208 px at the town's own closest stop: **a person 25%
+ * SMALLER in the surface whose whole purpose is to be closer.** At 4 the composite is 2.0, a
+ * clean pixel doubling, and a body is exactly the size it is out of doors.
+ *
+ * ★ AND IT IS THE STAGE THAT DECIDES WHETHER 4 IS ON, because the fit check says so rather
+ * than my eye. The drawn box is `WALL_H_TILES × TILE_W + ROOM_SLOTS × SLOT_TILES × TILE_H` =
+ * 192 px, so 4 needs 768 px of stage against 3's 576. MEASURED in the running app on this
+ * machine's maximised window: 1728 × 963 gives `app.screen.height` = 818 — 4 fits, and would
+ * not have with the old unconditional 40 px lift (that needed 848). A stage shorter than
+ * 768 + two margins cannot hold it at all and keeps 3, which is exactly what it draws today.
+ */
+export const ROOM_ZOOM_CLOSE = 4
+export const ROOM_ZOOM_SHORT = 3
+/** Stage left above the wall top and below the near floor vertex. A room flush to the edge of
+ *  the screen reads as a room that has been cut off. */
+export const ROOM_MARGIN_Y = 8
+
 /** How deep the walls' shade falls across the row of floor nearest them. */
 export const FAR_ROW_SHADE_ALPHA = 0.22
 
@@ -236,13 +260,35 @@ export function roomBox(
   return { top, bottom, height: bottom - top }
 }
 
-/** Where the room container's origin goes so the whole box is centred in a stage `screenH`
- *  tall, lifted clear of the chrome at the bottom by `offsetY`. */
+/** ★ HOW CLOSE THIS STAGE CAN HOLD THE WHOLE ROOM: `ROOM_ZOOM_CLOSE` when the box and its two
+ *  margins fit, `ROOM_ZOOM_SHORT` — today's behaviour — when they do not. A short window gets
+ *  the room it already gets; it never gets a wall cut off by the top of the screen. */
+export function roomZoomFor(
+  screenH: number, slots: number = ROOM_SLOTS, slotTiles: number = SLOT_TILES,
+  wallH: number = WALL_H_TILES,
+): number {
+  const h = roomBox(slots, slotTiles, wallH).height
+  return h * ROOM_ZOOM_CLOSE + 2 * ROOM_MARGIN_Y <= screenH ? ROOM_ZOOM_CLOSE : ROOM_ZOOM_SHORT
+}
+
+/**
+ * Where the room container's origin goes so the whole box is centred in a stage `screenH`
+ * tall, lifted clear of the chrome at the bottom by `offsetY`.
+ *
+ * ★ THE LIFT IS A COURTESY, NOT A LICENCE. It was subtracted unconditionally, which is fine
+ * while the box is half the stage and pushes a wall off the top the moment it is not: at zoom
+ * 4 on an 818 px stage the box has 25 px of headroom and the flat 40 px lift spent 40 of it.
+ * It is clamped to the headroom the stage actually has, less the margin, so the invariant the
+ * landed test states — every wall point on the stage — holds at every zoom and every height
+ * instead of at the one pair it was written for.
+ */
 export function roomOriginY(
   screenH: number, offsetY: number, zoom: number, slots: number, slotTiles: number, wallH: number,
 ): number {
   const box = roomBox(slots, slotTiles, wallH)
-  return screenH / 2 - offsetY - ((box.top + box.bottom) / 2) * zoom
+  const centred = screenH / 2 - ((box.top + box.bottom) / 2) * zoom
+  const headroom = centred + box.top * zoom     // stage above the wall top, centred
+  return centred - Math.max(0, Math.min(offsetY, headroom - ROOM_MARGIN_Y))
 }
 
 /** Just enough of a Pixi `Graphics` to paint the shell. Structural, so this module stays pure

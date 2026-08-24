@@ -1,11 +1,16 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
+import { CHAR_TARGET_PX } from './charAnim.js'
+import { furnishingScale } from './interiors.js'
+import { ZOOM_SCALE_MAX } from './camera.js'
 import {
-  DOORWAY_POOL_ALPHA, HEARTH_POOL_ALPHA, ROOM_SHELL_INK, ROOM_SHELL_PAINT, ROOM_SLOTS,
-  SLOT_TILES, WALL_H_TILES, WALL_KINDS, WALL_MOUNT_H_TILES,
+  DOORWAY_POOL_ALPHA, HEARTH_POOL_ALPHA, ROOM_MARGIN_Y, ROOM_SHELL_INK, ROOM_SHELL_PAINT,
+  ROOM_SLOTS, ROOM_ZOOM_CLOSE, ROOM_ZOOM_SHORT, SLOT_TILES, WALL_H_TILES, WALL_KINDS,
+  WALL_MOUNT_H_TILES,
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorBoards, floorPolyOf, floorPools,
-  roomBox, roomMaskPoly, roomOriginY, skirtingPolys, slotCentreScreen, thresholdPoly,
-  wallCourses, wallMount, wallPolys, type ShellPainter,
+  roomBox, roomMaskPoly, roomOriginY, roomZoomFor, skirtingPolys, slotCentreScreen,
+  thresholdPoly, wallCourses, wallMount, wallPolys, type ShellPainter,
 } from './roomShell.js'
 
 // Every colour the room shell paints must be a MASTER_PALETTE member — the same law the
@@ -327,6 +332,71 @@ describe('roomShell — the room fits the stage', () => {
     // the landed rule centred the floor only, and put the wall top off the top of the stage
     const landed = STAGE_H / 2 - OFFSET - ((ROOM_SLOTS * SLOT_TILES * TILE_H) / 2) * ZOOM
     expect(landed + box.top * ZOOM).toBeLessThan(0)
+  })
+
+  // ★ THE SAME INVARIANT, TOTALLY: at the zoom the stage itself chooses, over every stage a
+  // viewer could have. The landed test above asserts it at ONE pair of numbers, which is how
+  // a 40 px lift that spends more headroom than a stage has could sit there unnoticed.
+  it('★ the whole box is on the stage at every height from 600 to 1600, at the chosen zoom', () => {
+    const box = roomBox(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+    for (let h = 600; h <= 1600; h += 1) {
+      const z = roomZoomFor(h, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+      const y = roomOriginY(h, OFFSET, z, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+      // A stage too short for even the short zoom clips, exactly as it always has. The skip
+      // is measured against ROOM_ZOOM_SHORT and never against the zoom under test, or a zoom
+      // that ignored the stage would excuse itself from this check (mutation M9).
+      if (box.height * ROOM_ZOOM_SHORT + 2 * ROOM_MARGIN_Y > h) continue
+      expect(y + box.top * z, `wall top off the stage at ${h} px, zoom ${z}`).toBeGreaterThanOrEqual(ROOM_MARGIN_Y)
+      expect(y + box.bottom * z, `floor off the stage at ${h} px, zoom ${z}`).toBeLessThanOrEqual(h - ROOM_MARGIN_Y)
+    }
+  })
+
+  it('★ and it still lifts the full offset when the stage can afford it', () => {
+    const tall = 1400
+    const z = roomZoomFor(tall)
+    const centred = tall / 2
+    expect(roomOriginY(tall, OFFSET, z, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)).toBe(centred - OFFSET)
+  })
+
+  it('★ takes the close zoom on the stage the running app actually reports, and not below it', () => {
+    // MEASURED in the browser: 1728 x 963 window, `app.screen.height` = 818.
+    const box = roomBox(ROOM_SLOTS, SLOT_TILES, WALL_H_TILES)
+    expect(roomZoomFor(818)).toBe(ROOM_ZOOM_CLOSE)
+    const need = box.height * ROOM_ZOOM_CLOSE + 2 * ROOM_MARGIN_Y
+    expect(need).toBe(784)
+    expect(roomZoomFor(need)).toBe(ROOM_ZOOM_CLOSE)
+    expect(roomZoomFor(need - 1)).toBe(ROOM_ZOOM_SHORT)
+  })
+})
+
+// ★ WHAT THE ZOOM IS FOR. Both of these are about the picture, not the geometry: they are the
+// two things that were wrong at 3, and neither is visible to `drawScale.test.ts`, which
+// measures WORLD size and leaves the zoom on top to the camera's own law.
+describe('★ the room is drawn at the same scale as the town at its closest', () => {
+  it('★ a body is exactly as tall indoors as it is out of doors', () => {
+    // `CHAR_TARGET_PX` is the world height of a figure and `ZOOM_SCALE_MAX` is the town's own
+    // deepest stop, so this is 52 x 4 = 208 px on both sides. At the landed ROOM_ZOOM of 3 it
+    // was 156 against 208 — a person a quarter smaller in the surface meant to be CLOSER.
+    expect(CHAR_TARGET_PX * ROOM_ZOOM_CLOSE).toBe(CHAR_TARGET_PX * ZOOM_SCALE_MAX)
+    expect(CHAR_TARGET_PX * ROOM_ZOOM_CLOSE).toBe(208)
+    expect(CHAR_TARGET_PX * ROOM_ZOOM_SHORT).toBe(156)
+  })
+
+  it('★ and a furnishing reaches the screen at a whole multiple of the pixels it was drawn on', () => {
+    // `furnishingScale` is the world-space half; the zoom is the other half, and the COMPOSITE
+    // is what the sampler sees. 0.5 x 3 = 1.5 duplicated every other source column under
+    // NEAREST; 0.5 x 4 = 2 is a clean doubling. `drawScale.test.ts` cannot see this: it
+    // measures WORLD size and leaves the zoom on top to the camera's own law.
+    const composite = furnishingScale(SLOT_TILES) * ROOM_ZOOM_CLOSE
+    expect(Number.isInteger(composite), `composite is ${composite}`).toBe(true)
+    expect(composite).toBe(2)
+    expect(furnishingScale(SLOT_TILES) * ROOM_ZOOM_SHORT).toBe(1.5)
+  })
+
+  it('★ and the zoom the scene uses is the one the stage chose, never a bare constant', () => {
+    const src = readFileSync(new URL('./interiorScene.ts', import.meta.url), 'utf8')
+    expect(src, 'the room scales by a constant again').toContain('room.scale.set(zoom)')
+    expect(src).toContain('roomZoomFor(app.screen.height)')
   })
 })
 

@@ -16,7 +16,7 @@ import type { ZoomStop } from './camera.js'
 import {
   ROOM_SHELL_INK, ROOM_SHELL_PAINT, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES,
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorPolyOf, floorPools,
-  roomMaskPoly, roomOriginY, slotCentreScreen, slotSpanCentre, wallMount,
+  roomMaskPoly, roomOriginY, roomZoomFor, slotCentreScreen, slotSpanCentre, wallMount,
 } from './roomShell.js'
 
 // Palette-true: the room is cut from the same warm paper the chrome is (Style Bible §7).
@@ -29,9 +29,10 @@ export const INTERIOR_VEIL = 0x322b38
 export const INTERIOR_VEIL_ALPHA = 0.62
 export const INTERIOR_HEARTH_GLOW = ROOM_SHELL_PAINT.hearthPool
 
-export { ROOM_SLOTS, SLOT_TILES } from './roomShell.js'
-export const ROOM_ZOOM = 3             // integer zoom only (spec §15)
-export const ROOM_OFFSET_Y = 40        // lifts the room clear of the transport bar
+export { ROOM_SLOTS, ROOM_ZOOM_CLOSE, ROOM_ZOOM_SHORT, SLOT_TILES, roomZoomFor } from './roomShell.js'
+/** How far the room is lifted clear of the transport bar AT MOST — `roomOriginY` clamps it to
+ *  the headroom the stage has, because a courtesy that pushes a wall off the top is not one. */
+export const ROOM_OFFSET_Y = 40
 export const HEARTH_GLOW_PX = 26
 export const PLACEHOLDER_URL = '/assets/placeholder/item.png'
 /** A hung piece is on the back plane, so it draws behind everything standing on the floor
@@ -223,7 +224,7 @@ export function createInteriorScene(
     sprite.zIndex = z
     const url = item.url ?? PLACEHOLDER_URL
     void book.get(url).then((t) => {
-      if (!sprite.destroyed) applyHalf(sprite, t, half)   // native px; ROOM_ZOOM is the only scale
+      if (!sprite.destroyed) applyHalf(sprite, t, half)   // native px; the room's zoom is the only scale
     })
     furniture.set(key, sprite)
     room.addChild(sprite)
@@ -420,12 +421,16 @@ export function createInteriorScene(
     veil.clear()
     veil.rect(0, 0, app.screen.width, app.screen.height)
     veil.fill({ color: INTERIOR_VEIL, alpha: INTERIOR_VEIL_ALPHA })
-    room.scale.set(ROOM_ZOOM)
+    // ★ AS CLOSE AS THIS STAGE CAN HOLD THE WHOLE ROOM — never a bare constant. At 4 a body
+    // is the height it is out of doors and library art doubles cleanly; at 3 it was 156 px
+    // against 208 and a 1.5x composite. `roomZoomFor` answers 3 on a stage too short for it.
+    const zoom = roomZoomFor(app.screen.height)
+    room.scale.set(zoom)
     // The whole box, walls included — centring the floor alone put the top of the walls off
     // the top of the stage, which is what the browser showed.
     room.position.set(
       app.screen.width / 2,
-      roomOriginY(app.screen.height, ROOM_OFFSET_Y, ROOM_ZOOM, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES),
+      roomOriginY(app.screen.height, ROOM_OFFSET_Y, zoom, ROOM_SLOTS, SLOT_TILES, WALL_H_TILES),
     )
     if (activeId !== null) layoutRoom()
   }
