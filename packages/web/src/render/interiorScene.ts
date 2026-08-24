@@ -14,13 +14,18 @@ import {
   INTERIOR_PX_SCALE, ROOM_TILES, WALL_PIECES_THAT_STAND, interiorPath, roomMapOf, standingTiles,
   type MapPiece, type RoomMap, type Tile,
 } from './interiorMap.js'
+import {
+  FURNISHING_WALL_PIECE, flagstoneRegions, hasInteriorTileset, resolveInteriorMaterial,
+  resolveInteriorPiece, wallCourses, wallStripAt, wallStripWidth, wallTransform,
+} from './interiorTileset.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 import { doorTileOf } from './entities.js'
 import type { ZoomStop } from './camera.js'
 import {
-  ROOM_SHELL_INK, ROOM_SHELL_PAINT, WALL_H_PX,
+  ROOM_SHELL_INK, ROOM_SHELL_PAINT, WALL_H_PX, WALL_TINT,
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorPolyOf, floorPools,
-  roomMaskPoly, roomOriginY, roomZoomFor, tileCentreScreen, tileSpanCentre, wallMount,
+  floorRegionPoly, roomMaskPoly, roomOriginX, roomOriginY, roomZoomFor, tileCentreScreen,
+  tileSpanCentre, wallMount,
 } from './roomShell.js'
 
 // Palette-true: the room is cut from the same warm paper the chrome is (Style Bible §7).
@@ -98,6 +103,12 @@ export function createInteriorScene(
   walls.zIndex = -4
   const floorArt = new Graphics()      // the continuous material, when the codex has one
   floorArt.zIndex = -3
+  const floorStone = new Graphics()    // flagstone under the hearth and inside the door
+  floorStone.zIndex = -2.75
+  // The authored wall elevations, sheared onto the two wall planes. Behind the painted shell's
+  // own rim and in front of nothing: a wall has no depth of its own.
+  const wallArt = new Container()
+  wallArt.zIndex = -3.5
   const floor = new Graphics()
   floor.zIndex = -2.5
   const floorLight = new Graphics()
@@ -113,7 +124,7 @@ export function createInteriorScene(
   // the body it belongs to because it is not in the sort at all.
   const shadows = new Graphics()
   shadows.zIndex = -1.5
-  room.addChild(walls, floorArt, floor, floorMask, floorLight, floorTop, shadows)
+  room.addChild(walls, wallArt, floorArt, floorStone, floor, floorMask, floorLight, floorTop, shadows)
 
   const furniture = new Map<string, Sprite>()   // piece id → sprite
   const bodies = new Map<string, Sprite>()      // agentId → sprite
@@ -128,6 +139,8 @@ export function createInteriorScene(
   let map: RoomMap = roomMapOf([])
   let lightKinds: ReadonlySet<string> = new Set()
   let perches: Tile[] = []
+  /** The kinds the wall itself draws this room, so no object is drawn for them as well. */
+  let elevated: ReadonlySet<string> = new Set()
   /** Where each body is on the room map, and the tiles it still has to cross to get where it
    *  is going. The engine has no interior position, so this is the renderer's own. */
   const walking = new Map<string, { at: Tile; path: Tile[]; t: number }>()
@@ -147,6 +160,28 @@ export function createInteriorScene(
     floorPools(m.pieces.map((p) => ({ tile: p.tile, light: lightKinds.has(p.kind) })), ROOM_TILES)
 
   let floorMaterial: string | null = null
+  let stoneMaterial: string | null = null
+
+  /** The flagstone patches, drawn over the boards: a hearth stands on stone, and so does the
+   *  ground just inside a door. Nothing here exists without the art, so nothing here is a hole
+   *  when the codex is empty. */
+  function paintStone(m: RoomMap, records: AssetRecord[]): void {
+    const url = resolveInteriorMaterial(records, 'interior-flagstone')
+    stoneMaterial = url
+    floorStone.clear()
+    if (url === null) return
+    const hearths = m.pieces.filter((p) => lightKinds.has(p.kind)).map((p) => p.tile)
+    void book.get(url).then((t) => {
+      if (stoneMaterial !== url || floorStone.destroyed) return
+      t.source.addressMode = 'repeat'
+      floorStone.clear()
+      for (const r of flagstoneRegions(hearths, ROOM_TILES)) {
+        floorStone.poly(floorRegionPoly(r))
+        floorStone.fill({ texture: t, matrix: materialMatrix('interior-flagstone', 1) })
+      }
+    })
+  }
+
   function paintFloor(m: RoomMap, records: AssetRecord[]): void {
     const url = resolveMaterial(records, 'interior-floor')
     if (url === null) {
@@ -166,9 +201,78 @@ export function createInteriorScene(
     }
     floor.clear()
     drawFloorBase(floor, ROOM_TILES, url === null ? ROOM_SHELL_PAINT.floor : null)
+    paintStone(m, records)
     floorLight.clear()
     drawFloorLight(floorLight, pools(m), ROOM_TILES)
   }
+
+  /**
+   * ★ THE WALLS, FROM ART. Every wall is laid plain end to end first so there is never a gap,
+   * then each feature is drawn over it: the window and the door the room must have, and the
+   * chimney breast that IS the hearth. A strip is authored square-on and sheared onto its own
+   * wall plane, so the art is never stretched along the wall — see `interiorTileset.ts`.
+   *
+   * When the codex holds no tileset this draws nothing and the code-painted shell stands,
+   * which is the same art-independence law the ground answers to.
+   */
+  function paintWalls(m: RoomMap, records: AssetRecord[]): void {
+    wallArt.removeChildren().forEach((c) => c.destroy())
+    const art = hasInteriorTileset(records)
+    walls.visible = !art          // painted trapezoids OR authored elevations, never both
+    if (!art) return
+    const features = m.pieces
+      .filter((p) => p.placement === 'wall')
+      .flatMap((p) => {
+        const wall = p.tile.x === 0 && p.tile.y > 0 ? 'back-left' as const : 'back-right' as const
+        return [{ kind: p.kind, wall, atTiles: wall === 'back-right' ? p.tile.x : p.tile.y }]
+      })
+    for (const course of wallCourses(features, ROOM_TILES)) {
+      const url = resolveInteriorPiece(records, course.piece)
+      if (url === null) continue
+      const width = wallStripWidth(course.wall, course.atTiles, ROOM_TILES)
+      if (width <= 0) continue
+      const at = wallStripAt(course.wall, course.atTiles)
+      const t = wallTransform(course.wall)
+      const sprite = new Sprite()
+      sprite.eventMode = 'none'
+      sprite.anchor.set(0, 0)
+      sprite.position.set(at.sx, at.sy)
+      sprite.skew.y = t.skewY
+      sprite.scale.set(t.scaleX, 1)
+      sprite.tint = tintOf(WALL_TINT[course.wall])
+      wallArt.addChild(sprite)
+      const apply = (tex: Texture): void => {
+        if (sprite.destroyed) return
+        // A strip that would overrun its wall is CROPPED, never squeezed: the art keeps its
+        // own pixel pitch and the corner simply arrives sooner.
+        sprite.texture = width >= tex.frame.width
+          ? tex
+          : new Texture({
+            source: tex.source,
+            frame: new Rectangle(tex.frame.x, tex.frame.y, width, tex.frame.height),
+          })
+      }
+      const inHand = book.peek(url)
+      if (inHand !== null) apply(inHand)
+      else void book.get(url).then(apply)
+    }
+  }
+
+  /** A multiplier on white, as the tint colour Pixi wants. */
+  const tintOf = (k: number): number => {
+    const c = Math.round(255 * k)
+    return (c << 16) | (c << 8) | c
+  }
+
+  /** Which of the room's furnishings the wall itself draws, so nothing is drawn twice. */
+  const elevationKinds = (m: RoomMap, records: AssetRecord[]): ReadonlySet<string> =>
+    new Set(m.pieces
+      .filter((p) => p.placement === 'wall')
+      .map((p) => p.kind)
+      .filter((k) => {
+        const piece = FURNISHING_WALL_PIECE[k]
+        return piece !== undefined && resolveInteriorPiece(records, piece) !== null
+      }))
 
   drawWalls(walls, ROOM_TILES, WALL_H_PX)
   drawFloorTop(floorTop, ROOM_TILES)
@@ -223,11 +327,15 @@ export function createInteriorScene(
    * its facing is that wall's own (`WALL_FACING`, and the type has no third member), and a
    * piece that reaches the ground STANDS at the foot of its wall instead of hanging over it.
    */
-  function placeFurniture(m: RoomMap, items: RoomItem[]): void {
+  function placeFurniture(m: RoomMap, items: RoomItem[], asElevation: ReadonlySet<string>): void {
     const onFloor: Array<{ piece: MapPiece; item: RoomItem }> = []
     m.pieces.forEach((piece, i) => {
       const item = items[i]
       if (item === undefined) return
+      // ★ ONCE, AND ONLY ONCE. When the tileset holds an elevation for this kind, the wall IS
+      // the furnishing — the chimney breast is the hearth — so no object is drawn as well. That
+      // duplicate is what the mock showed as two fireplaces in one corner.
+      if (asElevation.has(piece.kind)) return
       if (piece.placement !== 'wall' || WALL_PIECES_THAT_STAND.has(piece.kind)) {
         onFloor.push({ piece, item })
         return
@@ -377,14 +485,18 @@ export function createInteriorScene(
       perches = AWAKE_PREFERENCE
         .flatMap((kind) => map.pieces.filter((p) => p.kind === kind))
         .flatMap((p) => standingTiles(map, p).slice(0, 1))
-      placeFurniture(map, plan)
+      elevated = elevationKinds(map, records)
+      placeFurniture(map, plan, elevated)
       paintFloor(map, records)   // the light on the floor is the room's own fires
+      paintWalls(map, records)
     }
 
     const sleeping = room2.occupants.filter((id) => state.agents[id]?.asleep === true)
     const beds = bedSlots(room2.kind, sleeping, records)
-    const standing = map.pieces.filter(
-      (p) => p.placement !== 'wall' || WALL_PIECES_THAT_STAND.has(p.kind))
+    // What is actually STANDING in the room: everything on the floor, plus the wall pieces
+    // that reach the ground and are not already drawn as part of the wall.
+    const standing = map.pieces.filter((p) => !elevated.has(p.kind)
+      && (p.placement !== 'wall' || WALL_PIECES_THAT_STAND.has(p.kind)))
     let awakeIdx = 0
 
     // Whom each body is with. A sleeper is IN the furnishing whose cells it was given; an
@@ -540,7 +652,7 @@ export function createInteriorScene(
     // The whole box, walls included — centring the floor alone put the top of the walls off
     // the top of the stage, which is what the browser showed.
     room.position.set(
-      app.screen.width / 2,
+      roomOriginX(app.screen.width, zoom, ROOM_TILES),
       roomOriginY(app.screen.height, ROOM_OFFSET_Y, zoom, ROOM_TILES, WALL_H_PX),
     )
     if (activeId !== null) layoutRoom(dtMs)

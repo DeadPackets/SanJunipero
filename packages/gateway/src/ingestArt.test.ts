@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
-  AssetCodex, BUILDINGS_CONTENT_DIR, LIBRARY, listCommittedBuildings, listCommittedCast,
+  AssetCodex, BUILDINGS_CONTENT_DIR, INTERIOR_PIECES, LIBRARY, interiorCodexKind,
+  listCommittedBuildings, listCommittedCast,
   listCommittedItems, openForgeDb, castArtCoverage, itemArtCoverage, coverageFailure,
   registerCommittedBuildings, structureArtCoverage, worldStructureKinds,
 } from '@sj/forge'
@@ -206,12 +207,19 @@ describe('ingestLibraryArt', () => {
     const db = openForgeDb(join(dir, 'lib.db'))
     const codex = new AssetCodex(db)
 
+    // ★ AND THE INTERIOR TILESET RIDES IN WITH THEM. The room the furniture stands in is seven
+    // more committed pieces — two floor materials and five wall elevations — and they register
+    // here because the terrain ingest short-circuits on a resumed town and this one never does.
     const first = await ingestLibraryArt(db)
-    expect(first.map((e) => e.kind).sort()).toEqual(LIBRARY.map((e) => e.kind).sort())
+    const interiorKinds = INTERIOR_PIECES.map(interiorCodexKind)
+    expect(first.map((e) => e.kind).sort())
+      .toEqual([...LIBRARY.map((e) => e.kind), ...interiorKinds].sort())
     expect(first.every((e) => e.action === 'registered')).toBe(true)
 
     const items = codex.listSince(0).filter((r) => r.class === 'item')
     expect(items, 'fifty sprites and fifty icons').toHaveLength(LIBRARY.length * 2)
+    const tileset = codex.listSince(0).filter((r) => r.kind?.startsWith('interior:') === true)
+    expect(tileset, 'five wall elevations').toHaveLength(5)
     const bed = items.find((r) => r.kind === 'bed')!
     const manifest = parseLibraryItemManifest(bed.meta)
     expect(manifest).not.toBeNull()

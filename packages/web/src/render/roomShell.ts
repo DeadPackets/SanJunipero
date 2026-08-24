@@ -104,6 +104,16 @@ export function floorPolyOf(room: RoomSize = ROOM_TILES): number[] {
   return c.flatMap((p) => [p.sx, p.sy])
 }
 
+/** A rectangle of the tile map as a closed diamond in room space — a patch of one floor
+ *  material laid over another, like the flagstone under a hearth. */
+export function floorRegionPoly(r: { x0: number; y0: number; x1: number; y1: number }): number[] {
+  const c = [
+    interiorToScreen(r.x0, r.y0), interiorToScreen(r.x1, r.y0),
+    interiorToScreen(r.x1, r.y1), interiorToScreen(r.x0, r.y1),
+  ]
+  return c.flatMap((p) => [p.sx, p.sy])
+}
+
 /**
  * The centre of the ground a piece stands on, in room space — the point its sprite's feet
  * belong at. A furnishing two tiles deep has its foot TWO tiles from its origin, not one.
@@ -288,6 +298,20 @@ export function roomCropPx(screenH: number, room: RoomSize = ROOM_TILES, wallH: 
 }
 
 /**
+ * ★ WHERE THE ROOM'S ORIGIN GOES ACROSS THE STAGE — and it is NOT the middle of it.
+ *
+ * The origin is the room's FAR corner, and the room only spreads evenly around it while it is
+ * square. Option C's room is 12 × 6, so its west vertex is 384 px to the left of the origin
+ * and its east vertex 768 px to the right: dropping the origin on the middle of the stage
+ * hangs the room 192 px off to the right, which is what the browser showed.
+ */
+export function roomOriginX(screenW: number, zoom: number, room: RoomSize = ROOM_TILES): number {
+  const west = interiorToScreen(0, room.h).sx
+  const east = interiorToScreen(room.w, 0).sx
+  return screenW / 2 - ((west + east) / 2) * zoom
+}
+
+/**
  * Where the room container's origin goes so the whole box is centred in a stage `screenH`
  * tall, lifted clear of the chrome at the bottom by `offsetY`.
  *
@@ -303,6 +327,10 @@ export function roomOriginY(
   const box = roomBox(room, wallH)
   const centred = screenH / 2 - ((box.top + box.bottom) / 2) * zoom
   const headroom = centred + box.top * zoom     // stage above the wall top, centred
+  // ★ A SHORT STAGE LOSES THE NEAR CORNER, NOT THE WALL TOP. Centring split the overflow
+  // evenly, which spends half of it on the windows, the chimney breast and the beams and the
+  // other half on a corner of bare boards. The walls are where the room's detail is.
+  if (headroom < ROOM_MARGIN_Y) return ROOM_MARGIN_Y - box.top * zoom
   return centred - Math.max(0, Math.min(offsetY, headroom - ROOM_MARGIN_Y))
 }
 

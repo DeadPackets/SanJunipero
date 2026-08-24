@@ -116,14 +116,19 @@ describe('U4 — "interiors are way too low quality, way too under detailed" —
     expect(roomFurnishings('house').some((f) => f.kind === 'bed')).toBe(true)
   })
 
-  // ★ THE HONEST LINE. Everything above is the code-painted polygon working as designed. The
-  // user reopened U4 after it was accepted once, and what they are asking for — real mapped
-  // rooms — needs a RENDERER THAT DOES NOT EXIST (C12b owns it), which is also why the forge
-  // cannot make an interior tileset class: there is nothing for it to generate for.
-  it('is a POLYGON, not a tileset, and that is why U4 stays open', () => {
-    expect(src('render/roomShell.ts')).toMatch(/Graphics|poly/)
+  // ★ THE HONEST LINE, ANSWERED. This said "it is a POLYGON, not a tileset, and that is why U4
+  // stays open" — and it invited its own retirement: "if this is true, U4 can be reassessed".
+  // It is true. The room is a 12×6 map of 128×64 interior tiles drawn from an authored tileset:
+  // continuous floorboards, a flagstone hearth, and wall ELEVATIONS carrying the window, the
+  // door and the chimney breast. The polygon is still there and still correct — it is the
+  // art-independent fallback, which is why both halves are asserted here.
+  it('★ is a TILESET now, over a polygon that still stands when the codex is empty', () => {
+    expect(src('render/roomShell.ts')).toMatch(/Graphics|poly/)   // the fallback shell, kept
     const anyInteriorTileset = sources().some((f) => /interior-tileset|interiorTileset/.test(f.source))
-    expect(anyInteriorTileset, 'if this is true, U4 can be reassessed').toBe(false)
+    expect(anyInteriorTileset, 'U4 needs a tileset, and this is it').toBe(true)
+    // and it is drawn from the CODEX, not from a constant — art independence, same law as ground
+    expect(src('render/interiorTileset.ts')).toContain('resolveInteriorPiece')
+    expect(src('render/interiorScene.ts')).toContain('hasInteriorTileset')
   })
 })
 

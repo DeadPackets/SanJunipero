@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { INTERIOR_KINDS, resolveFurnishingKind, type LibraryCategory } from '@sj/shared'
-import { LIBRARY, LibraryEntrySchema, libraryEntry, LIBRARY_COUNTS } from './catalog.js'
+import { LIBRARY, LibraryEntrySchema, libraryEntry, LIBRARY_COUNTS, SHORT_OF_FOOTPRINT } from './catalog.js'
+import { ICON_PX, WORLD_SPRITE_PX, nativeSizeFor, resolveScale } from '../assetResolution.js'
+import { GEN_SIZE } from '../imageClient.js'
 
 const byCategory = (c: LibraryCategory) => LIBRARY.filter(e => e.category === c)
 
@@ -31,12 +33,41 @@ describe('the library catalog', () => {
 
   // The C-level bar: 128 px of sprite and a 64 px icon, both exact divisors of the 512
   // generation. The old pair were 24 and 24, and 512/24 = 21.33.
-  it('every entry is authored at the C-level sizes', () => {
+  // ★ AND THE SIZE IS THE FOOTPRINT'S, NOT ONE NUMBER FOR EVERYTHING. This asserted 128 for
+  // every entry, which reads as a law and is really the 1x1 answer written down twice: a 1x2
+  // bed covers `(1 + 2) x 64` = 192 px of the interior tile, which is what
+  // `assetResolution.nativeSizeFor` has said since the C-level bar landed. Shipping it at 128
+  // drew a bed two-thirds the length of the person lying in it.
+  //
+  // `512 % spritePx === 0` went with it, and it was never the law either: the published rule is
+  // INTEGER DOWNSCALE OF A CROP — 192 x 2 = 384 px taken out of a 512 generation and halved.
+  // `resolveScale` is that rule, and it throws rather than returning a fractional factor.
+  it('every entry is authored at the size its own footprint covers', () => {
     for (const e of LIBRARY) {
-      expect(e.spritePx, e.kind).toBe(128)
-      expect(e.iconPx, e.kind).toBe(64)
-      expect(512 % e.spritePx, e.kind).toBe(0)
-      expect(512 % e.iconPx, e.kind).toBe(0)
+      expect(e.iconPx, e.kind).toBe(ICON_PX)
+      expect(resolveScale({ w: e.iconPx, h: e.iconPx }).factor, e.kind).toBeGreaterThanOrEqual(2)
+      // integer downscale of a crop, at whatever size this entry is authored
+      const r = resolveScale({ w: e.spritePx, h: e.spritePx })
+      expect(Number.isInteger(r.factor), e.kind).toBe(true)
+      expect(r.rawCrop.w, e.kind).toBeLessThanOrEqual(GEN_SIZE)
+      if (e.interior === undefined) {
+        expect(e.spritePx, e.kind).toBe(WORLD_SPRITE_PX)
+        continue
+      }
+      const want = nativeSizeFor('item', e.interior.slots).w
+      expect(e.spritePx, `${e.kind} — declared bigger than its art`)
+        .toBe(SHORT_OF_FOOTPRINT.has(e.kind) ? WORLD_SPRITE_PX : want)
+    }
+  })
+
+  // ★ THE GAP, NAMED. Two 1x2 kinds have no 192 px art, so they keep the size their pixels
+  // actually are. This test exists so the list can only ever shrink on purpose.
+  it('names every furnishing still short of the ground it covers', () => {
+    expect([...SHORT_OF_FOOTPRINT].sort()).toEqual(['bench', 'loom'])
+    for (const kind of SHORT_OF_FOOTPRINT) {
+      const e = LIBRARY.find((x) => x.kind === kind)!
+      expect(e.interior, kind).toBeDefined()
+      expect(nativeSizeFor('item', e.interior!.slots).w, kind).toBeGreaterThan(e.spritePx)
     }
   })
 

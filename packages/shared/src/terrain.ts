@@ -15,6 +15,16 @@ export function materialKind(kind: string): string {
   return `${MATERIAL_KIND_PREFIX}${kind}`
 }
 
+// OPTION C's interior tileset. A wall ELEVATION is not a material — it is never sampled
+// continuously, it has an up and a down, and it belongs to one face of one wall — so it takes
+// its own namespace. Same law as `materialKind`: the forge writes this string and the renderer
+// reads it, so it lives here or the two drift.
+export const INTERIOR_PIECE_KIND_PREFIX = 'interior:'
+
+export function interiorPieceKind(id: string): string {
+  return `${INTERIOR_PIECE_KIND_PREFIX}${id}`
+}
+
 export const TerrainTileManifestSchema = z.object({
   version: z.literal('v1-terrain-tile'),
   kind: TerrainTileKindSchema,

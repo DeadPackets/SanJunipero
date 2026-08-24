@@ -15,6 +15,7 @@ import { LibraryItemManifestSchema, type LibraryItemManifest } from '@sj/shared'
 import type { AssetCodex } from '../codex.js'
 import { libraryEntry, type LibraryEntry } from './catalog.js'
 import { ICON_SUFFIX, registerLibraryEntry } from './register.js'
+import { registerCommittedInteriors } from '../interiorArt.js'
 
 export const ITEMS_CONTENT_DIR = fileURLToPath(new URL('../../content/items', import.meta.url))
 
@@ -71,9 +72,13 @@ function latestItem(codex: AssetCodex, kind: string) {
  *  register nothing, and regenerated art gets a new record that wins by seq. Registration is
  *  free — the generation booked its own spend in the forge ledger when it was paid for. */
 export function registerCommittedItems(
-  codex: AssetCodex, opts: { root?: string } = {},
+  codex: AssetCodex, opts: { root?: string; interiorRoot?: string } = {},
 ): ItemIngestEntry[] {
-  const out: ItemIngestEntry[] = []
+  // ★ THE INTERIOR TILESET RIDES IN WITH THE FURNITURE IT STANDS IN. The gateway's terrain
+  // ingest short-circuits the moment every terrain kind exists, so a resumed town would never
+  // see a piece added later; the library ingest is idempotent per item and always runs. The
+  // tileset is the room the furniture is placed in, so this is where it belongs.
+  const out: ItemIngestEntry[] = registerCommittedInteriors(codex, { root: opts.interiorRoot })
   for (const item of listCommittedItems(opts.root)) {
     const existing = latestItem(codex, item.kind)
     if (existing !== null) {

@@ -11,7 +11,8 @@ import {
   DOORWAY_POOL_ALPHA, HEARTH_POOL_ALPHA, ROOM_MARGIN_Y, ROOM_SHELL_INK, ROOM_SHELL_PAINT,
   ROOM_ZOOM, WALL_MOUNT_H_PX,
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorBoards, floorPolyOf, floorPools,
-  roomBox, roomCropPx, roomMaskPoly, roomOriginY, roomZoomFor, skirtingPolys, tileCentreScreen,
+  roomBox, roomCropPx, roomMaskPoly, roomOriginX, roomOriginY, roomZoomFor, skirtingPolys,
+  tileCentreScreen,
   thresholdPoly, wallCourses, wallMount, wallPolys, type ShellPainter,
 } from './roomShell.js'
 
@@ -383,6 +384,32 @@ describe('roomShell — the room fits the stage', () => {
     const box = roomBox()
     const centred = tall / 2 - ((box.top + box.bottom) / 2) * ROOM_ZOOM
     expect(roomOriginY(tall, OFFSET, roomZoomFor(tall))).toBe(centred - OFFSET)
+  })
+
+  // ★ WHAT THE BROWSER CAUGHT, AGAIN: the origin is the room's FAR CORNER, and a 12x6 room does
+  // not spread evenly around it. Dropping the origin on the middle of the stage hung the whole
+  // room 192 px to the right of centre — visible the moment the room stopped being square.
+  it('★ the room is centred by its own BOX across the stage, not by its origin', () => {
+    const screenW = 1568
+    const x = roomOriginX(screenW, ROOM_ZOOM)
+    const west = x + interiorToScreen(0, ROOM_TILES.h).sx * ROOM_ZOOM
+    const east = x + interiorToScreen(ROOM_TILES.w, 0).sx * ROOM_ZOOM
+    expect((west + east) / 2).toBe(screenW / 2)
+    expect(screenW / 2 - x).toBe(192)   // by how much the landed rule was off
+    expect(west).toBeGreaterThan(0)
+    expect(east).toBeLessThan(screenW)
+  })
+
+  it('★ a stage too short loses the near corner, never the wall top', () => {
+    // MEASURED in the running app: 1728 x 823 window gives a canvas 678 CSS px tall, and the
+    // box needs 736 + two 8 px margins. 74 px do not fit and every one of them comes off the
+    // bottom, because the walls carry the window, the chimney breast and the beams.
+    const short = 678
+    expect(roomCropPx(short)).toBe(74)
+    const box = roomBox()
+    const y = roomOriginY(short, OFFSET, ROOM_ZOOM)
+    expect(y + box.top * ROOM_ZOOM).toBe(ROOM_MARGIN_Y)          // the wall top is kept
+    expect(y + box.bottom * ROOM_ZOOM).toBeGreaterThan(short)    // the near corner is what goes
   })
 
   it('★ the crop is measured, not asserted — and it is zero on the stage the app reports', () => {
