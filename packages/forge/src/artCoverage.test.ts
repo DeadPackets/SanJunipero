@@ -1,13 +1,18 @@
 import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { FOUNDER_IDS, parseCharacterAtlasManifest, parseLibraryItemManifest } from '@sj/shared'
-import { BUILDINGS_CONTENT_DIR } from './buildingArt.js'
+import { BUILDINGS_CONTENT_DIR, STRUCTURE_FACINGS, listCommittedBuildings } from './buildingArt.js'
 import { loadReferenceSheet, paletteSwatchPng } from './referenceSheet.js'
 import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
 import { decodePng } from './post/raw.js'
-import { alphaBinaryGate, paletteGate, soleSilhouetteGate } from './pixelGates.js'
-import { ICON_PX, WORLD_SPRITE_PX } from './assetResolution.js'
+import {
+  alphaBinaryGate, classDensityGate, nativeDensityGate, paletteGate, soleSilhouetteGate,
+  spriteDensity,
+} from './pixelGates.js'
+import { mirrorX } from './sheet.js'
+import { mirrorFacingGate } from './structureArt.js'
+import { ICON_PX, TOWN_TILE, WORLD_SPRITE_PX } from './assetResolution.js'
 import { LIBRARY, LIBRARY_COUNTS } from './library/catalog.js'
 import { ICON_SUFFIX } from './library/register.js'
 import { ITEMS_CONTENT_DIR, listCommittedItems, registerCommittedItems } from './library/committed.js'
@@ -147,6 +152,86 @@ describe('nothing an art pipeline depends on is missing from the tree as shipped
     for (const [name, dir] of [
       ['buildings', BUILDINGS_CONTENT_DIR], ['items', ITEMS_CONTENT_DIR], ['cast', CAST_CONTENT_DIR],
     ] as const) expect(existsSync(dir), `content/${name} is not in the tree`).toBe(true)
+  })
+})
+
+// ── ★ THE COMMITTED BUILDINGS, WHICH NOTHING WAS ASKING ABOUT ─────────────────────────────
+//
+// The items below get a pixel bar. The cast gets a pixel bar and a silhouette gate. The
+// twenty committed buildings — the things the town is actually made of — got neither: the
+// only assertion anywhere was that `content/buildings` exists as a directory.
+//
+// And `mirrorFacingGate` has been in `structureArt.ts` since round 4, written after a
+// mirrored SE cell was caught by eye, with SE_MIRROR_MIN_DISTANCE calibrated and a unit test
+// on synthetic images — and it has NEVER been run against the art. That is the shape this
+// lane was asked to sweep for: a thing that measures, and no caller. `classDensityGate` is
+// the same, one step milder: three generators computed it and put it in a markdown table.
+//
+// All three pass today. Measured, so the numbers are on the record rather than implied:
+// closest to a mirror is `shed` at 0.1752 against the 0.05 floor (3.5x headroom); one density,
+// 8 art px per world px, across all twenty; pixel bar clean on every cell.
+describe('★ the committed buildings', () => {
+  const buildings = listCommittedBuildings()
+
+  it('ships the kinds the world can place, in the facings it can place them in', () => {
+    expect(buildings.length).toBeGreaterThan(0)
+    for (const b of buildings) expect(STRUCTURE_FACINGS).toContain(b.facing)
+  })
+
+  it.each(buildings.map((b) => [b.dir, b] as const))('%s clears the pixel bar', async (_dir, b) => {
+    const img = await decodePng(b.png)
+    expect(alphaBinaryGate(img).failures).toEqual([])
+    expect(paletteGate(img).failures).toEqual([])
+    expect(img.width, 'a building cell is square').toBe(img.height)
+  })
+
+  // ★ THE GATE NOBODY EVER RAN. A turned building is not a flipped one: flipping moves the
+  // door to the other wall AND gets the light wrong, because the sun does not flip with the
+  // building. That is the cheap wrong answer that looks almost right.
+  it('★ no SE cell is its SW cell mirrored — the gate that had no caller', async () => {
+    const img = new Map<string, Awaited<ReturnType<typeof decodePng>>>()
+    for (const b of buildings) img.set(b.dir, await decodePng(b.png))
+    const pairs = buildings.filter((b) => b.facing === 'se').map((b) => {
+      const sw = buildings.find((o) => o.kind === b.kind && o.facing !== b.facing)
+      expect(sw, `${b.kind}: an SE cell with no SW cell to turn from`).toBeDefined()
+      return { kind: b.kind, sw: img.get(sw!.dir)!, se: img.get(b.dir)! }
+    })
+    expect(pairs.length, 'no two-facing building to judge — the gate would be vacuous')
+      .toBeGreaterThanOrEqual(7)
+    const r = mirrorFacingGate(pairs)
+    expect(r.failures.join('\n')).toBe('')
+    // anti-vacuity: the gate must red on a cell that IS a mirror, or the line above proves
+    // nothing about the gate
+    const one = pairs[0]!
+    expect(mirrorFacingGate([{ kind: one.kind, sw: one.sw, se: mirrorX(one.sw) }]).failures)
+      .toHaveLength(1)
+  })
+
+  it('★ one density across the whole class — computed by three generators, read by none', async () => {
+    const members = await Promise.all(buildings.map(async (b) => {
+      const img = await decodePng(b.png)
+      return {
+        name: b.dir,
+        density: spriteDensity({
+          canvas: { w: img.width, h: img.height }, footprint: b.manifest.footprint, tile: TOWN_TILE,
+        }),
+      }
+    }))
+    const cls = classDensityGate(members)
+    expect(cls.failures.join('; ')).toBe('')
+    expect(cls.densities, 'the class drifted onto two densities').toHaveLength(1)
+  })
+
+  it('and every cell carries the native density its footprint asks for', async () => {
+    const bad: string[] = []
+    for (const b of buildings) {
+      const img = await decodePng(b.png)
+      bad.push(...nativeDensityGate({
+        name: b.dir, canvas: { w: img.width, h: img.height },
+        footprint: b.manifest.footprint, tile: TOWN_TILE,
+      }).failures)
+    }
+    expect(bad).toEqual([])
   })
 })
 
