@@ -77,3 +77,36 @@ export function worldTextOffenders(pairs: readonly WorldTextPair[]): string[] {
   }
   return out
 }
+
+// ── ★ A MARK DRAWN ON THE GROUND, WHICH IS THE OTHER HALF OF THE PROBLEM ──────────────────
+//
+// World TEXT brings its own paper, so `WORLD_TEXT_PAIRS` can name both sides of every pair.
+// An affordance drawn straight on the terrain cannot: its background is whichever of eleven
+// tile tones the lattice happened to plat under it, times the light band. The door sill was
+// the one mark in this product with that shape, and it was invisible — see `entities.ts`.
+
+/** WCAG 1.4.11: the floor for a UI component's own boundary. Lower than AA because a shape
+ *  is not a glyph — but a floor, and one that a 45 % opacity cannot reach. */
+export const UI_BOUNDARY_RATIO = 3
+
+/** `fg` laid over `bg` at `alpha`. A translucent mark's real colour is the composite, so this
+ *  is what has to be measured — never the material's own hex. */
+export function over(fg: number, bg: number, alpha: number): number {
+  const ch = (shift: number): number =>
+    Math.round(alpha * ((fg >> shift) & 0xff) + (1 - alpha) * ((bg >> shift) & 0xff))
+  return (ch(16) << 16) | (ch(8) << 8) | ch(0)
+}
+
+/** `what — band ratio on tile` for every ground/band a mark fails on. Empty is the pass. */
+export function groundMarkOffenders(
+  what: string, colour: number, grounds: readonly number[], floor = UI_BOUNDARY_RATIO,
+): string[] {
+  const out: string[] = []
+  for (const g of grounds) {
+    for (const band of ['day', 'night'] as const) {
+      const r = readableRatio(colour, g, LIGHT_BANDS[band])
+      if (r < floor) out.push(`${what} — ${band} ${r.toFixed(2)}:1 on #${g.toString(16).padStart(6, '0')}`)
+    }
+  }
+  return out
+}

@@ -136,11 +136,16 @@ export function doorLocalRect(
 /** The threshold itself: the door tile's own ground diamond, inset so it reads as a sill laid
  *  in front of the doorway rather than as a slab painted over the wall (U11). */
 export const DOOR_SILL_INSET = 0.16
-export function doorSillPolygon(footprint: { w: number; h: number }, scale: number): number[] {
+/** How much further in the sill's LIT inner line sits — one screen pixel of step at zoom 1,
+ *  which is what makes the rim a ledge rather than a line. */
+export const DOOR_SILL_STEP = 0.075
+export function doorSillPolygon(
+  footprint: { w: number; h: number }, scale: number, inset = DOOR_SILL_INSET,
+): number[] {
   const k = scale === 0 ? 1 : scale
   const c = doorLocalCentre(footprint)
-  const halfW = (TILE_PX / 2) * (1 - DOOR_SILL_INSET)
-  const halfH = (TILE_PX / 4) * (1 - DOOR_SILL_INSET)
+  const halfW = (TILE_PX / 2) * (1 - inset)
+  const halfH = (TILE_PX / 4) * (1 - inset)
   return [c.x, c.y - halfH, c.x + halfW, c.y, c.x, c.y + halfH, c.x - halfW, c.y]
     .map((v, i) => (i % 2 === 0 ? (v - 0) / k : v / k))
 }
