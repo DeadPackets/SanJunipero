@@ -49,7 +49,7 @@ import {
   CELL_V2, FEET_Y_V2, POSES_V2, FACINGS, anchorToCanvas, downscaleMajority,
   frameCoherenceGate, mirrorX, sleepGate,
 } from './sheet.js'
-import { strideGateV4 } from './mirror.js'
+import { sleepAxisDeg, sleepAxisGate, strideGateV4 } from './mirror.js'
 import { alphaBinaryGate, paletteGate, soleSilhouetteGate } from './pixelGates.js'
 import { listCommittedCast, type CommittedCharacter } from './castArt.js'
 
@@ -98,11 +98,20 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
   }
   for (const x of sleepGate('sleep', view.get('idle-se')!, view.get('sleep-se')!))
     found.push(`${c.id} sleep ${x.gate}`)
+  // ★ AND THE AXIS, WHICH THE AUDIT WAS NOT ASKING. The head-term gap ran the other way:
+  // `coherenceGateV4` (pre-spend) asked less than `frameCoherenceGate` (post-hoc). For SLEEP
+  // it is the audit that asks less — `sleepGate` checks palette and wider-than-tall, while the
+  // generator's `sleepCoherenceGateV4` also checks that the body lies ALONG the ground diagonal
+  // rather than flat across the screen. A body drawn flat passes `aspect > 1`; three of the
+  // five shipped that way once. All five committed cells are in the band today
+  // (-33.4, -36.1, -37.7, -38.0, -36.2 against -50..-20), so asking costs nothing and the
+  // two gates now ask the same set in both directions.
+  for (const x of sleepAxisGate(view.get('sleep-se')!)) found.push(`${c.id} sleep ${x.gate}`)
   return found
 }
 
 /**
- * ★ THE DEBT, AS OF THIS SWEEP. TWO cells, both in the cast.
+ * ★ THE DEBT, AS OF THIS SWEEP. ONE cell, and it is one this project made on purpose.
  *
  * It was four. `salma ne/contact-a` — the second TACTICAL GEAR, a large brown bundle in her
  * right hand in one frame of four, +24.3 % opaque area against a ±18 % tolerance and WORSE
@@ -126,11 +135,6 @@ export const KNOWN_GATE_DEBT: Record<string, string> = {
   'amara ne stride contact-a~contact-b':
     '0.0000 against 0.1085 — the TACTICAL GEAR repair, by construction',
 
-  // Yusuf's sleep cell shares 53 % of its palette with his idle against a floor of 80 %. A
-  // lying body at gate-view scale is mostly face where a standing one is mostly jacket, so
-  // this may be the gate rather than the art — it is the one of the four to look at last.
-  'yusuf sleep palette':
-    '0.5294 against 0.8000 — sleep vs idle palette, possibly the gate and not the cell',
 }
 
 const cast = listCommittedCast()
@@ -151,8 +155,8 @@ describe('★ the committed cast against the gates as they now behave', () => {
       'this entry passes now — delete it from KNOWN_GATE_DEBT').toEqual([])
   })
 
-  it('★ and the debt is TWO cells, so a jump shows up in the diff', () => {
-    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(2)
+  it('★ and the debt is ONE cell, so a jump shows up in the diff', () => {
+    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(1)
   })
 })
 
@@ -192,5 +196,17 @@ describe('the derived facings are exact mirrors, and the gate still disagrees ac
     expect(disagreements.length,
       'the gate no longer measures its own rounding — widen the sweep to all four facings')
       .toBeGreaterThan(0)
+  })
+})
+
+
+// ★ THE OTHER HALF OF "THE TWO GATES ASK THE SAME SET", stated as a number rather than left in
+// prose: every committed sleeper lies along the ground diagonal, head up-right.
+describe('every committed sleep cell lies along the ground, not across the screen', () => {
+  it.each(cast.map((c) => [c.id, c] as const))('%s', async (id, c) => {
+    const atlas = await decodePng(c.atlas)
+    const deg = sleepAxisDeg(cropper(c, atlas)('sleep-se'))
+    expect(deg, `${id} sleeps at ${deg.toFixed(1)} deg`).toBeGreaterThanOrEqual(-50)
+    expect(deg, `${id} sleeps at ${deg.toFixed(1)} deg`).toBeLessThanOrEqual(-20)
   })
 })
