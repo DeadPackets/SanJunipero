@@ -73,15 +73,17 @@
 
 **Read the two right-hand columns before dispatching.** *Needs from the wave before* is the real dependency. *Contends on* is a **merge** problem and never a scheduling one: two tasks in the same wave that edit one file can both be written at once and must be landed in some order, which is a train's job, not a graph's.
 
+**★★ v6, RULING 2 — this table is recomputed after two edits that took the critical path from fourteen to twelve.** T58's roster columns moved into T34, and `costReport` moved out of `packages/supervisor/` (which does not exist until T32) into `packages/agents/src/live/`, beside the `reportDeadCalls` it reports. Both are recorded in the tasks themselves.
+
 | Wave | Tasks | Needs from the wave before | Contends on |
 |---:|---|---|---|
-| **1** | **T1, T2, T5, T8, T9, T11, T12, T19, T21, T22, T23, T24, T26, T28, T31, T35, T36(a), T37, T38, T39, T40, T44, T45, T55, T66** — **twenty-five** | **nothing.** Every one consumes only what is already on `main` | `perception.ts` (T21, T23, T55) · `bridge.ts` (T19) · `verbs.ts` (T22, T24, T28) · `genesis/world.ts` (T9, T11) · `llm/` (T8, T37, T38, T39, T40) |
-| **2** | **T3, T6, T7, T10, T13, T15, T20, T27, T30, T46, T47, T56, T58, T60, T62, T65** — sixteen | T2 → T3 · T5 → T6, T7, T15 · T9 → T10 · T12 → T13 · T19 → T20 *(assertion only)* · T26 → T27 · T2+T5 → T30 · T45 → T46, T47 · T55 → T56, T58, T60, T62 · T37 → T65 | `bridge.ts` (T15, T20, T56) · `prose.ts` (T7, T20, T56, T58) · `pins.ts` (T65 after T37) |
+| **1** | **T1, T2, T5, T8, T9, T11, T12, T19, T21, T22, T23, T24, T26, T28, T31, T35, T36(1–3), T37, T38, T39, T40, T44, T45, T55, T66** — **twenty-five** | **nothing.** Every one consumes only what is already on `main` | `perception.ts` (T21, T23, T55) · `bridge.ts` (T19) · `verbs.ts` (T22, T24, T28) · `genesis/world.ts` (T9, T11) · `llm/` (T8, T37, T38, T39, T40) · **`live/` (T26, T36)** |
+| **2** | **T3, T6, T7, T10, T13, T15, T20, T27, T30, T46, T47, T56, T58, T60, T62, T65** — sixteen | T2 → T3 · T5 → T6, T7, T15 · T9 → T10 · T12 → T13 · T19 → T20 *(assertion only)* · T26 → T27 · T2+T5 → T30 · T45 → T46, T47 · T55 → T56, **T58**, T60, T62 · T37 → T65 | `bridge.ts` (T15, T20, T56) · `prose.ts` (T7, T20, T56, T58) · `pins.ts` (T65 after T37) |
 | **3** | **T4, T14, T16, T17, T42, T57, T63** — seven | T3 → T4 · T13 → T14 · T15 → T16, T17 · T4+T11 → T42 · T56 → T57 · T62 → T63 | `drives/state.ts` (T16, T17) · `prompt/social.ts` (T57) |
 | **4** | **T18, T25, T29, T61** — four | T16+T17 → T18 · T57 → T25 **and** T57 → T29 (C25's pairing, and the only edge holding T29 late) · T16+T60 → T61 | `config.ts` (T29 alone, deliberately) |
-| **5** | **T32, T59** | T4, T7, T8, T10, T11, T18, T27, T30, T31 → **T32** · T29+T58 → T59 | `supervisor.ts` (T32) |
-| **6** | **T33, T34, T36(b), T43, T48, T64** — six | T32 → all six · T25 → T34 · T42 → T43 · T44–T47 → T48 · T63 → T64 | `supervisor.ts` (T32, T33, T34, T64) |
-| **7** | **T41, T49** | T36(b) + T37–T40 + T65 → T41 · T13, T25, T26, T27, T32, T36(b), T57, T62, T64, T66 → **T49** | — |
+| **5** | **T32, T59** | T4, T7, T8, T10, T11, T18, T27, T30, T31 → **T32** · T29+T58 → **T59** *(★ v6: T58 is wave 2 now, so T29 is what holds T59)* | `supervisor.ts` (T32) |
+| **6** | **T33, T34, T36(4–5), T43, T48, T64** — six | T32 → all six · T25+T36(1–3) → T34 · T42 → T43 · T34+T44–T47 → T48 · T63 → T64 | `supervisor.ts` (T32, T33, T34, T64) |
+| **7** | **T41, T49** | T36(4–5) + T37–T40 + T65 → T41 · T13, T25, T26, T27, T32, T36, T57, T62, T64, T66 → **T49** | — |
 | **8** | **T50** — the dress rehearsal, three live runs | T33, T41, T43, T48, T49, T59, T61 | — |
 | **9** | **T51** — GATE G8 | T50 | — |
 | **10–12** | **T52 → T53 → T54** | strictly serial, and deferred by ruling | the box |
@@ -90,24 +92,24 @@
 
 ### 2. The true critical path
 
-**Fourteen tasks as the plan stands. Twelve after two splits this revision names but does not take.**
+**★★ v6, RULING 2 — TWELVE. v5b's was fourteen, and both edges that made the difference have now been cut.**
 
 ```
-T5 → T15 → T16 → T18 → T32 → T36 → T34 → T58 → T59 → T50 → T51 → T52 → T53 → T54      (14)
+T5 → T15 → T16 → T18 → T32 → T36(4–5) → T49 → T50 → T51 → T52 → T53 → T54      (12)
 ```
 
-Read it as a sentence: **a genome makes a drive, the drive gains a person, the person reaches the prompt, the prompt is wired into a process, the process is measured, the measurement gets a dashboard, the dashboard shows an age, the age slows a body, and only then can the town be run, gated and shipped.**
+Read it as a sentence: **a genome makes a drive, the drive gains a person, the person reaches the prompt, the prompt is wired into a process, the process is measured, the measurement is scored, and only then can the town be run, gated and shipped.**
 
-**★ TWO EDGES ON THAT PATH ARE ACCIDENTS OF TASK BOUNDARIES, NOT OF THE WORK. Cutting them takes the path to twelve, and both cuts are inside a single task.**
+**`T5 → T15 → T16 → T18 → T32 → T64 → T49 → T50 → …` is the same twelve** through the furniture seam, so the path is not fragile: cutting one of the two wave-6 joins does not shorten it.
 
-| Edge | Why it exists | The cut |
+**★ THE TWO CUTS, AND WHY EACH WAS A TASK-BOUNDARY ACCIDENT RATHER THAN WORK.**
+
+| Was | Why the edge existed | The cut, made |
 |---|---|---|
-| **T36 → T34** | T34's `GET /api/cost` calls `costReport(db)`, which T36 produces. **But T36's Steps 1–3 build the instrument against a seeded ledger and need nothing; only Step 4 is the $4.61 live baseline, and only Step 4 needs T32.** As written, an admin panel waits on a live run | **Treat T36 Steps 1–3 as wave 1 and Step 4 as wave 6.** The task is not split and not renumbered; its steps are dispatched to two waves, which the step list already permits |
-| **T34 → T58** | T58 adds two columns to `GET /api/roster`, and T34 creates the file that route lives in. **Three lines of a nine-step task pull the whole of Phase F2 behind the whole of Phase G** | **Move T58's roster columns into T34's route.** It is `ageYears` and `ageBand` on a row T34 is already building, T34 already imports the world state, and T58 keeps its prose and perception halves. **This one is a real edit and this revision does not make it** — it changes two tasks' file lists, and the wave table is more useful naming it than quietly assuming it |
+| **`T34 → T58`**, and through `T34 → T48` it sat on the path | T58 added `ageYears` and `ageBand` to `GET /api/roster`, and T34 creates that file. **Three lines of a nine-step task pulled the whole of Phase F2 behind the whole of Phase G** | **The two columns moved into T34's route**, where the row is already being built. `yearsOf` is still produced once, in T58. **T58 is now wave 2 and depends on nothing but `testFixtures.ts`** |
+| **`T36 → T34`** | T34's `/api/cost` calls `costReport(db)`. **And T36's instrument could not be written early even though it needs nothing, because `packages/supervisor/` does not exist until T32 creates it** | **`costReport` moved to `packages/agents/src/live/cost.ts`** — beside `reportDeadCalls`, over the `llm_calls` table both read. **It was in the wrong package**: two functions over one table in two packages. Steps 1–3 are wave 1; only `measure.ts` and the live run wait on T32 |
 
-**With both: `T5 → T15 → T16 → T18 → T32 → T36(b) → T49 → T50 → T51 → T52 → T53 → T54` — twelve.** No further cut is available: **T32 is a genuine join of nine tasks and T50 is a genuine join of seven**, and both are joins for the right reason — one wires the town together and the other runs it.
-
-**The path is 18% of the plan. The other 82% is schedulable around it.**
+**No further cut is available, and the two remaining joins are joins for the right reason: T32 wires the town together and T50 runs it.** T32 is a genuine convergence of nine tasks; T50 of seven. **The path is 18% of the plan; the other 82% is schedulable around it.**
 
 ### 3. Every task that is now parallelisable and was not, named
 
@@ -402,7 +404,7 @@ Each is one line and its reason. Every one was paid for by a real failure in thi
 | `packages/supervisor/src/nightly.ts` | `runNightly` — chronicle, milestones, constructs, dead calls |
 | `packages/supervisor/src/admin.ts` | `createAdminServer` |
 | `packages/supervisor/src/index.ts` | process entrypoint |
-| `packages/supervisor/src/cost/report.ts` | `costReport` |
+| `packages/agents/src/live/cost.ts` | `costReport` — ★ v6 moved out of the supervisor: it reads `llm_calls`, which is agents-side, and its sibling `reportDeadCalls` is already here (T36) |
 | `packages/supervisor/src/rehearsal/{run,report}.ts` | the dress rehearsal and its schema |
 | `packages/supervisor/src/g8.gate.test.ts` | GATE G8, re-asserted offline against committed evidence |
 | `packages/agents/src/live/injection/{corpus,g8-run,g8report}.ts` | the manipulator gate |
@@ -6195,7 +6197,15 @@ Predicted vs observed, per change, including any prediction that was wrong."
 
 ### Task 58: Age is a fact the town can see — the years, the band, and the roster
 
-**Files:** Modify `packages/agents/src/prompt/prose.ts`, `packages/agents/src/prompt/prose.test.ts`, `packages/engine/src/perception.ts`, `packages/engine/src/perception.test.ts`, `packages/supervisor/src/admin.ts`, `packages/supervisor/src/admin.test.ts`.
+**Files:** Modify `packages/agents/src/prompt/prose.ts`, `packages/agents/src/prompt/prose.test.ts`, `packages/engine/src/perception.ts`, `packages/engine/src/perception.test.ts`.
+
+> ### ★★ v6, RULING 2 — THE ROSTER COLUMNS MOVE TO T34, AND THAT IS TWO TASKS OFF THE CRITICAL PATH.
+>
+> v5b's T58 also modified `packages/supervisor/src/admin.ts` to add `ageYears` and `ageBand` to `GET /api/roster`. **T34 creates that file.** So **three lines of a nine-step task pulled the whole of Phase F2 behind the whole of Phase G**, and through `T34 → T48` they sat on the critical path: `… → T32 → T36 → T34 → T58 → T59 → T50 → …`.
+>
+> **The two columns move into T34's route, where the row is already being built.** T34 already has the world state in hand and already emits a roster row; `ageYears: yearsOf(a.ageDays)` and `ageBand: ageBand(config, a.ageDays)` are two fields on an object that exists. **`yearsOf` is still T58's** — it is produced once, in `systems/aging.ts`, and T34 imports it exactly as T59 and T61 do.
+>
+> **T58 keeps its prose half and its perception half, which is all of its actual subject**: a mind has never been told that anybody is old. **It is now a wave-2 task depending on nothing but `testFixtures.ts`.**
 
 **A mind has never been told that anybody is old.** `PerceivedAgent.ageBand` has been in the packet since C11 and `grep -rn "ageBand" packages/agents/src` returns nothing: the field is carried, dropped on the floor at the prompt boundary, and has never reached a single turn. **A world where nobody can tell an elder from a youth cannot produce respect, care, teaching or grief**, and all four are things the user asked for.
 
@@ -6219,8 +6229,8 @@ export function yearsOf(ageDays: number): number      // floor(ageDays / DAYS_PE
 export const AGE_BAND_PROSE: Readonly<Record<AgeBand,
   { of: (name: string, noun: 'woman' | 'man') => string | null; self: string | null }>>
 
-// packages/supervisor/src/admin.ts — GET /api/roster rows gain:
-//   ageYears: number; ageBand: 'child' | 'adult' | 'elder'
+// ★ v6, RULING 2: the roster columns are T34's now — see the box at the head of this task.
+// `yearsOf` is still produced HERE, once, and T34 imports it.
 ```
 
 - [ ] **Step 1: Write the failing test.**
@@ -6260,22 +6270,13 @@ it('a body always knows its own age in years', () => {
 })
 ```
 
-```ts
-// packages/supervisor/src/admin.test.ts — appended
-it('the roster shows an age, so an operator can see a generation arrive and leave', async () => {
-  const row = (await getJson('/api/roster')).rows.find((r: { id: string }) => r.id === 'amara')
-  expect(row.ageYears).toBe(31)
-  expect(row.ageBand).toBe('adult')
-})
-```
-
 - [ ] **Step 2: Run them — FAIL, output saved (C18).**
 
 ```bash
-pnpm vitest run packages/agents/src/prompt/prose.test.ts packages/engine/src/perception.test.ts packages/supervisor/src/admin.test.ts 2>&1 | tee /tmp/t58-red.txt
+pnpm vitest run packages/agents/src/prompt/prose.test.ts packages/engine/src/perception.test.ts 2>&1 | tee /tmp/t58-red.txt
 ```
 
-Expected: FAIL — no age sentence in the prose, no `self.ageYears`, no roster column.
+Expected: FAIL — no age sentence in the prose and no `self.ageYears`. *(★ v6: no roster row here; the columns are T34's.)*
 
 - [ ] **Step 3: Implement.**
 
@@ -6308,15 +6309,15 @@ export const AGE_BAND_PROSE: Readonly<Record<AgeBand,
 - [ ] **Step 4: Green.**
 
 ```bash
-pnpm vitest run packages/agents/ packages/engine/src/perception.test.ts packages/supervisor/ && pnpm typecheck
+pnpm vitest run packages/agents/ packages/engine/src/perception.test.ts && pnpm typecheck
 ```
 
-Expected: PASS. Perception is derived, not stored, so nothing in the fold changes.
+Expected: PASS. Perception is derived, not stored, so nothing in the fold changes. **★ v6: `packages/supervisor` is not run here — this task no longer touches it, which is the whole of Ruling 2's first cut.**
 
 - [ ] **Step 5: Commit.**
 
 ```bash
-git add packages/agents/src/prompt/ packages/engine/src/ packages/supervisor/src/
+git add packages/agents/src/prompt/ packages/engine/src/
 git commit -m "feat: the town can tell an elder from a youth, and a mind knows its own years"
 ```
 
@@ -7779,6 +7780,10 @@ export function createAdminServer(deps: AdminDeps): http.Server
 //   GET  /api/health             → { ok, tick, day, speed, paused, alive, resumed, arm }
 //   POST /api/pause | /api/resume
 //   POST /api/speed { multiplier }
+//   GET  /api/roster             → [{ id, name, ageYears, ageBand, alive }]
+//        ★ v6, RULING 2: the two age columns were T58's and are T34's now. They pulled the whole
+//        of Phase F2 behind the whole of Phase G for three lines on a row this route already
+//        builds. `yearsOf` and `ageBand` are still produced once, in `engine/src/systems/aging.ts`.
 //   GET  /api/tokens?days=7      → [{ agentId, day, inputTokens, outputTokens, cacheReadTokens, costUsd }]
 //   GET  /api/spend?window=15    → SpendProjection & { deadCalls }        ← READ-ONLY
 //   GET  /api/rulings/pending    → ReviewRow[]
@@ -7812,6 +7817,14 @@ describe('the admin panel', () => {
   it('refuses a speed of zero and leaves the loop alone', async () => {
     expect((await post('/api/speed', { multiplier: 0 })).status).toBe(400)
     expect(loop.speed).toBe(1)
+  })
+
+  // ★ v6, RULING 2 — moved here from T58, where three lines cost two tasks on the critical
+  // path. The row this route already builds gains two fields; `yearsOf` is still T58's.
+  it('the roster shows an age, so an operator can see a generation arrive and leave', async () => {
+    const row = (await getJson('/api/roster')).rows.find((r: { id: string }) => r.id === 'amara')
+    expect(row.ageYears).toBe(31)
+    expect(row.ageBand).toBe('adult')
   })
 
   it('groups the token ledger by mind and day, with a cost column', async () => {
@@ -7933,7 +7946,24 @@ git commit -m "feat(gateway): the observatory serves itself — static bundle, d
 
 ### Task 36: The cost instrument, and the 4-sim-day baseline (LIVE, ≈$4.61)
 
-**Files:** Create `packages/supervisor/src/cost/report.ts`, `report.test.ts`, `packages/supervisor/scripts/measure.ts`, `packages/supervisor/data/cost-baseline.json`.
+**Files:** Create **`packages/agents/src/live/cost.ts`**, **`packages/agents/src/live/cost.test.ts`**, `packages/supervisor/scripts/measure.ts`, `packages/supervisor/data/cost-baseline.json`.
+
+> ### ★★ v6, RULING 2 — `costReport` MOVES OUT OF THE SUPERVISOR, AND THAT IS THE SECOND CUT.
+>
+> **v5b put `report.ts` in `packages/supervisor/src/cost/`. `packages/supervisor/` does not exist until T32 creates it** — measured: `ls packages/` at `9d76b97` returns `agents arbiter engine forge gateway narrator shared web`. So **T36's instrument, which reads a seeded ledger and needs nothing else, could not be written until the join of nine tasks had landed**, and T34's one-line `/api/cost` route inherited that: `… → T32 → T36 → T34 → T48 → T50 → …`.
+>
+> **It was in the wrong package anyway, and that is why this is a fix and not a dodge.** `costReport` reads **`llm_calls`**, which is written by `packages/agents/src/llm/callLog.ts`. Its sibling `reportDeadCalls` / `deadCallCounts` already live in **`packages/agents/src/live/g11report.ts`** — and `costReport` **reports `deadCalls`**. Two functions over one table, in two packages, was the split.
+>
+> **So the instrument lands beside its data**, and only the **runner** stays in the supervisor, because only the runner needs `createSim`:
+>
+> | Half | Where | Needs | Wave |
+> |---|---|---|---|
+> | **`costReport(db, opts)` + its test** | **`packages/agents/src/live/cost.ts`** — beside `reportDeadCalls`, over the same table | a seeded ledger. **Nothing else** | **1** |
+> | `measure.ts` + the live baseline run | `packages/supervisor/scripts/` | `createSim` (T32) | **6** |
+>
+> **No C12 problem**: `packages/agents` gains no import, and `@sj/supervisor` already depends on `@sj/agents`. **`CostReportSchema` stays in T49's supervisor-side schema file** and is `z.infer`'d from the same type, exactly as `DayRowSchema` and `ModeCollapseReportSchema` are — those two are already agents-side types consumed by a supervisor-side schema, so this is the pattern and not an exception.
+>
+> **Steps 1–3 are wave 1 and Step 4 is wave 6.** The task is not split, not renumbered, and its step list already draws the line in the right place.
 
 ```ts
 export type CostReport = {
@@ -7957,7 +7987,7 @@ export function costReport(db: Database, opts: { runId: string; simDays: number;
 - [ ] **Step 1: Write the failing test.**
 
 ```ts
-// packages/supervisor/src/cost/report.test.ts
+// packages/agents/src/live/cost.test.ts        ★ v6, RULING 2 — beside reportDeadCalls
 describe('costReport', () => {
   const db = seededLedger()   // 2 days, 3 minds, known token counts, 3 dead rows, 2 providers
 
@@ -7996,7 +8026,7 @@ describe('costReport', () => {
 ```
 
 - [ ] **Step 2:** Run — FAIL.
-- [ ] **Step 3:** Implement `report.ts` and `measure.ts` — a thin runner: `createSim`, run N sim-days headless, write `cost-<label>.json` plus a markdown table.
+- [ ] **Step 3:** Implement **`packages/agents/src/live/cost.ts`** — pure reads over `llm_calls`, no network, no `createSim`, **so this step and the two above it are dispatchable in wave 1.** Then `measure.ts` in `packages/supervisor/scripts/`: a thin runner — `createSim`, run N sim-days headless, write `cost-<label>.json` plus a markdown table. **The runner is the only half that waits on T32.**
 - [ ] **Step 4: THE BASELINE RUN (LIVE).**
 
 ```bash
@@ -8009,8 +8039,8 @@ node --env-file=.env --import packages/agents/scripts/ts-loader.mjs \
 - [ ] **Step 5: Commit** the report and a one-page reading of it.
 
 ```bash
-git add packages/supervisor/src/cost/ packages/supervisor/scripts/measure.ts packages/supervisor/data/cost-baseline.json
-git commit -m "test(supervisor): the cost baseline — four sim-days, measured, before any lever"
+git add packages/agents/src/live/cost.ts packages/agents/src/live/cost.test.ts packages/supervisor/scripts/measure.ts packages/supervisor/data/cost-baseline.json
+git commit -m "test: the cost baseline — four sim-days, measured, before any lever"
 ```
 
 ### Task 37: L1 RE-DERIVED — the routing measured, not pinned
