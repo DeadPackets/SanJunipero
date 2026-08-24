@@ -36,7 +36,28 @@ export const CROP_SCALE_BASE = 0.4
 export const CROP_SCALE_PER_STAGE = 0.15
 export const PIP_COUNT = 4
 export const PIP_COLOR = 0xf2c879
-export const BUILD_TICKS_FULL = 2880 // pip denominator — DEFAULT_CONFIG construction.houseTicks; presentation only
+/** The fallback denominator, for the frames before the snapshot's config has arrived. It is
+ *  `DEFAULT_CONFIG.construction.houseTicks` and it is NOT the authority — see `pipsFilled`. */
+export const BUILD_TICKS_FULL = 2880
+
+/**
+ * ★ HOW FULL THE PROGRESS PIPS ARE — READ OFF THE WORLD'S OWN CLOCK, NOT A COPY OF IT.
+ *
+ * This was `progressTicks / BUILD_TICKS_FULL`, a hardcoded 2880 transcribed from
+ * `DEFAULT_CONFIG`. The dev world raises a house in 240 ticks so a viewer can watch one go up,
+ * and under the transcribed denominator `floor((240 / 2880) × 4)` is **zero at completion** —
+ * every house in the demo would stand under scaffolding for its whole build with not one pip
+ * lit, and the guard would have been the eye of whoever happened to look.
+ *
+ * `houseTicks` comes off the snapshot the viewer is already holding (`store.getConfig()`, which
+ * `worldStore` parses with the engine's own strict schema), so the meter measures the build the
+ * world is actually running. A non-positive or absent figure falls back rather than dividing by
+ * zero.
+ */
+export function pipsFilled(progressTicks: number, houseTicks: number | undefined): number {
+  const full = houseTicks !== undefined && houseTicks > 0 ? houseTicks : BUILD_TICKS_FULL
+  return Math.max(0, Math.min(PIP_COUNT, Math.floor((progressTicks / full) * PIP_COUNT)))
+}
 
 // The door a resident walks out of: south face, centre of the frontage. The same rule the
 // C13 city template applies in template space (`doorTile`), read here in world tiles.
@@ -317,7 +338,7 @@ export function syncEntities(
       const k = entry.sprite.scale.x || 1
       entry.pips.scale.set(1 / k)
       entry.pips.position.set(0, 6 / k)
-      drawPips(entry.pips, Math.min(PIP_COUNT, Math.floor((s.progressTicks / BUILD_TICKS_FULL) * PIP_COUNT)))
+      drawPips(entry.pips, pipsFilled(s.progressTicks, store.getConfig()?.construction.houseTicks))
     } else {
       entry.sprite.tint = 0xffffff
       if (entry.pips !== null) {

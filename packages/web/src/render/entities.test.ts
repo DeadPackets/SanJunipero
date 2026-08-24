@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import type { Structure } from '@sj/engine/state'
 import { TILE_H, depthKey, tileToScreen } from './iso.js'
 import {
-  BUILDING_PX_PER_TILE, ENTERABLE_KINDS, doorTileOf, footprintHitPoints, structureZIndex,
+  BUILDING_PX_PER_TILE, BUILD_TICKS_FULL, ENTERABLE_KINDS, PIP_COUNT, doorTileOf,
+  footprintHitPoints, pipsFilled, structureZIndex,
 } from './entities.js'
 import { HIT_MIN_PX, doorLocalCentre, doorLocalRect, doorSillPolygon, resolveHit } from './hitShapes.js'
 import { rendersOnMap } from './characters.js'
@@ -240,5 +241,42 @@ describe('rendersOnMap', () => {
   it('still does not draw the dead', () => {
     expect(rendersOnMap({ alive: false })).toBe(false)
     expect(rendersOnMap({ alive: false, insideId: 'structure_house' })).toBe(false)
+  })
+})
+
+// ★ THE PROGRESS METER MEASURES THE BUILD THE WORLD IS ACTUALLY RUNNING.
+//
+// The denominator was a hardcoded 2880, transcribed from `DEFAULT_CONFIG.construction
+// .houseTicks`. It is the only affordance that says a tinted building is GOING UP rather than
+// simply odd-looking, and it was a second copy of a number the viewer already holds.
+//
+// The dev world raises a house in 240 ticks so somebody can watch one rise. Under the
+// transcribed denominator a house finishing at 240 lights `floor((240/2880) x 4)` = ZERO pips
+// - every house in the demo would stand under scaffolding for its whole build with the meter
+// dark, and nothing would have failed.
+describe('pipsFilled', () => {
+  it('* fills across the build the world is running, not the one the default assumes', () => {
+    expect(pipsFilled(0, 240)).toBe(0)
+    expect(pipsFilled(60, 240)).toBe(1)
+    expect(pipsFilled(120, 240)).toBe(2)
+    expect(pipsFilled(239, 240)).toBe(3)
+    expect(pipsFilled(240, 240)).toBe(PIP_COUNT)
+    // THE BEFORE-STATE, kept because it is the defect: against the transcribed 2880, a house
+    // that is FINISHED at 240 ticks lights nothing at all.
+    expect(Math.floor((240 / BUILD_TICKS_FULL) * PIP_COUNT)).toBe(0)
+  })
+
+  it('still fills across a default-length build, and never overfills', () => {
+    expect(pipsFilled(0, BUILD_TICKS_FULL)).toBe(0)
+    expect(pipsFilled(1440, BUILD_TICKS_FULL)).toBe(2)
+    expect(pipsFilled(2880, BUILD_TICKS_FULL)).toBe(PIP_COUNT)
+    expect(pipsFilled(99999, 240)).toBe(PIP_COUNT)
+  })
+
+  it('falls back rather than dividing by nothing, before the snapshot has landed', () => {
+    expect(pipsFilled(1440, undefined)).toBe(pipsFilled(1440, BUILD_TICKS_FULL))
+    expect(pipsFilled(1440, 0)).toBe(pipsFilled(1440, BUILD_TICKS_FULL))
+    expect(pipsFilled(1440, -5)).toBe(pipsFilled(1440, BUILD_TICKS_FULL))
+    expect(pipsFilled(-5, 240)).toBe(0)
   })
 })
