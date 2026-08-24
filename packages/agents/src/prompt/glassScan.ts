@@ -7,11 +7,31 @@
 // Deliberately NOT here: `joke`, `lie`, `metaphor` — the semantic-first catalog keys that are
 // also ordinary English. A mind may lie and may say so; the label for that is the tier row,
 // which this list does catch.
-export const CONSTRUCT_VOCABULARY: readonly string[] = [
-  'festival', 'faith', 'council', 'market', 'custom',
+//
+// ★ THE LIST IS BANNED ON AUTHORED SURFACES. ONLY PART OF IT IS REFUSED MID-RUN — see
+// `MID_RUN_ENFORCED`, and read that before adding a word here.
+
+// The concepts the experiment exists to watch a town reach on its own. No authored surface may
+// hand one over — that is the whole of one-way glass. Every one of them is also an ordinary
+// English noun for a real thing (a market district, a council of neighbours, keeping faith, the
+// custom of the place, a festival somebody proposes), so a mind may hear one from another mouth.
+const CONSTRUCT_TYPE_WORDS: readonly string[] = ['festival', 'faith', 'council', 'market', 'custom']
+
+// Our jargon for the machinery, not concepts a town invents. Also ordinary English: a milestone
+// is a stone by a road, a tier is a shelf, to construct is to build. A mind describing an
+// ordinary day reaches for all three.
+const OPS_JARGON_WORDS: readonly string[] = [
   'construct', 'constructs', 'milestone', 'milestones', 'tier', 'tiers',
+]
+
+// Ops keys, spelled the way only a schema spells them. No person writes these by accident.
+const OPS_KEYS: readonly string[] = [
   'god_afterlife', 'fear_of_death', 'love_expression', 'justice_claim', 'multi_day_plan', 'past_reference',
   'semantic first', 'semantic firsts',
+]
+
+export const CONSTRUCT_VOCABULARY: readonly string[] = [
+  ...CONSTRUCT_TYPE_WORDS, ...OPS_JARGON_WORDS, ...OPS_KEYS,
 ]
 
 // ★ THE SECOND ONE-WAY GLASS: HOW THE TOWN IS LAID OUT.
@@ -36,12 +56,19 @@ export const TOWN_LAYOUT_VOCABULARY: readonly string[] = [
   'plot', 'plots', 'block', 'blocks', 'ring', 'rings', 'lattice', 'plat', 'platted', 'frontage',
 ]
 
-// Four of those five words are also ordinary nouns for real things — the genesis map has a
-// market district, a town holds councils, a body keeps faith, a place has customs — so a mind
-// may hear them from another mouth. They stay in the scan the G11a gate runs over authored
-// prompt surfaces; they are NOT what assembly refuses mid-run, because crashing a live town
-// over a word one of its people said is the label harming the world, precisely backwards.
-const WORLD_AMBIGUOUS: ReadonlySet<string> = new Set(['faith', 'council', 'market', 'custom'])
+// ★ WHAT ASSEMBLY REFUSES MID-RUN, AND WHY IT IS A SHAPE AND NOT A ROSTER.
+//
+// Crashing a live town over a word one of its people said is the label harming the world,
+// precisely backwards. This file said that already and kept a hand-written roster of four
+// exceptions — and then G9b lost a mind ten consecutive turns to `milestone`, which the
+// compaction summariser wrote into that mind's own append-only day log. `assemblePrompt` scans
+// the day log, the scene and the moment: text nobody authored, some of it a mind's own words
+// coming back. A hand-maintained exception list cannot keep up with ordinary English.
+//
+// So the rule is the shape: a term is refused mid-run only if no person could write it — an
+// underscored ops key, or a two-word ops phrase. Every single ordinary word stays in the scan
+// the G11a gate runs over AUTHORED surfaces, where we own the text and a red is a real bug.
+const opsKeyShape = (term: string): boolean => /[_ ]/.test(term)
 
 // Milestone kinds are all `first_<something>`, so the shape is banned rather than the roster:
 // a kind invented next year is caught the day it is written.
@@ -53,8 +80,10 @@ const patternsFor = (terms: readonly string[]): ReadonlyArray<{ term: string; re
     re: new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'iu'),
   }))
 
+export const MID_RUN_ENFORCED: readonly string[] = CONSTRUCT_VOCABULARY.filter(opsKeyShape)
+
 const ALL_PATTERNS = patternsFor(CONSTRUCT_VOCABULARY)
-const OPS_ONLY_PATTERNS = patternsFor(CONSTRUCT_VOCABULARY.filter((t) => !WORLD_AMBIGUOUS.has(t)))
+const OPS_ONLY_PATTERNS = patternsFor(MID_RUN_ENFORCED)
 
 function scan(prompt: string, patterns: ReadonlyArray<{ term: string; re: RegExp }>): string[] {
   const out = patterns.filter(({ re }) => re.test(prompt)).map(({ term }) => term)
