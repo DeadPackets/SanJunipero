@@ -20,21 +20,62 @@ export const GAMIFICATION_BAN = /progress|score|level|quest|points|badge|streak|
 
 export type LensHint = { lens: Lens; count: number | null; hint: string }
 
-// Counts for lenses whose readers land in later tasks (bonds, moments) arrive as an override
-// rather than a null the strip has to special-case.
-export type LensCounts = Partial<Record<Lens, number>>
+/**
+ * ★ A BADGE COUNTS THE SURFACE IT BADGES, OR IT COUNTS NOTHING — and every lens has to say
+ * which, because this went wrong by silence once already.
+ *
+ * `chronicle` used to be badged with `recentEvents.length`: the LIVE SOCKET FEED, what has
+ * arrived since the viewer joined. The panel behind that tab lists `/api/chronicle`, the whole
+ * record. On a town that is days old the feed is empty and the record is not, so the first
+ * screen a viewer meets said `CHRONICLE 0` over sixteen entries — the nav telling them the
+ * simulation was doing nothing while it was visibly doing something.
+ *
+ * So this is TOTAL, with a written reason per row, exactly as `MINIMAP_LENSES` was made total
+ * for the same class of bug: the next surface anybody adds is a type error until it decides
+ * where its number comes from, and "the number I happen to have in hand" is no longer reachable.
+ */
+export type LensCounts = Record<Lens, number | null>
 
-export function lensHints(stats: TownStats, recentEvents: SimEvent[], counts: LensCounts = {}): LensHint[] {
-  const base: Record<Lens, { count: number | null; hint: string }> = {
-    map: { count: null, hint: 'Walk the town' },
-    inspector: { count: stats.alive, hint: `Townsfolk (${stats.alive})` },
-    chronicle: { count: recentEvents.length, hint: `Chronicle (${recentEvents.length})` },
-    discoveries: { count: null, hint: 'What the townsfolk worked out for themselves' },
-    society: { count: null, hint: 'Who the town has tied itself to' },
-    director: { count: null, hint: 'The days the town kept' },
-    laws: { count: null, hint: 'The rules the town lives under' },
+/** What the viewer can count without asking the server: the living, and nothing else. The two
+ *  that have a real number — the chronicle and the bonds — are fetched from the very endpoints
+ *  their own panels read, and `LensTabs` lays them over this. */
+export const countsFromWorld = (stats: TownStats): LensCounts => ({
+  map: null,          // the map IS the town; a number stuck on it would be a score
+  inspector: stats.alive,   // the living, straight out of the state the viewer already holds
+  chronicle: null,    // the size of the RECORD, and only /api/chronicle knows it
+  discoveries: null,  // no count offered: the panel's own empty state says it better
+  society: null,      // /api/bonds, the same endpoint the roster and the society lens read
+  director: null,     // no count offered
+  laws: null,         // a rule count is machinery, not a thing to show a viewer
+})
+
+/**
+ * ★ THE BADGES A VIEWER ACTUALLY SEES — the world's own count, with the two that come off the
+ * wire laid over it. A pure function rather than a line inside the component, because the line
+ * inside the component was the one thing no test could reach: a mutation that dropped both
+ * fetched counts on the floor left every UI test green while the nav went back to reading
+ * `CHRONICLE ·` on a town with sixteen entries in the record.
+ *
+ * `null` from either endpoint means it has not answered yet, and no badge is better than a
+ * wrong one — the same rule `useRemoteCount`'s catch already follows.
+ */
+export function lensCountsFor(
+  stats: TownStats, chronicle: number | null, bonds: number | null,
+): LensCounts {
+  return { ...countsFromWorld(stats), chronicle, society: bonds }
+}
+
+export function lensHints(stats: TownStats, counts: LensCounts = countsFromWorld(stats)): LensHint[] {
+  const hint: Record<Lens, string> = {
+    map: 'Walk the town',
+    inspector: `Townsfolk (${stats.alive})`,
+    chronicle: 'Everything the town has written down',
+    discoveries: 'What the townsfolk worked out for themselves',
+    society: 'Who the town has tied itself to',
+    director: 'The days the town kept',
+    laws: 'The rules the town lives under',
   }
-  return LENSES.map((lens) => ({ lens, count: counts[lens] ?? base[lens].count, hint: base[lens].hint }))
+  return LENSES.map((lens) => ({ lens, count: counts[lens], hint: hint[lens] }))
 }
 
 // ------------------------------------------------------------------ empty states

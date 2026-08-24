@@ -3,7 +3,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { LENS_LABELS, LensTabsView, StatusStripView } from './StatusStrip.js'
 import { LENSES } from './route.js'
-import { lensHints, type TownStats } from './townStats.js'
+import { countsFromWorld, lensHints, type LensCounts, type TownStats } from './townStats.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u
 const stats: TownStats = { day: 0, time: '14:30', weather: 'rain', alive: 2, total: 3 }
@@ -44,7 +44,7 @@ describe('StatusStripView', () => {
 })
 
 describe('LensTabsView', () => {
-  const hints = lensHints(stats, [])
+  const hints = lensHints(stats)
   const html = renderToStaticMarkup(createElement(LensTabsView, { lens: 'chronicle', hints, onNav: () => {} }))
 
   it('renders one labelled tab per lens and marks the current one', () => {
@@ -61,7 +61,20 @@ describe('LensTabsView', () => {
 
   it('badges only the lenses that have a real count', () => {
     expect(html).toContain('<span class="tab-count" aria-hidden="true">2</span>')  // 2 alive
-    expect(html.match(/tab-count/g)).toHaveLength(2)                                // townsfolk + chronicle
+    // Townsfolk alone, because the living are the only count the viewer holds without asking.
+    // The chronicle used to be badged here too, with the length of the LIVE SOCKET FEED, and
+    // it read `CHRONICLE 0` over a panel of sixteen. It arrives from `/api/chronicle` now.
+    expect(html.match(/tab-count/g)).toHaveLength(1)
+  })
+
+  it('★ shows the chronicle and the bonds once their own endpoints have answered', () => {
+    const counts: LensCounts = { ...countsFromWorld(stats), chronicle: 16, society: 2 }
+    const withCounts = renderToStaticMarkup(createElement(LensTabsView, {
+      lens: 'chronicle', hints: lensHints(stats, counts), onNav: () => {},
+    }))
+    expect(withCounts).toContain('<span class="tab-count" aria-hidden="true">16</span>')
+    expect(withCounts).toContain('<span class="tab-count" aria-hidden="true">2</span>')
+    expect(withCounts.match(/tab-count/g)).toHaveLength(3)
   })
 
   it('never renders an emoji in the lens bar', () => {

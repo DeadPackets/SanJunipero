@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import type { SimEvent } from '@sj/shared'
 import type { AgentBody, WorldState } from '@sj/engine/state'
 import { LENSES } from './route.js'
-import { EMPTY_COPY, GAMIFICATION_BAN, WEATHER_GLYPH, lensHints, townStats } from './townStats.js'
+import {
+  EMPTY_COPY, GAMIFICATION_BAN, WEATHER_GLYPH, countsFromWorld, lensCountsFor, lensHints, townStats,
+  type LensCounts,
+} from './townStats.js'
 
 const agent = (id: string, alive: boolean): AgentBody => ({
   id, name: id, x: 0, y: 0, alive, asleep: false,
@@ -17,9 +19,6 @@ const state = (tick: number, weather: string, agents: AgentBody[]): WorldState =
   structures: {}, items: {}, crops: {}, wildlife: { fish: 1, deer: 1 },
   counters: { nextEntityId: 1 },
 })
-
-const event = (type: string, tick: number): SimEvent =>
-  ({ seq: tick + 1, tick, type, payload: {} }) as unknown as SimEvent
 
 describe('townStats', () => {
   it('counts the living against the whole cast', () => {
@@ -41,28 +40,63 @@ describe('townStats', () => {
 
 describe('lensHints', () => {
   const stats = townStats(state(0, 'sunny', [agent('a', true), agent('b', true)]), 0)
-  const events = [event('agent_spoke', 1), event('agent_died', 2)]
 
   it('gives one hint per lens, in lens order', () => {
-    expect(lensHints(stats, events).map((h) => h.lens)).toEqual([...LENSES])
+    expect(lensHints(stats).map((h) => h.lens)).toEqual([...LENSES])
   })
 
-  it('badges the townsfolk count and the chronicle length, and leaves the map unbadged', () => {
-    const by = new Map(lensHints(stats, events).map((h) => [h.lens, h]))
+  // ★ A BADGE COUNTS THE SURFACE IT BADGES, OR IT COUNTS NOTHING.
+  //
+  // This test used to assert `chronicle === events.length`, and `events` is the LIVE SOCKET
+  // FEED — what has arrived since the viewer joined. The panel behind that tab lists
+  // `/api/chronicle`, the whole record. Merge train 3 photographed the gap: `CHRONICLE 0` in
+  // the nav over a panel holding sixteen entries, on the first screen a viewer sees. The file
+  // already knew the two were different things — `EMPTY_COPY.chronicleQuiet` exists to say so
+  // in words — and the badge read the wrong one anyway.
+  it('badges the townsfolk count, and never counts the live feed as the chronicle', () => {
+    const by = new Map(lensHints(stats).map((h) => [h.lens, h]))
     expect(by.get('inspector')!.count).toBe(2)
-    expect(by.get('chronicle')!.count).toBe(events.length)
+    expect(by.get('chronicle')!.count, 'the badge invented a number').toBeNull()
     expect(by.get('map')!.count).toBeNull()
   })
 
-  it('takes a count override for the lenses whose readers land later', () => {
-    const by = new Map(lensHints(stats, events, { society: 7, director: 0 }).map((h) => [h.lens, h]))
+  // ★ AND THE LIVE FEED CANNOT REACH IT AT ALL, which is the part a number-swap would not fix.
+  // `lensHints` no longer takes the socket feed, so there is nothing for a chronicle count to
+  // be accidentally derived FROM. The only way a badge gets a number is a caller handing it one.
+  it('★ takes no live feed at all — the only counts are the ones a caller declares', () => {
+    const declared: LensCounts = { ...countsFromWorld(stats), chronicle: 16, society: 7 }
+    const by = new Map(lensHints(stats, declared).map((h) => [h.lens, h]))
+    expect(by.get('chronicle')!.count).toBe(16)
     expect(by.get('society')!.count).toBe(7)
-    expect(by.get('director')!.count).toBe(0)
-    expect(lensHints(stats, events).find((h) => h.lens === 'society')!.count).toBeNull()
+    expect(by.get('director')!.count).toBeNull()
+  })
+
+  // The MINIMAP_LENSES precedent, restated: a total record with a reason on every row, so the
+  // next lens anybody adds is a type error until it says where its number comes from.
+  it('★ every lens is accounted for by name, so a new one cannot arrive unbadged by silence', () => {
+    expect(Object.keys(countsFromWorld(stats)).sort()).toEqual([...LENSES].sort())
+    expect(countsFromWorld(stats).inspector).toBe(2)
+    for (const lens of LENSES) {
+      if (lens === 'inspector') continue
+      expect(countsFromWorld(stats)[lens], lens).toBeNull()
+    }
+  })
+
+  // ★ THE WIRING ITSELF, because a mutation proved it was the one line no test could reach:
+  // dropping both fetched counts on the floor inside `LensTabs` left all 796 UI tests green
+  // while the nav went back to showing no chronicle number at all.
+  it('★ lays the two fetched counts over the world’s, and shows nothing until they answer', () => {
+    expect(lensCountsFor(stats, 16, 2)).toEqual({ ...countsFromWorld(stats), chronicle: 16, society: 2 })
+    // Before either endpoint has answered: no badge is better than a wrong one.
+    expect(lensCountsFor(stats, null, null)).toEqual(countsFromWorld(stats))
+    expect(lensCountsFor(stats, 16, 2).inspector, 'the world’s own count was overwritten').toBe(2)
+    // Zero is a real answer and must survive: a town with nothing written down says so.
+    expect(lensCountsFor(stats, 0, 0).chronicle).toBe(0)
+    expect(lensCountsFor(stats, 0, 0).society).toBe(0)
   })
 
   it('never speaks the language of a game (living-documentary law)', () => {
-    for (const h of lensHints(stats, events, { society: 3, director: 4 })) {
+    for (const h of lensHints(stats, { ...countsFromWorld(stats), society: 3, director: 4 })) {
       expect(h.hint, h.lens).not.toMatch(GAMIFICATION_BAN)
     }
     expect(GAMIFICATION_BAN.test('Your PROGRESS')).toBe(true)
@@ -71,7 +105,7 @@ describe('lensHints', () => {
   })
 
   it('every hint is human-framed prose, never machinery', () => {
-    for (const h of lensHints(stats, events)) {
+    for (const h of lensHints(stats)) {
       expect(h.hint.length).toBeGreaterThan(3)
       expect(h.hint).not.toMatch(/\b(AI|LLM|model|prompt|token|agent)\b/i)
     }

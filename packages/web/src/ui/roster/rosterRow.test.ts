@@ -280,6 +280,24 @@ describe('the rendered row', () => {
     expect(html).toContain(`aria-label="${label.replace(/"/g, '&quot;')}"`)
   })
 
+  // ★ PROXIMITY IS NOT A BOND, AND THE ROW MUST NOT SAY IT IS.
+  //
+  // `row.with` is `companyOf` — who is inside earshot right now. It printed as "with Yusuf",
+  // and the nav tab beside it is labelled BONDS. Merge train 3 read the two as one claim and
+  // filed `BONDS 0` as a counter that lies. The count was right — the scripted founders never
+  // speak, give, teach or share a roof, so the bond ledger genuinely holds nothing — and the
+  // word was borrowed from a surface that means something else.
+  it('★ says who is NEAR, never who someone is "with" — that word belongs to the bonds', () => {
+    expect(row.with).toEqual(['Yusuf'])          // they are one tile apart, and that is all
+    expect(html).toContain('near Yusuf')
+    expect(html).not.toMatch(/\bwith Yusuf\b/)
+    expect(rowLabel(row)).toContain('near Yusuf')
+    expect(rowLabel(row)).not.toMatch(/\bwith Yusuf\b/)
+    // and a body on its own still reads as a body on its own
+    const alone = rosterRows2(world([{ id: 'amara', name: 'Amara', x: 10, y: 10 }], [], DAY_TICKS), [], null, DAY_TICKS)[0]!
+    expect(rowLabel(alone)).toContain('alone')
+  })
+
   it('draws the mood, and never borrows a glyph from the reader’s font', () => {
     expect(html).toContain('<svg')
     expect(html).toContain('shape-rendering="crispEdges"')

@@ -1,15 +1,18 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { BondsResponseSchema } from '@sj/shared'
+import { BondsResponseSchema, ChronicleResponseSchema } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { LENSES, type Lens } from './route.js'
 import {
-  lensHints, townStats, weatherGlyph,
-  type LensCounts, type LensHint, type TownStats, type WeatherGlyph,
+  lensCountsFor, lensHints, townStats, weatherGlyph,
+  type LensHint, type TownStats, type WeatherGlyph,
 } from './townStats.js'
 
 // The bond count is history, not a tick reading — a slow beat keeps the badge honest without
 // putting a fetch on the world's clock.
 export const BOND_COUNT_REFETCH_MS = 60_000
+/** The chronicle's own beat, matching `ChroniclePanel.CHRONICLE_REFETCH_MS`: the badge and the
+ *  panel read the same endpoint, so they should go stale at the same rate too. */
+export const CHRONICLE_COUNT_REFETCH_MS = 20_000
 
 // chrome copy speaks about townsfolk, never machinery (spec §5)
 export const LENS_LABELS: Record<Lens, string> = {
@@ -92,25 +95,34 @@ export function LensTabsView({ lens, hints, onNav }: { lens: Lens; hints: LensHi
   )
 }
 
-function useBondCount(): number | null {
+/** ★ ONE READER, TWO BADGES, AND EACH READS ITS OWN PANEL'S ENDPOINT. Both counts are history
+ *  rather than a tick reading, so a slow beat keeps them honest without putting a fetch on the
+ *  world's clock. `size` pulls the number out of whatever shape that endpoint answers in. */
+function useRemoteCount<T>(
+  url: string, parse: (json: unknown) => { success: true; data: T } | { success: false },
+  size: (data: T) => number, everyMs: number,
+): number | null {
   const [count, setCount] = useState<number | null>(null)
   useEffect(() => {
     let alive = true
     const load = (): void => {
-      void fetch('/api/bonds')
-        .then(async (r) => (r.ok ? BondsResponseSchema.safeParse(await r.json()) : null))
+      void fetch(url)
+        .then(async (r) => (r.ok ? parse(await r.json()) : null))
         .then((parsed) => {
-          if (alive && parsed?.success === true) setCount(parsed.data.bonds.length)
+          if (alive && parsed?.success === true) setCount(size(parsed.data))
         })
         .catch(() => { /* no badge is better than a wrong one */ })
     }
     load()
-    const timer = setInterval(load, BOND_COUNT_REFETCH_MS)
+    const timer = setInterval(load, everyMs)
     return () => {
       alive = false
       clearInterval(timer)
     }
-  }, [])
+    // the three arguments are module constants at every call site; re-running on identity
+    // would refetch on every render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, everyMs])
   return count
 }
 
@@ -119,8 +131,16 @@ function useBondCount(): number | null {
 export function LensTabs({ store, lens, onNav }: { store: WorldStore; lens: Lens; onNav: (l: Lens) => void }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
-  const events = useSyncExternalStore(store.subscribe, store.recentEvents)
-  const bonds = useBondCount()
-  const counts: LensCounts = bonds === null ? {} : { society: bonds }
-  return <LensTabsView lens={lens} hints={lensHints(townStats(state, tick), events, counts)} onNav={onNav} />
+  const bonds = useRemoteCount(
+    '/api/bonds', (j) => BondsResponseSchema.safeParse(j), (d) => d.bonds.length, BOND_COUNT_REFETCH_MS,
+  )
+  // ★ THE SAME ENDPOINT `ChroniclePanel` LISTS FROM, so the badge and the panel behind it can
+  // never again disagree. It used to count the live socket feed instead: `CHRONICLE 0` over
+  // sixteen entries, on the first screen a viewer sees.
+  const chronicle = useRemoteCount(
+    '/api/chronicle', (j) => ChronicleResponseSchema.safeParse(j), (d) => d.entries.length,
+    CHRONICLE_COUNT_REFETCH_MS,
+  )
+  const stats = townStats(state, tick)
+  return <LensTabsView lens={lens} hints={lensHints(stats, lensCountsFor(stats, chronicle, bonds))} onNav={onNav} />
 }

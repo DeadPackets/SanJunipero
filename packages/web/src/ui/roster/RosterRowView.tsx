@@ -42,7 +42,7 @@ function Portrait({ row }: { row: RosterRow2 }) {
 /** Everything U12 asks a row to say, in one sentence, for someone who cannot see it. */
 export function rowLabel(row: RosterRow2): string {
   const conds = row.conditions.map((c) => CONDITION_WORD[c].toLowerCase())
-  const company = row.with.length === 0 ? 'alone' : `with ${row.with.join(' and ')}`
+  const company = row.with.length === 0 ? 'alone' : `near ${row.with.join(' and ')}`
   return [
     `${row.name}, ${row.ageWords}`,
     row.state.toLowerCase(),
@@ -87,8 +87,13 @@ export function RosterRowView(
       </span>
       <MoodGlyph mood={row.mood} />
       <span className="rr-place">{row.place.words}</span>
+      {/* ★ "near", not "with". `row.with` is `companyOf` — who is inside earshot RIGHT NOW,
+          which is a fact about where two bodies are standing and not a tie between them. It
+          said "with Nadia" beside a nav tab labelled BONDS, and merge train 3 read the two as
+          the same claim and filed the bond count as a lie. The count was right; the word was
+          borrowed. Proximity and a bond are different things and the roster now says which. */}
       {row.with.length > 0 && (
-        <span className="rr-with">with {row.with.join(', ')}</span>
+        <span className="rr-with">near {row.with.join(', ')}</span>
       )}
     </button>
   )
