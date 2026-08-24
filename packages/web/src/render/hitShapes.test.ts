@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { CHAR_TARGET_PX, HIT_AREA_H, HIT_AREA_W } from './charAnim.js'
 import {
-  HEAD_W, HIT_MIN_PX, HIT_TIGHTNESS_MAX, SHOULDER_W, STANCE_W, TORSO_TOP, bodyHitPolygon,
-  doorLocalRect, hitTightness, inflateToMin, legacyHitRectPolygon, polygonBounds,
+  BUILDING_UNIT_PX, HEAD_W, HIT_MIN_PX, HIT_TIGHTNESS_MAX, SHOULDER_W, STANCE_W, TORSO_TOP,
+  artPrismPolygon, bodyHitPolygon, extrudeDiamond, hitTightness, inflateToMin,
+  legacyFootprintPolygon, legacyHitRectPolygon, polygonArea, polygonBounds,
 } from './hitShapes.js'
+import { footprintDiamond } from './builtForm.js'
+import { CROWD_PITCH_PX } from './crowd.js'
 import { ZOOM_STOPS } from './camera.js'
 import { ZOOM_MAX, ZOOM_MIN } from './scene.js'
 
@@ -134,8 +137,6 @@ describe('inflateToMin — small on screen is still clickable', () => {
 // and every hit class has to be measured there rather than assumed.
 describe('the 24 px floor at the new ZOOM_MIN', () => {
   const local = bodyHitPolygon(FIGURE_H, SCALE)
-  const FOOTPRINT = { w: 1, h: 1 }
-  const ART = 0.25   // a hi-res building sprite's applied scale
 
   it('ZOOM_MIN is the bottom of the stop set, and it is 0.25', () => {
     expect(ZOOM_MIN).toBe(0.25)
@@ -152,26 +153,144 @@ describe('the 24 px floor at the new ZOOM_MIN', () => {
     }
   })
 
-  it('THE DEFECT THE NEW STOP CREATES: a zoom-blind door target is 12 px at 0.5', () => {
-    // the landed rule floors at HIT_MIN_PX in WORLD px, which halves on screen at 0.5
-    const blind = doorLocalRect(FOOTPRINT, ART)
-    expect(blind.w * ART * 0.5).toBeCloseTo(HIT_MIN_PX / 2, 9)   // 12 px. RED.
-    expect(blind.w * ART * 0.5).toBeLessThan(HIT_MIN_PX)
-  })
-
-  it('a door target clears 24 px in both axes at every stop, at every art scale', () => {
+  it('a building prism clears 24 px in both axes at every stop, at every art scale', () => {
     for (const z of ZOOM_STOPS) {
       for (const art of [0.125, 0.25, 1]) {
-        const r = doorLocalRect(FOOTPRINT, art, z)
-        expect(r.w * art * z, `${z}× ${art} width`).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
-        expect(r.h * art * z, `${z}× ${art} height`).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
+        const poly = inflateToMin(artPrismPolygon(1, 1, art), HIT_MIN_PX, art * z)
+        const b = polygonBounds(poly)
+        expect(b.w * art * z, `${z}× ${art} width`).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
+        expect(b.h * art * z, `${z}× ${art} height`).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
       }
     }
   })
 
-  it('nothing above 1× changed — the door is the size batch 2 measured', () => {
-    for (const z of [1, 2, 3, 4] as const) {
-      expect(doorLocalRect(FOOTPRINT, ART, z)).toEqual(doorLocalRect(FOOTPRINT, ART))
+  it('★ and the floor is INERT above the stop where the thing is already big enough', () => {
+    // a 1×1 shed is 64 world px across: 16 px at 0.25 (grown), 32 px at 0.5 (untouched)
+    for (const art of [0.125, 0.25, 1]) {
+      const raw = artPrismPolygon(1, 1, art)
+      expect(inflateToMin(raw, HIT_MIN_PX, art * 0.25)).not.toEqual(raw)
+      for (const z of [0.5, 1, 2, 4]) expect(inflateToMin(raw, HIT_MIN_PX, art * z), `${z}×`).toEqual(raw)
     }
+  })
+})
+
+// ── ★ THE STRUCTURE PRISM ─────────────────────────────────────────────────────────────────
+//
+// The numbers cited here were measured by decoding every building root in the town's codex and
+// counting opaque pixels — `scratchpad/hb/alpha.mts`, twenty roots. They are not derived from
+// `cull.ts`'s AABB and they cannot be: the cull's box is the bounding RECTANGLE of a diamond,
+// so its corners are void by construction and a test against it passes with the property
+// broken. The oracle here is the art.
+
+describe('★ a building is a volume, and the landed target was the ground under it', () => {
+  const SHAPES: Array<[number, number]> = [[1, 1], [2, 2], [1, 2], [2, 1], [3, 2], [2, 4]]
+
+  it('THE DEFECT: the flat footprint diamond and the drawn sprite barely touch', () => {
+    // The art is fitted to a (w+h)·32 SQUARE whose lowest opaque row is the sprite's own
+    // anchor, so the drawn body occupies y ∈ [−side, 0]. The ground plan runs from the
+    // footprint's north vertex DOWN. For a 2×2 they share 8 px of a 128 px tall picture.
+    const flat = legacyFootprintPolygon(footprintDiamond(2, 2), 1)
+    expect(polygonBounds(flat)).toEqual({ w: 64, h: 32, cx: 0, cy: 8 })
+    const prism = artPrismPolygon(2, 2, 1)
+    expect(polygonBounds(prism)).toEqual({ w: 128, h: 128, cx: 0, cy: -64 })
+  })
+
+  it('is the drawn cell exactly, with the corners cut off by the diamond', () => {
+    for (const [w, h] of SHAPES) {
+      const side = (w + h) * BUILDING_UNIT_PX
+      const b = polygonBounds(artPrismPolygon(w, h, 1))
+      expect([b.w, b.h], `${w}x${h}`).toEqual([side, side])
+      // the south vertex is the sprite's own feet point, which is the art's lowest row
+      expect(b.cy + b.h / 2, `${w}x${h}`).toBe(0)
+      // 0.75 of the box: an axis-aligned rect would claim the other quarter, all of it sky
+      expect(polygonArea(artPrismPolygon(w, h, 1)) / (side * side), `${w}x${h}`).toBeCloseTo(0.75, 9)
+    }
+  })
+
+  it('contains the roof, the wall and the doorway — the places a viewer clicks', () => {
+    const p = artPrismPolygon(2, 2, 1)   // a 2×2 house: 128 × 128 drawn
+    expect(contains(p, 0, -120)).toBe(true)    // the ridge
+    expect(contains(p, -40, -70)).toBe(true)   // the left wall
+    expect(contains(p, 30, -70)).toBe(true)    // the right wall
+    expect(contains(p, 0, -20)).toBe(true)     // the doorway, bottom centre
+    expect(contains(p, 0, -1)).toBe(true)      // the ground contact
+  })
+
+  it('★ and it claims NOTHING outside the drawn cell — the corners stay empty sky', () => {
+    const p = artPrismPolygon(2, 2, 1)
+    for (const [x, y] of [[-63, -2], [63, -2], [-70, -60], [70, -60], [0, 4], [0, -130]] as const) {
+      expect(contains(p, x, y), `${x},${y}`).toBe(false)
+    }
+  })
+
+  it('is scale-invariant on screen — Pixi scales hitArea, so the local points divide out', () => {
+    const at1 = artPrismPolygon(2, 2, 1)
+    for (const s of [0.125, 0.25, 1, 2]) {
+      const same = screen(artPrismPolygon(2, 2, s), s)
+      for (const [i, v] of same.entries()) expect(v, `scale ${s}`).toBeCloseTo(at1[i]!, 9)
+    }
+  })
+
+  it('extrudeDiamond gives the SIX-point silhouette of a solid, not a wireframe box', () => {
+    // a 1×1 ground diamond raised 10 px: W, S, E, then back across the raised top
+    expect(extrudeDiamond([0, 0, 16, 8, 0, 16, -16, 8], 10))
+      .toEqual([-16, 8, 0, 16, 16, 8, 16, -2, 0, -10, -16, -2])
+    // a zero-height extrusion is the diamond's own outline, still six points
+    expect(polygonArea(extrudeDiamond([0, 0, 16, 8, 0, 16, -16, 8], 0)))
+      .toBeCloseTo(polygonArea([0, 0, 16, 8, 0, 16, -16, 8]), 9)
+  })
+
+  it('the tightness is the number U9 ratified, measured against the DRAWN box', () => {
+    for (const [w, h] of SHAPES) {
+      const side = (w + h) * BUILDING_UNIT_PX
+      const t = hitTightness(artPrismPolygon(w, h, 0.25), side / 0.25, side / 0.25, 0.25)
+      expect(t, `${w}x${h}`).toBeCloseTo(0.75, 9)
+      expect(t).toBeLessThan(HIT_TIGHTNESS_MAX)
+    }
+  })
+})
+
+// ── ★ WHERE ACCURACY AND THE 24 px FLOOR MEET ─────────────────────────────────────────────
+
+describe('★ the floor yields to the neighbour, because the neighbour is the harder case', () => {
+  const local = bodyHitPolygon(FIGURE_H, SCALE)
+
+  it('a LONE body still gets the whole 24/z — nothing is capped that has room', () => {
+    for (const z of ZOOM_STOPS) {
+      const k = SCALE * z
+      const b = polygonBounds(screen(inflateToMin(local, HIT_MIN_PX, k, Infinity), k))
+      expect(b.w, `${z}×`).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
+    }
+  })
+
+  it('★ THE RED: uncapped, five bodies at 14 px pitch become one 24 px target at 0.25', () => {
+    const k = SCALE * 0.25
+    const wide = polygonBounds(screen(inflateToMin(local, HIT_MIN_PX, k), k)).w
+    const pitchOnScreen = CROWD_PITCH_PX * 0.25          // 3.5 screen px between shoulders
+    expect(wide).toBeGreaterThanOrEqual(HIT_MIN_PX)
+    expect(wide).toBeGreaterThan(pitchOnScreen * 4)      // one capsule swallows the whole rank
+  })
+
+  it('★ capped at the pitch, a ranked body keeps its OWN width at every stop', () => {
+    // And the cap binds at every one of them, which is not a coincidence: a rank is DEFINED as
+    // a pitch narrower than a body (14 px against 28 px of shoulder), so there is never room
+    // to grow sideways into. The HEIGHT still takes the floor — bodies in a rank stand beside
+    // each other, not on each other, so a taller target costs nobody their click.
+    expect(CROWD_PITCH_PX).toBeLessThan(SHOULDER_W)
+    for (const z of ZOOM_STOPS) {
+      const k = SCALE * z
+      const capped = inflateToMin(local, HIT_MIN_PX, k, CROWD_PITCH_PX * z)
+      const b = polygonBounds(screen(capped, k))
+      expect(b.w, `${z}× width`).toBeCloseTo(SHOULDER_W * z, 9)
+      expect(b.h, `${z}× height`).toBeGreaterThanOrEqual(Math.min(HIT_MIN_PX, DRAWN_H * z) - 1e-9)
+    }
+  })
+
+  it('and the cap never SHRINKS a body that is already wider than the pitch', () => {
+    const k = SCALE * 4          // shoulders are 112 screen px at the closest stop
+    const raw = polygonBounds(screen(local, k)).w
+    const capped = polygonBounds(screen(inflateToMin(local, HIT_MIN_PX, k, CROWD_PITCH_PX * 4), k)).w
+    expect(capped).toBe(raw)
+    expect(raw).toBeCloseTo(SHOULDER_W * 4, 9)
   })
 })

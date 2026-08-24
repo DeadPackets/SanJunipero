@@ -1,12 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import type { Structure } from '@sj/engine/state'
-import { TILE_H, depthKey, tileToScreen } from './iso.js'
+import type { Structure, WorldState } from '@sj/engine/state'
+import { depthKey, tileToScreen } from './iso.js'
 import {
-  BUILDING_PX_PER_TILE, BUILD_TICKS_FULL, ENTERABLE_KINDS, PIP_COUNT, doorTileOf,
-  footprintHitPoints, pipsFilled, structureZIndex,
+  BUILDING_PX_PER_TILE, BUILD_TICKS_FULL, ENTERABLE_KINDS, LOOK_INSIDE, PIP_COUNT, doorTileOf,
+  entersOnClick, footprintHitPoints, pipsFilled, structureHitPoints, structureHoverText,
+  structureZIndex,
 } from './entities.js'
-import { HIT_MIN_PX, doorLocalCentre, doorLocalRect, doorSillPolygon, resolveHit } from './hitShapes.js'
+import { polygonBounds, resolveHit } from './hitShapes.js'
+import { builtFormSpec } from './builtForm.js'
+import { inFrontOf, structureDepthBox } from './depth.js'
 import { rendersOnMap } from './characters.js'
 
 // FIX ROUND 2 defect 2: the door affordance was drawn at the door TILE's depth, but the
@@ -39,73 +42,67 @@ describe('doorTileOf', () => {
   })
 })
 
-// P9d IS REPEALED (controller ruling R6). The door used to be a SIBLING of its building at
-// `structureZIndex + 1`, which is how it painted over anybody standing in the doorway (U11)
-// and how its 10 × 13 target lost every contest with the 52 × 72 body box (audit M5). It is
-// now a CHILD of the building sprite: a child cannot sort against its parent, and Pixi
-// hit-tests children before parents, so the door wins its own click with no priority table.
-describe('the door is part of the building', () => {
+// ★ THE TWO CLICK SQUARES ARE RETIRED AND ONE HITBOX REPLACES BOTH.
+//
+// A building carried a SEPARATE `Rectangle` target on its door tile under a honey sill drawn
+// flat on the ground. It is gone: a building is one object and takes one pointer, and what a
+// click MEANS is a property of the building — enterable and complete goes in, everything else
+// tells its story. `InteriorBar` puts the same provenance line at the top of the room, so the
+// nine enterable buildings lose nothing by giving the popover up.
+describe('one building, one hitbox, and the building says what a click does', () => {
   const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
+  const code = src.split('\n').map((l) => l.trim())
+    .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*')).join('\n')
 
-  it('is added to the SPRITE, not to the scene', () => {
-    expect(src).toContain('entry.sprite.addChild(door)')
-    expect(src).not.toContain('scene.layers.entities.addChild(door)')
+  const world = (structures: Structure[]): WorldState =>
+    ({ structures: Object.fromEntries(structures.map((s) => [s.id, s])) }) as unknown as WorldState
+
+  it('has no door node, no door graphics and no rectangle hit area left', () => {
+    for (const gone of [
+      'entry.sprite.addChild(door)', 'doorZIndex', 'DOOR_Z_OVER_BUILDING', 'doorSillPolygon',
+      'DOOR_SILL', 'DOOR_LINTEL', 'DOOR_RIM', 'doorLocalRect', 'new Rectangle(', 'layoutDoor',
+    ]) expect(code, gone).not.toContain(gone)
   })
 
-  it('has no depth of its own any more — doorZIndex is deleted, and that is the test', () => {
-    expect(src).not.toContain('doorZIndex')
-    expect(src).not.toContain('DOOR_Z_OVER_BUILDING')
+  it('routes the click by what the building IS, not by where inside it the pointer landed', () => {
+    const house = box(4, 4, 2, 2, 'house')
+    const well = box(9, 9, 1, 1, 'well')
+    const shell: Structure = { ...box(12, 12, 2, 2, 'house'), id: 'shell', stage: 'construction' }
+    expect(entersOnClick(world([house, well, shell]), house.id)).toBe(true)
+    expect(entersOnClick(world([house, well, shell]), well.id)).toBe(false)
+    expect(entersOnClick(world([house, well, shell]), 'shell')).toBe(false)
+    expect(entersOnClick(null, house.id)).toBe(false)
+    expect(entersOnClick(world([]), 'nobody')).toBe(false)
   })
 
-  it('is a lit sill on the ground, not a dark plate over the building’s own face', () => {
-    expect(src).toContain('doorSillPolygon')
-    expect(src).toContain('DOOR_SILL')
-    expect(src).toContain('DOOR_LINTEL')
-    expect(src).not.toContain('roundRect(-DOOR_W')
-    expect(src).not.toContain('DOOR_RECESS')   // the dark slab is gone, and that is the test
+  it('and the hover tag SAYS which, before the click is made', () => {
+    const house = box(4, 4, 2, 2, 'house')
+    const well = box(9, 9, 1, 1, 'well')
+    const st = world([house, well])
+    expect(structureHoverText(st, house.id)).toBe(`house · ${LOOK_INSIDE}`)
+    expect(structureHoverText(st, well.id)).toBe('well')
+    expect(structureHoverText(st, 'nobody')).toBeNull()
   })
 
-  it('gives a 1×1 frontage a target at least HIT_MIN_PX in both axes — it was 10 × 13', () => {
-    const r = doorLocalRect({ w: 1, h: 1 }, 1)
-    expect(r.w).toBeGreaterThanOrEqual(HIT_MIN_PX)
-    expect(r.h).toBeGreaterThanOrEqual(HIT_MIN_PX)
-    expect([10, 13].every((v) => v >= HIT_MIN_PX)).toBe(false)   // the landed size, for the record
+  it('and it spends ONE em-dash, because the name already spent the other', () => {
+    const built: Structure = { ...box(4, 4, 2, 2, 'house'), builtBy: 'omar' }
+    const st = ({
+      structures: { [built.id]: built }, agents: { omar: { id: 'omar', name: 'Omar' } },
+    }) as unknown as WorldState
+    const tag = structureHoverText(st, built.id)!
+    expect(tag).toBe(`house — built by Omar · ${LOOK_INSIDE}`)
+    expect(tag.split('—')).toHaveLength(2)   // LOOK INSIDE — HOUSE — BUILT BY OMAR had three
   })
 
-  it('scales inversely with the sprite, so the door is one size on screen', () => {
-    for (const scale of [0.0625, 0.25, 1, 2]) {
-      const r = doorLocalRect({ w: 2, h: 2 }, scale)
-      expect(r.w * scale, `scale ${scale}`).toBeCloseTo(doorLocalRect({ w: 2, h: 2 }, 1).w, 9)
-      expect(r.h * scale, `scale ${scale}`).toBeCloseTo(doorLocalRect({ w: 2, h: 2 }, 1).h, 9)
-    }
+  it('the sprite is the one thing wired to the pointer — nothing else in the file is', () => {
+    expect(code).toContain("sprite.eventMode = 'static'")
+    expect(code).not.toMatch(/door\.eventMode/)
+    // the two meanings both hang off the one tap handler
+    expect(code).toMatch(/entersOnClick\(store\.getState\(\), sid\)/)
+    expect(code).toMatch(/sync!\.onDoor\?\.\(sid\)/)
   })
 
-  it('sits on the south face, centred on the frontage the resident walks out of', () => {
-    for (const [w, h] of SHAPES) {
-      const r = doorLocalRect({ w, h }, 1)
-      const s = box(10, 10, w, h)
-      const d = doorTileOf(s)
-      // the door tile's centre, expressed against the sprite's own origin
-      const ddx = d.x - s.x - (w / 2 - 0.5), ddy = d.y - s.y - (h / 2 - 0.5)
-      expect(r.x + r.w / 2, `${w}x${h}`).toBeCloseTo((ddx - ddy) * 16, 9)
-      expect(r.y + r.h / 2, `${w}x${h}`).toBeCloseTo((ddx + ddy) * 8 + 8, 9)
-    }
-  })
-
-  it('draws the sill inside the door tile it names — it can never cover a neighbour', () => {
-    for (const [w, h] of SHAPES) {
-      const poly = doorSillPolygon({ w, h }, 1)
-      const c = doorLocalCentre({ w, h })
-      const xs = poly.filter((_, i) => i % 2 === 0), ys = poly.filter((_, i) => i % 2 === 1)
-      expect(Math.max(...xs) - Math.min(...xs), `${w}x${h}`).toBeLessThanOrEqual(32)
-      expect(Math.max(...ys) - Math.min(...ys), `${w}x${h}`).toBeLessThanOrEqual(16)
-      expect((Math.max(...xs) + Math.min(...xs)) / 2).toBeCloseTo(c.x, 9)
-      expect((Math.max(...ys) + Math.min(...ys)) / 2).toBeCloseTo(c.y, 9)
-    }
-  })
-
-  it('resolveHit: a door beats a body, a body beats a building, nothing beats nothing', () => {
-    expect(resolveHit([{ kind: 'agent', id: 'a' }, { kind: 'door', id: 'd' }])).toBe('d')
+  it('resolveHit: a body beats a building, nothing beats nothing', () => {
     expect(resolveHit([{ kind: 'structure', id: 's' }, { kind: 'agent', id: 'a' }])).toBe('a')
     expect(resolveHit([{ kind: 'crop', id: 'c' }, { kind: 'item', id: 'i' }])).toBe('i')
     expect(resolveHit([])).toBeNull()
@@ -122,18 +119,26 @@ describe('ENTERABLE_KINDS', () => {
 })
 
 
-// FIX ROUND 3. Pixi hit-tests a sprite's full RECTANGULAR bounds, transparent margin and
-// all, and a building sprite is ~1.85x wider than the ground it stands on. Live repros at 3x
-// in the showcase dev world: hovering the STOREHOUSE door reported "wagon", and hovering the
-// HOUSE door reported nothing — in both cases a structure one depth row south was intercepting
-// the pointer with empty padding. The hit area is now the footprint diamond, which cannot
-// reach past the tiles the building occupies.
+// ★ WHAT A CLICK ON A BUILDING NOW HITS, AND WHAT THE OLD TARGET MISSED.
+//
+// Pixi hit-tests a sprite's full RECTANGULAR bounds unless a hitArea says otherwise, and a
+// building sprite is 1.9× – 2.0× wider than the ground it stands on — which is how a wagon's
+// empty canopy padding used to intercept the storehouse. The answer to that was the flat
+// footprint diamond, and the answer went too far: measured against every codex root's decoded
+// alpha it contained 0.0 % – 0.8 % of the building's DRAWN pixels.
+//
+// The prism is the middle that is not a compromise: it is the drawn cell with its corners cut
+// off by the diamond, so it can claim no pixel outside the picture and it misses almost none
+// inside it.
 
 // the sprite sits at the top vertex of its centre tile; local points are offsets from there
-function worldHitPolygon(s: Structure): Array<[number, number]> {
-  const at = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
-  const pts = footprintHitPoints(s.w, s.h)
-  return [0, 1, 2, 3].map((i) => [at.sx + pts[i * 2]!, at.sy + pts[i * 2 + 1]!])
+function spriteAt(s: Structure): { sx: number; sy: number } {
+  return tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
+}
+function worldPoly(local: number[], s: Structure): Array<[number, number]> {
+  const at = spriteAt(s)
+  return Array.from({ length: local.length / 2 }, (_, i) =>
+    [at.sx + local[i * 2]!, at.sy + local[i * 2 + 1]!] as [number, number])
 }
 
 function contains(poly: Array<[number, number]>, px: number, py: number): boolean {
@@ -145,80 +150,88 @@ function contains(poly: Array<[number, number]>, px: number, py: number): boolea
   return inside
 }
 
-// where a viewer's pointer actually is when hovering the drawn door
-function doorPoint(s: Structure): [number, number] {
-  const d = doorTileOf(s)
-  const at = tileToScreen(d.x, d.y)
-  return [at.sx, at.sy + TILE_H / 2]
+/** Where the DRAWN doorway is: the bottom centre of the art, a fifth of the way up the cell.
+ *  Read off the running product — every root's lowest opaque row is its own feet anchor. */
+function drawnDoorPoint(s: Structure): [number, number] {
+  const at = spriteAt(s)
+  return [at.sx, at.sy - ((s.w + s.h) * BUILDING_PX_PER_TILE) / 5]
 }
 
-describe('a structure hit-tests its ground, never its padding', () => {
-  it('covers its own door tile — the building is still hoverable where it stands', () => {
+/** The whole drawn cell's corner points, so "outside the picture" can be tested. */
+function drawnCorners(s: Structure): Array<[number, number]> {
+  const at = spriteAt(s)
+  const side = (s.w + s.h) * BUILDING_PX_PER_TILE
+  return [
+    [at.sx - side / 2 + 1, at.sy - 1], [at.sx + side / 2 - 1, at.sy - 1],
+    [at.sx - side / 2 + 1, at.sy - side + 1], [at.sx + side / 2 - 1, at.sy - side + 1],
+  ]
+}
+
+describe('a structure hit-tests the structure', () => {
+  it('★ THE DEFECT: the landed flat diamond does not contain the drawn doorway at all', () => {
     for (const [w, h] of SHAPES) {
       const s = box(20, 20, w, h)
-      const [px, py] = doorPoint(s)
-      expect(contains(worldHitPolygon(s), px, py), `${w}x${h}`).toBe(true)
+      const [px, py] = drawnDoorPoint(s)
+      expect(contains(worldPoly(footprintHitPoints(w, h), s), px, py), `${w}x${h}`).toBe(false)
     }
   })
 
-  it('LIVE REPRO: the wagon does not intercept the storehouse door', () => {
-    const storehouse = box(20, 20, 2, 2, 'storehouse')
-    const wagon = box(26, 25, 1, 2, 'wagon')          // dev-world TOWN_STRUCTURES coordinates
-    const [px, py] = doorPoint(storehouse)
-    expect(contains(worldHitPolygon(wagon), px, py)).toBe(false)
-  })
-
-  it('LIVE REPRO: the scaffolding does not intercept the house door', () => {
-    const house = box(30, 20, 2, 2, 'house')
-    const scaffolding = box(34, 23, 1, 1, 'scaffolding')
-    const [px, py] = doorPoint(house)
-    expect(contains(worldHitPolygon(scaffolding), px, py)).toBe(false)
-  })
-
-  it('no structure anywhere in the dev town reaches another structure\'s door', () => {
-    const town = [
-      box(20, 20, 2, 2, 'storehouse'), box(23, 20, 1, 1, 'shed'), box(30, 20, 2, 2, 'house'),
-      box(26, 25, 1, 2, 'wagon'), box(34, 23, 1, 1, 'scaffolding'), box(15, 28, 1, 1, 'standing_stone'),
-    ]
-    for (const target of town) {
-      const [px, py] = doorPoint(target)
-      for (const other of town) {
-        if (other === target) continue
-        expect(contains(worldHitPolygon(other), px, py), `${other.kind} eats ${target.kind}'s door`).toBe(false)
-      }
-    }
-  })
-
-  it('proves the fix is load-bearing: the OLD rectangular bounds did swallow that point', () => {
-    // what Pixi hit-tested before: the whole sprite, a (w+h)*BUILDING_PX_PER_TILE square
-    // anchored bottom-centre at the ground point — transparent canopy margin included
-    const oldBounds = (s: Structure): Array<[number, number]> => {
-      const at = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
-      const side = (s.w + s.h) * BUILDING_PX_PER_TILE
-      return [
-        [at.sx - side / 2, at.sy - side], [at.sx + side / 2, at.sy - side],
-        [at.sx + side / 2, at.sy], [at.sx - side / 2, at.sy],
-      ]
-    }
-    const [sx, sy] = doorPoint(box(20, 20, 2, 2, 'storehouse'))
-    expect(contains(oldBounds(box(26, 25, 1, 2, 'wagon')), sx, sy)).toBe(true)   // the bug
-    expect(contains(worldHitPolygon(box(26, 25, 1, 2, 'wagon')), sx, sy)).toBe(false) // the fix
-  })
-
-  it('is a diamond the size of the footprint, and scales with the sprite', () => {
-    // a 1x1 is the tile diamond itself: 32 wide, 16 tall, top vertex at the origin
-    expect(footprintHitPoints(1, 1)).toEqual([0, 0, 16, 8, 0, 16, -16, 8])
-    // a 2x2 is twice as wide and twice as tall
-    expect(footprintHitPoints(2, 2)).toEqual([0, -8, 32, 8, 0, 24, -32, 8])
-    // the sprite scales its hit area, so the points are pre-divided
-    expect(footprintHitPoints(1, 1, 2)).toEqual([0, 0, 8, 4, 0, 8, -8, 4])
-  })
-
-  it('never reaches wider than the ground it stands on', () => {
+  it('★ THE FIX: the prism contains the doorway, the wall and the roof', () => {
     for (const [w, h] of SHAPES) {
-      const xs = footprintHitPoints(w, h).filter((_, i) => i % 2 === 0)
-      expect(Math.max(...xs) - Math.min(...xs)).toBe((w + h) * 16)
+      const s = box(20, 20, w, h)
+      const p = worldPoly(structureHitPoints('house', w, h, 1), s)
+      const at = spriteAt(s)
+      const side = (w + h) * BUILDING_PX_PER_TILE
+      const [dx, dy] = drawnDoorPoint(s)
+      expect(contains(p, dx, dy), `${w}x${h} doorway`).toBe(true)
+      expect(contains(p, at.sx - side / 4, at.sy - side / 2), `${w}x${h} wall`).toBe(true)
+      expect(contains(p, at.sx, at.sy - side * 0.9), `${w}x${h} roof`).toBe(true)
     }
+  })
+
+  it('★ and it claims nothing outside the drawn cell — every corner is empty sky', () => {
+    for (const [w, h] of SHAPES) {
+      const s = box(20, 20, w, h)
+      const p = worldPoly(structureHitPoints('house', w, h, 1), s)
+      for (const [cx, cy] of drawnCorners(s)) {
+        expect(contains(p, cx, cy), `${w}x${h} corner ${cx},${cy}`).toBe(false)
+      }
+      // nor a pixel below the feet row, which is grass in front of the building
+      expect(contains(p, spriteAt(s).sx, spriteAt(s).sy + 2), `${w}x${h} below`).toBe(false)
+    }
+  })
+
+  it('★ NEIGHBOURS AT THE TOWN GRAMMAR\'S PROVEN 86.1626 px SPACING DO OVERLAP', () => {
+    // Two houses on adjacent plots. Their prisms genuinely intersect on screen — that is not a
+    // defect and it cannot be designed away, because the drawn buildings intersect. Which one
+    // answers is settled by the DEPTH ORDER, in `layers.applyDepthOrder`, from the same boxes
+    // the painter uses. This test exists so nobody "fixes" the overlap by shrinking a hitbox.
+    const near = box(32, 25, 2, 2, 'house')
+    const far = box(30, 22, 2, 2, 'house')
+    const p = worldPoly(structureHitPoints('house', 2, 2, 1), near)
+    const q = worldPoly(structureHitPoints('house', 2, 2, 1), far)
+    const at = spriteAt(near)
+    const shared = [at.sx, at.sy - 100] as const
+    expect(contains(p, shared[0], shared[1])).toBe(true)
+    expect(contains(q, shared[0], shared[1])).toBe(true)
+    // and geometry says the near one is in front, which is what the sort will read
+    expect(inFrontOf(structureDepthBox('near', near), structureDepthBox('far', far))).toBe(true)
+  })
+
+  it('a kind with NO art gets the volume that is actually drawn for it', () => {
+    // `builtFormSpec` draws a plinth on the true footprint and a volume `heightPx` tall on top
+    const noArt = structureHitPoints('well', 1, 1, 1, 1, false)
+    const b = polygonBounds(noArt)
+    expect(b.w).toBe(32)                                   // the footprint diamond's own width
+    expect(b.h).toBeCloseTo(16 + builtFormSpec('well', 1, 1).heightPx, 9)
+    // and it is NOT the art prism, which would claim a 64 px cell the form never paints
+    expect(polygonBounds(structureHitPoints('well', 1, 1, 1)).w).toBe(64)
+  })
+
+  it('is a diamond the size of the footprint, and scales with the sprite (the before-state)', () => {
+    expect(footprintHitPoints(1, 1)).toEqual([0, 0, 16, 8, 0, 16, -16, 8])
+    expect(footprintHitPoints(2, 2)).toEqual([0, -8, 32, 8, 0, 24, -32, 8])
+    expect(footprintHitPoints(1, 1, 2)).toEqual([0, 0, 8, 4, 0, 8, -8, 4])
   })
 })
 

@@ -29,9 +29,9 @@ import { ROOM_SLOTS, SLOT_TILES, WALL_H_TILES, wallPolys } from './roomShell.js'
 import {
   OVERLAP_RANK, bodyDepthBox, depthOrder, structureDepthBox, tileDepthBox, type DepthBox,
 } from './depth.js'
-import { doorTileOf } from './entities.js'
+import { doorTileOf, structureHitPoints } from './entities.js'
 import {
-  HIT_MIN_PX, HIT_TIGHTNESS_MAX, bodyHitPolygon, doorLocalRect, hitTightness,
+  HIT_MIN_PX, HIT_TIGHTNESS_MAX, bodyHitPolygon, hitTightness, polygonBounds,
 } from './hitShapes.js'
 import { placeTag } from './tooltip.js'
 import { SPEECH_FILL, SPEECH_INK, THOUGHT_FILL, THOUGHT_INK, nineSlice, worldTextScale } from './textFaces.js'
@@ -293,17 +293,21 @@ describe('U10 — "tooltips are out of place"', () => {
 // ── U11 · the door is part of the building ────────────────────────────────────────────────
 
 describe('U11 — "door hotspots render as dark rectangular artifacts"', () => {
+  // U11's dark rectangle became a honey sill, and the sill has now been retired with the rest
+  // of the ground squares: one building, one hitbox, and it is the prism of what is drawn.
   it('clears the 24px hit floor in both axes at every zoom stop', () => {
     for (const zoom of ZOOM_STOPS) {
-      const r = doorLocalRect({ w: 1, h: 1 }, 1, zoom)
-      expect(r.w * zoom, `zoom ${zoom} width`).toBeGreaterThanOrEqual(HIT_MIN_PX)
-      expect(r.h * zoom, `zoom ${zoom} height`).toBeGreaterThanOrEqual(HIT_MIN_PX)
+      const poly = structureHitPoints('shed', 1, 1, 1, zoom)
+      const b = polygonBounds(poly)
+      expect(b.w * zoom, `zoom ${zoom} width`).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
+      expect(b.h * zoom, `zoom ${zoom} height`).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
     }
   })
 
-  it('gives the door no depth of its own — it is a child of its building', () => {
+  it('has no door node at all any more — no rectangle to render as an artifact', () => {
     expect(src('render/entities.ts')).not.toContain('doorZIndex')
-    expect(src('render/entities.ts')).toContain('entry.sprite.addChild(door)')
+    expect(src('render/entities.ts')).not.toContain('entry.sprite.addChild(door)')
+    expect(src('render/entities.ts')).not.toContain('new Rectangle(')
   })
 })
 
