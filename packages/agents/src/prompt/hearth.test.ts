@@ -5,6 +5,8 @@ import {
 } from '@sj/engine'
 import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { EngineBridge } from '../runtime/bridge.js'
+import { scanForLayoutLeak, scanPromptForGlassLeak } from './glassScan.js'
+import { CAPABILITIES } from './rulesOfBeing.js'
 import { perceptionToProse } from './prose.js'
 
 // ★ THE ROOM A MIND COULD NOT SEE INTO — INCLUDING THE ONE IT WAS STANDING IN.
@@ -184,5 +186,33 @@ describe('★ a roofless building has no inside yet, and the wall says so', () =
     for (const hint of ['you should', 'you must', 'once the roof', 'when it is finished', 'come back']) {
       expect(said, hint).not.toContain(hint)
     }
+  })
+})
+
+// ★ THE ONE-WAY GLASS, over every surface this lane wrote. Nothing a mind perceives may name a
+// construct type, our ops jargon, or the grammar that decides where a building can stand.
+describe('the one-way glass holds over every sentence this lane added', () => {
+  const AUTHORED = [
+    'The hearth here is cold.',
+    'A fire is burning in the hearth here.',
+    'Firelight moves inside it.',
+    'There are beds in here.',
+    'There are beds in it.',
+    'There is no inside to it yet.',
+    CAPABILITIES,
+  ]
+
+  it('names no construct type and no ops word', () => {
+    for (const text of AUTHORED) expect(scanPromptForGlassLeak(text), text.slice(0, 40)).toEqual([])
+  })
+
+  it('names nothing about how the town is laid out', () => {
+    for (const text of AUTHORED) expect(scanForLayoutLeak(text), text.slice(0, 40)).toEqual([])
+  })
+
+  // ★ VACUOUS GUARD: the scan is looking, and would have caught one.
+  it('and the scan is awake — a sentence that DID leak comes back named', () => {
+    expect(scanPromptForGlassLeak('The hearth here is cold, and the council meets by it.')).toContain('council')
+    expect(scanForLayoutLeak('There are beds in it, on the town\'s next free plot.')).toContain('plot')
   })
 })
