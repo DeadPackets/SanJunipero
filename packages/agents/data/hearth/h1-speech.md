@@ -1,0 +1,16 @@
+- t=1156 {"agentId":"yusuf","text":"Aye. Light's going. Let me drop my wood in the storehouse and see what you make of the day.","x":79,"y":63}
+- t=1194 {"agentId":"amara","text":"A good day. Roof goes on tomorrow. I'm sleeping.","x":81,"y":68}
+- t=1195 {"agentId":"yusuf","text":"There. Now it's all in one place.","x":81,"y":61,"insideId":"structure_1"}
+- t=1196 {"agentId":"nadia","text":"Amara! Bushes are heavy — grabbed a couple for the pot before light went.","x":74,"y":71}
+- t=1210 {"agentId":"yusuf","text":"Aye. Sleep well. I'll be beside you at the roof come light.","x":81,"y":68,"insideId":"structure_2"}
+- t=1224 {"agentId":"yusuf","text":"Aye. Rest well.","x":81,"y":68,"insideId":"structure_2"}
+- t=1224 {"agentId":"nadia","text":"Good pace today. See you in the morning.","x":74,"y":71}
+- t=1238 {"agentId":"salma","text":"Long one. I'll turn in.","x":72,"y":105}
+- t=1251 {"agentId":"omar","text":"Now then. Rest well.","x":76,"y":107}
+- t=1410 {"agentId":"salma","text":"Goodnight, Omar.","x":74,"y":113}
+- t=1446 {"agentId":"omar","text":"Now then, no use freezing. Let's get these walls up.","x":81,"y":106}
+- t=1453 {"agentId":"salma","text":"Night like this, you don't get much choice where you lie.","x":74,"y":113}
+- t=1471 {"agentId":"omar","text":"Now then. Almost there.","x":81,"y":106}
+- t=1718 {"agentId":"salma","text":"Enough for tonight.","x":74,"y":113}
+- t=1718 {"agentId":"nadia","text":"Beds. Finally. Thank whatever keeps a roof over us.","x":81,"y":68}
+- t=1719 {"agentId":"omar","text":"Now then. The ground'll do.","x":81,"y":106}
