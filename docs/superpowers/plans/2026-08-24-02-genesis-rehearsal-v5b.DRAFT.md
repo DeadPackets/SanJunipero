@@ -283,15 +283,17 @@ Each is one line and its reason. Every one was paid for by a real failure in thi
 > | **2. Re-read all four pins from the merged tip** (R7) | discharged at `cd845bc` | **★ RETIRED, NOT DISCHARGED. THERE ARE NO PINS.** The `unpin` lane deleted all four and the census that maintained them; `git grep -cE "[0-9a-f]{64}" -- 'packages/**/*.ts'` returns **zero** at `9d76b97`. C4 carries what each pin was protecting and what asserts it now. |
 > | **3. the `house` rename must have landed** | OPEN | **★ DISCHARGED.** The lane merged. Task 1 Step 0's grep becomes a regression guard whose answer is zero (C30). |
 > | **4. the two frozen content drafts must be re-authored** | **OPEN, the largest one** | **★ DISCHARGED. OD16 IS CLOSED.** Both live at `docs/superpowers/content/`, re-authored against the contemporary canon, checked by a script whose output is in their `README.md`. **v4's own period grep returns nothing on either file** — run against the landed text, not assumed. Task 1 Step 2's gate is kept and now passes. |
-> | **5. ★ NEW — the `first-night` lane must land, or its outcome must be ruled** | — | **OPEN, and it is the only one left.** It is fixing a cast that collapses in the street on night one, a dev world with no mason, and two lying counters — and **it is the one lane authorised to move G1.** Nine tasks in this plan are contingent on it. **See the contingency box at the end of this document; it names them and does not guess the answer.** |
+> | **5. the `first-night` lane must land, or its outcome must be ruled** | — | **★★ v6 — DISCHARGED. THE LANE MERGED, ALL THREE DEFECTS FIXED, AND IT DID NOT MOVE G1.** `git merge-base --is-ancestor 1941a5f main` returns true: `fd687fb` *(the town survives its first night, and sleeps indoors)*, `1b3929e` *(the dev world builds — a mason, and the frame that let it)*, `0a8726c` *(the two nav counters, and they were lying in two different ways)* and `1941a5f` *(the build meter measures the build the world is running)* are all in `main`. **The contingency box at the end of this document is rewritten from nine open questions into a four-line record.** |
+> | **6. ★ NEW IN v6 — nothing.** | — | **There are no open preconditions.** `main` is `9d76b97`; every gate above is discharged or retired. **Task 1 Step 0 is a regression sweep, not a scheduling gate**, and Phase A may begin. |
 >
 > **Three further facts, each of which changes what a later task may assume.**
 >
 > - **`cityTemplate.ts` is no longer a layout at all.** It is a plotter: it asks `townGrammar` for nine buildings and the grammar claims the plots. **Global Constraint C14 is rewritten to match, and C8 still edits none of the four town files** — every fixture reads from `@sj/shared`, and **no task types a town coordinate.**
 > - **`gate-g11-partial` is tagged at 16 of 17.** **Criterion 9 is UNMET and travels into G8 as a named debt owned by Task 24** — see the box in Phase D. It is not a failure carried forward; it is an untested criterion carried forward, and the difference is the whole point of the box.
-> - **The keystone's single regen is still UNSPENT.** The two pins that moved were moved by other lanes on their own evidence, not by C8, so **the one re-pin C8 is allowed is still Phase F's to spend**, and no task outside Phase F may move a pin as a side effect.
+> - **★ v6 — THERE IS NO KEYSTONE AND NO REGEN.** The `unpin` lane deleted all four hash pins; C3 is gone, C4 is promoted in its place, and **Phase F is an ordinary phase.** No task in this plan re-pins anything, and no task carries a "must not move a pin" side condition — which is what the wave table below is able to exploit.
+> - **★ v6 — OD22 IS FIXED ON `main`, BY THE `many-hands` LANE, AND T21 STEP 0 IS DELETED.** `joinableSite` is landed at `verbs.ts:1070` and both `buildSiteOf` and `stepBuild` resolve through `ownSite(...) ?? joinableSite(...)`. **Two bodies raise one building in a town.** T22 is unblocked and G8 criterion 7 is passable. See the box on Task 21.
 >
-> **Nothing in Phase A may begin until `git rev-parse HEAD` is a descendant of `645a8d9` and the `first-night` lane's outcome is on the tip or ruled.** Every other precondition in this plan is a task.
+> **★ v6 — Nothing in Phase A may begin until `git rev-parse HEAD` is a descendant of `9d76b97`.** That is now the whole of it. `645a8d9` is an ancestor of `9d76b97` (25 commits behind), so the older assertion is implied and is kept in Task 1 Step 0 as the weaker of the two. Every other precondition in this plan is a task.
 
 ### Task 1: Ratify this plan, and fix the roadmap it hangs from
 
@@ -302,8 +304,10 @@ Each is one line and its reason. Every one was paid for by a real failure in thi
 - [ ] **Step 0: Prove the SIX preconditions, and STOP if any is unmet.**
 
 ```bash
-# (a) ★ v5 — the 2026-08-23/24 sprint has landed and this worktree descends from it
-git merge-base --is-ancestor 645a8d9 HEAD && echo "TIP ANCESTOR OK"
+# (a) ★ v6 — `many-hands`, `first-night` and `unpin` have landed and this worktree descends
+# from all three. 645a8d9 is an ancestor of 9d76b97, so the older check is implied.
+git merge-base --is-ancestor 9d76b97 HEAD && echo "TIP ANCESTOR OK"
+git merge-base --is-ancestor 1941a5f HEAD && echo "FIRST-NIGHT PRESENT"
 git log --oneline -1
 # (b) ★ v6 — THE INVERSE OF v5b's CENSUS. There are no pins, and the check is that there are
 # still none: a lane that reintroduces one has reintroduced the maintenance the user cut.
@@ -325,7 +329,7 @@ grep -n "makeablesLine(" packages/agents/src/runtime/agentRuntime.ts
 
 Expected, in order:
 
-1. `TIP ANCESTOR OK`.
+1. `TIP ANCESTOR OK` and `FIRST-NIGHT PRESENT`.
 2. **Both greps return nothing, and the mid-log fold row is present.** `git grep -cE "[0-9a-f]{64}"` over `packages/**/*.ts` returned **zero** at `9d76b97`, measured. **If a 64-hex literal has come back, STOP and name the file** — it is a lane re-pinning something, and the user's ruling is that the only gate we need is that the project works. **If the mid-log fold row is missing, STOP**: it is the one replacement guard that bit under mutation, and C4 says why.
 3. `sleepableKinds` defaults to `['house']` and the `hut` grep prints `NO hut IN src`. **If an `id` or a kind is `hut`, STOP** — but note that `packages/agents/scripts/` is outside this grep and legitimately carries `hut` inside two personas' own words about their own homes; that is content, it is declared in C30, and it is not renamed here.
 4. `canon.ts` names the generator, `machine_repair` and the `arrangement` era.
@@ -3380,138 +3384,37 @@ git commit -m "feat(agents): twenty wood in the storehouse at (61, 68) — enoug
 
 **Files:** Modify `packages/agents/src/prompt/prose.ts`, `packages/agents/src/prompt/prose.test.ts`, `packages/engine/src/perception.ts`, `packages/engine/src/perception.test.ts`.
 
-> ### ★★★ v5b — THE PREMISE OF THIS TASK IS FALSE IN A TOWN, AND IT IS **OD22**. READ THIS BEFORE STEP 1.
+> ### ★★★ v6 — OD22 IS FIXED ON `main`. **v5b's STEP 0 IS DELETED**, AND THE LANE THAT FIXED IT WENT FURTHER THAN THE FIX.
 >
-> v5's header below says *"`stepBuild` already emits `structure_progressed {ticks: 1}` per builder per tick"* and prices a house at *"0.6 of a day for five"*. **Executed against `645a8d9`, both halves fail on a plot.**
+> **v5b raised OD22 as the largest thing it found: on a plot, both site-resolution paths were keyed on the BUILDER, so a second builder was handed the next free plot and five bodies raised five houses.** It printed a nine-line `joinableSite` as T21 Step 0 and blocked T22 on the ruling.
 >
-> ```
-> # a genesis town; amara and yusuf both standing on plot 1's door tile, both carrying wood
-> amara build ok: true      planted structure_84 at (98, 87), builtBy amara
-> yusuf build ok: false     "the town keeps ground for a house — go and stand at (86, 94)"
-> yusuf's site:  {x: 86, y: 92}   resume: null      # A DIFFERENT PLOT
-> ```
+> **The `many-hands` lane landed it.** `8056f1f fix(engine): a second pair of hands joins the walls instead of claiming a second plot (OD22)` — `joinableSite(state, agentId, kind)` at `verbs.ts:1070`, keyed on the ground through `nearRect`, and `siteToRaise = ownSite(...) ?? joinableSite(...)` consumed by both `buildSiteOf` and `stepBuild`. **v5b's Step 0 is deleted, not amended: the code it printed is on `main`, and re-landing it is a merge conflict for nothing.**
 >
-> **Two mechanisms, both keyed on the builder.** `buildSiteOf`'s plotted branch reads `ownSite(state, agentId, kind)`, which requires `s.builtBy === agentId`; if that is null it calls `claimInWorld`, **which returns the next FREE plot** — plot 1 is no longer free. And `stepBuild`'s plotted branch resolves its site the same way, so a second body could not advance the first body's walls even if it somehow held the activity. **On a plot, five bodies raise five houses.**
->
-> **On the SITED branch it works, and always has** — `siteAt(state, x, y)` is keyed on the ground, so both builders name the same tile:
+> **★ AND THE LANE FOUND THE HALF v5b's FIX WOULD NOT HAVE COVERED, WHICH IS THE MORE INTERESTING RESULT.** v5b's Step 0 made two builders *advance the same walls*. It did **not** touch the builder's own clock, and the lane measured what that costs:
 >
 > ```
-> meadow: a builds at (1,1) -> true      meadow: b joins the SAME (1,1) -> true
-> two builders, one tick: [structure_progressed structure_1, structure_progressed structure_1]
-> progressTicks after: 2        # one body would give 1
+> // verbs.ts stepBuild, landed comment
+> // ★ THE HANDS ARE THE RATE, AND THIS IS THE WHOLE OF "HELP MUST HELP". A builder's clock is
+> // settled once, at intent time... Before this the clock ignored the crowd: five hands took
+> // exactly as long as one and cost five times as much, and cooperation was a net penalty in
+> // the one measurement G8 asks for.
 > ```
 >
-> **So the claim seam removed joint building from every town and nothing caught it, because the only joint-build coverage in the tree is a meadow test.** The fold accepts two `structure_progressed` for one site in one tick; what was lost is the *site resolution*, not the physics.
+> **Under v5b's fix alone, joint building would have been legal and irrational** — the walls go up five times faster, every builder's clock runs the same length, and five minds pay five wages for one house. **G8 criterion 7 gates joint building; a mind that tried it once would have learnt not to.** The landed `stepBuild` emits `action_progressed {ticks: hands}`, so every hand's clock loses `hands` and `ticksRemaining` stays equal to `durationTicks − progressTicks` however many arrive or leave.
 >
-> **What it costs, named, because four things in this plan rest on it:** T21's arithmetic; **T22's entire `minHands` rule — `storehouse` at 3 hands and `shed` at 2 become UNBUILDABLE, a beam nobody can ever lift**; T49's `production.jointBuildTicks` and `socialVerbs.jointBuild`, which can only ever be 0; and **G8 criterion 7, which gates *"give, tend, teach and joint build each non-zero at least once"* and is therefore UNPASSABLE as the tree stands.**
+> **★ THREE CONSEQUENCES FOR THIS PLAN, AND ONE OF THEM IS A CORRECTION TO A v5b CORRECTION.**
 >
-> **OD22's recommendation is Step 0 below, and it is printed rather than described.** It is nine lines, it is keyed on the ground exactly as the sited branch already is, and it changes no fold and no hash.
-
-- [ ] **Step 0 (★ v5b, OD22): a site another pair of hands can join.** Modify `packages/engine/src/verbs.ts` and `packages/engine/src/buildSeam.test.ts`. **Its own commit, before Step 1**, because T22 cannot be executed without it.
-
-```ts
-// packages/engine/src/verbs.ts — beside `ownSite`, which it does not replace.
-//
-// ★ THE HALF `ownSite` CANNOT ANSWER. `ownSite` is keyed on the BUILDER, which is right for a
-// resume — a body goes back to its own walls. Joining is keyed on the GROUND, exactly as the
-// sited branch has always been through `siteAt`: the walls a body is standing next to. Without
-// this, `claimInWorld` hands the second body the next FREE plot and a town of five raises five
-// houses, which is the one thing the joint-build line in the prompt promises it will not do.
-//
-// Deterministic and rolls no die: (y, x) then id, the same order the shared `#scan` uses.
-function joinableSite(state: WorldState, agentId: string, kind: string) {
-  let best: Structure | null = null
-  for (const id of Object.keys(state.structures).sort()) {
-    const s = state.structures[id]!
-    if (s.stage !== 'construction' || s.kind !== kind) continue
-    if (s.builtBy === agentId) continue                       // that is `ownSite`'s answer
-    if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) continue
-    if (best === null || s.y < best.y || (s.y === best.y && s.x < best.x)) best = s
-  }
-  return best
-}
-```
-
-```ts
-// packages/engine/src/verbs.ts — inside `buildSiteOf`, the plotted branch. ONE LINE CHANGES.
-- const mine = ownSite(state, agentId, params.kind)
-+ // Own walls first, then a neighbour's within reach; only then does the town claim new ground.
-+ const mine = ownSite(state, agentId, params.kind) ?? joinableSite(state, agentId, params.kind)
-```
-
-```ts
-// packages/engine/src/verbs.ts — inside `stepBuild`, the plotted branch. ONE LINE CHANGES.
-  const site = p.x === undefined || p.y === undefined
--   ? ownSite(state, agentId, p.kind)
-+   ? ownSite(state, agentId, p.kind) ?? joinableSite(state, agentId, p.kind)
-    : siteAt(state, p.x, p.y)
-```
-
-**★ AND THE MATERIALS FALL OUT RIGHT WITHOUT A LINE OF WORK, WHICH IS THE TEST THAT THIS IS THE CORRECT SEAM.** `mine !== null` makes `resume` non-null, `plottedRefusal` is skipped for a resume, and `onStart` returns `[]` when `answer.resume !== null` — **so a joiner spends no second pile of wood, plants no second `structure_planned`, and claims no second plot.** Every one of those is already written; the only thing that was missing is the sentence that says *which* walls.
-
-```ts
-// packages/engine/src/buildSeam.test.ts — appended
-describe('★ OD22 — a second pair of hands joins the walls rather than starting new ones', () => {
-  it('TWO BODIES ON ONE SITE, IN A TOWN — the thing the prompt has always promised', () => {
-    const base = genesisTown()
-    const claim = claimInWorld(base, { along: 2, deep: 2 })!
-    let s = withBuilder(withBuilder(base, 'a', claim.door), 'b', claim.door)
-    const first = submitIntent(s, CFG, 'a', 'build', { kind: 'house' })
-    expect(first.ok).toBe(true)
-    s = apply(s, first.ok ? first.events : [])
-    const site = Object.values(s.structures).find((x) => x.stage === 'construction')!
-
-    const second = submitIntent(s, CFG, 'b', 'build', { kind: 'house' })
-    expect(second.ok, 'b was sent to a second plot — OD22 is not wired').toBe(true)
-    s = apply(s, second.ok ? second.events : [])
-    expect(Object.values(s.structures).filter((x) => x.stage === 'construction')).toHaveLength(1)
-  })
-
-  it('AND THE WALLS GO UP TWICE AS FAST, which is the whole arithmetic in this task s header', () => {
-    const s = twoOnOneSite()
-    const site = Object.values(s.structures).find((x) => x.stage === 'construction')!
-    const next = apply(s, [...stepBuild(s, 'a'), ...stepBuild(s, 'b')])
-    expect(next.structures[site.id]!.progressTicks).toBe(site.progressTicks + 2)
-  })
-
-  // `heldQty` is module-private in verbs.ts, so the fixture counts the pile itself.
-  const woodOf = (s: WorldState, id: string): number => Object.values(s.items)
-    .filter((i) => i.kind === 'wood' && i.loc.t === 'agent' && i.loc.id === id)
-    .reduce((n, i) => n + i.qty, 0)
-
-  it('★ THE JOINER PAYS NOTHING TWICE — no second pile, no second plot, no second plan', () => {
-    const before = twoOnOneSite('before')
-    const after = twoOnOneSite('after')
-    expect(woodOf(after, 'b')).toBe(woodOf(before, 'b'))
-    expect(Object.values(after.structures).filter((x) => x.stage === 'construction')).toHaveLength(1)
-  })
-
-  it('★ AND A BODY ACROSS TOWN IS STILL SENT TO ITS OWN GROUND — joining is a fact about REACH', () => {
-    const base = genesisTown()
-    const claim = claimInWorld(base, { along: 2, deep: 2 })!
-    let s = withBuilder(base, 'a', claim.door)
-    s = apply(s, (submitIntent(s, CFG, 'a', 'build', { kind: 'house' }) as { events: never[] }).events)
-    s = withBuilder(s, 'c', { x: TOWN_SQUARE.x + 7, y: TOWN_SQUARE.y + 7 })
-    expect(buildSiteOf(s, CFG, 'c', { kind: 'house' }).resume).toBeNull()
-  })
-
-  it('THE FOLD IS UNTOUCHED — this changes site resolution, never a fold', () => {
-    const store = goldenStore()
-    expect(stateHash(replayFromGenesis(store))).toBe(stateHash(replayFromGenesis(store)))
-  })
-})
-```
-
-- [ ] **Step 0b:** `pnpm vitest run packages/engine/ && pnpm typecheck` — PASS.
-
-```bash
-git add packages/engine/src/verbs.ts packages/engine/src/buildSeam.test.ts
-git commit -m "fix(engine): a second pair of hands joins the walls instead of claiming a second plot (OD22)"
-```
+> | What landed | What it changes here |
+> |---|---|
+> | `joinableSite`, `siteToRaise` | **T21 Step 0 deleted.** T22 is unblocked; its fixture's `siteUnderConstruction` throw stays, because a fixture that silently measures two sites is still the failure mode, and the throw now names a regression rather than an unruled decision |
+> | `handsOnSite(state, siteId): number` at `verbs.ts:1893`, **exported** | **T22 does not write its own hand counter.** `minHandsFor` compares against `handsOnSite`, which is landed, tested (`buildSeam.test.ts:593`) and already the number `stepBuild` uses for the rate. Two counters for one number is the drift T49 makes the same argument about |
+> | **`stepBuild` TAKES THREE ARGUMENTS: `(state, config, agentId)`** | **★ v5b's own correction is stale.** Its box read: *"`stepBuild` TAKES TWO ARGUMENTS, NOT THREE... Measured: `stepBuild.length === 2`."* That was true at `645a8d9` and is false at `9d76b97` — the config came back when the ledger cap needed `buildTicks(config, p.kind)`. **T22's three `stepBuild(state, 'amara')` rows are wrong again, in the opposite direction, and are corrected in place.** *This is the fourth revision in a row in which this one signature has been wrong; the lesson is C17′, and it is that a signature is read at the moment it is used* |
+>
+> **v5b's arithmetic in the paragraph below is now true and then some**: a house is 2 880 ticks, five hands raise it in 576, and — new — five hands are billed 576 ticks each rather than 2 880 each.
 
 ---
 
-**This is the highest impact-per-cost item in the entire design and it changes no physics at all.** `stepBuild` emits `structure_progressed {ticks: 1}` **per builder per tick** — **★ v5b: true of the FOLD, and true of the sited branch; true of a town only after Step 0 above** — and `build`'s duration resumes from `site.progressTicks`. So a house is **2880 ticks — three waking days for one body and 0.6 of a day for five** — and **cooperation has always been required and the world has never once said so.** Three free fixes:
+**This is the highest impact-per-cost item in the entire design and it changes no physics at all.** `stepBuild` emits `structure_progressed {ticks: 1}` per builder per tick, **in a town as well as a meadow since `8056f1f`**, and `build`'s duration resumes from `site.progressTicks`. So a house is **2 880 ticks — three waking days for one body and 0.6 of a day for five** — and **cooperation is required, is now also rational, and the world has still never once said so.** Three free fixes:
 
 1. **The site's remainder in human words.** `PerceivedStructure` carries `stage` and nothing else. Add a phrase derived from `progressTicks / durationTicks`: *"barely begun"* / *"half-raised"* / *"a morning's work from finished"*. **★ v4: the field is `durationTicks`, not `buildTicks`** — `StructureRecipeSchema` at `packages/shared/src/config.ts` declares `{ inputs, w, h, maxHp, flammable, durationTicks }` and always has. v3 wrote `buildTicks` in four places and it exists nowhere in the tree.
 2. **The prose says hands help.** On a site in `construction` within reach: *"Another pair of hands here would halve what is left."* A physical fact, not an instruction.
@@ -3676,6 +3579,17 @@ describe('SEED_STRUCTURES', () => {
     expect(minHandsFor(DEFAULT_CONFIG, 'house')).toBe(1)
   })
 
+  // ★ v6: `handsOnSite` is landed (`verbs.ts:1893`) and is the number `stepBuild` already uses
+  // as its RATE. `minHandsFor` must compare against that exact function and never a second
+  // count of its own, or the beam's threshold and the walls' speed will disagree about how many
+  // people are standing there. Asserted rather than assumed, because the drift would be silent.
+  it('★ COUNTS THE HANDS THE WAY THE WALLS ALREADY COUNT THEM — one definition, not two', () => {
+    const three = siteUnderConstruction('storehouse', ['amara', 'yusuf', 'nadia'])
+    expect(handsOnSite(three, theSite(three)!.id)).toBe(3)
+    const two = siteUnderConstruction('house', ['amara', 'yusuf'])
+    expect(handsOnSite(two, theSite(two)!.id)).toBe(2)
+  })
+
   // ★ NEW IN v4 (C29). A seed kind is a word a mind reads in the makeables line (T20) and
   // speaks back to `build`, so it is a genesis string like any other.
   it('★ NAMES NOTHING THE CANON PUTS OUT OF REACH', () => {
@@ -3722,7 +3636,7 @@ describe('SEED_STRUCTURES', () => {
 
 - [ ] **Step 1b: The art fixture, and it reads DISK rather than a list.** `packages/engine/src/structures/committedArt.fixture.ts` exports `listCommittedBuildingKinds(): string[]` = `readdirSync('packages/forge/content/buildings')`, sorted. **It is a `readdirSync`, not a typed array, because a typed array is a second copy of the art lane's contract and would go stale the first time a cell is commissioned.** `@sj/engine` must not import `@sj/forge` (C12 — nothing outside the forge may depend on `sharp`), so this reads the directory rather than the package. Four lines, test-only, and asserted test-only by the same source-level check T55 Step 0 uses.
 
-- [ ] **Step 1c (★★ v5b): THE FIXTURE, PRINTED.** v5 described this and printed nothing, and its own closing concern called it *"the least-verified amendment in v5 — if one amendment is going to cost an executor an afternoon, it is that one."* The house style forbids a described code step. **Here it is, in full, with no ellipsis and nothing left to derive.** Every symbol in it was executed against `645a8d9`; **it depends on T21 Step 0 (OD22)** and cannot stand up a multi-hand site without it, which is why that step is a separate commit that runs first.
+- [ ] **Step 1c (★★ v5b): THE FIXTURE, PRINTED.** v5 described this and printed nothing, and its own closing concern called it *"the least-verified amendment in v5 — if one amendment is going to cost an executor an afternoon, it is that one."* The house style forbids a described code step. **Here it is, in full, with no ellipsis and nothing left to derive.** Every symbol in it was executed against `645a8d9`; **★ v6: it depended on T21 Step 0, which is now landed on `main` (`8056f1f`), so this fixture stands up on a clean checkout with nothing added.** Every symbol in it was re-executed against `9d76b97`, and `stepBuild`'s arity is three.
 
 ```ts
 // packages/engine/src/verbs.test.ts — appended, at the top of the file with the other fixtures
@@ -3732,7 +3646,7 @@ import { genesisState, type Structure, type WorldState } from './state.js'
 import { makeGenesisWorld } from './genesis/world.js'
 import { submitIntent } from './intent.js'
 import { claimInWorld } from './town.js'
-import { stepBuild, VERBS } from './verbs.js'
+import { handsOnSite, stepBuild, VERBS } from './verbs.js'   // ★ v6: handsOnSite is LANDED
 import { structureRecipeFor } from './structures/seedStructures.js'
 
 const CFG = DEFAULT_CONFIG
@@ -3814,7 +3728,7 @@ function handedTown(ids: readonly string[], kind = 'storehouse'): WorldState {
 }
 ```
 
-> **★ THE ONE THING THIS FIXTURE ASSERTS BY THROWING RATHER THAN BY EXPECTING**, and it is deliberate: if `siteUnderConstruction` finds two construction sites, **T21 Step 0 is not wired and every `minHands` assertion below is meaningless** — three bodies would be raising three storehouses and each of them would be at one hand. A fixture that returns a plausible-looking world in that case is how a task goes green while measuring nothing, which is the shape this plan has now caught fourteen times. **The throw names OD22 so the executor is not sent looking.**
+> **★ THE ONE THING THIS FIXTURE ASSERTS BY THROWING RATHER THAN BY EXPECTING**, and it is deliberate: if `siteUnderConstruction` finds two construction sites, **the landed join path has regressed and every `minHands` assertion below is meaningless** — three bodies would be raising three storehouses and each of them would be at one hand. A fixture that returns a plausible-looking world in that case is how a task goes green while measuring nothing, which is the shape this plan has now caught fourteen times. **★ v6: the throw's message keeps the words `OD22` in it, and its meaning changes from "go and wire this" to "this landed at `8056f1f` and something has taken it out".**
 
 ```ts
 // packages/engine/src/verbs.test.ts — appended
@@ -3824,16 +3738,17 @@ function handedTown(ids: readonly string[], kind = 'storehouse'): WorldState {
 // It takes no coordinate, and `siteAt(state, 61, 68)` becomes `theSite(state)`, because
 // (61, 68) was a coordinate v3 chose and no lattice would ever offer. The fixture returns the
 // world it seated so the assertions read the site rather than retyping it (C14).
-// ★★ v5b — `stepBuild` TAKES TWO ARGUMENTS, NOT THREE. `export function stepBuild(state:
-// WorldState, agentId: string): PendingEvent[]` at `verbs.ts:1836` — it reads the config it
-// needs off nothing, because a tick of work is a tick of work. v5 passed `DEFAULT_CONFIG` as
-// the second argument in all three rows below, which is `TS2554: Expected 2 arguments, but
-// got 3` on every one of them. Measured: `stepBuild.length === 2`.
+// ★★ v6 — AND NOW IT TAKES THREE AGAIN. `export function stepBuild(state: WorldState, config:
+// SimConfig, agentId: string): PendingEvent[]` at `verbs.ts:1902` on `main` @ `9d76b97`. The
+// config came back with the build-ledger cap, which needs `buildTicks(config, p.kind)` to know
+// how much work the walls still owe. v5 passed three and was wrong; v5b corrected it to two and
+// is now wrong the other way. THREE. The rows below pass `CFG`, and `buildSeam.test.ts:249`
+// on `main` is the landed call to copy: `stepBuild(s, CFG, id)`.
 describe('a beam that does not go up with two', () => {
   it('MAKES NO PROGRESS AT ALL below the hand count — not slow progress', () => {
     const state = siteUnderConstruction('storehouse', ['amara', 'yusuf'])
     const before = theSite(state)!.progressTicks
-    const next = foldAll(state, stepBuild(state, 'amara'))
+    const next = foldAll(state, stepBuild(state, CFG, 'amara'))
     expect(theSite(next)!.progressTicks).toBe(before)
   })
 
@@ -3841,13 +3756,13 @@ describe('a beam that does not go up with two', () => {
     const state = siteUnderConstruction('storehouse', ['amara', 'yusuf', 'nadia'])
     const before = theSite(state)!.progressTicks
     let next = state
-    for (const id of ['amara', 'yusuf', 'nadia']) next = foldAll(next, stepBuild(next, id))
+    for (const id of ['amara', 'yusuf', 'nadia']) next = foldAll(next, stepBuild(next, CFG, id))
     expect(theSite(next)!.progressTicks).toBe(before + 3)
   })
 
   it('a house still goes up alone, exactly as it always did', () => {
     const state = siteUnderConstruction('house', ['amara'])
-    const next = foldAll(state, stepBuild(state, 'amara'))
+    const next = foldAll(state, stepBuild(state, CFG, 'amara'))
     expect(theSite(next)!.progressTicks).toBe(theSite(state)!.progressTicks + 1)
   })
 
@@ -3888,7 +3803,7 @@ describe('a beam that does not go up with two', () => {
 Run: `pnpm vitest run packages/engine/src/structures/ packages/engine/src/verbs.test.ts`
 Expected: FAIL — `Cannot find module './seedStructures.js'`.
 
-- [ ] **Step 3: Implement.** `stepBuild` counts the bodies whose current `activity` is a `build` on this site and returns `[]` when the count is below `minHandsFor`. `build.validate` returns the refusal string when the count would still be short **at the moment the mind sets to work**, so a mind is told rather than left to fail silently.
+- [ ] **Step 3: Implement.** **★ v6 — DO NOT WRITE A HAND COUNTER. `handsOnSite(state, siteId): number` is landed and exported at `verbs.ts:1893`, and it is already the number `stepBuild` uses for its rate** — a second one would be two definitions of "how many hands are on this site", which is exactly the drift T49 refuses for `classifyDeaths`. `stepBuild` returns `[]` when `handsOnSite(state, site.id) < minHandsFor(config, p.kind)`. `build.validate` returns the refusal string when the count would still be short **at the moment the mind sets to work**, so a mind is told rather than left to fail silently.
 
 **★ v5 — WHERE THE HAND CHECK GOES, AND IT IS AFTER THE SHAPE AND BEFORE THE SITE.** The order inside `build.validate` is now: **(1)** `buildIsPlotted` chooses the params shape and `safeParse` refuses an extra key; **(2)** the hand count; **(3)** `buildSiteOf`, which claims the plot. **The hand check must sit at (2) and not at (3)**, because a refusal that fires after the claim would have already reserved ground for a beam nobody can lift — and `claimInWorld` reads *"free"* off what stands, so the reservation would not even be visible to unwind. Two hands short is a fact about the bodies present, not about the ground, and it is answered before any ground is asked for.
 
@@ -5990,7 +5905,7 @@ git commit -m "feat: the town can tell an elder from a youth, and a mind knows i
 **Two changes, and the second is why the first is not enough.**
 
 1. **A phrase of its own**, in a new module and deliberately **not** a fifth member of `CONDITION_PROSE`, so nothing can ever rank it against a wound or a fever: *"moving slowly, the way years move a body."* It is carried on `PerceivedAgent.aged`, a third field beside `condition` (T23) and `distress` (T55).
-2. **A visible slowing that is not exhaustion.** Elders take longer over work. This is the one member Phase F's keystone bundle carries for this phase — **`aging.elderWorkSlowdown`, default `1.25`, added in Task 29 and pinned there** (see the box in Task 29). Reading it here moves nothing.
+2. **A visible slowing that is not exhaustion.** Elders take longer over work, through **`aging.elderWorkSlowdown`, default `1.25`, added in Task 29** (see the box there for why it lands in T29 rather than here, and for the condition under which it may move). Reading it here changes nothing.
 
 **Interfaces — Consumes:** `ageBand`, `yearsOf` (T58), `config.aging.elderWorkSlowdown` (T29), `VerbDef.ticks` (landed).
 
@@ -9320,7 +9235,7 @@ All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throt
 | 4 | **Every mind reaches ≥1 full-need moment per sim-day** from day 2, and **`discretionaryActRate` ≥ 8** | **gate** | emergence law — *that window is where culture happens* |
 | 5 | **★ PRODUCTION IS NON-ZERO.** `builds + crafts + chops + tills + plants ≥ 1 per town-day from day 2, and ≥ 1 structure completed across the run | **gate** | **batch 14 — the central defect** |
 | 6 | **★ THE MODE-COLLAPSE GATE PASSES**: `D_b ≥ 0.15`, `D_c ≥ 0.12`, `unisonBuckets ≤ 0.34`, `≥3` qualifying buckets — **and, across A and B, `D_r ≥ D_b`** | **gate** | **U29, U31** |
-| **7** | **★ `socialVerbDiversity ≥ 3` across the run, and `discretionarySocialShare` reported per day.** Give, tend, teach and joint build each non-zero at least once. **Social-need satisfaction is NOT a criterion and may not be quoted as evidence.** **★★ v5b — THE JOINT-BUILD CLAUSE IS CURRENTLY UNPASSABLE: see OD22.** In a town the second builder is handed a different plot, so `socialVerbs.jointBuild` can only ever be 0. **Do not weaken the criterion** — the same instruction criterion 2 carries, for the same reason | **gate** | **C25 — the paired pull, made enforceable; ★ OD22** |
+| **7** | **★ `socialVerbDiversity ≥ 3` across the run, and `discretionarySocialShare` reported per day.** Give, tend, teach and joint build each non-zero at least once. **Social-need satisfaction is NOT a criterion and may not be quoted as evidence.** **★★ v6 — THE JOINT-BUILD CLAUSE IS PASSABLE. OD22 LANDED (`8056f1f`) and `many-hands` also made joint building RATIONAL**, so a mind that tries it is not punished for it. **The clause is unchanged and was never weakened**, which is the point worth recording: v5b named it unpassable and refused to soften it, and the fix arrived instead | **gate** | **C25 — the paired pull, made enforceable** |
 | 8 | `codifiedVerbs ≥ 1`, every recorded `attempt` carries a `recipe.canon` the codex holds, **and a repeat of a codified intent resolves with zero arbiter calls** | **gate** | delta §8 / G9 §17.3. **Non-negotiable** |
 | 9 | The arbiter is world-sighted: **zero** rulings denying a structure visible at ask time. **UNMET at `gate-g11-partial` (16/17) and carried here as T24's debt — see the box on Task 24. If it fails, it fails for the FIRST time** | **gate** | mini-rehearsal W2 / batch-8 R9, ruling R8 |
 | 10 | **≥1 law flipped mid-run through the admin channel**, and replay from genesis **and** from a pre-flip snapshot both reproduce the identical state hash | **gate** | delta §12 |
@@ -9351,7 +9266,7 @@ All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throt
 >
 > **★ AND ONE THING G8 MUST NOT GAIN: A BRIDGE CRITERION.** The far-bank lane delivered the ruling — a completed deck opens the west bank on the tick it completes — and then said plainly that **nothing gives a mind a reason to build one.** `CLAIM_RING_LIMIT` is 24 and the east bank holds hundreds of plots before the town needs the west; the only pressure that exists is the refusal *"there is nowhere left in the town for a house"*, and it will not fire for a very long time. **A criterion nothing in the world motivates measures the author's hope, not the town.** If C8 wants to see a bridge, that is a **society-design lever** — the fauna and forageables already across the water are the obvious one — and it is flagged here and solved nowhere in this plan.
 >
-> **★ AND CRITERION 2 IS NOT A CRITERIA PROBLEM BUT IT IS CURRENTLY UNREACHABLE.** Merge train 3 ran the product and found **all five founders ill at 17:02 on day 0 and prone in the street by 23:19.** Under criterion 2 as written, every run fails on day 0 before a mind has done anything. **That is the `first-night` lane's to answer and the answer is not guessed here** — see the contingency box at the end of this document.
+> **★★ v6 — CRITERION 2 IS REACHABLE. THE `first-night` LANE LANDED AND THE TOWN SURVIVES ITS FIRST NIGHT.** Merge train 3 found all five founders ill at 17:02 on day 0 and prone in the street by 23:19; under criterion 2 as written, every run failed before a mind had decided anything. **`fd687fb fix(gateway): the town survives its first night, and sleeps indoors` is on `main`.** **The criterion was not weakened while it was unreachable** — that is the second time in this revision the answer to an unpassable gate was a fix rather than a lower bar, and it is the pattern worth keeping.
 
 **★ WHY CRITERION 2 IS NOW THE WHOLE RUN AND NOT JUST THE FIRST THREE DAYS.** v2's criterion 2 was *"zero unforced deaths through sim-day 3, every later death carries a verdict that a competent actor would have died too"*. **The user's directive removes the escape clause**: under C26, a starvation on day 15 is the same defect as one on day 2 — the world failed to name the food, or the town failed to answer a window it could see. There is no day on which starving is acceptable.
 
@@ -9874,7 +9789,7 @@ The Discovery Record landed: `DISCOVERY_EVENT = 'discovery_made'`, a `DiscoveryR
 
 T29 as ratified moves four things: the energy residue, resented company, the coat, and the crop. **v3 adds `aging.elderWorkSlowdown: 1.25`**, because Phase F2 must make an elder *feel* old and Phase F is the only place a `SimConfig` key may be added (C3). Without it, the only elder effect in the world is a 1.2× energy decay whose visible symptom is tiredness — **which the world already speaks as "grey with a tiredness sleep has not lifted", i.e. exactly the illness confusion the user's directive forbids.**
 
-- **Recommendation: ACCEPT.** It costs nothing — the regen is already being spent on four other changes, and T29's own argument is that a fifth level-3 member is free. The attribution table predicts it as a null against both goldens (the scripted agents are adults) and a real move against the forge pin.
+- **Recommendation: ACCEPT.** *(★ v6 — RULED ACCEPTED, and the reasoning below is superseded rather than wrong. There is no regen and no attribution table; the key lands in T29 because `config.ts` is the highest-contention file in the tree and one editor per file is a merge rule. The prediction survives as a prediction: `elderWorkSlowdown` should change no existing test, because every scripted world is adults.)* It costs nothing — the regen is already being spent on four other changes, and T29's own argument is that a fifth level-3 member is free. The attribution table predicts it as a null against both goldens (the scripted agents are adults) and a real move against the forge pin.
 - **If you strike it:** T59 ships elder legibility on the existing energy multiplier alone, an elder never visibly works slower, and **Phase F2 delivers a visible age with no felt consequence** — which is a config dial wearing a phase's clothes. Say so explicitly and T59's step 3 drops `elderTicksFor`.
 
 **13. ★ NEW — RUN A IS GATED AT ZERO UNFORCED DEATHS OVER 21 DAYS, WHICH IS THREE TIMES THE DIRECTIVE'S EXPOSURE.**
@@ -9930,37 +9845,38 @@ I have provisionally ruled **neutral-default with `authored` as a named second a
 
 ---
 
-## ★★ THE `first-night` LANE IS LIVE, AND NINE TASKS DEPEND ON WHAT IT FINDS
+## ★★ THE `first-night` LANE LANDED. THE NINE-TASK CONTINGENCY IS CLOSED, AND HERE IS WHAT IT COST EACH ONE.
 
-**This section does not guess the answer. It names the tasks whose acceptance criteria change depending on it, so that when the lane reports, the reader can go straight to them.**
+**v5b ended with nine tasks whose acceptance criteria hung on a lane that was still running. The lane merged into `main` before v6 was written, and this section is now a record rather than a hazard.** Kept, not deleted: three of the nine changed, and a reader who only sees the amended tasks would not know why.
 
-`first-night` is running in `packages/engine`, `packages/gateway`, `packages/agents` and `packages/web/src/ui`, against `main` @ `645a8d9` — the same tip this plan is written against. **It cannot conflict with this document, which writes only under `docs/`. It can and probably will change three things this document rests on.** What it is fixing, from its own brief:
+**Discharged, with the commits:** `git merge-base --is-ancestor 1941a5f main` → true.
 
-1. **The whole cast collapses in the street on night one.** `map=showcase`, `rings=3`: **all five founders fall ill at Day 0 17:02** and are **`COLLAPSED · WORN OUT` on the road by Day 0 23:19**, bodies drawn prone. Five at once within hours is not five bad decisions; it is systemic. **The lane is instructed to diagnose before it tunes, and it is the one lane authorised to move G1 if the fix changes the world's rules.**
-2. **The dev world has no mason.** `makeFoundersOnTick` offers only `walk / sleep / enter / exit`, so nothing builds in a running world and everything the claim seam proved is proved only on engine fixtures.
-3. **Two nav counters read 0 while their panels hold data** — `CHRONICLE 0` beside sixteen entries, `BONDS 0` beside two pairs.
+| Defect v5b named | Landed as | Status |
+|---|---|---|
+| **The whole cast collapses in the street on night one** — all five ill at Day 0 17:02, `COLLAPSED · WORN OUT` on the road by 23:19 | **`fd687fb` — *the town survives its first night, and sleeps indoors*** | **FIXED** |
+| **The dev world has no mason** — `makeFoundersOnTick` offered only `walk / sleep / enter / exit` | **`1b3929e` — *the dev world builds — a mason, and the frame that let it*.** `masonIntent` at `gateway/src/founders.ts:244`, `devMason.test.ts` beside it | **FIXED** |
+| **Two nav counters read 0 while their panels hold data** | **`0a8726c` — *the two nav counters, and they were lying in two different ways*** | **FIXED** |
+| *(not in v5b's list)* the build meter | **`1941a5f` — *the build meter measures the build the world is running*** | landed |
 
-| Task | What depends on the lane, and what changes if it lands differently |
-|---|---|
-| **T29** — the keystone regen | **The only structural dependency, and the sharpest.** C3 records four pin values and T29 re-pins from them. **Defect 1's fix may move G1, which has never moved in this project's history.** If it does, C3's table and T29's "from" side are both wrong and Task 1 Step 0 will STOP on the mismatch — **which is correct behaviour, and the answer is to record the lane's value, not to re-derive one.** C8's single regen is unaffected either way: the lane spends its own. |
-| **T50 criterion 2** — zero unforced deaths, every day, all three runs | **Currently unreachable, and not because the criterion is wrong.** Five founders ill on day 0 and prone by 23:19 fails criterion 2 before a mind has decided anything. **Do not weaken the criterion** (C23, and this project has found that shape thirteen times). If the lane's answer is that this was a bug, criterion 2 becomes measurable for the first time. **If the answer is that the world is meant to be this hard, that is a specification question for the principal and criterion 2 is where it surfaces.** |
-| **T66** — the death taxonomy | `illness` is one of the four things permitted to kill. **Five simultaneous illnesses at 17:02 on day 0 is either a bug — in which case the taxonomy is untouched — or it is the world, in which case a permitted cause can wipe the town and pass the gate.** T66's mapping table does not change; what changes is whether `illness` needs the same rescue-window qualification `fatigue` already carries. **Read the lane's mechanism before writing T66's `illness` row.** |
-| **T55** — the rescue window | **Its entire subject is a body in sustained distress and whether anyone answers.** Five bodies down at once is the worst case for a window that assumes a neighbour is upright to see it. If the lane changes when or how a body goes down, T55's three-rung escalation table and its 1440-tick window are measured against a different curve. **The window length is not the thing to adjust** — v4 already says so — but the rungs may need re-reading. |
-| **T23** — a wound may not eat a famine | `conditionProse` reads `afflictions` first, then `a.ill`, then hunger, then hp. **The collapse presents as `WORN OUT` and is preceded by `has fallen ill`, so the `a.ill` rung fires before the hunger rungs T23 is inserting.** If the lane changes what sets `ill`, T23's ordering argument is about a different branch. The fix itself — hunger outranking a wound — is unaffected. |
-| **T59** — ageing reads as ageing, never as illness | **The most direct collision of all: T59's whole purpose is that an old body must not read as an ill one, and the lane is inside the illness mechanism.** If `ill` gains or loses a trigger, `agedProse`'s "never one of `CONDITION_PROSE`'s four" claim is about a different four. **Write T59 after the lane reports, not before.** |
-| **T62, T63** — furnishings and the placement arm | **Three integration trains in a row have failed to reach an interior**, and the cause is now known: they collapse before reaching a door, so `enter` never fires. **No room, no furnishings and no `ROOM_ZOOM` verdict has ever been seen.** T62 and T63 are written against an interior nobody has looked at. The lane is expected to produce the first one; **T62's fold and T63's placement arm are sound either way, but their acceptance is "a mind put a chair in a room and somebody saw it", and that sentence is not currently possible.** |
-| **T19, T20** — the production roads | **Soft, but worth naming.** The lane will add a mason to `makeFoundersOnTick`. That is a **scripted demonstration policy**, and its brief says so in as many words — *"be explicit in the code about which behaviour is scripted and which is emergent, so nobody later mistakes a demo for a result."* **C8's minds must not be given the scripted policy's decision rule**, and G8's criterion 5 must never be scored against a run in which a scripted mason was building. **T50 asserts the arm it ran; if the lane's mason is reachable from the supervisor, T32 must not wire it.** |
+**★ AND THE ONE THING v5b WAS MOST WORRIED ABOUT DID NOT HAPPEN, FOR A REASON NOBODY PREDICTED.** v5b called `first-night` *"the one lane authorised to move G1"* and made T29's whole "from" side contingent on it. **The lane did not move G1 — and neither could it have, because the `unpin` lane deleted G1 first.** Two lanes ran in parallel against one hazard and the hazard was removed from underneath it.
 
-**Two things this plan does NOT do about any of it.** It does not pre-empt the diagnosis — **no task here assumes the collapse is a bug, and none assumes it is balance.** And it does not soften anything in anticipation: **the harshness order is legibility → rescue window → giving → softened decay LAST** (C25, and the binding ruling behind Phases D, D2 and F), and a lane fixing night one does not reorder it.
+**The nine rows, resolved. Six needed no change; three did, and each is amended in place.**
 
-**If `first-night` reports before this plan is ratified, the nine rows above are the re-read list.** If it reports after, they are the amendment list for v6 — and the honest expectation is that **T59, T66 and T50's criterion 2 are the three that will actually need words changed**, because all three make a claim about what illness is.
+| Task | What v5b said depended on the lane | Resolution in v6 |
+|---|---|---|
+| **T29** | *"The only structural dependency, and the sharpest. Defect 1's fix may move G1."* | **VOID.** There is no G1 to move, and T29 is rewritten around that (see its box). The dependency was on the pin, not on the lane |
+| **T50 criterion 2** | *"Currently unreachable... five founders ill on day 0 fails criterion 2 before a mind has decided anything."* | **REACHABLE.** `fd687fb` landed. **The criterion was never weakened while it was unreachable**, and the note recording that is kept in T50 |
+| **T66** | *"Read the lane's mechanism before writing T66's `illness` row."* | **★ AMENDED — SEE BELOW.** This is one of the three that actually changed |
+| **T55** | *"Five bodies down at once is the worst case for a window that assumes a neighbour is upright to see it."* | **★ AMENDED — SEE BELOW.** The rungs are unchanged; the *assumption* they rest on is now stated |
+| **T23** | *"`conditionProse` reads `afflictions` first, then `a.ill`... If the lane changes what sets `ill`, T23's ordering argument is about a different branch."* | **UNCHANGED, and now verifiable.** The fix — hunger outranking a wound — never depended on it. T23's Step 2 reads the landed `conditionProse` before writing its rungs, which it always should have |
+| **T59** | *"The most direct collision of all... Write T59 after the lane reports, not before."* | **★ AMENDED — SEE BELOW.** The lane reported; T59 may be written |
+| **T62, T63** | *"Three integration trains in a row have failed to reach an interior... no room, no furnishings and no `ROOM_ZOOM` verdict has ever been seen."* | **UNBLOCKED.** A town that sleeps indoors is a town that reaches a door. **Their acceptance sentence — *"a mind put a chair in a room and somebody saw it"* — is possible for the first time**, and it is still not proved: no run has done it |
+| **T19, T20** | *"The lane will add a mason... C8's minds must not be given the scripted policy's decision rule."* | **STANDS, AND IT IS A LIVE HAZARD RATHER THAN A PREDICTED ONE.** `masonIntent` exists. **T32 must not wire it, and G8 criterion 5 must never be scored against a run in which a scripted mason was building.** T50 asserts the arm it ran; it must also assert that `SJ_DEV_JOINT` and the dev mason were off |
 
-> ### ★★ v5b — THE LIST IS REFRESHED, NOT REPLACED. STILL NINE, AND THE LANE'S ANSWER IS STILL NOT GUESSED.
->
-> The lane was live when v5 was written and it is live now, in `packages/engine`, `packages/gateway`, `packages/agents` and `packages/web/src/ui`. **v5b writes only under `docs/` and proved it: `git diff --stat main...HEAD -- packages/` is empty.** Three things are worth adding, none of which is a prediction:
->
-> 1. **The pin census was re-derived independently at `645a8d9` and it has not moved.** `git grep -n "f487a26b\|00d72434\|da065752\|4205d892" 645a8d9 -- 'packages/**/*.ts'` returns **twelve lines across seven files, eleven of them full literals** — identical to v5's count, arrived at from the tip rather than from v5's table. **So T29's "from" side is still correct, and G1 is still `f487a26b…`.** If the lane moves it, that is the one row above that changes structurally, and the answer is still to record the lane's value rather than derive one.
-> 2. **★ Defect 2 — "the dev world has no mason" — now touches OD22 as well as T19/T20.** A scripted mason that builds alone will never exercise the join path, so **the lane landing a mason does NOT discharge OD22** and must not be read as evidence that joint building works. If the lane's mason is the first thing to build in a running world, it will build one roof per body, which is exactly the behaviour OD22 describes and is indistinguishable from correct unless somebody counts the sites.
-> 3. **Criterion 7 now has two independent reasons it may not pass** — the lane's (a town too ill to speak) and OD22's (a joint build that cannot happen). **They must not be confused for each other in the read-through.** If `socialVerbs.jointBuild` is 0 and OD22 is unwired, that number is a plan defect and not a finding about the town.
->
-> **Unchanged, and said again because it is the discipline that matters:** no task here assumes the collapse is a bug and none assumes it is balance, nothing is softened in anticipation, and the harshness order is not reordered by a lane fixing night one.
+**★ THE THREE AMENDMENTS, EACH ONE LINE OF INSTRUCTION.**
+
+1. **T66 — read the illness mechanism before writing the `illness` row.** v5b asked whether `illness` needs the same rescue-window qualification `fatigue` carries. **The lane changed when a body falls ill and where it sleeps; it did not change what illness IS.** `illness` stays a permitted cause with no qualification — **but the row is now written against a landed mechanism rather than a hypothetical one, and T66 Step 0 says so: read `systems/illness.ts` and `4a696e1` before writing `TAXON_OF`.**
+2. **T55 — the assumption is now written down.** The three rungs and the 1440-tick window are unchanged. What v5b could not say and v6 can: **a rescue window assumes a neighbour is upright to see it, and until `fd687fb` that assumption was false for the whole town at once.** T55 states the assumption in its header, because a window that only works when the town is well is a window that fails exactly when it is needed — and that is a finding the rehearsal can produce even now.
+3. **T59 — may be written, and the collision did not materialise.** `agedProse`'s claim is *"never one of `CONDITION_PROSE`'s four"*. **The lane did not add or remove a member of `CONDITION_PROSE`**; it changed when `ill` is set and where a body sleeps. **T59's claim is about the same four and stands.**
+
+**★ AND ONE THING THE LANE DID NOT DISCHARGE, RESTATED SO IT IS NOT LOST WITH THE REST OF THIS BOX.** v5b's own note: *"a scripted mason that builds alone will never exercise the join path, so the lane landing a mason does NOT discharge OD22."* **OD22 was discharged by `many-hands`, not by the mason** — and the note's underlying warning survives intact: **a scripted mason building one roof per body is indistinguishable from correct unless somebody counts the sites.** T49's `production.structuresCompleted` and `socialVerbs.jointBuild` are that count.
