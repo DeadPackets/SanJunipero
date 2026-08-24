@@ -27,7 +27,8 @@ import {
   shelterLedger, TickLoop, warmthTargetFor, type LawQueue, type TickHandler, type WorldState,
 } from '@sj/engine'
 import {
-  isBeddedKind, isHearthKind, MINUTES_PER_DAY, SimConfigSchema, type SimConfig, type SimEvent,
+  isBeddedKind, isHearthKind, MINUTES_PER_DAY, simTimeFromTick, SimConfigSchema,
+  type SimConfig, type SimEvent,
 } from '@sj/shared'
 import { EngineBridge, type Intent, type SubmitResult } from '../src/runtime/bridge.js'
 import { AgentRuntime } from '../src/runtime/agentRuntime.js'
@@ -42,8 +43,12 @@ import { MINDS } from './probeFounders.js'
 const ARM = (process.env.HEARTH_ARM ?? 'h').toLowerCase()
 const LABEL = process.env.HEARTH_LABEL ?? ARM
 const TOTAL_TICKS = Number(process.env.HEARTH_TICKS ?? 720)
-// 18:00, the motive probe's own hour, so the two records stack. The cold bites at 21:00.
-const START_TICK = 18 * 60
+// 18:00, the motive probe's own hour, so the two records stack. `HEARTH_DAY` moves the night
+// into another season without touching anything else: day 0 is early spring, and day 273 is
+// the winter the whole cold design was ratified for — the only season in which an indoor body
+// crosses the shiver line, and therefore the only one in which a hearth answers a want a body
+// can feel on itself rather than only see in the room.
+const START_TICK = Number(process.env.HEARTH_DAY ?? 0) * MINUTES_PER_DAY + 18 * 60
 const CAP_USD = 6.0
 const REAL_MS_PER_TICK = Number(process.env.HEARTH_MS_PER_TICK ?? 250)
 const WOOD_IN_HAND = 10
@@ -199,6 +204,8 @@ async function main(): Promise<void> {
 
   const report = {
     arm: ARM, label: LABEL, ticks: TOTAL_TICKS, startTick: START_TICK,
+    season: simTimeFromTick(START_TICK).season,
+    weatherAtEnd: s.weather,
     // The world both arms ran in, so a reader can check they are the same world.
     houseFinished: houseId,
     houseHoldsAFire: isHearthKind(config, 'house'),

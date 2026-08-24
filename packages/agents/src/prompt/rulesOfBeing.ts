@@ -74,7 +74,7 @@ pave — name it pave; give x and y as two numbers for ground within reach, with
 dig_channel — name it dig_channel; give x and y as two numbers for grass or dirt within reach that water already touches
 kindle — name it kindle; give itemId, the torch or lamp you hold
 snuff — name it snuff; give itemId, the lit thing you hold
-stoke — name it stoke; give structureId, the fire you stand beside, with wood in hand
+stoke — name it stoke; give structureId, a fire you stand beside or a hearth in the room you are in, with wood in hand. A cold one takes the wood as readily as a burning one
 douse — name it douse; give x and y as two numbers for the burning thing beside you, with a full bucket in hand
 extinguish — name it extinguish; give structureId, the mark of the burning thing
 attack — name it attack; give targetId, the mark of the person you strike
