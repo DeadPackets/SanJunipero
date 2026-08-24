@@ -5,7 +5,7 @@ import { ClientMsg, DEFAULT_CONFIG, PROTOCOL_VERSION, type SimConfig } from '@sj
 import type { TileId } from '@sj/engine'
 import { AssetCodex } from '@sj/forge'
 import { WorldMirror } from './worldMirror.js'
-import { SocketHub } from './hub.js'
+import { OPEN, SocketHub } from './hub.js'
 import { thoughtsSince } from './observer.js'
 import { mountAssetRoutes } from './assetsHttp.js'
 import { mountDataApi } from './api.js'
@@ -13,6 +13,7 @@ import { mountNarratorApi } from './narratorApi.js'
 import { mountBondsApi } from './bonds.js'
 import { mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
+import { makeStaticSite } from './staticSite.js'
 
 export type GatewayOpts = {
   dbPath: string; port?: number                 // default 8787
@@ -21,6 +22,8 @@ export type GatewayOpts = {
   db?: Database.Database                        // in-process override (dev world); else opened readonly
   agentDbDir?: string                           // per-agent memory DBs (`<id>.db`); absent → [] tab responses
   narratorDbPath?: string                       // C7's narrator.db; absent or unwritten → typed empties
+  staticDir?: string                            // built @sj/web; absent → API/socket only (the dev split)
+  maxViewers?: number                           // default DEFAULT_MAX_VIEWERS
 }
 export type Gateway = { port: number; close(): Promise<void>; pump(): void }  // pump exposed for tests
 
@@ -30,6 +33,28 @@ export type Router = { route(method: string, pattern: string, fn: RouteHandler):
 const DEFAULT_PORT = 8787
 const DEFAULT_POLL_MS = 250
 const CLOSE_BAD_HELLO = 4400
+export const CLOSE_TOO_MANY = 4429
+
+/** A viewer only ever sends `hello`, `scrub` or `live`, none of which reach 200 bytes. ws
+ *  defaults to a 100 MB frame, which is 100 MB a stranger can make the server buffer. */
+export const MAX_CLIENT_FRAME = 4096
+
+/** How many viewers one world serves before it turns people away. Refusing the 501st with a
+ *  code is a stream at capacity; accepting it and degrading for the other 500 is an outage. */
+export const DEFAULT_MAX_VIEWERS = 500
+
+/**
+ * ★ SCRUB IS THE ONE EXPENSIVE THING A STRANGER CAN ASK FOR, AND IT WAS FREE AND UNLIMITED.
+ *
+ * A 40-byte `scrub` frame makes the gateway load a snapshot, `JSON.parse` it, fold every event
+ * up to the asked tick and `JSON.stringify` the whole world back out — ~120 KB of work per
+ * request, on the thread that ticks the town. Nothing rate-limited it, so one socket in a loop
+ * was a denial of service against every other viewer.
+ *
+ * Coalescing rather than rejecting is also what the scrub BAR wants: a drag fires continuously
+ * and only the position the finger stopped at is worth answering.
+ */
+export const SCRUB_MIN_MS = 100
 
 export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const config = opts.config ?? DEFAULT_CONFIG
@@ -66,12 +91,15 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     }
   }
 
-  mountAssetRoutes(router, { getCodex })
+  mountAssetRoutes(router, { getCodex, knowsAgent: (id) => mirror.state().agents[id] !== undefined })
   mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
   mountNarratorApi(router, { db, mirror, narratorDb, agentDbDir: opts.agentDbDir })
   mountBondsApi(router, { db, mirror, config })
   mountLineageApi(router, { db, mirror })
   mountDiscoveryApi(router, { db, mirror })
+
+  // The built client, served from the world's own origin so the stream is one address.
+  const site = opts.staticDir === undefined ? null : makeStaticSite(opts.staticDir)
 
   const httpServer = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
@@ -87,6 +115,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       }
       if (ok) { r.fn(req, res, params); return }
     }
+    if (site !== null && site(req, res, url.pathname)) return
     res.writeHead(404, { 'content-type': 'application/json' })
     res.end('{"error":"not found"}')
   })
@@ -101,10 +130,35 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   }
 
   // ── ws protocol ──
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' })
+  let listening = false
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws', maxPayload: MAX_CLIENT_FRAME })
+  // An EventEmitter with no 'error' listener THROWS, and ws re-emits every failure of the http
+  // server it is attached to. A busy port took the whole process down with an unhandled
+  // EADDRINUSE trace even though `httpServer.once('error')` below already reports it, and any
+  // socket-layer error would do the same to a stream that had been up for a week.
+  wss.on('error', (e) => { if (listening) console.error(`gateway: socket server error — ${e.message}`) })
   const removers = new Map<WebSocket, () => void>()
+  const maxViewers = opts.maxViewers ?? DEFAULT_MAX_VIEWERS
   wss.on('connection', (sock: WebSocket) => {
+    if (hub.size() >= maxViewers) { sock.close(CLOSE_TOO_MANY); return }
     let greeted = false
+    let scrubAt = 0                       // last answered scrub, for coalescing
+    let pendingScrub: { tick: number; reqId: number } | null = null
+    let scrubTimer: ReturnType<typeof setTimeout> | null = null
+
+    const answerScrub = (req: { tick: number; reqId: number }): void => {
+      scrubAt = Date.now()
+      let tick = req.tick
+      let state
+      try {
+        state = mirror.stateAt(tick)
+      } catch {
+        tick = mirror.state().tick   // clamp, never error the socket
+        state = mirror.state()
+      }
+      sock.send(JSON.stringify({ t: 'scrubbed', reqId: req.reqId, tick, state }))
+    }
+
     sock.on('message', (data) => {
       let msg: ClientMsg
       try {
@@ -124,20 +178,27 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         return
       }
       if (msg.t === 'scrub') {
-        let tick = msg.tick
-        let state
-        try {
-          state = mirror.stateAt(tick)
-        } catch {
-          tick = mirror.state().tick   // clamp, never error the socket
-          state = mirror.state()
-        }
-        sock.send(JSON.stringify({ t: 'scrubbed', reqId: msg.reqId, tick, state }))
+        const since = Date.now() - scrubAt
+        if (since >= SCRUB_MIN_MS) { answerScrub(msg); return }
+        // Inside the window: keep only the newest ask, and answer that one when it opens.
+        pendingScrub = { tick: msg.tick, reqId: msg.reqId }
+        scrubTimer ??= setTimeout(() => {
+          scrubTimer = null
+          const next = pendingScrub
+          pendingScrub = null
+          if (next !== null && sock.readyState === OPEN) answerScrub(next)
+        }, SCRUB_MIN_MS - since)
       } else if (msg.t === 'live') {
         sock.send(snapshotJson())
       }
     })
-    sock.on('close', () => { removers.get(sock)?.(); removers.delete(sock) })
+    sock.on('close', () => {
+      if (scrubTimer !== null) clearTimeout(scrubTimer)
+      removers.get(sock)?.()
+      removers.delete(sock)
+    })
+    // A viewer's connection dying mid-frame must not throw out of the socket server.
+    sock.on('error', () => sock.terminate())
   })
 
   // ── poll pump ──
@@ -170,6 +231,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const port = await new Promise<number>((resolve, reject) => {
     httpServer.once('error', reject)
     httpServer.listen(opts.port ?? DEFAULT_PORT, () => {
+      listening = true
       const addr = httpServer.address()
       resolve(typeof addr === 'object' && addr !== null ? addr.port : (opts.port ?? DEFAULT_PORT))
     })

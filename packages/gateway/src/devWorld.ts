@@ -137,6 +137,9 @@ export async function startDevWorld(
      *  answers typed-empty, which is why the timeline marks and the filmstrip had never been
      *  seen with data. The gateway already opens it readonly; the dev world could not ask. */
     narratorDbPath?: string
+    /** The built `@sj/web`. Present, this process is the whole stream — world, socket and
+     *  viewer on one port. Absent, it is the API/socket half and vite proxies to it. */
+    staticDir?: string
   } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH
@@ -207,6 +210,7 @@ export async function startDevWorld(
 
   const gateway = await createGateway({
     dbPath, port: opts.port ?? DEV_PORT, terrain, config, db, narratorDbPath: opts.narratorDbPath,
+    ...(opts.staticDir === undefined ? {} : { staticDir: opts.staticDir }),
   })
 
   // Scripted thoughts: when an actor's chosen intent verb changes, it "thinks" a line.

@@ -91,17 +91,41 @@ const sendPng = (res: ServerResponse, buf: Buffer, immutable = false): void => {
 
 const stripPng = (file: string): string | null => (file.endsWith('.png') ? file.slice(0, -4) : null)
 
-export function mountAssetRoutes(router: Router, deps: { getCodex(): AssetCodex | null }): void {
+/**
+ * ★ THE PLACEHOLDER ROUTES ENCODE A PNG PER REQUEST, AND THE KEY IS THE STRANGER'S TO CHOOSE.
+ *
+ * `/assets/character/<anything>.png` built and `sharp`-encoded a fresh 384×576 sheet for any id
+ * asked for, real agent or not. sharp runs on libuv's four-thread pool, which the whole process
+ * shares with every file read, so a stranger looping over made-up ids starves the server of
+ * threads with a handful of GETs. Two guards, and neither costs a real viewer anything:
+ * the id must name somebody the world actually has, and each sheet is encoded once.
+ */
+export type AssetRouteDeps = {
+  getCodex(): AssetCodex | null
+  /** Absent → every id is served, which is only ever right for a test fixture. */
+  knowsAgent?: (id: string) => boolean
+}
+
+export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
+  const encoded = new Map<string, Buffer>()
+  const onceEncoded = (key: string, build: () => RawImage, then: (buf: Buffer) => void): void => {
+    const hit = encoded.get(key)
+    if (hit !== undefined) { then(hit); return }
+    void encodePng(build()).then((buf) => { encoded.set(key, buf); then(buf) })
+  }
+
   router.route('GET', '/assets/placeholder/:file', (_req, res, params) => {
     const klass = stripPng(params.file ?? '')
     const size = klass !== null && klass in PLACEHOLDER_PX ? PLACEHOLDER_PX[klass as AssetClass] : undefined
     if (!size) { notFound(res); return }
-    void encodePng(makePlaceholder(klass as AssetClass, size)).then(buf => sendPng(res, buf))
+    onceEncoded(`placeholder:${klass}`, () => makePlaceholder(klass as AssetClass, size),
+      (buf) => sendPng(res, buf))
   })
 
   router.route('GET', '/assets/character/:file', (_req, res, params) => {
     const agentId = stripPng(params.file ?? '')
     if (agentId === null || agentId === '') { notFound(res); return }
+    if (deps.knowsAgent !== undefined && !deps.knowsAgent(agentId)) { notFound(res); return }
     // binding: newest ready codex sheet registered for this agent, else the built placeholder
     const codex = deps.getCodex()
     if (codex) {
@@ -113,13 +137,13 @@ export function mountAssetRoutes(router: Router, deps: { getCodex(): AssetCodex 
         if (hit) { sendPng(res, hit.png); return }
       }
     }
-    void encodePng(buildPlaceholderSheet(agentId)).then(buf => sendPng(res, buf))
+    onceEncoded(`character:${agentId}`, () => buildPlaceholderSheet(agentId), (buf) => sendPng(res, buf))
   })
 
   router.route('GET', '/assets/:file', (_req, res, params) => {
     const file = params.file ?? ''
     if (file === 'emotes.png') {
-      void encodePng(buildEmoteAtlas()).then(buf => sendPng(res, buf))
+      onceEncoded('emotes', buildEmoteAtlas, (buf) => sendPng(res, buf))
       return
     }
     if (file === 'emotes.json') {

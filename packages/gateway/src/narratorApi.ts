@@ -10,6 +10,8 @@ import { MYSTERY_BY_KIND } from '@sj/engine'
 import { readDiscoveries } from './discoveries.js'
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
+import { makeSeqCache, sendPrebuilt } from './seqCache.js'
+import { clampWindow } from './api.js'
 
 // The narrator's tables are read through plain SELECTs rather than @sj/narrator, which drags
 // @sj/agents (onnxruntime, transformers) behind it — the same call api.ts makes for agent
@@ -53,6 +55,9 @@ function readOrEmpty<T>(db: Database.Database | null, sql: string): T[] {
 }
 
 export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
+  // `/api/chronicle` scans the weighted log and `/api/timeline/marks` opens EVERY agent memory
+  // db from disk — both per request, both on the tick thread. See seqCache.ts.
+  const cache = makeSeqCache(() => deps.mirror.seq())
   const placeholders = CHRONICLE_TYPES.map(() => '?').join(', ')
   const selWeighted = deps.db.prepare(
     `SELECT seq, tick, type, payload FROM events
@@ -73,13 +78,11 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
 
   router.route('GET', '/api/chronicle', (req: IncomingMessage, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
-    const liveTick = deps.mirror.state().tick
-    const fromTick = Number(url.searchParams.get('fromTick') ?? 0)
-    const toTick = Number(url.searchParams.get('toTick') ?? liveTick)
-    if (!Number.isFinite(fromTick) || !Number.isFinite(toTick)) {
-      sendJson(res, { entries: [] })
-      return
-    }
+    sendPrebuilt(res, cache.json(`chronicle${url.search}`, () => {
+    // Clamped into the world for the same reason `/api/digest` is: an unbounded window is a
+    // window on nothing, and a free key is a cache a stranger can miss on purpose.
+    const { fromTick, toTick } = clampWindow(
+      url.searchParams.get('fromTick'), url.searchParams.get('toTick'), deps.mirror.state().tick)
     const look = lookup()
     const rows = selWeighted.all(...CHRONICLE_TYPES, fromTick, toTick) as Array<{
       seq: number; tick: number; type: string; payload: string
@@ -103,7 +106,8 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       })
     }
     entries.sort((a, b) => a.tick - b.tick || a.seq - b.seq)
-    sendJson(res, { entries })
+    return { entries }
+    }))
   })
 
   router.route('GET', '/api/chapters', (_req, res) => {
@@ -177,7 +181,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   }
 
   router.route('GET', '/api/timeline/marks', (_req, res) => {
-    sendJson(res, {
+    sendPrebuilt(res, cache.json('marks', () => ({
       throughTick: deps.mirror.state().tick,
       chapters: readOrEmpty<{ day: number; title: string }>(
         deps.narratorDb, 'SELECT day, title FROM chapters ORDER BY day'),
@@ -191,6 +195,6 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       discoveries: readDiscoveries(deps.db, (id) => deps.mirror.state().agents[id]?.name ?? id)
         .map((d) => ({ tick: d.tick, words: discoveryHeadline(d) })),
       events: selMarkEvents.all(...MARK_EVENT_TYPES) as Array<{ tick: number; type: string }>,
-    })
+    })))
   })
 }

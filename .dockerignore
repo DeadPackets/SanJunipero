@@ -1,0 +1,12 @@
+# Host node_modules hold darwin-arm64 binaries for better-sqlite3, sharp and onnxruntime; copied
+# into a linux image they are worse than absent, because install would consider them satisfied.
+**/node_modules
+**/dist
+# Only the WRITTEN data dirs. Not `**/data` — `packages/engine/src/data/` is source, and
+# dropping it fails the client build on an unresolved import rather than at copy time.
+packages/gateway/data
+packages/agents/data
+.git
+.claude
+docs
+**/*.log

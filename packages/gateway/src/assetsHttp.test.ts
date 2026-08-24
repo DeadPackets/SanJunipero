@@ -2,7 +2,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { openDb, type TileId } from '@sj/engine'
+import { DEFAULT_CONFIG } from '@sj/shared'
+import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { AssetCodex, EMOTE_KINDS, decodePng, encodePng, openForgeDb, paletteRgb, type RawImage } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
 
@@ -32,10 +33,24 @@ describe('asset http routes', () => {
   let codex: AssetCodex
   let base: string
 
+  // The character route only draws people the world HAS — an id nobody answers to is a sharp
+  // png encode a stranger picked the key for (see assetsHttp.ts). So the fixture town is
+  // populated by the four it is about to ask for sheets of.
+  const CAST = ['farmer', 'idler', 'weaver', 'mason'] as const
+
   beforeAll(async () => {
     openForgeDb(dbPath).close()
     const db = openDb(dbPath)
     codex = new AssetCodex(db)
+    const loop = new TickLoop({
+      store: new EventStore(db), state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('assets-http'), snapshotEveryTicks: 5,
+      onTick: ({ tick, emit }) => {
+        if (tick !== 1) return
+        CAST.forEach((id, i) => emit('agent_spawned', { id, name: id, x: i, y: 0, ageDays: 7300 }))
+      },
+    })
+    loop.step()
     gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
     base = `http://127.0.0.1:${gw.port}`
   })
