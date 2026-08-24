@@ -1,0 +1,14 @@
+{
+  "version": "v4-hires-building",
+  "kind": "lamp_post",
+  "footprint": {
+    "w": 1,
+    "h": 1
+  },
+  "cell": {
+    "w": 256,
+    "h": 256,
+    "feetX": 128,
+    "feetY": 247
+  }
+}

@@ -33,6 +33,12 @@ choose echoes in the lives around you. Live as yourself.`
 // keeps ground, and that it must go and stand there. It does not say plot, block, ring or
 // lattice — those are OUR words for the machinery, and a mind that could reason about the
 // lattice would be a mind reasoning about the world's construction rather than living in it.
+//
+// AMENDED A THIRD TIME, by the night-light lane, for the same line and the same reason. It read
+// "A span laid over water is the one exception" — and a second exception now exists, so the
+// sentence had become false in the one block a mind is taught its own hands. It is written as a
+// PROPERTY rather than a roster of two, the way `structures.recipes[kind].sited` is: things
+// smaller than a building are yours to place. It names no reason to place one.
 export const CAPABILITIES = `What your hands and voice can do. Name each act by its exact word, and give it exactly what it asks:
 
 walk — name it walk; give x and y as two numbers, the spot you go to
@@ -61,7 +67,7 @@ fish — name it fish; give x and y as two numbers for the water at your side
 forage — name it forage; give nodeId, the mark of a patch you can see, or nothing at all when trees stand at your elbow
 hunt — name it hunt; give faunaId, the mark of the animal beside you, with something to kill it with in hand
 chop — name it chop; give x and y as two numbers for the tree or sapling within reach
-build — name it build; give kind, the thing to raise. Where it stands is not yours to choose: the town keeps ground for such things, and you must be standing at that ground to begin. A span laid over water is the one exception, and takes x and y for what it crosses
+build — name it build; give kind, the thing to raise. Where a building stands is not yours to choose: the town keeps ground for such things, and you must be standing at that ground to begin. Smaller things than a building are yours to place, and those take x and y for the spot you mean — a span laid over water, a post set in the ground
 craft — name it craft; give recipe, the name of what you shape
 pave — name it pave; give x and y as two numbers for ground within reach, with stone in hand
 dig_channel — name it dig_channel; give x and y as two numbers for grass or dirt within reach that water already touches

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { SimConfigSchema, DEFAULT_CONFIG, SPAWN_AGE_YEARS, thirstDecayPerTick } from './config.js'
+import { MINUTES_PER_DAY } from './time.js'
 
 // Every C11 section flag, in the order Task 37 will unpin them.
 const C11_FLAGS = [
@@ -184,7 +185,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(c.light.torchBurnTicks).toBe(240)
     expect(c.light.fuelBurnTicks).toBe(480)
     expect(c.light.fireRiskPerTick).toBe(0.0005)
-    expect(c.light.glowRadius).toEqual({ torch: 3, lantern: 5, hearth: 3, fire_pit: 4 })
+    expect(c.light.glowRadius).toEqual({ torch: 3, lantern: 5, hearth: 3, fire_pit: 4, lamp_post: 4 })
     expect(c.nightWitness).toEqual({ enabled: true, nightFactor: 0.35, duskFactor: 0.7 })
   })
 
@@ -198,10 +199,18 @@ describe('SimConfigSchema: C9 living-world sections', () => {
 
   it('structures.recipes is the one table that knows what a building costs and measures', () => {
     const r = SimConfigSchema.parse({}).structures.recipes
-    expect(r['house']).toEqual({ inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880 })
-    expect(r['well']).toEqual({ inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720 })
-    expect(r['bridge']).toEqual({ inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480 })
-    expect(r['grave']).toEqual({ inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1 })
+    expect(r['house']).toEqual({ inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880, sited: false })
+    expect(r['well']).toEqual({ inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, sited: false })
+    expect(r['bridge']).toEqual({ inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, sited: true })
+    expect(r['grave']).toEqual({ inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, sited: false })
+    // ★ THE LAMP, AND ITS WHOLE ARGUMENT IN FOUR NUMBERS. 2 wood against a house's 10, and 120
+    // ticks against 2 880 — a night is 720, so this is the one roofless thing a want that
+    // arrives at dusk can actually finish before dawn. `sited` because a plot spent on a lamp
+    // is a house not built, and the lattice plats masses, not street furniture.
+    expect(r['lamp_post']).toEqual({ inputs: { wood: 2 }, w: 1, h: 1, maxHp: 15, flammable: false, durationTicks: 120, sited: true })
+    expect(r['lamp_post']!.durationTicks).toBeLessThan(MINUTES_PER_DAY / 2)   // finishable in one night
+    // Only the two kinds that are not masses choose their own ground.
+    expect(Object.entries(r).filter(([, v]) => v.sited).map(([k]) => k).sort()).toEqual(['bridge', 'lamp_post'])
     // The house row must agree with the C9 dials it replaces, or Task 12's generalisation drifts.
     expect(r['house']!.inputs).toEqual(DEFAULT_CONFIG.construction.houseMaterials)
     expect(r['house']!.durationTicks).toBe(DEFAULT_CONFIG.construction.houseTicks)

@@ -144,6 +144,11 @@ export const StructureRecipeSchema = z.object({
   maxHp: z.number().positive(),
   flammable: z.boolean(),
   durationTicks: z.number().int().positive(),
+  // ★ WHO CHOOSES THE GROUND. Absent means the town does: the kind is a mass, it takes a plot,
+  // and `claimInWorld` seats it. `sited` means the builder names x and y, because the thing is
+  // not a mass — a deck belongs to the water it crosses, a lamp to the spot somebody wanted lit.
+  // This replaced `kind !== BRIDGE_KIND`, which was the roster form of the same question.
+  sited: z.boolean().default(false),
 }).strict()
 
 const StructuresSchema = z.object({
@@ -153,10 +158,18 @@ const StructuresSchema = z.object({
   sleepableKinds: z.array(z.string()).default(['house']),
   // An empty `inputs` marks a kind the world places and nobody builds.
   recipes: z.record(z.string(), StructureRecipeSchema).default({
-    house: { inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880 },
-    well: { inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720 },
-    bridge: { inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480 },
-    grave: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1 },
+    house: { inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880, sited: false },
+    well: { inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, sited: false },
+    bridge: { inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, sited: true },
+    grave: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, sited: false },
+    // ★ THE CHEAPEST THING IN THE WORLD, ON PURPOSE. The dark has charged 1.5x for work since
+    // C11 and the only fixed answer was the square's own fire pit; a torch is 240 ticks in one
+    // hand. 2 wood and 120 ticks is two hours of one night, so the want that arrives at dusk
+    // can be answered before dawn — which a house at 2 880 cannot. Wood, not stone: the only
+    // outcrops are on the hill fifty tiles south-west, and a road that far is not a road.
+    // `flammable: false` matches the bridge, which is also six planks that do not burn: what
+    // burns here is the fuel in the basket, and `fueledUntilTick` already puts that out.
+    lamp_post: { inputs: { wood: 2 }, w: 1, h: 1, maxHp: 15, flammable: false, durationTicks: 120, sited: true },
   }),
 }).strict()
 
@@ -332,6 +345,9 @@ const LightSchema = z.object({
     lantern: z.number().default(5),
     hearth: z.number().default(3),
     fire_pit: z.number().default(4),
+    // A standing light: shorter reach than the square's fire, and it is not a heat source, so
+    // this table is the whole of what makes it a lamp — glow, and a structure that takes fuel.
+    lamp_post: z.number().default(4),
   }).strict().prefault({}),
 }).strict()
 

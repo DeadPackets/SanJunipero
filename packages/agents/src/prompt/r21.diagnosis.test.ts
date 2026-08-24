@@ -316,7 +316,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     // a mind is never given is a word it never uses. Nothing in the prompt names one.
     const buildable = Object.keys(CFG.structures.recipes).sort()
     const craftable = Object.keys(CFG.crafting.recipes).sort()
-    expect(buildable).toEqual(['bridge', 'grave', 'house', 'well'])
+    expect(buildable).toEqual(['bridge', 'grave', 'house', 'lamp_post', 'well'])
     expect(craftable).toEqual(['cloth', 'garment', 'plank'])
     // The one place a mind is taught its verbs asks for both nouns and names neither, and
     // nothing else in the prompt fills the gap. `well` is the exception that proves it: the

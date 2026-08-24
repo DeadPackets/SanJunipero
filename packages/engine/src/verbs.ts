@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
   classMembers, dayPhaseFromTick, fertilityAt, glowRadiusFor, inputName, litSourceWithin,
-  MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
+  MINUTES_PER_DAY, simTimeFromTick, T_PATH, T_ROAD, WATER_TILES,
   type RecipeDef, type SimConfig, type StructureRecipeDef, type TownFacing,
 } from '@sj/shared'
 
@@ -489,10 +489,17 @@ const doff: VerbDef = makeVerb({
 export const KindleParams = z.object({ itemId: z.string() }).strict()
 export const StokeParams = z.object({ structureId: z.string() }).strict()
 
-// A thing you can carry and set alight: it glows, and it is not a building. One table of what
-// glows (`light.glowRadius`) answers both halves, so a codified lantern needs no second list.
+// A light that STANDS: one the world places and feeds (a hearth, the square's fire pit), or one
+// a pair of hands raises. The other side of this line is a light you carry. One table of what
+// glows (`light.glowRadius`) plus this one line answers both, so a codified lantern needs no
+// second list — and so does a lamp post, which is fed rather than struck.
+function isStandingLight(config: SimConfig, kind: string): boolean {
+  return HEAT_SOURCE_KINDS.has(kind) || config.structures.recipes[kind] !== undefined
+}
+
+// A thing you can carry and set alight: it glows, and it does not stand.
 export function isKindleable(config: SimConfig, kind: string): boolean {
-  return glowRadiusFor(config, kind) !== undefined && !HEAT_SOURCE_KINDS.has(kind)
+  return glowRadiusFor(config, kind) !== undefined && !isStandingLight(config, kind)
 }
 
 // What is left in this torch: a full one has never been struck, a snuffed one remembers.
@@ -543,13 +550,22 @@ const snuff: VerbDef = makeVerb({
 
 export const FUEL_KIND = 'wood'
 
+// A standing thing you can feed: it glows, and `fueledUntilTick` is where the feeding goes.
+// This was `HEAT_SOURCE_KINDS`, a roster kept by the WARMTH system — so a lamp post could be
+// raised and never lit, because the only list that would let you feed it was a list of things
+// that keep you warm. Warmth keeps its own roster and should: a lamp is not a hearth. Feeding
+// belongs to the glow table, which is the same table `isKindleable` reads for a torch.
+export function isStokeable(config: SimConfig, kind: string): boolean {
+  return glowRadiusFor(config, kind) !== undefined && isStandingLight(config, kind)
+}
+
 const stoke: VerbDef = makeVerb({
   kind: 'stoke',
-  validate(state, _config, agentId, params) {
+  validate(state, config, agentId, params) {
     const p = StokeParams.safeParse(params)
     if (!p.success) return 'stoke needs a {structureId}'
     const s = state.structures[p.data.structureId]
-    if (!s || !HEAT_SOURCE_KINDS.has(s.kind)) return 'there is no fire there to feed'
+    if (!s || !isStokeable(config, s.kind)) return 'there is no fire there to feed'
     if (s.stage !== 'complete') return 'it is not finished'
     if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to the fire'
     if (heldQty(state, agentId, FUEL_KIND) < 1) return shortOf(FUEL_KIND)
@@ -558,7 +574,7 @@ const stoke: VerbDef = makeVerb({
   onComplete(state, config, agentId, params) {
     const p = StokeParams.parse(params)
     const s = state.structures[p.structureId]
-    if (!s || !HEAT_SOURCE_KINDS.has(s.kind) || heldQty(state, agentId, FUEL_KIND) < 1) return []
+    if (!s || !isStokeable(config, s.kind) || heldQty(state, agentId, FUEL_KIND) < 1) return []
     return [
       ...consumeHeld(state, agentId, FUEL_KIND, 1),
       { type: 'structure_fueled', payload: { structureId: p.structureId, burnsUntilTick: state.tick + config.light.fuelBurnTicks } },
@@ -1003,6 +1019,27 @@ function bridgeSiteRefusal(state: WorldState, x: number, y: number, w: number, h
 
 type BuildSite = { kind: string; x: number; y: number }
 
+// ★ A LAMP GOES ON THE KERB, NOT IN THE CARRIAGEWAY. Every structure makes its tiles
+// impassable (`isPassable`), so a post raised in the street would close the street — and a post
+// on somebody's door tile would close their door, which `doorTile` reads off the road ring. A
+// plotted kind can never hit this, because the lattice never plats a mass onto a street; only
+// a sited one can be aimed at a road, so only a sited one is asked. The glow is 4 tiles, so a
+// lamp on the verge lights the road it stands beside anyway. The refusal names the reason.
+function roadBlockRefusal(
+  state: WorldState, kind: string, x: number, y: number, w: number, h: number,
+): string | null {
+  if (kind === BRIDGE_KIND) return null      // a deck IS the way across; it opens ground, never closes it
+  for (let dy = 0; dy < h; dy++) {
+    for (let dx = 0; dx < w; dx++) {
+      const tile = state.terrain[y + dy]?.[x + dx]
+      if (tile === T_ROAD || tile === T_PATH) {
+        return `that would stand in the way — the ${words(kind)} goes on the ground beside the way, not on it`
+      }
+    }
+  }
+  return null
+}
+
 // Everything about a site that depends on how big the thing standing on it is.
 function footprintRefusal(
   state: WorldState, config: SimConfig, agentId: string, d: BuildSite, w: number, h: number,
@@ -1018,6 +1055,8 @@ function footprintRefusal(
     ? bridgeSiteRefusal(state, d.x, d.y, w, h)
     : buildableGroundRefusal(state, d.x, d.y, w, h)
   if (ground) return ground
+  const blocked = roadBlockRefusal(state, d.kind, d.x, d.y, w, h)
+  if (blocked) return blocked
   for (const a of Object.values(state.agents)) {
     if (a.alive && a.x >= d.x && a.x < d.x + w && a.y >= d.y && a.y < d.y + h) return 'someone is in the way'
   }
@@ -1041,14 +1080,16 @@ export function buildFootprint(
   return turned === null ? { w: h, h: w, refusal: null } : { w, h, refusal: written }
 }
 
-/** A bridge stands on the water and the water decides where it can stand; everything else a
- *  pair of hands raises stands on the town's ground, and the town decides. Those are the only
- *  two site rules this file has ever had — `bridgeSiteRefusal` is the older one. */
-export const isPlottedKind = (kind: string): boolean => kind !== BRIDGE_KIND
+/** A mass stands on the town's ground and the town decides where; a sited thing belongs to a
+ *  spot somebody picked, and says so in its own recipe. This was `kind !== BRIDGE_KIND` — the
+ *  roster form of the same question, and it had no room for a second answer. `bridgeSiteRefusal`
+ *  is still the bridge's alone: the water rule is not every sited kind's rule. */
+export const isPlottedKind = (config: SimConfig, kind: string): boolean =>
+  config.structures.recipes[kind]?.sited !== true
 
 /** Whether THIS world seats THIS kind on a plot. It takes a town to seat one. */
-export function buildIsPlotted(state: WorldState, kind: string): boolean {
-  return isPlottedKind(kind) && townSquareOf(state) !== null
+export function buildIsPlotted(state: WorldState, config: SimConfig, kind: string): boolean {
+  return isPlottedKind(config, kind) && townSquareOf(state) !== null
 }
 
 /** The site this agent already has half-raised, so a build that was interrupted goes back to
@@ -1108,7 +1149,7 @@ export function buildSiteOf(
   state: WorldState, config: SimConfig, agentId: string, params: { kind: string; x?: number; y?: number },
 ): BuildSiteAnswer {
   const recipe = buildableRecipe(config, params.kind)!
-  if (!buildIsPlotted(state, params.kind)) {
+  if (!buildIsPlotted(state, config, params.kind)) {
     if (params.x === undefined || params.y === undefined) {
       return { site: null, resume: null, lay: [], refusal: `build needs {kind, x, y}` }
     }
@@ -1190,7 +1231,7 @@ const build: VerbDef = makeVerb({
     const kind = (params as { kind?: unknown }).kind
     if (typeof kind !== 'string') return 'build needs {kind, x, y}'
     if (buildableRecipe(config, kind) === null) return `cannot build a ${kind}`
-    const plotted = buildIsPlotted(state, kind)
+    const plotted = buildIsPlotted(state, config, kind)
     const p = (plotted ? PlottedBuildParams : SitedBuildParams).safeParse(params)
     // ★ THE LOUD HALF. The prompt tells a mind that a roof goes where the town has ground for
     // it; a mind that names a coordinate anyway is told plainly that it does not get to.

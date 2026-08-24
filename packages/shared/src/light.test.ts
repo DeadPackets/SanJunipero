@@ -31,7 +31,7 @@ const pit = (x: number, y: number, w: number, h: number, fueledUntilTick?: numbe
 
 describe('the glow table is the config, read in one place', () => {
   it('names a radius for each source the world knows, and nothing else', () => {
-    expect(LIGHT_GLOW_RADIUS).toEqual({ torch: 3, lantern: 5, hearth: 3, fire_pit: 4 })
+    expect(LIGHT_GLOW_RADIUS).toEqual({ torch: 3, lantern: 5, hearth: 3, fire_pit: 4, lamp_post: 4 })
     for (const [kind, radius] of Object.entries(LIGHT_GLOW_RADIUS)) {
       expect([kind, glowRadiusFor(CFG, kind)]).toEqual([kind, radius])
     }
