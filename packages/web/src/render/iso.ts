@@ -6,10 +6,26 @@ export function tileToScreen(x: number, y: number): { sx: number; sy: number } {
   return { sx: (x - y) * (TILE_W / 2), sy: (x + y) * (TILE_H / 2) }
 }
 
+/**
+ * ★ THE TILE A SCREEN POINT IS STANDING ON — AND IT USED TO BE THE WRONG ONE BY HALF A TILE.
+ *
+ * `tileToScreen` returns a tile's TOP vertex, so tile (x, y) covers `[x, x+1] × [y, y+1]` in
+ * continuous tile space. `ground.ts` states exactly that in its own header and
+ * `groundField.toScreen` adds `TILE_H / 2` to reach a tile's CENTRE from it. The tile
+ * containing a point is therefore the FLOOR of its continuous coordinates. This ROUNDED, which
+ * answers with the tile whose top vertex is nearest — the neighbour to the south-east for any
+ * point in a tile's lower half, and one tile off in BOTH axes at a tile's own centre.
+ *
+ * `iso.test.ts` shipped a sweep that only ever sampled `tileToScreen`'s own output, i.e. the
+ * lattice vertices, the one set of points where rounding and flooring cannot disagree — so it
+ * passed for the whole life of the defect. The reader that DID notice was `minimap.ts`, which
+ * carried a hand-rolled `- TILE_H / 2` to shift the point half a tile north before asking.
+ * That workaround is gone, and `iso.test.ts` now samples inside the tile.
+ */
 export function screenToTile(sx: number, sy: number): { x: number; y: number } {
   const a = sx / (TILE_W / 2)
   const b = sy / (TILE_H / 2)
-  return { x: Math.round((a + b) / 2), y: Math.round((b - a) / 2) }
+  return { x: Math.floor((a + b) / 2), y: Math.floor((b - a) / 2) }
 }
 
 /**
