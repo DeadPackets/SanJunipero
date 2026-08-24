@@ -1,0 +1,97 @@
+{
+  "arm": "a",
+  "label": "a1",
+  "ticks": 720,
+  "startTick": 1080,
+  "llmCalls": 120,
+  "costUsd": 0.0713,
+  "intents": 192,
+  "byVerb": {
+    "speak": 67,
+    "enter": 51,
+    "sleep": 30,
+    "walk": 16,
+    "forage": 10,
+    "eat": 5,
+    "wake": 5,
+    "stow": 4,
+    "build": 1,
+    "harvest": 1,
+    "give": 1,
+    "experiment": 1
+  },
+  "builds": 1,
+  "structuresPlanned": 1,
+  "structuresCompleted": 0,
+  "structureProgressed": 639,
+  "entered": 0,
+  "spoke": 65,
+  "refusals": 81,
+  "refusalsByReason": [
+    [
+      "there is no way into a cottage",
+      39
+    ],
+    [
+      "there is no bed here; find somewhere to lie down — weary enough and the bare ground will do",
+      14
+    ],
+    [
+      "there is no way into a cabin",
+      12
+    ],
+    [
+      "already asleep",
+      5
+    ],
+    [
+      "already at that spot",
+      3
+    ],
+    [
+      "not holding that",
+      2
+    ],
+    [
+      "not close enough to gather — the patch is at (74, 71); stand beside it",
+      1
+    ],
+    [
+      "there is nothing left to take here",
+      1
+    ],
+    [
+      "no path to that spot",
+      1
+    ],
+    [
+      "no such crop",
+      1
+    ],
+    [
+      "not adjacent to give — they are at (78, 105)",
+      1
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 44.6,
+    "yusuf": 44.6,
+    "nadia": 44.6,
+    "omar": 44.6,
+    "salma": 44.6
+  },
+  "buildIntents": [
+    {
+      "tick": 1138,
+      "id": "amara",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 64,
+  "thoughts": 113
+}
