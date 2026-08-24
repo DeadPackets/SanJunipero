@@ -1,0 +1,10 @@
+- t=1101 {"agentId":"nadia","text":"The bushes are heavy out east. Won't take me but a minute.","x":67,"y":75}
+- t=1120 {"agentId":"yusuf","text":"Amara. You know where the straight wood is. I'll trade bread for a morning with your axe.","x":79,"y":63}
+- t=1153 {"agentId":"yusuf","text":"Aye, I'll leave the tools be. Eat and turn in.","x":79,"y":63}
+- t=1161 {"agentId":"amara","text":"No axe on me. The store holds wood, stone, rope, cloth—no blade.","x":81,"y":61}
+- t=1173 {"agentId":"yusuf","text":"Aye, no blade there. I've wood enough for tonight.","x":79,"y":63}
+- t=1176 {"agentId":"amara","text":"No axe here. The store's count is wood, stone, rope, cloth — no tools. I'll set my ten in and eat.","x":81,"y":61}
+- t=1191 {"agentId":"yusuf","text":"Aye. I'll fetch my axe and turn in.","x":79,"y":63}
+- t=1214 {"agentId":"yusuf","text":"Your axe is at the house. I'll fetch it.","x":79,"y":63}
+- t=1228 {"agentId":"yusuf","text":"Aye. I'm stowing mine, then turning in.","x":79,"y":63}
+- t=1266 {"agentId":"omar","text":"Now then. Long day — time to rest my bones.","x":76,"y":107}

@@ -1,0 +1,124 @@
+{
+  "arm": "d",
+  "label": "d3",
+  "ticks": 720,
+  "startTick": 1080,
+  "llmCalls": 118,
+  "costUsd": 0.0613,
+  "intents": 111,
+  "byVerb": {
+    "speak": 56,
+    "walk": 21,
+    "sleep": 12,
+    "harvest": 5,
+    "forage": 3,
+    "enter": 3,
+    "build": 3,
+    "experiment": 2,
+    "stow": 2,
+    "give": 1,
+    "eat": 1,
+    "give store store": 1,
+    "store": 1
+  },
+  "builds": 3,
+  "structuresPlanned": 2,
+  "structuresCompleted": 0,
+  "structureProgressed": 1035,
+  "entered": 2,
+  "shelterLedger": {
+    "roofs": 1,
+    "slots": 2,
+    "bodies": 5,
+    "per": 0.4
+  },
+  "collapsedAtEnd": 0,
+  "shelteredAtEnd": 2,
+  "refusedNoWayIn": 0,
+  "refusedNoFloor": 0,
+  "spoke": 29,
+  "refusals": 49,
+  "refusalsByReason": [
+    [
+      "already busy with build",
+      24
+    ],
+    [
+      "already at that spot",
+      5
+    ],
+    [
+      "no such crop",
+      5
+    ],
+    [
+      "already busy with walk",
+      3
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      2
+    ],
+    [
+      "already asleep",
+      2
+    ],
+    [
+      "there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      2
+    ],
+    [
+      "not adjacent to give — they are at (79, 63)",
+      1
+    ],
+    [
+      "stow needs {itemId, structureId}",
+      1
+    ],
+    [
+      "there is nothing there to put it in",
+      1
+    ],
+    [
+      "there is nothing there to enter",
+      1
+    ],
+    [
+      "unknown verb: give store store",
+      1
+    ],
+    [
+      "unknown verb: store",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 44.6,
+    "yusuf": 44.6,
+    "nadia": 44.6,
+    "omar": 46.6,
+    "salma": 46.6
+  },
+  "buildIntents": [
+    {
+      "tick": 1273,
+      "id": "amara",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1506,
+      "id": "nadia",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1517,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 56,
+  "thoughts": 99
+}

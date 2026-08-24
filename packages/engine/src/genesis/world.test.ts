@@ -7,10 +7,12 @@ import { fold } from '../fold.js'
 import { findPath, isPassable, searchPath } from '../path.js'
 import { genesisState, type WorldState } from '../state.js'
 import { submitIntent } from '../intent.js'
+import { buildableRecipe, buildTicks } from '../verbs.js'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
 import {
   makeGenesisWorld, genesisDurability, GENESIS_FORD, GENESIS_FORK_Y, GENESIS_BUILDER_ID,
+  GENESIS_ROOF_STOOD, GENESIS_SOUND_ROOFS, roofFell,
   GENESIS_RIVER_X,
 } from './world.js'
 import { CITY_DWELLING_KINDS } from '@sj/shared'
@@ -90,11 +92,37 @@ describe('makeGenesisWorld: the town', () => {
     for (const p of planned) expect(p['builderId']).toBe(GENESIS_BUILDER_ID)
   })
 
-  it('completes every building it plants', () => {
+  // ★ THE VILLAGE THE FOUNDERS WALK INTO IS ABANDONED, AND THE ROOFS SHOW IT. Two buildings
+  // still have theirs — the storehouse and the cabin — and the other seven dwellings stand as
+  // walls, three quarters up, on ground the town already platted. This is what puts a want in
+  // the founding: sound, the valley held 21 bodies against a cast of 5.
+  it('plants every building, and stands seven of them roofless', () => {
     const s = foldAll()
     const all = Object.values(s.structures)
     expect(all.length).toBe(makeCityTemplate().structures.length)
-    for (const x of all) expect(x.stage).toBe('complete')
+    const sound = all.filter((x) => x.stage === 'complete').map((x) => x.kind).sort()
+    const fallen = all.filter((x) => x.stage === 'construction').map((x) => x.kind).sort()
+    expect(sound).toEqual(['cabin', 'fire_pit', 'storehouse', 'well'])
+    expect(fallen).toEqual(['cottage', 'farmhouse', 'house', 'house', 'house', 'house', 'house'])
+  })
+
+  // ★ AND EVERY ONE OF THEM IS A WALL A PAIR OF HANDS CAN FINISH. A roofless building nobody
+  // can carry on is the cabin-that-was-not-a-cabin all over again — a thing that looks like an
+  // answer and refuses in words a mind cannot use. `roofFell` throws rather than plant one.
+  it('stands nothing roofless that nobody could finish, and leaves one night of work on it', () => {
+    const s = foldAll()
+    for (const x of Object.values(s.structures)) {
+      if (x.stage !== 'construction') continue
+      expect(buildableRecipe(DEFAULT_CONFIG, x.kind), `${x.kind} cannot be finished`).not.toBeNull()
+      const left = buildTicks(DEFAULT_CONFIG, x.kind) - x.progressTicks
+      expect(left, `${x.kind} left`).toBeGreaterThan(0)
+      // One pair of hands, one 720-tick night, for the smallest of them; two pairs for the rest.
+      expect(left, `${x.kind} is more than a night for two`).toBeLessThanOrEqual(1440)
+      expect(x.progressTicks).toBe(Math.floor(buildTicks(DEFAULT_CONFIG, x.kind) * GENESIS_ROOF_STOOD))
+    }
+    // And nothing without a roof to lose lost one.
+    expect(s.structures[Object.keys(s.structures).find((id) => s.structures[id]!.kind === 'well')!]!.stage)
+      .toBe('complete')
   })
 
   it('takes footprint from the template and durability from the one table that knows', () => {

@@ -1,12 +1,15 @@
-import { lightBandAt, simTimeFromTick, visionRadiusAt, type SimConfig, type SimEvent, type SimTime } from '@sj/shared'
+import {
+  isBeddedKind, isHearthKind, isRoofedKind, lightBandAt, simTimeFromTick, visionRadiusAt,
+  type SimConfig, type SimEvent, type SimTime,
+} from '@sj/shared'
 import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
-import { doorTile } from './interiors.js'
+import { doorTile, roomIsFull } from './interiors.js'
 import { effectiveConfig } from './laws.js'
 import { thirstOf, type AfflictionKind, type Item, type Structure, type WorldState } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
-import { isAdjacentToRect, walkIsCapped, workPenalty } from './verbs.js'
+import { buildTicks, isAdjacentToRect, walkIsCapped, workPenalty } from './verbs.js'
 
 // Perception is a pure projection: what one agent can sense from the shared
 // world state plus the events that just happened. It never mutates state and
@@ -86,6 +89,28 @@ export type PerceivedStructure = {
   hasInscription?: true
   inscription?: { text: string; by: string }
   door?: { x: number; y: number }
+  // ★ FULL, SAID BEFORE THE WALK. A room holds only so many bodies, and a mind that has to be
+  // refused at the door to learn it has already spent the turn. Present only alongside `door`
+  // and only when no more fit, so a packet from a town with room in it reads as it always did.
+  full?: true
+  // ★ HOW FAR UP THE WALLS ARE. Present only while a thing is going up. A house is 2 880 ticks
+  // of work and a night is 720 — but every hand on a site adds one to the walls, so five pairs
+  // raise one in 576. Nothing in the packet had ever said a half-raised wall was a place work
+  // could go, and five founders raised five separate houses and finished none.
+  raised?: { done: number; needs: number }
+  // ★ WHAT IS IN THE ROOM, AND THE ONLY THING IN IT A BODY CAN DO ANYTHING WITH. The five
+  // furnishings a house holds were the renderer's alone: nothing a mind read had ever said
+  // there was a fire in there. Present only on a finished building of a kind that has one —
+  // and `lit` only while somebody is still feeding it, because a fire burns down on its own.
+  //
+  // The table, the chair and the rug are deliberately NOT here. A mind that is handed the word
+  // "chair" and has no verb for it spends turns being refused, which is a road with nothing at
+  // the end of it; the day a verb reaches one, this is where it becomes visible.
+  hearth?: 'lit' | 'cold'
+  // ★ AND WHETHER THERE IS A BED IN IT. A body has to be able to tell a room it will sleep
+  // WELL in from a room with a floor, BEFORE it walks there — being told at the door is a turn
+  // already spent, which is the lesson `full` learned. Absent on a kind with no bed.
+  bed?: true
 }
 
 // Whose it is, and whose hands made it — the two things prose needs to say
@@ -322,18 +347,39 @@ export function composePerception(
 
   // The way in, from the same function the verb uses. A body that reads this and stands there
   // is a body `enter` accepts (C11 batch-8 R7).
-  const wayIn = (s: Structure): { door: { x: number; y: number } } | Record<string, never> => {
-    if (s.stage !== 'complete' || !config.structures.enterableKinds.includes(s.kind)) return {}
+  const wayIn = (s: Structure): { door?: { x: number; y: number }; full?: true } => {
+    if (s.stage !== 'complete' || !isRoofedKind(config, s.kind)) return {}
     const door = doorTile(state, s)
-    return door === null ? {} : { door: { x: door.x, y: door.y } }
+    if (door === null) return {}
+    return { door: { x: door.x, y: door.y }, ...(roomIsFull(state, s) ? { full: true as const } : {}) }
   }
+
+  // Read off the same two numbers `stepBuild` runs down, so what a mind is shown and what the
+  // walls actually are cannot disagree.
+  const howFarUp = (s: Structure): { raised?: { done: number; needs: number } } => {
+    if (s.stage !== 'construction') return {}
+    const needs = buildTicks(config, s.kind)
+    return needs <= 0 ? {} : { raised: { done: Math.min(s.progressTicks, needs), needs } }
+  }
+
+  // The fire in the room, off the same property `stoke` validates against and the same clock
+  // `flamesAt` reads — so what a mind is told about a hearth is what the hearth is.
+  const theHearth = (s: Structure): { hearth?: 'lit' | 'cold' } => {
+    if (s.stage !== 'complete' || !isHearthKind(config, s.kind)) return {}
+    return { hearth: (s.fueledUntilTick ?? 0) > state.tick ? 'lit' : 'cold' }
+  }
+
+  // Off the same property `sleepRegenPerTick` reads, so what a mind is promised at the door is
+  // what the night actually gives it.
+  const theBed = (s: Structure): { bed?: true } =>
+    s.stage === 'complete' && isBeddedKind(config, s.kind) ? { bed: true as const } : {}
 
   const visibleStructures: PerceivedStructure[] = Object.values(state.structures)
     .filter(s => (indoors === null ? structureInSight(s) : s.id === indoors))
     .sort(byId)
     .map(s => ({
       id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, burning: s.burning, stage: s.stage,
-      ...carved(s), ...wayIn(s),
+      ...carved(s), ...wayIn(s), ...howFarUp(s), ...theHearth(s), ...theBed(s),
     }))
 
   const tileItems: PerceivedItem[] = indoors !== null ? [] : Object.values(state.items)

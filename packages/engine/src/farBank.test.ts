@@ -356,7 +356,9 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
       .reduce((s, ev) => fold(s, ev, CFG), genesisState(CFG, run.genesisTerrain))
     const raising = Object.values(midRun.structures).filter((s) => s.stage === 'construction')
     expect(raising.length, 'no building was under construction to draw').toBeGreaterThan(0)
-    for (const s of raising) expect(['house', BRIDGE_KIND]).toContain(s.kind)
+    // The valley's own roofless dwellings are in this list too, and they are the same state a
+    // renderer has to draw: a building standing under its own kind with its walls part-way up.
+    for (const s of raising) expect(['house', 'cottage', 'farmhouse', BRIDGE_KIND]).toContain(s.kind)
   })
 
   // ★ THE ONE-COMPONENT PROPERTY, RESTATED OVER THE WALK GRAPH — merge train 3's ruling.

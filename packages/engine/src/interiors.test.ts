@@ -92,7 +92,7 @@ describe('enter / exit', () => {
 
     const stone = withAgent(withHouse(world(), 'standing_stone'), 'a1', 3, 4)
     expect(submitIntent(stone, DEFAULT_CONFIG, 'a1', 'enter', { structureId: 'structure_1' }))
-      .toMatchObject({ ok: false, reason: 'there is no way into a standing_stone' })
+      .toMatchObject({ ok: false, reason: 'a standing stone has no roof to get under' })
 
     const far = withAgent(withHouse(world()), 'a1', 7, 5)
     expect(submitIntent(far, DEFAULT_CONFIG, 'a1', 'enter', { structureId: 'structure_1' }))
@@ -141,7 +141,7 @@ describe('destruction ejects occupants', () => {
 })
 
 describe('sleep is indoors-only (C9 T2b)', () => {
-  const OUTDOORS = 'there is no bed here; find somewhere to lie down — weary enough and the bare ground will do'
+  const OUTDOORS = 'there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do'
 
   it('refuses a bed under the sky, allows one inside a house', () => {
     let s = withAgent(withHouse(world()), 'a1', 2, 3)
@@ -150,10 +150,19 @@ describe('sleep is indoors-only (C9 T2b)', () => {
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
   })
 
-  it('checks the kind, not the owner — a storehouse is enterable but has no bed', () => {
-    let s = withAgent(withHouse(world(), 'storehouse'), 'a1', 2, 3)
-    s = fold(s, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
-    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {})).toMatchObject({ ok: false, reason: OUTDOORS })
+  // ★ A ROOF, NOT A ROSTER, AND NOT AN OWNER. `sleepableKinds` used to say `house` and nothing
+  // else, so a body standing dry inside a storehouse — or a cottage, or a cabin — was refused a
+  // bed and walked back out into the weather. Anything with a roof over it will do.
+  it('checks the roof, not the owner — a storehouse and a cottage both do', () => {
+    for (const kind of ['storehouse', 'cottage', 'cabin', 'farmhouse']) {
+      let s = withAgent(withHouse(world(), kind), 'a1', 2, 3)
+      s = fold(s, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
+      expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok, kind).toBe(true)
+    }
+    // A thing with no roof over it is still not a bed, however close you stand to it.
+    let bare = withAgent(withHouse(world(), 'well'), 'a1', 2, 3)
+    bare = fold(bare, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
+    expect(submitIntent(bare, DEFAULT_CONFIG, 'a1', 'sleep', {})).toMatchObject({ ok: false, reason: OUTDOORS })
 
     // Another agent's house is a legal bed: ownership is witnessed, never enforced.
     let owned = fold(world(), ev(1, 'structure_planned', {
@@ -187,7 +196,6 @@ describe('sleep is indoors-only (C9 T2b)', () => {
     const off = SimConfigSchema.parse({ structures: { sleepIndoorsOnly: false } })
     const s = withAgent(withHouse(world(), 'house', 'complete'), 'a1', 6, 5)
     expect(submitIntent(s, off, 'a1', 'sleep', {}).ok).toBe(true)
-    expect(off.structures.sleepableKinds).toEqual(['house'])
   })
 })
 

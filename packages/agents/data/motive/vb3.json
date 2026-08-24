@@ -1,0 +1,125 @@
+{
+  "arm": "b",
+  "label": "vb3",
+  "ticks": 720,
+  "startTick": 1080,
+  "llmCalls": 78,
+  "costUsd": 0.0519,
+  "intents": 74,
+  "byVerb": {
+    "speak": 21,
+    "walk": 14,
+    "enter": 14,
+    "sleep": 9,
+    "forage": 5,
+    "eat": 3,
+    "exit": 2,
+    "stow": 2,
+    "wake": 2,
+    "experiment": 1,
+    "harvest": 1
+  },
+  "builds": 0,
+  "structuresPlanned": 0,
+  "structuresCompleted": 0,
+  "structureProgressed": 0,
+  "entered": 6,
+  "shelterLedger": {
+    "roofs": 9,
+    "slots": 21,
+    "bodies": 5,
+    "per": 4.2
+  },
+  "collapsedAtEnd": 0,
+  "shelteredAtEnd": 5,
+  "refusedNoWayIn": 0,
+  "refusedNoFloor": 0,
+  "spoke": 21,
+  "refusals": 16,
+  "refusalsByReason": [
+    [
+      "not close enough to the door",
+      7
+    ],
+    [
+      "already at that spot",
+      2
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      1
+    ],
+    [
+      "no path to that spot",
+      1
+    ],
+    [
+      "already inside",
+      1
+    ],
+    [
+      "there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      1
+    ],
+    [
+      "you are indoors; step outside first",
+      1
+    ],
+    [
+      "no such crop",
+      1
+    ],
+    [
+      "already asleep",
+      1
+    ]
+  ],
+  "refusalsByVerb": [
+    [
+      "enter: not close enough to the door",
+      7
+    ],
+    [
+      "walk: already at that spot",
+      2
+    ],
+    [
+      "experiment: You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      1
+    ],
+    [
+      "walk: no path to that spot",
+      1
+    ],
+    [
+      "enter: already inside",
+      1
+    ],
+    [
+      "sleep: there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      1
+    ],
+    [
+      "walk: you are indoors; step outside first",
+      1
+    ],
+    [
+      "harvest: no such crop",
+      1
+    ],
+    [
+      "sleep: already asleep",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 46.6,
+    "yusuf": 46.6,
+    "nadia": 46.6,
+    "omar": 46.6,
+    "salma": 45.6
+  },
+  "buildIntents": [],
+  "thoughtsMentioningCold": 20,
+  "thoughts": 56
+}

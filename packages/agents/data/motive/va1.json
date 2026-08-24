@@ -1,0 +1,127 @@
+{
+  "arm": "a",
+  "label": "va1",
+  "ticks": 720,
+  "startTick": 1080,
+  "llmCalls": 83,
+  "costUsd": 0.0574,
+  "intents": 88,
+  "byVerb": {
+    "speak": 27,
+    "walk": 25,
+    "sleep": 10,
+    "stow": 9,
+    "enter": 5,
+    "forage": 4,
+    "eat": 4,
+    "experiment": 2,
+    "build": 1,
+    "wear": 1
+  },
+  "builds": 1,
+  "structuresPlanned": 0,
+  "structuresCompleted": 0,
+  "structureProgressed": 540,
+  "entered": 3,
+  "shelterLedger": {
+    "roofs": 2,
+    "slots": 4,
+    "bodies": 5,
+    "per": 0.8
+  },
+  "collapsedAtEnd": 0,
+  "shelteredAtEnd": 3,
+  "refusedNoWayIn": 0,
+  "refusedNoFloor": 0,
+  "spoke": 26,
+  "refusals": 27,
+  "refusalsByReason": [
+    [
+      "it is not finished",
+      9
+    ],
+    [
+      "already at that spot",
+      7
+    ],
+    [
+      "no path to that spot",
+      3
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      2
+    ],
+    [
+      "there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      2
+    ],
+    [
+      "already asleep",
+      2
+    ],
+    [
+      "not close enough to gather — the patch is at (76, 107); stand beside it",
+      1
+    ],
+    [
+      "wear needs an {itemId}",
+      1
+    ]
+  ],
+  "refusalsByVerb": [
+    [
+      "walk: already at that spot",
+      7
+    ],
+    [
+      "stow: it is not finished",
+      7
+    ],
+    [
+      "walk: no path to that spot",
+      3
+    ],
+    [
+      "experiment: You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      2
+    ],
+    [
+      "sleep: there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      2
+    ],
+    [
+      "sleep: already asleep",
+      2
+    ],
+    [
+      "enter: it is not finished",
+      2
+    ],
+    [
+      "forage: not close enough to gather — the patch is at (76, 107); stand beside it",
+      1
+    ],
+    [
+      "wear: wear needs an {itemId}",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 46.6,
+    "yusuf": 44.6,
+    "nadia": 44.6,
+    "omar": 46.6,
+    "salma": 46.6
+  },
+  "buildIntents": [
+    {
+      "tick": 1237,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 24,
+  "thoughts": 62
+}

@@ -1,0 +1,154 @@
+{
+  "arm": "d",
+  "label": "d2",
+  "ticks": 720,
+  "startTick": 1080,
+  "llmCalls": 147,
+  "costUsd": 0.08,
+  "intents": 124,
+  "byVerb": {
+    "speak": 56,
+    "walk": 19,
+    "sleep": 15,
+    "enter": 7,
+    "stow": 7,
+    "build": 6,
+    "forage": 3,
+    "experiment": 3,
+    "harvest": 3,
+    "eat": 2,
+    "take": 1,
+    "wake": 1,
+    "exit": 1
+  },
+  "builds": 6,
+  "structuresPlanned": 2,
+  "structuresCompleted": 0,
+  "structureProgressed": 847,
+  "entered": 2,
+  "shelterLedger": {
+    "roofs": 1,
+    "slots": 2,
+    "bodies": 5,
+    "per": 0.4
+  },
+  "collapsedAtEnd": 0,
+  "shelteredAtEnd": 2,
+  "refusedNoWayIn": 0,
+  "refusedNoFloor": 0,
+  "spoke": 30,
+  "refusals": 60,
+  "refusalsByReason": [
+    [
+      "already busy with build",
+      24
+    ],
+    [
+      "there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      6
+    ],
+    [
+      "already at that spot",
+      5
+    ],
+    [
+      "already asleep",
+      4
+    ],
+    [
+      "it is not finished",
+      4
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      3
+    ],
+    [
+      "no such crop",
+      3
+    ],
+    [
+      "build needs {kind, x, y}",
+      2
+    ],
+    [
+      "a bridge belongs over water",
+      2
+    ],
+    [
+      "speak needs a {text}",
+      1
+    ],
+    [
+      "there is nothing there to put it in",
+      1
+    ],
+    [
+      "no path to that spot",
+      1
+    ],
+    [
+      "already holding that",
+      1
+    ],
+    [
+      "already inside",
+      1
+    ],
+    [
+      "not close enough to the door",
+      1
+    ],
+    [
+      "enter needs a {structureId}",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 44.6,
+    "yusuf": 44.6,
+    "nadia": 44.6,
+    "omar": 46.6,
+    "salma": 46.6
+  },
+  "buildIntents": [
+    {
+      "tick": 1204,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"bridge\"}"
+    },
+    {
+      "tick": 1231,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"x\":85,\"y\":70,\"kind\":\"bridge\"}"
+    },
+    {
+      "tick": 1276,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"x\":80,\"y\":65,\"kind\":\"bridge\"}"
+    },
+    {
+      "tick": 1292,
+      "id": "amara",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1316,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"bridge\"}"
+    },
+    {
+      "tick": 1415,
+      "id": "nadia",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 75,
+  "thoughts": 121
+}

@@ -33,10 +33,17 @@ choose echoes in the lives around you. Live as yourself.`
 // keeps ground, and that it must go and stand there. It does not say plot, block, ring or
 // lattice — those are OUR words for the machinery, and a mind that could reason about the
 // lattice would be a mind reasoning about the world's construction rather than living in it.
+//
+// AMENDED A THIRD TIME, by the wants lane, because the `sleep` line was FALSE. It said
+// "nothing more is needed" while `sleepIndoorsOnly` refused every bed under the sky, and thirty
+// sleeps in one live night were turned down on a rule this block had told the mind did not
+// exist. It now says the two halves the verb actually has. The bytes are free to be edited: the
+// four pins came off, and block 1's cache stability is a test about every prompt opening with
+// the same prefix, not about which bytes that prefix is.
 export const CAPABILITIES = `What your hands and voice can do. Name each act by its exact word, and give it exactly what it asks:
 
 walk — name it walk; give x and y as two numbers, the spot you go to
-sleep — name it sleep when weary; nothing more is needed
+sleep — name it sleep when weary; a roof over you is what it takes, unless you are worn down so far that the bare ground will do
 wake — name it wake to rise from sleep; nothing more is needed
 enter — name it enter; give structureId, the mark of the building whose doorway you stand beside
 exit — name it exit to step back out under the sky; nothing more is needed
@@ -67,7 +74,7 @@ pave — name it pave; give x and y as two numbers for ground within reach, with
 dig_channel — name it dig_channel; give x and y as two numbers for grass or dirt within reach that water already touches
 kindle — name it kindle; give itemId, the torch or lamp you hold
 snuff — name it snuff; give itemId, the lit thing you hold
-stoke — name it stoke; give structureId, the fire you stand beside, with wood in hand
+stoke — name it stoke; give structureId, a fire you stand beside or a hearth in the room you are in, with wood in hand. A cold one takes the wood as readily as a burning one
 douse — name it douse; give x and y as two numbers for the burning thing beside you, with a full bucket in hand
 extinguish — name it extinguish; give structureId, the mark of the burning thing
 attack — name it attack; give targetId, the mark of the person you strike

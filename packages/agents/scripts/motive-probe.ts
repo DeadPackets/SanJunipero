@@ -11,19 +11,19 @@ import { fileURLToPath } from 'node:url'
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import {
-  createWorldTick, doorTile, EventStore, fold, genesisState, makeGenesisWorld, RngStreams,
-  TickLoop, type LawQueue, type TickHandler, type WorldState,
+  buildTicks, createWorldTick, doorTile, EventStore, fold, genesisState, makeGenesisWorld,
+  RngStreams, shelterLedger, TickLoop, type LawQueue, type TickHandler, type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, isRoofedKind, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
 import { EngineBridge, type Intent, type SubmitResult } from '../src/runtime/bridge.js'
 import { AgentRuntime } from '../src/runtime/agentRuntime.js'
 import { openAgentDb } from '../src/memory/schema.js'
-import { PersonalityStore, type PersonalityDoc } from '../src/personality.js'
+import { PersonalityStore } from '../src/personality.js'
 import { migrateLlmTables } from '../src/llm/callLog.js'
 import { LlmClient } from '../src/llm/client.js'
 import { Embedder } from '../src/memory/embedder.js'
 import { makeReflectionLlm } from '../src/reflection.js'
-import type { IdentityCore } from '../src/prompt/assemble.js'
+import { MINDS } from './probeFounders.js'
 
 const ARM = (process.env.MOTIVE_ARM ?? 'b').toLowerCase()
 const LABEL = process.env.MOTIVE_LABEL ?? ARM
@@ -38,110 +38,76 @@ const DATA_DIR = fileURLToPath(new URL('../data/motive/', import.meta.url))
 
 const config: SimConfig = DEFAULT_CONFIG
 
-// ---------------------------------------------------------------- the minds ---
-// The g11 founders, with their backstories and voices intact and their GOALS MADE NEUTRAL.
-// g11's goals say things like "cut timber for a deck" — that is the fixture instructing a
-// mind, and a probe that kept it would measure the fixture. Both arms get the same neutral
-// line, so nothing here points at a roof.
-type Mind = { id: string; identity: IdentityCore; personality: PersonalityDoc; ageDays: number; sex: 'f' | 'm' }
-const voice = (
-  register: string, rhythm: string, tics: string[], neverSays: string[],
-  exampleLines: string[], typical: number, burst: number,
-): IdentityCore['voiceCard'] => ({ register, rhythm, tics, neverSays, exampleLines, wordBudget: { typical, burst } })
-
-const NEUTRAL = (temperament: string, values: string[], beliefs: string[], mood: string): PersonalityDoc => ({
-  temperament, values, beliefs,
-  current: { mood, worries: [], goals: ['get through the day'] },
-})
-
-const MINDS: Mind[] = [
-  {
-    id: 'amara', sex: 'f', ageDays: 34 * 364,
-    identity: {
-      name: 'Amara', age: 34,
-      backstory: 'Keeps the storehouse tally in her head and has never once been wrong about it. Came to this valley first and put the well where the well is.',
-      temperament: 'steady, exacting, slow to warm',
-      voiceCard: voice('plain and precise, names the thing', 'short, then done', ['counts aloud'], ['flattery'],
-        ['The store holds four days.', 'Put it back where it was.'], 12, 22),
-    },
-    personality: NEUTRAL('steady, exacting, slow to warm', ['a full store'], ['what is counted keeps'], 'watchful'),
-  },
-  {
-    id: 'yusuf', sex: 'm', ageDays: 41 * 364,
-    identity: {
-      name: 'Yusuf', age: 41,
-      backstory: 'A carpenter with a grudge against the river, which took his first bridge.',
-      temperament: 'stubborn, generous with his hands, quiet about it',
-      voiceCard: voice('warm and practical', 'two sentences, then work', ['says "aye"'], ['long speeches'],
-        ['Aye. I will cut it today.', 'That will take a deck.'], 14, 26),
-    },
-    personality: NEUTRAL('stubborn, generous with his hands, quiet about it', ['good joinery'], ['a job done once is a job done'], 'even'),
-  },
-  {
-    id: 'nadia', sex: 'f', ageDays: 29 * 364,
-    identity: {
-      name: 'Nadia', age: 29,
-      backstory: 'Walks the whole valley most days and knows where the berries are before anyone else does.',
-      temperament: 'restless, cheerful, impatient',
-      voiceCard: voice('bright and quick', 'runs on when she is pleased', ['calls the path "the way"'], ['self-pity'],
-        ['The bushes are heavy out east.', 'This way is all mud again.'], 22, 36),
-    },
-    personality: NEUTRAL('restless, cheerful, impatient', ['nothing wasted'], ['feet make the road'], 'in a hurry'),
-  },
-  {
-    id: 'omar', sex: 'm', ageDays: 46 * 364,
-    identity: {
-      name: 'Omar', age: 46,
-      backstory: 'The nearest thing this town has to a healer. Keeps herbs and has sat up with more sick people than he can name.',
-      temperament: 'gentle, unhurried, hard to alarm',
-      voiceCard: voice('low and calm', 'pauses before he answers', ['says "now then"'], ['alarm'],
-        ['Now then. Sit down.', 'It will pass, or it will not.'], 16, 28),
-    },
-    personality: NEUTRAL('gentle, unhurried, hard to alarm', ['sitting with the sick'], ['a hand does more than a remedy'], 'attentive'),
-  },
-  {
-    id: 'salma', sex: 'f', ageDays: 26 * 364,
-    identity: {
-      name: 'Salma', age: 26,
-      backstory: 'Sings at her work, which the others have stopped remarking on.',
-      temperament: 'private, wry, does not complain',
-      voiceCard: voice('dry and glancing', 'a line, then a shrug', ['understates'], ['complaint'],
-        ['It is nothing.', 'I have had worse.'], 11, 20),
-    },
-    personality: NEUTRAL('private, wry, does not complain', ['carrying your own weight'], ['a thing named is a thing made worse'], 'quiet'),
-  },
-]
-
 // ------------------------------------------------------------------ the world ---
 // The genesis valley exactly as it is — its ground, its river, its trees and the ground the
-// town keeps for a new roof — with every ROOF taken out of it. Nothing else is touched: the
-// question is what five bodies do about a cold night when there is nowhere to go in out of it.
-const ROOFED = new Set(config.structures.enterableKinds)
-// ARM C: the valley also loses the buildings that LOOK like shelter and are not. `cabin`,
-// `cottage` and `farmhouse` are not in `enterableKinds`, so arm B's minds spent a whole night
-// walking to their doors and being told "there is no way into a cabin" — eighty refusals.
-// With them gone there is genuinely nowhere to go in, and the question is finally the one
-// this lane is asking: does a felt cold with no existing answer produce a built one?
-const FAKE_SHELTER = new Set(['cabin', 'cottage', 'farmhouse'])
-const REMOVED = new Set([...ROOFED, ...(ARM === 'c' ? FAKE_SHELTER : [])])
+// town keeps for a new roof — with some of its buildings taken out of it. Nothing else is
+// touched.
+//
+// ★ THE ARM WORLDS ARE NAMED KINDS AND NOT A PROPERTY LOOKUP, ON PURPOSE. The motivation lane
+// wrote `new Set(config.structures.enterableKinds)`, which was `['house','storehouse']` on the
+// day it ran. `roofed` has since made cabins, cottages and farmhouses shelter too, and reading
+// the property here would silently gut arms A and B and make this run incomparable with the
+// nine nights already on record. These four sets are frozen so the table can be stacked.
+//
+// The nine nights the motivation lane ran are `a1..c3` in `data/motive/`, left untouched. This
+// lane's twelve are `wa1..wd3` — pass MOTIVE_LABEL=w<arm><round> to add to them rather than
+// overwrite the record.
+//
+//   a  control — the founding valley, and main's prose: the `cold` field stripped at the seam.
+//   b  the cold felt, and the valley SOUND — every roof back on, which is the town every
+//      production figure this project ever reported was measured in. 21 slots for 5 bodies.
+//   c  the cold felt, and nowhere at all to go in: no roof of any kind, nothing half-raised.
+//   g  ★ THE FOUNDING, EXACTLY AS IT SHIPS. Nothing added, nothing taken away. Two sound roofs
+//      and seven dwellings standing at three quarters. `per` 0.8.
+//
+// Arms `a`, `b` and `c` are the founding valley with something DONE to it; `g` is the founding
+// valley. The nine nights of the motivation lane (`a1..c3`) and the twelve of the wants lane's
+// first pass (`wa1..wd3`) both ran on a valley whose roofs were all sound, so neither stacks on
+// this table run for run — what stacks is the question each arm asks.
+const SPAWN_KINDS = new Set(['house', 'storehouse'])
+const REMOVED_BY_ARM: Record<string, string[]> = {
+  a: [],
+  b: [],
+  c: ['house', 'storehouse', 'cabin', 'cottage', 'farmhouse'],
+  g: [],
+}
+// Arm B puts the roofs back on: the valley as it stood before the ruling, and the only arm
+// where the want is answered before the first tick.
+const ROOFS_BACK_ON = ARM === 'b'
+const REMOVED = new Set(REMOVED_BY_ARM[ARM] ?? REMOVED_BY_ARM['g']!)
+void isRoofedKind
 
 function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: number; y: number }> } {
   const g = makeGenesisWorld(config)
   let state = genesisState(config, g.terrain)
   const dropped = new Set<string>()
+  const roofless = new Set<string>()
   const doors: Array<{ x: number; y: number }> = []
+  const emit = (type: string, payload: unknown): void => {
+    state = fold(state, store.append(state.tick, type, payload), config)
+  }
   for (const e of g.events) {
     const p = e.payload as Record<string, unknown>
-    if (e.type === 'structure_planned' && REMOVED.has(String(p['kind']))) {
-      dropped.add(String(p['id']))
-      // Remember the doorways of the HOUSES only, so every arm spawns its five founders on
-      // exactly the same five tiles and the arms differ in nothing but what stands around them.
-      if (ROOFED.has(String(p['kind']))) doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
+    if (e.type === 'structure_planned') {
+      // Every arm spawns its five founders on exactly the same five tiles, so the arms differ
+      // in nothing but what stands around them.
+      if (SPAWN_KINDS.has(String(p['kind']))) doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
+      if (REMOVED.has(String(p['kind']))) {
+        dropped.add(String(p['id']))
+        continue
+      }
+      roofless.add(String(p['id']))
+      emit(e.type, e.payload)
       continue
     }
-    if (e.type === 'structure_completed' && dropped.has(String(p['id']))) continue
-    state = fold(state, store.append(state.tick, e.type, e.payload), config)
+    if (dropped.has(String(p['id']))) continue
+    if (e.type === 'structure_completed') roofless.delete(String(p['id']))
+    // ARM B ONLY: the progress genesis books into a roofless dwelling is skipped and the
+    // building is completed instead — the sound village, as every earlier run measured it.
+    if (ROOFS_BACK_ON && e.type === 'structure_progressed') continue
+    emit(e.type, e.payload)
   }
+  if (ROOFS_BACK_ON) for (const id of [...roofless].sort()) emit('structure_completed', { id })
   return { state, doors }
 }
 
@@ -253,6 +219,13 @@ async function main(): Promise<void> {
 
   const warmth = Object.fromEntries(MINDS.map((m) =>
     [m.id, Number((loop.state.agents[m.id]?.needs.warmth ?? -1).toFixed(1))]))
+  // The two things arm B's failure was actually made of, counted rather than inferred: bodies
+  // that went down in the street, and acts spent on a door that could never open.
+  const collapsed = MINDS.filter((m) => loop.state.agents[m.id]?.collapsedSinceTick != null).length
+  const sheltered = MINDS.filter((m) => loop.state.agents[m.id]?.insideId !== undefined).length
+  const noWayIn = refusals.filter((r) => /no way into|has no roof/.test(r.reason)).length
+  const noFloor = refusals.filter((r) => /no floor left/.test(r.reason)).length
+  const ledger = shelterLedger(loop.state, config)
 
   const report = {
     arm: ARM, label: LABEL, ticks: TOTAL_TICKS, startTick: START_TICK,
@@ -264,13 +237,34 @@ async function main(): Promise<void> {
     structuresCompleted: completed.length,
     structureProgressed: progressed.length,
     entered: entered.length,
+    shelterLedger: { ...ledger, per: Number(ledger.per.toFixed(2)) },
+    collapsedAtEnd: collapsed,
+    shelteredAtEnd: sheltered,
+    refusedNoWayIn: noWayIn,
+    refusedNoFloor: noFloor,
     spoke: spoke.length,
     refusals: refusals.length,
     refusalsByReason: Object.entries(refusals.reduce<Record<string, number>>((acc, r) => {
       acc[r.reason] = (acc[r.reason] ?? 0) + 1
       return acc
     }, {})).sort((a, b) => b[1] - a[1]),
+    // ★ WHICH VERB WAS TURNED AWAY, not just what it was told. The last pass reported 159
+    // `already busy with build` and had to read the runtime's source to find out they were all
+    // speech. A refusal count whose composition is a guess has measured half of nothing.
+    refusalsByVerb: Object.entries(refusals.reduce<Record<string, number>>((acc, r) => {
+      const k = `${r.verb}: ${r.reason}`
+      acc[k] = (acc[k] ?? 0) + 1
+      return acc
+    }, {})).sort((a, b) => b[1] - a[1]).slice(0, 12),
     warmthAtEnd: warmth,
+    // Every wall in the town at dawn, and how far up it is. "No house finished" is a claim
+    // about a distance, and a report that cannot say the distance cannot say what is missing.
+    sitesAtEnd: Object.values(loop.state.structures)
+      .filter((s) => s.stage === 'construction')
+      .map((s) => `${s.kind} ${s.id} ${s.progressTicks}/${buildTicks(config, s.kind)} by ${s.builtBy}`)
+      .sort(),
+    roofsAtEnd: Object.values(loop.state.structures)
+      .filter((s) => s.stage === 'complete' && isRoofedKind(config, s.kind)).length,
     buildIntents: attempts.filter((a) => a.verb === 'build'),
     thoughtsMentioningCold: thoughts.filter((t) => /\bcold|shiver|freez|warm|roof|shelter|walls|night air\b/i.test(t.text)).length,
     thoughts: thoughts.length,

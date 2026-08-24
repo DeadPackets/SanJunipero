@@ -1,4 +1,4 @@
-import { T_ROAD } from '@sj/shared'
+import { isRoofedKind, T_ROAD, type SimConfig } from '@sj/shared'
 import type { Structure, WorldState } from './state.js'
 import { isPassable, type Point } from './path.js'
 
@@ -49,7 +49,43 @@ export function occupantsOf(state: WorldState, structureId: string): string[] {
   return Object.keys(state.agents).sort().filter((id) => state.agents[id]!.insideId === structureId)
 }
 
+// ★ A ROOM HOLDS ONLY SO MANY BODIES, AND FLOOR IS WHY. Two tiles of floor per body: a 2x2
+// house takes two, a 4x2 farmhouse four. This is PHYSICS AND NOT OWNERSHIP — nothing here asks
+// whose the building is, because whose it is, is a thing the town has to invent and we do not
+// get to hand it over. Without a cap one roof sheltered the whole town and the second house
+// anybody raised was worth exactly nothing.
+export const TILES_PER_BODY = 2
+
+export function roomCapacity(s: { w: number; h: number }): number {
+  return Math.max(1, Math.floor((s.w * s.h) / TILES_PER_BODY))
+}
+
+/** True when no more bodies fit. `enter` refuses on it and perception says it out loud, so a
+ *  mind reads "full" off the packet instead of paying a turn to be told. */
+export function roomIsFull(state: WorldState, s: { id: string; w: number; h: number }): boolean {
+  return occupantsOf(state, s.id).length >= roomCapacity(s)
+}
+
 // Two agents can reach each other only from the same side of a wall.
 export function sameInterior(state: WorldState, aId: string, bId: string): boolean {
   return insideOf(state, aId) === insideOf(state, bId)
+}
+
+/** ★ THE ONE ARITHMETIC NOBODY WAS DOING: how many bodies the standing roofs hold, against how
+ *  many bodies there are. Every "production was zero" number this project has reported was
+ *  measured in a town whose only modelled want was already answered — the genesis valley holds
+ *  21 and the cast is 5. A run that wants to watch a town build shelter has to start below 1.0,
+ *  and this is the one place to ask whether it does. */
+export type ShelterLedger = { roofs: number; slots: number; bodies: number; per: number }
+
+export function shelterLedger(state: WorldState, config: SimConfig): ShelterLedger {
+  let roofs = 0
+  let slots = 0
+  for (const s of Object.values(state.structures)) {
+    if (s.stage !== 'complete' || !isRoofedKind(config, s.kind)) continue
+    roofs++
+    slots += roomCapacity(s)
+  }
+  const bodies = Object.values(state.agents).filter((a) => a.alive).length
+  return { roofs, slots, bodies, per: bodies === 0 ? Infinity : slots / bodies }
 }

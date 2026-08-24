@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
-  classMembers, dayPhaseFromTick, fertilityAt, glowRadiusFor, inputName, litSourceWithin,
-  MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
+  CITY_HEARTH_KIND, classMembers, dayPhaseFromTick, fertilityAt, glowRadiusFor, inputName,
+  isRoofedKind, litSourceWithin, MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
   type RecipeDef, type SimConfig, type StructureRecipeDef, type TownFacing,
 } from '@sj/shared'
 
@@ -9,12 +9,12 @@ import {
 const DEFAULT_TOWN_FACING: TownFacing = 'sw'
 import { mintId, type Affliction, type Item, type Structure, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
-import { doorTile, sameInterior } from './interiors.js'
+import { doorTile, occupantsOf, roomIsFull, sameInterior } from './interiors.js'
 import { bridgeAt, BRIDGE_KIND, findPath, isPassable, searchPath } from './path.js'
 import { claimInWorld, layBlock, townSquareOf, type TileChange } from './town.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 import { fleeTo } from './systems/fauna.js'
-import { HEAT_SOURCE_KINDS } from './systems/warmth.js'
+import { fireIsOnYourSide, inTheRoomWith, isHeatSource } from './systems/warmth.js'
 import { FAUNA_YIELD, type FaunaKind } from './data/faunaDefs.js'
 import { FORAGEABLE_YIELD } from './data/forageables.js'
 
@@ -30,6 +30,16 @@ export type VerbDef = {
   validate(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): string | null
   duration(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): number
   onStart?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): PendingEvent[]
+  /** ★ THE MOUTH IS NOT THE HANDS. A verb that declares this never takes the activity slot and
+   *  is never refused for busy-ness: its events land the moment it is asked for. `speak` is the
+   *  whole of the list, and it is there because a body with an axe in its hands can still answer
+   *  when it is spoken to. Before this, `submitIntent` refused EVERY act while an activity ran
+   *  and the runtime submits speech directly, so 159 utterances across twelve live nights were
+   *  swallowed by `already busy with build` — 39% of every refusal in the run, and a 2 880-tick
+   *  house is two sim-days of silence in the arm where the town most needed to talk to itself.
+   *  It takes no rng, on purpose: a thing that happens at intent time cannot draw from a stream
+   *  the tick loop is keeping. */
+  atOnce?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): PendingEvent[]
   onComplete(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>, rng: RngStream): PendingEvent[]
   results?(state: WorldState, config: SimConfig, agentId: string, params: Record<string, unknown>): Record<string, unknown>
   skill?: { track: string; xp: number }
@@ -188,8 +198,8 @@ const sleep: VerbDef = makeVerb({
     if (a.asleep) return 'already asleep'
     if (!config.structures.sleepIndoorsOnly || mayLieDownRough(state, config, agentId)) return null
     const s = a.insideId === undefined ? undefined : state.structures[a.insideId]
-    if (!s || s.stage !== 'complete' || !config.structures.sleepableKinds.includes(s.kind)) {
-      return 'there is no bed here; find somewhere to lie down — weary enough and the bare ground will do'
+    if (!s || s.stage !== 'complete' || !isRoofedKind(config, s.kind)) {
+      return 'there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do'
     }
     return null
   },
@@ -216,11 +226,19 @@ const enter: VerbDef = makeVerb({
     if (a.insideId !== undefined) return 'already inside'
     const s = state.structures[p.data.structureId]
     if (!s) return 'there is nothing there to enter'
-    if (!config.structures.enterableKinds.includes(s.kind)) return `there is no way into a ${s.kind}`
+    if (!isRoofedKind(config, s.kind)) return `a ${words(s.kind)} has no roof to get under`
     if (s.stage !== 'complete') return 'it is not finished'
     const door = doorTile(state, s)
     if (!door) return 'there is no way in'
     if (Math.abs(a.x - door.x) > 1 || Math.abs(a.y - door.y) > 1) return 'not close enough to the door'
+    // ★ FULL IS NOT IMPOSSIBLE, AND THE WORDS HAVE TO SAY WHICH. A mind that cannot tell one
+    // from the other spends the night walking back to the same door — that is arm B's defect in
+    // a new costume. This one names the bodies and it names the floor, so it reads as a thing
+    // that changes when somebody steps out.
+    if (roomIsFull(state, s)) {
+      const n = occupantsOf(state, s.id).length
+      return `there is no floor left in there — ${n === 1 ? 'one body fills' : `${n} bodies fill`} it`
+    }
     return null
   },
   onComplete(state, _config, agentId, params) {
@@ -489,10 +507,16 @@ const doff: VerbDef = makeVerb({
 export const KindleParams = z.object({ itemId: z.string() }).strict()
 export const StokeParams = z.object({ structureId: z.string() }).strict()
 
-// A thing you can carry and set alight: it glows, and it is not a building. One table of what
-// glows (`light.glowRadius`) answers both halves, so a codified lantern needs no second list.
+// A thing you can carry and set alight: it glows, and it is neither a building nor the fire
+// built into one. One table of what glows (`light.glowRadius`) answers the first half, so a
+// codified lantern needs no second list.
+//
+// `CITY_HEARTH_KIND` is named here because the glow table holds it and `structures.recipes` does
+// NOT: a hearth is a furnishing, not a building, so `isHeatSource` cannot speak for it and the
+// glow row exists only to give the house that holds one its reach (`structureGlowRadius`).
 export function isKindleable(config: SimConfig, kind: string): boolean {
-  return glowRadiusFor(config, kind) !== undefined && !HEAT_SOURCE_KINDS.has(kind)
+  return glowRadiusFor(config, kind) !== undefined
+    && !isHeatSource(config, kind) && kind !== CITY_HEARTH_KIND
 }
 
 // What is left in this torch: a full one has never been struck, a snuffed one remembers.
@@ -543,22 +567,30 @@ const snuff: VerbDef = makeVerb({
 
 export const FUEL_KIND = 'wood'
 
+// Arm's reach of a fire: the room you are standing in, or a footprint you are beside. The wall
+// half is `warmth`'s one derivation of it; only the distance is this verb's own (G4).
+function atTheFire(state: WorldState, agentId: string, s: Structure): boolean {
+  const a = state.agents[agentId]!
+  if (!fireIsOnYourSide(a, s)) return false
+  return inTheRoomWith(a, s) || nearRect(state, agentId, s.x, s.y, s.w, s.h)
+}
+
 const stoke: VerbDef = makeVerb({
   kind: 'stoke',
-  validate(state, _config, agentId, params) {
+  validate(state, config, agentId, params) {
     const p = StokeParams.safeParse(params)
     if (!p.success) return 'stoke needs a {structureId}'
     const s = state.structures[p.data.structureId]
-    if (!s || !HEAT_SOURCE_KINDS.has(s.kind)) return 'there is no fire there to feed'
+    if (!s || !isHeatSource(config, s.kind)) return 'there is no fire there to feed'
     if (s.stage !== 'complete') return 'it is not finished'
-    if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to the fire'
+    if (!atTheFire(state, agentId, s)) return 'not close enough to the fire'
     if (heldQty(state, agentId, FUEL_KIND) < 1) return shortOf(FUEL_KIND)
     return null
   },
   onComplete(state, config, agentId, params) {
     const p = StokeParams.parse(params)
     const s = state.structures[p.structureId]
-    if (!s || !HEAT_SOURCE_KINDS.has(s.kind) || heldQty(state, agentId, FUEL_KIND) < 1) return []
+    if (!s || !isHeatSource(config, s.kind) || heldQty(state, agentId, FUEL_KIND) < 1) return []
     return [
       ...consumeHeld(state, agentId, FUEL_KIND, 1),
       { type: 'structure_fueled', payload: { structureId: p.structureId, burnsUntilTick: state.tick + config.light.fuelBurnTicks } },
@@ -1159,9 +1191,42 @@ export function buildSiteOf(
 
 /** Where the town has room for the next roof, as a place to walk to — the plot's own street
  *  corner. `null` for a world with no town, or a town with nothing left to offer. Every plot
- *  in the lattice holds every legal mass, so this is one answer for every buildable kind. */
+ *  in the lattice holds every legal mass, so this is one answer for every buildable kind.
+ *
+ *  ★ IT NAMES FREE GROUND, AND THAT IS BOTH FACES OF ONE DEFECT. Before anybody starts, the
+ *  lattice's first free plot is the same plot for everyone, so masons converge on it — the dev
+ *  world's finding. The moment one body plants walls there that plot stops being free, so
+ *  everyone who asks next is sent somewhere else — the live probe's finding: five founders,
+ *  ten separate houses, none finished. Same rule, opposite behaviour either side of the first
+ *  wall. The fix is not to change which plot this names. It is that free ground was the ONLY
+ *  answer the world ever gave to "where does work go", and `unfinishedWork` is the other one. */
 export function groundForBuilding(state: WorldState): { x: number; y: number } | null {
   return claimInWorld(state, { along: 1, deep: 1 })?.door ?? null
+}
+
+/** ★ THE OTHER PLACE WORK CAN GO: walls that already stand, unfinished, and the tile a body
+ *  reaches them from. Nearest first, ties by id so two minds asked in the same tick are told
+ *  the same thing. Only kinds a pair of hands can actually carry on — a wall nobody can finish
+ *  is the cottage-that-was-not-a-cottage all over again, and naming one would be worse than
+ *  silence. `null` when the town has nothing half-raised in it. */
+export type StandingWalls = { id: string; kind: string; at: { x: number; y: number }; done: number; needs: number }
+
+export function unfinishedWork(state: WorldState, config: SimConfig, from: { x: number; y: number }): StandingWalls | null {
+  let best: StandingWalls | null = null
+  let bestDist = Infinity
+  for (const id of Object.keys(state.structures).sort()) {
+    const s = state.structures[id]!
+    if (s.stage !== 'construction' || buildableRecipe(config, s.kind) === null) continue
+    const needs = buildTicks(config, s.kind)
+    if (needs <= 0) continue
+    const door = doorTile(state, s)
+    const at = door ?? { x: s.x, y: s.y + s.h }
+    const d = Math.abs(at.x - from.x) + Math.abs(at.y - from.y)
+    if (d >= bestDist) continue
+    bestDist = d
+    best = { id: s.id, kind: s.kind, at, done: Math.min(s.progressTicks, needs), needs }
+  }
+  return best
 }
 
 /** Everything that can still be wrong once the town has named the ground. */
@@ -1345,13 +1410,14 @@ const heldWater = (state: WorldState, agentId: string) =>
   Object.keys(state.items).sort().map((id) => state.items[id]!)
     .find((i) => i.loc.t === 'agent' && i.loc.id === agentId && VESSEL_KINDS.has(i.kind) && (i.charges ?? 0) > 0)
 
-// A fire somebody is feeding, within arm's reach of where the cooking happens.
-function keptFireInReach(state: WorldState, agentId: string): boolean {
+// A fire somebody is feeding, within arm's reach of where the cooking happens — and a hearth
+// somebody has fed is one, so a pot can finally go over a fire that is out of the weather.
+function keptFireInReach(state: WorldState, config: SimConfig, agentId: string): boolean {
   for (const id of Object.keys(state.structures).sort()) {
     const s = state.structures[id]!
-    if (!HEAT_SOURCE_KINDS.has(s.kind) || s.stage !== 'complete') continue
+    if (!isHeatSource(config, s.kind) || s.stage !== 'complete') continue
     if ((s.fueledUntilTick ?? 0) <= state.tick) continue
-    if (nearRect(state, agentId, s.x, s.y, s.w, s.h)) return true
+    if (atTheFire(state, agentId, s)) return true
   }
   return false
 }
@@ -1378,11 +1444,11 @@ export function shortOf(kind: string): string {
 }
 
 // What stands between these hands and this recipe right now, or null when nothing does.
-function craftRefusal(state: WorldState, agentId: string, recipe: SeedRecipe): string | null {
+function craftRefusal(state: WorldState, config: SimConfig, agentId: string, recipe: SeedRecipe): string | null {
   for (const [kind, qty] of Object.entries(recipe.inputs)) {
     if (heldForInput(state, agentId, kind) < qty) return shortOf(kind)
   }
-  if (recipe.atFire && !keptFireInReach(state, agentId)) return 'there is no fire lit here to cook on'
+  if (recipe.atFire && !keptFireInReach(state, config, agentId)) return 'there is no fire lit here to cook on'
   if (recipe.water !== undefined && heldWater(state, agentId) === undefined) return 'you have no water to cook with'
   return null
 }
@@ -1400,7 +1466,7 @@ function chosenRoute(
   }
   let asNamed: string | null = null
   for (const recipe of routes) {
-    const refusal = craftRefusal(state, agentId, recipe)
+    const refusal = craftRefusal(state, config, agentId, recipe)
     if (refusal === null) return { recipe }
     asNamed ??= refusal
   }
@@ -1425,7 +1491,7 @@ const craft: VerbDef = makeVerb({
       if (heldForInput(state, agentId, kind) < qty) return []
       events.push(...consumeForInput(state, agentId, kind, qty))
     }
-    if (recipe.atFire && !keptFireInReach(state, agentId)) return []
+    if (recipe.atFire && !keptFireInReach(state, config, agentId)) return []
     if (recipe.water !== undefined) {
       const vessel = heldWater(state, agentId)
       if (vessel === undefined) return []
@@ -1594,6 +1660,19 @@ export const TeachParams = z.object({ targetId: z.string(), track: z.string() })
 export const AttackParams = z.object({ targetId: z.string() }).strict()
 export const ExperimentParams = z.object({ description: z.string() }).strict()
 
+// One function under two names, so the word a busy body says and the word an idle one says are
+// composed in exactly one place (G4).
+const spoken = (
+  state: WorldState, _config: SimConfig, agentId: string, params: Record<string, unknown>,
+): PendingEvent[] => {
+  const p = SpeakParams.parse(params)
+  const a = state.agents[agentId]!
+  return [{
+    type: 'agent_spoke',
+    payload: { agentId, text: p.text, x: a.x, y: a.y, ...(a.insideId === undefined ? {} : { insideId: a.insideId }) },
+  }]
+}
+
 const speak: VerbDef = makeVerb({
   kind: 'speak',
   validate(_state, _config, _agentId, params) {
@@ -1601,14 +1680,8 @@ const speak: VerbDef = makeVerb({
     if (!p.success) return 'speak needs a {text}'
     return null
   },
-  onComplete(state, _config, agentId, params) {
-    const p = SpeakParams.parse(params)
-    const a = state.agents[agentId]!
-    return [{
-      type: 'agent_spoke',
-      payload: { agentId, text: p.text, x: a.x, y: a.y, ...(a.insideId === undefined ? {} : { insideId: a.insideId }) },
-    }]
-  },
+  atOnce: spoken,
+  onComplete: spoken,
 })
 
 const give: VerbDef = makeVerb({

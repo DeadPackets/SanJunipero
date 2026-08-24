@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, type SimConfig } from './config.js'
+import { DEFAULT_CONFIG, isHearthKind, type SimConfig } from './config.js'
 import { dayPhaseFromTick } from './time.js'
 
 // Where the physics of light lives, so the engine's witness radius and C12's render read the
@@ -26,6 +26,13 @@ export function glowRadiusFor(config: SimConfig, kind: string): number | undefin
 
 // The same table at world defaults, for the render side, which has no config in its hands.
 export const LIGHT_GLOW_RADIUS: Readonly<Record<string, number>> = DEFAULT_CONFIG.light.glowRadius
+
+// ★ A HOUSE GLOWS WITH ITS HEARTH'S OWN RADIUS, and never with a second number written beside
+// it. `glowRadius` is keyed by kind, so a fed house threw no light at all until this: the fire
+// in it is the hearth's fire, so the reach of it is the hearth's reach (G4).
+export function structureGlowRadius(config: SimConfig, kind: string): number | undefined {
+  return glowRadiusFor(config, kind) ?? (isHearthKind(config, kind) ? glowRadiusFor(config, 'hearth') : undefined)
+}
 
 const chebyshev = (ax: number, ay: number, bx: number, by: number): number =>
   Math.max(Math.abs(ax - bx), Math.abs(ay - by))
@@ -56,7 +63,7 @@ export function flamesAt(state: LitWorld, tick: number, config: SimConfig): Flam
   }
   for (const id of Object.keys(state.structures).sort()) {
     const s = state.structures[id]!
-    const radius = glowRadiusFor(config, s.kind)
+    const radius = structureGlowRadius(config, s.kind)
     if (radius === undefined || s.stage !== 'complete') continue
     if (s.fueledUntilTick === undefined || s.fueledUntilTick < tick) continue
     out.push({ id, source: 'structure', x: s.x, y: s.y, w: s.w, h: s.h, radius })

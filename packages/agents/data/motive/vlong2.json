@@ -1,0 +1,201 @@
+{
+  "arm": "g",
+  "label": "vlong2",
+  "ticks": 1440,
+  "startTick": 1080,
+  "llmCalls": 146,
+  "costUsd": 0.1063,
+  "intents": 158,
+  "byVerb": {
+    "walk": 49,
+    "speak": 24,
+    "sleep": 20,
+    "enter": 17,
+    "stow": 14,
+    "forage": 11,
+    "wake": 7,
+    "take": 6,
+    "exit": 4,
+    "build": 3,
+    "experiment": 1,
+    "sequence": 1,
+    "craft": 1
+  },
+  "builds": 3,
+  "structuresPlanned": 1,
+  "structuresCompleted": 0,
+  "structureProgressed": 903,
+  "entered": 5,
+  "shelterLedger": {
+    "roofs": 2,
+    "slots": 4,
+    "bodies": 5,
+    "per": 0.8
+  },
+  "collapsedAtEnd": 0,
+  "shelteredAtEnd": 1,
+  "refusedNoWayIn": 0,
+  "refusedNoFloor": 0,
+  "spoke": 23,
+  "refusals": 54,
+  "refusalsByReason": [
+    [
+      "it is not finished",
+      13
+    ],
+    [
+      "already at that spot",
+      10
+    ],
+    [
+      "no path to that spot",
+      8
+    ],
+    [
+      "already asleep",
+      5
+    ],
+    [
+      "there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      3
+    ],
+    [
+      "you are indoors; step outside first",
+      3
+    ],
+    [
+      "not close enough to the door",
+      2
+    ],
+    [
+      "walk needs a destination {x, y}",
+      1
+    ],
+    [
+      "not close enough to gather — the patch is at (76, 107); stand beside it",
+      1
+    ],
+    [
+      "no forest nearby — berries, mushrooms and herbs grow in patches, and a patch is gathered by name once you can see one",
+      1
+    ],
+    [
+      "not holding that",
+      1
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      1
+    ],
+    [
+      "unknown verb: sequence",
+      1
+    ],
+    [
+      "build needs {kind} — where a house stands is the town's to say, not yours",
+      1
+    ],
+    [
+      "already inside",
+      1
+    ],
+    [
+      "speak needs a {text}",
+      1
+    ],
+    [
+      "no such recipe: herbal remedy — perhaps someone nearby knows how, or it wants discovering.",
+      1
+    ]
+  ],
+  "refusalsByVerb": [
+    [
+      "walk: already at that spot",
+      10
+    ],
+    [
+      "walk: no path to that spot",
+      8
+    ],
+    [
+      "enter: it is not finished",
+      8
+    ],
+    [
+      "stow: it is not finished",
+      5
+    ],
+    [
+      "sleep: already asleep",
+      5
+    ],
+    [
+      "sleep: there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      3
+    ],
+    [
+      "walk: you are indoors; step outside first",
+      3
+    ],
+    [
+      "enter: not close enough to the door",
+      2
+    ],
+    [
+      "walk: walk needs a destination {x, y}",
+      1
+    ],
+    [
+      "forage: not close enough to gather — the patch is at (76, 107); stand beside it",
+      1
+    ],
+    [
+      "forage: no forest nearby — berries, mushrooms and herbs grow in patches, and a patch is gathered by name once you can see one",
+      1
+    ],
+    [
+      "stow: not holding that",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 58,
+    "yusuf": 58,
+    "nadia": 58,
+    "omar": 58,
+    "salma": 58
+  },
+  "sitesAtEnd": [
+    "cottage structure_4 3240/4320 by genesis",
+    "farmhouse structure_9 4320/5760 by genesis",
+    "house structure_2 2610/2880 by genesis",
+    "house structure_3 2160/2880 by genesis",
+    "house structure_5 2160/2880 by genesis",
+    "house structure_7 2160/2880 by genesis",
+    "house structure_8 2160/2880 by genesis",
+    "house structure_88 453/2880 by salma"
+  ],
+  "roofsAtEnd": 2,
+  "buildIntents": [
+    {
+      "tick": 1324,
+      "id": "salma",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1950,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"x\":81,\"y\":68,\"kind\":\"house\"}"
+    },
+    {
+      "tick": 2070,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 53,
+  "thoughts": 110
+}

@@ -215,7 +215,9 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
   const WINTER_DAY = 3 * DAYS_PER_SEASON * MINUTES_PER_DAY + 12 * 60 // −4
   const WINTER_DUSK = 3 * DAYS_PER_SEASON * MINUTES_PER_DAY + 19 * 60 // −8
   const WINTER_NIGHT = 3 * DAYS_PER_SEASON * MINUTES_PER_DAY + 22 * 60 // −12
-  const HEARTH: Box = { id: 'structure_1', kind: 'hearth', x: 8, y: 8, w: 1, h: 1 }
+  // A `fire_pit`, not a `hearth`: the old heat-source roster named a structure kind this world
+  // has never stood one of, and the recipe table now says so. Same 1x1 fire, real name.
+  const HEARTH: Box = { id: 'structure_1', kind: 'fire_pit', x: 8, y: 8, w: 1, h: 1 }
   const HOUSE: Box = { id: 'structure_2', kind: 'house', x: 14, y: 14, w: 2, h: 2 }
   const NIGHT_TICKS = 8 * 60 // 21:00 to 05:00, the whole of a winter night
 

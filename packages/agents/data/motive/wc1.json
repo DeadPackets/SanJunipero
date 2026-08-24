@@ -1,0 +1,133 @@
+{
+  "arm": "c",
+  "label": "c1",
+  "ticks": 720,
+  "startTick": 1080,
+  "llmCalls": 147,
+  "costUsd": 0.0702,
+  "intents": 116,
+  "byVerb": {
+    "speak": 53,
+    "walk": 21,
+    "sleep": 12,
+    "forage": 10,
+    "harvest": 6,
+    "build": 5,
+    "experiment": 4,
+    "stow": 2,
+    "take": 2,
+    "wake": 1
+  },
+  "builds": 5,
+  "structuresPlanned": 3,
+  "structuresCompleted": 0,
+  "structureProgressed": 2066,
+  "entered": 0,
+  "shelterLedger": {
+    "roofs": 0,
+    "slots": 0,
+    "bodies": 5,
+    "per": 0
+  },
+  "collapsedAtEnd": 0,
+  "shelteredAtEnd": 0,
+  "refusedNoWayIn": 0,
+  "refusedNoFloor": 0,
+  "spoke": 23,
+  "refusals": 58,
+  "refusalsByReason": [
+    [
+      "already busy with build",
+      24
+    ],
+    [
+      "no such crop",
+      6
+    ],
+    [
+      "already busy with walk",
+      6
+    ],
+    [
+      "already at that spot",
+      5
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      4
+    ],
+    [
+      "already asleep",
+      4
+    ],
+    [
+      "there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      2
+    ],
+    [
+      "there is nothing there to put it in",
+      2
+    ],
+    [
+      "not close enough to gather — the patch is at (76, 107); stand beside it",
+      1
+    ],
+    [
+      "not close enough to gather — the patch is at (72, 105); stand beside it",
+      1
+    ],
+    [
+      "already holding that",
+      1
+    ],
+    [
+      "no forest nearby — berries, mushrooms and herbs grow in patches, and a patch is gathered by name once you can see one",
+      1
+    ],
+    [
+      "someone is holding that",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 44.6,
+    "yusuf": 44.6,
+    "nadia": 44.6,
+    "omar": 44.6,
+    "salma": 44.6
+  },
+  "buildIntents": [
+    {
+      "tick": 1288,
+      "id": "amara",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1343,
+      "id": "nadia",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1361,
+      "id": "salma",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1396,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1431,
+      "id": "omar",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 90,
+  "thoughts": 137
+}

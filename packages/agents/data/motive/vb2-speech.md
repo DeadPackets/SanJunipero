@@ -1,0 +1,11 @@
+- t=1095 {"agentId":"yusuf","text":"Morning, Amara. Early to it?","x":79,"y":70}
+- t=1129 {"agentId":"amara","text":"Morning. Store's got to be set before the day starts. You need something?","x":81,"y":61}
+- t=1143 {"agentId":"yusuf","text":"Aye, I'm fine. Need a hand with the store?","x":81,"y":63}
+- t=1143 {"agentId":"amara","text":"Early's when the count is right.","x":81,"y":61}
+- t=1165 {"agentId":"yusuf","text":"Evening. Store's stocked, looks good. Need a hand?","x":81,"y":63}
+- t=1180 {"agentId":"yusuf","text":"Nothing I need. Store's set, that's what matters.","x":81,"y":63}
+- t=1194 {"agentId":"yusuf","text":"Nothing. I'm good. I'll turn in soon.","x":81,"y":63}
+- t=1197 {"agentId":"amara","text":"Evening, Yusuf. I'm done here. Store's set.","x":81,"y":61}
+- t=1212 {"agentId":"yusuf","text":"Aye, store's settled. I've got wood to bring in tomorrow.","x":81,"y":63}
+- t=1222 {"agentId":"amara","text":"Store's set, Yusuf. Rest.","x":81,"y":68}
+- t=1226 {"agentId":"yusuf","text":"Store's set, good. I'll rest my wood in there tomorrow. You carry meat? I can make stew.","x":81,"y":63}

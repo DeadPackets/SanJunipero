@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ROAD_AUTOTILE_KEYS } from './autotile.js'
-import { DEFAULT_CONFIG } from './config.js'
+import { DEFAULT_CONFIG, isRoofedKind } from './config.js'
 import {
   CityTemplateSchema, CITY_ANCHOR_DEFAULT, CITY_W, CITY_H, TOWN_ORIGIN, TOWN_RINGS_GENESIS,
   townOrigin, townSpan, RIVER_LOCAL_DX, RIVER_HALF, BANK_HALF, cityGroundAt, CITY_GROUND,
@@ -356,15 +356,13 @@ describe('city structures', () => {
       expect(s.owner, s.kind).toBeNull()
   })
 
-  // ONLY A HOUSE IS A HOME, and the reason is a pinned gate: `enterableKinds` and
-  // `sleepableKinds` live in SimConfigSchema, whose hash is the `forge` pin. A founder housed
-  // in a cottage could not open their own door.
-  it('houses every founder in a kind the engine can let them into', () => {
-    const enterable = new Set(DEFAULT_CONFIG.structures.enterableKinds)
-    const sleepable = new Set(DEFAULT_CONFIG.structures.sleepableKinds)
-    for (const s of structures.filter(x => x.owner !== null)) {
-      expect(enterable.has(s.kind), `${s.owner} cannot enter their ${s.kind}`).toBe(true)
-      expect(sleepable.has(s.kind), `${s.owner} cannot sleep in their ${s.kind}`).toBe(true)
+  // EVERY DWELLING THIS TEMPLATE PLATS IS ONE A BODY CAN GET INTO. It used to be only `house`,
+  // because two rosters in SimConfigSchema named `house` and nothing else, and the cottage, the
+  // cabin and the farmhouse were painted scenery a mind walked to all night. `roofed` on the
+  // recipe row is now the one answer, and this asserts the template and that row agree.
+  it('plats no dwelling the engine cannot let a body into', () => {
+    for (const s of structures.filter(x => isDwellingKind(x.kind) || x.kind === 'storehouse')) {
+      expect(isRoofedKind(DEFAULT_CONFIG, s.kind), `nobody can get into a ${s.kind}`).toBe(true)
     }
   })
 

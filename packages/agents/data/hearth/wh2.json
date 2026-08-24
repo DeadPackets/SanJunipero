@@ -1,0 +1,148 @@
+{
+  "arm": "h",
+  "label": "wh2",
+  "ticks": 720,
+  "startTick": 394200,
+  "season": "winter",
+  "weatherAtEnd": {
+    "kind": "sunny",
+    "temperatureC": -4
+  },
+  "houseFinished": "structure_2",
+  "houseHoldsAFire": true,
+  "houseHoldsABed": true,
+  "hearthsStanding": [
+    "fire_pit structure_11",
+    "house structure_2"
+  ],
+  "shelterLedger": {
+    "roofs": 2,
+    "slots": 4,
+    "bodies": 5,
+    "per": 0.8
+  },
+  "llmCalls": 130,
+  "costUsd": 0.0891,
+  "intents": 133,
+  "byVerb": {
+    "speak": 58,
+    "sleep": 22,
+    "enter": 17,
+    "walk": 15,
+    "forage": 7,
+    "stow": 3,
+    "experiment": 2,
+    "wake": 2,
+    "stoke": 2,
+    "build": 2,
+    "chop": 1,
+    "exit": 1,
+    "eat": 1
+  },
+  "stokeIntents": [
+    {
+      "tick": 394381,
+      "id": "nadia",
+      "verb": "stoke",
+      "params": "{\"structureId\":\"structure_2\"}"
+    },
+    {
+      "tick": 394914,
+      "id": "yusuf",
+      "verb": "stoke",
+      "params": "{\"structureId\":\"structure_2\"}"
+    }
+  ],
+  "firesFed": [
+    "{\"structureId\":\"structure_2\",\"burnsUntilTick\":394862}",
+    "{\"structureId\":\"structure_2\",\"burnsUntilTick\":395395}"
+  ],
+  "firesLitAtDawn": [
+    "house structure_2"
+  ],
+  "endedInside": {
+    "amara": null,
+    "yusuf": "structure_2",
+    "nadia": "structure_2",
+    "omar": null,
+    "salma": null
+  },
+  "endedAtALitFire": {
+    "amara": null,
+    "yusuf": "lit",
+    "nadia": "lit",
+    "omar": null,
+    "salma": null
+  },
+  "asleepAtDawn": 2,
+  "energyAtEnd": {
+    "amara": 33,
+    "yusuf": 97.8,
+    "nadia": 99.2,
+    "omar": 14.1,
+    "salma": 14.1
+  },
+  "warmthAtEnd": {
+    "amara": 22.1,
+    "yusuf": 17.2,
+    "nadia": 17.2,
+    "omar": 0,
+    "salma": 0
+  },
+  "warmthTargetAtEnd": {
+    "amara": 46,
+    "yusuf": 46,
+    "nadia": 46,
+    "omar": 22,
+    "salma": 22
+  },
+  "exposedAtEnd": 2,
+  "collapsedAtEnd": 0,
+  "entered": 3,
+  "slept": 10,
+  "spoke": 58,
+  "builds": 2,
+  "refusals": 35,
+  "refusalsByVerb": [
+    [
+      "enter: there is no floor left in there — 2 bodies fill it",
+      12
+    ],
+    [
+      "sleep: there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      10
+    ],
+    [
+      "walk: already at that spot",
+      3
+    ],
+    [
+      "enter: already inside",
+      2
+    ],
+    [
+      "experiment: You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      2
+    ],
+    [
+      "stow: not holding that",
+      2
+    ],
+    [
+      "sleep: already asleep",
+      2
+    ],
+    [
+      "chop: there is nothing standing there to cut",
+      1
+    ],
+    [
+      "walk: no path to that spot",
+      1
+    ]
+  ],
+  "thoughts": 106,
+  "thoughtsMentioningFire": 16,
+  "thoughtsMentioningBed": 30,
+  "thoughtsMentioningCold": 86
+}

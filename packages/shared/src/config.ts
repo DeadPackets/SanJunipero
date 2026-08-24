@@ -4,6 +4,13 @@ const NeedsSchema = z.object({
   hungerDecayPerTick: z.number().default(0.035),
   energyDecayAwakePerTick: z.number().default(0.093),
   energyRegenAsleepPerTick: z.number().default(0.25),
+  // ★ WHAT A BED IS WORTH, and until now it was worth nothing at all: one flat rate answered
+  // the bare ground, a storehouse floor and a bed alike, and `sleep` named the HOUSE and never
+  // the bed in it. A full night fills the bar from empty either way (720 ticks x 0.25 = 180 of
+  // a 100 bar), so this is not a night's sleep made better — it is the SHORT one. Empty to full
+  // is 400 ticks on the boards and 267 in a bed: two sim-hours of daylight given back to a body
+  // that lay down at noon. Only ever a bonus; the boards are exactly as good as they were.
+  bedRegenMultiplier: z.number().default(1.5),
   socialDecayPerTick: z.number().default(0.018),
   socialRegenConversingPerTick: z.number().default(0.5),
   socialRegenRecencyTicks: z.number().default(60),
@@ -135,8 +142,15 @@ const CraftingSchema = z.object({
   expertDifficulty: z.number().int().default(4),
 }).strict()
 
-// What a building costs, how big it stands, how hard it is to knock down and how long it takes.
-// Enterability is NOT here: `structures.enterableKinds` is its one landed home.
+// What a building costs, how big it stands, how hard it is to knock down, how long it takes —
+// and whether it has a roof.
+//
+// ★ `roofed` REPLACED TWO ROSTERS. `structures.enterableKinds` and `structures.sleepableKinds`
+// were hand-written lists of kind names, and the valley's cabins, cottages and farmhouses were
+// missing from both — so a mind walked to a cottage door, was told "there is no way into a
+// cottage", and learned nothing it could use. A roster says which names somebody remembered;
+// a property says what a building IS. Ask the kind whether it has a roof over it, and the
+// answer is the same for the way in, the cold it holds off, and lying down out of the weather.
 export const StructureRecipeSchema = z.object({
   inputs: z.record(z.string(), z.number()),
   w: z.number().int().positive(),
@@ -144,19 +158,63 @@ export const StructureRecipeSchema = z.object({
   maxHp: z.number().positive(),
   flammable: z.boolean(),
   durationTicks: z.number().int().positive(),
+  // Defaults to false, so a kind the arbiter codifies is a thing in the world and not a shelter
+  // until somebody says it is one.
+  roofed: z.boolean().default(false),
+  // ★ AND `hearth` KILLS THE THIRD ROSTER. `HEAT_SOURCE_KINDS` was a two-name Set in the warmth
+  // system, so the fire in a house was a thing the renderer drew and no verb could reach. A
+  // furnishing is NOT an entity here and NOT a coordinate: it is a property of the kind, exactly
+  // as a roof is, and its fire is the building's own `fueledUntilTick`. One row answers what
+  // glows, what a pot can be cooked on, and what holds the cold off a body beside it.
+  hearth: z.boolean().default(false),
+  // And a bed, for the same reason and by the same rule. TWO BOOLEANS AND NOT A LIST OF
+  // FURNISHINGS: a house also holds a table, a chair and a rug, and putting those words here
+  // would be dead data — no law reads them, and a mind handed a word with no verb behind it
+  // spends turns being refused. A flag exists here because a law asks for it, and for no other
+  // reason. The room the renderer draws is the wider truth; this is the part the world acts on.
+  bed: z.boolean().default(false),
 }).strict()
 
 const StructuresSchema = z.object({
-  enterableKinds: z.array(z.string()).default(['house', 'storehouse']),
   privateKinds: z.array(z.string()).default(['house']),
   sleepIndoorsOnly: z.boolean().default(true),
-  sleepableKinds: z.array(z.string()).default(['house']),
-  // An empty `inputs` marks a kind the world places and nobody builds.
+  // An empty `inputs` marks a kind the world places and nobody builds. Every kind the world
+  // places has a row here now, because a kind with no row is a kind nothing can say `roofed`
+  // about — which is exactly how three dwellings became scenery.
   recipes: z.record(z.string(), StructureRecipeSchema).default({
-    house: { inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880 },
-    well: { inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720 },
-    bridge: { inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480 },
-    grave: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1 },
+    house: { inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880, roofed: true, hearth: true, bed: true },
+    well: { inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false, hearth: false, bed: false },
+    bridge: { inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false, hearth: false, bed: false },
+    grave: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false, hearth: false, bed: false },
+    // The four the town template plants. Their mass and their hp were already authored — the
+    // footprints in `cityTemplate`, the hp in the engine's genesis table — and this is the row
+    // both now read, so a cottage is one building and not three descriptions.
+    //
+    // ★ THE COTTAGE AND THE FARMHOUSE ARE BUILDABLE, AND THE PRICE IS THE HOUSE'S OWN RATE.
+    // A house is 4 tiles of floor for 10 wood and 2 880 ticks: 2.5 wood and 720 ticks a tile.
+    // A cottage is 6 tiles and a farmhouse is 8, so they cost 15/4 320 and 20/5 760 — one
+    // derivation, not three authored numbers, and `config.test.ts` holds them to it. They had
+    // to become buildable for genesis to stand them up ROOFLESS: a wall nobody can finish is
+    // the cabin-that-was-not-a-cabin all over again, and standing seven of them in the founding
+    // valley would have rebuilt arm B at nine times the scale.
+    //
+    // The cabin stays unbuildable on purpose. It is 2x2, exactly a house's mass, so a buildable
+    // one would be the same building under a second name — a word in every mind's vocabulary
+    // that buys nothing. It is the one dwelling whose roof held.
+    storehouse: { inputs: {}, w: 2, h: 2, maxHp: 40, flammable: true, durationTicks: 1, roofed: true, hearth: false, bed: false },
+    cabin: { inputs: {}, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 1, roofed: true, hearth: false, bed: false },
+    cottage: { inputs: { wood: 15 }, w: 3, h: 2, maxHp: 60, flammable: true, durationTicks: 4320, roofed: true, hearth: false, bed: false },
+    farmhouse: { inputs: { wood: 20 }, w: 4, h: 2, maxHp: 80, flammable: true, durationTicks: 5760, roofed: true, hearth: false, bed: false },
+    // The town's open fire, here for the same reason the storehouse and the dwellings came off
+    // `GENESIS_STRUCTURE_DEFS` when `roofed` landed: a kind with no row is a kind nothing can
+    // say `hearth` about, and hp written in two places is hp that drifts. Nobody builds it —
+    // `inputs` is empty — and it has no roof, which is what an open fire is.
+    //
+    // ★ THERE IS NO `hearth` ROW, AND THE OLD ROSTER'S FIRST NAME WAS A GHOST. `HEAT_SOURCE_KINDS`
+    // was `['hearth', 'fire_pit']` and NOTHING IN THIS WORLD HAS EVER STOOD A STRUCTURE OF KIND
+    // `hearth`: the template has no such building and genesis places none. A hearth is not a
+    // building at all — it is a thing a house HAS, which is exactly what the flag above says.
+    fire_pit: { inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false, hearth: true, bed: false },
   }),
 }).strict()
 
@@ -308,6 +366,14 @@ const WarmthSchema = z.object({
   // clothing line exists for. Twelve is the LEAST that reaches winter and reaches no hour
   // past its mildest: dusk, night and a snowy day still want a roof or a fire (C11 T37b).
   insulation: z.object({ garment: z.number().default(12) }).strict().prefault({}),
+  // ★ WHAT A FED FIRE IS ACTUALLY WORTH, and until now it was worth nothing. `isExposed` treats
+  // a roof, a coat and a fire as three answers to the same question — but only the fire's answer
+  // stopped at "you are not freezing". A body beside one still drifted to the WEATHER's number,
+  // so on a winter night an indoor body sat at warmth 10 and read "you shiver against the cold"
+  // and "these walls are holding it off you" in the same breath. Twelve, because it is the
+  // garment's own number and the two are already interchangeable one line above `isExposed`:
+  // it carries a winter night from 10 to 34, over the shiver line and no further.
+  fireWarmth: z.number().default(12),
   ambient: z.object({
     spring: ambientBand(14, 9, 5),
     summer: ambientBand(26, 20, 15),
@@ -431,6 +497,27 @@ export type SimConfig = z.infer<typeof SimConfigSchema>
 export type CropDef = z.infer<typeof CropDefSchema>
 export type RecipeDef = z.infer<typeof RecipeSchema>
 export type StructureRecipeDef = z.infer<typeof StructureRecipeSchema>
+
+/** Does a building of this kind have a roof over it? The one derivation (G4) behind every
+ *  question that used to be answered by a roster: the way in, the cold held off, and whether a
+ *  body can lie down out of the weather. A kind with no row is not a shelter. */
+export function isRoofedKind(config: SimConfig, kind: string): boolean {
+  return config.structures.recipes[kind]?.roofed === true
+}
+
+/** Does a building of this kind hold a fire somebody can feed? The one derivation (G4) behind
+ *  what glows after dark, what a pot can be cooked on, and what holds the cold off a body
+ *  beside it. A kind with no row has no fire in it. */
+export function isHearthKind(config: SimConfig, kind: string): boolean {
+  return config.structures.recipes[kind]?.hearth === true
+}
+
+/** Is there a bed in a building of this kind? The one derivation (G4) behind how well a body
+ *  sleeps in it. `roofed` says a body may lie down out of the weather at all; this says whether
+ *  it lies down on a bed or on the boards. */
+export function isBeddedKind(config: SimConfig, kind: string): boolean {
+  return config.structures.recipes[kind]?.bed === true
+}
 
 // The one derivation of the slower clock (G4): 0.021/tick at defaults, 0.6x hunger by ruling D4.
 export function thirstDecayPerTick(config: SimConfig): number {

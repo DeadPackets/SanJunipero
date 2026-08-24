@@ -1,4 +1,4 @@
-import { type SimConfig } from '@sj/shared'
+import { isRoofedKind, type SimConfig } from '@sj/shared'
 import { composePerception, type PerceptionPacket } from './perception.js'
 import { doorTile } from './interiors.js'
 import { submitIntent } from './intent.js'
@@ -243,10 +243,10 @@ function bedGate(state: WorldState, config: SimConfig, id: string, intent: Scrip
   const here = a.insideId === undefined ? undefined : state.structures[a.insideId]
   if (intent.verb !== 'sleep') return here ? { verb: 'exit', params: {} } : intent
   if (a.collapsedSinceTick !== null) return intent // a body already down may lie where it fell
-  if (here) return config.structures.sleepableKinds.includes(here.kind) ? intent : { verb: 'exit', params: {} }
+  if (here) return isRoofedKind(config, here.kind) ? intent : { verb: 'exit', params: {} }
   for (const sid of Object.keys(state.structures).sort()) {
     const s = state.structures[sid]!
-    if (s.stage !== 'complete' || !config.structures.sleepableKinds.includes(s.kind)) continue
+    if (s.stage !== 'complete' || !isRoofedKind(config, s.kind)) continue
     const door = doorTile(state, s)
     if (door && cheb(a.x, a.y, door.x, door.y) <= 1) return { verb: 'enter', params: { structureId: s.id } }
   }

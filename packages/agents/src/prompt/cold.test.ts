@@ -46,9 +46,14 @@ function town(
   const rng = new RngStreams('cold-test')
   let state: WorldState = genesisState(CFG, g.terrain)
   for (const e of g.events) state = fold(state, store.append(state.tick, e.type, e.payload), CFG)
+  // ★ THE VALLEY'S HOUSES STAND ROOFLESS NOW — the abandoned village is abandoned — so the body
+  // that goes indoors goes into the cabin, which is one of the two roofs that held. Amara still
+  // wakes at her own (roofless) doorway, out under the sky, which is the half this test needs.
   const homes: Record<string, string> = {}
+  const cabin = Object.values(state.structures).find((s) => s.kind === 'cabin')!
   for (const id of ['amara', 'yusuf']) {
-    const house = Object.values(state.structures).find((s) => s.kind === 'house' && s.owner === id)!
+    const house = id === 'yusuf' ? cabin
+      : Object.values(state.structures).find((s) => s.kind === 'house' && s.owner === id)!
     const door = doorTile(state, house)!
     homes[id] = house.id
     state = fold(state, store.append(state.tick, 'agent_spawned',

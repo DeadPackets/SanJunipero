@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, isRoofedKind, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import { doorTile, fold, genesisState, isPassable, submitIntent, type WorldState } from '@sj/engine'
 import {
   CARRIED_MATERIALS, COPSE, CREEK, HOUSES, MAP_N, MATERIAL_PILES, PLOTS, WEIR, WORN_TOOL,
@@ -133,7 +133,7 @@ describe('the G9b world — a town that can feed itself', () => {
       const s = state.structures[box.id]!
       expect(s.owner, `${box.id} belongs to ${m.id}`).toBe(m.id)
       expect(s.stage, `${box.id} is built`).toBe('complete')
-      expect(DEFAULT_CONFIG.structures.sleepableKinds).toContain(s.kind)
+      expect(isRoofedKind(DEFAULT_CONFIG, s.kind), `${box.id} has a roof`).toBe(true)
 
       // The engine's own door, and the body already standing on it: the commute
       // to a bed is one `enter`.

@@ -1,0 +1,140 @@
+{
+  "arm": "hb",
+  "label": "whb3",
+  "ticks": 720,
+  "startTick": 394200,
+  "season": "winter",
+  "weatherAtEnd": {
+    "kind": "sunny",
+    "temperatureC": -4
+  },
+  "houseFinished": "structure_2",
+  "houseHoldsAFire": false,
+  "houseHoldsABed": false,
+  "hearthsStanding": [
+    "fire_pit structure_11"
+  ],
+  "shelterLedger": {
+    "roofs": 2,
+    "slots": 4,
+    "bodies": 5,
+    "per": 0.8
+  },
+  "llmCalls": 112,
+  "costUsd": 0.0736,
+  "intents": 118,
+  "byVerb": {
+    "speak": 39,
+    "walk": 24,
+    "sleep": 20,
+    "wake": 6,
+    "enter": 5,
+    "build": 5,
+    "forage": 5,
+    "exit": 4,
+    "experiment": 3,
+    "stow": 3,
+    "harvest": 3,
+    "eat": 1
+  },
+  "stokeIntents": [],
+  "firesFed": [],
+  "firesLitAtDawn": [],
+  "endedInside": {
+    "amara": "structure_1",
+    "yusuf": null,
+    "nadia": null,
+    "omar": null,
+    "salma": null
+  },
+  "endedAtALitFire": {
+    "amara": "cold",
+    "yusuf": null,
+    "nadia": null,
+    "omar": null,
+    "salma": null
+  },
+  "asleepAtDawn": 3,
+  "energyAtEnd": {
+    "amara": 69.9,
+    "yusuf": 8.8,
+    "nadia": 59.3,
+    "omar": 14.1,
+    "salma": 7.5
+  },
+  "warmthAtEnd": {
+    "amara": 10.5,
+    "yusuf": 0,
+    "nadia": 0,
+    "omar": 0,
+    "salma": 0
+  },
+  "warmthTargetAtEnd": {
+    "amara": 22,
+    "yusuf": 22,
+    "nadia": 22,
+    "omar": 22,
+    "salma": 22
+  },
+  "exposedAtEnd": 4,
+  "collapsedAtEnd": 0,
+  "entered": 4,
+  "slept": 14,
+  "spoke": 37,
+  "builds": 5,
+  "refusals": 26,
+  "refusalsByVerb": [
+    [
+      "walk: already at that spot",
+      5
+    ],
+    [
+      "sleep: already asleep",
+      4
+    ],
+    [
+      "experiment: You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      3
+    ],
+    [
+      "harvest: no such crop",
+      3
+    ],
+    [
+      "stow: not holding that",
+      2
+    ],
+    [
+      "forage: not close enough to gather — the patch is at (72, 105); stand beside it",
+      1
+    ],
+    [
+      "build: the town keeps ground for a house — go and stand at (81, 106)",
+      1
+    ],
+    [
+      "walk: no path to that spot",
+      1
+    ],
+    [
+      "build: the town keeps ground for a cottage — go and stand at (81, 107)",
+      1
+    ],
+    [
+      "exit: not inside anything",
+      1
+    ],
+    [
+      "sleep: there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do",
+      1
+    ],
+    [
+      "walk: collapsed and unable to act",
+      1
+    ]
+  ],
+  "thoughts": 94,
+  "thoughtsMentioningFire": 1,
+  "thoughtsMentioningBed": 25,
+  "thoughtsMentioningCold": 61
+}

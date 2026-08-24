@@ -53,6 +53,17 @@ export type PerceptionStructure = {
   // The tile `enter` measures against. Absent when there is no way in at all, and then the
   // prose falls back to the nearest open ground beside the wall.
   door?: { x: number; y: number }
+  // No more bodies fit. Said at the door rather than at the refusal, because a mind that has
+  // to be turned away to learn it has already spent the turn.
+  full?: true
+  // How far up the walls are, while a thing is still going up. Every hand on a site adds one to
+  // the walls, so this is the one number that says whether tonight is long enough.
+  raised?: { done: number; needs: number }
+  // The fire in the room, and whether anybody is feeding it. Absent on a building whose kind
+  // holds no fire and on one still going up, so a packet from a town of sheds reads as before.
+  hearth?: 'lit' | 'cold'
+  // There is a bed in it. Absent on a roof with nothing but a floor under it.
+  bed?: true
 }
 
 export type PerceptionCrop = {
@@ -277,8 +288,34 @@ function roadPhrase(r: MakeableRoad): string {
   return [costPhrase(r.inputs), ...conditions].join(', ')
 }
 
+// ★ HOW FAR UP, IN WORDS AND NOT A TICK COUNT. A mind was told a building was "still being
+// built" and nothing else, so a wall one hour short read exactly like a wall four days short —
+// and five founders raised five separate houses and finished none of them. Says where the work
+// has got to and never what to do about it.
+const HOW_FAR = [
+  'barely begun', 'a little way up', 'a quarter of the way up', 'a third of the way up',
+  'half up', 'well past half', 'three quarters up', 'nearly done',
+]
+
+export function howFarUp(raised?: { done: number; needs: number }): string {
+  if (raised === undefined || raised.needs <= 0) return 'still being built'
+  const f = Math.max(0, Math.min(1, raised.done / raised.needs))
+  const i = Math.min(HOW_FAR.length - 1, Math.floor(f * HOW_FAR.length))
+  return `its walls are ${HOW_FAR[i]}`
+}
+
 // Block 6, not block 1: the static prefix is byte-frozen and prompt caching rides on it, so
 // the vocabulary a mind needs rides the same breath as what it can see (C11 R-H).
+/** ★ THE OTHER PLACE WORK CAN GO, SAID PLAINLY AND WITH NO COUNSEL IN IT. Where walls already
+ *  stand and how far up they are. It names no act, asks for nothing, and points at no remedy —
+ *  the pair (ground to begin on, walls already standing) is the whole of what there is to learn,
+ *  and the inference is the mind's, exactly as it is for the cold. */
+export function standingWallsLine(w?: { kind: string; at: { x: number; y: number }; done: number; needs: number } | null): string {
+  if (w === undefined || w === null) return ''
+  return `Walls already stand at (${w.at.x}, ${w.at.y}) — a ${w.kind.replace(/_/g, ' ')}, ${
+    howFarUp({ done: w.done, needs: w.needs }).replace(/^its walls are /, '')}.`
+}
+
 export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: number } | null): string {
   const parts: string[] = []
   if (m.builds.length > 0) {
@@ -288,8 +325,14 @@ export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: 
     // The spot, named — the line has always promised one and never said where. A mind that
     // has to be refused before it can learn where to go wastes a waking hour on it, which is
     // the same complaint R21 candidate 3 settled about every other refusal in the world.
+    //
+    // ★ "to BEGIN a new one", not "to raise one", and the difference is the whole of R3's
+    // remainder. This ground is where a roof STARTS. Walls that already stand are raised where
+    // they stand, and a mind sent to the town's next free plot while a half-raised house waited
+    // two streets away read the old wording as the only place work could go — measured, in
+    // yusuf's own words, twelve ticks apart.
     if (groundForBuilding !== undefined && groundForBuilding !== null) {
-      parts.push(`The town keeps ground for a new roof at (${groundForBuilding.x}, ${groundForBuilding.y}); you must be standing there to raise one.`)
+      parts.push(`The town keeps ground for a new roof at (${groundForBuilding.x}, ${groundForBuilding.y}); you must be standing there to begin a new one.`)
     }
   }
   if (m.crafts.length > 0) {
@@ -298,6 +341,31 @@ export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: 
     }.`)
   }
   return parts.join(' ')
+}
+
+/** ★ THE FIRE IN THE ROOM, AND NOTHING ABOUT WHAT TO DO WITH IT. Five furnishings stand in
+ *  every house and no mind had ever been told one of them was there — a body could walk to the
+ *  hearth and there was nothing it could do at it, and nothing that said it was a hearth.
+ *
+ *  Inside, both states are said, because the room you are in is the room you are in. From
+ *  outside only a LIT one is said: firelight through a doorway is a thing eyes actually get,
+ *  and reciting the cold hearth of every house in sight is five lines a turn that carry no
+ *  news. It names no act and points at no remedy, exactly as the cold and the walls do. */
+function hearthClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): string {
+  if (s.hearth === undefined) return ''
+  if (isTheRoomYouAreIn) {
+    return s.hearth === 'lit' ? ' A fire is burning in the hearth here.' : ' The hearth here is cold.'
+  }
+  return s.hearth === 'lit' ? ' Firelight moves inside it.' : ''
+}
+
+/** ★ THE BED, SAID BEFORE THE WALK AND NOT AT THE DOOR. Two roofs the same size are not the
+ *  same night: one has beds in it and one has a floor. A body that can only learn which by
+ *  lying down in both has spent two nights finding out. Says what is there and never that it
+ *  is better — the comparison is the mind's, exactly as it is for the cold. */
+function bedClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): string {
+  if (s.bed !== true) return ''
+  return isTheRoomYouAreIn ? ' There are beds in here.' : ' There are beds in it.'
 }
 
 // Renders mechanics as fiction: body numbers become felt sentences, speech is
@@ -407,7 +475,8 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   }
 
   for (const s of packet.visible.structures) {
-    const state = s.burning ? ' — it is burning' : s.stage === 'construction' ? ' — still being built' : ''
+    const state = s.burning ? ' — it is burning'
+      : s.stage === 'construction' ? ` — ${howFarUp(s.raised)}` : ''
     // The doorway outranks the wall: the tile the packet names is the tile `enter` measures
     // against, so a mind told to stand there is a mind the world lets in.
     let approach = 'walk to a tile beside it.'
@@ -416,12 +485,23 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
         ? 'this is the roof you are under.'
         : `this is the roof you are under; the way out is at (${s.door.x}, ${s.door.y}).`
     } else if (s.door !== undefined) {
-      approach = `its doorway is at (${s.door.x}, ${s.door.y}) — stand there and you can go in.`
+      // ★ FULL IS A FACT, NOT A REFUSAL. It names the doorway either way, so a mind can tell a
+      // room that is full now from a wall with no way through it ever — and can come back.
+      approach = s.full === true
+        ? `its doorway is at (${s.door.x}, ${s.door.y}), and there is no floor left in it.`
+        : `its doorway is at (${s.door.x}, ${s.door.y}) — stand there and you can go in.`
     } else if (world?.isWalkable) {
       const t = besideTile(s, packet.self, world.isWalkable)
       approach = t === null ? 'no open ground lies beside it.' : `you could stand beside it at (${t.x}, ${t.y}).`
     }
-    lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${approach}`)
+    // ★ A ROOFLESS BUILDING HAS NO INSIDE YET, SAID AT THE WALL INSTEAD OF AT THE REFUSAL.
+    // `enter` and `stow` were turned away with "it is not finished" 34 times across twelve live
+    // nights: a mind reads "its walls are three quarters up", walks over and tries the door
+    // anyway. The packet said how far up the walls were and never that there was nothing
+    // behind them yet. A fact about now — it names no act and promises no later.
+    const hollow = s.stage === 'construction' ? ' There is no inside to it yet.' : ''
+    lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${
+      approach}${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id)}`)
   }
 
   for (const i of packet.visible.items) {

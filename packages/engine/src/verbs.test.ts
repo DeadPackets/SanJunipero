@@ -654,9 +654,15 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
       const day = durationOf(site(NOON), verb, params)
       expect([verb, dark]).toEqual([verb, Math.ceil(day * PENALTY)])
     }
-    for (const [verb, params] of [['speak', { text: 'hi' }], ['walk', { x: 4, y: 4 }]] as const) {
+    for (const [verb, params] of [['walk', { x: 4, y: 4 }]] as const) {
       expect([verb, durationOf(site(MIDNIGHT), verb, params)])
         .toEqual([verb, durationOf(site(NOON), verb, params)])
+    }
+    // `speak` is off this list because it no longer has a duration to slow: the mouth is not
+    // the hands, so a word takes no activity slot and no tick, in the dark or in the day.
+    for (const at of [MIDNIGHT, NOON]) {
+      const r = submitIntent(site(at), CFG, 'a1', 'speak', { text: 'hi' })
+      expect(r.ok && r.events.some((e) => e.type === 'action_started'), String(at)).toBe(false)
     }
   })
 
@@ -956,6 +962,9 @@ describe('a torch is a thing hands can make', () => {
 
   it('what it makes will take a flame, which is the whole point of making it', () => {
     expect(isKindleable(CFG, 'torch')).toBe(true)
+    // ★ AND THE THREE THINGS IN THE GLOW TABLE THAT ARE NOT IN A HAND STAY OUT. `hearth` is
+    // there so the house that holds one can borrow its reach, and it is not a thing you carry.
+    for (const kind of ['hearth', 'fire_pit', 'house']) expect(isKindleable(CFG, kind), kind).toBe(false)
     const lit = fold(bench([]), ev(1200, 'item_spawned', {
       id: 'torch_1', kind: 'torch', qty: 1, loc: { t: 'agent', id: 'a1' },
     }), CFG)

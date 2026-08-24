@@ -1,0 +1,103 @@
+{
+  "arm": "c",
+  "label": "c2",
+  "ticks": 720,
+  "startTick": 1080,
+  "llmCalls": 122,
+  "costUsd": 0.0501,
+  "intents": 82,
+  "byVerb": {
+    "speak": 34,
+    "walk": 24,
+    "sleep": 6,
+    "forage": 5,
+    "harvest": 5,
+    "build": 5,
+    "experiment": 2,
+    "wake": 1
+  },
+  "builds": 5,
+  "structuresPlanned": 5,
+  "structuresCompleted": 0,
+  "structureProgressed": 2460,
+  "entered": 0,
+  "shelterLedger": {
+    "roofs": 0,
+    "slots": 0,
+    "bodies": 5,
+    "per": 0
+  },
+  "collapsedAtEnd": 0,
+  "shelteredAtEnd": 0,
+  "refusedNoWayIn": 0,
+  "refusedNoFloor": 0,
+  "spoke": 11,
+  "refusals": 41,
+  "refusalsByReason": [
+    [
+      "already busy with build",
+      23
+    ],
+    [
+      "already at that spot",
+      9
+    ],
+    [
+      "no such crop",
+      5
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      2
+    ],
+    [
+      "walk needs a destination {x, y}",
+      1
+    ],
+    [
+      "already asleep",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 44.6,
+    "yusuf": 44.6,
+    "nadia": 44.6,
+    "omar": 44.6,
+    "salma": 44.6
+  },
+  "buildIntents": [
+    {
+      "tick": 1144,
+      "id": "amara",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1214,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1300,
+      "id": "nadia",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1334,
+      "id": "omar",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1433,
+      "id": "salma",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 79,
+  "thoughts": 109
+}

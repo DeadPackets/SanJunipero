@@ -4,7 +4,7 @@ import type Database from 'better-sqlite3'
 import type { LlmClient } from '../llm/client.js'
 import type { IdentityCore, AssembledPrompt, PromptBlocks } from '../prompt/assemble.js'
 import { assemblePrompt, compactDayLog } from '../prompt/assemble.js'
-import { makeablesLine, perceptionToProse, type PerceptionPacket } from '../prompt/prose.js'
+import { makeablesLine, perceptionToProse, standingWallsLine, type PerceptionPacket } from '../prompt/prose.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
@@ -441,7 +441,11 @@ export class AgentRuntime {
     this.#dayLog.push(prose)
     // Said in the same breath as what the eyes can reach, and NOT into the day log: what these
     // hands can make is a standing fact about the world, not something that happened today.
-    const nowProse = `${prose} ${makeablesLine(this.#bridge.makeables(), this.#bridge.groundForBuilding())}`
+    const nowProse = [
+      prose,
+      makeablesLine(this.#bridge.makeables(), this.#bridge.groundForBuilding()),
+      standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
+    ].filter((p) => p.length > 0).join(' ')
 
     // Retrieve BEFORE inserting this perception: a just-written row would win
     // recency and tag match, filling the scene with echoes of the present.

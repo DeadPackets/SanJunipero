@@ -206,8 +206,13 @@ describe('R21 candidate 2 — "perception omits it": CONFIRMED', () => {
 
 describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED', () => {
   it('a body indoors is told to go indoors: the prose gives an instruction the world refuses', () => {
-    const s = genesisTown()
-    const house = Object.values(s.structures).find((st) => st.kind === 'house' && st.owner === 'nadia')!
+    // Nadia's house stands roofless in the founding valley now, and a body cannot be under a
+    // roof that is not there. This test is about the sentence, so it puts the roof back on.
+    const roofless = Object.values(genesisTown().structures)
+      .find((st) => st.kind === 'house' && st.owner === 'nadia')!
+    const s = fold(genesisTown(), ev('structure_completed', { id: roofless.id }), CFG)
+    const house = s.structures[roofless.id]!
+    expect(house.stage).toBe('complete')
     const inside: WorldState = {
       ...s,
       agents: { ...s.agents, nadia: { ...s.agents.nadia!, insideId: house.id, x: house.x, y: house.y } },
@@ -316,7 +321,12 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     // a mind is never given is a word it never uses. Nothing in the prompt names one.
     const buildable = Object.keys(CFG.structures.recipes).sort()
     const craftable = Object.keys(CFG.crafting.recipes).sort()
-    expect(buildable).toEqual(['bridge', 'grave', 'house', 'well'])
+    // Four more rows since `roofed` landed and a fifth since `hearth` did — the kinds the world
+    // plants and nobody raises need a row to say what they ARE. An empty `inputs` still keeps
+    // every one of them out of `makeables`, which is asserted two lines down.
+    expect(buildable).toEqual([
+      'bridge', 'cabin', 'cottage', 'farmhouse', 'fire_pit', 'grave', 'house', 'storehouse', 'well',
+    ])
     expect(craftable).toEqual(['cloth', 'garment', 'plank'])
     // The one place a mind is taught its verbs asks for both nouns and names neither, and
     // nothing else in the prompt fills the gap. `well` is the exception that proves it: the
@@ -358,7 +368,11 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
     // The build refusal used to answer a coordinate the mind chose. It cannot any more — a
     // roof goes on the plot the town has ground for — so the door it leaves open is the place
     // itself, which is strictly more than the old one gave.
-    ['build', { kind: 'house' }, 'the town keeps ground for a house — go and stand at (100, 87)'],
+    //
+    // ★ IT IS A COTTAGE AND NOT A HOUSE NOW, and the reason is the point of this whole lane:
+    // amara stands at her own roofless house, and `build {kind:'house'}` from there is ACCEPTED,
+    // because half-raised walls within reach are walls she can carry on. See below.
+    ['build', { kind: 'cottage' }, 'the town keeps ground for a cottage — go and stand at (100, 88)'],
     ['tend', { targetId: 'yusuf' }, 'not adjacent to the patient — they are at (67, 75)'],
     ['give', { itemId: 'item_17', targetId: 'yusuf' }, 'not adjacent to give — they are at (67, 75)'],
     ['pave', { x: 80, y: 67 }, 'not enough stone — stone comes from the loose rock at the foot of an outcrop'],
@@ -371,6 +385,20 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
         .toEqual({ verb, ok: false, reason })
       expect(reason).toMatch(/ — /)
     }
+  })
+
+  // ★ AND THE OLDEST DIAGNOSTIC IN THIS FILE HAS A DIFFERENT ANSWER NOW. A body standing beside
+  // walls of the kind it means to raise is not refused and not sent across town: it puts its
+  // hands on the walls that are there. That is R3's remainder and R5's ruling landing in the
+  // same act — and it costs no materials, because resuming a site never spends them twice.
+  it('★ walls within reach are not a refusal any more — they are the job', () => {
+    const s = genesisTown()
+    const r = submitIntent(s, CFG, 'amara', 'build', { kind: 'house' })
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    // No `structure_planned`: she joined what stood rather than claiming fresh ground.
+    expect(r.ok && r.events.map((e) => e.type)).toEqual(['action_started'])
+    const started = r.ok ? r.events[0]!.payload as { duration: number } : { duration: -1 }
+    expect(started.duration, 'a whole house, not the roof that is missing').toBeLessThan(2880)
   })
 
   it('the refusals that were already honest are left exactly as they were', () => {

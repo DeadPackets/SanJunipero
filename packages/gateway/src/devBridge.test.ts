@@ -216,11 +216,15 @@ describe('★ THE DEV WORLD CROSSES ITS OWN RIVER — a founder builds a deck, t
     // ★ AND THE GAP IS NOT THE DECK'S DOING, which is worth saying because `farBank.test.ts`
     // reports these two as the SAME tick and this town does not. There the far bank was the
     // nearest free ground the moment it became reachable; here the town still had east plots
-    // ahead of it in the register, so it took another 402 ticks and four more roofs to work
+    // ahead of it in the register, so it took another 322 ticks and four more roofs to work
     // round to the water. Reachability is the deck's; ORDER is the claim's, and the two are
     // separated below by taking the deck away again.
+    //
+    // The gap was 402 ticks until a bed became worth something: this town's founders sleep in
+    // houses, `needs.bedRegenMultiplier` is 1.5, and they are back on their feet 80 ticks
+    // sooner. The deck's own tick did not move — nobody is asleep when it goes up.
     expect(run.deckTick).toBe(766)
-    expect(run.crossedTick).toBe(1168)
+    expect(run.crossedTick).toBe(1088)
   })
 
   it('★ AND IT IS THE DECK AND NOTHING CACHED: take it away and the claim goes back east', () => {

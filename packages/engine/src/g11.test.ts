@@ -62,7 +62,11 @@ describe('G11a-M1: the genesis town folds, and it is the size the world says it 
 
     const structures = Object.values(state.structures)
     expect(structures).toHaveLength(11)
-    expect(structures.every((s) => s.stage === 'complete')).toBe(true)
+    // Eleven buildings, and four of them still have a roof: the village was abandoned, and the
+    // other seven stand as walls a pair of hands can finish. That is the whole of the founding's
+    // want — sound, this valley held 21 bodies against a cast of five.
+    expect(structures.filter((s) => s.stage === 'complete').map((s) => s.kind).sort())
+      .toEqual(['cabin', 'fire_pit', 'storehouse', 'well'])
     expect(structures.filter((s) => s.kind === 'house')).toHaveLength(5)
     expect(structures.some((s) => s.kind === 'well')).toBe(true)
     expect(structures.some((s) => s.kind === 'storehouse')).toBe(true)
@@ -572,7 +576,7 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     // its own weariness will open.
     expect(submitIntent({ ...s, tick: 1 }, CFG, 'ada', 'sleep', {})).toEqual({
       ok: false,
-      reason: 'there is no bed here; find somewhere to lie down — weary enough and the bare ground will do',
+      reason: 'there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do',
     })
 
     // HALF 2 — weary enough, and the bare ground will do. No fall is required to earn it.
