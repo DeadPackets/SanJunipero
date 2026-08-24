@@ -589,6 +589,6 @@ describe('G9a-11: the goldens are where the single deliberate regen left them', 
 
   it('G1 and G2 still pin the post-regen hashes', () => {
     expect(source('golden.test.ts')).toContain('f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac')
-    expect(source('g2.test.ts')).toContain('00d724345c37104d6c93f10398b96eded080b58db78108746e2a037fce836a10')
+    expect(source('g2.test.ts')).toContain('ec75f7f7e0948cb4cd6985d8d660ec93081ecc51ca4a0e733f25b9527c6b1bde')
   })
 })

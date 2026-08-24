@@ -37,7 +37,13 @@ import { nutritionOf } from './verbs.js'
 // renaming the kind moves this literal and no world law with it. G1 and BLOCK1 were measured
 // against the same rename and did not move.
 // Previous value (C11 Task 37b): c1c51b42aa340f0e5ae0d8cc321b602345f6ec4fee4e4d20b48f7e692b946d9c
-const GOLDEN_G2_HASH = '00d724345c37104d6c93f10398b96eded080b58db78108746e2a037fce836a10'
+//
+// Moved again by the build-ledger cap, and by 23 events: the Builder starts her house at tick 21,
+// which is night, so `workPenalty` gave her a 4 320-tick clock for a 2 880-tick house and the
+// walls booked every extra tick she spent fumbling. `progressTicks` read 2 903 for a house that
+// is 2 880. The ledger now stops at the work the building is; the dark still costs her the time.
+// Previous value (the 2 903-tick house): 00d724345c37104d6c93f10398b96eded080b58db78108746e2a037fce836a10
+const GOLDEN_G2_HASH = 'ec75f7f7e0948cb4cd6985d8d660ec93081ecc51ca4a0e733f25b9527c6b1bde'
 
 // Task 16 Step 0 took C9's four pins off. Task 37 took C11's fourteen off in one act: this
 // world has nothing suppressed in it at all. Every C11 law — mortality, thirst, fauna,

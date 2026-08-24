@@ -89,7 +89,7 @@ const GOLDEN_G1 = 'f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182eff
 // decision, so the merge re-pins it to main's.
 // Re-pinned again by the `hut` → `house` rename lane (previous: c1c51b42…), whose scripted
 // fixture builds a dwelling and therefore carries the kind string into the state hash.
-const GOLDEN_G2 = '00d724345c37104d6c93f10398b96eded080b58db78108746e2a037fce836a10'
+const GOLDEN_G2 = 'ec75f7f7e0948cb4cd6985d8d660ec93081ecc51ca4a0e733f25b9527c6b1bde'
 
 const git = (...args: string[]): string =>
   execFileSync('git', args, { cwd: REPO, encoding: 'utf8' }).trim()
