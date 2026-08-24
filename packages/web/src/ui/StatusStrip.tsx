@@ -95,22 +95,20 @@ export function LensTabsView({ lens, hints, onNav }: { lens: Lens; hints: LensHi
   )
 }
 
-/** ★ ONE READER, TWO BADGES, AND EACH READS ITS OWN PANEL'S ENDPOINT. Both counts are history
- *  rather than a tick reading, so a slow beat keeps them honest without putting a fetch on the
- *  world's clock. `size` pulls the number out of whatever shape that endpoint answers in. */
-function useRemoteCount<T>(
-  url: string, parse: (json: unknown) => { success: true; data: T } | { success: false },
-  size: (data: T) => number, everyMs: number,
+/** ★ ONE READER, TWO BADGES, AND EACH READS ITS OWN PANEL'S ENDPOINT — how many rows a history
+ *  endpoint is holding, on that endpoint's own slow beat, so no count rides the world's clock.
+ *  `null` until the first answer and after any failure: no badge is better than a wrong one,
+ *  which is the whole subject of the note over `chronicle` below. */
+function useHistoryCount(
+  url: string, rows: (body: unknown) => number | null, everyMs: number,
 ): number | null {
   const [count, setCount] = useState<number | null>(null)
   useEffect(() => {
     let alive = true
     const load = (): void => {
       void fetch(url)
-        .then(async (r) => (r.ok ? parse(await r.json()) : null))
-        .then((parsed) => {
-          if (alive && parsed?.success === true) setCount(size(parsed.data))
-        })
+        .then(async (r) => (r.ok ? rows(await r.json()) : null))
+        .then((n) => { if (alive && n !== null) setCount(n) })
         .catch(() => { /* no badge is better than a wrong one */ })
     }
     load()
@@ -119,11 +117,20 @@ function useRemoteCount<T>(
       alive = false
       clearInterval(timer)
     }
-    // the three arguments are module constants at every call site; re-running on identity
-    // would refetch on every render
+    // `rows` is a module-level parser, not a prop — re-subscribing on it would restart the beat
+    // every render. The url and its beat are the identity of the feed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, everyMs])
   return count
+}
+
+const bondRows = (body: unknown): number | null => {
+  const p = BondsResponseSchema.safeParse(body)
+  return p.success ? p.data.bonds.length : null
+}
+const chronicleRows = (body: unknown): number | null => {
+  const p = ChronicleResponseSchema.safeParse(body)
+  return p.success ? p.data.entries.length : null
 }
 
 // The lens bar subscribes on its own so the counts can tick without re-rendering App and,
@@ -131,16 +138,12 @@ function useRemoteCount<T>(
 export function LensTabs({ store, lens, onNav }: { store: WorldStore; lens: Lens; onNav: (l: Lens) => void }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
-  const bonds = useRemoteCount(
-    '/api/bonds', (j) => BondsResponseSchema.safeParse(j), (d) => d.bonds.length, BOND_COUNT_REFETCH_MS,
-  )
-  // ★ THE SAME ENDPOINT `ChroniclePanel` LISTS FROM, so the badge and the panel behind it can
-  // never again disagree. It used to count the live socket feed instead: `CHRONICLE 0` over
-  // sixteen entries, on the first screen a viewer sees.
-  const chronicle = useRemoteCount(
-    '/api/chronicle', (j) => ChronicleResponseSchema.safeParse(j), (d) => d.entries.length,
-    CHRONICLE_COUNT_REFETCH_MS,
-  )
+  const bonds = useHistoryCount('/api/bonds', bondRows, BOND_COUNT_REFETCH_MS)
+  // ★ THE SAME ENDPOINT `ChroniclePanel` LISTS FROM — the ledger the chronicle lens actually
+  // opens on — so the badge and the panel behind it can never again disagree. It used to count
+  // the live socket feed instead: `CHRONICLE 0` over sixteen entries, on the first screen a
+  // viewer sees. See the note over `lensHints`.
+  const chronicle = useHistoryCount('/api/chronicle', chronicleRows, CHRONICLE_COUNT_REFETCH_MS)
   const stats = townStats(state, tick)
   return <LensTabsView lens={lens} hints={lensHints(stats, lensCountsFor(stats, chronicle, bonds))} onNav={onNav} />
 }

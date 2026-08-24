@@ -7,7 +7,8 @@ import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
 import { structureDepthBox, tileDepthBox, type DepthBox } from './depth.js'
 import { TILE_H, depthKey, tileToScreen } from './iso.js'
 import type { DepthEntry } from './layers.js'
-import { doorLocalRect, doorSillPolygon } from './hitShapes.js'
+import { DOOR_SILL_INSET, DOOR_SILL_STEP, doorLocalRect, doorSillPolygon } from './hitShapes.js'
+import { LANDMARK_INK, LANDMARK_PLATE } from './legibility.js'
 import { anchorForSprite } from './tooltip.js'
 import type { Scene } from './scene.js'
 import {
@@ -67,9 +68,40 @@ export const ENTERABLE_KINDS: ReadonlySet<string> = new Set(INTERIOR_KINDS)
 // a warm step in front of the doorway — never a slab painted over the building's own face.
 // A dark plate on the wall was exactly the artefact the user reported.
 export const DOOR_SILL = 0xf2c879         // --honey, the lit step
+/** @deprecated the rim is a two-tone ledge now (`DOOR_RIM_INK` / `DOOR_RIM_LIT`). Kept because
+ *  `entities.test.ts` cites it as the single-line before-state. */
 export const DOOR_LINTEL = 0x43394a       // --ink, its 1px rim
-export const DOOR_IDLE_ALPHA = 0.45
-export const DOOR_HOVER_ALPHA = 1
+
+// ★ THE ONE AFFORDANCE FOR "YOU CAN GO IN HERE" WAS BEHIND AN OPACITY, AND THE BAR SAYS
+// OPACITY IS NOT A CONTRAST STRATEGY.
+//
+// The sill was drawn whole and then dimmed — `door.alpha = 0.45` over the fill AND its rim —
+// so the boundary, the part that has to be seen, was 45 % of itself. Measured through
+// `legibility.readableRatio` against the six tones `ground.ts` can paint under a doorway
+// (grass, earth, rock, sand, road, path), in BOTH light bands, worst case of the six:
+//
+//                                day    night
+//   --ink rim at 0.45            1.74    1.35     what shipped — fails 1.4.11 in both bands
+//   --ink rim at 1.00            3.71    1.83     opaque is not enough AFTER DARK
+//   --honey fill at any alpha    1.05    1.02     honey and mid grass share a luminance
+//
+// ★ AND NO SINGLE COLOUR FIXES IT. Every candidate was measured over the same six grounds in
+// both bands and the dual-band set is EMPTY, exactly as it is for the chrome's palette: the
+// best dark (`--deep`) is 5.46 / 2.16 and the best light (`--cream`) is 1.34 / 1.30, because
+// the night multiply compresses every pair toward the tint. A mark whose legibility is a
+// function of the ground cannot clear 3:1 on ground this varied under a tint this deep.
+//
+// So the rim does not depend on the ground: it is the STEPPED LEDGE every floating slab in
+// this town already wears, an ink line with a lit line one pixel inside it. Its contrast is
+// the contrast of the two lines with EACH OTHER — `LANDMARK_INK` on `LANDMARK_PLATE`, which
+// `legibility.ts` has already proved at 15.02:1 by day and 5.19:1 at night — and that number
+// is the same on grass, on sand and on the road. The honey stays as the warmth of the step,
+// which is all it was ever contributing.
+export const DOOR_RIM_INK = LANDMARK_INK
+export const DOOR_RIM_LIT = LANDMARK_PLATE
+export const DOOR_SILL_FILL_ALPHA = 0.45
+export const DOOR_RIM_ALPHA = 1
+export const DOOR_HOVER_FILL_ALPHA = 0.85
 
 export function doorTileOf(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): { x: number; y: number } {
   return { x: s.x + ((s.w - 1) >> 1), y: s.y + s.h - 1 }
@@ -106,6 +138,11 @@ type Entry = {
   footprint: { w: number; h: number }
   /** the camera scale this door's target was last cut for — the 24 px floor is a SCREEN size */
   doorZoom: number
+  /** the sill's own fill strength. Lives on the entry rather than on the node because the rim
+   *  must NOT follow it: a node alpha dims the boundary too, which is the thing that has to
+   *  be seen. Hover brightens the step; it never brightens the outline, which is already at
+   *  full strength. */
+  doorFill: number
   /** the ground this drawable stands on, republished every sync for the frame's depth sort */
   box: DepthBox
 }
@@ -178,18 +215,23 @@ function applyBuildingArt(
  * on the ground it never punches a hole in the building's own art. Re-cut whenever the
  * sprite's scale moves, so it stays one size on screen at any art resolution.
  */
-function layoutDoor(entry: Entry, zoom = entry.doorZoom): void {
+function layoutDoor(entry: Entry, zoom = entry.doorZoom, fillAlpha = entry.doorFill): void {
   const door = entry.door
   if (door === null) return
   entry.doorZoom = zoom
+  entry.doorFill = fillAlpha
   const footprint = entry.footprint
   const scale = entry.sprite.scale.x || 1
   door.clear()
   door.poly(doorSillPolygon(footprint, scale))
-  door.fill(DOOR_SILL)
+  door.fill({ color: DOOR_SILL, alpha: fillAlpha })
+  // The ledge, lit line first and ink line over it, both at full strength. The node is never
+  // dimmed: a node alpha takes the boundary down with the fill, which is the defect the table
+  // above measures.
+  door.poly(doorSillPolygon(footprint, scale, DOOR_SILL_INSET + DOOR_SILL_STEP))
+  door.stroke({ width: 1 / scale, color: DOOR_RIM_LIT, alignment: 0.5, alpha: DOOR_RIM_ALPHA })
   door.poly(doorSillPolygon(footprint, scale))
-  door.stroke({ width: 1 / scale, color: DOOR_LINTEL, alignment: 0.5 })
-  door.alpha = DOOR_IDLE_ALPHA
+  door.stroke({ width: 1 / scale, color: DOOR_RIM_INK, alignment: 0.5, alpha: DOOR_RIM_ALPHA })
   door.position.set(0, 0)
   // The 24 px floor is a SCREEN size, so the target is re-cut on a zoom change, not per frame.
   const r = doorLocalRect(footprint, scale, zoom)
@@ -319,7 +361,8 @@ export function syncEntities(
       sprite.hitArea = new Polygon(footprintHitPoints(s.w, s.h))   // until the art sets its scale
       entry = {
         sprite, url: '', pips: null, form: null, door: null,
-        footprint: { w: s.w, h: s.h }, doorZoom: sync.doorZoom, box: structureDepthBox(key, s),
+        footprint: { w: s.w, h: s.h }, doorZoom: sync.doorZoom, doorFill: DOOR_SILL_FILL_ALPHA,
+        box: structureDepthBox(key, s),
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
@@ -361,7 +404,7 @@ export function syncEntities(
       const sw = s.w, sh = s.h
       door.on('pointerover', (e: FederatedPointerEvent) => {
         e.stopPropagation()   // one pointer names ONE thing: the door, not also its building
-        door.alpha = DOOR_HOVER_ALPHA
+        layoutDoor(self, self.doorZoom, DOOR_HOVER_FILL_ALPHA)
         const name = hoverLabel(store.getState(), 'structure', sid)
         const k = self.sprite.scale.x || 1
         const r = doorLocalRect({ w: sw, h: sh }, k)
@@ -374,7 +417,7 @@ export function syncEntities(
       })
       door.on('pointerout', (e: FederatedPointerEvent) => {
         e.stopPropagation()
-        door.alpha = DOOR_IDLE_ALPHA
+        layoutDoor(self, self.doorZoom, DOOR_SILL_FILL_ALPHA)
         tags.hide('door')
       })
       door.on('pointertap', (e: FederatedPointerEvent) => {
@@ -407,7 +450,8 @@ export function syncEntities(
       })
       entry = {
         sprite, url: '', pips: null, form: null, door: null,
-        footprint: { w: 1, h: 1 }, doorZoom: 1, box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX),
+        footprint: { w: 1, h: 1 }, doorZoom: 1, doorFill: DOOR_SILL_FILL_ALPHA,
+        box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX),
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
@@ -437,7 +481,8 @@ export function syncEntities(
       })
       entry = {
         sprite, url: '', pips: null, form: null, door: null,
-        footprint: { w: 1, h: 1 }, doorZoom: 1, box: tileDepthBox(key, c.x, c.y),
+        footprint: { w: 1, h: 1 }, doorZoom: 1, doorFill: DOOR_SILL_FILL_ALPHA,
+        box: tileDepthBox(key, c.x, c.y),
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)

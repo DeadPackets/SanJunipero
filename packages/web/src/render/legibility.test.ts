@@ -1,8 +1,13 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
-  AA_RATIO, LANDMARK_INK, LANDMARK_PLATE, LIGHT_BANDS, WORLD_TEXT_PAIRS, bandRatios,
-  readableRatio, tintedBy, worldTextOffenders,
+  AA_RATIO, LANDMARK_INK, LANDMARK_PLATE, LIGHT_BANDS, UI_BOUNDARY_RATIO, WORLD_TEXT_PAIRS,
+  bandRatios, groundMarkOffenders, over, readableRatio, tintedBy, worldTextOffenders,
 } from './legibility.js'
+import {
+  DOOR_HOVER_FILL_ALPHA, DOOR_LINTEL, DOOR_RIM_ALPHA, DOOR_RIM_INK, DOOR_RIM_LIT, DOOR_SILL,
+  DOOR_SILL_FILL_ALPHA,
+} from './entities.js'
 import { TILE_COLORS } from './ground.js'
 import { SPEECH_FILL, SPEECH_INK, THOUGHT_FILL, THOUGHT_INK } from './textFaces.js'
 import { clockTint } from './tints.js'
@@ -54,6 +59,76 @@ describe('every word the world says clears AA in BOTH bands, not just in dayligh
     expect(SPEECH_FILL).not.toBe(THOUGHT_FILL)
     for (const [ink, fill] of [[SPEECH_INK, SPEECH_FILL], [THOUGHT_INK, THOUGHT_FILL]] as const) {
       expect(bandRatios(ink, fill).night).toBeGreaterThanOrEqual(AA_RATIO)
+    }
+  })
+})
+
+// ── ★ THE DOOR SILL: A MARK WITH NO PAPER OF ITS OWN ──────────────────────────────────────
+
+/** The tile tones the block lattice can plat under a doorway: grass, the bare earth and rock
+ *  of a yard, sand, the road strip and the path the feet made. Water, forest, farmland and
+ *  the channel are not door ground and are not held to this. */
+const DOOR_GROUNDS = ([0, 1, 4, 5, 7, 8] as const).map((t) => TILE_COLORS[t])
+
+describe('★ the one affordance for "you can go in here"', () => {
+  it('reproduces what shipped: a 45 % rim fails the boundary floor on EVERY door ground', () => {
+    const dimmed = DOOR_GROUNDS.map((g) => over(DOOR_LINTEL, g, 0.45))
+    for (const [i, g] of DOOR_GROUNDS.entries()) {
+      expect(readableRatio(dimmed[i]!, g, LIGHT_BANDS.day)).toBeLessThan(UI_BOUNDARY_RATIO)
+      expect(readableRatio(dimmed[i]!, g, LIGHT_BANDS.night)).toBeLessThan(UI_BOUNDARY_RATIO)
+    }
+  })
+
+  it('★ and OPAQUE was not the fix either — the night multiply takes it back under', () => {
+    const grass = TILE_COLORS[0]
+    expect(readableRatio(DOOR_LINTEL, grass, LIGHT_BANDS.day)).toBeGreaterThan(UI_BOUNDARY_RATIO)
+    expect(readableRatio(DOOR_LINTEL, grass, LIGHT_BANDS.night)).toBeLessThan(UI_BOUNDARY_RATIO)
+  })
+
+  it('★★ THE DUAL-BAND SET FOR A GROUND-DEPENDENT RIM IS EMPTY, which is why there is a ledge', () => {
+    // Every colour a lane might reach for, over the six grounds, in both bands. Not one of
+    // them clears — the dark ones die at night, the light ones die on sand. This is the
+    // measurement that makes the two-tone edge a conclusion rather than a taste, and it is
+    // the test that goes red if somebody flattens the ledge back to one line.
+    const candidates = [0x43394a, 0x241f2b, 0xfff6e9, 0xf8dca2, 0xffffff, 0xf2c879, 0x000000]
+    for (const c of candidates) {
+      expect(
+        groundMarkOffenders(`#${c.toString(16)}`, c, DOOR_GROUNDS),
+        `a single rim colour cleared both bands: #${c.toString(16)}`,
+      ).not.toEqual([])
+    }
+  })
+
+  it('★ so the sill wears the stepped ledge, whose contrast is with ITSELF and not the ground', () => {
+    expect(DOOR_RIM_INK).toBe(LANDMARK_INK)
+    expect(DOOR_RIM_LIT).toBe(LANDMARK_PLATE)
+    const r = bandRatios(DOOR_RIM_INK, DOOR_RIM_LIT)
+    expect(r.day).toBeGreaterThanOrEqual(UI_BOUNDARY_RATIO)
+    expect(r.night).toBeGreaterThanOrEqual(UI_BOUNDARY_RATIO)
+    // and it clears AA, not merely the boundary floor, in both bands
+    expect(Math.min(r.day, r.night)).toBeGreaterThanOrEqual(AA_RATIO)
+  })
+
+  it('★ and the node is NEVER dimmed — an alpha on the graphics takes the rim with the fill', () => {
+    const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
+    const body = src.slice(src.indexOf('function layoutDoor('), src.indexOf('function drawPips('))
+    expect(body).not.toMatch(/door\.alpha\s*=/)
+    expect(body).toMatch(/color: DOOR_RIM_INK, alignment: 0\.5, alpha: DOOR_RIM_ALPHA/)
+    expect(body).toMatch(/color: DOOR_RIM_LIT, alignment: 0\.5, alpha: DOOR_RIM_ALPHA/)
+    expect(DOOR_RIM_ALPHA).toBe(1)
+    // hover brightens the STEP; the outline is already at full strength and has nowhere to go
+    expect(DOOR_HOVER_FILL_ALPHA).toBeGreaterThan(DOOR_SILL_FILL_ALPHA)
+    // nowhere else either — the hover handlers used to set it. Comments may quote the old
+    // line, and one above this very function does.
+    const code = src.split('\n').map((l) => l.trim()).filter((l) => !l.startsWith('//') && !l.startsWith('*'))
+    expect(code.filter((l) => /door\.alpha\s*=(?!=)/.test(l))).toEqual([])
+  })
+
+  it('the honey fill is warmth and was never the affordance, at any alpha', () => {
+    for (const a of [0.45, 0.85, 1]) {
+      const grass = TILE_COLORS[0]
+      expect(readableRatio(over(DOOR_SILL, grass, a), grass, LIGHT_BANDS.day))
+        .toBeLessThan(UI_BOUNDARY_RATIO)
     }
   })
 })

@@ -222,10 +222,20 @@ export function createInteriorScene(
     sprite.scale.set(furnishingScale(SLOT_TILES))
     sprite.position.set(sx, sy)
     sprite.zIndex = z
+    // ★ THE ROOM AND ITS FURNITURE ARRIVE IN THE SAME FRAME. `book.get(...).then(...)` alone
+    // could not do that: the plan is built inside the frame that first paints the room, and a
+    // `.then` — even on a texture already in the book — runs on a microtask, i.e. after that
+    // frame is on the glass. Every room's first painted frame was therefore an empty room, and
+    // a viewer sampling the screen at intervals sees "the walls, and then the furniture".
+    // `peek` closes it for a warm book; a cold one still takes the round trip and the fade.
     const url = item.url ?? PLACEHOLDER_URL
-    void book.get(url).then((t) => {
-      if (!sprite.destroyed) applyHalf(sprite, t, half)   // native px; the room's zoom is the only scale
-    })
+    const inHand = book.peek(url)
+    if (inHand !== null) applyHalf(sprite, inHand, half)   // native px; the room's zoom is the only scale
+    else {
+      void book.get(url).then((t) => {
+        if (!sprite.destroyed) applyHalf(sprite, t, half)
+      })
+    }
     furniture.set(key, sprite)
     room.addChild(sprite)
     // The glow belongs to the whole furnishing, so only the front half of a split one wears it.

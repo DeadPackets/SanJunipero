@@ -11,6 +11,7 @@ import { TAG_PAD_X, TAG_PAD_Y, anchorForSprite, placeTag } from './tooltip.js'
 import { characterArt, type TextureBook } from './textures.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
 import { faceFor, worldTextScale } from './textFaces.js'
+import { CROWD_SETTLE_MS, NO_OFFSET, crowdOffsets, type CrowdOffset } from './crowd.js'
 import {
   CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, NAME_TAG_ABOVE_HEAD_PX,
   SHEET_COLS, SHEET_ROWS, WALK_LEAD_TICKS, charPose, emoteFor, gaitOf, initialTickClock,
@@ -56,6 +57,12 @@ type CharEntry = {
   legMs: number
   /** the tile the body is standing on RIGHT NOW — interpolated, never rounded (F-3c) */
   box: DepthBox
+  /** where in its tile's rank this body is standing, and where it is sliding to. A world
+   *  offset, so the box, the cull, the shadow and every label follow it for free. */
+  crowd: CrowdOffset
+  crowdFrom: CrowdOffset
+  crowdTo: CrowdOffset
+  crowdSinceMs: number
 }
 
 export type CharacterLayer = {
@@ -237,6 +244,7 @@ export function createCharacterLayer(
       sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, figureH: 0, hitScale: 0,
       emoteUntil: 0, facing: 'sw', gait: gaitOf(agentId), legMs: clock.periodMs,
       path: [{ x, y, atMs: now }], box: bodyDepthBox(agentId, x, y),
+      crowd: NO_OFFSET, crowdFrom: NO_OFFSET, crowdTo: NO_OFFSET, crowdSinceMs: now,
     }
     setHitScale(e, CHAR_TARGET_PX / 64, 64)
     entries.set(agentId, e)
@@ -304,6 +312,13 @@ export function createCharacterLayer(
       }
     }
     const live = new Set<string>()
+    // ★ TWO PASSES, BECAUSE A RANK IS A PROPERTY OF A TILE AND NOT OF A BODY. Where a body
+    // stands now depends on who else is standing there, so every position is settled before
+    // any of them is drawn. One frame's worth of small arrays; the cull still runs downstream.
+    const standing: Array<{ id: string; x: number; y: number; settled: boolean }> = []
+    const drawing: Array<{
+      a: { id: string; name: string }; e: CharEntry; pos: { x: number; y: number }; bobY: number
+    }> = []
     for (const a of Object.values(state.agents)) {
       if (!rendersOnMap(a)) continue
       live.add(a.id)
@@ -345,9 +360,33 @@ export function createCharacterLayer(
           setHitScale(e, CHAR_TARGET_PX / 64, 64)
         }
       }
-      const { sx, sy } = tileToScreen(pos.x, pos.y)
-      e.sprite.position.set(sx, sy + pose.bobY)
-      e.box = bodyDepthBox(a.id, pos.x, pos.y)
+      standing.push({ id: a.id, x: pos.x, y: pos.y, settled: !walking })
+      drawing.push({ a, e, pos, bobY: pose.bobY })
+    }
+
+    // ── pass two: the rank, then everything that hangs off a body's position ────────────────
+    const ranks = crowdOffsets(standing)
+    for (const { a, e, pos, bobY } of drawing) {
+      // A slot change is a glide, not a jump: a group re-forms as somebody joins it. Reduced
+      // motion gets the destination, which is the point of the arrangement.
+      const want = ranks.get(a.id) ?? NO_OFFSET
+      if (want.dx !== e.crowdTo.dx || want.dy !== e.crowdTo.dy) {
+        e.crowdFrom = e.crowd
+        e.crowdTo = want
+        e.crowdSinceMs = nowMs
+      }
+      const t = scene.wantsMotion()
+        ? Math.min(1, Math.max(0, (nowMs - e.crowdSinceMs) / CROWD_SETTLE_MS))
+        : 1
+      e.crowd = t >= 1 ? e.crowdTo : {
+        dx: e.crowdFrom.dx + (e.crowdTo.dx - e.crowdFrom.dx) * t,
+        dy: e.crowdFrom.dy + (e.crowdTo.dy - e.crowdFrom.dy) * t,
+      }
+      const px = pos.x + e.crowd.dx
+      const py = pos.y + e.crowd.dy
+      const { sx, sy } = tileToScreen(px, py)
+      e.sprite.position.set(sx, sy + bobY)
+      e.box = bodyDepthBox(a.id, px, py)
       e.shadow.position.set(sx, sy)
       e.emote.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX)
       e.emote.visible = !emotesHidden && nowMs < e.emoteUntil && e.emote.texture !== Texture.EMPTY

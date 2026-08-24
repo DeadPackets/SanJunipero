@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { BOND_NOTES } from '@sj/shared'
 import type { AgentBody, WorldState } from '@sj/engine/state'
-import { LENSES } from './route.js'
+import { LENSES, type Lens } from './route.js'
 import {
   EMPTY_COPY, GAMIFICATION_BAN, WEATHER_GLYPH, countsFromWorld, lensCountsFor, lensHints, townStats,
   type LensCounts,
@@ -94,6 +94,42 @@ describe('lensHints', () => {
     // Zero is a real answer and must survive: a town with nothing written down says so.
     expect(lensCountsFor(stats, 0, 0).chronicle).toBe(0)
     expect(lensCountsFor(stats, 0, 0).society).toBe(0)
+  })
+
+  it('★★ THE BADGE AND ITS LABEL ARE ONE NUMBER, not two that can disagree', () => {
+    // A hint is the tooltip AND the screen-reader label for the badge beside it. When the
+    // hint was built before the override was applied, the two could name different numbers on
+    // the same button — the defect this whole change is about, one layer down.
+    const declared: LensCounts = {
+      ...countsFromWorld(stats), chronicle: 11, inspector: 40, society: 3, director: 4,
+    }
+    for (const h of lensHints(stats, declared)) {
+      if (h.count === null) continue
+      expect(h.hint, `${h.lens}: hint does not carry its own count`).toContain(String(h.count))
+    }
+    const hintOf = (over: Partial<LensCounts>, lens: Lens): string =>
+      lensHints(stats, { ...countsFromWorld(stats), ...over }).find((h) => h.lens === lens)!.hint
+    expect(hintOf({ chronicle: 11 }, 'chronicle')).toBe('11 in the town’s own ledger')
+    // ★ AND IT WAS TWO LENSES, NOT ONE. `Bonds` and `Moments` rendered a visible count that
+    // the button's own aria-label never mentioned, and the badge itself is `aria-hidden`, so
+    // there was no way to hear the number at all.
+    expect(hintOf({ society: 3 }, 'society')).toBe('3 ties the town has made')
+    expect(hintOf({ director: 4 }, 'director')).toBe('4 days the town kept')
+  })
+
+  it('and a lens with no count keeps its prose, with no empty parenthesis in it', () => {
+    for (const h of lensHints(stats)) {
+      if (h.count !== null) continue
+      expect(h.hint, h.lens).not.toMatch(/\(\s*\)|\bnull\b|undefined|NaN/)
+    }
+  })
+
+  it('takes a count override for the lenses whose readers land later', () => {
+    const over: LensCounts = { ...countsFromWorld(stats), society: 7, director: 0 }
+    const by = new Map(lensHints(stats, over).map((h) => [h.lens, h]))
+    expect(by.get('society')!.count).toBe(7)
+    expect(by.get('director')!.count).toBe(0)
+    expect(lensHints(stats).find((h) => h.lens === 'society')!.count).toBeNull()
   })
 
   it('never speaks the language of a game (living-documentary law)', () => {

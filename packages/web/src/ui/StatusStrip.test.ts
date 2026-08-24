@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -46,6 +47,14 @@ describe('StatusStripView', () => {
 describe('LensTabsView', () => {
   const hints = lensHints(stats)
   const html = renderToStaticMarkup(createElement(LensTabsView, { lens: 'chronicle', hints, onNav: () => {} }))
+  // The same bar once both history endpoints have answered: the only render in which a lens
+  // other than the living carries a badge at all, so it is the one the "speaks its badge" law
+  // below has to walk.
+  const badged = renderToStaticMarkup(createElement(LensTabsView, {
+    lens: 'chronicle',
+    hints: lensHints(stats, { ...countsFromWorld(stats), chronicle: 11, society: 3 }),
+    onNav: () => {},
+  }))
 
   it('renders one labelled tab per lens and marks the current one', () => {
     for (const lens of LENSES) expect(html, lens).toContain(`>${LENS_LABELS[lens]}`)
@@ -56,7 +65,34 @@ describe('LensTabsView', () => {
   it('carries a hint on every tab, for the pointer and the screen reader alike', () => {
     expect(html).toContain('title="Walk the town"')
     expect(html).toContain('aria-label="Town — Walk the town"')
-    expect(html).toContain('aria-label="Townsfolk — Townsfolk (2)"')
+    expect(html).toContain('aria-label="Townsfolk — 2 walking the town"')
+  })
+
+  it('★ and every VISIBLE count is spoken, because the badge itself is aria-hidden', () => {
+    // The number is decoration in the tree; the label is the only place it exists for a
+    // screen reader. A tab that shows a count and does not say it is a tab whose count only
+    // some readers get.
+    for (const [, label, badge] of badged.matchAll(
+      /aria-label="[^—]+— ([^"]*)"[^>]*>[^<]*(?:<span class="tab-count" aria-hidden="true">(\d+)<\/span>)?/g,
+    )) {
+      if (badge === undefined) continue
+      expect(label, `a badge of ${badge} that the label never says`).toContain(badge)
+    }
+  })
+
+  it('★ and the strip ACTUALLY ASKS for every count it is able to badge', () => {
+    // `lensHints` is a pure model and its tests can only prove what it does with a number it
+    // is handed. Deleting the fetch that hands it over leaves every model test green and puts
+    // the badge back to nothing — a per-element law that cannot see the screen. This is the
+    // wiring, named.
+    const src = readFileSync(new URL('./StatusStrip.tsx', import.meta.url), 'utf8')
+    const body = src.slice(src.indexOf('export function LensTabs('))
+    for (const [lens, url, binding] of [
+      ['society', '/api/bonds', 'bonds'], ['chronicle', '/api/chronicle', 'chronicle'],
+    ] as const) {
+      expect(body, `${lens} must be badged from ${url}`).toContain(`useHistoryCount('${url}'`)
+      expect(body, `${lens} must reach the counts object`).toMatch(new RegExp(`\\b${binding}\\b`))
+    }
   })
 
   it('badges only the lenses that have a real count', () => {
