@@ -39,11 +39,11 @@ export const GENESIS_BUILDER_ID = 'genesis'
 export type Durability = { maxHp: number; flammable: boolean }
 // The storehouse and the three dwellings came OFF this table when `roofed` landed: they need a
 // `structures.recipes` row to say they have a roof, and a row already carries hp and flammable,
-// so keeping them here would have been the same two numbers written twice (G4).
+// so keeping them here would have been the same two numbers written twice (G4). The fire pit
+// went the same way when `hearth` landed, for the same reason and with the same two numbers.
 const GENESIS_STRUCTURE_DEFS: Readonly<Record<string, Durability>> = {
   shed: { maxHp: 20, flammable: true },
   wagon: { maxHp: 15, flammable: true },
-  fire_pit: { maxHp: 10, flammable: false },
 }
 
 /** What a genesis-placed structure is made of: a buildable kind takes its recipe, a placed-only

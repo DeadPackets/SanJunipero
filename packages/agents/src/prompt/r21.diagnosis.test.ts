@@ -321,10 +321,11 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     // a mind is never given is a word it never uses. Nothing in the prompt names one.
     const buildable = Object.keys(CFG.structures.recipes).sort()
     const craftable = Object.keys(CFG.crafting.recipes).sort()
-    // Four more rows since `roofed` landed — the kinds the world plants and nobody raises now
-    // need a row to say they have a roof. An empty `inputs` still keeps them out of `makeables`.
+    // Four more rows since `roofed` landed and a fifth since `hearth` did — the kinds the world
+    // plants and nobody raises need a row to say what they ARE. An empty `inputs` still keeps
+    // every one of them out of `makeables`, which is asserted two lines down.
     expect(buildable).toEqual([
-      'bridge', 'cabin', 'cottage', 'farmhouse', 'grave', 'house', 'storehouse', 'well',
+      'bridge', 'cabin', 'cottage', 'farmhouse', 'fire_pit', 'grave', 'house', 'storehouse', 'well',
     ])
     expect(craftable).toEqual(['cloth', 'garment', 'plank'])
     // The one place a mind is taught its verbs asks for both nouns and names neither, and

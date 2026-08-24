@@ -14,7 +14,7 @@ import { bridgeAt, BRIDGE_KIND, findPath, isPassable, searchPath } from './path.
 import { claimInWorld, layBlock, townSquareOf, type TileChange } from './town.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 import { fleeTo } from './systems/fauna.js'
-import { HEAT_SOURCE_KINDS } from './systems/warmth.js'
+import { isHeatSource } from './systems/warmth.js'
 import { FAUNA_YIELD, type FaunaKind } from './data/faunaDefs.js'
 import { FORAGEABLE_YIELD } from './data/forageables.js'
 
@@ -510,7 +510,7 @@ export const StokeParams = z.object({ structureId: z.string() }).strict()
 // A thing you can carry and set alight: it glows, and it is not a building. One table of what
 // glows (`light.glowRadius`) answers both halves, so a codified lantern needs no second list.
 export function isKindleable(config: SimConfig, kind: string): boolean {
-  return glowRadiusFor(config, kind) !== undefined && !HEAT_SOURCE_KINDS.has(kind)
+  return glowRadiusFor(config, kind) !== undefined && !isHeatSource(config, kind)
 }
 
 // What is left in this torch: a full one has never been struck, a snuffed one remembers.
@@ -561,22 +561,33 @@ const snuff: VerbDef = makeVerb({
 
 export const FUEL_KIND = 'wood'
 
+// ★ WHERE A BODY IS WHEN IT IS INDOORS, IN ONE LINE. A body inside a building is AT the fire in
+// that building, whichever tile it stands on — a room is one place, and this world's unit of
+// reach is a whole footprint. A body inside somewhere ELSE is at no fire at all: a wall stops
+// the heat exactly as `stow`'s wall stops a pair of hands. Outdoors it is the reach every other
+// verb uses, unchanged.
+function atTheFire(state: WorldState, agentId: string, s: Structure): boolean {
+  const a = state.agents[agentId]!
+  if (a.insideId !== undefined) return a.insideId === s.id
+  return nearRect(state, agentId, s.x, s.y, s.w, s.h)
+}
+
 const stoke: VerbDef = makeVerb({
   kind: 'stoke',
-  validate(state, _config, agentId, params) {
+  validate(state, config, agentId, params) {
     const p = StokeParams.safeParse(params)
     if (!p.success) return 'stoke needs a {structureId}'
     const s = state.structures[p.data.structureId]
-    if (!s || !HEAT_SOURCE_KINDS.has(s.kind)) return 'there is no fire there to feed'
+    if (!s || !isHeatSource(config, s.kind)) return 'there is no fire there to feed'
     if (s.stage !== 'complete') return 'it is not finished'
-    if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to the fire'
+    if (!atTheFire(state, agentId, s)) return 'not close enough to the fire'
     if (heldQty(state, agentId, FUEL_KIND) < 1) return shortOf(FUEL_KIND)
     return null
   },
   onComplete(state, config, agentId, params) {
     const p = StokeParams.parse(params)
     const s = state.structures[p.structureId]
-    if (!s || !HEAT_SOURCE_KINDS.has(s.kind) || heldQty(state, agentId, FUEL_KIND) < 1) return []
+    if (!s || !isHeatSource(config, s.kind) || heldQty(state, agentId, FUEL_KIND) < 1) return []
     return [
       ...consumeHeld(state, agentId, FUEL_KIND, 1),
       { type: 'structure_fueled', payload: { structureId: p.structureId, burnsUntilTick: state.tick + config.light.fuelBurnTicks } },
@@ -1396,13 +1407,14 @@ const heldWater = (state: WorldState, agentId: string) =>
   Object.keys(state.items).sort().map((id) => state.items[id]!)
     .find((i) => i.loc.t === 'agent' && i.loc.id === agentId && VESSEL_KINDS.has(i.kind) && (i.charges ?? 0) > 0)
 
-// A fire somebody is feeding, within arm's reach of where the cooking happens.
-function keptFireInReach(state: WorldState, agentId: string): boolean {
+// A fire somebody is feeding, within arm's reach of where the cooking happens — and a hearth
+// somebody has fed is one, so a pot can finally go over a fire that is out of the weather.
+function keptFireInReach(state: WorldState, config: SimConfig, agentId: string): boolean {
   for (const id of Object.keys(state.structures).sort()) {
     const s = state.structures[id]!
-    if (!HEAT_SOURCE_KINDS.has(s.kind) || s.stage !== 'complete') continue
+    if (!isHeatSource(config, s.kind) || s.stage !== 'complete') continue
     if ((s.fueledUntilTick ?? 0) <= state.tick) continue
-    if (nearRect(state, agentId, s.x, s.y, s.w, s.h)) return true
+    if (atTheFire(state, agentId, s)) return true
   }
   return false
 }
@@ -1429,11 +1441,11 @@ export function shortOf(kind: string): string {
 }
 
 // What stands between these hands and this recipe right now, or null when nothing does.
-function craftRefusal(state: WorldState, agentId: string, recipe: SeedRecipe): string | null {
+function craftRefusal(state: WorldState, config: SimConfig, agentId: string, recipe: SeedRecipe): string | null {
   for (const [kind, qty] of Object.entries(recipe.inputs)) {
     if (heldForInput(state, agentId, kind) < qty) return shortOf(kind)
   }
-  if (recipe.atFire && !keptFireInReach(state, agentId)) return 'there is no fire lit here to cook on'
+  if (recipe.atFire && !keptFireInReach(state, config, agentId)) return 'there is no fire lit here to cook on'
   if (recipe.water !== undefined && heldWater(state, agentId) === undefined) return 'you have no water to cook with'
   return null
 }
@@ -1451,7 +1463,7 @@ function chosenRoute(
   }
   let asNamed: string | null = null
   for (const recipe of routes) {
-    const refusal = craftRefusal(state, agentId, recipe)
+    const refusal = craftRefusal(state, config, agentId, recipe)
     if (refusal === null) return { recipe }
     asNamed ??= refusal
   }
@@ -1476,7 +1488,7 @@ const craft: VerbDef = makeVerb({
       if (heldForInput(state, agentId, kind) < qty) return []
       events.push(...consumeForInput(state, agentId, kind, qty))
     }
-    if (recipe.atFire && !keptFireInReach(state, agentId)) return []
+    if (recipe.atFire && !keptFireInReach(state, config, agentId)) return []
     if (recipe.water !== undefined) {
       const vessel = heldWater(state, agentId)
       if (vessel === undefined) return []

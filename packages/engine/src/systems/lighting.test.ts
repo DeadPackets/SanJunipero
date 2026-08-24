@@ -115,14 +115,56 @@ describe('stoke: a fire is warm for as long as somebody feeds it', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toBe('not close enough to the fire')
 
-    let house = holding(bodyAt(0), 'item_1', 'wood')
-    house = fold(house, ev('structure_planned', {
-      id: 'structure_2', kind: 'house', x: 5, y: 4, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
-    }, house.tick), CFG)
-    house = fold(house, ev('structure_completed', { id: 'structure_2' }, house.tick), CFG)
-    const wrong = submitIntent(house, CFG, 'a1', 'stoke', { structureId: 'structure_2' })
+    // ★ THIS CASE USED TO BE A HOUSE, AND THAT WAS THE DEFECT. A house holds a hearth — the
+    // renderer has drawn one in every one of them for two chunks — and `stoke` answered "there
+    // is no fire there to feed". A WELL is the honest example of a building with no fire in it.
+    let well = holding(bodyAt(0), 'item_1', 'wood')
+    well = fold(well, ev('structure_planned', {
+      id: 'structure_2', kind: 'well', x: 5, y: 4, w: 1, h: 1, maxHp: 30, flammable: false, builderId: 'a1',
+    }, well.tick), CFG)
+    well = fold(well, ev('structure_completed', { id: 'structure_2' }, well.tick), CFG)
+    const wrong = submitIntent(well, CFG, 'a1', 'stoke', { structureId: 'structure_2' })
     expect(wrong.ok).toBe(false)
     if (!wrong.ok) expect(wrong.reason).toBe('there is no fire there to feed')
+  })
+
+  // ★ THE GAP THIS LANE EXISTS FOR. A body could walk to the hearth and there was nothing it
+  // could do there: every candidate verb took a `{structureId}` and no structure in the world
+  // was ever a hearth. The house IS the hearth's address, because a house holds exactly one.
+  it('★ a house holds a fire, and the same wood feeds it', () => {
+    let s = holding(bodyAt(0), 'item_1', 'wood')
+    s = fold(s, ev('structure_planned', {
+      id: 'structure_2', kind: 'house', x: 5, y: 4, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
+    }, s.tick), CFG)
+    s = fold(s, ev('structure_completed', { id: 'structure_2' }, s.tick), CFG)
+    const fed = apply(s, 'stoke', { structureId: 'structure_2' })
+    expect(fed.structures.structure_2!.fueledUntilTick).toBe(FUEL)
+    expect(fed.items.item_1).toBeUndefined()
+  })
+
+  it('★ and a body standing INSIDE it is at that fire, wherever in the room it stands', () => {
+    let s = holding(bodyAt(0), 'item_1', 'wood')
+    s = fold(s, ev('structure_planned', {
+      id: 'structure_2', kind: 'house', x: 5, y: 4, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
+    }, s.tick), CFG)
+    s = fold(s, ev('structure_completed', { id: 'structure_2' }, s.tick), CFG)
+    // Standing far away and indoors: the reach that answers is the ROOM, not the footprint.
+    s = fold(s, ev('agent_moved', { id: 'a1', x: 0, y: 0 }, s.tick), CFG)
+    s = fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'structure_2' }, s.tick), CFG)
+    expect(apply(s, 'stoke', { structureId: 'structure_2' }).structures.structure_2!.fueledUntilTick).toBe(FUEL)
+
+    // ★ VACUOUS GUARD: a wall stops a pair of hands. Inside SOMEWHERE ELSE is not at this fire,
+    // even standing on the very tile that would reach it from out under the sky.
+    let other = fold(s, ev('structure_planned', {
+      id: 'structure_3', kind: 'house', x: 8, y: 8, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
+    }, s.tick), CFG)
+    other = fold(other, ev('structure_completed', { id: 'structure_3' }, other.tick), CFG)
+    other = fold(other, ev('agent_exited', { agentId: 'a1', structureId: 'structure_2' }, other.tick), CFG)
+    other = fold(other, ev('agent_moved', { id: 'a1', x: 4, y: 4 }, other.tick), CFG)
+    other = fold(other, ev('agent_entered', { agentId: 'a1', structureId: 'structure_3' }, other.tick), CFG)
+    const walled = submitIntent(other, CFG, 'a1', 'stoke', { structureId: 'structure_2' })
+    expect(walled.ok).toBe(false)
+    if (!walled.ok) expect(walled.reason).toBe('not close enough to the fire')
   })
 })
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, DEFAULT_CONFIG, isRoofedKind, SPAWN_AGE_YEARS, thirstDecayPerTick } from './config.js'
+import { SimConfigSchema, DEFAULT_CONFIG, isHearthKind, isRoofedKind, SPAWN_AGE_YEARS, thirstDecayPerTick } from './config.js'
+import { CITY_HEARTH_KIND, cityStructures } from './cityTemplate.js'
 
 // Every C11 section flag, in the order Task 37 will unpin them.
 const C11_FLAGS = [
@@ -61,6 +62,40 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     for (const k of ['well', 'bridge', 'grave']) expect(isRoofedKind(c, k), k).toBe(false)
     // A kind nothing has ever heard of is not a shelter by accident.
     expect(isRoofedKind(c, 'standing_stone')).toBe(false)
+  })
+
+  // ★ AND NEITHER IS A FIRE. `HEAT_SOURCE_KINDS` was the third roster — two names in a Set in
+  // the warmth system — and it is why the hearth every house has held was a thing the renderer
+  // drew and no verb could reach. Same medicine, same shape: ask the kind.
+  it('a fire is a property of the kind, not a roster of names', () => {
+    const hearths = Object.keys(c.structures.recipes).filter((k) => isHearthKind(c, k)).sort()
+    // Two, not three: the old roster's first name, `hearth`, was a structure kind NOTHING in
+    // this world has ever stood. A hearth is a thing a house has, not a building.
+    expect(hearths).toEqual(['fire_pit', 'house'])
+    expect(c.structures.recipes).not.toHaveProperty('hearth')
+    for (const k of ['well', 'bridge', 'grave', 'storehouse', 'cabin']) expect(isHearthKind(c, k), k).toBe(false)
+    expect(isHearthKind(c, 'standing_stone')).toBe(false)
+    // Neither open fire is a shelter and nobody builds either — an empty `inputs` is the whole
+    // of what "the world places this" means, and `buildableRecipe` reads exactly that.
+    expect(c.structures.recipes['fire_pit']!.inputs).toEqual({})
+    expect(isRoofedKind(c, 'fire_pit')).toBe(false)
+  })
+
+  // ★ THE SEAM THAT MUST NOT DRIFT: the engine's hearth IS the hearth the room draws. The city
+  // template furnishes a house with a hearth and furnishes nothing else with one, and if these
+  // two ever disagree then a mind can feed a fire nobody can see, or see one nobody can feed.
+  //
+  // Only `house` is on both sides today. A cottage and a farmhouse are dwellings a mind can
+  // raise and the template gives them no furnishings at all — the day it does, this test says
+  // so out loud instead of letting the two halves part company in silence.
+  it('the kinds the engine says hold a fire are exactly the kinds the room furnishes with one', () => {
+    const furnished = cityStructures()
+      .filter((s) => s.furnishings.some((f) => f.kind === CITY_HEARTH_KIND))
+      .map((s) => s.kind)
+    expect([...new Set(furnished)].sort()).toEqual(['house'])
+    const dwellingsWithFire = Object.keys(c.structures.recipes)
+      .filter((k) => isHearthKind(c, k) && isRoofedKind(c, k)).sort()
+    expect(dwellingsWithFire).toEqual([...new Set(furnished)].sort())
   })
 
   it('reproduction: partnership, conception, gestation, fertility', () => {
@@ -211,10 +246,10 @@ describe('SimConfigSchema: C9 living-world sections', () => {
 
   it('structures.recipes is the one table that knows what a building costs and measures', () => {
     const r = SimConfigSchema.parse({}).structures.recipes
-    expect(r['house']).toEqual({ inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880, roofed: true })
-    expect(r['well']).toEqual({ inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false })
-    expect(r['bridge']).toEqual({ inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false })
-    expect(r['grave']).toEqual({ inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false })
+    expect(r['house']).toEqual({ inputs: { wood: 10 }, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 2880, roofed: true, hearth: true })
+    expect(r['well']).toEqual({ inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false, hearth: false })
+    expect(r['bridge']).toEqual({ inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false, hearth: false })
+    expect(r['grave']).toEqual({ inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false, hearth: false })
     // The four the town template plants. All four are roofed; an empty `inputs` is still the
     // whole of what "nobody builds this" means, and only the two 2x2 ones keep it — a buildable
     // cabin or storehouse would be a second name for `house`.

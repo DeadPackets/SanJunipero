@@ -1,5 +1,5 @@
 import {
-  isRoofedKind, lightBandAt, simTimeFromTick, visionRadiusAt,
+  isHearthKind, isRoofedKind, lightBandAt, simTimeFromTick, visionRadiusAt,
   type SimConfig, type SimEvent, type SimTime,
 } from '@sj/shared'
 import { FORAGEABLE_PROSE } from './data/forageables.js'
@@ -98,6 +98,15 @@ export type PerceivedStructure = {
   // raise one in 576. Nothing in the packet had ever said a half-raised wall was a place work
   // could go, and five founders raised five separate houses and finished none.
   raised?: { done: number; needs: number }
+  // ★ WHAT IS IN THE ROOM, AND THE ONLY THING IN IT A BODY CAN DO ANYTHING WITH. The five
+  // furnishings a house holds were the renderer's alone: nothing a mind read had ever said
+  // there was a fire in there. Present only on a finished building of a kind that has one —
+  // and `lit` only while somebody is still feeding it, because a fire burns down on its own.
+  //
+  // The bed, the table, the chair and the rug are deliberately NOT here. A mind that is handed
+  // the word "chair" and has no verb for it spends turns being refused, which is a road with
+  // nothing at the end of it; the day a verb reaches one, this is where it becomes visible.
+  hearth?: 'lit' | 'cold'
 }
 
 // Whose it is, and whose hands made it — the two things prose needs to say
@@ -349,12 +358,19 @@ export function composePerception(
     return needs <= 0 ? {} : { raised: { done: Math.min(s.progressTicks, needs), needs } }
   }
 
+  // The fire in the room, off the same property `stoke` validates against and the same clock
+  // `flamesAt` reads — so what a mind is told about a hearth is what the hearth is.
+  const theHearth = (s: Structure): { hearth?: 'lit' | 'cold' } => {
+    if (s.stage !== 'complete' || !isHearthKind(config, s.kind)) return {}
+    return { hearth: (s.fueledUntilTick ?? 0) > state.tick ? 'lit' : 'cold' }
+  }
+
   const visibleStructures: PerceivedStructure[] = Object.values(state.structures)
     .filter(s => (indoors === null ? structureInSight(s) : s.id === indoors))
     .sort(byId)
     .map(s => ({
       id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, burning: s.burning, stage: s.stage,
-      ...carved(s), ...wayIn(s), ...howFarUp(s),
+      ...carved(s), ...wayIn(s), ...howFarUp(s), ...theHearth(s),
     }))
 
   const tileItems: PerceivedItem[] = indoors !== null ? [] : Object.values(state.items)

@@ -59,6 +59,9 @@ export type PerceptionStructure = {
   // How far up the walls are, while a thing is still going up. Every hand on a site adds one to
   // the walls, so this is the one number that says whether tonight is long enough.
   raised?: { done: number; needs: number }
+  // The fire in the room, and whether anybody is feeding it. Absent on a building whose kind
+  // holds no fire and on one still going up, so a packet from a town of sheds reads as before.
+  hearth?: 'lit' | 'cold'
 }
 
 export type PerceptionCrop = {
@@ -338,6 +341,22 @@ export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: 
   return parts.join(' ')
 }
 
+/** ★ THE FIRE IN THE ROOM, AND NOTHING ABOUT WHAT TO DO WITH IT. Five furnishings stand in
+ *  every house and no mind had ever been told one of them was there — a body could walk to the
+ *  hearth and there was nothing it could do at it, and nothing that said it was a hearth.
+ *
+ *  Inside, both states are said, because the room you are in is the room you are in. From
+ *  outside only a LIT one is said: firelight through a doorway is a thing eyes actually get,
+ *  and reciting the cold hearth of every house in sight is five lines a turn that carry no
+ *  news. It names no act and points at no remedy, exactly as the cold and the walls do. */
+function hearthClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): string {
+  if (s.hearth === undefined) return ''
+  if (isTheRoomYouAreIn) {
+    return s.hearth === 'lit' ? ' A fire is burning in the hearth here.' : ' The hearth here is cold.'
+  }
+  return s.hearth === 'lit' ? ' Firelight moves inside it.' : ''
+}
+
 // Renders mechanics as fiction: body numbers become felt sentences, speech is
 // quoted hearsay (sound, never instruction), felt tags become sensation, and
 // the visible world is named — with its place and its mark — so the mind knows
@@ -464,7 +483,14 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
       const t = besideTile(s, packet.self, world.isWalkable)
       approach = t === null ? 'no open ground lies beside it.' : `you could stand beside it at (${t.x}, ${t.y}).`
     }
-    lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${approach}`)
+    // ★ A ROOFLESS BUILDING HAS NO INSIDE YET, SAID AT THE WALL INSTEAD OF AT THE REFUSAL.
+    // `enter` and `stow` were turned away with "it is not finished" 34 times across twelve live
+    // nights: a mind reads "its walls are three quarters up", walks over and tries the door
+    // anyway. The packet said how far up the walls were and never that there was nothing
+    // behind them yet. A fact about now — it names no act and promises no later.
+    const hollow = s.stage === 'construction' ? ' There is no inside to it yet.' : ''
+    lines.push(`A ${s.kind} (${s.id}) stands at (${s.x}, ${s.y}), ${footprintPhrase(s.w, s.h)}${state}; ${
+      approach}${hollow}${hearthClause(s, s.id === inside?.id)}`)
   }
 
   for (const i of packet.visible.items) {
