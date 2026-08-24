@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, expect } from 'vitest'
 import { mechanicalGate, refusalMessage } from './gate.js'
+import { SILHOUETTE_AREA_TOL, silhouetteBound } from './sheet.js'
 import { paletteRgb } from './palette.js'
 
 const pal = paletteRgb()
@@ -111,6 +112,27 @@ describe('gen-cast-v5 ships nothing that failed a gate', () => {
   it('reads the attempt knob its own header has documented since v4', () => {
     expect(src).toContain("process.env['CAST_ATTEMPTS']")
     expect(src, 'a hard-coded attempt count is left somewhere').not.toMatch(/for \(let i = 0; i < 3; i\+\+\)/)
+  })
+})
+
+// ── ★ AND THE MARGIN IN THAT MESSAGE HAS TO BE THE REAL ONE ───────────────────────────────
+//
+// Measured live in this lane: the refusal for salma's `ne/contact-a` read
+//   `silhouette: ... 1.2429 against 0.1800 (off by 1.0629)`
+// because `silhouette` is the one gate whose VALUE is a ratio around 1 while its threshold is
+// a half-width, and it put the half-width in `limit`. The true miss is 0.0629. Overstating it
+// SEVENTEEN-FOLD defeats the only purpose the message has — telling an operator a threshold
+// that is 0.5 % too tight from a model that cannot draw the thing.
+describe('★ a failure reports the bound it crossed, not the tolerance', () => {
+  it('names the upper bound for a body that grew, and the lower for one that shrank', () => {
+    expect(silhouetteBound(1.2429)).toBeCloseTo(1.18, 10)
+    expect(silhouetteBound(0.5000)).toBeCloseTo(0.82, 10)
+  })
+
+  it("★ so |value - limit| is the real margin, which is what an operator reads", () => {
+    expect(Math.abs(1.2429 - silhouetteBound(1.2429))).toBeCloseTo(0.0629, 4)
+    // the shape it used to have, kept as the number NOT to print
+    expect(Math.abs(1.2429 - SILHOUETTE_AREA_TOL)).toBeCloseTo(1.0629, 4)
   })
 })
 

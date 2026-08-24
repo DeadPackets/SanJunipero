@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { decodePng, type RawImage } from './post/raw.js'
-import { FACINGS, POSES_V2, mirrorX, opaqueBbox } from './sheet.js'
+import {
+  FACINGS, POSES_V2, HEAD_DIFF_MAX, frameCoherenceGate, mirrorX, opaqueBbox,
+} from './sheet.js'
 import {
   AUTHORED_FACINGS, CELL_NAMES_V4, STRIP_POSES_V4, WALK_CYCLE_V4,
-  deriveSheet, sleepAxisDeg, sleepAxisGate, type AuthoredSet,
+  coherenceGateV4, deriveSheet, sleepAxisDeg, sleepAxisGate, type AuthoredSet,
 } from './mirror.js'
 
 // 4×4 with a single opaque marker pixel — asymmetric so flips are detectable.
@@ -119,5 +121,58 @@ describe('sleepAxisGate', () => {
     const amara = await sleeper('amara')
     expect(sleepAxisGate(amara)).toHaveLength(1)
     expect(sleepAxisGate(mirrorX(amara))).toEqual([])
+  })
+})
+
+
+// ── ★ THE PRE-SPEND GATE MUST NOT BE WEAKER THAN THE POST-HOC AUDIT ───────────────────────
+//
+// `coherenceGateV4` decides which candidate a live-spend generator ships. `frameCoherenceGate`
+// asks the same question of the cells afterwards, in `castAudit.test.ts`. Until this lane the
+// first asked TWO questions and the second asked THREE — so a candidate could clear the gate
+// that costs money and red the gate that costs nothing, which is the worst way round.
+//
+// Measured, live: salma's regenerated `ne/contact-a` cleared the generator (silhouette and
+// palette clean) and reds the audit at head 0.3366 against 0.20. The gate had no head term to
+// stop it with. `omar ne/contact-a` at 0.2379 is the same hole, already in the tree.
+//
+// This file had NO test for `coherenceGateV4` at all before now — the gate that chooses every
+// walk frame in the cast.
+describe('★ coherenceGateV4 asks everything frameCoherenceGate asks', () => {
+  // Two bodies, same palette and same area, DIFFERENT HEADS: a 16-wide torso with a head
+  // block that moves. Area is equal to the pixel, so silhouette and palette cannot see it.
+  const body = (headX: number): RawImage => {
+    const w = 24, h = 24
+    const data = new Uint8ClampedArray(w * h * 4)
+    const put = (x: number, y: number) => {
+      const i = (y * w + x) * 4
+      data[i] = 190; data[i + 1] = 130; data[i + 2] = 90; data[i + 3] = 255
+    }
+    for (let y = 10; y < 22; y++) for (let x = 6; x < 18; x++) put(x, y)   // torso, identical
+    for (let y = 2; y < 9; y++) for (let x = headX; x < headX + 7; x++) put(x, y)  // head, moves
+    return { width: w, height: h, data }
+  }
+
+  const master = body(9)
+  const drifted = body(2)
+
+  it('★ RED on a head that moved, with the silhouette and the palette identical', () => {
+    const f = coherenceGateV4('cell', master, drifted)
+    expect(f.map((x) => x.gate), 'the head moved and only the head moved').toEqual(['head'])
+    expect(f[0]!.limit).toBe(HEAD_DIFF_MAX)
+    expect(f[0]!.value).toBeGreaterThan(HEAD_DIFF_MAX)
+  })
+
+  it('clean on the same body against itself', () => {
+    expect(coherenceGateV4('cell', master, body(9))).toEqual([])
+  })
+
+  // ★ THE PROPERTY, not the term. Whatever either gate learns to ask, they ask the same set —
+  // otherwise the money is spent behind the weaker one.
+  it('★ and the two gates agree on the same pair, term for term', () => {
+    const mine = coherenceGateV4('cell', master, drifted).map((x) => x.gate).sort()
+    const theirs = frameCoherenceGate('ne', master, [{ label: 'cell', img: drifted }])
+      .map((x) => x.gate).sort()
+    expect(mine, 'the pre-spend gate and the audit disagree about what is wrong').toEqual(theirs)
   })
 })

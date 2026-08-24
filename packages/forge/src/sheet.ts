@@ -1162,6 +1162,15 @@ export const PALETTE_JACCARD_MIN = 0.80
 export const PALETTE_EPS = 8 // per-channel single-linkage radius, as in v7 clusterDominant
 export const PALETTE_MIN_SHARE = 0.01 // clusters under 1% of opaque pixels are speckle, not palette
 export const SILHOUETTE_AREA_TOL = 0.18
+
+// ★ `limit` IS THE BOUND THE VALUE CROSSED, NOT THE TOLERANCE. Every reader of a GateFailure
+// prints `value against limit (off by |value - limit|)`, and silhouette is the one gate whose
+// value is a RATIO around 1 while its tolerance is a half-width. Reporting 0.18 there made the
+// refusal message say salma's `ne/contact-a` missed by 1.0629 when it missed by 0.0629 —
+// SEVENTEEN TIMES the real margin, in the one artifact whose whole job is to let an operator
+// tell a threshold that is slightly too tight from a model that cannot draw the thing.
+export const silhouetteBound = (areaRatio: number): number =>
+  areaRatio > 1 ? 1 + SILHOUETTE_AREA_TOL : 1 - SILHOUETTE_AREA_TOL
 export const HEAD_REGION_FRAC = 0.40
 export const HEAD_DIFF_MAX = 0.20 // v1 legit frames measure ≤0.123; sw~se cross-facing measures 0.269
 
@@ -1334,7 +1343,7 @@ export function frameCoherenceGate(facing: string, idle: RawImage,
       failures.push({ gate: 'palette', a, b: idleLabel, value: jac, limit: PALETTE_JACCARD_MIN })
     const areaRatio = opaqueArea(img) / idleArea
     if (Math.abs(areaRatio - 1) > SILHOUETTE_AREA_TOL)
-      failures.push({ gate: 'silhouette', a, b: idleLabel, value: areaRatio, limit: SILHOUETTE_AREA_TOL })
+      failures.push({ gate: 'silhouette', a, b: idleLabel, value: areaRatio, limit: silhouetteBound(areaRatio) })
     const head = headRegionDiff(idle, img)
     if (head > HEAD_DIFF_MAX)
       failures.push({ gate: 'head', a, b: idleLabel, value: head, limit: HEAD_DIFF_MAX })

@@ -83,9 +83,14 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
 }
 
 /**
- * ★ THE DEBT, AS OF THIS SWEEP. Four cells, all of them in the cast; the 20 committed
- * buildings and the 50 committed items are clean. Two of the four are the TACTICAL GEAR
- * family — the model drew something that is not the character, and the gate said so.
+ * ★ THE DEBT, AS OF THIS SWEEP. THREE cells, all of them in the cast.
+ *
+ * It was four. `salma ne/contact-a` — the second TACTICAL GEAR, a large brown bundle in her
+ * right hand in one frame of four, +24.3 % opaque area against a ±18 % tolerance and WORSE
+ * than the 1.1855 that shipped the caption — was regenerated live for $0.0687 and is gone.
+ * The refusal the ruling installed is what made that happen: `gen-cast-v5` stopped on her
+ * three cached candidates instead of shipping the least-bad, `CAST_ATTEMPTS=6` drew a fourth,
+ * and the fourth passed. Two cells of twenty-four moved; her ne stride trio still passes.
  */
 export const KNOWN_GATE_DEBT: Record<string, string> = {
   // MINE, and named so it is not mistaken for the model's. The TACTICAL GEAR repair set
@@ -93,13 +98,6 @@ export const KNOWN_GATE_DEBT: Record<string, string> = {
   // back-facing walk cycles have no alternating stride. Clears when the strip is redrawn.
   'amara ne stride contact-a~contact-b':
     '0.0000 against 0.1085 — the TACTICAL GEAR repair, by construction',
-
-  // ★ THE SECOND TACTICAL GEAR. Salma's back-facing contact-a has a large brown bundle in her
-  // right hand that appears in NO other frame of the cycle: +24.3 % opaque area against a
-  // ±18 % tolerance, WORSE than the 1.1855 that shipped the caption. It is in the product —
-  // she flashes an object one frame in four walking away from the camera, in ne and nw.
-  'salma ne silhouette contact-a':
-    '1.2429 against 1.1800 — an object in her hand for one frame in four',
 
   // Omar's head moves 24 % between idle and contact-a in the back view. Legs move, heads do not.
   'omar ne head contact-a':
@@ -130,8 +128,8 @@ describe('★ the committed cast against the gates as they now behave', () => {
       'this entry passes now — delete it from KNOWN_GATE_DEBT').toEqual([])
   })
 
-  it('★ and the debt is FOUR cells, so a jump shows up in the diff', () => {
-    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(4)
+  it('★ and the debt is THREE cells, so a jump shows up in the diff', () => {
+    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(3)
   })
 })
 
