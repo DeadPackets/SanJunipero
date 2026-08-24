@@ -25,6 +25,7 @@ import {
   type AuthoredFacing, type StripPoseV4,
 } from '../src/mirror.js'
 import { processHiResCell, cellAnchor, buildManifestV4 } from '../src/hires.js'
+import { refusalMessage } from '../src/gate.js'
 import { BIG_PIXEL } from './character.js'
 import { CAST_V4, type CastMember } from './cast.js'
 
@@ -50,6 +51,24 @@ const RUN_CAST = CAST_V4.filter(c => CAST_FILTER.includes(c.id))
 if (RUN_CAST.length === 0) throw new Error(`CAST=${process.env.CAST} matches no cast member`)
 
 class OutOfBudget extends Error {}
+
+// ── ★ SUPERSEDED BY gen-cast-v5.ts, AND STILL UNDER THE SAME RULING ────────────────────────
+//
+// This script is the previous standard and its output directory has been wiped, but `bestOf`
+// below is the identical policy that put TACTICAL GEAR into `content/cast`: a gate measures a
+// candidate, the caller ships the least-bad failure anyway. It stays reachable by anyone who
+// types the wrong filename, so it obeys the ruling too. The shape and the reason are in
+// `src/gate.ts`; this is the adapter that renders a `GateFailure` with its margin, because the
+// margin is what tells an operator a threshold from a bad drawing.
+const said = (x: GateFailure): string =>
+  `${x.gate}: ${x.a} vs ${x.b} — ${x.value.toFixed(4)} against ${x.limit.toFixed(4)} `
+  + `(off by ${Math.abs(x.value - x.limit).toFixed(4)})`
+
+function refuseFailing(what: string, cands: readonly { key: string; failures: GateFailure[] }[]): void {
+  const msg = refusalMessage(what, cands.map((c) => ({ key: c.key, failures: c.failures.map(said) })))
+  if (msg === '') return
+  throw new Error(`${msg}\n  Nothing is written for this character. Use gen-cast-v5.ts.`)
+}
 
 // Per-asset spend ledger (persisted per character as spend.json).
 const assetSpend: Record<string, number> = {}
@@ -354,6 +373,7 @@ async function runCharacter(m: CastMember): Promise<void> {
         const extra = await genFrame(f, p, 2)
         if (extra) { frameCands[f][p].push(extra); best = bestOf(frameCands[f][p])! }
       }
+      refuseFailing(`${m.id} ${f}/${p}`, frameCands[f][p].map(c => ({ key: c.key, failures: c.failures })))
       chosen[f][p] = best
     }
     let stride = strideGateV4(f, {
@@ -382,7 +402,12 @@ async function runCharacter(m: CastMember): Promise<void> {
       }
     }
     for (const x of stride) push(`${f} stride: ${x.gate} ${x.a}~${x.b} value=${x.value.toFixed(3)} limit=${x.limit.toFixed(3)}`)
-    push(`${f} trio: ${WALK_POSES.map(p => chosen[f][p].key).join(', ')} stride=${stride.length === 0 ? 'PASS' : 'FLAGGED'}`)
+    push(`${f} trio: ${WALK_POSES.map(p => chosen[f][p].key).join(', ')} stride=${stride.length === 0 ? 'PASS' : 'FAILED'}`)
+    // The trio is a property of three frames already chosen, so there is no candidate to
+    // re-roll: the failure is the character's, loudly. It used to log a flag and go on.
+    refuseFailing(`${m.id} ${f}/stride-trio`, [{
+      key: `${f}: ${WALK_POSES.map(p => chosen[f][p].key).join(', ')}`, failures: stride,
+    }])
   }
 
   // sleep: up to 2 candidates, master attached
@@ -417,6 +442,7 @@ async function runCharacter(m: CastMember): Promise<void> {
   }
   const sleep = sleepCands.reduce<SleepCand | null>((a, c) => (!a || c.failures.length < a.failures.length ? c : a), null)
   if (!sleep) throw new Error(`${m.id}: every sleep candidate failed processing`)
+  refuseFailing(`${m.id} sleep`, sleepCands.map(c => ({ key: c.key, failures: c.failures })))
 
   // derivation (zero spend): 9 authored hi-res cells → the 24-cell contract
   const cells = deriveSheet({

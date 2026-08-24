@@ -24,12 +24,19 @@ export function mechanicalGate(img: RawImage, expected: { w: number; h: number; 
 
 // ── ★ A GATE THAT COMPUTES A VERDICT MAY NOT HAVE THAT VERDICT DISCARDED ───────────────────
 //
-// USER RULING. Every generator in this package chose a winner the same way and all three
-// wrote it differently, which is why nobody saw it was one policy:
+// USER RULING. Every generator in this package chose a winner the same way and wrote it
+// differently, which is why nobody saw it was one policy. There are SEVEN of them in three
+// disguises — and a count by disguise undercounts, because each disguise was pasted between
+// siblings:
 //
-//   gen-cast-v5    `bestOf`  → the candidate with the FEWEST failures, shipped
-//   gen-structures `const win = (clean.length ? clean : cands)...`  → falls back to the dirty
-//   gen-library-v2 `rank = c.fails.length * 100 + ...` → a failure ranks worse, never excluded
+//   least-bad `bestOf` reduce     gen-cast-v5, gen-cast-v4, gen-character-v4
+//   `(clean.length ? clean : …)`  gen-structures-v5, gen-dwellings-v2, gen-dwellings
+//   `rank = fails.length * 100`   gen-library-v2 — a failure ranks worse, never excluded
+//
+// ★ `gen-dwellings-v2` is the one that matters and was not on the first list: it is live, it
+// writes `content/buildings`, and it wrote the ten dwelling cells the town stands on. Those
+// cells are measured clean today — but the policy that could have shipped a bad one was live
+// the whole time.
 //
 // So a gate could measure a cell, write the number into a report, and be overruled by its own
 // caller. It happened: `amara/contact-b-ne` was measured at 1.1855 opaque area against a 1.18

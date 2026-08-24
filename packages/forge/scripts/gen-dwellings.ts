@@ -34,6 +34,7 @@ import {
   spriteDensity,
 } from '../src/pixelGates.js'
 import { TOWN_TILE } from '../src/assetResolution.js'
+import { refusalMessage } from '../src/gate.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
 if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
@@ -162,6 +163,9 @@ async function generate(p: string, reserve: number) {
 const rows: string[] = []
 const members: { name: string; density: number }[] = []
 const lines: string[] = []
+// ★ Dwellings this run refused to ship. Collected, not thrown on the spot: the unit of work is
+// ONE CELL and the report of every attempt is worth more than an early exit.
+const refusedCells: string[] = []
 const spend: Record<string, number> = {}
 
 for (const d of DWELLINGS) {
@@ -205,11 +209,17 @@ for (const d of DWELLINGS) {
     }
   }
 
-  // among clean candidates, the one whose source correction is smallest — least thrown away
+  // ★ AMONG THE CLEAN ONES ONLY (user ruling; the shape and the reason are in src/gate.ts).
+  // `(clean.length ? clean : cands)` fell back to the DIRTY set and shipped the least-corrected
+  // failure. Choosing is not deciding.
   const clean = cands.filter(c => c.fails.length === 0)
-  const win = (clean.length ? clean : cands)
+  const win = clean
     .sort((a, b) => Math.abs(1 - b.plan.sourceScale) - Math.abs(1 - a.plan.sourceScale)).at(-1)
-  if (!win) { lines.push(`${d.id}: NO CANDIDATE`); continue }
+  if (!win) {
+    const why = refusalMessage(d.id, cands.map(c => ({ key: c.key, failures: c.fails })))
+      || `${d.id}: NO CANDIDATE — every attempt failed to process`
+    lines.push(why); console.log(`  ${why}`); refusedCells.push(d.id); continue
+  }
 
   const dest = `${ART}/building-${d.id}`
   mkdirSync(`${dest}/raws`, { recursive: true })
@@ -229,7 +239,7 @@ for (const d of DWELLINGS) {
   members.push({ name: d.id, density })
   rows.push(`| ${d.id} | ${d.fp.w}x${d.fp.h} | ${cellPx}x${cellPx} | ${GEN_PX}/${win.plan.factor} (window ${win.plan.window}`
     + `${win.plan.sourceScale === 1 ? '' : `, source x${win.plan.sourceScale.toFixed(3)}`}) | ${density} `
-    + `| ${win.fails.length === 0 ? 'clean' : win.fails.join('; ')} | ${win.key} |`)
+    + `| clean | ${win.key} |`)
 }
 
 const cls = classDensityGate(members)
@@ -242,3 +252,13 @@ const md = ['# the three dwellings of a contemporary San Junipero', '',
 mkdirSync(`${S}/r3/reports`, { recursive: true })
 writeFileSync(`${S}/r3/reports/dwellings.md`, md)
 console.log(`\n${md}`)
+
+// ★ THE VERDICTS ARE BINDING, AFTER THE REPORT IS ON DISK. `classDensityGate` only ever went
+// into that markdown.
+const stopped = [
+  ...(refusedCells.length === 0 ? [] : [`${refusedCells.length} dwelling(s) shipped nothing: ${refusedCells.join(', ')}`]),
+  ...cls.failures,
+]
+if (stopped.length > 0) throw new Error(`${stopped.join('\n  ')}\n  Raise DWELL_ATTEMPTS to draw `
+  + `more, DWELL_REJECTED to refuse a candidate by eye, or change a threshold on purpose. `
+  + `Nothing was written for a refused dwelling.`)
