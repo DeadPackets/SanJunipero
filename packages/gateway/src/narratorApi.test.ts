@@ -126,6 +126,34 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     ])
   })
 
+  /**
+   * ★ THE BADGE ASKED FOR A NUMBER AND WAS SENT THE WHOLE LEDGER.
+   *
+   * `/api/chronicle/count` is the same scan, the same window clamp and the same memo as the
+   * body route — only the shape sent differs.
+   */
+  it('answers the ledger length without sending the ledger', async () => {
+    const res = await fetch(`${base}/api/chronicle/count`)
+    expect(res.status).toBe(200)
+    const body = await res.json() as { count: number; latestSeq: number; latestTick: number }
+    const entries = await chronicle()
+    expect(body.count).toBe(entries.length)
+    expect(body.latestSeq).toBe(entries[entries.length - 1]!.seq)
+    expect(body.latestTick).toBe(entries[entries.length - 1]!.tick)
+    // three integers, not a feed
+    const full = await (await fetch(`${base}/api/chronicle`)).text()
+    expect(JSON.stringify(body).length).toBeLessThan(full.length / 4)
+  })
+
+  it('counts the same window the body route would, and clamps a stranger’s the same way', async () => {
+    const count = async (q: string): Promise<number> =>
+      ((await (await fetch(`${base}/api/chronicle/count${q}`)).json()) as { count: number }).count
+    expect(await count('?fromTick=45')).toBe((await chronicle('?fromTick=45')).length)
+    expect(await count('?fromTick=45')).toBeLessThan(await count(''))
+    // an unbounded window is the world's window, exactly as the body route answers it
+    expect(await count('?toTick=1000000000')).toBe((await chronicle('?toTick=1000000000')).length)
+  })
+
   it('writes each entry as a sentence, never as a payload', async () => {
     const byType = new Map((await chronicle()).map((e) => [e.type, e.label]))
     expect(byType.get('structure_completed')).toBe('The house is finished.')
