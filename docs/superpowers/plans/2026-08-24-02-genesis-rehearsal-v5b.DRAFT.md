@@ -1,8 +1,18 @@
-# Genesis & Rehearsal (C8) Implementation Plan — v5 DRAFT for controller review
+# Genesis & Rehearsal (C8) Implementation Plan — v5b DRAFT for controller review
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** DRAFT **v5**, superseding `2026-08-23-01-genesis-rehearsal-v4.DRAFT.md` (66 tasks / 15 phases, branch `c8-plan-v4` @ `50d1bfc`, written against `main` @ `cd845bc`), which superseded v3 (66 / 15, `c8-plan-v3` @ `51a98a2`, **RATIFIED as the plan of record** by `c8-v3-controller-rulings.md`), v2 (54 / 12, `c8-plan-v2` @ `4924709`) and the base draft (39 / 9). **v5 keeps every one of v3's 66 task numbers, all 15 phases and every document position.** It is written against local `main` @ **`645a8d9`** — merge trains 1, 2 **and 3** of the 2026-08-23/24 sprint have landed, carrying the town grammar, the claim seam, unbounded world growth, the far bank, the Discovery Record and the recovered art. Every value in Global Constraint C3 was grepped out of `645a8d9`, not copied from v4.
+> ### ★★ WHY v5b EXISTS — FOUR RULINGS LANDED, AND THE PLAN WAS COMPILED FOR THE FIRST TIME
+>
+> **v5's every claim was a claim about source text.** Its own closing concern said so: *"none of the code in v5's amended steps has been compiled."* v5b lifted that limit. Every signature, arity, count and constant this plan names was **executed** against `645a8d9` — `tsc --noEmit` over probe files that import `packages/` directly, and `tsx` runs that build a genesis town and submit real intents through the real verb.
+>
+> **Ninety-one source-text claims were put to a compiler or a runtime. Eighty survived; eleven did not.** The eleven are amended in place and each is one line in `c8-v5-to-v5b-delta.md`, with the command that produced it.
+>
+> **The four open decisions of v5 are RULED, all four as recommended (controller, 2026-08-24):** **OD18** — the 103-node tree is a scoring instrument and never a gate; **OD19** — `storehouse` and `shed`, and `long_bridge` is deleted; **OD20** — `builds ≥ 1` splits out as its own criterion, a **tightening**; **OD21** — the Discovery Record is reported and never gated. They are written into the tasks, not appended to them.
+>
+> **★ AND ONE NEW OPEN DECISION, WHICH IS THE LARGEST THING THIS REVISION FOUND: OD22 — TWO BODIES CANNOT RAISE ONE BUILDING IN A TOWN.** Executed, not read: on the sited branch two builders on one site give `progressTicks + 2` in a tick; **in a town the second builder is handed a different plot** and `stepBuild` only ever advances `ownSite(builder)`. T21's headline arithmetic, T22's whole `minHands` rule, T49's `jointBuildTicks` and **G8's criterion 7** all assume a mechanism that the claim seam removed and no test covers. See OD22.
+
+**Status:** DRAFT **v5b**, superseding `2026-08-24-01-genesis-rehearsal-v5.DRAFT.md` (66 tasks / 15 phases, branch `c8-plan-v5` @ `ee5d1c5`), which superseded `2026-08-23-01-genesis-rehearsal-v4.DRAFT.md` (66 tasks / 15 phases, branch `c8-plan-v4` @ `50d1bfc`, written against `main` @ `cd845bc`), which superseded v3 (66 / 15, `c8-plan-v3` @ `51a98a2`, **RATIFIED as the plan of record** by `c8-v3-controller-rulings.md`), v2 (54 / 12, `c8-plan-v2` @ `4924709`) and the base draft (39 / 9). **v5 keeps every one of v3's 66 task numbers, all 15 phases and every document position.** It is written against local `main` @ **`645a8d9`** — merge trains 1, 2 **and 3** of the 2026-08-23/24 sprint have landed, carrying the town grammar, the claim seam, unbounded world growth, the far bank, the Discovery Record and the recovered art. Every value in Global Constraint C3 was grepped out of `645a8d9`, not copied from v4.
 
 > ### ★ WHY v5 EXISTS — ONE REASON, AND IT IS NOT A REFACTOR
 >
@@ -178,7 +188,9 @@ Every task's requirements implicitly include this section.
   **(c)** `cityTemplate.doorTile(s: StructureBox)` takes **four numbers** (`{dx, dy, w, h}`), not a `CityStructure` and not an id. Beside it is the new **`doorFrontTile(s: CityStructure)`** — the tile the door opens **onto**, on the face the `facing` names. The engine's own `interiors.doorTile(state, s: Structure): Point | null` is unchanged, **still returns null**, and now **prefers a road on a face** rather than always the south wall.
   **(d)** `PLAZA`, `PLAZA_CENTRE`, `WELL_AT` and `FIRE_PIT_AT` are all `{dx, dy}` and all derived: `PLAZA = plazaOf(1) = {dx0: 22, dy0: 22, dx1: 37, dy1: 37}`, `WELL_AT = {dx: 26, dy: 27}`, `FIRE_PIT_AT = {dx: 31, dy: 31}`, `PLAZA_CENTRE = {dx: 29, dy: 29}`. **These are the ring-1 values and they move with the ring count** — the constants exist for the fixtures that only ever ask about genesis.
   **(e)** **Facing is DATA.** `CityStructure.facing` is `'sw' | 'se'` and there is no third answer. A building on an east plot stands on its footprint **turned**, so a farmhouse is 4×2 on a south plot and 2×4 on an east one. **`footprintFor(mass, facing)` is the only correct way to ask what ground a placed building covers**; reading `w`/`h` off `DWELLING_FOOTPRINTS` for an SE building is the mistake that table's comment exists to prevent.
-  **(f)** **The world has no size.** `mapGrowth` is `{ enabled }` and nothing else. Size is a **clearance** — `WORLD_MARGIN = PITCH = 19`, owed on every side of the union of the built set and the ground the town has laid — so a task that reads `maxSize`, `step` or `structuresPerStep` is reading a key that was deleted.
+  **(f)** **The world has no CEILING.** `mapGrowth` is `{ enabled }` and nothing else — **executed: `Object.keys(DEFAULT_CONFIG.mapGrowth)` is `['enabled']`** — and how far it may grow is a **clearance**, `WORLD_MARGIN = PITCH = 19`, owed on every side of the union of the built set and the ground the town has laid. A task that reads `maxSize`, `step` or `structuresPerStep` is reading a key that was deleted.
+
+  **★ v5b — BUT `DEFAULT_CONFIG.world.size` IS ALIVE AND IS STILL `{ w: 128, h: 128 }`, AND v5's phrasing would have got it deleted.** *"The world has no size"* is true of the growth ceiling and false of the starting array: `makeGenesisWorld` builds a 128×128 terrain from it, `world.test.ts:38` asserts `DEFAULT_CONFIG.world.size` equals `{ w: WORLD_SIZE_GENESIS, h: WORLD_SIZE_GENESIS }`, and `makeGenesisWorld(SimConfigSchema.parse({world:{size:{w:64,h:48}}}))` returns a 48-row terrain. **The starting extent is a config value; the ceiling is not.** Both were measured.
 
   **The rule is unchanged and now matters more than it ever has: any fixture that pins a home, well, storehouse, plot or road coordinate must read it from `@sj/shared`, and never retype it.** Anything that assumed "every plaza tile is a road" must read the road set instead — **two plaza tiles are monuments and are not roads.** `cityTemplate.ts`, `townGrammar.ts`, `townPlot.ts` and `townClaim.ts` are **not edited by C8** (Open Decision 6 is closed).
 - **C32. ★ NEW IN v5 — THE LAYOUT GLASS. A MIND MAY KNOW THAT THE TOWN KEEPS GROUND FOR A ROOF, AND WHERE THAT GROUND IS. NOTHING ELSE.** *A place is a world fact and eyes report places; the rule that chose the place is ours.* The claim-seam lane landed `TOWN_LAYOUT_VOCABULARY = ['plot', 'plots', 'block', 'blocks', 'ring', 'rings', 'lattice', 'plat', 'platted', 'frontage']` and `scanForLayoutLeak` beside `CONSTRUCT_VOCABULARY` in `packages/agents/src/prompt/glassScan.ts`, and it runs over **every authored surface a mind reads** — `RULES_OF_BEING`, `CAPABILITIES`, `SPEECH_RULES`, the moment prose and the makeables line.
@@ -346,7 +358,7 @@ Expected, in order:
 - [ ] **Step 1: Copy this DRAFT to its ratified path.**
 
 ```bash
-git mv docs/superpowers/plans/2026-08-24-01-genesis-rehearsal-v5.DRAFT.md \
+git mv docs/superpowers/plans/2026-08-24-02-genesis-rehearsal-v5b.DRAFT.md \
        docs/superpowers/plans/2026-08-24-01-genesis-rehearsal.md
 ```
 
@@ -461,7 +473,15 @@ export const FounderSchema = z.object({
     goals: z.array(z.string()),
   }).strict(),
   relationships: z.array(z.object({ name: z.string().min(1), note: z.string().min(1) }).strict()).length(4),
-  startingSkills: z.record(z.enum(SKILL_TRACKS), z.number().int().min(0).max(5)),
+  // ★★ v5b — `partialRecord`, NOT `record`, AND THIS IS A ZOD 4 FACT THAT WOULD HAVE STOPPED
+  // T2 DEAD. Under the repo's zod 4.4.3 an enum-keyed `z.record` is EXHAUSTIVE: it demands a
+  // value for every member of the enum. `z.record(z.enum(SKILL_TRACKS), …).parse({farming:3})`
+  // returns eleven `invalid_type` issues, one per track nobody listed — so `FounderSchema`
+  // would reject every founder in T3 and T4, and T2's own VALID fixture, at parse time.
+  // The tree already knows this: `forge/src/terrainManifest.ts:16` uses `z.partialRecord` for
+  // exactly this reason, one line below a `z.record(z.enum([…]))` where all four seasons ARE
+  // required. Executed, both ways, before this line was changed.
+  startingSkills: z.partialRecord(z.enum(SKILL_TRACKS), z.number().int().min(0).max(5)),
   secret: z.string().min(100),
 }).strict()
 export type Founder = z.infer<typeof FounderSchema>
@@ -1635,7 +1655,7 @@ describe('the deal', () => {
 // packages/engine/src/genesis/world.test.ts — appended
 it('THE TOWN NO LONGER WAKES WITH FIVE IDENTICAL KITS', () => {
   const g = makeGenesisWorld(DEFAULT_CONFIG)
-  const state = foldAll(initialState(DEFAULT_CONFIG, g.terrain), g.events, DEFAULT_CONFIG)
+  const state = foldAll()          // ★ v5b — see the note above this describe block
   const byOwner = new Map<string, string[]>()
   for (const item of Object.values(state.items)) {
     if (item.owner === null || item.owner === undefined) continue
@@ -1747,6 +1767,8 @@ git commit -m "feat(engine): five different hands on the first morning — a see
 
 R3: the storehouse ships the communal **~10 sim-days the spec promises, as PUBLIC food (`owner: null`)**, and the private loaves stay as T10 dealt them. Scarcity in v1 comes from the stores running down and from winter, never from day-zero destitution. `STOREHOUSE_STOCK` gains **`bread ×27`** (27 + 15 = 42 loaves = 10.0 sim-days at 4.2/day) and **`wheat ×20`** as seed (60-day shelf life ×2 = never a factor in any run this plan schedules).
 
+> **★ v5b — EVERY NUMBER IN THE TABLE ABOVE WAS EXECUTED, AND ALL OF THEM HOLD.** A genesis world was folded and read: **15 loaves** (all five privately owned, every one carrying a spoilage clock), **0 wheat**, `hungerDecayPerTick` **0.035**, `eatRestoreHunger` **60**, **0.840 meals/body/day**, **4.20 loaves/town/day**, `spoilage.days.bread` **6**, and `Math.ceil(10 × perDay × 5)` = **42**, which is the bar the first larder row asserts. The town stands **eleven** structures — `cabin, cottage, farmhouse, fire_pit, house, storehouse, well` — **no `standing_stone`**, and `cityStructures().length` is 11, so the *"eleven is a hard budget"* note below is measured rather than remembered. `cityRoadTiles()` takes no argument and returns **1 178** tiles keyed `{dx, dy, to}`; all 1 178 survive `isRoadTile`, so the `roads.size > 0` guard is not vacuous. **`standing_stone` already has a committed art cell (SW only)** and is one of the gateway's four dev-town kinds, so this task's structure needs no commission and reds no coverage gate.
+
 - [ ] **Step 1: Write the failing tests.**
 
 ```ts
@@ -1757,9 +1779,15 @@ R3: the storehouse ships the communal **~10 sim-days the spec promises, as PUBLI
 // The stone's own `x`/`y` are WORLD coordinates, so the comparison must add the anchor.
 import { CITY_ANCHOR_DEFAULT, cityRoadTiles, isRoadTile } from '@sj/shared'
 
+// ★★ v5b — `initialState` AND A THREE-ARGUMENT `foldAll` DO NOT EXIST. Executed: neither name
+// is exported anywhere in `packages/` at `645a8d9`. This file's own fold helper is
+// `function foldAll(): WorldState` at `genesis/world.test.ts:22` — a NO-ARGUMENT closure over
+// `makeGenesisWorld(DEFAULT_CONFIG)`, built on the landed `genesisState(config, terrain)` —
+// and these two describe blocks are APPENDED to that file, so it is already in scope. Both
+// rows below call it with no arguments; adding a parameter to it would be a second fixture.
+
 describe('the standing stone', () => {
-  const g = makeGenesisWorld(DEFAULT_CONFIG)
-  const state = foldAll(initialState(DEFAULT_CONFIG, g.terrain), g.events, DEFAULT_CONFIG)
+  const state = foldAll()          // ★ v5b — see the note above this describe block
   const stones = Object.values(state.structures).filter((s) => s.kind === 'standing_stone')
 
   it('stands, exactly once, owned by nobody, already finished', () => {
@@ -1785,8 +1813,7 @@ describe('the standing stone', () => {
 })
 
 describe('the larder', () => {
-  const g = makeGenesisWorld(DEFAULT_CONFIG)
-  const state = foldAll(initialState(DEFAULT_CONFIG, g.terrain), g.events, DEFAULT_CONFIG)
+  const state = foldAll()          // ★ v5b — see the note above this describe block
   const bread = Object.values(state.items).filter((i) => i.kind === 'bread')
 
   it('IS A COMPUTED PROMISE, NOT A NUMBER SOMEBODY TYPED', () => {
@@ -2130,15 +2157,20 @@ git commit -m "feat(engine): the discovery tree, transcribed — five rungs of r
 
 **Files:** Create `packages/engine/src/discovery/codexSeed.ts`, `packages/engine/src/discovery/codexSeed.test.ts`; Modify `packages/engine/src/index.ts`. *(★ v5 — the canon move is **T12 Step 0** now, for the reason written there; this task's Step 0 is a one-line assertion that it happened.)*
 
-> ### ★ v5 — THIS TASK IS THE ONE PLACE OD18 BITES, AND IT MUST NOT BE ANSWERED BY AN EXECUTOR
+> ### ★★ v5b — OD18 IS RULED: **ACCEPTED AS RECOMMENDED** (controller, 2026-08-24). THE TREE IS A SCORING INSTRUMENT AND NEVER A GATE.
 >
+> **The ruling, in the controller's words:** *"The codex keeps `GENESIS_CODEX`'s thirteen; the 103-node tree becomes a scoring instrument in T49's report; T14 builds the function and a test asserts nothing calls it. Seeding 103 nodes into `CodexStore` would make it a gate, and the whole point of the arbiter is that a mind may invent something nobody anticipated."* The unwired guard below is therefore **permanent**, not a holding position, and its message changes from *"OD18 IS UNRULED"* to *"OD18 IS RULED"*.
+>
+> **★ AND v5b FOUND THE PLACE THAT WOULD HAVE BROKEN IT.** **T32 Step 2 said in as many words: *"seed the arbiter `codex` from `codexEntriesFromTree()`"*, and v5's own Step 3 below said *"the actual insert is done by the supervisor in T32."*** So the guard in this task passes until T32 runs and then **T14's own test goes red from inside this plan** — `grep -rln "codexEntriesFromTree" packages/` would return `packages/supervisor/src/supervisor.ts`. **T32 Step 2 now seeds `GENESIS_CODEX`**, which is what the two live gate scripts already do (`g9-livingworld.ts:229`, `g11-deepworld.ts:283`), and the sentence in Step 3 below is struck.
+>
+
 > **Two things changed under this task and they point in opposite directions.**
 >
 > **(1) The era is a name.** v4's row `expect(r.era).toBe(ERAS[byId.get(r.id)!.era - 1])` reads `ERAS[<a string> - 1]`, which is `ERAS[NaN]`, which is `undefined` — **so every codex row would carry an undefined era and the test that was supposed to catch it would compare `undefined` to `undefined` and pass.** That is the exact shape v4's own delta document exists to prevent. **The mapping is now the identity**: a node's era already IS one of `ERAS`, so `codexEntriesFromTree` copies it and asserts membership rather than indexing.
 >
 > **(2) `codexEntriesFromTree()` seeds ALL 103 NODES into the arbiter's `CodexStore` — and a landed user ruling says the tree is a yardstick, never a gate.** `CodexStore.frontier()` feeds the adjudication prompt and `withinAdjacency()` decides whether a novel intent may be codified. Seeding 103 authored nodes makes the authored tree **the thing that decides what a mind is allowed to have invented** — which is the tree being the gate, in the one place it would matter most. The ruling of 2026-08-23 says the opposite in as many words, and records that **no code reads the tree and none should**; its stated purpose is to let a finished run be graded — *"they found 14 of the 103 we anticipated, plus 9 we did not"* — **and the 9 are the result.**
 >
-> **This is OD18 and the recommendation is in the Open Decisions section. Until it is ruled, this task builds `codexEntriesFromTree` and DOES NOT WIRE IT** — the function, its tests and its determinism are all real work either way, and the one line that inserts its output into a live `CodexStore` is the line that waits. **An executor who wires it has answered a controller's question with a commit.**
+> **RULED. This task builds `codexEntriesFromTree` and NEVER WIRES IT.** The function, its tests and its determinism are real work: **T49's report is its one consumer**, printing *anticipated found*, *unanticipated found* and the ids of both, which is the ruling's own sentence delivered as a number. **The one line that would insert its output into a live `CodexStore` is never written**, and the test below is what stops it being written by accident. **An executor who wires it has overturned a controller's ruling with a commit.**
 
 **Interfaces — Consumes (★ v5):** `ERAS`, `Era`, `ERA_ORDER`, `GENESIS_CODEX` and `CodexEntry` **from `@sj/shared`** (T12 Step 0 put them there); `CodexStore` and `migrateArbiterTables` from `@sj/arbiter` **test-side only** (C12 — `@sj/arbiter` depends on `@sj/engine`, so a production import here is the cycle); `DiscoveryNode` from T12 and `DISCOVERY_TREE` from T13.
 
@@ -2236,18 +2268,32 @@ describe('codexEntriesFromTree', () => {
     }
   })
 
-  // ★ v5, AND IT IS THE ROW OD18 TURNS ON. Whatever the controller rules, the SEED FUNCTION is
-  // allowed to exist; what waits on the ruling is whether anything calls it against a live
-  // store. This asserts the wiring is absent so nobody can land it by accident.
-  it('★ IS NOT WIRED INTO A LIVE CODEX ANYWHERE — OD18 IS UNRULED', () => {
+  // ★★ v5b — THE ROW OD18 WAS RULED ON, AND IT IS NOW PERMANENT. The tree is a yardstick and
+  // never a gate (controller, 2026-08-24), so nothing may insert its output into a live
+  // `CodexStore`. T49's report reads the TREE — `DISCOVERY_TREE` — to score a finished run; it
+  // does not read this function, and the two allowed files below are the whole of its reach.
+  // ★ T32 IS THE CALLER THIS ROW WOULD HAVE CAUGHT: v5's T32 Step 2 seeded the codex from here.
+  it('★ IS NOT WIRED INTO A LIVE CODEX ANYWHERE — OD18 IS RULED, AND THIS IS THE RULING', () => {
     const wired = execSync(
       'grep -rln "codexEntriesFromTree" packages/ --include=*.ts || true', { encoding: 'utf8' },
     ).split('\n').filter(Boolean).sort()
-    expect(wired, 'codexEntriesFromTree has a caller outside its own module and test — see OD18')
+    expect(wired, 'codexEntriesFromTree has a caller outside its own module and test — OD18 forbids it')
       .toEqual([
         'packages/engine/src/discovery/codexSeed.test.ts',
         'packages/engine/src/discovery/codexSeed.ts',
       ])
+  })
+
+  // ★★ v5b — AND THE OTHER HALF OF THE SAME RULING, ASSERTED FROM THE OTHER END. A guard that
+  // only says "nothing calls the seed" is satisfied by a supervisor that inserts 103 rows by
+  // hand. What the ruling protects is the CONTENT of the live codex: thirteen canon entries.
+  it('★ THE LIVE CODEX IS THE CANON S THIRTEEN, NOT THE TREE S 103', () => {
+    const db = freshArbiterDb()
+    const codex = new CodexStore(db)
+    for (const entry of GENESIS_CODEX) codex.insert(entry)      // exactly what T32 Step 2 does
+    expect(GENESIS_CODEX).toHaveLength(13)
+    expect(codexEntriesFromTree()).toHaveLength(103)
+    expect(codex.frontier().length).toBeLessThan(codexEntriesFromTree().length)
   })
 
   // ★ v4 — this row replaces v3's "derived from CANON" prose with the derivation itself, and
@@ -2351,7 +2397,7 @@ export function codexEntriesFromTree(tree: readonly DiscoveryNode[] = DISCOVERY_
 >
 > **Do the move as its own commit, before the seed.** A cross-package move and a new module in one commit is two things to bisect.
 
-Then the seed itself: the engine gains **no** dependency on `@sj/arbiter`. Assert it in the same file with `expect(Object.keys(pkg.dependencies)).not.toContain('@sj/arbiter')`, and keep `CodexStore` and `migrateArbiterTables` **test-only** — the actual insert is done by the supervisor in T32, which sits above everything and may import both. **T13's `GENESIS_CODEX` import moves to `@sj/shared` with everything else.**
+Then the seed itself: the engine gains **no** dependency on `@sj/arbiter`. Assert it in the same file with `expect(Object.keys(pkg.dependencies)).not.toContain('@sj/arbiter')`, and keep `CodexStore` and `migrateArbiterTables` **test-only**. **★ v5b — v5 finished this sentence with *"the actual insert is done by the supervisor in T32"*, and OD18's ruling deletes it: there is no insert of this function's output, in T32 or anywhere.** The supervisor seeds the live codex from `GENESIS_CODEX`, exactly as `g9-livingworld.ts:229` and `g11-deepworld.ts:283` already do; **this module's output is read by T49's report and by nothing else.** **T13's `GENESIS_CODEX` import moves to `@sj/shared` with everything else.**
 
 - [ ] **Step 4:** `pnpm vitest run packages/engine/ && pnpm typecheck` — PASS.
 
@@ -3348,7 +3394,137 @@ git commit -m "feat(agents): twenty wood in the storehouse at (61, 68) — enoug
 
 **Files:** Modify `packages/agents/src/prompt/prose.ts`, `packages/agents/src/prompt/prose.test.ts`, `packages/engine/src/perception.ts`, `packages/engine/src/perception.test.ts`.
 
-**This is the highest impact-per-cost item in the entire design and it changes no physics at all.** `stepBuild` already emits `structure_progressed {ticks: 1}` **per builder per tick**, and `build`'s duration resumes from `site.progressTicks`. So a house is **2880 ticks — three waking days for one body and 0.6 of a day for five** — and **cooperation has always been required and the world has never once said so.** Three free fixes:
+> ### ★★★ v5b — THE PREMISE OF THIS TASK IS FALSE IN A TOWN, AND IT IS **OD22**. READ THIS BEFORE STEP 1.
+>
+> v5's header below says *"`stepBuild` already emits `structure_progressed {ticks: 1}` per builder per tick"* and prices a house at *"0.6 of a day for five"*. **Executed against `645a8d9`, both halves fail on a plot.**
+>
+> ```
+> # a genesis town; amara and yusuf both standing on plot 1's door tile, both carrying wood
+> amara build ok: true      planted structure_84 at (98, 87), builtBy amara
+> yusuf build ok: false     "the town keeps ground for a house — go and stand at (86, 94)"
+> yusuf's site:  {x: 86, y: 92}   resume: null      # A DIFFERENT PLOT
+> ```
+>
+> **Two mechanisms, both keyed on the builder.** `buildSiteOf`'s plotted branch reads `ownSite(state, agentId, kind)`, which requires `s.builtBy === agentId`; if that is null it calls `claimInWorld`, **which returns the next FREE plot** — plot 1 is no longer free. And `stepBuild`'s plotted branch resolves its site the same way, so a second body could not advance the first body's walls even if it somehow held the activity. **On a plot, five bodies raise five houses.**
+>
+> **On the SITED branch it works, and always has** — `siteAt(state, x, y)` is keyed on the ground, so both builders name the same tile:
+>
+> ```
+> meadow: a builds at (1,1) -> true      meadow: b joins the SAME (1,1) -> true
+> two builders, one tick: [structure_progressed structure_1, structure_progressed structure_1]
+> progressTicks after: 2        # one body would give 1
+> ```
+>
+> **So the claim seam removed joint building from every town and nothing caught it, because the only joint-build coverage in the tree is a meadow test.** The fold accepts two `structure_progressed` for one site in one tick; what was lost is the *site resolution*, not the physics.
+>
+> **What it costs, named, because four things in this plan rest on it:** T21's arithmetic; **T22's entire `minHands` rule — `storehouse` at 3 hands and `shed` at 2 become UNBUILDABLE, a beam nobody can ever lift**; T49's `production.jointBuildTicks` and `socialVerbs.jointBuild`, which can only ever be 0; and **G8 criterion 7, which gates *"give, tend, teach and joint build each non-zero at least once"* and is therefore UNPASSABLE as the tree stands.**
+>
+> **OD22's recommendation is Step 0 below, and it is printed rather than described.** It is nine lines, it is keyed on the ground exactly as the sited branch already is, and it changes no fold and no hash.
+
+- [ ] **Step 0 (★ v5b, OD22): a site another pair of hands can join.** Modify `packages/engine/src/verbs.ts` and `packages/engine/src/buildSeam.test.ts`. **Its own commit, before Step 1**, because T22 cannot be executed without it.
+
+```ts
+// packages/engine/src/verbs.ts — beside `ownSite`, which it does not replace.
+//
+// ★ THE HALF `ownSite` CANNOT ANSWER. `ownSite` is keyed on the BUILDER, which is right for a
+// resume — a body goes back to its own walls. Joining is keyed on the GROUND, exactly as the
+// sited branch has always been through `siteAt`: the walls a body is standing next to. Without
+// this, `claimInWorld` hands the second body the next FREE plot and a town of five raises five
+// houses, which is the one thing the joint-build line in the prompt promises it will not do.
+//
+// Deterministic and rolls no die: (y, x) then id, the same order the shared `#scan` uses.
+function joinableSite(state: WorldState, agentId: string, kind: string) {
+  let best: Structure | null = null
+  for (const id of Object.keys(state.structures).sort()) {
+    const s = state.structures[id]!
+    if (s.stage !== 'construction' || s.kind !== kind) continue
+    if (s.builtBy === agentId) continue                       // that is `ownSite`'s answer
+    if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) continue
+    if (best === null || s.y < best.y || (s.y === best.y && s.x < best.x)) best = s
+  }
+  return best
+}
+```
+
+```ts
+// packages/engine/src/verbs.ts — inside `buildSiteOf`, the plotted branch. ONE LINE CHANGES.
+- const mine = ownSite(state, agentId, params.kind)
++ // Own walls first, then a neighbour's within reach; only then does the town claim new ground.
++ const mine = ownSite(state, agentId, params.kind) ?? joinableSite(state, agentId, params.kind)
+```
+
+```ts
+// packages/engine/src/verbs.ts — inside `stepBuild`, the plotted branch. ONE LINE CHANGES.
+  const site = p.x === undefined || p.y === undefined
+-   ? ownSite(state, agentId, p.kind)
++   ? ownSite(state, agentId, p.kind) ?? joinableSite(state, agentId, p.kind)
+    : siteAt(state, p.x, p.y)
+```
+
+**★ AND THE MATERIALS FALL OUT RIGHT WITHOUT A LINE OF WORK, WHICH IS THE TEST THAT THIS IS THE CORRECT SEAM.** `mine !== null` makes `resume` non-null, `plottedRefusal` is skipped for a resume, and `onStart` returns `[]` when `answer.resume !== null` — **so a joiner spends no second pile of wood, plants no second `structure_planned`, and claims no second plot.** Every one of those is already written; the only thing that was missing is the sentence that says *which* walls.
+
+```ts
+// packages/engine/src/buildSeam.test.ts — appended
+describe('★ OD22 — a second pair of hands joins the walls rather than starting new ones', () => {
+  it('TWO BODIES ON ONE SITE, IN A TOWN — the thing the prompt has always promised', () => {
+    const base = genesisTown()
+    const claim = claimInWorld(base, { along: 2, deep: 2 })!
+    let s = withBuilder(withBuilder(base, 'a', claim.door), 'b', claim.door)
+    const first = submitIntent(s, CFG, 'a', 'build', { kind: 'house' })
+    expect(first.ok).toBe(true)
+    s = apply(s, first.ok ? first.events : [])
+    const site = Object.values(s.structures).find((x) => x.stage === 'construction')!
+
+    const second = submitIntent(s, CFG, 'b', 'build', { kind: 'house' })
+    expect(second.ok, 'b was sent to a second plot — OD22 is not wired').toBe(true)
+    s = apply(s, second.ok ? second.events : [])
+    expect(Object.values(s.structures).filter((x) => x.stage === 'construction')).toHaveLength(1)
+  })
+
+  it('AND THE WALLS GO UP TWICE AS FAST, which is the whole arithmetic in this task s header', () => {
+    const s = twoOnOneSite()
+    const site = Object.values(s.structures).find((x) => x.stage === 'construction')!
+    const next = apply(s, [...stepBuild(s, 'a'), ...stepBuild(s, 'b')])
+    expect(next.structures[site.id]!.progressTicks).toBe(site.progressTicks + 2)
+  })
+
+  // `heldQty` is module-private in verbs.ts, so the fixture counts the pile itself.
+  const woodOf = (s: WorldState, id: string): number => Object.values(s.items)
+    .filter((i) => i.kind === 'wood' && i.loc.t === 'agent' && i.loc.id === id)
+    .reduce((n, i) => n + i.qty, 0)
+
+  it('★ THE JOINER PAYS NOTHING TWICE — no second pile, no second plot, no second plan', () => {
+    const before = twoOnOneSite('before')
+    const after = twoOnOneSite('after')
+    expect(woodOf(after, 'b')).toBe(woodOf(before, 'b'))
+    expect(Object.values(after.structures).filter((x) => x.stage === 'construction')).toHaveLength(1)
+  })
+
+  it('★ AND A BODY ACROSS TOWN IS STILL SENT TO ITS OWN GROUND — joining is a fact about REACH', () => {
+    const base = genesisTown()
+    const claim = claimInWorld(base, { along: 2, deep: 2 })!
+    let s = withBuilder(base, 'a', claim.door)
+    s = apply(s, (submitIntent(s, CFG, 'a', 'build', { kind: 'house' }) as { events: never[] }).events)
+    s = withBuilder(s, 'c', { x: TOWN_SQUARE.x + 7, y: TOWN_SQUARE.y + 7 })
+    expect(buildSiteOf(s, CFG, 'c', { kind: 'house' }).resume).toBeNull()
+  })
+
+  it('THE GOLDENS DO NOT MOVE — this changes site resolution, never a fold', () => {
+    expect(stateHash(replayFromGenesis(goldenStore(), CFG))).toBe(GOLDEN_DAY_HASH)
+  })
+})
+```
+
+- [ ] **Step 0b:** `pnpm vitest run packages/engine/ && pnpm typecheck` — PASS, **and `golden.test.ts` and `g2.test.ts` run explicitly with their two hashes pasted into the commit body.** Site resolution is not folded; if either pin moves, **STOP**.
+
+```bash
+git add packages/engine/src/verbs.ts packages/engine/src/buildSeam.test.ts
+git commit -m "fix(engine): a second pair of hands joins the walls instead of claiming a second plot (OD22)"
+```
+
+---
+
+**This is the highest impact-per-cost item in the entire design and it changes no physics at all.** `stepBuild` emits `structure_progressed {ticks: 1}` **per builder per tick** — **★ v5b: true of the FOLD, and true of the sited branch; true of a town only after Step 0 above** — and `build`'s duration resumes from `site.progressTicks`. So a house is **2880 ticks — three waking days for one body and 0.6 of a day for five** — and **cooperation has always been required and the world has never once said so.** Three free fixes:
 
 1. **The site's remainder in human words.** `PerceivedStructure` carries `stage` and nothing else. Add a phrase derived from `progressTicks / durationTicks`: *"barely begun"* / *"half-raised"* / *"a morning's work from finished"*. **★ v4: the field is `durationTicks`, not `buildTicks`** — `StructureRecipeSchema` at `packages/shared/src/config.ts` declares `{ inputs, w, h, maxHp, flammable, durationTicks }` and always has. v3 wrote `buildTicks` in four places and it exists nowhere in the tree.
 2. **The prose says hands help.** On a site in `construction` within reach: *"Another pair of hands here would halve what is left."* A physical fact, not an instruction.
@@ -3477,7 +3653,9 @@ export function minHandsFor(config: SimConfig, kind: string): number
 >
 > **Fault 3, and it is the one nobody would have predicted — `long_bridge` would claim a LAND PLOT.** `isPlottedKind(kind) = kind !== BRIDGE_KIND`, and `BRIDGE_KIND` is the single string `'bridge'`. **A kind called `long_bridge` is a plotted kind**, so the claim would hand it the free plot nearest the square and the span would be raised on dry ground in the middle of town. A longer bridge is not a different kind; it is the same deck over more water, and the far-bank lane already proved a deck completing and opening the west bank on the same tick.
 >
-> **★ THE ANSWER IS OD19 AND THE CONTROLLER OWNS IT. The recommendation, taken here so the task is executable, is to use TWO KINDS THE TOWN ALREADY STANDS AND TO DELETE THE THIRD.** `storehouse` for the three-hand mass and `shed` for the two-hand lift: both have committed cells in both facings, both are kinds a founder has walked past on the first morning, and the physical argument survives word for word. **It costs `minHands` its most vivid example and I would rather that than a red gate in somebody else's package.** `long_bridge` is deleted outright — **the plan says so loudly, and no task is added or renumbered for it.** If the controller would rather spend on three new cells, OD19's option (a) restores v4's three names unchanged and this table is the only thing that moves.
+> **★★ v5b — OD19 IS RULED: ACCEPTED AS RECOMMENDED (controller, 2026-08-24). THIS IS NO LONGER PROVISIONAL.** *"Heavy kinds become `storehouse`/`shed`; **`long_bridge` is deleted**. A plotted kind that would claim a land plot and raise a span on dry ground is a defect, not a feature, and `barn`/`pump_house` have no art against a gate that now covers every recipe key."* `storehouse` for the three-hand mass and `shed` for the two-hand lift: **executed — both have committed cells in both facings** (`storehouse`, `storehouse-se`, `shed`, `shed-se` on disk), both are kinds a founder has walked past on the first morning, and the physical argument survives word for word. **Option (a) — commission six cells and restore `barn`/`pump_house`/`long_bridge` — is closed.** `long_bridge` is deleted outright and no task is added or renumbered for it.
+>
+> **★ AND ONE CORRECTION TO FAULT 2's MECHANISM, WHICH DOES NOT MOVE THE RULING.** v5 said a seed kind with no art *"turns a green gate red on the commit that adds it."* **Executed: it does not.** `CREATABLE` in `structureArt.test.ts` is `worldStructureKinds({structures: TEMPLATE.structures, recipes: DEFAULT_CONFIG.structures.recipes, extra: DEV_TOWN_KINDS})`, and a `SEED_STRUCTURES` key is in **none of those three** — `worldStructureKinds({…}).includes('barn')` is `false`. **So `barn` and `pump_house` would have shipped a kind the world can create and cannot draw, silently, with every gate green.** That is worse than the red v5 predicted, and it is why the coverage row below is asserted **in this task's own test** rather than left to the forge's. The ruling stands on faults 1 and 3, which are unaffected, and on this one, which is stronger than stated.
 
 **Both are still NEW RECIPE ROWS and that is what keeps the pins still.** `storehouse` and `shed` are **template and fixture kinds, not `structures.recipes` keys** — verify with `grep -n "recipes:" -A 8 packages/shared/src/config.ts`, which shows the landed buildable set is `house`, `well`, `bridge`, `grave` and nothing else. **Run that grep rather than trusting this sentence.** Adding them to `SEED_STRUCTURES` (not to `DEFAULT_CONFIG`) makes them buildable **without touching the pinned hash at all**, which is the whole reason `SEED_STRUCTURES` exists — and because both already have art, the coverage gate stays green on the same commit.
 
@@ -3526,7 +3704,7 @@ describe('SEED_STRUCTURES', () => {
   // draw. Asserted HERE, in the package that adds the kind, so the failure names the cause
   // rather than surfacing three packages away as "farmhouse-se clears the pixel bar".
   it('★ EVERY SEED KIND HAS COMMITTED ART, IN EVERY FACING THE TOWN CAN STAND IT IN', () => {
-    const cells = new Set(listCommittedBuildingKinds())     // 20 cells, 14 kinds, from disk
+    const cells = new Set(listCommittedBuildingKinds())     // ★ v5b: 20 dirs, 13 kinds, from disk
     for (const kind of Object.keys(SEED_STRUCTURES)) {
       expect(cells.has(kind), `${kind} has no committed art cell — see OD19`).toBe(true)
       expect(cells.has(`${kind}-se`), `${kind} has no turned cell — see OD19`).toBe(true)
@@ -3557,19 +3735,118 @@ describe('SEED_STRUCTURES', () => {
 
 - [ ] **Step 1b: The art fixture, and it reads DISK rather than a list.** `packages/engine/src/structures/committedArt.fixture.ts` exports `listCommittedBuildingKinds(): string[]` = `readdirSync('packages/forge/content/buildings')`, sorted. **It is a `readdirSync`, not a typed array, because a typed array is a second copy of the art lane's contract and would go stale the first time a cell is commissioned.** `@sj/engine` must not import `@sj/forge` (C12 — nothing outside the forge may depend on `sharp`), so this reads the directory rather than the package. Four lines, test-only, and asserted test-only by the same source-level check T55 Step 0 uses.
 
+- [ ] **Step 1c (★★ v5b): THE FIXTURE, PRINTED.** v5 described this and printed nothing, and its own closing concern called it *"the least-verified amendment in v5 — if one amendment is going to cost an executor an afternoon, it is that one."* The house style forbids a described code step. **Here it is, in full, with no ellipsis and nothing left to derive.** Every symbol in it was executed against `645a8d9`; **it depends on T21 Step 0 (OD22)** and cannot stand up a multi-hand site without it, which is why that step is a separate commit that runs first.
+
+```ts
+// packages/engine/src/verbs.test.ts — appended, at the top of the file with the other fixtures
+import { DEFAULT_CONFIG, TOWN_SQUARE, type SimEvent } from '@sj/shared'
+import { fold } from './fold.js'
+import { genesisState, type Structure, type WorldState } from './state.js'
+import { makeGenesisWorld } from './genesis/world.js'
+import { submitIntent } from './intent.js'
+import { claimInWorld } from './town.js'
+import { stepBuild, VERBS } from './verbs.js'
+import { structureRecipeFor } from './structures/seedStructures.js'
+
+const CFG = DEFAULT_CONFIG
+let buildSeq = 20_000
+const bev = (type: string, payload: unknown, tick = 0): SimEvent =>
+  ({ seq: buildSeq++, tick, type, payload } as SimEvent)
+
+/** ★ THE ONE FOLD HELPER, AND ITS ARITY IS THREE. The landed `foldAll()` in
+ *  `genesis/world.test.ts` is a no-argument closure over that file's own genesis; this file
+ *  folds arbitrary events onto arbitrary state, so it takes them. Named `foldAll` because the
+ *  assertions below read as English with it. */
+const foldAll = (s: WorldState, events: ReadonlyArray<{ type: string; payload: unknown }>,
+  config = CFG): WorldState =>
+  events.reduce((acc, e) => fold(acc, bev(e.type, e.payload, acc.tick), config), s)
+
+/** A genesis town: eleven structures, a paved square, and therefore `buildIsPlotted === true`
+ *  for every kind but the bridge. A MEADOW WOULD PROVE THE WRONG THING — `genesisState(CFG)`
+ *  alone has no square, takes the sited branch, and accepts the coordinates this task exists
+ *  to see refused. */
+const townWorld = (): WorldState => {
+  const g = makeGenesisWorld(CFG)
+  return foldAll(genesisState(CFG, g.terrain), g.events)
+}
+
+/** A body standing where it is told, with enough of everything the recipe asks for. The
+ *  quantities come from the recipe rather than a number somebody typed, so a seed row that
+ *  changes its inputs does not silently start refusing for want of stone. */
+const seatBuilder = (s: WorldState, id: string, at: { x: number; y: number }, kind: string): WorldState =>
+  foldAll(s, [
+    { type: 'agent_spawned', payload: { id, name: id, x: at.x, y: at.y, ageDays: 10_000 } },
+    ...Object.entries(structureRecipeFor(CFG, kind)!.inputs).map(([k, qty]) => ({
+      type: 'item_spawned',
+      payload: { id: `${k}_${id}`, kind: k, qty: qty * 2, loc: { t: 'agent', id } },
+    })),
+  ])
+
+/**
+ * ★★ A SITE OF `kind`, UNDER CONSTRUCTION, WITH `builders` SET TO IT — THROUGH THE REAL CLAIM.
+ *
+ * It takes no coordinate and could not use one. `claimInWorld` names the free plot nearest the
+ * square and its door tile; every builder is seated on THAT door, the first raises the walls
+ * through the real verb, and each of the rest JOINS them (T21 Step 0). The site is whatever
+ * the lattice offered — never `(61, 68)`, which is a coordinate v3 chose and no lattice would
+ * ever hand out. Read it back with `theSite`; do not retype it (C14).
+ */
+function siteUnderConstruction(kind: string, builders: readonly string[]): WorldState {
+  const base = townWorld()
+  const recipe = structureRecipeFor(CFG, kind)!
+  const claim = claimInWorld(base, { along: recipe.w, deep: recipe.h })!
+  let s = builders.reduce((acc, id) => seatBuilder(acc, id, claim.door, kind), base)
+  for (const id of builders) {
+    const r = submitIntent(s, CFG, id, 'build', { kind })
+    if (!r.ok) throw new Error(`siteUnderConstruction(${kind}, [${builders}]): ${id} was refused — ${r.reason}`)
+    s = foldAll(s, r.events)
+  }
+  // One site, whoever started it. More than one means the join did not happen and every
+  // assertion below would be measuring two half-built things instead of one.
+  const sites = Object.values(s.structures).filter((x) => x.stage === 'construction')
+  if (sites.length !== 1) {
+    throw new Error(`siteUnderConstruction: ${sites.length} sites, expected 1 — is T21 Step 0 (OD22) wired?`)
+  }
+  return s
+}
+
+/** The one site under construction, read off the world rather than looked up by coordinate —
+ *  which is the whole point: on a plot there is no coordinate to look one up by. */
+const theSite = (s: WorldState): Structure | null =>
+  Object.values(s.structures).find((x) => x.stage === 'construction') ?? null
+
+/** A town with two bodies at the plot's door and nothing raised yet — the state in which the
+ *  three-hand refusal is the FIRST thing `build.validate` has to say. */
+const twoHandedTown = (): WorldState => handedTown(['amara', 'yusuf'])
+const threeHandedTown = (): WorldState => handedTown(['amara', 'yusuf', 'nadia'])
+function handedTown(ids: readonly string[], kind = 'storehouse'): WorldState {
+  const base = townWorld()
+  const recipe = structureRecipeFor(CFG, kind)!
+  const door = claimInWorld(base, { along: recipe.w, deep: recipe.h })!.door
+  return ids.reduce((acc, id) => seatBuilder(acc, id, door, kind), base)
+}
+```
+
+> **★ THE ONE THING THIS FIXTURE ASSERTS BY THROWING RATHER THAN BY EXPECTING**, and it is deliberate: if `siteUnderConstruction` finds two construction sites, **T21 Step 0 is not wired and every `minHands` assertion below is meaningless** — three bodies would be raising three storehouses and each of them would be at one hand. A fixture that returns a plausible-looking world in that case is how a task goes green while measuring nothing, which is the shape this plan has now caught fourteen times. **The throw names OD22 so the executor is not sent looking.**
+
 ```ts
 // packages/engine/src/verbs.test.ts — appended
 //
-// ★ v5: `siteUnderConstruction(kind, builders)` now stands its site through the REAL claim —
-// it builds a town world, calls `claimTownPlot`, and seats the site at `answer.site`. It no
-// longer takes a coordinate, and `siteAt(state, 61, 68)` becomes `theSite(state)`, because
+// ★ v5: `siteUnderConstruction(kind, builders)` stands its site through the REAL claim — it
+// builds a town world, calls `claimInWorld`, and seats the site where the lattice offered it.
+// It takes no coordinate, and `siteAt(state, 61, 68)` becomes `theSite(state)`, because
 // (61, 68) was a coordinate v3 chose and no lattice would ever offer. The fixture returns the
-// site it seated so the assertions read it rather than retyping it (C14).
+// world it seated so the assertions read the site rather than retyping it (C14).
+// ★★ v5b — `stepBuild` TAKES TWO ARGUMENTS, NOT THREE. `export function stepBuild(state:
+// WorldState, agentId: string): PendingEvent[]` at `verbs.ts:1836` — it reads the config it
+// needs off nothing, because a tick of work is a tick of work. v5 passed `DEFAULT_CONFIG` as
+// the second argument in all three rows below, which is `TS2554: Expected 2 arguments, but
+// got 3` on every one of them. Measured: `stepBuild.length === 2`.
 describe('a beam that does not go up with two', () => {
   it('MAKES NO PROGRESS AT ALL below the hand count — not slow progress', () => {
     const state = siteUnderConstruction('storehouse', ['amara', 'yusuf'])
     const before = theSite(state)!.progressTicks
-    const next = foldAll(state, stepBuild(state, DEFAULT_CONFIG, 'amara'), DEFAULT_CONFIG)
+    const next = foldAll(state, stepBuild(state, 'amara'))
     expect(theSite(next)!.progressTicks).toBe(before)
   })
 
@@ -3577,13 +3854,13 @@ describe('a beam that does not go up with two', () => {
     const state = siteUnderConstruction('storehouse', ['amara', 'yusuf', 'nadia'])
     const before = theSite(state)!.progressTicks
     let next = state
-    for (const id of ['amara', 'yusuf', 'nadia']) next = foldAll(next, stepBuild(next, DEFAULT_CONFIG, id), DEFAULT_CONFIG)
+    for (const id of ['amara', 'yusuf', 'nadia']) next = foldAll(next, stepBuild(next, id))
     expect(theSite(next)!.progressTicks).toBe(before + 3)
   })
 
   it('a house still goes up alone, exactly as it always did', () => {
     const state = siteUnderConstruction('house', ['amara'])
-    const next = foldAll(state, stepBuild(state, DEFAULT_CONFIG, 'amara'), DEFAULT_CONFIG)
+    const next = foldAll(state, stepBuild(state, 'amara'))
     expect(theSite(next)!.progressTicks).toBe(theSite(state)!.progressTicks + 1)
   })
 
@@ -3639,7 +3916,9 @@ Expected: PASS; **run `golden.test.ts`, `g2.test.ts` and `forgeConfig.test.ts` e
 pnpm vitest run packages/forge/src/structureArt.test.ts packages/gateway/src/ingestArt.test.ts
 ```
 
-Expected: PASS, **20 committed cells, zero uncovered kinds.** `worldStructureKinds` unions the template's kinds with every recipe key, so **if a later ruling on OD19 puts a kind with no cell into `SEED_STRUCTURES`, this is where it goes red** — and it goes red in `packages/forge`, which C8 does not own. **A red here is a STOP, not a cell to commission on the spot** (C20: the user's eye is the only art gate).
+Expected: PASS, **20 committed cells across 13 kinds, zero uncovered kinds.**
+
+**★★ v5b — AND THE REASON THIS RUN IS A REGRESSION CHECK AND NOT THIS TASK'S ART GATE.** v5 said *"if a kind with no cell goes into `SEED_STRUCTURES`, this is where it goes red."* **Executed, and it is false.** `worldStructureKinds` unions the template's kinds with the keys of **`DEFAULT_CONFIG.structures.recipes`** — `bridge, grave, house, well` — plus the gateway's four dev-town kinds. **A `SEED_STRUCTURES` key is in none of the three**, which is the same property that keeps the forge pin still. So a seed kind with no art is **invisible to `structureArt.test.ts`** and would ship as a kind the world can create and cannot draw, with every gate green. **The row that actually binds is `★ EVERY SEED KIND HAS COMMITTED ART` in this task's own test, above**, which reads the directory. Run the forge gate anyway — it proves this task moved nothing that was already covered — and treat a red there as a STOP, not a cell to commission on the spot (C20: the user's eye is the only art gate).
 
 - [ ] **Step 5: Commit.**
 
@@ -3768,7 +4047,7 @@ Four reachability walls, closed together because each is one small change and th
 > **So item 3 is now the largest single source of Discovery Records in the run.** Inverting the expressive test turns *"an act is expressive if it matches one of 22 blessed stems"* into *"an act is expressive if it names no mutating stem and no known verb"* — which is a much wider door, and **every mind that walks through it gets a `word` credited to it by name.** Two things follow:
 >
 > 1. **The credit is a world fact and the one-way glass still binds it.** `discoveryHeadline` deliberately omits `intent` — *"a headline reaches the chronicle, the chronicle is agent-visible, and a mind reading its own sentence back is a loop the one-way glass exists to prevent."* **This task adds no string that undoes that**, and the Self-Review's glass sweep covers the skill-word table it does add.
-> 2. **G8 does not currently look at any of it, and OD21 asks whether it should.** The recommendation is **report, never gate** — a discovery *count* has no baseline, and a threshold with no baseline is the thing C23 forbids. What the report should carry is `discoveries` by `kind` and by `byId`, plus the identity **`discoveries.length === craftsCodified + wordsMinted`**, which is the assertion that keeps the two codification paths from drifting apart. **T49's schema is where it lands if the controller says yes; nothing here is written on the assumption that they will.**
+> 2. **★★ v5b — OD21 IS RULED: REPORT, NEVER GATE (controller, 2026-08-24).** *"Same reasoning as OD18: gating on discoveries makes the arbiter's openness a target, and a target is not a measurement."* A discovery *count* also has no baseline, and a threshold with no baseline is the thing C23 forbids. **T49's schema now carries `discoveries: { total, byKind, byFinder, craftsCodified, wordsMinted }`** and the identity **`total === craftsCodified + wordsMinted`**, which is the assertion that keeps the two codification paths from drifting apart. **`checkRehearsal` fails on `discovery-ledger-drift` and on nothing else about discoveries — a run that discovered nothing still passes.**
 
 - [ ] **Step 1: Write the failing test.**
 
@@ -4777,7 +5056,9 @@ import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
 import { SURVIVAL_FLOOR_PCT, discretionaryTable, emergenceVerdict } from './discretionary.js'
 
-const townDb = (spec: { verbs: Record<string, string[]>; fullNeedTicks?: number; deaths?: Array<{ agentId: string; tick: number; cause: string; foodInReach: boolean }> }) => { /* seeds events + agents_body; defined at the top of this file */ }
+// ★ v5b: seeds the `events` table only — there is no `agents_body` table and a body is folded
+// state. `fullNeedTicks` is seeded by writing the need-changing events the fold reads.
+const townDb = (spec: { verbs: Record<string, string[]>; fullNeedTicks?: number; deaths?: Array<{ agentId: string; tick: number; cause: string; foodInReach: boolean }> }) => { /* seeds events; defined at the top of this file */ }
 
 describe('the corrected classifier', () => {
   it('COUNTS tend IN BOTH COLUMNS AND NEVER TWICE IN THE TAX', () => {
@@ -4862,7 +5143,17 @@ describe('emergenceVerdict', () => {
 Run: `pnpm vitest run packages/agents/src/live/discretionary.test.ts`
 Expected: FAIL with `Cannot find module './discretionary.js'`.
 
-- [ ] **Step 3: Implement.** Read `events` and the `agents_body` history from the world DB; no LLM, no network. `g11report.ts` keeps `classifyVerb` exactly as it is, exported and unchanged, so `survivalTaxPctLegacy` is computed by the same code that produced every prior report — **that is what makes the two numbers comparable rather than two guesses.** Also fix `fullNeedTicks` repeating a run total on every row (batch 12 R6).
+- [ ] **Step 3: Implement.** Read the `events` table and **rebuild the bodies by folding it**; no LLM, no network.
+
+> ### ★★ v5b — THERE IS NO `agents_body` TABLE, AND THERE NEVER HAS BEEN
+>
+> v5 said *"read `events` and the `agents_body` history from the world DB."* **Executed: `grep -rn "agents_body" packages/` returns nothing, and the world DB holds `events`, `snapshots` and `rng_state` — a body is folded state, never a row.** A task written against a table that does not exist is the exact shape this pass exists to find, and it survived four revisions because nobody opened the database.
+>
+> **What the landed code does instead, and what this task must reuse.** `fullNeedTicks` is not read back at all — it is **accumulated live** by `FullNeedTally` (`g11report.ts:274`, `sample(agentId, day)` / `ticksOn(agentId, day)`, sampled every `FULL_NEED_SAMPLE_TICKS` at `g11-deepworld.ts:753` and restored from the checkpoint sidecar at `:682`). **So an offline `discretionary.ts` has exactly one honest source: fold the event log forward and sample the needs at the same cadence the live tally does.** `replayFromGenesis(store, config, terrain)` is landed and does the fold.
+>
+> **Reuse `FullNeedTally`, do not write a second one.** It is exported, it already carries the per-agent-per-day keying this task's `DayRow` needs, and **two accumulators for one number is how the survival tax and the discretionary rate would come to disagree between a run and the report that scored it** — the same argument T49 makes for `classifyDeaths`. Keep `FULL_NEED_SAMPLE_TICKS` identical, or the two numbers are not comparable and the whole point of `survivalTaxPctLegacy` is lost.
+
+ `g11report.ts` keeps `classifyVerb` exactly as it is, exported and unchanged, so `survivalTaxPctLegacy` is computed by the same code that produced every prior report — **that is what makes the two numbers comparable rather than two guesses.** Also fix `fullNeedTicks` repeating a run total on every row (batch 12 R6).
 
 - [ ] **Step 4: Green.**
 
@@ -5522,6 +5813,8 @@ grep -rnE "'[0-9a-f]{64}'" --include='*.ts' packages/forge/src/forgeConfig.test.
 > **`g9.test.ts:591-592` is the one that will waste an afternoon.** It does not import the hash; it reads the other test file's bytes and asserts the literal appears in them. A regen that updates `golden.test.ts` makes it pass automatically and a regen that forgets to makes it fail with a message about a *file*, not a hash.
 >
 > **★ AND THE ONE THAT IS NOT A PIN AT ALL: `arbiter/src/g4.test.ts:208` CARRIES `f487a26b` INSIDE A TEST NAME** — *"G1 golden day still replays bit-identically to the pinned hash f487a26b"*. It is why the prefix grep returns twelve lines and the literal count is eleven. **It has no assertion behind it, so it cannot go red**, which is exactly what makes it worth naming: a regen that leaves it behind ships a test whose name says one hash and whose body checks another. **Update it for honesty, and never count it toward the census.**
+>
+> **★★ v5b — AND ONE THING THE REGEN MUST NOT TIDY, WHICH NO REVISION HAS NAMED: `g2.test.ts:33`'s `Previous value (C11 Task 37)` COMMENT IS LOAD-BEARING.** `gateway/src/g12c.test.ts:142` asserts `expect(g2, 'g2.test.ts no longer records its superseded pin — pick another').toContain('665a8249…')` — it plants a known-stale value in the file **on purpose**, to prove that `pinAt`'s regex reads the live assignment and not a comment. **A regen that deletes the superseded-value comments while updating the pin turns a green anti-vacuity guard red in another package**, and the failure message is about picking a different value rather than about the thing that was deleted. **Keep every `Previous value:` line and append to them; that is the convention those files already follow, and one of them is now a test fixture.** Twelve grep lines is the census; **`git grep -nE "[0-9a-f]{64}" -- 'packages/**/*.ts'` returns NINETEEN**, and the other seven are six `Previous value:` comments plus the `g11checkpoint.test.ts:15` decoy. **None of the seven is a pin and one of them is asserted.**
 >
 > **The command that finds all eleven is in C3 and is run again here, before and after. It prints TWELVE lines:**
 >
@@ -6912,7 +7205,9 @@ export function createSim(deps: SimDeps): Sim
 **What `createSim` does, in order.** Every line is a delta §6 item or a landed-reality requirement:
 
 1. **Write the run manifest** (T27) before anything else, so a run cannot acquire its own description afterwards.
-2. **Genesis or resume.** Empty event store: fold `makeGenesisWorld(config).events`, then `spawnFounders`, then seed the arbiter `codex` from `codexEntriesFromTree()`. **Not** empty: `replayLatest(store, config, makeGenesisWorld(config).terrain)` and continue, spawning nothing. *A container with `restart: unless-stopped` will restart; without this branch every restart either re-runs genesis into a live log or dies.*
+2. **Genesis or resume.** Empty event store: fold `makeGenesisWorld(config).events`, then `spawnFounders`, then **seed the arbiter `codex` from `GENESIS_CODEX` — `for (const entry of GENESIS_CODEX) codex.insert(entry)`**. **Not** empty: `replayLatest(store, config, makeGenesisWorld(config).terrain)` and continue, spawning nothing. *A container with `restart: unless-stopped` will restart; without this branch every restart either re-runs genesis into a live log or dies.*
+
+> **★★ v5b — THIS LINE SAID `codexEntriesFromTree()` AND IT WOULD HAVE REDDENED T14'S OWN TEST.** OD18 is ruled: the 103-node tree is a yardstick and never a gate, and T14 ships a test asserting that `codexEntriesFromTree` has **no caller outside its own module and test**. **A supervisor that called it would have made that test go red from inside this plan, three phases later, in a package neither task names** — and an executor who "fixed" the test to accommodate the supervisor would have overturned a controller's ruling to make a suite green. `GENESIS_CODEX` is the seed, it is thirteen entries, and it is what both live gate scripts already insert (`g9-livingworld.ts:229`, `g11-deepworld.ts:283`). **The tree reaches T49's report and nothing else.**
 3. `createWorldTick(config, rng, lawQueue)` — the **same** queue handed to `applyLaw`, drained before any system runs, so a flip is live for the tick that carries it and can never land mid-tick.
 4. `EngineBridge` with **no `recentWindowTicks`** — the default is derived (`ceil(boredomTicks × 1.1)`) and supplying one can only narrow what a mind is handed.
 5. **Five `AgentRuntime`s, arm-dependent.** Neutral: `neutralIdentity({name, age, genome: genomeOf(worldSeed, id)})` + `neutralPersonality()`, **no seeded ledgers** — a neutral town has met nobody. Authored: `toIdentityCore(f)` + `PersonalityStore.init(toPersonalityV1(f), 0)` + `toInitialLedgers(f)`. Both: a per-mind `LlmClient` built with `temperatureOf(genome)`, `makeReflectionLlm`, and `onThought` into `observer_thoughts`.
@@ -6921,6 +7216,14 @@ export function createSim(deps: SimDeps): Sim
 8. `checkSpend(db, {})` on a real-clock interval (default hourly = one projection per sim-day at the nominal pace). **It alerts; it never pauses.** Pausing is a human call.
 9. `createLawsAdmin({submitLaw: (p, v) => applyLaw(queue, p, v), token, host})` on its **own port**, bound to `127.0.0.1`.
 10. `stop()`: stop the loop → `bridge.drain()` and log the count (without it a mind awaiting a queued submit hangs and `stop()` never resolves) → await every `reflectionInFlight()` → close the admin and law servers → close every DB.
+
+> ### ★ v5b — T32 WAS COMPILED, ONE LINE WAS WRONG, AND THE REST HOLDS
+>
+> This task was the first place v5's own report said to look, and **every landed signature it names typechecks** against `645a8d9`: `replayLatest(store, config, terrain)` takes terrain third; `createWorldTick(config, rng, laws?)` takes three with the queue optional; **`new EngineBridge({loop, store, simConfig})` with no `recentWindowTicks` typechecks**, and the default really is derived — `DEFAULT_RECENT_WINDOW_TICKS = Math.ceil(DEFAULT_MIND_CONFIG.boredomTicks * 1.1)` at `bridge.ts:27`; `watchBirths(bridge, store, spawn)` takes three; `applyLaw(queue, path, value)` queues `{path, value}`; `checkSpend(db, opts = {})` returns `alerted` and writes an alert of kind `spend_projection`; `createLawsAdmin({submitLaw, token, host?})` returns a `Server` the caller listens on, which is why `SimDeps.laws` carries the port and `LawsAdminOpts` does not; `makeGenesisWorld(DEFAULT_CONFIG)` yields **94 events and a 128-row terrain**; `SeamArbiter` is `{adjudicate, codify}`.
+>
+> **`sim.tickLoop.paused` is NOT landed** — `TickLoop` has `state`, `tick`, `step()`, `start()`, `stop()` and nothing else — **and that is correct, because T31 produces `pause`/`resume`/`setSpeed`/`speed`/`paused` and T31 runs first in document order.** Checked rather than assumed, because "a symbol an earlier task produces" and "a symbol nobody produces" look identical in a grep.
+>
+> **The one line that was wrong is Step 2's codex seed, and it is corrected above.**
 
 - [ ] **Step 1: Write the failing test** — deterministic, no network: a fake embedder, an `llmFactory` returning a scripted client, a stub `SeamArbiter`.
 
@@ -8102,7 +8405,7 @@ git commit -m "test(agents): GATE G8 injection — fourteen attacks, two arms, n
 >
 > **`DEFAULT_ART_ROOT`, the `artRoot` option, `BUILDING_ART_DIRS`, `ingestBuilding`, `tryIngest`, `upsert` and `latestByKind` are all gone.** Every one of v4's four test bodies passes `{ artRoot, libraryRoot }` into a function whose signature takes a `Database` and nothing else, so **all four fail to compile**, and Step 3's *"set `SJ_ART_ROOT` / `SJ_LIBRARY_ROOT` defaults when the scratchpad is absent"* configures a mechanism that no longer exists — a shape `packages/forge/scripts/recell-buildings.ts` is still documenting and which merge train 3 flagged as its concern 4.
 >
-> **The art is committed**: `packages/forge/content/buildings/` holds **20 cells across 14 kinds**, `registerCommittedCast` holds the five rigs, and the library holds 100 item records. The running product boots **`ingested production art (25 of 25 assets)`** with **zero `NO ART` lines**, where trains 1 and 2 both got 15 of 19 with four ENOENTs.
+> **The art is committed**: `packages/forge/content/buildings/` holds **20 cells across THIRTEEN kinds** (★ v5b: v5 said fourteen; `listCommittedBuildings()` returns 20 cells and `new Set(cells.map(c => c.kind)).size` is **13** — seven kinds in both facings, six SW-only), `registerCommittedCast` holds the five rigs, and the library holds 100 item records. The running product boots **`ingested production art (25 of 25 assets)`** with **zero `NO ART` lines**, where trains 1 and 2 both got 15 of 19 with four ENOENTs.
 >
 > **★ SO THE TASK IS NOT DELETED, BECAUSE THE THING IT WAS FOR IS STILL NOT PROVED.** *"The art is in the repo"* and *"a cold arm64 box comes up with pictures"* are different claims, and only the first has been measured. What remains, and what this task now does: **a `bootstrap` that is idempotent across a restart, that brings the API and the world up when the art is unreadable, and that is exercised on the deployment image rather than on a developer's laptop.** It gets smaller, it stops vendoring anything, and it stops naming a root.
 
@@ -8114,8 +8417,14 @@ git commit -m "test(agents): GATE G8 injection — fourteen attacks, two arms, n
 
 ```ts
 // packages/supervisor/src/bootstrap.test.ts
-import { chmodSync } from 'node:fs'
+// ★ v5b: `listCommittedBuildings` is imported for the half-cell row; `@sj/supervisor` sits
+// above everything and may depend on `@sj/forge` (C12), which is also why `bootstrap` is the
+// one place sharp runs in production.
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { listCommittedBuildings } from '@sj/forge'
 import { bootstrap } from './bootstrap.js'
 import { assetCount, freshCodex } from './testDb.js'
 
@@ -8125,7 +8434,7 @@ describe('bootstrap', () => {
     const db = freshCodex()
     const out = await bootstrap(db)
     expect(out.characters).toBe(5)
-    expect(out.buildings).toBe(20)      // packages/forge/content/buildings, 14 kinds
+    expect(out.buildings).toBe(20)      // ★ v5b: 20 cells across 13 kinds, measured
     expect(out.library).toBe(100)
     expect(assetCount(db)).toBeGreaterThan(0)
   })
@@ -8138,12 +8447,27 @@ describe('bootstrap', () => {
     expect(second.characters + second.buildings + second.library).toBe(0)
   })
 
-  // ★ v5: the successor to v4's "a missing library sprite is not an error". `three-defects`
-  // landed the opposite guarantee for BUILDINGS — `listCommittedBuildings` THROWS on half a
-  // cell and names the directory — so the two are asserted apart rather than merged.
-  it('★ A HALF-WRITTEN BUILDING CELL THROWS, AND NAMES THE DIRECTORY', async () => {
-    await expect(bootstrap(freshCodex(), { root: 'packages/forge/content/buildings-partial' }))
-      .rejects.toThrow(/buildings-partial/)
+  // ★★ v5b — v5's version of this row PASSED VACUOUSLY AND WOULD HAVE GONE RED FOR THE WRONG
+  // REASON. Two faults, both executed: (1) `listCommittedBuildings(root)` opens with
+  // `if (!existsSync(root)) return []` — an ABSENT directory yields an empty list and throws
+  // NOTHING, and `packages/forge/content/buildings-partial` does not exist; (2) `bootstrap`
+  // cannot forward a root anyway, because `ingestProductionArt(db)` takes a database and
+  // nothing else and this task's own Consumes line forbids adding one back.
+  //
+  // So the guarantee is asserted where it lives — against `listCommittedBuildings` directly,
+  // over a half-written cell this test WRITES — and `bootstrap` keeps its no-root signature.
+  it('★ A HALF-WRITTEN BUILDING CELL THROWS, AND NAMES THE DIRECTORY', () => {
+    const root = mkdtempSync(join(tmpdir(), 'sj-art-'))
+    mkdirSync(join(root, 'shed'))
+    writeFileSync(join(root, 'shed', 'manifest.json'), '{"kind":"shed"}')   // and no cell.png
+    expect(() => listCommittedBuildings(root)).toThrow(/shed.*cell\.png/)
+    rmSync(root, { recursive: true, force: true })
+  })
+
+  // ★ v5b — and the row that proves the one above is not vacuous: an ABSENT root is silence,
+  // not an error, which is precisely why the fixture has to write a broken cell to test one.
+  it('an absent art root is empty and silent — the guarantee is about HALF a cell', () => {
+    expect(listCommittedBuildings(join(tmpdir(), 'sj-no-such-art-root'))).toEqual([])
   })
 
   // ★ v5: the row that replaces "AN EMPTY ART ROOT STILL BOOTS", asked in the only way that is
@@ -8751,6 +9075,33 @@ export const G8RehearsalReportSchema = z.object({
   }),
   // ★ THE R4 MEASURE. Never social-need satisfaction, which is oversatisfied ~34x (C25).
   socialVerbDiversity: z.number().int(), discretionarySocialShare: z.number(),
+  // ★★ v5b — OD21 RULED: THE DISCOVERY RECORD IS REPORTED AND NEVER GATED. `total` is the
+  // identity that keeps the two codification paths from drifting: a word minted inside
+  // `codifyExpressive` never passes through `codify()`, so if these two ever disagree one of
+  // the paths has stopped recording. `byFinder` is a free mode-collapse signal — five minds
+  // and every discovery credited to one of them says something D_b and D_c do not.
+  discoveries: z.object({
+    total: z.number().int(),
+    byKind: z.record(z.string(), z.number().int()),
+    byFinder: z.record(z.string(), z.number().int()),
+    craftsCodified: z.number().int(), wordsMinted: z.number().int(),
+  }),
+  // ★★ v5b — OD18 RULED: THIS IS THE TREE'S ONE CONSUMER AND THE WHOLE OF ITS REACH.
+  // `DISCOVERY_TREE` (T13) is read HERE and nowhere else; `codexEntriesFromTree` is not read
+  // at all. The ruling's own sentence, as a number: "they found 14 of the 103 we anticipated,
+  // plus 9 we did not" — and `unanticipatedFoundIds` IS THE RESULT.
+  tree: z.object({
+    treeSize: z.number().int(),
+    anticipatedFound: z.number().int(), anticipatedFoundIds: z.array(z.string()),
+    unanticipatedFound: z.number().int(), unanticipatedFoundIds: z.array(z.string()),
+  }),
+  // ★ v5b — the ratified G8 verdict's third gap: a run that builds now changes the MAP and
+  // nothing recorded that it did. Three real observables the 2026-08-23/24 sprint created.
+  // REPORTED, never gated: no prior run exists to derive a threshold from, and a 21-day soak
+  // that never leaves ring 1 is a fact worth having rather than a bar to clear.
+  mapChange: z.object({
+    ringsStanding: z.number().int(), plotsClaimed: z.number().int(), worldGrowths: z.number().int(),
+  }),
   // ★ THE FURNITURE SEAM (Phase F3), REPORTED AND NOT GATED — the slice runs with commissions off.
   furnishings: z.object({
     placed: z.number().int(), byAgent: z.record(z.string(), z.number().int()),
@@ -8788,7 +9139,7 @@ export const SeamcheckSchema = z.object({
 
 **`sawSomebodyOld` will be `false` in every run this plan makes**, because 21 sim-days of thirty-year-olds produces no elder. **It is recorded as no coverage and never as a pass** — the ageing path's only proof is T60's offline test against a seeded ninety-year-old (C24: a test that passes against the broken code has measured nothing, and a live run that could not have exercised the path has measured nothing either).
 
-**The seamcheck** is the emergence law's lever 1 (effectiveness) made into six live assertions, each the counterpart of a landed fix, because **landed is not the same as working with a real mind in the loop** and every one of them was a silent failure the first time:
+**The seamcheck** is the emergence law's lever 1 (effectiveness) made into **eleven** live assertions (★ v5b: v5's prose said *"six"* and then listed eleven — the list is right and the number was three revisions stale), each the counterpart of a landed fix, because **landed is not the same as working with a real mind in the loop** and every one of them was a silent failure the first time:
 
 1. `enter` succeeds at least once and at least one mind **sleeps in a bed**. *Baseline: 15 attempts, 0 successes, 80 collapses.*
 2. At least one mind is woken by **thirst** and one by an **affliction**, and no mind ends a day at hunger 0 with food in reach.
@@ -8801,6 +9152,14 @@ export const SeamcheckSchema = z.object({
 9. **★ At least one mind GIVES to somebody who needed it** — a `give` whose target had an open distress at the tick. *Baseline: **0 gives in four days**, while Nadia ate nine meals and three others ate one each and died.*
 10. **★ At least one mind PLACES ITS OWN FURNISHING** — a `furnishing_placed` carrying a `byId`. *Baseline: every house in the world was furnished identically, for ever.*
 11. **`sawSomebodyOld` is recorded and expected FALSE** — see the note above. A run of adults cannot see an elder, and writing that down is the difference between an honest zero and a silent one.
+
+**★★ v5b — WHERE THE THREE NEW BLOCKS GET THEIR NUMBERS, because a schema field with no source is a zero waiting to be believed.**
+
+| Block | Source, named | Notes |
+|---|---|---|
+| `discoveries` | **the `discovery_made` events in the world log** — `DISCOVERY_EVENT` at `packages/shared/src/discovery.ts:3`, parsed with the landed `DiscoveryRecordSchema`. `byKind` groups on `kind` (`'craft' \| 'word'`), `byFinder` on `byId`; `craftsCodified` and `wordsMinted` are the two `kind` counts | **`discoveryHeadline` deliberately omits `intent`, so the one-way glass holds** (T24). The identity is asserted, not assumed |
+| `tree` | **`DISCOVERY_TREE` (T13)** ∩ the run's `codifiedVerbIds`. `anticipatedFound` is the intersection; `unanticipatedFound` is everything codified that the tree does not name | **This is the ONLY read of the tree in the whole plan (OD18).** `codexEntriesFromTree` is not read here or anywhere |
+| `mapChange` | `ringsStanding` from the plat state at run end; `plotsClaimed` from the `structure_planned` count; **`worldGrowths` from `tile_changed` events carrying `reason: 'grown'`** (★ v5b: there is no `world_grown` event — `events.def.ts:216` is the enum that names it) | All three are event-log counts, so a resumed run recovers them by replay |
 
 **`checkRehearsal` consumes T66's `classifyDeaths` and does not re-derive the taxonomy.** One definition of what may kill, used by the report, by the gate and by the chronicle's own weighting — a second copy is exactly how `unforced` and `taxon` would drift apart between a run and the gate that judged it.
 
@@ -8869,6 +9228,49 @@ describe('checkRehearsal', () => {
     expect(checkRehearsal(barren).failures).toContain('zero-production')
   })
 
+  // ★★ v5b — OD20 RULED. Criterion 5's sum is unchanged and criterion 17 sits on top of it.
+  // This is the row that makes the split real: a town that crafted every day and raised
+  // nothing passes criterion 5 and FAILS criterion 17. It is a TIGHTENING — the bar went up.
+  it('★★ FAILS A TOWN THAT ONLY CRAFTED — `craft` was never the blocked verb (OD20)', () => {
+    const busy = { ...fixture(), production: { ...fixture().production, builds: 0, crafts: 21, structuresCompleted: 0 } }
+    expect(checkRehearsal(busy).failures).not.toContain('zero-production')   // the sum is met
+    expect(checkRehearsal(busy).failures).toContain('zero-builds')           // and the split bites
+    expect(checkRehearsal({ ...fixture(), production: { ...fixture().production, builds: 1 } }).failures)
+      .not.toContain('zero-builds')
+  })
+
+  // ★★ v5b — OD21 RULED: reported, never gated. Both halves asserted, because "we report it"
+  // is only half a decision — the other half is that a zero can never fail the run.
+  it('★★ REPORTS THE DISCOVERY RECORD AND NEVER GATES ON IT (OD21)', () => {
+    const none = { ...fixture(), discoveries: { total: 0, byKind: {}, byFinder: {}, craftsCodified: 0, wordsMinted: 0 } }
+    expect(checkRehearsal(none).pass).toBe(true)
+    expect(checkRehearsal(none).failures).not.toContain('discoveries')
+    expect(G8RehearsalReportSchema.parse(none).discoveries.total).toBe(0)
+  })
+
+  // ★★ v5b — and the one assertion the record exists FOR. A word minted inside
+  // `codifyExpressive` never passes through `codify()`, so two paths write one ledger; if they
+  // ever disagree, one of them has stopped recording and the report is quietly short.
+  it('★★ THE TWO CODIFICATION PATHS AGREE, OR THE REPORT IS WRONG', () => {
+    const drifted = { ...fixture(), discoveries: { ...fixture().discoveries, total: 5, craftsCodified: 2, wordsMinted: 1 } }
+    expect(checkRehearsal(drifted).failures).toContain('discovery-ledger-drift')
+  })
+
+  // ★ v5b — OD18's scoring instrument, and the only place the tree is read. The 9 are the
+  // result, so the report must be able to carry a run where the anticipated count is ZERO and
+  // still pass: an unanticipated-only town is a success, not a failure.
+  it('★ SCORES THE TREE AND GATES ON NEITHER HALF (OD18)', () => {
+    const surprising = { ...fixture(), tree: { treeSize: 103, anticipatedFound: 0, anticipatedFoundIds: [], unanticipatedFound: 9, unanticipatedFoundIds: ['a', 'b'] } }
+    expect(checkRehearsal(surprising).pass).toBe(true)
+    expect(checkRehearsal({ ...fixture(), tree: { ...fixture().tree, unanticipatedFound: 0, unanticipatedFoundIds: [] } }).pass).toBe(true)
+  })
+
+  // ★ v5b — the map columns, reported. A soak that never leaves ring 1 is a finding.
+  it('★ REPORTS WHAT THE TOWN DID TO THE MAP AND GATES ON NONE OF IT', () => {
+    const still = { ...fixture(), mapChange: { ringsStanding: 1, plotsClaimed: 0, worldGrowths: 0 } }
+    expect(checkRehearsal(still).pass).toBe(true)
+  })
+
   it('★ FAILS A COLLAPSED TOWN on the mode-collapse verdict', () => {
     expect(checkRehearsal({ ...fixture(), modeCollapse: { ...fixture().modeCollapse, pass: false, failures: ['D_c'] } }).failures)
       .toContain('mode-collapse')
@@ -8915,7 +9317,15 @@ git commit -m "feat(supervisor): the rehearsal's report — everything the world
 
 All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throttles turns and would make every number a fiction), on the arm64 stack, C7 pre-flight first, tripwire per C6. Cost at the re-derived rate: **A ≈$4.52, B ≈$1.51, C ≈$1.51 — ≈$7.54 total.**
 
-**PASS CRITERIA — written before the run, never decided after it. SIXTEEN in v3, and criterion 2 is the headline.**
+**PASS CRITERIA — written before the run, never decided after it. SIXTEEN in v3; ★ v5b makes it SEVENTEEN, and the seventeenth is a TIGHTENING.** Criterion 2 is still the headline.
+
+> ### ★★ v5b — OD20 IS RULED, AND THE RECORD OF WHY MATTERS MORE THAN THE ROW
+>
+> **The controller's ruling, 2026-08-24:** *"Criterion 5 passing on crafting alone cannot see the thing C8 exists to measure. **Split `builds ≥ 1` out as its own criterion.** This makes the gate HARDER, which is the only direction a criterion may move after the code changes. **Note in the plan that it is a tightening and why**, so no future reader mistakes it for the thing this project has caught thirteen times — a threshold moved to match what the code does."*
+>
+> **So it is written down here, once, plainly. This gate got HARDER after the code changed, and it is the only kind of movement that is allowed.** Criterion 5 as it stood is a disjunction — `builds + crafts + chops + tills + plants ≥ 1 per town-day` — and **`craft` was never the blocked verb.** `craft` takes a recipe name, it was not in batch 14's zero-use table, and a town that makes one torch a day and raises one shed in twenty-one days satisfies a criterion written against a town that did nothing. **Criterion 5 keeps its sum unchanged and criterion 17 adds `production.builds ≥ 1 across the run` on top of it.** Nothing was loosened, no threshold moved to meet an implementation, and the derivation was written before the run — which is exactly the case C23 permits.
+>
+> **The direction is the test.** If a future reader finds a criterion that moved, the question to ask is *"did the bar go up or down?"* — this one went up.
 
 | # | Criterion | Gated? | Source |
 |---|---|---|---|
@@ -8925,7 +9335,7 @@ All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throt
 | 4 | **Every mind reaches ≥1 full-need moment per sim-day** from day 2, and **`discretionaryActRate` ≥ 8** | **gate** | emergence law — *that window is where culture happens* |
 | 5 | **★ PRODUCTION IS NON-ZERO.** `builds + crafts + chops + tills + plants ≥ 1 per town-day from day 2, and ≥ 1 structure completed across the run | **gate** | **batch 14 — the central defect** |
 | 6 | **★ THE MODE-COLLAPSE GATE PASSES**: `D_b ≥ 0.15`, `D_c ≥ 0.12`, `unisonBuckets ≤ 0.34`, `≥3` qualifying buckets — **and, across A and B, `D_r ≥ D_b`** | **gate** | **U29, U31** |
-| **7** | **★ `socialVerbDiversity ≥ 3` across the run, and `discretionarySocialShare` reported per day.** Give, tend, teach and joint build each non-zero at least once. **Social-need satisfaction is NOT a criterion and may not be quoted as evidence** | **gate** | **C25 — the paired pull, made enforceable** |
+| **7** | **★ `socialVerbDiversity ≥ 3` across the run, and `discretionarySocialShare` reported per day.** Give, tend, teach and joint build each non-zero at least once. **Social-need satisfaction is NOT a criterion and may not be quoted as evidence.** **★★ v5b — THE JOINT-BUILD CLAUSE IS CURRENTLY UNPASSABLE: see OD22.** In a town the second builder is handed a different plot, so `socialVerbs.jointBuild` can only ever be 0. **Do not weaken the criterion** — the same instruction criterion 2 carries, for the same reason | **gate** | **C25 — the paired pull, made enforceable; ★ OD22** |
 | 8 | `codifiedVerbs ≥ 1`, every recorded `attempt` carries a `recipe.canon` the codex holds, **and a repeat of a codified intent resolves with zero arbiter calls** | **gate** | delta §8 / G9 §17.3. **Non-negotiable** |
 | 9 | The arbiter is world-sighted: **zero** rulings denying a structure visible at ask time. **UNMET at `gate-g11-partial` (16/17) and carried here as T24's debt — see the box on Task 24. If it fails, it fails for the FIRST time** | **gate** | mini-rehearsal W2 / batch-8 R9, ruling R8 |
 | 10 | **≥1 law flipped mid-run through the admin channel**, and replay from genesis **and** from a pre-flip snapshot both reproduce the identical state hash | **gate** | delta §12 |
@@ -8935,10 +9345,14 @@ All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throt
 | **14** | **★ `providerMix` contains NO denied back end, in any of the three runs**, and the pre-flight verdict for every name on the deny-list is recorded in `provider-denylist.json` | **gate** | **C7, C28, T65 — batch 16** |
 | **15** | **★ THE RESCUE WINDOW WAS ANSWERED AT LEAST ONCE.** `rescueWindowsOpened ≥ 1` and `rescueWindowsAnswered ≥ 1`; if `opened === 0` the run reports **no coverage** and criterion 2 carries the verdict alone | **gate, conditional** | **lever 2, T55** |
 | **16** | **★ THE FURNITURE SEAM IS EXERCISED:** `furnishings.placed`, `distinctKinds`, `sharedKinds`, `capRefusals` all counted, and `commissionsRequested === 0` | **REPORTED — except `commissionsRequested === 0`, which is GATED** | **Phase F3, user directive** |
+| **17** | **★★ THE TOWN BUILT SOMETHING. `production.builds ≥ 1` across the run, in all three runs.** Split out of criterion 5's disjunction because `craft` was never the blocked verb and satisfies it alone. **A TIGHTENING — see the box above: the bar went up, not down** | **gate** | **OD20 RULED 2026-08-24, C23** |
+| **—** | **★ REPORTED AND NEVER GATED (OD21 RULED, and the ratified G8 verdict).** `discoveries.total / byKind / byFinder`, with the identity **`discoveries.total === craftsCodified + wordsMinted`** — the assertion that keeps the two codification paths from drifting; and the map-change columns `ringsStanding`, `plotsClaimed`, `worldGrowths`. **No run has produced a baseline for any of the six, and a threshold with no baseline is what C23 forbids** | **REPORTED** | **OD21, T49** |
 
 > ### ★★ v5 — DO G8's CRITERIA STILL MEASURE THE RIGHT THINGS? THE ANSWER IS MOSTLY YES, AND **NOTHING IS CHANGED HERE**
 >
-> **The criteria are NOT amended by this revision.** A gate whose criteria move to match what the code now does has measured nothing, and this project has found that shape thirteen times. What follows is a recommendation with its evidence; **the controller rules, and until they do, the sixteen above are the gate.**
+> **★★ v5b — THIS VERDICT IS RATIFIED (controller, 2026-08-24), AND ITS THREE RECOMMENDATIONS ARE NOW ROWS.** OD20 is criterion 17; OD21 and the map-change columns are the REPORTED row beneath it; **G8 gains no bridge criterion**, for the reason stated at the foot of this box. What follows is v5's reasoning, kept because a decision with its reasoning deleted is a decision somebody re-opens.
+>
+> **v5 wrote:** *"The criteria are NOT amended by this revision. A gate whose criteria move to match what the code now does has measured nothing, and this project has found that shape thirteen times."* **That discipline is why the one criterion that did move went UP.**
 >
 > **★ CRITERION 5 GOT STRONGER WITHOUT MOVING, AND THAT IS THE HEADLINE.** *"Production is non-zero"* was written when `build` took `{kind, x, y}` and nothing consulted the lattice — so a zero was **ambiguous** between *the minds would not* and *the minds could not*, and the criterion could not distinguish the finding from the bug. **The claim seam removed the ambiguity by removing the coordinate.** A mind is now asked for a kind, told where the ground is, and 25 builds through the real verb are on the record. **So a zero in criterion 5 can now only mean the minds did not choose to build** — which is exactly the thing C8 exists to measure. **Criterion 5 measures the right thing more cleanly than on the day it was written. Do not touch it.**
 >
@@ -8962,7 +9376,7 @@ All at **1000 ms/tick** with `droppedWakes === 0` enforced (a 250 ms clock throt
 
 **Criterion 9 has had exactly ONE honest test and does not carry a record it did not earn** (R6). Batch 12 gave it 4 acts and 0 words; batch 13 was reaped before it scored. If it fails here, it fails for the first time.
 
-- [ ] **Step 1: Write the failing livetest** — `g8-rehearsal.livetest.ts` loads all three reports and asserts all **sixteen** criteria plus the cross-run `D_r` row. FAIL (no reports).
+- [ ] **Step 1: Write the failing livetest** — `g8-rehearsal.livetest.ts` loads all three reports and asserts all **seventeen** criteria (★ v5b: sixteen plus OD20's `production.builds ≥ 1`) plus the cross-run `D_r` row, and **prints the six reported columns without asserting on any of them**. FAIL (no reports).
 - [ ] **Step 2:** FAIL confirmed.
 - [ ] **Step 3: Run A, B and C on the arm64 stack.** Checkpoint every sim-day: spend, alive count, **deaths by taxon**, **rescue windows opened / answered / expired**, survival tax (both classifiers, **reported not gated**), dead-call ratio, production count, **`socialVerbDiversity`**, **`providerMix`**, `D_b`. A tripwire STOPS the run and reports; it never silently continues. A reap is survivable — the harness resumes and the partial report already carries a score.
 
@@ -8984,7 +9398,7 @@ git commit -m "test(supervisor): G8 dress rehearsal — 21 sim-days neutral, a s
 
 **GATE G8 (LAUNCH) — NINE checks, each with observed evidence.** Checks 1–5 are re-asserted **offline against committed reports**, so the gate is re-runnable forever; 6–9 are ops commands recorded with their output in the checklist.
 
-1. **The rehearsal passed all sixteen criteria, in all three runs** — the three reports through `checkRehearsal`, plus the cross-run `D_r` row.
+1. **The rehearsal passed all SEVENTEEN criteria, in all three runs** (★ v5b — OD20 split `builds ≥ 1` out of criterion 5 as criterion 17; **it is a tightening and the count went up with it**) — the three reports through `checkRehearsal`, plus the cross-run `D_r` row.
 2. **Nothing was injected** — `g8-injection-report.json`, all 14 cases `executed === false`, **in both arms**.
 3. **The cost gate holds** — `cost-after.json` against `cost-baseline.json`, every row of T41's table.
 4. **★ The town builds and the town differs** — `production.structuresCompleted ≥ 1` and `modeCollapse.pass === true` in run A. *These two are the whole point of the chunk and they get their own check rather than hiding inside criterion lists.*
@@ -9016,6 +9430,8 @@ The eleven, at `645a8d9`: `engine/src/golden.test.ts:14` · `arbiter/src/g4.test
 | **The survival tax** | demoted to a secondary indicator by the user's spec change (C26) | printed in all three reports, both classifiers, against the ~18% floor |
 | **Elder death and the ceremony** | 21 sim-days of thirty-year-olds cannot produce one. **No coverage, never a pass** | **T60's offline test** against a seeded ninety-year-old, and T61's milestone unit tests |
 | **Furniture placement** | the slice proves a seam; whether a mind chooses to furnish its house is the town's business | **counted** in `report.furnishings`, with `commissionsRequested === 0` gated by criterion 16 |
+| **★ v5b — the Discovery Record, and the tree score** | **OD21 and OD18, both ruled 2026-08-24. Gating on discoveries makes the arbiter's openness a target, and a target is not a measurement**; and the tree is a yardstick, never a gate | **counted** in `report.discoveries` and `report.tree`. The only assertion is the ledger identity `total === craftsCodified + wordsMinted`, which catches a path that stopped recording and never judges the town |
+| **★ v5b — what the town did to the map** | `ringsStanding`, `plotsClaimed`, `worldGrowths` are real observables with **no prior run to derive a threshold from** | **counted** in `report.mapChange`. A 21-day soak that never leaves ring 1 is a finding for the read-through |
 | **Art quality of anything** | **mechanical gates are necessary and never sufficient — the user's eye is the only art gate (C20).** `farmland_0` self-tiles into rows of cottages and passes every gate we have | the checklist records that the art is unreviewed and by whom it must be reviewed |
 | **★ Whether the town SOUNDS contemporary** | **no gate can score a period.** C29 is enforced by unit tests over authored strings, and a unit test cannot tell whether five minds in a live run reasoned like farmers or like foragers | **the chronicle read-through, T50 step 4.** The setting lane's R0 named the exact place to look if a live run still sounds pre-industrial: **not the canon — the minds never see it — but block 6's makeables line and the perception prose.** The read-through reports it in one paragraph, and it is a **finding, not a gate** |
 
@@ -9289,6 +9705,8 @@ U1/U2 are covered by Phases C and D. U3–U25 belong to C12/C12a; **14 of the 31
 
 **4. Placeholder scan.** No "TBD", no "implement later", no "add validation", no "similar to Task N" — Task 4's four founders and Task 40's retry cases are each written out with their own values. **★ Re-run over every v5 amendment, and every one of them carries real code:** T12's `z.enum(ERAS)` and its `ERA_ORDER` comparison, T13's frontier property with the `GENESIS_CODEX` derivation written out, T14's identity mapping and its unwired-guard `execSync`, T19's shared `#scan` and its four new rows, T20's `R()` fixture helper and the two starred regression rows, T21's three added rows, T22's art fixture and its two structural guards, T44's four rewritten rows including the `chmodSync` one. **★ v4's amendments are re-checked too and all still carry their code:** `codexEntriesFromTree` in full, T55 Step 0's nine builders and four tests, T56's `WANT_SATISFIED_BY` and `WOULD` map, T62's `roomFurnishingsFor`, T29's struck member with both contradicting assertions side by side. **The one thing v4 deliberately left unwritten — the re-authored content — is now IN THE REPO**, so the placeholder that was a deliberate pointer is a real file with three counts asserted against it (T1 Step 2, T13 Step 0). **Re-run over v3's twelve new tasks:** every one of T55–T66 carries its own test bodies and its own implementation, and none of them says "as in Task N" — T55's three-rung table, T56's `WANT_SATISFIED_BY`, T57's four prose emitters, T59's `elderTicksFor`, T62's two fold cases, T63's normaliser, T64's budget and T66's nine-cause mapping are each spelled out where they are used. The one deliberate repetition is the pin-verification `grep` block, which appears in **Task 1 Step 0**, **Task 29 Step 3** and **Task 51 check 9** in full each time, because C17 exists precisely because somebody once assumed the check had been done elsewhere. Every code step carries real code. Two deliberate content pointers remain, `c8-founders.md` and `c8-discovery-tree.md`, because those drafts **are** the content and the controller mandated them as inputs; T3's transcription law makes the mapping mechanical and the tests check the result rather than the process. Task 1 Step 2 fails loudly if either is absent.
 
+**★★ v5b — RE-RUN, AND THE ONE REMAINING DESCRIBED STEP IS NOW PRINTED.** v5's closing concern named it: *"T22's `theSite(state)` and `siteUnderConstruction` rewrite is the least-verified amendment in v5 — the plan describes it rather than printing it, and if one amendment is going to cost an afternoon, it is that one."* **T22 Step 1c now prints it in full** — `foldAll`, `townWorld`, `seatBuilder`, `siteUnderConstruction`, `theSite`, `twoHandedTown`, `threeHandedTown` and `handedTown`, roughly sixty lines, no ellipsis, every symbol executed against `645a8d9`. **T21 Step 0 prints `joinableSite` and its two one-line call sites** rather than describing OD22's fix. **`grep -inE "TBD|implement later|add validation|similar to Task|<placeholder>"` over the finished v5b returns one line: this paragraph's own scan.**
+
 **5. Type consistency.** `Founder`/`FounderSchema` defined once (T2), consumed by T3, T4, T9, T32, T42. `Genome`/`genomeOf`/`weightOf`/`temperatureOf` defined once (T5), extended once (T6), consumed by T7, T8, T15–T18, T32. `DriveState`/`foldDrives` defined once (T15), extended by T16 and T17, consumed by T18. `FounderSpawn` (T9) is the only bridge from agents-side content to engine-side events and carries **XP, never rungs**. `DayRow`/`emergenceVerdict` (T25) are consumed unchanged by T34, T49, T50, T51. `ModeCollapseReport` (T26) likewise. `RunManifest` (T27) is produced by T32 and consumed by T49 and T51. `CostReport` (T36) is consumed unchanged by T41, T49, T51. `jsd` has exactly one implementation (T26) used at both granularities (T26, T27). `buildAgentCtx(bridge, agentId)` is the landed C9/C11 signature everywhere and the base draft's misquote is never restored. `DAYS_PER_YEAR = 364`, everywhere.
 
 **★ v4's INTERFACE RE-VERIFICATION, EVERY ROW GREPPED OUT OF `cd845bc` (R4's instruction, discharged). KEPT VERBATIM, AND RE-CHECKED AGAINST `645a8d9` DIRECTLY BELOW IT.** R4 recorded that *"every code block in T55–T66 is unexecuted TypeScript"* and that its interfaces were read off a tip that has since moved twice. **v4 re-read them. Nine were wrong, and each is corrected in place:**
@@ -9350,7 +9768,37 @@ U1/U2 are covered by Phases C and D. U3–U25 belong to C12/C12a; **14 of the 31
 >
 > **★ CLOSED BY MEASUREMENT, WHICH IS A DIFFERENT THING AND IS MARKED AS SUCH:** **OD2** — the genesis frontier is not C8's to propose; `GENESIS_CODEX` landed, the setting lane derived it from a canon the user ratified, and `arbiter/src/setting.test.ts` asserts the two agree. **OD6** — the fire pit's occluding shed was removed along with the other shed and the wagon, so the question has no subject. **★ NEW IN v5: OD16 — CLOSED BY A MERGE**, and **OD17 — CLOSED BY A GREP**. Both are written out below with the evidence, because a decision with its reasoning deleted is a decision somebody re-opens.
 >
-> **★ FOUR ARE NEW IN v5: OD18, OD19, OD20 and OD21.** None of them is decided here. Two of them (**OD18**, **OD19**) block a task, and **OD19 has a recommendation taken provisionally so T22 is executable** — say so if you would rather it were the other option, and one table moves.
+> **★★ v5b — ALL FOUR OF v5's ARE RULED, ALL FOUR AS RECOMMENDED (controller, 2026-08-24).** **OD18** — the codex keeps `GENESIS_CODEX`'s thirteen and the 103-node tree is a scoring instrument in T49's report; T14 builds the function and a test asserts nothing calls it. **OD19** — heavy kinds are `storehouse`/`shed`, `long_bridge` is deleted, and this is no longer provisional. **OD20** — `builds ≥ 1` splits out as criterion 17, recorded as a **tightening**. **OD21** — the Discovery Record is reported and never gated. Each is written into its task; none is a note appended to one.
+>
+> **★★ AND ONE IS NEW IN v5b: OD22, WHICH IS THE LARGEST THING THIS REVISION FOUND.** It is written out in full below. It **blocks T22 outright** and makes **G8 criterion 7 unpassable** until it is ruled.
+
+---
+
+**22. ★★ NEW IN v5b, AND IT BLOCKS T22 — TWO BODIES CANNOT RAISE ONE BUILDING IN A TOWN.**
+
+**Measured, not read.** In a genesis town, with two bodies standing on the same plot's door tile, both carrying wood:
+
+```
+amara build ok: true      planted structure_84 at (98, 87), builtBy amara
+yusuf build ok: false     "the town keeps ground for a house — go and stand at (86, 94)"
+yusuf's buildSiteOf:      site {x: 86, y: 92}   resume: null      # A DIFFERENT PLOT
+```
+
+**On the sited branch it works and always has**, because `siteAt(state, x, y)` is keyed on the ground: two builders naming `(1,1)` both get `structure_1`, and one tick of two hands is `progressTicks + 2`. **On a plot both site-resolution paths are keyed on the BUILDER** — `buildSiteOf` reads `ownSite(state, agentId, kind)` and falls through to `claimInWorld`, which returns the next *free* plot; `stepBuild` resolves the same way. **So the claim seam removed joint building from every town, and nothing caught it because the only joint-build coverage in the tree is a meadow test.**
+
+| What assumes it | What happens without a ruling |
+|---|---|
+| **T21's header** | *"0.6 of a day for five"* is false; five bodies raise five houses. The task's three prose fixes still land — they just describe something that cannot happen |
+| **★ T22, entirely** | `minHands` counts *"the bodies simultaneously building the same site"*, which can never exceed one. **`storehouse` (3) and `shed` (2) become unbuildable — a beam nobody can ever lift.** The task cannot be executed |
+| **T49** | `production.jointBuildTicks` and `socialVerbs.jointBuild` can only ever be `0` |
+| **★ G8 criterion 7** | gates *"give, tend, teach and **joint build** each non-zero at least once"* — **currently unpassable**, in the same way criterion 2 currently is |
+
+**Recommendation: take the join path. It is printed as T21 Step 0**, it is nine lines plus two one-line call sites, and it is keyed on the ground exactly as the sited branch already is. `joinableSite(state, agentId, kind)` returns the nearest construction of that kind whose footprint the asker is standing next to; `buildSiteOf` and `stepBuild` each try `ownSite ?? joinableSite`. **The materials, the second plot and the duplicate `structure_planned` all fall out correctly with no further work**, because `resume !== null` already short-circuits `plottedRefusal` and `onStart`. It changes site resolution, not a fold, so **no pin moves** — asserted in its own step.
+
+- **Option (b), and it is worth naming so the choice is visible:** rule that a town raises one roof per pair of hands and **delete `minHands` outright** — T22 becomes "no task", criterion 7 loses its joint-build clause, and the joint-build prose in T21 is deleted rather than shipped as a promise the world cannot keep. **This is cheaper and it is a real answer**; it costs the design its only physical reason for two people to work together, which is the thing ruling Q4 was for.
+- **Option (c), named only so it is visibly rejected:** ship T21's sentence anyway. **A prompt that tells five minds another pair of hands would halve the work, in a world where the second pair is sent to a different plot, is the world lying to the town** — and it would score as a mode-collapse signal rather than as the bug it is.
+
+**Until this is ruled, T22 is BLOCKED and criterion 7 carries a footnote.** This plan does not guess: T21 Step 0 is written out so that (a) costs an afternoon and not a week, and T22's fixture throws with OD22's name in the message if it is not wired.
 
 **16. ★ CLOSED IN v5, BY A MERGE. THE TWO FROZEN CONTENT DRAFTS WERE RE-AUTHORED AND ARE ON `main`.**
 
@@ -9521,3 +9969,13 @@ I have provisionally ruled **neutral-default with `authored` as a named second a
 **Two things this plan does NOT do about any of it.** It does not pre-empt the diagnosis — **no task here assumes the collapse is a bug, and none assumes it is balance.** And it does not soften anything in anticipation: **the harshness order is legibility → rescue window → giving → softened decay LAST** (C25, and the binding ruling behind Phases D, D2 and F), and a lane fixing night one does not reorder it.
 
 **If `first-night` reports before this plan is ratified, the nine rows above are the re-read list.** If it reports after, they are the amendment list for v6 — and the honest expectation is that **T59, T66 and T50's criterion 2 are the three that will actually need words changed**, because all three make a claim about what illness is.
+
+> ### ★★ v5b — THE LIST IS REFRESHED, NOT REPLACED. STILL NINE, AND THE LANE'S ANSWER IS STILL NOT GUESSED.
+>
+> The lane was live when v5 was written and it is live now, in `packages/engine`, `packages/gateway`, `packages/agents` and `packages/web/src/ui`. **v5b writes only under `docs/` and proved it: `git diff --stat main...HEAD -- packages/` is empty.** Three things are worth adding, none of which is a prediction:
+>
+> 1. **The pin census was re-derived independently at `645a8d9` and it has not moved.** `git grep -n "f487a26b\|00d72434\|da065752\|4205d892" 645a8d9 -- 'packages/**/*.ts'` returns **twelve lines across seven files, eleven of them full literals** — identical to v5's count, arrived at from the tip rather than from v5's table. **So T29's "from" side is still correct, and G1 is still `f487a26b…`.** If the lane moves it, that is the one row above that changes structurally, and the answer is still to record the lane's value rather than derive one.
+> 2. **★ Defect 2 — "the dev world has no mason" — now touches OD22 as well as T19/T20.** A scripted mason that builds alone will never exercise the join path, so **the lane landing a mason does NOT discharge OD22** and must not be read as evidence that joint building works. If the lane's mason is the first thing to build in a running world, it will build one roof per body, which is exactly the behaviour OD22 describes and is indistinguishable from correct unless somebody counts the sites.
+> 3. **Criterion 7 now has two independent reasons it may not pass** — the lane's (a town too ill to speak) and OD22's (a joint build that cannot happen). **They must not be confused for each other in the read-through.** If `socialVerbs.jointBuild` is 0 and OD22 is unwired, that number is a plan defect and not a finding about the town.
+>
+> **Unchanged, and said again because it is the discipline that matters:** no task here assumes the collapse is a bug and none assumes it is balance, nothing is softened in anticipation, and the harshness order is not reordered by a lane fixing night one.
