@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { BondsResponseSchema } from '@sj/shared'
+import { BondsResponseSchema, ChronicleResponseSchema } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { LENSES, type Lens } from './route.js'
 import {
@@ -92,16 +92,17 @@ export function LensTabsView({ lens, hints, onNav }: { lens: Lens; hints: LensHi
   )
 }
 
-function useBondCount(): number | null {
+/** How many rows a history endpoint is holding, on a slow beat. `null` until the first answer
+ *  and after any failure: no badge is better than a wrong one, which is the whole subject of
+ *  the note over `chronicle` below. */
+function useHistoryCount(url: string, rows: (body: unknown) => number | null): number | null {
   const [count, setCount] = useState<number | null>(null)
   useEffect(() => {
     let alive = true
     const load = (): void => {
-      void fetch('/api/bonds')
-        .then(async (r) => (r.ok ? BondsResponseSchema.safeParse(await r.json()) : null))
-        .then((parsed) => {
-          if (alive && parsed?.success === true) setCount(parsed.data.bonds.length)
-        })
+      void fetch(url)
+        .then(async (r) => (r.ok ? rows(await r.json()) : null))
+        .then((n) => { if (alive && n !== null) setCount(n) })
         .catch(() => { /* no badge is better than a wrong one */ })
     }
     load()
@@ -110,8 +111,19 @@ function useBondCount(): number | null {
       alive = false
       clearInterval(timer)
     }
-  }, [])
+    // `rows` is a module-level parser, not a prop — re-subscribing on it would restart the beat
+    // every render. The url is the identity of the feed.
+  }, [url]) // eslint-disable-line react-hooks/exhaustive-deps
   return count
+}
+
+const bondRows = (body: unknown): number | null => {
+  const p = BondsResponseSchema.safeParse(body)
+  return p.success ? p.data.bonds.length : null
+}
+const chronicleRows = (body: unknown): number | null => {
+  const p = ChronicleResponseSchema.safeParse(body)
+  return p.success ? p.data.entries.length : null
 }
 
 // The lens bar subscribes on its own so the counts can tick without re-rendering App and,
@@ -119,8 +131,12 @@ function useBondCount(): number | null {
 export function LensTabs({ store, lens, onNav }: { store: WorldStore; lens: Lens; onNav: (l: Lens) => void }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
-  const events = useSyncExternalStore(store.subscribe, store.recentEvents)
-  const bonds = useBondCount()
-  const counts: LensCounts = bonds === null ? {} : { society: bonds }
-  return <LensTabsView lens={lens} hints={lensHints(townStats(state, tick), events, counts)} onNav={onNav} />
+  const bonds = useHistoryCount('/api/bonds', bondRows)
+  // The ledger the chronicle lens actually opens on — see the note over `lensHints`.
+  const chronicle = useHistoryCount('/api/chronicle', chronicleRows)
+  const counts: LensCounts = {
+    ...(bonds === null ? {} : { society: bonds }),
+    ...(chronicle === null ? {} : { chronicle }),
+  }
+  return <LensTabsView lens={lens} hints={lensHints(townStats(state, tick), counts)} onNav={onNav} />
 }

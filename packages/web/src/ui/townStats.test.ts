@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import type { SimEvent } from '@sj/shared'
 import type { AgentBody, WorldState } from '@sj/engine/state'
 import { LENSES } from './route.js'
 import { EMPTY_COPY, GAMIFICATION_BAN, WEATHER_GLYPH, lensHints, townStats } from './townStats.js'
@@ -17,9 +16,6 @@ const state = (tick: number, weather: string, agents: AgentBody[]): WorldState =
   structures: {}, items: {}, crops: {}, wildlife: { fish: 1, deer: 1 },
   counters: { nextEntityId: 1 },
 })
-
-const event = (type: string, tick: number): SimEvent =>
-  ({ seq: tick + 1, tick, type, payload: {} }) as unknown as SimEvent
 
 describe('townStats', () => {
   it('counts the living against the whole cast', () => {
@@ -41,28 +37,59 @@ describe('townStats', () => {
 
 describe('lensHints', () => {
   const stats = townStats(state(0, 'sunny', [agent('a', true), agent('b', true)]), 0)
-  const events = [event('agent_spoke', 1), event('agent_died', 2)]
 
   it('gives one hint per lens, in lens order', () => {
-    expect(lensHints(stats, events).map((h) => h.lens)).toEqual([...LENSES])
+    expect(lensHints(stats).map((h) => h.lens)).toEqual([...LENSES])
   })
 
-  it('badges the townsfolk count and the chronicle length, and leaves the map unbadged', () => {
-    const by = new Map(lensHints(stats, events).map((h) => [h.lens, h]))
+  it('badges the townsfolk count and leaves the map unbadged', () => {
+    const by = new Map(lensHints(stats).map((h) => [h.lens, h]))
     expect(by.get('inspector')!.count).toBe(2)
-    expect(by.get('chronicle')!.count).toBe(events.length)
     expect(by.get('map')!.count).toBeNull()
   })
 
+  it('★ the chronicle has NO count of its own — the strip brings the ledger it opens on', () => {
+    // It used to default to the live ring, which is the panel's SECOND tab: a town two hours
+    // old showed `CHRONICLE 0` beside eleven finished buildings.
+    expect(lensHints(stats).find((h) => h.lens === 'chronicle')!.count).toBeNull()
+    expect(lensHints(stats, { chronicle: 11 }).find((h) => h.lens === 'chronicle')!.count).toBe(11)
+  })
+
+  it('★★ THE BADGE AND ITS LABEL ARE ONE NUMBER, not two that can disagree', () => {
+    // A hint is the tooltip AND the screen-reader label for the badge beside it. When the
+    // hint was built before the override was applied, the two could name different numbers on
+    // the same button — the defect this whole change is about, one layer down.
+    for (const h of lensHints(stats, { chronicle: 11, inspector: 40, society: 3 })) {
+      if (h.count === null) continue
+      expect(h.hint, `${h.lens}: hint does not carry its own count`).toContain(String(h.count))
+    }
+    expect(lensHints(stats, { chronicle: 11 }).find((h) => h.lens === 'chronicle')!.hint)
+      .toBe('11 in the town’s own ledger')
+    // ★ AND IT WAS TWO LENSES, NOT ONE. `Bonds` and `Moments` rendered a visible count that
+    // the button's own aria-label never mentioned, and the badge itself is `aria-hidden`, so
+    // there was no way to hear the number at all.
+    expect(lensHints(stats, { society: 3 }).find((h) => h.lens === 'society')!.hint)
+      .toBe('3 ties the town has made')
+    expect(lensHints(stats, { director: 4 }).find((h) => h.lens === 'director')!.hint)
+      .toBe('4 days the town kept')
+  })
+
+  it('and a lens with no count keeps its prose, with no empty parenthesis in it', () => {
+    for (const h of lensHints(stats)) {
+      if (h.count !== null) continue
+      expect(h.hint, h.lens).not.toMatch(/\(\s*\)|\bnull\b|undefined|NaN/)
+    }
+  })
+
   it('takes a count override for the lenses whose readers land later', () => {
-    const by = new Map(lensHints(stats, events, { society: 7, director: 0 }).map((h) => [h.lens, h]))
+    const by = new Map(lensHints(stats, { society: 7, director: 0 }).map((h) => [h.lens, h]))
     expect(by.get('society')!.count).toBe(7)
     expect(by.get('director')!.count).toBe(0)
-    expect(lensHints(stats, events).find((h) => h.lens === 'society')!.count).toBeNull()
+    expect(lensHints(stats).find((h) => h.lens === 'society')!.count).toBeNull()
   })
 
   it('never speaks the language of a game (living-documentary law)', () => {
-    for (const h of lensHints(stats, events, { society: 3, director: 4 })) {
+    for (const h of lensHints(stats, { society: 3, director: 4 })) {
       expect(h.hint, h.lens).not.toMatch(GAMIFICATION_BAN)
     }
     expect(GAMIFICATION_BAN.test('Your PROGRESS')).toBe(true)
@@ -71,7 +98,7 @@ describe('lensHints', () => {
   })
 
   it('every hint is human-framed prose, never machinery', () => {
-    for (const h of lensHints(stats, events)) {
+    for (const h of lensHints(stats)) {
       expect(h.hint.length).toBeGreaterThan(3)
       expect(h.hint).not.toMatch(/\b(AI|LLM|model|prompt|token|agent)\b/i)
     }

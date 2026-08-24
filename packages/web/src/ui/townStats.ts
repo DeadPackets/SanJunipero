@@ -1,4 +1,4 @@
-import { tickToMoment, type SimEvent } from '@sj/shared'
+import { tickToMoment } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import { LENSES, type Lens } from './route.js'
 
@@ -24,17 +24,60 @@ export type LensHint = { lens: Lens; count: number | null; hint: string }
 // rather than a null the strip has to special-case.
 export type LensCounts = Partial<Record<Lens, number>>
 
-export function lensHints(stats: TownStats, recentEvents: SimEvent[], counts: LensCounts = {}): LensHint[] {
-  const base: Record<Lens, { count: number | null; hint: string }> = {
-    map: { count: null, hint: 'Walk the town' },
-    inspector: { count: stats.alive, hint: `Townsfolk (${stats.alive})` },
-    chronicle: { count: recentEvents.length, hint: `Chronicle (${recentEvents.length})` },
-    discoveries: { count: null, hint: 'What the townsfolk worked out for themselves' },
-    society: { count: null, hint: 'Who the town has tied itself to' },
-    director: { count: null, hint: 'The days the town kept' },
-    laws: { count: null, hint: 'The rules the town lives under' },
-  }
-  return LENSES.map((lens) => ({ lens, count: counts[lens] ?? base[lens].count, hint: base[lens].hint }))
+/**
+ * ★ TWO NUMBERS ON ONE BUTTON, AND THEY DISAGREED.
+ *
+ * A LENS TAB CARRIES A COUNT AND A HINT, and the hint is the button's `aria-label` AND its
+ * `title`. The badge itself is rendered `aria-hidden`, so the hint is the only place a screen
+ * reader or a hovering pointer can learn the number. Two things were wrong with that:
+ *
+ *  · `chronicle` defaulted its count to `recentEvents.length` — the ring of what has arrived
+ *    SINCE YOU JOINED, which is the panel's SECOND tab. The panel opens on "What mattered",
+ *    the curated record from `/api/chronicle`, so a town two hours old showed `CHRONICLE 0`
+ *    beside a list of eleven finished buildings, both on screen at once. The ring is the wrong
+ *    shape for a badge whatever tab is open: it is capped, so the number plateaus at the cap
+ *    and stops meaning anything. `StatusStrip` now supplies the ledger's own length, and until
+ *    it answers there is no badge at all — no badge is better than a wrong one.
+ *
+ *  · and the hint was a FIXED STRING built beside a count an override could then replace, so
+ *    the label and the badge could name different numbers. `Bonds` showed a visible 3 under a
+ *    label that read *"Who the town has tied itself to"* and never said three at all.
+ *
+ * So the count is resolved FIRST and the hint is a function of it. Two tables, because a lens
+ * with a number and a lens without one are different sentences in English; one loop, because
+ * "a badged lens speaks its badge" is a law and not a per-lens decision.
+ */
+
+/** What each lens says when it has nothing to count. The VIEW already prefixes the lens's own
+ *  name, so a hint never repeats it. */
+const LENS_PROSE: Record<Lens, string> = {
+  map: 'Walk the town',
+  inspector: 'Who is walking the town',
+  chronicle: 'The town’s own ledger',
+  discoveries: 'What the townsfolk worked out for themselves',
+  society: 'Who the town has tied itself to',
+  director: 'The days the town kept',
+  laws: 'The rules the town lives under',
+}
+
+/** And what it says when it has. The phrasing is per lens because English is; the LAW — that
+ *  a badged lens speaks its badge — is the loop below and the test that walks it. */
+const LENS_COUNTED: Partial<Record<Lens, (n: number) => string>> = {
+  inspector: (n) => `${n} walking the town`,
+  chronicle: (n) => `${n} in the town’s own ledger`,
+  society: (n) => `${n} ties the town has made`,
+  director: (n) => `${n} days the town kept`,
+}
+
+export function lensHints(stats: TownStats, counts: LensCounts = {}): LensHint[] {
+  // Only `inspector` knows its own number: the cast is in the snapshot. Every other count is
+  // history and arrives as an override, or does not arrive and is not badged.
+  const own: Partial<Record<Lens, number>> = { inspector: stats.alive }
+  return LENSES.map((lens) => {
+    const count = counts[lens] ?? own[lens] ?? null
+    const counted = count === null ? undefined : LENS_COUNTED[lens]?.(count)
+    return { lens, count, hint: counted ?? LENS_PROSE[lens] }
+  })
 }
 
 // ------------------------------------------------------------------ empty states
