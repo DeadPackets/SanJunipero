@@ -32,8 +32,8 @@ ENV NODE_ENV=production
 # behind, since it lives outside /app.
 COPY --from=build /app /app
 
-# The world writes its db here. Mount a volume to keep a town across restarts; without one the
-# town is new every boot, which for a stream is a feature, not a bug.
+# The world writes its db here, and resumes from it on the next boot. WITHOUT a volume the town
+# dies with the container; with one (see compose.yaml) it survives restart, upgrade and crash.
 RUN mkdir -p /app/packages/gateway/data
 VOLUME ["/app/packages/gateway/data"]
 

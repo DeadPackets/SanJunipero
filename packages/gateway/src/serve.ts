@@ -7,8 +7,14 @@
 // client bolted to the same http server, so the town a viewer watches over the internet is
 // byte-for-byte the town a lane watches on localhost.
 //
-//   pnpm stream                 the product town, one ring, port 8080
+//   pnpm stream                 RESUME the town that was running (a new one if there is none)
+//   SJ_FRESH=1 pnpm stream      throw that town away and start a new day 0
 //   PORT=9000 SJ_RINGS=3 …      pick the port and how far the town is platted
+//
+// ★ RESUME IS THE DEFAULT, AND THAT IS THE WHOLE POINT OF THIS FILE EXISTING. A stream is
+// watched because day 12 follows days 1 to 11. Until now `startDevWorld` deleted the world db
+// on boot, so every deploy, every crash and every `docker restart` was a new town at day 0 —
+// a demo on a loop. The event log held all of it; nothing read it back.
 //
 // ★ WHAT THIS DOES NOT DO: spend money. The founders are a SCRIPTED cast (`founders.ts`), not
 // LLM minds — `createGateway` has never had a live-mind world behind it in this repo. See the
@@ -41,10 +47,11 @@ export async function main(): Promise<void> {
   const rings = intEnv('SJ_RINGS', TOWN_RINGS_GENESIS, 1)
   const map: DevMapKind = process.env['SJ_MAP'] === 'scripted' ? 'scripted' : 'showcase'
   const interiors = process.env['SJ_INTERIORS'] === '1'
+  const fresh = process.env['SJ_FRESH'] === '1'
 
   let world
   try {
-    world = await startDevWorld({ ingest: true, map, rings, interiors, port, staticDir: CLIENT_DIST })
+    world = await startDevWorld({ ingest: true, map, rings, interiors, port, fresh, staticDir: CLIENT_DIST })
   } catch (e) {
     // A taken port is the single most common way this command fails, and a raw EADDRINUSE
     // stack says nothing an operator can act on.
@@ -55,6 +62,9 @@ export async function main(): Promise<void> {
     process.exitCode = 1
     return
   }
+  console.log(world.resumedAtTick === null
+    ? 'stream: this is a new town — SJ_FRESH=1 starts another one over it'
+    : `stream: this is the town that was running, resumed at tick ${world.resumedAtTick}`)
   console.log(`stream: the town is open at http://localhost:${world.gateway.port}/`)
 
   // A stream is a long-running process and a container stops it with a signal; without this the

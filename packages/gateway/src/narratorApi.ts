@@ -76,37 +76,67 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     }
   }
 
+  // Clamped into the world for the same reason `/api/digest` is: an unbounded window is a
+  // window on nothing, and a free key is a cache a stranger can miss on purpose. The clamped
+  // pair is also the memo key, so every over-long window collapses onto the same entry.
+  const windowOf = (url: URL): { fromTick: number; toTick: number } => clampWindow(
+    url.searchParams.get('fromTick'), url.searchParams.get('toTick'), deps.mirror.state().tick)
+
+  const chronicleEntries = (fromTick: number, toTick: number): readonly ChronicleEntry[] =>
+    cache.value(`chronicle:${fromTick}:${toTick}`, () => {
+      const look = lookup()
+      const rows = selWeighted.all(...CHRONICLE_TYPES, fromTick, toTick) as Array<{
+        seq: number; tick: number; type: string; payload: string
+      }>
+      const entries: ChronicleEntry[] = []
+      for (const r of rows) {
+        const ev: SimEvent = { seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }
+        const label = chronicleLine(ev, look)
+        if (label === null) continue // a weighted type the formatter has no words for yet
+        entries.push({ seq: r.seq, tick: r.tick, type: r.type, icon: chronicleIcon(r.type), label })
+      }
+
+      // The narrator's firsts join the same stream: same shape, same ordering, one feed.
+      for (const m of readOrEmpty<{ label: string; event_seq: number; tick: number }>(
+        deps.narratorDb, 'SELECT label, event_seq, tick FROM milestones ORDER BY id',
+      )) {
+        if (m.tick < fromTick || m.tick > toTick) continue
+        entries.push({
+          seq: Math.max(1, m.event_seq), tick: m.tick,
+          type: MILESTONE_TYPE, icon: MILESTONE_ICON, label: m.label,
+        })
+      }
+      entries.sort((a, b) => a.tick - b.tick || a.seq - b.seq)
+      return entries
+    })
+
   router.route('GET', '/api/chronicle', (req: IncomingMessage, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
     sendPrebuilt(res, cache.json(`chronicle${url.search}`, () => {
-    // Clamped into the world for the same reason `/api/digest` is: an unbounded window is a
-    // window on nothing, and a free key is a cache a stranger can miss on purpose.
-    const { fromTick, toTick } = clampWindow(
-      url.searchParams.get('fromTick'), url.searchParams.get('toTick'), deps.mirror.state().tick)
-    const look = lookup()
-    const rows = selWeighted.all(...CHRONICLE_TYPES, fromTick, toTick) as Array<{
-      seq: number; tick: number; type: string; payload: string
-    }>
-    const entries: ChronicleEntry[] = []
-    for (const r of rows) {
-      const ev: SimEvent = { seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }
-      const label = chronicleLine(ev, look)
-      if (label === null) continue // a weighted type the formatter has no words for yet
-      entries.push({ seq: r.seq, tick: r.tick, type: r.type, icon: chronicleIcon(r.type), label })
-    }
+      const { fromTick, toTick } = windowOf(url)
+      return { entries: chronicleEntries(fromTick, toTick) }
+    }))
+  })
 
-    // The narrator's firsts join the same stream: same shape, same ordering, one feed.
-    for (const m of readOrEmpty<{ label: string; event_seq: number; tick: number }>(
-      deps.narratorDb, 'SELECT label, event_seq, tick FROM milestones ORDER BY id',
-    )) {
-      if (m.tick < fromTick || m.tick > toTick) continue
-      entries.push({
-        seq: Math.max(1, m.event_seq), tick: m.tick,
-        type: MILESTONE_TYPE, icon: MILESTONE_ICON, label: m.label,
-      })
-    }
-    entries.sort((a, b) => a.tick - b.tick || a.seq - b.seq)
-    return { entries }
+  /**
+   * ★ HOW LONG THE LEDGER IS, WITHOUT SENDING THE LEDGER.
+   *
+   * The viewer's chronicle badge fetched every entry to display one number — the whole feed
+   * over the wire and through `JSON.parse` on every poll, for two integers' worth of answer.
+   * That is the same read amplification as everything else on this surface, just paid by the
+   * browser instead of the tick thread.
+   *
+   * It costs the server nothing extra: `chronicleEntries` is memoised per world generation, so
+   * the badge and the panel share one scan when both ask in the same tick.
+   */
+  router.route('GET', '/api/chronicle/count', (req: IncomingMessage, res) => {
+    const url = new URL(req.url ?? '/', 'http://localhost')
+    sendPrebuilt(res, cache.json(`chronicle-count${url.search}`, () => {
+      const { fromTick, toTick } = windowOf(url)
+      const entries = chronicleEntries(fromTick, toTick)
+      const last = entries[entries.length - 1]
+      // `latestSeq` is the feed's newest entry, so a badge can say "N new" without the body.
+      return { count: entries.length, latestSeq: last ? last.seq : 0, latestTick: last ? last.tick : 0 }
     }))
   })
 

@@ -1,9 +1,10 @@
-import { mkdirSync, rmSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { DEFAULT_CONFIG, TOWN_RINGS_GENESIS, type SimConfig } from '@sj/shared'
+import { DEFAULT_CONFIG, TOWN_RINGS_GENESIS, simTimeFromTick, type SimConfig } from '@sj/shared'
 import {
-  EventStore, RngStreams, TickLoop, genesisState, makeFixtureMap, openDb,
+  EventStore, RngStreams, TickLoop, genesisState, makeFixtureMap, openDb, replayLatest,
+  type TileId,
 } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
@@ -12,6 +13,7 @@ import { foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.j
 import { ingestLibraryArt, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
 import { showcaseDeck, showcaseTerrain } from './showcaseMap.js'
 import { devWorldOrigin } from './devTown.js'
+import { assertSameWorld, ensureWorldMetaTable, readWorldMeta, writeWorldMeta } from './worldMeta.js'
 
 export const DEV_DB_PATH = 'data/dev-world.db'
 export const DEV_PORT = 8787
@@ -52,7 +54,40 @@ export const THOUGHT_LINES: Record<string, string> = {
   take: 'The storehouse can spare this.',   build: 'Beam by beam it rises.',
 }
 
-export type DevWorld = { gateway: Gateway; loop: TickLoop; stop(): Promise<void> }
+export type DevWorld = {
+  gateway: Gateway; loop: TickLoop
+  /** The map the world actually runs on — the resumed one when there is a town on disk, and
+   *  the same array the gateway was handed, so the viewer can never render a different map. */
+  terrain: TileId[][]
+  /** The tick a resumed town woke at, or `null` when this boot is a new day 0. */
+  resumedAtTick: number | null
+  stop(): Promise<void>
+}
+
+/**
+ * ★ FRESH MUST MEAN FRESH FOR THE MINDS TOO, OR THE TOWN GETS AMNESIA BACKWARDS.
+ *
+ * Agent memory is not in the world db — it is a separate `<id>.db` per mind, which the world
+ * delete never touched. That is harmless only for as long as the cast is scripted. The moment
+ * live minds are wired to this gateway, a fresh boot would hand you the one state that is
+ * worse than either a clean reset or a clean resume: the buildings gone, the day counter back
+ * to 0, and every mind still remembering all of it.
+ *
+ * World and mind are wiped as ONE unit. Only `*.db` goes — anything else in the directory is
+ * not this function's to delete.
+ */
+function wipeAgentMemory(agentDbDir: string | undefined): number {
+  if (agentDbDir === undefined) return 0
+  let gone = 0
+  let names: string[]
+  try { names = readdirSync(agentDbDir) } catch { return 0 }
+  for (const name of names) {
+    if (!/\.db(-wal|-shm)?$/.test(name)) continue
+    rmSync(join(agentDbDir, name), { force: true })
+    gone += 1
+  }
+  return gone
+}
 
 /**
  * ★ THE TWO DEV WORLDS, AND WHICH ONE IS THE PRODUCT.
@@ -140,16 +175,52 @@ export async function startDevWorld(
     /** The built `@sj/web`. Present, this process is the whole stream — world, socket and
      *  viewer on one port. Absent, it is the API/socket half and vite proxies to it. */
     staticDir?: string
+    /** Per-mind memory dbs (`<id>.db`). Served read-only by the gateway, and — see
+     *  `wipeAgentMemory` — thrown away together with the world when `fresh` is asked for. */
+    agentDbDir?: string
+    /**
+     * ★ THROW THE TOWN AWAY AND START A NEW DAY 0. Off by default, and that default is the
+     * whole point of this option existing.
+     *
+     * This function used to `rmSync` the world db unconditionally, so every boot — every
+     * deploy, every crash, every `docker restart` — was a new town. The event log held every
+     * fact the old one ever had and nothing read it back. A function handed a path to a
+     * database does not get to delete it without being asked.
+     */
+    fresh?: boolean
   } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH
+  const fresh = opts.fresh === true
   mkdirSync(dirname(dbPath), { recursive: true })
-  for (const suffix of ['', '-wal', '-shm']) rmSync(dbPath + suffix, { force: true }) // recreated fresh
+  if (fresh) {
+    for (const suffix of ['', '-wal', '-shm']) rmSync(dbPath + suffix, { force: true })
+    const minds = wipeAgentMemory(opts.agentDbDir)
+    console.log(`dev world: FRESH — the world db was deleted${minds > 0 ? ` along with ${minds} agent memory db(s)` : ''}`)
+  }
+
+  const config = SHOWCASE_CONFIG
+  const map = opts.map ?? DEV_MAP_DEFAULT
+  const rings = opts.rings ?? TOWN_RINGS_GENESIS
+  const seed = opts.seed ?? DEV_SEED
+  // The frozen fixture has no grammar to grow, so its ring count is not part of its identity.
+  const identity = { map, rings: map === 'showcase' ? rings : 0, seed }
+
+  // Refused BEFORE the art ingest, so a boot that cannot proceed does not spend a minute first.
+  {
+    const probe = openDb(dbPath)
+    try {
+      ensureWorldMetaTable(probe)
+      const stored = readWorldMeta(probe)
+      if (stored && new EventStore(probe).lastSeq() > 0) assertSameWorld(stored, identity)
+    } finally { probe.close() }
+  }
 
   const forgeDb = openForgeDb(dbPath) // migrate forge assets/jobs tables for the push loop + hot-swap demo
   if (opts.ingest === true) {
-    // the dev DB is recreated each boot — load the approved production art so the
-    // town wakes with its real cast + buildings (CLI default; tests skip the cost)
+    // load the approved production art so the town wakes with its real cast + buildings
+    // (CLI default; tests skip the cost). Idempotent: unchanged bytes register nothing, so a
+    // resumed town does not grow a second copy of the ~6 MB art cache on every boot.
     const tiles = await ingestTerrainArt(forgeDb) // code-painted, offline, $0 — never throws on a missing root
     console.log(`dev world: ingested terrain tiles (${tiles.length} records, road strip included)`)
     try {
@@ -172,14 +243,34 @@ export async function startDevWorld(
   forgeDb.close()
   const db = openDb(dbPath)
   ensureObserverTables(db)
+  ensureWorldMetaTable(db)
+  writeWorldMeta(db, identity)
 
-  const config = SHOWCASE_CONFIG
-  const map = opts.map ?? DEV_MAP_DEFAULT
-  const rings = opts.rings ?? TOWN_RINGS_GENESIS
-  const terrain = devTerrain(map, rings)
+  const genesisTerrain = devTerrain(map, rings)
   // Terrain and buildings are read from the SAME map kind AND the same ring count, so the town
   // can never again be an overlay of two unrelated layouts.
   const structures = townStructuresFor(map, rings)
+
+  /**
+   * ★ RESUME IS NOT A NEW FUNCTION. IT IS THE ONE THE ENGINE ALREADY HAS, FINALLY CALLED.
+   *
+   * `replayLatest` loads the latest snapshot — state AND rng cursor — folds the events after
+   * it, and cross-checks the rng checkpoint's tick against the folded tick, throwing rather
+   * than resuming skewed. It has been in `engine/src/replay.ts` all along with exactly one
+   * caller, and that caller was a gate script.
+   *
+   * The fold starts at the latest snapshot, never at genesis, so this is flat in world age:
+   * at most `DEV_SNAPSHOT_EVERY_TICKS` ticks of events however old the town is.
+   *
+   * ★ AND THE TERRAIN COMES BACK WITH IT. `WorldState.terrain` rides in the snapshot, so the
+   * resumed map is the town's real one — which is exactly why the gateway must be handed THIS
+   * array and not `devTerrain(map, rings)` recomputed from the environment.
+   */
+  const store = new EventStore(db)
+  const resumed = store.lastSeq() > 0 ? replayLatest(store, config, genesisTerrain, seed) : null
+  const terrain = resumed ? resumed.state.terrain : genesisTerrain
+  const rng = resumed ? resumed.rng : new RngStreams(seed)
+
   // Said out loud on every boot, in every path, because a lane that does not know which world
   // it is looking at reports a finding about the wrong one.
   console.log(
@@ -187,10 +278,22 @@ export async function startDevWorld(
     + `terrain=${terrain[0]?.length ?? 0}x${terrain.length} structures=${structures.length}`
     + (map === 'scripted' ? '  ← THE FROZEN G6 TEST FIXTURE, not the product town' : ''),
   )
-  const rng = new RngStreams(opts.seed ?? DEV_SEED)
-  const store = new EventStore(db)
+  if (resumed) {
+    const t = simTimeFromTick(resumed.state.tick)
+    // A resumed world says which tick it woke at rather than pretending it never stopped: a
+    // SIGKILL rolls back the tick that was in flight, so this number can be one behind.
+    console.log(
+      `dev world: RESUMED at tick ${resumed.state.tick} — year ${t.year} ${t.season} day ${t.dayOfSeason}, `
+      + `${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')}, `
+      + `${Object.keys(resumed.state.structures).length} structures, `
+      + `${Object.keys(resumed.state.agents).length} townsfolk, ${resumed.seq} events`,
+    )
+  } else {
+    console.log('dev world: a new day 0 — no town on disk')
+  }
+
   const loop: TickLoop = new TickLoop({
-    store, state: devGenesisState(config, terrain, map, rings), rng, config,
+    store, state: resumed ? resumed.state : devGenesisState(config, terrain, map, rings), rng, config,
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
     // the founders showcase town
     onTick: makeFoundersOnTick(config, rng, () => loop.state, {
@@ -211,10 +314,13 @@ export async function startDevWorld(
   const gateway = await createGateway({
     dbPath, port: opts.port ?? DEV_PORT, terrain, config, db, narratorDbPath: opts.narratorDbPath,
     ...(opts.staticDir === undefined ? {} : { staticDir: opts.staticDir }),
+    ...(opts.agentDbDir === undefined ? {} : { agentDbDir: opts.agentDbDir }),
   })
 
   // Scripted thoughts: when an actor's chosen intent verb changes, it "thinks" a line.
-  let lastSeq = 0
+  // ★ The cursor starts at the END of the log, not at 0: a resumed world would otherwise scan
+  // its whole history on its first tick and re-publish every thought the town ever had.
+  let lastSeq = store.lastSeq()
   const lastVerb = new Map<string, string>()
   const tickOnce = (): void => {
     loop.step()
@@ -238,7 +344,7 @@ export async function startDevWorld(
   const timer = setInterval(tickOnce, opts.realMsPerTick ?? DEV_MS_PER_TICK)
 
   return {
-    gateway, loop,
+    gateway, loop, terrain, resumedAtTick: resumed ? resumed.state.tick : null,
     stop: async () => {
       clearInterval(timer)
       await gateway.close()
@@ -256,6 +362,7 @@ export async function startDevWorld(
 //   SJ_DEV_JOINT=1        let a mason lend a hand at a neighbour's walls (OFF by default, and
 //                         the only default here that is off for a MEASURED reason rather than
 //                         a conservative one — see `jointBuild` on `FoundersOpts`)
+//   SJ_FRESH=1            throw the town on disk away and start a new day 0
 //
 // ★ AND INTERIORS DEFAULT ON FOR A PERSON, for the same reason `showcase` does. Three
 // integration trains in a row reported no interior seen; two of them had the surface switched
@@ -272,10 +379,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const builders = process.env['SJ_DEV_BUILDERS'] !== '0'
   const bridge = process.env['SJ_DEV_BRIDGE'] !== '0'
   const jointBuild = process.env['SJ_DEV_JOINT'] === '1'
+  const fresh = process.env['SJ_FRESH'] === '1'
   const asked = Number(process.env['SJ_DEV_RINGS'] ?? TOWN_RINGS_GENESIS)
   const rings = Number.isInteger(asked) && asked >= 1 ? asked : TOWN_RINGS_GENESIS
   if (rings !== asked) console.log(`dev world: SJ_DEV_RINGS=${process.env['SJ_DEV_RINGS']} is not a ring count; using ${rings}`)
-  void startDevWorld({ ingest: true, map, interiors, builders, bridge, jointBuild, rings }).then(({ gateway }) => {
+  void startDevWorld({ ingest: true, map, interiors, builders, bridge, jointBuild, rings, fresh }).then(({ gateway }) => {
     console.log(`dev world: interiors=${interiors ? 'on' : 'off'} builders=${builders && map === 'showcase' ? 'on (SCRIPTED masons, real build verb)' : 'off'}`
       + ` bridge=${bridge && map === 'showcase' ? `on (a deck at the ford ${JSON.stringify(showcaseDeck(undefined, rings))})` : 'off'}`
       + ` joint=${jointBuild && map === 'showcase' ? 'on (a mason lends a hand at walls in reach)' : 'off'}`)
