@@ -1,6 +1,30 @@
-import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { describe, expect, it, vi } from 'vitest'
 import type { AssetRecord } from '@sj/shared'
-import { buildingArt, characterArt, resolveAssetId, textureUrlFor } from './textures.js'
+
+// The book calls into Pixi's loader; nothing else in this file does. A tiny stand-in keeps the
+// pure resolvers under test exactly as they were and lets `peek` be asserted at all.
+const loads = new Map<string, { resolve: (t: unknown) => void; texture: unknown }>()
+vi.mock('pixi.js', () => ({
+  Assets: {
+    add: vi.fn(),
+    load: vi.fn((url: string) => new Promise((resolve) => {
+      loads.set(url, { resolve, texture: { url, source: { unload: vi.fn() } } })
+    })),
+    unload: vi.fn(async () => {}),
+  },
+}))
+
+const land = async (url: string): Promise<void> => {
+  const l = loads.get(url)!
+  l.resolve(l.texture)
+  await Promise.resolve()
+  await Promise.resolve()
+}
+
+import { TextureBook, buildingArt, characterArt, resolveAssetId, textureUrlFor } from './textures.js'
 
 const rec = (over: Partial<AssetRecord>): AssetRecord => ({
   id: 'asset_x', seq: 1, class: 'building', desc: 'house: timber dwelling', kind: 'house',
@@ -88,5 +112,56 @@ describe('buildingArt (v4-hires-building manifest)', () => {
   it('reports NO ART rather than a checkerboard, so the renderer can draw a built form', () => {
     expect(buildingArt([], 'house', 2, 2)).toEqual({ url: null, anchor: null, scale: null })
     expect(buildingArt([], 'well', 1, 1).url).toBeNull()
+  })
+})
+
+describe('★ TextureBook.peek — the room and its furniture arrive in the same frame', () => {
+  it('is null before the bytes land and the texture after', async () => {
+    const book = new TextureBook()
+    expect(book.peek('/assets/a.png')).toBeNull()
+    void book.get('/assets/a.png')
+    expect(book.peek('/assets/a.png')).toBeNull()   // asked for, not yet in hand
+    await land('/assets/a.png')
+    expect(book.peek('/assets/a.png')).toEqual(loads.get('/assets/a.png')!.texture)
+  })
+
+  it('★ and THAT is the frame `get` alone could never make', async () => {
+    // The defect, stated as an experiment. A caller holding only `get` cannot paint in the
+    // frame it asks, because a resolved promise still defers to a microtask; `peek` can.
+    const book = new TextureBook()
+    void book.get('/assets/b.png')
+    await land('/assets/b.png')
+
+    let viaThen: unknown = null
+    void book.get('/assets/b.png').then((t) => { viaThen = t })
+    const viaPeek = book.peek('/assets/b.png')
+
+    expect(viaPeek).not.toBeNull()   // in hand, this turn
+    expect(viaThen).toBeNull()       // still a microtask away
+    await Promise.resolve()
+    expect(viaThen).toBe(viaPeek)
+  })
+
+  it('a swapped-out url stops peeking, so nothing hands out an unloaded texture', async () => {
+    const book = new TextureBook()
+    void book.get('/assets/old.png')
+    await land('/assets/old.png')
+    expect(book.peek('/assets/old.png')).not.toBeNull()
+
+    const p = book.swap('/assets/old.png', '/assets/new.png')
+    await land('/assets/new.png')
+    await p
+    expect(book.peek('/assets/old.png')).toBeNull()
+    expect(book.peek('/assets/new.png')).not.toBeNull()
+  })
+
+  it('★ and the room reads it — the furniture path peeks BEFORE it awaits', () => {
+    // A behavioural test would need a Pixi stage; this is the composition, and it is the thing
+    // that regresses: somebody tidies the branch back into a bare `get(...).then(...)` and the
+    // empty first frame is back with nothing to say so.
+    const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'interiorScene.ts'), 'utf8')
+    const add = src.slice(src.indexOf('function addPiece('), src.indexOf('function bodyFor('))
+    expect(add).toMatch(/const inHand = book\.peek\(url\)/)
+    expect(add.indexOf('book.peek(url)')).toBeLessThan(add.indexOf('book.get(url)'))
   })
 })

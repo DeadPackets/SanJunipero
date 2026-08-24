@@ -110,6 +110,9 @@ vi.mock('pixi.js', () => {
 import { Container as MockContainer, Sprite as MockSprite, Texture as MockTexture } from 'pixi.js'
 import { CELL, SHEET_ROWS } from './charAnim.js'
 import { createCharacterLayer } from './characters.js'
+import { CROWD_SETTLE_MS } from './crowd.js'
+import { BODY_SPRITE_W } from './depth.js'
+import { tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
 
@@ -503,5 +506,90 @@ describe('★ the layer walks each body at the record\'s pace, not a stopwatch\'
       rows.delete('idle')
       expect(rows.size).toBeGreaterThan(1)          // the person is still walking
     })()
+  })
+})
+
+describe('★ four people on one tile, through the real layer', () => {
+  const NAMES = ['amara', 'nadia', 'salma', 'yusuf']
+  let agents: MutableAgents
+  let scene: Scene
+  let layer: ReturnType<typeof createCharacterLayer>
+
+  beforeEach(() => {
+    agents = Object.fromEntries(NAMES.map((n) => [n, makeAgent(n, 103, 77)]))
+    scene = makeScene()
+    layer = createCharacterLayer(scene, makeBook().book, makeStore(agents).store, () => {})
+  })
+
+  /** Where the layer actually put each body's sprite, in the order it created them. */
+  const sprites = (): Array<{ x: number; y: number }> => {
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    return l.entities!.children.map((c) => ({ x: c.position.x, y: c.position.y }))
+  }
+
+  it('★ THE RED — four bodies at one door are drawn at four points, not one', () => {
+    layer.tick(1000)
+    layer.tick(2000)   // past CROWD_SETTLE_MS: the rank has formed
+    const at = sprites()
+    expect(at).toHaveLength(4)
+    expect(new Set(at.map((p) => `${p.x},${p.y}`)).size).toBe(4)
+  })
+
+  it('and the depth box follows the sprite, so the sort and the cull see the drawn place', () => {
+    layer.tick(1000)
+    layer.tick(2000)
+    const boxes = publishedBoxes(scene) as unknown as Array<{ id: string; x0: number; y0: number; sx0: number }>
+    expect(new Set(boxes.map((b) => `${b.x0},${b.y0}`)).size).toBe(4)
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    for (const b of boxes) {
+      const sprite = l.entities!.children[NAMES.indexOf(b.id)]!
+      expect(b.sx0).toBeCloseTo(sprite.position.x - BODY_SPRITE_W / 2, 6)
+    }
+  })
+
+  it('the shadow and the emote move with the body', () => {
+    layer.tick(1000)
+    layer.tick(2000)
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    const { sx } = tileToScreen(103, 77)
+    for (let i = 0; i < NAMES.length; i++) {
+      const sprite = l.entities!.children[i]!
+      // non-vacuous: this body is NOT where the record put it, and its companions came along
+      expect(sprite.position.x).not.toBe(sx)
+      expect(l.shadow!.children[i]!.position.x).toBe(sprite.position.x)
+      expect(l.worldText!.children[i * 2]!.position.x).toBe(sprite.position.x)
+    }
+  })
+
+  it('★ ONE body on a tile is left exactly where the record puts it', () => {
+    for (const n of NAMES.slice(1)) delete agents[n]
+    layer.tick(1000)
+    layer.tick(2000)
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    const { sx, sy } = tileToScreen(103, 77)
+    expect(l.entities!.children[0]!.position.x).toBe(sx)
+    expect(l.entities!.children[0]!.position.y).toBe(sy)
+  })
+
+  it('★ the rank GLIDES into place rather than snapping', () => {
+    layer.tick(1000)
+    const start = sprites().map((p) => p.x)
+    layer.tick(1000 + CROWD_SETTLE_MS / 2)
+    const mid = sprites().map((p) => p.x)
+    layer.tick(1000 + CROWD_SETTLE_MS)
+    const end = sprites().map((p) => p.x)
+    expect(Math.abs(mid[0]! - start[0]!)).toBeGreaterThan(0)
+    expect(Math.abs(mid[0]! - start[0]!)).toBeLessThan(Math.abs(end[0]! - start[0]!))
+  })
+
+  it('and a viewer who asked for less motion gets the arrangement, not the slide', () => {
+    const still = makeScene()
+    ;(still as unknown as { wantsMotion: () => boolean }).wantsMotion = () => false
+    const l2 = createCharacterLayer(still, makeBook().book, makeStore(agents).store, () => {})
+    l2.tick(1000)
+    const at = (still.layers as unknown as Record<string, InstanceType<typeof MockContainer>>)
+      .entities!.children.map((c) => c.position.x)
+    expect(new Set(at).size).toBe(4)   // arrived on the very first frame
+    l2.destroy()
   })
 })

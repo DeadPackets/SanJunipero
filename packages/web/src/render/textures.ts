@@ -68,12 +68,30 @@ export function textureUrlFor(records: AssetRecord[], klass: AssetClass, kind: s
 
 export class TextureBook {
   #cache = new Map<string, Promise<Texture>>()
+  #ready = new Map<string, Texture>()
+
+  /**
+   * ★ THE TEXTURE IF IT IS ALREADY IN HAND, so a caller can paint it in the FRAME IT ASKS.
+   *
+   * `get` cannot do this and never could: a Promise that is already resolved still defers its
+   * `.then` to a microtask, and a microtask lands after the frame that scheduled it has been
+   * rendered. So a node built and textured through `get` alone always draws at least one frame
+   * with nothing on it, however warm the book is. One frame is 16 ms and no viewer sees it —
+   * but it is a real hole in a real frame, it is what an intermittent observer photographs,
+   * and it costs two lines to close.
+   */
+  peek(url: string): Texture | null {
+    return this.#ready.get(url) ?? null
+  }
 
   get(url: string): Promise<Texture> {
     let p = this.#cache.get(url)
     if (p === undefined) {
       Assets.add({ alias: url, src: url })
-      p = Assets.load<Texture>(url)
+      p = Assets.load<Texture>(url).then((t) => {
+        this.#ready.set(url, t)
+        return t
+      })
       this.#cache.set(url, p)
     }
     return p
@@ -87,6 +105,7 @@ export class TextureBook {
         // claim the entry synchronously: concurrent swaps off a shared url (all
         // structures leave the placeholder at once) must unload exactly once
         this.#cache.delete(oldUrl)
+        this.#ready.delete(oldUrl) // a peek must never hand out a texture that was unloaded
         const old = await oldP
         old.source.unload() // texture GC gotcha — spec §15
         await Assets.unload(oldUrl)
