@@ -102,7 +102,7 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
 }
 
 /**
- * ★ THE DEBT, AS OF THIS SWEEP. THREE cells, all of them in the cast.
+ * ★ THE DEBT, AS OF THIS SWEEP. TWO cells, both in the cast.
  *
  * It was four. `salma ne/contact-a` — the second TACTICAL GEAR, a large brown bundle in her
  * right hand in one frame of four, +24.3 % opaque area against a ±18 % tolerance and WORSE
@@ -110,6 +110,14 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
  * The refusal the ruling installed is what made that happen: `gen-cast-v5` stopped on her
  * three cached candidates instead of shipping the least-bad, `CAST_ATTEMPTS=6` drew a fourth,
  * and the fourth passed. Two cells of twenty-four moved; her ne stride trio still passes.
+ *
+ * `omar ne/contact-a` went the same way, for $0.2745 and three refusals — two of them BY EYE,
+ * which is the control the eye is for. c3 cleared every gate with a contact frame no wider
+ * than the idle (foot span 1.00x, against 1.21x for the cell it would have replaced): a walk
+ * frame with no walk in it, and `strideGateV4` cannot see it because it measures frame-to-frame
+ * pixel distance, not stance. c4 cleared every gate with a BAKED GROUND SHADOW under the boots
+ * — Nadia's defect, the one this project has already proved no gate catches. c5 is clean on
+ * both counts at 1.93x. Neither of those two properties is gated; see the report.
  */
 export const KNOWN_GATE_DEBT: Record<string, string> = {
   // MINE, and named so it is not mistaken for the model's. The TACTICAL GEAR repair set
@@ -117,10 +125,6 @@ export const KNOWN_GATE_DEBT: Record<string, string> = {
   // back-facing walk cycles have no alternating stride. Clears when the strip is redrawn.
   'amara ne stride contact-a~contact-b':
     '0.0000 against 0.1085 — the TACTICAL GEAR repair, by construction',
-
-  // Omar's head moves 24 % between idle and contact-a in the back view. Legs move, heads do not.
-  'omar ne head contact-a':
-    '0.2379 against 0.2000 — head drift in the back-facing contact frame',
 
   // Yusuf's sleep cell shares 53 % of its palette with his idle against a floor of 80 %. A
   // lying body at gate-view scale is mostly face where a standing one is mostly jacket, so
@@ -147,8 +151,8 @@ describe('★ the committed cast against the gates as they now behave', () => {
       'this entry passes now — delete it from KNOWN_GATE_DEBT').toEqual([])
   })
 
-  it('★ and the debt is THREE cells, so a jump shows up in the diff', () => {
-    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(3)
+  it('★ and the debt is TWO cells, so a jump shows up in the diff', () => {
+    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(2)
   })
 })
 
