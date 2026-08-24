@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import type { AgentBody } from '@sj/engine/state'
-import type { SimEvent } from '@sj/shared'
+import { TICK_REAL_MS, type SimEvent } from '@sj/shared'
 import {
   BOB_PX, EMOTE_KINDS, GAIT_STRIDE_SPREAD, HIT_AREA_H, HIT_AREA_W, NAME_TAG_MAX_CHARS,
   STRIDE_TILES, TICK_PERIOD_MAX_MS, TICK_PERIOD_SEED_MS, WALK_FRAME_MAX_MS, WALK_FRAME_MIN_MS,
@@ -637,6 +637,43 @@ describe('★ B2 — five people, five gaits, and none of them from a random num
     const buckets = new Array(8).fill(0)
     for (let i = 0; i < 500; i++) buckets[Math.floor(gaitOf(`agent-${i}`).phase * 8)]++
     for (const [i, n] of buckets.entries()) expect(n, `bucket ${i}`).toBeGreaterThan(20)
+  })
+
+  // ★ AND IT MUST BE TRUE AT THE RATE THE PRODUCT RUNS AT, WHICH IS NOT THE DEV RATE.
+  //
+  // The guard below asserted two founders differ at 400 ms a tile — `devWorld`'s old cadence.
+  // The world ticks at `TICK_REAL_MS` = 2500 ms, and at 2500 the clamp bound: the ideal frame
+  // time is 1125 ms and every stride in the ±12 % band asks for 990–1260 ms, all of them over
+  // `WALK_FRAME_MAX_MS`. MEASURED before the fix: 5 distinct frame times at 400 ms a tile,
+  // ONE at 1000 and at 2500. Half of "they all walk at the EXACT same jumpy pace" was still
+  // true in the shipped product and CI was green, because the assertion was made at a rate
+  // nobody watches.
+  it('★ five founders keep five cadences at EVERY rate, the shipped one included', () => {
+    const rows: string[] = [], inStep: string[] = []
+    for (const msPerTile of [120, 400, 1000, TICK_REAL_MS, 6000]) {
+      const ms = FOUNDERS.map((id) => strideFrameMs(msPerTile, gaitOf(id).stride))
+      const distinct = new Set(ms.map((v) => v.toFixed(4))).size
+      rows.push(`${String(msPerTile).padStart(4)} ms/tile → ${ms.map((v) => v.toFixed(1)).join(' ')}`)
+      if (distinct < FOUNDERS.length) inStep.push(`${msPerTile} ms/tile: ${distinct} of 5 cadences`)
+    }
+    // eslint-disable-next-line no-console
+    console.log('WALK CADENCE PER FOUNDER, ms/frame\n  ' + rows.join('\n  '))
+    expect(inStep).toEqual([])
+  })
+
+  it('★ and the clamp still holds the world\'s own cadence — the stride only varies it', () => {
+    // the band is on the NOMINAL cadence; a body may sit at most one gait spread outside it
+    for (const msPerTile of [1, 120, 400, 2500, 100_000]) {
+      for (const id of [...FOUNDERS, 'agent-0', 'agent-499']) {
+        const v = strideFrameMs(msPerTile, gaitOf(id).stride)
+        expect(v).toBeGreaterThanOrEqual(WALK_FRAME_MIN_MS * (1 - GAIT_STRIDE_SPREAD))
+        expect(v).toBeLessThanOrEqual(WALK_FRAME_MAX_MS * (1 + GAIT_STRIDE_SPREAD))
+      }
+      expect(strideFrameMs(msPerTile)).toBeGreaterThanOrEqual(WALK_FRAME_MIN_MS)
+      expect(strideFrameMs(msPerTile)).toBeLessThanOrEqual(WALK_FRAME_MAX_MS)
+    }
+    // the landed identity is untouched: the dev world's 400 ms a tile IS the v4 cadence
+    expect(strideFrameMs(400)).toBe(WALK_FRAME_MS_V4)
   })
 
   it('★ a stride difference changes the LEG CADENCE and never the ground speed', () => {

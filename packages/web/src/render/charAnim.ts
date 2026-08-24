@@ -161,14 +161,36 @@ export const STRIDE_TILES = 1.8
 /** Outside this band the legs stop matching the ground, and that is deliberate: a body
  *  crossing a tile in 2.5 s would otherwise cycle its legs once every 4.5 s, which reads as a
  *  freeze rather than an amble. Inside it the feet are planted; outside it they slide, slowly
- *  at the top and quickly at the bottom, which is the least bad thing available. */
+ *  at the top and quickly at the bottom, which is the least bad thing available.
+ *
+ *  The band bounds the world's NOMINAL cadence, not a body's own. See `strideFrameMs`. */
 export const WALK_FRAME_MIN_MS = 90
 export const WALK_FRAME_MAX_MS = 360
 
-/** The frame time whose four-frame loop carries `STRIDE_TILES` tiles at this speed. */
+/**
+ * The frame time whose four-frame loop carries `STRIDE_TILES` tiles at this speed.
+ *
+ * ★ THE STRIDE SCALES THE CLAMPED CADENCE, NOT THE IDEAL — AND THAT IS THE WHOLE OF B2 IN THE
+ * SHIPPED PRODUCT. This used to clamp `msPerTile x STRIDE_TILES x stride / 4`, with the stride
+ * INSIDE the clamp. At the world's real rate the clamp binds: 2500 ms a tile asks for 1125 ms a
+ * frame, and every stride in the +-12 % band asks for 990 to 1260 — all of them above
+ * `WALK_FRAME_MAX_MS`, so all five founders came out at exactly 360 ms. MEASURED: 5 of 5
+ * distinct at the dev world's 400 ms a tile, 1 of 5 from about 800 ms a tile upward, including
+ * every rate this product has ever been watched at.
+ *
+ * So half of "they all walk at the EXACT same jumpy pace" was still true where the user was
+ * looking, and the landed guard could not see it: it asserted two founders differ at 400 ms,
+ * which is the DEV rate. A check that passes at a rate the product does not run at is the
+ * vacuous-guard family's newest member.
+ *
+ * Scaling after the clamp costs nothing physically — past the clamp the feet are already
+ * sliding, which is what the band says — and the reachable output widens by exactly the gait
+ * spread, to `[WALK_FRAME_MIN_MS x (1 - s), WALK_FRAME_MAX_MS x (1 + s)]`. Inside the band, where
+ * the clamp does not bind, the arithmetic is unchanged and so is every landed number.
+ */
 export function strideFrameMs(msPerTile: number, strideScale = 1): number {
-  const ideal = (msPerTile * STRIDE_TILES * strideScale) / WALK_LOOP.length
-  return Math.min(WALK_FRAME_MAX_MS, Math.max(WALK_FRAME_MIN_MS, ideal))
+  const ideal = (msPerTile * STRIDE_TILES) / WALK_LOOP.length
+  return Math.min(WALK_FRAME_MAX_MS, Math.max(WALK_FRAME_MIN_MS, ideal)) * strideScale
 }
 
 // ── ★ THE WORLD'S CLOCK, AS THE RENDERER SEES IT ──────────────────────────────────────────
