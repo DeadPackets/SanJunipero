@@ -12,6 +12,11 @@ services:
       SJ_RINGS: "${SJ_RINGS:-1}"
       SJ_INTERIORS: "${SJ_INTERIORS:-0}"
     volumes:
+      # ★ THIS DOES NOT YET PRESERVE A TOWN, and the volume is here to mark the gap rather than
+      # to close it. `startDevWorld` deletes the world db on every boot (devWorld.ts: "recreated
+      # fresh"), so `restart` below brings back a NEW town at day 0, not the one that was
+      # running. A stream that is meant to be watched for weeks needs that line to become a
+      # resume, and nothing else here has to change when it does.
       - town-data:/app/packages/gateway/data
     restart: unless-stopped
     stop_grace_period: 20s
