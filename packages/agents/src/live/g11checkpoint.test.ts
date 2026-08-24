@@ -12,7 +12,7 @@ import {
 
 const FINGERPRINT: G11Fingerprint = {
   gitSha: '6d5c9376c9c0342300ccabc46459e70026347db6',
-  configHash: 'a90bd7471668eea6e8a8e7932129ef7905ae2477b396d5c7b792df539065c4d8',
+  configHash: 'config-hash-of-the-run-that-wrote-this',
   totalTicks: 5760,
   startTick: 420,
   wearThreshold: 1,

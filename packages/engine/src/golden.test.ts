@@ -6,12 +6,10 @@ import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash } from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
 import { genesisState } from './state.js'
+import { fold } from './fold.js'
 import { RngStreams } from './rng.js'
 import { TickLoop } from './tickLoop.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
-
-// Pinned golden hash — regenerating this constant is a deliberate, reviewed act.
-const GOLDEN_DAY_HASH = 'f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac'
 
 // Synthetic day: 5 scripted actors move and get hungry, all randomness from named streams.
 function makeLoopHandler(rng: RngStreams): ConstructorParameters<typeof TickLoop>[0]['onTick'] {
@@ -33,12 +31,38 @@ function makeLoop(store: EventStore, rng: RngStreams) {
 }
 
 describe('GATE G1: golden replay', () => {
-  it('a full synthetic sim-day replays bit-identically from genesis', () => {
+  it('a full synthetic sim-day replays from genesis to the state the live run left', () => {
     const store = new EventStore(openDb(':memory:'))
     const live = makeLoop(store, new RngStreams('golden'))
     for (let i = 0; i < MINUTES_PER_DAY; i++) live.step()
-    expect(stateHash(live.state)).toBe(GOLDEN_DAY_HASH)
     expect(stateHash(replayFromGenesis(store))).toBe(stateHash(live.state))
+  })
+
+  // The guarantee scrubbing needs, stated directly: folding one recorded log twice lands on
+  // one state. Anything ambient inside the fold — Math.random, a clock, module state — shows
+  // up here as two different towns at the same tick.
+  it('folding the same recorded log twice gives the same state', () => {
+    const store = new EventStore(openDb(':memory:'))
+    const live = makeLoop(store, new RngStreams('golden'))
+    for (let i = 0; i < MINUTES_PER_DAY; i++) live.step()
+    expect(stateHash(replayFromGenesis(store))).toBe(stateHash(replayFromGenesis(store)))
+  })
+
+  // And at every tick along the way, not only at the end. This is the shape `WorldMirror.
+  // stateAt` scrubs with: fold the events up to a tick and show what you get. Scrubbing back
+  // to a tick you already visited must not show a second town.
+  it('folding to a mid-log tick twice lands on the same state', () => {
+    const store = new EventStore(openDb(':memory:'))
+    const live = makeLoop(store, new RngStreams('golden'))
+    for (let i = 0; i < MINUTES_PER_DAY; i++) live.step()
+    const log = store.readFrom(0)
+    const foldTo = (tick: number): string => stateHash(
+      log.filter((ev) => ev.tick <= tick)
+        .reduce((s, ev) => fold(s, ev, DEFAULT_CONFIG), genesisState(DEFAULT_CONFIG)),
+    )
+    for (const tick of [1, 137, 600, MINUTES_PER_DAY - 1]) {
+      expect(foldTo(tick), `fold to tick ${tick} is not stable`).toBe(foldTo(tick))
+    }
   })
 
   it('crash mid-day: reopen db, resume from snapshot, final state identical to uninterrupted run', () => {

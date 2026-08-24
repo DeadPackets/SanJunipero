@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-// Shared schema for `data/g3-report.json`: the run script writes it, the
-// livetest re-asserts 1–8 against it. Keeping the shape in one module stops the
-// writer and the reader from drifting apart.
+// Shared schema for `data/g3-report.json`: the run script writes it and checks 1–8 against
+// what it just ran. Keeping the shape in one module stops the writer and the checker from
+// drifting apart.
 
 export const G3NightlyEditOutcomeSchema = z.object({
   day: z.number().int(),

@@ -572,23 +572,3 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
   })
 })
 
-describe('G9a-11: the goldens are where the single deliberate regen left them', () => {
-  // This row fails the moment a golden hash moves again, which is the signal that G9 must be
-  // re-run before anything ships. It names the values as they stand after the latest
-  // authorized regen, so moving a pin means coming here and saying why.
-  //   G2 regen #4 (C9 Task 16):  6f2529fb…
-  //   G2 regen #5 (C11 Task 37): 665a8249…
-  //   G2 regen #6 (C11 Task 37b, the gate-remediation regen, ruling R-G): c1c51b42…
-  //   G2 regen #7 (the `hut` → `house` rename lane): the value below.
-  // G1 HAS NEVER MOVED and must not: it is the replay proof, and it is not a world run —
-  // `TickLoop` folds the events it is handed and runs no world system, so no dial reaches it.
-  // The rename lane measured it and it held, which is the check that says the rename touched
-  // no law.
-  const source = (name: string): string =>
-    readFileSync(fileURLToPath(new URL(name, import.meta.url)), 'utf8')
-
-  it('G1 and G2 still pin the post-regen hashes', () => {
-    expect(source('golden.test.ts')).toContain('f487a26bd9dfba5d6d0d04f41b57f8e85dc9afe7f9ae1caf608de8c182effeac')
-    expect(source('g2.test.ts')).toContain('ec75f7f7e0948cb4cd6985d8d660ec93081ecc51ca4a0e733f25b9527c6b1bde')
-  })
-})

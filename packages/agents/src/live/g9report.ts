@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-// Shared schema for `data/g9-report.json`: the run script writes it, the
-// livetest re-asserts addendum §17's G9b criteria 1–8 against it. One module so
-// the writer and the reader cannot drift apart.
+// Shared schema for `data/g9-report.json`: the run script writes it and checks addendum §17's
+// G9b criteria 1–8 against what it just ran. One module so the writer and the checker cannot
+// drift apart.
 
 export const MAX_MEAN_WORDS_PER_UTTERANCE = 35
 

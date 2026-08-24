@@ -1,8 +1,8 @@
 import { z } from 'zod'
 
-// Shared schema for `data/g11-report.json`: the run script writes it, the livetest re-asserts
-// deep-world addendum §18's G11b criteria against it, and `g11report.test.ts` proves the
-// checker offline against a recorded fixture. One module so the writer and the reader cannot
+// Shared schema for `data/g11-report.json`: the run script writes it and checks deep-world
+// addendum §18's G11b criteria against what it just ran, and `g11report.test.ts` proves the
+// checker offline against a recorded fixture. One module so the writer and the checker cannot
 // drift apart (the C9 `g9report` pattern).
 
 export const G11_MIN_SIM_DAYS = 2
