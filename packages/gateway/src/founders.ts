@@ -28,8 +28,8 @@
 // and the world's own decay, multiplied.
 import { doorFrontTile, type SimConfig } from '@sj/shared'
 import {
-  awakeEnergyDecay, claimInWorld, composePerception, createWorldTick, doorTile, findPath,
-  isAdjacentToRect, submitIntent,
+  BRIDGE_KIND, awakeEnergyDecay, bridgeAt, claimInWorld, composePerception, createWorldTick,
+  doorTile, findPath, isAdjacentToRect, submitIntent,
   type PerceptionPacket, type RngStreams, type Structure, type WorldState,
 } from '@sj/engine'
 import { devTown, type DevStructure } from './devTown.js'
@@ -256,6 +256,43 @@ export function masonIntent(state: WorldState, config: SimConfig, agentId: strin
     : { verb: 'walk', params: { x: claim.door.x, y: claim.door.y } }
 }
 
+// ── THE BRIDGEWRIGHT ───────────────────────────────────────────────────────────────────────
+//
+// ★ THIS ONE IS HANDED ITS COORDINATE, AND THAT IS THE HONEST DESCRIPTION OF IT.
+//
+// A bridge is the one kind the verb still takes an x and a y for, because the WATER decides
+// where a deck can stand and no town can claim a plot on it (`isPlottedKind`). And far-bank's
+// C-1 stands untouched: nothing gives a MIND a reason to bridge while the near bank has room
+// for hundreds. So this is a demonstration puppet walking to a crossing somebody else found —
+// exactly what `farBank.test.ts` does with `DECK`, said out loud in the same words.
+//
+// What is NOT scripted is whether the crossing is real. The site comes from `showcaseDeck`,
+// which is derived from the ford the map lays, and `devBridge.test.ts` asks the ENGINE — every
+// water tile in the channel, through `buildSiteOf` — which sites it accepts. Take the ford
+// away and the sweep finds nothing, the walk finds no path to the spit, and no deck stands.
+
+/** The first founder is the wright: with the same cast in the same order, deterministically. */
+export const bridgewrightOf = (cast: readonly FounderDef[]): string | null => cast[0]?.id ?? null
+
+/** Walk to the far end of the crossing, then lay the deck. `null` once a deck is standing, or
+ *  when this body cannot pay for the errand — a wright who falls in the river builds nothing. */
+export function bridgewrightIntent(
+  state: WorldState, config: SimConfig, agentId: string,
+  deck: { x: number; y: number; w: number; h: number },
+): Intent | null {
+  const a = state.agents[agentId]
+  if (a === undefined || a.insideId !== undefined) return null
+  if (bridgeAt(state, deck.x, deck.y)) return null
+  // The spit at the far end of the deck — the one tile beside the crossing a body can stand on.
+  const stand = { x: deck.x + deck.w, y: deck.y }
+  const out = walkEnergyCost(state, config, agentId, stand)
+  const work = workEnergyCost(state, config, agentId, config.structures.recipes[BRIDGE_KIND]?.durationTicks ?? 0)
+  if (out === null || work === null || a.needs.energy - (out + work) <= GO_HOME_BELOW) return null
+  return isAdjacentToRect(a.x, a.y, deck)
+    ? { verb: 'build', params: { kind: BRIDGE_KIND, x: deck.x, y: deck.y } }
+    : { verb: 'walk', params: stand }
+}
+
 // patrol like the G2 idler: ping-pong between two fixed waypoints, sleep when spent — and
 // never set out on a leg the legs cannot pay for (rule B in the header).
 function makePatrolPolicy(f: FounderDef) {
@@ -286,6 +323,10 @@ export type FoundersOpts = {
    *  real `build` verb with `{kind}` and no coordinate. OFF by default — every existing gate
    *  folds exactly the events it always did, and the frozen fixture has no lattice to build on. */
   builders?: boolean
+  /** dev/demo only: the crossing one founder lays a deck over before it joins the masons.
+   *  ABSENT by default — a world with no ford has nowhere to put one, and every existing gate
+   *  folds exactly the events it always did. */
+  deck?: { x: number; y: number; w: number; h: number }
 }
 
 /** The house this person owns, or null. Ownership is a fact of the world (Structure.owner) —
@@ -372,6 +413,7 @@ export function makeFoundersOnTick(
   config: SimConfig, rng: RngStreams, getState: () => WorldState, opts: FoundersOpts = {},
 ): FoundersOnTick {
   const cast = opts.founders ?? FOUNDERS
+  const wright = opts.deck === undefined ? null : bridgewrightOf(cast)
   const policies = new Map(cast.map(f => [f.id, makePatrolPolicy(f)]))
   const worldTick = createWorldTick(config, rng)
   const structures = opts.structures ?? SCRIPTED_STRUCTURES
@@ -412,7 +454,7 @@ export function makeFoundersOnTick(
       if (a.needs.warmth < NEED_TOPUP_BELOW) emit('need_changed', { id: f.id, need: 'warmth', delta: WARMTH_TOPUP })
       // Scripted timber, on the same footing and for the same declared reason. The id never
       // ends in a digit, because `fold` advances the world's entity counter off any that does.
-      if (opts.builders === true && a.activity === null
+      if ((opts.builders === true || f.id === wright) && a.activity === null
         && heldWood(getState(), f.id) < (config.structures.recipes[MASON_KIND]?.inputs[MASON_WOOD_KIND] ?? 0)) {
         emit('item_spawned', {
           id: `item_${MASON_WOOD_KIND}_${f.id}_${tick}_load`, kind: MASON_WOOD_KIND,
@@ -432,9 +474,11 @@ export function makeFoundersOnTick(
       // why every landed gate folds exactly the world it always did.
       if (a.activity) continue
       const packet = composePerception(state, config, f.id, [])
-      // The order of a day: rest first, then work, then walk the town. Home comes before the
-      // mason because a body that is spent has no business starting a house.
+      // The order of a day: rest first, then the crossing, then work, then walk the town. Home
+      // comes before either because a body that is spent has no business starting anything, and
+      // the deck comes before the houses because until it stands half the town is unreachable.
       const intent = (opts.interiors === true ? homeIntent(state, config, f.id) : null)
+        ?? (f.id === wright ? bridgewrightIntent(state, config, f.id, opts.deck!) : null)
         ?? (opts.builders === true ? masonIntent(state, config, f.id) : null)
         ?? policies.get(f.id)!(state, config, packet)
       if (!intent) continue

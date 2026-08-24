@@ -10,7 +10,7 @@ import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
 import { foundersFor, makeFoundersOnTick, townStructuresFor } from './founders.js'
 import { ingestLibraryArt, ingestProductionArt, ingestTerrainArt } from './ingestArt.js'
-import { showcaseTerrain } from './showcaseMap.js'
+import { showcaseDeck, showcaseTerrain } from './showcaseMap.js'
 import { devWorldOrigin } from './devTown.js'
 
 export const DEV_DB_PATH = 'data/dev-world.db'
@@ -125,6 +125,10 @@ export async function startDevWorld(
      *  real `build` verb. Off by default; the frozen fixture has no lattice to build on and
      *  every existing gate folds exactly the events it always did. */
     builders?: boolean
+    /** dev/demo only: one founder lays a deck over the ford before it joins the masons, and the
+     *  fourteen plattable blocks across the water join the town. Off by default; only the
+     *  showcase has a ford, and every existing gate folds exactly the events it always did. */
+    bridge?: boolean
     /** C7's narrator.db. Absent, every narrated surface — chapters, milestones, moments —
      *  answers typed-empty, which is why the timeline marks and the filmstrip had never been
      *  seen with data. The gateway already opens it readonly; the dev world could not ask. */
@@ -190,6 +194,8 @@ export async function startDevWorld(
       holdings: map === 'showcase',
       // and a lattice nobody ever builds in is why merge train 3 called a ring-3 town empty
       builders: opts.builders === true && map === 'showcase',
+      // the crossing: derived from the ford the map lays, so the two cannot disagree
+      ...(opts.bridge === true && map === 'showcase' ? { deck: showcaseDeck(undefined, rings) } : {}),
     }),
   })
 
@@ -236,6 +242,7 @@ export async function startDevWorld(
 //   SJ_DEV_RINGS=3        plat the showcase town for three rings of blocks instead of one
 //   SJ_DEV_INTERIORS=0    keep the founders out of doors (they go home and sleep otherwise)
 //   SJ_DEV_BUILDERS=0     stop the founders raising houses (they build on claimed plots otherwise)
+//   SJ_DEV_BRIDGE=0       leave the river uncrossed (one founder decks the ford otherwise)
 //
 // ★ AND INTERIORS DEFAULT ON FOR A PERSON, for the same reason `showcase` does. Three
 // integration trains in a row reported no interior seen; two of them had the surface switched
@@ -250,11 +257,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const map: DevMapKind = process.env['SJ_DEV_MAP'] === 'scripted' ? 'scripted' : DEV_MAP_HUMAN
   const interiors = process.env['SJ_DEV_INTERIORS'] !== '0'
   const builders = process.env['SJ_DEV_BUILDERS'] !== '0'
+  const bridge = process.env['SJ_DEV_BRIDGE'] !== '0'
   const asked = Number(process.env['SJ_DEV_RINGS'] ?? TOWN_RINGS_GENESIS)
   const rings = Number.isInteger(asked) && asked >= 1 ? asked : TOWN_RINGS_GENESIS
   if (rings !== asked) console.log(`dev world: SJ_DEV_RINGS=${process.env['SJ_DEV_RINGS']} is not a ring count; using ${rings}`)
-  void startDevWorld({ ingest: true, map, interiors, builders, rings }).then(({ gateway }) => {
-    console.log(`dev world: interiors=${interiors ? 'on' : 'off'} builders=${builders && map === 'showcase' ? 'on (SCRIPTED masons, real build verb)' : 'off'}`)
+  void startDevWorld({ ingest: true, map, interiors, builders, bridge, rings }).then(({ gateway }) => {
+    console.log(`dev world: interiors=${interiors ? 'on' : 'off'} builders=${builders && map === 'showcase' ? 'on (SCRIPTED masons, real build verb)' : 'off'}`
+      + ` bridge=${bridge && map === 'showcase' ? `on (a deck at the ford ${JSON.stringify(showcaseDeck(undefined, rings))})` : 'off'}`)
     console.log(`dev world: the town is awake on ws://localhost:${gateway.port}/ws`)
   })
 }
