@@ -56,6 +56,9 @@ export type PerceptionStructure = {
   // No more bodies fit. Said at the door rather than at the refusal, because a mind that has
   // to be turned away to learn it has already spent the turn.
   full?: true
+  // How far up the walls are, while a thing is still going up. Every hand on a site adds one to
+  // the walls, so this is the one number that says whether tonight is long enough.
+  raised?: { done: number; needs: number }
 }
 
 export type PerceptionCrop = {
@@ -280,6 +283,22 @@ function roadPhrase(r: MakeableRoad): string {
   return [costPhrase(r.inputs), ...conditions].join(', ')
 }
 
+// ★ HOW FAR UP, IN WORDS AND NOT A TICK COUNT. A mind was told a building was "still being
+// built" and nothing else, so a wall one hour short read exactly like a wall four days short —
+// and five founders raised five separate houses and finished none of them. Says where the work
+// has got to and never what to do about it.
+const HOW_FAR = [
+  'barely begun', 'a little way up', 'a quarter of the way up', 'a third of the way up',
+  'half up', 'well past half', 'three quarters up', 'nearly done',
+]
+
+export function howFarUp(raised?: { done: number; needs: number }): string {
+  if (raised === undefined || raised.needs <= 0) return 'still being built'
+  const f = Math.max(0, Math.min(1, raised.done / raised.needs))
+  const i = Math.min(HOW_FAR.length - 1, Math.floor(f * HOW_FAR.length))
+  return `its walls are ${HOW_FAR[i]}`
+}
+
 // Block 6, not block 1: the static prefix is byte-frozen and prompt caching rides on it, so
 // the vocabulary a mind needs rides the same breath as what it can see (C11 R-H).
 export function makeablesLine(m: Makeables, groundForBuilding?: { x: number; y: number } | null): string {
@@ -410,7 +429,8 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   }
 
   for (const s of packet.visible.structures) {
-    const state = s.burning ? ' — it is burning' : s.stage === 'construction' ? ' — still being built' : ''
+    const state = s.burning ? ' — it is burning'
+      : s.stage === 'construction' ? ` — ${howFarUp(s.raised)}` : ''
     // The doorway outranks the wall: the tile the packet names is the tile `enter` measures
     // against, so a mind told to stand there is a mind the world lets in.
     let approach = 'walk to a tile beside it.'

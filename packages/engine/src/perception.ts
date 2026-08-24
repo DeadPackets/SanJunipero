@@ -9,7 +9,7 @@ import { effectiveConfig } from './laws.js'
 import { thirstOf, type AfflictionKind, type Item, type Structure, type WorldState } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
 import { isSpoiling } from './systems/spoilage.js'
-import { isAdjacentToRect, walkIsCapped, workPenalty } from './verbs.js'
+import { buildTicks, isAdjacentToRect, walkIsCapped, workPenalty } from './verbs.js'
 
 // Perception is a pure projection: what one agent can sense from the shared
 // world state plus the events that just happened. It never mutates state and
@@ -93,6 +93,11 @@ export type PerceivedStructure = {
   // refused at the door to learn it has already spent the turn. Present only alongside `door`
   // and only when no more fit, so a packet from a town with room in it reads as it always did.
   full?: true
+  // ★ HOW FAR UP THE WALLS ARE. Present only while a thing is going up. A house is 2 880 ticks
+  // of work and a night is 720 — but every hand on a site adds one to the walls, so five pairs
+  // raise one in 576. Nothing in the packet had ever said a half-raised wall was a place work
+  // could go, and five founders raised five separate houses and finished none.
+  raised?: { done: number; needs: number }
 }
 
 // Whose it is, and whose hands made it — the two things prose needs to say
@@ -336,12 +341,20 @@ export function composePerception(
     return { door: { x: door.x, y: door.y }, ...(roomIsFull(state, s) ? { full: true as const } : {}) }
   }
 
+  // Read off the same two numbers `stepBuild` runs down, so what a mind is shown and what the
+  // walls actually are cannot disagree.
+  const howFarUp = (s: Structure): { raised?: { done: number; needs: number } } => {
+    if (s.stage !== 'construction') return {}
+    const needs = buildTicks(config, s.kind)
+    return needs <= 0 ? {} : { raised: { done: Math.min(s.progressTicks, needs), needs } }
+  }
+
   const visibleStructures: PerceivedStructure[] = Object.values(state.structures)
     .filter(s => (indoors === null ? structureInSight(s) : s.id === indoors))
     .sort(byId)
     .map(s => ({
       id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, burning: s.burning, stage: s.stage,
-      ...carved(s), ...wayIn(s),
+      ...carved(s), ...wayIn(s), ...howFarUp(s),
     }))
 
   const tileItems: PerceivedItem[] = indoors !== null ? [] : Object.values(state.items)
