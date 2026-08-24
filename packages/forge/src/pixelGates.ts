@@ -216,6 +216,65 @@ export function tilesetVarietyGate(
   return { ok: ok(failures), failures, shortestPeriod }
 }
 
+// ------------------------------------------------- 9. one body, one silhouette
+
+// ★ THE GATE THAT WOULD HAVE STOPPED "TACTICAL GEAR".
+//
+// `amara/contact-b-ne` shipped a standing figure in a tactical harness with the words
+// TACTICAL GEAR set beside her in silver pixel type — the image model captioning the costume
+// it had just invented — and its mirror `contact-b-nw` shipped the caption backwards. It
+// reached the running product: one frame in four of Amara's walk loop, in two of her four
+// facings. EVERY LANDED GATE PASSED IT. `alphaBinaryGate` passed because the letters are hard
+// alpha; `paletteGate` passed because they are drawn in MASTER_PALETTE silver; the coherence
+// gate measured 1.1855 against a 1.18 silhouette tolerance and the generator shipped the
+// least-bad of three failing candidates anyway; and `despeckle` removes islands under 1 % of
+// the mass, while "TACTICAL" alone is 8.93 %.
+//
+// What none of them asked is the thing a person can see instantly: A PERSON IS ONE SHAPE.
+// Text, a caption, a stray prop, a second figure, a baked drop shadow — every one of them is
+// opaque mass that does not touch the body. Measured over the 120 committed cast cells: 118
+// are exactly ONE island and the largest detached mass anywhere among them is 0.0000 %.
+//
+// The tolerance is `despeckle`'s own contract, so this gate asks for nothing the pipeline does
+// not already promise: anything the pipeline should have swept, and nothing it should not.
+export const DETACHED_MASS_MAX = 0.01
+
+export function soleSilhouetteGate(img: RawImage): GateResult & {
+  islands: number; detachedFraction: number
+} {
+  const { width: w, height: h, data } = img
+  const seen = new Uint8Array(w * h)
+  const stack: number[] = []
+  const sizes: number[] = []
+  for (let start = 0; start < w * h; start++) {
+    if (seen[start] === 1 || data[start * 4 + 3] === 0) continue
+    let n = 0
+    stack.push(start)
+    seen[start] = 1
+    while (stack.length > 0) {
+      const p = stack.pop()!
+      n++
+      const px = p % w, py = (p - px) / w
+      if (px + 1 < w) { const q = p + 1; if (seen[q] === 0 && data[q * 4 + 3] !== 0) { seen[q] = 1; stack.push(q) } }
+      if (px > 0) { const q = p - 1; if (seen[q] === 0 && data[q * 4 + 3] !== 0) { seen[q] = 1; stack.push(q) } }
+      if (py + 1 < h) { const q = p + w; if (seen[q] === 0 && data[q * 4 + 3] !== 0) { seen[q] = 1; stack.push(q) } }
+      if (py > 0) { const q = p - w; if (seen[q] === 0 && data[q * 4 + 3] !== 0) { seen[q] = 1; stack.push(q) } }
+    }
+    sizes.push(n)
+  }
+  const total = sizes.reduce((s, n) => s + n, 0)
+  const body = sizes.length === 0 ? 0 : Math.max(...sizes)
+  const detachedFraction = total === 0 ? 0 : (total - body) / total
+  const failures = total === 0
+    ? ['silhouette: the cell has no opaque pixels at all']
+    : detachedFraction > DETACHED_MASS_MAX
+      ? [`silhouette: ${sizes.length} opaque islands — ${(detachedFraction * 100).toFixed(2)}% of the `
+        + `mass does not touch the body (limit ${(DETACHED_MASS_MAX * 100).toFixed(0)}%). `
+        + 'A person is ONE shape; a second island is a caption, a prop or a second figure.']
+      : []
+  return { ok: ok(failures), failures, islands: sizes.length, detachedFraction }
+}
+
 // ---------------------------------------------------------------- the bar, assembled
 
 export type PixelBarArgs = {

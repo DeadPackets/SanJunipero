@@ -4,6 +4,7 @@
 import type { RawImage } from './post/raw.js'
 import {
   FACINGS, POSES_V2, mirrorX, cellDistance, paletteJaccard, opaqueArea, opaqueBbox,
+  headRegionDiff, silhouetteBound, HEAD_DIFF_MAX,
   PALETTE_JACCARD_MIN, SILHOUETTE_AREA_TOL, STRIDE_MIN_RATIO, CONTACT_PASSING_MIN_RATIO,
   type Facing, type PoseV2, type GateFailure,
 } from './sheet.js'
@@ -70,8 +71,18 @@ export function strideGateV4(facing: string, strip: Record<StripPoseV4, RawImage
   return failures
 }
 
-// The ONE coherence gate: palette-jaccard + silhouette (opaque area) vs the master's
+// The ONE coherence gate: palette-jaccard + silhouette (opaque area) + head, vs the master's
 // figure for the same view. Catches identity drift in edit calls; nothing else.
+//
+// ★ THE HEAD TERM WAS MISSING, AND THAT IS THE FINDING. This gate runs BEFORE the money is
+// spent and decides which candidate ships; `frameCoherenceGate` runs AFTER, over the committed
+// cells, in `castAudit.test.ts`. It asks three questions and this one asked two — so the
+// pre-spend gate was a STRICT SUBSET of the post-hoc audit and a candidate could clear the one
+// that costs money and red the one that costs nothing. Two of the cast's known debts are
+// exactly that: `omar ne/contact-a` at 0.2379, and salma's first replacement `ne/contact-a`,
+// drawn live in this lane, at 0.3366 — clean on silhouette and palette, and a different head.
+// Legs move between walk frames; heads do not, and the number that says so was only ever read
+// after the fact.
 export function coherenceGateV4(label: string, master: RawImage, cell: RawImage): GateFailure[] {
   const failures: GateFailure[] = []
   const jac = paletteJaccard(master, cell)
@@ -79,7 +90,10 @@ export function coherenceGateV4(label: string, master: RawImage, cell: RawImage)
     failures.push({ gate: 'palette', a: label, b: 'master', value: jac, limit: PALETTE_JACCARD_MIN })
   const areaRatio = opaqueArea(cell) / opaqueArea(master)
   if (Math.abs(areaRatio - 1) > SILHOUETTE_AREA_TOL)
-    failures.push({ gate: 'silhouette', a: label, b: 'master', value: areaRatio, limit: SILHOUETTE_AREA_TOL })
+    failures.push({ gate: 'silhouette', a: label, b: 'master', value: areaRatio, limit: silhouetteBound(areaRatio) })
+  const head = headRegionDiff(master, cell)
+  if (head > HEAD_DIFF_MAX)
+    failures.push({ gate: 'head', a: label, b: 'master', value: head, limit: HEAD_DIFF_MAX })
   return failures
 }
 

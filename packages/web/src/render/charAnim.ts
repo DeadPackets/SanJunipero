@@ -1,9 +1,10 @@
 import type { AgentBody } from '@sj/engine/state'
 import { TICK_REAL_MS, type SimEvent } from '@sj/shared'
-import { facingFrom, type Facing } from './iso.js'
+import { FACINGS, facingFrom, type Facing } from './iso.js'
 
-// Character standard v2 sheet layout (forge style bible) — the atlas is the runtime truth
-export const SHEET_COLS: Facing[] = ['sw', 'se', 'ne', 'nw']
+// Character standard v2 sheet layout (forge style bible) — the atlas is the runtime truth.
+// The column order IS the facing roster; `iso.FACINGS` is the one copy of it (see iso.ts).
+export const SHEET_COLS: readonly Facing[] = FACINGS
 export const SHEET_ROWS = ['idle', 'contact-a', 'passing-a', 'contact-b', 'passing-b', 'sleep'] as const
 export const CELL = 96
 export const FEET_Y = 88
@@ -79,7 +80,31 @@ export function gaitOf(agentId: string): Gait {
   return { phase, stride }
 }
 
-export type CharPose = { row: (typeof SHEET_ROWS)[number]; facing: Facing; bobY: number }
+export type SheetRow = (typeof SHEET_ROWS)[number]
+export type CharPose = { row: SheetRow; facing: Facing; bobY: number }
+
+/**
+ * ★ WHAT A BODY DRAWS WHEN THE CELL IT WANTS IS NOT IN THE SHEET, in the order it tries.
+ *
+ * The landed renderer answered this by DOING NOTHING: on a missing cell it left
+ * `sprite.texture` at whatever was in it, which is the previous frame — of whatever facing the
+ * body was pointing LAST. So a missing cell drew a body walking one way with the art for
+ * another, silently, and the first frame of a body's life drew nothing at all.
+ *
+ * The ladder is the LAST GOOD FRAME OF THE SAME FACING and never leaves it: the walk loop
+ * backwards from the frame before this one, then that facing's idle. Borrowing across facings
+ * is the one thing it must not do — that is exactly "facing the wrong direction", and a body
+ * frozen on one good frame of the right facing reads as a hitch, which is honest.
+ */
+export function cellRowLadder(row: SheetRow): readonly SheetRow[] {
+  const i = (WALK_LOOP as readonly string[]).indexOf(row)
+  // the walk loop backwards from the frame before this one — the last frame that was drawn
+  const back: SheetRow[] = i < 0 ? [...WALK_LOOP]
+    : WALK_LOOP.map((_, k) => WALK_LOOP[(i - 1 - k + 2 * WALK_LOOP.length) % WALK_LOOP.length]!)
+  // a lying body is the worst stand-in for a standing one, so `sleep` is always last
+  const order: SheetRow[] = row === 'sleep' ? [row, 'idle', ...back] : [row, ...back, 'idle', 'sleep']
+  return [...new Set(order)]
+}
 
 export type PoseOpts = {
   /** this body's own offset into the walk loop, from `gaitOf` — 0 is the shared clock */
@@ -136,14 +161,36 @@ export const STRIDE_TILES = 1.8
 /** Outside this band the legs stop matching the ground, and that is deliberate: a body
  *  crossing a tile in 2.5 s would otherwise cycle its legs once every 4.5 s, which reads as a
  *  freeze rather than an amble. Inside it the feet are planted; outside it they slide, slowly
- *  at the top and quickly at the bottom, which is the least bad thing available. */
+ *  at the top and quickly at the bottom, which is the least bad thing available.
+ *
+ *  The band bounds the world's NOMINAL cadence, not a body's own. See `strideFrameMs`. */
 export const WALK_FRAME_MIN_MS = 90
 export const WALK_FRAME_MAX_MS = 360
 
-/** The frame time whose four-frame loop carries `STRIDE_TILES` tiles at this speed. */
+/**
+ * The frame time whose four-frame loop carries `STRIDE_TILES` tiles at this speed.
+ *
+ * ★ THE STRIDE SCALES THE CLAMPED CADENCE, NOT THE IDEAL — AND THAT IS THE WHOLE OF B2 IN THE
+ * SHIPPED PRODUCT. This used to clamp `msPerTile x STRIDE_TILES x stride / 4`, with the stride
+ * INSIDE the clamp. At the world's real rate the clamp binds: 2500 ms a tile asks for 1125 ms a
+ * frame, and every stride in the +-12 % band asks for 990 to 1260 — all of them above
+ * `WALK_FRAME_MAX_MS`, so all five founders came out at exactly 360 ms. MEASURED: 5 of 5
+ * distinct at the dev world's 400 ms a tile, 1 of 5 from about 800 ms a tile upward, including
+ * every rate this product has ever been watched at.
+ *
+ * So half of "they all walk at the EXACT same jumpy pace" was still true where the user was
+ * looking, and the landed guard could not see it: it asserted two founders differ at 400 ms,
+ * which is the DEV rate. A check that passes at a rate the product does not run at is the
+ * vacuous-guard family's newest member.
+ *
+ * Scaling after the clamp costs nothing physically — past the clamp the feet are already
+ * sliding, which is what the band says — and the reachable output widens by exactly the gait
+ * spread, to `[WALK_FRAME_MIN_MS x (1 - s), WALK_FRAME_MAX_MS x (1 + s)]`. Inside the band, where
+ * the clamp does not bind, the arithmetic is unchanged and so is every landed number.
+ */
 export function strideFrameMs(msPerTile: number, strideScale = 1): number {
-  const ideal = (msPerTile * STRIDE_TILES * strideScale) / WALK_LOOP.length
-  return Math.min(WALK_FRAME_MAX_MS, Math.max(WALK_FRAME_MIN_MS, ideal))
+  const ideal = (msPerTile * STRIDE_TILES) / WALK_LOOP.length
+  return Math.min(WALK_FRAME_MAX_MS, Math.max(WALK_FRAME_MIN_MS, ideal)) * strideScale
 }
 
 // ── ★ THE WORLD'S CLOCK, AS THE RENDERER SEES IT ──────────────────────────────────────────

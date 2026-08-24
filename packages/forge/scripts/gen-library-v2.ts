@@ -39,6 +39,7 @@ import { ICON_PX, WORLD_SPRITE_PX } from '../src/assetResolution.js'
 import { LIBRARY_BATCHES, planBatch } from '../src/library/plan.js'
 import { integralSpriteCell } from '../src/library/integralCell.js'
 import { candidateRank } from '../src/library/postItem.js'
+import { refusalMessage } from '../src/gate.js'
 import { ITEMS_CONTENT_DIR } from '../src/library/committed.js'
 import type { LibraryEntry } from '../src/library/catalog.js'
 
@@ -114,6 +115,9 @@ type Row = {
 }
 const rows: Row[] = []
 const lines: string[] = []
+// Kinds this run refused to ship. Collected, not thrown on the spot: the unit of work is ONE
+// ITEM, and the report of every attempt is worth more than an early exit.
+const refusedKinds: string[] = []
 
 for (const item of items) {
   const e: LibraryEntry = item.entry
@@ -180,16 +184,31 @@ for (const item of items) {
     }
   }
 
-  // Clean pixel bar first, then the judge's verdict, then the cleanest silhouette.
-  const rank = (c: Cand): number =>
-    c.fails.length * 100 + (c.verdict?.overall === 'pass' ? 0 : 10) + candidateRank(c)
-  const win = cands.slice().sort((a, b) => rank(a) - rank(b))[0]
+  // ★ THE RANK ORDERED FAILURES INSTEAD OF EXCLUDING THEM (user ruling; the shape and the
+  // reason are in src/gate.ts). A failed pixel bar used to cost 100 rank points and a judge
+  // rejection 10 — both a penalty, neither a disqualification — so the least-bad candidate of
+  // a bad batch went into `content/items` and into the codex as `ready`. Both verdicts are
+  // binding now; the rank still chooses among what is left.
+  //
+  // ★ INCLUDING THE JUDGE'S. It is the only gate in the package that can tell a pail from a
+  // market stall, it is paid for on every candidate, and it could never refuse one.
+  //
+  // A NULL verdict is "not judged", not "failed": under LIB_DRY=1 the judge is never called,
+  // and a cached raw would otherwise refuse itself.
+  const judgeFails = (c: Cand): string[] => (c.verdict !== null && c.verdict.overall !== 'pass'
+    ? [`judge: ${c.verdict.overall} — ${c.verdict.feedback}`] : [])
+  const clean = cands.filter((c) => c.fails.length === 0 && judgeFails(c).length === 0)
+  const rank = (c: Cand): number => candidateRank(c)
+  const win = clean.slice().sort((a, b) => rank(a) - rank(b))[0]
   if (!win) {
-    lines.push(`${e.kind}: NO CANDIDATE`); console.log('  NO CANDIDATE')
+    const why = refusalMessage(e.kind, cands.map((c) => ({ key: c.key, failures: [...c.fails, ...judgeFails(c)] })))
+      || `${e.kind}: NO CANDIDATE`
+    lines.push(why); console.log(`  ${why}`); refusedKinds.push(e.kind)
     rows.push({
       kind: e.kind, category: e.category, status: 'no-candidate', attempts: MAX_ATTEMPTS,
       factor: 0, islands: 0, opaqueFrac: 0, spend: ledger.totalFor(assetId) - spentBefore,
-      chosen: '', score: null, note: 'every attempt failed',
+      chosen: '', score: null,
+      note: cands.length === 0 ? 'every attempt failed' : 'every candidate failed a gate',
     })
     continue
   }
@@ -208,7 +227,7 @@ for (const item of items) {
     factor: win.factor, islands: win.islands, opaqueFrac: win.opaqueFrac,
     spend: ledger.totalFor(assetId) - spentBefore, chosen: win.key,
     score: win.verdict ? meanScore(win.verdict) : null,
-    note: win.fails.join('; ') || (win.verdict?.overall === 'pass' ? '' : win.verdict?.feedback ?? ''),
+    note: '',
   })
 }
 
@@ -225,3 +244,11 @@ mkdirSync(`${S}/reports`, { recursive: true })
 writeFileSync(`${S}/reports/library-${batches.join('-')}.md`, md)
 console.log(`\n${md.split('\n## every attempt')[0]}`)
 console.log(`\nwrote ${S}/reports/library-${batches.join('-')}.md`)
+
+// ★ THE REFUSALS ARE BINDING, AFTER THE REPORT IS ON DISK — the report is what tells an
+// operator whether the model or the threshold is wrong, and the items that DID pass are
+// already committed. Nothing was written for a refused kind.
+if (refusedKinds.length > 0) throw new Error(
+  `${refusedKinds.length} item(s) shipped nothing: ${refusedKinds.join(', ')}.\n  Raise `
+  + `LIB_ATTEMPTS to draw more, LIB_REJECTED to refuse a candidate by eye, or change a `
+  + `threshold on purpose.`)

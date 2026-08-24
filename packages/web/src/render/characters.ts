@@ -14,9 +14,9 @@ import { faceFor, worldTextScale } from './textFaces.js'
 import { CROWD_SETTLE_MS, NO_OFFSET, crowdOffsets, type CrowdOffset } from './crowd.js'
 import {
   CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, NAME_TAG_ABOVE_HEAD_PX,
-  SHEET_COLS, SHEET_ROWS, WALK_LEAD_TICKS, charPose, emoteFor, gaitOf, initialTickClock,
-  interpolatePos, legFacing, nameTagText, observeTick, prunePath, scheduleLeg, strideFrameMs,
-  ticksPerTileOf, type Gait, type TickClock, type Waypoint,
+  SHEET_COLS, SHEET_ROWS, WALK_LEAD_TICKS, cellRowLadder, charPose, emoteFor, gaitOf,
+  initialTickClock, interpolatePos, legFacing, nameTagText, observeTick, prunePath, scheduleLeg,
+  strideFrameMs, ticksPerTileOf, type Gait, type TickClock, type Waypoint,
 } from './charAnim.js'
 
 export const EMOTE_MS = 2000
@@ -113,25 +113,38 @@ export function rendersOnMap(a: { alive: boolean; insideId?: string }): boolean 
   return a.alive && a.insideId === undefined
 }
 
-export type CharacterCell = { texture: Texture; anchor: { x: number; y: number }; scale: number }
+export type CharacterCell = {
+  texture: Texture; anchor: { x: number; y: number }; scale: number
+  /** the sheet's own figure height, so a caller sizing anything off the art has one source */
+  figureH: number
+}
 
 // One posed cell out of a loaded sheet, feet-anchored and scaled to the world footprint.
-// The map layer below inlines this; the interior sub-scene borrows it rather than growing a
-// second slicer that could disagree about where a body's feet are.
+// The map layer and the interior sub-scene both go through this rather than growing a second
+// slicer that could disagree about where a body's feet are — or about which way it is pointing.
 export function characterCell(
   sheet: Texture, art: CharArt, row: (typeof SHEET_ROWS)[number], facing: Facing,
 ): CharacterCell | null {
   if (art.manifest === null) {
-    return { texture: sliceV2(sheet, row, facing), anchor: { x: 0.5, y: FEET_Y / CELL }, scale: CHAR_TARGET_PX / 64 }
+    return {
+      texture: sliceV2(sheet, row, facing), anchor: { x: 0.5, y: FEET_Y / CELL },
+      scale: CHAR_TARGET_PX / 64, figureH: 64,
+    }
   }
-  const cell = art.manifest.cells[`${row}-${facing}`]
-  const texture = sliceV4(sheet, art, row, facing)
-  if (cell === undefined || texture === null) return null
-  return {
-    texture,
-    anchor: { x: cell.feetX / cell.w, y: cell.feetY / cell.h },
-    scale: CHAR_TARGET_PX / art.manifest.figureH,
+  // ★ A MISSING CELL DEGRADES INSIDE ITS OWN FACING (charAnim.cellRowLadder) — never across
+  // one, and never by leaving the last texture where it was.
+  for (const r of cellRowLadder(row)) {
+    const cell = art.manifest.cells[`${r}-${facing}`]
+    const texture = sliceV4(sheet, art, r, facing)
+    if (cell === undefined || texture === null) continue
+    return {
+      texture,
+      anchor: { x: cell.feetX / cell.w, y: cell.feetY / cell.h },
+      scale: CHAR_TARGET_PX / art.manifest.figureH,
+      figureH: art.manifest.figureH,
+    }
   }
+  return null
 }
 
 export function createCharacterLayer(
@@ -275,7 +288,7 @@ export function createCharacterLayer(
       const last = e.path[e.path.length - 1]!
       const dx = p.x - last.x
       const dy = p.y - last.y
-      if (dx !== 0 || dy !== 0) e.facing = facingFrom(dx, dy)
+      e.facing = facingFrom(dx, dy) ?? e.facing // a body that has not moved keeps its facing
       // ★ THE LEG'S LENGTH COMES FROM THE RECORD, NOT FROM A STOPWATCH ON THE SOCKET.
       // `ticksPerTileOf` is the engine's own rule: a body whose needs have fallen under the
       // debuff threshold takes twice as many ticks per tile, and always has.
@@ -334,7 +347,6 @@ export function createCharacterLayer(
       // idle orientation after arrival
       if (walking) e.facing = legFacing(e.path) ?? e.facing
       const sheet = sheets.get(a.id)
-      const hires = sheet !== undefined && sheet.texture !== null && sheet.art.manifest !== null
       // ★ THE LEGS FOLLOW THE GROUND AND THE PERSON. `legMs` is what the record says this leg
       // costs; `gait.stride` is how long this body's own step is; `gait.phase` is where in the
       // loop it happens to be. All three are derived — none of them is a clock nobody set.
@@ -344,20 +356,12 @@ export function createCharacterLayer(
         { phase: e.gait.phase, bob: scene.wantsMotion() },
       )
       if (sheet !== undefined && sheet.texture !== null) {
-        if (hires) {
-          const cell = sheet.art.manifest!.cells[`${pose.row}-${pose.facing}`]
-          const t = sliceV4(sheet.texture, sheet.art, pose.row, pose.facing)
-          if (t !== null && cell !== undefined) {
-            e.sprite.texture = t
-            e.sprite.anchor.set(cell.feetX / cell.w, cell.feetY / cell.h) // feet-anchor law
-            e.sprite.scale.set(CHAR_TARGET_PX / sheet.art.manifest!.figureH) // smooth downscale to world footprint
-            setHitScale(e, CHAR_TARGET_PX / sheet.art.manifest!.figureH, sheet.art.manifest!.figureH)
-          }
-        } else {
-          e.sprite.texture = sliceV2(sheet.texture, pose.row, pose.facing)
-          e.sprite.anchor.set(0.5, FEET_Y / CELL)
-          e.sprite.scale.set(CHAR_TARGET_PX / 64)
-          setHitScale(e, CHAR_TARGET_PX / 64, 64)
+        const cell = characterCell(sheet.texture, sheet.art, pose.row, pose.facing)
+        if (cell !== null) {
+          e.sprite.texture = cell.texture
+          e.sprite.anchor.set(cell.anchor.x, cell.anchor.y) // feet-anchor law
+          e.sprite.scale.set(cell.scale) // smooth downscale to world footprint
+          setHitScale(e, cell.scale, cell.figureH)
         }
       }
       standing.push({ id: a.id, x: pos.x, y: pos.y, settled: !walking })

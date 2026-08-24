@@ -42,6 +42,7 @@ import {
   spriteDensity,
 } from '../src/pixelGates.js'
 import { TOWN_TILE } from '../src/assetResolution.js'
+import { refusalMessage } from '../src/gate.js'
 import { BUILDINGS_CONTENT_DIR, facingKind, type StructureFacing } from '../src/buildingArt.js'
 import { ONE_CELL_KINDS, TWO_FACING_KINDS } from '../src/structureArt.js'
 
@@ -297,6 +298,9 @@ writeFileSync(`${S}/palette-swatch.png`, swatch)
 const rows: string[] = []
 const members: { name: string; density: number }[] = []
 const lines: string[] = []
+// ★ Cells this run refused to ship. Collected rather than thrown on the spot, because the unit
+// of work here is ONE CELL and the report of every attempt is worth more than an early exit.
+const refusedCells: string[] = []
 
 for (const s of SUBJECTS) {
   if (ONLY.length && !ONLY.includes(s.id)) continue
@@ -341,11 +345,20 @@ for (const s of SUBJECTS) {
       }
     }
 
-    // among clean candidates, the one whose source correction is smallest — least thrown away
+    // ★ AMONG THE CLEAN ONES ONLY (user ruling; the shape and the reason are in src/gate.ts).
+    // This line used to read `(clean.length ? clean : cands)` — the most explicit statement of
+    // the policy anywhere in the package: when nothing was clean it fell back to the DIRTY set
+    // and committed the least-corrected failure. Choosing is not deciding. The ranker still
+    // picks the candidate whose source correction is smallest; it now picks from a pool that
+    // cannot contain a failure.
     const clean = cands.filter((c) => c.fails.length === 0)
-    const win = (clean.length ? clean : cands)
+    const win = clean
       .sort((a, b) => Math.abs(1 - b.plan.sourceScale) - Math.abs(1 - a.plan.sourceScale)).at(-1)
-    if (!win) { lines.push(`${label}: NO CANDIDATE`); console.log(`  NO CANDIDATE`); continue }
+    if (!win) {
+      const why = refusalMessage(label, cands.map((c) => ({ key: c.key, failures: c.fails })))
+        || `${label}: NO CANDIDATE — every attempt failed to process`
+      lines.push(why); console.log(`  ${why}`); refusedCells.push(label); continue
+    }
 
     // contact sheet of every candidate, beside the raws, so the eye can compare before signing
     for (const c of cands) writeFileSync(`${S}/cells/${c.key}.png`, await encodePng(c.cell))
@@ -362,7 +375,7 @@ for (const s of SUBJECTS) {
     members.push({ name: label, density })
     rows.push(`| ${label} | ${s.fp.w}x${s.fp.h} | ${cellPx} | ${GEN_PX}/${win.plan.factor} `
       + `(window ${win.plan.window}${win.plan.sourceScale === 1 ? '' : `, source x${win.plan.sourceScale.toFixed(3)}`}) `
-      + `| ${density} | ${win.fails.length === 0 ? 'clean' : win.fails.join('; ')} | ${win.key} |`)
+      + `| ${density} | clean | ${win.key} |`)
   }
 }
 
@@ -377,3 +390,16 @@ const md = ['# the eight bare kinds, in ten cells', '',
 mkdirSync(`${S}/reports`, { recursive: true })
 writeFileSync(`${S}/reports/structures-v5.md`, md)
 console.log(`\n${md}`)
+
+// ★ THE VERDICTS ARE BINDING, AFTER THE REPORT IS ON DISK. The report is what tells an
+// operator whether the model or the threshold is wrong, so it is written first and then the
+// run fails. `classDensityGate` only ever went into that markdown; it is a class property, so
+// it can only be judged over what this run produced — the whole committed class is judged by
+// `artCoverage.test.ts`.
+const stopped = [
+  ...(refusedCells.length === 0 ? [] : [`${refusedCells.length} cell(s) shipped nothing: ${refusedCells.join(', ')}`]),
+  ...cls.failures,
+]
+if (stopped.length > 0) throw new Error(`${stopped.join('\n  ')}\n  Raise STRUCT_ATTEMPTS to draw `
+  + `more, STRUCT_REJECTED to refuse a candidate by eye, or change a threshold on purpose. `
+  + `Nothing was committed for a refused cell.`)

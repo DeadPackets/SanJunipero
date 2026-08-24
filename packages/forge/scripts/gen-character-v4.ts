@@ -24,6 +24,7 @@ import {
   type AuthoredFacing, type StripPoseV4,
 } from '../src/mirror.js'
 import { processHiResCell, normalizeFigureHeight, cellAnchor, buildManifestV4 } from '../src/hires.js'
+import { refusalMessage } from '../src/gate.js'
 import { CHAR_DESC_V4, FEATURE_CAP_V4, BIG_PIXEL } from './character.js'
 
 const KEY = process.env.OPENROUTER_API_KEY
@@ -219,6 +220,24 @@ function bestOf(cands: FrameCand[]): FrameCand | null {
   }, null)
 }
 
+// ── ★ SUPERSEDED BY gen-cast-v5.ts, AND STILL UNDER THE SAME RULING ────────────────────────
+//
+// `bestOf` above is the identical policy that put TACTICAL GEAR into `content/cast`: a gate
+// measures a candidate and the caller ships the least-bad FAILURE. This script is the previous
+// standard, its output directory has been wiped, and the style bible still names it — so it
+// stays reachable by anyone who types the wrong filename, and it obeys the ruling too. The
+// shape and the reason are in `src/gate.ts`; this renders a `GateFailure` with its margin,
+// because the margin is what tells an operator a threshold from a bad drawing.
+const said = (x: GateFailure): string =>
+  `${x.gate}: ${x.a} vs ${x.b} — ${x.value.toFixed(4)} against ${x.limit.toFixed(4)} `
+  + `(off by ${Math.abs(x.value - x.limit).toFixed(4)})`
+
+function refuseFailing(what: string, cands: readonly { key: string; failures: GateFailure[] }[]): void {
+  const msg = refusalMessage(what, cands.map((c) => ({ key: c.key, failures: c.failures.map(said) })))
+  if (msg === '') return
+  throw new Error(`${msg}\n  Nothing is written. Use gen-cast-v5.ts.`)
+}
+
 const chosen: Record<AuthoredFacing, Record<WalkPose, FrameCand>> = { se: {}, ne: {} } as never
 for (const f of AUTHORED_FACINGS) {
   console.log(`walk frames ${f}`)
@@ -231,6 +250,7 @@ for (const f of AUTHORED_FACINGS) {
     }
     const best = bestOf(frameCands[f][p])
     if (!best) throw new Error(`${f}/${p}: every candidate failed processing`)
+    refuseFailing(`${f}/${p}`, frameCands[f][p].map(c => ({ key: c.key, failures: c.failures })))
     chosen[f][p] = best
   }
   // in-strip stride across the assembled trio (+ master idle for the record)
@@ -263,7 +283,12 @@ for (const f of AUTHORED_FACINGS) {
     }
   }
   for (const x of stride) reportLines.push(`${f} stride: ${x.gate} ${x.a}~${x.b} value=${x.value.toFixed(3)} limit=${x.limit.toFixed(3)}`)
-  reportLines.push(`${f} trio: ${WALK_POSES.map(p => chosen[f][p].key).join(', ')} stride=${stride.length === 0 ? 'PASS' : 'FLAGGED'}`)
+  reportLines.push(`${f} trio: ${WALK_POSES.map(p => chosen[f][p].key).join(', ')} stride=${stride.length === 0 ? 'PASS' : 'FAILED'}`)
+  // A property of three frames already chosen — there is no candidate to re-roll, so the
+  // failure is the strip's, loudly. It used to print FLAGGED and go on.
+  refuseFailing(`${f}/stride-trio`, [{
+    key: `${f}: ${WALK_POSES.map(p => chosen[f][p].key).join(', ')}`, failures: stride,
+  }])
 }
 
 // ── sleep: re-key the passed phase-2b raw through the hi-res path, $0 ─────────
@@ -283,6 +308,9 @@ let sleepHi = processHiResCell(keyBg(await decodePng(readFileSync(sleepRawPath))
 const sleepFailures = sleepCoherenceGateV4(masterGate.se, gateView(sleepHi))
 reportLines.push(`sleep-b0 (re-keyed hi-res): gates=${sleepFailures.length === 0 ? 'PASS' : sleepFailures.map(x => x.gate).join(',')}`)
 console.log(reportLines[reportLines.length - 1])
+// The sleep cell is a cached raw, so there is nothing to re-roll and its verdict was printed
+// and then discarded. It is binding: a sleep cell that fails is not shipped either.
+refuseFailing('sleep', [{ key: 'sleep-b0 (cached raw, re-keyed)', failures: sleepFailures }])
 
 // ── derivation (zero spend): 9 authored hi-res cells → the 24-cell contract ───
 const authoredStrips: Record<AuthoredFacing, Record<StripPoseV4, RawImage>> = {
