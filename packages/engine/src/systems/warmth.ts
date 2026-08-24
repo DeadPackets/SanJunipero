@@ -31,16 +31,25 @@ export function insulationOf(state: WorldState, config: SimConfig, agentId: stri
   return (config.warmth.insulation as Record<string, number | undefined>)[kind] ?? 0
 }
 
+// ★ WHERE A BODY IS WHEN IT IS INDOORS, IN ONE DERIVATION (G4). This lane's whole answer is
+// that a room is ONE PLACE — a body inside a building is at that building's fire whichever tile
+// it stands on, and a wall stops the heat as squarely as it stops sound. HOW CLOSE you then
+// have to be is a different question with two honest answers, so `stoke` asks for arm's reach
+// and warmth asks for `heatRadius`; neither gets its own copy of the wall.
+export const inTheRoomWith = (a: { insideId?: string }, s: { id: string }): boolean =>
+  a.insideId === s.id
+export const fireIsOnYourSide = (a: { insideId?: string }, s: { id: string }): boolean =>
+  a.insideId === undefined || a.insideId === s.id
+
 // A fire is warm while somebody keeps feeding it. Measured to the nearest footprint tile, so a
-// long hearth warms whoever stands at its near end — and a body INSIDE a building is at its
-// fire whatever tile it is standing on, because the fire is in the room with it.
+// long hearth warms whoever stands at its near end.
 export function besideAKeptFire(state: WorldState, config: SimConfig, agentId: string): boolean {
   const a = state.agents[agentId]!
   for (const s of Object.values(state.structures)) {
     if (!isHeatSource(config, s.kind) || s.stage !== 'complete') continue
     if ((s.fueledUntilTick ?? 0) <= state.tick) continue
-    if (a.insideId === s.id) return true
-    if (a.insideId !== undefined) continue // a wall stops the heat as squarely as it stops sound
+    if (!fireIsOnYourSide(a, s)) continue
+    if (inTheRoomWith(a, s)) return true
     const nx = Math.min(Math.max(a.x, s.x), s.x + s.w - 1)
     const ny = Math.min(Math.max(a.y, s.y), s.y + s.h - 1)
     if (Math.max(Math.abs(a.x - nx), Math.abs(a.y - ny)) <= config.warmth.heatRadius) return true

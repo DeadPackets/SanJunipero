@@ -54,6 +54,9 @@ function houseAndBody(tick = WINTER_NIGHT, weatherC = -10): WorldState {
 const holding = (s: WorldState, id: string, kind: string, qty = 1): WorldState =>
   fold(s, ev('item_spawned', { id, kind, qty, loc: { t: 'agent', id: 'a1' } }, s.tick), CFG)
 
+// A body that has gone in stands at its own doorway, which is where `enter` leaves it — the
+// room's reach is proved where it is load-bearing, in `lighting.test.ts`, on a body that has
+// walked away from the door.
 const indoors = (s: WorldState): WorldState =>
   fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'house_1' }, s.tick), CFG)
 

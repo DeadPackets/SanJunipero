@@ -14,7 +14,7 @@ import { bridgeAt, BRIDGE_KIND, findPath, isPassable, searchPath } from './path.
 import { claimInWorld, layBlock, townSquareOf, type TileChange } from './town.js'
 import { isSpoiling, spoilageFor } from './systems/spoilage.js'
 import { fleeTo } from './systems/fauna.js'
-import { isHeatSource } from './systems/warmth.js'
+import { fireIsOnYourSide, inTheRoomWith, isHeatSource } from './systems/warmth.js'
 import { FAUNA_YIELD, type FaunaKind } from './data/faunaDefs.js'
 import { FORAGEABLE_YIELD } from './data/forageables.js'
 
@@ -561,15 +561,12 @@ const snuff: VerbDef = makeVerb({
 
 export const FUEL_KIND = 'wood'
 
-// ★ WHERE A BODY IS WHEN IT IS INDOORS, IN ONE LINE. A body inside a building is AT the fire in
-// that building, whichever tile it stands on — a room is one place, and this world's unit of
-// reach is a whole footprint. A body inside somewhere ELSE is at no fire at all: a wall stops
-// the heat exactly as `stow`'s wall stops a pair of hands. Outdoors it is the reach every other
-// verb uses, unchanged.
+// Arm's reach of a fire: the room you are standing in, or a footprint you are beside. The wall
+// half is `warmth`'s one derivation of it; only the distance is this verb's own (G4).
 function atTheFire(state: WorldState, agentId: string, s: Structure): boolean {
   const a = state.agents[agentId]!
-  if (a.insideId !== undefined) return a.insideId === s.id
-  return nearRect(state, agentId, s.x, s.y, s.w, s.h)
+  if (!fireIsOnYourSide(a, s)) return false
+  return inTheRoomWith(a, s) || nearRect(state, agentId, s.x, s.y, s.w, s.h)
 }
 
 const stoke: VerbDef = makeVerb({
