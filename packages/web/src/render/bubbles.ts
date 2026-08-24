@@ -234,7 +234,14 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       // that does not know about the bubble beside it is the pile the user saw.
       const want = bubbles.map((b, i) => {
         const a = state!.agents[b.agentId]!
-        const { sx, sy } = tileToScreen(a.x, a.y)
+        // ★ OVER THE BODY, NOT OVER THE RECORD'S TILE. `anchorOf` is where the character layer
+        // actually DREW this person a moment ago — its interpolated step, and its place in the
+        // rank when it is one of several sharing a tile. Reading `a.x, a.y` put every bubble of
+        // a crowd on one point and pointed every tail at a person who was not there; it also
+        // left a walker's bubble sitting on the tile behind them for the length of a leg. The
+        // character layer ticks before this one, so the anchor is this frame's.
+        const at = scene.anchorOf?.(b.agentId) ?? null
+        const { sx, sy } = at === null ? tileToScreen(a.x, a.y) : { sx: at.x, sy: at.y }
         const drift = b.isThought ? (THOUGHT_DRIFT_PX * (nowMs - b.bornMs)) / (b.dieMs - b.bornMs) : 0
         return {
           id: String(i), sx, sy: sy - CHAR_TARGET_PX - 18 - drift,

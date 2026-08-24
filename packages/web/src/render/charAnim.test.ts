@@ -591,11 +591,33 @@ describe('★ prefers-reduced-motion: the person still walks, the flourish goes'
   })
 
   it('★ interpolation is NOT a flourish and survives — the person is still going somewhere', () => {
-    // reduced motion touches the bob only; nothing in the schedule reads it
+    // ★ THIS USED TO COUNT THE CALL SITES AND REQUIRE EXACTLY ONE. That number was never the
+    // property; it was a proxy for it, and it went red the first time a SECOND legitimate
+    // flourish appeared — the rank's settle glide, which honours reduced motion exactly as it
+    // should. A count cannot tell a new flourish from a leak into the walk schedule. So every
+    // occurrence must now BE one of the flourishes named here, and the walk keeps its own row:
+    // an unnamed caller fails whether it is the eleventh or the second.
+    const FLOURISHES: ReadonlyArray<{ what: string; line: RegExp }> = [
+      { what: 'the 1px passing hop', line: /^\{ phase: e\.gait\.phase, bob: scene\.wantsMotion\(\) \},$/ },
+      { what: "a crowd re-forming into its rank", line: /^const t = scene\.wantsMotion\(\)$/ },
+    ]
     const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'characters.ts'), 'utf8')
-    const wm = src.split('wantsMotion()')
-    expect(wm.length - 1, 'reduced motion is asked exactly once, for the bob').toBe(1)
-    expect(src).toMatch(/bob: scene\.wantsMotion\(\)/)
+    const sites = src.split('\n')
+      .map((l, i) => ({ n: i + 1, t: l.trim() }))
+      .filter((l) => l.t.includes('wantsMotion()'))
+
+    const undeclared = sites.filter((s) => !FLOURISHES.some((f) => f.line.test(s.t)))
+    expect(undeclared.map((s) => `characters.ts:${s.n} — ${s.t}`)).toEqual([])
+    // and every declared flourish is really there, so the list cannot rot into a permit
+    for (const f of FLOURISHES) {
+      expect(sites.some((s) => f.line.test(s.t)), `no call site for ${f.what}`).toBe(true)
+    }
+    // the schedule is not one of them: nothing that decides WHERE a body is asks the flag
+    for (const call of ['scheduleLeg(', 'interpolatePos(', 'prunePath(', 'ticksPerTileOf(']) {
+      for (const l of src.split('\n')) {
+        if (l.includes(call)) expect(l).not.toContain('wantsMotion')
+      }
+    }
   })
 
   it('the canvas asks ONE owner, so no surface can be forgotten', () => {
