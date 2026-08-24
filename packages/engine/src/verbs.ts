@@ -1887,11 +1887,12 @@ function siteOfBuild(state: WorldState, agentId: string): Structure | null {
 }
 
 /** ★ HOW MANY PAIRS OF HANDS ARE ON THESE WALLS THIS TICK — the number the world could count
- *  and could not spend. Live bodies only: the dead and the collapsed have stopped working. */
+ *  and could not spend. An ACTIVITY is asked for, not a body: dying and collapsing both null
+ *  the activity, so the dead and the fallen are already not counted and a liveness test here
+ *  would be a condition nothing can satisfy. */
 export function handsOnSite(state: WorldState, siteId: string): number {
   let n = 0
   for (const id of Object.keys(state.agents)) {
-    if (!state.agents[id]!.alive) continue
     if (siteOfBuild(state, id)?.id === siteId) n++
   }
   return n

@@ -9,7 +9,7 @@ import { makeGenesisWorld, GENESIS_FORD } from './genesis/world.js'
 import { submitIntent } from './intent.js'
 import { makeFixtureMap } from './scripted.js'
 import {
-  buildIsPlotted, buildSiteOf, isAdjacentToRect, isPlottedKind, stepBuild, workPenalty,
+  buildIsPlotted, buildSiteOf, handsOnSite, isAdjacentToRect, isPlottedKind, stepBuild, workPenalty,
 } from './verbs.js'
 import { claimInWorld, layBlock, standingRects, townGroundBox, townSquareOf } from './town.js'
 import { builtBox, owedBox } from './systems/mapGrowth.js'
@@ -559,6 +559,46 @@ describe('★ help must help — what a second pair of hands buys the calendar',
       // hand whose clock runs out finishes the walls before the rest have worked that tick.
       expect(pt, `${hands} hands`).toBeGreaterThan(HOUSE_TICKS - hands)
     }
+  })
+
+  /** Put a crew on the town's NEXT free plot and start every one of them building. */
+  function alsoRaising(s0: WorldState, n: number, prefix: string): { s: WorldState; ids: string[] } {
+    let s = s0
+    const claim = claimInWorld(s, { along: 2, deep: 2 })!
+    const spots = [claim.door, ...ringOf(claim)]
+    const ids: string[] = []
+    for (let i = 0; i < n; i++) {
+      const id = `${prefix}${i}`
+      ids.push(id)
+      s = foldWith(s, [
+        { type: 'agent_spawned', payload: { id, name: id, x: spots[i]!.x, y: spots[i]!.y, ageDays: 10000 } },
+        { type: 'item_spawned', payload: { id: `wood_${id}`, kind: 'wood', qty: 10, loc: { t: 'agent', id } } },
+      ], s.tick)
+    }
+    for (const id of ids) {
+      const r = submitIntent(s, FAST, id, 'build', { kind: 'house' })
+      expect(r.ok, r.ok ? '' : `${id}: ${r.reason}`).toBe(true)
+      s = foldWith(s, r.ok ? r.events : [], s.tick)
+    }
+    return { s, ids }
+  }
+
+  it('★ the hands are counted per SITE, not per town', () => {
+    // Two crews of two, one street apart. Without this, a rate read off "everybody who is
+    // building" would make four hands of two and finish both houses twice as fast.
+    const two = alsoRaising(crewOf(0).s, 2, 'h')
+    const four = alsoRaising(two.s, 2, 'k')
+    const sites = Object.values(four.s.structures).filter((x) => x.stage === 'construction')
+    expect(sites).toHaveLength(2)
+    for (const site of sites) expect(handsOnSite(four.s, site.id), site.id).toBe(2)
+  })
+
+  it('a body that has died is not a pair of hands', () => {
+    const { s, ids } = alsoRaising(crewOf(0).s, 2, 'h')
+    const site = Object.values(s.structures).find((x) => x.stage === 'construction')!
+    expect(handsOnSite(s, site.id)).toBe(2)
+    const after = foldWith(s, [{ type: 'agent_died', payload: { agentId: ids[1]!, cause: 'hunger' } }], s.tick)
+    expect(handsOnSite(after, site.id)).toBe(1)
   })
 
   // ★ THE SECOND BUG, WHICH WAS THERE BEFORE THE FIRST AND NEEDS ONLY ONE BUILDER.
