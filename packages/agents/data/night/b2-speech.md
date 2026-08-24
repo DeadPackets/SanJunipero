@@ -1,0 +1,8 @@
+- t=1216 {"agentId":"amara","text":"Four bread held. Twelve wood. The day's closed out even.","x":79,"y":63}
+- t=1217 {"agentId":"yusuf","text":"Still light enough to see what's yours, Amara. You resting already?","x":79,"y":70}
+- t=1229 {"agentId":"amara","text":"Not yet. Counting wood. Four bread's still set. You need one?","x":79,"y":63}
+- t=1242 {"agentId":"amara","text":"Fuel first, then rest. The wood's not going to stack itself.","x":79,"y":63}
+- t=1251 {"agentId":"yusuf","text":"Aye. Nothing to gain from watching the dusk. I'll get a frame up before the dark takes it.","x":79,"y":70}
+- t=1257 {"agentId":"amara","text":"Store holds four days. Not resting. Just counting what I carry.","x":79,"y":63}
+- t=1260 {"agentId":"omar","text":"Evening, Salma. Off to find a spot for the night?","x":79,"y":104}
+- t=1279 {"agentId":"amara","text":"Count's steady. We build while the light holds.","x":79,"y":63}

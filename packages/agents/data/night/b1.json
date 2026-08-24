@@ -1,0 +1,107 @@
+{
+  "arm": "b",
+  "label": "b1",
+  "ticks": 300,
+  "startTick": 1200,
+  "llmCalls": 62,
+  "costUsd": 0.027,
+  "intents": 51,
+  "byVerb": {
+    "speak": 31,
+    "walk": 13,
+    "build": 5,
+    "use approach": 1,
+    "experiment": 1
+  },
+  "builds": 5,
+  "structuresPlanned": 2,
+  "structuresCompleted": 0,
+  "structureProgressed": 538,
+  "entered": 0,
+  "spoke": 12,
+  "refusals": 24,
+  "refusalsByReason": [
+    [
+      "already busy with build",
+      14
+    ],
+    [
+      "already at that spot",
+      3
+    ],
+    [
+      "build needs {kind, x, y}",
+      2
+    ],
+    [
+      "already busy with walk",
+      1
+    ],
+    [
+      "unknown verb: use approach",
+      1
+    ],
+    [
+      "You lack the knowledge to attempt this. Perhaps someone in the town knows how.",
+      1
+    ],
+    [
+      "walk needs a destination {x, y}",
+      1
+    ],
+    [
+      "speak needs a {text}",
+      1
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 0,
+    "yusuf": 0,
+    "nadia": 0,
+    "omar": 0,
+    "salma": 0
+  },
+  "buildIntents": [
+    {
+      "tick": 1279,
+      "id": "nadia",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1284,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1369,
+      "id": "amara",
+      "verb": "build",
+      "params": "{}"
+    },
+    {
+      "tick": 1399,
+      "id": "amara",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1472,
+      "id": "omar",
+      "verb": "build",
+      "params": "{}"
+    }
+  ],
+  "thoughtsMentioningCold": 38,
+  "thoughts": 55,
+  "lampsPlanned": 0,
+  "lampsCompleted": 0,
+  "lampBuildIntents": 0,
+  "houseBuildIntents": 3,
+  "stoked": 0,
+  "kindled": 0,
+  "torchCrafts": 0,
+  "lightActs": 0,
+  "thoughtsMentioningDark": 37
+}
