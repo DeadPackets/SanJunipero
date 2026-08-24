@@ -108,10 +108,12 @@ vi.mock('pixi.js', () => {
 })
 
 import { Container as MockContainer, Sprite as MockSprite, Texture as MockTexture } from 'pixi.js'
-import { CELL, SHEET_ROWS } from './charAnim.js'
+import { CELL, CHAR_TARGET_PX, SHEET_ROWS } from './charAnim.js'
 import { createCharacterLayer } from './characters.js'
-import { CROWD_SETTLE_MS } from './crowd.js'
-import { BODY_SPRITE_W } from './depth.js'
+import { ZOOM_STOPS } from './camera.js'
+import { CROWD_PITCH_PX, CROWD_SETTLE_MS } from './crowd.js'
+import { BODY_SPRITE_W, depthOrder, type DepthBox } from './depth.js'
+import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin, polygonBounds } from './hitShapes.js'
 import { tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
@@ -591,5 +593,192 @@ describe('★ four people on one tile, through the real layer', () => {
       .entities!.children.map((c) => c.position.x)
     expect(new Set(at).size).toBe(4)   // arrived on the very first frame
     l2.destroy()
+  })
+})
+
+// ── ★ FIVE ON ONE TILE ARE FIVE TARGETS, THROUGH THE REAL LAYER ───────────────────────────
+//
+// The rank is the picture the user asked for and picking has to match it. The bodies genuinely
+// OVERLAP — a 14 px pitch against 28 px of shoulder is what makes a group read as a group — so
+// "five targets" cannot mean five disjoint capsules. It means what it means in the picture:
+// for each of the five there is somewhere on screen where THAT body is the one in front, and
+// clicking there selects them.
+//
+// The pick below is Pixi's own rule restated: every capsule containing the point, resolved by
+// the FRONT-MOST, where front-most comes from `depthOrder` over the boxes the layer publishes —
+// the same call `layers.applyDepthOrder` makes to set the zIndex Pixi then hit-tests in. The
+// sort cannot disagree with the pixels because it is the sort that made the pixels.
+
+function containsPoly(points: number[], px: number, py: number): boolean {
+  let inside = false
+  const n = points.length / 2
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = points[i * 2]!, yi = points[i * 2 + 1]!
+    const xj = points[j * 2]!, yj = points[j * 2 + 1]!
+    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
+type MockSpriteT = {
+  position: { x: number; y: number }
+  scale: { x: number }
+  hitArea: { points: number[] } | null
+}
+/** The test scene, seen through the one thing this suite needs of it: the published boxes and
+ *  the nodes they belong to. `Scene.sortDepth` returns `void` in the product; the mock returns
+ *  the entries, so the type has to be replaced rather than intersected. */
+type PickScene = Omit<Scene, 'sortDepth' | 'getZoom'> & {
+  sortDepth: () => Array<{ box: DepthBox; node: MockSpriteT }>
+  getZoom: () => number
+}
+
+describe('★ five people on one tile are five separate hit targets', () => {
+  const NAMES = ['amara', 'nadia', 'omar', 'salma', 'yusuf']
+
+  /** A scene whose zoom the test can move, so the 24 px floor is exercised where it is live. */
+  function zoomableScene(zoom: number): PickScene {
+    const s = makeScene() as unknown as PickScene
+    s.getZoom = () => zoom
+    return s
+  }
+
+  /** Pixi's pick, restated: the point is taken into the sprite's LOCAL space — which is what
+   *  divides the sprite scale back out of a hitArea — and the front-most capsule containing it
+   *  wins, where front-most is `depthOrder` over the boxes the layer publishes. */
+  function pickAt(
+    scene: PickScene, sx: number, sy: number,
+  ): string | null {
+    const entries = scene.sortDepth()
+    const order = depthOrder(entries.map((e) => e.box))
+    let best: string | null = null, bestI = -1
+    for (const e of entries) {
+      const pts = e.node.hitArea?.points
+      if (pts === undefined || pts === null) continue
+      const k = e.node.scale.x || 1
+      if (!containsPoly(pts, (sx - e.node.position.x) / k, (sy - e.node.position.y) / k)) continue
+      const i = order.indexOf(e.box.id)
+      if (i > bestI) { bestI = i; best = e.box.id }
+    }
+    return best
+  }
+
+  /** Which screen-x COLUMNS each body owns — the columns where it is the one in front
+   *  somewhere. A rank divides the pointer left to right, so this is the division that has to
+   *  survive; the height is free to take the floor because nobody stands above anybody. */
+  function ownedColumns(
+    scene: PickScene,
+  ): Map<string, { n: number; x0: number; x1: number }> {
+    const out = new Map<string, { n: number; x0: number; x1: number }>()
+    const { sx, sy } = tileToScreen(103, 77)
+    for (let dx = -160; dx <= 160; dx++) {
+      const owner = new Set<string>()
+      for (let dy = -140; dy <= 40; dy++) {
+        const id = pickAt(scene, sx + dx, sy + dy)
+        if (id !== null) owner.add(id)
+      }
+      for (const id of owner) {
+        const s = out.get(id)
+        if (s === undefined) out.set(id, { n: 1, x0: dx, x1: dx })
+        else { s.n++; s.x1 = dx }
+      }
+    }
+    return out
+  }
+
+  it('★ THE RED, and it is the whole task: five bodies, five ids, none of them lost', () => {
+    const scene = zoomableScene(1)
+    const agents = Object.fromEntries(NAMES.map((n) => [n, makeAgent(n, 103, 77)]))
+    const layer = createCharacterLayer(scene, makeBook().book, makeStore(agents).store, () => {})
+    layer.tick(1000)
+    layer.tick(2000)
+    const owned = ownedColumns(scene)
+    expect([...owned.keys()].sort()).toEqual([...NAMES].sort())
+    for (const n of NAMES) expect(owned.get(n)!.n, `${n} owns nothing`).toBeGreaterThan(0)
+    layer.destroy()
+  })
+
+  // ★ THE PROPERTY THAT MAKES THIS NON-VACUOUS, AND MY FIRST VERSION DID NOT HAVE IT.
+  //
+  // "each of the five owns at least one pixel" PASSES with the cap deleted — measured, not
+  // guessed: uncapped at the 0.25 stop the five still own (1727, 3248, 140, 12758, 1998) world
+  // px² between them, because inflating five identical shapes about their own centroids leaves
+  // each of them a sliver somewhere. A guard that survives its own mutation is not a guard.
+  //
+  // What the cap actually protects is that A BODY'S TARGET NEVER REACHES OUTSIDE THE BODY.
+  // That is what "accurate hitbox" means, it is the property the floor is in tension with, and
+  // it is what the mutation destroys: uncapped at 0.25 the front body's columns run 137 wide
+  // against 28 px of shoulder, and every one of the extra ones is taken off a neighbour.
+  it('★ no body\'s target reaches outside its own SHOULDERS, at any zoom stop', () => {
+    for (const z of ZOOM_STOPS) {
+      const scene = zoomableScene(z)
+      const agents = Object.fromEntries(NAMES.map((n) => [n, makeAgent(n, 103, 77)]))
+      const layer = createCharacterLayer(scene, makeBook().book, makeStore(agents).store, () => {})
+      layer.tick(1000)
+      layer.tick(2000)
+      const owned = ownedColumns(scene)
+      const at = tileToScreen(103, 77)
+      const drawnX = new Map(scene.sortDepth().map((e) => [e.box.id, e.node.position.x - at.sx]))
+      expect([...owned.keys()].sort(), `zoom ${z}`).toEqual([...NAMES].sort())
+      for (const n of NAMES) {
+        const own = owned.get(n)!
+        const centre = drawnX.get(n)!
+        expect(own.n, `${n} owns nothing at ${z}×`).toBeGreaterThan(0)
+        expect(own.x0, `${n} reaches left of its shoulders at ${z}×`)
+          .toBeGreaterThanOrEqual(centre - SHOULDER_W / 2 - 1)
+        expect(own.x1, `${n} reaches right of its shoulders at ${z}×`)
+          .toBeLessThanOrEqual(centre + SHOULDER_W / 2 + 1)
+      }
+      layer.destroy()
+    }
+  })
+
+  it('★ AND THE ARITHMETIC BEHIND THE CAP: 24 px is seven pitches at the overview stop', () => {
+    // Why the cap exists, said in numbers rather than in a source read. Without it a capsule is
+    // grown to 24 screen px against a 3.5 px pitch — wider, on its own, than the whole rank.
+    const grown = inflateToMin(bodyHitPolygon(64, CHAR_TARGET_PX / 64), HIT_MIN_PX, (CHAR_TARGET_PX / 64) * 0.25)
+    const width = polygonBounds(grown).w * (CHAR_TARGET_PX / 64) * 0.25
+    expect(width).toBeGreaterThanOrEqual(HIT_MIN_PX)
+    expect(width).toBeGreaterThan(CROWD_PITCH_PX * 0.25 * (NAMES.length - 1))
+  })
+
+  it('a LONE body is not capped — it takes the whole floor, because it has the room', () => {
+    const scene = zoomableScene(0.25)
+    const agents = { omar: makeAgent('omar', 103, 77) }
+    const layer = createCharacterLayer(scene, makeBook().book, makeStore(agents).store, () => {})
+    layer.tick(1000)
+    const node = scene.sortDepth()[0]!.node
+    const k = (CHAR_TARGET_PX / 64) * 0.25
+    expect(polygonBounds(node.hitArea!.points).w * k).toBeGreaterThanOrEqual(HIT_MIN_PX - 1e-9)
+    layer.destroy()
+  })
+
+  it('★ and the pick is the FRONT one where they overlap, never the one behind it', () => {
+    const scene = zoomableScene(1)
+    const agents = Object.fromEntries(NAMES.map((n) => [n, makeAgent(n, 103, 77)]))
+    const layer = createCharacterLayer(scene, makeBook().book, makeStore(agents).store, () => {})
+    layer.tick(1000)
+    layer.tick(2000)
+    const entries = scene.sortDepth()
+    const order = depthOrder(entries.map((e) => e.box))
+    const { sx, sy } = tileToScreen(103, 77)
+    let checked = 0
+    for (let dx = -120; dx <= 120; dx++) {
+      for (let dy = -90; dy <= 30; dy++) {
+        const hits = entries.filter((e) =>
+          e.node.hitArea !== null
+          && containsPoly(
+            e.node.hitArea.points,
+            (sx + dx - e.node.position.x) / (e.node.scale.x || 1),
+            (sy + dy - e.node.position.y) / (e.node.scale.x || 1)))
+        if (hits.length < 2) continue
+        checked++
+        const won = pickAt(scene, sx + dx, sy + dy)
+        const last = hits.map((e) => order.indexOf(e.box.id)).reduce((a, b) => Math.max(a, b))
+        expect(won).toBe(order[last])
+      }
+    }
+    expect(checked, 'the capsules never overlapped — this test proved nothing').toBeGreaterThan(500)
+    layer.destroy()
   })
 })

@@ -11,7 +11,7 @@ import { TAG_PAD_X, TAG_PAD_Y, anchorForSprite, placeTag } from './tooltip.js'
 import { characterArt, type TextureBook } from './textures.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
 import { faceFor, worldTextScale } from './textFaces.js'
-import { CROWD_SETTLE_MS, NO_OFFSET, crowdOffsets, type CrowdOffset } from './crowd.js'
+import { CROWD_PITCH_PX, CROWD_SETTLE_MS, NO_OFFSET, crowdOffsets, type CrowdOffset } from './crowd.js'
 import {
   CELL, CHAR_TARGET_PX, EMOTE_KINDS, FEET_Y, NAME_TAG_ABOVE_HEAD_PX,
   SHEET_COLS, SHEET_ROWS, WALK_LEAD_TICKS, charPose, emoteFor, gaitOf, initialTickClock,
@@ -48,6 +48,8 @@ type CharEntry = {
   /** the sheet's own figure height, so the capsule follows the art rather than a second table */
   figureH: number
   hitScale: number
+  /** standing in a rank, so the 24 px floor may not grow this capsule past one pitch */
+  ranked: boolean
   emoteUntil: number
   facing: Facing
   path: Waypoint[]
@@ -183,12 +185,23 @@ export function createCharacterLayer(
   // the sky where the name tag sits and reached far enough sideways to steal a neighbour's
   // door. The capsule is 0.93×, and it is inflated only when the figure would otherwise be
   // under HIT_MIN_PX on screen.
+  //
+  // ★ AND `ranked` IS WHERE THE FLOOR MEETS THE RANK. The floor is a Fitts's-law rule about a
+  // target in open space; a body standing 14 px from a neighbour is not in open space. Grown
+  // to 24 px at the overview stop, the five bodies of a shoulder rank become one 24 px contest
+  // and the viewer can no longer choose which of them they meant. Hitting the WRONG person is
+  // a worse failure than a small target, so the width takes the pitch as its ceiling and the
+  // height keeps the whole floor — bodies in a rank stand beside each other, not on each other.
   let hitZoom = 1
-  const setHitScale = (e: CharEntry, scale: number, figureH: number): void => {
-    if (e.hitScale === scale && e.figureH === figureH) return
+  const setHitScale = (e: CharEntry, scale: number, figureH: number, ranked = e.ranked): void => {
+    if (e.hitScale === scale && e.figureH === figureH && e.ranked === ranked) return
     e.hitScale = scale
     e.figureH = figureH
-    e.hit.points = inflateToMin(bodyHitPolygon(figureH, scale), HIT_MIN_PX, scale * hitZoom)
+    e.ranked = ranked
+    e.hit.points = inflateToMin(
+      bodyHitPolygon(figureH, scale), HIT_MIN_PX, scale * hitZoom,
+      ranked ? CROWD_PITCH_PX * hitZoom : Infinity,
+    )
   }
   // The inflation floor is a SCREEN size, so a zoom change re-cuts every capsule. Cheap: it
   // fires on a camera stop, not on a frame.
@@ -242,6 +255,7 @@ export function createCharacterLayer(
     const now = performance.now()
     e = {
       sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, figureH: 0, hitScale: 0,
+      ranked: false,
       emoteUntil: 0, facing: 'sw', gait: gaitOf(agentId), legMs: clock.periodMs,
       path: [{ x, y, atMs: now }], box: bodyDepthBox(agentId, x, y),
       crowd: NO_OFFSET, crowdFrom: NO_OFFSET, crowdTo: NO_OFFSET, crowdSinceMs: now,
@@ -370,6 +384,9 @@ export function createCharacterLayer(
       // A slot change is a glide, not a jump: a group re-forms as somebody joins it. Reduced
       // motion gets the destination, which is the point of the arrangement.
       const want = ranks.get(a.id) ?? NO_OFFSET
+      // A body that has JOINED a rank may not grow past its neighbour, and one that has left
+      // it takes the whole floor back.
+      setHitScale(e, e.hitScale, e.figureH, ranks.has(a.id))
       if (want.dx !== e.crowdTo.dx || want.dy !== e.crowdTo.dy) {
         e.crowdFrom = e.crowd
         e.crowdTo = want
