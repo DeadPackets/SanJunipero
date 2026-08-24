@@ -14,6 +14,9 @@ export type PerceptionItem = {
   // Absent when the thing is unclaimed — or claimed by the one looking at it.
   ownerName?: string
   crafterMarkName?: string
+  // Present only on the last day a thing can still be eaten. The engine has composed it since
+  // spoilage landed; `reconcile` dropped it, so no mind was ever told its fish was going over.
+  spoiling?: true
   loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
 }
 
@@ -95,6 +98,10 @@ export type PerceptionPacket = {
   ground?: { wellTravelled: true }
   // Present only while the dark is charging this body for the work in its hands.
   fumbling?: true
+  // How the cold stands against this body when the air outside would bite: getting in, or held
+  // off, and by what. Absent whenever the air is warm enough that nothing is deciding anything,
+  // so a packet from a mild afternoon — or from before the cold could be felt — reads as before.
+  cold?: { biting: true } | { keptOffBy: 'walls' | 'coat' | 'fire' }
   // Present only while the legs are on a route that stops short of where they were sent.
   wayUnclear?: true
   // How much light is on the ground underfoot. Absent on a packet from before the dark had
@@ -147,6 +154,14 @@ const AFFLICTION_PROSE: Record<string, string> = {
 }
 
 const AFFLICTION_SEVERE = 3
+
+// The three things that can stand between a body and a cold night, each said as the body has
+// it. They mirror `isExposed`'s own order, so the sentence and the law can never disagree.
+const COLD_KEPT_OFF: Record<'walls' | 'coat' | 'fire', string> = {
+  walls: 'The air out there is cold; in here these walls are holding it off you.',
+  coat: 'The air is cold, and what you have on your back is holding it off you.',
+  fire: 'The air is cold, and the fire at your side is holding it off you.',
+}
 
 const WEATHER_KIND_PROSE: Record<string, string> = {
   sunny: 'The sun is out.',
@@ -241,6 +256,7 @@ function claimPhrase(i: PerceptionItem): string {
   const parts: string[] = []
   if (i.ownerName !== undefined) parts.push(`${i.ownerName}'s`)
   if (i.crafterMarkName !== undefined) parts.push(`marked by ${i.crafterMarkName}`)
+  if (i.spoiling === true) parts.push('it is turning')
   return parts.length === 0 ? '' : ` — ${parts.join(', ')}`
 }
 
@@ -322,6 +338,14 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   else if (energy < 25) lines.push('Your legs tremble — you can barely stand; you must sleep.')
   else if (energy < 30) lines.push('Weariness drags at your limbs.')
   if (warmth < 30) lines.push('You shiver against the cold.')
+  // Said as the body has it, and only ever as a fact: where the cold is, and what stands
+  // between. No remedy is named — a mind that reads one of these under the sky and the other
+  // under a roof has the pair, and the pair is the whole of what there is to learn.
+  if (packet.cold !== undefined) {
+    lines.push('biting' in packet.cold
+      ? 'The cold is getting into you out here.'
+      : COLD_KEPT_OFF[packet.cold.keptOffBy])
+  }
   if (social < 30) lines.push('Loneliness settles over you.')
   if (packet.self.body.hp < 30) lines.push('Your body aches with its hurts.')
   if (packet.self.body.ill) lines.push('A fever grips you; you feel weak.')
