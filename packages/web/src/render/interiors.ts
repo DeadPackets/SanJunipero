@@ -4,7 +4,7 @@ import {
 } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import { OVERLAP_RANK, depthOrder, type DepthBox } from './depth.js'
-import { INTERIOR_BODY_PX, INTERIOR_TILE, interiorToScreen, slotToTile } from './interiorMap.js'
+import { INTERIOR_BODY_PX, INTERIOR_TILE, interiorToScreen, seatInBlock } from './interiorMap.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 
@@ -114,10 +114,14 @@ export const BED_FOOTPRINT = { w: 1, h: 2 } as const
 
 function bedCells(kind: InteriorKind, records: AssetRecord[]): Array<{ x: number; y: number }> {
   const cells: Array<{ x: number; y: number }> = []
-  for (const f of roomPlan(kind, records)) {
+  // The same seating the room map uses, over the same list in the same order — a sleeper's
+  // cell and the bed's own tiles are one answer or a body lies beside its bed.
+  const plan = roomPlan(kind, records)
+  const slots = plan.map((p) => p.slot)
+  for (const [i, f] of plan.entries()) {
     if (f.meta === null ? f.kind !== 'bed' : f.meta.isBed !== true) continue
     const size = f.meta?.slots ?? BED_FOOTPRINT
-    const at = slotToTile(f.slot)
+    const at = seatInBlock(f.slot, slots.filter((_, j) => j !== i))
     for (let dy = 0; dy < size.h; dy++) {
       for (let dx = 0; dx < size.w; dx++) cells.push({ x: at.x + dx, y: at.y + dy })
     }

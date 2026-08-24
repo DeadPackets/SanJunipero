@@ -78,12 +78,19 @@ export function wallCourses(
     const tiles = wall === 'back-right' ? room.w : room.h
     for (let at = 0; at < tiles; at += WALL_STRIP_TILES) out.push({ wall, piece: 'wall-plain', atTiles: at })
   }
-  // The door is on the near end of the long wall, where the exterior door is; the window is on
-  // the far end of it, so the light falls across the room rather than into the corner.
-  const fixtures: WallCourse[] = [
-    { wall: 'back-right', piece: 'wall-window', atTiles: 0 },
-    { wall: 'back-right', piece: 'wall-door', atTiles: Math.max(0, room.w - WALL_STRIP_TILES) },
-  ]
+  // The door is on the near end of the long wall, where the exterior door is.
+  //
+  // ★ AND EVERY OTHER BAY OF THAT WALL IS GLAZED. It used to be one window, at the far end, and
+  // a 12-tile wall is THREE bays: the middle one was 256 px of blank wainscot in the visual
+  // centre of the room, which is a large part of why the room read as emptier than the mock.
+  // A window per bay is a rule and not a coordinate — it holds when the room is longer, and it
+  // is the same class of thing the door already is: a hole in a wall, not a piece of furniture
+  // the world does not know the room owns.
+  const doorAt = Math.max(0, room.w - WALL_STRIP_TILES)
+  const fixtures: WallCourse[] = [{ wall: 'back-right', piece: 'wall-door', atTiles: doorAt }]
+  for (let at = 0; at < room.w; at += WALL_STRIP_TILES) {
+    if (at !== doorAt) fixtures.unshift({ wall: 'back-right', piece: 'wall-window', atTiles: at })
+  }
   for (const f of features) {
     const piece = FURNISHING_WALL_PIECE[f.kind]
     if (piece === undefined) continue

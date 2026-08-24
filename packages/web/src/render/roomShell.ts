@@ -218,6 +218,36 @@ export function thresholdPoly(room: RoomSize = ROOM_TILES): number[] {
   return [c.sx, c.sy - hy, c.sx + hx, c.sy, c.sx, c.sy + hy, c.sx - hx, c.sy]
 }
 
+// ── ★ THE CEILING, SEEN THE ONLY WAY A DIMETRIC CAMERA CAN SEE IT ────────────────────────
+//
+// A room drawn from above has no ceiling on the screen, and the mock the user approved solves
+// that the way a painter does: three joists, drawn as the shadows they cast down the floor.
+// It is the cheapest thing in the picture and it is most of what stops a big floor reading as
+// an empty one. The lane before this one ran out of room before them and said so.
+//
+// The spacing is the WALL BAY, not a number: a joist lands over the joint between two wall
+// strips, which is where a joist actually goes, so the ceiling and the walls are the same
+// building. `WALL_STRIP_TILES` lives in `interiorTileset.ts`, so it is passed in.
+
+/** How far a joist reaches either side of its own centre line, in interior tiles. */
+export const BEAM_HALF_TILES = 0.22
+/** The shadow a joist lays on the floor. Ink, barely — a beam is a darkening, not a stripe. */
+export const BEAM_ALPHA = 0.13
+
+/** One quad per ceiling joist, in room space, running the full depth of the floor. */
+export function ceilingBeams(bayTiles: number, room: RoomSize = ROOM_TILES): number[][] {
+  const out: number[][] = []
+  for (let i = 0; (i + 0.5) * bayTiles < room.w; i++) {
+    const cx = (i + 0.5) * bayTiles
+    const c = [
+      interiorToScreen(cx - BEAM_HALF_TILES, 0), interiorToScreen(cx + BEAM_HALF_TILES, 0),
+      interiorToScreen(cx + BEAM_HALF_TILES, room.h), interiorToScreen(cx - BEAM_HALF_TILES, room.h),
+    ]
+    out.push(c.flatMap((p) => [p.sx, p.sy]))
+  }
+  return out
+}
+
 export type FloorPool = { sx: number; sy: number; radius: number; alpha: number }
 
 /**
@@ -415,7 +445,12 @@ export function drawFloorBase(
  */
 export function drawFloorLight(
   g: ShellPainter, pools: readonly FloorPool[], room: RoomSize = ROOM_TILES,
+  beams: readonly number[][] = [],
 ): void {
+  for (const beam of beams) {
+    g.poly(beam)
+    g.fill({ color: ROOM_SHELL_INK, alpha: BEAM_ALPHA })
+  }
   for (const [i, p] of pools.entries()) {
     g.ellipse(p.sx, p.sy, p.radius, p.radius / 2)
     g.fill({

@@ -4,7 +4,7 @@ import { TILE_H, TILE_W } from './iso.js'
 import {
   INTERIOR_ACTS, INTERIOR_PX_SCALE, INTERIOR_TILE, ROOM_TILES, TILES_PER_SLOT, WALL_FACING,
   WALL_H_PX, WALL_KINDS, actFor, alongWall, interiorPath, interiorToScreen, isWalkable,
-  roomMapOf, slotToTile, standingTiles, tilesOf, walkableCount, wallOfTile,
+  roomMapOf, seatInBlock, slotToTile, standingTiles, tilesOf, walkableCount, wallOfTile,
   type PieceInput, type RoomMap, type Tile,
 } from './interiorMap.js'
 
@@ -72,7 +72,31 @@ describe('interiorMap — the room is a map a body can occupy', () => {
     const map = roomMapOf(HUT)
     const table = at(map, 'table')
     for (const t of tilesOf(table)) expect(isWalkable(map, t), `${t.x},${t.y}`).toBe(false)
-    expect(standingTiles(map, table).length).toBe(4)
+    // ★ THREE, NOT FOUR — and the fourth is the CHAIR. The template says the chair's slot is
+    // next to the table's, and `seatInBlock` now puts it on the side of its own block the
+    // table is on, so the two are drawn as a pair instead of two tiles apart. The seat a body
+    // cannot stand on is a chair standing there.
+    expect(standingTiles(map, table).length).toBe(3)
+    expect(at(map, 'chair').tile).toEqual({ x: table.tile.x, y: table.tile.y - 1 })
+  })
+
+  it('★ seatInBlock groups what the template says belongs together, and moves nothing else', () => {
+    // WHAT THE USER REACTED TO: the room reads as a warehouse. The chair's slot is adjacent to
+    // the table's and it was drawn TWO tiles away, because every piece took the same corner of
+    // its own two-deep block. Derived from the slots, so it is still world data.
+    const map = roomMapOf(HUT)
+    expect(seatInBlock({ x: 1, y: 1 }, [{ x: 1, y: 2 }])).toEqual({ x: 5, y: 3 })  // pulled near
+    expect(seatInBlock({ x: 1, y: 2 }, [{ x: 1, y: 1 }])).toEqual({ x: 5, y: 4 })  // stays far
+    expect(seatInBlock({ x: 1, y: 1 }, [])).toEqual(slotToTile({ x: 1, y: 1 }))    // alone: unmoved
+    // both sides pull equally, so nothing moves — a rule with no arbitrary tie-break
+    expect(seatInBlock({ x: 1, y: 1 }, [{ x: 1, y: 0 }, { x: 1, y: 2 }]))
+      .toEqual(slotToTile({ x: 1, y: 1 }))
+    // a piece with no neighbour in its own column is exactly where it always was
+    for (const kind of ['bed', 'rug']) {
+      const p = at(map, kind)
+      const src = HUT.find((h) => h.kind === kind)!
+      expect(p.tile, kind).toEqual(slotToTile(src.slot))
+    }
   })
 
   it('the rug is walked ON — a flat piece blocks nothing', () => {
@@ -99,8 +123,12 @@ describe('interiorMap — a body walks it', () => {
   // DIRECTLY across the table from each other. The straight line between these two tiles is
   // two steps and the middle one is the table, so a walk that is not a detour is a walk
   // through the furniture — which is the whole thing this test exists to catch.
-  const start: Tile = { x: table.tile.x, y: table.tile.y + 1 }
-  const goal: Tile = { x: table.tile.x, y: table.tile.y - 1 }
+  //
+  // ACROSS THE TABLE, NOT UP IT: the chair now stands on the tile behind the table, so the
+  // depth axis has two blockers on it and the detour it forces is a different length. The
+  // x axis has one, which is the case this proof is about.
+  const start: Tile = { x: table.tile.x - 1, y: table.tile.y }
+  const goal: Tile = { x: table.tile.x + 1, y: table.tile.y }
 
   const walkIsLegal = (path: readonly Tile[], from: Tile): void => {
     let prev = from

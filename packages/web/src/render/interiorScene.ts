@@ -15,15 +15,16 @@ import {
   type MapPiece, type RoomMap, type Tile,
 } from './interiorMap.js'
 import {
-  FURNISHING_WALL_PIECE, flagstoneRegions, hasInteriorTileset, resolveInteriorMaterial,
-  resolveInteriorPiece, wallCourses, wallStripAt, wallStripWidth, wallTransform,
+  FURNISHING_WALL_PIECE, WALL_STRIP_TILES, flagstoneRegions, hasInteriorTileset,
+  resolveInteriorMaterial, resolveInteriorPiece, wallCourses, wallStripAt, wallStripWidth,
+  wallTransform,
 } from './interiorTileset.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 import { doorTileOf } from './entities.js'
 import type { ZoomStop } from './camera.js'
 import {
   ROOM_SHELL_INK, ROOM_SHELL_PAINT, WALL_H_PX, WALL_TINT,
-  drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorPolyOf, floorPools,
+  ceilingBeams, drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorPolyOf, floorPools,
   floorRegionPoly, roomMaskPoly, roomOriginX, roomOriginY, roomZoomFor, tileCentreScreen,
   tileSpanCentre, wallMount,
 } from './roomShell.js'
@@ -203,7 +204,7 @@ export function createInteriorScene(
     drawFloorBase(floor, ROOM_TILES, url === null ? ROOM_SHELL_PAINT.floor : null)
     paintStone(m, records)
     floorLight.clear()
-    drawFloorLight(floorLight, pools(m), ROOM_TILES)
+    drawFloorLight(floorLight, pools(m), ROOM_TILES, ceilingBeams(WALL_STRIP_TILES, ROOM_TILES))
   }
 
   /**

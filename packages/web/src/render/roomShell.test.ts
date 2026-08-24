@@ -4,6 +4,7 @@ import { CHAR_TARGET_PX } from './charAnim.js'
 import { furnishingScale } from './interiors.js'
 import { ZOOM_SCALE_MAX } from './camera.js'
 import { TILE_W } from './iso.js'
+import { WALL_STRIP_TILES } from './interiorTileset.js'
 import {
   INTERIOR_BODY_PX, INTERIOR_PX_SCALE, INTERIOR_TILE, ROOM_TILES, WALL_FACING, WALL_H_PX,
   WALL_KINDS, interiorToScreen,
@@ -11,6 +12,7 @@ import {
 import {
   DOORWAY_POOL_ALPHA, HEARTH_POOL_ALPHA, ROOM_MARGIN_Y, ROOM_SHELL_INK, ROOM_SHELL_PAINT,
   ROOM_ZOOM, WALL_MOUNT_H_PX,
+  BEAM_HALF_TILES, ceilingBeams,
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorBoards, floorPolyOf, floorPools,
   roomBox, roomCropPx, roomMaskPoly, roomOriginX, roomOriginY, roomZoomFor, skirtingPolys,
   tileCentreScreen,
@@ -279,6 +281,31 @@ describe('roomShell — what the painter is asked to draw', () => {
       (o) => o.op === 'fill' && (o.arg as { color?: number }).color === ROOM_SHELL_PAINT.threshold,
     )
     expect(light).toBeLessThan(sill)
+  })
+
+  // ★ THE CEILING, THE ONLY WAY A DIMETRIC CAMERA CAN SEE IT. The mock the user approved has
+  // three joists across the floor; the product had none, and a 72-tile floor with nothing on
+  // it is most of what "nowhere near as nice as expected" is looking at. The spacing is the
+  // WALL BAY, so the ceiling and the walls are the same building rather than two guesses.
+  it('★ a joist over every wall bay, under the light and inside the floor', () => {
+    const beams = ceilingBeams(WALL_STRIP_TILES)
+    expect(beams).toHaveLength(Math.ceil(ROOM_TILES.w / WALL_STRIP_TILES))
+    for (const [i, b] of beams.entries()) {
+      expect(b, `beam ${i} is a quad`).toHaveLength(8)
+      const cx = (i + 0.5) * WALL_STRIP_TILES
+      // it runs the room's full depth, from the far edge to the near one
+      expect(b.slice(0, 2)).toEqual(Object.values(interiorToScreen(cx - BEAM_HALF_TILES, 0)))
+      expect(b.slice(4, 6))
+        .toEqual(Object.values(interiorToScreen(cx + BEAM_HALF_TILES, ROOM_TILES.h)))
+    }
+    // and it is PAINTED, in ink, before the light that falls over it
+    const { ops, g } = recorder()
+    drawFloorLight(g, floorPools([]), ROOM_TILES, beams)
+    const inked = ops.filter(
+      (o) => o.op === 'fill' && (o.arg as { color?: number }).color === ROOM_SHELL_INK)
+    expect(inked).toHaveLength(beams.length)
+    expect(ops.findIndex((o) => o.op === 'poly')).toBeLessThan(
+      ops.findIndex((o) => o.op === 'ellipse'))
   })
 
   // WHAT THE BROWSER CAUGHT: unmasked, the doorway pool painted a pale ellipse across the town

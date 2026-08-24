@@ -93,6 +93,31 @@ export function slotToTile(slot: Slot): Tile {
   }
 }
 
+/**
+ * ★ WHERE INSIDE ITS OWN BLOCK A PIECE SITS — and the room's furniture stops being scattered.
+ *
+ * THE GAP THE USER REACTED TO: the room "is nowhere near as nice as expected", and part of that
+ * is that it is a warehouse. The template says the chair belongs with the table — their slots
+ * are (1,1) and (1,2), adjacent — and the mock draws them together. The product drew them TWO
+ * TILES APART, because every piece took the same corner of its own block: a block is two tiles
+ * deep, so two adjacent slots land two tiles apart however close the world says they are.
+ *
+ * `SLOT_ORIGIN_OFFSET` was the only answer to "where in the block", and it is the same answer
+ * for every piece. This is the other half of it, and it is still derived from world data: a
+ * piece sits on the side of its own block that its neighbour's slot is on. No per-kind
+ * coordinate table — the arrangement is still the slots', which is what the world owns.
+ *
+ * Only the depth axis, because only the depth axis is short: a block is FOUR tiles across, so
+ * two pieces side by side already read as a pair, and it is two tiles deep, where they do not.
+ */
+export function seatInBlock(slot: Slot, others: readonly Slot[]): Tile {
+  const base = slotToTile(slot)
+  const nearer = others.some((o) => o.x === slot.x && o.y === slot.y + 1)
+  const further = others.some((o) => o.x === slot.x && o.y === slot.y - 1)
+  if (nearer === further) return base            // both sides, or neither: stay where you are
+  return { x: base.x, y: base.y + (nearer ? TILES_PER_SLOT.h - 1 : 0) }
+}
+
 export const inRoom = (t: Tile): boolean =>
   t.x >= 0 && t.y >= 0 && t.x < ROOM_TILES.w && t.y < ROOM_TILES.h
 
@@ -187,10 +212,11 @@ export type PieceInput = {
 export function roomMapOf(inputs: readonly PieceInput[]): RoomMap {
   const blocked = new Uint8Array(ROOM_TILES.w * ROOM_TILES.h)
   const pieces: MapPiece[] = []
-  for (const input of inputs) {
+  const slots = inputs.map((i) => i.slot)
+  for (const [i, input] of inputs.entries()) {
     const size = input.size ?? { w: 1, h: 1 }
     const placement = input.placement ?? 'floor'
-    let tile = slotToTile(input.slot)
+    let tile = seatInBlock(input.slot, slots.filter((_, j) => j !== i))
     let facing: TownFacing | null = null
     if (placement === 'wall') {
       // A slot column 0 is against the back-left wall, a slot row 0 against the back-right.

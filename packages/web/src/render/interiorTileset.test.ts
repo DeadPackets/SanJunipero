@@ -80,13 +80,22 @@ describe('interiorTileset — what goes on the wall', () => {
     expect(Math.max(...left) + WALL_STRIP_TILES).toBeGreaterThanOrEqual(ROOM_TILES.h)
   })
 
-  it('a room has a window and a door, and they are at opposite ends of the long wall', () => {
+  // ★ EVERY BAY OF THE LONG WALL IS GLAZED, and the door takes the near one. It used to be ONE
+  // window: a 12-tile wall is three bays, so the middle one was 256 px of blank wainscot in the
+  // visual centre of the room, which is part of what "nowhere near as nice as expected" was
+  // looking at. A rule per bay, not a coordinate, so a longer wall gets more glass.
+  it('a room has a door at the near end of the long wall and a window in every other bay', () => {
     const c = wallCourses([])
-    const window = c.find((x) => x.piece === 'wall-window')!
+    const windows = c.filter((x) => x.piece === 'wall-window')
     const door = c.find((x) => x.piece === 'wall-door')!
-    expect(window.wall).toBe('back-right')
     expect(door.wall).toBe('back-right')
-    expect(door.atTiles).toBeGreaterThan(window.atTiles)
+    expect(door.atTiles).toBe(ROOM_TILES.w - WALL_STRIP_TILES)
+    expect(windows.map((w) => w.wall)).toEqual(['back-right', 'back-right'])
+    expect(windows.map((w) => w.atTiles).sort((a, b) => a - b)).toEqual([0, 4])
+    // no bay carries two fixtures, and no bay of the long wall carries none
+    const bays = c.filter((x) => x.piece !== 'wall-plain' && x.wall === 'back-right')
+    expect(new Set(bays.map((b) => b.atTiles)).size).toBe(bays.length)
+    expect(bays.length).toBe(Math.ceil(ROOM_TILES.w / WALL_STRIP_TILES))
   })
 
   it('★ THE HEARTH IS THE CHIMNEY BREAST — one piece, on the wall its tile is against', () => {
@@ -103,7 +112,7 @@ describe('interiorTileset — what goes on the wall', () => {
     expect(FURNISHING_WALL_PIECE['lantern']).toBeUndefined()
     const c = wallCourses([{ kind: 'lantern', wall: 'back-left', atTiles: 2 }])
     expect(c.filter((x) => x.piece !== 'wall-plain').map((x) => x.piece).sort())
-      .toEqual(['wall-door', 'wall-window'])
+      .toEqual(['wall-door', 'wall-window', 'wall-window'])
   })
 })
 
