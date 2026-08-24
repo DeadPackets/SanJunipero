@@ -506,7 +506,7 @@ Expected, in order:
 - [ ] **Step 1: Copy this DRAFT to its ratified path.**
 
 ```bash
-git mv docs/superpowers/plans/2026-08-24-02-genesis-rehearsal-v5b.DRAFT.md \
+git mv docs/superpowers/plans/2026-08-24-03-genesis-rehearsal-v6.DRAFT.md \
        docs/superpowers/plans/2026-08-24-01-genesis-rehearsal.md
 ```
 
