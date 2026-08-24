@@ -323,7 +323,7 @@ export function syncEntities(
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
-      applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h), null, s, s.kind)
+      applyBuildingArt(book, entry, buildingArt(records, s.kind, s.w, s.h, s.facing), null, s, s.kind)
     }
     const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
     entry.sprite.position.set(ground.sx, ground.sy)
@@ -467,7 +467,7 @@ export function syncEntities(
       if (key.startsWith('structure:')) {
         const s = state.structures[id]
         if (s === undefined) continue
-        const art = buildingArt(records, s.kind, s.w, s.h)
+        const art = buildingArt(records, s.kind, s.w, s.h, s.facing)
         if ((art.url ?? NO_ART) !== entry.url) {
           applyBuildingArt(book, entry, art, entry.url === NO_ART ? null : entry.url, s, s.kind)
         }

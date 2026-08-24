@@ -2,8 +2,11 @@ import { z } from 'zod'
 import {
   classMembers, dayPhaseFromTick, fertilityAt, glowRadiusFor, inputName, litSourceWithin,
   MINUTES_PER_DAY, simTimeFromTick, WATER_TILES,
-  type RecipeDef, type SimConfig, type StructureRecipeDef,
+  type RecipeDef, type SimConfig, type StructureRecipeDef, type TownFacing,
 } from '@sj/shared'
+
+/** Absent means this. The same convention `forge/buildingArt.facingKind` uses for a cell id. */
+const DEFAULT_TOWN_FACING: TownFacing = 'sw'
 import { mintId, type Affliction, type Item, type TileId, type WorldState } from './state.js'
 import type { RngStream } from './rng.js'
 import { doorTile, sameInterior } from './interiors.js'
@@ -1056,7 +1059,9 @@ function ownSite(state: WorldState, agentId: string, kind: string) {
 }
 
 export type BuildSiteAnswer = {
-  site: { x: number; y: number; w: number; h: number } | null
+  /** `facing` rides along ONLY when the plot turned the building — absent is `sw`, and a
+   *  bridge has no door and no facing at all. */
+  site: { x: number; y: number; w: number; h: number; facing?: TownFacing } | null
   /** The standing construction this build continues, if any: its materials are already spent. */
   resume: { id: string; progressTicks: number } | null
   /** The ground the town must lay before anything can stand here — empty when it already has. */
@@ -1096,7 +1101,9 @@ export function buildSiteOf(
   const square = townSquareOf(state)!
   const mine = ownSite(state, agentId, params.kind)
   const claim = claimInWorld(state, { along: recipe.w, deep: recipe.h })
-  const site = mine !== null ? { x: mine.x, y: mine.y, w: mine.w, h: mine.h } : claim?.site ?? null
+  const site = mine !== null
+    ? { x: mine.x, y: mine.y, w: mine.w, h: mine.h, ...(mine.facing === undefined ? {} : { facing: mine.facing }) }
+    : claim === null ? null : { ...claim.site, ...(claim.facing === DEFAULT_TOWN_FACING ? {} : { facing: claim.facing }) }
   if (site === null || claim === null) {
     return { site, resume: null, lay: [], refusal: `there is nowhere left in the town for a ${words(params.kind)}` }
   }
@@ -1180,7 +1187,7 @@ const build: VerbDef = makeVerb({
     if (recipe === null) return []
     const answer = buildSiteOf(state, config, agentId, p)
     if (answer.resume !== null || answer.site === null) return []
-    const { x, y, w, h } = answer.site
+    const { x, y, w, h, facing } = answer.site
     return [
       // The ground first: a roof cannot stand on a block the town has not cleared, and a door
       // cannot open onto a street nobody laid.
@@ -1192,6 +1199,8 @@ const build: VerbDef = makeVerb({
           id: mintId(state, 'structure'), kind: p.kind, x, y, w, h,
           maxHp: recipe.maxHp, flammable: recipe.flammable, builderId: agentId,
           ...(config.ownership.enabled ? { owner: agentId } : {}),
+          // The plot decided this; nothing downstream should have to infer it back.
+          ...(facing === undefined ? {} : { facing }),
         },
       },
     ]

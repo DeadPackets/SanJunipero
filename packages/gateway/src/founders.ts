@@ -429,6 +429,10 @@ export function makeFoundersOnTick(
           id: s.id, kind: s.kind, x: s.x, y: s.y, w: s.w, h: s.h, maxHp: 20,
           flammable: s.flammable, builderId: 'script',
           ...(s.owner === null ? {} : { owner: s.owner }),
+          // The template already decided this; dropping it made the drawn face of half the
+          // town disagree with the plot it sits on. Absent is `sw`, so the frozen fixture —
+          // every one of whose six buildings faces sw — folds the payload it always folded.
+          ...(s.facing === 'sw' ? {} : { facing: s.facing }),
         })
         emit('structure_completed', { id: s.id })
       }

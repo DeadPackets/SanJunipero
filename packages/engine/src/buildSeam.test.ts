@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_CONFIG, MIN_SEP, PITCH, STREET, TOWN_SQUARE, T_GRASS, T_ROAD, WORLD_MARGIN,
-  blockGroundOf, centreOf, edgesOwed, type SimEvent,
+  blockGroundOf, centreOf, edgesOwed, type SimEvent, type TownClaim,
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { genesisState, type WorldState } from './state.js'
@@ -37,6 +37,11 @@ function withBuilder(s: WorldState, id: string, at: { x: number; y: number }, wo
 /** Where a builder has to stand to raise the next thing: the plot's own door tile. */
 const doorFor = (s: WorldState) => claimInWorld(s, { along: 2, deep: 2 })!.door
 
+/** The site as the engine reports it: the plot's rectangle, plus the facing when — and only
+ *  when — the plot turned the building. Absent is `sw`. */
+const seatedAs = (claim: TownClaim): Record<string, unknown> =>
+  ({ ...claim.site, ...(claim.facing === 'sw' ? {} : { facing: claim.facing }) })
+
 describe('★ how an agent builds: the plot, never the coordinate', () => {
   it('a house in a town takes {kind} and refuses a coordinate, in words', () => {
     const s = withBuilder(genesisTown(), 'a', doorFor(genesisTown()))
@@ -56,7 +61,9 @@ describe('★ how an agent builds: the plot, never the coordinate', () => {
       for (let y = 60; y < 75; y++) {
         // Every one of them is refused, and the site the engine WOULD use never moves.
         expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house', x, y }).ok).toBe(false)
-        expect(buildSiteOf(s, CFG, 'a', { kind: 'house', x, y }).site).toEqual(claim.site)
+        // The FACING is part of the site now, and it does not move either: the plot decides
+        // which way the house is turned, and no coordinate a mind names changes that.
+        expect(buildSiteOf(s, CFG, 'a', { kind: 'house', x, y }).site).toEqual(seatedAs(claim))
         named++
       }
     expect(named).toBe(225)
@@ -149,7 +156,7 @@ describe('a build that stops halfway goes back to the same walls', () => {
     expect(again.ok, again.ok ? '' : again.reason).toBe(true)
     // No second structure, and no second bill.
     expect(again.ok ? again.events.filter((e) => e.type === 'structure_planned') : null).toEqual([])
-    expect(buildSiteOf(s, CFG, 'a', { kind: 'house' }).site).toEqual(claim.site)
+    expect(buildSiteOf(s, CFG, 'a', { kind: 'house' }).site).toEqual(seatedAs(claim))
   })
 })
 

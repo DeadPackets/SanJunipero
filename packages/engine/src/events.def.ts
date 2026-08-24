@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TOWN_FACINGS } from '@sj/shared'
 
 export const TickAdvanced = z.object({}).strict()
 export const AgentSpawned = z.object({
@@ -64,6 +65,10 @@ export const ItemTextChanged = z.object({ id: z.string(), text: z.string() }).st
 export const StructurePlanned = z.object({
   id: z.string(), kind: z.string(), x: z.number(), y: z.number(), w: z.number(), h: z.number(),
   maxHp: z.number(), flammable: z.boolean(), builderId: z.string(), owner: z.string().optional(),
+  // Two facings and no third: NE and NW are unauthored and must stay unrepresentable. Written
+  // only when the plot TURNED the building, so every world that never turns one folds the
+  // payload it always folded. See `Structure.facing`.
+  facing: z.enum(TOWN_FACINGS).optional(),
 }).strict()
 export const StructureProgressed = z.object({ id: z.string(), ticks: z.number() }).strict()
 export const StructureCompleted = z.object({ id: z.string() }).strict()

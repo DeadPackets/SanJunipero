@@ -282,6 +282,7 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
             hp: 1, maxHp: p.maxHp, flammable: p.flammable, stage: 'construction',
             progressTicks: 0, builtBy: p.builderId, burning: false, burnTicks: 0,
             ...(p.owner === undefined ? {} : { owner: p.owner }),
+            ...(p.facing === undefined ? {} : { facing: p.facing }),
           },
         },
         counters: bumpCounter(state.counters, p.id),
