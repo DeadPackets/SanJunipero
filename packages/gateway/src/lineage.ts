@@ -1,8 +1,8 @@
-import type { ServerResponse } from 'node:http'
 import type Database from 'better-sqlite3'
 import type { SimEvent } from '@sj/shared'
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
+import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 
 // WHO CAME FROM WHOM (v1 task 23, the reader half — the prerequisite task 84 needs).
 //
@@ -78,22 +78,18 @@ export function buildLineage(
 
 export type LineageDeps = { db: Database.Database; mirror: WorldMirror }
 
-const sendJson = (res: ServerResponse, body: unknown, status = 200): void => {
-  res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(body))
-}
-
 export function mountLineageApi(router: Router, deps: LineageDeps): void {
   const selBirths = deps.db.prepare(
     "SELECT seq, tick, type, payload FROM events WHERE type = 'agent_born' ORDER BY seq",
   )
-  router.route('GET', '/api/lineage', (_req, res) => {
+  const cache = makeSeqCache(() => deps.mirror.seq())
+  router.route('GET', '/api/lineage', (_req, res) => sendPrebuilt(res, cache.json('lineage', () => {
     try {
       const events = (selBirths.all() as Array<{ seq: number; tick: number; type: string; payload: string }>)
         .map((r) => ({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }) as SimEvent)
-      sendJson(res, buildLineage(events, deps.mirror.state().agents))
+      return buildLineage(events, deps.mirror.state().agents)
     } catch {
-      sendJson(res, EMPTY_LINEAGE)   // a town with no ancestry is not an error
+      return EMPTY_LINEAGE   // a town with no ancestry is not an error
     }
-  })
+  })))
 }

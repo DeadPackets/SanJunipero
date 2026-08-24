@@ -3,13 +3,9 @@ import type Database from 'better-sqlite3'
 import { DISCOVERY_EVENT, DiscoveryRecordSchema, type DiscoveryRecord } from '@sj/shared'
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
+import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 
 export type DiscoveryApiDeps = { db: Database.Database; mirror: WorldMirror }
-
-const sendJson = (res: ServerResponse, body: unknown): void => {
-  res.writeHead(200, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(body))
-}
 
 // The world's own log IS the archive: append-only, ordered, and physically unable to lose a
 // row when a rule is later reverted. Nothing here reaches the ops plane, by construction —
@@ -37,10 +33,10 @@ export function readDiscoveries(
 }
 
 export function mountDiscoveryApi(router: Router, deps: DiscoveryApiDeps): void {
-  router.route('GET', '/api/discoveries', (_req: IncomingMessage, res: ServerResponse) => {
-    const state = deps.mirror.state()
-    sendJson(res, {
-      discoveries: readDiscoveries(deps.db, (id) => state.agents[id]?.name ?? id),
-    })
-  })
+  const cache = makeSeqCache(() => deps.mirror.seq())
+  router.route('GET', '/api/discoveries', (_req: IncomingMessage, res: ServerResponse) =>
+    sendPrebuilt(res, cache.json('discoveries', () => {
+      const state = deps.mirror.state()
+      return { discoveries: readDiscoveries(deps.db, (id) => state.agents[id]?.name ?? id) }
+    })))
 }

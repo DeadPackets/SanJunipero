@@ -9,7 +9,8 @@ export const HEAT_WEIGHTS: Record<string, number> = {
 
 export type HeatWindow = { fromTick: number; toTick: number; agentId: string; score: number }
 
-export function heatWindows(events: SimEvent[]): HeatWindow[] {
+// readonly: the caller's array is memoised per world generation and shared between endpoints.
+export function heatWindows(events: readonly SimEvent[]): HeatWindow[] {
   const scores = new Map<string, number>() // `${windowIndex}\n${agentId}` → score
   for (const ev of events) {
     const weight = HEAT_WEIGHTS[ev.type] ?? 0

@@ -1,4 +1,3 @@
-import type { ServerResponse } from 'node:http'
 import type Database from 'better-sqlite3'
 import {
   bondId, strongerBondKind,
@@ -7,6 +6,7 @@ import {
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import { TALK_WINDOW_TICKS } from './api.js'
+import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 
 // What the town did, read as what the town became. Each rule is one observable act; the
 // SEMANTICS (trust, debt, grudge, love from the ledgers) stay C9 T11/T12's job — when they
@@ -26,11 +26,6 @@ export type BondsDeps = {
   db: Database.Database
   mirror: WorldMirror
   config: SimConfig
-}
-
-const sendJson = (res: ServerResponse, body: unknown, status = 200): void => {
-  res.writeHead(status, { 'content-type': 'application/json' })
-  res.end(JSON.stringify(body))
 }
 
 type Draft = { aId: string; bId: string; kind: BondKind; history: BondEvent[] }
@@ -93,10 +88,12 @@ export function buildBonds(events: SimEvent[], earshot: number, asOfTick: number
 
 export function mountBondsApi(router: Router, deps: BondsDeps): void {
   const selEvents = deps.db.prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq')
+  // Whole-log scan per request; see seqCache.ts for why a public stream cannot pay that per viewer.
+  const cache = makeSeqCache(() => deps.mirror.seq())
 
-  router.route('GET', '/api/bonds', (_req, res) => {
+  router.route('GET', '/api/bonds', (_req, res) => sendPrebuilt(res, cache.json('bonds', () => {
     const events = (selEvents.all() as Array<{ seq: number; tick: number; type: string; payload: string }>)
       .map((r) => ({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }) as SimEvent)
-    sendJson(res, buildBonds(events, deps.config.movement.earshotRadius, deps.mirror.state().tick))
-  })
+    return buildBonds(events, deps.config.movement.earshotRadius, deps.mirror.state().tick)
+  })))
 }
