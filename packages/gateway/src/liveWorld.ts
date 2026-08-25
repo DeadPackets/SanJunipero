@@ -139,10 +139,48 @@ export function spendStopMessage(spent: number, cap: number): string {
   ].join('\n')
 }
 
+/**
+ * ★ THE CAP IS PER TOWN, NOT PER PROCESS, AND THAT HAS TO BE SAID OUT LOUD RATHER THAN MET.
+ *
+ * The call ledger lives in `agentDbDir` and resumes with the town, so a town that has already
+ * spent its cap over twenty boots is a town that has spent its cap. That is the right reading
+ * for an ANOMALY STOP — the point is to bound total exposure, not to reset it every time
+ * somebody restarts — but it means a resumed boot can be over the line before its first tick.
+ *
+ * Without this it would still stop: the tick watchdog fires within ten ticks, and before that
+ * `LlmClient`'s own `budgetUsd` would throw `BudgetExceededError` out of the pre-flight. Both
+ * are twenty-five confusing seconds and a stack trace. This is one sentence, before anything.
+ */
+export function capReachedRefusal(spent: number, cap: number, agentDbDir: string): string {
+  return [
+    `stream: could not start — this town has already spent $${spent.toFixed(4)} of its`
+    + ` $${cap.toFixed(2)} cap.`,
+    '        The cap is per TOWN, not per process: the call ledger resumes with the world, so',
+    '        restarting does not reset it. That is the point of an anomaly stop.',
+    '        `pnpm stream` (no SJ_LIVE) resumes this same town scripted, for $0.00/hour.',
+    `        SJ_FRESH=1 starts a new town and a new ledger, throwing away ${agentDbDir}.`,
+  ].join('\n')
+}
+
 /** Total dollars in a call ledger, across every caller. `sumCostUsd` is per-caller and the cap
  *  is not: five minds on two callers each would clear a per-caller cap ten times over. */
 export function ledgerTotalUsd(db: Database.Database): number {
   const row = db.prepare('SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls').get() as { total: number }
+  return row.total
+}
+
+/**
+ * ★ WHAT THE PRE-FLIGHT COST, AND ONLY WHAT THE PRE-FLIGHT COST.
+ *
+ * The ledger is resumed with the town, so on the second boot `ledgerTotalUsd` is the whole
+ * history — the first RESUMED live boot printed `pre-flight … $0.047463` for twelve calls that
+ * had cost about a tenth of a cent, which is a number an operator would act on. The ledger has
+ * a `caller` column for exactly this reason and g11 scopes its own query the same way.
+ */
+export function preflightCostUsd(db: Database.Database, since: number): number {
+  const row = db.prepare(
+    "SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE caller = 'preflight' AND ts >= ?",
+  ).get(since) as { total: number }
   return row.total
 }
 
@@ -190,6 +228,14 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   const opsDb = openAgentDb(join(opts.agentDbDir, LIVE_OPS_DB))
   migrateLlmTables(opsDb)
 
+  // Before the pre-flight, because the pre-flight spends and a town that is already over its
+  // cap must not spend another cent to be told so.
+  const alreadySpent = ledgerTotalUsd(opsDb)
+  if (alreadySpent >= cap) {
+    opsDb.close()
+    throw new Error(capReachedRefusal(alreadySpent, cap, opts.agentDbDir))
+  }
+
   const makeClient = (caller: string, agentId?: string): LlmClient =>
     opts.makeClient !== undefined
       ? opts.makeClient(opsDb, caller, agentId)
@@ -205,13 +251,17 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     if (!process.env['OPENROUTER_API_KEY']) {
       throw new Error('SJ_LIVE=1 needs OPENROUTER_API_KEY — run with node --env-file=<repo>/.env')
     }
+    // Scoped to THIS boot's pre-flight rows: the ledger is resumed with the town, so the whole
+    // sum would be the whole history of the town and not the cost of these twelve calls.
+    const startedAt = Date.now()
     const result = await runPreflight({
       llm: makeClient('preflight'), provider: 'default', hardAllowList: false, model: MIND_MODEL,
       identity: minds[0]?.identity, personality: minds[0]?.personality, rounds: PREFLIGHT_ROUNDS,
-      costUsd: () => ledgerTotalUsd(opsDb),
+      costUsd: () => preflightCostUsd(opsDb, startedAt),
     })
     log(`stream: pre-flight — action ${result.actions}/${result.calls} over ${result.roundsRun}`
-      + ` round(s), ${result.roundsPassed} passed, $${result.costUsd.toFixed(6)}`)
+      + ` round(s), ${result.roundsPassed} passed, $${result.costUsd.toFixed(6)};`
+      + ` this town has spent $${ledgerTotalUsd(opsDb).toFixed(4)} of its $${cap.toFixed(2)} so far`)
     if (!result.passed) throw new Error(preflightRefusal(result))
   }
 

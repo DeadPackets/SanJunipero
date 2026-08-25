@@ -13,7 +13,8 @@ import { FakeEmbedder, insertAlert, openAgentDb, type LlmClient, type MindSpec }
 import { startDevWorld, type DevWorld, type LiveCast } from './devWorld.js'
 import { foundersFor, townStructuresFor } from './founders.js'
 import {
-  LIVE_OPS_DB, amnesiaRefusal, createLiveCast, ledgerTotalUsd, restorableSnapshot, settle,
+  LIVE_OPS_DB, amnesiaRefusal, capReachedRefusal, createLiveCast, ledgerTotalUsd,
+  preflightCostUsd, restorableSnapshot, settle,
 } from './liveWorld.js'
 import { thoughtsSince } from './observer.js'
 
@@ -256,6 +257,56 @@ describe('★ the money, inside the served world', () => {
     await run(world, 10)
     expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
   }, 40_000)
+})
+
+describe('★ the cap is per town, not per process', () => {
+  it('refuses a resumed town that has already spent its cap, before spending another cent', async () => {
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({ dir, spendCapUsd: 0.25 })
+    await run(world, 2)
+    opsDb.prepare(
+      `INSERT INTO llm_calls
+       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
+       VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, 0.40, 0, 1, NULL, NULL)`,
+    ).run(Date.now())
+    await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+
+    // The ledger resumed with the town, so the second boot is already over the line.
+    await expect(liveWorld({ dir, spendCapUsd: 0.25 })).rejects.toThrow(/already spent/)
+    // …and it says the two ways out rather than only that it will not start.
+    await expect(liveWorld({ dir, spendCapUsd: 0.25 })).rejects.toThrow(/SJ_FRESH=1/)
+  }, 60_000)
+
+  it('names the amount, the cap and the directory a fresh start would throw away', () => {
+    const msg = capReachedRefusal(5.1234, 5, 'data/minds')
+    expect(msg).toContain('$5.1234')
+    expect(msg).toContain('$5.00')
+    expect(msg).toContain('data/minds')
+    expect(msg).toContain('per TOWN, not per process')
+  })
+
+  it('reports what the PRE-FLIGHT cost, not what the town has ever cost', () => {
+    // The first resumed live boot printed `pre-flight … $0.047463` for twelve calls that had
+    // cost about a tenth of a cent, because the ledger resumes with the world.
+    const dir = tmp()
+    const db = openAgentDb(join(dir, 'ledger.db'))
+    db.exec(`CREATE TABLE IF NOT EXISTS llm_calls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, agent_id TEXT, caller TEXT, model TEXT,
+      input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER,
+      reasoning_tokens INTEGER, cost_usd REAL, latency_ms INTEGER, ok INTEGER, error TEXT,
+      provider TEXT)`)
+    const put = (ts: number, caller: string, usd: number): void => {
+      db.prepare('INSERT INTO llm_calls (ts, caller, model, cost_usd, ok) VALUES (?, ?, ?, ?, 1)')
+        .run(ts, caller, 'm', usd)
+    }
+    put(1000, 'preflight', 0.001)   // a previous boot's pre-flight
+    put(2000, 'turn', 0.9)          // a previous boot's town
+    put(3000, 'preflight', 0.002)   // THIS boot's pre-flight
+    expect(preflightCostUsd(db, 2500)).toBeCloseTo(0.002, 6)
+    expect(ledgerTotalUsd(db)).toBeCloseTo(0.903, 6)
+    db.close()
+  })
 })
 
 describe('★ a mind\'s memory across a resume', () => {
