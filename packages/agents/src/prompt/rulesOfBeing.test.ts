@@ -21,6 +21,23 @@ describe('SPEECH_RULES', () => {
     expect(SPEECH_RULES).toMatch(/three|threes/)
   })
 
+  // The two tells the old block never named, measured at 63% and 35-54% of lines in a corpus
+  // produced with the old block already in the prompt.
+  it('forbids the stock opener and the long dash', () => {
+    expect(SPEECH_RULES).toMatch(/never begin two turns running the same\s+way/)
+    expect(SPEECH_RULES).toMatch(/long dash/)
+  })
+
+  it('spends no em dash of its own', () => {
+    expect(SPEECH_RULES).not.toContain('—')
+  })
+
+  it('forbids only, and grants no voice', () => {
+    // A shared block that hands every mind the same mannerism makes five copies of one actor.
+    // Anything that makes a mind sound like someone in particular belongs on its own card.
+    expect(SPEECH_RULES).not.toMatch(/\b(say|use|open with|begin with) ["'][a-z]/i)
+  })
+
   it('never names the machinery', () => {
     expect(SPEECH_RULES).not.toMatch(FORBIDDEN_FRAMING)
   })
