@@ -327,10 +327,9 @@ export const CITY_HEARTH_KIND = 'hearth'
 // ★ THE FIRE AND THE BED, ON ONE PAIR OF SLOTS. More than one dwelling holds them now, and
 // (0, 2) written in three places is (0, 2) that drifts. These are also the only two furnishings
 // a LAW reads, which is why a kind can be given these and nothing else and still be honest.
-const HEARTH_AND_BED: CityFurnishing[] = [
-  { kind: CITY_BED_KIND, slot: { x: 2, y: 1 } },
-  { kind: CITY_HEARTH_KIND, slot: { x: 0, y: 2 } },
-]
+const THE_BED: CityFurnishing = { kind: CITY_BED_KIND, slot: { x: 2, y: 1 } }
+const THE_HEARTH: CityFurnishing = { kind: CITY_HEARTH_KIND, slot: { x: 0, y: 2 } }
+const HEARTH_AND_BED: CityFurnishing[] = [THE_BED, THE_HEARTH]
 const HOUSE_FURNISHINGS: CityFurnishing[] = [
   ...HEARTH_AND_BED,
   { kind: 'table', slot: { x: 1, y: 2 } },
@@ -382,6 +381,9 @@ const FURNISHINGS_BY_KIND: Readonly<Record<string, CityFurnishing[]>> = {
   house: HOUSE_FURNISHINGS,
   cottage: HEARTH_AND_BED,
   farmhouse: HEARTH_AND_BED,
+  // The cabin's stove and no bed: it is the founding valley's one indoor fire and it is a
+  // refuge, not a home. A body is warm in it and still sleeps on the boards.
+  cabin: [THE_HEARTH],
   [STOREHOUSE_KIND]: STOREHOUSE_FURNISHINGS,
 }
 

@@ -75,9 +75,9 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     const hearths = Object.keys(c.structures.recipes).filter((k) => isHearthKind(c, k)).sort()
     // The old roster's first name, `hearth`, was a structure kind NOTHING in this world has
     // ever stood. A hearth is a thing a dwelling has, not a building.
-    expect(hearths).toEqual(['cottage', 'farmhouse', 'fire_pit', 'house'])
+    expect(hearths).toEqual(['cabin', 'cottage', 'farmhouse', 'fire_pit', 'house'])
     expect(c.structures.recipes).not.toHaveProperty('hearth')
-    for (const k of ['well', 'bridge', 'grave', 'storehouse', 'cabin']) expect(isHearthKind(c, k), k).toBe(false)
+    for (const k of ['well', 'bridge', 'grave', 'storehouse']) expect(isHearthKind(c, k), k).toBe(false)
     expect(isHearthKind(c, 'standing_stone')).toBe(false)
     // Neither open fire is a shelter and nobody builds either — an empty `inputs` is the whole
     // of what "the world places this" means, and `buildableRecipe` reads exactly that.
@@ -97,7 +97,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     const furnishedWith = (kind: string): string[] => [...new Set(cityStructures()
       .filter((s) => s.furnishings.some((f) => f.kind === kind))
       .map((s) => s.kind))].sort()
-    expect(furnishedWith(CITY_HEARTH_KIND)).toEqual(['cottage', 'farmhouse', 'house'])
+    expect(furnishedWith(CITY_HEARTH_KIND)).toEqual(['cabin', 'cottage', 'farmhouse', 'house'])
     expect(furnishedWith(CITY_BED_KIND)).toEqual(['cottage', 'farmhouse', 'house'])
     const dwellingsWith = (has: (c: typeof DEFAULT_CONFIG, k: string) => boolean): string[] =>
       Object.keys(c.structures.recipes).filter((k) => has(c, k) && isRoofedKind(c, k)).sort()

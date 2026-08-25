@@ -261,7 +261,7 @@ describe('what a lamp is NOT — the three ways it could have quietly made the n
     }
     // ★ VACUOUS GUARD: both sides of that line have names on them.
     expect(Object.keys(CFG.structures.recipes).filter((k) => isStokeable(CFG, k)).sort())
-      .toEqual(['cottage', 'farmhouse', 'fire_pit', 'house', 'lamp_post'])
+      .toEqual(['cabin', 'cottage', 'farmhouse', 'fire_pit', 'house', 'lamp_post'])
     for (const k of ['well', 'grave', 'bridge', 'storehouse']) expect(isStokeable(CFG, k), k).toBe(false)
     expect(isStokeable(CFG, 'torch')).toBe(false)
     expect(isKindleable(CFG, 'lamp_post')).toBe(false)
