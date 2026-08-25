@@ -6,6 +6,8 @@ import Database from 'better-sqlite3'
 import { DEFAULT_CONFIG, DiscoveryResponseSchema, type DiscoveryRecord } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { createGateway, type Gateway } from './index.js'
+import { readDiscoveries } from './discoveries.js'
+import { clearDegradations, degradations } from './degraded.js'
 
 const GRASS: TileId[][] = Array.from({ length: 16 }, () => Array.from({ length: 16 }, () => 0 as TileId))
 
@@ -132,5 +134,47 @@ describe('the archive — every discovery, in order, with its credit', () => {
     // Not vacuous: the file exists, is non-trivial, and does serve from the world log.
     expect(src.length).toBeGreaterThan(400)
     expect(src).toContain('from events where type')
+  })
+})
+
+/**
+ * ★ A READER THAT DROPS A ROW AND COUNTS NOTHING IS A SCHEMA DRIFT NOBODY CAN SEE.
+ *
+ * `readDiscoveries` skips any row that fails `DiscoveryRecordSchema`, and it is RIGHT to: the
+ * observatory is a window and a window does not break because one pane is unfinished. What it
+ * did not do was say so — a writer that changes a discovery payload made the archive quietly
+ * short, with a 200 and a well-formed body over the top of it.
+ *
+ * MUTATION-PROVED: taking the `reportOnce` call out of the `else` leaves `degradations()` empty
+ * while the body is still one entry short.
+ */
+describe('★ a dropped discovery row is said out loud, once', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-drift-'))
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+  it('answers without the bad row AND reports the drift, naming the field', () => {
+    clearDegradations()
+    const dbPath = join(dir, 'drift.db')
+    const db = scriptedWorld(dbPath, true)
+    // what a future writer renaming a field looks like from here
+    db.prepare('UPDATE events SET payload = ? WHERE type = ? AND tick = ?')
+      .run(JSON.stringify({ ...D2, makes: 'not-an-array' }), 'discovery_made', 90)
+
+    const out = readDiscoveries(db, (id) => id)
+    expect(out.map((d) => d.recipeId), 'the good row still answers').toEqual([D1.recipeId])
+
+    const said = degradations()
+    expect(said, 'the drop is reported').toHaveLength(1)
+    expect(said[0]!.key).toBe('discoveries.schema')
+    expect(said[0]!.line).toContain('makes')
+    expect(said[0]!.line).toContain('/api/discoveries')
+
+    // and a second read of the same drift does not say it again — these run behind the seq
+    // cache, four times a second on a live world
+    readDiscoveries(db, (id) => id)
+    readDiscoveries(db, (id) => id)
+    expect(degradations()).toHaveLength(1)
+    db.close()
+    clearDegradations()
   })
 })

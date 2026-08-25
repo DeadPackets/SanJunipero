@@ -4,6 +4,7 @@ import { DISCOVERY_EVENT, DiscoveryRecordSchema, type DiscoveryRecord } from '@s
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
+import { reportOnce } from './degraded.js'
 
 export type DiscoveryApiDeps = { db: Database.Database; mirror: WorldMirror }
 
@@ -26,8 +27,15 @@ export function readDiscoveries(
       by: nameOf(String(p.byId ?? '')), intent: p.intent, makes: p.makes,
     })
     // A row a future writer shaped differently is skipped, never a 500: the observatory is a
-    // window, and a window does not break because one pane is unfinished.
+    // window, and a window does not break because one pane is unfinished. It does say which
+    // pane — silently short is how a schema drift stays invisible instead of degraded.
     if (parsed.success) out.push(parsed.data)
+    else {
+      reportOnce('discoveries.schema', () =>
+        `a ${DISCOVERY_EVENT} row at seq ${r.seq} does not fit DiscoveryRecordSchema and is being`
+        + ` dropped from /api/discoveries — ${parsed.error.issues.map((i) =>
+          `${i.path.join('.')}: ${i.message}`).join('; ')}`)
+    }
   }
   return out
 }

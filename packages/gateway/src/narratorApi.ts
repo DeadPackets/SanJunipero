@@ -12,6 +12,7 @@ import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { clampWindow } from './api.js'
+import { reportOnce } from './degraded.js'
 
 // The narrator's tables are read through plain SELECTs rather than @sj/narrator, which drags
 // @sj/agents (onnxruntime, transformers) behind it — the same call api.ts makes for agent
@@ -45,11 +46,19 @@ const sendJson = (res: ServerResponse, body: unknown, status = 200): void => {
 
 // A narrator.db that exists but predates a table still answers [] — the observatory is a
 // window, and a window never errors because the room behind it is unfinished.
+/**
+ * A town whose narrator has never run has nothing to read, and that is not an error — but a
+ * narrator whose TABLE has been renamed is a different fact wearing the same empty answer.
+ * Neither 500s; the second one says so once. See `degraded.ts`.
+ */
 function readOrEmpty<T>(db: Database.Database | null, sql: string): T[] {
   if (db === null) return []
   try {
     return db.prepare(sql).all() as T[]
-  } catch {
+  } catch (e) {
+    reportOnce(`narrator.${sql}`, () =>
+      `the narrator db is open but \`${sql}\` failed, so /api/chronicle is answering without it`
+      + ` — ${e instanceof Error ? e.message : String(e)}`)
     return []
   }
 }
