@@ -45,7 +45,7 @@ export const FOUNDER_MINDS: Mind[] = [
       name: 'Yusuf', age: 41,
       backstory: 'A carpenter with a grudge against the river, which took his first bridge.',
       temperament: 'stubborn, generous with his hands, quiet about it',
-      voiceCard: voice('warm and practical', 'two sentences, then work', ['says "aye"'], ['long speeches'],
+      voiceCard: voice('warm and practical', 'two sentences, then work', ['agrees in one word'], ['long speeches'],
         ['I will cut it today.', 'That will take a deck.'], 14, 26),
     },
     personality: NEUTRAL('stubborn, generous with his hands, quiet about it', ['good joinery'], ['a job done once is a job done'], 'even'),
