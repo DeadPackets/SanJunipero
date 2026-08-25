@@ -114,12 +114,19 @@ What you cannot do yet, the world will show you, and you will learn.`
 // diegetically, as advice to a person, never as a style guide to a writer.
 //
 // AMENDED by the voice lane, against 6 867 lines of this system's own output that were all
-// produced WITH this block already in the prompt. Every rule here held (rule-of-three 1.3%,
-// no puffery, sd/mean 0.55) except the two nobody had written: stock openers ran at 63% of
-// Omar's spoken lines and the em dash at 35-54% of all lines. Both new clauses forbid a shape
-// of output rather than adding a thing to weigh, because output tokens are 64% of the bill and
-// 94.6% of those are reasoning. The clause about the dash also cost this block its own em dash:
-// a block that spends one while forbidding it is a demonstration, not a rule.
+// produced WITH this block already in the prompt. Every rule here held (rule-of-three 1.3%, no
+// puffery, sentence-length sd/mean 0.55) except two nobody had written: the em dash on 35-54% of
+// all lines, and stock openers on 63% of Omar's spoken lines.
+//
+// ONE clause landed, not two, and 20 live runs on the hearth probe decided which. A four-arm
+// matrix over the same world and seed priced each clause on its own: the dash clause takes the
+// em dash from 27.1% of lines to 1.7% for +229 reasoning tokens a turn, while a clause forbidding
+// a repeated opener moved opener reuse only 39% -> 36% for +120, and left Omar's tic at 34%.
+// A shared forbid cannot outrun a voice card that both names a tic and demonstrates it in
+// opening position; that one is `founderMinds.ts`'s to fix, not this block's.
+//
+// The clause also cost this block its own em dash: a block that spends one while forbidding it
+// is a demonstration, not a rule.
 export const SPEECH_RULES = `How you speak, when you speak aloud.
 
 Talk the way people talk. Let the length change from one turn to the next: a
@@ -130,10 +137,6 @@ Answer what was just said, in the words it was said in, not the idea behind
 it. Most of what anyone says is plain. Do not hand over a polished saying every
 time you open your mouth, and never lay things out in threes. Grand words come
 out far less often than plain ones.
-
-A habit of speech is a habit, not a greeting. Whatever words you opened with
-last time are the ones to leave alone: never begin two turns running the same
-way. Your own turn of phrase is for the odd moment, not for every mouthful.
 
 The long dash is a crutch. A full stop does the same work, and a comma does the
 rest.`

@@ -21,10 +21,9 @@ describe('SPEECH_RULES', () => {
     expect(SPEECH_RULES).toMatch(/three|threes/)
   })
 
-  // The two tells the old block never named, measured at 63% and 35-54% of lines in a corpus
-  // produced with the old block already in the prompt.
-  it('forbids the stock opener and the long dash', () => {
-    expect(SPEECH_RULES).toMatch(/never begin two turns running the same\s+way/)
+  // The em dash ran at 35-54% of lines in a corpus produced with the old block already in the
+  // prompt, and it was the one humanizer tell nothing here named.
+  it('forbids the long dash', () => {
     expect(SPEECH_RULES).toMatch(/long dash/)
   })
 
