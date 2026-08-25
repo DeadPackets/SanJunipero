@@ -163,7 +163,10 @@ export function extractFactsPrompt(dayMemories: MemoryRow[]): LlmPrompt {
   return {
     system: [
       'Before sleep, you sort the day into what is solidly true.',
-      'From each moment, keep only the facts you are sure of: who did what, who owes whom, what is where.',
+      // "From each moment" is a pass per memory, against an array that had no bound: the only
+      // prompt of the six with no length word, and the one that spent most. A day does not
+      // hold thirty solid facts; asking for the few surest ones asks for the same work once.
+      'Keep only the few facts you are surest of, at most eight: who did what, who owes whom, what is where.',
       'For each fact, name the subject, the relation, and the object, and note the memory it came from.',
       'Write down only what the memories actually show, never what you merely suspect.',
     ].join('\n'),

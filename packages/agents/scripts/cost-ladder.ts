@@ -44,11 +44,18 @@ import { Embedder } from '../src/memory/embedder.js'
 import { makeReflectionLlm } from '../src/reflection.js'
 
 const LABEL = process.env.LADDER_LABEL ?? 'ladder'
-const TOTAL_TICKS = Number(process.env.LADDER_TICKS ?? 300)
-// 20:00, exactly where night-probe starts: dusk costs nothing, the deep dark starts at 21:00.
-// A mind meets the night rather than waking in it, so BOTH the going-indoors behaviour and the
-// making-light behaviour are reachable inside one arm.
-const START_TICK = 20 * 60
+const TOTAL_TICKS = Number(process.env.LADDER_TICKS ?? 420)
+// ★ A WINTER NIGHT, BECAUSE THE FIRST CONTROL ARM MEASURED NOTHING.
+//
+// Run on the default day 0 the arm came back `enteredWarm 0, lightActs 0, completed 0` — not
+// because the minds failed, but because day 0 is SPRING (`SEASONS[floor(dayOfYear/91)]`) and
+// spring night sits at ambient 9. Nobody drops under the shiver line, so three of the six
+// behaviours cannot fire in the control and a measure that cannot fire cannot detect a
+// regression. Winter night is ambient -12: the cold is real, the dark is real, and all six are
+// live. Day 273 is the first winter day; 20:00 is where night-probe starts, an hour before the
+// deep dark, so a mind meets the night rather than waking in it.
+const WINTER_NIGHT = 273 * MINUTES_PER_DAY + 20 * 60
+const START_TICK = Number(process.env.LADDER_START_TICK ?? WINTER_NIGHT)
 const CAP_USD = Number(process.env.LADDER_CAP ?? 3.0)
 const REAL_MS_PER_TICK = Number(process.env.LADDER_MS_PER_TICK ?? 250)
 const WOOD_IN_HAND = 12
@@ -234,6 +241,9 @@ async function main(): Promise<void> {
     label: LABEL,
     turnReasoning: TURN_REASONING, reflectionReasoning: REFL_REASONING,
     ticks: TOTAL_TICKS, startTick: START_TICK, simHours,
+    season: ['spring', 'summer', 'autumn', 'winter'][Math.floor((Math.floor(START_TICK / MINUTES_PER_DAY) % 364) / 91)],
+    warmthAtEnd: Object.fromEntries(MINDS.map((m) =>
+      [m.id, Number((loop.state.agents[m.id]?.needs.warmth ?? -1).toFixed(1))])),
     seed: 'cost-ladder', cast: MINDS.map((m) => m.id),
 
     // ---- the bill ----
