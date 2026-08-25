@@ -73,9 +73,9 @@ describe('SimConfigSchema: C9 living-world sections', () => {
   // drew and no verb could reach. Same medicine, same shape: ask the kind.
   it('a fire is a property of the kind, not a roster of names', () => {
     const hearths = Object.keys(c.structures.recipes).filter((k) => isHearthKind(c, k)).sort()
-    // Two, not three: the old roster's first name, `hearth`, was a structure kind NOTHING in
-    // this world has ever stood. A hearth is a thing a house has, not a building.
-    expect(hearths).toEqual(['fire_pit', 'house'])
+    // The old roster's first name, `hearth`, was a structure kind NOTHING in this world has
+    // ever stood. A hearth is a thing a dwelling has, not a building.
+    expect(hearths).toEqual(['cottage', 'farmhouse', 'fire_pit', 'house'])
     expect(c.structures.recipes).not.toHaveProperty('hearth')
     for (const k of ['well', 'bridge', 'grave', 'storehouse', 'cabin']) expect(isHearthKind(c, k), k).toBe(false)
     expect(isHearthKind(c, 'standing_stone')).toBe(false)
@@ -90,15 +90,15 @@ describe('SimConfigSchema: C9 living-world sections', () => {
   // either, and if these two halves ever disagree then a mind can feed a fire nobody can see,
   // or sleep in a bed that is not in the picture.
   //
-  // Only `house` is on either side today. A cottage and a farmhouse are dwellings a mind can
-  // raise and the template gives them no furnishings at all — the day it does, this test says
-  // so out loud instead of letting the two halves part company in silence.
+  // The three buildable dwellings are on both sides. A storehouse is on neither: it is a roof
+  // over goods, and the ledger below is what keeps that from drifting into "every roof is a
+  // home".
   it('the furnishings the engine acts on are exactly the ones the room is drawn with', () => {
     const furnishedWith = (kind: string): string[] => [...new Set(cityStructures()
       .filter((s) => s.furnishings.some((f) => f.kind === kind))
       .map((s) => s.kind))].sort()
-    expect(furnishedWith(CITY_HEARTH_KIND)).toEqual(['house'])
-    expect(furnishedWith(CITY_BED_KIND)).toEqual(['house'])
+    expect(furnishedWith(CITY_HEARTH_KIND)).toEqual(['cottage', 'farmhouse', 'house'])
+    expect(furnishedWith(CITY_BED_KIND)).toEqual(['cottage', 'farmhouse', 'house'])
     const dwellingsWith = (has: (c: typeof DEFAULT_CONFIG, k: string) => boolean): string[] =>
       Object.keys(c.structures.recipes).filter((k) => has(c, k) && isRoofedKind(c, k)).sort()
     expect(dwellingsWith(isHearthKind)).toEqual(furnishedWith(CITY_HEARTH_KIND))

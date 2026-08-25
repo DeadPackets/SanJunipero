@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, isRoofedKind, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  DEFAULT_CONFIG, isBeddedKind, isHearthKind, isRoofedKind, MINUTES_PER_DAY,
+  type SimConfig, type SimEvent,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -98,6 +101,79 @@ describe('★ a roof is a property of the kind, and the valley meant what it loo
     const far = fold(withBuilding(world(), 'cottage'), ev(10,
       'agent_spawned', { id: 'a1', name: 'a1', x: 9, y: 9, ageDays: 7300 }))
     expect(enter(far, 'a1')).toMatchObject({ ok: false, reason: 'not close enough to the door' })
+  })
+})
+
+// ------------------------------------------------------------- R1b: the ladder ---
+
+// ★ THE LADDER RAN THE WRONG WAY AND NOTHING SAID SO.
+//
+// Every dwelling is priced at ONE rate — 2.5 wood and 720 ticks a tile — so a farmhouse is 20
+// wood, 5 760 ticks and 4 sleeping slots, and so is a PAIR of houses, to the wood and to the
+// tick. With no `hearth` and no `bed` on its row the farmhouse was therefore the same floor for
+// the same price MINUS two fires and two beds: not a worse rung, a STRICTLY DOMINATED one. A
+// mind that saved half again and worked half again got less, and `wants` would have pointed it
+// straight up that ladder — "a drive with no road is not a drive", in its purest form.
+//
+// The fix was effectiveness and not price, and this is the law rather than the two rows: what a
+// dearer roof buys is floor, and the fuel economy that comes with floor. `stoke` feeds the
+// BUILDING for one armful and `besideAKeptFire` warms everybody in the room off it, so wood per
+// body-night falls as the roof grows. No new dial, no retuned rate.
+describe('★ a dearer dwelling is never a worse one', () => {
+  const r = CFG.structures.recipes
+  const buildableDwellings = Object.keys(r)
+    .filter((k) => isRoofedKind(CFG, k) && buildableRecipe(CFG, k) !== null)
+    .sort()
+  const woodOf = (k: string) => r[k]!.inputs['wood']!
+  const slotsOf = (k: string) => roomCapacity({ w: r[k]!.w, h: r[k]!.h })
+  /** What one night of fire costs each body under this roof. A night is 720 ticks and an armful
+   *  buys `fuelBurnTicks` of them, and the whole room drinks the one fire. */
+  const woodPerBodyNight = (k: string) => isHearthKind(CFG, k)
+    ? (MINUTES_PER_DAY / 2) / CFG.light.fuelBurnTicks / slotsOf(k)
+    : Infinity
+
+  it('is asked of every dwelling a pair of hands can raise, and there are three', () => {
+    expect(buildableDwellings).toEqual(['cottage', 'farmhouse', 'house'])
+  })
+
+  it('★ buys something with every extra armful, and gives nothing back', () => {
+    for (const dear of buildableDwellings) {
+      for (const cheap of buildableDwellings) {
+        if (woodOf(dear) <= woodOf(cheap)) continue
+        expect(slotsOf(dear), `${dear} over ${cheap}: floor`).toBeGreaterThan(slotsOf(cheap))
+        expect(woodPerBodyNight(dear), `${dear} over ${cheap}: fuel`).toBeLessThan(woodPerBodyNight(cheap))
+        // And it gives nothing back: whatever the cheaper roof holds, the dearer one holds too.
+        if (isHearthKind(CFG, cheap)) expect(isHearthKind(CFG, dear), `${dear} lost the fire`).toBe(true)
+        if (isBeddedKind(CFG, cheap)) expect(isBeddedKind(CFG, dear), `${dear} lost the bed`).toBe(true)
+      }
+    }
+  })
+
+  // ★ VACUOUS GUARD: the loop above passes on an empty world and on a flat one. These are the
+  // rungs as real numbers, and the price they were bought at is UNCHANGED — the tuning order on
+  // this project is effectiveness → abundance → time-cost → difficulty LAST, and this fix never
+  // reached the last step.
+  it('★ is a real ladder — three rungs of fuel, at one unmoved rate', () => {
+    expect(buildableDwellings.map(slotsOf)).toEqual([3, 4, 2])
+    expect(buildableDwellings.map(woodPerBodyNight)).toEqual([0.5, 0.375, 0.75])
+    for (const k of buildableDwellings) {
+      const tiles = r[k]!.w * r[k]!.h
+      expect(woodOf(k) / tiles, `${k} wood a tile`).toBe(2.5)
+      expect(r[k]!.durationTicks / tiles, `${k} ticks a tile`).toBe(720)
+    }
+  })
+
+  // ★ AND THE SMALL ROOF IS NOT DOMINATED IN RETURN. A house buys the cheapest door in the
+  // world and the only PRIVATE one: `reproductionSystem` counts a night only under a kind named
+  // here, so a couple's own roof is a thing no farmhouse can be. That is what the two-slot
+  // dwelling keeps, and it is why the ladder is a trade rather than a ranking.
+  it('★ leaves the house the one thing no bigger roof can buy', () => {
+    expect(CFG.structures.privateKinds).toEqual(['house'])
+    expect(woodOf('house')).toBe(Math.min(...buildableDwellings.map(woodOf)))
+    for (const k of buildableDwellings) {
+      if (k === 'house') continue
+      expect(CFG.structures.privateKinds, k).not.toContain(k)
+    }
   })
 })
 

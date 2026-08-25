@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  dayPhaseFromTick, glowRadiusFor, isDark, lightBandAt, SimConfigSchema, T_PATH, T_ROAD,
+  dayPhaseFromTick, glowRadiusFor, isDark, isHearthKind, lightBandAt, SimConfigSchema, T_PATH, T_ROAD,
   type SimConfig, type SimEvent,
 } from '@sj/shared'
 import { fold } from './fold.js'
@@ -253,9 +253,16 @@ describe('what a lamp is NOT — the three ways it could have quietly made the n
     expect(isStokeable(CFG, 'hearth')).toBe(true)
     expect(isStokeable(CFG, 'fire_pit')).toBe(true)
     expect(isStokeable(CFG, 'house')).toBe(true)      // it holds a hearth, and that is the fire
-    for (const k of ['well', 'grave', 'bridge', 'storehouse', 'cabin', 'cottage', 'farmhouse']) {
-      expect(isStokeable(CFG, k), k).toBe(false)
+    // Asked of the WHOLE table and not a hand-list, so a kind that gains a hearth is read off
+    // its row instead of going stale here. `lamp_post` is the one stokeable kind with no
+    // hearth: a fire that holds nobody's cold off is exactly what a street light is.
+    for (const k of Object.keys(CFG.structures.recipes)) {
+      expect(isStokeable(CFG, k), k).toBe(isHearthKind(CFG, k) || k === 'lamp_post')
     }
+    // ★ VACUOUS GUARD: both sides of that line have names on them.
+    expect(Object.keys(CFG.structures.recipes).filter((k) => isStokeable(CFG, k)).sort())
+      .toEqual(['cottage', 'farmhouse', 'fire_pit', 'house', 'lamp_post'])
+    for (const k of ['well', 'grave', 'bridge', 'storehouse']) expect(isStokeable(CFG, k), k).toBe(false)
     expect(isStokeable(CFG, 'torch')).toBe(false)
     expect(isKindleable(CFG, 'lamp_post')).toBe(false)
     expect(isKindleable(CFG, 'torch')).toBe(true)

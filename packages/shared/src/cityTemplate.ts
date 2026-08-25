@@ -324,9 +324,15 @@ export const CITY_FURNISHING_KINDS =
 export const CITY_BED_KIND = 'bed'
 export const CITY_HEARTH_KIND = 'hearth'
 
+// ★ THE FIRE AND THE BED, ON ONE PAIR OF SLOTS. More than one dwelling holds them now, and
+// (0, 2) written in three places is (0, 2) that drifts. These are also the only two furnishings
+// a LAW reads, which is why a kind can be given these and nothing else and still be honest.
+const HEARTH_AND_BED: CityFurnishing[] = [
+  { kind: CITY_BED_KIND, slot: { x: 2, y: 1 } },
+  { kind: CITY_HEARTH_KIND, slot: { x: 0, y: 2 } },
+]
 const HOUSE_FURNISHINGS: CityFurnishing[] = [
-  { kind: 'bed', slot: { x: 2, y: 1 } },
-  { kind: 'hearth', slot: { x: 0, y: 2 } },
+  ...HEARTH_AND_BED,
   { kind: 'table', slot: { x: 1, y: 2 } },
   { kind: 'chair', slot: { x: 1, y: 1 } },
   // The plan put the rug at (0,1). A rug is two slots tall, so it would have lain across the
@@ -367,9 +373,19 @@ export const GENESIS_WANTED: readonly Wanted[] = [
   { kind: 'farmhouse', ...mass(DWELLING_FOOTPRINTS.farmhouse), owner: null },
 ]
 
-const furnishingsFor = (kind: string): CityFurnishing[] =>
-  kind === 'house' ? [...HOUSE_FURNISHINGS]
-    : kind === STOREHOUSE_KIND ? [...STOREHOUSE_FURNISHINGS] : []
+// ★ A KIND WHOSE ROW SAYS `hearth` IS FURNISHED WITH ONE, AND `config.test.ts` HOLDS THE TWO
+// HALVES EQUAL. A recipe that promises a fire over a room with no fire in it is a fire a mind
+// can feed and nobody can see — the same parting of ways that made the house's own hearth
+// scenery for a chunk. A cottage and a farmhouse get the pair and nothing more: no renderer
+// draws their interior yet, and a table nobody can see is the dead data the recipe row refuses.
+const FURNISHINGS_BY_KIND: Readonly<Record<string, CityFurnishing[]>> = {
+  house: HOUSE_FURNISHINGS,
+  cottage: HEARTH_AND_BED,
+  farmhouse: HEARTH_AND_BED,
+  [STOREHOUSE_KIND]: STOREHOUSE_FURNISHINGS,
+}
+
+const furnishingsFor = (kind: string): CityFurnishing[] => [...(FURNISHINGS_BY_KIND[kind] ?? [])]
 
 /** The buildings the grammar plats, in grammar coordinates — the one place a plot is claimed. */
 export function cityPlacements(): PlacedStructure[] {
@@ -380,10 +396,11 @@ export function cityPlacements(): PlacedStructure[] {
 // monuments in the square. The STANDING STONE is deliberately absent — it stands beyond the
 // edge of town, unexplained (C11 §9).
 //
-// ONLY A HOUSE IS A HOME. `structures.enterableKinds` and `sleepableKinds` name `house` and
-// nothing else, so the five founders keep five houses, one each, and the cottage, cabin and
-// farmhouse stand as fixtures the eye reads and nobody walks into. Widening that list is a
-// config decision with a pinned hash behind it, not a layout one.
+// EVERY DWELLING IS A HOME, AND ONLY A HOUSE IS PRIVATE. The two rosters this note used to
+// name are gone; the kind's own row answers the way in, the fire and the bed, so the cottage
+// and the farmhouse are buildings a body walks into rather than fixtures the eye reads.
+// `structures.privateKinds` still names `house` alone, which is the one thing the five
+// founders' own doors keep over any bigger roof.
 export function cityStructures(rings: number = TOWN_RINGS_GENESIS): CityStructure[] {
   const monument = (kind: string, at: { dx: number; dy: number }): CityStructure => ({
     kind, dx: at.dx, dy: at.dy, w: 1, h: 1, owner: null, facing: 'sw', furnishings: [],
