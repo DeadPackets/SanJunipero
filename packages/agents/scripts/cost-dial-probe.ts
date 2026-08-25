@@ -12,7 +12,7 @@ import { z } from 'zod'
 import { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS } from '../src/llm/pins.js'
 
 const CAP_USD = 0.5
-const REPS = Number(process.env.DIAL_REPS ?? 3)
+const REPS = Number(process.env.DIAL_REPS ?? 10)
 
 const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY! })
 
@@ -40,8 +40,11 @@ let spent = 0
 type Row = { rung: string; rep: number; provider: string; served: string; inTok: number; outTok: number; reasonTok: number; ok: boolean; note: string }
 const rows: Row[] = []
 
-for (const rung of RUNGS) {
-  for (let rep = 0; rep < REPS; rep++) {
+// Rep OUTER, rung INNER, and the only varying text is `#${rep}` — so within one rep every rung
+// is asked byte-identical bytes. The first probe varied the suffix WITH the rung name and the
+// input-token count moved with it, which would have aliased prompt length onto the dial.
+for (let rep = 0; rep < REPS; rep++) {
+  for (const rung of RUNGS) {
     const extraBody: Record<string, unknown> = {
       models: [MIND_MODEL, ...FALLBACK_MODELS],
       provider: { order: PROVIDER_ORDER, allow_fallbacks: true },
@@ -51,8 +54,7 @@ for (const rung of RUNGS) {
       const r = await generateText({
         model: openrouter(MIND_MODEL, { extraBody }),
         system: SYSTEM,
-        // A distinct suffix per rep so no rung is answered out of the prompt cache.
-        messages: [{ role: 'user', content: `${USER} (ask ${rung.name} #${rep})` }],
+        messages: [{ role: 'user', content: `${USER} (ask #${rep})` }],
         maxRetries: 0,
         output: Output.object({ schema: SCHEMA }),
       })
@@ -82,6 +84,23 @@ for (const rung of RUNGS) {
 for (const r of rows) {
   console.log(
     `${r.ok ? 'OK ' : 'ERR'} rung=${r.rung.padEnd(14)} rep=${r.rep} prov=${String(r.provider).padEnd(12)} served=${r.served} in=${r.inTok} out=${r.outTok} reasoning=${r.reasonTok} :: ${r.note}`,
+  )
+}
+
+const median = (xs: number[]): number => {
+  const s = [...xs].sort((a, b) => a - b)
+  return s.length === 0 ? 0 : s[Math.floor(s.length / 2)]!
+}
+console.log('\nrung           n   ok  in(med)  out(med)  out(min..max)   reasoning(med)  reasoning%')
+for (const rung of RUNGS) {
+  const rs = rows.filter((r) => r.rung === rung.name)
+  const ok = rs.filter((r) => r.ok)
+  const outs = ok.map((r) => r.outTok)
+  const reas = ok.map((r) => r.reasonTok)
+  const sumOut = outs.reduce((a, b) => a + b, 0)
+  const sumRe = reas.reduce((a, b) => a + b, 0)
+  console.log(
+    `${rung.name.padEnd(14)} ${String(rs.length).padStart(2)}  ${String(ok.length).padStart(2)}  ${String(median(ok.map((r) => r.inTok))).padStart(6)}  ${String(median(outs)).padStart(8)}  ${String(Math.min(...outs)).padStart(5)}..${String(Math.max(...outs)).padEnd(6)}  ${String(median(reas)).padStart(12)}  ${sumOut === 0 ? '0' : ((100 * sumRe) / sumOut).toFixed(1)}%`,
   )
 }
 console.log(`\nspend at Wafer prices (0.28/0.56 per M) = $${spent.toFixed(6)}`)
