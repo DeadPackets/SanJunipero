@@ -13,7 +13,7 @@ import { FakeEmbedder, insertAlert, openAgentDb, type LlmClient, type MindSpec }
 import { startDevWorld, type DevWorld, type LiveCast } from './devWorld.js'
 import { foundersFor, townStructuresFor } from './founders.js'
 import {
-  LIVE_OPS_DB, amnesiaRefusal, createLiveCast, ledgerTotalUsd, restorableSnapshot,
+  LIVE_OPS_DB, amnesiaRefusal, createLiveCast, ledgerTotalUsd, restorableSnapshot, settle,
 } from './liveWorld.js'
 import { thoughtsSince } from './observer.js'
 
@@ -387,7 +387,35 @@ describe('★ what the first live boot broke', () => {
       await new Promise((r) => blocker.close(r))
     }
     expect(stopped, 'five minds were left holding databases and the process never exited').toBe(1)
+
+    // ★ AND NOTHING IS STILL POLLING. `createGateway` builds its pump timer BEFORE it listens,
+    // and `close()` — the only thing that clears it — is on the object a failed listen never
+    // returns. The orphan fired every 250 ms against a db the caller had closed and threw an
+    // UNCAUGHT `The database connection is not open`. Vitest reports that as an unhandled
+    // error rather than a failure, so this waits past two poll intervals for it.
+    await new Promise((r) => setTimeout(r, 600))
   }, 30_000)
+})
+
+describe('★ closing the town without closing a database under a mind', () => {
+  // `runSleepReflection` writes its facts and scene summaries AFTER the model answers. Close
+  // the mind's db while one is in flight and better-sqlite3 throws "The database connection is
+  // not open" out of a promise nobody awaits — a stream that dies on SIGTERM instead of
+  // shutting down. `stop` waits for the night, but only for as long as a container will let it.
+  it('waits while a reflection is still in flight', async () => {
+    let busy = true
+    setTimeout(() => { busy = false }, 120)
+    const at = Date.now()
+    expect(await settle(() => busy, 5_000, 20)).toBe(true)
+    expect(Date.now() - at).toBeGreaterThanOrEqual(100)
+  })
+
+  it('and gives up rather than hanging the shutdown', async () => {
+    const at = Date.now()
+    expect(await settle(() => true, 200, 20)).toBe(false)
+    // Bounded: it must not sit past its own deadline waiting out one more poll.
+    expect(Date.now() - at).toBeLessThan(1_000)
+  })
 })
 
 describe('★ the default stays scripted and free', () => {

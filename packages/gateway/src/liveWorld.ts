@@ -61,6 +61,10 @@ export const LIVE_SPEND_STOP_USD = 5
 export const LIVE_SPEND_CHECK_TICKS = 10
 /** How often each mind's clock and half-run plan are written down. ~2 min of wall clock. */
 export const LIVE_RUNTIME_SAVE_TICKS = 48
+/** How long a shutdown waits for a night's reflection to land before closing the db under it.
+ *  A container gives about ten seconds before SIGKILL; losing the night is survivable and
+ *  hanging the shutdown is not. */
+export const REFLECTION_SETTLE_MS = 5_000
 /** The call ledger and the alerts. A `.db` beside the minds, so `SJ_FRESH=1` takes it too. */
 export const LIVE_OPS_DB = '_ops.db'
 /** The sentence-transformer cache. `SJ_MODELS_DIR` moves it; nothing downloads at run time. */
@@ -110,6 +114,21 @@ export function amnesiaRefusal(remembering: ReadonlyArray<{ id: string; memories
     '        A world reset with the minds left standing is worse than either a clean reset or a',
     '        clean resume. Start both over with SJ_FRESH=1, or put the world db back.',
   ].join('\n')
+}
+
+/**
+ * Wait for something to stop being busy, but never for longer than `deadlineMs`. Returns
+ * whether it settled, so a caller can say which of the two happened rather than guess.
+ */
+export async function settle(
+  busy: () => boolean, deadlineMs: number, pollMs = 200,
+): Promise<boolean> {
+  const until = Date.now() + deadlineMs
+  while (busy()) {
+    if (Date.now() >= until) return false
+    await new Promise((r) => setTimeout(r, Math.min(pollMs, Math.max(1, until - Date.now()))))
+  }
+  return true
 }
 
 export function spendStopMessage(spent: number, cap: number): string {
@@ -284,10 +303,19 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     },
 
     async stop(): Promise<void> {
+      stopMinds()
+      // ★ A NIGHT HALF-REFLECTED IS PAID FOR AND THEN THROWN AWAY, AND IT TAKES THE PROCESS
+      // WITH IT. `runSleepReflection` writes its facts and its scene summaries AFTER the model
+      // answers; close the mind's database while one is in flight and better-sqlite3 throws
+      // "The database connection is not open" out of a promise nobody is awaiting. `stop` is
+      // wired to SIGTERM, and a container gives about ten seconds before SIGKILL, so this
+      // waits a bounded five and then closes anyway — losing the night is survivable, hanging
+      // the shutdown is not.
+      const settled = await settle(() => booted?.reflecting() === true, REFLECTION_SETTLE_MS)
+      if (!settled) log('stream: a night was still being reflected on when the town closed')
       // The last plan each mind was halfway through, written at the tick it stopped rather
       // than at the last multiple of 48 — a clean shutdown should lose nothing at all.
       try { saveRuntime(bridge?.currentTick() ?? 0) } catch { /* a closed db loses the plan, not the memory */ }
-      stopMinds()
       for (const db of mindDbs.values()) db.close()
       opsDb.close()
     },
