@@ -16,8 +16,8 @@ run() {
   echo "done $1"
 }
 
-run R1-control unset unset
-run R1-turnoff off   unset
-run R2-control unset unset
-run R2-turnoff off   unset
-echo REPLICATES DONE
+# One pair per invocation, on purpose: a four-arm batch takes ten minutes and the watchdog on
+# this box kills anything quiet for that long — it already took arms D and E of `cost-arms.sh`.
+run "${1:-R1}-control" unset unset
+run "${1:-R1}-turnoff" off   unset
+echo REPLICATE PAIR DONE
