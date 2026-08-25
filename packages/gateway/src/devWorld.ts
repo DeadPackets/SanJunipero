@@ -64,6 +64,10 @@ export type DevWorld = {
   /** True when a live cast is driving the bodies. `false` is the scripted puppets, and the
    *  distinction is the whole seam — a caller that cannot read it cannot tell the two apart. */
   live: boolean
+  /** ONE WHOLE TICK, the way the wall clock takes it: the loop step AND the observer scan that
+   *  follows it. Tests used to reach past this and call `loop.step()`, which is most of a tick
+   *  and not all of it — the thought channel was outside every test in the repo. */
+  tick(): void
   stop(): Promise<void>
 }
 
@@ -86,6 +90,9 @@ export type DevWorld = {
 export type LiveCast = {
   attach(deps: {
     loop: TickLoop; store: EventStore; config: SimConfig
+    /** The world db, in process. A live cast publishes what its minds actually thought into
+     *  `observer_thoughts`, which is the same channel the scripted canned lines used. */
+    db: ReturnType<typeof openDb>
     /** The scripted handler: the tick-1 town, the world systems, and nothing else when the
      *  cast is attached (`FoundersOpts.minds`). A live cast wraps it, never replaces it. */
     world: TickHandler
@@ -359,7 +366,7 @@ export async function startDevWorld(
   })
   handler = opts.cast === undefined
     ? scriptedOnTick
-    : opts.cast.attach({ loop, store, config, world: scriptedOnTick })
+    : opts.cast.attach({ loop, store, config, db, world: scriptedOnTick })
 
   const gateway = await createGateway({
     dbPath, port: opts.port ?? DEV_PORT, terrain, config, db, narratorDbPath: opts.narratorDbPath,
@@ -370,10 +377,16 @@ export async function startDevWorld(
   // Scripted thoughts: when an actor's chosen intent verb changes, it "thinks" a line.
   // ★ The cursor starts at the END of the log, not at 0: a resumed world would otherwise scan
   // its whole history on its first tick and re-publish every thought the town ever had.
+  //
+  // ★ AND A LIVE CAST TURNS THEM OFF. `THOUGHT_LINES` is ten canned strings keyed by verb;
+  // a mind that walks has an actual thought and the cast publishes it to the same table. Left
+  // on, the bubble over a live founder would read "The path is clear enough." over the top of
+  // what it was really thinking, which is the one lie this file must not tell.
   let lastSeq = store.lastSeq()
   const lastVerb = new Map<string, string>()
   const tickOnce = (): void => {
     loop.step()
+    if (opts.cast !== undefined) return
     for (const ev of store.readFrom(lastSeq)) {
       lastSeq = ev.seq
       if (ev.type !== 'action_started') continue
@@ -395,7 +408,7 @@ export async function startDevWorld(
 
   return {
     gateway, loop, terrain, resumedAtTick: resumed ? resumed.state.tick : null,
-    live: opts.cast !== undefined,
+    live: opts.cast !== undefined, tick: tickOnce,
     stop: async () => {
       clearInterval(timer)
       // The cast first: a mind holding a promise on an intent the loop will never step is a

@@ -120,6 +120,9 @@ importers:
 
   packages/gateway:
     dependencies:
+      '@sj/agents':
+        specifier: workspace:*
+        version: link:../agents
       '@sj/engine':
         specifier: workspace:*
         version: link:../engine

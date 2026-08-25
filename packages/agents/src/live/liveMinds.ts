@@ -26,6 +26,7 @@ import { makeReflectionLlm } from '../reflection.js'
 import { AgentRuntime, type RuntimeSnapshot } from '../runtime/agentRuntime.js'
 import type { EngineBridge } from '../runtime/bridge.js'
 import { wireArbiter, type SeamArbiter } from '../runtime/arbiterSeam.js'
+import type { MindConfig } from '../wake.js'
 
 /** One person, before there is a body for them. The shape `founderMinds.ts` already speaks. */
 export type MindSpec = {
@@ -62,15 +63,10 @@ export type BootMindsOpts = {
   turnLlm: (agentId: string) => LlmClient
   /** Absent, a mind sleeps without reflecting — cheaper, and a night that costs nothing. */
   reflectionLlm?: (agentId: string) => LlmClient
-  /**
-   * ★ WRITE A FIRST PERSONALITY, OR TRUST THE ONE ON DISK. `PersonalityStore.current()` THROWS
-   * on a mind with no version 1, and `init` on a mind that already has one silently writes a
-   * second version 1 — a personality that then reads back at random. A resumed mind's document
-   * is already in its database, edits and all, so this must be false on a resume and true on a
-   * new day 0, and there is no third answer.
-   */
-  seedPersonality: boolean
-  /** The sim day a seeded personality is stamped with. Ignored when `seedPersonality` is false. */
+  /** The wake cadence. Absent in every real run; a harness that cannot wait out the 120-tick
+   *  boredom floor to see a mind take one turn sets it. */
+  mindConfig?: Partial<MindConfig>
+  /** The sim day a first personality is stamped with. See `hasPersonality`. */
   day?: number
   onThought?: (t: { tick: number; agentId: string; text: string }) => void
   /** Per-mind runtime state to put back after `start`, which is what clears it. */
@@ -79,12 +75,26 @@ export type BootMindsOpts = {
   arbiter?: SeamArbiter
 }
 
+/**
+ * ★ WRITE A FIRST PERSONALITY, OR TRUST THE ONE ON DISK — AND DECIDE IT BY LOOKING, NOT BY A
+ * FLAG THE CALLER MIGHT GET WRONG. `PersonalityStore.current()` THROWS on a mind with no
+ * version 1, and `init` on a mind that already has one writes a SECOND version 1, after which
+ * `current()` reads back whichever row the index happens to pick. A caller passing
+ * `resuming = false` on a directory that still holds yesterday's minds gets the second failure
+ * silently. Asking the database removes the question.
+ */
+export function hasPersonality(db: Database.Database, agentId: string): boolean {
+  try {
+    return db.prepare('SELECT 1 FROM personality_versions WHERE agent_id = ? LIMIT 1').get(agentId) !== undefined
+  } catch { return false }
+}
+
 export function bootMinds(opts: BootMindsOpts): BootedMinds {
   const runtimes = new Map<string, AgentRuntime>()
   for (const spec of opts.minds) {
     const db = opts.dbFor(spec.id)
     const personality = new PersonalityStore(db, spec.id)
-    if (opts.seedPersonality) personality.init(spec.personality, opts.day ?? 0)
+    if (!hasPersonality(db, spec.id)) personality.init(spec.personality, opts.day ?? 0)
     const runtime = new AgentRuntime({
       db,
       llm: opts.turnLlm(spec.id),
@@ -92,6 +102,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
       identity: spec.identity,
       personality,
       bridge: opts.bridge,
+      ...(opts.mindConfig === undefined ? {} : { config: opts.mindConfig }),
       ...(opts.reflectionLlm === undefined
         ? {}
         : { reflectionLlm: makeReflectionLlm(opts.reflectionLlm(spec.id)) }),

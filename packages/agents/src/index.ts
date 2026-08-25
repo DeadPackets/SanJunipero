@@ -22,7 +22,8 @@ export { wireArbiter, buildAgentCtx, type Adjudicator, type Codifier, type SeamA
 export { PersonalityStore, type PersonalityDoc } from './personality.js'
 export { openAgentDb, migrateAgentTables } from './memory/schema.js'
 export { type IdentityCore } from './prompt/assemble.js'
-export { bootMinds, type BootedMinds, type BootMindsOpts, type MindSpec } from './live/liveMinds.js'
+export { bootMinds, hasPersonality, type BootedMinds, type BootMindsOpts, type MindSpec } from './live/liveMinds.js'
+export { type MindConfig } from './wake.js'
 export { FOUNDER_MINDS, type Mind } from './live/founderMinds.js'
 export {
   PREFLIGHT_BAR, PREFLIGHT_CALLS, PREFLIGHT_ROUNDS, preflightRefusal, runPreflight, scorePreflight,
