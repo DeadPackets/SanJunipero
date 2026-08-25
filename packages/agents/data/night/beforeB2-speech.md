@@ -1,0 +1,16 @@
+- t=1239 {"agentId":"amara","text":"I'll put my wood in.","x":79,"y":63}
+- t=1276 {"agentId":"nadia","text":"Omar! Walls look good. You about to call it a night?","x":74,"y":75}
+- t=1288 {"agentId":"yusuf","text":"Aye. I will not waste the dusk.","x":79,"y":70}
+- t=1307 {"agentId":"omar","text":"Now then. Walls look good, and I'm about done. Cold night, but I've slept worse. See you at first light.","x":74,"y":75}
+- t=1309 {"agentId":"yusuf","text":"Aye. Bring it in — I'll have this one closed up before the night goes deeper.","x":79,"y":70}
+- t=1323 {"agentId":"nadia","text":"Omar, you carrying wood? I've got twelve, and this cottage's still a good bit short of a roof.","x":74,"y":75}
+- t=1360 {"agentId":"yusuf","text":"Aye. A bit more and it's done.","x":79,"y":70}
+- t=1399 {"agentId":"omar","text":"Now then. Aye, I'll call it. The walls will wait, and the ground will do.","x":74,"y":75}
+- t=1403 {"agentId":"yusuf","text":"Aye. This one's near done — I'll see you all at first light.","x":79,"y":70}
+- t=1410 {"agentId":"nadia","text":"See you at first light, Omar. The wall's good enough for me tonight.","x":74,"y":75}
+- t=1422 {"agentId":"yusuf","text":"Aye. I've got wood enough. I'll finish this one before I sleep.","x":79,"y":70}
+- t=1436 {"agentId":"amara","text":"Thirty-two wood in now. Sleep.","x":81,"y":61,"insideId":"structure_1"}
+- t=1458 {"agentId":"omar","text":"Now then. I've got a dozen — take it, let's get this roof up.","x":74,"y":75}
+- t=1460 {"agentId":"yusuf","text":"Aye. A few more sticks and the roof's on.","x":79,"y":70}
+- t=1481 {"agentId":"omar","text":"Now then. I'll take the ground tonight — first light finds me ready.","x":74,"y":75}
+- t=1487 {"agentId":"nadia","text":"Omar, I've wood enough for a house — I'm off to the plot to get one up. You're welcome to the walls when they're done.","x":74,"y":75}

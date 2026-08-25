@@ -1,0 +1,76 @@
+{
+  "arm": "b",
+  "valley": "shipped",
+  "ladder": "after",
+  "label": "afterB1",
+  "ticks": 300,
+  "startTick": 1200,
+  "llmCalls": 41,
+  "costUsd": 0.0335,
+  "intents": 48,
+  "byVerb": {
+    "speak": 29,
+    "walk": 9,
+    "build": 3,
+    "forage": 2,
+    "enter": 1,
+    "stow": 1,
+    "eat": 1,
+    "sleep": 1,
+    "give": 1
+  },
+  "builds": 3,
+  "structuresPlanned": 0,
+  "structuresCompleted": 0,
+  "structureProgressed": 499,
+  "entered": 1,
+  "spoke": 28,
+  "refusals": 3,
+  "refusalsByReason": [
+    [
+      "already at that spot",
+      3
+    ]
+  ],
+  "warmthAtEnd": {
+    "amara": 0,
+    "yusuf": 0,
+    "nadia": 0,
+    "omar": 0,
+    "salma": 46
+  },
+  "buildIntents": [
+    {
+      "tick": 1271,
+      "id": "yusuf",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1275,
+      "id": "amara",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    },
+    {
+      "tick": 1455,
+      "id": "nadia",
+      "verb": "build",
+      "params": "{\"kind\":\"house\"}"
+    }
+  ],
+  "thoughtsMentioningCold": 24,
+  "thoughts": 32,
+  "lampsPlanned": 0,
+  "lampsCompleted": 0,
+  "lampBuildIntents": 0,
+  "houseBuildIntents": 3,
+  "stoked": 0,
+  "enteredWarm": 1,
+  "stokedIndoors": 0,
+  "slept": 1,
+  "kindled": 0,
+  "torchCrafts": 0,
+  "lightActs": 0,
+  "thoughtsMentioningDark": 9
+}
