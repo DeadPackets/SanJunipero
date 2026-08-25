@@ -43,11 +43,12 @@ describe('★ chrome.css survives the merge trains intact', () => {
     }
   })
 
-  // 167 base + 5 the Discovery Record + 2 the little map — merge train 1's hand count. Half a
+  // 167 base + 5 the Discovery Record + 2 the little map — merge train 1's hand count — + 1 the
+  // bond tally (`contracts`: the whole-history counts the 24-act window cannot say). Half a
   // block surviving a union merge keeps its banner and still balances its braces; only the rule
   // count sees it.
-  it('has the 174 top-level rules the trains counted', () => {
-    expect(LINES.filter((l) => l.startsWith('}'))).toHaveLength(174)
+  it('has the 175 top-level rules the trains counted', () => {
+    expect(LINES.filter((l) => l.startsWith('}'))).toHaveLength(175)
   })
 
   it('is brace-balanced and carries no conflict marker', () => {

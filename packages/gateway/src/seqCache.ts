@@ -19,6 +19,25 @@ import type { ServerResponse } from 'node:http'
  */
 export const MAX_KEYS = 32
 
+/**
+ * ★ AND A KEY CAP IS NOT A MEMORY CAP.
+ *
+ * The comment above promised bounded memory and the code bounded the number of KEYS, so the real
+ * ceiling was 32 × the largest body — and the largest body was `/api/bonds` at **83 704 521 B**,
+ * which made the honest reading of "bounded" about 2.7 GB. Bonds now has a ceiling of its own,
+ * but a key cap over unbounded bodies is not a cap and the next big route would inherit the same
+ * lie.
+ *
+ * 4 MiB, because the four whole-history routes come to about 100 KB together on a twelve-agent
+ * town and 4 MiB is two orders of headroom over that — large enough that no real viewer ever
+ * meets it, small enough to be a number rather than "whatever the biggest answer happens to be".
+ *
+ * A single body larger than the whole budget is still admitted, after everything else has been
+ * dropped for it. Refusing it would mean rebuilding it on every request, which is exactly the
+ * amplification this cache exists to stop.
+ */
+export const MAX_BYTES = 4 * 1024 * 1024
+
 export type SeqCache = {
   /** The body for `key` in this generation, built at most once. */
   json(key: string, build: () => unknown): string
@@ -31,12 +50,17 @@ export type SeqCache = {
   value<T>(key: string, build: () => T): T
   /** Testing seam: how many bodies are held right now. */
   size(): number
+  /** Testing seam: how many bytes of body are held right now. */
+  bytes(): number
 }
 
-export function makeSeqCache(seqOf: () => number, maxKeys = MAX_KEYS): SeqCache {
+export function makeSeqCache(
+  seqOf: () => number, maxKeys = MAX_KEYS, maxBytes = MAX_BYTES,
+): SeqCache {
   let generation = -1
   const bodies = new Map<string, string>()
   const values = new Map<string, unknown>()
+  let held = 0
   // Oldest-first eviction. An attacker varying the query string churns these maps but can
   // never grow them, and a real viewer's handful of URLs never reaches the cap.
   const fresh = (): void => {
@@ -45,9 +69,13 @@ export function makeSeqCache(seqOf: () => number, maxKeys = MAX_KEYS): SeqCache 
     generation = seq
     bodies.clear()
     values.clear()
+    held = 0
   }
-  const cap = (m: Map<string, unknown>): void => {
-    if (m.size >= maxKeys) m.delete(m.keys().next().value as string)
+  const evictOldest = (): void => {
+    const oldest = bodies.keys().next()
+    if (oldest.done === true) return
+    held -= bodies.get(oldest.value)!.length
+    bodies.delete(oldest.value)
   }
   return {
     json(key, build) {
@@ -55,19 +83,25 @@ export function makeSeqCache(seqOf: () => number, maxKeys = MAX_KEYS): SeqCache 
       const hit = bodies.get(key)
       if (hit !== undefined) return hit
       const body = JSON.stringify(build())
-      cap(bodies)
+      if (bodies.size >= maxKeys) evictOldest()
+      while (bodies.size > 0 && held + body.length > maxBytes) evictOldest()
       bodies.set(key, body)
+      held += body.length
       return body
     },
     value<T>(key: string, build: () => T): T {
       fresh()
       if (values.has(key)) return values.get(key) as T
       const v = build()
-      cap(values)
+      // Intermediates are objects, not strings, so their bytes cannot be measured without
+      // serialising them — which is the work this map exists to avoid. Keys only, and the two
+      // callers of `value` share one key each.
+      if (values.size >= maxKeys) values.delete(values.keys().next().value as string)
       values.set(key, v)
       return v
     },
     size: () => bodies.size,
+    bytes: () => held,
   }
 }
 

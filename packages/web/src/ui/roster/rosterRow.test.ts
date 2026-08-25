@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { bondId, type AssetRecord, type Bond, type BondsResponse, type SimEvent } from '@sj/shared'
+import { bondFrom, type AssetRecord, type Bond, type BondsResponse, type SimEvent } from '@sj/shared'
 import type { Structure, TileId, WorldState } from '@sj/engine/state'
 import { EXPRESSIONS, moodOf, type MoodView } from '../../render/mood.js'
 import { GAMIFICATION_BAN } from '../townStats.js'
@@ -59,10 +59,8 @@ function world(
   }
 }
 
-const bond = (aId: string, bId: string, kind: Bond['kind'], n: number, tick: number): Bond => ({
-  id: bondId(aId, bId), aId, bId, kind, strength: n, formedTick: tick, lastUpdatedTick: tick,
-  history: Array.from({ length: n }, () => ({ tick, kind, note: 'x' })),
-})
+const bond = (aId: string, bId: string, kind: Bond['kind'], n: number, tick: number): Bond =>
+  bondFrom(aId, bId, Array.from({ length: n }, () => ({ tick, kind })), tick)
 const api = (bonds: Bond[]): BondsResponse => ({ bonds, asOfTick: 0 })
 
 // ── DAY 0: complete, dignified, and visibly a person who has not lived yet ────────────────

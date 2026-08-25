@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { bondId, type Bond, type BondEvent, type BondKind, type BondsResponse } from '@sj/shared'
+import { bondFrom, type Bond, type BondAct, type BondKind, type BondsResponse } from '@sj/shared'
 import { GAMIFICATION_BAN } from './townStats.js'
 import { BOND_LEVELS, BOND_TYPES, LEVEL_RANK, bondArc, type LineageLike } from './bondModel2.js'
 import { BondDetailPanel } from './BondDetailPanel.js'
@@ -33,13 +33,10 @@ const contrast = (fg: string, bg: string): number => {
   return (hi + 0.05) / (lo + 0.05)
 }
 
-const at = (tick: number, kind: BondKind): BondEvent => ({ tick, kind, note: 'spoke together' })
+const at = (tick: number, kind: BondKind): BondAct => ({ tick, kind })
 
-const bond = (aId: string, bId: string, kind: BondKind, history: BondEvent[]): Bond => ({
-  id: bondId(aId, bId), aId, bId, kind, strength: history.length,
-  formedTick: history[0]?.tick ?? 0, lastUpdatedTick: history[history.length - 1]?.tick ?? 0,
-  history,
-})
+const bond = (aId: string, bId: string, _kind: BondKind, acts: BondAct[], asOfTick = 0): Bond =>
+  bondFrom(aId, bId, acts, asOfTick)
 const api = (bonds: Bond[]): BondsResponse => ({ bonds, asOfTick: 0 })
 
 const PEOPLE: PeopleIndex = {
@@ -204,8 +201,8 @@ describe('the legend’s off chip is a struck-through mark, not an opacity', () 
 // ── THE DETAIL PANEL ───────────────────────────────────────────────────────────────────────
 describe('BondDetailPanel — the arc, the evidence, and NO filled bar', () => {
   const history = [at(0, 'partner'), at(100, 'partner'), at(200, 'partner')]
-  const b = bond('amara', 'nadia', 'partner', history)
-  const arc = bondArc(history, 200)
+  const b = bond('amara', 'nadia', 'partner', history, 200)
+  const arc = bondArc(b, 200)
   const html = renderToStaticMarkup(createElement(BondDetailPanel, {
     bond: b, people: PEOPLE, type: 'partner' as const, level: 'friendly' as const,
     arc, words: 'Amara and Nadia are partners, and they are friends.',

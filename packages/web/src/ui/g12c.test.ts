@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { TOGGLABLE_PATHS } from '@sj/engine/laws'
 import type { WorldState } from '@sj/engine/state'
-import { chronicleIcon, type SimEvent } from '@sj/shared'
+import { bondFrom, chronicleIcon, type SimEvent } from '@sj/shared'
 
 // GATE G12c — THE CHROME HALF. The other two files are:
 //   packages/web/src/render/g12c.test.ts   — the canvas (U3–U11, U18, U19)
@@ -202,15 +202,18 @@ describe('U14 — "the timeline is missing MARKS; the font is hard to read and t
 
 describe('U15 — "the bonds tab does not represent relationships and its tags are weird"', () => {
   it('starts a pair who spoke once as strangers', () => {
-    expect(bondLevel(bondWarmth([{ tick: 10, kind: 'spoke' }] as never, 20))).toBe('strangers')
+    // `as never` on an act NAME used to slip past the type system and read as a valence of 1
+    // by luck. The contract's own kind is the only thing the fold will take now.
+    expect(bondLevel(bondWarmth(bondFrom('a', 'b', [{ tick: 10, kind: 'friend' }], 20), 20)))
+      .toBe('strangers')
   })
 
   it('reaches every one of the six levels, and a level FALLS on decay', () => {
     expect(new Set(LEVEL_RANK).size).toBe(6)
     for (const t of LEVEL_THRESHOLDS) expect(LEVEL_RANK).toContain(t.level)
-    const acts = Array.from({ length: 40 }, (_, i) => ({ tick: i * 10, kind: 'give' }))
-    const hot = bondWarmth(acts as never, 400)
-    const cold = bondWarmth(acts as never, 400 + 20000)
+    const acts = Array.from({ length: 40 }, (_, i) => ({ tick: i * 10, kind: 'owe' as const }))
+    const hot = bondWarmth(bondFrom('a', 'b', acts, 400), 400)
+    const cold = bondWarmth(bondFrom('a', 'b', acts, 400), 400 + 20000)
     expect(cold).toBeLessThan(hot)
     expect(LEVEL_RANK.indexOf(bondLevel(cold)))
       .toBeLessThanOrEqual(LEVEL_RANK.indexOf(bondLevel(hot)))

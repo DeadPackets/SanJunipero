@@ -86,7 +86,7 @@ export function toRelationGraph(
 
   const links: RelationLink[] = []
   for (const b of [...bonds.bonds].sort((x, y) => x.id.localeCompare(y.id))) {
-    const level = bondLevel(bondWarmth(b.history, nowTick))
+    const level = bondLevel(bondWarmth(b, nowTick))
     if (level === NO_LINK_LEVEL) continue
     let source = b.aId
     let target = b.bId
@@ -95,7 +95,7 @@ export function toRelationGraph(
       ;[source, target] = [target, source]
       type = 'parent'
     }
-    const arc = bondArc(b.history, nowTick)
+    const arc = bondArc(b, nowTick)
     const stroke = TYPE_STROKE[type]
     links.push({
       id: b.id, source, target, type, level, arc,

@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { BondsResponseSchema, ChronicleResponseSchema } from '@sj/shared'
+import { BondsCountSchema, ChronicleCountSchema } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { LENSES, type Lens } from './route.js'
 import {
@@ -125,12 +125,12 @@ function useHistoryCount(
 }
 
 const bondRows = (body: unknown): number | null => {
-  const p = BondsResponseSchema.safeParse(body)
-  return p.success ? p.data.bonds.length : null
+  const p = BondsCountSchema.safeParse(body)
+  return p.success ? p.data.count : null
 }
 const chronicleRows = (body: unknown): number | null => {
-  const p = ChronicleResponseSchema.safeParse(body)
-  return p.success ? p.data.entries.length : null
+  const p = ChronicleCountSchema.safeParse(body)
+  return p.success ? p.data.count : null
 }
 
 // The lens bar subscribes on its own so the counts can tick without re-rendering App and,
@@ -138,12 +138,17 @@ const chronicleRows = (body: unknown): number | null => {
 export function LensTabs({ store, lens, onNav }: { store: WorldStore; lens: Lens; onNav: (l: Lens) => void }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
-  const bonds = useHistoryCount('/api/bonds', bondRows, BOND_COUNT_REFETCH_MS)
-  // ★ THE SAME ENDPOINT `ChroniclePanel` LISTS FROM — the ledger the chronicle lens actually
-  // opens on — so the badge and the panel behind it can never again disagree. It used to count
-  // the live socket feed instead: `CHRONICLE 0` over sixteen entries, on the first screen a
-  // viewer sees. See the note over `lensHints`.
-  const chronicle = useHistoryCount('/api/chronicle', chronicleRows, CHRONICLE_COUNT_REFETCH_MS)
+  // ★ AND THE SAME FIX AS THE CHRONICLE, FOR A MUCH BIGGER FEED. A `Bond` carries its whole
+  // history, so counting by downloading cost 83.7 MB at sim-day 20 of a talkative town — every
+  // 60 s, per viewer, for a two-digit badge.
+  const bonds = useHistoryCount('/api/bonds/count', bondRows, BOND_COUNT_REFETCH_MS)
+  // ★ THE SAME LEDGER `ChroniclePanel` LISTS FROM, COUNTED WITHOUT BEING DOWNLOADED. The badge
+  // and the panel can never again disagree — it used to count the live socket feed instead, and
+  // read `CHRONICLE 0` over sixteen entries on the first screen a viewer sees. It then read the
+  // right number by fetching every entry to measure the array: 5 260 B of ledger for two digits
+  // at sim-day 100, every 20 s, per viewer. `/api/chronicle/count` is the same scan on the
+  // server (memoised per world generation, so the panel pays nothing extra) and ~60 B back.
+  const chronicle = useHistoryCount('/api/chronicle/count', chronicleRows, CHRONICLE_COUNT_REFETCH_MS)
   const stats = townStats(state, tick)
   return <LensTabsView lens={lens} hints={lensHints(stats, lensCountsFor(stats, chronicle, bonds))} onNav={onNav} />
 }

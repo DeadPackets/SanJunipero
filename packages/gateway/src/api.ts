@@ -4,7 +4,10 @@ import Database from 'better-sqlite3'
 import { MINUTES_PER_DAY, tickToMoment, type SimConfig, type SimEvent } from '@sj/shared'
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
-import { heatWindows, type HeatWindow } from './heatStub.js'
+import {
+  HEAT_WINDOW_TICKS, heatContext, heatFromScores, heatSince, scoreEvent,
+  type HeatScores, type HeatWindow,
+} from './heatStub.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 
 export const TALK_WINDOW_TICKS = 20   // two spoke events this close, in earshot → one talk weight
@@ -54,6 +57,17 @@ export type DataApiDeps = {
   mirror: WorldMirror
   config: SimConfig
   agentDbDir?: string
+  /** Testing seam only: how many records the read path is holding right now. See `readFold`. */
+  onFootprint?: (f: () => Footprint) => void
+}
+
+/** What the read path keeps once an event has been folded. Every field is a count of ANSWERS —
+ *  links, drama windows, deaths, buildings — and none of them is a count of events. */
+export type Footprint = {
+  provenance: number; heat: number; links: number; spokes: number
+  started: number; deaths: number; completions: number
+  /** The highest seq folded. Present so a guard can prove the fold really consumed the log. */
+  seq: number
 }
 
 type LinkKind = 'talk' | 'give' | 'teach' | 'attack'
@@ -79,39 +93,163 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
    * cache-missing requests fell to 13/s at a 510 ms median AND stretched the town's own 2500 ms
    * tick to 2923-2991 ms — the world visibly ran slow for every other viewer.
    *
-   * The parse is the cost, not the shaping. Memoised per generation it is paid once however
-   * many endpoints and however many query strings ask for it, so a deliberate cache miss now
-   * buys a filter over an array already in memory instead of a second walk of the log.
+   * An earlier lane fixed the CPU by memoising the parsed log and appending to it per
+   * generation. That made the reads 338× faster and left a `SimEvent[]` that never shrinks.
    *
-   * Callers MUST treat the result as frozen; every one of them filters or folds rather than
-   * mutating, and `heatWindows` only reads.
+   * ★ AND A RETAINED LOG IS A LEAK WITH A VIEWER ATTACHED. Measured on this machine against a
+   * real founders town, over `/api/society` — the first endpoint to touch the array:
    *
-   * ★ AND ONCE PER GENERATION IS STILL O(WORLD AGE), WHICH IS THE CEILING ON A TOWN THAT NEVER
-   * RESTARTS. The generation changes EVERY tick, so re-reading the whole table per generation
-   * costs the tick thread a full re-parse of all of history, every 2.5 seconds. Measured on
-   * this machine at 185 ns and 123 B per event against a real town's payloads: 48 ms/tick at
-   * sim-day 10, 250 ms at sim-day 52, 485 ms at sim-day 100. Nobody had ever hit it because
-   * nobody could keep a town alive past a few hours — resume is what makes it reachable.
+   *   |  events | retained |
+   *   |---:|---:|
+   *   |  49 649 |  7.2 MB |
+   *   | 139 337 | 20.3 MB |
+   *   | 183 622 | 28.7 MB |
+   *   | 255 809 | 52.8 MB |
+   *   | 346 069 | 86.9 MB |
    *
-   * The log is append-only, so the fix is to append. The array is retained across generations
-   * and only the rows after the highest seq already held are read and parsed: O(events this
-   * tick), flat in world age. What remains O(age) is the RESIDENT array, and that is the part
-   * this cannot fix from here — see the report.
+   * Strictly linear in EVENTS, with no ceiling of any kind — 151 B/event early and 396 B/event
+   * marginal once `fauna_moved` (640 B payloads) dominates. Days are not the axis: this town
+   * goes quiet on day 3, and one that stays as busy as its own founding days (34.5 events/tick)
+   * passes 387 MB at sim-day 31 and 750 MB at day 100. A stream is watched for weeks.
+   *
+   * ★ SO THE LOG IS NOT KEPT. Every event is folded ONCE, into the aggregates the four routes
+   * below actually answer from, and then dropped. What is retained is a count of ANSWERS —
+   * one entry per talking pair, per 60-tick drama window, per death, per building — never a
+   * count of events. `footprint()` is that in numbers, and `apiFootprint.test.ts` ticks a world
+   * four times deeper and holds it to a ceiling.
    */
   type EventRow = { seq: number; tick: number; type: string; payload: string }
-  let eventsGen = -1
-  let eventsCursor = 0
-  const eventsMemo: SimEvent[] = []
-  const readEvents = (): readonly SimEvent[] => {
+  type Planned = { kind: string; builderId: string; plannedTick: number }
+  type Spoke = { agentId: string; tick: number; x: number; y: number }
+
+  const planned = new Map<string, Planned>()
+  const completedTick = new Map<string, number>()
+  const heat: HeatScores = new Map()
+  const weights = new Map<string, number>()        // `${source}\n${target}\n${kind}` → weight
+  const deaths: Array<{ agentId: string; tick: number; cause: string }> = []
+  const completions: Array<{ id: string; tick: number }> = []
+  // Bounded by construction: a spoke older than the talk window can never pair with a new one,
+  // and the started map is keyed by agent and verb, so it is the size of the cast times three.
+  let spokes: Spoke[] = []
+  const started = new Map<string, Record<string, unknown>>()
+
+  const earshot = deps.config.movement.earshotRadius
+  const bump = (source: string, target: string, kind: LinkKind): void => {
+    const key = `${source}\n${target}\n${kind}`
+    weights.set(key, (weights.get(key) ?? 0) + 1)
+  }
+
+  // The drama scorer's one piece of world knowledge, and the read path already keeps it: a fire
+  // at a place is scored to the person who raised the place. See `heatStub.dramatis`.
+  const builderOf = (id: string): string | null => planned.get(id)?.builderId ?? null
+  const heatCtx = heatContext(builderOf)
+
+  const foldOne = (ev: SimEvent): void => {
+    scoreEvent(heat, ev, heatCtx)
+    switch (ev.type) {
+      case 'agent_spoke': {
+        const p = ev.payload as { agentId: string; x: number; y: number }
+        // The old scan compared against every earlier spoke and skipped the stale ones; dropping
+        // them instead is the same answer and turns an O(spokes²) walk into a bounded one.
+        if (spokes.length > 0 && spokes[0]!.tick < ev.tick - TALK_WINDOW_TICKS) {
+          spokes = spokes.filter((s) => ev.tick - s.tick <= TALK_WINDOW_TICKS)
+        }
+        for (const prev of spokes) {
+          if (prev.agentId === p.agentId) continue
+          if (Math.hypot(p.x - prev.x, p.y - prev.y) > earshot) continue
+          const [a, b] = [prev.agentId, p.agentId].sort() as [string, string]
+          bump(a, b, 'talk')
+        }
+        spokes.push({ agentId: p.agentId, tick: ev.tick, x: p.x, y: p.y })
+        return
+      }
+      case 'action_started': {
+        const p = ev.payload as { agentId: string; verb: string; params: Record<string, unknown> }
+        if (VERB_LINKS.has(p.verb)) started.set(`${p.agentId}\n${p.verb}`, p.params)
+        return
+      }
+      case 'action_completed': {
+        const p = ev.payload as { agentId: string; verb: string }
+        if (!VERB_LINKS.has(p.verb)) return
+        const targetId = started.get(`${p.agentId}\n${p.verb}`)?.targetId
+        if (typeof targetId === 'string') bump(p.agentId, targetId, p.verb as LinkKind)
+        return
+      }
+      case 'structure_planned': {
+        const p = ev.payload as { id: string; kind: string; builderId: string }
+        // Last plan wins and last completion wins, in two maps, because that is what the old
+        // linear scan did — it tracked the two facts independently and in either order.
+        planned.set(p.id, { kind: p.kind, builderId: p.builderId, plannedTick: ev.tick })
+        return
+      }
+      case 'structure_completed': {
+        const id = (ev.payload as { id: string }).id
+        completedTick.set(id, ev.tick)
+        completions.push({ id, tick: ev.tick })
+        return
+      }
+      case 'agent_died': {
+        const p = ev.payload as { agentId: string; cause: string }
+        deaths.push({ agentId: p.agentId, tick: ev.tick, cause: p.cause })
+        return
+      }
+      default:
+    }
+  }
+
+  let foldGen = -1
+  let foldCursor = 0
+  const readFold = (): void => {
     const gen = deps.mirror.seq()
-    if (gen !== eventsGen) {
-      eventsGen = gen
-      for (const r of selEventsAfter.all(eventsCursor) as EventRow[]) {
-        eventsMemo.push({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) } as SimEvent)
-        eventsCursor = r.seq
+    if (gen === foldGen) return
+    foldGen = gen
+    for (const r of selEventsAfter.all(foldCursor) as EventRow[]) {
+      foldOne({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) } as SimEvent)
+      foldCursor = r.seq
+    }
+  }
+  deps.onFootprint?.(() => ({
+    provenance: planned.size + completedTick.size, heat: heat.size, links: weights.size,
+    spokes: spokes.length, started: started.size, deaths: deaths.length,
+    completions: completions.length, seq: foldCursor,
+  }))
+
+  /**
+   * ★ HEAT OVER A WINDOW THE VIEWER PICKED, WITHOUT KEEPING THE LOG.
+   *
+   * `/api/digest` is "what did I miss" — `fromTick = tick − missedTicks` — so its ends land
+   * anywhere, and a 60-tick drama window the range only half covers must score only the half.
+   * Rounding to whole windows would report drama from before the viewer left.
+   *
+   * Whole windows come from the running map. The at most TWO windows the range cuts are
+   * re-scored from the log, which is at most 120 ticks and hits `idx_events_tick` — bounded
+   * however old the town is.
+   */
+  const selRange = deps.db.prepare(
+    'SELECT seq, tick, type, payload FROM events WHERE tick BETWEEN ? AND ? ORDER BY seq')
+  const heatOver = (fromTick: number, toTick: number): HeatWindow[] => {
+    const lo = Math.floor(fromTick / HEAT_WINDOW_TICKS)
+    const hi = Math.floor(toTick / HEAT_WINDOW_TICKS)
+    const loWhole = fromTick % HEAT_WINDOW_TICKS === 0 ? lo : lo + 1
+    const hiWhole = toTick % HEAT_WINDOW_TICKS === HEAT_WINDOW_TICKS - 1 ? hi : hi - 1
+    const scores: HeatScores = new Map()
+    // A fresh actor memory per re-read; a verb's completion and its results share a tick, so a
+    // tick range never splits the pair and the re-scored window is exact.
+    const ctx = heatContext(builderOf)
+    for (const [key, score] of heat) {
+      const w = Number(key.slice(0, key.indexOf('\n')))
+      if (w >= loWhole && w <= hiWhole) scores.set(key, score)
+    }
+    for (const w of new Set([lo, hi])) {
+      if (w >= loWhole && w <= hiWhole) continue
+      const from = Math.max(fromTick, w * HEAT_WINDOW_TICKS)
+      const to = Math.min(toTick, (w + 1) * HEAT_WINDOW_TICKS - 1)
+      if (from > to) continue
+      for (const r of selRange.all(from, to) as EventRow[]) {
+        scoreEvent(scores, { seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) } as SimEvent, ctx)
       }
     }
-    return eventsMemo
+    return heatFromScores(scores)
   }
 
   // agent memory DBs are optional (scripted world) — missing file or table reads as []
@@ -155,98 +293,70 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
       'SELECT version, day, doc, edit FROM personality_versions WHERE agent_id = ? ORDER BY version'))
   })
 
+  // ★ AND THIS ONE WAS NOT BEHIND THE CACHE AT ALL. It walked the whole memo per request with
+  // the id chosen by the caller, so a stranger in a loop bought a full history scan every time.
+  // A map keyed by the id makes it the O(1) lookup it always described itself as.
   router.route('GET', '/api/structure/:id/provenance', (_req, res, params) => {
+    readFold()
     const id = params.id ?? ''
-    let planned: { tick: number; kind: string; builderId: string } | null = null
-    let completedTick: number | null = null
-    for (const ev of readEvents()) {
-      if (ev.type === 'structure_planned') {
-        const p = ev.payload as { id: string; kind: string; builderId: string }
-        if (p.id === id) planned = { tick: ev.tick, kind: p.kind, builderId: p.builderId }
-      } else if (ev.type === 'structure_completed' && (ev.payload as { id: string }).id === id) {
-        completedTick = ev.tick
-      }
-    }
-    if (!planned) { notFound(res); return }
-    sendJson(res, { id, kind: planned.kind, plannedTick: planned.tick, builderId: planned.builderId, completedTick })
+    const plan = planned.get(id)
+    if (!plan) { notFound(res); return }
+    sendJson(res, {
+      id, kind: plan.kind, plannedTick: plan.plannedTick, builderId: plan.builderId,
+      completedTick: completedTick.get(id) ?? null,
+    })
   })
 
-  router.route('GET', '/api/society', (_req, res) => sendPrebuilt(res, cache.json('society', () => {
-    const state = deps.mirror.state()
-    const nodes = Object.values(state.agents)
-      .sort((a, b) => (a.id < b.id ? -1 : 1))
-      .map(a => ({ id: a.id, name: a.name, alive: a.alive }))
-
-    const weights = new Map<string, number>() // `${source}\n${target}\n${kind}` → weight
-    const bump = (source: string, target: string, kind: LinkKind): void => {
-      const key = `${source}\n${target}\n${kind}`
-      weights.set(key, (weights.get(key) ?? 0) + 1)
-    }
-
-    const earshot = deps.config.movement.earshotRadius
-    const spokes: Array<{ agentId: string; tick: number; x: number; y: number }> = []
-    const started = new Map<string, Record<string, unknown>>() // `${agentId}\n${verb}` → params
-    for (const ev of readEvents()) {
-      if (ev.type === 'agent_spoke') {
-        const p = ev.payload as { agentId: string; x: number; y: number }
-        const cur = { agentId: p.agentId, tick: ev.tick, x: p.x, y: p.y }
-        for (const prev of spokes) {
-          if (prev.agentId === cur.agentId) continue
-          if (cur.tick - prev.tick > TALK_WINDOW_TICKS) continue
-          if (Math.hypot(cur.x - prev.x, cur.y - prev.y) > earshot) continue
-          const [a, b] = [prev.agentId, cur.agentId].sort() as [string, string]
-          bump(a, b, 'talk')
-        }
-        spokes.push(cur)
-      } else if (ev.type === 'action_started') {
-        const p = ev.payload as { agentId: string; verb: string; params: Record<string, unknown> }
-        if (VERB_LINKS.has(p.verb)) started.set(`${p.agentId}\n${p.verb}`, p.params)
-      } else if (ev.type === 'action_completed') {
-        const p = ev.payload as { agentId: string; verb: string }
-        if (!VERB_LINKS.has(p.verb)) continue
-        const params = started.get(`${p.agentId}\n${p.verb}`)
-        const targetId = params?.targetId
-        if (typeof targetId === 'string') bump(p.agentId, targetId, p.verb as LinkKind)
-      }
-    }
-
-    const links = [...weights.entries()]
-      .map(([key, weight]) => {
-        const [source, target, kind] = key.split('\n') as [string, string, LinkKind]
-        return { source, target, kind, weight }
-      })
-      .sort((a, b) => b.weight - a.weight
-        || a.source.localeCompare(b.source) || a.target.localeCompare(b.target) || a.kind.localeCompare(b.kind))
-    return { nodes, links }
-  })))
+  router.route('GET', '/api/society', (_req, res) => {
+    readFold()
+    sendPrebuilt(res, cache.json('society', () => {
+      const nodes = Object.values(deps.mirror.state().agents)
+        .sort((a, b) => (a.id < b.id ? -1 : 1))
+        .map(a => ({ id: a.id, name: a.name, alive: a.alive }))
+      const links = [...weights.entries()]
+        .map(([key, weight]) => {
+          const [source, target, kind] = key.split('\n') as [string, string, LinkKind]
+          return { source, target, kind, weight }
+        })
+        .sort((a, b) => b.weight - a.weight
+          || a.source.localeCompare(b.source) || a.target.localeCompare(b.target) || a.kind.localeCompare(b.kind))
+      return { nodes, links }
+    }))
+  })
 
   // /api/chapters moved to narratorApi.ts, where it reads C7's real chapters instead of [].
 
-  router.route('GET', '/api/heat', (_req, res) =>
-    sendPrebuilt(res, cache.json('heat', () => heatWindows(readEvents()))))
+  /**
+   * ★ THE HORIZON IS THE CEILING — see `HEAT_HORIZON_TICKS`.
+   *
+   * The running map stays whole, because `/api/digest` answers "what did I miss" over a window
+   * the viewer picks and must be exact however far back it reaches. What is SENT is the last
+   * sim-day of it, which is a body bounded by the population rather than by the town's age, and
+   * twelve times more than `pickCut` looks at.
+   */
+  router.route('GET', '/api/heat', (_req, res) => {
+    readFold()
+    sendPrebuilt(res, cache.json('heat', () =>
+      heatSince(heatFromScores(heat), deps.mirror.state().tick)))
+  })
 
   router.route('GET', '/api/digest', (req: IncomingMessage, res) => {
+    readFold()
     const url = new URL(req.url ?? '/', 'http://localhost')
     sendPrebuilt(res, cache.json(`digest${url.search}`, () => {
       const { fromTick, toTick } = clampWindow(
         url.searchParams.get('fromTick'), url.searchParams.get('toTick'), deps.mirror.state().tick)
-      const events = readEvents().filter(ev => ev.tick >= fromTick && ev.tick <= toTick)
+      const inWindow = (t: number): boolean => t >= fromTick && t <= toTick
 
       const days: number[] = []
       for (let d = Math.floor(fromTick / MINUTES_PER_DAY); d <= Math.floor(toTick / MINUTES_PER_DAY); d++) days.push(d)
 
-      const deaths = events.filter(ev => ev.type === 'agent_died').map(ev => {
-        const p = ev.payload as { agentId: string; cause: string }
-        return { agentId: p.agentId, tick: ev.tick, cause: p.cause }
-      })
-
       const state = deps.mirror.state()
-      const structuresCompleted = events.filter(ev => ev.type === 'structure_completed').map(ev => {
-        const id = (ev.payload as { id: string }).id
-        return { id, kind: state.structures[id]?.kind ?? 'structure', tick: ev.tick }
-      })
+      const structuresCompleted = completions.filter(c => inWindow(c.tick)).map(c => ({
+        id: c.id, kind: state.structures[c.id]?.kind ?? 'structure', tick: c.tick,
+      }))
 
-      const topMoments = heatWindows(events)
+      const topMoments = heatOver(fromTick, toTick)
         .sort((a: HeatWindow, b: HeatWindow) => b.score - a.score
           || a.fromTick - b.fromTick || a.agentId.localeCompare(b.agentId))
         .slice(0, TOP_MOMENTS)
@@ -260,7 +370,10 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
           line: `${a.name} was last seen ${a.activity ? gerund(a.activity.verb) : 'resting'}`,
         }))
 
-      return { days, deaths, births: [], structuresCompleted, topMoments, agentLines }
+      return {
+        days, deaths: deaths.filter(d => inWindow(d.tick)), births: [],
+        structuresCompleted, topMoments, agentLines,
+      }
     }))
   })
 }

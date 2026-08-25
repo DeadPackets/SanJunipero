@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { bondId, type Bond, type BondEvent, type BondKind, type BondsResponse } from '@sj/shared'
+import { bondFrom, warmthOf, type Bond, type BondAct, type BondKind, type BondsResponse } from '@sj/shared'
 import { GAMIFICATION_BAN } from './townStats.js'
 import {
   ACT_OF_BOND_KIND, BOND_LEVELS, BOND_LEVEL_WORD, BOND_TYPES, BOND_TYPE_WORD, BOND_VALENCE,
   EMPTY_LINEAGE, LEVEL_RANK, LEVEL_THRESHOLDS, SPOUSE_NIGHTS, WARMTH_HALF_LIFE_TICKS,
-  bondArc, bondLevel, bondTypeOf, bondWarmth, partnerEvidence, relationLine,
+  bondArc, bondLevel, bondTypeOf, partnerEvidence, relationLine,
   type BondLevel, type LineageLike,
 } from './bondModel2.js'
 
@@ -12,15 +12,16 @@ import {
 const HALF = WARMTH_HALF_LIFE_TICKS
 const DAY = HALF
 
-/** the endpoint records a BondKind per event, so the fixtures speak the endpoint's language */
-const at = (tick: number, kind: BondKind): BondEvent => ({ tick, kind, note: 'x' })
+/** the endpoint records a BondKind per act, so the fixtures speak the endpoint's language */
+const at = (tick: number, kind: BondKind): BondAct => ({ tick, kind })
 
-const bond = (aId: string, bId: string, history: BondEvent[], kind: BondKind = 'friend'): Bond => ({
-  id: bondId(aId, bId), aId, bId, kind, strength: history.length,
-  formedTick: history[0]?.tick ?? 0,
-  lastUpdatedTick: history[history.length - 1]?.tick ?? 0,
-  history,
-})
+/** ★ THE FIXTURES GO THROUGH THE REAL FOLD. A hand-built `Bond` could carry a `warmth` and a
+ *  `recent` that disagree, which is exactly the drift this contract has to be safe from. */
+const bond = (aId: string, bId: string, acts: BondAct[], asOfTick = 0): Bond =>
+  bondFrom(aId, bId, acts, asOfTick)
+
+/** the reference sum over acts in hand — what the server's fold has to agree with */
+const bondWarmth = warmthOf
 
 const api = (bonds: Bond[]): BondsResponse => ({ bonds, asOfTick: 0 })
 
@@ -28,7 +29,7 @@ const lineage = (edges: Array<[string, string]>, tick = 100): LineageLike => ({
   parentOf: edges.map(([parentId, childId]) => ({ parentId, childId, tick })),
 })
 
-const STEADY = bondArc([], 0)
+const STEADY = bondArc(bond('a', 'b', []), 0)
 
 // ── THE COMPLAINT, AS A TEST ───────────────────────────────────────────────────────────────
 describe('U15: the landed model calls anyone who ever spoke a friend', () => {
@@ -43,12 +44,12 @@ describe('U15: the landed model calls anyone who ever spoke a friend', () => {
 
   it('hatred is expressible at all, which it was not', () => {
     expect([...BOND_LEVELS]).toContain('hatred')
-    expect(BOND_VALENCE.attack).toBeLessThan(0)
+    expect(BOND_VALENCE.rival).toBeLessThan(0)
   })
 })
 
 describe('every level is reachable, one history each', () => {
-  const cases: Array<[BondLevel, BondEvent[]]> = [
+  const cases: Array<[BondLevel, BondAct[]]> = [
     ['strangers', [at(0, 'friend')]],
     ['acquaintances', [at(0, 'friend'), at(0, 'friend'), at(0, 'work')]],
     ['friendly', [at(0, 'owe'), at(0, 'owe'), at(0, 'partner'), at(0, 'friend')]],
@@ -111,13 +112,14 @@ describe('a friendship is losable and hatred is earnable', () => {
   })
 
   it('a birth adds no warmth — being kin is a type, never a temperature', () => {
-    expect(BOND_VALENCE.born).toBe(0)
+    expect(BOND_VALENCE.kin).toBe(0)
     expect(bondWarmth([at(0, 'kin')], 0)).toBe(0)
   })
 
   it('the act table covers every kind the endpoint can record', () => {
     for (const k of Object.keys(ACT_OF_BOND_KIND) as BondKind[]) {
-      expect(BOND_VALENCE[ACT_OF_BOND_KIND[k]], k).not.toBeUndefined()
+      expect(BOND_VALENCE[k], k).not.toBeUndefined()
+      expect(ACT_OF_BOND_KIND[k], k).not.toBeUndefined()
     }
   })
 })
@@ -144,13 +146,13 @@ describe('bondTypeOf — the same edge read from two ends', () => {
   })
 
   it('a pair who slept under one roof are partners', () => {
-    const b = api([bond('amara', 'yusuf', [at(0, 'partner')], 'partner')])
+    const b = api([bond('amara', 'yusuf', [at(0, 'partner')])])
     expect(bondTypeOf('amara', 'yusuf', EMPTY_LINEAGE, b)).toBe('partner')
     expect(bondTypeOf('yusuf', 'amara', EMPTY_LINEAGE, b)).toBe('partner')
   })
 
   it('kin OUTRANKS partner: a recorded birth beats an inferred partnership', () => {
-    const b = api([bond('amara', 'kid', [at(0, 'partner')], 'partner')])
+    const b = api([bond('amara', 'kid', [at(0, 'partner')])])
     expect(bondTypeOf('amara', 'kid', fam, b)).toBe('parent')
   })
 
@@ -162,7 +164,7 @@ describe('bondTypeOf — the same edge read from two ends', () => {
 })
 
 describe('partnerEvidence — shown, never asserted', () => {
-  const nights = (n: number, from = 0): BondEvent[] =>
+  const nights = (n: number, from = 0): BondAct[] =>
     Array.from({ length: n }, (_, i) => at(from + i * DAY, 'partner'))
 
   it('names the day once there have been enough nights, and says "lately" before', () => {
@@ -190,7 +192,7 @@ describe('partnerEvidence — shown, never asserted', () => {
 describe('bondArc — which way it is going', () => {
   it('a history that keeps building reports warming', () => {
     const h = [at(0, 'friend'), at(DAY + 10, 'owe'), at(DAY + 20, 'owe'), at(DAY + 30, 'partner')]
-    const arc = bondArc(h, DAY + 40)
+    const arc = bondArc(bond('a', 'b', h, DAY + 40), DAY + 40)
     expect(arc.direction).toBe('warming')
     expect(LEVEL_RANK.indexOf(arc.to)).toBeGreaterThan(LEVEL_RANK.indexOf(arc.from))
   })
@@ -198,7 +200,7 @@ describe('bondArc — which way it is going', () => {
   it('a history that stops reports cooling, and names the day it turned', () => {
     // warmth 24 at tick 0: a day later it is 12 (friendly), two days later 6 (acquaintances)
     const h = Array.from({ length: 6 }, () => at(0, 'partner'))
-    const arc = bondArc(h, 2 * DAY)
+    const arc = bondArc(bond('a', 'b', h, 2 * DAY), 2 * DAY)
     expect(arc).toEqual({
       from: 'friendly', to: 'acquaintances', direction: 'cooling', sinceDay: 0,
     })
@@ -206,7 +208,7 @@ describe('bondArc — which way it is going', () => {
   })
 
   it('a level that has not moved is steady, and an empty history does not throw', () => {
-    const flat = bondArc([at(0, 'friend')], 10)
+    const flat = bondArc(bond('a', 'b', [at(0, 'friend')], 10), 10)
     expect(flat.direction).toBe('steady')
     expect(STEADY.direction).toBe('steady')
     expect(STEADY.from).toBe(STEADY.to)

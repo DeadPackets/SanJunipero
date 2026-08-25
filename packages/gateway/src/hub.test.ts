@@ -82,3 +82,50 @@ describe('SocketHub', () => {
     expect(hub.size()).toBe(0)
   })
 })
+
+/**
+ * ★ THE ONE HEALTH SIGNAL THAT MATTERS, AND NOBODY WAS EVER TOLD.
+ *
+ * The hub decides a viewer is 1 MiB behind, marks it `lagging` and silently drops its deltas
+ * until it drains. `laggingCount()` reported exactly that and had **no non-test caller** — it
+ * was computed for nobody on a surface handed to strangers.
+ *
+ * MUTATION-PROVED: deleting either `#say` call leaves this at 0 lines and 1 line respectively.
+ */
+describe('★ the stream says when a viewer falls behind', () => {
+  it('reports the transition, both ways, with the count — and only on the transition', () => {
+    const lines: string[] = []
+    const hub = new SocketHub((l) => lines.push(l))
+    const s = fakeSocket({ buffered: 2 * 1024 * 1024 })
+    hub.add(s, () => '{"t":"snapshot"}')
+
+    hub.broadcast('a')
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain('fell behind')
+    expect(lines[0], 'the count is the operational fact, not the one socket')
+      .toContain('1 of 1 viewers lagging')
+
+    // still lagging, three more broadcasts: a line per delta would be 4 Hz of the same sentence
+    hub.broadcast('b')
+    hub.broadcast('c')
+    expect(lines).toHaveLength(1)
+
+    s.bufferedAmount = 0
+    hub.broadcast('d')
+    expect(lines).toHaveLength(2)
+    expect(lines[1]).toContain('caught up')
+    expect(lines[1]).toContain('0 of 1 viewers lagging')
+
+    // and a healthy stream says nothing at all
+    hub.broadcast('e')
+    expect(lines).toHaveLength(2)
+  })
+
+  it('a healthy viewer never produces a line', () => {
+    const lines: string[] = []
+    const hub = new SocketHub((l) => lines.push(l))
+    hub.add(fakeSocket(), () => '{}')
+    for (let i = 0; i < 50; i++) hub.broadcast('x')
+    expect(lines).toEqual([])
+  })
+})

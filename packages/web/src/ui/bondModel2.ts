@@ -1,4 +1,23 @@
-import { tickToMoment, type Bond, type BondEvent, type BondKind, type BondsResponse } from '@sj/shared'
+import {
+  BOND_ACT_OF_KIND, BOND_LEVELS, BOND_VALENCE, LEVEL_RANK, LEVEL_THRESHOLDS,
+  WARMTH_HALF_LIFE_TICKS, bondActCount, bondLevel, bondRollup, bondWarmth, tickToMoment,
+  type Bond, type BondLevel, type BondsResponse,
+} from '@sj/shared'
+
+// ★ THE MODEL MOVED HALFWAY TO THE SERVER, AND ONLY BECAUSE THE HISTORY DID.
+//
+// Warmth, the level thresholds and the valence table now live in `@sj/shared`: the reader is no
+// longer handed the acts, so the fold happens once on the server and the reader decays the
+// scalar forward. `decayWarmth` makes that EXACT rather than approximate — see the identity in
+// `shared/src/bonds.ts`. What stays here is everything a viewer reads and a server never should:
+// the type axis, the words, and the arc's presentation.
+export {
+  BOND_LEVELS, BOND_VALENCE, LEVEL_RANK, LEVEL_THRESHOLDS, WARMTH_HALF_LIFE_TICKS,
+  bondLevel, bondWarmth, type BondLevel,
+} from '@sj/shared'
+
+/** The endpoint records a `BondKind`; the plan names the ACT. The table is the contract's. */
+export const ACT_OF_BOND_KIND = BOND_ACT_OF_KIND
 
 // RELATIONSHIPS HAVE A KIND AND A TEMPERATURE, AND THE TEMPERATURE CAN FALL (U15, P22).
 //
@@ -56,7 +75,9 @@ export function bondTypeOf(
     for (const p of parentsOf(bId, lineage)) if (mine.has(p)) return 'sibling'
   }
   const bond = bondBetween(aId, bId, bonds)
-  return bond !== null && bond.history.some((h) => actOf(h) === 'co_slept') ? 'partner' : 'none'
+  // The rollup counts EVERY night the pair kept house, so a marriage older than the 24-act
+  // window is still a marriage — which a truncated list on its own could not have said.
+  return bond !== null && bondActCount(bond, 'partner') > 0 ? 'partner' : 'none'
 }
 
 /** Shared roofs after which the line can name the day it began rather than saying "lately". */
@@ -68,81 +89,17 @@ export const SPOUSE_NIGHTS = 14
  * "married" appears only if the world recorded it, and the world records nights, not weddings.
  */
 export function partnerEvidence(b: Bond): string | null {
-  const nights = b.history.filter((h) => actOf(h) === 'co_slept')
-  if (nights.length === 0) return null
-  if (nights.length < SPOUSE_NIGHTS) return 'They have shared a roof lately.'
-  return `They have shared a roof since Day ${tickToMoment(nights[0]!.tick).day}.`
+  const nights = bondRollup(b, 'partner')
+  if (nights === null) return null
+  if (nights.count < SPOUSE_NIGHTS) return 'They have shared a roof lately.'
+  return `They have shared a roof since Day ${tickToMoment(nights.firstTick).day}.`
 }
 
 // ── LEVEL ──────────────────────────────────────────────────────────────────────────────────
 
-export const BOND_LEVELS =
-  ['strangers', 'acquaintances', 'friendly', 'close', 'strained', 'hatred'] as const
-export type BondLevel = (typeof BOND_LEVELS)[number]
-
 export const BOND_LEVEL_WORD: Readonly<Record<BondLevel, string>> = {
   strangers: 'Strangers', acquaintances: 'Acquaintances', friendly: 'Friends',
   close: 'Close', strained: 'Strained', hatred: 'Hatred',
-}
-
-/** Signed weight per recorded act. The NEGATIVE half is what makes a level a relationship
- *  rather than a counter, and it is the only reason "hatred" is reachable at all. */
-export const BOND_VALENCE: Readonly<Record<string, number>> = {
-  spoke: 1, teach: 2, give: 3, co_slept: 4, born: 0, attack: -8,
-}
-
-/**
- * The acts above are how the plan names them; the endpoint records a `BondKind`, and in the
- * landed gateway the two are one-to-one — one rule per verb, one kind per rule. This is the
- * translation, written down rather than assumed, so a future writer that records the act
- * directly also works.
- */
-export const ACT_OF_BOND_KIND: Readonly<Record<BondKind, string>> = {
-  friend: 'spoke', work: 'teach', owe: 'give', partner: 'co_slept', kin: 'born', rival: 'attack',
-}
-
-function actOf(h: BondEvent): string {
-  return BOND_VALENCE[h.kind] !== undefined
-    ? h.kind
-    : ACT_OF_BOND_KIND[h.kind as BondKind] ?? h.kind
-}
-
-/**
- * A friendship needs keeping up: silence costs warmth, which is what lets a level FALL without
- * anybody doing anything wrong.
- *
- * MEASURED CORRECTION to the plan, which calls this constant "one sim-day": a tick is a
- * sim-MINUTE and `MINUTES_PER_DAY` is 1440, so 2880 ticks is **two** sim-days. The value is
- * kept — two days of silence to halve a warmth is the gentler and better-behaved of the two
- * readings — and the comment is corrected rather than the number.
- */
-export const WARMTH_HALF_LIFE_TICKS = 2880
-
-/** Deterministic and order-independent — a sum is commutative, and two reads of one history
- *  at one tick can never disagree. */
-export function bondWarmth(history: readonly BondEvent[], nowTick: number): number {
-  let sum = 0
-  for (const h of history) {
-    const w = BOND_VALENCE[actOf(h)]
-    if (w === undefined) continue
-    const age = Math.max(0, nowTick - h.tick)
-    sum += w * Math.pow(0.5, age / WARMTH_HALF_LIFE_TICKS)
-  }
-  return sum
-}
-
-/** Ascending in warmth: the first row whose ceiling the warmth is at or under. */
-export const LEVEL_THRESHOLDS: ReadonlyArray<{ at: number; level: BondLevel }> = [
-  { at: -12, level: 'hatred' }, { at: -3, level: 'strained' }, { at: 2, level: 'strangers' },
-  { at: 8, level: 'acquaintances' }, { at: 20, level: 'friendly' }, { at: Infinity, level: 'close' },
-]
-
-/** Coldest to warmest — the one order that says whether a relationship went up or down. */
-export const LEVEL_RANK: readonly BondLevel[] = LEVEL_THRESHOLDS.map((t) => t.level)
-
-export function bondLevel(warmth: number): BondLevel {
-  for (const t of LEVEL_THRESHOLDS) if (warmth <= t.at) return t.level
-  return 'close'
 }
 
 const rankOf = (l: BondLevel): number => LEVEL_RANK.indexOf(l)
@@ -157,28 +114,21 @@ export type BondArc = {
   sinceDay: number
 }
 
-export function bondArc(
-  history: readonly BondEvent[], nowTick: number, windowTicks: number = WARMTH_HALF_LIFE_TICKS,
-): BondArc {
-  const then = Math.max(0, nowTick - windowTicks)
-  const past = history.filter((h) => h.tick <= then)
-  const from = bondLevel(bondWarmth(past, then))
-  const to = bondLevel(bondWarmth(history, nowTick))
-
-  // the last tick at which the level was different from what it is now
-  const ticks = [...new Set(history.map((h) => h.tick))].sort((a, b) => a - b)
-  let changedAt = ticks[0] ?? 0
-  let prev: BondLevel | null = null
-  for (const t of ticks) {
-    const at = bondLevel(bondWarmth(history.filter((h) => h.tick <= t), t))
-    if (prev !== null && at !== prev) changedAt = t
-    prev = at
-  }
-
+/**
+ * ★ THREE READS OF A SUMMARY, WHERE THIS USED TO BE O(acts²) IN THE BROWSER.
+ *
+ * It found `sinceDay` by re-summing the history at every distinct tick — a nested walk, per
+ * link, per render, over a history that reached six figures per bond. The server folds the same
+ * answer forward in one pass; `priorWarmth` is where the pair stood a half-life ago and
+ * `levelChangedTick` is when the level last moved.
+ */
+export function bondArc(bond: Bond, nowTick: number): BondArc {
+  const from = bondLevel(bond.priorWarmth)
+  const to = bondLevel(bondWarmth(bond, nowTick))
   const direction = rankOf(to) > rankOf(from) ? 'warming'
     : rankOf(to) < rankOf(from) ? 'cooling'
       : 'steady'
-  return { from, to, direction, sinceDay: tickToMoment(changedAt).day }
+  return { from, to, direction, sinceDay: tickToMoment(bond.levelChangedTick).day }
 }
 
 // ── THE SENTENCE A VIEWER READS ────────────────────────────────────────────────────────────

@@ -2,9 +2,13 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BondsResponseSchema, DEFAULT_CONFIG, bondId, type Bond, type BondsResponse } from '@sj/shared'
+import {
+  BOND_RECENT_ACTS, BondsCountSchema, BondsResponseSchema, DEFAULT_CONFIG, bondId, bondNote,
+  type Bond, type BondsResponse, type SimEvent,
+} from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { createGateway, type Gateway } from './index.js'
+import { buildBonds } from './bonds.js'
 
 const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0 as TileId))
 
@@ -72,7 +76,8 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     const b = find('alice', 'bob')
     expect(b?.kind).toBe('partner')
     expect(b?.strength).toBe(2)
-    expect(b?.history.map((h) => h.note)).toEqual(['kept house together', 'kept house together'])
+    expect(b?.recent.map((h) => bondNote(h.kind))).toEqual(['kept house together', 'kept house together'])
+    expect(b?.acts).toEqual([{ kind: 'partner', count: 2, firstTick: 30, lastTick: 40 }])
     expect(b?.formedTick).toBe(30)
     expect(b?.lastUpdatedTick).toBe(40)
   })
@@ -81,23 +86,23 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     for (const parent of ['alice', 'bob']) {
       const b = find(parent, 'mira')
       expect(b?.kind, parent).toBe('kin')
-      expect(b?.history.map((h) => h.note), parent).toEqual(['parent and child'])
+      expect(b?.recent.map((h) => bondNote(h.kind)), parent).toEqual(['parent and child'])
       expect(b?.formedTick, parent).toBe(50)
     }
   })
 
   it('reads a gift as a debt, a lesson as work, and a blow as a rivalry', () => {
     expect(find('cara', 'eve')?.kind).toBe('owe')
-    expect(find('cara', 'eve')?.history[0]?.note).toBe('gave something away')
+    expect(find('cara', 'eve')?.recent[0]).toEqual({ tick: 22, kind: 'owe' })
     expect(find('dan', 'eve')?.kind).toBe('rival')      // the fight outranks the lesson
-    expect(find('dan', 'eve')?.history.map((h) => h.note))
+    expect(find('dan', 'eve')?.recent.map((h) => bondNote(h.kind)))
       .toEqual(['taught something', 'came to blows'])
   })
 
   it('still ties a friendship from talk alone, with no C9 data at all', () => {
     const b = find('cara', 'dan')
     expect(b?.kind).toBe('friend')
-    expect(b?.history[0]?.note).toBe('spoke together')
+    expect(b?.recent[0]).toEqual({ tick: 10, kind: 'friend' })
   })
 
   it('ties no one who has done nothing together', () => {
@@ -111,19 +116,77 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     expect(again).toEqual(body)
   })
 
-  it('keeps every history entry in the order it happened', () => {
+  it('keeps the window in the order it happened, and the rollup over the whole of it', () => {
     for (const b of body.bonds) {
-      const ticks = b.history.map((h) => h.tick)
+      const ticks = b.recent.map((h) => h.tick)
       expect([...ticks].sort((x, y) => x - y), b.id).toEqual(ticks)
-      expect(b.formedTick, b.id).toBe(ticks[0])
       expect(b.lastUpdatedTick, b.id).toBe(ticks[ticks.length - 1])
-      expect(b.strength, b.id).toBe(b.history.length)
+      // the rollup is over EVERY act, so it agrees with `strength` and with the two stamps
+      expect(b.acts.reduce((n, a) => n + a.count, 0), b.id).toBe(b.strength)
+      expect(Math.min(...b.acts.map((a) => a.firstTick)), b.id).toBe(b.formedTick)
+      expect(Math.max(...b.acts.map((a) => a.lastTick)), b.id).toBe(b.lastUpdatedTick)
+      expect(b.recent.length, b.id).toBeLessThanOrEqual(BOND_RECENT_ACTS)
     }
   })
 
   it('speaks of the town in every note — no verbs, no payloads', () => {
     for (const b of body.bonds) {
-      for (const h of b.history) expect(h.note, h.note).toMatch(/^[a-z]/)
+      for (const h of b.recent) expect(bondNote(h.kind), h.kind).toMatch(/^[a-z]/)
     }
+  })
+
+  /**
+   * ★ HOW MANY BONDS, WITHOUT SENDING THE BONDS. The feed used to carry every act that ever
+   * formed a tie — 83.7 MB at sim-day 20 of a talkative town — and the lens badge fetched all of
+   * it every 60 s to display one number. The feed has a ceiling now; the badge still may not
+   * pay for it.
+   */
+  it('★ counts the bonds without sending them', async () => {
+    const count = BondsCountSchema.parse(await (await fetch(`${base}/api/bonds/count`)).json())
+    expect(count.count).toBe(body.bonds.length)
+    expect(count.asOfTick).toBe(body.asOfTick)
+    const full = await (await fetch(`${base}/api/bonds`)).text()
+    expect(JSON.stringify(count).length, 'two integers, not a feed').toBeLessThan(full.length / 4)
+  })
+})
+
+/**
+ * ★ EVERY SPOKE AGAINST EVERY EARLIER SPOKE WAS O(n²), ON THE THREAD THAT TICKS THE TOWN.
+ *
+ * A spoke older than `TALK_WINDOW_TICKS` is skipped by the earshot loop, so it can pair with
+ * nothing ever again — but it stayed in the array and was walked once per later spoke. Measured
+ * at sim-day 20 of a talkative town: 38.4 s for one `/api/bonds`. Dropping the stale ones is the
+ * same answer in bounded time, and this proves the "same answer" half.
+ */
+describe('★ the talk window is a window, not the whole log', () => {
+  const spoke = (seq: number, tick: number, agentId: string, x: number): SimEvent =>
+    ({ seq, tick, type: 'agent_spoke', payload: { agentId, text: 'w', x, y: 0 } }) as SimEvent
+
+  it('ties exactly the pairs inside the window and none outside it', () => {
+    const events = [
+      spoke(1, 0, 'a', 0), spoke(2, 5, 'b', 1),          // 5 apart, in earshot → friend
+      spoke(3, 200, 'c', 0), spoke(4, 219, 'a', 1),      // 19 apart → friend
+      spoke(5, 240, 'b', 0), spoke(6, 261, 'c', 1),      // 21 apart → NOT a pair
+      spoke(7, 400, 'a', 0), spoke(8, 401, 'b', 40),     // in the window, out of earshot
+    ]
+    const out = buildBonds(events, 5, 500)
+    expect(out.bonds.map((b) => b.id)).toEqual([bondId('a', 'b'), bondId('a', 'c')])
+    expect(out.bonds.find((b) => b.id === bondId('a', 'b'))?.recent.map((h) => h.tick)).toEqual([5])
+    expect(out.bonds.find((b) => b.id === bondId('a', 'c'))?.recent.map((h) => h.tick)).toEqual([219])
+  })
+
+  it('is linear in the log, not quadratic — 8× the speech is not 64× the work', () => {
+    const run = (n: number): number => {
+      const events = Array.from({ length: n }, (_, i) => spoke(i + 1, i, `a${i % 8}`, 0))
+      const t0 = process.hrtime.bigint()
+      buildBonds(events, 5, n)
+      return Number(process.hrtime.bigint() - t0) / 1e6
+    }
+    run(4_000)                                  // warm the jit so the ratio is the algorithm
+    const small = Math.max(run(8_000), 1)
+    const large = run(64_000)
+    // quadratic would be ~64×; the bound makes it ~8×. Ten is the honest line between them.
+    expect(large / small, `8k took ${small.toFixed(1)} ms, 64k took ${large.toFixed(1)} ms`)
+      .toBeLessThan(10)
   })
 })

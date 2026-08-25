@@ -1,4 +1,4 @@
-import { tickToMoment, type Bond } from '@sj/shared'
+import { BOND_RECENT_ACTS, bondNote, tickToMoment, type Bond } from '@sj/shared'
 import {
   BOND_LEVEL_WORD, BOND_TYPE_WORD, partnerEvidence, type BondArc, type BondLevel, type BondType,
 } from './bondModel2.js'
@@ -30,9 +30,10 @@ export function BondDetailPanel({ bond, people, type, level, arc, words, onClose
   words: string
   onClose: () => void
 }) {
-  const newestFirst = [...bond.history].reverse()
+  const newestFirst = [...bond.recent].reverse()
   const evidence = type === 'partner' ? partnerEvidence(bond) : null
   const nameOf = (id: string): string => people[id]?.name ?? id
+  const earlier = bond.strength - bond.recent.length
 
   return (
     <aside className="bond-detail" role="dialog" aria-label={words}>
@@ -65,14 +66,37 @@ export function BondDetailPanel({ bond, people, type, level, arc, words, onClose
         <dd>{moment(bond.lastUpdatedTick)}</dd>
       </dl>
 
+      {/* ★ WHAT THE TALLY SAYS AND THE LIST NEVER COULD.
+          The feed used to carry every act that ever formed the tie, which at sim-day 20 of a
+          talkative town was 83.7 MB of "They spoke together." — a list nobody reads to the end
+          of, and one no browser was going to render. The counts are the whole history; the
+          column below is the last {BOND_RECENT_ACTS} of it. */}
+      <ul className="bond-tally">
+        {bond.acts.map((a) => (
+          <li key={a.kind}>
+            <span className="tally-count">{a.count.toLocaleString()}×</span>
+            <span className="feed-text">
+              They {bondNote(a.kind)}, first on Day {tickToMoment(a.firstTick).day}.
+            </span>
+          </li>
+        ))}
+      </ul>
+
       <ol className="bond-history">
         {newestFirst.map((h, i) => (
           <li key={`${h.tick}:${i}`}>
             <span className="stamp">{moment(h.tick)}</span>
-            <span className="feed-text">They {h.note}.</span>
+            <span className="feed-text">They {bondNote(h.kind)}.</span>
           </li>
         ))}
       </ol>
+
+      {earlier > 0 && (
+        <p className="bond-earlier">
+          {earlier === 1 ? 'One earlier time is counted above.'
+            : `${earlier.toLocaleString()} earlier times are counted above.`}
+        </p>
+      )}
     </aside>
   )
 }

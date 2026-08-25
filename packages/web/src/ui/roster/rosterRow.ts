@@ -78,10 +78,10 @@ function substanceFor(
   const mine = (bonds?.bonds ?? []).filter((b) => b.aId === agentId || b.bId === agentId)
   const skillXp = Object.values(a.skills).reduce((s, xp) => s + xp, 0)
   return substanceOf({
-    actsDone: skillXp + mine.reduce((n, b) => n + b.history.length, 0),
+    actsDone: skillXp + mine.reduce((n, b) => n + b.strength, 0),
     daysLived: tickToMoment(nowTick).day,
     bondsAtOrAbove: mine.filter((b) =>
-      LEVEL_RANK.indexOf(bondLevel(bondWarmth(b.history, nowTick)))
+      LEVEL_RANK.indexOf(bondLevel(bondWarmth(b, nowTick)))
       >= LEVEL_RANK.indexOf(SUBSTANCE_BOND_LEVEL)).length,
     skillBands: Object.keys(a.skills).length,
     personalityVersions: 0,

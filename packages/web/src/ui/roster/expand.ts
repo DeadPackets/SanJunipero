@@ -132,9 +132,19 @@ export function actsOf(
   const out: Array<{ tick: number; words: string }> = []
   for (const b of bonds?.bonds ?? []) {
     if (b.aId !== agentId && b.bId !== agentId) continue
-    for (const h of b.history) {
+    // The window says what has happened lately; the rollup's two stamps make sure the day an
+    // act FIRST happened survives it. Becoming folds both to one row per day per act, so a
+    // parenthood on Day 3 is still in the list on Day 300 and nothing is duplicated.
+    const ticks: Array<{ tick: number; kind: string }> = [
+      ...b.recent,
+      ...b.acts.flatMap((a) => [{ tick: a.firstTick, kind: a.kind }, { tick: a.lastTick, kind: a.kind }]),
+    ]
+    for (const h of ticks) {
       const words = ACT_WORDS[h.kind] ?? ACT_WORDS[BOND_ACT[h.kind] ?? ''] ?? null
-      if (words !== null) out.push({ tick: h.tick, words })
+      if (words === null) continue
+      // the window and the two stamps overlap by construction; one act is one entry
+      if (out.some((o) => o.tick === h.tick && o.words === words)) continue
+      out.push({ tick: h.tick, words })
     }
   }
   for (const ev of events) {
@@ -183,9 +193,9 @@ export function becomingOf(input: BecomingInput): Becoming {
     if (b.aId !== input.id && b.bId !== input.id) continue
     const otherId = b.aId === input.id ? b.bId : b.aId
     const name = input.people[otherId] ?? otherId
-    const level = bondLevel(bondWarmth(b.history, input.nowTick))
+    const level = bondLevel(bondWarmth(b, input.nowTick))
     const type = bondTypeOf(input.id, otherId, input.lineage, input.bonds!)
-    const arc = bondArc(b.history, input.nowTick)
+    const arc = bondArc(b, input.nowTick)
     const evidence = type === 'partner' ? partnerEvidence(b) : null
     const line = relationLine(type, level, arc, [input.name, name])
     knows.push({ id: otherId, name, level, type, words: evidence === null ? line : `${line} ${evidence}` })
