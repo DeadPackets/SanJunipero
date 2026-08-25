@@ -1,5 +1,5 @@
 import { Graphics, Polygon, Sprite, Texture, type FederatedPointerEvent } from 'pixi.js'
-import { INTERIOR_KINDS, tickToMoment } from '@sj/shared'
+import { isRoofedKind, tickToMoment, type SimConfig } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { hoverLabel, itemCropDetail, type HoverKind } from '../ui/interaction.js'
@@ -59,10 +59,25 @@ export function pipsFilled(progressTicks: number, houseTicks: number | undefined
   return Math.max(0, Math.min(PIP_COUNT, Math.floor((progressTicks / full) * PIP_COUNT)))
 }
 
-// The door a resident walks out of: south face, centre of the frontage. The same rule the
-// C13 city template applies in template space (`doorTile`), read here in world tiles. Read by
-// `interiorScene`, which needs to know where a room's occupants came in.
-export const ENTERABLE_KINDS: ReadonlySet<string> = new Set(INTERIOR_KINDS)
+/**
+ * ★ A ROSTER CAME BACK, IN THE ONE PACKAGE NOBODY SWEPT.
+ *
+ * This was `ENTERABLE_KINDS = new Set(INTERIOR_KINDS)` — a SECOND, independent derivation of
+ * enterability, sitting beside the engine's `isRoofedKind`. The project deleted four rosters and
+ * replaced them with properties (`enterableKinds`/`sleepableKinds` → `roofed`,
+ * `HEAT_SOURCE_KINDS` → `hearth`, `isPlottedKind` → `sited`); this one was never merged in, so
+ * no merge brief caught it, and it only became WRONG when the world grew.
+ *
+ * It disagreed with the property on FOUR kinds: it said yes to `shed`, which has no recipe row
+ * at all and which the engine refuses by name; and no to `cabin`, `cottage` and `farmhouse`,
+ * which a body can now walk into and be warm in. A viewer that will not open the door to the
+ * founding valley's only indoor fire.
+ *
+ * A roster says which names somebody remembered. Ask the kind.
+ */
+export function enterableKind(config: SimConfig | null, kind: string): boolean {
+  return config !== null && isRoofedKind(config, kind)
+}
 
 // ★ THE "CLICK TO ENTER" SQUARE IS RETIRED, AND SO IS THE SLAB THAT DREW IT.
 //
@@ -94,9 +109,11 @@ export const ENTERABLE_KINDS: ReadonlySet<string> = new Set(INTERIOR_KINDS)
 
 /** Whether clicking this building walks into it. A shell still going up has no room to walk
  *  into, and a well has no room at all — both answer with their story instead. */
-export function entersOnClick(state: WorldState | null, structureId: string): boolean {
+export function entersOnClick(
+  config: SimConfig | null, state: WorldState | null, structureId: string,
+): boolean {
   const s = state?.structures[structureId]
-  return s !== undefined && s.stage === 'complete' && ENTERABLE_KINDS.has(s.kind)
+  return s !== undefined && s.stage === 'complete' && enterableKind(config, s.kind)
 }
 
 /**
@@ -109,10 +126,12 @@ export function entersOnClick(state: WorldState | null, structureId: string): bo
  * on two identical separators with the least important one in the middle.
  */
 export const LOOK_INSIDE = 'Look inside'
-export function structureHoverText(state: WorldState | null, structureId: string): string | null {
+export function structureHoverText(
+  config: SimConfig | null, state: WorldState | null, structureId: string,
+): string | null {
   const name = hoverLabel(state, 'structure', structureId)
   if (name === null) return null
-  return entersOnClick(state, structureId) ? `${name} · ${LOOK_INSIDE}` : name
+  return entersOnClick(config, state, structureId) ? `${name} · ${LOOK_INSIDE}` : name
 }
 
 export function doorTileOf(s: Pick<Structure, 'x' | 'y' | 'w' | 'h'>): { x: number; y: number } {
@@ -345,7 +364,7 @@ export function syncEntities(
     sprite.cursor = 'pointer'
     sprite.on('pointerover', () => {
       const text = kind === 'structure'
-        ? structureHoverText(store.getState(), id)
+        ? structureHoverText(store.getConfig(), store.getState(), id)
         : hoverLabel(store.getState(), kind, id)
       // the anchor comes from the sprite's DRAWN bounds — for a base-anchored 1.85× building
       // `sprite.y - sprite.height` landed above the roof and off nobody's screen in particular
@@ -369,7 +388,7 @@ export function syncEntities(
       // is the reason to click a house; everything else answers with its story. The hover tag
       // says which one this click will do before it is made.
       sprite.on('pointertap', (e: FederatedPointerEvent) => {
-        if (entersOnClick(store.getState(), sid)) {
+        if (entersOnClick(store.getConfig(), store.getState(), sid)) {
           sync!.onDoor?.(sid)
           return
         }

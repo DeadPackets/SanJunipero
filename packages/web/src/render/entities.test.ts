@@ -47,13 +47,16 @@ vi.mock('pixi.js', () => {
   return { Container, Graphics, Point, Polygon, Rectangle, Sprite, Texture }
 })
 import type { Structure, WorldState } from '@sj/engine/state'
-import type { AssetRecord } from '@sj/shared'
+import {
+  DEFAULT_CONFIG, INTERIOR_KINDS, cityStructures, isRoofedKind,
+  type AssetRecord, type SimConfig,
+} from '@sj/shared'
 import { depthKey, tileToScreen } from './iso.js'
 import { Container as MockContainer } from 'pixi.js'
 import {
-  BUILDING_PX_PER_TILE, BUILD_TICKS_FULL, ENTERABLE_KINDS, LOOK_INSIDE, PIP_COUNT, doorTileOf,
-  entersOnClick, entitySpriteOf, footprintHitPoints, pipsFilled, structureHitPoints,
-  structureHoverText, structureZIndex, syncEntities,
+  BUILDING_PX_PER_TILE, BUILD_TICKS_FULL, LOOK_INSIDE, PIP_COUNT, doorTileOf,
+  enterableKind, entersOnClick, entitySpriteOf, footprintHitPoints, pipsFilled,
+  structureHitPoints, structureHoverText, structureZIndex, syncEntities,
 } from './entities.js'
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
@@ -119,20 +122,21 @@ describe('one building, one hitbox, and the building says what a click does', ()
     const house = box(4, 4, 2, 2, 'house')
     const well = box(9, 9, 1, 1, 'well')
     const shell: Structure = { ...box(12, 12, 2, 2, 'house'), id: 'shell', stage: 'construction' }
-    expect(entersOnClick(world([house, well, shell]), house.id)).toBe(true)
-    expect(entersOnClick(world([house, well, shell]), well.id)).toBe(false)
-    expect(entersOnClick(world([house, well, shell]), 'shell')).toBe(false)
-    expect(entersOnClick(null, house.id)).toBe(false)
-    expect(entersOnClick(world([]), 'nobody')).toBe(false)
+    const st = world([house, well, shell])
+    expect(entersOnClick(DEFAULT_CONFIG, st, house.id)).toBe(true)
+    expect(entersOnClick(DEFAULT_CONFIG, st, well.id)).toBe(false)
+    expect(entersOnClick(DEFAULT_CONFIG, st, 'shell')).toBe(false)
+    expect(entersOnClick(DEFAULT_CONFIG, null, house.id)).toBe(false)
+    expect(entersOnClick(DEFAULT_CONFIG, world([]), 'nobody')).toBe(false)
   })
 
   it('and the hover tag SAYS which, before the click is made', () => {
     const house = box(4, 4, 2, 2, 'house')
     const well = box(9, 9, 1, 1, 'well')
     const st = world([house, well])
-    expect(structureHoverText(st, house.id)).toBe(`house · ${LOOK_INSIDE}`)
-    expect(structureHoverText(st, well.id)).toBe('well')
-    expect(structureHoverText(st, 'nobody')).toBeNull()
+    expect(structureHoverText(DEFAULT_CONFIG, st, house.id)).toBe(`house · ${LOOK_INSIDE}`)
+    expect(structureHoverText(DEFAULT_CONFIG, st, well.id)).toBe('well')
+    expect(structureHoverText(DEFAULT_CONFIG, st, 'nobody')).toBeNull()
   })
 
   it('and it spends ONE em-dash, because the name already spent the other', () => {
@@ -140,7 +144,7 @@ describe('one building, one hitbox, and the building says what a click does', ()
     const st = ({
       structures: { [built.id]: built }, agents: { omar: { id: 'omar', name: 'Omar' } },
     }) as unknown as WorldState
-    const tag = structureHoverText(st, built.id)!
+    const tag = structureHoverText(DEFAULT_CONFIG, st, built.id)!
     expect(tag).toBe(`house — built by Omar · ${LOOK_INSIDE}`)
     expect(tag.split('—')).toHaveLength(2)   // LOOK INSIDE — HOUSE — BUILT BY OMAR had three
   })
@@ -149,7 +153,7 @@ describe('one building, one hitbox, and the building says what a click does', ()
     expect(code).toContain("sprite.eventMode = 'static'")
     expect(code).not.toMatch(/door\.eventMode/)
     // the two meanings both hang off the one tap handler
-    expect(code).toMatch(/entersOnClick\(store\.getState\(\), sid\)/)
+    expect(code).toMatch(/entersOnClick\(store\.getConfig\(\), store\.getState\(\), sid\)/)
     expect(code).toMatch(/sync!\.onDoor\?\.\(sid\)/)
   })
 
@@ -160,12 +164,82 @@ describe('one building, one hitbox, and the building says what a click does', ()
   })
 })
 
-describe('ENTERABLE_KINDS', () => {
-  it('is exactly the three interior kinds — a well or a wagon grows no door', () => {
-    expect([...ENTERABLE_KINDS].sort()).toEqual(['house', 'shed', 'storehouse'])
-    for (const kind of ['well', 'fire_pit', 'wagon', 'standing_stone', 'scaffolding']) {
-      expect(ENTERABLE_KINDS.has(kind), kind).toBe(false)
+// ★ THE ROSTER THAT CAME BACK, AND THE GUARD THAT KEEPS IT DEAD.
+//
+// This describe used to be `expect([...ENTERABLE_KINDS].sort()).toEqual(['house','shed',
+// 'storehouse'])` — a check whose passing condition is satisfiable without the property holding,
+// because it pinned the roster to a transcription of ITSELF. It passed on the day `cabin`,
+// `cottage` and `farmhouse` became rooms a body walks into, and it would have gone on passing
+// while the viewer refused the door to the founding valley's only indoor fire.
+//
+// The guard is now the general law: over EVERY kind this product can stand, the viewer's answer
+// is `isRoofedKind`'s answer. A hand-list cannot satisfy it, because the second test moves the
+// config out from under it.
+describe('★ enterability is asked of the config, and there is no second list', () => {
+  // comments stripped — the epitaph above the fix names the roster it replaced, and the point
+  // is that no CODE does
+  const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
+    .split('\n').map((l) => l.trim())
+    .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*')).join('\n')
+
+  // Every kind that can appear in a world, from the three places kinds come from: the recipe
+  // table, the town the template plants, and the renderer's own room vocabulary. `shed` is only
+  // in the third — it has no recipe row at all — which is exactly the kind the roster got wrong.
+  const ALL_KINDS = [...new Set([
+    ...Object.keys(DEFAULT_CONFIG.structures.recipes),
+    ...cityStructures().map((s) => s.kind),
+    ...INTERIOR_KINDS,
+  ])].sort()
+
+  const withRoofed = (over: Record<string, boolean>): SimConfig => ({
+    ...DEFAULT_CONFIG,
+    structures: {
+      ...DEFAULT_CONFIG.structures,
+      recipes: Object.fromEntries(Object.entries(DEFAULT_CONFIG.structures.recipes).map(
+        ([k, r]) => [k, over[k] === undefined ? r : { ...r, roofed: over[k] }],
+      )),
+    },
+  })
+
+  it('★ over every kind there is, the viewer answers exactly what isRoofedKind answers', () => {
+    for (const kind of ALL_KINDS) {
+      expect(enterableKind(DEFAULT_CONFIG, kind), kind)
+        .toBe(isRoofedKind(DEFAULT_CONFIG, kind))
     }
+    // Not vacuous: the enumeration is big, and it holds BOTH answers. Without these three the
+    // law is satisfied by `false === false` over an empty or one-sided list.
+    expect(ALL_KINDS.length).toBeGreaterThan(8)
+    expect(ALL_KINDS.filter((k) => isRoofedKind(DEFAULT_CONFIG, k)).length).toBeGreaterThan(0)
+    expect(ALL_KINDS.filter((k) => !isRoofedKind(DEFAULT_CONFIG, k)).length).toBeGreaterThan(0)
+  })
+
+  it('★ and it FOLLOWS the config — a list transcribed from today cannot pass this', () => {
+    const flipped = withRoofed({ well: true, house: false, cottage: false })
+    expect(enterableKind(flipped, 'well')).toBe(true)     // a roster would still refuse it
+    expect(enterableKind(flipped, 'house')).toBe(false)   // a roster would still open it
+    expect(enterableKind(flipped, 'cottage')).toBe(false)
+    for (const kind of ALL_KINDS) {
+      expect(enterableKind(flipped, kind), kind).toBe(isRoofedKind(flipped, kind))
+    }
+  })
+
+  it('★ the four kinds the roster had wrong on the day it was found', () => {
+    // it said no to the three dwellings the world grew — including the cabin, which holds the
+    // founding valley's only indoor fire …
+    for (const kind of ['cabin', 'cottage', 'farmhouse']) {
+      expect(enterableKind(DEFAULT_CONFIG, kind), kind).toBe(true)
+    }
+    // … and yes to the shed, which has no recipe row, so the engine refuses `enter` by name.
+    expect(enterableKind(DEFAULT_CONFIG, 'shed')).toBe(false)
+  })
+
+  it('★ and the roster itself is gone from the module', () => {
+    expect(src).not.toContain('ENTERABLE_KINDS')
+    expect(src).not.toMatch(/new Set\(INTERIOR_KINDS\)/)
+  })
+
+  it('with no config yet, nothing is enterable — the viewer does not guess', () => {
+    for (const kind of ALL_KINDS) expect(enterableKind(null, kind), kind).toBe(false)
   })
 })
 
@@ -320,7 +394,7 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
       getState: () => ({
         structures: Object.fromEntries(structures.map((s) => [s.id, s])), items: {}, crops: {},
       }) as unknown as WorldState,
-      getConfig: () => null,
+      getConfig: () => DEFAULT_CONFIG,
       assetsSeq: () => 0,
       assetRecords: () => records,
     } as unknown as WorldStore
@@ -333,6 +407,7 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
 
   const house = box(20, 20, 2, 2, 'house')
   const cottage = box(30, 30, 3, 2, 'cottage')
+  const well = box(40, 40, 1, 1, 'well')
 
   // The harness hands the layer no asset records, so these buildings take the no-art path and
   // draw a `builtFormSpec` volume — which is a real product state (the well and the fire pit
@@ -389,14 +464,20 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
       body: { appendChild: () => {} },
       addEventListener: () => {},
     })
-    const h = harness([house, cottage])
+    const h = harness([house, cottage, well])
     syncEntities(h.scene, h.book, h.store, (id) => h.doors.push(id))
-    ;(entitySpriteOf(h.scene, 'structure', cottage.id) as never as { fire: (n: string) => void })
-      .fire('pointertap')
-    expect(h.doors).toEqual([])                                    // a cottage has no room
-    ;(entitySpriteOf(h.scene, 'structure', house.id) as never as { fire: (n: string) => void })
-      .fire('pointertap')
-    expect(h.doors).toEqual([house.id])
+    const tap = (id: string): void =>
+      (entitySpriteOf(h.scene, 'structure', id) as never as { fire: (n: string) => void })
+        .fire('pointertap')
+    // A WELL IS THE NEGATIVE HERE, AND IT USED TO BE THE COTTAGE. The landed test tapped a
+    // cottage and asserted `doors == []` with the comment "a cottage has no room" — a test that
+    // held the roster's mistake in place. A cottage is roofed, so it is a door.
+    tap(well.id)
+    expect(h.doors).toEqual([])
+    tap(cottage.id)
+    expect(h.doors).toEqual([cottage.id])
+    tap(house.id)
+    expect(h.doors).toEqual([cottage.id, house.id])
   })
 })
 
