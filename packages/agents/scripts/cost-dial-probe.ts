@@ -87,6 +87,9 @@ for (const r of rows) {
   )
 }
 
+console.log('\n--- failures, verbatim ---')
+for (const r of rows.filter((x) => !x.ok)) console.log(`rung=${r.rung} rep=${r.rep} :: ${r.note}`)
+
 const median = (xs: number[]): number => {
   const s = [...xs].sort((a, b) => a - b)
   return s.length === 0 ? 0 : s[Math.floor(s.length / 2)]!
