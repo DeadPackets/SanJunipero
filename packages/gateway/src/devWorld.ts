@@ -227,10 +227,19 @@ export async function startDevWorld(
      * database does not get to delete it without being asked.
      */
     fresh?: boolean
-    /** ★ MINDS INSTEAD OF PUPPETS. Absent, the founders are the scripted cast this file has
-     *  always run and the world costs $0.00/hour. Present, the same town is raised and the
-     *  bodies in it are driven by whatever the cast drives them with. See `LiveCast`. */
-    cast?: LiveCast
+    /**
+     * ★ MINDS INSTEAD OF PUPPETS. Absent, the founders are the scripted cast this file has
+     * always run and the world costs $0.00/hour. Present, the same town is raised and the
+     * bodies in it are driven by whatever the cast drives them with. See `LiveCast`.
+     *
+     * ★ AND IT IS A FACTORY, NOT A CAST, FOR ONE MEASURED REASON. A cast built before this
+     * call has already OPENED the per-mind databases, and `fresh` then deletes them out from
+     * under the open handles — observed on the first live boot, which reported "the world db
+     * was deleted along with 3 agent memory db(s)" and unlinked the very call ledger the spend
+     * cap reads. Wipe first, build second. It also means a boot that is going to be refused
+     * for a ring mismatch no longer pays a second of ONNX load to find out.
+     */
+    cast?: () => Promise<LiveCast>
   } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH
@@ -364,15 +373,26 @@ export async function startDevWorld(
       // tick 1 and the world systems stay; the patrols, the masons and the need top-ups go.
       minds: opts.cast !== undefined,
   })
-  handler = opts.cast === undefined
+  const cast = opts.cast === undefined ? null : await opts.cast()
+  handler = cast === null
     ? scriptedOnTick
-    : opts.cast.attach({ loop, store, config, db, world: scriptedOnTick })
+    : cast.attach({ loop, store, config, db, world: scriptedOnTick })
 
-  const gateway = await createGateway({
-    dbPath, port: opts.port ?? DEV_PORT, terrain, config, db, narratorDbPath: opts.narratorDbPath,
-    ...(opts.staticDir === undefined ? {} : { staticDir: opts.staticDir }),
-    ...(opts.agentDbDir === undefined ? {} : { agentDbDir: opts.agentDbDir }),
-  })
+  let gateway: Gateway
+  try {
+    gateway = await createGateway({
+      dbPath, port: opts.port ?? DEV_PORT, terrain, config, db, narratorDbPath: opts.narratorDbPath,
+      ...(opts.staticDir === undefined ? {} : { staticDir: opts.staticDir }),
+      ...(opts.agentDbDir === undefined ? {} : { agentDbDir: opts.agentDbDir }),
+    })
+  } catch (e) {
+    // A taken port used to leave five booted minds holding open databases and a process that
+    // never exited, because nothing outside this function had a handle to stop them. Observed
+    // on the first live boot. The world db goes too — this function opened it.
+    await cast?.stop()
+    db.close()
+    throw e
+  }
 
   // Scripted thoughts: when an actor's chosen intent verb changes, it "thinks" a line.
   // ★ The cursor starts at the END of the log, not at 0: a resumed world would otherwise scan
@@ -386,7 +406,7 @@ export async function startDevWorld(
   const lastVerb = new Map<string, string>()
   const tickOnce = (): void => {
     loop.step()
-    if (opts.cast !== undefined) return
+    if (cast !== null) return
     for (const ev of store.readFrom(lastSeq)) {
       lastSeq = ev.seq
       if (ev.type !== 'action_started') continue
@@ -408,12 +428,12 @@ export async function startDevWorld(
 
   return {
     gateway, loop, terrain, resumedAtTick: resumed ? resumed.state.tick : null,
-    live: opts.cast !== undefined, tick: tickOnce,
+    live: cast !== null, tick: tickOnce,
     stop: async () => {
       clearInterval(timer)
       // The cast first: a mind holding a promise on an intent the loop will never step is a
       // mind that never returns, and a reflection half-written is a night paid for twice.
-      await opts.cast?.stop()
+      await cast?.stop()
       await gateway.close()
       db.close()
     },

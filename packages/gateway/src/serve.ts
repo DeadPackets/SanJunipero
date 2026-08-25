@@ -70,27 +70,18 @@ export async function main(): Promise<void> {
   // scripted stream should pay for neither.
   const live = process.env['SJ_LIVE'] === '1'
   const mindsDir = process.env['SJ_MINDS_DIR'] ?? STREAM_MINDS_DIR
-  let cast: LiveCast | undefined
   let world: Awaited<ReturnType<typeof startDevWorld>> | undefined
-  if (live) {
-    try {
-      const { createLiveCast } = await import('./liveWorld.js')
-      cast = await createLiveCast({
-        agentDbDir: mindsDir,
-        ...(process.env['SJ_MODELS_DIR'] === undefined ? {} : { modelsDir: process.env['SJ_MODELS_DIR'] }),
-        // ★ THE CAP KILLS THE PROCESS. A stream that stops thinking and keeps serving is a
-        // town of statues nobody would notice for hours; a stream that dies leaves a resumable
-        // town on disk and a message in the log an operator cannot miss.
-        onSpendStop: () => { void world?.stop().then(() => process.exit(1)) },
-      })
-    } catch (e) {
-      // The pre-flight refusal and the amnesia refusal are both whole paragraphs written for
-      // an operator; wrapping either in "stream: could not start — " would bury the first line.
-      console.error(e instanceof Error ? e.message : String(e))
-      process.exitCode = 1
-      return
-    }
-  }
+  // A FACTORY, not a cast: `startDevWorld` deletes the minds when `SJ_FRESH=1`, and a cast
+  // built out here would already be holding those files open. Wipe first, build second.
+  const castFactory = (): Promise<LiveCast> => import('./liveWorld.js').then(({ createLiveCast }) =>
+    createLiveCast({
+      agentDbDir: mindsDir,
+      ...(process.env['SJ_MODELS_DIR'] === undefined ? {} : { modelsDir: process.env['SJ_MODELS_DIR'] }),
+      // ★ THE CAP KILLS THE PROCESS. A stream that stops thinking and keeps serving is a town
+      // of statues nobody would notice for hours; a stream that dies leaves a resumable town
+      // on disk and a message in the log an operator cannot miss.
+      onSpendStop: () => { void world?.stop().then(() => process.exit(1)) },
+    }))
 
   try {
     world = await startDevWorld({
@@ -99,15 +90,17 @@ export async function main(): Promise<void> {
       // ★ THE MINDS ARE WIPED WITH THE WORLD, OR NOT AT ALL. `agentDbDir` is what makes
       // `SJ_FRESH=1` delete them in the same breath as the town; without it a fresh boot is
       // the one state worse than either a reset or a resume.
-      ...(cast === undefined ? {} : { cast, agentDbDir: mindsDir }),
+      ...(live ? { cast: castFactory, agentDbDir: mindsDir } : {}),
     })
   } catch (e) {
     // A taken port is the single most common way this command fails, and a raw EADDRINUSE
-    // stack says nothing an operator can act on.
+    // stack says nothing an operator can act on. The pre-flight and amnesia refusals are whole
+    // paragraphs written for an operator, so they are printed as they were written.
     const busy = (e as { code?: string }).code === 'EADDRINUSE'
+    const text = e instanceof Error ? e.message : String(e)
     console.error(busy
       ? `stream: port ${port} is already in use — pick another with PORT=…`
-      : `stream: could not start — ${e instanceof Error ? e.message : String(e)}`)
+      : text.includes('\n') ? text : `stream: could not start — ${text}`)
     process.exitCode = 1
     return
   }

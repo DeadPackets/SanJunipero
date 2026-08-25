@@ -2,7 +2,8 @@
 // against a scripted cast. A test that passes whether or not a mind is behind the body is the
 // vacuous guard this project keeps finding, and the whole point of this file is the one thing
 // a scripted founder can never do — say a sentence a model wrote.
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -117,26 +118,33 @@ async function liveWorld(opts: {
 }): Promise<{ world: DevWorld; cast: LiveCast; opsDb: ReturnType<typeof openAgentDb> }> {
   const agentDbDir = join(opts.dir, 'minds')
   let seen: ReturnType<typeof openAgentDb> | null = null
-  const cast = await createLiveCast({
-    agentDbDir,
-    minds: opts.minds ?? TWO,
-    preflight: false,
-    embedder: new FakeEmbedder(),
-    mindConfig: EAGER,
-    ...(opts.spendCapUsd === undefined ? {} : { spendCapUsd: opts.spendCapUsd }),
-    ...(opts.onSpendStop === undefined ? {} : { onSpendStop: opts.onSpendStop }),
-    log: () => {},
-    makeClient: (opsDb, _caller, agentId) => {
-      seen = opsDb
-      return fakeLlm(opsDb, agentId ?? null, opts.turn ?? SPEAKING_TURN)
-    },
-  })
+  let cast: LiveCast | null = null
+  // ★ THROUGH THE FACTORY, exactly as `serve.ts` does it. Built out here instead, the cast
+  // would already hold the per-mind files open when `fresh` deleted them — which is what the
+  // first live boot did, unlinking the very ledger the spend cap reads.
   const world = await startDevWorld({
     dbPath: join(opts.dir, 'world.db'), port: 0, map: 'showcase', realMsPerTick: 10_000_000,
-    agentDbDir, cast, ...(opts.fresh === undefined ? {} : { fresh: opts.fresh }),
+    agentDbDir, ...(opts.fresh === undefined ? {} : { fresh: opts.fresh }),
+    cast: async () => {
+      cast = await createLiveCast({
+        agentDbDir,
+        minds: opts.minds ?? TWO,
+        preflight: false,
+        embedder: new FakeEmbedder(),
+        mindConfig: EAGER,
+        ...(opts.spendCapUsd === undefined ? {} : { spendCapUsd: opts.spendCapUsd }),
+        ...(opts.onSpendStop === undefined ? {} : { onSpendStop: opts.onSpendStop }),
+        log: () => {},
+        makeClient: (opsDb, _caller, agentId) => {
+          seen = opsDb
+          return fakeLlm(opsDb, agentId ?? null, opts.turn ?? SPEAKING_TURN)
+        },
+      })
+      return cast
+    },
   })
   worlds.push(world)
-  return { world, cast, opsDb: seen! }
+  return { world, cast: cast!, opsDb: seen! }
 }
 
 /** Take WHOLE ticks — `world.tick()`, not `loop.step()` — and let every promise a turn started
@@ -334,6 +342,54 @@ describe('★ a mind\'s memory across a resume', () => {
   })
 })
 
+// ★ BOTH OF THESE ARE REGRESSIONS FROM THE FIRST REAL LIVE BOOT, NOT IMAGINED CASES. That boot
+// printed "the world db was deleted along with 3 agent memory db(s)" — the three were the call
+// ledger and its WAL, unlinked out from under the open handle — and then hung for ever on a
+// taken port with five minds still booted and nothing holding a reference to stop them.
+describe('★ what the first live boot broke', () => {
+  it('the fresh wipe runs BEFORE the cast opens anything, so the ledger is still on disk', async () => {
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({ dir, fresh: true })
+    await run(world, 2)
+
+    const onDisk = join(dir, 'minds', LIVE_OPS_DB)
+    expect(existsSync(onDisk), 'the ledger the cap reads was deleted after it was opened')
+      .toBe(true)
+    opsDb.prepare(
+      `INSERT INTO llm_calls
+       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
+       VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, 0.5, 0, 1, NULL, NULL)`,
+    ).run(Date.now())
+    // And a reader that opens the PATH — which is all a restarted process has — sees it.
+    const reopened = new Database(onDisk, { readonly: true, fileMustExist: true })
+    try {
+      expect((reopened.prepare('SELECT COALESCE(SUM(cost_usd), 0) AS t FROM llm_calls').get() as { t: number }).t)
+        .toBeCloseTo(0.5, 6)
+    } finally { reopened.close() }
+  }, 40_000)
+
+  it('a world that cannot take its port stops the cast instead of leaving it booted', async () => {
+    const dir = tmp()
+    // Hold a port, then ask the world for it.
+    const blocker = createServer()
+    const taken = await new Promise<number>((resolve) => {
+      blocker.listen(0, () => resolve((blocker.address() as { port: number }).port))
+    })
+    let stopped = 0
+    try {
+      await expect(startDevWorld({
+        dbPath: join(dir, 'world.db'), port: taken, map: 'showcase', realMsPerTick: 10_000_000,
+        agentDbDir: join(dir, 'minds'),
+        cast: async () => ({ attach: ({ world }) => world, stop: async () => { stopped += 1 } }),
+      })).rejects.toThrow()
+    } finally {
+      await new Promise((r) => blocker.close(r))
+    }
+    expect(stopped, 'five minds were left holding databases and the process never exited').toBe(1)
+  }, 30_000)
+})
+
 describe('★ the default stays scripted and free', () => {
   const here = dirname(fileURLToPath(import.meta.url))
   const src = (name: string): string => readFileSync(join(here, name), 'utf8')
@@ -356,7 +412,7 @@ describe('★ the default stays scripted and free', () => {
   it('serve.ts reaches the live world only through a dynamic import behind the flag', () => {
     const s = src('serve.ts')
     expect(s).not.toMatch(/^import .*liveWorld/m)
-    expect(s).toContain("await import('./liveWorld.js')")
+    expect(s).toContain("import('./liveWorld.js')")
     expect(s).toContain("process.env['SJ_LIVE'] === '1'")
   })
 
