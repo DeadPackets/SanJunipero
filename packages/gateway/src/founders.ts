@@ -88,14 +88,28 @@ export function townStructuresFor(map: DevMapKind, rings?: number): readonly Dev
 
 export type DevHolding = { id: string; kind: string; qty: number; structureId: string; owner: string | null }
 
-/** Deliberately past the card's eight-row cap, so the "and N more" line is a thing a viewer
- *  can actually see. Every kind is a library entry, so every row resolves a real icon. */
+/**
+ * Deliberately past the card's eight-row cap, so the "and N more" line is a thing a viewer
+ * can actually see.
+ *
+ * ★ `wood`, NOT `timber` — AND THIS IS WHY A LIVE TOWN COULD NOT BUILD. These rows were chosen
+ * for the art library, which draws a stack of planks under the name `timber`. Nothing in the
+ * world eats `timber`: a house is `{ wood: 10 }`, a bridge `{ wood: 6 }`, a plank `{ wood: 1 }`.
+ * So the town's whole building material was a kind with no recipe behind it, and a mind that
+ * reasoned its way to needing walls could carry fifteen of it to a plot and be refused.
+ * `genesis/world.ts` wrote this rule down for its own storehouse and the showcase town — the one
+ * the stream actually serves — never followed it.
+ *
+ * 30 is three houses at the recipe's ten, plus the shed's four. At `DEV_HOUSE_TICKS` that is
+ * about half an hour of watchable building, and then the store is out and the forest has to
+ * start mattering. It is a founding store, not a supply: nothing refills it.
+ */
 const STOREHOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
-  ['wheat_sheaf', 12], ['bread', 6], ['fish', 4], ['berries', 9], ['timber', 15], ['stone', 11],
+  ['wheat_sheaf', 12], ['bread', 6], ['fish', 4], ['berries', 9], ['wood', 30], ['stone', 11],
   ['rope', 3], ['cloth', 5], ['fiber', 7], ['charcoal', 2], ['hide', 2], ['clay', 6],
 ]
 const SHED_STOCK: ReadonlyArray<readonly [string, number]> = [
-  ['axe', 1], ['saw', 1], ['hammer', 1], ['gravel', 8], ['timber', 4],
+  ['axe', 1], ['saw', 1], ['hammer', 1], ['gravel', 8], ['wood', 4],
 ]
 /** A home holds a household's things, not a warehouse's — three kinds and few of each. */
 const HOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [

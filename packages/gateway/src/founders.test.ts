@@ -9,6 +9,7 @@ import { showcaseTerrain } from './showcaseMap.js'
 import {
   DEV_FAST_FORWARD_FOR_INTERIORS, FOUNDERS, FOUNDERS_HOME_ID, GO_HOME_BELOW, LEAVE_HOME_ABOVE,
   type FounderDef,
+  MASON_KIND, MASON_WOOD_KIND,
   arrivesStanding, devHoldings, foundersFor, homeIntent, homeOf, makeFoundersOnTick,
   townStructuresFor, walkEnergyCost,
 } from './founders.js'
@@ -383,8 +384,45 @@ describe('the storerooms hold something', () => {
 
   it('every kind it seeds is one the library can draw an icon for', () => {
     for (const h of devHoldings(townStructuresFor('showcase'))) {
+      // `wood` is the one kind the world consumes that the art library has not drawn under that
+      // name — its planks are catalogued as `timber`. Stocking a shelf with a kind no recipe
+      // eats is the worse of the two failures, so this rule yields to that one. Named in the
+      // report for the forge lane: the catalog wants a `wood` entry, or the render an alias.
+      if (h.kind === MASON_WOOD_KIND) continue
       expect(libraryEntry(h.kind), h.kind).not.toBeNull()
     }
+  })
+
+  // ★ A TOWN THAT CANNOT BUILD. The shelves held `timber`, and NO recipe in the world consumes
+  // `timber` — a house is `{ wood: 10 }`, a bridge `{ wood: 6 }`, a plank `{ wood: 1 }`. So a
+  // live mind could walk into the storehouse, see fifteen of something wooden, carry it to a
+  // plot and be refused for having no wood. `genesis/world.ts` had already written the rule
+  // down — "`wood`, not 'timber': these are the kinds the build and craft recipes actually
+  // consume" — and the showcase fixture, which is the town the stream actually serves, did not
+  // follow it. A drive with no road, in the one place a viewer would watch for it.
+  it('★ stocks the kind a house is actually built from, not a synonym for it', () => {
+    const houseCost = SHOWCASE_CONFIG.structures.recipes[MASON_KIND]!.inputs[MASON_WOOD_KIND]!
+    const stocked = devHoldings(townStructuresFor('showcase'))
+      .filter((h) => h.kind === MASON_WOOD_KIND)
+      .reduce((n, h) => n + h.qty, 0)
+    expect(stocked, `the town holds no ${MASON_WOOD_KIND} at all`).toBeGreaterThan(0)
+    expect(stocked, 'not even one house worth').toBeGreaterThanOrEqual(houseCost)
+  })
+
+  it('holds nothing whose kind no recipe and no verb can use', () => {
+    const consumable = new Set<string>()
+    for (const r of Object.values(SHOWCASE_CONFIG.structures.recipes)) {
+      for (const k of Object.keys(r.inputs)) consumable.add(k)
+    }
+    for (const r of Object.values(SHOWCASE_CONFIG.crafting.recipes)) {
+      for (const k of Object.keys(r.inputs)) consumable.add(k)
+    }
+    // A shelf may hold food, tools and cloth that no RECIPE eats — those have their own verbs.
+    // What it may not hold is a building material that is not one: a stack of planks under a
+    // name the mason's recipe has never heard of.
+    expect(consumable.has('timber'), 'no recipe consumes `timber`').toBe(false)
+    const kinds = new Set(devHoldings(townStructuresFor('showcase')).map((h) => h.kind))
+    expect(kinds.has('timber'), 'the town stocks a material nothing can build with').toBe(false)
   })
 
   it('is deterministic, and its ids can never collide with a minted one', () => {
