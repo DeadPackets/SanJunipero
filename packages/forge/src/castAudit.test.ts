@@ -60,8 +60,9 @@
 import { describe, expect, it } from 'vitest'
 import { decodePng, type RawImage } from './post/raw.js'
 import {
-  CELL_V2, FEET_Y_V2, POSES_V2, FACINGS, anchorToCanvas, cellDistance, downscaleMajority,
-  frameCoherenceGate, headRegionDiff, mirrorX, opaqueArea, opaqueBbox, paletteJaccard, sleepGate,
+  CELL_V2, FEET_Y_V2, POSES_V2, FACINGS, anchorToCanvas, cellDistance, crossFacingDupeGate,
+  downscaleMajority, frameCoherenceGate, headRegionDiff, mirrorX, opaqueArea, opaqueBbox,
+  paletteJaccard, sleepGate,
 } from './sheet.js'
 import { sleepAxisDeg, sleepAxisGate, stanceGate, strideGateV4 } from './mirror.js'
 import { alphaBinaryGate, paletteGate, soleSilhouetteGate } from './pixelGates.js'
@@ -115,6 +116,17 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
     for (const x of stanceGate(f, crop(`idle-${f}`),
       ['contact-a', 'contact-b'].map((p) => ({ label: p, img: crop(`${p}-${f}`) }))))
       found.push(`${c.id} ${f} ${x.gate} ${x.a.split('/')[1]}`)
+  }
+  // ★ AND THE FRONT VIEW MUST NOT BE THE BACK VIEW. `crossFacingDupeGate` was written for the
+  // v1 sheet's ne/nw back-view dupe, calibrated, unit-tested on that fixture — and its only
+  // caller is `gen-character-v3.ts`, superseded. It has never run against committed art.
+  // AUTHORED facings only: `sw`/`nw` are mirrors by construction, so judging them would fire
+  // `mirror-dupe` by design and say nothing about the drawing. Closest today is yusuf/idle at
+  // 0.2614 against a 0.1705 bar — 1.53x headroom across all twenty pairs.
+  for (const p of ['idle', ...WALK]) {
+    for (const x of crossFacingDupeGate(
+      AUTHORED.map((f) => ({ label: `${f}/${p}`, img: view.get(`${p}-${f}`)! })), CALIBRATED_MEDIAN))
+      found.push(`${c.id} ${p} ${x.gate} ${x.a}~${x.b}`)
   }
   for (const x of sleepGate('sleep', view.get('idle-se')!, view.get('sleep-se')!))
     found.push(`${c.id} sleep ${x.gate}`)
