@@ -418,7 +418,9 @@ describe('city structures', () => {
       for (const f of s.furnishings)
         expect(CITY_FURNISHING_KINDS, `${s.kind} ${f.kind}`).toContain(f.kind)
     const used = new Set(structures.flatMap(s => s.furnishings.map(f => f.kind)))
-    expect([...used].sort()).toEqual(['barrel', 'bed', 'chair', 'crate', 'hearth', 'rug', 'shelf', 'table'])
+    // `bench` joined when the cabin got a room: a refuge has somewhere to sit and no bed.
+    expect([...used].sort())
+      .toEqual(['barrel', 'bed', 'bench', 'chair', 'crate', 'hearth', 'rug', 'shelf', 'table'])
     expect([...CITY_FURNISHING_KINDS].sort())
       .toEqual(['anvil', 'barrel', 'bed', 'bench', 'chair', 'crate', 'hearth', 'rug', 'shelf', 'table'])
   })

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CITY_FURNISHING_KINDS, DEFAULT_CONFIG, INTERIOR_KINDS,
-  type AssetRecord, type InteriorMeta, type LibraryItemManifest,
+  CITY_FURNISHING_KINDS, DEFAULT_CONFIG, INTERIOR_KINDS, isBeddedKind, isHearthKind,
+  type AssetRecord, type InteriorKind, type InteriorMeta, type LibraryItemManifest,
 } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
-import { INTERIOR_TILE, interiorToScreen, slotToTile } from './interiorMap.js'
+import {
+  INTERIOR_TILE, ROOM_TILES, WALL_FACING, interiorPath, interiorToScreen, isWalkable, roomMapOf,
+  slotToTile, standingTiles, walkableCount, wallOfTile, type RoomMap,
+} from './interiorMap.js'
 import { tileSpanCentre } from './roomShell.js'
 import {
   BED_FOOTPRINT, CONTACT_SHADOW_ALPHA, FURNITURE_OCCUPANCY, INTERIOR_FADE_MS, INTERIOR_LAYOUTS,
@@ -111,6 +114,7 @@ describe('INTERIOR_LAYOUTS and roomFurnishings', () => {
     ])
     expect(INTERIOR_LAYOUTS.storehouse.map((f) => f.kind)).toEqual(['shelf', 'shelf', 'crate'])
     expect(INTERIOR_LAYOUTS.shed.map((f) => f.kind)).toEqual(['tools', 'crate'])
+    expect(INTERIOR_LAYOUTS.cabin.map((f) => f.kind)).toEqual(['hearth', 'bench'])
   })
 
   it('furnishes every interior kind from the C13 city template, resolving `tools`', () => {
@@ -122,6 +126,7 @@ describe('INTERIOR_LAYOUTS and roomFurnishings', () => {
     // which is what that fallback is for. The plan's `tools` is still the library's anvil
     // (interiorMeta's declared alias).
     expect(roomFurnishings('shed').map((f) => f.kind)).toEqual(['anvil', 'crate'])
+    expect(roomFurnishings('cabin').map((f) => f.kind)).toEqual(['hearth', 'bench', 'crate'])
     for (const kind of INTERIOR_KINDS) {
       for (const f of roomFurnishings(kind)) {
         expect(CITY_FURNISHING_KINDS as readonly string[]).toContain(f.kind)
@@ -448,5 +453,108 @@ describe('contactShadow — nothing floats', () => {
     expect(contactShadow(48).rx).toBeGreaterThan(contactShadow(24).rx)
     expect(contactShadow(0).rx).toBeGreaterThanOrEqual(0)
     expect(contactShadow(-10).rx).toBeGreaterThanOrEqual(0)
+  })
+})
+
+// ── ★ THE CABIN, AND WHY THIS ROOM AND NOT ANOTHER ONE FIRST ─────────────────────────────
+//
+// `world-fixes` proved the ENGINE's half of this walk and this lane does not re-prove it:
+// `searchPath` from all five founders' doorsteps and from the storehouse door, every route
+// `capped: false`, the body walked tile by tile, `enter`, warmth asserted UNCHANGED indoors,
+// then `stoke`, then warmth up by exactly `2 x warmth.fireWarmth`.
+//
+// What it could not prove is that any of it is on screen, and its own report says so: *"a mind
+// can feed a fire the viewer cannot see."* The cabin holds the founding valley's ONLY reachable
+// indoor fire, so it is the room that makes the whole chain visible, and it is first for that
+// reason and no other.
+//
+// THIS IS THE VIEWER'S HALF: that the room a body walks into is the room the engine says it is.
+describe('★ the cabin is a room, and it is the room the engine says it is', () => {
+  const HEARTH = libraryRecord('hearth', {
+    slots: { w: 1, h: 1 }, placement: 'wall', interiorKinds: ['house'],
+    isHearth: true, providesLight: true,
+  })
+  const BENCH = libraryRecord('bench', {
+    slots: { w: 1, h: 2 }, placement: 'floor', interiorKinds: ['house'],
+  })
+  const CRATE = libraryRecord('crate', {
+    slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['storehouse'],
+  })
+  const RECORDS = [HEARTH, BENCH, CRATE]
+
+  // The same assembly `interiorScene.layoutRoom` runs: the plan becomes a room map, and a wall
+  // furnishing goes on its wall. Written out rather than imported because the scene builds it
+  // inside a Pixi closure — the pieces are these three lines and nothing else.
+  const mapFor = (kind: InteriorKind): RoomMap => roomMapOf(
+    roomPlan(kind, RECORDS).map((i) => ({
+      kind: i.kind, slot: i.slot, size: i.meta?.slots ?? { w: 1, h: 1 },
+      placement: i.meta?.placement ?? 'floor', flat: isFlat(i.kind),
+    })),
+  )
+
+  it('★ resolves an interior at all — before this it was null and the body vanished', () => {
+    const state = {
+      ...fixture(), structures: { cabin1: structure('cabin1', 'cabin') },
+    } as unknown as WorldState
+    const room = interiorOf(state, 'cabin1')
+    expect(room).not.toBeNull()
+    expect(room!.kind).toBe('cabin')
+  })
+
+  it('★ holds one fire, on a wall, facing that wall\'s own face', () => {
+    const map = mapFor('cabin')
+    const fires = map.pieces.filter((p) => p.kind === 'hearth')
+    expect(fires).toHaveLength(1)
+    const fire = fires[0]!
+    expect(fire.placement).toBe('wall')
+    // THE FIREPLACE/WALL FACING BUG, WHICH MUST NOT COME BACK: the facing is the wall's, by
+    // construction, so a piece can never present a face its wall does not have.
+    const wall = wallOfTile(fire.tile)
+    expect(wall).not.toBeNull()
+    expect(fire.facing).toBe(WALL_FACING[wall!])
+  })
+
+  it('★ and a body inside can walk from the threshold to a tile beside that fire', () => {
+    const map = mapFor('cabin')
+    const fire = map.pieces.find((p) => p.kind === 'hearth')!
+    // the threshold is the room's near corner — the tile a body stands on the moment the door
+    // closes behind it, and the same corner `thresholdPoly` draws the plate on
+    const door = { x: ROOM_TILES.w - 1, y: ROOM_TILES.h - 1 }
+    expect(isWalkable(map, door)).toBe(true)
+    const perches = standingTiles(map, fire)
+    expect(perches.length).toBeGreaterThan(0)
+    const path = interiorPath(map, door, perches[0]!)
+    expect(path).not.toBeNull()
+    expect(path!.length).toBeGreaterThan(0)
+    // not vacuous: the room is furniture as well as floor, so SOMETHING must be unwalkable
+    expect(walkableCount(map)).toBeLessThan(ROOM_TILES.w * ROOM_TILES.h)
+    expect(walkableCount(map)).toBeGreaterThan(0)
+  })
+
+  // ★ THE TWO HALVES AGREE. Over every kind the viewer draws a room for, what the room CONTAINS
+  // is what the recipe row SAYS it contains. A room that draws a fire the config denies is a
+  // fire nobody can stoke; a room that omits one the config promises is `world-fixes`' defect
+  // coming back through the renderer.
+  it('★ the fire in the room is the fire in the config, over every room there is', () => {
+    for (const kind of INTERIOR_KINDS) {
+      const kinds = mapFor(kind).pieces.map((p) => p.kind)
+      expect(kinds.includes('hearth'), `${kind} hearth`).toBe(isHearthKind(DEFAULT_CONFIG, kind))
+      expect(kinds.includes('bed'), `${kind} bed`).toBe(isBeddedKind(DEFAULT_CONFIG, kind))
+    }
+    // both answers present on both properties, or `false === false` satisfies the loop
+    const hearths = INTERIOR_KINDS.filter((k) => isHearthKind(DEFAULT_CONFIG, k))
+    const beds = INTERIOR_KINDS.filter((k) => isBeddedKind(DEFAULT_CONFIG, k))
+    expect(hearths.length).toBeGreaterThan(0)
+    expect(hearths.length).toBeLessThan(INTERIOR_KINDS.length)
+    expect(beds.length).toBeGreaterThan(0)
+    expect(beds.length).toBeLessThan(INTERIOR_KINDS.length)
+  })
+
+  it('★ and the cabin is a refuge, not a home — warm, and you sleep on the boards', () => {
+    const kinds = mapFor('cabin').pieces.map((p) => p.kind)
+    expect(kinds).toContain('hearth')
+    expect(kinds).not.toContain('bed')
+    expect(bedSlots('cabin', ['amara'], RECORDS)).toEqual({})   // nowhere to lie down
+    expect(mapFor('house').pieces.map((p) => p.kind)).toContain('bed')
   })
 })

@@ -102,8 +102,15 @@ const HOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
   ['bread', 2], ['waterskin', 1], ['herb_bundle', 3],
 ]
 
+/** A refuge holds fuel and a blanket, and nothing that belongs to anybody. The cabin became an
+ *  enterable room when it got its interior, and the guard below asks every room to hold
+ *  something so none reads as empty by accident. */
+const CABIN_STOCK: ReadonlyArray<readonly [string, number]> = [
+  ['timber', 6], ['cloth', 2],
+]
+
 const STOCK_FOR: Readonly<Record<string, ReadonlyArray<readonly [string, number]>>> = {
-  storehouse: STOREHOUSE_STOCK, shed: SHED_STOCK, house: HOUSE_STOCK,
+  storehouse: STOREHOUSE_STOCK, shed: SHED_STOCK, house: HOUSE_STOCK, cabin: CABIN_STOCK,
 }
 
 /**

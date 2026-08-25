@@ -381,9 +381,19 @@ const FURNISHINGS_BY_KIND: Readonly<Record<string, CityFurnishing[]>> = {
   house: HOUSE_FURNISHINGS,
   cottage: HEARTH_AND_BED,
   farmhouse: HEARTH_AND_BED,
-  // The cabin's stove and no bed: it is the founding valley's one indoor fire and it is a
+  // ★ THE CABIN'S STOVE AND NO BED: it is the founding valley's one indoor fire and it is a
   // refuge, not a home. A body is warm in it and still sleeps on the boards.
-  cabin: [THE_HEARTH],
+  //
+  // The bench and the woodpile are here now that a renderer draws this room. They are the two
+  // things a refuge has and a home does not need: somewhere to sit out a night you are not
+  // sleeping through, and the fuel the fire on the wall opposite is fed from. NO BED, NO TABLE,
+  // NO RUG — the absence is the point, and it is the only way the screen can say "refuge" where
+  // the config says `hearth: true, bed: false`.
+  cabin: [
+    THE_HEARTH,
+    { kind: 'bench', slot: { x: 1, y: 2 } },
+    { kind: 'crate', slot: { x: 2, y: 2 } },
+  ],
   [STOREHOUSE_KIND]: STOREHOUSE_FURNISHINGS,
 }
 

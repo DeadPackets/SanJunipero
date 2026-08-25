@@ -13,7 +13,9 @@ import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 export { INTERIOR_KINDS } from '@sj/shared'
 export type { InteriorKind }
 
-export type FurnishingKind = 'bed' | 'hearth' | 'table' | 'shelf' | 'crate' | 'tools'
+// `bench` joined for the cabin. A refuge is a fire and somewhere to sit by it, and the bench is
+// the piece the library already ships for that (1x2 floor, honey-wood planks on two trestles).
+export type FurnishingKind = 'bed' | 'hearth' | 'table' | 'shelf' | 'crate' | 'tools' | 'bench'
 export type Furnishing = { kind: FurnishingKind; slot: { x: number; y: number } }
 
 // The C10 plan's declared minimum room. It is the floor the renderer can always draw, and
@@ -32,6 +34,11 @@ export const INTERIOR_LAYOUTS: Record<InteriorKind, Furnishing[]> = {
   shed: [
     { kind: 'tools', slot: { x: 1, y: 1 } },
     { kind: 'crate', slot: { x: 2, y: 1 } },
+  ],
+  // A fire and somewhere to sit by it. The floor a body sleeps on is the floor itself.
+  cabin: [
+    { kind: 'hearth', slot: { x: 0, y: 2 } },
+    { kind: 'bench', slot: { x: 1, y: 2 } },
   ],
 }
 
