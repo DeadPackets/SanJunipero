@@ -14,7 +14,14 @@
 // difference is whether `lamp_post` is in `structures.recipes` — arm A is the world before
 // this lane, arm B is the world after. Nothing in either arm tells a mind to build anything.
 //
+// ★ AND THE WORLD IT ASKS IN WENT STALE UNDER IT. These numbers were taken before `wants`
+// landed and before the world-fixes lane, and the harness DELETES EVERY ROOFED BUILDING — so
+// re-running it unchanged would measure a town with the cabin, the cottage and the farmhouse
+// lifted out of it, which is not a town this project ships. `NIGHT_VALLEY` and `NIGHT_LADDER`
+// are what make the gap readable against the shipped world and against the world before it.
+//
 //   NIGHT_ARM=a|b  NIGHT_TICKS=300  NIGHT_LABEL=run1
+//   NIGHT_VALLEY=shipped|stripped   NIGHT_LADDER=after|before
 import { fileURLToPath } from 'node:url'
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
@@ -22,7 +29,10 @@ import {
   createWorldTick, doorTile, EventStore, fold, genesisState, makeGenesisWorld, RngStreams,
   TickLoop, type LawQueue, type TickHandler, type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, isRoofedKind, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  DEFAULT_CONFIG, MINUTES_PER_DAY, isHearthKind, isRoofedKind,
+  type SimConfig, type SimEvent,
+} from '@sj/shared'
 import { EngineBridge, type Intent, type SubmitResult } from '../src/runtime/bridge.js'
 import { AgentRuntime } from '../src/runtime/agentRuntime.js'
 import { openAgentDb } from '../src/memory/schema.js'
@@ -64,7 +74,26 @@ const withoutLamp = (c: SimConfig): SimConfig => {
     light: { ...c.light, glowRadius: glowRadius as typeof c.light.glowRadius },
   }
 }
-const config: SimConfig = ARM === 'a' ? withoutLamp(DEFAULT_CONFIG) : DEFAULT_CONFIG
+
+// ★ THE LADDER BEFORE AND AFTER. `before` puts back the exact three rows the world-fixes lane
+// changed, so the lamp A/B can be read against the world we ship AND against the world we
+// shipped it over. Nothing else moves: same seed, same prose, same cast, same ground.
+const LADDER = (process.env.NIGHT_LADDER ?? 'after').toLowerCase()
+const beforeTheLadder = (c: SimConfig): SimConfig => ({
+  ...c,
+  structures: {
+    ...c.structures,
+    recipes: {
+      ...c.structures.recipes,
+      cabin: { ...c.structures.recipes['cabin']!, hearth: false },
+      cottage: { ...c.structures.recipes['cottage']!, hearth: false, bed: false },
+      farmhouse: { ...c.structures.recipes['farmhouse']!, hearth: false, bed: false },
+    },
+  },
+})
+
+const withArm = ARM === 'a' ? withoutLamp(DEFAULT_CONFIG) : DEFAULT_CONFIG
+const config: SimConfig = LADDER === 'before' ? beforeTheLadder(withArm) : withArm
 
 // ---------------------------------------------------------------- the minds ---
 // The g11 founders, with their backstories and voices intact and their GOALS MADE NEUTRAL.
@@ -148,12 +177,19 @@ const MINDS: Mind[] = [
 // property, so the question is asked of every recipe rather than of a remembered list.
 const ROOFED = new Set(
   Object.keys(config.structures.recipes).filter((k) => isRoofedKind(config, k)))
-// BOTH ARMS lose the buildings that LOOK like shelter and are not — the motivation lane
-// measured eighty refusals a night on "there is no way into a cabin", and a probe that left
-// them in would spend its whole budget re-measuring somebody else's known defect instead of
-// asking about the dark.
-const FAKE_SHELTER = new Set(['cabin', 'cottage', 'farmhouse'])
-const REMOVED = new Set([...ROOFED, ...FAKE_SHELTER])
+
+// ★ AND WHICH WORLD IT ASKS IT OF, WHICH IS THE THING THAT WENT STALE. `stripped` is the world
+// the landed numbers were taken in: every roof lifted out, because the motivation lane was
+// measuring eighty refusals a night on "there is no way into a cabin" and a probe that left
+// them in would have spent its budget re-measuring somebody else's defect.
+//
+// That defect is closed. A cabin is a room a body walks into and, since the world-fixes lane,
+// the one indoor fire in the valley. So `stripped` now deletes the very buildings the question
+// is about — a lamp A/B run in it cannot see a hearth, a bed or a ladder, and the number it
+// returns describes a town this project does not ship. `shipped` is the founding valley as it
+// stands: two sound roofs, seven sets of walls three quarters up, and a fire under one of them.
+const VALLEY = (process.env.NIGHT_VALLEY ?? 'shipped').toLowerCase()
+const REMOVED: ReadonlySet<string> = VALLEY === 'stripped' ? ROOFED : new Set<string>()
 
 function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: number; y: number }> } {
   const g = makeGenesisWorld(config)
@@ -162,14 +198,22 @@ function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: n
   const doors: Array<{ x: number; y: number }> = []
   for (const e of g.events) {
     const p = e.payload as Record<string, unknown>
+    if (e.type === 'structure_planned' && ROOFED.has(String(p['kind']))) {
+      // Collected whether or not the roof is then dropped, so every arm and BOTH valleys spawn
+      // their five founders on exactly the same five tiles.
+      doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
+    }
     if (e.type === 'structure_planned' && REMOVED.has(String(p['kind']))) {
       dropped.add(String(p['id']))
-      // Remember the doorways of the HOUSES only, so every arm spawns its five founders on
-      // exactly the same five tiles and the arms differ in nothing but what stands around them.
-      if (ROOFED.has(String(p['kind']))) doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
       continue
     }
-    if (e.type === 'structure_completed' && dropped.has(String(p['id']))) continue
+    // Anything that names a building that is not there: the completion, the walls genesis
+    // stands three quarters up, and the founder kit that would have been spawned inside it.
+    // `structure_progressed` and the kits did not exist here when this probe last ran, and an
+    // item carries its own `id` — so the location has to be asked FIRST or the kit slips past.
+    const loc = p['loc'] as { t?: string; id?: string } | undefined
+    const names = loc?.t === 'structure' ? loc.id : (p['structureId'] ?? p['id'])
+    if (e.type !== 'structure_planned' && typeof names === 'string' && dropped.has(names)) continue
     state = fold(state, store.append(state.tick, e.type, e.payload), config)
   }
   return { state, doors }
@@ -280,7 +324,7 @@ async function main(): Promise<void> {
     [m.id, Number((loop.state.agents[m.id]?.needs.warmth ?? -1).toFixed(1))]))
 
   const report = {
-    arm: ARM, label: LABEL, ticks: TOTAL_TICKS, startTick: START_TICK,
+    arm: ARM, valley: VALLEY, ladder: LADDER, label: LABEL, ticks: TOTAL_TICKS, startTick: START_TICK,
     llmCalls: calls.n, costUsd: Number(cost.c.toFixed(4)),
     intents: attempts.length,
     byVerb: Object.fromEntries([...byVerb].sort((a, b) => b[1] - a[1])),
@@ -314,6 +358,21 @@ async function main(): Promise<void> {
     lampBuildIntents: attempts.filter((a) => a.verb === 'build' && a.params.includes(LAMP)).length,
     houseBuildIntents: attempts.filter((a) => a.verb === 'build' && a.params.includes('house')).length,
     stoked: events.filter((e) => e.type === 'structure_fueled').length,
+    // ★ THE CHAIN THE WORLD-FIXES LANE BUILT A ROAD FOR, counted end to end: a body that went
+    // in, a body that went in somewhere with a fire in it, and a fire it then fed. Zero on the
+    // third with a positive first is the road being there and nobody walking it.
+    enteredWarm: entered.filter((e) => {
+      const id = (e.payload as { structureId?: string }).structureId
+      const k = id === undefined ? undefined : loop.state.structures[id]?.kind
+      return k !== undefined && isHearthKind(config, k)
+    }).length,
+    stokedIndoors: events.filter((e) => {
+      if (e.type !== 'structure_fueled') return false
+      const id = (e.payload as { structureId?: string }).structureId
+      const k = id === undefined ? undefined : loop.state.structures[id]?.kind
+      return k !== undefined && isRoofedKind(config, k)
+    }).length,
+    slept: events.filter((e) => e.type === 'agent_slept').length,
     kindled: events.filter((e) => e.type === 'item_lit').length,
     torchCrafts: attempts.filter((a) => a.verb === 'craft' && a.params.includes('torch')).length,
     // The ONE number that says whether the road was taken: acts aimed at light, of any kind.
