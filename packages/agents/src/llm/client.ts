@@ -3,8 +3,13 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type Database from 'better-sqlite3'
 import type { z } from 'zod'
 import { insertAlert, insertLlmCall, makeBudgetGuard, sumCostUsd, type BudgetGuard } from './callLog.js'
-import { FALLBACK_MODELS, MIND_MODEL, PRICE_PER_M, PRICE_PER_M_BY_MODEL, PROVIDER_ORDER } from './pins.js'
+import {
+  FALLBACK_MODELS, MIND_MODEL, PRICE_PER_M, PRICE_PER_M_BY_MODEL, PROVIDER_ORDER,
+  reasoningFor, type ReasoningSetting,
+} from './pins.js'
 import { repairToSchema } from './repair.js'
+
+export type { ReasoningSetting }
 
 export type LlmUsage = {
   inputTokens: number
@@ -42,10 +47,16 @@ export function defaultExtraBody(
   fallbackModels: string[] = FALLBACK_MODELS,
   providerOrder: string[] = PROVIDER_ORDER,
   allowFallbacks = true,
-): { models: string[]; provider: { order: string[]; allow_fallbacks: boolean } } {
+  reasoning?: ReasoningSetting,
+): {
+  models: string[]
+  provider: { order: string[]; allow_fallbacks: boolean }
+  reasoning?: ReasoningSetting
+} {
   return {
     models: [MIND_MODEL, ...fallbackModels],
     provider: { order: providerOrder, allow_fallbacks: allowFallbacks },
+    ...(reasoning === undefined ? {} : { reasoning }),
   }
 }
 
@@ -68,6 +79,8 @@ export type LlmClientOpts = {
   // False turns `providerOrder` from a preference into an allow-list. Absent leaves the
   // routing exactly as it has always been.
   allowProviderFallbacks?: boolean
+  // Absent falls back to the per-caller pin in `pins.ts`; `null` sends nothing at all.
+  reasoning?: ReasoningSetting | null
   maxRetries?: number
   // How long one attempt may sit before it is abandoned. A stalled provider response used to
   // hang the caller for ever: an interrupted G11b night lost 614 s to one `semantic` call and
@@ -92,6 +105,7 @@ export class LlmClient {
   private readonly fallbackModels: string[]
   private readonly providerOrder: string[]
   private readonly allowProviderFallbacks: boolean
+  private readonly reasoning: ReasoningSetting | null
   private readonly maxRetries: number
   private readonly requestTimeoutMs: number
   private readonly budgetUsd: number | undefined
@@ -107,6 +121,7 @@ export class LlmClient {
     this.fallbackModels = opts.fallbackModels ?? FALLBACK_MODELS
     this.providerOrder = opts.providerOrder ?? PROVIDER_ORDER
     this.allowProviderFallbacks = opts.allowProviderFallbacks ?? true
+    this.reasoning = opts.reasoning === undefined ? reasoningFor(opts.caller) : opts.reasoning
     this.maxRetries = opts.maxRetries ?? 2
     this.requestTimeoutMs = opts.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
     this.budgetUsd = opts.budgetUsd
@@ -268,7 +283,12 @@ export class LlmClient {
     if (this.model !== undefined) return this.model
     const openrouter = createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY })
     this.model = openrouter(MIND_MODEL, {
-      extraBody: defaultExtraBody(this.fallbackModels, this.providerOrder, this.allowProviderFallbacks),
+      extraBody: defaultExtraBody(
+        this.fallbackModels,
+        this.providerOrder,
+        this.allowProviderFallbacks,
+        this.reasoning ?? undefined,
+      ),
     })
     return this.model
   }

@@ -425,6 +425,21 @@ describe('default OpenRouter path extraBody', () => {
     })
     expect(defaultExtraBody(['x/y'], ['P']).provider.allow_fallbacks).toBe(true)
   })
+
+  // Measured at Wafer, n=20 per rung, byte-identical prompts: `minimal`/`low`/`medium`/`high`
+  // are indistinguishable (medians 245-323, each rung's own spread four times wider than any
+  // gap between them), while `enabled:false` takes reasoning to exactly 0 on 20/20 calls and
+  // median output from 168 to 50. `unset` and `high` bill the same +22-token thinking preamble,
+  // so leaving it unset has always meant asking for the maximum.
+  it('carries a reasoning setting into the body, and sends none when none is asked for', () => {
+    expect(defaultExtraBody(['x/y'], ['P'], true, { enabled: false })).toEqual({
+      models: [MIND_MODEL, 'x/y'],
+      provider: { order: ['P'], allow_fallbacks: true },
+      reasoning: { enabled: false },
+    })
+    expect(defaultExtraBody(['x/y'], ['P'], true, { effort: 'low' }).reasoning).toEqual({ effort: 'low' })
+    expect(defaultExtraBody()).not.toHaveProperty('reasoning')
+  })
 })
 
 describe('the back end that answered is written down (C11 R20)', () => {
