@@ -1,0 +1,3 @@
+- t=1201 **omar**: Evening's come on quick. The house is close but not done. Salma's not far. I'll say something gentle, see what she needs.
+- t=1201 **amara**: The house needs its roof. Ten wood for a house, I'm holding twelve. Count it, then put it up before the light's gone.
+- t=1201 **yusuf**: Walls are three quarters up. A couple of beams and a roof, then I sleep dry. River's not going to take this one.

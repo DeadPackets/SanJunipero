@@ -1,0 +1,56 @@
+{
+  "label": "smoke",
+  "turnReasoning": null,
+  "reflectionReasoning": null,
+  "ticks": 40,
+  "startTick": 1200,
+  "simHours": 0.6666666666666666,
+  "seed": "cost-ladder",
+  "cast": [
+    "amara",
+    "yusuf",
+    "nadia",
+    "omar",
+    "salma"
+  ],
+  "byCaller": [
+    {
+      "caller": "turn",
+      "calls": 3,
+      "okCalls": 3,
+      "inTok": 7539,
+      "outTok": 3296,
+      "reasonTok": 3074,
+      "cacheTok": 1536,
+      "cost": 0.001806,
+      "outPerCall": 1099,
+      "reasoningPct": 93.3,
+      "cacheHitPct": 20.4
+    }
+  ],
+  "costUsd": 0.001806,
+  "costPerSimHour": 0.0027,
+  "quality": {
+    "enteredWarm": 0,
+    "lightActs": 0,
+    "recovered": 0,
+    "bonds": 0,
+    "completed": 0,
+    "planned": 0,
+    "refusals": 0,
+    "recoveryPct": null,
+    "thoughts": 3,
+    "spoke": 1,
+    "emDashPct": 0,
+    "topOpener": {
+      "words": "evening's come on",
+      "n": 1,
+      "pct": 25
+    },
+    "repairs": 0,
+    "repairPct": 0,
+    "hardFailures": 0
+  },
+  "intents": 3,
+  "refusalsByReason": []
+}

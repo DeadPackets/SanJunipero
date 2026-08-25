@@ -8,6 +8,11 @@ import { PersonalityStore, type PersonalityDoc } from './personality.js'
 import {
   runSleepReflection,
   makeReflectionLlm,
+  extractFactsPrompt,
+  summarizeScenesPrompt,
+  summarizeDayPrompt,
+  updateLedgerPrompt,
+  autobiographyPrompt,
   proposeEditPrompt,
   ProposeEditSchema,
   FALLBACK_AUTOBIOGRAPHY,
@@ -17,6 +22,7 @@ import {
 } from './reflection.js'
 import { BudgetExceededError } from './llm/client.js'
 import { FORBIDDEN_FRAMING } from './prompt/rulesOfBeing.js'
+import { scanForLayoutLeak, scanPromptForGlassLeak } from './prompt/glassScan.js'
 import type { LlmClient, LlmMessage } from './llm/client.js'
 
 const AGENT = 'tamar'
@@ -421,6 +427,30 @@ describe('makeReflectionLlm prompts', () => {
         .not.toContain('—')
     }
   })
+  // ★ SIX AUTHORED SURFACES EVERY MIND READS EVERY NIGHT, AND NOTHING HELD THEM TO THE GLASS.
+  // `founderMinds.test.ts` scans the persona cards and `assemblePrompt` scans the turn; neither
+  // reaches these. That gap is why this test exists BEFORE the prose is rewritten: a shorter
+  // reflection prompt must not buy its brevity by turning a question into an instruction.
+  it('no reflection prompt leaks the ops taxonomy, the town grammar, or a hint', () => {
+    const authored = [
+      extractFactsPrompt(memories).system,
+      summarizeScenesPrompt(memories).system,
+      summarizeDayPrompt([{ title: 'Trade', text: 'The day was full of deals.' }]).system,
+      updateLedgerPrompt('Nadia', null, memories).system,
+      autobiographyPrompt('The day was full of deals.', doc).system,
+      proposeEditPrompt('The day was full of deals.', doc, memories).system,
+    ]
+    for (const text of authored) {
+      expect(scanPromptForGlassLeak(text), text.slice(0, 48)).toEqual([])
+      expect(scanForLayoutLeak(text), text.slice(0, 48)).toEqual([])
+      // The turn is where a mind decides what to do. A night prompt that reaches across and
+      // tells it what to do next has stopped being reflection.
+      for (const hint of ['you should', 'you must build', 'go inside', 'raise a', 'be sure to']) {
+        expect(text.toLowerCase(), `${text.slice(0, 48)} hints "${hint}"`).not.toContain(hint)
+      }
+    }
+  })
+
   it("proposeEdit prompt carries today's memory ids and the edit shape", () => {
     const p = proposeEditPrompt('The day was full of deals.', doc, memories)
     const text = p.system + '\n' + p.messages.map((m) => m.content).join('\n')
