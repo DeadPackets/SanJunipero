@@ -120,9 +120,15 @@ const SHED_STOCK: ReadonlyArray<readonly [string, number]> = [
  * founder spawns at their own door and goes in at their own door, so nobody is ever adjacent to
  * the public store and thirty planks might as well not be there. The bread on a household shelf
  * is the one road live minds have actually been observed to walk; the wood goes on the same shelf.
+ *
+ * ★ AND THE QUANTITY IS A HOUSE, BECAUSE ANYTHING LESS IS NOT A BUILDING. A house is `{ wood: 10 }`;
+ * four buys a lamp post and a lit hearth and no roof at all. Eleven buildings already stand here on
+ * tick 0, so the only thing a founding day can mean in this town is **the ability to add one more**
+ * — and a household that cannot afford a single wall has not been given that. It is a founding
+ * store and nothing refills it: spend it and the forest has to start mattering.
  */
 const HOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
-  ['bread', 2], ['waterskin', 1], ['herb_bundle', 3], ['wood', 4],
+  ['bread', 2], ['waterskin', 1], ['herb_bundle', 3], ['wood', 10],
 ]
 
 const STOCK_FOR: Readonly<Record<string, ReadonlyArray<readonly [string, number]>>> = {
