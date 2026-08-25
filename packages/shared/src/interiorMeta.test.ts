@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { DEFAULT_CONFIG, isRoofedKind } from './config.js'
 import {
   INTERIOR_KINDS, InteriorMetaSchema, LibraryItemManifestSchema,
   parseLibraryItemManifest, resolveFurnishingKind, FURNISHING_KIND_ALIASES,
@@ -37,9 +38,33 @@ describe('InteriorMetaSchema', () => {
     expect(() => InteriorMetaSchema.parse({ ...BED, interiorKinds: ['barn'] })).toThrow()
   })
 
-  // C10 T10 declares `type InteriorKind = 'house' | 'storehouse' | 'shed'`; the two must not drift.
-  it('INTERIOR_KINDS is exactly C10 T10 s literal list, in order', () => {
-    expect([...INTERIOR_KINDS]).toEqual(['house', 'storehouse', 'shed'])
+  // ★ THE LAW, WHERE A TRANSCRIPTION USED TO BE.
+  //
+  // This was `expect([...INTERIOR_KINDS]).toEqual(['house','storehouse','shed'])` — the list
+  // pinned to a copy of itself, which is satisfiable without the property holding and which
+  // passed for the whole time three roofed dwellings had no room to draw.
+  //
+  // The property is an IMPLICATION, not an equality: a body can enter anything `roofed`, so
+  // anything `roofed` must have a room here, or entering it is a body vanishing into a shape.
+  // The converse is allowed and has exactly one member.
+  const roofedKinds = Object.keys(DEFAULT_CONFIG.structures.recipes)
+    .filter((k) => isRoofedKind(DEFAULT_CONFIG, k)).sort()
+
+  // The ledger this lane carried — `['cottage','farmhouse']` while their rooms were being
+  // drawn — is EMPTY, so the law stands bare: nothing a body can walk into is missing a room.
+  it('★ every kind a body can walk into has a room drawn for it', () => {
+    expect(roofedKinds.length).toBeGreaterThan(1)
+    const missing = roofedKinds.filter((k) => !(INTERIOR_KINDS as readonly string[]).includes(k))
+    expect(missing).toEqual([])
+  })
+
+  it('★ and the rooms nobody can enter are exactly the shed, by name', () => {
+    const unenterable = [...INTERIOR_KINDS]
+      .filter((k) => !isRoofedKind(DEFAULT_CONFIG, k)).sort()
+    // `shed` is not roofed, the engine refuses `enter` on it by name, and it keeps a room
+    // because its art and eight furnishing manifests are shipped and name it. One exception,
+    // written down — a second one has to be argued for here rather than arriving quietly.
+    expect(unenterable).toEqual(['shed'])
   })
 })
 

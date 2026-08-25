@@ -10,11 +10,19 @@ import { resolveAssetId } from '../render/textures.js'
 // endpoint already knew who raised it. A room must read as SOMEBODY'S, not as a generic box,
 // and every fact this card needs is already in the world.
 
-/** The town's word for each enterable kind. Chrome copy speaks about townsfolk, never
- *  machinery (spec §5), and observes rather than scores (living-documentary law). */
-export const ROOM_WORDS: Record<string, string> = {
-  house: 'house', storehouse: 'storehouse', shed: 'shed',
-}
+/**
+ * ★ THE SECOND ROSTER THIS LANE FOUND, AND IT WAS AN IDENTITY MAP.
+ *
+ * This was `{ house: 'house', storehouse: 'storehouse', shed: 'shed' }` — a hand-maintained list
+ * of the enterable kinds whose every entry mapped a kind to its own name, with `?? 'room'` behind
+ * it. So the day `cabin`, `cottage` and `farmhouse` became rooms, the card over three of the six
+ * would have read *"the room"* — a card whose whole job is that a room reads as SOMEBODY'S and
+ * not as a generic box.
+ *
+ * The town's word for a kind IS the kind, with its underscores spent. Chrome copy speaks about
+ * townsfolk, never machinery (spec §5), and observes rather than scores.
+ */
+export const roomWord = (kind: string): string => kind.replace(/_/g, ' ')
 
 /** At most this many holdings get a row; the rest are counted honestly. */
 export const ROOM_HOLDS_MAX = 8
@@ -99,7 +107,7 @@ export function roomCard(
   const room = interiorOf(state, structureId)
   if (room === null) return null
 
-  const word = ROOM_WORDS[room.kind] ?? 'room'
+  const word = roomWord(room.kind)
   const ownerId = room.structure.owner
   // A typographic apostrophe, because the town's own name for a place is not a code literal.
   const title = ownerId === undefined ? `the ${word}` : `${nameOf(state, ownerId)}’s ${word}`

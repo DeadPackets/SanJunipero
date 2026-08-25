@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle, Sprite, Texture } from 'pixi.js'
-import type { AssetRecord, SimEvent } from '@sj/shared'
+import { CITY_INTERIOR_SLOTS, type AssetRecord, type SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 import { materialMatrix, resolveMaterial } from './groundField.js'
@@ -7,7 +7,9 @@ import { characterArt, type TextureBook } from './textures.js'
 import { characterCell } from './characters.js'
 import {
   advanceInterior, bedSlots, contactShadow, furnishingId, furnishingScale,
-  interiorBodyScale, interiorOf, interiorOrder, interiorPieces, isFlat, roomPlan,
+  interiorBodyScale, interiorOf, interiorOrder, interiorPieces, isFlat, roomLights, roomPlan,
+  roomSizeOf,
+  slotGridOf,
   type InteriorPhaseState, type PlacedBody, type RoomItem,
 } from './interiors.js'
 import {
@@ -24,7 +26,7 @@ import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 import { doorTileOf } from './entities.js'
 import type { ZoomStop } from './camera.js'
 import {
-  ROOM_SHELL_INK, ROOM_SHELL_PAINT, WALL_H_PX, WALL_TINT,
+  ROOM_SHELL_INK, ROOM_SHELL_PAINT, WALL_H_PX, WALL_MOUNT_H_PX, WALL_TINT,
   ceilingBeams, drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorPolyOf, floorPools,
   floorRegionPoly, roomMaskPoly, roomOriginX, roomOriginY, roomZoomFor, tileCentreScreen,
   tileSpanCentre, wallMount,
@@ -46,6 +48,9 @@ export { ROOM_TILES } from './interiorMap.js'
  *  the headroom the stage has, because a courtesy that pushes a wall off the top is not one. */
 export const ROOM_OFFSET_Y = 40
 export const HEARTH_GLOW_PX = 26 * INTERIOR_PX_SCALE
+/** How far above the floor line a chimney breast's firebox sits, in interior px — where the
+ *  fire is in the authored strip, and so where its light comes from. */
+export const HEARTH_FIRE_H_PX = 44
 export const PLACEHOLDER_URL = '/assets/placeholder/item.png'
 /** A hung piece is on the back plane, so it draws behind everything standing on the floor
  *  and in front of the wall itself — one depth, because a wall has no depth of its own. */
@@ -54,8 +59,10 @@ export const WALL_PIECE_Z = -1
 // Awake occupants stand where the room's life is: the hearth first, then the table, then
 // whatever else is furnished. Deterministic, so two viewers see the same room.
 const AWAKE_PREFERENCE = ['hearth', 'table', 'bench', 'chair', 'anvil', 'shelf'] as const
-/** Where a body goes when the room furnishes it nowhere to be: just inside the threshold. */
-const SPARE_TILE = { x: ROOM_TILES.w - 1, y: ROOM_TILES.h - 1 }
+/** Where a body goes when the room furnishes it nowhere to be: just inside the threshold. A
+ *  function of the room now that rooms differ in size — the near corner of a farmhouse is not
+ *  the near corner of a house. */
+const spareTile = (room: { w: number; h: number }): Tile => ({ x: room.w - 1, y: room.h - 1 })
 /** How long a body takes to cross one interior tile. A step, not a glide. */
 export const WALK_MS_PER_TILE = 420
 
@@ -78,6 +85,12 @@ export function createInteriorScene(
 ): InteriorScene {
   const app = scene.app
 
+  // ★ THE ROOM'S SIZE IS THE BUILDING'S NOW, so it is state and not a module constant. It is
+  // set from the kind the moment a room is planned; `ROOM_TILES` is the house's, and the house
+  // is only one of six. Everything that draws a plane reads this.
+  let roomTiles: { w: number; h: number } = ROOM_TILES
+  let roomSlots: { w: number; h: number } = CITY_INTERIOR_SLOTS
+
   const root = new Container()
   root.visible = false
   root.eventMode = 'passive'
@@ -90,7 +103,7 @@ export function createInteriorScene(
   // every prop: a hearth's glow is a child of its sprite and grew with the furniture scale
   // until it was painting a pale disc across the town.
   const roomMask = new Graphics()
-  roomMask.poly(roomMaskPoly(ROOM_TILES, WALL_H_PX))
+  roomMask.poly(roomMaskPoly(roomTiles, WALL_H_PX))
   roomMask.fill(0xffffff)
   room.addChild(roomMask)
   room.mask = roomMask
@@ -116,7 +129,7 @@ export function createInteriorScene(
   const floorLight = new Graphics()
   floorLight.zIndex = -2.25
   const floorMask = new Graphics()
-  floorMask.poly(floorPolyOf(ROOM_TILES))
+  floorMask.poly(floorPolyOf(roomTiles))
   floorMask.fill(0xffffff)
   floorLight.mask = floorMask
   const floorTop = new Graphics()
@@ -159,7 +172,7 @@ export function createInteriorScene(
   // the codex holds one and reads as a palette-true plane until then — the same hot-swap law
   // the outdoor ground answers to, and the same reason a missing texture is never a hole.
   const pools = (m: RoomMap): ReturnType<typeof floorPools> =>
-    floorPools(m.pieces.map((p) => ({ tile: p.tile, light: lightKinds.has(p.kind) })), ROOM_TILES)
+    floorPools(m.pieces.map((p) => ({ tile: p.tile, light: lightKinds.has(p.kind) })), roomTiles)
 
   let floorMaterial: string | null = null
   let stoneMaterial: string | null = null
@@ -177,7 +190,7 @@ export function createInteriorScene(
       if (stoneMaterial !== url || floorStone.destroyed) return
       t.source.addressMode = 'repeat'
       floorStone.clear()
-      for (const r of flagstoneRegions(hearths, ROOM_TILES)) {
+      for (const r of flagstoneRegions(hearths, roomTiles)) {
         floorStone.poly(floorRegionPoly(r))
         floorStone.fill({ texture: t, matrix: materialMatrix('interior-flagstone', 1) })
       }
@@ -196,16 +209,16 @@ export function createInteriorScene(
         if (floorMaterial !== url || floorArt.destroyed) return
         t.source.addressMode = 'repeat'
         floorArt.clear()
-        floorArt.poly(floorPolyOf(ROOM_TILES))
+        floorArt.poly(floorPolyOf(roomTiles))
         floorArt.fill({ texture: t, matrix: materialMatrix('interior-floor', 0) })
         floorArt.visible = true
       })
     }
     floor.clear()
-    drawFloorBase(floor, ROOM_TILES, url === null ? ROOM_SHELL_PAINT.floor : null)
+    drawFloorBase(floor, roomTiles, url === null ? ROOM_SHELL_PAINT.floor : null)
     paintStone(m, records)
     floorLight.clear()
-    drawFloorLight(floorLight, pools(m), ROOM_TILES, ceilingBeams(WALL_STRIP_TILES, ROOM_TILES))
+    drawFloorLight(floorLight, pools(m), roomTiles, ceilingBeams(WALL_STRIP_TILES, roomTiles))
   }
 
   /**
@@ -228,10 +241,10 @@ export function createInteriorScene(
         const wall = p.tile.x === 0 && p.tile.y > 0 ? 'back-left' as const : 'back-right' as const
         return [{ kind: p.kind, wall, atTiles: wall === 'back-right' ? p.tile.x : p.tile.y }]
       })
-    for (const course of wallCourses(features, ROOM_TILES)) {
+    for (const course of wallCourses(features, roomTiles)) {
       const url = resolveInteriorPiece(records, course.piece)
       if (url === null) continue
-      const width = wallStripWidth(course.wall, course.atTiles, ROOM_TILES)
+      const width = wallStripWidth(course.wall, course.atTiles, roomTiles)
       if (width <= 0) continue
       const at = wallStripAt(course.wall, course.atTiles)
       const t = wallTransform(course.wall)
@@ -276,8 +289,8 @@ export function createInteriorScene(
         return piece !== undefined && resolveInteriorPiece(records, piece) !== null
       }))
 
-  drawWalls(walls, ROOM_TILES, WALL_H_PX)
-  drawFloorTop(floorTop, ROOM_TILES)
+  drawWalls(walls, roomTiles, WALL_H_PX)
+  drawFloorTop(floorTop, roomTiles)
   paintFloor(roomMapOf([]), [])
 
   function clearRoom(): void {
@@ -297,7 +310,7 @@ export function createInteriorScene(
   const mapOf = (items: RoomItem[]): RoomMap => roomMapOf(items.map((i) => ({
     kind: i.kind, slot: i.slot, size: sizeOf(i),
     placement: onWall(i) ? 'wall' : 'floor', flat: isFlat(i.kind),
-  })))
+  })), roomTiles, roomSlots)
 
   /**
    * A furnishing a body lies IN is drawn as TWO sprites cut from ONE texture, split at its
@@ -337,7 +350,7 @@ export function createInteriorScene(
       // ★ ONCE, AND ONLY ONCE. When the tileset holds an elevation for this kind, the wall IS
       // the furnishing — the chimney breast is the hearth — so no object is drawn as well. That
       // duplicate is what the mock showed as two fireplaces in one corner.
-      if (asElevation.has(piece.kind)) return
+      if (asElevation.has(piece.kind)) return   // the wall is the furnishing; its LIGHT is drawn below
       if (piece.placement !== 'wall' || WALL_PIECES_THAT_STAND.has(piece.kind)) {
         onFloor.push({ piece, item })
         return
@@ -359,6 +372,33 @@ export function createInteriorScene(
       const foot = tileSpanCentre(p.anchor.tile, p.anchor.size)
       addPiece(p.id, item, p.half, foot.sx, foot.sy, 0)
     }
+
+    // ★ AND THE FIRES THE WALL DREW. A hearth the tileset draws as a chimney breast has no
+    // sprite of its own, and the glow was a child of that sprite — so the one fire in the
+    // founding valley reached the screen as a cold fireplace. The light list is derived from
+    // what the room CONTAINS, never from how a piece happens to be drawn.
+    for (const light of roomLights(m.pieces, lightKinds)) {
+      if (!asElevation.has(light.kind)) continue        // its own sprite already wears the glow
+      const at = wallMount(light.tile)
+      if (at === null) continue
+      addWallGlow(light.id, at.sx, at.sy + WALL_MOUNT_H_PX - HEARTH_FIRE_H_PX)
+    }
+  }
+
+  /** The firelight of a hearth the WALL draws, at the height of its own firebox. A Sprite with
+   *  no texture, so it lives and dies in the `furniture` map with everything else in the room. */
+  function addWallGlow(key: string, sx: number, sy: number): void {
+    const holder = new Sprite()
+    holder.position.set(sx, sy)
+    holder.zIndex = WALL_PIECE_Z
+    holder.eventMode = 'none'
+    const glow = new Graphics()
+    glow.circle(0, 0, HEARTH_GLOW_PX)
+    glow.fill({ color: INTERIOR_HEARTH_GLOW, alpha: 0.22 })
+    glow.eventMode = 'none'
+    holder.addChild(glow)
+    furniture.set(key, holder)
+    room.addChild(holder)
   }
 
   function addPiece(
@@ -481,6 +521,16 @@ export function createInteriorScene(
       clearRoom()
       plannedFor = room2.kind
       plannedSeq = seq
+      // The room's own floor plan, before anything is drawn on it. Both masks are cut from it,
+      // so a farmhouse is not clipped to a house's box.
+      roomTiles = roomSizeOf(room2.kind)
+      roomSlots = slotGridOf(room2.kind)
+      roomMask.clear()
+      roomMask.poly(roomMaskPoly(roomTiles, WALL_H_PX))
+      roomMask.fill(0xffffff)
+      floorMask.clear()
+      floorMask.poly(floorPolyOf(roomTiles))
+      floorMask.fill(0xffffff)
       plan = roomPlan(room2.kind, records)
       lightKinds = new Set(plan.filter((p) => p.meta?.providesLight === true).map((p) => p.kind))
       map = mapOf(plan)
@@ -512,8 +562,8 @@ export function createInteriorScene(
       if (agent === undefined) continue
       const asleep = agent.asleep
       const goal = asleep
-        ? beds[id] ?? SPARE_TILE
-        : perches[awakeIdx++ % Math.max(1, perches.length)] ?? SPARE_TILE
+        ? beds[id] ?? spareTile(roomTiles)
+        : perches[awakeIdx++ % Math.max(1, perches.length)] ?? spareTile(roomTiles)
       retarget(id, goal, map)
       const own = asleep ? goal : walking.get(id)?.at ?? goal
       const host = standing.find((p) => hosts(p, own)) ?? null
@@ -661,8 +711,8 @@ export function createInteriorScene(
     // The whole box, walls included — centring the floor alone put the top of the walls off
     // the top of the stage, which is what the browser showed.
     room.position.set(
-      roomOriginX(app.screen.width, zoom, ROOM_TILES),
-      roomOriginY(app.screen.height, ROOM_OFFSET_Y, zoom, ROOM_TILES, WALL_H_PX),
+      roomOriginX(app.screen.width, zoom, roomTiles),
+      roomOriginY(app.screen.height, ROOM_OFFSET_Y, zoom, roomTiles, WALL_H_PX),
     )
     if (activeId !== null) layoutRoom(dtMs)
   }

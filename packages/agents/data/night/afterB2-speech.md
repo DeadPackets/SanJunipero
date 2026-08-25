@@ -1,0 +1,12 @@
+- t=1227 {"agentId":"nadia","text":"Evening, Omar. The walls look well set, even in this light.","x":67,"y":75}
+- t=1245 {"agentId":"nadia","text":"Omar! Bushes are heavy out east. I saw them before the light went.","x":74,"y":75}
+- t=1322 {"agentId":"omar","text":"Evening, Nadia. The berries can keep till dawn. The herbs won't.","x":74,"y":75}
+- t=1328 {"agentId":"nadia","text":"Omar — the bushes up the rise are full. I'm going to go strip them before morning.","x":74,"y":75}
+- t=1353 {"agentId":"omar","text":"Evening, Nadia. The walls will do. I'll just take a bit more of these greens before the dark takes them.","x":73,"y":68}
+- t=1370 {"agentId":"nadia","text":"Right. Berries keep, herbs don't — I'm on the way.","x":74,"y":71}
+- t=1377 {"agentId":"omar","text":"Now then — you go ahead with the bushes. I'll take what these herbs give me.","x":73,"y":68}
+- t=1383 {"agentId":"amara","text":"Ten wood should close this. I've got twelve to spare.","x":79,"y":67}
+- t=1425 {"agentId":"nadia","text":"Herbs are gone then. Good thing the bushes are heavy.","x":72,"y":68}
+- t=1444 {"agentId":"amara","text":"Ten for the house. Two left over.","x":79,"y":67}
+- t=1488 {"agentId":"amara","text":"Five. Six. Ten for the house, two spare.","x":79,"y":67}
+- t=1499 {"agentId":"omar","text":"Bushes are yours, Nadia. I've wood for a roof; I'll be off before the cold bites.","x":73,"y":68}

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, type AssetRecord } from '@sj/shared'
+import { DEFAULT_CONFIG, INTERIOR_KINDS, type AssetRecord } from '@sj/shared'
 import { genesisState, type Item, type WorldState } from '@sj/engine/state'
 import { GAMIFICATION_BAN } from './townStats.js'
 import {
-  ROOM_HOLDS_MAX, ROOM_STATE_ASLEEP, ROOM_STATE_IDLE, roomCard, roomStateOf,
+  ROOM_HOLDS_MAX, ROOM_STATE_ASLEEP, ROOM_STATE_IDLE, roomCard, roomStateOf, roomWord,
   type Provenance,
 } from './interiorModel.js'
 
@@ -82,6 +82,21 @@ describe('roomCard — whose room this is', () => {
     expect(roomCard(world(), 'stone', RECORDS, null)).toBeNull()
     expect(roomCard(world(), 'nope', RECORDS, null)).toBeNull()
     expect(roomCard(null, 'house1', RECORDS, null)).toBeNull()
+  })
+
+  // ★ THE ROSTER THAT WOULD HAVE CALLED HALF THE TOWN "the room".
+  //
+  // `ROOM_WORDS` was `{ house, storehouse, shed }`, every entry an identity mapping, with
+  // `?? 'room'` behind it. It went stale the moment `cabin`, `cottage` and `farmhouse` became
+  // rooms — and a card whose whole job is that a room reads as SOMEBODY'S would have said
+  // "the room" over three of the six.
+  it('★ every room there is has the town\'s own word for it, not "room"', () => {
+    for (const kind of INTERIOR_KINDS) {
+      expect(roomWord(kind), kind).toBe(kind.replace(/_/g, ' '))
+      expect(roomWord(kind), kind).not.toBe('room')
+    }
+    // and it holds for a kind nobody has thought of yet, which a list cannot do
+    expect(roomWord('turf_lodge')).toBe('turf lodge')
   })
 })
 

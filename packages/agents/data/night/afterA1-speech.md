@@ -1,0 +1,16 @@
+- t=1252 {"agentId":"omar","text":"Now then. I'll take some berries before the dark settles.","x":74,"y":75}
+- t=1274 {"agentId":"nadia","text":"The way's a short one — bushes are heavy out east. You want company while the light holds?","x":74,"y":75}
+- t=1285 {"agentId":"yusuf","text":"Aye. Almost there — good straight wood.","x":79,"y":70}
+- t=1315 {"agentId":"nadia","text":"I'll take the far side—no point letting the good ones go to waste in the dark.","x":74,"y":75}
+- t=1330 {"agentId":"nadia","text":"Right behind you. These ones pick quick.","x":74,"y":71}
+- t=1372 {"agentId":"yusuf","text":"Take the berries. I’ll have this roof on before the cold settles.","x":79,"y":70}
+- t=1397 {"agentId":"nadia","text":"Omar! The good ones are right here.","x":74,"y":71}
+- t=1401 {"agentId":"omar","text":"Now then. Let's put our wood on this frame before the dark settles in.","x":74,"y":75}
+- t=1404 {"agentId":"yusuf","text":"Aye. She'll stand before the night's out.","x":79,"y":70}
+- t=1419 {"agentId":"yusuf","text":"Aye. One more course and this roof is on.","x":79,"y":70}
+- t=1424 {"agentId":"omar","text":"Now then. Can't leave this half-done. Pick what you can, Nadia — I'll see to the berries after.","x":74,"y":75}
+- t=1437 {"agentId":"yusuf","text":"Cold night for it. But one more course and this house is done.","x":79,"y":70}
+- t=1460 {"agentId":"omar","text":"Now then, take the good ones, Nadia. I'll have this roof on before the cold gets in.","x":74,"y":75}
+- t=1476 {"agentId":"yusuf","text":"Aye. One more course, then we're snug.","x":79,"y":70}
+- t=1488 {"agentId":"omar","text":"Now then, Nadia — pick the good ones. I'll have this roof on before the cold settles.","x":74,"y":75}
+- t=1491 {"agentId":"yusuf","text":"Aye. Just a bit more and she's a house.","x":79,"y":70}

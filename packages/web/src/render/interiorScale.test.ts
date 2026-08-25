@@ -8,7 +8,7 @@ import {
 import { ROOM_ZOOM, roomCropPx, roomZoomFor } from './roomShell.js'
 import {
   BED_FOOTPRINT, FURNITURE_OCCUPANCY, interiorBodyScale, interiorPieces, roomFurnishings,
-  type PlacedItem,
+  roomSizeOf, slotGridOf, type PlacedItem,
 } from './interiors.js'
 
 // ★ THE COMPOSITION GUARD — the laws a per-element test cannot see.
@@ -122,10 +122,15 @@ describe('★ AND IT HOLDS FOR A SECOND BODY, EVERY ROOM KIND AND EVERY ZOOM', (
     for (const kind of INTERIOR_KINDS) {
       const pieces = roomFurnishings(kind)
       expect(pieces.length, `${kind} is furnished`).toBeGreaterThan(0)
+      // ★ AGAINST ITS OWN ROOM, NOT THE HOUSE'S. Rooms differ in size since the shared
+      // dwellings landed — a farmhouse is 24 x 6 — so measuring every kind against `ROOM_TILES`
+      // asked a farmhouse to fit in a house.
+      const room = roomSizeOf(kind)
+      expect(room.w, `${kind} room`).toBeGreaterThanOrEqual(ROOM_TILES.w)
       for (const f of pieces) {
-        const tile = slotToTile(f.slot)
-        expect(tile.x, `${kind}/${f.kind} is inside the room`).toBeLessThan(ROOM_TILES.w)
-        expect(tile.y, `${kind}/${f.kind} is inside the room`).toBeLessThan(ROOM_TILES.h)
+        const tile = slotToTile(f.slot, room, slotGridOf(kind))
+        expect(tile.x, `${kind}/${f.kind} is inside the room`).toBeLessThan(room.w)
+        expect(tile.y, `${kind}/${f.kind} is inside the room`).toBeLessThan(room.h)
         // a 1x1 or 1x2 furnishing's sprite is (w+h)x64 px; nothing in the vocabulary is bigger
         // than the wall it stands against
         expect(bodyPx(), `${kind}/${f.kind}: a body fits under the wall`)

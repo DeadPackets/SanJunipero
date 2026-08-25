@@ -1,10 +1,13 @@
 import {
-  INTERIOR_KINDS, cityStructures, parseLibraryItemManifest, resolveFurnishingKind,
+  DEFAULT_CONFIG, INTERIOR_KINDS, cityStructures, citySlotsFor, parseLibraryItemManifest,
+  resolveFurnishingKind,
   type AssetRecord, type InteriorKind, type InteriorMeta,
 } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import { OVERLAP_RANK, depthOrder, type DepthBox } from './depth.js'
-import { INTERIOR_BODY_PX, INTERIOR_TILE, interiorToScreen, seatInBlock } from './interiorMap.js'
+import {
+  INTERIOR_BODY_PX, INTERIOR_TILE, interiorToScreen, roomTilesFor, seatInBlock,
+} from './interiorMap.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 
@@ -13,7 +16,9 @@ import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 export { INTERIOR_KINDS } from '@sj/shared'
 export type { InteriorKind }
 
-export type FurnishingKind = 'bed' | 'hearth' | 'table' | 'shelf' | 'crate' | 'tools'
+// `bench` joined for the cabin. A refuge is a fire and somewhere to sit by it, and the bench is
+// the piece the library already ships for that (1x2 floor, honey-wood planks on two trestles).
+export type FurnishingKind = 'bed' | 'hearth' | 'table' | 'shelf' | 'crate' | 'tools' | 'bench'
 export type Furnishing = { kind: FurnishingKind; slot: { x: number; y: number } }
 
 // The C10 plan's declared minimum room. It is the floor the renderer can always draw, and
@@ -33,7 +38,40 @@ export const INTERIOR_LAYOUTS: Record<InteriorKind, Furnishing[]> = {
     { kind: 'tools', slot: { x: 1, y: 1 } },
     { kind: 'crate', slot: { x: 2, y: 1 } },
   ],
+  // A fire and somewhere to sit by it. The floor a body sleeps on is the floor itself.
+  cabin: [
+    { kind: 'hearth', slot: { x: 0, y: 2 } },
+    { kind: 'bench', slot: { x: 1, y: 2 } },
+  ],
+  // The shared dwellings' fallback floor. The real rooms come from the city template, which
+  // lays one bed per body out of `roomCapacity`; this is only what is drawn if that is empty.
+  cottage: [
+    { kind: 'bed', slot: { x: 0, y: 0 } },
+    { kind: 'hearth', slot: { x: 0, y: 2 } },
+    { kind: 'bench', slot: { x: 1, y: 1 } },
+  ],
+  farmhouse: [
+    { kind: 'bed', slot: { x: 0, y: 0 } },
+    { kind: 'hearth', slot: { x: 0, y: 2 } },
+    { kind: 'bench', slot: { x: 1, y: 1 } },
+  ],
 }
+
+/**
+ * ★ THE ROOM'S OWN SIZE, off the building's plan. A cottage is 3×2 outside and a farmhouse 4×2,
+ * and the world says they sleep three and four — so drawing all three dwellings on a house's
+ * floor would put the picture at odds with `roomCapacity`, which is the arithmetic the whole
+ * dwelling ladder is priced on. `interiorMap.roomTilesFor` owns the factor and it is forced by
+ * the house's landed 12×6.
+ */
+export function roomSizeOf(kind: InteriorKind): { w: number; h: number } {
+  const plan = DEFAULT_CONFIG.structures.recipes[kind]
+  return roomTilesFor(plan === undefined ? { w: 2, h: 2 } : { w: plan.w, h: plan.h })
+}
+
+/** The template slot grid this kind's furnishings are laid on — wider for a household that
+ *  needs more beds than a 3-wide grid can hold. `slotToTile` divides the room by it. */
+export const slotGridOf = (kind: InteriorKind): { w: number; h: number } => citySlotsFor(kind)
 
 export type RoomFurnishing = { kind: string; slot: { x: number; y: number } }
 
@@ -81,6 +119,34 @@ export function roomPlan(kind: InteriorKind, records: AssetRecord[]): RoomItem[]
   })
 }
 
+/**
+ * ★ EVERY FIRE THE ROOM OWES, WHICHEVER WAY ITS FURNISHING IS DRAWN — found by eye, in the
+ * running app, on the one fire this lane exists to make visible.
+ *
+ * THE DEFECT: the room's glow was a child of the furnishing's own SPRITE, and `placeFurniture`
+ * returns early for any kind the wall draws as an elevation — *"the chimney breast IS the
+ * hearth, so no object is drawn as well"*, which is right. But the hearth is the only elevated
+ * kind that provides light, so `providesLight` was computed and then **discarded for exactly the
+ * hearths that reach the screen**. Measure-then-ignore, and its consequence was the founding
+ * valley's only indoor fire reading as a cold, sooty fireplace.
+ *
+ * It could not be fixed in the art: `wall-chimney` is authored as *"a warm-grey stone chimney
+ * breast … with a mantel and soot above the opening"* — a chimney, correctly, and no fire.
+ *
+ * So the list of the room's lights is derived from what the room CONTAINS, and never from how
+ * any of it happens to be drawn. That is the whole property, and it is what the test pins.
+ */
+export type RoomLight = { id: string; kind: string; tile: { x: number; y: number } }
+
+export function roomLights(
+  pieces: ReadonlyArray<{ kind: string; tile: { x: number; y: number } }>,
+  lightKinds: ReadonlySet<string>,
+): RoomLight[] {
+  return pieces
+    .filter((p) => lightKinds.has(p.kind))
+    .map((p) => ({ id: furnishingId(p.kind, p.tile), kind: p.kind, tile: p.tile }))
+}
+
 export type Interior = {
   structure: Structure
   kind: InteriorKind
@@ -121,7 +187,7 @@ function bedCells(kind: InteriorKind, records: AssetRecord[]): Array<{ x: number
   for (const [i, f] of plan.entries()) {
     if (f.meta === null ? f.kind !== 'bed' : f.meta.isBed !== true) continue
     const size = f.meta?.slots ?? BED_FOOTPRINT
-    const at = seatInBlock(f.slot, slots.filter((_, j) => j !== i))
+    const at = seatInBlock(f.slot, slots.filter((_, j) => j !== i), roomSizeOf(kind), slotGridOf(kind))
     for (let dy = 0; dy < size.h; dy++) {
       for (let dx = 0; dx < size.w; dx++) cells.push({ x: at.x + dx, y: at.y + dy })
     }

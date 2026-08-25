@@ -206,10 +206,44 @@ const StructuresSchema = z.object({
     // The cabin stays unbuildable on purpose. It is 2x2, exactly a house's mass, so a buildable
     // one would be the same building under a second name — a word in every mind's vocabulary
     // that buys nothing. It is the one dwelling whose roof held.
+    //
+    // ★ AND IT IS THE ONLY INDOOR FIRE THE FOUNDING VALLEY HAS. Genesis takes the roof off every
+    // buildable dwelling, so every `hearth` in the valley stood behind unfinished walls and
+    // there was NOWHERE A BODY COULD GO TO BE WARM: a 720-tick rehearsal measured zero hearth
+    // behaviour because the cold → shelter → fire chain had no terminal state on the shipped
+    // world. The square's fire pit does not answer it — `fireIsOnYourSide` gives a body under a
+    // roof none of an open fire, so stepping in out of the cold left it colder.
+    //
+    // The cabin is the only kind that COULD answer it. `roofFell` throws on a roofed kind that
+    // is unbuildable and not sound, so the sound set is forced to be exactly the unbuildable
+    // roofed kinds — this and the storehouse — and a storehouse is a roof over goods. A cabin
+    // with a stove in it is what a cabin is.
+    //
+    // NO BED, and that is the point of it rather than an omission: the cabin is the refuge and
+    // the house is the home. The founders can be warm on the first night and still have every
+    // reason to finish a roof — `shelterLedger` stays at 0.8, and the want the abandoned
+    // village exists to create is untouched.
+    //
+    // ★ AND THE LADDER RAN THE WRONG WAY, WHICH ONE RATE MAKES EASY TO PROVE. Under 2.5 wood a
+    // tile, a farmhouse is 20 wood, 5 760 ticks and 4 sleeping slots — and so is a PAIR of
+    // houses, to the wood and to the tick. So a mind that saved half again and worked half
+    // again bought the same floor MINUS two fires and two beds: not a worse rung, a strictly
+    // dominated one at an identical price. `wants` would have pointed a mind straight up it.
+    //
+    // The fix is effectiveness, not price (tuning order: effectiveness → abundance → time-cost
+    // → difficulty LAST). Every dwelling gets the fire and the bed, and the rung a bigger one
+    // buys is FUEL: `stoke` feeds the BUILDING for `light.fuelBurnTicks` on one wood, and
+    // `besideAKeptFire` warms everybody in the room, so a farmhouse keeps 4 bodies warm on the
+    // armful that keeps a house's 2: 0.375 wood a body-night against 0.75. A real trade, out of
+    // laws already shipped, with no new dial and the rate untouched.
+    //
+    // What the house keeps is `privateKinds`, which names it and nothing else: a couple's night
+    // only counts under its own roof. So the big dwellings are not better houses — they are
+    // cheaper warmth bought by giving up the door you own.
     storehouse: { inputs: {}, w: 2, h: 2, maxHp: 40, flammable: true, durationTicks: 1, roofed: true, hearth: false, bed: false, sited: false },
-    cabin: { inputs: {}, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 1, roofed: true, hearth: false, bed: false, sited: false },
-    cottage: { inputs: { wood: 15 }, w: 3, h: 2, maxHp: 60, flammable: true, durationTicks: 4320, roofed: true, hearth: false, bed: false, sited: false },
-    farmhouse: { inputs: { wood: 20 }, w: 4, h: 2, maxHp: 80, flammable: true, durationTicks: 5760, roofed: true, hearth: false, bed: false, sited: false },
+    cabin: { inputs: {}, w: 2, h: 2, maxHp: 50, flammable: true, durationTicks: 1, roofed: true, hearth: true, bed: false, sited: false },
+    cottage: { inputs: { wood: 15 }, w: 3, h: 2, maxHp: 60, flammable: true, durationTicks: 4320, roofed: true, hearth: true, bed: true, sited: false },
+    farmhouse: { inputs: { wood: 20 }, w: 4, h: 2, maxHp: 80, flammable: true, durationTicks: 5760, roofed: true, hearth: true, bed: true, sited: false },
     // The town's open fire, here for the same reason the storehouse and the dwellings came off
     // `GENESIS_STRUCTURE_DEFS` when `roofed` landed: a kind with no row is a kind nothing can
     // say `hearth` about, and hp written in two places is hp that drifts. Nobody builds it —

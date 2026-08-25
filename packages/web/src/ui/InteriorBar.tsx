@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
-import { ROOM_WORDS, roomCard, type Provenance, type RoomCard } from './interiorModel.js'
+import { roomCard, roomWord, type Provenance, type RoomCard } from './interiorModel.js'
 
 // A ROOM TELLS YOU WHOSE IT IS (U4, audit R7, plan task 68).
 //
@@ -10,7 +10,7 @@ import { ROOM_WORDS, roomCard, type Provenance, type RoomCard } from './interior
 // single answer to "what is this room"; the caption pair it replaces is retired rather than
 // left beside it, because two descriptions of one room is the defect this task is fixing.
 
-export { ROOM_WORDS as INTERIOR_ROOM_WORDS } from './interiorModel.js'
+export { roomWord as interiorRoomWord } from './interiorModel.js'
 
 export function RoomCardView(
   { card, onBack, backRef }: {

@@ -303,6 +303,19 @@ export const DWELLING_FOOTPRINTS: Readonly<Record<DwellingKind, { w: number; h: 
   house: { w: 2, h: 2 },
 }
 
+// ★ HOW MANY BODIES A ROOM HOLDS, AND FLOOR IS WHY. Two tiles of floor per body: a 2×2 house
+// takes two, a 3×2 cottage three, a 4×2 farmhouse four. PHYSICS, NOT OWNERSHIP — nothing here
+// asks whose the building is.
+//
+// It lived in `engine/interiors.ts` and moved here because it is now read by TWO sides: the
+// engine caps a room by it, and the template below lays a bed down for every body a dwelling
+// sleeps. The engine re-exports it, so every caller it had is untouched.
+export const TILES_PER_BODY = 2
+
+export function roomCapacity(s: { w: number; h: number }): number {
+  return Math.max(1, Math.floor((s.w * s.h) / TILES_PER_BODY))
+}
+
 /** The ground a building of this mass covers once it is turned to face `facing`. */
 export const footprintFor = (
   mass: { w: number; h: number }, facing: 'sw' | 'se',
@@ -317,6 +330,21 @@ export type FounderId = (typeof FOUNDER_IDS)[number]
 // C10 T11 owns what a room actually looks like.
 export const CITY_INTERIOR_SLOTS = { w: 3, h: 3 } as const
 
+/**
+ * ★ AND THE GRID IS AS WIDE AS THE HOUSEHOLD, because a bed is TWO slots deep.
+ *
+ * A shared dwelling lays one bed per body. A bed's library footprint is 1 × 2, so three beds
+ * fill two whole rows of a 3 × 3 grid and a farmhouse's fourth has nowhere to go — the grid,
+ * not the floor, is what runs out. It widens with `roomCapacity` and never narrows below the
+ * landed 3, so a house, a storehouse, a shed, a cabin and a cottage are all exactly 3 × 3 still.
+ */
+export function citySlotsFor(kind: string): { w: number; h: number } {
+  const plan = DWELLING_FOOTPRINTS[kind as DwellingKind]
+  const w = plan === undefined ? CITY_INTERIOR_SLOTS.w
+    : Math.max(CITY_INTERIOR_SLOTS.w, roomCapacity(plan))
+  return { w, h: CITY_INTERIOR_SLOTS.h }
+}
+
 // Shared cannot import the forge catalog, so these stand in for it here and Task 28's
 // g13.test.ts asserts them equal to the library (the plan's declared seam).
 export const CITY_FURNISHING_KINDS =
@@ -324,9 +352,53 @@ export const CITY_FURNISHING_KINDS =
 export const CITY_BED_KIND = 'bed'
 export const CITY_HEARTH_KIND = 'hearth'
 
+// ★ THE FIRE AND THE BED, ON ONE PAIR OF SLOTS. More than one dwelling holds them now, and
+// (0, 2) written in three places is (0, 2) that drifts. These are also the only two furnishings
+// a LAW reads, which is why a kind can be given these and nothing else and still be honest.
+const THE_BED: CityFurnishing = { kind: CITY_BED_KIND, slot: { x: 2, y: 1 } }
+const THE_HEARTH: CityFurnishing = { kind: CITY_HEARTH_KIND, slot: { x: 0, y: 2 } }
+/**
+ * ★ HOW A SHARED ROOM DIFFERS FROM A PRIVATE ONE, AND IT IS THE LADDER DRAWN.
+ *
+ * `world-fixes` made a farmhouse a real rung: half the fuel per body-night (0.375 against a
+ * house's 0.75), bought by giving up the one thing `privateKinds` names. **If the two rooms look
+ * alike on screen, that trade is invisible and the ladder is a spreadsheet.**
+ *
+ * So the room says it with the count, and the count is not chosen — it is `roomCapacity`, the
+ * same `floor(w × h / 2)` the ladder is priced on:
+ *
+ *   · a PRIVATE dwelling lays ONE bed. A house sleeps two and has one bed, because the two are
+ *     a couple: `reproductionSystem` counts a night only under a roof in `privateKinds`, and
+ *     `bedSlots` already lays a partnered pair down one cell each in a single bed. One bed IS
+ *     what privacy looks like.
+ *   · a SHARED dwelling lays ONE BED PER BODY. A cottage sleeps three and shows three; a
+ *     farmhouse sleeps four and shows four. Nobody here chose anybody.
+ *
+ * And the seat says the same thing twice: a house has a CHAIR, which seats one; a cottage and a
+ * farmhouse have a BENCH, which seats whoever sits down. No rug in a shared room — a rug is a
+ * comfort somebody owns.
+ *
+ * The beds run along the back-right wall and wrap, so a bigger household is a longer row rather
+ * than a denser pile.
+ */
+const bedRow = (count: number): CityFurnishing[] =>
+  Array.from({ length: count }, (_, i) => ({ kind: CITY_BED_KIND, slot: { x: i, y: 0 } }))
+
+// The beds run along the back-right wall in ONE row — a bed is two slots deep, so a row of them
+// is the whole of the grid's top two rows and the last row is what the household shares: the
+// fire, the table everybody eats at, and the bench, which seats whoever sits down where a
+// house's chair seats one.
+const sharedDwelling = (kind: DwellingKind): CityFurnishing[] => {
+  const slots = citySlotsFor(kind)
+  return [
+    ...bedRow(roomCapacity(DWELLING_FOOTPRINTS[kind])),
+    THE_HEARTH,
+    { kind: 'table', slot: { x: 1, y: 2 } },
+    { kind: 'bench', slot: { x: slots.w - 1, y: 2 } },
+  ]
+}
 const HOUSE_FURNISHINGS: CityFurnishing[] = [
-  { kind: 'bed', slot: { x: 2, y: 1 } },
-  { kind: 'hearth', slot: { x: 0, y: 2 } },
+  THE_BED, THE_HEARTH,
   { kind: 'table', slot: { x: 1, y: 2 } },
   { kind: 'chair', slot: { x: 1, y: 1 } },
   // The plan put the rug at (0,1). A rug is two slots tall, so it would have lain across the
@@ -367,9 +439,32 @@ export const GENESIS_WANTED: readonly Wanted[] = [
   { kind: 'farmhouse', ...mass(DWELLING_FOOTPRINTS.farmhouse), owner: null },
 ]
 
-const furnishingsFor = (kind: string): CityFurnishing[] =>
-  kind === 'house' ? [...HOUSE_FURNISHINGS]
-    : kind === STOREHOUSE_KIND ? [...STOREHOUSE_FURNISHINGS] : []
+// ★ A KIND WHOSE ROW SAYS `hearth` IS FURNISHED WITH ONE, AND `config.test.ts` HOLDS THE TWO
+// HALVES EQUAL. A recipe that promises a fire over a room with no fire in it is a fire a mind
+// can feed and nobody can see — the same parting of ways that made the house's own hearth
+// scenery for a chunk. A cottage and a farmhouse get the pair and nothing more: no renderer
+// draws their interior yet, and a table nobody can see is the dead data the recipe row refuses.
+const FURNISHINGS_BY_KIND: Readonly<Record<string, CityFurnishing[]>> = {
+  house: HOUSE_FURNISHINGS,
+  cottage: sharedDwelling('cottage'),
+  farmhouse: sharedDwelling('farmhouse'),
+  // ★ THE CABIN'S STOVE AND NO BED: it is the founding valley's one indoor fire and it is a
+  // refuge, not a home. A body is warm in it and still sleeps on the boards.
+  //
+  // The bench and the woodpile are here now that a renderer draws this room. They are the two
+  // things a refuge has and a home does not need: somewhere to sit out a night you are not
+  // sleeping through, and the fuel the fire on the wall opposite is fed from. NO BED, NO TABLE,
+  // NO RUG — the absence is the point, and it is the only way the screen can say "refuge" where
+  // the config says `hearth: true, bed: false`.
+  cabin: [
+    THE_HEARTH,
+    { kind: 'bench', slot: { x: 1, y: 2 } },
+    { kind: 'crate', slot: { x: 2, y: 2 } },
+  ],
+  [STOREHOUSE_KIND]: STOREHOUSE_FURNISHINGS,
+}
+
+const furnishingsFor = (kind: string): CityFurnishing[] => [...(FURNISHINGS_BY_KIND[kind] ?? [])]
 
 /** The buildings the grammar plats, in grammar coordinates — the one place a plot is claimed. */
 export function cityPlacements(): PlacedStructure[] {
@@ -380,10 +475,11 @@ export function cityPlacements(): PlacedStructure[] {
 // monuments in the square. The STANDING STONE is deliberately absent — it stands beyond the
 // edge of town, unexplained (C11 §9).
 //
-// ONLY A HOUSE IS A HOME. `structures.enterableKinds` and `sleepableKinds` name `house` and
-// nothing else, so the five founders keep five houses, one each, and the cottage, cabin and
-// farmhouse stand as fixtures the eye reads and nobody walks into. Widening that list is a
-// config decision with a pinned hash behind it, not a layout one.
+// EVERY DWELLING IS A HOME, AND ONLY A HOUSE IS PRIVATE. The two rosters this note used to
+// name are gone; the kind's own row answers the way in, the fire and the bed, so the cottage
+// and the farmhouse are buildings a body walks into rather than fixtures the eye reads.
+// `structures.privateKinds` still names `house` alone, which is the one thing the five
+// founders' own doors keep over any bigger roof.
 export function cityStructures(rings: number = TOWN_RINGS_GENESIS): CityStructure[] {
   const monument = (kind: string, at: { dx: number; dy: number }): CityStructure => ({
     kind, dx: at.dx, dy: at.dy, w: 1, h: 1, owner: null, facing: 'sw', furnishings: [],

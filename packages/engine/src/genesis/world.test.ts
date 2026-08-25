@@ -1,13 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import {
-  CITY_ANCHOR_DEFAULT, DEFAULT_CONFIG, FOUNDER_IDS, SimConfigSchema, WORLD_SIZE_GENESIS,
+  CITY_ANCHOR_DEFAULT, DEFAULT_CONFIG, FOUNDER_IDS, MINUTES_PER_DAY, SimConfigSchema,
+  WORLD_SIZE_GENESIS, isHearthKind, isRoofedKind,
   makeCityTemplate, stateHash, templateFits, type SimEvent,
 } from '@sj/shared'
 import { fold } from '../fold.js'
+import { doorTile } from '../interiors.js'
+import { besideAKeptFire, warmthTargetFor } from '../systems/warmth.js'
 import { findPath, isPassable, searchPath } from '../path.js'
 import { genesisState, type WorldState } from '../state.js'
 import { submitIntent } from '../intent.js'
-import { buildableRecipe, buildTicks } from '../verbs.js'
+import { RngStreams } from '../rng.js'
+import { buildableRecipe, buildTicks, VERBS } from '../verbs.js'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
 import {
@@ -307,5 +311,145 @@ describe('the ford: one reach where the channel runs two wide', () => {
     expect(route!.some(([x]) => x === 48)).toBe(true)
     // And with no deck there is still no crossing.
     expect(findPath(s, { x: GENESIS_FORD.x, y }, { x: 45, y }, DEFAULT_CONFIG)).toBeNull()
+  })
+})
+
+// ★ THERE WAS NO FIRE A BODY COULD WALK TO INDOORS, ANYWHERE IN THE FOUNDING VALLEY.
+//
+// Genesis stands nine buildings and takes the roof off seven. The two that stand sound are the
+// storehouse and the cabin, and BOTH WERE HEARTHLESS — every `hearth: true` building in the
+// valley was walls three quarters of the way up. `fireIsOnYourSide` is what makes that fatal
+// rather than merely a pity: a body OUT in it is warmed by any fire within `heatRadius`, but a
+// body under a roof is warmed only by the fire in its own room. So the cold → shelter → fire
+// chain had no terminal state reachable on the shipped world, a 720-tick rehearsal measured
+// zero hearth behaviour because there was nowhere to measure it, and going indoors out of the
+// cold left a body colder than standing in the square.
+//
+// ★ THE TRAP: the square's fire pit does not close this. It is `hearth: true, roofed: false` —
+// an open fire, and stepping under a roof is stepping away from it.
+//
+// The answer is the cabin, and it is the only kind that COULD be the answer: `roofFell` throws
+// on any roofed kind that is unbuildable and not sound, so the sound set is forced to be
+// exactly the unbuildable roofed kinds — the storehouse and the cabin. A storehouse is a roof
+// over goods. A cabin with a stove in it is what a cabin is.
+describe('★ a fire indoors that a body can walk to, on the morning of day one', () => {
+  const CFG = DEFAULT_CONFIG
+  const isWarmRoom = (kind: string) => isRoofedKind(CFG, kind) && isHearthKind(CFG, kind)
+  const warmRooms = (s: WorldState) =>
+    Object.values(s.structures).filter((st) => st.stage === 'complete' && isWarmRoom(st.kind))
+
+  it('★ stands at least one, and an open fire is not one of them', () => {
+    const s = foldAll()
+    expect(warmRooms(s).length, 'nowhere indoors a body can be warm').toBeGreaterThan(0)
+
+    const pit = Object.values(s.structures).find((st) => st.kind === 'fire_pit')!
+    expect(pit.stage).toBe('complete')
+    expect(isHearthKind(CFG, 'fire_pit'), 'the pit is a fire').toBe(true)
+    expect(isRoofedKind(CFG, 'fire_pit'), 'and it is not indoors').toBe(false)
+    expect(warmRooms(s).map((w) => w.kind)).not.toContain('fire_pit')
+
+    // ★ VACUOUS GUARD, both ways: some roof over the valley still holds no fire, and some fire
+    // in it is still behind unfinished walls. This passes for the wrong reason if every
+    // building is warm or if nothing is.
+    expect(Object.values(s.structures).some((st) =>
+      st.stage === 'complete' && isRoofedKind(CFG, st.kind) && !isHearthKind(CFG, st.kind))).toBe(true)
+    expect(Object.values(s.structures).some((st) =>
+      st.stage === 'construction' && isWarmRoom(st.kind))).toBe(true)
+  })
+
+  // ★ AND IT COULD NOT HAVE BEEN ANY OTHER KIND. `roofFell` throws on a roofed kind that is
+  // unbuildable and not sound, so the sound set is not a taste — it is FORCED to be exactly the
+  // unbuildable roofed kinds. There are two, and one of them is a roof over goods.
+  it('★ had one candidate, because the sound set is forced and not chosen', () => {
+    const unbuildableRoofs = Object.keys(CFG.structures.recipes)
+      .filter((k) => isRoofedKind(CFG, k) && buildableRecipe(CFG, k) === null).sort()
+    expect([...GENESIS_SOUND_ROOFS].sort()).toEqual(unbuildableRoofs)
+    expect(unbuildableRoofs).toEqual(['cabin', 'storehouse'])
+    expect(isHearthKind(CFG, 'storehouse'), 'a storehouse is a roof over goods').toBe(false)
+
+    // And a roofed kind outside the set that nobody could finish is refused out loud rather
+    // than planted as a wall that lies — which is the whole reason the set cannot grow.
+    const withHut = {
+      ...CFG,
+      structures: {
+        ...CFG.structures,
+        recipes: { ...CFG.structures.recipes, hut: { ...CFG.structures.recipes['cabin']!, inputs: {} } },
+      },
+    }
+    expect(() => roofFell(withHut, 'hut')).toThrow(/nobody could finish/)
+    expect(roofFell(CFG, 'cabin'), 'the cabin stands').toBe(false)
+    expect(roofFell(CFG, 'cottage'), 'and a cottage does not').toBe(true)
+  })
+
+  // Reachability proved by walking it, not by eye: the pathfinder the world uses, from the door
+  // a founder wakes at, to the door `enter` will accept — and then the whole chain through it.
+  it('★ and a founder walks there from their own doorstep, goes in, feeds it, and is warmer', () => {
+    const base = foldAll()
+    const rooms = warmRooms(base).sort((a, b) => a.id.localeCompare(b.id))
+    expect(rooms.length, 'no fire indoors to walk to').toBeGreaterThan(0)
+    const room = rooms[0]!
+    const target = doorTile(base, room)!
+    const store = Object.values(base.structures)
+      .find((st) => st.kind === 'storehouse' && st.stage === 'complete')!
+
+    // Every founder's own front door, and the storehouse door where the valley's 20 wood is:
+    // the fuel and the fire have to be on the same side of the water as well.
+    const starts = Object.values(base.structures)
+      .filter((st) => st.kind === 'house')
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((st) => doorTile(base, st)!)
+    expect(starts).toHaveLength(FOUNDER_IDS.length)
+    for (const from of [...starts, doorTile(base, store)!]) {
+      const route = searchPath(base, from, target, CFG)
+      expect(route, `no way from (${from.x}, ${from.y}) to the fire`).not.toBeNull()
+      expect(route!.capped, 'the walk ran out of budget').toBe(false)
+    }
+
+    // A winter night, one body on the doorstep, one armful of wood in its hands.
+    const NIGHT = 273 * MINUTES_PER_DAY + 22 * 60 + 30
+    let s = fold(base, { seq: 9100, tick: 0, type: 'tick_advanced', payload: {} }, CFG)
+    s = fold(s, { seq: 9101, tick: NIGHT, type: 'tick_advanced', payload: {} }, CFG)
+    s = fold(s, {
+      seq: 9102, tick: NIGHT, type: 'weather_changed', payload: { kind: 'sunny', temperatureC: -10 },
+    }, CFG)
+    s = fold(s, {
+      seq: 9103, tick: NIGHT, type: 'agent_spawned',
+      payload: { id: 'walker', name: 'Walker', x: starts[0]!.x, y: starts[0]!.y, ageDays: 7300 },
+    }, CFG)
+    s = fold(s, {
+      seq: 9104, tick: NIGHT, type: 'item_spawned',
+      payload: { id: 'armful', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'walker' } },
+    }, CFG)
+    const outside = warmthTargetFor(s, CFG, 'walker')
+
+    // The walk itself, one step at a time down the route the pathfinder returned.
+    let seq = 9200
+    for (const [x, y] of findPath(s, starts[0]!, target, CFG)!) {
+      s = fold(s, { seq: seq++, tick: NIGHT, type: 'agent_moved', payload: { id: 'walker', x, y } }, CFG)
+    }
+    expect([s.agents['walker']!.x, s.agents['walker']!.y]).toEqual([target.x, target.y])
+
+    /** Run a verb to completion the way the tick loop would, and refuse to guess. */
+    const apply = (verb: string, params: Record<string, unknown>): void => {
+      const r = submitIntent(s, CFG, 'walker', verb, params)
+      expect(r.ok, r.ok ? '' : `${verb}: ${r.reason}`).toBe(true)
+      const done = VERBS[verb]!.onComplete(s, CFG, 'walker', params, new RngStreams('genesis-fire').get('actions'))
+      for (const e of [...(r.ok ? r.events : []), { type: 'action_completed', payload: { agentId: 'walker', verb } }, ...done]) {
+        s = fold(s, { seq: seq++, tick: NIGHT, type: e.type, payload: e.payload }, CFG)
+      }
+    }
+
+    apply('enter', { structureId: room.id })
+    expect(s.agents['walker']!.insideId).toBe(room.id)
+
+    // Indoors and cold: the roof alone buys a body nothing against the air, which is exactly
+    // why a roofed hearthless valley measured no hearth behaviour.
+    expect(warmthTargetFor(s, CFG, 'walker')).toBe(outside)
+
+    apply('stoke', { structureId: room.id })
+
+    expect(besideAKeptFire(s, CFG, 'walker'), 'the fire is not reaching the body').toBe(true)
+    expect(warmthTargetFor(s, CFG, 'walker')).toBeGreaterThan(outside)
+    expect(warmthTargetFor(s, CFG, 'walker') - outside).toBe(2 * CFG.warmth.fireWarmth)
   })
 })
