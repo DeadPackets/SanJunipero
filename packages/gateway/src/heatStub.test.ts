@@ -40,6 +40,41 @@ describe('heat stub', () => {
     expect(windows).toEqual([{ fromTick: 0, toTick: 59, agentId: 'bob', score: 20 }])
   })
 
+  /**
+   * ★ FIVE OF THE NINE WEIGHTS CAN NEVER FIRE, AND THE TABLE ABOVE READS LIKE THEY DO.
+   *
+   * The scorer needs `payload.agentId` or `payload.builderId` to file a score under somebody.
+   * Checked against `events.def.ts`, five weighted payloads carry neither: `fire_ignited`
+   * `{structureId, cause}`, `fire_spread` `{fromId, toId}`, `structure_completed` `{id}`,
+   * `crop_harvested` `{cropId}`, `item_moved` `{id, loc}`. Their weights — 12, 10, 6, 3 and 1 —
+   * are computed and dropped on every event, which is the whole of the town's fire and harvest
+   * drama going unscored while the table promises it is the second-loudest thing after a death.
+   *
+   * The `builderId` fallback is unreachable for the same reason: `structure_planned` is the only
+   * payload that carries one and it is not weighted. The test above it forges an `agent_died`
+   * with a `builderId`, which `AgentDied.strict()` makes impossible — a branch protected against
+   * a shape the engine cannot emit.
+   *
+   * This test does NOT fix it: deciding whose drama a fire is changes the director's moment list
+   * and belongs to whoever owns the drama model. It refuses to let the table keep reading like
+   * protection, and it FAILS THE DAY SOMEBODY FIXES ONE — which is the point.
+   */
+  it('★ names the five weights that score nothing, because the table above hides them', () => {
+    const unattributed: ReadonlyArray<[string, Record<string, unknown>]> = [
+      ['fire_ignited', { structureId: 's1', cause: 'lightning' }],
+      ['fire_spread', { fromId: 's1', toId: 's2' }],
+      ['structure_completed', { id: 's1' }],
+      ['crop_harvested', { cropId: 'c1' }],
+      ['item_moved', { id: 'i1', loc: { t: 'tile', x: 0, y: 0 } }],
+    ]
+    for (const [type, payload] of unattributed) {
+      expect(HEAT_WEIGHTS[type], `${type} is weighted`).toBeGreaterThan(0)
+      expect(heatWindows([ev(1, 0, type, payload)]), `${type} scores for nobody`).toEqual([])
+    }
+    // and no weighted payload in the engine carries a builderId, so the fallback is dead too
+    expect(Object.keys(HEAT_WEIGHTS)).not.toContain('structure_planned')
+  })
+
   it('returns [] for no events', () => {
     expect(heatWindows([])).toEqual([])
   })

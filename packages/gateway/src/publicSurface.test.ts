@@ -3,7 +3,7 @@
 //
 // The world these run against is the one `pnpm stream` serves: a real gateway, a real world db,
 // a real agent-memory directory, spoken to over a real socket by a client that is not the app.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
@@ -15,7 +15,7 @@ import { openForgeDb } from '@sj/forge'
 import { createGateway, CLOSE_TOO_MANY, SCRUB_MIN_MS, type Gateway } from './server.js'
 import { AGENT_ID } from './api.js'
 import { makeSeqCache } from './seqCache.js'
-import { resolveInRoot } from './staticSite.js'
+import { CLIENT_ASSET_DIR, resolveInRoot } from './staticSite.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId))
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -221,5 +221,25 @@ describe('the guards themselves', () => {
     // A stranger varying the query string churns the map; it must not grow.
     for (let i = 0; i < 500; i++) cache.json(`digest?x=${i}`, build)
     expect(cache.size()).toBeLessThanOrEqual(4)
+  })
+
+  /**
+   * ★ THE ONE PACT ON THIS SURFACE THAT NOTHING ENFORCED, AND IT HAS BROKEN THE STREAM TWICE.
+   *
+   * `/assets/:file` is the codex PNG route and answers 404 to anything that is not a png, so a
+   * client bundle emitted to vite's default `assets/` 404s on every one of its own scripts —
+   * a blank page served by a gateway reporting itself healthy. `@sj/web` emits to `client/`
+   * and `CLIENT_ASSET_DIR` is the other half of it.
+   *
+   * Both files carried a comment saying "keep in step with the other one" and nothing read
+   * either comment. This is the pact, named, in the file that owns what a stranger can reach.
+   */
+  it('★ the built client is not served from under /assets, and the two halves agree', () => {
+    const vite = readFileSync(new URL('../../web/vite.config.ts', import.meta.url), 'utf8')
+    const declared = /assetsDir:\s*'([^']+)'/.exec(vite)?.[1]
+    expect(declared, 'vite must name an assetsDir at all').toBeDefined()
+    expect(declared, 'the gateway serves the bundle from CLIENT_ASSET_DIR').toBe(CLIENT_ASSET_DIR)
+    expect(CLIENT_ASSET_DIR, 'the codex PNG route owns /assets and 404s a script')
+      .not.toBe('assets')
   })
 })
