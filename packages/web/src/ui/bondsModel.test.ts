@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { BOND_KINDS, type Bond, type BondsResponse } from '@sj/shared'
+import { BOND_KINDS, bondFrom, type Bond, type BondsResponse } from '@sj/shared'
 import {
   BOND_COLORS, BOND_KIND_LABEL, NODE_ALIVE, NODE_DEAD,
   bondTooltip, maxBondStrength, toBondGraph,
 } from './bondsModel.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 
-const bond = (id: string, aId: string, bId: string, kind: Bond['kind'], strength: number): Bond => ({
-  id, aId, bId, kind, strength,
-  formedTick: 10, lastUpdatedTick: 10 + strength,
-  history: Array.from({ length: strength }, (_, i) => ({ tick: 10 + i, kind, note: 'did a thing' })),
-})
+const bond = (_id: string, aId: string, bId: string, kind: Bond['kind'], strength: number): Bond =>
+  bondFrom(aId, bId, Array.from({ length: strength }, (_, i) => ({ tick: 10 + i, kind })), 100)
 
 const api: BondsResponse = {
   asOfTick: 100,
@@ -72,7 +69,8 @@ describe('toBondGraph', () => {
   })
 
   it('carries the whole bond on the link, so a click needs no second lookup', () => {
-    expect(graph.links[0]?.bond.history).toHaveLength(4)
+    expect(graph.links[0]?.bond.recent).toHaveLength(4)
+    expect(graph.links[0]?.bond.strength).toBe(4)
   })
 
   it('draws nothing from a town that has tied no one', () => {

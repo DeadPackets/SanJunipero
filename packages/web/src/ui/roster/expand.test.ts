@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { bondId, type Bond, type BondKind, type BondsResponse, type SimEvent } from '@sj/shared'
+import { bondFrom, type Bond, type BondAct, type BondKind, type BondsResponse, type SimEvent } from '@sj/shared'
 import { GAMIFICATION_BAN } from '../townStats.js'
 import { changeLog } from '../becoming.js'
 import { EMPTY_LINEAGE, type LineageLike } from '../bondModel2.js'
@@ -22,14 +22,10 @@ const IDS = ['amara', 'nadia', 'yusuf']
 // AUDIT R3's six literals — the placeholders that described an empty person
 const R3_LITERALS = ['Their mind is quiet.', 'Still learning everything.']
 
-const at = (tick: number, kind: BondKind): { tick: number; kind: BondKind; note: string } =>
-  ({ tick, kind, note: 'x' })
+const at = (tick: number, kind: BondKind): BondAct => ({ tick, kind })
 
-const bond = (aId: string, bId: string, kind: BondKind, history: Array<{ tick: number; kind: BondKind; note: string }>): Bond => ({
-  id: bondId(aId, bId), aId, bId, kind, strength: history.length,
-  formedTick: history[0]?.tick ?? 0, lastUpdatedTick: history[history.length - 1]?.tick ?? 0,
-  history,
-})
+const bond = (aId: string, bId: string, _kind: BondKind, acts: BondAct[], asOfTick = 0): Bond =>
+  bondFrom(aId, bId, acts, asOfTick)
 const api = (bonds: Bond[]): BondsResponse => ({ bonds, asOfTick: 0 })
 
 const input = (over: Partial<BecomingInput> = {}): BecomingInput => ({

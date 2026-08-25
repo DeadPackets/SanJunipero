@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
-  BondsCountSchema, BondsResponseSchema, DEFAULT_CONFIG, bondId,
+  BOND_RECENT_ACTS, BondsCountSchema, BondsResponseSchema, DEFAULT_CONFIG, bondId, bondNote,
   type Bond, type BondsResponse, type SimEvent,
 } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
@@ -76,7 +76,8 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     const b = find('alice', 'bob')
     expect(b?.kind).toBe('partner')
     expect(b?.strength).toBe(2)
-    expect(b?.history.map((h) => h.note)).toEqual(['kept house together', 'kept house together'])
+    expect(b?.recent.map((h) => bondNote(h.kind))).toEqual(['kept house together', 'kept house together'])
+    expect(b?.acts).toEqual([{ kind: 'partner', count: 2, firstTick: 30, lastTick: 40 }])
     expect(b?.formedTick).toBe(30)
     expect(b?.lastUpdatedTick).toBe(40)
   })
@@ -85,23 +86,23 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     for (const parent of ['alice', 'bob']) {
       const b = find(parent, 'mira')
       expect(b?.kind, parent).toBe('kin')
-      expect(b?.history.map((h) => h.note), parent).toEqual(['parent and child'])
+      expect(b?.recent.map((h) => bondNote(h.kind)), parent).toEqual(['parent and child'])
       expect(b?.formedTick, parent).toBe(50)
     }
   })
 
   it('reads a gift as a debt, a lesson as work, and a blow as a rivalry', () => {
     expect(find('cara', 'eve')?.kind).toBe('owe')
-    expect(find('cara', 'eve')?.history[0]?.note).toBe('gave something away')
+    expect(find('cara', 'eve')?.recent[0]).toEqual({ tick: 22, kind: 'owe' })
     expect(find('dan', 'eve')?.kind).toBe('rival')      // the fight outranks the lesson
-    expect(find('dan', 'eve')?.history.map((h) => h.note))
+    expect(find('dan', 'eve')?.recent.map((h) => bondNote(h.kind)))
       .toEqual(['taught something', 'came to blows'])
   })
 
   it('still ties a friendship from talk alone, with no C9 data at all', () => {
     const b = find('cara', 'dan')
     expect(b?.kind).toBe('friend')
-    expect(b?.history[0]?.note).toBe('spoke together')
+    expect(b?.recent[0]).toEqual({ tick: 10, kind: 'friend' })
   })
 
   it('ties no one who has done nothing together', () => {
@@ -115,26 +116,30 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     expect(again).toEqual(body)
   })
 
-  it('keeps every history entry in the order it happened', () => {
+  it('keeps the window in the order it happened, and the rollup over the whole of it', () => {
     for (const b of body.bonds) {
-      const ticks = b.history.map((h) => h.tick)
+      const ticks = b.recent.map((h) => h.tick)
       expect([...ticks].sort((x, y) => x - y), b.id).toEqual(ticks)
-      expect(b.formedTick, b.id).toBe(ticks[0])
       expect(b.lastUpdatedTick, b.id).toBe(ticks[ticks.length - 1])
-      expect(b.strength, b.id).toBe(b.history.length)
+      // the rollup is over EVERY act, so it agrees with `strength` and with the two stamps
+      expect(b.acts.reduce((n, a) => n + a.count, 0), b.id).toBe(b.strength)
+      expect(Math.min(...b.acts.map((a) => a.firstTick)), b.id).toBe(b.formedTick)
+      expect(Math.max(...b.acts.map((a) => a.lastTick)), b.id).toBe(b.lastUpdatedTick)
+      expect(b.recent.length, b.id).toBeLessThanOrEqual(BOND_RECENT_ACTS)
     }
   })
 
   it('speaks of the town in every note — no verbs, no payloads', () => {
     for (const b of body.bonds) {
-      for (const h of b.history) expect(h.note, h.note).toMatch(/^[a-z]/)
+      for (const h of b.recent) expect(bondNote(h.kind), h.kind).toMatch(/^[a-z]/)
     }
   })
 
   /**
-   * ★ HOW MANY BONDS, WITHOUT SENDING THE BONDS. Every `Bond` carries its whole history, so the
-   * feed is not small: at sim-day 20 of a talkative town `/api/bonds` answered 83.7 MB, and the
-   * lens badge fetched it every 60 s to display one number.
+   * ★ HOW MANY BONDS, WITHOUT SENDING THE BONDS. The feed used to carry every act that ever
+   * formed a tie — 83.7 MB at sim-day 20 of a talkative town — and the lens badge fetched all of
+   * it every 60 s to display one number. The feed has a ceiling now; the badge still may not
+   * pay for it.
    */
   it('★ counts the bonds without sending them', async () => {
     const count = BondsCountSchema.parse(await (await fetch(`${base}/api/bonds/count`)).json())
@@ -166,8 +171,8 @@ describe('★ the talk window is a window, not the whole log', () => {
     ]
     const out = buildBonds(events, 5, 500)
     expect(out.bonds.map((b) => b.id)).toEqual([bondId('a', 'b'), bondId('a', 'c')])
-    expect(out.bonds.find((b) => b.id === bondId('a', 'b'))?.history.map((h) => h.tick)).toEqual([5])
-    expect(out.bonds.find((b) => b.id === bondId('a', 'c'))?.history.map((h) => h.tick)).toEqual([219])
+    expect(out.bonds.find((b) => b.id === bondId('a', 'b'))?.recent.map((h) => h.tick)).toEqual([5])
+    expect(out.bonds.find((b) => b.id === bondId('a', 'c'))?.recent.map((h) => h.tick)).toEqual([219])
   })
 
   it('is linear in the log, not quadratic — 8× the speech is not 64× the work', () => {

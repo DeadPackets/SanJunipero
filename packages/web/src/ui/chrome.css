@@ -1081,6 +1081,15 @@ body {
   flex: none; width: 6.2rem; font-size: 0.75rem; color: var(--ink-quiet);
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
+/* The tally is the whole history; the column under it is the last few of it. The count reads
+   as a figure, so it takes the data face and tabular figures the stamps already use. */
+.bond-tally { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+.bond-tally li { display: flex; gap: 0.5rem; align-items: baseline; padding: 0.15rem 0; }
+.bond-tally .tally-count {
+  flex: none; min-width: 4.4rem; text-align: right; font-family: var(--font-data);
+  font-variant-numeric: tabular-nums; font-size: 0.8rem;
+}
+.bond-earlier { margin: 0.4rem 0 0; font-size: 0.75rem; color: var(--ink-quiet); }
 
 /* ── director mode + catch-up digest (Task 19) ── */
 /* ── the days the town kept: postcard rail + transport ── */

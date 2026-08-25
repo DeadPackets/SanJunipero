@@ -1,23 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import type { Bond } from '@sj/shared'
+import { bondFrom, type Bond } from '@sj/shared'
 import { BondDetailPanel } from './BondDetailPanel.js'
 import { bondArc } from './bondModel2.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 
-const bond: Bond = {
-  id: 'alice|bob', aId: 'alice', bId: 'bob', kind: 'partner', strength: 3,
-  formedTick: 30, lastUpdatedTick: 1500,
-  history: [
-    { tick: 30, kind: 'partner', note: 'kept house together' },
-    { tick: 900, kind: 'partner', note: 'kept house together' },
-    { tick: 1500, kind: 'partner', note: 'kept house together' },
-  ],
-}
+const bond: Bond = bondFrom('alice', 'bob', [
+  { tick: 30, kind: 'partner' },
+  { tick: 900, kind: 'partner' },
+  { tick: 1500, kind: 'partner' },
+], 1500)
 
 const people = { alice: { name: 'Alice', alive: true }, bob: { name: 'Bob', alive: true } }
-const arc = bondArc(bond.history, 1500)
+const arc = bondArc(bond, 1500)
 
 const html = renderToStaticMarkup(createElement(BondDetailPanel, {
   bond, people, type: 'partner' as const, level: 'friendly' as const, arc,
