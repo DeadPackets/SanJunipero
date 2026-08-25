@@ -156,10 +156,12 @@ describe('observer data apis', () => {
     expect(await (await fetch(`${base}/api/chapters`)).json()).toEqual([])
   })
 
+  // bob is 2 for speaking and 6 for the house he PLANNED and the town completed at tick 40 —
+  // `structure_completed {id}` names no person, and the plan is where the town keeps one.
   it('heat: per-agent 60-tick windows from the stub scorer', async () => {
     expect(await (await fetch(`${base}/api/heat`)).json()).toEqual([
       { fromTick: 0, toTick: 59, agentId: 'alice', score: 4 },
-      { fromTick: 0, toTick: 59, agentId: 'bob', score: 2 },
+      { fromTick: 0, toTick: 59, agentId: 'bob', score: 8 },
       { fromTick: 0, toTick: 59, agentId: 'cara', score: 2 },
       { fromTick: 60, toTick: 119, agentId: 'bob', score: 2 },
       { fromTick: 60, toTick: 119, agentId: 'dan', score: 20 },
@@ -174,8 +176,8 @@ describe('observer data apis', () => {
       structuresCompleted: [{ id: 's1', kind: 'house', tick: 40 }],
       topMoments: [
         { tick: 60, agentId: 'dan', score: 20, moment: { day: 0, time: '01:00' } },
+        { tick: 0, agentId: 'bob', score: 8, moment: { day: 0, time: '00:00' } },
         { tick: 0, agentId: 'alice', score: 4, moment: { day: 0, time: '00:00' } },
-        { tick: 0, agentId: 'bob', score: 2, moment: { day: 0, time: '00:00' } },
         { tick: 0, agentId: 'cara', score: 2, moment: { day: 0, time: '00:00' } },
         { tick: 60, agentId: 'bob', score: 2, moment: { day: 0, time: '01:00' } },
       ],

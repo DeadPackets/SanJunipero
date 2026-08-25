@@ -5,7 +5,7 @@ import { MINUTES_PER_DAY, tickToMoment, type SimConfig, type SimEvent } from '@s
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import {
-  HEAT_WINDOW_TICKS, heatFromScores, scoreEvent, type HeatScores, type HeatWindow,
+  HEAT_WINDOW_TICKS, heatContext, heatFromScores, scoreEvent, type HeatScores, type HeatWindow,
 } from './heatStub.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 
@@ -138,8 +138,13 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
     weights.set(key, (weights.get(key) ?? 0) + 1)
   }
 
+  // The drama scorer's one piece of world knowledge, and the read path already keeps it: a fire
+  // at a place is scored to the person who raised the place. See `heatStub.dramatis`.
+  const builderOf = (id: string): string | null => planned.get(id)?.builderId ?? null
+  const heatCtx = heatContext(builderOf)
+
   const foldOne = (ev: SimEvent): void => {
-    scoreEvent(heat, ev)
+    scoreEvent(heat, ev, heatCtx)
     switch (ev.type) {
       case 'agent_spoke': {
         const p = ev.payload as { agentId: string; x: number; y: number }
@@ -227,6 +232,9 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
     const loWhole = fromTick % HEAT_WINDOW_TICKS === 0 ? lo : lo + 1
     const hiWhole = toTick % HEAT_WINDOW_TICKS === HEAT_WINDOW_TICKS - 1 ? hi : hi - 1
     const scores: HeatScores = new Map()
+    // A fresh actor memory per re-read; a verb's completion and its results share a tick, so a
+    // tick range never splits the pair and the re-scored window is exact.
+    const ctx = heatContext(builderOf)
     for (const [key, score] of heat) {
       const w = Number(key.slice(0, key.indexOf('\n')))
       if (w >= loWhole && w <= hiWhole) scores.set(key, score)
@@ -237,7 +245,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
       const to = Math.min(toTick, (w + 1) * HEAT_WINDOW_TICKS - 1)
       if (from > to) continue
       for (const r of selRange.all(from, to) as EventRow[]) {
-        scoreEvent(scores, { seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) } as SimEvent)
+        scoreEvent(scores, { seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) } as SimEvent, ctx)
       }
     }
     return heatFromScores(scores)
