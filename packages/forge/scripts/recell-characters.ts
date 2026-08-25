@@ -77,6 +77,7 @@ function chosenRaws(dir: string): Record<string, string> | null {
 
 const rows: string[] = []
 const factors = new Set<number>()
+const refused: string[] = []
 
 for (const c of CAST) {
   const chosen = chosenRaws(c.src)
@@ -135,20 +136,11 @@ for (const c of CAST) {
   const figureH = standing.y1 - standing.y0 + 1
   const manifest = buildManifestV4(cells, figureH)
 
-  mkdirSync(join(c.dest, 'cells'), { recursive: true })
-  mkdirSync(join(c.dest, 'raws'), { recursive: true })
-  mkdirSync(join(c.dest, 'master'), { recursive: true })
-  for (const [name, img] of cells) writeFileSync(join(c.dest, 'cells', `${name}.png`), await encodePng(img))
-  writeFileSync(join(c.dest, 'manifest.json'), JSON.stringify(manifest, null, 2))
-  // KEEP THE RAWS beside the output, and the art it replaces beside them
-  cpSync(join(c.src, 'master', 'master.png'), join(c.dest, 'master', 'master.png'))
-  for (const key of [...walks, sleepKey]) cpSync(findRaw(c.rawDirs, key), join(c.dest, 'raws', `${key}.png`))
-  mkdirSync(join(c.dest, 'before'), { recursive: true })
-  for (const name of CELL_NAMES_V4) cpSync(join(c.src, 'cells', `${name}.png`), join(c.dest, 'before', `${name}.png`))
-  cpSync(join(c.src, 'manifest.json'), join(c.dest, 'before-manifest.json'))
-
   const before = JSON.parse(readFileSync(join(c.src, 'manifest.json'), 'utf8')) as { figureH: number; cells: Record<string, { w: number; h: number }> }
   const beforeSizes = [...new Set(Object.values(before.cells).map((v) => `${v.w}x${v.h}`))]
+  // ★ THE PIXEL BAR USED TO RUN AFTER ALL 24 CELLS WERE ON DISK, and its verdict went into a
+  // markdown cell. It decides now: a founder whose cells fail is not written, and the loop
+  // carries on to the next one so one bad sheet does not cost the others.
   const fails: string[] = []
   for (const [name, img] of cells) {
     fails.push(...alphaBinaryGate(img).failures.map((f) => `${name}: ${f}`))
@@ -156,6 +148,19 @@ for (const c of CAST) {
     if (img.width !== CHAR_CELL_PX || img.height !== CHAR_CELL_PX) fails.push(`${name}: ${img.width}x${img.height}`)
   }
   for (const p of cellPlans) factors.add(p.factor)
+  if (fails.length === 0) {
+    mkdirSync(join(c.dest, 'cells'), { recursive: true })
+    mkdirSync(join(c.dest, 'raws'), { recursive: true })
+    mkdirSync(join(c.dest, 'master'), { recursive: true })
+    for (const [name, img] of cells) writeFileSync(join(c.dest, 'cells', `${name}.png`), await encodePng(img))
+    writeFileSync(join(c.dest, 'manifest.json'), JSON.stringify(manifest, null, 2))
+    // KEEP THE RAWS beside the output, and the art it replaces beside them
+    cpSync(join(c.src, 'master', 'master.png'), join(c.dest, 'master', 'master.png'))
+    for (const key of [...walks, sleepKey]) cpSync(findRaw(c.rawDirs, key), join(c.dest, 'raws', `${key}.png`))
+    mkdirSync(join(c.dest, 'before'), { recursive: true })
+    for (const name of CELL_NAMES_V4) cpSync(join(c.src, 'cells', `${name}.png`), join(c.dest, 'before', `${name}.png`))
+    cpSync(join(c.src, 'manifest.json'), join(c.dest, 'before-manifest.json'))
+  } else refused.push(`${c.id}: ${fails.join('; ')}`)
   const figures = cellPlans.filter((p) => p.name !== 'sleep').map((p) => p.figure)
   const worstScale = cellPlans.reduce((w, p) => Math.max(w, Math.abs(1 - p.scale)), 0)
   rows.push(`| ${c.id} | ${beforeSizes.length} sizes, ${beforeSizes.slice(0, 2).join(' ')}${beforeSizes.length > 2 ? ' …' : ''} `
@@ -180,3 +185,9 @@ const md = [
 mkdirSync(`${S}/fqc2/reports`, { recursive: true })
 writeFileSync(`${S}/fqc2/reports/characters.md`, md)
 console.log(`\n${md}`)
+
+// Report first, then the wall: the margins are what tell an operator a threshold from a
+// broken cell, and they are worthless if the failure eats them.
+if (refused.length > 0) throw new Error(
+  `${refused.length} founder(s) FAILED the pixel bar and were not written:\n    `
+  + `${refused.join('\n    ')}\n  The report is at ${S}/fqc2/reports/characters.md.`)

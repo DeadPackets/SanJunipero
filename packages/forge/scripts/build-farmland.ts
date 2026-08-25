@@ -31,10 +31,22 @@ const soil = gradeMaterial(earth, { targetMean: FARMLAND_GRADE.targetMean, contr
 const farmland = ploughFurrows(soil)
 
 const s = seamReport(farmland), b = borderReport(farmland)
+const veto = materialVeto(farmland)
+const bar = paletteGate(farmland).failures
 console.log(`furrow pitch ${FURROW_PITCH_PX}, depth ${FURROW_DEPTH}, lip ${FURROW_LIP}`)
 console.log(`seam h=${s.horizontalDelta.toFixed(1)} v=${s.verticalDelta.toFixed(1)} ring=${b.ringDelta.toFixed(1)}`)
-console.log(`veto: ${materialVeto(farmland) ?? 'none'}`)
-console.log(`palette: ${paletteGate(farmland).failures.join('; ') || 'clean'}`)
+console.log(`veto: ${veto ?? 'none'}`)
+console.log(`palette: ${bar.join('; ') || 'clean'}`)
+
+// ★ THIS FILE HAD NO CONTROL FLOW IN IT AT ALL. `materialVeto` and `paletteGate` were printed
+// and the material written whatever they said — and unlike the other probes in this sweep it
+// writes COMMITTED content, `content/tilesets/materials/terrain_farmland_0.png`. The seam is
+// already consumed, by `terrainIngest.test.ts` over every shipped material; these two were not
+// consumed anywhere.
+if (veto !== null || bar.length > 0) throw new Error(
+  `the farmland material FAILS its own gates and was not written.\n    `
+  + `${[...(veto === null ? [] : [`veto: ${veto}`]), ...bar].join('\n    ')}\n`
+  + `  The shipped material on disk is untouched.`)
 
 writeFileSync(join(MATERIALS, 'terrain_farmland_0.png'), await encodePng(farmland))
 const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad'
