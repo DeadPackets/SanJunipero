@@ -216,8 +216,8 @@ const MINDS: Mind[] = [
       name: 'Yusuf', age: 41,
       backstory: 'A carpenter with a grudge against the river, which took his first bridge. He has been eyeing the narrows north of town since the spring.',
       temperament: 'stubborn, generous with his hands, quiet about it',
-      voiceCard: voice('warm and practical', 'two sentences, then work', ['says "aye"'], ['long speeches'],
-        ['Aye. I will cut it today.', 'The narrows will take a deck.'], 14, 26),
+      voiceCard: voice('warm and practical', 'two sentences, then work', ['agrees in one word'], ['long speeches'],
+        ['I will cut it today.', 'The narrows will take a deck.'], 14, 26),
     },
     personality: {
       temperament: 'stubborn, generous with his hands, quiet about it',
@@ -248,8 +248,8 @@ const MINDS: Mind[] = [
       name: 'Omar', age: 46,
       backstory: 'The nearest thing this town has to a healer. Keeps herbs in his hut and has sat up with more sick people than he can name.',
       temperament: 'gentle, unhurried, hard to alarm',
-      voiceCard: voice('low and calm', 'pauses before he answers', ['says "now then"'], ['alarm'],
-        ['Now then. Sit down.', 'It will pass, or it will not.'], 16, 28),
+      voiceCard: voice('low and calm', 'pauses before he answers', ['settles a person before he begins'], ['alarm'],
+        ['Sit down. Let me look at it.', 'It will pass, or it will not.'], 16, 28),
     },
     personality: {
       temperament: 'gentle, unhurried, hard to alarm',

@@ -11,9 +11,9 @@ export const TAMAR: IdentityCore = {
   voiceCard: {
     register: 'plain and clipped; concrete nouns; rarely more than two sentences',
     rhythm: 'short declaratives; questions only when she truly wants the answer',
-    tics: ['calls food "provisions"', 'says "well enough" instead of "fine"'],
+    tics: ['calls food "provisions"', 'understates how well a thing went'],
     neverSays: ['flowery endearments', 'exclamations', 'apologies she does not mean'],
-    exampleLines: ['Provisions first. Talk after.', 'Well enough. The roof held.', 'I sleep better with the river in earshot.'],
+    exampleLines: ['We settle the provisions first, then talk.', 'The roof held.', 'I sleep better with the river in earshot.'],
   },
 }
 

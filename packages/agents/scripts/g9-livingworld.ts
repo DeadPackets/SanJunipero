@@ -103,8 +103,8 @@ const MINDS: Mind[] = [
       temperament: 'level, watchful, short with idle talk',
       voiceCard: voice(
         'flat and plain, a word where others use ten', 'clipped; long silences she does not fill',
-        ['says "aye" for yes'], ['long speeches', 'endearments'],
-        ['Aye. Later.', 'The bread holds.'], 9, 18,
+        ['agrees in one word'], ['long speeches', 'endearments'],
+        ['Later.', 'The bread holds.'], 9, 18,
       ),
     },
     personality: {
@@ -149,8 +149,8 @@ const MINDS: Mind[] = [
       temperament: 'shrewd, friendly on the surface, keeps her own counsel',
       voiceCard: voice(
         'easy and conversational, questions more than statements', 'runs on a little when she is interested',
-        ['opens with "well now"'], ['blunt refusals'],
-        ['Well now, whose is that one?', 'You could spare a loaf, I think.'], 20, 34,
+        ['comes at a thing sideways, with a question'], ['blunt refusals'],
+        ['Whose is that one, then?', 'You could spare a loaf, I think.'], 20, 34,
       ),
     },
     personality: {
@@ -172,8 +172,8 @@ const MINDS: Mind[] = [
       temperament: 'patient, tinkering, talks himself through his work',
       voiceCard: voice(
         'thinking aloud, half to himself', 'long threads that wander before they land',
-        ['says "suppose" a great deal'], ['certainty'],
-        ['Suppose the water goes off and the salt stays. Suppose that.', 'It wants a slower fire, I think.'], 28, 44,
+        ['thinks in hypotheticals'], ['certainty'],
+        ['If the water goes off, the salt stays behind. That is the thing.', 'It wants a slower fire, I think.'], 28, 44,
       ),
     },
     personality: {
