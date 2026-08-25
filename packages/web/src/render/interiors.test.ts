@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CITY_FURNISHING_KINDS, DEFAULT_CONFIG, INTERIOR_KINDS, isBeddedKind, isHearthKind,
+  CITY_FURNISHING_KINDS, DEFAULT_CONFIG, INTERIOR_KINDS, isBeddedKind, isHearthKind, roomCapacity,
   type AssetRecord, type InteriorKind, type InteriorMeta, type LibraryItemManifest,
 } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import {
   INTERIOR_TILE, ROOM_TILES, WALL_FACING, interiorPath, interiorToScreen, isWalkable, roomMapOf,
-  slotToTile, standingTiles, walkableCount, wallOfTile, type RoomMap,
+  roomTilesFor, slotToTile, standingTiles, walkableCount, wallOfTile, type RoomMap,
 } from './interiorMap.js'
 import { tileSpanCentre } from './roomShell.js'
 import {
@@ -14,7 +14,7 @@ import {
   LIBRARY_TILE_PX, advanceInterior, bedSlots, contactShadow, furnishingDivisor, furnishingScale,
   interiorOf,
   interiorOrder, interiorPieces, interiorTransition, isFlat, occupancyOf, roomFurnishings,
-  roomPlan, type InteriorPhase,
+  roomPlan, roomSizeOf, slotGridOf, type InteriorPhase,
 } from './interiors.js'
 
 function agent(id: string, over: Partial<WorldState['agents'][string]> = {}): WorldState['agents'][string] {
@@ -489,7 +489,7 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
     roomPlan(kind, RECORDS).map((i) => ({
       kind: i.kind, slot: i.slot, size: i.meta?.slots ?? { w: 1, h: 1 },
       placement: i.meta?.placement ?? 'floor', flat: isFlat(i.kind),
-    })),
+    })), roomSizeOf(kind), slotGridOf(kind),
   )
 
   it('★ resolves an interior at all — before this it was null and the body vanished', () => {
@@ -550,11 +550,107 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
     expect(beds.length).toBeLessThan(INTERIOR_KINDS.length)
   })
 
+  it('★ and the room is as big as the building, because capacity IS floor', () => {
+    // `roomCapacity` is `floor(w x h / 2)`, and it is the arithmetic the whole dwelling ladder
+    // is priced on. A farmhouse drawn on a house's floor would put the picture at odds with it.
+    for (const kind of INTERIOR_KINDS) {
+      const plan = DEFAULT_CONFIG.structures.recipes[kind]
+      if (plan === undefined) continue                       // shed has no row; it keeps the default
+      expect(roomSizeOf(kind), kind).toEqual(roomTilesFor({ w: plan.w, h: plan.h }))
+    }
+    // the house's landed room is what FORCES the factor — it is derived, not chosen
+    expect(roomSizeOf('house')).toEqual({ w: 12, h: 6 })
+    expect(roomSizeOf('cabin')).toEqual({ w: 12, h: 6 })
+    expect(roomSizeOf('storehouse')).toEqual({ w: 12, h: 6 })
+    expect(roomSizeOf('cottage')).toEqual({ w: 18, h: 6 })
+    expect(roomSizeOf('farmhouse')).toEqual({ w: 24, h: 6 })
+    // and more bodies is strictly more floor, in the same order the ladder ranks them
+    const floorOf = (k: InteriorKind): number => roomSizeOf(k).w * roomSizeOf(k).h
+    expect(floorOf('house')).toBeLessThan(floorOf('cottage'))
+    expect(floorOf('cottage')).toBeLessThan(floorOf('farmhouse'))
+  })
+
   it('★ and the cabin is a refuge, not a home — warm, and you sleep on the boards', () => {
     const kinds = mapFor('cabin').pieces.map((p) => p.kind)
     expect(kinds).toContain('hearth')
     expect(kinds).not.toContain('bed')
     expect(bedSlots('cabin', ['amara'], RECORDS)).toEqual({})   // nowhere to lie down
     expect(mapFor('house').pieces.map((p) => p.kind)).toContain('bed')
+  })
+})
+
+// ── ★ THE DESIGN QUESTION OF THIS LANE, AS A LAW ─────────────────────────────────────────
+//
+// `world-fixes` made the farmhouse a real rung: HALF THE FUEL PER BODY-NIGHT (0.375 against a
+// house's 0.75), bought by giving up the one thing `structures.privateKinds` names. If a viewer
+// cannot tell the two rooms apart, that trade is invisible and the ladder is a spreadsheet.
+//
+// THE ANSWER: THE ROOM SAYS IT WITH THE BED COUNT, AND THE COUNT IS NOT CHOSEN.
+//
+//   · a PRIVATE dwelling lays ONE bed. A house sleeps two and shows one, because the two are a
+//     couple — `reproductionSystem` counts a night only under a roof in `privateKinds`, and
+//     `bedSlots` already lays a partnered pair down one cell each in a single bed.
+//     ONE BED IS WHAT PRIVACY LOOKS LIKE.
+//   · a SHARED dwelling lays ONE BED PER BODY — `roomCapacity`, the same `floor(w x h / 2)` the
+//     ladder is priced on. A cottage shows three, a farmhouse four. Nobody chose anybody.
+//
+// The seat says it a second time: a house has a CHAIR, which seats one; the shared dwellings
+// have a BENCH, which seats whoever sits down. And no rug in a shared room — a rug is a comfort
+// somebody owns.
+describe('★ a shared room and a private room, and the difference is the ladder', () => {
+  const beds = (kind: InteriorKind): number =>
+    roomFurnishings(kind).filter((f) => f.kind === 'bed').length
+  const planOf = (kind: InteriorKind): { w: number; h: number } => {
+    const r = DEFAULT_CONFIG.structures.recipes[kind]!
+    return { w: r.w, h: r.h }
+  }
+  const isPrivate = (kind: string): boolean =>
+    DEFAULT_CONFIG.structures.privateKinds.includes(kind)
+
+  it('★ one bed if the door is yours, one bed per body if it is not', () => {
+    const bedded = INTERIOR_KINDS.filter((k) => isBeddedKind(DEFAULT_CONFIG, k))
+    for (const kind of bedded) {
+      const want = isPrivate(kind) ? 1 : roomCapacity(planOf(kind))
+      expect(beds(kind), `${kind} beds`).toBe(want)
+    }
+    // NOT VACUOUS: the two branches must both be exercised, or one rule is untested
+    expect(bedded.filter(isPrivate).length).toBeGreaterThan(0)
+    expect(bedded.filter((k) => !isPrivate(k)).length).toBeGreaterThan(0)
+    // and the counts really are different, which is the whole point of the picture
+    expect(beds('house')).toBe(1)
+    expect(beds('cottage')).toBe(3)
+    expect(beds('farmhouse')).toBe(4)
+  })
+
+  it('★ so a house and a farmhouse cannot be mistaken for one another', () => {
+    const house = roomFurnishings('house').map((f) => f.kind)
+    const farm = roomFurnishings('farmhouse').map((f) => f.kind)
+    expect(house.filter((k) => k === 'bed')).toHaveLength(1)
+    expect(farm.filter((k) => k === 'bed')).toHaveLength(4)
+    // a chair seats one; a bench seats whoever sits down
+    expect(house).toContain('chair')
+    expect(house).not.toContain('bench')
+    expect(farm).toContain('bench')
+    expect(farm).not.toContain('chair')
+    // a rug is a comfort somebody owns
+    expect(house).toContain('rug')
+    expect(farm).not.toContain('rug')
+    // and they share the one thing the ladder does NOT trade away
+    expect(house).toContain('hearth')
+    expect(farm).toContain('hearth')
+  })
+
+  it('★ and every body the world lets sleep there has somewhere to lie', () => {
+    const bedRecord = libraryRecord('bed', {
+      slots: { w: 1, h: 2 }, placement: 'floor', interiorKinds: ['house'], isBed: true,
+    })
+    for (const kind of INTERIOR_KINDS.filter((k) => isBeddedKind(DEFAULT_CONFIG, k))) {
+      const sleepers = Array.from({ length: roomCapacity(planOf(kind)) }, (_, i) => `s${i}`)
+      const laid = bedSlots(kind, sleepers, [bedRecord])
+      expect(Object.keys(laid).sort(), `${kind} sleepers`).toEqual(sleepers.sort())
+      // every sleeper in a cell of their own — nobody lies on anybody
+      const cells = Object.values(laid).map((c) => `${c.x},${c.y}`)
+      expect(new Set(cells).size, `${kind} distinct cells`).toBe(sleepers.length)
+    }
   })
 })

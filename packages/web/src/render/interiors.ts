@@ -1,10 +1,13 @@
 import {
-  INTERIOR_KINDS, cityStructures, parseLibraryItemManifest, resolveFurnishingKind,
+  DEFAULT_CONFIG, INTERIOR_KINDS, cityStructures, citySlotsFor, parseLibraryItemManifest,
+  resolveFurnishingKind,
   type AssetRecord, type InteriorKind, type InteriorMeta,
 } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import { OVERLAP_RANK, depthOrder, type DepthBox } from './depth.js'
-import { INTERIOR_BODY_PX, INTERIOR_TILE, interiorToScreen, seatInBlock } from './interiorMap.js'
+import {
+  INTERIOR_BODY_PX, INTERIOR_TILE, interiorToScreen, roomTilesFor, seatInBlock,
+} from './interiorMap.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 
@@ -40,7 +43,35 @@ export const INTERIOR_LAYOUTS: Record<InteriorKind, Furnishing[]> = {
     { kind: 'hearth', slot: { x: 0, y: 2 } },
     { kind: 'bench', slot: { x: 1, y: 2 } },
   ],
+  // The shared dwellings' fallback floor. The real rooms come from the city template, which
+  // lays one bed per body out of `roomCapacity`; this is only what is drawn if that is empty.
+  cottage: [
+    { kind: 'bed', slot: { x: 0, y: 0 } },
+    { kind: 'hearth', slot: { x: 0, y: 2 } },
+    { kind: 'bench', slot: { x: 1, y: 1 } },
+  ],
+  farmhouse: [
+    { kind: 'bed', slot: { x: 0, y: 0 } },
+    { kind: 'hearth', slot: { x: 0, y: 2 } },
+    { kind: 'bench', slot: { x: 1, y: 1 } },
+  ],
 }
+
+/**
+ * ★ THE ROOM'S OWN SIZE, off the building's plan. A cottage is 3×2 outside and a farmhouse 4×2,
+ * and the world says they sleep three and four — so drawing all three dwellings on a house's
+ * floor would put the picture at odds with `roomCapacity`, which is the arithmetic the whole
+ * dwelling ladder is priced on. `interiorMap.roomTilesFor` owns the factor and it is forced by
+ * the house's landed 12×6.
+ */
+export function roomSizeOf(kind: InteriorKind): { w: number; h: number } {
+  const plan = DEFAULT_CONFIG.structures.recipes[kind]
+  return roomTilesFor(plan === undefined ? { w: 2, h: 2 } : { w: plan.w, h: plan.h })
+}
+
+/** The template slot grid this kind's furnishings are laid on — wider for a household that
+ *  needs more beds than a 3-wide grid can hold. `slotToTile` divides the room by it. */
+export const slotGridOf = (kind: InteriorKind): { w: number; h: number } => citySlotsFor(kind)
 
 export type RoomFurnishing = { kind: string; slot: { x: number; y: number } }
 
@@ -128,7 +159,7 @@ function bedCells(kind: InteriorKind, records: AssetRecord[]): Array<{ x: number
   for (const [i, f] of plan.entries()) {
     if (f.meta === null ? f.kind !== 'bed' : f.meta.isBed !== true) continue
     const size = f.meta?.slots ?? BED_FOOTPRINT
-    const at = seatInBlock(f.slot, slots.filter((_, j) => j !== i))
+    const at = seatInBlock(f.slot, slots.filter((_, j) => j !== i), roomSizeOf(kind), slotGridOf(kind))
     for (let dy = 0; dy < size.h; dy++) {
       for (let dx = 0; dx < size.w; dx++) cells.push({ x: at.x + dx, y: at.y + dy })
     }

@@ -303,6 +303,19 @@ export const DWELLING_FOOTPRINTS: Readonly<Record<DwellingKind, { w: number; h: 
   house: { w: 2, h: 2 },
 }
 
+// ★ HOW MANY BODIES A ROOM HOLDS, AND FLOOR IS WHY. Two tiles of floor per body: a 2×2 house
+// takes two, a 3×2 cottage three, a 4×2 farmhouse four. PHYSICS, NOT OWNERSHIP — nothing here
+// asks whose the building is.
+//
+// It lived in `engine/interiors.ts` and moved here because it is now read by TWO sides: the
+// engine caps a room by it, and the template below lays a bed down for every body a dwelling
+// sleeps. The engine re-exports it, so every caller it had is untouched.
+export const TILES_PER_BODY = 2
+
+export function roomCapacity(s: { w: number; h: number }): number {
+  return Math.max(1, Math.floor((s.w * s.h) / TILES_PER_BODY))
+}
+
 /** The ground a building of this mass covers once it is turned to face `facing`. */
 export const footprintFor = (
   mass: { w: number; h: number }, facing: 'sw' | 'se',
@@ -317,6 +330,21 @@ export type FounderId = (typeof FOUNDER_IDS)[number]
 // C10 T11 owns what a room actually looks like.
 export const CITY_INTERIOR_SLOTS = { w: 3, h: 3 } as const
 
+/**
+ * ★ AND THE GRID IS AS WIDE AS THE HOUSEHOLD, because a bed is TWO slots deep.
+ *
+ * A shared dwelling lays one bed per body. A bed's library footprint is 1 × 2, so three beds
+ * fill two whole rows of a 3 × 3 grid and a farmhouse's fourth has nowhere to go — the grid,
+ * not the floor, is what runs out. It widens with `roomCapacity` and never narrows below the
+ * landed 3, so a house, a storehouse, a shed, a cabin and a cottage are all exactly 3 × 3 still.
+ */
+export function citySlotsFor(kind: string): { w: number; h: number } {
+  const plan = DWELLING_FOOTPRINTS[kind as DwellingKind]
+  const w = plan === undefined ? CITY_INTERIOR_SLOTS.w
+    : Math.max(CITY_INTERIOR_SLOTS.w, roomCapacity(plan))
+  return { w, h: CITY_INTERIOR_SLOTS.h }
+}
+
 // Shared cannot import the forge catalog, so these stand in for it here and Task 28's
 // g13.test.ts asserts them equal to the library (the plan's declared seam).
 export const CITY_FURNISHING_KINDS =
@@ -329,9 +357,48 @@ export const CITY_HEARTH_KIND = 'hearth'
 // a LAW reads, which is why a kind can be given these and nothing else and still be honest.
 const THE_BED: CityFurnishing = { kind: CITY_BED_KIND, slot: { x: 2, y: 1 } }
 const THE_HEARTH: CityFurnishing = { kind: CITY_HEARTH_KIND, slot: { x: 0, y: 2 } }
-const HEARTH_AND_BED: CityFurnishing[] = [THE_BED, THE_HEARTH]
+/**
+ * ★ HOW A SHARED ROOM DIFFERS FROM A PRIVATE ONE, AND IT IS THE LADDER DRAWN.
+ *
+ * `world-fixes` made a farmhouse a real rung: half the fuel per body-night (0.375 against a
+ * house's 0.75), bought by giving up the one thing `privateKinds` names. **If the two rooms look
+ * alike on screen, that trade is invisible and the ladder is a spreadsheet.**
+ *
+ * So the room says it with the count, and the count is not chosen — it is `roomCapacity`, the
+ * same `floor(w × h / 2)` the ladder is priced on:
+ *
+ *   · a PRIVATE dwelling lays ONE bed. A house sleeps two and has one bed, because the two are
+ *     a couple: `reproductionSystem` counts a night only under a roof in `privateKinds`, and
+ *     `bedSlots` already lays a partnered pair down one cell each in a single bed. One bed IS
+ *     what privacy looks like.
+ *   · a SHARED dwelling lays ONE BED PER BODY. A cottage sleeps three and shows three; a
+ *     farmhouse sleeps four and shows four. Nobody here chose anybody.
+ *
+ * And the seat says the same thing twice: a house has a CHAIR, which seats one; a cottage and a
+ * farmhouse have a BENCH, which seats whoever sits down. No rug in a shared room — a rug is a
+ * comfort somebody owns.
+ *
+ * The beds run along the back-right wall and wrap, so a bigger household is a longer row rather
+ * than a denser pile.
+ */
+const bedRow = (count: number): CityFurnishing[] =>
+  Array.from({ length: count }, (_, i) => ({ kind: CITY_BED_KIND, slot: { x: i, y: 0 } }))
+
+// The beds run along the back-right wall in ONE row — a bed is two slots deep, so a row of them
+// is the whole of the grid's top two rows and the last row is what the household shares: the
+// fire, the table everybody eats at, and the bench, which seats whoever sits down where a
+// house's chair seats one.
+const sharedDwelling = (kind: DwellingKind): CityFurnishing[] => {
+  const slots = citySlotsFor(kind)
+  return [
+    ...bedRow(roomCapacity(DWELLING_FOOTPRINTS[kind])),
+    THE_HEARTH,
+    { kind: 'table', slot: { x: 1, y: 2 } },
+    { kind: 'bench', slot: { x: slots.w - 1, y: 2 } },
+  ]
+}
 const HOUSE_FURNISHINGS: CityFurnishing[] = [
-  ...HEARTH_AND_BED,
+  THE_BED, THE_HEARTH,
   { kind: 'table', slot: { x: 1, y: 2 } },
   { kind: 'chair', slot: { x: 1, y: 1 } },
   // The plan put the rug at (0,1). A rug is two slots tall, so it would have lain across the
@@ -379,8 +446,8 @@ export const GENESIS_WANTED: readonly Wanted[] = [
 // draws their interior yet, and a table nobody can see is the dead data the recipe row refuses.
 const FURNISHINGS_BY_KIND: Readonly<Record<string, CityFurnishing[]>> = {
   house: HOUSE_FURNISHINGS,
-  cottage: HEARTH_AND_BED,
-  farmhouse: HEARTH_AND_BED,
+  cottage: sharedDwelling('cottage'),
+  farmhouse: sharedDwelling('farmhouse'),
   // ★ THE CABIN'S STOVE AND NO BED: it is the founding valley's one indoor fire and it is a
   // refuge, not a home. A body is warm in it and still sleeps on the boards.
   //

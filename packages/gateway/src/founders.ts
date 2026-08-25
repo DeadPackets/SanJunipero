@@ -109,8 +109,15 @@ const CABIN_STOCK: ReadonlyArray<readonly [string, number]> = [
   ['timber', 6], ['cloth', 2],
 ]
 
+/** A household's larder rather than one family's: the same three kinds a house holds, in the
+ *  quantities three or four people get through. */
+const SHARED_STOCK: ReadonlyArray<readonly [string, number]> = [
+  ['bread', 6], ['waterskin', 3], ['herb_bundle', 5], ['timber', 4],
+]
+
 const STOCK_FOR: Readonly<Record<string, ReadonlyArray<readonly [string, number]>>> = {
   storehouse: STOREHOUSE_STOCK, shed: SHED_STOCK, house: HOUSE_STOCK, cabin: CABIN_STOCK,
+  cottage: SHARED_STOCK, farmhouse: SHARED_STOCK,
 }
 
 /**

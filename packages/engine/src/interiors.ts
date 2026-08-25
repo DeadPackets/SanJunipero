@@ -1,4 +1,4 @@
-import { isRoofedKind, T_ROAD, type SimConfig } from '@sj/shared'
+import { isRoofedKind, roomCapacity, T_ROAD, type SimConfig } from '@sj/shared'
 import type { Structure, WorldState } from './state.js'
 import { isPassable, type Point } from './path.js'
 
@@ -54,11 +54,13 @@ export function occupantsOf(state: WorldState, structureId: string): string[] {
 // whose the building is, because whose it is, is a thing the town has to invent and we do not
 // get to hand it over. Without a cap one roof sheltered the whole town and the second house
 // anybody raised was worth exactly nothing.
-export const TILES_PER_BODY = 2
-
-export function roomCapacity(s: { w: number; h: number }): number {
-  return Math.max(1, Math.floor((s.w * s.h) / TILES_PER_BODY))
-}
+//
+// ★ IT MOVED TO `@sj/shared` AND IT IS STILL ONE DEFINITION. The city template has to lay a bed
+// down for every body a dwelling sleeps, and the template is in shared, which cannot import the
+// engine. Transcribing `floor(w × h / 2)` over there would have been a second derivation of the
+// number the whole dwelling ladder is priced on. Re-exported here so every existing caller is
+// untouched.
+export { TILES_PER_BODY, roomCapacity } from '@sj/shared'
 
 /** True when no more bodies fit. `enter` refuses on it and perception says it out loud, so a
  *  mind reads "full" off the packet instead of paying a turn to be told. */

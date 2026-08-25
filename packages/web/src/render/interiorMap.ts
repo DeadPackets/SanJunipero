@@ -32,6 +32,39 @@ export const ROOM_TILES = {
   w: CITY_INTERIOR_SLOTS.w * TILES_PER_SLOT.w,
   h: CITY_INTERIOR_SLOTS.h * TILES_PER_SLOT.h,
 } as const
+
+/**
+ * ★ A ROOM IS AS BIG AS THE BUILDING IT IS INSIDE, AND THE FACTOR IS NOT A TASTE CALL.
+ *
+ * Every room was `ROOM_TILES` — 12 × 6 whatever stood outside — and that was true while the only
+ * rooms drawn were a 2 × 2 house, a 2 × 2 storehouse and a 1 × 1 shed nobody enters. A farmhouse
+ * is 4 × 2 on the plan and the world says it sleeps FOUR: `interiors.roomCapacity` is
+ * `floor(w × h / 2)`, which is the same arithmetic the whole dwelling ladder is priced on. Draw
+ * that on a house's floor and the picture contradicts the law — two derivations of one fact,
+ * which is the disease this lane exists to kill.
+ *
+ * The factor is FORCED by the room already shipped: a house is 2 × 2 and its room is 12 × 6, so
+ * one plan tile is 6 interior tiles across and 3 deep. Nothing is chosen here — a house, a
+ * storehouse and a cabin all still come out at exactly 12 × 6.
+ */
+export const ROOM_TILES_PER_PLAN_TILE = { w: 6, h: 3 } as const
+
+export function roomTilesFor(plan: { w: number; h: number }): Size {
+  return {
+    w: Math.max(1, plan.w) * ROOM_TILES_PER_PLAN_TILE.w,
+    h: Math.max(1, plan.h) * ROOM_TILES_PER_PLAN_TILE.h,
+  }
+}
+
+/** How many interior tiles one template slot owns in a room this size. The template grid is
+ *  3 × 3 for every kind — a longer building spends its extra floor on wider slots, not on more
+ *  of them — so this is a division and never a second table. */
+export function tilesPerSlot(room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS): Size {
+  return {
+    w: Math.max(1, Math.floor(room.w / Math.max(1, slots.w))),
+    h: Math.max(1, Math.floor(room.h / Math.max(1, slots.h))),
+  }
+}
 /** Where inside its 4×2 block a furnishing's origin tile sits: one tile of clearance on the
  *  -x side, so nothing is jammed into the block seam. */
 export const SLOT_ORIGIN_OFFSET = { x: 1, y: 0 } as const
@@ -86,10 +119,11 @@ export type Size = { w: number; h: number }
 
 /** The origin tile of a template slot. Total over the 3×3 grid, and the inverse of nothing —
  *  a tile does not have to belong to a slot, which is the point. */
-export function slotToTile(slot: Slot): Tile {
+export function slotToTile(slot: Slot, room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS): Tile {
+  const per = tilesPerSlot(room, slots)
   return {
-    x: slot.x * TILES_PER_SLOT.w + SLOT_ORIGIN_OFFSET.x,
-    y: slot.y * TILES_PER_SLOT.h + SLOT_ORIGIN_OFFSET.y,
+    x: slot.x * per.w + SLOT_ORIGIN_OFFSET.x,
+    y: slot.y * per.h + SLOT_ORIGIN_OFFSET.y,
   }
 }
 
@@ -110,16 +144,18 @@ export function slotToTile(slot: Slot): Tile {
  * Only the depth axis, because only the depth axis is short: a block is FOUR tiles across, so
  * two pieces side by side already read as a pair, and it is two tiles deep, where they do not.
  */
-export function seatInBlock(slot: Slot, others: readonly Slot[]): Tile {
-  const base = slotToTile(slot)
+export function seatInBlock(
+  slot: Slot, others: readonly Slot[], room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS,
+): Tile {
+  const base = slotToTile(slot, room, slots)
   const nearer = others.some((o) => o.x === slot.x && o.y === slot.y + 1)
   const further = others.some((o) => o.x === slot.x && o.y === slot.y - 1)
   if (nearer === further) return base            // both sides, or neither: stay where you are
-  return { x: base.x, y: base.y + (nearer ? TILES_PER_SLOT.h - 1 : 0) }
+  return { x: base.x, y: base.y + (nearer ? tilesPerSlot(room, slots).h - 1 : 0) }
 }
 
-export const inRoom = (t: Tile): boolean =>
-  t.x >= 0 && t.y >= 0 && t.x < ROOM_TILES.w && t.y < ROOM_TILES.h
+export const inRoom = (t: Tile, room: Size = ROOM_TILES): boolean =>
+  t.x >= 0 && t.y >= 0 && t.x < room.w && t.y < room.h
 
 // ── THE TWO WALLS, AND THE TWO FACINGS THEY PRESENT ──────────────────────────────────────
 //
@@ -235,14 +271,16 @@ export type PieceInput = {
  * is part of the elevation rather than an object standing in front of one; its facing is the
  * wall's, by construction, which is the only way the art and the surface can agree.
  */
-export function roomMapOf(inputs: readonly PieceInput[]): RoomMap {
-  const blocked = new Uint8Array(ROOM_TILES.w * ROOM_TILES.h)
+export function roomMapOf(
+  inputs: readonly PieceInput[], room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS,
+): RoomMap {
+  const blocked = new Uint8Array(room.w * room.h)
   const pieces: MapPiece[] = []
-  const slots = inputs.map((i) => i.slot)
+  const taken = inputs.map((i) => i.slot)
   for (const [i, input] of inputs.entries()) {
     const size = input.size ?? { w: 1, h: 1 }
     const placement = input.placement ?? 'floor'
-    let tile = seatInBlock(input.slot, slots.filter((_, j) => j !== i))
+    let tile = seatInBlock(input.slot, taken.filter((_, j) => j !== i), room, slots)
     let facing: TownFacing | null = null
     if (placement === 'wall') {
       // A slot column 0 is against the back-left wall, a slot row 0 against the back-right.
@@ -255,15 +293,15 @@ export function roomMapOf(inputs: readonly PieceInput[]): RoomMap {
     pieces.push(piece)
     if (piece.flat) continue
     for (const t of tilesOf(piece)) {
-      if (!inRoom(t)) continue
-      blocked[t.y * ROOM_TILES.w + t.x] = 1
+      if (!inRoom(t, room)) continue
+      blocked[t.y * room.w + t.x] = 1
     }
   }
-  return { w: ROOM_TILES.w, h: ROOM_TILES.h, pieces, blocked }
+  return { w: room.w, h: room.h, pieces, blocked }
 }
 
 export const isWalkable = (map: RoomMap, t: Tile): boolean =>
-  inRoom(t) && map.blocked[t.y * map.w + t.x] === 0
+  inRoom(t, map) && map.blocked[t.y * map.w + t.x] === 0
 
 /** How many tiles of this room a body can stand on. The number the C stat strip calls "tiles in
  *  room", less what the furniture takes. */

@@ -11,7 +11,8 @@ import { z } from 'zod'
 // The reverse does not hold, and `shed` is why: it is not roofed, nothing enters it, and it
 // keeps a room because its art and eight furnishing manifests are shipped and name it. That
 // exception is pinned by name, so a second unenterable room kind cannot arrive quietly.
-export const INTERIOR_KINDS = ['house', 'storehouse', 'shed', 'cabin'] as const
+export const INTERIOR_KINDS =
+  ['house', 'storehouse', 'shed', 'cabin', 'cottage', 'farmhouse'] as const
 export type InteriorKind = (typeof INTERIOR_KINDS)[number]
 export const InteriorKindSchema = z.enum(INTERIOR_KINDS)
 

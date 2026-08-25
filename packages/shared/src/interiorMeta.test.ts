@@ -50,18 +50,12 @@ describe('InteriorMetaSchema', () => {
   const roofedKinds = Object.keys(DEFAULT_CONFIG.structures.recipes)
     .filter((k) => isRoofedKind(DEFAULT_CONFIG, k)).sort()
 
-  // Until every room is drawn this is a LEDGER rather than a bare implication, and the ledger
-  // is written down so it cannot be forgotten: these are the kinds a body walks into and the
-  // viewer has nothing to show for. It shrinks to `[]` as the rooms land, and then the
-  // implication above it is the whole law.
-  const NO_ROOM_YET = ['cottage', 'farmhouse']
-
+  // The ledger this lane carried — `['cottage','farmhouse']` while their rooms were being
+  // drawn — is EMPTY, so the law stands bare: nothing a body can walk into is missing a room.
   it('★ every kind a body can walk into has a room drawn for it', () => {
     expect(roofedKinds.length).toBeGreaterThan(1)
     const missing = roofedKinds.filter((k) => !(INTERIOR_KINDS as readonly string[]).includes(k))
-    expect(missing).toEqual(NO_ROOM_YET)
-    // and the ledger only ever shrinks — a NEW roofed kind cannot be added to it silently
-    expect(missing.length).toBeLessThan(roofedKinds.length)
+    expect(missing).toEqual([])
   })
 
   it('★ and the rooms nobody can enter are exactly the shed, by name', () => {

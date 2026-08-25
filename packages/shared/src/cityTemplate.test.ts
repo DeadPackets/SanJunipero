@@ -10,7 +10,7 @@ import {
   isRoadTile, PLAZA, PLAZA_CENTRE, T_ROAD, T_WATER, T_EARTH,
   cityStructures, cityPlacements, cityBlocks, genesisEmptyPlots, plattedPlots, doorTile, doorFrontTile,
   structureTiles, FOUNDER_IDS, CITY_INTERIOR_SLOTS,
-  CITY_FURNISHING_KINDS, CITY_BED_KIND, CITY_HEARTH_KIND,
+  CITY_FURNISHING_KINDS, CITY_BED_KIND, CITY_HEARTH_KIND, citySlotsFor,
   makeCityTemplate, templateFits, growthPlots, T_GRASS, footprintFor,
   WELL_AT, FIRE_PIT_AT, danglingRoadEnds, frontages, GENESIS_WANTED,
   CITY_DWELLING_KINDS, DWELLING_FOOTPRINTS, isDwellingKind,
@@ -403,8 +403,12 @@ describe('city structures', () => {
       for (const f of s.furnishings) {
         expect(f.slot.x, `${s.kind} ${f.kind}`).toBeGreaterThanOrEqual(0)
         expect(f.slot.y, `${s.kind} ${f.kind}`).toBeGreaterThanOrEqual(0)
-        expect(f.slot.x, `${s.kind} ${f.kind}`).toBeLessThan(CITY_INTERIOR_SLOTS.w)
-        expect(f.slot.y, `${s.kind} ${f.kind}`).toBeLessThan(CITY_INTERIOR_SLOTS.h)
+        // per-kind: the grid widens with the household, because a bed is two slots deep and a
+        // farmhouse sleeps four. `citySlotsFor` never narrows below the landed 3.
+        const grid = citySlotsFor(s.kind)
+        expect(grid.w, s.kind).toBeGreaterThanOrEqual(CITY_INTERIOR_SLOTS.w)
+        expect(f.slot.x, `${s.kind} ${f.kind}`).toBeLessThan(grid.w)
+        expect(f.slot.y, `${s.kind} ${f.kind}`).toBeLessThan(grid.h)
         const k = key(f.slot.x, f.slot.y)
         expect(seen.has(k), `${s.kind} stacks two furnishings on ${k}`).toBe(false)
         seen.add(k)
