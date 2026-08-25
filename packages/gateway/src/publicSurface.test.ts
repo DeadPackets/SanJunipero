@@ -14,7 +14,7 @@ import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } f
 import { openForgeDb } from '@sj/forge'
 import { createGateway, CLOSE_TOO_MANY, SCRUB_MIN_MS, type Gateway } from './server.js'
 import { AGENT_ID } from './api.js'
-import { makeSeqCache } from './seqCache.js'
+import { MAX_BYTES, MAX_KEYS, makeSeqCache } from './seqCache.js'
 import { CLIENT_ASSET_DIR, resolveInRoot } from './staticSite.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId))
@@ -221,6 +221,39 @@ describe('the guards themselves', () => {
     // A stranger varying the query string churns the map; it must not grow.
     for (let i = 0; i < 500; i++) cache.json(`digest?x=${i}`, build)
     expect(cache.size()).toBeLessThanOrEqual(4)
+  })
+
+  /**
+   * ★ A KEY CAP OVER UNBOUNDED BODIES IS NOT A CAP.
+   *
+   * `seqCache`'s own comment promised bounded memory and the code bounded the number of KEYS, so
+   * the real ceiling was 32 × the largest body — and the largest body was `/api/bonds` at
+   * 83 704 521 B. "Bounded" meant about 2.7 GB.
+   *
+   * MUTATION-PROVED: deleting the `held + body.length > maxBytes` eviction loop takes the held
+   * bytes below from 4 008 to 15 030 — nearly four times its budget, on fifteen keys well under
+   * the key cap.
+   */
+  it('★ the seq cache holds a budget of BYTES, not a number of bodies', () => {
+    let seq = 1
+    const cache = makeSeqCache(() => seq, MAX_KEYS, 4096)
+    const kb = 'x'.repeat(1000)
+    for (let i = 0; i < 15; i++) cache.json(`big?x=${i}`, () => kb)
+    expect(cache.size(), 'well under the key cap, and still evicting').toBeLessThan(MAX_KEYS)
+    expect(cache.bytes(), 'the budget is the ceiling').toBeLessThanOrEqual(4096)
+
+    // A single body larger than the whole budget is admitted, alone: refusing it would mean
+    // rebuilding it per request, which is the amplification the cache exists to stop.
+    seq = 2
+    const huge = 'y'.repeat(9000)
+    expect(cache.json('huge', () => huge)).toBe(JSON.stringify(huge))
+    expect(cache.size()).toBe(1)
+    expect(cache.json('huge', () => { throw new Error('rebuilt a body it was holding') }))
+      .toBe(JSON.stringify(huge))
+
+    // and the shipped budget is a real number rather than "whatever the biggest answer is"
+    expect(MAX_BYTES).toBeGreaterThan(0)
+    expect(MAX_BYTES).toBeLessThan(64 * 1024 * 1024)
   })
 
   /**

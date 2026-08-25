@@ -9,6 +9,30 @@ export const HEAT_WEIGHTS: Record<string, number> = {
 
 export type HeatWindow = { fromTick: number; toTick: number; agentId: string; score: number }
 
+/**
+ * ★ `/api/heat` HAD NO HORIZON, AND ITS ONE CALLER READS THE LAST TWO MINUTES.
+ *
+ * The body was **356 797 B** at sim-day 20 of a loud town and grew without limit —
+ * ~36 KB per sim-day, forever — and `DirectorMode.tsx` polls it every **5 s**. The previous
+ * lane's aggregate cut a year of streaming from ~2.7 GB to ~13 MB and said plainly that the
+ * residual was the contract, not slack. This is the contract.
+ *
+ * `directorCut.pickCut` keeps only the windows overlapping `[nowTick − 120, nowTick]` and throws
+ * the rest away. Everything older than that was being built, cached, serialised and sent so it
+ * could be discarded by the only thing that reads it.
+ *
+ * One sim-day rather than the 120 ticks the caller uses: `/api/heat` is a public contract and a
+ * legible unit survives a second reader better than a number tuned to the first. The ceiling is
+ * 24 windows × the living population — at fifteen people, about 25 KB, at any age of town.
+ */
+export const HEAT_HORIZON_TICKS = 1440
+
+/** The windows inside the horizon, newest end anchored at `nowTick`. */
+export function heatSince(windows: readonly HeatWindow[], nowTick: number): HeatWindow[] {
+  const floor = nowTick - HEAT_HORIZON_TICKS
+  return windows.filter((w) => w.toTick >= floor)
+}
+
 /** `${windowIndex}\n${agentId}` → score. The whole of what heat needs to remember: one number
  *  per 60-tick window an agent was in, which is the answer itself and not the events behind it. */
 export type HeatScores = Map<string, number>

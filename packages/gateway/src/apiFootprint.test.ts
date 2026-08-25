@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
+import { HEAT_HORIZON_TICKS, HEAT_WINDOW_TICKS } from './heatStub.js'
 import { mountDataApi, type Footprint } from './api.js'
 import { WorldMirror } from './worldMirror.js'
 import type { RouteHandler, Router } from './server.js'
@@ -137,11 +138,32 @@ describe('★ the read path holds answers, not the log', () => {
 
     // ── and the answers are real, so the bound is a bound over something ───────────────────
     const society = JSON.parse(bodies.get('GET /api/society')!) as { nodes: unknown[]; links: unknown[] }
-    const heat = JSON.parse(bodies.get('GET /api/heat')!) as unknown[]
+    const heat = JSON.parse(bodies.get('GET /api/heat')!) as Array<{ fromTick: number }>
     expect(society.nodes).toHaveLength(AGENTS)
     expect(society.links.length, 'a town this loud has talk and give links').toBeGreaterThan(100)
-    expect(heat.length, 'and drama in most of its 60-tick windows').toBeGreaterThan(1000)
+    expect(heat.length, 'and drama in most of its recent 60-tick windows').toBeGreaterThan(100)
     expect(bodies.get('GET /api/digest')!.length).toBeGreaterThan(500)
+
+    /**
+     * ★ AND THE HEAT BODY HAS A HORIZON — see `HEAT_HORIZON_TICKS`.
+     *
+     * The running map is the whole town's drama, because `/api/digest` must be exact over a
+     * window the viewer picks. What is SENT is the last sim-day of it, so the body is bounded by
+     * the population and not by the age: 188 335 B unbounded at 16 000 ticks against 18 051 B
+     * windowed, and the windowed number does not move as the town ages. `DirectorMode` polls this every 5 s and
+     * `pickCut` throws away everything older than 120 ticks.
+     *
+     * MUTATION-PROVED: dropping `heatSince` from the route sends 3 204 windows instead of 300,
+     * and 188 335 B instead of 18 051 — at 16 000 ticks, and the gap grows for ever.
+     */
+    const oldest = Math.min(...heat.map((w) => w.fromTick))
+    const live = mirror.state().tick
+    expect(oldest, 'nothing older than the horizon is sent')
+      .toBeGreaterThanOrEqual(live - HEAT_HORIZON_TICKS - HEAT_WINDOW_TICKS)
+    expect(heat.length, 'one window per agent per 60 ticks of the horizon, at most')
+      .toBeLessThanOrEqual(Math.ceil(HEAT_HORIZON_TICKS / HEAT_WINDOW_TICKS + 1) * AGENTS)
+    expect(f.heat, 'the MAP is still the whole town, so the digest stays exact')
+      .toBeGreaterThan(heat.length * 4)
 
     // ── the property: what is retained counts ANSWERS, never events ────────────────────────
     expect(f.spokes, 'a spoke past the talk window can pair with nothing and is dropped')

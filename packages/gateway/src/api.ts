@@ -5,7 +5,8 @@ import { MINUTES_PER_DAY, tickToMoment, type SimConfig, type SimEvent } from '@s
 import type { Router } from './server.js'
 import type { WorldMirror } from './worldMirror.js'
 import {
-  HEAT_WINDOW_TICKS, heatContext, heatFromScores, scoreEvent, type HeatScores, type HeatWindow,
+  HEAT_WINDOW_TICKS, heatContext, heatFromScores, heatSince, scoreEvent,
+  type HeatScores, type HeatWindow,
 } from './heatStub.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 
@@ -325,9 +326,18 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
 
   // /api/chapters moved to narratorApi.ts, where it reads C7's real chapters instead of [].
 
+  /**
+   * ★ THE HORIZON IS THE CEILING — see `HEAT_HORIZON_TICKS`.
+   *
+   * The running map stays whole, because `/api/digest` answers "what did I miss" over a window
+   * the viewer picks and must be exact however far back it reaches. What is SENT is the last
+   * sim-day of it, which is a body bounded by the population rather than by the town's age, and
+   * twelve times more than `pickCut` looks at.
+   */
   router.route('GET', '/api/heat', (_req, res) => {
     readFold()
-    sendPrebuilt(res, cache.json('heat', () => heatFromScores(heat)))
+    sendPrebuilt(res, cache.json('heat', () =>
+      heatSince(heatFromScores(heat), deps.mirror.state().tick)))
   })
 
   router.route('GET', '/api/digest', (req: IncomingMessage, res) => {
