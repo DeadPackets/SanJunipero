@@ -55,7 +55,10 @@ const levelOf = (body: AlarmBody, need: AlarmNeed): number =>
   need === 'thirst' ? body.thirst ?? 100 : body.needs[need]
 
 export type MindClock = {
-  lastTurnTick: number
+  // `null` is a mind that has never taken a turn, and it is not the same as tick 0: a fresh town
+  // starts at tick 0, so a zero here made five new arrivals wait out the whole boredom floor
+  // before their first thought.
+  lastTurnTick: number | null
   reconsiderAtTick: number | null
   conversationUntilTick: number
   dozeUntilTick: number
@@ -109,7 +112,7 @@ export function decideWake(
     return null
   }
 
-  const sinceLast = tick - clock.lastTurnTick
+  const sinceLast = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
   const inConversation = tick < clock.conversationUntilTick
 
   // Floor-exempt: physical rousing and immediate surprises.

@@ -11,7 +11,24 @@ export {
   type QuotedName,
 } from './prompt/glassScan.js'
 export { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS, PRICE_PER_M } from './llm/pins.js'
-export { migrateLlmTables, insertAlert } from './llm/callLog.js'
+export { migrateLlmTables, insertAlert, sumCostUsd } from './llm/callLog.js'
+// ★ THE LIVE SEAM'S PUBLIC FACE. Until now nothing outside this package could boot a mind:
+// `AgentRuntime`, `EngineBridge` and `openAgentDb` were reachable only by a script's relative
+// path, which is why the only live worlds in the repo were scripts. The served world imports
+// these by package name like everything else.
+export { AgentRuntime, type RuntimeSnapshot, type RuntimeStats } from './runtime/agentRuntime.js'
+export { EngineBridge, type Intent, type SubmitResult } from './runtime/bridge.js'
+export { wireArbiter, buildAgentCtx, type Adjudicator, type Codifier, type SeamArbiter } from './runtime/arbiterSeam.js'
+export { PersonalityStore, type PersonalityDoc } from './personality.js'
+export { openAgentDb, migrateAgentTables } from './memory/schema.js'
+export { type IdentityCore } from './prompt/assemble.js'
+export { bootMinds, hasPersonality, type BootedMinds, type BootMindsOpts, type MindSpec } from './live/liveMinds.js'
+export { type MindConfig } from './wake.js'
+export { FOUNDER_MINDS, type Mind } from './live/founderMinds.js'
+export {
+  PREFLIGHT_BAR, PREFLIGHT_CALLS, PREFLIGHT_ROUNDS, preflightRefusal, runPreflight, scorePreflight,
+  type PreflightResult,
+} from './live/providerPreflight.js'
 export {
   checkSpend,
   classifyFailure,

@@ -228,14 +228,36 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   }
   const timer = setInterval(pump, opts.pollMs ?? DEFAULT_POLL_MS)
 
-  const port = await new Promise<number>((resolve, reject) => {
-    httpServer.once('error', reject)
-    httpServer.listen(opts.port ?? DEFAULT_PORT, () => {
-      listening = true
-      const addr = httpServer.address()
-      resolve(typeof addr === 'object' && addr !== null ? addr.port : (opts.port ?? DEFAULT_PORT))
+  /**
+   * ★ A GATEWAY THAT CANNOT TAKE ITS PORT USED TO LEAVE ITS PUMP RUNNING FOR EVER.
+   *
+   * The poll timer, the socket server and the http server are all built above, and `close()` —
+   * the only thing that clears them — is on the object this function never gets to return. So
+   * an `EADDRINUSE` left a `setInterval` polling a `WorldMirror` every 250 ms in a process that
+   * had already given up, and the caller's `db.close()` then turned that into an UNCAUGHT
+   * `TypeError: The database connection is not open` out of a timer nobody owns.
+   *
+   * Found by the live seam: `startDevWorld` learned to close the world db on a failed boot, and
+   * the orphan pump started shouting about it. It was always leaking; it was just quiet.
+   */
+  let port: number
+  try {
+    port = await new Promise<number>((resolve, reject) => {
+      httpServer.once('error', reject)
+      httpServer.listen(opts.port ?? DEFAULT_PORT, () => {
+        listening = true
+        const addr = httpServer.address()
+        resolve(typeof addr === 'object' && addr !== null ? addr.port : (opts.port ?? DEFAULT_PORT))
+      })
     })
-  })
+  } catch (e) {
+    clearInterval(timer)
+    wss.close()
+    httpServer.close()
+    if (ownsDb) db.close()
+    narratorDb?.close()
+    throw e
+  }
 
   return {
     port,

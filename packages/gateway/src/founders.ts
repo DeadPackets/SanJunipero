@@ -88,31 +88,61 @@ export function townStructuresFor(map: DevMapKind, rings?: number): readonly Dev
 
 export type DevHolding = { id: string; kind: string; qty: number; structureId: string; owner: string | null }
 
-/** Deliberately past the card's eight-row cap, so the "and N more" line is a thing a viewer
- *  can actually see. Every kind is a library entry, so every row resolves a real icon. */
+/**
+ * Deliberately past the card's eight-row cap, so the "and N more" line is a thing a viewer
+ * can actually see.
+ *
+ * ★ `wood`, NOT `timber` — AND THIS IS WHY A LIVE TOWN COULD NOT BUILD. These rows were chosen
+ * for the art library, which draws a stack of planks under the name `timber`. Nothing in the
+ * world eats `timber`: a house is `{ wood: 10 }`, a bridge `{ wood: 6 }`, a plank `{ wood: 1 }`.
+ * So the town's whole building material was a kind with no recipe behind it, and a mind that
+ * reasoned its way to needing walls could carry fifteen of it to a plot and be refused.
+ * `genesis/world.ts` wrote this rule down for its own storehouse and the showcase town — the one
+ * the stream actually serves — never followed it.
+ *
+ * 30 is three houses at the recipe's ten, plus the shed's four. At `DEV_HOUSE_TICKS` that is
+ * about half an hour of watchable building, and then the store is out and the forest has to
+ * start mattering. It is a founding store, not a supply: nothing refills it.
+ */
 const STOREHOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
-  ['wheat_sheaf', 12], ['bread', 6], ['fish', 4], ['berries', 9], ['timber', 15], ['stone', 11],
+  ['wheat_sheaf', 12], ['bread', 6], ['fish', 4], ['berries', 9], ['wood', 30], ['stone', 11],
   ['rope', 3], ['cloth', 5], ['fiber', 7], ['charcoal', 2], ['hide', 2], ['clay', 6],
 ]
 const SHED_STOCK: ReadonlyArray<readonly [string, number]> = [
-  ['axe', 1], ['saw', 1], ['hammer', 1], ['gravel', 8], ['timber', 4],
+  ['axe', 1], ['saw', 1], ['hammer', 1], ['gravel', 8], ['wood', 4],
 ]
-/** A home holds a household's things, not a warehouse's — three kinds and few of each. */
+/**
+ * A home holds a household's things, not a warehouse's — four kinds and few of each.
+ *
+ * ★ AND WOOD IS ONE OF THEM, BECAUSE THE STOREHOUSE'S WOOD IS INVISIBLE IN PRACTICE.
+ * `composePerception` shows a building's shelves only to somebody INSIDE it or standing against
+ * its wall — `indoors === null ? isAdjacentToRect(self.x, self.y, s) : s.id === indoors`. Every
+ * founder spawns at their own door and goes in at their own door, so nobody is ever adjacent to
+ * the public store and thirty planks might as well not be there. The bread on a household shelf
+ * is the one road live minds have actually been observed to walk; the wood goes on the same shelf.
+ *
+ * ★ AND THE QUANTITY IS A HOUSE, BECAUSE ANYTHING LESS IS NOT A BUILDING. A house is `{ wood: 10 }`;
+ * four buys a lamp post and a lit hearth and no roof at all. Eleven buildings already stand here on
+ * tick 0, so the only thing a founding day can mean in this town is **the ability to add one more**
+ * — and a household that cannot afford a single wall has not been given that. It is a founding
+ * store and nothing refills it: spend it and the forest has to start mattering.
+ */
 const HOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
-  ['bread', 2], ['waterskin', 1], ['herb_bundle', 3],
+  ['bread', 2], ['waterskin', 1], ['herb_bundle', 3], ['wood', 10],
 ]
 
 /** A refuge holds fuel and a blanket, and nothing that belongs to anybody. The cabin became an
  *  enterable room when it got its interior, and the guard below asks every room to hold
  *  something so none reads as empty by accident. */
 const CABIN_STOCK: ReadonlyArray<readonly [string, number]> = [
-  ['timber', 6], ['cloth', 2],
+  ['wood', 6], ['cloth', 2],
 ]
 
 /** A household's larder rather than one family's: the same three kinds a house holds, in the
- *  quantities three or four people get through. */
+ *  quantities three or four people get through — and a house's worth of wood, on the same
+ *  reasoning as HOUSE_STOCK above: a dwelling that cannot afford one wall is not a founding. */
 const SHARED_STOCK: ReadonlyArray<readonly [string, number]> = [
-  ['bread', 6], ['waterskin', 3], ['herb_bundle', 5], ['timber', 4],
+  ['bread', 6], ['waterskin', 3], ['herb_bundle', 5], ['wood', 10],
 ]
 
 const STOCK_FOR: Readonly<Record<string, ReadonlyArray<readonly [string, number]>>> = {
@@ -490,6 +520,19 @@ export type FoundersOpts = {
   /** dev/demo only: one founder raises lamp posts along the street and keeps them fed.
    *  ABSENT by default — every existing gate folds exactly the events it always did. */
   lamps?: number
+  /**
+   * ★ THE BODIES ARE NOT DRIVEN FROM THIS FILE. The town is still raised on tick 1 and the
+   * world systems still run, but every DECISION below that line is skipped: no patrol, no
+   * mason, no bridgewright, no lamplighter, no walk home — and no scripted need top-up either.
+   *
+   * That last one is the part worth arguing. The top-ups exist because a puppet cannot feed
+   * itself; a mind can, and a town that quietly refills five stomachs is a town whose hunger
+   * means nothing. If a live cast starves, that is the finding, not a bug in this file.
+   *
+   * OFF by default, so every landed gate folds exactly the world it always did. Set by
+   * `startDevWorld` when — and only when — a live cast is attached.
+   */
+  minds?: boolean
 }
 
 /** The house this person owns, or null. Ownership is a fact of the world (Structure.owner) —
@@ -613,6 +656,10 @@ export function makeFoundersOnTick(
 
     const result = worldTick(getState())
     for (const e of result.events) emit(e.type, e.payload)
+
+    // ★ EVERYTHING BELOW THIS LINE IS A PUPPET STRING. A live cast keeps the town and the
+    // world systems above and takes none of it — see `minds` on FoundersOpts.
+    if (opts.minds === true) return
 
     // scripted need top-ups keep the showcase town alive without a food economy
     for (const f of cast) {

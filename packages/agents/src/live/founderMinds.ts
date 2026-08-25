@@ -2,15 +2,21 @@
 // `motive-probe.ts` until a second probe wanted it, and two copies of a cast is two runs that
 // look comparable and are not — which is the exact reading error the wants lane called out
 // about arm B. Extraction only: not one word of a backstory, a voice card or a goal has moved.
-import type { PersonalityDoc } from '../src/personality.js'
-import type { IdentityCore } from '../src/prompt/assemble.js'
+//
+// ★ AND IT IS IN `src/` NOW BECAUSE THE STREAM WANTED IT TOO. `scripts/` is outside every
+// package's `include`, so a cast that lives there can be read by a script and by nothing else.
+// The served live world (`gateway/src/liveWorld.ts`) is the third caller, and it is not a
+// script. `scripts/probeFounders.ts` is gone; its two callers import this instead.
+import type { PersonalityDoc } from '../personality.js'
+import type { IdentityCore } from '../prompt/assemble.js'
+import type { MindSpec } from './liveMinds.js'
 
 // ---------------------------------------------------------------- the minds ---
 // The g11 founders, with their backstories and voices intact and their GOALS MADE NEUTRAL.
 // g11's goals say things like "cut timber for a deck" — that is the fixture instructing a
 // mind, and a probe that kept it would measure the fixture. Both arms get the same neutral
 // line, so nothing here points at a roof.
-export type Mind = { id: string; identity: IdentityCore; personality: PersonalityDoc; ageDays: number; sex: 'f' | 'm' }
+export type Mind = MindSpec
 const voice = (
   register: string, rhythm: string, tics: string[], neverSays: string[],
   exampleLines: string[], typical: number, burst: number,
@@ -21,7 +27,7 @@ const NEUTRAL = (temperament: string, values: string[], beliefs: string[], mood:
   current: { mood, worries: [], goals: ['get through the day'] },
 })
 
-export const MINDS: Mind[] = [
+export const FOUNDER_MINDS: Mind[] = [
   {
     id: 'amara', sex: 'f', ageDays: 34 * 364,
     identity: {
