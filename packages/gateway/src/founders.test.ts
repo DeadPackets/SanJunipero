@@ -409,6 +409,24 @@ describe('the storerooms hold something', () => {
     expect(stocked, 'not even one house worth').toBeGreaterThanOrEqual(houseCost)
   })
 
+  // ★ AND IT HAS TO BE SOMEWHERE SOMEBODY LOOKS. `composePerception` shows a building's shelves
+  // only to a mind INSIDE it or standing against its wall. Every founder spawns on their own
+  // doorstep and goes in at that door, so nothing in the public storehouse is ever perceived by
+  // anybody — measured on a live run: five enter, five sleep, three take, and not one founder
+  // within reach of the store. Wood correctly named and still on no road.
+  it('★ puts the wood where a founder will actually see it — their own shelf', () => {
+    const structures = townStructuresFor('showcase')
+    const holdings = devHoldings(structures)
+    const woodByStructure = new Set(
+      holdings.filter((h) => h.kind === MASON_WOOD_KIND).map((h) => h.structureId))
+    for (const f of FOUNDERS) {
+      const home = structures.find((s) => s.owner === f.id)
+      expect(home, `${f.id} owns no roof`).toBeDefined()
+      expect(woodByStructure.has(home!.id), `${f.id}'s own home holds no ${MASON_WOOD_KIND}`)
+        .toBe(true)
+    }
+  })
+
   it('holds nothing whose kind no recipe and no verb can use', () => {
     const consumable = new Set<string>()
     for (const r of Object.values(SHOWCASE_CONFIG.structures.recipes)) {
