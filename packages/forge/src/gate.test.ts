@@ -214,4 +214,52 @@ describe('★ no generator in the package ships a candidate that failed a gate',
     }
     expect(offenders, 'a generator ships a candidate its own gate failed').toEqual([])
   })
+
+  // ── ★ THE OTHER HALF OF THE SWEEP: A GATE THAT RUNS AFTER THE WRITE ────────────────────
+  //
+  // The generators above chose a failing candidate. These scripts did something quieter and
+  // in one case worse: they computed the verdict AFTER the file was already on disk, and put
+  // it in a markdown cell or a log line. `gen-library.ts` carried a comment saying "a sprite
+  // that fails the pixel bar never ships" directly above the code that shipped it — a
+  // superseded script with a lie in it is worse than a superseded script, because the lie is
+  // what the next person reads.
+  // Each entry names the file's OWN shipped artifact, because the ordering that matters is
+  // the gate against that write and not against a candidate dump into a scratch directory.
+  const REPAIRS = [
+    ['gen-library.ts', /writeFileSync\(join\(dir, 'sprite\.png'\)/, /pixelBarReport\(/],
+    ['recell-buildings.ts', /writeFileSync\(join\(to, 'cell\.png'\)/, /integerScaleGate\(/],
+    ['recell-characters.ts', /writeFileSync\(join\(c\.dest, 'manifest\.json'\)/, /alphaBinaryGate\(/],
+    ['repair-sleep-cell.ts', /writeFileSync\(join\(DEST, 'cells', 'sleep-se\.png'\)/, /sleepAxisGate\(/],
+    ['requantize-portraits.ts', /writeFileSync\(join\(dest, f\)/, /paletteGate\(/],
+    ['build-farmland.ts', /writeFileSync\(join\(MATERIALS/, /materialVeto\(/],
+  ] as const
+
+  it.each(REPAIRS)('%s decides on its gates before it writes, not after', (file, artifact, gate) => {
+    const s = read(file)
+    const g = s.search(gate), w = s.search(artifact)
+    expect(g, `${file} no longer calls the gate this test was written for`).toBeGreaterThan(-1)
+    expect(w, `${file} no longer writes the artifact this test was written for`).toBeGreaterThan(-1)
+    expect(s, 'the verdict has no consumer — no refusal anywhere in the file')
+      .toMatch(/throw new Error|refused\.push/)
+    expect(g, 'the gate still runs after the artifact is already on disk').toBeLessThan(w)
+  })
+
+  // ★ THE ANTI-VACUITY ONE, and the only one that catches a script nobody listed. The class
+  // that matters is the one that writes COMMITTED content: a scratchpad probe that ignores a
+  // gate costs a re-run, and this costs the product.
+  it('★ and every script that writes into content/ refuses, or its consumer is in the suite', () => {
+    const offenders: string[] = []
+    for (const f of readdirSync(scriptsDir).filter((n) => n.endsWith('.ts')).sort()) {
+      const s = read(f)
+      if (!/CONTENT_DIR|content\/tilesets|content\/buildings|content\/items|content\/cast|MATERIALS/.test(s)) continue
+      if (!/writeFileSync/.test(s)) continue
+      // `write-generated-terrain.ts` prints SEAM and writes anyway — and that is correct:
+      // `terrainIngest.test.ts` asserts `tileSeamGate(img).failures === ''` over every shipped
+      // material. For committed content the suite is the right place for the consumer.
+      if (f === 'write-generated-terrain.ts') continue
+      if (!/throw new Error|refusedCells\.push|refused\.push/.test(s))
+        offenders.push(`${f}: writes committed content with no refusal beside its gates`)
+    }
+    expect(offenders, 'a script writes committed content its own gate failed').toEqual([])
+  })
 })

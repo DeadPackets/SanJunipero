@@ -55,6 +55,19 @@ cpSync(SLEEP_RAW, join(DEST, 'raws', basename(SLEEP_RAW)))
 for (const n of ['sleep-se', 'sleep-sw', 'sleep-ne', 'sleep-nw'])
   cpSync(join(DEST, 'cells', `${n}.png`), join(DEST, 'before', `${n}.png`))
 
+// ★ THE THREE GATES USED TO RUN AFTER ALL FOUR CELLS AND THE MANIFEST WERE ON DISK, and go
+// into one log line. This script's whole job is to repair a sleep cell whose AXIS was wrong,
+// so shipping one that still fails `sleepAxisGate` is the one thing it must not do.
+const fails = [...alphaBinaryGate(r.cell).failures, ...paletteGate(r.cell).failures,
+  ...sleepAxisGate(r.cell).map(f => `${f.gate} ${f.value.toFixed(1)} (limit ${f.limit})`)]
+console.log(`${FOUNDER}  raw=${basename(SLEEP_RAW)}`)
+console.log(`  axis  ${sleepAxisDeg(before).toFixed(1)}  ->  ${sleepAxisDeg(r.cell).toFixed(1)}`)
+console.log(`  cell  ${r.cell.width}x${r.cell.height}  factor ${r.plan.factor}  source x${r.plan.sourceScale.toFixed(3)}`)
+console.log(`  gates ${fails.length === 0 ? 'clean' : fails.join('; ')}`)
+if (fails.length > 0) throw new Error(
+  `${FOUNDER}: the repaired sleep cell FAILS its own gates and was not written.\n    `
+  + `${fails.join('\n    ')}\n  The four cells and the manifest are untouched.`)
+
 writeFileSync(join(DEST, 'cells', 'sleep-se.png'), await encodePng(r.cell))
 writeFileSync(join(DEST, 'cells', 'sleep-sw.png'), await encodePng(r.cell))
 writeFileSync(join(DEST, 'cells', 'sleep-ne.png'), await encodePng(flip))
@@ -69,10 +82,3 @@ manifest.cells['sleep-sw'] = cellAnchor(r.cell)
 manifest.cells['sleep-ne'] = cellAnchor(flip)
 manifest.cells['sleep-nw'] = cellAnchor(flip)
 writeFileSync(mPath, JSON.stringify(manifest, null, 2))
-
-const fails = [...alphaBinaryGate(r.cell).failures, ...paletteGate(r.cell).failures,
-  ...sleepAxisGate(r.cell).map(f => `${f.gate} ${f.value.toFixed(1)} (limit ${f.limit})`)]
-console.log(`${FOUNDER}  raw=${basename(SLEEP_RAW)}`)
-console.log(`  axis  ${sleepAxisDeg(before).toFixed(1)}  ->  ${sleepAxisDeg(r.cell).toFixed(1)}`)
-console.log(`  cell  ${r.cell.width}x${r.cell.height}  factor ${r.plan.factor}  source x${r.plan.sourceScale.toFixed(3)}`)
-console.log(`  gates ${fails.length === 0 ? 'clean' : fails.join('; ')}`)

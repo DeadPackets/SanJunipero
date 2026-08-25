@@ -2,11 +2,13 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { decodePng, type RawImage } from './post/raw.js'
 import {
-  FACINGS, POSES_V2, HEAD_DIFF_MAX, frameCoherenceGate, mirrorX, opaqueBbox,
+  FACINGS, POSES_V2, HEAD_DIFF_MAX, STANCE_MIN_RATIO, footSpan, frameCoherenceGate, mirrorX,
+  opaqueBbox,
 } from './sheet.js'
 import {
   AUTHORED_FACINGS, CELL_NAMES_V4, STRIP_POSES_V4, WALK_CYCLE_V4,
-  coherenceGateV4, deriveSheet, sleepAxisDeg, sleepAxisGate, type AuthoredSet,
+  coherenceGateV4, deriveSheet, sleepAxisDeg, sleepAxisGate, stanceGate, strideGateV4,
+  type AuthoredSet,
 } from './mirror.js'
 
 // 4×4 with a single opaque marker pixel — asymmetric so flips are detectable.
@@ -174,5 +176,66 @@ describe('★ coherenceGateV4 asks everything frameCoherenceGate asks', () => {
     const theirs = frameCoherenceGate('ne', master, [{ label: 'cell', img: drifted }])
       .map((x) => x.gate).sort()
     expect(mine, 'the pre-spend gate and the audit disagree about what is wrong').toEqual(theirs)
+  })
+})
+
+// ★ THE GATE `strideGateV4` IS NOT — and the fixture is built so that strideGateV4 PASSES the
+// same pair, which is the whole reason this exists.
+describe('★ stanceGate: a contact frame with no stride in it', () => {
+  // A body with two legs whose spread is a parameter. Torso and head are identical, so the
+  // silhouette and the palette cannot see the difference either.
+  const walker = (spread: number, armY = 0): RawImage => {
+    const w = 40, h = 40
+    const data = new Uint8ClampedArray(w * h * 4)
+    const put = (x: number, y: number, c: number) => {
+      const i = (y * w + x) * 4
+      data[i] = c; data[i + 1] = 130; data[i + 2] = 90; data[i + 3] = 255
+    }
+    for (let y = 4; y < 26; y++) for (let x = 16; x < 24; x++) put(x, y, 190) // torso
+    for (let y = 26; y < 38; y++) {                                           // two legs
+      const t = (y - 26) / 11
+      for (let d = 0; d < 3; d++) {
+        put(Math.round(19 - t * spread) + d, y, 120)
+        put(Math.round(20 + t * spread) - d, y, 120)
+      }
+    }
+    // arms, high up the body: they move the pixels a lot and the feet not at all
+    for (let y = 10 + armY; y < 14 + armY; y++) for (let x = 12; x < 16; x++) put(x, y, 160)
+    return { width: w, height: h, data }
+  }
+  const idle = walker(1)
+
+  it('★ RED on a contact frame no wider at the feet than the idle', () => {
+    const f = stanceGate('se', idle, [{ label: 'contact-b', img: walker(1) }])
+    expect(f.map((x) => x.gate)).toEqual(['stance'])
+    expect(f[0]!.value).toBeLessThan(STANCE_MIN_RATIO)
+    expect(f[0]!.a).toBe('se/contact-b')
+  })
+
+  it('clean on a real stride', () => {
+    expect(stanceGate('se', idle, [{ label: 'contact-a', img: walker(9) }])).toEqual([])
+  })
+
+  // ★ THE POINT. `strideGateV4` sees a difference between the two frames and passes them both;
+  // the standing one is a walk frame with no walk in it and only the stance gate says so.
+  it('★ and strideGateV4 passes the pair that stanceGate refuses', () => {
+    const strip = {
+      'idle': idle, 'contact-a': walker(9), 'passing': walker(0, 8), 'contact-b': walker(1, 4),
+    }
+    expect(strideGateV4('se', strip, 0.02), 'the fixture must clear the stride gate').toEqual([])
+    expect(stanceGate('se', idle, [{ label: 'contact-b', img: strip['contact-b'] }])
+      .map((x) => x.gate)).toEqual(['stance'])
+  })
+
+  // Feet, not arms: a swung arm widens the bbox and must not buy a stance.
+  it('measures the feet, so an outstretched arm does not buy a stance', () => {
+    const armed = walker(1)
+    for (let x = 2; x < 16; x++) for (let y = 8; y < 11; y++) {
+      const i = (y * 40 + x) * 4
+      armed.data[i] = 190; armed.data[i + 1] = 130; armed.data[i + 2] = 90; armed.data[i + 3] = 255
+    }
+    expect(footSpan(armed)).toBe(footSpan(walker(1)))
+    expect(stanceGate('se', idle, [{ label: 'contact-a', img: armed }]).map((x) => x.gate))
+      .toEqual(['stance'])
   })
 })

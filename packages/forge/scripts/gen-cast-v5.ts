@@ -53,7 +53,7 @@ import {
   type GateFailure,
 } from '../src/sheet.js'
 import {
-  AUTHORED_FACINGS, coherenceGateV4, deriveSheet, sleepCoherenceGateV4, strideGateV4,
+  AUTHORED_FACINGS, coherenceGateV4, deriveSheet, sleepCoherenceGateV4, stanceGate, strideGateV4,
   type AuthoredFacing, type StripPoseV4,
 } from '../src/mirror.js'
 import { processHiResCell } from '../src/hires.js'
@@ -138,10 +138,22 @@ const VIEW: Record<AuthoredFacing, string> = {
 const VIEW_REF = 'the reference image'
 type WalkPose = Exclude<StripPoseV4, 'idle'>
 const WALK_POSES: readonly WalkPose[] = ['contact-a', 'passing', 'contact-b']
+// ★ SEEN FROM BEHIND, "THE OTHER FOOT" IS NOT A DESCRIPTION OF A SHAPE. Every SE contact
+// frame in the committed cast has feet 1.36x-2.04x the idle's; the NE contacts the model
+// volunteered across two lanes measured 1.00, 1.00, 1.02 and 1.02, and one of them is in the
+// committed art. `POSE_V4['contact-b']` asked for "the OTHER foot planted forward this time",
+// which from a back view — where you cannot tell one foot from the other — the model renders
+// as a body standing still. The A/B distinction has to stay, because `strideGateV4` needs the
+// two frames to differ; what it needs BESIDE it is the stride stated as a geometry rather
+// than as an identity, so that it survives a view in which the feet are interchangeable.
+const STRIDE_CLAUSE =
+  ' THE FEET ARE WIDE APART: the gap between the two feet is at least as wide as the '
+  + 'shoulders, with clear background visible between the legs. This is the WIDEST frame of '
+  + 'the walk cycle. It is NOT a standing pose and the feet are NOT together.'
 const POSE_V4: Record<WalkPose, string> = {
-  'contact-a': 'walk cycle CONTACT pose A: legs at full stride spread, one foot planted forward, the other back with heel lifting, opposite arm swung forward',
+  'contact-a': 'walk cycle CONTACT pose A: legs at full stride spread, one foot planted forward, the other back with heel lifting, opposite arm swung forward.' + STRIDE_CLAUSE,
   'passing': 'walk cycle PASSING pose: legs close together, one foot lifted and passing under the body, the other leg planted straight, arms near the sides',
-  'contact-b': 'walk cycle CONTACT pose B: legs at full stride spread, the OTHER foot planted forward this time, its opposite arm swung forward',
+  'contact-b': 'walk cycle CONTACT pose B: legs at full stride spread, the OTHER foot planted forward this time, its opposite arm swung forward.' + STRIDE_CLAUSE,
 }
 
 /** PRESENT DAY. The same clause the dwellings carry, in the register a person needs. Without
@@ -334,7 +346,7 @@ async function runCharacter(m: CastMember): Promise<void> {
 
   // walk frames — the master sheet is the only reference: identity, not architecture
   type FrameCand = { key: string; hi: RawImage; gate: RawImage; failures: GateFailure[] }
-  function evalFrame(key: string, f: AuthoredFacing, raw: RawImage): FrameCand {
+  function evalFrame(key: string, f: AuthoredFacing, p: WalkPose, raw: RawImage): FrameCand {
     const keyed = keyBg(raw)
     let two = false
     try { sliceStrip(keyed, 2); two = true } catch { /* one cluster — good */ }
@@ -351,7 +363,15 @@ async function runCharacter(m: CastMember): Promise<void> {
     const aspect = (b.x1 - b.x0 + 1) / (b.y1 - b.y0 + 1)
     if (aspect > 1.15) throw new Error(`aspect ${aspect.toFixed(2)} > 1.15 — multi-figure or lying`)
     const gate = gateView(hi)
-    return { key, hi, gate, failures: coherenceGateV4(key, masterGate[f], gate) }
+    // ★ AND A CONTACT FRAME HAS TO BE A CONTACT POSE. Four candidates across two lanes were
+    // refused BY EYE for being standing figures dropped into a walk loop, every one of them
+    // clean on every gate in the package; `strideGateV4` cannot see it because it measures
+    // frame-to-frame distance, not stance. A failure rather than a throw, so the refusal
+    // message carries the margin — the operator's question is whether the model can draw a
+    // stride from behind at all, and only the numbers answer it.
+    const stance = p === 'passing' ? []
+      : stanceGate(f, idleHi[f], [{ label: p, img: hi }]).map((x) => ({ ...x, a: key }))
+    return { key, hi, gate, failures: [...coherenceGateV4(key, masterGate[f], gate), ...stance] }
   }
   const identityBroken = (c: FrameCand): boolean => c.failures.some((x) =>
     (x.gate === 'palette' && x.value < PALETTE_HARD_FLOOR)
@@ -369,7 +389,7 @@ async function runCharacter(m: CastMember): Promise<void> {
     try { raw = await candidate(DIR, key, framePrompt(m, f, p), [soloRef[f]], '1024x1024', 0.08, assetId) }
     catch (e) { if (e instanceof OutOfBudget) throw e; push(`${key}: generation FAILED — ${String(e).slice(0, 160)}`); return null }
     try {
-      const c = evalFrame(key, f, await decodePng(raw))
+      const c = evalFrame(key, f, p, await decodePng(raw))
       push(`${key}: ${c.failures.length === 0 ? 'PASS' : c.failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`)
       return c
     } catch (e) { push(`${key}: process FAILED — ${String(e).slice(0, 160)}`); return null }

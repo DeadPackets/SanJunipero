@@ -56,6 +56,7 @@ console.log(`master palette ${paletteRgb().length} colours → derived ramps ${d
 type Row = { who: string; expr: string; hairBefore: number; hairMaster: number; hairAfter: number
   skinBefore: number; skinMaster: number; skinAfter: number; off: number }
 const rows: Row[] = []
+const refused: string[] = []
 
 for (const c of CASTS) {
   if (!existsSync(c.dir)) { console.log(`${c.id}: no portraits at ${c.dir}`); continue }
@@ -78,6 +79,10 @@ for (const c of CASTS) {
       skinAfter: bandTones(ramped, BANDS.skin),
       off: g.offPalette,
     })
+    // ★ `paletteGate`'s verdict went into a table column and the portrait was written
+    // whatever it said. The whole point of this script is to land every pixel on a derived
+    // ramp, so an off-ramp pixel is the one failure it cannot ship.
+    if (!g.ok) { refused.push(`${c.id}/${f}: ${g.failures.join('; ')}`); continue }
     writeFileSync(join(dest, f), await encodePng(ramped))
     writeFileSync(join(dest, f.replace('.png', '-4x.png')), await encodePng(upscaleNearest(ramped, 4)))
     cpSync(join(c.dir, f), join(dest, `before-${f}`))
@@ -108,3 +113,8 @@ md.push('', `**mean hair** ${mean((r) => r.hairBefore)} → ${mean((r) => r.hair
 mkdirSync(`${S}/fqc2/reports`, { recursive: true })
 writeFileSync(`${S}/fqc2/reports/portraits.md`, md.join('\n'))
 console.log(`\n${md.join('\n')}`)
+
+// Report first, then the wall — the table is what says whether the ramps or the art are wrong.
+if (refused.length > 0) throw new Error(
+  `${refused.length} portrait(s) landed OFF the derived ramps and were not written:\n    `
+  + `${refused.join('\n    ')}\n  The report is at ${S}/fqc2/reports/portraits.md.`)

@@ -4,8 +4,9 @@
 import type { RawImage } from './post/raw.js'
 import {
   FACINGS, POSES_V2, mirrorX, cellDistance, paletteJaccard, opaqueArea, opaqueBbox,
-  headRegionDiff, silhouetteBound, HEAD_DIFF_MAX,
+  headRegionDiff, silhouetteBound, footSpan, HEAD_DIFF_MAX,
   PALETTE_JACCARD_MIN, SILHOUETTE_AREA_TOL, STRIDE_MIN_RATIO, CONTACT_PASSING_MIN_RATIO,
+  STANCE_MIN_RATIO,
   type Facing, type PoseV2, type GateFailure,
 } from './sheet.js'
 
@@ -69,6 +70,24 @@ export function strideGateV4(facing: string, strip: Record<StripPoseV4, RawImage
   check('contact-a', 'passing', CONTACT_PASSING_MIN_RATIO, 'contact-passing')
   check('contact-b', 'passing', CONTACT_PASSING_MIN_RATIO, 'contact-passing')
   return failures
+}
+
+/**
+ * ★ THE GATE `strideGateV4` IS NOT. It asks whether two frames DIFFER; this asks whether a
+ * contact frame is a contact POSE. See `footSpan` in `sheet.ts` for the calibration and for
+ * the four standing figures that cleared every other gate in the package.
+ *
+ * NATIVE cells, not gate views: the separation is 0.19 wide and a 96px canvas cannot hold it.
+ */
+export function stanceGate(facing: string, idle: RawImage,
+  contacts: { label: string; img: RawImage }[], min = STANCE_MIN_RATIO): GateFailure[] {
+  const base = footSpan(idle)
+  if (base === 0) throw new Error(`stanceGate: ${facing}/idle has no feet`)
+  return contacts.flatMap(({ label, img }) => {
+    const ratio = footSpan(img) / base
+    return ratio >= min ? []
+      : [{ gate: 'stance' as const, a: `${facing}/${label}`, b: `${facing}/idle`, value: ratio, limit: min }]
+  })
 }
 
 // The ONE coherence gate: palette-jaccard + silhouette (opaque area) + head, vs the master's

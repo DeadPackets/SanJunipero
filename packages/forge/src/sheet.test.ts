@@ -90,9 +90,13 @@ describe('downscaleMajority', () => {
     const halfClear = img(4, 4, (x, y) => (y * 4 + x < 8 ? CLEAR : RED))
     expect([...downscaleMajority(halfClear, 1, 1).data]).toEqual(RED)
   })
-  it('breaks frequency ties by first-seen scan order', () => {
+  // Was "first-seen scan order", which is the property that made the whole thing
+  // orientation-dependent: reversing the block reversed the answer.
+  it('breaks frequency ties the same way whichever end of the block it reads from', () => {
     const src = img(2, 2, (x, y) => (y === 0 ? BLUE : RED)) // 2 blue then 2 red
     expect([...downscaleMajority(src, 1, 1).data]).toEqual(BLUE)
+    const reversed = img(2, 2, (x, y) => (y === 0 ? RED : BLUE))
+    expect([...downscaleMajority(reversed, 1, 1).data]).toEqual(BLUE)
   })
   it('preserves quadrant colors on a clean 2x downscale', () => {
     const src = img(4, 4, (x, y) => (x < 2 ? (y < 2 ? RED : BLUE) : (y < 2 ? [0, 255, 0, 255] as Px : CLEAR)))
@@ -101,6 +105,33 @@ describe('downscaleMajority', () => {
     expect([...out.data.slice(4, 8)]).toEqual([0, 255, 0, 255])
     expect([...out.data.slice(8, 12)]).toEqual(BLUE)
     expect(out.data[15]).toBe(0)
+  })
+
+  // ★ THE PROPERTY THAT MAKES A GATE A GATE AND NOT A COIN. Half of every character sheet
+  // is `mirrorX` of the other half, so the reduction the gates measure through has to
+  // commute with a flip. It did not: `floor(i*src/n)` boxes are not their own mirror on a
+  // non-integer factor, and the tie-break read left to right. Both are fixed; this asserts
+  // the consequence over the AWKWARD sizes — odd source, even output and the reverse — which
+  // is where every one of the disagreements lived.
+  it('★ commutes with a horizontal flip, at every source/output parity', () => {
+    const offenders: string[] = []
+    for (const src of [31, 32, 33, 96, 127, 128]) for (const out of [7, 8, 9, 10]) {
+      const x = img(src, 5, (px, py) => [(px * 37 + py * 11) % 256, (px * 13) % 256, py * 40, px % 7 === 0 ? 0 : 255])
+      const lhs = downscaleMajority(mirrorX(x), out, 3), rhs = mirrorX(downscaleMajority(x, out, 3))
+      let diff = 0
+      for (let i = 0; i < lhs.data.length; i++) if (lhs.data[i] !== rhs.data[i]) diff++
+      if (diff > 0) offenders.push(`${src}->${out}: ${diff} bytes`)
+    }
+    expect(offenders, 'downscaleMajority(flip(x)) is not flip(downscaleMajority(x))').toEqual([])
+  })
+
+  // Anti-vacuity: a downscale that threw everything away would also "commute".
+  it('and still carries the source through — the mirror test is not passing on empty output', () => {
+    const x = img(33, 5, (px) => (px < 11 ? RED : px < 22 ? BLUE : CLEAR))
+    const out = downscaleMajority(x, 9, 3)
+    expect([...out.data.slice(0, 4)]).toEqual(RED)
+    expect([...out.data.slice(4 * 4, 4 * 4 + 4)]).toEqual(BLUE)
+    expect(out.data[8 * 4 + 3]).toBe(0)
   })
 })
 

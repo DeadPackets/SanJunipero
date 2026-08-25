@@ -8,7 +8,7 @@ import {
   HEAD_REGION_FRAC, HEAD_DIFF_MAX,
   sliceStrip, opaqueArea, paletteJaccard, headRegionDiff,
   crossFacingDupeGate, strideGate, frameCoherenceGate, sleepGate,
-  pairwiseMedian, cellDistance, opaqueBbox,
+  pairwiseMedian, cellDistance, opaqueBbox, mirrorX,
 } from './sheet.js'
 
 type Px = [number, number, number, number]
@@ -127,6 +127,27 @@ describe('headRegionDiff', () => {
   })
   it('flags a laterally shifted head', () => {
     expect(headRegionDiff(sprite(0), sprite(6))).toBeGreaterThan(0.3)
+  })
+
+  // ★ THE MIRROR PROPERTY, and the awkward case is the one that used to break it: two
+  // bboxes of DIFFERENT width parity have their centres half a column apart, and an integer
+  // offset has to round one way going and the other way coming back. The pair below is
+  // 10 wide against 11 wide on purpose.
+  it('★ gives the same number for a pair of sprites and their mirrors, at either parity', () => {
+    const wide = (w: number) => img(30, 40, (x, y) => {
+      if (y >= 5 && y < 15 && x >= 10 && x < 10 + w) return RED
+      if (y >= 15 && y < 35 && x >= 12 && x < 18) return TEAL
+      return CLEAR
+    })
+    for (const [a, b] of [[wide(10), wide(11)], [wide(11), wide(10)], [wide(10), wide(10)], [sprite(0), sprite(6)]] as const)
+      expect(headRegionDiff(mirrorX(a), mirrorX(b)), 'headRegionDiff is not mirror-invariant')
+        .toBeCloseTo(headRegionDiff(a, b), 12)
+  })
+
+  // Anti-vacuity: the same-parity values are the CALIBRATED ones and must not have moved.
+  it('and the half-pixel alignment did not move the same-parity numbers it was calibrated on', () => {
+    expect(headRegionDiff(sprite(0), sprite(0))).toBe(0)
+    expect(headRegionDiff(sprite(0), sprite(6))).toBeCloseTo(0.4, 10) // 0.4 before the change too
   })
 })
 
