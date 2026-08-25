@@ -2,9 +2,13 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BondsResponseSchema, DEFAULT_CONFIG, bondId, type Bond, type BondsResponse } from '@sj/shared'
+import {
+  BondsCountSchema, BondsResponseSchema, DEFAULT_CONFIG, bondId,
+  type Bond, type BondsResponse, type SimEvent,
+} from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { createGateway, type Gateway } from './index.js'
+import { buildBonds } from './bonds.js'
 
 const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0 as TileId))
 
@@ -125,5 +129,59 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     for (const b of body.bonds) {
       for (const h of b.history) expect(h.note, h.note).toMatch(/^[a-z]/)
     }
+  })
+
+  /**
+   * ★ HOW MANY BONDS, WITHOUT SENDING THE BONDS. Every `Bond` carries its whole history, so the
+   * feed is not small: at sim-day 20 of a talkative town `/api/bonds` answered 83.7 MB, and the
+   * lens badge fetched it every 60 s to display one number.
+   */
+  it('★ counts the bonds without sending them', async () => {
+    const count = BondsCountSchema.parse(await (await fetch(`${base}/api/bonds/count`)).json())
+    expect(count.count).toBe(body.bonds.length)
+    expect(count.asOfTick).toBe(body.asOfTick)
+    const full = await (await fetch(`${base}/api/bonds`)).text()
+    expect(JSON.stringify(count).length, 'two integers, not a feed').toBeLessThan(full.length / 4)
+  })
+})
+
+/**
+ * ★ EVERY SPOKE AGAINST EVERY EARLIER SPOKE WAS O(n²), ON THE THREAD THAT TICKS THE TOWN.
+ *
+ * A spoke older than `TALK_WINDOW_TICKS` is skipped by the earshot loop, so it can pair with
+ * nothing ever again — but it stayed in the array and was walked once per later spoke. Measured
+ * at sim-day 20 of a talkative town: 38.4 s for one `/api/bonds`. Dropping the stale ones is the
+ * same answer in bounded time, and this proves the "same answer" half.
+ */
+describe('★ the talk window is a window, not the whole log', () => {
+  const spoke = (seq: number, tick: number, agentId: string, x: number): SimEvent =>
+    ({ seq, tick, type: 'agent_spoke', payload: { agentId, text: 'w', x, y: 0 } }) as SimEvent
+
+  it('ties exactly the pairs inside the window and none outside it', () => {
+    const events = [
+      spoke(1, 0, 'a', 0), spoke(2, 5, 'b', 1),          // 5 apart, in earshot → friend
+      spoke(3, 200, 'c', 0), spoke(4, 219, 'a', 1),      // 19 apart → friend
+      spoke(5, 240, 'b', 0), spoke(6, 261, 'c', 1),      // 21 apart → NOT a pair
+      spoke(7, 400, 'a', 0), spoke(8, 401, 'b', 40),     // in the window, out of earshot
+    ]
+    const out = buildBonds(events, 5, 500)
+    expect(out.bonds.map((b) => b.id)).toEqual([bondId('a', 'b'), bondId('a', 'c')])
+    expect(out.bonds.find((b) => b.id === bondId('a', 'b'))?.history.map((h) => h.tick)).toEqual([5])
+    expect(out.bonds.find((b) => b.id === bondId('a', 'c'))?.history.map((h) => h.tick)).toEqual([219])
+  })
+
+  it('is linear in the log, not quadratic — 8× the speech is not 64× the work', () => {
+    const run = (n: number): number => {
+      const events = Array.from({ length: n }, (_, i) => spoke(i + 1, i, `a${i % 8}`, 0))
+      const t0 = process.hrtime.bigint()
+      buildBonds(events, 5, n)
+      return Number(process.hrtime.bigint() - t0) / 1e6
+    }
+    run(4_000)                                  // warm the jit so the ratio is the algorithm
+    const small = Math.max(run(8_000), 1)
+    const large = run(64_000)
+    // quadratic would be ~64×; the bound makes it ~8×. Ten is the honest line between them.
+    expect(large / small, `8k took ${small.toFixed(1)} ms, 64k took ${large.toFixed(1)} ms`)
+      .toBeLessThan(10)
   })
 })

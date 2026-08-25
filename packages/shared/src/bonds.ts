@@ -29,6 +29,14 @@ export const BondsResponseSchema = z.object({
 }).strict()
 export type BondsResponse = z.infer<typeof BondsResponseSchema>
 
+/** What `/api/bonds/count` answers. Every `Bond` carries its whole history, so the full feed is
+ *  84 MB at sim-day 20 of a talkative town — a badge showing one number may not ask for it. */
+export const BondsCountSchema = z.object({
+  count: z.number().int().nonnegative(),
+  asOfTick: z.number().int().nonnegative(),
+}).strict()
+export type BondsCount = z.infer<typeof BondsCountSchema>
+
 /**
  * ★ THE SIX ACTS A TIE IS DERIVED FROM, and the whole of them. `buildBonds` reads the record
  * for exactly these; a bond count of zero IS "none of these six has been recorded", which is

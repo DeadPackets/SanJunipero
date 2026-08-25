@@ -37,15 +37,22 @@ export function buildBonds(events: SimEvent[], earshot: number, asOfTick: number
     drafts.set(id, draft)
   }
 
-  const spokes: Array<{ agentId: string; tick: number; x: number; y: number }> = []
+  // ★ EVERY SPOKE AGAINST EVERY EARLIER SPOKE IS O(n²), AND IT IS THE ONE ENDPOINT A BADGE
+  // POLLS. Measured at sim-day 20 of a talkative town: `/api/bonds` took 38.4 s on the tick
+  // thread. A spoke older than the talk window is skipped by the next line, so it can pair with
+  // nothing ever again — dropping it is the same answer in bounded time. `api.ts` does the same
+  // to the same array for the same reason.
+  let spokes: Array<{ agentId: string; tick: number; x: number; y: number }> = []
   const started = new Map<string, Record<string, unknown>>() // `${agentId}\n${verb}` → params
 
   for (const ev of events) {
     if (ev.type === 'agent_spoke') {
       const p = ev.payload as { agentId: string; x: number; y: number }
+      if (spokes.length > 0 && spokes[0]!.tick < ev.tick - TALK_WINDOW_TICKS) {
+        spokes = spokes.filter((s) => ev.tick - s.tick <= TALK_WINDOW_TICKS)
+      }
       for (const prev of spokes) {
         if (prev.agentId === p.agentId) continue
-        if (ev.tick - prev.tick > TALK_WINDOW_TICKS) continue
         if (Math.hypot(p.x - prev.x, p.y - prev.y) > earshot) continue
         tie(prev.agentId, p.agentId, 'friend', ev.tick, BOND_NOTES.spoke!)
       }
@@ -85,9 +92,26 @@ export function mountBondsApi(router: Router, deps: BondsDeps): void {
   // Whole-log scan per request; see seqCache.ts for why a public stream cannot pay that per viewer.
   const cache = makeSeqCache(() => deps.mirror.seq())
 
-  router.route('GET', '/api/bonds', (_req, res) => sendPrebuilt(res, cache.json('bonds', () => {
+  const bonds = (): BondsResponse => cache.value('bonds', () => {
     const events = (selEvents.all() as Array<{ seq: number; tick: number; type: string; payload: string }>)
       .map((r) => ({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }) as SimEvent)
     return buildBonds(events, deps.config.movement.earshotRadius, deps.mirror.state().tick)
+  })
+
+  router.route('GET', '/api/bonds', (_req, res) => sendPrebuilt(res, cache.json('bonds', bonds)))
+
+  /**
+   * ★ HOW MANY BONDS THERE ARE, WITHOUT SENDING THE BONDS.
+   *
+   * The lens badge showed one number and fetched every bond to measure the array. A `Bond`
+   * carries its whole `history`, so this is not a small feed: measured at sim-day 20 of a
+   * talkative town, `/api/bonds` answered **83.7 MB**, and the badge asked for it every 60 s
+   * per viewer. `/api/chronicle/count` learned this lesson first.
+   *
+   * It costs the server nothing extra — the panel and the badge share one memoised build.
+   */
+  router.route('GET', '/api/bonds/count', (_req, res) => sendPrebuilt(res, cache.json('bonds-count', () => {
+    const b = bonds()
+    return { count: b.bonds.length, asOfTick: b.asOfTick }
   })))
 }
