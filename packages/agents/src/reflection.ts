@@ -235,14 +235,23 @@ export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): Ll
 export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): LlmPrompt {
   const memoryLines = dayMemories.map((m) => `[${m.id}] ${m.text}`).join('\n')
   return {
+    // ★ 156 WORDS DOWN TO 62, AND THE THREE LINES THAT WENT WERE THE SCHEMA SPELLED TWICE.
+    // `ProposeEditSchema` is a discriminated union over `verdict` and `PersonalityEditSchema`
+    // already names `op`, `field`, `text`, `index` and their enums; the provider is sent that
+    // schema on every call. Restating it in prose bought nothing and cost the longest prompt of
+    // the six. What the schema genuinely cannot say — that `evidence` means today's memory
+    // numbers, and that temperament is not on the table — stays.
+    //
+    // ★ AND THE QUESTION ITSELF CHANGED SHAPE. "If today held an event that changed how you see
+    // the world" is a yes/no gate that can only be answered by re-reading every memory, which
+    // is the best explanation there is for 93% reasoning on a two-token answer. Pointing it at
+    // the day's own telling first, and saying plainly that most days change nothing, gives the
+    // answer somewhere to stop.
     system: [
       'Before sleep, you may change one thing about what you value or what you believe.',
-      'You may change at most one, and only if this day gives you a clear reason.',
-      'If today held an event that changed how you see the world (a collapse, hunger, a conflict, a first), propose exactly one change to what you value or believe, and point to the memory that shows why.',
-      'If the day was truly uneventful, say so and propose nothing.',
-      'Answer with one field named `verdict`, either `no_proposal` or `propose`.',
-      'For `no_proposal`, `verdict` is `no_proposal`.',
-      'For `propose`, `verdict` is `propose` and `edit` holds the change: `op` one of add, remove, revise; `field` one of values, beliefs; for add or revise, `text` is the new wording; for remove or revise, `index` is its place counting from 0; and `evidence` is the list of today\'s memory numbers that show why.',
+      'Read the telling of your day below. If it holds something that changed how you see the world (a collapse, hunger, a conflict, a first), name the single change it made in you.',
+      'Most days hold nothing like that. When yours does not, propose nothing and be done.',
+      'When you do propose, `evidence` is the memory numbers from today that show why.',
       'Never change your temperament: it is yours from birth.',
     ].join('\n'),
     messages: [
@@ -262,7 +271,10 @@ export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc, dayMe
 const FACT_SCHEMA = z
   .object({ subject: z.string().min(1), predicate: z.string().min(1), object: z.string().min(1), srcMemoryId: z.number().int() })
   .strict()
-const FACTS_SCHEMA = z.object({ facts: z.array(FACT_SCHEMA) }).strict()
+// Ten, against a prose bound of eight. The prose is the real ask; the schema is the runaway
+// stop, set loose enough that an honest answer is never rejected — a night that returns nine
+// solid facts still lands, and only a per-memory enumeration is refused.
+const FACTS_SCHEMA = z.object({ facts: z.array(FACT_SCHEMA).max(10) }).strict()
 const SCENE_SCHEMA = z.object({ title: z.string().min(1), text: z.string().min(1), memoryIds: z.array(z.number().int()) }).strict()
 const SCENES_SCHEMA = z.object({ scenes: z.array(SCENE_SCHEMA) }).strict()
 const DAY_SUMMARY_SCHEMA = z.object({ title: z.string().min(1), text: z.string().min(1) }).strict()

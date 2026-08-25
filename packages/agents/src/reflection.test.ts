@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import type Database from 'better-sqlite3'
 import { NoObjectGeneratedError } from 'ai'
 import { openAgentDb } from './memory/schema.js'
@@ -451,15 +452,45 @@ describe('makeReflectionLlm prompts', () => {
     }
   })
 
-  it("proposeEdit prompt carries today's memory ids and the edit shape", () => {
+  it("proposeEdit prompt carries today's memory ids and what the schema cannot say", () => {
     const p = proposeEditPrompt('The day was full of deals.', doc, memories)
     const text = p.system + '\n' + p.messages.map((m) => m.content).join('\n')
     expect(text).toContain(`[${memories[0]!.id}]`)
     expect(text).toContain(`[${memories[1]!.id}]`)
-    for (const kw of ['`verdict`', '`no_proposal`', '`propose`', '`edit`', '`op`', '`field`', '`text`', '`index`', '`evidence`', 'add', 'remove', 'revise', 'values', 'beliefs', 'collapse', 'hunger', 'conflict']) {
+    // What `ProposeEditSchema` cannot carry: what `evidence` refers to, that only one change is
+    // on the table, that temperament is not, and the kinds of day that earn a change at all.
+    for (const kw of ['`evidence`', 'one thing', 'temperament', 'collapse', 'hunger', 'conflict']) {
       expect(text).toContain(kw)
     }
     expect(text).not.toMatch(FORBIDDEN_FRAMING)
+  })
+
+  // ★ THE PROSE THAT WENT IS THE PROSE THE SCHEMA ALREADY ENFORCES. This is the assertion that
+  // stops it coming back: every field name and enum below reaches the provider as JSON schema
+  // on the same call, so spelling them again in English bought nothing and made this the
+  // longest of the six prompts by 2.5x.
+  it('proposeEdit no longer restates its own schema in prose', () => {
+    const system = proposeEditPrompt('The day was full of deals.', doc, memories).system
+    for (const spelledTwice of ['`verdict`', '`no_proposal`', '`op`', '`field`', '`index`', 'counting from 0']) {
+      expect(system, `proposeEdit spells ${spelledTwice} that ProposeEditSchema already enforces`)
+        .not.toContain(spelledTwice)
+    }
+    // Every one of them still reaches the model, because the schema is what carries them.
+    const shape = JSON.stringify(z.toJSONSchema(ProposeEditSchema))
+    for (const fromSchema of ['verdict', 'no_proposal', 'propose', 'op', 'field', 'index', 'evidence']) {
+      expect(shape, `${fromSchema} is not in the schema either`).toContain(fromSchema)
+    }
+    // The longest of the six is no longer this one.
+    const others = [
+      extractFactsPrompt(memories).system,
+      summarizeScenesPrompt(memories).system,
+      summarizeDayPrompt([{ title: 'Trade', text: 'x' }]).system,
+      updateLedgerPrompt('Nadia', null, memories).system,
+      autobiographyPrompt('x', doc).system,
+    ]
+    const words = (s: string): number => s.split(/\s+/).length
+    expect(words(system), 'proposeEdit is still 2.5x the next longest')
+      .toBeLessThan(2 * Math.max(...others.map(words)))
   })
 
   it('propose verdict schema accepts no_proposal and shaped edits, rejects temperament', () => {
