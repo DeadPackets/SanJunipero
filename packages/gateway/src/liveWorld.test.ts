@@ -115,6 +115,7 @@ async function liveWorld(opts: {
   minds?: MindSpec[]
   spendCapUsd?: number
   onSpendStop?: (spent: number, cap: number) => void
+  rateWindowRealMinutes?: number
   fresh?: boolean
 }): Promise<{ world: DevWorld; cast: LiveCast; opsDb: ReturnType<typeof openAgentDb> }> {
   const agentDbDir = join(opts.dir, 'minds')
@@ -135,6 +136,8 @@ async function liveWorld(opts: {
         mindConfig: EAGER,
         ...(opts.spendCapUsd === undefined ? {} : { spendCapUsd: opts.spendCapUsd }),
         ...(opts.onSpendStop === undefined ? {} : { onSpendStop: opts.onSpendStop }),
+        ...(opts.rateWindowRealMinutes === undefined
+          ? {} : { rateWindowRealMinutes: opts.rateWindowRealMinutes }),
         log: () => {},
         makeClient: (opsDb, _caller, agentId) => {
           seen = opsDb
@@ -256,6 +259,59 @@ describe('★ the money, inside the served world', () => {
     const atStop = eventsOf(dir, 'agent_spoke').length
     await run(world, 10)
     expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
+  }, 40_000)
+
+  // ★ THE RATE TRIPWIRE. The total cap is 94 hours of streaming at the measured rate — it stops
+  // a lane's mistake and cannot stop a leak on a process meant to run for weeks. This row spends
+  // FAR UNDER the cap and fast, which is the exact shape the cap is blind to.
+  it('★ stops a town burning too fast even though it is nowhere near its cap', async () => {
+    const stops: Array<{ spent: number; cap: number }> = []
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({
+      dir, spendCapUsd: 5, rateWindowRealMinutes: 15,
+      onSpendStop: (spent, cap) => stops.push({ spent, cap }),
+    })
+    await run(world, 4)
+    expect(stops).toHaveLength(0)
+
+    // TWO minds, so the ceiling is 2 x $0.10 = $0.20/sim-day. $0.09 inside a 15-minute window
+    // projects to $0.36/sim-day — over the flow ceiling and 1.8% of the $5 total.
+    opsDb.prepare(
+      `INSERT INTO llm_calls
+       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
+       VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, ?, 0, 1, NULL, NULL)`,
+    ).run(Date.now(), 0.09)
+    expect(ledgerTotalUsd(opsDb)).toBeLessThan(5)
+
+    await run(world, 10)
+    expect(stops, 'a fast leak went unnoticed under a distant cap').toHaveLength(1)
+    expect(stops[0]!.spent).toBeLessThan(5)
+
+    const atStop = eventsOf(dir, 'agent_spoke').length
+    await run(world, 10)
+    expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
+  }, 40_000)
+
+  it('leaves the measured rate alone — the real stream must not trip its own wire', async () => {
+    const stops: Array<{ spent: number; cap: number }> = []
+    const dir = tmp()
+    const { world, opsDb } = await liveWorld({
+      dir, spendCapUsd: 5, rateWindowRealMinutes: 15,
+      onSpendStop: (spent, cap) => stops.push({ spent, cap }),
+    })
+    // The seam lane's worst measured 15 minutes: the nightly reflection burst, $0.0154 for five
+    // minds. Two minds' share of that is $0.0062 — this row bills DOUBLE it and still must not
+    // fire, or the ceiling has no headroom and the stream would kill itself every night.
+    opsDb.prepare(
+      `INSERT INTO llm_calls
+       (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
+       VALUES (?, NULL, 'reflection', 'm', 0, 0, 0, 0, ?, 0, 1, NULL, NULL)`,
+    ).run(Date.now(), 0.0124)
+
+    await run(world, 20)
+    expect(stops, 'the tripwire fired on an ordinary night').toHaveLength(0)
   }, 40_000)
 })
 

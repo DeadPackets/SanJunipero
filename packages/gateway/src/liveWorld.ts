@@ -38,7 +38,7 @@ import { MINUTES_PER_DAY, type SimConfig } from '@sj/shared'
 import type { EventStore, TickHandler, TickLoop } from '@sj/engine'
 import {
   Embedder, EngineBridge, LlmClient, MIND_MODEL, PREFLIGHT_ROUNDS, bootMinds, migrateLlmTables,
-  openAgentDb, preflightRefusal, runPreflight,
+  openAgentDb, preflightRefusal, projectDailySpend, runPreflight,
   FOUNDER_MINDS, type BootedMinds, type MindConfig, type MindSpec, type RuntimeSnapshot,
   type SeamArbiter,
 } from '@sj/agents'
@@ -89,6 +89,8 @@ export type LiveCastOpts = {
   /** What a stream does when the cap lands. Default is a loud message and nothing else, so a
    *  test can assert the stop without taking the test runner down with it. */
   onSpendStop?: (spent: number, cap: number) => void
+  /** The rate tripwire's window. A test cannot wait fifteen real minutes to prove a flow. */
+  rateWindowRealMinutes?: number
   /** Injected in tests, and handed the SAME ops db the cap is read off — a test whose fake
    *  client bills a different ledger proves nothing about the stop. */
   makeClient?: (opsDb: Database.Database, caller: string, agentId?: string) => LlmClient
@@ -139,6 +141,43 @@ export async function settle(
     await new Promise((r) => setTimeout(r, Math.min(pollMs, Math.max(1, until - Date.now()))))
   }
   return true
+}
+
+/**
+ * ★ THE RATE TRIPWIRE — the guard the `$5` cap cannot be.
+ *
+ * At the seam lane's measured **$0.053/hour** the total cap is **94 hours of streaming**. It stops
+ * a lane's mistake and it cannot stop a runaway on a process meant to run for weeks: a regression
+ * has to be ~90x the normal rate before the cap lands inside an hour. A total is the wrong
+ * instrument for a leak — you need the FLOW.
+ *
+ * PER MIND, deliberately. The bill scales with the cast and not with the world, so a total ceiling
+ * would false-fire the day somebody streams ten people. The arithmetic behind the number:
+ *
+ * | | $/mind/sim-day |
+ * |---|---|
+ * | measured, five minds over 1 252 ticks | **0.0106** |
+ * | the same run's worst 15 minutes — the nightly reflection burst, 34% of a day's spend in 90 s | ~0.0154 |
+ * | **this ceiling** | **0.10** — 9.4x the measured rate, 6.5x the worst measured window |
+ *
+ * So it survives the reflection burst, a doubled prompt and a doubled cast, and it kills a 10x
+ * regression inside one 15-minute window instead of four days from now. One sim-day is one real
+ * hour at this tick, so `usdPerSimDay` and $/real-hour are the same number.
+ */
+export const LIVE_RATE_CEILING_USD_PER_MIND_DAY = 0.10
+/** The projection window. Long enough that one reflection burst cannot carry it, short enough
+ *  that a runaway dies in minutes. `checkSpend`'s own default, and g11 uses the same 15. */
+export const LIVE_RATE_WINDOW_REAL_MINUTES = 15
+
+export function rateStopMessage(rate: number, ceiling: number, minds: number): string {
+  return [
+    `STREAM STOPPED: the live cast is spending $${rate.toFixed(4)}/hour, over its`
+      + ` $${ceiling.toFixed(4)}/hour ceiling (${minds} mind(s) x`
+      + ` $${LIVE_RATE_CEILING_USD_PER_MIND_DAY.toFixed(2)}).`,
+    `        Measured over the last ${LIVE_RATE_WINDOW_REAL_MINUTES} real minutes. This is a RATE`,
+    '        stop, not the total cap — the town is nowhere near its $5 and is burning too fast.',
+    '        Every mind is stopped and no further call will be made. The town on disk is intact.',
+  ].join('\n')
 }
 
 export function spendStopMessage(spent: number, cap: number): string {
@@ -353,8 +392,19 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime(tick)
         if (tick % LIVE_SPEND_CHECK_TICKS !== 0 || stopped) return
         const spent = ledgerTotalUsd(opsDb)
-        if (spent < cap) return
-        console.error(spendStopMessage(spent, cap))
+        if (spent >= cap) {
+          console.error(spendStopMessage(spent, cap))
+          stopMinds()
+          opts.onSpendStop?.(spent, cap)
+          return
+        }
+        // The flow, not the total. A leak is visible here four days before it is visible above.
+        const ceiling = LIVE_RATE_CEILING_USD_PER_MIND_DAY * minds.length
+        const rate = projectDailySpend(opsDb, {
+          windowRealMinutes: opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES,
+        }).usdPerSimDay
+        if (rate <= ceiling) return
+        console.error(rateStopMessage(rate, ceiling, minds.length))
         stopMinds()
         opts.onSpendStop?.(spent, cap)
       })
