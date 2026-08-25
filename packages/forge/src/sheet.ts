@@ -58,28 +58,51 @@ export function sliceGrid(img: RawImage, cols: number, rows: number): RawImage[]
     }))
 }
 
+/**
+ * Box bounds for output index `i` of `n`, over `src` source columns/rows, as a partition
+ * that is its OWN MIRROR: box(n-1-i) is the reflection of box(i) for every i.
+ *
+ * ★ THIS IS WHY `downscaleMajority` USED TO DISAGREE WITH ITSELF ACROSS A FLIP. The old
+ * bounds were `floor(i*src/n)`, and `floor((n-1-i)*src/n)` is not `src - floor((i+1)*src/n)`
+ * unless the product is an integer — so mirroring the source shifted every box by one column
+ * and a 10-wide box's modal colour got compared with an 11-wide box's. Symmetric bounds fix
+ * it exactly. When `n` is even and `src` is odd there is no centre boundary on the grid at
+ * all, so the centre column votes in BOTH middle boxes: the only rule that stays its own
+ * mirror. Costs one duplicated source column out of `src`.
+ */
+function boxBounds(i: number, n: number, src: number): [number, number] {
+  const at = (j: number) => (j * 2 <= n ? Math.round((j * src) / n) : src - Math.round(((n - j) * src) / n))
+  let lo = at(i), hi = at(i + 1)
+  if (n % 2 === 0 && src % 2 === 1) {
+    if (i === n / 2 - 1) hi = (src + 1) / 2
+    if (i === n / 2) lo = (src - 1) / 2
+  }
+  return [lo, hi]
+}
+
 // Majority-vote reduction for big-pixel source art: each output pixel is the most
-// frequent opaque RGBA in its source block (ties: first-seen); transparent iff >50%
-// of the block is transparent. Robust to speckle noise, unlike point sampling.
+// frequent opaque RGBA in its source block (ties: the smallest RGBA, so the answer does
+// not depend on scan order); transparent iff >50% of the block is transparent. Robust to
+// speckle noise, unlike point sampling. Mirror-equivariant: see `boxBounds`.
 export function downscaleMajority(img: RawImage, w: number, h: number): RawImage {
   const out = new Uint8ClampedArray(w * h * 4)
   for (let y = 0; y < h; y++) {
-    const y0 = Math.floor(y * img.height / h), y1 = Math.floor((y + 1) * img.height / h)
+    const [y0, y1] = boxBounds(y, h, img.height)
     for (let x = 0; x < w; x++) {
-      const x0 = Math.floor(x * img.width / w), x1 = Math.floor((x + 1) * img.width / w)
+      const [x0, x1] = boxBounds(x, w, img.width)
       const counts = new Map<number, number>()
-      let clear = 0, total = 0, best = -1, bestN = 0
+      let clear = 0, total = 0
       for (let sy = y0; sy < y1; sy++) for (let sx = x0; sx < x1; sx++) {
         total++
         const i = (sy * img.width + sx) * 4
         if (img.data[i + 3]! === 0) { clear++; continue }
         const key = (img.data[i]! << 24 | img.data[i + 1]! << 16 | img.data[i + 2]! << 8 | img.data[i + 3]!) >>> 0
-        const n = (counts.get(key) ?? 0) + 1
-        counts.set(key, n)
-        if (n > bestN) { bestN = n; best = key } // strict > keeps first-seen on ties
+        counts.set(key, (counts.get(key) ?? 0) + 1)
       }
       const d = (y * w + x) * 4
-      if (clear * 2 > total || best < 0) continue // stays transparent
+      if (clear * 2 > total || counts.size === 0) continue // stays transparent
+      let best = -1, bestN = 0
+      for (const [key, n] of counts) if (n > bestN || (n === bestN && key < best)) { bestN = n; best = key }
       out[d] = best >>> 24; out[d + 1] = (best >>> 16) & 255; out[d + 2] = (best >>> 8) & 255; out[d + 3] = best & 255
     }
   }
@@ -1270,6 +1293,13 @@ export function paletteJaccard(a: RawImage, b: RawImage, eps = PALETTE_EPS, minS
 // Head-region stability (coherence gate c): opaque-mask disagreement over the top
 // `frac` of each sprite's opaque bbox, aligned bbox-top / bbox-center-x, normalized
 // by the union of opaque pixels. Legs move between walk phases; heads must not.
+//
+// ★ THE CENTRES ARE ALIGNED IN HALF PIXELS, and that is the second half of the mirror fix.
+// Two bboxes of DIFFERENT width parity have their centres half a column apart, which no
+// integer offset can express: `floor((w - c.w)/2)` rounds one way and its mirror rounds the
+// other, so the same two frames flipped produced a different number. Sampling each mask at
+// 2x horizontally makes the offset `w - c.w`, an integer, in both directions. The value is
+// UNCHANGED wherever the two widths share a parity — which is where the gate was calibrated.
 export function headRegionDiff(a: RawImage, b: RawImage, frac = HEAD_REGION_FRAC): number {
   const prep = (img: RawImage) => {
     const bb = opaqueBbox(img)
@@ -1278,15 +1308,15 @@ export function headRegionDiff(a: RawImage, b: RawImage, frac = HEAD_REGION_FRAC
   }
   const A = prep(a), B = prep(b)
   const w = Math.max(A.w, B.w), h = Math.max(A.rows, B.rows)
-  const on = (c: typeof A, x: number, y: number) => {
+  const on = (c: typeof A, u: number, y: number) => {
     if (y >= c.rows) return false
-    const sx = c.bb.x0 + x - Math.floor((w - c.w) / 2)
-    if (sx < c.bb.x0 || sx > c.bb.x1) return false
-    return c.img.data[((c.bb.y0 + y) * c.img.width + sx) * 4 + 3]! > 0
+    const su = u - (w - c.w) // half-pixel column, inside this bbox
+    if (su < 0 || su >= 2 * c.w) return false
+    return c.img.data[((c.bb.y0 + y) * c.img.width + c.bb.x0 + (su >> 1)) * 4 + 3]! > 0
   }
   let diff = 0, union = 0
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const pa = on(A, x, y), pb = on(B, x, y)
+  for (let y = 0; y < h; y++) for (let u = 0; u < 2 * w; u++) {
+    const pa = on(A, u, y), pb = on(B, u, y)
     if (pa || pb) union++
     if (pa !== pb) diff++
   }
