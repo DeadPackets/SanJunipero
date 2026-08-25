@@ -293,7 +293,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
       ...WORLD,
       nearestFood: () => ({ x: 0, y: 0, kind: 'berries' }),
     })
-    expect(fed).toContain('Your satchel holds bread (held_loaf) — you could eat it now.')
+    expect(fed).toContain('Your satchel holds bread (held_loaf). You could eat it now.')
     expect(fed).not.toContain('The nearest food you know of')
   })
 

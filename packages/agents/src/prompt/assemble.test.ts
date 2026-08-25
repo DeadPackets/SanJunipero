@@ -217,8 +217,8 @@ describe('perceptionToProse', () => {
         }],
       },
     })
-    expect(prose).toContain("basket (item_3) at (12, 10) — Rahel's, marked by Yusuf")
-    expect(prose).toContain("carrying 1 plank (item_9) — Bex's")
+    expect(prose).toContain("basket (item_3) at (12, 10); Rahel's, marked by Yusuf")
+    expect(prose).toContain("carrying 1 plank (item_9); Bex's")
   })
 
   it('leaves an unclaimed thing exactly as it always read', () => {
@@ -455,7 +455,7 @@ describe('perceptionToProse', () => {
       },
     }
     const isEdible = (kind: string) => kind === 'bread'
-    expect(perceptionToProse(hungry, undefined, { isEdible })).toContain('Your satchel holds bread (b1) — you could eat it now.')
+    expect(perceptionToProse(hungry, undefined, { isEdible })).toContain('Your satchel holds bread (b1). You could eat it now.')
 
     // Sated: no nagging about the satchel.
     const sated = { ...hungry, self: { ...hungry.self, body: quietMeadowPacket.self.body } }

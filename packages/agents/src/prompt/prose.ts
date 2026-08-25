@@ -138,14 +138,14 @@ export const FELT_EVENT_PROSE: Record<string, string> = {
   rain_started: 'Rain begins to fall.',
   storm_started: 'A storm breaks overhead; wind and rain lash down.',
   snow_started: 'Snow begins to fall.',
-  you_were_attacked: 'Pain — someone has struck you!',
+  you_were_attacked: 'Pain. Someone has struck you!',
   you_collapsed: 'Your legs give under you and the ground comes up; you cannot get back on your feet.',
   you_died: 'Everything goes far away and very quiet, and then there is nothing left to feel.',
-  you_fell_ill: 'A sickness settles into you — your skin burns, your limbs turn heavy.',
+  you_fell_ill: 'A sickness settles into you; your skin burns, your limbs turn heavy.',
   you_were_infected: 'A wound of yours has turned bad; it throbs hot and the skin around it is angry.',
   you_recovered: 'The sickness lifts. Your head clears and your strength begins to come back.',
   you_were_tended: 'Someone has cared for your hurts; the pain eases under their hands.',
-  fire_ignited: 'Smoke stings your nose — something nearby is burning.',
+  fire_ignited: 'Smoke stings your nose. Something nearby is burning.',
   fire_spread: 'The fire is spreading; the smell of smoke grows thicker.',
   fire_extinguished: 'The smoke thins and the air clears.',
   // The engine's table is the single copy of this prose; a mystery must read as
@@ -160,7 +160,7 @@ const UNKNOWN_FELT_PROSE = 'You sense something change nearby.'
 const AFFLICTION_PROSE: Record<string, string> = {
   injury: 'A hurt on your body throbs and will not let you forget it.',
   poison: 'Your gut cramps and turns; something you ate has gone against you.',
-  illness: 'A sickness is in you — heat behind the eyes, weight in the limbs.',
+  illness: 'A sickness is in you: heat behind the eyes, weight in the limbs.',
   fatigue: 'A tiredness sits in your bones that sleep has not lifted.',
 }
 
@@ -268,7 +268,7 @@ function claimPhrase(i: PerceptionItem): string {
   if (i.ownerName !== undefined) parts.push(`${i.ownerName}'s`)
   if (i.crafterMarkName !== undefined) parts.push(`marked by ${i.crafterMarkName}`)
   if (i.spoiling === true) parts.push('it is turning')
-  return parts.length === 0 ? '' : ` — ${parts.join(', ')}`
+  return parts.length === 0 ? '' : `; ${parts.join(', ')}`
 }
 
 // What a thing costs, in the words a refusal already uses for it. `inputName` turns the two
@@ -312,7 +312,7 @@ export function howFarUp(raised?: { done: number; needs: number }): string {
  *  and the inference is the mind's, exactly as it is for the cold. */
 export function standingWallsLine(w?: { kind: string; at: { x: number; y: number }; done: number; needs: number } | null): string {
   if (w === undefined || w === null) return ''
-  return `Walls already stand at (${w.at.x}, ${w.at.y}) — a ${w.kind.replace(/_/g, ' ')}, ${
+  return `Walls already stand at (${w.at.x}, ${w.at.y}): a ${w.kind.replace(/_/g, ' ')}, ${
     howFarUp({ done: w.done, needs: w.needs }).replace(/^its walls are /, '')}.`
 }
 
@@ -391,7 +391,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   if (packet.self.activity !== null && !packet.self.asleep) {
     const toward = packet.self.activityToward
     lines.push(toward === undefined
-      ? `Your hands are already busy — you are partway through ${packet.self.activity}, and it will finish before anything else can begin.`
+      ? `Your hands are already busy; you are partway through ${packet.self.activity}, and it will finish before anything else can begin.`
       : `Your legs are already carrying you toward (${toward.x}, ${toward.y}); you will get there if you let them.`)
   }
 
@@ -403,7 +403,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   if (thirst < 5) lines.push('Your throat burns; you must drink.')
   else if (thirst < 30) lines.push('Your mouth is dry.')
   if (energy < 10) lines.push('You are about to collapse; sleep NOW.')
-  else if (energy < 25) lines.push('Your legs tremble — you can barely stand; you must sleep.')
+  else if (energy < 25) lines.push('Your legs tremble. You can barely stand; you must sleep.')
   else if (energy < 30) lines.push('Weariness drags at your limbs.')
   if (warmth < 30) lines.push('You shiver against the cold.')
   // Said as the body has it, and only ever as a fact: where the cold is, and what stands
@@ -427,7 +427,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   // because a throwaway patch told it where to go.
   if (thirst < 30) {
     if (world?.waterAtHand?.() === true) {
-      lines.push('Water lies within reach of your hands — you could drink here, or fill what you carry.')
+      lines.push('Water lies within reach of your hands. You could drink here, or fill what you carry.')
     } else {
       const w = world?.nearestWater?.(x, y) ?? null
       if (w !== null) lines.push(`The nearest water you know of lies at (${w.x}, ${w.y}).`)
@@ -440,7 +440,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
     const food = world?.isEdible === undefined
       ? undefined
       : packet.self.inventory.find((i) => world.isEdible!(i.kind))
-    if (food) lines.push(`Your satchel holds ${food.kind} (${food.id}) — you could eat it now.`)
+    if (food) lines.push(`Your satchel holds ${food.kind} (${food.id}). You could eat it now.`)
     else {
       const f = world?.nearestFood?.(x, y) ?? null
       if (f !== null) lines.push(`The nearest food you know of is ${f.kind} at (${f.x}, ${f.y}).`)
@@ -475,8 +475,8 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
   }
 
   for (const s of packet.visible.structures) {
-    const state = s.burning ? ' — it is burning'
-      : s.stage === 'construction' ? ` — ${howFarUp(s.raised)}` : ''
+    const state = s.burning ? ', and it is burning'
+      : s.stage === 'construction' ? `, and ${howFarUp(s.raised)}` : ''
     // The doorway outranks the wall: the tile the packet names is the tile `enter` measures
     // against, so a mind told to stand there is a mind the world lets in.
     let approach = 'walk to a tile beside it.'
@@ -489,7 +489,7 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
       // room that is full now from a wall with no way through it ever — and can come back.
       approach = s.full === true
         ? `its doorway is at (${s.door.x}, ${s.door.y}), and there is no floor left in it.`
-        : `its doorway is at (${s.door.x}, ${s.door.y}) — stand there and you can go in.`
+        : `its doorway is at (${s.door.x}, ${s.door.y}); stand there and you can go in.`
     } else if (world?.isWalkable) {
       const t = besideTile(s, packet.self, world.isWalkable)
       approach = t === null ? 'no open ground lies beside it.' : `you could stand beside it at (${t.x}, ${t.y}).`
