@@ -111,9 +111,18 @@ const STOREHOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
 const SHED_STOCK: ReadonlyArray<readonly [string, number]> = [
   ['axe', 1], ['saw', 1], ['hammer', 1], ['gravel', 8], ['wood', 4],
 ]
-/** A home holds a household's things, not a warehouse's — three kinds and few of each. */
+/**
+ * A home holds a household's things, not a warehouse's — four kinds and few of each.
+ *
+ * ★ AND WOOD IS ONE OF THEM, BECAUSE THE STOREHOUSE'S WOOD IS INVISIBLE IN PRACTICE.
+ * `composePerception` shows a building's shelves only to somebody INSIDE it or standing against
+ * its wall — `indoors === null ? isAdjacentToRect(self.x, self.y, s) : s.id === indoors`. Every
+ * founder spawns at their own door and goes in at their own door, so nobody is ever adjacent to
+ * the public store and thirty planks might as well not be there. The bread on a household shelf
+ * is the one road live minds have actually been observed to walk; the wood goes on the same shelf.
+ */
 const HOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
-  ['bread', 2], ['waterskin', 1], ['herb_bundle', 3],
+  ['bread', 2], ['waterskin', 1], ['herb_bundle', 3], ['wood', 4],
 ]
 
 const STOCK_FOR: Readonly<Record<string, ReadonlyArray<readonly [string, number]>>> = {
