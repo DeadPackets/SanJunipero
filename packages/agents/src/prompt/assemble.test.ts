@@ -567,8 +567,8 @@ describe('capabilities', () => {
 
   it('teaches give as person-only, wake as the way to rise, and stow as the way to shelve (g3 round 6, T17)', () => {
     const a = assemblePrompt(fixtureBlocks())
-    expect(a.system).toMatch(/give — [^\n]*living person[^\n]*never a building/)
-    expect(a.system).toMatch(/wake — [^\n]*rise/)
+    expect(a.system).toMatch(/give: [^\n]*living person[^\n]*never a building/)
+    expect(a.system).toMatch(/wake: [^\n]*rise/)
     expect(a.system).toContain('no way to set a thing down on bare ground')
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })

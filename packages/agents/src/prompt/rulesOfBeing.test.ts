@@ -51,14 +51,14 @@ describe('SPEECH_RULES', () => {
 
 describe('CAPABILITIES — C9 verbs and ownership', () => {
   it('names enter, exit, stow and inscribe with their exact parameter keys', () => {
-    expect(CAPABILITIES).toMatch(/enter — [^\n]*structureId/)
-    expect(CAPABILITIES).toMatch(/exit — [^\n]*nothing more is needed/)
-    expect(CAPABILITIES).toMatch(/stow — [^\n]*itemId[^\n]*structureId/)
-    expect(CAPABILITIES).toMatch(/inscribe — [^\n]*structureId[^\n]*text/)
+    expect(CAPABILITIES).toMatch(/enter: [^\n]*structureId/)
+    expect(CAPABILITIES).toMatch(/exit: [^\n]*nothing more is needed/)
+    expect(CAPABILITIES).toMatch(/stow: [^\n]*itemId[^\n]*structureId/)
+    expect(CAPABILITIES).toMatch(/inscribe: [^\n]*structureId[^\n]*text/)
   })
 
   it('teaches that things are owned and that ownership is visible to all', () => {
-    expect(CAPABILITIES).toContain("some things are someone's — all can see whose")
+    expect(CAPABILITIES).toContain("some things are someone's; all can see whose")
   })
 
   it('replaces the "nothing can be shelved" paragraph with stow guidance', () => {
@@ -81,21 +81,21 @@ describe('CAPABILITIES — the twelve C11 Tier-1 verbs', () => {
   ]
 
   it.each(C11_VERBS)('names %s with the word the registry answers to', (verb) => {
-    expect(CAPABILITIES).toMatch(new RegExp(`^${verb} — name it ${verb}`, 'm'))
+    expect(CAPABILITIES).toMatch(new RegExp(`^${verb}: name it ${verb}`, 'm'))
   })
 
   it('gives each of them exactly what its verb asks for', () => {
-    expect(CAPABILITIES).toMatch(/hunt — [^\n]*faunaId/)
-    expect(CAPABILITIES).toMatch(/forage — [^\n]*nodeId/)
-    expect(CAPABILITIES).toMatch(/fill — [^\n]*itemId/)
-    expect(CAPABILITIES).toMatch(/stoke — [^\n]*structureId/)
-    expect(CAPABILITIES).toMatch(/dig_channel — [^\n]*x and y as two numbers/)
+    expect(CAPABILITIES).toMatch(/hunt: [^\n]*faunaId/)
+    expect(CAPABILITIES).toMatch(/forage: [^\n]*nodeId/)
+    expect(CAPABILITIES).toMatch(/fill: [^\n]*itemId/)
+    expect(CAPABILITIES).toMatch(/stoke: [^\n]*structureId/)
+    expect(CAPABILITIES).toMatch(/dig_channel: [^\n]*x and y as two numbers/)
     expect(CAPABILITIES).not.toMatch(FORBIDDEN_FRAMING)
   })
 
   it('leaves every verb a mind already had exactly where it was', () => {
     for (const verb of ['walk', 'sleep', 'enter', 'stow', 'craft', 'experiment']) {
-      expect(CAPABILITIES).toMatch(new RegExp(`^${verb} — name it ${verb}`, 'm'))
+      expect(CAPABILITIES).toMatch(new RegExp(`^${verb}: name it ${verb}`, 'm'))
     }
   })
 })
@@ -113,7 +113,7 @@ describe('★ block 1 tells the truth about sleep', () => {
   const CFG = DEFAULT_CONFIG
   const ev = (seq: number, type: string, payload: unknown): SimEvent =>
     ({ seq, tick: 0, type, payload })
-  const sleepLine = CAPABILITIES.split('\n').find((l) => l.startsWith('sleep — '))!
+  const sleepLine = CAPABILITIES.split('\n').find((l) => l.startsWith('sleep: '))!
 
   /** One roofed building at (2,1), one body, and a way to put it inside or leave it out. */
   function body(opts: { indoors: boolean; energy?: number }): WorldState {
