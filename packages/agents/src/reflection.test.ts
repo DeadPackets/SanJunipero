@@ -414,6 +414,11 @@ describe('makeReflectionLlm prompts', () => {
       expect(c.system).toMatch(/\byou\b/i)
       expect(c.system).not.toMatch(FORBIDDEN_FRAMING)
       expect(c.messages.map((m) => m.content).join('\n')).not.toMatch(FORBIDDEN_FRAMING)
+      // Reflection is the most expensive prompt in the system per call and the last one still
+      // demonstrating the separator it forbids elsewhere. `rulesOfBeing.test.ts` holds this over
+      // SPEECH_RULES and `assemble.test.ts` over the perception; neither reaches these six.
+      expect(c.system, 'a reflection prompt spends an em dash a mind will imitate')
+        .not.toContain('—')
     }
   })
   it("proposeEdit prompt carries today's memory ids and the edit shape", () => {

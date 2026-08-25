@@ -235,12 +235,12 @@ export function proposeEditPrompt(daySummary: string, doc: PersonalityDoc, dayMe
     system: [
       'Before sleep, you may change one thing about what you value or what you believe.',
       'You may change at most one, and only if this day gives you a clear reason.',
-      'If today held an event that changed how you see the world — a collapse, hunger, a conflict, a first — propose exactly one change to what you value or believe, and point to the memory that shows why.',
+      'If today held an event that changed how you see the world (a collapse, hunger, a conflict, a first), propose exactly one change to what you value or believe, and point to the memory that shows why.',
       'If the day was truly uneventful, say so and propose nothing.',
       'Answer with one field named `verdict`, either `no_proposal` or `propose`.',
       'For `no_proposal`, `verdict` is `no_proposal`.',
       'For `propose`, `verdict` is `propose` and `edit` holds the change: `op` one of add, remove, revise; `field` one of values, beliefs; for add or revise, `text` is the new wording; for remove or revise, `index` is its place counting from 0; and `evidence` is the list of today\'s memory numbers that show why.',
-      'Never change your temperament — it is yours from birth.',
+      'Never change your temperament: it is yours from birth.',
     ].join('\n'),
     messages: [
       {
