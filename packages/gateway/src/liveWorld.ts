@@ -65,6 +65,16 @@ export const LIVE_RUNTIME_SAVE_TICKS = 48
  *  A container gives about ten seconds before SIGKILL; losing the night is survivable and
  *  hanging the shutdown is not. */
 export const REFLECTION_SETTLE_MS = 5_000
+/**
+ * ★ The mind dials whose meaning is REAL seconds, restated for this world's 2 500 ms tick.
+ *
+ * Nearly every number in `DEFAULT_MIND_CONFIG` is denominated in sim-minutes — one tick is one
+ * sim-minute — so it says the same thing about a person at any tick rate and must NOT be scaled.
+ * `dozeTicks` is the exception: `#doze()` is a retry backoff against an HTTP provider, and a 429
+ * does not know what a sim-hour is. 60 ticks held 15 real seconds at the 250 ms tick it was tuned
+ * on; here it would silence a mind for 150 seconds of stream over one transient failure.
+ */
+export const STREAM_MIND_CONFIG: Partial<MindConfig> = { dozeTicks: 6 }
 /** The call ledger and the alerts. A `.db` beside the minds, so `SJ_FRESH=1` takes it too. */
 export const LIVE_OPS_DB = '_ops.db'
 /** The sentence-transformer cache. `SJ_MODELS_DIR` moves it; nothing downloads at run time. */
@@ -317,7 +327,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         minds, bridge, embedder, dbFor,
         turnLlm: (id) => makeClient('turn', id),
         reflectionLlm: (id) => makeClient('reflection', id),
-        ...(opts.mindConfig === undefined ? {} : { mindConfig: opts.mindConfig }),
+        mindConfig: { ...STREAM_MIND_CONFIG, ...opts.mindConfig },
         day: Math.floor(worldTick / MINUTES_PER_DAY),
         restoring,
         ...(opts.arbiter === undefined ? {} : { arbiter: opts.arbiter }),

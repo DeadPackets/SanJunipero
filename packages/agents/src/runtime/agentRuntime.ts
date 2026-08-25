@@ -90,7 +90,7 @@ export type RuntimeSnapshot = {
 
 function freshClock(): MindClock {
   return {
-    lastTurnTick: 0,
+    lastTurnTick: null,
     reconsiderAtTick: null,
     conversationUntilTick: 0,
     dozeUntilTick: 0,
@@ -599,7 +599,7 @@ export class AgentRuntime {
     if (turn.journal) {
       mem.insertJournal(tick, day, turn.journal)
       await mem.insertMemory({ tick, kind: 'journal', text: turn.journal, importance: turn.importance, tags: EMPTY_TAGS })
-      this.#clock.lastTurnTick += this.#config.journalTicks
+      this.#clock.lastTurnTick = (this.#clock.lastTurnTick ?? tick) + this.#config.journalTicks
     }
 
     if (turn.reconsider_at) {

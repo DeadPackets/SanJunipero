@@ -60,7 +60,7 @@ const SpendProjection = z.object({ tick: z.number().int(), usdPerSimDay: z.numbe
 // The shape of `RuntimeSnapshot`, written out. The test holds the two to each other so a field
 // added to a mind's clock cannot be silently dropped by a resume.
 const MindClockZ = z.object({
-  lastTurnTick: z.number(),
+  lastTurnTick: z.number().nullable(),
   reconsiderAtTick: z.number().nullable(),
   conversationUntilTick: z.number(),
   dozeUntilTick: z.number(),

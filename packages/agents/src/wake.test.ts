@@ -277,3 +277,17 @@ describe('decideWake — conversation cadence and reconsider', () => {
     expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 100, reconsiderAtTick: null }), 130, pln())).toBe(null)
   })
 })
+
+describe('a mind that has never taken a turn', () => {
+  // `lastTurnTick: 0` could not tell "never" from "took one at tick 0", and a fresh town starts
+  // at tick 0. At the stream's 2 500 ms tick that charged five new arrivals the whole 120-tick
+  // boredom floor — five real minutes of statues — for the first thing a viewer ever sees.
+  it('is bored on its first tick, not `boredomTicks` later', () => {
+    expect(decideWake(cfg, pkt(), clk({ lastTurnTick: null }), 1, pln())).toBe('boredom')
+  })
+
+  it('waits out the floor again once it HAS taken one', () => {
+    expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 1 }), 2, pln())).toBe(null)
+    expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 1 }), 121, pln())).toBe('boredom')
+  })
+})

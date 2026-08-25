@@ -388,8 +388,10 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   })
 
   it('respects the doze backoff even when body_alarm keeps firing during an outage', async () => {
-    // Default bodyAlarm thresholds; hunger starts at 30 and decays 0.5/tick,
-    // so the alarm rings from ~tick 11 onward while the provider stays down.
+    // Default bodyAlarm thresholds; hunger starts at 30 and decays 0.5/tick, so the alarm rings
+    // from ~tick 11 onward while the provider stays down. The mind reaches for its first turn on
+    // tick 1 — it has never taken one — so 25 ticks at a 20-tick backoff holds two attempts and
+    // no more. Without the backoff a ringing alarm would doze it every tick.
     const { loop, runtime } = await setup({
       model: throwingModel(),
       mindConfig: { dozeTicks: 20 },
@@ -398,7 +400,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       loop.step()
       await flush()
     }
-    expect(runtime.stats().dozes).toBe(1)
+    expect(runtime.stats().dozes).toBe(2)
   })
 
   it('surfaces a rejected intent in-world', async () => {
