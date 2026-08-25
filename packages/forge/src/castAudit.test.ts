@@ -63,7 +63,7 @@ import {
   CELL_V2, FEET_Y_V2, POSES_V2, FACINGS, anchorToCanvas, cellDistance, downscaleMajority,
   frameCoherenceGate, headRegionDiff, mirrorX, opaqueArea, opaqueBbox, paletteJaccard, sleepGate,
 } from './sheet.js'
-import { sleepAxisDeg, sleepAxisGate, strideGateV4 } from './mirror.js'
+import { sleepAxisDeg, sleepAxisGate, stanceGate, strideGateV4 } from './mirror.js'
 import { alphaBinaryGate, paletteGate, soleSilhouetteGate } from './pixelGates.js'
 import { listCommittedCast, type CommittedCharacter } from './castArt.js'
 
@@ -110,6 +110,11 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
       'idle': idle, 'contact-a': view.get(`contact-a-${f}`)!,
       'passing': view.get(`passing-a-${f}`)!, 'contact-b': view.get(`contact-b-${f}`)!,
     }, CALIBRATED_MEDIAN)) found.push(`${c.id} ${f} ${x.gate} ${x.a.split('/')[1]}~${x.b.split('/')[1]}`)
+    // ★ AND WHETHER A CONTACT FRAME IS A CONTACT POSE, which nothing has ever asked. On the
+    // NATIVE cells: the whole separation is 0.19 wide and the gate canvas cannot hold it.
+    for (const x of stanceGate(f, crop(`idle-${f}`),
+      ['contact-a', 'contact-b'].map((p) => ({ label: p, img: crop(`${p}-${f}`) }))))
+      found.push(`${c.id} ${f} ${x.gate} ${x.a.split('/')[1]}`)
   }
   for (const x of sleepGate('sleep', view.get('idle-se')!, view.get('sleep-se')!))
     found.push(`${c.id} sleep ${x.gate}`)
@@ -159,6 +164,13 @@ export const KNOWN_GATE_DEBT: Record<string, string> = {
   // watch both.
   'omar se palette contact-a':
     '0.6875 against 0.8000 — one palette cluster of sixteen, exposed by the mirror fix',
+
+  // ★ A CONTACT FRAME THAT IS NOT A CONTACT POSE, in committed SE art nobody had looked at.
+  // Her feet are 280px apart against 277px standing: she walks without her weight ever
+  // landing, and it reads as gliding. Found only because the stance instrument was built for
+  // a different reason; no gate in the package could see it before this commit.
+  'amara se stance contact-b':
+    '1.011 against 1.100 — a standing figure in a walk loop',
 }
 
 const cast = listCommittedCast()
@@ -179,8 +191,8 @@ describe('★ the committed cast against the gates as they now behave', () => {
       'this entry passes now — delete it from KNOWN_GATE_DEBT').toEqual([])
   })
 
-  it('★ and the debt is TWO cells, so a jump shows up in the diff', () => {
-    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(2)
+  it('★ and the debt is THREE cells, so a jump shows up in the diff', () => {
+    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(3)
   })
 })
 

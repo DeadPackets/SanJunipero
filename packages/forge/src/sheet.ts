@@ -1198,8 +1198,36 @@ export const HEAD_REGION_FRAC = 0.40
 export const HEAD_DIFF_MAX = 0.20 // v1 legit frames measure ≤0.123; sw~se cross-facing measures 0.269
 
 export type GateFailure = {
-  gate: 'near-dupe' | 'mirror-dupe' | 'stride' | 'contact-passing' | 'palette' | 'silhouette' | 'head' | 'lying' | 'lying-axis'
+  gate: 'near-dupe' | 'mirror-dupe' | 'stride' | 'contact-passing' | 'palette' | 'silhouette' | 'head' | 'lying' | 'lying-axis' | 'stance'
   a: string; b: string; value: number; limit: number
+}
+
+// ★ A CONTACT FRAME IS A STANCE, AND NOTHING MEASURED THE STANCE. `strideGateV4` asks whether
+// two frames differ; a body standing still differs from a body standing still slightly
+// differently, so it passes. Four candidates were caught BY EYE across two lanes — omar's
+// ne/contact-a c3 at 1.004, salma's ne/contact-a c1 at 1.007, amara's ne/contact-b c3 at
+// 1.000 and c6 at 1.018 — every one of them a walk frame with no walk in it, and every one
+// cleared every gate in the package. One is in the committed art: `amara/se/contact-b`.
+//
+// Feet, not arms: the bottom quarter of the figure's own bbox, so a swung arm does not read
+// as a stride. Measured on the NATIVE cell, not the gate view — a 96px canvas quantises a
+// 271px foot span into 20 steps and the whole separation is 0.19 wide.
+export const STANCE_FRAC = 0.25
+// The four eye-refused standing candidates top out at 1.018 and the narrowest stride a lane
+// accepted is 1.206 — a 1.18x gap. 1.10 sits inside it: 8% above the worst standing figure,
+// 9.6% below the narrowest real stride. Passing frames span 0.870-1.257 and overlap the
+// contact band, which is why only contact frames are asked.
+export const STANCE_MIN_RATIO = 1.10
+
+/** Width of the opaque mass in the bottom `frac` of the figure's bbox — the feet. */
+export function footSpan(img: RawImage, frac = STANCE_FRAC): number {
+  const b = opaqueBbox(img)
+  if (!b) throw new Error('footSpan: sprite has no opaque pixels')
+  const y0 = b.y1 - Math.max(0, Math.ceil((b.y1 - b.y0 + 1) * frac) - 1)
+  let x0 = img.width, x1 = -1
+  for (let y = y0; y <= b.y1; y++) for (let x = 0; x < img.width; x++)
+    if (img.data[(y * img.width + x) * 4 + 3]! > 0) { if (x < x0) x0 = x; if (x > x1) x1 = x }
+  return x1 < 0 ? 0 : x1 - x0 + 1
 }
 
 // Slices a 1×n horizontal phase strip into n full-height segments by clustering

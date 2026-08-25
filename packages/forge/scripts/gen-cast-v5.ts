@@ -53,7 +53,7 @@ import {
   type GateFailure,
 } from '../src/sheet.js'
 import {
-  AUTHORED_FACINGS, coherenceGateV4, deriveSheet, sleepCoherenceGateV4, strideGateV4,
+  AUTHORED_FACINGS, coherenceGateV4, deriveSheet, sleepCoherenceGateV4, stanceGate, strideGateV4,
   type AuthoredFacing, type StripPoseV4,
 } from '../src/mirror.js'
 import { processHiResCell } from '../src/hires.js'
@@ -334,7 +334,7 @@ async function runCharacter(m: CastMember): Promise<void> {
 
   // walk frames — the master sheet is the only reference: identity, not architecture
   type FrameCand = { key: string; hi: RawImage; gate: RawImage; failures: GateFailure[] }
-  function evalFrame(key: string, f: AuthoredFacing, raw: RawImage): FrameCand {
+  function evalFrame(key: string, f: AuthoredFacing, p: WalkPose, raw: RawImage): FrameCand {
     const keyed = keyBg(raw)
     let two = false
     try { sliceStrip(keyed, 2); two = true } catch { /* one cluster — good */ }
@@ -351,7 +351,15 @@ async function runCharacter(m: CastMember): Promise<void> {
     const aspect = (b.x1 - b.x0 + 1) / (b.y1 - b.y0 + 1)
     if (aspect > 1.15) throw new Error(`aspect ${aspect.toFixed(2)} > 1.15 — multi-figure or lying`)
     const gate = gateView(hi)
-    return { key, hi, gate, failures: coherenceGateV4(key, masterGate[f], gate) }
+    // ★ AND A CONTACT FRAME HAS TO BE A CONTACT POSE. Four candidates across two lanes were
+    // refused BY EYE for being standing figures dropped into a walk loop, every one of them
+    // clean on every gate in the package; `strideGateV4` cannot see it because it measures
+    // frame-to-frame distance, not stance. A failure rather than a throw, so the refusal
+    // message carries the margin — the operator's question is whether the model can draw a
+    // stride from behind at all, and only the numbers answer it.
+    const stance = p === 'passing' ? []
+      : stanceGate(f, idleHi[f], [{ label: p, img: hi }]).map((x) => ({ ...x, a: key }))
+    return { key, hi, gate, failures: [...coherenceGateV4(key, masterGate[f], gate), ...stance] }
   }
   const identityBroken = (c: FrameCand): boolean => c.failures.some((x) =>
     (x.gate === 'palette' && x.value < PALETTE_HARD_FLOOR)
@@ -369,7 +377,7 @@ async function runCharacter(m: CastMember): Promise<void> {
     try { raw = await candidate(DIR, key, framePrompt(m, f, p), [soloRef[f]], '1024x1024', 0.08, assetId) }
     catch (e) { if (e instanceof OutOfBudget) throw e; push(`${key}: generation FAILED — ${String(e).slice(0, 160)}`); return null }
     try {
-      const c = evalFrame(key, f, await decodePng(raw))
+      const c = evalFrame(key, f, p, await decodePng(raw))
       push(`${key}: ${c.failures.length === 0 ? 'PASS' : c.failures.map((x) => `${x.gate}(${x.value.toFixed(3)})`).join(',')}`)
       return c
     } catch (e) { push(`${key}: process FAILED — ${String(e).slice(0, 160)}`); return null }
