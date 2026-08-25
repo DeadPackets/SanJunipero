@@ -138,10 +138,22 @@ const VIEW: Record<AuthoredFacing, string> = {
 const VIEW_REF = 'the reference image'
 type WalkPose = Exclude<StripPoseV4, 'idle'>
 const WALK_POSES: readonly WalkPose[] = ['contact-a', 'passing', 'contact-b']
+// ★ SEEN FROM BEHIND, "THE OTHER FOOT" IS NOT A DESCRIPTION OF A SHAPE. Every SE contact
+// frame in the committed cast has feet 1.36x-2.04x the idle's; the NE contacts the model
+// volunteered across two lanes measured 1.00, 1.00, 1.02 and 1.02, and one of them is in the
+// committed art. `POSE_V4['contact-b']` asked for "the OTHER foot planted forward this time",
+// which from a back view — where you cannot tell one foot from the other — the model renders
+// as a body standing still. The A/B distinction has to stay, because `strideGateV4` needs the
+// two frames to differ; what it needs BESIDE it is the stride stated as a geometry rather
+// than as an identity, so that it survives a view in which the feet are interchangeable.
+const STRIDE_CLAUSE =
+  ' THE FEET ARE WIDE APART: the gap between the two feet is at least as wide as the '
+  + 'shoulders, with clear background visible between the legs. This is the WIDEST frame of '
+  + 'the walk cycle. It is NOT a standing pose and the feet are NOT together.'
 const POSE_V4: Record<WalkPose, string> = {
-  'contact-a': 'walk cycle CONTACT pose A: legs at full stride spread, one foot planted forward, the other back with heel lifting, opposite arm swung forward',
+  'contact-a': 'walk cycle CONTACT pose A: legs at full stride spread, one foot planted forward, the other back with heel lifting, opposite arm swung forward.' + STRIDE_CLAUSE,
   'passing': 'walk cycle PASSING pose: legs close together, one foot lifted and passing under the body, the other leg planted straight, arms near the sides',
-  'contact-b': 'walk cycle CONTACT pose B: legs at full stride spread, the OTHER foot planted forward this time, its opposite arm swung forward',
+  'contact-b': 'walk cycle CONTACT pose B: legs at full stride spread, the OTHER foot planted forward this time, its opposite arm swung forward.' + STRIDE_CLAUSE,
 }
 
 /** PRESENT DAY. The same clause the dwellings carry, in the register a person needs. Without

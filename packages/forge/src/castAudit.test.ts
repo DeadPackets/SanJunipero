@@ -131,46 +131,42 @@ function failuresOf(c: CommittedCharacter, atlas: RawImage): string[] {
 }
 
 /**
- * ★ THE DEBT, AS OF THIS SWEEP. ONE cell, and it is one this project made on purpose.
+ * ★ THE DEBT, AS OF THIS SWEEP. ONE cell, and it is the only one that is not a drawing.
  *
- * It was four. `salma ne/contact-a` — the second TACTICAL GEAR, a large brown bundle in her
- * right hand in one frame of four, +24.3 % opaque area against a ±18 % tolerance and WORSE
- * than the 1.1855 that shipped the caption — was regenerated live for $0.0687 and is gone.
- * The refusal the ruling installed is what made that happen: `gen-cast-v5` stopped on her
- * three cached candidates instead of shipping the least-bad, `CAST_ATTEMPTS=6` drew a fourth,
- * and the fourth passed. Two cells of twenty-four moved; her ne stride trio still passes.
+ * ★ AMARA IS OUT, BOTH ENTRIES, AND THE STRIDE SURVIVED. Her `se/contact-b` was a contact
+ * frame with no contact in it — feet 280 px apart against 277 px standing, 1.011x, so she
+ * walked without her weight ever landing. It was the last of the four defects the least-bad
+ * policy shipped, and it was invisible to every gate in the package until `stanceGate`.
  *
- * `omar ne/contact-a` went the same way, for $0.2745 and three refusals — two of them BY EYE,
- * which is the control the eye is for. c3 cleared every gate with a contact frame no wider
- * than the idle (foot span 1.00x, against 1.21x for the cell it would have replaced): a walk
- * frame with no walk in it, and `strideGateV4` cannot see it because it measures frame-to-frame
- * pixel distance, not stance. c4 cleared every gate with a BAKED GROUND SHADOW under the boots
- * — Nadia's defect, the one this project has already proved no gate catches. c5 is clean on
- * both counts at 1.93x. Neither of those two properties is gated; see the report.
+ * The trap was named in advance and did not spring. Regenerating her cost her nothing:
+ *
+ *     cell                se/contact-b        ne/contact-b
+ *     stance              1.011  -> 1.412     1.299  -> 2.199
+ *     silhouette          1.0005 -> 1.1568    0.9911 -> 1.1030   (bar 1.18)
+ *     head                0.0014 -> 0.1045    0.0473 -> 0.1293   (bar 0.20)
+ *     stride trio         PASS   -> PASS      FAIL   -> PASS
+ *
+ * FOUR of her twenty-four cells moved — `contact-b` in each facing, which is two authored
+ * cells and their two mirrors — and the other twenty are byte-identical. `figureH` is
+ * unchanged at 954. So the second entry cleared as a side effect of the first: `ne/contact-b`
+ * had been `contact-a-ne` copied, which is why its stride read 0.0000, and it is now a real
+ * back-view stride. THREE new draws, $0.2060.
+ *
+ * ★ AND THE EYE-ONLY CONTROL BECAME A GATE. The two cached NE candidates a previous lane had
+ * to refuse BY EYE — c3 at 1.000 and c6 at 1.018, both clean on every other gate — were
+ * refused mechanically this time, by name and with a margin, before any money was spent.
+ * That, and not the repair, is why the run cost three draws instead of seven.
  */
 export const KNOWN_GATE_DEBT: Record<string, string> = {
-  // MINE, and named so it is not mistaken for the model's. The TACTICAL GEAR repair set
-  // contact-b-ne := contact-a-ne — the last good frame of the same facing — so Amara's two
-  // back-facing walk cycles have no alternating stride. Clears when the strip is redrawn.
-  'amara ne stride contact-a~contact-b':
-    '0.0000 against 0.1085 — the TACTICAL GEAR repair, by construction',
-
-  // ★ THE RULER MOVED, NOT THE ART — the only entry here that is not a drawing defect, and
-  // it is written down rather than absorbed because that is what this list is for. See the
-  // header: this cell measured 0.8125 through a partition that answered differently on its
-  // own mirror, which read 0.6875. The gate is consistent now and reads 0.6875 in both.
-  // Clearing it means redrawing omar's se/contact-a, which also carries head 0.1871 against
-  // a 0.20 bar — the cell is marginal on two terms, and a lane that regenerates it must
-  // watch both.
+  // ★ THE RULER MOVED, NOT THE ART — the only entry left, and the only one here that is not
+  // a drawing defect. It is written down rather than absorbed because that is what this list
+  // is for. See the header: this cell measured 0.8125 through a partition that answered
+  // differently on its own mirror, which read 0.6875. The gate is consistent now and reads
+  // 0.6875 in both. Clearing it means redrawing omar's se/contact-a, which also carries head
+  // 0.1871 against a 0.20 bar — the cell is marginal on two terms and a lane that regenerates
+  // it must watch both.
   'omar se palette contact-a':
     '0.6875 against 0.8000 — one palette cluster of sixteen, exposed by the mirror fix',
-
-  // ★ A CONTACT FRAME THAT IS NOT A CONTACT POSE, in committed SE art nobody had looked at.
-  // Her feet are 280px apart against 277px standing: she walks without her weight ever
-  // landing, and it reads as gliding. Found only because the stance instrument was built for
-  // a different reason; no gate in the package could see it before this commit.
-  'amara se stance contact-b':
-    '1.011 against 1.100 — a standing figure in a walk loop',
 }
 
 const cast = listCommittedCast()
@@ -191,8 +187,8 @@ describe('★ the committed cast against the gates as they now behave', () => {
       'this entry passes now — delete it from KNOWN_GATE_DEBT').toEqual([])
   })
 
-  it('★ and the debt is THREE cells, so a jump shows up in the diff', () => {
-    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(3)
+  it('★ and the debt is ONE cell, so a jump shows up in the diff', () => {
+    expect(Object.keys(KNOWN_GATE_DEBT)).toHaveLength(1)
   })
 })
 
