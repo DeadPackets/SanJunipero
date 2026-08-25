@@ -7,7 +7,8 @@ import { characterArt, type TextureBook } from './textures.js'
 import { characterCell } from './characters.js'
 import {
   advanceInterior, bedSlots, contactShadow, furnishingId, furnishingScale,
-  interiorBodyScale, interiorOf, interiorOrder, interiorPieces, isFlat, roomPlan, roomSizeOf,
+  interiorBodyScale, interiorOf, interiorOrder, interiorPieces, isFlat, roomLights, roomPlan,
+  roomSizeOf,
   slotGridOf,
   type InteriorPhaseState, type PlacedBody, type RoomItem,
 } from './interiors.js'
@@ -25,7 +26,7 @@ import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 import { doorTileOf } from './entities.js'
 import type { ZoomStop } from './camera.js'
 import {
-  ROOM_SHELL_INK, ROOM_SHELL_PAINT, WALL_H_PX, WALL_TINT,
+  ROOM_SHELL_INK, ROOM_SHELL_PAINT, WALL_H_PX, WALL_MOUNT_H_PX, WALL_TINT,
   ceilingBeams, drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorPolyOf, floorPools,
   floorRegionPoly, roomMaskPoly, roomOriginX, roomOriginY, roomZoomFor, tileCentreScreen,
   tileSpanCentre, wallMount,
@@ -47,6 +48,9 @@ export { ROOM_TILES } from './interiorMap.js'
  *  the headroom the stage has, because a courtesy that pushes a wall off the top is not one. */
 export const ROOM_OFFSET_Y = 40
 export const HEARTH_GLOW_PX = 26 * INTERIOR_PX_SCALE
+/** How far above the floor line a chimney breast's firebox sits, in interior px — where the
+ *  fire is in the authored strip, and so where its light comes from. */
+export const HEARTH_FIRE_H_PX = 44
 export const PLACEHOLDER_URL = '/assets/placeholder/item.png'
 /** A hung piece is on the back plane, so it draws behind everything standing on the floor
  *  and in front of the wall itself — one depth, because a wall has no depth of its own. */
@@ -346,7 +350,7 @@ export function createInteriorScene(
       // ★ ONCE, AND ONLY ONCE. When the tileset holds an elevation for this kind, the wall IS
       // the furnishing — the chimney breast is the hearth — so no object is drawn as well. That
       // duplicate is what the mock showed as two fireplaces in one corner.
-      if (asElevation.has(piece.kind)) return
+      if (asElevation.has(piece.kind)) return   // the wall is the furnishing; its LIGHT is drawn below
       if (piece.placement !== 'wall' || WALL_PIECES_THAT_STAND.has(piece.kind)) {
         onFloor.push({ piece, item })
         return
@@ -368,6 +372,33 @@ export function createInteriorScene(
       const foot = tileSpanCentre(p.anchor.tile, p.anchor.size)
       addPiece(p.id, item, p.half, foot.sx, foot.sy, 0)
     }
+
+    // ★ AND THE FIRES THE WALL DREW. A hearth the tileset draws as a chimney breast has no
+    // sprite of its own, and the glow was a child of that sprite — so the one fire in the
+    // founding valley reached the screen as a cold fireplace. The light list is derived from
+    // what the room CONTAINS, never from how a piece happens to be drawn.
+    for (const light of roomLights(m.pieces, lightKinds)) {
+      if (!asElevation.has(light.kind)) continue        // its own sprite already wears the glow
+      const at = wallMount(light.tile)
+      if (at === null) continue
+      addWallGlow(light.id, at.sx, at.sy + WALL_MOUNT_H_PX - HEARTH_FIRE_H_PX)
+    }
+  }
+
+  /** The firelight of a hearth the WALL draws, at the height of its own firebox. A Sprite with
+   *  no texture, so it lives and dies in the `furniture` map with everything else in the room. */
+  function addWallGlow(key: string, sx: number, sy: number): void {
+    const holder = new Sprite()
+    holder.position.set(sx, sy)
+    holder.zIndex = WALL_PIECE_Z
+    holder.eventMode = 'none'
+    const glow = new Graphics()
+    glow.circle(0, 0, HEARTH_GLOW_PX)
+    glow.fill({ color: INTERIOR_HEARTH_GLOW, alpha: 0.22 })
+    glow.eventMode = 'none'
+    holder.addChild(glow)
+    furniture.set(key, holder)
+    room.addChild(holder)
   }
 
   function addPiece(

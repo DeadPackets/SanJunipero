@@ -119,6 +119,34 @@ export function roomPlan(kind: InteriorKind, records: AssetRecord[]): RoomItem[]
   })
 }
 
+/**
+ * ★ EVERY FIRE THE ROOM OWES, WHICHEVER WAY ITS FURNISHING IS DRAWN — found by eye, in the
+ * running app, on the one fire this lane exists to make visible.
+ *
+ * THE DEFECT: the room's glow was a child of the furnishing's own SPRITE, and `placeFurniture`
+ * returns early for any kind the wall draws as an elevation — *"the chimney breast IS the
+ * hearth, so no object is drawn as well"*, which is right. But the hearth is the only elevated
+ * kind that provides light, so `providesLight` was computed and then **discarded for exactly the
+ * hearths that reach the screen**. Measure-then-ignore, and its consequence was the founding
+ * valley's only indoor fire reading as a cold, sooty fireplace.
+ *
+ * It could not be fixed in the art: `wall-chimney` is authored as *"a warm-grey stone chimney
+ * breast … with a mantel and soot above the opening"* — a chimney, correctly, and no fire.
+ *
+ * So the list of the room's lights is derived from what the room CONTAINS, and never from how
+ * any of it happens to be drawn. That is the whole property, and it is what the test pins.
+ */
+export type RoomLight = { id: string; kind: string; tile: { x: number; y: number } }
+
+export function roomLights(
+  pieces: ReadonlyArray<{ kind: string; tile: { x: number; y: number } }>,
+  lightKinds: ReadonlySet<string>,
+): RoomLight[] {
+  return pieces
+    .filter((p) => lightKinds.has(p.kind))
+    .map((p) => ({ id: furnishingId(p.kind, p.tile), kind: p.kind, tile: p.tile }))
+}
+
 export type Interior = {
   structure: Structure
   kind: InteriorKind

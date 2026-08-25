@@ -14,7 +14,7 @@ import {
   LIBRARY_TILE_PX, advanceInterior, bedSlots, contactShadow, furnishingDivisor, furnishingScale,
   interiorOf,
   interiorOrder, interiorPieces, interiorTransition, isFlat, occupancyOf, roomFurnishings,
-  roomPlan, roomSizeOf, slotGridOf, type InteriorPhase,
+  roomLights, roomPlan, roomSizeOf, slotGridOf, type InteriorPhase,
 } from './interiors.js'
 
 function agent(id: string, over: Partial<WorldState['agents'][string]> = {}): WorldState['agents'][string] {
@@ -548,6 +548,37 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
     expect(hearths.length).toBeLessThan(INTERIOR_KINDS.length)
     expect(beds.length).toBeGreaterThan(0)
     expect(beds.length).toBeLessThan(INTERIOR_KINDS.length)
+  })
+
+  // ★ FOUND BY EYE, IN THE RUNNING APP, ON THE ONE FIRE THIS LANE EXISTS TO MAKE VISIBLE.
+  //
+  // The room's glow was a child of the furnishing's own sprite, and `placeFurniture` returns
+  // early for any kind the tileset draws as a wall elevation — the chimney breast IS the hearth,
+  // so no object is drawn as well, which is right. But the hearth is the ONLY elevated kind that
+  // provides light, so `providesLight` was computed and then discarded for exactly the hearths
+  // that reach the screen. The suite was green and the cabin's fireplace was cold.
+  //
+  // It is not fixable in the art: `wall-chimney` is authored as "a warm-grey stone chimney breast
+  // … with a mantel and soot above the opening" — a chimney, correctly, and no fire.
+  it('★ a fire the WALL draws is still a fire the room has to light', () => {
+    const map = mapFor('cabin')
+    const fire = map.pieces.find((p) => p.kind === 'hearth')!
+    const lightKinds = new Set(
+      roomPlan('cabin', RECORDS).filter((p) => p.meta?.providesLight === true).map((p) => p.kind),
+    )
+    expect(lightKinds.has('hearth')).toBe(true)
+
+    // the room's lights do not depend on HOW anything is drawn — that is the whole property
+    const lights = roomLights(map.pieces, lightKinds)
+    expect(lights).toHaveLength(1)
+    expect(lights[0]!.kind).toBe('hearth')
+    expect(lights[0]!.tile).toEqual(fire.tile)
+    // …and the hearth is a wall piece, which is the case that used to lose its light
+    expect(fire.placement).toBe('wall')
+
+    // not vacuous: a room with no fire is dark, and the bench is not a lamp
+    expect(roomLights(mapFor('storehouse').pieces, lightKinds)).toEqual([])
+    expect(roomLights(map.pieces, new Set())).toEqual([])
   })
 
   it('★ and the room is as big as the building, because capacity IS floor', () => {
