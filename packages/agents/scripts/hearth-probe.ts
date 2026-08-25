@@ -38,7 +38,7 @@ import { migrateLlmTables } from '../src/llm/callLog.js'
 import { LlmClient } from '../src/llm/client.js'
 import { Embedder } from '../src/memory/embedder.js'
 import { makeReflectionLlm } from '../src/reflection.js'
-import { MINDS } from './probeFounders.js'
+import { FOUNDER_MINDS as MINDS } from '../src/live/founderMinds.js'
 
 const ARM = (process.env.HEARTH_ARM ?? 'h').toLowerCase()
 const LABEL = process.env.HEARTH_LABEL ?? ARM

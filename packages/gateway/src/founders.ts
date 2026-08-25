@@ -476,6 +476,19 @@ export type FoundersOpts = {
   /** dev/demo only: one founder raises lamp posts along the street and keeps them fed.
    *  ABSENT by default — every existing gate folds exactly the events it always did. */
   lamps?: number
+  /**
+   * ★ THE BODIES ARE NOT DRIVEN FROM THIS FILE. The town is still raised on tick 1 and the
+   * world systems still run, but every DECISION below that line is skipped: no patrol, no
+   * mason, no bridgewright, no lamplighter, no walk home — and no scripted need top-up either.
+   *
+   * That last one is the part worth arguing. The top-ups exist because a puppet cannot feed
+   * itself; a mind can, and a town that quietly refills five stomachs is a town whose hunger
+   * means nothing. If a live cast starves, that is the finding, not a bug in this file.
+   *
+   * OFF by default, so every landed gate folds exactly the world it always did. Set by
+   * `startDevWorld` when — and only when — a live cast is attached.
+   */
+  minds?: boolean
 }
 
 /** The house this person owns, or null. Ownership is a fact of the world (Structure.owner) —
@@ -599,6 +612,10 @@ export function makeFoundersOnTick(
 
     const result = worldTick(getState())
     for (const e of result.events) emit(e.type, e.payload)
+
+    // ★ EVERYTHING BELOW THIS LINE IS A PUPPET STRING. A live cast keeps the town and the
+    // world systems above and takes none of it — see `minds` on FoundersOpts.
+    if (opts.minds === true) return
 
     // scripted need top-ups keep the showcase town alive without a food economy
     for (const f of cast) {

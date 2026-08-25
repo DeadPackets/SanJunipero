@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { DEFAULT_CONFIG, TOWN_RINGS_GENESIS, simTimeFromTick, type SimConfig } from '@sj/shared'
 import {
   EventStore, RngStreams, TickLoop, genesisState, makeFixtureMap, openDb, replayLatest,
-  type TileId,
+  type TickHandler, type TileId,
 } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
@@ -61,6 +61,35 @@ export type DevWorld = {
   terrain: TileId[][]
   /** The tick a resumed town woke at, or `null` when this boot is a new day 0. */
   resumedAtTick: number | null
+  /** True when a live cast is driving the bodies. `false` is the scripted puppets, and the
+   *  distinction is the whole seam — a caller that cannot read it cannot tell the two apart. */
+  live: boolean
+  stop(): Promise<void>
+}
+
+/**
+ * ★ THE PORT A LIVE CAST PLUGS INTO, AND WHY IT IS A PORT AND NOT AN IMPORT.
+ *
+ * A world with minds in it needs `@sj/agents`, and — the moment anything wants an arbiter or a
+ * narrator around those minds — `@sj/arbiter` and `@sj/narrator` too. Both of those depend on
+ * `@sj/agents`, so the assembly cannot live in `@sj/agents`; and `@sj/gateway` is what serves
+ * the world, so the assembly cannot live below it either. It lives in `gateway/src/liveWorld.ts`,
+ * which is the one node in the graph where all four may legally meet.
+ *
+ * This file stays ignorant of every one of them. It is handed something that knows how to wrap
+ * the world's tick handler and how to stop, and it does not care what is inside. That is what
+ * keeps `startDevWorld` — which 300-odd tests call — free of an onnxruntime import.
+ *
+ * `attach` is called AFTER the loop exists and BEFORE the first tick, because a bridge needs
+ * the loop it is bridging and the loop needs the handler the bridge returns.
+ */
+export type LiveCast = {
+  attach(deps: {
+    loop: TickLoop; store: EventStore; config: SimConfig
+    /** The scripted handler: the tick-1 town, the world systems, and nothing else when the
+     *  cast is attached (`FoundersOpts.minds`). A live cast wraps it, never replaces it. */
+    world: TickHandler
+  }): TickHandler
   stop(): Promise<void>
 }
 
@@ -191,6 +220,10 @@ export async function startDevWorld(
      * database does not get to delete it without being asked.
      */
     fresh?: boolean
+    /** ★ MINDS INSTEAD OF PUPPETS. Absent, the founders are the scripted cast this file has
+     *  always run and the world costs $0.00/hour. Present, the same town is raised and the
+     *  bodies in it are driven by whatever the cast drives them with. See `LiveCast`. */
+    cast?: LiveCast
   } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH
@@ -295,11 +328,17 @@ export async function startDevWorld(
     console.log('dev world: a new day 0 — no town on disk')
   }
 
+  // ★ THE HANDLER IS AN INDIRECTION BECAUSE A BRIDGE AND A LOOP EACH NEED THE OTHER FIRST.
+  // A live cast's bridge is constructed around `loop`, and the handler `loop` runs is the one
+  // that bridge returns. Scripted, this costs one function call per tick and nothing else.
+  let handler: TickHandler = () => {}
   const loop: TickLoop = new TickLoop({
     store, state: resumed ? resumed.state : devGenesisState(config, terrain, map, rings), rng, config,
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
-    // the founders showcase town
-    onTick: makeFoundersOnTick(config, rng, () => loop.state, {
+    onTick: (ctx) => handler(ctx),
+  })
+  // the founders showcase town
+  const scriptedOnTick = makeFoundersOnTick(config, rng, () => loop.state, {
       // foundersFor is identity on an unowned town, so the scripted arm is byte-identical.
       interiors: opts.interiors === true, structures, founders: foundersFor(structures),
       // the showcase town is what a viewer opens, and an empty storeroom is why the room
@@ -314,8 +353,13 @@ export async function startDevWorld(
       ...(opts.lamps !== undefined && opts.lamps > 0 && map === 'showcase' ? { lamps: opts.lamps } : {}),
       // the crossing: derived from the ford the map lays, so the two cannot disagree
       ...(opts.bridge === true && map === 'showcase' ? { deck: showcaseDeck(undefined, rings) } : {}),
-    }),
+      // ★ AND THE PUPPET STRINGS COME OFF THE MOMENT A LIVE CAST IS ATTACHED. The town on
+      // tick 1 and the world systems stay; the patrols, the masons and the need top-ups go.
+      minds: opts.cast !== undefined,
   })
+  handler = opts.cast === undefined
+    ? scriptedOnTick
+    : opts.cast.attach({ loop, store, config, world: scriptedOnTick })
 
   const gateway = await createGateway({
     dbPath, port: opts.port ?? DEV_PORT, terrain, config, db, narratorDbPath: opts.narratorDbPath,
@@ -351,8 +395,12 @@ export async function startDevWorld(
 
   return {
     gateway, loop, terrain, resumedAtTick: resumed ? resumed.state.tick : null,
+    live: opts.cast !== undefined,
     stop: async () => {
       clearInterval(timer)
+      // The cast first: a mind holding a promise on an intent the loop will never step is a
+      // mind that never returns, and a reflection half-written is a night paid for twice.
+      await opts.cast?.stop()
       await gateway.close()
       db.close()
     },
