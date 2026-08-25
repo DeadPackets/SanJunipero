@@ -357,6 +357,30 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
       st.stage === 'construction' && isWarmRoom(st.kind))).toBe(true)
   })
 
+  // ★ AND IT COULD NOT HAVE BEEN ANY OTHER KIND. `roofFell` throws on a roofed kind that is
+  // unbuildable and not sound, so the sound set is not a taste — it is FORCED to be exactly the
+  // unbuildable roofed kinds. There are two, and one of them is a roof over goods.
+  it('★ had one candidate, because the sound set is forced and not chosen', () => {
+    const unbuildableRoofs = Object.keys(CFG.structures.recipes)
+      .filter((k) => isRoofedKind(CFG, k) && buildableRecipe(CFG, k) === null).sort()
+    expect([...GENESIS_SOUND_ROOFS].sort()).toEqual(unbuildableRoofs)
+    expect(unbuildableRoofs).toEqual(['cabin', 'storehouse'])
+    expect(isHearthKind(CFG, 'storehouse'), 'a storehouse is a roof over goods').toBe(false)
+
+    // And a roofed kind outside the set that nobody could finish is refused out loud rather
+    // than planted as a wall that lies — which is the whole reason the set cannot grow.
+    const withHut = {
+      ...CFG,
+      structures: {
+        ...CFG.structures,
+        recipes: { ...CFG.structures.recipes, hut: { ...CFG.structures.recipes['cabin']!, inputs: {} } },
+      },
+    }
+    expect(() => roofFell(withHut, 'hut')).toThrow(/nobody could finish/)
+    expect(roofFell(CFG, 'cabin'), 'the cabin stands').toBe(false)
+    expect(roofFell(CFG, 'cottage'), 'and a cottage does not').toBe(true)
+  })
+
   // Reachability proved by walking it, not by eye: the pathfinder the world uses, from the door
   // a founder wakes at, to the door `enter` will accept — and then the whole chain through it.
   it('★ and a founder walks there from their own doorstep, goes in, feeds it, and is warmer', () => {

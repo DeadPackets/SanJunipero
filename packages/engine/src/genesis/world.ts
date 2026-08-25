@@ -41,6 +41,18 @@ export type Durability = { maxHp: number; flammable: boolean }
 // `structures.recipes` row to say they have a roof, and a row already carries hp and flammable,
 // so keeping them here would have been the same two numbers written twice (G4). The fire pit
 // went the same way when `hearth` landed, for the same reason and with the same two numbers.
+//
+// ★ THE SHED KEEPS ITS ROW HERE AND MUST NEVER GET ONE IN `structures.recipes`. It reads as a
+// dead kind — no city template stands one and no pair of hands can raise one — and it is not.
+// It has two jobs. It is one of the SIX buildings in the frozen `scripted` dev world
+// (`gateway/founders.ts` TOWN_STRUCTURES), which G1, G2 and G6 hash and which may therefore
+// never change; and it is one of three `INTERIOR_KINDS`, with a shipped 1x1 sprite — a plank
+// door and a slanted roof — and eight furnishing manifests naming it as a room they belong in.
+//
+// A `structures.recipes` row is the wrong home for both of those. A row with `inputs` would
+// mint a 1x1 store nobody asked for; a row with `roofed: true` would tell every mind a shed is
+// somewhere to get out of the weather, which is the word-with-no-verb-behind-it the cabin's
+// unbuildability exists to prevent. Placed-only, unenterable, and known here: that is the job.
 const GENESIS_STRUCTURE_DEFS: Readonly<Record<string, Durability>> = {
   shed: { maxHp: 20, flammable: true },
   wagon: { maxHp: 15, flammable: true },
@@ -114,6 +126,11 @@ export type GenesisWorld = { terrain: TileId[][]; events: PendingEvent[] }
 // only other 2-slot kinds are the cabin and the storehouse themselves, both 2x2: making either
 // buildable would mint a second name for `house`. A one-body want is worth more than a building
 // that looks like an answer and refuses in words a mind cannot use.
+//
+// It is also not really a choice: `roofFell` throws on any roofed kind that is unbuildable and
+// not sound, so this set is FORCED to be exactly the unbuildable roofed kinds, and there are
+// two. `world.test.ts` states that as a law. The cabin can never come off it for a second
+// reason now — it holds the founding valley's only indoor fire.
 export const GENESIS_SOUND_ROOFS: ReadonlySet<string> = new Set(['storehouse', 'cabin'])
 
 /** Three quarters. A house is 2 880 ticks, so 720 are left — one night for one pair of hands,
