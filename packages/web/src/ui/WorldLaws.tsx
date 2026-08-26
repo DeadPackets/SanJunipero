@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { tickToMoment } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
-import { LAW_GROUPS, lawCopyFor, lawGroupOf, lawReadingRank } from '../ui/lawCopy.js'
+import { LAW_GROUPS, lawCopyFor, lawGroupOf, lawReadingRank } from './lawCopy.js'
 import { lawRows, type LawRow } from './lawsModel.js'
 
 /** Every law of this town and every time it changed. Read-only: there is no write path. */
