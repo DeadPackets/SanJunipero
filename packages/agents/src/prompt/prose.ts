@@ -1,4 +1,6 @@
-import { dayPhaseFromTick, DAYS_PER_SEASON, inputName, MINUTES_PER_DAY, type SimTime } from '@sj/shared'
+import {
+  dayPhaseFromTick, DAYS_PER_SEASON, inputName, MINUTES_PER_DAY, sanitizeSpokenText, type SimTime,
+} from '@sj/shared'
 import { MYSTERIES, type MakeableRoad, type Makeables } from '@sj/engine'
 
 // Local mirror of the engine's PerceptionPacket (composePerception) plus the
@@ -527,8 +529,12 @@ export function perceptionToProse(packet: PerceptionPacket, alert?: (detail: str
     lines.push(`You are carrying ${it.qty} ${it.kind} (${it.id})${claimPhrase(it)}.`)
   }
 
+  // ★ THE ONE UNTRUSTED STRING IN THIS FILE. The speaker writes `h.text`; everything else on
+  // this list is composed from world state. `sanitizeSpokenText` takes the fence character off
+  // the speaker, so every `"` a mind reads is one of ours and pairs around one named mouth.
+  // Re-run here as well as at the verb: a world resumed from an older log carries raw text.
   for (const h of packet.heard) {
-    lines.push(`You hear ${h.name} say: "${h.text}" (from nearby)`)
+    lines.push(`You hear ${h.name} say: "${sanitizeSpokenText(h.text)}" (from nearby)`)
   }
 
   for (const s of packet.seen) {
