@@ -1,13 +1,17 @@
 import { generateText, Output } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'
+import { PRICE_PER_M } from '../src/llm/pins.js'
 
 const MODEL = 'deepseek/deepseek-v4-flash-0731'
 const CAP_USD = 5.0
 let spentUsd = 0
+// Imported, not re-typed: this script booked its own spend at 0.14/0.28/0.028 while the route
+// charged double, so its own $5 cap was a $10 cap.
 function book(usage: any, label: string) {
   const cin = usage?.inputTokenDetails?.cacheReadTokens ?? 0
-  const cost = ((usage.inputTokens - cin) * 0.14 + cin * 0.028 + usage.outputTokens * 0.28) / 1e6
+  const cost = ((usage.inputTokens - cin) * PRICE_PER_M.input
+    + cin * PRICE_PER_M.cacheRead + usage.outputTokens * PRICE_PER_M.output) / 1e6
   spentUsd += cost
   console.log(`[${label}] in=${usage.inputTokens} out=${usage.outputTokens} cacheRead=${cin} cost=$${cost.toFixed(6)} total=$${spentUsd.toFixed(4)}`)
   if (spentUsd > CAP_USD) { console.error('BUDGET CAP EXCEEDED'); process.exit(1) }
