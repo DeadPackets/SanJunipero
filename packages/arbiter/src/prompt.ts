@@ -78,10 +78,8 @@ function fenceSaying(saying: string | undefined): string | null {
   return fence('In their own words, the thought behind it', saying)
 }
 
-// The human-framing law for arbiter outputs: no world text, recipe name,
-// verdict reason, or outcome label may name the machinery behind the agent.
-export const FORBIDDEN_FRAMING =
-  /\b(AI|A\.I\.|artificial intelligence|language models?|LLMs?|neural|prompts?|context windows?|tokens?|chatbots?|simulations?|models?|tools?)(?!\w)/i
+// The human-framing law lives in @sj/shared so the three packages that enforce it cannot drift.
+export { FORBIDDEN_FRAMING } from '@sj/shared'
 
 function renderAgent(agent: AdjudicationBlocks['agent']): string {
   const skills = Object.entries(agent.skills)
