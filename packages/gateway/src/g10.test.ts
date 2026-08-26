@@ -10,7 +10,7 @@ import {
 } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { AssetCodex, openForgeDb, registerTerrainTiles } from '@sj/forge'
-import { createGateway, type Gateway } from './index.js'
+import { createGateway, type Gateway } from './server.js'
 import {
   PLAZA_TILE, ROAD_TILE, makeShowcaseMap, roadReach, showcaseDoorTile, showcaseTerrain,
 } from './showcaseMap.js'

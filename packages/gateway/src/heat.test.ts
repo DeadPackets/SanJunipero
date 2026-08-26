@@ -3,7 +3,7 @@ import type { SimEvent } from '@sj/shared'
 import {
   HEAT_WEIGHTS, HEAT_WINDOW_TICKS, heatContext, heatFromScores, scoreEvent,
   type HeatScores, type HeatWindow,
-} from './heatStub.js'
+} from './heat.js'
 
 const ev = (seq: number, tick: number, type: string, payload: Record<string, unknown>): SimEvent =>
   ({ seq, tick, type, payload }) as SimEvent

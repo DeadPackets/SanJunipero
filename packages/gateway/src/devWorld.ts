@@ -351,27 +351,27 @@ export async function startDevWorld(
 }
 
 // CLI switches, read HERE and nowhere else, so no test's world can drift with an env var:
-//   SJ_DEV_MAP=scripted   ask for the frozen G6 fixture BY NAME (the product town otherwise)
-//   SJ_DEV_RINGS=3        plat the showcase town for three rings of blocks instead of one
-//   SJ_DEV_INTERIORS=0    keep the founders out of doors (they go home and sleep otherwise)
-//   SJ_DEV_BUILDERS=0     stop the founders raising houses (they build on claimed plots otherwise)
-//   SJ_DEV_BRIDGE=0       leave the river uncrossed (one founder decks the ford otherwise)
-//   SJ_DEV_JOINT=1        let a mason lend a hand at a neighbour's walls (off by default for a
-//                         measured reason — see `jointBuild` on `FoundersOpts`)
-//   SJ_FRESH=1            throw the town on disk away and start a new day 0
+//   SJ_MAP=scripted   ask for the frozen G6 fixture BY NAME (the product town otherwise)
+//   SJ_RINGS=3        plat the showcase town for three rings of blocks instead of one
+//   SJ_INTERIORS=0    keep the founders out of doors (they go home and sleep otherwise)
+//   SJ_BUILDERS=0     stop the founders raising houses (they build on claimed plots otherwise)
+//   SJ_BRIDGE=0       leave the river uncrossed (one founder decks the ford otherwise)
+//   SJ_JOINT=1        let a mason lend a hand at a neighbour's walls (off by default for a
+//                     measured reason — see `jointBuild` on `FoundersOpts`)
+//   SJ_FRESH=1        throw the town on disk away and start a new day 0
 //
 // The human path defaults to the product town and to interiors on; the LIBRARY defaults stay
 // `scripted` and interiors off, because `g6.test.ts` and `devWorld.test.ts` hash exactly that.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const map: DevMapKind = process.env['SJ_DEV_MAP'] === 'scripted' ? 'scripted' : DEV_MAP_HUMAN
-  const interiors = process.env['SJ_DEV_INTERIORS'] !== '0'
-  const builders = process.env['SJ_DEV_BUILDERS'] !== '0'
-  const bridge = process.env['SJ_DEV_BRIDGE'] !== '0'
-  const jointBuild = process.env['SJ_DEV_JOINT'] === '1'
+  const map: DevMapKind = process.env['SJ_MAP'] === 'scripted' ? 'scripted' : DEV_MAP_HUMAN
+  const interiors = process.env['SJ_INTERIORS'] !== '0'
+  const builders = process.env['SJ_BUILDERS'] !== '0'
+  const bridge = process.env['SJ_BRIDGE'] !== '0'
+  const jointBuild = process.env['SJ_JOINT'] === '1'
   const fresh = process.env['SJ_FRESH'] === '1'
-  const asked = Number(process.env['SJ_DEV_RINGS'] ?? TOWN_RINGS_GENESIS)
+  const asked = Number(process.env['SJ_RINGS'] ?? TOWN_RINGS_GENESIS)
   const rings = Number.isInteger(asked) && asked >= 1 ? asked : TOWN_RINGS_GENESIS
-  if (rings !== asked) console.log(`dev world: SJ_DEV_RINGS=${process.env['SJ_DEV_RINGS']} is not a ring count; using ${rings}`)
+  if (rings !== asked) console.log(`dev world: SJ_RINGS=${process.env['SJ_RINGS']} is not a ring count; using ${rings}`)
   void startDevWorld({ ingest: true, map, interiors, builders, bridge, jointBuild, rings, fresh }).then(({ gateway }) => {
     console.log(`dev world: interiors=${interiors ? 'on' : 'off'} builders=${builders && map === 'showcase' ? 'on (SCRIPTED masons, real build verb)' : 'off'}`
       + ` bridge=${bridge && map === 'showcase' ? `on (a deck at the ford ${JSON.stringify(showcaseDeck(undefined, rings))})` : 'off'}`

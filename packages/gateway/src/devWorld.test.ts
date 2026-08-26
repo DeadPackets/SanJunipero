@@ -48,7 +48,7 @@ describe('★ the fixture world must be asked for by name, never received by sil
     expect(DEV_MAP_HUMAN).toBe('showcase')
     expect(DEV_MAP_HUMAN).not.toBe(DEV_MAP_DEFAULT)
     // and the CLI at the bottom of the module reads the human one, with the fixture opt-IN
-    expect(CLI).toMatch(/SJ_DEV_MAP'\] === 'scripted' \? 'scripted' : DEV_MAP_HUMAN/)
+    expect(CLI).toMatch(/SJ_MAP'\] === 'scripted' \? 'scripted' : DEV_MAP_HUMAN/)
   })
 
   it('★ says which map it loaded, on every boot, in every path', () => {

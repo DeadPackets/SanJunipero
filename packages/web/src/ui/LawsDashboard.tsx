@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
-import { editRows, formatLawValue, lawRows, postLaw, type EditRow } from '../panels/lawsModel.js'
+import { editRows, formatLawValue, lawRows, postLaw, type EditRow } from './lawsModel.js'
 
 export type LawsDashboardProps = {
   store: WorldStore

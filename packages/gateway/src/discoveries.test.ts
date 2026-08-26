@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { DEFAULT_CONFIG, DiscoveryResponseSchema, type DiscoveryRecord } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
-import { createGateway, type Gateway } from './index.js'
+import { createGateway, type Gateway } from './server.js'
 import { readDiscoveries } from './discoveries.js'
 import { clearDegradations, degradations } from './degraded.js'
 

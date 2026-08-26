@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { WorldLawsView } from './WorldLaws.js'
 import { lawRows } from './lawsModel.js'
-import { LAW_COPY, LAW_GROUPS } from '../ui/lawCopy.js'
+import { LAW_COPY, LAW_GROUPS } from './lawCopy.js'
 
 const rows = lawRows(DEFAULT_CONFIG, {}, [])
 const html = renderToStaticMarkup(createElement(WorldLawsView, { rows }))

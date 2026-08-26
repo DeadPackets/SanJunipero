@@ -1,15 +1,15 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { openDb } from '@sj/engine'
-import { EVENTFUL_DAY } from '../fixtures/eventfulDay.js'
-import { renderChapter } from '../chronicle.js'
-import { rankScenesForDirector } from '../heat.js'
+import { EVENTFUL_DAY } from './fixtures/eventfulDay.js'
+import { renderChapter } from './chronicle.js'
+import { rankScenesForDirector } from './heat.js'
 import { FORBIDDEN_FRAMING } from '@sj/shared'
-import { narrateDay, narrateWeek, renderDigest } from '../narrate.js'
-import { renderNewspaper, timelapseCaptions, writeBiography } from '../publications.js'
-import { migrateNarratorTables } from '../schema.js'
-import { NarratorStore } from '../store.js'
-import type { ChapterRow, HeatScores, Milestone, NarratorLlm, SceneSegment } from '../types.js'
+import { narrateDay, narrateWeek, renderDigest } from './narrate.js'
+import { renderNewspaper, timelapseCaptions, writeBiography } from './publications.js'
+import { migrateNarratorTables } from './schema.js'
+import { NarratorStore } from './store.js'
+import type { ChapterRow, HeatScores, Milestone, NarratorLlm, SceneSegment } from './types.js'
 
 const memStore = (): NarratorStore => {
   const db = new Database(':memory:')

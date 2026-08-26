@@ -34,11 +34,11 @@ describe('Task 1 offline part — probe mechanics pinned without a live call', (
     expect(src).toContain('CHECK 3')
   })
 
-  it('probe runs through the agents ts-loader (NodeNext .js-in-imports)', () => {
+  it('probe runs through tsx (NodeNext .js-in-imports)', () => {
     const pkg = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')) as {
       scripts: Record<string, string>
     }
-    expect(pkg.scripts.probe).toBe('node --import ../agents/scripts/ts-loader.mjs scripts/probe.ts')
+    expect(pkg.scripts.probe).toBe('tsx scripts/probe.ts')
   })
 
   it('root typecheck covers @sj/narrator', () => {

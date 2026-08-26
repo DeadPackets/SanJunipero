@@ -34,9 +34,9 @@ import type { ZoomStop } from './render/camera.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { LAST_SEEN_KEY } from './net/socket.js'
 import { Timeline } from './ui/Timeline.js'
-import { WorldLaws } from './panels/WorldLaws.js'
-import { LawsDashboard } from './admin/LawsDashboard.js'
-import { adminToken } from './panels/lawsModel.js'
+import { WorldLaws } from './ui/WorldLaws.js'
+import { LawsDashboard } from './ui/LawsDashboard.js'
+import { adminToken } from './ui/lawsModel.js'
 import type { Scene } from './render/scene.js'
 
 function ScrubBanner({ store }: { store: WorldStore }) {
