@@ -84,9 +84,8 @@ describe('projectDailySpend (T24)', () => {
   })
 })
 
-// 135 of 1296 live calls came back with nothing and were billed anyway — 75 empty, 56
-// unparseable — and the whole run raised one alert and zero crashes, because the repair path
-// and the client retry absorb both in silence. The ops surface has to be able to say so.
+// The repair path and the client retry absorb an empty answer in silence, so the ops surface
+// has to be able to say one happened.
 describe('dead calls — paid for, and nothing came back', () => {
   const fail = (db: Database.Database, agentId: string | null, error: string | null, agoMinutes = 1, now = NOW): void => {
     db.prepare(
@@ -213,10 +212,6 @@ describe('checkSpend (T24)', () => {
   })
 })
 
-// C11 R20: the last gate was decided by an empty-call rate that swung 14-51% across identical
-// runs, and nobody could say whose rate it was. Every call now names the back end that served
-// it, so the rate is attributable — and the ones that never came back are reported as their
-// own row rather than spread across the providers by guesswork.
 describe('providerCounts: which back end answered, and how much of it was worth paying for', () => {
   function seedProviderCall(
     db: Database.Database,
@@ -265,8 +260,7 @@ describe('providerCounts: which back end answered, and how much of it was worth 
   })
 })
 
-// The whole-run version of the per-call reconciliation. This is the shape of the comparison
-// that actually found the defect: one lane's bill against the project's ledger.
+// The whole-run version of the per-call reconciliation: a bill against the ledger.
 describe('price reconciliation over a run', () => {
   const insert = (db: Database.Database, computed: number, reported: number | null): void => {
     db.prepare(

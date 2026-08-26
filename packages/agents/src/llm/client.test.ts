@@ -156,9 +156,6 @@ describe('LlmClient.object', () => {
     expect(all[0]!.ok).toBe(0)
   })
 
-  // GATE G11b day 3: a chronicle whose `title` and `text` were both complete and whose shape
-  // was wrong cost the run a night and criterion 11. An answer that only needs reframing is
-  // not a dead call (C11 batch 16 fix 2).
   it('repairs a shape the decoder refused, logs the call as answered, and says it repaired it', async () => {
     const db = openDb()
     const model = mockModel([
@@ -182,9 +179,8 @@ describe('LlmClient.object', () => {
     expect(all[0]!.input_tokens).toBe(1000)
     expect(usage.costUsd).toBeGreaterThan(0)
     const alerts = db.prepare('SELECT kind, detail FROM alerts').all() as Array<{ kind: string; detail: string }>
-    // `NoObjectGeneratedError` carries no `providerMetadata`, so a repaired call can name
-    // neither its back end nor its cost. It books at the ceiling and says so rather than
-    // guessing a cheap rate — the second alert is that, and it is deliberate.
+    // `NoObjectGeneratedError` carries no `providerMetadata`, so a repaired call books at the
+    // ceiling and says so rather than guessing a cheap rate.
     expect(alerts.map((a) => a.kind)).toEqual(['decode_repaired', 'llm_price_unpriced_route'])
     expect(alerts.find((a) => a.kind === 'decode_repaired')!.detail).toContain('narrator')
   })
@@ -277,10 +273,8 @@ describe('budget guard', () => {
 })
 
 describe('served model attribution', () => {
-  // This assertion used to read "costed with pinned prices when unknown", and that was the
-  // defect: an unpriced route booked at the pinned model's cheap rate and nobody could see it.
-  // An unknown model is a different product at an unknown price, so it now books at the worst
-  // rate any endpoint charges and raises an alert. It can only over-report.
+  // An unknown model is a different product at an unknown price, so it books at the worst rate
+  // any endpoint charges and raises an alert. It can only over-report.
   it('logs the model that actually answered, costed at the ceiling when unpriced', async () => {
     const db = openDb()
     const model = mockModel([
@@ -296,9 +290,8 @@ describe('served model attribution', () => {
   })
 })
 
-// The guard that would have caught this project's own defect on call 1 instead of call 611.
-// OpenRouter reports what it charged on the same response that carries the tokens; the pinned
-// table computes a second opinion; the two are compared every call.
+// OpenRouter reports what it charged on the response that carries the tokens; the pinned table
+// computes a second opinion; the two are compared every call.
 describe('price reconciliation', () => {
   const kinds = (db: Database.Database): string[] =>
     (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as Array<{ kind: string }>).map((r) => r.kind)
@@ -320,8 +313,7 @@ describe('price reconciliation', () => {
     expect(usage.costUsd).toBeCloseTo(0.00099, 12)
   })
 
-  // THE DEFECT. Wafer charges 0.28/0.56; the table said 0.14/0.28 and booked half. With the
-  // table restored to Baidu's prices this alert is what fires on the first call.
+  // The defect: a table half the endpoint's real price books half the spend.
   it('alerts when the table disagrees with what the provider charged', async () => {
     const db = openDb()
     // Wafer's real price for these tokens is (1000*0.28 + 1000*0.56)/1e6 = $0.00084.
@@ -376,8 +368,7 @@ describe('price reconciliation', () => {
     expect(kinds(db)).toEqual([])
   })
 
-  // The mechanism of the original defect, on its own, because it deserves its own test: a
-  // `served` value with no price row must not fall through to somebody else's cheap rate.
+  // A `served` value with no price row must not fall through to somebody else's cheap rate.
   it('books an unpriced provider at the ceiling and complains, never at the pinned rate', async () => {
     const db = openDb()
     const model = mockModel([
@@ -436,8 +427,7 @@ describe('alerts', () => {
 })
 
 describe('pessimistic reservation (T21)', () => {
-  // A model that will not answer until released: every caller is in flight at
-  // once, which is exactly the race the booked-after-the-fact guard lost.
+  // A model that will not answer until released, so every caller is in flight at once.
   function gatedModel(): { model: MockLanguageModelV4; started: () => number; release: () => void } {
     let started = 0
     let open!: () => void
@@ -548,9 +538,6 @@ describe('default OpenRouter path extraBody', () => {
     })
   })
 
-  // C11 R20: `provider.order` is a preference and only `allow_fallbacks:false` makes it an
-  // allow-list. It was a hardcoded literal, so a run that "pinned" a provider got that
-  // provider's answer rate AND whatever OpenRouter fell through to.
   it('the allow-list is a switch now, and the default leaves the routing where it was', () => {
     expect(defaultExtraBody(['x/y'], ['P'], false)).toEqual({
       models: [MIND_MODEL, 'x/y'],
@@ -559,11 +546,8 @@ describe('default OpenRouter path extraBody', () => {
     expect(defaultExtraBody(['x/y'], ['P']).provider.allow_fallbacks).toBe(true)
   })
 
-  // Measured at Wafer, n=20 per rung, byte-identical prompts: `minimal`/`low`/`medium`/`high`
-  // are indistinguishable (medians 245-323, each rung's own spread four times wider than any
-  // gap between them), while `enabled:false` takes reasoning to exactly 0 on 20/20 calls and
-  // median output from 168 to 50. `unset` and `high` bill the same +22-token thinking preamble,
-  // so leaving it unset has always meant asking for the maximum.
+  // The effort rungs are indistinguishable in practice; only `enabled:false` takes reasoning
+  // to zero. Unset bills the same as `high`, so leaving it unset asks for the maximum.
   it('carries a reasoning setting into the body, and sends none when none is asked for', () => {
     expect(defaultExtraBody(['x/y'], ['P'], true, { enabled: false })).toEqual({
       models: [MIND_MODEL, 'x/y'],
@@ -605,10 +589,6 @@ describe('the back end that answered is written down (C11 R20)', () => {
   })
 })
 
-// C11 T37b step 5 — a stalled provider response used to hang the caller for ever. The
-// interrupted G11b re-run lost its night to a `semantic` call that sat for 614 s and then
-// failed; with `maxRetries` 2 behind it, one stalled request could hold a gate open for the
-// best part of an hour. The bound turns an unbounded wait into an ordinary failed attempt.
 describe('a stalled request is bounded (T37b)', () => {
   it('aborts a call that outlives the timeout, and logs it as a failed attempt', async () => {
     const db = openDb()
