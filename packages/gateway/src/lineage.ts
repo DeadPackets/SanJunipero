@@ -5,7 +5,7 @@ import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { toEvent, type EventRow } from './http.js'
 
-export type LineagePerson = { id: string; name: string; alive: boolean }
+type LineagePerson = { id: string; name: string; alive: boolean }
 export type ParentEdge = { parentId: string; childId: string; tick: number }
 export type Household = { structureId: string; memberIds: string[] }
 export type LineageResponse = {

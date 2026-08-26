@@ -109,7 +109,7 @@ describe('observer data apis', () => {
       },
     })
     for (let i = 0; i < 80; i++) loop.step()
-    liveAgents = JSON.parse(JSON.stringify(loop.state.agents))
+    liveAgents = JSON.parse(JSON.stringify(loop.state.agents)) as Record<string, unknown>
 
     const adb = openAgentFixtureDb(join(dir, 'alice.db'))
     adb

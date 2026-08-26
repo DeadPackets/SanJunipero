@@ -2,8 +2,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { z } from 'zod'
 import { TOGGLABLE_PATHS } from '@sj/engine'
 
-export const ADMIN_LAWS_PATH = '/admin/laws'
-export const DEFAULT_ADMIN_HOST = '127.0.0.1'
+const ADMIN_LAWS_PATH = '/admin/laws'
+const DEFAULT_ADMIN_HOST = '127.0.0.1'
 const MAX_BODY_BYTES = 4096
 
 const LawRequest = z.object({ path: z.string().min(1), value: z.unknown() })

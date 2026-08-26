@@ -1,5 +1,14 @@
 import type { ServerResponse } from 'node:http'
+import type { RawData } from 'ws'
 import type { SimEvent } from '@sj/shared'
+
+/** ws hands a frame back as `Buffer | ArrayBuffer | Buffer[]`; only the Buffer case survives a
+ *  bare `.toString()`, and a fragmented text frame arrives as the array. */
+export function frameText(d: RawData): string {
+  if (Buffer.isBuffer(d)) return d.toString('utf8')
+  if (Array.isArray(d)) return Buffer.concat(d).toString('utf8')
+  return Buffer.from(d).toString('utf8')
+}
 
 export const sendJson = (res: ServerResponse, body: unknown, status = 200): void => {
   res.writeHead(status, { 'content-type': 'application/json' })

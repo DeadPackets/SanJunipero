@@ -15,10 +15,7 @@ import { TALK_WINDOW_TICKS } from './api.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { toEvent, type EventRow } from './http.js'
 
-// Each rule here is one observable act, not a semantic. `BOND_NOTES` lives in `@sj/shared` so
-// the viewer can name the six acts without reading the server.
-export { BOND_NOTES } from '@sj/shared'
-
+// Each rule here is one observable act, not a semantic.
 const VERB_BONDS: Readonly<Record<string, BondKind>> = {
   give: 'owe',
   teach: 'work',

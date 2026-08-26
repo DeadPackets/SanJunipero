@@ -18,7 +18,7 @@ import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { notFound, sendJson, toEvent, type EventRow } from './http.js'
 
 export const TALK_WINDOW_TICKS = 20 // two spoke events this close, in earshot → one talk weight
-export const TOP_MOMENTS = 5
+const TOP_MOMENTS = 5
 
 /**
  * `server.ts` decodes each path segment AFTER splitting on `/`, so a `%2f` a stranger writes

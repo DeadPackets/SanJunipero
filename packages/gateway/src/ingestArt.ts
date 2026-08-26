@@ -45,16 +45,16 @@ export async function ingestTerrainArt(db: Database.Database): Promise<IngestEnt
 
 // The premade library — 50 painted items, fifteen of them the furniture the interior scenes
 // place. `registerCommittedItems` THROWS on a half-present item rather than falling back.
-export async function ingestLibraryArt(db: Database.Database): Promise<IngestEntry[]> {
+export function ingestLibraryArt(db: Database.Database): IngestEntry[] {
   return registerCommittedItems(new AssetCodex(db))
 }
 
 // The five founder sheets, one packed atlas each.
-export async function ingestCastArt(db: Database.Database): Promise<IngestEntry[]> {
+export function ingestCastArt(db: Database.Database): IngestEntry[] {
   return registerCommittedCast(new AssetCodex(db))
 }
 
-export async function ingestProductionArt(db: Database.Database): Promise<IngestEntry[]> {
+export function ingestProductionArt(db: Database.Database): IngestEntry[] {
   const codex = new AssetCodex(db)
   return [...registerCommittedBuildings(codex), ...registerCommittedCast(codex)]
 }

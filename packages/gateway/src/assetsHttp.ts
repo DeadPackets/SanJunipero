@@ -32,15 +32,15 @@ export const PLACEHOLDER_PX: Record<AssetClass, { w: number; h: number }> = {
 }
 
 // Placeholder-sheet geometry (Character standard v2 cells; tunables exported per plan law)
-export const BODY_W = 40
-export const BODY_H = 64
-export const FOOT_BAR_W = 4
-export const FOOT_BAR_H = 2
-export const FOOT_BAR_Y = 86
-export const FOOT_BAR_OFFSET = 6
-export const MARKER_SIZE = 6
+const BODY_W = 40
+const BODY_H = 64
+const FOOT_BAR_W = 4
+const FOOT_BAR_H = 2
+const FOOT_BAR_Y = 86
+const FOOT_BAR_OFFSET = 6
+const MARKER_SIZE = 6
 // facing corner markers: sw honey, se sage, ne water, nw rose (master-palette ramp entries)
-export const FACING_MARKER: Record<Facing, Rgb> = {
+const FACING_MARKER: Record<Facing, Rgb> = {
   sw: [0xe0, 0xa9, 0x5e],
   se: [0x93, 0xb5, 0x73],
   ne: [0x7f, 0xb0, 0xc9],
@@ -53,10 +53,10 @@ const px = (img: RawImage, x: number, y: number, c: Rgb): void => {
 
 // v2 geometry: 4 facing cols × 6 pose rows, 96×96 cells, feet at y=88; walk poses visibly
 // distinct via foot-bar offsets; sleep lies sideways (wider than tall).
-export function buildPlaceholderSheet(agentId: string): RawImage {
+function buildPlaceholderSheet(agentId: string): RawImage {
   const pal = paletteRgb()
   // body fill alternates two warm-grey ramp entries chosen by agentId char-code sum parity
-  const parity = [...agentId].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 2
+  const parity = Array.from(agentId).reduce((s, ch) => s + ch.charCodeAt(0), 0) % 2
   const light = parity === 0 ? pal[24]! : pal[25]!
   const dark = parity === 0 ? pal[25]! : pal[26]!
   const barColor = pal[31]!
@@ -103,7 +103,7 @@ export function buildPlaceholderSheet(agentId: string): RawImage {
   return sheet
 }
 
-export function buildEmoteAtlas(): RawImage {
+function buildEmoteAtlas(): RawImage {
   const width = EMOTE_KINDS.length * EMOTE_SIZE
   const atlas: RawImage = {
     width,
@@ -131,7 +131,7 @@ const sendPng = (res: ServerResponse, buf: Buffer, immutable = false): void => {
 const stripPng = (file: string): string | null => (file.endsWith('.png') ? file.slice(0, -4) : null)
 
 /** Encoded sheets held at once. A character sheet is 5 938 B here, so this is about 760 KB. */
-export const MAX_ENCODED = 128
+const MAX_ENCODED = 128
 
 /**
  * The key is the stranger's to choose and `sharp` runs on libuv's four-thread pool, which the

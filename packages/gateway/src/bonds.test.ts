@@ -15,6 +15,7 @@ import {
 } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { createGateway, type Gateway } from './server.js'
+import { toEvent, type EventRow } from './http.js'
 import { BOND_TYPES, buildBonds } from './bonds.js'
 
 const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0))
@@ -190,18 +191,10 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
    * SELECT may drop them — `fauna_moved` alone carries 640 B payloads and dominates a real log.
    */
   it('★ answers what the whole log answers, reading only the five types a bond is made of', () => {
-    const rows = db.prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq').all() as {
-      seq: number
-      tick: number
-      type: string
-      payload: string
-    }[]
-    const all = rows.map((r) => ({
-      seq: r.seq,
-      tick: r.tick,
-      type: r.type,
-      payload: JSON.parse(r.payload),
-    }))
+    const rows = db
+      .prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq')
+      .all() as EventRow[]
+    const all = rows.map(toEvent)
     expect(
       all.some((e) => !BOND_TYPES.includes(e.type)),
       'the log carries types bonds ignore',

@@ -27,7 +27,7 @@ export function readDiscoveries(
       name: p.name,
       kind: p.kind,
       byId: p.byId,
-      by: nameOf(String(p.byId ?? '')),
+      by: nameOf(typeof p.byId === 'string' ? p.byId : ''),
       intent: p.intent,
       makes: p.makes,
     })

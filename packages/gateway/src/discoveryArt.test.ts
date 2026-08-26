@@ -10,7 +10,7 @@ import {
 const stubCodex = (kinds: string[]) => ({
   listSince: (): AssetRecord[] =>
     kinds.map((k, i) => ({ id: `asset_${k}`, seq: i + 1, kind: k }) as unknown as AssetRecord),
-  onAssetReady: (_cb: (r: AssetRecord) => void): void => {},
+  onAssetReady: (): void => {},
 })
 
 describe('what a discovery still needs drawing', () => {

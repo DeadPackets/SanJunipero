@@ -237,7 +237,7 @@ export function restorableSnapshot(
 
 const countMemories = (db: Database.Database): number => {
   try {
-    return Number((db.prepare('SELECT COUNT(*) AS n FROM memories').get() as { n: number }).n)
+    return (db.prepare('SELECT COUNT(*) AS n FROM memories').get() as { n: number }).n
   } catch {
     return 0
   }
@@ -335,7 +335,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   let booted: BootedMinds | null = null
   let bridge: EngineBridge | null = null
   let stopped = false
-  let saveRuntime: (tick: number) => void = () => {}
+  let saveRuntime: ((tick: number) => void) | null = null
 
   const stopMinds = (): void => {
     if (stopped) return
@@ -398,7 +398,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
                 },
               })
               return {
-                adjudicate: built.adjudicate,
+                adjudicate: (...args) => built.adjudicate(...args),
                 codify: (recipe: { id: string }, credit) => built.codify(recipe as Recipe, credit),
               }
             })())
@@ -441,7 +441,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
       // ── the money, on the world's own clock ──
       bridge.onTick((tick) => {
-        if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime(tick)
+        if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
         if (tick % LIVE_SPEND_CHECK_TICKS !== 0 || stopped) return
         const spent = ledgerTotalUsd(opsDb)
         if (spent >= cap) {
@@ -473,7 +473,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       // The last plan each mind was halfway through, written at the tick it stopped rather
       // than at the last multiple of 48 — a clean shutdown should lose nothing at all.
       try {
-        saveRuntime(bridge?.currentTick() ?? 0)
+        saveRuntime?.(bridge?.currentTick() ?? 0)
       } catch {
         /* a closed db loses the plan, not the memory */
       }

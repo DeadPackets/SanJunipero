@@ -15,7 +15,7 @@ import { mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
 import { makeStaticSite } from './staticSite.js'
 import { reportOnce } from './degraded.js'
-import { notFound, sendJson } from './http.js'
+import { frameText, notFound, sendJson } from './http.js'
 
 export type GatewayOpts = {
   dbPath: string
@@ -49,11 +49,11 @@ export const HELLO_DEADLINE_MS = 5_000
 
 /** A viewer only ever sends `hello`, `scrub` or `live`, none of which reach 200 bytes. ws
  *  defaults to a 100 MB frame, which is 100 MB a stranger can make the server buffer. */
-export const MAX_CLIENT_FRAME = 4096
+const MAX_CLIENT_FRAME = 4096
 
 /** How many viewers one world serves before it turns people away. Refusing the 501st with a
  *  code is a stream at capacity; accepting it and degrading for the other 500 is an outage. */
-export const DEFAULT_MAX_VIEWERS = 500
+const DEFAULT_MAX_VIEWERS = 500
 
 /**
  * A 40-byte `scrub` frame makes the gateway load a snapshot, fold every event to the asked tick
@@ -151,7 +151,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         return
       }
     }
-    if (site !== null && site(req, res, url.pathname)) return
+    if (site?.(req, res, url.pathname)) return
     notFound(res)
   })
 
@@ -162,17 +162,15 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const catchUp: string[] = []
   let catchUpSeq = 0
   const snapshotJson = (): string => {
-    if (snapJson === null) {
-      snapJson = JSON.stringify({
-        t: 'snapshot',
-        tick: mirror.state().tick,
-        seq: mirror.seq(),
-        state: mirror.state(),
-        config,
-        laws: mirror.state().laws ?? {},
-        live: true,
-      })
-    }
+    snapJson ??= JSON.stringify({
+      t: 'snapshot',
+      tick: mirror.state().tick,
+      seq: mirror.seq(),
+      state: mirror.state(),
+      config,
+      laws: mirror.state().laws ?? {},
+      live: true,
+    })
     return snapJson
   }
 
@@ -217,7 +215,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     sock.on('message', (data) => {
       let msg: ClientMsg
       try {
-        msg = ClientMsg.parse(JSON.parse(data.toString()))
+        msg = ClientMsg.parse(JSON.parse(frameText(data)))
       } catch {
         sock.close(CLOSE_BAD_HELLO)
         return

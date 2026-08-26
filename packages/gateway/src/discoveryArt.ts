@@ -45,9 +45,8 @@ export function watchDiscoveryArt(deps: {
         // Claimed BEFORE the await, so a second discovery naming the same kind in the same
         // breath does not pay for it twice.
         known.add(kind)
-        const p: Promise<void> = deps.forge
+        const p: Promise<unknown> = deps.forge
           .commission(itemCommissionText(kind, d.name), { w: 1, h: 1 }, 'item')
-          .then(() => {})
           .catch((err: unknown) => {
             // commission() contracts never to reject; if it somehow does, the kind goes back
             // so a later discovery can try again, and the run does not stop for a picture.

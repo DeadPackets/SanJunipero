@@ -6,7 +6,12 @@ type SnapRow = { tick: number; seq: number; state: string }
 type EvRow = { seq: number; tick: number; type: string; payload: string }
 
 const parseEv = (r: EvRow): SimEvent =>
-  EventEnvelope.parse({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) })
+  EventEnvelope.parse({
+    seq: r.seq,
+    tick: r.tick,
+    type: r.type,
+    payload: JSON.parse(r.payload) as unknown,
+  })
 
 // Read-only by construction: the mirror only ever prepares SELECTs. Readonly
 // enforcement lives where the DB is opened (createGateway passes { readonly: true }).
@@ -63,7 +68,7 @@ export class WorldMirror {
       this.#state = fold(this.#state, ev, this.#config)
       this.#seq = ev.seq
       const last = groups[groups.length - 1]
-      if (last && last.tick === ev.tick) last.events.push(ev)
+      if (last?.tick === ev.tick) last.events.push(ev)
       else groups.push({ tick: ev.tick, events: [ev] })
     }
     return groups

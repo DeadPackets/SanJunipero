@@ -10,6 +10,7 @@ import { startDevWorld } from './devWorld.js'
 import { publishThought } from './observer.js'
 import { drawHouse, registerDemoHouse } from './hotswapDemo.js'
 import { WorldMirror } from './worldMirror.js'
+import { frameText } from './http.js'
 
 const until = async (cond: () => boolean, timeoutMs = 30_000): Promise<void> => {
   const t0 = Date.now()
@@ -24,7 +25,7 @@ type Client = { sock: WebSocket; frames: string[] }
 const connect = async (port: number): Promise<Client> => {
   const sock = new WebSocket(`ws://127.0.0.1:${port}/ws`)
   const frames: string[] = []
-  sock.on('message', (d) => frames.push(d.toString()))
+  sock.on('message', (d) => frames.push(frameText(d)))
   await new Promise((resolve, reject) => {
     sock.on('open', resolve)
     sock.on('error', reject)

@@ -55,7 +55,7 @@ describe('ingestProductionArt', () => {
     const codex = new AssetCodex(db)
 
     const committed = listCommittedBuildings().length + listCommittedCast().length
-    const first = await ingestProductionArt(db)
+    const first = ingestProductionArt(db)
     expect(first).toHaveLength(committed)
     expect(first.every((e) => e.action === 'registered')).toBe(true)
     expect(first.map((e) => e.kind)).toContain('character:omar')
@@ -91,7 +91,7 @@ describe('ingestProductionArt', () => {
     expect(codex.listSince(0).some((r) => r.kind === 'house:se')).toBe(true)
 
     // second run: nothing new
-    const second = await ingestProductionArt(db)
+    const second = ingestProductionArt(db)
     expect(second.every((e) => e.action === 'unchanged')).toBe(true)
     expect(codex.listSince(0)).toHaveLength(first.length)
 
@@ -228,7 +228,7 @@ describe('ingestLibraryArt', () => {
 
     // The interior tileset rides in with them: it registers here because the terrain ingest
     // short-circuits on a resumed town and this one never does.
-    const first = await ingestLibraryArt(db)
+    const first = ingestLibraryArt(db)
     const interiorKinds = INTERIOR_PIECES.map(interiorCodexKind)
     expect(first.map((e) => e.kind).sort()).toEqual(
       [...LIBRARY.map((e) => e.kind), ...interiorKinds].sort(),
@@ -245,7 +245,7 @@ describe('ingestLibraryArt', () => {
     expect(manifest!.interior?.isBed).toBe(true) // the meta the interior scene reads
     expect(bed.costUsd).toBe(0) // the generation booked its own spend
 
-    const second = await ingestLibraryArt(db)
+    const second = ingestLibraryArt(db)
     expect(second.every((e) => e.action === 'unchanged')).toBe(true)
     expect(codex.listSince(0).filter((r) => r.class === 'item')).toHaveLength(LIBRARY.length * 2)
     db.close()
@@ -274,12 +274,12 @@ describe('ingestCastArt', () => {
     const db = openForgeDb(join(dir, 'cast.db'))
     const codex = new AssetCodex(db)
 
-    const first = await ingestCastArt(db)
+    const first = ingestCastArt(db)
     expect(first.map((e) => e.kind).sort()).toEqual(
       [...FOUNDER_IDS].map((id) => `character:${id}`).sort(),
     )
     expect(first.every((e) => e.action === 'registered')).toBe(true)
-    expect((await ingestCastArt(db)).every((e) => e.action === 'unchanged')).toBe(true)
+    expect(ingestCastArt(db).every((e) => e.action === 'unchanged')).toBe(true)
     expect(codex.listSince(0).filter((r) => r.class === 'rig-part')).toHaveLength(
       FOUNDER_IDS.length,
     )
@@ -290,8 +290,8 @@ describe('ingestCastArt', () => {
 describe('the boot resolves every kind the world will ask for', () => {
   it('after a real boot ingest, nothing is left to the placeholder', async () => {
     const db = openForgeDb(join(dir, 'boot.db'))
-    await ingestProductionArt(db)
-    await ingestLibraryArt(db)
+    ingestProductionArt(db)
+    ingestLibraryArt(db)
     const all = new AssetCodex(db).listSince(0).filter((r) => r.status === 'ready')
     const kindsOf = (klass: string) =>
       all.filter((r) => r.class === klass && r.kind !== null).map((r) => r.kind!)

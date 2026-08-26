@@ -15,6 +15,7 @@ import {
   startDevWorld,
 } from './devWorld.js'
 import { townStructuresFor } from './founders.js'
+import { frameText } from './http.js'
 
 const until = async (cond: () => boolean, timeoutMs = 12_000): Promise<void> => {
   const t0 = Date.now()
@@ -96,7 +97,7 @@ describe('dev world server', () => {
 
       const sock = new WebSocket(`ws://127.0.0.1:${dw.gateway.port}/ws`)
       const frames: string[] = []
-      sock.on('message', (d) => frames.push(d.toString()))
+      sock.on('message', (d) => frames.push(frameText(d)))
       await new Promise((resolve, reject) => {
         sock.on('open', resolve)
         sock.on('error', reject)
@@ -137,12 +138,10 @@ describe('dev world server', () => {
 
       const ticks = parsed().filter((m) => m.t === 'tick')
       expect(ticks.length).toBeGreaterThanOrEqual(2)
-      for (const m of ticks) expect(m.t === 'tick' && m.events.length).toBeGreaterThan(0)
+      for (const m of ticks) expect(m.events.length).toBeGreaterThan(0)
 
       const thought = parsed().find((m) => m.t === 'thought')!
-      expect(thought.t === 'thought' && Object.values(THOUGHT_LINES)).toContain(
-        thought.t === 'thought' ? thought.text : '',
-      )
+      expect(Object.values(THOUGHT_LINES)).toContain(thought.text)
 
       sock.close()
     } finally {

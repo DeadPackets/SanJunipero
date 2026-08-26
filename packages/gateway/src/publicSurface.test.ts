@@ -20,6 +20,7 @@ import {
 import { AGENT_ID } from './api.js'
 import { MAX_BYTES, MAX_KEYS, MAX_VALUES, makeSeqCache } from './seqCache.js'
 import { CLIENT_ASSET_DIR, resolveInRoot } from './staticSite.js'
+import { frameText } from './http.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -121,7 +122,7 @@ describe('the public surface a stranger reaches', () => {
     const base = `http://127.0.0.1:${gw.port}`
 
     // The legitimate read still works, so the guard is a filter and not a wall.
-    const mine = await (await fetch(`${base}/api/agent/walker/journal`)).json()
+    const mine = (await (await fetch(`${base}/api/agent/walker/journal`)).json()) as unknown
     expect(mine).toEqual([{ tick: 1, day: 0, text: 'I walked east.' }])
 
     // `:id` is decoded AFTER the router splits on '/', so these arrive as one segment holding a
@@ -258,8 +259,9 @@ describe('the public surface a stranger reaches', () => {
     const gw = await gwPromise
     const sock = await connect(gw.port)
     open.push(sock)
-    const frames: { t: string; reqId?: number; tick?: number }[] = []
-    sock.on('message', (d) => frames.push(JSON.parse(d.toString())))
+    type Frame = { t: string; reqId?: number; tick?: number }
+    const frames: Frame[] = []
+    sock.on('message', (d) => frames.push(JSON.parse(frameText(d)) as Frame))
     sock.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: null }))
     await wait(60)
     frames.length = 0

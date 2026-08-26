@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # No OPENROUTER_API_KEY or IMAGE_PROVIDER_KEY anywhere in this file, deliberately: with no key
+  # No OPENROUTER_API_KEY anywhere in this file, deliberately: with no key
   # in the environment there is no path from a green build to a bill. Never add one as a secret.
   CI: "true"
 

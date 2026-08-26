@@ -1,12 +1,9 @@
 import { z } from 'zod'
 import {
   CITY_DWELLING_KINDS,
-  CITY_H,
-  CITY_W,
   RIVER_HALF,
   TOWN_RINGS_GENESIS,
   T_PATH,
-  T_ROAD,
   doorFrontTile,
   makeCityTemplate,
   plazaCentreOf,
@@ -32,9 +29,9 @@ export const SHOWCASE_H = showcaseSpan(TOWN_RINGS_GENESIS)
 export const ROAD_TILE = 7
 export const GRASS_TILE = 0,
   WATER_TILE = 2,
-  FOREST_TILE = 3,
-  ROCK_TILE = 4,
   SAND_TILE = 5
+const FOREST_TILE = 3,
+  ROCK_TILE = 4
 
 export const SHOWCASE_ANCHOR = { x: SHOWCASE_MARGIN, y: SHOWCASE_MARGIN } as const
 
@@ -102,7 +99,7 @@ export const PLAZA_TILE = plazaTile(TOWN_RINGS_GENESIS)
 
 // The city template's kinds, not a smaller invented set — dropping the well, the fire pit or
 // the wagon would make the showcase a different town from the one genesis builds.
-export const ShowcaseStructureSchema = z
+const ShowcaseStructureSchema = z
   .object({
     kind: z.enum([...CITY_DWELLING_KINDS, 'storehouse', 'shed', 'well', 'fire_pit', 'wagon']),
     x: z.number().int().min(0),
@@ -237,5 +234,3 @@ export function roadReach(
   }
   return seen
 }
-
-export { CITY_H, CITY_W, T_ROAD }
