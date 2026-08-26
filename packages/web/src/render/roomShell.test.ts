@@ -16,7 +16,7 @@ import {
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorBoards, floorPolyOf, floorPools,
   roomBox, roomCrop, roomCropPx, roomMaskPoly, roomOriginX, roomOriginY, roomPanRange, roomPanTo,
   roomWidthPx, roomZoomFor, skirtingPolys,
-  easePan, ROOM_PAN_HALF_LIFE_MS,
+  easePan, roomFocusOf, ROOM_PAN_HALF_LIFE_MS,
   tileCentreScreen,
   thresholdPoly, wallCourses, wallMount, wallPolys, type ShellPainter,
 } from './roomShell.js'
@@ -654,6 +654,89 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
     }
     // ANTI-VACUITY, and the size of the defect: a fifth of a farmhouse's floor was unreachable
     expect(offWithout, 'no tile was ever off the glass — nothing was fixed').toBeGreaterThan(20)
+  })
+
+  // ★ WHAT IT FOLLOWS WHEN NOBODY IS SELECTED, decided rather than defaulted. A room with four
+  // sleepers and no action still needs a defined resting position; "wherever it was left" reads
+  // as broken.
+  it('★ it follows the person you came in for, then the room, then nothing', () => {
+    const a = { id: 'amara', sx: 100, sy: 40 }
+    const b = { id: 'yusuf', sx: 300, sy: 80 }
+    // 1. the followed body wins outright, wherever it is standing
+    expect(roomFocusOf([a, b], 'yusuf')).toEqual({ sx: 300, sy: 80 })
+    expect(roomFocusOf([a, b], 'amara')).toEqual({ sx: 100, sy: 40 })
+    // 2. followed but NOT in this room falls through to the room, it does not freeze
+    expect(roomFocusOf([a, b], 'someone-else')).toEqual({ sx: 200, sy: 60 })
+    expect(roomFocusOf([a, b], null)).toEqual({ sx: 200, sy: 60 })
+    // 3. an empty room is the landed placement, never a stale one
+    expect(roomFocusOf([], 'amara')).toBeNull()
+    expect(roomFocusOf([], null)).toBeNull()
+    // and four sleepers who never move give one FIXED resting point, not a drift
+    const sleepers = [a, b, { id: 'c', sx: 500, sy: 120 }, { id: 'd', sx: 700, sy: 160 }]
+    expect(roomFocusOf(sleepers, null)).toEqual(roomFocusOf(sleepers, null))
+    expect(roomFocusOf(sleepers, null)).toEqual({ sx: 400, sy: 100 })
+  })
+
+  // ★ THE FOCUS IS ALWAYS INSIDE THE ROOM. A focus outside the walls is how a camera ends up
+  // framing a viewer on nothing at all — it clamps to an edge and parks there. Over every room
+  // kind the config knows, and over every body in it.
+  it('★ the focus never leaves the room, whoever is in it and wherever they stand', () => {
+    let checked = 0
+    for (const { kind, room } of roomsOf()) {
+      // every tile centre in the room — the whole set of places a body can be
+      const pts = []
+      for (let x = 0; x < room.w; x++) {
+        for (let y = 0; y < room.h; y++) {
+          const c = tileCentreScreen(x, y)
+          pts.push({ id: `b${x}-${y}`, sx: c.sx, sy: c.sy })
+        }
+      }
+      const west = interiorToScreen(0, room.h).sx
+      const east = interiorToScreen(room.w, 0).sx
+      const box = roomBox(room, WALL_H_PX)
+      // a followed body, the whole crowd, and every single-occupant room there could be
+      const cases = [
+        roomFocusOf(pts, pts[0]!.id),
+        roomFocusOf(pts, pts[pts.length - 1]!.id),
+        roomFocusOf(pts, null),
+        roomFocusOf(pts, 'a-body-in-another-room'),
+        ...pts.map((p) => roomFocusOf([p], null)),
+      ]
+      for (const f of cases) {
+        expect(f, `${kind}: a room with bodies in it has a focus`).not.toBeNull()
+        expect(f!.sx, `${kind}: focus west of the room`).toBeGreaterThanOrEqual(west)
+        expect(f!.sx, `${kind}: focus east of the room`).toBeLessThanOrEqual(east)
+        expect(f!.sy, `${kind}: focus above the room`).toBeGreaterThanOrEqual(box.top)
+        expect(f!.sy, `${kind}: focus below the room`).toBeLessThanOrEqual(box.bottom)
+        checked++
+      }
+      // a room whose last body just walked out through the door does not keep his corner
+      expect(roomFocusOf([], null), `${kind}: emptied room holds a stale focus`).toBeNull()
+    }
+    expect(checked, 'no focus was ever checked').toBeGreaterThan(100)
+  })
+
+  // ★ AND THE CAMERA NEVER ASKS FOR RANGE IT DOES NOT HAVE. In a room with zero crop the focus
+  // must resolve to a FIXED position — not a clamped one that jitters as a body walks about.
+  it('★ a room that fits does not move, whoever walks about inside it', () => {
+    let fitted = 0
+    for (const { kind, room } of roomsOf()) {
+      for (const stage of [{ w: 1920, h: 1200 }, { w: 2560, h: 1440 }]) {
+        if (roomCrop(stage.w, stage.h, room, WALL_H_PX).x > 0) continue
+        if (roomCrop(stage.w, stage.h, room, WALL_H_PX).y > 0) continue
+        fitted++
+        for (let x = 0; x < room.w; x++) {
+          for (let y = 0; y < room.h; y++) {
+            const f = tileCentreScreen(x, y)
+            expect(
+              roomPanTo(f, stage.w, stage.h, ROOM_ZOOM, room, WALL_H_PX),
+              `${kind} @${stage.w}x${stage.h}: moved for a body at ${x},${y}`,
+            ).toEqual({ dx: 0, dy: 0 })
+          }
+        }
+      }
+    }
+    expect(fitted, 'no room ever fitted — this proved nothing').toBeGreaterThan(0)
   })
 
   it('★ the pan eases rather than cuts, and at the same rate however fast the frames come', () => {

@@ -407,6 +407,32 @@ export function roomPanTo(
   }
 }
 
+/**
+ * ★ WHAT THE CAMERA FOLLOWS — and the order is the answer to "a camera that follows nobody is
+ * a camera the viewer has to drive".
+ *
+ * The user chose this room for one stated reason: *"I want NPCs to be able to actually walk
+ * around and interact with objects."* So the camera watches the room's LIFE, not its geometry:
+ *
+ * 1. the body the viewer is already following, if it is in this room — never lose the person
+ *    you came in for;
+ * 2. otherwise the centroid of everybody in the room, so a room with people in it is framed on
+ *    the people;
+ * 3. otherwise `null` — and an empty room does not drift. `roomPanTo(null)` is the landed
+ *    placement to the pixel, so a room nobody is in looks exactly as it does today.
+ */
+export function roomFocusOf(
+  bodies: ReadonlyArray<{ id: string; sx: number; sy: number }>,
+  followedId: string | null,
+): { sx: number; sy: number } | null {
+  const followed = bodies.find((b) => b.id === followedId)
+  if (followed !== undefined) return { sx: followed.sx, sy: followed.sy }
+  if (bodies.length === 0) return null
+  const sx = bodies.reduce((a, b) => a + b.sx, 0) / bodies.length
+  const sy = bodies.reduce((a, b) => a + b.sy, 0) / bodies.length
+  return { sx, sy }
+}
+
 /** How far the camera closes on its target each frame. A room camera that snaps is a cut, and
  *  a cut inside one room reads as a different room. Frame-rate independent. */
 export const ROOM_PAN_HALF_LIFE_MS = 260
