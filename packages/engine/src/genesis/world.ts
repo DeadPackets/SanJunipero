@@ -8,10 +8,8 @@ import { genesisState, type TileId, type WorldState } from '../state.js'
 import { spoilageFor } from '../systems/spoilage.js'
 import { buildableRecipe, buildTicks, type PendingEvent } from '../verbs.js'
 
-// The world on the morning of day one: ground authored from (x, y) arithmetic alone, then the
-// city template baked in, then the ordered events that plant the town. NO RNG anywhere here —
-// a genesis roll would need somewhere to be recorded, and `world_grown` is where that pattern
-// belongs. Two calls with the same config are deep-equal, which is what lets replay start here.
+// The world on the morning of day one, authored from (x, y) arithmetic alone. NO RNG anywhere:
+// two calls with the same config are deep-equal, which is what lets replay start here.
 
 const T_GRASS: TileId = 0, T_EARTH: TileId = 1, T_WATER: TileId = 2
 const T_FOREST: TileId = 3, T_ROCK: TileId = 4, T_SAND: TileId = 5
@@ -24,10 +22,8 @@ export const GENESIS_LAKE = { x: 86, y: 20, rx: 9, ry: 6 } as const
 export const GENESIS_HILL = { x: 22, y: 104, rx: 9, ry: 7 } as const
 export const GENESIS_FOREST_X = 92
 
-// The ford. One reach, four rows, a little north of where the town wakes up: a spit of sand
-// reaches out from the near bank and the channel runs two tiles instead of three. It is the
-// only place a six-plank deck can span, so the paths will converge on it and the bridge will
-// go where feet already go — which is better world than a wider recipe would have been.
+// A spit of sand reaches out from the near bank and the channel runs two tiles instead of three:
+// the only place a six-plank deck can span, so the paths converge on it.
 export const GENESIS_FORD = { x: GENESIS_RIVER_X + 1, y0: 50, y1: 53 } as const
 
 const inFord = (x: number, y: number): boolean =>
@@ -37,22 +33,8 @@ const inFord = (x: number, y: number): boolean =>
 // footprint; `structures.recipes` is the single source for the kinds that can also be built.
 export const GENESIS_BUILDER_ID = 'genesis'
 export type Durability = { maxHp: number; flammable: boolean }
-// The storehouse and the three dwellings came OFF this table when `roofed` landed: they need a
-// `structures.recipes` row to say they have a roof, and a row already carries hp and flammable,
-// so keeping them here would have been the same two numbers written twice (G4). The fire pit
-// went the same way when `hearth` landed, for the same reason and with the same two numbers.
-//
-// ★ THE SHED KEEPS ITS ROW HERE AND MUST NEVER GET ONE IN `structures.recipes`. It reads as a
-// dead kind — no city template stands one and no pair of hands can raise one — and it is not.
-// It has two jobs. It is one of the SIX buildings in the frozen `scripted` dev world
-// (`gateway/founders.ts` TOWN_STRUCTURES), which G1, G2 and G6 hash and which may therefore
-// never change; and it is one of three `INTERIOR_KINDS`, with a shipped 1x1 sprite — a plank
-// door and a slanted roof — and eight furnishing manifests naming it as a room they belong in.
-//
-// A `structures.recipes` row is the wrong home for both of those. A row with `inputs` would
-// mint a 1x1 store nobody asked for; a row with `roofed: true` would tell every mind a shed is
-// somewhere to get out of the weather, which is the word-with-no-verb-behind-it the cabin's
-// unbuildability exists to prevent. Placed-only, unenterable, and known here: that is the job.
+// shed must never get a structures.recipes row: it is in the frozen scripted world and an
+// INTERIOR_KIND, but inputs would mint a 1x1 store and roofed:true would promise shelter it lacks.
 const GENESIS_STRUCTURE_DEFS: Readonly<Record<string, Durability>> = {
   shed: { maxHp: 20, flammable: true },
   wagon: { maxHp: 15, flammable: true },
@@ -106,31 +88,8 @@ function makeTerrain(config: SimConfig, anchor: { x: number; y: number }): TileI
 
 export type GenesisWorld = { terrain: TileId[][]; events: PendingEvent[] }
 
-// ★ THE ABANDONED VILLAGE IS ABANDONED, AND THAT IS WHY THE FOUNDING HAS A WANT IN IT.
-//
-// Canon: the five walked up a single track into a village of eight dwellings, a storehouse, a
-// well and a fire pit that somebody else built and left. What canon never said is how long ago
-// they left. Every dwelling stood sound, so the valley handed five founders 21 bodies' worth of
-// floor before the first tick — 4.2 times what the cast could use — and the only want this
-// project models was answered at tick zero. Every production figure ever reported from here was
-// measured in that town.
-//
-// So the roofs are down on all but two. What stands is walls, three quarters of the way up, on
-// buildings a pair of hands can finish in a night — which is the whole reason this shape was
-// chosen over shrinking the village: the founders' answer to the cold is the village itself,
-// half-mended, and every tick of work pays back the same night.
-//
-// ★ WHY THESE TWO AND NOT THREE. The bar is `shelterLedger(...).per < 1.0`. Sound storehouse and
-// sound cabin is 4 slots against 5 bodies — 0.8 — and it is the LOWEST value reachable without
-// standing up a wall nobody can finish. Every fallen kind must be one `build` accepts, and the
-// only other 2-slot kinds are the cabin and the storehouse themselves, both 2x2: making either
-// buildable would mint a second name for `house`. A one-body want is worth more than a building
-// that looks like an answer and refuses in words a mind cannot use.
-//
-// It is also not really a choice: `roofFell` throws on any roofed kind that is unbuildable and
-// not sound, so this set is FORCED to be exactly the unbuildable roofed kinds, and there are
-// two. `world.test.ts` states that as a law. The cabin can never come off it for a second
-// reason now — it holds the founding valley's only indoor fire.
+// Forced, not chosen: roofFell throws on a roofed kind that is unbuildable and not sound, and
+// those are exactly these two. Holds shelterLedger().per at 0.8 — 4 slots against 5 bodies.
 export const GENESIS_SOUND_ROOFS: ReadonlySet<string> = new Set(['storehouse', 'cabin'])
 
 /** Three quarters. A house is 2 880 ticks, so 720 are left — one night for one pair of hands,
@@ -196,10 +155,8 @@ export function makeGenesisWorld(config: SimConfig, opts: { anchor?: { x: number
       events.push({ type: 'structure_completed', payload: { id } })
       return
     }
-    // Walls, and no roof on them. `structure_progressed` is the same event a builder's own
-    // hands emit, so what a founder finds standing and what a founder leaves standing are the
-    // same thing, and finishing one costs labour and NOTHING ELSE — resuming a site never
-    // spends materials a second time.
+    // structure_progressed is the same event a builder's own hands emit, so finishing one costs
+    // labour and nothing else — resuming a site never spends materials a second time.
     const stood = Math.floor(buildTicks(config, s.kind) * GENESIS_ROOF_STOOD)
     if (stood > 0) events.push({ type: 'structure_progressed', payload: { id, ticks: stood } })
   })

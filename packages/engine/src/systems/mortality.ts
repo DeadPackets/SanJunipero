@@ -4,13 +4,11 @@ import type { SimConfig } from '@sj/shared'
 import { perimeter } from '../interiors.js'
 import { isPassable, type Point } from '../path.js'
 
-// Death gets a cause because dying is arithmetic here, not a roll: every affliction on a body
-// takes its own toll every tick, and the tick the total reaches the floor is the tick it dies.
-// ZERO RNG in this file. What put the affliction there may have been chance; what it does is not.
+// Dying is arithmetic here, not a roll: every affliction on a body takes its own toll every tick,
+// and the tick the total reaches the floor is the tick it dies. ZERO RNG in this file.
 
-// The closed vocabulary of ways to die. The wire type of `agent_died.cause` stays a free
-// string so recorded C1-C10 logs still parse; emitters are held to this list by the type.
-// Array order is the last tiebreak in attribution, so it is part of the contract.
+// The wire type of `agent_died.cause` stays a free string so recorded logs still parse; emitters
+// are held to this list by the type. Array order is the last tiebreak in attribution.
 export const DEATH_CAUSES = [
   'injury', 'poison', 'illness', 'fatigue', 'exposure', 'hunger', 'thirst', 'slain', 'old_age',
 ] as const
@@ -98,9 +96,8 @@ export function placeGrave(ctx: TickCtx, agentId: string): void {
   ctx.emit('grave_placed', { id: mintId(ctx.state(), 'structure'), agentId, name: a.name, x: at.x, y: at.y })
 }
 
-// Called straight after every agent_collapsed, when the fold has already counted the rung.
-// Cold reaches death through this ladder and no other way (Task 22), which is what keeps
-// the cause list closed while still giving a winter night teeth.
+// Called straight after every agent_collapsed, when the fold has already counted the rung. Cold
+// reaches death through this ladder and no other way, which keeps the cause list closed.
 export function escalateFatigue(ctx: TickCtx, agentId: string): void {
   if (!ctx.config.mortality.enabled) return
   const a = ctx.state().agents[agentId]

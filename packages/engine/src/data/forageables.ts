@@ -1,6 +1,5 @@
-// Authored initial conditions, not outcomes: where the first berries and mushrooms stand on
-// day zero. Task 21 owns the node system and emits from this table; nothing reads it yet.
-// Coordinates are absolute on the 128x128 genesis map (C11 section 9).
+// Authored initial conditions, not outcomes: where the first berries and mushrooms stand on day
+// zero. Coordinates are absolute on the 128x128 genesis map.
 
 export const FORAGEABLE_KINDS = [
   'berry_bush', 'mushroom_patch', 'pale_mushroom_patch', 'herb_patch', 'clay_deposit', 'stone_outcrop',
@@ -34,18 +33,8 @@ export const GENESIS_FORAGEABLES: readonly ForageableScatter[] = [
   { kind: 'reed_bed', x: 51, y: 52, stock: 6 },
   { kind: 'reed_bed', x: 51, y: 84, stock: 6 },
   { kind: 'reed_bed', x: 47, y: 70, stock: 6 },
-  // The town's own meadow (C11 R14). Everything above stands beyond the founders' horizon on
-  // the first morning — the nearest bush is seventeen steps and sight reaches twelve — so no
-  // mind could ever name a patch, and the town gathered ONCE in five live runs. These are
-  // inside every founder's sight from their own doorway, on the town's side of the water: the
-  // far bank stays a bridge away, as it always was. The herbs are the healer's, and there was
-  // not one reachable herb patch in the world before this row.
-  //
-  // RE-SITED, NOT RE-DECIDED, when the layout became a grammar: the founders no longer live on
-  // one street, they live on two blocks forty tiles apart, so three patches around one row of
-  // doors could not reach them. FOUR now, two per block, and they stand in the BACKLAND — the
-  // north-west interior every block keeps as garden, which is exactly the ground a town's own
-  // meadow is made of.
+  // The town's own meadow: inside every founder's sight from their doorway (sight 12; the nearest
+  // wild bush is 17 steps), two per block, in the backland. The far bank stays a bridge away.
   { kind: 'berry_bush', x: 74, y: 71, stock: 6 },
   { kind: 'herb_patch', x: 72, y: 68, stock: 4 },
   { kind: 'berry_bush', x: 72, y: 105, stock: 6 },

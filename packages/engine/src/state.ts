@@ -5,10 +5,8 @@ import type { ForageableKind } from './data/forageables.js'
 // grass, dirt, water, forest, rock, sand, farmland, road, path, sapling, channel
 export type TileId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
 
-// The ground a recipe is allowed to name, and the one table for it: the arbiter's
-// `adjacent_tile` requirement reads it forwards, and the ground shown to the arbiter reads it
-// backwards. Road, path, sapling and channel are deliberately absent — a rule may not ask for
-// ground the town has no word for.
+// The ground a recipe is allowed to name, and the one table for it. Road, path, sapling and
+// channel are deliberately absent — a rule may not ask for ground the town has no word for.
 export const RECIPE_TILE_IDS: Readonly<Record<string, TileId>> = {
   grass: 0, dirt: 1, water: 2, forest: 3, rock: 4, sand: 5, farmland: 6,
 }
@@ -44,9 +42,8 @@ export type AgentBody = {
   // How many times this body has hit the ground without a meal or a night's sleep since.
   // Absent until the first such fall, and absent again the moment it eats or sleeps.
   collapsesWithoutRecovery?: number
-  // How many ticks the cold has taken energy out of this body since its last meal or sleep.
-  // Absent until the first such tick, and absent again the moment it recovers — it is what
-  // lets a fatal ladder a winter night drove be named for the night.
+  // Absent until the first such tick, and absent again the moment it recovers — it is what lets
+  // a fatal ladder a winter night drove be named for the night.
   coldTicksSinceRecovery?: number
   // What this body has eaten lately, pruned to the variety window at every meal. Absent until
   // the first one, so a body that has never eaten hashes as it always did.
@@ -68,12 +65,8 @@ export type Structure = {
   hp: number; maxHp: number; flammable: boolean; stage: 'construction' | 'complete'
   progressTicks: number; builtBy: string | null; burning: boolean; burnTicks: number
   owner?: string                          // absent = public; the hash-stable form of `agentId | null`
-  // ★ WHICH FACE THE BUILDING PRESENTS, and absent means `sw`. The claim seam TURNS a building
-  // to suit its plot and a turned 2x2 is byte-identical to an unturned one, so `w`/`h` cannot
-  // answer for a house the way they answer for a deck — `doorFrontOf` had one option, the
-  // default, and on an SE plot that answer is a wall. Absent-means-default is the same
-  // convention `forge/buildingArt.facingKind` already uses (the bare kind IS sw), and it is
-  // what keeps every world that never turns one hashing exactly what it always hashed.
+  // Absent means `sw`. A turned 2x2 is byte-identical to an unturned one, so w/h cannot answer
+  // for a house the way they do for a deck; absent-means-default keeps every old world's hash.
   facing?: TownFacing
   inscription?: { text: string; by: string }  // absent = unmarked; only the latest layer, the log keeps the rest
   // The tick a fed fire burns down to. Absent until somebody stokes it, so an unlit hearth is
@@ -89,9 +82,8 @@ export type Item = {
   spoilage?: { spawnDay: number; days: number }  // absent = keeps forever
   durability?: number                     // absent = never wears; 0 breaks the thing
   charges?: number                        // absent = not a vessel; 0 = a vessel standing empty
-  // A flame and the fuel behind it, never both at once: `litUntilTick` is the tick it burns
-  // down to while alight, `fuelTicks` is what a snuffed one has left. Absent on both means a
-  // torch nobody has struck yet — which is a full one.
+  // A flame and the fuel behind it, never both at once. Absent on both is a torch nobody has
+  // struck yet — which is a full one.
   litUntilTick?: number
   fuelTicks?: number
   loc: { t: 'tile'; x: number; y: number } | { t: 'agent'; id: string } | { t: 'structure'; id: string }
@@ -104,11 +96,8 @@ export type Crop = { id: string; kind: string; x: number; y: number; plantedDay:
 // walks; `alive` is the interface the hunt reads, and a kill removes the entity outright.
 export type Fauna = { kind: FaunaKind; x: number; y: number; alive: boolean; stock?: number }
 
-// A standing thing worth working: a bush, a patch, a bank of clay. Stripped it stays where it
-// is at zero — a bare bush is still a bush, and the ground remembers where to put the berries back.
-// `fullStock` is the abundance the world authored for this node — what the ground climbs back
-// toward, season by season. Absent on a node from a log that predates the ceiling, which keeps
-// the old behaviour of crawling back to one.
+// Stripped it stays where it is at zero: the ground remembers where to put the berries back.
+// fullStock is absent on a node from a log that predates the ceiling, which crawls back to one.
 export type Forageable = { kind: ForageableKind; x: number; y: number; stock: number; fullStock?: number }
 
 export type WorldState = {
@@ -128,12 +117,8 @@ export type WorldState = {
   // How many times the map has grown. Absent until the first world_grown, so a world that
   // never widens hashes as it always did. Read only through growthsSoFar().
   growths?: number
-  // Where the array's (0, 0) stands in the AUTHORED frame — the frame `genesisTerrainAt` is
-  // written in. Growing north or west moves every stored coordinate, so it moves this too;
-  // growing south or east never does. Absent while the two frames agree, which is why a world
-  // that has only ever widened south and east hashes exactly as it did. Read through
-  // authoredOrigin(); it is what lets a new strip CONTINUE the world's river and forest edge
-  // rather than roll noise beside them.
+  // Where the array's (0, 0) stands in the AUTHORED frame. Growing north or west moves it, south
+  // or east never does; absent while the frames agree, so such a world hashes exactly as it did.
   origin?: { x: number; y: number }
   // Footfalls per tile, keyed "x,y" — sparse, because a 128x128 array of zeroes is a hash of
   // nothing. Absent until the first step anybody takes.
@@ -166,9 +151,8 @@ export function genesisState(config: SimConfig, terrain?: TileId[][]): WorldStat
   }
 }
 
-/** Where the array's (0, 0) stands in the frame `genesisTerrainAt` is written in. Homed here
- *  beside the field rather than in `mapGrowth`, because the town has to ask it too and the
- *  growth system already imports the town. */
+/** Where the array's (0, 0) stands in the frame genesisTerrainAt is written in. Homed beside the
+ *  field rather than in mapGrowth, because the town has to ask it too. */
 export function authoredOrigin(state: { origin?: { x: number; y: number } }): { x: number; y: number } {
   return state.origin ?? { x: 0, y: 0 }
 }

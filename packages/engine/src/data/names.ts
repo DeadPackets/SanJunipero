@@ -1,6 +1,5 @@
-// Registry names for children born in the world. Era-neutral on purpose: the town
-// spans centuries and these must not date it. The mother's own name for the child
-// is a social name, recorded mind-side, and may differ.
+// Registry names for children born in the world. Era-neutral on purpose: the town spans
+// centuries. The mother's own name for the child is social, recorded mind-side, and may differ.
 export const BIRTH_NAMES: Readonly<Record<'f' | 'm', readonly string[]>> = {
   f: [
     'Ada', 'Aina', 'Alma', 'Amara', 'Anwen', 'Asha', 'Beela', 'Cira', 'Dala', 'Edda',

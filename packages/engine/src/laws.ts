@@ -1,10 +1,8 @@
 import { z } from 'zod'
 import type { SimConfig } from '@sj/shared'
 
-// World laws are physics an operator may change while the world runs. The change
-// is never a side-channel write to the config object: it lands as one
-// `config_changed` event, folds into `state.laws`, and is therefore hashed,
-// snapshotted and replayed like every other fact about the world.
+// World laws are physics an operator may change while the world runs. Never a side-channel write
+// to the config: it lands as one config_changed event, so it is hashed, snapshotted and replayed.
 
 // Addendum §19's whitelist, path → the type the value must satisfy. A path that is
 // not on this list cannot be changed at runtime by anyone, through any surface.

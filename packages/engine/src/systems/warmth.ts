@@ -3,14 +3,10 @@ import type { WorldState } from '../state.js'
 import type { TickCtx } from '../worldTick.js'
 import { awakeEnergyDecay, warmthTargetFromAir } from './needs.js'
 
-// Cold is not a new way to die. It takes the warmth out of a body, and a body with no warmth
-// left spends energy twice as fast — which walks it down the Task 9 collapse ladder and nowhere
-// else. There is no second severity writer here, and ZERO RNG in this file.
+// Cold is not a new way to die: it takes the warmth out of a body, and a body with no warmth
+// left spends energy twice as fast, which walks it down the collapse ladder and nowhere else.
 
-// ★ THE ROSTER IS GONE. This was `new Set(['hearth', 'fire_pit'])` — two names somebody
-// remembered, and the reason no verb in the world could reach the fire in a house. It is
-// `structures.recipes[kind].hearth` now, the same shape `roofed` took, so a kind that holds a
-// fire says so once and every law reads the one answer (G4).
+// A kind that holds a fire says so once, in structures.recipes[kind].hearth — the same shape roofed took.
 export function isHeatSource(config: SimConfig, kind: string): boolean {
   return isHearthKind(config, kind)
 }
@@ -31,11 +27,8 @@ export function insulationOf(state: WorldState, config: SimConfig, agentId: stri
   return (config.warmth.insulation as Record<string, number | undefined>)[kind] ?? 0
 }
 
-// ★ WHERE A BODY IS WHEN IT IS INDOORS, IN ONE DERIVATION (G4). This lane's whole answer is
-// that a room is ONE PLACE — a body inside a building is at that building's fire whichever tile
-// it stands on, and a wall stops the heat as squarely as it stops sound. HOW CLOSE you then
-// have to be is a different question with two honest answers, so `stoke` asks for arm's reach
-// and warmth asks for `heatRadius`; neither gets its own copy of the wall.
+// A room is ONE PLACE: a body inside a building is at that building's fire whichever tile it
+// stands on. How close you must be is a second question — stoke asks arm's reach, warmth heatRadius.
 export const inTheRoomWith = (a: { insideId?: string }, s: { id: string }): boolean =>
   a.insideId === s.id
 export const fireIsOnYourSide = (a: { insideId?: string }, s: { id: string }): boolean =>
@@ -57,15 +50,8 @@ export function besideAKeptFire(state: WorldState, config: SimConfig, agentId: s
   return false
 }
 
-// ★ THE WARMTH A PARTICULAR BODY DRIFTS TOWARD, with what is on its back and the fire it is
-// sitting at both counted. Until this, a fed fire only decided whether a body was FREEZING:
-// `isExposed` stops at the exposure drain, and everybody who was not freezing drifted to the
-// weather's own bare number. So a hearth was worth exactly as much as no hearth to anybody
-// already under a roof — a thing the world draws that changes nothing, which is arm B's shape.
-// Measured on a winter night: 10 without, 34 with, and the shiver line is 30.
-//
-// It only ever goes UP. Nothing here can make a body colder than the air it stands in, so no
-// night is worse than it was — which is the distinction R2 turned on, and it holds here too.
+// Counts what is on the body's back and the fire it sits at, not just the weather's bare number.
+// Only ever raises the target: nothing here can make a body colder than the air it stands in.
 export function warmthTargetFor(state: WorldState, config: SimConfig, agentId: string): number {
   const fire = besideAKeptFire(state, config, agentId) ? config.warmth.fireWarmth : 0
   return warmthTargetFromAir(state.weather.temperatureC + insulationOf(state, config, agentId) + fire)

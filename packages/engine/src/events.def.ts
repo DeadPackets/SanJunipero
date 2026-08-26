@@ -51,9 +51,8 @@ export const ItemEquipped = z.object({
   agentId: z.string(), itemId: z.string(), slot: z.literal('body'),
 }).strict()
 export const ItemUnequipped = z.object({ agentId: z.string(), itemId: z.string() }).strict()
-// C11 light. `burnsUntilTick` rides the event because the fold must not have to know the
-// config to place the flame in time; snuffing carries nothing, because what is left is
-// arithmetic the fold can do from the tick it happened on.
+// `burnsUntilTick` rides the event so the fold need not know the config to place the flame in
+// time; snuffing carries nothing, because what is left is arithmetic the fold can do.
 export const ItemLit = z.object({ itemId: z.string(), burnsUntilTick: z.number().int() }).strict()
 export const ItemSnuffed = z.object({ itemId: z.string() }).strict()
 export const ItemBurnedOut = z.object({ itemId: z.string() }).strict()
@@ -66,8 +65,7 @@ export const StructurePlanned = z.object({
   id: z.string(), kind: z.string(), x: z.number(), y: z.number(), w: z.number(), h: z.number(),
   maxHp: z.number(), flammable: z.boolean(), builderId: z.string(), owner: z.string().optional(),
   // Two facings and no third: NE and NW are unauthored and must stay unrepresentable. Written
-  // only when the plot TURNED the building, so every world that never turns one folds the
-  // payload it always folded. See `Structure.facing`.
+  // only when the plot TURNED the building, so an unturned world folds the payload it always did.
   facing: z.enum(TOWN_FACINGS).optional(),
 }).strict()
 export const StructureProgressed = z.object({ id: z.string(), ticks: z.number() }).strict()
@@ -103,18 +101,15 @@ export const AgentExited = z.object({ agentId: z.string(), structureId: z.string
 export const AgentSpoke = z.object({
   agentId: z.string(), text: z.string(), x: z.number(), y: z.number(), insideId: z.string().optional(),
 }).strict()
-// A witness record and nothing else: the fold returns the state it was handed. `sense` says
-// which way the act travelled, so a replay knows a song from a dance without asking the
-// arbiter; optional, because an act with no sense recorded is one the eye caught.
-// `insideId` replays the doorway rule from the event alone, exactly as agent_spoke does.
+// A witness record and nothing else. `sense` says which way the act travelled, so a replay knows
+// a song from a dance; `insideId` replays the doorway rule from the event alone.
 export const AgentExpressed = z.object({
   agentId: z.string(), verb: z.string().min(1), targetId: z.string().optional(),
   x: z.number(), y: z.number(), sense: z.enum(['sight', 'sound']).optional(),
   insideId: z.string().optional(),
 }).strict()
-// A mind worked something out that nobody wrote down. `byId` is the inventor, `intent` the
-// words they used, `makes` the item kinds the new verb can produce (empty for a coined word).
-// The tick is the envelope's; nothing here is duplicated from it.
+// `byId` is the inventor, `intent` the words they used, `makes` the item kinds the new verb can
+// produce (empty for a coined word). The tick is the envelope's.
 export const DiscoveryMade = z.object({
   recipeId: z.string().min(1), name: z.string().min(1), kind: z.enum(['craft', 'word']),
   byId: z.string().min(1), intent: z.string().min(1), makes: z.array(z.string().min(1)),
@@ -186,9 +181,8 @@ export const FaunaSpawned = z.object({
 export const FaunaMoved = z.object({
   moves: z.array(z.object({ id: z.string(), x: z.number().int(), y: z.number().int() }).strict()).min(1),
 }).strict()
-// A school is one entity with many fish in it; a catch takes one of them. `fold` is the only
-// writer of world state, so the taking needs an event of its own — a school that reaches zero
-// disbands as `fauna_killed` instead, which is why this one never carries a zero.
+// fold is the only writer of world state, so taking one fish needs an event of its own. A school
+// that reaches zero disbands as fauna_killed, which is why this one never carries a zero.
 export const FaunaStockChanged = z.object({ id: z.string(), stock: z.number().int().positive() }).strict()
 export const FaunaKilled = z.object({
   id: z.string(), kind: FaunaKindSchema, x: z.number().int(), y: z.number().int(),

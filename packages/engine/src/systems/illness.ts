@@ -4,9 +4,8 @@ import type { TickCtx } from '../worldTick.js'
 
 const INJURY_HEAL_DAYS = 3
 
-// A fever is a nightly coin, not a per-tick one: the body either loses ground or gains it,
-// and the same event carries both directions. C9's per-tick contagion loop is retired
-// (controller ruling 3) — this file is the world's only contagion, once a night, on one stream.
+// A fever is a nightly coin, not a per-tick one: the body either loses ground or gains it, and
+// the same event carries both. This file is the world's only contagion, once a night, one stream.
 
 const hasIllness = (state: WorldState, id: string): boolean =>
   state.agents[id]?.afflictions?.some((x) => x.kind === 'illness') ?? false
@@ -19,11 +18,8 @@ function breathesTheSameAir(state: WorldState, aId: string, bId: string, radius:
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= radius
 }
 
-// A wound is the world's other way into a fever. C9 rolled this at dawn in healthSystem and
-// set a boolean nothing could lift; the roll is unchanged — same chance, same `health` stream,
-// same open-wound window — but what it mints is an affliction the midnight turn above owns
-// (batch-2 ruling 1). Gated with the rest of the system: an illness no night can lift is a
-// life sentence, not a sickness.
+// A wound is the world's other way into a fever, and what it mints is an affliction the midnight
+// turn above owns. An illness no night can lift is a life sentence, not a sickness.
 function septicWounds(ctx: TickCtx): void {
   const chance = ctx.config.health.infectionChancePerInjuryPerDay
   const day = Math.floor(ctx.state().tick / MINUTES_PER_DAY)
