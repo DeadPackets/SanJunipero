@@ -29,15 +29,9 @@ export type Need = { along: number; deep: number }
 
 export const plotKey = (p: PlotRef): string => `${p.block.i},${p.block.j}/${p.slot}`
 
-export const plotRefOf = (p: PlotRef): PlotRef => ({ block: { ...p.block }, slot: p.slot })
-
 /** Which plots are spoken for, read off the town itself. */
 export function takenPlots(standing: readonly PlotRef[]): Set<string> {
   return new Set(standing.map(plotKey))
-}
-
-export function isClaimable(plot: Plot, need: Need, taken: ReadonlySet<string>): boolean {
-  return holds(plot, need) && !taken.has(plotKey(plot))
 }
 
 /** Big enough, before anything is asked about who holds it. */
@@ -46,11 +40,6 @@ const holds = (plot: Plot, need: Need): boolean =>
 
 const fits = (need: Need): boolean =>
   need.along >= 1 && need.deep >= 1 && need.along <= MAX_ALONG && need.deep <= MAX_DEEP
-
-/** How many rings the town must have platted for this builder to have somewhere to go. */
-export function ringsPlatted(taken: ReadonlySet<string>, ground: Ground, need: Need): number {
-  return ringsPlattedWhere((p) => taken.has(plotKey(p)), ground, need)
-}
 
 /** The plot the next building goes on, and the ring count the town stands at once it does. */
 export function claimPlot(a: {
@@ -66,15 +55,11 @@ export function claimPlot(a: {
 // `claimAll` knows the plots it has just handed out and can answer with a set of keys. A
 // RUNNING WORLD cannot: what stands in it is a list of rectangles, some of them raised by the
 // grammar and some of them — a bridge, a grave, a thing an arbiter minted — never platted at
-// all. So the claim takes a PREDICATE and the caller answers however it can see. The two
-// callers below and `townPlot.ts` are the whole of it, and the set-of-keys reading is now one
+// all. So the claim takes a PREDICATE and the caller answers however it can see. The caller
+// above and `townPlot.ts` are the whole of it, and the set-of-keys reading is now one
 // predicate among several rather than the only shape a claim understands.
 
 export type IsTaken = (plot: Plot) => boolean
-
-export function ringsPlattedWhere(isTaken: IsTaken, ground: Ground, need: Need): number {
-  return claimPlotWhere({ isTaken, ground, need })?.rings ?? CLAIM_RING_LIMIT
-}
 
 /** One walk outward, not two: the ring the town has to reach and the plot it offers there are
  *  the same answer, and `plattedBlocks` is the expensive part of asking. */

@@ -1,12 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
-  MAX_ALONG, MAX_DEEP, RIVER_GROUND, DRY_GROUND, freePlots, place, plotsOf, streetTiles,
+  MAX_DEEP, RIVER_GROUND, DRY_GROUND, freePlots, place, plotsOf, streetTiles,
   townErrors, type Ground, type PlacedStructure,
 } from './townGrammar.js'
-import {
-  plotKey, plotRefOf, takenPlots, isClaimable, ringsPlatted, claimPlot, claimAll,
-  CLAIM_RING_LIMIT,
-} from './townClaim.js'
+import { plotKey, takenPlots, claimPlot, claimAll } from './townClaim.js'
 
 // ★ A PLOT IS A CLAIMABLE THING, AND THE SPACING HOLDS BY CONSTRUCTION.
 //
@@ -20,20 +17,11 @@ describe('what makes a plot claimable', () => {
   it('names a plot by its block and slot, and nothing else', () => {
     const p = plotsOf(1, -2)[2]!
     expect(plotKey(p)).toBe('1,-2/e0')
-    expect(plotRefOf(p)).toEqual({ block: { i: 1, j: -2 }, slot: 'e0' })
   })
 
   it('reads what is taken off the buildings that stand there, never off a register', () => {
     const built = [place(plotsOf(0, -1)[0]!, 'house', 2, 2, 'amara')]
     expect([...takenPlots(built)]).toEqual(['0,-1/s0'])
-  })
-
-  it('is free, platted, and big enough — all three', () => {
-    const p = plotsOf(0, -1)[0]!
-    expect(isClaimable(p, NEED, new Set())).toBe(true)
-    expect(isClaimable(p, NEED, new Set([plotKey(p)])), 'already built on').toBe(false)
-    expect(isClaimable(p, { along: MAX_ALONG + 1, deep: 1 }, new Set()), 'too long').toBe(false)
-    expect(isClaimable(p, { along: 1, deep: MAX_DEEP + 1 }, new Set()), 'too deep').toBe(false)
   })
 })
 
@@ -41,16 +29,16 @@ describe('when a ring plats', () => {
   // Ring 1 is what a town starts as. A ring plats when the platted area has no free plot left
   // for the building being raised — never before, so the town densifies before it sprawls.
   it('starts at ring 1 and stays there while a plot is free', () => {
-    expect(ringsPlatted(new Set(), RIVER_GROUND, NEED)).toBe(1)
+    expect(claimPlot({ taken: new Set(), ground: RIVER_GROUND, need: NEED })!.rings).toBe(1)
     const some = new Set(freePlots(1, RIVER_GROUND).slice(0, 19).map(plotKey))
-    expect(ringsPlatted(some, RIVER_GROUND, NEED)).toBe(1)
+    expect(claimPlot({ taken: some, ground: RIVER_GROUND, need: NEED })!.rings).toBe(1)
   })
 
   it('plats the next ring the moment the last plot inside is taken', () => {
     const full = new Set(freePlots(1, RIVER_GROUND).map(plotKey))
-    expect(ringsPlatted(full, RIVER_GROUND, NEED)).toBe(2)
+    expect(claimPlot({ taken: full, ground: RIVER_GROUND, need: NEED })!.rings).toBe(2)
     const full2 = new Set(freePlots(2, RIVER_GROUND).map(plotKey))
-    expect(ringsPlatted(full2, RIVER_GROUND, NEED)).toBe(3)
+    expect(claimPlot({ taken: full2, ground: RIVER_GROUND, need: NEED })!.rings).toBe(3)
   })
 
   // Growth is monotone: platting a ring never withdraws a plot that was already offered, so a
@@ -65,9 +53,9 @@ describe('when a ring plats', () => {
 
   it('gives up rather than platting forever when nothing can ever be built', () => {
     const drowned: Ground = () => 'water'
-    expect(ringsPlatted(new Set(), drowned, NEED)).toBe(CLAIM_RING_LIMIT)
     expect(claimPlot({ taken: new Set(), ground: drowned, need: NEED })).toBeNull()
     expect(claimPlot({ taken: new Set(), ground: DRY_GROUND, need: { along: 9, deep: 1 } })).toBeNull()
+    expect(claimPlot({ taken: new Set(), ground: DRY_GROUND, need: { along: 1, deep: MAX_DEEP + 1 } })).toBeNull()
   })
 })
 
