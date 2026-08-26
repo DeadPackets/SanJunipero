@@ -544,6 +544,28 @@ describe('★ the default stays scripted and free', () => {
     expect(imports('liveWorld.ts').join('\n')).toContain('@sj/agents')
   })
 
+  it('and the arbiter is inside the same quarantine, not beside it', () => {
+    // `@sj/arbiter` depends on `@sj/agents`, so a static import of it anywhere on the scripted
+    // path drags the whole mind stack in exactly as directly as importing `@sj/agents` would.
+    // The guard above would not have caught that: it names one package.
+    const imports = (name: string): string[] =>
+      src(name).split('\n').filter((l) => /^\s*import\b/.test(l) || /\bfrom '@sj\//.test(l))
+    for (const file of ['devWorld.ts', 'founders.ts', 'server.ts', 'api.ts', 'serve.ts']) {
+      expect(imports(file).join('\n'), file).not.toContain('@sj/arbiter')
+    }
+    expect(imports('liveWorld.ts').join('\n')).toContain('@sj/arbiter')
+  })
+
+  it('★ turning the god layer off is a flag, and it does not touch the scripted default', () => {
+    // `SJ_ARBITER` may only ever be read on the live path. Read in `devWorld.ts` it would be a
+    // switch that appears to do something on a stream that has no minds to rule over.
+    const s = src('serve.ts')
+    expect(s).toContain("process.env['SJ_ARBITER'] !== '0'")
+    expect(src('devWorld.ts')).not.toContain('SJ_ARBITER')
+    // Opt-OUT, not opt-in: absent the variable the expression is true.
+    expect(undefined !== '0').toBe(true)
+  })
+
   it('serve.ts reaches the live world only through a dynamic import behind the flag', () => {
     const s = src('serve.ts')
     expect(s).not.toMatch(/^import .*liveWorld/m)

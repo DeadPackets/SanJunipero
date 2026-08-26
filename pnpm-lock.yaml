@@ -123,6 +123,9 @@ importers:
       '@sj/agents':
         specifier: workspace:*
         version: link:../agents
+      '@sj/arbiter':
+        specifier: workspace:*
+        version: link:../arbiter
       '@sj/engine':
         specifier: workspace:*
         version: link:../engine

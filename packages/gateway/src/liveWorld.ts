@@ -34,7 +34,7 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
-import { MINUTES_PER_DAY, type SimConfig } from '@sj/shared'
+import { DISCOVERY_EVENT, MINUTES_PER_DAY, type SimConfig } from '@sj/shared'
 import type { EventStore, TickHandler, TickLoop } from '@sj/engine'
 import {
   Embedder, EngineBridge, LlmClient, MIND_MODEL, PREFLIGHT_ROUNDS, bootMinds, migrateLlmTables,
@@ -42,6 +42,15 @@ import {
   FOUNDER_MINDS, type BootedMinds, type MindConfig, type MindSpec, type RuntimeSnapshot,
   type SeamArbiter,
 } from '@sj/agents'
+// ★ AND THE GOD LAYER, which is legal here for exactly the reason the header gives above:
+// `@sj/arbiter -> @sj/agents`, so an arbiter around the minds can only be assembled somewhere
+// above both, and this is the only file that is. `serve.ts` reaches this module through a
+// dynamic `import()` behind `SJ_LIVE=1`, so these imports cost the scripted stream nothing —
+// the same quarantine `@sj/agents` already sits inside, and `liveWorld.test.ts` asserts it for
+// both packages now.
+import {
+  CodexStore, GENESIS_CODEX, makeArbiter, openArbiterDb, type Codified, type Recipe,
+} from '@sj/arbiter'
 import type { LiveCast } from './devWorld.js'
 import { publishThought } from './observer.js'
 
@@ -77,6 +86,40 @@ export const REFLECTION_SETTLE_MS = 5_000
 export const STREAM_MIND_CONFIG: Partial<MindConfig> = { dozeTicks: 6 }
 /** The call ledger and the alerts. A `.db` beside the minds, so `SJ_FRESH=1` takes it too. */
 export const LIVE_OPS_DB = '_ops.db'
+/**
+ * ★ THE TOWN'S LAWS, AND WHY THEY ARE NOT IN THE WORLD DB.
+ *
+ * Rulings, the rulebook, the codex and the construct registry go here. Three reasons, and the
+ * first is a law somebody already wrote down: `arbiter/src/schema.ts` says of the construct
+ * tables "these tables live in the arbiter's database, never in the world's". The gateway
+ * SERVES the world db to strangers, so putting an ops-plane table in it is a one-way-glass
+ * breach through the API rather than through a prompt.
+ *
+ * Second, the world db is an event log replayed on resume. Rulings are not events and cannot
+ * be replayed; they need a table that simply persists. It also needs `sqlite-vec` for
+ * `rulings_vec`, which `openArbiterDb` loads and `openDb` alone does not.
+ *
+ * Third — and this is the one that decides the directory — a town's laws must reset when the
+ * town does. `agentDbDir` is what `SJ_FRESH=1` wipes in the same breath as the world; a new
+ * day 0 that kept yesterday's rulebook is the same class of state `amnesiaRefusal` already
+ * refuses for memories. The leading underscore keeps it out of the `<mindId>.db` namespace the
+ * amnesia guard walks, exactly like `_ops.db`.
+ */
+export const LIVE_ARBITER_DB = '_arbiter.db'
+/**
+ * The words the town has for stuff. Rendered into the adjudication prompt AND enforced against
+ * the answer, so a ruling can never mint a recipe out of a material nobody has a word for.
+ * Same table `g11-deepworld.ts` proved the sanity gate against; a stream with no table gets
+ * only the checks that need no table, which is how a live run once denied its own well.
+ */
+export const STREAM_VOCABULARY = {
+  itemKinds: [
+    'wood', 'stone', 'rope', 'cloth', 'fiber', 'hide', 'clay', 'axe', 'hoe', 'knife',
+    'seed_pouch', 'waterskin', 'bucket', 'torch', 'garment', 'plank', 'bread', 'wheat',
+    'fish', 'venison', 'rabbit_meat', 'berries', 'mushroom', 'herb', 'stew',
+  ],
+  structureKinds: ['house', 'storehouse', 'shed', 'wagon', 'well', 'fire_pit', 'bridge', 'grave'],
+} as const
 /** The sentence-transformer cache. `SJ_MODELS_DIR` moves it; nothing downloads at run time. */
 export const DEFAULT_MODELS_DIR = fileURLToPath(new URL('../../../data/models/', import.meta.url))
 
@@ -101,9 +144,27 @@ export type LiveCastOpts = {
    *  burned a lane before. Off only for a test, which spends nothing to preflight. */
   preflight?: boolean
   modelsDir?: string
-  /** Adjudication and codification. Absent, an invented verb falls back to `experiment` and
-   *  the world answers it; the arbiter is the gateway's to wire and no lane has asked yet. */
+  /** Adjudication and codification, pre-built. Only a test passes this: a real stream lets
+   *  `createLiveCast` build the real one below, because the real one needs the bridge and the
+   *  tick, which do not exist until `attach`. */
   arbiter?: SeamArbiter
+  /**
+   * ★ ON BY DEFAULT INSIDE `SJ_LIVE=1`, and the argument is the call path.
+   *
+   * Spec §4 is an entire section of the product, and what makes this a simulation rather than
+   * five minds picking from a fixed list is that a mind can attempt something the engine has
+   * no verb for. A live stream with the god dark ships the demo, not the product.
+   *
+   * The cost objection does not survive the call path: the arbiter fires only when the world
+   * has ALREADY refused an intent with `unknown verb:` (`agentRuntime.ts` `#reroutesUnknownVerb`,
+   * once per turn), so it is a per-NOVELTY call and not a per-turn one — and stages 1 and 2 of
+   * `adjudicate` resolve a repeat with zero LLM calls, so the second mind to try the same thing
+   * costs nothing at all.
+   *
+   * `SJ_ARBITER=0` sets this false. It exists as the operator's kill switch if a ruling ever
+   * starts leaking, and as the control arm for measuring what the god costs.
+   */
+  useArbiter?: boolean
   log?: (line: string) => void
 }
 
@@ -327,6 +388,22 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     return db
   }
 
+  // ── the god layer's own database, opened before a mind boots and closed with them ──
+  // Opened here rather than in `attach` so a failure to open it refuses the run instead of
+  // taking down a world that is already ticking.
+  const wantsArbiter = opts.useArbiter !== false
+  const arbiterDb = wantsArbiter && opts.arbiter === undefined
+    ? openArbiterDb(join(opts.agentDbDir, LIVE_ARBITER_DB))
+    : null
+  if (arbiterDb !== null) {
+    // Seeded once per town, not once per boot: the codex is what the town knows and what it
+    // has earned since, and re-seeding a resumed town would throw a UNIQUE constraint on the
+    // first genesis row anyway. Emptiness is the test because it is the only state that can
+    // mean "this town has never had a codex".
+    const codex = new CodexStore(arbiterDb)
+    if (codex.known().length === 0) for (const entry of GENESIS_CODEX) codex.insert(entry)
+  }
+
   let booted: BootedMinds | null = null
   let bridge: EngineBridge | null = null
   let stopped = false
@@ -362,6 +439,38 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (snap !== null) restoring.set(m.id, snap)
       }
 
+      // ── ★ THE GOD LAYER, ASSEMBLED. Spec §4, in the town a person can watch. ──
+      //
+      // Built here and not at `createLiveCast` time because `makeArbiter` needs the tick and
+      // `onCodified` needs the bridge, and neither exists until a loop does.
+      //
+      // ★ THE ARBITER BILLS THE OPS LEDGER, NOT ITS OWN DATABASE. `makeClient` points at
+      // `opsDb`, which is what `ledgerTotalUsd` reads every ten ticks for the $5 stop and the
+      // rate ceiling. An arbiter billing its own db would spend OUTSIDE the anomaly stop —
+      // the exact failure the stop exists to prevent, and it would be invisible.
+      const arbiter: SeamArbiter | undefined = opts.arbiter ?? (arbiterDb === null
+        ? undefined
+        : (() => {
+            const built = makeArbiter({
+              db: arbiterDb, llm: makeClient('arbiter'), embedder,
+              tick: () => loop.state.tick, vocabulary: STREAM_VOCABULARY,
+              // A codification is a world fact, so it goes in the world's log — where the
+              // chronicle already renders `discovery_made` for the viewer. The arbiter owns no
+              // world and cannot do this itself; it has already minted the verb by the time
+              // this runs, so nothing here can fail the codification.
+              onCodified: (d: Codified) => {
+                bridge?.announce(DISCOVERY_EVENT, {
+                  recipeId: d.recipeId, name: d.name, kind: d.kind,
+                  byId: d.credit.agentId, intent: d.credit.intent, makes: d.makes,
+                })
+              },
+            })
+            return {
+              adjudicate: built.adjudicate,
+              codify: (recipe: { id: string }, credit) => built.codify(recipe as Recipe, credit),
+            }
+          })())
+
       booted = bootMinds({
         minds, bridge, embedder, dbFor,
         turnLlm: (id) => makeClient('turn', id),
@@ -369,7 +478,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         mindConfig: { ...STREAM_MIND_CONFIG, ...opts.mindConfig },
         day: Math.floor(worldTick / MINUTES_PER_DAY),
         restoring,
-        ...(opts.arbiter === undefined ? {} : { arbiter: opts.arbiter }),
+        ...(arbiter === undefined ? {} : { arbiter }),
         // ★ WHAT THE BUBBLE OVER A HEAD SAYS IS NOW WHAT THE MIND ACTUALLY THOUGHT. The same
         // table, the same socket frame, the same viewer — and the string is no longer one of
         // ten canned lines keyed by verb.
@@ -386,6 +495,12 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
       log(`stream: LIVE — ${minds.length} minds on ${MIND_MODEL}, cap $${cap.toFixed(2)},`
         + ` memory in ${opts.agentDbDir}`)
+      // Said out loud in both directions. "Can a mind here do something the engine has no verb
+      // for?" is the one question a viewer cannot answer by watching, and it is the difference
+      // between the product and a demo.
+      log(arbiter === undefined
+        ? 'stream: the arbiter is OFF — an invented act falls back to experiment and the world answers it'
+        : `stream: the arbiter is ON — a mind may attempt what the engine has no verb for; laws in ${LIVE_ARBITER_DB}`)
 
       // ── the money, on the world's own clock ──
       bridge.onTick((tick) => {
@@ -427,6 +542,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       // than at the last multiple of 48 — a clean shutdown should lose nothing at all.
       try { saveRuntime(bridge?.currentTick() ?? 0) } catch { /* a closed db loses the plan, not the memory */ }
       for (const db of mindDbs.values()) db.close()
+      arbiterDb?.close()
       opsDb.close()
     },
   }

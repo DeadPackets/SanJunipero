@@ -12,6 +12,7 @@
 //   PORT=9000 SJ_RINGS=3 …      pick the port and how far the town is platted
 //   SJ_LAMPS=0 pnpm stream      leave the streets dark (a lamplighter raises eight otherwise)
 //   SJ_LIVE=1 pnpm stream       ★ THE BODIES ARE LLM MINDS. Costs real money. See below.
+//   SJ_ARBITER=0 …              turn the god layer off inside a live run (it is ON by default)
 //
 // ★ RESUME IS THE DEFAULT, AND THAT IS THE WHOLE POINT OF THIS FILE EXISTING. A stream is
 // watched because day 12 follows days 1 to 11. Until now `startDevWorld` deleted the world db
@@ -81,6 +82,12 @@ export async function main(): Promise<void> {
       // of statues nobody would notice for hours; a stream that dies leaves a resumable town
       // on disk and a message in the log an operator cannot miss.
       onSpendStop: () => { void world?.stop().then(() => process.exit(1)) },
+      // ★ THE GOD LAYER IS ON INSIDE A LIVE RUN, and it is opt-OUT rather than opt-in. A
+      // person who typed SJ_LIVE=1 asked for minds that decide, and a mind that can only pick
+      // from a fixed verb list is the demo, not the product (spec §4). It bills the same
+      // ledger and dies on the same $5 stop, and it only ever fires on an act the engine has
+      // no verb for — a per-novelty call, not a per-turn one.
+      useArbiter: process.env['SJ_ARBITER'] !== '0',
     }))
 
   try {
