@@ -229,10 +229,8 @@ describe('narrateWeek', () => {
   })
 })
 
-// C11 R18: `first_house` and `first_bridge` read a structure's kind, and a house takes two sim-days
-// to raise — so the day the roof goes on, the plan that named it is in a stream this pass never
-// sees. `narrateDay` passed no `structureKind` at all, so both firsts missed every building the
-// town actually built.
+// `first_house` and `first_bridge` read a structure's kind, and the day a roof goes on is not
+// the day its plan named it.
 describe('narrateDay: a roof finished on a day whose plan it never read', () => {
   const FINISH: SimEvent[] = [
     ev(1, 4320, 'structure_completed', { id: 'structure_9' }),

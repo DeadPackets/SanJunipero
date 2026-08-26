@@ -23,8 +23,7 @@ import type {
 export const MARKER_HEAT_THRESHOLD = 6
 
 // A night whose chronicle would not render. The rest of the night is attached, because the
-// render is not the only thing that happened and the caller has to be able to say so: GATE
-// G11b day 3 lost its semantic pass to a chapter that failed a schema (C11 batch 16).
+// render is not the only thing that happened and the caller has to be able to say so.
 export class ChapterRenderError extends Error {
   constructor(
     readonly renderCause: unknown,
@@ -104,10 +103,8 @@ export async function narrateDay(deps: {
 
   const scenes = segmentScenes(events, deps.segmentCfg)
   const seenKinds = store.milestoneKinds()
-  // The world in reach answers what the day's own events cannot: a house planned on a Tuesday
-  // and finished on a Friday is `structure_completed` with no kind on it, and narrating day by
-  // day the Friday pass has never seen the plan. Without this, first_house and first_bridge miss
-  // every building that took more than a day to raise — which is every house (C11 R18).
+  // The world in reach answers what the day's own events cannot: `structure_completed` carries
+  // no kind, and the day that finishes a house never saw the day that planned it.
   const structures = deps.world?.state?.structures
   const tier1 = detectFirsts(events, {
     seenKinds,
@@ -124,11 +121,8 @@ export async function narrateDay(deps: {
   const milestones = [...tier1, ...tier2]
   const privateThoughts = deps.privateCounts.thoughts + deps.privateCounts.journals
 
-  // F3 ruling (novelty priors): priors count each type's occurrences in EARLIER
-  // scenes of this day, and every type present in the scored scene is seeded at
-  // its running count (0 when never seen) — so a brand-new type scores full
-  // novelty 1/(1+0), never a permanent 0. Prior days are not re-read: stored
-  // scenes carry event ids, not types, so the day is the novelty horizon.
+  // Priors count each type's occurrences in earlier scenes of THIS day only: stored scenes
+  // carry event ids and not types, so the day is the novelty horizon.
   const running: Record<string, number> = {}
   const heats = scenes.map((scene) => {
     const inScene = new Set(scene.eventIds)
@@ -156,11 +150,8 @@ export async function narrateDay(deps: {
     return counts
   }
 
-  // renderChapter owns scene persistence; chapter.sceneIds (ordered as scenes) is
-  // the single index -> store-id mapping point (T1-7 review ruling).
-  // Only what needs the chapter fails with the chapter. The heats are indexed by its scene
-  // ids and go down with it; the milestones and the semantic pass are not its dependants and
-  // no longer share its fate (C11 batch 16 fix 1).
+  // renderChapter owns scene persistence; `chapter.sceneIds` is the one index -> store-id map.
+  // Only what needs the chapter fails with it: heats go down with it, milestones do not.
   let chapter: ChapterRow | undefined
   let renderFailure: unknown
   try {

@@ -4,35 +4,17 @@ import type { PersonalityDoc } from '../personality.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { TurnSchema, type Turn } from '../turn.js'
 
-// The provider pre-flight, promoted from a throwaway diagnostic to a gate precondition.
-//
-// G11b ran 38 minutes and $0.76 to discover that its pinned provider serves structured output
-// by grammar-constrained decoding and returns ONLY the required properties of a schema: every
-// turn came back with `thought` and `importance`, no `action`, and the town died without
-// taking a step. Twelve calls costing $0.0035 would have said so first. This is those calls,
-// committed, with a bar the gate refuses to start below.
-//
-// It asks the REAL `TurnSchema` with the REAL system prompt and the REAL model id. A toy
-// schema proves nothing: what failed was an optional field inside a union inside a strict
-// object, and only the shape the run actually sends can exercise that.
+// Asks the real `TurnSchema` with the real system prompt and model id — a grammar-constrained
+// provider can return only a schema's required properties, so a toy schema proves nothing.
 
 export const PREFLIGHT_CALLS = 3
-// `action` on every call, and NOTHING ELSE. A provider that cannot begin an act is unusable
-// for the turn caller at any price, and the action count is stable across rounds: it separated
-// four candidates cleanly over 48 probe calls.
-//
-// `speech` was half of this bar and is no longer any of it (controller ruling, C11 batch 13).
-// The same probe run twice on identical code scored speech 3/3 and then 0/3, because speech
-// measures a mind's CHOICE and not a provider's CAPABILITY. A precondition that flips on
-// sampling does not gate anything — it aborts a $0.70 run at random. It is measured on every
-// call and reported beside the verdict, and it never stops a gate.
+// `action` on every call is the bar — it separated four candidates cleanly over 48 probe calls;
+// `speech` measures a mind's choice, not a provider's capability, so it is reported and never gates.
 export const PREFLIGHT_BAR = { action: 3 } as const
-// How many times the bar is repeated before the gate gives up on a provider. One probe
-// concludes nothing; a round costs ~$0.0008, and an abort costs the whole run.
+// How many times the bar is repeated before the gate gives up: one probe concludes nothing.
 export const PREFLIGHT_ROUNDS = 4
 
-// A founder of the same shape the gate boots, so the system prefix is the real one — block 1,
-// the capabilities, the speech rules, an identity and a personality — and not a stub.
+// A founder of the shape the gate boots, so the system prefix is the real one and not a stub.
 export const PREFLIGHT_IDENTITY: IdentityCore = {
   name: 'Hana', age: 33,
   backstory: 'Keeps the eastern path clear and knows which of the bushes ripen first. Has lived beside this river since she could walk.',
@@ -56,8 +38,7 @@ export const PREFLIGHT_PERSONALITY: PersonalityDoc = {
   },
 }
 
-// Three moments, each one a body would plainly answer with both a word and an act. They are
-// deliberately unambiguous: the pre-flight measures whether a provider CAN emit the optional
+// Deliberately unambiguous moments: this measures whether a provider CAN emit the optional
 // fields, not whether a mind chooses to.
 export const PREFLIGHT_SCENES: readonly string[] = [
   'Your throat is dry and cracking. The well stands three steps away at (62, 70), its rope in reach. Yusuf is beside you, waiting on you.',
@@ -144,8 +125,7 @@ export function scorePreflight(opts: {
   }
 }
 
-// What the gate prints instead of running. It names the provider and the counts, because the
-// last gate's 38 minutes bought exactly this sentence.
+// What the gate prints instead of running: the provider and the counts.
 export function preflightRefusal(r: PreflightResult): string {
   return [
     `GATE REFUSED TO START: provider '${r.provider}' failed the turn pre-flight.`,
@@ -160,9 +140,8 @@ export function preflightRefusal(r: PreflightResult): string {
   ].join('\n')
 }
 
-// The only part that spends. Three calls on the real schema; a call that throws is recorded
-// as a failure rather than aborting the probe, because a provider that fails outright and one
-// that answers emptily are both disqualified and both worth reporting.
+// The only part that spends. A call that throws is recorded as a failure rather than aborting:
+// failing outright and answering emptily are both disqualifying and both worth reporting.
 export type PreflightLlm = {
   object<T>(opts: { system: string; messages: Array<{ role: 'user' | 'assistant'; content: string }>; schema: { _zod?: unknown } }): Promise<{ value: T }>
 }

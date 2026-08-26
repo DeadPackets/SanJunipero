@@ -4,9 +4,8 @@ import { insertAlert, type LlmClient } from '@sj/agents'
 import type { NarratorStore } from './store.js'
 import type { Milestone } from './types.js'
 
-// Tier 2.5 — the firsts no rule can catch: the first time somebody spoke of a god, made a
-// joke, or said one thing while thinking another. A model reads the day's words; every claim
-// it makes is checked back against those words verbatim before it is allowed to be true.
+// Tier 2.5 — the firsts no rule can catch. Every claim is checked back against the day's own
+// words verbatim before it is allowed to be true.
 
 export const SEMANTIC_CONCEPTS = [
   'god_afterlife', 'fear_of_death', 'love_expression', 'justice_claim', 'joke', 'metaphor',
@@ -178,10 +177,8 @@ export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Mile
   }
 
   const system = semanticInstruction(remaining)
-  // The generator throws on a verdict that does not fit the schema, so a second parse here
-  // would be unreachable and one malformed night took the whole chapter down with it (found
-  // live by GATE G11b: a hit that cited neither an event nor a remembered record). A night
-  // nobody can read is a night with no semantic firsts in it, and it says so in an alert.
+  // The generator throws on a verdict that does not fit the schema, so a second parse here is
+  // unreachable. A night nobody can read has no semantic firsts, and it says so in an alert.
   let value: z.infer<typeof SemanticVerdictSchema>
   try {
     value = (await deps.llm.object({

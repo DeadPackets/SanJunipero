@@ -1,16 +1,12 @@
 import { z } from 'zod'
 
-// Shared schema for `data/g11-report.json`: the run script writes it and checks deep-world
-// addendum §18's G11b criteria against what it just ran, and `g11report.test.ts` proves the
-// checker offline against a recorded fixture. One module so the writer and the checker cannot
-// drift apart (the C9 `g9report` pattern).
+// Shared schema for `data/g11-report.json`: writer and offline checker in one module so they
+// cannot drift. Criteria are deep-world addendum §18's.
 
 export const G11_MIN_SIM_DAYS = 2
 
-// What a turn was FOR. Controller ruling 2026-08-17: a town that spends its whole day staying
-// alive is a failed tuning outcome, so the run has to say where the day went — not only that
-// nobody died. Movement is nobody's purpose and gets its own bucket rather than being
-// charged to one of the three.
+// What a turn was for: a town that spends its whole day staying alive is a failed tuning
+// outcome. Movement is nobody's purpose, so it gets its own bucket.
 export const SURVIVAL_VERBS: readonly string[] = [
   'eat', 'drink', 'sleep', 'wake', 'fill', 'tend', 'forage', 'fish', 'hunt', 'douse',
   'extinguish', 'kindle', 'stoke', 'snuff', 'wear', 'doff', 'enter', 'exit',
@@ -33,8 +29,7 @@ export function classifyVerb(verb: string): TurnClass {
   return 'other'
 }
 
-// The three regexes chronicle.test.ts already holds every line to, applied here to every line
-// the RUN actually produced. A chronicle may not name a mechanism, a number, or the machinery.
+// The three regexes chronicle.test.ts holds every line to, applied to the lines the run made.
 export const CHRONICLE_BANNED: ReadonlyArray<{ name: string; re: RegExp }> = [
   { name: 'mechanism', re: /\b(hp|severity|affliction|config|tier|roll|construct|milestone)\b/i },
   { name: 'number', re: /[0-9]/ },
@@ -57,8 +52,7 @@ export const G11MindSchema = z.object({
   reflections: z.number().int(),
 }).strict()
 
-// One mind, one sim-day: where the day went, and whether it ever had a moment with nothing
-// wrong with it. A town with no full-need moments has no window in which society happens.
+// One mind, one sim-day: a town with no full-need moments has no window for society.
 export const G11DiscretionSchema = z.object({
   agentId: z.string(),
   day: z.number().int(),
@@ -104,13 +98,10 @@ export const G11SpendSchema = z.object({
   cacheReadShare: z.number(),
   costPerMindPerSimDay: z.number(),
   requestedProviderOrder: z.array(z.string()),
-  // OpenRouter's `provider.order` with allow_fallbacks:true is a PREFERENCE, not an allow-list.
-  // Until C11 R20 this was a hardcoded literal and could only ever be false.
+  // `provider.order` with allow_fallbacks:true is a preference, not an allow-list.
   hardProviderAllowList: z.boolean(),
-  // Which back end actually served each call, and how much of what it served was worth
-  // paying for. The empty-call rate decided the last gate and nobody could say whose it was,
-  // so it is a REPORTED METRIC here and not a footnote (C11 R20). `provider: null` is the
-  // row for calls that never came back, which carry no answer to read a back end off.
+  // Which back end served each call, and how much of it was worth paying for. `provider: null`
+  // is the row for calls that never came back, which carry no answer to read a back end off.
   providerMix: z.array(z.object({
     provider: z.string().nullable(),
     calls: z.number().int(),
@@ -183,13 +174,10 @@ export const G11EvidenceSchema = z.object({
   semanticPassRan: z.boolean(),
   semanticHits: z.array(z.string()),
   semanticPassErrors: z.number().int(),
-  // Reported, not gated: a night whose verdict the generator refused. The pass ran and said
-  // so; what it found was nothing. Hiding it would make a silent night look like a clean one.
+  // Reported, never gated: hiding a refused verdict would make a silent night look clean.
   semanticUnreadableNights: z.number().int(),
-  // Reported, not gated: a night that had words to read and never got its pass at all. GATE
-  // G11b day 3 was one, and nothing in the report said so — the pass sat downstream of the
-  // chronicle render and went down with it. It must read 0 now that they are independent, and
-  // if it ever reads anything else the ordering has come back (C11 batch 16 fix 3).
+  // Reported, never gated: a night whose pass never ran. Must read 0 now the pass and the
+  // chronicle render are independent.
   semanticSkippedNights: z.number().int(),
   // the brief's three named world assertions
   fordBridge: z.object({
@@ -232,10 +220,8 @@ export const G11PreflightSchema = z.object({
   failures: z.array(z.string()),
 }).strict()
 
-// Whether this run was continuous, and if not, where it picked itself up. Reported, never
-// gated: a resumed run must be readable as a resumed run, and a checkpoint that could hide
-// itself would be a way to launder a failure into a pass. NOT a criterion — `checkG11Report`
-// returns the same seventeen either way.
+// Reported, never gated: a resumed run must read as one, or a checkpoint becomes a way to
+// launder a failure into a pass.
 export const G11ResumeSchema = z.object({
   resumed: z.boolean(),
   attempts: z.number().int(),
@@ -245,9 +231,7 @@ export const G11ResumeSchema = z.object({
 
 export const G11ReportSchema = z.object({
   generatedAt: z.string(),
-  // A report written before the run finished. It exists so that a gate reaped inside its last
-  // day-close still leaves a score behind: batch 13 had all seventeen criteria's data in the
-  // database and lost the lot to the reaper alone.
+  // A report written before the run finished, so a reaped gate still leaves a score behind.
   partial: z.boolean(),
   model: z.string(),
   totalTicks: z.number().int(),
@@ -268,9 +252,8 @@ export const G11ReportSchema = z.object({
 }).strict()
 export type G11Report = z.infer<typeof G11ReportSchema>
 
-// Moments a body had nothing wrong with it, kept per mind AND per sim-day. It was kept per
-// mind for the whole run, so every row of the per-mind-per-sim-day table carried the same
-// number and none of them was a per-day figure (C11 batch 12's reporting flaw).
+// Moments a body had nothing wrong with it, kept per mind AND per sim-day — per mind alone
+// gives every row of the table the same number.
 export class FullNeedTally {
   readonly #counts = new Map<string, number>()
 
@@ -302,9 +285,8 @@ export class FullNeedTally {
   }
 }
 
-// Nights whose close errored, each counted once. `semanticErrors` is a strict subset of
-// `narrateErrors` — the day-close catch raises both for one failed night — so summing them
-// reported one bad night as two.
+// Nights whose close errored, each counted once: `semanticErrors` is a strict subset of
+// `narrateErrors`, so summing them counts one bad night as two.
 export const semanticPassErrorCount = (
   counters: { narrateErrors: number; semanticErrors: number },
 ): number => counters.narrateErrors
