@@ -198,7 +198,7 @@ const walk: VerbDef = makeVerb({
 // of where the mind aimed them — which is a thing the body can tell, and the only thing it can.
 export function walkIsCapped(state: WorldState, agentId: string): boolean {
   const a = state.agents[agentId]
-  if (!a?.activity || a.activity.verb !== 'walk') return false
+  if (a?.activity?.verb !== 'walk') return false
   const p = WalkParams.safeParse(a.activity.params)
   if (!p.success) return false
   // An empty route is a walk that was already there, not a walk that stops short.
@@ -285,7 +285,7 @@ const sleep: VerbDef = makeVerb({
     if (a.asleep) return 'already asleep'
     if (!config.structures.sleepIndoorsOnly || mayLieDownRough(state, config, agentId)) return null
     const s = a.insideId === undefined ? undefined : state.structures[a.insideId]
-    if (!s || s.stage !== 'complete' || !isRoofedKind(config, s.kind)) {
+    if (s?.stage !== 'complete' || !isRoofedKind(config, s.kind)) {
       return 'there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do'
     }
     return null
@@ -469,7 +469,7 @@ const tend: VerbDef = makeVerb({
       return 'nothing to tend'
     if (p.data.itemId !== undefined) {
       const item = state.items[p.data.itemId]
-      if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+      if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
       if (item.kind !== HERB_KIND) return `${item.kind} is not a remedy`
     }
     return null
@@ -481,11 +481,7 @@ const tend: VerbDef = makeVerb({
     if (!target?.alive) return []
     if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return []
     const item = p.itemId === undefined ? undefined : state.items[p.itemId]
-    const offered =
-      item !== undefined &&
-      item.kind === HERB_KIND &&
-      item.loc.t === 'agent' &&
-      item.loc.id === agentId
+    const offered = item?.kind === HERB_KIND && item.loc.t === 'agent' && item.loc.id === agentId
     return [
       {
         type: 'agent_tended',
@@ -537,7 +533,7 @@ const drink: VerbDef = makeVerb({
     if (!p.success) return 'drink takes an optional {itemId}'
     if (p.data.itemId !== undefined) {
       const item = state.items[p.data.itemId]
-      if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+      if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
       if (!VESSEL_KINDS.has(item.kind)) return 'nothing to drink from'
       if ((item.charges ?? 0) <= 0) return 'the skin is empty'
       return null
@@ -549,8 +545,7 @@ const drink: VerbDef = makeVerb({
     const p = DrinkParams.parse(params)
     if (p.itemId !== undefined) {
       const item = state.items[p.itemId]
-      if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId || (item.charges ?? 0) <= 0)
-        return []
+      if (item?.loc.t !== 'agent' || item.loc.id !== agentId || (item.charges ?? 0) <= 0) return []
       return [{ type: 'agent_drank', payload: { agentId, source: 'item', itemId: p.itemId } }]
     }
     const source = waterWithinReach(state, agentId)
@@ -570,7 +565,7 @@ const fill: VerbDef = makeVerb({
     const p = FillParams.safeParse(params)
     if (!p.success) return 'fill needs an {itemId}'
     const item = state.items[p.data.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     if (!VESSEL_KINDS.has(item.kind)) return 'that holds no water'
     if (waterWithinReach(state, agentId) === null) return 'no water within reach'
     return null
@@ -578,7 +573,7 @@ const fill: VerbDef = makeVerb({
   onComplete(state, config, agentId, params) {
     const p = FillParams.parse(params)
     const item = state.items[p.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return []
     if (!VESSEL_KINDS.has(item.kind) || waterWithinReach(state, agentId) === null) return []
     const charges = item.kind === BUCKET_KIND ? BUCKET_CHARGES : config.thirst.waterskinCharges
     return [{ type: 'item_filled', payload: { itemId: p.itemId, charges } }]
@@ -599,7 +594,7 @@ const wear: VerbDef = makeVerb({
     const p = WearParams.safeParse(params)
     if (!p.success) return 'wear needs an {itemId}'
     const item = state.items[p.data.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     if (!isWearable(config, item.kind)) return 'that is not something you can wear'
     if (state.agents[agentId]!.equipped?.body !== undefined)
       return 'you are already wearing something'
@@ -608,7 +603,7 @@ const wear: VerbDef = makeVerb({
   onComplete(state, config, agentId, params) {
     const p = WearParams.parse(params)
     const item = state.items[p.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return []
     if (!isWearable(config, item.kind) || state.agents[agentId]!.equipped?.body !== undefined)
       return []
     return [{ type: 'item_equipped', payload: { agentId, itemId: p.itemId, slot: 'body' } }]
@@ -657,7 +652,7 @@ const kindle: VerbDef = makeVerb({
     const p = KindleParams.safeParse(params)
     if (!p.success) return 'kindle needs an {itemId}'
     const item = state.items[p.data.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     if (!isKindleable(config, item.kind)) return 'that will not take a flame'
     if (item.litUntilTick !== undefined) return 'it is already lit'
     if (fuelLeft(item, config) <= 0) return 'it is burnt out'
@@ -666,7 +661,7 @@ const kindle: VerbDef = makeVerb({
   onComplete(state, config, agentId, params) {
     const p = KindleParams.parse(params)
     const item = state.items[p.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return []
     if (!isKindleable(config, item.kind) || item.litUntilTick !== undefined) return []
     const left = fuelLeft(item, config)
     if (left <= 0) return []
@@ -680,19 +675,14 @@ const snuff: VerbDef = makeVerb({
     const p = KindleParams.safeParse(params)
     if (!p.success) return 'snuff needs an {itemId}'
     const item = state.items[p.data.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     if (item.litUntilTick === undefined) return 'it is not lit'
     return null
   },
   onComplete(state, _config, agentId, params) {
     const p = KindleParams.parse(params)
     const item = state.items[p.itemId]
-    if (
-      !item ||
-      item.loc.t !== 'agent' ||
-      item.loc.id !== agentId ||
-      item.litUntilTick === undefined
-    )
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId || item.litUntilTick === undefined)
       return []
     return [{ type: 'item_snuffed', payload: { itemId: p.itemId } }]
   },
@@ -1364,7 +1354,7 @@ function footprintRefusal(
   if (!nearRect(state, agentId, d.x, d.y, w, h))
     return `not close enough to build — stand within reach of (${d.x}, ${d.y})`
   const site = siteAt(state, d.x, d.y)
-  if (site && site.kind === d.kind) return null // resume: materials already spent
+  if (site?.kind === d.kind) return null // resume: materials already spent
   for (const s of Object.values(state.structures)) {
     if (d.x < s.x + s.w && s.x < d.x + w && d.y < s.y + s.h && s.y < d.y + h)
       return 'that spot is taken'
@@ -1465,7 +1455,7 @@ export function buildSiteOf(
 ): BuildSiteAnswer {
   const key = `${agentId}|${params.kind}|${params.x ?? ''}|${params.y ?? ''}`
   const hit = siteMemo.get(state)
-  if (hit !== undefined && hit.config === config && hit.key === key) return hit.answer
+  if (hit?.config === config && hit.key === key) return hit.answer
   const answer = computeBuildSite(state, config, agentId, params)
   siteMemo.set(state, { config, key, answer })
   return answer
@@ -2140,13 +2130,13 @@ const give: VerbDef = makeVerb({
     })
     if (bad) return bad
     const item = state.items[p.data.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     return null
   },
   onComplete(state, config, agentId, params) {
     const p = GiveParams.parse(params)
     const item = state.items[p.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return []
     const target = state.agents[p.targetId]
     if (!target?.alive) return []
     // The only voluntary transfer of title the world has.
@@ -2221,7 +2211,7 @@ const stow: VerbDef = makeVerb({
     const p = StowParams.safeParse(params)
     if (!p.success) return 'stow needs {itemId, structureId}'
     const item = state.items[p.data.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     const s = state.structures[p.data.structureId]
     if (!s) return 'there is nothing there to put it in'
     if (s.stage !== 'complete') return 'it is not finished'
@@ -2234,7 +2224,7 @@ const stow: VerbDef = makeVerb({
   onComplete(state, _config, agentId, params) {
     const p = StowParams.parse(params)
     const item = state.items[p.itemId]
-    if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return []
     // A shelf is not a transfer: the owner is unchanged, wherever the thing sits.
     return [
       { type: 'item_moved', payload: { id: p.itemId, loc: { t: 'structure', id: p.structureId } } },
@@ -2298,8 +2288,7 @@ const write: VerbDef = makeVerb({
     const p = WriteParams.parse(params)
     if (p.itemId !== undefined) {
       const item = state.items[p.itemId]
-      if (!item || item.kind !== 'note' || item.loc.t !== 'agent' || item.loc.id !== agentId)
-        return []
+      if (item?.kind !== 'note' || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
       return [{ type: 'item_text_changed', payload: { id: p.itemId, text: p.text } }]
     }
     return [
@@ -2481,14 +2470,14 @@ export function registerVerb(def: VerbDef): void {
 }
 
 export function unregisterVerb(kind: string): void {
-  delete VERBS[kind]
+  delete VERBS[kind] // eslint-disable-line @typescript-eslint/no-dynamic-delete -- a registry key removal
 }
 
 /** On a plot there is no coordinate to look the walls up by, so it is the walls this body began
  *  or the neighbour's it is standing at; a bridge is looked up by the water it was named on. */
 function siteOfBuild(state: WorldState, agentId: string): Structure | null {
   const act = state.agents[agentId]?.activity
-  if (!act || act.verb !== 'build') return null
+  if (act?.verb !== 'build') return null
   const p = BuildParams.safeParse(act.params)
   if (!p.success) return null
   return p.data.x === undefined || p.data.y === undefined
@@ -2510,7 +2499,7 @@ export function handsOnSite(state: WorldState, siteId: string): number {
 export function stepBuild(state: WorldState, config: SimConfig, agentId: string): PendingEvent[] {
   const a = state.agents[agentId]
   const act = a?.activity
-  if (!a || !act || act.verb !== 'build')
+  if (!a || act?.verb !== 'build')
     throw new Error(`stepBuild: agent ${agentId} has no build in progress`)
   const p = BuildParams.parse(act.params)
   const site = siteOfBuild(state, agentId)
@@ -2530,7 +2519,7 @@ export function stepBuild(state: WorldState, config: SimConfig, agentId: string)
 export function stepWalk(state: WorldState, agentId: string): PendingEvent[] {
   const a = state.agents[agentId]
   const act = a?.activity
-  if (!a || !act || act.verb !== 'walk' || !act.path)
+  if (!a || act?.verb !== 'walk' || !act.path)
     throw new Error(`stepWalk: agent ${agentId} has no walk in progress`)
   const done = act.path.findIndex(([x, y]) => x === a.x && y === a.y) + 1
   const tilesLeft = act.path.length - done

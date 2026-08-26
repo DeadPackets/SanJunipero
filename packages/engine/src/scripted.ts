@@ -130,7 +130,7 @@ export function makeFisherPolicy(config: SimConfig): Policy {
 }
 
 // Idler: wander or sleep. Starts hungry (scripted), collapses, is rescued, and later starves.
-export function makeIdlerPolicy(_config: SimConfig): Policy {
+export function makeIdlerPolicy(): Policy {
   const a = { x: 30, y: 30 }
   const b = { x: 5, y: 32 }
   return (p) => {
@@ -153,7 +153,7 @@ export function makeBuilderPolicy(config: SimConfig): Policy {
     const food = p.self.inventory.find((i) => isFoodKind(config, i.kind))
     const house = p.visible.structures.find((s) => s.kind === 'house')
 
-    if (house && house.stage === 'complete') return { verb: 'sleep', params: {} }
+    if (house?.stage === 'complete') return { verb: 'sleep', params: {} }
 
     if (needs.hunger < 60 && food) return { verb: 'eat', params: { itemId: food.id } }
 
@@ -174,13 +174,13 @@ export function makeBuilderPolicy(config: SimConfig): Policy {
 
 // Keeper: owns the knife on the storehouse shelf and stands his post for three days. He does
 // nothing on purpose — a body that walks about would change what is six tiles from the taking.
-export function makeKeeperPolicy(_config: SimConfig): Policy {
+export function makeKeeperPolicy(): Policy {
   return () => null
 }
 
 // Thief: stands beside the storehouse and reaches in twice, at two named ticks. Carries no
 // flame, which is the other half of the night rule — a lit body is a witnessed body.
-export function makeThiefPolicy(_config: SimConfig): Policy {
+export function makeThiefPolicy(): Policy {
   return (p) =>
     p.time.tick === NIGHT_THEFT_TICK || p.time.tick === NOON_THEFT_TICK
       ? { verb: 'take', params: { itemId: STOLEN_ITEM } }
@@ -191,10 +191,10 @@ export function makePolicies(config: SimConfig): Record<string, Policy> {
   return {
     [FARMER]: makeFarmerPolicy(config),
     [FISHER]: makeFisherPolicy(config),
-    [IDLER]: makeIdlerPolicy(config),
+    [IDLER]: makeIdlerPolicy(),
     [BUILDER]: makeBuilderPolicy(config),
-    [THIEF]: makeThiefPolicy(config),
-    [KEEPER]: makeKeeperPolicy(config),
+    [THIEF]: makeThiefPolicy(),
+    [KEEPER]: makeKeeperPolicy(),
   }
 }
 

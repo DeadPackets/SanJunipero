@@ -39,11 +39,16 @@ export class EventStore {
       seq: Number(info.lastInsertRowid),
       tick,
       type,
-      payload: JSON.parse(json),
+      payload: JSON.parse(json) as unknown,
     })
   }
   private parseRow = (r: { seq: number; tick: number; type: string; payload: string }): SimEvent =>
-    EventEnvelope.parse({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) })
+    EventEnvelope.parse({
+      seq: r.seq,
+      tick: r.tick,
+      type: r.type,
+      payload: JSON.parse(r.payload) as unknown,
+    })
 
   readFrom(seqExclusive: number): SimEvent[] {
     return (this.selFrom.all(seqExclusive) as never[]).map(this.parseRow)
@@ -66,7 +71,7 @@ export class EventStore {
       ? {
           tick: r.tick,
           seq: r.seq,
-          state: JSON.parse(r.state),
+          state: JSON.parse(r.state) as unknown,
           rng: JSON.parse(r.rng) as Record<string, RngState>,
         }
       : null

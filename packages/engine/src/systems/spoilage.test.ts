@@ -33,7 +33,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 function world(config = DEFAULT_CONFIG): WorldState {
   const s = genesisState(
     config,
-    ROWS.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+    ROWS.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
   return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }), config)
 }

@@ -28,7 +28,7 @@ const ORTHOGONAL: readonly (readonly [number, number])[] = [
 ]
 
 // Seed fall is a thing that happens between touching tiles, not across a corner.
-export function beside(state: WorldState, x: number, y: number, tile: TileId): boolean {
+function beside(state: WorldState, x: number, y: number, tile: TileId): boolean {
   return ORTHOGONAL.some(([dx, dy]) => state.terrain[y + dy]?.[x + dx] === tile)
 }
 

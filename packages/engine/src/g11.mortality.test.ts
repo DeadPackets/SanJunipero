@@ -392,7 +392,7 @@ describe('G11a-M4: a blow struck by a hand, a death that names the hand, and a t
       const seed = `brawl-${i}`
       const out = act(brawl(), CFG, START, 'bruiser', 'attack', { targetId: 'victim' }, seed)
       const hurt = out.events.find((e) => e.type === 'agent_injured')
-      if ((hurt?.payload as { agentId?: string })?.agentId === 'victim') return seed
+      if ((hurt?.payload as { agentId?: string } | undefined)?.agentId === 'victim') return seed
     }
     throw new Error('no seed found where the attacker wins')
   }

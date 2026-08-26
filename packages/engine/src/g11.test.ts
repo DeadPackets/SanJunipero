@@ -549,7 +549,7 @@ describe('G11a-P1: the perf gate on a full 128x128 town', () => {
     // Either it finished inside the budget or it stopped at the frontier — never a lie about
     // where the walking ends, and never an empty answer dressed as a route.
     expect(found === null || found.path.length > 0).toBe(true)
-    if (found !== null && found.capped) {
+    if (found?.capped) {
       expect(found.path.length).toBeLessThanOrEqual(CFG.pathing.maxNodes)
     }
     // A tighter budget on the same query is capped, and the partial still starts where the
@@ -652,7 +652,7 @@ describe('G11a-D1: a competent body comes through three days on the default worl
               : minute === DRINK_AT
                 ? { verb: 'drink', params: { itemId: skinInHand(s) } }
                 : null
-      if (wants !== null && wants.params !== null) {
+      if (wants !== null) {
         const out = submitIntent({ ...s, tick }, CFG, 'ada', wants.verb, wants.params)
         if (out.ok) s = apply({ ...s, tick }, CFG, out.events, tick)
       }

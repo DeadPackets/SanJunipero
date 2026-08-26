@@ -22,7 +22,7 @@ const OPEN = ['........', '........', '........', '........', '........', '.....
 function world(rows: string[] = OPEN, config = DEFAULT_CONFIG): WorldState {
   return genesisState(
     config,
-    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+    rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
 }
 

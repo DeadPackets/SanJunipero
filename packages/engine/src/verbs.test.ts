@@ -45,7 +45,7 @@ const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
 function makeWorld(rows: string[] = ['........', '........', '........', '........']): WorldState {
   const s = genesisState(
     DEFAULT_CONFIG,
-    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+    rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
   return fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }))
 }
@@ -366,7 +366,7 @@ describe("tend: an hour of another body's hands", () => {
   function pair(): WorldState {
     let s = genesisState(
       CFG,
-      ['....', '....', '....', '....'].map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+      ['....', '....', '....', '....'].map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
     )
     s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
     s = fold(s, ev(2, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: 7300 }), CFG)
@@ -459,7 +459,7 @@ describe('verb: pave', () => {
   function quarried(rows: string[] = ['..', '..'], qty = 1, config = CFG): WorldState {
     let s = genesisState(
       config,
-      rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+      rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
     )
     s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
     if (qty === 0) return s

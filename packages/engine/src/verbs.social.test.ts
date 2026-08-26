@@ -168,7 +168,7 @@ describe('verb: give', () => {
     )
     expect(submitIntent(s, CFG, 'a1', 'give', { itemId: 'item_1', targetId: 'a2' })).toMatchObject({
       ok: false,
-      reason: expect.stringMatching(/^not adjacent to give — they are at \(/),
+      reason: expect.stringMatching(/^not adjacent to give — they are at \(/) as string,
     })
     expect(
       submitIntent(makeWorld(), CFG, 'a1', 'give', { itemId: 'item_1', targetId: 'a1' }),
@@ -275,7 +275,7 @@ describe('verbs: write + read', () => {
     const s2 = applyAll(res.state, rr.events)
     const res2 = tickOnce(s2)
     const completed = res2.events.find((e) => e.type === 'action_completed')
-    expect((completed?.payload as { results?: unknown })?.results).toEqual({
+    expect((completed?.payload as { results?: unknown } | undefined)?.results).toEqual({
       text: 'the password is swordfish',
     })
   })
@@ -393,7 +393,7 @@ describe('verb: teach', () => {
       submitIntent(far, CFG, 'a1', 'teach', { targetId: 'a2', track: 'farming' }),
     ).toMatchObject({
       ok: false,
-      reason: expect.stringMatching(/^not adjacent to teach — they are at \(/),
+      reason: expect.stringMatching(/^not adjacent to teach — they are at \(/) as string,
     })
     const busy = applyAll(s, [
       {
@@ -539,7 +539,7 @@ describe('verb: attack', () => {
     ])
     expect(submitIntent(far, CFG, 'a1', 'attack', { targetId: 'a2' })).toMatchObject({
       ok: false,
-      reason: expect.stringMatching(/^not adjacent to attack — they are at \(/),
+      reason: expect.stringMatching(/^not adjacent to attack — they are at \(/) as string,
     })
   })
 

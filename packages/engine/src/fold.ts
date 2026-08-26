@@ -1066,7 +1066,7 @@ export function fold(
       const key = saplingKey(p.x, p.y)
       const saplings = { ...state.saplings }
       if (p.to === SAPLING_TILE) saplings[key] = Math.floor(event.tick / MINUTES_PER_DAY)
-      else delete saplings[key]
+      else delete saplings[key] // eslint-disable-line @typescript-eslint/no-dynamic-delete -- key order is hashed
       const next: WorldState = { ...state, terrain }
       if (Object.keys(saplings).length > 0) next.saplings = saplings
       else delete next.saplings

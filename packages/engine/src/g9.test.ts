@@ -545,7 +545,7 @@ describe('G9a-8: the world keeps one hand hidden', () => {
 
     const here = ev('mystery_event', { kind: 'stone_hums', x: 6, y: 7 })
     expect(composePerception(s, CFG, 'awake', [here]).seen).toEqual([
-      { kind: 'mystery', mystery: 'stone_hums', prose: expect.stringContaining('hums') },
+      { kind: 'mystery', mystery: 'stone_hums', prose: expect.stringContaining('hums') as string },
     ])
     expect(composePerception(s, CFG, 'distant', [here]).seen).toEqual([])
     expect(composePerception(s, CFG, 'indoors', [here]).seen).toEqual([])
@@ -680,7 +680,7 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
       { tick: FLIP_TICK + 1, path: 'mystery.chancePerDay', value: 1 },
     ])
     // Legislation before physics: nothing of that tick ran before the flips.
-    expect(events.filter((e) => e.tick === FLIP_TICK + 1)[0]!.type).toBe('config_changed')
+    expect(events.find((e) => e.tick === FLIP_TICK + 1)!.type).toBe('config_changed')
     expect(loop.state.laws).toEqual({ 'spoilage.enabled': false, 'mystery.chancePerDay': 1 })
 
     // Behaviour, not bookkeeping: day 0's midday was silent under chance 0; day 1's is not.

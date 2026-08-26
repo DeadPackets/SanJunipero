@@ -19,7 +19,7 @@ const ROWS = ['..###...', '........', '........', '..~~....', '........', '.....
 function world(...agents: { id: string; x: number; y: number }[]): WorldState {
   let s = genesisState(
     DEFAULT_CONFIG,
-    ROWS.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+    ROWS.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
   for (const a of agents)
     s = fold(s, ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 7300 }))
