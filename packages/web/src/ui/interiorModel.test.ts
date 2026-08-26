@@ -84,12 +84,6 @@ describe('roomCard — whose room this is', () => {
     expect(roomCard(null, 'house1', RECORDS, null)).toBeNull()
   })
 
-  // ★ THE ROSTER THAT WOULD HAVE CALLED HALF THE TOWN "the room".
-  //
-  // `ROOM_WORDS` was `{ house, storehouse, shed }`, every entry an identity mapping, with
-  // `?? 'room'` behind it. It went stale the moment `cabin`, `cottage` and `farmhouse` became
-  // rooms — and a card whose whole job is that a room reads as SOMEBODY'S would have said
-  // "the room" over three of the six.
   it('★ every room there is has the town\'s own word for it, not "room"', () => {
     for (const kind of INTERIOR_KINDS) {
       expect(roomWord(kind), kind).toBe(kind.replace(/_/g, ' '))

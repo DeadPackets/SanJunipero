@@ -82,10 +82,6 @@ describe('a friendship is losable and hatred is earnable', () => {
     const levels = [0, 1, 2, 3, 4, 5].map((fights) =>
       bondLevel(bondWarmth([...warm, ...Array.from({ length: fights }, () => at(0, 'rival'))], 0)))
 
-    // MEASURED, not asserted from the plan: from `close` (warmth 24) each fight is -8, so the
-    // fall runs close → friendly → strangers → strained → hatred. The plan's "two fights →
-    // strained, three → hatred" is arithmetically impossible against its own tables; the
-    // PROPERTY it is protecting — a level falls, and hatred is reachable — holds exactly.
     expect(levels).toEqual([
       'close', 'friendly', 'acquaintances', 'strangers', 'strained', 'hatred',
     ])
@@ -98,9 +94,6 @@ describe('a friendship is losable and hatred is earnable', () => {
     const after = bondLevel(bondWarmth(h, 2 * HALF))
     expect(after).toBe('acquaintances')
     expect(LEVEL_RANK.indexOf(after)).toBeLessThan(LEVEL_RANK.indexOf('friendly'))
-    // MEASURED, and it amends the plan twice over: the half-life is TWO sim-days, not one, so
-    // the plan's "four sim-days of nothing → acquaintances" is exactly right in DAYS while
-    // being two half-lives, not four. Four half-lives is already `strangers`.
     expect(bondLevel(bondWarmth(h, 4 * HALF))).toBe('strangers')
   })
 

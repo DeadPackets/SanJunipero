@@ -73,10 +73,8 @@ describe('B3 — the timeline day labels are on the slab they sit on', () => {
 })
 
 // ── --ink-quiet: de-emphasis as a chosen colour, not as a transparency ───────────────
-// Partial C12 Task 54. Four AA failures and all six near-misses in the audit came from one
-// habit: reducing contrast with `opacity`, whose ratio is unknowable at authoring time.
-// These are the ink-on-paper sites. Cream text on the night surfaces (.subtitle.thought,
-// .roster-empty em) keeps its opacity — a second token for that surface is C12's.
+// Reducing contrast with `opacity` makes the ratio unknowable at authoring time. These are the
+// ink-on-paper sites; the dark grounds are below.
 const QUIET_SITES = [
   '.tick-badge.waking', '.strip-weather', '.strip-gone', '.fps-overlay .fps-avg',
   '.block h3', '.thought-line', '.tab-body .stamp', '.veil-sub',
@@ -87,10 +85,8 @@ const QUIET_SITES = [
   '.digest-footer', '.roster-gone', '.laws-lede', '.law-history', '.law-edit input:disabled',
 ]
 
-// U18 closes the deferral in the comment above. A thought was `opacity: 0.85` on the DOM
-// subtitle for the same reason it was `alpha: 0.55` on the canvas bubble, and it is the same
-// mistake in both places: a thought must read as a different INK, not a thinner one, or its
-// ratio is unknowable at the one surface where the town is actually speaking.
+// A thought must read as a different INK, not a thinner one, or its ratio is unknowable at the one
+// surface where the town is actually speaking.
 const DARK_QUIET_SITES = ['.subtitle.thought', '.roster-empty em']
 
 /** Every paper the chrome paints quiet text on. */
@@ -163,13 +159,6 @@ describe('the opacity habit, at every ink-on-paper site it produced', () => {
 })
 
 // ── ★ THE BADGE THAT RAISES ITS VOICE, MEASURED ───────────────────────────────────────────
-//
-// R8 gave the tick badge a stale state and painted it `--cream` on `--rose`. That is 3.12:1,
-// and the badge is 12.48px in the desktop chrome — normal text, so AA is 4.5 and it FAILS.
-// `.link-pill`, which wears the same rose beside it, had `--deep` on it all along: 4.82:1.
-// The one surface whose whole job is to tell a viewer the clock is no longer being told to us
-// was the one they could not read. Fourth time opacity-or-colour has been asserted rather
-// than measured on this project.
 
 describe('a stale clock is legible, not just loud', () => {
   const ROSE_SITES = ['.tick-badge.stale', '.link-pill']

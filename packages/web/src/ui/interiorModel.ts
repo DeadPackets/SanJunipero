@@ -3,36 +3,17 @@ import type { WorldState } from '@sj/engine/state'
 import { interiorOf } from '../render/interiors.js'
 import { resolveAssetId } from '../render/textures.js'
 
-// WHAT THIS ROOM IS (U4, audit R7, plan task 68).
-//
-// THE GAP, measured: an interior showed a bare diamond, four props and "No one is in just
-// now" — while the chronicle already knew "The storehouse is finished" and the provenance
-// endpoint already knew who raised it. A room must read as SOMEBODY'S, not as a generic box,
-// and every fact this card needs is already in the world.
-
 /**
- * ★ THE SECOND ROSTER THIS LANE FOUND, AND IT WAS AN IDENTITY MAP.
- *
- * This was `{ house: 'house', storehouse: 'storehouse', shed: 'shed' }` — a hand-maintained list
- * of the enterable kinds whose every entry mapped a kind to its own name, with `?? 'room'` behind
- * it. So the day `cabin`, `cottage` and `farmhouse` became rooms, the card over three of the six
- * would have read *"the room"* — a card whose whole job is that a room reads as SOMEBODY'S and
- * not as a generic box.
- *
- * The town's word for a kind IS the kind, with its underscores spent. Chrome copy speaks about
- * townsfolk, never machinery (spec §5), and observes rather than scores.
+ * The town's word for a kind IS the kind, with its underscores spent. The hand-maintained map this
+ * replaces went stale the day `cabin`, `cottage` and `farmhouse` became rooms, and read "the room".
  */
 export const roomWord = (kind: string): string => kind.replace(/_/g, ' ')
 
 /** At most this many holdings get a row; the rest are counted honestly. */
 export const ROOM_HOLDS_MAX = 8
 
-/**
- * DEVIATION: task 79 owns the ONE status vocabulary and has not landed. These are the only
- * words this card needs, chosen to obey P17 in advance — `resting` and `awake` mean the same
- * thing as `asleep`'s opposite and as each other, which is the synonym pair U13 names — so
- * task 79 replaces this map rather than having to audit it.
- */
+/** The only status words this card needs, chosen so one ratified vocabulary can replace this map
+ *  rather than have to audit it. */
 export const ROOM_STATE_ASLEEP = 'Asleep'
 /** The ratified answer to "awake with nothing to do" (C12 ruling R7, Q6). */
 export const ROOM_STATE_IDLE = 'Between things'
@@ -56,10 +37,8 @@ export type Provenance = {
   completedTick: number | null
 }
 
-/** `kind` is the engine's slug and is what resolves the icon; `words` is what a viewer reads.
- *  WHAT THE BROWSER CAUGHT, the first time this grid ever rendered against data: it printed
- *  the slug, so `wheat_sheaf` reached a viewer as `wheat_s…` — machine vocabulary, cut in the
- *  middle of the one thing the row names. */
+/** `kind` is the engine's slug and is what resolves the icon; `words` is what a viewer reads. The
+ *  grid printed the slug once, so `wheat_sheaf` reached a viewer as `wheat_s…`. */
 export type RoomHolding = { kind: string; words: string; qty: number; iconUrl: string | null }
 export type RoomPresence = { id: string; name: string; state: string }
 
@@ -77,7 +56,7 @@ export type RoomCard = {
   /** who is in, right now */
   present: RoomPresence[]
   /** the line for a room with nobody in it — about NOW, never about a world that has not
-   *  started yet (audit M6) */
+   *  started yet */
   empty: string
 }
 
@@ -93,10 +72,8 @@ export function builtLine(state: WorldState, p: Provenance | null): string | nul
   return `Raised by ${who}, Day ${tickToMoment(p.completedTick).day}`
 }
 
-/**
- * Everything a viewer should learn by standing in a room, from world state alone. Pure: the
- * caller owns the fetch, so a card renders the same twice and needs no network in a test.
- */
+/** Everything a viewer should learn by standing in a room, from world state alone. Pure: the caller
+ *  owns the fetch, so a card renders the same twice and needs no network in a test. */
 export function roomCard(
   state: WorldState | null,
   structureId: string | null,

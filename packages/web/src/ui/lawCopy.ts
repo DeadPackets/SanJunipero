@@ -3,15 +3,8 @@
 import { TOGGLABLE_PATHS } from '@sj/engine/laws'
 
 /**
- * U17 — THE TOWN'S RULES, SAID IN WORDS.
- *
- * The panel printed `Object.keys(TOGGLABLE_PATHS).sort()`, so a viewer read `spoilage.days`
- * and `movement.earshotRadius`, and `formatLawValue` fell through to `JSON.stringify` for
- * anything that was not a boolean or a number. That is also the mechanism of audit M2:
- * `spoilage.days` is an object, so its value rendered as one unwrappable blob.
- *
- * Every law says what it DOES TO PEOPLE. The machine path stays, small, underneath — the
- * operator needs it and the viewer does not have to read it first.
+ * Every law says what it DOES TO PEOPLE, with the machine path small underneath. `formatLawValue`
+ * may not fall through to `JSON.stringify`: `spoilage.days` is an object and rendered as one blob.
  */
 
 export type LawRow = { label: string; value: string }
@@ -296,9 +289,8 @@ export function lawCopyFor(path: string): LawCopy | null {
   return LAW_COPY[path] ?? null
 }
 
-/** WHAT THE BROWSER CAUGHT: sorted by path, "the body" read as dying of old age, then how
- *  often a night makes a child, then whether children are born at all. The table above is
- *  written in the order a person would ask the questions, so that order is the order. */
+/** The table above is written in the order a person would ask the questions, so that order is the
+ *  order; sorted by path it read as dying of old age, then how often a night makes a child. */
 const READING_ORDER: readonly string[] = Object.keys(LAW_COPY)
 export function lawReadingRank(path: string): number {
   const at = READING_ORDER.indexOf(path)

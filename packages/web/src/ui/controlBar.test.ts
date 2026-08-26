@@ -23,10 +23,8 @@ const base: ControlCtx = {
 }
 
 // ── ★ the overview control tells the truth about a town it cannot hold ────────────────────
-//
-// The stop ladder ends at 0.25, which holds four rings of the block grammar. Past that "The
-// whole town" shows as much of the town as the ladder can and the rest is off screen. A
-// control that quietly does most of what it says is worse than one that says what it can do.
+// The stop ladder ends at 0.25, which holds four rings of the block grammar; past that the control
+// says what it can actually do rather than promising the whole town.
 
 describe('"The whole town" on a town that does not fit', () => {
   const fitItem = (townFits: boolean) =>

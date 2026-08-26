@@ -1,27 +1,11 @@
-// CONTROLS THE VIEWER CAN MOVE, AND HIDE (U20, U21, plan task 78).
-//
-// THE ASK: "I need more controls that are out of the way so I can still observe the town",
-// and "be able to MOVE/HIDE the controls to get an unobstructed view."
-//
-// Docking is SLOT-BASED, not free pixel dragging. A freely dragged panel is a panel a viewer
-// can lose behind another one, off the edge, or under their own pointer; four edges plus
-// hidden covers every case the ask names and none of the ones it does not.
-//
-// And the escape hatch that makes hiding safe: however much is put away, ONE always-present
-// affordance brings it back, and `HUD_TOGGLE_KEY` works from anywhere.
+// Docking is SLOT-BASED, not free pixel dragging: a freely dragged panel is one a viewer can lose
+// behind another, off the edge, or under their own pointer. `HUD_TOGGLE_KEY` always brings it back.
 
 export const DOCK_SLOTS = ['bottom', 'top', 'left', 'right', 'hidden'] as const
 export type DockSlot = (typeof DOCK_SLOTS)[number]
 
-/**
- * DEVIATION from the plan's list: `cameraHud` was retired into the control bar by task 77. A
- * dockable the renderer cannot place is a setting that does nothing, so the list names the
- * surfaces that are really on the stage.
- *
- * `minimap` was excluded here because it did not exist; it does now, and it is the reason this
- * table exists at all — a map of the town is the surface most likely to be in the way of the
- * town. It takes the corner it lives in and `hidden`, and `H` puts it away with everything else.
- */
+/** A dockable the renderer cannot place is a setting that does nothing, so this names the surfaces
+ *  that are really on the stage. */
 export const DOCKABLE = ['controlBar', 'timeline', 'statusStrip', 'fps', 'minimap'] as const
 export type Dockable = (typeof DOCKABLE)[number]
 
@@ -32,13 +16,9 @@ export const DEFAULT_HUD: HudLayout = {
 }
 
 /**
- * WHICH SLOTS EACH SURFACE CAN REALLY TAKE.
- *
- * Only `controlBar` has all four edges in CSS. The timeline and the status strip are
- * horizontal bands and the frame counter is a corner tag; the renderer honours `hidden` for
- * all three and otherwise leaves them where they live. Offering a move nothing performs is a
- * setting that does nothing, so the menu, the reducer and the stored preference all answer to
- * this one table.
+ * Which slots each surface can really take: only `controlBar` has all four edges in CSS. Offering
+ * a move nothing performs is a setting that does nothing, so menu, reducer and stored preference
+ * all answer to this one table.
  */
 export const SLOTS_FOR: Readonly<Record<Dockable, readonly DockSlot[]>> = {
   controlBar: DOCK_SLOTS,
@@ -118,12 +98,8 @@ export function isFullyHidden(l: HudLayout): boolean {
 }
 
 /**
- * What `HUD_TOGGLE_KEY` does from here.
- *
- * WHAT THE BROWSER CAUGHT: a literal toggle on "is everything hidden" put the REST away when
- * a viewer had hidden only the bar and pressed H to get it back. If anything at all is put
- * away, the key brings everything back; it only puts things away from a full stage. The key
- * is the way back first and a shortcut second.
+ * If anything at all is put away the key brings everything back, and it only puts things away from
+ * a full stage: a literal toggle on "is everything hidden" put the REST away instead.
  */
 export function hudToggle(l: HudLayout): HudEv {
   return { kind: hiddenCount(l) > 0 ? 'show-all' : 'hide-all' }

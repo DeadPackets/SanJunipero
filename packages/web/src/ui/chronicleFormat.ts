@@ -58,9 +58,8 @@ export function describeEvent(ev: SimEvent, state: WorldState | null): string | 
   }
 }
 
-// The recent-event ring is filtered by this, so the Chronicle's count and the lines under it
-// are the same set. The verdict never depends on world state: an event either has a sentence
-// or it does not.
+// The recent-event ring is filtered by this, so the Chronicle's count and the lines under it are
+// the same set. The verdict never depends on world state.
 export function isNarratable(ev: SimEvent): boolean {
   return describeEvent(ev, null) !== null
 }

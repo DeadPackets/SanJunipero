@@ -5,16 +5,8 @@ import { kindWords } from './broadcastReady.js'
 import { DISCOVERY_REFETCH_MS, leavesOf, recordSummary, type Leaf } from './discoveryModel.js'
 
 /**
- * THE DISCOVERY RECORD.
- *
- * A vertical chain of leaves, one per discovery, joined top to bottom by a single rule, so
- * scrolling it IS scrolling the town's history. Each leaf is a museum label: the commissioned
- * sprite, the town's own name for the thing, the day and the person, the mind's actual words,
- * and what it unlocked. Clicking a leaf scrubs the world back to that tick, so the record is
- * not a document beside the simulation — it is a way into it.
- *
- * This is the ONE place the agent's own words are printed. The chronicle never quotes them:
- * a chronicle line is agent-visible and this panel is not.
+ * The one place the agent's own words are printed. The chronicle never quotes them: a chronicle
+ * line is agent-visible and this panel is not.
  */
 
 /** The whole record, as a pure view. The panel below is the same thing with a fetch on it. */

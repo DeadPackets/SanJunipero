@@ -3,10 +3,8 @@ import {
   hiddenCount, isFullyHidden, type HudEv, type HudLayout,
 } from './hudLayout.js'
 
-// THE WAY BACK. Whatever a viewer has put away, this is always on the stage: a 12 px grab
-// handle at the corner that opens into a slot picker. Hiding is only safe if it is reversible
-// without knowing a keyboard shortcut, so the handle is a real button with a spoken label and
-// it is never itself hideable.
+// Hiding is only safe if it is reversible without knowing a keyboard shortcut, so the grab
+// handle is a real button with a spoken label and is never itself hideable.
 
 export function HudDock(
   { layout, open, onEvent, onOpen }: {

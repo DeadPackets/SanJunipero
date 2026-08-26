@@ -184,12 +184,8 @@ describe('R2 · every caption survives the downscale to a 480px mobile player', 
     for (const c of CAPTIONS) expect(c.px, c.what).toBeGreaterThan(0)
   })
 
-  // ★ THE NUMBER THAT BOUGHT THE SECOND LAYOUT, AND IT STAYS PINNED. Every burned-in caption
-  // in the DESKTOP chrome is 12–16 px against a 22 px floor, so on a 480-wide phone they land
-  // at 3.0–4.0 px where 5.4 px is needed. No token fixes it — 22 px chrome on a 1920 stage is
-  // absurd for the person sitting in front of it — so `ui/broadcast.ts` is a second
-  // composition rather than a bigger desktop, and `broadcast.test.ts` measures ITS captions at
-  // the same 0.25 and finds no shortfall. This row is what the desktop still is, on purpose.
+  // The desktop shortfall is measured on purpose rather than asserted away: it is what bought
+  // the second composition in `ui/broadcast.ts`.
   it('MEASURES the desktop shortfall rather than asserting it away', () => {
     expect(captionShortfall(CAPTIONS)).toEqual([
       'speech bubble — 4.00px of 5.4px',
@@ -262,10 +258,6 @@ describe('R8 · a dropped socket never leaves a confident clock on screen', () =
 })
 
 // ── R1 / R3 · the decidable halves, which were recorded as "unmeasured" whole ─────────────
-//
-// Neither line closes without a person: ten unattended minutes is a wall clock, and whether a
-// stranger UNDERSTANDS in ten seconds is a judgement. But both rest on preconditions that are
-// arithmetic, and both preconditions were false before this batch.
 
 describe('R1 / R3 · what a machine can say about the two human lines', () => {
   const TOWN = ['amara', 'omar', 'salma', 'yusuf']
@@ -291,11 +283,6 @@ describe('R1 / R3 · what a machine can say about the two human lines', () => {
 })
 
 // ── R5 · a death, a birth and a build each read differently without sound ─────────────────
-//
-// The verdict is a person's — whether three things READ differently is a judgement, and the
-// protocol for it is in the report. But the NECESSARY condition is arithmetic, and it was
-// recorded as "not machine-decidable" without the decidable half being measured. Every
-// channel a silent viewer has is enumerated below and checked pairwise.
 
 const R5_EVENTS = ['agent_died', 'agent_born', 'structure_completed'] as const
 
@@ -338,20 +325,15 @@ describe('R5 · the three the town cannot say out loud', () => {
     expect(distinct(marks.map((m) => JSON.stringify(MARK_GLYPH[m.kind])))).toBe(true)
   })
 
-  // WEIGHT IS NOT ONE OF R5's CHANNELS, and asserting it would have been wrong: a death and a
-  // birth are both 14 on purpose — the weight decides what a crowded timeline keeps, not what
-  // a mark looks like. Recorded so the next reader does not mistake the equality for a bug.
+  // A death and a birth are both 14 on purpose: the weight decides what a crowded timeline keeps,
+  // not what a mark looks like.
   it('weighs a death and a birth the same, and says why that is not a collision', () => {
     expect(marks[0]!.weight).toBe(marks[1]!.weight)
     expect(marks[2]!.weight).toBeLessThan(marks[0]!.weight)
   })
 
-  // ★ MEASURED, AND IT IS NOT CLEAN. `spark` is the birth glyph AND the narrator milestone's
-  // (`MILESTONE_ICON`), so the three R5 asks are pairwise distinct but a birth and a "first"
-  // are not. The sentence beside it still separates them and the glyph is `aria-hidden`, so
-  // nothing is announced wrongly — but the picture alone is ambiguous, which is exactly what
-  // R5 asks about. Recorded rather than asserted away; the human pass decides whether it
-  // matters, and this pin moves the moment the table does.
+  // `spark` is the birth glyph AND the narrator milestone's, so a birth and a "first" are not
+  // distinct; the sentence beside it separates them and the glyph is aria-hidden.
   it('records the one collision in the icon table', () => {
     expect(MILESTONE_ICON).toBe(chronicleIcon('agent_born'))
     expect(chronicleGlyph('spark').label).toBe('a first')

@@ -108,11 +108,8 @@ describe('what a stream viewer is left with', () => {
     expect(CSS).toContain("[data-broadcast='on'] .moments-lens[data-letterboxed='true'] { --letterbox-h: 0px; }")
   })
 
-  // ★ WHAT THE BROWSER CAUGHT. With the caption floating over the picture, a doubled bubble —
-  // 624 x 272 CSS px, measured on the live canvas for a 33-character line — landed on top of
-  // it. The stage ENDS above the band now, from ONE variable, so `placeBubbles` clamping to
-  // `viewRect()` cannot put anything in the world across the caption. Measured in the browser
-  // at 0px overlap: canvas bottom 647, caption top 647.
+  // The stage ENDS above the band, from one variable, so `placeBubbles` clamping to `viewRect()`
+  // cannot put anything in the world across the caption.
   it('★ ends the picture where the caption starts, from one number', () => {
     const h = /\[data-broadcast='on'\]\s*\{[^}]*--bc-caption-h:\s*([^;}]+)/.exec(CSS)?.[1]?.trim()
     expect(h).toBe('11rem')

@@ -2,10 +2,6 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { CSS_DURATION_TOKEN } from './motion.js'
 
-// U23's "extra final touches to give it that extra shine", turned into TWELVE LINES WITH A
-// TEST EACH, so "polish" is not a vibe somebody claims. Every line below was a known finish
-// defect in the landed surface or a known AAA affordance it lacked.
-
 const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
 const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8')
 
@@ -37,10 +33,8 @@ export function decl(body: string, prop: string): string | null {
 const missing = (list: readonly string[], ok: (sel: string) => boolean): string[] =>
   list.filter((s) => !ok(s))
 
-// ★ ANTI-VACUITY. A line that names a selector the sheet does not have can be satisfied by
-// writing DEAD CSS, and then twelve green lines mean nothing. Every selector any row below
-// names must already exist as a rule — the row proves a PROPERTY of a real surface, never
-// the existence of a rule invented to pass it.
+// ANTI-VACUITY. A row naming a selector the sheet does not have can be satisfied by writing DEAD
+// CSS, so every selector named below must already exist as a rule.
 const ALL_NAMED: string[] = []
 const named = <T extends readonly string[]>(list: T): T => {
   ALL_NAMED.push(...list)
@@ -48,8 +42,8 @@ const named = <T extends readonly string[]>(list: T): T => {
 }
 
 // ── 1 · optical alignment ─────────────────────────────────────────────────────────────────
-// An icon beside a word is two boxes of different heights. Centring them centres the BOXES;
-// what a reader sees is the two baselines disagreeing. Every inline pair states its rule.
+// An icon beside a word is two boxes of different heights: centring them centres the BOXES, and
+// what a reader sees is the two baselines disagreeing.
 const ICON_LABEL_PAIRS = named(['.legend-chip', '.strip-cell', '.feed-line', '.room-roll li', '.rr-doing'])
 
 describe('1 · an icon and its word sit on one line, declared and never defaulted', () => {

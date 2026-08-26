@@ -4,10 +4,8 @@ export type PlaySpeed = typeof PLAY_SPEEDS[number]
 // At 1×, one sim minute every half second of real time — slow enough to read a street.
 export const MOMENT_STEP_MS = 500
 
-// accMs is the part-step left over from the last frame. It is what makes this a pure
-// accumulator rather than a clock: a 60fps loop hands over ~16ms at a time, and without a
-// remainder every frame would floor to zero and playback would never move at all. Nothing
-// here reads performance.now(), so the same run of frames always lands in the same place.
+// accMs is the part-step left over from the last frame, which is what makes this an accumulator
+// rather than a clock: at ~16ms a frame, without a remainder every step would floor to zero.
 export type PlayerState = {
   status: 'idle' | 'playing' | 'paused'
   tick: number

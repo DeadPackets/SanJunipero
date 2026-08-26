@@ -5,18 +5,8 @@ import {
   relationLine, type BondLevel, type BondType, type LineageLike,
 } from '../bondModel2.js'
 
-// A ROW OPENS INTO WHO THIS PERSON HAS BECOME (U12, P22).
-//
-// THE ASK, verbatim: "Clicking a row EXPANDS into the full view."
-//
-// THE BUG THAT CANNOT COME BACK: clicking used to push a route that REPLACED the list with the
-// inspector, which is why the audit found a back-button class of bug and why C10 needed three
-// separate ways back. Expansion is a state of the LIST. The list never unmounts, so there is no
-// "back" left to get wrong.
-//
-// ★ AND THE MANDATE: every section below is RUN-PRODUCED. Not one of them reads a handed-down
-// field, and where the run has produced nothing the section says so honestly rather than
-// describing an empty person.
+// Expansion is a state of the LIST, not a route: the list never unmounts, so there is no "back"
+// left to get wrong. Every section is RUN-PRODUCED and says so honestly when the run produced none.
 
 export type ExpandState = { openId: string | null }
 export type ExpandEv =
@@ -65,12 +55,8 @@ export type Becoming = {
   changed: Array<{ day: number; words: string }>
 }
 
-/**
- * One line per section for a person the run has not yet made anything of.
- *
- * Each says THIS PERSON has not done it yet — never that the town has not started (audit M6) —
- * and none of them is one of the six literals audit R3 named.
- */
+/** One line per section for a person the run has not yet made anything of. Each says THIS PERSON
+ *  has not done it yet, never that the town has not started. */
 export const SECTION_EMPTY: Readonly<Record<keyof Becoming, string>> = {
   lived: 'They arrived today.',
   done: 'They have not done anything the town wrote down yet.',
@@ -107,11 +93,8 @@ export function skillBand(xp: number): string {
   return SKILL_BANDS[SKILL_BANDS.length - 1]!.words
 }
 
-/**
- * WHAT THEY HAVE DONE, sourced. The bond log is a dated record of acts between people and the
- * live feed is a dated record of acts on the world; both are things that HAPPENED. Nothing here
- * is inferred from who somebody is.
- */
+/** The bond log and the live feed are both dated records of things that HAPPENED. Nothing here is
+ *  inferred from who somebody is. */
 const ACT_WORDS: Readonly<Record<string, string>> = {
   spoke: 'talked with someone', teach: 'taught someone something',
   give: 'gave something away', co_slept: 'shared a roof', attack: 'came to blows',
@@ -132,9 +115,8 @@ export function actsOf(
   const out: Array<{ tick: number; words: string }> = []
   for (const b of bonds?.bonds ?? []) {
     if (b.aId !== agentId && b.bId !== agentId) continue
-    // The window says what has happened lately; the rollup's two stamps make sure the day an
-    // act FIRST happened survives it. Becoming folds both to one row per day per act, so a
-    // parenthood on Day 3 is still in the list on Day 300 and nothing is duplicated.
+    // The window says what has happened lately; the rollup's two stamps keep the day an act FIRST
+    // happened. Both fold to one row per day per act, so nothing is duplicated.
     const ticks: Array<{ tick: number; kind: string }> = [
       ...b.recent,
       ...b.acts.flatMap((a) => [{ tick: a.firstTick, kind: a.kind }, { tick: a.lastTick, kind: a.kind }]),

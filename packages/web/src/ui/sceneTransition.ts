@@ -1,15 +1,7 @@
 import { MOTION, easeFn, type Motion } from './motion.js'
 
-/**
- * U23 — GOING SOMEWHERE LOOKS LIKE GOING SOMEWHERE.
- *
- * The four transitions that matter most were the four hardest cuts in the product: changing
- * lens swapped a subtree instantly, entering a room faded a card in over a town that never
- * moved, and the day crossed in one step of the clock.
- *
- * OUT THEN IN, NEVER BOTH AT ONCE. A crossfade of two live scenes doubles the frame cost and
- * reads as a smear at this pixel density, so the outgoing leaves before the incoming arrives.
- */
+/** OUT THEN IN, NEVER BOTH AT ONCE: a crossfade of two live scenes doubles the frame cost and reads
+ *  as a smear at this pixel density, so the outgoing leaves before the incoming arrives. */
 export const SCENES = ['lens', 'interior', 'follow', 'daybreak', 'nightfall'] as const
 export type SceneName = (typeof SCENES)[number]
 export type ScenePhase = 'idle' | 'out' | 'in'
@@ -52,11 +44,8 @@ export function sceneReducer(prev: SceneState, ev: SceneEvent): SceneState {
   return prev
 }
 
-/**
- * The outgoing scene's opacity and the incoming one's, at this instant. Under reduced motion
- * the STATE MACHINE IS IDENTICAL and only the curve changes to a step — so a viewer who opted
- * out cannot desynchronise anything, they simply do not watch it move.
- */
+/** The outgoing scene's opacity and the incoming one's, at this instant. Under reduced motion the
+ *  STATE MACHINE IS IDENTICAL and only the curve becomes a step, so nothing can desynchronise. */
 export function sceneAlpha(
   s: SceneState, nowMs: number, reducedMotion = false,
 ): { out: number; in: number } {

@@ -1,15 +1,7 @@
 import type { LegendRow } from './relationGraph.js'
 
-/**
- * THE LEGEND'S OFF STATE IS A MARK, NOT A DIMMING (audit M4).
- *
- * A struck-through chip says "filtered out"; a faded one says "less important", which is a
- * different claim and the one the landed lens accidentally made. De-emphasis by `opacity` is
- * also how four of the audit's six AA failures happened, so the state is an ELEMENT.
- *
- * It lives in its own file because `SocietyLens.tsx` imports `react-force-graph-2d`, which
- * touches `window` at module load and therefore cannot be imported by a node test.
- */
+/** Its own file: `SocietyLens.tsx` imports `react-force-graph-2d`, which touches `window` at
+ *  module load and so cannot be imported by a node test. The off state is a mark, never opacity. */
 export function LegendChip(
   { row, off, onToggle }: { row: LegendRow; off: boolean; onToggle: () => void },
 ) {

@@ -4,13 +4,8 @@ import {
   type Bond, type BondLevel, type BondsResponse,
 } from '@sj/shared'
 
-// ★ THE MODEL MOVED HALFWAY TO THE SERVER, AND ONLY BECAUSE THE HISTORY DID.
-//
-// Warmth, the level thresholds and the valence table now live in `@sj/shared`: the reader is no
-// longer handed the acts, so the fold happens once on the server and the reader decays the
-// scalar forward. `decayWarmth` makes that EXACT rather than approximate — see the identity in
-// `shared/src/bonds.ts`. What stays here is everything a viewer reads and a server never should:
-// the type axis, the words, and the arc's presentation.
+// Warmth, the level thresholds and the valence table live in `@sj/shared`: the reader is handed
+// the folded scalar, not the acts, and `decayWarmth` carries it forward exactly.
 export {
   BOND_LEVELS, BOND_VALENCE, LEVEL_RANK, LEVEL_THRESHOLDS, WARMTH_HALF_LIFE_TICKS,
   bondLevel, bondWarmth, type BondLevel,
@@ -19,22 +14,8 @@ export {
 /** The endpoint records a `BondKind`; the plan names the ACT. The table is the contract's. */
 export const ACT_OF_BOND_KIND = BOND_ACT_OF_KIND
 
-// RELATIONSHIPS HAVE A KIND AND A TEMPERATURE, AND THE TEMPERATURE CAN FALL (U15, P22).
-//
-// THE ASK, verbatim: "It must express LEVELS — strangers, acquaintances, friends, hatred — AND
-// TYPES — romantic (spouse counts as romantic), sibling, parent-child."
-//
-// WHY THE LANDED MODEL CANNOT: one kind per pair collapsed by precedence, with `strength` as an
-// UNSIGNED interaction count. Any two people who once spoke in earshot are labelled `friend`;
-// `kin` fuses parent-child with sibling; and "strangers" is inexpressible, because an unlinked
-// person is not even a node in the graph. Hatred is unreachable by construction — that is the
-// bug, and an unsigned counter is why.
-//
-// THE MODEL: two INDEPENDENT axes over the history the endpoint already returns.
-//   TYPE  is structural — a fact the world recorded. A pair has at most one.
-//   LEVEL is valenced and decayed — it can go down, which is what makes it a relationship
-//         rather than a counter.
-// This is a pure READER. No engine or gateway type moves.
+// Two INDEPENDENT axes over the history the endpoint returns. TYPE is structural — a fact the
+// world recorded, and a pair has at most one. LEVEL is valenced and decayed, so it can go DOWN.
 
 // ── TYPE ───────────────────────────────────────────────────────────────────────────────────
 
@@ -59,10 +40,8 @@ const bondBetween = (aId: string, bId: string, bonds: BondsResponse): Bond | nul
   bonds.bonds.find((b) => (b.aId === aId && b.bId === bId) || (b.aId === bId && b.bId === aId)) ?? null
 
 /**
- * Directional, because "parent" and "child" are the same edge read from two ends.
- *
- * KIN OUTRANKS PARTNER, deliberately: a birth is a fact the world wrote down and a partnership
- * is inferred from who slept under the same roof. When the two disagree, the recorded fact wins.
+ * Directional, because "parent" and "child" are the same edge read from two ends. KIN OUTRANKS
+ * PARTNER: a birth is a fact the world wrote down, a partnership is inferred from who slept where.
  */
 export function bondTypeOf(
   aId: string, bId: string, lineage: LineageLike, bonds: BondsResponse,
@@ -84,9 +63,8 @@ export function bondTypeOf(
 export const SPOUSE_NIGHTS = 14
 
 /**
- * The user's ruling is "romantic (spouse counts as romantic)" — so a partnership is presented
- * as one AND its evidence is shown beside it. The naming law (P12) still holds: the word
- * "married" appears only if the world recorded it, and the world records nights, not weddings.
+ * A partnership is presented as romantic AND its evidence shown beside it: the word "married"
+ * appears only if the world recorded it, and the world records nights, not weddings.
  */
 export function partnerEvidence(b: Bond): string | null {
   const nights = bondRollup(b, 'partner')
@@ -115,12 +93,8 @@ export type BondArc = {
 }
 
 /**
- * ★ THREE READS OF A SUMMARY, WHERE THIS USED TO BE O(acts²) IN THE BROWSER.
- *
- * It found `sinceDay` by re-summing the history at every distinct tick — a nested walk, per
- * link, per render, over a history that reached six figures per bond. The server folds the same
- * answer forward in one pass; `priorWarmth` is where the pair stood a half-life ago and
- * `levelChangedTick` is when the level last moved.
+ * Three reads of a server-folded summary: `priorWarmth` is where the pair stood a half-life ago
+ * and `levelChangedTick` is when the level last moved. Re-summing the history here was O(acts²).
  */
 export function bondArc(bond: Bond, nowTick: number): BondArc {
   const from = bondLevel(bond.priorWarmth)

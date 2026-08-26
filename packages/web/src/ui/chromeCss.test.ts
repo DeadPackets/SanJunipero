@@ -3,12 +3,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// ★ THE STRUCTURAL GUARD ON chrome.css. Every UI lane appends a block to this sheet and every
-// merge train has resolved it by hand, counting braces in a terminal. A union merge that drops
-// one side's block is invisible to tsc and to every other test in the suite — the remaining CSS
-// still parses, still builds, and the surface it styled just stops being styled. Merge train 1
-// caught a real off-by-one that way and asked for this file: it turns the integrator's
-// arithmetic into something `pnpm test` does.
+// A union merge that drops one side's block is invisible to tsc and to every other test in the
+// suite: the remaining CSS still parses, and the surface it styled just stops being styled.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CSS = readFileSync(join(HERE, 'chrome.css'), 'utf8')
@@ -43,10 +39,8 @@ describe('★ chrome.css survives the merge trains intact', () => {
     }
   })
 
-  // 167 base + 5 the Discovery Record + 2 the little map — merge train 1's hand count — + 1 the
-  // bond tally (`contracts`: the whole-history counts the 24-act window cannot say). Half a
-  // block surviving a union merge keeps its banner and still balances its braces; only the rule
-  // count sees it.
+  // Half a block surviving a union merge keeps its banner and still balances its braces; only the
+  // rule count sees it.
   it('has the 175 top-level rules the trains counted', () => {
     expect(LINES.filter((l) => l.startsWith('}'))).toHaveLength(175)
   })
@@ -58,30 +52,16 @@ describe('★ chrome.css survives the merge trains intact', () => {
   })
 })
 
-// ★ THE CONTROL BAR MAY NOT LOSE A CONTROL, AND THE SHEET IS WHERE THAT IS DECIDED.
-//
-// Merge train 2 and this lane both photographed it: with a right-hand panel open, the bar was
-// 1072 px holding 1435 px of controls, and MOMENTS, WORLD LAWS and HIDE THE CONTROLS were past
-// the edge. HIDE THE CONTROLS is the escape hatch; losing it is the worst of the three.
-//
-// The cause is one word. The bar's ONLY responsive rule was `@media (max-width: 1100px)`, and
-// the thing that narrows this bar is not the window — it is a 23rem panel sliding in beside it.
-// The window never changed, so the rule never fired.
-//
-// These assertions are on the SHEET rather than on a model of it, because the sheet is the
-// thing that was wrong and a model would have agreed with the model. No layout engine runs in
-// vitest; what a test CAN do is refuse the two constructions that made a control unreachable.
+// These assertions are on the SHEET rather than on a model of it: no layout engine runs in vitest,
+// and a model of the sheet would have agreed with the model.
 describe('★ the control bar keeps every control at every stage width', () => {
   /** The sheet with its comments removed. Everything below asks what the sheet DOES, and a
    *  comment quoting the rule that was wrong must not read as that rule still being there. */
   const BARE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
 
   /**
-   * ONE top-level rule, by its own selector line, ending at the first bare `}` — or on the
-   * same line when the rule is a one-liner. A regex over the whole sheet reads whatever comes
-   * next: the first `.control-bar` in this file is the DOCKED variant a hundred lines above,
-   * and a guard that measured that block would have passed on the broken sheet. Twelve vacuous
-   * guards on this project began exactly that way.
+   * ONE top-level rule, by its own selector line, ending at the first bare `}`. A regex over the
+   * whole sheet reads whatever comes next: the first `.control-bar` here is the DOCKED variant.
    */
   const topRule = (selector: string): string => {
     const lines = BARE.split('\n')

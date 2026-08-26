@@ -1,12 +1,7 @@
 import type { Structure, TileId, WorldState } from '@sj/engine/state'
 
-// WHERE THEY ARE, IN WORDS (U12, plan task 80).
-//
-// U12 requires WHERE THEY ARE on every roster row and nothing in the product computed it.
-// `agentRuntime.ts` has a `nearestStructureKind` for the MIND, in `@sj/agents`, which P1 forbids
-// the viewer from importing — so this is a deliberate viewer-side reimplementation, and it
-// answers in prose rather than in kinds: never a coordinate, never a structure id, never a slug
-// with an underscore in it.
+// A deliberate viewer-side reimplementation: `nearestStructureKind` lives in `@sj/agents`, which P1
+// forbids the viewer importing. It answers in prose — never a coordinate, an id, or a slug.
 
 export type Place = { words: string; kind: 'inside' | 'at' | 'on' | 'out' }
 
@@ -82,10 +77,8 @@ function groundWords(state: WorldState, x: number, y: number): string | null {
   return TERRAIN_WORDS[t]
 }
 
-/**
- * First match wins: the room they are in, then the thing they are beside, then the ground they
- * stand on, then the honest admission that they are nowhere in particular.
- */
+/** First match wins: the room they are in, then the thing they are beside, then the ground they
+ *  stand on, then the honest admission that they are nowhere in particular. */
 export function placeOf(state: WorldState, agentId: string): Place {
   const a = state.agents[agentId]
   if (a === undefined) return { words: NOWHERE, kind: 'out' }

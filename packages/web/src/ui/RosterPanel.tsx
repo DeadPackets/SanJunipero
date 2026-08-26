@@ -132,9 +132,8 @@ export function RosterPanel(
     return () => { alive = false; clearInterval(timer) }
   }, [])
 
-  // A LOADING SURFACE HAS A SHAPE (finish line 7). The veil covers the stage, not the aside,
-  // so this used to be 23rem of blank parchment: five slabs at the real row height say what
-  // is coming and stop the panel jumping when it lands.
+  // The veil covers the stage, not the aside: five slabs at the real row height say what is
+  // coming and stop the panel jumping when it lands.
   if (state === null) {
     return (
       <div className="roster-panel" aria-busy="true">

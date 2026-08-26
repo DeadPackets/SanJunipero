@@ -58,16 +58,8 @@ export type InspectorAgent = AgentView & { skills: Record<string, number> } & {
   activity: null | { verb: string; ticksRemaining: number }
 }
 
-/**
- * ★ WHAT A RUN HAS MADE OF THIS PERSON — the panel's substance, with the store taken out of it.
- *
- * Every section here is sourced to something the run recorded: a thought the observer wrote
- * down, a body the engine ticked, an activity the mind chose, things the world put in their
- * hands, crafts they have practised, and the days their own document changed. NOTHING here is
- * handed to them at genesis, and where the record is empty it says the RECORD is empty — the
- * two placeholders that described an empty person instead ("Their mind is quiet.", "Still
- * learning everything.") are deleted, not softened.
- */
+/** What a run has made of this person. Every section is sourced to something the run recorded,
+ *  and where the record is empty it says the RECORD is empty. */
 export function InspectorBodyView(
   { agent, tick, thought, carrying, changes }: {
     agent: InspectorAgent
@@ -238,7 +230,7 @@ export function InspectorPanel(
         )}
         <div>
           <h2 className="px-title">{a.name}</h2>
-          {/* ONE state and its conditions, from the one vocabulary (task 79). This badge row
+          {/* ONE state and its conditions, from the one vocabulary. This badge row
               used to carry "asleep"/"awake"/"at rest forever" beside a separate unwell chip —
               three words for one fact and a synonym pair among them. */}
           <div className="badges">

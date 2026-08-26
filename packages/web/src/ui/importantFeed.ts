@@ -2,11 +2,8 @@ import { kindWords } from './broadcastReady.js'
 import { CHRONICLE_FALLBACK_ICON, chronicleLine, type ChronicleLookup, type SimEvent } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 
-// The viewer's half of the chronicle formatter. It shares chronicleLine with the gateway, so
-// a live event and a chronicle entry read as the same sentence rather than two near-misses.
-// The authored mystery prose lives in the engine's data tables, which the browser bundle does
-// not carry — a mystery therefore arrives labelled through /api/chronicle, and this formatter
-// stays quiet rather than inventing a second version of the town's own words.
+// Shares `chronicleLine` with the gateway, so a live event and a chronicle entry read as the same
+// sentence. Authored mystery prose is engine data the browser bundle does not carry, so it stays quiet.
 export function chronicleLabel(ev: SimEvent, state: WorldState | null): string | null {
   const look: ChronicleLookup = {
     agentName: (id) => state?.agents[id]?.name ?? id,

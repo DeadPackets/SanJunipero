@@ -106,11 +106,6 @@ describe('PlayerStripView', () => {
   })
 })
 
-// ★ U16, THE COMPOSITION. The user: the left summary is "very jarring because it doesn't fit
-// into the letterbox view." The rail was full stage height at z-index 18 over two 12% bands at
-// z-index 15, and App.tsx rendered the two views as SIBLINGS, so nothing in the layout knew
-// they were one picture. The bottom band is now the filmstrip: the picture is unobstructed and
-// the 12% is earned.
 const frame = (over: Partial<Parameters<typeof MomentsFrameView>[0]> = {}): string =>
   renderToStaticMarkup(createElement(MomentsFrameView, {
     moments: [moment], people, momentId: null, letterboxed: true, leaving: false,
@@ -141,9 +136,8 @@ describe('MomentsFrameView — the rail leaves the picture alone', () => {
     expect(frame({ momentId: null })).toContain('data-scroll-x="0"')
   })
 
-  // The old rail was `overflow-y: auto`, so the browser carried a tabbed-to card into view.
-  // A computed transform would have taken that away and left the sixth day focusable but
-  // invisible, so the strip keeps a real scroller and the layout only drives it.
+  // A computed transform would have left the sixth day focusable but invisible, so the strip
+  // keeps a real scroller and the layout only drives it.
   it('keeps a real scroller, so a card the keyboard reaches is a card you can see', () => {
     const list = /\.strip-list\s*\{([^}]*)\}/.exec(CSS)?.[1] ?? ''
     expect(list).toMatch(/overflow-x:\s*auto/)

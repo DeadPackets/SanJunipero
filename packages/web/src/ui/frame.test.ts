@@ -60,9 +60,6 @@ describe('frameLayout — the stage is a picture between two bands, and nothing 
   })
 })
 
-// ★ U16, AS A FAILING ASSERTION. The user: the left summary is "very jarring because it
-// doesn't fit into the letterbox view" — an element sits ON TOP of the letterbox. The rail
-// was `top: 0.8rem; bottom: 0.8rem`, which is full stage height, over two 12% bands.
 describe('straddlers — P19s mechanical guard on the band edges', () => {
   const l = frameLayout(STAGE, true)
   const RAIL_INSET = 13 // 0.8rem at the default 16px root

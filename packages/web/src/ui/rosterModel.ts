@@ -7,9 +7,9 @@ export type RosterRow = {
   id: string
   name: string
   band: 'young' | 'grown' | 'elder'
-  /** exactly ONE word for what they are doing (task 79) — never a second badge beside it */
+  /** exactly ONE word for what they are doing — never a second badge beside it */
   state: string
-  /** zero or more, from a vocabulary disjoint from the state's (task 79) */
+  /** zero or more, from a vocabulary disjoint from the state's */
   conditions: Condition[]
 }
 

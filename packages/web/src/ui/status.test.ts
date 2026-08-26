@@ -39,9 +39,7 @@ const body = (over: Partial<AgentView> = {}): AgentView => ({
   ...over,
 })
 
-// ── THE USER'S OWN EXAMPLE (U13) ──────────────────────────────────────────────────────────
-// rosterModel.ts:32 set `doing: 'resting'` while RosterPanel.tsx:47 rendered a separate
-// `asleep` badge, so a sleeping founder's card carried BOTH words for one fact.
+// ── THE USER'S OWN EXAMPLE ──────────────────────────────────────────────────────────
 describe('the duplicate, as a test', () => {
   const sleeper = body({ asleep: true, activity: null })
 

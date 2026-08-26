@@ -1,98 +1,5 @@
-/* Observatory chrome — pixel-art-native: chunky stepped frames, master-palette tokens,
-   warm paper surfaces over the night backdrop. World art alone renders pixelated;
-   chrome is crisp. (Style Bible §7 + AAA UI mandate.)
-
-   C10 T4 design-token plan (status strip + lens hints), written before implementing:
-   · SURFACE   reuse --parchment + --grain + --sand inset; the strip is the topbar's
-               second storey, not a new material. No new surface token.
-   · COLOUR    one new token, --stone (#ABA198, MASTER_PALETTE warm grey), for the
-               strip's tick rule and the clouded-sky glyph. Weather glyph fills come
-               from existing palette hexes, held in townStats.ts beside their labels
-               so the colour and the word can never disagree.
-   · TYPE      --font-px for the strip (it is chrome, not prose); tabular figures on
-               every number so a 2.5s clock cannot shift a pixel.
-   · SPACE     --strip-h: 30px, a fixed band. Height is a token because the stage
-               measures itself against it.
-   · MOTION    --t-slow: 300ms names the band ceiling the mandate sets. The strip
-               enters once, 80ms after the topbar (split + stagger); nothing in it
-               animates on tick. All of it inside prefers-reduced-motion.
-   · STATE     the count badge is deliberately the quietest thing on a tab — sand fill,
-               hairline inset, no colour of its own. A count is a fact, not a trophy.
-
-   C10 T6 design-token plan (curated chronicle + scrub-to-event), written before implementing:
-   · SURFACE   no new material. The Important feed lives in the panel it already had; the
-               view switch borrows the lens tab's slab at a smaller scale (.feed-tab).
-   · COLOUR    no new token. Glyph fills are palette hexes held in importantFeed.ts beside
-               each glyph's spoken label, so the picture and the word cannot disagree.
-               --ember marks the entry you are standing in, --honey the one under the pointer.
-   · TYPE      --font-data for the stamp (tabular figures, fixed 6.2rem column, so a feed of
-               different days does not ripple); --font-body for the sentence, because the
-               label is prose about people and must read as prose.
-   · SPACE     the 6.2rem stamp column and the 16px glyph column are the two fixed rails;
-               everything else flows. Rows are 40px minimum — a jump target, not a line.
-   · MOTION    the existing 30ms feed stagger is kept for arrival; a row's own hover and
-               press are 150ms colour-only transitions. Nothing animates on tick: a curated
-               feed that re-animated every 2.5s would strobe under a reading eye.
-   · STATE     the viewed entry is marked by an ember left rail AND aria-current, never by
-               colour alone. A row is a button with a full spoken label ("… Go to this
-               moment."), so the chronicle is navigable without a pointer.
-
-   C10 T7 design-token plan (bond detail over the redesigned graph):
-   · SURFACE   the detail is a cream slab in the same 9-slice frame the timeline and legend
-               wear (--px-cream + --grain + --ledge). No new material, no modal scrim: the
-               graph behind it stays live and readable, because the bond is about it.
-   · COLOUR    six tie colours, one per kind, all MASTER_PALETTE, held in bondsModel.ts.
-               A tie colour NEVER sits behind text — six hues cannot all clear AA under a
-               label — so it rides a swatch and a bar, and the word carries the meaning.
-   · TYPE      --font-px for the kind chip and the date labels, --font-data (tabular) for
-               every tick-stamped figure, --font-body for the title and the notes.
-   · SPACE     the same 6.2rem stamp rail as the chronicle, so the two feeds read as one
-               family; 40px on the close button.
-   · MOTION    one entrance (the existing panel-in, 240ms), nothing else. The graph's own
-               force simulation is motion enough on this surface.
-   · STATE     the bar is data, not a meter: it is labelled "N shared moments, out of M for
-               the closest pair in town" and cannot be filled, completed or won.
-
-   C10 T9 design-token plan (moments list + playback), written before implementing:
-   · SURFACE   two surfaces, both already in the language: a cream rail of postcards down
-               the left of the stage (--px-cream frame, --grain), and a night transport bar
-               across the bottom (--night, the same material as the letterbox it sits under),
-               so the lens keeps its cinema when a day is playing.
-   · COLOUR    --honey is the playhead and the open postcard's rail; cream on night in the
-               transport bar (12.6:1). Location motifs are palette hexes from the same set
-               importantFeed.ts draws its glyphs with.
-   · TYPE      --font-px for the day stamp, the speed pill and LIVE; --font-body for the
-               day's title and cast; --font-data (tabular) for the running clock, so a
-               ticking playhead cannot shift the bar it sits in.
-   · SPACE     --strip-card: 168px and --player-h: 56px, both tokens because the stage
-               measures against them. Every transport control is 40px.
-   · MOTION    the playhead is positioned, never transitioned — a transition would lag a
-               scrub and lie about where the town is. One 240ms entrance on the rail, and
-               the postcards stagger 30ms apart on arrival; both inside reduced-motion.
-   · STATE     the open day carries aria-current AND an ember rail; play/pause is one button
-               with aria-pressed and a label that changes with it. The transport is drawn in
-               the town's own pixels — ▶ and ❙❙ are pictographic characters whose shape
-               belongs to the reader's font, not to the town.
-
-   C10 T11 design-token plan (interior scenes + back to town), written before implementing:
-   · SURFACE   the ROOM is canvas, not chrome: a cream floor diamond (--parchment) with an
-               ink rim, cut from the same paper the panels are. The only chrome is one bar
-               at the head of the stage, on the --px-cream slab every floating surface wears.
-   · COLOUR    no new colour token. The town is dimmed behind --night at 0.62 — enough that
-               the room is unambiguously the subject, little enough that the town is still
-               THERE (the user ruling: the outside world stays on the main scene). --honey
-               is the hearth's light, the same warmth the moments playhead uses.
-   · TYPE      --font-px for the room's name and the button; --font-body for the line about
-               who is in, because that sentence is about people and must read as prose.
-   · SPACE     --interior-bar-h: 44px. A token because the button in it is the escape hatch
-               and must clear the 44px touch minimum whatever else the stage is showing.
-   · MOTION    INTERIOR_FADE_MS (260ms) — inside the 150–300ms band. The fade is a CAMERA
-               MOVE, not a cartoon effect, so the grave-tone director never suppresses it;
-               under prefers-reduced-motion it becomes a cut, and the bar stops sliding.
-   · STATE     focus lands on "Back to town" when the room opens and returns to the map when
-               it closes; Escape leaves. The caption observes ("Amara asleep, Yusuf are in")
-               and never counts. The door on the frontage is drawn at 0.5 and brightens on
-               hover — an affordance a viewer can find without sweeping the pointer. */
+/* Observatory chrome: chunky stepped frames over the night backdrop. World art renders
+   pixelated; chrome itself is crisp. */
 :root {
   --cream: #FFF6E9;
   --parchment: #F6E8D5;
@@ -100,12 +7,10 @@
   --sand: #E8D5BC;
   --ink: #43394A;
   /* De-emphasis is a colour, never `opacity` — a transparency's ratio is unknowable at the
-     call site, and that habit produced four of the six AA failures in the audit. Ink lifted
-     toward the warm greys: 6.57:1 on cream, 5.83:1 on parchment, 4.91:1 on sand. */
+     call site. 6.57:1 on cream, 5.83:1 on parchment, 4.91:1 on sand. */
   --ink-quiet: #5F5568;
-  /* The same rule turned over: quiet CREAM, for the dark grounds the town speaks over. The
-     subtitle's thought was the last `opacity` left on a reading surface. 8.28:1 on deep,
-     7.03:1 on night, and 1.81x quieter than cream — a ratio that is now known. */
+  /* The same rule turned over, for the dark grounds: 8.28:1 on deep, 7.03:1 on night, and
+     1.81x quieter than cream. */
   --cream-quiet: #C4B8AE;
   --deep: #241F2B;
   --night: #322B38;
@@ -119,11 +24,8 @@
 
   --stone: #ABA198;
 
-  /* MOTION. One vocabulary, two runtimes: every value below is DERIVED from `motion.ts`'s
-     MOTION table and a test fails if the two disagree. A motion is named by what it is for —
-     `--t-fast`, `--t-med` and `--t-slow` keep their landed spelling for reveal, enter and
-     scene, and lose their independence. `--t-ambient` is scenery, never a response to an
-     input, which is why it is the one value above the 300ms ceiling. */
+  /* Every value below is DERIVED from `motion.ts`'s MOTION table and a test fails if the two
+     disagree. `--t-ambient` is scenery, which is why it is the one value above the 300ms ceiling. */
   --t-tap: 90ms;
   --t-fast: 150ms;
   --t-move: 180ms;
@@ -138,7 +40,7 @@
   /* status strip: one fixed band so a ticking clock can never shift the stage */
   --strip-h: 30px;
 
-  /* moments: the filmstrip IS the bottom letterbox band (U16), so its card width and its
+  /* moments: the filmstrip IS the bottom letterbox band, so its card width and its
      floor are tokens the pure `frame.ts` layout and the sheet both answer to. */
   --strip-card: 168px;
   --film-h: 104px;   /* frame.ts BAND_MIN_PX — the band has to hold a whole postcard */
@@ -266,12 +168,10 @@ body {
 }
 .tick-badge.past { background: var(--sage); color: var(--deep); }
 .tick-badge.waking { color: var(--ink-quiet); }
-/* R8 / audit M9: with the socket down the badge went on reading `Now` in its live colour. It
-   says "Last seen" now, and it wears the rose the link pill wears — a stale figure is stated,
-   never implied by the absence of something. Colour is the SECOND signal; the word is first. */
-/* `--deep`, not `--cream`: cream on rose is 3.12:1 and this badge is 12.48px, so it failed AA
-   on the one surface whose job is to say the clock is stale. The pill beside it always wore
-   the darker ink — 4.82:1 — and now they agree. */
+/* A stale clock is stated in words ("Last seen"), never implied by the absence of something;
+   the rose it wears is the second signal. */
+/* `--deep`, not `--cream`: cream on rose is 3.12:1 and this badge is 12.48px, so it failed AA.
+   The pill beside it wears the same darker ink at 4.82:1. */
 .tick-badge.stale { background: var(--rose); color: var(--deep); }
 
 /* link trouble is the only time the chrome raises its voice */
@@ -291,8 +191,7 @@ body {
 }
 
 /* ── status strip: the town's own instrument panel, under the signboard ──
-   Day, sky, and how many are still walking. Fixed height + tabular figures, so a clock
-   that changes every 2.5s never nudges the stage by a pixel. */
+   Fixed height + tabular figures, so a clock that changes every 2.5s never nudges the stage. */
 .status-strip {
   display: flex; align-items: center; gap: 0.55rem;
   height: var(--strip-h); flex: none;
@@ -332,9 +231,8 @@ body {
   flex: 1; min-width: 0; background: var(--night);
   display: grid; grid-template-rows: 1fr auto; grid-template-columns: 1fr; min-height: 0;
 }
-/* WHERE THE CONTROLS SIT (Task 78). Slot-based, so a viewer can put the bar out of the way
-   without being able to lose it: four edges plus put-away, and the dock handle is never
-   itself dockable. */
+/* Slot-based, so a viewer can put the bar out of the way without being able to lose it: four
+   edges plus put-away, and the dock handle is never itself dockable. */
 #stage-root[data-dock-controls="top"] { grid-template-rows: auto 1fr; }
 #stage-root[data-dock-controls="top"] .stage-cell { grid-row: 2; }
 #stage-root[data-dock-controls="top"] .control-bar { grid-row: 1; border-top: 0; border-bottom: 2px solid var(--ink); box-shadow: 0 4px 0 0 var(--deep); }
@@ -434,29 +332,21 @@ body {
 }
 .fps-overlay .fps-avg { font-size: 0.75rem; color: var(--ink-quiet); }
 
-/* ── the bottom control bar: one control surface, not two (Task 77) ──
-   A grid ROW of the stage, never an overlay, so P19 holds by construction: nothing in it can
-   sit on top of the town. `.camera-hud` is retired into its `camera` group. */
+/* ── the bottom control bar: one control surface, not two ──
+   A grid ROW of the stage, never an overlay, so nothing in it can sit on top of the town. */
 .control-bar {
   grid-row: 2;
   display: flex; align-items: stretch; gap: 0.9rem;
-  /* ★ A CONTROL THAT VANISHES WHEN A PANEL OPENS IS UNREACHABLE (composition lane).
-     Measured at a 1440 px window with the Townsfolk panel open: the bar is 1072 px, its
-     content 1435 px, and MOMENTS, WORLD LAWS and HIDE THE CONTROLS were 363 px past the
-     right edge — HIDE THE CONTROLS being the escape hatch, the worst one to lose. The bar
-     scrolled, in the sense that `overflow-x: auto` says it did, with no affordance any
-     viewer or any stream frame can use.
-     The bar WRAPS instead. It is a grid row of the stage, so a second row costs the canvas
-     56 px and costs the viewer no control at all. */
+  /* The bar WRAPS rather than scrolls: `overflow-x: auto` gives a viewer past the right edge no
+     affordance a pointer or a stream frame can use, and one of the lost controls is the escape hatch. */
   flex-wrap: wrap;
   /* and it is a SIZE CONTAINER, because the thing that narrows this bar is a panel, not the
      window — see the @container rule below */
   container-type: inline-size; container-name: control-bar;
   min-width: 0;
   min-height: var(--control-bar-h);
-  /* 52px on the right, not 0.8rem: the dock handle is 44px pinned to this same corner and it
-     sits ON the bar (measured: handle 1420..1464, bar bottom row 730..774). A control under
-     the handle is as unreachable as one past the edge. */
+  /* 52px on the right, not 0.8rem: the 44px dock handle is pinned to this same corner and sits ON
+     the bar. A control under the handle is as unreachable as one past the edge. */
   padding: 0.3rem 52px 0.3rem 0.8rem;
   overflow-x: auto; overflow-y: hidden;
   background: var(--cream) var(--grain);
@@ -490,17 +380,9 @@ body {
     transition-duration: var(--t-fast); transition-timing-function: var(--ease-enter);
   }
 }
-/* A NARROW BAR keeps the buttons and drops the words — the label is still spoken.
-   ★ KEYED TO THE BAR, NOT THE WINDOW, and that swap is the defect. This was
-   `@media (max-width: 1100px)`: the only responsive rule the bar had watched the VIEWPORT,
-   and the thing that narrows this bar is a 23rem panel sliding in beside it. At a 1440 px
-   window with a panel open the bar is 1072 px and the media query never fires, so the bar
-   kept full labels it had 363 px too little room for. A container query asks the question
-   the bar is actually in.
-   1500 px is the MEASURED width a labelled bar needs — 1435 px of controls plus the 52 px the
-   dock handle takes out of the same corner is 1487 — rounded up to the next 50. Below it the
-   same twelve controls are 678 px of glyphs and fit in one row down to about 730; below THAT
-   the wrap above takes over and the bar grows a row. Nothing is ever cut. */
+/* A NARROW BAR keeps the buttons and drops the words — the label is still spoken. Keyed to the
+   BAR, not the window: what narrows this bar is a 23rem panel beside it, which no media query sees.
+   1500px is measured — 1435px of controls plus the handle's 52px, rounded up to the next 50. */
 @container control-bar (max-width: 1500px) {
   .ctl-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
@@ -515,11 +397,9 @@ body {
   box-shadow: inset 2px 0 0 0 var(--sand), inset -4px 0 0 0 var(--sand), -4px 0 0 0 rgba(36, 31, 43, 0.35);
 }
 
-/* ── a lens change is a change of subject (U23, task 91) ──────────────────────────────────
-   OUT THEN IN, NEVER BOTH: the leaving view slides 8px BACK toward its own edge and goes,
-   then the arriving one comes from that edge. Two live scenes crossfading doubles the frame
-   cost and smears at this pixel density. The CANVAS never fades — the town is not the thing
-   that changed — so every selector here names a chrome surface. */
+/* ── a lens change is a change of subject ──────────────────────────────────
+   OUT THEN IN, NEVER BOTH: two live scenes crossfading doubles the frame cost and smears at this
+   pixel density. The CANVAS never fades, so every selector here names a chrome surface. */
 .stage-row[data-scene-phase='out'] #panel-outlet > *,
 .stage-row[data-scene-phase='out'] .society-lens,
 .stage-row[data-scene-phase='out'] .moments-frame,
@@ -635,9 +515,7 @@ body {
 .diff-line.add { background: #DCE8C8; }
 .diff-line.del { background: #F2C6C2; text-decoration: line-through; }
 
-/* ── how they have changed: what the run MOVED, newest first (task 83) ──
-   Not a character sheet. Each entry is a day the town rewrote its record of somebody, and
-   the diff under it is the evidence. A person with one version gets one honest line. */
+/* ── how they have changed: what the run MOVED, newest first ── */
 .change-entry { margin: 0.5rem 0 0; padding-left: 0.55rem; border-left: 2px solid var(--sand); }
 .change-entry:first-of-type { border-left-color: var(--honey); }
 .change-head { margin: 0; font-size: 0.875rem; }
@@ -675,7 +553,7 @@ body {
 }
 .veil-sub { font-size: 0.875rem; font-style: italic; color: var(--ink-quiet); }
 
-/* ── chronicle lens: feed + timeline + scrub banner (Task 17) ── */
+/* ── chronicle lens: feed + timeline + scrub banner ── */
 .chronicle-panel { padding: 1rem; font-size: 0.875rem; }
 .feed { list-style: none; margin: 0.6rem 0 0; padding: 0; }
 .feed-line {
@@ -820,9 +698,7 @@ body {
   }
 }
 
-/* ── back out of one townsperson to the roster (user bug 2026-08-17) ──
-   The lens is a roster or one person, and there was no route back. Ink-on-cream, the panel's
-   own language, 40px tall, and the global :focus-visible ember ring reaches it. */
+/* ── back out of one townsperson to the roster ── */
 .roster-back {
   display: inline-flex; align-items: center; gap: 0.4rem;
   min-height: 40px; margin: 0 0 0.6rem; padding: 0 0.7rem;
@@ -840,16 +716,10 @@ body {
   }
 }
 
-/* ── interiors: the room the camera stepped into, and the way back out (Tasks 11, 68) ──
-   The room itself is drawn on the canvas; this card is what the room IS — whose it is, who
-   raised it, who lives in it, what it holds. Every line is omitted when the world has nothing
-   to put in it, so an honest empty room is short rather than full of blanks. */
-/* ★ THE CARD SITS IN THE CORNER THE ROOM DOES NOT REACH, AND THAT IS THE BOTTOM ONE.
-   It was top-left, which is where the back-left wall goes — and the hearth is ON the back-left
-   wall, so the card hid the one thing a viewer opens a door to see, in every room. The room is
-   a diamond: its west vertex is halfway down the stage and its near vertex is bottom-centre, so
-   the bottom-left of the stage is outside the floor for every room size. Nothing else is there
-   while a room is open — the minimap hides indoors and the timeline is the chronicle lens's. */
+/* ── interiors: the room the camera stepped into, and the way back out ──
+   Every line is omitted when the world has nothing to put in it, so an honest empty room is short. */
+/* Bottom-left, not top-left: the hearth is on the back-left wall, and the room diamond never
+   reaches the bottom-left of the stage at any room size. */
 .room-card {
   position: absolute; bottom: 0.8rem; left: 0.8rem; z-index: 21;
   display: grid; gap: 0.55rem;
@@ -860,9 +730,8 @@ body {
   border: 10px solid transparent; border-image: var(--px-cream);
   box-shadow: var(--ledge);
 }
-/* The button first (it is the escape hatch, and the reading order must match the tab order),
-   the room's name on its own line under it. Side by side, "the storehouse" truncated to
-   "the store…" — a card may not cut the one thing it is naming. */
+/* The button first: it is the escape hatch, so the reading order must match the tab order. Side
+   by side, "the storehouse" truncates, and a card may not cut the one thing it is naming. */
 .room-head { display: grid; justify-items: start; gap: 0.35rem; }
 .interior-back {
   flex: none;
@@ -944,7 +813,7 @@ body {
   }
 }
 
-/* ── society lens: bonds graph over the night ground (Task 18) ── */
+/* ── society lens: bonds graph over the night ground ── */
 .stage-hidden .stage-mount { display: none; }
 .society-lens {
   position: absolute; inset: 0; overflow: hidden;
@@ -996,9 +865,8 @@ body {
 }
 .legend-chip:hover { translate: 0 -2px; }
 .legend-chip:active { translate: 0 1px; }
-/* AUDIT M4: the off state was a DIMMING. The ask was a MARK — a struck-through chip says
-   "filtered out"; a faded one says "less important", which is a different claim. The chip
-   keeps its own contrast and wears a rule through it. */
+/* The off state is a MARK, not a dimming: a struck-through chip says "filtered out", a faded one
+   says "less important". */
 .legend-chip { position: relative; }
 /* full-strength ink even when off: the STRIKE is the signal, so the word stays as readable
    as every other chip's. Fading it would say "less important", which it is not. */
@@ -1021,9 +889,7 @@ body {
   font-size: 0.75rem; color: var(--ink-quiet); margin-left: 0.3rem;
   font-family: var(--font-data); font-variant-numeric: tabular-nums;
 }
-/* WHAT THE BROWSER CAUGHT: centred, this card sat on top of a person. It used to be safe
-   because a town with no ties drew no nodes at all — which is exactly the defect task 85
-   fixed, so the card had to move off the middle of the page with it. */
+/* Off-centre: centred, this card sat on top of a person. */
 .society-empty {
   position: absolute; bottom: 1rem; left: 50%; translate: -50% 0; z-index: 10;
   color: var(--cream); font-style: italic;
@@ -1097,12 +963,10 @@ body {
 }
 .bond-earlier { margin: 0.4rem 0 0; font-size: 0.75rem; color: var(--ink-quiet); }
 
-/* ── director mode + catch-up digest (Task 19) ── */
+/* ── director mode + catch-up digest ── */
 /* ── the days the town kept: postcard rail + transport ── */
-/* U16: ONE picture, three boxes (frame.ts). `--letterbox-h` is the only number that says how
-   deep a band is, so nothing can measure it by hand and land half in and half out. The rail
-   used to run the full height of the stage over both bars; the bottom band is now the strip
-   itself, so the picture between them is genuinely unobstructed. */
+/* `--letterbox-h` is the only number that says how deep a band is, so nothing can measure it by
+   hand and land half in and half out. */
 .moments-frame { position: absolute; inset: 0; pointer-events: none; z-index: 18; }
 .moments-lens { position: absolute; inset: 0; --letterbox-h: 0px; }
 /* max(), not min-height on the strip alone: that gave a 71px top band over an 88px strip on a
@@ -1152,9 +1016,8 @@ body {
   .strip-list li:nth-child(4) { animation-delay: 90ms; }
 }
 .thumb-motif { flex: none; display: block; }
-/* A filmstrip card is a fixed frame, so its content is trimmed to fit rather than clipped by
-   the band: the title takes two lines at most and the cast and the place share one. Nothing is
-   lost to a reader who cannot see it — the aria-label still says the whole postcard. */
+/* A filmstrip card is a fixed frame, so its content is trimmed to fit rather than clipped by the
+   band; the aria-label still says the whole postcard. */
 .thumb-body { display: grid; gap: 0.05rem; min-width: 0; align-content: start; }
 .thumb-day {
   font-family: var(--font-px); font-size: 0.75rem; color: var(--ink-quiet);
@@ -1286,11 +1149,7 @@ body {
   pointer-events: none;
 }
 
-/* ── townsfolk roster (Townsfolk lens, nobody picked) ──
-   U12: "redesign as a video-game character roster. Required per row: portrait · name · current
-   status · a MOOD STATUS ICON · WHERE THEY ARE." The landed card was a bust, a name and three
-   badges with ~60% of it blank. A row is now a four-column GRID — portrait rail, name+state
-   column, mood glyph, place line — because that is what makes a party screen scannable. */
+/* ── townsfolk roster (Townsfolk lens, nobody picked) ── */
 .roster-panel { padding: 1rem; min-width: 21rem; font-size: 0.875rem; }
 @media (prefers-reduced-motion: no-preference) {
   .roster-panel { animation: panel-in var(--t-med) var(--ease-enter); }
@@ -1382,7 +1241,7 @@ body {
 }
 .rr-with { grid-area: with; font-size: 0.75rem; color: var(--ink-quiet); font-style: italic; }
 
-/* ── who they have become, opened UNDER the row (task 82) ──
+/* ── who they have become, opened UNDER the row ──
    The list stays mounted behind it, so the way back is the row the viewer just clicked. */
 .roster-expanded {
   margin: 0 0 0 0.6rem; padding: 0.6rem 0.7rem;
@@ -1456,9 +1315,8 @@ body {
 .law-says { grid-column: 1 / -1; margin: 0.15rem 0 0; font-size: 0.875rem; text-wrap: pretty; }
 /* AUDIT M2: `word-break: break-all` on a dotted path collapsed the label column to one
    character per line and pushed 77px off the viewport. A path wraps at its own joints. */
-/* WHAT THE BROWSER CAUGHT: Silkscreen has no lowercase, so the pixel face rendered
-   `aging.deathOfOldAgeEnabled` as AGING.DEATHOFOLDAGEENABLED — every word boundary gone, and
-   less readable than the key it replaced. The operator's path is set in the data face. */
+/* Silkscreen has no lowercase, so the pixel face renders `aging.deathOfOldAgeEnabled` with every
+   word boundary gone. The operator's path is set in the data face. */
 .law-path {
   font-family: var(--font-data); font-size: 0.75rem; letter-spacing: 0;
   color: var(--ink-quiet); overflow-wrap: anywhere; min-width: 0;
@@ -1497,24 +1355,19 @@ body {
   padding: 0.5rem 0.7rem; margin: 0 0 0.8rem;
 }
 
-/* ══ THE FINISH PASS (U23, task 92) ════════════════════════════════════════════════════════
-   Twelve lines, each with a test in `finish.test.ts`. NINE of the twelve failed on the landed
-   sheet; that number is the honest size of "the last five percent". Everything here is the
-   fix for a named line, and nothing here is decoration. */
+/* ══ THE FINISH PASS ════════════════════════════════════════════════════════ */
 
 /* 2 · a ticking number never shifts the box it sits in */
 .tick-badge { font-variant-numeric: tabular-nums; }
 
-/* 3 · a state arriving does not move the row it arrives in. The three roster cells that fill
-   in from live data reserve their width, so a founder who starts walking does not shove the
-   place-name column sideways on the tick they set off. */
+/* The three roster cells that fill in from live data reserve their width, so a founder who starts
+   walking does not shove the place-name column sideways on the tick they set off. */
 .rr-state { min-width: 6.5rem; }
 .rr-mood { min-width: 1.75rem; }
 .rr-place { min-width: 9rem; }
 
-/* 4 · a focus ring inside a clipping box is drawn INSIDE it. An outline offset outward at the
-   edge of an `overflow: hidden` box is painted into the overflow and simply lost, so a
-   keyboard viewer tabs into something they cannot see. */
+/* An outline offset outward at the edge of an `overflow: hidden` box is painted into the overflow
+   and lost, so the focus ring is drawn INSIDE the clipping box. */
 .stage-cell :focus-visible,
 .hud-menu :focus-visible,
 .strip-list :focus-visible,
@@ -1525,9 +1378,8 @@ body {
 .legend-chip:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
 .hud-slot:active { translate: 0 1px; box-shadow: 1px 1px 0 0 var(--deep); }
 
-/* 6 · hover arrives in 150ms and leaves the instant the pointer does. A hover that FADES OUT
-   goes on claiming the pointer is somewhere it already left, which is the single most common
-   way a UI feels laggy while every frame is on time. */
+/* Hover arrives in 150ms and leaves the instant the pointer does: a hover that FADES OUT goes on
+   claiming the pointer is somewhere it already left. */
 .tab, .ctl-btn, .feed-tab, .live-pill, .legend-chip, .hud-slot, .roster-back, .interior-back {
   transition-duration: var(--t-fast);
 }
@@ -1558,15 +1410,10 @@ body {
   scrollbar-width: thin;
 }
 
-/* ══ ★ THE BROADCAST LAYOUT — R2 ═══════════════════════════════════════════════════════════
-   A second composition for a second audience: 1080p downscaled to a 480px phone is a scale of
-   0.25, and at 0.25 every caption in the sheet above lands at 3.0–4.0px against a 5.4px floor.
-   No token fixes that — 22px chrome is absurd for the person at the desk — so the frame a
-   stream viewer gets is a DIFFERENT frame. `ui/broadcast.ts` states the whole design and its
-   trigger; the sizes below are the ones `broadcast.test.ts` measures at 0.25.
-
-   Turned on by `?broadcast=1` and by nothing else. Never a media query: a layout this large
-   firing on a narrow desktop window would be a regression for the ordinary viewer. */
+/* ══ ★ THE BROADCAST LAYOUT ═══════════════════════════════════════════════════════════
+   1080p downscaled to a 480px phone is a scale of 0.25, at which every caption in the sheet above
+   lands under the 5.4px floor. Turned on by `?broadcast=1` and never by a media query, which would
+   fire on a narrow desktop window. */
 
 /* A stream has no operator. Every surface here is navigation a viewer can neither press nor
    read, so it leaves the frame rather than shrinking inside it. */
@@ -1602,15 +1449,8 @@ body {
   letter-spacing: 0.04em;
 }
 
-/* ★ THE CAPTION GETS ITS OWN BAND, AND THE CANVAS GIVES IT THE ROOM.
-   WHAT THE BROWSER CAUGHT: with the caption floating over the picture, a doubled speech
-   bubble — 416 x 181 CSS px, measured on the live canvas — landed on top of it. Two things
-   the viewer must read, in the same place, is worse than either alone. So the stage ENDS
-   above the band: `placeBubbles` clamps to `viewRect()`, which is the canvas, so nothing in
-   the world can be drawn across the caption any more. That is P19's rule — a surface sits in
-   a box, never across the boundary between two — applied to the frame a stream sees.
-   `--cream` on `--deep` is 15.02:1 and `--honey` on `--deep` 10.19:1; no alpha carries any
-   of it. */
+/* The stage ENDS above the band: `placeBubbles` clamps to `viewRect()`, so nothing in the world can
+   be drawn across the caption. `--cream` on `--deep` is 15.02:1, `--honey` on `--deep` 10.19:1. */
 [data-broadcast='on'] { --bc-caption-h: 11rem; }
 [data-broadcast='on'] .stage-mount { bottom: var(--bc-caption-h); }
 [data-broadcast='on'] .stage-cell { background: var(--deep); }
@@ -1629,16 +1469,13 @@ body {
 }
 
 /* ── the Discovery Record: a chain of museum labels, one per thing the town worked out ──
-   PER-BAND COLOUR, and the reason is measured: no palette token clears AA on both a light
-   ground and a dark one. The dual-band set is EMPTY. So the leaf's light ground carries
-   --ink (10.20 on cream) and --ink-quiet (6.57 on cream, 5.83 on parchment), and the quote
-   block's dark ground carries --cream-quiet (8.28 on deep). Opacity is never the strategy. */
+   PER-BAND COLOUR: no palette token clears AA on both a light ground and a dark one — the dual-band
+   set is EMPTY. Opacity is never the strategy. */
 .discovery-record { padding: 12px 14px; background: var(--parchment); }
 .discovery-summary { font-size: 14px; color: var(--ink); margin: 0 0 12px; }
 .discovery-chain {
-  /* WHAT THE BROWSER CAUGHT: --sand on --parchment is 1.19:1. The rule that is supposed to
-     make the panel read as one history was invisible, and it looked like three loose cards.
-     --ink-quiet is 5.83 on parchment: a line a viewer can actually follow down the page. */
+  /* --sand on --parchment is 1.19:1: the rule meant to bind the panel into one history was
+     invisible. --ink-quiet is 5.83 on parchment. */
   list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--ink-quiet);
 }
 .discovery-leaf {
@@ -1666,31 +1503,9 @@ body {
 .discovery-art-none { background: var(--sand); border: 1px dashed var(--ink-quiet); }
 @media (prefers-reduced-motion: reduce) { .discovery-leaf { transition: none; } }
 /* ══ ★ THE LITTLE MAP ══════════════════════════════════════════════════════════════════════
-   The one instrument a streamed town cannot do without: at 4x a viewer sees 5 % of a three-ring
-   town, and the grammar keeps platting outward. `render/minimap.ts` states the whole design.
-
-   · SURFACE   the same floating slab every other reading aid wears — a 9-slice --px-cream frame
-               over --deep, which is the void beyond the world showing through a canvas that is
-               transparent wherever the town is not. No new material.
-   · SIZE      NONE HERE. The canvas carries its own width and height attributes from
-               MINIMAP_W / MINIMAP_H, so the widget is sized by the one place that number lives
-               and the sheet cannot drift from it.
-   · COLOUR    the ground is TILE_COLORS, the renderer's own palette-true fallback, so the map
-               and the town can never disagree about what water looks like. Every MARK over it
-               is two tone — a --deep halo under a light core — because no single token clears
-               3:1 on grounds running from forest #4F7040 to sand #E8D5BC. Measured, not assumed.
-   · TYPE      none. The map is a picture; its whole label is spoken.
-   · SPACE     bottom left of the stage cell, the one corner nothing else claims: the frame
-               counter is top right, the dock handle bottom right, the scrub banner top centre.
-   · MOTION    ONE, and it is a reveal. A press is a CUT — a glide continues a hand the viewer
-               moved, and nobody's hand crossed a ten-ring town. The only thing that moves is
-               the map arriving and leaving as the view stops and starts holding the whole town
-               (`viewHoldsTown`), and that is `--t-fast` / `reveal`, 150ms, opacity only, inside
-               the band and inside the reduced-motion guard. A slab this size appearing without
-               one is a jump cut in the corner of the picture.
-   · STATE     focus lands on the whole map, which is the target; the ring comes from the
-               stage-cell rule that draws it INSIDE a clipping box. It docks like every other
-               surface and `H` puts it away with them. */
+   `render/minimap.ts` states the design. No width or height here: the canvas carries its own from
+   MINIMAP_W / MINIMAP_H. Every mark is two-tone — a --deep halo under a light core — because no
+   single token clears 3:1 on grounds running from forest #4F7040 to sand #E8D5BC. */
 .minimap {
   position: absolute; left: 0.8rem; bottom: 0.8rem; z-index: 25;
   padding: 0;
@@ -1703,11 +1518,8 @@ body {
 }
 .minimap-canvas { display: block; image-rendering: pixelated; }
 
-/* ★ A MAP OF A TOWN YOU CAN ALREADY SEE ALL OF IS A SMALLER COPY OF THE PICTURE BEHIND IT.
-   Caught in a foregrounded browser at the 0.25 stop, where the whole settlement was 370 x 190 px
-   in the middle of the stage and this sat in the corner saying the same thing with less in it,
-   under a rectangle that covered the whole map. `visibility` goes with the opacity so a map that
-   is not there is not a tab stop either. */
+/* A map of a town you can already see all of is a smaller copy of the picture behind it.
+   `visibility` goes with the opacity so a map that is not there is not a tab stop either. */
 .minimap[data-idle='true'] { opacity: 0; visibility: hidden; }
 @media (prefers-reduced-motion: no-preference) {
   .minimap {

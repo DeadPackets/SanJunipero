@@ -2,14 +2,6 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { roomCard, roomWord, type Provenance, type RoomCard } from './interiorModel.js'
 
-// A ROOM TELLS YOU WHOSE IT IS (U4, audit R7, plan task 68).
-//
-// The bar used to say two things: a title and a one-line roll call. Everything else the world
-// already knew about the room — who raised it, who lives in it, what it holds — was reachable
-// from the endpoints and shown nowhere. It is a CARD now, and `interiorModel.roomCard` is the
-// single answer to "what is this room"; the caption pair it replaces is retired rather than
-// left beside it, because two descriptions of one room is the defect this task is fixing.
-
 export { roomWord as interiorRoomWord } from './interiorModel.js'
 
 export function RoomCardView(
@@ -94,9 +86,8 @@ export function useProvenance(structureId: string | null): Provenance | null {
   return prov
 }
 
-// Escape leaves the room and focus goes back to the map, so the interior is never a place a
-// keyboard can walk into and not out of. The card subscribes to a DERIVED string rather than
-// to world state, so a 2.5s tick that changed nobody's whereabouts re-renders nothing.
+// Escape leaves the room, so the interior is never a place a keyboard can walk into and not out
+// of. The card subscribes to a DERIVED string, so a tick that moved nobody re-renders nothing.
 export function InteriorBar(
   { store, structureId, onBack }: {
     store: WorldStore

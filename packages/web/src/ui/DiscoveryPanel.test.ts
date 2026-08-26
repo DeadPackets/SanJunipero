@@ -125,9 +125,8 @@ describe('the Discovery Record clears AA in both bands', () => {
   })
 
   it('draws the chain rule in something a viewer can actually see', () => {
-    // WHAT THE BROWSER CAUGHT: --sand on --parchment is 1.19:1, so the one rule that makes
-    // the panel read as a history was not on the screen at all. A line is structure, and
-    // structure is held to the same 3:1 the mark glyphs are.
+    // A line is structure, held to the same 3:1 the mark glyphs are: --sand on --parchment is
+    // 1.19:1.
     const name = /border-left:[^;]*var\(--([\w-]+)\)/.exec(ruleBody(CSS, '.discovery-chain'))?.[1]
     expect(name, 'the chain has no rule').toBeDefined()
     expect(contrast(T[name!]!, T['parchment']!)).toBeGreaterThanOrEqual(3)

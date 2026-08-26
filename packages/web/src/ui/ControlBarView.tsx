@@ -23,11 +23,7 @@ function Glyph({ id }: { id: string }) {
   )
 }
 
-/**
- * A toolbar with a ROVING TABINDEX: one tab stop for the whole bar, Left and Right walk it.
- * Sixteen separate tab stops between the map and the panel would be the accessibility cost of
- * putting every control in one place, and this is the price of not paying it.
- */
+/** A toolbar with a ROVING TABINDEX: one tab stop for the whole bar, Left and Right walk it. */
 export function ControlBar(
   { items, onAction }: { items: ControlItem[]; onAction: (a: ControlAction) => void },
 ) {
@@ -36,10 +32,8 @@ export function ControlBar(
   const focusable = items.filter((i) => i.disabled !== true)
   const cursor = Math.min(at, Math.max(0, focusable.length - 1))
 
-  /** WHERE THE CURSOR IS, read from FOCUS rather than from React state. Four arrow presses
-   *  inside one frame all see the same stale state and every one computes the same next
-   *  index, so the bar moves once and stops — which is what the browser showed. Focus is the
-   *  truth the viewer can see, so focus is what the walk reads. */
+  /** Read the cursor from FOCUS, not React state: four arrow presses inside one frame all see
+   *  the same stale state and compute the same next index, so the bar moves once and stops. */
   const goTo = (index: number): void => {
     if (focusable.length === 0) return
     const next = (index + focusable.length) % focusable.length

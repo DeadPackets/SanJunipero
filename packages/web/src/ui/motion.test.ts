@@ -130,12 +130,6 @@ describe('zero is the absence of a motion, and the scan says so out loud', () =>
 })
 
 // ── ★ EVERY LONG MOTION IN THE PRODUCT HAS A WRITTEN REASON ───────────────────────────────
-//
-// The controller's ruling after the camera lane shipped a 700ms drag glide against a 150–300ms
-// band: the argument was accepted, but it lived only in a source comment in `render/fling.ts`,
-// so the MOTION table showed a band nothing declared an exception to. An unwritten exception is
-// a bug with a delay fuse — the next reader "fixes" the deliberate thing, or adds a long motion
-// of their own because one already exists unexplained.
 
 describe('the exemptions from the motion band', () => {
   it('★ names every long motion, with a reason, in one table', () => {

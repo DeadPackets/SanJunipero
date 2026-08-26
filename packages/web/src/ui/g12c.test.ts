@@ -6,10 +6,6 @@ import { TOGGLABLE_PATHS } from '@sj/engine/laws'
 import type { WorldState } from '@sj/engine/state'
 import { bondFrom, chronicleIcon, type SimEvent } from '@sj/shared'
 
-// GATE G12c — THE CHROME HALF. The other two files are:
-//   packages/web/src/render/g12c.test.ts   — the canvas (U3–U11, U18, U19)
-//   packages/gateway/src/g12c.test.ts      — the town, U25, and the read-only proof
-
 import { rosterRows2, sortRoster, ROSTER_SORTS } from './roster/rosterRow.js'
 import { expandReducer, becomingOf, ALWAYS_SHOWN } from './roster/expand.js'
 import { CONDITION_WORD, STATE_WORD, statusLiteralOffenders } from './status.js'
@@ -403,9 +399,6 @@ describe('U24 — "it really feels a very far distance from being that ready"', 
     expect(tickBadgeState('reconnecting', true, true)).toBe('stale')
   })
 
-  // ★ R2 CLOSES ON A SECOND COMPOSITION, NOT ON A BIGGER DESKTOP. The desktop shortfall is
-  // still 3.00–4.00px against 5.4 and stays measured; the broadcast frame's captions are read
-  // off the shipped sheet at the same true 0.25 and there is no shortfall left in them.
   it('reports R2 as CLOSED by the broadcast layout, and the desktop as still short', () => {
     const desktop = captionShortfall([
       { what: 'speech bubble', px: 16 }, { what: 'filmstrip title', px: 14 },
