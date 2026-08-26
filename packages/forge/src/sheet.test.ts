@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { RawImage } from './post/raw.js'
-import { FACINGS, POSES, assembleGrid, sliceGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, sheetScale, registerToReference, despeckle, fillPinholes, unionPalette, erodeAlpha, resampleToArtHeight, erodeForPitch, estimatePitch, refineLattice, resampleModeLattice, sheetMetrics, sweepMagenta, driftField, resampleClusterLattice, mergeSheetColors, sweepMagentaCensus, repairOutlineBlends, opaqueBbox, upscaleNearest, distanceMatrix, pairwiseMedian, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
-import { quantize } from './post/quantize.js'
+import { FACINGS, POSES, assembleGrid, mirrorX, cellDistance, duplicateReport, downscaleMajority, detectArtScale, snapToGrid, anchorToCanvas, defringe, registerToReference, despeckle, fillPinholes, erodeAlpha, resampleToArtHeight, erodeForPitch, estimatePitch, refineLattice, resampleModeLattice, sheetMetrics, sweepMagenta, driftField, resampleClusterLattice, mergeSheetColors, sweepMagentaCensus, repairOutlineBlends, opaqueBbox, upscaleNearest, distanceMatrix, pairwiseMedian, STRAIGHT_DUPE, MIRROR_DUPE } from './sheet.js'
 
 type Px = [number, number, number, number]
 function img(w: number, h: number, px: (x: number, y: number) => Px): RawImage {
@@ -21,17 +20,14 @@ describe('sheet constants', () => {
   })
 })
 
-describe('assembleGrid / sliceGrid', () => {
-  it('round-trips a 2x2 grid of distinct 2x2 cells', () => {
+describe('assembleGrid', () => {
+  it('sizes a 2x2 grid of 2x2 cells', () => {
     const cells = [
       [solid(2, 2, RED), solid(2, 2, BLUE)],
       [solid(2, 2, [0, 255, 0, 255]), solid(2, 2, [1, 2, 3, 255])],
     ]
     const sheet = assembleGrid(cells, 2, 2)
     expect(sheet.width).toBe(4); expect(sheet.height).toBe(4)
-    const back = sliceGrid(sheet, 2, 2)
-    for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++)
-      expect(back[r]![c]!.data).toEqual(cells[r]![c]!.data)
   })
   it('blits row-major: top-left pixel of sheet comes from cells[0][0]', () => {
     const sheet = assembleGrid([[solid(1, 1, RED), solid(1, 1, BLUE)]], 1, 1)
@@ -40,9 +36,6 @@ describe('assembleGrid / sliceGrid', () => {
   })
   it('throws on a size-mismatched cell', () => {
     expect(() => assembleGrid([[solid(2, 2, RED), solid(1, 2, BLUE)]], 2, 2)).toThrow()
-  })
-  it('sliceGrid throws when dimensions do not divide evenly', () => {
-    expect(() => sliceGrid(solid(3, 2, RED), 2, 1)).toThrow()
   })
 })
 
@@ -234,17 +227,6 @@ describe('defringe', () => {
   })
 })
 
-describe('sheetScale', () => {
-  it('returns the modal detected scale across images', () => {
-    const six = img(60, 60, (x, y) => {
-      const palette: Px[] = [RED, BLUE, [0, 255, 0, 255], [255, 255, 0, 255]]
-      const bx = Math.floor(x / 6), by = Math.floor(y / 6)
-      return palette[(bx * 3 + by * 5 + (bx * by) % 7) % palette.length]!
-    })
-    expect(sheetScale([sevenPxBlockImage(), sevenPxBlockImage(), sevenPxBlockImage(), six])).toBe(7)
-  })
-})
-
 describe('registerToReference', () => {
   it('recovers a synthetic horizontal shift', () => {
     const ref = img(12, 6, (x, y) => (x >= 2 && x <= 4 && y >= 1 && y <= 4 ? RED : CLEAR))
@@ -280,22 +262,6 @@ describe('fillPinholes', () => {
     // border-touching single transparent pixel
     const edge = img(3, 3, (x, y) => (x === 0 && y === 1 ? CLEAR : RED))
     expect(fillPinholes(edge, 2).data[(1 * 3) * 4 + 3]).toBe(0)
-  })
-})
-
-describe('unionPalette', () => {
-  it('keeps both images\' dominant colors and quantizing preserves them exactly', () => {
-    const a = solid(4, 4, [10, 20, 30, 255])
-    const b = solid(4, 4, [200, 210, 220, 255])
-    const pal = unionPalette([a, b], 48)
-    expect(pal).toContainEqual([10, 20, 30])
-    expect(pal).toContainEqual([200, 210, 220])
-    const qa = quantize(a, pal)
-    expect([...qa.data.slice(0, 4)]).toEqual([10, 20, 30, 255])
-  })
-  it('caps the palette at k frequency-ranked colors', () => {
-    const noisy = img(4, 4, (x, y) => [x * 16, y * 16, 128, 255] as Px) // 16 distinct colors
-    expect(unionPalette([noisy], 5)).toHaveLength(5)
   })
 })
 
