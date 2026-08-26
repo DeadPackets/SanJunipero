@@ -20,16 +20,34 @@ const validRecipe: Recipe = {
   costs: [{ kind: 'firewood', qty: 1 }],
   requires: [{ type: 'held_item', kind: 'clay_pot', qty: 1 }],
   outcomeTable: [
-    { weight: 1, success: true, label: 'The water boils away, leaving a crust of salt.', effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }] },
-    { weight: 1, success: false, label: 'The pot cracks and the water is lost.', effects: [{ op: 'none' }] },
+    {
+      weight: 1,
+      success: true,
+      label: 'The water boils away, leaving a crust of salt.',
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+    },
+    {
+      weight: 1,
+      success: false,
+      label: 'The pot cracks and the water is lost.',
+      effects: [{ op: 'none' }],
+    },
   ],
   rngStream: 'craft',
   canon: ['fire'],
 }
 
 const validMap = { kind: 'map' as const, verb: 'craft', params: { recipe: 'recipe:boil_salt' } }
-const validAttempt = { kind: 'attempt' as const, recipe: validRecipe, summary: 'Boil river water to extract salt.' }
-const validImpossible = { kind: 'impossible' as const, reason: 'No fire is available.', class: 'physically_impossible' as const }
+const validAttempt = {
+  kind: 'attempt' as const,
+  recipe: validRecipe,
+  summary: 'Boil river water to extract salt.',
+}
+const validImpossible = {
+  kind: 'impossible' as const,
+  reason: 'No fire is available.',
+  class: 'physically_impossible' as const,
+}
 
 describe('VerdictSchema', () => {
   it('parses valid map, attempt, and impossible verdicts via the kind discriminator', () => {
@@ -59,12 +77,16 @@ describe('VerdictSchema', () => {
     // `z.record` puts `propertyNames` in the emitted schema and a grammar compiler refuses it
     // outright, so the arbiter caller would break on the next such provider.
     for (const io of ['input', 'output'] as const) {
-      expect(JSON.stringify(z.toJSONSchema(VerdictSchema, { io })), io).not.toContain('propertyNames')
+      expect(JSON.stringify(z.toJSONSchema(VerdictSchema, { io })), io).not.toContain(
+        'propertyNames',
+      )
     }
   })
 
   it('names every parameter a mapped verb can be handed, and the two schemas cannot drift', () => {
-    type Branch = { properties: { kind: { const: string }; params?: { properties?: Record<string, unknown> } } }
+    type Branch = {
+      properties: { kind: { const: string }; params?: { properties?: Record<string, unknown> } }
+    }
     const emitted = z.toJSONSchema(VerdictSchema, { io: 'input' }) as unknown as { oneOf: Branch[] }
     const mapBranch = emitted.oneOf.find((b) => b.properties.kind.const === 'map')!
     const named = Object.keys(mapBranch.properties.params?.properties ?? {})
@@ -75,13 +97,19 @@ describe('VerdictSchema', () => {
   })
 
   it('stays loose, so a verb minted at runtime can be handed a parameter nobody has written down', () => {
-    const v = VerdictSchema.parse({ kind: 'map', verb: 'express:hum', params: { whittledFrom: 'ash' } })
+    const v = VerdictSchema.parse({
+      kind: 'map',
+      verb: 'express:hum',
+      params: { whittledFrom: 'ash' },
+    })
     expect(v.kind).toBe('map')
     if (v.kind === 'map') expect(v.params.whittledFrom).toBe('ash')
   })
 
   it('rejects an extra key via strict', () => {
-    expect(() => VerdictSchema.parse({ kind: 'map', verb: 'x', params: {}, bogus: 1 })).toThrow(/bogus/)
+    expect(() => VerdictSchema.parse({ kind: 'map', verb: 'x', params: {}, bogus: 1 })).toThrow(
+      /bogus/,
+    )
   })
 
   it('rejects an unknown kind (closed union)', () => {
@@ -108,13 +136,18 @@ describe('RecipeSchema', () => {
   it('rejects difficulty 0 and 11', () => {
     const withSkill = { ...validRecipe, skillCheck: { track: 'cooking', difficulty: 0 } }
     expect(RecipeSchema.safeParse(withSkill).success).toBe(false)
-    expect(RecipeSchema.safeParse({ ...validRecipe, skillCheck: { track: 'cooking', difficulty: 11 } }).success).toBe(false)
+    expect(
+      RecipeSchema.safeParse({ ...validRecipe, skillCheck: { track: 'cooking', difficulty: 11 } })
+        .success,
+    ).toBe(false)
   })
 })
 
 describe('OutcomeEffectSchema', () => {
   it('rejects spawn_item missing the to field', () => {
-    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 1 }).success).toBe(false)
+    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 1 }).success).toBe(
+      false,
+    )
   })
 
   it('rejects an unknown op — the whitelist is closed', () => {
@@ -124,14 +157,31 @@ describe('OutcomeEffectSchema', () => {
 
 describe('effect magnitude caps (out-of-range LLM verdicts fail schema parse)', () => {
   it('caps spawn_item qty at 20', () => {
-    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 20, to: 'agent' }).success).toBe(true)
-    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 21, to: 'agent' }).success).toBe(false)
-    expect(OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 1_000_000_000, to: 'agent' }).success).toBe(false)
+    expect(
+      OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 20, to: 'agent' })
+        .success,
+    ).toBe(true)
+    expect(
+      OutcomeEffectSchema.safeParse({ op: 'spawn_item', kind: 'salt', qty: 21, to: 'agent' })
+        .success,
+    ).toBe(false)
+    expect(
+      OutcomeEffectSchema.safeParse({
+        op: 'spawn_item',
+        kind: 'salt',
+        qty: 1_000_000_000,
+        to: 'agent',
+      }).success,
+    ).toBe(false)
   })
 
   it('caps gain_skill xp at 100', () => {
-    expect(OutcomeEffectSchema.safeParse({ op: 'gain_skill', track: 'cooking', xp: 100 }).success).toBe(true)
-    expect(OutcomeEffectSchema.safeParse({ op: 'gain_skill', track: 'cooking', xp: 101 }).success).toBe(false)
+    expect(
+      OutcomeEffectSchema.safeParse({ op: 'gain_skill', track: 'cooking', xp: 100 }).success,
+    ).toBe(true)
+    expect(
+      OutcomeEffectSchema.safeParse({ op: 'gain_skill', track: 'cooking', xp: 101 }).success,
+    ).toBe(false)
   })
 
   it('caps |hp_delta| at 50', () => {
@@ -147,7 +197,9 @@ describe('effect magnitude caps (out-of-range LLM verdicts fail schema parse)', 
   })
 
   it('caps outcome row weight at 1000', () => {
-    const row = (weight: number) => [{ weight, success: true, label: 'x', effects: [{ op: 'none' }] }]
+    const row = (weight: number) => [
+      { weight, success: true, label: 'x', effects: [{ op: 'none' }] },
+    ]
     expect(OutcomeTableSchema.safeParse(row(1000)).success).toBe(true)
     expect(OutcomeTableSchema.safeParse(row(1001)).success).toBe(false)
   })

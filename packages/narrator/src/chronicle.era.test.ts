@@ -14,7 +14,13 @@ const memStore = (): NarratorStore => {
 
 const seedChapters = (store: NarratorStore, days: number[]): ChapterRow[] =>
   days.map((day) => {
-    const c = { day, title: `Day ${day}`, text: `The tale of day ${day}.`, citations: [day + 1], sceneIds: [] }
+    const c = {
+      day,
+      title: `Day ${day}`,
+      text: `The tale of day ${day}.`,
+      citations: [day + 1],
+      sceneIds: [],
+    }
     const id = store.insertChapter(c)
     return { id, ...c }
   })
@@ -22,7 +28,11 @@ const seedChapters = (store: NarratorStore, days: number[]): ChapterRow[] =>
 const llmWith = (citations: number[]) =>
   ({
     summarizeChapter: vi.fn(),
-    summarizeEra: vi.fn(async () => ({ title: 'The First Week', text: 'Seven days by the river.', citations })),
+    summarizeEra: vi.fn(async () => ({
+      title: 'The First Week',
+      text: 'Seven days by the river.',
+      citations,
+    })),
     newspaperCopy: vi.fn(),
     biography: vi.fn(),
   }) as unknown as NarratorLlm
@@ -33,7 +43,13 @@ describe('renderEra', () => {
     const chapters = seedChapters(store, [0, 1, 2, 3, 4, 5, 6])
     const alert = vi.fn()
     const era = await renderEra({
-      store, llm: llmWith([2, 3, 777]), startDay: 0, endDay: 6, chapters, validEventIds: [1, 2, 3, 4, 5], alert,
+      store,
+      llm: llmWith([2, 3, 777]),
+      startDay: 0,
+      endDay: 6,
+      chapters,
+      validEventIds: [1, 2, 3, 4, 5],
+      alert,
     })
     expect(era.startDay).toBe(0)
     expect(era.endDay).toBe(6)
@@ -50,7 +66,15 @@ describe('renderEra', () => {
     const store = memStore()
     const llm = llmWith([2, 3, 777])
     const alert = vi.fn()
-    const era = await renderEra({ store, llm, startDay: 0, endDay: 6, chapters: [], validEventIds: [], alert })
+    const era = await renderEra({
+      store,
+      llm,
+      startDay: 0,
+      endDay: 6,
+      chapters: [],
+      validEventIds: [],
+      alert,
+    })
     expect(era.citations).toEqual([])
     expect(era.chapterIds).toEqual([])
     expect(alert).not.toHaveBeenCalled()
@@ -62,8 +86,22 @@ describe('renderEra', () => {
   it('never reprocesses an era: a second call with the same startDay returns the existing row', async () => {
     const store = memStore()
     const chapters = seedChapters(store, [0, 1, 2, 3, 4, 5, 6])
-    const first = await renderEra({ store, llm: llmWith([2]), startDay: 0, endDay: 6, chapters, validEventIds: [1, 2, 3] })
-    const second = await renderEra({ store, llm: llmWith([3]), startDay: 0, endDay: 6, chapters, validEventIds: [1, 2, 3] })
+    const first = await renderEra({
+      store,
+      llm: llmWith([2]),
+      startDay: 0,
+      endDay: 6,
+      chapters,
+      validEventIds: [1, 2, 3],
+    })
+    const second = await renderEra({
+      store,
+      llm: llmWith([3]),
+      startDay: 0,
+      endDay: 6,
+      chapters,
+      validEventIds: [1, 2, 3],
+    })
     expect(store.eras().length).toBe(1)
     expect(second).toEqual(first)
   })
@@ -72,7 +110,15 @@ describe('renderEra', () => {
     const store = memStore()
     const chapters = seedChapters(store, [0, 1, 2])
     const alert = vi.fn()
-    const era = await renderEra({ store, llm: llmWith([]), startDay: 0, endDay: 2, chapters, validEventIds: [1, 2, 3], alert })
+    const era = await renderEra({
+      store,
+      llm: llmWith([]),
+      startDay: 0,
+      endDay: 2,
+      chapters,
+      validEventIds: [1, 2, 3],
+      alert,
+    })
     expect(era.citations).toEqual([1])
     expect(alert).not.toHaveBeenCalled()
   })

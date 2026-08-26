@@ -2,8 +2,20 @@ import { useEffect, useRef } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 import {
-  MINIMAP_H, MINIMAP_W, dotOps, minimapActionFor, minimapFit, minimapPixels, pageTarget,
-  peopleDots, travelTargetAt, viewHoldsTown, viewOps, type MapOp, type MapPerson, type MinimapFit,
+  MINIMAP_H,
+  MINIMAP_W,
+  dotOps,
+  minimapActionFor,
+  minimapFit,
+  minimapPixels,
+  pageTarget,
+  peopleDots,
+  travelTargetAt,
+  viewHoldsTown,
+  viewOps,
+  type MapOp,
+  type MapPerson,
+  type MinimapFit,
 } from './minimap.js'
 
 // Every number is minimap.ts's; this file owns a 2D context, a pointer and a keyboard. It adds
@@ -13,20 +25,22 @@ import {
 /** The whole instrument, spoken. The keyboard half is not a fallback — an arrow travels a
  *  screenful, which the pointer cannot do at all. */
 export const MINIMAP_LABEL =
-  'The little map of the town. Press anywhere on it to take the camera there, or drag across it '
-  + 'to sweep. The arrow keys travel a screenful at a time and Home shows the whole town.'
+  'The little map of the town. Press anywhere on it to take the camera there, or drag across it ' +
+  'to sweep. The arrow keys travel a screenful at a time and Home shows the whole town.'
 
 const css = (color: number): string => `#${color.toString(16).padStart(6, '0')}`
 
-export function Minimap(
-  { scene, store, focusAgentId }: {
-    scene: Scene | null
-    /** `null` while the town is still arriving — the map draws nothing rather than a lie */
-    store: WorldStore
-    /** whose dot is drawn large: the person the viewer has open, and nobody by default */
-    focusAgentId: string | null
-  },
-) {
+export function Minimap({
+  scene,
+  store,
+  focusAgentId,
+}: {
+  scene: Scene | null
+  /** `null` while the town is still arriving — the map draws nothing rather than a lie */
+  store: WorldStore
+  /** whose dot is drawn large: the person the viewer has open, and nobody by default */
+  focusAgentId: string | null
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fitRef = useRef<MinimapFit | null>(null)
   const groundRef = useRef<ImageData | null>(null)
@@ -47,7 +61,8 @@ export function Minimap(
     let lastSig = ''
 
     const paint = (): void => {
-      const f = fitRef.current, ground = groundRef.current
+      const f = fitRef.current,
+        ground = groundRef.current
       if (f === null || ground === null) return
       // The map leaves when the view already holds the whole town. The attribute drives the
       // sheet and React is not told: this runs on every frame of a zoom.
@@ -84,7 +99,8 @@ export function Minimap(
 
     /** People walk on a tick, not on a frame, so their dots are built on one. */
     const rebuildDots = (): void => {
-      const s = store.getState(), f = fitRef.current
+      const s = store.getState(),
+        f = fitRef.current
       if (s === null || f === null) return
       const people = Object.values(s.agents) as MapPerson[]
       dotsRef.current = dotOps(peopleDots(people, f, focusRef.current), f)
@@ -116,7 +132,8 @@ export function Minimap(
 
   // The subject changed without the world changing: redraw her dot, do not rebuild the ground.
   useEffect(() => {
-    const s = store.getState(), f = fitRef.current
+    const s = store.getState(),
+      f = fitRef.current
     if (s === null || f === null) return
     const people = Object.values(s.agents) as MapPerson[]
     dotsRef.current = dotOps(peopleDots(people, f, focusAgentId), f)
@@ -137,7 +154,8 @@ export function Minimap(
 
   /** Press or sweep: both are one call to the guarded mover, never a write of our own. */
   const travel = (e: React.PointerEvent): void => {
-    const f = fitRef.current, s = sceneRef.current
+    const f = fitRef.current,
+      s = sceneRef.current
     const p = at(e)
     if (f === null || s === null || p === null) return
     const t = travelTargetAt(p.mx, p.my, f)
@@ -160,7 +178,10 @@ export function Minimap(
     const action = minimapActionFor(e.key)
     if (action === null) return
     e.preventDefault()
-    if (action.kind === 'whole') { s.fitToTown(); return }
+    if (action.kind === 'whole') {
+      s.fitToTown()
+      return
+    }
     const t = pageTarget(s.viewRect(), action.dx, action.dy)
     s.travelTo(t.sx, t.sy)
   }

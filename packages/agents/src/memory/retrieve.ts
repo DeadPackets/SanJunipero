@@ -42,9 +42,36 @@ const VEC_POOL = 50
 const MAX_TAG_MATCH = 3
 
 const STOPWORDS = new Set<string>([
-  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'but', 'by', 'for',
-  'from', 'had', 'has', 'have', 'he', 'her', 'his', 'i', 'in', 'is',
-  'it', 'its', 'of', 'on', 'or', 'that', 'the', 'they', 'to', 'was',
+  'a',
+  'an',
+  'and',
+  'are',
+  'as',
+  'at',
+  'be',
+  'but',
+  'by',
+  'for',
+  'from',
+  'had',
+  'has',
+  'have',
+  'he',
+  'her',
+  'his',
+  'i',
+  'in',
+  'is',
+  'it',
+  'its',
+  'of',
+  'on',
+  'or',
+  'that',
+  'the',
+  'they',
+  'to',
+  'was',
 ])
 
 export function keywords(text: string, max = 6): string[] {
@@ -106,7 +133,7 @@ async function retrieve(
          ORDER BY bm25(memories_fts)
          LIMIT ?`,
       )
-      .all(matchExpr, agentId, FTS_POOL) as Array<{ id: number; raw: number }>
+      .all(matchExpr, agentId, FTS_POOL) as { id: number; raw: number }[]
     for (const r of rows) {
       rawBm25.set(r.id, r.raw)
       candidates.add(r.id)
@@ -122,10 +149,10 @@ async function retrieve(
          WHERE embedding MATCH ? AND k = ?
            AND rowid IN (SELECT id FROM memories WHERE agent_id = ?)`,
       )
-      .all(Buffer.from(qvec.buffer, qvec.byteOffset, qvec.byteLength), VEC_POOL, agentId) as Array<{
+      .all(Buffer.from(qvec.buffer, qvec.byteOffset, qvec.byteLength), VEC_POOL, agentId) as {
       id: number
       dist: number
-    }>
+    }[]
     for (const r of rows) {
       // embeddings are L2-normalized: cosine = 1 − dist²/2
       cosine.set(r.id, 1 - (r.dist * r.dist) / 2)
@@ -142,7 +169,7 @@ async function retrieve(
          JOIN memories m ON m.id = t.memory_id
          WHERE t.tag IN (${placeholders}) AND m.agent_id = ?`,
       )
-      .all(...[...qTags], agentId) as Array<{ id: number }>
+      .all(...[...qTags], agentId) as { id: number }[]
     for (const r of rows) candidates.add(r.id)
   }
 
@@ -161,11 +188,7 @@ async function retrieve(
 
     const parts = { tag, bm25, cosine: cos, recency, importance }
     const score =
-      w.tag * tag +
-      w.bm25 * bm25 +
-      w.cosine * cos +
-      w.recency * recency +
-      w.importance * importance
+      w.tag * tag + w.bm25 * bm25 + w.cosine * cos + w.recency * recency + w.importance * importance
     return { ...row, score, parts }
   })
 

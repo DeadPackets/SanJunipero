@@ -10,13 +10,18 @@ import { DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
 import {
-  createGateway, CLOSE_BAD_HELLO, CLOSE_TOO_MANY, HELLO_DEADLINE_MS, SCRUB_MIN_MS, type Gateway,
+  createGateway,
+  CLOSE_BAD_HELLO,
+  CLOSE_TOO_MANY,
+  HELLO_DEADLINE_MS,
+  SCRUB_MIN_MS,
+  type Gateway,
 } from './server.js'
 import { AGENT_ID } from './api.js'
 import { MAX_BYTES, MAX_KEYS, MAX_VALUES, makeSeqCache } from './seqCache.js'
 import { CLIENT_ASSET_DIR, resolveInRoot } from './staticSite.js'
 
-const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId))
+const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 const dir = mkdtempSync(join(tmpdir(), 'sj-public-'))
@@ -28,15 +33,21 @@ mkdirSync(outside)
 // The file a traversal reaches FOR: a db outside `agentDbDir` carrying the schema the reader
 // selects, which is what makes it an exfiltration rather than an error.
 const secret = new Database(join(outside, 'secret.db'))
-secret.exec('CREATE TABLE journal (id INTEGER PRIMARY KEY, agent_id TEXT, tick INT, day INT, text TEXT)')
-secret.prepare('INSERT INTO journal (agent_id, tick, day, text) VALUES (?, 1, 0, ?)')
+secret.exec(
+  'CREATE TABLE journal (id INTEGER PRIMARY KEY, agent_id TEXT, tick INT, day INT, text TEXT)',
+)
+secret
+  .prepare('INSERT INTO journal (agent_id, tick, day, text) VALUES (?, 1, 0, ?)')
   .run('../outside/secret', 'THE PRIVATE THING')
 secret.close()
 
 // A real agent memory db, so a legitimate read is proved to still work.
 const walker = new Database(join(agentDbDir, 'walker.db'))
-walker.exec('CREATE TABLE journal (id INTEGER PRIMARY KEY, agent_id TEXT, tick INT, day INT, text TEXT)')
-walker.prepare('INSERT INTO journal (agent_id, tick, day, text) VALUES (?, 1, 0, ?)')
+walker.exec(
+  'CREATE TABLE journal (id INTEGER PRIMARY KEY, agent_id TEXT, tick INT, day INT, text TEXT)',
+)
+walker
+  .prepare('INSERT INTO journal (agent_id, tick, day, text) VALUES (?, 1, 0, ?)')
   .run('walker', 'I walked east.')
 walker.close()
 
@@ -44,33 +55,48 @@ function makeWorld(dbPath: string) {
   const db = openDb(dbPath)
   const store = new EventStore(db)
   const loop = new TickLoop({
-    store, state: genesisState(DEFAULT_CONFIG, GRASS), rng: new RngStreams('public-surface'),
+    store,
+    state: genesisState(DEFAULT_CONFIG, GRASS),
+    rng: new RngStreams('public-surface'),
     snapshotEveryTicks: 5,
     onTick: ({ tick, emit }) => {
-      if (tick === 1) emit('agent_spawned', { id: 'walker', name: 'walker', x: 0, y: 0, ageDays: 7300 })
+      if (tick === 1)
+        emit('agent_spawned', { id: 'walker', name: 'walker', x: 0, y: 0, ageDays: 7300 })
       if (tick > 1) emit('agent_moved', { id: 'walker', x: (tick - 1) % 8, y: 0 })
     },
   })
   return { db, loop }
 }
 
-const connect = (port: number): Promise<WebSocket> => new Promise((resolve, reject) => {
-  const s = new WebSocket(`ws://127.0.0.1:${port}/ws`)
-  s.on('open', () => resolve(s))
-  s.on('error', reject)
-})
+const connect = (port: number): Promise<WebSocket> =>
+  new Promise((resolve, reject) => {
+    const s = new WebSocket(`ws://127.0.0.1:${port}/ws`)
+    s.on('open', () => {
+      resolve(s)
+    })
+    s.on('error', reject)
+  })
 
 /** The close code, or 'open' if the socket is still up after `ms` — so "was not closed" is an
  *  assertion rather than a timeout. */
-const closeCode = (s: WebSocket, ms = 1000): Promise<number | 'open'> => new Promise((resolve) => {
-  const t = setTimeout(() => resolve('open'), ms)
-  s.on('close', (code) => { clearTimeout(t); resolve(code) })
-})
+const closeCode = (s: WebSocket, ms = 1000): Promise<number | 'open'> =>
+  new Promise((resolve) => {
+    const t = setTimeout(() => {
+      resolve('open')
+    }, ms)
+    s.on('close', (code) => {
+      clearTimeout(t)
+      resolve(code)
+    })
+  })
 
 describe('the public surface a stranger reaches', () => {
-  const open: Array<WebSocket | Gateway> = []
+  const open: (WebSocket | Gateway)[] = []
   afterAll(async () => {
-    for (const o of open) { if (o instanceof WebSocket) o.close(); else await o.close() }
+    for (const o of open) {
+      if (o instanceof WebSocket) o.close()
+      else await o.close()
+    }
     rmSync(dir, { recursive: true, force: true })
   })
 
@@ -80,11 +106,18 @@ describe('the public surface a stranger reaches', () => {
   for (let i = 0; i < 12; i++) loop.step()
 
   const gwPromise = createGateway({
-    dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db, agentDbDir, maxViewers: 3,
+    dbPath,
+    port: 0,
+    terrain: GRASS,
+    pollMs: 3_600_000,
+    db,
+    agentDbDir,
+    maxViewers: 3,
   })
 
   it('cannot read a file outside agentDbDir through a %2f in an agent id', async () => {
-    const gw = await gwPromise; open.push(gw)
+    const gw = await gwPromise
+    open.push(gw)
     const base = `http://127.0.0.1:${gw.port}`
 
     // The legitimate read still works, so the guard is a filter and not a wall.
@@ -93,7 +126,11 @@ describe('the public surface a stranger reaches', () => {
 
     // `:id` is decoded AFTER the router splits on '/', so these arrive as one segment holding a
     // path separator. Remove `AGENT_ID.test` from readAgentRows and the first returns the secret.
-    for (const id of ['..%2foutside%2fsecret', '..%2F..%2Fetc%2Fpasswd', '%2e%2e%2foutside%2fsecret']) {
+    for (const id of [
+      '..%2foutside%2fsecret',
+      '..%2F..%2Fetc%2Fpasswd',
+      '%2e%2e%2foutside%2fsecret',
+    ]) {
       const r = await fetch(`${base}/api/agent/${id}/journal`)
       expect(r.status).toBe(200)
       expect(await r.json()).toEqual([])
@@ -136,7 +173,8 @@ describe('the public surface a stranger reaches', () => {
     const gw = await gwPromise
     const base = `http://127.0.0.1:${gw.port}`
     const bodies = await Promise.all(
-      Array.from({ length: 25 }, async () => (await fetch(`${base}/api/society`)).text()))
+      Array.from({ length: 25 }, async () => (await fetch(`${base}/api/society`)).text()),
+    )
     expect(new Set(bodies).size).toBe(1)
   })
 
@@ -151,7 +189,12 @@ describe('the public surface a stranger reaches', () => {
     expect(absurd).toEqual(honest)
 
     // Backwards, negative and non-numeric windows are answers, not errors or loops.
-    for (const q of ['?fromTick=-99999999', '?toTick=-1', '?fromTick=9e99&toTick=1e99', '?toTick=abc']) {
+    for (const q of [
+      '?fromTick=-99999999',
+      '?toTick=-1',
+      '?fromTick=9e99&toTick=1e99',
+      '?toTick=abc',
+    ]) {
       const r = await fetch(`${base}/api/digest${q}`)
       expect(r.status).toBe(200)
       expect((await r.text()).length).toBeLessThan(4096)
@@ -166,7 +209,11 @@ describe('the public surface a stranger reaches', () => {
     for (const s of silent) open.push(s)
     // `wss.clients` already holds the arriving socket: counted with `>=` the cap would serve
     // maxViewers − 1, and the third honest viewer would be the one turned away.
-    expect(await Promise.all(silent.map((s) => closeCode(s, 300)))).toEqual(['open', 'open', 'open'])
+    expect(await Promise.all(silent.map((s) => closeCode(s, 300)))).toEqual([
+      'open',
+      'open',
+      'open',
+    ])
 
     const extra = new WebSocket(`ws://127.0.0.1:${gw.port}/ws`)
     open.push(extra)
@@ -176,12 +223,17 @@ describe('the public surface a stranger reaches', () => {
     await wait(120)
   })
 
-  it('★ closes a socket that opens and never says hello', async () => {
-    const gw = await gwPromise
-    const mute = await connect(gw.port); open.push(mute)
-    expect(await closeCode(mute, HELLO_DEADLINE_MS * 2)).toBe(CLOSE_BAD_HELLO)
-    await wait(120)
-  }, HELLO_DEADLINE_MS * 3)
+  it(
+    '★ closes a socket that opens and never says hello',
+    async () => {
+      const gw = await gwPromise
+      const mute = await connect(gw.port)
+      open.push(mute)
+      expect(await closeCode(mute, HELLO_DEADLINE_MS * 2)).toBe(CLOSE_BAD_HELLO)
+      await wait(120)
+    },
+    HELLO_DEADLINE_MS * 3,
+  )
 
   it('turns the extra viewer away instead of degrading for the others', async () => {
     const gw = await gwPromise
@@ -204,8 +256,9 @@ describe('the public surface a stranger reaches', () => {
 
   it('coalesces a scrub flood into one answer per window, keeping the newest ask', async () => {
     const gw = await gwPromise
-    const sock = await connect(gw.port); open.push(sock)
-    const frames: Array<{ t: string; reqId?: number; tick?: number }> = []
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: { t: string; reqId?: number; tick?: number }[] = []
     sock.on('message', (d) => frames.push(JSON.parse(d.toString())))
     sock.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: null }))
     await wait(60)
@@ -256,7 +309,8 @@ describe('a route handler that throws', () => {
 
 describe('the guards themselves', () => {
   it('AGENT_ID admits a slug and refuses everything that could be a path', () => {
-    for (const ok of ['walker', 'omar', 'agent_1', 'a-b-c', 'A9']) expect(AGENT_ID.test(ok)).toBe(true)
+    for (const ok of ['walker', 'omar', 'agent_1', 'a-b-c', 'A9'])
+      expect(AGENT_ID.test(ok)).toBe(true)
     for (const bad of ['../x', 'a/b', '..', '', 'a b', 'x.db', '__proto__', 'a'.repeat(65)]) {
       expect(AGENT_ID.test(bad)).toBe(false)
     }
@@ -267,7 +321,13 @@ describe('the guards themselves', () => {
     writeFileSync(join(root, 'index.html'), 'hi')
     expect(resolveInRoot(root, '/index.html')).toBe(join(root, 'index.html'))
     expect(resolveInRoot(root, '/sub/../index.html')).toBe(join(root, 'index.html'))
-    for (const bad of ['/../secret', '/../../etc/passwd', '/%2e%2e/%2e%2e/etc/passwd', '/a/\0b', '/%ZZ']) {
+    for (const bad of [
+      '/../secret',
+      '/../../etc/passwd',
+      '/%2e%2e/%2e%2e/etc/passwd',
+      '/a/\0b',
+      '/%ZZ',
+    ]) {
       const hit = resolveInRoot(root, bad)
       expect(hit === null || hit.startsWith(root)).toBe(true)
     }
@@ -282,7 +342,10 @@ describe('the guards themselves', () => {
     let seq = 1
     let built = 0
     const cache = makeSeqCache(() => seq, 4)
-    const build = () => { built++; return { seq } }
+    const build = () => {
+      built++
+      return { seq }
+    }
 
     for (let i = 0; i < 10; i++) cache.json('society', build)
     expect(built).toBe(1)
@@ -312,8 +375,11 @@ describe('the guards themselves', () => {
     const huge = 'y'.repeat(9000)
     expect(cache.json('huge', () => huge)).toBe(JSON.stringify(huge))
     expect(cache.size()).toBe(1)
-    expect(cache.json('huge', () => { throw new Error('rebuilt a body it was holding') }))
-      .toBe(JSON.stringify(huge))
+    expect(
+      cache.json('huge', () => {
+        throw new Error('rebuilt a body it was holding')
+      }),
+    ).toBe(JSON.stringify(huge))
 
     // and the shipped budget is a real number rather than "whatever the biggest answer is"
     expect(MAX_BYTES).toBeGreaterThan(0)
@@ -323,7 +389,10 @@ describe('the guards themselves', () => {
   it('★ the seq cache holds a couple of intermediates, not a key cap of unmeasured ones', () => {
     const cache = makeSeqCache(() => 1)
     const built: string[] = []
-    const build = (k: string) => () => { built.push(k); return { k } }
+    const build = (k: string) => () => {
+      built.push(k)
+      return { k }
+    }
     // A stranger's window is the memo key and the value is a full entry array — 32 of those
     // resident at once is 144 MB against a body budget of 4 MiB.
     for (const k of ['a', 'b', 'c', 'd']) cache.value(k, build(k))
@@ -343,7 +412,8 @@ describe('the guards themselves', () => {
     const declared = /assetsDir:\s*'([^']+)'/.exec(vite)?.[1]
     expect(declared, 'vite must name an assetsDir at all').toBeDefined()
     expect(declared, 'the gateway serves the bundle from CLIENT_ASSET_DIR').toBe(CLIENT_ASSET_DIR)
-    expect(CLIENT_ASSET_DIR, 'the codex PNG route owns /assets and 404s a script')
-      .not.toBe('assets')
+    expect(CLIENT_ASSET_DIR, 'the codex PNG route owns /assets and 404s a script').not.toBe(
+      'assets',
+    )
   })
 })

@@ -10,9 +10,16 @@ import { TilesetManifest, loadTilesetManifest } from './terrainManifest.js'
 
 const names16 = Array.from({ length: 16 }, (_, i) => `tile-${i}`)
 const manifest = {
-  tileW: 32, tileH: 16, cols: 4, rows: 4,
-  seasons: Object.fromEntries((['spring', 'summer', 'autumn', 'winter'] as const)
-    .map(s => [s, { file: `${s}.png`, tiles: names16 }])),
+  tileW: 32,
+  tileH: 16,
+  cols: 4,
+  rows: 4,
+  seasons: Object.fromEntries(
+    (['spring', 'summer', 'autumn', 'winter'] as const).map((s) => [
+      s,
+      { file: `${s}.png`, tiles: names16 },
+    ]),
+  ),
   scaffolding: { file: 'scaffolding.png' },
 }
 
@@ -34,12 +41,17 @@ describe('loadTilesetManifest', () => {
       expect(loadTilesetManifest(dir).scaffolding.file).toBe('scaffolding.png')
       rmSync(join(dir, 'winter.png'))
       expect(() => loadTilesetManifest(dir)).toThrow(/winter\.png/)
-    } finally { rmSync(dir, { recursive: true, force: true }) }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
 const allTiles = Object.fromEntries(ROAD_AUTOTILE_KEYS.map((k, i) => [k, i]))
-const withAutotile = { ...manifest, autotile: { road: { file: 'road-autotile.png', tiles: allTiles } } }
+const withAutotile = {
+  ...manifest,
+  autotile: { road: { file: 'road-autotile.png', tiles: allTiles } },
+}
 
 describe('TilesetManifest.autotile (additive, optional)', () => {
   it('C10 COMPAT: a manifest with no autotile block still parses', () => {
@@ -55,15 +67,39 @@ describe('TilesetManifest.autotile (additive, optional)', () => {
 
   it('rejects 14 keys with the all-15 message', () => {
     const { cross: _drop, ...fourteen } = allTiles
-    expect(() => TilesetManifest.parse({ ...manifest, autotile: { road: { file: 'r.png', tiles: fourteen } } }))
-      .toThrow(/all 15 road tiles required/)
+    expect(() =>
+      TilesetManifest.parse({
+        ...manifest,
+        autotile: { road: { file: 'r.png', tiles: fourteen } },
+      }),
+    ).toThrow(/all 15 road tiles required/)
   })
 
   it('rejects an unknown tile key and a bad index', () => {
-    expect(() => TilesetManifest.parse({ ...manifest, autotile: { road: { file: 'r.png', tiles: { ...allTiles, 'cap-x': 15 } } } })).toThrow()
-    expect(() => TilesetManifest.parse({ ...manifest, autotile: { road: { file: 'r.png', tiles: { ...allTiles, cross: -1 } } } })).toThrow()
-    expect(() => TilesetManifest.parse({ ...manifest, autotile: { road: { file: 'r.png', tiles: { ...allTiles, cross: 1.5 } } } })).toThrow()
-    expect(() => TilesetManifest.parse({ ...withAutotile, autotile: { road: { file: 'r.png', tiles: allTiles }, extra: 1 } })).toThrow()
+    expect(() =>
+      TilesetManifest.parse({
+        ...manifest,
+        autotile: { road: { file: 'r.png', tiles: { ...allTiles, 'cap-x': 15 } } },
+      }),
+    ).toThrow()
+    expect(() =>
+      TilesetManifest.parse({
+        ...manifest,
+        autotile: { road: { file: 'r.png', tiles: { ...allTiles, cross: -1 } } },
+      }),
+    ).toThrow()
+    expect(() =>
+      TilesetManifest.parse({
+        ...manifest,
+        autotile: { road: { file: 'r.png', tiles: { ...allTiles, cross: 1.5 } } },
+      }),
+    ).toThrow()
+    expect(() =>
+      TilesetManifest.parse({
+        ...withAutotile,
+        autotile: { road: { file: 'r.png', tiles: allTiles }, extra: 1 },
+      }),
+    ).toThrow()
   })
 
   it('file-existence checking extends to the autotile strip', () => {
@@ -75,7 +111,9 @@ describe('TilesetManifest.autotile (additive, optional)', () => {
       expect(() => loadTilesetManifest(dir)).toThrow(/road-autotile\.png/)
       writeFileSync(join(dir, 'road-autotile.png'), Buffer.from('png'))
       expect(loadTilesetManifest(dir).autotile!.road.file).toBe('road-autotile.png')
-    } finally { rmSync(dir, { recursive: true, force: true }) }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
@@ -85,7 +123,7 @@ describe('the shipped content/tilesets manifest', () => {
   it('carries the C10 seasons/scaffolding block AND the C13 autotile block', () => {
     const m = loadTilesetManifest()
     expect(Object.keys(m.seasons).sort()).toEqual(['autumn', 'spring', 'summer', 'winter'])
-    for (const s of Object.values(m.seasons)) expect(s!.tiles).toHaveLength(16)
+    for (const s of Object.values(m.seasons)) expect(s.tiles).toHaveLength(16)
     expect(m.scaffolding.file).toBe('scaffolding.png')
     expect(m.tileW).toBe(32)
     expect(Object.keys(m.autotile!.road.tiles).sort()).toEqual([...ROAD_AUTOTILE_KEYS].sort())
@@ -96,8 +134,8 @@ describe('the shipped content/tilesets manifest', () => {
   it('keeps every key the renderer consumes, whoever painted the pixels', () => {
     const m = loadTilesetManifest()
     for (const season of ['spring', 'summer', 'autumn', 'winter'] as const) {
-      expect(m.seasons[season]!.file).toBe(`${season}.png`)
-      expect(m.seasons[season]!.tiles).toEqual(seasonTileNames())
+      expect(m.seasons[season].file).toBe(`${season}.png`)
+      expect(m.seasons[season].tiles).toEqual(seasonTileNames())
     }
     expect([m.tileW, m.tileH, m.cols, m.rows]).toEqual([32, 16, 4, 4])
     expect(m.autotile!.road.file).toBe('road-autotile.png')
@@ -111,8 +149,8 @@ describe('the shipped content/tilesets manifest', () => {
     const m = loadTilesetManifest()
     const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets')
     for (const season of Object.values(m.seasons)) {
-      const img = await decodePng(readFileSync(join(dir, season!.file)))
-      expect([img.width, img.height], season!.file).toEqual([m.cols * m.tileW, m.rows * m.tileH])
+      const img = await decodePng(readFileSync(join(dir, season.file)))
+      expect([img.width, img.height], season.file).toEqual([m.cols * m.tileW, m.rows * m.tileH])
     }
     const strip = await decodePng(readFileSync(join(dir, m.autotile!.road.file)))
     expect([strip.width, strip.height]).toEqual([ROAD_AUTOTILE_KEYS.length * m.tileW, m.tileH])

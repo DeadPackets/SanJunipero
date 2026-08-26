@@ -1,24 +1,72 @@
 import { describe, expect, it } from 'vitest'
-import { ZOOM_STOPS, type ZoomStop } from '../render/camera.js'
+import { ZOOM_STOPS } from '../render/camera.js'
 import { LENSES, LENS_LABELS, type Lens } from './route.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 import {
-  CONTROL_BAR_H, CONTROL_GLYPH, CONTROL_GLYPH_PALETTE, CONTROL_GLYPH_PX, CONTROL_GROUPS,
-  actionFor, controlGlyph, controlItems, zoomTargetOf, type ControlCtx,
+  CONTROL_BAR_H,
+  CONTROL_GLYPH,
+  CONTROL_GLYPH_PALETTE,
+  CONTROL_GLYPH_PX,
+  CONTROL_GROUPS,
+  actionFor,
+  controlGlyph,
+  controlItems,
+  zoomTargetOf,
+  type ControlCtx,
 } from './controlBar.js'
 
 const MASTER_PALETTE = [
-  '#FFF6E9', '#F6E8D5', '#E8D5BC', '#D4BC9E', '#B89D7E', '#F2C879', '#E0A95E', '#C68A48',
-  '#A66E38', '#7E512B', '#DCE8C8', '#B9D19A', '#93B573', '#6F9455', '#4F7040', '#F2C6C2',
-  '#E09E9B', '#C47876', '#9E5A5C', '#D6EAF2', '#A8CFE0', '#7FB0C9', '#5A8CAB', '#3E6786',
-  '#E9E2DA', '#CFC6BC', '#ABA198', '#857D75', '#5D5751', '#43394A', '#322B38', '#241F2B',
-  '#171420', '#F7A66B', '#E8785A', '#8A6FA8', '#F4E289', '#F5D3B3', '#D9A876', '#9C6B47',
+  '#FFF6E9',
+  '#F6E8D5',
+  '#E8D5BC',
+  '#D4BC9E',
+  '#B89D7E',
+  '#F2C879',
+  '#E0A95E',
+  '#C68A48',
+  '#A66E38',
+  '#7E512B',
+  '#DCE8C8',
+  '#B9D19A',
+  '#93B573',
+  '#6F9455',
+  '#4F7040',
+  '#F2C6C2',
+  '#E09E9B',
+  '#C47876',
+  '#9E5A5C',
+  '#D6EAF2',
+  '#A8CFE0',
+  '#7FB0C9',
+  '#5A8CAB',
+  '#3E6786',
+  '#E9E2DA',
+  '#CFC6BC',
+  '#ABA198',
+  '#857D75',
+  '#5D5751',
+  '#43394A',
+  '#322B38',
+  '#241F2B',
+  '#171420',
+  '#F7A66B',
+  '#E8785A',
+  '#8A6FA8',
+  '#F4E289',
+  '#F5D3B3',
+  '#D9A876',
+  '#9C6B47',
 ]
 
 const EMOJI = /\p{Extended_Pictographic}/u
 
 const base: ControlCtx = {
-  lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false,
+  lens: 'map',
+  live: true,
+  zoom: 1,
+  following: null,
+  insideId: null,
+  hudHidden: false,
   townFits: true,
 }
 
@@ -71,15 +119,19 @@ describe('controlItems — the bar can only offer what the viewer can do', () =>
     for (const ctx of contexts()) {
       const items = controlItems(ctx)
       for (const g of CONTROL_GROUPS) {
-        expect(items.filter((i) => i.group === g).length, `${g} in ${JSON.stringify(ctx)}`)
-          .toBeGreaterThan(0)
+        expect(
+          items.filter((i) => i.group === g).length,
+          `${g} in ${JSON.stringify(ctx)}`,
+        ).toBeGreaterThan(0)
       }
     }
   })
 
   it('offers the way out of a room ONLY when the camera is in one', () => {
     expect(controlItems(base).map((i) => i.id)).not.toContain('exit-interior')
-    expect(controlItems({ ...base, insideId: 'house1' }).map((i) => i.id)).toContain('exit-interior')
+    expect(controlItems({ ...base, insideId: 'house1' }).map((i) => i.id)).toContain(
+      'exit-interior',
+    )
   })
 
   it('offers to stop following ONLY when it is following somebody', () => {
@@ -105,7 +157,9 @@ describe('controlItems — the bar can only offer what the viewer can do', () =>
 
   it('marks the lens the viewer is in, and only that one', () => {
     for (const lens of LENSES) {
-      const on = controlItems({ ...base, lens }).filter((i) => i.group === 'lens' && i.state === 'on')
+      const on = controlItems({ ...base, lens }).filter(
+        (i) => i.group === 'lens' && i.state === 'on',
+      )
       expect(on.map((i) => i.id)).toEqual([`lens-${lens}`])
     }
   })
@@ -151,7 +205,10 @@ describe('actionFor — total over everything the bar can render', () => {
     expect(of('zoom-out')).toEqual({ kind: 'zoom', dir: -1 })
     expect(of('zoom-in')).toEqual({ kind: 'zoom', dir: 1 })
     expect(of('fit')).toEqual({ kind: 'fit' })
-    expect(of('unfollow', { ...base, following: 'amara' })).toEqual({ kind: 'follow', agentId: null })
+    expect(of('unfollow', { ...base, following: 'amara' })).toEqual({
+      kind: 'follow',
+      agentId: null,
+    })
     expect(of('exit-interior', { ...base, insideId: 'house1' })).toEqual({ kind: 'exit-interior' })
     for (const lens of LENSES) expect(of(`lens-${lens}`)).toEqual({ kind: 'lens', lens })
   })
@@ -181,8 +238,8 @@ describe('actionFor — total over everything the bar can render', () => {
 
   it('a zoom action lands on a real stop and clamps at the ends', () => {
     expect(zoomTargetOf(1, 1)).toBe(2)
-    expect(zoomTargetOf(0.5 as ZoomStop, -1)).toBe(0.25)
-    expect(zoomTargetOf(0.25 as ZoomStop, -1)).toBe(0.25)
+    expect(zoomTargetOf(0.5, -1)).toBe(0.25)
+    expect(zoomTargetOf(0.25, -1)).toBe(0.25)
     expect(zoomTargetOf(4, 1)).toBe(4)
     for (const z of ZOOM_STOPS) {
       for (const d of [1, -1] as const) {

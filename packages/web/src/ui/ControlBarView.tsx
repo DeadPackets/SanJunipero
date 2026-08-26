@@ -1,7 +1,11 @@
 import { useRef, useState } from 'react'
 import {
-  CONTROL_GLYPH_PX, CONTROL_GROUPS, actionFor, controlGlyph,
-  type ControlAction, type ControlItem,
+  CONTROL_GLYPH_PX,
+  CONTROL_GROUPS,
+  actionFor,
+  controlGlyph,
+  type ControlAction,
+  type ControlItem,
 } from './controlBar.js'
 
 // The bar is a grid ROW of the stage, not an absolute overlay, so P19 holds by construction:
@@ -12,9 +16,13 @@ import {
 function Glyph({ id }: { id: string }) {
   return (
     <svg
-      className="ctl-glyph" viewBox={`0 0 ${CONTROL_GLYPH_PX} ${CONTROL_GLYPH_PX}`}
-      width={CONTROL_GLYPH_PX * 2} height={CONTROL_GLYPH_PX * 2}
-      shapeRendering="crispEdges" aria-hidden="true" focusable="false"
+      className="ctl-glyph"
+      viewBox={`0 0 ${CONTROL_GLYPH_PX} ${CONTROL_GLYPH_PX}`}
+      width={CONTROL_GLYPH_PX * 2}
+      height={CONTROL_GLYPH_PX * 2}
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      focusable="false"
     >
       {controlGlyph(id).map(([x, y, fill]) => (
         <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
@@ -24,9 +32,13 @@ function Glyph({ id }: { id: string }) {
 }
 
 /** A toolbar with a ROVING TABINDEX: one tab stop for the whole bar, Left and Right walk it. */
-export function ControlBar(
-  { items, onAction }: { items: ControlItem[]; onAction: (a: ControlAction) => void },
-) {
+export function ControlBar({
+  items,
+  onAction,
+}: {
+  items: ControlItem[]
+  onAction: (a: ControlAction) => void
+}) {
   const [at, setAt] = useState(0)
   const ref = useRef<HTMLDivElement>(null)
   const focusable = items.filter((i) => i.disabled !== true)
@@ -42,16 +54,25 @@ export function ControlBar(
   }
 
   const here = (): number => {
-    const id = (ref.current?.ownerDocument.activeElement as HTMLElement | null)?.dataset['ctl']
+    const id = (ref.current?.ownerDocument.activeElement as HTMLElement | null)?.dataset.ctl
     const i = id === undefined ? -1 : focusable.findIndex((f) => f.id === id)
     return i >= 0 ? i : cursor
   }
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
-    if (e.key === 'ArrowRight') { e.preventDefault(); goTo(here() + 1) }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(here() - 1) }
-    else if (e.key === 'Home') { e.preventDefault(); goTo(0) }
-    else if (e.key === 'End') { e.preventDefault(); goTo(focusable.length - 1) }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      goTo(here() + 1)
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      goTo(here() - 1)
+    } else if (e.key === 'Home') {
+      e.preventDefault()
+      goTo(0)
+    } else if (e.key === 'End') {
+      e.preventDefault()
+      goTo(focusable.length - 1)
+    }
   }
 
   return (
@@ -84,7 +105,9 @@ export function ControlBar(
                   {...(item.disabled === true && item.disabledReason !== undefined
                     ? { 'aria-description': item.disabledReason }
                     : {})}
-                  onClick={() => onAction(actionFor(item))}
+                  onClick={() => {
+                    onAction(actionFor(item))
+                  }}
                   onFocus={() => {
                     const i = focusable.findIndex((f) => f.id === item.id)
                     if (i >= 0) setAt(i)

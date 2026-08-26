@@ -1,7 +1,15 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
-  MAX_DEEP, RIVER_GROUND, DRY_GROUND, freePlots, place, plotsOf, streetTiles,
-  townErrors, type Ground, type PlacedStructure,
+  MAX_DEEP,
+  RIVER_GROUND,
+  DRY_GROUND,
+  freePlots,
+  place,
+  plotsOf,
+  streetTiles,
+  townErrors,
+  type Ground,
+  type PlacedStructure,
 } from './townGrammar.js'
 import { plotKey, takenPlots, claimPlot, claimAll } from './townClaim.js'
 
@@ -51,8 +59,12 @@ describe('when a ring plats', () => {
   it('gives up rather than platting forever when nothing can ever be built', () => {
     const drowned: Ground = () => 'water'
     expect(claimPlot({ taken: new Set(), ground: drowned, need: NEED })).toBeNull()
-    expect(claimPlot({ taken: new Set(), ground: DRY_GROUND, need: { along: 9, deep: 1 } })).toBeNull()
-    expect(claimPlot({ taken: new Set(), ground: DRY_GROUND, need: { along: 1, deep: MAX_DEEP + 1 } })).toBeNull()
+    expect(
+      claimPlot({ taken: new Set(), ground: DRY_GROUND, need: { along: 9, deep: 1 } }),
+    ).toBeNull()
+    expect(
+      claimPlot({ taken: new Set(), ground: DRY_GROUND, need: { along: 1, deep: MAX_DEEP + 1 } }),
+    ).toBeNull()
   })
 })
 
@@ -98,9 +110,15 @@ describe('claiming', () => {
 // ★ THE DELIVERABLE. Not "this town has no overlaps" — "no town this grammar can reach has
 // one". A hundred and twenty claims, each one a real agent build, checked as a whole town.
 describe('★ NO SEQUENCE OF AGENT BUILDS CAN BREAK THE SPACING', () => {
-  const KINDS: ReadonlyArray<[string, number, number]> = [
-    ['house', 2, 2], ['cabin', 2, 2], ['cottage', 3, 2], ['storehouse', 2, 2],
-    ['workshop', 1, 1], ['barn', 4, 2], ['shed', 1, 2], ['farmhouse', 4, 1],
+  const KINDS: readonly [string, number, number][] = [
+    ['house', 2, 2],
+    ['cabin', 2, 2],
+    ['cottage', 3, 2],
+    ['storehouse', 2, 2],
+    ['workshop', 1, 1],
+    ['barn', 4, 2],
+    ['shed', 1, 2],
+    ['farmhouse', 4, 1],
   ]
 
   const grow = (n: number, ground: Ground): { built: PlacedStructure[]; rings: number } => {
@@ -148,9 +166,13 @@ describe('★ NO SEQUENCE OF AGENT BUILDS CAN BREAK THE SPACING', () => {
   })
 
   it('carries on from a town that is already standing', () => {
-    const first = claimAll({ ground: RIVER_GROUND, wanted: [{ kind: 'house', along: 2, deep: 2, owner: 'amara' }] })
+    const first = claimAll({
+      ground: RIVER_GROUND,
+      wanted: [{ kind: 'house', along: 2, deep: 2, owner: 'amara' }],
+    })
     const second = claimAll({
-      ground: RIVER_GROUND, standing: first.built,
+      ground: RIVER_GROUND,
+      standing: first.built,
       wanted: [{ kind: 'cabin', along: 2, deep: 2, owner: null }],
     })
     expect(plotKey(second.built[0]!)).not.toBe(plotKey(first.built[0]!))

@@ -73,12 +73,17 @@ export function mountLineageApi(router: Router, deps: LineageDeps): void {
     "SELECT seq, tick, type, payload FROM events WHERE type = 'agent_born' ORDER BY seq",
   )
   const cache = makeSeqCache(() => deps.mirror.seq())
-  router.route('GET', '/api/lineage', (_req, res) => sendPrebuilt(res, cache.json('lineage', () => {
-    try {
-      const events = (selBirths.all() as EventRow[]).map(toEvent)
-      return buildLineage(events, deps.mirror.state().agents)
-    } catch {
-      return EMPTY_LINEAGE   // a town with no ancestry is not an error
-    }
-  })))
+  router.route('GET', '/api/lineage', (_req, res) => {
+    sendPrebuilt(
+      res,
+      cache.json('lineage', () => {
+        try {
+          const events = (selBirths.all() as EventRow[]).map(toEvent)
+          return buildLineage(events, deps.mirror.state().agents)
+        } catch {
+          return EMPTY_LINEAGE // a town with no ancestry is not an error
+        }
+      }),
+    )
+  })
 }

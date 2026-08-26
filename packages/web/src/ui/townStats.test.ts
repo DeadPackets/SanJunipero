@@ -3,27 +3,54 @@ import { BOND_NOTES } from '@sj/shared'
 import type { AgentBody, WorldState } from '@sj/engine/state'
 import { LENSES, type Lens } from './route.js'
 import {
-  EMPTY_COPY, GAMIFICATION_BAN, WEATHER_GLYPH, countsFromWorld, lensCountsFor, lensHints, townStats,
+  EMPTY_COPY,
+  GAMIFICATION_BAN,
+  WEATHER_GLYPH,
+  countsFromWorld,
+  lensCountsFor,
+  lensHints,
+  townStats,
   type LensCounts,
 } from './townStats.js'
 
 const agent = (id: string, alive: boolean): AgentBody => ({
-  id, name: id, x: 0, y: 0, alive, asleep: false,
+  id,
+  name: id,
+  x: 0,
+  y: 0,
+  alive,
+  asleep: false,
   needs: { hunger: 1, energy: 1, warmth: 1, social: 1 },
-  hp: 10, injuries: [], ill: false, ageDays: 20, skills: {},
-  activity: null, collapsedSinceTick: null, zeroHungerSinceTick: null,
+  hp: 10,
+  injuries: [],
+  ill: false,
+  ageDays: 20,
+  skills: {},
+  activity: null,
+  collapsedSinceTick: null,
+  zeroHungerSinceTick: null,
 })
 
 const state = (tick: number, weather: string, agents: AgentBody[]): WorldState => ({
-  tick, terrain: [[0]], weather: { kind: weather, temperatureC: 12 },
+  tick,
+  terrain: [[0]],
+  weather: { kind: weather, temperatureC: 12 },
   agents: Object.fromEntries(agents.map((a) => [a.id, a])),
-  structures: {}, items: {}, crops: {}, wildlife: { fish: 1, deer: 1 },
+  structures: {},
+  items: {},
+  crops: {},
+  wildlife: { fish: 1, deer: 1 },
   counters: { nextEntityId: 1 },
 })
 
 describe('townStats', () => {
   it('counts the living against the whole cast', () => {
-    const s = state(0, 'sunny', [agent('a', true), agent('b', true), agent('c', true), agent('d', false)])
+    const s = state(0, 'sunny', [
+      agent('a', true),
+      agent('b', true),
+      agent('c', true),
+      agent('d', false),
+    ])
     expect(townStats(s, 0)).toEqual({ day: 0, time: '00:00', weather: 'sunny', alive: 3, total: 4 })
   })
 
@@ -77,7 +104,11 @@ describe('lensHints', () => {
   // A mutation proved this was the one line no test could reach: dropping both fetched counts inside
   // `LensTabs` left every UI test green while the nav showed no chronicle number at all.
   it('★ lays the two fetched counts over the world’s, and shows nothing until they answer', () => {
-    expect(lensCountsFor(stats, 16, 2)).toEqual({ ...countsFromWorld(stats), chronicle: 16, society: 2 })
+    expect(lensCountsFor(stats, 16, 2)).toEqual({
+      ...countsFromWorld(stats),
+      chronicle: 16,
+      society: 2,
+    })
     // Before either endpoint has answered: no badge is better than a wrong one.
     expect(lensCountsFor(stats, null, null)).toEqual(countsFromWorld(stats))
     expect(lensCountsFor(stats, 16, 2).inspector, 'the world’s own count was overwritten').toBe(2)
@@ -90,7 +121,11 @@ describe('lensHints', () => {
     // A hint is the tooltip AND the screen-reader label for the badge beside it, so a hint built
     // before the override was applied could name a different number on the same button.
     const declared: LensCounts = {
-      ...countsFromWorld(stats), chronicle: 11, inspector: 40, society: 3, director: 4,
+      ...countsFromWorld(stats),
+      chronicle: 11,
+      inspector: 40,
+      society: 3,
+      director: 4,
     }
     for (const h of lensHints(stats, declared)) {
       if (h.count === null) continue
@@ -139,10 +174,16 @@ describe('lensHints', () => {
 
 describe('EMPTY_COPY', () => {
   it('tells the viewer what has not happened yet, in the town’s own voice', () => {
-    expect(EMPTY_COPY.chronicle).toBe('Day one is still unwritten. The town’s ledger fills as the townsfolk live it.')
+    expect(EMPTY_COPY.chronicle).toBe(
+      'Day one is still unwritten. The town’s ledger fills as the townsfolk live it.',
+    )
     expect(EMPTY_COPY.bonds).toContain('No bonds yet.')
-    expect(EMPTY_COPY.moments).toBe('Nothing worth replaying yet — the first recorded day is still ahead.')
-    expect(EMPTY_COPY.roster).toBe('No one walks the town yet — the first footsteps are still to come.')
+    expect(EMPTY_COPY.moments).toBe(
+      'Nothing worth replaying yet — the first recorded day is still ahead.',
+    )
+    expect(EMPTY_COPY.roster).toBe(
+      'No one walks the town yet — the first footsteps are still to come.',
+    )
     expect(EMPTY_COPY.rosterSub).toBe('The founders arrive at dawn.')
   })
 
@@ -152,11 +193,18 @@ describe('EMPTY_COPY', () => {
     const acts = Object.keys(BOND_NOTES)
     expect(acts).toHaveLength(6)
     const words: Record<string, RegExp> = {
-      spoke: /\bword\b/, give: /\bgift\b/, teach: /\blesson\b/,
-      attack: /\bblow\b/, co_slept: /night under one roof/, born: /\bchild\b/,
+      spoke: /\bword\b/,
+      give: /\bgift\b/,
+      teach: /\blesson\b/,
+      attack: /\bblow\b/,
+      co_slept: /night under one roof/,
+      born: /\bchild\b/,
     }
     for (const act of acts) {
-      expect(words[act], `${act} is a bond-forming act with no word in the empty state`).toBeDefined()
+      expect(
+        words[act],
+        `${act} is a bond-forming act with no word in the empty state`,
+      ).toBeDefined()
       expect(EMPTY_COPY.bonds, act).toMatch(words[act]!)
     }
     // and it does not tell the viewer to wait for something this world may never do

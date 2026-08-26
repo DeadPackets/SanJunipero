@@ -15,13 +15,13 @@ import type { Scene } from './scene.js'
  * measured: under the deep-night multiply (0.45, 0.52, 0.95) honey `#F2C879` comes out
  * BLUE-dominant, and `#F7A66B` — already `FIRE_COLOR` — is the warm end that survives it.
  */
-export const POOL_COLOR = 0xf7a66b        // MASTER_PALETTE, and `ambient.FIRE_COLOR`
-export const POOL_TEX_R = 64              // the radial texture's own radius, in texture px
+export const POOL_COLOR = 0xf7a66b // MASTER_PALETTE, and `ambient.FIRE_COLOR`
+export const POOL_TEX_R = 64 // the radial texture's own radius, in texture px
 
 /** Additive over a darkened ground is exactly when a pale shape shows most, so the pool lifts
  *  the ground back toward its day value and stops well short of white. */
 export const POOL_MAX_ALPHA = 0.44
-export const POOL_DUSK_SCALE = 0.45       // dusk is 'dim', not 'dark': half a pool, not none
+export const POOL_DUSK_SCALE = 0.45 // dusk is 'dim', not 'dark': half a pool, not none
 /** A flame breathes. Under `prefers-reduced-motion` it does not, and the pool holds at base. */
 export const POOL_SWING = 0.06
 export const POOL_HZ = 0.45
@@ -56,7 +56,10 @@ function poolTexture(scene: Scene): Texture {
   for (let i = RINGS; i >= 1; i--) {
     const t = i / RINGS
     // squared falloff: bright core, long tail — an inverse-square flame, not a spotlight
-    g.circle(POOL_TEX_R, POOL_TEX_R, POOL_TEX_R * t).fill({ color: POOL_COLOR, alpha: (1 - t) ** 2 / RINGS * 6 })
+    g.circle(POOL_TEX_R, POOL_TEX_R, POOL_TEX_R * t).fill({
+      color: POOL_COLOR,
+      alpha: ((1 - t) ** 2 / RINGS) * 6,
+    })
   }
   const tex = scene.app.renderer.generateTexture({ target: g, resolution: 1 })
   // Pixi's `GCSystem` calls `unload()` on any resource with `autoGarbageCollect` that goes
@@ -72,7 +75,8 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
   scene.layers.groundDecal.addChild(root)
   const tex = poolTexture(scene)
   const pools = new Map<string, Sprite>()
-  const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+  const still =
+    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
   let t = 0
   let drawn = 0
 

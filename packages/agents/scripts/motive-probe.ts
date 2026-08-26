@@ -9,10 +9,27 @@ import { fileURLToPath } from 'node:url'
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import {
-  buildTicks, createWorldTick, doorTile, EventStore, fold, genesisState, makeGenesisWorld,
-  RngStreams, shelterLedger, TickLoop, type LawQueue, type TickHandler, type WorldState,
+  buildTicks,
+  createWorldTick,
+  doorTile,
+  EventStore,
+  fold,
+  genesisState,
+  makeGenesisWorld,
+  RngStreams,
+  shelterLedger,
+  TickLoop,
+  type LawQueue,
+  type TickHandler,
+  type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, isRoofedKind, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  DEFAULT_CONFIG,
+  isRoofedKind,
+  MINUTES_PER_DAY,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { EngineBridge, type Intent, type SubmitResult } from '../src/runtime/bridge.js'
 import { AgentRuntime } from '../src/runtime/agentRuntime.js'
 import { openAgentDb } from '../src/memory/schema.js'
@@ -58,15 +75,18 @@ const REMOVED_BY_ARM: Record<string, string[]> = {
 // Arm B puts the roofs back on: the valley as it stood before the ruling, and the only arm
 // where the want is answered before the first tick.
 const ROOFS_BACK_ON = ARM === 'b'
-const REMOVED = new Set(REMOVED_BY_ARM[ARM] ?? REMOVED_BY_ARM['g']!)
+const REMOVED = new Set(REMOVED_BY_ARM[ARM] ?? REMOVED_BY_ARM.g!)
 void isRoofedKind
 
-function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: number; y: number }> } {
+function buildWorld(store: EventStore): {
+  state: WorldState
+  doors: { x: number; y: number }[]
+} {
   const g = makeGenesisWorld(config)
   let state = genesisState(config, g.terrain)
   const dropped = new Set<string>()
   const roofless = new Set<string>()
-  const doors: Array<{ x: number; y: number }> = []
+  const doors: { x: number; y: number }[] = []
   const emit = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
@@ -75,17 +95,18 @@ function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: n
     if (e.type === 'structure_planned') {
       // Every arm spawns its five founders on exactly the same five tiles, so the arms differ
       // in nothing but what stands around them.
-      if (SPAWN_KINDS.has(String(p['kind']))) doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
-      if (REMOVED.has(String(p['kind']))) {
-        dropped.add(String(p['id']))
+      if (SPAWN_KINDS.has(String(p.kind)))
+        doors.push({ x: Number(p.x), y: Number(p.y) + Number(p.h ?? 1) })
+      if (REMOVED.has(String(p.kind))) {
+        dropped.add(String(p.id))
         continue
       }
-      roofless.add(String(p['id']))
+      roofless.add(String(p.id))
       emit(e.type, e.payload)
       continue
     }
-    if (dropped.has(String(p['id']))) continue
-    if (e.type === 'structure_completed') roofless.delete(String(p['id']))
+    if (dropped.has(String(p.id))) continue
+    if (e.type === 'structure_completed') roofless.delete(String(p.id))
     // ARM B ONLY: the progress genesis books into a roofless dwelling is skipped and the
     // building is completed instead — the sound village, as every earlier run measured it.
     if (ROOFS_BACK_ON && e.type === 'structure_progressed') continue
@@ -110,17 +131,49 @@ async function main(): Promise<void> {
   let { state, doors } = buildWorld(store)
   MINDS.forEach((m, i) => {
     const at = doors[i] ?? doors[0]!
-    state = fold(state, store.append(state.tick, 'agent_spawned',
-      { id: m.id, name: m.identity.name, x: at.x, y: at.y, sex: m.sex, ageDays: m.ageDays }), config)
+    state = fold(
+      state,
+      store.append(state.tick, 'agent_spawned', {
+        id: m.id,
+        name: m.identity.name,
+        x: at.x,
+        y: at.y,
+        sex: m.sex,
+        ageDays: m.ageDays,
+      }),
+      config,
+    )
     // The wood is already in hand: this probe asks about motive, not about gathering.
-    state = fold(state, store.append(state.tick, 'item_spawned',
-      { id: `wood_${m.id}`, kind: 'wood', qty: WOOD_IN_HAND, loc: { t: 'agent', id: m.id }, owner: m.id }), config)
-    state = fold(state, store.append(state.tick, 'item_spawned',
-      { id: `bread_${m.id}`, kind: 'bread', qty: 4, loc: { t: 'agent', id: m.id }, owner: m.id }), config)
+    state = fold(
+      state,
+      store.append(state.tick, 'item_spawned', {
+        id: `wood_${m.id}`,
+        kind: 'wood',
+        qty: WOOD_IN_HAND,
+        loc: { t: 'agent', id: m.id },
+        owner: m.id,
+      }),
+      config,
+    )
+    state = fold(
+      state,
+      store.append(state.tick, 'item_spawned', {
+        id: `bread_${m.id}`,
+        kind: 'bread',
+        qty: 4,
+        loc: { t: 'agent', id: m.id },
+        owner: m.id,
+      }),
+      config,
+    )
   })
   // Nobody starts the evening already worn out: an exhaustion run measures exhaustion.
   for (const m of MINDS) {
-    state = fold(state, store.append(state.tick, 'need_changed', { id: m.id, need: 'energy', delta: 0 }), config)
+    state = fold(
+      state,
+      store.append(state.tick, 'need_changed', { id: m.id, need: 'energy', delta: 0 }),
+      config,
+    )
   }
   void doorTile
 
@@ -128,16 +181,34 @@ async function main(): Promise<void> {
   const worldTick = createWorldTick(config, rng, lawQueue)
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
-    store, state, rng, config, startTick: START_TICK, realMsPerTick: 0, onTick: (c) => handler(c),
+    store,
+    state,
+    rng,
+    config,
+    startTick: START_TICK,
+    realMsPerTick: 0,
+    onTick: (c) => {
+      handler(c)
+    },
   })
 
-  const refusals: Array<{ tick: number; id: string; verb: string; reason: string }> = []
-  const attempts: Array<{ tick: number; id: string; verb: string; params: string }> = []
+  const refusals: { tick: number; id: string; verb: string; reason: string }[] = []
+  const attempts: { tick: number; id: string; verb: string; params: string }[] = []
   class Watched extends EngineBridge {
-    override submit(agentId: string, intent: Intent, cb?: (r: SubmitResult) => void): Promise<SubmitResult> {
-      attempts.push({ tick: loop.tick, id: agentId, verb: intent.verb, params: JSON.stringify(intent.params) })
+    override submit(
+      agentId: string,
+      intent: Intent,
+      cb?: (r: SubmitResult) => void,
+    ): Promise<SubmitResult> {
+      attempts.push({
+        tick: loop.tick,
+        id: agentId,
+        verb: intent.verb,
+        params: JSON.stringify(intent.params),
+      })
       return super.submit(agentId, intent, (r) => {
-        if (!r.ok) refusals.push({ tick: loop.tick, id: agentId, verb: intent.verb, reason: r.reason })
+        if (!r.ok)
+          refusals.push({ tick: loop.tick, id: agentId, verb: intent.verb, reason: r.reason })
         cb?.(r)
       })
     }
@@ -148,7 +219,7 @@ async function main(): Promise<void> {
       const p = super.perception(agentId)
       if (ARM === 'b' || ARM === 'c') return p
       const { cold: _dropped, ...rest } = p
-      return rest as typeof p
+      return rest
     }
   }
   const bridge = new Watched({ loop, store, simConfig: config })
@@ -156,8 +227,10 @@ async function main(): Promise<void> {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
 
-  const embedder = await Embedder.create(fileURLToPath(new URL('../../../data/models/', import.meta.url)))
-  const thoughts: Array<{ tick: number; agentId: string; text: string }> = []
+  const embedder = await Embedder.create(
+    fileURLToPath(new URL('../../../data/models/', import.meta.url)),
+  )
+  const thoughts: { tick: number; agentId: string; text: string }[] = []
   const runtimes: AgentRuntime[] = []
   for (const spec of MINDS) {
     const personality = new PersonalityStore(db, spec.id)
@@ -169,7 +242,9 @@ async function main(): Promise<void> {
       identity: spec.identity,
       personality,
       bridge,
-      reflectionLlm: makeReflectionLlm(new LlmClient({ db, caller: 'reflection', agentId: spec.id, budgetUsd: CAP_USD })),
+      reflectionLlm: makeReflectionLlm(
+        new LlmClient({ db, caller: 'reflection', agentId: spec.id, budgetUsd: CAP_USD }),
+      ),
       onThought: (t) => thoughts.push(t),
     })
     runtime.start(spec.id)
@@ -198,22 +273,29 @@ async function main(): Promise<void> {
   const spoke = events.filter((e) => e.type === 'agent_spoke')
   const byVerb = new Map<string, number>()
   for (const a of attempts) byVerb.set(a.verb, (byVerb.get(a.verb) ?? 0) + 1)
-  const cost = db.prepare('SELECT COALESCE(SUM(cost_usd),0) AS c FROM llm_calls').get() as { c: number }
+  const cost = db.prepare('SELECT COALESCE(SUM(cost_usd),0) AS c FROM llm_calls').get() as {
+    c: number
+  }
   const calls = db.prepare('SELECT COUNT(*) AS n FROM llm_calls').get() as { n: number }
 
-  const warmth = Object.fromEntries(MINDS.map((m) =>
-    [m.id, Number((loop.state.agents[m.id]?.needs.warmth ?? -1).toFixed(1))]))
+  const warmth = Object.fromEntries(
+    MINDS.map((m) => [m.id, Number((loop.state.agents[m.id]?.needs.warmth ?? -1).toFixed(1))]),
+  )
   // The two things arm B's failure was actually made of, counted rather than inferred: bodies
   // that went down in the street, and acts spent on a door that could never open.
   const collapsed = MINDS.filter((m) => loop.state.agents[m.id]?.collapsedSinceTick != null).length
   const sheltered = MINDS.filter((m) => loop.state.agents[m.id]?.insideId !== undefined).length
   const noWayIn = refusals.filter((r) => /no way into|has no roof/.test(r.reason)).length
-  const noFloor = refusals.filter((r) => /no floor left/.test(r.reason)).length
+  const noFloor = refusals.filter((r) => r.reason.includes('no floor left')).length
   const ledger = shelterLedger(loop.state, config)
 
   const report = {
-    arm: ARM, label: LABEL, ticks: TOTAL_TICKS, startTick: START_TICK,
-    llmCalls: calls.n, costUsd: Number(cost.c.toFixed(4)),
+    arm: ARM,
+    label: LABEL,
+    ticks: TOTAL_TICKS,
+    startTick: START_TICK,
+    llmCalls: calls.n,
+    costUsd: Number(cost.c.toFixed(4)),
     intents: attempts.length,
     byVerb: Object.fromEntries([...byVerb].sort((a, b) => b[1] - a[1])),
     builds: byVerb.get('build') ?? 0,
@@ -228,36 +310,51 @@ async function main(): Promise<void> {
     refusedNoFloor: noFloor,
     spoke: spoke.length,
     refusals: refusals.length,
-    refusalsByReason: Object.entries(refusals.reduce<Record<string, number>>((acc, r) => {
-      acc[r.reason] = (acc[r.reason] ?? 0) + 1
-      return acc
-    }, {})).sort((a, b) => b[1] - a[1]),
+    refusalsByReason: Object.entries(
+      refusals.reduce<Record<string, number>>((acc, r) => {
+        acc[r.reason] = (acc[r.reason] ?? 0) + 1
+        return acc
+      }, {}),
+    ).sort((a, b) => b[1] - a[1]),
     // ★ WHICH VERB WAS TURNED AWAY, not just what it was told. The last pass reported 159
     // `already busy with build` and had to read the runtime's source to find out they were all
     // speech. A refusal count whose composition is a guess has measured half of nothing.
-    refusalsByVerb: Object.entries(refusals.reduce<Record<string, number>>((acc, r) => {
-      const k = `${r.verb}: ${r.reason}`
-      acc[k] = (acc[k] ?? 0) + 1
-      return acc
-    }, {})).sort((a, b) => b[1] - a[1]).slice(0, 12),
+    refusalsByVerb: Object.entries(
+      refusals.reduce<Record<string, number>>((acc, r) => {
+        const k = `${r.verb}: ${r.reason}`
+        acc[k] = (acc[k] ?? 0) + 1
+        return acc
+      }, {}),
+    )
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12),
     warmthAtEnd: warmth,
     // Every wall in the town at dawn, and how far up it is. "No house finished" is a claim
     // about a distance, and a report that cannot say the distance cannot say what is missing.
     sitesAtEnd: Object.values(loop.state.structures)
       .filter((s) => s.stage === 'construction')
-      .map((s) => `${s.kind} ${s.id} ${s.progressTicks}/${buildTicks(config, s.kind)} by ${s.builtBy}`)
+      .map(
+        (s) => `${s.kind} ${s.id} ${s.progressTicks}/${buildTicks(config, s.kind)} by ${s.builtBy}`,
+      )
       .sort(),
-    roofsAtEnd: Object.values(loop.state.structures)
-      .filter((s) => s.stage === 'complete' && isRoofedKind(config, s.kind)).length,
+    roofsAtEnd: Object.values(loop.state.structures).filter(
+      (s) => s.stage === 'complete' && isRoofedKind(config, s.kind),
+    ).length,
     buildIntents: attempts.filter((a) => a.verb === 'build'),
-    thoughtsMentioningCold: thoughts.filter((t) => /\bcold|shiver|freez|warm|roof|shelter|walls|night air\b/i.test(t.text)).length,
+    thoughtsMentioningCold: thoughts.filter((t) =>
+      /\bcold|shiver|freez|warm|roof|shelter|walls|night air\b/i.test(t.text),
+    ).length,
     thoughts: thoughts.length,
   }
   writeFileSync(path.join(DATA_DIR, `${LABEL}.json`), JSON.stringify(report, null, 2))
-  writeFileSync(path.join(DATA_DIR, `${LABEL}-thoughts.md`),
-    thoughts.map((t) => `- t=${t.tick} **${t.agentId}**: ${t.text}`).join('\n'))
-  writeFileSync(path.join(DATA_DIR, `${LABEL}-speech.md`),
-    spoke.map((e) => `- t=${e.tick} ${JSON.stringify(e.payload)}`).join('\n'))
+  writeFileSync(
+    path.join(DATA_DIR, `${LABEL}-thoughts.md`),
+    thoughts.map((t) => `- t=${t.tick} **${t.agentId}**: ${t.text}`).join('\n'),
+  )
+  writeFileSync(
+    path.join(DATA_DIR, `${LABEL}-speech.md`),
+    spoke.map((e) => `- t=${e.tick} ${JSON.stringify(e.payload)}`).join('\n'),
+  )
   console.log(JSON.stringify(report, null, 2))
   // Left open on purpose: a turn still in flight logs its own abandonment, and a closed handle
   // turns that into a crash after the report is already on disk.

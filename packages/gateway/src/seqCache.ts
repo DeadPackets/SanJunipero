@@ -29,7 +29,9 @@ export type SeqCache = {
 }
 
 export function makeSeqCache(
-  seqOf: () => number, maxKeys = MAX_KEYS, maxBytes = MAX_BYTES,
+  seqOf: () => number,
+  maxKeys = MAX_KEYS,
+  maxBytes = MAX_BYTES,
 ): SeqCache {
   let generation = -1
   const bodies = new Map<string, string>()
@@ -67,7 +69,7 @@ export function makeSeqCache(
       fresh()
       if (values.has(key)) return values.get(key) as T
       const v = build()
-      if (values.size >= MAX_VALUES) values.delete(values.keys().next().value as string)
+      if (values.size >= MAX_VALUES) values.delete(values.keys().next().value!)
       values.set(key, v)
       return v
     },

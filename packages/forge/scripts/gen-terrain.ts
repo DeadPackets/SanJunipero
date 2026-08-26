@@ -18,18 +18,52 @@ const OUT = 'packages/forge/out/terrain-candidates'
 mkdirSync(OUT, { recursive: true })
 
 const codex = new AssetCodex(openForgeDb('packages/forge/out/terrain.db'))
-const forge = createForge({ client: makeImageClient({ apiKey: KEY, budget }), judge: makeVlmJudge({ apiKey: KEY, refSheets: refs }), codex, refs })
+const forge = createForge({
+  client: makeImageClient({ apiKey: KEY, budget }),
+  judge: makeVlmJudge({ apiKey: KEY, refSheets: refs }),
+  codex,
+  refs,
+})
 
 const sheets: [string, string, 'terrain' | 'building', { w: number; h: number }][] = [
-  ['spring', 'seasonal ground tileset, spring: fresh sage meadow grass, dirt path, river water edge, mossy rock — 16 tile variants', 'terrain', { w: 4, h: 4 }],
-  ['summer', 'seasonal ground tileset, summer: deep warm green grass, dry dirt path, calm river water edge, sun-baked rock — 16 tile variants', 'terrain', { w: 4, h: 4 }],
-  ['autumn', 'seasonal ground tileset, autumn: leaf-littered amber grass, muddy path, cool river water edge, lichen rock — 16 tile variants', 'terrain', { w: 4, h: 4 }],
-  ['winter', 'seasonal ground tileset, winter: snow-blued ground, trodden snow path, icy river edge, frosted rock — 16 tile variants', 'terrain', { w: 4, h: 4 }],
-  ['scaffolding', 'a construction scaffolding of honey-wood poles and cream canvas wraps, building-under-construction sprite', 'building', { w: 1, h: 1 }],
+  [
+    'spring',
+    'seasonal ground tileset, spring: fresh sage meadow grass, dirt path, river water edge, mossy rock — 16 tile variants',
+    'terrain',
+    { w: 4, h: 4 },
+  ],
+  [
+    'summer',
+    'seasonal ground tileset, summer: deep warm green grass, dry dirt path, calm river water edge, sun-baked rock — 16 tile variants',
+    'terrain',
+    { w: 4, h: 4 },
+  ],
+  [
+    'autumn',
+    'seasonal ground tileset, autumn: leaf-littered amber grass, muddy path, cool river water edge, lichen rock — 16 tile variants',
+    'terrain',
+    { w: 4, h: 4 },
+  ],
+  [
+    'winter',
+    'seasonal ground tileset, winter: snow-blued ground, trodden snow path, icy river edge, frosted rock — 16 tile variants',
+    'terrain',
+    { w: 4, h: 4 },
+  ],
+  [
+    'scaffolding',
+    'a construction scaffolding of honey-wood poles and cream canvas wraps, building-under-construction sprite',
+    'building',
+    { w: 1, h: 1 },
+  ],
 ]
 for (const [id, desc, klass, fp] of sheets) {
   const rec = await forge.commission(desc, fp, klass)
   writeFileSync(`${OUT}/${id}.${rec.status}.png`, codex.get(rec.id)!.png)
-  console.log(`${id}: ${rec.status} score=${rec.score} attempts=${rec.attempts} $${rec.costUsd.toFixed(3)}`)
+  console.log(
+    `${id}: ${rec.status} score=${rec.score} attempts=${rec.attempts} $${rec.costUsd.toFixed(3)}`,
+  )
 }
-console.log('curate into packages/forge/content/tilesets/ + manifest.json (16 tile names per season)')
+console.log(
+  'curate into packages/forge/content/tilesets/ + manifest.json (16 tile names per season)',
+)

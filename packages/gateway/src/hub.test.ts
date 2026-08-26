@@ -6,7 +6,9 @@ function fakeSocket(opts: { buffered?: number; readyState?: number } = {}) {
     sent: [] as string[],
     bufferedAmount: opts.buffered ?? 0,
     readyState: opts.readyState ?? OPEN,
-    send(data: string) { this.sent.push(data) },
+    send(data: string) {
+      this.sent.push(data)
+    },
   }
   return sock as typeof sock & HubSocket
 }
@@ -39,7 +41,7 @@ describe('SocketHub', () => {
     const hub = new SocketHub()
     const s = fakeSocket({ buffered: 2 * 1024 * 1024 })
     hub.add(s, () => 'SNAP')
-    hub.broadcast('a')            // marks lagging, drops
+    hub.broadcast('a') // marks lagging, drops
     expect(s.sent).toEqual([])
     s.bufferedAmount = 0
     expect(s.bufferedAmount).toBeLessThan(RESUME_BELOW)
@@ -55,7 +57,7 @@ describe('SocketHub', () => {
     const s = fakeSocket({ buffered: 2 * 1024 * 1024 })
     hub.add(s, () => 'SNAP')
     hub.broadcast('a')
-    s.bufferedAmount = RESUME_BELOW + 1   // not drained enough
+    s.bufferedAmount = RESUME_BELOW + 1 // not drained enough
     hub.broadcast('b')
     expect(s.sent).toEqual([])
     expect(hub.laggingCount()).toBe(1)
@@ -94,8 +96,9 @@ describe('★ the stream says when a viewer falls behind', () => {
     hub.broadcast('a')
     expect(lines).toHaveLength(1)
     expect(lines[0]).toContain('fell behind')
-    expect(lines[0], 'the count is the operational fact, not the one socket')
-      .toContain('1 of 1 viewers lagging')
+    expect(lines[0], 'the count is the operational fact, not the one socket').toContain(
+      '1 of 1 viewers lagging',
+    )
 
     // still lagging, three more broadcasts: a line per delta would be 4 Hz of the same sentence
     hub.broadcast('b')

@@ -10,12 +10,12 @@ export function packCharacterAtlas(
   cells: Map<string, RawImage>,
   figureH: number,
 ): { image: RawImage; manifest: CharacterAtlasManifest } {
-  const missing = CELL_NAMES_V4.filter(n => !cells.has(n))
+  const missing = CELL_NAMES_V4.filter((n) => !cells.has(n))
   if (missing.length) throw new Error(`packCharacterAtlas: missing cells ${missing.join(', ')}`)
 
-  const rows = FACINGS.map(f => POSES_V2.map(p => `${p}-${f}`))
-  const rowH = rows.map(names => Math.max(...names.map(n => cells.get(n)!.height)))
-  const width = Math.max(...rows.map(names => names.reduce((s, n) => s + cells.get(n)!.width, 0)))
+  const rows = FACINGS.map((f) => POSES_V2.map((p) => `${p}-${f}`))
+  const rowH = rows.map((names) => Math.max(...names.map((n) => cells.get(n)!.height)))
+  const width = Math.max(...rows.map((names) => names.reduce((s, n) => s + cells.get(n)!.width, 0)))
   const height = rowH.reduce((s, h) => s + h, 0)
 
   const image: RawImage = { width, height, data: new Uint8ClampedArray(width * height * 4) }

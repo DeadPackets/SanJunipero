@@ -9,21 +9,38 @@ import { RosterPanelView } from './RosterPanel.js'
 import { rosterRows2 } from './roster/rosterRow.js'
 import type { WorldState } from '@sj/engine/state'
 import {
-  BANNED_STATUS_LITERALS, CONDITIONS, CONDITION_WORD, DRIVES, MACHINE_STATUS_IDS, NEED_LOW,
-  STATES, STATE_PRIORITY, STATE_WORD, TALK_RECENT_TICKS,
-  conditionsOf, drivesOf, stateWord, statusLiteralOffenders, statusOf,
-  type AgentView, type Condition, type State,
+  BANNED_STATUS_LITERALS,
+  CONDITIONS,
+  CONDITION_WORD,
+  DRIVES,
+  MACHINE_STATUS_IDS,
+  NEED_LOW,
+  STATES,
+  STATE_PRIORITY,
+  STATE_WORD,
+  TALK_RECENT_TICKS,
+  conditionsOf,
+  drivesOf,
+  stateWord,
+  statusLiteralOffenders,
+  statusOf,
+  type AgentView,
+  type Condition,
+  type State,
 } from './status.js'
 
 const WEB_SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** every non-test source file the viewer ships, read off disk */
-function sourceFiles(): Array<{ path: string; source: string }> {
-  const out: Array<{ path: string; source: string }> = []
+function sourceFiles(): { path: string; source: string }[] {
+  const out: { path: string; source: string }[] = []
   const walk = (dir: string): void => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const p = join(dir, e.name)
-      if (e.isDirectory()) { walk(p); continue }
+      if (e.isDirectory()) {
+        walk(p)
+        continue
+      }
       if (!/\.tsx?$/.test(e.name) || /\.test\.tsx?$/.test(e.name)) continue
       out.push({ path: relative(WEB_SRC, p), source: readFileSync(p, 'utf8') })
     }
@@ -33,7 +50,12 @@ function sourceFiles(): Array<{ path: string; source: string }> {
 }
 
 const body = (over: Partial<AgentView> = {}): AgentView => ({
-  alive: true, asleep: false, activity: null, ill: false, hp: 100, injuries: [],
+  alive: true,
+  asleep: false,
+  activity: null,
+  ill: false,
+  hp: 100,
+  injuries: [],
   collapsedSinceTick: null,
   needs: { hunger: 80, energy: 80, warmth: 80, social: 80 },
   ...over,
@@ -56,20 +78,41 @@ describe('the duplicate, as a test', () => {
       tick: 400,
       agents: {
         amara: {
-          id: 'amara', name: 'Amara', x: 3, y: 3, alive: true, asleep: true, ageDays: 35 * 364,
+          id: 'amara',
+          name: 'Amara',
+          x: 3,
+          y: 3,
+          alive: true,
+          asleep: true,
+          ageDays: 35 * 364,
           needs: { hunger: 80, energy: 40, warmth: 80, social: 80 },
-          hp: 100, injuries: [], ill: false, skills: {}, activity: null,
-          collapsedSinceTick: null, zeroHungerSinceTick: null,
+          hp: 100,
+          injuries: [],
+          ill: false,
+          skills: {},
+          activity: null,
+          collapsedSinceTick: null,
+          zeroHungerSinceTick: null,
         },
       },
-      structures: {}, items: {}, crops: {},
-      terrain: [[0] as unknown], weather: { kind: 'sunny', temperatureC: 12 },
-      wildlife: { fish: 1, deer: 1 }, counters: { nextEntityId: 2 },
+      structures: {},
+      items: {},
+      crops: {},
+      terrain: [[0] as unknown],
+      weather: { kind: 'sunny', temperatureC: 12 },
+      wildlife: { fish: 1, deer: 1 },
+      counters: { nextEntityId: 2 },
     } as unknown as WorldState
-    const html = renderToStaticMarkup(createElement(RosterPanelView, {
-      rows: rosterRows2(state, [], null, state.tick), gone: 0,
-      sort: 'name' as const, openId: null, onSort: () => {}, onToggle: () => {},
-    }))
+    const html = renderToStaticMarkup(
+      createElement(RosterPanelView, {
+        rows: rosterRows2(state, [], null, state.tick),
+        gone: 0,
+        sort: 'name' as const,
+        openId: null,
+        onSort: () => {},
+        onToggle: () => {},
+      }),
+    )
     const text = html.replace(/<[^>]*>/g, ' ')
     // the landed card carried BOTH: an `asleep` badge and a `resting` doing-badge
     expect(text.match(/Asleep/gi)?.length).toBe(1)
@@ -100,14 +143,17 @@ describe('STATES — one state per person, and the array IS the priority', () =>
 
   it('a collapsed sleeper is collapsed; a dead agent is gone whatever else is true', () => {
     expect(statusOf(body({ asleep: true, collapsedSinceTick: 12 }))).toBe('collapsed')
-    expect(statusOf(body({ alive: false, asleep: true, collapsedSinceTick: 12, activity: { verb: 'build' } })))
-      .toBe('gone')
+    expect(
+      statusOf(
+        body({ alive: false, asleep: true, collapsedSinceTick: 12, activity: { verb: 'build' } }),
+      ),
+    ).toBe('gone')
   })
 
   it('a WALKING TALKER is talking — the conversation is the fact worth reading', () => {
     const walker = body({ activity: { verb: 'walk' }, lastSpokeTick: 500 })
-    expect(statusOf(walker)).toBe('walking')                    // without a clock, the verb rules
-    expect(statusOf(walker, 505)).toBe('talking')               // in earshot of the last word
+    expect(statusOf(walker)).toBe('walking') // without a clock, the verb rules
+    expect(statusOf(walker, 505)).toBe('talking') // in earshot of the last word
     expect(statusOf(walker, 500 + TALK_RECENT_TICKS + 1)).toBe('walking')
   })
 
@@ -119,7 +165,7 @@ describe('STATES — one state per person, and the array IS the priority', () =>
   it('the working word is the verb’s own gerund, and the others keep theirs', () => {
     expect(stateWord(body({ activity: { verb: 'build' } }))).toBe('Building')
     expect(stateWord(body({ activity: { verb: 'tend' } }))).toBe('Tending')
-    expect(stateWord(body({ activity: { verb: 'make' } }))).toBe('Making')   // the t7 gerund rule
+    expect(stateWord(body({ activity: { verb: 'make' } }))).toBe('Making') // the t7 gerund rule
     expect(stateWord(body({ activity: { verb: 'walk' } }))).toBe('Walking')
     expect(stateWord(body())).toBe('Between things')
   })
@@ -162,7 +208,7 @@ describe('conditionsOf — zero or more, and never a state', () => {
   })
 
   it('reads each condition off its own field', () => {
-    const cases: Array<[Condition, AgentView]> = [
+    const cases: [Condition, AgentView][] = [
       ['unwell', body({ ill: true })],
       ['hurt', body({ injuries: [{ kind: 'serious', day: 2 }] })],
       ['hungry', body({ needs: { hunger: NEED_LOW - 1, energy: 80, warmth: 80, social: 80 } })],
@@ -180,7 +226,9 @@ describe('conditionsOf — zero or more, and never a state', () => {
 
   it('is deterministic and in CONDITIONS order, however many are true', () => {
     const wretched = body({
-      ill: true, injuries: [{ kind: 'minor', day: 1 }], thirst: 1,
+      ill: true,
+      injuries: [{ kind: 'minor', day: 1 }],
+      thirst: 1,
       needs: { hunger: 1, energy: 1, warmth: 1, social: 1 },
     })
     const got = conditionsOf(wretched)
@@ -206,14 +254,20 @@ describe('statusLiteralOffenders — the synonym bug cannot come back', () => {
   })
 
   it('catches each banned word in the shape the defect actually had', () => {
-    expect(statusLiteralOffenders([{ path: 'a.ts', source: "doing: a.activity ? g : 'resting'" }]))
-      .toEqual(['a.ts'])
-    expect(statusLiteralOffenders([{ path: 'b.tsx', source: "<span>{a.asleep ? 'asleep' : 'awake'}</span>" }]))
-      .toEqual(['b.tsx'])
-    expect(statusLiteralOffenders([{ path: 'c.tsx', source: "return <p>at rest forever</p>" }]))
-      .toEqual(['c.tsx'])
-    expect(statusLiteralOffenders([{ path: 'd.ts', source: "const s = 'Sleeping'" }]))
-      .toEqual(['d.ts'])
+    expect(
+      statusLiteralOffenders([{ path: 'a.ts', source: "doing: a.activity ? g : 'resting'" }]),
+    ).toEqual(['a.ts'])
+    expect(
+      statusLiteralOffenders([
+        { path: 'b.tsx', source: "<span>{a.asleep ? 'asleep' : 'awake'}</span>" },
+      ]),
+    ).toEqual(['b.tsx'])
+    expect(
+      statusLiteralOffenders([{ path: 'c.tsx', source: 'return <p>at rest forever</p>' }]),
+    ).toEqual(['c.tsx'])
+    expect(statusLiteralOffenders([{ path: 'd.ts', source: "const s = 'Sleeping'" }])).toEqual([
+      'd.ts',
+    ])
   })
 
   it('leaves the machine vocabulary alone — an id is not a printed word', () => {
@@ -228,11 +282,14 @@ describe('statusLiteralOffenders — the synonym bug cannot come back', () => {
 
   it('names every banned literal it is asked to catch, and reports each file once', () => {
     for (const lit of BANNED_STATUS_LITERALS) {
-      const machine = (MACHINE_STATUS_IDS as readonly string[]).includes(lit)
+      const machine = MACHINE_STATUS_IDS.includes(lit)
       const src = `const x = '${lit}'`
-      expect(statusLiteralOffenders([{ path: 'x.ts', source: src }]), lit)
-        .toEqual(machine ? [] : ['x.ts'])
+      expect(statusLiteralOffenders([{ path: 'x.ts', source: src }]), lit).toEqual(
+        machine ? [] : ['x.ts'],
+      )
     }
-    expect(statusLiteralOffenders([{ path: 'y.ts', source: "'resting' + 'awake'" }])).toEqual(['y.ts'])
+    expect(statusLiteralOffenders([{ path: 'y.ts', source: "'resting' + 'awake'" }])).toEqual([
+      'y.ts',
+    ])
   })
 })

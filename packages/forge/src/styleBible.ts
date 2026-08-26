@@ -15,8 +15,10 @@ const CLASS_HINTS: Record<AssetClass, string> = {
   building: 'A single free-standing building sprite.',
   item: 'A single small hand-held item sprite.',
   crop: 'A crop sprite sheet with exactly 4 growth stages left to right, evenly spaced: sprout, young, mature, harvest-ready.',
-  terrain: 'A seamless terrain tile sheet, 4 columns by 4 rows of 32x16 diamond ground tiles. The sheet fills the whole frame; no magenta background for terrain.',
-  'rig-part': 'A character sprite sheet with exactly 4 facing directions left to right: south, west, north, east. Same character, consistent pixel style across all 4.',
+  terrain:
+    'A seamless terrain tile sheet, 4 columns by 4 rows of 32x16 diamond ground tiles. The sheet fills the whole frame; no magenta background for terrain.',
+  'rig-part':
+    'A character sprite sheet with exactly 4 facing directions left to right: south, west, north, east. Same character, consistent pixel style across all 4.',
   portrait: 'A large character portrait, bust framing, painted pixel-art style.',
 }
 
@@ -26,7 +28,8 @@ export const STYLE_ANCHOR_CLAUSE =
   'match the pixel density, palette warmth, and cute rounded style of the first reference image exactly'
 
 export function buildAssetPrompt(desc: string, footprint: Footprint, klass: AssetClass): string {
-  const anchor = klass === 'rig-part' || klass === 'portrait' ? '' : ` Style: ${STYLE_ANCHOR_CLAUSE}.`
+  const anchor =
+    klass === 'rig-part' || klass === 'portrait' ? '' : ` Style: ${STYLE_ANCHOR_CLAUSE}.`
   return `${STYLE_PROMPT} ${CLASS_HINTS[klass]}${anchor} Subject: ${desc}. World footprint: ${footprint.w}x${footprint.h} tiles on a 32x16 pixel tile grid.`
 }
 
@@ -34,11 +37,17 @@ export function buildAssetPrompt(desc: string, footprint: Footprint, klass: Asse
 // the ~64 px sprite the Style Bible names; crops and rigs are 4-frame horizontal sheets.
 export function targetSize(klass: AssetClass, fp: Footprint): { w: number; h: number } {
   switch (klass) {
-    case 'building': return { w: 32 * (fp.w + fp.h), h: 32 * (fp.w + fp.h) }
-    case 'item': return nativeSizeFor('item', fp)
-    case 'crop': return { w: 128, h: 32 }
-    case 'rig-part': return { w: 128, h: 32 }
-    case 'terrain': return { w: 128, h: 64 }
-    case 'portrait': return { w: 256, h: 256 }
+    case 'building':
+      return { w: 32 * (fp.w + fp.h), h: 32 * (fp.w + fp.h) }
+    case 'item':
+      return nativeSizeFor('item', fp)
+    case 'crop':
+      return { w: 128, h: 32 }
+    case 'rig-part':
+      return { w: 128, h: 32 }
+    case 'terrain':
+      return { w: 128, h: 64 }
+    case 'portrait':
+      return { w: 256, h: 256 }
   }
 }

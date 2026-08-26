@@ -7,13 +7,24 @@ import type { Recipe } from './verdict.js'
 // The words the arbiter answers WITH. None of them is the name of a craft, and one of them
 // arriving as an id means the model wrote its verdict into the wrong field.
 const VERDICT_WORDS: ReadonlySet<string> = new Set([
-  'map', 'attempt', 'impossible', 'verdict', 'recipe', 'none', 'unknown', 'null', 'undefined',
+  'map',
+  'attempt',
+  'impossible',
+  'verdict',
+  'recipe',
+  'none',
+  'unknown',
+  'null',
+  'undefined',
 ])
 
 // Ids the world mints as it runs. A recipe is a rule and outlives every one of them.
 const ENTITY_ID = /\b(?:item|structure|agent|crop|fauna|forageable|grave)_\d+\b/
 
-const tokens = (s: string): string[] => slugify(s).split('_').filter((t) => t.length > 0)
+const tokens = (s: string): string[] =>
+  slugify(s)
+    .split('_')
+    .filter((t) => t.length > 0)
 
 // Levenshtein, capped at two — that is all the answer this needs.
 function editDistance(a: string, b: string): number {
@@ -22,7 +33,11 @@ function editDistance(a: string, b: string): number {
   for (let i = 1; i <= a.length; i++) {
     const row = [i]
     for (let j = 1; j <= b.length; j++) {
-      row[j] = Math.min(prev[j]! + 1, row[j - 1]! + 1, prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1))
+      row[j] = Math.min(
+        prev[j]! + 1,
+        row[j - 1]! + 1,
+        prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1),
+      )
     }
     prev = row
   }
@@ -80,28 +95,35 @@ export function recipeSanityRefusal(recipe: Recipe, vocab: RecipeVocabulary = {}
   // Every word of the id must be a word of the name, allowing a shortening or an ending. A word
   // with its HEAD eaten is a prefix of nothing, which is how a truncated id is caught.
   const nameTokens = tokens(recipe.name)
-  const nameHas = (t: string): boolean => nameTokens.some((n) => n === t
-    || (Math.min(n.length, t.length) >= 3 && (n.startsWith(t) || t.startsWith(n))))
+  const nameHas = (t: string): boolean =>
+    nameTokens.some(
+      (n) => n === t || (Math.min(n.length, t.length) >= 3 && (n.startsWith(t) || t.startsWith(n))),
+    )
   const stray = tokens(slug).find((t) => !nameHas(t))
-  if (stray !== undefined) return `${recipe.id} says "${stray}", which is nowhere in "${recipe.name}"`
+  if (stray !== undefined)
+    return `${recipe.id} says "${stray}", which is nowhere in "${recipe.name}"`
 
   const serialized = JSON.stringify(recipe)
   const entity = ENTITY_ID.exec(serialized)
-  if (entity !== null) return `${recipe.id} names ${entity[0]}, a thing the world minted, not a kind`
+  if (entity !== null)
+    return `${recipe.id} names ${entity[0]}, a thing the world minted, not a kind`
 
   if (vocab.itemKinds !== undefined) {
     for (const req of recipe.requires) {
       if (req.type !== 'held_item') continue
-      if (!vocab.itemKinds.has(req.kind)) return `${recipe.id} asks for ${req.kind}, which the town has no word for`
+      if (!vocab.itemKinds.has(req.kind))
+        return `${recipe.id} asks for ${req.kind}, which the town has no word for`
     }
     for (const cost of recipe.costs) {
-      if (!vocab.itemKinds.has(cost.kind)) return `${recipe.id} spends ${cost.kind}, which the town has no word for`
+      if (!vocab.itemKinds.has(cost.kind))
+        return `${recipe.id} spends ${cost.kind}, which the town has no word for`
     }
   }
   if (vocab.structureKinds !== undefined) {
     for (const req of recipe.requires) {
       if (req.type !== 'adjacent_structure') continue
-      if (!vocab.structureKinds.has(req.kind)) return `${recipe.id} wants a ${req.kind}, which the town does not build`
+      if (!vocab.structureKinds.has(req.kind))
+        return `${recipe.id} wants a ${req.kind}, which the town does not build`
     }
   }
   // A rule that asks for ground nobody in sight can point at: the live run required sand for
@@ -109,13 +131,15 @@ export function recipeSanityRefusal(recipe: Recipe, vocab: RecipeVocabulary = {}
   if (vocab.tileKinds !== undefined) {
     for (const req of recipe.requires) {
       if (req.type !== 'adjacent_tile') continue
-      if (!vocab.tileKinds.has(req.tile)) return `${recipe.id} wants ${req.tile} ground, and none lies within sight`
+      if (!vocab.tileKinds.has(req.tile))
+        return `${recipe.id} wants ${req.tile} ground, and none lies within sight`
     }
   }
 
   for (const product of productsOf(recipe)) {
     for (const known of vocab.knownProducts ?? []) {
-      if (nearDuplicate(product, known)) return `${recipe.id} makes ${product}, and the town already makes ${known}`
+      if (nearDuplicate(product, known))
+        return `${recipe.id} makes ${product}, and the town already makes ${known}`
     }
   }
   for (const known of vocab.knownRecipeIds ?? []) {

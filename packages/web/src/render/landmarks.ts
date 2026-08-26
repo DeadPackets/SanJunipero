@@ -18,7 +18,11 @@ import { LANDMARK_EDGE, LANDMARK_INK, LANDMARK_PLATE } from './legibility.js'
 export type Footprint = { x: number; y: number; w: number; h: number }
 
 export type Landmark = {
-  id: string; name: string; x: number; y: number; rank: 1 | 2 | 3
+  id: string
+  name: string
+  x: number
+  y: number
+  rank: 1 | 2 | 3
   /** Every footprint this name speaks about, so the layer can keep the plate off them. A name
    *  that does not know what it names cannot be kept from hiding it. */
   of: readonly Footprint[]
@@ -26,37 +30,65 @@ export type Landmark = {
 
 /** Every kind the town can stand, dev fixture included. A new kind with no rank is a type error. */
 export const TOWN_KINDS = [
-  'house', 'cottage', 'farmhouse', 'cabin',
-  'storehouse', 'shed', 'well', 'fire_pit', 'wagon', 'standing_stone', 'scaffolding',
+  'house',
+  'cottage',
+  'farmhouse',
+  'cabin',
+  'storehouse',
+  'shed',
+  'well',
+  'fire_pit',
+  'wagon',
+  'standing_stone',
+  'scaffolding',
 ] as const
 export type TownKind = (typeof TOWN_KINDS)[number]
 
 /** A building's visual weight: 1 reads heaviest. Public buildings outrank dwellings, so the
  *  eye lands on the civic centre first. Applied as a rim and a ledge, never as a tint. */
 export const SILHOUETTE_RANK: Record<TownKind, 1 | 2 | 3> = {
-  fire_pit: 1, well: 1, storehouse: 1, standing_stone: 1,
+  fire_pit: 1,
+  well: 1,
+  storehouse: 1,
+  standing_stone: 1,
   // The farmhouse is the biggest roof outside the square and the anchor of its own district,
   // so it reads a rung above the houses without joining the civic centre.
-  farmhouse: 2, shed: 2, wagon: 2,
-  house: 3, cottage: 3, cabin: 3, scaffolding: 3,
+  farmhouse: 2,
+  shed: 2,
+  wagon: 2,
+  house: 3,
+  cottage: 3,
+  cabin: 3,
+  scaffolding: 3,
 }
 
 // Which part of town a kind belongs to. The viewer does not know the template's anchor, so a
 // district is read from what is standing rather than from a rectangle in template space.
 const DISTRICT_OF_KIND: Partial<Record<TownKind, string>> = {
-  house: 'houses', cottage: 'houses', cabin: 'houses',
-  well: 'square', fire_pit: 'square', storehouse: 'square',
-  farmhouse: 'fields', shed: 'fields', wagon: 'landing',
+  house: 'houses',
+  cottage: 'houses',
+  cabin: 'houses',
+  well: 'square',
+  fire_pit: 'square',
+  storehouse: 'square',
+  farmhouse: 'fields',
+  shed: 'fields',
+  wagon: 'landing',
 }
 const DISTRICT_NAME: Record<string, string> = {
-  houses: 'the houses', square: 'the square', fields: 'the fields', landing: 'the landing',
+  houses: 'the houses',
+  square: 'the square',
+  fields: 'the fields',
+  landing: 'the landing',
 }
 const DISTRICT_ORDER = ['houses', 'square', 'fields', 'landing']
 
 // A notable single building gets its own name; a house does not, because five of them do not
 // each deserve a label at map scale.
 const SINGLE_NAME: Partial<Record<TownKind, string>> = {
-  fire_pit: 'the fire pit', well: 'the well', storehouse: 'the storehouse',
+  fire_pit: 'the fire pit',
+  well: 'the well',
+  storehouse: 'the storehouse',
 }
 
 /**
@@ -72,14 +104,17 @@ const LANDMARK_FULL_BELOW_SCALE = 0.75
 export const LANDMARK_LABEL_PX = faceFor('label').size
 
 export function landmarkAlpha(scale: number): number {
-  const inward = (LANDMARK_SHOW_BELOW_SCALE - scale) / (LANDMARK_SHOW_BELOW_SCALE - LANDMARK_FULL_BELOW_SCALE)
+  const inward =
+    (LANDMARK_SHOW_BELOW_SCALE - scale) / (LANDMARK_SHOW_BELOW_SCALE - LANDMARK_FULL_BELOW_SCALE)
   return Math.min(1, Math.max(0, inward))
 }
 
 type Standing = { id: string; kind: string; x: number; y: number; w: number; h: number }
 
-const centreOf = (s: Standing): { x: number; y: number } =>
-  ({ x: s.x + ((s.w - 1) >> 1), y: s.y + ((s.h - 1) >> 1) })
+const centreOf = (s: Standing): { x: number; y: number } => ({
+  x: s.x + ((s.w - 1) >> 1),
+  y: s.y + ((s.h - 1) >> 1),
+})
 
 /** The settlement as it stands, in one order. The legend and its size rule read the same list,
  *  so the names and the map they are measured against can never be two different towns. */
@@ -90,8 +125,12 @@ export function standingOf(state: WorldState | null): Standing[] {
 }
 
 /** A `CameraBounds` as the `Rect` every placement rule in the product speaks. */
-export const rectOfBounds = (b: CameraBounds): Rect =>
-  ({ x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY })
+export const rectOfBounds = (b: CameraBounds): Rect => ({
+  x: b.minX,
+  y: b.minY,
+  w: b.maxX - b.minX,
+  h: b.maxY - b.minY,
+})
 
 /** Derived from what is standing, never authored twice. rank 1 = the centre, 2 = a district
  *  anchor, 3 = a notable single building. Sorted by rank then id, so two calls agree. */
@@ -106,9 +145,10 @@ export function landmarksOf(state: WorldState): Landmark[] {
     const kind = s.kind as TownKind
     // The fire pit is the one thing a town gathers around, so it is the centre and the only
     // rank 1. The other named singles are landmarks you navigate by, not the middle.
-    if (kind === 'fire_pit') out.push({ id: s.id, name: SINGLE_NAME[kind]!, x: s.x, y: s.y, rank: 1, of: [boxOf(s)] })
+    if (kind === 'fire_pit')
+      out.push({ id: s.id, name: SINGLE_NAME[kind]!, x: s.x, y: s.y, rank: 1, of: [boxOf(s)] })
     else if (SINGLE_NAME[kind] !== undefined)
-      out.push({ id: s.id, name: SINGLE_NAME[kind]!, x: s.x, y: s.y, rank: 3, of: [boxOf(s)] })
+      out.push({ id: s.id, name: SINGLE_NAME[kind], x: s.x, y: s.y, rank: 3, of: [boxOf(s)] })
   }
 
   for (const district of DISTRICT_ORDER) {
@@ -134,7 +174,8 @@ export function landmarksOf(state: WorldState): Landmark[] {
 // the dev ESM graph threw "Export 'LANDMARK_EDGE' is not defined in module", which blanked
 // every place name on screen. A re-export names its source.
 export { LANDMARK_EDGE, LANDMARK_INK, LANDMARK_PLATE } from './legibility.js'
-export const LANDMARK_PAD_X = 5, LANDMARK_PAD_Y = 3
+export const LANDMARK_PAD_X = 5,
+  LANDMARK_PAD_Y = 3
 
 /** Which name matters, said in SIZE and PAPER rather than in transparency — two channels a
  *  viewer can see and a test can measure. Both papers clear AA under the night multiply. */
@@ -169,9 +210,11 @@ export type PlaceableMark = {
 /** The extent of what a name is for. Its leash is measured from here, so a district's caption
  *  may sit anywhere along the district and a single building's may not wander. */
 const extentOf = (of: readonly Rect[]): Rect => {
-  const x = Math.min(...of.map((r) => r.x)), y = Math.min(...of.map((r) => r.y))
+  const x = Math.min(...of.map((r) => r.x)),
+    y = Math.min(...of.map((r) => r.y))
   return {
-    x, y,
+    x,
+    y,
     w: Math.max(...of.map((r) => r.x + r.w)) - x,
     h: Math.max(...of.map((r) => r.y + r.h)) - y,
   }
@@ -193,15 +236,18 @@ export const leashOf = (of: readonly Rect[], size: { w: number; h: number }): Re
 export function placeLandmarks(
   marks: readonly PlaceableMark[],
   view: Rect,
-): Array<{ id: string; sx: number; sy: number; rect: Rect }> {
+): { id: string; sx: number; sy: number; rect: Rect }[] {
   const m0 = LANDMARK_CULL_MARGIN_PX
   const places = marks.flatMap((m) => m.of)
   const taken: Rect[] = []
-  const out: Array<{ id: string; sx: number; sy: number; rect: Rect }> = []
+  const out: { id: string; sx: number; sy: number; rect: Rect }[] = []
   for (const m of marks) {
     if (m.sx < view.x - m0 || m.sx > view.x + view.w + m0) continue
     if (m.sy < view.y - m0 || m.sy > view.y + view.h + m0) continue
-    const at = placeTag({ sx: m.sx, sy: m.sy, halfW: m.size.w / 2, topY: m.sy }, m.size, view, [...places, ...taken])
+    const at = placeTag({ sx: m.sx, sy: m.sy, halfW: m.size.w / 2, topY: m.sy }, m.size, view, [
+      ...places,
+      ...taken,
+    ])
     const rect = { x: at.sx - m.size.w / 2, y: at.sy, w: m.size.w, h: m.size.h }
     if (places.some((p) => hits(rect, p)) || taken.some((t) => hits(rect, t))) continue
     if (!hits(rect, leashOf(m.of, m.size))) continue
@@ -259,7 +305,9 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
         // createWorldLabel, never `new BitmapText`: a bitmap glyph with no installed font
         // blanks the entire canvas, so the choice is made once from the font cache.
         const label = createWorldLabel(m.name, {
-          fontFamily: faceFor('label').family, fontSize: style.size, fill: LANDMARK_INK,
+          fontFamily: faceFor('label').family,
+          fontSize: style.size,
+          fill: LANDMARK_INK,
         })
         label.anchor.set(0.5, 0)
         label.eventMode = 'none'
@@ -271,7 +319,8 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
       if (t.label.text !== m.name) t.label.text = m.name
       if (t.drawn !== m.name) {
         t.drawn = m.name
-        const w = t.label.width + LANDMARK_PAD_X * 2, h = t.label.height + LANDMARK_PAD_Y * 2
+        const w = t.label.width + LANDMARK_PAD_X * 2,
+          h = t.label.height + LANDMARK_PAD_Y * 2
         t.plate.clear()
         t.plate.rect(-w / 2, -LANDMARK_PAD_Y, w, h)
         t.plate.fill(style.plate)
@@ -280,8 +329,13 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
       t.node.scale.set(inv)
       const { sx, sy } = tileToScreen(m.x, m.y)
       wanted.push({
-        id: m.id, sx, sy,
-        size: { w: (t.label.width + LANDMARK_PAD_X * 2) * inv, h: (t.label.height + LANDMARK_PAD_Y * 2) * inv },
+        id: m.id,
+        sx,
+        sy,
+        size: {
+          w: (t.label.width + LANDMARK_PAD_X * 2) * inv,
+          h: (t.label.height + LANDMARK_PAD_Y * 2) * inv,
+        },
         // The same drawn box the camera fits and the cull tests, one per building, so the
         // legend and the picture cannot disagree about where a building is.
         of: m.of.map((f) => rectOfBounds(drawnBoundsOf([f]))),

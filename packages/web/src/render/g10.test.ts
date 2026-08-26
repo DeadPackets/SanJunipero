@@ -1,15 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CITY_H, CITY_W, DEFAULT_CONFIG, ROAD_AUTOTILE_KEYS, T_PATH, T_ROAD, TERRAIN_TILE_KINDS,
-  makeCityTemplate, roadAutotile, roadAutotileKind,
-  type AssetRecord, type TerrainTileKind,
+  CITY_H,
+  CITY_W,
+  DEFAULT_CONFIG,
+  ROAD_AUTOTILE_KEYS,
+  T_PATH,
+  T_ROAD,
+  TERRAIN_TILE_KINDS,
+  makeCityTemplate,
+  roadAutotile,
+  roadAutotileKind,
+  type AssetRecord,
+  type TerrainTileKind,
 } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '@sj/engine/state'
 import { tilesetPlan } from './ground.js'
 import { ROAD_TILE_ID, TERRAIN_VARIANTS, roadNeighborsAt, tileVariant } from './tileset.js'
 import {
-  INTERIOR_FADE_MS, INTERIOR_LAYOUTS, advanceInterior, bedSlots, interiorOf, interiorTransition,
-  roomFurnishings, roomPlan,
+  INTERIOR_FADE_MS,
+  INTERIOR_LAYOUTS,
+  advanceInterior,
+  bedSlots,
+  interiorOf,
+  interiorTransition,
+  roomFurnishings,
+  roomPlan,
 } from './interiors.js'
 
 // The renderer side. A gateway test cannot import `tilesetPlan` or `interiorOf` without
@@ -18,7 +33,9 @@ import {
 // ── the showcase terrain, rasterised here from the same C13 template the gateway uses ──
 function showcaseTerrain(): TileId[][] {
   const t = makeCityTemplate({ x: 0, y: 0 })
-  const grid: TileId[][] = Array.from({ length: CITY_H }, () => Array.from({ length: CITY_W }, () => 0 as TileId))
+  const grid: TileId[][] = Array.from({ length: CITY_H }, () =>
+    Array.from({ length: CITY_W }, () => 0),
+  )
   for (const tile of t.tiles) {
     if (tile.dx < 0 || tile.dy < 0 || tile.dx >= CITY_W || tile.dy >= CITY_H) continue
     // T_PATH (8) does not exist in the engine yet — a path rasterises as road
@@ -26,15 +43,26 @@ function showcaseTerrain(): TileId[][] {
   }
   // The town's three-tile streets meet on a lattice and resolve to nine of the fifteen autotile
   // shapes, so a straight run and a dead end are drawn here to exercise the whole strip.
-  for (let y = 2; y <= 6; y++) grid[y]![13] = T_ROAD as TileId       // straight-ns, cap-n, cap-s
-  for (let x = 12; x <= 16; x++) grid[10]![x] = T_ROAD as TileId     // straight-ew, cap-e, cap-w
+  for (let y = 2; y <= 6; y++) grid[y]![13] = T_ROAD // straight-ns, cap-n, cap-s
+  for (let x = 12; x <= 16; x++) grid[10]![x] = T_ROAD // straight-ew, cap-e, cap-w
   return grid
 }
 
 const record = (kind: string, meta: string | null, seq = 1): AssetRecord => ({
-  id: `rec-${kind}-${seq}`, seq, class: 'terrain', kind, status: 'ready',
-  desc: kind, meta, footprint: { w: 1, h: 1 }, widthPx: 32, heightPx: 16,
-  score: 10, attempts: 1, costUsd: 0, createdAt: '2026-08-17T00:00:00Z',
+  id: `rec-${kind}-${seq}`,
+  seq,
+  class: 'terrain',
+  kind,
+  status: 'ready',
+  desc: kind,
+  meta,
+  footprint: { w: 1, h: 1 },
+  widthPx: 32,
+  heightPx: 16,
+  score: 10,
+  attempts: 1,
+  costUsd: 0,
+  createdAt: '2026-08-17T00:00:00Z',
 })
 
 const terrainManifest = (kind: TerrainTileKind, variant: number): string =>
@@ -45,7 +73,8 @@ function fullCodex(): AssetRecord[] {
   let seq = 0
   const out: AssetRecord[] = []
   for (const kind of TERRAIN_TILE_KINDS) {
-    for (let v = 0; v < TERRAIN_VARIANTS; v++) out.push(record(kind, terrainManifest(kind, v), ++seq))
+    for (let v = 0; v < TERRAIN_VARIANTS; v++)
+      out.push(record(kind, terrainManifest(kind, v), ++seq))
   }
   for (const key of ROAD_AUTOTILE_KEYS) {
     out.push(record(roadAutotileKind(key), terrainManifest('road', 0), ++seq))
@@ -118,7 +147,11 @@ describe('GATE G10 — 1. tileset over the showcase terrain', () => {
       for (let x = 0; x < terrain[y]!.length; x++) {
         if (terrain[y]![x] !== ROAD_TILE_ID) continue
         expect(plan[y * CITY_W + x]!.tex).toEqual({
-          version: 'v1-terrain-tile', kind: 'road', variant: tileVariant(x, y), wPx: 32, hPx: 16,
+          version: 'v1-terrain-tile',
+          kind: 'road',
+          variant: tileVariant(x, y),
+          wPx: 32,
+          hPx: 16,
         })
         checked++
       }
@@ -135,10 +168,22 @@ describe('GATE G10 — 1. tileset over the showcase terrain', () => {
 function c9Fixture(): WorldState {
   const s = genesisState(DEFAULT_CONFIG)
   const body = (id: string, over: Partial<WorldState['agents'][string]>) => ({
-    id, name: id, x: 2, y: 2, alive: true, asleep: false,
+    id,
+    name: id,
+    x: 2,
+    y: 2,
+    alive: true,
+    asleep: false,
     needs: { hunger: 1, energy: 1, warmth: 1, social: 1 },
-    hp: 10, injuries: [], ill: false, ageDays: 7300, skills: {}, activity: null,
-    collapsedSinceTick: null, zeroHungerSinceTick: null, ...over,
+    hp: 10,
+    injuries: [],
+    ill: false,
+    ageDays: 7300,
+    skills: {},
+    activity: null,
+    collapsedSinceTick: null,
+    zeroHungerSinceTick: null,
+    ...over,
   })
   return {
     ...s,
@@ -149,14 +194,37 @@ function c9Fixture(): WorldState {
     },
     structures: {
       house1: {
-        id: 'house1', kind: 'house', x: 2, y: 2, w: 2, h: 2, hp: 50, maxHp: 50, flammable: true,
-        stage: 'complete', progressTicks: 0, builtBy: 'yusuf', burning: false, burnTicks: 0,
+        id: 'house1',
+        kind: 'house',
+        x: 2,
+        y: 2,
+        w: 2,
+        h: 2,
+        hp: 50,
+        maxHp: 50,
+        flammable: true,
+        stage: 'complete',
+        progressTicks: 0,
+        builtBy: 'yusuf',
+        burning: false,
+        burnTicks: 0,
         owner: 'amara',
       },
       stone: {
-        id: 'stone', kind: 'standing_stone', x: 8, y: 8, w: 1, h: 1, hp: 50, maxHp: 50,
-        flammable: false, stage: 'complete', progressTicks: 0, builtBy: null,
-        burning: false, burnTicks: 0,
+        id: 'stone',
+        kind: 'standing_stone',
+        x: 8,
+        y: 8,
+        w: 1,
+        h: 1,
+        hp: 50,
+        maxHp: 50,
+        flammable: false,
+        stage: 'complete',
+        progressTicks: 0,
+        builtBy: null,
+        burning: false,
+        burnTicks: 0,
       },
     },
     items: { i1: { id: 'i1', kind: 'bread', qty: 2, loc: { t: 'structure', id: 'house1' } } },
@@ -175,14 +243,14 @@ describe('GATE G10 — 4. interior purity', () => {
     expect(interiorOf(state, 'stone')).toBeNull()
     // reading the room did not touch the state it read
     expect(interiorOf(state, 'house1')).toEqual(room)
-    expect(state.agents['amara']!.insideId).toBe('house1')
+    expect(state.agents.amara!.insideId).toBe('house1')
   })
 
-  it('furnishes the room from the C13 template and keeps the plan\'s minimum intact', () => {
+  it("furnishes the room from the C13 template and keeps the plan's minimum intact", () => {
     expect(INTERIOR_LAYOUTS.house.map((f) => f.kind)).toEqual(['bed', 'hearth', 'table'])
     const kinds = roomFurnishings('house').map((f) => f.kind)
     for (const must of ['bed', 'hearth', 'table']) expect(kinds).toContain(must)
-    expect(roomPlan('house', []).every((p) => p.url === null)).toBe(true)   // art independence
+    expect(roomPlan('house', []).every((p) => p.url === null)).toBe(true) // art independence
   })
 
   it('lays both sleepers on the bed at distinct cells, and nobody in a bedless room', () => {
@@ -190,7 +258,7 @@ describe('GATE G10 — 4. interior purity', () => {
     const sleeping = room.occupants.filter((id) => state.agents[id]!.asleep)
     const slots = bedSlots(room.kind, sleeping)
     expect(Object.keys(slots)).toEqual(['amara', 'yusuf'])
-    expect(slots['amara']).not.toEqual(slots['yusuf'])
+    expect(slots.amara).not.toEqual(slots.yusuf)
     expect(bedSlots('shed', sleeping)).toEqual({})
     expect(bedSlots('storehouse', sleeping)).toEqual({})
   })

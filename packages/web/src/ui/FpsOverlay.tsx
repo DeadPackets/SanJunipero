@@ -14,7 +14,9 @@ export function FpsOverlay() {
       if (e.key === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) setVisible((v) => !v)
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+    }
   }, [])
 
   useEffect(() => {
@@ -22,7 +24,7 @@ export function FpsOverlay() {
     let raf = 0
     let frames = 0
     let windowStart = performance.now()
-    const samples: Array<{ t: number; fps: number }> = []
+    const samples: { t: number; fps: number }[] = []
     const step = (t: number): void => {
       frames++
       if (t - windowStart >= FPS_SAMPLE_MS) {
@@ -37,7 +39,9 @@ export function FpsOverlay() {
       raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(raf)
+    }
   }, [visible])
 
   if (!visible) return null

@@ -60,13 +60,18 @@ describe('the scene owns its clock', () => {
 
   it('goes quiet once the scene is closed, so a late effect cannot reach a destroyed app', () => {
     const calls: string[] = []
-    const app: { ticker: { start(): void; stop(): void } | null } =
-      { ticker: { start: () => calls.push('start'), stop: () => calls.push('stop') } }
+    const app: { ticker: { start(): void; stop(): void } | null } = {
+      ticker: { start: () => calls.push('start'), stop: () => calls.push('stop') },
+    }
     const clock = sceneClock(app)
     clock.close()
-    app.ticker = null                       // exactly what Application.destroy() does
-    expect(() => clock.set(true)).not.toThrow()
-    expect(() => clock.set(false)).not.toThrow()
+    app.ticker = null // exactly what Application.destroy() does
+    expect(() => {
+      clock.set(true)
+    }).not.toThrow()
+    expect(() => {
+      clock.set(false)
+    }).not.toThrow()
     expect(calls).toEqual([])
   })
 })
@@ -132,7 +137,10 @@ describe('a glide is ended by anything that says where the camera should be', ()
   })
 
   for (const mover of [
-    'function fitTo(', 'panBy: (dx, dy) =>', 'centerHome: () =>', 'setFollow: (target) =>',
+    'function fitTo(',
+    'panBy: (dx, dy) =>',
+    'centerHome: () =>',
+    'setFollow: (target) =>',
     'travelTo: (sx, sy) =>',
   ]) {
     it(`${mover.replace(/[(:].*/, '')} stops it`, () => {
@@ -157,8 +165,11 @@ describe('a glide is ended by anything that says where the camera should be', ()
   it('★ and the stage hit area survives, because the camera is standing on it', () => {
     // CODE, not the file: the comment above the handler quotes this very line, and a guard
     // that reads its own explanation is satisfied by the explanation. Caught by mutation.
-    const code = src.split('\n').map((l) => l.trim())
-      .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*')).join('\n')
+    const code = src
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
+      .join('\n')
     expect(code).toContain('app.stage.hitArea = app.screen')
     for (const gesture of ['pointerdown', 'pointermove', 'pointerup']) {
       expect(code, gesture).toContain(`app.stage.on('${gesture}'`)
@@ -199,7 +210,9 @@ describe('★ the wheel gesture is released on the frame, so the resting frame s
     const wheel = body('const onWheel =')
     // guarded by the gesture test, not fired unconditionally: re-pinning on every event makes
     // the town swim under the cursor instead of growing beneath it
-    expect(wheel).toMatch(/if \(zoom\.live === null \|\| now - zoom\.lastWheelMs > WHEEL_GESTURE_GAP_MS\)/)
+    expect(wheel).toMatch(
+      /if \(zoom\.live === null \|\| now - zoom\.lastWheelMs > WHEEL_GESTURE_GAP_MS\)/,
+    )
     expect(wheel.indexOf('captureAnchor')).toBeGreaterThan(wheel.indexOf('zoom.live === null'))
   })
 
@@ -223,11 +236,18 @@ describe('going somewhere from the map takes the same road as going home', () =>
 
   it('★ the reader stops at the end of the function it was asked for', () => {
     const fake = [
-      'const a = () => {', '  first()', '}', 'const b = () => {', '  second()', '}', '',
+      'const a = () => {',
+      '  first()',
+      '}',
+      'const b = () => {',
+      '  second()',
+      '}',
+      '',
     ].join('\n  ')
     expect(functionBody(`  ${fake}`, 'const a =')).toContain('first()')
-    expect(functionBody(`  ${fake}`, 'const a ='), 'read into the next function')
-      .not.toContain('second()')
+    expect(functionBody(`  ${fake}`, 'const a ='), 'read into the next function').not.toContain(
+      'second()',
+    )
   })
 
   it('★ does the same four things, in the same order, as centerHome', () => {

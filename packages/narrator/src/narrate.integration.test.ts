@@ -19,24 +19,23 @@ const memStore = (): NarratorStore => {
 
 // The scripted NarratorLlm (no OpenRouter): summarizeChapter cites one dangling
 // 9999 so the render-layer hallucination guard is exercised at the gate.
-const gateLlm = (chapterCitations: number[]): NarratorLlm =>
-  ({
-    summarizeChapter: vi.fn(async () => ({
-      title: 'The Quarrel at the Wall',
-      text: 'Omar and Yusuf traded hard words at the wall, and by evening a first gift changed hands.',
-      citations: chapterCitations,
-    })),
-    summarizeEra: vi.fn(async () => ({
-      title: 'The First Days',
-      text: 'A week that opened with quarrels and closed with a gift.',
-      citations: [],
-    })),
-    newspaperCopy: vi.fn(),
-    biography: vi.fn(async () => ({
-      title: 'Omar of the Wall',
-      body: 'Omar was heard at the wall by midday and seen to give before nightfall.',
-    })),
-  }) as unknown as NarratorLlm
+const gateLlm = (chapterCitations: number[]): NarratorLlm => ({
+  summarizeChapter: vi.fn(async () => ({
+    title: 'The Quarrel at the Wall',
+    text: 'Omar and Yusuf traded hard words at the wall, and by evening a first gift changed hands.',
+    citations: chapterCitations,
+  })),
+  summarizeEra: vi.fn(async () => ({
+    title: 'The First Days',
+    text: 'A week that opened with quarrels and closed with a gift.',
+    citations: [],
+  })),
+  newspaperCopy: vi.fn(),
+  biography: vi.fn(async () => ({
+    title: 'Omar of the Wall',
+    body: 'Omar was heard at the wall by midday and seen to give before nightfall.',
+  })),
+})
 
 describe('GATE G7 — recorded eventful day replays to a verified chronicle', () => {
   const store = memStore()
@@ -45,7 +44,7 @@ describe('GATE G7 — recorded eventful day replays to a verified chronicle', ()
   let chapter: ChapterRow
   let heat: HeatScores[]
   let milestones: Milestone[]
-  let scenes: Array<SceneSegment & { id: number }>
+  let scenes: (SceneSegment & { id: number })[]
 
   beforeAll(async () => {
     const out = await narrateDay({
@@ -124,18 +123,42 @@ describe('GATE G7 — recorded eventful day replays to a verified chronicle', ()
   })
 
   it('5. framing: every persisted chapter/era/newspaper/biography/caption string is framing-free', async () => {
-    await narrateWeek({ store, llm: gateLlm([]), days: [chapter], validEventIds: EVENTFUL_DAY.map((e) => e.seq) })
+    await narrateWeek({
+      store,
+      llm: gateLlm([]),
+      days: [chapter],
+      validEventIds: EVENTFUL_DAY.map((e) => e.seq),
+    })
 
     const paper = renderNewspaper(0, chapter, heat, milestones, scenes)
-    store.insertPublication({ day: 0, kind: 'newspaper', title: paper.headline, body: paper.body, citations: paper.citations })
+    store.insertPublication({
+      day: 0,
+      kind: 'newspaper',
+      title: paper.headline,
+      body: paper.body,
+      citations: paper.citations,
+    })
 
     const world = openDb(':memory:')
     const ins = world.prepare('INSERT INTO events (seq, tick, type, payload) VALUES (?, ?, ?, ?)')
     for (const e of EVENTFUL_DAY) ins.run(e.seq, e.tick, e.type, JSON.stringify(e.payload))
-    await writeBiography({ store, llm: gateLlm([]), world, agentId: 'omar', name: 'Omar', throughDay: 0 })
+    await writeBiography({
+      store,
+      llm: gateLlm([]),
+      world,
+      agentId: 'omar',
+      name: 'Omar',
+      throughDay: 0,
+    })
 
     for (const c of timelapseCaptions(store.chaptersInRange(0, 3))) {
-      store.insertPublication({ day: c.day, kind: 'timelapse_caption', title: `Day ${c.day}`, body: c.caption, citations: [] })
+      store.insertPublication({
+        day: c.day,
+        kind: 'timelapse_caption',
+        title: `Day ${c.day}`,
+        body: c.caption,
+        citations: [],
+      })
     }
 
     const strings: string[] = []

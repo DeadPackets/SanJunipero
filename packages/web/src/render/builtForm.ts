@@ -6,20 +6,20 @@ import { TILE_H, TILE_W } from './iso.js'
 
 /** The footprint diamond in the sprite's LOCAL space, origin at the centre tile's top vertex — the one ground shape both the hit area and the built form are cut from. */
 export function footprintDiamond(w: number, h: number): number[] {
-  const corners: ReadonlyArray<readonly [number, number]> = [
-    [0.5 - w / 2, 0.5 - h / 2],   // north
-    [w / 2 + 0.5, 0.5 - h / 2],   // east
-    [w / 2 + 0.5, h / 2 + 0.5],   // south
-    [0.5 - w / 2, h / 2 + 0.5],   // west
+  const corners: readonly (readonly [number, number])[] = [
+    [0.5 - w / 2, 0.5 - h / 2], // north
+    [w / 2 + 0.5, 0.5 - h / 2], // east
+    [w / 2 + 0.5, h / 2 + 0.5], // south
+    [0.5 - w / 2, h / 2 + 0.5], // west
   ]
   return corners.flatMap(([dx, dy]) => [(dx - dy) * (TILE_W / 2), (dx + dy) * (TILE_H / 2)])
 }
 
 /** One MASTER_PALETTE ramp per material, lit from above: top catches the light, south-east holds mid tone, south-west falls away, plinth is the ground contact. */
 export const BUILT_FORM_RAMPS = {
-  stone:  { top: 0xe9e2da, right: 0xaba198, left: 0x857d75, plinth: 0x5d5751 },
+  stone: { top: 0xe9e2da, right: 0xaba198, left: 0x857d75, plinth: 0x5d5751 },
   timber: { top: 0xe0a95e, right: 0xa66e38, left: 0x7e512b, plinth: 0x5d5751 },
-  clay:   { top: 0xf5d3b3, right: 0xd9a876, left: 0x9c6b47, plinth: 0x5d5751 },
+  clay: { top: 0xf5d3b3, right: 0xd9a876, left: 0x9c6b47, plinth: 0x5d5751 },
 } as const
 export type RampName = keyof typeof BUILT_FORM_RAMPS
 const RAMP_NAMES = Object.keys(BUILT_FORM_RAMPS) as RampName[]
@@ -27,16 +27,28 @@ const RAMP_NAMES = Object.keys(BUILT_FORM_RAMPS) as RampName[]
 /** What a kind is made of. Anything unnamed is hashed onto a ramp, so an unknown kind is
  *  still consistent with itself across frames and across sessions. */
 export const BUILT_FORM_MATERIALS: Readonly<Record<string, RampName>> = {
-  well: 'stone', fire_pit: 'stone', standing_stone: 'stone', grave: 'stone',
-  wagon: 'timber', scaffolding: 'timber', bridge: 'timber', shed: 'timber',
+  well: 'stone',
+  fire_pit: 'stone',
+  standing_stone: 'stone',
+  grave: 'stone',
+  wagon: 'timber',
+  scaffolding: 'timber',
+  bridge: 'timber',
+  shed: 'timber',
   cabin: 'timber',
-  house: 'clay', cottage: 'clay', farmhouse: 'clay', storehouse: 'clay',
+  house: 'clay',
+  cottage: 'clay',
+  farmhouse: 'clay',
+  storehouse: 'clay',
 }
 
 /** The one mark that says a person made this and meant it: water in the well's mouth, embers
  *  in the fire pit, a honey step on everything else. */
 export const BUILT_FORM_ACCENTS: Readonly<Record<string, number>> = {
-  well: 0x7fb0c9, fire_pit: 0xf7a66b, standing_stone: 0x8a6fa8, grave: 0x5d5751,
+  well: 0x7fb0c9,
+  fire_pit: 0xf7a66b,
+  standing_stone: 0x8a6fa8,
+  grave: 0x5d5751,
   default: 0xe0a95e,
 }
 
@@ -50,11 +62,18 @@ export const BUILT_FORM_UNIT_PX = TILE_W
 /** How tall each kind stands, in tiles. A well is waist-high and a fire pit is a ring of
  *  stones; nothing here may read as a house that happens to be grey. */
 export const BUILT_FORM_HEIGHT_TILES: Readonly<Record<string, number>> = {
-  fire_pit: 0.4, well: 0.6, grave: 0.45, wagon: 0.65,
-  standing_stone: 1.1, scaffolding: 1.0, bridge: 0.35,
+  fire_pit: 0.4,
+  well: 0.6,
+  grave: 0.45,
+  wagon: 0.65,
+  standing_stone: 1.1,
+  scaffolding: 1.0,
+  bridge: 0.35,
   // The dwellings differ in height as well as width, so the farmhouse's wide low roof does not
   // read as a house that is merely nearer.
-  cabin: 0.85, cottage: 1.05, farmhouse: 0.95,
+  cabin: 0.85,
+  cottage: 1.05,
+  farmhouse: 0.95,
 }
 export const BUILT_FORM_DEFAULT_HEIGHT_TILES = 0.9
 
@@ -102,8 +121,10 @@ function raise(poly: number[], dy: number): number[] {
 const pt = (poly: number[], i: number): [number, number] => [poly[i * 2]!, poly[i * 2 + 1]!]
 
 export function builtFormSpec(kind: string, w: number, h: number): BuiltForm {
-  const ramp = BUILT_FORM_RAMPS[BUILT_FORM_MATERIALS[kind] ?? RAMP_NAMES[hashKind(kind) % RAMP_NAMES.length]!]
-  const heightPx = (BUILT_FORM_HEIGHT_TILES[kind] ?? BUILT_FORM_DEFAULT_HEIGHT_TILES) * BUILT_FORM_UNIT_PX
+  const ramp =
+    BUILT_FORM_RAMPS[BUILT_FORM_MATERIALS[kind] ?? RAMP_NAMES[hashKind(kind) % RAMP_NAMES.length]!]
+  const heightPx =
+    (BUILT_FORM_HEIGHT_TILES[kind] ?? BUILT_FORM_DEFAULT_HEIGHT_TILES) * BUILT_FORM_UNIT_PX
 
   const ground = inset(w, h, BUILT_FORM_INSET_TILES)
   const top = raise(ground, -heightPx)
@@ -116,12 +137,12 @@ export function builtFormSpec(kind: string, w: number, h: number): BuiltForm {
     heightPx,
     plinth: { poly: footprintDiamond(w, h), color: ramp.plinth },
     faces: [
-      { poly: [...gW!, ...gS!, ...tS!, ...tW!], color: ramp.left },
-      { poly: [...gS!, ...gE!, ...tE!, ...tS!], color: ramp.right },
+      { poly: [...gW, ...gS, ...tS, ...tW], color: ramp.left },
+      { poly: [...gS, ...gE, ...tE, ...tS], color: ramp.right },
       { poly: top, color: ramp.top },
     ],
-    silhouette: [...gW!, ...gS!, ...gE!, ...tE!, ...tN!, ...tW!],
-    nearEdge: [gS![0], gS![1], tS![0], tS![1]],
+    silhouette: [...gW, ...gS, ...gE, ...tE, ...tN, ...tW],
+    nearEdge: [gS[0], gS[1], tS[0], tS[1]],
     accent: {
       poly: raise(inset(w, h, BUILT_FORM_ACCENT_INSET_TILES), -heightPx),
       color: BUILT_FORM_ACCENTS[kind] ?? BUILT_FORM_ACCENTS.default!,

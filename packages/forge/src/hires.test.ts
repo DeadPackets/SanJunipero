@@ -4,18 +4,33 @@ import { paletteRgb } from './palette.js'
 import { opaqueBbox } from './sheet.js'
 import { STRIP_POSES_V4, deriveSheet, CELL_NAMES_V4, type AuthoredSet } from './mirror.js'
 import {
-  HIRES_MARGIN, trimToFigure, normalizeFigureHeight, cellAnchor, buildManifestV4,
+  HIRES_MARGIN,
+  trimToFigure,
+  normalizeFigureHeight,
+  cellAnchor,
+  buildManifestV4,
   processHiResCell,
 } from './hires.js'
 
 // Solid-color rectangle figure at (x0,y0)-(x1,y1) on a transparent w×h canvas.
-function rect(w: number, h: number, x0: number, y0: number, x1: number, y1: number,
-  rgb: [number, number, number] = [147, 181, 115]): RawImage {
+function rect(
+  w: number,
+  h: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  rgb: [number, number, number] = [147, 181, 115],
+): RawImage {
   const data = new Uint8ClampedArray(w * h * 4)
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-    const i = (y * w + x) * 4
-    data[i] = rgb[0]; data[i + 1] = rgb[1]; data[i + 2] = rgb[2]; data[i + 3] = 255
-  }
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++) {
+      const i = (y * w + x) * 4
+      data[i] = rgb[0]
+      data[i + 1] = rgb[1]
+      data[i + 2] = rgb[2]
+      data[i + 3] = 255
+    }
   return { width: w, height: h, data }
 }
 
@@ -27,8 +42,10 @@ describe('trimToFigure', () => {
     expect(t.height).toBe(60 + HIRES_MARGIN * 2)
     const b = opaqueBbox(t)!
     expect(b).toEqual({
-      x0: HIRES_MARGIN, x1: HIRES_MARGIN + 39,
-      y0: HIRES_MARGIN, y1: HIRES_MARGIN + 59,
+      x0: HIRES_MARGIN,
+      x1: HIRES_MARGIN + 39,
+      y0: HIRES_MARGIN,
+      y1: HIRES_MARGIN + 59,
     })
   })
 })
@@ -38,7 +55,8 @@ describe('normalizeFigureHeight', () => {
     const img = trimToFigure(rect(100, 100, 10, 10, 49, 89)) // figure 40×80
     const n = normalizeFigureHeight(img, 60)
     const b = opaqueBbox(n)!
-    const bh = b.y1 - b.y0 + 1, bw = b.x1 - b.x0 + 1
+    const bh = b.y1 - b.y0 + 1,
+      bw = b.x1 - b.x0 + 1
     expect(Math.abs(bh - 60)).toBeLessThanOrEqual(1)
     // original aspect 40/80 = 0.5
     expect(Math.abs(bw / bh - 0.5)).toBeLessThan(0.05)
@@ -62,10 +80,12 @@ describe('processHiResCell', () => {
     const img = rect(200, 300, 20, 20, 179, 279, [150, 180, 110]) // off-palette green
     const cell = processHiResCell(img)
     expect(cell.height).toBe(260 + HIRES_MARGIN * 2) // no coarsening
-    const palette = new Set(paletteRgb().map(p => (p[0] << 16) | (p[1] << 8) | p[2]))
+    const palette = new Set(paletteRgb().map((p) => (p[0] << 16) | (p[1] << 8) | p[2]))
     for (let i = 0; i < cell.data.length; i += 4) {
       if (cell.data[i + 3] === 0) continue
-      expect(palette.has((cell.data[i]! << 16) | (cell.data[i + 1]! << 8) | cell.data[i + 2]!)).toBe(true)
+      expect(
+        palette.has((cell.data[i]! << 16) | (cell.data[i + 1]! << 8) | cell.data[i + 2]!),
+      ).toBe(true)
     }
   })
 
@@ -78,7 +98,7 @@ describe('processHiResCell', () => {
 
   it('drops background speckle islands so they cannot inflate the bbox', () => {
     const img = rect(200, 300, 60, 60, 139, 239) // figure 80×180 = 14400 px
-    img.data[(10 * 200 + 10) * 4 + 3] = 255      // 1px speckle far outside the figure
+    img.data[(10 * 200 + 10) * 4 + 3] = 255 // 1px speckle far outside the figure
     img.data[(290 * 200 + 190) * 4 + 3] = 255
     const cell = processHiResCell(img)
     expect(cell.width).toBe(80 + HIRES_MARGIN * 2)
@@ -88,9 +108,10 @@ describe('processHiResCell', () => {
 
 describe('buildManifestV4', () => {
   function authored(): AuthoredSet {
-    const strip = () => Object.fromEntries(
-      STRIP_POSES_V4.map((p, i) => [p, rect(30 + i, 50, 2, 2, 20 + i, 45)]),
-    ) as Record<(typeof STRIP_POSES_V4)[number], RawImage>
+    const strip = () =>
+      Object.fromEntries(
+        STRIP_POSES_V4.map((p, i) => [p, rect(30 + i, 50, 2, 2, 20 + i, 45)]),
+      ) as Record<(typeof STRIP_POSES_V4)[number], RawImage>
     return { strips: { se: strip(), ne: strip() }, sleep: rect(60, 30, 4, 4, 55, 25) }
   }
 
@@ -115,7 +136,8 @@ describe('buildManifestV4', () => {
   it('anchors flip with the cell: derived SW feetX mirrors SE feetX', () => {
     const cells = deriveSheet(authored())
     const m = buildManifestV4(cells, 44)
-    const se = m.cells['idle-se']!, sw = m.cells['idle-sw']!
+    const se = m.cells['idle-se']!,
+      sw = m.cells['idle-sw']!
     expect(sw.w).toBe(se.w)
     expect(sw.feetY).toBe(se.feetY)
     expect(sw.feetX).toBe(se.w - 1 - se.feetX)

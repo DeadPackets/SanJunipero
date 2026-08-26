@@ -12,12 +12,18 @@ function art(tag: number): RawImage {
   return img
 }
 function criteria(score: number): VisionCriteria {
-  return Object.fromEntries(CRITERIA.map(k => [k, { pass: true, score, evidence: 'seen' }])) as VisionCriteria
+  return Object.fromEntries(
+    CRITERIA.map((k) => [k, { pass: true, score, evidence: 'seen' }]),
+  ) as VisionCriteria
 }
 function verdict(score: number, attempt: number, feedback: string): VisionVerdict {
   const c = criteria(score)
   return {
-    assetId: 'asset_1', model: 'google/gemini-3.7-flash', rubricVersion: 'v1', criteria: c, feedback,
+    assetId: 'asset_1',
+    model: 'google/gemini-3.7-flash',
+    rubricVersion: 'v1',
+    criteria: c,
+    feedback,
     overall: deriveOverall(c, { minScore: 7, attempt, maxRetries: 3 }),
   }
 }
@@ -32,22 +38,34 @@ function harness(scores: number[], judgeCost = 0.0025) {
     prompts.push(prompt)
     return { sprite: art(attempt), costUsd: 0.045, model: 'google/gemini-3.1-flash-image' }
   }
-  const judge: VisionJudgeFn = async a => {
+  const judge: VisionJudgeFn = async (a) => {
     const score = scores[Math.min(n, scores.length - 1)]!
-    judged.push(score); n++
+    judged.push(score)
+    n++
     return { verdict: verdict(score, a.attempt ?? 1, `raise the roof ${n}`), costUsd: judgeCost }
   }
   return { prompts, judged, regenerate, judge }
 }
 
-const argsFor = (h: ReturnType<typeof harness>, ledger: SpendLedger, config = DEFAULT_FORGE_CONFIG) => ({
-  assetId: 'asset_1', klass: 'building', commission: 'a squat storehouse',
-  regenerate: h.regenerate, basePrompt: BASE, judge: h.judge, ledger, config,
+const argsFor = (
+  h: ReturnType<typeof harness>,
+  ledger: SpendLedger,
+  config = DEFAULT_FORGE_CONFIG,
+) => ({
+  assetId: 'asset_1',
+  klass: 'building',
+  commission: 'a squat storehouse',
+  regenerate: h.regenerate,
+  basePrompt: BASE,
+  judge: h.judge,
+  ledger,
+  config,
 })
 
 describe('runVisionGate', () => {
   it('passes on the first try with one generation, one judgement, two ledger rows', async () => {
-    const h = harness([9]), ledger = new SpendLedger(null)
+    const h = harness([9]),
+      ledger = new SpendLedger(null)
     const r = await runVisionGate(argsFor(h, ledger))
     expect(r.status).toBe('pass')
     expect(r.attempts).toBe(1)
@@ -60,7 +78,8 @@ describe('runVisionGate', () => {
   })
 
   it('puts feedback AFTER the boilerplate and BEFORE the commission, character-for-character', async () => {
-    const h = harness([5, 9]), ledger = new SpendLedger(null)
+    const h = harness([5, 9]),
+      ledger = new SpendLedger(null)
     const r = await runVisionGate(argsFor(h, ledger))
     expect(r.status).toBe('pass')
     expect(r.attempts).toBe(2)
@@ -71,18 +90,20 @@ describe('runVisionGate', () => {
   })
 
   it('blocks after the retry budget and returns the best-scoring attempt', async () => {
-    const h = harness([3, 6, 4, 5]), ledger = new SpendLedger(null)
+    const h = harness([3, 6, 4, 5]),
+      ledger = new SpendLedger(null)
     const r = await runVisionGate(argsFor(h, ledger))
     expect(r.status).toBe('blocked')
-    expect(h.prompts).toHaveLength(4)              // maxRetries 3 + the first try
+    expect(h.prompts).toHaveLength(4) // maxRetries 3 + the first try
     expect(r.verdicts).toHaveLength(4)
     expect(r.attempts).toBe(4)
     expect(r.verdicts.at(-1)!.overall).toBe('blocked')
-    expect(r.sprite.data[0]).toBe(2)               // attempt 2 scored 6, the highest of the four
+    expect(r.sprite.data[0]).toBe(2) // attempt 2 scored 6, the highest of the four
   })
 
   it('skips the judge entirely when the gate is switched off', async () => {
-    const h = harness([1]), ledger = new SpendLedger(null)
+    const h = harness([1]),
+      ledger = new SpendLedger(null)
     const config = ForgeConfigSchema.parse({ visionQa: { enabled: false } })
     const r = await runVisionGate(argsFor(h, ledger, config))
     expect(r.status).toBe('pass')
@@ -93,14 +114,16 @@ describe('runVisionGate', () => {
   })
 
   it('reports the QA sub-cap without enforcing it', async () => {
-    const h = harness([9], 0.06), ledger = new SpendLedger(null)
+    const h = harness([9], 0.06),
+      ledger = new SpendLedger(null)
     const r = await runVisionGate(argsFor(h, ledger))
     expect(r.overQaCap).toBe(true)
     expect(r.status).toBe('pass')
   })
 
   it('lets an anomaly stop propagate and generates nothing further', async () => {
-    const h = harness([3]), ledger = new SpendLedger(null)
+    const h = harness([3]),
+      ledger = new SpendLedger(null)
     ledger.append({ assetId: 'asset_1', kind: 'image_gen', model: 'm', usd: 4.99 })
     await expect(runVisionGate(argsFor(h, ledger))).rejects.toThrow(AnomalyStopError)
     expect(h.prompts).toHaveLength(1)

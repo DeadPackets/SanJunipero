@@ -1,28 +1,64 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  blockGroundOf, claimTownPlot, grammarOf, plotExtent, plotIsTaken, reachOnFoot,
-  ringsStanding, townBoxOf, walkOnGround, worldOf, type Walk, type WorldRect,
+  blockGroundOf,
+  claimTownPlot,
+  grammarOf,
+  plotExtent,
+  plotIsTaken,
+  reachOnFoot,
+  ringsStanding,
+  townBoxOf,
+  walkOnGround,
+  worldOf,
+  type Walk,
+  type WorldRect,
 } from './townPlot.js'
 import {
-  CITY_GROUND, DWELLING_FOOTPRINTS, GENESIS_WANTED, TOWN_RINGS_GENESIS, TOWN_SQUARE,
-  cityPlacements, townOrigin, townSpan,
+  CITY_GROUND,
+  DWELLING_FOOTPRINTS,
+  GENESIS_WANTED,
+  TOWN_RINGS_GENESIS,
+  TOWN_SQUARE,
+  cityPlacements,
+  townOrigin,
+  townSpan,
 } from './cityTemplate.js'
 import {
-  BLOCK, MIN_SEP, PITCH, STREET, blockIsPlattable, centreOf, doorFrontOf, freePlots, place,
-  placedTiles, plattedBlocks, plotsOf, streetTiles,
+  BLOCK,
+  MIN_SEP,
+  PITCH,
+  STREET,
+  blockIsPlattable,
+  centreOf,
+  doorFrontOf,
+  freePlots,
+  place,
+  placedTiles,
+  plattedBlocks,
+  plotsOf,
+  streetTiles,
 } from './townGrammar.js'
 
 const key = (p: { x: number; y: number }): string => `${p.x},${p.y}`
 
 /** The genesis nine, as the world holds them: grammar rectangles shifted onto the square. */
 function genesisStanding(): WorldRect[] {
-  return cityPlacements().map((s) => ({ ...worldOf(TOWN_SQUARE, { dx: s.dx, dy: s.dy }), w: s.w, h: s.h }))
+  return cityPlacements().map((s) => ({
+    ...worldOf(TOWN_SQUARE, { dx: s.dx, dy: s.dy }),
+    w: s.w,
+    h: s.h,
+  }))
 }
 
 /** Raise `n` buildings of one mass through the claim, exactly as the engine does: each claim
  *  sees everything the ones before it put up, and nothing else. */
 function raise(n: number, need = { along: 2, deep: 2 }, standing: WorldRect[] = genesisStanding()) {
-  const built: Array<{ site: WorldRect; door: { x: number; y: number }; rings: number; facing: string }> = []
+  const built: {
+    site: WorldRect
+    door: { x: number; y: number }
+    rings: number
+    facing: string
+  }[] = []
   for (let i = 0; i < n; i++) {
     const c = claimTownPlot({ square: TOWN_SQUARE, standing, need })
     if (c === null) break
@@ -51,9 +87,13 @@ describe('the town, seen from the world', () => {
 
   it('the taken plots are exactly the nine the grammar claimed, slot for slot', () => {
     const taken = plotIsTaken(TOWN_SQUARE, genesisStanding())
-    const byRect = freePlots(TOWN_RINGS_GENESIS, CITY_GROUND).filter(taken)
-      .map((p) => `${p.block.i},${p.block.j}/${p.slot}`).sort()
-    const byClaim = cityPlacements().map((s) => `${s.block.i},${s.block.j}/${s.slot}`).sort()
+    const byRect = freePlots(TOWN_RINGS_GENESIS, CITY_GROUND)
+      .filter(taken)
+      .map((p) => `${p.block.i},${p.block.j}/${p.slot}`)
+      .sort()
+    const byClaim = cityPlacements()
+      .map((s) => `${s.block.i},${s.block.j}/${s.slot}`)
+      .sort()
     expect(byRect).toEqual(byClaim)
   })
 
@@ -65,8 +105,10 @@ describe('the town, seen from the world', () => {
         for (let deep = 1; deep <= p.maxDeep; deep++) {
           const s = place(p, 'x', along, deep, null)
           for (const t of placedTiles(s)) {
-            expect(t.dx >= e.dx && t.dx < e.dx + e.w && t.dy >= e.dy && t.dy < e.dy + e.h,
-              `${p.block.i},${p.block.j}/${p.slot} ${along}x${deep} at ${t.dx},${t.dy}`).toBe(true)
+            expect(
+              t.dx >= e.dx && t.dx < e.dx + e.w && t.dy >= e.dy && t.dy < e.dy + e.h,
+              `${p.block.i},${p.block.j}/${p.slot} ${along}x${deep} at ${t.dx},${t.dy}`,
+            ).toBe(true)
             checked++
           }
         }
@@ -101,7 +143,8 @@ describe('★ a build takes a plot, and the plot is never the asker s', () => {
     let closest = Infinity
     for (let i = 0; i < all.length; i++)
       for (let j = i + 1; j < all.length; j++) {
-        const p = centre(all[i]!), q = centre(all[j]!)
+        const p = centre(all[i]!),
+          q = centre(all[j]!)
         closest = Math.min(closest, Math.hypot(p.sx - q.sx, p.sy - q.sy))
       }
     expect(closest).toBeGreaterThanOrEqual(MIN_SEP)
@@ -134,14 +177,26 @@ describe('★ a build takes a plot, and the plot is never the asker s', () => {
   })
 
   it('refuses, loudly and with null, a mass no plot in the town can hold', () => {
-    expect(claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 5, deep: 1 } })).toBeNull()
-    expect(claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 1, deep: 3 } })).toBeNull()
-    expect(claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 0, deep: 1 } })).toBeNull()
-    expect(claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 4, deep: 2 } })).not.toBeNull()
+    expect(
+      claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 5, deep: 1 } }),
+    ).toBeNull()
+    expect(
+      claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 1, deep: 3 } }),
+    ).toBeNull()
+    expect(
+      claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 0, deep: 1 } }),
+    ).toBeNull()
+    expect(
+      claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 4, deep: 2 } }),
+    ).not.toBeNull()
   })
 
   it('a thing standing across a plot takes it, even though the grammar never platted it', () => {
-    const free = claimTownPlot({ square: TOWN_SQUARE, standing: genesisStanding(), need: { along: 2, deep: 2 } })!
+    const free = claimTownPlot({
+      square: TOWN_SQUARE,
+      standing: genesisStanding(),
+      need: { along: 2, deep: 2 },
+    })!
     const blocked = claimTownPlot({
       square: TOWN_SQUARE,
       standing: [...genesisStanding(), { x: free.site.x, y: free.site.y, w: 1, h: 1 }],
@@ -181,10 +236,14 @@ describe('how many rings are standing', () => {
     expect([Math.floor(g.dx / PITCH), Math.floor(g.dy / PITCH)]).toEqual([-1, -2])
     expect(blockIsPlattable(-1, -2, CITY_GROUND)).toBe(false)
     // It really does sit on the plot — so only the plattable test can be what refuses it.
-    expect(plotsOf(-1, -2).some((p) => {
-      const e = plotExtent(p)
-      return e.dx < g.dx + deck.w && g.dx < e.dx + e.w && e.dy < g.dy + deck.h && g.dy < e.dy + e.h
-    })).toBe(true)
+    expect(
+      plotsOf(-1, -2).some((p) => {
+        const e = plotExtent(p)
+        return (
+          e.dx < g.dx + deck.w && g.dx < e.dx + e.w && e.dy < g.dy + deck.h && g.dy < e.dy + e.h
+        )
+      }),
+    ).toBe(true)
     expect(ringsStanding(TOWN_SQUARE, [...genesisStanding(), deck])).toBe(1)
   })
 })
@@ -234,7 +293,10 @@ describe('a block is laid out when its first building is raised', () => {
         for (let along = 1; along <= plot.maxAlong; along++)
           for (let deep = 1; deep <= plot.maxDeep; deep++) {
             const door = worldOf(TOWN_SQUARE, doorFrontOf(place(plot, 'x', along, deep, null)))
-            expect(paved.has(key(door)), `${b.i},${b.j}/${plot.slot} ${along}x${deep} door ${key(door)}`).toBe(true)
+            expect(
+              paved.has(key(door)),
+              `${b.i},${b.j}/${plot.slot} ${along}x${deep} door ${key(door)}`,
+            ).toBe(true)
             checked++
           }
     }
@@ -242,7 +304,11 @@ describe('a block is laid out when its first building is raised', () => {
   })
 
   it('never paves the channel', () => {
-    for (const b of [{ i: -1, j: 0 }, { i: 0, j: -1 }, { i: -2, j: -2 }]) {
+    for (const b of [
+      { i: -1, j: 0 },
+      { i: 0, j: -1 },
+      { i: -2, j: -2 },
+    ]) {
       for (const t of blockGroundOf(TOWN_SQUARE, b).paved) {
         const g = grammarOf(TOWN_SQUARE, t)
         expect(CITY_GROUND(g.dx, g.dy), key(t)).not.toBe('water')
@@ -260,7 +326,11 @@ describe('a block is laid out when its first building is raised', () => {
 describe('the masses the town actually builds', () => {
   it('every dwelling footprint the template knows fits a plot', () => {
     for (const [kind, m] of Object.entries(DWELLING_FOOTPRINTS)) {
-      const c = claimTownPlot({ square: TOWN_SQUARE, standing: genesisStanding(), need: { along: m.w, deep: m.h } })
+      const c = claimTownPlot({
+        square: TOWN_SQUARE,
+        standing: genesisStanding(),
+        need: { along: m.w, deep: m.h },
+      })
       expect(c, kind).not.toBeNull()
       expect(c!.site.w * c!.site.h, kind).toBe(m.w * m.h)
     }
@@ -273,12 +343,12 @@ const CHANNEL = [-17, -16, -15] as const
 
 /** A walk with a deck laid over the named grammar tiles. A deck over water is not water; a
  *  deck anywhere else is a plank on the grass and changes nothing. */
-const deck = (base: Walk, tiles: ReadonlyArray<{ dx: number; dy: number }>): Walk => {
+const deck = (base: Walk, tiles: readonly { dx: number; dy: number }[]): Walk => {
   const on = new Set(tiles.map((t) => `${t.dx},${t.dy}`))
   return (dx, dy) => base(dx, dy) || on.has(`${dx},${dy}`)
 }
 
-const span = (dy: number, cols: readonly number[] = CHANNEL): Array<{ dx: number; dy: number }> =>
+const span = (dy: number, cols: readonly number[] = CHANNEL): { dx: number; dy: number }[] =>
   cols.map((dx) => ({ dx, dy }))
 
 /** The blocks the claim will actually offer, in order, for a 2x2 — read off the claim itself, so
@@ -289,8 +359,13 @@ const offered = (walk: Walk, n = 40, standing = genesisStanding()): string[] =>
     return `${Math.floor(g.dx / PITCH)},${Math.floor(g.dy / PITCH)}`
   })
 
-function raiseWith(walk: Walk, n: number, standing: WorldRect[] = genesisStanding(), need = { along: 2, deep: 2 }) {
-  const built: Array<{ site: WorldRect; door: { x: number; y: number }; rings: number }> = []
+function raiseWith(
+  walk: Walk,
+  n: number,
+  standing: WorldRect[] = genesisStanding(),
+  need = { along: 2, deep: 2 },
+) {
+  const built: { site: WorldRect; door: { x: number; y: number }; rings: number }[] = []
   for (let i = 0; i < n; i++) {
     const c = claimTownPlot({ square: TOWN_SQUARE, standing, need, walk })
     if (c === null) break
@@ -306,7 +381,8 @@ describe('★ a plot you cannot walk to is not ground the town keeps for you', (
   it('the channel is a WALL, not an obstacle: there is no way round it inside the town', () => {
     // If any row of the town's box were dry across the channel, the far bank would already be
     // reachable and every test below would pass with the bridge doing nothing.
-    const lo = -townOrigin(2), hi = lo + townSpan(2) - 1
+    const lo = -townOrigin(2),
+      hi = lo + townSpan(2) - 1
     for (let dy = lo; dy <= hi; dy++)
       for (const dx of CHANNEL) expect(CITY_GROUND(dx, dy), `${dx},${dy}`).toBe('water')
     const reached = reachOnFoot(2, dry)
@@ -355,7 +431,9 @@ describe('★ a plot you cannot walk to is not ground the town keeps for you', (
     expect(reachOnFoot(2, short).has(-16, -3)).toBe(true)
     expect(reachOnFoot(2, short).has(-17, -3)).toBe(false)
     // A deck laid on dry ground is a plank in a meadow.
-    expect(offered(deck(dry, span(-3, [10, 11, 12])), 80).some((k) => Number(k.split(',')[0]) <= -2)).toBe(false)
+    expect(
+      offered(deck(dry, span(-3, [10, 11, 12])), 80).some((k) => Number(k.split(',')[0]) <= -2),
+    ).toBe(false)
   })
 
   it('★ and reachability is DERIVED: take the deck away and the far bank closes again', () => {
@@ -377,6 +455,8 @@ describe('★ a plot you cannot walk to is not ground the town keeps for you', (
       expect(reached.has(g.dx, g.dy), `door ${b.door.x},${b.door.y}`).toBe(true)
     }
     // …and at least eight of them are on the far side, so the loop above is not all east bank.
-    expect(built.filter((b) => grammarOf(TOWN_SQUARE, b.site).dx < -17).length).toBeGreaterThanOrEqual(8)
+    expect(
+      built.filter((b) => grammarOf(TOWN_SQUARE, b.site).dx < -17).length,
+    ).toBeGreaterThanOrEqual(8)
   })
 })

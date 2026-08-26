@@ -8,16 +8,26 @@ export type SpendKind = (typeof SPEND_KINDS)[number]
 export const ANOMALY_STOP_USD = 5
 
 export class AnomalyStopError extends Error {
-  constructor(public assetId: string, public totalUsd: number) {
-    super(`asset ${assetId} crossed the $${ANOMALY_STOP_USD} anomaly stop (attempted total $${totalUsd.toFixed(4)})`)
+  constructor(
+    public assetId: string,
+    public totalUsd: number,
+  ) {
+    super(
+      `asset ${assetId} crossed the $${ANOMALY_STOP_USD} anomaly stop (attempted total $${totalUsd.toFixed(4)})`,
+    )
     this.name = 'AnomalyStopError'
   }
 }
 
-export const SpendRowSchema = z.object({
-  assetId: z.string().min(1), kind: z.enum(SPEND_KINDS),
-  model: z.string().min(1), usd: z.number().min(0), at: z.string().min(1),
-}).strict()
+export const SpendRowSchema = z
+  .object({
+    assetId: z.string().min(1),
+    kind: z.enum(SPEND_KINDS),
+    model: z.string().min(1),
+    usd: z.number().min(0),
+    at: z.string().min(1),
+  })
+  .strict()
 export type SpendRow = z.infer<typeof SpendRowSchema>
 
 function readRows(path: string): SpendRow[] {
@@ -25,14 +35,19 @@ function readRows(path: string): SpendRow[] {
   try {
     const parsed = z.array(SpendRowSchema).safeParse(JSON.parse(readFileSync(path, 'utf8')))
     return parsed.success ? parsed.data : []
-  } catch { return [] }   // a corrupt or half-written file is a first run, not a crash
+  } catch {
+    return []
+  } // a corrupt or half-written file is a first run, not a crash
 }
 
 export class SpendLedger {
   #rows: SpendRow[]
   #flushedUpTo: number
 
-  constructor(private path: string | null, private now: () => string = () => new Date().toISOString()) {
+  constructor(
+    private path: string | null,
+    private now: () => string = () => new Date().toISOString(),
+  ) {
     this.#rows = path === null ? [] : readRows(path)
     this.#flushedUpTo = this.#rows.length
   }
@@ -49,14 +64,18 @@ export class SpendLedger {
   }
 
   byKind(): Record<SpendKind, number> {
-    const out = Object.fromEntries(SPEND_KINDS.map(k => [k, 0])) as Record<SpendKind, number>
+    const out = Object.fromEntries(SPEND_KINDS.map((k) => [k, 0])) as Record<SpendKind, number>
     for (const r of this.#rows) out[r.kind] += r.usd
     return out
   }
 
-  total(): number { return this.#rows.reduce((s, r) => s + r.usd, 0) }
+  total(): number {
+    return this.#rows.reduce((s, r) => s + r.usd, 0)
+  }
 
-  rows(): readonly SpendRow[] { return this.#rows }
+  rows(): readonly SpendRow[] {
+    return this.#rows
+  }
 
   // Read-merge-write: whatever another writer added since we loaded stays, our new rows go on the end.
   flush(): void {

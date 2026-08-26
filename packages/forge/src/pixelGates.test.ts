@@ -2,9 +2,18 @@ import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { decodePng, type RawImage } from './post/raw.js'
 import {
-  integerScaleGate, pixelGridGate, alphaBinaryGate, paletteGate,
-  nativeDensityGate, classDensityGate, tileSeamGate, tilesetVarietyGate,
-  pixelBarReport, soleSilhouetteGate, SEAM_RATIO_MAX, SEAM_ABSOLUTE_FLOOR,
+  integerScaleGate,
+  pixelGridGate,
+  alphaBinaryGate,
+  paletteGate,
+  nativeDensityGate,
+  classDensityGate,
+  tileSeamGate,
+  tilesetVarietyGate,
+  pixelBarReport,
+  soleSilhouetteGate,
+  SEAM_RATIO_MAX,
+  SEAM_ABSOLUTE_FLOOR,
 } from './pixelGates.js'
 import { derivedPalette } from './ramps.js'
 import { quantize } from './post/quantize.js'
@@ -32,7 +41,11 @@ describe('integerScaleGate', () => {
     expect(r.failures.join(' ')).toContain('anisotropic')
   })
   it('GREEN on the real chair: 512 -> 128 is exactly 4x', () => {
-    expect(integerScaleGate({ w: 512, h: 512 }, { w: 128, h: 128 })).toEqual({ ok: true, failures: [], factor: 4 })
+    expect(integerScaleGate({ w: 512, h: 512 }, { w: 128, h: 128 })).toEqual({
+      ok: true,
+      failures: [],
+      factor: 4,
+    })
   })
   it('a shipped size larger than the raw is an upscale, never allowed', () => {
     const r = integerScaleGate({ w: 128, h: 128 }, { w: 256, h: 256 })
@@ -96,8 +109,9 @@ describe('paletteGate', () => {
     expect(r.offPalette).toBe(6412)
   })
   it('and RED against the derived ramps too — wider is not open', async () => {
-    expect(paletteGate(await fixture('portrait-neutral-128.png'), { palette: derivedPalette() }).ok)
-      .toBe(false)
+    expect(
+      paletteGate(await fixture('portrait-neutral-128.png'), { palette: derivedPalette() }).ok,
+    ).toBe(false)
   })
   it('GREEN once the bust is quantized onto the derived ramps', async () => {
     const q = quantize(await fixture('portrait-neutral-128.png'), derivedPalette())
@@ -113,7 +127,10 @@ describe('paletteGate', () => {
 describe('nativeDensityGate', () => {
   it('RED on every shipped library item: 24 px over a 1x1 footprint on the 32x16 tile is 0.75 art px', () => {
     const r = nativeDensityGate({
-      name: 'bed', canvas: { w: 24, h: 24 }, footprint: { w: 1, h: 1 }, tile: { w: 32, h: 16 },
+      name: 'bed',
+      canvas: { w: 24, h: 24 },
+      footprint: { w: 1, h: 1 },
+      tile: { w: 32, h: 16 },
     })
     expect(r.ok).toBe(false)
     expect(r.density).toBeCloseTo(0.75, 6)
@@ -121,14 +138,22 @@ describe('nativeDensityGate', () => {
   })
   it('GREEN at the C-level target: 128 px over a 1x1 footprint on the 128x64 interior tile', () => {
     const r = nativeDensityGate({
-      name: 'chair', canvas: { w: 128, h: 128 }, footprint: { w: 1, h: 1 }, tile: { w: 128, h: 64 },
+      name: 'chair',
+      canvas: { w: 128, h: 128 },
+      footprint: { w: 1, h: 1 },
+      tile: { w: 128, h: 64 },
     })
     expect(r).toMatchObject({ ok: true, density: 1 })
   })
   it('the mock bed was already at density 1 — its defect was the 2.667x downscale, not its size', () => {
-    expect(nativeDensityGate({
-      name: 'bed', canvas: { w: 192, h: 192 }, footprint: { w: 1, h: 2 }, tile: { w: 128, h: 64 },
-    })).toMatchObject({ ok: true, density: 1 })
+    expect(
+      nativeDensityGate({
+        name: 'bed',
+        canvas: { w: 192, h: 192 },
+        footprint: { w: 1, h: 2 },
+        tile: { w: 128, h: 64 },
+      }),
+    ).toMatchObject({ ok: true, density: 1 })
   })
 })
 
@@ -144,7 +169,12 @@ describe('classDensityGate', () => {
     expect(r.failures[0]).toContain('mat-floor')
   })
   it('GREEN when every member shares one density', () => {
-    expect(classDensityGate([{ name: 'a', density: 1 }, { name: 'b', density: 1 }]).ok).toBe(true)
+    expect(
+      classDensityGate([
+        { name: 'a', density: 1 },
+        { name: 'b', density: 1 },
+      ]).ok,
+    ).toBe(true)
   })
 })
 
@@ -163,7 +193,9 @@ describe('tileSeamGate', () => {
 describe('tilesetVarietyGate', () => {
   it('RED on the real treatment-C wall run: the plain piece comes back every 4 tiles', () => {
     const r = tilesetVarietyGate(
-      ['plain', 'window', 'plain', 'dresser', 'plain', 'window', 'plain', 'door'], { minPeriod: 5 })
+      ['plain', 'window', 'plain', 'dresser', 'plain', 'window', 'plain', 'door'],
+      { minPeriod: 5 },
+    )
     expect(r.ok).toBe(false)
     expect(r.shortestPeriod).toBe(2)
     expect(r.failures[0]).toContain('plain')
@@ -176,8 +208,11 @@ describe('tilesetVarietyGate', () => {
 describe('pixelBarReport', () => {
   it('names the one thing wrong with the real bed: the downscale, nothing else', async () => {
     const r = await pixelBarReport({
-      name: 'furniture-bed', img: await fixture('bed-192.png'), raw: { w: 512, h: 512 },
-      footprint: { w: 1, h: 2 }, tile: { w: 128, h: 64 },
+      name: 'furniture-bed',
+      img: await fixture('bed-192.png'),
+      raw: { w: 512, h: 512 },
+      footprint: { w: 1, h: 2 },
+      tile: { w: 128, h: 64 },
     })
     expect(r.ok).toBe(false)
     expect(r.failures).toHaveLength(1)
@@ -185,8 +220,11 @@ describe('pixelBarReport', () => {
   })
   it('collects failures from every gate it was handed', async () => {
     const r = await pixelBarReport({
-      name: 'wall-plain', img: await fixture('wall-plain-256x160.png'),
-      raw: { w: 512, h: 512 }, artPx: 3, seam: true,
+      name: 'wall-plain',
+      img: await fixture('wall-plain-256x160.png'),
+      raw: { w: 512, h: 512 },
+      artPx: 3,
+      seam: true,
     })
     expect(r.ok).toBe(false)
     expect(r.failures.length).toBeGreaterThanOrEqual(3)
@@ -199,7 +237,8 @@ describe('soleSilhouetteGate — a person is ONE shape', () => {
   const body = (w: number, h: number): RawImage => {
     const img = solid(w, h, [0, 0, 0, 0])
     for (let y = h >> 2; y < h - (h >> 2); y++)
-      for (let x = w >> 2; x < w - (w >> 2); x++) img.data.set([0x43, 0x39, 0x4a, 255], (y * w + x) * 4)
+      for (let x = w >> 2; x < w - (w >> 2); x++)
+        img.data.set([0x43, 0x39, 0x4a, 255], (y * w + x) * 4)
     return img
   }
   // a detached rectangle in the corner — a caption, a prop, a baked shadow, a second figure
@@ -227,7 +266,7 @@ describe('soleSilhouetteGate — a person is ONE shape', () => {
   })
 
   it("tolerates a speck inside despeckle's own 1% contract, and nothing past it", () => {
-    expect(soleSilhouetteGate(withIsland(body(400, 600), 20, 20)).ok).toBe(true)  // 0.66%
+    expect(soleSilhouetteGate(withIsland(body(400, 600), 20, 20)).ok).toBe(true) // 0.66%
     expect(soleSilhouetteGate(withIsland(body(400, 600), 30, 30)).ok).toBe(false) // 1.48%
   })
 
@@ -239,7 +278,12 @@ describe('soleSilhouetteGate — a person is ONE shape', () => {
 
   it('counts diagonal-only contact as detached — a pixel body is 4-connected', () => {
     const img = solid(8, 8, [0, 0, 0, 0])
-    for (const [x, y] of [[1, 1], [2, 2], [3, 3]]) img.data.set([0, 0, 0, 255], (y! * 8 + x!) * 4)
+    for (const [x, y] of [
+      [1, 1],
+      [2, 2],
+      [3, 3],
+    ])
+      img.data.set([0, 0, 0, 255], (y! * 8 + x!) * 4)
     expect(soleSilhouetteGate(img).islands).toBe(3)
   })
 })

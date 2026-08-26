@@ -3,9 +3,16 @@ import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
 
 const input = {
-  class: 'item' as const, desc: 'a wooden bucket', footprint: { w: 1, h: 1 },
-  png: Buffer.from('png-bytes'), widthPx: 24, heightPx: 24,
-  status: 'ready' as const, score: 8.2, attempts: 1, costUsd: 0.14,
+  class: 'item' as const,
+  desc: 'a wooden bucket',
+  footprint: { w: 1, h: 1 },
+  png: Buffer.from('png-bytes'),
+  widthPx: 24,
+  heightPx: 24,
+  status: 'ready' as const,
+  score: 8.2,
+  attempts: 1,
+  costUsd: 0.14,
 }
 
 describe('AssetCodex', () => {
@@ -21,12 +28,12 @@ describe('AssetCodex', () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     codex.register(input)
     const b = codex.register({ ...input, desc: 'a clay pot' })
-    expect(codex.listSince(1).map(r => r.id)).toEqual([b.id])
+    expect(codex.listSince(1).map((r) => r.id)).toEqual([b.id])
   })
   it('fires onAssetReady with the registered record', () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     const seen: string[] = []
-    codex.onAssetReady(r => seen.push(r.desc))
+    codex.onAssetReady((r) => seen.push(r.desc))
     codex.register(input)
     expect(seen).toEqual(['a wooden bucket'])
   })
@@ -34,10 +41,14 @@ describe('AssetCodex', () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const seen: string[] = []
-    codex.onAssetReady(() => { throw new Error('listener boom') })
-    codex.onAssetReady(r => seen.push(r.desc))
+    codex.onAssetReady(() => {
+      throw new Error('listener boom')
+    })
+    codex.onAssetReady((r) => seen.push(r.desc))
     let rec
-    expect(() => { rec = codex.register(input) }).not.toThrow() // row is committed; no duplicate regen
+    expect(() => {
+      rec = codex.register(input)
+    }).not.toThrow() // row is committed; no duplicate regen
     expect(codex.get(rec!.id)).not.toBeNull()
     expect(seen).toEqual(['a wooden bucket'])
     expect(errSpy).toHaveBeenCalledOnce()

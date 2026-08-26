@@ -3,7 +3,15 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import type { LlmClient, LlmMessage, LlmUsage } from '@sj/agents'
-import { DEATH_CAUSES, fold, genesisState, RngStreams, VERBS, type TileId, type WorldState } from '@sj/engine'
+import {
+  DEATH_CAUSES,
+  fold,
+  genesisState,
+  RngStreams,
+  VERBS,
+  type TileId,
+  type WorldState,
+} from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import { detectFirsts } from './firsts.js'
 import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak } from './glass.js'
@@ -11,13 +19,16 @@ import { DEATH_CAUSE_LABELS, TIER1_DEFS } from './milestones/tier1.js'
 import { detectTier2 } from './milestones/tier2.js'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
-import {
-  DEFAULT_SEMANTIC_CONFIG, SEMANTIC_CONCEPTS, SEMANTIC_INSTRUCTION, detectSemanticFirsts,
-} from './semanticFirsts.js'
+import { SEMANTIC_CONCEPTS, SEMANTIC_INSTRUCTION, detectSemanticFirsts } from './semanticFirsts.js'
 import { AUTHORED_DAY, DAY, GOOD_VERDICT, GOD_QUOTE } from './fixtures/transcripts.js'
 
 let seq = 1
-const ev = (tick: number, type: string, payload: unknown = {}): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (tick: number, type: string, payload: unknown = {}): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 const day = (n: number): number => n * MINUTES_PER_DAY
 
 const memDb = (): Database.Database => {
@@ -34,28 +45,76 @@ describe('G11a-L1: the engine firsts fire once each, and a second death of a new
   const ctx = () => ({ seenKinds: new Set<string>(), rulebookCount: 0 })
 
   it('a day that does everything three times leaves one row per kind', () => {
-    const thrice = (make: (n: number) => SimEvent[]): SimEvent[] => [0, 1, 2].flatMap((n) => make(n))
+    const thrice = (make: (n: number) => SimEvent[]): SimEvent[] =>
+      [0, 1, 2].flatMap((n) => make(n))
     const events: SimEvent[] = [
-      ...thrice((n) => [ev(day(n) + 10, 'agent_spoke', { agentId: 'ada', text: 'oi', x: 0, y: 0 })]),
+      ...thrice((n) => [
+        ev(day(n) + 10, 'agent_spoke', { agentId: 'ada', text: 'oi', x: 0, y: 0 }),
+      ]),
       ...thrice((n) => [
         ev(day(n), 'structure_planned', { id: `house_${n}`, kind: 'house' }),
         ev(day(n) + 20, 'structure_completed', { id: `house_${n}` }),
       ]),
       ...thrice((n) => [ev(day(n) + 30, 'action_completed', { agentId: 'ada', verb: 'eat' })]),
-      ...thrice((n) => [ev(day(n) + 40, 'tile_changed', { x: n, y: 0, from: 0, to: 7, reason: 'paved', byId: 'ada' })]),
-      ...thrice((n) => [ev(day(n) + 50, 'tile_changed', { x: n, y: 1, from: 0, to: 10, reason: 'channel', byId: 'ada' })]),
-      ...thrice((n) => [ev(day(n) + 60, 'fauna_killed', { id: `f_${n}`, kind: 'deer', x: 1, y: 1, byId: 'ada' })]),
-      ...thrice((n) => [ev(day(n) + 70, 'fire_extinguished', { structureId: 's1', cause: 'doused', agentId: 'ada' })]),
-      ...thrice((n) => [ev(day(n) + 80, 'agent_expressed', { agentId: 'ada', verb: 'dance', x: 0, y: 0, sense: 'sight' })]),
-      ...thrice((n) => [ev(day(n) + 90, 'agent_afflicted', { agentId: 'ada', kind: 'illness', severity: 1 })]),
+      ...thrice((n) => [
+        ev(day(n) + 40, 'tile_changed', {
+          x: n,
+          y: 0,
+          from: 0,
+          to: 7,
+          reason: 'paved',
+          byId: 'ada',
+        }),
+      ]),
+      ...thrice((n) => [
+        ev(day(n) + 50, 'tile_changed', {
+          x: n,
+          y: 1,
+          from: 0,
+          to: 10,
+          reason: 'channel',
+          byId: 'ada',
+        }),
+      ]),
+      ...thrice((n) => [
+        ev(day(n) + 60, 'fauna_killed', { id: `f_${n}`, kind: 'deer', x: 1, y: 1, byId: 'ada' }),
+      ]),
+      ...thrice((n) => [
+        ev(day(n) + 70, 'fire_extinguished', {
+          structureId: 's1',
+          cause: 'doused',
+          agentId: 'ada',
+        }),
+      ]),
+      ...thrice((n) => [
+        ev(day(n) + 80, 'agent_expressed', {
+          agentId: 'ada',
+          verb: 'dance',
+          x: 0,
+          y: 0,
+          sense: 'sight',
+        }),
+      ]),
+      ...thrice((n) => [
+        ev(day(n) + 90, 'agent_afflicted', { agentId: 'ada', kind: 'illness', severity: 1 }),
+      ]),
     ]
     const found = detectFirsts(events, ctx())
     const kinds = found.map((m) => m.kind)
     expect(new Set(kinds).size).toBe(kinds.length) // once each, never twice
     for (const want of [
-      'first_speech', 'first_structure', 'first_house', 'first_meal', 'first_road', 'first_channel',
-      'first_hunt', 'first_fire_out', 'first_expression', 'first_infection',
-    ]) expect(kinds).toContain(want)
+      'first_speech',
+      'first_structure',
+      'first_house',
+      'first_meal',
+      'first_road',
+      'first_channel',
+      'first_hunt',
+      'first_fire_out',
+      'first_expression',
+      'first_infection',
+    ])
+      expect(kinds).toContain(want)
   })
 
   it('two deaths of two causes are two firsts, and the generic grave is only the first one', () => {
@@ -90,12 +149,23 @@ describe('G11a-L1: the engine firsts fire once each, and a second death of a new
 // ------------------------------------------------------------------ tier 2
 
 describe('G11a-L2: the parting a scripted lapse produces', () => {
-  function pairWorld(rows: Record<string, {
-    nights: number; lastNightDay: number; formedTick: number | null; dissolvedTick: number | null
-  }>): WorldState {
+  function pairWorld(
+    rows: Record<
+      string,
+      {
+        nights: number
+        lastNightDay: number
+        formedTick: number | null
+        dissolvedTick: number | null
+      }
+    >,
+  ): WorldState {
     const flat = Array.from({ length: 32 }, () => Array.from({ length: 32 }, (): TileId => 0))
     let s = genesisState(DEFAULT_CONFIG, flat)
-    for (const [id, name] of [['ada', 'Ada'], ['bex', 'Bex']]) {
+    for (const [id, name] of [
+      ['ada', 'Ada'],
+      ['bex', 'Bex'],
+    ]) {
       s = fold(s, ev(0, 'agent_spawned', { id, name, x: 4, y: 4, ageDays: 7300 }), DEFAULT_CONFIG)
     }
     return { ...s, pairNights: rows }
@@ -105,9 +175,13 @@ describe('G11a-L2: the parting a scripted lapse produces', () => {
     detectTier2(events, { seenKinds: new Set(), config: DEFAULT_CONFIG, state })
 
   it('five shared nights, a dissolution, and a whole window of silence make a parting', () => {
-    const state = pairWorld({ 'ada|bex': { nights: 5, lastNightDay: 4, formedTick: day(3), dissolvedTick: day(12) } })
+    const state = pairWorld({
+      'ada|bex': { nights: 5, lastNightDay: 4, formedTick: day(3), dissolvedTick: day(12) },
+    })
     const lapse = [
-      ...Array.from({ length: 5 }, (_, i) => ev(day(i) + 1, 'co_slept', { aId: 'ada', bId: 'bex', day: i })),
+      ...Array.from({ length: 5 }, (_, i) =>
+        ev(day(i) + 1, 'co_slept', { aId: 'ada', bId: 'bex', day: i }),
+      ),
       ev(day(12) + 60, 'agent_moved', { id: 'ada', x: 9, y: 9 }),
     ]
     const found = t2(lapse, state).find((m) => m.kind === 'first_breakup')
@@ -118,9 +192,13 @@ describe('G11a-L2: the parting a scripted lapse produces', () => {
   })
 
   it('a gap they talked across is not a parting', () => {
-    const state = pairWorld({ 'ada|bex': { nights: 5, lastNightDay: 4, formedTick: day(3), dissolvedTick: day(9) } })
+    const state = pairWorld({
+      'ada|bex': { nights: 5, lastNightDay: 4, formedTick: day(3), dissolvedTick: day(9) },
+    })
     const talked = [
-      ...Array.from({ length: 5 }, (_, i) => ev(day(i) + 1, 'co_slept', { aId: 'ada', bId: 'bex', day: i })),
+      ...Array.from({ length: 5 }, (_, i) =>
+        ev(day(i) + 1, 'co_slept', { aId: 'ada', bId: 'bex', day: i }),
+      ),
       ev(day(5) + 60, 'agent_spoke', { agentId: 'ada', text: 'still here', x: 4, y: 4 }),
       ev(day(9) + 60, 'agent_spoke', { agentId: 'ada', text: 'and again', x: 4, y: 4 }),
     ]
@@ -136,7 +214,13 @@ describe('G11a-L2: the parting a scripted lapse produces', () => {
   // the verb actually produces rather than a hand-written one.
   it('a blow and a word after it: the quarrel and the peace, off the log attack really writes', () => {
     const s = pairWorld({})
-    const blow = VERBS.attack.onComplete(s, DEFAULT_CONFIG, 'ada', { targetId: 'bex' }, new RngStreams('c1').get('combat'))
+    const blow = VERBS.attack!.onComplete(
+      s,
+      DEFAULT_CONFIG,
+      'ada',
+      { targetId: 'bex' },
+      new RngStreams('c1').get('combat'),
+    )
     const harmed = blow.find((e) => e.type === 'agent_harmed')
     expect(harmed).toBeDefined()
     expect(harmed!.payload).toMatchObject({ agentId: 'bex', source: 'attack', byId: 'ada' })
@@ -168,21 +252,34 @@ describe('G11a-L2: the parting a scripted lapse produces', () => {
 
 // ------------------------------------------------------------------ tier 2.5
 
-const emptyUsage = (): LlmUsage => ({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 })
+const emptyUsage = (): LlmUsage => ({
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadTokens: 0,
+  costUsd: 0,
+})
 
 class ScriptedLlm {
   objectCalls = 0
   systems: string[] = []
   constructor(private readonly value: unknown = GOOD_VERDICT) {}
 
-  async object<T>(opts: { system: string; messages: LlmMessage[]; schema: unknown }): Promise<{ value: T; usage: LlmUsage }> {
+  async object<T>(opts: {
+    system: string
+    messages: LlmMessage[]
+    schema: unknown
+  }): Promise<{ value: T; usage: LlmUsage }> {
     this.objectCalls += 1
     this.systems.push(opts.system)
     return { value: this.value as T, usage: emptyUsage() }
   }
 
-  async text(): Promise<{ text: string; usage: LlmUsage }> { return { text: '', usage: emptyUsage() } }
-  totalCostUsd(): number { return 0 }
+  async text(): Promise<{ text: string; usage: LlmUsage }> {
+    return { text: '', usage: emptyUsage() }
+  }
+  totalCostUsd(): number {
+    return 0
+  }
   alert(): void {}
 }
 
@@ -190,7 +287,12 @@ const runSemantic = async (llm: ScriptedLlm, over: Record<string, unknown> = {})
   const db = memDb()
   const store = new NarratorStore(db)
   const milestones = await detectSemanticFirsts({
-    db, store, llm: llm as unknown as LlmClient, day: DAY, records: AUTHORED_DAY, ...over,
+    db,
+    store,
+    llm: llm as unknown as LlmClient,
+    day: DAY,
+    records: AUTHORED_DAY,
+    ...over,
   })
   return { db, store, milestones, llm }
 }
@@ -215,12 +317,18 @@ describe('G11a-L3: the firsts no rule can catch, and the checks that keep them h
 
   it('a quote the record does not contain is voided, with the reason written down', async () => {
     const fabricated = {
-      hits: [{
-        conceptKind: 'god_afterlife', agentId: 'ada', day: DAY, sourceKind: 'speech',
-        eventSeq: AUTHORED_DAY.find((r) => r.text === GOD_QUOTE)!.eventSeq,
-        quote: 'the gods will judge us all', confidence: 0.99,
-        rationale: 'a line nobody in this town ever said',
-      }],
+      hits: [
+        {
+          conceptKind: 'god_afterlife',
+          agentId: 'ada',
+          day: DAY,
+          sourceKind: 'speech',
+          eventSeq: AUTHORED_DAY.find((r) => r.text === GOD_QUOTE)!.eventSeq,
+          quote: 'the gods will judge us all',
+          confidence: 0.99,
+          rationale: 'a line nobody in this town ever said',
+        },
+      ],
     }
     const { store, milestones } = await runSemantic(new ScriptedLlm(fabricated))
     expect(milestones).toEqual([])
@@ -245,5 +353,4 @@ describe('G11a-L3: the firsts no rule can catch, and the checks that keep them h
     // Every id the model must answer with is on the page in front of it.
     for (const concept of SEMANTIC_CONCEPTS) expect(SEMANTIC_INSTRUCTION).toContain(concept)
   })
-
 })

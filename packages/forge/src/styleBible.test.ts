@@ -7,8 +7,9 @@ import { buildAssetPrompt, targetSize, STYLE_PROMPT } from './styleBible.js'
 // The bible wraps its lines, so every scan runs over whitespace-collapsed text —
 // otherwise a law can be "absent" purely because it straddles a newline.
 const BIBLE = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'style-bible.md'), 'utf8')
-  .replace(/\s+/g, ' ')
+  join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'style-bible.md'),
+  'utf8',
+).replace(/\s+/g, ' ')
 
 describe('style bible facing law (narrowed by C13)', () => {
   it('no longer claims the facing gate is never automated', () => {
@@ -38,7 +39,8 @@ describe('style bible prompts', () => {
     expect(buildAssetPrompt('wheat', { w: 1, h: 1 }, 'crop')).toMatch(/4 growth stages/i)
   })
   it('non-character prompts carry the style-anchor density clause; character prompts do not', () => {
-    const clause = 'match the pixel density, palette warmth, and cute rounded style of the first reference image exactly'
+    const clause =
+      'match the pixel density, palette warmth, and cute rounded style of the first reference image exactly'
     for (const klass of ['building', 'item', 'crop', 'terrain'] as const)
       expect(buildAssetPrompt('x', { w: 1, h: 1 }, klass)).toContain(clause)
     for (const klass of ['rig-part', 'portrait'] as const)

@@ -1,7 +1,13 @@
 // Free is read off standing buildings, never a register that could drift on crash recovery.
 // Order is the plot nearest the square, block then slot — pure, because replay depends on it.
 import {
-  MAX_ALONG, MAX_DEEP, freePlots, place, type Ground, type PlacedStructure, type Plot,
+  MAX_ALONG,
+  MAX_DEEP,
+  freePlots,
+  place,
+  type Ground,
+  type PlacedStructure,
+  type Plot,
 } from './townGrammar.js'
 
 /** How far the town may plat looking for a claimable plot before it admits there is none. A
@@ -41,7 +47,11 @@ export type IsTaken = (plot: Plot) => boolean
 
 /** One walk outward, not two: the ring the town has to reach and the plot it offers there are
  *  the same answer, and `plattedBlocks` is the expensive part of asking. */
-export function claimPlotWhere(a: { isTaken: IsTaken; ground: Ground; need: Need }): { plot: Plot; rings: number } | null {
+export function claimPlotWhere(a: {
+  isTaken: IsTaken
+  ground: Ground
+  need: Need
+}): { plot: Plot; rings: number } | null {
   if (!fits(a.need)) return null
   for (let r = 1; r < CLAIM_RING_LIMIT; r++) {
     const plot = freePlots(r, a.ground).find((p) => holds(p, a.need) && !a.isTaken(p))

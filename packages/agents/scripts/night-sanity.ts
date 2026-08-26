@@ -17,7 +17,10 @@ const withoutLamp = (c: SimConfig): SimConfig => {
   }
 }
 
-for (const [arm, cfg] of [['A (before this lane)', withoutLamp(DEFAULT_CONFIG)], ['B (after)', DEFAULT_CONFIG]] as const) {
+for (const [arm, cfg] of [
+  ['A (before this lane)', withoutLamp(DEFAULT_CONFIG)],
+  ['B (after)', DEFAULT_CONFIG],
+] as const) {
   console.log(`\n=== ARM ${arm} ===`)
   console.log(makeablesLine(makeables(cfg), { x: 81, y: 68 }))
 }
@@ -39,12 +42,19 @@ const LINES = [
 // you" as naming a remedy, because "light around" contains "light a". A guard that cries wolf
 // on its own prose is worse than none.
 const BANNED = [
-  /\bbuild\b/i, /\braise a\b/i, /\byou should\b/i, /\ba lamp would\b/i,
-  /\bgo inside\b/i, /\blight a (lamp|torch|fire)\b/i, /\bmake a\b/i,
+  /\bbuild\b/i,
+  /\braise a\b/i,
+  /\byou should\b/i,
+  /\ba lamp would\b/i,
+  /\bgo inside\b/i,
+  /\blight a (lamp|torch|fire)\b/i,
+  /\bmake a\b/i,
 ]
 for (const l of LINES) {
   const hit = BANNED.filter((b) => b.test(l)).map((b) => String(b))
-  console.log(`${hit.length === 0 ? 'ok  ' : 'LEAK'}  ${l}${hit.length ? `  <-- ${hit.join(', ')}` : ''}`)
+  console.log(
+    `${hit.length === 0 ? 'ok  ' : 'LEAK'}  ${l}${hit.length ? `  <-- ${hit.join(', ')}` : ''}`,
+  )
 }
 
 console.log('\n=== and block 1 names no reason to place one ===')
@@ -55,10 +65,20 @@ console.log('mentions "dark" or "light":', /dark|light/i.test(buildLine))
 
 console.log('\n=== isDark, at one instant, in one world ===')
 const lit = {
-  agents: {}, items: {},
-  structures: { l1: { kind: LAMP, x: 10, y: 10, w: 1, h: 1, stage: 'complete', fueledUntilTick: 9e9 } },
+  agents: {},
+  items: {},
+  structures: {
+    l1: { kind: LAMP, x: 10, y: 10, w: 1, h: 1, stage: 'complete', fueledUntilTick: 9e9 },
+  },
 }
 const MIDNIGHT = 0
-for (const [x, y] of [[10, 10], [14, 10], [15, 10], [40, 40]] as const) {
-  console.log(`  (${x},${y})  band=${lightBandAt(lit, x, y, MIDNIGHT, DEFAULT_CONFIG).padEnd(6)} isDark=${isDark(lit, x, y, MIDNIGHT, DEFAULT_CONFIG)}`)
+for (const [x, y] of [
+  [10, 10],
+  [14, 10],
+  [15, 10],
+  [40, 40],
+] as const) {
+  console.log(
+    `  (${x},${y})  band=${lightBandAt(lit, x, y, MIDNIGHT, DEFAULT_CONFIG).padEnd(6)} isDark=${isDark(lit, x, y, MIDNIGHT, DEFAULT_CONFIG)}`,
+  )
 }

@@ -8,13 +8,11 @@ export function chunkOf(x: number, y: number): { cx: number; cy: number } {
 }
 
 // Sorted by (cx, cy) numerically rather than by string, so the order holds past chunk 9.
-export function chunksTouched(coords: ReadonlyArray<{ x: number; y: number }>): string[] {
+export function chunksTouched(coords: readonly { x: number; y: number }[]): string[] {
   const seen = new Map<string, { cx: number; cy: number }>()
   for (const { x, y } of coords) {
     const c = chunkOf(x, y)
     seen.set(`${c.cx},${c.cy}`, c)
   }
-  return [...seen.entries()]
-    .sort(([, a], [, b]) => (a.cx - b.cx) || (a.cy - b.cy))
-    .map(([k]) => k)
+  return [...seen.entries()].sort(([, a], [, b]) => a.cx - b.cx || a.cy - b.cy).map(([k]) => k)
 }

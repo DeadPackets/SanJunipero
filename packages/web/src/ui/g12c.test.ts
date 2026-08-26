@@ -11,7 +11,13 @@ import { expandReducer, becomingOf, ALWAYS_SHOWN } from './roster/expand.js'
 import { CONDITION_WORD, STATE_WORD, statusLiteralOffenders } from './status.js'
 import { MARK_MIN_WEIGHT, MARK_WEIGHT, coalesceMarks, marksFrom } from './timelineMarks.js'
 import {
-  BOND_LEVELS, BOND_TYPES, LEVEL_RANK, LEVEL_THRESHOLDS, bondLevel, bondTypeOf, bondWarmth,
+  BOND_LEVELS,
+  BOND_TYPES,
+  LEVEL_RANK,
+  LEVEL_THRESHOLDS,
+  bondLevel,
+  bondTypeOf,
+  bondWarmth,
   relationLine,
 } from './bondModel2.js'
 import { frameLayout, straddlers } from './frame.js'
@@ -21,8 +27,13 @@ import { actionFor, controlItems } from './controlBar.js'
 import { MOTION, MOTIONS, MOTION_CEILING_MS, untokenisedDurations } from './motion.js'
 import { SCENE_TOTAL_MS, idleScene, sceneAlpha, sceneReducer } from './sceneTransition.js'
 import {
-  MACHINE_CHECKABLE, READINESS, captionFloorPx, captionShortfall, layoutOffenders,
-  machineWordOffenders, tickBadgeState,
+  MACHINE_CHECKABLE,
+  READINESS,
+  captionFloorPx,
+  captionShortfall,
+  layoutOffenders,
+  machineWordOffenders,
+  tickBadgeState,
 } from './broadcastReady.js'
 import { BROADCAST_CAPTIONS } from './broadcast.js'
 import { subjectFor } from './directorCut.js'
@@ -45,11 +56,14 @@ function broadcastSheetPx(selector: string): number {
   return hits.at(-1)!
 }
 
-function sources(dir = WEB_SRC): Array<{ path: string; source: string }> {
-  const out: Array<{ path: string; source: string }> = []
+function sources(dir = WEB_SRC): { path: string; source: string }[] {
+  const out: { path: string; source: string }[] = []
   for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name)
-    if (statSync(p).isDirectory()) { out.push(...sources(p)); continue }
+    if (statSync(p).isDirectory()) {
+      out.push(...sources(p))
+      continue
+    }
     if (!/\.(ts|tsx)$/.test(name) || /\.test\.(ts|tsx)$/.test(name)) continue
     out.push({ path: p.slice(WEB_SRC.length + 1), source: readFileSync(p, 'utf8') })
   }
@@ -58,27 +72,71 @@ function sources(dir = WEB_SRC): Array<{ path: string; source: string }> {
 
 // ── the day-0 fixture, and the same town five days on ─────────────────────────────────────
 
-const agent = (id: string, name: string, x: number, y: number, over: Record<string, unknown> = {}) => ({
-  id, name, x, y, alive: true, asleep: false, ill: false, injuries: [], insideId: undefined,
-  collapsedSinceTick: null, activity: { verb: 'walk' }, ageDays: 30,
-  needs: { hunger: 70, warmth: 70, energy: 70, social: 70 }, skills: {}, ...over,
+const agent = (
+  id: string,
+  name: string,
+  x: number,
+  y: number,
+  over: Record<string, unknown> = {},
+) => ({
+  id,
+  name,
+  x,
+  y,
+  alive: true,
+  asleep: false,
+  ill: false,
+  injuries: [],
+  insideId: undefined,
+  collapsedSinceTick: null,
+  activity: { verb: 'walk' },
+  ageDays: 30,
+  needs: { hunger: 70, warmth: 70, energy: 70, social: 70 },
+  skills: {},
+  ...over,
 })
 
-const world = (over: Record<string, unknown> = {}): WorldState => ({
-  tick: 480,
-  terrain: [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-  agents: {
-    a1: agent('a1', 'Amara', 1, 1),
-    a2: agent('a2', 'Yusuf', 2, 2, { asleep: true, activity: null }),
-    a3: agent('a3', 'Nadia', 0, 2, { activity: { verb: 'till' } }),
-  },
-  structures: {
-    s_house: { id: 's_house', kind: 'house', x: 1, y: 0, w: 1, h: 1, stage: 'complete', owner: 'a1', builtBy: null },
-    s_fire: { id: 's_fire', kind: 'fire_pit', x: 0, y: 0, w: 1, h: 1, stage: 'complete', builtBy: null },
-  },
-  items: {}, crops: {}, weather: { kind: 'clear' },
-  ...over,
-} as unknown as WorldState)
+const world = (over: Record<string, unknown> = {}): WorldState =>
+  ({
+    tick: 480,
+    terrain: [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ],
+    agents: {
+      a1: agent('a1', 'Amara', 1, 1),
+      a2: agent('a2', 'Yusuf', 2, 2, { asleep: true, activity: null }),
+      a3: agent('a3', 'Nadia', 0, 2, { activity: { verb: 'till' } }),
+    },
+    structures: {
+      s_house: {
+        id: 's_house',
+        kind: 'house',
+        x: 1,
+        y: 0,
+        w: 1,
+        h: 1,
+        stage: 'complete',
+        owner: 'a1',
+        builtBy: null,
+      },
+      s_fire: {
+        id: 's_fire',
+        kind: 'fire_pit',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        stage: 'complete',
+        builtBy: null,
+      },
+    },
+    items: {},
+    crops: {},
+    weather: { kind: 'clear' },
+    ...over,
+  }) as unknown as WorldState
 
 // ── U12 · the townsfolk tab is a character roster ─────────────────────────────────────────
 
@@ -128,7 +186,7 @@ describe('U12 — "lackluster… doesn\'t have any information at a glance"', ()
 
 // ── U13 · one status vocabulary ───────────────────────────────────────────────────────────
 
-describe('U13 — "\'Asleep\' and \'Resting\' mean the same thing"', () => {
+describe("U13 — \"'Asleep' and 'Resting' mean the same thing\"", () => {
   it('leaves no printed status literal anywhere outside its own module', () => {
     expect(statusLiteralOffenders(sources())).toEqual([])
   })
@@ -148,8 +206,12 @@ describe('U13 — "\'Asleep\' and \'Resting\' mean the same thing"', () => {
 
 // ── U14 · the chronicle timeline ──────────────────────────────────────────────────────────
 
-const ev = (tick: number, type: string, payload: Record<string, unknown> = {}): SimEvent =>
-  ({ seq: tick, tick, type, payload } as unknown as SimEvent)
+const ev = (tick: number, type: string, payload: Record<string, unknown> = {}): SimEvent => ({
+  seq: tick,
+  tick,
+  type,
+  payload,
+})
 
 describe('U14 — "the timeline is missing MARKS; the font is hard to read and too small"', () => {
   const marks = marksFrom({
@@ -159,7 +221,11 @@ describe('U14 — "the timeline is missing MARKS; the font is hard to read and t
       ev(300, 'agent_born', { agentId: 'a4' }),
       ev(400, 'fire_ignited', { structureId: 's_house' }),
     ],
-    chapters: [], milestones: [], moments: [], changes: [{ tick: 250 }], discoveries: [],
+    chapters: [],
+    milestones: [],
+    moments: [],
+    changes: [{ tick: 250 }],
+    discoveries: [],
   })
 
   it('puts marks on a mature day at all', () => {
@@ -174,7 +240,12 @@ describe('U14 — "the timeline is missing MARKS; the font is hard to read and t
   it('coalesces rather than piling, so a busy hour is still readable', () => {
     const dense = [0, 1, 2, 3, 4].map((i) => ev(100 + i, 'structure_completed', { id: `s${i}` }))
     const all = marksFrom({
-      events: dense, chapters: [], milestones: [], moments: [], changes: [], discoveries: [],
+      events: dense,
+      chapters: [],
+      milestones: [],
+      moments: [],
+      changes: [],
+      discoveries: [],
     })
     expect(coalesceMarks(all, 500).length).toBeLessThanOrEqual(all.length)
   })
@@ -200,8 +271,9 @@ describe('U15 — "the bonds tab does not represent relationships and its tags a
   it('starts a pair who spoke once as strangers', () => {
     // `as never` on an act NAME used to slip past the type system and read as a valence of 1
     // by luck. The contract's own kind is the only thing the fold will take now.
-    expect(bondLevel(bondWarmth(bondFrom('a', 'b', [{ tick: 10, kind: 'friend' }], 20), 20)))
-      .toBe('strangers')
+    expect(bondLevel(bondWarmth(bondFrom('a', 'b', [{ tick: 10, kind: 'friend' }], 20), 20))).toBe(
+      'strangers',
+    )
   })
 
   it('reaches every one of the six levels, and a level FALLS on decay', () => {
@@ -211,14 +283,16 @@ describe('U15 — "the bonds tab does not represent relationships and its tags a
     const hot = bondWarmth(bondFrom('a', 'b', acts, 400), 400)
     const cold = bondWarmth(bondFrom('a', 'b', acts, 400), 400 + 20000)
     expect(cold).toBeLessThan(hot)
-    expect(LEVEL_RANK.indexOf(bondLevel(cold)))
-      .toBeLessThanOrEqual(LEVEL_RANK.indexOf(bondLevel(hot)))
+    expect(LEVEL_RANK.indexOf(bondLevel(cold))).toBeLessThanOrEqual(
+      LEVEL_RANK.indexOf(bondLevel(hot)),
+    )
   })
 
   it('tells a parent from a child from a sibling', () => {
     const lineage = {
       parentOf: [
-        { parentId: 'p', childId: 'c', tick: 10 }, { parentId: 'p', childId: 'd', tick: 20 },
+        { parentId: 'p', childId: 'c', tick: 10 },
+        { parentId: 'p', childId: 'd', tick: 20 },
       ],
     }
     const none = { pairs: [] } as never
@@ -253,12 +327,19 @@ describe('U16 — "an element sits ON TOP of the letterbox"', () => {
 
   it('has nothing straddling a band edge', () => {
     const l = frameLayout({ w: 1280, h: 594 }, true)
-    expect(straddlers([
-      { id: 'strip', x: 0, y: l.bandBottom.y, w: 1280, h: l.bandBottom.h },
-      { id: 'player', x: 100, y: l.picture.y + 20, w: 400, h: 56 },
-    ], l)).toEqual([])
+    expect(
+      straddlers(
+        [
+          { id: 'strip', x: 0, y: l.bandBottom.y, w: 1280, h: l.bandBottom.h },
+          { id: 'player', x: 100, y: l.picture.y + 20, w: 400, h: 56 },
+        ],
+        l,
+      ),
+    ).toEqual([])
     // and it FINDS one that crosses, so the guard is not vacuous
-    expect(straddlers([{ id: 'rail', x: 0, y: 8, w: 240, h: l.picture.y + 40 }], l)).toEqual(['rail'])
+    expect(straddlers([{ id: 'rail', x: 0, y: 8, w: 240, h: l.picture.y + 40 }], l)).toEqual([
+      'rail',
+    ])
   })
 
   it('does not engage the letterbox with nothing playing (audit M7)', () => {
@@ -273,7 +354,7 @@ describe('U16 — "an element sits ON TOP of the letterbox"', () => {
 describe('U17 — "world laws are super technical"', () => {
   it('is total over every togglable path', () => {
     for (const path of Object.keys(TOGGLABLE_PATHS)) {
-      expect(LAW_COPY[path as keyof typeof LAW_COPY], path).toBeDefined()
+      expect(LAW_COPY[path], path).toBeDefined()
     }
   })
 
@@ -287,7 +368,8 @@ describe('U17 — "world laws are super technical"', () => {
 
   it('says nothing a machine says, over every law surface at once', () => {
     const sites = Object.entries(LAW_COPY).flatMap(([p, c]) => [
-      { where: `${p} title`, text: c.title }, { where: `${p} sentence`, text: c.sentence },
+      { where: `${p} title`, text: c.title },
+      { where: `${p} sentence`, text: c.sentence },
     ])
     expect(machineWordOffenders(sites)).toEqual([])
   })
@@ -315,7 +397,9 @@ describe('U20/U21 — "I need controls out of the way… I must be able to move 
     const store = new Map<string, string>()
     const fake = {
       getItem: (k: string) => store.get(k) ?? null,
-      setItem: (k: string, v: string) => { store.set(k, v) },
+      setItem: (k: string, v: string) => {
+        store.set(k, v)
+      },
     } as unknown as Storage
     const moved = hudReducer(DEFAULT_HUD, { kind: 'dock', what: 'controlBar', to: 'top' })
     saveHud(fake, moved)
@@ -326,13 +410,29 @@ describe('U20/U21 — "I need controls out of the way… I must be able to move 
 // ── U22 · a proper bottom control bar ─────────────────────────────────────────────────────
 
 describe('U22 — "I should have controls at the bottom to let me do what I want"', () => {
-  const items = controlItems({ lens: 'map', live: true, zoom: 1, following: null, insideId: null, hudHidden: false, townFits: true })
+  const items = controlItems({
+    lens: 'map',
+    live: true,
+    zoom: 1,
+    following: null,
+    insideId: null,
+    hudHidden: false,
+    townFits: true,
+  })
 
   it('turns every id the bar can produce into an action', () => {
     for (const lens of ['map', 'inspector', 'chronicle', 'society', 'director', 'laws'] as const) {
       for (const live of [true, false]) {
         for (const inside of [null, 's_house']) {
-          for (const item of controlItems({ lens, live, zoom: 1, following: null, insideId: inside, hudHidden: false, townFits: true })) {
+          for (const item of controlItems({
+            lens,
+            live,
+            zoom: 1,
+            following: null,
+            insideId: inside,
+            hudHidden: false,
+            townFits: true,
+          })) {
             expect(() => actionFor(item), `${lens}/${item.id}`).not.toThrow()
             expect(actionFor(item).kind, `${lens}/${item.id}`).toBeTypeOf('string')
           }
@@ -345,15 +445,17 @@ describe('U22 — "I should have controls at the bottom to let me do what I want
     expect(items.length).toBeGreaterThan(4)
     for (const item of items) {
       expect(item.label.length, item.id).toBeGreaterThan(2)
-      // eslint-disable-next-line no-control-regex
+
       expect(/[^\u0000-\u00FF]/.test(item.label), `${item.id} label "${item.label}"`).toBe(false)
       expect(item.glyph.length, item.id).toBeGreaterThan(0)
     }
   })
 
   it('holds the 44px touch floor in the sheet', () => {
-    expect(/\.ctl-btn\s*\{[^}]*min-(?:width|height):\s*44px/.test(CSS)
-      || /--control-bar-h:\s*5[0-9]px/.test(CSS)).toBe(true)
+    expect(
+      /\.ctl-btn\s*\{[^}]*min-(?:width|height):\s*44px/.test(CSS) ||
+        /--control-bar-h:\s*5[0-9]px/.test(CSS),
+    ).toBe(true)
   })
 })
 
@@ -362,7 +464,8 @@ describe('U22 — "I should have controls at the bottom to let me do what I want
 describe('U23 — "missing special touches… transitions, that extra shine"', () => {
   it('has one motion table, total and inside the ceiling', () => {
     expect(Object.keys(MOTION).sort()).toEqual([...MOTIONS].sort())
-    for (const n of MOTIONS) if (n !== 'ambient') expect(MOTION[n].ms, n).toBeLessThanOrEqual(MOTION_CEILING_MS)
+    for (const n of MOTIONS)
+      if (n !== 'ambient') expect(MOTION[n].ms, n).toBeLessThanOrEqual(MOTION_CEILING_MS)
   })
 
   it('writes no raw duration in the whole sheet', () => {
@@ -370,7 +473,12 @@ describe('U23 — "missing special touches… transitions, that extra shine"', (
   })
 
   it('completes a scene and retargets one without restarting it', () => {
-    let s = sceneReducer(idleScene('lens', 'town'), { kind: 'go', name: 'lens', to: 'chronicle', atMs: 0 })
+    let s = sceneReducer(idleScene('lens', 'town'), {
+      kind: 'go',
+      name: 'lens',
+      to: 'chronicle',
+      atMs: 0,
+    })
     const retargeted = sceneReducer(s, { kind: 'go', name: 'lens', to: 'society', atMs: 40 })
     expect(retargeted.startedMs).toBe(s.startedMs)
     s = sceneReducer(retargeted, { kind: 'tick', atMs: SCENE_TOTAL_MS })
@@ -394,14 +502,19 @@ describe('U24 — "it really feels a very far distance from being that ready"', 
   })
 
   it('passes R4, R7 and R8', () => {
-    expect(machineWordOffenders([{ where: 'probe', text: 'The fire pit is finished.' }])).toEqual([])
-    expect(layoutOffenders({ panel: 368, stripCard: 168, controlItem: 44, controlCount: 11 })).toEqual([])
+    expect(machineWordOffenders([{ where: 'probe', text: 'The fire pit is finished.' }])).toEqual(
+      [],
+    )
+    expect(
+      layoutOffenders({ panel: 368, stripCard: 168, controlItem: 44, controlCount: 11 }),
+    ).toEqual([])
     expect(tickBadgeState('reconnecting', true, true)).toBe('stale')
   })
 
   it('reports R2 as CLOSED by the broadcast layout, and the desktop as still short', () => {
     const desktop = captionShortfall([
-      { what: 'speech bubble', px: 16 }, { what: 'filmstrip title', px: 14 },
+      { what: 'speech bubble', px: 16 },
+      { what: 'filmstrip title', px: 14 },
     ])
     expect(desktop).toHaveLength(2)
     expect(desktop[0]).toContain('4.00px of 5.4px')
@@ -429,7 +542,10 @@ describe('U24 — "it really feels a very far distance from being that ready"', 
   })
 
   it('carries a measured value in every row of the report, including the failures', () => {
-    const md = readFileSync(join(WEB_SRC, '..', '..', '..', 'docs', 'superpowers', 'reports', 'twitch-readiness.md'), 'utf8')
+    const md = readFileSync(
+      join(WEB_SRC, '..', '..', '..', 'docs', 'superpowers', 'reports', 'twitch-readiness.md'),
+      'utf8',
+    )
     for (const id of ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8']) {
       expect(md, id).toContain(`**${id}**`)
     }
@@ -447,11 +563,19 @@ describe('P22 — personality is an OUTPUT, not an input', () => {
 
   it('measures substance from the LOG, never from a genesis fact', () => {
     const thin = substanceOf({
-      actsDone: 0, daysLived: 0, bondsAtOrAbove: 0, skillBands: 0, personalityVersions: 0,
+      actsDone: 0,
+      daysLived: 0,
+      bondsAtOrAbove: 0,
+      skillBands: 0,
+      personalityVersions: 0,
       changeDays: 0,
     })
     const thick = substanceOf({
-      actsDone: 20, daysLived: 5, bondsAtOrAbove: 3, skillBands: 4, personalityVersions: 2,
+      actsDone: 20,
+      daysLived: 5,
+      bondsAtOrAbove: 3,
+      skillBands: 4,
+      personalityVersions: 2,
       changeDays: 3,
     })
     expect(thick).toBeGreaterThan(thin)
@@ -459,12 +583,19 @@ describe('P22 — personality is an OUTPUT, not an input', () => {
 
   it('renders two people with identical genesis and different logs differently', () => {
     const base = {
-      name: 'A', nowTick: 480, skills: {}, bonds: null, lineage: { parentOf: [] },
-      people: { a1: 'A', a2: 'B' }, changes: [],
+      name: 'A',
+      nowTick: 480,
+      skills: {},
+      bonds: null,
+      lineage: { parentOf: [] },
+      people: { a1: 'A', a2: 'B' },
+      changes: [],
     }
-    const quiet = becomingOf({ ...base, id: 'a1', acts: [] } as never)
+    const quiet = becomingOf({ ...base, id: 'a1', acts: [] })
     const busy = becomingOf({
-      ...base, id: 'a2', name: 'B',
+      ...base,
+      id: 'a2',
+      name: 'B',
       acts: [{ tick: 100, words: 'gave bread to A', day: 0 }],
     } as never)
     expect(JSON.stringify(quiet.done)).not.toEqual(JSON.stringify(busy.done))

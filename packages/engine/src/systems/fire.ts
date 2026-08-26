@@ -10,7 +10,9 @@ export function structuresAdjacent(a: Structure, b: Structure): boolean {
 }
 
 function sorted(state: WorldState): Structure[] {
-  return Object.keys(state.structures).sort().map((id) => state.structures[id]!)
+  return Object.keys(state.structures)
+    .sort()
+    .map((id) => state.structures[id]!)
 }
 
 export function fireSystem(ctx: TickCtx): void {
@@ -35,7 +37,9 @@ export function fireSystem(ctx: TickCtx): void {
   // The roll happens only where a flame actually stands beside something that burns, so a world
   // with no torches lit never touches the `fire` stream and hashes exactly as it did.
   if (ctx.config.light.enabled) {
-    for (const f of flamesAt(ctx.state(), ctx.state().tick, ctx.config).filter((x) => x.source === 'item')) {
+    for (const f of flamesAt(ctx.state(), ctx.state().tick, ctx.config).filter(
+      (x) => x.source === 'item',
+    )) {
       for (const to of sorted(ctx.state())) {
         if (!to.flammable || to.burning) continue
         if (!isAdjacentToRect(f.x, f.y, to)) continue
@@ -46,8 +50,11 @@ export function fireSystem(ctx: TickCtx): void {
     }
   }
 
-  const spreadChance = cfg.spreadChancePerTickAdjacent * (weather === 'storm' ? cfg.stormSpreadMultiplier : 1)
-  const sources = sorted(ctx.state()).filter((s) => s.burning).map((s) => s.id)
+  const spreadChance =
+    cfg.spreadChancePerTickAdjacent * (weather === 'storm' ? cfg.stormSpreadMultiplier : 1)
+  const sources = sorted(ctx.state())
+    .filter((s) => s.burning)
+    .map((s) => s.id)
   for (const fromId of sources) {
     // The list of sources is taken before the loop and every emit inside it folds, so a structure
     // that burns down between one source and the next is a ghost.

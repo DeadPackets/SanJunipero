@@ -2,37 +2,50 @@ import { z } from 'zod'
 
 // The renderer's room vocabulary, not enterability — that is roofed. Every enterable kind must
 // have a room here (interiors.test.ts); shed is the one unenterable exception, pinned by name.
-export const INTERIOR_KINDS =
-  ['house', 'storehouse', 'shed', 'cabin', 'cottage', 'farmhouse'] as const
+export const INTERIOR_KINDS = [
+  'house',
+  'storehouse',
+  'shed',
+  'cabin',
+  'cottage',
+  'farmhouse',
+] as const
 export type InteriorKind = (typeof INTERIOR_KINDS)[number]
 export const InteriorKindSchema = z.enum(INTERIOR_KINDS)
 
 export const LIBRARY_CATEGORIES = ['tool', 'food', 'material', 'ritual', 'furniture'] as const
 export type LibraryCategory = (typeof LIBRARY_CATEGORIES)[number]
 
-export const InteriorMetaSchema = z.object({
-  slots: z.object({
-    w: z.number().int().min(1).max(2), h: z.number().int().min(1).max(2),
-  }).strict(),
-  placement: z.enum(['floor', 'wall']),
-  interiorKinds: z.array(InteriorKindSchema).min(1),
-  // Literal true: absence is the only way to say "no", so a flag can never be half-set.
-  isBed: z.literal(true).optional(),
-  isHearth: z.literal(true).optional(),
-  providesLight: z.literal(true).optional(),
-}).strict()
+export const InteriorMetaSchema = z
+  .object({
+    slots: z
+      .object({
+        w: z.number().int().min(1).max(2),
+        h: z.number().int().min(1).max(2),
+      })
+      .strict(),
+    placement: z.enum(['floor', 'wall']),
+    interiorKinds: z.array(InteriorKindSchema).min(1),
+    // Literal true: absence is the only way to say "no", so a flag can never be half-set.
+    isBed: z.literal(true).optional(),
+    isHearth: z.literal(true).optional(),
+    providesLight: z.literal(true).optional(),
+  })
+  .strict()
 export type InteriorMeta = z.infer<typeof InteriorMetaSchema>
 
-export const LibraryItemManifestSchema = z.object({
-  version: z.literal('v1-library-item'),
-  kind: z.string().min(1),
-  category: z.enum(LIBRARY_CATEGORIES),
-  // The 24 px ceiling moved to the C-level bar (forge assetResolution.ts). The bound only
-  // widens, so the 24 px manifests already in the codex keep parsing beside 128 px art.
-  spritePx: z.number().int().min(16).max(256),
-  iconPx: z.number().int().min(16).max(128),
-  interior: InteriorMetaSchema.optional(),
-}).strict()
+export const LibraryItemManifestSchema = z
+  .object({
+    version: z.literal('v1-library-item'),
+    kind: z.string().min(1),
+    category: z.enum(LIBRARY_CATEGORIES),
+    // The 24 px ceiling moved to the C-level bar (forge assetResolution.ts). The bound only
+    // widens, so the 24 px manifests already in the codex keep parsing beside 128 px art.
+    spritePx: z.number().int().min(16).max(256),
+    iconPx: z.number().int().min(16).max(128),
+    interior: InteriorMetaSchema.optional(),
+  })
+  .strict()
 export type LibraryItemManifest = z.infer<typeof LibraryItemManifestSchema>
 
 export function parseLibraryItemManifest(meta: string | null): LibraryItemManifest | null {

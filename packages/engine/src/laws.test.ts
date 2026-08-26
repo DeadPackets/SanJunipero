@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
 import { fold } from './fold.js'
@@ -13,12 +20,21 @@ import { createWorldTick } from './worldTick.js'
 // A law is a fact about the world, so it travels the only road facts travel:
 // one event, folded, hashed, snapshotted, replayed.
 
-const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
+const CFG: SimConfig = SimConfigSchema.parse({
+  weather: { hourlyChangeChance: 0 },
+  mystery: { chancePerDay: 0 },
+})
 
 let seq = 70000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
-const MAP = (): TileId[][] => Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+const MAP = (): TileId[][] =>
+  Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
 
 function world(): WorldState {
   const s = genesisState(CFG, MAP())
@@ -64,13 +80,30 @@ describe('effectiveConfig', () => {
   // Driven from an explicit array, not from the table itself: a missing whitelist entry has to
   // fail loudly, and a table-derived loop would happily agree with its own omission.
   const C11_LAW_PATHS = [
-    'mortality.enabled', 'illness.enabled', 'thirst.enabled', 'fertility.enabled', 'roads.enabled',
-    'desirePaths.enabled', 'fauna.enabled', 'warmth.enabled', 'light.enabled', 'nightWitness.enabled',
-    'foodVariety.enabled', 'regrowth.enabled', 'mapGrowth.enabled', 'constructs.enabled',
+    'mortality.enabled',
+    'illness.enabled',
+    'thirst.enabled',
+    'fertility.enabled',
+    'roads.enabled',
+    'desirePaths.enabled',
+    'fauna.enabled',
+    'warmth.enabled',
+    'light.enabled',
+    'nightWitness.enabled',
+    'foodVariety.enabled',
+    'regrowth.enabled',
+    'mapGrowth.enabled',
+    'constructs.enabled',
     'constructs.minParticipants',
-    'mortality.poisonChanceSpoiled', 'illness.dailyWorsenChance', 'illness.contagionEnabled',
-    'illness.contagionChance', 'thirst.decayFactorOfHunger', 'desirePaths.wearThreshold',
-    'light.nightWorkPenalty', 'light.fireRiskPerTick', 'nightWitness.nightFactor',
+    'mortality.poisonChanceSpoiled',
+    'illness.dailyWorsenChance',
+    'illness.contagionEnabled',
+    'illness.contagionChance',
+    'thirst.decayFactorOfHunger',
+    'desirePaths.wearThreshold',
+    'light.nightWorkPenalty',
+    'light.fireRiskPerTick',
+    'nightWitness.nightFactor',
     'regrowth.saplingChancePerDay',
   ]
 
@@ -98,7 +131,11 @@ describe('effectiveConfig', () => {
 describe('fold: config_changed', () => {
   it('sets the law and, because laws are hashed, moves the state hash', () => {
     const before = world()
-    const after = fold(before, ev('config_changed', { path: 'spoilage.enabled', value: false }), CFG)
+    const after = fold(
+      before,
+      ev('config_changed', { path: 'spoilage.enabled', value: false }),
+      CFG,
+    )
     expect(after.laws).toEqual({ 'spoilage.enabled': false })
     expect(stateHash(after)).not.toBe(stateHash(before))
   })
@@ -108,15 +145,18 @@ describe('fold: config_changed', () => {
   })
 
   it('rejects a path that is not on the whitelist', () => {
-    expect(() => fold(world(), ev('config_changed', { path: 'movement.sightRadius', value: 40 }), CFG))
-      .toThrow(/not a world law/)
+    expect(() =>
+      fold(world(), ev('config_changed', { path: 'movement.sightRadius', value: 40 }), CFG),
+    ).toThrow(/not a world law/)
   })
 
   it('rejects a string where the law wants a boolean', () => {
-    expect(() => fold(world(), ev('config_changed', { path: 'spoilage.enabled', value: 'off' }), CFG))
-      .toThrow(/rejected/)
-    expect(() => fold(world(), ev('config_changed', { path: 'mystery.chancePerDay', value: 4 }), CFG))
-      .toThrow(/rejected/)
+    expect(() =>
+      fold(world(), ev('config_changed', { path: 'spoilage.enabled', value: 'off' }), CFG),
+    ).toThrow(/rejected/)
+    expect(() =>
+      fold(world(), ev('config_changed', { path: 'mystery.chancePerDay', value: 4 }), CFG),
+    ).toThrow(/rejected/)
   })
 
   it('the latest flip of a path wins and the others stay put', () => {
@@ -134,7 +174,11 @@ describe('fold: config_changed', () => {
     const narrow = fold(s, ev('co_slept', { aId: 'a1', bId: 'a2', day: 20 }), CFG)
     expect(narrow.pairNights!['a1|a2']!.nights).toBe(1) // the gap broke the run
 
-    const widened = fold(s, ev('config_changed', { path: 'reproduction.partnerWindowDays', value: 40 }), CFG)
+    const widened = fold(
+      s,
+      ev('config_changed', { path: 'reproduction.partnerWindowDays', value: 40 }),
+      CFG,
+    )
     const kept = fold(widened, ev('co_slept', { aId: 'a1', bId: 'a2', day: 20 }), CFG)
     expect(kept.pairNights!['a1|a2']!.nights).toBe(2)
   })
@@ -191,10 +235,17 @@ describe('laws survive the wire: replay and snapshots', () => {
     const rng = new RngStreams('laws-run')
     const worldTick = createWorldTick(CFG, rng, queue)
     const loop: TickLoop = new TickLoop({
-      store, state: genesisState(CFG, MAP()), rng, config: CFG, snapshotEveryTicks: 10,
+      store,
+      state: genesisState(CFG, MAP()),
+      rng,
+      config: CFG,
+      snapshotEveryTicks: 10,
       onTick: ({ tick, emit }) => {
         if (tick === 1) emit('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 })
-        if (tick === 12) { applyLaw(queue, 'spoilage.enabled', false); applyLaw(queue, 'mystery.chancePerDay', 1) }
+        if (tick === 12) {
+          applyLaw(queue, 'spoilage.enabled', false)
+          applyLaw(queue, 'mystery.chancePerDay', 1)
+        }
         for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
       },
     })

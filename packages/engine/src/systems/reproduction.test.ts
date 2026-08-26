@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { DAYS_PER_YEAR, DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  DAYS_PER_YEAR,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
@@ -11,34 +18,64 @@ import { isPartnered, pairKey, partnershipOf, sexOf } from './reproduction.js'
 // Partnership is inferred, never declared: the town reads it off who sleeps where.
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
-const OFF: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, reproduction: { enabled: false } })
+const OFF: SimConfig = SimConfigSchema.parse({
+  weather: { hourlyChangeChance: 0 },
+  reproduction: { enabled: false },
+})
 
 let seq = 50000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
 const HOUSE = { id: 'structure_1', kind: 'house', x: 2, y: 2, w: 3, h: 3 }
 const STORE = { id: 'structure_2', kind: 'storehouse', x: 8, y: 2, w: 3, h: 3 }
 
 function room(config: SimConfig, box: typeof HOUSE): (s: WorldState) => WorldState {
   return (s) => {
-    const planned = fold(s, ev('structure_planned', {
-      ...box, maxHp: 50, flammable: true, builderId: 'a1',
-    }), config)
+    const planned = fold(
+      s,
+      ev('structure_planned', {
+        ...box,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'a1',
+      }),
+      config,
+    )
     return fold(planned, ev('structure_completed', { id: box.id }), config)
   }
 }
 
 // Agents indoors and (by default) asleep, which is all the midnight pass looks at.
-type WorldOpts = { awake?: string[]; sexes?: Record<string, 'f' | 'm'>; ages?: Record<string, number> }
+type WorldOpts = {
+  awake?: string[]
+  sexes?: Record<string, 'f' | 'm'>
+  ages?: Record<string, number>
+}
 
 function world(ids: string[], config = CFG, box = HOUSE, opts: WorldOpts = {}): WorldState {
-  let s = genesisState(config, Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0)))
+  let s = genesisState(
+    config,
+    Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0)),
+  )
   s = room(config, box)(s)
   for (const id of ids) {
-    s = fold(s, ev('agent_spawned', {
-      id, name: id, x: box.x, y: box.y, ageDays: opts.ages?.[id] ?? 7300,
-      ...(opts.sexes?.[id] === undefined ? {} : { sex: opts.sexes[id] }),
-    }), config)
+    s = fold(
+      s,
+      ev('agent_spawned', {
+        id,
+        name: id,
+        x: box.x,
+        y: box.y,
+        ageDays: opts.ages?.[id] ?? 7300,
+        ...(opts.sexes?.[id] === undefined ? {} : { sex: opts.sexes[id] }),
+      }),
+      config,
+    )
     s = fold(s, ev('agent_entered', { agentId: id, structureId: box.id }), config)
     if (!opts.awake?.includes(id)) s = fold(s, ev('agent_slept', { agentId: id }), config)
   }
@@ -47,15 +84,19 @@ function world(ids: string[], config = CFG, box = HOUSE, opts: WorldOpts = {}): 
 
 type Midnight = {
   state: WorldState
-  events: Array<{ type: string; payload: unknown }>
-  coSlept: Array<{ type: string; payload: unknown }>
+  events: { type: string; payload: unknown }[]
+  coSlept: { type: string; payload: unknown }[]
 }
 
 function midnight(s: WorldState, day: number, config = CFG, seed = 'repro'): Midnight {
   const tick = day * MINUTES_PER_DAY
   const advanced = fold({ ...s, tick: tick - 1 }, ev('tick_advanced', {}, tick), config)
   const r = createWorldTick(config, new RngStreams(seed))(advanced)
-  return { state: r.state, events: r.events, coSlept: r.events.filter(e => e.type === 'co_slept') }
+  return {
+    state: r.state,
+    events: r.events,
+    coSlept: r.events.filter((e) => e.type === 'co_slept'),
+  }
 }
 
 // Sleep through `days` consecutive midnights, starting at day 1.
@@ -67,7 +108,12 @@ describe('the midnight co-sleeping pass', () => {
   it('records the pair asleep in one house', () => {
     const { state, coSlept } = midnight(world(['a1', 'a2']), 1)
     expect(coSlept).toEqual([{ type: 'co_slept', payload: { aId: 'a1', bId: 'a2', day: 1 } }])
-    expect(partnershipOf(state, 'a1', 'a2')).toEqual({ nights: 1, lastNightDay: 1, formedTick: null, dissolvedTick: null })
+    expect(partnershipOf(state, 'a1', 'a2')).toEqual({
+      nights: 1,
+      lastNightDay: 1,
+      formedTick: null,
+      dissolvedTick: null,
+    })
   })
 
   it('ignores an occupant who is awake', () => {
@@ -79,7 +125,7 @@ describe('the midnight co-sleeping pass', () => {
   })
 
   it('pairs three occupants three ways, in a deterministic order', () => {
-    expect(midnight(world(['a3', 'a1', 'a2']), 1).coSlept.map(e => e.payload)).toEqual([
+    expect(midnight(world(['a3', 'a1', 'a2']), 1).coSlept.map((e) => e.payload)).toEqual([
       { aId: 'a1', bId: 'a2', day: 1 },
       { aId: 'a1', bId: 'a3', day: 1 },
       { aId: 'a2', bId: 'a3', day: 1 },
@@ -114,17 +160,28 @@ describe('partnership is counted, not declared', () => {
     const three = midnight(two, 3).state
     expect(partnershipOf(three, 'a1', 'a2')!.formedTick).toBe(3 * MINUTES_PER_DAY)
     // A fourth night does not re-stamp what is already true.
-    expect(partnershipOf(midnight(three, 4).state, 'a1', 'a2')!.formedTick).toBe(3 * MINUTES_PER_DAY)
+    expect(partnershipOf(midnight(three, 4).state, 'a1', 'a2')!.formedTick).toBe(
+      3 * MINUTES_PER_DAY,
+    )
   })
 
   it('leaves both transition fields null for a pair that never got there', () => {
-    expect(partnershipOf(nights(world(['a1', 'a2']), [1, 2]), 'a1', 'a2'))
-      .toEqual({ nights: 2, lastNightDay: 2, formedTick: null, dissolvedTick: null })
+    expect(partnershipOf(nights(world(['a1', 'a2']), [1, 2]), 'a1', 'a2')).toEqual({
+      nights: 2,
+      lastNightDay: 2,
+      formedTick: null,
+      dissolvedTick: null,
+    })
   })
 
   it('resets the count to one after a gap wider than the window', () => {
     const s = nights(world(['a1', 'a2']), [1, 2, 11]) // 9-day gap
-    expect(partnershipOf(s, 'a1', 'a2')).toEqual({ nights: 1, lastNightDay: 11, formedTick: null, dissolvedTick: null })
+    expect(partnershipOf(s, 'a1', 'a2')).toEqual({
+      nights: 1,
+      lastNightDay: 11,
+      formedTick: null,
+      dissolvedTick: null,
+    })
   })
 
   it('stamps dissolvedTick at the gap-reset midnight once they were partnered', () => {
@@ -132,7 +189,10 @@ describe('partnership is counted, not declared', () => {
     expect(partnershipOf(partnered, 'a1', 'a2')!.formedTick).toBe(3 * MINUTES_PER_DAY)
     const apart = midnight(partnered, 12).state // 9-day gap
     expect(partnershipOf(apart, 'a1', 'a2')).toEqual({
-      nights: 1, lastNightDay: 12, formedTick: 3 * MINUTES_PER_DAY, dissolvedTick: 12 * MINUTES_PER_DAY,
+      nights: 1,
+      lastNightDay: 12,
+      formedTick: 3 * MINUTES_PER_DAY,
+      dissolvedTick: 12 * MINUTES_PER_DAY,
     })
     expect(isPartnered(apart, 'a1', 'a2', CFG)).toBe(false)
   })
@@ -142,7 +202,10 @@ describe('partnership is counted, not declared', () => {
     expect(partnershipOf(apart, 'a1', 'a2')!.dissolvedTick).toBe(12 * MINUTES_PER_DAY)
     const again = nights(apart, [13, 14])
     expect(partnershipOf(again, 'a1', 'a2')).toEqual({
-      nights: 3, lastNightDay: 14, formedTick: 14 * MINUTES_PER_DAY, dissolvedTick: null,
+      nights: 3,
+      lastNightDay: 14,
+      formedTick: 14 * MINUTES_PER_DAY,
+      dissolvedTick: null,
     })
     expect(isPartnered(again, 'a1', 'a2', CFG)).toBe(true)
   })
@@ -162,23 +225,30 @@ describe('partnership is counted, not declared', () => {
 
 describe('conception', () => {
   const CONCEIVES = 'r3' // first reproduction roll ≈ 0.143, under the 0.2 chance
-  const REFUSES = 'r0'   // ≈ 0.777
+  const REFUSES = 'r0' // ≈ 0.777
   const SEXES = { a1: 'f', a2: 'm' } as const
 
   // Three nights together, then the fourth midnight is the one that can conceive.
   function couple(config = CFG, opts: WorldOpts = {}): WorldState {
-    return nights(world(['a1', 'a2'], config, HOUSE, { sexes: { ...SEXES }, ...opts }), [1, 2, 3], config)
+    return nights(
+      world(['a1', 'a2'], config, HOUSE, { sexes: { ...SEXES }, ...opts }),
+      [1, 2, 3],
+      config,
+    )
   }
 
   const conceptions = (s: WorldState, seed: string, config = CFG, day = 4) =>
-    midnight(s, day, config, seed).events.filter(e => e.type === 'agent_conceived')
+    midnight(s, day, config, seed).events.filter((e) => e.type === 'agent_conceived')
 
   it('fires for a partnered, co-sleeping, fertile f/m pair when the roll lands', () => {
     const s = couple()
     expect(conceptions(s, CONCEIVES)).toEqual([
       { type: 'agent_conceived', payload: { motherId: 'a1', fatherId: 'a2', day: 4 } },
     ])
-    expect(midnight(s, 4, CFG, CONCEIVES).state.agents.a1!.pregnant).toEqual({ sinceDay: 4, byId: 'a2' })
+    expect(midnight(s, 4, CFG, CONCEIVES).state.agents.a1!.pregnant).toEqual({
+      sinceDay: 4,
+      byId: 'a2',
+    })
   })
 
   it('does not fire when the roll misses', () => {
@@ -210,7 +280,11 @@ describe('conception', () => {
   })
 
   it('never stacks a second pregnancy on the first', () => {
-    const carrying = fold(couple(), ev('agent_conceived', { motherId: 'a1', fatherId: 'a2', day: 4 }), CFG)
+    const carrying = fold(
+      couple(),
+      ev('agent_conceived', { motherId: 'a1', fatherId: 'a2', day: 4 }),
+      CFG,
+    )
     expect(conceptions(carrying, CONCEIVES, CFG, 5)).toEqual([])
   })
 
@@ -229,7 +303,7 @@ describe('gestation and birth', () => {
   }
 
   const births = (s: WorldState, day: number, config = CFG, seed = 'repro') =>
-    midnight(s, day, config, seed).events.filter(e => e.type === 'agent_born')
+    midnight(s, day, config, seed).events.filter((e) => e.type === 'agent_born')
 
   it('counts days, not ticks: nothing is born a day early', () => {
     expect(births(carrying(0), TERM - 1)).toEqual([])
@@ -245,7 +319,7 @@ describe('gestation and birth', () => {
 
   it('places the child beside its mother, aged twelve, with both parents named', () => {
     const born = midnight(carrying(0), TERM, CFG, 'r5').state
-    const child = Object.values(born.agents).find(a => a.id !== 'a1' && a.id !== 'a2')!
+    const child = Object.values(born.agents).find((a) => a.id !== 'a1' && a.id !== 'a2')!
     expect(child.ageDays).toBe(12 * DAYS_PER_YEAR + 1) // agingSystem runs after this midnight's birth
     expect(child.parents).toEqual(['a1', 'a2'])
     expect(child.insideId).toBe(HOUSE.id)
@@ -272,8 +346,12 @@ describe('gestation and birth', () => {
 
   it('keeps a birth outdoors outdoors', () => {
     const outside = carrying(0)
-    const s = { ...outside, agents: { ...outside.agents, a1: { ...outside.agents.a1!, insideId: undefined, x: 9, y: 9 } } }
-    const child = Object.values(midnight(s, TERM, CFG, 'r5').state.agents).find(a => a.id !== 'a1' && a.id !== 'a2')!
+    const a1 = { ...outside.agents.a1!, x: 9, y: 9 }
+    delete a1.insideId
+    const s = { ...outside, agents: { ...outside.agents, a1 } }
+    const child = Object.values(midnight(s, TERM, CFG, 'r5').state.agents).find(
+      (a) => a.id !== 'a1' && a.id !== 'a2',
+    )!
     expect(child).not.toHaveProperty('insideId')
     expect([child.x, child.y]).toEqual([9, 9])
   })
@@ -293,12 +371,21 @@ describe('sex', () => {
   })
 
   it('rejects a sex the world does not have', () => {
-    expect(() => fold(genesisState(CFG), ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300, sex: 'x' }), CFG))
-      .toThrow()
+    expect(() =>
+      fold(
+        genesisState(CFG),
+        ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300, sex: 'x' }),
+        CFG,
+      ),
+    ).toThrow()
   })
 
   it('is left off the body entirely when reproduction is off, so old logs hash as before', () => {
-    const s = fold(genesisState(DEFAULT_CONFIG), ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), DEFAULT_CONFIG)
+    const s = fold(
+      genesisState(DEFAULT_CONFIG),
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }),
+      DEFAULT_CONFIG,
+    )
     expect(s.agents.a1).not.toHaveProperty('sex')
   })
 })

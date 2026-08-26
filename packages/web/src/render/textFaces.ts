@@ -61,7 +61,12 @@ export function wrapCharsFor(family: string, size: number, maxPx: number): numbe
 // ── installing the faces ──────────────────────────────────────────────────────────────────
 
 /** ASCII plus the punctuation the narrator and the agents actually use. */
-const CHARS: Array<string | string[]> = [['a', 'z'], ['A', 'Z'], ['0', '9'], " .,:;!?'\"()[]-–—…&%/*+="]
+const CHARS: (string | string[])[] = [
+  ['a', 'z'],
+  ['A', 'Z'],
+  ['0', '9'],
+  ' .,:;!?\'"()[]-–—…&%/*+=',
+]
 
 let installed = false
 export function facesInstalled(): boolean {
@@ -73,7 +78,9 @@ export function facesInstalled(): boolean {
 export async function installFaces(doc: { fonts: FontFaceSet }): Promise<void> {
   if (installed) return
   try {
-    await Promise.all(Object.values(FACE_SOURCE).map((f) => doc.fonts.load(`${FACE_INSTALL_PX}px "${f}"`)))
+    await Promise.all(
+      Object.values(FACE_SOURCE).map((f) => doc.fonts.load(`${FACE_INSTALL_PX}px "${f}"`)),
+    )
     await doc.fonts.ready
     for (const [name, source] of Object.entries(FACE_SOURCE)) {
       BitmapFont.install({
@@ -103,8 +110,14 @@ export const BUBBLE_SLICE = 10
 export const BUBBLE_FRAME_PX = 30
 
 export type SliceRect = {
-  sx: number; sy: number; sw: number; sh: number
-  dx: number; dy: number; dw: number; dh: number
+  sx: number
+  sy: number
+  sw: number
+  sh: number
+  dx: number
+  dy: number
+  dw: number
+  dh: number
 }
 
 /** Nine rects from one frame texture, so a slab stretches without smearing at any length.
@@ -145,10 +158,14 @@ export function tailPoly(side: BubbleSide, w: number, h: number): number[] {
   const cx = Math.round(w / 2)
   const cy = Math.round(h / 2)
   switch (side) {
-    case 'above': return [cx - t, h, cx + t, h, cx, h + t]
-    case 'below': return [cx - t, 0, cx + t, 0, cx, -t]
-    case 'left': return [w, cy - t, w, cy + t, w + t, cy]
-    case 'right': return [0, cy - t, 0, cy + t, -t, cy]
+    case 'above':
+      return [cx - t, h, cx + t, h, cx, h + t]
+    case 'below':
+      return [cx - t, 0, cx + t, 0, cx, -t]
+    case 'left':
+      return [w, cy - t, w, cy + t, w + t, cy]
+    case 'right':
+      return [0, cy - t, 0, cy + t, -t, cy]
   }
 }
 
@@ -156,11 +173,11 @@ export function tailPoly(side: BubbleSide, w: number, h: number): number[] {
 
 // Only three palette pairs clear AA under the deep-night multiply, so BOTH bubbles take
 // `--deep` and carry their difference in the paper and the edge shape, never in the ink.
-export const SPEECH_FILL = 0xfff6e9        // --cream:     15.02:1 day / 5.19:1 night
-export const SPEECH_INK = 0x241f2b         // --deep
-export const THOUGHT_FILL = 0xf6e8d5       // --parchment: 13.34:1 day / 4.67:1 night
-export const THOUGHT_INK = 0x241f2b        // --deep, on visibly different paper
-export const BUBBLE_EDGE = 0x241f2b        // --deep, the stepped ledge under every slab
+export const SPEECH_FILL = 0xfff6e9 // --cream:     15.02:1 day / 5.19:1 night
+export const SPEECH_INK = 0x241f2b // --deep
+export const THOUGHT_FILL = 0xf6e8d5 // --parchment: 13.34:1 day / 4.67:1 night
+export const THOUGHT_INK = 0x241f2b // --deep, on visibly different paper
+export const BUBBLE_EDGE = 0x241f2b // --deep, the stepped ledge under every slab
 /** The cloud edge on a thought: a different SHAPE, which is the channel alpha was misusing. */
 export const THOUGHT_SCALLOP_R = 3
 export const SCALLOP_COUNT = 3
@@ -168,18 +185,29 @@ export const SCALLOP_COUNT = 3
 /** The three shrinking dots that trail from a thought toward its thinker, pointing the same
  *  four ways the speech tail does — a de-conflicted bubble can sit on any side of the head. */
 export function scallopTrail(
-  side: BubbleSide, w: number, h: number,
-): Array<{ cx: number; cy: number; r: number }> {
-  const cx = Math.round(w / 2), cy = Math.round(h / 2)
-  const out: Array<{ cx: number; cy: number; r: number }> = []
+  side: BubbleSide,
+  w: number,
+  h: number,
+): { cx: number; cy: number; r: number }[] {
+  const cx = Math.round(w / 2),
+    cy = Math.round(h / 2)
+  const out: { cx: number; cy: number; r: number }[] = []
   for (let i = 0; i < SCALLOP_COUNT; i++) {
     const r = Math.max(1, THOUGHT_SCALLOP_R - i)
     const step = 3 + i * (THOUGHT_SCALLOP_R + 2)
     switch (side) {
-      case 'above': out.push({ cx: cx - i * 2, cy: h + step, r }); break
-      case 'below': out.push({ cx: cx - i * 2, cy: -step, r }); break
-      case 'left': out.push({ cx: w + step, cy: cy - i * 2, r }); break
-      case 'right': out.push({ cx: -step, cy: cy - i * 2, r }); break
+      case 'above':
+        out.push({ cx: cx - i * 2, cy: h + step, r })
+        break
+      case 'below':
+        out.push({ cx: cx - i * 2, cy: -step, r })
+        break
+      case 'left':
+        out.push({ cx: w + step, cy: cy - i * 2, r })
+        break
+      case 'right':
+        out.push({ cx: -step, cy: cy - i * 2, r })
+        break
     }
   }
   return out

@@ -12,7 +12,7 @@ const db = openForgeDb(dbPath)
 try {
   const entries = await ingestProductionArt(db)
   for (const e of entries) console.log(`${e.action.padEnd(10)} ${e.kind} (${e.id})`)
-  const n = entries.filter(e => e.action === 'registered').length
+  const n = entries.filter((e) => e.action === 'registered').length
   console.log(`ingest: ${n} registered, ${entries.length - n} unchanged → ${dbPath}`)
 } finally {
   db.close()

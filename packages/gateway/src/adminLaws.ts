@@ -28,8 +28,12 @@ function readBody(req: IncomingMessage): Promise<string | null> {
       text += chunk.toString()
       if (text.length > MAX_BODY_BYTES) over = true
     })
-    req.on('end', () => resolve(over ? null : text))
-    req.on('error', () => resolve(null))
+    req.on('end', () => {
+      resolve(over ? null : text)
+    })
+    req.on('error', () => {
+      resolve(null)
+    })
   })
 }
 
@@ -40,32 +44,56 @@ export function createLawsAdmin(opts: LawsAdminOpts): Server {
   // Binding is the operator's job; this is the second lock — a listener started on 0.0.0.0
   // still refuses every request that did not arrive on the configured address.
   const wrongInterface = (req: IncomingMessage): boolean =>
-    host !== '0.0.0.0' && host !== '::' && (req.socket.localAddress ?? '').replace(/^::ffff:/, '') !== host
+    host !== '0.0.0.0' &&
+    host !== '::' &&
+    (req.socket.localAddress ?? '').replace(/^::ffff:/, '') !== host
 
   return createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost')
-    if (url.pathname !== ADMIN_LAWS_PATH) return send(res, 404, { error: 'not found' })
-    if (req.method !== 'POST') return send(res, 405, { error: 'POST only' })
-    if (req.headers.authorization !== `Bearer ${opts.token}`) return send(res, 401, { error: 'unauthorized' })
-    if (wrongInterface(req)) return send(res, 403, { error: `the law channel answers on ${host} only` })
+    if (url.pathname !== ADMIN_LAWS_PATH) {
+      send(res, 404, { error: 'not found' })
+      return
+    }
+    if (req.method !== 'POST') {
+      send(res, 405, { error: 'POST only' })
+      return
+    }
+    if (req.headers.authorization !== `Bearer ${opts.token}`) {
+      send(res, 401, { error: 'unauthorized' })
+      return
+    }
+    if (wrongInterface(req)) {
+      send(res, 403, { error: `the law channel answers on ${host} only` })
+      return
+    }
 
     void readBody(req).then((text) => {
-      if (text === null) return send(res, 400, { error: 'body unreadable' })
+      if (text === null) {
+        send(res, 400, { error: 'body unreadable' })
+        return
+      }
       let parsed: z.infer<typeof LawRequest>
       try {
         parsed = LawRequest.parse(JSON.parse(text))
       } catch {
-        return send(res, 400, { error: 'expected {path, value}' })
+        send(res, 400, { error: 'expected {path, value}' })
+        return
       }
       const schema = TOGGLABLE_PATHS[parsed.path]
-      if (schema === undefined) return send(res, 400, { error: `${parsed.path} is not a world law` })
+      if (schema === undefined) {
+        send(res, 400, { error: `${parsed.path} is not a world law` })
+        return
+      }
       // The fold THROWS on a value its schema rejects, so a cheerful 202 here
       // would take the world down at the next tick boundary. Refuse it now.
       const value = schema.safeParse(parsed.value)
-      if (!value.success) return send(res, 400, { error: `value rejected for ${parsed.path}` })
+      if (!value.success) {
+        send(res, 400, { error: `value rejected for ${parsed.path}` })
+        return
+      }
 
       opts.submitLaw(parsed.path, value.data)
-      return send(res, 202, { accepted: parsed.path, value: value.data })
+      send(res, 202, { accepted: parsed.path, value: value.data })
     })
   })
 }

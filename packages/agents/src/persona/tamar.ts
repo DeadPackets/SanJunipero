@@ -13,7 +13,11 @@ export const TAMAR: IdentityCore = {
     rhythm: 'short declaratives; questions only when she truly wants the answer',
     tics: ['calls food "provisions"', 'understates how well a thing went'],
     neverSays: ['flowery endearments', 'exclamations', 'apologies she does not mean'],
-    exampleLines: ['We settle the provisions first, then talk.', 'The roof held.', 'I sleep better with the river in earshot.'],
+    exampleLines: [
+      'We settle the provisions first, then talk.',
+      'The roof held.',
+      'I sleep better with the river in earshot.',
+    ],
   },
 }
 

@@ -16,10 +16,16 @@ export type DepthBox = {
   /** OVERLAP_RANK — consulted only when two boxes share ground */
   rank: OverlapRank
   /** the ground it stands on, in tile-EDGE coordinates — floats, never rounded */
-  x0: number; y0: number; x1: number; y1: number
+  x0: number
+  y0: number
+  x1: number
+  y1: number
   /** screen AABB of the DRAWN sprite, which may overhang the footprint by ~1.85×.
    *  Broad phase only: it decides whether two things CAN overlap, never who wins. */
-  sx0: number; sy0: number; sx1: number; sy1: number
+  sx0: number
+  sy0: number
+  sx1: number
+  sy1: number
 }
 
 /** `a` is strictly nearer the viewer than `b`. Both +x and +y run toward the camera in dimetric, so "nearer" is "past the far edge on either world axis", and touching edges count. */
@@ -63,12 +69,13 @@ export function resetDepthFallbacks(): void {
 export type EdgeRule = (a: DepthBox, b: DepthBox) => DepthBox | null
 
 export const geometricEdge: EdgeRule = (a, b) => {
-  if (!screenOverlap(a, b)) return null            // cannot occlude ⇒ no constraint
+  if (!screenOverlap(a, b)) return null // cannot occlude ⇒ no constraint
   // Standing ON it beats standing NEAR it: neither box is past the other's far edge when a
   // body is in a doorway, and the seed would then bury the body inside the wall.
   if (groundOverlap(a, b) && a.rank !== b.rank) return a.rank > b.rank ? a : b
-  const aFront = inFrontOf(a, b), bFront = inFrontOf(b, a)
-  if (aFront === bFront) return null               // level, or mutually diagonal ⇒ seed decides
+  const aFront = inFrontOf(a, b),
+    bFront = inFrontOf(b, a)
+  if (aFront === bFront) return null // level, or mutually diagonal ⇒ seed decides
   return aFront ? a : b
 }
 
@@ -83,11 +90,12 @@ export function depthOrder(boxes: readonly DepthBox[], edge: EdgeRule = geometri
     return seeded.map((b) => b.id)
   }
 
-  const after: number[][] = seeded.map(() => [])   // i must be drawn BEFORE each j in after[i]
+  const after: number[][] = seeded.map(() => []) // i must be drawn BEFORE each j in after[i]
   const indeg = new Array<number>(n).fill(0)
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      const a = seeded[i]!, b = seeded[j]!
+      const a = seeded[i]!,
+        b = seeded[j]!
       const front = edge(a, b)
       if (front === null) continue
       if (front === b) {
@@ -137,25 +145,36 @@ export function bodyDepthBox(id: string, px: number, py: number): DepthBox {
   return {
     id,
     rank: OVERLAP_RANK.body,
-    x0: px - 0.5, y0: py - 0.5, x1: px + 0.5, y1: py + 0.5,
-    sx0: sx - BODY_SPRITE_W / 2, sy0: sy - BODY_ABOVE_FEET_PX,
-    sx1: sx + BODY_SPRITE_W / 2, sy1: sy + BODY_BELOW_FEET_PX,
+    x0: px - 0.5,
+    y0: py - 0.5,
+    x1: px + 0.5,
+    y1: py + 0.5,
+    sx0: sx - BODY_SPRITE_W / 2,
+    sy0: sy - BODY_ABOVE_FEET_PX,
+    sx1: sx + BODY_SPRITE_W / 2,
+    sy1: sy + BODY_BELOW_FEET_PX,
   }
 }
 
 /** A building stands on a RANGE of tiles (F-3a), and its sprite overhangs that ground by up
  *  to 1.85× — which is why the screen box and the ground box are two different things. */
 export function structureDepthBox(
-  id: string, s: { x: number; y: number; w: number; h: number },
+  id: string,
+  s: { x: number; y: number; w: number; h: number },
 ): DepthBox {
   const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
   const side = (s.w + s.h) * BUILDING_PX_PER_TILE
   return {
     id,
     rank: OVERLAP_RANK.structure,
-    x0: s.x - 0.5, y0: s.y - 0.5, x1: s.x + s.w - 0.5, y1: s.y + s.h - 0.5,
-    sx0: ground.sx - side / 2, sy0: ground.sy - side,
-    sx1: ground.sx + side / 2, sy1: ground.sy + ((s.w + s.h) * TILE_H) / 2,
+    x0: s.x - 0.5,
+    y0: s.y - 0.5,
+    x1: s.x + s.w - 0.5,
+    y1: s.y + s.h - 0.5,
+    sx0: ground.sx - side / 2,
+    sy0: ground.sy - side,
+    sx1: ground.sx + side / 2,
+    sy1: ground.sy + ((s.w + s.h) * TILE_H) / 2,
   }
 }
 
@@ -165,7 +184,13 @@ export function tileDepthBox(id: string, x: number, y: number, spritePx = 24): D
   return {
     id,
     rank: OVERLAP_RANK.ground,
-    x0: x - 0.5, y0: y - 0.5, x1: x + 0.5, y1: y + 0.5,
-    sx0: sx - spritePx / 2, sy0: sy - spritePx, sx1: sx + spritePx / 2, sy1: sy + TILE_H / 2,
+    x0: x - 0.5,
+    y0: y - 0.5,
+    x1: x + 0.5,
+    y1: y + 0.5,
+    sx0: sx - spritePx / 2,
+    sy0: sy - spritePx,
+    sx1: sx + spritePx / 2,
+    sy1: sy + TILE_H / 2,
   }
 }

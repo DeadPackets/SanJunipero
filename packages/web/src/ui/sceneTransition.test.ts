@@ -2,8 +2,16 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { MOTION, MOTION_CEILING_MS } from './motion.js'
 import {
-  GRAVE_STRETCH, SCENES, SCENE_IN_MS, SCENE_OUT_MS, SCENE_TOTAL_MS, idleScene, sceneAlpha,
-  sceneMotion, sceneReducer, type SceneState,
+  GRAVE_STRETCH,
+  SCENES,
+  SCENE_IN_MS,
+  SCENE_OUT_MS,
+  SCENE_TOTAL_MS,
+  idleScene,
+  sceneAlpha,
+  sceneMotion,
+  sceneReducer,
+  type SceneState,
 } from './sceneTransition.js'
 
 const at0 = (): SceneState => idleScene('lens', 'town')
@@ -54,7 +62,8 @@ describe('the state machine', () => {
 })
 
 describe('sceneAlpha', () => {
-  const go = (): SceneState => sceneReducer(at0(), { kind: 'go', name: 'lens', to: 'chronicle', atMs: 0 })
+  const go = (): SceneState =>
+    sceneReducer(at0(), { kind: 'go', name: 'lens', to: 'chronicle', atMs: 0 })
 
   it('never has the outgoing and the incoming both up — a crossfade of two live scenes smears', () => {
     let s = go()
@@ -114,7 +123,7 @@ describe('sceneMotion', () => {
 
   it('keeps every responsive scene inside the mandate band, grave included', () => {
     for (const name of SCENES) {
-      if (sceneMotion(name, false).ms === MOTION.ambient.ms) continue  // the day crossing is scenery
+      if (sceneMotion(name, false).ms === MOTION.ambient.ms) continue // the day crossing is scenery
       expect(sceneMotion(name, true).ms, name).toBeLessThanOrEqual(MOTION_CEILING_MS)
     }
   })
@@ -131,12 +140,17 @@ const APP = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8')
 const DIRECTOR = readFileSync(new URL('./DirectorMode.tsx', import.meta.url), 'utf8')
 const INTERIOR = readFileSync(new URL('../render/interiorScene.ts', import.meta.url), 'utf8')
 const ATMOS = readFileSync(new URL('../render/atmosphere.ts', import.meta.url), 'utf8')
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+)
 
 describe('a lens change is a change of subject, and it looks like one', () => {
   it('drives the outgoing lens off the reducer rather than a hand-written timeout', () => {
     expect(APP).toContain('sceneReducer')
-    expect(APP, 'the 260ms director timeout is a second motion vocabulary').not.toMatch(/setTimeout\([^)]*260\)/)
+    expect(APP, 'the 260ms director timeout is a second motion vocabulary').not.toMatch(
+      /setTimeout\([^)]*260\)/,
+    )
   })
 
   it('tells the sheet which way the view moved', () => {
@@ -158,7 +172,7 @@ describe('entering a room is a camera going in, not a card appearing', () => {
 })
 
 describe('following someone eases the zoom', () => {
-  it('goes through the camera\'s own stop machine, which eases — never a raw scale write', () => {
+  it("goes through the camera's own stop machine, which eases — never a raw scale write", () => {
     expect(DIRECTOR).toContain('scene.setZoom(DIRECTOR_ZOOM)')
     expect(DIRECTOR).not.toMatch(/world\.scale/)
   })

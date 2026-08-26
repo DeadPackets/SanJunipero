@@ -7,15 +7,24 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 export const CLIENT_ASSET_DIR = 'client'
 
 const TYPES: Readonly<Record<string, string>> = {
-  html: 'text/html; charset=utf-8', js: 'text/javascript; charset=utf-8',
-  css: 'text/css; charset=utf-8', json: 'application/json; charset=utf-8',
-  png: 'image/png', jpg: 'image/jpeg', svg: 'image/svg+xml', ico: 'image/x-icon',
-  woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf', map: 'application/json; charset=utf-8',
+  html: 'text/html; charset=utf-8',
+  js: 'text/javascript; charset=utf-8',
+  css: 'text/css; charset=utf-8',
+  json: 'application/json; charset=utf-8',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  svg: 'image/svg+xml',
+  ico: 'image/x-icon',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+  ttf: 'font/ttf',
+  map: 'application/json; charset=utf-8',
   webmanifest: 'application/manifest+json',
 }
 const OCTET = 'application/octet-stream'
 
-const typeOf = (path: string): string => TYPES[path.slice(path.lastIndexOf('.') + 1).toLowerCase()] ?? OCTET
+const typeOf = (path: string): string =>
+  TYPES[path.slice(path.lastIndexOf('.') + 1).toLowerCase()] ?? OCTET
 
 /** The file a URL path names inside `root`, or null. Traversal is refused on the RESOLVED path
  *  rather than by pattern: `%2e%2e%2f`, `..%5c` and a symlink arrive as three different strings. */
@@ -24,7 +33,7 @@ export function resolveInRoot(root: string, urlPath: string): string | null {
   try {
     decoded = decodeURIComponent(urlPath)
   } catch {
-    return null                                   // a malformed escape is not a file name
+    return null // a malformed escape is not a file name
   }
   if (decoded.includes('\0')) return null
   const base = resolve(root)
@@ -62,10 +71,15 @@ export function makeStaticSite(root: string): StaticSite {
   return (req, res, pathname) => {
     if ((req.method ?? 'GET') !== 'GET' && req.method !== 'HEAD') return false
     const hit = resolveInRoot(root, pathname)
-    if (hit !== null && hit !== resolve(root)
-      && sendFile(res, hit, pathname.startsWith(`/${CLIENT_ASSET_DIR}/`))) return true
+    if (
+      hit !== null &&
+      hit !== resolve(root) &&
+      sendFile(res, hit, pathname.startsWith(`/${CLIENT_ASSET_DIR}/`))
+    )
+      return true
     // Deep links get the app; a missed API or asset call keeps its honest 404.
-    if (pathname.startsWith('/api/') || pathname.startsWith('/assets/') || pathname === '/ws') return false
+    if (pathname.startsWith('/api/') || pathname.startsWith('/assets/') || pathname === '/ws')
+      return false
     return sendFile(res, indexPath, false)
   }
 }

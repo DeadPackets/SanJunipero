@@ -36,7 +36,7 @@ export type SubmitResult = { ok: true } | { ok: false; reason: string }
 type QueuedSubmit = {
   agentId: string
   intent: Intent
-  onResult?: (result: SubmitResult) => void
+  onResult: ((result: SubmitResult) => void) | undefined
   resolve: (result: SubmitResult) => void
 }
 
@@ -48,7 +48,9 @@ function claims(
 ): { ownerName?: string; crafterMarkName?: string; spoiling?: true } {
   return {
     ...(i.ownerName === undefined || i.ownerName === selfName ? {} : { ownerName: i.ownerName }),
-    ...(i.crafterMarkName === undefined || i.crafterMarkName === selfName ? {} : { crafterMarkName: i.crafterMarkName }),
+    ...(i.crafterMarkName === undefined || i.crafterMarkName === selfName
+      ? {}
+      : { crafterMarkName: i.crafterMarkName }),
     ...(i.spoiling === undefined ? {} : { spoiling: i.spoiling }),
   }
 }
@@ -56,16 +58,19 @@ function claims(
 // Reads `isExposed`'s own order forward — a roof, then what is on your back, then a fire — so
 // the sentence a mind gets and the number its body loses cannot disagree.
 function coldOf(
-  state: WorldState, config: SimConfig, agentId: string,
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
 ): { biting: true } | { keptOffBy: 'walls' | 'coat' | 'fire' } | undefined {
   if (!config.warmth.enabled) return undefined
   const a = state.agents[agentId]
-  if (a === undefined || !a.alive) return undefined
+  if (!a?.alive) return undefined
   const ambient = ambientTempAt(state, config)
   if (ambient >= config.warmth.comfortBand) return undefined
   if (isExposed(state, config, agentId)) return { biting: true }
   if (a.insideId !== undefined) return { keptOffBy: 'walls' }
-  if (ambient + insulationOf(state, config, agentId) >= config.warmth.comfortBand) return { keptOffBy: 'coat' }
+  if (ambient + insulationOf(state, config, agentId) >= config.warmth.comfortBand)
+    return { keptOffBy: 'coat' }
   return { keptOffBy: 'fire' }
 }
 
@@ -129,8 +134,8 @@ export class EngineBridge {
   readonly #simConfig: SimConfig
   readonly #recentWindowTicks: number
   #queue: QueuedSubmit[] = []
-  #announcements: Array<{ type: string; payload: Record<string, unknown> }> = []
-  #tickCallbacks: Array<(tick: number) => void> = []
+  #announcements: { type: string; payload: Record<string, unknown> }[] = []
+  #tickCallbacks: ((tick: number) => void)[] = []
   #window: SimEvent[] = []
   #lastSeq = 0
 
@@ -187,7 +192,11 @@ export class EngineBridge {
     this.#announcements.push({ type, payload })
   }
 
-  submit(agentId: string, intent: Intent, onResult?: (result: SubmitResult) => void): Promise<SubmitResult> {
+  submit(
+    agentId: string,
+    intent: Intent,
+    onResult?: (result: SubmitResult) => void,
+  ): Promise<SubmitResult> {
     return new Promise<SubmitResult>((resolve) => {
       this.#queue.push({ agentId, intent, onResult, resolve })
     })
@@ -256,7 +265,10 @@ export class EngineBridge {
     let bestD = Infinity
     const offer = (px: number, py: number): void => {
       const d = Math.abs(px - x) + Math.abs(py - y)
-      if (d < bestD || (d === bestD && best !== null && (py < best.y || (py === best.y && px < best.x)))) {
+      if (
+        d < bestD ||
+        (d === bestD && best !== null && (py < best.y || (py === best.y && px < best.x)))
+      ) {
         bestD = d
         best = { x: px, y: py }
       }
@@ -298,7 +310,7 @@ export class EngineBridge {
     for (const id of Object.keys(state.forageables ?? {}).sort()) {
       const node = state.forageables![id]!
       if (node.stock <= 0) continue
-      const kind = FORAGEABLE_YIELD[node.kind as keyof typeof FORAGEABLE_YIELD]
+      const kind = FORAGEABLE_YIELD[node.kind]
       if (kind === undefined || !isFoodKind(this.#simConfig, kind)) continue
       offer(node.x, node.y, kind)
     }

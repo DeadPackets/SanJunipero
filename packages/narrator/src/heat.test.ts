@@ -3,10 +3,21 @@ import type { SimEvent } from '@sj/shared'
 import type { HeatCtx, SceneSegment } from './types.js'
 import { CONFLICT_WEIGHT, STAKES_WEIGHT, rankScenesForDirector, scoreHeat } from './heat.js'
 
-const ev = (seq: number, tick: number, type: string, payload: unknown = {}): SimEvent => ({ seq, tick, type, payload })
+const ev = (seq: number, tick: number, type: string, payload: unknown = {}): SimEvent => ({
+  seq,
+  tick,
+  type,
+  payload,
+})
 
 const scene = (eventIds: number[], over: Partial<SceneSegment> = {}): SceneSegment => ({
-  day: 0, startTick: 0, endTick: 10, eventIds, cast: [], location: null, ...over,
+  day: 0,
+  startTick: 0,
+  endTick: 10,
+  eventIds,
+  cast: [],
+  location: null,
+  ...over,
 })
 
 describe('scoreHeat', () => {
@@ -37,7 +48,12 @@ describe('scoreHeat', () => {
       ev(1, 0, 'agent_moved', { id: 'a', x: 1, y: 1 }),
       ev(2, 1, 'crop_grew', { cropId: 'c', stage: 1 }),
     ]
-    const ctx: HeatCtx = { priorTypeCounts: {}, firstsInScene: 0, privateThoughts: 0, publicSpeech: 0 }
+    const ctx: HeatCtx = {
+      priorTypeCounts: {},
+      firstsInScene: 0,
+      privateThoughts: 0,
+      publicSpeech: 0,
+    }
     const s = scoreHeat(scene([1, 2]), ctx, events)
     expect(s.total).toBe(0)
   })
@@ -47,7 +63,12 @@ describe('scoreHeat', () => {
       ev(1, 0, 'agent_died', { agentId: 'a', cause: 'age' }),
       ev(2, 1, 'agent_moved', { id: 'b', x: 1, y: 1 }),
     ]
-    const ctx: HeatCtx = { priorTypeCounts: {}, firstsInScene: 0, privateThoughts: 0, publicSpeech: 0 }
+    const ctx: HeatCtx = {
+      priorTypeCounts: {},
+      firstsInScene: 0,
+      privateThoughts: 0,
+      publicSpeech: 0,
+    }
     const s = scoreHeat(scene([2]), ctx, events) // the death is outside this scene
     expect(s.conflict).toBe(0)
     expect(s.stakes).toBe(0)
@@ -94,7 +115,12 @@ describe('scoreHeat: the C11 sickness plane is visible to the director', () => {
     ev(15, 4, 'agent_tended', { agentId: 'a', tenderId: 'c' }),
     ev(16, 5, 'grave_placed', { id: 's1', agentId: 'a', name: 'A', x: 1, y: 1 }),
   ]
-  const flat: HeatCtx = { priorTypeCounts: {}, firstsInScene: 0, privateThoughts: 0, publicSpeech: 0 }
+  const flat: HeatCtx = {
+    priorTypeCounts: {},
+    firstsInScene: 0,
+    privateThoughts: 0,
+    publicSpeech: 0,
+  }
 
   it('a day that nearly lost somebody outscores a day of nothing', () => {
     const dull = scoreHeat(scene([1, 2, 3]), flat, quiet)
@@ -113,7 +139,9 @@ describe('scoreHeat: the C11 sickness plane is visible to the director', () => {
   it('hp_changed is weighted by neither table: it fires every tick a body is dying', () => {
     expect(CONFLICT_WEIGHT.hp_changed).toBeUndefined()
     expect(STAKES_WEIGHT.hp_changed).toBeUndefined()
-    const bleeding = Array.from({ length: 40 }, (_, i) => ev(100 + i, i, 'hp_changed', { agentId: 'a', delta: -0.05 }))
+    const bleeding = Array.from({ length: 40 }, (_, i) =>
+      ev(100 + i, i, 'hp_changed', { agentId: 'a', delta: -0.05 }),
+    )
     expect(scoreHeat(scene(bleeding.map((e) => e.seq)), flat, bleeding).total).toBe(0)
   })
 
@@ -121,10 +149,19 @@ describe('scoreHeat: the C11 sickness plane is visible to the director', () => {
     // Kept because recorded C1-C10 logs carry them; nothing emits either any more.
     const legacy = new Set(['agent_fell_ill', 'agent_infected'])
     const weighted = new Set([...Object.keys(CONFLICT_WEIGHT), ...Object.keys(STAKES_WEIGHT)])
-    for (const kind of ['agent_afflicted', 'affliction_worsened', 'affliction_recovered',
-      'agent_tended', 'grave_placed', 'agent_harmed']) {
+    for (const kind of [
+      'agent_afflicted',
+      'affliction_worsened',
+      'affliction_recovered',
+      'agent_tended',
+      'grave_placed',
+      'agent_harmed',
+    ]) {
       expect(weighted.has(kind)).toBe(true)
     }
-    expect([...weighted].filter((k) => legacy.has(k)).sort()).toEqual(['agent_fell_ill', 'agent_infected'])
+    expect([...weighted].filter((k) => legacy.has(k)).sort()).toEqual([
+      'agent_fell_ill',
+      'agent_infected',
+    ])
   })
 })

@@ -10,23 +10,45 @@ const CONSTRUCT_TYPE_WORDS: readonly string[] = ['festival', 'faith', 'council',
 
 // Our jargon for the machinery, not concepts a town invents; all three are ordinary English too.
 const OPS_JARGON_WORDS: readonly string[] = [
-  'construct', 'constructs', 'milestone', 'milestones', 'tier', 'tiers',
+  'construct',
+  'constructs',
+  'milestone',
+  'milestones',
+  'tier',
+  'tiers',
 ]
 
 // Ops keys, spelled the way only a schema spells them. No person writes these by accident.
 const OPS_KEYS: readonly string[] = [
-  'god_afterlife', 'fear_of_death', 'love_expression', 'justice_claim', 'multi_day_plan', 'past_reference',
-  'semantic first', 'semantic firsts',
+  'god_afterlife',
+  'fear_of_death',
+  'love_expression',
+  'justice_claim',
+  'multi_day_plan',
+  'past_reference',
+  'semantic first',
+  'semantic firsts',
 ]
 
 export const CONSTRUCT_VOCABULARY: readonly string[] = [
-  ...CONSTRUCT_TYPE_WORDS, ...OPS_JARGON_WORDS, ...OPS_KEYS,
+  ...CONSTRUCT_TYPE_WORDS,
+  ...OPS_JARGON_WORDS,
+  ...OPS_KEYS,
 ]
 
 // The words this project uses for the grammar that decides where a building may stand — as much
 // a taxonomy as `milestone`. A mind may know the town keeps ground for a roof, and where; no more.
 export const TOWN_LAYOUT_VOCABULARY: readonly string[] = [
-  'plot', 'plots', 'block', 'blocks', 'ring', 'rings', 'lattice', 'plat', 'platted', 'frontage',
+  'plot',
+  'plots',
+  'block',
+  'blocks',
+  'ring',
+  'rings',
+  'lattice',
+  'plat',
+  'platted',
+  'frontage',
 ]
 
 // Refused mid-run only if no person could write it — an underscored ops key or a two-word ops
@@ -40,10 +62,37 @@ const MILESTONE_KIND = /\bfirst_\w+/giu
 // Cyrillic and Greek letters that render as their Latin twin. Only the ones that can spell a
 // roster word; a longer table would be a Unicode confusables copy nobody maintains.
 const CONFUSABLE_TO_LATIN: Readonly<Record<string, string>> = {
-  а: 'a', с: 'c', е: 'e', һ: 'h', і: 'i', ј: 'j', ӏ: 'l', м: 'm', о: 'o', р: 'p', ԛ: 'q',
-  г: 'r', ѕ: 's', т: 't', ѵ: 'v', ԝ: 'w', х: 'x', у: 'y',
-  α: 'a', ε: 'e', ι: 'i', κ: 'k', ο: 'o', ρ: 'p', τ: 't', υ: 'u', ν: 'v', χ: 'x',
-  ı: 'i', ɑ: 'a', ɡ: 'g',
+  а: 'a',
+  с: 'c',
+  е: 'e',
+  һ: 'h',
+  і: 'i',
+  ј: 'j',
+  ӏ: 'l',
+  м: 'm',
+  о: 'o',
+  р: 'p',
+  ԛ: 'q',
+  г: 'r',
+  ѕ: 's',
+  т: 't',
+  ѵ: 'v',
+  ԝ: 'w',
+  х: 'x',
+  у: 'y',
+  α: 'a',
+  ε: 'e',
+  ι: 'i',
+  κ: 'k',
+  ο: 'o',
+  ρ: 'p',
+  τ: 't',
+  υ: 'u',
+  ν: 'v',
+  χ: 'x',
+  ı: 'i',
+  ɑ: 'a',
+  ɡ: 'g',
 }
 const CONFUSABLE = new RegExp(`[${Object.keys(CONFUSABLE_TO_LATIN).join('')}]`, 'gu')
 
@@ -57,7 +106,7 @@ function fold(text: string): string {
     .replace(CONFUSABLE, (c) => CONFUSABLE_TO_LATIN[c] ?? c)
 }
 
-const patternsFor = (terms: readonly string[]): ReadonlyArray<{ term: string; re: RegExp }> =>
+const patternsFor = (terms: readonly string[]): readonly { term: string; re: RegExp }[] =>
   terms.map((term) => ({
     term,
     re: new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'iu'),
@@ -68,7 +117,7 @@ export const MID_RUN_ENFORCED: readonly string[] = CONSTRUCT_VOCABULARY.filter(o
 const ALL_PATTERNS = patternsFor(CONSTRUCT_VOCABULARY)
 const OPS_ONLY_PATTERNS = patternsFor(MID_RUN_ENFORCED)
 
-function scan(prompt: string, patterns: ReadonlyArray<{ term: string; re: RegExp }>): string[] {
+function scan(prompt: string, patterns: readonly { term: string; re: RegExp }[]): string[] {
   const out = patterns.filter(({ re }) => re.test(prompt)).map(({ term }) => term)
   for (const m of prompt.matchAll(MILESTONE_KIND)) {
     const kind = m[0].toLowerCase()
@@ -115,7 +164,10 @@ const vocabularyTokens = (v: RulingVocabulary): ReadonlySet<string> => {
 const namesAKnownThing = (rest: string, vocabulary: RulingVocabulary | undefined): boolean => {
   if (vocabulary === undefined) return false
   const known = vocabularyTokens(vocabulary)
-  const words = rest.split(/[^a-z0-9]+/u).filter((w) => w.length > 0).slice(0, NAMED_THING_WORDS)
+  const words = rest
+    .split(/[^a-z0-9]+/u)
+    .filter((w) => w.length > 0)
+    .slice(0, NAMED_THING_WORDS)
   return words.some((w) => known.has(w) || (w.endsWith('s') && known.has(w.slice(0, -1))))
 }
 
@@ -128,7 +180,10 @@ export function scanRulingForGlassLeak(text: string, vocabulary?: RulingVocabula
   const directive = RULING_DIRECTIVE.exec(folded)
   if (directive !== null) out.push(directive[0].trim())
   const missing = RULING_NAMES_THE_MISSING_THING.exec(folded)
-  if (missing !== null && !namesAKnownThing(folded.slice(missing.index + missing[0].length), vocabulary)) {
+  if (
+    missing !== null &&
+    !namesAKnownThing(folded.slice(missing.index + missing[0].length), vocabulary)
+  ) {
     out.push(missing[0].trim())
   }
   return out

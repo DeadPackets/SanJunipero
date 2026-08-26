@@ -63,12 +63,12 @@ export class PersonalityStore {
     return { version: row.version, doc: JSON.parse(row.doc) as PersonalityDoc }
   }
 
-  history(): Array<{ version: number; day: number; edit: PersonalityEdit | null }> {
+  history(): { version: number; day: number; edit: PersonalityEdit | null }[] {
     const rows = this.db
       .prepare(
         'SELECT version, day, edit FROM personality_versions WHERE agent_id = ? ORDER BY version',
       )
-      .all(this.agentId) as Array<{ version: number; day: number; edit: string | null }>
+      .all(this.agentId) as { version: number; day: number; edit: string | null }[]
     return rows.map((r) => ({
       version: r.version,
       day: r.day,

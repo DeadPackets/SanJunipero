@@ -1,8 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import {
-  CITY_ANCHOR_DEFAULT, DEFAULT_CONFIG, FOUNDER_IDS, MINUTES_PER_DAY, SimConfigSchema,
-  WORLD_SIZE_GENESIS, isHearthKind, isRoofedKind,
-  makeCityTemplate, stateHash, templateFits, type SimEvent,
+  CITY_ANCHOR_DEFAULT,
+  DEFAULT_CONFIG,
+  FOUNDER_IDS,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  WORLD_SIZE_GENESIS,
+  isHearthKind,
+  isRoofedKind,
+  makeCityTemplate,
+  stateHash,
+  templateFits,
+  type SimEvent,
 } from '@sj/shared'
 import { fold } from '../fold.js'
 import { doorTile } from '../interiors.js'
@@ -15,8 +24,14 @@ import { buildableRecipe, buildTicks, VERBS } from '../verbs.js'
 import { GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { GENESIS_FORAGEABLES } from '../data/forageables.js'
 import {
-  makeGenesisWorld, genesisDurability, GENESIS_FORD, GENESIS_FORK_Y, GENESIS_BUILDER_ID,
-  GENESIS_ROOF_STOOD, GENESIS_SOUND_ROOFS, roofFell,
+  makeGenesisWorld,
+  genesisDurability,
+  GENESIS_FORD,
+  GENESIS_FORK_Y,
+  GENESIS_BUILDER_ID,
+  GENESIS_ROOF_STOOD,
+  GENESIS_SOUND_ROOFS,
+  roofFell,
   GENESIS_RIVER_X,
 } from './world.js'
 import { CITY_DWELLING_KINDS } from '@sj/shared'
@@ -74,8 +89,11 @@ describe('makeGenesisWorld: the ground', () => {
   it('the city template is baked into the ground, not emitted as a change', () => {
     const { terrain, events } = makeGenesisWorld(DEFAULT_CONFIG)
     const t = makeCityTemplate()
-    for (const tile of t.tiles) expect(terrain[t.anchor.y + tile.dy]![t.anchor.x + tile.dx]).toBe(tile.to)
-    expect(events.some((e) => e.type === 'tile_changed' || e.type === 'terrain_changed')).toBe(false)
+    for (const tile of t.tiles)
+      expect(terrain[t.anchor.y + tile.dy]![t.anchor.x + tile.dx]).toBe(tile.to)
+    expect(events.some((e) => e.type === 'tile_changed' || e.type === 'terrain_changed')).toBe(
+      false,
+    )
   })
 })
 
@@ -89,11 +107,13 @@ describe('makeGenesisWorld: the town', () => {
 
   it('leaves every public building unowned — absent, not null', () => {
     const { events } = makeGenesisWorld(DEFAULT_CONFIG)
-    const planned = events.filter((e) => e.type === 'structure_planned').map((e) => e.payload as Payload)
-    const publics = planned.filter((p) => p['kind'] !== 'house')
+    const planned = events
+      .filter((e) => e.type === 'structure_planned')
+      .map((e) => e.payload as Payload)
+    const publics = planned.filter((p) => p.kind !== 'house')
     expect(publics.length).toBeGreaterThan(0)
     for (const p of publics) expect(Object.keys(p)).not.toContain('owner')
-    for (const p of planned) expect(p['builderId']).toBe(GENESIS_BUILDER_ID)
+    for (const p of planned) expect(p.builderId).toBe(GENESIS_BUILDER_ID)
   })
 
   // Two buildings still have their roofs and the other seven stand as walls three quarters up.
@@ -102,8 +122,14 @@ describe('makeGenesisWorld: the town', () => {
     const s = foldAll()
     const all = Object.values(s.structures)
     expect(all.length).toBe(makeCityTemplate().structures.length)
-    const sound = all.filter((x) => x.stage === 'complete').map((x) => x.kind).sort()
-    const fallen = all.filter((x) => x.stage === 'construction').map((x) => x.kind).sort()
+    const sound = all
+      .filter((x) => x.stage === 'complete')
+      .map((x) => x.kind)
+      .sort()
+    const fallen = all
+      .filter((x) => x.stage === 'construction')
+      .map((x) => x.kind)
+      .sort()
     expect(sound).toEqual(['cabin', 'fire_pit', 'storehouse', 'well'])
     expect(fallen).toEqual(['cottage', 'farmhouse', 'house', 'house', 'house', 'house', 'house'])
   })
@@ -119,21 +145,25 @@ describe('makeGenesisWorld: the town', () => {
       expect(left, `${x.kind} left`).toBeGreaterThan(0)
       // One pair of hands, one 720-tick night, for the smallest of them; two pairs for the rest.
       expect(left, `${x.kind} is more than a night for two`).toBeLessThanOrEqual(1440)
-      expect(x.progressTicks).toBe(Math.floor(buildTicks(DEFAULT_CONFIG, x.kind) * GENESIS_ROOF_STOOD))
+      expect(x.progressTicks).toBe(
+        Math.floor(buildTicks(DEFAULT_CONFIG, x.kind) * GENESIS_ROOF_STOOD),
+      )
     }
     // And nothing without a roof to lose lost one.
-    expect(s.structures[Object.keys(s.structures).find((id) => s.structures[id]!.kind === 'well')!]!.stage)
-      .toBe('complete')
+    expect(
+      s.structures[Object.keys(s.structures).find((id) => s.structures[id]!.kind === 'well')!]!
+        .stage,
+    ).toBe('complete')
   })
 
   it('takes footprint from the template and durability from the one table that knows', () => {
     const s = foldAll()
     const house = Object.values(s.structures).find((x) => x.kind === 'house')!
     expect({ w: house.w, h: house.h }).toEqual({ w: 2, h: 2 })
-    expect(house.maxHp).toBe(DEFAULT_CONFIG.structures.recipes['house']!.maxHp)
+    expect(house.maxHp).toBe(DEFAULT_CONFIG.structures.recipes.house!.maxHp)
     expect(house.flammable).toBe(true)
     const well = Object.values(s.structures).find((x) => x.kind === 'well')!
-    expect(well.maxHp).toBe(DEFAULT_CONFIG.structures.recipes['well']!.maxHp)
+    expect(well.maxHp).toBe(DEFAULT_CONFIG.structures.recipes.well!.maxHp)
     expect(well.flammable).toBe(false)
   })
 
@@ -155,8 +185,12 @@ describe('makeGenesisWorld: the town', () => {
     const s = foldAll()
     expect(Object.values(s.structures).some((x) => x.kind === 'bridge')).toBe(false)
     const inFord = (y: number): boolean => y >= GENESIS_FORD.y0 && y <= GENESIS_FORD.y1
-    expect(s.terrain.every((row, y) => row[48] === T_WATER && row[49] === T_WATER
-      && (row[50] === T_WATER) === !inFord(y))).toBe(true)
+    expect(
+      s.terrain.every(
+        (row, y) =>
+          row[48] === T_WATER && row[49] === T_WATER && (row[50] === T_WATER) === !inFord(y),
+      ),
+    ).toBe(true)
     // 128x128 holds more open ground than the 6000-node budget can walk, so the search cannot
     // prove the far bank unreachable — it spends the budget and stops at the water.
     const across = searchPath(s, { x: 30, y: 100 }, { x: 55, y: 100 }, DEFAULT_CONFIG)!
@@ -169,22 +203,34 @@ describe('makeGenesisWorld: the town', () => {
     const s = foldAll()
     for (const id of FOUNDER_IDS) {
       const kit = Object.values(s.items).filter((i) => i.owner === id)
-      expect(kit.map((i) => i.kind).sort()).toEqual(['axe', 'bread', 'hoe', 'knife', 'seed_pouch', 'waterskin'])
+      expect(kit.map((i) => i.kind).sort()).toEqual([
+        'axe',
+        'bread',
+        'hoe',
+        'knife',
+        'seed_pouch',
+        'waterskin',
+      ])
       const house = Object.values(s.structures).find((x) => x.kind === 'house' && x.owner === id)!
       for (const item of kit) expect(item.loc).toEqual({ t: 'structure', id: house.id })
       expect(kit.find((i) => i.kind === 'bread')!.qty).toBe(3)
     }
     const store = Object.values(s.structures).find((x) => x.kind === 'storehouse')!
-    const stock = Object.values(s.items)
-      .filter((i) => i.loc.t === 'structure' && i.loc.id === store.id && i.owner === undefined)
-    expect(Object.fromEntries(stock.map((i) => [i.kind, i.qty])))
-      .toEqual({ wood: 20, stone: 12, rope: 4, cloth: 4 })
+    const stock = Object.values(s.items).filter(
+      (i) => i.loc.t === 'structure' && i.loc.id === store.id && i.owner === undefined,
+    )
+    expect(Object.fromEntries(stock.map((i) => [i.kind, i.qty]))).toEqual({
+      wood: 20,
+      stone: 12,
+      rope: 4,
+      cloth: 4,
+    })
   })
 
   it('stamps spoilage on the food and on nothing else', () => {
     const s = foldAll()
     const bread = Object.values(s.items).find((i) => i.kind === 'bread')!
-    expect(bread.spoilage).toEqual({ spawnDay: 0, days: DEFAULT_CONFIG.spoilage.days['bread'] })
+    expect(bread.spoilage).toEqual({ spawnDay: 0, days: DEFAULT_CONFIG.spoilage.days.bread })
     expect(Object.values(s.items).find((i) => i.kind === 'axe')!.spoilage).toBeUndefined()
   })
 
@@ -202,7 +248,9 @@ describe('makeGenesisWorld: the town', () => {
       expect(f.alive).toBe(true)
       expect(f.stock === undefined).toBe(f.kind !== 'fish')
     }
-    expect(fauna.filter((f) => f.kind === 'fish').every((f) => s.terrain[f.y]![f.x] === T_WATER)).toBe(true)
+    expect(
+      fauna.filter((f) => f.kind === 'fish').every((f) => s.terrain[f.y]![f.x] === T_WATER),
+    ).toBe(true)
     expect(fauna.some((f) => f.x > 50)).toBe(true)
   })
 
@@ -234,8 +282,10 @@ describe('makeGenesisWorld: the town', () => {
   it('mints ids the counter law can follow', () => {
     const s = foldAll()
     for (const id of [
-      ...Object.keys(s.structures), ...Object.keys(s.items),
-      ...Object.keys(s.fauna ?? {}), ...Object.keys(s.forageables ?? {}),
+      ...Object.keys(s.structures),
+      ...Object.keys(s.items),
+      ...Object.keys(s.fauna ?? {}),
+      ...Object.keys(s.forageables ?? {}),
     ]) {
       expect(id).toMatch(/_\d+$/)
       expect(Number(/_(\d+)$/.exec(id)![1])).toBeLessThan(s.counters.nextEntityId)
@@ -250,7 +300,9 @@ describe('the ford: one reach where the channel runs two wide', () => {
 
   it('narrows the water to two tiles across four rows, and nowhere else', () => {
     const { terrain } = makeGenesisWorld(DEFAULT_CONFIG)
-    const widths = terrain.map((row) => row.filter((t, x) => t === T_WATER && Math.abs(x - GENESIS_RIVER_X) <= 1).length)
+    const widths = terrain.map(
+      (row) => row.filter((t, x) => t === T_WATER && Math.abs(x - GENESIS_RIVER_X) <= 1).length,
+    )
     for (let y = 0; y < terrain.length; y++) {
       const narrowed = y >= GENESIS_FORD.y0 && y <= GENESIS_FORD.y1
       expect(widths[y], `y=${y}`).toBe(narrowed ? 2 : 3)
@@ -272,35 +324,75 @@ describe('the ford: one reach where the channel runs two wide', () => {
   it('takes a bridge, and the bridge takes feet to the far bank', () => {
     const s = foldAll()
     const y = GENESIS_FORD.y0 + 1
-    let world = fold(s, {
-      seq: 9000, tick: 0, type: 'agent_spawned',
-      payload: { id: 'builder', name: 'Bridger', x: GENESIS_FORD.x, y, ageDays: 7300 },
-    }, DEFAULT_CONFIG)
-    world = fold(world, {
-      seq: 9001, tick: 0, type: 'item_spawned',
-      payload: { id: 'planks', kind: 'wood', qty: 6, loc: { t: 'agent', id: 'builder' } },
-    }, DEFAULT_CONFIG)
+    let world = fold(
+      s,
+      {
+        seq: 9000,
+        tick: 0,
+        type: 'agent_spawned',
+        payload: { id: 'builder', name: 'Bridger', x: GENESIS_FORD.x, y, ageDays: 7300 },
+      },
+      DEFAULT_CONFIG,
+    )
+    world = fold(
+      world,
+      {
+        seq: 9001,
+        tick: 0,
+        type: 'item_spawned',
+        payload: { id: 'planks', kind: 'wood', qty: 6, loc: { t: 'agent', id: 'builder' } },
+      },
+      DEFAULT_CONFIG,
+    )
 
     // Nowhere else on the river will take one: measured from the same bank, three rows south.
-    const wide = submitIntent(world, DEFAULT_CONFIG, 'builder', 'build', { kind: 'bridge', x: 48, y: GENESIS_FORD.y1 + 2 })
+    const wide = submitIntent(world, DEFAULT_CONFIG, 'builder', 'build', {
+      kind: 'bridge',
+      x: 48,
+      y: GENESIS_FORD.y1 + 2,
+    })
     expect(wide.ok).toBe(false)
 
-    const started = submitIntent(world, DEFAULT_CONFIG, 'builder', 'build', { kind: 'bridge', x: 48, y })
+    const started = submitIntent(world, DEFAULT_CONFIG, 'builder', 'build', {
+      kind: 'bridge',
+      x: 48,
+      y,
+    })
     expect(started.ok).toBe(true)
     const planned = started.ok
-      ? started.events.find((e) => e.type === 'structure_planned')!.payload as Record<string, number>
+      ? (started.events.find((e) => e.type === 'structure_planned')!.payload as Record<
+          string,
+          number
+        >)
       : {}
     expect([planned.w, planned.h]).toEqual([2, 1])
 
     // Lay the deck by hand — the point being measured is the crossing, not the labour.
-    let crossed = fold(world, {
-      seq: 9002, tick: 0, type: 'structure_planned',
-      payload: {
-        id: 'structure_bridge', kind: 'bridge', x: 48, y, w: 2, h: 1,
-        maxHp: 20, flammable: false, builderId: 'builder',
+    let crossed = fold(
+      world,
+      {
+        seq: 9002,
+        tick: 0,
+        type: 'structure_planned',
+        payload: {
+          id: 'structure_bridge',
+          kind: 'bridge',
+          x: 48,
+          y,
+          w: 2,
+          h: 1,
+          maxHp: 20,
+          flammable: false,
+          builderId: 'builder',
+        },
       },
-    }, DEFAULT_CONFIG)
-    crossed = fold(crossed, { seq: 9003, tick: 0, type: 'structure_completed', payload: { id: 'structure_bridge' } }, DEFAULT_CONFIG)
+      DEFAULT_CONFIG,
+    )
+    crossed = fold(
+      crossed,
+      { seq: 9003, tick: 0, type: 'structure_completed', payload: { id: 'structure_bridge' } },
+      DEFAULT_CONFIG,
+    )
 
     const route = findPath(crossed, { x: GENESIS_FORD.x, y }, { x: 45, y }, DEFAULT_CONFIG)
     expect(route).not.toBeNull()
@@ -330,17 +422,23 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
 
     // Vacuous guard, both ways: some roof over the valley still holds no fire, and some fire in it
     // is still behind unfinished walls. This passes for the wrong reason if everything is warm.
-    expect(Object.values(s.structures).some((st) =>
-      st.stage === 'complete' && isRoofedKind(CFG, st.kind) && !isHearthKind(CFG, st.kind))).toBe(true)
-    expect(Object.values(s.structures).some((st) =>
-      st.stage === 'construction' && isWarmRoom(st.kind))).toBe(true)
+    expect(
+      Object.values(s.structures).some(
+        (st) =>
+          st.stage === 'complete' && isRoofedKind(CFG, st.kind) && !isHearthKind(CFG, st.kind),
+      ),
+    ).toBe(true)
+    expect(
+      Object.values(s.structures).some((st) => st.stage === 'construction' && isWarmRoom(st.kind)),
+    ).toBe(true)
   })
 
   // roofFell throws on a roofed kind that is unbuildable and not sound, so the sound set is FORCED
   // to be exactly the unbuildable roofed kinds. There are two, and one is a roof over goods.
   it('★ had one candidate, because the sound set is forced and not chosen', () => {
     const unbuildableRoofs = Object.keys(CFG.structures.recipes)
-      .filter((k) => isRoofedKind(CFG, k) && buildableRecipe(CFG, k) === null).sort()
+      .filter((k) => isRoofedKind(CFG, k) && buildableRecipe(CFG, k) === null)
+      .sort()
     expect([...GENESIS_SOUND_ROOFS].sort()).toEqual(unbuildableRoofs)
     expect(unbuildableRoofs).toEqual(['cabin', 'storehouse'])
     expect(isHearthKind(CFG, 'storehouse'), 'a storehouse is a roof over goods').toBe(false)
@@ -351,7 +449,10 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
       ...CFG,
       structures: {
         ...CFG.structures,
-        recipes: { ...CFG.structures.recipes, hut: { ...CFG.structures.recipes['cabin']!, inputs: {} } },
+        recipes: {
+          ...CFG.structures.recipes,
+          hut: { ...CFG.structures.recipes.cabin!, inputs: {} },
+        },
       },
     }
     expect(() => roofFell(withHut, 'hut')).toThrow(/nobody could finish/)
@@ -367,8 +468,9 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
     expect(rooms.length, 'no fire indoors to walk to').toBeGreaterThan(0)
     const room = rooms[0]!
     const target = doorTile(base, room)!
-    const store = Object.values(base.structures)
-      .find((st) => st.kind === 'storehouse' && st.stage === 'complete')!
+    const store = Object.values(base.structures).find(
+      (st) => st.kind === 'storehouse' && st.stage === 'complete',
+    )!
 
     // Every founder's own front door, and the storehouse door where the valley's 20 wood is:
     // the fuel and the fire have to be on the same side of the water as well.
@@ -387,38 +489,71 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
     const NIGHT = 273 * MINUTES_PER_DAY + 22 * 60 + 30
     let s = fold(base, { seq: 9100, tick: 0, type: 'tick_advanced', payload: {} }, CFG)
     s = fold(s, { seq: 9101, tick: NIGHT, type: 'tick_advanced', payload: {} }, CFG)
-    s = fold(s, {
-      seq: 9102, tick: NIGHT, type: 'weather_changed', payload: { kind: 'sunny', temperatureC: -10 },
-    }, CFG)
-    s = fold(s, {
-      seq: 9103, tick: NIGHT, type: 'agent_spawned',
-      payload: { id: 'walker', name: 'Walker', x: starts[0]!.x, y: starts[0]!.y, ageDays: 7300 },
-    }, CFG)
-    s = fold(s, {
-      seq: 9104, tick: NIGHT, type: 'item_spawned',
-      payload: { id: 'armful', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'walker' } },
-    }, CFG)
+    s = fold(
+      s,
+      {
+        seq: 9102,
+        tick: NIGHT,
+        type: 'weather_changed',
+        payload: { kind: 'sunny', temperatureC: -10 },
+      },
+      CFG,
+    )
+    s = fold(
+      s,
+      {
+        seq: 9103,
+        tick: NIGHT,
+        type: 'agent_spawned',
+        payload: { id: 'walker', name: 'Walker', x: starts[0]!.x, y: starts[0]!.y, ageDays: 7300 },
+      },
+      CFG,
+    )
+    s = fold(
+      s,
+      {
+        seq: 9104,
+        tick: NIGHT,
+        type: 'item_spawned',
+        payload: { id: 'armful', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'walker' } },
+      },
+      CFG,
+    )
     const outside = warmthTargetFor(s, CFG, 'walker')
 
     // The walk itself, one step at a time down the route the pathfinder returned.
     let seq = 9200
     for (const [x, y] of findPath(s, starts[0]!, target, CFG)!) {
-      s = fold(s, { seq: seq++, tick: NIGHT, type: 'agent_moved', payload: { id: 'walker', x, y } }, CFG)
+      s = fold(
+        s,
+        { seq: seq++, tick: NIGHT, type: 'agent_moved', payload: { id: 'walker', x, y } },
+        CFG,
+      )
     }
-    expect([s.agents['walker']!.x, s.agents['walker']!.y]).toEqual([target.x, target.y])
+    expect([s.agents.walker!.x, s.agents.walker!.y]).toEqual([target.x, target.y])
 
     /** Run a verb to completion the way the tick loop would, and refuse to guess. */
     const apply = (verb: string, params: Record<string, unknown>): void => {
       const r = submitIntent(s, CFG, 'walker', verb, params)
       expect(r.ok, r.ok ? '' : `${verb}: ${r.reason}`).toBe(true)
-      const done = VERBS[verb]!.onComplete(s, CFG, 'walker', params, new RngStreams('genesis-fire').get('actions'))
-      for (const e of [...(r.ok ? r.events : []), { type: 'action_completed', payload: { agentId: 'walker', verb } }, ...done]) {
+      const done = VERBS[verb]!.onComplete(
+        s,
+        CFG,
+        'walker',
+        params,
+        new RngStreams('genesis-fire').get('actions'),
+      )
+      for (const e of [
+        ...(r.ok ? r.events : []),
+        { type: 'action_completed', payload: { agentId: 'walker', verb } },
+        ...done,
+      ]) {
         s = fold(s, { seq: seq++, tick: NIGHT, type: e.type, payload: e.payload }, CFG)
       }
     }
 
     apply('enter', { structureId: room.id })
-    expect(s.agents['walker']!.insideId).toBe(room.id)
+    expect(s.agents.walker!.insideId).toBe(room.id)
 
     // Indoors and cold: the roof alone buys a body nothing against the air, which is exactly
     // why a roofed hearthless valley measured no hearth behaviour.

@@ -11,9 +11,13 @@ export const MOOD_GLYPH_SCALE = 2
 function MoodGlyph({ mood }: { mood: Expression }) {
   return (
     <svg
-      className="rr-mood" viewBox={`0 0 ${MOOD_GLYPH_PX} ${MOOD_GLYPH_PX}`}
-      width={MOOD_GLYPH_PX * MOOD_GLYPH_SCALE} height={MOOD_GLYPH_PX * MOOD_GLYPH_SCALE}
-      shapeRendering="crispEdges" aria-hidden="true" focusable="false"
+      className="rr-mood"
+      viewBox={`0 0 ${MOOD_GLYPH_PX} ${MOOD_GLYPH_PX}`}
+      width={MOOD_GLYPH_PX * MOOD_GLYPH_SCALE}
+      height={MOOD_GLYPH_PX * MOOD_GLYPH_SCALE}
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      focusable="false"
     >
       {moodGlyph(mood).map(([x, y, fill]) => (
         <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
@@ -24,12 +28,22 @@ function MoodGlyph({ mood }: { mood: Expression }) {
 
 function Portrait({ row }: { row: RosterRow2 }) {
   if ('url' in row.portrait) {
-    return <span className="rr-face" style={{ backgroundImage: `url("${row.portrait.url}")` }} aria-hidden="true" />
+    return (
+      <span
+        className="rr-face"
+        style={{ backgroundImage: `url("${row.portrait.url}")` }}
+        aria-hidden="true"
+      />
+    )
   }
   if ('bust' in row.portrait) {
     return <span className="rr-face" style={row.portrait.bust} aria-hidden="true" />
   }
-  return <span className="rr-face rr-token" aria-hidden="true">{row.portrait.token}</span>
+  return (
+    <span className="rr-face rr-token" aria-hidden="true">
+      {row.portrait.token}
+    </span>
+  )
 }
 
 /** Everything U12 asks a row to say, in one sentence, for someone who cannot see it. */
@@ -46,9 +60,15 @@ export function rowLabel(row: RosterRow2): string {
   ].join(', ')
 }
 
-export function RosterRowView(
-  { row, open, onToggle }: { row: RosterRow2; open: boolean; onToggle: (id: string) => void },
-) {
+export function RosterRowView({
+  row,
+  open,
+  onToggle,
+}: {
+  row: RosterRow2
+  open: boolean
+  onToggle: (id: string) => void
+}) {
   return (
     <button
       type="button"
@@ -59,7 +79,9 @@ export function RosterRowView(
       data-lived={row.substance >= 0.34 ? 'much' : row.substance > 0 ? 'some' : 'none'}
       aria-expanded={open}
       aria-label={rowLabel(row)}
-      onClick={() => onToggle(row.id)}
+      onClick={() => {
+        onToggle(row.id)
+      }}
     >
       <Portrait row={row} />
       <span className="rr-who">
@@ -85,9 +107,7 @@ export function RosterRowView(
           said "with Nadia" beside a nav tab labelled BONDS, and merge train 3 read the two as
           the same claim and filed the bond count as a lie. The count was right; the word was
           borrowed. Proximity and a bond are different things and the roster now says which. */}
-      {row.with.length > 0 && (
-        <span className="rr-with">near {row.with.join(', ')}</span>
-      )}
+      {row.with.length > 0 && <span className="rr-with">near {row.with.join(', ')}</span>}
     </button>
   )
 }

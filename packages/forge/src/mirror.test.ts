@@ -2,12 +2,26 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { decodePng, type RawImage } from './post/raw.js'
 import {
-  FACINGS, POSES_V2, HEAD_DIFF_MAX, STANCE_MIN_RATIO, footSpan, frameCoherenceGate, mirrorX,
+  FACINGS,
+  POSES_V2,
+  HEAD_DIFF_MAX,
+  STANCE_MIN_RATIO,
+  footSpan,
+  frameCoherenceGate,
+  mirrorX,
   opaqueBbox,
 } from './sheet.js'
 import {
-  AUTHORED_FACINGS, CELL_NAMES_V4, STRIP_POSES_V4, WALK_CYCLE_V4,
-  coherenceGateV4, deriveSheet, sleepAxisDeg, sleepAxisGate, stanceGate, strideGateV4,
+  AUTHORED_FACINGS,
+  CELL_NAMES_V4,
+  STRIP_POSES_V4,
+  WALK_CYCLE_V4,
+  coherenceGateV4,
+  deriveSheet,
+  sleepAxisDeg,
+  sleepAxisGate,
+  stanceGate,
+  strideGateV4,
   type AuthoredSet,
 } from './mirror.js'
 
@@ -15,14 +29,19 @@ import {
 function marker(x: number, y: number, r = 200): RawImage {
   const data = new Uint8ClampedArray(4 * 4 * 4)
   const i = (y * 4 + x) * 4
-  data[i] = r; data[i + 1] = 50; data[i + 2] = 50; data[i + 3] = 255
+  data[i] = r
+  data[i + 1] = 50
+  data[i + 2] = 50
+  data[i + 3] = 255
   return { width: 4, height: 4, data }
 }
 
 function makeAuthored(): AuthoredSet {
-  const strip = (base: number) => Object.fromEntries(
-    STRIP_POSES_V4.map((p, i) => [p, marker(i % 4, base, 100 + i)]),
-  ) as Record<(typeof STRIP_POSES_V4)[number], RawImage>
+  const strip = (base: number) =>
+    Object.fromEntries(STRIP_POSES_V4.map((p, i) => [p, marker(i % 4, base, 100 + i)])) as Record<
+      (typeof STRIP_POSES_V4)[number],
+      RawImage
+    >
   return { strips: { se: strip(0), ne: strip(1) }, sleep: marker(3, 3) }
 }
 
@@ -30,8 +49,7 @@ describe('CELL_NAMES_V4 contract', () => {
   it('has exactly the 24 renderer cell names, no dupes', () => {
     expect(CELL_NAMES_V4.length).toBe(24)
     expect(new Set(CELL_NAMES_V4).size).toBe(24)
-    for (const p of POSES_V2) for (const f of FACINGS)
-      expect(CELL_NAMES_V4).toContain(`${p}-${f}`)
+    for (const p of POSES_V2) for (const f of FACINGS) expect(CELL_NAMES_V4).toContain(`${p}-${f}`)
   })
 })
 
@@ -126,20 +144,23 @@ describe('sleepAxisGate', () => {
   })
 })
 
-
 // ── ★ THE PRE-SPEND GATE MUST NOT BE WEAKER THAN THE POST-HOC AUDIT ───────────────────────
 describe('★ coherenceGateV4 asks everything frameCoherenceGate asks', () => {
   // Two bodies, same palette and same area, DIFFERENT HEADS: a 16-wide torso with a head
   // block that moves. Area is equal to the pixel, so silhouette and palette cannot see it.
   const body = (headX: number): RawImage => {
-    const w = 24, h = 24
+    const w = 24,
+      h = 24
     const data = new Uint8ClampedArray(w * h * 4)
     const put = (x: number, y: number) => {
       const i = (y * w + x) * 4
-      data[i] = 190; data[i + 1] = 130; data[i + 2] = 90; data[i + 3] = 255
+      data[i] = 190
+      data[i + 1] = 130
+      data[i + 2] = 90
+      data[i + 3] = 255
     }
-    for (let y = 10; y < 22; y++) for (let x = 6; x < 18; x++) put(x, y)   // torso, identical
-    for (let y = 2; y < 9; y++) for (let x = headX; x < headX + 7; x++) put(x, y)  // head, moves
+    for (let y = 10; y < 22; y++) for (let x = 6; x < 18; x++) put(x, y) // torso, identical
+    for (let y = 2; y < 9; y++) for (let x = headX; x < headX + 7; x++) put(x, y) // head, moves
     return { width: w, height: h, data }
   }
 
@@ -148,7 +169,10 @@ describe('★ coherenceGateV4 asks everything frameCoherenceGate asks', () => {
 
   it('★ RED on a head that moved, with the silhouette and the palette identical', () => {
     const f = coherenceGateV4('cell', master, drifted)
-    expect(f.map((x) => x.gate), 'the head moved and only the head moved').toEqual(['head'])
+    expect(
+      f.map((x) => x.gate),
+      'the head moved and only the head moved',
+    ).toEqual(['head'])
     expect(f[0]!.limit).toBe(HEAD_DIFF_MAX)
     expect(f[0]!.value).toBeGreaterThan(HEAD_DIFF_MAX)
   })
@@ -160,9 +184,12 @@ describe('★ coherenceGateV4 asks everything frameCoherenceGate asks', () => {
   // ★ THE PROPERTY, not the term. Whatever either gate learns to ask, they ask the same set —
   // otherwise the money is spent behind the weaker one.
   it('★ and the two gates agree on the same pair, term for term', () => {
-    const mine = coherenceGateV4('cell', master, drifted).map((x) => x.gate).sort()
+    const mine = coherenceGateV4('cell', master, drifted)
+      .map((x) => x.gate)
+      .sort()
     const theirs = frameCoherenceGate('ne', master, [{ label: 'cell', img: drifted }])
-      .map((x) => x.gate).sort()
+      .map((x) => x.gate)
+      .sort()
     expect(mine, 'the pre-spend gate and the audit disagree about what is wrong').toEqual(theirs)
   })
 })
@@ -173,14 +200,19 @@ describe('★ stanceGate: a contact frame with no stride in it', () => {
   // A body with two legs whose spread is a parameter. Torso and head are identical, so the
   // silhouette and the palette cannot see the difference either.
   const walker = (spread: number, armY = 0): RawImage => {
-    const w = 40, h = 40
+    const w = 40,
+      h = 40
     const data = new Uint8ClampedArray(w * h * 4)
     const put = (x: number, y: number, c: number) => {
       const i = (y * w + x) * 4
-      data[i] = c; data[i + 1] = 130; data[i + 2] = 90; data[i + 3] = 255
+      data[i] = c
+      data[i + 1] = 130
+      data[i + 2] = 90
+      data[i + 3] = 255
     }
     for (let y = 4; y < 26; y++) for (let x = 16; x < 24; x++) put(x, y, 190) // torso
-    for (let y = 26; y < 38; y++) {                                           // two legs
+    for (let y = 26; y < 38; y++) {
+      // two legs
       const t = (y - 26) / 11
       for (let d = 0; d < 3; d++) {
         put(Math.round(19 - t * spread) + d, y, 120)
@@ -208,22 +240,31 @@ describe('★ stanceGate: a contact frame with no stride in it', () => {
   // the standing one is a walk frame with no walk in it and only the stance gate says so.
   it('★ and strideGateV4 passes the pair that stanceGate refuses', () => {
     const strip = {
-      'idle': idle, 'contact-a': walker(9), 'passing': walker(0, 8), 'contact-b': walker(1, 4),
+      idle: idle,
+      'contact-a': walker(9),
+      passing: walker(0, 8),
+      'contact-b': walker(1, 4),
     }
     expect(strideGateV4('se', strip, 0.02), 'the fixture must clear the stride gate').toEqual([])
-    expect(stanceGate('se', idle, [{ label: 'contact-b', img: strip['contact-b'] }])
-      .map((x) => x.gate)).toEqual(['stance'])
+    expect(
+      stanceGate('se', idle, [{ label: 'contact-b', img: strip['contact-b'] }]).map((x) => x.gate),
+    ).toEqual(['stance'])
   })
 
   // Feet, not arms: a swung arm widens the bbox and must not buy a stance.
   it('measures the feet, so an outstretched arm does not buy a stance', () => {
     const armed = walker(1)
-    for (let x = 2; x < 16; x++) for (let y = 8; y < 11; y++) {
-      const i = (y * 40 + x) * 4
-      armed.data[i] = 190; armed.data[i + 1] = 130; armed.data[i + 2] = 90; armed.data[i + 3] = 255
-    }
+    for (let x = 2; x < 16; x++)
+      for (let y = 8; y < 11; y++) {
+        const i = (y * 40 + x) * 4
+        armed.data[i] = 190
+        armed.data[i + 1] = 130
+        armed.data[i + 2] = 90
+        armed.data[i + 3] = 255
+      }
     expect(footSpan(armed)).toBe(footSpan(walker(1)))
-    expect(stanceGate('se', idle, [{ label: 'contact-a', img: armed }]).map((x) => x.gate))
-      .toEqual(['stance'])
+    expect(stanceGate('se', idle, [{ label: 'contact-a', img: armed }]).map((x) => x.gate)).toEqual(
+      ['stance'],
+    )
   })
 })

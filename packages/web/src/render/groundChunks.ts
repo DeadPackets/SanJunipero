@@ -49,9 +49,13 @@ export type ChunkRect = {
   c: number
   r: number
   /** the chunk's own rectangle in BAKE space (screen space shifted right by `offsetX`) */
-  x: number; y: number; w: number; h: number
+  x: number
+  y: number
+  w: number
+  h: number
   /** the texture it is baked into — its rect plus the bleed */
-  texW: number; texH: number
+  texW: number
+  texH: number
 }
 
 export type ChunkGrid = {
@@ -69,43 +73,61 @@ export function groundGrid(fieldW: number, fieldH: number, offsetX: number): Chu
   return {
     cols: Math.max(1, Math.ceil(fieldW / CHUNK_PX_W)),
     rows: Math.max(1, Math.ceil(fieldH / CHUNK_PX_H)),
-    fieldW, fieldH, offsetX,
+    fieldW,
+    fieldH,
+    offsetX,
   }
 }
 
 /** The last column and row are cut to the field, not padded out: the field's own edge has no neighbour to seam against, and the remainder still satisfies the whole-pixel law. */
 export function chunkAt(grid: ChunkGrid, c: number, r: number): ChunkRect {
-  const x = c * CHUNK_PX_W, y = r * CHUNK_PX_H
+  const x = c * CHUNK_PX_W,
+    y = r * CHUNK_PX_H
   const w = Math.min(CHUNK_PX_W, grid.fieldW - x)
   const h = Math.min(CHUNK_PX_H, grid.fieldH - y)
   return {
-    key: chunkKey(c, r), c, r, x, y, w, h,
-    texW: w + CHUNK_BLEED_PX, texH: h + CHUNK_BLEED_PX,
+    key: chunkKey(c, r),
+    c,
+    r,
+    x,
+    y,
+    w,
+    h,
+    texW: w + CHUNK_BLEED_PX,
+    texH: h + CHUNK_BLEED_PX,
   }
 }
 
 export function allChunks(grid: ChunkGrid): ChunkRect[] {
   const out: ChunkRect[] = []
-  for (let r = 0; r < grid.rows; r++) for (let c = 0; c < grid.cols; c++) out.push(chunkAt(grid, c, r))
+  for (let r = 0; r < grid.rows; r++)
+    for (let c = 0; c < grid.cols; c++) out.push(chunkAt(grid, c, r))
   return out
 }
 
 /** The chunks whose paint reaches the WORLD-space view, asked through the entity cull's own `rectInView` and margin — deciding by a different rule would show a hole at the stage edge. */
 export function chunksInView(
-  grid: ChunkGrid, view: ViewRect, margin: number = CULL_MARGIN_PX,
+  grid: ChunkGrid,
+  view: ViewRect,
+  margin: number = CULL_MARGIN_PX,
 ): ChunkRect[] {
   // The span is derived from the rectangle rather than swept over the grid, so the cost of
   // asking is the size of the VIEW and not the size of the town — the whole point of chunking.
-  const bx0 = view.x - margin + grid.offsetX, bx1 = view.x + view.w + margin + grid.offsetX
+  const bx0 = view.x - margin + grid.offsetX,
+    bx1 = view.x + view.w + margin + grid.offsetX
   const c0 = Math.max(0, Math.min(grid.cols - 1, Math.floor(bx0 / CHUNK_PX_W)))
   const c1 = Math.max(0, Math.min(grid.cols - 1, Math.floor(bx1 / CHUNK_PX_W)))
   const r0 = Math.max(0, Math.min(grid.rows - 1, Math.floor((view.y - margin) / CHUNK_PX_H)))
-  const r1 = Math.max(0, Math.min(grid.rows - 1, Math.floor((view.y + view.h + margin) / CHUNK_PX_H)))
+  const r1 = Math.max(
+    0,
+    Math.min(grid.rows - 1, Math.floor((view.y + view.h + margin) / CHUNK_PX_H)),
+  )
   const out: ChunkRect[] = []
   for (let r = r0; r <= r1; r++) {
     for (let c = c0; c <= c1; c++) {
       const k = chunkAt(grid, c, r)
-      const sx0 = k.x - grid.offsetX, sy0 = k.y
+      const sx0 = k.x - grid.offsetX,
+        sy0 = k.y
       if (rectInView(sx0, sy0, sx0 + k.w, sy0 + k.h, view, margin)) out.push(k)
     }
   }
@@ -134,18 +156,22 @@ const spanHi = (v: number, size: number, max: number): number =>
   Math.max(0, Math.min(max, Math.floor(v / size)))
 
 /** Does a bake-space rectangle reach this chunk's TEXTURE (its rect plus the bleed)? */
-function reachesChunk(
-  k: ChunkRect, x0: number, y0: number, x1: number, y1: number,
-): boolean {
+function reachesChunk(k: ChunkRect, x0: number, y0: number, x1: number, y1: number): boolean {
   return x1 >= k.x && x0 <= k.x + k.texW && y1 >= k.y && y0 <= k.y + k.texH
 }
 
 function chunkKeysForBox(
-  grid: ChunkGrid, x0: number, y0: number, x1: number, y1: number,
+  grid: ChunkGrid,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
 ): ChunkRect[] {
   const out: ChunkRect[] = []
-  const c0 = spanLo(x0, CHUNK_PX_W, grid.cols - 1), c1 = spanHi(x1, CHUNK_PX_W, grid.cols - 1)
-  const r0 = spanLo(y0, CHUNK_PX_H, grid.rows - 1), r1 = spanHi(y1, CHUNK_PX_H, grid.rows - 1)
+  const c0 = spanLo(x0, CHUNK_PX_W, grid.cols - 1),
+    c1 = spanHi(x1, CHUNK_PX_W, grid.cols - 1)
+  const r0 = spanLo(y0, CHUNK_PX_H, grid.rows - 1),
+    r1 = spanHi(y1, CHUNK_PX_H, grid.rows - 1)
   for (let r = r0; r <= r1; r++) {
     for (let c = c0; c <= c1; c++) {
       const k = chunkAt(grid, c, r)
@@ -157,18 +183,23 @@ function chunkKeysForBox(
 
 /** The painted box of one tile's mask shape, in bake space, with the slack. */
 export function shapeBox(
-  grid: ChunkGrid, sx: number, sy: number,
+  grid: ChunkGrid,
+  sx: number,
+  sy: number,
 ): { x0: number; y0: number; x1: number; y1: number } {
   const bx = sx + grid.offsetX
   return {
-    x0: bx - TILE_W / 2 - SHAPE_PAD_PX, x1: bx + TILE_W / 2 + SHAPE_PAD_PX,
-    y0: sy - SHAPE_PAD_PX, y1: sy + TILE_H + SHAPE_PAD_PX,
+    x0: bx - TILE_W / 2 - SHAPE_PAD_PX,
+    x1: bx + TILE_W / 2 + SHAPE_PAD_PX,
+    y0: sy - SHAPE_PAD_PX,
+    y1: sy + TILE_H + SHAPE_PAD_PX,
   }
 }
 
 /** Every chunk gets every layer at its ORIGINAL index, empty or not: `materialMatrix` and `octaveMatrix` take the layer's POSITION, so a renumbered stack samples the same ground through a different rotation than its neighbour. */
 export function bucketLayers(
-  grid: ChunkGrid, layers: readonly FieldLayer[],
+  grid: ChunkGrid,
+  layers: readonly FieldLayer[],
 ): Map<ChunkKey, FieldLayer[]> {
   const out = new Map<ChunkKey, FieldLayer[]>()
   const stackFor = (key: ChunkKey): FieldLayer[] => {
@@ -195,20 +226,31 @@ export const POLY_PAD_PX = 2
 
 /** The kerb, headland and furrow polylines, cut the same way: assigned WHOLE to every chunk their bounding box reaches, never split, so a crossing outline stays one continuous stroke. */
 export function bucketPolys(
-  grid: ChunkGrid, polys: readonly number[][],
+  grid: ChunkGrid,
+  polys: readonly number[][],
 ): Map<ChunkKey, number[][]> {
   const out = new Map<ChunkKey, number[][]>()
   for (const poly of polys) {
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    let x0 = Infinity,
+      y0 = Infinity,
+      x1 = -Infinity,
+      y1 = -Infinity
     for (let i = 0; i < poly.length; i += 2) {
-      const x = poly[i]! + grid.offsetX, y = poly[i + 1]!
+      const x = poly[i]! + grid.offsetX,
+        y = poly[i + 1]!
       if (x < x0) x0 = x
       if (x > x1) x1 = x
       if (y < y0) y0 = y
       if (y > y1) y1 = y
     }
     if (x0 === Infinity) continue
-    for (const k of chunkKeysForBox(grid, x0 - POLY_PAD_PX, y0 - POLY_PAD_PX, x1 + POLY_PAD_PX, y1 + POLY_PAD_PX)) {
+    for (const k of chunkKeysForBox(
+      grid,
+      x0 - POLY_PAD_PX,
+      y0 - POLY_PAD_PX,
+      x1 + POLY_PAD_PX,
+      y1 + POLY_PAD_PX,
+    )) {
       const list = out.get(k.key)
       if (list === undefined) out.set(k.key, [poly])
       else list.push(poly)

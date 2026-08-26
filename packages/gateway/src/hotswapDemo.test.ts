@@ -33,7 +33,10 @@ describe('hotswap demo house', () => {
 
     const row = db.prepare('SELECT png FROM assets WHERE id = ?').get(rec.id) as { png: Buffer }
     const back = await decodePng(row.png)
-    expect({ width: back.width, height: back.height }).toEqual({ width: HOUSE_PX, height: HOUSE_PX })
+    expect({ width: back.width, height: back.height }).toEqual({
+      width: HOUSE_PX,
+      height: HOUSE_PX,
+    })
     expect(Array.from(back.data)).toEqual(Array.from(drawHouse().data))
     db.close()
   })

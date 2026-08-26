@@ -1,6 +1,11 @@
 import type { SimEvent } from '@sj/shared'
 
-const ev = (seq: number, tick: number, type: string, payload: unknown): SimEvent => ({ seq, tick, type, payload })
+const ev = (seq: number, tick: number, type: string, payload: unknown): SimEvent => ({
+  seq,
+  tick,
+  type,
+  payload,
+})
 
 // Three scenes separated by >20-tick silences. The evening trade carries a trailing
 // `agent_moved` so the scene survives the segmenter's minEvents floor.

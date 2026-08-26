@@ -3,8 +3,9 @@ import { stableStringify, stateHash } from './hash.js'
 
 describe('stableStringify', () => {
   it('is key-order independent', () => {
-    expect(stableStringify({ b: 1, a: { d: 2, c: 3 } }))
-      .toBe(stableStringify({ a: { c: 3, d: 2 }, b: 1 }))
+    expect(stableStringify({ b: 1, a: { d: 2, c: 3 } })).toBe(
+      stableStringify({ a: { c: 3, d: 2 }, b: 1 }),
+    )
   })
   it('preserves array order', () => {
     expect(stableStringify([2, 1])).not.toBe(stableStringify([1, 2]))

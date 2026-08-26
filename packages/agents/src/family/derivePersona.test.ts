@@ -80,7 +80,9 @@ describe('derivePersona (T25)', () => {
     const { identity } = derivePersona(CHILD, [MOTHER, FATHER])
     const v = identity.voiceCard
     const registerFrom = v.register === MOTHER.identity.voiceCard.register ? 0 : 1
-    expect([MOTHER.identity.voiceCard.register, FATHER.identity.voiceCard.register]).toContain(v.register)
+    expect([MOTHER.identity.voiceCard.register, FATHER.identity.voiceCard.register]).toContain(
+      v.register,
+    )
     const rhythms = [MOTHER.identity.voiceCard.rhythm, FATHER.identity.voiceCard.rhythm]
     expect(v.rhythm).toBe(rhythms[1 - registerFrom])
   })
@@ -108,10 +110,11 @@ describe('derivePersona (T25)', () => {
     const { identity } = derivePersona(CHILD, [MOTHER, FATHER])
     expect(identity.voiceCard.wordBudget).toEqual({ typical: 21, burst: 44 })
 
-    const plain = (p: ParentPersona): ParentPersona => ({
-      ...p,
-      identity: { ...p.identity, voiceCard: { ...p.identity.voiceCard, wordBudget: undefined } },
-    })
+    const plain = (p: ParentPersona): ParentPersona => {
+      const voiceCard = { ...p.identity.voiceCard }
+      delete voiceCard.wordBudget
+      return { ...p, identity: { ...p.identity, voiceCard } }
+    }
     const budgetless = derivePersona(CHILD, [plain(MOTHER), plain(FATHER)])
     expect('wordBudget' in budgetless.identity.voiceCard).toBe(false)
   })

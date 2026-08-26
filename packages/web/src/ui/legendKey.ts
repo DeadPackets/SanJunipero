@@ -7,14 +7,14 @@ export type Box = { x: number; y: number; w: number; h: number }
 export type Stage = { w: number; h: number }
 
 /** Every constant below is the value in `chrome.css`; a test walks the sheet and pins them. */
-export const KEY_CHIP_H = 40        // .legend-chip min-height — a pointer target first
-export const KEY_MAX_W = 640        // .society-key max-width: min(40rem, …)
-export const KEY_GAP = 6.4          // 0.4rem
-export const KEY_PAD_Y = 1.6        // 0.1rem
-export const KEY_MARGIN = 12.8      // 0.8rem — the inset from the lens edge
-export const KEY_BORDER = 10        // the 9-slice frame, on all four sides
-export const KEY_SUMMARY_W = 168    // the shut control: one chip that says what it opens
-export const KEY_AXIS_NAME_W = 110  // "HOW CLOSE" / "FAMILY" / "WHICH WAY"
+export const KEY_CHIP_H = 40 // .legend-chip min-height — a pointer target first
+export const KEY_MAX_W = 640 // .society-key max-width: min(40rem, …)
+export const KEY_GAP = 6.4 // 0.4rem
+export const KEY_PAD_Y = 1.6 // 0.1rem
+export const KEY_MARGIN = 12.8 // 0.8rem — the inset from the lens edge
+export const KEY_BORDER = 10 // the 9-slice frame, on all four sides
+export const KEY_SUMMARY_W = 168 // the shut control: one chip that says what it opens
+export const KEY_AXIS_NAME_W = 110 // "HOW CLOSE" / "FAMILY" / "WHICH WAY"
 export const KEY_AXES = 3
 
 export function keyBox(stage: Stage, opts: { open: boolean; chips: number; chipW: number }): Box {
@@ -22,7 +22,8 @@ export function keyBox(stage: Stage, opts: { open: boolean; chips: number; chipW
   const pad = 2 * KEY_PAD_Y
   if (!opts.open) {
     return {
-      x: KEY_MARGIN, y: KEY_MARGIN,
+      x: KEY_MARGIN,
+      y: KEY_MARGIN,
       w: Math.min(KEY_SUMMARY_W + frame, stage.w - 2 * KEY_MARGIN),
       h: Math.min(KEY_CHIP_H + pad + frame, stage.h - 2 * KEY_MARGIN),
     }
@@ -31,7 +32,8 @@ export function keyBox(stage: Stage, opts: { open: boolean; chips: number; chipW
   const run = opts.chips * (opts.chipW + KEY_GAP) + KEY_AXES * KEY_AXIS_NAME_W
   const rows = Math.max(1, Math.ceil(run / content))
   return {
-    x: KEY_MARGIN, y: KEY_MARGIN,
+    x: KEY_MARGIN,
+    y: KEY_MARGIN,
     w: Math.min(content + frame, stage.w - 2 * KEY_MARGIN),
     h: Math.min(rows * KEY_CHIP_H + (rows - 1) * KEY_GAP + pad + frame, stage.h - 2 * KEY_MARGIN),
   }
@@ -44,7 +46,7 @@ export function coverage(box: Box, stage: Stage): number {
 
 /** Which people the key is standing on. Inclusive on the near edges, like a hit box. */
 export function nodesUnder(
-  nodes: ReadonlyArray<{ id: string; x: number; y: number }>,
+  nodes: readonly { id: string; x: number; y: number }[],
   box: Box,
 ): string[] {
   return nodes

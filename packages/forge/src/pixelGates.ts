@@ -15,16 +15,23 @@ const ok = (failures: string[]): boolean => failures.length === 0
 
 export function integerScaleGate(raw: Size, shipped: Size): GateResult & { factor: number | null } {
   const failures: string[] = []
-  const fx = raw.w / shipped.w, fy = raw.h / shipped.h
-  if (fx < 1 || fy < 1) failures.push(
-    `upscale ${raw.w}x${raw.h} -> ${shipped.w}x${shipped.h}: the shipped size must never exceed the generation`)
+  const fx = raw.w / shipped.w,
+    fy = raw.h / shipped.h
+  if (fx < 1 || fy < 1)
+    failures.push(
+      `upscale ${raw.w}x${raw.h} -> ${shipped.w}x${shipped.h}: the shipped size must never exceed the generation`,
+    )
   else {
-    if (!Number.isInteger(fx) || !Number.isInteger(fy)) failures.push(
-      `non-integer downscale ${raw.w}x${raw.h} -> ${shipped.w}x${shipped.h}: ` +
-      `x=${fx.toFixed(3)} y=${fy.toFixed(3)}, both must be whole numbers`)
-    if (fx !== fy) failures.push(
-      `anisotropic downscale ${raw.w}x${raw.h} -> ${shipped.w}x${shipped.h}: ` +
-      `x=${fx.toFixed(3)} but y=${fy.toFixed(3)}`)
+    if (!Number.isInteger(fx) || !Number.isInteger(fy))
+      failures.push(
+        `non-integer downscale ${raw.w}x${raw.h} -> ${shipped.w}x${shipped.h}: ` +
+          `x=${fx.toFixed(3)} y=${fy.toFixed(3)}, both must be whole numbers`,
+      )
+    if (fx !== fy)
+      failures.push(
+        `anisotropic downscale ${raw.w}x${raw.h} -> ${shipped.w}x${shipped.h}: ` +
+          `x=${fx.toFixed(3)} but y=${fy.toFixed(3)}`,
+      )
   }
   return { ok: ok(failures), failures, factor: ok(failures) ? fx : null }
 }
@@ -34,14 +41,20 @@ export function integerScaleGate(raw: Size, shipped: Size): GateResult & { facto
 // Downscale by the claimed pixel size and re-upscale: the result must be identical to the
 // shipped image. Equivalently, every artPx x artPx block is one RGBA value.
 export function pixelGridGate(img: RawImage, artPx: number): GateResult & { badBlocks: number } {
-  if (!Number.isInteger(artPx) || artPx < 1) return {
-    ok: false, badBlocks: -1,
-    failures: [`claimed pixel size ${artPx} is not a positive integer`],
-  }
-  if (img.width % artPx !== 0 || img.height % artPx !== 0) return {
-    ok: false, badBlocks: -1,
-    failures: [`claimed pixel size ${artPx} does not divide the ${img.width}x${img.height} canvas`],
-  }
+  if (!Number.isInteger(artPx) || artPx < 1)
+    return {
+      ok: false,
+      badBlocks: -1,
+      failures: [`claimed pixel size ${artPx} is not a positive integer`],
+    }
+  if (img.width % artPx !== 0 || img.height % artPx !== 0)
+    return {
+      ok: false,
+      badBlocks: -1,
+      failures: [
+        `claimed pixel size ${artPx} does not divide the ${img.width}x${img.height} canvas`,
+      ],
+    }
   let badBlocks = 0
   let first = ''
   for (let by = 0; by < img.height; by += artPx)
@@ -51,16 +64,25 @@ export function pixelGridGate(img: RawImage, artPx: number): GateResult & { badB
       for (let y = 0; y < artPx && uniform; y++)
         for (let x = 0; x < artPx; x++) {
           const i = ((by + y) * img.width + bx + x) * 4
-          if (img.data[i] !== img.data[i0] || img.data[i + 1] !== img.data[i0 + 1]
-            || img.data[i + 2] !== img.data[i0 + 2] || img.data[i + 3] !== img.data[i0 + 3]) {
+          if (
+            img.data[i] !== img.data[i0] ||
+            img.data[i + 1] !== img.data[i0 + 1] ||
+            img.data[i + 2] !== img.data[i0 + 2] ||
+            img.data[i + 3] !== img.data[i0 + 3]
+          ) {
             uniform = false
             break
           }
         }
-      if (!uniform) { badBlocks++; first ||= `${bx},${by}` }
+      if (!uniform) {
+        badBlocks++
+        first ||= `${bx},${by}`
+      }
     }
-  const failures = badBlocks === 0 ? []
-    : [`pixel grid ${artPx}: ${badBlocks} blocks are not a single colour (first at ${first})`]
+  const failures =
+    badBlocks === 0
+      ? []
+      : [`pixel grid ${artPx}: ${badBlocks} blocks are not a single colour (first at ${first})`]
   return { ok: ok(failures), failures, badBlocks }
 }
 
@@ -69,15 +91,18 @@ export function pixelGridGate(img: RawImage, artPx: number): GateResult & { badB
 // Soft alpha is allowed for exactly one thing: preview/contact images that are never
 // sampled by the renderer. Every shipped sprite, tile and portrait is opaque or clear.
 export function alphaBinaryGate(
-  img: RawImage, opts: { allowSoftAlpha?: boolean } = {},
+  img: RawImage,
+  opts: { allowSoftAlpha?: boolean | undefined } = {},
 ): GateResult & { softPixels: number } {
   let softPixels = 0
   for (let i = 3; i < img.data.length; i += 4) {
     const a = img.data[i]!
     if (a !== 0 && a !== 255) softPixels++
   }
-  const failures = softPixels === 0 || opts.allowSoftAlpha === true ? []
-    : [`alpha: ${softPixels} pixels are neither fully opaque nor fully transparent`]
+  const failures =
+    softPixels === 0 || opts.allowSoftAlpha === true
+      ? []
+      : [`alpha: ${softPixels} pixels are neither fully opaque nor fully transparent`]
   return { ok: ok(failures), failures, softPixels }
 }
 
@@ -86,10 +111,13 @@ export function alphaBinaryGate(
 // A class may answer to a WIDER palette, never to none, and `palette` is how it says which:
 // portraits pass `derivedPalette()`, MASTER_PALETTE plus the tones interpolated within each ramp.
 export function paletteGate(
-  img: RawImage, opts: { palette?: readonly (readonly number[])[] } = {},
+  img: RawImage,
+  opts: { palette?: readonly (readonly number[])[] } = {},
 ): GateResult & { offPalette: number; offenders: { hex: string; count: number }[] } {
-  const allowed = opts.palette === undefined ? PALETTE_SET
-    : new Set(opts.palette.map((p) => (p[0]! << 16) | (p[1]! << 8) | p[2]!))
+  const allowed =
+    opts.palette === undefined
+      ? PALETTE_SET
+      : new Set(opts.palette.map((p) => (p[0]! << 16) | (p[1]! << 8) | p[2]!))
   const counts = new Map<number, number>()
   let offPalette = 0
   for (let i = 0; i < img.data.length; i += 4) {
@@ -99,11 +127,17 @@ export function paletteGate(
     offPalette++
     counts.set(rgb, (counts.get(rgb) ?? 0) + 1)
   }
-  const offenders = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 8)
+  const offenders = [...counts]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
     .map(([rgb, count]) => ({ hex: hex(rgb), count }))
-  const failures = offPalette === 0 ? []
-    : [`palette: ${offPalette} opaque pixels off the ${allowed.size}-colour palette in ` +
-      `${counts.size} colours (worst ${offenders.map(o => `${o.hex} x${o.count}`).join(', ')})`]
+  const failures =
+    offPalette === 0
+      ? []
+      : [
+          `palette: ${offPalette} opaque pixels off the ${allowed.size}-colour palette in ` +
+            `${counts.size} colours (worst ${offenders.map((o) => `${o.hex} x${o.count}`).join(', ')})`,
+        ]
   return { ok: ok(failures), failures, offPalette, offenders }
 }
 
@@ -117,12 +151,18 @@ export function spriteDensity(a: { canvas: Size; footprint: Footprint; tile: Siz
 }
 
 export function nativeDensityGate(a: {
-  name: string; canvas: Size; footprint: Footprint; tile: Size
+  name: string
+  canvas: Size
+  footprint: Footprint
+  tile: Size
 }): GateResult & { density: number } {
   const density = spriteDensity(a)
-  const failures = Number.isInteger(density) ? []
-    : [`${a.name}: ${a.canvas.w}px of art over a ${a.footprint.w}x${a.footprint.h} footprint on a ` +
-      `${a.tile.w}x${a.tile.h} tile is ${density} art px per world px, which is not a whole number`]
+  const failures = Number.isInteger(density)
+    ? []
+    : [
+        `${a.name}: ${a.canvas.w}px of art over a ${a.footprint.w}x${a.footprint.h} footprint on a ` +
+          `${a.tile.w}x${a.tile.h} tile is ${density} art px per world px, which is not a whole number`,
+      ]
   return { ok: ok(failures), failures, density }
 }
 
@@ -131,9 +171,11 @@ export function nativeDensityGate(a: {
 export function classDensityGate(
   members: readonly { name: string; density: number }[],
 ): GateResult & { densities: number[] } {
-  const densities = [...new Set(members.map(m => m.density))].sort((a, b) => a - b)
-  const failures = densities.length <= 1 ? []
-    : [`mixed densities in one class: ${members.map(m => `${m.name}=${m.density}`).join(', ')}`]
+  const densities = [...new Set(members.map((m) => m.density))].sort((a, b) => a - b)
+  const failures =
+    densities.length <= 1
+      ? []
+      : [`mixed densities in one class: ${members.map((m) => `${m.name}=${m.density}`).join(', ')}`]
   return { ok: ok(failures), failures, densities }
 }
 
@@ -145,12 +187,16 @@ export const SEAM_RATIO_MAX = 2.5
 export const SEAM_ABSOLUTE_FLOOR = 8
 
 export function tileSeamGate(img: RawImage): GateResult & {
-  wrapH: number; baselineH: number; wrapV: number; baselineV: number
+  wrapH: number
+  baselineH: number
+  wrapV: number
+  baselineV: number
 } {
   const colDelta = (a: number, b: number): number => {
     let s = 0
     for (let y = 0; y < img.height; y++) {
-      const i = (y * img.width + a) * 4, j = (y * img.width + b) * 4
+      const i = (y * img.width + a) * 4,
+        j = (y * img.width + b) * 4
       for (let k = 0; k < 3; k++) s += Math.abs(img.data[i + k]! - img.data[j + k]!)
     }
     return s / (img.height * 3)
@@ -158,7 +204,8 @@ export function tileSeamGate(img: RawImage): GateResult & {
   const rowDelta = (a: number, b: number): number => {
     let s = 0
     for (let x = 0; x < img.width; x++) {
-      const i = (a * img.width + x) * 4, j = (b * img.width + x) * 4
+      const i = (a * img.width + x) * 4,
+        j = (b * img.width + x) * 4
       for (let k = 0; k < 3; k++) s += Math.abs(img.data[i + k]! - img.data[j + k]!)
     }
     return s / (img.width * 3)
@@ -167,14 +214,18 @@ export function tileSeamGate(img: RawImage): GateResult & {
   for (let x = 0; x < img.width - 1; x++) hb += colDelta(x, x + 1)
   let vb = 0
   for (let y = 0; y < img.height - 1; y++) vb += rowDelta(y, y + 1)
-  const baselineH = hb / Math.max(1, img.width - 1), baselineV = vb / Math.max(1, img.height - 1)
-  const wrapH = colDelta(img.width - 1, 0), wrapV = rowDelta(img.height - 1, 0)
+  const baselineH = hb / Math.max(1, img.width - 1),
+    baselineV = vb / Math.max(1, img.height - 1)
+  const wrapH = colDelta(img.width - 1, 0),
+    wrapV = rowDelta(img.height - 1, 0)
 
   const failures: string[] = []
   const check = (axis: string, wrap: number, base: number): void => {
-    if (wrap > SEAM_ABSOLUTE_FLOOR && wrap > base * SEAM_RATIO_MAX) failures.push(
-      `${axis} seam: the wrap edge differs by ${wrap.toFixed(1)}, ` +
-      `${(wrap / Math.max(base, 0.1)).toFixed(1)}x this material's own ${base.toFixed(1)} interior noise`)
+    if (wrap > SEAM_ABSOLUTE_FLOOR && wrap > base * SEAM_RATIO_MAX)
+      failures.push(
+        `${axis} seam: the wrap edge differs by ${wrap.toFixed(1)}, ` +
+          `${(wrap / Math.max(base, 0.1)).toFixed(1)}x this material's own ${base.toFixed(1)} interior noise`,
+      )
   }
   check('horizontal', wrapH, baselineH)
   check('vertical', wrapV, baselineV)
@@ -184,7 +235,8 @@ export function tileSeamGate(img: RawImage): GateResult & {
 // The other half of a seam: a join can be perfect and the repeat still read as a pattern — a wall
 // piece coming back every 4 tiles looked like deliberate half-timbering.
 export function tilesetVarietyGate(
-  sequence: readonly string[], opts: { minPeriod: number },
+  sequence: readonly string[],
+  opts: { minPeriod: number },
 ): GateResult & { shortestPeriod: number | null } {
   let shortestPeriod: number | null = null
   let worst = ''
@@ -197,10 +249,13 @@ export function tilesetVarietyGate(
     }
     lastSeen.set(piece, i)
   })
-  const failures = shortestPeriod !== null && shortestPeriod < opts.minPeriod
-    ? [`tileset repeat: "${worst}" comes back after ${shortestPeriod} tiles, ` +
-      `below the ${opts.minPeriod}-tile minimum period`]
-    : []
+  const failures =
+    shortestPeriod !== null && shortestPeriod < opts.minPeriod
+      ? [
+          `tileset repeat: "${worst}" comes back after ${shortestPeriod} tiles, ` +
+            `below the ${opts.minPeriod}-tile minimum period`,
+        ]
+      : []
   return { ok: ok(failures), failures, shortestPeriod }
 }
 
@@ -211,7 +266,8 @@ export function tilesetVarietyGate(
 export const DETACHED_MASS_MAX = 0.01
 
 export function soleSilhouetteGate(img: RawImage): GateResult & {
-  islands: number; detachedFraction: number
+  islands: number
+  detachedFraction: number
 } {
   const { width: w, height: h, data } = img
   const seen = new Uint8Array(w * h)
@@ -225,24 +281,52 @@ export function soleSilhouetteGate(img: RawImage): GateResult & {
     while (stack.length > 0) {
       const p = stack.pop()!
       n++
-      const px = p % w, py = (p - px) / w
-      if (px + 1 < w) { const q = p + 1; if (seen[q] === 0 && data[q * 4 + 3] !== 0) { seen[q] = 1; stack.push(q) } }
-      if (px > 0) { const q = p - 1; if (seen[q] === 0 && data[q * 4 + 3] !== 0) { seen[q] = 1; stack.push(q) } }
-      if (py + 1 < h) { const q = p + w; if (seen[q] === 0 && data[q * 4 + 3] !== 0) { seen[q] = 1; stack.push(q) } }
-      if (py > 0) { const q = p - w; if (seen[q] === 0 && data[q * 4 + 3] !== 0) { seen[q] = 1; stack.push(q) } }
+      const px = p % w,
+        py = (p - px) / w
+      if (px + 1 < w) {
+        const q = p + 1
+        if (seen[q] === 0 && data[q * 4 + 3] !== 0) {
+          seen[q] = 1
+          stack.push(q)
+        }
+      }
+      if (px > 0) {
+        const q = p - 1
+        if (seen[q] === 0 && data[q * 4 + 3] !== 0) {
+          seen[q] = 1
+          stack.push(q)
+        }
+      }
+      if (py + 1 < h) {
+        const q = p + w
+        if (seen[q] === 0 && data[q * 4 + 3] !== 0) {
+          seen[q] = 1
+          stack.push(q)
+        }
+      }
+      if (py > 0) {
+        const q = p - w
+        if (seen[q] === 0 && data[q * 4 + 3] !== 0) {
+          seen[q] = 1
+          stack.push(q)
+        }
+      }
     }
     sizes.push(n)
   }
   const total = sizes.reduce((s, n) => s + n, 0)
   const body = sizes.length === 0 ? 0 : Math.max(...sizes)
   const detachedFraction = total === 0 ? 0 : (total - body) / total
-  const failures = total === 0
-    ? ['silhouette: the cell has no opaque pixels at all']
-    : detachedFraction > DETACHED_MASS_MAX
-      ? [`silhouette: ${sizes.length} opaque islands — ${(detachedFraction * 100).toFixed(2)}% of the `
-        + `mass does not touch the body (limit ${(DETACHED_MASS_MAX * 100).toFixed(0)}%). `
-        + 'A person is ONE shape; a second island is a caption, a prop or a second figure.']
-      : []
+  const failures =
+    total === 0
+      ? ['silhouette: the cell has no opaque pixels at all']
+      : detachedFraction > DETACHED_MASS_MAX
+        ? [
+            `silhouette: ${sizes.length} opaque islands — ${(detachedFraction * 100).toFixed(2)}% of the ` +
+              `mass does not touch the body (limit ${(DETACHED_MASS_MAX * 100).toFixed(0)}%). ` +
+              'A person is ONE shape; a second island is a caption, a prop or a second figure.',
+          ]
+        : []
   return { ok: ok(failures), failures, islands: sizes.length, detachedFraction }
 }
 
@@ -265,10 +349,18 @@ export async function pixelBarReport(a: PixelBarArgs): Promise<GateResult & { na
   if (a.raw) failures.push(...integerScaleGate(a.raw, { w: a.img.width, h: a.img.height }).failures)
   if (a.artPx !== undefined) failures.push(...pixelGridGate(a.img, a.artPx).failures)
   failures.push(...alphaBinaryGate(a.img, { allowSoftAlpha: a.allowSoftAlpha }).failures)
-  failures.push(...paletteGate(a.img, a.palette === undefined ? {} : { palette: a.palette }).failures)
-  if (a.footprint && a.tile) failures.push(...nativeDensityGate({
-    name: a.name, canvas: { w: a.img.width, h: a.img.height }, footprint: a.footprint, tile: a.tile,
-  }).failures)
+  failures.push(
+    ...paletteGate(a.img, a.palette === undefined ? {} : { palette: a.palette }).failures,
+  )
+  if (a.footprint && a.tile)
+    failures.push(
+      ...nativeDensityGate({
+        name: a.name,
+        canvas: { w: a.img.width, h: a.img.height },
+        footprint: a.footprint,
+        tile: a.tile,
+      }).failures,
+    )
   if (a.seam === true) failures.push(...tileSeamGate(a.img).failures)
   return { name: a.name, ok: ok(failures), failures }
 }

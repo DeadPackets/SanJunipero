@@ -16,12 +16,13 @@ const SYSTEM = [
   'You are standing by the fire pit. You have 12 wood and 4 bread.',
   'Choose exactly one thing to do now.',
 ].join('\n')
-const USER = 'You can: walk, build, stoke, kindle, talk, eat, sleep, wait. Choose one and give a short reason.'
+const USER =
+  'You can: walk, build, stoke, kindle, talk, eat, sleep, wait. Choose one and give a short reason.'
 const SCHEMA = z.object({ verb: z.string().min(1), reason: z.string().min(1) }).strict()
 
 // The rungs. `reasoning:{enabled:false}` is OpenRouter's off switch; effort levels are its
 // three named rungs. `null` is the control: exactly what the code sends today.
-const RUNGS: Array<{ name: string; reasoning: unknown }> = [
+const RUNGS: { name: string; reasoning: unknown }[] = [
   { name: 'unset (today)', reasoning: null },
   { name: 'off', reasoning: { enabled: false } },
   { name: 'minimal', reasoning: { effort: 'minimal' } },
@@ -31,7 +32,17 @@ const RUNGS: Array<{ name: string; reasoning: unknown }> = [
 ]
 
 let spent = 0
-type Row = { rung: string; rep: number; provider: string; served: string; inTok: number; outTok: number; reasonTok: number; ok: boolean; note: string }
+type Row = {
+  rung: string
+  rep: number
+  provider: string
+  served: string
+  inTok: number
+  outTok: number
+  reasonTok: number
+  ok: boolean
+  note: string
+}
 const rows: Row[] = []
 
 // Rep OUTER, rung INNER, and the only varying text is `#${rep}` — so within one rep every rung
@@ -43,7 +54,7 @@ for (let rep = 0; rep < REPS; rep++) {
       models: [MIND_MODEL, ...FALLBACK_MODELS],
       provider: { order: PROVIDER_ORDER, allow_fallbacks: true },
     }
-    if (rung.reasoning !== null) extraBody['reasoning'] = rung.reasoning
+    if (rung.reasoning !== null) extraBody.reasoning = rung.reasoning
     try {
       const r = await generateText({
         model: openrouter(MIND_MODEL, { extraBody }),
@@ -56,22 +67,35 @@ for (let rep = 0; rep < REPS; rep++) {
       const inTok = u.inputTokens ?? 0
       const outTok = u.outputTokens ?? 0
       const reasonTok = u.outputTokenDetails?.reasoningTokens ?? 0
-      spent += ((inTok * 0.28) + (outTok * 0.56)) / 1e6
+      spent += (inTok * 0.28 + outTok * 0.56) / 1e6
       rows.push({
-        rung: rung.name, rep, ok: true,
+        rung: rung.name,
+        rep,
+        ok: true,
         provider: String((r.providerMetadata as any)?.openrouter?.provider ?? 'unknown'),
         served: String(r.response?.modelId ?? '?'),
-        inTok, outTok, reasonTok,
+        inTok,
+        outTok,
+        reasonTok,
         note: JSON.stringify(r.output).slice(0, 60),
       })
     } catch (err) {
       rows.push({
-        rung: rung.name, rep, ok: false, provider: '-', served: '-',
-        inTok: 0, outTok: 0, reasonTok: 0,
+        rung: rung.name,
+        rep,
+        ok: false,
+        provider: '-',
+        served: '-',
+        inTok: 0,
+        outTok: 0,
+        reasonTok: 0,
         note: (err instanceof Error ? err.message : String(err)).slice(0, 140),
       })
     }
-    if (spent > CAP_USD) { console.error('DIAL PROBE CAP HIT'); break }
+    if (spent > CAP_USD) {
+      console.error('DIAL PROBE CAP HIT')
+      break
+    }
   }
 }
 
@@ -88,7 +112,9 @@ const median = (xs: number[]): number => {
   const s = [...xs].sort((a, b) => a - b)
   return s.length === 0 ? 0 : s[Math.floor(s.length / 2)]!
 }
-console.log('\nrung           n   ok  in(med)  out(med)  out(min..max)   reasoning(med)  reasoning%')
+console.log(
+  '\nrung           n   ok  in(med)  out(med)  out(min..max)   reasoning(med)  reasoning%',
+)
 for (const rung of RUNGS) {
   const rs = rows.filter((r) => r.rung === rung.name)
   const ok = rs.filter((r) => r.ok)

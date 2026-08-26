@@ -26,31 +26,67 @@ export const IntentParamsSchema = z.looseObject({
   text: z.string().optional(),
   description: z.string().optional(),
 })
-export const IntentSchema = z.object({
-  verb: z.string().min(1).describe('The exact word of the act, such as walk or eat.'),
-  params: IntentParamsSchema.default({}).describe('Exactly what the act asks for, named by its keys.'),
-}).strict()
+export const IntentSchema = z
+  .object({
+    verb: z.string().min(1).describe('The exact word of the act, such as walk or eat.'),
+    params: IntentParamsSchema.default({}).describe(
+      'Exactly what the act asks for, named by its keys.',
+    ),
+  })
+  .strict()
 // Every optional field takes null as well as absence, and not via `.transform()`, which
 // `z.toJSONSchema(..., { io: 'output' })` refuses to represent. Readers treat both alike.
-export const TurnSchema = z.object({
-  thought: z.string().min(1)
-    .describe('What passes through your mind this moment. Yours alone; no one else ever hears it.'),
-  speech: z.string().min(1).nullish()
-    .describe('Words you say aloud. Anyone within earshot hears them.'),
-  action: z.union([IntentSchema, z.object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') }).strict()]).nullish()
-    .describe('One act you begin now: its exact word as verb with what it asks as params, or freeform for a try at something new.'),
-  plan: z.array(IntentSchema).max(12).nullish()
-    .describe('Up to twelve acts your body carries out one after another while your mind rests.'),
-  journal: z.string().min(1).nullish()
-    .describe('Words you set down in your own book. Writing takes part of the hour.'),
-  importance: z.number().int().min(1).max(10)
-    .describe('How deeply this moment matters to you, one through ten.'),
-  reconsider_at: ReconsiderAtSchema.nullish()
-    .describe('When you mean to return to your thoughts: a clock time today such as 08:30, or a day and a part of that day such as {"day": 12, "phase": "dusk"}. The parts of a day are day, dusk and night.'),
-}).strict()
+export const TurnSchema = z
+  .object({
+    thought: z
+      .string()
+      .min(1)
+      .describe(
+        'What passes through your mind this moment. Yours alone; no one else ever hears it.',
+      ),
+    speech: z
+      .string()
+      .min(1)
+      .nullish()
+      .describe('Words you say aloud. Anyone within earshot hears them.'),
+    action: z
+      .union([
+        IntentSchema,
+        z
+          .object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') })
+          .strict(),
+      ])
+      .nullish()
+      .describe(
+        'One act you begin now: its exact word as verb with what it asks as params, or freeform for a try at something new.',
+      ),
+    plan: z
+      .array(IntentSchema)
+      .max(12)
+      .nullish()
+      .describe('Up to twelve acts your body carries out one after another while your mind rests.'),
+    journal: z
+      .string()
+      .min(1)
+      .nullish()
+      .describe('Words you set down in your own book. Writing takes part of the hour.'),
+    importance: z
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .describe('How deeply this moment matters to you, one through ten.'),
+    reconsider_at: ReconsiderAtSchema.nullish().describe(
+      'When you mean to return to your thoughts: a clock time today such as 08:30, or a day and a part of that day such as {"day": 12, "phase": "dusk"}. The parts of a day are day, dusk and night.',
+    ),
+  })
+  .strict()
 export type Turn = z.infer<typeof TurnSchema>
 
-export const FALLBACK_TURN: Turn = { thought: 'My mind drifts. I stand quietly, lost in thought.', importance: 1 }
+export const FALLBACK_TURN: Turn = {
+  thought: 'My mind drifts. I stand quietly, lost in thought.',
+  importance: 1,
+}
 
 // Nothing came back at all, as against something wrong coming back. The two need different
 // answers: a wrong answer is worth correcting, and a blank one is worth only asking again.
@@ -77,7 +113,11 @@ export async function parseTurnWithRepair(
 
 // Where each part of the day begins, as the one clock everybody shares. Read back through
 // `dayPhaseFromTick` in the tests, so an anchor can never drift out of its own phase.
-const PHASE_START_MINUTE: Readonly<Record<DayPhase, number>> = { day: 7 * 60, dusk: 19 * 60, night: 21 * 60 }
+const PHASE_START_MINUTE: Readonly<Record<DayPhase, number>> = {
+  day: 7 * 60,
+  dusk: 19 * 60,
+  night: 21 * 60,
+}
 
 // The single resolution of "when", whichever way it was named (G4). An appointment already
 // gone comes round again at the next occurrence of that part of the day, never in the past.

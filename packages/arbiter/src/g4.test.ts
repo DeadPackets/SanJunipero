@@ -2,12 +2,16 @@
 // with zero further arbiter calls. Fully deterministic: no live API.
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
+import { DEFAULT_CONFIG, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
 import {
-  DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimConfig, type SimEvent,
-} from '@sj/shared'
-import {
-  EventStore, RngStream, RngStreams, TickLoop, VERBS, createWorldTick, fold, genesisState,
-  openDb, submitIntent, type WorldState,
+  RngStream,
+  RngStreams,
+  VERBS,
+  createWorldTick,
+  fold,
+  genesisState,
+  submitIntent,
+  type WorldState,
 } from '@sj/engine'
 import { FakeEmbedder, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
 import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
@@ -32,8 +36,18 @@ const boilSaltRecipe: Recipe = {
   costs: [],
   requires: [{ type: 'adjacent_fire' }],
   outcomeTable: [
-    { weight: 1, success: true, label: 'A crust of salt forms as the water boils away.', effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }] },
-    { weight: 1, success: false, label: 'The water boils to nothing; the pot is bare.', effects: [{ op: 'none' }] },
+    {
+      weight: 1,
+      success: true,
+      label: 'A crust of salt forms as the water boils away.',
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+    },
+    {
+      weight: 1,
+      success: false,
+      label: 'The water boils to nothing; the pot is bare.',
+      effects: [{ op: 'none' }],
+    },
   ],
   rngStream: 'recipe:boil_salt',
   canon: ['fire', 'pottery'],
@@ -75,7 +89,11 @@ function isSpawnPayload(p: unknown): p is { kind: string } {
 class ScriptedLlm {
   objectCalls = 0
 
-  async object<T>(opts: { system: string; messages: LlmMessage[]; schema: unknown }): Promise<{ value: T; usage: LlmUsage }> {
+  async object<T>(opts: {
+    system: string
+    messages: LlmMessage[]
+    schema: unknown
+  }): Promise<{ value: T; usage: LlmUsage }> {
     void opts
     this.objectCalls += 1
     return { value: boilSaltVerdict as unknown as T, usage: emptyUsage() }
@@ -93,12 +111,35 @@ class ScriptedLlm {
 }
 
 let seq = 90000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
 // Minimal world: one agent adjacent to a burning flammable structure at (2,1).
 function makeWorld(): WorldState {
-  let s = fold(genesisState(CFG), ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }), CFG)
-  s = fold(s, ev('structure_planned', { id: 's1', kind: 'campfire', x: 2, y: 1, w: 1, h: 1, maxHp: 10, flammable: true, builderId: 'a1' }), CFG)
+  let s = fold(
+    genesisState(CFG),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }),
+    CFG,
+  )
+  s = fold(
+    s,
+    ev('structure_planned', {
+      id: 's1',
+      kind: 'campfire',
+      x: 2,
+      y: 1,
+      w: 1,
+      h: 1,
+      maxHp: 10,
+      flammable: true,
+      builderId: 'a1',
+    }),
+    CFG,
+  )
   s = fold(s, ev('fire_ignited', { structureId: 's1', cause: 'scripted' }), CFG)
   return s
 }
@@ -116,7 +157,10 @@ async function makeRig(llm: ScriptedLlm): Promise<{ db: Database.Database; arbit
 // Seeded stream bag that pins the recipe's named rngStream to a forced roll.
 // RngStream.from([0,0,0,0]).next() === 0 → the outcome table's success row wins.
 class ForcedRngStreams extends RngStreams {
-  constructor(seed: string, private readonly forced: Record<string, RngStream>) {
+  constructor(
+    seed: string,
+    private readonly forced: Record<string, RngStream>,
+  ) {
     super(seed)
   }
 
@@ -127,9 +171,14 @@ class ForcedRngStreams extends RngStreams {
 
 // Tier-1 execution: submit the codified verb and drive the tick pipeline the full
 // 5 duration ticks, collecting every event the pipeline emits.
-function runTier1(state: WorldState): { state: WorldState; events: Array<{ type: string; payload: unknown }> } {
-  const events: Array<{ type: string; payload: unknown }> = []
-  const rng = new ForcedRngStreams('g4-scripted', { 'recipe:boil_salt': RngStream.from([0, 0, 0, 0]) })
+function runTier1(state: WorldState): {
+  state: WorldState
+  events: { type: string; payload: unknown }[]
+} {
+  const events: { type: string; payload: unknown }[] = []
+  const rng = new ForcedRngStreams('g4-scripted', {
+    'recipe:boil_salt': RngStream.from([0, 0, 0, 0]),
+  })
 
   const res = submitIntent(state, CFG, 'a1', 'recipe:boil_salt', {})
   if (!res.ok) throw new Error(res.reason)
@@ -198,4 +247,3 @@ describe('GATE G4: "boil river water for salt" adjudicates once, then runs Tier-
     expect(stateHash(a.state)).toBe(stateHash(b.state))
   })
 })
-

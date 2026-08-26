@@ -23,10 +23,10 @@ describe('outlinePass', () => {
     const out = outlinePass(block3x3())
     // expected snap computed the same way production does — dark shade of honey wood
     const pal = paletteRgb()
-    const dark = HONEY.map(c => Math.round(c * OUTLINE_DARKEN)) as [number, number, number]
+    const dark = HONEY.map((c) => Math.round(c * OUTLINE_DARKEN)) as [number, number, number]
     const expected = pal[makeQuantizer(pal).nearest(...dark)]!
-    expect([...out.data.slice(0, 3)]).toEqual(expected)          // corner = edge
-    expect([...out.data.slice(0, 3)]).not.toEqual([...HONEY])    // actually changed
+    expect([...out.data.slice(0, 3)]).toEqual(expected) // corner = edge
+    expect([...out.data.slice(0, 3)]).not.toEqual([...HONEY]) // actually changed
     const center = 4 * 4
     expect([...out.data.slice(center, center + 3)]).toEqual([...HONEY]) // interior kept
   })
@@ -34,7 +34,7 @@ describe('outlinePass', () => {
     const img = block5x5()
     img.data[(2 * 5 + 2) * 4 + 3] = 0 // transparent hole at (2,2), in-canvas
     const out = outlinePass(img)
-    const probe = (1 * 5 + 2) * 4  // pixel (2,1); its only transparent 4-neighbor is the hole
+    const probe = (1 * 5 + 2) * 4 // pixel (2,1); its only transparent 4-neighbor is the hole
     expect(out.data[probe + 3]).toBe(255)
     expect([...out.data.slice(probe, probe + 3)]).not.toEqual([...HONEY])
   })

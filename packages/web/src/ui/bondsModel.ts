@@ -39,13 +39,22 @@ export type PeopleIndex = Readonly<Record<string, Person>>
 
 export type BondNode = { id: string; name: string; size: number; color: string; alive: boolean }
 export type BondLink = {
-  id: string; source: string; target: string; kind: BondKind
-  color: string; width: number; strength: number; bond: Bond
+  id: string
+  source: string
+  target: string
+  kind: BondKind
+  color: string
+  width: number
+  strength: number
+  bond: Bond
 }
 
 const nameOf = (people: PeopleIndex, id: string): string => people[id]?.name ?? id
 
-export function toBondGraph(api: BondsResponse, people: PeopleIndex): { nodes: BondNode[]; links: BondLink[] } {
+export function toBondGraph(
+  api: BondsResponse,
+  people: PeopleIndex,
+): { nodes: BondNode[]; links: BondLink[] } {
   const degree = new Map<string, number>()
   for (const b of api.bonds) {
     degree.set(b.aId, (degree.get(b.aId) ?? 0) + 1)

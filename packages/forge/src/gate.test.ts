@@ -16,16 +16,30 @@ function img(w: number, h: number, fill: [number, number, number, number]) {
 describe('mechanicalGate', () => {
   it('passes a compliant sprite (palette colors + transparent pixel present)', () => {
     const i = img(2, 2, [...pal[0]!, 255] as [number, number, number, number])
-    i.data[3] = 0; i.data[0] = 0; i.data[1] = 0; i.data[2] = 0
-    expect(mechanicalGate(i, { w: 2, h: 2, requireAlpha: true })).toEqual({ ok: true, failures: [] })
+    i.data[3] = 0
+    i.data[0] = 0
+    i.data[1] = 0
+    i.data[2] = 0
+    expect(mechanicalGate(i, { w: 2, h: 2, requireAlpha: true })).toEqual({
+      ok: true,
+      failures: [],
+    })
   })
   it('fails on wrong size', () => {
-    const r = mechanicalGate(img(2, 2, [...pal[0]!, 255] as never), { w: 4, h: 4, requireAlpha: false })
+    const r = mechanicalGate(img(2, 2, [...pal[0]!, 255] as never), {
+      w: 4,
+      h: 4,
+      requireAlpha: false,
+    })
     expect(r.ok).toBe(false)
     expect(r.failures.join()).toMatch(/size/)
   })
   it('fails when alpha is required but absent (chroma-key found no background)', () => {
-    const r = mechanicalGate(img(2, 2, [...pal[0]!, 255] as never), { w: 2, h: 2, requireAlpha: true })
+    const r = mechanicalGate(img(2, 2, [...pal[0]!, 255] as never), {
+      w: 2,
+      h: 2,
+      requireAlpha: true,
+    })
     expect(r.failures.join()).toMatch(/alpha/)
   })
   it('fails on any off-palette opaque pixel', () => {
@@ -40,11 +54,13 @@ describe('refusalMessage — choosing is not deciding', () => {
   const cand = (key: string, ...failures: string[]) => ({ key, failures })
 
   it('says nothing when ANY candidate is clean — the run goes on', () => {
-    expect(refusalMessage('amara se/contact-b', [
-      cand('c0', 'silhouette: 1.24 against 1.18'),
-      cand('c1'),
-      cand('c2', 'palette: 0.69 against 0.80'),
-    ])).toBe('')
+    expect(
+      refusalMessage('amara se/contact-b', [
+        cand('c0', 'silhouette: 1.24 against 1.18'),
+        cand('c1'),
+        cand('c2', 'palette: 0.69 against 0.80'),
+      ]),
+    ).toBe('')
   })
 
   it('says nothing when there is nothing to judge', () => {
@@ -75,8 +91,9 @@ describe('refusalMessage — choosing is not deciding', () => {
   })
 
   it('the one-candidate case reads as one, not as "1 candidates"', () => {
-    expect(refusalMessage('amara se/stride-trio', [cand('trio', 'stride: 0.0000 against 0.1085')]))
-      .toContain('all 1 candidate FAILED')
+    expect(
+      refusalMessage('amara se/stride-trio', [cand('trio', 'stride: 0.0000 against 0.1085')]),
+    ).toContain('all 1 candidate FAILED')
   })
 })
 
@@ -93,13 +110,16 @@ describe('gen-cast-v5 ships nothing that failed a gate', () => {
 
   it('★ the stride trio and the atlas pixel bar are no longer advisory', () => {
     expect(src, 'the stride trio still just logs FLAGGED').not.toContain("'FLAGGED'")
-    expect(src, 'the packed atlas is still written whatever the bar says')
-      .toMatch(/if \(bar\.length > 0\) throw new Error/)
+    expect(src, 'the packed atlas is still written whatever the bar says').toMatch(
+      /if \(bar\.length > 0\)\s+throw new Error/,
+    )
   })
 
   it('reads the attempt knob its own header has documented since v4', () => {
-    expect(src).toContain("process.env['CAST_ATTEMPTS']")
-    expect(src, 'a hard-coded attempt count is left somewhere').not.toMatch(/for \(let i = 0; i < 3; i\+\+\)/)
+    expect(src).toMatch(/process\.env(\.CAST_ATTEMPTS|\['CAST_ATTEMPTS'\])/)
+    expect(src, 'a hard-coded attempt count is left somewhere').not.toMatch(
+      /for \(let i = 0; i < 3; i\+\+\)/,
+    )
   })
 })
 
@@ -109,10 +129,10 @@ describe('gen-cast-v5 ships nothing that failed a gate', () => {
 describe('★ a failure reports the bound it crossed, not the tolerance', () => {
   it('names the upper bound for a body that grew, and the lower for one that shrank', () => {
     expect(silhouetteBound(1.2429)).toBeCloseTo(1.18, 10)
-    expect(silhouetteBound(0.5000)).toBeCloseTo(0.82, 10)
+    expect(silhouetteBound(0.5)).toBeCloseTo(0.82, 10)
   })
 
-  it("★ so |value - limit| is the real margin, which is what an operator reads", () => {
+  it('★ so |value - limit| is the real margin, which is what an operator reads', () => {
     expect(Math.abs(1.2429 - silhouetteBound(1.2429))).toBeCloseTo(0.0629, 4)
     // the shape it used to have, kept as the number NOT to print
     expect(Math.abs(1.2429 - SILHOUETTE_AREA_TOL)).toBeCloseTo(1.0629, 4)
@@ -125,12 +145,20 @@ describe('★ no generator in the package ships a candidate that failed a gate',
   const scriptsDir = fileURLToPath(new URL('../scripts', import.meta.url))
   // CODE ONLY: each of these files carries a comment QUOTING the shape it used to have, so a scan
   // that reads the prose reds on the explanation of the fix.
-  const read = (f: string): string => readFileSync(join(scriptsDir, f), 'utf8')
-    .split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n')
+  const read = (f: string): string =>
+    readFileSync(join(scriptsDir, f), 'utf8')
+      .split('\n')
+      .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+      .join('\n')
 
   const GENERATORS = [
-    'gen-cast-v5.ts', 'gen-structures-v5.ts', 'gen-dwellings-v2.ts', 'gen-dwellings.ts',
-    'gen-library-v2.ts', 'gen-cast-v4.ts', 'gen-character-v4.ts',
+    'gen-cast-v5.ts',
+    'gen-structures-v5.ts',
+    'gen-dwellings-v2.ts',
+    'gen-dwellings.ts',
+    'gen-library-v2.ts',
+    'gen-cast-v4.ts',
+    'gen-character-v4.ts',
   ] as const
 
   it.each(GENERATORS)('%s goes through the ONE shared refusal in src/gate.ts', (file) => {
@@ -140,16 +168,21 @@ describe('★ no generator in the package ships a candidate that failed a gate',
   })
 
   it.each(['gen-structures-v5.ts', 'gen-dwellings-v2.ts', 'gen-dwellings.ts'] as const)(
-    '%s picks from the clean set, not from the dirty one', (file) => {
+    '%s picks from the clean set, not from the dirty one',
+    (file) => {
       const s = read(file)
       expect(s, 'still falls back to the dirty candidate set').not.toMatch(/clean\.length \? clean/)
-      expect(s, 'no longer filters to the clean candidates at all').toMatch(/const clean = cands\.filter/)
-    })
+      expect(s, 'no longer filters to the clean candidates at all').toMatch(
+        /const clean = cands\.filter/,
+      )
+    },
+  )
 
   it('★ gen-library-v2 EXCLUDES a failure instead of pricing it into a rank', () => {
     const s = read('gen-library-v2.ts')
-    expect(s, 'a failed pixel bar is still only worth 100 rank points')
-      .not.toMatch(/fails\.length \* 100/)
+    expect(s, 'a failed pixel bar is still only worth 100 rank points').not.toMatch(
+      /fails\.length \* 100/,
+    )
     expect(s, "the judge's rejection is still only worth 10 rank points").not.toMatch(/\? 0 : 10/)
     // The judge is a gate too — it is the only one in the package that can tell a pail from a
     // market stall, and it was never allowed to disqualify anything.
@@ -158,25 +191,31 @@ describe('★ no generator in the package ships a candidate that failed a gate',
   })
 
   it.each(['gen-cast-v4.ts', 'gen-character-v4.ts'] as const)(
-    '%s refuses at all three decision points, superseded or not', (file) => {
+    '%s refuses at all three decision points, superseded or not',
+    (file) => {
       const s = read(file)
       // walk frames, the stride trio, the sleep cell — 1 definition + 3 call sites
-      expect(s.match(/refuseFailing\(/g) ?? [], 'a decision point has no refusal beside it')
-        .toHaveLength(4)
+      expect(
+        s.match(/refuseFailing\(/g) ?? [],
+        'a decision point has no refusal beside it',
+      ).toHaveLength(4)
       expect(s, 'the stride trio is still advisory').toMatch(/stride-trio/)
-    })
+    },
+  )
 
   // ★ THE ANTI-VACUITY TEST, and the only one here that can catch a generator nobody listed.
   it('★ and no script in the package brings the policy back, in any of its three disguises', () => {
     const offenders: string[] = []
-    for (const f of readdirSync(scriptsDir).filter((n) => n.endsWith('.ts')).sort()) {
+    for (const f of readdirSync(scriptsDir)
+      .filter((n) => n.endsWith('.ts'))
+      .sort()) {
       const s = read(f)
-      if (/clean\.length \? clean/.test(s))
+      if (s.includes('clean.length ? clean'))
         offenders.push(`${f}: falls back to the DIRTY candidate set when nothing is clean`)
-      if (/fails\.length \* 100/.test(s))
+      if (s.includes('fails.length * 100'))
         offenders.push(`${f}: RANKS a failure instead of excluding it`)
       // the least-bad reduce is legal — CHOOSING is not deciding — but only beside a refusal
-      if (/failures\.length < a\.failures\.length/.test(s) && !/refuseFailing\(/.test(s))
+      if (s.includes('failures.length < a.failures.length') && !s.includes('refuseFailing('))
         offenders.push(`${f}: picks the least-bad candidate and never refuses one`)
     }
     expect(offenders, 'a generator ships a candidate its own gate failed').toEqual([])
@@ -188,30 +227,52 @@ describe('★ no generator in the package ships a candidate that failed a gate',
   const REPAIRS = [
     ['gen-library.ts', /writeFileSync\(join\(dir, 'sprite\.png'\)/, /pixelBarReport\(/],
     ['recell-buildings.ts', /writeFileSync\(join\(to, 'cell\.png'\)/, /integerScaleGate\(/],
-    ['recell-characters.ts', /writeFileSync\(join\(c\.dest, 'manifest\.json'\)/, /alphaBinaryGate\(/],
-    ['repair-sleep-cell.ts', /writeFileSync\(join\(DEST, 'cells', 'sleep-se\.png'\)/, /sleepAxisGate\(/],
+    [
+      'recell-characters.ts',
+      /writeFileSync\(join\(c\.dest, 'manifest\.json'\)/,
+      /alphaBinaryGate\(/,
+    ],
+    [
+      'repair-sleep-cell.ts',
+      /writeFileSync\(join\(DEST, 'cells', 'sleep-se\.png'\)/,
+      /sleepAxisGate\(/,
+    ],
     ['requantize-portraits.ts', /writeFileSync\(join\(dest, f\)/, /paletteGate\(/],
     ['build-farmland.ts', /writeFileSync\(join\(MATERIALS/, /materialVeto\(/],
   ] as const
 
-  it.each(REPAIRS)('%s decides on its gates before it writes, not after', (file, artifact, gate) => {
-    const s = read(file)
-    const g = s.search(gate), w = s.search(artifact)
-    expect(g, `${file} no longer calls the gate this test was written for`).toBeGreaterThan(-1)
-    expect(w, `${file} no longer writes the artifact this test was written for`).toBeGreaterThan(-1)
-    expect(s, 'the verdict has no consumer — no refusal anywhere in the file')
-      .toMatch(/throw new Error|refused\.push/)
-    expect(g, 'the gate still runs after the artifact is already on disk').toBeLessThan(w)
-  })
+  it.each(REPAIRS)(
+    '%s decides on its gates before it writes, not after',
+    (file, artifact, gate) => {
+      const s = read(file)
+      const g = s.search(gate),
+        w = s.search(artifact)
+      expect(g, `${file} no longer calls the gate this test was written for`).toBeGreaterThan(-1)
+      expect(w, `${file} no longer writes the artifact this test was written for`).toBeGreaterThan(
+        -1,
+      )
+      expect(s, 'the verdict has no consumer — no refusal anywhere in the file').toMatch(
+        /throw new Error|refused\.push/,
+      )
+      expect(g, 'the gate still runs after the artifact is already on disk').toBeLessThan(w)
+    },
+  )
 
   // The class that matters is the one that writes COMMITTED content: a scratchpad probe that
   // ignores a gate costs a re-run, and this costs the product.
   it('★ and every script that writes into content/ refuses, or its consumer is in the suite', () => {
     const offenders: string[] = []
-    for (const f of readdirSync(scriptsDir).filter((n) => n.endsWith('.ts')).sort()) {
+    for (const f of readdirSync(scriptsDir)
+      .filter((n) => n.endsWith('.ts'))
+      .sort()) {
       const s = read(f)
-      if (!/CONTENT_DIR|content\/tilesets|content\/buildings|content\/items|content\/cast|MATERIALS/.test(s)) continue
-      if (!/writeFileSync/.test(s)) continue
+      if (
+        !/CONTENT_DIR|content\/tilesets|content\/buildings|content\/items|content\/cast|MATERIALS/.test(
+          s,
+        )
+      )
+        continue
+      if (!s.includes('writeFileSync')) continue
       // `write-generated-terrain.ts` prints SEAM and writes anyway; `terrainIngest.test.ts` asserts
       // `tileSeamGate` over every shipped material, so the consumer is in the suite.
       if (f === 'write-generated-terrain.ts') continue

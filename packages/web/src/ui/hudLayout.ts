@@ -12,7 +12,11 @@ export type Dockable = (typeof DOCKABLE)[number]
 export type HudLayout = Readonly<Record<Dockable, DockSlot>>
 
 export const DEFAULT_HUD: HudLayout = {
-  controlBar: 'bottom', timeline: 'bottom', statusStrip: 'top', fps: 'right', minimap: 'left',
+  controlBar: 'bottom',
+  timeline: 'bottom',
+  statusStrip: 'top',
+  fps: 'right',
+  minimap: 'left',
 }
 
 /**
@@ -46,12 +50,16 @@ export function loadHud(storage: Storage): HudLayout {
   let raw: string | null = null
   try {
     raw = storage.getItem(HUD_STORAGE_KEY)
-  } catch { return DEFAULT_HUD }
+  } catch {
+    return DEFAULT_HUD
+  }
   if (raw === null) return DEFAULT_HUD
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
-  } catch { return DEFAULT_HUD }
+  } catch {
+    return DEFAULT_HUD
+  }
   if (typeof parsed !== 'object' || parsed === null) return DEFAULT_HUD
   const rec = parsed as Record<string, unknown>
   const out = { ...DEFAULT_HUD } as Record<Dockable, DockSlot>
@@ -62,7 +70,9 @@ export function loadHud(storage: Storage): HudLayout {
 export function saveHud(storage: Storage, l: HudLayout): void {
   try {
     storage.setItem(HUD_STORAGE_KEY, JSON.stringify(l))
-  } catch { /* private mode: the layout is a preference, never a requirement */ }
+  } catch {
+    /* private mode: the layout is a preference, never a requirement */
+  }
 }
 
 export type HudEv =
@@ -82,8 +92,10 @@ export function hudReducer(prev: HudLayout, ev: HudEv): HudLayout {
       for (const k of DOCKABLE) out[k] = 'hidden'
       return out
     }
-    case 'show-all': return DEFAULT_HUD
-    case 'reset': return DEFAULT_HUD
+    case 'show-all':
+      return DEFAULT_HUD
+    case 'reset':
+      return DEFAULT_HUD
   }
 }
 
@@ -108,12 +120,17 @@ export function hudToggle(l: HudLayout): HudEv {
 /** The town's own word for each surface, so a menu of them reads as places rather than as
  *  identifiers. */
 export const DOCKABLE_LABEL: Readonly<Record<Dockable, string>> = {
-  controlBar: 'The controls', timeline: 'The timeline',
-  statusStrip: 'The day and the sky', fps: 'The frame counter',
+  controlBar: 'The controls',
+  timeline: 'The timeline',
+  statusStrip: 'The day and the sky',
+  fps: 'The frame counter',
   minimap: 'The little map',
 }
 
 export const SLOT_LABEL: Readonly<Record<DockSlot, string>> = {
-  bottom: 'Along the bottom', top: 'Along the top',
-  left: 'Down the left', right: 'Down the right', hidden: 'Put away',
+  bottom: 'Along the bottom',
+  top: 'Along the top',
+  left: 'Down the left',
+  right: 'Down the right',
+  hidden: 'Put away',
 }

@@ -1,20 +1,33 @@
 import { momentToTick } from '@sj/shared'
 import { BROADCAST_PARAM, broadcastFromSearch } from './broadcast.js'
 
-export const LENSES = ['map', 'inspector', 'chronicle', 'discoveries', 'society', 'director', 'laws'] as const
-export type Lens = typeof LENSES[number]
+export const LENSES = [
+  'map',
+  'inspector',
+  'chronicle',
+  'discoveries',
+  'society',
+  'director',
+  'laws',
+] as const
+export type Lens = (typeof LENSES)[number]
 
 /** THE ONE TABLE. The top nav and the control bar name one thing once — they used to keep a
  *  table each, and the two had already drifted ("Town"/"The town", "World Laws"/"World laws").
  *  Chrome copy speaks about townsfolk, never machinery (spec §5). */
 export const LENS_LABELS: Readonly<Record<Lens, string>> = {
-  map: 'Town', inspector: 'Townsfolk', chronicle: 'Chronicle', discoveries: 'What they made',
-  society: 'Bonds', director: 'Moments', laws: 'World Laws',
+  map: 'Town',
+  inspector: 'Townsfolk',
+  chronicle: 'Chronicle',
+  discoveries: 'What they made',
+  society: 'Bonds',
+  director: 'Moments',
+  laws: 'World Laws',
 }
 export type Route = {
   lens: Lens
   moment: { day: number; time: string } | null
-  momentId: number | null              // a recorded day, by its narrator scene id
+  momentId: number | null // a recorded day, by its narrator scene id
   agentId: string | null
   /** the roster row that is open UNDER the list — a third state of the Townsfolk lens, and
    *  shareable like the other two. `?agent=` still opens the standalone page. */
@@ -46,21 +59,32 @@ export function parseRoute(pathname: string, search: string): Route {
   // A recorded day only plays in the Moments lens, so a hand-typed /moment/<id> opens there
   // rather than dropping the viewer on the map with a link that does nothing.
   const fallback: Lens = momentId === null ? 'map' : 'director'
-  const lens: Lens = (LENSES as readonly string[]).includes(lensParam ?? '') ? lensParam as Lens : fallback
+  const lens: Lens = (LENSES as readonly string[]).includes(lensParam ?? '')
+    ? (lensParam as Lens)
+    : fallback
 
   // A broadcast IS the town televised, so the flag decides the lens rather than sitting beside it,
   // and the reading surfaces a stream has no reader for are not addressable at all.
   if (broadcastFromSearch(search)) {
-    return { lens: 'director', moment, momentId: null, agentId: null, openId: null, broadcast: true }
+    return {
+      lens: 'director',
+      moment,
+      momentId: null,
+      agentId: null,
+      openId: null,
+      broadcast: true,
+    }
   }
   return { lens, moment, momentId, agentId, openId, broadcast: false }
 }
 
 export function routeToPath(r: Route): string {
   const path =
-    r.momentId !== null ? `/moment/${r.momentId}`
-    : r.moment ? `/moment/${r.moment.day}/${r.moment.time}`
-    : '/'
+    r.momentId !== null
+      ? `/moment/${r.momentId}`
+      : r.moment
+        ? `/moment/${r.moment.day}/${r.moment.time}`
+        : '/'
   const params = new URLSearchParams()
   if (r.lens !== 'map') params.set('lens', r.lens)
   if (r.agentId !== null) params.set('agent', r.agentId)
@@ -71,7 +95,6 @@ export function routeToPath(r: Route): string {
   const q = params.toString()
   return q === '' ? path : `${path}?${q}`
 }
-
 
 // ── stepping back out of a single-character view ────────────────────────────────────────
 

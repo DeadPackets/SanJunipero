@@ -1,34 +1,66 @@
 import { describe, expect, it } from 'vitest'
 import type { AssetRecord, SimEvent } from '@sj/shared'
 import {
-  EXPRESSIONS, MOOD_COMFORT, MOOD_ENERGY_WEARY, MOOD_PRIORITY, MOOD_WINDOW_TICKS,
-  moodOf, portraitKind, portraitUrl, type Expression, type MoodView,
+  EXPRESSIONS,
+  MOOD_COMFORT,
+  MOOD_ENERGY_WEARY,
+  MOOD_PRIORITY,
+  MOOD_WINDOW_TICKS,
+  moodOf,
+  portraitKind,
+  portraitUrl,
+  type Expression,
+  type MoodView,
 } from './mood.js'
 
 const NOW = 1000
 
 const body = (over: Partial<MoodView> = {}): MoodView => ({
-  id: 'amara', alive: true, asleep: false, ill: false, injuries: [],
+  id: 'amara',
+  alive: true,
+  asleep: false,
+  ill: false,
+  injuries: [],
   needs: { hunger: 80, energy: 80, warmth: 80, social: 80 },
-  collapsedSinceTick: null, ...over,
+  collapsedSinceTick: null,
+  ...over,
 })
 
-const ev = (type: string, payload: Record<string, unknown>, tick = NOW - 10): SimEvent =>
-  ({ seq: 1, tick, type, payload }) as SimEvent
+const ev = (type: string, payload: Record<string, unknown>, tick = NOW - 10): SimEvent => ({
+  seq: 1,
+  tick,
+  type,
+  payload,
+})
 
 const rec = (id: string, kind: string): AssetRecord => ({
-  id, seq: 1, class: 'portrait', desc: kind, kind, footprint: { w: 1, h: 1 },
-  widthPx: 128, heightPx: 128, status: 'ready', score: null, attempts: 1,
-  costUsd: 0, createdAt: 'now', meta: null,
+  id,
+  seq: 1,
+  class: 'portrait',
+  desc: kind,
+  kind,
+  footprint: { w: 1, h: 1 },
+  widthPx: 128,
+  heightPx: 128,
+  status: 'ready',
+  score: null,
+  attempts: 1,
+  costUsd: 0,
+  createdAt: 'now',
+  meta: null,
 })
 
 describe('moodOf — each row of the table fires exactly once', () => {
-  const cases: Array<[Expression, MoodView, SimEvent[]]> = [
+  const cases: [Expression, MoodView, SimEvent[]][] = [
     ['asleep', body({ asleep: true }), []],
     ['angry', body(), [ev('agent_attacked', { targetId: 'amara' })]],
     ['sad', body(), [ev('agent_died', { id: 'amara' })]],
     ['surprised', body(), [ev('mystery_event', { agentId: 'amara' })]],
-    ['weary', body({ needs: { hunger: 80, energy: MOOD_ENERGY_WEARY - 1, warmth: 80, social: 80 } }), []],
+    [
+      'weary',
+      body({ needs: { hunger: 80, energy: MOOD_ENERGY_WEARY - 1, warmth: 80, social: 80 } }),
+      [],
+    ],
     ['happy', body(), [ev('item_given', { targetId: 'amara' })]],
     ['neutral', body(), []],
   ]
@@ -45,19 +77,27 @@ describe('moodOf — each row of the table fires exactly once', () => {
 
 describe('moodOf — priority, asserted directly', () => {
   it('a sleeper who was attacked this hour is asleep', () => {
-    expect(moodOf(body({ asleep: true }), [ev('agent_attacked', { targetId: 'amara' })], NOW))
-      .toBe('asleep')
+    expect(moodOf(body({ asleep: true }), [ev('agent_attacked', { targetId: 'amara' })], NOW)).toBe(
+      'asleep',
+    )
   })
 
   it('angry beats sad, and sad beats surprised', () => {
     const both = [ev('agent_attacked', { targetId: 'amara' }), ev('agent_died', { id: 'amara' })]
     expect(moodOf(body(), both, NOW)).toBe('angry')
-    expect(moodOf(body(), [ev('agent_died', { id: 'amara' }), ev('world_grown', { agentId: 'amara' })], NOW))
-      .toBe('sad')
+    expect(
+      moodOf(
+        body(),
+        [ev('agent_died', { id: 'amara' }), ev('world_grown', { agentId: 'amara' })],
+        NOW,
+      ),
+    ).toBe('sad')
   })
 
   it('weary beats happy — a tired person with good news is still tired', () => {
-    const tired = body({ needs: { hunger: 90, energy: MOOD_ENERGY_WEARY - 1, warmth: 90, social: 90 } })
+    const tired = body({
+      needs: { hunger: 90, energy: MOOD_ENERGY_WEARY - 1, warmth: 90, social: 90 },
+    })
     expect(moodOf(tired, [ev('item_given', { targetId: 'amara' })], NOW)).toBe('weary')
   })
 
@@ -83,8 +123,9 @@ describe('moodOf — the window, and whose feeling it is', () => {
   })
 
   it('somebody else’s fight is not this person’s mood', () => {
-    expect(moodOf(body(), [ev('agent_attacked', { targetId: 'yusuf', agentId: 'omar' })], NOW))
-      .toBe('neutral')
+    expect(
+      moodOf(body(), [ev('agent_attacked', { targetId: 'yusuf', agentId: 'omar' })], NOW),
+    ).toBe('neutral')
   })
 
   it('a world with no C11 fields present is simply neutral', () => {
@@ -104,7 +145,10 @@ describe('portraitKind / portraitUrl', () => {
   })
 
   it('prefers the expression, falls back to neutral, then to null', () => {
-    const both = [rec('p1', portraitKind('amara', 'happy')), rec('p2', portraitKind('amara', 'neutral'))]
+    const both = [
+      rec('p1', portraitKind('amara', 'happy')),
+      rec('p2', portraitKind('amara', 'neutral')),
+    ]
     expect(portraitUrl(both, 'amara', 'happy')).toBe('/assets/p1.png')
     expect(portraitUrl([both[1]!], 'amara', 'happy')).toBe('/assets/p2.png')
     expect(portraitUrl([], 'amara', 'happy')).toBeNull()

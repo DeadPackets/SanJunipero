@@ -1,5 +1,9 @@
 import {
-  edgesOwed, simTimeFromTick, TOWN_RINGS_GENESIS, WORLD_MARGIN, worldSizeForRings,
+  edgesOwed,
+  simTimeFromTick,
+  TOWN_RINGS_GENESIS,
+  WORLD_MARGIN,
+  worldSizeForRings,
 } from '@sj/shared'
 import { genesisTerrainAt } from '../genesis/world.js'
 import { authoredOrigin, type WorldState } from '../state.js'
@@ -28,22 +32,27 @@ export { authoredOrigin }
 
 /** The tile box of everything built, in array coordinates; null when nothing stands. Structures
  *  only — a world that widened because somebody wandered to the edge would widen forever. */
-export function builtBox(state: WorldState): { dx0: number; dy0: number; dx1: number; dy1: number } | null {
+export function builtBox(
+  state: WorldState,
+): { dx0: number; dy0: number; dx1: number; dy1: number } | null {
   const all = Object.values(state.structures)
   if (all.length === 0) return null
-  let dx0 = Infinity, dy0 = Infinity, dx1 = -Infinity, dy1 = -Infinity
+  let dx0 = Infinity,
+    dy0 = Infinity,
+    dx1 = -Infinity,
+    dy1 = -Infinity
   for (const s of all) {
-    dx0 = Math.min(dx0, s.x); dy0 = Math.min(dy0, s.y)
-    dx1 = Math.max(dx1, s.x + s.w - 1); dy1 = Math.max(dy1, s.y + s.h - 1)
+    dx0 = Math.min(dx0, s.x)
+    dy0 = Math.min(dy0, s.y)
+    dx1 = Math.max(dx1, s.x + s.w - 1)
+    dy1 = Math.max(dy1, s.y + s.h - 1)
   }
   return { dx0, dy0, dx1, dy1 }
 }
 
 /** genesisTerrainAt is a pure function of an authored coordinate with no bounds in it, so the
  *  strip is the world continued. Nothing already standing is regenerated, only shifted. */
-export function grownStrip(
-  state: WorldState, edge: GrowthEdge, depth: number,
-): number[][] {
+export function grownStrip(state: WorldState, edge: GrowthEdge, depth: number): number[][] {
   const h = state.terrain.length
   const w = state.terrain[0]!.length
   const before = authoredOrigin(state)
@@ -57,19 +66,24 @@ export function grownStrip(
   const atX = edge === 'e' ? w : 0
   const atY = edge === 's' ? h : 0
   return Array.from({ length: rows }, (_, r) =>
-    Array.from({ length: cols }, (_, c) => genesisTerrainAt(atX + c + ox, atY + r + oy) as number))
+    Array.from({ length: cols }, (_, c) => genesisTerrainAt(atX + c + ox, atY + r + oy) as number),
+  )
 }
 
 /** Measured from the whole town, streets included, not from the built set: the outermost roof
  *  stands STREET inside its own kerb, so the next ring's far band lands in exactly those tiles. */
-export function owedBox(state: WorldState): { dx0: number; dy0: number; dx1: number; dy1: number } | null {
+export function owedBox(
+  state: WorldState,
+): { dx0: number; dy0: number; dx1: number; dy1: number } | null {
   const built = builtBox(state)
   const town = townGroundBox(state)
   if (built === null) return town
   if (town === null) return built
   return {
-    dx0: Math.min(built.dx0, town.dx0), dy0: Math.min(built.dy0, town.dy0),
-    dx1: Math.max(built.dx1, town.dx1), dy1: Math.max(built.dy1, town.dy1),
+    dx0: Math.min(built.dx0, town.dx0),
+    dy0: Math.min(built.dy0, town.dy0),
+    dx1: Math.max(built.dx1, town.dx1),
+    dy1: Math.max(built.dy1, town.dy1),
   }
 }
 
@@ -81,7 +95,8 @@ export function mapGrowthSystem(ctx: TickCtx): void {
 
   const box = owedBox(state)
   if (box === null) return
-  const w = state.terrain[0]!.length, h = state.terrain.length
+  const w = state.terrain[0]!.length,
+    h = state.terrain.length
   if (w < GROWABLE_FLOOR || h < GROWABLE_FLOOR) return
   const owed = edgesOwed(box, { w, h }, WORLD_MARGIN)
   // One edge a night. The margin is a whole block pitch, so the world is never short of the
@@ -89,6 +104,8 @@ export function mapGrowthSystem(ctx: TickCtx): void {
   const first = owed[0]
   if (first === undefined) return
   ctx.emit('world_grown', {
-    edge: first.edge, depth: first.owed, tiles: grownStrip(state, first.edge, first.owed),
+    edge: first.edge,
+    depth: first.owed,
+    tiles: grownStrip(state, first.edge, first.owed),
   })
 }

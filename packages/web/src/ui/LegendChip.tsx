@@ -2,9 +2,15 @@ import type { LegendRow } from './relationGraph.js'
 
 /** Its own file: `SocietyLens.tsx` imports `react-force-graph-2d`, which touches `window` at
  *  module load and so cannot be imported by a node test. The off state is a mark, never opacity. */
-export function LegendChip(
-  { row, off, onToggle }: { row: LegendRow; off: boolean; onToggle: () => void },
-) {
+export function LegendChip({
+  row,
+  off,
+  onToggle,
+}: {
+  row: LegendRow
+  off: boolean
+  onToggle: () => void
+}) {
   const y = row.strokeCount === 2 ? 3.5 : 5
   const dash = row.dash === null ? {} : { strokeDasharray: row.dash.join(' ') }
   return (

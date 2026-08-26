@@ -3,11 +3,14 @@
 // table to keep in step when a sheet gets taller.
 
 /** Screen px, across. A stance is narrower than shoulders; a head is narrower still. */
-export const STANCE_W = 20, SHOULDER_W = 28, HEAD_W = 18
+export const STANCE_W = 20,
+  SHOULDER_W = 28,
+  HEAD_W = 18
 /** Screen px up from the feet where the stance has widened into the torso. */
 export const FOOT_H = 8
 /** Fractions of the DRAWN figure height. */
-export const TORSO_TOP = 0.66, HEAD_TOP = 0.94
+export const TORSO_TOP = 0.66,
+  HEAD_TOP = 0.94
 
 /** The minimum any pointer target may be, in SCREEN px, at any zoom. */
 export const HIT_MIN_PX = 24
@@ -46,8 +49,10 @@ export function polygonArea(poly: number[]): number {
 export function polygonBounds(poly: number[]): { w: number; h: number; cx: number; cy: number } {
   const xs = poly.filter((_, i) => i % 2 === 0)
   const ys = poly.filter((_, i) => i % 2 === 1)
-  const x0 = Math.min(...xs), x1 = Math.max(...xs)
-  const y0 = Math.min(...ys), y1 = Math.max(...ys)
+  const x0 = Math.min(...xs),
+    x1 = Math.max(...xs)
+  const y0 = Math.min(...ys),
+    y1 = Math.max(...ys)
   return { w: x1 - x0, h: y1 - y0, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 }
 }
 
@@ -57,7 +62,10 @@ export function polygonBounds(poly: number[]): { w: number; h: number; cx: numbe
  * same class: a rank of bodies all grown to the floor is one contest the viewer cannot settle.
  */
 export function inflateToMin(
-  poly: number[], minPx: number, screenScale: number, maxWidthPx = Infinity,
+  poly: number[],
+  minPx: number,
+  screenScale: number,
+  maxWidthPx = Infinity,
 ): number[] {
   const k = screenScale === 0 ? 1 : screenScale
   const { w, h, cx, cy } = polygonBounds(poly)
@@ -69,7 +77,12 @@ export function inflateToMin(
 }
 
 /** Hit-shape area over the drawn silhouette's bounding box; 1.0 is the silhouette itself. */
-export function hitTightness(poly: number[], figureW: number, figureH: number, scale: number): number {
+export function hitTightness(
+  poly: number[],
+  figureW: number,
+  figureH: number,
+  scale: number,
+): number {
   const k = scale === 0 ? 1 : scale
   return (polygonArea(poly) * k * k) / (figureW * k * (figureH * k))
 }
@@ -92,7 +105,16 @@ export const BUILDING_UNIT_PX = 32
  * SIX-point outer silhouette, because the raised south vertex is inside the shape.
  */
 export function extrudeDiamond(base: number[], heightPx: number): number[] {
-  const [nx, ny, ex, ey, sx, sy, wx, wy] = base as [number, number, number, number, number, number, number, number]
+  const [nx, ny, ex, ey, sx, sy, wx, wy] = base as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ]
   const h = Math.max(0, heightPx)
   return [wx, wy, sx, sy, ex, ey, ex, ey - h, nx, ny - h, wx, wy - h]
 }
@@ -105,7 +127,8 @@ export function extrudeDiamond(base: number[], heightPx: number): number[] {
 export function artPrismPolygon(w: number, h: number, scale: number): number[] {
   const k = scale === 0 ? 1 : scale
   const side = (w + h) * BUILDING_UNIT_PX
-  const halfW = side / 2, halfH = side / 4
+  const halfW = side / 2,
+    halfH = side / 4
   // N, E, S, W of the DRAWN ground diamond, south vertex on the feet point
   const base = [0, -halfH * 2, halfW, -halfH, 0, 0, -halfW, -halfH]
   return extrudeDiamond(base, side - halfH * 2).map((v) => v / k)
@@ -117,11 +140,15 @@ export const artPrismHeightPx = (w: number, h: number): number => (w + h) * BUIL
 
 /** Priority when two hit-testable things genuinely overlap. Lower wins. A body beats a
  *  building because a person is the smaller, more specific claim on the pointer. */
-export const HIT_PRIORITY: Readonly<Record<'agent' | 'item' | 'crop' | 'structure', number>> =
-  { agent: 0, item: 1, crop: 2, structure: 3 }
+export const HIT_PRIORITY: Readonly<Record<'agent' | 'item' | 'crop' | 'structure', number>> = {
+  agent: 0,
+  item: 1,
+  crop: 2,
+  structure: 3,
+}
 
 export function resolveHit(
-  candidates: ReadonlyArray<{ kind: keyof typeof HIT_PRIORITY; id: string }>,
+  candidates: readonly { kind: keyof typeof HIT_PRIORITY; id: string }[],
 ): string | null {
   let best: { kind: keyof typeof HIT_PRIORITY; id: string } | null = null
   for (const c of candidates) {

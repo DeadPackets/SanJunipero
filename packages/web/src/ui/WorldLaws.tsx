@@ -8,14 +8,17 @@ import { lawRows, type LawRow } from './lawsModel.js'
 export function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
   const byGroup = LAW_GROUPS.map((group) => ({
     group,
-    rows: rows.filter((r) => lawGroupOf(r.path) === group)
+    rows: rows
+      .filter((r) => lawGroupOf(r.path) === group)
       .sort((a, b) => lawReadingRank(a.path) - lawReadingRank(b.path)),
   })).filter((g) => g.rows.length > 0)
 
   return (
     <div className="laws-panel" aria-label="World Laws">
       <h2 className="px-title">World Laws</h2>
-      <p className="laws-lede">The rules this town runs on. When one changes, the change is written down here.</p>
+      <p className="laws-lede">
+        The rules this town runs on. When one changes, the change is written down here.
+      </p>
       {byGroup.map(({ group, rows: inGroup }) => (
         <section className="law-group" key={group}>
           <h3 className="law-group-name">{group}</h3>
@@ -40,7 +43,11 @@ export function WorldLawsView({ rows }: { rows: readonly LawRow[] }) {
                     <ol className="law-history">
                       {row.history.map((h, i) => {
                         const m = tickToMoment(h.tick)
-                        return <li key={`${h.tick}-${i}`}>Changed on day {m.day}, at {m.time}</li>
+                        return (
+                          <li key={`${h.tick}-${i}`}>
+                            Changed on day {m.day}, at {m.time}
+                          </li>
+                        )
                       })}
                     </ol>
                   )}

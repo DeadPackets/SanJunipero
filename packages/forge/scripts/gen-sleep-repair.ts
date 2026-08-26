@@ -26,7 +26,7 @@ const MODEL = 'google/gemini-3.1-flash-image'
 const OUT = `${S}/r3/sleep`
 
 const id = process.env.FOUNDER
-const m = CAST_V4.find(c => c.id === id)
+const m = CAST_V4.find((c) => c.id === id)
 if (!m) throw new Error(`FOUNDER=${id} is not in CAST_V4`)
 
 const DIR = `${OUT}/${m.id}`
@@ -37,7 +37,8 @@ const MASTER = readFileSync(`${S}/c5/production/${m.id}/master/master.png`)
 // a body lying ALONG the 2:1 dimetric ground, head up to the right; naming "horizontal" got
 // a body pasted flat across the picture instead.
 function sleepPrompt(): string {
-  return `${STYLE_PROMPT} A single character sprite, exactly one figure — exactly the same character, costume and ` +
+  return (
+    `${STYLE_PROMPT} A single character sprite, exactly one figure — exactly the same character, costume and ` +
     `colors as the figures in the reference image, at the same chunky pixel scale. The character is ` +
     `curled on their side fast asleep on the ground, seen from the same high three-quarter angle as ` +
     `the reference figures. The body lies ALONG THE GROUND running away up to the right: the head is ` +
@@ -49,6 +50,7 @@ function sleepPrompt(): string {
     `NO text, NO labels. NO shadow under the figure. NO bed, NO pillow, NO blanket, NO props. ` +
     `NO buildings, NO houses, NO scenery, NO ground plane. The ONLY content is the single sleeping ` +
     `figure on the magenta background. Subject: ${m!.desc}. ${m!.featureCap} ${BIG_PIXEL}`
+  )
 }
 
 function keyBg(img: RawImage): RawImage {
@@ -56,25 +58,32 @@ function keyBg(img: RawImage): RawImage {
     const keyed = chromaKey(img, { tolerance })
     let clear = 0
     for (let i = 3; i < keyed.data.length; i += 4) if (keyed.data[i] === 0) clear++
-    if (clear / (keyed.width * keyed.height) >= 0.10) return keyed
+    if (clear / (keyed.width * keyed.height) >= 0.1) return keyed
   }
   throw new Error('keyBg: <10% keyed even at tolerance 110')
 }
 
 async function generate(prompt: string, refs: Buffer[], reserve: number) {
-  if (budget.total + reserve > CAP) throw new Error(`reserve exceeds cap ($${budget.total.toFixed(3)} of $${CAP})`)
+  if (budget.total + reserve > CAP)
+    throw new Error(`reserve exceeds cap ($${budget.total.toFixed(3)} of $${CAP})`)
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: MODEL, prompt, size: '1024x1024', response_format: 'b64_json',
-      input_references: refs.map(r => ({ type: 'image_url', image_url: { url: `data:image/png;base64,${r.toString('base64')}` } })),
+      model: MODEL,
+      prompt,
+      size: '1024x1024',
+      response_format: 'b64_json',
+      input_references: refs.map((r) => ({
+        type: 'image_url',
+        image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
+      })),
       usage: { include: true },
     }),
   })
   if (!res.ok) throw new Error(`${MODEL} HTTP ${res.status}: ${await res.text()}`)
   const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: { cost?: number } }
-  const b64 = (json.data ?? []).filter(d => d.b64_json).at(-1)?.b64_json
+  const b64 = (json.data ?? []).filter((d) => d.b64_json).at(-1)?.b64_json
   if (!b64) throw new Error(`${MODEL}: no b64_json`)
   return { raw: Buffer.from(b64, 'base64'), cost: json.usage?.cost ?? reserve }
 }
@@ -88,15 +97,25 @@ for (let i = 0; i < MAX_ATTEMPTS; i++) {
   const key = `sleep-${m.id}-r${i}`
   const path = `${DIR}/raws/${key}.png`
   let buf: Buffer
-  if (existsSync(path)) { buf = readFileSync(path); console.log(`  ${key}: cached`) } else {
+  if (existsSync(path)) {
+    buf = readFileSync(path)
+    console.log(`  ${key}: cached`)
+  } else {
     const r = await generate(sleepPrompt(), [MASTER], 0.08)
-    writeFileSync(path, r.raw); budget.spend(r.cost); buf = r.raw
+    writeFileSync(path, r.raw)
+    budget.spend(r.cost)
+    buf = r.raw
     console.log(`  ${key}: generated $${r.cost.toFixed(4)} (total $${budget.total.toFixed(4)})`)
   }
   try {
     const keyed = keyBg(await decodePng(buf))
     let twoFigures = false
-    try { sliceStrip(keyed, 2); twoFigures = true } catch { /* one cluster — good */ }
+    try {
+      sliceStrip(keyed, 2)
+      twoFigures = true
+    } catch {
+      /* one cluster — good */
+    }
     if (twoFigures) throw new Error('slices into 2 figure clusters')
     const hi = processHiResCell(keyed)
     const bb = opaqueBbox(hi)!
@@ -118,11 +137,21 @@ for (let i = 0; i < MAX_ATTEMPTS; i++) {
 
 // nearest to the middle of the band wins among passes; among failures, nearest the band
 const mid = (SLEEP_AXIS_DEG_MIN + SLEEP_AXIS_DEG_MAX) / 2
-const passes = cands.filter(c => c.ok)
-const pick = (passes.length ? passes : cands).sort((a, b) => Math.abs(a.deg - mid) - Math.abs(b.deg - mid))[0]
-lines.push('', `spend: $${budget.total.toFixed(4)} of $${CAP}`,
-  pick ? `chosen: ${pick.key} (${pick.ok ? 'PASS' : 'best of a failing set — DO NOT SHIP'}) ${pick.note}` : 'chosen: none')
+const passes = cands.filter((c) => c.ok)
+const pick = (passes.length ? passes : cands).sort(
+  (a, b) => Math.abs(a.deg - mid) - Math.abs(b.deg - mid),
+)[0]
+lines.push(
+  '',
+  `spend: $${budget.total.toFixed(4)} of $${CAP}`,
+  pick
+    ? `chosen: ${pick.key} (${pick.ok ? 'PASS' : 'best of a failing set — DO NOT SHIP'}) ${pick.note}`
+    : 'chosen: none',
+)
 writeFileSync(`${DIR}/report.txt`, lines.join('\n'))
-writeFileSync(`${DIR}/spend.json`, JSON.stringify({ asset: `sleep-${m.id}`, spendUsd: budget.total }, null, 2))
+writeFileSync(
+  `${DIR}/spend.json`,
+  JSON.stringify({ asset: `sleep-${m.id}`, spendUsd: budget.total }, null, 2),
+)
 console.log(`\n${lines.join('\n')}`)
 if (pick?.ok) console.log(`\nSLEEP_RAW=${DIR}/raws/${pick.key}.png`)

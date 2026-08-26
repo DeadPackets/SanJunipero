@@ -9,7 +9,10 @@ const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url),
 
 // Every glyph the product draws onto a canvas is set in one of these four modules.
 const CANVAS_TEXT_FILES = [
-  './characters.ts', './tooltip.ts', './bubbles.ts', '../ui/SocietyLens.tsx',
+  './characters.ts',
+  './tooltip.ts',
+  './bubbles.ts',
+  '../ui/SocietyLens.tsx',
 ]
 
 describe('the legibility floors themselves', () => {

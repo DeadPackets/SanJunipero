@@ -16,7 +16,12 @@ const TICKS = 4320
 const RINGS = 3
 
 type Seen = { type: string; tick: number; payload: Record<string, unknown> }
-type Run = { state: WorldState; events: Seen[]; store: EventStore; terrain: ReturnType<typeof devTerrain> }
+type Run = {
+  state: WorldState
+  events: Seen[]
+  store: EventStore
+  terrain: ReturnType<typeof devTerrain>
+}
 
 function runDevWorld(interiors: boolean, ticks = TICKS): Run {
   const config = SHOWCASE_CONFIG
@@ -26,25 +31,33 @@ function runDevWorld(interiors: boolean, ticks = TICKS): Run {
   const rng = new RngStreams('g6')
   const events: Seen[] = []
   const inner = makeFoundersOnTick(config, rng, () => loop.state, {
-    interiors, structures, founders: foundersFor(structures), holdings: true,
+    interiors,
+    structures,
+    founders: foundersFor(structures),
+    holdings: true,
   })
   const loop: TickLoop = new TickLoop({
-    store, state: devGenesisState(config, terrain, 'showcase', RINGS), rng, config,
+    store,
+    state: devGenesisState(config, terrain, 'showcase', RINGS),
+    rng,
+    config,
     snapshotEveryTicks: 720,
-    onTick: (ctx) => inner({
-      tick: ctx.tick,
-      emit: (type, payload) => {
-        events.push({ type, tick: ctx.tick, payload: (payload ?? {}) as Record<string, unknown> })
-        ctx.emit(type, payload)
-      },
-    }),
+    onTick: (ctx) => {
+      inner({
+        tick: ctx.tick,
+        emit: (type, payload) => {
+          events.push({ type, tick: ctx.tick, payload: (payload ?? {}) as Record<string, unknown> })
+          ctx.emit(type, payload)
+        },
+      })
+    },
   })
   for (let t = 0; t < ticks; t++) loop.step()
   return { state: loop.state, events, store, terrain }
 }
 
 const of = (run: Run, type: string): Seen[] => run.events.filter((e) => e.type === type)
-const who = (e: Seen): string => String(e.payload['agentId'] ?? e.payload['id'] ?? '')
+const who = (e: Seen): string => String(e.payload.agentId ?? e.payload.id ?? '')
 
 describe('★ THE FIRST NIGHT — the showcase town on rings=3, three sim days', () => {
   const run = runDevWorld(true)
@@ -53,7 +66,10 @@ describe('★ THE FIRST NIGHT — the showcase town on rings=3, three sim days',
     const down = of(run, 'agent_collapsed')
     // The failure names the tick and the clock, because 17:02 is the arithmetic and saying so
     // is what stops the next reader treating it as a bad roll.
-    expect(down.map((e) => `${who(e)}@${e.tick}`), 'a founder went down in the street').toEqual([])
+    expect(
+      down.map((e) => `${who(e)}@${e.tick}`),
+      'a founder went down in the street',
+    ).toEqual([])
   })
 
   it('★ AND EVERY ONE OF THE FIVE SLEEPS INDOORS — the interior is reachable at last', () => {
@@ -80,7 +96,7 @@ describe('★ THE FIRST NIGHT — the showcase town on rings=3, three sim days',
   it('★ and nobody is ever narrated as ill, because nobody is ever ill', () => {
     // `escalateFatigue` mints `agent_afflicted{kind:"fatigue"}` after every collapse, and the
     // chronicle renders a non-poison affliction as illness. Both halves are asserted.
-    expect(of(run, 'agent_afflicted').map((e) => `${who(e)}:${String(e.payload['kind'])}`)).toEqual([])
+    expect(of(run, 'agent_afflicted').map((e) => `${who(e)}:${String(e.payload.kind)}`)).toEqual([])
   })
 
   it('★ and the whole run replays from genesis, event for event, to the same hash', () => {

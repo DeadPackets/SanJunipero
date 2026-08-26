@@ -10,7 +10,9 @@ import { RngStreams } from './rng.js'
 function seedStore(): { store: EventStore; live: ReturnType<typeof genesisState> } {
   const store = new EventStore(openDb(':memory:'))
   let live = genesisState(DEFAULT_CONFIG)
-  const emit = (tick: number, type: string, payload: unknown) => { live = fold(live, store.append(tick, type, payload)) }
+  const emit = (tick: number, type: string, payload: unknown) => {
+    live = fold(live, store.append(tick, type, payload))
+  }
   emit(0, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 })
   emit(1, 'tick_advanced', {})
   emit(1, 'agent_moved', { id: 'a1', x: 2, y: 1 })
@@ -25,11 +27,14 @@ describe('replay', () => {
   })
   it('snapshot + tail replay matches full replay', () => {
     const { store, live } = seedStore()
-    const rng = new RngStreams('town1'); rng.get('weather').next()
+    const rng = new RngStreams('town1')
+    rng.get('weather').next()
     // snapshot mid-stream (after seq 2), then more events already exist after it
     const mid = replayFromGenesis(store) // final state; emulate mid by re-folding first 2
     void mid
-    const firstTwo = store.readRange(1, 2).reduce((s, e) => fold(s, e), genesisState(DEFAULT_CONFIG))
+    const firstTwo = store
+      .readRange(1, 2)
+      .reduce((s, e) => fold(s, e), genesisState(DEFAULT_CONFIG))
     store.saveSnapshot(1, 2, firstTwo, rng.snapshot())
     const r = replayLatest(store)
     expect(stateHash(r.state)).toBe(stateHash(live))
@@ -38,7 +43,9 @@ describe('replay', () => {
   })
   it('replayLatest with no snapshot equals genesis replay (seed provided)', () => {
     const { store, live } = seedStore()
-    expect(stateHash(replayLatest(store, DEFAULT_CONFIG, undefined, 'town1').state)).toBe(stateHash(live))
+    expect(stateHash(replayLatest(store, DEFAULT_CONFIG, undefined, 'town1').state)).toBe(
+      stateHash(live),
+    )
   })
   it('throws when no rng checkpoint, no snapshot, and no seed exist', () => {
     const { store } = seedStore()
@@ -47,7 +54,9 @@ describe('replay', () => {
   it('throws when the snapshot rng is behind the folded state tick', () => {
     const { store } = seedStore()
     const rng = new RngStreams('town1')
-    const firstTwo = store.readRange(1, 2).reduce((s, e) => fold(s, e), genesisState(DEFAULT_CONFIG))
+    const firstTwo = store
+      .readRange(1, 2)
+      .reduce((s, e) => fold(s, e), genesisState(DEFAULT_CONFIG))
     store.saveSnapshot(1, 2, firstTwo, rng.snapshot()) // no rng checkpoint: rng falls back to the snapshot
     store.append(3, 'tick_advanced', {})
     expect(() => replayLatest(store)).toThrow(/rng checkpoint .* behind/)

@@ -6,8 +6,13 @@ import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import { codify as codifyRecipe, verbFromRecipe } from './codify.js'
 import {
-  assembleExpressivePrompt, ExpressiveRulingSchema, expressiveRow, expressiveVerbFromRuling,
-  isExpressive, isExpressiveRow, type ExpressiveRuling,
+  assembleExpressivePrompt,
+  ExpressiveRulingSchema,
+  expressiveRow,
+  expressiveVerbFromRuling,
+  isExpressive,
+  isExpressiveRow,
+  type ExpressiveRuling,
 } from './expressive.js'
 import { assembleAdjudicationPrompt } from './prompt.js'
 import { recipeSanityRefusal, type RecipeVocabulary } from './sanity.js'
@@ -22,7 +27,10 @@ export const SIMILARITY_SHORT_CIRCUIT = 0.92
 
 // Impossible classes that depend on who asked (skills, inventory) must never
 // become global precedent; only context-independent classes short-circuit.
-const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set(['physically_impossible', 'beyond_adjacency'])
+const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set([
+  'physically_impossible',
+  'beyond_adjacency',
+])
 
 // Invalid LLM verdicts (e.g. a map naming a verb that does not exist) get this
 // many total tries before the diegetic fallback below.
@@ -59,27 +67,30 @@ const MACHINE_TOKEN = /^[A-Z0-9_]+$/
 
 // The law prompt.ts states and the validation loop never checked: a refusal whose own words
 // say the act can be begun. Subject-led, so an honest "no one can begin this" is not a match.
-const REASON_AFFIRMS_THE_ATTEMPT = /\b(you|he|she|they|it|this) (can|could|may|might) (attempt|try|begin|start)\b/i
+const REASON_AFFIRMS_THE_ATTEMPT =
+  /\b(you|he|she|they|it|this) (can|could|may|might) (attempt|try|begin|start)\b/i
 
 // A refusal is written verbatim into a mind's memory, so it is scanned for directives too.
 // Replaced rather than retried: a retry can end at `FALLBACK_IMPOSSIBLE` and lose the reason.
 function reasonTainted(reason: string, vocabulary?: RulingVocabulary): boolean {
-  return FORBIDDEN_FRAMING.test(reason)
-    || MACHINE_TOKEN.test(reason.trim())
-    || REASON_AFFIRMS_THE_ATTEMPT.test(reason)
-    || scanRulingForGlassLeak(reason, vocabulary).length > 0
+  return (
+    FORBIDDEN_FRAMING.test(reason) ||
+    MACHINE_TOKEN.test(reason.trim()) ||
+    REASON_AFFIRMS_THE_ATTEMPT.test(reason) ||
+    scanRulingForGlassLeak(reason, vocabulary).length > 0
+  )
 }
 
 export type AgentCtx = {
   agentId: string
   name: string
   skills: Record<string, number>
-  inventory: Array<{ kind: string; qty: number }>
+  inventory: { kind: string; qty: number }[]
   position: { x: number; y: number }
   // What the asker can see. Absent from a caller that projects no world — and then the
   // arbiter judges as it always did, on the asker alone.
   visible?: {
-    structures: Array<{ kind: string; x: number; y: number }>
+    structures: { kind: string; x: number; y: number }[]
     ground: string[]
   }
   // The asker's own sentence behind the ask. Threaded to the prompt, never to a precedent key.
@@ -130,14 +141,20 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
   for (const row of rulebook.allActive()) {
     if (VERBS[row.verb]) continue
     const parsed: unknown = JSON.parse(row.recipeJson)
-    registerVerb(isExpressiveRow(parsed)
-      ? expressiveVerbFromRuling(parsed.name, parsed)
-      : verbFromRecipe(parsed as Recipe))
+    registerVerb(
+      isExpressiveRow(parsed)
+        ? expressiveVerbFromRuling(parsed.name, parsed)
+        : verbFromRecipe(parsed as Recipe),
+    )
   }
 
   // The cheap approval: a word for an act that changes nothing. One small call, one rulebook
   // row, and thereafter the whole town has the verb for free.
-  function codifyExpressive(ruling: ExpressiveRuling, tick: number, credit: DiscoveryCredit): string {
+  function codifyExpressive(
+    ruling: ExpressiveRuling,
+    tick: number,
+    credit: DiscoveryCredit,
+  ): string {
     const row = expressiveRow(ruling)
     const existing = rulebook.byId(row.id)
     if (existing !== null && existing.revertedAtTick === null) return row.id
@@ -177,7 +194,11 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       ...(shown === undefined
         ? {}
         : {
-            itemKinds: new Set([...shown.itemKinds, ...agentCtx.inventory.map((i) => i.kind), ...knownProducts]),
+            itemKinds: new Set([
+              ...shown.itemKinds,
+              ...agentCtx.inventory.map((i) => i.kind),
+              ...knownProducts,
+            ]),
             // A building the asker is looking at is a building the ruling may name, whether or
             // not the town knows how to raise one — the live run denied its own well.
             structureKinds: new Set([
@@ -207,7 +228,8 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         if (stored.kind === 'attempt') {
           const row = rulebook.byId(stored.recipe.id)
           if (row === null) return stored
-          if (row.revertedAtTick === null) return { kind: 'map', verb: stored.recipe.id, params: {} }
+          if (row.revertedAtTick === null)
+            return { kind: 'map', verb: stored.recipe.id, params: {} }
           // Reverted → fall through to the LLM (the admin re-decides after revert).
         } else if (stored.kind === 'map') {
           if (stored.verb.startsWith('recipe:')) {
@@ -245,8 +267,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       // Stage 3 — only genuinely novel intents reach the LLM.
       const precedent = similar.map(({ ruling }) => {
         const v = JSON.parse(ruling.verdictJson) as Verdict
-        if (v.kind === 'attempt') return { summary: v.summary, verdictKind: 'attempt', recipeName: v.recipe.name } as const
-        if (v.kind === 'impossible') return { summary: v.reason, verdictKind: 'impossible' } as const
+        if (v.kind === 'attempt')
+          return { summary: v.summary, verdictKind: 'attempt', recipeName: v.recipe.name } as const
+        if (v.kind === 'impossible')
+          return { summary: v.reason, verdictKind: 'impossible' } as const
         return { summary: v.verb, verdictKind: 'map' } as const
       })
       const vocab = codifiedVocabulary(agentCtx)
@@ -270,7 +294,8 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         if (framingTainted(r.value)) continue
         // A recipe that cannot stand as a permanent verb is invalid — retry. Codification is
         // forever, and the mini-rehearsal proved a bad one is minted in silence otherwise.
-        if (r.value.kind === 'attempt' && recipeSanityRefusal(r.value.recipe, vocab) !== null) continue
+        if (r.value.kind === 'attempt' && recipeSanityRefusal(r.value.recipe, vocab) !== null)
+          continue
         value = r.value
       }
       if (value === null) return FALLBACK_IMPOSSIBLE
@@ -282,7 +307,11 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       // corrected verdict is what gets recorded, so an exploit never becomes precedent.
       const verdict: Verdict =
         value.kind === 'attempt' && !codex.withinAdjacency(value.recipe.canon)
-          ? { kind: 'impossible', reason: 'this would need a craft the town has not yet reached', class: 'beyond_adjacency' }
+          ? {
+              kind: 'impossible',
+              reason: 'this would need a craft the town has not yet reached',
+              class: 'beyond_adjacency',
+            }
           : value
 
       // Stage 4 — record the ruling as shared precedent.
@@ -293,7 +322,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
 
     codify(recipe, credit) {
       return codifyRecipe(recipe, credit, {
-        rulebook, review, codex, tick: tick(),
+        rulebook,
+        review,
+        codex,
+        tick: tick(),
         ...(deps.onCodified === undefined ? {} : { onCodified: deps.onCodified }),
       })
     },

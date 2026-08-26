@@ -18,7 +18,9 @@ const EMOJI = /\p{Extended_Pictographic}/u
 /** Every declaration the sheet applies to `selector`, in cascade order. */
 function ruleBody(css: string, selector: string): string {
   const hits: string[] = []
-  for (const [, sel, body] of css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  for (const [, sel, body] of css
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if ((sel ?? '').split(',').some((s) => s.trim() === selector)) hits.push(body ?? '')
   }
   if (hits.length === 0) throw new Error(`no rule for ${selector}`)
@@ -99,7 +101,9 @@ describe('the map costs a resting camera nothing', () => {
   it('★ builds people on a tick and the rectangle on a frame — never both on a frame', () => {
     const paint = /const paint = \(\): void => \{[\s\S]*?\n {4}\}/.exec(view)?.[0] ?? ''
     expect(paint).toContain('viewOps(')
-    expect(paint, 'a frame is rebuilding every person who has not moved').not.toContain('peopleDots(')
+    expect(paint, 'a frame is rebuilding every person who has not moved').not.toContain(
+      'peopleDots(',
+    )
     expect(paint).toContain('dotsRef.current')
   })
 
@@ -144,7 +148,8 @@ describe('where the map sits, and what it promises not to cover', () => {
   })
 
   it('sits under the frame counter and over the things it must not be hidden by', () => {
-    const z = (sel: string): number => Number(/z-index:\s*(\d+)/.exec(ruleBody(CSS, sel))?.[1] ?? '0')
+    const z = (sel: string): number =>
+      Number(/z-index:\s*(\d+)/.exec(ruleBody(CSS, sel))?.[1] ?? '0')
     expect(z('.minimap')).toBeGreaterThan(z('.scrub-banner'))
     expect(z('.minimap')).toBeLessThan(z('.fps-overlay'))
     expect(z('.minimap')).toBeLessThan(z('.hud-dock'))
@@ -170,7 +175,7 @@ describe('where the map sits, and what it promises not to cover', () => {
   })
 
   it('★ its one motion is a reveal, named from the table and guarded', () => {
-    const idle = ruleBody(CSS, '.minimap[data-idle=\'true\']')
+    const idle = ruleBody(CSS, ".minimap[data-idle='true']")
     expect(idle).toMatch(/opacity:\s*0/)
     expect(idle).toMatch(/visibility:\s*hidden/)
     // opacity and visibility only — nothing that moves a box, nothing untokenised
@@ -214,8 +219,10 @@ describe('a map of a town you can already see all of', () => {
 
 describe('App shows the map exactly where the predicate says', () => {
   it('asks one question and asks it with the viewer’s own three facts', () => {
-    expect(APP).toContain('minimapShown(shownLens, insideId, hud.minimap === \'hidden\')')
-    expect(APP).toMatch(/<Minimap scene=\{scene\} store=\{store\} focusAgentId=\{route\.agentId\} \/>/)
+    expect(APP).toContain("minimapShown(shownLens, insideId, hud.minimap === 'hidden')")
+    expect(APP).toMatch(
+      /<Minimap scene=\{scene\} store=\{store\} focusAgentId=\{route\.agentId\} \/>/,
+    )
   })
 
   it('the predicate and the dock agree that putting it away means putting it away', () => {

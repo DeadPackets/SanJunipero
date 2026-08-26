@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { CHRONICLE_FALLBACK_ICON, CHRONICLE_ICONS, MILESTONE_ICON, chronicleIcon, type SimEvent } from '@sj/shared'
+import {
+  CHRONICLE_FALLBACK_ICON,
+  CHRONICLE_ICONS,
+  MILESTONE_ICON,
+  chronicleIcon,
+  type SimEvent,
+} from '@sj/shared'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
-import {
-  CHRONICLE_GLYPH, GLYPH_PALETTE, chronicleGlyph, chronicleLabel,
-} from './importantFeed.js'
+import { CHRONICLE_GLYPH, GLYPH_PALETTE, chronicleGlyph, chronicleLabel } from './importantFeed.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u
 
@@ -18,8 +22,20 @@ function fixture(): WorldState {
     },
     structures: {
       s1: {
-        id: 's1', kind: 'house', x: 0, y: 0, w: 1, h: 1, hp: 5, maxHp: 5, flammable: true,
-        stage: 'complete', progressTicks: 0, builtBy: 'a2', burning: false, burnTicks: 0,
+        id: 's1',
+        kind: 'house',
+        x: 0,
+        y: 0,
+        w: 1,
+        h: 1,
+        hp: 5,
+        maxHp: 5,
+        flammable: true,
+        stage: 'complete',
+        progressTicks: 0,
+        builtBy: 'a2',
+        burning: false,
+        burnTicks: 0,
       },
     },
   }
@@ -27,10 +43,21 @@ function fixture(): WorldState {
 
 function agent(id: string, name: string): WorldState['agents'][string] {
   return {
-    id, name, x: 0, y: 0, alive: true, asleep: false,
+    id,
+    name,
+    x: 0,
+    y: 0,
+    alive: true,
+    asleep: false,
     needs: { hunger: 1, energy: 1, warmth: 1, social: 1 },
-    hp: 10, injuries: [], ill: false, ageDays: 7300, skills: {}, activity: null,
-    collapsedSinceTick: null, zeroHungerSinceTick: null,
+    hp: 10,
+    injuries: [],
+    ill: false,
+    ageDays: 7300,
+    skills: {},
+    activity: null,
+    collapsedSinceTick: null,
+    zeroHungerSinceTick: null,
   }
 }
 
@@ -40,15 +67,27 @@ describe('chronicleLabel', () => {
   const state = fixture()
 
   it('writes the entries the town would remember', () => {
-    expect(chronicleLabel(ev('agent_died', { agentId: 'a1', cause: 'exposure' }), state))
-      .toBe('Rahel froze.')
-    expect(chronicleLabel(ev('agent_born', { id: 'a3', name: 'Mira', motherId: 'a1', fatherId: 'a2' }), state))
-      .toBe('Mira was born.')
-    expect(chronicleLabel(ev('co_slept', { aId: 'a1', bId: 'a2', day: 1 }), state))
-      .toBe('Rahel and Tomas kept house together.')
-    expect(chronicleLabel(ev('structure_completed', { id: 's1' }), state)).toBe('The house is finished.')
-    expect(chronicleLabel(ev('structure_inscribed', { structureId: 's1', text: 'ours', agentId: 'a1' }), state))
-      .toBe('New words carved on the house.')
+    expect(chronicleLabel(ev('agent_died', { agentId: 'a1', cause: 'exposure' }), state)).toBe(
+      'Rahel froze.',
+    )
+    expect(
+      chronicleLabel(
+        ev('agent_born', { id: 'a3', name: 'Mira', motherId: 'a1', fatherId: 'a2' }),
+        state,
+      ),
+    ).toBe('Mira was born.')
+    expect(chronicleLabel(ev('co_slept', { aId: 'a1', bId: 'a2', day: 1 }), state)).toBe(
+      'Rahel and Tomas kept house together.',
+    )
+    expect(chronicleLabel(ev('structure_completed', { id: 's1' }), state)).toBe(
+      'The house is finished.',
+    )
+    expect(
+      chronicleLabel(
+        ev('structure_inscribed', { structureId: 's1', text: 'ours', agentId: 'a1' }),
+        state,
+      ),
+    ).toBe('New words carved on the house.')
   })
 
   it('says nothing about a type it has no words for', () => {
@@ -61,8 +100,9 @@ describe('chronicleLabel', () => {
   })
 
   it('falls back to raw ids rather than inventing a person before the first snapshot', () => {
-    expect(chronicleLabel(ev('agent_died', { agentId: 'a1', cause: 'exposure' }), null))
-      .toBe('a1 froze.')
+    expect(chronicleLabel(ev('agent_died', { agentId: 'a1', cause: 'exposure' }), null)).toBe(
+      'a1 froze.',
+    )
   })
 })
 
@@ -104,14 +144,17 @@ describe('the chronicle glyphs', () => {
 describe('the discovery glyph', () => {
   it('exists under the icon the chronicle names, and is not the fallback', () => {
     expect(chronicleGlyph('key').pixels).not.toEqual(chronicleGlyph(CHRONICLE_FALLBACK_ICON).pixels)
-    expect(chronicleGlyph(chronicleIcon('discovery_made')).pixels)
-      .toEqual(chronicleGlyph('key').pixels)
+    expect(chronicleGlyph(chronicleIcon('discovery_made')).pixels).toEqual(
+      chronicleGlyph('key').pixels,
+    )
   })
 
   it('is 8×8 and paints only the palette', () => {
     for (const [x, y, fill] of chronicleGlyph('key').pixels) {
-      expect(x).toBeGreaterThanOrEqual(0); expect(x).toBeLessThan(8)
-      expect(y).toBeGreaterThanOrEqual(0); expect(y).toBeLessThan(8)
+      expect(x).toBeGreaterThanOrEqual(0)
+      expect(x).toBeLessThan(8)
+      expect(y).toBeGreaterThanOrEqual(0)
+      expect(y).toBeLessThan(8)
       expect(GLYPH_PALETTE).toContain(fill)
     }
   })

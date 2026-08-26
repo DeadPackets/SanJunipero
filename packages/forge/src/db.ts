@@ -34,13 +34,15 @@ export function openForgeDb(path: string): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_vision_qa_class ON vision_qa(asset_class, created_at);
   `)
-  const cols = db.pragma('table_info(assets)') as Array<{ name: string }>
-  if (!cols.some(c => c.name === 'kind')) {
+  const cols = db.pragma('table_info(assets)') as { name: string }[]
+  if (!cols.some((c) => c.name === 'kind')) {
     db.exec('ALTER TABLE assets ADD COLUMN kind TEXT')
     // backfill pre-existing rows only, by the desc-prefix convention; new rows set kind at register
-    db.exec("UPDATE assets SET kind = substr(desc, 1, instr(desc, ':') - 1) WHERE instr(desc, ':') > 0")
+    db.exec(
+      "UPDATE assets SET kind = substr(desc, 1, instr(desc, ':') - 1) WHERE instr(desc, ':') > 0",
+    )
   }
-  if (!cols.some(c => c.name === 'meta')) {
+  if (!cols.some((c) => c.name === 'meta')) {
     db.exec('ALTER TABLE assets ADD COLUMN meta TEXT') // v4 hi-res manifest JSON; no backfill (v2 rows have none)
   }
   return db

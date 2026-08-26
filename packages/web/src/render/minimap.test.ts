@@ -1,18 +1,44 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
-  ZOOM_STOPS, clampCamera, fitsAt, reachableBoundsOf, tooBigToFit, type CameraBounds,
+  ZOOM_STOPS,
+  clampCamera,
+  fitsAt,
+  reachableBoundsOf,
+  tooBigToFit,
+  type CameraBounds,
 } from './camera.js'
 import type { ViewRect } from './cull.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import { TILE_COLORS } from './ground.js'
 import { ROAD, WATER, bigTownPlaced, bigTownSide, bigTownTerrain } from './bigTown.js'
 import {
-  MARK_GROUNDS, MARK_HALO, MARK_MIN_CONTRAST, MARK_PERSON, MARK_VIEW, MARK_WATCHED,
-  MINIMAP_H, MINIMAP_PAGE, MINIMAP_W, VIEW_MIN_PX,
-  MINIMAP_LENSES, MINIMAP_ON_LENS,
-  dotOps, mapToWorld, minimapActionFor, minimapFit, minimapPixels, minimapShown, minimapViewBox,
-  overlayOps, pageTarget, peopleDots, travelTargetAt, viewHoldsTown, viewOps, worldToMap,
+  MARK_GROUNDS,
+  MARK_HALO,
+  MARK_MIN_CONTRAST,
+  MARK_PERSON,
+  MARK_VIEW,
+  MARK_WATCHED,
+  MINIMAP_H,
+  MINIMAP_PAGE,
+  MINIMAP_W,
+  VIEW_MIN_PX,
+  MINIMAP_LENSES,
+  MINIMAP_ON_LENS,
+  dotOps,
+  mapToWorld,
+  minimapActionFor,
+  minimapFit,
+  minimapPixels,
+  minimapShown,
+  minimapViewBox,
+  overlayOps,
+  pageTarget,
+  peopleDots,
+  travelTargetAt,
+  viewHoldsTown,
+  viewOps,
+  worldToMap,
   type MinimapFit,
 } from './minimap.js'
 import { LENSES } from '../ui/route.js'
@@ -25,7 +51,9 @@ import { LENSES } from '../ui/route.js'
 /** The stage the audit measured, less the 56 px the control bar takes. */
 const STAGE = { w: 1728, h: 880 - 56 }
 
-const townOf = (rings: number): { bounds: CameraBounds; terrain: number[][]; town: ReturnType<typeof bigTownPlaced> } => {
+const townOf = (
+  rings: number,
+): { bounds: CameraBounds; terrain: number[][]; town: ReturnType<typeof bigTownPlaced> } => {
   const terrain = bigTownTerrain(rings)
   const town = bigTownPlaced(rings)
   return { bounds: reachableBoundsOf(terrain, town), terrain, town }
@@ -34,7 +62,10 @@ const townOf = (rings: number): { bounds: CameraBounds; terrain: number[][]; tow
 /** The view a camera clamped to `bounds` actually shows when asked to centre on a point. */
 function viewAfterTravel(target: { sx: number; sy: number }, b: CameraBounds, z: number): ViewRect {
   const p = clampCamera(
-    { x: STAGE.w / 2 - target.sx * z, y: STAGE.h / 2 - target.sy * z }, z, b, STAGE,
+    { x: STAGE.w / 2 - target.sx * z, y: STAGE.h / 2 - target.sy * z },
+    z,
+    b,
+    STAGE,
   )
   return { x: -p.x / z, y: -p.y / z, w: STAGE.w / z, h: STAGE.h / z }
 }
@@ -73,7 +104,12 @@ describe('the map is a fixed box at a scale the town sets', () => {
     for (const rings of [1, 3, 10]) {
       const b = townOf(rings).bounds
       const f = minimapFit(b)
-      for (const [sx, sy] of [[b.minX, b.minY], [b.maxX, b.minY], [b.minX, b.maxY], [b.maxX, b.maxY]]) {
+      for (const [sx, sy] of [
+        [b.minX, b.minY],
+        [b.maxX, b.minY],
+        [b.minX, b.maxY],
+        [b.maxX, b.maxY],
+      ]) {
         const p = worldToMap(sx!, sy!, f)
         expect(p.mx, `${rings} rings`).toBeGreaterThanOrEqual(-0.001)
         expect(p.my, `${rings} rings`).toBeGreaterThanOrEqual(-0.001)
@@ -103,16 +139,24 @@ describe('the map is a fixed box at a scale the town sets', () => {
  * four: an iso street runs diagonally across the raster, so consecutive tiles land on pixels
  * that touch at a corner, and four-connectivity would call a clean diagonal a heap of dots.
  */
-function shapeOf(px: Uint8ClampedArray, f: MinimapFit, color: number): { total: number; largest: number; pieces: number } {
+function shapeOf(
+  px: Uint8ClampedArray,
+  f: MinimapFit,
+  color: number,
+): { total: number; largest: number; pieces: number } {
   const hit = new Uint8Array(f.w * f.h)
   let total = 0
   for (let my = 0; my < f.h; my++) {
     for (let mx = 0; mx < f.w; mx++) {
-      if (rgbaAt(px, f, mx, my) === color) { hit[my * f.w + mx] = 1; total++ }
+      if (rgbaAt(px, f, mx, my) === color) {
+        hit[my * f.w + mx] = 1
+        total++
+      }
     }
   }
   const seen = new Uint8Array(f.w * f.h)
-  let largest = 0, pieces = 0
+  let largest = 0,
+    pieces = 0
   for (let start = 0; start < hit.length; start++) {
     if (hit[start] === 0 || seen[start] === 1) continue
     pieces++
@@ -122,13 +166,18 @@ function shapeOf(px: Uint8ClampedArray, f: MinimapFit, color: number): { total: 
     while (stack.length > 0) {
       const at = stack.pop()!
       size++
-      const x = at % f.w, y = (at - (at % f.w)) / f.w
+      const x = at % f.w,
+        y = (at - (at % f.w)) / f.w
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
-          const nx = x + dx, ny = y + dy
+          const nx = x + dx,
+            ny = y + dy
           if ((dx === 0 && dy === 0) || nx < 0 || ny < 0 || nx >= f.w || ny >= f.h) continue
           const j = ny * f.w + nx
-          if (hit[j] === 1 && seen[j] === 0) { seen[j] = 1; stack.push(j) }
+          if (hit[j] === 1 && seen[j] === 0) {
+            seen[j] = 1
+            stack.push(j)
+          }
         }
       }
     }
@@ -150,9 +199,12 @@ function pointSampled(terrain: readonly (readonly number[])[], f: MinimapFit): U
       const t = screenToTile(p.sx, p.sy - TILE_H / 2)
       const id = terrain[t.y]?.[t.x]
       if (id === undefined) continue
-      const c = TILE_COLORS[id as 0]!
+      const c = TILE_COLORS[id as 0]
       const i = (my * f.w + mx) * 4
-      px[i] = (c >> 16) & 0xff; px[i + 1] = (c >> 8) & 0xff; px[i + 2] = c & 0xff; px[i + 3] = 255
+      px[i] = (c >> 16) & 0xff
+      px[i + 1] = (c >> 8) & 0xff
+      px[i + 2] = c & 0xff
+      px[i + 3] = 255
     }
   }
   return px
@@ -164,9 +216,10 @@ describe('the picture keeps the features that make a town legible', () => {
     const f = minimapFit(bounds)
     const px = minimapPixels(terrain, town, f)
     expect(px).toHaveLength(f.w * f.h * 4)
-    let painted = 0, clear = 0
+    let painted = 0,
+      clear = 0
     for (let my = 0; my < f.h; my++) {
-      for (let mx = 0; mx < f.w; mx++) (rgbaAt(px, f, mx, my) === -1 ? clear++ : painted++)
+      for (let mx = 0; mx < f.w; mx++) rgbaAt(px, f, mx, my) === -1 ? clear++ : painted++
     }
     // the world is a diamond inside a rectangle, so both must be true at once
     expect(painted).toBeGreaterThan(f.w * f.h * 0.3)
@@ -179,22 +232,24 @@ describe('the picture keeps the features that make a town legible', () => {
     for (const rings of [1, 3, 10]) {
       const { bounds, terrain } = townOf(rings)
       const f = minimapFit(bounds)
-      const road = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[ROAD]!)
+      const road = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[ROAD])
       expect(road.total, `${rings} rings: no road at all`).toBeGreaterThan(f.w)
       // one lattice of streets is ONE shape
-      expect(road.largest / road.total, `${rings} rings: ${road.total} px in ${road.pieces} pieces`)
-        .toBeGreaterThan(0.9)
+      expect(
+        road.largest / road.total,
+        `${rings} rings: ${road.total} px in ${road.pieces} pieces`,
+      ).toBeGreaterThan(0.9)
     }
   })
 
   it('★ and the control proves it: the same map, point-sampled, comes apart', () => {
     const { bounds, terrain } = townOf(10)
     const f = minimapFit(bounds)
-    const ours = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[ROAD]!)
-    const naive = shapeOf(pointSampled(terrain, f), f, TILE_COLORS[ROAD]!)
+    const ours = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[ROAD])
+    const naive = shapeOf(pointSampled(terrain, f), f, TILE_COLORS[ROAD])
     console.log(
-      `\n  ten rings, the street lattice: ours ${ours.total} px in ${ours.pieces} piece(s)`
-      + ` · point-sampled ${naive.total} px in ${naive.pieces} piece(s)`,
+      `\n  ten rings, the street lattice: ours ${ours.total} px in ${ours.pieces} piece(s)` +
+        ` · point-sampled ${naive.total} px in ${naive.pieces} piece(s)`,
     )
     expect(ours.pieces).toBeLessThan(naive.pieces / 4)
     expect(naive.largest / naive.total).toBeLessThan(0.5)
@@ -203,7 +258,7 @@ describe('the picture keeps the features that make a town legible', () => {
   it('★ a one-tile channel is still a channel when a pixel is four tiles wide', () => {
     const { bounds, terrain } = townOf(10)
     const f = minimapFit(bounds)
-    const water = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[WATER]!)
+    const water = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[WATER])
     expect(water.total).toBeGreaterThan(f.h / 4)
     expect(water.largest / water.total).toBeGreaterThan(0.9)
   })
@@ -214,11 +269,14 @@ describe('the picture keeps the features that make a town legible', () => {
     const px = minimapPixels(terrain, town, f)
     const seen = new Set<number>()
     for (let my = 0; my < f.h; my++) {
-      for (let mx = 0; mx < f.w; mx++) { const c = rgbaAt(px, f, mx, my); if (c >= 0) seen.add(c) }
+      for (let mx = 0; mx < f.w; mx++) {
+        const c = rgbaAt(px, f, mx, my)
+        if (c >= 0) seen.add(c)
+      }
     }
-    expect(seen.has(TILE_COLORS[ROAD]!)).toBe(true)
-    expect(seen.has(TILE_COLORS[WATER]!)).toBe(true)
-    expect(seen.has(TILE_COLORS[0]!)).toBe(true)
+    expect(seen.has(TILE_COLORS[ROAD])).toBe(true)
+    expect(seen.has(TILE_COLORS[WATER])).toBe(true)
+    expect(seen.has(TILE_COLORS[0])).toBe(true)
   })
 
   it('marks what is built, so the extent of the town is visible as such', () => {
@@ -227,7 +285,8 @@ describe('the picture keeps the features that make a town legible', () => {
     const bare = minimapPixels(terrain, [], f)
     const built = minimapPixels(terrain, town, f)
     let differ = 0
-    for (let i = 0; i < bare.length; i += 4) if (bare[i] !== built[i] || bare[i + 1] !== built[i + 1]) differ++
+    for (let i = 0; i < bare.length; i += 4)
+      if (bare[i] !== built[i] || bare[i + 1] !== built[i + 1]) differ++
     expect(differ, 'a town of 192 buildings must change the picture').toBeGreaterThan(80)
   })
 })
@@ -250,8 +309,10 @@ describe('the rectangle that says where the camera is', () => {
   it('★ never leaves the map it is drawn on', () => {
     for (const z of ZOOM_STOPS) {
       for (const corner of [
-        { sx: bounds.minX, sy: bounds.minY }, { sx: bounds.maxX, sy: bounds.maxY },
-        { sx: bounds.minX, sy: bounds.maxY }, { sx: bounds.maxX, sy: bounds.minY },
+        { sx: bounds.minX, sy: bounds.minY },
+        { sx: bounds.maxX, sy: bounds.maxY },
+        { sx: bounds.minX, sy: bounds.maxY },
+        { sx: bounds.maxX, sy: bounds.minY },
       ]) {
         const box = minimapViewBox(viewAfterTravel(corner, bounds, z), f)
         expect(box.x, `zoom ${z}`).toBeGreaterThanOrEqual(-0.001)
@@ -275,7 +336,8 @@ describe('the rectangle that says where the camera is', () => {
     const f1 = minimapFit(one.bounds)
     const v = viewAfterTravel(
       { sx: (one.bounds.minX + one.bounds.maxX) / 2, sy: (one.bounds.minY + one.bounds.maxY) / 2 },
-      one.bounds, ZOOM_STOPS[0]!,
+      one.bounds,
+      ZOOM_STOPS[0],
     )
     const box = minimapViewBox(v, f1)
     expect(box.w).toBeCloseTo(f1.w, 0)
@@ -325,8 +387,8 @@ describe('a click is a promise that you will be looking at what you clicked', ()
           for (let mx = 0; mx <= f.w; mx += Math.max(1, Math.floor(f.w / 6))) {
             const t = travelTargetAt(mx, my, f)
             const v = viewAfterTravel(t, bounds, z)
-            const inside = t.sx >= v.x - 1 && t.sx <= v.x + v.w + 1
-              && t.sy >= v.y - 1 && t.sy <= v.y + v.h + 1
+            const inside =
+              t.sx >= v.x - 1 && t.sx <= v.x + v.w + 1 && t.sy >= v.y - 1 && t.sy <= v.y + v.h + 1
             expect(inside, `${rings} rings, zoom ${z}, map ${mx},${my}`).toBe(true)
           }
         }
@@ -337,7 +399,11 @@ describe('a click is a promise that you will be looking at what you clicked', ()
   it('a point off the edge of the map is pulled onto it, never followed off the world', () => {
     const { bounds } = townOf(2)
     const f = minimapFit(bounds)
-    for (const [mx, my] of [[-50, -50], [f.w + 90, f.h + 90], [-1, f.h / 2]]) {
+    for (const [mx, my] of [
+      [-50, -50],
+      [f.w + 90, f.h + 90],
+      [-1, f.h / 2],
+    ]) {
       const t = travelTargetAt(mx!, my!, f)
       expect(t.sx).toBeGreaterThanOrEqual(bounds.minX - 0.001)
       expect(t.sx).toBeLessThanOrEqual(bounds.maxX + 0.001)
@@ -421,13 +487,16 @@ describe('people on a map the size of a postcard', () => {
     const src = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
     const townRule = /export function rendersOnMap\([\s\S]*?\n\}/.exec(src)?.[0] ?? ''
     const flat = townRule.replace(/\s+/g, ' ')
-    expect(flat, 'characters.ts no longer decides this the way the map does')
-      .toContain('return a.alive && a.insideId === undefined')
+    expect(flat, 'characters.ts no longer decides this the way the map does').toContain(
+      'return a.alive && a.insideId === undefined',
+    )
     // and the map's own departure from it is exactly one clause, stated where it is made
-    expect(peopleDots([{ id: 'in', x: 40, y: 40, alive: true, insideId: 's1' }], f, null))
-      .toHaveLength(0)
-    expect(peopleDots([{ id: 'in', x: 40, y: 40, alive: true, insideId: 's1' }], f, 'in'))
-      .toHaveLength(1)
+    expect(
+      peopleDots([{ id: 'in', x: 40, y: 40, alive: true, insideId: 's1' }], f, null),
+    ).toHaveLength(0)
+    expect(
+      peopleDots([{ id: 'in', x: 40, y: 40, alive: true, insideId: 's1' }], f, 'in'),
+    ).toHaveLength(1)
   })
 
   it('★ the person you are following is never the one that got deduplicated away', () => {
@@ -450,12 +519,24 @@ describe('what one frame of the overlay costs, counted', () => {
   const view = viewAfterTravel({ sx: 0, sy: 0 }, bounds, 2)
 
   it('★ is a bounded display list — no per-frame work grows with the town', () => {
-    const few = overlayOps(view, peopleDots(
-      Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, x: 50 + i * 9, y: 60 })), f, 'p3',
-    ), f)
-    const many = overlayOps(view, peopleDots(
-      Array.from({ length: 4000 }, (_, i) => ({ id: `p${i}`, x: i % 300, y: (i * 3) % 300 })), f, 'p3',
-    ), f)
+    const few = overlayOps(
+      view,
+      peopleDots(
+        Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, x: 50 + i * 9, y: 60 })),
+        f,
+        'p3',
+      ),
+      f,
+    )
+    const many = overlayOps(
+      view,
+      peopleDots(
+        Array.from({ length: 4000 }, (_, i) => ({ id: `p${i}`, x: i % 300, y: (i * 3) % 300 })),
+        f,
+        'p3',
+      ),
+      f,
+    )
     expect(few.length).toBeGreaterThan(4)
     expect(few.length).toBeLessThan(64)
     // Every mark is two rectangles — a dark halo under a light core — so the ceiling is TWO PER
@@ -506,17 +587,26 @@ describe('the marks a viewer reads, against every ground under them', () => {
     dotOps([dot], f).map((o) => o.color)
 
   it('prints the table this rule is enforced from', () => {
-    const marks: Array<[string, number[]]> = [
-      ['the camera rectangle', [...new Set(viewOps({ x: 0, y: 0, w: 2000, h: 1000 }, f).map((o) => o.color))]],
+    const marks: [string, number[]][] = [
+      [
+        'the camera rectangle',
+        [...new Set(viewOps({ x: 0, y: 0, w: 2000, h: 1000 }, f).map((o) => o.color))],
+      ],
       ['a person', tonesOf({ mx: 40, my: 40, focus: false })],
       ['the one you are watching', tonesOf({ mx: 40, my: 40, focus: true })],
     ]
-    console.log(`\n  mark                     tones                          worst ground   best tone there`)
+    console.log(
+      `\n  mark                     tones                          worst ground   best tone there`,
+    )
     for (const [name, tones] of marks) {
-      let worst = Infinity, where = 0
+      let worst = Infinity,
+        where = 0
       for (const g of MARK_GROUNDS) {
         const best = Math.max(...tones.map((t) => contrast(t, g)))
-        if (best < worst) { worst = best; where = g }
+        if (best < worst) {
+          worst = best
+          where = g
+        }
       }
       console.log(
         `  ${name.padEnd(24)} ${tones.map(hex).join(' ').padEnd(30)} ${hex(where).padEnd(14)} ${worst.toFixed(2)}`,
@@ -526,18 +616,25 @@ describe('the marks a viewer reads, against every ground under them', () => {
   })
 
   it('★ every mark clears 3:1 on every ground the raster can draw', () => {
-    const marks: Array<[string, number[]]> = [
-      ['camera rectangle', [...new Set(viewOps({ x: 0, y: 0, w: 2000, h: 1000 }, f).map((o) => o.color))]],
+    const marks: [string, number[]][] = [
+      [
+        'camera rectangle',
+        [...new Set(viewOps({ x: 0, y: 0, w: 2000, h: 1000 }, f).map((o) => o.color))],
+      ],
       ['person', tonesOf({ mx: 40, my: 40, focus: false })],
       ['watched', tonesOf({ mx: 40, my: 40, focus: true })],
     ]
     for (const [name, tones] of marks) {
-      expect(tones.length, `${name} is a single tone — no ground-independent colour exists`)
-        .toBeGreaterThan(1)
+      expect(
+        tones.length,
+        `${name} is a single tone — no ground-independent colour exists`,
+      ).toBeGreaterThan(1)
       for (const g of MARK_GROUNDS) {
         const best = Math.max(...tones.map((t) => contrast(t, g)))
-        expect(best, `${name} on ${hex(g)}: best tone is only ${best.toFixed(2)}`)
-          .toBeGreaterThanOrEqual(MARK_MIN_CONTRAST)
+        expect(
+          best,
+          `${name} on ${hex(g)}: best tone is only ${best.toFixed(2)}`,
+        ).toBeGreaterThanOrEqual(MARK_MIN_CONTRAST)
       }
     }
   })
@@ -553,8 +650,10 @@ describe('the marks a viewer reads, against every ground under them', () => {
   it('★ no single palette colour would have done, which is why they are layered', () => {
     for (const tone of [MARK_HALO, MARK_VIEW, MARK_PERSON, MARK_WATCHED]) {
       const fails = MARK_GROUNDS.filter((g) => contrast(tone, g) < MARK_MIN_CONTRAST)
-      expect(fails.length, `${hex(tone)} clears every ground alone — the layering could be dropped`)
-        .toBeGreaterThan(0)
+      expect(
+        fails.length,
+        `${hex(tone)} clears every ground alone — the layering could be dropped`,
+      ).toBeGreaterThan(0)
     }
   })
 })
@@ -595,9 +694,8 @@ describe('a minimap that covers the town it explains is worse than none', () => 
     expect(Object.keys(MINIMAP_ON_LENS).sort()).toEqual([...LENSES].sort())
   })
 
-  it('the reader\'s list is derived from the table, never transcribed beside it', () => {
-    expect([...MINIMAP_LENSES].sort())
-      .toEqual(LENSES.filter((l) => MINIMAP_ON_LENS[l]).sort())
+  it("the reader's list is derived from the table, never transcribed beside it", () => {
+    expect([...MINIMAP_LENSES].sort()).toEqual(LENSES.filter((l) => MINIMAP_ON_LENS[l]).sort())
     expect(MINIMAP_LENSES.length).toBeGreaterThan(0)
     expect(MINIMAP_LENSES.length).toBeLessThan(LENSES.length)
   })
@@ -622,7 +720,11 @@ describe('the minimap in one number per ring count', () => {
       const { bounds, terrain, town } = townOf(rings)
       const f = minimapFit(bounds)
       const side = bigTownSide(rings)
-      const people = Array.from({ length: 24 }, (_, i) => ({ id: `p${i}`, x: 20 + i * 5, y: 30 + i * 3 }))
+      const people = Array.from({ length: 24 }, (_, i) => ({
+        id: `p${i}`,
+        x: 20 + i * 5,
+        y: 30 + i * 3,
+      }))
       const view = viewAfterTravel({ sx: 0, sy: 0 }, bounds, 2)
       const dots = peopleDots(people, f, 'p7')
       return {
@@ -634,21 +736,25 @@ describe('the minimap in one number per ring count', () => {
         worldPxPerMapPx: (1 / f.scale).toFixed(1),
         tilesPerMapPx: (1 / (f.scale * (TILE_H / 2))).toFixed(2),
         raster: minimapPixels(terrain, town, f).length / 4,
-        rasterMs: medianMs(5, () => { minimapPixels(terrain, town, f) }),
+        rasterMs: medianMs(5, () => {
+          minimapPixels(terrain, town, f)
+        }),
         ops: overlayOps(view, dots, f).length,
-        frameMs: medianMs(51, () => { overlayOps(view, dots, f) }),
+        frameMs: medianMs(51, () => {
+          overlayOps(view, dots, f)
+        }),
       }
     })
     console.log(
-      `\n  rings | tiles   | built | town span      | map      | world px/px | tiles/px`
-      + ` | raster px | rebuild ms | frame ops | frame ms`,
+      `\n  rings | tiles   | built | town span      | map      | world px/px | tiles/px` +
+        ` | raster px | rebuild ms | frame ops | frame ms`,
     )
     for (const r of rows) {
       console.log(
-        `  ${String(r.rings).padStart(5)} | ${String(r.tiles).padStart(7)} | ${String(r.structures).padStart(5)}`
-        + ` | ${r.span.padStart(14)} | ${r.map.padStart(8)} | ${r.worldPxPerMapPx.padStart(11)}`
-        + ` | ${r.tilesPerMapPx.padStart(8)} | ${String(r.raster).padStart(9)}`
-        + ` | ${r.rasterMs.toFixed(2).padStart(10)} | ${String(r.ops).padStart(9)} | ${r.frameMs.toFixed(4).padStart(8)}`,
+        `  ${String(r.rings).padStart(5)} | ${String(r.tiles).padStart(7)} | ${String(r.structures).padStart(5)}` +
+          ` | ${r.span.padStart(14)} | ${r.map.padStart(8)} | ${r.worldPxPerMapPx.padStart(11)}` +
+          ` | ${r.tilesPerMapPx.padStart(8)} | ${String(r.raster).padStart(9)}` +
+          ` | ${r.rasterMs.toFixed(2).padStart(10)} | ${String(r.ops).padStart(9)} | ${r.frameMs.toFixed(4).padStart(8)}`,
       )
     }
     // ★ THE CLAIM: the raster is the same size at ten rings as at one. Only the scale moved.

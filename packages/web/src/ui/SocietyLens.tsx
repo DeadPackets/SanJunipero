@@ -6,7 +6,12 @@ import { TEXT_MIN_PX } from '../textFloor.js'
 import { BondDetailPanel } from './BondDetailPanel.js'
 import { LegendChip } from './LegendChip.js'
 import { EMPTY_LINEAGE, type LineageLike } from './bondModel2.js'
-import { toRelationGraph, relationLegend, type LegendRow, type RelationLink } from './relationGraph.js'
+import {
+  toRelationGraph,
+  relationLegend,
+  type LegendRow,
+  type RelationLink,
+} from './relationGraph.js'
 import type { BondNode, PeopleIndex } from './bondsModel.js'
 import { EMPTY_COPY } from './townStats.js'
 
@@ -23,7 +28,13 @@ const slabSide = (n: BondNode): number => Math.max(14, Math.round(Math.sqrt(n.si
  *  field of unconnected people, so the wait has to name itself. */
 export const LOADING_COPY = 'Reading the town’s ties…'
 
-export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (agentId: string) => void }) {
+export function SocietyLens({
+  store,
+  onPick,
+}: {
+  store: WorldStore
+  onPick: (agentId: string) => void
+}) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const [api, setApi] = useState<BondsResponse | null>(null)
   const [lineage, setLineage] = useState<LineageLike>(EMPTY_LINEAGE)
@@ -39,7 +50,8 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
   // d3 link force, so it is set on the instance once the graph exists.
   useEffect(() => {
     const link = fgRef.current?.d3Force('link') as
-      { distance: (f: (l: unknown) => number) => void } | undefined
+      | { distance: (f: (l: unknown) => number) => void }
+      | undefined
     link?.distance((l: unknown) => (l as RelationLink).distance)
   }, [])
 
@@ -51,7 +63,9 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
         .then((parsed) => {
           if (alive && parsed?.success === true) setApi(parsed.data)
         })
-        .catch(() => { /* the town keeps its ties whether or not we can read them */ })
+        .catch(() => {
+          /* the town keeps its ties whether or not we can read them */
+        })
     }
     load()
     const timer = setInterval(load, REFETCH_MS)
@@ -63,17 +77,25 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
 
   useEffect(() => {
     void fetch('/api/lineage')
-      .then(async (r) => (r.ok ? (await r.json()) as LineageLike : null))
-      .then((l) => { if (l !== null && Array.isArray(l.parentOf)) setLineage(l) })
-      .catch(() => { /* ancestry is a nice-to-have, never a requirement */ })
+      .then(async (r) => (r.ok ? ((await r.json()) as LineageLike) : null))
+      .then((l) => {
+        if (l !== null && Array.isArray(l.parentOf)) setLineage(l)
+      })
+      .catch(() => {
+        /* ancestry is a nice-to-have, never a requirement */
+      })
   }, [])
 
   useEffect(() => {
     const el = boxRef.current
     if (el === null) return
-    const ro = new ResizeObserver(() => setDims({ w: el.clientWidth, h: el.clientHeight }))
+    const ro = new ResizeObserver(() => {
+      setDims({ w: el.clientWidth, h: el.clientHeight })
+    })
     ro.observe(el)
-    return () => ro.disconnect()
+    return () => {
+      ro.disconnect()
+    }
   }, [])
 
   // Names come from the world the viewer already holds — the bonds endpoint carries ties, not
@@ -104,8 +126,13 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
   const legend = useMemo(() => relationLegend(), [])
   const key = (r: LegendRow): string => `${r.axis}:${r.key}`
   const links = useMemo(
-    () => graph.links.filter((l) =>
-      !hidden.has(`level:${l.level}`) && !hidden.has(`type:${l.type}`) && !hidden.has(`arc:${l.arc.direction}`)),
+    () =>
+      graph.links.filter(
+        (l) =>
+          !hidden.has(`level:${l.level}`) &&
+          !hidden.has(`type:${l.type}`) &&
+          !hidden.has(`arc:${l.arc.direction}`),
+      ),
     [graph, hidden],
   )
 
@@ -136,21 +163,37 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
           className="key-summary"
           aria-expanded={keyOpen}
           aria-controls="society-key-body"
-          onClick={() => setKeyOpen((v) => !v)}
+          onClick={() => {
+            setKeyOpen((v) => !v)
+          }}
         >
           {keyOpen ? 'Hide the key' : 'How to read this'}
           {hiddenCount > 0 && <span className="key-filtered">{hiddenCount} hidden</span>}
         </button>
         {keyOpen && (
-          <div id="society-key-body" className="society-legend" role="group" aria-label="How to read this">
+          <div
+            id="society-key-body"
+            className="society-legend"
+            role="group"
+            aria-label="How to read this"
+          >
             {(['level', 'type', 'arc'] as const).map((axis) => (
               <div className="legend-axis" key={axis} data-axis={axis}>
                 <span className="legend-axis-name">
                   {axis === 'level' ? 'How close' : axis === 'type' ? 'Family' : 'Which way'}
                 </span>
-                {legend.filter((r) => r.axis === axis).map((r) => (
-                  <LegendChip key={key(r)} row={r} off={hidden.has(key(r))} onToggle={() => toggle(key(r))} />
-                ))}
+                {legend
+                  .filter((r) => r.axis === axis)
+                  .map((r) => (
+                    <LegendChip
+                      key={key(r)}
+                      row={r}
+                      off={hidden.has(key(r))}
+                      onToggle={() => {
+                        toggle(key(r))
+                      }}
+                    />
+                  ))}
               </div>
             ))}
             {api !== null && (
@@ -166,7 +209,9 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
           in which nothing has passed between anyone yet — and a field of unconnected people is
           what BOTH a tieless town and an unanswered fetch look like, so the wait says so. */}
       {api === null ? (
-        <p className="society-empty" aria-busy="true">{LOADING_COPY}</p>
+        <p className="society-empty" aria-busy="true">
+          {LOADING_COPY}
+        </p>
       ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
         <p className="society-empty">{EMPTY_COPY.bonds}</p>
       ) : null}
@@ -179,7 +224,9 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
           level={selected.level}
           arc={selected.arc}
           words={selected.words}
-          onClose={() => setSelected(null)}
+          onClose={() => {
+            setSelected(null)
+          }}
         />
       )}
 
@@ -243,8 +290,12 @@ export function SocietyLens({ store, onPick }: { store: WorldStore; onPick: (age
         linkWidth={(l) => ((l as RelationLink).strokeCount === 2 ? 3 : 1.5)}
         linkLineDash={(l) => (l as RelationLink).dash as number[] | null}
         linkLabel={(l) => (l as RelationLink).words}
-        onLinkClick={(l) => setSelected(l as unknown as RelationLink)}
-        onNodeClick={(n) => onPick((n as BondNode).id)}
+        onLinkClick={(l) => {
+          setSelected(l as unknown as RelationLink)
+        }}
+        onNodeClick={(n) => {
+          onPick((n as BondNode).id)
+        }}
       />
     </div>
   )

@@ -1,12 +1,19 @@
 import { Assets, type Texture } from 'pixi.js'
 import { progress, type MotionName } from '../ui/motion.js'
 import {
-  parseBuildingManifest, parseCharacterAtlasManifest,
-  type AssetClass, type AssetRecord, type CharacterAtlasManifest,
+  parseBuildingManifest,
+  parseCharacterAtlasManifest,
+  type AssetClass,
+  type AssetRecord,
+  type CharacterAtlasManifest,
 } from '@sj/shared'
 
 // (controller ruling) resolution runs on the codex kind column, never on desc parsing
-export function resolveAsset(records: AssetRecord[], klass: AssetClass, kind: string): AssetRecord | null {
+export function resolveAsset(
+  records: AssetRecord[],
+  klass: AssetClass,
+  kind: string,
+): AssetRecord | null {
   let best: AssetRecord | null = null
   for (const r of records) {
     if (r.status !== 'ready' || r.class !== klass || r.kind !== kind) continue
@@ -15,7 +22,11 @@ export function resolveAsset(records: AssetRecord[], klass: AssetClass, kind: st
   return best
 }
 
-export function resolveAssetId(records: AssetRecord[], klass: AssetClass, kind: string): string | null {
+export function resolveAssetId(
+  records: AssetRecord[],
+  klass: AssetClass,
+  kind: string,
+): string | null {
   return resolveAsset(records, klass, kind)?.id ?? null
 }
 
@@ -34,7 +45,8 @@ export function characterArt(records: AssetRecord[], agentId: string): Character
   const rec = resolveAsset(records, CHARACTER_CLASS, `character:${agentId}`)
   if (rec === null) return { url: `/assets/character/${agentId}.png`, manifest: null, size: null }
   const manifest = parseCharacterAtlasManifest(rec.meta)
-  if (manifest === null) return { url: `/assets/character/${agentId}.png`, manifest: null, size: null }
+  if (manifest === null)
+    return { url: `/assets/character/${agentId}.png`, manifest: null, size: null }
   return { url: `/assets/${rec.id}.png`, manifest, size: { w: rec.widthPx, h: rec.heightPx } }
 }
 
@@ -42,7 +54,11 @@ export const BUILDING_PX_PER_TILE = 32 // Style Bible: ~64px sprite for a 1×1 b
 
 /** `url: null` means NO ART EXISTS for this kind and the renderer draws a palette-true built
  *  form. It must never mean the forge's checkerboard placeholder. */
-export type BuildingArt = { url: string | null; anchor: { x: number; y: number } | null; scale: number | null }
+export type BuildingArt = {
+  url: string | null
+  anchor: { x: number; y: number } | null
+  scale: number | null
+}
 
 // v4 hi-res building → feet-anchored, scaled to fit the Style Bible's 32·(w+h) px
 // square; anything else draws at natural size with the bottom-center anchor law.
@@ -52,10 +68,15 @@ export const facingCellKind = (kind: string, facing?: 'sw' | 'se'): string =>
   facing === 'se' ? `${kind}:se` : kind
 
 export function buildingArt(
-  records: AssetRecord[], kind: string, fw: number, fh: number, facing?: 'sw' | 'se',
+  records: AssetRecord[],
+  kind: string,
+  fw: number,
+  fh: number,
+  facing?: 'sw' | 'se',
 ): BuildingArt {
-  const rec = resolveAsset(records, 'building', facingCellKind(kind, facing))
-    ?? resolveAsset(records, 'building', kind)
+  const rec =
+    resolveAsset(records, 'building', facingCellKind(kind, facing)) ??
+    resolveAsset(records, 'building', kind)
   if (rec === null) return { url: null, anchor: null, scale: null }
   const m = parseBuildingManifest(rec.meta)
   if (m === null) return { url: `/assets/${rec.id}.png`, anchor: null, scale: null }

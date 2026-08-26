@@ -6,27 +6,59 @@ import type { WorldStore } from '../state/worldStore.js'
 import type { InteriorScene } from './interiorScene.js'
 import { TILE_H, TILE_W, screenToTile, tileToScreen } from './iso.js'
 import {
-  ZOOM_STOPS, boundsCentre, cameraBoundsOf, clampCamera, fitStop, initialZoom, nearestStop,
-  drawnBoundsOf, fitsAt, reachableBoundsOf, resizeIntent, tooBigToFit, zoomScaleAt, zoomSettled,
-  zoomTo, zoomWheel, zoomGestureEnded, zoomRelease, WHEEL_GESTURE_GAP_MS,
-  type CameraBounds, type ZoomState, type ZoomStop,
+  ZOOM_STOPS,
+  boundsCentre,
+  cameraBoundsOf,
+  clampCamera,
+  fitStop,
+  initialZoom,
+  drawnBoundsOf,
+  reachableBoundsOf,
+  resizeIntent,
+  tooBigToFit,
+  zoomScaleAt,
+  zoomSettled,
+  zoomTo,
+  zoomWheel,
+  zoomGestureEnded,
+  zoomRelease,
+  WHEEL_GESTURE_GAP_MS,
+  type CameraBounds,
+  type ZoomState,
+  type ZoomStop,
 } from './camera.js'
 import {
-  OCTAVE_ALPHA, ROAD_SHOULDER_DARK, ROAD_SHOULDER_LIGHT, groundArtSignature, groundField,
-  isRoadMass, materialMatrix, octaveMatrix, roadRibbonPolys, roadShoulderBands,
+  OCTAVE_ALPHA,
+  ROAD_SHOULDER_DARK,
+  ROAD_SHOULDER_LIGHT,
+  groundArtSignature,
+  groundField,
+  isRoadMass,
+  materialMatrix,
+  octaveMatrix,
+  roadRibbonPolys,
+  roadShoulderBands,
   type FieldLayer,
 } from './groundField.js'
 import {
-  CHUNK_BYTES_PER_PX, bucketLayers, bucketPolys, createChunkResidency, groundGrid,
-  type ChunkGrid, type ChunkKey, type ChunkRect,
+  CHUNK_BYTES_PER_PX,
+  bucketLayers,
+  bucketPolys,
+  createChunkResidency,
+  groundGrid,
+  type ChunkGrid,
+  type ChunkKey,
+  type ChunkRect,
 } from './groundChunks.js'
 import type { ViewRect } from './cull.js'
 import {
-  applyDepthOrder, createLayers, type DepthCounts, type DepthEntry, type LayerSet,
+  applyDepthOrder,
+  createLayers,
+  type DepthCounts,
+  type DepthEntry,
+  type LayerSet,
 } from './layers.js'
-import {
-  flingFrom, flingStep, isDrag, trackDrag, type DragTrack, type Fling,
-} from './fling.js'
+import { flingFrom, flingStep, isDrag, trackDrag, type DragTrack, type Fling } from './fling.js'
 import { createTooltipLayer, type TooltipLayer } from './tooltip.js'
 import { HEADLAND_COLOR, KERB_COLOR, furrowLines, patchOutline, type Tile } from './patches.js'
 import { tileKind } from './tileset.js'
@@ -54,7 +86,9 @@ export type BakeRenderer = {
 }
 
 export function createGroundBaker(
-  renderer: BakeRenderer, root: Container, book: TextureBook,
+  renderer: BakeRenderer,
+  root: Container,
+  book: TextureBook,
 ): GroundBaker {
   let grid: ChunkGrid | null = null
   /** the field's layers, cut per chunk — one O(shapes) pass per terrain, never per chunk */
@@ -77,13 +111,14 @@ export function createGroundBaker(
     const stack = buckets.get(rect.key) ?? []
     for (let li = 0; li < stack.length; li++) {
       const l = stack[li]!
-      if (l.shapes.length === 0) continue   // its index is still its index — see bucketLayers
+      if (l.shapes.length === 0) continue // its index is still its index — see bucketLayers
       // Every shoulder is laid down BEFORE any ribbon, so a neighbour's rim can never sit on
       // top of this tile's surface.
       if (l.kind === 'road') {
         // Two tones, because one flat shoulder sat 0.060 luma from the grass and vanished at 1x.
         for (const [tone, pick] of [
-          [ROAD_SHOULDER_LIGHT, 'light'], [ROAD_SHOULDER_DARK, 'dark'],
+          [ROAD_SHOULDER_LIGHT, 'light'],
+          [ROAD_SHOULDER_DARK, 'dark'],
         ] as const) {
           const sh = new Graphics()
           for (const shape of l.shapes) {
@@ -103,9 +138,19 @@ export function createGroundBaker(
       // the layer's mask, laid down once per pass
       const shapesInto = (g: Graphics): void => {
         for (const shape of l.shapes) {
-          const cx = shape.sx + offX, cy = shape.sy
+          const cx = shape.sx + offX,
+            cy = shape.sy
           if (shape.roadKey === null) {
-            g.poly([cx, cy, cx + TILE_W / 2, cy + TILE_H / 2, cx, cy + TILE_H, cx - TILE_W / 2, cy + TILE_H / 2])
+            g.poly([
+              cx,
+              cy,
+              cx + TILE_W / 2,
+              cy + TILE_H / 2,
+              cx,
+              cy + TILE_H,
+              cx - TILE_W / 2,
+              cy + TILE_H / 2,
+            ])
             continue
           }
           for (const poly of roadRibbonPolys(shape.roadKey)) {
@@ -120,10 +165,10 @@ export function createGroundBaker(
       shapesInto(g)
       const tex = l.url === null ? undefined : loaded.get(l.url)
       if (tex === undefined) {
-        g.fill(l.fallback)                     // art independence: palette-true flat ground
+        g.fill(l.fallback) // art independence: palette-true flat ground
         layer.addChild(g)
       } else {
-        tex.source.addressMode = 'repeat'      // the field wraps; the material must too
+        tex.source.addressMode = 'repeat' // the field wraps; the material must too
         // An identity matrix would tile one 256px material on an axis-aligned lattice across
         // the whole map, so each layer samples through its own rotation and offset instead.
         g.fill({ texture: tex, matrix: materialMatrix(l.id, li) })
@@ -145,7 +190,10 @@ export function createGroundBaker(
         const pts: number[] = []
         for (let i = 0; i < poly.length; i += 2) pts.push(poly[i]! + offX, poly[i + 1]!)
         if (close) g.poly(pts)
-        else { g.moveTo(pts[0]!, pts[1]!); g.lineTo(pts[2]!, pts[3]!) }
+        else {
+          g.moveTo(pts[0]!, pts[1]!)
+          g.lineTo(pts[2]!, pts[3]!)
+        }
       }
       g.stroke({ color, alpha, width: 1, alignment: 0.5 })
       layer.addChild(g)
@@ -165,7 +213,10 @@ export function createGroundBaker(
     // resolution 1 and NEAREST, stated rather than inherited: a chunk baked at the device ratio
     // would resample the pixel art the whole `nearest` law exists to keep unresampled.
     const tex = RenderTexture.create({
-      width: rect.texW, height: rect.texH, scaleMode: 'nearest', resolution: 1,
+      width: rect.texW,
+      height: rect.texH,
+      scaleMode: 'nearest',
+      resolution: 1,
     })
     const sprite = new Sprite(tex)
     sprite.position.set(rect.x - offsetX, rect.y)
@@ -200,7 +251,8 @@ export function createGroundBaker(
       grid = groundGrid(field.widthPx, field.heightPx, field.offsetX)
       buckets = bucketLayers(grid, field.layers)
 
-      const plaza: Tile[] = [], farmland: Tile[] = []
+      const plaza: Tile[] = [],
+        farmland: Tile[] = []
       for (let y = 0; y < terrain.length; y++) {
         const row = terrain[y]!
         for (let x = 0; x < row.length; x++) {
@@ -219,16 +271,23 @@ export function createGroundBaker(
 
       // Textures load async: paint the flat fallback now, repaint once the art is in, and let
       // the generation counter stop a stale load overwriting a newer bake.
-      const urls = [...new Set(field.layers.map((l) => l.url))]
-        .filter((u): u is string => u !== null && !loaded.has(u))
+      const urls = [...new Set(field.layers.map((l) => l.url))].filter(
+        (u): u is string => u !== null && !loaded.has(u),
+      )
       if (urls.length === 0) return
       const gen = ++generation
-      void Promise.all(urls.map(async (u) => { loaded.set(u, await book.get(u)) }))
+      void Promise.all(
+        urls.map(async (u) => {
+          loaded.set(u, await book.get(u))
+        }),
+      )
         .then(() => {
           if (gen !== generation) return
           for (const held of live.values()) drawChunk(held.rect, held.tex, offsetX)
         })
-        .catch(() => { /* art is optional — the flat diamonds already rendered */ })
+        .catch(() => {
+          /* art is optional — the flat diamonds already rendered */
+        })
     },
     setView(next) {
       if (next.x === view.x && next.y === view.y && next.w === view.w && next.h === view.h) return
@@ -236,7 +295,8 @@ export function createGroundBaker(
       applyResidency()
     },
     vram() {
-      let bytes = 0, maxDimPx = 0
+      let bytes = 0,
+        maxDimPx = 0
       for (const held of live.values()) {
         bytes += held.rect.texW * held.rect.texH * CHUNK_BYTES_PER_PX
         maxDimPx = Math.max(maxDimPx, held.rect.texW, held.rect.texH)
@@ -266,7 +326,9 @@ export function sceneClock(app: { ticker: { start(): void; stop(): void } | null
       if (on) app.ticker!.start()
       else app.ticker!.stop()
     },
-    close: () => { closed = true },
+    close: () => {
+      closed = true
+    },
   }
 }
 
@@ -380,13 +442,15 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const viewRect = (): { x: number; y: number; w: number; h: number } => {
     const k = world.scale.x || 1
     return {
-      x: -world.position.x / k, y: -world.position.y / k,
-      w: app.screen.width / k, h: app.screen.height / k,
+      x: -world.position.x / k,
+      y: -world.position.y / k,
+      w: app.screen.width / k,
+      h: app.screen.height / k,
     }
   }
   const tags = createTooltipLayer(layers, viewRect, () => world.scale.x)
 
-  const tileCbs: Array<(t: { x: number; y: number }) => void> = []
+  const tileCbs: ((t: { x: number; y: number }) => void)[] = []
 
   // The depth sort has ONE owner and runs ONCE a frame over the whole live set. Modules
   // publish the ground they stand on; nobody publishes an opinion about who is in front.
@@ -407,7 +471,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   // ground that exists UNION the town as drawn — a building can stand past the tile array.
   let bounds: CameraBounds = cameraBoundsOf([])
 
-  const structureList = (): Array<{ x: number; y: number; w: number; h: number }> => {
+  const structureList = (): { x: number; y: number; w: number; h: number }[] => {
     const s = store.getState()
     return s === null ? [] : Object.values(s.structures)
   }
@@ -467,7 +531,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
 
   // smooth follow: eases the camera toward a moving world-space anchor each frame
   let followFn: (() => { x: number; y: number } | null) | null = null
-  const followEndCbs: Array<() => void> = []
+  const followEndCbs: (() => void)[] = []
   const breakFollow = (): void => {
     if (followFn === null) return
     followFn = null
@@ -481,11 +545,14 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     const ty = app.screen.height / 2 - t.y * world.scale.y
     // frame-rate independent lerp (~12%/frame at 60fps)
     const k = 1 - Math.pow(0.88, app.ticker.deltaMS / 16.7)
-    place(world.position.x + (tx - world.position.x) * k, world.position.y + (ty - world.position.y) * k)
+    place(
+      world.position.x + (tx - world.position.x) * k,
+      world.position.y + (ty - world.position.y) * k,
+    )
   }
   app.ticker.add(followTick)
 
-  const cameraCbs: Array<() => void> = []
+  const cameraCbs: (() => void)[] = []
   const notifyCamera = (): void => {
     for (const cb of cameraCbs) cb()
   }
@@ -507,8 +574,9 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     zoom = zoomTo(zoom, stop, performance.now())
   }
 
-  const setZoom = (stop: ZoomStop): void =>
+  const setZoom = (stop: ZoomStop): void => {
     setZoomAt(stop, app.screen.width / 2, app.screen.height / 2)
+  }
 
   // The release lives here and not in `onWheel`, because the end of a gesture is the ABSENCE
   // of an event: nothing arrives to notice it, and the frame is the only thing still running.
@@ -546,7 +614,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   }
 
   app.stage.on('pointerdown', (e: FederatedPointerEvent) => {
-    stopGlide()                       // catching a moving camera stops it, as a hand would
+    stopGlide() // catching a moving camera stops it, as a hand would
     dragging = true
     drag = trackDrag(null, e.global.x, e.global.y, performance.now())
     last = { x: e.global.x, y: e.global.y }
@@ -729,7 +797,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     setFollow: (target) => {
       if (target !== null) {
         fitted = false
-        stopGlide()   // a follow owns the camera; a leftover throw would fight it
+        stopGlide() // a follow owns the camera; a leftover throw would fight it
       }
       followFn = target
     },

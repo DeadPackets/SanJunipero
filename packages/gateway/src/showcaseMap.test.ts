@@ -1,15 +1,45 @@
 import { describe, it, expect } from 'vitest'
 import {
-  CITY_H, CITY_W, RIVER_HALF, RIVER_LOCAL_DX, T_PATH, cityGroundAt, makeCityTemplate, townSpan,
+  CITY_H,
+  CITY_W,
+  RIVER_HALF,
+  RIVER_LOCAL_DX,
+  T_PATH,
+  cityGroundAt,
+  makeCityTemplate,
+  townSpan,
 } from '@sj/shared'
 import { TERRAIN_COST, makeFixtureMap } from '@sj/engine'
 import { DEV_MAP_DEFAULT, devTerrain } from './devWorld.js'
 import {
-  FORD_ROWS, FOREST_BAND_X0, GRASS_TILE, PLAZA_TILE, ROAD_TILE, ROCK_HILL, SAND_TILE,
-  SHOWCASE_ANCHOR, SHOWCASE_H, SHOWCASE_MARGIN, SHOWCASE_W, STANDING_STONE_TILE,
-  ShowcaseMapSchema, WATER_TILE, forestBandX0, makeShowcaseMap, plazaTile, roadReach, rockHill,
-  showcaseDeck, showcaseDoorTile, showcaseFord, showcaseFordStand, showcaseSpan,
-  showcaseStructureTiles, showcaseTerrain, standingStoneTile, toTileId,
+  FORD_ROWS,
+  FOREST_BAND_X0,
+  GRASS_TILE,
+  PLAZA_TILE,
+  ROAD_TILE,
+  ROCK_HILL,
+  SAND_TILE,
+  SHOWCASE_ANCHOR,
+  SHOWCASE_H,
+  SHOWCASE_MARGIN,
+  SHOWCASE_W,
+  STANDING_STONE_TILE,
+  ShowcaseMapSchema,
+  WATER_TILE,
+  forestBandX0,
+  makeShowcaseMap,
+  plazaTile,
+  roadReach,
+  rockHill,
+  showcaseDeck,
+  showcaseDoorTile,
+  showcaseFord,
+  showcaseFordStand,
+  showcaseSpan,
+  showcaseStructureTiles,
+  showcaseTerrain,
+  standingStoneTile,
+  toTileId,
 } from './showcaseMap.js'
 
 const map = makeShowcaseMap()
@@ -31,7 +61,8 @@ describe('makeShowcaseMap', () => {
   })
 
   it('uses only tile ids the engine can cost (0..7)', () => {
-    for (const row of map.terrain) for (const t of row) expect(TERRAIN_COST[t as 0]).toBeTypeOf('number')
+    for (const row of map.terrain)
+      for (const t of row) expect(TERRAIN_COST[t as 0]).toBeTypeOf('number')
   })
 
   it('rasterises C13 makeCityTemplate rather than a rival hand-authored layout', () => {
@@ -41,12 +72,14 @@ describe('makeShowcaseMap', () => {
     const ford = showcaseFord()
     const differs: string[] = []
     for (const t of template.tiles) {
-      const x = SHOWCASE_ANCHOR.x + t.dx, y = SHOWCASE_ANCHOR.y + t.dy
+      const x = SHOWCASE_ANCHOR.x + t.dx,
+        y = SHOWCASE_ANCHOR.y + t.dy
       if (tileAt(x, y) !== toTileId(t.to)) differs.push(`${x},${y}`)
     }
     const fordTiles = Array.from({ length: FORD_ROWS }, (_, i) => `${ford.x},${ford.y0 + i}`)
-    expect(differs, 'the map disagrees with the template somewhere other than the ford')
-      .toEqual(fordTiles)
+    expect(differs, 'the map disagrees with the template somewhere other than the ford').toEqual(
+      fordTiles,
+    )
     for (const y of [ford.y0, ford.y1]) expect(tileAt(ford.x, y)).toBe(SAND_TILE)
     expect(map.structures).toHaveLength(template.structures.length)
     expect(new Set(map.structures.map((s) => s.kind))).toContain('well')
@@ -83,7 +116,8 @@ describe('the founders landscape (spec §10)', () => {
         expect(t[y]![f.x - 3], `rings ${rings}: the west bank`).not.toBe(WATER_TILE)
       }
       // one row above and one below it, the channel is three again
-      for (const y of [f.y0 - 1, f.y1 + 1]) expect(t[y]![f.x], `rings ${rings}: y=${y}`).toBe(WATER_TILE)
+      for (const y of [f.y0 - 1, f.y1 + 1])
+        expect(t[y]![f.x], `rings ${rings}: y=${y}`).toBe(WATER_TILE)
     }
   })
 
@@ -93,7 +127,10 @@ describe('the founders landscape (spec §10)', () => {
       // The plat rule must go on refusing to seat anything here — `townGroundOf` unions the
       // grammar's channel with the world's, so the spit is walkable ground and never a plot.
       expect(cityGroundAt(f.x - SHOWCASE_ANCHOR.x, rings), `rings ${rings}`).toBe('water')
-      expect(cityGroundAt(f.x - SHOWCASE_ANCHOR.x + 1, rings), `rings ${rings}: east of the spit`).toBe('bank')
+      expect(
+        cityGroundAt(f.x - SHOWCASE_ANCHOR.x + 1, rings),
+        `rings ${rings}: east of the spit`,
+      ).toBe('bank')
       // and it is due west of the square, so the reach fill's box can never exclude it
       expect(f.y0 + 1, `rings ${rings}`).toBe(plazaTile(rings).y)
     }
@@ -120,7 +157,9 @@ describe('the founders landscape (spec §10)', () => {
 
   it('reserves an open meadow tile beyond the edge of town for the standing stone', () => {
     expect(tileAt(STANDING_STONE_TILE.x, STANDING_STONE_TILE.y)).toBe(GRASS_TILE)
-    const built = new Set(map.structures.flatMap(showcaseStructureTiles).map((t) => `${t.x},${t.y}`))
+    const built = new Set(
+      map.structures.flatMap(showcaseStructureTiles).map((t) => `${t.x},${t.y}`),
+    )
     expect(built.has(`${STANDING_STONE_TILE.x},${STANDING_STONE_TILE.y}`)).toBe(false)
   })
 })
@@ -137,9 +176,17 @@ describe('the road lattice', () => {
     expect(reached.size).toBeGreaterThan(50)
     for (const s of map.structures) {
       const d = showcaseDoorTile(s)
-      const at = s.w === 1 && s.h === 1
-        ? ([[0, -1], [1, 0], [0, 1], [-1, 0]] as const).some(([dx, dy]) => reached.has(`${d.x + dx},${d.y + dy}`))
-        : reached.has(`${d.x},${d.y}`)
+      const at =
+        s.w === 1 && s.h === 1
+          ? (
+              [
+                [0, -1],
+                [1, 0],
+                [0, 1],
+                [-1, 0],
+              ] as const
+            ).some(([dx, dy]) => reached.has(`${d.x + dx},${d.y + dy}`))
+          : reached.has(`${d.x},${d.y}`)
       expect(at, `${s.kind} at ${s.x},${s.y} has no reachable road at its door`).toBe(true)
     }
   })
@@ -147,7 +194,9 @@ describe('the road lattice', () => {
   it('puts every structure on buildable ground, never on water or road', () => {
     for (const s of map.structures) {
       for (const t of showcaseStructureTiles(s)) {
-        expect([GRASS_TILE, 1 /* earth */], `${s.kind} at ${t.x},${t.y}`).toContain(tileAt(t.x, t.y))
+        expect([GRASS_TILE, 1 /* earth */], `${s.kind} at ${t.x},${t.y}`).toContain(
+          tileAt(t.x, t.y),
+        )
       }
     }
   })
@@ -175,7 +224,7 @@ describe('devTerrain', () => {
 describe('★ the showcase map is sized by the ring count, not by a constant', () => {
   const RINGS = [1, 2, 3, 4, 5, 6]
 
-  it('is exactly the grammar\'s span plus two margins, at every ring count', () => {
+  it("is exactly the grammar's span plus two margins, at every ring count", () => {
     for (const r of RINGS) {
       const m = makeShowcaseMap(SHOWCASE_ANCHOR, r)
       const want = townSpan(r) + 2 * SHOWCASE_MARGIN
@@ -203,12 +252,16 @@ describe('★ the showcase map is sized by the ring count, not by a constant', (
         for (const t of showcaseStructureTiles(s)) {
           expect(t.x, `rings ${r}: ${s.kind} runs off the east edge`).toBeLessThan(span)
           expect(t.y, `rings ${r}: ${s.kind} runs off the south edge`).toBeLessThan(span)
-          expect(Math.min(t.x, t.y), `rings ${r}: ${s.kind} runs off the origin`).toBeGreaterThanOrEqual(0)
+          expect(
+            Math.min(t.x, t.y),
+            `rings ${r}: ${s.kind} runs off the origin`,
+          ).toBeGreaterThanOrEqual(0)
         }
       }
       // and every road tile the grammar drew is on the map it was drawn for
-      const roads = makeCityTemplate(SHOWCASE_ANCHOR, r).tiles
-        .filter((t) => toTileId(t.to) === ROAD_TILE)
+      const roads = makeCityTemplate(SHOWCASE_ANCHOR, r).tiles.filter(
+        (t) => toTileId(t.to) === ROAD_TILE,
+      )
       expect(roads.length, `rings ${r} has no roads`).toBeGreaterThan(0)
       for (const t of roads) {
         expect(SHOWCASE_ANCHOR.x + t.dx, `rings ${r} road off the map`).toBeLessThan(span)

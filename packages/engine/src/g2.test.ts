@@ -10,9 +10,20 @@ import { EventStore } from './eventStore.js'
 import { TickLoop } from './tickLoop.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
 import {
-  createScriptedLoop, makeScriptedOnTick, makeFixtureMap,
-  BUILDER, FARMER, FISHER, IDLER, STOREHOUSE, SHED,
-  KEEPER, THIEF, STOLEN_ITEM, NIGHT_THEFT_TICK, NOON_THEFT_TICK,
+  createScriptedLoop,
+  makeScriptedOnTick,
+  makeFixtureMap,
+  BUILDER,
+  FARMER,
+  FISHER,
+  IDLER,
+  STOREHOUSE,
+  SHED,
+  KEEPER,
+  THIEF,
+  STOLEN_ITEM,
+  NIGHT_THEFT_TICK,
+  NOON_THEFT_TICK,
 } from './scripted.js'
 import { composePerception } from './perception.js'
 import { DEATH_CAUSES } from './systems/mortality.js'
@@ -54,9 +65,13 @@ describe('GATE G2: 3-day scripted world run', () => {
 
     // hungerHpDrainPerTick empties an empty body's hp bar long before deathAfterZeroHungerTicks
     // runs out, so the death lands early and the attribution names what the old timer would have.
-    const collapseEv = evs.find((e) => e.type === 'agent_collapsed' && (e.payload as Payload).agentId === IDLER)
+    const collapseEv = evs.find(
+      (e) => e.type === 'agent_collapsed' && (e.payload as Payload).agentId === IDLER,
+    )
     expect(collapseEv).toBeDefined()
-    const diedEv = evs.find((e) => e.type === 'agent_died' && (e.payload as Payload).agentId === IDLER)
+    const diedEv = evs.find(
+      (e) => e.type === 'agent_died' && (e.payload as Payload).agentId === IDLER,
+    )
     expect(diedEv).toBeDefined()
     expect((diedEv!.payload as Payload).cause).toBe('hunger')
     expect(collapseEv!.tick).toBeLessThan(diedEv!.tick)
@@ -72,13 +87,35 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(house!.progressTicks).toBeLessThanOrEqual(G2_CONFIG.construction.houseTicks)
 
     // 4. Day-2 fire: ignited, spreads to the adjacent shed, doused by rain; count unchanged.
-    expect(evs.some((e) => e.type === 'fire_ignited' && (e.payload as Payload).structureId === STOREHOUSE.id)).toBe(true)
-    expect(evs.some((e) => e.type === 'fire_spread'
-      && (e.payload as Payload).fromId === STOREHOUSE.id && (e.payload as Payload).toId === SHED.id)).toBe(true)
-    expect(evs.some((e) => e.type === 'fire_extinguished'
-      && (e.payload as Payload).structureId === STOREHOUSE.id && (e.payload as Payload).cause === 'rain')).toBe(true)
-    expect(evs.some((e) => e.type === 'fire_extinguished'
-      && (e.payload as Payload).structureId === SHED.id && (e.payload as Payload).cause === 'rain')).toBe(true)
+    expect(
+      evs.some(
+        (e) => e.type === 'fire_ignited' && (e.payload as Payload).structureId === STOREHOUSE.id,
+      ),
+    ).toBe(true)
+    expect(
+      evs.some(
+        (e) =>
+          e.type === 'fire_spread' &&
+          (e.payload as Payload).fromId === STOREHOUSE.id &&
+          (e.payload as Payload).toId === SHED.id,
+      ),
+    ).toBe(true)
+    expect(
+      evs.some(
+        (e) =>
+          e.type === 'fire_extinguished' &&
+          (e.payload as Payload).structureId === STOREHOUSE.id &&
+          (e.payload as Payload).cause === 'rain',
+      ),
+    ).toBe(true)
+    expect(
+      evs.some(
+        (e) =>
+          e.type === 'fire_extinguished' &&
+          (e.payload as Payload).structureId === SHED.id &&
+          (e.payload as Payload).cause === 'rain',
+      ),
+    ).toBe(true)
     // Three buildings and one stone for each of the two dead: graves are structures too.
     expect(Object.keys(state.structures)).toHaveLength(5)
 
@@ -91,27 +128,36 @@ describe('GATE G2: 3-day scripted world run', () => {
 
     // Rescue flow: collapsed Idler fed via give + eat (eat exempt), recovers, then dies. A fish is
     // worth less than the flat eatRestoreHunger, and nutritionOf is the one place that says so.
-    const giveEv = evs.find((e) => e.type === 'item_moved'
-      && (e.payload as Payload).loc !== undefined
-      && ((e.payload as Payload).loc as Payload).t === 'agent'
-      && ((e.payload as Payload).loc as Payload).id === IDLER)
+    const giveEv = evs.find(
+      (e) =>
+        e.type === 'item_moved' &&
+        (e.payload as Payload).loc !== undefined &&
+        ((e.payload as Payload).loc as Payload).t === 'agent' &&
+        ((e.payload as Payload).loc as Payload).id === IDLER,
+    )
     expect(giveEv).toBeDefined()
     expect(collapseEv!.tick).toBeLessThan(giveEv!.tick)
     // First meal of the run, so the variety bonus is nothing: the flat restore times the
     // fish's own worth, and no longer the flat restore.
     const firstFish = G2_CONFIG.needs.eatRestoreHunger * nutritionOf(G2_CONFIG, 'fish')
     expect(firstFish).toBeLessThan(G2_CONFIG.needs.eatRestoreHunger)
-    const eatEv = evs.find((e) => e.type === 'need_changed'
-      && (e.payload as Payload).id === IDLER
-      && (e.payload as Payload).need === 'hunger'
-      && (e.payload as Payload).delta === firstFish)
+    const eatEv = evs.find(
+      (e) =>
+        e.type === 'need_changed' &&
+        (e.payload as Payload).id === IDLER &&
+        (e.payload as Payload).need === 'hunger' &&
+        (e.payload as Payload).delta === firstFish,
+    )
     expect(eatEv).toBeDefined()
     expect(giveEv!.tick).toBeLessThan(eatEv!.tick)
     // After eating, the Idler can act again (walk) -> collapse cleared.
-    const actEv = evs.find((e) => e.type === 'action_started'
-      && (e.payload as Payload).agentId === IDLER
-      && (e.payload as Payload).verb === 'walk'
-      && e.tick >= eatEv!.tick)
+    const actEv = evs.find(
+      (e) =>
+        e.type === 'action_started' &&
+        (e.payload as Payload).agentId === IDLER &&
+        (e.payload as Payload).verb === 'walk' &&
+        e.tick >= eatEv!.tick,
+    )
     expect(actEv).toBeDefined()
     expect(actEv!.tick).toBeLessThan(diedEv!.tick)
   })
@@ -133,7 +179,9 @@ describe('GATE G2: 3-day scripted world run', () => {
     const entered = evs.filter((e) => e.type === 'agent_entered')
     expect(entered.map((e) => (e.payload as Payload).agentId)).toContain(BUILDER)
     const inside = entered.find((e) => (e.payload as Payload).agentId === BUILDER)!
-    const slept = evs.find((e) => e.type === 'agent_slept' && (e.payload as Payload).agentId === BUILDER)
+    const slept = evs.find(
+      (e) => e.type === 'agent_slept' && (e.payload as Payload).agentId === BUILDER,
+    )
     expect(slept).toBeDefined()
     expect(inside.tick).toBeLessThan(slept!.tick)
     expect((inside.payload as Payload).structureId).toBe(house.id)
@@ -142,7 +190,8 @@ describe('GATE G2: 3-day scripted world run', () => {
     // Spoilage: a two-day fish does not survive a three-day run.
     const spoiled = evs.filter((e) => e.type === 'item_spoiled')
     expect(spoiled.length).toBeGreaterThan(0)
-    for (const e of spoiled) expect(state.items[(e.payload as Payload).id as string]).toBeUndefined()
+    for (const e of spoiled)
+      expect(state.items[(e.payload as Payload).id as string]).toBeUndefined()
 
     // Reproduction: sexes are on the bodies, which is what the pin used to suppress.
     expect(state.agents[FISHER]!.sex).toBe('m')
@@ -154,12 +203,16 @@ describe('GATE G2: 3-day scripted world run', () => {
   it('C11 is live in this run: bodies thirst, wear out, are poisoned, and are buried', () => {
     const { state, evs } = runScenario()
     const types = evs.map((e) => e.type)
-    const dead = evs.filter((e) => e.type === 'agent_died')
+    const dead = evs
+      .filter((e) => e.type === 'agent_died')
       .map((e) => [(e.payload as Payload).agentId, (e.payload as Payload).cause])
 
     // Two bodies, two ways out, each cause one the world names. The farmer used to be the third,
     // of fatigue: his falls still put him on the ladder, and every night he sleeps takes him off it.
-    expect(dead).toEqual([[IDLER, 'hunger'], [FISHER, 'poison']])
+    expect(dead).toEqual([
+      [IDLER, 'hunger'],
+      [FISHER, 'poison'],
+    ])
     for (const [, cause] of dead) expect(DEATH_CAUSES).toContain(cause)
     // A grave at the tile each of them fell on.
     const graves = Object.values(state.structures).filter((s) => s.kind === 'grave')
@@ -167,7 +220,9 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(evs.filter((e) => e.type === 'grave_placed')).toHaveLength(2)
 
     // The fatigue ladder and the poison that killed the Fisher are afflictions, not booleans.
-    expect(evs.some((e) => e.type === 'agent_afflicted' && (e.payload as Payload).kind === 'poison')).toBe(true)
+    expect(
+      evs.some((e) => e.type === 'agent_afflicted' && (e.payload as Payload).kind === 'poison'),
+    ).toBe(true)
     // The ladder is still minted by a fall — three times here — and lifted every time a body
     // sleeps: the named proof that the rule fires, not merely that the death stopped happening.
     const fatigue = (type: string): number =>
@@ -186,7 +241,9 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(Object.keys(state.fauna ?? {}).length).toBeGreaterThan(0)
 
     // Regrowth seeds the felled forest edge; desire paths sweep the traffic table nightly.
-    expect(evs.some((e) => e.type === 'tile_changed' && (e.payload as Payload).reason === 'seeded')).toBe(true)
+    expect(
+      evs.some((e) => e.type === 'tile_changed' && (e.payload as Payload).reason === 'seeded'),
+    ).toBe(true)
     expect(types).toContain('traffic_decayed')
 
     // Warmth and light are live and inert by arithmetic here: a spring meadow is inside the
@@ -220,14 +277,23 @@ describe('GATE G2: 3-day scripted world run', () => {
 
     const night = seen(NIGHT_THEFT_TICK + 1)
     expect(night.taken).toHaveLength(1)
-    expect(night.taken[0]!.payload).toMatchObject({ itemId: STOLEN_ITEM, takerId: THIEF, ownerId: KEEPER })
+    expect(night.taken[0]!.payload).toMatchObject({
+      itemId: STOLEN_ITEM,
+      takerId: THIEF,
+      ownerId: KEEPER,
+    })
     expect(dayPhaseFromTick(night.taken[0]!.tick)).toBe('night')
     expect(night.watched).toEqual([])
 
     const noon = seen(NOON_THEFT_TICK + 1)
     expect(noon.taken).toHaveLength(2)
     expect(dayPhaseFromTick(noon.taken[1]!.tick)).toBe('day')
-    expect(noon.watched).toContainEqual({ kind: 'item_taken', takerName: 'Thief', ownerName: 'Keeper', itemKind: 'knife' })
+    expect(noon.watched).toContainEqual({
+      kind: 'item_taken',
+      takerName: 'Thief',
+      ownerName: 'Keeper',
+      itemKind: 'knife',
+    })
   })
 
   it('crash at tick 2000: recover, continue to 4320, hash equals uninterrupted run', () => {
@@ -243,7 +309,11 @@ describe('GATE G2: 3-day scripted world run', () => {
       // "crash": no clean shutdown; recover from the durable store.
       const rec = replayLatest(store, G2_CONFIG, makeFixtureMap())
       const loop2: TickLoop = new TickLoop({
-        store, state: rec.state, rng: rec.rng, config: G2_CONFIG, startTick: rec.state.tick,
+        store,
+        state: rec.state,
+        rng: rec.rng,
+        config: G2_CONFIG,
+        startTick: rec.state.tick,
         snapshotEveryTicks: 120,
         onTick: makeScriptedOnTick(G2_CONFIG, rec.rng, () => loop2.state),
       })

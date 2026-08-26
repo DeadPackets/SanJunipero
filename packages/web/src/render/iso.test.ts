@@ -14,34 +14,43 @@ describe('dimetric math', () => {
   })
 
   it('screenToTile inverts a lattice sweep', () => {
-    for (let x = 0; x < 8; x++) for (let y = 0; y < 8; y++) {
-      const { sx, sy } = tileToScreen(x, y)
-      expect(screenToTile(sx, sy)).toEqual({ x, y })
-    }
+    for (let x = 0; x < 8; x++)
+      for (let y = 0; y < 8; y++) {
+        const { sx, sy } = tileToScreen(x, y)
+        expect(screenToTile(sx, sy)).toEqual({ x, y })
+      }
   })
 
   // The sweep above samples only `tileToScreen`'s OWN OUTPUT — the lattice vertices, the one
   // set of points where a rounding rule and a flooring rule cannot disagree. This one samples
   // inside the tile, where `ground.ts`'s convention `[x, x+1] × [y, y+1]` is decidable.
   it('★ names the tile a point is STANDING ON, everywhere inside the tile', () => {
-    for (let x = 0; x < 6; x++) for (let y = 0; y < 6; y++) {
-      // the four quadrants of the tile's own diamond, plus its centre
-      for (const [fx, fy] of [[0.5, 0.5], [0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]] as const) {
-        const sx = (x + fx - (y + fy)) * (TILE_W / 2)
-        const sy = (x + fx + y + fy) * (TILE_H / 2)
-        expect(screenToTile(sx, sy), `(${x}+${fx}, ${y}+${fy})`).toEqual({ x, y })
+    for (let x = 0; x < 6; x++)
+      for (let y = 0; y < 6; y++) {
+        // the four quadrants of the tile's own diamond, plus its centre
+        for (const [fx, fy] of [
+          [0.5, 0.5],
+          [0.2, 0.2],
+          [0.8, 0.2],
+          [0.2, 0.8],
+          [0.8, 0.8],
+        ] as const) {
+          const sx = (x + fx - (y + fy)) * (TILE_W / 2)
+          const sy = (x + fx + y + fy) * (TILE_H / 2)
+          expect(screenToTile(sx, sy), `(${x}+${fx}, ${y}+${fy})`).toEqual({ x, y })
+        }
       }
-    }
   })
 
   it('★ THE DEFECT, reproduced: rounding answers with the tile to the SOUTH', () => {
     // the centre of tile (3, 4) — the point a viewer is over when they click the middle of it
-    const sx = (3.5 - 4.5) * (TILE_W / 2), sy = (3.5 + 4.5) * (TILE_H / 2)
+    const sx = (3.5 - 4.5) * (TILE_W / 2),
+      sy = (3.5 + 4.5) * (TILE_H / 2)
     const rounded = {
       x: Math.round((sx / (TILE_W / 2) + sy / (TILE_H / 2)) / 2),
       y: Math.round((sy / (TILE_H / 2) - sx / (TILE_W / 2)) / 2),
     }
-    expect(rounded).toEqual({ x: 4, y: 5 })          // the landed answer: one tile off in BOTH axes
+    expect(rounded).toEqual({ x: 4, y: 5 }) // the landed answer: one tile off in BOTH axes
     expect(screenToTile(sx, sy)).toEqual({ x: 3, y: 4 })
   })
 
@@ -76,13 +85,16 @@ describe('dimetric math', () => {
 // against the PROJECTION instead, because the projection is what the viewer's eye is doing.
 
 describe('a facing is a screen direction, so the screen decides it', () => {
-  const cases: Array<[number, number]> = []
+  const cases: [number, number][] = []
   for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) cases.push([dx, dy])
 
   // Where each facing's art points, as a screen quadrant. `se` is drawn walking toward the
   // bottom-right of the picture, and so on; a zero component is the tie the facing sits on.
   const QUADRANT: Record<string, { sx: -1 | 0 | 1; sy: -1 | 0 | 1 }> = {
-    se: { sx: 1, sy: 1 }, sw: { sx: -1, sy: 1 }, ne: { sx: 1, sy: -1 }, nw: { sx: -1, sy: -1 },
+    se: { sx: 1, sy: 1 },
+    sw: { sx: -1, sy: 1 },
+    ne: { sx: 1, sy: -1 },
+    nw: { sx: -1, sy: -1 },
   }
   const sign = (n: number): -1 | 0 | 1 => (n > 0 ? 1 : n < 0 ? -1 : 0)
 
@@ -95,8 +107,10 @@ describe('a facing is a screen direction, so the screen decides it', () => {
       const q = QUADRANT[f!]!
       // A zero screen component is a tie the facing is allowed to break either way; a NONZERO
       // one is travel the viewer can see, and the art must agree with it.
-      if (sx !== 0) expect(sign(sx), `${dx},${dy} → ${f} goes the wrong way across the screen`).toBe(q.sx)
-      if (sy !== 0) expect(sign(sy), `${dx},${dy} → ${f} shows the wrong side of the body`).toBe(q.sy)
+      if (sx !== 0)
+        expect(sign(sx), `${dx},${dy} → ${f} goes the wrong way across the screen`).toBe(q.sx)
+      if (sy !== 0)
+        expect(sign(sy), `${dx},${dy} → ${f} shows the wrong side of the body`).toBe(q.sy)
     }
   })
 
@@ -164,12 +178,15 @@ describe('the facing roster is written down once', () => {
     expect([...FACINGS]).toEqual(['sw', 'se', 'ne', 'nw'])
     // `@sj/web` does not depend on `@sj/forge`, so the only check available is to read the
     // literal off disk. A reordered forge roster re-cuts every v2 sheet's columns.
-    const forge = readFileSync(
-      new URL('../../../forge/src/sheet.ts', import.meta.url), 'utf8')
+    const forge = readFileSync(new URL('../../../forge/src/sheet.ts', import.meta.url), 'utf8')
     const m = /export const FACINGS = \[([^\]]*)\] as const/.exec(forge)
     expect(m, 'forge/sheet.ts no longer declares FACINGS the way this reads it').not.toBeNull()
-    expect(m![1]!.split(',').map((s) => s.trim().replace(/'/g, '')).filter(Boolean))
-      .toEqual([...FACINGS])
+    expect(
+      m![1]!
+        .split(',')
+        .map((s) => s.trim().replace(/'/g, ''))
+        .filter(Boolean),
+    ).toEqual([...FACINGS])
   })
 })
 

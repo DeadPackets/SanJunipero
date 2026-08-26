@@ -1,25 +1,42 @@
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import {
-  buildTicks, composePerception, fold, genesisState, makeables, makeGenesisWorld, unfinishedWork,
-  type TileId, type WorldState,
+  buildTicks,
+  composePerception,
+  fold,
+  genesisState,
+  makeables,
+  makeGenesisWorld,
+  unfinishedWork,
+  type TileId,
+  type WorldState,
 } from '@sj/engine'
 import {
-  howFarUp, makeablesLine, perceptionToProse, standingWallsLine, type PerceptionPacket,
+  howFarUp,
+  makeablesLine,
+  perceptionToProse,
+  standingWallsLine,
+  type PerceptionPacket,
 } from './prose.js'
 
 // Hands are the rate — `stepBuild` adds one per hand on the site — so a house is a night's work
 // for five. "Still being built" reads the same one hour short as four days short.
 
 const CFG = DEFAULT_CONFIG
-const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
+const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
+  seq,
+  tick: 0,
+  type,
+  payload,
+})
 
 describe('howFarUp — where the work has got to, in words', () => {
   const needs = 2880
 
   it('walks the whole span, and no two neighbouring stages read alike', () => {
-    const said = [0, 360, 720, 1080, 1440, 1800, 2160, 2520, 2879]
-      .map((done) => howFarUp({ done, needs }))
+    const said = [0, 360, 720, 1080, 1440, 1800, 2160, 2520, 2879].map((done) =>
+      howFarUp({ done, needs }),
+    )
     expect(new Set(said).size, said.join(' / ')).toBe(8)
     expect(said[0]).toBe('its walls are barely begun')
     expect(said[4]).toBe('its walls are half up')
@@ -44,7 +61,15 @@ describe('howFarUp — where the work has got to, in words', () => {
   it('names no remedy', () => {
     for (let done = 0; done <= needs; done += 120) {
       const said = howFarUp({ done, needs }).toLowerCase()
-      for (const hint of ['build', 'raise a', 'you should', 'you must', 'a roof would', 'go inside', 'help']) {
+      for (const hint of [
+        'build',
+        'raise a',
+        'you should',
+        'you must',
+        'a roof would',
+        'go inside',
+        'help',
+      ]) {
         expect(said, `${done}: ${said}`).not.toContain(hint)
       }
     }
@@ -53,13 +78,24 @@ describe('howFarUp — where the work has got to, in words', () => {
 
 describe('★ the packet carries how far up the walls are', () => {
   function siteWorld(progress: number): WorldState {
-    const rows = Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => 0 as TileId))
+    const rows = Array.from({ length: 10 }, () => Array.from({ length: 10 }, (): TileId => 0))
     let s = genesisState(CFG, rows)
-    s = fold(s, ev(1, 'structure_planned', {
-      id: 'structure_1', kind: 'house', x: 2, y: 1, w: 2, h: 2,
-      maxHp: 50, flammable: true, builderId: 'b',
-    }))
-    if (progress > 0) s = fold(s, ev(2, 'structure_progressed', { id: 'structure_1', ticks: progress }))
+    s = fold(
+      s,
+      ev(1, 'structure_planned', {
+        id: 'structure_1',
+        kind: 'house',
+        x: 2,
+        y: 1,
+        w: 2,
+        h: 2,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'b',
+      }),
+    )
+    if (progress > 0)
+      s = fold(s, ev(2, 'structure_progressed', { id: 'structure_1', ticks: progress }))
     return fold(s, ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: 7300 }))
   }
 
@@ -89,8 +125,17 @@ describe('★ the packet carries how far up the walls are', () => {
     let s = genesisState(CFG, g.terrain)
     for (const e of g.events) s = fold(s, ev(1, e.type, e.payload), CFG)
     const house = Object.values(s.structures).find((x) => x.kind === 'house')!
-    s = fold(s, ev(2, 'agent_spawned',
-      { id: 'a1', name: 'a1', x: house.x, y: house.y + house.h, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev(2, 'agent_spawned', {
+        id: 'a1',
+        name: 'a1',
+        x: house.x,
+        y: house.y + house.h,
+        ageDays: 7300,
+      }),
+      CFG,
+    )
     const seen = composePerception(s, CFG, 'a1', []).visible.structures
     expect(seen.length).toBeGreaterThan(0)
     const roofless = seen.filter((st) => st.stage === 'construction')
@@ -107,24 +152,58 @@ describe('★ the packet carries how far up the walls are', () => {
 })
 
 describe('★ and the prose says it where the mind will read it', () => {
-  const packetWith = (raised?: { done: number; needs: number }): PerceptionPacket => ({
-    time: { tick: 0, year: 0, season: 'spring', dayOfSeason: 1, dayOfYear: 0, hour: 12, minute: 0, isNight: false },
-    self: {
-      body: { needs: { hunger: 90, energy: 90, warmth: 90, social: 90 }, hp: 100, injuries: [], ill: false },
-      x: 2, y: 4, asleep: false, collapsed: false, activity: null, inventory: [],
-    },
-    weather: { kind: 'sunny', temperatureC: 14 },
-    light: 'bright',
-    visible: {
-      agents: [],
-      structures: [{
-        id: 'structure_1', kind: 'house', x: 2, y: 1, w: 2, h: 2,
-        burning: false, stage: 'construction', ...(raised === undefined ? {} : { raised }),
-      }],
-      items: [], crops: [], fauna: [], forageables: [],
-    },
-    heard: [], seen: [], feltEvents: [],
-  } as unknown as PerceptionPacket)
+  const packetWith = (raised?: { done: number; needs: number }): PerceptionPacket =>
+    ({
+      time: {
+        tick: 0,
+        year: 0,
+        season: 'spring',
+        dayOfSeason: 1,
+        dayOfYear: 0,
+        hour: 12,
+        minute: 0,
+        isNight: false,
+      },
+      self: {
+        body: {
+          needs: { hunger: 90, energy: 90, warmth: 90, social: 90 },
+          hp: 100,
+          injuries: [],
+          ill: false,
+        },
+        x: 2,
+        y: 4,
+        asleep: false,
+        collapsed: false,
+        activity: null,
+        inventory: [],
+      },
+      weather: { kind: 'sunny', temperatureC: 14 },
+      light: 'bright',
+      visible: {
+        agents: [],
+        structures: [
+          {
+            id: 'structure_1',
+            kind: 'house',
+            x: 2,
+            y: 1,
+            w: 2,
+            h: 2,
+            burning: false,
+            stage: 'construction',
+            ...(raised === undefined ? {} : { raised }),
+          },
+        ],
+        items: [],
+        crops: [],
+        fauna: [],
+        forageables: [],
+      },
+      heard: [],
+      seen: [],
+      feltEvents: [],
+    }) as unknown as PerceptionPacket
 
   const say = (raised?: { done: number; needs: number }): string =>
     perceptionToProse(packetWith(raised), undefined, { isWalkable: () => true })
@@ -138,7 +217,9 @@ describe('★ and the prose says it where the mind will read it', () => {
   })
 
   it('still tells the mind where to stand, which is the half that lets it join', () => {
-    expect(say({ done: 1440, needs: 2880 })).toMatch(/its walls are half up; you could stand beside it at \(\d+, \d+\)\./)
+    expect(say({ done: 1440, needs: 2880 })).toMatch(
+      /its walls are half up; you could stand beside it at \(\d+, \d+\)\./,
+    )
   })
 
   it('falls back to the landed sentence when the packet carries no progress', () => {
@@ -149,28 +230,69 @@ describe('★ and the prose says it where the mind will read it', () => {
 // ---------------------------------------------------- what a mind READS at a full door ---
 
 describe('★ a full room, said in the prose and not in a refusal', () => {
-  const seeing = (extra: Record<string, unknown>): string => perceptionToProse({
-    time: { tick: 0, year: 0, season: 'spring', dayOfSeason: 1, dayOfYear: 0, hour: 12, minute: 0, isNight: false },
-    self: {
-      body: { needs: { hunger: 90, energy: 90, warmth: 90, social: 90 }, hp: 100, injuries: [], ill: false },
-      x: 2, y: 4, asleep: false, collapsed: false, activity: null, inventory: [],
-    },
-    weather: { kind: 'sunny', temperatureC: 14 },
-    light: 'bright',
-    visible: {
-      agents: [],
-      structures: [{
-        id: 'structure_1', kind: 'cabin', x: 2, y: 1, w: 2, h: 2,
-        burning: false, stage: 'complete', door: { x: 2, y: 3 }, ...extra,
-      }],
-      items: [], crops: [], fauna: [], forageables: [],
-    },
-    heard: [], seen: [], feltEvents: [],
-  } as unknown as PerceptionPacket, undefined, { isWalkable: () => true })
+  const seeing = (extra: Record<string, unknown>): string =>
+    perceptionToProse(
+      {
+        time: {
+          tick: 0,
+          year: 0,
+          season: 'spring',
+          dayOfSeason: 1,
+          dayOfYear: 0,
+          hour: 12,
+          minute: 0,
+          isNight: false,
+        },
+        self: {
+          body: {
+            needs: { hunger: 90, energy: 90, warmth: 90, social: 90 },
+            hp: 100,
+            injuries: [],
+            ill: false,
+          },
+          x: 2,
+          y: 4,
+          asleep: false,
+          collapsed: false,
+          activity: null,
+          inventory: [],
+        },
+        weather: { kind: 'sunny', temperatureC: 14 },
+        light: 'bright',
+        visible: {
+          agents: [],
+          structures: [
+            {
+              id: 'structure_1',
+              kind: 'cabin',
+              x: 2,
+              y: 1,
+              w: 2,
+              h: 2,
+              burning: false,
+              stage: 'complete',
+              door: { x: 2, y: 3 },
+              ...extra,
+            },
+          ],
+          items: [],
+          crops: [],
+          fauna: [],
+          forageables: [],
+        },
+        heard: [],
+        seen: [],
+        feltEvents: [],
+      } as unknown as PerceptionPacket,
+      undefined,
+      { isWalkable: () => true },
+    )
 
   it('names the doorway either way — a full room is not a wall', () => {
     expect(seeing({})).toContain('its doorway is at (2, 3); stand there and you can go in.')
-    expect(seeing({ full: true })).toContain('its doorway is at (2, 3), and there is no floor left in it.')
+    expect(seeing({ full: true })).toContain(
+      'its doorway is at (2, 3), and there is no floor left in it.',
+    )
   })
 
   // The distinction the whole of R2 turns on: a mind that cannot tell "full now" from "no way
@@ -185,7 +307,14 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
 
   it('names no remedy and gives no counsel', () => {
     const said = seeing({ full: true }).toLowerCase()
-    for (const hint of ['build', 'raise a', 'you should', 'a roof would', 'go inside', 'wait for']) {
+    for (const hint of [
+      'build',
+      'raise a',
+      'you should',
+      'a roof would',
+      'go inside',
+      'wait for',
+    ]) {
       expect(said).not.toContain(hint)
     }
   })
@@ -195,23 +324,40 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
 // until one body plants walls on it: free ground alone cannot answer "where does work go".
 
 describe('* walls already standing are a place the world can name', () => {
-  const rows = () => Array.from({ length: 14 }, () => Array.from({ length: 14 }, () => 0 as TileId))
-  const ev2 = (seq: number, type: string, payload: unknown) => ({ seq, tick: 0, type, payload } as SimEvent)
+  const rows = () => Array.from({ length: 14 }, () => Array.from({ length: 14 }, (): TileId => 0))
+  const ev2 = (seq: number, type: string, payload: unknown) => ({ seq, tick: 0, type, payload })
 
-  function townWith(sites: Array<{ id: string; kind: string; x: number; y: number; progress: number }>): WorldState {
+  function townWith(
+    sites: { id: string; kind: string; x: number; y: number; progress: number }[],
+  ): WorldState {
     let s = genesisState(CFG, rows())
     let seq = 0
     for (const site of sites) {
       const row = CFG.structures.recipes[site.kind]!
-      s = fold(s, ev2(++seq, 'structure_planned', {
-        id: site.id, kind: site.kind, x: site.x, y: site.y, w: row.w, h: row.h,
-        maxHp: row.maxHp, flammable: row.flammable, builderId: 'g',
-      }), CFG)
+      s = fold(
+        s,
+        ev2(++seq, 'structure_planned', {
+          id: site.id,
+          kind: site.kind,
+          x: site.x,
+          y: site.y,
+          w: row.w,
+          h: row.h,
+          maxHp: row.maxHp,
+          flammable: row.flammable,
+          builderId: 'g',
+        }),
+        CFG,
+      )
       if (site.progress > 0) {
         s = fold(s, ev2(++seq, 'structure_progressed', { id: site.id, ticks: site.progress }), CFG)
       }
     }
-    return fold(s, ev2(++seq, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }), CFG)
+    return fold(
+      s,
+      ev2(++seq, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }),
+      CFG,
+    )
   }
 
   it('names the nearest half-raised building, and how far up it is', () => {
@@ -236,7 +382,7 @@ describe('* walls already standing are a place the world can name', () => {
   // again: a building that looks like an answer and refuses in words a mind cannot use.
   it('says nothing about walls no pair of hands could carry on', () => {
     const s = townWith([{ id: 'structure_1', kind: 'cabin', x: 2, y: 2, progress: 1 }])
-    expect(CFG.structures.recipes['cabin']!.inputs).toEqual({})
+    expect(CFG.structures.recipes.cabin!.inputs).toEqual({})
     expect(unfinishedWork(s, CFG, { x: 1, y: 1 }), 'named an unfinishable wall').toBeNull()
   })
 

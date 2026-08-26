@@ -4,7 +4,12 @@ import { openForgeDb } from '../db.js'
 import { AssetCodex } from '../codex.js'
 import type { RawImage } from '../post/raw.js'
 import { LIBRARY, libraryEntry } from './catalog.js'
-import { registerLibraryEntry, libraryIndexJson, deriveIcon, LIBRARY_INDEX_VERSION } from './register.js'
+import {
+  registerLibraryEntry,
+  libraryIndexJson,
+  deriveIcon,
+  LIBRARY_INDEX_VERSION,
+} from './register.js'
 
 const png = (tag: string) => Buffer.from(`png:${tag}`)
 const args = { sprite: png('s'), icon: png('i'), score: 8.5, attempts: 1, costUsd: 0.11 }
@@ -12,11 +17,14 @@ const codex = () => new AssetCodex(openForgeDb(':memory:'))
 
 function solid(w: number, h: number, alphaAt?: (x: number, y: number) => number): RawImage {
   const data = new Uint8ClampedArray(w * h * 4)
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = (y * w + x) * 4
-    data[i] = (x * 8) & 255; data[i + 1] = (y * 8) & 255; data[i + 2] = 64
-    data[i + 3] = alphaAt ? alphaAt(x, y) : 255
-  }
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4
+      data[i] = (x * 8) & 255
+      data[i + 1] = (y * 8) & 255
+      data[i + 2] = 64
+      data[i + 3] = alphaAt ? alphaAt(x, y) : 255
+    }
   return { width: w, height: h, data }
 }
 
@@ -71,7 +79,8 @@ describe('deriveIcon', () => {
   it('preserves transparency rather than blending it away', () => {
     const src = solid(24, 24, (x, y) => (x < 4 || y < 4 ? 0 : 255))
     const out = deriveIcon(src, 16)
-    let clear = 0, opaque = 0
+    let clear = 0,
+      opaque = 0
     for (let i = 3; i < out.data.length; i += 4) {
       if (out.data[i] === 0) clear++
       else if (out.data[i] === 255) opaque++
@@ -103,7 +112,7 @@ describe('libraryIndexJson', () => {
     }
     expect(index.version).toBe(LIBRARY_INDEX_VERSION)
     expect(index.entries).toHaveLength(50)
-    expect(index.entries.map(e => e.kind)).toEqual(LIBRARY.map(e => e.kind))
+    expect(index.entries.map((e) => e.kind)).toEqual(LIBRARY.map((e) => e.kind))
     for (const e of index.entries) {
       expect(e.spriteId, e.kind).toMatch(/^asset_/)
       expect(e.iconId, e.kind).toMatch(/^asset_/)
@@ -115,10 +124,21 @@ describe('libraryIndexJson', () => {
     const c = codex()
     const { spriteRecord, iconRecord } = registerLibraryEntry(c, libraryEntry('axe')!, args)
     const stray = c.register({
-      class: 'building', desc: 'a shed', kind: 'shed', footprint: { w: 1, h: 1 },
-      png: png('b'), widthPx: 64, heightPx: 64, status: 'ready', score: null, attempts: 1, costUsd: 0,
+      class: 'building',
+      desc: 'a shed',
+      kind: 'shed',
+      footprint: { w: 1, h: 1 },
+      png: png('b'),
+      widthPx: 64,
+      heightPx: 64,
+      status: 'ready',
+      score: null,
+      attempts: 1,
+      costUsd: 0,
     })
-    const index = JSON.parse(libraryIndexJson([spriteRecord, stray, iconRecord])) as { entries: unknown[] }
+    const index = JSON.parse(libraryIndexJson([spriteRecord, stray, iconRecord])) as {
+      entries: unknown[]
+    }
     expect(index.entries).toHaveLength(1)
   })
 })

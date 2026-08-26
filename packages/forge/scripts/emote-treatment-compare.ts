@@ -186,12 +186,21 @@ async function generatedGlyphs(): Promise<{ imgs: RawImage[] }> {
     console.log(`generated raw cached at ${GEN_RAW_PATH} (no spend)`)
   } else {
     const client = makeImageClient({ apiKey: KEY!, budget: new BudgetGuard(1.0) })
-    const [cand] = await client.generateCandidates(GEN_PROMPT, [], 1)
+    const cand = (await client.generateCandidates(GEN_PROMPT, [], 1))[0]!
     raw = cand.png
     costUsd = cand.costUsd
     writeFileSync(GEN_RAW_PATH, raw)
-    writeFileSync(SPEND_PATH, JSON.stringify({ asset: 'emote-treatment-generated', spendUsd: readSpend() + costUsd }, null, 2))
-    console.log(`generated raw written to ${GEN_RAW_PATH} (${cand.model}, $${cand.costUsd.toFixed(4)})`)
+    writeFileSync(
+      SPEND_PATH,
+      JSON.stringify(
+        { asset: 'emote-treatment-generated', spendUsd: readSpend() + costUsd },
+        null,
+        2,
+      ),
+    )
+    console.log(
+      `generated raw written to ${GEN_RAW_PATH} (${cand.model}, $${cand.costUsd.toFixed(4)})`,
+    )
   }
   const sheet = await decodePng(raw)
   // Slice the 512-wide sheet into 3 equal columns (170px each; the last 2px are dropped).
@@ -207,7 +216,8 @@ async function generatedGlyphs(): Promise<{ imgs: RawImage[] }> {
     const keyed = chromaKey(cell) // magenta background -> transparent
     const bbox = opaqueBbox(keyed)
     if (!bbox) throw new Error(`generated cell ${c} is empty after keying`)
-    const bw = bbox.x1 - bbox.x0 + 1, bh = bbox.y1 - bbox.y0 + 1
+    const bw = bbox.x1 - bbox.x0 + 1,
+      bh = bbox.y1 - bbox.y0 + 1
     const cropped = new Uint8ClampedArray(bw * bh * 4)
     for (let y = 0; y < bh; y++) {
       const src = ((bbox.y0 + y) * cellW + bbox.x0) * 4
@@ -228,7 +238,8 @@ const GAP = 16
 const LABEL_W = 90
 const HEADER_H = 40
 const MARGIN = 20
-const COLS = 3, ROWS = 3
+const COLS = 3,
+  ROWS = 3
 const SHEET_W = LABEL_W + COLS * CELL + (COLS - 1) * GAP + MARGIN
 const SHEET_H = HEADER_H + ROWS * CELL + (ROWS - 1) * GAP + MARGIN
 
@@ -238,17 +249,16 @@ const GLYPH_NAMES = ['heart', 'sleep', 'alert'] as const
 async function textPng(text: string, size: number, color = '#43394a'): Promise<Buffer> {
   const svg = Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="${size + 10}">` +
-    `<text x="0" y="${size}" font-family="Helvetica, Arial, sans-serif" font-size="${size}" ` +
-    `font-weight="600" fill="${color}">${text}</text></svg>`,
+      `<text x="0" y="${size}" font-family="Helvetica, Arial, sans-serif" font-size="${size}" ` +
+      `font-weight="600" fill="${color}">${text}</text></svg>`,
   )
   return sharp(svg).trim().png().toBuffer()
 }
 
-
 async function main(): Promise<void> {
   // Build the 3×3 grid of glyph cells (rows = glyphs, cols = treatments).
-  const current = GLYPH_NAMES.map(n => renderEmote(n === 'alert' ? 'exclaim' : n))
-  const authored = GLYPH_NAMES.map(n => renderAuthored(n))
+  const current = GLYPH_NAMES.map((n) => renderEmote(n === 'alert' ? 'exclaim' : n))
+  const authored = GLYPH_NAMES.map((n) => renderAuthored(n))
   const { imgs: generated } = await generatedGlyphs()
 
   const cells: RawImage[][] = GLYPH_NAMES.map((_, r) => [
@@ -259,8 +269,15 @@ async function main(): Promise<void> {
 
   // Composite onto a transparent canvas with sharp.
   const base = await sharp({
-    create: { width: SHEET_W, height: SHEET_H, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } },
-  }).png().toBuffer()
+    create: {
+      width: SHEET_W,
+      height: SHEET_H,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 },
+    },
+  })
+    .png()
+    .toBuffer()
 
   const layers: { input: Buffer; left: number; top: number }[] = []
   for (let r = 0; r < ROWS; r++) {
@@ -277,14 +294,22 @@ async function main(): Promise<void> {
     const label = await textPng(TREATMENTS[c]!, 14)
     const meta = await sharp(label).metadata()
     const w = meta.width ?? 0
-    layers.push({ input: label, left: LABEL_W + c * (CELL + GAP) + Math.round((CELL - w) / 2), top: 8 })
+    layers.push({
+      input: label,
+      left: LABEL_W + c * (CELL + GAP) + Math.round((CELL - w) / 2),
+      top: 8,
+    })
   }
   // Row labels, vertically centered per row.
   for (let r = 0; r < ROWS; r++) {
     const label = await textPng(GLYPH_NAMES[r]!, 20)
     const meta = await sharp(label).metadata()
     const h = meta.height ?? 0
-    layers.push({ input: label, left: 8, top: HEADER_H + r * (CELL + GAP) + Math.round((CELL - h) / 2) })
+    layers.push({
+      input: label,
+      left: 8,
+      top: HEADER_H + r * (CELL + GAP) + Math.round((CELL - h) / 2),
+    })
   }
 
   const out = await sharp(base).composite(layers).png().toBuffer()
@@ -320,4 +345,7 @@ async function main(): Promise<void> {
   console.log(`wrote ${reportPath}`)
 }
 
-main().catch(e => { console.error(e); process.exit(1) })
+main().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

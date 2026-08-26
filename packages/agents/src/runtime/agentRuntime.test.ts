@@ -16,10 +16,21 @@ import {
   type TickHandler,
   type TileId,
 } from '@sj/engine'
-import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type DiscoveryCredit, type SimConfig } from '@sj/shared'
+import {
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  stateHash,
+  type DiscoveryCredit,
+  type SimConfig,
+} from '@sj/shared'
 import { EngineBridge } from './bridge.js'
 import {
-  AgentRuntime, CRAFT_HINT, OPAQUE_REFUSAL, REFUSAL_MEMORY_TICKS, REPEATED_REFUSAL, refusalMemoryText,
+  AgentRuntime,
+  CRAFT_HINT,
+  OPAQUE_REFUSAL,
+  REFUSAL_MEMORY_TICKS,
+  REPEATED_REFUSAL,
+  refusalMemoryText,
 } from './agentRuntime.js'
 import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
 import { openAgentDb } from '../memory/schema.js'
@@ -47,23 +58,34 @@ const ZERO_USAGE = {
 }
 
 const FAST_MIND: Partial<MindConfig> = {
-  idleGapTicks: 0, boredomTicks: 1,
+  idleGapTicks: 0,
+  boredomTicks: 1,
   // Every rung switched off: these rows drive the cadence themselves.
   bodyAlarm: { hunger: 0, energy: 0, warmth: 0, thirst: 0, affliction: Infinity },
 }
 
 // Empty 24x24 grass, no structures: the C9 bed law would refuse every sleep these rows drive.
 function fastSimConfig(): SimConfig {
-  return SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0.5 }, structures: { sleepIndoorsOnly: false } })
+  return SimConfigSchema.parse({
+    needs: { hungerDecayPerTick: 0.5 },
+    structures: { sleepIndoorsOnly: false },
+  })
 }
 
 function baseDoc(): PersonalityDoc {
-  return { temperament: 'calm', values: ['loyalty'], beliefs: [], current: { mood: 'settled', worries: [], goals: [] } }
+  return {
+    temperament: 'calm',
+    values: ['loyalty'],
+    beliefs: [],
+    current: { mood: 'settled', worries: [], goals: [] },
+  }
 }
 
 function buildWorld(simConfig?: SimConfig) {
   const config = simConfig ?? fastSimConfig()
-  const terrain: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
+  const terrain: TileId[][] = Array.from({ length: 24 }, () =>
+    Array.from({ length: 24 }, (): TileId => 0),
+  )
   const engineDb = openDb(':memory:')
   const store = new EventStore(engineDb)
   const rng = new RngStreams('c3-t12-test')
@@ -74,9 +96,24 @@ function buildWorld(simConfig?: SimConfig) {
   }
   emit('agent_spawned', { id: AGENT, name: 'Tamar', x: 3, y: 3, ageDays: 30 })
   emit('need_changed', { id: AGENT, need: 'hunger', delta: -70 })
-  emit('structure_planned', { id: STRUCTURE_ID, kind: 'storehouse', x: 5, y: 5, w: 1, h: 1, maxHp: 50, flammable: true, builderId: AGENT })
+  emit('structure_planned', {
+    id: STRUCTURE_ID,
+    kind: 'storehouse',
+    x: 5,
+    y: 5,
+    w: 1,
+    h: 1,
+    maxHp: 50,
+    flammable: true,
+    builderId: AGENT,
+  })
   emit('structure_completed', { id: STRUCTURE_ID })
-  emit('item_spawned', { id: BREAD_ID, kind: 'bread', qty: 6, loc: { t: 'structure', id: STRUCTURE_ID } })
+  emit('item_spawned', {
+    id: BREAD_ID,
+    kind: 'bread',
+    qty: 6,
+    loc: { t: 'structure', id: STRUCTURE_ID },
+  })
   return { config, terrain, engineDb, store, rng, state }
 }
 
@@ -98,15 +135,18 @@ function turnModel(responses: unknown[], fallback: unknown = BENIGN_TURN): MockL
 
 type CapturedMessage = { role: string; text: string }
 
-function capturingModel(responses: unknown[]): { model: MockLanguageModelV4; prompts: CapturedMessage[][] } {
+function capturingModel(responses: unknown[]): {
+  model: MockLanguageModelV4
+  prompts: CapturedMessage[][]
+} {
   const prompts: CapturedMessage[][] = []
   let i = 0
   const model = new MockLanguageModelV4({
     doGenerate: async (options) => {
-      const msgs = (options.prompt as Array<{ role: string; content: unknown }>).map((m) => ({
+      const msgs = (options.prompt as { role: string; content: unknown }[]).map((m) => ({
         role: m.role,
         text: Array.isArray(m.content)
-          ? (m.content as Array<{ text?: string }>).map((p) => p.text ?? '').join('')
+          ? (m.content as { text?: string }[]).map((p) => p.text ?? '').join('')
           : String(m.content),
       }))
       prompts.push(msgs)
@@ -125,18 +165,22 @@ function capturingModel(responses: unknown[]): { model: MockLanguageModelV4; pro
 
 // A back end that answers with nothing at all — the empty call R20 made visible, which ran at
 // 6.0% of the last live gate. `content: []` is a landed call carrying no answer.
-function blankModel(blanks: number, then: unknown = BENIGN_TURN):
-{ model: MockLanguageModelV4; prompts: CapturedMessage[][] } {
+function blankModel(
+  blanks: number,
+  then: unknown = BENIGN_TURN,
+): { model: MockLanguageModelV4; prompts: CapturedMessage[][] } {
   const prompts: CapturedMessage[][] = []
   let i = 0
   const model = new MockLanguageModelV4({
     doGenerate: async (options) => {
-      prompts.push((options.prompt as Array<{ role: string; content: unknown }>).map((m) => ({
-        role: m.role,
-        text: Array.isArray(m.content)
-          ? (m.content as Array<{ text?: string }>).map((p) => p.text ?? '').join('')
-          : String(m.content),
-      })))
+      prompts.push(
+        (options.prompt as { role: string; content: unknown }[]).map((m) => ({
+          role: m.role,
+          text: Array.isArray(m.content)
+            ? (m.content as { text?: string }[]).map((p) => p.text ?? '').join('')
+            : String(m.content),
+        })),
+      )
       const blank = i < blanks
       i += 1
       return {
@@ -158,7 +202,11 @@ function throwingModel(): MockLanguageModelV4 {
   })
 }
 
-function gatedModel(): { model: MockLanguageModelV4; calls: { count: number }; resolve: (text: string) => void } {
+function gatedModel(): {
+  model: MockLanguageModelV4
+  calls: { count: number }
+  resolve: (text: string) => void
+} {
   const calls = { count: 0 }
   let resolveFn!: (text: string) => void
   const promise = new Promise<string>((resolve) => {
@@ -189,7 +237,9 @@ class ScriptedReflectionLlm implements ReflectionLlm {
   }
   async summarizeScenes(dayMemories: MemoryRow[]) {
     this.calls.push('summarizeScenes')
-    return [{ title: 'The meadow', text: 'A quiet meadow.', memoryIds: dayMemories.map((m) => m.id) }]
+    return [
+      { title: 'The meadow', text: 'A quiet meadow.', memoryIds: dayMemories.map((m) => m.id) },
+    ]
   }
   async summarizeDay() {
     this.calls.push('summarizeDay')
@@ -238,7 +288,9 @@ async function setup(opts: {
     state: world.state,
     rng: world.rng,
     config: world.config,
-    onTick: (ctx) => handler(ctx),
+    onTick: (ctx) => {
+      handler(ctx)
+    },
   })
   const bridge = new EngineBridge({ loop, store: world.store, simConfig: world.config })
   handler = bridge.wrapTickHandler(({ emit }) => {
@@ -251,7 +303,11 @@ async function setup(opts: {
   const personality = new PersonalityStore(agentDb, AGENT)
   personality.init(baseDoc(), 0)
   const llm = new LlmClient({
-    model: opts.model, db: agentDb, caller: 'turn', agentId: AGENT, maxRetries: opts.maxRetries ?? 2,
+    model: opts.model,
+    db: agentDb,
+    caller: 'turn',
+    agentId: AGENT,
+    maxRetries: opts.maxRetries ?? 2,
     ...(opts.budgetUsd === undefined ? {} : { budgetUsd: opts.budgetUsd }),
   })
   const runtime = new AgentRuntime({
@@ -285,37 +341,59 @@ async function stepUntil(loop: TickLoop, predicate: () => boolean, max = 500): P
 }
 
 function startedVerbs(db: Database.Database): string[] {
-  return (db.prepare("SELECT payload FROM events WHERE type = 'action_started' ORDER BY seq").all() as Array<{ payload: string }>)
-    .map((r) => (JSON.parse(r.payload) as { verb: string }).verb)
+  return (
+    db.prepare("SELECT payload FROM events WHERE type = 'action_started' ORDER BY seq").all() as {
+      payload: string
+    }[]
+  ).map((r) => (JSON.parse(r.payload) as { verb: string }).verb)
 }
 
 function completedVerbs(db: Database.Database): string[] {
-  return (db.prepare("SELECT payload FROM events WHERE type = 'action_completed' ORDER BY seq").all() as Array<{ payload: string }>)
-    .map((r) => (JSON.parse(r.payload) as { verb: string }).verb)
+  return (
+    db.prepare("SELECT payload FROM events WHERE type = 'action_completed' ORDER BY seq").all() as {
+      payload: string
+    }[]
+  ).map((r) => (JSON.parse(r.payload) as { verb: string }).verb)
 }
 
 function spokeTexts(db: Database.Database): string[] {
-  return (db.prepare("SELECT payload FROM events WHERE type = 'agent_spoke' ORDER BY seq").all() as Array<{ payload: string }>)
-    .map((r) => (JSON.parse(r.payload) as { text: string }).text)
+  return (
+    db.prepare("SELECT payload FROM events WHERE type = 'agent_spoke' ORDER BY seq").all() as {
+      payload: string
+    }[]
+  ).map((r) => (JSON.parse(r.payload) as { text: string }).text)
 }
 
-function memoriesOfKind(db: Database.Database, kind: string): Array<{ tick: number; text: string; importance: number }> {
+function memoriesOfKind(
+  db: Database.Database,
+  kind: string,
+): { tick: number; text: string; importance: number }[] {
   return db
-    .prepare("SELECT tick, text, importance FROM memories WHERE agent_id = ? AND kind = ? ORDER BY id")
-    .all(AGENT, kind) as Array<{ tick: number; text: string; importance: number }>
+    .prepare(
+      'SELECT tick, text, importance FROM memories WHERE agent_id = ? AND kind = ? ORDER BY id',
+    )
+    .all(AGENT, kind) as { tick: number; text: string; importance: number }[]
 }
 
-function journalRows(db: Database.Database): Array<{ tick: number; text: string }> {
-  return db.prepare("SELECT tick, text FROM journal WHERE agent_id = ? ORDER BY id").all(AGENT) as Array<{ tick: number; text: string }>
+function journalRows(db: Database.Database): { tick: number; text: string }[] {
+  return db.prepare('SELECT tick, text FROM journal WHERE agent_id = ? ORDER BY id').all(AGENT) as {
+    tick: number
+    text: string
+  }[]
 }
 
 function alertKinds(db: Database.Database): string[] {
-  return (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as Array<{ kind: string }>).map((r) => r.kind)
+  return (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as { kind: string }[]).map(
+    (r) => r.kind,
+  )
 }
 
 function alertDetails(db: Database.Database, kind: string): string[] {
-  return (db.prepare('SELECT detail FROM alerts WHERE kind = ? ORDER BY id').all(kind) as Array<{ detail: string }>)
-    .map((r) => r.detail)
+  return (
+    db.prepare('SELECT detail FROM alerts WHERE kind = ? ORDER BY id').all(kind) as {
+      detail: string
+    }[]
+  ).map((r) => r.detail)
 }
 
 describe('EngineBridge + AgentRuntime against the real engine', () => {
@@ -341,7 +419,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
 
   it('submits speech and records a thought memory with its importance', async () => {
     const { world, loop, agentDb } = await setup({
-      model: turnModel([{ thought: 'Good, the storehouse still has bread.', speech: 'The storehouse is stocked.', importance: 4 }]),
+      model: turnModel([
+        {
+          thought: 'Good, the storehouse still has bread.',
+          speech: 'The storehouse is stocked.',
+          importance: 4,
+        },
+      ]),
       mindConfig: FAST_MIND,
     })
     await stepUntil(loop, () => spokeTexts(world.engineDb).length >= 1, 100)
@@ -351,14 +435,18 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
 
   it('journals, stores a journal memory, and delays the next wake by journalTicks', async () => {
     const { loop, agentDb } = await setup({
-      model: turnModel([{ thought: 'I will write it down.', journal: 'First day at the meadow.', importance: 6 }]),
+      model: turnModel([
+        { thought: 'I will write it down.', journal: 'First day at the meadow.', importance: 6 },
+      ]),
       mindConfig: { ...FAST_MIND, boredomTicks: 5, journalTicks: 10 },
     })
     await stepUntil(loop, () => journalRows(agentDb).length >= 1, 100)
     const journal = journalRows(agentDb)
     expect(journal).toHaveLength(1)
     expect(journal[0]!.text).toBe('First day at the meadow.')
-    expect(memoriesOfKind(agentDb, 'journal').map((m) => m.text)).toContain('First day at the meadow.')
+    expect(memoriesOfKind(agentDb, 'journal').map((m) => m.text)).toContain(
+      'First day at the meadow.',
+    )
 
     const t1 = journal[0]!.tick
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'thought').length >= 2, 200)
@@ -387,12 +475,16 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       model: throwingModel(),
       mindConfig: { ...FAST_MIND, dozeTicks: 20 },
     })
-    expect(() => loop.step()).not.toThrow()
+    expect(() => {
+      loop.step()
+    }).not.toThrow()
     await flush()
     expect(runtime.stats().dozes).toBe(1)
     expect(alertKinds(agentDb)).toContain('doze_off')
     for (let i = 0; i < 19; i++) {
-      expect(() => loop.step()).not.toThrow()
+      expect(() => {
+        loop.step()
+      }).not.toThrow()
       await flush()
     }
     expect(runtime.stats().dozes).toBe(1)
@@ -438,11 +530,19 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
 
   it('surfaces a rejected intent in-world', async () => {
     const { loop, agentDb } = await setup({
-      model: turnModel([{ thought: 'I will try to eat.', action: { verb: 'eat', params: { itemId: 'nope' } }, importance: 3 }]),
+      model: turnModel([
+        {
+          thought: 'I will try to eat.',
+          action: { verb: 'eat', params: { itemId: 'nope' } },
+          importance: 3,
+        },
+      ]),
       mindConfig: FAST_MIND,
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
-    expect(memoriesOfKind(agentDb, 'action').some((m) => /You realize you cannot/.test(m.text))).toBe(true)
+    expect(
+      memoriesOfKind(agentDb, 'action').some((m) => m.text.includes('You realize you cannot')),
+    ).toBe(true)
     // A plain physics refusal is not a craft the town can teach.
     expect(memoriesOfKind(agentDb, 'action').some((m) => m.text.includes(CRAFT_HINT))).toBe(false)
   })
@@ -451,7 +551,9 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     const reflection = new ScriptedReflectionLlm()
     const dream = new ScriptedDreamLlm()
     const { loop, runtime, mem, personality, agentDb } = await setup({
-      model: turnModel([{ thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 }]),
+      model: turnModel([
+        { thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 },
+      ]),
       mindConfig: { ...FAST_MIND, dreamChance: 1 },
       reflectionLlm: reflection,
       dreamLlm: dream,
@@ -482,7 +584,11 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
           importance: 4,
           reconsider_at: '00:05',
         },
-        { thought: 'No — I am spent. I lie down where I stand.', action: { verb: 'sleep', params: {} }, importance: 6 },
+        {
+          thought: 'No — I am spent. I lie down where I stand.',
+          action: { verb: 'sleep', params: {} },
+          importance: 6,
+        },
       ]),
       mindConfig: FAST_MIND,
     })
@@ -533,7 +639,8 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       // until the alarm rings, and a woken sleeper is not what this row is about.
       simConfig: SimConfigSchema.parse({
         needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 },
-        structures: { sleepIndoorsOnly: false }, warmth: { enabled: false },
+        structures: { sleepIndoorsOnly: false },
+        warmth: { enabled: false },
       }),
     })
     while (loop.tick < 1350) {
@@ -568,7 +675,9 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     }
     const reflection = new GatedReflectionLlm()
     const { loop, runtime, mem } = await setup({
-      model: turnModel([{ thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 }]),
+      model: turnModel([
+        { thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 },
+      ]),
       mindConfig: FAST_MIND,
       reflectionLlm: reflection,
     })
@@ -594,12 +703,20 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
           ],
           importance: 5,
         },
-        { thought: 'Good, the storehouse still has bread.', speech: 'The storehouse is stocked.', importance: 4 },
+        {
+          thought: 'Good, the storehouse still has bread.',
+          speech: 'The storehouse is stocked.',
+          importance: 4,
+        },
         { thought: 'I will write it down.', journal: 'First day at the meadow.', importance: 6 },
       ]),
       mindConfig: { ...FAST_MIND, journalTicks: 10 },
     })
-    await stepUntil(loop, () => loop.tick >= 80 && memoriesOfKind(agentDb, 'journal').length >= 1, 300)
+    await stepUntil(
+      loop,
+      () => loop.tick >= 80 && memoriesOfKind(agentDb, 'journal').length >= 1,
+      300,
+    )
     const liveHash = stateHash(loop.state)
     const replayed = replayFromGenesis(world.store, world.config, world.terrain)
     expect(stateHash(replayed)).toBe(liveHash)
@@ -620,7 +737,9 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       mindConfig: FAST_MIND,
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
-    expect(memoriesOfKind(agentDb, 'action').some((m) => /You realize you cannot/.test(m.text))).toBe(true)
+    expect(
+      memoriesOfKind(agentDb, 'action').some((m) => m.text.includes('You realize you cannot')),
+    ).toBe(true)
     // Let any wrongly-submitted head drain and complete before asserting, so a
     // regression of the rejection race (head submitted despite the block) shows up.
     for (let i = 0; i < 15; i++) {
@@ -717,7 +836,9 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     const thoughts: string[] = []
     const { model, prompts } = blankModel(2)
     const { loop, runtime, agentDb } = await setup({
-      model, mindConfig: FAST_MIND, onThought: (t) => thoughts.push(t.text),
+      model,
+      mindConfig: FAST_MIND,
+      onThought: (t) => thoughts.push(t.text),
     })
     await stepUntil(loop, () => prompts.length >= 2, 60)
 
@@ -757,13 +878,20 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     await stepUntil(loop, () => runtime.stats().turns >= 1, 30)
     // A storehouse is a thing you can walk into, so the prose names the doorway `enter`
     // measures against rather than the nearest open ground beside the wall.
-    expect(runtime.dayLogSnapshot()[0]).toContain('its doorway is at (5, 6); stand there and you can go in')
+    expect(runtime.dayLogSnapshot()[0]).toContain(
+      'its doorway is at (5, 6); stand there and you can go in',
+    )
   })
 
   it('the body answers its own alarm: a sleeper whose turn submits nothing is woken by a runtime wake', async () => {
-    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 }, structures: { sleepIndoorsOnly: false } })
+    const stillSim = SimConfigSchema.parse({
+      needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 },
+      structures: { sleepIndoorsOnly: false },
+    })
     const { world, loop } = await setup({
-      model: turnModel([{ thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 }]),
+      model: turnModel([
+        { thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 },
+      ]),
       mindConfig: FAST_MIND,
       simConfig: stillSim,
     })
@@ -782,13 +910,20 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   })
 
   it('a sleeper whose every intent the world rejects still rises', async () => {
-    const stillSim = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 }, structures: { sleepIndoorsOnly: false } })
+    const stillSim = SimConfigSchema.parse({
+      needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 },
+      structures: { sleepIndoorsOnly: false },
+    })
     const { world, loop, agentDb } = await setup({
       model: turnModel(
         [{ thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 }],
         // Every later turn targets the storehouse's own tile: the engine
         // rejects it ('no path to that spot'), just as in the live run.
-        { thought: 'To the storehouse.', action: { verb: 'walk', params: { x: 5, y: 5 } }, importance: 4 },
+        {
+          thought: 'To the storehouse.',
+          action: { verb: 'walk', params: { x: 5, y: 5 } },
+          importance: 4,
+        },
       ),
       mindConfig: FAST_MIND,
       simConfig: stillSim,
@@ -797,21 +932,31 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     await stepUntil(loop, () => loop.tick >= DAWN_TICK && !loop.state.agents[AGENT]!.asleep, 500)
     expect(loop.state.agents[AGENT]!.asleep).toBe(false)
     expect(startedVerbs(world.engineDb)).toContain('wake')
-    expect(memoriesOfKind(agentDb, 'action').some((m) => /no path to that spot/.test(m.text))).toBe(true)
+    expect(
+      memoriesOfKind(agentDb, 'action').some((m) => m.text.includes('no path to that spot')),
+    ).toBe(true)
   })
 
   it('backs off on non-provider turn failures', async () => {
     const { loop, runtime, agentDb } = await setup({
       model: turnModel([{ thought: 'I think.', importance: 3 }]),
       mindConfig: { ...FAST_MIND, dozeTicks: 20 },
-      embedder: { async embed(): Promise<Float32Array> { throw new Error('embedder down') } },
+      embedder: {
+        async embed(): Promise<Float32Array> {
+          throw new Error('embedder down')
+        },
+      },
     })
-    expect(() => loop.step()).not.toThrow()
+    expect(() => {
+      loop.step()
+    }).not.toThrow()
     await flush()
     expect(runtime.stats().turns).toBe(0)
     expect(alertKinds(agentDb).filter((k) => k === 'turn_crash')).toHaveLength(1)
     for (let i = 0; i < 19; i++) {
-      expect(() => loop.step()).not.toThrow()
+      expect(() => {
+        loop.step()
+      }).not.toThrow()
       await flush()
     }
     expect(runtime.stats().turns).toBe(0)
@@ -819,7 +964,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   })
 
   it('fires the optional onThought hook once per turn with tick, agentId, and the turn thought', async () => {
-    const seen: Array<{ tick: number; agentId: string; text: string }> = []
+    const seen: { tick: number; agentId: string; text: string }[] = []
     const { loop, runtime } = await setup({
       model: turnModel([BENIGN_TURN]),
       mindConfig: FAST_MIND,
@@ -833,15 +978,23 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
 })
 
 describe('arbiter seam (T19)', () => {
-  const freeformTurn = { thought: 'I will try something new.', action: { freeform: 'weave reeds into a basket' }, importance: 4 }
+  const freeformTurn = {
+    thought: 'I will try something new.',
+    action: { freeform: 'weave reeds into a basket' },
+    importance: 4,
+  }
 
   it('routes a freeform intent to the adjudicator and executes a map verdict as a Tier-1 act', async () => {
-    const seen: Array<{ intent: string; ctx: AgentCtx }> = []
+    const seen: { intent: string; ctx: AgentCtx }[] = []
     const adjudicator: Adjudicator = async (intent, ctx) => {
       seen.push({ intent, ctx })
       return { kind: 'map', verb: 'walk', params: { x: 5, y: 6 } }
     }
-    const { loop, world } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND, adjudicator })
+    const { loop, world } = await setup({
+      model: turnModel([freeformTurn]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
     await stepUntil(loop, () => startedVerbs(world.engineDb).includes('walk'), 100)
 
     expect(startedVerbs(world.engineDb)).toContain('walk')
@@ -858,7 +1011,11 @@ describe('arbiter seam (T19)', () => {
       reason: 'your hands do not yet know the weave',
       class: 'insufficient_skill',
     })
-    const { loop, agentDb, world } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND, adjudicator })
+    const { loop, agentDb, world } = await setup({
+      model: turnModel([freeformTurn]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
 
     expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
@@ -868,11 +1025,15 @@ describe('arbiter seam (T19)', () => {
   })
 
   // A refusal a mind cannot act on is a refusal it repeats, at a full arbiter call each time.
-  it('★ asks the god ONCE for one idea: the same intent again is answered from the mind\'s own past', async () => {
+  it("★ asks the god ONCE for one idea: the same intent again is answered from the mind's own past", async () => {
     let calls = 0
     const adjudicator: Adjudicator = async () => {
       calls += 1
-      return { kind: 'impossible', reason: 'the reeds will not hold that shape', class: 'physically_impossible' }
+      return {
+        kind: 'impossible',
+        reason: 'the reeds will not hold that shape',
+        class: 'physically_impossible',
+      }
     }
     const { loop, agentDb } = await setup({
       // The same idea, three turns running — and said differently the third time, because a
@@ -904,7 +1065,11 @@ describe('arbiter seam (T19)', () => {
     const seen: string[] = []
     const adjudicator: Adjudicator = async (intent) => {
       seen.push(intent)
-      return { kind: 'impossible', reason: 'the reeds will not hold that shape', class: 'physically_impossible' }
+      return {
+        kind: 'impossible',
+        reason: 'the reeds will not hold that shape',
+        class: 'physically_impossible',
+      }
     }
     const { loop, agentDb } = await setup({
       model: turnModel([
@@ -923,21 +1088,34 @@ describe('arbiter seam (T19)', () => {
   })
 
   it('falls back to the world’s own answer when no adjudicator is wired', async () => {
-    const { loop, agentDb } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND })
+    const { loop, agentDb } = await setup({
+      model: turnModel([freeformTurn]),
+      mindConfig: FAST_MIND,
+    })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
 
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('Perhaps someone in the town knows how.')
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
+      'You lack the knowledge to attempt this.',
+    )
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
+      'Perhaps someone in the town knows how.',
+    )
   })
 
   it('falls back to the world when the adjudicator throws, and says so in an alert', async () => {
     const adjudicator: Adjudicator = async () => {
       throw new Error('the arbiter is unreachable')
     }
-    const { loop, agentDb } = await setup({ model: turnModel([freeformTurn]), mindConfig: FAST_MIND, adjudicator })
+    const { loop, agentDb } = await setup({
+      model: turnModel([freeformTurn]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
 
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
+      'You lack the knowledge to attempt this.',
+    )
     expect(alertKinds(agentDb)).toContain('adjudicate_failed')
   })
 
@@ -950,11 +1128,13 @@ describe('arbiter seam (T19)', () => {
       return { kind: 'map', verb: 'walk', params: { x: 5, y: 6 } }
     }
     const { loop, world } = await setup({
-      model: turnModel([{
-        thought: 'I will try it.',
-        action: { verb: 'experiment', params: { description: 'boil river water down for salt' } },
-        importance: 4,
-      }]),
+      model: turnModel([
+        {
+          thought: 'I will try it.',
+          action: { verb: 'experiment', params: { description: 'boil river water down for salt' } },
+          importance: 4,
+        },
+      ]),
       mindConfig: FAST_MIND,
       adjudicator,
     })
@@ -966,15 +1146,19 @@ describe('arbiter seam (T19)', () => {
 
   it('lets an experiment reach the world unchanged when no arbiter is wired', async () => {
     const { loop, agentDb } = await setup({
-      model: turnModel([{
-        thought: 'I will try it.',
-        action: { verb: 'experiment', params: { description: 'boil river water down for salt' } },
-        importance: 4,
-      }]),
+      model: turnModel([
+        {
+          thought: 'I will try it.',
+          action: { verb: 'experiment', params: { description: 'boil river water down for salt' } },
+          importance: 4,
+        },
+      ]),
       mindConfig: FAST_MIND,
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
+      'You lack the knowledge to attempt this.',
+    )
   })
 
   it('leaves a named Tier-1 action untouched by the seam', async () => {
@@ -982,7 +1166,9 @@ describe('arbiter seam (T19)', () => {
       throw new Error('must not be consulted')
     }
     const { loop, agentDb, world } = await setup({
-      model: turnModel([{ thought: 'I walk.', action: { verb: 'walk', params: { x: 5, y: 6 } }, importance: 2 }]),
+      model: turnModel([
+        { thought: 'I walk.', action: { verb: 'walk', params: { x: 5, y: 6 } }, importance: 2 },
+      ]),
       mindConfig: FAST_MIND,
       adjudicator,
     })
@@ -994,7 +1180,9 @@ describe('arbiter seam (T19)', () => {
 
 describe('arbiter wiring expansion (T20)', () => {
   const RECIPE_VERB = 'recipe:t20_weave'
-  afterEach(() => unregisterVerb(RECIPE_VERB))
+  afterEach(() => {
+    unregisterVerb(RECIPE_VERB)
+  })
 
   const unknownVerbTurn = {
     thought: 'I will patch the roof.',
@@ -1006,13 +1194,23 @@ describe('arbiter wiring expansion (T20)', () => {
     const seen: string[] = []
     const adjudicator: Adjudicator = async (intent) => {
       seen.push(intent)
-      return { kind: 'impossible', reason: 'the roof is beyond mending', class: 'physically_impossible' }
+      return {
+        kind: 'impossible',
+        reason: 'the roof is beyond mending',
+        class: 'physically_impossible',
+      }
     }
-    const { loop, agentDb } = await setup({ model: turnModel([unknownVerbTurn]), mindConfig: FAST_MIND, adjudicator })
+    const { loop, agentDb } = await setup({
+      model: turnModel([unknownVerbTurn]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
 
     expect(seen).toEqual([`patch ${STRUCTURE_ID}`])
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe('You realize you cannot: the roof is beyond mending')
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      'You realize you cannot: the roof is beyond mending',
+    )
   })
 
   it('asks the arbiter once per turn: a second unknown verb falls back to refusal memory', async () => {
@@ -1022,11 +1220,17 @@ describe('arbiter wiring expansion (T20)', () => {
       // A map onto another verb the world does not have: the retry fails too.
       return { kind: 'map', verb: 'patch_again', params: {} }
     }
-    const { loop, agentDb } = await setup({ model: turnModel([unknownVerbTurn]), mindConfig: FAST_MIND, adjudicator })
+    const { loop, agentDb } = await setup({
+      model: turnModel([unknownVerbTurn]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
 
     expect(calls).toBe(1)
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(`You realize you cannot: ${OPAQUE_REFUSAL}`)
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      `You realize you cannot: ${OPAQUE_REFUSAL}`,
+    )
   })
 
   // ★ Four voided promises with no rejection sink, in a process with no `unhandledRejection`
@@ -1035,18 +1239,27 @@ describe('arbiter wiring expansion (T20)', () => {
     const base = await FakeEmbedder.create()
     const embedder = {
       embed: async (t: string): Promise<Float32Array> => {
-        if (t.startsWith('You realize you cannot')) throw new Error('The database connection is not open')
+        if (t.startsWith('You realize you cannot'))
+          throw new Error('The database connection is not open')
         return base.embed(t)
       },
     }
     const unhandled: unknown[] = []
-    const onUnhandled = (err: unknown): void => { unhandled.push(err) }
+    const onUnhandled = (err: unknown): void => {
+      unhandled.push(err)
+    }
     process.on('unhandledRejection', onUnhandled)
     try {
-      const { loop, agentDb } = await setup({ model: turnModel([unknownVerbTurn]), mindConfig: FAST_MIND, embedder })
+      const { loop, agentDb } = await setup({
+        model: turnModel([unknownVerbTurn]),
+        mindConfig: FAST_MIND,
+        embedder,
+      })
       await stepUntil(loop, () => alertKinds(agentDb).includes('memory_write_failed'), 100)
       expect(alertKinds(agentDb)).toContain('memory_write_failed')
-      expect(alertDetails(agentDb, 'memory_write_failed')[0]).toContain('database connection is not open')
+      expect(alertDetails(agentDb, 'memory_write_failed')[0]).toContain(
+        'database connection is not open',
+      )
       await flush()
       expect(unhandled).toEqual([])
     } finally {
@@ -1074,7 +1287,9 @@ describe('arbiter wiring expansion (T20)', () => {
       },
     }
     const { loop, runtime, world } = await setup({
-      model: turnModel([{ thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 }]),
+      model: turnModel([
+        { thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 },
+      ]),
       mindConfig: FAST_MIND,
     })
     wireArbiter(runtime, arbiter)
@@ -1086,7 +1301,7 @@ describe('arbiter wiring expansion (T20)', () => {
   })
 
   it('names the asking mind and its own words where the recipe becomes law (F-A)', async () => {
-    const calls: Array<{ recipeId: string; credit: DiscoveryCredit | undefined }> = []
+    const calls: { recipeId: string; credit: DiscoveryCredit | undefined }[] = []
     const INTENT = 'weave reeds into a mat'
     let asked = ''
     const arbiter: SeamArbiter = {
@@ -1097,7 +1312,9 @@ describe('arbiter wiring expansion (T20)', () => {
       codify: (recipe, credit) => {
         calls.push({ recipeId: recipe.id, credit })
         registerVerb({
-          kind: RECIPE_VERB, validate: () => null, duration: () => 1,
+          kind: RECIPE_VERB,
+          validate: () => null,
+          duration: () => 1,
           onComplete: () => [],
         })
         return { ruleId: 1, verb: recipe.id }
@@ -1123,12 +1340,16 @@ describe('arbiter wiring expansion (T20)', () => {
       summary: 'Weave reeds into a mat.',
     })
     const { loop, agentDb } = await setup({
-      model: turnModel([{ thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 }]),
+      model: turnModel([
+        { thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 },
+      ]),
       mindConfig: FAST_MIND,
       adjudicator,
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain('You lack the knowledge to attempt this.')
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
+      'You lack the knowledge to attempt this.',
+    )
   })
 })
 
@@ -1142,7 +1363,7 @@ describe('refusal prose teaches a path (T18)', () => {
 
   // ★ The engine's reasons are machinery: its registry's word for itself and its param schemas.
   // `refusalMemoryText` wrote them verbatim into a retrievable memory.
-  it('★ never writes the engine\'s own words into a mind\'s memory', () => {
+  it("★ never writes the engine's own words into a mind's memory", () => {
     for (const reason of [
       'unknown verb: dance',
       'no such agent',
@@ -1166,7 +1387,12 @@ describe('refusal prose teaches a path (T18)', () => {
   })
 
   it('leaves every other refusal exactly as the world stated it', () => {
-    for (const cls of ['physically_impossible', 'beyond_adjacency', 'insufficient_materials', undefined]) {
+    for (const cls of [
+      'physically_impossible',
+      'beyond_adjacency',
+      'insufficient_materials',
+      undefined,
+    ]) {
       expect(refusalMemoryText('no such craft exists under the sun', cls)).toBe(
         'You realize you cannot: no such craft exists under the sun',
       )

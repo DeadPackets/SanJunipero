@@ -7,7 +7,12 @@ import { fileURLToPath } from 'node:url'
 import { SEASONS } from '@sj/shared'
 import { encodePng } from '../src/post/raw.js'
 import {
-  SHEET_COLS, SHEET_ROWS, TERRAIN_TILE_H, TERRAIN_TILE_W, paintTilesetSheets, seasonTileNames,
+  SHEET_COLS,
+  SHEET_ROWS,
+  TERRAIN_TILE_H,
+  TERRAIN_TILE_W,
+  paintTilesetSheets,
+  seasonTileNames,
 } from '../src/terrainTiles.js'
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets')
@@ -26,13 +31,25 @@ console.log(`wrote ${SCAFFOLDING_FILE} — ${sheets.scaffolding.width}x${sheets.
 
 const tiles = seasonTileNames()
 const path = join(DIR, 'manifest.json')
-const { tileW: _w, tileH: _h, cols: _c, rows: _r, seasons: _s, scaffolding: _sc, ...rest }
-  = (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}) as Record<string, unknown>
+const {
+  tileW: _w,
+  tileH: _h,
+  cols: _c,
+  rows: _r,
+  seasons: _s,
+  scaffolding: _sc,
+  ...rest
+} = (existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}) as Record<string, unknown>
 const merged = {
-  tileW: TERRAIN_TILE_W, tileH: TERRAIN_TILE_H, cols: SHEET_COLS, rows: SHEET_ROWS,
+  tileW: TERRAIN_TILE_W,
+  tileH: TERRAIN_TILE_H,
+  cols: SHEET_COLS,
+  rows: SHEET_ROWS,
   seasons: Object.fromEntries(SEASONS.map((s) => [s, { file: `${s}.png`, tiles }])),
   scaffolding: { file: SCAFFOLDING_FILE },
   ...rest,
 }
 writeFileSync(path, `${JSON.stringify(merged, null, 2)}\n`)
-console.log(`merged seasons + scaffolding into ${path}; kept ${Object.keys(rest).join(', ') || 'nothing else'}`)
+console.log(
+  `merged seasons + scaffolding into ${path}; kept ${Object.keys(rest).join(', ') || 'nothing else'}`,
+)

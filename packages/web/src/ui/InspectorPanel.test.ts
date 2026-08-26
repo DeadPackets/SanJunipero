@@ -6,15 +6,28 @@ import { BackToRoster, InspectorBodyView, fetchTab, type InspectorAgent } from '
 const EMOJI = /\p{Extended_Pictographic}/u
 
 const person = (over: Partial<InspectorAgent> = {}): InspectorAgent => ({
-  alive: true, asleep: false, activity: null,
+  alive: true,
+  asleep: false,
+  activity: null,
   needs: { hunger: 80, energy: 60, warmth: 70, social: 90 },
-  hp: 100, ill: false, injuries: [], collapsedSinceTick: null, skills: {},
+  hp: 100,
+  ill: false,
+  injuries: [],
+  collapsedSinceTick: null,
+  skills: {},
   ...over,
 })
 
-const body = (agent: InspectorAgent): string => renderToStaticMarkup(createElement(InspectorBodyView, {
-  agent, tick: 0, thought: null, carrying: [], changes: [],
-}))
+const body = (agent: InspectorAgent): string =>
+  renderToStaticMarkup(
+    createElement(InspectorBodyView, {
+      agent,
+      tick: 0,
+      thought: null,
+      carrying: [],
+      changes: [],
+    }),
+  )
 
 describe('BackToRoster', () => {
   const html = renderToStaticMarkup(createElement(BackToRoster, { onBack: () => {} }))
@@ -67,7 +80,10 @@ describe('fetchTab', () => {
   const fail = (): Response => ({ ok: false, json: async () => [] }) as unknown as Response
 
   it('never caches a read that failed', async () => {
-    const fetchFn = vi.fn<typeof fetch>().mockResolvedValueOnce(fail()).mockResolvedValueOnce(ok([{ a: 1 }]))
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(fail())
+      .mockResolvedValueOnce(ok([{ a: 1 }]))
     expect(await fetchTab('miss-1', 'ledger', fetchFn)).toEqual([])
     expect(await fetchTab('miss-1', 'ledger', fetchFn)).toEqual([{ a: 1 }])
     expect(fetchFn).toHaveBeenCalledTimes(2)

@@ -67,7 +67,14 @@ export class RulebookStore {
         `INSERT INTO rulebook (recipe_id, name, normalized_name, recipe_json, verb, tick)
          VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(recipe.id, recipe.name, normalizeIntent(recipe.name), JSON.stringify(recipe), recipe.id, tick)
+      .run(
+        recipe.id,
+        recipe.name,
+        normalizeIntent(recipe.name),
+        JSON.stringify(recipe),
+        recipe.id,
+        tick,
+      )
     return Number(res.lastInsertRowid)
   }
 
@@ -92,11 +99,20 @@ export class RulebookStore {
            name = ?, normalized_name = ?, recipe_json = ?, verb = ?, tick = ?
          WHERE recipe_id = ?`,
       )
-      .run(recipe.name, normalizeIntent(recipe.name), JSON.stringify(recipe), recipe.id, tick, recipe.id)
+      .run(
+        recipe.name,
+        normalizeIntent(recipe.name),
+        JSON.stringify(recipe),
+        recipe.id,
+        tick,
+        recipe.id,
+      )
   }
 
   allActive(): RulebookRow[] {
-    const rows = this.db.prepare('SELECT * FROM rulebook WHERE reverted_at_tick IS NULL ORDER BY id').all() as RawRulebookRow[]
+    const rows = this.db
+      .prepare('SELECT * FROM rulebook WHERE reverted_at_tick IS NULL ORDER BY id')
+      .all() as RawRulebookRow[]
     return rows.map(toRulebookRow)
   }
 

@@ -7,17 +7,29 @@ import { submitIntent } from './intent.js'
 import { stepWalk, VERBS } from './verbs.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
-const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
+const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
+  seq,
+  tick: 0,
+  type,
+  payload,
+})
 
 let seq = 100
 function makeWorld(rows: string[] = ['........', '........', '........', '........']): WorldState {
-  const s = genesisState(DEFAULT_CONFIG, rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)))
+  const s = genesisState(
+    DEFAULT_CONFIG,
+    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+  )
   return fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }))
 }
-function patchAgent(s: WorldState, id: string, patch: Partial<WorldState['agents'][string]>): WorldState {
+function patchAgent(
+  s: WorldState,
+  id: string,
+  patch: Partial<WorldState['agents'][string]>,
+): WorldState {
   return { ...s, agents: { ...s.agents, [id]: { ...s.agents[id]!, ...patch } } }
 }
-function applyAll(s: WorldState, events: Array<{ type: string; payload: unknown }>): WorldState {
+function applyAll(s: WorldState, events: { type: string; payload: unknown }[]): WorldState {
   for (const e of events) s = fold(s, ev(seq++, e.type, e.payload))
   return s
 }
@@ -28,7 +40,12 @@ describe('submitIntent', () => {
     const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 3, y: 0 })
     expect(r).toEqual({
       ok: true,
-      events: [{ type: 'action_started', payload: { agentId: 'a1', verb: 'walk', params: { x: 3, y: 0 }, duration: 3 } }],
+      events: [
+        {
+          type: 'action_started',
+          payload: { agentId: 'a1', verb: 'walk', params: { x: 3, y: 0 }, duration: 3 },
+        },
+      ],
     })
   })
 
@@ -43,8 +60,18 @@ describe('submitIntent', () => {
   it('rejects unknown, dead, collapsed, and busy agents', () => {
     let s = makeWorld()
     expect(submitIntent(s, DEFAULT_CONFIG, 'ghost', 'walk', { x: 1, y: 0 }).ok).toBe(false)
-    expect(submitIntent(patchAgent(s, 'a1', { alive: false }), DEFAULT_CONFIG, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(false)
-    expect(submitIntent(patchAgent(s, 'a1', { collapsedSinceTick: 5 }), DEFAULT_CONFIG, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(false)
+    expect(
+      submitIntent(patchAgent(s, 'a1', { alive: false }), DEFAULT_CONFIG, 'a1', 'walk', {
+        x: 1,
+        y: 0,
+      }).ok,
+    ).toBe(false)
+    expect(
+      submitIntent(patchAgent(s, 'a1', { collapsedSinceTick: 5 }), DEFAULT_CONFIG, 'a1', 'walk', {
+        x: 1,
+        y: 0,
+      }).ok,
+    ).toBe(false)
     s = patchAgent(s, 'a1', { activity: { verb: 'walk', ticksRemaining: 2, params: {} } })
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(false)
   })
@@ -75,15 +102,27 @@ describe('submitIntent', () => {
 describe('fold: action + skill + wake events', () => {
   it('action_started stores the activity (with path for walk)', () => {
     let s = makeWorld()
-    s = fold(s, ev(2, 'action_started', { agentId: 'a1', verb: 'walk', params: { x: 2, y: 0 }, duration: 2 }))
+    s = fold(
+      s,
+      ev(2, 'action_started', { agentId: 'a1', verb: 'walk', params: { x: 2, y: 0 }, duration: 2 }),
+    )
     expect(s.agents.a1!.activity).toEqual({
-      verb: 'walk', ticksRemaining: 2, params: { x: 2, y: 0 }, path: [[1, 0], [2, 0]],
+      verb: 'walk',
+      ticksRemaining: 2,
+      params: { x: 2, y: 0 },
+      path: [
+        [1, 0],
+        [2, 0],
+      ],
     })
   })
 
   it('action_progressed decrements; completed/interrupted clear the activity', () => {
     let s = makeWorld()
-    s = fold(s, ev(2, 'action_started', { agentId: 'a1', verb: 'walk', params: { x: 2, y: 0 }, duration: 2 }))
+    s = fold(
+      s,
+      ev(2, 'action_started', { agentId: 'a1', verb: 'walk', params: { x: 2, y: 0 }, duration: 2 }),
+    )
     s = fold(s, ev(3, 'action_progressed', { agentId: 'a1', ticks: 1 }))
     expect(s.agents.a1!.activity!.ticksRemaining).toBe(1)
     const done = fold(s, ev(4, 'action_completed', { agentId: 'a1', verb: 'walk' }))
@@ -103,9 +142,24 @@ describe('fold: action + skill + wake events', () => {
 
   it('strict payloads reject extra keys; unknown agents throw', () => {
     const s = makeWorld()
-    expect(() => fold(s, ev(2, 'action_started', { agentId: 'a1', verb: 'walk', params: { x: 1, y: 0 }, duration: 1, extra: 1 }))).toThrow()
-    expect(() => fold(s, ev(2, 'action_progressed', { agentId: 'ghost', ticks: 1 }))).toThrow(/unknown agent/i)
-    expect(() => fold(s, ev(2, 'skill_gained', { agentId: 'ghost', track: 'farming', xp: 1 }))).toThrow(/unknown agent/i)
+    expect(() =>
+      fold(
+        s,
+        ev(2, 'action_started', {
+          agentId: 'a1',
+          verb: 'walk',
+          params: { x: 1, y: 0 },
+          duration: 1,
+          extra: 1,
+        }),
+      ),
+    ).toThrow()
+    expect(() => fold(s, ev(2, 'action_progressed', { agentId: 'ghost', ticks: 1 }))).toThrow(
+      /unknown agent/i,
+    )
+    expect(() =>
+      fold(s, ev(2, 'skill_gained', { agentId: 'ghost', track: 'farming', xp: 1 })),
+    ).toThrow(/unknown agent/i)
     expect(() => fold(s, ev(2, 'agent_woke', { agentId: 'ghost' }))).toThrow(/unknown agent/i)
   })
 })
@@ -161,9 +215,24 @@ describe('walk progression (stepWalk)', () => {
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     s = applyAll(s, stepWalk(s, 'a1')) // a1 now at (1,0)
-    s = fold(s, ev(seq++, 'structure_planned', { id: 'structure_1', kind: 'house', x: 2, y: 0, w: 1, h: 1, maxHp: 50, flammable: true, builderId: 'a1' }))
+    s = fold(
+      s,
+      ev(seq++, 'structure_planned', {
+        id: 'structure_1',
+        kind: 'house',
+        x: 2,
+        y: 0,
+        w: 1,
+        h: 1,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'a1',
+      }),
+    )
     const blocked = stepWalk(s, 'a1')
-    expect(blocked).toEqual([{ type: 'action_interrupted', payload: { agentId: 'a1', reason: 'blocked' } }])
+    expect(blocked).toEqual([
+      { type: 'action_interrupted', payload: { agentId: 'a1', reason: 'blocked' } },
+    ])
     s = applyAll(s, blocked)
     expect(s.agents.a1!.activity).toBeNull()
     expect([s.agents.a1!.x, s.agents.a1!.y]).toEqual([1, 0])
@@ -184,16 +253,22 @@ describe('verb registry', () => {
 describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () => {
   const CFG = DEFAULT_CONFIG
   const busyWith = (verb: string): WorldState =>
-    applyAll(makeWorld(), [{ type: 'action_started', payload: { agentId: 'a1', verb, params: {}, duration: 100 } }])
+    applyAll(makeWorld(), [
+      { type: 'action_started', payload: { agentId: 'a1', verb, params: {}, duration: 100 } },
+    ])
 
   // The policy is about the HANDS. `speak` declares `atOnce`, because a body with an axe in its
   // hands can still answer when it is spoken to. Widening this set is a visible edit.
   it('★ the mouth is the only thing that does not wait for the hands', () => {
-    const exempt = Object.keys(VERBS).filter((k) => VERBS[k]!.atOnce !== undefined).sort()
+    const exempt = Object.keys(VERBS)
+      .filter((k) => VERBS[k]!.atOnce !== undefined)
+      .sort()
     expect(exempt).toEqual(['speak'])
     const r = submitIntent(busyWith('build'), CFG, 'a1', 'speak', { text: 'over here' })
     expect(r.ok).toBe(true)
-    expect(r.ok && r.events.some((e) => e.type === 'action_started'), 'a word took the slot').toBe(false)
+    expect(r.ok && r.events.some((e) => e.type === 'action_started'), 'a word took the slot').toBe(
+      false,
+    )
   })
 
   it('★ refuses a second intent while ANY verb in the registry is running — all of them', () => {
@@ -206,7 +281,9 @@ describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () =
       const r = submitIntent(busyWith(kind), CFG, 'a1', 'sleep', {})
       answers.add(r.ok ? `ACCEPTED while ${kind}` : r.reason.replace(` ${kind}`, ' <verb>'))
     }
-    expect([...answers], 'a verb got a different answer from the rest').toEqual(['already busy with <verb>'])
+    expect([...answers], 'a verb got a different answer from the rest').toEqual([
+      'already busy with <verb>',
+    ])
   })
 
   it('★ and the only thing that ends an activity early is the world, not another intent', () => {
@@ -217,10 +294,14 @@ describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () =
     const byIntent = submitIntent(s, CFG, 'a1', 'eat', {})
     expect(byIntent.ok).toBe(false)
     const src = readFileSync(new URL('./intent.ts', import.meta.url), 'utf8')
-    expect(src, 'submitIntent learned to interrupt without a ruling').not.toContain('action_interrupted')
+    expect(src, 'submitIntent learned to interrupt without a ruling').not.toContain(
+      'action_interrupted',
+    )
     // and the world's own four reasons still clear it
     for (const reason of ['blocked', 'gone', 'collapsed', 'rest']) {
-      const cleared = applyAll(s, [{ type: 'action_interrupted', payload: { agentId: 'a1', reason } }])
+      const cleared = applyAll(s, [
+        { type: 'action_interrupted', payload: { agentId: 'a1', reason } },
+      ])
       expect(cleared.agents.a1!.activity, reason).toBeNull()
     }
   })

@@ -14,13 +14,18 @@ beforeEach(() => {
   t = 0
 })
 
-const row = (assetId: string, usd: number, kind: 'image_gen' | 'vision_qa' | 'style_judge' = 'image_gen') =>
-  ({ assetId, kind, model: 'google/gemini-3.1-flash-image', usd })
+const row = (
+  assetId: string,
+  usd: number,
+  kind: 'image_gen' | 'vision_qa' | 'style_judge' = 'image_gen',
+) => ({ assetId, kind, model: 'google/gemini-3.1-flash-image', usd })
 
 describe('SpendRowSchema', () => {
   it('rejects a negative amount and an unknown kind', () => {
     expect(() => SpendRowSchema.parse({ ...row('a', -1), at: now() })).toThrow()
-    expect(() => SpendRowSchema.parse({ assetId: 'a', kind: 'guessing', model: 'm', usd: 1, at: now() })).toThrow()
+    expect(() =>
+      SpendRowSchema.parse({ assetId: 'a', kind: 'guessing', model: 'm', usd: 1, at: now() }),
+    ).toThrow()
     expect(() => SpendRowSchema.parse({ ...row('a', 1), at: now(), extra: 1 })).toThrow()
     expect(SpendRowSchema.parse({ ...row('a', 0), at: '2026-01-01' }).usd).toBe(0)
   })
@@ -43,7 +48,11 @@ describe('SpendLedger accounting', () => {
   })
 
   it('byKind reports every kind even when unused', () => {
-    expect(new SpendLedger(null, now).byKind()).toEqual({ image_gen: 0, vision_qa: 0, style_judge: 0 })
+    expect(new SpendLedger(null, now).byKind()).toEqual({
+      image_gen: 0,
+      vision_qa: 0,
+      style_judge: 0,
+    })
   })
 
   it('never touches disk when the path is null', () => {
@@ -75,16 +84,25 @@ describe('SpendLedger persistence', () => {
   it('keeps both writers rows when they interleave over one file', () => {
     const a = new SpendLedger(file, now)
     const b = new SpendLedger(file, now)
-    a.append(row('a', 1)); b.append(row('b', 2))
-    a.flush(); b.flush()
+    a.append(row('a', 1))
+    b.append(row('b', 2))
+    a.flush()
+    b.flush()
     const merged = new SpendLedger(file, now)
-    expect(merged.rows().map(r => r.assetId).sort()).toEqual(['a', 'b'])
+    expect(
+      merged
+        .rows()
+        .map((r) => r.assetId)
+        .sort(),
+    ).toEqual(['a', 'b'])
   })
 
   it('flushing twice does not duplicate rows', () => {
     const l = new SpendLedger(file, now)
     l.append(row('a', 0.045))
-    l.flush(); l.flush(); l.flush()
+    l.flush()
+    l.flush()
+    l.flush()
     expect(JSON.parse(readFileSync(file, 'utf8'))).toHaveLength(1)
     l.append(row('a', 0.01))
     l.flush()
@@ -97,7 +115,9 @@ describe('SpendLedger persistence', () => {
     const l = new SpendLedger(file, now)
     expect(l.rows()).toHaveLength(0)
     l.append(row('a', 1))
-    expect(() => l.flush()).not.toThrow()
+    expect(() => {
+      l.flush()
+    }).not.toThrow()
     expect(JSON.parse(readFileSync(file, 'utf8'))).toHaveLength(1)
   })
 })
@@ -107,7 +127,9 @@ describe('anomaly stop', () => {
     const l = new SpendLedger(null, now)
     l.append(row('a', 4.5))
     l.append(row('b', 4.9))
-    expect(() => l.append(row('a', 0.6))).toThrow(AnomalyStopError)
+    expect(() => {
+      l.append(row('a', 0.6))
+    }).toThrow(AnomalyStopError)
     expect(l.totalFor('a')).toBe(4.5)
     expect(l.rows()).toHaveLength(2)
     l.append(row('b', 0.05))
@@ -118,14 +140,18 @@ describe('anomaly stop', () => {
     const l = new SpendLedger(null, now)
     l.append(row('a', ANOMALY_STOP_USD))
     expect(l.totalFor('a')).toBe(5)
-    expect(() => l.append(row('a', 0.01))).toThrow(/anomaly stop/)
+    expect(() => {
+      l.append(row('a', 0.01))
+    }).toThrow(/anomaly stop/)
   })
 
   it('carries the asset id and the attempted total', () => {
     const l = new SpendLedger(null, now)
     l.append(row('a', 4.99))
-    try { l.append(row('a', 1)); expect.unreachable() }
-    catch (e) {
+    try {
+      l.append(row('a', 1))
+      expect.unreachable()
+    } catch (e) {
       expect(e).toBeInstanceOf(AnomalyStopError)
       expect((e as AnomalyStopError).assetId).toBe('a')
       expect((e as AnomalyStopError).totalUsd).toBeCloseTo(5.99, 10)

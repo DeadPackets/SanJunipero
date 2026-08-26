@@ -30,7 +30,10 @@ export function decayTraffic(value: number, config: SimConfig): number {
 // Which trails are standing empty tonight, and since when. A tile busy again loses its stamp;
 // a tile that stopped being a trail — paved, overgrown, flooded — drops out entirely.
 export function quietPathsAt(
-  state: WorldState, traffic: Record<string, number>, day: number, config: SimConfig,
+  state: WorldState,
+  traffic: Record<string, number>,
+  day: number,
+  config: SimConfig,
 ): Record<string, number> {
   const out: Record<string, number> = {}
   for (let y = 0; y < state.terrain.length; y++) {

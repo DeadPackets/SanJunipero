@@ -55,23 +55,69 @@ export const CHRONICLE_ICONS: Record<string, string> = {
 // cannot be silently dropped. Routine bodily and housekeeping acts stay out of the feed.
 export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   // The quiet acts, named one by one (addendum §12).
-  'agent_drank', 'item_filled', 'item_equipped', 'item_unequipped', 'item_lit', 'item_snuffed',
-  'item_burned_out', 'structure_fueled', 'fauna_spawned', 'fauna_moved', 'fauna_stock_changed',
-  'forageable_spawned', 'forageable_stock_changed', 'forageable_depleted', 'forageable_regrown',
-  'thirst_changed', 'traffic_decayed',
+  'agent_drank',
+  'item_filled',
+  'item_equipped',
+  'item_unequipped',
+  'item_lit',
+  'item_snuffed',
+  'item_burned_out',
+  'structure_fueled',
+  'fauna_spawned',
+  'fauna_moved',
+  'fauna_stock_changed',
+  'forageable_spawned',
+  'forageable_stock_changed',
+  'forageable_depleted',
+  'forageable_regrown',
+  'thirst_changed',
+  'traffic_decayed',
   // The body's own bookkeeping, and the ledger's.
-  'tick_advanced', 'agent_moved', 'need_changed', 'hp_changed', 'skill_gained', 'agent_woke',
-  'agent_slept', 'agent_entered', 'agent_exited', 'agent_aged', 'agent_collapsed', 'agent_spawned',
-  'agent_spoke', 'agent_conceived',
+  'tick_advanced',
+  'agent_moved',
+  'need_changed',
+  'hp_changed',
+  'skill_gained',
+  'agent_woke',
+  'agent_slept',
+  'agent_entered',
+  'agent_exited',
+  'agent_aged',
+  'agent_collapsed',
+  'agent_spawned',
+  'agent_spoke',
+  'agent_conceived',
   // Superseded by the mortality events above, which say the same things better.
-  'agent_injured', 'agent_infected', 'agent_fell_ill', 'agent_recovered',
+  'agent_injured',
+  'agent_infected',
+  'agent_fell_ill',
+  'agent_recovered',
   // Work in progress, and things changing hands.
-  'action_started', 'action_progressed', 'action_completed', 'action_interrupted',
-  'structure_planned', 'structure_progressed', 'structure_damaged', 'structure_destroyed',
-  'item_spawned', 'item_moved', 'item_spoiled', 'item_worn', 'item_broke', 'item_owner_changed',
-  'item_qty_changed', 'item_text_changed', 'item_taken',
-  'crop_planted', 'crop_grew', 'crop_withered', 'crop_harvested',
-  'terrain_changed', 'weather_changed', 'wildlife_changed', 'config_changed',
+  'action_started',
+  'action_progressed',
+  'action_completed',
+  'action_interrupted',
+  'structure_planned',
+  'structure_progressed',
+  'structure_damaged',
+  'structure_destroyed',
+  'item_spawned',
+  'item_moved',
+  'item_spoiled',
+  'item_worn',
+  'item_broke',
+  'item_owner_changed',
+  'item_qty_changed',
+  'item_text_changed',
+  'item_taken',
+  'crop_planted',
+  'crop_grew',
+  'crop_withered',
+  'crop_harvested',
+  'terrain_changed',
+  'weather_changed',
+  'wildlife_changed',
+  'config_changed',
 ])
 
 export const CHRONICLE_TYPES: readonly string[] = Object.keys(CHRONICLE_WEIGHTS)
@@ -82,13 +128,15 @@ export const CHRONICLE_FALLBACK_ICON = 'star'
 export const MILESTONE_TYPE = 'first'
 export const MILESTONE_ICON = 'spark'
 
-export const ChronicleEntrySchema = z.object({
-  seq: z.number().int().positive(),
-  tick: z.number().int().nonnegative(),
-  type: z.string().min(1),
-  icon: z.string().min(1),
-  label: z.string().min(1),
-}).strict()
+export const ChronicleEntrySchema = z
+  .object({
+    seq: z.number().int().positive(),
+    tick: z.number().int().nonnegative(),
+    type: z.string().min(1),
+    icon: z.string().min(1),
+    label: z.string().min(1),
+  })
+  .strict()
 export type ChronicleEntry = z.infer<typeof ChronicleEntrySchema>
 
 export const ChronicleResponseSchema = z.object({ entries: z.array(ChronicleEntrySchema) }).strict()
@@ -96,11 +144,13 @@ export type ChronicleResponse = z.infer<typeof ChronicleResponseSchema>
 
 /** What `/api/chronicle/count` answers. The lens badge shows one number and used to download the
  *  whole ledger to find it — every entry over the wire and through `JSON.parse`, every 20 s. */
-export const ChronicleCountSchema = z.object({
-  count: z.number().int().nonnegative(),
-  latestSeq: z.number().int().nonnegative(),
-  latestTick: z.number().int().nonnegative(),
-}).strict()
+export const ChronicleCountSchema = z
+  .object({
+    count: z.number().int().nonnegative(),
+    latestSeq: z.number().int().nonnegative(),
+    latestTick: z.number().int().nonnegative(),
+  })
+  .strict()
 export type ChronicleCount = z.infer<typeof ChronicleCountSchema>
 
 export function chronicleIcon(type: string): string {

@@ -58,8 +58,9 @@ export function migrateLlmTables(db: Database.Database): void {
   `)
   // A ledger written before the column existed is still a ledger: add it in place rather
   // than making every recorded run unreadable.
-  const cols = db.prepare('PRAGMA table_info(llm_calls)').all() as Array<{ name: string }>
-  if (!cols.some((c) => c.name === 'provider')) db.exec('ALTER TABLE llm_calls ADD COLUMN provider TEXT')
+  const cols = db.prepare('PRAGMA table_info(llm_calls)').all() as { name: string }[]
+  if (!cols.some((c) => c.name === 'provider'))
+    db.exec('ALTER TABLE llm_calls ADD COLUMN provider TEXT')
   if (!cols.some((c) => c.name === 'reported_cost_usd')) {
     db.exec('ALTER TABLE llm_calls ADD COLUMN reported_cost_usd REAL')
   }
@@ -82,10 +83,15 @@ export type BudgetGuard = {
 // Booking after the fact lets every call in flight pass one read-only check and all overshoot.
 // Read and claim inside one synchronous transaction; the worst overshoot is one reserved call.
 export function makeBudgetGuard(db: Database.Database, caller: string): BudgetGuard {
-  const insert = db.prepare('INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)')
+  const insert = db.prepare(
+    'INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)',
+  )
   const remove = db.prepare('DELETE FROM llm_reservations WHERE id = ?')
   const reserve = db.transaction((expectedUsd: number, budgetUsd: number | null): number | null => {
-    if (budgetUsd !== null && sumCostUsd(db, caller) + sumReserved(db, caller) + expectedUsd > budgetUsd) {
+    if (
+      budgetUsd !== null &&
+      sumCostUsd(db, caller) + sumReserved(db, caller) + expectedUsd > budgetUsd
+    ) {
       return null
     }
     return Number(insert.run(Date.now(), caller, expectedUsd).lastInsertRowid)

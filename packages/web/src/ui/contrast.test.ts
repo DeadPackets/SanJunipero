@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+)
 
 // ── WCAG 2.x relative luminance and contrast, on the sheet's own tokens ──────────────
 
@@ -14,7 +17,7 @@ export function luminance(hex: string): number {
 
 export function contrast(fg: string, bg: string): number {
   const [a, b] = [luminance(fg), luminance(bg)]
-  const [hi, lo] = a! > b! ? [a!, b!] : [b!, a!]
+  const [hi, lo] = a > b ? [a, b] : [b, a]
   return (hi + 0.05) / (lo + 0.05)
 }
 
@@ -41,14 +44,14 @@ const AA = 4.5
 
 describe('the palette these fixes are measured against', () => {
   it('reads the tokens out of the sheet', () => {
-    expect(T['ink']).toBe('#43394A')
-    expect(T['cream']).toBe('#FFF6E9')
-    expect(T['sand']).toBe('#E8D5BC')
+    expect(T.ink).toBe('#43394A')
+    expect(T.cream).toBe('#FFF6E9')
+    expect(T.sand).toBe('#E8D5BC')
   })
 
   it('agrees with the audit on the base pairs', () => {
-    expect(contrast(T['ink']!, T['parchment']!)).toBeCloseTo(9.06, 1)
-    expect(contrast(T['ink']!, T['cream']!)).toBeCloseTo(10.2, 1)
+    expect(contrast(T.ink!, T.parchment!)).toBeCloseTo(9.06, 1)
+    expect(contrast(T.ink!, T.cream!)).toBeCloseTo(10.2, 1)
   })
 })
 
@@ -63,8 +66,8 @@ describe('B3 — the timeline day labels are on the slab they sit on', () => {
 
   it('clears AA on the cream slab AND on the sand track it overhangs', () => {
     const fg = T[colour!]!
-    expect(contrast(fg, T['cream']!)).toBeGreaterThanOrEqual(AA)
-    expect(contrast(fg, T['sand']!)).toBeGreaterThanOrEqual(AA)
+    expect(contrast(fg, T.cream!)).toBeGreaterThanOrEqual(AA)
+    expect(contrast(fg, T.sand!)).toBeGreaterThanOrEqual(AA)
   })
 
   it('does not thin its own colour back down with opacity', () => {
@@ -76,13 +79,31 @@ describe('B3 — the timeline day labels are on the slab they sit on', () => {
 // Reducing contrast with `opacity` makes the ratio unknowable at authoring time. These are the
 // ink-on-paper sites; the dark grounds are below.
 const QUIET_SITES = [
-  '.tick-badge.waking', '.strip-weather', '.strip-gone', '.fps-overlay .fps-avg',
-  '.block h3', '.thought-line', '.tab-body .stamp', '.veil-sub',
-  '.feed-line .stamp', '.feed-empty', '.room-who', '.legend-chip.off', '.legend-stamp',
+  '.tick-badge.waking',
+  '.strip-weather',
+  '.strip-gone',
+  '.fps-overlay .fps-avg',
+  '.block h3',
+  '.thought-line',
+  '.tab-body .stamp',
+  '.veil-sub',
+  '.feed-line .stamp',
+  '.feed-empty',
+  '.room-who',
+  '.legend-chip.off',
+  '.legend-stamp',
   // `.bond-count` is gone: task 85 retired the strength bar and the count under it, because a
   // count that can only go up cannot express a relationship cooling.
-  '.bond-evidence', '.bond-dates dt', '.bond-history .stamp', '.thumb-day', '.thumb-cast',
-  '.digest-footer', '.roster-gone', '.laws-lede', '.law-history', '.law-edit input:disabled',
+  '.bond-evidence',
+  '.bond-dates dt',
+  '.bond-history .stamp',
+  '.thumb-day',
+  '.thumb-cast',
+  '.digest-footer',
+  '.roster-gone',
+  '.laws-lede',
+  '.law-history',
+  '.law-edit input:disabled',
 ]
 
 // A thought must read as a different INK, not a thinner one, or its ratio is unknowable at the one
@@ -101,13 +122,15 @@ describe('--ink-quiet — the de-emphasis token', () => {
 
   it('clears AA on every paper the chrome uses', () => {
     for (const paper of PAPERS) {
-      expect(contrast(T['ink-quiet']!, T[paper]!), `ink-quiet on ${paper}`).toBeGreaterThanOrEqual(AA)
+      expect(contrast(T['ink-quiet']!, T[paper]!), `ink-quiet on ${paper}`).toBeGreaterThanOrEqual(
+        AA,
+      )
     }
   })
 
   it('is genuinely quieter than ink, or it is not de-emphasis', () => {
     for (const paper of PAPERS) {
-      expect(contrast(T['ink-quiet']!, T[paper]!)).toBeLessThan(contrast(T['ink']!, T[paper]!))
+      expect(contrast(T['ink-quiet']!, T[paper]!)).toBeLessThan(contrast(T.ink!, T[paper]!))
     }
   })
 })
@@ -129,9 +152,14 @@ describe('--cream-quiet — the same de-emphasis, on the dark ground the town sp
   it('exists as a colour, clears AA on both dark grounds, and is visibly quieter than cream', () => {
     expect(T['cream-quiet']).toMatch(/^#[0-9A-Fa-f]{6}$/)
     for (const paper of DARK_PAPERS) {
-      expect(contrast(T['cream-quiet']!, T[paper]!), `cream-quiet on ${paper}`).toBeGreaterThanOrEqual(AA)
-      expect(contrast(T['cream-quiet']!, T[paper]!), `cream-quiet vs cream on ${paper}`)
-        .toBeLessThan(contrast(T['cream']!, T[paper]!))
+      expect(
+        contrast(T['cream-quiet']!, T[paper]!),
+        `cream-quiet on ${paper}`,
+      ).toBeGreaterThanOrEqual(AA)
+      expect(
+        contrast(T['cream-quiet']!, T[paper]!),
+        `cream-quiet vs cream on ${paper}`,
+      ).toBeLessThan(contrast(T.cream!, T[paper]!))
     }
   })
 
@@ -169,12 +197,12 @@ describe('a stale clock is legible, not just loud', () => {
     const bg = /background:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
     expect(bg, `${selector} sets no background token`).toBe('rose')
     expect(fg, `${selector} sets no colour token`).toBeDefined()
-    expect(contrast(T[fg!]!, T['rose']!), `${selector}`).toBeGreaterThanOrEqual(AA)
+    expect(contrast(T[fg!]!, T.rose!), selector).toBeGreaterThanOrEqual(AA)
   })
 
   it('records the pair it rejected, so it cannot come back', () => {
-    expect(contrast(T['cream']!, T['rose']!)).toBeCloseTo(3.12, 2)
-    expect(contrast(T['deep']!, T['rose']!)).toBeCloseTo(4.82, 2)
+    expect(contrast(T.cream!, T.rose!)).toBeCloseTo(3.12, 2)
+    expect(contrast(T.deep!, T.rose!)).toBeCloseTo(4.82, 2)
   })
 })
 
@@ -188,12 +216,15 @@ describe('a mark drawn to divide the panel can actually be seen', () => {
     const colour = /repeating-linear-gradient\([^)]*var\(--([\w-]+)\)/.exec(body)?.[1]
     expect(colour, 'the rule paints no palette token').toBeDefined()
     for (const paper of ['parchment', 'cream'] as const) {
-      expect(contrast(T[colour!]!, T[paper]!), `.block h3::after on ${paper}`).toBeGreaterThanOrEqual(3)
+      expect(
+        contrast(T[colour!]!, T[paper]!),
+        `.block h3::after on ${paper}`,
+      ).toBeGreaterThanOrEqual(3)
     }
   })
 
   it('records the pair it rejected, so it cannot come back', () => {
-    expect(contrast(T['sand']!, T['parchment']!)).toBeCloseTo(1.19, 2)
-    expect(contrast(T['sand']!, T['cream']!)).toBeCloseTo(1.34, 2)
+    expect(contrast(T.sand!, T.parchment!)).toBeCloseTo(1.19, 2)
+    expect(contrast(T.sand!, T.cream!)).toBeCloseTo(1.34, 2)
   })
 })

@@ -13,14 +13,17 @@ export const REF_SWATCH_COLS = 8
 export async function paletteSwatchPng(): Promise<Buffer> {
   const rgb = paletteRgb(MASTER_PALETTE)
   const rows = Math.ceil(rgb.length / REF_SWATCH_COLS)
-  const width = REF_SWATCH_COLS * REF_SWATCH_PX, height = rows * REF_SWATCH_PX
+  const width = REF_SWATCH_COLS * REF_SWATCH_PX,
+    height = rows * REF_SWATCH_PX
   const data = new Uint8ClampedArray(width * height * 4)
   for (let i = 0; i < rgb.length; i++) {
     const [r, g, b] = rgb[i]!
-    const cx = (i % REF_SWATCH_COLS) * REF_SWATCH_PX, cy = Math.floor(i / REF_SWATCH_COLS) * REF_SWATCH_PX
-    for (let y = cy; y < cy + REF_SWATCH_PX; y++) for (let x = cx; x < cx + REF_SWATCH_PX; x++) {
-      data.set([r, g, b, 255], (y * width + x) * 4)
-    }
+    const cx = (i % REF_SWATCH_COLS) * REF_SWATCH_PX,
+      cy = Math.floor(i / REF_SWATCH_COLS) * REF_SWATCH_PX
+    for (let y = cy; y < cy + REF_SWATCH_PX; y++)
+      for (let x = cx; x < cx + REF_SWATCH_PX; x++) {
+        data.set([r, g, b, 255], (y * width + x) * 4)
+      }
   }
   return encodePng({ width, height, data })
 }

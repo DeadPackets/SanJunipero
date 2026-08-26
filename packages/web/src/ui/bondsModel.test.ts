@@ -1,13 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { BOND_KINDS, bondFrom, type Bond, type BondsResponse } from '@sj/shared'
 import {
-  BOND_COLORS, BOND_KIND_LABEL, NODE_ALIVE, NODE_DEAD,
-  bondTooltip, maxBondStrength, toBondGraph,
+  BOND_COLORS,
+  BOND_KIND_LABEL,
+  NODE_ALIVE,
+  NODE_DEAD,
+  bondTooltip,
+  maxBondStrength,
+  toBondGraph,
 } from './bondsModel.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 
 const bond = (_id: string, aId: string, bId: string, kind: Bond['kind'], strength: number): Bond =>
-  bondFrom(aId, bId, Array.from({ length: strength }, (_, i) => ({ tick: 10 + i, kind })), 100)
+  bondFrom(
+    aId,
+    bId,
+    Array.from({ length: strength }, (_, i) => ({ tick: 10 + i, kind })),
+    100,
+  )
 
 const api: BondsResponse = {
   asOfTick: 100,
@@ -34,8 +44,8 @@ describe('toBondGraph', () => {
 
   it('sizes a node by how many ties it carries', () => {
     const by = new Map(graph.nodes.map((n) => [n.id, n]))
-    expect(by.get('alice')?.size).toBe(10)   // two bonds → 6 + 2·2
-    expect(by.get('mira')?.size).toBe(8)     // one bond  → 6 + 2·1
+    expect(by.get('alice')?.size).toBe(10) // two bonds → 6 + 2·2
+    expect(by.get('mira')?.size).toBe(8) // one bond  → 6 + 2·1
   })
 
   it('marks who is still walking and who is remembered', () => {
@@ -58,9 +68,9 @@ describe('toBondGraph', () => {
 
   it('widens a link by how much has passed between the two', () => {
     const by = new Map(graph.links.map((l) => [l.id, l]))
-    expect(by.get('alice|bob')?.width).toBe(3)     // strength 4 → 1 + log2(4)
-    expect(by.get('bob|cara')?.width).toBe(2)      // strength 2 → 1 + log2(2)
-    expect(by.get('alice|mira')?.width).toBe(1)    // strength 1 → 1 + log2(1)
+    expect(by.get('alice|bob')?.width).toBe(3) // strength 4 → 1 + log2(4)
+    expect(by.get('bob|cara')?.width).toBe(2) // strength 2 → 1 + log2(2)
+    expect(by.get('alice|mira')?.width).toBe(1) // strength 1 → 1 + log2(1)
   })
 
   it('never lets a strength of zero collapse a link out of sight', () => {
@@ -91,7 +101,8 @@ describe('the bond vocabulary', () => {
   })
 
   it('speaks of the town, never of a score', () => {
-    for (const label of Object.values(BOND_KIND_LABEL)) expect(label, label).not.toMatch(GAMIFICATION_BAN)
+    for (const label of Object.values(BOND_KIND_LABEL))
+      expect(label, label).not.toMatch(GAMIFICATION_BAN)
   })
 })
 

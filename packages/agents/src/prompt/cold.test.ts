@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
-  createWorldTick, doorTile, EventStore, fold, genesisState, isExposed, makeGenesisWorld, openDb,
-  RngStreams, TickLoop, type LawQueue, type TickHandler, type WorldState,
+  createWorldTick,
+  doorTile,
+  EventStore,
+  fold,
+  genesisState,
+  isExposed,
+  makeGenesisWorld,
+  openDb,
+  RngStreams,
+  TickLoop,
+  type LawQueue,
+  type TickHandler,
+  type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, MINUTES_PER_DAY } from '@sj/shared'
 import { EngineBridge } from '../runtime/bridge.js'
 import { perceptionToProse, type PerceptionPacket } from './prose.js'
 
@@ -11,10 +22,6 @@ import { perceptionToProse, type PerceptionPacket } from './prose.js'
 // indoors), and the prose used to say the opposite: the sky as freedom, the roof as a cage.
 
 const CFG = DEFAULT_CONFIG
-
-let seq = 0
-const ev = (type: string, payload: unknown): SimEvent =>
-  ({ seq: ++seq, tick: 0, type, payload } as unknown as SimEvent)
 
 const WORLD = {
   isWalkable: () => true,
@@ -27,7 +34,8 @@ const WORLD = {
 // The genesis town with two founders at their own doorways, wired through a real bridge — the
 // same object the runtime reads its packets from, so nothing here is a hand-built fixture.
 function town(
-  startTick: number, extraItems: Array<Record<string, unknown>> = [],
+  startTick: number,
+  extraItems: Record<string, unknown>[] = [],
 ): { bridge: EngineBridge; loop: TickLoop; homes: Record<string, string> } {
   const db = openDb(':memory:')
   const g = makeGenesisWorld(CFG)
@@ -39,22 +47,50 @@ function town(
   const homes: Record<string, string> = {}
   const cabin = Object.values(state.structures).find((s) => s.kind === 'cabin')!
   for (const id of ['amara', 'yusuf']) {
-    const house = id === 'yusuf' ? cabin
-      : Object.values(state.structures).find((s) => s.kind === 'house' && s.owner === id)!
+    const house =
+      id === 'yusuf'
+        ? cabin
+        : Object.values(state.structures).find((s) => s.kind === 'house' && s.owner === id)!
     const door = doorTile(state, house)!
     homes[id] = house.id
-    state = fold(state, store.append(state.tick, 'agent_spawned',
-      { id, name: id, x: door.x, y: door.y, ageDays: 30 * 364, sex: 'f' }), CFG)
+    state = fold(
+      state,
+      store.append(state.tick, 'agent_spawned', {
+        id,
+        name: id,
+        x: door.x,
+        y: door.y,
+        ageDays: 30 * 364,
+        sex: 'f',
+      }),
+      CFG,
+    )
   }
   // Spawned at tick zero on purpose: a shelf life is dated from the moment a thing is made.
   for (const item of extraItems) {
-    state = fold(state, store.append(state.tick, 'item_spawned',
-      { ...item, spoilage: { spawnDay: 0, days: CFG.spoilage.days['fish'] } }), CFG)
+    state = fold(
+      state,
+      store.append(state.tick, 'item_spawned', {
+        ...item,
+        spoilage: { spawnDay: 0, days: CFG.spoilage.days.fish },
+      }),
+      CFG,
+    )
   }
   const lawQueue: LawQueue = []
   const worldTick = createWorldTick(CFG, rng, lawQueue)
   let handler: TickHandler = () => {}
-  const loop = new TickLoop({ store, state, rng, config: CFG, startTick, realMsPerTick: 0, onTick: (c) => handler(c) })
+  const loop = new TickLoop({
+    store,
+    state,
+    rng,
+    config: CFG,
+    startTick,
+    realMsPerTick: 0,
+    onTick: (c) => {
+      handler(c)
+    },
+  })
   const bridge = new EngineBridge({ loop, store, simConfig: CFG })
   handler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
@@ -78,7 +114,7 @@ describe('the cold a body can feel, and the thing that answers it', () => {
 
   it('a body under a roof on the same cold night is told the walls are holding it off', () => {
     const { bridge, loop, homes } = town(COLD_HOUR - 2)
-    void bridge.submit('yusuf', { verb: 'enter', params: { structureId: homes['yusuf']! } })
+    void bridge.submit('yusuf', { verb: 'enter', params: { structureId: homes.yusuf! } })
     loop.step()
     loop.step()
     expect(isExposed(loop.state, CFG, 'yusuf')).toBe(false)
@@ -89,7 +125,7 @@ describe('the cold a body can feel, and the thing that answers it', () => {
 
   it('the two bodies read different sentences on the same night — the pair is the whole lesson', () => {
     const { bridge, loop, homes } = town(COLD_HOUR - 2)
-    void bridge.submit('yusuf', { verb: 'enter', params: { structureId: homes['yusuf']! } })
+    void bridge.submit('yusuf', { verb: 'enter', params: { structureId: homes.yusuf! } })
     loop.step()
     loop.step()
     const outside = proseFor(bridge, 'amara')
@@ -111,7 +147,14 @@ describe('the cold a body can feel, and the thing that answers it', () => {
     const { bridge, loop } = town(COLD_HOUR - 1)
     loop.step()
     const prose = proseFor(bridge, 'amara')
-    for (const hint of ['build', 'raise a', 'you should', 'you must build', 'a roof would', 'go inside']) {
+    for (const hint of [
+      'build',
+      'raise a',
+      'you should',
+      'you must build',
+      'a roof would',
+      'go inside',
+    ]) {
       expect(prose.toLowerCase()).not.toContain(hint)
     }
   })
@@ -121,30 +164,78 @@ describe('food that is turning', () => {
   // The engine composes `spoiling`, and `reconcile` used to drop it on the floor.
   it('a mind is told when what it carries is on its last day', () => {
     const packet = {
-      time: { tick: 0, year: 0, season: 'spring', dayOfSeason: 1, dayOfYear: 0, hour: 12, minute: 0, isNight: false },
+      time: {
+        tick: 0,
+        year: 0,
+        season: 'spring',
+        dayOfSeason: 1,
+        dayOfYear: 0,
+        hour: 12,
+        minute: 0,
+        isNight: false,
+      },
       self: {
-        body: { needs: { hunger: 90, energy: 90, warmth: 90, social: 90 }, hp: 100, injuries: [], ill: false },
-        x: 0, y: 0, asleep: false, collapsed: false, activity: null,
-        inventory: [{ id: 'item_1', kind: 'fish', qty: 2, loc: { t: 'agent', id: 'a' }, spoiling: true as const }],
+        body: {
+          needs: { hunger: 90, energy: 90, warmth: 90, social: 90 },
+          hp: 100,
+          injuries: [],
+          ill: false,
+        },
+        x: 0,
+        y: 0,
+        asleep: false,
+        collapsed: false,
+        activity: null,
+        inventory: [
+          {
+            id: 'item_1',
+            kind: 'fish',
+            qty: 2,
+            loc: { t: 'agent', id: 'a' },
+            spoiling: true as const,
+          },
+        ],
       },
       weather: { kind: 'sunny', temperatureC: 14 },
       visible: { agents: [], structures: [], items: [], crops: [] },
-      heard: [], seen: [], feltEvents: [],
+      heard: [],
+      seen: [],
+      feltEvents: [],
     } as unknown as PerceptionPacket
     expect(perceptionToProse(packet, () => {}, WORLD)).toContain('it is turning')
   })
 
   it('fresh food reads exactly as it always did', () => {
     const packet = {
-      time: { tick: 0, year: 0, season: 'spring', dayOfSeason: 1, dayOfYear: 0, hour: 12, minute: 0, isNight: false },
+      time: {
+        tick: 0,
+        year: 0,
+        season: 'spring',
+        dayOfSeason: 1,
+        dayOfYear: 0,
+        hour: 12,
+        minute: 0,
+        isNight: false,
+      },
       self: {
-        body: { needs: { hunger: 90, energy: 90, warmth: 90, social: 90 }, hp: 100, injuries: [], ill: false },
-        x: 0, y: 0, asleep: false, collapsed: false, activity: null,
+        body: {
+          needs: { hunger: 90, energy: 90, warmth: 90, social: 90 },
+          hp: 100,
+          injuries: [],
+          ill: false,
+        },
+        x: 0,
+        y: 0,
+        asleep: false,
+        collapsed: false,
+        activity: null,
         inventory: [{ id: 'item_1', kind: 'fish', qty: 2, loc: { t: 'agent', id: 'a' } }],
       },
       weather: { kind: 'sunny', temperatureC: 14 },
       visible: { agents: [], structures: [], items: [], crops: [] },
-      heard: [], seen: [], feltEvents: [],
+      heard: [],
+      seen: [],
+      feltEvents: [],
     } as unknown as PerceptionPacket
     expect(perceptionToProse(packet, () => {}, WORLD)).not.toContain('turning')
   })
@@ -153,7 +244,13 @@ describe('food that is turning', () => {
     // A fish caught on day zero is on its last day once day one begins: `spoilage.days.fish`
     // is 2 and `isSpoiling` fires a whole day before the deadline. Start the clock there.
     const { bridge, loop } = town(MINUTES_PER_DAY + 8 * 60, [
-      { id: 'item_fresh_fish', kind: 'fish', qty: 1, loc: { t: 'agent', id: 'amara' }, owner: 'amara' },
+      {
+        id: 'item_fresh_fish',
+        kind: 'fish',
+        qty: 1,
+        loc: { t: 'agent', id: 'amara' },
+        owner: 'amara',
+      },
     ])
     loop.step()
     const packet = bridge.perception('amara')

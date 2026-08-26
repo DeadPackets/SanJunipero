@@ -8,8 +8,12 @@ describe('forge config', () => {
   it('DEFAULT_FORGE_CONFIG is exact on all 10 leaf values', () => {
     expect(DEFAULT_FORGE_CONFIG).toEqual({
       visionQa: {
-        enabled: true, model: 'google/gemini-3.7-flash', minScore: 7,
-        maxRetries: 2, costCapPerAssetUsd: 0.05, rubricVersion: 'v1',
+        enabled: true,
+        model: 'google/gemini-3.7-flash',
+        minScore: 7,
+        maxRetries: 2,
+        costCapPerAssetUsd: 0.05,
+        rubricVersion: 'v1',
       },
       library: { iconSizePx: 64, furnitureIconSizePx: 64 },
       alignment: { feetTolerancePx: 2, baseFitToleranceQuarterTiles: 1 },
@@ -38,7 +42,9 @@ describe('forge config', () => {
 
   it('a garbage numeric env var throws rather than silently defaulting', () => {
     expect(() => loadForgeConfig({ FORGE_VISION_MIN_SCORE: 'x' })).toThrow(/FORGE_VISION_MIN_SCORE/)
-    expect(() => loadForgeConfig({ FORGE_VISION_MAX_RETRIES: '' })).toThrow(/FORGE_VISION_MAX_RETRIES/)
+    expect(() => loadForgeConfig({ FORGE_VISION_MAX_RETRIES: '' })).toThrow(
+      /FORGE_VISION_MAX_RETRIES/,
+    )
     expect(() => loadForgeConfig({ FORGE_VISION_ENABLED: 'yes' })).toThrow(/FORGE_VISION_ENABLED/)
   })
 
@@ -51,16 +57,34 @@ describe('forge config', () => {
   it('the worst-case attempt count the gate can produce still registers in the codex', () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     const attempts = DEFAULT_FORGE_CONFIG.visionQa.maxRetries + 1
-    expect(() => codex.register({
-      class: 'item', desc: 'a wooden bucket', footprint: { w: 1, h: 1 },
-      png: Buffer.from('png-bytes'), widthPx: 16, heightPx: 16,
-      status: 'ready', score: null, attempts, costUsd: 0.09,
-    })).not.toThrow()
-    expect(() => codex.register({
-      class: 'item', desc: 'a wooden bucket', footprint: { w: 1, h: 1 },
-      png: Buffer.from('png-bytes'), widthPx: 16, heightPx: 16,
-      status: 'ready', score: null, attempts: attempts + 1, costUsd: 0.09,
-    })).toThrow()
+    expect(() =>
+      codex.register({
+        class: 'item',
+        desc: 'a wooden bucket',
+        footprint: { w: 1, h: 1 },
+        png: Buffer.from('png-bytes'),
+        widthPx: 16,
+        heightPx: 16,
+        status: 'ready',
+        score: null,
+        attempts,
+        costUsd: 0.09,
+      }),
+    ).not.toThrow()
+    expect(() =>
+      codex.register({
+        class: 'item',
+        desc: 'a wooden bucket',
+        footprint: { w: 1, h: 1 },
+        png: Buffer.from('png-bytes'),
+        widthPx: 16,
+        heightPx: 16,
+        status: 'ready',
+        score: null,
+        attempts: attempts + 1,
+        costUsd: 0.09,
+      }),
+    ).toThrow()
   })
 
   it('leaves SimConfig untouched — DEFAULT_CONFIG is still the schema default', () => {

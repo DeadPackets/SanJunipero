@@ -2,21 +2,34 @@ import type { BudgetGuard } from './budget.js'
 import { BudgetExceededError } from './budget.js'
 
 export const IMAGE_MODEL_PRIMARY = 'google/gemini-3.1-flash-image'
-export const IMAGE_MODEL_FALLBACKS = ['bytedance-seed/seedream-4.5', 'black-forest-labs/flux.2-klein-4b'] as const
+export const IMAGE_MODEL_FALLBACKS = [
+  'bytedance-seed/seedream-4.5',
+  'black-forest-labs/flux.2-klein-4b',
+] as const
 export const GEN_SIZE = 512
 export const EST_COST_PER_IMAGE = 0.045
 const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
 
 export type Candidate = { png: Buffer; model: string; costUsd: number }
-export type ImageClient = { generateCandidates(prompt: string, refs: Buffer[], n?: number): Promise<Candidate[]> }
+export type ImageClient = {
+  generateCandidates(prompt: string, refs: Buffer[], n?: number): Promise<Candidate[]>
+}
 
 export class ImageGenError extends Error {
-  constructor(public model: string, public status: number, detail: string) {
+  constructor(
+    public model: string,
+    public status: number,
+    detail: string,
+  ) {
     super(`image generation failed (${model}, HTTP ${status}): ${detail}`)
   }
 }
 
-export function makeImageClient(opts: { apiKey: string; fetchFn?: typeof fetch; budget?: BudgetGuard }): ImageClient {
+export function makeImageClient(opts: {
+  apiKey: string
+  fetchFn?: typeof fetch
+  budget?: BudgetGuard
+}): ImageClient {
   const doFetch = opts.fetchFn ?? fetch
 
   async function generateOne(model: string, prompt: string, refs: Buffer[]): Promise<Candidate> {
@@ -26,13 +39,18 @@ export function makeImageClient(opts: { apiKey: string; fetchFn?: typeof fetch; 
       method: 'POST',
       headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model, prompt, size: `${GEN_SIZE}x${GEN_SIZE}`, response_format: 'b64_json',
-        ...(refs.length ? {
-          input_references: refs.map(r => ({
-            type: 'image_url' as const,
-            image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
-          })),
-        } : {}),
+        model,
+        prompt,
+        size: `${GEN_SIZE}x${GEN_SIZE}`,
+        response_format: 'b64_json',
+        ...(refs.length
+          ? {
+              input_references: refs.map((r) => ({
+                type: 'image_url' as const,
+                image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
+              })),
+            }
+          : {}),
         usage: { include: true },
       }),
     })
@@ -49,8 +67,9 @@ export function makeImageClient(opts: { apiKey: string; fetchFn?: typeof fetch; 
   async function slot(prompt: string, refs: Buffer[]): Promise<Candidate | ImageGenError> {
     let lastErr = new ImageGenError('none', 0, 'no models attempted')
     for (const model of [IMAGE_MODEL_PRIMARY, ...IMAGE_MODEL_FALLBACKS]) {
-      try { return await generateOne(model, prompt, refs) }
-      catch (e) {
+      try {
+        return await generateOne(model, prompt, refs)
+      } catch (e) {
         if (e instanceof BudgetExceededError) throw e
         lastErr = e instanceof ImageGenError ? e : new ImageGenError(model, 0, String(e))
       }
@@ -67,7 +86,10 @@ export function makeImageClient(opts: { apiKey: string; fetchFn?: typeof fetch; 
       let genErr: ImageGenError | undefined
       for (const s of settled) {
         if (s.status === 'rejected') {
-          if (s.reason instanceof BudgetExceededError) { budgetErr ??= s.reason; continue }
+          if (s.reason instanceof BudgetExceededError) {
+            budgetErr ??= s.reason
+            continue
+          }
           throw s.reason
         }
         if (s.value instanceof ImageGenError) genErr ??= s.value

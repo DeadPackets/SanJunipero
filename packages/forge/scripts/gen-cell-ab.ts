@@ -22,7 +22,8 @@ const DURABLE = scratch('c5', 'quality-ab')
 mkdirSync(`${DURABLE}/raws`, { recursive: true })
 mkdirSync(`${DURABLE}/cells`, { recursive: true })
 
-const PROMPT = `${STYLE_PROMPT} A single character sprite, exactly one figure, whole body visible. ` +
+const PROMPT =
+  `${STYLE_PROMPT} A single character sprite, exactly one figure, whole body visible. ` +
   `The character is ${FACING_CLAUSES.sw}. The character is ${POSE_CLAUSES.idle}. ` +
   'Subject: a friendly young villager in a sage-green cap and overalls. ' +
   'Rendered as chunky low-resolution pixel art: the entire figure is drawn from large visible square pixels ' +
@@ -31,20 +32,35 @@ const PROMPT = `${STYLE_PROMPT} A single character sprite, exactly one figure, w
 
 // gpt-image-2 rejects size/response_format (T6 v4 wave: aspect_ratio 1:1, quality medium only).
 const MODELS: { id: string; short: string; body: Record<string, unknown> }[] = [
-  { id: 'google/gemini-3.1-flash-image', short: 'gemini', body: { size: '512x512', response_format: 'b64_json' } },
-  { id: 'openai/gpt-image-2', short: 'gpt2', body: { aspect_ratio: '1:1', quality: 'medium', n: 1 } },
+  {
+    id: 'google/gemini-3.1-flash-image',
+    short: 'gemini',
+    body: { size: '512x512', response_format: 'b64_json' },
+  },
+  {
+    id: 'openai/gpt-image-2',
+    short: 'gpt2',
+    body: { aspect_ratio: '1:1', quality: 'medium', n: 1 },
+  },
   // seedream rejects 512x512 (needs >=3,686,400 output px); omit size for its default.
   { id: 'bytedance-seed/seedream-4.5', short: 'seedream', body: { response_format: 'b64_json' } },
 ]
 
-async function generate(model: typeof MODELS[number]): Promise<{ png: Buffer; costUsd: number }> {
+async function generate(model: (typeof MODELS)[number]): Promise<{ png: Buffer; costUsd: number }> {
   budget.spend(RESERVE)
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: model.id, prompt: PROMPT, ...model.body,
-      input_references: [{ type: 'image_url', image_url: { url: `data:image/png;base64,${ANCHOR.toString('base64')}` } }],
+      model: model.id,
+      prompt: PROMPT,
+      ...model.body,
+      input_references: [
+        {
+          type: 'image_url',
+          image_url: { url: `data:image/png;base64,${ANCHOR.toString('base64')}` },
+        },
+      ],
       usage: { include: true },
     }),
   })
@@ -57,29 +73,44 @@ async function generate(model: typeof MODELS[number]): Promise<{ png: Buffer; co
   return { png: Buffer.from(b64, 'base64'), costUsd }
 }
 
-
 // contact sheet: rows = model, cols = cand0-nearest, cand0-majority, cand1-nearest, cand1-majority
-const CELLPX = 128, GAP = 1
-const sheetW = 4 * CELLPX + 3 * GAP, sheetH = MODELS.length * CELLPX + (MODELS.length - 1) * GAP
-const sheet: RawImage = { width: sheetW, height: sheetH, data: new Uint8ClampedArray(sheetW * sheetH * 4) }
+const CELLPX = 128,
+  GAP = 1
+const sheetW = 4 * CELLPX + 3 * GAP,
+  sheetH = MODELS.length * CELLPX + (MODELS.length - 1) * GAP
+const sheet: RawImage = {
+  width: sheetW,
+  height: sheetH,
+  data: new Uint8ClampedArray(sheetW * sheetH * 4),
+}
 function blit(cell: RawImage, row: number, col: number) {
-  const ox = col * (CELLPX + GAP), oy = row * (CELLPX + GAP)
+  const ox = col * (CELLPX + GAP),
+    oy = row * (CELLPX + GAP)
   for (let y = 0; y < cell.height; y++)
-    sheet.data.set(cell.data.subarray(y * cell.width * 4, (y + 1) * cell.width * 4), ((oy + y) * sheetW + ox) * 4)
+    sheet.data.set(
+      cell.data.subarray(y * cell.width * 4, (y + 1) * cell.width * 4),
+      ((oy + y) * sheetW + ox) * 4,
+    )
 }
 
-const readme: string[] = ['quality-ab contact sheet layout (no text labels rendered):',
+const readme: string[] = [
+  'quality-ab contact sheet layout (no text labels rendered):',
   'rows top->bottom: gemini (google/gemini-3.1-flash-image), gpt2 (openai/gpt-image-2), seedream (bytedance-seed/seedream-4.5)',
   'cols left->right: cand0-nearest, cand0-majority, cand1-nearest, cand1-majority',
   'nearest = chromaKey -> downscaleNearest 32 -> quantize -> outlinePass (old chain)',
-  'majority = chromaKey -> downscaleMajority 32 -> quantize, no outline (new chain)', '', 'per-image costs:']
+  'majority = chromaKey -> downscaleMajority 32 -> quantize, no outline (new chain)',
+  '',
+  'per-image costs:',
+]
 for (const [row, model] of MODELS.entries()) {
   for (let i = 0; i < 2; i++) {
     // idempotent rerun: an existing raw means this image is already paid for
     const rawPath = `${DURABLE}/raws/${model.short}-${i}.png`
     let png: Buffer
-    try { png = readFileSync(rawPath); console.log(`${model.short} cand${i}: reusing existing raw`) }
-    catch {
+    try {
+      png = readFileSync(rawPath)
+      console.log(`${model.short} cand${i}: reusing existing raw`)
+    } catch {
       const r = await generate(model)
       png = r.png
       console.log(`${model.short} cand${i}: $${r.costUsd.toFixed(4)}`)
@@ -96,6 +127,9 @@ for (const [row, model] of MODELS.entries()) {
   }
 }
 writeFileSync(`${DURABLE}/contact-sheet.png`, await encodePng(sheet))
-readme.push('', `total spend: $${budget.total.toFixed(4)} of $1.00 (reserve-then-fire at $${RESERVE}/image)`)
+readme.push(
+  '',
+  `total spend: $${budget.total.toFixed(4)} of $1.00 (reserve-then-fire at $${RESERVE}/image)`,
+)
 writeFileSync(`${DURABLE}/README.txt`, readme.join('\n'))
 console.log(readme.join('\n'))

@@ -12,7 +12,12 @@ export const FLASH_COLOR = 0xf4e289
 export const FLASH_MIN_GAP_S = 6
 export const FLASH_MAX_GAP_S = 14
 
-export type WeatherLayer = { setKind(kind: string): void; setSuppressed(v: boolean): void; tick(dtMs: number): void; destroy(): void }
+export type WeatherLayer = {
+  setKind(kind: string): void
+  setSuppressed(v: boolean): void
+  tick(dtMs: number): void
+  destroy(): void
+}
 
 type Drop = { sprite: Sprite; x: number; y: number }
 
@@ -35,7 +40,8 @@ export function createWeatherLayer(scene: Scene): WeatherLayer {
   const streakTextures = new Map<string, Texture>()
 
   // viewer-side Math.random is FINE here: presentation only, never simulation
-  const rollFlashGap = (): number => (FLASH_MIN_GAP_S + Math.random() * (FLASH_MAX_GAP_S - FLASH_MIN_GAP_S)) * 1000
+  const rollFlashGap = (): number =>
+    (FLASH_MIN_GAP_S + Math.random() * (FLASH_MAX_GAP_S - FLASH_MIN_GAP_S)) * 1000
 
   const clear = (): void => {
     for (const d of drops) d.sprite.destroy()
@@ -81,7 +87,8 @@ export function createWeatherLayer(scene: Scene): WeatherLayer {
     setSuppressed(v) {
       if (v === suppressed) return
       suppressed = v
-      if (v) clear() // suppression clears live particles and blocks spawns
+      if (v)
+        clear() // suppression clears live particles and blocks spawns
       else spawnAll()
     },
     tick(dtMs) {

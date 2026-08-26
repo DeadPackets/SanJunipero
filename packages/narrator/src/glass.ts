@@ -5,16 +5,38 @@ export { NARRATOR_TABLES, openNarratorDb } from './schema.js'
 // Two rules, one door each: the narrator may not own a world table, and nothing it names may
 // reach a mind. Both enforcement points live agents-side and are re-exported here.
 export {
-  assertQuotedName, CONSTRUCT_VOCABULARY, scanPromptForGlassLeak, UNNAMED_CONSTRUCT_COPY,
-  type NameSource, type QuotedName,
+  assertQuotedName,
+  CONSTRUCT_VOCABULARY,
+  scanPromptForGlassLeak,
+  UNNAMED_CONSTRUCT_COPY,
+  type NameSource,
+  type QuotedName,
 } from '@sj/agents'
 
 // Every world+agent table the narrator must not own (asserted absent from narrator.db).
 export const WORLD_TABLES = [
-  'events', 'snapshots', 'rng_state',
-  'rulebook', 'rulings', 'rulings_fts', 'rulings_vec', 'ruling_reviews', 'codex', 'assets', 'jobs',
-  'memories', 'memory_tags', 'memories_fts', 'memory_vec', 'facts', 'ledgers', 'summary_nodes',
-  'journal', 'autobiography', 'recall_misses', 'personality_versions',
+  'events',
+  'snapshots',
+  'rng_state',
+  'rulebook',
+  'rulings',
+  'rulings_fts',
+  'rulings_vec',
+  'ruling_reviews',
+  'codex',
+  'assets',
+  'jobs',
+  'memories',
+  'memory_tags',
+  'memories_fts',
+  'memory_vec',
+  'facts',
+  'ledgers',
+  'summary_nodes',
+  'journal',
+  'autobiography',
+  'recall_misses',
+  'personality_versions',
 ] as const
 
 // Deliberately NOT engine openDb: readonly is the only genuine "no write grant"

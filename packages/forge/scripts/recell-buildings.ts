@@ -7,7 +7,14 @@ import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'
 import { chromaKey } from '../src/post/chromaKey.js'
 import { cellAnchor } from '../src/hires.js'
 import { buildingCellPx, reCell } from '../src/reCell.js'
-import { alphaBinaryGate, integerScaleGate, nativeDensityGate, paletteGate, spriteDensity, classDensityGate } from '../src/pixelGates.js'
+import {
+  alphaBinaryGate,
+  integerScaleGate,
+  nativeDensityGate,
+  paletteGate,
+  spriteDensity,
+  classDensityGate,
+} from '../src/pixelGates.js'
 import { TOWN_TILE } from '../src/assetResolution.js'
 import { scratch } from './scratch.js'
 
@@ -30,7 +37,7 @@ function keyBg(img: RawImage): RawImage {
     const keyed = chromaKey(img, { tolerance })
     let clear = 0
     for (let i = 3; i < keyed.data.length; i += 4) if (keyed.data[i] === 0) clear++
-    if (clear / (keyed.width * keyed.height) >= 0.10) return keyed
+    if (clear / (keyed.width * keyed.height) >= 0.1) return keyed
   }
   throw new Error('keyBg: <10% keyed even at tolerance 110')
 }
@@ -40,10 +47,14 @@ const members: { name: string; density: number }[] = []
 const refused: string[] = []
 
 for (const b of BUILDINGS) {
-  const from = join(SRC, b.dir), to = join(OUT, b.dir)
+  const from = join(SRC, b.dir),
+    to = join(OUT, b.dir)
   mkdirSync(join(to, 'raws'), { recursive: true })
-  const manifest = JSON.parse(readFileSync(join(from, 'manifest.json'), 'utf8')) as
-    { version: string; kind: string; footprint: { w: number; h: number } }
+  const manifest = JSON.parse(readFileSync(join(from, 'manifest.json'), 'utf8')) as {
+    version: string
+    kind: string
+    footprint: { w: number; h: number }
+  }
 
   const rawBuf = readFileSync(join(from, 'raws', `${b.raw}.png`))
   const raw = await decodePng(rawBuf)
@@ -52,7 +63,11 @@ for (const b of BUILDINGS) {
   const anchor = cellAnchor(r.cell)
 
   const before = await decodePng(readFileSync(join(from, 'cell.png')))
-  const density = spriteDensity({ canvas: { w: cellPx, h: cellPx }, footprint: b.fp, tile: TOWN_TILE })
+  const density = spriteDensity({
+    canvas: { w: cellPx, h: cellPx },
+    footprint: b.fp,
+    tile: TOWN_TILE,
+  })
   members.push({ name: b.dir, density })
   // ★ THE GATES USED TO RUN AFTER THE WRITE. Every one of these four was computed, put in a
   // markdown cell, and the cell written to disk whatever it said. They decide now, and a
@@ -61,17 +76,38 @@ for (const b of BUILDINGS) {
     ...integerScaleGate({ w: r.plan.window, h: r.plan.window }, { w: cellPx, h: cellPx }).failures,
     ...alphaBinaryGate(r.cell).failures,
     ...paletteGate(r.cell).failures,
-    ...nativeDensityGate({ name: b.dir, canvas: { w: cellPx, h: cellPx }, footprint: b.fp, tile: TOWN_TILE }).failures,
+    ...nativeDensityGate({
+      name: b.dir,
+      canvas: { w: cellPx, h: cellPx },
+      footprint: b.fp,
+      tile: TOWN_TILE,
+    }).failures,
   ]
-  rows.push(`| ${b.dir} | ${b.fp.w}x${b.fp.h} | ${before.width}x${before.height} | ${cellPx}x${cellPx} | `
-    + `${raw.width}/${r.plan.factor} (window ${r.plan.window}${r.plan.sourceScale === 1 ? '' : `, source x${r.plan.sourceScale.toFixed(3)}`}) | `
-    + `${density} | ${fails.length === 0 ? 'clean' : fails.join('; ')} |`)
+  rows.push(
+    `| ${b.dir} | ${b.fp.w}x${b.fp.h} | ${before.width}x${before.height} | ${cellPx}x${cellPx} | ` +
+      `${raw.width}/${r.plan.factor} (window ${r.plan.window}${r.plan.sourceScale === 1 ? '' : `, source x${r.plan.sourceScale.toFixed(3)}`}) | ` +
+      `${density} | ${fails.length === 0 ? 'clean' : fails.join('; ')} |`,
+  )
   console.log(rows.at(-1))
-  if (fails.length > 0) { refused.push(`${b.dir}: ${fails.join('; ')}`); continue }
+  if (fails.length > 0) {
+    refused.push(`${b.dir}: ${fails.join('; ')}`)
+    continue
+  }
 
   writeFileSync(join(to, 'cell.png'), await encodePng(r.cell))
-  writeFileSync(join(to, 'manifest.json'), JSON.stringify(
-    { version: 'v4-hires-building', kind: manifest.kind, footprint: manifest.footprint, cell: anchor }, null, 2))
+  writeFileSync(
+    join(to, 'manifest.json'),
+    JSON.stringify(
+      {
+        version: 'v4-hires-building',
+        kind: manifest.kind,
+        footprint: manifest.footprint,
+        cell: anchor,
+      },
+      null,
+      2,
+    ),
+  )
   // KEEP THE RAWS: the source of this repair travels with its output.
   cpSync(join(from, 'raws', `${b.raw}.png`), join(to, 'raws', `${b.raw}.png`))
   // and the art it replaces, so the before/after is a file comparison, not a memory
@@ -96,6 +132,8 @@ console.log(`\n${md}`)
 // The report is on disk BEFORE the throw: it is what tells an operator whether the model or
 // the threshold is wrong, and it is worthless if the failure eats it.
 if (!cls.ok) refused.push(`class density: ${cls.failures.join('; ')}`)
-if (refused.length > 0) throw new Error(
-  `${refused.length} building(s) FAILED the pixel bar and were not written:\n    `
-  + `${refused.join('\n    ')}\n  The report is at ${S}/fqc2/reports/buildings.md.`)
+if (refused.length > 0)
+  throw new Error(
+    `${refused.length} building(s) FAILED the pixel bar and were not written:\n    ` +
+      `${refused.join('\n    ')}\n  The report is at ${S}/fqc2/reports/buildings.md.`,
+  )

@@ -9,14 +9,22 @@ import { GAMIFICATION_BAN } from './townStats.js'
 import { BAND_MIN_PX, STRIP_CARD_W, STRIP_GAP } from './frame.js'
 import { EMPTY_COPY } from './townStats.js'
 
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+)
 const APP = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8')
 
 const EMOJI = /\p{Extended_Pictographic}/u
 
 const moment: Moment = {
-  id: 4, day: 3, startTick: 4320, endTick: 4380,
-  title: 'What the Fire Took', cast: ['alice', 'bob'], location: 'the riverbank',
+  id: 4,
+  day: 3,
+  startTick: 4320,
+  endTick: 4380,
+  title: 'What the Fire Took',
+  cast: ['alice', 'bob'],
+  location: 'the riverbank',
 }
 const people = { alice: { name: 'Rahel', alive: true }, bob: { name: 'Tomas', alive: true } }
 
@@ -24,9 +32,16 @@ const card = (open: boolean): string =>
   renderToStaticMarkup(createElement(MomentCardView, { moment, people, open, onOpen: () => {} }))
 
 const strip = (player: PlayerState): string =>
-  renderToStaticMarkup(createElement(PlayerStripView, {
-    moment, player, onToggle: () => {}, onSeek: () => {}, onSpeed: () => {}, onLive: () => {},
-  }))
+  renderToStaticMarkup(
+    createElement(PlayerStripView, {
+      moment,
+      player,
+      onToggle: () => {},
+      onSeek: () => {},
+      onSpeed: () => {},
+      onLive: () => {},
+    }),
+  )
 
 describe('MomentCardView', () => {
   const html = card(false)
@@ -46,7 +61,7 @@ describe('MomentCardView', () => {
 
   it('draws the place as palette pixels, never as an emoji', () => {
     expect(html).toContain('shape-rendering="crispEdges"')
-    expect(html).toContain('#7FB0C9')      // the riverbank motif, in water blue
+    expect(html).toContain('#7FB0C9') // the riverbank motif, in water blue
     expect(html).not.toMatch(EMOJI)
   })
 
@@ -57,9 +72,14 @@ describe('MomentCardView', () => {
   })
 
   it('says somewhere in the town when the day had no place', () => {
-    const nowhere = renderToStaticMarkup(createElement(MomentCardView, {
-      moment: { ...moment, location: null }, people, open: false, onOpen: () => {},
-    }))
+    const nowhere = renderToStaticMarkup(
+      createElement(MomentCardView, {
+        moment: { ...moment, location: null },
+        people,
+        open: false,
+        onOpen: () => {},
+      }),
+    )
     expect(nowhere).toContain('somewhere in the town')
   })
 })
@@ -107,10 +127,18 @@ describe('PlayerStripView', () => {
 })
 
 const frame = (over: Partial<Parameters<typeof MomentsFrameView>[0]> = {}): string =>
-  renderToStaticMarkup(createElement(MomentsFrameView, {
-    moments: [moment], people, momentId: null, letterboxed: true, leaving: false,
-    bandW: 1200, onOpen: () => {}, ...over,
-  }))
+  renderToStaticMarkup(
+    createElement(MomentsFrameView, {
+      moments: [moment],
+      people,
+      momentId: null,
+      letterboxed: true,
+      leaving: false,
+      bandW: 1200,
+      onOpen: () => {},
+      ...over,
+    }),
+  )
 
 describe('MomentsFrameView — the rail leaves the picture alone', () => {
   const html = frame()
@@ -175,7 +203,8 @@ describe('the composition, in the stylesheet and in the app that mounts it', () 
       // every rule the sheet has for the selector, joined — `.subtitle` is declared twice
       const all = [...CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
         .filter(([, s]) => (s ?? '').split(',').some((one) => one.trim() === sel))
-        .map(([, , body]) => body ?? '').join(';')
+        .map(([, , body]) => body ?? '')
+        .join(';')
       expect(all, `${sel} still measures the band by hand`).toMatch(/var\(--letterbox-h\)/)
     }
     expect(CSS).not.toMatch(/bottom:\s*calc\(12%/)

@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { ZOOM_STOPS, drawnBoundsOf } from './camera.js'
 import { CULL_MARGIN_PX, boxInView, type ViewRect } from './cull.js'
 import {
-  DEPTH_BUDGET, bodyDepthBox, depthOrder, structureDepthBox, type DepthBox,
+  DEPTH_BUDGET,
+  bodyDepthBox,
+  depthOrder,
+  structureDepthBox,
+  type DepthBox,
 } from './depth.js'
 import { bigTown, bigTownScreenSize, type FixtureStructure } from './bigTown.js'
 
@@ -16,14 +20,17 @@ const STAGE = { w: 1728, h: 880 - 56 }
 /** A viewport centred on the middle of the town, in the world space `tileToScreen` produces. */
 function viewAt(scale: number, centre: { sx: number; sy: number }): ViewRect {
   return {
-    x: centre.sx - STAGE.w / (2 * scale), y: centre.sy - STAGE.h / (2 * scale),
-    w: STAGE.w / scale, h: STAGE.h / scale,
+    x: centre.sx - STAGE.w / (2 * scale),
+    y: centre.sy - STAGE.h / (2 * scale),
+    w: STAGE.w / scale,
+    h: STAGE.h / scale,
   }
 }
 
 /** Pixi batches consecutive sprites sharing a texture, so a DRAW CALL is a run of one kind in painter's order. Kind stands in for texture: the codex resolves one art url per kind. */
 function drawCalls(order: readonly string[], kindOf: ReadonlyMap<string, string>): number {
-  let calls = 0, last: string | null = null
+  let calls = 0,
+    last: string | null = null
   for (const id of order) {
     const k = kindOf.get(id) ?? ''
     if (k !== last) calls++
@@ -52,10 +59,7 @@ function townBodies(town: readonly FixtureStructure[]): DepthBox[] {
 }
 
 function measure(town: readonly FixtureStructure[]): Row[] {
-  const boxes: DepthBox[] = [
-    ...town.map((s) => structureDepthBox(s.id, s)),
-    ...townBodies(town),
-  ]
+  const boxes: DepthBox[] = [...town.map((s) => structureDepthBox(s.id, s)), ...townBodies(town)]
   const kindOf = new Map<string, string>([
     ...town.map((s) => [s.id, s.kind] as const),
     ...townBodies(town).map((b) => [b.id, 'body'] as const),
@@ -83,11 +87,15 @@ function measure(town: readonly FixtureStructure[]): Row[] {
 
 function table(name: string, rows: readonly Row[]): string {
   const head = `\n${name}\n  zoom | objects | drawn | culled |  % | calls culled | calls uncalled | budget`
-  const body = rows.map((r) =>
-    `  ${String(r.zoom).padStart(4)} | ${String(r.objects).padStart(7)} | ${String(r.drawn).padStart(5)}`
-    + ` | ${String(r.culled).padStart(6)} | ${String(Math.round((r.culled / r.objects) * 100)).padStart(2)}`
-    + ` | ${String(r.callsCulled).padStart(12)} | ${String(r.callsUncalled).padStart(14)}`
-    + ` | ${r.drawn > DEPTH_BUDGET ? 'BLOWN' : 'ok'} vs ${r.budgetBlown ? 'BLOWN' : 'ok'}`).join('\n')
+  const body = rows
+    .map(
+      (r) =>
+        `  ${String(r.zoom).padStart(4)} | ${String(r.objects).padStart(7)} | ${String(r.drawn).padStart(5)}` +
+        ` | ${String(r.culled).padStart(6)} | ${String(Math.round((r.culled / r.objects) * 100)).padStart(2)}` +
+        ` | ${String(r.callsCulled).padStart(12)} | ${String(r.callsUncalled).padStart(14)}` +
+        ` | ${r.drawn > DEPTH_BUDGET ? 'BLOWN' : 'ok'} vs ${r.budgetBlown ? 'BLOWN' : 'ok'}`,
+    )
+    .join('\n')
   return `${head}\n${body}`
 }
 
@@ -98,14 +106,20 @@ describe('the cull, measured on a town the viewport cannot hold', () => {
     const size = bigTownScreenSize(rings)
 
     it(`${rings} ring(s): ${town.length} structures over ${size.w} × ${size.h} px — the table`, () => {
-      console.log(table(`${rings} ring(s) — ${town.length} structures, ${size.w} × ${size.h} px at scale 1`, rows))
+      console.log(
+        table(
+          `${rings} ring(s) — ${town.length} structures, ${size.w} × ${size.h} px at scale 1`,
+          rows,
+        ),
+      )
       expect(rows).toHaveLength(ZOOM_STOPS.length)
     })
 
     it(`${rings} ring(s): the tighter the view, the less it draws — monotonically`, () => {
       for (let i = 1; i < rows.length; i++) {
-        expect(rows[i]!.drawn, `zoom ${rows[i]!.zoom} vs ${rows[i - 1]!.zoom}`)
-          .toBeLessThanOrEqual(rows[i - 1]!.drawn)
+        expect(rows[i]!.drawn, `zoom ${rows[i]!.zoom} vs ${rows[i - 1]!.zoom}`).toBeLessThanOrEqual(
+          rows[i - 1]!.drawn,
+        )
       }
       expect(rows[rows.length - 1]!.drawn).toBeLessThan(rows[0]!.drawn)
       // A one-ring town is 1792 × 896 px and the stage holds 1728 × 824 plus two margins, so
@@ -126,7 +140,9 @@ describe('the cull, measured on a town the viewport cannot hold', () => {
     const overview = rows.find((r) => r.zoom === 0.5)!
     expect(overview.drawn).toBeGreaterThan(DEPTH_BUDGET)
     for (const r of rows.filter((x) => x.zoom >= 1)) {
-      expect(r.drawn, `zoom ${r.zoom} must stay inside the budget`).toBeLessThanOrEqual(DEPTH_BUDGET)
+      expect(r.drawn, `zoom ${r.zoom} must stay inside the budget`).toBeLessThanOrEqual(
+        DEPTH_BUDGET,
+      )
     }
   })
 
@@ -145,8 +161,10 @@ describe('the cull, measured on a town the viewport cannot hold', () => {
       const view = viewAt(z, centre)
       const tight = boxes.filter((x) => boxInView(x, view, 0)).length
       const slack = boxes.filter((x) => boxInView(x, view)).length
-      expect(slack - tight, `zoom ${z} pays ${slack - tight} extra for ${CULL_MARGIN_PX}px of margin`)
-        .toBeLessThan(Math.max(8, tight))
+      expect(
+        slack - tight,
+        `zoom ${z} pays ${slack - tight} extra for ${CULL_MARGIN_PX}px of margin`,
+      ).toBeLessThan(Math.max(8, tight))
     }
   })
 })

@@ -4,7 +4,15 @@
  */
 
 export const MARK_KINDS = [
-  'death', 'birth', 'built', 'first', 'chapter', 'changed', 'quarrel', 'joined', 'discovery',
+  'death',
+  'birth',
+  'built',
+  'first',
+  'chapter',
+  'changed',
+  'quarrel',
+  'joined',
+  'discovery',
 ] as const
 export type MarkKind = (typeof MARK_KINDS)[number]
 
@@ -14,7 +22,14 @@ export type Mark = { tick: number; kind: MarkKind; words: string; weight: number
  *  high weight costs them almost nothing, and it is the only PERMANENT one. */
 export const MARK_WEIGHT: Readonly<Record<MarkKind, number>> = {
   discovery: 18,
-  changed: 16, first: 16, death: 14, birth: 14, joined: 12, quarrel: 12, chapter: 10, built: 8,
+  changed: 16,
+  first: 16,
+  death: 14,
+  birth: 14,
+  joined: 12,
+  quarrel: 12,
+  chapter: 10,
+  built: 8,
 }
 export const MARK_MIN_WEIGHT = 8
 
@@ -53,8 +68,13 @@ export function tipSide(tick: number, span: number): TipSide {
   return 'center'
 }
 
-const DEEP = '#241F2B', HONEY = '#F2C879', SAGE = '#93B573', WATER = '#7FB0C9'
-const ROSE = '#C47876', EMBER = '#E8785A', INK = '#43394A'
+const DEEP = '#241F2B',
+  HONEY = '#F2C879',
+  SAGE = '#93B573',
+  WATER = '#7FB0C9'
+const ROSE = '#C47876',
+  EMBER = '#E8785A',
+  INK = '#43394A'
 
 /** Every fill a mark may use — all MASTER_PALETTE members, asserted as a set. */
 export const MARK_GLYPH_PALETTE: readonly string[] = [DEEP, HONEY, SAGE, WATER, ROSE, EMBER, INK]
@@ -66,7 +86,13 @@ export const MARK_STRUCTURE_INKS: readonly string[] = [INK, DEEP]
 export type MarkPixel = readonly [number, number, string]
 
 const KEY: Readonly<Record<string, string>> = {
-  d: DEEP, h: HONEY, g: SAGE, w: WATER, r: ROSE, e: EMBER, i: INK,
+  d: DEEP,
+  h: HONEY,
+  g: SAGE,
+  w: WATER,
+  r: ROSE,
+  e: EMBER,
+  i: INK,
 }
 
 /** Seven rows of seven characters: `.` is empty. Written as pictures, because a table of
@@ -74,7 +100,7 @@ const KEY: Readonly<Record<string, string>> = {
 function art(...rows: string[]): MarkPixel[] {
   const out: MarkPixel[] = []
   rows.forEach((row, y) => {
-    [...row].forEach((ch, x) => {
+    ;[...row].forEach((ch, x) => {
       const fill = KEY[ch]
       if (fill !== undefined) out.push([x, y, fill] as const)
     })
@@ -86,96 +112,24 @@ function art(...rows: string[]): MarkPixel[] {
  *  colour taken away. */
 export const MARK_GLYPH: Readonly<Record<MarkKind, MarkPixel[]>> = {
   // a headstone
-  death: art(
-    '..iii..',
-    '.iiiii.',
-    '.iidii.',
-    '.iidii.',
-    '.iidii.',
-    '.iidii.',
-    'iiiiiii',
-  ),
+  death: art('..iii..', '.iiiii.', '.iidii.', '.iidii.', '.iidii.', '.iidii.', 'iiiiiii'),
   // a sprout, two leaves on a stem
-  birth: art(
-    '.i...i.',
-    'igi.igi',
-    '.igigi.',
-    '..iii..',
-    '...i...',
-    '...i...',
-    '.iiiii.',
-  ),
+  birth: art('.i...i.', 'igi.igi', '.igigi.', '..iii..', '...i...', '...i...', '.iiiii.'),
   // a roof over two windows
-  built: art(
-    '...i...',
-    '..iii..',
-    '.iiiii.',
-    'iiiiiii',
-    '.iiiii.',
-    '.ihihi.',
-    '.iiiii.',
-  ),
+  built: art('...i...', '..iii..', '.iiiii.', 'iiiiiii', '.iiiii.', '.ihihi.', '.iiiii.'),
   // a cut diamond — the narrator's own "first"
-  first: art(
-    '...i...',
-    '..iii..',
-    '.iieii.',
-    'iieeeii',
-    '.iieii.',
-    '..iii..',
-    '...i...',
-  ),
+  first: art('...i...', '..iii..', '.iieii.', 'iieeeii', '.iieii.', '..iii..', '...i...'),
   // an open book
-  chapter: art(
-    '.i...i.',
-    'iwiiiwi',
-    'iwiiiwi',
-    'iwiiiwi',
-    'iwiiiwi',
-    'iwiiiwi',
-    '.iiiii.',
-  ),
+  chapter: art('.i...i.', 'iwiiiwi', 'iwiiiwi', 'iwiiiwi', 'iwiiiwi', 'iwiiiwi', '.iiiii.'),
   // a turn — the day somebody became different
-  changed: art(
-    '.iiiii.',
-    'ii.r.ii',
-    'ii.....',
-    '.iiiii.',
-    '.....ii',
-    'ii.r.ii',
-    '.iiiii.',
-  ),
+  changed: art('.iiiii.', 'ii.r.ii', 'ii.....', '.iiiii.', '.....ii', 'ii.r.ii', '.iiiii.'),
   // two strokes crossing
-  quarrel: art(
-    'ii...ii',
-    'iii.iii',
-    '.iiiii.',
-    '..iii..',
-    '.iiiii.',
-    'iii.iii',
-    'ii...ii',
-  ),
+  quarrel: art('ii...ii', 'iii.iii', '.iiiii.', '..iii..', '.iiiii.', 'iii.iii', 'ii...ii'),
   // an arrival: an arrow coming down onto the ground
-  joined: art(
-    '...i...',
-    '...i...',
-    '.iiiii.',
-    '..iii..',
-    '...i...',
-    '.......',
-    'iiiiiii',
-  ),
+  joined: art('...i...', '...i...', '.iiiii.', '..iii..', '...i...', '.......', 'iiiiiii'),
   // a key — the day a door opened. HONEY is the ward; INK carries the whole silhouette, so the
   // shape survives the colour being taken away (7.63:1 on the sand track).
-  discovery: art(
-    '..iii..',
-    '.ii.ii.',
-    '.ii.ii.',
-    '..iii..',
-    '...i...',
-    '...ihi.',
-    '...ih..',
-  ),
+  discovery: art('..iii..', '.ii.ii.', '.ii.ii.', '..iii..', '...i...', '...ihi.', '...ih..'),
 }
 
 // ── the sources ───────────────────────────────────────────────────────────────────────────
@@ -190,35 +144,36 @@ const EVENT_MARK: Readonly<Record<string, MarkKind>> = {
 }
 
 /** One phrase for one of a thing, one for several. `n` is filled in by the coalescer. */
-export const MARK_WORDS: Readonly<Record<MarkKind, { one: string; many: (n: number) => string }>> = {
-  death: { one: 'Someone died', many: (n) => `${n} people died` },
-  birth: { one: 'A child was born', many: (n) => `${n} children were born` },
-  built: { one: 'A building was finished', many: (n) => `${n} buildings were finished` },
-  joined: { one: 'Someone arrived in the town', many: (n) => `${n} people arrived in the town` },
-  quarrel: { one: 'A quarrel', many: (n) => `${n} quarrels` },
-  changed: { one: 'Someone changed', many: (n) => `${n} people changed` },
-  // these two carry the narrator's own words, so the fallback is only ever a safety net
-  first: { one: 'Something happened for the first time', many: (n) => `${n} firsts` },
-  chapter: { one: 'A day the town kept', many: (n) => `${n} days the town kept` },
-  // carries the gateway's own credited words, so the fallback is only ever a safety net
-  discovery: {
-    one: 'Somebody worked something out',
-    many: (n) => `${n} things were worked out`,
-  },
-}
+export const MARK_WORDS: Readonly<Record<MarkKind, { one: string; many: (n: number) => string }>> =
+  {
+    death: { one: 'Someone died', many: (n) => `${n} people died` },
+    birth: { one: 'A child was born', many: (n) => `${n} children were born` },
+    built: { one: 'A building was finished', many: (n) => `${n} buildings were finished` },
+    joined: { one: 'Someone arrived in the town', many: (n) => `${n} people arrived in the town` },
+    quarrel: { one: 'A quarrel', many: (n) => `${n} quarrels` },
+    changed: { one: 'Someone changed', many: (n) => `${n} people changed` },
+    // these two carry the narrator's own words, so the fallback is only ever a safety net
+    first: { one: 'Something happened for the first time', many: (n) => `${n} firsts` },
+    chapter: { one: 'A day the town kept', many: (n) => `${n} days the town kept` },
+    // carries the gateway's own credited words, so the fallback is only ever a safety net
+    discovery: {
+      one: 'Somebody worked something out',
+      many: (n) => `${n} things were worked out`,
+    },
+  }
 
 export type MarkSources = {
-  chapters: ReadonlyArray<{ day: number; title: string }>
-  milestones: ReadonlyArray<{ label: string; day: number; tick: number }>
+  chapters: readonly { day: number; title: string }[]
+  milestones: readonly { label: string; day: number; tick: number }[]
   /** A narrated scene. A day the narrator kept but never titled still deserves a mark. */
-  moments: ReadonlyArray<{ day: number; startTick: number }>
+  moments: readonly { day: number; startTick: number }[]
   /** The days a personality document actually moved — Task 83's change log. */
-  changes: ReadonlyArray<{ tick: number }>
+  changes: readonly { tick: number }[]
   /** The world's own log. Anything not in EVENT_MARK is noise here. */
-  events: ReadonlyArray<{ tick: number; type: string }>
+  events: readonly { tick: number; type: string }[]
   /** Already credited and already prose — the gateway owns the sentence, because only the
    *  gateway can turn an agent id into a name. */
-  discoveries: ReadonlyArray<{ tick: number; words: string }>
+  discoveries: readonly { tick: number; words: string }[]
 }
 
 const MINUTES_PER_DAY = 1440

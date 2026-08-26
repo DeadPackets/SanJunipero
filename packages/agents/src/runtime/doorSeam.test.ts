@@ -20,8 +20,13 @@ const AGENT = 'tamar'
 const HOUSE = 'structure_1'
 
 function town(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
-  const config = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
-  const terrain: TileId[][] = Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+  const config = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
+  const terrain: TileId[][] = Array.from({ length: 16 }, () =>
+    Array.from({ length: 16 }, (): TileId => 0),
+  )
   const store = new EventStore(openDb(':memory:'))
   const rng = new RngStreams('door-seam')
   let state = genesisState(config, terrain)
@@ -30,7 +35,15 @@ function town(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
   }
   put('agent_spawned', { id: AGENT, name: 'Tamar', x: 10, y: 10, ageDays: 7300 })
   put('structure_planned', {
-    id: HOUSE, kind: 'house', x: 5, y: 5, w: 2, h: 2, maxHp: 50, flammable: true, builderId: AGENT,
+    id: HOUSE,
+    kind: 'house',
+    x: 5,
+    y: 5,
+    w: 2,
+    h: 2,
+    maxHp: 50,
+    flammable: true,
+    builderId: AGENT,
   })
   put('structure_completed', { id: HOUSE })
   // Noon: the sight horizon shrinks with the light, and a house seven tiles
@@ -39,12 +52,26 @@ function town(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
 
   const worldTick = createWorldTick(config, rng)
   let handler: TickHandler = () => {}
-  const loop = new TickLoop({ store, state, rng, config, onTick: (ctx) => handler(ctx) })
+  const loop = new TickLoop({
+    store,
+    state,
+    rng,
+    config,
+    onTick: (ctx) => {
+      handler(ctx)
+    },
+  })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
   handler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
-  return { bridge, step: () => loop.step(), loop }
+  return {
+    bridge,
+    step: () => {
+      loop.step()
+    },
+    loop,
+  }
 }
 
 const proseFor = (bridge: EngineBridge): string =>

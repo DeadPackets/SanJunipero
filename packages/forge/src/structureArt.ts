@@ -1,9 +1,14 @@
 // THE COVERAGE LAW: every kind the world can create has a cell. Measured on the CODEX, never on
 // the screen — `builtForm` always answers, so asking the renderer whether it drew measures nothing.
+import { CITY_DWELLING_KINDS, isDwellingKind, type CityStructure } from '@sj/shared'
 import {
-  CITY_DWELLING_KINDS, isDwellingKind, type CityStructure,
-} from '@sj/shared'
-import { DEFAULT_FACING, STRUCTURE_FACINGS, facingKind, isStructureFacing, splitFacingKind, type StructureFacing } from './buildingArt.js'
+  DEFAULT_FACING,
+  STRUCTURE_FACINGS,
+  facingKind,
+  isStructureFacing,
+  splitFacingKind,
+  type StructureFacing,
+} from './buildingArt.js'
 import { cellDistance, mirrorX } from './sheet.js'
 import type { RawImage } from './post/raw.js'
 
@@ -11,11 +16,14 @@ import type { RawImage } from './post/raw.js'
  *  non-dwelling structure the user asked to be turned, so it carries the same two facings. */
 export const STOREHOUSE_KIND = 'storehouse'
 
-
 /** Two facings, SW and SE, for everything that can stand in both: dwellings, the storehouse, the
  *  shed (it has a door) and the wagon (wheels and a tailgate along a 1×2 long axis). */
-export const TWO_FACING_KINDS: readonly string[] =
-  [...CITY_DWELLING_KINDS, STOREHOUSE_KIND, 'shed', 'wagon']
+export const TWO_FACING_KINDS: readonly string[] = [
+  ...CITY_DWELLING_KINDS,
+  STOREHOUSE_KIND,
+  'shed',
+  'wagon',
+]
 
 /** The kinds that ship ONE cell, each with the reason it cannot turn. Not an exemption from art —
  *  every one ships a cell — but from the SECOND cell; `facingPartitionIsTotal` closes the gap. */
@@ -25,11 +33,13 @@ export const ONE_CELL_KINDS: Readonly<Record<string, string>> = {
   standing_stone: 'a monolith — no front, no door, no ridge to reverse',
   grave: 'a headstone and a mound; the stone faces the reader whichever way the world turns',
   scaffolding: 'a cage of poles around nothing; its two visible faces are the same face',
-  lamp_post: 'a post with a lantern on it: a vertical axis of rotation and nothing to face. '
-    + 'It stands on the verge rather than on a plot, so no street ever tells it which way to look.',
-  bridge: 'a deck, not a building. It turns by SWAPPING ITS FOOTPRINT — `buildFootprint` tries '
-    + '1×2 and then 2×1 — and a footprint turn is not a facing, so a second cell here would be '
-    + 'the wrong shape rather than the right one turned.',
+  lamp_post:
+    'a post with a lantern on it: a vertical axis of rotation and nothing to face. ' +
+    'It stands on the verge rather than on a plot, so no street ever tells it which way to look.',
+  bridge:
+    'a deck, not a building. It turns by SWAPPING ITS FOOTPRINT — `buildFootprint` tries ' +
+    '1×2 and then 2×1 — and a footprint turn is not a facing, so a second cell here would be ' +
+    'the wrong shape rather than the right one turned.',
 }
 
 /** Every creatable kind belongs to exactly one of the two lists above. This is what the old
@@ -37,7 +47,8 @@ export const ONE_CELL_KINDS: Readonly<Record<string, string>> = {
 export function facingPartitionIsTotal(creatable: readonly string[]): string[] {
   const out: string[] = []
   for (const k of creatable) {
-    const two = TWO_FACING_KINDS.includes(k), one = k in ONE_CELL_KINDS
+    const two = TWO_FACING_KINDS.includes(k),
+      one = k in ONE_CELL_KINDS
     if (two && one) out.push(`${k} is on BOTH the two-facing list and the one-cell list`)
     if (!two && !one) {
       out.push(`${k} is on neither list — say whether it turns, and if it does not, say why`)
@@ -55,11 +66,9 @@ export function worldStructureKinds(a: {
   recipes: Readonly<Record<string, unknown>>
   extra?: readonly string[]
 }): string[] {
-  return [...new Set([
-    ...a.structures.map((s) => s.kind),
-    ...Object.keys(a.recipes),
-    ...(a.extra ?? []),
-  ])].sort()
+  return [
+    ...new Set([...a.structures.map((s) => s.kind), ...Object.keys(a.recipes), ...(a.extra ?? [])]),
+  ].sort()
 }
 
 // ── what the world asks for ─────────────────────────────────────────────────────────────────
@@ -120,7 +129,8 @@ export function structureArtCoverage(a: {
 }): ArtCoverage {
   const have = new Set(a.registered)
   const required = requiredFacings(a.structures, a.creatable ?? [])
-  const missing: string[] = [], covered: string[] = []
+  const missing: string[] = [],
+    covered: string[] = []
   for (const [kind, facings] of [...required].sort((x, y) => x[0].localeCompare(y[0]))) {
     for (const f of STRUCTURE_FACINGS) {
       if (!facings.has(f)) continue
@@ -146,14 +156,19 @@ export function seMirrorDistance(sw: RawImage, se: RawImage): number {
   return cellDistance(se, mirrorX(sw))
 }
 
-export function mirrorFacingGate(
-  pairs: readonly { kind: string; sw: RawImage; se: RawImage }[],
-): { ok: boolean; failures: string[]; measured: { kind: string; distance: number }[] } {
+export function mirrorFacingGate(pairs: readonly { kind: string; sw: RawImage; se: RawImage }[]): {
+  ok: boolean
+  failures: string[]
+  measured: { kind: string; distance: number }[]
+} {
   const measured = pairs.map((p) => ({ kind: p.kind, distance: seMirrorDistance(p.sw, p.se) }))
   const failures = measured
     .filter((m) => m.distance < SE_MIRROR_MIN_DISTANCE)
-    .map((m) => `${m.kind}: the SE cell is ${m.distance.toFixed(4)} from a mirror of its SW cell, ` +
-      `below the ${SE_MIRROR_MIN_DISTANCE} floor — a turned building is not a flipped one`)
+    .map(
+      (m) =>
+        `${m.kind}: the SE cell is ${m.distance.toFixed(4)} from a mirror of its SW cell, ` +
+        `below the ${SE_MIRROR_MIN_DISTANCE} floor — a turned building is not a flipped one`,
+    )
   return { ok: failures.length === 0, failures, measured }
 }
 

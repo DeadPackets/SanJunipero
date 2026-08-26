@@ -1,7 +1,12 @@
 import { expect, it } from 'vitest'
 import {
-  CEILING_PRICE_PER_M, FALLBACK_MODELS, MIND_MODEL, PRICE_PER_M, PRICE_PER_M_BY_PROVIDER,
-  PROVIDER_ORDER, pricesFor,
+  CEILING_PRICE_PER_M,
+  FALLBACK_MODELS,
+  MIND_MODEL,
+  PRICE_PER_M,
+  PRICE_PER_M_BY_PROVIDER,
+  PROVIDER_ORDER,
+  pricesFor,
 } from './pins.js'
 
 it('pins are concrete', () => {
@@ -26,8 +31,14 @@ it('the ceiling is at least as expensive as every priced provider', () => {
 })
 
 it('prices the pinned model by who served it', () => {
-  expect(pricesFor(MIND_MODEL, 'Wafer')).toEqual({ prices: PRICE_PER_M_BY_PROVIDER.Wafer, source: 'provider' })
-  expect(pricesFor(MIND_MODEL, 'Baidu')).toEqual({ prices: PRICE_PER_M_BY_PROVIDER.Baidu, source: 'provider' })
+  expect(pricesFor(MIND_MODEL, 'Wafer')).toEqual({
+    prices: PRICE_PER_M_BY_PROVIDER.Wafer,
+    source: 'provider',
+  })
+  expect(pricesFor(MIND_MODEL, 'Baidu')).toEqual({
+    prices: PRICE_PER_M_BY_PROVIDER.Baidu,
+    source: 'provider',
+  })
   // Two back ends for one model at prices that differ 2x. A model-keyed table cannot say this.
   expect(PRICE_PER_M_BY_PROVIDER.Wafer!.input).toBe(PRICE_PER_M_BY_PROVIDER.Baidu!.input * 2)
 })

@@ -5,15 +5,34 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  ROAD_AUTOTILE_KEYS, roadAutotile, resolveFurnishingKind,
-  makeCityTemplate, growthPlots, structureTiles, doorTile, doorFrontTile, isRoadTile, key,
+  ROAD_AUTOTILE_KEYS,
+  roadAutotile,
+  resolveFurnishingKind,
+  makeCityTemplate,
+  growthPlots,
+  structureTiles,
+  doorTile,
+  doorFrontTile,
+  isRoadTile,
+  key,
   PLAZA_CENTRE,
-  CITY_FURNISHING_KINDS, CITY_BED_KIND, CITY_HEARTH_KIND, CITY_INTERIOR_SLOTS,
-  WORLD_SIZE_GENESIS, T_WATER, parseLibraryItemManifest,
+  CITY_FURNISHING_KINDS,
+  CITY_BED_KIND,
+  CITY_HEARTH_KIND,
+  CITY_INTERIOR_SLOTS,
+  WORLD_SIZE_GENESIS,
+  T_WATER,
+  parseLibraryItemManifest,
   type RoadAutotileKey,
 } from '@sj/shared'
 import { DEFAULT_FORGE_CONFIG } from './forgeConfig.js'
-import { VisionVerdictSchema, deriveOverall, CRITERIA, NA_CRITERIA_BY_CLASS, type VisionCriteria } from './visionQa/verdict.js'
+import {
+  VisionVerdictSchema,
+  deriveOverall,
+  CRITERIA,
+  NA_CRITERIA_BY_CLASS,
+  type VisionCriteria,
+} from './visionQa/verdict.js'
 import { paintRoadAutotile, ROAD_BASE, ROAD_EDGE, ROAD_GRIT } from './roadTiles.js'
 import { TilesetManifest } from './terrainManifest.js'
 import { validateBuildingAlignment, footprintDiamond } from './alignment.js'
@@ -28,14 +47,20 @@ const SRC = dirname(fileURLToPath(import.meta.url))
 // ---------------------------------------------------------------- 1. verdicts
 
 const criterion = (score: number, pass = score >= 7) => ({ pass, score, evidence: 'fixture' })
-const criteria = (over: Partial<Record<string, ReturnType<typeof criterion>>> = {}): VisionCriteria =>
-  Object.fromEntries(CRITERIA.map(c => [c, over[c] ?? criterion(10)])) as VisionCriteria
+const criteria = (
+  over: Partial<Record<string, ReturnType<typeof criterion>>> = {},
+): VisionCriteria =>
+  Object.fromEntries(CRITERIA.map((c) => [c, over[c] ?? criterion(10)])) as VisionCriteria
 
 describe('G13a.1 — verdict schema and derivation', () => {
   it('round-trips a verdict', () => {
     const v = {
-      assetId: 'library:axe', model: 'google/gemini-3.7-flash', rubricVersion: 'v1',
-      criteria: criteria(), overall: 'pass' as const, feedback: '',
+      assetId: 'library:axe',
+      model: 'google/gemini-3.7-flash',
+      rubricVersion: 'v1',
+      criteria: criteria(),
+      overall: 'pass' as const,
+      feedback: '',
     }
     expect(VisionVerdictSchema.parse(v)).toEqual(v)
     expect(() => VisionVerdictSchema.parse({ ...v, overall: 'maybe' })).toThrow()
@@ -44,7 +69,9 @@ describe('G13a.1 — verdict schema and derivation', () => {
   it('derives the four outcomes exactly', () => {
     const o = { minScore: 7, maxRetries: 2 }
     // hard fail on a binary criterion, whatever the score says
-    expect(deriveOverall(criteria({ singleFigure: criterion(10, false) }), { ...o, attempt: 1 })).toBe('retry')
+    expect(
+      deriveOverall(criteria({ singleFigure: criterion(10, false) }), { ...o, attempt: 1 }),
+    ).toBe('retry')
     expect(deriveOverall(criteria({ density: criterion(6) }), { ...o, attempt: 1 })).toBe('retry')
     expect(deriveOverall(criteria(), { ...o, attempt: 1 })).toBe('pass')
     expect(deriveOverall(criteria({ density: criterion(6) }), { ...o, attempt: 3 })).toBe('blocked')
@@ -71,14 +98,26 @@ describe('G13a.2 — road autotiling', () => {
 
   it('refuses a manifest autotile block that is one tile short', () => {
     const base = {
-      tileW: 32, tileH: 16, cols: 4, rows: 4, scaffolding: { file: 's.png' },
-      seasons: Object.fromEntries((['spring', 'summer', 'autumn', 'winter'] as const)
-        .map(s => [s, { file: `${s}.png`, tiles: Array.from({ length: 16 }, (_, i) => `t${i}`) }])),
+      tileW: 32,
+      tileH: 16,
+      cols: 4,
+      rows: 4,
+      scaffolding: { file: 's.png' },
+      seasons: Object.fromEntries(
+        (['spring', 'summer', 'autumn', 'winter'] as const).map((s) => [
+          s,
+          { file: `${s}.png`, tiles: Array.from({ length: 16 }, (_, i) => `t${i}`) },
+        ]),
+      ),
     }
-    const tiles = (n: number) => Object.fromEntries(ROAD_AUTOTILE_KEYS.slice(0, n).map((k, i) => [k, i]))
-    expect(() => TilesetManifest.parse({ ...base, autotile: { road: { file: 'r.png', tiles: tiles(15) } } })).not.toThrow()
-    expect(() => TilesetManifest.parse({ ...base, autotile: { road: { file: 'r.png', tiles: tiles(14) } } }))
-      .toThrow(/all 15 road tiles required/)
+    const tiles = (n: number) =>
+      Object.fromEntries(ROAD_AUTOTILE_KEYS.slice(0, n).map((k, i) => [k, i]))
+    expect(() =>
+      TilesetManifest.parse({ ...base, autotile: { road: { file: 'r.png', tiles: tiles(15) } } }),
+    ).not.toThrow()
+    expect(() =>
+      TilesetManifest.parse({ ...base, autotile: { road: { file: 'r.png', tiles: tiles(14) } } }),
+    ).toThrow(/all 15 road tiles required/)
     expect(() => TilesetManifest.parse(base), 'the block stays optional').not.toThrow()
   })
 
@@ -115,38 +154,53 @@ describe('G13a.3 — the city template', () => {
 
   // The town has to WORK: every door must be walkable-to from the square.
   it('reaches every building door from the market square over the road grid', () => {
-    const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
+    const roads = new Set(t.tiles.filter(isRoadTile).map((x) => key(x.dx, x.dy)))
     const start = key(PLAZA_CENTRE.dx, PLAZA_CENTRE.dy)
     expect(roads.has(start)).toBe(true)
     const seen = new Set([start])
     const stack: [number, number][] = [[PLAZA_CENTRE.dx, PLAZA_CENTRE.dy]]
     while (stack.length) {
       const [dx, dy] = stack.pop()!
-      for (const [nx, ny] of [[dx, dy - 1], [dx + 1, dy], [dx, dy + 1], [dx - 1, dy]] as [number, number][]) {
+      for (const [nx, ny] of [
+        [dx, dy - 1],
+        [dx + 1, dy],
+        [dx, dy + 1],
+        [dx - 1, dy],
+      ] as [number, number][]) {
         const k = key(nx, ny)
-        if (roads.has(k) && !seen.has(k)) { seen.add(k); stack.push([nx, ny]) }
+        if (roads.has(k) && !seen.has(k)) {
+          seen.add(k)
+          stack.push([nx, ny])
+        }
       }
     }
     // The door is on the face the structure's FACING names, and half this town faces +x — a
     // reach test that only looked south found the storehouse's door in its own back wall.
     for (const s of t.structures) {
       const d = s.w === 1 && s.h === 1 ? doorTile(s) : doorFrontTile(s)
-      const reached = seen.has(key(d.dx, d.dy))
-        || [[d.dx, d.dy - 1], [d.dx + 1, d.dy], [d.dx, d.dy + 1], [d.dx - 1, d.dy]]
-          .some(([x, y]) => seen.has(key(x!, y!)))
+      const reached =
+        seen.has(key(d.dx, d.dy)) ||
+        [
+          [d.dx, d.dy - 1],
+          [d.dx + 1, d.dy],
+          [d.dx, d.dy + 1],
+          [d.dx - 1, d.dy],
+        ].some(([x, y]) => seen.has(key(x!, y!)))
       expect(reached, `${s.kind} at ${key(s.dx, s.dy)} is cut off from the square`).toBe(true)
     }
   })
 
   // THE NO-BRIDGE LAW.
   it('carries no road over water', () => {
-    const water = new Set(t.tiles.filter(x => x.to === T_WATER).map(x => key(x.dx, x.dy)))
+    const water = new Set(t.tiles.filter((x) => x.to === T_WATER).map((x) => key(x.dx, x.dy)))
     for (const x of t.tiles.filter(isRoadTile))
       expect(water.has(key(x.dx, x.dy)), key(x.dx, x.dy)).toBe(false)
   })
 
   it('clears growth plots that no structure stands on', () => {
-    const built = new Set(t.structures.flatMap(s => structureTiles(s).map(c => key(c.dx, c.dy))))
+    const built = new Set(
+      t.structures.flatMap((s) => structureTiles(s).map((c) => key(c.dx, c.dy))),
+    )
     const plots = growthPlots(t)
     expect(plots.length).toBeGreaterThan(0)
     for (const p of plots) expect(built.has(key(p.dx, p.dy))).toBe(false)
@@ -199,13 +253,18 @@ describe('G13a.4 — the alignment pixel half', () => {
   const D = footprintDiamond({ w: 1, h: 1 }, CELL)
 
   const block = (bottomY: number, width: number): RawImage => {
-    const img: RawImage = { width: CELL.w, height: CELL.h, data: new Uint8ClampedArray(CELL.w * CELL.h * 4) }
+    const img: RawImage = {
+      width: CELL.w,
+      height: CELL.h,
+      data: new Uint8ClampedArray(CELL.w * CELL.h * 4),
+    }
     const x0 = Math.round(D.centerX - width / 2)
     for (let y = Math.max(0, bottomY - 19); y <= bottomY && y < CELL.h; y++)
       for (let x = x0; x < x0 + width && x < CELL.w; x++) img.data[(y * CELL.w + x) * 4 + 3] = 255
     return img
   }
-  const run = (img: RawImage) => validateBuildingAlignment(img, { w: 1, h: 1 }, DEFAULT_FORGE_CONFIG.alignment, CELL)
+  const run = (img: RawImage) =>
+    validateBuildingAlignment(img, { w: 1, h: 1 }, DEFAULT_FORGE_CONFIG.alignment, CELL)
 
   it('is exact on the four authored fixtures', () => {
     expect(run(block(56, 24)).ok, 'good').toBe(true)
@@ -224,7 +283,11 @@ describe('G13a.5 — the library in the codex', () => {
     let n = 0
     for (const e of LIBRARY) {
       const { spriteRecord, iconRecord } = registerLibraryEntry(codex, e, {
-        sprite: png, icon: png, score: 8, attempts: 1, costUsd: 0,
+        sprite: png,
+        icon: png,
+        score: 8,
+        attempts: 1,
+        costUsd: 0,
       })
       for (const r of [spriteRecord, iconRecord]) {
         const m = parseLibraryItemManifest(r.meta)
@@ -252,11 +315,18 @@ describe('G13a.5 — the library in the codex', () => {
 // ---------------------------------------------------------------- 6. lane law
 
 describe('G13a.6 — the parallel-lane boundary', () => {
-  const FORBIDDEN = ['@sj/engine', '@sj/gateway', '@sj/web', '@sj/agents', '@sj/arbiter', '@sj/narrator']
+  const FORBIDDEN = [
+    '@sj/engine',
+    '@sj/gateway',
+    '@sj/web',
+    '@sj/agents',
+    '@sj/arbiter',
+    '@sj/narrator',
+  ]
   const SHARED_MODULES = ['autotile.ts', 'interiorMeta.ts', 'cityTemplate.ts']
 
   const walk = (dir: string): string[] =>
-    readdirSync(dir).flatMap(n => {
+    readdirSync(dir).flatMap((n) => {
       const p = join(dir, n)
       return statSync(p).isDirectory() ? walk(p) : p.endsWith('.ts') ? [p] : []
     })
@@ -264,7 +334,7 @@ describe('G13a.6 — the parallel-lane boundary', () => {
   it('never lets forge or the new shared modules import a consumer lane', () => {
     const files = [
       ...walk(SRC),
-      ...SHARED_MODULES.map(m => join(SRC, '..', '..', 'shared', 'src', m)),
+      ...SHARED_MODULES.map((m) => join(SRC, '..', '..', 'shared', 'src', m)),
     ]
     expect(files.length).toBeGreaterThan(30)
     for (const f of files) {
@@ -272,7 +342,9 @@ describe('G13a.6 — the parallel-lane boundary', () => {
       for (const pkg of FORBIDDEN) {
         // The import FORM, not the bare name — this file names all six in a list and still
         // has to be scanned like every other.
-        const re = new RegExp(String.raw`(?:from|import|require)\s*\(?\s*['"]${pkg.replace('/', '\\/')}`)
+        const re = new RegExp(
+          String.raw`(?:from|import|require)\s*\(?\s*['"]${pkg.replace('/', '\\/')}`,
+        )
         expect(re.test(src), `${f} imports ${pkg}`).toBe(false)
       }
     }

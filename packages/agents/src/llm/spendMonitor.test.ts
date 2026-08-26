@@ -35,8 +35,11 @@ function seedCall(db: Database.Database, agoMinutes: number, costUsd: number, no
   ).run(now - agoMinutes * 60_000, costUsd)
 }
 
-function alerts(db: Database.Database): Array<{ kind: string; detail: string }> {
-  return db.prepare('SELECT kind, detail FROM alerts ORDER BY id').all() as Array<{ kind: string; detail: string }>
+function alerts(db: Database.Database): { kind: string; detail: string }[] {
+  return db.prepare('SELECT kind, detail FROM alerts ORDER BY id').all() as {
+    kind: string
+    detail: string
+  }[]
 }
 
 afterEach(() => {
@@ -88,7 +91,13 @@ describe('projectDailySpend (T24)', () => {
 // The repair path and the client retry absorb an empty answer in silence, so the ops surface
 // has to be able to say one happened.
 describe('dead calls — paid for, and nothing came back', () => {
-  const fail = (db: Database.Database, agentId: string | null, error: string | null, agoMinutes = 1, now = NOW): void => {
+  const fail = (
+    db: Database.Database,
+    agentId: string | null,
+    error: string | null,
+    agoMinutes = 1,
+    now = NOW,
+  ): void => {
     db.prepare(
       `INSERT INTO llm_calls
          (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
@@ -99,7 +108,9 @@ describe('dead calls — paid for, and nothing came back', () => {
 
   it('tells an empty answer from an unparseable one from anything else', () => {
     expect(classifyFailure('No output generated.')).toBe('empty_output')
-    expect(classifyFailure('No object generated: could not parse the response.')).toBe('unparseable')
+    expect(classifyFailure('No object generated: could not parse the response.')).toBe(
+      'unparseable',
+    )
     expect(classifyFailure('fetch failed')).toBe('other')
     expect(classifyFailure(null)).toBe('other')
   })
@@ -114,9 +125,14 @@ describe('dead calls — paid for, and nothing came back', () => {
 
     const rows = deadCallCounts(db)
     expect(rows.map((r) => r.agentId)).toEqual(['nadia', 'omar', 'omar'])
-    const omarToday = rows.find((r) => r.agentId === 'omar' && r.emptyOutput === 1 && r.unparseable === 1)!
+    const omarToday = rows.find(
+      (r) => r.agentId === 'omar' && r.emptyOutput === 1 && r.unparseable === 1,
+    )!
     expect(omarToday).toMatchObject({ emptyOutput: 1, unparseable: 1, otherFailures: 0, calls: 2 })
-    expect(rows.find((r) => r.agentId === 'nadia')).toMatchObject({ otherFailures: 1, emptyOutput: 0 })
+    expect(rows.find((r) => r.agentId === 'nadia')).toMatchObject({
+      otherFailures: 1,
+      emptyOutput: 0,
+    })
     // Two days for one mind means two rows, never one lumped total.
     expect(rows.filter((r) => r.agentId === 'omar')).toHaveLength(2)
     expect(new Set(rows.filter((r) => r.agentId === 'omar').map((r) => r.day)).size).toBe(2)
@@ -238,15 +254,43 @@ describe('providerCounts: which back end answered, and how much of it was worth 
     seedProviderCall(db, { provider: 'Wafer', ok: true, costUsd: 0.01 })
     seedProviderCall(db, { provider: 'Baidu', ok: true, costUsd: 0.001 })
     seedProviderCall(db, { provider: null, ok: false, error: 'No output generated.' })
-    seedProviderCall(db, { provider: null, ok: false, error: 'No object generated: could not parse' })
+    seedProviderCall(db, {
+      provider: null,
+      ok: false,
+      error: 'No object generated: could not parse',
+    })
     return db
   }
 
   it('folds calls, answers, failures and cost per back end, sorted by name', () => {
     expect(providerCounts(mixed())).toEqual([
-      { provider: null, calls: 2, ok: 0, failed: 2, emptyOutput: 1, unparseable: 1, costUsd: 0.002 },
-      { provider: 'Baidu', calls: 1, ok: 1, failed: 0, emptyOutput: 0, unparseable: 0, costUsd: 0.001 },
-      { provider: 'Wafer', calls: 2, ok: 2, failed: 0, emptyOutput: 0, unparseable: 0, costUsd: 0.02 },
+      {
+        provider: null,
+        calls: 2,
+        ok: 0,
+        failed: 2,
+        emptyOutput: 1,
+        unparseable: 1,
+        costUsd: 0.002,
+      },
+      {
+        provider: 'Baidu',
+        calls: 1,
+        ok: 1,
+        failed: 0,
+        emptyOutput: 0,
+        unparseable: 0,
+        costUsd: 0.001,
+      },
+      {
+        provider: 'Wafer',
+        calls: 2,
+        ok: 2,
+        failed: 0,
+        emptyOutput: 0,
+        unparseable: 0,
+        costUsd: 0.02,
+      },
     ])
   })
 
@@ -255,7 +299,9 @@ describe('providerCounts: which back end answered, and how much of it was worth 
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const rows = reportProviders(db)
     expect(rows).toHaveLength(3)
-    const details = alerts(db).filter((a) => a.kind === 'llm_provider_mix').map((a) => a.detail)
+    const details = alerts(db)
+      .filter((a) => a.kind === 'llm_provider_mix')
+      .map((a) => a.detail)
     expect(details).toHaveLength(3)
     expect(details.some((d) => d.startsWith('unattributed: 2 calls'))).toBe(true)
     expect(details.some((d) => d.startsWith('Wafer: 2 calls, 2 answered'))).toBe(true)
@@ -291,7 +337,10 @@ describe('price reconciliation over a run', () => {
     insert(db, 0.43, 0.89)
     const r = reportReconciliation(db)
     expect(r.ratio).toBeCloseTo(2.07, 2)
-    const row = db.prepare('SELECT kind, detail FROM alerts').get() as { kind: string; detail: string }
+    const row = db.prepare('SELECT kind, detail FROM alerts').get() as {
+      kind: string
+      detail: string
+    }
     expect(row.kind).toBe('llm_price_reconciliation')
     expect(row.detail).toContain('2.07x out')
   })

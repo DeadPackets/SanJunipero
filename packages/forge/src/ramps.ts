@@ -36,7 +36,8 @@ export function derivedPalette(steps: number = RAMP_STEPS): Rgb[] {
   const seen = new Map<number, Rgb>()
   for (const c of master) seen.set(key(c), c)
   for (const [a, b] of rampPairs()) {
-    const p = master[a]!, q = master[b]!
+    const p = master[a]!,
+      q = master[b]!
     for (let s = 1; s < steps; s++) {
       const t = s / steps
       const c: Rgb = [
@@ -59,10 +60,15 @@ export function onARamp(c: Rgb, tolerance: number = RAMP_TOLERANCE): boolean {
   const master = paletteRgb()
   for (const p of master) if (p[0] === c[0] && p[1] === c[1] && p[2] === c[2]) return true
   for (const [ai, bi] of rampPairs()) {
-    const p = master[ai]!, q = master[bi]!
+    const p = master[ai]!,
+      q = master[bi]!
     // project c onto pq, clamp to the segment, and measure how far off it landed
-    let num = 0, den = 0
-    for (let k = 0; k < 3; k++) { num += (c[k]! - p[k]!) * (q[k]! - p[k]!); den += (q[k]! - p[k]!) ** 2 }
+    let num = 0,
+      den = 0
+    for (let k = 0; k < 3; k++) {
+      num += (c[k]! - p[k]!) * (q[k]! - p[k]!)
+      den += (q[k]! - p[k]!) ** 2
+    }
     if (den === 0) continue
     const t = Math.min(1, Math.max(0, num / den))
     let d = 0

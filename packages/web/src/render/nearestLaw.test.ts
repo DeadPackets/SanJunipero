@@ -12,7 +12,11 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB_SRC = join(HERE, '..')
 
 /** One row of a paletted source, resampled to `outLen` under each filter. */
-export function resampleRow(src: readonly number[], outLen: number, mode: 'nearest' | 'linear'): number[] {
+export function resampleRow(
+  src: readonly number[],
+  outLen: number,
+  mode: 'nearest' | 'linear',
+): number[] {
   const out: number[] = []
   for (let i = 0; i < outLen; i++) {
     const u = ((i + 0.5) * src.length) / outLen - 0.5
@@ -35,10 +39,11 @@ export function offPalette(row: readonly number[], palette: ReadonlySet<number>)
 /** A hi-res building cell as the forge ships it; a 1x1 footprint is drawn into 64px. */
 const SOURCE_PX = 128
 const drawnPx = (stop: number): number =>
-  Math.max(1, Math.round(SOURCE_PX * ((1 + 1) * BUILDING_PX_PER_TILE / SOURCE_PX) * stop))
+  Math.max(1, Math.round(SOURCE_PX * (((1 + 1) * BUILDING_PX_PER_TILE) / SOURCE_PX) * stop))
 
 // two MASTER_PALETTE members, as one channel each, alternating: the worst case for a blend
-const A = 0x93, B = 0x43
+const A = 0x93,
+  B = 0x43
 const PALETTE = new Set([A, B])
 const SRC = Array.from({ length: SOURCE_PX }, (_, i) => (i % 2 === 0 ? A : B))
 
@@ -59,7 +64,9 @@ describe('a bilinear sample invents colours the palette does not have', () => {
 
   it('and NEAREST produces none, at EVERY stop', () => {
     for (const stop of ZOOM_STOPS) {
-      expect(offPalette(resampleRow(SRC, drawnPx(stop), 'nearest'), PALETTE), `stop ${stop}`).toBe(0)
+      expect(offPalette(resampleRow(SRC, drawnPx(stop), 'nearest'), PALETTE), `stop ${stop}`).toBe(
+        0,
+      )
     }
   })
 })
@@ -69,7 +76,10 @@ function sources(dir = WEB_SRC): string[] {
   const out: string[] = []
   for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name)
-    if (statSync(p).isDirectory()) { out.push(...sources(p)); continue }
+    if (statSync(p).isDirectory()) {
+      out.push(...sources(p))
+      continue
+    }
     if (!/\.(ts|tsx)$/.test(name) || /\.test\.(ts|tsx)$/.test(name)) continue
     out.push(p)
   }
@@ -101,7 +111,8 @@ describe('one filter for the whole town', () => {
   })
 
   it('still sets the global law in one place', () => {
-    expect(readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8'))
-      .toContain("TextureSource.defaultOptions.scaleMode = 'nearest'")
+    expect(readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')).toContain(
+      "TextureSource.defaultOptions.scaleMode = 'nearest'",
+    )
   })
 })

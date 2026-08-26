@@ -2,33 +2,101 @@ import { describe, it, expect, vi } from 'vitest'
 import { ROAD_AUTOTILE_KEYS } from './autotile.js'
 import { DEFAULT_CONFIG, isRoofedKind } from './config.js'
 import {
-  CityTemplateSchema, CITY_ANCHOR_DEFAULT, CITY_W, CITY_H, TOWN_ORIGIN, TOWN_RINGS_GENESIS,
-  townOrigin, townSpan, RIVER_LOCAL_DX, RIVER_HALF, BANK_HALF, cityGroundAt, CITY_GROUND,
-  TOWN_SQUARE, anchorFor, riverLocalDx, RIVER_GRAMMAR_DX,
-  WORLD_MARGIN, worldSizeForRings, worldForRings, edgesOwed,
-  WORLD_SIZE_GENESIS, inExtent, inRect, key, cityTerrainTiles, cityRoadTiles, cityRoadKeys,
-  isRoadTile, PLAZA, PLAZA_CENTRE, T_ROAD, T_WATER, T_EARTH,
-  cityStructures, cityPlacements, cityBlocks, genesisEmptyPlots, plattedPlots, doorTile, doorFrontTile,
-  structureTiles, FOUNDER_IDS, CITY_INTERIOR_SLOTS,
-  CITY_FURNISHING_KINDS, CITY_BED_KIND, CITY_HEARTH_KIND, citySlotsFor,
-  makeCityTemplate, templateFits, growthPlots, T_GRASS, footprintFor,
-  WELL_AT, FIRE_PIT_AT, danglingRoadEnds, frontages, GENESIS_WANTED,
-  CITY_DWELLING_KINDS, DWELLING_FOOTPRINTS, isDwellingKind,
+  CityTemplateSchema,
+  CITY_ANCHOR_DEFAULT,
+  CITY_W,
+  CITY_H,
+  TOWN_ORIGIN,
+  TOWN_RINGS_GENESIS,
+  townOrigin,
+  townSpan,
+  RIVER_LOCAL_DX,
+  RIVER_HALF,
+  BANK_HALF,
+  cityGroundAt,
+  CITY_GROUND,
+  TOWN_SQUARE,
+  anchorFor,
+  riverLocalDx,
+  RIVER_GRAMMAR_DX,
+  WORLD_MARGIN,
+  worldSizeForRings,
+  worldForRings,
+  edgesOwed,
+  WORLD_SIZE_GENESIS,
+  inExtent,
+  inRect,
+  key,
+  cityTerrainTiles,
+  cityRoadTiles,
+  cityRoadKeys,
+  isRoadTile,
+  PLAZA,
+  PLAZA_CENTRE,
+  T_ROAD,
+  T_WATER,
+  T_EARTH,
+  cityStructures,
+  cityPlacements,
+  cityBlocks,
+  genesisEmptyPlots,
+  plattedPlots,
+  doorFrontTile,
+  structureTiles,
+  FOUNDER_IDS,
+  CITY_INTERIOR_SLOTS,
+  CITY_FURNISHING_KINDS,
+  CITY_BED_KIND,
+  CITY_HEARTH_KIND,
+  citySlotsFor,
+  makeCityTemplate,
+  templateFits,
+  growthPlots,
+  T_GRASS,
+  footprintFor,
+  WELL_AT,
+  FIRE_PIT_AT,
+  danglingRoadEnds,
+  frontages,
+  GENESIS_WANTED,
+  CITY_DWELLING_KINDS,
+  DWELLING_FOOTPRINTS,
+  isDwellingKind,
 } from './cityTemplate.js'
 import type { CityTemplate } from './cityTemplate.js'
 import {
-  BLOCK, MAX_ALONG, MAX_DEEP, PITCH, STREET, TOWN_FACINGS, blockTiles, closestPair, freePlots,
-  place, placedTiles, plattedBlocks, streetTiles, townErrors,
+  BLOCK,
+  MAX_ALONG,
+  MAX_DEEP,
+  PITCH,
+  STREET,
+  TOWN_FACINGS,
+  blockTiles,
+  closestPair,
+  freePlots,
+  place,
+  placedTiles,
+  plattedBlocks,
+  streetTiles,
+  townErrors,
 } from './townGrammar.js'
 import { claimAll, plotKey } from './townClaim.js'
 
 const MINIMAL = {
   anchor: { x: 0, y: 0 },
   tiles: [{ dx: 1, dy: 2, to: T_ROAD }],
-  structures: [{
-    kind: 'house', dx: 3, dy: 4, w: 2, h: 2, owner: 'amara', facing: 'sw',
-    furnishings: [{ kind: 'bed', slot: { x: 1, y: 1 } }],
-  }],
+  structures: [
+    {
+      kind: 'house',
+      dx: 3,
+      dy: 4,
+      w: 2,
+      h: 2,
+      owner: 'amara',
+      facing: 'sw',
+      furnishings: [{ kind: 'bed', slot: { x: 1, y: 1 } }],
+    },
+  ],
 }
 
 describe('CityTemplateSchema', () => {
@@ -38,31 +106,42 @@ describe('CityTemplateSchema', () => {
 
   it('rejects an unknown key', () => {
     expect(() => CityTemplateSchema.parse({ ...MINIMAL, zoning: [] })).toThrow()
-    expect(() => CityTemplateSchema.parse({
-      ...MINIMAL, structures: [{ ...MINIMAL.structures[0], district: 'homes' }],
-    })).toThrow()
+    expect(() =>
+      CityTemplateSchema.parse({
+        ...MINIMAL,
+        structures: [{ ...MINIMAL.structures[0], district: 'homes' }],
+      }),
+    ).toThrow()
   })
 
   it('rejects a footprint wider than 4', () => {
-    expect(() => CityTemplateSchema.parse({
-      ...MINIMAL, structures: [{ ...MINIMAL.structures[0], w: 5 }],
-    })).toThrow()
+    expect(() =>
+      CityTemplateSchema.parse({
+        ...MINIMAL,
+        structures: [{ ...MINIMAL.structures[0], w: 5 }],
+      }),
+    ).toThrow()
   })
 
   // The field is required so a public building says `null` out loud; it never goes missing.
   it('rejects a missing owner but accepts a null one', () => {
     const { owner: _drop, ...noOwner } = MINIMAL.structures[0]!
     expect(() => CityTemplateSchema.parse({ ...MINIMAL, structures: [noOwner] })).toThrow()
-    expect(() => CityTemplateSchema.parse({
-      ...MINIMAL, structures: [{ ...MINIMAL.structures[0], owner: null }],
-    })).not.toThrow()
+    expect(() =>
+      CityTemplateSchema.parse({
+        ...MINIMAL,
+        structures: [{ ...MINIMAL.structures[0], owner: null }],
+      }),
+    ).not.toThrow()
   })
 
   it('rejects a furnishing without a slot', () => {
-    expect(() => CityTemplateSchema.parse({
-      ...MINIMAL,
-      structures: [{ ...MINIMAL.structures[0], furnishings: [{ kind: 'bed' }] }],
-    })).toThrow()
+    expect(() =>
+      CityTemplateSchema.parse({
+        ...MINIMAL,
+        structures: [{ ...MINIMAL.structures[0], furnishings: [{ kind: 'bed' }] }],
+      }),
+    ).toThrow()
   })
 })
 
@@ -71,14 +150,21 @@ describe('CityTemplateSchema', () => {
 describe('every building says which way it faces', () => {
   it('carries a facing on every structure, and only ever one of the two', () => {
     for (const s of cityStructures())
-      expect(TOWN_FACINGS as readonly string[], `${s.kind} at ${key(s.dx, s.dy)}`).toContain(s.facing)
+      expect(TOWN_FACINGS as readonly string[], `${s.kind} at ${key(s.dx, s.dy)}`).toContain(
+        s.facing,
+      )
   })
 
   it('refuses a facing the forge has no art for', () => {
     for (const bad of ['ne', 'nw', 'north', ''])
-      expect(() => CityTemplateSchema.parse({
-        ...MINIMAL, structures: [{ ...MINIMAL.structures[0], facing: bad }],
-      }), bad).toThrow()
+      expect(
+        () =>
+          CityTemplateSchema.parse({
+            ...MINIMAL,
+            structures: [{ ...MINIMAL.structures[0], facing: bad }],
+          }),
+        bad,
+      ).toThrow()
   })
 
   it('refuses a structure with no facing at all — the column is required', () => {
@@ -96,14 +182,22 @@ describe('every building says which way it faces', () => {
   // This is the assertion that makes the column MEAN something rather than merely being
   // present and ignored: the door is on the face the column names, and that face is a road.
   it('puts each door on the face its column names, and that face is a street', () => {
-    const roads = new Set(cityRoadTiles().filter(isRoadTile).map(t => key(t.dx, t.dy)))
+    const roads = new Set(
+      cityRoadTiles()
+        .filter(isRoadTile)
+        .map((t) => key(t.dx, t.dy)),
+    )
     for (const s of cityStructures()) {
-      if (s.w === 1 && s.h === 1) continue          // the well and the fire pit have no door
+      if (s.w === 1 && s.h === 1) continue // the well and the fire pit have no door
       const front = doorFrontTile(s)
-      expect(roads.has(key(front.dx, front.dy)),
-        `${s.kind} says ${s.facing} but ${key(front.dx, front.dy)} is not a road`).toBe(true)
-      expect(structureTiles(s).some(t => t.dx === front.dx && t.dy === front.dy),
-        'the door tile is outside the building, on its street').toBe(false)
+      expect(
+        roads.has(key(front.dx, front.dy)),
+        `${s.kind} says ${s.facing} but ${key(front.dx, front.dy)} is not a road`,
+      ).toBe(true)
+      expect(
+        structureTiles(s).some((t) => t.dx === front.dx && t.dy === front.dy),
+        'the door tile is outside the building, on its street',
+      ).toBe(false)
     }
   })
 })
@@ -122,12 +216,15 @@ describe('the lattice the template plats on', () => {
   // ★ A RIVER IS A REASON FOR THE TOWN'S SHAPE. Three of the eight blocks ring 1 could plat
   // stand in the channel, so they are not platted and the west of the town is riverfront.
   it('plats five of the eight blocks, because three of them are in the river', () => {
-    expect(cityBlocks().map(b => `${b.i},${b.j}`)).toEqual(['0,-1', '0,1', '1,0', '1,-1', '1,1'])
-    expect(plattedBlocks(1, () => 'dry'), 'without a river all eight plat').toHaveLength(8)
+    expect(cityBlocks().map((b) => `${b.i},${b.j}`)).toEqual(['0,-1', '0,1', '1,0', '1,-1', '1,1'])
+    expect(
+      plattedBlocks(1, () => 'dry'),
+      'without a river all eight plat',
+    ).toHaveLength(8)
   })
 
   it('never plats the square', () => {
-    expect(cityBlocks().some(b => b.i === 0 && b.j === 0)).toBe(false)
+    expect(cityBlocks().some((b) => b.i === 0 && b.j === 0)).toBe(false)
   })
 
   it('runs a three-tile channel with a tile of wet bank either side', () => {
@@ -162,7 +259,7 @@ describe('the genesis anchor', () => {
 describe('city roads', () => {
   const roads = cityRoadTiles()
   const terrain = cityTerrainTiles()
-  const roadSet = new Set(roads.filter(isRoadTile).map(t => key(t.dx, t.dy)))
+  const roadSet = new Set(roads.filter(isRoadTile).map((t) => key(t.dx, t.dy)))
 
   it('lays every road tile inside the template extent', () => {
     for (const t of roads) expect(inExtent(t.dx, t.dy), key(t.dx, t.dy)).toBe(true)
@@ -175,7 +272,7 @@ describe('city roads', () => {
   // THE NO-BRIDGE LAW. The far bank is an earned milestone (§2); a template author will be
   // tempted, and this is the guard.
   it('no road tile lies on water, and the water is really there', () => {
-    const water = new Set(terrain.filter(t => t.to === T_WATER).map(t => key(t.dx, t.dy)))
+    const water = new Set(terrain.filter((t) => t.to === T_WATER).map((t) => key(t.dx, t.dy)))
     expect(water.size).toBe(3 * CITY_H)
     for (const t of roads) {
       expect(water.has(key(t.dx, t.dy)), `road on water at ${key(t.dx, t.dy)}`).toBe(false)
@@ -186,8 +283,11 @@ describe('city roads', () => {
   // A special case that widened the main street once ran a phantom road row through a block's
   // frontage. This is the guard that keeps one from coming back.
   it('never lays a street tile on a block', () => {
-    const onBlock = new Set(cityBlocks().flatMap(b =>
-      blockTiles(b.i, b.j).map(t => key(t.dx + TOWN_ORIGIN, t.dy + TOWN_ORIGIN))))
+    const onBlock = new Set(
+      cityBlocks().flatMap((b) =>
+        blockTiles(b.i, b.j).map((t) => key(t.dx + TOWN_ORIGIN, t.dy + TOWN_ORIGIN)),
+      ),
+    )
     for (const t of roads)
       expect(onBlock.has(key(t.dx, t.dy)), `a street on a block at ${key(t.dx, t.dy)}`).toBe(false)
   })
@@ -198,9 +298,17 @@ describe('city roads', () => {
     const stack: [number, number][] = [[PLAZA_CENTRE.dx, PLAZA_CENTRE.dy]]
     while (stack.length) {
       const [dx, dy] = stack.pop()!
-      for (const [nx, ny] of [[dx, dy - 1], [dx + 1, dy], [dx, dy + 1], [dx - 1, dy]] as [number, number][]) {
+      for (const [nx, ny] of [
+        [dx, dy - 1],
+        [dx + 1, dy],
+        [dx, dy + 1],
+        [dx - 1, dy],
+      ] as [number, number][]) {
         const k = key(nx, ny)
-        if (roadSet.has(k) && !seen.has(k)) { seen.add(k); stack.push([nx, ny]) }
+        if (roadSet.has(k) && !seen.has(k)) {
+          seen.add(k)
+          stack.push([nx, ny])
+        }
       }
     }
     expect(seen.size).toBe(roadSet.size)
@@ -217,8 +325,15 @@ describe('city roads', () => {
   it('asks for the nine shapes a regular three-tile lattice makes, and no others', () => {
     const seen = new Set(cityRoadKeys(roads).values())
     expect([...seen].sort()).toEqual([
-      'corner-es', 'corner-ne', 'corner-sw', 'corner-wn',
-      'cross', 't-no-e', 't-no-n', 't-no-s', 't-no-w',
+      'corner-es',
+      'corner-ne',
+      'corner-sw',
+      'corner-wn',
+      'cross',
+      't-no-e',
+      't-no-n',
+      't-no-s',
+      't-no-w',
     ])
   })
 
@@ -227,12 +342,19 @@ describe('city roads', () => {
   it('resolves the square interior to cross, and the monuments to tees around them', () => {
     const keys = cityRoadKeys(roads)
     const monument = new Set([key(WELL_AT.dx, WELL_AT.dy), key(FIRE_PIT_AT.dx, FIRE_PIT_AT.dy)])
-    const DIRS = [['n', 0, -1], ['e', 1, 0], ['s', 0, 1], ['w', -1, 0]] as const
+    const DIRS = [
+      ['n', 0, -1],
+      ['e', 1, 0],
+      ['s', 0, 1],
+      ['w', -1, 0],
+    ] as const
     for (let dy = PLAZA.dy0 + 1; dy <= PLAZA.dy1 - 1; dy++)
       for (let dx = PLAZA.dx0 + 1; dx <= PLAZA.dx1 - 1; dx++) {
         if (monument.has(key(dx, dy))) continue
         const gone = DIRS.find(([, ox, oy]) => monument.has(key(dx + ox, dy + oy)))
-        expect(keys.get(key(dx, dy)), key(dx, dy)).toBe(gone === undefined ? 'cross' : `t-no-${gone[0]}`)
+        expect(keys.get(key(dx, dy)), key(dx, dy)).toBe(
+          gone === undefined ? 'cross' : `t-no-${gone[0]}`,
+        )
       }
     expect(keys.get(key(PLAZA_CENTRE.dx, PLAZA_CENTRE.dy))).toBe('cross')
     expect(keys.get(key(WELL_AT.dx, WELL_AT.dy + 1))).toBe('t-no-n')
@@ -240,11 +362,12 @@ describe('city roads', () => {
   })
 
   it('keeps terrain and roads on disjoint tiles, and covers the extent between them', () => {
-    const t = new Set(terrain.map(x => key(x.dx, x.dy)))
+    const t = new Set(terrain.map((x) => key(x.dx, x.dy)))
     expect(t.size).toBe(terrain.length)
     for (const r of roads) expect(t.has(key(r.dx, r.dy)), key(r.dx, r.dy)).toBe(false)
-    expect(t.size + roads.length, 'the town leaves a tile of its own extent unauthored')
-      .toBe(CITY_W * CITY_H)
+    expect(t.size + roads.length, 'the town leaves a tile of its own extent unauthored').toBe(
+      CITY_W * CITY_H,
+    )
   })
 
   it('is deterministic', () => {
@@ -255,7 +378,7 @@ describe('city roads', () => {
 
   // The town clears its own ground: no forest, no rock, no hillside under a street.
   it('authors every tile as water, wet bank or cleared grass, and nothing else', () => {
-    expect(new Set(terrain.map(x => x.to))).toEqual(new Set([T_WATER, T_EARTH, T_GRASS]))
+    expect(new Set(terrain.map((x) => x.to))).toEqual(new Set([T_WATER, T_EARTH, T_GRASS]))
   })
 })
 
@@ -265,9 +388,9 @@ describe('the four dwelling kinds', () => {
   })
 
   it('holds the founders home kind as a first-class member', () => {
-    expect((CITY_DWELLING_KINDS as readonly string[])).toContain('house')
+    expect(CITY_DWELLING_KINDS as readonly string[]).toContain('house')
     expect(isDwellingKind('house')).toBe(true)
-    expect((CITY_DWELLING_KINDS as readonly string[])).not.toContain('hut')
+    expect(CITY_DWELLING_KINDS as readonly string[]).not.toContain('hut')
     expect(isDwellingKind('hut')).toBe(false)
   })
 
@@ -308,9 +431,13 @@ describe('the four dwelling kinds', () => {
 describe('city structures', () => {
   const structures = cityStructures()
   const roads = cityRoadTiles()
-  const roadSet = new Set(roads.filter(isRoadTile).map(t => key(t.dx, t.dy)))
-  const water = new Set(cityTerrainTiles().filter(t => t.to === T_WATER).map(t => key(t.dx, t.dy)))
-  const houses = structures.filter(s => s.kind === 'house')
+  const roadSet = new Set(roads.filter(isRoadTile).map((t) => key(t.dx, t.dy)))
+  const water = new Set(
+    cityTerrainTiles()
+      .filter((t) => t.to === T_WATER)
+      .map((t) => key(t.dx, t.dy)),
+  )
+  const houses = structures.filter((s) => s.kind === 'house')
 
   it('places exactly eleven structures: nine on claimed plots, two in the square', () => {
     expect(structures).toHaveLength(11)
@@ -328,23 +455,24 @@ describe('city structures', () => {
   })
 
   it('replays to exactly the same town, from the same list', () => {
-    expect(claimAll({ ground: CITY_GROUND, wanted: GENESIS_WANTED }).built).toEqual(cityPlacements())
+    expect(claimAll({ ground: CITY_GROUND, wanted: GENESIS_WANTED }).built).toEqual(
+      cityPlacements(),
+    )
   })
 
   // USER RULING 1, both halves.
   it('gives each of the five houses a distinct founder owner', () => {
     expect(houses).toHaveLength(5)
-    expect(houses.map(h => h.owner).sort()).toEqual([...FOUNDER_IDS].sort())
+    expect(houses.map((h) => h.owner).sort()).toEqual([...FOUNDER_IDS].sort())
   })
 
   it('leaves every non-house public — owner null, never absent', () => {
-    for (const s of structures.filter(x => x.kind !== 'house'))
-      expect(s.owner, s.kind).toBeNull()
+    for (const s of structures.filter((x) => x.kind !== 'house')) expect(s.owner, s.kind).toBeNull()
   })
 
   // `roofed` on the recipe row is the one answer; this asserts the template and that row agree.
   it('plats no dwelling the engine cannot let a body into', () => {
-    for (const s of structures.filter(x => isDwellingKind(x.kind) || x.kind === 'storehouse')) {
+    for (const s of structures.filter((x) => isDwellingKind(x.kind) || x.kind === 'storehouse')) {
       expect(isRoofedKind(DEFAULT_CONFIG, s.kind), `nobody can get into a ${s.kind}`).toBe(true)
     }
   })
@@ -362,7 +490,9 @@ describe('city structures', () => {
   it('never occupies a road or a water tile', () => {
     for (const s of structures)
       for (const t of structureTiles(s)) {
-        expect(roadSet.has(key(t.dx, t.dy)), `${s.kind} on a road at ${key(t.dx, t.dy)}`).toBe(false)
+        expect(roadSet.has(key(t.dx, t.dy)), `${s.kind} on a road at ${key(t.dx, t.dy)}`).toBe(
+          false,
+        )
         expect(water.has(key(t.dx, t.dy)), `${s.kind} on water at ${key(t.dx, t.dy)}`).toBe(false)
         expect(inExtent(t.dx, t.dy), `${s.kind} outside the extent`).toBe(true)
       }
@@ -370,13 +500,19 @@ describe('city structures', () => {
 
   // §9: the standing stone stands beyond the edge of town, unexplained.
   it('does not build the standing stone', () => {
-    expect(structures.some(s => s.kind === 'standing_stone')).toBe(false)
+    expect(structures.some((s) => s.kind === 'standing_stone')).toBe(false)
   })
 
   it('gives every home exactly one bed and one hearth', () => {
     for (const h of houses) {
-      expect(h.furnishings.filter(f => f.kind === CITY_BED_KIND), 'bed').toHaveLength(1)
-      expect(h.furnishings.filter(f => f.kind === CITY_HEARTH_KIND), 'hearth').toHaveLength(1)
+      expect(
+        h.furnishings.filter((f) => f.kind === CITY_BED_KIND),
+        'bed',
+      ).toHaveLength(1)
+      expect(
+        h.furnishings.filter((f) => f.kind === CITY_HEARTH_KIND),
+        'hearth',
+      ).toHaveLength(1)
     }
   })
 
@@ -404,12 +540,31 @@ describe('city structures', () => {
     for (const s of structures)
       for (const f of s.furnishings)
         expect(CITY_FURNISHING_KINDS, `${s.kind} ${f.kind}`).toContain(f.kind)
-    const used = new Set(structures.flatMap(s => s.furnishings.map(f => f.kind)))
+    const used = new Set(structures.flatMap((s) => s.furnishings.map((f) => f.kind)))
     // `bench` joined when the cabin got a room: a refuge has somewhere to sit and no bed.
-    expect([...used].sort())
-      .toEqual(['barrel', 'bed', 'bench', 'chair', 'crate', 'hearth', 'rug', 'shelf', 'table'])
-    expect([...CITY_FURNISHING_KINDS].sort())
-      .toEqual(['anvil', 'barrel', 'bed', 'bench', 'chair', 'crate', 'hearth', 'rug', 'shelf', 'table'])
+    expect([...used].sort()).toEqual([
+      'barrel',
+      'bed',
+      'bench',
+      'chair',
+      'crate',
+      'hearth',
+      'rug',
+      'shelf',
+      'table',
+    ])
+    expect([...CITY_FURNISHING_KINDS].sort()).toEqual([
+      'anvil',
+      'barrel',
+      'bed',
+      'bench',
+      'chair',
+      'crate',
+      'hearth',
+      'rug',
+      'shelf',
+      'table',
+    ])
   })
 
   it('is deterministic', () => {
@@ -425,8 +580,9 @@ describe('★ the town this grammar builds, measured', () => {
   })
 
   it('has no error of any kind in it', () => {
-    expect(townErrors(cityPlacements(), streetTiles(TOWN_RINGS_GENESIS, CITY_GROUND), CITY_GROUND))
-      .toEqual([])
+    expect(
+      townErrors(cityPlacements(), streetTiles(TOWN_RINGS_GENESIS, CITY_GROUND), CITY_GROUND),
+    ).toEqual([])
   })
 
   // ★ NOT "THIS TOWN IS CLEAN" — "no town this template can grow is anything else". Every
@@ -435,7 +591,7 @@ describe('★ the town this grammar builds, measured', () => {
     const water = new Set<string>()
     const doorless: string[] = []
     for (let rings = 1; rings <= 4; rings++) {
-      const road = new Set(streetTiles(rings, CITY_GROUND).map(t => key(t.dx, t.dy)))
+      const road = new Set(streetTiles(rings, CITY_GROUND).map((t) => key(t.dx, t.dy)))
       for (const p of freePlots(rings, CITY_GROUND))
         for (let along = 1; along <= MAX_ALONG; along++)
           for (let deep = 1; deep <= MAX_DEEP; deep++) {
@@ -468,7 +624,10 @@ describe('★ the world a town of R rings needs', () => {
   it('is exactly what a fixed 128-tile world at a fixed anchor could not give', () => {
     expect(templateFits(CITY_ANCHOR_DEFAULT, WORLD_SIZE_GENESIS, 1)).toBe(true)
     for (const r of [2, 3, 4, 5])
-      expect(templateFits(CITY_ANCHOR_DEFAULT, WORLD_SIZE_GENESIS, r), `ring ${r} in a 128 world`).toBe(false)
+      expect(
+        templateFits(CITY_ANCHOR_DEFAULT, WORLD_SIZE_GENESIS, r),
+        `ring ${r} in a 128 world`,
+      ).toBe(false)
     expect(townSpan(2)).toBe(98)
     expect(townSpan(3)).toBe(136)
     expect(worldSizeForRings(2)).toBeGreaterThan(WORLD_SIZE_GENESIS)
@@ -479,15 +638,18 @@ describe('★ the world a town of R rings needs', () => {
   it('leaves the square and the channel exactly where they are, at every ring', () => {
     for (let r = 1; r <= 12; r++) {
       const a = anchorFor(r)
-      expect({ x: a.x + townOrigin(r), y: a.y + townOrigin(r) }, `ring ${r} square`).toEqual(TOWN_SQUARE)
+      expect({ x: a.x + townOrigin(r), y: a.y + townOrigin(r) }, `ring ${r} square`).toEqual(
+        TOWN_SQUARE,
+      )
       expect(a.x + riverLocalDx(r), `ring ${r} channel`).toBe(49)
       expect(TOWN_SQUARE.x + RIVER_GRAMMAR_DX).toBe(49)
     }
     expect(anchorFor(TOWN_RINGS_GENESIS)).toEqual(CITY_ANCHOR_DEFAULT)
     // The plat rule reads the same ground whatever the ring count, so ring 1's five blocks are
     // still ring 1's five blocks inside a ring-5 town.
-    const inner = plattedBlocks(1, CITY_GROUND).map(b => `${b.i},${b.j}`)
-    for (const b of inner) expect(plattedBlocks(5, CITY_GROUND).map(x => `${x.i},${x.j}`)).toContain(b)
+    const inner = plattedBlocks(1, CITY_GROUND).map((b) => `${b.i},${b.j}`)
+    for (const b of inner)
+      expect(plattedBlocks(5, CITY_GROUND).map((x) => `${x.i},${x.j}`)).toContain(b)
   })
 
   it('grows the platted lattice monotonically, so a ring never withdraws what it offered', () => {
@@ -508,9 +670,13 @@ describe('★ the town still stands at ring 5', () => {
     it(`puts every legal building on every plot of ring ${rings} on dry, in-world, road-fronted ground`, () => {
       const world = worldForRings(rings)
       const o = townOrigin(rings)
-      const road = new Set(streetTiles(rings, CITY_GROUND).map(t => key(t.dx, t.dy)))
-      const wet: string[] = [], doorless: string[] = [], outside: string[] = []
-      let closest = Infinity, buildings = 0, tiles = 0
+      const road = new Set(streetTiles(rings, CITY_GROUND).map((t) => key(t.dx, t.dy)))
+      const wet: string[] = [],
+        doorless: string[] = [],
+        outside: string[] = []
+      let closest = Infinity,
+        buildings = 0,
+        tiles = 0
       for (const p of freePlots(rings, CITY_GROUND))
         for (let along = 1; along <= MAX_ALONG; along++)
           for (let deep = 1; deep <= MAX_DEEP; deep++) {
@@ -520,8 +686,10 @@ describe('★ the town still stands at ring 5', () => {
               tiles++
               if (CITY_GROUND(c.dx, c.dy) === 'water') wet.push(key(c.dx, c.dy))
               // grammar → template → the world's own frame
-              const wx = world.anchor.x + c.dx + o, wy = world.anchor.y + c.dy + o
-              if (wx < 0 || wy < 0 || wx >= world.size || wy >= world.size) outside.push(`${wx},${wy}`)
+              const wx = world.anchor.x + c.dx + o,
+                wy = world.anchor.y + c.dy + o
+              if (wx < 0 || wy < 0 || wx >= world.size || wy >= world.size)
+                outside.push(`${wx},${wy}`)
               closest = Math.min(closest, wx, wy, world.size - 1 - wx, world.size - 1 - wy)
             }
             const d = doorFrontTile({ ...s, furnishings: [] })
@@ -536,13 +704,19 @@ describe('★ the town still stands at ring 5', () => {
       // in from their own street, and that slack would swallow a shrunken margin unnoticed.
       const span = townSpan(rings)
       const box = {
-        dx0: world.anchor.x, dy0: world.anchor.y,
-        dx1: world.anchor.x + span - 1, dy1: world.anchor.y + span - 1,
+        dx0: world.anchor.x,
+        dy0: world.anchor.y,
+        dx1: world.anchor.x + span - 1,
+        dy1: world.anchor.y + span - 1,
       }
-      expect(edgesOwed(box, { w: world.size, h: world.size }), 'the world owes the town ground')
-        .toEqual([])
-      expect(edgesOwed(box, { w: world.size - 1, h: world.size }), 'one tile narrower must not do')
-        .toEqual([{ edge: 'e', owed: 1 }])
+      expect(
+        edgesOwed(box, { w: world.size, h: world.size }),
+        'the world owes the town ground',
+      ).toEqual([])
+      expect(
+        edgesOwed(box, { w: world.size - 1, h: world.size }),
+        'one tile narrower must not do',
+      ).toEqual([{ edge: 'e', owed: 1 }])
       expect(closest).toBeGreaterThanOrEqual(WORLD_MARGIN)
     })
   }
@@ -552,7 +726,8 @@ describe('★ the town still stands at ring 5', () => {
   it('offers the plots of the ring it is asked about, not the ring genesis platted', () => {
     expect(genesisEmptyPlots(1)).toHaveLength(11)
     expect(genesisEmptyPlots(5)).toHaveLength(436 - GENESIS_WANTED.length)
-    for (const p of genesisEmptyPlots(5)) expect(inExtent(p.dx, p.dy, 5), key(p.dx, p.dy)).toBe(true)
+    for (const p of genesisEmptyPlots(5))
+      expect(inExtent(p.dx, p.dy, 5), key(p.dx, p.dy)).toBe(true)
   })
 
   // ★ THE THIRD DEFECT, AND THE SHAPE THAT ANSWERS ALL THREE. Every one of them returned a
@@ -565,18 +740,22 @@ describe('★ the town still stands at ring 5', () => {
     expect(() => genesisEmptyPlots(0)).toThrow(/no plots/)
     // A template built for one ring count, asked about another, is the clamp itself.
     expect(() => growthPlots(makeCityTemplate(), 5)).toThrow(/is not a town of 5 ring/)
-    expect(() => growthPlots(makeCityTemplate(worldForRings(3).anchor, 3))).toThrow(/is not a town of 1 ring/)
+    expect(() => growthPlots(makeCityTemplate(worldForRings(3).anchor, 3))).toThrow(
+      /is not a town of 1 ring/,
+    )
     // And the right question still answers: the template and the ring count agree.
-    expect(growthPlots(makeCityTemplate(worldForRings(3).anchor, 3), 3).length)
-      .toBe(genesisEmptyPlots(3).length)
+    expect(growthPlots(makeCityTemplate(worldForRings(3).anchor, 3), 3).length).toBe(
+      genesisEmptyPlots(3).length,
+    )
   })
 
   // ★ THE SPLIT, MEASURED. "What could ever be built on" and "what genesis leaves empty" are
   // different lists, and the difference is exactly the nine buildings the template stands.
   it('★ what could ever be built on, and what genesis leaves empty, are two lists', () => {
     for (const rings of [1, 2, 5]) {
-      expect(plattedPlots(rings).length - genesisEmptyPlots(rings).length,
-        `${rings} rings`).toBe(GENESIS_WANTED.length)
+      expect(plattedPlots(rings).length - genesisEmptyPlots(rings).length, `${rings} rings`).toBe(
+        GENESIS_WANTED.length,
+      )
     }
     // Neither takes a template, so neither can be mistaken for the running-world question —
     // and `genesisEmptyPlots` answering the same eleven forever is now its contract, not a bug.
@@ -609,20 +788,32 @@ describe('edgesOwed', () => {
 
   it('is empty exactly when every side of the built set has its margin', () => {
     expect(edgesOwed(box, { w: 200, h: 200 })).toEqual([])
-    expect(edgesOwed({ dx0: WORLD_MARGIN, dy0: WORLD_MARGIN, dx1: 60, dy1: 60 },
-      { w: 60 + WORLD_MARGIN + 1, h: 60 + WORLD_MARGIN + 1 })).toEqual([])
+    expect(
+      edgesOwed(
+        { dx0: WORLD_MARGIN, dy0: WORLD_MARGIN, dx1: 60, dy1: 60 },
+        { w: 60 + WORLD_MARGIN + 1, h: 60 + WORLD_MARGIN + 1 },
+      ),
+    ).toEqual([])
   })
 
   it('names the edge and the shortfall when one tile is missing, on each of the four', () => {
-    expect(edgesOwed({ ...box, dy0: WORLD_MARGIN - 1 }, { w: 200, h: 200 })).toEqual([{ edge: 'n', owed: 1 }])
-    expect(edgesOwed({ ...box, dx0: WORLD_MARGIN - 1 }, { w: 200, h: 200 })).toEqual([{ edge: 'w', owed: 1 }])
+    expect(edgesOwed({ ...box, dy0: WORLD_MARGIN - 1 }, { w: 200, h: 200 })).toEqual([
+      { edge: 'n', owed: 1 },
+    ])
+    expect(edgesOwed({ ...box, dx0: WORLD_MARGIN - 1 }, { w: 200, h: 200 })).toEqual([
+      { edge: 'w', owed: 1 },
+    ])
     expect(edgesOwed(box, { w: 200, h: 60 + WORLD_MARGIN })).toEqual([{ edge: 's', owed: 1 }])
     expect(edgesOwed(box, { w: 60 + WORLD_MARGIN, h: 200 })).toEqual([{ edge: 'e', owed: 1 }])
   })
 
   it('names all four, in n-e-s-w order, for a world with nothing to spare', () => {
-    expect(edgesOwed({ dx0: 0, dy0: 0, dx1: 9, dy1: 9 }, { w: 10, h: 10 }))
-      .toEqual([{ edge: 'n', owed: 19 }, { edge: 'e', owed: 19 }, { edge: 's', owed: 19 }, { edge: 'w', owed: 19 }])
+    expect(edgesOwed({ dx0: 0, dy0: 0, dx1: 9, dy1: 9 }, { w: 10, h: 10 })).toEqual([
+      { edge: 'n', owed: 19 },
+      { edge: 'e', owed: 19 },
+      { edge: 's', owed: 19 },
+      { edge: 'w', owed: 19 },
+    ])
   })
 
   // The genesis world is not a counter-example but the first thing the rule finds: 128 tiles leave
@@ -631,12 +822,14 @@ describe('edgesOwed', () => {
     const built = cityStructures()
     const a = CITY_ANCHOR_DEFAULT
     const world = {
-      dx0: a.x + Math.min(...built.map(s => s.dx)), dy0: a.y + Math.min(...built.map(s => s.dy)),
-      dx1: a.x + Math.max(...built.map(s => s.dx + s.w - 1)),
-      dy1: a.y + Math.max(...built.map(s => s.dy + s.h - 1)),
+      dx0: a.x + Math.min(...built.map((s) => s.dx)),
+      dy0: a.y + Math.min(...built.map((s) => s.dy)),
+      dx1: a.x + Math.max(...built.map((s) => s.dx + s.w - 1)),
+      dy1: a.y + Math.max(...built.map((s) => s.dy + s.h - 1)),
     }
-    expect(edgesOwed(world, { w: WORLD_SIZE_GENESIS, h: WORLD_SIZE_GENESIS }))
-      .toEqual([{ edge: 's', owed: 4 }])
+    expect(edgesOwed(world, { w: WORLD_SIZE_GENESIS, h: WORLD_SIZE_GENESIS })).toEqual([
+      { edge: 's', owed: 4 },
+    ])
   })
 })
 
@@ -650,7 +843,10 @@ describe('makeCityTemplate', () => {
 
   it('is deterministic across calls and unaffected by the other exports', () => {
     expect(makeCityTemplate()).toEqual(t)
-    cityRoadTiles(); cityTerrainTiles(); cityStructures(); growthPlots(t)
+    cityRoadTiles()
+    cityTerrainTiles()
+    cityStructures()
+    growthPlots(t)
     expect(makeCityTemplate()).toEqual(t)
   })
 
@@ -689,7 +885,12 @@ describe('makeCityTemplate', () => {
     expect(templateFits(CITY_ANCHOR_DEFAULT, WORLD_SIZE_GENESIS)).toBe(true)
     expect(templateFits({ x: 100, y: 100 }, WORLD_SIZE_GENESIS)).toBe(false)
     expect(templateFits({ x: -1, y: 0 }, WORLD_SIZE_GENESIS)).toBe(false)
-    expect(templateFits({ x: WORLD_SIZE_GENESIS - CITY_W, y: WORLD_SIZE_GENESIS - CITY_H }, WORLD_SIZE_GENESIS)).toBe(true)
+    expect(
+      templateFits(
+        { x: WORLD_SIZE_GENESIS - CITY_W, y: WORLD_SIZE_GENESIS - CITY_H },
+        WORLD_SIZE_GENESIS,
+      ),
+    ).toBe(true)
   })
 
   it('carries the eleven structures and the road set into the assembled template', () => {
@@ -704,7 +905,9 @@ describe('the plots agents will build on', () => {
 
   it('offers every plot the town has not built on, and no others', () => {
     const plots = genesisEmptyPlots()
-    expect(plots).toHaveLength(freePlots(TOWN_RINGS_GENESIS, CITY_GROUND).length - GENESIS_WANTED.length)
+    expect(plots).toHaveLength(
+      freePlots(TOWN_RINGS_GENESIS, CITY_GROUND).length - GENESIS_WANTED.length,
+    )
     expect(plots).toHaveLength(11)
     const built = new Set(cityPlacements().map(plotKey))
     for (const p of plots) expect(built.has(plotKey(p)), `${plotKey(p)} is built on`).toBe(false)
@@ -716,24 +919,38 @@ describe('the plots agents will build on', () => {
   })
 
   it('leaves every plot on cleared grass beside a street, and under nothing', () => {
-    const grass = new Set(t.tiles.filter(x => x.to === T_GRASS).map(x => key(x.dx, x.dy)))
-    const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
-    const built = new Set(t.structures.flatMap(s => structureTiles(s).map(c => key(c.dx, c.dy))))
+    const grass = new Set(t.tiles.filter((x) => x.to === T_GRASS).map((x) => key(x.dx, x.dy)))
+    const roads = new Set(t.tiles.filter(isRoadTile).map((x) => key(x.dx, x.dy)))
+    const built = new Set(
+      t.structures.flatMap((s) => structureTiles(s).map((c) => key(c.dx, c.dy))),
+    )
     for (const p of growthPlots(t)) {
       expect(grass.has(key(p.dx, p.dy)), `${key(p.dx, p.dy)} is not cleared grass`).toBe(true)
       expect(built.has(key(p.dx, p.dy)), `${key(p.dx, p.dy)} is under a structure`).toBe(false)
-      expect([[0, -1], [1, 0], [0, 1], [-1, 0]]
-        .some(([ox, oy]) => roads.has(key(p.dx + ox!, p.dy + oy!))), `${key(p.dx, p.dy)} touches no road`).toBe(true)
+      expect(
+        [
+          [0, -1],
+          [1, 0],
+          [0, 1],
+          [-1, 0],
+        ].some(([ox, oy]) => roads.has(key(p.dx + ox!, p.dy + oy!))),
+        `${key(p.dx, p.dy)} touches no road`,
+      ).toBe(true)
     }
   })
 })
 
 describe('a centre that reads as a centre', () => {
   const t = makeCityTemplate()
-  const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
+  const roads = new Set(t.tiles.filter(isRoadTile).map((x) => key(x.dx, x.dy)))
 
   it('is the square the grammar never plats, and it is paved', () => {
-    expect(PLAZA).toEqual({ dx0: TOWN_ORIGIN, dy0: TOWN_ORIGIN, dx1: TOWN_ORIGIN + BLOCK - 1, dy1: TOWN_ORIGIN + BLOCK - 1 })
+    expect(PLAZA).toEqual({
+      dx0: TOWN_ORIGIN,
+      dy0: TOWN_ORIGIN,
+      dx1: TOWN_ORIGIN + BLOCK - 1,
+      dy1: TOWN_ORIGIN + BLOCK - 1,
+    })
     expect(roads.has(key(PLAZA_CENTRE.dx, PLAZA_CENTRE.dy))).toBe(true)
   })
 
@@ -750,7 +967,7 @@ describe('a centre that reads as a centre', () => {
   })
 
   it('builds on no tile of the square at all', () => {
-    for (const s of t.structures.filter(x => x.w > 1 || x.h > 1))
+    for (const s of t.structures.filter((x) => x.w > 1 || x.h > 1))
       for (const c of structureTiles(s))
         expect(inRect(PLAZA, c.dx, c.dy), `${s.kind} in the square`).toBe(false)
   })
@@ -759,17 +976,24 @@ describe('a centre that reads as a centre', () => {
 // ★ THE FIVE PROPERTIES. "It does not look like a town" is a feeling; these are the five
 // things that feeling is made of, each one a function of the template and nothing else.
 
-const ORTHO = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const
+const ORTHO = [
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0],
+] as const
 
 const roadSetOf = (t: CityTemplate): Set<string> =>
   new Set(t.tiles.filter(isRoadTile).map((x) => key(x.dx, x.dy)))
 
 /** 1. FRONTAGE. Pairs of structures whose footprints touch orthogonally. A town has ground on
  *  every side of every building, so the invariant is that this list is empty. */
-function touchingStructures(t: CityTemplate): Array<[string, string]> {
-  const out: Array<[string, string]> = []
+function touchingStructures(t: CityTemplate): [string, string][] {
+  const out: [string, string][] = []
   const at = new Map<string, number>()
-  t.structures.forEach((s, i) => { for (const c of structureTiles(s)) at.set(key(c.dx, c.dy), i) })
+  t.structures.forEach((s, i) => {
+    for (const c of structureTiles(s)) at.set(key(c.dx, c.dy), i)
+  })
   t.structures.forEach((s, i) => {
     const touched = new Set<number>()
     for (const c of structureTiles(s))
@@ -778,7 +1002,10 @@ function touchingStructures(t: CityTemplate): Array<[string, string]> {
         if (j !== undefined && j > i) touched.add(j)
       }
     for (const j of [...touched].sort((a, b) => a - b))
-      out.push([`${s.kind}@${s.dx},${s.dy}`, `${t.structures[j]!.kind}@${t.structures[j]!.dx},${t.structures[j]!.dy}`])
+      out.push([
+        `${s.kind}@${s.dx},${s.dy}`,
+        `${t.structures[j]!.kind}@${t.structures[j]!.dx},${t.structures[j]!.dy}`,
+      ])
   })
   return out
 }
@@ -798,7 +1025,10 @@ function structureComponents(t: CityTemplate): string[][] {
       const [dx, dy] = stack.pop()!.split(',').map(Number) as [number, number]
       for (const [ox, oy] of ORTHO) {
         const nk = key(dx + ox, dy + oy)
-        if (roads.has(nk) && !label.has(nk)) { label.set(nk, id); stack.push(nk) }
+        if (roads.has(nk) && !label.has(nk)) {
+          label.set(nk, id)
+          stack.push(nk)
+        }
       }
     }
   }
@@ -807,7 +1037,8 @@ function structureComponents(t: CityTemplate): string[][] {
     const id = f.onto === null ? 'none' : label.get(key(f.onto.dx, f.onto.dy))!
     const name = `${f.kind}@${f.door.dx},${f.door.dy}`
     const g = groups.get(id)
-    if (g === undefined) groups.set(id, [name]); else g.push(name)
+    if (g === undefined) groups.set(id, [name])
+    else g.push(name)
   }
   return [...groups.values()]
 }
@@ -819,7 +1050,12 @@ type PlazaArrival = { side: 'n' | 'e' | 's' | 'w'; from: { dx: number; dy: numbe
 function plazaArrivals(t: CityTemplate): PlazaArrival[] {
   const roads = roadSetOf(t)
   const out: PlazaArrival[] = []
-  const SIDES = [['n', 0, -1], ['e', 1, 0], ['s', 0, 1], ['w', -1, 0]] as const
+  const SIDES = [
+    ['n', 0, -1],
+    ['e', 1, 0],
+    ['s', 0, 1],
+    ['w', -1, 0],
+  ] as const
   for (let dy = PLAZA.dy0; dy <= PLAZA.dy1; dy++)
     for (let dx = PLAZA.dx0; dx <= PLAZA.dx1; dx++) {
       if (!roads.has(key(dx, dy))) continue
@@ -835,7 +1071,7 @@ function plazaArrivals(t: CityTemplate): PlazaArrival[] {
 type StreetRank = {
   /** `row 38` or `col 40` — the line of road every door on this rank opens onto */
   street: string
-  dwellings: Array<{ kind: string; along: number; span: number }>
+  dwellings: { kind: string; along: number; span: number }[]
 }
 
 /** The houses grouped by the street their doors open onto and ordered along it. The facing column
@@ -845,14 +1081,19 @@ function dwellingRanks(t: CityTemplate): StreetRank[] {
   for (const s of t.structures) {
     if (!isDwellingKind(s.kind)) continue
     const street = s.facing === 'sw' ? `row ${s.dy + s.h}` : `col ${s.dx + s.w}`
-    const entry = s.facing === 'sw'
-      ? { kind: s.kind, along: s.dx, span: s.w }
-      : { kind: s.kind, along: s.dy, span: s.h }
+    const entry =
+      s.facing === 'sw'
+        ? { kind: s.kind, along: s.dx, span: s.w }
+        : { kind: s.kind, along: s.dy, span: s.h }
     const g = byStreet.get(street)
-    if (g === undefined) byStreet.set(street, [entry]); else g.push(entry)
+    if (g === undefined) byStreet.set(street, [entry])
+    else g.push(entry)
   }
   return [...byStreet.entries()]
-    .map(([street, dwellings]) => ({ street, dwellings: dwellings.sort((a, b) => a.along - b.along) }))
+    .map(([street, dwellings]) => ({
+      street,
+      dwellings: dwellings.sort((a, b) => a.along - b.along),
+    }))
     .sort((a, b) => a.street.localeCompare(b.street))
 }
 
@@ -861,7 +1102,8 @@ function dwellingRanks(t: CityTemplate): StreetRank[] {
 function longestKindRun(t: CityTemplate): number {
   let worst = 0
   for (const rank of dwellingRanks(t)) {
-    let run = 0, last = ''
+    let run = 0,
+      last = ''
     for (const d of rank.dwellings) {
       run = d.kind === last ? run + 1 : 1
       last = d.kind
@@ -877,7 +1119,8 @@ function dwellingGaps(t: CityTemplate): number[] {
   const out: number[] = []
   for (const rank of dwellingRanks(t))
     for (let i = 1; i < rank.dwellings.length; i++) {
-      const prev = rank.dwellings[i - 1]!, next = rank.dwellings[i]!
+      const prev = rank.dwellings[i - 1]!,
+        next = rank.dwellings[i]!
       out.push(next.along - (prev.along + prev.span))
     }
   return out
@@ -899,21 +1142,26 @@ describe('PROPERTY 1 — buildings front onto something', () => {
   })
 
   it('finds a touch when one is planted, so the check is not vacuous', () => {
-    const s = t.structures.find(x => x.kind === 'storehouse')!
-    const stub = { ...t, structures: [...t.structures, { ...s, dx: s.dx + s.w, kind: 'shed', w: 1, h: 1 }] }
+    const s = t.structures.find((x) => x.kind === 'storehouse')!
+    const stub = {
+      ...t,
+      structures: [...t.structures, { ...s, dx: s.dx + s.w, kind: 'shed', w: 1, h: 1 }],
+    }
     expect(touchingStructures(stub).length).toBeGreaterThan(0)
   })
 
   // Moving equally in +dx and +dy is pure depth, so a building directly behind another cannot be
   // seen. Two doors on one line is the array-space signature of that.
   it('never puts one door directly behind another', () => {
-    const fronts = t.structures.filter(s => s.w > 1 || s.h > 1).map(doorFrontTile)
-    expect(new Set(fronts.map(d => key(d.dx, d.dy))).size).toBe(fronts.length)
+    const fronts = t.structures.filter((s) => s.w > 1 || s.h > 1).map(doorFrontTile)
+    expect(new Set(fronts.map((d) => key(d.dx, d.dy))).size).toBe(fronts.length)
     for (const a of fronts)
       for (const b of fronts) {
         if (a === b) continue
-        expect(a.dx - a.dy === b.dx - b.dy && a.dx + a.dy !== b.dx + b.dy,
-          `${key(a.dx, a.dy)} is straight behind ${key(b.dx, b.dy)}`).toBe(false)
+        expect(
+          a.dx - a.dy === b.dx - b.dy && a.dx + a.dy !== b.dx + b.dy,
+          `${key(a.dx, a.dy)} is straight behind ${key(b.dx, b.dy)}`,
+        ).toBe(false)
       }
   })
 })
@@ -928,9 +1176,22 @@ describe('PROPERTY 2 — roads connect the places people go', () => {
   })
 
   it('splits the group when a building is stranded, so the check is not vacuous', () => {
-    const stub = { ...t, structures: [...t.structures, {
-      kind: 'shed', dx: 1, dy: 55, w: 1, h: 1, owner: null, facing: 'sw' as const, furnishings: [],
-    }] }
+    const stub = {
+      ...t,
+      structures: [
+        ...t.structures,
+        {
+          kind: 'shed',
+          dx: 1,
+          dy: 55,
+          w: 1,
+          h: 1,
+          owner: null,
+          facing: 'sw' as const,
+          furnishings: [],
+        },
+      ],
+    }
     expect(structureComponents(stub).length).toBeGreaterThan(1)
   })
 
@@ -940,7 +1201,8 @@ describe('PROPERTY 2 — roads connect the places people go', () => {
 
   it('finds a dangling end when one is planted, so the check is not vacuous', () => {
     const stub = {
-      ...t, tiles: [...t.tiles, { dx: 13, dy: 12, to: T_ROAD }, { dx: 13, dy: 13, to: T_ROAD }],
+      ...t,
+      tiles: [...t.tiles, { dx: 13, dy: 12, to: T_ROAD }, { dx: 13, dy: 13, to: T_ROAD }],
     }
     expect(danglingRoadEnds(stub).length).toBeGreaterThan(0)
   })
@@ -948,10 +1210,10 @@ describe('PROPERTY 2 — roads connect the places people go', () => {
 
 describe('PROPERTY 3 — variety of mass', () => {
   const t = makeCityTemplate()
-  const houses = t.structures.filter(s => isDwellingKind(s.kind))
+  const houses = t.structures.filter((s) => isDwellingKind(s.kind))
 
   it('stands all four contracted kinds, not one building repeated', () => {
-    expect(new Set(houses.map(s => s.kind))).toEqual(new Set(CITY_DWELLING_KINDS))
+    expect(new Set(houses.map((s) => s.kind))).toEqual(new Set(CITY_DWELLING_KINDS))
   })
 
   // N = 2. A pair of a kind reads as two neighbours; three reads as a terrace, and five
@@ -961,15 +1223,22 @@ describe('PROPERTY 3 — variety of mass', () => {
   })
 
   it('counts a longer run when one is planted, so the ruling is not vacuous', () => {
-    const three = { ...t, structures: [0, 1, 2].map(n => ({
-      ...t.structures.find(s => s.kind === 'cabin')!,
-      facing: 'sw' as const, w: 2, h: 2, dx: 24 + n * 3, dy: 17,
-    })) }
+    const three = {
+      ...t,
+      structures: [0, 1, 2].map((n) => ({
+        ...t.structures.find((s) => s.kind === 'cabin')!,
+        facing: 'sw' as const,
+        w: 2,
+        h: 2,
+        dx: 24 + n * 3,
+        dy: 17,
+      })),
+    }
     expect(longestKindRun(three)).toBe(3)
   })
 
   it('gives the town three different house masses to look at', () => {
-    expect(new Set(houses.map(s => s.w * s.h)).size, 'every house covers the same ground').toBe(3)
+    expect(new Set(houses.map((s) => s.w * s.h)).size, 'every house covers the same ground').toBe(3)
   })
 })
 
@@ -977,13 +1246,15 @@ describe('PROPERTY 4 — a centre streets arrive at', () => {
   const t = makeCityTemplate()
 
   it('is reached from all four sides', () => {
-    expect([...new Set(plazaArrivals(t).map(a => a.side))].sort()).toEqual(['e', 'n', 's', 'w'])
+    expect([...new Set(plazaArrivals(t).map((a) => a.side))].sort()).toEqual(['e', 'n', 's', 'w'])
   })
 
   it('lands each arrival on the square itself, not beside it', () => {
-    const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
+    const roads = new Set(t.tiles.filter(isRoadTile).map((x) => key(x.dx, x.dy)))
     for (const a of plazaArrivals(t)) {
-      expect(inRect(PLAZA, a.from.dx, a.from.dy), `${a.side} arrival is inside the square`).toBe(false)
+      expect(inRect(PLAZA, a.from.dx, a.from.dy), `${a.side} arrival is inside the square`).toBe(
+        false,
+      )
       expect(roads.has(key(a.from.dx, a.from.dy))).toBe(true)
     }
   })
@@ -1015,7 +1286,10 @@ describe('PROPERTY 5 — plots and gaps', () => {
     for (const s of t.structures) {
       if (!isDwellingKind(s.kind)) continue
       const street = s.facing === 'sw' ? `row ${s.dy + s.h}` : `col ${s.dx + s.w}`
-      expect(dwellingRanks(t).map(r => r.street), `${s.kind}`).toContain(street)
+      expect(
+        dwellingRanks(t).map((r) => r.street),
+        s.kind,
+      ).toContain(street)
     }
   })
 })

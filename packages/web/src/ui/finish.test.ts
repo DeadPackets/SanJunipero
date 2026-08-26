@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { CSS_DURATION_TOKEN } from './motion.js'
 
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+)
 const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8')
 
 /** Every declaration block whose selector list contains `sel` exactly, joined in cascade order. */
@@ -44,27 +47,45 @@ const named = <T extends readonly string[]>(list: T): T => {
 // ── 1 · optical alignment ─────────────────────────────────────────────────────────────────
 // An icon beside a word is two boxes of different heights: centring them centres the BOXES, and
 // what a reader sees is the two baselines disagreeing.
-const ICON_LABEL_PAIRS = named(['.legend-chip', '.strip-cell', '.feed-line', '.room-roll li', '.rr-doing'])
+const ICON_LABEL_PAIRS = named([
+  '.legend-chip',
+  '.strip-cell',
+  '.feed-line',
+  '.room-roll li',
+  '.rr-doing',
+])
 
 describe('1 · an icon and its word sit on one line, declared and never defaulted', () => {
   it('states align-items on every inline icon+label pair', () => {
-    expect(missing(ICON_LABEL_PAIRS, (s) => {
-      const v = decl(rulesFor(CSS, s), 'align-items')
-      return v === 'baseline' || v === 'center'
-    })).toEqual([])
+    expect(
+      missing(ICON_LABEL_PAIRS, (s) => {
+        const v = decl(rulesFor(CSS, s), 'align-items')
+        return v === 'baseline' || v === 'center'
+      }),
+    ).toEqual([])
   })
 })
 
 // ── 2 · tabular figures wherever a number ticks ───────────────────────────────────────────
 const TICKING_NUMBERS = named([
-  '.tick-badge', '.strip-num i', '.tab-count', '.player-clock', '.thumb-day',
-  '.tab-body .stamp', '.feed-line .stamp', '.bond-history .stamp',
+  '.tick-badge',
+  '.strip-num i',
+  '.tab-count',
+  '.player-clock',
+  '.thumb-day',
+  '.tab-body .stamp',
+  '.feed-line .stamp',
+  '.bond-history .stamp',
 ])
 
 describe('2 · a ticking number never shifts the box it sits in', () => {
   it('sets tabular figures on every live number', () => {
-    expect(missing(TICKING_NUMBERS, (s) =>
-      decl(rulesFor(CSS, s), 'font-variant-numeric') === 'tabular-nums')).toEqual([])
+    expect(
+      missing(
+        TICKING_NUMBERS,
+        (s) => decl(rulesFor(CSS, s), 'font-variant-numeric') === 'tabular-nums',
+      ),
+    ).toEqual([])
   })
 })
 
@@ -74,41 +95,62 @@ const RESERVED_SLOTS = named(['.ctl-btn', '.rr-state', '.rr-place', '.rr-mood'])
 
 describe('3 · a state arriving does not move the row it arrives in', () => {
   it('reserves the slot, so an empty one is the same size as a full one', () => {
-    expect(missing(RESERVED_SLOTS, (s) => {
-      const body = rulesFor(CSS, s)
-      return decl(body, 'min-width') !== null || decl(body, 'flex-basis') !== null
-    })).toEqual([])
+    expect(
+      missing(RESERVED_SLOTS, (s) => {
+        const body = rulesFor(CSS, s)
+        return decl(body, 'min-width') !== null || decl(body, 'flex-basis') !== null
+      }),
+    ).toEqual([])
   })
 })
 
 // ── 4 · focus is never clipped ────────────────────────────────────────────────────────────
 // An outline drawn OUTSIDE a scroll container's edge is painted into the overflow and lost.
-const CLIPPING_CONTAINERS = named(['#panel-outlet', '.stage-cell', '.hud-menu', '.strip-list', '.digest-modal'])
+const CLIPPING_CONTAINERS = named([
+  '#panel-outlet',
+  '.stage-cell',
+  '.hud-menu',
+  '.strip-list',
+  '.digest-modal',
+])
 
 describe('4 · a focus ring inside a clipping box is drawn inside it', () => {
   it('gives every clipping container an inset ring for its focusable children', () => {
-    expect(missing(CLIPPING_CONTAINERS, (s) => {
-      const rules = selectorsMatching(CSS, new RegExp(`^${s.replace(/[.#]/g, '\\$&')}\\s.*:focus-visible$`))
-      return rules.some((r) => {
-        const v = decl(rulesFor(CSS, r), 'outline-offset')
-        return v !== null && v.startsWith('-')
-      })
-    })).toEqual([])
+    expect(
+      missing(CLIPPING_CONTAINERS, (s) => {
+        const rules = selectorsMatching(
+          CSS,
+          new RegExp(`^${s.replace(/[.#]/g, '\\$&')}\\s.*:focus-visible$`),
+        )
+        return rules.some((r) => {
+          const v = decl(rulesFor(CSS, r), 'outline-offset')
+          return v !== null && v.startsWith('-')
+        })
+      }),
+    ).toEqual([])
   })
 })
 
 // ── 5 · press has weight ──────────────────────────────────────────────────────────────────
 const CONTROLS = named([
-  '.tab', '.ctl-btn', '.feed-tab', '.live-pill', '.legend-chip', '.hud-slot', '.roster-back',
+  '.tab',
+  '.ctl-btn',
+  '.feed-tab',
+  '.live-pill',
+  '.legend-chip',
+  '.hud-slot',
+  '.roster-back',
   '.interior-back',
 ])
 
 describe('5 · a control answers the finger that pressed it', () => {
   it('moves and loses a shadow step on :active, for every control', () => {
-    expect(missing(CONTROLS, (s) => {
-      const body = rulesFor(CSS, `${s}:active`) + rulesFor(CSS, `${s}:active:not(:disabled)`)
-      return decl(body, 'translate') !== null && decl(body, 'box-shadow') !== null
-    })).toEqual([])
+    expect(
+      missing(CONTROLS, (s) => {
+        const body = rulesFor(CSS, `${s}:active`) + rulesFor(CSS, `${s}:active:not(:disabled)`)
+        return decl(body, 'translate') !== null && decl(body, 'box-shadow') !== null
+      }),
+    ).toEqual([])
   })
 })
 
@@ -116,12 +158,14 @@ describe('5 · a control answers the finger that pressed it', () => {
 // A hover that fades OUT keeps claiming the pointer is somewhere it left.
 describe('6 · a hover arrives in 150ms and leaves the instant the pointer does', () => {
   it('transitions in on --t-fast and out on 0s, for every hovering control', () => {
-    expect(missing(CONTROLS, (s) => {
-      const base = rulesFor(CSS, s)
-      const inMs = decl(base, 'transition-duration')
-      const out = decl(rulesFor(CSS, `${s}:hover`), 'transition-duration')
-      return inMs === `var(${CSS_DURATION_TOKEN.reveal})` && out === '0s'
-    })).toEqual([])
+    expect(
+      missing(CONTROLS, (s) => {
+        const base = rulesFor(CSS, s)
+        const inMs = decl(base, 'transition-duration')
+        const out = decl(rulesFor(CSS, `${s}:hover`), 'transition-duration')
+        return inMs === `var(${CSS_DURATION_TOKEN.reveal})` && out === '0s'
+      }),
+    ).toEqual([])
   })
 })
 
@@ -178,7 +222,13 @@ describe('10 · a world with nothing happening still breathes', () => {
 })
 
 // ── 11 · text never widows ────────────────────────────────────────────────────────────────
-const TITLES = named(['.px-title', '.bond-title', '.veil-title', '.thumb-title', '.tab-body article h4'])
+const TITLES = named([
+  '.px-title',
+  '.bond-title',
+  '.veil-title',
+  '.thumb-title',
+  '.tab-body article h4',
+])
 const PARAGRAPHS = named(['.block p', '.feed-text', '.room-who', '.veil-sub', '.room-empty'])
 
 describe('11 · a title never leaves one word on its own line', () => {
@@ -194,12 +244,14 @@ describe('11 · a title never leaves one word on its own line', () => {
 // ── 12 · the scrollbars are the town's ────────────────────────────────────────────────────
 const SCROLLERS = named(['#panel-outlet', '.hud-menu', '.strip-list', '.digest-modal'])
 
-describe('12 · a scrollable region says so, in the town\'s own colours', () => {
-  it('paints every scroll container\'s bar from the palette and keeps it visible', () => {
-    expect(missing(SCROLLERS, (s) => {
-      const body = rulesFor(CSS, s)
-      return decl(body, 'scrollbar-color') !== null && decl(body, 'scrollbar-width') !== null
-    })).toEqual([])
+describe("12 · a scrollable region says so, in the town's own colours", () => {
+  it("paints every scroll container's bar from the palette and keeps it visible", () => {
+    expect(
+      missing(SCROLLERS, (s) => {
+        const body = rulesFor(CSS, s)
+        return decl(body, 'scrollbar-color') !== null && decl(body, 'scrollbar-width') !== null
+      }),
+    ).toEqual([])
   })
 })
 
@@ -207,7 +259,8 @@ describe('12 · a scrollable region says so, in the town\'s own colours', () => 
 describe('every line above is about a surface that exists', () => {
   it('names no selector the sheet does not already have a rule for', () => {
     const phantom = [...new Set(ALL_NAMED)].filter((s) => rulesFor(CSS, s).length === 0)
-    expect(phantom, 'a finish line satisfiable by writing dead CSS is not a finish line')
-      .toEqual([])
+    expect(phantom, 'a finish line satisfiable by writing dead CSS is not a finish line').toEqual(
+      [],
+    )
   })
 })

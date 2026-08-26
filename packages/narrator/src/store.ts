@@ -30,10 +30,12 @@ export class NarratorStore {
     return run(scenes)
   }
 
-  scenesForDay(day: number): Array<SceneSegment & { id: number }> {
+  scenesForDay(day: number): (SceneSegment & { id: number })[] {
     const rows = this.db
-      .prepare(`SELECT id, day, start_tick, end_tick, event_ids, "cast", location FROM scenes WHERE day = ? ORDER BY id`)
-      .all(day) as Array<{
+      .prepare(
+        `SELECT id, day, start_tick, end_tick, event_ids, "cast", location FROM scenes WHERE day = ? ORDER BY id`,
+      )
+      .all(day) as {
       id: number
       day: number
       start_tick: number
@@ -41,7 +43,7 @@ export class NarratorStore {
       event_ids: string
       cast: string
       location: string | null
-    }>
+    }[]
     return rows.map((r) => ({
       id: r.id,
       day: r.day,
@@ -62,13 +64,13 @@ export class NarratorStore {
       .run(sceneId, s.conflict, s.novelty, s.firsts, s.stakes, s.dramaticIrony, s.total)
   }
 
-  heatsForDay(day: number): Array<{ sceneId: number; s: HeatScores }> {
+  heatsForDay(day: number): { sceneId: number; s: HeatScores }[] {
     const rows = this.db
       .prepare(
         `SELECT h.scene_id, h.conflict, h.novelty, h.firsts, h.stakes, h.dramatic_irony, h.total
          FROM heat_scores h JOIN scenes s ON s.id = h.scene_id WHERE s.day = ? ORDER BY h.id`,
       )
-      .all(day) as Array<{
+      .all(day) as {
       scene_id: number
       conflict: number
       novelty: number
@@ -76,7 +78,7 @@ export class NarratorStore {
       stakes: number
       dramatic_irony: number
       total: number
-    }>
+    }[]
     return rows.map((r) => ({
       sceneId: r.scene_id,
       s: {
@@ -97,13 +99,23 @@ export class NarratorStore {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
-        m.kind, m.label, m.eventSeq, m.day, m.tick, String(m.tier), m.domain, arr(m.agentIds),
-        m.constructId ?? null, m.nameProvenance === undefined ? null : JSON.stringify(m.nameProvenance),
+        m.kind,
+        m.label,
+        m.eventSeq,
+        m.day,
+        m.tick,
+        String(m.tier),
+        m.domain,
+        arr(m.agentIds),
+        m.constructId ?? null,
+        m.nameProvenance === undefined ? null : JSON.stringify(m.nameProvenance),
       )
   }
 
   milestoneKinds(): Set<string> {
-    const rows = this.db.prepare('SELECT DISTINCT kind FROM milestones').all() as Array<{ kind: string }>
+    const rows = this.db.prepare('SELECT DISTINCT kind FROM milestones').all() as {
+      kind: string
+    }[]
     return new Set(rows.map((r) => r.kind))
   }
 
@@ -113,10 +125,18 @@ export class NarratorStore {
         `SELECT kind, label, event_seq, day, tick, tier, domain, agent_ids, construct_id, name_provenance
          FROM milestones ORDER BY id`,
       )
-      .all() as Array<{
-      kind: string; label: string; event_seq: number; day: number; tick: number
-      tier: string; domain: string; agent_ids: string; construct_id: string | null; name_provenance: string | null
-    }>
+      .all() as {
+      kind: string
+      label: string
+      event_seq: number
+      day: number
+      tick: number
+      tier: string
+      domain: string
+      agent_ids: string
+      construct_id: string | null
+      name_provenance: string | null
+    }[]
     return rows.map((r) => ({
       kind: r.kind,
       tier: Number(r.tier) as Milestone['tier'],
@@ -129,23 +149,31 @@ export class NarratorStore {
       ...(r.construct_id === null ? {} : { constructId: r.construct_id }),
       ...(r.name_provenance === null
         ? {}
-        : { nameProvenance: JSON.parse(r.name_provenance) as Milestone['nameProvenance'] }),
+        : {
+            nameProvenance: JSON.parse(r.name_provenance) as NonNullable<
+              Milestone['nameProvenance']
+            >,
+          }),
     }))
   }
 
   insertSemanticFirst(r: SemanticFirstRow): void {
-    this.db.prepare(
-      `INSERT INTO semantic_first_detected
+    this.db
+      .prepare(
+        `INSERT INTO semantic_first_detected
         (concept_kind, agent_id, day, source_kind, event_seq, memory_ref, quote, quote2, provenance2, confidence, rationale)
        VALUES (@conceptKind, @agentId, @day, @sourceKind, @eventSeq, @memoryRef, @quote, @quote2, @provenance2, @confidence, @rationale)`,
-    ).run(r)
+      )
+      .run(r)
   }
 
   semanticFirsts(): SemanticFirstRow[] {
-    const rows = this.db.prepare(
-      `SELECT concept_kind, agent_id, day, source_kind, event_seq, memory_ref, quote, quote2, provenance2, confidence, rationale
+    const rows = this.db
+      .prepare(
+        `SELECT concept_kind, agent_id, day, source_kind, event_seq, memory_ref, quote, quote2, provenance2, confidence, rationale
        FROM semantic_first_detected ORDER BY id`,
-    ).all() as Array<Record<string, unknown>>
+      )
+      .all() as Record<string, unknown>[]
     return rows.map((r) => ({
       conceptKind: r.concept_kind as string,
       agentId: r.agent_id as string,
@@ -162,21 +190,27 @@ export class NarratorStore {
   }
 
   semanticFirstKinds(): Set<string> {
-    const rows = this.db.prepare('SELECT concept_kind FROM semantic_first_detected').all() as Array<{ concept_kind: string }>
+    const rows = this.db.prepare('SELECT concept_kind FROM semantic_first_detected').all() as {
+      concept_kind: string
+    }[]
     return new Set(rows.map((r) => r.concept_kind))
   }
 
   insertSemanticCandidate(c: SemanticCandidateRow): void {
-    this.db.prepare(
-      `INSERT INTO semantic_candidates (concept_kind, agent_id, day, source_kind, quote, confidence, rationale, reason)
+    this.db
+      .prepare(
+        `INSERT INTO semantic_candidates (concept_kind, agent_id, day, source_kind, quote, confidence, rationale, reason)
        VALUES (@conceptKind, @agentId, @day, @sourceKind, @quote, @confidence, @rationale, @reason)`,
-    ).run(c)
+      )
+      .run(c)
   }
 
   semanticCandidates(): SemanticCandidateRow[] {
-    const rows = this.db.prepare(
-      'SELECT concept_kind, agent_id, day, source_kind, quote, confidence, rationale, reason FROM semantic_candidates ORDER BY id',
-    ).all() as Array<Record<string, unknown>>
+    const rows = this.db
+      .prepare(
+        'SELECT concept_kind, agent_id, day, source_kind, quote, confidence, rationale, reason FROM semantic_candidates ORDER BY id',
+      )
+      .all() as Record<string, unknown>[]
     return rows.map((r) => ({
       conceptKind: r.concept_kind as string,
       agentId: r.agent_id as string,
@@ -195,16 +229,22 @@ export class NarratorStore {
         `INSERT INTO institutions (kind, name, description, founding_scene_id, member_ids, source_event_ids)
          VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(i.kind, i.name, i.description, i.foundingSceneId, arr(i.memberIds), arr(i.sourceEventIds))
-      .lastInsertRowid as number
+      .run(
+        i.kind,
+        i.name,
+        i.description,
+        i.foundingSceneId,
+        arr(i.memberIds),
+        arr(i.sourceEventIds),
+      ).lastInsertRowid as number
   }
 
-  institutions(): Array<Institution & { id: number }> {
+  institutions(): (Institution & { id: number })[] {
     const rows = this.db
       .prepare(
         'SELECT id, kind, name, description, founding_scene_id, member_ids, source_event_ids FROM institutions ORDER BY id',
       )
-      .all() as Array<{
+      .all() as {
       id: number
       kind: Institution['kind']
       name: string
@@ -212,7 +252,7 @@ export class NarratorStore {
       founding_scene_id: number
       member_ids: string
       source_event_ids: string
-    }>
+    }[]
     return rows.map((r) => ({
       id: r.id,
       kind: r.kind,
@@ -224,15 +264,30 @@ export class NarratorStore {
     }))
   }
 
-  insertChapter(c: { day: number; title: string; text: string; citations: number[]; sceneIds: number[] }): number {
+  insertChapter(c: {
+    day: number
+    title: string
+    text: string
+    citations: number[]
+    sceneIds: number[]
+  }): number {
     return this.db
-      .prepare('INSERT INTO chapters (day, title, text, citations, scene_ids) VALUES (?, ?, ?, ?, ?)')
+      .prepare(
+        'INSERT INTO chapters (day, title, text, citations, scene_ids) VALUES (?, ?, ?, ?, ?)',
+      )
       .run(c.day, c.title, c.text, arr(c.citations), arr(c.sceneIds)).lastInsertRowid as number
   }
 
   private chapterRows(rows: unknown[]): ChapterRow[] {
     return (
-      rows as Array<{ id: number; day: number; title: string; text: string; citations: string; scene_ids: string }>
+      rows as {
+        id: number
+        day: number
+        title: string
+        text: string
+        citations: string
+        scene_ids: string
+      }[]
     ).map((r) => ({
       id: r.id,
       day: r.day,
@@ -245,28 +300,46 @@ export class NarratorStore {
 
   chaptersForDay(day: number): ChapterRow[] {
     return this.chapterRows(
-      this.db.prepare('SELECT id, day, title, text, citations, scene_ids FROM chapters WHERE day = ? ORDER BY id').all(day),
+      this.db
+        .prepare(
+          'SELECT id, day, title, text, citations, scene_ids FROM chapters WHERE day = ? ORDER BY id',
+        )
+        .all(day),
     )
   }
 
   chaptersInRange(fromDay: number, toDay: number): ChapterRow[] {
     return this.chapterRows(
       this.db
-        .prepare('SELECT id, day, title, text, citations, scene_ids FROM chapters WHERE day BETWEEN ? AND ? ORDER BY day')
+        .prepare(
+          'SELECT id, day, title, text, citations, scene_ids FROM chapters WHERE day BETWEEN ? AND ? ORDER BY day',
+        )
         .all(fromDay, toDay),
     )
   }
 
-  insertEra(e: { startDay: number; endDay: number; title: string; text: string; citations: number[]; chapterIds: number[] }): number {
+  insertEra(e: {
+    startDay: number
+    endDay: number
+    title: string
+    text: string
+    citations: number[]
+    chapterIds: number[]
+  }): number {
     return this.db
-      .prepare('INSERT INTO eras (start_day, end_day, title, text, citations, chapter_ids) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(e.startDay, e.endDay, e.title, e.text, arr(e.citations), arr(e.chapterIds)).lastInsertRowid as number
+      .prepare(
+        'INSERT INTO eras (start_day, end_day, title, text, citations, chapter_ids) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(e.startDay, e.endDay, e.title, e.text, arr(e.citations), arr(e.chapterIds))
+      .lastInsertRowid as number
   }
 
   eras(): EraRow[] {
     const rows = this.db
-      .prepare('SELECT id, start_day, end_day, title, text, citations, chapter_ids FROM eras ORDER BY id')
-      .all() as Array<{
+      .prepare(
+        'SELECT id, start_day, end_day, title, text, citations, chapter_ids FROM eras ORDER BY id',
+      )
+      .all() as {
       id: number
       start_day: number
       end_day: number
@@ -274,7 +347,7 @@ export class NarratorStore {
       text: string
       citations: string
       chapter_ids: string
-    }>
+    }[]
     return rows.map((r) => ({
       id: r.id,
       startDay: r.start_day,
@@ -286,18 +359,40 @@ export class NarratorStore {
     }))
   }
 
-  insertPublication(p: { day: number; kind: PublicationRow['kind']; title: string; body: string; citations: number[] | null }): number {
+  insertPublication(p: {
+    day: number
+    kind: PublicationRow['kind']
+    title: string
+    body: string
+    citations: number[] | null
+  }): number {
     return this.db
-      .prepare('INSERT INTO publications (day, kind, title, body, citations) VALUES (?, ?, ?, ?, ?)')
-      .run(p.day, p.kind, p.title, p.body, p.citations === null ? null : arr(p.citations)).lastInsertRowid as number
+      .prepare(
+        'INSERT INTO publications (day, kind, title, body, citations) VALUES (?, ?, ?, ?, ?)',
+      )
+      .run(p.day, p.kind, p.title, p.body, p.citations === null ? null : arr(p.citations))
+      .lastInsertRowid as number
   }
 
   publications(kind?: PublicationRow['kind']): PublicationRow[] {
     const rows = (
       kind === undefined
-        ? this.db.prepare('SELECT id, day, kind, title, body, citations FROM publications ORDER BY id').all()
-        : this.db.prepare('SELECT id, day, kind, title, body, citations FROM publications WHERE kind = ? ORDER BY id').all(kind)
-    ) as Array<{ id: number; day: number; kind: PublicationRow['kind']; title: string; body: string; citations: string | null }>
+        ? this.db
+            .prepare('SELECT id, day, kind, title, body, citations FROM publications ORDER BY id')
+            .all()
+        : this.db
+            .prepare(
+              'SELECT id, day, kind, title, body, citations FROM publications WHERE kind = ? ORDER BY id',
+            )
+            .all(kind)
+    ) as {
+      id: number
+      day: number
+      kind: PublicationRow['kind']
+      title: string
+      body: string
+      citations: string | null
+    }[]
     return rows.map((r) => ({
       id: r.id,
       day: r.day,

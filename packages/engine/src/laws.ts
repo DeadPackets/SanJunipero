@@ -53,7 +53,7 @@ export const TOGGLABLE_PATHS: Readonly<Record<string, z.ZodType>> = {
   'regrowth.saplingChancePerDay': z.number().min(0).max(1),
 }
 
-export type LawQueue = Array<{ path: string; value: unknown }>
+export type LawQueue = { path: string; value: unknown }[]
 
 // Enqueue only. The tick wrapper drains this at the boundary and emits the events;
 // nothing here touches state, so an operator can never land a change mid-tick.
@@ -86,7 +86,10 @@ export function effectiveConfig(base: SimConfig, laws?: Record<string, unknown>)
   for (const path of paths.sort()) withPath(out, path, laws[path])
   const derived = out as unknown as SimConfig
   let perBase = memo.get(laws)
-  if (perBase === undefined) { perBase = new WeakMap(); memo.set(laws, perBase) }
+  if (perBase === undefined) {
+    perBase = new WeakMap()
+    memo.set(laws, perBase)
+  }
   perBase.set(base, derived)
   return derived
 }

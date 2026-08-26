@@ -15,11 +15,12 @@ export function trimToFigure(img: RawImage, margin = HIRES_MARGIN): RawImage {
   const w = b.x1 - b.x0 + 1 + margin * 2
   const h = b.y1 - b.y0 + 1 + margin * 2
   const data = new Uint8ClampedArray(w * h * 4)
-  for (let y = b.y0; y <= b.y1; y++) for (let x = b.x0; x <= b.x1; x++) {
-    const s = (y * img.width + x) * 4
-    if (img.data[s + 3] === 0) continue
-    data.set(img.data.subarray(s, s + 4), ((y - b.y0 + margin) * w + (x - b.x0 + margin)) * 4)
-  }
+  for (let y = b.y0; y <= b.y1; y++)
+    for (let x = b.x0; x <= b.x1; x++) {
+      const s = (y * img.width + x) * 4
+      if (img.data[s + 3] === 0) continue
+      data.set(img.data.subarray(s, s + 4), ((y - b.y0 + margin) * w + (x - b.x0 + margin)) * 4)
+    }
   return { width: w, height: h, data }
 }
 
@@ -31,8 +32,11 @@ export function normalizeFigureHeight(img: RawImage, targetH: number): RawImage 
   const bh = b.y1 - b.y0 + 1
   if (bh === targetH) return img
   const k = targetH / bh
-  return downscaleNearest(img,
-    Math.max(1, Math.round(img.width * k)), Math.max(1, Math.round(img.height * k)))
+  return downscaleNearest(
+    img,
+    Math.max(1, Math.round(img.width * k)),
+    Math.max(1, Math.round(img.height * k)),
+  )
 }
 
 export type CellAnchor = { w: number; h: number; feetX: number; feetY: number }
@@ -51,10 +55,13 @@ export type CharacterManifestV4 = {
 }
 
 // Manifest for the renderer: exactly the 24-cell contract, one anchor per cell.
-export function buildManifestV4(cells: Map<string, RawImage>, figureH: number): CharacterManifestV4 {
-  const missing = CELL_NAMES_V4.filter(n => !cells.has(n))
+export function buildManifestV4(
+  cells: Map<string, RawImage>,
+  figureH: number,
+): CharacterManifestV4 {
+  const missing = CELL_NAMES_V4.filter((n) => !cells.has(n))
   if (missing.length) throw new Error(`buildManifestV4: missing cells ${missing.join(', ')}`)
-  const extra = [...cells.keys()].filter(n => !CELL_NAMES_V4.includes(n))
+  const extra = [...cells.keys()].filter((n) => !CELL_NAMES_V4.includes(n))
   if (extra.length) throw new Error(`buildManifestV4: unexpected cells ${extra.join(', ')}`)
   const anchors: Record<string, CellAnchor> = {}
   for (const name of CELL_NAMES_V4) anchors[name] = cellAnchor(cells.get(name)!)

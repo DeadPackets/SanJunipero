@@ -3,7 +3,12 @@ import { DEFAULT_CONFIG, INTERIOR_KINDS, type AssetRecord } from '@sj/shared'
 import { genesisState, type Item, type WorldState } from '@sj/engine/state'
 import { GAMIFICATION_BAN } from './townStats.js'
 import {
-  ROOM_HOLDS_MAX, ROOM_STATE_ASLEEP, ROOM_STATE_IDLE, roomCard, roomStateOf, roomWord,
+  ROOM_HOLDS_MAX,
+  ROOM_STATE_ASLEEP,
+  ROOM_STATE_IDLE,
+  roomCard,
+  roomStateOf,
+  roomWord,
   type Provenance,
 } from './interiorModel.js'
 
@@ -13,23 +18,51 @@ const SYNONYM_BAN = /\b(resting|awake)\b/i
 
 function agent(id: string, name: string, over: Partial<WorldState['agents'][string]> = {}) {
   return {
-    id, name, x: 0, y: 0, alive: true, asleep: false,
+    id,
+    name,
+    x: 0,
+    y: 0,
+    alive: true,
+    asleep: false,
     needs: { hunger: 1, energy: 1, warmth: 1, social: 1 },
-    hp: 10, injuries: [], ill: false, ageDays: 7300, skills: {}, activity: null,
-    collapsedSinceTick: null, zeroHungerSinceTick: null, ...over,
+    hp: 10,
+    injuries: [],
+    ill: false,
+    ageDays: 7300,
+    skills: {},
+    activity: null,
+    collapsedSinceTick: null,
+    zeroHungerSinceTick: null,
+    ...over,
   }
 }
 
 function structure(id: string, kind: string, owner?: string): WorldState['structures'][string] {
   return {
-    id, kind, x: 1, y: 1, w: 2, h: 2, hp: 10, maxHp: 10, flammable: true,
-    stage: 'complete', progressTicks: 0, builtBy: null, burning: false, burnTicks: 0,
+    id,
+    kind,
+    x: 1,
+    y: 1,
+    w: 2,
+    h: 2,
+    hp: 10,
+    maxHp: 10,
+    flammable: true,
+    stage: 'complete',
+    progressTicks: 0,
+    builtBy: null,
+    burning: false,
+    burnTicks: 0,
     ...(owner === undefined ? {} : { owner }),
   }
 }
 
-const item = (id: string, kind: string, qty: number, structureId: string): Item =>
-  ({ id, kind, qty, loc: { t: 'structure', id: structureId } })
+const item = (id: string, kind: string, qty: number, structureId: string): Item => ({
+  id,
+  kind,
+  qty,
+  loc: { t: 'structure', id: structureId },
+})
 
 function world(over: Partial<WorldState> = {}): WorldState {
   const s = genesisState(DEFAULT_CONFIG)
@@ -38,7 +71,8 @@ function world(over: Partial<WorldState> = {}): WorldState {
     agents: {
       amara: agent('amara', 'Amara', { insideId: 'house1', asleep: true }),
       yusuf: agent('yusuf', 'Yusuf', {
-        insideId: 'house1', activity: { verb: 'weave', ticksRemaining: 4 },
+        insideId: 'house1',
+        activity: { verb: 'weave', ticksRemaining: 4 },
       } as Partial<WorldState['agents'][string]>),
       nadia: agent('nadia', 'Nadia', { insideId: 'store1' }),
     },
@@ -59,13 +93,25 @@ function world(over: Partial<WorldState> = {}): WorldState {
   }
 }
 
-const rec = (id: string, kind: string): AssetRecord => ({
-  id, class: 'item', kind, status: 'ready', seq: 1, meta: null,
-} as unknown as AssetRecord)
+const rec = (id: string, kind: string): AssetRecord =>
+  ({
+    id,
+    class: 'item',
+    kind,
+    status: 'ready',
+    seq: 1,
+    meta: null,
+  }) as unknown as AssetRecord
 
 const RECORDS = [rec('a1', 'grain#icon'), rec('a2', 'plank#icon')]
 
-const PROV: Provenance = { id: 'house1', kind: 'house', plannedTick: 1, builderId: 'yusuf', completedTick: 4320 }
+const PROV: Provenance = {
+  id: 'house1',
+  kind: 'house',
+  plannedTick: 1,
+  builderId: 'yusuf',
+  completedTick: 4320,
+}
 
 describe('roomCard — whose room this is', () => {
   it('names an owned house after its resident, with a typographic apostrophe', () => {
@@ -154,8 +200,9 @@ describe('roomCard — what it holds', () => {
   })
 
   it('gives a kind with no icon in the codex a null, not a broken url', () => {
-    expect(roomCard(world(), 'house1', RECORDS, null)!.holds)
-      .toEqual([{ kind: 'bowl', words: 'bowl', qty: 1, iconUrl: null }])
+    expect(roomCard(world(), 'house1', RECORDS, null)!.holds).toEqual([
+      { kind: 'bowl', words: 'bowl', qty: 1, iconUrl: null },
+    ])
   })
 
   // WHAT THE BROWSER CAUGHT the first time this grid ever had data in it: it printed the
@@ -184,8 +231,8 @@ describe('roomCard — what it holds', () => {
 describe('roomCard — the empty line', () => {
   it('says nobody is in NOW, never that nothing has happened yet', () => {
     const quiet = world()
-    delete quiet.agents['amara']
-    delete quiet.agents['yusuf']
+    delete quiet.agents.amara
+    delete quiet.agents.yusuf
     const c = roomCard(quiet, 'house1', RECORDS, null)!
     expect(c.present).toEqual([])
     expect(c.empty).toContain('now')
@@ -206,14 +253,22 @@ describe('roomCard — the house style', () => {
   it('carries no gamification and no emoji anywhere in the card', () => {
     for (const id of ['house1', 'store1']) {
       const c = roomCard(world(), id, RECORDS, PROV)!
-      const text = [c.title, c.built ?? '', c.empty, ...c.lives,
-        ...c.holds.map((h) => h.words), ...c.present.map((p) => `${p.name} ${p.state}`)].join(' ')
+      const text = [
+        c.title,
+        c.built ?? '',
+        c.empty,
+        ...c.lives,
+        ...c.holds.map((h) => h.words),
+        ...c.present.map((p) => `${p.name} ${p.state}`),
+      ].join(' ')
       expect(text, id).not.toMatch(GAMIFICATION_BAN)
       expect(text, id).not.toMatch(EMOJI)
     }
   })
 
   it('is pure — the same world twice gives the same card', () => {
-    expect(roomCard(world(), 'house1', RECORDS, PROV)).toEqual(roomCard(world(), 'house1', RECORDS, PROV))
+    expect(roomCard(world(), 'house1', RECORDS, PROV)).toEqual(
+      roomCard(world(), 'house1', RECORDS, PROV),
+    )
   })
 })

@@ -1,12 +1,22 @@
 import {
-  DEFAULT_CONFIG, INTERIOR_KINDS, cityStructures, citySlotsFor, parseLibraryItemManifest,
+  DEFAULT_CONFIG,
+  INTERIOR_KINDS,
+  cityStructures,
+  citySlotsFor,
+  parseLibraryItemManifest,
   resolveFurnishingKind,
-  type AssetRecord, type InteriorKind, type InteriorMeta,
+  type AssetRecord,
+  type InteriorKind,
+  type InteriorMeta,
 } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import { OVERLAP_RANK, depthOrder, type DepthBox } from './depth.js'
 import {
-  INTERIOR_BODY_PX, INTERIOR_TILE, interiorToScreen, roomTilesFor, seatInBlock,
+  INTERIOR_BODY_PX,
+  INTERIOR_TILE,
+  interiorToScreen,
+  roomTilesFor,
+  seatInBlock,
 } from './interiorMap.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
@@ -76,9 +86,8 @@ const CITY_FURNISHINGS: Record<InteriorKind, RoomFurnishing[]> = (() => {
   const out = {} as Record<InteriorKind, RoomFurnishing[]>
   for (const kind of INTERIOR_KINDS) {
     const s = cityStructures().find((c) => c.kind === kind)
-    const source: RoomFurnishing[] = s !== undefined && s.furnishings.length > 0
-      ? s.furnishings
-      : INTERIOR_LAYOUTS[kind]
+    const source: RoomFurnishing[] =
+      s !== undefined && s.furnishings.length > 0 ? s.furnishings : INTERIOR_LAYOUTS[kind]
     out[kind] = source.map((f) => ({ kind: resolveFurnishingKind(f.kind), slot: { ...f.slot } }))
   }
   return out
@@ -119,7 +128,7 @@ export function roomPlan(kind: InteriorKind, records: AssetRecord[]): RoomItem[]
 export type RoomLight = { id: string; kind: string; tile: { x: number; y: number } }
 
 export function roomLights(
-  pieces: ReadonlyArray<{ kind: string; tile: { x: number; y: number } }>,
+  pieces: readonly { kind: string; tile: { x: number; y: number } }[],
   lightKinds: ReadonlySet<string>,
 ): RoomLight[] {
   return pieces
@@ -157,8 +166,8 @@ export function interiorOf(state: WorldState, structureId: string): Interior | n
 // each and a third sleeper gets none rather than lying on someone. The cells are INTERIOR TILES.
 export const BED_FOOTPRINT = { w: 1, h: 2 } as const
 
-function bedCells(kind: InteriorKind, records: AssetRecord[]): Array<{ x: number; y: number }> {
-  const cells: Array<{ x: number; y: number }> = []
+function bedCells(kind: InteriorKind, records: AssetRecord[]): { x: number; y: number }[] {
+  const cells: { x: number; y: number }[] = []
   // The same seating the room map uses, over the same list in the same order — a sleeper's
   // cell and the bed's own tiles are one answer or a body lies beside its bed.
   const plan = roomPlan(kind, records)
@@ -166,7 +175,12 @@ function bedCells(kind: InteriorKind, records: AssetRecord[]): Array<{ x: number
   for (const [i, f] of plan.entries()) {
     if (f.meta === null ? f.kind !== 'bed' : f.meta.isBed !== true) continue
     const size = f.meta?.slots ?? BED_FOOTPRINT
-    const at = seatInBlock(f.slot, slots.filter((_, j) => j !== i), roomSizeOf(kind), slotGridOf(kind))
+    const at = seatInBlock(
+      f.slot,
+      slots.filter((_, j) => j !== i),
+      roomSizeOf(kind),
+      slotGridOf(kind),
+    )
     for (let dy = 0; dy < size.h; dy++) {
       for (let dx = 0; dx < size.w; dx++) cells.push({ x: at.x + dx, y: at.y + dy })
     }
@@ -176,7 +190,9 @@ function bedCells(kind: InteriorKind, records: AssetRecord[]): Array<{ x: number
 
 /** Which interior tile each sleeper lies in. */
 export function bedSlots(
-  kind: InteriorKind, sleeping: string[], records: AssetRecord[] = [],
+  kind: InteriorKind,
+  sleeping: string[],
+  records: AssetRecord[] = [],
 ): Record<string, { x: number; y: number }> {
   const cells = bedCells(kind, records)
   const out: Record<string, { x: number; y: number }> = {}
@@ -200,9 +216,16 @@ export type OccupancyMode = 'in' | 'at' | 'beside'
 /** Total over `CITY_FURNISHING_KINDS` — a kind added to the template with no mode fails the
  *  test rather than silently falling through. */
 export const FURNITURE_OCCUPANCY: Record<string, OccupancyMode> = {
-  bed: 'in', chair: 'in', bench: 'in',
-  table: 'at', hearth: 'at', anvil: 'at',
-  shelf: 'beside', crate: 'beside', barrel: 'beside', rug: 'beside',
+  bed: 'in',
+  chair: 'in',
+  bench: 'in',
+  table: 'at',
+  hearth: 'at',
+  anvil: 'at',
+  shelf: 'beside',
+  crate: 'beside',
+  barrel: 'beside',
+  rug: 'beside',
 }
 
 export function occupancyOf(kind: string): OccupancyMode {
@@ -214,9 +237,12 @@ export function occupancyOf(kind: string): OccupancyMode {
  *  pixel is the NEAR VERTEX of its ground, not the centre; a body's feet already are that. */
 export const CONTACT_SHADOW_ALPHA = 0.22
 export const CONTACT_SHADOW_SHARE = 0.42
-export function contactShadow(
-  widthPx: number,
-): { rx: number; ry: number; alpha: number; lift: number } {
+export function contactShadow(widthPx: number): {
+  rx: number
+  ry: number
+  alpha: number
+  lift: number
+} {
   const rx = Math.max(0, widthPx) * CONTACT_SHADOW_SHARE
   const ry = rx / 2
   return { rx, ry, alpha: CONTACT_SHADOW_ALPHA, lift: ry }
@@ -288,7 +314,8 @@ export function occupantTile(mode: OccupancyMode, own: Tile, at: Tile | null): T
 
 /** Every drawable in the room, in a stable order. */
 export function interiorPieces(
-  items: ReadonlyArray<PlacedItem>, bodies: ReadonlyArray<PlacedBody>,
+  items: readonly PlacedItem[],
+  bodies: readonly PlacedBody[],
 ): RoomPiece[] {
   const out: RoomPiece[] = []
   const byId = new Map<string, PlacedItem>()
@@ -303,13 +330,20 @@ export function interiorPieces(
     }
     const halfH = size.h / 2
     out.push({
-      id: `${id}#back`, kind: 'furniture',
-      tile: item.tile, size: { w: size.w, h: halfH }, half: 'back', anchor,
+      id: `${id}#back`,
+      kind: 'furniture',
+      tile: item.tile,
+      size: { w: size.w, h: halfH },
+      half: 'back',
+      anchor,
     })
     out.push({
-      id: `${id}#front`, kind: 'furniture',
-      tile: { x: item.tile.x, y: item.tile.y + halfH }, size: { w: size.w, h: halfH },
-      half: 'front', anchor,
+      id: `${id}#front`,
+      kind: 'furniture',
+      tile: { x: item.tile.x, y: item.tile.y + halfH },
+      size: { w: size.w, h: halfH },
+      half: 'front',
+      anchor,
     })
   }
   for (const b of bodies) {
@@ -324,7 +358,10 @@ export function interiorPieces(
 
 /** A piece's box in TILE space, plus a generous screen box for the broad phase. */
 export function roomDepthBox(p: RoomPiece): DepthBox {
-  const x0 = p.tile.x, y0 = p.tile.y, x1 = p.tile.x + p.size.w, y1 = p.tile.y + p.size.h
+  const x0 = p.tile.x,
+    y0 = p.tile.y,
+    x1 = p.tile.x + p.size.w,
+    y1 = p.tile.y + p.size.h
   const near = interiorToScreen(x1, y1)
   const far = interiorToScreen(x0, y0)
   const east = interiorToScreen(x1, y0)
@@ -333,8 +370,14 @@ export function roomDepthBox(p: RoomPiece): DepthBox {
   return {
     id: p.id,
     rank: p.kind === 'body' ? OVERLAP_RANK.body : OVERLAP_RANK.structure,
-    x0, y0, x1, y1,
-    sx0: west.sx, sy0: far.sy - rise, sx1: east.sx, sy1: near.sy,
+    x0,
+    y0,
+    x1,
+    y1,
+    sx0: west.sx,
+    sy0: far.sy - rise,
+    sx1: east.sx,
+    sy1: near.sy,
   }
 }
 
@@ -352,21 +395,30 @@ export const INTERIOR_FADE_MS = SCENE_TOTAL_MS
 // Pure: the caller owns the clock. A viewer who turns around mid-fade reverses; the fade never
 // finishes a move that was abandoned.
 export function interiorTransition(
-  prev: InteriorPhase, entered: boolean, nowMs: number, sinceMs = 0,
+  prev: InteriorPhase,
+  entered: boolean,
+  nowMs: number,
+  sinceMs = 0,
 ): InteriorPhase {
   const done = nowMs - sinceMs >= INTERIOR_FADE_MS
   switch (prev) {
-    case 'town': return entered ? 'entering' : 'town'
-    case 'entering': return entered ? (done ? 'inside' : 'entering') : 'exiting'
-    case 'inside': return entered ? 'inside' : 'exiting'
-    case 'exiting': return entered ? 'entering' : (done ? 'town' : 'exiting')
+    case 'town':
+      return entered ? 'entering' : 'town'
+    case 'entering':
+      return entered ? (done ? 'inside' : 'entering') : 'exiting'
+    case 'inside':
+      return entered ? 'inside' : 'exiting'
+    case 'exiting':
+      return entered ? 'entering' : done ? 'town' : 'exiting'
   }
 }
 
 export type InteriorPhaseState = { phase: InteriorPhase; sinceMs: number }
 
 export function advanceInterior(
-  state: InteriorPhaseState, entered: boolean, nowMs: number,
+  state: InteriorPhaseState,
+  entered: boolean,
+  nowMs: number,
 ): InteriorPhaseState {
   const next = interiorTransition(state.phase, entered, nowMs, state.sinceMs)
   return next === state.phase ? state : { phase: next, sinceMs: nowMs }

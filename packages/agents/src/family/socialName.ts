@@ -28,7 +28,10 @@ export function promptBirthLine(born: AgentBornPayload): string {
   return `You have borne a ${child}. The town rolls will know ${object} as ${born.name} — what do you call ${object}?`
 }
 
-function namingPrompt(born: AgentBornPayload, mother: ParentPersona): { system: string; user: string } {
+function namingPrompt(
+  born: AgentBornPayload,
+  mother: ParentPersona,
+): { system: string; user: string } {
   const v = mother.identity.voiceCard
   return {
     system: [
@@ -37,7 +40,10 @@ function namingPrompt(born: AgentBornPayload, mother: ParentPersona): { system: 
       'It may be the name the town rolls carry, or it may be your own — a name out of your family, a word for what you see in the face, whatever you would actually say.',
       `You speak ${v.register}.`,
     ].join('\n'),
-    user: [promptBirthLine(born), `You are ${mother.identity.name}. Right now you are ${mother.personality.current.mood}.`].join('\n'),
+    user: [
+      promptBirthLine(born),
+      `You are ${mother.identity.name}. Right now you are ${mother.personality.current.mood}.`,
+    ].join('\n'),
   }
 }
 
@@ -62,11 +68,8 @@ export async function captureSocialName(
     return null
   }
   if (answer.length === 0 || answer.length > MAX_SOCIAL_NAME_CHARS) return null
-  db.prepare('INSERT INTO social_names (agent_id, social_name, named_by, tick) VALUES (?, ?, ?, ?)').run(
-    ctx.born.id,
-    answer,
-    ctx.born.motherId,
-    ctx.tick,
-  )
+  db.prepare(
+    'INSERT INTO social_names (agent_id, social_name, named_by, tick) VALUES (?, ?, ?, ?)',
+  ).run(ctx.born.id, answer, ctx.born.motherId, ctx.tick)
   return answer
 }

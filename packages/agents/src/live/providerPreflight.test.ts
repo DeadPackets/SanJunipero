@@ -3,8 +3,14 @@ import { z } from 'zod'
 import { CAPABILITIES } from '../prompt/rulesOfBeing.js'
 import { TurnSchema } from '../turn.js'
 import {
-  PREFLIGHT_BAR, PREFLIGHT_CALLS, preflightPrompts, preflightRefusal, runPreflight, scorePreflight,
-  type PreflightAnswer, type PreflightLlm,
+  PREFLIGHT_BAR,
+  PREFLIGHT_CALLS,
+  preflightPrompts,
+  preflightRefusal,
+  runPreflight,
+  scorePreflight,
+  type PreflightAnswer,
+  type PreflightLlm,
 } from './providerPreflight.js'
 
 // Two recorded signatures: a grammar-constrained back end returns only the schema's required
@@ -44,7 +50,12 @@ function fakeLlm(answers: readonly unknown[]): PreflightLlm {
 }
 
 const score = (answers: readonly PreflightAnswer[]) =>
-  scorePreflight({ provider: 'DeepInfra', hardAllowList: true, model: 'deepseek/deepseek-v4-flash-0731', answers })
+  scorePreflight({
+    provider: 'DeepInfra',
+    hardAllowList: true,
+    model: 'deepseek/deepseek-v4-flash-0731',
+    answers,
+  })
 
 describe('the provider pre-flight asks the real question', () => {
   it('sends the real system prompt, so the capabilities and the speech rules are in it', () => {
@@ -82,7 +93,11 @@ describe('scorePreflight', () => {
   })
 
   it('fails two acts out of three, however much it says', () => {
-    const r = score([ok(WHOLE_TURNS[0]), ok(WHOLE_TURNS[2]), ok({ ...REQUIRED_ONLY, speech: 'aye' })])
+    const r = score([
+      ok(WHOLE_TURNS[0]),
+      ok(WHOLE_TURNS[2]),
+      ok({ ...REQUIRED_ONLY, speech: 'aye' }),
+    ])
     expect(r.actions).toBe(2)
     expect(r.speeches).toBe(3)
     expect(r.passed).toBe(false)
@@ -104,7 +119,11 @@ describe('scorePreflight', () => {
   })
 
   it('does not count a null action as an act, now that the schema accepts one', () => {
-    const r = score([ok({ ...WHOLE_TURNS[0], action: null, speech: null }), ok(WHOLE_TURNS[1]), ok(WHOLE_TURNS[2])])
+    const r = score([
+      ok({ ...WHOLE_TURNS[0], action: null, speech: null }),
+      ok(WHOLE_TURNS[1]),
+      ok(WHOLE_TURNS[2]),
+    ])
     expect(r.actions).toBe(2)
     expect(r.speeches).toBe(1)
     expect(r.passed).toBe(false)
@@ -112,7 +131,8 @@ describe('scorePreflight', () => {
 
   it('counts a call that never came back as unanswered and keeps its error', () => {
     const r = score([
-      ok(WHOLE_TURNS[0]), ok(WHOLE_TURNS[2]),
+      ok(WHOLE_TURNS[0]),
+      ok(WHOLE_TURNS[2]),
       { ok: false, error: 'Upstream error: Grammar error: Unimplemented keys: ["propertyNames"]' },
     ])
     expect(r.answered).toBe(2)
@@ -123,8 +143,11 @@ describe('scorePreflight', () => {
 
   it('reports the back ends that actually served, deduplicated', () => {
     const r = scorePreflight({
-      provider: 'unpinned', hardAllowList: false, model: 'm',
-      answers: WHOLE_TURNS.map(ok), costUsd: 0.0009,
+      provider: 'unpinned',
+      hardAllowList: false,
+      model: 'm',
+      answers: WHOLE_TURNS.map(ok),
+      costUsd: 0.0009,
       servedProviders: ['Wafer', 'DeepInfra', 'Wafer'],
     })
     expect(r.servedProviders).toEqual(['DeepInfra', 'Wafer'])
@@ -152,7 +175,10 @@ describe('runPreflight repeats the bar, because one probe concludes nothing', ()
     // Round 1 is the DeepInfra signature; round 2 acts three times. Six calls, then done.
     const r = await runPreflight({
       llm: fakeLlm([REQUIRED_ONLY, REQUIRED_ONLY, REQUIRED_ONLY, ...WHOLE_TURNS, ...WHOLE_TURNS]),
-      provider: 'Baidu', hardAllowList: true, model: 'm', rounds: 4,
+      provider: 'Baidu',
+      hardAllowList: true,
+      model: 'm',
+      rounds: 4,
     })
     expect(r.roundsRun).toBe(2)
     expect(r.roundsPassed).toBe(1)
@@ -163,7 +189,11 @@ describe('runPreflight repeats the bar, because one probe concludes nothing', ()
   it('refuses only when every round fails the action bar, and totals them all', async () => {
     const dead = Array.from({ length: 4 * PREFLIGHT_CALLS }, () => REQUIRED_ONLY)
     const r = await runPreflight({
-      llm: fakeLlm(dead), provider: 'DeepInfra', hardAllowList: true, model: 'm', rounds: 4,
+      llm: fakeLlm(dead),
+      provider: 'DeepInfra',
+      hardAllowList: true,
+      model: 'm',
+      rounds: 4,
     })
     expect(r.roundsRun).toBe(4)
     expect(r.roundsPassed).toBe(0)
@@ -175,8 +205,11 @@ describe('runPreflight repeats the bar, because one probe concludes nothing', ()
   it('never repeats on speech alone: three acts and no words is one round and a pass', async () => {
     const silent = WHOLE_TURNS.map((t) => ({ ...t, speech: undefined }))
     const r = await runPreflight({
-      llm: fakeLlm([...silent, ...WHOLE_TURNS]), provider: 'StreamLake', hardAllowList: true,
-      model: 'm', rounds: 4,
+      llm: fakeLlm([...silent, ...WHOLE_TURNS]),
+      provider: 'StreamLake',
+      hardAllowList: true,
+      model: 'm',
+      rounds: 4,
     })
     expect(r.roundsRun).toBe(1)
     expect(r.speeches).toBe(0)
@@ -187,7 +220,10 @@ describe('runPreflight repeats the bar, because one probe concludes nothing', ()
 describe('runPreflight', () => {
   it('makes exactly three calls and scores what came back', async () => {
     const r = await runPreflight({
-      llm: fakeLlm(WHOLE_TURNS), provider: 'StreamLake', hardAllowList: true, model: 'm',
+      llm: fakeLlm(WHOLE_TURNS),
+      provider: 'StreamLake',
+      hardAllowList: true,
+      model: 'm',
     })
     expect(r.calls).toBe(PREFLIGHT_CALLS)
     expect(r.passed).toBe(true)
@@ -195,8 +231,14 @@ describe('runPreflight', () => {
 
   it('records a thrown call instead of abandoning the probe', async () => {
     const r = await runPreflight({
-      llm: fakeLlm([WHOLE_TURNS[0], new Error('Grammar error: Unimplemented keys: ["propertyNames"]'), WHOLE_TURNS[2]]),
-      provider: 'DeepInfra', hardAllowList: true, model: 'm',
+      llm: fakeLlm([
+        WHOLE_TURNS[0],
+        new Error('Grammar error: Unimplemented keys: ["propertyNames"]'),
+        WHOLE_TURNS[2],
+      ]),
+      provider: 'DeepInfra',
+      hardAllowList: true,
+      model: 'm',
     })
     expect(r.calls).toBe(PREFLIGHT_CALLS)
     expect(r.answered).toBe(2)
@@ -207,7 +249,10 @@ describe('runPreflight', () => {
   it('hands every answer back, so a bar cleared with three-word turns can be seen', async () => {
     const seen: PreflightAnswer[] = []
     await runPreflight({
-      llm: fakeLlm(WHOLE_TURNS), provider: 'StreamLake', hardAllowList: true, model: 'm',
+      llm: fakeLlm(WHOLE_TURNS),
+      provider: 'StreamLake',
+      hardAllowList: true,
+      model: 'm',
       onAnswer: (a) => seen.push(a),
     })
     expect(seen).toHaveLength(PREFLIGHT_CALLS)
@@ -217,7 +262,9 @@ describe('runPreflight', () => {
   it('treats an answer that does not fit the turn shape as a failed call', async () => {
     const r = await runPreflight({
       llm: fakeLlm([{ nonsense: true }, WHOLE_TURNS[1], WHOLE_TURNS[2]]),
-      provider: 'Baidu', hardAllowList: true, model: 'm',
+      provider: 'Baidu',
+      hardAllowList: true,
+      model: 'm',
     })
     expect(r.answered).toBe(2)
     expect(r.failures[0]).toContain('did not fit TurnSchema')

@@ -1,26 +1,41 @@
 import { describe, it, expect } from 'vitest'
 import { DEFAULT_CONFIG, isRoofedKind } from './config.js'
 import {
-  INTERIOR_KINDS, InteriorMetaSchema, LibraryItemManifestSchema,
-  parseLibraryItemManifest, resolveFurnishingKind, FURNISHING_KIND_ALIASES,
+  INTERIOR_KINDS,
+  InteriorMetaSchema,
+  LibraryItemManifestSchema,
+  parseLibraryItemManifest,
+  resolveFurnishingKind,
+  FURNISHING_KIND_ALIASES,
 } from './interiorMeta.js'
 
 const BED = {
-  slots: { w: 1, h: 2 }, placement: 'floor' as const,
-  interiorKinds: ['house' as const], isBed: true as const,
+  slots: { w: 1, h: 2 },
+  placement: 'floor' as const,
+  interiorKinds: ['house' as const],
+  isBed: true as const,
 }
 const MANIFEST = {
-  version: 'v1-library-item' as const, kind: 'bed', category: 'furniture' as const,
-  spritePx: 24, iconPx: 24 as const, interior: BED,
+  version: 'v1-library-item' as const,
+  kind: 'bed',
+  category: 'furniture' as const,
+  spritePx: 24,
+  iconPx: 24 as const,
+  interior: BED,
 }
 
 describe('InteriorMetaSchema', () => {
   it('parses a full furniture meta', () => {
     expect(InteriorMetaSchema.parse(BED)).toEqual(BED)
-    expect(InteriorMetaSchema.parse({
-      slots: { w: 1, h: 1 }, placement: 'wall', interiorKinds: ['house', 'storehouse', 'shed'],
-      isHearth: true, providesLight: true,
-    }).providesLight).toBe(true)
+    expect(
+      InteriorMetaSchema.parse({
+        slots: { w: 1, h: 1 },
+        placement: 'wall',
+        interiorKinds: ['house', 'storehouse', 'shed'],
+        isHearth: true,
+        providesLight: true,
+      }).providesLight,
+    ).toBe(true)
   })
 
   it('rejects slots wider than 2, an invented placement, and an unknown key', () => {
@@ -41,7 +56,8 @@ describe('InteriorMetaSchema', () => {
   // An implication, not an equality: everything roofed must have a room here. The converse is
   // allowed and has one member.
   const roofedKinds = Object.keys(DEFAULT_CONFIG.structures.recipes)
-    .filter((k) => isRoofedKind(DEFAULT_CONFIG, k)).sort()
+    .filter((k) => isRoofedKind(DEFAULT_CONFIG, k))
+    .sort()
 
   // The ledger this lane carried — `['cottage','farmhouse']` while their rooms were being
   // drawn — is EMPTY, so the law stands bare: nothing a body can walk into is missing a room.
@@ -52,8 +68,7 @@ describe('InteriorMetaSchema', () => {
   })
 
   it('★ and the rooms nobody can enter are exactly the shed, by name', () => {
-    const unenterable = [...INTERIOR_KINDS]
-      .filter((k) => !isRoofedKind(DEFAULT_CONFIG, k)).sort()
+    const unenterable = [...INTERIOR_KINDS].filter((k) => !isRoofedKind(DEFAULT_CONFIG, k)).sort()
     // shed is not roofed and the engine refuses enter on it by name; it keeps a room because its
     // shipped art and furnishing manifests name it.
     expect(unenterable).toEqual(['shed'])
@@ -63,20 +78,32 @@ describe('InteriorMetaSchema', () => {
 describe('LibraryItemManifestSchema', () => {
   it('parses a furniture manifest and a non-furniture one without interior', () => {
     expect(LibraryItemManifestSchema.parse(MANIFEST)).toEqual(MANIFEST)
-    const axe = { version: 'v1-library-item' as const, kind: 'axe', category: 'tool' as const, spritePx: 24, iconPx: 16 as const }
+    const axe = {
+      version: 'v1-library-item' as const,
+      kind: 'axe',
+      category: 'tool' as const,
+      spritePx: 24,
+      iconPx: 16 as const,
+    }
     expect(LibraryItemManifestSchema.parse(axe).interior).toBeUndefined()
   })
 
   it('takes C-level sizes beside the 24 px art already in the codex', () => {
-    expect(LibraryItemManifestSchema.parse({ ...MANIFEST, spritePx: 128, iconPx: 64 }).spritePx).toBe(128)
-    expect(LibraryItemManifestSchema.parse({ ...MANIFEST, spritePx: 24, iconPx: 24 }).spritePx).toBe(24)
+    expect(
+      LibraryItemManifestSchema.parse({ ...MANIFEST, spritePx: 128, iconPx: 64 }).spritePx,
+    ).toBe(128)
+    expect(
+      LibraryItemManifestSchema.parse({ ...MANIFEST, spritePx: 24, iconPx: 24 }).spritePx,
+    ).toBe(24)
   })
 
   it('rejects sizes off either end of the bound, and an unknown version', () => {
     expect(() => LibraryItemManifestSchema.parse({ ...MANIFEST, iconPx: 8 })).toThrow()
     expect(() => LibraryItemManifestSchema.parse({ ...MANIFEST, spritePx: 512 })).toThrow()
     expect(() => LibraryItemManifestSchema.parse({ ...MANIFEST, spritePx: 24.5 })).toThrow()
-    expect(() => LibraryItemManifestSchema.parse({ ...MANIFEST, version: 'v2-library-item' })).toThrow()
+    expect(() =>
+      LibraryItemManifestSchema.parse({ ...MANIFEST, version: 'v2-library-item' }),
+    ).toThrow()
   })
 })
 

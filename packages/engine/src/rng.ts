@@ -7,9 +7,16 @@ export class RngStream {
 
   static seed(seed: string, streamName: string): RngStream {
     const h = createHash('sha256').update(`${seed}:${streamName}`).digest()
-    return new RngStream([h.readUInt32LE(0), h.readUInt32LE(4), h.readUInt32LE(8), h.readUInt32LE(12)])
+    return new RngStream([
+      h.readUInt32LE(0),
+      h.readUInt32LE(4),
+      h.readUInt32LE(8),
+      h.readUInt32LE(12),
+    ])
   }
-  static from(state: RngState): RngStream { return new RngStream([...state] as RngState) }
+  static from(state: RngState): RngStream {
+    return new RngStream([...state] as RngState)
+  }
 
   // sfc32
   next(): number {
@@ -23,8 +30,12 @@ export class RngStream {
     this.s = [a, b, c, d]
     return (t >>> 0) / 4294967296
   }
-  int(maxExclusive: number): number { return Math.floor(this.next() * maxExclusive) }
-  state(): RngState { return [...this.s] as RngState }
+  int(maxExclusive: number): number {
+    return Math.floor(this.next() * maxExclusive)
+  }
+  state(): RngState {
+    return [...this.s] as RngState
+  }
 }
 
 export class RngStreams {
@@ -33,7 +44,10 @@ export class RngStreams {
 
   get(name: string): RngStream {
     let s = this.streams.get(name)
-    if (!s) { s = RngStream.seed(this.seed, name); this.streams.set(name, s) }
+    if (!s) {
+      s = RngStream.seed(this.seed, name)
+      this.streams.set(name, s)
+    }
     return s
   }
   snapshot(): { __seed: string } & Record<string, RngState> {

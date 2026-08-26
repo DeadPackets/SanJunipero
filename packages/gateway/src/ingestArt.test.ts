@@ -3,23 +3,51 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
-  AssetCodex, BUILDINGS_CONTENT_DIR, INTERIOR_PIECES, LIBRARY, interiorCodexKind,
-  listCommittedBuildings, listCommittedCast,
-  listCommittedItems, openForgeDb, castArtCoverage, itemArtCoverage, coverageFailure,
-  registerCommittedBuildings, structureArtCoverage, worldStructureKinds,
+  AssetCodex,
+  BUILDINGS_CONTENT_DIR,
+  INTERIOR_PIECES,
+  LIBRARY,
+  interiorCodexKind,
+  listCommittedBuildings,
+  listCommittedCast,
+  listCommittedItems,
+  openForgeDb,
+  castArtCoverage,
+  itemArtCoverage,
+  coverageFailure,
+  registerCommittedBuildings,
+  structureArtCoverage,
+  worldStructureKinds,
 } from '@sj/forge'
 import {
-  DEFAULT_CONFIG, DWELLING_FOOTPRINTS, FOUNDER_IDS, ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS,
-  makeCityTemplate, parseBuildingManifest, parseCharacterAtlasManifest, roadAutotileKind,
+  DEFAULT_CONFIG,
+  DWELLING_FOOTPRINTS,
+  FOUNDER_IDS,
+  ROAD_AUTOTILE_KEYS,
+  TERRAIN_TILE_KINDS,
+  makeCityTemplate,
+  parseBuildingManifest,
+  parseCharacterAtlasManifest,
+  roadAutotileKind,
 } from '@sj/shared'
-import { INTERIOR_KINDS, cityStructures, parseLibraryItemManifest, resolveFurnishingKind } from '@sj/shared'
 import {
-  ingestCastArt, ingestLibraryArt, ingestProductionArt, ingestTerrainArt,
+  INTERIOR_KINDS,
+  cityStructures,
+  parseLibraryItemManifest,
+  resolveFurnishingKind,
+} from '@sj/shared'
+import {
+  ingestCastArt,
+  ingestLibraryArt,
+  ingestProductionArt,
+  ingestTerrainArt,
 } from './ingestArt.js'
 import { townStructuresFor } from './founders.js'
 
 const dir = mkdtempSync(join(tmpdir(), 'sj-ingest-'))
-afterAll(() => rmSync(dir, { recursive: true, force: true }))
+afterAll(() => {
+  rmSync(dir, { recursive: true, force: true })
+})
 
 describe('ingestProductionArt', () => {
   it('registers every committed cell and every committed sheet, idempotently', async () => {
@@ -55,7 +83,10 @@ describe('ingestProductionArt', () => {
     const homeManifest = parseBuildingManifest(home.meta)!
     expect(homeManifest.footprint).toEqual(DWELLING_FOOTPRINTS.house)
     expect(homeManifest.cell.feetY).toBeLessThan(homeManifest.cell.h)
-    expect(codex.listSince(0).some((r) => r.kind === 'hut'), 'nothing places `hut`').toBe(false)
+    expect(
+      codex.listSince(0).some((r) => r.kind === 'hut'),
+      'nothing places `hut`',
+    ).toBe(false)
     // and its turned twin, which nothing places yet and everything is ready for
     expect(codex.listSince(0).some((r) => r.kind === 'house:se')).toBe(true)
 
@@ -100,7 +131,8 @@ describe('ingestProductionArt', () => {
     const TEMPLATE = makeCityTemplate()
 
     it.each(['scripted', 'showcase'] as const)(
-      'every kind the %s dev town stands resolves to committed art', (map) => {
+      'every kind the %s dev town stands resolves to committed art',
+      (map) => {
         const town = townStructuresFor(map)
         expect(town.length).toBeGreaterThan(0)
         const { missing } = structureArtCoverage({
@@ -111,31 +143,41 @@ describe('ingestProductionArt', () => {
             recipes: DEFAULT_CONFIG.structures.recipes,
           }),
         })
-        expect(missing, `the ${map} town stands these and no codex cell answers:\n  ${missing.join('\n  ')}`)
-          .toEqual([])
-      })
+        expect(
+          missing,
+          `the ${map} town stands these and no codex cell answers:\n  ${missing.join('\n  ')}`,
+        ).toEqual([])
+      },
+    )
 
     it('★ and it NAMES a kind the town stands with no art — the mutation', () => {
       // A DELTA, so it proves the same thing whether the tree is whole or already broken:
       // standing one more kind in the fixture town adds exactly one failure and no other.
       const registered = listCommittedBuildings().map((c) => c.codexKind)
-      const coverage = (town: readonly { kind: string }[]): string[] => structureArtCoverage({
-        structures: town,
-        registered,
-        creatable: worldStructureKinds({
-          structures: [...TEMPLATE.structures, ...town],
-          recipes: DEFAULT_CONFIG.structures.recipes,
-        }),
-      }).missing
+      const coverage = (town: readonly { kind: string }[]): string[] =>
+        structureArtCoverage({
+          structures: town,
+          registered,
+          creatable: worldStructureKinds({
+            structures: [...TEMPLATE.structures, ...town],
+            recipes: DEFAULT_CONFIG.structures.recipes,
+          }),
+        }).missing
       const before = coverage(townStructuresFor('scripted'))
       const after = coverage([...townStructuresFor('scripted'), { kind: 'watchtower' }])
       expect(after.filter((m) => !before.includes(m))).toEqual(['watchtower facing sw'])
     })
 
-    it('the four kinds the boot log named are this town\'s, and their footprints are its own', () => {
+    it("the four kinds the boot log named are this town's, and their footprints are its own", () => {
       const byKind = new Map(townStructuresFor('scripted').map((s) => [s.kind, s]))
-      expect([...byKind.keys()].sort())
-        .toEqual(['house', 'scaffolding', 'shed', 'standing_stone', 'storehouse', 'wagon'])
+      expect([...byKind.keys()].sort()).toEqual([
+        'house',
+        'scaffolding',
+        'shed',
+        'standing_stone',
+        'storehouse',
+        'wagon',
+      ])
       // the footprints `structureArt.test.ts` cannot see from inside @sj/forge
       const cells = new Map(listCommittedBuildings().map((c) => [c.codexKind, c]))
       for (const kind of ['wagon', 'shed', 'scaffolding', 'standing_stone']) {
@@ -188,8 +230,9 @@ describe('ingestLibraryArt', () => {
     // short-circuits on a resumed town and this one never does.
     const first = await ingestLibraryArt(db)
     const interiorKinds = INTERIOR_PIECES.map(interiorCodexKind)
-    expect(first.map((e) => e.kind).sort())
-      .toEqual([...LIBRARY.map((e) => e.kind), ...interiorKinds].sort())
+    expect(first.map((e) => e.kind).sort()).toEqual(
+      [...LIBRARY.map((e) => e.kind), ...interiorKinds].sort(),
+    )
     expect(first.every((e) => e.action === 'registered')).toBe(true)
 
     const items = codex.listSince(0).filter((r) => r.class === 'item')
@@ -199,8 +242,8 @@ describe('ingestLibraryArt', () => {
     const bed = items.find((r) => r.kind === 'bed')!
     const manifest = parseLibraryItemManifest(bed.meta)
     expect(manifest).not.toBeNull()
-    expect(manifest!.interior?.isBed).toBe(true)        // the meta the interior scene reads
-    expect(bed.costUsd).toBe(0)                         // the generation booked its own spend
+    expect(manifest!.interior?.isBed).toBe(true) // the meta the interior scene reads
+    expect(bed.costUsd).toBe(0) // the generation booked its own spend
 
     const second = await ingestLibraryArt(db)
     expect(second.every((e) => e.action === 'unchanged')).toBe(true)
@@ -218,8 +261,9 @@ describe('ingestLibraryArt', () => {
       const s = cityStructures().find((c) => c.kind === kind)
       expect(s, kind).toBeDefined()
       for (const f of s!.furnishings) {
-        expect(known, `${kind} places ${f.kind}, which the library cannot paint`)
-          .toContain(resolveFurnishingKind(f.kind))
+        expect(known, `${kind} places ${f.kind}, which the library cannot paint`).toContain(
+          resolveFurnishingKind(f.kind),
+        )
       }
     }
   })
@@ -231,11 +275,14 @@ describe('ingestCastArt', () => {
     const codex = new AssetCodex(db)
 
     const first = await ingestCastArt(db)
-    expect(first.map((e) => e.kind).sort())
-      .toEqual([...FOUNDER_IDS].map((id) => `character:${id}`).sort())
+    expect(first.map((e) => e.kind).sort()).toEqual(
+      [...FOUNDER_IDS].map((id) => `character:${id}`).sort(),
+    )
     expect(first.every((e) => e.action === 'registered')).toBe(true)
     expect((await ingestCastArt(db)).every((e) => e.action === 'unchanged')).toBe(true)
-    expect(codex.listSince(0).filter((r) => r.class === 'rig-part')).toHaveLength(FOUNDER_IDS.length)
+    expect(codex.listSince(0).filter((r) => r.class === 'rig-part')).toHaveLength(
+      FOUNDER_IDS.length,
+    )
     db.close()
   }, 30_000)
 })

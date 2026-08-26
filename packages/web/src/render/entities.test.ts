@@ -5,56 +5,109 @@ import { describe, expect, it, vi } from 'vitest'
 // so the layer is driven for real and what is read back is the hitArea the SPRITE carries.
 vi.mock('pixi.js', () => {
   class Point {
-    x = 0; y = 0
-    set(x: number, y: number = x): void { this.x = x; this.y = y }
+    x = 0
+    y = 0
+    set(x: number, y: number = x): void {
+      this.x = x
+      this.y = y
+    }
   }
   class Container {
     children: Container[] = []
     parent: Container | null = null
-    visible = true; zIndex = 0; destroyed = false; eventMode = ''; cursor = ''; tint = 0xffffff
+    visible = true
+    zIndex = 0
+    destroyed = false
+    eventMode = ''
+    cursor = ''
+    tint = 0xffffff
     alpha = 1
-    position = new Point(); scale = new Point()
+    position = new Point()
+    scale = new Point()
     handlers = new Map<string, (e: unknown) => void>()
     hitArea: unknown = null
     addChild(...cs: Container[]): void {
-      for (const c of cs) { c.parent = this; this.children.push(c) }
+      for (const c of cs) {
+        c.parent = this
+        this.children.push(c)
+      }
     }
-    on(name: string, fn: (e: unknown) => void): this { this.handlers.set(name, fn); return this }
-    fire(name: string, e: unknown = { client: { x: 0, y: 0 } }): void { this.handlers.get(name)?.(e) }
-    destroy(): void { this.destroyed = true }
+    on(name: string, fn: (e: unknown) => void): this {
+      this.handlers.set(name, fn)
+      return this
+    }
+    fire(name: string, e: unknown = { client: { x: 0, y: 0 } }): void {
+      this.handlers.get(name)?.(e)
+    }
+    destroy(): void {
+      this.destroyed = true
+    }
   }
   class Sprite extends Container {
     anchor = new Point()
     texture: unknown = null
   }
   class Graphics extends Container {
-    clear(): this { return this }
-    poly(): this { return this }
-    fill(): this { return this }
-    stroke(): this { return this }
-    rect(): this { return this }
+    clear(): this {
+      return this
+    }
+    poly(): this {
+      return this
+    }
+    fill(): this {
+      return this
+    }
+    stroke(): this {
+      return this
+    }
+    rect(): this {
+      return this
+    }
   }
-  class Texture { static EMPTY = new Texture() }
+  class Texture {
+    static EMPTY = new Texture()
+  }
   class Polygon {
     points: number[]
-    constructor(points: number[] = []) { this.points = points }
+    constructor(points: number[] = []) {
+      this.points = points
+    }
   }
   class Rectangle {
-    constructor(public x = 0, public y = 0, public width = 0, public height = 0) {}
+    constructor(
+      public x = 0,
+      public y = 0,
+      public width = 0,
+      public height = 0,
+    ) {}
   }
   return { Container, Graphics, Point, Polygon, Rectangle, Sprite, Texture }
 })
 import type { Structure, WorldState } from '@sj/engine/state'
 import {
-  DEFAULT_CONFIG, INTERIOR_KINDS, cityStructures, isRoofedKind,
-  type AssetRecord, type SimConfig,
+  DEFAULT_CONFIG,
+  INTERIOR_KINDS,
+  cityStructures,
+  isRoofedKind,
+  type AssetRecord,
+  type SimConfig,
 } from '@sj/shared'
-import { depthKey, tileToScreen } from './iso.js'
+import { tileToScreen } from './iso.js'
 import { Container as MockContainer } from 'pixi.js'
 import {
-  BUILDING_PX_PER_TILE, BUILD_TICKS_FULL, LOOK_INSIDE, PIP_COUNT, doorTileOf,
-  enterableKind, entersOnClick, entitySpriteOf, footprintHitPoints, pipsFilled,
-  structureHitPoints, structureHoverText, structureZIndex, syncEntities,
+  BUILDING_PX_PER_TILE,
+  BUILD_TICKS_FULL,
+  LOOK_INSIDE,
+  PIP_COUNT,
+  doorTileOf,
+  enterableKind,
+  entersOnClick,
+  entitySpriteOf,
+  footprintHitPoints,
+  pipsFilled,
+  structureHitPoints,
+  structureHoverText,
+  syncEntities,
 } from './entities.js'
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
@@ -65,11 +118,30 @@ import { inFrontOf, structureDepthBox } from './depth.js'
 import { rendersOnMap } from './characters.js'
 
 const box = (x: number, y: number, w: number, h: number, kind = 'house'): Structure => ({
-  id: `s-${x}-${y}`, kind, x, y, w, h, hp: 50, maxHp: 50, flammable: true,
-  stage: 'complete', progressTicks: 0, builtBy: null, burning: false, burnTicks: 0,
+  id: `s-${x}-${y}`,
+  kind,
+  x,
+  y,
+  w,
+  h,
+  hp: 50,
+  maxHp: 50,
+  flammable: true,
+  stage: 'complete',
+  progressTicks: 0,
+  builtBy: null,
+  burning: false,
+  burnTicks: 0,
 })
 
-const SHAPES: Array<[number, number]> = [[1, 1], [2, 2], [1, 2], [2, 1], [3, 2], [2, 3]]
+const SHAPES: [number, number][] = [
+  [1, 1],
+  [2, 2],
+  [1, 2],
+  [2, 1],
+  [3, 2],
+  [2, 3],
+]
 
 describe('doorTileOf', () => {
   it('sits on the south face, at the centre of the frontage', () => {
@@ -93,17 +165,29 @@ describe('doorTileOf', () => {
 // building rather than of where inside it the pointer landed.
 describe('one building, one hitbox, and the building says what a click does', () => {
   const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
-  const code = src.split('\n').map((l) => l.trim())
-    .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*')).join('\n')
+  const code = src
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
+    .join('\n')
 
   const world = (structures: Structure[]): WorldState =>
     ({ structures: Object.fromEntries(structures.map((s) => [s.id, s])) }) as unknown as WorldState
 
   it('has no door node, no door graphics and no rectangle hit area left', () => {
     for (const gone of [
-      'entry.sprite.addChild(door)', 'doorZIndex', 'DOOR_Z_OVER_BUILDING', 'doorSillPolygon',
-      'DOOR_SILL', 'DOOR_LINTEL', 'DOOR_RIM', 'doorLocalRect', 'new Rectangle(', 'layoutDoor',
-    ]) expect(code, gone).not.toContain(gone)
+      'entry.sprite.addChild(door)',
+      'doorZIndex',
+      'DOOR_Z_OVER_BUILDING',
+      'doorSillPolygon',
+      'DOOR_SILL',
+      'DOOR_LINTEL',
+      'DOOR_RIM',
+      'doorLocalRect',
+      'new Rectangle(',
+      'layoutDoor',
+    ])
+      expect(code, gone).not.toContain(gone)
   })
 
   it('routes the click by what the building IS, not by where inside it the pointer landed', () => {
@@ -129,12 +213,13 @@ describe('one building, one hitbox, and the building says what a click does', ()
 
   it('and it spends ONE em-dash, because the name already spent the other', () => {
     const built: Structure = { ...box(4, 4, 2, 2, 'house'), builtBy: 'omar' }
-    const st = ({
-      structures: { [built.id]: built }, agents: { omar: { id: 'omar', name: 'Omar' } },
-    }) as unknown as WorldState
+    const st = {
+      structures: { [built.id]: built },
+      agents: { omar: { id: 'omar', name: 'Omar' } },
+    } as unknown as WorldState
     const tag = structureHoverText(DEFAULT_CONFIG, st, built.id)!
     expect(tag).toBe(`house — built by Omar · ${LOOK_INSIDE}`)
-    expect(tag.split('—')).toHaveLength(2)   // LOOK INSIDE — HOUSE — BUILT BY OMAR had three
+    expect(tag.split('—')).toHaveLength(2) // LOOK INSIDE — HOUSE — BUILT BY OMAR had three
   })
 
   it('the sprite is the one thing wired to the pointer — nothing else in the file is', () => {
@@ -142,12 +227,22 @@ describe('one building, one hitbox, and the building says what a click does', ()
     expect(code).not.toMatch(/door\.eventMode/)
     // the two meanings both hang off the one tap handler
     expect(code).toMatch(/entersOnClick\(store\.getConfig\(\), store\.getState\(\), sid\)/)
-    expect(code).toMatch(/sync!\.onDoor\?\.\(sid\)/)
+    expect(code).toMatch(/sync!?\.onDoor\?\.\(sid\)/)
   })
 
   it('resolveHit: a body beats a building, nothing beats nothing', () => {
-    expect(resolveHit([{ kind: 'structure', id: 's' }, { kind: 'agent', id: 'a' }])).toBe('a')
-    expect(resolveHit([{ kind: 'crop', id: 'c' }, { kind: 'item', id: 'i' }])).toBe('i')
+    expect(
+      resolveHit([
+        { kind: 'structure', id: 's' },
+        { kind: 'agent', id: 'a' },
+      ]),
+    ).toBe('a')
+    expect(
+      resolveHit([
+        { kind: 'crop', id: 'c' },
+        { kind: 'item', id: 'i' },
+      ]),
+    ).toBe('i')
     expect(resolveHit([])).toBeNull()
   })
 })
@@ -157,32 +252,38 @@ describe('one building, one hitbox, and the building says what a click does', ()
 describe('★ enterability is asked of the config, and there is no second list', () => {
   // comments stripped: the claim is that no CODE names a roster
   const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
-    .split('\n').map((l) => l.trim())
-    .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*')).join('\n')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
+    .join('\n')
 
   // Every kind that can appear in a world, from the three places kinds come from: the recipe
   // table, the town the template plants, and the renderer's own room vocabulary. `shed` is only
   // in the third — it has no recipe row at all — which is exactly the kind the roster got wrong.
-  const ALL_KINDS = [...new Set([
-    ...Object.keys(DEFAULT_CONFIG.structures.recipes),
-    ...cityStructures().map((s) => s.kind),
-    ...INTERIOR_KINDS,
-  ])].sort()
+  const ALL_KINDS = [
+    ...new Set([
+      ...Object.keys(DEFAULT_CONFIG.structures.recipes),
+      ...cityStructures().map((s) => s.kind),
+      ...INTERIOR_KINDS,
+    ]),
+  ].sort()
 
   const withRoofed = (over: Record<string, boolean>): SimConfig => ({
     ...DEFAULT_CONFIG,
     structures: {
       ...DEFAULT_CONFIG.structures,
-      recipes: Object.fromEntries(Object.entries(DEFAULT_CONFIG.structures.recipes).map(
-        ([k, r]) => [k, over[k] === undefined ? r : { ...r, roofed: over[k] }],
-      )),
+      recipes: Object.fromEntries(
+        Object.entries(DEFAULT_CONFIG.structures.recipes).map(([k, r]) => [
+          k,
+          over[k] === undefined ? r : { ...r, roofed: over[k] },
+        ]),
+      ),
     },
   })
 
   it('★ over every kind there is, the viewer answers exactly what isRoofedKind answers', () => {
     for (const kind of ALL_KINDS) {
-      expect(enterableKind(DEFAULT_CONFIG, kind), kind)
-        .toBe(isRoofedKind(DEFAULT_CONFIG, kind))
+      expect(enterableKind(DEFAULT_CONFIG, kind), kind).toBe(isRoofedKind(DEFAULT_CONFIG, kind))
     }
     // Not vacuous: the enumeration is big, and it holds BOTH answers. Without these three the
     // law is satisfied by `false === false` over an empty or one-sided list.
@@ -193,8 +294,8 @@ describe('★ enterability is asked of the config, and there is no second list',
 
   it('★ and it FOLLOWS the config — a list transcribed from today cannot pass this', () => {
     const flipped = withRoofed({ well: true, house: false, cottage: false })
-    expect(enterableKind(flipped, 'well')).toBe(true)     // a roster would still refuse it
-    expect(enterableKind(flipped, 'house')).toBe(false)   // a roster would still open it
+    expect(enterableKind(flipped, 'well')).toBe(true) // a roster would still refuse it
+    expect(enterableKind(flipped, 'house')).toBe(false) // a roster would still open it
     expect(enterableKind(flipped, 'cottage')).toBe(false)
     for (const kind of ALL_KINDS) {
       expect(enterableKind(flipped, kind), kind).toBe(isRoofedKind(flipped, kind))
@@ -221,7 +322,6 @@ describe('★ enterability is asked of the config, and there is no second list',
   })
 })
 
-
 // Pixi hit-tests a sprite's full RECTANGULAR bounds unless a hitArea says otherwise, and a
 // building sprite is about twice as wide as the ground it stands on. The prism is the drawn cell
 // with its corners cut off by the diamond, so it claims no pixel outside the picture.
@@ -230,17 +330,20 @@ describe('★ enterability is asked of the config, and there is no second list',
 function spriteAt(s: Structure): { sx: number; sy: number } {
   return tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
 }
-function worldPoly(local: number[], s: Structure): Array<[number, number]> {
+function worldPoly(local: number[], s: Structure): [number, number][] {
   const at = spriteAt(s)
-  return Array.from({ length: local.length / 2 }, (_, i) =>
-    [at.sx + local[i * 2]!, at.sy + local[i * 2 + 1]!] as [number, number])
+  return Array.from(
+    { length: local.length / 2 },
+    (_, i) => [at.sx + local[i * 2]!, at.sy + local[i * 2 + 1]!] as [number, number],
+  )
 }
 
-function contains(poly: Array<[number, number]>, px: number, py: number): boolean {
+function contains(poly: [number, number][], px: number, py: number): boolean {
   let inside = false
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const [xi, yi] = poly[i]!, [xj, yj] = poly[j]!
-    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside
+    const [xi, yi] = poly[i]!,
+      [xj, yj] = poly[j]!
+    if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside
   }
   return inside
 }
@@ -253,12 +356,14 @@ function drawnDoorPoint(s: Structure): [number, number] {
 }
 
 /** The whole drawn cell's corner points, so "outside the picture" can be tested. */
-function drawnCorners(s: Structure): Array<[number, number]> {
+function drawnCorners(s: Structure): [number, number][] {
   const at = spriteAt(s)
   const side = (s.w + s.h) * BUILDING_PX_PER_TILE
   return [
-    [at.sx - side / 2 + 1, at.sy - 1], [at.sx + side / 2 - 1, at.sy - 1],
-    [at.sx - side / 2 + 1, at.sy - side + 1], [at.sx + side / 2 - 1, at.sy - side + 1],
+    [at.sx - side / 2 + 1, at.sy - 1],
+    [at.sx + side / 2 - 1, at.sy - 1],
+    [at.sx - side / 2 + 1, at.sy - side + 1],
+    [at.sx + side / 2 - 1, at.sy - side + 1],
   ]
 }
 
@@ -296,7 +401,7 @@ describe('a structure hit-tests the structure', () => {
     }
   })
 
-  it('★ NEIGHBOURS AT THE TOWN GRAMMAR\'S PROVEN 86.1626 px SPACING DO OVERLAP', () => {
+  it("★ NEIGHBOURS AT THE TOWN GRAMMAR'S PROVEN 86.1626 px SPACING DO OVERLAP", () => {
     // Their prisms genuinely intersect on screen because the drawn buildings do; which one
     // answers is the depth order's business. Nobody may "fix" the overlap by shrinking a hitbox.
     const near = box(32, 25, 2, 2, 'house')
@@ -315,7 +420,7 @@ describe('a structure hit-tests the structure', () => {
     // `builtFormSpec` draws a plinth on the true footprint and a volume `heightPx` tall on top
     const noArt = structureHitPoints('well', 1, 1, 1, 1, false)
     const b = polygonBounds(noArt)
-    expect(b.w).toBe(32)                                   // the footprint diamond's own width
+    expect(b.w).toBe(32) // the footprint diamond's own width
     expect(b.h).toBeCloseTo(16 + builtFormSpec('well', 1, 1).heightPx, 9)
     // and it is NOT the art prism, which would claim a 64 px cell the form never paints
     expect(polygonBounds(structureHitPoints('well', 1, 1, 1)).w).toBe(64)
@@ -335,33 +440,60 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
   /** One codex root for `house`, shaped exactly as the town's own: a 512 px cell fitted to the
    *  (w+h)·32 square, feet at its bottom centre. `scale` is 0.25 and known synchronously. */
   const HOUSE_ART = {
-    id: 'asset_house', seq: 1, class: 'building', desc: 'a house', kind: 'house',
+    id: 'asset_house',
+    seq: 1,
+    class: 'building',
+    desc: 'a house',
+    kind: 'house',
     meta: JSON.stringify({
-      version: 'v4-hires-building', kind: 'house', footprint: { w: 2, h: 2 },
+      version: 'v4-hires-building',
+      kind: 'house',
+      footprint: { w: 2, h: 2 },
       cell: { w: 512, h: 512, feetX: 256, feetY: 511 },
     }),
-    footprint: { w: 2, h: 2 }, widthPx: 512, heightPx: 512, status: 'ready', score: null,
-    attempts: 1, costUsd: 0, createdAt: '',
+    footprint: { w: 2, h: 2 },
+    widthPx: 512,
+    heightPx: 512,
+    status: 'ready',
+    score: null,
+    attempts: 1,
+    costUsd: 0,
+    createdAt: '',
   } as unknown as AssetRecord
 
-  function harness(structures: Structure[], records: AssetRecord[] = []): {
-    scene: Scene; store: WorldStore; book: TextureBook
-    zoom: { at: number }; cameras: Cam[]; doors: string[]
+  function harness(
+    structures: Structure[],
+    records: AssetRecord[] = [],
+  ): {
+    scene: Scene
+    store: WorldStore
+    book: TextureBook
+    zoom: { at: number }
+    cameras: Cam[]
+    doors: string[]
   } {
     const zoom = { at: 1 }
     const cameras: Cam[] = []
     const doors: string[] = []
     const scene = {
-      layers: { entities: new (MockContainer as never as typeof Object)() as { addChild: () => void } },
+      layers: {
+        entities: new (MockContainer as never as typeof Object)() as { addChild: () => void },
+      },
       tags: { show: () => {}, hide: () => {}, hideAll: () => {} },
       getZoom: () => zoom.at,
-      onCamera: (cb: Cam) => { cameras.push(cb); return () => {} },
+      onCamera: (cb: Cam) => {
+        cameras.push(cb)
+        return () => {}
+      },
       addDepthSource: () => () => {},
     } as unknown as Scene
     const store = {
-      getState: () => ({
-        structures: Object.fromEntries(structures.map((s) => [s.id, s])), items: {}, crops: {},
-      }) as unknown as WorldState,
+      getState: () =>
+        ({
+          structures: Object.fromEntries(structures.map((s) => [s.id, s])),
+          items: {},
+          crops: {},
+        }) as unknown as WorldState,
       getConfig: () => DEFAULT_CONFIG,
       assetsSeq: () => 0,
       assetRecords: () => records,
@@ -379,14 +511,14 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
 
   // The harness hands the layer no asset records, so these take the no-art path and draw a
   // `builtFormSpec` volume — the one whose hit prism can be checked without a texture round trip.
-  it('★ the sprite\'s hitArea IS the prism — not the diamond, and not nothing', () => {
+  it("★ the sprite's hitArea IS the prism — not the diamond, and not nothing", () => {
     const h = harness([house])
     syncEntities(h.scene, h.book, h.store, (id) => h.doors.push(id))
     const sprite = entitySpriteOf(h.scene, 'structure', house.id)!
     expect(sprite).not.toBeNull()
     const pts = (sprite.hitArea as unknown as { points: number[] }).points
     expect(pts).toEqual(structureHitPoints('house', 2, 2, 1, 1, false))
-    expect(pts).toHaveLength(12)                                   // six points, not four
+    expect(pts).toHaveLength(12) // six points, not four
     expect(pts).not.toEqual(footprintHitPoints(2, 2))
   })
 
@@ -408,8 +540,9 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
     // all — which is the point: the manifest's scale is known synchronously and so is the shape
     const h = harness([house], [HOUSE_ART])
     syncEntities(h.scene, h.book, h.store, () => {})
-    const pts = (entitySpriteOf(h.scene, 'structure', house.id)!
-      .hitArea as unknown as { points: number[] }).points
+    const pts = (
+      entitySpriteOf(h.scene, 'structure', house.id)!.hitArea as unknown as { points: number[] }
+    ).points
     expect(pts).toEqual(structureHitPoints('house', 2, 2, 0.25, 1, true))
     // 128 world px across at an art scale of 0.25 — the drawn cell, not the 32 px built volume
     expect(polygonBounds(pts).w * 0.25).toBe(128)
@@ -417,8 +550,11 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
 
   it('and the art path re-cuts AGAIN when the texture lands and applies the scale', () => {
     const src = readFileSync(new URL('./entities.ts', import.meta.url), 'utf8')
-    const applied = src.slice(src.indexOf('function applyBuildingArt('), src.indexOf('function cutHitPrism('))
-    expect(applied.match(/cutHitPrism\(/g)).toHaveLength(3)  // no-art, art-synchronous, art-landed
+    const applied = src.slice(
+      src.indexOf('function applyBuildingArt('),
+      src.indexOf('function cutHitPrism('),
+    )
+    expect(applied.match(/cutHitPrism\(/g)).toHaveLength(3) // no-art, art-synchronous, art-landed
   })
 
   it('★ a tap on an enterable building GOES IN; a tap on anything else does not', () => {
@@ -432,9 +568,11 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
     })
     const h = harness([house, cottage, well])
     syncEntities(h.scene, h.book, h.store, (id) => h.doors.push(id))
-    const tap = (id: string): void =>
-      (entitySpriteOf(h.scene, 'structure', id) as never as { fire: (n: string) => void })
-        .fire('pointertap')
+    const tap = (id: string): void => {
+      ;(entitySpriteOf(h.scene, 'structure', id) as never as { fire: (n: string) => void }).fire(
+        'pointertap',
+      )
+    }
     // The well is the negative: it is unroofed, while a cottage is roofed and so is a door.
     tap(well.id)
     expect(h.doors).toEqual([])
@@ -444,7 +582,6 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
     expect(h.doors).toEqual([cottage.id, house.id])
   })
 })
-
 
 // An occupant asleep inside a cottage was still drawn on the town map, at the door tile they
 // walked in through, when the character layer checked only `alive`.

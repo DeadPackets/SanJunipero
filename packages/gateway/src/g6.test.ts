@@ -25,7 +25,10 @@ const connect = async (port: number): Promise<Client> => {
   const sock = new WebSocket(`ws://127.0.0.1:${port}/ws`)
   const frames: string[] = []
   sock.on('message', (d) => frames.push(d.toString()))
-  await new Promise((resolve, reject) => { sock.on('open', resolve); sock.on('error', reject) })
+  await new Promise((resolve, reject) => {
+    sock.on('open', resolve)
+    sock.on('error', reject)
+  })
   sock.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: null }))
   await until(() => frames.length >= 1, 10_000)
   return { sock, frames }
@@ -49,7 +52,9 @@ const lcg = (seed: number) => (): number => {
 
 describe('GATE G6 — automated half', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-g6-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('dual-viewer byte parity over ~3 sim days, then a scrub parity sweep', async () => {
     const dbPath = join(dir, 'g6-run.db')
@@ -64,8 +69,11 @@ describe('GATE G6 — automated half', () => {
       await until(() => {
         const ta = tickFrames(a)
         const tb = tickFrames(b)
-        return ta.size > 0 && tb.size > 0 &&
+        return (
+          ta.size > 0 &&
+          tb.size > 0 &&
           Math.min(Math.max(...ta.keys()), Math.max(...tb.keys())) >= 4400
+        )
       }, 30_000)
 
       // 1. serialize-once end-to-end: every tick BOTH clients saw is byte-identical
@@ -89,7 +97,9 @@ describe('GATE G6 — automated half', () => {
       const terrain = makeFixtureMap()
       const mirror = new WorldMirror({ db, config, terrain })
       const rnd = lcg(0x6706)
-      const targets = [...new Set(Array.from({ length: 12 }, () => 1 + Math.floor(rnd() * finalTick)))].sort((x, y) => x - y)
+      const targets = [
+        ...new Set(Array.from({ length: 12 }, () => 1 + Math.floor(rnd() * finalTick))),
+      ].sort((x, y) => x - y)
 
       let ref = genesisState(config, terrain)
       const events = new EventStore(db).readFrom(0)
@@ -121,10 +131,17 @@ describe('GATE G6 — automated half', () => {
       publishThought(wdb, { tick: tickT, agentId: 'farmer', text: 'The gate check begins.' })
       wdb.close()
       dw.gateway.pump()
-      await until(() => a.frames.some((f) => f.includes('"thought"')) && b.frames.some((f) => f.includes('"thought"')), 10_000)
+      await until(
+        () =>
+          a.frames.some((f) => f.includes('"thought"')) &&
+          b.frames.some((f) => f.includes('"thought"')),
+        10_000,
+      )
       for (const c of [a, b]) {
         const msgs = c.frames.map((f) => ServerMsg.parse(JSON.parse(f)))
-        const thoughtIdx = msgs.findIndex((m) => m.t === 'thought' && m.text === 'The gate check begins.')
+        const thoughtIdx = msgs.findIndex(
+          (m) => m.t === 'thought' && m.text === 'The gate check begins.',
+        )
         expect(thoughtIdx).toBeGreaterThanOrEqual(0)
         const laterTickIdx = msgs.findIndex((m) => m.t === 'tick' && m.tick > tickT)
         if (laterTickIdx >= 0) expect(thoughtIdx).toBeLessThan(laterTickIdx)
@@ -135,9 +152,13 @@ describe('GATE G6 — automated half', () => {
       const rec = await registerDemoHouse(fdb)
       fdb.close()
       dw.gateway.pump()
-      await until(() => a.frames.some((f) => f.includes(rec.id)) && b.frames.some((f) => f.includes(rec.id)), 10_000)
+      await until(
+        () => a.frames.some((f) => f.includes(rec.id)) && b.frames.some((f) => f.includes(rec.id)),
+        10_000,
+      )
       for (const c of [a, b]) {
-        const asset = c.frames.map((f) => ServerMsg.parse(JSON.parse(f)))
+        const asset = c.frames
+          .map((f) => ServerMsg.parse(JSON.parse(f)))
           .find((m) => m.t === 'asset' && m.record.id === rec.id)
         expect(asset).toBeDefined()
       }

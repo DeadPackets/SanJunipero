@@ -7,18 +7,30 @@ export function allowedKinds(config: SimConfig, season: Season): string[] {
   return config.weather.kinds.filter((k) => k !== 'snow' || season === config.weather.snowOnlyIn)
 }
 
-export function rollWeatherKind(config: SimConfig, rng: RngStream, season: Season, currentKind: string): string {
+export function rollWeatherKind(
+  config: SimConfig,
+  rng: RngStream,
+  season: Season,
+  currentKind: string,
+): string {
   const allowed = allowedKinds(config, season)
   const change = rng.next() < config.weather.hourlyChangeChance
   if (!change && allowed.includes(currentKind)) return currentKind
   return allowed[rng.int(allowed.length)]!
 }
 
-export function weatherTemperature(config: SimConfig, kind: string, season: Season, isNight: boolean): number {
+export function weatherTemperature(
+  config: SimConfig,
+  kind: string,
+  season: Season,
+  isNight: boolean,
+): number {
   const wet = kind === 'rain' || kind === 'storm' || kind === 'snow'
-  return config.weather.seasonTemps[season]
-    + (isNight ? config.weather.nightTempDelta : 0)
-    + (wet ? config.weather.rainTempDelta : 0)
+  return (
+    config.weather.seasonTemps[season] +
+    (isNight ? config.weather.nightTempDelta : 0) +
+    (wet ? config.weather.rainTempDelta : 0)
+  )
 }
 
 export function weatherSystem(ctx: TickCtx): void {

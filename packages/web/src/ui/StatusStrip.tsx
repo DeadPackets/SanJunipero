@@ -3,8 +3,13 @@ import { BondsCountSchema, ChronicleCountSchema } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { LENSES, LENS_LABELS, type Lens } from './route.js'
 import {
-  lensCountsFor, lensHints, townStats, weatherGlyph,
-  type LensHint, type TownStats, type WeatherGlyph,
+  lensCountsFor,
+  lensHints,
+  townStats,
+  weatherGlyph,
+  type LensHint,
+  type TownStats,
+  type WeatherGlyph,
 } from './townStats.js'
 
 // The bond count is history, not a tick reading — a slow beat keeps the badge honest without
@@ -14,16 +19,20 @@ export const BOND_COUNT_REFETCH_MS = 60_000
  *  panel read the same endpoint, so they should go stale at the same rate too. */
 export const CHRONICLE_COUNT_REFETCH_MS = 20_000
 
-export const GLYPH_PX = 8   // the glyph grid; rendered at 2× so it stays on whole pixels
+export const GLYPH_PX = 8 // the glyph grid; rendered at 2× so it stays on whole pixels
 
 // Decorative: the weather word beside it carries the meaning, so the glyph stays out of the
 // accessibility tree instead of being read twice.
 function Glyph({ glyph }: { glyph: WeatherGlyph }) {
   return (
     <svg
-      className="strip-glyph" viewBox={`0 0 ${GLYPH_PX} ${GLYPH_PX}`}
-      width={GLYPH_PX * 2} height={GLYPH_PX * 2}
-      shapeRendering="crispEdges" aria-hidden="true" focusable="false"
+      className="strip-glyph"
+      viewBox={`0 0 ${GLYPH_PX} ${GLYPH_PX}`}
+      width={GLYPH_PX * 2}
+      height={GLYPH_PX * 2}
+      shapeRendering="crispEdges"
+      aria-hidden="true"
+      focusable="false"
     >
       {glyph.pixels.map(([x, y, fill]) => (
         <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
@@ -48,7 +57,9 @@ export function StatusStripView({ stats }: { stats: TownStats }) {
           Townsfolk <i>{stats.alive}</i>
         </span>
         {gone > 0 && (
-          <span className="strip-gone" aria-label={`${gone} remembered`}>· <i>{gone}</i> remembered</span>
+          <span className="strip-gone" aria-label={`${gone} remembered`}>
+            · <i>{gone}</i> remembered
+          </span>
         )}
       </span>
     </div>
@@ -62,7 +73,15 @@ export function StatusStrip({ store }: { store: WorldStore }) {
   return <StatusStripView stats={townStats(state, tick)} />
 }
 
-export function LensTabsView({ lens, hints, onNav }: { lens: Lens; hints: LensHint[]; onNav: (l: Lens) => void }) {
+export function LensTabsView({
+  lens,
+  hints,
+  onNav,
+}: {
+  lens: Lens
+  hints: LensHint[]
+  onNav: (l: Lens) => void
+}) {
   const by = new Map(hints.map((h) => [h.lens, h]))
   return (
     <nav className="lens-tabs" aria-label="Lenses — left and right arrow keys move between them">
@@ -75,10 +94,16 @@ export function LensTabsView({ lens, hints, onNav }: { lens: Lens; hints: LensHi
             aria-current={l === lens ? 'page' : undefined}
             aria-label={`${LENS_LABELS[l]} — ${hint.hint}`}
             title={hint.hint}
-            onClick={() => onNav(l)}
+            onClick={() => {
+              onNav(l)
+            }}
           >
             {LENS_LABELS[l]}
-            {hint.count !== null && <span className="tab-count" aria-hidden="true">{hint.count}</span>}
+            {hint.count !== null && (
+              <span className="tab-count" aria-hidden="true">
+                {hint.count}
+              </span>
+            )}
           </button>
         )
       })}
@@ -89,7 +114,9 @@ export function LensTabsView({ lens, hints, onNav }: { lens: Lens; hints: LensHi
 /** Each badge reads its own panel's endpoint on that endpoint's own slow beat, so no count rides
  *  the world's clock. `null` until the first answer and after any failure: no badge beats a wrong one. */
 function useHistoryCount(
-  url: string, rows: (body: unknown) => number | null, everyMs: number,
+  url: string,
+  rows: (body: unknown) => number | null,
+  everyMs: number,
 ): number | null {
   const [count, setCount] = useState<number | null>(null)
   useEffect(() => {
@@ -97,8 +124,12 @@ function useHistoryCount(
     const load = (): void => {
       void fetch(url)
         .then(async (r) => (r.ok ? rows(await r.json()) : null))
-        .then((n) => { if (alive && n !== null) setCount(n) })
-        .catch(() => { /* no badge is better than a wrong one */ })
+        .then((n) => {
+          if (alive && n !== null) setCount(n)
+        })
+        .catch(() => {
+          /* no badge is better than a wrong one */
+        })
     }
     load()
     const timer = setInterval(load, everyMs)
@@ -124,7 +155,15 @@ const chronicleRows = (body: unknown): number | null => {
 
 // The lens bar subscribes on its own so the counts can tick without re-rendering App and,
 // with it, the Pixi stage.
-export function LensTabs({ store, lens, onNav }: { store: WorldStore; lens: Lens; onNav: (l: Lens) => void }) {
+export function LensTabs({
+  store,
+  lens,
+  onNav,
+}: {
+  store: WorldStore
+  lens: Lens
+  onNav: (l: Lens) => void
+}) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick)
   // A `Bond` carries its whole history, so counting by downloading cost 83.7 MB at sim-day 20 of
@@ -132,7 +171,17 @@ export function LensTabs({ store, lens, onNav }: { store: WorldStore; lens: Lens
   const bonds = useHistoryCount('/api/bonds/count', bondRows, BOND_COUNT_REFETCH_MS)
   // Counted on the server rather than by downloading the ledger the panel lists from, so the
   // badge and the panel can never disagree.
-  const chronicle = useHistoryCount('/api/chronicle/count', chronicleRows, CHRONICLE_COUNT_REFETCH_MS)
+  const chronicle = useHistoryCount(
+    '/api/chronicle/count',
+    chronicleRows,
+    CHRONICLE_COUNT_REFETCH_MS,
+  )
   const stats = townStats(state, tick)
-  return <LensTabsView lens={lens} hints={lensHints(stats, lensCountsFor(stats, chronicle, bonds))} onNav={onNav} />
+  return (
+    <LensTabsView
+      lens={lens}
+      hints={lensHints(stats, lensCountsFor(stats, chronicle, bonds))}
+      onNav={onNav}
+    />
+  )
 }

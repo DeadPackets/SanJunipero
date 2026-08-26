@@ -18,10 +18,16 @@ export function createAtmosphere(scene: Scene): Atmosphere {
   const filter = new ColorMatrixFilter()
   let filtered = false
 
-  let fromTint = -1, toTint = -1, crossStartedMs = 0
+  let fromTint = -1,
+    toTint = -1,
+    crossStartedMs = 0
   const cross = (): void => {
     if (fromTint < 0) return
-    quad.tint = crossTint(fromTint, toTint, progress('ambient', crossStartedMs, scene.app.ticker.lastTime))
+    quad.tint = crossTint(
+      fromTint,
+      toTint,
+      progress('ambient', crossStartedMs, scene.app.ticker.lastTime),
+    )
   }
   scene.app.ticker.add(cross)
 
@@ -33,7 +39,10 @@ export function createAtmosphere(scene: Scene): Atmosphere {
       if (next !== toTint) {
         const nowMs = scene.app.ticker.lastTime
         // leave from where the quad IS, so a tick arriving mid-cross continues rather than jumps
-        fromTint = fromTint < 0 ? next : crossTint(fromTint, toTint, progress('ambient', crossStartedMs, nowMs))
+        fromTint =
+          fromTint < 0
+            ? next
+            : crossTint(fromTint, toTint, progress('ambient', crossStartedMs, nowMs))
         toTint = next
         crossStartedMs = nowMs
       }

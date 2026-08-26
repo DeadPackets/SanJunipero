@@ -10,9 +10,12 @@ const loads = new Map<string, { resolve: (t: unknown) => void; texture: unknown 
 vi.mock('pixi.js', () => ({
   Assets: {
     add: vi.fn(),
-    load: vi.fn((url: string) => new Promise((resolve) => {
-      loads.set(url, { resolve, texture: { url, source: { unload: vi.fn() } } })
-    })),
+    load: vi.fn(
+      (url: string) =>
+        new Promise((resolve) => {
+          loads.set(url, { resolve, texture: { url, source: { unload: vi.fn() } } })
+        }),
+    ),
     unload: vi.fn(async () => {}),
   },
 }))
@@ -25,35 +28,63 @@ const land = async (url: string): Promise<void> => {
 }
 
 import {
-  TextureBook, buildingArt, characterArt, facingCellKind, resolveAssetId, textureUrlFor,
+  TextureBook,
+  buildingArt,
+  characterArt,
+  facingCellKind,
+  resolveAssetId,
+  textureUrlFor,
 } from './textures.js'
 
 const rec = (over: Partial<AssetRecord>): AssetRecord => ({
-  id: 'asset_x', seq: 1, class: 'building', desc: 'house: timber dwelling', kind: 'house',
-  footprint: { w: 2, h: 2 }, widthPx: 64, heightPx: 64, status: 'ready',
-  score: 9, attempts: 1, costUsd: 0, createdAt: '2026-08-16 00:00:00', meta: null,
+  id: 'asset_x',
+  seq: 1,
+  class: 'building',
+  desc: 'house: timber dwelling',
+  kind: 'house',
+  footprint: { w: 2, h: 2 },
+  widthPx: 64,
+  heightPx: 64,
+  status: 'ready',
+  score: 9,
+  attempts: 1,
+  costUsd: 0,
+  createdAt: '2026-08-16 00:00:00',
+  meta: null,
   ...over,
 })
 
 describe('resolveAssetId', () => {
   it('picks the newest ready record for the kind over an older one', () => {
-    const records = [rec({ id: 'old', seq: 1 }), rec({ id: 'new', seq: 7 }), rec({ id: 'other', seq: 9, kind: 'barn' })]
+    const records = [
+      rec({ id: 'old', seq: 1 }),
+      rec({ id: 'new', seq: 7 }),
+      rec({ id: 'other', seq: 9, kind: 'barn' }),
+    ]
     expect(resolveAssetId(records, 'building', 'house')).toBe('new')
   })
 
   it('ignores placeholder-status records', () => {
-    const records = [rec({ id: 'ready1', seq: 1 }), rec({ id: 'ph', seq: 5, status: 'placeholder', score: null })]
+    const records = [
+      rec({ id: 'ready1', seq: 1 }),
+      rec({ id: 'ph', seq: 5, status: 'placeholder', score: null }),
+    ]
     expect(resolveAssetId(records, 'building', 'house')).toBe('ready1')
   })
 
   it('resolves by the kind column, never by desc parsing', () => {
     // desc mentions house, kind says otherwise: no match; null kind never matches either
-    const records = [rec({ id: 'a', kind: 'shed', desc: 'house lookalike' }), rec({ id: 'b', kind: null, desc: 'house: timber' })]
+    const records = [
+      rec({ id: 'a', kind: 'shed', desc: 'house lookalike' }),
+      rec({ id: 'b', kind: null, desc: 'house: timber' }),
+    ]
     expect(resolveAssetId(records, 'building', 'house')).toBeNull()
   })
 
   it('requires the class to match', () => {
-    expect(resolveAssetId([rec({ class: 'item', footprint: { w: 1, h: 1 } })], 'building', 'house')).toBeNull()
+    expect(
+      resolveAssetId([rec({ class: 'item', footprint: { w: 1, h: 1 } })], 'building', 'house'),
+    ).toBeNull()
   })
 })
 
@@ -68,13 +99,19 @@ describe('textureUrlFor', () => {
 
 describe('characterArt (v4 manifest contract)', () => {
   const atlasMeta = JSON.stringify({
-    version: 'v4-hires-atlas', figureH: 840,
+    version: 'v4-hires-atlas',
+    figureH: 840,
     cells: { 'idle-sw': { x: 0, y: 0, w: 347, h: 848, feetX: 173, feetY: 843 } },
   })
-  const charRec = (over: Partial<AssetRecord>): AssetRecord => rec({
-    class: 'rig-part', kind: 'character:omar', desc: 'character sheet: omar', meta: atlasMeta,
-    footprint: { w: 1, h: 1 }, ...over,
-  })
+  const charRec = (over: Partial<AssetRecord>): AssetRecord =>
+    rec({
+      class: 'rig-part',
+      kind: 'character:omar',
+      desc: 'character sheet: omar',
+      meta: atlasMeta,
+      footprint: { w: 1, h: 1 },
+      ...over,
+    })
 
   it('resolves a v4 atlas record to its immutable png + parsed manifest', () => {
     const art = characterArt([charRec({ id: 'asset_omar' })], 'omar')
@@ -84,19 +121,32 @@ describe('characterArt (v4 manifest contract)', () => {
   })
 
   it('falls back to the gateway character route with no manifest when meta is absent or not v4', () => {
-    expect(characterArt([charRec({ meta: null })], 'omar')).toEqual({ url: '/assets/character/omar.png', manifest: null, size: null })
-    expect(characterArt([], 'omar')).toEqual({ url: '/assets/character/omar.png', manifest: null, size: null })
+    expect(characterArt([charRec({ meta: null })], 'omar')).toEqual({
+      url: '/assets/character/omar.png',
+      manifest: null,
+      size: null,
+    })
+    expect(characterArt([], 'omar')).toEqual({
+      url: '/assets/character/omar.png',
+      manifest: null,
+      size: null,
+    })
   })
 
   it('newest ready atlas wins on regen', () => {
-    const art = characterArt([charRec({ id: 'old', seq: 3 }), charRec({ id: 'new', seq: 8 })], 'omar')
+    const art = characterArt(
+      [charRec({ id: 'old', seq: 3 }), charRec({ id: 'new', seq: 8 })],
+      'omar',
+    )
     expect(art.url).toBe('/assets/new.png')
   })
 })
 
 describe('buildingArt (v4-hires-building manifest)', () => {
   const meta = JSON.stringify({
-    version: 'v4-hires-building', kind: 'storehouse', footprint: { w: 2, h: 2 },
+    version: 'v4-hires-building',
+    kind: 'storehouse',
+    footprint: { w: 2, h: 2 },
     cell: { w: 810, h: 866, feetX: 405, feetY: 861 },
   })
 
@@ -108,7 +158,11 @@ describe('buildingArt (v4-hires-building manifest)', () => {
   })
 
   it('v2/no-meta records draw at natural size with the bottom-center law', () => {
-    expect(buildingArt([rec({ id: 'housev2', kind: 'house' })], 'house', 2, 2)).toEqual({ url: '/assets/housev2.png', anchor: null, scale: null })
+    expect(buildingArt([rec({ id: 'housev2', kind: 'house' })], 'house', 2, 2)).toEqual({
+      url: '/assets/housev2.png',
+      anchor: null,
+      scale: null,
+    })
   })
 
   it('reports NO ART rather than a checkerboard, so the renderer can draw a built form', () => {
@@ -144,7 +198,7 @@ describe('★ TextureBook.peek — the room and its furniture arrive in the same
     const book = new TextureBook()
     expect(book.peek('/assets/a.png')).toBeNull()
     void book.get('/assets/a.png')
-    expect(book.peek('/assets/a.png')).toBeNull()   // asked for, not yet in hand
+    expect(book.peek('/assets/a.png')).toBeNull() // asked for, not yet in hand
     await land('/assets/a.png')
     expect(book.peek('/assets/a.png')).toEqual(loads.get('/assets/a.png')!.texture)
   })
@@ -157,11 +211,13 @@ describe('★ TextureBook.peek — the room and its furniture arrive in the same
     await land('/assets/b.png')
 
     let viaThen: unknown = null
-    void book.get('/assets/b.png').then((t) => { viaThen = t })
+    void book.get('/assets/b.png').then((t) => {
+      viaThen = t
+    })
     const viaPeek = book.peek('/assets/b.png')
 
-    expect(viaPeek).not.toBeNull()   // in hand, this turn
-    expect(viaThen).toBeNull()       // still a microtask away
+    expect(viaPeek).not.toBeNull() // in hand, this turn
+    expect(viaThen).toBeNull() // still a microtask away
     await Promise.resolve()
     expect(viaThen).toBe(viaPeek)
   })
@@ -182,7 +238,10 @@ describe('★ TextureBook.peek — the room and its furniture arrive in the same
   it('★ and the room reads it — the furniture path peeks BEFORE it awaits', () => {
     // A behavioural test would need a Pixi stage; what regresses is the composition — the
     // branch tidied back into a bare `get(...).then(...)`, and the empty first frame returns.
-    const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'interiorScene.ts'), 'utf8')
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'interiorScene.ts'),
+      'utf8',
+    )
     const add = src.slice(src.indexOf('function addPiece('), src.indexOf('function bodyFor('))
     expect(add).toMatch(/const inHand = book\.peek\(url\)/)
     expect(add.indexOf('book.peek(url)')).toBeLessThan(add.indexOf('book.get(url)'))

@@ -25,25 +25,37 @@ const yesNo = (value: unknown): LawRow[] =>
 
 const plural = (n: number, one: string): string => `${n} ${n === 1 ? one : `${one}s`}`
 
-const count = (one: string) => (value: unknown): LawRow[] =>
-  typeof value === 'number' ? [{ label: 'Set to', value: plural(value, one) }] : UNKNOWN
+const count =
+  (one: string) =>
+  (value: unknown): LawRow[] =>
+    typeof value === 'number' ? [{ label: 'Set to', value: plural(value, one) }] : UNKNOWN
 
 /** A bare 0.08 tells a viewer nothing. "eight days in a hundred" tells them how often. */
-const chance = (per: string) => (value: unknown): LawRow[] =>
-  typeof value === 'number'
-    ? [{ label: 'About', value: `${Math.round(value * 100)} ${per} in a hundred` }]
-    : UNKNOWN
+const chance =
+  (per: string) =>
+  (value: unknown): LawRow[] =>
+    typeof value === 'number'
+      ? [{ label: 'About', value: `${Math.round(value * 100)} ${per} in a hundred` }]
+      : UNKNOWN
 
 /** Common ratios have words. Everything else falls back to the honest arithmetic. */
 const SHARE_WORD: Readonly<Record<string, string>> = {
-  '0.25': 'a quarter', '0.5': 'half', '0.75': 'three quarters', '1': 'the same',
-  '1.25': 'a quarter more', '1.5': 'half again', '2': 'twice', '3': 'three times',
+  '0.25': 'a quarter',
+  '0.5': 'half',
+  '0.75': 'three quarters',
+  '1': 'the same',
+  '1.25': 'a quarter more',
+  '1.5': 'half again',
+  '2': 'twice',
+  '3': 'three times',
 }
-const share = (tail: string) => (value: unknown): LawRow[] => {
-  if (typeof value !== 'number') return UNKNOWN
-  const word = SHARE_WORD[String(value)] ?? `${value} times`
-  return [{ label: 'Compared with usual', value: `${word} ${tail}` }]
-}
+const share =
+  (tail: string) =>
+  (value: unknown): LawRow[] => {
+    if (typeof value !== 'number') return UNKNOWN
+    const word = SHARE_WORD[String(value)] ?? `${value} times`
+    return [{ label: 'Compared with usual', value: `${word} ${tail}` }]
+  }
 
 const people = (value: unknown): LawRow[] =>
   typeof value === 'number'
@@ -52,10 +64,12 @@ const people = (value: unknown): LawRow[] =>
 
 /** Rounding a chance under half a percent to "0 in a hundred" reads as "never", which is the
  *  opposite of what a fire risk means. Say the odds instead. */
-const rare = (per: string) => (value: unknown): LawRow[] =>
-  typeof value === 'number' && value > 0
-    ? [{ label: 'About', value: `once in ${Math.round(1 / value)} ${per}` }]
-    : UNKNOWN
+const rare =
+  (per: string) =>
+  (value: unknown): LawRow[] =>
+    typeof value === 'number' && value > 0
+      ? [{ label: 'About', value: `once in ${Math.round(1 / value)} ${per}` }]
+      : UNKNOWN
 
 const capitalise = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
@@ -64,7 +78,10 @@ const perFood = (value: unknown): LawRow[] => {
   if (typeof value !== 'object' || value === null) return UNKNOWN
   const rows = Object.entries(value as Record<string, unknown>)
     .filter(([, v]) => typeof v === 'number')
-    .map(([k, v]) => ({ label: capitalise(k.replace(/[_-]+/g, ' ')), value: plural(v as number, 'day') }))
+    .map(([k, v]) => ({
+      label: capitalise(k.replace(/[_-]+/g, ' ')),
+      value: plural(v as number, 'day'),
+    }))
   return rows.length === 0 ? UNKNOWN : rows
 }
 
@@ -74,214 +91,264 @@ export const LAW_COPY: Readonly<Record<keyof typeof TOGGLABLE_PATHS, LawCopy>> =
   'aging.deathOfOldAgeEnabled': {
     title: 'Dying of old age',
     sentence: 'Nobody here lasts forever. A body that has gone on long enough simply stops.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'reproduction.enabled': {
     title: 'Whether children are born',
     sentence: 'Two people who share a roof through the nights may in time have a child.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'reproduction.gestationDays': {
     title: 'How long a pregnancy lasts',
     sentence: 'The wait between a child being started and a child arriving in the town.',
-    unit: 'days', render: count('day'),
+    unit: 'days',
+    render: count('day'),
   },
   'reproduction.conceptionChancePerNight': {
     title: 'How often a night makes a child',
     sentence: 'Sharing a bed does not always start a child. Most nights nothing comes of it.',
-    unit: null, render: chance('nights'),
+    unit: null,
+    render: chance('nights'),
   },
   'reproduction.coSleepNightsToPartner': {
     title: 'When two people count as a pair',
     sentence: 'After enough nights under one roof, the town reads two people as together.',
-    unit: 'nights', render: count('night'),
+    unit: 'nights',
+    render: count('night'),
   },
   'reproduction.partnerWindowDays': {
     title: 'How long a pairing is remembered',
     sentence: 'Two people who stop sharing a roof drift apart again after a while.',
-    unit: 'days', render: count('day'),
+    unit: 'days',
+    render: count('day'),
   },
   'spoilage.enabled': {
     title: 'Whether food goes bad',
     sentence: 'Food left too long stops being food. Nothing keeps forever out here.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'spoilage.days': {
     title: 'How long food keeps',
     sentence: 'Fish turns first and bread lasts a while, but grain keeps far longer than either.',
-    unit: 'days', render: perFood,
+    unit: 'days',
+    render: perFood,
   },
   'spoilage.storehouseMultiplier': {
     title: 'What a storehouse is worth',
     sentence: 'Food kept in the storehouse lasts longer than food left on a shelf at home.',
-    unit: null, render: share('as long'),
+    unit: null,
+    render: share('as long'),
   },
   'tools.wearEnabled': {
     title: 'Whether tools wear out',
     sentence: 'An axe used all season stops cutting like a new one, and one day it breaks.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'occlusion.enabled': {
     title: 'Whether walls muffle a voice',
     sentence: 'Words spoken indoors stay indoors, unless somebody is standing in the doorway.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'ownership.enabled': {
     title: 'Whether a thing can belong to someone',
     sentence: 'A house, a bed and a tool can each have an owner, and the town remembers who.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'inscription.enabled': {
     title: 'Whether people can carve words',
     sentence: 'Somebody may cut a line into a wall, and it stays there after they are gone.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'mystery.enabled': {
     title: 'Whether strange things happen',
     sentence: 'Now and then something happens here that nobody in the town can account for.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'mystery.chancePerDay': {
     title: 'How often a strange thing happens',
     sentence: 'Most days pass with nothing odd in them at all.',
-    unit: null, render: chance('days'),
+    unit: null,
+    render: chance('days'),
   },
   'seasons.winter.fishCatchMultiplier': {
     title: 'Fishing in winter',
     sentence: 'The river gives up less when it is cold, so a day on the bank feeds fewer people.',
-    unit: null, render: share('a catch'),
+    unit: null,
+    render: share('a catch'),
   },
   'seasons.winter.hungerDecayMultiplier': {
     title: 'Hunger in winter',
     sentence: 'Cold empties a stomach faster, so the winter asks for more food than the summer.',
-    unit: null, render: share('as fast'),
+    unit: null,
+    render: share('as fast'),
   },
   // MERGE TRAIN 5. C11 opened twenty-five more of the deep world to an operator after this
   // table was written; U17 is only kept if every one of them says what it does to people.
   'mortality.enabled': {
     title: 'Whether a body can die',
     sentence: 'A body that runs out of what it needs stops, and the town has to go on without it.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'mortality.poisonChanceSpoiled': {
     title: 'How often bad food poisons',
-    sentence: 'Eating something that has turned does not always harm a body, but often enough it does.',
-    unit: null, render: chance('meals'),
+    sentence:
+      'Eating something that has turned does not always harm a body, but often enough it does.',
+    unit: null,
+    render: chance('meals'),
   },
   'illness.enabled': {
     title: 'Whether people fall ill',
     sentence: 'A body can sicken here, and an illness left alone gets worse before it gets better.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'illness.dailyWorsenChance': {
     title: 'How fast an illness deepens',
-    sentence: 'An illness left untended does not hold still; some days it takes a turn for the worse.',
-    unit: null, render: chance('days'),
+    sentence:
+      'An illness left untended does not hold still; some days it takes a turn for the worse.',
+    unit: null,
+    render: chance('days'),
   },
   'illness.contagionEnabled': {
     title: 'Whether illness spreads',
     sentence: 'Standing close to somebody who is sick can leave you sick as well.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'illness.contagionChance': {
     title: 'How easily illness passes on',
-    sentence: 'Being near a sick body is not the same as catching it; most meetings pass harmlessly.',
-    unit: null, render: chance('meetings'),
+    sentence:
+      'Being near a sick body is not the same as catching it; most meetings pass harmlessly.',
+    unit: null,
+    render: chance('meetings'),
   },
   'thirst.enabled': {
     title: 'Whether people get thirsty',
     sentence: 'A body needs water as well as food, and going without it tells sooner.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'thirst.decayFactorOfHunger': {
     title: 'How fast thirst comes on',
     sentence: 'Thirst is measured against hunger: this is how quickly a body dries out beside it.',
-    unit: null, render: share('as fast'),
+    unit: null,
+    render: share('as fast'),
   },
   'fertility.enabled': {
     title: 'Whether the ground tires',
     sentence: 'Ground worked season after season gives less back, until it is left to rest.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'foodVariety.enabled': {
     title: 'Whether the same meal palls',
     sentence: 'Eating one thing every day stops satisfying, so a table wants more than one crop.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'roads.enabled': {
     title: 'Whether the town lays roads',
     sentence: 'People can put stone down where they walk most, and the walking gets easier.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'desirePaths.enabled': {
     title: 'Whether feet wear a track',
-    sentence: 'Enough crossings over the same ground beat a path into it without anyone deciding to.',
-    unit: null, render: yesNo,
+    sentence:
+      'Enough crossings over the same ground beat a path into it without anyone deciding to.',
+    unit: null,
+    render: yesNo,
   },
   'desirePaths.wearThreshold': {
     title: 'How much walking makes a path',
-    sentence: 'The number of crossings the same ground takes before the grass gives up and a track shows.',
-    unit: 'crossings', render: count('crossing'),
+    sentence:
+      'The number of crossings the same ground takes before the grass gives up and a track shows.',
+    unit: 'crossings',
+    render: count('crossing'),
   },
   'fauna.enabled': {
     title: 'Whether animals live here',
     sentence: 'There are creatures in the woods and the water, and somebody may go out after them.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'regrowth.enabled': {
     title: 'Whether the woods come back',
     sentence: 'A felled tree is not gone forever; in time something grows where it stood.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'regrowth.saplingChancePerDay': {
     title: 'How fast a sapling appears',
     sentence: 'Ground that has been cleared puts up something new now and then, given long enough.',
-    unit: null, render: chance('days'),
+    unit: null,
+    render: chance('days'),
   },
   'mapGrowth.enabled': {
     title: 'Whether the world gets bigger',
     sentence: 'The land beyond the edge opens up as the town reaches for it.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'warmth.enabled': {
     title: 'Whether the cold is felt',
     sentence: 'A body out in the cold with no fire and no roof pays for it.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'light.enabled': {
     title: 'Whether the dark matters',
     sentence: 'Work goes slower after sunset, and a flame left burning at night can catch.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'light.nightWorkPenalty': {
     title: 'How much slower the night is',
     sentence: 'Work done by firelight takes longer than the same work done under the sun.',
-    unit: null, render: share('as long'),
+    unit: null,
+    render: share('as long'),
   },
   'light.fireRiskPerTick': {
     title: 'How often a flame gets loose',
-    sentence: 'A fire left burning is mostly harmless, but now and then it finds something it should not.',
-    unit: null, render: rare('moments'),
+    sentence:
+      'A fire left burning is mostly harmless, but now and then it finds something it should not.',
+    unit: null,
+    render: rare('moments'),
   },
   'nightWitness.enabled': {
     title: 'Whether the dark hides things',
     sentence: 'What happens after dark is harder to see, so fewer people notice it.',
-    unit: null, render: yesNo,
+    unit: null,
+    render: yesNo,
   },
   'nightWitness.nightFactor': {
     title: 'How much the dark hides',
-    sentence: 'How likely somebody is to notice a thing after dark, set against noticing it at noon.',
-    unit: null, render: share('as likely'),
+    sentence:
+      'How likely somebody is to notice a thing after dark, set against noticing it at noon.',
+    unit: null,
+    render: share('as likely'),
   },
   'constructs.enabled': {
     title: 'Whether people build together',
-    sentence: 'Some things are too big for one pair of hands, so several people raise them at once.',
-    unit: null, render: yesNo,
+    sentence:
+      'Some things are too big for one pair of hands, so several people raise them at once.',
+    unit: null,
+    render: yesNo,
   },
   'constructs.minParticipants': {
     title: 'How many hands a great work needs',
     sentence: 'The smallest crowd that can raise something no one person could.',
-    unit: 'people', render: people,
+    unit: 'people',
+    render: people,
   },
 }
 

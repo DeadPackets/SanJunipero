@@ -15,18 +15,30 @@ vi.mock('pixi.js', () => {
     eventMode = ''
     position = new Point()
     scale = new Point()
-    get width(): number { return 0 }
-    get height(): number { return 0 }
+    get width(): number {
+      return 0
+    }
+    get height(): number {
+      return 0
+    }
     addChild(...cs: Container[]): void {
       this.children.push(...cs)
     }
     destroy(): void {}
   }
   class Graphics extends Container {
-    clear(): this { return this }
-    roundRect(): this { return this }
-    fill(): this { return this }
-    stroke(): this { return this }
+    clear(): this {
+      return this
+    }
+    roundRect(): this {
+      return this
+    }
+    fill(): this {
+      return this
+    }
+    stroke(): this {
+      return this
+    }
   }
   class Text extends Container {
     text: string
@@ -37,8 +49,12 @@ vi.mock('pixi.js', () => {
       this.text = opts?.text ?? ''
     }
     // a 7px-per-character monospace stand-in, so a size is deterministic in a test
-    override get width(): number { return this.text.length * 7 }
-    override get height(): number { return 12 }
+    override get width(): number {
+      return this.text.length * 7
+    }
+    override get height(): number {
+      return 12
+    }
   }
   class BitmapText extends Text {}
   const Cache = { has: () => false }
@@ -48,15 +64,29 @@ vi.mock('pixi.js', () => {
 import type { Anchor, Rect } from './tooltip.js'
 
 const {
-  EDGE_PAD_PX, MAX_STACK_STEPS, STACK_STEP_PX, TAG_GAP_PX, anchorForSprite, createTooltipLayer,
+  EDGE_PAD_PX,
+  MAX_STACK_STEPS,
+  STACK_STEP_PX,
+  TAG_GAP_PX,
+  anchorForSprite,
+  createTooltipLayer,
   placeTag,
 } = await import('./tooltip.js')
 
 const VIEW: Rect = { x: 0, y: 0, w: 800, h: 600 }
 const SIZE = { w: 60, h: 18 }
-const anchor = (sx: number, sy: number, topY = sy - 40, halfW = 14): Anchor => ({ sx, sy, halfW, topY })
-const rectOf = (p: { sx: number; sy: number }, size = SIZE): Rect =>
-  ({ x: p.sx - size.w / 2, y: p.sy, w: size.w, h: size.h })
+const anchor = (sx: number, sy: number, topY = sy - 40, halfW = 14): Anchor => ({
+  sx,
+  sy,
+  halfW,
+  topY,
+})
+const rectOf = (p: { sx: number; sy: number }, size = SIZE): Rect => ({
+  x: p.sx - size.w / 2,
+  y: p.sy,
+  w: size.w,
+  h: size.h,
+})
 const inside = (r: Rect, v: Rect): boolean =>
   r.x >= v.x && r.y >= v.y && r.x + r.w <= v.x + v.w && r.y + r.h <= v.y + v.h
 
@@ -120,7 +150,12 @@ describe('placeTag — one rule for every label in the product', () => {
   })
 
   it('keeps the edge pad on every side', () => {
-    for (const [sx, sy] of [[0, 0], [800, 0], [0, 600], [800, 600]] as const) {
+    for (const [sx, sy] of [
+      [0, 0],
+      [800, 0],
+      [0, 600],
+      [800, 600],
+    ] as const) {
       const r = rectOf(placeTag(anchor(sx, sy), SIZE, VIEW))
       expect(r.x).toBeGreaterThanOrEqual(VIEW.x + EDGE_PAD_PX)
       expect(r.y).toBeGreaterThanOrEqual(VIEW.y + EDGE_PAD_PX)
@@ -137,7 +172,7 @@ describe('anchorForSprite — the defect was subtracting a height from the botto
     expect(a.sx).toBe(0)
     expect(a.sy).toBe(328)
     expect(a.topY).toBe(200)
-    expect(a.topY).toBeLessThan(a.sy)          // above the roof, not below the floor
+    expect(a.topY).toBeLessThan(a.sy) // above the roof, not below the floor
     expect(a.halfW).toBe(64)
   })
 
@@ -151,7 +186,9 @@ describe('createTooltipLayer — one owner, so nothing is ever left behind', () 
   const layers = (): unknown => ({
     worldText: {
       children: [] as unknown[],
-      addChild(...cs: unknown[]): void { (this.children as unknown[]).push(...cs) },
+      addChild(...cs: unknown[]): void {
+        this.children.push(...cs)
+      },
     },
   })
   const view = (): Rect => VIEW
@@ -164,7 +201,9 @@ describe('createTooltipLayer — one owner, so nothing is ever left behind', () 
     const boxes = l.boxes().map((b) => b.rect)
     expect(boxes).toHaveLength(2)
     const [a, b] = boxes
-    expect(a!.y < b!.y + b!.h && b!.y < a!.y + a!.h && a!.x < b!.x + b!.w && b!.x < a!.x + a!.w).toBe(false)
+    expect(
+      a!.y < b!.y + b!.h && b!.y < a!.y + a!.h && a!.x < b!.x + b!.w && b!.x < a!.x + a!.w,
+    ).toBe(false)
   })
 
   it('never shows a tag for an empty string', () => {

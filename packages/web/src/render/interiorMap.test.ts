@@ -2,10 +2,29 @@ import { describe, expect, it } from 'vitest'
 import { CITY_INTERIOR_SLOTS, cityStructures } from '@sj/shared'
 import { TILE_H, TILE_W } from './iso.js'
 import {
-  INTERIOR_ACTS, INTERIOR_PX_SCALE, INTERIOR_TILE, ROOM_TILES, TILES_PER_SLOT, WALL_FACING,
-  WALL_H_PX, WALL_KINDS, actFor, alongWall, interiorPath, interiorToScreen, isWalkable,
-  roomMapOf, seatInBlock, slotToTile, standingTiles, tilesOf, walkableCount, wallOfTile,
-  type PieceInput, type RoomMap, type Tile,
+  INTERIOR_ACTS,
+  INTERIOR_PX_SCALE,
+  INTERIOR_TILE,
+  ROOM_TILES,
+  TILES_PER_SLOT,
+  WALL_FACING,
+  WALL_H_PX,
+  WALL_KINDS,
+  actFor,
+  alongWall,
+  interiorPath,
+  interiorToScreen,
+  isWalkable,
+  roomMapOf,
+  seatInBlock,
+  slotToTile,
+  standingTiles,
+  tilesOf,
+  walkableCount,
+  wallOfTile,
+  type PieceInput,
+  type RoomMap,
+  type Tile,
 } from './interiorMap.js'
 
 // The five pieces the city template gives every founder's house, with the footprints the C13
@@ -31,7 +50,7 @@ describe('interiorMap — Option C, the numbers off the mock', () => {
     expect(WALL_H_PX).toBe(160)
   })
 
-  it('the room map is the template\'s own slot grid, four tiles by two', () => {
+  it("the room map is the template's own slot grid, four tiles by two", () => {
     expect(ROOM_TILES.w).toBe(CITY_INTERIOR_SLOTS.w * TILES_PER_SLOT.w)
     expect(ROOM_TILES.h).toBe(CITY_INTERIOR_SLOTS.h * TILES_PER_SLOT.h)
     // every slot the template can name lands inside the room
@@ -44,7 +63,7 @@ describe('interiorMap — Option C, the numbers off the mock', () => {
     }
   })
 
-  it('keeps the town\'s projection — the doorway is a push-in, not another world', () => {
+  it("keeps the town's projection — the doorway is a push-in, not another world", () => {
     // sx = (x-y)*tileW/2, sy = (x+y)*tileH/2, exactly iso.ts with a bigger tile
     expect(interiorToScreen(1, 0)).toEqual({ sx: 64, sy: 32 })
     expect(interiorToScreen(0, 1)).toEqual({ sx: -64, sy: 32 })
@@ -54,7 +73,8 @@ describe('interiorMap — Option C, the numbers off the mock', () => {
     // and it is the town's projection scaled, tile for tile
     const town = { sx: (3 - 1) * (TILE_W / 2), sy: (3 + 1) * (TILE_H / 2) }
     expect(interiorToScreen(3, 1)).toEqual({
-      sx: town.sx * INTERIOR_PX_SCALE, sy: town.sy * INTERIOR_PX_SCALE,
+      sx: town.sx * INTERIOR_PX_SCALE,
+      sy: town.sy * INTERIOR_PX_SCALE,
     })
   })
 })
@@ -83,12 +103,16 @@ describe('interiorMap — the room is a map a body can occupy', () => {
     // piece took the same corner of its own two-deep block. Derived from the slots, so it is
     // still world data.
     const map = roomMapOf(HUT)
-    expect(seatInBlock({ x: 1, y: 1 }, [{ x: 1, y: 2 }])).toEqual({ x: 5, y: 3 })  // pulled near
-    expect(seatInBlock({ x: 1, y: 2 }, [{ x: 1, y: 1 }])).toEqual({ x: 5, y: 4 })  // stays far
-    expect(seatInBlock({ x: 1, y: 1 }, [])).toEqual(slotToTile({ x: 1, y: 1 }))    // alone: unmoved
+    expect(seatInBlock({ x: 1, y: 1 }, [{ x: 1, y: 2 }])).toEqual({ x: 5, y: 3 }) // pulled near
+    expect(seatInBlock({ x: 1, y: 2 }, [{ x: 1, y: 1 }])).toEqual({ x: 5, y: 4 }) // stays far
+    expect(seatInBlock({ x: 1, y: 1 }, [])).toEqual(slotToTile({ x: 1, y: 1 })) // alone: unmoved
     // both sides pull equally, so nothing moves — a rule with no arbitrary tie-break
-    expect(seatInBlock({ x: 1, y: 1 }, [{ x: 1, y: 0 }, { x: 1, y: 2 }]))
-      .toEqual(slotToTile({ x: 1, y: 1 }))
+    expect(
+      seatInBlock({ x: 1, y: 1 }, [
+        { x: 1, y: 0 },
+        { x: 1, y: 2 },
+      ]),
+    ).toEqual(slotToTile({ x: 1, y: 1 }))
     // a piece with no neighbour in its own column is exactly where it always was
     for (const kind of ['bed', 'rug']) {
       const p = at(map, kind)
@@ -165,7 +189,12 @@ describe('interiorMap — a body walks it', () => {
     // Fence the goal in on all four sides. If the walk above could pass over an unwalkable room
     // this would still find a path — a pathing test is the easiest one to write vacuously.
     const fenced: RoomMap = { ...map, blocked: new Uint8Array(map.blocked) }
-    for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]] as const) {
+    for (const [dx, dy] of [
+      [0, -1],
+      [-1, 0],
+      [1, 0],
+      [0, 1],
+    ] as const) {
       const n = { x: goal.x + dx, y: goal.y + dy }
       if (n.x < 0 || n.y < 0 || n.x >= map.w || n.y >= map.h) continue
       fenced.blocked[n.y * map.w + n.x] = 1

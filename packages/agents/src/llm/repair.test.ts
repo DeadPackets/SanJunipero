@@ -4,13 +4,19 @@ import { repairCandidates, repairToSchema } from './repair.js'
 
 // The chronicle schema the narrator asks for, verbatim — this is the decode that failed on
 // a live night and cost the run a criterion.
-const Chapter = z.object({
-  title: z.string().min(1),
-  text: z.string().min(1),
-  citations: z.array(z.number().int().nonnegative()).max(40),
-}).strict()
+const Chapter = z
+  .object({
+    title: z.string().min(1),
+    text: z.string().min(1),
+    citations: z.array(z.number().int().nonnegative()).max(40),
+  })
+  .strict()
 
-const GOOD = { title: 'A Grave at the Northern Ford', text: 'At the fork where the water bends.', citations: [4, 9] }
+const GOOD = {
+  title: 'A Grave at the Northern Ford',
+  text: 'At the fork where the water bends.',
+  citations: [4, 9],
+}
 const asJson = JSON.stringify(GOOD)
 
 describe('repairToSchema: the shape is repaired, the content never is', () => {
@@ -25,7 +31,10 @@ describe('repairToSchema: the shape is repaired, the content never is', () => {
   })
 
   it('reads it with prose on both sides, and past a brace in the prose', () => {
-    const out = repairToSchema(`I considered {a shorter title} first. Final answer:\n${asJson}\nHope that helps.`, Chapter)
+    const out = repairToSchema(
+      `I considered {a shorter title} first. Final answer:\n${asJson}\nHope that helps.`,
+      Chapter,
+    )
     expect(out?.value).toEqual(GOOD)
   })
 
@@ -61,11 +70,15 @@ describe('repairToSchema: the shape is repaired, the content never is', () => {
 
 describe('repairToSchema: it refuses rather than guesses', () => {
   it('will not supply a required field the provider never wrote', () => {
-    expect(repairToSchema(JSON.stringify({ title: 'A Grave', text: 'the water bends' }), Chapter)).toBeUndefined()
+    expect(
+      repairToSchema(JSON.stringify({ title: 'A Grave', text: 'the water bends' }), Chapter),
+    ).toBeUndefined()
   })
 
   it('will not read a number out of a string that is not one', () => {
-    expect(repairToSchema(JSON.stringify({ ...GOOD, citations: ['4 events'] }), Chapter)).toBeUndefined()
+    expect(
+      repairToSchema(JSON.stringify({ ...GOOD, citations: ['4 events'] }), Chapter),
+    ).toBeUndefined()
   })
 
   it('will not truncate a citation list the schema caps', () => {
@@ -81,7 +94,8 @@ describe('repairToSchema: it refuses rather than guesses', () => {
   // The known gap, pinned: a correct turn emitted as YAML is a different serialisation, not a
   // reframing, and reading it needs a parser this pass deliberately does not have.
   it('does not pretend to read YAML', () => {
-    const yaml = 'title: A Grave at the Northern Ford\ntext: At the fork where the water bends.\ncitations:\n  - 4\n  - 9\n'
+    const yaml =
+      'title: A Grave at the Northern Ford\ntext: At the fork where the water bends.\ncitations:\n  - 4\n  - 9\n'
     expect(repairToSchema(yaml, Chapter)).toBeUndefined()
   })
 })

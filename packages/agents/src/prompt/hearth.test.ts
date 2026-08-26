@@ -1,7 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import {
-  createWorldTick, doorTile, EventStore, fold, genesisState, makeGenesisWorld, openDb,
-  RngStreams, TickLoop, warmthTargetFor, type LawQueue, type TickHandler, type WorldState,
+  createWorldTick,
+  doorTile,
+  EventStore,
+  fold,
+  genesisState,
+  makeGenesisWorld,
+  openDb,
+  RngStreams,
+  TickLoop,
+  warmthTargetFor,
+  type LawQueue,
+  type TickHandler,
+  type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
 import { EngineBridge } from '../runtime/bridge.js'
@@ -36,14 +47,43 @@ function town(startTick: number): { bridge: EngineBridge; loop: TickLoop; homeId
   const house = Object.values(state.structures).find((s) => s.kind === 'house')!
   state = fold(state, store.append(state.tick, 'structure_completed', { id: house.id }), CFG)
   const door = doorTile(state, state.structures[house.id]!)!
-  state = fold(state, store.append(state.tick, 'agent_spawned',
-    { id: 'amara', name: 'amara', x: door.x, y: door.y, ageDays: 30 * 364, sex: 'f' }), CFG)
-  state = fold(state, store.append(state.tick, 'item_spawned',
-    { id: 'wood_1', kind: 'wood', qty: 4, loc: { t: 'agent', id: 'amara' }, owner: 'amara' }), CFG)
+  state = fold(
+    state,
+    store.append(state.tick, 'agent_spawned', {
+      id: 'amara',
+      name: 'amara',
+      x: door.x,
+      y: door.y,
+      ageDays: 30 * 364,
+      sex: 'f',
+    }),
+    CFG,
+  )
+  state = fold(
+    state,
+    store.append(state.tick, 'item_spawned', {
+      id: 'wood_1',
+      kind: 'wood',
+      qty: 4,
+      loc: { t: 'agent', id: 'amara' },
+      owner: 'amara',
+    }),
+    CFG,
+  )
   const lawQueue: LawQueue = []
   const worldTick = createWorldTick(CFG, rng, lawQueue)
   let handler: TickHandler = () => {}
-  const loop = new TickLoop({ store, state, rng, config: CFG, startTick, realMsPerTick: 0, onTick: (c) => handler(c) })
+  const loop = new TickLoop({
+    store,
+    state,
+    rng,
+    config: CFG,
+    startTick,
+    realMsPerTick: 0,
+    onTick: (c) => {
+      handler(c)
+    },
+  })
   const bridge = new EngineBridge({ loop, store, simConfig: CFG })
   handler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
@@ -104,8 +144,9 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     const said = bridge.perception('amara').visible.structures
     const cabin = Object.values(loop.state.structures).find((s) => s.kind === 'cabin')!
     // Same mass, same roof, same way in — and one of them is somewhere to sleep well.
-    expect(loop.state.structures[homeId]!.w * loop.state.structures[homeId]!.h)
-      .toBe(cabin.w * cabin.h)
+    expect(loop.state.structures[homeId]!.w * loop.state.structures[homeId]!.h).toBe(
+      cabin.w * cabin.h,
+    )
     expect(said.find((x) => x.id === homeId)?.bed).toBe(true)
     expect(said.find((x) => x.id === cabin.id)?.bed).toBeUndefined()
   })
@@ -130,8 +171,16 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     const lit = proseFor(bridge).toLowerCase()
     for (const said of [cold, lit]) {
       for (const hint of [
-        'stoke', 'you should', 'you must', 'you could feed', 'go inside', 'light it', 'feed it',
-        'sleep here', 'better than', 'you would rest',
+        'stoke',
+        'you should',
+        'you must',
+        'you could feed',
+        'go inside',
+        'light it',
+        'feed it',
+        'sleep here',
+        'better than',
+        'you would rest',
       ]) {
         expect(said, hint).not.toContain(hint)
       }
@@ -142,19 +191,42 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
 // A mind reads "its walls are three quarters up", walks over and tries the door; how far up
 // the walls are never said there was nothing behind them yet.
 describe('★ a roofless building has no inside yet, and the wall says so', () => {
-  const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
+  const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
+    seq,
+    tick: 0,
+    type,
+    payload,
+  })
 
   function site(stage: 'construction' | 'complete'): string {
     const rows = Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => 0 as const))
     let s = genesisState(CFG, rows)
-    s = fold(s, ev(1, 'structure_planned', {
-      id: 'structure_1', kind: 'house', x: 2, y: 1, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'b',
-    }))
+    s = fold(
+      s,
+      ev(1, 'structure_planned', {
+        id: 'structure_1',
+        kind: 'house',
+        x: 2,
+        y: 1,
+        w: 2,
+        h: 2,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'b',
+      }),
+    )
     if (stage === 'complete') s = fold(s, ev(2, 'structure_completed', { id: 'structure_1' }))
     s = fold(s, ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 4, ageDays: 7300 }))
     const db = openDb(':memory:')
     const store = new EventStore(db)
-    const loop = new TickLoop({ store, state: s, rng: new RngStreams('h2'), config: CFG, realMsPerTick: 0, onTick: () => {} })
+    const loop = new TickLoop({
+      store,
+      state: s,
+      rng: new RngStreams('h2'),
+      config: CFG,
+      realMsPerTick: 0,
+      onTick: () => {},
+    })
     const bridge = new EngineBridge({ loop, store, simConfig: CFG })
     return perceptionToProse(bridge.perception('a1'), () => {}, WORLD)
   }
@@ -171,7 +243,13 @@ describe('★ a roofless building has no inside yet, and the wall says so', () =
 
   it('names no remedy: it is a fact about now and promises nothing later', () => {
     const said = site('construction').toLowerCase()
-    for (const hint of ['you should', 'you must', 'once the roof', 'when it is finished', 'come back']) {
+    for (const hint of [
+      'you should',
+      'you must',
+      'once the roof',
+      'when it is finished',
+      'come back',
+    ]) {
       expect(said, hint).not.toContain(hint)
     }
   })
@@ -200,7 +278,11 @@ describe('the one-way glass holds over every sentence this lane added', () => {
 
   // ★ VACUOUS GUARD: the scan is looking, and would have caught one.
   it('and the scan is awake — a sentence that DID leak comes back named', () => {
-    expect(scanPromptForGlassLeak('The hearth here is cold, and the council meets by it.')).toContain('council')
-    expect(scanForLayoutLeak('There are beds in it, on the town\'s next free plot.')).toContain('plot')
+    expect(
+      scanPromptForGlassLeak('The hearth here is cold, and the council meets by it.'),
+    ).toContain('council')
+    expect(scanForLayoutLeak("There are beds in it, on the town's next free plot.")).toContain(
+      'plot',
+    )
   })
 })

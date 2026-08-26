@@ -2,7 +2,28 @@
   "name": "san-junipero",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
-  "scripts": { "stream": "pnpm --filter @sj/web build && pnpm --filter @sj/gateway serve", "test": "vitest run", "typecheck": "tsc -b packages/shared packages/engine packages/agents packages/arbiter packages/forge packages/gateway packages/web packages/narrator && tsc -p packages/agents/tsconfig.scripts.json && tsc -p packages/forge/tsconfig.scripts.json" },
-  "devDependencies": { "typescript": "^5.9.0", "vitest": "^3.2.0", "@types/node": "^24.0.0", "tsx": "^4.23.12" }
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "stream": "pnpm --filter @sj/web build && pnpm --filter @sj/gateway serve",
+    "test": "vitest run",
+    "typecheck": "tsc -b packages/shared packages/engine packages/agents packages/arbiter packages/forge packages/gateway packages/web packages/narrator && tsc -p packages/agents/tsconfig.scripts.json && tsc -p packages/forge/tsconfig.scripts.json",
+    "lint": "eslint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "knip": "knip",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm knip && pnpm test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.10",
+    "@types/node": "^24.0.0",
+    "eslint": "10.9.1",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "knip": "6.32.3",
+    "tsx": "^4.23.12",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "8.68.0",
+    "vitest": "^3.2.0"
+  }
 }

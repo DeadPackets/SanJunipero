@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
-  CUT_MIN_MS, QUIET_TURN_TICKS, STICKY_FACTOR, pickCut, quietSubject, subjectFor,
+  CUT_MIN_MS,
+  QUIET_TURN_TICKS,
+  STICKY_FACTOR,
+  pickCut,
+  quietSubject,
+  subjectFor,
 } from './directorCut.js'
 
-const w = (agentId: string, fromTick: number, score: number) => ({ agentId, fromTick, toTick: fromTick + 59, score })
+const w = (agentId: string, fromTick: number, score: number) => ({
+  agentId,
+  fromTick,
+  toTick: fromTick + 59,
+  score,
+})
 
 describe('pickCut', () => {
   it('the hottest recent window wins', () => {
@@ -37,7 +47,9 @@ describe('the televised town always has somebody in front of the camera', () => 
   const TOWN = ['amara', 'omar', 'salma', 'yusuf']
 
   it('still takes the hottest agent whenever the town gives it one', () => {
-    expect(subjectFor([w('farmer', 940, 6), w('builder', 940, 20)], null, 1000, TOWN)).toBe('builder')
+    expect(subjectFor([w('farmer', 940, 6), w('builder', 940, 20)], null, 1000, TOWN)).toBe(
+      'builder',
+    )
   })
 
   it('falls back to somebody who is actually there when nothing has scored', () => {

@@ -22,9 +22,7 @@ export const ROOM_STATE_IDLE = 'Between things'
 const gerund = (verb: string): string => `${verb.endsWith('e') ? verb.slice(0, -1) : verb}ing`
 const sentenceCase = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
-export function roomStateOf(
-  a: { asleep: boolean; activity: { verb: string } | null },
-): string {
+export function roomStateOf(a: { asleep: boolean; activity: { verb: string } | null }): string {
   if (a.asleep) return ROOM_STATE_ASLEEP
   return a.activity === null ? ROOM_STATE_IDLE : sentenceCase(gerund(a.activity.verb))
 }
@@ -68,7 +66,8 @@ const nameOf = (state: WorldState, id: string): string => state.agents[id]?.name
 export function builtLine(state: WorldState, p: Provenance | null): string | null {
   if (p === null) return null
   const who = nameOf(state, p.builderId)
-  if (p.completedTick === null) return `Begun by ${who}, Day ${tickToMoment(p.plannedTick).day} — still rising`
+  if (p.completedTick === null)
+    return `Begun by ${who}, Day ${tickToMoment(p.plannedTick).day} — still rising`
   return `Raised by ${who}, Day ${tickToMoment(p.completedTick).day}`
 }
 
@@ -107,7 +106,9 @@ export function roomCard(
     .map(([kind, qty]): RoomHolding => {
       const id = resolveAssetId(records, 'item', `${kind}#icon`)
       return {
-        kind, words: kind.replace(/_/g, ' '), qty,
+        kind,
+        words: kind.replace(/_/g, ' '),
+        qty,
         iconUrl: id === null ? null : `/assets/${id}.png`,
       }
     })

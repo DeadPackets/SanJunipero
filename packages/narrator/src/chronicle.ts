@@ -14,8 +14,8 @@ export const NARRATOR_VOCABULARY_NOTES = [
 ].join(' ')
 
 // Who actually sat with whom, off the ledger. The chapter may credit care only from this.
-export function creditedCare(events: SimEvent[]): Array<{ patient: string; tender: string }> {
-  const out: Array<{ patient: string; tender: string }> = []
+export function creditedCare(events: SimEvent[]): { patient: string; tender: string }[] {
+  const out: { patient: string; tender: string }[] = []
   for (const ev of events) {
     if (ev.type !== 'agent_tended') continue
     const p = (ev.payload ?? {}) as { agentId?: unknown; tenderId?: unknown }
@@ -26,8 +26,8 @@ export function creditedCare(events: SimEvent[]): Array<{ patient: string; tende
 }
 
 // The hand a death was witnessed by — the payload's own `byId`, and nothing inferred.
-export function witnessedAttackers(events: SimEvent[]): Array<{ victim: string; byId: string }> {
-  const out: Array<{ victim: string; byId: string }> = []
+export function witnessedAttackers(events: SimEvent[]): { victim: string; byId: string }[] {
+  const out: { victim: string; byId: string }[] = []
   for (const ev of events) {
     if (ev.type !== 'agent_died') continue
     const p = (ev.payload ?? {}) as { agentId?: unknown; byId?: unknown }
@@ -37,7 +37,10 @@ export function witnessedAttackers(events: SimEvent[]): Array<{ victim: string; 
   return out
 }
 
-export function verifyCitations(citations: number[], valid: Set<number>): { ok: boolean; dangling: number[] } {
+export function verifyCitations(
+  citations: number[],
+  valid: Set<number>,
+): { ok: boolean; dangling: number[] } {
   const dangling = citations.filter((c) => !valid.has(c))
   return { ok: dangling.length === 0, dangling }
 }
@@ -61,18 +64,28 @@ export async function renderChapter(deps: {
   llm: NarratorLlm
   day: number
   scenes: SceneSegment[]
-  typeCounts?: (ids: number[]) => Record<string, number>
-  alert?: (d: string) => void
+  typeCounts?: ((ids: number[]) => Record<string, number>) | undefined
+  alert?: ((d: string) => void) | undefined
 }): Promise<ChapterRow> {
   const { store, llm, day, scenes } = deps
   const sceneIds = store.insertScenes(scenes)
   const summary = await llm.summarizeChapter(sceneDigests(scenes, deps.typeCounts ?? (() => ({}))))
   const valid = new Set(scenes.flatMap((s) => s.eventIds))
   const { ok, dangling } = verifyCitations(summary.citations, valid)
-  if (!ok) deps.alert?.(`dangling_citation: chapter for day ${day} cited unknown ledger numbers ${dangling.join(', ')}`)
+  if (!ok)
+    deps.alert?.(
+      `dangling_citation: chapter for day ${day} cited unknown ledger numbers ${dangling.join(', ')}`,
+    )
   let citations = summary.citations.filter((c) => valid.has(c))
-  if (citations.length === 0) citations = scenes.map((s) => s.eventIds[0]).filter((id): id is number => id !== undefined)
-  const id = store.insertChapter({ day, title: summary.title, text: summary.text, citations, sceneIds })
+  if (citations.length === 0)
+    citations = scenes.map((s) => s.eventIds[0]).filter((id): id is number => id !== undefined)
+  const id = store.insertChapter({
+    day,
+    title: summary.title,
+    text: summary.text,
+    citations,
+    sceneIds,
+  })
   return { id, day, title: summary.title, text: summary.text, citations, sceneIds }
 }
 
@@ -85,7 +98,7 @@ export async function renderEra(deps: {
   endDay: number
   chapters: ChapterRow[]
   validEventIds: number[]
-  alert?: (d: string) => void
+  alert?: ((d: string) => void) | undefined
 }): Promise<EraRow> {
   const { store, startDay, endDay, chapters } = deps
   const existing = store.eras().find((e) => e.startDay === startDay)
@@ -104,9 +117,19 @@ export async function renderEra(deps: {
   )
   const valid = new Set(deps.validEventIds)
   const { ok, dangling } = verifyCitations(summary.citations, valid)
-  if (!ok) deps.alert?.(`dangling_citation: era days ${startDay}-${endDay} cited unknown ledger numbers ${dangling.join(', ')}`)
+  if (!ok)
+    deps.alert?.(
+      `dangling_citation: era days ${startDay}-${endDay} cited unknown ledger numbers ${dangling.join(', ')}`,
+    )
   let citations = summary.citations.filter((c) => valid.has(c))
   if (citations.length === 0) citations = chapters[0]!.citations.slice(0, 1)
-  const id = store.insertEra({ startDay, endDay, title: summary.title, text: summary.text, citations, chapterIds })
+  const id = store.insertEra({
+    startDay,
+    endDay,
+    title: summary.title,
+    text: summary.text,
+    citations,
+    chapterIds,
+  })
   return { id, startDay, endDay, title: summary.title, text: summary.text, citations, chapterIds }
 }

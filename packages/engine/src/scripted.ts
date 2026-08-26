@@ -46,17 +46,19 @@ export const THIEF_POST = { x: 19, y: 20 } // beside the storehouse, on the far 
 // vision reaches four; noon reaches twelve. The post is the whole experiment.
 export const WATCH_POST = { x: 20, y: 26 }
 export const NIGHT_THEFT_TICK = 2760 // day 2, 22:00 — no moon, no torch
-export const NOON_THEFT_TICK = 3600  // day 3, 12:00 — the same act, in full light
-const RESTOW_TICK = 3000             // the knife goes back on the shelf between the two
-const UPKEEP_EVERY = 720             // see keepUpright
+export const NOON_THEFT_TICK = 3600 // day 3, 12:00 — the same act, in full light
+const RESTOW_TICK = 3000 // the knife goes back on the shelf between the two
+const UPKEEP_EVERY = 720 // see keepUpright
 
 export function makeFixtureMap(): TileId[][] {
   const rows: TileId[][] = []
   for (let y = 0; y < MAP_H; y++) {
     const row: TileId[] = []
     for (let x = 0; x < MAP_W; x++) {
-      if (x <= 3) row.push(2) // river
-      else if (x >= 61) row.push(3) // forest edge
+      if (x <= 3)
+        row.push(2) // river
+      else if (x >= 61)
+        row.push(3) // forest edge
       else row.push(0) // grass
     }
     rows.push(row)
@@ -64,20 +66,25 @@ export function makeFixtureMap(): TileId[][] {
   return rows
 }
 
-const cheb = (ax: number, ay: number, bx: number, by: number): number => Math.max(Math.abs(ax - bx), Math.abs(ay - by))
+const cheb = (ax: number, ay: number, bx: number, by: number): number =>
+  Math.max(Math.abs(ax - bx), Math.abs(ay - by))
 
 const held = (p: PerceptionPacket, kind: string): number =>
   p.self.inventory.filter((i) => i.kind === kind).reduce((s, i) => s + i.qty, 0)
 
-const nearStorehouse = (p: PerceptionPacket): boolean => isAdjacentToRect(p.self.x, p.self.y, STOREHOUSE)
+const nearStorehouse = (p: PerceptionPacket): boolean =>
+  isAdjacentToRect(p.self.x, p.self.y, STOREHOUSE)
 
-const nearHouseSite = (p: PerceptionPacket): boolean => isAdjacentToRect(p.self.x, p.self.y, { ...HOUSE_SITE, w: 2, h: 2 })
+const nearHouseSite = (p: PerceptionPacket): boolean =>
+  isAdjacentToRect(p.self.x, p.self.y, { ...HOUSE_SITE, w: 2, h: 2 })
 
 // Farmer: till + plant wheat on day 1, then eat wheat from the storehouse and sleep.
 export function makeFarmerPolicy(config: SimConfig): Policy {
   return (p) => {
     const needs = p.self.body.needs
-    const hasCrop = p.visible.crops.some((c) => c.x === FARM_PLOT.x && c.y === FARM_PLOT.y && !c.withered)
+    const hasCrop = p.visible.crops.some(
+      (c) => c.x === FARM_PLOT.x && c.y === FARM_PLOT.y && !c.withered,
+    )
 
     if (!hasCrop) {
       if (cheb(p.self.x, p.self.y, FARM_PLOT.x, FARM_PLOT.y) > 1) {
@@ -109,7 +116,12 @@ export function makeFisherPolicy(config: SimConfig): Policy {
       if (food) return { verb: 'eat', params: { itemId: food.id } }
     }
     if (needs.energy < 20) return { verb: 'sleep', params: {} }
-    if (idler && idler.collapsed && cheb(p.self.x, p.self.y, idler.x, idler.y) <= 1 && fish.length >= 2) {
+    if (
+      idler &&
+      idler.collapsed &&
+      cheb(p.self.x, p.self.y, idler.x, idler.y) <= 1 &&
+      fish.length >= 2
+    ) {
       return { verb: 'give', params: { itemId: fish[0]!.id, targetId: IDLER } }
     }
     if (fish.length < 2) return { verb: 'fish', params: { x: FISHER_WATER.x, y: FISHER_WATER.y } }
@@ -148,7 +160,8 @@ export function makeBuilderPolicy(config: SimConfig): Policy {
     // Wood is spent once, at the first build; only provision before the site exists.
     if (!house && (wood < config.construction.houseMaterials.wood || wheat < 1)) {
       if (nearStorehouse(p)) {
-        if (wood < config.construction.houseMaterials.wood) return { verb: 'take', params: { itemId: WOOD_ITEM } }
+        if (wood < config.construction.houseMaterials.wood)
+          return { verb: 'take', params: { itemId: WOOD_ITEM } }
         return { verb: 'take', params: { itemId: WHEAT_BUILDER } }
       }
       return { verb: 'walk', params: { x: STOREHOUSE_NEAR.x, y: STOREHOUSE_NEAR.y } }
@@ -168,9 +181,10 @@ export function makeKeeperPolicy(_config: SimConfig): Policy {
 // Thief: stands beside the storehouse and reaches in twice, at two named ticks. Carries no
 // flame, which is the other half of the night rule — a lit body is a witnessed body.
 export function makeThiefPolicy(_config: SimConfig): Policy {
-  return (p) => (p.time.tick === NIGHT_THEFT_TICK || p.time.tick === NOON_THEFT_TICK
-    ? { verb: 'take', params: { itemId: STOLEN_ITEM } }
-    : null)
+  return (p) =>
+    p.time.tick === NIGHT_THEFT_TICK || p.time.tick === NOON_THEFT_TICK
+      ? { verb: 'take', params: { itemId: STOLEN_ITEM } }
+      : null
 }
 
 export function makePolicies(config: SimConfig): Record<string, Policy> {
@@ -185,19 +199,65 @@ export function makePolicies(config: SimConfig): Record<string, Policy> {
 }
 
 // One-shot scripted injections keyed on absolute tick (setup + the day-2 fire).
-function scriptedTimeline(config: SimConfig, tick: number, emit: (type: string, payload: unknown) => void): void {
+function scriptedTimeline(
+  config: SimConfig,
+  tick: number,
+  emit: (type: string, payload: unknown) => void,
+): void {
   // Sexes ride the reproduction flag: a fixture with it off spawns the earlier bodies exactly.
   const sex = (s: 'f' | 'm'): { sex?: 'f' | 'm' } => (config.reproduction.enabled ? { sex: s } : {})
   if (tick === 1) {
     emit('agent_spawned', { id: FARMER, name: 'Farmer', x: 26, y: 21, ageDays: 7300, ...sex('f') })
     emit('agent_spawned', { id: FISHER, name: 'Fisher', x: 4, y: 32, ageDays: 7300, ...sex('m') })
     emit('agent_spawned', { id: IDLER, name: 'Idler', x: 5, y: 32, ageDays: 7300, ...sex('m') })
-    emit('agent_spawned', { id: BUILDER, name: 'Builder', x: 30, y: 22, ageDays: 7300, ...sex('f') })
-    emit('structure_planned', { id: STOREHOUSE.id, kind: 'storehouse', x: STOREHOUSE.x, y: STOREHOUSE.y, w: STOREHOUSE.w, h: STOREHOUSE.h, maxHp: 20, flammable: true, builderId: 'script' })
-    emit('structure_planned', { id: SHED.id, kind: 'shed', x: SHED.x, y: SHED.y, w: SHED.w, h: SHED.h, maxHp: 20, flammable: true, builderId: 'script' })
-    emit('item_spawned', { id: WOOD_ITEM, kind: 'wood', qty: 12, loc: { t: 'structure', id: STOREHOUSE.id } })
-    emit('item_spawned', { id: WHEAT_FARMER, kind: 'wheat', qty: 3, loc: { t: 'structure', id: STOREHOUSE.id } })
-    emit('item_spawned', { id: WHEAT_BUILDER, kind: 'wheat', qty: 3, loc: { t: 'structure', id: STOREHOUSE.id } })
+    emit('agent_spawned', {
+      id: BUILDER,
+      name: 'Builder',
+      x: 30,
+      y: 22,
+      ageDays: 7300,
+      ...sex('f'),
+    })
+    emit('structure_planned', {
+      id: STOREHOUSE.id,
+      kind: 'storehouse',
+      x: STOREHOUSE.x,
+      y: STOREHOUSE.y,
+      w: STOREHOUSE.w,
+      h: STOREHOUSE.h,
+      maxHp: 20,
+      flammable: true,
+      builderId: 'script',
+    })
+    emit('structure_planned', {
+      id: SHED.id,
+      kind: 'shed',
+      x: SHED.x,
+      y: SHED.y,
+      w: SHED.w,
+      h: SHED.h,
+      maxHp: 20,
+      flammable: true,
+      builderId: 'script',
+    })
+    emit('item_spawned', {
+      id: WOOD_ITEM,
+      kind: 'wood',
+      qty: 12,
+      loc: { t: 'structure', id: STOREHOUSE.id },
+    })
+    emit('item_spawned', {
+      id: WHEAT_FARMER,
+      kind: 'wheat',
+      qty: 3,
+      loc: { t: 'structure', id: STOREHOUSE.id },
+    })
+    emit('item_spawned', {
+      id: WHEAT_BUILDER,
+      kind: 'wheat',
+      qty: 3,
+      loc: { t: 'structure', id: STOREHOUSE.id },
+    })
     // Idler starts food-insecure: hunger 100 -> 4, collapses this tick.
     emit('need_changed', { id: IDLER, need: 'hunger', delta: -96 })
   }
@@ -211,13 +271,34 @@ function scriptedTimeline(config: SimConfig, tick: number, emit: (type: string, 
   // with §19 off runs the earlier timeline body for body and event for event.
   if (!config.nightWitness.enabled) return
   if (tick === 1) {
-    emit('agent_spawned', { id: THIEF, name: 'Thief', x: THIEF_POST.x, y: THIEF_POST.y, ageDays: 7300, ...sex('m') })
-    emit('agent_spawned', { id: KEEPER, name: 'Keeper', x: WATCH_POST.x, y: WATCH_POST.y, ageDays: 7300, ...sex('f') })
-    emit('item_spawned', { id: STOLEN_ITEM, kind: 'knife', qty: 1, loc: { t: 'structure', id: STOREHOUSE.id }, owner: KEEPER })
+    emit('agent_spawned', {
+      id: THIEF,
+      name: 'Thief',
+      x: THIEF_POST.x,
+      y: THIEF_POST.y,
+      ageDays: 7300,
+      ...sex('m'),
+    })
+    emit('agent_spawned', {
+      id: KEEPER,
+      name: 'Keeper',
+      x: WATCH_POST.x,
+      y: WATCH_POST.y,
+      ageDays: 7300,
+      ...sex('f'),
+    })
+    emit('item_spawned', {
+      id: STOLEN_ITEM,
+      kind: 'knife',
+      qty: 1,
+      loc: { t: 'structure', id: STOREHOUSE.id },
+      owner: KEEPER,
+    })
   }
   // The knife goes back on the shelf, so the noon taking is the same act as the night one and
   // the light is the only thing that changed.
-  if (tick === RESTOW_TICK) emit('item_moved', { id: STOLEN_ITEM, loc: { t: 'structure', id: STOREHOUSE.id } })
+  if (tick === RESTOW_TICK)
+    emit('item_moved', { id: STOLEN_ITEM, loc: { t: 'structure', id: STOREHOUSE.id } })
   // These two are placed, not lived: a body that only stands runs out before the second night,
   // so twice a day the fixture puts them back on their feet, on a fixed clock so replay agrees.
   if (tick % UPKEEP_EVERY === 0) {
@@ -230,7 +311,12 @@ function scriptedTimeline(config: SimConfig, tick: number, emit: (type: string, 
 
 // A policy sees only a packet, which never says "you are indoors", so the harness steps an actor
 // through a doorway it is already standing in before it lies down. No commuting: rough is the law.
-function bedGate(state: WorldState, config: SimConfig, id: string, intent: ScriptedIntent): ScriptedIntent {
+function bedGate(
+  state: WorldState,
+  config: SimConfig,
+  id: string,
+  intent: ScriptedIntent,
+): ScriptedIntent {
   const a = state.agents[id]!
   const here = a.insideId === undefined ? undefined : state.structures[a.insideId]
   if (intent.verb !== 'sleep') return here ? { verb: 'exit', params: {} } : intent
@@ -240,16 +326,24 @@ function bedGate(state: WorldState, config: SimConfig, id: string, intent: Scrip
     const s = state.structures[sid]!
     if (s.stage !== 'complete' || !isRoofedKind(config, s.kind)) continue
     const door = doorTile(state, s)
-    if (door && cheb(a.x, a.y, door.x, door.y) <= 1) return { verb: 'enter', params: { structureId: s.id } }
+    if (door && cheb(a.x, a.y, door.x, door.y) <= 1)
+      return { verb: 'enter', params: { structureId: s.id } }
   }
   return intent
 }
 
-export type ScriptedOnTick = (ctx: { tick: number; emit: (type: string, payload: unknown) => void }) => void
+export type ScriptedOnTick = (ctx: {
+  tick: number
+  emit: (type: string, payload: unknown) => void
+}) => void
 
 // getState() must return the *current* loop state; every decision is recomputed from it, so the
 // handler has no hidden mutable state and replays bit-identically from the store.
-export function makeScriptedOnTick(config: SimConfig, rng: RngStreams, getState: () => WorldState): ScriptedOnTick {
+export function makeScriptedOnTick(
+  config: SimConfig,
+  rng: RngStreams,
+  getState: () => WorldState,
+): ScriptedOnTick {
   const policies = makePolicies(config)
   const worldTick = createWorldTick(config, rng)
   return ({ tick, emit }) => {
@@ -263,17 +357,22 @@ export function makeScriptedOnTick(config: SimConfig, rng: RngStreams, getState:
     // runs, so the Builder's rest break and eat break are scripted here.
     const builder = getState().agents[BUILDER]
     if (builder && builder.alive && builder.activity?.verb === 'build') {
-      if (builder.needs.energy < 30) emit('need_changed', { id: BUILDER, need: 'energy', delta: 70 })
-      const holdsFood = Object.values(getState().items).some((i) =>
-        i.loc.t === 'agent' && i.loc.id === BUILDER
-        && (FOOD_KINDS.has(i.kind) || Object.prototype.hasOwnProperty.call(config.crops, i.kind)))
-      if (builder.needs.hunger < 60 && holdsFood) emit('action_interrupted', { agentId: BUILDER, reason: 'rest' })
+      if (builder.needs.energy < 30)
+        emit('need_changed', { id: BUILDER, need: 'energy', delta: 70 })
+      const holdsFood = Object.values(getState().items).some(
+        (i) =>
+          i.loc.t === 'agent' &&
+          i.loc.id === BUILDER &&
+          (FOOD_KINDS.has(i.kind) || Object.prototype.hasOwnProperty.call(config.crops, i.kind)),
+      )
+      if (builder.needs.hunger < 60 && holdsFood)
+        emit('action_interrupted', { agentId: BUILDER, reason: 'rest' })
     }
     // Policies submit intents against the freshly-advanced state.
     for (const id of ACTORS) {
       const state = getState()
       const a = state.agents[id]
-      if (!a || !a.alive) continue
+      if (!a?.alive) continue
       const packet = composePerception(state, config, id, [])
       const intent = policies[id]!(packet)
       if (!intent) continue
@@ -289,7 +388,11 @@ export function createScriptedLoop(config: SimConfig, seed: string, store?: Even
   const state = genesisState(config, makeFixtureMap())
   const s = store ?? new EventStore(openDb(':memory:'))
   const loop: TickLoop = new TickLoop({
-    store: s, state, rng, config, snapshotEveryTicks: 120,
+    store: s,
+    state,
+    rng,
+    config,
+    snapshotEveryTicks: 120,
     onTick: makeScriptedOnTick(config, rng, () => loop.state),
   })
   return loop

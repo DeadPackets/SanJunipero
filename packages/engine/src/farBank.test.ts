@@ -2,8 +2,20 @@
 // town, with every claim-seam invariant still standing on the far side. Scripted only, no LLM.
 import { describe, expect, it } from 'vitest'
 import {
-  MINUTES_PER_DAY, SimConfigSchema, TOWN_SQUARE, T_ROAD, doorFrontOf, freePlots, grammarOf,
-  latticeFloor, place, plotExtent, ringsStanding, stateHash, townSpacing, type SimConfig,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  TOWN_SQUARE,
+  T_ROAD,
+  doorFrontOf,
+  freePlots,
+  grammarOf,
+  latticeFloor,
+  place,
+  plotExtent,
+  ringsStanding,
+  stateHash,
+  townSpacing,
+  type SimConfig,
 } from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
@@ -27,8 +39,15 @@ const CFG: SimConfig = SimConfigSchema.parse({
   mystery: { chancePerDay: 0 },
   aging: { deathOfOldAgeEnabled: false },
   construction: { houseTicks: HOUSE_TICKS },
-  structures: { recipes: { ...SimConfigSchema.parse({}).structures.recipes,
-    house: { ...SimConfigSchema.parse({}).structures.recipes['house']!, durationTicks: HOUSE_TICKS } } },
+  structures: {
+    recipes: {
+      ...SimConfigSchema.parse({}).structures.recipes,
+      house: {
+        ...SimConfigSchema.parse({}).structures.recipes.house!,
+        durationTicks: HOUSE_TICKS,
+      },
+    },
+  },
 })
 
 const MASONS = 6
@@ -39,12 +58,16 @@ const WET: ReadonlySet<number> = new Set([2, 10])
 // A spit of sand at rows 50–53 makes the channel two tiles instead of three — the only place a
 // six-plank deck can span. The deck is asked for at the WRITTEN 1x2, and the engine turns it.
 const FORD_ROW = 51
-const DECK = { x: GENESIS_RIVER_X - 1, y: FORD_ROW }   // 48, 51
-const BANK_STAND = { x: GENESIS_RIVER_X + 1, y: FORD_ROW }  // 50, 51 — the sand, east of the deck
+const DECK = { x: GENESIS_RIVER_X - 1, y: FORD_ROW } // 48, 51
+const BANK_STAND = { x: GENESIS_RIVER_X + 1, y: FORD_ROW } // 50, 51 — the sand, east of the deck
 
 type Run = {
-  loop: TickLoop; store: EventStore; genesisTerrain: TileId[][]
-  growths: number; bridgeTick: number | null; crossedTick: number | null
+  loop: TickLoop
+  store: EventStore
+  genesisTerrain: TileId[][]
+  growths: number
+  bridgeTick: number | null
+  crossedTick: number | null
 }
 
 /** Six masons who want roofs; one lays a deck at the ford first. Nobody ever names a coordinate
@@ -59,13 +82,23 @@ function runTown(seed = 'far-bank'): Run {
   let bridgeTick: number | null = null
   let crossedTick: number | null = null
   const loop: TickLoop = new TickLoop({
-    store, state: genesisState(CFG, terrain), rng, config: CFG, snapshotEveryTicks: 720,
+    store,
+    state: genesisState(CFG, terrain),
+    rng,
+    config: CFG,
+    snapshotEveryTicks: 720,
     onTick: ({ tick, emit }) => {
       if (tick === 1) {
         for (const e of genesis) emit(e.type, e.payload)
-        ids.forEach((id, i) => emit('agent_spawned', {
-          id, name: id, x: TOWN_SQUARE.x + i + 1, y: TOWN_SQUARE.y + 1, ageDays: 7300,
-        }))
+        ids.forEach((id, i) => {
+          emit('agent_spawned', {
+            id,
+            name: id,
+            x: TOWN_SQUARE.x + i + 1,
+            y: TOWN_SQUARE.y + 1,
+            ageDays: 7300,
+          })
+        })
       }
       // Declared fixture upkeep, exactly as the claim-seam proof does it: this is a proof about
       // the lattice and the river, not about the economy.
@@ -83,7 +116,8 @@ function runTown(seed = 'far-bank'): Run {
       const decked = bridgeAt(loop.state, DECK.x, DECK.y)
       if (decked && bridgeTick === null) bridgeTick = tick
       let claim = claimInWorld(loop.state, { along: 2, deep: 2 })
-      if (crossedTick === null && claim !== null && claim.site.x < GENESIS_RIVER_X) crossedTick = tick
+      if (crossedTick === null && claim !== null && claim.site.x < GENESIS_RIVER_X)
+        crossedTick = tick
 
       for (const id of ids) {
         const a = loop.state.agents[id]
@@ -91,7 +125,13 @@ function runTown(seed = 'far-bank'): Run {
         const wood = Object.values(loop.state.items)
           .filter((i) => i.kind === 'wood' && i.loc.t === 'agent' && i.loc.id === id)
           .reduce((s, i) => s + i.qty, 0)
-        if (wood < 10) emit('item_spawned', { id: `wood_${id}_${tick}`, kind: 'wood', qty: 10, loc: { t: 'agent', id } })
+        if (wood < 10)
+          emit('item_spawned', {
+            id: `wood_${id}_${tick}`,
+            kind: 'wood',
+            qty: 10,
+            loc: { t: 'agent', id },
+          })
 
         // ★ THE BRIDGEWRIGHT. Until a deck stands it does nothing else, and it names the ONE
         // coordinate the verb still takes — because the water, not the town, decides here.
@@ -122,7 +162,11 @@ function runTown(seed = 'far-bank'): Run {
   })
   for (let i = 0; i < DAYS * MINUTES_PER_DAY; i++) loop.step()
   return {
-    loop, store, genesisTerrain: terrain, bridgeTick, crossedTick,
+    loop,
+    store,
+    genesisTerrain: terrain,
+    bridgeTick,
+    crossedTick,
     growths: store.readFrom(0).filter((e) => e.type === 'world_grown').length,
   }
 }
@@ -133,13 +177,18 @@ function plotOf(state: WorldState, s: Structure) {
   const g = grammarOf(square, s)
   for (const plot of freePlots(6, townGroundOf(state, square))) {
     const e = plotExtent(plot)
-    if (e.dx <= g.dx && g.dx + s.w <= e.dx + e.w && e.dy <= g.dy && g.dy + s.h <= e.dy + e.h) return plot
+    if (e.dx <= g.dx && g.dx + s.w <= e.dx + e.w && e.dy <= g.dy && g.dy + s.h <= e.dy + e.h)
+      return plot
   }
   return null
 }
 
-const massOf = (s: { x: number; y: number; w: number; h: number }) =>
-  ({ dx: s.x, dy: s.y, w: s.w, h: s.h })
+const massOf = (s: { x: number; y: number; w: number; h: number }) => ({
+  dx: s.x,
+  dy: s.y,
+  w: s.w,
+  h: s.h,
+})
 
 describe('★ a bridge opens the far bank, and the town grows across the water', () => {
   const run = runTown()
@@ -156,11 +205,12 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
   const size = { w: state.terrain[0]!.length, h: state.terrain.length }
 
   it('★ an agent built a bridge, and the town then crossed the river', () => {
-    // eslint-disable-next-line no-console
-    console.log(`[far-bank] ${DAYS * MINUTES_PER_DAY} ticks, ${MASONS} masons:`
-      + ` deck complete at tick ${run.bridgeTick}, first claim west of the channel at tick ${run.crossedTick};`
-      + ` ${houses.length} houses (${west.length} on the FAR BANK), ${all.length} standing,`
-      + ` world ${size.w}x${size.h}, ${run.growths} growths`)
+    console.log(
+      `[far-bank] ${DAYS * MINUTES_PER_DAY} ticks, ${MASONS} masons:` +
+        ` deck complete at tick ${run.bridgeTick}, first claim west of the channel at tick ${run.crossedTick};` +
+        ` ${houses.length} houses (${west.length} on the FAR BANK), ${all.length} standing,` +
+        ` world ${size.w}x${size.h}, ${run.growths} growths`,
+    )
     expect(decks).toHaveLength(1)
     expect(decks[0]!.builtBy).toBe('mason_0')
     expect(decks[0]!.stage).toBe('complete')
@@ -190,7 +240,9 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
   it('★ and it is the DECK that opens it: pull the deck and the far bank closes again', () => {
     const withoutDeck: WorldState = {
       ...state,
-      structures: Object.fromEntries(Object.entries(state.structures).filter(([, s]) => s.kind !== BRIDGE_KIND)),
+      structures: Object.fromEntries(
+        Object.entries(state.structures).filter(([, s]) => s.kind !== BRIDGE_KIND),
+      ),
     }
     expect(townWalkOf(state, square)(DECK.x - square.x, DECK.y - square.y)).toBe(true)
     expect(townWalkOf(withoutDeck, square)(DECK.x - square.x, DECK.y - square.y)).toBe(false)
@@ -198,22 +250,31 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     const eastOnly: WorldState = {
       ...withoutDeck,
       structures: Object.fromEntries(
-        Object.entries(withoutDeck.structures).filter(([, s]) => !(s.x + s.w <= riverX && s.kind === 'house'))),
+        Object.entries(withoutDeck.structures).filter(
+          ([, s]) => !(s.x + s.w <= riverX && s.kind === 'house'),
+        ),
+      ),
     }
     const shut = claimInWorld(eastOnly, { along: 2, deep: 2 })
     expect(shut).not.toBeNull()
     expect(shut!.site.x, 'the far bank is offered with no deck standing').toBeGreaterThan(riverX)
     // …and with the deck back, the same world offers the west again.
-    const open = claimInWorld({ ...eastOnly, structures: { ...eastOnly.structures, deck: decks[0]! } },
-      { along: 2, deep: 2 })
+    const open = claimInWorld(
+      { ...eastOnly, structures: { ...eastOnly.structures, deck: decks[0]! } },
+      { along: 2, deep: 2 },
+    )
     expect(open!.site.x).toBeLessThan(riverX)
   })
 
   it('★ a HALF-BUILT deck opens nothing — scaffolding over open water is not a crossing', () => {
     const halfBuilt: WorldState = {
       ...state,
-      structures: Object.fromEntries(Object.entries(state.structures)
-        .map(([k, s]) => [k, s.kind === BRIDGE_KIND ? { ...s, stage: 'construction' as const } : s])),
+      structures: Object.fromEntries(
+        Object.entries(state.structures).map(([k, s]) => [
+          k,
+          s.kind === BRIDGE_KIND ? { ...s, stage: 'construction' as const } : s,
+        ]),
+      ),
     }
     expect(townWalkOf(halfBuilt, square)(DECK.x - square.x, DECK.y - square.y)).toBe(false)
   })
@@ -230,16 +291,25 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
             expect(WET.has(state.terrain[y]![x]!), `${s.kind} in water at ${x},${y}`).toBe(false)
         }
       const plot = plotOf(state, s)
-      if (plot === null) { offPlot++; continue }
+      if (plot === null) {
+        offPlot++
+        continue
+      }
       const along = plot.face === 'sw' ? s.w : s.h
       const deep = plot.face === 'sw' ? s.h : s.w
       const front = doorFrontOf(place(plot, s.kind, along, deep, null))
       const at = { x: square.x + front.dx, y: square.y + front.dy }
-      expect(state.terrain[at.y]?.[at.x], `${s.kind} at ${s.x},${s.y} fronts ${at.x},${at.y}`).toBe(T_ROAD)
+      expect(state.terrain[at.y]?.[at.x], `${s.kind} at ${s.x},${s.y} fronts ${at.x},${at.y}`).toBe(
+        T_ROAD,
+      )
     }
     // The well, the fire pit and the deck: none of them stands on a plot, and none of them can.
-    expect(all.filter((s) => plotOf(state, s) === null).map((s) => s.kind).sort())
-      .toEqual(['bridge', 'fire_pit', 'well'])
+    expect(
+      all
+        .filter((s) => plotOf(state, s) === null)
+        .map((s) => s.kind)
+        .sort(),
+    ).toEqual(['bridge', 'fire_pit', 'well'])
     expect(offPlot).toBe(3)
     // Non-vacuity: the far-bank houses are among the ones that DID find a plot and a road.
     expect(west.every((s) => plotOf(state, s) !== null)).toBe(true)
@@ -251,11 +321,13 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     const governed = all.filter((s) => plotOf(state, s) !== null).map(massOf)
     const ungoverned = all.filter((s) => plotOf(state, s) === null).map(massOf)
     const sp = townSpacing(governed, ungoverned)
-    // eslint-disable-next-line no-console
-    console.log(`[far-bank] lattice floor over ${sp.governed} plot-seated buildings:`
-      + ` ${sp.latticeFloor.toFixed(4)} px (exhaustive floor ${latticeFloor().closest.toFixed(4)});`
-      + ` whole-town minimum over all ${sp.governed + sp.ungoverned}, monuments and deck included:`
-      + ` ${sp.wholeTown.toFixed(4)} px`)
+
+    console.log(
+      `[far-bank] lattice floor over ${sp.governed} plot-seated buildings:` +
+        ` ${sp.latticeFloor.toFixed(4)} px (exhaustive floor ${latticeFloor().closest.toFixed(4)});` +
+        ` whole-town minimum over all ${sp.governed + sp.ungoverned}, monuments and deck included:` +
+        ` ${sp.wholeTown.toFixed(4)} px`,
+    )
     // THE INVARIANT. Only these pairs the exhaustive survey is a claim about.
     expect(sp.latticeFloor).toBeGreaterThanOrEqual(latticeFloor().closest)
     expect(latticeFloor().closest).toBeCloseTo(86.1626, 3)
@@ -279,8 +351,10 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     for (const s of all) {
       const plot = plotOf(state, s)
       if (plot === null) continue
-      perPlot.set(`${plot.block.i},${plot.block.j}/${plot.slot}`,
-        (perPlot.get(`${plot.block.i},${plot.block.j}/${plot.slot}`) ?? 0) + 1)
+      perPlot.set(
+        `${plot.block.i},${plot.block.j}/${plot.slot}`,
+        (perPlot.get(`${plot.block.i},${plot.block.j}/${plot.slot}`) ?? 0) + 1,
+      )
     }
     expect(perPlot.size).toBe(all.length - 3)
     for (const [k, n] of perPlot) expect(n, k).toBe(1)
@@ -301,14 +375,23 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
   it('★ the deck the engine stands is TURNED, and w/h is where it says so', () => {
     const d = decks[0]!
     expect(CFG.structures.recipes[BRIDGE_KIND]).toMatchObject({ w: 1, h: 2 })
-    expect({ w: d.w, h: d.h }, 'the ford runs east-west, so the written 1x2 was turned').toEqual({ w: 2, h: 1 })
+    expect({ w: d.w, h: d.h }, 'the ford runs east-west, so the written 1x2 was turned').toEqual({
+      w: 2,
+      h: 1,
+    })
     // The turn is in the log too, not only in the folded state — so a replay draws it the same.
-    const planned = run.store.readFrom(0)
-      .find((e) => e.type === 'structure_planned' && (e.payload as { kind: string }).kind === BRIDGE_KIND)!
+    const planned = run.store
+      .readFrom(0)
+      .find(
+        (e) =>
+          e.type === 'structure_planned' && (e.payload as { kind: string }).kind === BRIDGE_KIND,
+      )!
     expect(planned.payload).toMatchObject({ kind: BRIDGE_KIND, w: 2, h: 1 })
     // And a transpose is invisible to the one measure the art layer takes off the footprint,
     // which is why nothing downstream has ever caught it.
-    expect(d.w + d.h).toBe(CFG.structures.recipes[BRIDGE_KIND]!.w + CFG.structures.recipes[BRIDGE_KIND]!.h)
+    expect(d.w + d.h).toBe(
+      CFG.structures.recipes[BRIDGE_KIND]!.w + CFG.structures.recipes[BRIDGE_KIND]!.h,
+    )
   })
 
   // A house being built is a HOUSE that is not finished: a scaffolding KIND would lie about what
@@ -318,53 +401,72 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     expect(all.map((s) => s.kind)).not.toContain('scaffolding')
     // The state a renderer must draw for really is reachable, and it is reachable on a HOUSE:
     // mid-run, houses stand half-raised under their own kind.
-    const midRun = run.store.readFrom(0).filter((e) => e.tick <= run.bridgeTick! + 120)
+    const midRun = run.store
+      .readFrom(0)
+      .filter((e) => e.tick <= run.bridgeTick! + 120)
       .reduce((s, ev) => fold(s, ev, CFG), genesisState(CFG, run.genesisTerrain))
     const raising = Object.values(midRun.structures).filter((s) => s.stage === 'construction')
     expect(raising.length, 'no building was under construction to draw').toBeGreaterThan(0)
     // The valley's own roofless dwellings are in this list too, and they are the same state a
     // renderer has to draw: a building standing under its own kind with its walls part-way up.
-    for (const s of raising) expect(['house', 'cottage', 'farmhouse', BRIDGE_KIND]).toContain(s.kind)
+    for (const s of raising)
+      expect(['house', 'cottage', 'farmhouse', BRIDGE_KIND]).toContain(s.kind)
   })
 
   // Road tiles are two components and the deck's neighbours are none of them, so connectivity
   // is asserted on the WALK graph — what a person can actually do — not on the road network.
   it('★ the town is ONE piece on the walk graph, and the deck is what makes it one', () => {
-    const H = state.terrain.length, W = state.terrain[0]!.length
+    const H = state.terrain.length,
+      W = state.terrain[0]!.length
     const reachedFromSquare = (s: WorldState): Set<string> => {
       const walk = townWalkOf(s, square)
       const seen = new Set([`${square.x},${square.y}`])
-      const stack: Array<readonly [number, number]> = [[square.x, square.y]]
+      const stack: (readonly [number, number])[] = [[square.x, square.y]]
       while (stack.length > 0) {
         const [cx, cy] = stack.pop()!
-        for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-          const nx = cx + ox, ny = cy + oy, k = `${nx},${ny}`
+        for (const [ox, oy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ] as const) {
+          const nx = cx + ox,
+            ny = cy + oy,
+            k = `${nx},${ny}`
           if (nx < 0 || ny < 0 || nx >= W || ny >= H || seen.has(k)) continue
           if (!walk(nx - square.x, ny - square.y)) continue
-          seen.add(k); stack.push([nx, ny])
+          seen.add(k)
+          stack.push([nx, ny])
         }
       }
       return seen
     }
     /** A building is joined to the town when a body can stand on any tile against its wall. */
-    const cutOff = (reached: Set<string>): string[] => all
-      .filter((s) => s.kind !== BRIDGE_KIND)
-      .filter((s) => !(function touches() {
-        for (let x = s.x - 1; x <= s.x + s.w; x++)
-          for (let y = s.y - 1; y <= s.y + s.h; y++) if (reached.has(`${x},${y}`)) return true
-        return false
-      })())
-      .map((s) => `${s.kind}@${s.x},${s.y}`)
+    const cutOff = (reached: Set<string>): string[] =>
+      all
+        .filter((s) => s.kind !== BRIDGE_KIND)
+        .filter(
+          (s) =>
+            !(function touches() {
+              for (let x = s.x - 1; x <= s.x + s.w; x++)
+                for (let y = s.y - 1; y <= s.y + s.h; y++) if (reached.has(`${x},${y}`)) return true
+              return false
+            })(),
+        )
+        .map((s) => `${s.kind}@${s.x},${s.y}`)
 
-    expect(cutOff(reachedFromSquare(state)),
-      'a building nobody in town can walk to').toEqual([])
+    expect(cutOff(reachedFromSquare(state)), 'a building nobody in town can walk to').toEqual([])
 
     // NOT VACUOUS, and it names the far bank: pull the deck out of the same finished world and
     // exactly the six houses west of the channel fall out of the one piece.
-    const withoutDeck: WorldState = { ...state,
+    const withoutDeck: WorldState = {
+      ...state,
       structures: Object.fromEntries(
-        Object.entries(state.structures).filter(([, s]) => s.kind !== BRIDGE_KIND)) }
-    expect(cutOff(reachedFromSquare(withoutDeck)).sort())
-      .toEqual(west.map((s) => `${s.kind}@${s.x},${s.y}`).sort())
+        Object.entries(state.structures).filter(([, s]) => s.kind !== BRIDGE_KIND),
+      ),
+    }
+    expect(cutOff(reachedFromSquare(withoutDeck)).sort()).toEqual(
+      west.map((s) => `${s.kind}@${s.x},${s.y}`).sort(),
+    )
   })
 })

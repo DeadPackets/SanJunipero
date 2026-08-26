@@ -4,26 +4,44 @@ import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
-import { AssetCodex, EMOTE_KINDS, decodePng, encodePng, openForgeDb, paletteRgb, type RawImage } from '@sj/forge'
+import {
+  AssetCodex,
+  EMOTE_KINDS,
+  decodePng,
+  encodePng,
+  openForgeDb,
+  paletteRgb,
+  type RawImage,
+} from '@sj/forge'
 import { PLACEHOLDER_PX } from './assetsHttp.js'
 import { createGateway, type Gateway } from './server.js'
 
-const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId))
+const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const CELL = 96
 
 function crop(img: RawImage, x0: number, y0: number, w: number, h: number): RawImage {
   const data = new Uint8ClampedArray(w * h * 4)
   for (let y = 0; y < h; y++)
-    data.set(img.data.subarray(((y0 + y) * img.width + x0) * 4, ((y0 + y) * img.width + x0 + w) * 4), y * w * 4)
+    data.set(
+      img.data.subarray(((y0 + y) * img.width + x0) * 4, ((y0 + y) * img.width + x0 + w) * 4),
+      y * w * 4,
+    )
   return { width: w, height: h, data }
 }
 
 function opaqueBbox(img: RawImage): { w: number; h: number } {
-  let x0 = img.width, x1 = -1, y0 = img.height, y1 = -1
-  for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
-    if (img.data[(y * img.width + x) * 4 + 3]! === 0) continue
-    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y
-  }
+  let x0 = img.width,
+    x1 = -1,
+    y0 = img.height,
+    y1 = -1
+  for (let y = 0; y < img.height; y++)
+    for (let x = 0; x < img.width; x++) {
+      if (img.data[(y * img.width + x) * 4 + 3]! === 0) continue
+      if (x < x0) x0 = x
+      if (x > x1) x1 = x
+      if (y < y0) y0 = y
+      if (y > y1) y1 = y
+    }
   return { w: x1 - x0 + 1, h: y1 - y0 + 1 }
 }
 
@@ -43,11 +61,15 @@ describe('asset http routes', () => {
     const db = openDb(dbPath)
     codex = new AssetCodex(db)
     const loop = new TickLoop({
-      store: new EventStore(db), state: genesisState(DEFAULT_CONFIG, GRASS),
-      rng: new RngStreams('assets-http'), snapshotEveryTicks: 5,
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('assets-http'),
+      snapshotEveryTicks: 5,
       onTick: ({ tick, emit }) => {
         if (tick !== 1) return
-        CAST.forEach((id, i) => emit('agent_spawned', { id, name: id, x: i, y: 0, ageDays: 7300 }))
+        CAST.forEach((id, i) => {
+          emit('agent_spawned', { id, name: id, x: i, y: 0, ageDays: 7300 })
+        })
       },
     })
     loop.step()
@@ -78,7 +100,7 @@ describe('asset http routes', () => {
    *  the socket holds head-less and silent until Node's 300 s requestTimeout closes it. */
   it('★ answers a failed encode instead of holding the socket open', async () => {
     const real = PLACEHOLDER_PX.crop
-    PLACEHOLDER_PX.crop = { w: 0, h: 0 }   // sharp: "Input Buffer is empty"
+    PLACEHOLDER_PX.crop = { w: 0, h: 0 } // sharp: "Input Buffer is empty"
     try {
       const res = await fetch(`${base}/assets/placeholder/crop.png`, {
         signal: AbortSignal.timeout(5_000),
@@ -114,19 +136,38 @@ describe('asset http routes', () => {
   })
 
   it('placeholder sheets differ deterministically by agentId parity', async () => {
-    const a = await decodePng(Buffer.from(await (await fetch(`${base}/assets/character/farmer.png`)).arrayBuffer()))
-    const again = await decodePng(Buffer.from(await (await fetch(`${base}/assets/character/farmer.png`)).arrayBuffer()))
+    const a = await decodePng(
+      Buffer.from(await (await fetch(`${base}/assets/character/farmer.png`)).arrayBuffer()),
+    )
+    const again = await decodePng(
+      Buffer.from(await (await fetch(`${base}/assets/character/farmer.png`)).arrayBuffer()),
+    )
     expect(Buffer.from(a.data).equals(Buffer.from(again.data))).toBe(true) // deterministic
     // 'farmer' sums to 641 (odd), 'fisher' to 645 (odd), 'idler' to 528 (even) — pick an even/odd pair
-    const even = await decodePng(Buffer.from(await (await fetch(`${base}/assets/character/idler.png`)).arrayBuffer()))
+    const even = await decodePng(
+      Buffer.from(await (await fetch(`${base}/assets/character/idler.png`)).arrayBuffer()),
+    )
     expect(Buffer.from(a.data).equals(Buffer.from(even.data))).toBe(false)
   })
 
   it('serves a ready codex character sheet byte-identical instead of the placeholder', async () => {
-    const png = await encodePng({ width: 4, height: 4, data: new Uint8ClampedArray(4 * 4 * 4).fill(200) })
+    const png = await encodePng({
+      width: 4,
+      height: 4,
+      data: new Uint8ClampedArray(4 * 4 * 4).fill(200),
+    })
     codex.register({
-      class: 'rig-part', desc: 'character:weaver', kind: 'character:weaver', footprint: { w: 1, h: 1 },
-      png, widthPx: 4, heightPx: 4, status: 'ready', score: 9, attempts: 1, costUsd: 0,
+      class: 'rig-part',
+      desc: 'character:weaver',
+      kind: 'character:weaver',
+      footprint: { w: 1, h: 1 },
+      png,
+      widthPx: 4,
+      heightPx: 4,
+      status: 'ready',
+      score: 9,
+      attempts: 1,
+      costUsd: 0,
     })
     const res = await fetch(`${base}/assets/character/weaver.png`)
     expect(res.status).toBe(200)
@@ -136,20 +177,46 @@ describe('asset http routes', () => {
   // The route no longer re-reads the whole `assets` table per GET, so "newest ready wins" is now
   // a claim about a cursor rather than about `.at(-1)`. This is that claim.
   it('a second ready sheet for the same agent replaces the first', async () => {
-    const png = await encodePng({ width: 8, height: 8, data: new Uint8ClampedArray(8 * 8 * 4).fill(150) })
+    const png = await encodePng({
+      width: 8,
+      height: 8,
+      data: new Uint8ClampedArray(8 * 8 * 4).fill(150),
+    })
     codex.register({
-      class: 'rig-part', desc: 'character:weaver', kind: 'character:weaver', footprint: { w: 1, h: 1 },
-      png, widthPx: 8, heightPx: 8, status: 'ready', score: 9, attempts: 1, costUsd: 0,
+      class: 'rig-part',
+      desc: 'character:weaver',
+      kind: 'character:weaver',
+      footprint: { w: 1, h: 1 },
+      png,
+      widthPx: 8,
+      heightPx: 8,
+      status: 'ready',
+      score: 9,
+      attempts: 1,
+      costUsd: 0,
     })
     const res = await fetch(`${base}/assets/character/weaver.png`)
     expect(Buffer.from(await res.arrayBuffer()).equals(png)).toBe(true)
   })
 
   it('a placeholder-status codex row does NOT shadow the built sheet', async () => {
-    const png = await encodePng({ width: 4, height: 4, data: new Uint8ClampedArray(4 * 4 * 4).fill(90) })
+    const png = await encodePng({
+      width: 4,
+      height: 4,
+      data: new Uint8ClampedArray(4 * 4 * 4).fill(90),
+    })
     codex.register({
-      class: 'rig-part', desc: 'character:mason', kind: 'character:mason', footprint: { w: 1, h: 1 },
-      png, widthPx: 4, heightPx: 4, status: 'placeholder', score: null, attempts: 1, costUsd: 0,
+      class: 'rig-part',
+      desc: 'character:mason',
+      kind: 'character:mason',
+      footprint: { w: 1, h: 1 },
+      png,
+      widthPx: 4,
+      heightPx: 4,
+      status: 'placeholder',
+      score: null,
+      attempts: 1,
+      costUsd: 0,
     })
     const res = await fetch(`${base}/assets/character/mason.png`)
     const img = await decodePng(Buffer.from(await res.arrayBuffer()))
@@ -157,10 +224,22 @@ describe('asset http routes', () => {
   })
 
   it('round-trips a codex png byte-identical with immutable caching', async () => {
-    const png = await encodePng({ width: 6, height: 3, data: new Uint8ClampedArray(6 * 3 * 4).fill(37) })
+    const png = await encodePng({
+      width: 6,
+      height: 3,
+      data: new Uint8ClampedArray(6 * 3 * 4).fill(37),
+    })
     const rec = codex.register({
-      class: 'item', desc: 'basket: woven reed', footprint: { w: 1, h: 1 },
-      png, widthPx: 6, heightPx: 3, status: 'ready', score: 8, attempts: 1, costUsd: 0,
+      class: 'item',
+      desc: 'basket: woven reed',
+      footprint: { w: 1, h: 1 },
+      png,
+      widthPx: 6,
+      heightPx: 3,
+      status: 'ready',
+      score: 8,
+      attempts: 1,
+      costUsd: 0,
     })
     const res = await fetch(`${base}/assets/${rec.id}.png`)
     expect(res.status).toBe(200)

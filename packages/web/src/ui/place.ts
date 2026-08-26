@@ -17,8 +17,8 @@ export const RIVER_BANK = 'on the river bank'
 /** The town's word for each ground, or `null` where the ground has no name worth saying. A
  *  `Record`, so a wider `TileId` union is a compile error here rather than a silent gap. */
 export const TERRAIN_WORDS: Readonly<Record<TileId, string | null>> = {
-  0: null,                    // grass — just ground
-  1: null,                    // dirt — just ground, until the river is beside it
+  0: null, // grass — just ground
+  1: null, // dirt — just ground, until the river is beside it
   2: 'in the river',
   3: 'in the forest',
   4: 'up among the rocks',
@@ -27,9 +27,9 @@ export const TERRAIN_WORDS: Readonly<Record<TileId, string | null>> = {
   7: 'on the road',
   // C11's 8/9/10 landed after this table was written; they take the word of the kind
   // `TILE_KIND` already aliases them onto — earth, forest, water.
-  8: null,                    // path — dirt the feet made
-  9: 'in the forest',         // sapling
-  10: 'in the river',         // channel
+  8: null, // path — dirt the feet made
+  9: 'in the forest', // sapling
+  10: 'in the river', // channel
 }
 
 const WATER: TileId = 2
@@ -60,7 +60,10 @@ function nearestStructure(state: WorldState, x: number, y: number): Structure | 
   let bestAt = Infinity
   for (const s of Object.values(state.structures).sort((a, b) => (a.id < b.id ? -1 : 1))) {
     const d = tilesFrom(s, x, y)
-    if (d < bestAt) { bestAt = d; best = s }
+    if (d < bestAt) {
+      bestAt = d
+      best = s
+    }
   }
   return best !== null && bestAt <= AT_RADIUS_TILES ? best : null
 }
@@ -69,7 +72,12 @@ function groundWords(state: WorldState, x: number, y: number): string | null {
   const t = tileAt(state, x, y)
   if (t === null) return null
   if (t === DIRT) {
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
       if (tileAt(state, x + dx, y + dy) === WATER) return RIVER_BANK
     }
     return null
@@ -85,7 +93,8 @@ export function placeOf(state: WorldState, agentId: string): Place {
 
   if (a.insideId !== undefined) {
     const room = state.structures[a.insideId]
-    if (room !== undefined) return { words: `inside ${structureWords(state, room)}`, kind: 'inside' }
+    if (room !== undefined)
+      return { words: `inside ${structureWords(state, room)}`, kind: 'inside' }
   }
 
   const near = nearestStructure(state, a.x, a.y)

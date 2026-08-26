@@ -6,20 +6,31 @@ import { BondDetailPanel } from './BondDetailPanel.js'
 import { bondArc } from './bondModel2.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 
-const bond: Bond = bondFrom('alice', 'bob', [
-  { tick: 30, kind: 'partner' },
-  { tick: 900, kind: 'partner' },
-  { tick: 1500, kind: 'partner' },
-], 1500)
+const bond: Bond = bondFrom(
+  'alice',
+  'bob',
+  [
+    { tick: 30, kind: 'partner' },
+    { tick: 900, kind: 'partner' },
+    { tick: 1500, kind: 'partner' },
+  ],
+  1500,
+)
 
 const people = { alice: { name: 'Alice', alive: true }, bob: { name: 'Bob', alive: true } }
 const arc = bondArc(bond, 1500)
 
-const html = renderToStaticMarkup(createElement(BondDetailPanel, {
-  bond, people, type: 'partner' as const, level: 'friendly' as const, arc,
-  words: 'Alice and Bob are partners, and they are friends.',
-  onClose: () => {},
-}))
+const html = renderToStaticMarkup(
+  createElement(BondDetailPanel, {
+    bond,
+    people,
+    type: 'partner' as const,
+    level: 'friendly' as const,
+    arc,
+    words: 'Alice and Bob are partners, and they are friends.',
+    onClose: () => {},
+  }),
+)
 
 describe('BondDetailPanel — the landed assertions, carried across the redraw', () => {
   it('says who this is about, in words, at the top', () => {
@@ -69,14 +80,26 @@ describe('what the redraw took OUT', () => {
 })
 
 describe('★ the panel says what the window cannot', () => {
-  const long: Bond = bondFrom('alice', 'bob', [
-    ...Array.from({ length: 300 }, (_, i) => ({ tick: 100 + i * 10, kind: 'friend' as const })),
-    { tick: 50, kind: 'partner' as const },
-  ], 4000)
-  const deep = renderToStaticMarkup(createElement(BondDetailPanel, {
-    bond: long, people, type: 'partner' as const, level: 'friendly' as const,
-    arc: bondArc(long, 4000), words: 'Alice and Bob are partners.', onClose: () => {},
-  }))
+  const long: Bond = bondFrom(
+    'alice',
+    'bob',
+    [
+      ...Array.from({ length: 300 }, (_, i) => ({ tick: 100 + i * 10, kind: 'friend' as const })),
+      { tick: 50, kind: 'partner' as const },
+    ],
+    4000,
+  )
+  const deep = renderToStaticMarkup(
+    createElement(BondDetailPanel, {
+      bond: long,
+      people,
+      type: 'partner' as const,
+      level: 'friendly' as const,
+      arc: bondArc(long, 4000),
+      words: 'Alice and Bob are partners.',
+      onClose: () => {},
+    }),
+  )
 
   it('lists the window and counts the whole history', () => {
     expect(long.strength).toBe(301)

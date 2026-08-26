@@ -41,7 +41,11 @@ function baseDoc(): PersonalityDoc {
   }
 }
 
-async function makeStores(): Promise<{ db: Database.Database; mem: MemoryStore; personality: PersonalityStore }> {
+async function makeStores(): Promise<{
+  db: Database.Database
+  mem: MemoryStore
+  personality: PersonalityStore
+}> {
   const db = openAgentDb(':memory:')
   const mem = new MemoryStore(db, AGENT, await FakeEmbedder.create())
   const personality = new PersonalityStore(db, AGENT)
@@ -64,7 +68,7 @@ const TWO_PERSON_DAY = [
 async function seedDay(
   mem: MemoryStore,
   day: number,
-  specs: Array<{ text: string; people: string[]; importance: number }>,
+  specs: { text: string; people: string[]; importance: number }[],
 ): Promise<MemoryRow[]> {
   let i = 0
   for (const s of specs) {
@@ -87,20 +91,38 @@ class ScriptedReflectionLlm implements ReflectionLlm {
   async extractFacts(dayMemories: MemoryRow[]) {
     this.calls.push('extractFacts')
     return [
-      { subject: 'Nadia', predicate: 'traded', object: 'grain for firewood', srcMemoryId: dayMemories[0]!.id },
-      { subject: 'Nadia', predicate: 'promised', object: 'to help mend the storehouse', srcMemoryId: dayMemories[1]!.id },
+      {
+        subject: 'Nadia',
+        predicate: 'traded',
+        object: 'grain for firewood',
+        srcMemoryId: dayMemories[0]!.id,
+      },
+      {
+        subject: 'Nadia',
+        predicate: 'promised',
+        object: 'to help mend the storehouse',
+        srcMemoryId: dayMemories[1]!.id,
+      },
     ]
   }
 
   async summarizeScenes(dayMemories: MemoryRow[]) {
     this.calls.push('summarizeScenes')
     return [
-      { title: 'Barter at the storehouse', text: 'I traded grain with Nadia.', memoryIds: [dayMemories[0]!.id] },
-      { title: 'A promise from Nadia', text: 'Nadia offered to help mend the door.', memoryIds: [dayMemories[1]!.id, dayMemories[2]!.id] },
+      {
+        title: 'Barter at the storehouse',
+        text: 'I traded grain with Nadia.',
+        memoryIds: [dayMemories[0]!.id],
+      },
+      {
+        title: 'A promise from Nadia',
+        text: 'Nadia offered to help mend the door.',
+        memoryIds: [dayMemories[1]!.id, dayMemories[2]!.id],
+      },
     ]
   }
 
-  async summarizeDay(_scenes: Array<{ title: string; text: string }>) {
+  async summarizeDay(_scenes: { title: string; text: string }[]) {
     this.calls.push('summarizeDay')
     return { title: 'Trade and promises', text: 'The day was full of deals.' }
   }
@@ -144,12 +166,19 @@ describe('runSleepReflection pipeline', () => {
     const nadiaFacts = mem.factsAbout('Nadia')
     expect(nadiaFacts).toHaveLength(2)
     expect(nadiaFacts.map((f) => f.srcMemoryId)).toEqual([memories[0]!.id, memories[1]!.id])
-    expect(nadiaFacts[0]).toMatchObject({ subject: 'Nadia', predicate: 'traded', object: 'grain for firewood' })
+    expect(nadiaFacts[0]).toMatchObject({
+      subject: 'Nadia',
+      predicate: 'traded',
+      object: 'grain for firewood',
+    })
 
     // day node's childIds equal the scene node ids
     const scenes = mem.summaryNodes('scene', DAY)
     expect(scenes).toHaveLength(2)
-    expect(scenes.map((s) => s.memoryIds)).toEqual([[memories[0]!.id], [memories[1]!.id, memories[2]!.id]])
+    expect(scenes.map((s) => s.memoryIds)).toEqual([
+      [memories[0]!.id],
+      [memories[1]!.id, memories[2]!.id],
+    ])
     const days = mem.summaryNodes('day', DAY)
     expect(days).toHaveLength(1)
     expect(days[0]!.childIds).toEqual(scenes.map((s) => s.id))
@@ -182,7 +211,12 @@ describe('runSleepReflection pipeline', () => {
   it('applies a valid proposed edit -> editApplied true and personality v2', async () => {
     const { mem, personality } = await makeStores()
     const memories = await seedDay(mem, DAY, TWO_PERSON_DAY)
-    const llm = new ScriptedReflectionLlm({ op: 'add', field: 'values', text: 'fairness', evidence: [memories[0]!.id] })
+    const llm = new ScriptedReflectionLlm({
+      op: 'add',
+      field: 'values',
+      text: 'fairness',
+      evidence: [memories[0]!.id],
+    })
     const res = await runSleepReflection({ mem, personality, llm, day: DAY })
 
     expect(res.editApplied).toBe(true)
@@ -194,7 +228,12 @@ describe('runSleepReflection pipeline', () => {
   it('rejects a temperament-shaped proposal -> editApplied false, invalid_edit_shape', async () => {
     const { mem, personality } = await makeStores()
     const memories = await seedDay(mem, DAY, TWO_PERSON_DAY)
-    const llm = new ScriptedReflectionLlm({ op: 'add', field: 'temperament', text: 'fierce', evidence: [memories[0]!.id] })
+    const llm = new ScriptedReflectionLlm({
+      op: 'add',
+      field: 'temperament',
+      text: 'fierce',
+      evidence: [memories[0]!.id],
+    })
     const res = await runSleepReflection({ mem, personality, llm, day: DAY })
 
     expect(res.editApplied).toBe(false)
@@ -218,7 +257,12 @@ describe('runSleepReflection pipeline', () => {
     llm.extractFacts = async () => {
       llm.calls.push('extractFacts')
       return [
-        { subject: 'Nadia', predicate: 'traded', object: 'grain for firewood', srcMemoryId: memories[0]!.id },
+        {
+          subject: 'Nadia',
+          predicate: 'traded',
+          object: 'grain for firewood',
+          srcMemoryId: memories[0]!.id,
+        },
         { subject: 'Ghost', predicate: 'did', object: 'nothing', srcMemoryId: 999_999 },
       ]
     }
@@ -248,8 +292,11 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     })
   }
 
-  function alertSink(): { alerts: Array<{ kind: string; detail: string }>; alert: (k: string, d: string) => void } {
-    const alerts: Array<{ kind: string; detail: string }> = []
+  function alertSink(): {
+    alerts: { kind: string; detail: string }[]
+    alert: (k: string, d: string) => void
+  } {
+    const alerts: { kind: string; detail: string }[] = []
     return { alerts, alert: (kind, detail) => alerts.push({ kind, detail }) }
   }
 
@@ -357,7 +404,10 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
       expect(days, name).toHaveLength(1)
       for (const m of memories) expect(days[0]!.text, name).toContain(m.text)
       expect(mem.autobiography(), name).toEqual([FALLBACK_AUTOBIOGRAPHY])
-      expect(sink.alerts.map((a) => a.kind), name).toEqual(['reflection_fallback'])
+      expect(
+        sink.alerts.map((a) => a.kind),
+        name,
+      ).toEqual(['reflection_fallback'])
     }
   })
 
@@ -370,9 +420,9 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     }
     const sink = alertSink()
 
-    await expect(runSleepReflection({ mem, personality, llm, day: DAY, alert: sink.alert })).rejects.toThrow(
-      'the provider is on fire',
-    )
+    await expect(
+      runSleepReflection({ mem, personality, llm, day: DAY, alert: sink.alert }),
+    ).rejects.toThrow('the provider is on fire')
     expect(sink.alerts).toEqual([])
   })
 
@@ -402,7 +452,12 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     quiet.extractFacts = async () => {
       throw new BudgetExceededError('no headroom')
     }
-    const res2 = await runSleepReflection({ mem: empty.mem, personality: empty.personality, llm: quiet, day: DAY })
+    const res2 = await runSleepReflection({
+      mem: empty.mem,
+      personality: empty.personality,
+      llm: quiet,
+      day: DAY,
+    })
     expect(res2.fallback).toBe(true)
     expect(empty.mem.summaryNodes('day', DAY)).toHaveLength(1)
   })
@@ -410,24 +465,53 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
   it('a clean night reports fallback false', async () => {
     const { mem, personality } = await makeStores()
     await seedDay(mem, DAY, SINGLE_PERSON_DAY)
-    const res = await runSleepReflection({ mem, personality, llm: new ScriptedReflectionLlm(null), day: DAY })
+    const res = await runSleepReflection({
+      mem,
+      personality,
+      llm: new ScriptedReflectionLlm(null),
+      day: DAY,
+    })
     expect(res.fallback).toBe(false)
   })
 })
 
 describe('makeReflectionLlm prompts', () => {
   const memories: MemoryRow[] = [
-    { id: 1, agentId: AGENT, tick: DAY * TICKS_PER_DAY, day: DAY, kind: 'perception', text: 'Nadia and I bartered grain for firewood.', importance: 7, tags: { ...TAGS, people: ['Nadia'] } },
-    { id: 2, agentId: AGENT, tick: DAY * TICKS_PER_DAY + 1, day: DAY, kind: 'perception', text: 'Nadia promised to help mend the storehouse.', importance: 8, tags: { ...TAGS, people: ['Nadia'] } },
+    {
+      id: 1,
+      agentId: AGENT,
+      tick: DAY * TICKS_PER_DAY,
+      day: DAY,
+      kind: 'perception',
+      text: 'Nadia and I bartered grain for firewood.',
+      importance: 7,
+      tags: { ...TAGS, people: ['Nadia'] },
+    },
+    {
+      id: 2,
+      agentId: AGENT,
+      tick: DAY * TICKS_PER_DAY + 1,
+      day: DAY,
+      kind: 'perception',
+      text: 'Nadia promised to help mend the storehouse.',
+      importance: 8,
+      tags: { ...TAGS, people: ['Nadia'] },
+    },
   ]
   const doc = baseDoc()
 
-  function recordingClient(): { client: LlmClient; calls: Array<{ system: string; messages: LlmMessage[] }> } {
-    const calls: Array<{ system: string; messages: LlmMessage[] }> = []
+  function recordingClient(): {
+    client: LlmClient
+    calls: { system: string; messages: LlmMessage[] }[]
+  } {
+    const calls: { system: string; messages: LlmMessage[] }[] = []
     const client = {
       async object(opts: { system: string; messages: LlmMessage[]; schema: unknown }) {
         calls.push({ system: opts.system, messages: opts.messages })
-        return { value: { edit: null }, usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 } }
+        return {
+          value: { edit: null },
+          usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 },
+        }
       },
     } as unknown as LlmClient
     return { client, calls }
@@ -450,8 +534,9 @@ describe('makeReflectionLlm prompts', () => {
       expect(c.messages.map((m) => m.content).join('\n')).not.toMatch(FORBIDDEN_FRAMING)
       // `rulesOfBeing.test.ts` holds this over SPEECH_RULES and `assemble.test.ts` over the
       // perception; neither reaches these six.
-      expect(c.system, 'a reflection prompt spends an em dash a mind will imitate')
-        .not.toContain('—')
+      expect(c.system, 'a reflection prompt spends an em dash a mind will imitate').not.toContain(
+        '—',
+      )
     }
   })
   // Six authored surfaces every mind reads every night, which neither the card scan nor
@@ -493,13 +578,30 @@ describe('makeReflectionLlm prompts', () => {
   // spelling them again in English buys nothing.
   it('proposeEdit no longer restates its own schema in prose', () => {
     const system = proposeEditPrompt('The day was full of deals.', doc, memories).system
-    for (const spelledTwice of ['`verdict`', '`no_proposal`', '`op`', '`field`', '`index`', 'counting from 0']) {
-      expect(system, `proposeEdit spells ${spelledTwice} that ProposeEditSchema already enforces`)
-        .not.toContain(spelledTwice)
+    for (const spelledTwice of [
+      '`verdict`',
+      '`no_proposal`',
+      '`op`',
+      '`field`',
+      '`index`',
+      'counting from 0',
+    ]) {
+      expect(
+        system,
+        `proposeEdit spells ${spelledTwice} that ProposeEditSchema already enforces`,
+      ).not.toContain(spelledTwice)
     }
     // Every one of them still reaches the model, because the schema is what carries them.
     const shape = JSON.stringify(z.toJSONSchema(ProposeEditSchema))
-    for (const fromSchema of ['verdict', 'no_proposal', 'propose', 'op', 'field', 'index', 'evidence']) {
+    for (const fromSchema of [
+      'verdict',
+      'no_proposal',
+      'propose',
+      'op',
+      'field',
+      'index',
+      'evidence',
+    ]) {
       expect(shape, `${fromSchema} is not in the schema either`).toContain(fromSchema)
     }
     // The longest of the six is no longer this one.
@@ -511,17 +613,24 @@ describe('makeReflectionLlm prompts', () => {
       autobiographyPrompt('x', doc).system,
     ]
     const words = (s: string): number => s.split(/\s+/).length
-    expect(words(system), 'proposeEdit is still 2.5x the next longest')
-      .toBeLessThan(2 * Math.max(...others.map(words)))
+    expect(words(system), 'proposeEdit is still 2.5x the next longest').toBeLessThan(
+      2 * Math.max(...others.map(words)),
+    )
   })
 
   it('propose verdict schema accepts no_proposal and shaped edits, rejects temperament', () => {
     expect(ProposeEditSchema.safeParse({ verdict: 'no_proposal' }).success).toBe(true)
     expect(
-      ProposeEditSchema.safeParse({ verdict: 'propose', edit: { op: 'add', field: 'values', text: 'fairness', evidence: [memories[0]!.id] } }).success,
+      ProposeEditSchema.safeParse({
+        verdict: 'propose',
+        edit: { op: 'add', field: 'values', text: 'fairness', evidence: [memories[0]!.id] },
+      }).success,
     ).toBe(true)
     expect(
-      ProposeEditSchema.safeParse({ verdict: 'propose', edit: { op: 'add', field: 'temperament', text: 'fierce', evidence: [1] } }).success,
+      ProposeEditSchema.safeParse({
+        verdict: 'propose',
+        edit: { op: 'add', field: 'temperament', text: 'fierce', evidence: [1] },
+      }).success,
     ).toBe(false)
   })
 })

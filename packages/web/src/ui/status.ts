@@ -10,7 +10,7 @@ export type AgentView = {
   needs: { hunger: number; energy: number; warmth: number; social: number }
   hp: number
   ill: boolean
-  injuries: ReadonlyArray<{ kind: string; day: number }>
+  injuries: readonly { kind: string; day: number }[]
   collapsedSinceTick: number | null
   lastSpokeTick?: number
   thirst?: number
@@ -22,7 +22,14 @@ export type AgentView = {
  * the single priority table.
  */
 export const STATES = [
-  'gone', 'collapsed', 'asleep', 'talking', 'eating', 'working', 'walking', 'idle',
+  'gone',
+  'collapsed',
+  'asleep',
+  'talking',
+  'eating',
+  'working',
+  'walking',
+  'idle',
 ] as const
 export type State = (typeof STATES)[number]
 export const STATE_PRIORITY: readonly State[] = STATES
@@ -33,9 +40,9 @@ export const STATE_WORD: Readonly<Record<State, string>> = {
   asleep: 'Asleep',
   talking: 'Talking',
   eating: 'Eating',
-  working: 'Working',        // overridden by the verb's own gerund, which there always is one of
+  working: 'Working', // overridden by the verb's own gerund, which there always is one of
   walking: 'Walking',
-  idle: 'Between things',    // NOT "resting", NOT "awake", NOT "idle" — those are the collision
+  idle: 'Between things', // NOT "resting", NOT "awake", NOT "idle" — those are the collision
 }
 
 /** How long after a word a person still reads as being in the conversation. The gateway's
@@ -59,8 +66,12 @@ export function statusOf(a: AgentView, nowTick?: number): State {
   if (a.asleep) return 'asleep'
   const verb = a.activity?.verb ?? null
   if (verb !== null && SPEECH_VERBS.has(verb)) return 'talking'
-  if (nowTick !== undefined && a.lastSpokeTick !== undefined
-    && nowTick - a.lastSpokeTick <= TALK_RECENT_TICKS) return 'talking'
+  if (
+    nowTick !== undefined &&
+    a.lastSpokeTick !== undefined &&
+    nowTick - a.lastSpokeTick <= TALK_RECENT_TICKS
+  )
+    return 'talking'
   if (verb === null) return 'idle'
   if (verb === 'eat') return 'eating'
   if (verb === 'walk') return 'walking'
@@ -81,8 +92,12 @@ export const CONDITIONS = ['unwell', 'hurt', 'hungry', 'cold', 'thirsty', 'spent
 export type Condition = (typeof CONDITIONS)[number]
 
 export const CONDITION_WORD: Readonly<Record<Condition, string>> = {
-  unwell: 'Unwell', hurt: 'Hurt', hungry: 'Hungry',
-  cold: 'Cold', thirsty: 'Thirsty', spent: 'Worn out',
+  unwell: 'Unwell',
+  hurt: 'Hurt',
+  hungry: 'Hungry',
+  cold: 'Cold',
+  thirsty: 'Thirsty',
+  spent: 'Worn out',
 }
 
 const CONDITION_TEST: Readonly<Record<Condition, (a: AgentView) => boolean>> = {
@@ -110,8 +125,17 @@ export function drivesOf(_a: AgentView): Drive[] {
 
 /** Any of these appearing as a PRINTED literal outside this module is the synonym bug coming
  *  back. */
-export const BANNED_STATUS_LITERALS: readonly string[] =
-  ['resting', 'Resting', 'awake', 'Awake', 'idle', 'Idle', 'at rest', 'sleeping', 'Sleeping']
+export const BANNED_STATUS_LITERALS: readonly string[] = [
+  'resting',
+  'Resting',
+  'awake',
+  'Awake',
+  'idle',
+  'Idle',
+  'at rest',
+  'sleeping',
+  'Sleeping',
+]
 
 /** The ids the code must keep, named rather than silently skipped. `idle` is a `State` id, an
  *  animation row and the player's stopped state; none is printed, and `Idle` is still banned. */
@@ -128,14 +152,14 @@ const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g
 
 /** Every viewer file that prints a banned status word. One entry per file, in the order given. */
 export function statusLiteralOffenders(
-  files: ReadonlyArray<{ path: string; source: string }>,
+  files: readonly { path: string; source: string }[],
 ): string[] {
   const banned = BANNED_STATUS_LITERALS.filter((w) => !MACHINE_STATUS_IDS.includes(w))
   // whole words only, so `idle-se` and `sleeping_bag` are identifiers and not copy
   const patterns = banned.map((w) => new RegExp(`(?<![\\w-])${w}(?![\\w-])`))
   const out: string[] = []
   for (const f of files) {
-    if (f.path.endsWith('status.ts')) continue    // the one module allowed to name them
+    if (f.path.endsWith('status.ts')) continue // the one module allowed to name them
     const stripped = f.source.replace(BLOCK_COMMENT, ' ').replace(LINE_COMMENT, ' ')
     const printed: string[] = []
     for (const m of stripped.matchAll(QUOTED)) printed.push(m[1] ?? m[2] ?? m[3] ?? '')

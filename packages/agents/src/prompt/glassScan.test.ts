@@ -2,8 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import { assemblePrompt } from './assemble.js'
 import {
-  assertQuotedName, CONSTRUCT_VOCABULARY, MID_RUN_ENFORCED, scanForLayoutLeak,
-  scanPromptForGlassLeak, scanRulingForGlassLeak, TOWN_LAYOUT_VOCABULARY, UNNAMED_CONSTRUCT_COPY,
+  assertQuotedName,
+  CONSTRUCT_VOCABULARY,
+  MID_RUN_ENFORCED,
+  scanForLayoutLeak,
+  scanPromptForGlassLeak,
+  scanRulingForGlassLeak,
+  TOWN_LAYOUT_VOCABULARY,
+  UNNAMED_CONSTRUCT_COPY,
 } from './glassScan.js'
 import { makeablesLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
@@ -79,8 +85,9 @@ describe('the prompt surfaces are clean', () => {
     // them for the authored surfaces the gate reads; assembly refuses only ops-only words.
     for (const word of ['faith', 'council', 'market', 'custom']) {
       expect(scanPromptForGlassLeak(`They spoke of the ${word}.`)).toEqual([word])
-      expect(() => assemblePrompt(fixtureBlocks({ now: { prose: `They spoke of the ${word}.` } })))
-        .not.toThrow()
+      expect(() =>
+        assemblePrompt(fixtureBlocks({ now: { prose: `They spoke of the ${word}.` } })),
+      ).not.toThrow()
     }
   })
 
@@ -88,21 +95,25 @@ describe('the prompt surfaces are clean', () => {
     for (let day = 0; day < 2; day++) {
       for (const hour of [7, 12, 19, 23]) {
         const prose = perceptionToProse({
-          ...quietMeadowPacket, time: simTimeFromTick(day * MINUTES_PER_DAY + hour * 60),
+          ...quietMeadowPacket,
+          time: simTimeFromTick(day * MINUTES_PER_DAY + hour * 60),
         })
         const a = assemblePrompt(fixtureBlocks({ now: { prose } }))
-        expect(scanPromptForGlassLeak(`${a.system}\n${a.messages.map((m) => m.content).join('\n')}`)).toEqual([])
+        expect(
+          scanPromptForGlassLeak(`${a.system}\n${a.messages.map((m) => m.content).join('\n')}`),
+        ).toEqual([])
       }
     }
   })
 
   it('assemblePrompt itself refuses to hand over a leaking prompt', () => {
-    expect(() => assemblePrompt(fixtureBlocks({ now: { prose: 'The god_afterlife row was written.' } })))
-      .toThrow(/god_afterlife/)
+    expect(() =>
+      assemblePrompt(fixtureBlocks({ now: { prose: 'The god_afterlife row was written.' } })),
+    ).toThrow(/god_afterlife/)
   })
 })
 
-describe('★ an ordinary English word must never kill a mind\'s day', () => {
+describe("★ an ordinary English word must never kill a mind's day", () => {
   // A mind's own day log carries ordinary English back into the prompt, so an ordinary word in
   // the enforced set crashes every remaining turn of its day.
   const ordinaryPhrases: Record<string, string> = {
@@ -125,12 +136,18 @@ describe('★ an ordinary English word must never kill a mind\'s day', () => {
     }
   })
 
-  it('and so may another mouth, and the mind\'s own remembered words', () => {
+  it("and so may another mouth, and the mind's own remembered words", () => {
     for (const [word, prose] of Object.entries(ordinaryPhrases)) {
       expect(() => assemblePrompt(fixtureBlocks({ now: { prose } })), word).not.toThrow()
-      expect(() => assemblePrompt(fixtureBlocks({
-        scene: { ledgers: [{ name: 'Nadia', doc: prose }], memories: [] },
-      })), word).not.toThrow()
+      expect(
+        () =>
+          assemblePrompt(
+            fixtureBlocks({
+              scene: { ledgers: [{ name: 'Nadia', doc: prose }], memories: [] },
+            }),
+          ),
+        word,
+      ).not.toThrow()
     }
   })
 
@@ -139,18 +156,23 @@ describe('★ an ordinary English word must never kill a mind\'s day', () => {
     // English — an underscored ops key, or a two-word ops phrase.
     expect(MID_RUN_ENFORCED.length).toBeGreaterThan(0)
     for (const term of MID_RUN_ENFORCED) {
-      expect(/[_ ]/.test(term), `${term} is ordinary English and must not crash a live town`).toBe(true)
+      expect(/[_ ]/.test(term), `${term} is ordinary English and must not crash a live town`).toBe(
+        true,
+      )
     }
   })
 
   it('★ and the split is not vacuous — the ops keys still throw', () => {
     for (const term of MID_RUN_ENFORCED) {
-      expect(() => assemblePrompt(fixtureBlocks({ dayLog: [`The ${term} row was written.`] })), term)
-        .toThrow(new RegExp(term))
+      expect(
+        () => assemblePrompt(fixtureBlocks({ dayLog: [`The ${term} row was written.`] })),
+        term,
+      ).toThrow(new RegExp(term))
     }
     // The shape ban still bites on a kind invented after this file was written.
-    expect(() => assemblePrompt(fixtureBlocks({ dayLog: ['first_lantern fired today.'] })))
-      .toThrow(/first_lantern/)
+    expect(() => assemblePrompt(fixtureBlocks({ dayLog: ['first_lantern fired today.'] }))).toThrow(
+      /first_lantern/,
+    )
   })
 
   it('★ every word on the list is still caught on an authored surface', () => {
@@ -160,7 +182,9 @@ describe('★ an ordinary English word must never kill a mind\'s day', () => {
       expect(CONSTRUCT_VOCABULARY, term).toContain(term)
       expect(scanPromptForGlassLeak(`the ${term} row`), term).toContain(term)
     }
-    expect(CONSTRUCT_VOCABULARY.length).toBe(Object.keys(ordinaryPhrases).length + MID_RUN_ENFORCED.length)
+    expect(CONSTRUCT_VOCABULARY.length).toBe(
+      Object.keys(ordinaryPhrases).length + MID_RUN_ENFORCED.length,
+    )
   })
 })
 
@@ -175,7 +199,8 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
 
   it('catches our jargon and an ops key, exactly as the authored scan does', () => {
     expect(scanRulingForGlassLeak('that construct is a milestone')).toEqual(
-      expect.arrayContaining(['construct', 'milestone']))
+      expect.arrayContaining(['construct', 'milestone']),
+    )
     expect(scanRulingForGlassLeak('first_bridge was already recorded')).toContain('first_bridge')
   })
 
@@ -269,11 +294,16 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
       expect(scanRulingForGlassLeak(line, vocabulary), line).not.toEqual([])
     }
     // ANTI-VACUITY: told nothing, the scan refuses all of them exactly as it did before.
-    for (const line of ['this requires a sharpened axe you do not carry', 'it will not stand without a hearth']) {
+    for (const line of [
+      'this requires a sharpened axe you do not carry',
+      'it will not stand without a hearth',
+    ]) {
       expect(scanRulingForGlassLeak(line), line).not.toEqual([])
     }
     // And a vocabulary never excuses an ops word or a directive.
-    expect(scanRulingForGlassLeak('you should build it without a hearth', vocabulary)).toContain('you should')
+    expect(scanRulingForGlassLeak('you should build it without a hearth', vocabulary)).toContain(
+      'you should',
+    )
     expect(scanRulingForGlassLeak('the festival needs no axe', vocabulary)).toContain('festival')
   })
 
@@ -293,21 +323,40 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
     for (const term of CONSTRUCT_VOCABULARY) {
       const text = `the ${term} row`
       expect(scanRulingForGlassLeak(text), term).toEqual(
-        expect.arrayContaining(scanPromptForGlassLeak(text)))
+        expect.arrayContaining(scanPromptForGlassLeak(text)),
+      )
     }
   })
 })
 
 describe('the naming law', () => {
-  const said = { sourceKind: 'speech' as const, text: 'We call it the Long Turning.', eventSeq: 41, byId: 'bex' }
-  const carved = { sourceKind: 'inscription' as const, text: 'THE LONG TURNING — every seventh night', eventSeq: 44, byId: 'ada' }
+  const said = {
+    sourceKind: 'speech' as const,
+    text: 'We call it the Long Turning.',
+    eventSeq: 41,
+    byId: 'bex',
+  }
+  const carved = {
+    sourceKind: 'inscription' as const,
+    text: 'THE LONG TURNING — every seventh night',
+    eventSeq: 44,
+    byId: 'ada',
+  }
 
   it('accepts a name only when a mouth or a wall said it verbatim', () => {
     expect(assertQuotedName('Long Turning', [said])).toEqual({
-      name: 'Long Turning', sourceKind: 'speech', eventSeq: 41, quote: said.text, byId: 'bex',
+      name: 'Long Turning',
+      sourceKind: 'speech',
+      eventSeq: 41,
+      quote: said.text,
+      byId: 'bex',
     })
     expect(assertQuotedName('THE LONG TURNING', [carved])).toEqual({
-      name: 'THE LONG TURNING', sourceKind: 'inscription', eventSeq: 44, quote: carved.text, byId: 'ada',
+      name: 'THE LONG TURNING',
+      sourceKind: 'inscription',
+      eventSeq: 44,
+      quote: carved.text,
+      byId: 'ada',
     })
   })
 
@@ -325,15 +374,19 @@ describe('the naming law', () => {
     expect(scanForLayoutLeak(perceptionToProse(conversationPacket))).toEqual([])
     // The one line that DOES say something about the layout says only a place.
     const line = makeablesLine(
-      { builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] }, { x: 67, y: 94 })
+      { builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] },
+      { x: 67, y: 94 },
+    )
     expect(line).toContain('The town keeps ground for a new roof at (67, 94)')
     expect(scanForLayoutLeak(line)).toEqual([])
     expect(scanPromptForGlassLeak(line)).toEqual([])
     // And it says nothing at all when there is nowhere left, rather than an empty phrase.
-    expect(makeablesLine({ builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] }, null))
-      .not.toContain('keeps ground')
-    expect(makeablesLine({ builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] }))
-      .not.toContain('keeps ground')
+    expect(
+      makeablesLine({ builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] }, null),
+    ).not.toContain('keeps ground')
+    expect(
+      makeablesLine({ builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] }),
+    ).not.toContain('keeps ground')
   })
 
   it('★ and the scan is not vacuous: it catches every one of our own words for the grammar', () => {
@@ -341,8 +394,9 @@ describe('the naming law', () => {
       expect(scanForLayoutLeak(`Stand on the ${word} by the road.`), word).toContain(word)
     }
     // A sentence that leaks the rule rather than the place is exactly what this refuses.
-    expect(scanForLayoutLeak('The next ring of blocks will be platted when this one fills.'))
-      .toEqual(['blocks', 'ring', 'platted'])
+    expect(
+      scanForLayoutLeak('The next ring of blocks will be platted when this one fills.'),
+    ).toEqual(['blocks', 'ring', 'platted'])
   })
 
   it('has one copy for the unnamed case, and it is not a label', () => {

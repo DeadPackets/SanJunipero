@@ -23,7 +23,7 @@ export type BootedMinds = {
   runtimes: Map<string, AgentRuntime>
   /** What each mind is carrying that is not in its database — the clock, the half-run plan,
    *  the turn counts. The only thing a resume has to write down itself. */
-  snapshots(): Array<{ agentId: string; snapshot: RuntimeSnapshot }>
+  snapshots(): { agentId: string; snapshot: RuntimeSnapshot }[]
   /** True while any mind is still finishing a night's reflection. A caller that stops the
    *  world mid-reflection loses the night and pays for it anyway. */
   reflecting(): boolean
@@ -57,8 +57,13 @@ export type BootMindsOpts = {
  *  whichever row the index picks — so ask the database, never a `resuming` flag. */
 export function hasPersonality(db: Database.Database, agentId: string): boolean {
   try {
-    return db.prepare('SELECT 1 FROM personality_versions WHERE agent_id = ? LIMIT 1').get(agentId) !== undefined
-  } catch { return false }
+    return (
+      db.prepare('SELECT 1 FROM personality_versions WHERE agent_id = ? LIMIT 1').get(agentId) !==
+      undefined
+    )
+  } catch {
+    return false
+  }
 }
 
 export function bootMinds(opts: BootMindsOpts): BootedMinds {
@@ -88,8 +93,11 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
   }
   return {
     runtimes,
-    snapshots: () => [...runtimes.entries()].map(([agentId, r]) => ({ agentId, snapshot: r.snapshot() })),
+    snapshots: () =>
+      [...runtimes.entries()].map(([agentId, r]) => ({ agentId, snapshot: r.snapshot() })),
     reflecting: () => [...runtimes.values()].some((r) => r.reflectionInFlight()),
-    stop: () => { for (const r of runtimes.values()) r.stop() },
+    stop: () => {
+      for (const r of runtimes.values()) r.stop()
+    },
   }
 }

@@ -3,8 +3,15 @@ import { describe, expect, it } from 'vitest'
 import { INTERIOR_KINDS } from '@sj/shared'
 import { TILE_H, TILE_W } from './iso.js'
 import {
-  BUILT_FORM_ACCENTS, BUILT_FORM_DEFAULT_HEIGHT_TILES, BUILT_FORM_HEIGHT_TILES, BUILT_FORM_INK,
-  BUILT_FORM_INSET_TILES, BUILT_FORM_RAMPS, BUILT_FORM_UNIT_PX, builtFormSpec, drawBuiltForm,
+  BUILT_FORM_ACCENTS,
+  BUILT_FORM_DEFAULT_HEIGHT_TILES,
+  BUILT_FORM_HEIGHT_TILES,
+  BUILT_FORM_INK,
+  BUILT_FORM_INSET_TILES,
+  BUILT_FORM_RAMPS,
+  BUILT_FORM_UNIT_PX,
+  builtFormSpec,
+  drawBuiltForm,
   footprintDiamond,
 } from './builtForm.js'
 import { buildingArt } from './textures.js'
@@ -14,20 +21,24 @@ import { TOWN_KINDS } from './landmarks.js'
 // The forge's 40-colour master palette (packages/forge/src/palette.ts), restated because
 // @sj/web cannot import it: forge pulls sharp and better-sqlite3.
 const MASTER_PALETTE = [
-  0xfff6e9, 0xf6e8d5, 0xe8d5bc, 0xd4bc9e, 0xb89d7e,
-  0xf2c879, 0xe0a95e, 0xc68a48, 0xa66e38, 0x7e512b,
-  0xdce8c8, 0xb9d19a, 0x93b573, 0x6f9455, 0x4f7040,
-  0xf2c6c2, 0xe09e9b, 0xc47876, 0x9e5a5c,
-  0xd6eaf2, 0xa8cfe0, 0x7fb0c9, 0x5a8cab, 0x3e6786,
-  0xe9e2da, 0xcfc6bc, 0xaba198, 0x857d75, 0x5d5751,
-  0x43394a, 0x322b38, 0x241f2b, 0x171420,
-  0xf7a66b, 0xe8785a, 0x8a6fa8, 0xf4e289,
-  0xf5d3b3, 0xd9a876, 0x9c6b47,
+  0xfff6e9, 0xf6e8d5, 0xe8d5bc, 0xd4bc9e, 0xb89d7e, 0xf2c879, 0xe0a95e, 0xc68a48, 0xa66e38,
+  0x7e512b, 0xdce8c8, 0xb9d19a, 0x93b573, 0x6f9455, 0x4f7040, 0xf2c6c2, 0xe09e9b, 0xc47876,
+  0x9e5a5c, 0xd6eaf2, 0xa8cfe0, 0x7fb0c9, 0x5a8cab, 0x3e6786, 0xe9e2da, 0xcfc6bc, 0xaba198,
+  0x857d75, 0x5d5751, 0x43394a, 0x322b38, 0x241f2b, 0x171420, 0xf7a66b, 0xe8785a, 0x8a6fa8,
+  0xf4e289, 0xf5d3b3, 0xd9a876, 0x9c6b47,
 ]
 
 // Every structure kind this product can raise today.
 const ALL_KINDS = [...new Set([...TOWN_KINDS, ...INTERIOR_KINDS, 'grave', 'bridge', 'cottage'])]
-const SHAPES: Array<[number, number]> = [[1, 1], [2, 2], [1, 2], [2, 1], [3, 2], [2, 3], [4, 2]]
+const SHAPES: [number, number][] = [
+  [1, 1],
+  [2, 2],
+  [1, 2],
+  [2, 1],
+  [3, 2],
+  [2, 3],
+  [4, 2],
+]
 
 const xsOf = (poly: number[]): number[] => poly.filter((_, i) => i % 2 === 0)
 const ysOf = (poly: number[]): number[] => poly.filter((_, i) => i % 2 === 1)
@@ -84,7 +95,7 @@ describe('a structure kind with no art still reads as a built thing', () => {
       for (const face of [form.plinth, ...form.faces, form.accent]) {
         expect(MASTER_PALETTE, `${kind} — 0x${face.color.toString(16)}`).toContain(face.color)
       }
-      expect(form.silhouette).toHaveLength(12)   // six points around the outside
+      expect(form.silhouette).toHaveLength(12) // six points around the outside
       expect(form.nearEdge).toHaveLength(4)
       expect(MASTER_PALETTE).toContain(form.ink)
     }
@@ -98,9 +109,9 @@ describe('a structure kind with no art still reads as a built thing', () => {
   it('never paints a checkerboard: no two adjacent faces share a colour', () => {
     for (const kind of ALL_KINDS) {
       const [left, right, top] = builtFormSpec(kind, 2, 2).faces
-      expect(left!.color, kind).not.toBe(right!.color)
-      expect(right!.color, kind).not.toBe(top!.color)
-      expect(top!.color, kind).not.toBe(left!.color)
+      expect(left.color, kind).not.toBe(right.color)
+      expect(right.color, kind).not.toBe(top.color)
+      expect(top.color, kind).not.toBe(left.color)
     }
   })
 
@@ -124,7 +135,9 @@ describe('a structure kind with no art still reads as a built thing', () => {
         const ys = [...form.faces, form.accent].flatMap((f) => ysOf(f.poly))
         expect(Math.min(...ys), `${kind} ${w}×${h}`).toBeLessThan(0)
         // the same ceiling the hi-res building art answers to: a (w+h)·32 px square
-        expect(-Math.min(...ys), `${kind} ${w}×${h}`).toBeLessThanOrEqual((w + h) * BUILDING_PX_PER_TILE)
+        expect(-Math.min(...ys), `${kind} ${w}×${h}`).toBeLessThanOrEqual(
+          (w + h) * BUILDING_PX_PER_TILE,
+        )
       }
     }
   })
@@ -169,7 +182,9 @@ describe('drawBuiltForm', () => {
     drawBuiltForm(painter(log), form)
     expect(log[0]!.op).toBe('clear')
     expect(log.filter((o) => o.op === 'fill').map((o) => o.arg)).toEqual([
-      form.plinth.color, ...form.faces.map((f) => f.color), form.accent.color,
+      form.plinth.color,
+      ...form.faces.map((f) => f.color),
+      form.accent.color,
     ])
     // the outer outline, the plinth and the one near vertical edge — NOT every face, which
     // drew a wireframe box that read as glass

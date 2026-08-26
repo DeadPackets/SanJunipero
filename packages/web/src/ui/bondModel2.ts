@@ -1,14 +1,27 @@
 import {
-  BOND_ACT_OF_KIND, BOND_LEVELS, BOND_VALENCE, LEVEL_RANK, LEVEL_THRESHOLDS,
-  WARMTH_HALF_LIFE_TICKS, bondActCount, bondLevel, bondRollup, bondWarmth, tickToMoment,
-  type Bond, type BondLevel, type BondsResponse,
+  BOND_ACT_OF_KIND,
+  LEVEL_RANK,
+  bondActCount,
+  bondLevel,
+  bondRollup,
+  bondWarmth,
+  tickToMoment,
+  type Bond,
+  type BondLevel,
+  type BondsResponse,
 } from '@sj/shared'
 
 // Warmth, the level thresholds and the valence table live in `@sj/shared`: the reader is handed
 // the folded scalar, not the acts, and `decayWarmth` carries it forward exactly.
 export {
-  BOND_LEVELS, BOND_VALENCE, LEVEL_RANK, LEVEL_THRESHOLDS, WARMTH_HALF_LIFE_TICKS,
-  bondLevel, bondWarmth, type BondLevel,
+  BOND_LEVELS,
+  BOND_VALENCE,
+  LEVEL_RANK,
+  LEVEL_THRESHOLDS,
+  WARMTH_HALF_LIFE_TICKS,
+  bondLevel,
+  bondWarmth,
+  type BondLevel,
 } from '@sj/shared'
 
 /** The endpoint records a `BondKind`; the plan names the ACT. The table is the contract's. */
@@ -23,13 +36,17 @@ export const BOND_TYPES = ['partner', 'parent', 'child', 'sibling', 'none'] as c
 export type BondType = (typeof BOND_TYPES)[number]
 
 export const BOND_TYPE_WORD: Readonly<Record<BondType, string>> = {
-  partner: 'Partners', parent: 'Parent', child: 'Child', sibling: 'Siblings', none: '',
+  partner: 'Partners',
+  parent: 'Parent',
+  child: 'Child',
+  sibling: 'Siblings',
+  none: '',
 }
 
 /** What the lineage endpoint returns. Structural, so the viewer needs no import from the
  *  gateway (P1) and a typed empty is a perfectly good answer. */
 export type LineageLike = {
-  parentOf: ReadonlyArray<{ parentId: string; childId: string; tick: number }>
+  parentOf: readonly { parentId: string; childId: string; tick: number }[]
 }
 export const EMPTY_LINEAGE: LineageLike = { parentOf: [] }
 
@@ -37,14 +54,18 @@ const parentsOf = (id: string, lineage: LineageLike): Set<string> =>
   new Set(lineage.parentOf.filter((e) => e.childId === id).map((e) => e.parentId))
 
 const bondBetween = (aId: string, bId: string, bonds: BondsResponse): Bond | null =>
-  bonds.bonds.find((b) => (b.aId === aId && b.bId === bId) || (b.aId === bId && b.bId === aId)) ?? null
+  bonds.bonds.find((b) => (b.aId === aId && b.bId === bId) || (b.aId === bId && b.bId === aId)) ??
+  null
 
 /**
  * Directional, because "parent" and "child" are the same edge read from two ends. KIN OUTRANKS
  * PARTNER: a birth is a fact the world wrote down, a partnership is inferred from who slept where.
  */
 export function bondTypeOf(
-  aId: string, bId: string, lineage: LineageLike, bonds: BondsResponse,
+  aId: string,
+  bId: string,
+  lineage: LineageLike,
+  bonds: BondsResponse,
 ): BondType {
   if (aId === bId) return 'none'
   if (lineage.parentOf.some((e) => e.parentId === aId && e.childId === bId)) return 'parent'
@@ -76,8 +97,12 @@ export function partnerEvidence(b: Bond): string | null {
 // ── LEVEL ──────────────────────────────────────────────────────────────────────────────────
 
 export const BOND_LEVEL_WORD: Readonly<Record<BondLevel, string>> = {
-  strangers: 'Strangers', acquaintances: 'Acquaintances', friendly: 'Friends',
-  close: 'Close', strained: 'Strained', hatred: 'Hatred',
+  strangers: 'Strangers',
+  acquaintances: 'Acquaintances',
+  friendly: 'Friends',
+  close: 'Close',
+  strained: 'Strained',
+  hatred: 'Hatred',
 }
 
 const rankOf = (l: BondLevel): number => LEVEL_RANK.indexOf(l)
@@ -99,9 +124,8 @@ export type BondArc = {
 export function bondArc(bond: Bond, nowTick: number): BondArc {
   const from = bondLevel(bond.priorWarmth)
   const to = bondLevel(bondWarmth(bond, nowTick))
-  const direction = rankOf(to) > rankOf(from) ? 'warming'
-    : rankOf(to) < rankOf(from) ? 'cooling'
-      : 'steady'
+  const direction =
+    rankOf(to) > rankOf(from) ? 'warming' : rankOf(to) < rankOf(from) ? 'cooling' : 'steady'
   return { from, to, direction, sinceDay: tickToMoment(bond.levelChangedTick).day }
 }
 
@@ -126,16 +150,22 @@ const LEVEL_CLAUSE: Readonly<Record<BondLevel, string>> = {
 }
 
 const ARC_CLAUSE: Readonly<Record<BondArc['direction'], string | null>> = {
-  warming: 'Warming since Day', cooling: 'Cooling since Day', steady: null,
+  warming: 'Warming since Day',
+  cooling: 'Cooling since Day',
+  steady: null,
 }
 
 export function relationLine(
-  type: BondType, level: BondLevel, arc: BondArc, names: [string, string],
+  type: BondType,
+  level: BondLevel,
+  arc: BondArc,
+  names: [string, string],
 ): string {
   const [a, b] = names
-  const head = type === 'none'
-    ? `${TYPE_CLAUSE.none(a, b)} ${LEVEL_CLAUSE[level]}.`
-    : `${TYPE_CLAUSE[type](a, b)}, and they ${LEVEL_CLAUSE[level]}.`
+  const head =
+    type === 'none'
+      ? `${TYPE_CLAUSE.none(a, b)} ${LEVEL_CLAUSE[level]}.`
+      : `${TYPE_CLAUSE[type](a, b)}, and they ${LEVEL_CLAUSE[level]}.`
   const arcWords = ARC_CLAUSE[arc.direction]
   return arcWords === null ? head : `${head} ${arcWords} ${arc.sinceDay}.`
 }

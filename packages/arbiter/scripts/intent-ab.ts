@@ -19,69 +19,125 @@ const OUT = process.env['SJ_OUT'] ?? '/tmp/intent-ab.json'
 // scored on its own. `SJ_ARM=after` re-runs one half instead of re-spending on both — which is
 // what the first attempt needed after a watchdog killed it with the before arm complete.
 const ARM = process.env['SJ_ARM'] ?? null
-const MODELS_DIR = process.env['SJ_MODELS_DIR']
-  ?? fileURLToPath(new URL('../../../data/models/', import.meta.url))
+const MODELS_DIR =
+  process.env['SJ_MODELS_DIR'] ?? fileURLToPath(new URL('../../../data/models/', import.meta.url))
 
 const VOCABULARY = {
   itemKinds: [
-    'wood', 'stone', 'rope', 'cloth', 'fiber', 'hide', 'clay', 'axe', 'hoe', 'knife',
-    'seed_pouch', 'waterskin', 'bucket', 'torch', 'garment', 'plank', 'bread', 'wheat',
-    'fish', 'venison', 'rabbit_meat', 'berries', 'mushroom', 'herb', 'stew',
+    'wood',
+    'stone',
+    'rope',
+    'cloth',
+    'fiber',
+    'hide',
+    'clay',
+    'axe',
+    'hoe',
+    'knife',
+    'seed_pouch',
+    'waterskin',
+    'bucket',
+    'torch',
+    'garment',
+    'plank',
+    'bread',
+    'wheat',
+    'fish',
+    'venison',
+    'rabbit_meat',
+    'berries',
+    'mushroom',
+    'herb',
+    'stew',
   ],
   structureKinds: ['house', 'storehouse', 'shed', 'wagon', 'well', 'fire_pit', 'bridge', 'grave'],
 } as const
 
 // Seven invented verbs a mind reached for, each with the thought behind it — an act the engine
 // has no verb for. Fixed order and cast, so the two arms differ in exactly one thing.
-const SEED: Array<{ verb: string; params: Record<string, unknown>; thought: string }> = [
+const SEED: { verb: string; params: Record<string, unknown>; thought: string }[] = [
   {
-    verb: 'smoke_fish', params: { over: 'green wood' },
+    verb: 'smoke_fish',
+    params: { over: 'green wood' },
     thought: 'Four fish. They will spoil unless I smoke them.',
   },
   {
-    verb: 'dry_fish', params: { on: 'the flat rocks' },
-    thought: 'The catch will not see the week out. Sun and wind might hold it if the flies keep off.',
+    verb: 'dry_fish',
+    params: { on: 'the flat rocks' },
+    thought:
+      'The catch will not see the week out. Sun and wind might hold it if the flies keep off.',
   },
   {
-    verb: 'salt_meat', params: { with: 'river salt' },
+    verb: 'salt_meat',
+    params: { with: 'river salt' },
     thought: 'The venison turns fast in this heat. Salt keeps it, if I can gather enough of it.',
   },
   {
-    verb: 'raise_marker', params: { at: 'the river fork' },
+    verb: 'raise_marker',
+    params: { at: 'the river fork' },
     thought: 'Where the two waters meet ought to be marked, so a stranger coming down knows it.',
   },
   {
-    verb: 'weave_basket', params: { from: 'reeds' },
+    verb: 'weave_basket',
+    params: { from: 'reeds' },
     thought: 'I drop half the berries on the walk back. I want something to carry them in.',
   },
   {
-    verb: 'bank_fire', params: { with: 'river clay' },
-    thought: 'The fire dies every night and I start it again cold. If I pack the coals they may hold till dawn.',
+    verb: 'bank_fire',
+    params: { with: 'river clay' },
+    thought:
+      'The fire dies every night and I start it again cold. If I pack the coals they may hold till dawn.',
   },
   {
-    verb: 'tan_hide', params: { with: 'oak bark' },
+    verb: 'tan_hide',
+    params: { with: 'oak bark' },
     thought: 'The hide stiffens and cracks after a week. There must be a way to keep it soft.',
   },
 ]
 
 const AGENT = {
-  agentId: 'amara', name: 'Amara',
+  agentId: 'amara',
+  name: 'Amara',
   skills: { cooking: 2, foraging: 3, building: 1 },
-  inventory: [{ kind: 'fish', qty: 4 }, { kind: 'wood', qty: 6 }, { kind: 'hide', qty: 1 }],
+  inventory: [
+    { kind: 'fish', qty: 4 },
+    { kind: 'wood', qty: 6 },
+    { kind: 'hide', qty: 1 },
+  ],
   position: { x: 12, y: 9 },
   visible: {
-    structures: [{ kind: 'storehouse', x: 13, y: 9 }, { kind: 'fire_pit', x: 11, y: 10 }],
+    structures: [
+      { kind: 'storehouse', x: 13, y: 9 },
+      { kind: 'fire_pit', x: 11, y: 10 },
+    ],
     ground: ['grass', 'dirt', 'water'],
   },
 }
 
 // The two renderings under test, side by side so the difference is one line each.
 const flattenIntent = (verb: string, params: Record<string, unknown>): string =>
-  [verb, ...Object.keys(params).sort().map((k) => String(params[k]))].join(' ')
+  [
+    verb,
+    ...Object.keys(params)
+      .sort()
+      .map((k) => String(params[k])),
+  ].join(' ')
 const humanizeIntent = (verb: string, params: Record<string, unknown>): string =>
-  [verb.replace(/_/g, ' '), ...Object.keys(params).sort().map((k) => String(params[k]))].join(' ')
+  [
+    verb.replace(/_/g, ' '),
+    ...Object.keys(params)
+      .sort()
+      .map((k) => String(params[k])),
+  ].join(' ')
 
-type Result = { intent: string; kind: string; class?: string; recipe?: string; fallback: boolean; codified: boolean }
+type Result = {
+  intent: string
+  kind: string
+  class?: string
+  recipe?: string
+  fallback: boolean
+  codified: boolean
+}
 
 async function runArm(
   arm: 'before' | 'after',
@@ -96,7 +152,8 @@ async function runArm(
 
   const out: Result[] = []
   for (const s of SEED) {
-    const intent = arm === 'before' ? flattenIntent(s.verb, s.params) : humanizeIntent(s.verb, s.params)
+    const intent =
+      arm === 'before' ? flattenIntent(s.verb, s.params) : humanizeIntent(s.verb, s.params)
     const ctx = arm === 'before' ? AGENT : { ...AGENT, saying: s.thought }
     const v = await arbiter.adjudicate(intent, ctx)
     const fallback = v.kind === 'impossible' && v.reason === FALLBACK_IMPOSSIBLE.reason
@@ -106,7 +163,9 @@ async function runArm(
       try {
         arbiter.codify(v.recipe as never, { agentId: AGENT.agentId, intent })
         codified = true
-      } catch { codified = false }
+      } catch {
+        codified = false
+      }
     }
     out.push({
       intent,
@@ -116,8 +175,15 @@ async function runArm(
       fallback,
       codified,
     })
-    const tail = v.kind === 'impossible' ? `${v.class} — ${v.reason}` : v.kind === 'attempt' ? v.recipe.id : v.verb
-    console.log(`  [${arm}] ${intent.padEnd(34)} ${v.kind.padEnd(10)} ${fallback ? 'FALLBACK ' : ''}${tail}`)
+    const tail =
+      v.kind === 'impossible'
+        ? `${v.class} — ${v.reason}`
+        : v.kind === 'attempt'
+          ? v.recipe.id
+          : v.verb
+    console.log(
+      `  [${arm}] ${intent.padEnd(34)} ${v.kind.padEnd(10)} ${fallback ? 'FALLBACK ' : ''}${tail}`,
+    )
   }
   db.close()
   return out
@@ -149,11 +215,20 @@ async function main(): Promise<void> {
   const b = tally(before)
   const a = tally(after)
   console.log(`\n            classed  fallback  attempt  map  codified   (of ${SEED.length})`)
-  console.log(`  BEFORE      ${b.classed}        ${b.fallback}        ${b.attempt}       ${b.map}     ${b.codified}`)
-  console.log(`  AFTER       ${a.classed}        ${a.fallback}        ${a.attempt}       ${a.map}     ${a.codified}`)
-  console.log(`\nbefore arm $${beforeUsd.toFixed(6)}  ·  after arm $${(llm.totalCostUsd() - beforeUsd).toFixed(6)}`
-    + `  ·  total $${llm.totalCostUsd().toFixed(6)}`)
-  writeFileSync(OUT, JSON.stringify({ seed: SEED, before, after, tally: { before: b, after: a } }, null, 2))
+  console.log(
+    `  BEFORE      ${b.classed}        ${b.fallback}        ${b.attempt}       ${b.map}     ${b.codified}`,
+  )
+  console.log(
+    `  AFTER       ${a.classed}        ${a.fallback}        ${a.attempt}       ${a.map}     ${a.codified}`,
+  )
+  console.log(
+    `\nbefore arm $${beforeUsd.toFixed(6)}  ·  after arm $${(llm.totalCostUsd() - beforeUsd).toFixed(6)}` +
+      `  ·  total $${llm.totalCostUsd().toFixed(6)}`,
+  )
+  writeFileSync(
+    OUT,
+    JSON.stringify({ seed: SEED, before, after, tally: { before: b, after: a } }, null, 2),
+  )
   console.log(`-> ${OUT}`)
 }
 

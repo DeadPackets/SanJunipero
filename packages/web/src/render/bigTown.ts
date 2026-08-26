@@ -20,7 +20,7 @@ export type FixtureStructure = {
 
 /** The footprints the town actually stands, smallest to largest — a 4×2 roof is the one that
  *  reaches furthest past its own ground, which is what a cull margin has to survive. */
-const FOOTPRINTS: ReadonlyArray<{ kind: string; w: number; h: number }> = [
+const FOOTPRINTS: readonly { kind: string; w: number; h: number }[] = [
   { kind: 'well', w: 1, h: 1 },
   { kind: 'house', w: 2, h: 2 },
   { kind: 'cottage', w: 2, h: 2 },
@@ -29,10 +29,15 @@ const FOOTPRINTS: ReadonlyArray<{ kind: string; w: number; h: number }> = [
 ]
 
 /** Eight plots around one block's perimeter, the way a street rank claims frontage. */
-const PLOT_OFFSETS: ReadonlyArray<{ dx: number; dy: number }> = [
-  { dx: 1, dy: 1 }, { dx: 7, dy: 1 }, { dx: 13, dy: 1 },
-  { dx: 1, dy: 8 }, { dx: 13, dy: 8 },
-  { dx: 1, dy: 15 }, { dx: 7, dy: 15 }, { dx: 13, dy: 15 },
+const PLOT_OFFSETS: readonly { dx: number; dy: number }[] = [
+  { dx: 1, dy: 1 },
+  { dx: 7, dy: 1 },
+  { dx: 13, dy: 1 },
+  { dx: 1, dy: 8 },
+  { dx: 13, dy: 8 },
+  { dx: 1, dy: 15 },
+  { dx: 7, dy: 15 },
+  { dx: 13, dy: 15 },
 ]
 
 /** Eight claimed plots per block; ring 0 is the square and stands nothing, so R rings hold `((2R+1)² − 1) · 8` structures, always in the same order. */
@@ -62,7 +67,9 @@ export function bigTown(rings: number): FixtureStructure[] {
 // A terrain array cannot hold a negative index, so this frame is shifted to the origin; ground
 // and structures cannot drift apart because both shift `bigTownTileExtent(rings)` by the same `lo`.
 
-export const ROAD = 7, WATER = 2, GRASS = 0
+export const ROAD = 7,
+  WATER = 2,
+  GRASS = 0
 
 /** One tile of the pitch is street; the channel is ONE tile wide on purpose — the thinnest
  *  feature the grammar produces, and the thing a map that point-samples loses first. */
@@ -81,12 +88,13 @@ export function bigTownTerrain(rings: number): number[][] {
     for (let x = 0; x < n; x++) {
       if (x % BLOCK_PITCH === BLOCK_SIDE || y % BLOCK_PITCH === BLOCK_SIDE) row[x] = ROAD
     }
-    row[CHANNEL_X] = WATER          // the channel runs unbroken; the streets bridge it
+    row[CHANNEL_X] = WATER // the channel runs unbroken; the streets bridge it
     out.push(row)
   }
   // ring 0 is the square: the whole central block is paved, and nothing stands on it
   const s = rings * BLOCK_PITCH
-  for (let y = s; y < s + BLOCK_SIDE; y++) for (let x = s; x < s + BLOCK_SIDE; x++) out[y]![x] = ROAD
+  for (let y = s; y < s + BLOCK_SIDE; y++)
+    for (let x = s; x < s + BLOCK_SIDE; x++) out[y]![x] = ROAD
   return out
 }
 
@@ -97,7 +105,12 @@ export function bigTownPlaced(rings: number): FixtureStructure[] {
 }
 
 /** The tile box the ring grammar plats into at this ring count, streets included. */
-export function bigTownTileExtent(rings: number): { x0: number; y0: number; x1: number; y1: number } {
+export function bigTownTileExtent(rings: number): {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+} {
   const lo = -rings * BLOCK_PITCH
   const hi = rings * BLOCK_PITCH + BLOCK_SIDE
   return { x0: lo, y0: lo, x1: hi, y1: hi }

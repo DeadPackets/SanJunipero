@@ -1,16 +1,34 @@
 import type { ServerResponse } from 'node:http'
 import type { AssetClass } from '@sj/shared'
 import {
-  AssetCodex, EMOTE_KINDS, EMOTE_SIZE, FACINGS, POSES_V2, CELL_V2, FEET_Y_V2, SHEET_W_V2, SHEET_H_V2,
-  encodePng, makePlaceholder, paletteRgb, renderEmote, type Facing, type RawImage, type Rgb,
+  AssetCodex,
+  EMOTE_KINDS,
+  EMOTE_SIZE,
+  FACINGS,
+  POSES_V2,
+  CELL_V2,
+  FEET_Y_V2,
+  SHEET_W_V2,
+  SHEET_H_V2,
+  encodePng,
+  makePlaceholder,
+  paletteRgb,
+  renderEmote,
+  type Facing,
+  type RawImage,
+  type Rgb,
 } from '@sj/forge'
 import type { Router } from './server.js'
 import { notFound, sendJson } from './http.js'
 import { reportOnce } from './degraded.js'
 
 export const PLACEHOLDER_PX: Record<AssetClass, { w: number; h: number }> = {
-  building: { w: 64, h: 64 }, item: { w: 24, h: 24 }, crop: { w: 32, h: 32 },
-  terrain: { w: 32, h: 16 }, 'rig-part': { w: 96, h: 96 }, portrait: { w: 128, h: 128 },
+  building: { w: 64, h: 64 },
+  item: { w: 24, h: 24 },
+  crop: { w: 32, h: 32 },
+  terrain: { w: 32, h: 16 },
+  'rig-part': { w: 96, h: 96 },
+  portrait: { w: 128, h: 128 },
 }
 
 // Placeholder-sheet geometry (Character standard v2 cells; tunables exported per plan law)
@@ -23,7 +41,10 @@ export const FOOT_BAR_OFFSET = 6
 export const MARKER_SIZE = 6
 // facing corner markers: sw honey, se sage, ne water, nw rose (master-palette ramp entries)
 export const FACING_MARKER: Record<Facing, Rgb> = {
-  sw: [0xe0, 0xa9, 0x5e], se: [0x93, 0xb5, 0x73], ne: [0x7f, 0xb0, 0xc9], nw: [0xe0, 0x9e, 0x9b],
+  sw: [0xe0, 0xa9, 0x5e],
+  se: [0x93, 0xb5, 0x73],
+  ne: [0x7f, 0xb0, 0xc9],
+  nw: [0xe0, 0x9e, 0x9b],
 }
 
 const px = (img: RawImage, x: number, y: number, c: Rgb): void => {
@@ -39,21 +60,35 @@ export function buildPlaceholderSheet(agentId: string): RawImage {
   const light = parity === 0 ? pal[24]! : pal[25]!
   const dark = parity === 0 ? pal[25]! : pal[26]!
   const barColor = pal[31]!
-  const sheet: RawImage = { width: SHEET_W_V2, height: SHEET_H_V2, data: new Uint8ClampedArray(SHEET_W_V2 * SHEET_H_V2 * 4) }
+  const sheet: RawImage = {
+    width: SHEET_W_V2,
+    height: SHEET_H_V2,
+    data: new Uint8ClampedArray(SHEET_W_V2 * SHEET_H_V2 * 4),
+  }
 
   FACINGS.forEach((facing, col) => {
     POSES_V2.forEach((pose, row) => {
-      const cx = col * CELL_V2, cy = row * CELL_V2
+      const cx = col * CELL_V2,
+        cy = row * CELL_V2
       const lying = pose === 'sleep'
-      const rw = lying ? BODY_H : BODY_W, rh = lying ? BODY_W : BODY_H
-      const rx = (CELL_V2 - rw) >> 1, ry = FEET_Y_V2 - rh
+      const rw = lying ? BODY_H : BODY_W,
+        rh = lying ? BODY_W : BODY_H
+      const rx = (CELL_V2 - rw) >> 1,
+        ry = FEET_Y_V2 - rh
       // makePlaceholder checkerboard cropped to the body rect (cell-local coords keep it deterministic)
-      for (let y = ry; y < ry + rh; y++) for (let x = rx; x < rx + rw; x++) {
-        px(sheet, cx + x, cy + y, ((x >> 2) + (y >> 2)) % 2 === 0 ? light : dark)
-      }
+      for (let y = ry; y < ry + rh; y++)
+        for (let x = rx; x < rx + rw; x++) {
+          px(sheet, cx + x, cy + y, ((x >> 2) + (y >> 2)) % 2 === 0 ? light : dark)
+        }
       // per-pose foot bar: contact-a left, contact-b right, passing centered; idle/sleep none
-      const off = pose === 'contact-a' ? -FOOT_BAR_OFFSET : pose === 'contact-b' ? FOOT_BAR_OFFSET
-        : pose === 'passing-a' || pose === 'passing-b' ? 0 : null
+      const off =
+        pose === 'contact-a'
+          ? -FOOT_BAR_OFFSET
+          : pose === 'contact-b'
+            ? FOOT_BAR_OFFSET
+            : pose === 'passing-a' || pose === 'passing-b'
+              ? 0
+              : null
       if (off !== null) {
         const bx = (CELL_V2 >> 1) + off - (FOOT_BAR_W >> 1)
         for (let y = FOOT_BAR_Y; y < FOOT_BAR_Y + FOOT_BAR_H; y++)
@@ -70,11 +105,18 @@ export function buildPlaceholderSheet(agentId: string): RawImage {
 
 export function buildEmoteAtlas(): RawImage {
   const width = EMOTE_KINDS.length * EMOTE_SIZE
-  const atlas: RawImage = { width, height: EMOTE_SIZE, data: new Uint8ClampedArray(width * EMOTE_SIZE * 4) }
+  const atlas: RawImage = {
+    width,
+    height: EMOTE_SIZE,
+    data: new Uint8ClampedArray(width * EMOTE_SIZE * 4),
+  }
   EMOTE_KINDS.forEach((kind, i) => {
     const glyph = renderEmote(kind)
     for (let y = 0; y < EMOTE_SIZE; y++)
-      atlas.data.set(glyph.data.subarray(y * EMOTE_SIZE * 4, (y + 1) * EMOTE_SIZE * 4), (y * width + i * EMOTE_SIZE) * 4)
+      atlas.data.set(
+        glyph.data.subarray(y * EMOTE_SIZE * 4, (y + 1) * EMOTE_SIZE * 4),
+        (y * width + i * EMOTE_SIZE) * 4,
+      )
   })
   return atlas
 }
@@ -120,14 +162,19 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
   // in `state.agents` for ever and `knowsAgent` lets them all through.
   const encoded = new Map<string, Promise<Buffer>>()
   const onceEncoded = (
-    res: ServerResponse, key: string, build: () => RawImage, then: (buf: Buffer) => void,
+    res: ServerResponse,
+    key: string,
+    build: () => RawImage,
+    then: (buf: Buffer) => void,
   ): void => {
     // A failed encode must not be remembered as this key's answer for the life of the process,
     // and an unanswered request holds the socket until Node's 300 s timeout.
     const failed = (e: unknown): void => {
       encoded.delete(key)
-      reportOnce(`encode.${key.split(':')[0]}`, () =>
-        `could not encode ${key} — ${e instanceof Error ? e.message : String(e)}`)
+      reportOnce(
+        `encode.${key.split(':')[0]}`,
+        () => `could not encode ${key} — ${e instanceof Error ? e.message : String(e)}`,
+      )
       if (!res.headersSent) sendJson(res, { error: 'could not draw that' }, 500)
     }
     let p = encoded.get(key)
@@ -138,7 +185,7 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
         failed(e)
         return
       }
-      if (encoded.size >= MAX_ENCODED) encoded.delete(encoded.keys().next().value as string)
+      if (encoded.size >= MAX_ENCODED) encoded.delete(encoded.keys().next().value!)
       encoded.set(key, p)
     }
     void p.then(then, failed)
@@ -146,30 +193,58 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
 
   router.route('GET', '/assets/placeholder/:file', (_req, res, params) => {
     const klass = stripPng(params.file ?? '')
-    const size = klass !== null && klass in PLACEHOLDER_PX ? PLACEHOLDER_PX[klass as AssetClass] : undefined
-    if (!size) { notFound(res); return }
-    onceEncoded(res, `placeholder:${klass}`, () => makePlaceholder(klass as AssetClass, size),
-      (buf) => sendPng(res, buf))
+    const size =
+      klass !== null && klass in PLACEHOLDER_PX ? PLACEHOLDER_PX[klass as AssetClass] : undefined
+    if (!size) {
+      notFound(res)
+      return
+    }
+    onceEncoded(
+      res,
+      `placeholder:${klass}`,
+      () => makePlaceholder(klass as AssetClass, size),
+      (buf) => {
+        sendPng(res, buf)
+      },
+    )
   })
 
   router.route('GET', '/assets/character/:file', (_req, res, params) => {
     const agentId = stripPng(params.file ?? '')
-    if (agentId === null || agentId === '') { notFound(res); return }
-    if (deps.knowsAgent !== undefined && !deps.knowsAgent(agentId)) { notFound(res); return }
+    if (agentId === null || agentId === '') {
+      notFound(res)
+      return
+    }
+    if (deps.knowsAgent !== undefined && !deps.knowsAgent(agentId)) {
+      notFound(res)
+      return
+    }
     // binding: newest ready codex sheet registered for this agent, else the built placeholder
     const codex = deps.getCodex()
     if (codex) {
       const id = newestReady(codex, `character:${agentId}`)
       const hit = id === undefined ? null : codex.get(id)
-      if (hit) { sendPng(res, hit.png); return }
+      if (hit) {
+        sendPng(res, hit.png)
+        return
+      }
     }
-    onceEncoded(res, `character:${agentId}`, () => buildPlaceholderSheet(agentId), (buf) => sendPng(res, buf))
+    onceEncoded(
+      res,
+      `character:${agentId}`,
+      () => buildPlaceholderSheet(agentId),
+      (buf) => {
+        sendPng(res, buf)
+      },
+    )
   })
 
   router.route('GET', '/assets/:file', (_req, res, params) => {
     const file = params.file ?? ''
     if (file === 'emotes.png') {
-      onceEncoded(res, 'emotes', buildEmoteAtlas, (buf) => sendPng(res, buf))
+      onceEncoded(res, 'emotes', buildEmoteAtlas, (buf) => {
+        sendPng(res, buf)
+      })
       return
     }
     if (file === 'emotes.json') {
@@ -178,8 +253,11 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
       return
     }
     const id = stripPng(file)
-    const hit = id !== null ? deps.getCodex()?.get(id) ?? null : null
-    if (!hit) { notFound(res); return }
+    const hit = id !== null ? (deps.getCodex()?.get(id) ?? null) : null
+    if (!hit) {
+      notFound(res)
+      return
+    }
     sendPng(res, hit.png, true) // codex rows never mutate; replacements get new ids
   })
 }

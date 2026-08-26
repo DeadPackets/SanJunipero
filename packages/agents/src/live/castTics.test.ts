@@ -23,14 +23,26 @@ const uncommented = (src: string): string => {
   let out = ''
   for (let i = 0; i < src.length; i++) {
     const two = src.slice(i, i + 2)
-    if (two === '//') { while (i < src.length && src[i] !== '\n') i++; out += '\n'; continue }
-    if (two === '/*') { i += 2; while (i < src.length && src.slice(i, i + 2) !== '*/') i++; i++; continue }
+    if (two === '//') {
+      while (i < src.length && src[i] !== '\n') i++
+      out += '\n'
+      continue
+    }
+    if (two === '/*') {
+      i += 2
+      while (i < src.length && src.slice(i, i + 2) !== '*/') i++
+      i++
+      continue
+    }
     const q = src[i]!
     if (q === '"' || q === "'" || q === '`') {
       out += q
       for (i++; i < src.length && src[i] !== q; i++) {
         out += src[i]
-        if (src[i] === '\\') { out += src[i + 1] ?? ''; i++ }
+        if (src[i] === '\\') {
+          out += src[i + 1] ?? ''
+          i++
+        }
       }
       out += q
       continue
@@ -66,7 +78,11 @@ const entries = (arrayLiteral: string): string[] => {
     if (c !== '"' && c !== "'" && c !== '`') continue
     let s = ''
     for (i++; i < arrayLiteral.length && arrayLiteral[i] !== c; i++) {
-      if (arrayLiteral[i] === '\\') { s += arrayLiteral[i + 1] ?? ''; i++; continue }
+      if (arrayLiteral[i] === '\\') {
+        s += arrayLiteral[i + 1] ?? ''
+        i++
+        continue
+      }
       s += arrayLiteral[i]
     }
     out.push(s)
@@ -77,7 +93,8 @@ const entries = (arrayLiteral: string): string[] => {
 /** Top-level arguments of a `(...)` span. */
 const args = (parenSpan: string): string[] => {
   const out: string[] = []
-  let depth = 0, start = 1
+  let depth = 0,
+    start = 1
   for (let i = 1; i < parenSpan.length; i++) {
     const c = parenSpan[i]!
     if (c === '"' || c === "'" || c === '`') {
@@ -85,9 +102,14 @@ const args = (parenSpan: string): string[] => {
       continue
     }
     if (c === '(' || c === '[' || c === '{') depth++
-    else if (c === ')' && depth === 0) { out.push(parenSpan.slice(start, i)); break }
-    else if (c === ')' || c === ']' || c === '}') depth--
-    else if (c === ',' && depth === 0) { out.push(parenSpan.slice(start, i)); start = i + 1 }
+    else if (c === ')' && depth === 0) {
+      out.push(parenSpan.slice(start, i))
+      break
+    } else if (c === ')' || c === ']' || c === '}') depth--
+    else if (c === ',' && depth === 0) {
+      out.push(parenSpan.slice(start, i))
+      start = i + 1
+    }
   }
   return out.map((a) => a.trim())
 }
@@ -103,16 +125,16 @@ const cards = (): Card[] => {
     const rel = path.relative(PACKAGES, file)
 
     for (const m of src.matchAll(/(?<![A-Za-z0-9_$])voice\s*\(/g)) {
-      const open = m.index! + m[0].length - 1
+      const open = m.index + m[0].length - 1
       // `function voice(` and `const voice = (` are the helper's definition, not a cast.
-      if (/(?:function|=)\s*$/.test(src.slice(Math.max(0, m.index! - 12), m.index!))) continue
+      if (/(?:function|=)\s*$/.test(src.slice(Math.max(0, m.index - 12), m.index))) continue
       const a = args(span(src, open))
       if (a.length < 5 || !a[2]!.startsWith('[') || !a[4]!.startsWith('[')) continue
       found.push({ file: rel, tics: entries(a[2]!), exampleLines: entries(a[4]!) })
     }
 
     for (const m of src.matchAll(/\btics\s*:\s*\[/g)) {
-      const open = m.index! + m[0].length - 1
+      const open = m.index + m[0].length - 1
       const ticsSpan = span(src, open)
       const rest = src.slice(open + ticsSpan.length)
       const ex = /\bexampleLines\s*:\s*\[/.exec(rest.split(/\btics\s*:/)[0] ?? '')
@@ -128,7 +150,8 @@ const cards = (): Card[] => {
 
 // A tic that hands a mind words to utter, not one describing what it does: the verb list is the
 // introducer and the quotes are the utterance, so `calls food "provisions"` is not caught.
-const UTTERANCE = /\b(say|says|saying|open|opens|start|starts|begin|begins|greet|greets|answer|answers|replies|reply)\b[^"'“]{0,20}["'“]/i
+const UTTERANCE =
+  /\b(say|says|saying|open|opens|start|starts|begin|begins|greet|greets|answer|answers|replies|reply)\b[^"'“]{0,20}["'“]/i
 
 describe('★ a tic is a habit, not a script — over every cast in the repo', () => {
   it('finds the casts it is meant to be guarding', () => {
@@ -138,15 +161,18 @@ describe('★ a tic is a habit, not a script — over every cast in the repo', (
       'agents/src/live/founderMinds.ts',
       'agents/scripts/g11-deepworld.ts',
       'agents/src/persona/tamar.ts',
-    ]) expect(files, `no cast found in ${expected}`).toContain(expected)
+    ])
+      expect(files, `no cast found in ${expected}`).toContain(expected)
     expect(cards().length).toBeGreaterThanOrEqual(15)
   })
 
   it('no cast anywhere defines a tic as words to say', () => {
     for (const card of cards()) {
       for (const tic of card.tics) {
-        expect(UTTERANCE.test(tic), `${card.file}: tic "${tic}" hands the mind a literal to say`)
-          .toBe(false)
+        expect(
+          UTTERANCE.test(tic),
+          `${card.file}: tic "${tic}" hands the mind a literal to say`,
+        ).toBe(false)
       }
     }
   })
@@ -159,9 +185,10 @@ describe('★ a tic is a habit, not a script — over every cast in the repo', (
         for (const quoted of tic.match(/"([^"]+)"/g) ?? []) {
           const words = quoted.slice(1, -1).toLowerCase()
           for (const line of card.exampleLines) {
-            expect(line.toLowerCase().replace(/[^a-z' ]/g, ''),
-              `${card.file}: a card demonstrates ${quoted} as an opener`)
-              .not.toMatch(new RegExp(`^${words.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`))
+            expect(
+              line.toLowerCase().replace(/[^a-z' ]/g, ''),
+              `${card.file}: a card demonstrates ${quoted} as an opener`,
+            ).not.toMatch(new RegExp(`^${words.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`))
           }
         }
       }
@@ -174,8 +201,13 @@ describe('★ a tic is a habit, not a script — over every cast in the repo', (
       expect(UTTERANCE.test(planted), `${planted} should be caught`).toBe(true)
     }
     for (const allowed of [
-      'counts aloud', 'understates', 'agrees in one word', 'calls the path "the way"',
-      'settles a person before he begins', 'calls food "provisions"',
-    ]) expect(UTTERANCE.test(allowed), `${allowed} should be allowed`).toBe(false)
+      'counts aloud',
+      'understates',
+      'agrees in one word',
+      'calls the path "the way"',
+      'settles a person before he begins',
+      'calls food "provisions"',
+    ])
+      expect(UTTERANCE.test(allowed), `${allowed} should be allowed`).toBe(false)
   })
 })

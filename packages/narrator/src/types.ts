@@ -74,7 +74,9 @@ export type Institution = {
 }
 // `foundingSceneIndex` is an index into the scenes array, -1 when the founding event sits in a
 // dropped scene. Map it through `insertScenes`' returned ids; never persist -1.
-export type DetectedInstitution = Omit<Institution, 'foundingSceneId'> & { foundingSceneIndex: number }
+export type DetectedInstitution = Omit<Institution, 'foundingSceneId'> & {
+  foundingSceneIndex: number
+}
 export type DetectConfig = {
   groupMinCoScenes: number
   groupMinMembers: number
@@ -98,8 +100,15 @@ export type PublicRecord = { eventSeq: number; tick: number; day: number; text: 
 export type NarratorLlm = {
   summarizeChapter(scenes: SceneDigest[]): Promise<ChapterSummary>
   summarizeEra(chapters: ChapterDigest[]): Promise<EraSummary>
-  newspaperCopy(day: number, highlights: string[]): Promise<{ headline: string; body: string; citations: number[] }>
-  biography(agentId: string, name: string, record: PublicRecord[]): Promise<{ title: string; body: string }>
+  newspaperCopy(
+    day: number,
+    highlights: string[],
+  ): Promise<{ headline: string; body: string; citations: number[] }>
+  biography(
+    agentId: string,
+    name: string,
+    record: PublicRecord[],
+  ): Promise<{ title: string; body: string }>
 }
 
 export type ChapterRow = {

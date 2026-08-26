@@ -18,8 +18,15 @@ const until = async (cond: () => boolean, timeoutMs = 12_000): Promise<void> => 
 
 /** Boot, run to at least `toTick`, close cleanly. Returns what the town looked like at the end. */
 const runTo = async (
-  dbPath: string, toTick: number, opts: Parameters<typeof startDevWorld>[0] = {},
-): Promise<{ tick: number; structures: number; agents: string[]; resumedAtTick: number | null }> => {
+  dbPath: string,
+  toTick: number,
+  opts: Parameters<typeof startDevWorld>[0] = {},
+): Promise<{
+  tick: number
+  structures: number
+  agents: string[]
+  resumedAtTick: number | null
+}> => {
   const dw = await startDevWorld({ realMsPerTick: 1, port: 0, dbPath, ...opts })
   try {
     await until(() => dw.loop.state.tick >= toTick, 30_000)
@@ -37,8 +44,12 @@ const runTo = async (
 const countEvents = (dbPath: string, type: string): number => {
   const db = openDb(dbPath)
   try {
-    return (db.prepare('SELECT COUNT(*) AS n FROM events WHERE type = ?').get(type) as { n: number }).n
-  } finally { db.close() }
+    return (
+      db.prepare('SELECT COUNT(*) AS n FROM events WHERE type = ?').get(type) as { n: number }
+    ).n
+  } finally {
+    db.close()
+  }
 }
 
 /** Removing the world-db delete ALONE is strictly worse than the wipe: the loop was built from
@@ -46,7 +57,9 @@ const countEvents = (dbPath: string, type: string): number => {
  *  db already holding 10 000 ticks. These tests pin both halves together. */
 describe('★ the town survives a restart', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-persist-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('resumes the same town on a second boot — same day, same buildings, same people', async () => {
     const dbPath = join(dir, 'resume.db')
@@ -83,9 +96,13 @@ describe('★ the town survives a restart', () => {
 
   it('does not re-publish every historic thought on resume', async () => {
     const dbPath = join(dir, 'thoughts.db')
-    const readThoughts = (): Array<{ id: number; tick: number }> => {
+    const readThoughts = (): { id: number; tick: number }[] => {
       const db = openDb(dbPath)
-      try { return thoughtsSince(db, 0) } finally { db.close() }
+      try {
+        return thoughtsSince(db, 0)
+      } finally {
+        db.close()
+      }
     }
     const first = await runTo(dbPath, 60)
     const before = readThoughts()
@@ -95,18 +112,28 @@ describe('★ the town survives a restart', () => {
     // A cursor left at seq 0 re-scans the whole log on the first resumed tick and publishes
     // thoughts stamped with HISTORIC ticks — the tell is the tick, not the count.
     const added = readThoughts().filter((t) => !before.some((b) => b.id === t.id))
-    for (const t of added) expect(t.tick, `a thought re-published from history at tick ${t.tick}`)
-      .toBeGreaterThan(second.resumedAtTick!)
+    for (const t of added)
+      expect(t.tick, `a thought re-published from history at tick ${t.tick}`).toBeGreaterThan(
+        second.resumedAtTick!,
+      )
   }, 120_000)
 
   it('the gateway is handed the terrain the world resumed on, not one recomputed from env', async () => {
     const dbPath = join(dir, 'terrain.db')
     await runTo(dbPath, 70, { map: 'showcase', rings: 1 }) // past the tick-60 snapshot
-    const dw = await startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, map: 'showcase', rings: 1 })
+    const dw = await startDevWorld({
+      realMsPerTick: 100_000,
+      port: 0,
+      dbPath,
+      map: 'showcase',
+      rings: 1,
+    })
     try {
       expect(dw.resumedAtTick).not.toBeNull()
       expect(dw.terrain).toBe(dw.loop.state.terrain)
-    } finally { await dw.stop() }
+    } finally {
+      await dw.stop()
+    }
   }, 90_000)
 })
 
@@ -115,7 +142,9 @@ describe('★ the town survives a restart', () => {
  *  with no error anywhere. */
 describe('★ a resumed world refuses a boot that is not the same world', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-identity-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('records who the town is on the first boot', async () => {
     const dbPath = join(dir, 'meta.db')
@@ -123,25 +152,38 @@ describe('★ a resumed world refuses a boot that is not the same world', () => 
     const db = openDb(dbPath)
     try {
       expect(readWorldMeta(db)).toEqual({ map: 'showcase', rings: 1, seed: 'g6' })
-    } finally { db.close() }
+    } finally {
+      db.close()
+    }
   }, 60_000)
 
   it('refuses a different ring count, and names both sides and the way out', async () => {
     const dbPath = join(dir, 'rings.db')
     await runTo(dbPath, 5, { map: 'showcase', rings: 1 })
-    await expect(startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, map: 'showcase', rings: 3 }))
-      .rejects.toThrow(/rings 1 → 3/)
-    await expect(startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, map: 'showcase', rings: 3 }))
-      .rejects.toThrow(/SJ_FRESH=1/)
+    await expect(
+      startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, map: 'showcase', rings: 3 }),
+    ).rejects.toThrow(/rings 1 → 3/)
+    await expect(
+      startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, map: 'showcase', rings: 3 }),
+    ).rejects.toThrow(/SJ_FRESH=1/)
   }, 60_000)
 
   it('refuses a different map and a different seed too', async () => {
     const dbPath = join(dir, 'map.db')
     await runTo(dbPath, 5, { map: 'showcase', rings: 1, seed: 'g6' })
-    await expect(startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, map: 'scripted' }))
-      .rejects.toThrow(/map/)
-    await expect(startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, map: 'showcase', rings: 1, seed: 'other' }))
-      .rejects.toThrow(/seed/)
+    await expect(
+      startDevWorld({ realMsPerTick: 100_000, port: 0, dbPath, map: 'scripted' }),
+    ).rejects.toThrow(/map/)
+    await expect(
+      startDevWorld({
+        realMsPerTick: 100_000,
+        port: 0,
+        dbPath,
+        map: 'showcase',
+        rings: 1,
+        seed: 'other',
+      }),
+    ).rejects.toThrow(/seed/)
   }, 60_000)
 
   it('a fresh start re-stamps the identity instead of refusing', async () => {
@@ -151,7 +193,9 @@ describe('★ a resumed world refuses a boot that is not the same world', () => 
     const db = openDb(dbPath)
     try {
       expect(readWorldMeta(db)?.rings).toBe(3)
-    } finally { db.close() }
+    } finally {
+      db.close()
+    }
   }, 60_000)
 })
 
@@ -159,7 +203,9 @@ describe('★ a resumed world refuses a boot that is not the same world', () => 
  *  boot gives the worst of both: the buildings gone and every mind still remembering. */
 describe('★ fresh means fresh for the minds too', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-minds-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('wipes the agent memory dbs together with the world db', async () => {
     const dbPath = join(dir, 'w.db')
@@ -170,7 +216,9 @@ describe('★ fresh means fresh for the minds too', () => {
     writeFileSync(join(agentDbDir, 'notes.txt'), 'left alone: not a mind')
 
     await runTo(dbPath, 3, { fresh: true, agentDbDir })
-    expect(existsSync(omar), 'a fresh town must not keep a mind that remembers the old one').toBe(false)
+    expect(existsSync(omar), 'a fresh town must not keep a mind that remembers the old one').toBe(
+      false,
+    )
     expect(existsSync(join(agentDbDir, 'notes.txt'))).toBe(true)
   }, 60_000)
 

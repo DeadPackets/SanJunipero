@@ -7,15 +7,15 @@ export { easeOutCubic } from '../render/camera.js'
  *  surfaces doing the same thing move the same way. */
 export const MOTIONS = ['tap', 'reveal', 'enter', 'move', 'scene', 'ambient'] as const
 export type MotionName = (typeof MOTIONS)[number]
-export type Motion = { ms: number; ease: string; stagger?: number }
+export type Motion = { ms: number; ease: string; stagger?: number | undefined }
 
 export const MOTION: Readonly<Record<MotionName, Motion>> = {
-  tap: { ms: 90, ease: 'cubic-bezier(0.3, 0, 0.2, 1)' },                // a press answering
-  reveal: { ms: 150, ease: 'cubic-bezier(0.2, 0, 0, 1)' },              // a hover, a chip
-  enter: { ms: 240, ease: 'cubic-bezier(0.2, 0, 0, 1)', stagger: 30 },  // a panel arriving
-  move: { ms: 180, ease: 'cubic-bezier(0.4, 0, 0.2, 1)' },              // camera, zoom, dock
-  scene: { ms: 300, ease: 'cubic-bezier(0.4, 0, 0.2, 1)' },             // lens, interior, day
-  ambient: { ms: 1200, ease: 'linear' },                                // breathing, drift
+  tap: { ms: 90, ease: 'cubic-bezier(0.3, 0, 0.2, 1)' }, // a press answering
+  reveal: { ms: 150, ease: 'cubic-bezier(0.2, 0, 0, 1)' }, // a hover, a chip
+  enter: { ms: 240, ease: 'cubic-bezier(0.2, 0, 0, 1)', stagger: 30 }, // a panel arriving
+  move: { ms: 180, ease: 'cubic-bezier(0.4, 0, 0.2, 1)' }, // camera, zoom, dock
+  scene: { ms: 300, ease: 'cubic-bezier(0.4, 0, 0.2, 1)' }, // lens, interior, day
+  ambient: { ms: 1200, ease: 'linear' }, // breathing, drift
 }
 
 /** The band the UI mandate sets. */
@@ -39,33 +39,48 @@ export const MOTION_EXEMPT: readonly MotionExemption[] = [
   {
     what: 'walk',
     ms: TICK_PERIOD_MAX_MS * (1 + WALK_LEAD_TICKS),
-    because: 'the world’s own clock — a body crosses a tile in a tick of the simulation, and '
-      + 'the alternative to spending it is teleporting the body 2.5 times a second',
+    because:
+      'the world’s own clock — a body crosses a tile in a tick of the simulation, and ' +
+      'the alternative to spending it is teleporting the body 2.5 times a second',
   },
 ]
 
 /** The exempt entries that are names in the table above — derived, so the two can never
  *  disagree about which of them the ceiling check should skip. */
-export const AMBIENT_EXEMPT: readonly MotionName[] = MOTION_EXEMPT
-  .map((e) => e.what)
-  .filter((w): w is MotionName => (MOTIONS as readonly string[]).includes(w))
+export const AMBIENT_EXEMPT: readonly MotionName[] = MOTION_EXEMPT.map((e) => e.what).filter(
+  (w): w is MotionName => (MOTIONS as readonly string[]).includes(w),
+)
 
 /** The sheet's spelling for each motion. The value comes from the table above and a test proves
  *  the two agree. */
 export const CSS_DURATION_TOKEN: Readonly<Record<MotionName, string>> = {
-  tap: '--t-tap', reveal: '--t-fast', enter: '--t-med', move: '--t-move',
-  scene: '--t-slow', ambient: '--t-ambient',
+  tap: '--t-tap',
+  reveal: '--t-fast',
+  enter: '--t-med',
+  move: '--t-move',
+  scene: '--t-slow',
+  ambient: '--t-ambient',
 }
 export const CSS_EASE_TOKEN: Readonly<Record<MotionName, string>> = {
-  tap: '--ease-tap', reveal: '--ease-enter', enter: '--ease-enter', move: '--ease-move',
-  scene: '--ease-move', ambient: '--ease-ambient',
+  tap: '--ease-tap',
+  reveal: '--ease-enter',
+  enter: '--ease-enter',
+  move: '--ease-move',
+  scene: '--ease-move',
+  ambient: '--ease-ambient',
 }
 
 /**
  * Reduced motion is not "no motion": it is INSTANT ARRIVAL. Opacity survives at a third of the
  * duration and every property that moves a box goes to zero, a stagger with them.
  */
-const OPACITY_PROPS: readonly string[] = ['opacity', 'color', 'background-color', 'border-color', 'fill']
+const OPACITY_PROPS: readonly string[] = [
+  'opacity',
+  'color',
+  'background-color',
+  'border-color',
+  'fill',
+]
 
 export function reduced(m: Motion, prop: string): Motion {
   if (!OPACITY_PROPS.includes(prop)) return { ms: 0, ease: m.ease }
@@ -99,7 +114,8 @@ function bezier(x1: number, y1: number, x2: number, y2: number): (t: number) => 
   return (t: number) => {
     if (t <= 0) return 0
     if (t >= 1) return 1
-    let lo = 0, hi = 1
+    let lo = 0,
+      hi = 1
     for (let i = 0; i < 20; i++) {
       const mid = (lo + hi) / 2
       if (at(x1, x2, mid) < t) lo = mid
@@ -118,9 +134,10 @@ export function easeFn(name: MotionName): (t: number) => number {
   const hit = CURVES.get(spec)
   if (hit !== undefined) return hit
   const m = BEZIER.exec(spec)
-  const f = m === null
-    ? (t: number) => Math.min(1, Math.max(0, t))
-    : bezier(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]))
+  const f =
+    m === null
+      ? (t: number) => Math.min(1, Math.max(0, t))
+      : bezier(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]))
   CURVES.set(spec, f)
   return f
 }
@@ -142,8 +159,8 @@ const TIME = /(?:^|[\s,(])(\d*\.?\d+)(ms|s)(?![\w-])/g
 
 /** Every duration the sheet states, as `selector — value`. Longhand and shorthand both: a
  *  shorthand's FIRST time is its duration and any second one is a delay, per the CSS grammar. */
-export function durationsIn(css: string): Array<{ selector: string; value: string }> {
-  const out: Array<{ selector: string; value: string }> = []
+export function durationsIn(css: string): { selector: string; value: string }[] {
+  const out: { selector: string; value: string }[] = []
   for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     for (const [, prop, raw] of (body ?? '').matchAll(
       /(transition-duration|animation-duration|transition|animation)\s*:\s*([^;}]+)/g,
@@ -156,8 +173,10 @@ export function durationsIn(css: string): Array<{ selector: string; value: strin
           const token = /var\(--[\w-]+\)/.exec(layer)
           if (time === undefined && token === null) continue
           // whichever comes first IS the duration; a second time is a delay (CSS grammar)
-          const first = token !== null && (time === undefined || token.index < time.index)
-            ? token[0] : time![0].trim()
+          const first =
+            token !== null && (time === undefined || token.index < time.index)
+              ? token[0]
+              : time![0].trim()
           out.push({ selector: (sel ?? '').trim(), value: first })
         }
       } else {

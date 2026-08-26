@@ -5,9 +5,16 @@ import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { RuntimeSnapshot } from '../runtime/agentRuntime.js'
 import {
-  G11_CHECKPOINT_VERSION, G11CheckpointSchema, checkpointRefusal, fingerprintMismatch,
-  migrateCheckpointTable, readCheckpoint, restoreSnapshot, writeCheckpoint,
-  type G11Checkpoint, type G11Fingerprint,
+  G11_CHECKPOINT_VERSION,
+  G11CheckpointSchema,
+  checkpointRefusal,
+  fingerprintMismatch,
+  migrateCheckpointTable,
+  readCheckpoint,
+  restoreSnapshot,
+  writeCheckpoint,
+  type G11Checkpoint,
+  type G11Fingerprint,
 } from './g11checkpoint.js'
 
 const FINGERPRINT: G11Fingerprint = {
@@ -32,12 +39,25 @@ const checkpointAt = (tick: number): G11Checkpoint => ({
     lastDayClosed: Math.floor(tick / 1440),
     stateHash: `hash-at-${tick}`,
     thoughts: [{ tick: tick - 1, agentId: 'omar', text: 'Salma looks ill.' }],
-    adjudications: [{ tick: tick - 2, agentId: 'salma', intent: 'hum a little', kind: 'map', verb: 'express:hum' }],
-    rejections: [{ tick: tick - 3, agentId: 'yusuf', verb: 'tend', reason: 'tend needs a {targetId}' }],
+    adjudications: [
+      {
+        tick: tick - 2,
+        agentId: 'salma',
+        intent: 'hum a little',
+        kind: 'map',
+        verb: 'express:hum',
+      },
+    ],
+    rejections: [
+      { tick: tick - 3, agentId: 'yusuf', verb: 'tend', reason: 'tend needs a {targetId}' },
+    ],
     accepted: [{ tick: tick - 4, agentId: 'amara', verb: 'drink' }],
     tickMs: [0.4, 0.5, 0.41],
     spendProjections: [{ tick: tick - 60, usdPerSimDay: 0.17 }],
-    fullNeed: [['omar:0', 12], ['salma:1', 3]],
+    fullNeed: [
+      ['omar:0', 12],
+      ['salma:1', 3],
+    ],
     nightsRun: [0],
     semanticRan: true,
     semanticErrors: 1,
@@ -45,22 +65,29 @@ const checkpointAt = (tick: number): G11Checkpoint => ({
     narrateErrors: 0,
     constructErrors: 0,
     semanticHits: ['first_song'],
-    minds: [{
-      agentId: 'omar',
-      snapshot: {
-        clock: {
-          lastTurnTick: tick - 6, reconsiderAtTick: tick + 40, conversationUntilTick: 0,
-          dozeUntilTick: 0, alarmArmed: { hunger: true }, morningWokeDay: 1,
-          wakeRetryAtTick: 0, prevVisibleIds: ['salma'],
+    minds: [
+      {
+        agentId: 'omar',
+        snapshot: {
+          clock: {
+            lastTurnTick: tick - 6,
+            reconsiderAtTick: tick + 40,
+            conversationUntilTick: 0,
+            dozeUntilTick: 0,
+            alarmArmed: { hunger: true },
+            morningWokeDay: 1,
+            wakeRetryAtTick: 0,
+            prevVisibleIds: ['salma'],
+          },
+          plan: { queue: [{ verb: 'walk', params: { x: 62, y: 70 } }], lastResult: 'running' },
+          stats: { turns: 27, dozes: 3, reflections: 2 },
+          dayLog: ['The morning is bright.'],
+          reflectedNight: 0,
+          wasNight: false,
+          pendingDreamMood: null,
         },
-        plan: { queue: [{ verb: 'walk', params: { x: 62, y: 70 } }], lastResult: 'running' },
-        stats: { turns: 27, dozes: 3, reflections: 2 },
-        dayLog: ['The morning is bright.'],
-        reflectedNight: 0,
-        wasNight: false,
-        pendingDreamMood: null,
       },
-    }],
+    ],
     dryTurn: 41,
     resumes: [],
   },
@@ -84,7 +111,7 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-describe('the checkpoint carries the run\'s memory, not only its world', () => {
+describe("the checkpoint carries the run's memory, not only its world", () => {
   it('round-trips every accumulator no criterion could be computed without', () => {
     const cp = checkpointAt(2880)
     writeCheckpoint(db, snapPath, cp)
@@ -110,12 +137,16 @@ describe('the checkpoint carries the run\'s memory, not only its world', () => {
   })
 
   it('refuses a snapshot that is not there rather than starting an empty world', () => {
-    expect(() => restoreSnapshot(join(dir, 'nothing.db'), dbPath)).toThrow(/no checkpoint snapshot/)
+    expect(() => {
+      restoreSnapshot(join(dir, 'nothing.db'), dbPath)
+    }).toThrow(/no checkpoint snapshot/)
   })
 
   it('a torn write leaves the previous checkpoint standing, because the copy is renamed', () => {
     writeCheckpoint(db, snapPath, checkpointAt(1440))
-    expect(() => writeCheckpoint(db, join(dir, 'no-such-dir', 'x.db'), checkpointAt(2880))).toThrow()
+    expect(() => {
+      writeCheckpoint(db, join(dir, 'no-such-dir', 'x.db'), checkpointAt(2880))
+    }).toThrow()
     restoreSnapshot(snapPath, join(dir, 'copy.db'))
     const old = new Database(join(dir, 'copy.db'))
     expect(readCheckpoint(old)!.sidecar.tick).toBe(1440)
@@ -126,14 +157,17 @@ describe('the checkpoint carries the run\'s memory, not only its world', () => {
 describe('a checkpoint cannot launder a failure into a pass', () => {
   it('only ever moves forward: an earlier tick may not overwrite a later one', () => {
     writeCheckpoint(db, snapPath, checkpointAt(4320))
-    expect(() => writeCheckpoint(db, snapPath, checkpointAt(2880)))
-      .toThrow(/may only move forward/)
+    expect(() => {
+      writeCheckpoint(db, snapPath, checkpointAt(2880))
+    }).toThrow(/may only move forward/)
     expect(readCheckpoint(db)!.sidecar.tick).toBe(4320)
   })
 
   it('allows a checkpoint at the same tick, which is a rewrite and not a rewind', () => {
     writeCheckpoint(db, snapPath, checkpointAt(4320))
-    expect(() => writeCheckpoint(db, snapPath, checkpointAt(4320))).not.toThrow()
+    expect(() => {
+      writeCheckpoint(db, snapPath, checkpointAt(4320))
+    }).not.toThrow()
   })
 
   it('refuses to continue a run taken on a different commit', () => {
@@ -144,7 +178,7 @@ describe('a checkpoint cannot launder a failure into a pass', () => {
   })
 
   it('refuses every difference that makes it a different gate', () => {
-    const differences: Array<Partial<G11Fingerprint>> = [
+    const differences: Partial<G11Fingerprint>[] = [
       { configHash: 'other' },
       { totalTicks: 2880 },
       { startTick: 0 },
@@ -177,8 +211,9 @@ describe('a checkpoint cannot launder a failure into a pass', () => {
   })
 
   it('refuses a checkpoint from an older format rather than guessing at its shape', () => {
-    db.prepare('INSERT OR REPLACE INTO g11_checkpoint (id, payload) VALUES (1, ?)')
-      .run(JSON.stringify({ ...checkpointAt(1440), version: 0 }))
+    db.prepare('INSERT OR REPLACE INTO g11_checkpoint (id, payload) VALUES (1, ?)').run(
+      JSON.stringify({ ...checkpointAt(1440), version: 0 }),
+    )
     expect(() => readCheckpoint(db)).toThrow()
   })
 
@@ -192,7 +227,7 @@ describe('a checkpoint cannot launder a failure into a pass', () => {
 describe('a mind comes back with its clock, not with a fresh one', () => {
   // The type below is the runtime's own, so a field added to a mind's clock fails this file
   // rather than being silently dropped by every resume.
-  it('the checkpoint\'s mind shape is exactly the runtime\'s snapshot shape', () => {
+  it("the checkpoint's mind shape is exactly the runtime's snapshot shape", () => {
     const fromCheckpoint = checkpointAt(2880).sidecar.minds[0]!.snapshot
     const asRuntime: RuntimeSnapshot = fromCheckpoint
     const backAgain: typeof fromCheckpoint = asRuntime

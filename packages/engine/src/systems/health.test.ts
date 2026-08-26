@@ -11,20 +11,45 @@ const CFG: SimConfig = SimConfigSchema.parse({})
 const DAWN = 360 // hour 6, minute 0
 
 let seq = 5000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
-function makeWorld(config = CFG, agents: Array<{ id: string; x: number; y: number }> = [{ id: 'a1', x: 0, y: 0 }]): WorldState {
-  let s = genesisState(config, Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0)))
-  for (const a of agents) s = fold(s, ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 7300 }), config)
+function makeWorld(
+  config = CFG,
+  agents: { id: string; x: number; y: number }[] = [{ id: 'a1', x: 0, y: 0 }],
+): WorldState {
+  let s = genesisState(
+    config,
+    Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0)),
+  )
+  for (const a of agents)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 7300 }),
+      config,
+    )
   return s
 }
-function patchAgent(s: WorldState, id: string, patch: Partial<WorldState['agents'][string]>): WorldState {
+function patchAgent(
+  s: WorldState,
+  id: string,
+  patch: Partial<WorldState['agents'][string]>,
+): WorldState {
   return { ...s, agents: { ...s.agents, [id]: { ...s.agents[id]!, ...patch } } }
 }
 function atTick(s: WorldState, tick: number): WorldState {
   return { ...s, tick }
 }
-function applyAll(s: WorldState, events: Array<{ type: string; payload: unknown }>, config = CFG, tick = s.tick): WorldState {
+function applyAll(
+  s: WorldState,
+  events: { type: string; payload: unknown }[],
+  config = CFG,
+  tick = s.tick,
+): WorldState {
   for (const e of events) s = fold(s, ev(e.type, e.payload, tick), config)
   return s
 }
@@ -34,9 +59,18 @@ function tickOnce(s: WorldState, config = CFG, rng = new RngStreams('t')): World
 }
 
 // The pair `attack` emits, so a test that wants a wound gets the hp loss with it.
-function wound(s: WorldState, agentId: string, kind: 'minor' | 'serious' | 'grave', tick?: number): WorldState {
+function wound(
+  s: WorldState,
+  agentId: string,
+  kind: 'minor' | 'serious' | 'grave',
+  tick?: number,
+): WorldState {
   const at = tick ?? s.tick
-  const hurtEv = ev('agent_harmed', { agentId, amount: CFG.health.injuryDamage[kind], source: 'attack' }, at)
+  const hurtEv = ev(
+    'agent_harmed',
+    { agentId, amount: CFG.health.injuryDamage[kind], source: 'attack' },
+    at,
+  )
   return fold(fold(s, hurtEv, CFG), ev('agent_injured', { agentId, kind }, at), CFG)
 }
 
@@ -56,7 +90,9 @@ describe('fold: health events', () => {
     // The record alone takes nothing: one subtraction, and it is the other event's.
     const recorded = fold(makeWorld(), ev('agent_injured', { agentId: 'a1', kind: 'grave' }), CFG)
     expect(recorded.agents.a1!.hp).toBe(100)
-    expect(() => fold(s, ev('agent_injured', { agentId: 'ghost', kind: 'minor' }), CFG)).toThrow(/unknown agent/i)
+    expect(() => fold(s, ev('agent_injured', { agentId: 'ghost', kind: 'minor' }), CFG)).toThrow(
+      /unknown agent/i,
+    )
   })
 
   it('agent_infected and agent_fell_ill set ill; agent_recovered clears it', () => {
@@ -83,7 +119,9 @@ describe('fold: health events', () => {
     expect(s.agents.a1!.hp).toBe(100)
     s = fold(s, ev('hp_changed', { agentId: 'a1', delta: -250 }), CFG)
     expect(s.agents.a1!.hp).toBe(0)
-    expect(() => fold(s, ev('hp_changed', { agentId: 'ghost', delta: 1 }), CFG)).toThrow(/unknown agent/i)
+    expect(() => fold(s, ev('hp_changed', { agentId: 'ghost', delta: 1 }), CFG)).toThrow(
+      /unknown agent/i,
+    )
   })
 
   it('hp_changed clears collapsedSinceTick only when hp and needs are back above thresholds', () => {
@@ -92,14 +130,22 @@ describe('fold: health events', () => {
     expect(s.agents.a1!.collapsedSinceTick).toBe(3) // 12 still below collapseHp 15
     s = fold(s, ev('hp_changed', { agentId: 'a1', delta: 50 }), CFG)
     expect(s.agents.a1!.collapsedSinceTick).toBeNull()
-    let low = patchAgent(makeWorld(), 'a1', { hp: 10, collapsedSinceTick: 3, needs: { hunger: 0, energy: 100, warmth: 100, social: 100 } })
+    let low = patchAgent(makeWorld(), 'a1', {
+      hp: 10,
+      collapsedSinceTick: 3,
+      needs: { hunger: 0, energy: 100, warmth: 100, social: 100 },
+    })
     low = fold(low, ev('hp_changed', { agentId: 'a1', delta: 50 }), CFG)
     expect(low.agents.a1!.collapsedSinceTick).toBe(3) // hunger still below threshold
   })
 })
 
 describe('verb: tend', () => {
-  const trio = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 1, y: 1 }, { id: 'a3', x: 5, y: 5 }])
+  const trio = makeWorld(CFG, [
+    { id: 'a1', x: 0, y: 0 },
+    { id: 'a2', x: 1, y: 1 },
+    { id: 'a3', x: 5, y: 5 },
+  ])
 
   it('is registered with the medicine skill', () => {
     expect(VERBS.tend!.kind).toBe('tend')
@@ -122,7 +168,7 @@ describe('verb: tend', () => {
 
 // `agent_infected` still folds for a recorded log; nothing emits it any more, and what a septic
 // wound produces is an illness affliction — see systems/illness.test.ts.
-describe('worldTick: infection is not healthSystem\'s any more', () => {
+describe("worldTick: infection is not healthSystem's any more", () => {
   it('an open wound at dawn infects nobody here, on the seed that used to', () => {
     let s = makeWorld()
     s = wound(s, 'a1', 'minor')
@@ -134,9 +180,13 @@ describe('worldTick: infection is not healthSystem\'s any more', () => {
 
 // healthSystem no longer spreads anything. `agent_fell_ill` still folds for
 // recorded logs, but nothing in the engine emits it — illnessSystem owns contagion.
-describe('worldTick: contagion is not healthSystem\'s any more', () => {
+describe("worldTick: contagion is not healthSystem's any more", () => {
   it('an ill body beside a healthy one infects nobody, at any dial', () => {
-    let s = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 1, y: 0 }, { id: 'a3', x: 10, y: 0 }])
+    let s = makeWorld(CFG, [
+      { id: 'a1', x: 0, y: 0 },
+      { id: 'a2', x: 1, y: 0 },
+      { id: 'a3', x: 10, y: 0 },
+    ])
     s = fold(s, ev('agent_fell_ill', { agentId: 'a1' }), CFG)
     for (let i = 0; i < 50; i++) s = tickOnce(s, CFG, new RngStreams(`c${i}`)).state
     expect(s.agents.a2!.ill).toBe(false)
@@ -146,7 +196,10 @@ describe('worldTick: contagion is not healthSystem\'s any more', () => {
 
 describe('worldTick: recovery and tend', () => {
   it('tended recovery beats natural: tendedRecoveryHpPerDay vs recoveryHpPerDay at dawn', () => {
-    let s = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 1, y: 0 }])
+    let s = makeWorld(CFG, [
+      { id: 'a1', x: 0, y: 0 },
+      { id: 'a2', x: 1, y: 0 },
+    ])
     s = patchAgent(s, 'a1', { hp: 50 })
     s = patchAgent(s, 'a2', { hp: 50 })
     s = atTick(s, DAWN - 6)
@@ -154,41 +207,76 @@ describe('worldTick: recovery and tend', () => {
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
     let last: WorldTickResult | null = null
-    for (let i = 0; i < 6; i++) { last = tickOnce(s); s = last.state }
+    for (let i = 0; i < 6; i++) {
+      last = tickOnce(s)
+      s = last.state
+    }
     // The hour of care lands three ticks in, and dawn pays it at the tended rate x tendMultiplier.
     expect(s.agents.a1!.tendedTick).toBe(DAWN - 3)
     expect(last!.events).toContainEqual({
-      type: 'hp_changed', payload: { agentId: 'a1', delta: CFG.health.tendedRecoveryHpPerDay * CFG.mortality.tendMultiplier },
+      type: 'hp_changed',
+      payload: {
+        agentId: 'a1',
+        delta: CFG.health.tendedRecoveryHpPerDay * CFG.mortality.tendMultiplier,
+      },
     })
-    expect(last!.events).toContainEqual({ type: 'hp_changed', payload: { agentId: 'a2', delta: 5 } })
+    expect(last!.events).toContainEqual({
+      type: 'hp_changed',
+      payload: { agentId: 'a2', delta: 5 },
+    })
     expect(s.agents.a1!.hp).toBe(80)
     expect(s.agents.a2!.hp).toBe(55)
   })
 
   it('rest and a full belly are the other two ways back', () => {
-    const asleep = tickOnce(atTick(patchAgent(makeWorld(), 'a1', { hp: 50, asleep: true }), DAWN - 1))
+    const asleep = tickOnce(
+      atTick(patchAgent(makeWorld(), 'a1', { hp: 50, asleep: true }), DAWN - 1),
+    )
     expect(asleep.events).toContainEqual({
       type: 'hp_changed',
-      payload: { agentId: 'a1', delta: CFG.health.recoveryHpPerDay * CFG.mortality.sleepRegenMultiplier },
+      payload: {
+        agentId: 'a1',
+        delta: CFG.health.recoveryHpPerDay * CFG.mortality.sleepRegenMultiplier,
+      },
     })
 
-    const fed = tickOnce(atTick(patchAgent(makeWorld(), 'a1', {
-      hp: 50, needs: { hunger: CFG.mortality.fedThreshold + 1, energy: 100, warmth: 100, social: 100 },
-    }), DAWN - 1))
+    const fed = tickOnce(
+      atTick(
+        patchAgent(makeWorld(), 'a1', {
+          hp: 50,
+          needs: { hunger: CFG.mortality.fedThreshold + 1, energy: 100, warmth: 100, social: 100 },
+        }),
+        DAWN - 1,
+      ),
+    )
     expect(fed.events).toContainEqual({ type: 'hp_changed', payload: { agentId: 'a1', delta: 5 } })
 
-    const hungry = tickOnce(atTick(patchAgent(makeWorld(), 'a1', {
-      hp: 50, needs: { hunger: CFG.mortality.fedThreshold - 1, energy: 100, warmth: 100, social: 100 },
-    }), DAWN - 1))
+    const hungry = tickOnce(
+      atTick(
+        patchAgent(makeWorld(), 'a1', {
+          hp: 50,
+          needs: { hunger: CFG.mortality.fedThreshold - 1, energy: 100, warmth: 100, social: 100 },
+        }),
+        DAWN - 1,
+      ),
+    )
     expect(hungry.events.map((e) => e.type)).not.toContain('hp_changed')
   })
 
   it('leaves C9 recovery exactly as it was when the world has mortality switched off', () => {
     const OFF = SimConfigSchema.parse({ mortality: { enabled: false } })
-    const s = atTick(patchAgent(makeWorld(OFF), 'a1', {
-      hp: 50, asleep: true, needs: { hunger: 1, energy: 100, warmth: 100, social: 100 },
-    }), DAWN - 1)
-    expect(tickOnce(s, OFF).events).toContainEqual({ type: 'hp_changed', payload: { agentId: 'a1', delta: 5 } })
+    const s = atTick(
+      patchAgent(makeWorld(OFF), 'a1', {
+        hp: 50,
+        asleep: true,
+        needs: { hunger: 1, energy: 100, warmth: 100, social: 100 },
+      }),
+      DAWN - 1,
+    )
+    expect(tickOnce(s, OFF).events).toContainEqual({
+      type: 'hp_changed',
+      payload: { agentId: 'a1', delta: 5 },
+    })
   })
 
   it('ill clears with agent_recovered when hp is back at max', () => {
@@ -212,14 +300,20 @@ describe('worldTick: hp floor (Task 6 integration)', () => {
 
     const dead = wound(s, 'a1', 'minor')
     const t2 = tickOnce(dead) // hp 0 <= deathHp
-    expect(t2.events).toContainEqual({ type: 'agent_died', payload: { agentId: 'a1', cause: 'injury' } })
+    expect(t2.events).toContainEqual({
+      type: 'agent_died',
+      payload: { agentId: 'a1', cause: 'injury' },
+    })
     expect(t2.state.agents.a1!.alive).toBe(false)
   })
 })
 
 describe('worldTick: health replay safety', () => {
   it('folding the returned events over the input reproduces the returned state', () => {
-    let s = makeWorld(CFG, [{ id: 'a1', x: 0, y: 0 }, { id: 'a2', x: 2, y: 0 }])
+    let s = makeWorld(CFG, [
+      { id: 'a1', x: 0, y: 0 },
+      { id: 'a2', x: 2, y: 0 },
+    ])
     s = wound(s, 'a1', 'serious')
     s = fold(s, ev('agent_fell_ill', { agentId: 'a2' }), CFG)
     s = atTick(s, DAWN - 1)

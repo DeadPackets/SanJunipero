@@ -39,7 +39,13 @@ describe('codex', () => {
   it('withinAdjacency grants one step beyond: an unearned authored id whose prerequisite is known', () => {
     const store = seededStore()
     expect(store.withinAdjacency(['iron_smelting'])).toBe(false)
-    store.insert({ id: 'iron_smelting', era: 'machinery', name: 'Iron smelting', prerequisiteId: 'charcoal', known: false })
+    store.insert({
+      id: 'iron_smelting',
+      era: 'machinery',
+      name: 'Iron smelting',
+      prerequisiteId: 'charcoal',
+      known: false,
+    })
     // Not yet known — but reachable from a practiced craft.
     expect(store.known()).not.toContain('iron_smelting')
     expect(store.withinAdjacency(['iron_smelting'])).toBe(true)
@@ -47,8 +53,20 @@ describe('codex', () => {
 
   it('withinAdjacency rejects an unearned authored id whose prerequisite is also unearned', () => {
     const store = seededStore()
-    store.insert({ id: 'iron_smelting', era: 'machinery', name: 'Iron smelting', prerequisiteId: 'charcoal', known: false })
-    store.insert({ id: 'steel', era: 'machinery', name: 'Steel', prerequisiteId: 'iron_smelting', known: false })
+    store.insert({
+      id: 'iron_smelting',
+      era: 'machinery',
+      name: 'Iron smelting',
+      prerequisiteId: 'charcoal',
+      known: false,
+    })
+    store.insert({
+      id: 'steel',
+      era: 'machinery',
+      name: 'Steel',
+      prerequisiteId: 'iron_smelting',
+      known: false,
+    })
     expect(store.withinAdjacency(['steel'])).toBe(false)
   })
 
@@ -59,7 +77,13 @@ describe('codex', () => {
 
   it('knownEra ignores unearned authored rows', () => {
     const store = seededStore()
-    store.insert({ id: 'iron_smelting', era: 'works', name: 'Iron smelting', prerequisiteId: 'charcoal', known: false })
+    store.insert({
+      id: 'iron_smelting',
+      era: 'works',
+      name: 'Iron smelting',
+      prerequisiteId: 'charcoal',
+      known: false,
+    })
     expect(store.knownEra()).toBe('machinery')
   })
 
@@ -71,9 +95,27 @@ describe('codex', () => {
   it('frontier() names every unearned rung withinAdjacency would accept, and nothing else', () => {
     const store = seededStore()
     expect(store.frontier()).toEqual([])
-    store.insert({ id: 'iron_smelting', era: 'machinery', name: 'Iron smelting', prerequisiteId: 'charcoal', known: false })
-    store.insert({ id: 'steel', era: 'machinery', name: 'Steel', prerequisiteId: 'iron_smelting', known: false })
-    store.insert({ id: 'glazing', era: 'arrangement', name: 'Glazing', prerequisiteId: 'pottery', known: false })
+    store.insert({
+      id: 'iron_smelting',
+      era: 'machinery',
+      name: 'Iron smelting',
+      prerequisiteId: 'charcoal',
+      known: false,
+    })
+    store.insert({
+      id: 'steel',
+      era: 'machinery',
+      name: 'Steel',
+      prerequisiteId: 'iron_smelting',
+      known: false,
+    })
+    store.insert({
+      id: 'glazing',
+      era: 'arrangement',
+      name: 'Glazing',
+      prerequisiteId: 'pottery',
+      known: false,
+    })
 
     // Sorted, so the line it renders into is byte-stable for a given codex.
     expect(store.frontier()).toEqual(['glazing', 'iron_smelting'])
@@ -86,9 +128,9 @@ describe('codex', () => {
 
   it('duplicate insert throws (PK)', () => {
     const store = seededStore()
-    expect(() =>
-      store.insert({ id: 'fire', era: 'handwork', name: 'Fire again', prerequisiteId: null }),
-    ).toThrow(/UNIQUE constraint failed/)
+    expect(() => {
+      store.insert({ id: 'fire', era: 'handwork', name: 'Fire again', prerequisiteId: null })
+    }).toThrow(/UNIQUE constraint failed/)
   })
 })
 
@@ -105,13 +147,24 @@ describe('codex known-column migration', () => {
       id TEXT PRIMARY KEY, era TEXT NOT NULL, name TEXT NOT NULL,
       prerequisite_id TEXT REFERENCES codex(id)
     );`)
-    db.prepare('INSERT INTO codex (id, era, name, prerequisite_id) VALUES (?, ?, ?, ?)').run('fire', 'handwork', 'Fire', null)
+    db.prepare('INSERT INTO codex (id, era, name, prerequisite_id) VALUES (?, ?, ?, ?)').run(
+      'fire',
+      'handwork',
+      'Fire',
+      null,
+    )
 
     migrateArbiterTables(db)
 
     const store = new CodexStore(db)
     expect(store.known()).toEqual(['fire'])
-    store.insert({ id: 'charcoal', era: 'arrangement', name: 'Charcoal', prerequisiteId: 'fire', known: false })
+    store.insert({
+      id: 'charcoal',
+      era: 'arrangement',
+      name: 'Charcoal',
+      prerequisiteId: 'fire',
+      known: false,
+    })
     expect(store.known()).toEqual(['fire'])
     expect(store.withinAdjacency(['charcoal'])).toBe(true)
   })

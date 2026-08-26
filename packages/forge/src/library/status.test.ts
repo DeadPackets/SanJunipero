@@ -4,10 +4,15 @@ import { spriteGateStatus } from './status.js'
 
 function verdict(overall: VisionVerdict['overall']): VisionVerdict {
   const criteria = Object.fromEntries(
-    CRITERIA.map(k => [k, { pass: true, score: 10, evidence: 'seen' }])) as VisionCriteria
+    CRITERIA.map((k) => [k, { pass: true, score: 10, evidence: 'seen' }]),
+  ) as VisionCriteria
   return {
-    assetId: 'library:stool', model: 'google/gemini-3.7-flash', rubricVersion: 'v1',
-    criteria, overall, feedback: '',
+    assetId: 'library:stool',
+    model: 'google/gemini-3.7-flash',
+    rubricVersion: 'v1',
+    criteria,
+    overall,
+    feedback: '',
   }
 }
 
@@ -17,8 +22,9 @@ describe('spriteGateStatus', () => {
   })
 
   it('reads the LAST sprite verdict, not the first', () => {
-    expect(spriteGateStatus([verdict('pass'), verdict('retry'), verdict('blocked')], 'pass'))
-      .toBe('blocked')
+    expect(spriteGateStatus([verdict('pass'), verdict('retry'), verdict('blocked')], 'pass')).toBe(
+      'blocked',
+    )
     expect(spriteGateStatus([verdict('blocked'), verdict('pass')], 'blocked')).toBe('pass')
   })
 

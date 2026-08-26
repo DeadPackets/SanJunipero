@@ -55,13 +55,13 @@ export function detectInstitutions(
   }
   for (const [key, seqs] of byAgentVerb) {
     if (seqs.length < cfg.roleMinActions) continue
-    const [agentId, verb] = key.split('|')
+    const [agentId, verb] = key.split('|') as [string, string]
     const label = ROLE_VERBS[verb]
     out.push({
       kind: 'role',
       name: `the ${label}`,
       description: `${agentId} has ${pastTense(verb)} ${seqs.length} times`,
-      foundingSceneIndex: sceneOf(seqs[0]),
+      foundingSceneIndex: sceneOf(seqs[0]!),
       memberIds: [agentId],
       sourceEventIds: seqs,
     })
@@ -81,7 +81,7 @@ export function detectInstitutions(
   const adj = new Map<string, Set<string>>()
   for (const [key, n] of coCount) {
     if (n < cfg.groupMinCoScenes) continue
-    const [a, b] = key.split('|')
+    const [a, b] = key.split('|') as [string, string]
     if (!adj.has(a)) adj.set(a, new Set())
     if (!adj.has(b)) adj.set(b, new Set())
     adj.get(a)!.add(b)
@@ -109,7 +109,7 @@ export function detectInstitutions(
       description: `${members.join(' & ')} are often seen together`,
       foundingSceneIndex: foundingIdx,
       memberIds: members,
-      sourceEventIds: foundingIdx === -1 ? [] : scenes[foundingIdx].eventIds,
+      sourceEventIds: foundingIdx === -1 ? [] : scenes[foundingIdx]!.eventIds,
     })
   }
 
@@ -128,7 +128,7 @@ export function detectInstitutions(
       kind: 'rule',
       name: `people ${verb}`,
       description: `${agents.size} people have ${pastTense(verb)} ${seqs.length} times`,
-      foundingSceneIndex: sceneOf(seqs[0]),
+      foundingSceneIndex: sceneOf(seqs[0]!),
       memberIds: [...agents].sort(),
       sourceEventIds: seqs,
     })

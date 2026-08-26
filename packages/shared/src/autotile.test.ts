@@ -1,13 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ROAD_AUTOTILE_CODEX_PREFIX, ROAD_AUTOTILE_KEYS, RoadAutotileKeySchema, roadAutotile,
-  roadAutotileKind, type RoadNeighbors,
+  ROAD_AUTOTILE_CODEX_PREFIX,
+  ROAD_AUTOTILE_KEYS,
+  RoadAutotileKeySchema,
+  roadAutotile,
+  roadAutotileKind,
+  type RoadNeighbors,
 } from './autotile.js'
 
-const F = false, T = true
+const F = false,
+  T = true
 // 16 explicit rows — the expectation is authored, never computed from the implementation.
-const TABLE: Array<[RoadNeighbors, string]> = [
-  [{ n: F, e: F, s: F, w: F }, 'cap-s'],        // isolated (deviation 3)
+const TABLE: [RoadNeighbors, string][] = [
+  [{ n: F, e: F, s: F, w: F }, 'cap-s'], // isolated (deviation 3)
   [{ n: T, e: F, s: F, w: F }, 'cap-n'],
   [{ n: F, e: T, s: F, w: F }, 'cap-e'],
   [{ n: T, e: T, s: F, w: F }, 'corner-ne'],

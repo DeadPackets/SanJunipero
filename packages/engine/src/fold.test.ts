@@ -3,8 +3,14 @@ import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimEvent } from '@sj/s
 import { genesisState } from './state.js'
 import { fold } from './fold.js'
 
-const ev = (seq: number, type: string, payload: unknown, tick = 0): SimEvent => ({ seq, tick, type, payload })
-const spawn = (id: string, x = 0, y = 0) => ev(1, 'agent_spawned', { id, name: id, x, y, ageDays: 7300 })
+const ev = (seq: number, type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq,
+  tick,
+  type,
+  payload,
+})
+const spawn = (id: string, x = 0, y = 0) =>
+  ev(1, 'agent_spawned', { id, name: id, x, y, ageDays: 7300 })
 
 describe('fold', () => {
   it('spawns, moves, and changes needs', () => {
@@ -39,12 +45,26 @@ describe('fold', () => {
   })
 
   it('spawn applies the full v2 default body', () => {
-    const s = fold(genesisState(DEFAULT_CONFIG), ev(1, 'agent_spawned', { id: 'a1', name: 'Ada', x: 2, y: 3, ageDays: 9125 }))
+    const s = fold(
+      genesisState(DEFAULT_CONFIG),
+      ev(1, 'agent_spawned', { id: 'a1', name: 'Ada', x: 2, y: 3, ageDays: 9125 }),
+    )
     expect(s.agents.a1).toEqual({
-      id: 'a1', name: 'Ada', x: 2, y: 3, alive: true, asleep: false,
+      id: 'a1',
+      name: 'Ada',
+      x: 2,
+      y: 3,
+      alive: true,
+      asleep: false,
       needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
-      hp: DEFAULT_CONFIG.health.maxHp, injuries: [], ill: false, ageDays: 9125,
-      skills: {}, activity: null, collapsedSinceTick: null, zeroHungerSinceTick: null,
+      hp: DEFAULT_CONFIG.health.maxHp,
+      injuries: [],
+      ill: false,
+      ageDays: 9125,
+      skills: {},
+      activity: null,
+      collapsedSinceTick: null,
+      zeroHungerSinceTick: null,
     })
   })
 
@@ -65,13 +85,20 @@ describe('fold', () => {
   })
 
   it('strict payloads reject an extra key on agent_spawned', () => {
-    expect(() => fold(genesisState(DEFAULT_CONFIG), ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 1, sneaky: true }))).toThrow()
+    expect(() =>
+      fold(
+        genesisState(DEFAULT_CONFIG),
+        ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 1, sneaky: true }),
+      ),
+    ).toThrow()
   })
   it('strict payloads reject extra keys on the migrated C1 events', () => {
-    let s = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
+    const s = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
     expect(() => fold(s, ev(2, 'tick_advanced', { extra: 1 }, 1))).toThrow()
     expect(() => fold(s, ev(2, 'agent_moved', { id: 'a1', x: 1, y: 1, extra: 1 }))).toThrow()
-    expect(() => fold(s, ev(2, 'need_changed', { id: 'a1', need: 'hunger', delta: -1, extra: 1 }))).toThrow()
+    expect(() =>
+      fold(s, ev(2, 'need_changed', { id: 'a1', need: 'hunger', delta: -1, extra: 1 })),
+    ).toThrow()
     void s
   })
 
@@ -84,15 +111,21 @@ describe('fold', () => {
   })
   it('tile_changed refuses a from that does not match the ground', () => {
     const s = genesisState(DEFAULT_CONFIG)
-    expect(() => fold(s, ev(1, 'tile_changed', { x: 2, y: 3, from: 7, to: 8, reason: 'worn' })))
-      .toThrow(/from-mismatch at \(2, 3\)/)
+    expect(() =>
+      fold(s, ev(1, 'tile_changed', { x: 2, y: 3, from: 7, to: 8, reason: 'worn' })),
+    ).toThrow(/from-mismatch at \(2, 3\)/)
   })
   it('tile_changed out of bounds throws, and an unknown reason is rejected', () => {
     const s = genesisState(DEFAULT_CONFIG)
-    expect(() => fold(s, ev(1, 'tile_changed', { x: 99, y: 0, from: 0, to: 8, reason: 'worn' })))
-      .toThrow(/out of bounds/i)
-    expect(() => fold(s, ev(1, 'tile_changed', { x: 0, y: 0, from: 0, to: 8, reason: 'vibes' }))).toThrow()
-    expect(() => fold(s, ev(1, 'tile_changed', { x: 0, y: 0, from: 0, to: 11, reason: 'worn' }))).toThrow()
+    expect(() =>
+      fold(s, ev(1, 'tile_changed', { x: 99, y: 0, from: 0, to: 8, reason: 'worn' })),
+    ).toThrow(/out of bounds/i)
+    expect(() =>
+      fold(s, ev(1, 'tile_changed', { x: 0, y: 0, from: 0, to: 8, reason: 'vibes' })),
+    ).toThrow()
+    expect(() =>
+      fold(s, ev(1, 'tile_changed', { x: 0, y: 0, from: 0, to: 11, reason: 'worn' })),
+    ).toThrow()
   })
   it('tile_changed records who did it when a body did it', () => {
     let s = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
@@ -124,8 +157,12 @@ describe('fold', () => {
 describe('discovery_made — the record, and nothing in the state', () => {
   const base = genesisState(DEFAULT_CONFIG)
   const payload = {
-    recipeId: 'recipe:waterskin', name: 'stitch a waterskin', kind: 'craft',
-    byId: 'a1', intent: 'carry water in a stitched hide', makes: ['waterskin'],
+    recipeId: 'recipe:waterskin',
+    name: 'stitch a waterskin',
+    kind: 'craft',
+    byId: 'a1',
+    intent: 'carry water in a stitched hide',
+    makes: ['waterskin'],
   }
   const evt: SimEvent = { seq: 1, tick: 7, type: 'discovery_made', payload }
 
@@ -141,7 +178,8 @@ describe('discovery_made — the record, and nothing in the state', () => {
   })
 
   it('refuses a kind the archive has no words for', () => {
-    expect(() => fold(base, { ...evt, payload: { ...payload, kind: 'vibe' } }, DEFAULT_CONFIG))
-      .toThrow()
+    expect(() =>
+      fold(base, { ...evt, payload: { ...payload, kind: 'vibe' } }, DEFAULT_CONFIG),
+    ).toThrow()
   })
 })

@@ -8,7 +8,12 @@ export const HEAT_POLL_MS = 5000
 export const DIRECTOR_ZOOM = 3 as const
 
 // `autoCut` is the LIVE town being televised; it must not fight a recorded day's playback.
-export function DirectorMode({ store, scene, autoCut, leaving = false }: {
+export function DirectorMode({
+  store,
+  scene,
+  autoCut,
+  leaving = false,
+}: {
   store: WorldStore
   scene: Scene | null
   autoCut: boolean
@@ -22,7 +27,9 @@ export function DirectorMode({ store, scene, autoCut, leaving = false }: {
   // read inside the poll, never subscribed to — the town changing must not restart the timer
   const livingRef = useRef<string[]>([])
   livingRef.current = Object.values(state?.agents ?? {})
-    .filter((a) => a.alive).map((a) => a.id).sort()
+    .filter((a) => a.alive)
+    .map((a) => a.id)
+    .sort()
 
   // heat poll → sticky cut, never faster than CUT_MIN_MS
   useEffect(() => {
@@ -39,7 +46,11 @@ export function DirectorMode({ store, scene, autoCut, leaving = false }: {
           if (!alive) return
           const next = subjectFor(heat, followedRef.current, store.getTick(), livingRef.current)
           const now = performance.now()
-          if (next !== null && next !== followedRef.current && now - lastCutRef.current >= CUT_MIN_MS) {
+          if (
+            next !== null &&
+            next !== followedRef.current &&
+            now - lastCutRef.current >= CUT_MIN_MS
+          ) {
             followedRef.current = next
             lastCutRef.current = now
             setFollowed(next)
@@ -63,7 +74,9 @@ export function DirectorMode({ store, scene, autoCut, leaving = false }: {
   // (glide-interpolated), so cuts and tracking are smooth; a drag interrupts it
   useEffect(() => {
     if (scene === null || !autoCut) return
-    return () => scene.setFollow(null)
+    return () => {
+      scene.setFollow(null)
+    }
   }, [scene, autoCut])
   // With no subject the picture is the whole settlement: pushing to 3x before the first heat
   // poll has named anybody frames a 3x crop of whatever the camera was over.
@@ -103,14 +116,28 @@ export function DirectorMode({ store, scene, autoCut, leaving = false }: {
       if (t !== null) subtitle = { text: t.text, kind: 'thought' }
     }
   }
-  const name = followed !== null ? state?.agents[followed]?.name ?? followed : null
+  const name = followed !== null ? (state?.agents[followed]?.name ?? followed) : null
 
   return (
-    <div className={leaving ? 'director leaving' : 'director'} aria-label="Moments — the town, televised">
+    <div
+      className={leaving ? 'director leaving' : 'director'}
+      aria-label="Moments — the town, televised"
+    >
       {!leaving && name !== null && (
-        <div className={subtitle?.kind === 'thought' ? 'subtitle thought' : 'subtitle'} role="status">
+        <div
+          className={subtitle?.kind === 'thought' ? 'subtitle thought' : 'subtitle'}
+          role="status"
+        >
           <span className="subtitle-name">{name}</span>
-          {subtitle !== null ? (subtitle.kind === 'thought' ? <em>{subtitle.text}</em> : `"${subtitle.text}"`) : '…'}
+          {subtitle !== null ? (
+            subtitle.kind === 'thought' ? (
+              <em>{subtitle.text}</em>
+            ) : (
+              `"${subtitle.text}"`
+            )
+          ) : (
+            '…'
+          )}
         </div>
       )}
     </div>

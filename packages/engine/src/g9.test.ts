@@ -1,11 +1,14 @@
 // @slow — the deterministic half of the living-world gate. Scripted actors only. Partnership
 // runs on the REAL coSleepNightsToPartner: 3; only gestation and the conception roll are forced.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import {
-  DAYS_PER_YEAR, MINUTES_PER_DAY, SPAWN_AGE_YEARS, SimConfigSchema, stateHash,
-  type SimConfig, type SimEvent,
+  DAYS_PER_YEAR,
+  MINUTES_PER_DAY,
+  SPAWN_AGE_YEARS,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+  type SimEvent,
 } from '@sj/shared'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
@@ -30,35 +33,57 @@ const QUIET = { weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }
 const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 // The only acceleration in this file, and neither clock is under test here.
 const FERTILE: SimConfig = SimConfigSchema.parse({
-  ...QUIET, reproduction: { conceptionChancePerNight: 1, gestationDays: 1 },
+  ...QUIET,
+  reproduction: { conceptionChancePerNight: 1, gestationDays: 1 },
 })
 
 const RNG = RngStream.seed('g9a', 'actions')
 
 let seq = 900000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
-const MAP = (n = 24): TileId[][] => Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
+const MAP = (n = 24): TileId[][] =>
+  Array.from({ length: n }, () => Array.from({ length: n }, (): TileId => 0))
 
 type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }
-const HOUSE: Box = { id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2 }        // door (4,6)
+const HOUSE: Box = { id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2 } // door (4,6)
 const STORE: Box = { id: 'structure_2', kind: 'storehouse', x: 10, y: 4, w: 2, h: 2 } // door (10,6)
 
 function raise(s: WorldState, config: SimConfig, box: Box, owner?: string): WorldState {
-  const planned = fold(s, ev('structure_planned', {
-    ...box, maxHp: 50, flammable: true, builderId: 'script',
-    ...(owner === undefined ? {} : { owner }),
-  }), config)
+  const planned = fold(
+    s,
+    ev('structure_planned', {
+      ...box,
+      maxHp: 50,
+      flammable: true,
+      builderId: 'script',
+      ...(owner === undefined ? {} : { owner }),
+    }),
+    config,
+  )
   return fold(planned, ev('structure_completed', { id: box.id }), config)
 }
 
 type Spawn = { id: string; x: number; y: number; sex?: 'f' | 'm'; ageDays?: number }
 
 function spawn(s: WorldState, config: SimConfig, a: Spawn): WorldState {
-  return fold(s, ev('agent_spawned', {
-    id: a.id, name: a.id, x: a.x, y: a.y, ageDays: a.ageDays ?? 7300,
-    ...(a.sex === undefined ? {} : { sex: a.sex }),
-  }), config)
+  return fold(
+    s,
+    ev('agent_spawned', {
+      id: a.id,
+      name: a.id,
+      x: a.x,
+      y: a.y,
+      ageDays: a.ageDays ?? 7300,
+      ...(a.sex === undefined ? {} : { sex: a.sex }),
+    }),
+    config,
+  )
 }
 
 const indoors = (s: WorldState, config: SimConfig, id: string, box: Box): WorldState => {
@@ -76,8 +101,15 @@ function apply(s: WorldState, config: SimConfig, events: PendingEvent[], tick = 
 
 // One full world pass at a chosen moment of a chosen day — the real pipeline, so a row
 // that passes here passes in a running town.
-function pass(s: WorldState, config: SimConfig, day: number, hour = 0, seed = 'g9a'): {
-  state: WorldState; events: PendingEvent[]
+function pass(
+  s: WorldState,
+  config: SimConfig,
+  day: number,
+  hour = 0,
+  seed = 'g9a',
+): {
+  state: WorldState
+  events: PendingEvent[]
 } {
   const tick = day * MINUTES_PER_DAY + hour * 60
   const advanced = fold({ ...s, tick: tick - 1 }, ev('tick_advanced', {}, tick), config)
@@ -87,7 +119,8 @@ function pass(s: WorldState, config: SimConfig, day: number, hour = 0, seed = 'g
 const nights = (s: WorldState, config: SimConfig, days: number[], seed = 'g9a'): WorldState =>
   days.reduce((acc, day) => pass(acc, config, day, 0, seed).state, s)
 
-const typed = (events: PendingEvent[], type: string): PendingEvent[] => events.filter((e) => e.type === type)
+const typed = (events: PendingEvent[], type: string): PendingEvent[] =>
+  events.filter((e) => e.type === type)
 
 // The config the tick wrapper would hand a verb: base ⊕ whatever the world has legislated.
 const live = (s: WorldState, base = CFG): SimConfig => effectiveConfig(base, s.laws)
@@ -97,7 +130,10 @@ function couple(config: SimConfig): WorldState {
   let s = raise(genesisState(config, MAP()), config, HOUSE)
   s = spawn(s, config, { id: 'ada', x: 4, y: 6, sex: 'f', ageDays: 30 * DAYS_PER_YEAR })
   s = spawn(s, config, { id: 'bex', x: 4, y: 6, sex: 'm', ageDays: 32 * DAYS_PER_YEAR })
-  for (const id of ['ada', 'bex']) { s = indoors(s, config, id, HOUSE); s = asleep(s, config, id) }
+  for (const id of ['ada', 'bex']) {
+    s = indoors(s, config, id, HOUSE)
+    s = asleep(s, config, id)
+  }
   return s
 }
 
@@ -120,7 +156,10 @@ describe('G9a-1: partnership is counted at the real threshold, and an eight-day 
     const partnered = nights(couple(CFG), CFG, [1, 2, 3])
     const apart = nights(partnered, CFG, [11]) // day 3 → day 11: an eight-day gap
     expect(partnershipOf(apart, 'ada', 'bex')).toEqual({
-      nights: 1, lastNightDay: 11, formedTick: 3 * MINUTES_PER_DAY, dissolvedTick: 11 * MINUTES_PER_DAY,
+      nights: 1,
+      lastNightDay: 11,
+      formedTick: 3 * MINUTES_PER_DAY,
+      dissolvedTick: 11 * MINUTES_PER_DAY,
     })
     expect(isPartnered(apart, 'ada', 'bex', CFG)).toBe(false)
   })
@@ -159,7 +198,11 @@ describe('G9a-2: conception, gestation and a child born at twelve', () => {
   })
 
   it('goes silent under the reproduction law, and the law travels as an event', () => {
-    const off = fold(couple(FERTILE), ev('config_changed', { path: 'reproduction.enabled', value: false }), FERTILE)
+    const off = fold(
+      couple(FERTILE),
+      ev('config_changed', { path: 'reproduction.enabled', value: false }),
+      FERTILE,
+    )
     const quiet = pass(off, FERTILE, 1)
     expect(typed(quiet.events, 'co_slept')).toEqual([])
     expect(quiet.state.pairNights).toBeUndefined()
@@ -174,13 +217,17 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
     s = spawn(s, CFG, { id: 'maker', x: 8, y: 5 })
     s = spawn(s, CFG, { id: 'owner', x: 9, y: 5 })
     s = spawn(s, CFG, { id: 'taker', x: 11, y: 5 })
-    s = spawn(s, CFG, { id: 'near', x: 12, y: 8 })    // 4.5 tiles from the shelf: in sight
-    s = spawn(s, CFG, { id: 'far', x: 10, y: 20 })    // 16 tiles away: out of sight
-    s = spawn(s, CFG, { id: 'shut', x: 4, y: 6 })     // behind a wall
+    s = spawn(s, CFG, { id: 'near', x: 12, y: 8 }) // 4.5 tiles from the shelf: in sight
+    s = spawn(s, CFG, { id: 'far', x: 10, y: 20 }) // 16 tiles away: out of sight
+    s = spawn(s, CFG, { id: 'shut', x: 4, y: 6 }) // behind a wall
     s = indoors(s, CFG, 'shut', HOUSE)
     // A hand expert enough to leave a mark on what it makes.
     s = fold(s, ev('skill_gained', { agentId: 'maker', track: 'carpentry', xp: 500 }), CFG)
-    s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 4, loc: { t: 'agent', id: 'maker' } }), CFG)
+    s = fold(
+      s,
+      ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 4, loc: { t: 'agent', id: 'maker' } }),
+      CFG,
+    )
     // The witness radius scales with the light on the tile looked at, and 4.5 tiles at midnight
     // is past it. The dark has its own row in perception.test.ts.
     return { ...s, tick: 720 }
@@ -197,8 +244,14 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
     expect(plank.crafterMark).toBe('maker')
 
     // give → the only voluntary transfer of title the world has.
-    expect(submitIntent(s, CFG, 'maker', 'give', { itemId: plank.id, targetId: 'owner' }).ok).toBe(true)
-    s = apply(s, CFG, VERBS.give!.onComplete(s, CFG, 'maker', { itemId: plank.id, targetId: 'owner' }, RNG))
+    expect(submitIntent(s, CFG, 'maker', 'give', { itemId: plank.id, targetId: 'owner' }).ok).toBe(
+      true,
+    )
+    s = apply(
+      s,
+      CFG,
+      VERBS.give!.onComplete(s, CFG, 'maker', { itemId: plank.id, targetId: 'owner' }, RNG),
+    )
     expect(s.items[plank.id]!.owner).toBe('owner')
     expect(s.items[plank.id]!.crafterMark).toBe('maker') // a mark is not a title; it never moves
 
@@ -214,7 +267,12 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
     const taken = takeEvents.find((e) => e.type === 'item_taken')
     expect(taken).toBeDefined()
     expect(taken!.payload).toEqual({
-      itemId: plank.id, kind: 'plank', takerId: 'taker', ownerId: 'owner', x: STORE.x, y: STORE.y,
+      itemId: plank.id,
+      kind: 'plank',
+      takerId: 'taker',
+      ownerId: 'owner',
+      x: STORE.x,
+      y: STORE.y,
     })
     expect(takeEvents.some((e) => e.type === 'item_owner_changed')).toBe(false) // taking is not title
     s = apply(s, CFG, takeEvents)
@@ -231,7 +289,9 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
     expect(seenBy('taker')).toEqual([]) // you do not witness yourself
 
     // Prose has both names to work with: "owner's plank".
-    const shelf = composePerception(s, CFG, 'taker', []).self.inventory.find((i) => i.id === plank.id)!
+    const shelf = composePerception(s, CFG, 'taker', []).self.inventory.find(
+      (i) => i.id === plank.id,
+    )!
     expect(shelf.ownerName).toBe('owner')
     expect(shelf.crafterMarkName).toBe('maker')
   })
@@ -245,14 +305,26 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
     expect(plank.crafterMark).toBeUndefined()
 
     // An item owned before the flip stays owned, inertly, and takes silently.
-    let owned = fold(town(), ev('item_spawned', {
-      id: 'item_9', kind: 'bread', qty: 1, loc: { t: 'structure', id: STORE.id }, owner: 'owner',
-    }), CFG)
+    let owned = fold(
+      town(),
+      ev('item_spawned', {
+        id: 'item_9',
+        kind: 'bread',
+        qty: 1,
+        loc: { t: 'structure', id: STORE.id },
+        owner: 'owner',
+      }),
+      CFG,
+    )
     owned = fold(owned, ev('config_changed', { path: 'ownership.enabled', value: false }), CFG)
     const events = VERBS.take!.onComplete(owned, live(owned), 'taker', { itemId: 'item_9' }, RNG)
     expect(events.some((e) => e.type === 'item_taken')).toBe(false)
     expect(owned.items.item_9!.owner).toBe('owner')
-    expect(composePerception(owned, CFG, 'near', []).visible.items.every((i) => i.ownerName === undefined)).toBe(true)
+    expect(
+      composePerception(owned, CFG, 'near', []).visible.items.every(
+        (i) => i.ownerName === undefined,
+      ),
+    ).toBe(true)
   })
 })
 
@@ -260,15 +332,24 @@ describe('G9a-4: a wall stops sound', () => {
   function room(): WorldState {
     let s = raise(genesisState(CFG, MAP()), CFG, HOUSE)
     for (const a of [
-      { id: 'speaker', x: 4, y: 6 }, { id: 'roommate', x: 4, y: 6 },
-      { id: 'doorway', x: 4, y: 7 }, { id: 'outside', x: 7, y: 6 },
-    ]) s = spawn(s, CFG, a)
+      { id: 'speaker', x: 4, y: 6 },
+      { id: 'roommate', x: 4, y: 6 },
+      { id: 'doorway', x: 4, y: 7 },
+      { id: 'outside', x: 7, y: 6 },
+    ])
+      s = spawn(s, CFG, a)
     s = indoors(s, CFG, 'speaker', HOUSE)
     return indoors(s, CFG, 'roommate', HOUSE)
   }
 
   const said = (s: WorldState): SimEvent => {
-    const events = VERBS.speak!.onComplete(s, CFG, 'speaker', { text: 'the rain is late this year' }, RNG)
+    const events = VERBS.speak!.onComplete(
+      s,
+      CFG,
+      'speaker',
+      { text: 'the rain is late this year' },
+      RNG,
+    )
     return ev('agent_spoke', events[0]!.payload)
   }
 
@@ -277,7 +358,8 @@ describe('G9a-4: a wall stops sound', () => {
     const spoke = said(s)
     expect((spoke.payload as { insideId?: string }).insideId).toBe(HOUSE.id)
 
-    const heardBy = (id: string) => composePerception(s, CFG, id, [spoke]).heard.map((h) => h.speakerId)
+    const heardBy = (id: string) =>
+      composePerception(s, CFG, id, [spoke]).heard.map((h) => h.speakerId)
     expect(heardBy('roommate')).toEqual(['speaker'])
     expect(heardBy('doorway')).toEqual(['speaker'])
     expect(heardBy('outside')).toEqual([]) // three tiles out, well inside plain earshot of 8
@@ -293,13 +375,29 @@ describe('G9a-5: a shelf buys time', () => {
   function larder(): WorldState {
     let s = raise(genesisState(CFG, MAP()), CFG, STORE)
     s = spawn(s, CFG, { id: 'cook', x: 9, y: 5 })
-    s = fold(s, ev('item_spawned', {
-      id: 'item_1', kind: 'fish', qty: 1, loc: { t: 'tile', x: 9, y: 6 }, spoilage: { spawnDay: 0, days: 2 },
-    }), CFG)
-    return fold(s, ev('item_spawned', {
-      id: 'item_2', kind: 'fish', qty: 1, loc: { t: 'agent', id: 'cook' }, owner: 'cook',
-      spoilage: { spawnDay: 0, days: 2 },
-    }), CFG)
+    s = fold(
+      s,
+      ev('item_spawned', {
+        id: 'item_1',
+        kind: 'fish',
+        qty: 1,
+        loc: { t: 'tile', x: 9, y: 6 },
+        spoilage: { spawnDay: 0, days: 2 },
+      }),
+      CFG,
+    )
+    return fold(
+      s,
+      ev('item_spawned', {
+        id: 'item_2',
+        kind: 'fish',
+        qty: 1,
+        loc: { t: 'agent', id: 'cook' },
+        owner: 'cook',
+        spoilage: { spawnDay: 0, days: 2 },
+      }),
+      CFG,
+    )
   }
 
   it('a stowed fish outlives a dropped one by the storehouse multiplier', () => {
@@ -313,16 +411,24 @@ describe('G9a-5: a shelf buys time', () => {
     expect(spoilDeadline(s, s.items.item_2!, CFG)).toBe(2 * CFG.spoilage.storehouseMultiplier)
 
     const day2 = pass(s, CFG, 2)
-    expect(typed(day2.events, 'item_spoiled').map((e) => (e.payload as { id: string }).id)).toEqual(['item_1'])
+    expect(typed(day2.events, 'item_spoiled').map((e) => (e.payload as { id: string }).id)).toEqual(
+      ['item_1'],
+    )
     expect(day2.state.items.item_2).toBeDefined()
 
     const day4 = pass(day2.state, CFG, 4)
-    expect(typed(day4.events, 'item_spoiled').map((e) => (e.payload as { id: string }).id)).toEqual(['item_2'])
+    expect(typed(day4.events, 'item_spoiled').map((e) => (e.payload as { id: string }).id)).toEqual(
+      ['item_2'],
+    )
     expect(day4.state.items.item_2).toBeUndefined()
   })
 
   it('with the spoilage law off nothing turns, and the deadline waits', () => {
-    const off = fold(larder(), ev('config_changed', { path: 'spoilage.enabled', value: false }), CFG)
+    const off = fold(
+      larder(),
+      ev('config_changed', { path: 'spoilage.enabled', value: false }),
+      CFG,
+    )
     expect(typed(pass(off, CFG, 4).events, 'item_spoiled')).toEqual([])
     expect(pass(off, CFG, 4).state.items.item_1).toBeDefined()
   })
@@ -333,9 +439,17 @@ describe('G9a-6: a tool wears out and breaks', () => {
   // without making a package cycle. This row asserts the world's half.
   function withRod(durability: number): WorldState {
     const s = spawn(genesisState(CFG, MAP()), CFG, { id: 'a1', x: 2, y: 2 })
-    return fold(s, ev('item_spawned', {
-      id: 'item_1', kind: 'rod', qty: 1, loc: { t: 'agent', id: 'a1' }, durability,
-    }), CFG)
+    return fold(
+      s,
+      ev('item_spawned', {
+        id: 'item_1',
+        kind: 'rod',
+        qty: 1,
+        loc: { t: 'agent', id: 'a1' },
+        durability,
+      }),
+      CFG,
+    )
   }
 
   it('two uses of a two-point rod leave nothing in the hand', () => {
@@ -348,11 +462,19 @@ describe('G9a-6: a tool wears out and breaks', () => {
   })
 
   it('a thing with no durability of its own never wears', () => {
-    const s = fold(spawn(genesisState(CFG, MAP()), CFG, { id: 'a1', x: 2, y: 2 }), ev('item_spawned', {
-      id: 'item_1', kind: 'bread', qty: 1, loc: { t: 'agent', id: 'a1' },
-    }), CFG)
-    expect(() => apply(s, CFG, [{ type: 'item_worn', payload: { id: 'item_1', delta: -1 } }]))
-      .toThrow(/no durability/)
+    const s = fold(
+      spawn(genesisState(CFG, MAP()), CFG, { id: 'a1', x: 2, y: 2 }),
+      ev('item_spawned', {
+        id: 'item_1',
+        kind: 'bread',
+        qty: 1,
+        loc: { t: 'agent', id: 'a1' },
+      }),
+      CFG,
+    )
+    expect(() =>
+      apply(s, CFG, [{ type: 'item_worn', payload: { id: 'item_1', delta: -1 } }]),
+    ).toThrow(/no durability/)
   })
 })
 
@@ -362,13 +484,13 @@ describe('G9a-7: what is carved can be read back', () => {
   function wall(config = CFG): WorldState {
     let s = raise(genesisState(config, MAP()), config, HOUSE)
     s = spawn(s, config, { id: 'carver', x: 4, y: 6 })
-    s = spawn(s, config, { id: 'passerby', x: 12, y: 6 })  // in sight, out of arm's reach
+    s = spawn(s, config, { id: 'passerby', x: 12, y: 6 }) // in sight, out of arm's reach
     // By daylight, for the same reason the ownership chain above is: what "in sight" means
     // now depends on the light on the wall.
     return { ...s, tick: 720 }
   }
 
-  it('an inscription is written, and read at arm\'s length only', () => {
+  it("an inscription is written, and read at arm's length only", () => {
     let s = wall()
     const params = { structureId: HOUSE.id, text: TEXT }
     const started = submitIntent(s, CFG, 'carver', 'inscribe', params)
@@ -376,9 +498,13 @@ describe('G9a-7: what is carved can be read back', () => {
     s = apply(s, CFG, VERBS.inscribe!.onComplete(s, CFG, 'carver', params, RNG))
     expect(s.structures[HOUSE.id]!.inscription).toEqual({ text: TEXT, by: 'carver' })
 
-    const close = composePerception(s, CFG, 'carver', []).visible.structures.find((x) => x.id === HOUSE.id)!
+    const close = composePerception(s, CFG, 'carver', []).visible.structures.find(
+      (x) => x.id === HOUSE.id,
+    )!
     expect(close.inscription).toEqual({ text: TEXT, by: 'carver' })
-    const across = composePerception(s, CFG, 'passerby', []).visible.structures.find((x) => x.id === HOUSE.id)!
+    const across = composePerception(s, CFG, 'passerby', []).visible.structures.find(
+      (x) => x.id === HOUSE.id,
+    )!
     expect(across.hasInscription).toBe(true)
     expect(across.inscription).toBeUndefined()
   })
@@ -426,21 +552,38 @@ describe('G9a-8: the world keeps one hand hidden', () => {
   })
 
   it('with the mystery law off the roll is not drawn at all', () => {
-    const off = fold(watchers(CERTAIN), ev('config_changed', { path: 'mystery.enabled', value: false }), CERTAIN)
+    const off = fold(
+      watchers(CERTAIN),
+      ev('config_changed', { path: 'mystery.enabled', value: false }),
+      CERTAIN,
+    )
     expect(typed(pass(off, CERTAIN, 1, 12).events, 'mystery_event')).toEqual([])
   })
 })
 
 describe('G9a-9: death of old age, under a forced roll', () => {
   const CERTAIN_DEATH: SimConfig = SimConfigSchema.parse({
-    ...QUIET, aging: { naturalDeathBaseChancePerDay: 1 },
+    ...QUIET,
+    aging: { naturalDeathBaseChancePerDay: 1 },
   })
 
   function elder(config: SimConfig): WorldState {
-    const s = spawn(genesisState(config, MAP()), config, { id: 'elder', x: 3, y: 3, ageDays: 70 * DAYS_PER_YEAR })
-    return fold(s, ev('item_spawned', {
-      id: 'item_1', kind: 'bread', qty: 1, loc: { t: 'agent', id: 'elder' },
-    }), config)
+    const s = spawn(genesisState(config, MAP()), config, {
+      id: 'elder',
+      x: 3,
+      y: 3,
+      ageDays: 70 * DAYS_PER_YEAR,
+    })
+    return fold(
+      s,
+      ev('item_spawned', {
+        id: 'item_1',
+        kind: 'bread',
+        qty: 1,
+        loc: { t: 'agent', id: 'elder' },
+      }),
+      config,
+    )
   }
 
   it('an elder dies at midnight and what she carried falls where she stood', () => {
@@ -453,9 +596,14 @@ describe('G9a-9: death of old age, under a forced roll', () => {
   })
 
   it('with the old-age law off the body still ages and the roll is skipped', () => {
-    const off = fold(elder(CERTAIN_DEATH), ev('config_changed', {
-      path: 'aging.deathOfOldAgeEnabled', value: false,
-    }), CERTAIN_DEATH)
+    const off = fold(
+      elder(CERTAIN_DEATH),
+      ev('config_changed', {
+        path: 'aging.deathOfOldAgeEnabled',
+        value: false,
+      }),
+      CERTAIN_DEATH,
+    )
     const midnight = pass(off, CERTAIN_DEATH, 1)
     expect(typed(midnight.events, 'agent_aged')).toHaveLength(1)
     expect(typed(midnight.events, 'agent_died')).toEqual([])
@@ -468,8 +616,9 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
   const END_TICK = 2200
 
   type Run = {
-    loop: TickLoop; store: EventStore
-    events: Array<{ tick: number; type: string; payload: unknown }>
+    loop: TickLoop
+    store: EventStore
+    events: { tick: number; type: string; payload: unknown }[]
     preFlip: { state: WorldState; seq: number }
   }
 
@@ -480,11 +629,18 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
     const queue: LawQueue = []
     const rng = new RngStreams('g9a-laws')
     const worldTick = createWorldTick(CFG, rng, queue)
-    const events: Array<{ tick: number; type: string; payload: unknown }> = []
+    const events: { tick: number; type: string; payload: unknown }[] = []
     const loop: TickLoop = new TickLoop({
-      store, state: genesisState(CFG, MAP()), rng, config: CFG, snapshotEveryTicks: 500,
+      store,
+      state: genesisState(CFG, MAP()),
+      rng,
+      config: CFG,
+      snapshotEveryTicks: 500,
       onTick: ({ tick, emit }) => {
-        const record = (type: string, payload: unknown) => { events.push({ tick, type, payload }); emit(type, payload) }
+        const record = (type: string, payload: unknown) => {
+          events.push({ tick, type, payload })
+          emit(type, payload)
+        }
         if (tick === 1) {
           record('structure_planned', { ...HOUSE, maxHp: 50, flammable: true, builderId: 'script' })
           record('structure_completed', { id: HOUSE.id })
@@ -492,7 +648,10 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
           record('agent_entered', { agentId: 'ada', structureId: HOUSE.id })
           record('agent_slept', { agentId: 'ada' })
           record('item_spawned', {
-            id: 'item_1', kind: 'fish', qty: 1, loc: { t: 'tile', x: 6, y: 6 },
+            id: 'item_1',
+            kind: 'fish',
+            qty: 1,
+            loc: { t: 'tile', x: 6, y: 6 },
             spoilage: { spawnDay: 0, days: 1 },
           })
         }
@@ -551,19 +710,28 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
 
   it('refuses a path that is not a world law, and a value of the wrong shape', () => {
     const s = genesisState(CFG, MAP())
-    expect(() => fold(s, ev('config_changed', { path: 'movement.sightRadius', value: 40 }), CFG))
-      .toThrow(/not a world law/)
-    expect(() => fold(s, ev('config_changed', { path: 'needs.eatRestoreHunger', value: 999 }), CFG))
-      .toThrow(/not a world law/)
-    expect(() => fold(s, ev('config_changed', { path: 'spoilage.enabled', value: 'off' }), CFG))
-      .toThrow(/rejected/)
+    expect(() =>
+      fold(s, ev('config_changed', { path: 'movement.sightRadius', value: 40 }), CFG),
+    ).toThrow(/not a world law/)
+    expect(() =>
+      fold(s, ev('config_changed', { path: 'needs.eatRestoreHunger', value: 999 }), CFG),
+    ).toThrow(/not a world law/)
+    expect(() =>
+      fold(s, ev('config_changed', { path: 'spoilage.enabled', value: 'off' }), CFG),
+    ).toThrow(/rejected/)
   })
 
   it('every C9 feature has a switch an operator can reach', () => {
     for (const path of [
-      'reproduction.enabled', 'aging.deathOfOldAgeEnabled', 'spoilage.enabled', 'tools.wearEnabled',
-      'mystery.enabled', 'occlusion.enabled', 'ownership.enabled', 'inscription.enabled',
-    ]) expect(TOGGLABLE_PATHS[path]).toBeDefined()
+      'reproduction.enabled',
+      'aging.deathOfOldAgeEnabled',
+      'spoilage.enabled',
+      'tools.wearEnabled',
+      'mystery.enabled',
+      'occlusion.enabled',
+      'ownership.enabled',
+      'inscription.enabled',
+    ])
+      expect(TOGGLABLE_PATHS[path]).toBeDefined()
   })
 })
-

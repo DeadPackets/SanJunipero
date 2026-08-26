@@ -7,13 +7,26 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { FakeEmbedder, insertAlert, OPAQUE_REFUSAL, openAgentDb, type LlmClient, type MindSpec } from '@sj/agents'
+import {
+  FakeEmbedder,
+  insertAlert,
+  OPAQUE_REFUSAL,
+  openAgentDb,
+  type LlmClient,
+  type MindSpec,
+} from '@sj/agents'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { startDevWorld, type DevWorld, type LiveCast } from './devWorld.js'
 import { foundersFor, townStructuresFor } from './founders.js'
 import {
-  LIVE_OPS_DB, amnesiaRefusal, capReachedRefusal, createLiveCast, ledgerTotalUsd,
-  preflightCostUsd, restorableSnapshot, settle,
+  LIVE_OPS_DB,
+  amnesiaRefusal,
+  capReachedRefusal,
+  createLiveCast,
+  ledgerTotalUsd,
+  preflightCostUsd,
+  restorableSnapshot,
+  settle,
 } from './liveWorld.js'
 import { thoughtsSince } from './observer.js'
 
@@ -26,30 +39,52 @@ const NO_USAGE = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd:
 // Two of the five, so a row costs two runtimes rather than five. Ids match the town's bodies.
 const TWO: MindSpec[] = [
   {
-    id: 'amara', sex: 'f', ageDays: 34 * 364,
+    id: 'amara',
+    sex: 'f',
+    ageDays: 34 * 364,
     identity: {
-      name: 'Amara', age: 34, backstory: 'Keeps the tally.', temperament: 'exacting',
+      name: 'Amara',
+      age: 34,
+      backstory: 'Keeps the tally.',
+      temperament: 'exacting',
       voiceCard: {
-        register: 'plain', rhythm: 'short', tics: [], neverSays: [],
-        exampleLines: ['Put it back.'], wordBudget: { typical: 12, burst: 22 },
+        register: 'plain',
+        rhythm: 'short',
+        tics: [],
+        neverSays: [],
+        exampleLines: ['Put it back.'],
+        wordBudget: { typical: 12, burst: 22 },
       },
     },
     personality: {
-      temperament: 'exacting', values: ['a full store'], beliefs: ['what is counted keeps'],
+      temperament: 'exacting',
+      values: ['a full store'],
+      beliefs: ['what is counted keeps'],
       current: { mood: 'watchful', worries: [], goals: ['get through the day'] },
     },
   },
   {
-    id: 'omar', sex: 'm', ageDays: 46 * 364,
+    id: 'omar',
+    sex: 'm',
+    ageDays: 46 * 364,
     identity: {
-      name: 'Omar', age: 46, backstory: 'Sits with the sick.', temperament: 'unhurried',
+      name: 'Omar',
+      age: 46,
+      backstory: 'Sits with the sick.',
+      temperament: 'unhurried',
       voiceCard: {
-        register: 'low', rhythm: 'slow', tics: [], neverSays: [],
-        exampleLines: ['Now then.'], wordBudget: { typical: 16, burst: 28 },
+        register: 'low',
+        rhythm: 'slow',
+        tics: [],
+        neverSays: [],
+        exampleLines: ['Now then.'],
+        wordBudget: { typical: 16, burst: 28 },
       },
     },
     personality: {
-      temperament: 'unhurried', values: ['sitting with the sick'], beliefs: ['a hand does more'],
+      temperament: 'unhurried',
+      values: ['sitting with the sick'],
+      beliefs: ['a hand does more'],
       current: { mood: 'attentive', worries: [], goals: ['get through the day'] },
     },
   },
@@ -67,9 +102,13 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
       }
       throw new Error('no canned answer fits this schema')
     },
-    async text() { return { text: 'the day passes', usage: NO_USAGE } },
+    async text() {
+      return { text: 'the day passes', usage: NO_USAGE }
+    },
     totalCostUsd: () => 0,
-    alert: (kind: string, detail: string) => insertAlert(db, { agentId, kind, detail }),
+    alert: (kind: string, detail: string) => {
+      insertAlert(db, { agentId, kind, detail })
+    },
   } as unknown as LlmClient
 }
 
@@ -81,7 +120,8 @@ const WELLSIDE = foundersFor(townStructuresFor('showcase')).find((f) => f.id ===
 // re-offers it to the arbiter as freeform words. That refusal is the only doorway to spec §4.
 const INVENTED_VERB = 'smoke_fish'
 const INVENTING_TURN = {
-  thought: THOUGHT, importance: 7,
+  thought: THOUGHT,
+  importance: 7,
   action: { verb: INVENTED_VERB, params: { over: 'green wood' } },
 }
 
@@ -95,7 +135,9 @@ const SMOKE_RECIPE = {
   requires: [],
   outcomeTable: [
     {
-      weight: 1, success: true, label: 'The fish darkens and firms in the smoke.',
+      weight: 1,
+      success: true,
+      label: 'The fish darkens and firms in the smoke.',
       effects: [{ op: 'spawn_item', kind: 'smoked_fish', qty: 1, to: 'agent' }],
     },
   ],
@@ -103,16 +145,20 @@ const SMOKE_RECIPE = {
   canon: ['food_preserving'],
 }
 const SMOKE_VERDICT = {
-  kind: 'attempt', recipe: SMOKE_RECIPE,
+  kind: 'attempt',
+  recipe: SMOKE_RECIPE,
   summary: 'Hang the fish in the smoke of green wood so it keeps past the week.',
 }
 const REFUSING_VERDICT = {
-  kind: 'impossible', class: 'insufficient_skill',
+  kind: 'impossible',
+  class: 'insufficient_skill',
   reason: 'the smoke will not hold without a knack for it nobody here has shown',
 }
 
 const SPEAKING_TURN = {
-  thought: THOUGHT, importance: 5, speech: SPOKEN,
+  thought: THOUGHT,
+  importance: 5,
+  speech: SPOKEN,
   action: { verb: 'walk', params: { x: WELLSIDE.x, y: WELLSIDE.y } },
 }
 const SILENT_TURN = { thought: THOUGHT, importance: 2 }
@@ -120,7 +166,8 @@ const SILENT_TURN = { thought: THOUGHT, importance: 2 }
 // Every mind turns on the tick it is asked to, so a row does not have to step out the 120-tick
 // boredom floor five times over.
 const EAGER = {
-  idleGapTicks: 0, boredomTicks: 1,
+  idleGapTicks: 0,
+  boredomTicks: 1,
   bodyAlarm: { hunger: 0, energy: 0, warmth: 0, thirst: 0, affliction: Infinity },
 }
 
@@ -156,8 +203,12 @@ async function liveWorld(opts: {
   // Through the factory, exactly as `serve.ts` does it: built out here the cast would already
   // hold the per-mind files open when `fresh` deleted them.
   const world = await startDevWorld({
-    dbPath: join(opts.dir, 'world.db'), port: 0, map: 'showcase', realMsPerTick: 10_000_000,
-    agentDbDir, ...(opts.fresh === undefined ? {} : { fresh: opts.fresh }),
+    dbPath: join(opts.dir, 'world.db'),
+    port: 0,
+    map: 'showcase',
+    realMsPerTick: 10_000_000,
+    agentDbDir,
+    ...(opts.fresh === undefined ? {} : { fresh: opts.fresh }),
     cast: async () => {
       cast = await createLiveCast({
         agentDbDir,
@@ -168,16 +219,18 @@ async function liveWorld(opts: {
         ...(opts.spendCapUsd === undefined ? {} : { spendCapUsd: opts.spendCapUsd }),
         ...(opts.onSpendStop === undefined ? {} : { onSpendStop: opts.onSpendStop }),
         ...(opts.rateWindowRealMinutes === undefined
-          ? {} : { rateWindowRealMinutes: opts.rateWindowRealMinutes }),
+          ? {}
+          : { rateWindowRealMinutes: opts.rateWindowRealMinutes }),
         log: () => {},
         ...(opts.useArbiter === undefined ? {} : { useArbiter: opts.useArbiter }),
         makeClient: (opsDb, caller, agentId) => {
           seen = opsDb
           // The god gets its own canned answer. Same ledger, deliberately — an arbiter that
           // billed anywhere else would spend outside the $5 stop, so the rig must not let it.
-          const canned = caller === 'arbiter' && opts.verdict !== undefined
-            ? opts.verdict
-            : opts.turn ?? SPEAKING_TURN
+          const canned =
+            caller === 'arbiter' && opts.verdict !== undefined
+              ? opts.verdict
+              : (opts.turn ?? SPEAKING_TURN)
           return fakeLlm(opsDb, agentId ?? null, canned)
         },
       })
@@ -199,17 +252,26 @@ async function run(world: DevWorld, ticks: number): Promise<void> {
 }
 
 /** The world's own log, read back out of the db the way any other reader would. */
-function eventsOf(dir: string, type: string): Array<Record<string, unknown>> {
+function eventsOf(dir: string, type: string): Record<string, unknown>[] {
   const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
   try {
-    return (db.prepare('SELECT payload FROM events WHERE type = ? ORDER BY seq').all(type) as
-      Array<{ payload: string }>).map((r) => JSON.parse(r.payload) as Record<string, unknown>)
-  } finally { db.close() }
+    return (
+      db.prepare('SELECT payload FROM events WHERE type = ? ORDER BY seq').all(type) as {
+        payload: string
+      }[]
+    ).map((r) => JSON.parse(r.payload) as Record<string, unknown>)
+  } finally {
+    db.close()
+  }
 }
 
 function thoughtTexts(dir: string): string[] {
   const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
-  try { return thoughtsSince(db, 0).map((t) => t.text) } finally { db.close() }
+  try {
+    return thoughtsSince(db, 0).map((t) => t.text)
+  } finally {
+    db.close()
+  }
 }
 
 describe('★ THE SEAM — a served world whose bodies are driven by minds', () => {
@@ -221,24 +283,26 @@ describe('★ THE SEAM — a served world whose bodies are driven by minds', () 
     expect(world.live).toBe(true)
     const spoke = eventsOf(dir, 'agent_spoke')
     expect(spoke.length).toBeGreaterThan(0)
-    expect(spoke.map((p) => p['text'])).toContain(SPOKEN)
-    expect(spoke.map((p) => p['agentId'])).toEqual(expect.arrayContaining(['amara']))
+    expect(spoke.map((p) => p.text)).toContain(SPOKEN)
+    expect(spoke.map((p) => p.agentId)).toEqual(expect.arrayContaining(['amara']))
   }, 30_000)
 
-  it('★ AND THE SAME WORLD WITH THE SCRIPTED CAST SAYS NOTHING — the row above is not vacuous',
-    async () => {
-      const dir = tmp()
-      const world = await startDevWorld({
-        dbPath: join(dir, 'world.db'), port: 0, map: 'showcase', realMsPerTick: 10_000_000,
-      })
-      worlds.push(world)
-      await run(world, 6)
+  it('★ AND THE SAME WORLD WITH THE SCRIPTED CAST SAYS NOTHING — the row above is not vacuous', async () => {
+    const dir = tmp()
+    const world = await startDevWorld({
+      dbPath: join(dir, 'world.db'),
+      port: 0,
+      map: 'showcase',
+      realMsPerTick: 10_000_000,
+    })
+    worlds.push(world)
+    await run(world, 6)
 
-      expect(world.live).toBe(false)
-      expect(eventsOf(dir, 'agent_spoke')).toHaveLength(0)
-      // …and it is a town that is genuinely running: the puppets walk.
-      expect(eventsOf(dir, 'action_started').length).toBeGreaterThan(0)
-    }, 30_000)
+    expect(world.live).toBe(false)
+    expect(eventsOf(dir, 'agent_spoke')).toHaveLength(0)
+    // …and it is a town that is genuinely running: the puppets walk.
+    expect(eventsOf(dir, 'action_started').length).toBeGreaterThan(0)
+  }, 30_000)
 
   it('the thought bubble carries what the mind THOUGHT, not one of ten canned lines', async () => {
     const dir = tmp()
@@ -246,7 +310,7 @@ describe('★ THE SEAM — a served world whose bodies are driven by minds', () 
     await run(world, 6)
 
     // The minds ARE walking, so a world still publishing the canned lines would publish one.
-    expect(eventsOf(dir, 'action_started').some((p) => p['verb'] === 'walk')).toBe(true)
+    expect(eventsOf(dir, 'action_started').some((p) => p.verb === 'walk')).toBe(true)
     const texts = thoughtTexts(dir)
     expect(texts).toContain(THOUGHT)
     // `THOUGHT_LINES.walk`, and the fallback for a verb the table has no line for.
@@ -255,39 +319,42 @@ describe('★ THE SEAM — a served world whose bodies are driven by minds', () 
     expect(new Set(texts)).toEqual(new Set([THOUGHT]))
   }, 30_000)
 
-  it('★ THE PUPPET STRINGS ARE OFF: a cast that never acts leaves every body standing still',
-    async () => {
-      // The scripted patrol walks from tick 1. If `FoundersOpts.minds` did not cut the policy
-      // loop, these bodies would move even though no mind ever asked them to.
-      const dir = tmp()
-      const { world } = await liveWorld({ dir, turn: SILENT_TURN })
-      await run(world, 8)
+  it('★ THE PUPPET STRINGS ARE OFF: a cast that never acts leaves every body standing still', async () => {
+    // The scripted patrol walks from tick 1. If `FoundersOpts.minds` did not cut the policy
+    // loop, these bodies would move even though no mind ever asked them to.
+    const dir = tmp()
+    const { world } = await liveWorld({ dir, turn: SILENT_TURN })
+    await run(world, 8)
 
-      expect(eventsOf(dir, 'action_started')).toHaveLength(0)
-      // And the scripted larder top-up is gone with it: a live town feeds itself or it does not.
-      expect(eventsOf(dir, 'need_changed').filter((p) => Number(p['delta']) > 0)).toHaveLength(0)
-    }, 30_000)
+    expect(eventsOf(dir, 'action_started')).toHaveLength(0)
+    // And the scripted larder top-up is gone with it: a live town feeds itself or it does not.
+    expect(eventsOf(dir, 'need_changed').filter((p) => Number(p.delta) > 0)).toHaveLength(0)
+  }, 30_000)
 })
 
 describe('★ the money, inside the served world', () => {
   it('stops every mind and calls the stop the moment the ledger reaches the cap', async () => {
-    const stops: Array<{ spent: number; cap: number }> = []
+    const stops: { spent: number; cap: number }[] = []
     const dir = tmp()
     const { world, opsDb } = await liveWorld({
-      dir, spendCapUsd: 0.25, onSpendStop: (spent, cap) => stops.push({ spent, cap }),
+      dir,
+      spendCapUsd: 0.25,
+      onSpendStop: (spent, cap) => stops.push({ spent, cap }),
     })
     await run(world, 4)
     expect(stops).toHaveLength(0)
 
-    opsDb.prepare(
-      `INSERT INTO llm_calls
+    opsDb
+      .prepare(
+        `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
        VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, ?, 0, 1, NULL, NULL)`,
-    ).run(Date.now(), 0.30)
-    expect(ledgerTotalUsd(opsDb)).toBeCloseTo(0.30, 6)
+      )
+      .run(Date.now(), 0.3)
+    expect(ledgerTotalUsd(opsDb)).toBeCloseTo(0.3, 6)
 
-    await run(world, 10)     // the watchdog reads every LIVE_SPEND_CHECK_TICKS
+    await run(world, 10) // the watchdog reads every LIVE_SPEND_CHECK_TICKS
     expect(stops).toHaveLength(1)
     expect(stops[0]!.cap).toBe(0.25)
 
@@ -300,10 +367,12 @@ describe('★ the money, inside the served world', () => {
   // The total cap stops a lane's mistake and cannot stop a leak on a process meant to run for
   // weeks. This row spends FAR UNDER the cap and fast, the exact shape the cap is blind to.
   it('★ stops a town burning too fast even though it is nowhere near its cap', async () => {
-    const stops: Array<{ spent: number; cap: number }> = []
+    const stops: { spent: number; cap: number }[] = []
     const dir = tmp()
     const { world, opsDb } = await liveWorld({
-      dir, spendCapUsd: 5, rateWindowRealMinutes: 15,
+      dir,
+      spendCapUsd: 5,
+      rateWindowRealMinutes: 15,
       onSpendStop: (spent, cap) => stops.push({ spent, cap }),
     })
     await run(world, 4)
@@ -311,12 +380,14 @@ describe('★ the money, inside the served world', () => {
 
     // TWO minds, so the ceiling is 2 x $0.21 = $0.42/sim-day. $0.19 inside a 15-minute window
     // projects to $0.76/sim-day — over the flow ceiling and 3.8% of the $5 total.
-    opsDb.prepare(
-      `INSERT INTO llm_calls
+    opsDb
+      .prepare(
+        `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
        VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, ?, 0, 1, NULL, NULL)`,
-    ).run(Date.now(), 0.19)
+      )
+      .run(Date.now(), 0.19)
     expect(ledgerTotalUsd(opsDb)).toBeLessThan(5)
 
     await run(world, 10)
@@ -329,20 +400,24 @@ describe('★ the money, inside the served world', () => {
   }, 40_000)
 
   it('leaves the measured rate alone — the real stream must not trip its own wire', async () => {
-    const stops: Array<{ spent: number; cap: number }> = []
+    const stops: { spent: number; cap: number }[] = []
     const dir = tmp()
     const { world, opsDb } = await liveWorld({
-      dir, spendCapUsd: 5, rateWindowRealMinutes: 15,
+      dir,
+      spendCapUsd: 5,
+      rateWindowRealMinutes: 15,
       onSpendStop: (spent, cap) => stops.push({ spent, cap }),
     })
     // The worst measured 15 minutes is the nightly reflection burst, $0.0154 for five minds; two
     // minds' share is $0.0062, and this row bills DOUBLE it and still must not fire.
-    opsDb.prepare(
-      `INSERT INTO llm_calls
+    opsDb
+      .prepare(
+        `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
        VALUES (?, NULL, 'reflection', 'm', 0, 0, 0, 0, ?, 0, 1, NULL, NULL)`,
-    ).run(Date.now(), 0.0124)
+      )
+      .run(Date.now(), 0.0124)
 
     await run(world, 20)
     expect(stops, 'the tripwire fired on an ordinary night').toHaveLength(0)
@@ -354,12 +429,14 @@ describe('★ the cap is per town, not per process', () => {
     const dir = tmp()
     const { world, opsDb } = await liveWorld({ dir, spendCapUsd: 0.25 })
     await run(world, 2)
-    opsDb.prepare(
-      `INSERT INTO llm_calls
+    opsDb
+      .prepare(
+        `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
        VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, 0.40, 0, 1, NULL, NULL)`,
-    ).run(Date.now())
+      )
+      .run(Date.now())
     await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
 
     // The ledger resumed with the town, so the second boot is already over the line.
@@ -387,19 +464,20 @@ describe('★ the cap is per town, not per process', () => {
       reasoning_tokens INTEGER, cost_usd REAL, latency_ms INTEGER, ok INTEGER, error TEXT,
       provider TEXT)`)
     const put = (ts: number, caller: string, usd: number): void => {
-      db.prepare('INSERT INTO llm_calls (ts, caller, model, cost_usd, ok) VALUES (?, ?, ?, ?, 1)')
-        .run(ts, caller, 'm', usd)
+      db.prepare(
+        'INSERT INTO llm_calls (ts, caller, model, cost_usd, ok) VALUES (?, ?, ?, ?, 1)',
+      ).run(ts, caller, 'm', usd)
     }
-    put(1000, 'preflight', 0.001)   // a previous boot's pre-flight
-    put(2000, 'turn', 0.9)          // a previous boot's town
-    put(3000, 'preflight', 0.002)   // THIS boot's pre-flight
+    put(1000, 'preflight', 0.001) // a previous boot's pre-flight
+    put(2000, 'turn', 0.9) // a previous boot's town
+    put(3000, 'preflight', 0.002) // THIS boot's pre-flight
     expect(preflightCostUsd(db, 2500)).toBeCloseTo(0.002, 6)
     expect(ledgerTotalUsd(db)).toBeCloseTo(0.903, 6)
     db.close()
   })
 })
 
-describe('★ a mind\'s memory across a resume', () => {
+describe("★ a mind's memory across a resume", () => {
   it('REFUSES a new day-0 town whose minds remember an older one', async () => {
     const dir = tmp()
     // Boot once, let two minds write memories, stop.
@@ -427,11 +505,17 @@ describe('★ a mind\'s memory across a resume', () => {
     await worlds.splice(worlds.indexOf(first.world), 1)[0]!.stop()
 
     const amara = openAgentDb(join(dir, 'minds', 'amara.db'))
-    const memoriesBefore = (amara.prepare('SELECT COUNT(*) AS n FROM memories').get() as { n: number }).n
-    const row = amara.prepare('SELECT tick, snapshot FROM mind_runtime WHERE agent_id = ?')
+    const memoriesBefore = (
+      amara.prepare('SELECT COUNT(*) AS n FROM memories').get() as { n: number }
+    ).n
+    const row = amara
+      .prepare('SELECT tick, snapshot FROM mind_runtime WHERE agent_id = ?')
       .get('amara') as { tick: number; snapshot: string }
-    const versions = (amara.prepare(
-      'SELECT COUNT(*) AS n FROM personality_versions WHERE agent_id = ?').get('amara') as { n: number }).n
+    const versions = (
+      amara
+        .prepare('SELECT COUNT(*) AS n FROM personality_versions WHERE agent_id = ?')
+        .get('amara') as { n: number }
+    ).n
     amara.close()
     expect(memoriesBefore).toBeGreaterThan(0)
     expect(row.tick).toBe(tickWas)
@@ -443,10 +527,16 @@ describe('★ a mind\'s memory across a resume', () => {
     await run(second.world, 2)
     const again = openAgentDb(join(dir, 'minds', 'amara.db'))
     // Not wiped, not re-seeded, and still exactly one personality: `hasPersonality` saw the row.
-    expect((again.prepare('SELECT COUNT(*) AS n FROM memories').get() as { n: number }).n)
-      .toBeGreaterThanOrEqual(memoriesBefore)
-    expect((again.prepare('SELECT COUNT(*) AS n FROM personality_versions WHERE agent_id = ?')
-      .get('amara') as { n: number }).n).toBe(1)
+    expect(
+      (again.prepare('SELECT COUNT(*) AS n FROM memories').get() as { n: number }).n,
+    ).toBeGreaterThanOrEqual(memoriesBefore)
+    expect(
+      (
+        again
+          .prepare('SELECT COUNT(*) AS n FROM personality_versions WHERE agent_id = ?')
+          .get('amara') as { n: number }
+      ).n,
+    ).toBe(1)
     again.close()
   }, 60_000)
 
@@ -461,8 +551,9 @@ describe('★ a mind\'s memory across a resume', () => {
     const amara = openAgentDb(join(dir, 'minds', 'amara.db'))
     // A brand new file: whatever it holds now was written after the wipe, and the guard above
     // proves a world at tick 0 with an unwiped mind would have refused to start at all.
-    expect((amara.prepare('SELECT COUNT(*) AS n FROM memories WHERE tick < 1').get() as { n: number }).n)
-      .toBe(0)
+    expect(
+      (amara.prepare('SELECT COUNT(*) AS n FROM memories WHERE tick < 1').get() as { n: number }).n,
+    ).toBe(0)
     amara.close()
   }, 60_000)
 
@@ -476,7 +567,10 @@ describe('★ a mind\'s memory across a resume', () => {
   })
 
   it('names every mind that is still remembering, and the way out', () => {
-    const msg = amnesiaRefusal([{ id: 'amara', memories: 12 }, { id: 'omar', memories: 4 }])
+    const msg = amnesiaRefusal([
+      { id: 'amara', memories: 12 },
+      { id: 'omar', memories: 4 },
+    ])
     expect(msg).toContain('amara (12)')
     expect(msg).toContain('omar (4)')
     expect(msg).toContain('SJ_FRESH=1')
@@ -490,20 +584,30 @@ describe('★ what the first live boot broke', () => {
     await run(world, 2)
 
     const onDisk = join(dir, 'minds', LIVE_OPS_DB)
-    expect(existsSync(onDisk), 'the ledger the cap reads was deleted after it was opened')
-      .toBe(true)
-    opsDb.prepare(
-      `INSERT INTO llm_calls
+    expect(existsSync(onDisk), 'the ledger the cap reads was deleted after it was opened').toBe(
+      true,
+    )
+    opsDb
+      .prepare(
+        `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
        VALUES (?, NULL, 'turn', 'm', 0, 0, 0, 0, 0.5, 0, 1, NULL, NULL)`,
-    ).run(Date.now())
+      )
+      .run(Date.now())
     // And a reader that opens the PATH — which is all a restarted process has — sees it.
     const reopened = new Database(onDisk, { readonly: true, fileMustExist: true })
     try {
-      expect((reopened.prepare('SELECT COALESCE(SUM(cost_usd), 0) AS t FROM llm_calls').get() as { t: number }).t)
-        .toBeCloseTo(0.5, 6)
-    } finally { reopened.close() }
+      expect(
+        (
+          reopened.prepare('SELECT COALESCE(SUM(cost_usd), 0) AS t FROM llm_calls').get() as {
+            t: number
+          }
+        ).t,
+      ).toBeCloseTo(0.5, 6)
+    } finally {
+      reopened.close()
+    }
   }, 40_000)
 
   it('a world that cannot take its port stops the cast instead of leaving it booted', async () => {
@@ -511,15 +615,27 @@ describe('★ what the first live boot broke', () => {
     // Hold a port, then ask the world for it.
     const blocker = createServer()
     const taken = await new Promise<number>((resolve) => {
-      blocker.listen(0, () => resolve((blocker.address() as { port: number }).port))
+      blocker.listen(0, () => {
+        resolve((blocker.address() as { port: number }).port)
+      })
     })
     let stopped = 0
     try {
-      await expect(startDevWorld({
-        dbPath: join(dir, 'world.db'), port: taken, map: 'showcase', realMsPerTick: 10_000_000,
-        agentDbDir: join(dir, 'minds'),
-        cast: async () => ({ attach: ({ world }) => world, stop: async () => { stopped += 1 } }),
-      })).rejects.toThrow()
+      await expect(
+        startDevWorld({
+          dbPath: join(dir, 'world.db'),
+          port: taken,
+          map: 'showcase',
+          realMsPerTick: 10_000_000,
+          agentDbDir: join(dir, 'minds'),
+          cast: async () => ({
+            attach: ({ world }) => world,
+            stop: async () => {
+              stopped += 1
+            },
+          }),
+        }),
+      ).rejects.toThrow()
     } finally {
       await new Promise((r) => blocker.close(r))
     }
@@ -537,7 +653,9 @@ describe('★ closing the town without closing a database under a mind', () => {
   // mid-flight throws out of a promise nobody awaits — a stream that dies on SIGTERM.
   it('waits while a reflection is still in flight', async () => {
     let busy = true
-    setTimeout(() => { busy = false }, 120)
+    setTimeout(() => {
+      busy = false
+    }, 120)
     const at = Date.now()
     expect(await settle(() => busy, 5_000, 20)).toBe(true)
     expect(Date.now() - at).toBeGreaterThanOrEqual(100)
@@ -556,18 +674,31 @@ describe('★ closing the town without closing a database under a mind', () => {
  * AND came back as something the world or the mind can perceive.
  */
 describe('★ a mind attempts what the engine has no verb for, and a god rules on it', () => {
-  const rulebookOf = (dir: string): Array<{ recipe_id: string; verb: string }> => {
-    const db = new Database(join(dir, 'minds', '_arbiter.db'), { readonly: true, fileMustExist: true })
+  const rulebookOf = (dir: string): { recipe_id: string; verb: string }[] => {
+    const db = new Database(join(dir, 'minds', '_arbiter.db'), {
+      readonly: true,
+      fileMustExist: true,
+    })
     try {
-      return db.prepare('SELECT recipe_id, verb FROM rulebook').all() as Array<{ recipe_id: string; verb: string }>
-    } finally { db.close() }
+      return db.prepare('SELECT recipe_id, verb FROM rulebook').all() as {
+        recipe_id: string
+        verb: string
+      }[]
+    } finally {
+      db.close()
+    }
   }
   const memoriesOf = (dir: string, id: string): string[] => {
     const db = new Database(join(dir, 'minds', `${id}.db`), { readonly: true, fileMustExist: true })
     try {
-      return (db.prepare('SELECT text FROM memories WHERE agent_id = ?').all(id) as Array<{ text: string }>)
-        .map((r) => r.text)
-    } finally { db.close() }
+      return (
+        db.prepare('SELECT text FROM memories WHERE agent_id = ?').all(id) as {
+          text: string
+        }[]
+      ).map((r) => r.text)
+    } finally {
+      db.close()
+    }
   }
 
   it('★ THE ROUND TRIP: the invented act becomes physics the engine did not have at boot', async () => {
@@ -585,17 +716,17 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     // 3. The world was TOLD — `onCodified` -> `bridge.announce` -> the event log the gateway
     //    serves and the chronicle renders. This is the half a viewer can actually see.
     const discoveries = eventsOf(dir, 'discovery_made')
-    expect(discoveries.map((p) => p['name'])).toContain(SMOKE_RECIPE.name)
-    const mine = discoveries.find((p) => p['name'] === SMOKE_RECIPE.name)!
-    expect(mine['byId']).toBe('amara')
+    expect(discoveries.map((p) => p.name)).toContain(SMOKE_RECIPE.name)
+    const mine = discoveries.find((p) => p.name === SMOKE_RECIPE.name)!
+    expect(mine.byId).toBe('amara')
     // `humanizeIntent` takes the underscore out of the coined verb, so the chronicle renders
     // `smoke fish green wood` and not the identifier the schema made of it.
-    expect(String(mine['intent'])).toContain(INVENTED_VERB.replace(/_/g, ' '))
-    expect(String(mine['intent'])).not.toContain(INVENTED_VERB)
+    expect(String(mine.intent)).toContain(INVENTED_VERB.replace(/_/g, ' '))
+    expect(String(mine.intent)).not.toContain(INVENTED_VERB)
 
     // 4. ★ AND THE BODY DID IT. The mind's own hands ran a verb that did not exist eight ticks
     //    ago. Without this row the three above are satisfied by a god talking to itself.
-    expect(eventsOf(dir, 'action_started').some((p) => p['verb'] === SMOKE_RECIPE.id)).toBe(true)
+    expect(eventsOf(dir, 'action_started').some((p) => p.verb === SMOKE_RECIPE.id)).toBe(true)
   }, 30_000)
 
   it('★ a refusal comes back in words the MIND can read, and teaches it something', async () => {
@@ -625,8 +756,9 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     expect(alerts.length).toBeGreaterThan(0)
     // ...and the intent still reached the world as `experiment`, which never starts an activity
     // (`validate()` always declines), so the perceivable outcome is a memory, not an event.
-    expect(memoriesOf(dir, 'amara').some((t) => t.includes('You lack the knowledge to attempt this')))
-      .toBe(true)
+    expect(
+      memoriesOf(dir, 'amara').some((t) => t.includes('You lack the knowledge to attempt this')),
+    ).toBe(true)
     // A god that fell over must not have minted law on the way down.
     expect(rulebookOf(dir)).toHaveLength(0)
   }, 30_000)
@@ -655,20 +787,31 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     expect(rulebookOf(dir).filter((r) => r.recipe_id === SMOKE_RECIPE.id)).toHaveLength(1)
 
     // And the codex was not re-seeded on top of itself — genesis is inserted once per TOWN.
-    const arb = new Database(join(dir, 'minds', '_arbiter.db'), { readonly: true, fileMustExist: true })
+    const arb = new Database(join(dir, 'minds', '_arbiter.db'), {
+      readonly: true,
+      fileMustExist: true,
+    })
     try {
-      const n = (arb.prepare("SELECT COUNT(*) AS n FROM codex WHERE id = 'cooking'").get() as { n: number }).n
+      const n = (
+        arb.prepare("SELECT COUNT(*) AS n FROM codex WHERE id = 'cooking'").get() as { n: number }
+      ).n
       expect(n).toBe(1)
       // The ruling itself survived too, so a rephrasing still short-circuits for free.
-      expect((arb.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n)
-        .toBeGreaterThan(0)
-    } finally { arb.close() }
+      expect(
+        (arb.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n,
+      ).toBeGreaterThan(0)
+    } finally {
+      arb.close()
+    }
   }, 45_000)
 
   it('★ SJ_ARBITER=0 leaves no god and no database, and the turn still lands', async () => {
     const dir = tmp()
     const { world } = await liveWorld({
-      dir, turn: INVENTING_TURN, verdict: SMOKE_VERDICT, useArbiter: false,
+      dir,
+      turn: INVENTING_TURN,
+      verdict: SMOKE_VERDICT,
+      useArbiter: false,
     })
     await run(world, 8)
 
@@ -692,7 +835,9 @@ describe('★ the default stays scripted and free', () => {
     // The prose in `devWorld.ts` NAMES the package while arguing why it must not import it, so
     // this reads the import statements and not the file.
     const imports = (name: string): string[] =>
-      src(name).split('\n').filter((l) => /^\s*import\b/.test(l) || /\bfrom '@sj\//.test(l))
+      src(name)
+        .split('\n')
+        .filter((l) => /^\s*import\b/.test(l) || /\bfrom '@sj\//.test(l))
     for (const file of ['devWorld.ts', 'founders.ts', 'server.ts', 'api.ts']) {
       expect(imports(file).join('\n')).not.toContain('@sj/agents')
     }
@@ -704,7 +849,9 @@ describe('★ the default stays scripted and free', () => {
     // `@sj/arbiter` depends on `@sj/agents`, so a static import of it drags the whole mind stack
     // in just as directly. The guard above names one package and would not have caught that.
     const imports = (name: string): string[] =>
-      src(name).split('\n').filter((l) => /^\s*import\b/.test(l) || /\bfrom '@sj\//.test(l))
+      src(name)
+        .split('\n')
+        .filter((l) => /^\s*import\b/.test(l) || /\bfrom '@sj\//.test(l))
     for (const file of ['devWorld.ts', 'founders.ts', 'server.ts', 'api.ts', 'serve.ts']) {
       expect(imports(file).join('\n'), file).not.toContain('@sj/arbiter')
     }
@@ -715,7 +862,7 @@ describe('★ the default stays scripted and free', () => {
     // `SJ_ARBITER` may only ever be read on the live path. Read in `devWorld.ts` it would be a
     // switch that appears to do something on a stream that has no minds to rule over.
     const s = src('serve.ts')
-    expect(s).toContain("process.env['SJ_ARBITER'] !== '0'")
+    expect(s).toMatch(/process\.env(\.SJ_ARBITER|\['SJ_ARBITER'\]) !== '0'/)
     expect(src('devWorld.ts')).not.toContain('SJ_ARBITER')
     // Opt-OUT, not opt-in: absent the variable the expression is true.
     expect(undefined !== '0').toBe(true)
@@ -725,7 +872,7 @@ describe('★ the default stays scripted and free', () => {
     const s = src('serve.ts')
     expect(s).not.toMatch(/^import .*liveWorld/m)
     expect(s).toContain("import('./liveWorld.js')")
-    expect(s).toContain("process.env['SJ_LIVE'] === '1'")
+    expect(s).toMatch(/process\.env(\.SJ_LIVE|\['SJ_LIVE'\]) === '1'/)
   })
 
   it('the ops db sits inside the minds directory, so the fresh wipe takes the ledger too', () => {

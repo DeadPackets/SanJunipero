@@ -9,15 +9,22 @@ import { recordVerdict, passRates } from './telemetry.js'
 
 function verdictAt(assetId: string, score: number, attempt: number): VisionVerdict {
   const criteria = Object.fromEntries(
-    CRITERIA.map(k => [k, { pass: true, score, evidence: 'seen' }])) as VisionCriteria
+    CRITERIA.map((k) => [k, { pass: true, score, evidence: 'seen' }]),
+  ) as VisionCriteria
   return {
-    assetId, model: 'google/gemini-3.7-flash', rubricVersion: 'v1', criteria, feedback: '',
+    assetId,
+    model: 'google/gemini-3.7-flash',
+    rubricVersion: 'v1',
+    criteria,
+    feedback: '',
     overall: deriveOverall(criteria, { minScore: 7, attempt, maxRetries: 3 }),
   }
 }
 
 let db: Database.Database
-beforeEach(() => { db = openForgeDb(':memory:') })
+beforeEach(() => {
+  db = openForgeDb(':memory:')
+})
 
 describe('vision_qa migration', () => {
   it('adds the table to a pre-existing forge DB and preserves every assets row', () => {
@@ -29,14 +36,30 @@ describe('vision_qa migration', () => {
       png BLOB NOT NULL, width_px INTEGER NOT NULL, height_px INTEGER NOT NULL,
       status TEXT NOT NULL, score REAL, attempts INTEGER NOT NULL, cost_usd REAL NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')));`)
-    old.prepare(`INSERT INTO assets (id, class, desc, footprint_w, footprint_h, png, width_px,
+    old
+      .prepare(`INSERT INTO assets (id, class, desc, footprint_w, footprint_h, png, width_px,
       height_px, status, score, attempts, cost_usd) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run('asset_old', 'building', 'shed: a lean-to', 1, 1, Buffer.from('png'), 64, 64, 'ready', 8, 1, 0.09)
+      .run(
+        'asset_old',
+        'building',
+        'shed: a lean-to',
+        1,
+        1,
+        Buffer.from('png'),
+        64,
+        64,
+        'ready',
+        8,
+        1,
+        0.09,
+      )
     old.close()
 
     const migrated = openForgeDb(file)
     expect(migrated.prepare('SELECT count(*) c FROM assets').get()).toEqual({ c: 1 })
-    expect((migrated.prepare('SELECT id, status FROM assets').get() as { id: string }).id).toBe('asset_old')
+    expect((migrated.prepare('SELECT id, status FROM assets').get() as { id: string }).id).toBe(
+      'asset_old',
+    )
     expect(() => migrated.prepare('SELECT * FROM vision_qa').all()).not.toThrow()
     expect(passRates(migrated).n).toBe(0)
   })
@@ -44,7 +67,11 @@ describe('vision_qa migration', () => {
 
 describe('recordVerdict', () => {
   it('round-trips the per-criterion scores as JSON', () => {
-    recordVerdict(db, verdictAt('a1', 9, 1), { assetClass: 'building', attempt: 1, costUsd: 0.0025 })
+    recordVerdict(db, verdictAt('a1', 9, 1), {
+      assetClass: 'building',
+      attempt: 1,
+      costUsd: 0.0025,
+    })
     const row = db.prepare('SELECT * FROM vision_qa').get() as Record<string, unknown>
     expect(row.asset_id).toBe('a1')
     expect(row.asset_class).toBe('building')
@@ -54,18 +81,26 @@ describe('recordVerdict', () => {
     expect(row.overall).toBe('pass')
     expect(row.cost_usd).toBe(0.0025)
     expect(JSON.parse(row.scores as string)).toEqual(
-      Object.fromEntries(CRITERIA.map(k => [k, 9])))
+      Object.fromEntries(CRITERIA.map((k) => [k, 9])),
+    )
   })
 })
 
 describe('passRates', () => {
   beforeEach(() => {
-    const rec = (id: string, klass: string, score: number, attempt: number) =>
-      recordVerdict(db, verdictAt(id, score, attempt), { assetClass: klass, attempt, costUsd: 0.0025 })
-    rec('a1', 'building', 9, 1)                                     // first-pass
-    rec('a2', 'building', 4, 1); rec('a2', 'building', 5, 2); rec('a2', 'building', 8, 3)   // pass on 3
-    for (const at of [1, 2, 3, 4]) rec('a3', 'building', 3, at)     // blocked on 4
-    rec('a4', 'item', 10, 1)                                        // first-pass, other class
+    const rec = (id: string, klass: string, score: number, attempt: number) => {
+      recordVerdict(db, verdictAt(id, score, attempt), {
+        assetClass: klass,
+        attempt,
+        costUsd: 0.0025,
+      })
+    }
+    rec('a1', 'building', 9, 1) // first-pass
+    rec('a2', 'building', 4, 1)
+    rec('a2', 'building', 5, 2)
+    rec('a2', 'building', 8, 3) // pass on 3
+    for (const at of [1, 2, 3, 4]) rec('a3', 'building', 3, at) // blocked on 4
+    rec('a4', 'item', 10, 1) // first-pass, other class
   })
 
   it('is exact over the four-asset fixture', () => {

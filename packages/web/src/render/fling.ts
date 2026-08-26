@@ -30,7 +30,9 @@ export type DragTrack = { moved: boolean; tail: readonly DragSample[]; elapsedMs
 export function trackDrag(prev: DragTrack | null, x: number, y: number, t: number): DragTrack {
   if (prev === null) return { moved: false, tail: [{ x, y, t }], elapsedMs: 0 }
   const first = prev.tail[0]!
-  const tail = [...prev.tail, { x, y, t }].filter((s, i, all) => t - s.t <= FLING_SAMPLE_MS || i === all.length - 1)
+  const tail = [...prev.tail, { x, y, t }].filter(
+    (s, i, all) => t - s.t <= FLING_SAMPLE_MS || i === all.length - 1,
+  )
   const last = prev.tail[prev.tail.length - 1]!
   return {
     // once a gesture is a drag it stays one, even if the finger comes back to where it started
@@ -53,10 +55,12 @@ export function flingFrom(track: DragTrack | null, nowMs: number): Fling | null 
   if (!isDrag(track)) return null
   const recent = track!.tail.filter((s) => nowMs - s.t <= FLING_SAMPLE_MS)
   if (recent.length < 2) return null
-  const a = recent[0]!, b = recent[recent.length - 1]!
+  const a = recent[0]!,
+    b = recent[recent.length - 1]!
   const dt = b.t - a.t
   if (dt <= 0) return null
-  const vx = (b.x - a.x) / dt, vy = (b.y - a.y) / dt
+  const vx = (b.x - a.x) / dt,
+    vy = (b.y - a.y) / dt
   if (Math.hypot(vx, vy) < FLING_MIN_PX_PER_MS) return null
   return { vx, vy, ms: 0 }
 }

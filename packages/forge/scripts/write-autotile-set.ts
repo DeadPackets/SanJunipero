@@ -14,13 +14,21 @@ mkdirSync(DIR, { recursive: true })
 
 const strip = paintRoadStrip()
 writeFileSync(join(DIR, FILE), await encodePng(strip))
-console.log(`wrote ${join(DIR, FILE)} — ${strip.width}x${strip.height}, ${ROAD_AUTOTILE_KEYS.length} tiles`)
+console.log(
+  `wrote ${join(DIR, FILE)} — ${strip.width}x${strip.height}, ${ROAD_AUTOTILE_KEYS.length} tiles`,
+)
 
 const path = join(DIR, 'manifest.json')
-const existing: Record<string, unknown> = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}
+const existing: Record<string, unknown> = existsSync(path)
+  ? JSON.parse(readFileSync(path, 'utf8'))
+  : {}
 const merged = {
   ...existing,
-  autotile: { road: { file: FILE, tiles: Object.fromEntries(ROAD_AUTOTILE_KEYS.map((k, i) => [k, i])) } },
+  autotile: {
+    road: { file: FILE, tiles: Object.fromEntries(ROAD_AUTOTILE_KEYS.map((k, i) => [k, i])) },
+  },
 }
 writeFileSync(path, `${JSON.stringify(merged, null, 2)}\n`)
-console.log(`merged autotile block into ${path}${Object.keys(existing).length ? '' : ' (new file — C10 T1 will merge its seasons in)'}`)
+console.log(
+  `merged autotile block into ${path}${Object.keys(existing).length ? '' : ' (new file — C10 T1 will merge its seasons in)'}`,
+)

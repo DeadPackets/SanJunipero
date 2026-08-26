@@ -6,7 +6,7 @@ import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { scanForLayoutLeak, scanPromptForGlassLeak } from '../prompt/glassScan.js'
 import { FOUNDER_MINDS } from './founderMinds.js'
 
-const promptFor = (mind: typeof FOUNDER_MINDS[number]): string => {
+const promptFor = (mind: (typeof FOUNDER_MINDS)[number]): string => {
   const p = assemblePrompt({
     rulesOfBeing: RULES_OF_BEING,
     identity: mind.identity,
@@ -30,10 +30,13 @@ describe('★ the streamed cast and the one-way glass', () => {
   it('and no layout word either — the second glass', () => {
     for (const mind of FOUNDER_MINDS) {
       const authored = [
-        mind.identity.backstory, mind.identity.temperament,
+        mind.identity.backstory,
+        mind.identity.temperament,
         ...mind.identity.voiceCard.exampleLines,
-        ...mind.personality.values, ...mind.personality.beliefs,
-        ...mind.personality.current.goals, ...mind.personality.current.worries,
+        ...mind.personality.values,
+        ...mind.personality.beliefs,
+        ...mind.personality.current.goals,
+        ...mind.personality.current.worries,
       ].join(' ')
       expect(scanForLayoutLeak(authored), `${mind.id} leaks layout`).toEqual([])
     }
@@ -56,10 +59,9 @@ describe('★ the streamed cast and the one-way glass', () => {
     // measuring its own prompt.
     const POINTING = ['build', 'raise a', 'cut timber', 'deck', 'bridge', 'you should', 'you must']
     for (const mind of FOUNDER_MINDS) {
-      const said = [
-        ...mind.personality.current.goals,
-        ...mind.personality.current.worries,
-      ].join(' ').toLowerCase()
+      const said = [...mind.personality.current.goals, ...mind.personality.current.worries]
+        .join(' ')
+        .toLowerCase()
       for (const hint of POINTING) {
         expect(said, `${mind.id} is being told what to do: ${hint}`).not.toContain(hint)
       }
@@ -74,9 +76,10 @@ describe('★ the streamed cast and the one-way glass', () => {
         for (const quoted of tic.match(/"([^"]+)"/g) ?? []) {
           const words = quoted.slice(1, -1).toLowerCase()
           for (const line of mind.identity.voiceCard.exampleLines) {
-            expect(line.toLowerCase().replace(/[^a-z' ]/g, ''),
-              `${mind.id}'s card demonstrates ${quoted} as an opener`).not.toMatch(
-              new RegExp(`^${words.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`))
+            expect(
+              line.toLowerCase().replace(/[^a-z' ]/g, ''),
+              `${mind.id}'s card demonstrates ${quoted} as an opener`,
+            ).not.toMatch(new RegExp(`^${words.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`))
           }
         }
       }
@@ -85,17 +88,29 @@ describe('★ the streamed cast and the one-way glass', () => {
 
   it('and no card opens two example lines the same way', () => {
     for (const mind of FOUNDER_MINDS) {
-      const openers = mind.identity.voiceCard.exampleLines
-        .map((l) => l.toLowerCase().replace(/[^a-z' ]/g, '').split(' ').slice(0, 2).join(' '))
-      expect(new Set(openers).size, `${mind.id} repeats an opener on its own card`)
-        .toBe(openers.length)
+      const openers = mind.identity.voiceCard.exampleLines.map((l) =>
+        l
+          .toLowerCase()
+          .replace(/[^a-z' ]/g, '')
+          .split(' ')
+          .slice(0, 2)
+          .join(' '),
+      )
+      expect(new Set(openers).size, `${mind.id} repeats an opener on its own card`).toBe(
+        openers.length,
+      )
     }
   })
 
   it('the cast is the five bodies the town spawns, by id', () => {
     // A mind whose id is not a body in the world gets no perception and never takes a turn;
     // a body with no mind stands still for ever. The two lists are one list or they are broken.
-    expect(FOUNDER_MINDS.map((m) => m.id).sort())
-      .toEqual(['amara', 'nadia', 'omar', 'salma', 'yusuf'])
+    expect(FOUNDER_MINDS.map((m) => m.id).sort()).toEqual([
+      'amara',
+      'nadia',
+      'omar',
+      'salma',
+      'yusuf',
+    ])
   })
 })

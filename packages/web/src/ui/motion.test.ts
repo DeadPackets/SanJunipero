@@ -3,12 +3,26 @@ import { describe, expect, it } from 'vitest'
 import { FLING_MAX_MS } from '../render/fling.js'
 import { TICK_PERIOD_MAX_MS, TICK_PERIOD_SEED_MS, WALK_LEAD_TICKS } from '../render/charAnim.js'
 import {
-  AMBIENT_EXEMPT, CSS_DURATION_TOKEN, CSS_EASE_TOKEN, MOTION, MOTIONS, MOTION_CEILING_MS,
-  MOTION_EXEMPT, MOTION_FLOOR_MS, durationsIn, easeFn, motionCss, progress, reduced,
+  AMBIENT_EXEMPT,
+  CSS_DURATION_TOKEN,
+  CSS_EASE_TOKEN,
+  MOTION,
+  MOTIONS,
+  MOTION_CEILING_MS,
+  MOTION_EXEMPT,
+  MOTION_FLOOR_MS,
+  durationsIn,
+  easeFn,
+  motionCss,
+  progress,
+  reduced,
   untokenisedDurations,
 } from './motion.js'
 
-const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+)
 
 describe('the table', () => {
   it('names a motion for every member of MOTIONS and nothing else', () => {
@@ -95,7 +109,7 @@ describe('the stylesheet speaks the same vocabulary', () => {
     expect(durationsIn(CSS).length).toBeGreaterThan(20)
   })
 
-  it('declares one token per motion, at exactly the table\'s value', () => {
+  it("declares one token per motion, at exactly the table's value", () => {
     for (const name of MOTIONS) {
       const token = CSS_DURATION_TOKEN[name]
       const hit = new RegExp(`${token}:\\s*(\\d+)ms`).exec(CSS)
@@ -104,7 +118,7 @@ describe('the stylesheet speaks the same vocabulary', () => {
     }
   })
 
-  it('declares one easing token per motion, at exactly the table\'s curve', () => {
+  it("declares one easing token per motion, at exactly the table's curve", () => {
     for (const name of MOTIONS) {
       const token = CSS_EASE_TOKEN[name]
       const hit = new RegExp(`${token}:\\s*([^;]+);`).exec(CSS)
@@ -119,7 +133,7 @@ describe('the stylesheet speaks the same vocabulary', () => {
 })
 
 describe('zero is the absence of a motion, and the scan says so out loud', () => {
-  it('accepts 0s, which is finish line 6\'s instant hover-out', () => {
+  it("accepts 0s, which is finish line 6's instant hover-out", () => {
     expect(untokenisedDurations('.x:hover { transition-duration: 0s; }')).toEqual([])
   })
 
@@ -134,7 +148,9 @@ describe('zero is the absence of a motion, and the scan says so out loud', () =>
 describe('the exemptions from the motion band', () => {
   it('★ names every long motion, with a reason, in one table', () => {
     for (const e of MOTION_EXEMPT) {
-      expect(e.ms, `${e.what} is exempt but is not actually long`).toBeGreaterThan(MOTION_CEILING_MS)
+      expect(e.ms, `${e.what} is exempt but is not actually long`).toBeGreaterThan(
+        MOTION_CEILING_MS,
+      )
       expect(e.because.length, `${e.what} has no reason`).toBeGreaterThan(24)
     }
     expect(MOTION_EXEMPT.map((e) => e.what)).toEqual(['ambient', 'fling', 'walk'])

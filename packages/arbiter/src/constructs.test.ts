@@ -1,16 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
+import {
+  CONSTRUCT_VOCABULARY,
+  scanPromptForGlassLeak,
+  type LlmClient,
+  type LlmMessage,
+  type LlmUsage,
+} from '@sj/agents'
 import { fold, genesisState, type TileId, type WorldState } from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, stateHash, type SimEvent } from '@sj/shared'
 import {
-  CONSTRUCT_TYPES, ConstructSchema, CONSTRUCT_TYPE_INSTRUCTION, detectCandidates, runConstructPass,
+  CONSTRUCT_TYPES,
+  ConstructSchema,
+  CONSTRUCT_TYPE_INSTRUCTION,
+  detectCandidates,
+  runConstructPass,
 } from './constructs.js'
 import { ConstructStore } from './constructStore.js'
 import { CANON } from './canon.js'
 import { openArbiterDb } from './schema.js'
 
 let seq = 1
-const ev = (tick: number, type: string, payload: unknown): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (tick: number, type: string, payload: unknown): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
 const THREE = ['ada', 'bex', 'cass']
 
@@ -19,13 +34,22 @@ function gathering(day: number, who: readonly string[] = THREE): SimEvent[] {
   const at = day * MINUTES_PER_DAY + 19 * 60
   return [
     ...who.map((id, i) => ev(at, 'agent_moved', { id, x: 30 + i, y: 30 })),
-    ev(at + 1, 'agent_expressed', { agentId: who[0]!, verb: 'dance', x: 30, y: 30, sense: 'sight' }),
+    ev(at + 1, 'agent_expressed', {
+      agentId: who[0]!,
+      verb: 'dance',
+      x: 30,
+      y: 30,
+      sense: 'sight',
+    }),
   ]
 }
 
 const NAMING = (day: number): SimEvent =>
   ev(day * MINUTES_PER_DAY + 19 * 60 + 2, 'agent_spoke', {
-    agentId: 'bex', text: 'Every seventh night now. We call it the Long Turning.', x: 30, y: 30,
+    agentId: 'bex',
+    text: 'Every seventh night now. We call it the Long Turning.',
+    x: 30,
+    y: 30,
   })
 
 const threeNights = (): SimEvent[] => [...gathering(1), ...gathering(3), ...gathering(5)]
@@ -37,25 +61,44 @@ function emptyUsage(): LlmUsage {
 class ScriptedLlm {
   objectCalls = 0
   systems: string[] = []
-  constructor(private readonly type: string = 'festival') {}
+  constructor(private readonly type = 'festival') {}
 
-  async object<T>(opts: { system: string; messages: LlmMessage[]; schema: unknown }): Promise<{ value: T; usage: LlmUsage }> {
+  async object<T>(opts: {
+    system: string
+    messages: LlmMessage[]
+    schema: unknown
+  }): Promise<{ value: T; usage: LlmUsage }> {
     this.objectCalls += 1
     this.systems.push(opts.system)
     const keys = [...opts.messages.at(-1)!.content.matchAll(/^- (\S+)/gmu)].map((m) => m[1]!)
-    return { value: { rulings: keys.map((key) => ({ key, type: this.type })) } as T, usage: emptyUsage() }
+    return {
+      value: { rulings: keys.map((key) => ({ key, type: this.type })) } as T,
+      usage: emptyUsage(),
+    }
   }
 
-  async text(): Promise<{ text: string; usage: LlmUsage }> { return { text: '', usage: emptyUsage() } }
-  totalCostUsd(): number { return 0 }
+  async text(): Promise<{ text: string; usage: LlmUsage }> {
+    return { text: '', usage: emptyUsage() }
+  }
+  totalCostUsd(): number {
+    return 0
+  }
   alert(): void {}
 }
 
-const pass = async (events: SimEvent[], llm: ScriptedLlm, overrides: Record<string, unknown> = {}) => {
+const pass = async (
+  events: SimEvent[],
+  llm: ScriptedLlm,
+  overrides: Record<string, unknown> = {},
+) => {
   const db = openArbiterDb(':memory:')
   const store = new ConstructStore(db)
   const rows = await runConstructPass({
-    events, baseConfig: DEFAULT_CONFIG, store, llm: llm as unknown as LlmClient, ...overrides,
+    events,
+    baseConfig: DEFAULT_CONFIG,
+    store,
+    llm: llm as unknown as LlmClient,
+    ...overrides,
   })
   return { rows, store, db }
 }
@@ -67,7 +110,11 @@ describe('detectCandidates', () => {
   })
 
   it('needs enough bodies to be a gathering at all', () => {
-    const two = [...gathering(1, ['ada', 'bex']), ...gathering(3, ['ada', 'bex']), ...gathering(5, ['ada', 'bex'])]
+    const two = [
+      ...gathering(1, ['ada', 'bex']),
+      ...gathering(3, ['ada', 'bex']),
+      ...gathering(5, ['ada', 'bex']),
+    ]
     expect(detectCandidates(two, DEFAULT_CONFIG)).toEqual([])
   })
 
@@ -104,7 +151,10 @@ describe('the daily pass', () => {
     expect(row.nameProvenance!.quote).toContain(row.name!)
     expect(store.all()).toHaveLength(1)
     expect(store.events().map((e) => e.type)).toEqual([
-      'construct_recognized', 'construct_recurred', 'construct_recurred', 'construct_named',
+      'construct_recognized',
+      'construct_recurred',
+      'construct_recurred',
+      'construct_named',
     ])
   })
 
@@ -116,7 +166,10 @@ describe('the daily pass', () => {
 
   it('writes nothing, and asks nothing, when the law is switched off', async () => {
     const llm = new ScriptedLlm()
-    const off = [...threeNights(), ev(6 * MINUTES_PER_DAY, 'config_changed', { path: 'constructs.enabled', value: false })]
+    const off = [
+      ...threeNights(),
+      ev(6 * MINUTES_PER_DAY, 'config_changed', { path: 'constructs.enabled', value: false }),
+    ]
     const { rows, store } = await pass(off, llm)
     expect(rows).toEqual([])
     expect(store.all()).toEqual([])
@@ -133,7 +186,9 @@ describe('the daily pass', () => {
     const four = ['ada', 'bex', 'cass', 'dov']
     const wider = [
       ev(0, 'config_changed', { path: 'constructs.minParticipants', value: 4 }),
-      ...gathering(1, four), ...gathering(3, four), ...gathering(5, four),
+      ...gathering(1, four),
+      ...gathering(3, four),
+      ...gathering(5, four),
     ]
     expect((await pass(wider, new ScriptedLlm())).rows).toHaveLength(1)
   })
@@ -142,7 +197,12 @@ describe('the daily pass', () => {
     const db = openArbiterDb(':memory:')
     const store = new ConstructStore(db)
     const events = [...threeNights(), NAMING(5)]
-    const deps = { events, baseConfig: DEFAULT_CONFIG, store, llm: new ScriptedLlm() as unknown as LlmClient }
+    const deps = {
+      events,
+      baseConfig: DEFAULT_CONFIG,
+      store,
+      llm: new ScriptedLlm() as unknown as LlmClient,
+    }
     await runConstructPass(deps)
     await runConstructPass(deps)
     expect(store.all()).toHaveLength(1)
@@ -158,14 +218,15 @@ describe('the daily pass', () => {
 })
 
 describe('one-way glass', () => {
-  it('the registry is the arbiter\'s alone — no world row, no hash movement', async () => {
+  it("the registry is the arbiter's alone — no world row, no hash movement", async () => {
     const flat = Array.from({ length: 64 }, () => Array.from({ length: 64 }, (): TileId => 0))
     let state: WorldState = genesisState(DEFAULT_CONFIG, flat)
     const events = [...threeNights(), NAMING(5)]
     const before = stateHash(state)
     const { rows, db } = await pass(events, new ScriptedLlm())
     for (const e of events) {
-      if (e.type === 'agent_moved' || e.type === 'agent_expressed' || e.type === 'agent_spoke') continue
+      if (e.type === 'agent_moved' || e.type === 'agent_expressed' || e.type === 'agent_spoke')
+        continue
       state = fold(state, e, DEFAULT_CONFIG)
     }
     expect(stateHash(state)).toBe(before)
@@ -185,7 +246,7 @@ describe('one-way glass', () => {
     }
   })
 
-  it('the arbiter\'s own agent-facing text is clean', () => {
+  it("the arbiter's own agent-facing text is clean", () => {
     const agentFacing = [
       'no clear way to do this presents itself',
       'nothing in the town lends itself to this',
@@ -195,7 +256,9 @@ describe('one-way glass', () => {
     for (const text of agentFacing) expect(scanPromptForGlassLeak(text), text).toEqual([])
   })
 
-  it('the recognizer\'s own prompt is ops-side, and says so by carrying the taxonomy', () => {
-    expect(scanPromptForGlassLeak(CONSTRUCT_TYPE_INSTRUCTION).sort()).toEqual([...CONSTRUCT_TYPES].sort())
+  it("the recognizer's own prompt is ops-side, and says so by carrying the taxonomy", () => {
+    expect(scanPromptForGlassLeak(CONSTRUCT_TYPE_INSTRUCTION).sort()).toEqual(
+      [...CONSTRUCT_TYPES].sort(),
+    )
   })
 })

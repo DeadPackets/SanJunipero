@@ -19,8 +19,14 @@ import { EngineBridge } from './bridge.js'
 const AGENT = 'tamar'
 
 function wild(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
-  const config = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 }, mapGrowth: { enabled: false } })
-  const terrain: TileId[][] = Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+  const config = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+    mapGrowth: { enabled: false },
+  })
+  const terrain: TileId[][] = Array.from({ length: 16 }, () =>
+    Array.from({ length: 16 }, (): TileId => 0),
+  )
   const store = new EventStore(openDb(':memory:'))
   const rng = new RngStreams('wild-seam')
   let state = genesisState(config, terrain)
@@ -32,19 +38,41 @@ function wild(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
   put('fauna_spawned', { id: 'fauna_1', kind: 'deer', x: 9, y: 8 })
   put('forageable_spawned', { id: 'node_1', kind: 'berry_bush', x: 7, y: 8, stock: 3 })
   put('structure_planned', {
-    id: 'structure_1', kind: 'well', x: 12, y: 8, w: 1, h: 1, maxHp: 40, flammable: false, builderId: AGENT,
+    id: 'structure_1',
+    kind: 'well',
+    x: 12,
+    y: 8,
+    w: 1,
+    h: 1,
+    maxHp: 40,
+    flammable: false,
+    builderId: AGENT,
   })
   put('structure_completed', { id: 'structure_1' })
   state = { ...state, tick: 720 }
 
   const worldTick = createWorldTick(config, rng)
   let handler: TickHandler = () => {}
-  const loop = new TickLoop({ store, state, rng, config, onTick: (ctx) => handler(ctx) })
+  const loop = new TickLoop({
+    store,
+    state,
+    rng,
+    config,
+    onTick: (ctx) => {
+      handler(ctx)
+    },
+  })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
   handler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
-  return { bridge, step: () => loop.step(), loop }
+  return {
+    bridge,
+    step: () => {
+      loop.step()
+    },
+    loop,
+  }
 }
 
 const proseFor = (bridge: EngineBridge): string =>
@@ -75,7 +103,7 @@ describe('the wild seam — prose, intent, verb, the thing taken', () => {
     const carried = Object.values(loop.state.items)
       .filter((i) => i.loc.t === 'agent' && i.loc.id === AGENT)
       .map((i) => i.kind)
-    if (deer === undefined || !deer.alive) expect(carried).toContain('venison')
+    if (!deer?.alive) expect(carried).toContain('venison')
     else expect({ x: deer.x, y: deer.y }).not.toEqual({ x: 9, y: 8 })
   })
 
@@ -87,7 +115,9 @@ describe('the wild seam — prose, intent, verb, the thing taken', () => {
     step()
     expect(await picking).toEqual({ ok: true })
     for (let i = 0; i < 60 && loop.state.agents[AGENT]!.activity !== null; i++) step()
-    const held = Object.values(loop.state.items).filter((i) => i.loc.t === 'agent' && i.kind === 'berries')
+    const held = Object.values(loop.state.items).filter(
+      (i) => i.loc.t === 'agent' && i.kind === 'berries',
+    )
     expect(held).toHaveLength(1)
     expect(loop.state.forageables!.node_1!.stock).toBe(2)
   })
@@ -115,6 +145,9 @@ describe('the wild seam — prose, intent, verb, the thing taken', () => {
     const { bridge, step } = wild()
     const blind = bridge.submit(AGENT, { verb: 'forage', params: {} })
     step()
-    expect(await blind).toMatchObject({ ok: false, reason: expect.stringMatching(/^no forest nearby — /) })
+    expect(await blind).toMatchObject({
+      ok: false,
+      reason: expect.stringMatching(/^no forest nearby — /),
+    })
   })
 })

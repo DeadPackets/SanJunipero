@@ -3,37 +3,68 @@ import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { FakeEmbedder, type LlmClient, type LlmMessage, type LlmUsage } from '@sj/agents'
 import {
-  composePerception, fold, genesisState, registerVerb, RngStream, submitIntent, unregisterVerb, VERBS,
+  composePerception,
+  fold,
+  genesisState,
+  registerVerb,
+  RngStream,
+  submitIntent,
+  unregisterVerb,
+  VERBS,
   type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
-import { makeArbiter, wordTainted, type AgentCtx, type Arbiter, type Codified } from './adjudicate.js'
+import {
+  makeArbiter,
+  wordTainted,
+  type AgentCtx,
+  type Arbiter,
+  type Codified,
+} from './adjudicate.js'
 import { openArbiterDb } from './schema.js'
 import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
 import {
-  EXPRESSIVE_INSTRUCTION, ExpressiveRulingSchema, expressiveVerbFromRuling, isExpressive,
+  EXPRESSIVE_INSTRUCTION,
+  ExpressiveRulingSchema,
+  expressiveVerbFromRuling,
+  isExpressive,
   type ExpressiveRuling,
 } from './expressive.js'
 import { ADJUDICATION_INSTRUCTION } from './prompt.js'
 import type { Verdict } from './verdict.js'
 
 const ctx: AgentCtx = {
-  agentId: 'a1', name: 'Tamar', skills: { cooking: 80 },
-  inventory: [{ kind: 'wood', qty: 2 }], position: { x: 3, y: 5 },
+  agentId: 'a1',
+  name: 'Tamar',
+  skills: { cooking: 80 },
+  inventory: [{ kind: 'wood', qty: 2 }],
+  position: { x: 3, y: 5 },
 }
 const ctx2: AgentCtx = { ...ctx, agentId: 'a2', name: 'Yusuf' }
 
 const DANCE: ExpressiveRuling = {
-  word: 'dance', sense: 'sight', durationTicks: 10, energyCost: 2, targeted: false,
+  word: 'dance',
+  sense: 'sight',
+  durationTicks: 10,
+  energyCost: 2,
+  targeted: false,
   emote: 'turns in slow circles, arms wide',
 }
 const SONG: ExpressiveRuling = {
-  word: 'sing', sense: 'sound', durationTicks: 8, energyCost: 1, targeted: false,
+  word: 'sing',
+  sense: 'sound',
+  durationTicks: 8,
+  energyCost: 1,
+  targeted: false,
   emote: 'lifts a long, wavering note',
 }
 
-const impossible: Verdict = { kind: 'impossible', reason: 'no clear way to do this', class: 'physically_impossible' }
+const impossible: Verdict = {
+  kind: 'impossible',
+  reason: 'no clear way to do this',
+  class: 'physically_impossible',
+}
 
 function emptyUsage(): LlmUsage {
   return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
@@ -46,7 +77,11 @@ class ScriptedLlm {
   systems: string[] = []
   constructor(private readonly respond: (system: string) => unknown) {}
 
-  async object<T>(opts: { system: string; messages: LlmMessage[]; schema: unknown }): Promise<{ value: T; usage: LlmUsage }> {
+  async object<T>(opts: {
+    system: string
+    messages: LlmMessage[]
+    schema: unknown
+  }): Promise<{ value: T; usage: LlmUsage }> {
     this.objectCalls += 1
     this.systems.push(opts.system)
     return { value: this.respond(opts.system) as T, usage: emptyUsage() }
@@ -56,7 +91,9 @@ class ScriptedLlm {
     return { text: '', usage: emptyUsage() }
   }
 
-  totalCostUsd(): number { return 0 }
+  totalCostUsd(): number {
+    return 0
+  }
   alert(): void {}
 }
 
@@ -65,29 +102,49 @@ async function makeRig(llm: ScriptedLlm): Promise<Arbiter> {
   const codex = new CodexStore(db)
   codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
   return makeArbiter({
-    db, llm: llm as unknown as LlmClient, embedder: await FakeEmbedder.create(), tick: () => 100,
+    db,
+    llm: llm as unknown as LlmClient,
+    embedder: await FakeEmbedder.create(),
+    tick: () => 100,
   })
 }
 
 // The scripted answer for whichever prompt arrived: the cheap one gets a ruling,
 // the expensive one gets a refusal, so the two paths are told apart by the result.
-const script = (ruling: ExpressiveRuling) => (system: string): unknown =>
-  system.includes(EXPRESSIVE_INSTRUCTION) ? ruling : impossible
+const script =
+  (ruling: ExpressiveRuling) =>
+  (system: string): unknown =>
+    system.includes(EXPRESSIVE_INSTRUCTION) ? ruling : impossible
 
 // Noon on a flat 64×64: the light is full, so every horizon below is a distance and
 // nothing else.
 function world(): WorldState {
-  let s = genesisState(DEFAULT_CONFIG, Array.from({ length: 64 }, () => Array.from({ length: 64 }, () => 0 as const)))
-  for (const [id, name] of [['a1', 'Tamar'], ['a2', 'Yusuf']]) {
-    s = fold(s, {
-      seq: 1, tick: 0, type: 'agent_spawned', payload: { id, name, x: 20, y: 20, ageDays: 7300 },
-    }, DEFAULT_CONFIG)
+  let s = genesisState(
+    DEFAULT_CONFIG,
+    Array.from({ length: 64 }, () => Array.from({ length: 64 }, () => 0 as const)),
+  )
+  for (const [id, name] of [
+    ['a1', 'Tamar'],
+    ['a2', 'Yusuf'],
+  ]) {
+    s = fold(
+      s,
+      {
+        seq: 1,
+        tick: 0,
+        type: 'agent_spawned',
+        payload: { id, name, x: 20, y: 20, ageDays: 7300 },
+      },
+      DEFAULT_CONFIG,
+    )
   }
   return { ...s, tick: 720 }
 }
 
 const expressedAt = (x: number, y: number, sense: 'sight' | 'sound'): SimEvent => ({
-  seq: 1, tick: 720, type: 'agent_expressed',
+  seq: 1,
+  tick: 720,
+  type: 'agent_expressed',
   payload: { agentId: 'a1', verb: sense === 'sound' ? 'sing' : 'dance', x, y, sense },
 })
 
@@ -153,7 +210,9 @@ describe('the cheap approval', () => {
     for (const word of ['sight', 'sound']) expect(EXPRESSIVE_INSTRUCTION).toContain(word)
     expect(ExpressiveRulingSchema.safeParse({ ...DANCE, sense: 'smell' }).success).toBe(false)
     expect(ExpressiveRulingSchema.safeParse({ ...DANCE, extra: 1 }).success).toBe(false)
-    expect(ExpressiveRulingSchema.safeParse({ ...DANCE, word: 'Dance The Long One' }).success).toBe(false)
+    expect(ExpressiveRulingSchema.safeParse({ ...DANCE, word: 'Dance The Long One' }).success).toBe(
+      false,
+    )
   })
 })
 
@@ -171,7 +230,10 @@ describe('the coined verb', () => {
         type: 'agent_expressed',
         payload: { agentId: 'a1', verb: 'dance', x: 20, y: 20, sense: 'sight' },
       })
-      expect(events[1]).toEqual({ type: 'need_changed', payload: { id: 'a1', need: 'energy', delta: -2 } })
+      expect(events[1]).toEqual({
+        type: 'need_changed',
+        payload: { id: 'a1', need: 'energy', delta: -2 },
+      })
     } finally {
       unregisterVerb('express:dance')
     }
@@ -181,7 +243,13 @@ describe('the coined verb', () => {
     registerVerb(expressiveVerbFromRuling('sing', SONG))
     try {
       const s = world()
-      const events = VERBS['express:sing']!.onComplete(s, DEFAULT_CONFIG, 'a1', {}, RngStream.seed('t', 'expressive'))
+      const events = VERBS['express:sing']!.onComplete(
+        s,
+        DEFAULT_CONFIG,
+        'a1',
+        {},
+        RngStream.seed('t', 'expressive'),
+      )
       expect(events[0]).toEqual({
         type: 'agent_expressed',
         payload: { agentId: 'a1', verb: 'sing', x: 20, y: 20, sense: 'sound' },
@@ -222,7 +290,9 @@ describe('who witnesses it', () => {
 
   it('nobody watches themselves', () => {
     const s = world()
-    expect(composePerception(s, DEFAULT_CONFIG, 'a1', [expressedAt(20, 20, 'sight')]).seen).toEqual([])
+    expect(composePerception(s, DEFAULT_CONFIG, 'a1', [expressedAt(20, 20, 'sight')]).seen).toEqual(
+      [],
+    )
   })
 })
 
@@ -232,14 +302,28 @@ describe('F-C — a coined word is held to the framing law, like a recipe name',
     const db = openArbiterDb(':memory:')
     new CodexStore(db).insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
     const arbiter = makeArbiter({
-      db, llm: llm as unknown as LlmClient, embedder: await FakeEmbedder.create(), tick: () => 100,
+      db,
+      llm: llm as unknown as LlmClient,
+      embedder: await FakeEmbedder.create(),
+      tick: () => 100,
     })
     return { arbiter, db }
   }
 
   it('refuses every machinery word the schema would otherwise admit', () => {
-    for (const w of ['ai', 'model', 'models', 'token', 'tokens', 'tool', 'tools',
-      'prompt', 'neural', 'chatbot', 'simulation']) {
+    for (const w of [
+      'ai',
+      'model',
+      'models',
+      'token',
+      'tokens',
+      'tool',
+      'tools',
+      'prompt',
+      'neural',
+      'chatbot',
+      'simulation',
+    ]) {
       expect(wordTainted(w), w).toBe(true)
     }
   })
@@ -284,7 +368,10 @@ describe('F-B — BOTH codification paths report their mint, and a third could n
     const db = openArbiterDb(':memory:')
     new CodexStore(db).insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
     return makeArbiter({
-      db, llm: llm as unknown as LlmClient, embedder: await FakeEmbedder.create(), tick: () => 100,
+      db,
+      llm: llm as unknown as LlmClient,
+      embedder: await FakeEmbedder.create(),
+      tick: () => 100,
       onCodified: (d) => seen.push(d),
     })
   }
@@ -294,10 +381,15 @@ describe('F-B — BOTH codification paths report their mint, and a third could n
     const arbiter = await rigWithSpy(new ScriptedLlm(script(DANCE)), seen)
     try {
       await arbiter.adjudicate('I dance by the fire', ctx)
-      expect(seen).toEqual([{
-        recipeId: 'express:dance', name: 'dance', kind: 'word', makes: [],
-        credit: { agentId: ctx.agentId, intent: 'I dance by the fire' },
-      }])
+      expect(seen).toEqual([
+        {
+          recipeId: 'express:dance',
+          name: 'dance',
+          kind: 'word',
+          makes: [],
+          credit: { agentId: ctx.agentId, intent: 'I dance by the fire' },
+        },
+      ])
     } finally {
       unregisterVerb('express:dance')
     }
@@ -334,7 +426,7 @@ describe('F-B — BOTH codification paths report their mint, and a third could n
       .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
       .map((f) => [f, readFileSync(new URL(f, dir), 'utf8')] as const)
 
-    const mints: Array<{ file: string; line: number; text: string }> = []
+    const mints: { file: string; line: number; text: string }[] = []
     for (const [file, src] of sources) {
       src.split('\n').forEach((text, i) => {
         if (/\brulebook\.insert\(/.test(text)) mints.push({ file, line: i + 1, text: text.trim() })
@@ -348,8 +440,10 @@ describe('F-B — BOTH codification paths report their mint, and a third could n
     for (const mint of mints) {
       const src = sources.find(([f]) => f === mint.file)![1].split('\n')
       const after = src.slice(mint.line, mint.line + 12).join('\n')
-      expect(after, `${mint.file}:${mint.line} mints a permanent verb and never reports it`)
-        .toContain('onCodified')
+      expect(
+        after,
+        `${mint.file}:${mint.line} mints a permanent verb and never reports it`,
+      ).toContain('onCodified')
     }
   })
 })

@@ -2,29 +2,45 @@
 // and the glass nothing said here may cross. Every model in this file is a script.
 import { describe, expect, it } from 'vitest'
 import {
-  FakeEmbedder, scanPromptForGlassLeak, UNNAMED_CONSTRUCT_COPY,
-  type LlmClient, type LlmMessage, type LlmUsage,
+  FakeEmbedder,
+  scanPromptForGlassLeak,
+  UNNAMED_CONSTRUCT_COPY,
+  type LlmClient,
+  type LlmMessage,
+  type LlmUsage,
 } from '@sj/agents'
 import {
-  fold, genesisState, submitIntent, unregisterVerb, VERBS, type WorldState,
+  fold,
+  genesisState,
+  submitIntent,
+  unregisterVerb,
+  VERBS,
+  type WorldState,
 } from '@sj/engine'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, type SimEvent } from '@sj/shared'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import {
-  CONSTRUCT_TYPES, CONSTRUCT_TYPE_INSTRUCTION, ConstructSchema, detectCandidates, runConstructPass,
+  CONSTRUCT_TYPES,
+  CONSTRUCT_TYPE_INSTRUCTION,
+  ConstructSchema,
+  detectCandidates,
+  runConstructPass,
 } from './constructs.js'
 import { ConstructStore } from './constructStore.js'
 import { makeArbiter, type AgentCtx, type Arbiter } from './adjudicate.js'
-import {
-  EXPRESSIVE_INSTRUCTION, ExpressiveRulingSchema, type ExpressiveRuling,
-} from './expressive.js'
+import { EXPRESSIVE_INSTRUCTION, type ExpressiveRuling } from './expressive.js'
 import { ADJUDICATION_INSTRUCTION } from './prompt.js'
 import { openArbiterDb } from './schema.js'
 import type { Verdict } from './verdict.js'
 
 let seq = 1
-const ev = (tick: number, type: string, payload: unknown): SimEvent => ({ seq: seq++, tick, type, payload })
+const ev = (tick: number, type: string, payload: unknown): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
 
 function emptyUsage(): LlmUsage {
   return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, costUsd: 0 }
@@ -38,7 +54,11 @@ class ScriptedLlm {
   users: string[] = []
   constructor(private readonly respond: (system: string, user: string) => unknown) {}
 
-  async object<T>(opts: { system: string; messages: LlmMessage[]; schema: unknown }): Promise<{ value: T; usage: LlmUsage }> {
+  async object<T>(opts: {
+    system: string
+    messages: LlmMessage[]
+    schema: unknown
+  }): Promise<{ value: T; usage: LlmUsage }> {
     this.objectCalls += 1
     this.systems.push(opts.system)
     const user = opts.messages.at(-1)!.content
@@ -46,8 +66,12 @@ class ScriptedLlm {
     return { value: this.respond(opts.system, user) as T, usage: emptyUsage() }
   }
 
-  async text(): Promise<{ text: string; usage: LlmUsage }> { return { text: '', usage: emptyUsage() } }
-  totalCostUsd(): number { return 0 }
+  async text(): Promise<{ text: string; usage: LlmUsage }> {
+    return { text: '', usage: emptyUsage() }
+  }
+  totalCostUsd(): number {
+    return 0
+  }
   alert(): void {}
 }
 
@@ -58,28 +82,52 @@ const ALL_PROMPTS: string[] = []
 // ------------------------------------------------------------------ the expressive verb
 
 const DANCE: ExpressiveRuling = {
-  word: 'dance', sense: 'sight', durationTicks: 10, energyCost: 2, targeted: false,
+  word: 'dance',
+  sense: 'sight',
+  durationTicks: 10,
+  energyCost: 2,
+  targeted: false,
   emote: 'turns in slow circles, arms wide',
 }
-const IMPOSSIBLE: Verdict = { kind: 'impossible', reason: 'no clear way to do this', class: 'physically_impossible' }
+const IMPOSSIBLE: Verdict = {
+  kind: 'impossible',
+  reason: 'no clear way to do this',
+  class: 'physically_impossible',
+}
 
 const ADA: AgentCtx = {
-  agentId: 'ada', name: 'Ada', skills: {}, inventory: [], position: { x: 20, y: 20 },
+  agentId: 'ada',
+  name: 'Ada',
+  skills: {},
+  inventory: [],
+  position: { x: 20, y: 20 },
 }
 const BEX: AgentCtx = { ...ADA, agentId: 'bex', name: 'Bex' }
 
 async function rig(llm: ScriptedLlm): Promise<Arbiter> {
   const db = openArbiterDb(':memory:')
   new CodexStore(db).insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
-  return makeArbiter({ db, llm: llm as unknown as LlmClient, embedder: await FakeEmbedder.create(), tick: () => 100 })
+  return makeArbiter({
+    db,
+    llm: llm as unknown as LlmClient,
+    embedder: await FakeEmbedder.create(),
+    tick: () => 100,
+  })
 }
 
 const scripted = new ScriptedLlm((system) =>
-  system.includes(EXPRESSIVE_INSTRUCTION) ? DANCE : IMPOSSIBLE)
+  system.includes(EXPRESSIVE_INSTRUCTION) ? DANCE : IMPOSSIBLE,
+)
 
 function twoBodies(): WorldState {
-  let s = genesisState(DEFAULT_CONFIG, Array.from({ length: 32 }, () => Array.from({ length: 32 }, () => 0 as const)))
-  for (const [id, name] of [['ada', 'Ada'], ['bex', 'Bex']]) {
+  let s = genesisState(
+    DEFAULT_CONFIG,
+    Array.from({ length: 32 }, () => Array.from({ length: 32 }, () => 0 as const)),
+  )
+  for (const [id, name] of [
+    ['ada', 'Ada'],
+    ['bex', 'Bex'],
+  ]) {
     s = fold(s, ev(0, 'agent_spawned', { id, name, x: 20, y: 20, ageDays: 7300 }), DEFAULT_CONFIG)
   }
   return { ...s, tick: 720 }
@@ -105,9 +153,14 @@ describe('G11a-X1: a word the town buys once and then owns', () => {
       const s = twoBodies()
       const started = submitIntent(s, DEFAULT_CONFIG, 'bex', 'express:dance', {})
       expect(started.ok).toBe(true)
-      const events = VERBS['express:dance']!.onComplete(
-        s, DEFAULT_CONFIG, 'bex', {}, { next: () => 0, int: () => 0 } as never)
-      expect(events[0]).toMatchObject({ type: 'agent_expressed', payload: { agentId: 'bex', verb: 'dance' } })
+      const events = VERBS['express:dance']!.onComplete(s, DEFAULT_CONFIG, 'bex', {}, {
+        next: () => 0,
+        int: () => 0,
+      } as never)
+      expect(events[0]).toMatchObject({
+        type: 'agent_expressed',
+        payload: { agentId: 'bex', verb: 'dance' },
+      })
       ALL_PROMPTS.push(...llm.systems, ...llm.users)
     } finally {
       unregisterVerb('express:dance')
@@ -124,26 +177,44 @@ function gathering(day: number, who: readonly string[] = THREE): SimEvent[] {
   const at = day * MINUTES_PER_DAY + 19 * 60
   return [
     ...who.map((id, i) => ev(at, 'agent_moved', { id, x: 30 + i, y: 30 })),
-    ev(at + 1, 'agent_expressed', { agentId: who[0]!, verb: 'dance', x: 30, y: 30, sense: 'sight' }),
+    ev(at + 1, 'agent_expressed', {
+      agentId: who[0]!,
+      verb: 'dance',
+      x: 30,
+      y: 30,
+      sense: 'sight',
+    }),
   ]
 }
 
 const NAMED = (day: number): SimEvent =>
   ev(day * MINUTES_PER_DAY + 19 * 60 + 2, 'agent_spoke', {
-    agentId: 'bex', text: 'Every seventh night now. We call it the Long Turning.', x: 30, y: 30,
+    agentId: 'bex',
+    text: 'Every seventh night now. We call it the Long Turning.',
+    x: 30,
+    y: 30,
   })
 
 const NIGHTS = (): SimEvent[] => [...gathering(1), ...gathering(3), ...gathering(5)]
 
-const classifier = (type: string) => new ScriptedLlm((_system, user) => ({
-  rulings: [...user.matchAll(/^- (\S+)/gmu)].map((m) => ({ key: m[1]!, type })),
-}))
+const classifier = (type: string) =>
+  new ScriptedLlm((_system, user) => ({
+    rulings: [...user.matchAll(/^- (\S+)/gmu)].map((m) => ({ key: m[1]!, type })),
+  }))
 
-async function runPass(events: SimEvent[], llm: ScriptedLlm, overrides: Record<string, unknown> = {}) {
+async function runPass(
+  events: SimEvent[],
+  llm: ScriptedLlm,
+  overrides: Record<string, unknown> = {},
+) {
   const db = openArbiterDb(':memory:')
   const store = new ConstructStore(db)
   const rows = await runConstructPass({
-    events, baseConfig: DEFAULT_CONFIG, store, llm: llm as unknown as LlmClient, ...overrides,
+    events,
+    baseConfig: DEFAULT_CONFIG,
+    store,
+    llm: llm as unknown as LlmClient,
+    ...overrides,
   })
   ALL_PROMPTS.push(...llm.systems, ...llm.users)
   return { rows, store }
@@ -185,7 +256,9 @@ describe('G11a-X2: the recognizer over the authored fixture', () => {
     const store = new ConstructStore(db)
     const llm = classifier('council')
     const deps = {
-      events: [...NIGHTS(), NAMED(5)], baseConfig: DEFAULT_CONFIG, store,
+      events: [...NIGHTS(), NAMED(5)],
+      baseConfig: DEFAULT_CONFIG,
+      store,
       llm: llm as unknown as LlmClient,
     }
     await runConstructPass(deps)
@@ -200,7 +273,10 @@ describe('G11a-X2: the recognizer over the authored fixture', () => {
     const db = openArbiterDb(':memory:')
     const store = new ConstructStore(db)
     const rows = await runConstructPass({
-      events: [...NIGHTS(), NAMED(5)], baseConfig: OFF, store, llm: llm as unknown as LlmClient,
+      events: [...NIGHTS(), NAMED(5)],
+      baseConfig: OFF,
+      store,
+      llm: llm as unknown as LlmClient,
     })
     expect(rows).toEqual([])
     expect(llm.objectCalls).toBe(0)
@@ -208,8 +284,11 @@ describe('G11a-X2: the recognizer over the authored fixture', () => {
 
     // And the same, switched off by a world law mid-run rather than by the base config.
     const byLaw = await runConstructPass({
-      events: [...NIGHTS(), NAMED(5)], baseConfig: DEFAULT_CONFIG, store,
-      llm: llm as unknown as LlmClient, laws: { 'constructs.enabled': false },
+      events: [...NIGHTS(), NAMED(5)],
+      baseConfig: DEFAULT_CONFIG,
+      store,
+      llm: llm as unknown as LlmClient,
+      laws: { 'constructs.enabled': false },
     })
     expect(byLaw).toEqual([])
     expect(llm.objectCalls).toBe(0)
@@ -219,14 +298,21 @@ describe('G11a-X2: the recognizer over the authored fixture', () => {
     // The classifier is not asked for names; the naming law reads mouths. A gathering whose
     // only speech names nothing leaves the field null rather than inventing one.
     const quiet = ev(5 * MINUTES_PER_DAY + 19 * 60 + 2, 'agent_spoke', {
-      agentId: 'bex', text: 'cold tonight', x: 30, y: 30,
+      agentId: 'bex',
+      text: 'cold tonight',
+      x: 30,
+      y: 30,
     })
     const { rows } = await runPass([...NIGHTS(), quiet], classifier('festival'))
     expect(rows[0]!.name).toBeNull()
   })
 
   it('two bodies are not a gathering, and two nights are not a habit', () => {
-    const two = [...gathering(1, ['ada', 'bex']), ...gathering(3, ['ada', 'bex']), ...gathering(5, ['ada', 'bex'])]
+    const two = [
+      ...gathering(1, ['ada', 'bex']),
+      ...gathering(3, ['ada', 'bex']),
+      ...gathering(5, ['ada', 'bex']),
+    ]
     expect(detectCandidates(two, DEFAULT_CONFIG)).toEqual([])
     expect(detectCandidates([...gathering(1), ...gathering(3)], DEFAULT_CONFIG)).toEqual([])
   })

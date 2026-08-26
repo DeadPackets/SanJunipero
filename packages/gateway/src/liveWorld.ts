@@ -6,16 +6,34 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
-import { DISCOVERY_EVENT, MINUTES_PER_DAY, type SimConfig } from '@sj/shared'
-import type { EventStore, TickHandler, TickLoop } from '@sj/engine'
+import { DISCOVERY_EVENT, MINUTES_PER_DAY } from '@sj/shared'
+import type { TickHandler } from '@sj/engine'
 import {
-  Embedder, EngineBridge, LlmClient, MIND_MODEL, PREFLIGHT_ROUNDS, bootMinds, migrateLlmTables,
-  openAgentDb, preflightRefusal, projectDailySpend, runPreflight,
-  FOUNDER_MINDS, type BootedMinds, type MindConfig, type MindSpec, type RuntimeSnapshot,
+  Embedder,
+  EngineBridge,
+  LlmClient,
+  MIND_MODEL,
+  PREFLIGHT_ROUNDS,
+  bootMinds,
+  migrateLlmTables,
+  openAgentDb,
+  preflightRefusal,
+  projectDailySpend,
+  runPreflight,
+  FOUNDER_MINDS,
+  type BootedMinds,
+  type MindConfig,
+  type MindSpec,
+  type RuntimeSnapshot,
   type SeamArbiter,
 } from '@sj/agents'
 import {
-  CodexStore, GENESIS_CODEX, makeArbiter, openArbiterDb, type Codified, type Recipe,
+  CodexStore,
+  GENESIS_CODEX,
+  makeArbiter,
+  openArbiterDb,
+  type Codified,
+  type Recipe,
 } from '@sj/arbiter'
 import type { LiveCast } from './devWorld.js'
 import { publishThought } from './observer.js'
@@ -44,9 +62,31 @@ export const LIVE_ARBITER_DB = '_arbiter.db'
  *  mint a recipe out of a material nobody has a word for. */
 export const STREAM_VOCABULARY = {
   itemKinds: [
-    'wood', 'stone', 'rope', 'cloth', 'fiber', 'hide', 'clay', 'axe', 'hoe', 'knife',
-    'seed_pouch', 'waterskin', 'bucket', 'torch', 'garment', 'plank', 'bread', 'wheat',
-    'fish', 'venison', 'rabbit_meat', 'berries', 'mushroom', 'herb', 'stew',
+    'wood',
+    'stone',
+    'rope',
+    'cloth',
+    'fiber',
+    'hide',
+    'clay',
+    'axe',
+    'hoe',
+    'knife',
+    'seed_pouch',
+    'waterskin',
+    'bucket',
+    'torch',
+    'garment',
+    'plank',
+    'bread',
+    'wheat',
+    'fish',
+    'venison',
+    'rabbit_meat',
+    'berries',
+    'mushroom',
+    'herb',
+    'stew',
   ],
   structureKinds: ['house', 'storehouse', 'shed', 'wagon', 'well', 'fire_pit', 'bridge', 'grave'],
 } as const
@@ -87,7 +127,7 @@ export type LiveCastOpts = {
 
 /** A new town whose minds remember an older one is refused rather than served: it is strictly
  *  worse than either a clean reset or a clean resume. */
-export function amnesiaRefusal(remembering: ReadonlyArray<{ id: string; memories: number }>): string {
+export function amnesiaRefusal(remembering: readonly { id: string; memories: number }[]): string {
   const who = remembering.map((r) => `${r.id} (${r.memories})`).join(', ')
   return [
     'stream: could not start — this is a new town at tick 0, and its minds remember an older one.',
@@ -100,7 +140,9 @@ export function amnesiaRefusal(remembering: ReadonlyArray<{ id: string; memories
 /** Wait for something to stop being busy, but never for longer than `deadlineMs`. Returns whether
  *  it settled. */
 export async function settle(
-  busy: () => boolean, deadlineMs: number, pollMs = 200,
+  busy: () => boolean,
+  deadlineMs: number,
+  pollMs = 200,
 ): Promise<boolean> {
   const until = Date.now() + deadlineMs
   while (busy()) {
@@ -123,9 +165,9 @@ export const LIVE_RATE_WINDOW_REAL_MINUTES = 15
 
 export function rateStopMessage(rate: number, ceiling: number, minds: number): string {
   return [
-    `STREAM STOPPED: the live cast is spending $${rate.toFixed(4)}/hour, over its`
-      + ` $${ceiling.toFixed(4)}/hour ceiling (${minds} mind(s) x`
-      + ` $${LIVE_RATE_CEILING_USD_PER_MIND_DAY.toFixed(2)}).`,
+    `STREAM STOPPED: the live cast is spending $${rate.toFixed(4)}/hour, over its` +
+      ` $${ceiling.toFixed(4)}/hour ceiling (${minds} mind(s) x` +
+      ` $${LIVE_RATE_CEILING_USD_PER_MIND_DAY.toFixed(2)}).`,
     `        Measured over the last ${LIVE_RATE_WINDOW_REAL_MINUTES} real minutes. This is a RATE`,
     '        stop, not the total cap — the town is nowhere near its $5 and is burning too fast.',
     '        Every mind is stopped and no further call will be made. The town on disk is intact.',
@@ -144,8 +186,8 @@ export function spendStopMessage(spent: number, cap: number): string {
  *  be over the line before its first tick, and is told so in one sentence rather than a trace. */
 export function capReachedRefusal(spent: number, cap: number, agentDbDir: string): string {
   return [
-    `stream: could not start — this town has already spent $${spent.toFixed(4)} of its`
-    + ` $${cap.toFixed(2)} cap.`,
+    `stream: could not start — this town has already spent $${spent.toFixed(4)} of its` +
+      ` $${cap.toFixed(2)} cap.`,
     '        The cap is per TOWN, not per process: the call ledger resumes with the world, so',
     '        restarting does not reset it. That is the point of an anomaly stop.',
     '        `pnpm stream` (no SJ_LIVE) resumes this same town scripted, for $0.00/hour.',
@@ -156,16 +198,20 @@ export function capReachedRefusal(spent: number, cap: number, agentDbDir: string
 /** Total dollars in a call ledger, across every caller. `sumCostUsd` is per-caller and the cap
  *  is not: five minds on two callers each would clear a per-caller cap ten times over. */
 export function ledgerTotalUsd(db: Database.Database): number {
-  const row = db.prepare('SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls').get() as { total: number }
+  const row = db.prepare('SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls').get() as {
+    total: number
+  }
   return row.total
 }
 
 /** Scoped to THIS boot's pre-flight rows: the ledger resumes with the town, so the whole sum
  *  would be the town's entire history rather than what the pre-flight cost. */
 export function preflightCostUsd(db: Database.Database, since: number): number {
-  const row = db.prepare(
-    "SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE caller = 'preflight' AND ts >= ?",
-  ).get(since) as { total: number }
+  const row = db
+    .prepare(
+      "SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE caller = 'preflight' AND ts >= ?",
+    )
+    .get(since) as { total: number }
   return row.total
 }
 
@@ -178,23 +224,34 @@ function ensureRuntimeTable(db: Database.Database): void {
 }
 
 export function restorableSnapshot(
-  row: { tick: number; snapshot: string } | undefined, worldTick: number,
+  row: { tick: number; snapshot: string } | undefined,
+  worldTick: number,
 ): RuntimeSnapshot | null {
   if (row === undefined || row.tick > worldTick) return null
-  try { return JSON.parse(row.snapshot) as RuntimeSnapshot } catch { return null }
+  try {
+    return JSON.parse(row.snapshot) as RuntimeSnapshot
+  } catch {
+    return null
+  }
 }
 
 const countMemories = (db: Database.Database): number => {
   try {
     return Number((db.prepare('SELECT COUNT(*) AS n FROM memories').get() as { n: number }).n)
-  } catch { return 0 }
+  } catch {
+    return 0
+  }
 }
 
 /** Build a cast of minds for `startDevWorld`. Async because the embedder load and the provider
  *  pre-flight both run first and either can refuse the whole run; everything that needs the world
  *  happens in `attach`, because a bridge needs the loop and the loop needs the bridge's handler. */
 export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
-  const log = opts.log ?? ((line: string) => console.log(line))
+  const log =
+    opts.log ??
+    ((line: string) => {
+      console.log(line)
+    })
   const minds = opts.minds ?? FOUNDER_MINDS
   const cap = opts.spendCapUsd ?? LIVE_SPEND_STOP_USD
   mkdirSync(opts.agentDbDir, { recursive: true })
@@ -214,31 +271,40 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     opts.makeClient !== undefined
       ? opts.makeClient(opsDb, caller, agentId)
       : new LlmClient({
-        db: opsDb, caller, ...(agentId === undefined ? {} : { agentId }),
-        // The per-caller backstop: it stops one caller running away between two reads of the
-        // ledger, which the tick watchdog below cannot see.
-        budgetUsd: cap,
-      })
+          db: opsDb,
+          caller,
+          ...(agentId === undefined ? {} : { agentId }),
+          // The per-caller backstop: it stops one caller running away between two reads of the
+          // ledger, which the tick watchdog below cannot see.
+          budgetUsd: cap,
+        })
 
   if (opts.preflight !== false) {
-    if (!process.env['OPENROUTER_API_KEY']) {
+    if (!process.env.OPENROUTER_API_KEY) {
       throw new Error('SJ_LIVE=1 needs OPENROUTER_API_KEY — run with node --env-file=<repo>/.env')
     }
     // Scoped to THIS boot's pre-flight rows: the ledger is resumed with the town, so the whole
     // sum would be the whole history of the town and not the cost of these twelve calls.
     const startedAt = Date.now()
     const result = await runPreflight({
-      llm: makeClient('preflight'), provider: 'default', hardAllowList: false, model: MIND_MODEL,
-      identity: minds[0]?.identity, personality: minds[0]?.personality, rounds: PREFLIGHT_ROUNDS,
+      llm: makeClient('preflight'),
+      provider: 'default',
+      hardAllowList: false,
+      model: MIND_MODEL,
+      identity: minds[0]?.identity,
+      personality: minds[0]?.personality,
+      rounds: PREFLIGHT_ROUNDS,
       costUsd: () => preflightCostUsd(opsDb, startedAt),
     })
-    log(`stream: pre-flight — action ${result.actions}/${result.calls} over ${result.roundsRun}`
-      + ` round(s), ${result.roundsPassed} passed, $${result.costUsd.toFixed(6)};`
-      + ` this town has spent $${ledgerTotalUsd(opsDb).toFixed(4)} of its $${cap.toFixed(2)} so far`)
+    log(
+      `stream: pre-flight — action ${result.actions}/${result.calls} over ${result.roundsRun}` +
+        ` round(s), ${result.roundsPassed} passed, $${result.costUsd.toFixed(6)};` +
+        ` this town has spent $${ledgerTotalUsd(opsDb).toFixed(4)} of its $${cap.toFixed(2)} so far`,
+    )
     if (!result.passed) throw new Error(preflightRefusal(result))
   }
 
-  const embedder = opts.embedder ?? await Embedder.create(opts.modelsDir ?? DEFAULT_MODELS_DIR)
+  const embedder = opts.embedder ?? (await Embedder.create(opts.modelsDir ?? DEFAULT_MODELS_DIR))
 
   const mindDbs = new Map<string, Database.Database>()
   const dbFor = (id: string): Database.Database => {
@@ -255,9 +321,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   // Opened here rather than in `attach` so a failure to open it refuses the run instead of
   // taking down a world that is already ticking.
   const wantsArbiter = opts.useArbiter !== false
-  const arbiterDb = wantsArbiter && opts.arbiter === undefined
-    ? openArbiterDb(join(opts.agentDbDir, LIVE_ARBITER_DB))
-    : null
+  const arbiterDb =
+    wantsArbiter && opts.arbiter === undefined
+      ? openArbiterDb(join(opts.agentDbDir, LIVE_ARBITER_DB))
+      : null
   if (arbiterDb !== null) {
     // Seeded once per TOWN, not once per boot. Emptiness is the test because it is the only
     // state that can mean "this town has never had a codex".
@@ -287,14 +354,17 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         .filter((r) => r.memories > 0)
       if (worldTick === 0 && remembering.length > 0) throw new Error(amnesiaRefusal(remembering))
       if (worldTick > 0 && remembering.length === 0) {
-        log(`stream: this town is ${worldTick} ticks old and every mind behind it is new —`
-          + ' the bodies remember more than the people in them do')
+        log(
+          `stream: this town is ${worldTick} ticks old and every mind behind it is new —` +
+            ' the bodies remember more than the people in them do',
+        )
       }
 
       bridge = new EngineBridge({ loop, store, simConfig: config })
       const restoring = new Map<string, RuntimeSnapshot>()
       for (const m of minds) {
-        const row = dbFor(m.id).prepare('SELECT tick, snapshot FROM mind_runtime WHERE agent_id = ?')
+        const row = dbFor(m.id)
+          .prepare('SELECT tick, snapshot FROM mind_runtime WHERE agent_id = ?')
           .get(m.id) as { tick: number; snapshot: string } | undefined
         const snap = restorableSnapshot(row, worldTick)
         if (snap !== null) restoring.set(m.id, snap)
@@ -303,51 +373,71 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       // Built here and not at `createLiveCast` time because `makeArbiter` needs the tick and
       // `onCodified` needs the bridge, and neither exists until a loop does. `makeClient` points
       // at `opsDb`: an arbiter billing its own db would spend outside the anomaly stop.
-      const arbiter: SeamArbiter | undefined = opts.arbiter ?? (arbiterDb === null
-        ? undefined
-        : (() => {
-            const built = makeArbiter({
-              db: arbiterDb, llm: makeClient('arbiter'), embedder,
-              tick: () => loop.state.tick, vocabulary: STREAM_VOCABULARY,
-              // A codification is a world fact, so it goes in the world's log. The verb is
-              // already minted by the time this runs, so nothing here can fail it.
-              onCodified: (d: Codified) => {
-                bridge?.announce(DISCOVERY_EVENT, {
-                  recipeId: d.recipeId, name: d.name, kind: d.kind,
-                  byId: d.credit.agentId, intent: d.credit.intent, makes: d.makes,
-                })
-              },
-            })
-            return {
-              adjudicate: built.adjudicate,
-              codify: (recipe: { id: string }, credit) => built.codify(recipe as Recipe, credit),
-            }
-          })())
+      const arbiter: SeamArbiter | undefined =
+        opts.arbiter ??
+        (arbiterDb === null
+          ? undefined
+          : (() => {
+              const built = makeArbiter({
+                db: arbiterDb,
+                llm: makeClient('arbiter'),
+                embedder,
+                tick: () => loop.state.tick,
+                vocabulary: STREAM_VOCABULARY,
+                // A codification is a world fact, so it goes in the world's log. The verb is
+                // already minted by the time this runs, so nothing here can fail it.
+                onCodified: (d: Codified) => {
+                  bridge?.announce(DISCOVERY_EVENT, {
+                    recipeId: d.recipeId,
+                    name: d.name,
+                    kind: d.kind,
+                    byId: d.credit.agentId,
+                    intent: d.credit.intent,
+                    makes: d.makes,
+                  })
+                },
+              })
+              return {
+                adjudicate: built.adjudicate,
+                codify: (recipe: { id: string }, credit) => built.codify(recipe as Recipe, credit),
+              }
+            })())
 
       booted = bootMinds({
-        minds, bridge, embedder, dbFor,
+        minds,
+        bridge,
+        embedder,
+        dbFor,
         turnLlm: (id) => makeClient('turn', id),
         reflectionLlm: (id) => makeClient('reflection', id),
         mindConfig: { ...STREAM_MIND_CONFIG, ...opts.mindConfig },
         day: Math.floor(worldTick / MINUTES_PER_DAY),
         restoring,
         ...(arbiter === undefined ? {} : { arbiter }),
-        onThought: (t) => { if (!stopped) publishThought(db, t) },
+        onThought: (t) => {
+          if (!stopped) publishThought(db, t)
+        },
       })
       saveRuntime = (tick: number): void => {
         for (const { agentId, snapshot } of booted?.snapshots() ?? []) {
-          dbFor(agentId).prepare(
-            'INSERT INTO mind_runtime (agent_id, tick, snapshot) VALUES (?, ?, ?)'
-            + ' ON CONFLICT(agent_id) DO UPDATE SET tick = excluded.tick, snapshot = excluded.snapshot',
-          ).run(agentId, tick, JSON.stringify(snapshot))
+          dbFor(agentId)
+            .prepare(
+              'INSERT INTO mind_runtime (agent_id, tick, snapshot) VALUES (?, ?, ?)' +
+                ' ON CONFLICT(agent_id) DO UPDATE SET tick = excluded.tick, snapshot = excluded.snapshot',
+            )
+            .run(agentId, tick, JSON.stringify(snapshot))
         }
       }
 
-      log(`stream: LIVE — ${minds.length} minds on ${MIND_MODEL}, cap $${cap.toFixed(2)},`
-        + ` memory in ${opts.agentDbDir}`)
-      log(arbiter === undefined
-        ? 'stream: the arbiter is OFF — an invented act falls back to experiment and the world answers it'
-        : `stream: the arbiter is ON — a mind may attempt what the engine has no verb for; laws in ${LIVE_ARBITER_DB}`)
+      log(
+        `stream: LIVE — ${minds.length} minds on ${MIND_MODEL}, cap $${cap.toFixed(2)},` +
+          ` memory in ${opts.agentDbDir}`,
+      )
+      log(
+        arbiter === undefined
+          ? 'stream: the arbiter is OFF — an invented act falls back to experiment and the world answers it'
+          : `stream: the arbiter is ON — a mind may attempt what the engine has no verb for; laws in ${LIVE_ARBITER_DB}`,
+      )
 
       // ── the money, on the world's own clock ──
       bridge.onTick((tick) => {
@@ -382,7 +472,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       if (!settled) log('stream: a night was still being reflected on when the town closed')
       // The last plan each mind was halfway through, written at the tick it stopped rather
       // than at the last multiple of 48 — a clean shutdown should lose nothing at all.
-      try { saveRuntime(bridge?.currentTick() ?? 0) } catch { /* a closed db loses the plan, not the memory */ }
+      try {
+        saveRuntime(bridge?.currentTick() ?? 0)
+      } catch {
+        /* a closed db loses the plan, not the memory */
+      }
       for (const db of mindDbs.values()) db.close()
       arbiterDb?.close()
       opsDb.close()

@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
-  isBeddedKind, isHearthKind, lightBandAt, MINUTES_PER_DAY, SimConfigSchema, structureGlowRadius,
-  type SimConfig, type SimEvent,
+  isBeddedKind,
+  isHearthKind,
+  lightBandAt,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  structureGlowRadius,
+  type SimConfig,
+  type SimEvent,
 } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -16,15 +22,24 @@ import { isExposed, warmthTargetFor } from './systems/warmth.js'
 // structures.recipes.house.hearth, with no new agent state.
 
 const quiet = {
-  weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 },
-  mapGrowth: { enabled: false }, fauna: { enabled: false }, desirePaths: { enabled: false },
+  weather: { hourlyChangeChance: 0 },
+  mystery: { chancePerDay: 0 },
+  mapGrowth: { enabled: false },
+  fauna: { enabled: false },
+  desirePaths: { enabled: false },
 }
 const CFG: SimConfig = SimConfigSchema.parse(quiet)
 const FUEL = CFG.light.fuelBurnTicks
 
 let seq = 71000
-const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({ seq: seq++, tick, type, payload })
-const map = (): TileId[][] => Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
+const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
+const map = (): TileId[][] =>
+  Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
 
 // Minute 30, so no hour boundary rolls anything. 22:00 on a winter day is the coldest hour the
 // warmth table has, and it is the hour the whole cold design exists for.
@@ -36,9 +51,25 @@ function houseAndBody(tick = WINTER_NIGHT, weatherC = -10): WorldState {
   s = fold(s, ev('tick_advanced', {}, tick), CFG)
   s = fold(s, ev('weather_changed', { kind: 'sunny', temperatureC: weatherC }, tick), CFG)
   s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }, tick), CFG)
-  s = fold(s, ev('structure_planned', {
-    id: 'house_1', kind: 'house', x: 5, y: 4, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
-  }, tick), CFG)
+  s = fold(
+    s,
+    ev(
+      'structure_planned',
+      {
+        id: 'house_1',
+        kind: 'house',
+        x: 5,
+        y: 4,
+        w: 2,
+        h: 2,
+        maxHp: 50,
+        flammable: true,
+        builderId: 'a1',
+      },
+      tick,
+    ),
+    CFG,
+  )
   return fold(s, ev('structure_completed', { id: 'house_1' }, tick), CFG)
 }
 
@@ -56,7 +87,11 @@ function apply(s: WorldState, verb: string, params: Record<string, unknown>): Wo
   if (!r.ok) throw new Error(`${verb}: ${r.reason}`)
   const done = VERBS[verb]!.onComplete(s, CFG, 'a1', params, new RngStreams('he').get('actions'))
   let out = s
-  for (const e of [...r.events, { type: 'action_completed', payload: { agentId: 'a1', verb } }, ...done]) {
+  for (const e of [
+    ...r.events,
+    { type: 'action_completed', payload: { agentId: 'a1', verb } },
+    ...done,
+  ]) {
     out = fold(out, ev(e.type, e.payload, s.tick), CFG)
   }
   return out
@@ -69,7 +104,10 @@ const light = (s: WorldState): 'bright' | 'dim' | 'dark' =>
  *  the hour, which is what advancing the clock past `fuelBurnTicks` measures instead. */
 const burntDown = (s: WorldState): WorldState => ({
   ...s,
-  structures: { ...s.structures, house_1: { ...s.structures.house_1!, fueledUntilTick: s.tick - 1 } },
+  structures: {
+    ...s.structures,
+    house_1: { ...s.structures.house_1!, fueledUntilTick: s.tick - 1 },
+  },
 })
 
 describe('★ the hearth in a house is a fire, and four laws already knew what to do with one', () => {
@@ -131,16 +169,40 @@ describe('★ the hearth in a house is a fire, and four laws already knew what t
 
   it('★ 3b — and a body INSIDE ANOTHER BUILDING gets nothing from it: a wall stops the heat', () => {
     let s = holding(houseAndBody(), 'wood_1', 'wood')
-    s = fold(s, ev('structure_planned', {
-      id: 'house_2', kind: 'house', x: 5, y: 7, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
-    }, s.tick), CFG)
+    s = fold(
+      s,
+      ev(
+        'structure_planned',
+        {
+          id: 'house_2',
+          kind: 'house',
+          x: 5,
+          y: 7,
+          w: 2,
+          h: 2,
+          maxHp: 50,
+          flammable: true,
+          builderId: 'a1',
+        },
+        s.tick,
+      ),
+      CFG,
+    )
     s = fold(s, ev('structure_completed', { id: 'house_2' }, s.tick), CFG)
     const fed = apply(indoors(s), 'stoke', { structureId: 'house_1' })
     expect(warmthTargetFor(fed, CFG, 'a1')).toBe(34)
 
     // Same tick, same fire, same tile — the body has simply stepped into the house next door.
-    let next = fold(fed, ev('agent_exited', { agentId: 'a1', structureId: 'house_1' }, fed.tick), CFG)
-    next = fold(next, ev('agent_entered', { agentId: 'a1', structureId: 'house_2' }, next.tick), CFG)
+    let next = fold(
+      fed,
+      ev('agent_exited', { agentId: 'a1', structureId: 'house_1' }, fed.tick),
+      CFG,
+    )
+    next = fold(
+      next,
+      ev('agent_entered', { agentId: 'a1', structureId: 'house_2' }, next.tick),
+      CFG,
+    )
     expect(warmthTargetFor(next, CFG, 'a1')).toBe(10)
   })
 
@@ -150,8 +212,15 @@ describe('★ the hearth in a house is a fire, and four laws already knew what t
     s = holding(s, 'wood_1', 'wood')
     s = holding(s, 'meat_1', 'venison')
     s = holding(s, 'veg_1', 'berries')
-    s = fold(s, ev('item_spawned',
-      { id: 'skin_1', kind: 'waterskin', qty: 1, charges: 2, loc: { t: 'agent', id: 'a1' } }, s.tick), CFG)
+    s = fold(
+      s,
+      ev(
+        'item_spawned',
+        { id: 'skin_1', kind: 'waterskin', qty: 1, charges: 2, loc: { t: 'agent', id: 'a1' } },
+        s.tick,
+      ),
+      CFG,
+    )
 
     const unlit = submitIntent(s, CFG, 'a1', 'craft', { recipe: 'stew' })
     expect(unlit.ok).toBe(false)
@@ -173,9 +242,25 @@ describe('★ the hearth in a house is a fire, and four laws already knew what t
     expect(roomOf(apply(cold, 'stoke', { structureId: 'house_1' }))?.hearth).toBe('lit')
 
     // ★ VACUOUS GUARD: a building with no fire in it says nothing, rather than saying "cold".
-    let shed = fold(cold, ev('structure_planned', {
-      id: 'store_1', kind: 'storehouse', x: 1, y: 1, w: 2, h: 2, maxHp: 40, flammable: true, builderId: 'a1',
-    }, cold.tick), CFG)
+    let shed = fold(
+      cold,
+      ev(
+        'structure_planned',
+        {
+          id: 'store_1',
+          kind: 'storehouse',
+          x: 1,
+          y: 1,
+          w: 2,
+          h: 2,
+          maxHp: 40,
+          flammable: true,
+          builderId: 'a1',
+        },
+        cold.tick,
+      ),
+      CFG,
+    )
     shed = fold(shed, ev('structure_completed', { id: 'store_1' }, shed.tick), CFG)
     shed = fold(shed, ev('agent_exited', { agentId: 'a1', structureId: 'house_1' }, shed.tick), CFG)
     const seen = composePerception(shed, CFG, 'a1', []).visible.structures
@@ -183,12 +268,30 @@ describe('★ the hearth in a house is a fire, and four laws already knew what t
     expect(seen.find((x) => x.id === 'house_1')?.hearth).toBe('cold')
 
     // A building still going up has no fire in it yet, whatever its kind will hold.
-    let site = fold(houseAndBody(), ev('structure_planned', {
-      id: 'site_1', kind: 'house', x: 1, y: 1, w: 2, h: 2, maxHp: 50, flammable: true, builderId: 'a1',
-    }, WINTER_NIGHT), CFG)
+    let site = fold(
+      houseAndBody(),
+      ev(
+        'structure_planned',
+        {
+          id: 'site_1',
+          kind: 'house',
+          x: 1,
+          y: 1,
+          w: 2,
+          h: 2,
+          maxHp: 50,
+          flammable: true,
+          builderId: 'a1',
+        },
+        WINTER_NIGHT,
+      ),
+      CFG,
+    )
     site = fold(site, ev('agent_moved', { id: 'a1', x: 3, y: 3 }, site.tick), CFG)
-    expect(composePerception(site, CFG, 'a1', []).visible.structures
-      .find((x) => x.id === 'site_1')?.hearth).toBeUndefined()
+    expect(
+      composePerception(site, CFG, 'a1', []).visible.structures.find((x) => x.id === 'site_1')
+        ?.hearth,
+    ).toBeUndefined()
   })
 })
 
@@ -202,11 +305,30 @@ describe('★ a bed is worth something, and it was worth nothing', () => {
     const row = CFG.structures.recipes[kind]!
     let s = genesisState(CFG, map())
     s = fold(s, ev('tick_advanced', {}, WINTER_NIGHT), CFG)
-    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }, WINTER_NIGHT), CFG)
-    s = fold(s, ev('structure_planned', {
-      id: 'roof_1', kind, x: 5, y: 4, w: row.w, h: row.h, maxHp: row.maxHp, flammable: row.flammable,
-      builderId: 'a1',
-    }, WINTER_NIGHT), CFG)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: 7300 }, WINTER_NIGHT),
+      CFG,
+    )
+    s = fold(
+      s,
+      ev(
+        'structure_planned',
+        {
+          id: 'roof_1',
+          kind,
+          x: 5,
+          y: 4,
+          w: row.w,
+          h: row.h,
+          maxHp: row.maxHp,
+          flammable: row.flammable,
+          builderId: 'a1',
+        },
+        WINTER_NIGHT,
+      ),
+      CFG,
+    )
     s = fold(s, ev('structure_completed', { id: 'roof_1' }, WINTER_NIGHT), CFG)
     return fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'roof_1' }, WINTER_NIGHT), CFG)
   }
@@ -228,7 +350,11 @@ describe('★ a bed is worth something, and it was worth nothing', () => {
     // The one number the whole world used before this change, unmoved for everybody without a
     // bed: out under the sky, in a storehouse, in the cabin. Only the bed is new.
     let outside = genesisState(CFG, map())
-    outside = fold(outside, ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }, 0), CFG)
+    outside = fold(
+      outside,
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }, 0),
+      CFG,
+    )
     expect(sleepRegenPerTick(outside, CFG, 'a1')).toBe(REGEN)
     for (const kind of ['storehouse', 'cabin']) {
       expect(sleepRegenPerTick(asleepIn(kind), CFG, 'a1'), kind).toBe(REGEN)
@@ -237,7 +363,11 @@ describe('★ a bed is worth something, and it was worth nothing', () => {
 
   it('★ and a mind can SEE which roof has beds in it, before it walks to one', () => {
     const seen = (kind: string) => {
-      const s = fold(asleepIn(kind), ev('agent_exited', { agentId: 'a1', structureId: 'roof_1' }, WINTER_NIGHT), CFG)
+      const s = fold(
+        asleepIn(kind),
+        ev('agent_exited', { agentId: 'a1', structureId: 'roof_1' }, WINTER_NIGHT),
+        CFG,
+      )
       return composePerception(s, CFG, 'a1', []).visible.structures.find((x) => x.id === 'roof_1')
     }
     expect(seen('house')?.bed).toBe(true)

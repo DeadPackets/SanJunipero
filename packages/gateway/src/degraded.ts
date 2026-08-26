@@ -17,4 +17,6 @@ export function reportOnce(key: string, line: () => string): void {
 export const degradations = (): Degradation[] => [...said.values()]
 
 /** Testing seam: the map is process-wide, because so is the process's ignorance. */
-export const clearDegradations = (): void => said.clear()
+export const clearDegradations = (): void => {
+  said.clear()
+}

@@ -17,25 +17,29 @@ if (!KEY) throw new Error('OPENROUTER_API_KEY not set')
 const budget = new BudgetGuard(0.3)
 const client = makeImageClient({ apiKey: KEY, budget })
 
-const REF_CANDIDATES = '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/reference-candidates'
+const REF_CANDIDATES =
+  '/Users/deadpackets/workspace/SanJunipero/.claude/scratch/c5/reference-candidates'
 // Canonical style anchor (the approved cottage raw, committed): FIRST generation ref + FIRST judge ref.
 const STYLE_ANCHOR = readFileSync('packages/forge/content/reference/style-anchor.png')
 const judge = makeVlmJudge({
   apiKey: KEY,
-  refSheets: [STYLE_ANCHOR, readFileSync(`${REF_CANDIDATES}/item-1.png`),
-    readFileSync('packages/forge/content/reference/identity-anchor.png')],
+  refSheets: [
+    STYLE_ANCHOR,
+    readFileSync(`${REF_CANDIDATES}/item-1.png`),
+    readFileSync('packages/forge/content/reference/identity-anchor.png'),
+  ],
 })
 
 const OUT = 'packages/forge/out/building-facing'
 const DURABLE = scratch('c5', 'building-facing')
 for (const d of [`${OUT}/candidates`, `${DURABLE}/candidates`]) mkdirSync(d, { recursive: true })
 
-const PROMPT = `${STYLE_PROMPT} A single free-standing building sprite. ` +
+const PROMPT =
+  `${STYLE_PROMPT} A single free-standing building sprite. ` +
   'the SAME cottage as the reference, identical materials and roof, but with the door and entrance ' +
   'on the other visible wall (the south-east face). Same fixed camera, do NOT mirror the image; ' +
   'lighting stays from the north-west. ' +
   'Match the pixel density, palette warmth, and cute rounded style of the first reference image exactly.'
-
 
 const cands = await client.generateCandidates(PROMPT, [STYLE_ANCHOR], 3)
 let winner: { png: Buffer; score: number; notes: string } | null = null
@@ -47,7 +51,9 @@ for (const [i, c] of cands.entries()) {
   if (!winner || v.score > winner.score) winner = { png: c.png, score: v.score, notes: v.notes }
 }
 
-const cell = outlinePass(quantize(downscaleNearest(chromaKey(await decodePng(winner!.png)), 64, 64)))
+const cell = outlinePass(
+  quantize(downscaleNearest(chromaKey(await decodePng(winner!.png)), 64, 64)),
+)
 const winnerPng = await encodePng(cell)
 writeFileSync(`${OUT}/winner.png`, winnerPng)
 writeFileSync(`${DURABLE}/winner.png`, winnerPng)

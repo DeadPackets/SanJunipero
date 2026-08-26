@@ -24,19 +24,18 @@ export function splitFacingKind(codexKind: string): { kind: string; facing: Stru
   const at = codexKind.lastIndexOf(':')
   if (at < 1) return { kind: codexKind, facing: DEFAULT_FACING }
   const tail = codexKind.slice(at + 1)
-  if (!isStructureFacing(tail) || tail === DEFAULT_FACING) return { kind: codexKind, facing: DEFAULT_FACING }
+  if (!isStructureFacing(tail) || tail === DEFAULT_FACING)
+    return { kind: codexKind, facing: DEFAULT_FACING }
   return { kind: codexKind.slice(0, at), facing: tail }
 }
 
 // ── the committed content ──────────────────────────────────────────────────────────────────
 
-export const BUILDINGS_CONTENT_DIR =
-  fileURLToPath(new URL('../content/buildings', import.meta.url))
+export const BUILDINGS_CONTENT_DIR = fileURLToPath(new URL('../content/buildings', import.meta.url))
 
 /** The style anchor and the identity anchors: the human-designated look, kept as the craft
  *  record. `referenceSheet.ts` says why nothing attaches them to a generation. */
-export const REFERENCE_CONTENT_DIR =
-  fileURLToPath(new URL('../content/reference', import.meta.url))
+export const REFERENCE_CONTENT_DIR = fileURLToPath(new URL('../content/reference', import.meta.url))
 
 export type CommittedBuilding = {
   /** `house-se` — the directory name, and the label the reports use */
@@ -55,9 +54,12 @@ export function listCommittedBuildings(root: string = BUILDINGS_CONTENT_DIR): Co
   if (!existsSync(root)) return []
   const out: CommittedBuilding[] = []
   for (const dir of readdirSync(root, { withFileTypes: true })
-    .filter((e) => e.isDirectory()).map((e) => e.name).sort()) {
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort()) {
     const base = join(root, dir)
-    const manifestPath = join(base, 'manifest.json'), cellPath = join(base, 'cell.png')
+    const manifestPath = join(base, 'manifest.json'),
+      cellPath = join(base, 'cell.png')
     for (const p of [manifestPath, cellPath]) {
       if (!existsSync(p)) throw new Error(`buildings/${dir}: ${p.split('/').at(-1)} is missing`)
     }
@@ -66,8 +68,10 @@ export function listCommittedBuildings(root: string = BUILDINGS_CONTENT_DIR): Co
     // The directory name is derived from the manifest, never trusted over it, but the two
     // disagreeing means someone renamed one of them alone.
     const expected = facing === DEFAULT_FACING ? kind : `${kind}-${facing}`
-    if (dir !== expected) throw new Error(
-      `buildings/${dir}: manifest kind "${manifest.kind}" belongs in buildings/${expected}`)
+    if (dir !== expected)
+      throw new Error(
+        `buildings/${dir}: manifest kind "${manifest.kind}" belongs in buildings/${expected}`,
+      )
     out.push({ dir, kind, facing, codexKind: manifest.kind, manifest, png: readFileSync(cellPath) })
   }
   return out
@@ -78,14 +82,19 @@ export function listCommittedBuildings(root: string = BUILDINGS_CONTENT_DIR): Co
 export type BuildingIngestEntry = { kind: string; action: 'registered' | 'unchanged'; id: string }
 
 function latestBuilding(codex: AssetCodex, kind: string) {
-  return codex.listSince(0)
-    .filter((r) => r.status === 'ready' && r.class === 'building' && r.kind === kind).at(-1) ?? null
+  return (
+    codex
+      .listSince(0)
+      .filter((r) => r.status === 'ready' && r.class === 'building' && r.kind === kind)
+      .at(-1) ?? null
+  )
 }
 
 /** Idempotent: unchanged bytes + unchanged manifest register nothing, and a regenerated cell
  *  gets a new record that wins by seq — the renderer's newest-ready law. */
 export function registerCommittedBuildings(
-  codex: AssetCodex, opts: { root?: string } = {},
+  codex: AssetCodex,
+  opts: { root?: string } = {},
 ): BuildingIngestEntry[] {
   const out: BuildingIngestEntry[] = []
   for (const b of listCommittedBuildings(opts.root)) {
@@ -99,10 +108,18 @@ export function registerCommittedBuildings(
       }
     }
     const rec = codex.register({
-      class: 'building', kind: b.codexKind, desc: `building v4: ${b.kind} facing ${b.facing}`,
-      meta, footprint: b.manifest.footprint, png: b.png,
-      widthPx: b.manifest.cell.w, heightPx: b.manifest.cell.h,
-      status: 'ready', score: null, attempts: 1, costUsd: 0,
+      class: 'building',
+      kind: b.codexKind,
+      desc: `building v4: ${b.kind} facing ${b.facing}`,
+      meta,
+      footprint: b.manifest.footprint,
+      png: b.png,
+      widthPx: b.manifest.cell.w,
+      heightPx: b.manifest.cell.h,
+      status: 'ready',
+      score: null,
+      attempts: 1,
+      costUsd: 0,
     })
     out.push({ kind: b.codexKind, action: 'registered', id: rec.id })
   }

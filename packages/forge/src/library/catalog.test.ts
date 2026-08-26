@@ -1,15 +1,21 @@
 import { describe, it, expect } from 'vitest'
 import { INTERIOR_KINDS, resolveFurnishingKind, type LibraryCategory } from '@sj/shared'
-import { LIBRARY, LibraryEntrySchema, libraryEntry, LIBRARY_COUNTS, SHORT_OF_FOOTPRINT } from './catalog.js'
+import {
+  LIBRARY,
+  LibraryEntrySchema,
+  libraryEntry,
+  LIBRARY_COUNTS,
+  SHORT_OF_FOOTPRINT,
+} from './catalog.js'
 import { ICON_PX, WORLD_SPRITE_PX, nativeSizeFor, resolveScale } from '../assetResolution.js'
 import { GEN_SIZE } from '../imageClient.js'
 
-const byCategory = (c: LibraryCategory) => LIBRARY.filter(e => e.category === c)
+const byCategory = (c: LibraryCategory) => LIBRARY.filter((e) => e.category === c)
 
 describe('the library catalog', () => {
   it('is exactly 50 entries with unique kinds', () => {
     expect(LIBRARY).toHaveLength(50)
-    expect(new Set(LIBRARY.map(e => e.kind)).size).toBe(50)
+    expect(new Set(LIBRARY.map((e) => e.kind)).size).toBe(50)
   })
 
   it('splits 10 / 10 / 9 / 6 / 15 across the five categories', () => {
@@ -46,8 +52,9 @@ describe('the library catalog', () => {
         continue
       }
       const want = nativeSizeFor('item', e.interior.slots).w
-      expect(e.spritePx, `${e.kind} — declared bigger than its art`)
-        .toBe(SHORT_OF_FOOTPRINT.has(e.kind) ? WORLD_SPRITE_PX : want)
+      expect(e.spritePx, `${e.kind} — declared bigger than its art`).toBe(
+        SHORT_OF_FOOTPRINT.has(e.kind) ? WORLD_SPRITE_PX : want,
+      )
     }
   })
 
@@ -70,13 +77,12 @@ describe('the library catalog', () => {
 
   it('every interiorKind named is a real interior kind', () => {
     for (const e of byCategory('furniture'))
-      for (const k of e.interior!.interiorKinds)
-        expect(INTERIOR_KINDS, e.kind).toContain(k)
+      for (const k of e.interior!.interiorKinds) expect(INTERIOR_KINDS, e.kind).toContain(k)
   })
 
   // Only a house can hold a bed.
   it('a house has at least one bed available; a shed and a storehouse have none', () => {
-    const beds = byCategory('furniture').filter(e => e.interior!.isBed === true)
+    const beds = byCategory('furniture').filter((e) => e.interior!.isBed === true)
     expect(beds.length).toBeGreaterThan(0)
     for (const b of beds) expect(b.interior!.interiorKinds).toEqual(['house'])
   })
@@ -86,15 +92,29 @@ describe('the library catalog', () => {
     const a = libraryEntry('field_mushroom')!.desc.split(/\s+/)
     const b = libraryEntry('pale_mushroom')!.desc.split(/\s+/)
     expect(a).toHaveLength(b.length)
-    const sa = new Set(a), sb = new Set(b)
-    expect([...sa].filter(w => !sb.has(w))).toHaveLength(1)
-    expect([...sb].filter(w => !sa.has(w))).toHaveLength(1)
+    const sa = new Set(a),
+      sb = new Set(b)
+    expect([...sa].filter((w) => !sb.has(w))).toHaveLength(1)
+    expect([...sb].filter((w) => !sa.has(w))).toHaveLength(1)
   })
 
   // Naming law: every desc is viewer-reachable prose, so no warnings and no registry vocabulary.
   it('no desc leaks a warning word or any pipeline vocabulary', () => {
-    const BANNED = ['poison', 'poisonous', 'toxic', 'deadly', 'danger', 'dangerous',
-      'safe', 'edible', 'model', 'prompt', 'generated', 'sprite', 'pixel']
+    const BANNED = [
+      'poison',
+      'poisonous',
+      'toxic',
+      'deadly',
+      'danger',
+      'dangerous',
+      'safe',
+      'edible',
+      'model',
+      'prompt',
+      'generated',
+      'sprite',
+      'pixel',
+    ]
     for (const e of LIBRARY) {
       const low = e.desc.toLowerCase()
       for (const w of BANNED) expect(low, `${e.kind} leaks "${w}"`).not.toContain(w)

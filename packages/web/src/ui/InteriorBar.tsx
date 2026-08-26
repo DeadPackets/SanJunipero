@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
-import { roomCard, roomWord, type Provenance, type RoomCard } from './interiorModel.js'
+import { roomCard, type Provenance, type RoomCard } from './interiorModel.js'
 
 export { roomWord as interiorRoomWord } from './interiorModel.js'
 
-export function RoomCardView(
-  { card, onBack, backRef }: {
-    card: RoomCard
-    onBack: () => void
-    backRef?: React.Ref<HTMLButtonElement>
-  },
-) {
+export function RoomCardView({
+  card,
+  onBack,
+  backRef,
+}: {
+  card: RoomCard
+  onBack: () => void
+  backRef?: React.Ref<HTMLButtonElement>
+}) {
   return (
     <aside className="room-card" role="group" aria-label={`Inside ${card.title}`}>
       <div className="room-head">
@@ -32,18 +34,18 @@ export function RoomCardView(
 
       <div className="room-present">
         <span className="room-label">In just now</span>
-        {card.present.length === 0
-          ? <p className="room-empty">{card.empty}</p>
-          : (
-            <ul className="room-roll">
-              {card.present.map((p) => (
-                <li key={p.id}>
-                  <span className="room-who">{p.name}</span>
-                  <span className="room-state">{p.state}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+        {card.present.length === 0 ? (
+          <p className="room-empty">{card.empty}</p>
+        ) : (
+          <ul className="room-roll">
+            {card.present.map((p) => (
+              <li key={p.id}>
+                <span className="room-who">{p.name}</span>
+                <span className="room-state">{p.state}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {card.holds.length > 0 && (
@@ -54,7 +56,9 @@ export function RoomCardView(
               <li key={h.kind} className="hold">
                 <span
                   className={h.iconUrl === null ? 'hold-icon bare' : 'hold-icon'}
-                  style={h.iconUrl === null ? undefined : { backgroundImage: `url("${h.iconUrl}")` }}
+                  style={
+                    h.iconUrl === null ? undefined : { backgroundImage: `url("${h.iconUrl}")` }
+                  }
                   aria-hidden="true"
                 />
                 <span className="hold-kind">{h.words}</span>
@@ -79,22 +83,30 @@ export function useProvenance(structureId: string | null): Provenance | null {
     let live = true
     void fetch(`/api/structure/${encodeURIComponent(structureId)}/provenance`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((p) => { if (live) setProv(p as Provenance | null) })
-      .catch(() => { /* a room with no recorded beginning still opens */ })
-    return () => { live = false }
+      .then((p) => {
+        if (live) setProv(p as Provenance | null)
+      })
+      .catch(() => {
+        /* a room with no recorded beginning still opens */
+      })
+    return () => {
+      live = false
+    }
   }, [structureId])
   return prov
 }
 
 // Escape leaves the room, so the interior is never a place a keyboard can walk into and not out
 // of. The card subscribes to a DERIVED string, so a tick that moved nobody re-renders nothing.
-export function InteriorBar(
-  { store, structureId, onBack }: {
-    store: WorldStore
-    structureId: string | null
-    onBack: () => void
-  },
-) {
+export function InteriorBar({
+  store,
+  structureId,
+  onBack,
+}: {
+  store: WorldStore
+  structureId: string | null
+  onBack: () => void
+}) {
   const backRef = useRef<HTMLButtonElement>(null)
   const prov = useProvenance(structureId)
   const signature = useSyncExternalStore(store.subscribe, () => {

@@ -28,10 +28,18 @@ const CAP = Number(process.env.LIB_CAP ?? '12.00')
 const MAX_ATTEMPTS = Number(process.env.LIB_ATTEMPTS ?? '3')
 const BATCH = process.env.BATCH ?? ''
 if (!BATCH) throw new Error(`BATCH is required — one of ${LIBRARY_BATCHES.join(', ')}, or all`)
-const ONLY = (process.env.ITEMS ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+const ONLY = (process.env.ITEMS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean)
 // A candidate named here is one a human LOOKED AT and refused, so it is never chosen however
 // clean its numbers are. The eye is the gate the gates cannot be.
-const REJECTED = new Set((process.env.LIB_REJECTED ?? '').split(',').map((s) => s.trim()).filter(Boolean))
+const REJECTED = new Set(
+  (process.env.LIB_REJECTED ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+)
 const DRY = process.env.LIB_DRY === '1'
 
 const S = scratch('ar')
@@ -48,13 +56,22 @@ const config = loadForgeConfig()
 
 async function generate(prompt: string, ref: Buffer, assetId: string) {
   const reserve = 0.08
-  if (budget.total + reserve > CAP) throw new Error(`reserve exceeds cap ($${budget.total.toFixed(3)} of $${CAP})`)
+  if (budget.total + reserve > CAP)
+    throw new Error(`reserve exceeds cap ($${budget.total.toFixed(3)} of $${CAP})`)
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: MODEL, prompt, size: `${GEN_PX}x${GEN_PX}`, response_format: 'b64_json',
-      input_references: [{ type: 'image_url', image_url: { url: `data:image/png;base64,${ref.toString('base64')}` } }],
+      model: MODEL,
+      prompt,
+      size: `${GEN_PX}x${GEN_PX}`,
+      response_format: 'b64_json',
+      input_references: [
+        {
+          type: 'image_url',
+          image_url: { url: `data:image/png;base64,${ref.toString('base64')}` },
+        },
+      ],
       usage: { include: true },
     }),
   })
@@ -64,7 +81,7 @@ async function generate(prompt: string, ref: Buffer, assetId: string) {
   if (!b64) throw new Error(`${MODEL}: no b64_json`)
   const cost = json.usage?.cost ?? reserve
   budget.spend(cost)
-  ledger.append({ assetId, kind: 'image_gen', model: MODEL, usd: cost })  // throws past the $5 anomaly stop
+  ledger.append({ assetId, kind: 'image_gen', model: MODEL, usd: cost }) // throws past the $5 anomaly stop
   ledger.flush()
   return { raw: Buffer.from(b64, 'base64'), cost }
 }
@@ -73,12 +90,16 @@ const meanScore = (v: VisionVerdict): number =>
   CRITERIA.reduce((s, k) => s + v.criteria[k].score, 0) / CRITERIA.length
 
 const batches = BATCH === 'all' ? [...LIBRARY_BATCHES] : [BATCH]
-const items = batches.flatMap((b) => planBatch(b))
+const items = batches
+  .flatMap((b) => planBatch(b))
   .filter((i) => ONLY.length === 0 || ONLY.includes(i.entry.kind))
-if (items.length === 0) throw new Error(`no items selected (BATCH=${BATCH} ITEMS=${ONLY.join(',')})`)
+if (items.length === 0)
+  throw new Error(`no items selected (BATCH=${BATCH} ITEMS=${ONLY.join(',')})`)
 
-console.log(`gen-library-v2 ${DRY ? 'DRY' : 'LIVE'} — ${items.length} items, gen ${GEN_PX}, ` +
-  `sprite ${WORLD_SPRITE_PX} icon ${ICON_PX}, cap $${CAP}`)
+console.log(
+  `gen-library-v2 ${DRY ? 'DRY' : 'LIVE'} — ${items.length} items, gen ${GEN_PX}, ` +
+    `sprite ${WORLD_SPRITE_PX} icon ${ICON_PX}, cap $${CAP}`,
+)
 
 mkdirSync(RAWS, { recursive: true })
 mkdirSync(`${S}/cells/items`, { recursive: true })
@@ -88,9 +109,17 @@ writeFileSync(`${S}/palette-swatch.png`, swatch)
 const judge = makeVisionJudge({ apiKey: KEY, refs: [swatch], config })
 
 type Row = {
-  kind: string; category: string; status: 'shipped' | 'no-candidate'; attempts: number
-  factor: number; islands: number; opaqueFrac: number; spend: number; chosen: string
-  score: number | null; note: string
+  kind: string
+  category: string
+  status: 'shipped' | 'no-candidate'
+  attempts: number
+  factor: number
+  islands: number
+  opaqueFrac: number
+  spend: number
+  chosen: string
+  score: number | null
+  note: string
 }
 const rows: Row[] = []
 const lines: string[] = []
@@ -105,8 +134,14 @@ for (const item of items) {
   console.log(`\n== ${e.kind} (${e.category}) ==`)
 
   type Cand = {
-    key: string; sprite: RawImage; icon: RawImage; factor: number; islands: number
-    opaqueFrac: number; fails: string[]; verdict: VisionVerdict | null
+    key: string
+    sprite: RawImage
+    icon: RawImage
+    factor: number
+    islands: number
+    opaqueFrac: number
+    fails: string[]
+    verdict: VisionVerdict | null
   }
   const cands: Cand[] = []
   let extra = ''
@@ -115,12 +150,19 @@ for (const item of items) {
     const key = `${e.kind}-c${i}`
     const path = `${RAWS}/${key}.png`
     let buf: Buffer
-    if (existsSync(path)) { buf = readFileSync(path); console.log(`  ${key}: cached`) } else {
-      if (DRY) { console.log(`  ${key}: DRY, skipped`); continue }
+    if (existsSync(path)) {
+      buf = readFileSync(path)
+      console.log(`  ${key}: cached`)
+    } else {
+      if (DRY) {
+        console.log(`  ${key}: DRY, skipped`)
+        continue
+      }
       // Feedback position law: boilerplate, then the fix, then the commission.
       const prompt = `${extra ? `${item.boilerplate} ${extra}` : item.boilerplate} ${item.commissionText}`
       const r = await generate(prompt, swatch, assetId)
-      writeFileSync(path, r.raw); buf = r.raw
+      writeFileSync(path, r.raw)
+      buf = r.raw
       console.log(`  ${key}: generated $${r.cost.toFixed(4)} (total $${budget.total.toFixed(4)})`)
     }
     try {
@@ -138,47 +180,75 @@ for (const item of items) {
       let verdict: VisionVerdict | null = null
       if (!DRY) {
         const jv = await judge({
-          assetId, klass: 'item', sprite: sprite.cell, commission: e.desc, attempt: i + 1,
+          assetId,
+          klass: 'item',
+          sprite: sprite.cell,
+          commission: e.desc,
+          attempt: i + 1,
         })
         ledger.append({ assetId, kind: 'vision_qa', model: jv.verdict.model, usd: jv.costUsd })
         ledger.flush()
         verdict = jv.verdict
       }
       const refused = REJECTED.has(key)
-      if (!refused) cands.push({
-        key, sprite: sprite.cell, icon: icon.cell, factor: sprite.factor,
-        islands: sprite.islands, opaqueFrac: sprite.opaqueFrac, fails, verdict,
-      })
+      if (!refused)
+        cands.push({
+          key,
+          sprite: sprite.cell,
+          icon: icon.cell,
+          factor: sprite.factor,
+          islands: sprite.islands,
+          opaqueFrac: sprite.opaqueFrac,
+          fails,
+          verdict,
+        })
       writeFileSync(`${S}/cells/items/${key}.png`, await encodePng(sprite.cell))
-      const msg = `${e.kind}: ${key} factor ${sprite.factor}, islands ${sprite.islands}, ` +
+      const msg =
+        `${e.kind}: ${key} factor ${sprite.factor}, islands ${sprite.islands}, ` +
         `opaque ${(sprite.opaqueFrac * 100).toFixed(1)}%, ` +
-        `${fails.length === 0 ? 'pixel bar clean' : fails.join('; ')}` +
+        (fails.length === 0 ? 'pixel bar clean' : fails.join('; ')) +
         `${verdict ? `, judge ${verdict.overall}` : ''}${refused ? ' — REFUSED BY EYE' : ''}`
-      lines.push(msg); console.log(`  ${msg}`)
+      lines.push(msg)
+      console.log(`  ${msg}`)
       if (fails.length === 0 && !refused && verdict?.overall === 'pass') break
       if (verdict && verdict.overall !== 'pass') extra = verdict.feedback
     } catch (err) {
       const msg = `${e.kind}: ${key} process FAILED — ${String(err).slice(0, 200)}`
-      lines.push(msg); console.log(`  ${msg}`)
+      lines.push(msg)
+      console.log(`  ${msg}`)
     }
   }
 
   // Both verdicts are binding, the judge's included — it is the only gate that can tell a pail
   // from a market stall. The rank chooses among what is left.
   // A NULL verdict is "not judged", not "failed": under LIB_DRY=1 the judge is never called.
-  const judgeFails = (c: Cand): string[] => (c.verdict !== null && c.verdict.overall !== 'pass'
-    ? [`judge: ${c.verdict.overall} — ${c.verdict.feedback}`] : [])
+  const judgeFails = (c: Cand): string[] =>
+    c.verdict !== null && c.verdict.overall !== 'pass'
+      ? [`judge: ${c.verdict.overall} — ${c.verdict.feedback}`]
+      : []
   const clean = cands.filter((c) => c.fails.length === 0 && judgeFails(c).length === 0)
   const rank = (c: Cand): number => candidateRank(c)
   const win = clean.slice().sort((a, b) => rank(a) - rank(b))[0]
   if (!win) {
-    const why = refusalMessage(e.kind, cands.map((c) => ({ key: c.key, failures: [...c.fails, ...judgeFails(c)] })))
-      || `${e.kind}: NO CANDIDATE`
-    lines.push(why); console.log(`  ${why}`); refusedKinds.push(e.kind)
+    const why =
+      refusalMessage(
+        e.kind,
+        cands.map((c) => ({ key: c.key, failures: [...c.fails, ...judgeFails(c)] })),
+      ) || `${e.kind}: NO CANDIDATE`
+    lines.push(why)
+    console.log(`  ${why}`)
+    refusedKinds.push(e.kind)
     rows.push({
-      kind: e.kind, category: e.category, status: 'no-candidate', attempts: MAX_ATTEMPTS,
-      factor: 0, islands: 0, opaqueFrac: 0, spend: ledger.totalFor(assetId) - spentBefore,
-      chosen: '', score: null,
+      kind: e.kind,
+      category: e.category,
+      status: 'no-candidate',
+      attempts: MAX_ATTEMPTS,
+      factor: 0,
+      islands: 0,
+      opaqueFrac: 0,
+      spend: ledger.totalFor(assetId) - spentBefore,
+      chosen: '',
+      score: null,
       note: cands.length === 0 ? 'every attempt failed' : 'every candidate failed a gate',
     })
     continue
@@ -188,27 +258,53 @@ for (const item of items) {
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'sprite.png'), await encodePng(win.sprite))
   writeFileSync(join(dir, 'icon.png'), await encodePng(win.icon))
-  writeFileSync(join(dir, 'manifest.json'), `${JSON.stringify({
-    version: 'v1-library-item', kind: e.kind, category: e.category,
-    spritePx: e.spritePx, iconPx: e.iconPx, ...(e.interior ? { interior: e.interior } : {}),
-  }, null, 2)}\n`)
+  writeFileSync(
+    join(dir, 'manifest.json'),
+    `${JSON.stringify(
+      {
+        version: 'v1-library-item',
+        kind: e.kind,
+        category: e.category,
+        spritePx: e.spritePx,
+        iconPx: e.iconPx,
+        ...(e.interior ? { interior: e.interior } : {}),
+      },
+      null,
+      2,
+    )}\n`,
+  )
 
   rows.push({
-    kind: e.kind, category: e.category, status: 'shipped', attempts: cands.length,
-    factor: win.factor, islands: win.islands, opaqueFrac: win.opaqueFrac,
-    spend: ledger.totalFor(assetId) - spentBefore, chosen: win.key,
+    kind: e.kind,
+    category: e.category,
+    status: 'shipped',
+    attempts: cands.length,
+    factor: win.factor,
+    islands: win.islands,
+    opaqueFrac: win.opaqueFrac,
+    spend: ledger.totalFor(assetId) - spentBefore,
+    chosen: win.key,
     score: win.verdict ? meanScore(win.verdict) : null,
     note: '',
   })
 }
 
-const md = [`# library recovery — ${batches.join(', ')}`, '',
+const md = [
+  `# library recovery — ${batches.join(', ')}`,
+  '',
   '| kind | category | status | attempts | factor | islands | opaque | judge | $ | chosen | note |',
   '|---|---|---|---|---|---|---|---|---|---|---|',
-  ...rows.map((r) => `| ${r.kind} | ${r.category} | ${r.status} | ${r.attempts} | ${r.factor} | ` +
-    `${r.islands} | ${(r.opaqueFrac * 100).toFixed(1)}% | ${r.score?.toFixed(1) ?? '-'} | ` +
-    `${r.spend.toFixed(4)} | ${r.chosen} | ${r.note.replace(/\|/g, '/').slice(0, 120)} |`),
-  '', '## every attempt', '', ...lines.map((l) => `- ${l}`), '',
+  ...rows.map(
+    (r) =>
+      `| ${r.kind} | ${r.category} | ${r.status} | ${r.attempts} | ${r.factor} | ` +
+      `${r.islands} | ${(r.opaqueFrac * 100).toFixed(1)}% | ${r.score?.toFixed(1) ?? '-'} | ` +
+      `${r.spend.toFixed(4)} | ${r.chosen} | ${r.note.replace(/\|/g, '/').slice(0, 120)} |`,
+  ),
+  '',
+  '## every attempt',
+  '',
+  ...lines.map((l) => `- ${l}`),
+  '',
   `spend this run: $${budget.total.toFixed(4)} of $${CAP} cap; ledger total $${ledger.total().toFixed(4)}`,
 ].join('\n')
 mkdirSync(`${S}/reports`, { recursive: true })
@@ -219,7 +315,9 @@ console.log(`\nwrote ${S}/reports/library-${batches.join('-')}.md`)
 // ★ THE REFUSALS ARE BINDING, AFTER THE REPORT IS ON DISK — the report is what tells an
 // operator whether the model or the threshold is wrong, and the items that DID pass are
 // already committed. Nothing was written for a refused kind.
-if (refusedKinds.length > 0) throw new Error(
-  `${refusedKinds.length} item(s) shipped nothing: ${refusedKinds.join(', ')}.\n  Raise `
-  + `LIB_ATTEMPTS to draw more, LIB_REJECTED to refuse a candidate by eye, or change a `
-  + `threshold on purpose.`)
+if (refusedKinds.length > 0)
+  throw new Error(
+    `${refusedKinds.length} item(s) shipped nothing: ${refusedKinds.join(', ')}.\n  Raise ` +
+      `LIB_ATTEMPTS to draw more, LIB_REJECTED to refuse a candidate by eye, or change a ` +
+      `threshold on purpose.`,
+  )

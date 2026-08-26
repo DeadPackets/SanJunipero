@@ -1,6 +1,11 @@
-import { BOND_RECENT_ACTS, bondNote, tickToMoment, type Bond } from '@sj/shared'
+import { bondNote, tickToMoment, type Bond } from '@sj/shared'
 import {
-  BOND_LEVEL_WORD, BOND_TYPE_WORD, partnerEvidence, type BondArc, type BondLevel, type BondType,
+  BOND_LEVEL_WORD,
+  BOND_TYPE_WORD,
+  partnerEvidence,
+  type BondArc,
+  type BondLevel,
+  type BondType,
 } from './bondModel2.js'
 import { ARC_COLOR } from './relationGraph.js'
 import type { PeopleIndex } from './bondsModel.js'
@@ -14,10 +19,20 @@ const moment = (tick: number): string => {
 }
 
 const ARC_WORD: Readonly<Record<BondArc['direction'], string>> = {
-  warming: 'Getting closer', cooling: 'Drifting apart', steady: 'Holding steady',
+  warming: 'Getting closer',
+  cooling: 'Drifting apart',
+  steady: 'Holding steady',
 }
 
-export function BondDetailPanel({ bond, people, type, level, arc, words, onClose }: {
+export function BondDetailPanel({
+  bond,
+  people,
+  type,
+  level,
+  arc,
+  words,
+  onClose,
+}: {
   bond: Bond
   people: PeopleIndex
   type: BondType
@@ -37,8 +52,12 @@ export function BondDetailPanel({ bond, people, type, level, arc, words, onClose
       <header className="bond-head">
         <span className="bond-level">{BOND_LEVEL_WORD[level]}</span>
         {type !== 'none' && <span className="bond-type">{BOND_TYPE_WORD[type]}</span>}
-        <h3 className="bond-title">{nameOf(bond.aId)} &amp; {nameOf(bond.bId)}</h3>
-        <button className="bond-close" onClick={onClose} aria-label="Close this bond">×</button>
+        <h3 className="bond-title">
+          {nameOf(bond.aId)} &amp; {nameOf(bond.bId)}
+        </h3>
+        <button className="bond-close" onClick={onClose} aria-label="Close this bond">
+          ×
+        </button>
       </header>
 
       <p className="bond-line">{words}</p>
@@ -90,7 +109,8 @@ export function BondDetailPanel({ bond, people, type, level, arc, words, onClose
 
       {earlier > 0 && (
         <p className="bond-earlier">
-          {earlier === 1 ? 'One earlier time is counted above.'
+          {earlier === 1
+            ? 'One earlier time is counted above.'
             : `${earlier.toLocaleString()} earlier times are counted above.`}
         </p>
       )}

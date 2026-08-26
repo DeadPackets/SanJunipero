@@ -1,8 +1,17 @@
 import { z } from 'zod'
 import { roadAutotile, type RoadAutotileKey } from './autotile.js'
 import {
-  BLOCK, PITCH, STREET, TOWN_FACINGS, blockRect, doorFrontOf, freePlots, plattedBlocks,
-  streetTiles, type Ground, type PlacedStructure,
+  BLOCK,
+  PITCH,
+  STREET,
+  TOWN_FACINGS,
+  blockRect,
+  doorFrontOf,
+  freePlots,
+  plattedBlocks,
+  streetTiles,
+  type Ground,
+  type PlacedStructure,
 } from './townGrammar.js'
 import { claimAll, plotKey, takenPlots, type Wanted } from './townClaim.js'
 
@@ -27,14 +36,19 @@ export const TOWN_SQUARE = { x: 65, y: 78 } as const
 /** Where the template's own (0, 0) stands, for a town of `rings` rings around `square`. Runs
  *  negative from ring 4 — that ground is what growing north and west is for. */
 export const anchorFor = (
-  rings: number, square: { x: number; y: number } = TOWN_SQUARE,
-): { x: number; y: number } => ({ x: square.x - townOrigin(rings), y: square.y - townOrigin(rings) })
+  rings: number,
+  square: { x: number; y: number } = TOWN_SQUARE,
+): { x: number; y: number } => ({
+  x: square.x - townOrigin(rings),
+  y: square.y - townOrigin(rings),
+})
 
 // RIVER_LOCAL_DX + anchor.x is GENESIS_RIVER_X: a town that paints a channel the world does not
 // have is a town with two rivers in it.
 export const CITY_ANCHOR_DEFAULT = anchorFor(TOWN_RINGS_GENESIS)
-export const CITY_W = townSpan(TOWN_RINGS_GENESIS), CITY_H = townSpan(TOWN_RINGS_GENESIS)
-export const WORLD_SIZE_GENESIS = 128           // C11 §9; asserted here, never imported from engine
+export const CITY_W = townSpan(TOWN_RINGS_GENESIS),
+  CITY_H = townSpan(TOWN_RINGS_GENESIS)
+export const WORLD_SIZE_GENESIS = 128 // C11 §9; asserted here, never imported from engine
 
 // Not a size, a clearance: one block pitch of wild beyond everything standing, which is exactly
 // the ground the next ring needs. So the world can never be the thing that stops a build.
@@ -47,7 +61,9 @@ export const worldSizeForRings = (rings: number): number => townSpan(rings) + 2 
 /** That world, laid out: the town sits one margin in from every edge. This is the world's OWN
  *  frame — its origin is not the authored origin, because growing north or west moves it. */
 export function worldForRings(rings: number): {
-  size: number; anchor: { x: number; y: number }; square: { x: number; y: number }
+  size: number
+  anchor: { x: number; y: number }
+  square: { x: number; y: number }
 } {
   const anchor = { x: WORLD_MARGIN, y: WORLD_MARGIN }
   return {
@@ -72,37 +88,53 @@ export function edgesOwed(
     .filter((x) => x.owed > 0)
 }
 
-export const T_GRASS = 0, T_EARTH = 1, T_WATER = 2, T_ROAD = 7, T_PATH = 8
+export const T_GRASS = 0,
+  T_EARTH = 1,
+  T_WATER = 2,
+  T_ROAD = 7,
+  T_PATH = 8
 
 export type Rect = { dx0: number; dy0: number; dx1: number; dy1: number }
 
-export const CityTileSchema = z.object({
-  dx: z.number().int(), dy: z.number().int(), to: z.number().int(),
-}).strict()
+export const CityTileSchema = z
+  .object({
+    dx: z.number().int(),
+    dy: z.number().int(),
+    to: z.number().int(),
+  })
+  .strict()
 
-export const CityFurnishingSchema = z.object({
-  kind: z.string(),
-  slot: z.object({ x: z.number().int(), y: z.number().int() }).strict(),
-}).strict()
+export const CityFurnishingSchema = z
+  .object({
+    kind: z.string(),
+    slot: z.object({ x: z.number().int(), y: z.number().int() }).strict(),
+  })
+  .strict()
 
-export const CityStructureSchema = z.object({
-  kind: z.string(),
-  dx: z.number().int(), dy: z.number().int(),
-  w: z.number().int().min(1).max(4), h: z.number().int().min(1).max(4),
-  // USER RULING 1: the five houses are owned, one founder each; every public building is null.
-  // The field is REQUIRED; only its value may be null.
-  owner: z.string().min(1).nullable(),
-  // A two-value enum, and REQUIRED, so `ne` and `nw` — which the forge has no art for — are
-  // unrepresentable rather than merely unused. facingFrom(dx, dy) answers four ways.
-  facing: z.enum(TOWN_FACINGS),
-  furnishings: z.array(CityFurnishingSchema),
-}).strict()
+export const CityStructureSchema = z
+  .object({
+    kind: z.string(),
+    dx: z.number().int(),
+    dy: z.number().int(),
+    w: z.number().int().min(1).max(4),
+    h: z.number().int().min(1).max(4),
+    // USER RULING 1: the five houses are owned, one founder each; every public building is null.
+    // The field is REQUIRED; only its value may be null.
+    owner: z.string().min(1).nullable(),
+    // A two-value enum, and REQUIRED, so `ne` and `nw` — which the forge has no art for — are
+    // unrepresentable rather than merely unused. facingFrom(dx, dy) answers four ways.
+    facing: z.enum(TOWN_FACINGS),
+    furnishings: z.array(CityFurnishingSchema),
+  })
+  .strict()
 
-export const CityTemplateSchema = z.object({
-  anchor: z.object({ x: z.number().int(), y: z.number().int() }).strict(),
-  tiles: z.array(CityTileSchema),
-  structures: z.array(CityStructureSchema),
-}).strict()
+export const CityTemplateSchema = z
+  .object({
+    anchor: z.object({ x: z.number().int(), y: z.number().int() }).strict(),
+    tiles: z.array(CityTileSchema),
+    structures: z.array(CityStructureSchema),
+  })
+  .strict()
 
 export type CityTile = z.infer<typeof CityTileSchema>
 export type CityFurnishing = z.infer<typeof CityFurnishingSchema>
@@ -125,14 +157,17 @@ export const key = (dx: number, dy: number): string => `${dx},${dy}`
 // Fixed in grammar coordinates: TOWN_SQUARE.x + RIVER_GRAMMAR_DX === GENESIS_RIVER_X at every
 // ring count. Straight, not the grammar's meander — the town paints the water it stands beside.
 export const RIVER_GRAMMAR_DX = -16
-export const RIVER_HALF = 1             // three tiles of channel
-export const BANK_HALF = 2              // one tile of wet earth either side
+export const RIVER_HALF = 1 // three tiles of channel
+export const BANK_HALF = 2 // one tile of wet earth either side
 
 export const riverLocalDx = (rings: number): number => RIVER_GRAMMAR_DX + townOrigin(rings)
-export const RIVER_LOCAL_DX = riverLocalDx(TOWN_RINGS_GENESIS)  // + CITY_ANCHOR_DEFAULT.x = GENESIS_RIVER_X
+export const RIVER_LOCAL_DX = riverLocalDx(TOWN_RINGS_GENESIS) // + CITY_ANCHOR_DEFAULT.x = GENESIS_RIVER_X
 
 /** The ground in TEMPLATE coordinates. A column, not a field: the channel runs true north. */
-export function cityGroundAt(dx: number, rings: number = TOWN_RINGS_GENESIS): 'dry' | 'water' | 'bank' {
+export function cityGroundAt(
+  dx: number,
+  rings: number = TOWN_RINGS_GENESIS,
+): 'dry' | 'water' | 'bank' {
   const d = Math.abs(dx - riverLocalDx(rings))
   return d <= RIVER_HALF ? 'water' : d <= BANK_HALF ? 'bank' : 'dry'
 }
@@ -144,8 +179,10 @@ export const CITY_GROUND: Ground = (dx) => {
   return d <= RIVER_HALF ? 'water' : d <= BANK_HALF ? 'bank' : 'dry'
 }
 
-const toLocal = <T extends { dx: number; dy: number }>(t: T, rings: number = TOWN_RINGS_GENESIS): T =>
-  ({ ...t, dx: t.dx + townOrigin(rings), dy: t.dy + townOrigin(rings) })
+const toLocal = <T extends { dx: number; dy: number }>(
+  t: T,
+  rings: number = TOWN_RINGS_GENESIS,
+): T => ({ ...t, dx: t.dx + townOrigin(rings), dy: t.dy + townOrigin(rings) })
 
 // ---------------------------------------------------------------- the square
 
@@ -159,12 +196,18 @@ export function plazaOf(rings: number = TOWN_RINGS_GENESIS): Rect {
 export const PLAZA: Rect = plazaOf(TOWN_RINGS_GENESIS)
 
 /** The tile you actually stand on, between the two monuments. Paving, never a monument. */
-export const plazaCentreOf = (rings: number = TOWN_RINGS_GENESIS): { dx: number; dy: number } =>
-  ({ dx: plazaOf(rings).dx0 + 7, dy: plazaOf(rings).dy0 + 7 })
-export const wellAt = (rings: number = TOWN_RINGS_GENESIS): { dx: number; dy: number } =>
-  ({ dx: plazaOf(rings).dx0 + 4, dy: plazaOf(rings).dy0 + 5 })
-export const firePitAt = (rings: number = TOWN_RINGS_GENESIS): { dx: number; dy: number } =>
-  ({ dx: plazaOf(rings).dx0 + 9, dy: plazaOf(rings).dy0 + 9 })
+export const plazaCentreOf = (rings: number = TOWN_RINGS_GENESIS): { dx: number; dy: number } => ({
+  dx: plazaOf(rings).dx0 + 7,
+  dy: plazaOf(rings).dy0 + 7,
+})
+export const wellAt = (rings: number = TOWN_RINGS_GENESIS): { dx: number; dy: number } => ({
+  dx: plazaOf(rings).dx0 + 4,
+  dy: plazaOf(rings).dy0 + 5,
+})
+export const firePitAt = (rings: number = TOWN_RINGS_GENESIS): { dx: number; dy: number } => ({
+  dx: plazaOf(rings).dx0 + 9,
+  dy: plazaOf(rings).dy0 + 9,
+})
 
 export const PLAZA_CENTRE = plazaCentreOf(TOWN_RINGS_GENESIS)
 export const WELL_AT = wellAt(TOWN_RINGS_GENESIS)
@@ -182,7 +225,7 @@ function rectTiles(r: Rect, to: number): CityTile[] {
 /** Every tile of the extent is authored — water, wet bank or cleared grass — so a building never
  *  stands in a forest and a street is never impassable. Road tiles are cut out here. */
 export function cityTerrainTiles(rings: number = TOWN_RINGS_GENESIS): CityTile[] {
-  const road = new Set(cityRoadTiles(rings).map(t => key(t.dx, t.dy)))
+  const road = new Set(cityRoadTiles(rings).map((t) => key(t.dx, t.dy)))
   const span = townSpan(rings)
   const out: CityTile[] = []
   for (let dy = 0; dy < span; dy++)
@@ -198,7 +241,8 @@ export function cityTerrainTiles(rings: number = TOWN_RINGS_GENESIS): CityTile[]
  *  No special case, ever: a widened-main-street special case once ran a road through a block's
  *  frontage. `streetTiles` cuts water, so nothing here crosses the channel. */
 export function cityRoadTiles(rings: number = TOWN_RINGS_GENESIS): CityTile[] {
-  const well = wellAt(rings), firePit = firePitAt(rings)
+  const well = wellAt(rings),
+    firePit = firePitAt(rings)
   const monuments = new Set([key(well.dx, well.dy), key(firePit.dx, firePit.dy)])
   const seen = new Set<string>()
   const out: CityTile[] = []
@@ -232,7 +276,9 @@ export const isDwellingKind = (kind: string): kind is DwellingKind =>
 // The UNTURNED footprint: w runs along the street, h into the block. footprintFor is the only
 // correct way to ask what ground a placed building covers — an SE building stands on it turned.
 export const DWELLING_FOOTPRINTS: Readonly<Record<DwellingKind, { w: number; h: number }>> = {
-  cabin: { w: 2, h: 2 }, cottage: { w: 3, h: 2 }, farmhouse: { w: 4, h: 2 },
+  cabin: { w: 2, h: 2 },
+  cottage: { w: 3, h: 2 },
+  farmhouse: { w: 4, h: 2 },
   // 2×2 is the footprint every landed gate measured a founder's home at, and `houseSize` in
   // SimConfigSchema still says so; this row and that dial must not drift apart.
   house: { w: 2, h: 2 },
@@ -248,8 +294,10 @@ export function roomCapacity(s: { w: number; h: number }): number {
 
 /** The ground a building of this mass covers once it is turned to face `facing`. */
 export const footprintFor = (
-  mass: { w: number; h: number }, facing: 'sw' | 'se',
-): { w: number; h: number } => facing === 'sw' ? { w: mass.w, h: mass.h } : { w: mass.h, h: mass.w }
+  mass: { w: number; h: number },
+  facing: 'sw' | 'se',
+): { w: number; h: number } =>
+  facing === 'sw' ? { w: mass.w, h: mass.h } : { w: mass.h, h: mass.w }
 
 // Assumption A-2: the five locked founders (design spec §10). Template data, not engine truth
 // — genesis binds them, and different id strings are one data edit with no code change.
@@ -264,15 +312,25 @@ export const CITY_INTERIOR_SLOTS = { w: 3, h: 3 } as const
  *  to go: the grid, not the floor, is what runs out. Widens with roomCapacity, never below 3. */
 export function citySlotsFor(kind: string): { w: number; h: number } {
   const plan = DWELLING_FOOTPRINTS[kind as DwellingKind]
-  const w = plan === undefined ? CITY_INTERIOR_SLOTS.w
-    : Math.max(CITY_INTERIOR_SLOTS.w, roomCapacity(plan))
+  const w =
+    plan === undefined ? CITY_INTERIOR_SLOTS.w : Math.max(CITY_INTERIOR_SLOTS.w, roomCapacity(plan))
   return { w, h: CITY_INTERIOR_SLOTS.h }
 }
 
 // Shared cannot import the forge catalog, so these stand in for it here; g13.test.ts
 // asserts them equal to the library.
-export const CITY_FURNISHING_KINDS =
-  ['bed', 'hearth', 'table', 'chair', 'rug', 'shelf', 'crate', 'barrel', 'anvil', 'bench'] as const
+export const CITY_FURNISHING_KINDS = [
+  'bed',
+  'hearth',
+  'table',
+  'chair',
+  'rug',
+  'shelf',
+  'crate',
+  'barrel',
+  'anvil',
+  'bench',
+] as const
 export const CITY_BED_KIND = 'bed'
 export const CITY_HEARTH_KIND = 'hearth'
 
@@ -294,7 +352,8 @@ const sharedDwelling = (kind: DwellingKind): CityFurnishing[] => {
   ]
 }
 const HOUSE_FURNISHINGS: CityFurnishing[] = [
-  THE_BED, THE_HEARTH,
+  THE_BED,
+  THE_HEARTH,
   { kind: 'table', slot: { x: 1, y: 2 } },
   { kind: 'chair', slot: { x: 1, y: 1 } },
   // The plan put the rug at (0,1). A rug is two slots tall, so it would have lain across the
@@ -311,8 +370,10 @@ const STOREHOUSE_FURNISHINGS: CityFurnishing[] = [
 
 const STOREHOUSE_KIND = 'storehouse'
 
-const mass = (m: { w: number; h: number }): { along: number; deep: number } =>
-  ({ along: m.w, deep: m.h })
+const mass = (m: { w: number; h: number }): { along: number; deep: number } => ({
+  along: m.w,
+  deep: m.h,
+})
 
 // Genesis asks for buildings in the order they are raised, never for positions: each claims the free
 // plot nearest the square, so moving a line moves a building and cannot move it onto a road or a neighbour.
@@ -355,13 +416,26 @@ export function cityPlacements(): PlacedStructure[] {
 // deliberately absent. Only structures.privateKinds (house) separates a home from a bigger roof.
 export function cityStructures(rings: number = TOWN_RINGS_GENESIS): CityStructure[] {
   const monument = (kind: string, at: { dx: number; dy: number }): CityStructure => ({
-    kind, dx: at.dx, dy: at.dy, w: 1, h: 1, owner: null, facing: 'sw', furnishings: [],
+    kind,
+    dx: at.dx,
+    dy: at.dy,
+    w: 1,
+    h: 1,
+    owner: null,
+    facing: 'sw',
+    furnishings: [],
   })
   return [
     ...cityPlacements().map((s): CityStructure => {
       const l = toLocal(s, rings)
       return {
-        kind: l.kind, dx: l.dx, dy: l.dy, w: l.w, h: l.h, owner: l.owner, facing: l.facing,
+        kind: l.kind,
+        dx: l.dx,
+        dy: l.dy,
+        w: l.w,
+        h: l.h,
+        owner: l.owner,
+        facing: l.facing,
         furnishings: furnishingsFor(l.kind),
       }
     }),
@@ -397,7 +471,8 @@ export function doorFrontTile(s: CityStructure): { dx: number; dy: number } {
 // Parsed on the way out, so the function cannot return an invalid template. Pure: two calls
 // are deep-equal and no RNG is consulted, which is why genesis can replay it.
 export function makeCityTemplate(
-  anchor: { x: number; y: number } = CITY_ANCHOR_DEFAULT, rings: number = TOWN_RINGS_GENESIS,
+  anchor: { x: number; y: number } = CITY_ANCHOR_DEFAULT,
+  rings: number = TOWN_RINGS_GENESIS,
 ): CityTemplate {
   return CityTemplateSchema.parse({
     anchor: { x: anchor.x, y: anchor.y },
@@ -407,18 +482,25 @@ export function makeCityTemplate(
 }
 
 export function templateFits(
-  anchor: { x: number; y: number }, worldSize: number, rings: number = TOWN_RINGS_GENESIS,
+  anchor: { x: number; y: number },
+  worldSize: number,
+  rings: number = TOWN_RINGS_GENESIS,
 ): boolean {
   const span = townSpan(rings)
-  return anchor.x >= 0 && anchor.y >= 0
-    && anchor.x + span <= worldSize && anchor.y + span <= worldSize
+  return (
+    anchor.x >= 0 && anchor.y >= 0 && anchor.x + span <= worldSize && anchor.y + span <= worldSize
+  )
 }
 
 // Two questions, never one function: plattedPlots(rings) is a fact about the lattice,
 // genesisEmptyPlots(rings) about the template. What is free right now is claimTownPlot (townPlot.ts).
 
 export type PlotTile = {
-  dx: number; dy: number; facing: 'sw' | 'se'; block: { i: number; j: number }; slot: string
+  dx: number
+  dy: number
+  facing: 'sw' | 'se'
+  block: { i: number; j: number }
+  slot: string
 }
 
 /** Every plot the grammar plats out to `rings`, in TEMPLATE coordinates; the tile is the plot's
@@ -433,10 +515,14 @@ export function plattedPlots(rings: number = TOWN_RINGS_GENESIS): PlotTile[] {
       ...(p.face === 'sw'
         ? { dx: p.dx + o, dy: p.anchorY - 1 + o }
         : { dx: p.anchorX - 1 + o, dy: p.dy + o }),
-      facing: p.face, block: p.block, slot: p.slot,
+      facing: p.face,
+      block: p.block,
+      slot: p.slot,
     }
     if (!inExtent(at.dx, at.dy, rings)) {
-      throw new Error(`plattedPlots: plot ${plotKey(p)} at ${key(at.dx, at.dy)} falls outside a ${rings}-ring town`)
+      throw new Error(
+        `plattedPlots: plot ${plotKey(p)} at ${key(at.dx, at.dy)} falls outside a ${rings}-ring town`,
+      )
     }
     return at
   })
@@ -455,35 +541,50 @@ const templateSpan = (t: CityTemplate): number =>
 
 /** The empty plots of THIS template, as bare tiles. Throws when `t` was built for another ring
  *  count rather than quietly answering with a shorter list. */
-export function growthPlots(t: CityTemplate, rings: number = TOWN_RINGS_GENESIS): { dx: number; dy: number }[] {
+export function growthPlots(
+  t: CityTemplate,
+  rings: number = TOWN_RINGS_GENESIS,
+): { dx: number; dy: number }[] {
   const span = templateSpan(t)
   if (span !== townSpan(rings)) {
-    throw new Error(`growthPlots: a template ${span} tiles across is not a town of ${rings} ring(s)`
-      + ` — that wants ${townSpan(rings)}`)
+    throw new Error(
+      `growthPlots: a template ${span} tiles across is not a town of ${rings} ring(s)` +
+        ` — that wants ${townSpan(rings)}`,
+    )
   }
   return genesisEmptyPlots(rings).map(({ dx, dy }) => ({ dx, dy }))
 }
 
 /** The blocks the town has platted, for a viewer that wants to draw them. */
-export const cityBlocks = (rings: number = TOWN_RINGS_GENESIS): Array<{ i: number; j: number }> =>
+export const cityBlocks = (rings: number = TOWN_RINGS_GENESIS): { i: number; j: number }[] =>
   plattedBlocks(rings, CITY_GROUND)
 
-const ORTHO = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const
+const ORTHO = [
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0],
+] as const
 
 /** Every structure's door, and the road tile it opens onto. `onto` is null when the face the
  *  building presents is not a road — the frontage invariant is that this never happens. */
-export function frontages(t: CityTemplate): Array<{
-  kind: string; door: { dx: number; dy: number }; onto: { dx: number; dy: number } | null
-}> {
-  const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
-  return t.structures.map(s => {
+export function frontages(t: CityTemplate): {
+  kind: string
+  door: { dx: number; dy: number }
+  onto: { dx: number; dy: number } | null
+}[] {
+  const roads = new Set(t.tiles.filter(isRoadTile).map((x) => key(x.dx, x.dy)))
+  return t.structures.map((s) => {
     const front = doorFrontTile(s)
     // The well and the fire pit have no door; they stand in the paving and are reached from
     // every side, so their frontage is any road tile that touches them.
-    const onto = roads.has(key(front.dx, front.dy)) ? front
-      : (s.w === 1 && s.h === 1
-        ? ORTHO.map(([ox, oy]) => ({ dx: s.dx + ox, dy: s.dy + oy })).find(p => roads.has(key(p.dx, p.dy))) ?? null
-        : null)
+    const onto = roads.has(key(front.dx, front.dy))
+      ? front
+      : s.w === 1 && s.h === 1
+        ? (ORTHO.map(([ox, oy]) => ({ dx: s.dx + ox, dy: s.dy + oy })).find((p) =>
+            roads.has(key(p.dx, p.dy)),
+          ) ?? null)
+        : null
     return { kind: s.kind, door: doorTile(s), onto }
   })
 }
@@ -491,17 +592,23 @@ export function frontages(t: CityTemplate): Array<{
 /** A road tile with exactly one road neighbour that is not a door or a template edge — a path
  *  that leads nowhere. The invariant is that this list is empty. */
 export function danglingRoadEnds(
-  t: CityTemplate, rings: number = TOWN_RINGS_GENESIS,
+  t: CityTemplate,
+  rings: number = TOWN_RINGS_GENESIS,
 ): { dx: number; dy: number }[] {
   const edge = townSpan(rings) - 1
-  const roads = new Set(t.tiles.filter(isRoadTile).map(x => key(x.dx, x.dy)))
-  const doors = new Set(t.structures.map(s => { const d = doorTile(s); return key(d.dx, d.dy) }))
+  const roads = new Set(t.tiles.filter(isRoadTile).map((x) => key(x.dx, x.dy)))
+  const doors = new Set(
+    t.structures.map((s) => {
+      const d = doorTile(s)
+      return key(d.dx, d.dy)
+    }),
+  )
   const out: { dx: number; dy: number }[] = []
   for (const k of roads) {
     const [dx, dy] = k.split(',').map(Number) as [number, number]
     if (ORTHO.filter(([ox, oy]) => roads.has(key(dx + ox, dy + oy))).length !== 1) continue
-    if (dx === 0 || dy === 0 || dx === edge || dy === edge) continue  // a map edge
-    if (ORTHO.some(([ox, oy]) => doors.has(key(dx + ox, dy + oy)))) continue      // arrives at a door
+    if (dx === 0 || dy === 0 || dx === edge || dy === edge) continue // a map edge
+    if (ORTHO.some(([ox, oy]) => doors.has(key(dx + ox, dy + oy)))) continue // arrives at a door
     out.push({ dx, dy })
   }
   return out.sort((a, b) => a.dy - b.dy || a.dx - b.dx)
@@ -510,14 +617,19 @@ export function danglingRoadEnds(
 // Neighbours are computed over the road set only (T_ROAD ∪ T_PATH), then the shared autotiler
 // picks the tile. Keyed 'dx,dy'.
 export function cityRoadKeys(tiles: readonly CityTile[]): Map<string, RoadAutotileKey> {
-  const set = new Set(tiles.filter(isRoadTile).map(t => key(t.dx, t.dy)))
+  const set = new Set(tiles.filter(isRoadTile).map((t) => key(t.dx, t.dy)))
   const out = new Map<string, RoadAutotileKey>()
   for (const k of set) {
     const [dx, dy] = k.split(',').map(Number) as [number, number]
-    out.set(k, roadAutotile({
-      n: set.has(key(dx, dy - 1)), e: set.has(key(dx + 1, dy)),
-      s: set.has(key(dx, dy + 1)), w: set.has(key(dx - 1, dy)),
-    }))
+    out.set(
+      k,
+      roadAutotile({
+        n: set.has(key(dx, dy - 1)),
+        e: set.has(key(dx + 1, dy)),
+        s: set.has(key(dx, dy + 1)),
+        w: set.has(key(dx - 1, dy)),
+      }),
+    )
   }
   return out
 }

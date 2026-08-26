@@ -22,7 +22,8 @@ const mid = Math.floor(img.width / 2)
 const [x0, x1] = HALF === 'left' ? [0, mid] : [mid, img.width]
 for (let y = 0; y < img.height; y++) {
   for (let a = x0, b = x1 - 1; a < b; a++, b--) {
-    const i = (y * img.width + a) * 4, j = (y * img.width + b) * 4
+    const i = (y * img.width + a) * 4,
+      j = (y * img.width + b) * 4
     for (let k = 0; k < 4; k++) {
       const t = img.data[i + k]!
       img.data[i + k] = img.data[j + k]!

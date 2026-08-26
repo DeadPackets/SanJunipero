@@ -1,7 +1,11 @@
 import { MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import type { SceneSegment, SegmentConfig } from './types.js'
 
-export const DEFAULT_SEGMENT_CONFIG: SegmentConfig = { silenceTicks: 20, maxTicks: 240, minEvents: 2 }
+export const DEFAULT_SEGMENT_CONFIG: SegmentConfig = {
+  silenceTicks: 20,
+  maxTicks: 240,
+  minEvents: 2,
+}
 
 // Bare payload.id is an AGENT id only on these types; elsewhere it names a structure/item/crop.
 const ID_IS_AGENT = new Set(['agent_spawned', 'agent_moved', 'need_changed'])
@@ -22,13 +26,16 @@ export function eventLocation(ev: SimEvent): { x: number; y: number } | null {
   return typeof p.x === 'number' && typeof p.y === 'number' ? { x: p.x, y: p.y } : null
 }
 
-export function segmentScenes(events: SimEvent[], cfg: SegmentConfig = DEFAULT_SEGMENT_CONFIG): SceneSegment[] {
+export function segmentScenes(
+  events: SimEvent[],
+  cfg: SegmentConfig = DEFAULT_SEGMENT_CONFIG,
+): SceneSegment[] {
   const raw: SimEvent[][] = []
   let current: SimEvent[] = []
   for (const e of events) {
     if (current.length > 0) {
-      const last = current[current.length - 1]
-      const start = current[0]
+      const last = current[current.length - 1]!
+      const start = current[0]!
       const boundary =
         e.tick - last.tick > cfg.silenceTicks ||
         e.tick - start.tick > cfg.maxTicks ||
@@ -53,9 +60,9 @@ export function segmentScenes(events: SimEvent[], cfg: SegmentConfig = DEFAULT_S
         if (l !== null) loc = l
       }
       return {
-        day: Math.floor(evs[0].tick / MINUTES_PER_DAY),
-        startTick: evs[0].tick,
-        endTick: evs[evs.length - 1].tick,
+        day: Math.floor(evs[0]!.tick / MINUTES_PER_DAY),
+        startTick: evs[0]!.tick,
+        endTick: evs[evs.length - 1]!.tick,
         eventIds: evs.map((e) => e.seq),
         cast,
         location: loc === null ? null : `${loc.x},${loc.y}`,

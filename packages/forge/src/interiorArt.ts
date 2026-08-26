@@ -8,8 +8,7 @@ import { INTERIOR_TILE } from './assetResolution.js'
 // Seven committed floor-and-wall pieces; the remaining two of the nine are cut from these in
 // code — the far-row shade and the seam the two walls meet in.
 
-export const INTERIORS_CONTENT_DIR =
-  fileURLToPath(new URL('../content/interiors', import.meta.url))
+export const INTERIORS_CONTENT_DIR = fileURLToPath(new URL('../content/interiors', import.meta.url))
 
 /** A floor material is sampled continuously across the room and has no orientation. A wall is an
  *  ELEVATION: a square-on view of one wall's inside face, sheared onto the wall plane. */
@@ -29,31 +28,47 @@ export const WALL_STRIP_PX = { w: (WALL_STRIP_TILES * INTERIOR_TILE.w) / 2, h: 1
 
 export const INTERIOR_PIECES: readonly InteriorPiece[] = [
   {
-    id: 'floor', role: 'floor-material', w: 512, h: 512,
+    id: 'floor',
+    role: 'floor-material',
+    w: 512,
+    h: 512,
     desc: 'wide horizontal honey-wood floorboards, three to the square, seamless in both axes',
   },
   {
-    id: 'flagstone', role: 'floor-material', w: 256, h: 256,
+    id: 'flagstone',
+    role: 'floor-material',
+    w: 256,
+    h: 256,
     desc: 'irregular warm-grey and cream flagstones with pale mortar, laid edge to edge',
   },
   {
-    id: 'wall-plain', role: 'wall', ...WALL_STRIP_PX,
+    id: 'wall-plain',
+    role: 'wall',
+    ...WALL_STRIP_PX,
     desc: 'lime-washed cream plaster over a honey-wood wainscot, with a rail and a deep skirting',
   },
   {
-    id: 'wall-window', role: 'wall', ...WALL_STRIP_PX,
+    id: 'wall-window',
+    role: 'wall',
+    ...WALL_STRIP_PX,
     desc: 'a deep-set cottage window of six leaded panes, a folded shutter and a pot of sage on the sill',
   },
   {
-    id: 'wall-door', role: 'wall', ...WALL_STRIP_PX,
+    id: 'wall-door',
+    role: 'wall',
+    ...WALL_STRIP_PX,
     desc: 'a five-plank honey-wood door with iron strap hinges, a ring latch and a stone threshold',
   },
   {
-    id: 'wall-chimney', role: 'wall', ...WALL_STRIP_PX,
+    id: 'wall-chimney',
+    role: 'wall',
+    ...WALL_STRIP_PX,
     desc: 'a warm-grey stone chimney breast rising out of the plaster, with a mantel and soot above the opening',
   },
   {
-    id: 'wall-dresser', role: 'wall', ...WALL_STRIP_PX,
+    id: 'wall-dresser',
+    role: 'wall',
+    ...WALL_STRIP_PX,
     desc: 'a tall honey-wood dresser of open crockery shelves over two closed cupboard doors',
   },
 ]
@@ -84,7 +99,8 @@ export type InteriorIngestEntry = { kind: string; action: 'registered' | 'unchan
 /** Idempotent, on the same law the committed items register by: unchanged bytes register
  *  nothing, and re-authored art gets a new record that wins by seq. */
 export function registerCommittedInteriors(
-  codex: AssetCodex, opts: { root?: string } = {},
+  codex: AssetCodex,
+  opts: { root?: string | undefined } = {},
 ): InteriorIngestEntry[] {
   const latest = new Map<string, AssetRecord>()
   for (const r of codex.listSince(0)) {
@@ -98,11 +114,18 @@ export function registerCommittedInteriors(
       continue
     }
     const rec = codex.register({
-      class: 'terrain', desc: piece.desc, kind: piece.kind, meta: null,
-      footprint: { w: 1, h: 1 }, png: piece.png,
-      widthPx: piece.w, heightPx: piece.h,
-      status: 'ready', score: null, attempts: 1,
-      costUsd: 0,   // the interior-mock round already booked this generation
+      class: 'terrain',
+      desc: piece.desc,
+      kind: piece.kind,
+      meta: null,
+      footprint: { w: 1, h: 1 },
+      png: piece.png,
+      widthPx: piece.w,
+      heightPx: piece.h,
+      status: 'ready',
+      score: null,
+      attempts: 1,
+      costUsd: 0, // the interior-mock round already booked this generation
     })
     out.push({ kind: piece.kind, action: 'registered', id: rec.id })
   }

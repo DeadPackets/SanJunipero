@@ -11,8 +11,12 @@ export function StageVeil({ store }: { store: WorldStore }) {
 
   useEffect(() => {
     if (!awake) return
-    const t = setTimeout(() => setGone(true), VEIL_EXIT_MS)
-    return () => clearTimeout(t)
+    const t = setTimeout(() => {
+      setGone(true)
+    }, VEIL_EXIT_MS)
+    return () => {
+      clearTimeout(t)
+    }
   }, [awake])
 
   if (gone) return null
@@ -20,7 +24,11 @@ export function StageVeil({ store }: { store: WorldStore }) {
     <div className={awake ? 'stage-veil leaving' : 'stage-veil'} role="status">
       <div className="veil-slab">
         <span className="veil-title">Waking the town</span>
-        <span className="veil-loader" aria-hidden="true"><i /><i /><i /></span>
+        <span className="veil-loader" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
         <span className="veil-sub">listening for the first morning bell</span>
       </div>
     </div>
