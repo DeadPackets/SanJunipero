@@ -1,6 +1,6 @@
 { "name": "@sj/narrator", "version": "0.0.1", "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "scripts": { "probe": "node --import ../agents/scripts/ts-loader.mjs scripts/probe.ts" },
+  "scripts": { "probe": "tsx scripts/probe.ts" },
   "dependencies": {
     "@sj/shared": "workspace:*", "@sj/engine": "workspace:*", "@sj/agents": "workspace:*",
     "better-sqlite3": "^13.0.0", "zod": "^4.4.0" },
