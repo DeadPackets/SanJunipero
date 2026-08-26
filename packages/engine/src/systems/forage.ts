@@ -10,7 +10,7 @@ export const FORAGE_REGROW_CHANCE = 0.2
 
 // What this node climbs back toward. A node from a log written before the ceiling existed
 // keeps the old behaviour and stops at one.
-export function fullStockOf(node: { fullStock?: number }): number {
+function fullStockOf(node: { fullStock?: number }): number {
   return node.fullStock ?? 1
 }
 

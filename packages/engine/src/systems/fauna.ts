@@ -9,7 +9,7 @@ import type { TickCtx } from '../worldTick.js'
 
 // The whole of "home range": a deer does not leave the wood and the meadow beside it. No stored
 // anchor, because a second copy of where a body belongs is a second thing that can drift.
-export const FAUNA_HABITAT: Readonly<Record<FaunaKind, ReadonlySet<TileId>>> = {
+const FAUNA_HABITAT: Readonly<Record<FaunaKind, ReadonlySet<TileId>>> = {
   deer: new Set<TileId>([0, 3]),
   rabbit: new Set<TileId>([0, 1]),
   fish: new Set<TileId>([2, 10]),

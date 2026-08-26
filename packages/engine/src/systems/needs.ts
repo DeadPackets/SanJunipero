@@ -7,7 +7,7 @@ const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v
 
 // The one derivation of the warmth a body drifts toward: warmthSystem takes the number
 // over the moment the cold has teeth, and it must be the same number in both places.
-export function warmthTarget(state: WorldState, _config: SimConfig): number {
+export function warmthTarget(state: WorldState): number {
   return warmthTargetFromAir(state.weather.temperatureC)
 }
 
@@ -57,7 +57,7 @@ function socialRegenActive(ctx: TickCtx, id: string): boolean {
 
 export function needsSystem(ctx: TickCtx): void {
   const { needs: cfg } = ctx.config
-  const target = warmthTarget(ctx.state(), ctx.config)
+  const target = warmthTarget(ctx.state())
   const winter = simTimeFromTick(ctx.state().tick).season === 'winter'
   const hungerDecay =
     cfg.hungerDecayPerTick * (winter ? ctx.config.seasons.winter.hungerDecayMultiplier : 1)
