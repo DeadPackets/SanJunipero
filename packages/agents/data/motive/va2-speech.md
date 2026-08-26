@@ -1,8 +1,0 @@
-- t=1140 {"agentId":"nadia","text":"Best get to them before the birds do.","x":74,"y":71}
-- t=1161 {"agentId":"omar","text":"Morning, Salma. Berries treating you kindly?","x":76,"y":107}
-- t=1165 {"agentId":"yusuf","text":"Evening, Amara. Good day for building — got the frame of my house near up.","x":79,"y":63}
-- t=1207 {"agentId":"salma","text":"Sour, but they'll do.","x":72,"y":105}
-- t=1223 {"agentId":"omar","text":"Sour they may be, but they're food. Now then. We're past the last of the light quick — I'd best get to the cabin.","x":72,"y":105}
-- t=1239 {"agentId":"omar","text":"Now then. Sour, but they'll keep you through the winter's worth.","x":72,"y":105}
-- t=1257 {"agentId":"omar","text":"Sour keeps the wolf away. They'll do right fine.","x":72,"y":105}
-- t=1712 {"agentId":"nadia","text":"Right, in I go. Walls are better than nothing.","x":74,"y":72}

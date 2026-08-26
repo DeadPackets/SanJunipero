@@ -7,5 +7,4 @@ dist/
 *.tsbuildinfo
 packages/forge/probe-out/
 packages/forge/out/
-packages/agents/data/*.partial.json
-packages/agents/data/*.partial.md
+packages/agents/data/

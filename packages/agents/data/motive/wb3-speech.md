@@ -1,6 +1,0 @@
-- t=1099 {"agentId":"amara","text":"Morning. Store still holds four days' bread. How's your count?","x":79,"y":63}
-- t=1101 {"agentId":"nadia","text":"Bushes are thick out this way — shouldn't waste the sun.","x":67,"y":75}
-- t=1108 {"agentId":"yusuf","text":"Aye. Morning, Amara. I've got wood for a house. I'll start on it at the clearing.","x":79,"y":70}
-- t=1141 {"agentId":"yusuf","text":"Aye, four days' bread in my pack. Total's holding steady.","x":81,"y":61}
-- t=1157 {"agentId":"yusuf","text":"Aye, four days' bread and ten wood. Going up now.","x":81,"y":61}
-- t=1259 {"agentId":"omar","text":"Now then. I'll take a little of this green before the dark gets serious.","x":76,"y":107}
