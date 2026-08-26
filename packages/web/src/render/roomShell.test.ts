@@ -14,10 +14,14 @@ import {
   ROOM_ZOOM, WALL_MOUNT_H_PX,
   BEAM_HALF_TILES, ceilingBeams,
   drawFloorBase, drawFloorLight, drawFloorTop, drawWalls, floorBoards, floorPolyOf, floorPools,
-  roomBox, roomCropPx, roomMaskPoly, roomOriginX, roomOriginY, roomZoomFor, skirtingPolys,
+  roomBox, roomCrop, roomCropPx, roomMaskPoly, roomOriginX, roomOriginY, roomPanRange, roomPanTo,
+  roomWidthPx, roomZoomFor, skirtingPolys,
+  easePan, ROOM_PAN_HALF_LIFE_MS,
   tileCentreScreen,
   thresholdPoly, wallCourses, wallMount, wallPolys, type ShellPainter,
 } from './roomShell.js'
+import { INTERIOR_KINDS } from '@sj/shared'
+import { roomSizeOf } from './interiors.js'
 
 // Every colour the room shell paints must be a MASTER_PALETTE member — the same law the
 // built form answers to, so an interior cannot drift off the town's palette.
@@ -462,6 +466,187 @@ describe('roomShell — the room fits the stage', () => {
     // and the zoom never drops below 1, because there is no integer under it
     expect(roomZoomFor(400)).toBe(ROOM_ZOOM)
     expect(roomZoomFor(2000)).toBe(ROOM_ZOOM)
+  })
+})
+
+// ★★ A FARMHOUSE ROOM DOES NOT FIT A LAPTOP — AND THE CAMERA IS WHAT MAKES IT WHOLE.
+//
+// Rooms are as big as their buildings (12x6 / 18x6 / 24x6) and the factor is forced by the
+// house's landed room, so a farmhouse's box is 1 120 px tall and 1 920 px WIDE. There is no
+// integer scene zoom below 1 to fall back on, so what is off the glass cannot be zoomed back
+// on: the only thing left to choose is WHICH part is showing, and that choice is a camera.
+//
+// The travel it is allowed IS `roomCrop`, in both axes. That is the whole design: a room that
+// fits gets a range of zero and cannot move, so nothing that fits acquires a camera.
+describe('★★ the camera inside a room, and its range IS the crop', () => {
+  // Every room the renderer draws, by its own size function rather than a transcription — a
+  // seventh room kind is in this enumeration without anybody editing this test.
+  const KINDS = [...INTERIOR_KINDS].sort()
+  const roomsOf = (): ReadonlyArray<{ kind: string; room: { w: number; h: number } }> =>
+    KINDS.map((kind) => ({ kind, room: roomSizeOf(kind) }))
+
+  // The two stages the crop was measured at. 678 is the CANVAS height at a 1728 x 823 window,
+  // measured in the running app (see the landed test above); 900 is a taller one.
+  const STAGES = [{ w: 1478, h: 678 }, { w: 1478, h: 900 }] as const
+
+  it('★ the crop has TWO axes, and the width is the one that was never measured', () => {
+    // `roomCropPx` takes a height and returns one number, so a room 1 920 px across on a
+    // 1 478 px stage was overflowing by 442 px with nothing in the codebase able to say so.
+    expect(roomWidthPx({ w: 12, h: 6 })).toBe(1152)
+    expect(roomWidthPx({ w: 18, h: 6 })).toBe(1536)
+    expect(roomWidthPx({ w: 24, h: 6 })).toBe(1920)
+    // and it is a real overflow on a real stage, in the axis nothing was watching
+    expect(roomCrop(1478, 900, { w: 24, h: 6 }).x).toBe(442)
+    expect(roomCrop(1478, 900, { w: 12, h: 6 }).x).toBe(0)
+    // the y axis is the landed number, unchanged — this widened the instrument, it did not
+    // move it
+    for (const h of [678, 700, 736, 900, 1200]) {
+      expect(roomCrop(9999, h, { w: 24, h: 6 }).y).toBe(roomCropPx(h, { w: 24, h: 6 }))
+    }
+  })
+
+  // ★ THE DELIVERABLE, AS A LAW. Not "the farmhouse pans" — every point of every room's box is
+  // on the glass at SOME camera offset, at every stage size a laptop has.
+  it('★★ a person on a laptop can see the whole of any room', () => {
+    let anyCropped = false
+    for (const { kind, room } of roomsOf()) {
+      const box = roomBox(room, WALL_H_PX)
+      const west = interiorToScreen(0, room.h).sx
+      const east = interiorToScreen(room.w, 0).sx
+      for (const stage of STAGES) {
+        const range = roomPanRange(stage.w, stage.h, room, WALL_H_PX)
+        const ox = roomOriginX(stage.w, ROOM_ZOOM, room)
+        const oy = roomOriginY(stage.h, 0, ROOM_ZOOM, room, WALL_H_PX)
+        const crop = roomCrop(stage.w, stage.h, room, WALL_H_PX)
+        if (crop.x > 0 || crop.y > 0) anyCropped = true
+        // the four extremes of the box, each at the offset that reaches hardest for it
+        const at = (d: number, o: number, p: number): number => o + d + p * ROOM_ZOOM
+        expect(at(range.maxX, ox, west), `${kind} @${stage.w}: west vertex unreachable`)
+          .toBeGreaterThanOrEqual(0)
+        expect(at(range.minX, ox, east), `${kind} @${stage.w}: east vertex unreachable`)
+          .toBeLessThanOrEqual(stage.w)
+        expect(at(range.maxY, oy, box.top), `${kind} @${stage.h}: wall top unreachable`)
+          .toBeGreaterThanOrEqual(0)
+        expect(at(range.minY, oy, box.bottom), `${kind} @${stage.h}: threshold unreachable`)
+          .toBeLessThanOrEqual(stage.h)
+      }
+    }
+    // ANTI-VACUITY: a range of zero everywhere satisfies the four above only if nothing was
+    // ever cropped. Something must be, or this test is asserting that the defect does not
+    // exist rather than that it is fixed.
+    expect(anyCropped, 'nothing was cropped — this law proved nothing').toBe(true)
+  })
+
+  it('★ and the camera never shows stage the room does not fill', () => {
+    // The other side of the same clamp. A camera free to travel is a camera that can park a
+    // wall in the middle of the screen with the town showing beside it.
+    for (const { kind, room } of roomsOf()) {
+      const box = roomBox(room, WALL_H_PX)
+      const west = interiorToScreen(0, room.h).sx
+      const east = interiorToScreen(room.w, 0).sx
+      for (const stage of STAGES) {
+        const crop = roomCrop(stage.w, stage.h, room, WALL_H_PX)
+        const ox = roomOriginX(stage.w, ROOM_ZOOM, room)
+        const oy = roomOriginY(stage.h, 0, ROOM_ZOOM, room, WALL_H_PX)
+        // ask for the middle of every tile in the room and a long way past every edge, so the
+        // clamp is exercised from outside its own range as well as inside it
+        for (const fx of [-4000, west, 0, east, 4000]) {
+          for (const fy of [-4000, box.top, 0, box.bottom, 4000]) {
+            const pan = roomPanTo({ sx: fx, sy: fy }, stage.w, stage.h, ROOM_ZOOM, room, WALL_H_PX)
+            if (crop.x > 0) {
+              expect(ox + pan.dx + west * ROOM_ZOOM, `${kind}: blank stage left`)
+                .toBeLessThanOrEqual(0)
+              expect(ox + pan.dx + east * ROOM_ZOOM, `${kind}: blank stage right`)
+                .toBeGreaterThanOrEqual(stage.w)
+            }
+            if (crop.y > 0) {
+              expect(oy + pan.dy + box.top * ROOM_ZOOM, `${kind}: blank stage above`)
+                .toBeLessThanOrEqual(0)
+              expect(oy + pan.dy + box.bottom * ROOM_ZOOM, `${kind}: blank stage below`)
+                .toBeGreaterThanOrEqual(stage.h)
+            }
+          }
+        }
+      }
+    }
+  })
+
+  // ★ THE NO-REGRESSION HALF, AND IT IS WHY THIS IS SAFE. A room that fits has no camera at
+  // all — not a camera that happens to sit still, a range of literally zero.
+  it('★ nothing that fits acquires a camera', () => {
+    for (const { kind, room } of roomsOf()) {
+      for (let h = 600; h <= 1600; h += 7) {
+        for (const w of [1280, 1478, 1512, 1920, 2400]) {
+          const crop = roomCrop(w, h, room, WALL_H_PX)
+          const range = roomPanRange(w, h, room, WALL_H_PX)
+          if (crop.x === 0) {
+            expect(range.minX, `${kind} @${w}x${h}`).toBe(0)
+            expect(range.maxX, `${kind} @${w}x${h}`).toBe(0)
+          }
+          if (crop.y === 0) {
+            expect(range.minY, `${kind} @${w}x${h}`).toBe(0)
+            expect(range.maxY, `${kind} @${w}x${h}`).toBe(0)
+          }
+        }
+      }
+    }
+    // and a house on a stage that holds it cannot be panned anywhere by any focus at all
+    const house = roomSizeOf('house')
+    for (const fx of [-2000, 0, 500, 2000]) {
+      expect(roomPanTo({ sx: fx, sy: fx }, 1920, 1200, ROOM_ZOOM, house, WALL_H_PX))
+        .toEqual({ dx: 0, dy: 0 })
+    }
+  })
+
+  it('★ an empty room does not drift — no focus is the landed placement, to the pixel', () => {
+    for (const { room } of roomsOf()) {
+      for (const stage of STAGES) {
+        expect(roomPanTo(null, stage.w, stage.h, ROOM_ZOOM, room, WALL_H_PX))
+          .toEqual({ dx: 0, dy: 0 })
+      }
+    }
+  })
+
+  // ★ WHAT THE CAMERA IS FOR, restated as arithmetic: follow a body and the body is on screen.
+  // The user chose Option C to watch NPCs walk about; a camera that crops the person you are
+  // following is worse than one that crops a wall.
+  it('★ following a body in a farmhouse puts that body on the glass, wherever it stands', () => {
+    const room = roomSizeOf('farmhouse')
+    const stage = { w: 1478, h: 678 }
+    const ox = roomOriginX(stage.w, ROOM_ZOOM, room)
+    const oy = roomOriginY(stage.h, 0, ROOM_ZOOM, room, WALL_H_PX)
+    let offWithout = 0
+    for (let x = 0; x < room.w; x++) {
+      for (let y = 0; y < room.h; y++) {
+        const f = tileCentreScreen(x, y)
+        const pan = roomPanTo(f, stage.w, stage.h, ROOM_ZOOM, room, WALL_H_PX)
+        const sx = ox + pan.dx + f.sx * ROOM_ZOOM
+        const sy = oy + pan.dy + f.sy * ROOM_ZOOM
+        expect(sx, `tile ${x},${y} off the stage horizontally`).toBeGreaterThanOrEqual(0)
+        expect(sx).toBeLessThanOrEqual(stage.w)
+        expect(sy, `tile ${x},${y} off the stage vertically`).toBeGreaterThanOrEqual(0)
+        expect(sy).toBeLessThanOrEqual(stage.h)
+        // and how many of those tiles are off the glass with the camera pinned, which is the
+        // defect this lane was given, counted
+        const px = ox + f.sx * ROOM_ZOOM, py = oy + f.sy * ROOM_ZOOM
+        if (px < 0 || px > stage.w || py < 0 || py > stage.h) offWithout++
+      }
+    }
+    // ANTI-VACUITY, and the size of the defect: a fifth of a farmhouse's floor was unreachable
+    expect(offWithout, 'no tile was ever off the glass — nothing was fixed').toBeGreaterThan(20)
+  })
+
+  it('★ the pan eases rather than cuts, and at the same rate however fast the frames come', () => {
+    // 260 ms to close half the distance — the same motion at 30 fps and at 120.
+    expect(easePan(100, 100, 16)).toBe(100)
+    expect(easePan(0, 100, 0)).toBe(0)                                  // no frame, no motion
+    expect(easePan(0, 100, ROOM_PAN_HALF_LIFE_MS)).toBeCloseTo(50, 6)   // half, by definition
+    // frame-rate independence: eight 8 ms frames land where two 32 ms frames land
+    let fast = 0
+    for (let i = 0; i < 8; i++) fast = easePan(fast, 100, 8)
+    let slow = 0
+    for (let i = 0; i < 2; i++) slow = easePan(slow, 100, 32)
+    expect(fast).toBeCloseTo(slow, 6)
   })
 })
 

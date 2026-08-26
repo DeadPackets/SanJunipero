@@ -334,6 +334,88 @@ export function roomCropPx(screenH: number, room: RoomSize = ROOM_TILES, wallH: 
 }
 
 /**
+ * ★ THE ROOM'S DRAWN WIDTH — and it is the half of the crop nobody was measuring.
+ *
+ * `roomCropPx` takes a HEIGHT and returns one number, so the only overflow anybody could see
+ * was the vertical one. A room is a diamond: it spreads `room.h` tiles to the WEST of its
+ * origin and `room.w` tiles to the EAST, so a 24 × 6 farmhouse is **1 920 px across** and no
+ * laptop is that wide. The hearth stands on the back-left wall, which is the west vertex —
+ * the first thing a centred horizontal crop eats.
+ */
+export function roomWidthPx(room: RoomSize = ROOM_TILES): number {
+  return wallBase('back-right', room).sx - wallBase('back-left', room).sx
+}
+
+/** How much of the room's box a stage this size cannot show, in each axis. 0 where it fits. */
+export function roomCrop(
+  screenW: number, screenH: number, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+): { x: number; y: number } {
+  return {
+    x: Math.max(0, roomWidthPx(room) * ROOM_ZOOM - screenW),
+    y: roomCropPx(screenH, room, wallH),
+  }
+}
+
+/**
+ * ★ WHERE THE CAMERA MAY GO INSIDE A ROOM IT CANNOT SHOW WHOLE — and the range IS the crop.
+ *
+ * `roomOriginX`/`roomOriginY` place a room that fits. When it does not fit there is nothing
+ * left to choose but WHICH part is on the glass, and that choice is a camera. The travel it is
+ * allowed is exactly `roomCrop`, because a pixel of travel past the crop is a pixel of stage
+ * showing nothing:
+ *
+ * - **x**: `roomOriginX` CENTRES the box, so the overflow is split — the camera may go half the
+ *   crop either way.
+ * - **y**: `roomOriginY` pins the wall top when the box overflows, so the whole overflow is
+ *   below. The camera may only travel DOWN into the room, never up into blank stage above a
+ *   wall that is already flush with the top.
+ *
+ * A room that fits gets a range of zero in that axis and therefore cannot move at all: a house,
+ * a cabin, a shed and a storehouse are pinned exactly where they are today, on every stage that
+ * holds them. **Nothing that fits acquires a camera.**
+ */
+export function roomPanRange(
+  screenW: number, screenH: number, room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+): { minX: number; maxX: number; minY: number; maxY: number } {
+  const crop = roomCrop(screenW, screenH, room, wallH)
+  return { minX: -crop.x / 2, maxX: crop.x / 2, minY: -crop.y, maxY: 0 }
+}
+
+const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
+
+/**
+ * The camera offset that brings `focus` — a point in ROOM space — as near the middle of the
+ * stage as the room allows, added to the origin the two `roomOrigin*` functions already give.
+ *
+ * `null` focus is the room's own life being nowhere: the offset is 0 in both axes, which is the
+ * landed placement to the pixel. An empty room does not drift.
+ */
+export function roomPanTo(
+  focus: { sx: number; sy: number } | null,
+  screenW: number, screenH: number, zoom: number,
+  room: RoomSize = ROOM_TILES, wallH: number = WALL_H_PX,
+): { dx: number; dy: number } {
+  const range = roomPanRange(screenW, screenH, room, wallH)
+  if (focus === null) return { dx: clamp(0, range.minX, range.maxX), dy: clamp(0, range.minY, range.maxY) }
+  const originX = roomOriginX(screenW, zoom, room)
+  const originY = roomOriginY(screenH, 0, zoom, room, wallH)
+  return {
+    dx: clamp(screenW / 2 - (originX + focus.sx * zoom), range.minX, range.maxX),
+    dy: clamp(screenH / 2 - (originY + focus.sy * zoom), range.minY, range.maxY),
+  }
+}
+
+/** How far the camera closes on its target each frame. A room camera that snaps is a cut, and
+ *  a cut inside one room reads as a different room. Frame-rate independent. */
+export const ROOM_PAN_HALF_LIFE_MS = 260
+
+/** One frame of easing toward `to`. Exponential, so it is the same motion at 30 fps and 120. */
+export function easePan(from: number, to: number, dtMs: number): number {
+  if (dtMs <= 0) return from
+  return to + (from - to) * Math.pow(0.5, dtMs / ROOM_PAN_HALF_LIFE_MS)
+}
+
+/**
  * ★ WHERE THE ROOM'S ORIGIN GOES ACROSS THE STAGE — and it is NOT the middle of it.
  *
  * The origin is the room's FAR corner, and the room only spreads evenly around it while it is
