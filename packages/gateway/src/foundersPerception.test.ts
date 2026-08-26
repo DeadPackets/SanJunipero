@@ -3,6 +3,7 @@
 // whether or not the patrol policy that reads it was ever reached. The REAL function is
 // counted here, not replaced by a stub.
 import { describe, expect, it, vi } from 'vitest'
+import type { TickLoop as TickLoopType } from '@sj/engine'
 
 vi.mock('@sj/engine', async (importOriginal) => {
   const real = await importOriginal<typeof import('@sj/engine')>()
@@ -29,7 +30,7 @@ function streamRun(): number {
       interiors: true, builders: true, structures, founders: foundersFor(structures),
       holdings: true, lamps: LAMPS, deck: showcaseDeck(undefined, RINGS),
     })
-  const loop: TickLoop = new TickLoop({
+  const loop: TickLoopType = new TickLoop({
     store: new EventStore(openDb(':memory:')),
     state: devGenesisState(SHOWCASE_CONFIG, devTerrain('showcase', RINGS), 'showcase', RINGS),
     rng: new RngStreams('perception-lane-world'), config: SHOWCASE_CONFIG, snapshotEveryTicks: 720,
