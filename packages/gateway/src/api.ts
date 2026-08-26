@@ -154,7 +154,9 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
     const gen = deps.mirror.seq()
     if (gen === foldGen) return
     foldGen = gen
-    for (const r of selEventsAfter.all(foldCursor) as EventRow[]) {
+    // `.iterate`, not `.all`: on a resumed town foldCursor is 0, and the rows and their parsed
+    // payloads would both be fully materialised before a single event is folded.
+    for (const r of selEventsAfter.iterate(foldCursor) as Iterable<EventRow>) {
       foldOne(toEvent(r))
       foldCursor = r.seq
     }
