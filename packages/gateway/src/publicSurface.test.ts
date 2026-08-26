@@ -11,7 +11,7 @@ import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } f
 import { openForgeDb } from '@sj/forge'
 import { createGateway, CLOSE_TOO_MANY, SCRUB_MIN_MS, type Gateway } from './server.js'
 import { AGENT_ID } from './api.js'
-import { MAX_BYTES, MAX_KEYS, makeSeqCache } from './seqCache.js'
+import { MAX_BYTES, MAX_KEYS, MAX_VALUES, makeSeqCache } from './seqCache.js'
 import { CLIENT_ASSET_DIR, resolveInRoot } from './staticSite.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId))
@@ -284,6 +284,22 @@ describe('the guards themselves', () => {
     // and the shipped budget is a real number rather than "whatever the biggest answer is"
     expect(MAX_BYTES).toBeGreaterThan(0)
     expect(MAX_BYTES).toBeLessThan(64 * 1024 * 1024)
+  })
+
+  it('★ the seq cache holds a couple of intermediates, not a key cap of unmeasured ones', () => {
+    const cache = makeSeqCache(() => 1)
+    const built: string[] = []
+    const build = (k: string) => () => { built.push(k); return { k } }
+    // A stranger's window is the memo key and the value is a full entry array — 32 of those
+    // resident at once is 144 MB against a body budget of 4 MiB.
+    for (const k of ['a', 'b', 'c', 'd']) cache.value(k, build(k))
+    cache.value('a', build('a'))
+    expect(built.filter((k) => k === 'a').length, 'the oldest window was evicted').toBe(2)
+
+    // and the pair a real viewer asks for — panel then badge on one window — still shares a scan
+    cache.value('a', build('a'))
+    expect(built.filter((k) => k === 'a').length).toBe(2)
+    expect(MAX_VALUES).toBeLessThanOrEqual(4)
   })
 
   /** `/assets/:file` is the codex PNG route and 404s anything that is not a png, so a bundle
