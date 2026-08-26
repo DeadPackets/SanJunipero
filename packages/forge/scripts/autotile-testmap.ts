@@ -1,7 +1,5 @@
-// OFFLINE. The ring + cross + stubs map that exercises all 15 road autotile keys. Emits the
-// tile grid JSON (for the C10 renderer to stamp through `tilesetPlan`) and a self-contained 4x
-// dimetric composite painted straight from `paintRoadAutotile`, so G13b assertion 5 has a
-// picture to look at even when C10 is unmerged. No key, no network, no spend.
+// OFFLINE, no spend. The ring + cross + stubs map exercising all 15 road autotile keys. Emits
+// the tile grid JSON and a self-contained 4x dimetric composite from `paintRoadAutotile`.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROAD_AUTOTILE_KEYS, roadAutotile, type RoadAutotileKey } from '@sj/shared'

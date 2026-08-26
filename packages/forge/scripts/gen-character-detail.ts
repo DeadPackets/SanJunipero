@@ -1,7 +1,5 @@
-// LIVE — cap $1. Regenerates 3 ref-free villager candidates (rig-part) after curation
-// feedback that rig-part-0.png "needs more detail". Same Style Bible boilerplate via
-// buildAssetPrompt; the description carries the extra detail clauses. Output lands next
-// to the first wave as rig-part2-{0,1,2}.png for the human to compare and pick.
+// LIVE — cap $1. Three ref-free villager candidates with extra detail clauses, landing beside
+// the first wave as rig-part2-{0,1,2}.png for a human to compare and pick.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { makeImageClient } from '../src/imageClient.js'
 import { buildAssetPrompt } from '../src/styleBible.js'

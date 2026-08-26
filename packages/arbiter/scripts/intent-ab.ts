@@ -31,10 +31,8 @@ const VOCABULARY = {
   structureKinds: ['house', 'storehouse', 'shed', 'wagon', 'well', 'fire_pit', 'bridge', 'grave'],
 } as const
 
-// ★ THE SEED. Seven invented verbs a mind reached for, each with the thought behind it. The
-// first is Amara's, verbatim off `data/arb-proof/minds/amara.db` — the intent this whole lane
-// exists because of. The rest are the same shape: an act the engine has no verb for, motivated
-// by a want the town can see. Fixed order, fixed cast, so the two arms differ in one thing.
+// Seven invented verbs a mind reached for, each with the thought behind it — an act the engine
+// has no verb for. Fixed order and cast, so the two arms differ in exactly one thing.
 const SEED: Array<{ verb: string; params: Record<string, unknown>; thought: string }> = [
   {
     verb: 'smoke_fish', params: { over: 'green wood' },

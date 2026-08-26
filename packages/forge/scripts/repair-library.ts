@@ -36,10 +36,8 @@ type Repair = {
   notes: readonly string[]   // one per strike; a second strike restarts from the same raw
 }
 
-// The defect lines are measured on the KEPT art, not on the last verdict in report.json:
-// a blocked item keeps its BEST attempt, so the closing verdict often scores a discarded
-// candidate. Both kept sprites are alpha-clean (0 semi-opaque pixels, one component) —
-// what the judge called "transparency 0" is a stray off-ramp SPECK, and that is the fix.
+// The defect lines are measured on the KEPT art, not the last verdict in report.json: a blocked
+// item keeps its BEST attempt, so the closing verdict often scores a discarded candidate.
 const REPAIRS: readonly Repair[] = [
   {
     kind: 'timber', srcRaw: 'a2-c1-raw.png',

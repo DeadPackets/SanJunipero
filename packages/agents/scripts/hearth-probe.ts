@@ -36,10 +36,8 @@ const REAL_MS_PER_TICK = Number(process.env.HEARTH_MS_PER_TICK ?? 250)
 const WOOD_IN_HAND = 10
 const DATA_DIR = fileURLToPath(new URL('../data/hearth/', import.meta.url))
 
-// ★ THE ARM IS ONE CONFIG EDIT AND NOTHING ELSE. Two booleans off is exactly the world before
-// this lane: `isHeatSource` says a house holds no fire, `structureGlowRadius` gives it no glow,
-// `sleepRegenPerTick` gives a bed nothing, and perception composes neither field. The world,
-// the seed, the cast, the wood in hand and the finished house are identical in both arms.
+// The arm is one config edit and nothing else — two booleans off is exactly the world before
+// this lane. World, seed, cast, wood in hand and the finished house are identical in both arms.
 const BEFORE = ARM === 'hb'
 const config: SimConfig = BEFORE
   ? SimConfigSchema.parse({

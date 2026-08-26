@@ -86,10 +86,8 @@ const START_TICK = 7 * 60
 // The tick the operator drops the wear threshold. A trail forms inside a two-day window only
 // if the number it has to cross is a two-day number — the flip is criterion 6 and 7 at once.
 const FLIP_TICK = START_TICK + 120
-// The dial the operator drops mid-run. A two-day town walks 80 tiles and retraces none of
-// them, so anything above one is unreachable inside the window; §18 asks for a DIALLED-DOWN
-// threshold and this is how far down it has to go. What the threshold means exactly — worn at
-// it, not one footfall before — is G11a-W5's row, offline and on real walking.
+// A two-day town walks 80 tiles and retraces none, so any threshold above one is unreachable
+// inside the window — this is how far down the dial has to go.
 const WEAR_THRESHOLD = Number(process.env.G11_WEAR ?? 1)
 // STOP-and-report tripwire, not a cap (controller: no per-task cap on this batch).
 const TRIPWIRE_USD_PER_MIND_SIM_HOUR = 20
@@ -345,9 +343,7 @@ async function main(): Promise<void> {
     dryRun: DRY_RUN,
   }
 
-  // A resume puts the last checkpoint's snapshot back where the live database lives and reads
-  // the run's memory out of it; a fresh run wipes the database and builds from genesis. The
-  // checkpoint's fingerprint has to match this run's or the resume is refused: continuing a
+  // The checkpoint's fingerprint has to match this run's or the resume is refused: continuing a
   // different gate's evidence is the one way a checkpoint could launder a failure into a pass.
   if (RESUME) {
     if (!existsSync(CHECKPOINT_PATH)) {
@@ -486,10 +482,8 @@ async function main(): Promise<void> {
   const runtimes = new Map<string, AgentRuntime>()
   let seam: { adjudicate: Adjudicator; codify: Codifier } | null = null
 
-  // A resumed mind comes back with the clock, the half-run plan and the counts it had. A fresh
-  // clock would make it think the instant the run woke up, drop what it was doing, and start
-  // counting turns at zero — and criterion 8 gates on `reflectionsStarted` matching the
-  // resolved half, which is counted out of the database and does NOT restart.
+  // A resumed mind keeps its clock, half-run plan and counts: a fresh clock would restart turn
+  // counting at zero, and criterion 8 gates on `reflectionsStarted` matching the resolved half.
   const restoring = new Map(
     (saved?.sidecar.minds ?? []).map((m) => [m.agentId, m.snapshot] as const))
 
@@ -1020,10 +1014,8 @@ async function main(): Promise<void> {
     return { acts, eaten }
   })()
 
-  // --- the response to the sick founder ---
-  // A visible response is a hand, a thing put into her hands, or her name in somebody's
-  // mouth (plan §18: tend, herb, or witnessed avoidance — recovery and death both pass,
-  // silence does not). The window is the stretch she was actually ill for.
+  // A visible response is a hand, a thing put into her hands, or her name in somebody's mouth:
+  // recovery and death both pass, silence does not. The window is the stretch she was ill for.
   const illFrom = 0
   const illTo = allEvents.find((e) => e.type === 'affliction_recovered' && payloadOf(e).agentId === SICK_ONE)?.tick
     ?? allEvents.find((e) => e.type === 'agent_died' && payloadOf(e).agentId === SICK_ONE)?.tick

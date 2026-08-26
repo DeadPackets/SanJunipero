@@ -1,7 +1,6 @@
 // CLI: ingest the approved production art into a forge codex DB (idempotent).
 // Usage: pnpm --filter @sj/gateway ingest:art [-- --db data/dev-world.db]
-// Running against a LIVE dev world hot-swaps the art into connected viewers
-// (the gateway pump pushes new codex records; no reload needed).
+// Against a LIVE dev world this hot-swaps the art into connected viewers.
 import { openForgeDb } from '@sj/forge'
 import { DEV_DB_PATH } from '../src/devWorld.js'
 import { ingestProductionArt } from '../src/ingestArt.js'

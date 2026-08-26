@@ -102,10 +102,8 @@ async function main(): Promise<void> {
       try { r = await baseJudge({ ...a, sprite: selfTile3x3(a.sprite) }) }
       catch { r = await baseJudge({ ...a, sprite: selfTile3x3(a.sprite) }) }
       eyeTiling.push(r.verdict.criteria.tiling.score)
-      // RULING (corrected after the water:0 finding): a measurement may VETO, never RESCUE.
-      // An objective failure is decisive; an objective pass is only a floor the eye still has
-      // to clear. The first version floored the eye's tiling score whenever the seam measured
-      // clean — and a DRAWN FRAME wraps perfectly, so it sailed through with a purple grid.
+      // A measurement may VETO, never RESCUE: an objective pass is only a floor the eye still has
+      // to clear. A DRAWN FRAME wraps perfectly, so a clean seam once sailed a purple grid through.
       const attempt = a.attempt ?? 1
       if (broke === undefined || broke === null) return r
       const criteria = { ...r.verdict.criteria, tiling: { pass: false, score: 0, evidence: broke } }

@@ -349,10 +349,8 @@ async function runCharacter(m: CastMember): Promise<void> {
       refuseFailing(`${m.id} ${f}/${p}`, cands.map((c) => ({ key: c.key, failures: c.failures })))
       chosen[f][p] = best
     }
-    // ★ THE STRIDE TRIO IS BINDING. It used to `push` a FLAGGED line and go on — a gate that
-    // computes a verdict beside a caller that discards it, which is what the whole of this
-    // block's ruling is about. There is no candidate to re-roll here: the trio is a property
-    // of three frames already chosen, so the failure is the character's, loudly.
+    // The stride trio is binding, and there is no candidate to re-roll: the trio is a property of
+    // three frames already chosen, so the failure is the character's.
     const stride = strideGateV4(f, {
       'idle': masterGate[f],
       'contact-a': chosen[f]['contact-a'].gate,

@@ -114,10 +114,8 @@ function portraitPrompt(desc: string, expressionClause: string): string {
     `NO text, NO words, NO labels anywhere.`
 }
 
-// Adaptive-tolerance keying (ported from gen-cast-v4 keyBg): nadia's portrait raws
-// drifted pinker than #FF00FF and dodged the B3 tolerance-72 corner check, shipping
-// magenta squares. Sweep 72→110; a keyed result counts only if ≥10% of the frame
-// cleared. White-background raws pass through untouched (B3 behavior).
+// Adaptive-tolerance keying: nadia's raws drifted pinker than #FF00FF and dodged a fixed
+// tolerance-72 check, shipping magenta squares. Sweep 72->110; a keyed result needs >=10% cleared.
 function keyIfMagenta(img: RawImage): RawImage {
   for (const tolerance of [72, 110]) {
     const corners = [0, (img.width - 1) * 4, (img.height - 1) * img.width * 4, (img.width * img.height - 1) * 4]

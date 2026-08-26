@@ -108,10 +108,8 @@ function buildWorld(store: EventStore): { state: WorldState; doors: Array<{ x: n
       dropped.add(String(p['id']))
       continue
     }
-    // Anything that names a building that is not there: the completion, the walls genesis
-    // stands three quarters up, and the founder kit that would have been spawned inside it.
-    // `structure_progressed` and the kits did not exist here when this probe last ran, and an
-    // item carries its own `id` — so the location has to be asked FIRST or the kit slips past.
+    // Anything naming a building that is not there. An item carries its own `id`, so the location
+    // has to be asked FIRST or the founder kit spawned inside the walls slips past.
     const loc = p['loc'] as { t?: string; id?: string } | undefined
     const names = loc?.t === 'structure' ? loc.id : (p['structureId'] ?? p['id'])
     if (e.type !== 'structure_planned' && typeof names === 'string' && dropped.has(names)) continue

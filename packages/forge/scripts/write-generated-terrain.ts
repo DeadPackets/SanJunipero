@@ -75,10 +75,8 @@ for (const [assetId, raw] of [...book]) {
     `ring=${border.ringDelta.toFixed(1)} wrap=${bar.wrapH.toFixed(1)}/${bar.wrapV.toFixed(1)}` +
     `${passes > 0 ? ` (deframed x${passes})` : ''}${bar.ok ? '' : '  SEAM'}${border.framed ? '  STILL FRAMED' : ''}`)
 }
-// The shipped state describes itself: what each material measured and how hard it had to be
-// cropped to lose its frame. A deframed material is ALLOWED a looser wrap, because the crop
-// that removed the frame is precisely what damaged the wrap — and a frame is the worse
-// artifact of the two. The test reads this rather than carrying a list of exceptions.
+// A deframed material is ALLOWED a looser wrap: the crop that removed the frame is what damaged
+// the wrap, and a frame is the worse artifact. The test reads this instead of a list of exceptions.
 writeFileSync(join(MATERIALS_DIR, 'provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`)
 console.log(`shipped ${book.size} materials into ${MATERIALS_DIR}`)
 

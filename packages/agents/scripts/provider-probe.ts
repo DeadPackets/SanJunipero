@@ -29,10 +29,8 @@ const CANDIDATES: Candidate[] = [
   { name: 'unpinned', order: PROVIDER_ORDER, hardAllowList: false },
 ]
 
-// Three calls is the gate's bar, and three calls is also a coin flip on an optional field a
-// mind may legitimately not use: the first run of this probe passed three of four candidates
-// and the second passed none, on identical code. ROUNDS repeats the whole 3-call bar, so the
-// pin rests on the aggregate and the report can say how often the bar itself swings.
+// Three calls is the gate's bar and also a coin flip on an optional field: one run passed three
+// of four candidates and the next passed none, on identical code. ROUNDS repeats the whole bar.
 const ROUNDS = Number(process.env.PROBE_ROUNDS ?? 1)
 
 type Row = {
@@ -54,10 +52,8 @@ type Row = {
   answers: PreflightAnswer[]
 }
 
-// OpenRouter publishes per-provider pricing for a model id. Our own cost model prices the
-// pinned model, not the back end that served it, so the booked figure cannot separate two
-// providers of the same model — this can. Free, unauthenticated, and reported beside the
-// measured spend rather than instead of it.
+// Our own cost model prices the pinned model, not the back end that served it, so the booked
+// figure cannot separate two providers of one model — OpenRouter's per-provider pricing can.
 async function publishedPrices(): Promise<Map<string, { prompt: number; completion: number }>> {
   const out = new Map<string, { prompt: number; completion: number }>()
   try {

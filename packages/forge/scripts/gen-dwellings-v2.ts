@@ -88,10 +88,8 @@ const PALETTE_WORDS = [
   'Flat blocks of these colours with hard pixel edges, no gradients, no anti-aliasing.',
 ].join(' ')
 
-// ★ THE CRAFT CLAUSE THAT MADE IT WORSE, kept as a warning. Naming the outline, the flatness
-// and the chunkiness in words came back MUTED and lower-contrast than the same prompt without
-// it — the model spent its budget on "hand-made" and lost the colour. The craft comes from the
-// post chain (2048 -> whole-number divide -> median block sample -> quantize), not from asking.
+// Kept as a warning: naming the outline and the flatness in words came back MUTED and lower-
+// contrast. The craft comes from the post chain, not from asking for it.
 
 // ── the frontage clauses, one per facing ────────────────────────────────────────────────────
 // A 2:1 dimetric sprite shows exactly two walls: +y runs down-left, +x down-right. Turning the
@@ -332,10 +330,8 @@ mkdirSync(`${S}/reports`, { recursive: true })
 writeFileSync(`${S}/reports/dwellings-v2.md`, md)
 console.log(`\n${md}`)
 
-// ★ THE VERDICTS ARE BINDING, AFTER THE REPORT IS ON DISK — the report is what tells an
-// operator whether the model or the threshold is wrong. `classDensityGate` only ever went into
-// that markdown; it can only judge what this run produced, so the whole committed class is
-// judged by `artCoverage.test.ts`.
+// The report is written FIRST and then the run fails: it is what tells an operator whether the
+// model or the threshold is wrong. `classDensityGate` is a class property, judged by artCoverage.
 const stopped = [
   ...(refusedCells.length === 0 ? [] : [`${refusedCells.length} cell(s) shipped nothing: ${refusedCells.join(', ')}`]),
   ...cls.failures,
