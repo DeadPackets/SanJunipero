@@ -105,8 +105,7 @@ async function main(): Promise<void> {
       extra = ''
     let chosen: RawImage | null = null,
       icon: RawImage | null = null
-    // Written from inside `regenerate`; a boxed field survives the narrowing a closure-assigned
-    // `let` loses.
+    // Boxed: a closure-assigned `let` narrows to null, and no-unnecessary-condition calls the read dead.
     const chosenRaw: { raw: RawImage | null } = { raw: null }
     const spriteVerdicts: VisionVerdict[] = [],
       iconVerdicts: VisionVerdict[] = []
