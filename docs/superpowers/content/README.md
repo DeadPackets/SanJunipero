@@ -111,7 +111,7 @@ is self-contained.
 
 ## How I checked it, rather than asserting it
 
-A script at `.scratch/tree-check.mjs` parses the tree and proves the structural claims:
+A throwaway parse of the tree produced the structural claims below:
 
 ```
 nodes: 103   handwork=8 arrangement=26 works=35 machinery=22 industry=12
