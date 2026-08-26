@@ -29,14 +29,16 @@ internet, see [deploy/README.md](deploy/README.md).
 | | Command | Port | Serves |
 |---|---|---|---|
 | Streamed town | `pnpm stream` | 8080 | The built viewer from `packages/web/dist`. |
-| Frontend dev loop | `pnpm --filter @sj/gateway dev:world` + `pnpm --filter @sj/web dev` | 8787 | Vite HMR, proxied to the gateway. |
+| Frontend dev loop | `pnpm --filter @sj/gateway dev:world` + `pnpm --filter @sj/web dev` | 5173 | Vite HMR; `/ws`, `/api` and `/assets` proxy to the gateway on 8787. |
 
 Both boot the same world through `startDevWorld`; they differ only in who serves the client and in
 a few defaults below.
 
 ## Environment
 
-Both entrypoints, unless the table says otherwise. Nothing here needs to be set for a default run.
+Read by `pnpm stream` and `dev:world` alike, unless the table says otherwise. Nothing here needs to be
+set for a default run. Under Docker only the variables `compose.yaml` names in its `environment:`
+block reach the container.
 
 | Variable | Default | Effect |
 |---|---|---|
@@ -45,15 +47,15 @@ Both entrypoints, unless the table says otherwise. Nothing here needs to be set 
 | `SJ_MAP` | `showcase` | `scripted` asks for the frozen G6 test fixture instead of the product town. |
 | `SJ_INTERIORS` | off on `pnpm stream`, on in `dev:world` | Let people go indoors and sleep. |
 | `SJ_FRESH` | off | `1` throws the town on disk away and starts a new day 0. Never leave it set. |
-| `SJ_LAMPS` | `8` | How many street lamps the lamplighter raises. `0` leaves the streets dark. |
+| `SJ_LAMPS` | `8` | How many street lamps the lamplighter raises. `0` leaves the streets dark. `pnpm stream` only; `dev:world` raises none. |
 | `SJ_LIVE` | off | **`1` puts LLM minds behind the bodies and bills a real card, continuously.** Needs `OPENROUTER_API_KEY`. `pnpm stream` only. |
 | `SJ_ARBITER` | on | `0` turns the god layer off inside a live run. `pnpm stream` only. |
-| `SJ_MINDS_DIR` | `data/minds` | Where per-mind memory lives, one sqlite file each. `pnpm stream` only. |
-| `SJ_MODELS_DIR` | `data/models` | Where the memory embedder's local model is cached. `pnpm stream` only. |
+| `SJ_MINDS_DIR` | `data/minds` under `packages/gateway` | Where per-mind memory lives, one sqlite file each. `pnpm stream` only. |
+| `SJ_MODELS_DIR` | `data/models` at the repo root | Where the memory embedder's local model is cached. Outside the container volume, unlike `SJ_MINDS_DIR`. `pnpm stream` only. |
 | `SJ_BUILDERS` | on | `0` stops the founders raising houses. `dev:world` only. |
 | `SJ_BRIDGE` | on | `0` leaves the river uncrossed. `dev:world` only. |
 | `SJ_JOINT` | off | `1` lets a mason lend a hand at a neighbour's walls. `dev:world` only. |
-| `DEV_FAST_FORWARD` | `0` | Step the world synchronously to a tick before serving it. `dev:world` only. |
+| `DEV_FAST_FORWARD` | `0` | Step the world synchronously to that tick before the real-time cadence starts. Screenshot and QA convenience — it fast-forwards a resumed town too. |
 
 Deployment adds `SJ_SITE_ADDRESS` (the Caddy hostname) and the `LITESTREAM_*` backup credentials —
 both documented in [deploy/.env.example](deploy/.env.example).
