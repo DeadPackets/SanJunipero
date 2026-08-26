@@ -511,9 +511,9 @@ export class AgentRuntime {
       importance: 3,
       tags: {
         people: packet.visible.agents.map((a) => a.name),
-        place: nearestStructureKind(packet),
+        place: cues.place,
         objects: [],
-        topics: keywords(packet.heard.map((h) => h.text).join(' ')),
+        topics: cues.topics,
       },
     })
 
