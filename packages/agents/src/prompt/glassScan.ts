@@ -100,6 +100,35 @@ export function scanPromptForGlassLeak(prompt: string): string[] {
   return scan(prompt, ALL_PATTERNS)
 }
 
+// ★ THE THIRD ONE-WAY GLASS: AN ARBITER RULING IS NOT A PERSON SPEAKING.
+//
+// `MID_RUN_ENFORCED` above spares `market`, `council`, `festival`, `faith` and `custom`
+// deliberately, because a live town must not die over a word one of its PEOPLE said. A ruling
+// is the other thing entirely: it is our machinery, in the voice of something that knows the
+// rules, and `refusalMemoryText` writes an `impossible.reason` verbatim into a mind's memory
+// for the next prompt to read back. There is no person to protect here, so the full roster
+// applies — a refusal that reaches for our word for the thing the town is being watched to
+// invent is a hint, and it invalidates the measurement it contaminates.
+//
+// The second half is the directive. A refusal answers what was asked; one that also says what
+// to do NEXT has handed over a path the mind did not reach on its own. `CRAFT_HINT` is the one
+// sanctioned door, and it is authored, rendered at prose time, and never stored in a ruling.
+//
+// ★ DELIBERATELY NOT BANNED: `build`, `enter`, `craft` and the rest of `CAPABILITIES`. Block 1
+// teaches every one of them to every mind BY NAME, so a refusal using one reveals nothing —
+// and banning them would leave the arbiter no vocabulary to refuse in. The leak is the
+// directive around the verb, never the verb.
+const RULING_DIRECTIVE =
+  /\byou (should|must|ought to|need to|could try|may want|will need)\b|\bgo (inside|and)\b|\binstead,? (you|try)\b/i
+
+/** Every ops word and every directive in text a mind will be handed. Empty is the only answer. */
+export function scanRulingForGlassLeak(text: string): string[] {
+  const out = scan(text, ALL_PATTERNS)
+  const directive = RULING_DIRECTIVE.exec(text)
+  if (directive !== null) out.push(directive[0].toLowerCase())
+  return out
+}
+
 const LAYOUT_PATTERNS = patternsFor(TOWN_LAYOUT_VOCABULARY)
 
 /** Every layout word an authored agent-visible surface uses. Empty is the only answer. */

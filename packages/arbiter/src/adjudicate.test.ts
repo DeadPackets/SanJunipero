@@ -225,6 +225,36 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     expect(row).not.toBeUndefined()
   })
 
+  // ★ THE ONE-WAY GLASS OVER A REFUSAL. `refusalMemoryText` writes this string verbatim into
+  // the mind's memory and the next prompt reads it back, so a ruling that reaches for our
+  // vocabulary is a hint delivered by the machinery itself. `FORBIDDEN_FRAMING` never covered
+  // it: it names what is BEHIND the mind, and none of the five construct words is in it.
+  it('★ swaps a refusal that names what the town is watched to invent', async () => {
+    for (const leak of [
+      'the market has nothing to trade for this',
+      'no council has ruled on such a thing',
+      'this is not the custom here',
+      'you should ask someone who knows the craft',
+    ]) {
+      const llm = new ScriptedLlm(() => ({ kind: 'impossible', reason: leak, class: 'physically_impossible' }))
+      const { arbiter } = await makeRig(llm)
+      const verdict = await arbiter.adjudicate(`I try ${leak}`, ctx)
+      // The verdict survives; only the words are replaced. A retry could have ended at
+      // FALLBACK_IMPOSSIBLE and thrown away a true refusal along with its bad sentence.
+      expect(verdict.kind, leak).toBe('impossible')
+      expect(verdict.kind === 'impossible' ? verdict.reason : '', leak).toBe(
+        'nothing in the town lends itself to this')
+    }
+  })
+
+  it('★ and it is not vacuous: an honest refusal reaches the mind in its own words', async () => {
+    const honest = 'the river runs too fast here to stand in'
+    const llm = new ScriptedLlm(() => ({ kind: 'impossible', reason: honest, class: 'physically_impossible' }))
+    const { arbiter } = await makeRig(llm)
+    const verdict = await arbiter.adjudicate('I wade the rapids', ctx)
+    expect(verdict.kind === 'impossible' ? verdict.reason : '').toBe(honest)
+  })
+
   it('stage-2 short-circuit resolves an active codified recipe to map with zero LLM calls', async () => {
     const llm = new ScriptedLlm(() => boilSaltVerdict)
     const { db, arbiter, embedder } = await makeRig(llm, new LexicalEmbedder())

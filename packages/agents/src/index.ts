@@ -5,6 +5,7 @@ export {
   CONSTRUCT_VOCABULARY,
   scanForLayoutLeak,
   scanPromptForGlassLeak,
+  scanRulingForGlassLeak,
   TOWN_LAYOUT_VOCABULARY,
   UNNAMED_CONSTRUCT_COPY,
   type NameSource,

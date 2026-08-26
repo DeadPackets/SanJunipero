@@ -3,7 +3,7 @@ import { MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
 import { assemblePrompt } from './assemble.js'
 import {
   assertQuotedName, CONSTRUCT_VOCABULARY, MID_RUN_ENFORCED, scanForLayoutLeak,
-  scanPromptForGlassLeak, TOWN_LAYOUT_VOCABULARY, UNNAMED_CONSTRUCT_COPY,
+  scanPromptForGlassLeak, scanRulingForGlassLeak, TOWN_LAYOUT_VOCABULARY, UNNAMED_CONSTRUCT_COPY,
 } from './glassScan.js'
 import { makeablesLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
@@ -135,6 +135,76 @@ describe('★ an ordinary English word must never kill a mind\'s day', () => {
       expect(scanPromptForGlassLeak(`the ${term} row`), term).toContain(term)
     }
     expect(CONSTRUCT_VOCABULARY.length).toBe(Object.keys(ordinaryPhrases).length + MID_RUN_ENFORCED.length)
+  })
+})
+
+describe('★ a ruling is our machinery writing into a mind, not a person speaking', () => {
+  // `refusalMemoryText` writes an arbiter's `impossible.reason` verbatim into a mind's memory,
+  // and the next prompt reads it back. It is the one mind-facing string in the system authored
+  // in the voice of something that knows the rules, which is exactly where our vocabulary
+  // leaks. Mid-run enforcement spares the five ambiguous words to keep a live town from dying
+  // over something one of its PEOPLE said; there is no person to protect in a ruling.
+  it('catches all five words the town is being watched to reach on its own', () => {
+    for (const word of ['festival', 'faith', 'council', 'market', 'custom']) {
+      expect(scanRulingForGlassLeak(`the ${word} has no place for this`), word).toContain(word)
+    }
+  })
+
+  it('catches our jargon and an ops key, exactly as the authored scan does', () => {
+    expect(scanRulingForGlassLeak('that construct is a milestone')).toEqual(
+      expect.arrayContaining(['construct', 'milestone']))
+    expect(scanRulingForGlassLeak('first_bridge was already recorded')).toContain('first_bridge')
+  })
+
+  it('catches a directive — a refusal that hands over the next step', () => {
+    // A refusal answers what was asked. One that also says what to do next has given the mind
+    // a path it did not reach on its own. `CRAFT_HINT` is the single sanctioned door and it is
+    // authored, rendered at prose time, and never written back into a stored ruling.
+    for (const line of [
+      'you should ask someone who knows the craft',
+      'you must gather stone before this can begin',
+      'you ought to wait for the water to fall',
+      'you need to find a sharper edge',
+      'nothing comes of it; instead, try the shallows',
+      'there is no way through here — go inside and wait',
+    ]) {
+      expect(scanRulingForGlassLeak(line), line).not.toEqual([])
+    }
+  })
+
+  it('★ and it is not vacuous: an honest refusal passes untouched', () => {
+    // The four reasons the arbiter can actually return today. If the guard reddens any of
+    // these it is banning the arbiter from refusing at all, which is worse than the leak.
+    for (const reason of [
+      'nothing in the town lends itself to this',
+      'no clear way to do this presents itself',
+      'this would need a craft the town has not yet reached',
+      'the river runs too fast here to stand in',
+    ]) {
+      expect(scanRulingForGlassLeak(reason), reason).toEqual([])
+    }
+  })
+
+  it('★ and it does not ban a verb the mind was already taught by name', () => {
+    // `CAPABILITIES` teaches `build`, `enter` and `craft` to every mind in block 1, by name.
+    // A refusal using one reveals nothing a mind does not already hold, and forbidding them
+    // would leave the arbiter no vocabulary to answer in. The DIRECTIVE is the leak, not the
+    // verb: the first line here stays clean and the second does not.
+    expect(scanRulingForGlassLeak('there is no ground here to build on')).toEqual([])
+    expect(scanRulingForGlassLeak('you should build it by the river')).not.toEqual([])
+    for (const verb of ['build', 'enter', 'craft', 'stoke', 'inscribe']) {
+      expect(CAPABILITIES, verb).toContain(`${verb}: name it ${verb}`)
+    }
+  })
+
+  it('★ the ruling scan is strictly stronger than the authored-surface scan', () => {
+    // Stated as a property so a word added to CONSTRUCT_VOCABULARY is covered the day it
+    // lands, rather than the day somebody remembers to extend this file.
+    for (const term of CONSTRUCT_VOCABULARY) {
+      const text = `the ${term} row`
+      expect(scanRulingForGlassLeak(text), term).toEqual(
+        expect.arrayContaining(scanPromptForGlassLeak(text)))
+    }
   })
 })
 

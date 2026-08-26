@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import type { LlmClient } from '@sj/agents'
+import { scanRulingForGlassLeak, type LlmClient } from '@sj/agents'
 import { registerVerb, VERBS } from '@sj/engine'
 import type { DiscoveryCredit, DiscoveryKind } from '@sj/shared'
 import { CANON } from './canon.js'
@@ -50,8 +50,20 @@ function framingTainted(v: Verdict): boolean {
 
 // The other half of the same law. `framingTainted` only ever sees an `attempt`, so the coined
 // word — which becomes a permanent verb AND an agent-visible chronicle line — went unchecked.
+// The glass scan is the wider half: `FORBIDDEN_FRAMING` names the machinery BEHIND the mind
+// and not one of `festival`, `faith`, `council`, `market` or `custom` is in it, so a coined
+// word could have minted the town a permanent verb for the concept it is being watched to
+// reach on its own.
 export function wordTainted(word: string): boolean {
-  return FORBIDDEN_FRAMING.test(word)
+  return FORBIDDEN_FRAMING.test(word) || scanRulingForGlassLeak(word).length > 0
+}
+
+// A refusal is the one arbiter output written verbatim into a mind's memory
+// (`refusalMemoryText`), so it is scanned on the wider roster and for directives too. Replaced
+// rather than retried: a retry can end at `FALLBACK_IMPOSSIBLE` and lose the true reason,
+// where a swap keeps the verdict and only loses the words.
+function reasonTainted(reason: string): boolean {
+  return FORBIDDEN_FRAMING.test(reason) || scanRulingForGlassLeak(reason).length > 0
 }
 
 export type AgentCtx = {
@@ -257,7 +269,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         value = r.value
       }
       if (value === null) return FALLBACK_IMPOSSIBLE
-      if (value.kind === 'impossible' && FORBIDDEN_FRAMING.test(value.reason)) {
+      if (value.kind === 'impossible' && reasonTainted(value.reason)) {
         value = { ...value, reason: CLEAN_IMPOSSIBLE_REASON }
       }
 
