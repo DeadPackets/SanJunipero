@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { FakeEmbedder, insertAlert, openAgentDb, type LlmClient, type MindSpec } from '@sj/agents'
+import { unregisterVerb, VERBS } from '@sj/engine'
 import { startDevWorld, type DevWorld, type LiveCast } from './devWorld.js'
 import { foundersFor, townStructuresFor } from './founders.js'
 import {
@@ -83,6 +84,44 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
 // what makes the canned-thought row below capable of failing.
 const WELLSIDE = foundersFor(townStructuresFor('showcase')).find((f) => f.id === 'amara')!.patrol[1]
 
+// ★ THE ACT THE ENGINE HAS NO VERB FOR. `VERBS` has no `smoke_fish`, so the world refuses this
+// with `unknown verb:` and the runtime re-offers it to the arbiter as freeform words. That
+// refusal is the doorway to spec §4 and there is no other way in.
+const INVENTED_VERB = 'smoke_fish'
+const INVENTING_TURN = {
+  thought: THOUGHT, importance: 7,
+  action: { verb: INVENTED_VERB, params: { over: 'green wood' } },
+}
+
+// What the arbiter answers with. `canon: ['food_preserving']` is an UNEARNED rung whose
+// prerequisite (`cooking`) the genesis codex knows, so `withinAdjacency` lets it through — the
+// one step out the canon is built to allow. `requires`/`costs` are empty on purpose: this row
+// is about the seam, and a recipe that needed a fish in hand would be refused for the
+// inventory rather than exercised for the wiring.
+const SMOKE_RECIPE = {
+  id: 'recipe:smoke_fish',
+  name: 'Smoke Fish Over Green Wood',
+  durationTicks: 2,
+  costs: [],
+  requires: [],
+  outcomeTable: [
+    {
+      weight: 1, success: true, label: 'The fish darkens and firms in the smoke.',
+      effects: [{ op: 'spawn_item', kind: 'smoked_fish', qty: 1, to: 'agent' }],
+    },
+  ],
+  rngStream: 'recipe:smoke_fish',
+  canon: ['food_preserving'],
+}
+const SMOKE_VERDICT = {
+  kind: 'attempt', recipe: SMOKE_RECIPE,
+  summary: 'Hang the fish in the smoke of green wood so it keeps past the week.',
+}
+const REFUSING_VERDICT = {
+  kind: 'impossible', class: 'insufficient_skill',
+  reason: 'the smoke will not hold without a knack for it nobody here has shown',
+}
+
 const SPEAKING_TURN = {
   thought: THOUGHT, importance: 5, speech: SPOKEN,
   action: { verb: 'walk', params: { x: WELLSIDE.x, y: WELLSIDE.y } },
@@ -117,6 +156,10 @@ async function liveWorld(opts: {
   onSpendStop?: (spent: number, cap: number) => void
   rateWindowRealMinutes?: number
   fresh?: boolean
+  /** What the god answers. Absent, the arbiter caller gets the same canned client as a mind,
+   *  which fits no verdict schema and therefore THROWS — which is the failure row below. */
+  verdict?: unknown
+  useArbiter?: boolean
 }): Promise<{ world: DevWorld; cast: LiveCast; opsDb: ReturnType<typeof openAgentDb> }> {
   const agentDbDir = join(opts.dir, 'minds')
   let seen: ReturnType<typeof openAgentDb> | null = null
@@ -139,9 +182,15 @@ async function liveWorld(opts: {
         ...(opts.rateWindowRealMinutes === undefined
           ? {} : { rateWindowRealMinutes: opts.rateWindowRealMinutes }),
         log: () => {},
-        makeClient: (opsDb, _caller, agentId) => {
+        ...(opts.useArbiter === undefined ? {} : { useArbiter: opts.useArbiter }),
+        makeClient: (opsDb, caller, agentId) => {
           seen = opsDb
-          return fakeLlm(opsDb, agentId ?? null, opts.turn ?? SPEAKING_TURN)
+          // The god gets its own canned answer. Same ledger, deliberately — an arbiter that
+          // billed anywhere else would spend outside the $5 stop, so the rig must not let it.
+          const canned = caller === 'arbiter' && opts.verdict !== undefined
+            ? opts.verdict
+            : opts.turn ?? SPEAKING_TURN
+          return fakeLlm(opsDb, agentId ?? null, canned)
         },
       })
       return cast
@@ -523,6 +572,147 @@ describe('★ closing the town without closing a database under a mind', () => {
     // Bounded: it must not sit past its own deadline waiting out one more poll.
     expect(Date.now() - at).toBeLessThan(1_000)
   })
+})
+
+/**
+ * ★ SPEC §4 — THE GOD LAYER, IN THE TOWN A PERSON CAN WATCH.
+ *
+ * Every row here asserts the ROUND TRIP and not the call. "The arbiter was invoked" is the
+ * vacuous version of this test: it would pass on a wire that dropped the verdict on the floor.
+ * What has to be true is that a mind's novel intent reached the god AND came back as something
+ * the world or the mind can perceive — an event in the log, a verb the engine did not have at
+ * boot, a line in the mind's own memory.
+ */
+describe('★ a mind attempts what the engine has no verb for, and a god rules on it', () => {
+  const rulebookOf = (dir: string): Array<{ recipe_id: string; verb: string }> => {
+    const db = new Database(join(dir, 'minds', '_arbiter.db'), { readonly: true, fileMustExist: true })
+    try {
+      return db.prepare('SELECT recipe_id, verb FROM rulebook').all() as Array<{ recipe_id: string; verb: string }>
+    } finally { db.close() }
+  }
+  const memoriesOf = (dir: string, id: string): string[] => {
+    const db = new Database(join(dir, 'minds', `${id}.db`), { readonly: true, fileMustExist: true })
+    try {
+      return (db.prepare('SELECT text FROM memories WHERE agent_id = ?').all(id) as Array<{ text: string }>)
+        .map((r) => r.text)
+    } finally { db.close() }
+  }
+
+  it('★ THE ROUND TRIP: the invented act becomes physics the engine did not have at boot', async () => {
+    const dir = tmp()
+    const { world } = await liveWorld({ dir, turn: INVENTING_TURN, verdict: SMOKE_VERDICT })
+    await run(world, 8)
+
+    // 1. The engine did not know this verb when the world booted, and knows it now. Nothing
+    //    but a codification can have put it there.
+    expect(VERBS[SMOKE_RECIPE.id]).toBeDefined()
+
+    // 2. It is LAW, not a one-off: a durable rulebook row in the arbiter's own database.
+    expect(rulebookOf(dir).map((r) => r.recipe_id)).toContain(SMOKE_RECIPE.id)
+
+    // 3. The world was TOLD — `onCodified` -> `bridge.announce` -> the event log the gateway
+    //    serves and the chronicle renders. This is the half a viewer can actually see.
+    const discoveries = eventsOf(dir, 'discovery_made')
+    expect(discoveries.map((p) => p['name'])).toContain(SMOKE_RECIPE.name)
+    const mine = discoveries.find((p) => p['name'] === SMOKE_RECIPE.name)!
+    expect(mine['byId']).toBe('amara')
+    // Credited to the words the mind actually used, flattened by `flattenIntent`.
+    expect(String(mine['intent'])).toContain(INVENTED_VERB)
+
+    // 4. ★ AND THE BODY DID IT. The mind's own hands ran a verb that did not exist eight ticks
+    //    ago. Without this row the three above are satisfied by a god talking to itself.
+    expect(eventsOf(dir, 'action_started').some((p) => p['verb'] === SMOKE_RECIPE.id)).toBe(true)
+  }, 30_000)
+
+  it('★ a refusal comes back in words the MIND can read, and teaches it something', async () => {
+    const dir = tmp()
+    const { world } = await liveWorld({ dir, turn: INVENTING_TURN, verdict: REFUSING_VERDICT })
+    await run(world, 8)
+
+    // The other half of the round trip. An impossible verdict is not a dropped turn: it is
+    // written into the mind's memory, and the next prompt reads it back.
+    const said = memoriesOf(dir, 'amara')
+    expect(said.some((t) => t.startsWith('You realize you cannot:'))).toBe(true)
+    // `insufficient_skill` earns the one sanctioned door — a refusal must leave one open.
+    expect(said.some((t) => t.includes('perhaps someone nearby knows the craft'))).toBe(true)
+    // And nothing was codified: a refusal must not mint physics.
+    expect(rulebookOf(dir)).toHaveLength(0)
+  }, 30_000)
+
+  it('★ a god that THROWS does not eat the turn — the world answers instead', async () => {
+    const dir = tmp()
+    // No `verdict`, so the arbiter's client is handed the mind's canned turn, fits no verdict
+    // schema, and throws out of `adjudicate`. This is a provider 500 in miniature.
+    const { world, opsDb } = await liveWorld({ dir, turn: INVENTING_TURN })
+    await run(world, 8)
+
+    // The failure was recorded where an operator looks...
+    const alerts = opsDb.prepare("SELECT kind FROM alerts WHERE kind = 'adjudicate_failed'").all()
+    expect(alerts.length).toBeGreaterThan(0)
+    // ...and the intent still reached the world as `experiment`, whose own refusal is what the
+    // mind ends up holding. `experiment` never starts an activity — `validate()` always
+    // declines (engine `verbs.ts`) — so the perceivable outcome is a memory, not an event.
+    expect(memoriesOf(dir, 'amara').some((t) => t.includes('You lack the knowledge to attempt this')))
+      .toBe(true)
+    // A god that fell over must not have minted law on the way down.
+    expect(rulebookOf(dir)).toHaveLength(0)
+  }, 30_000)
+
+  it('★ THE TOWN DOES NOT FORGET ITS OWN LAWS ACROSS A RESTART', async () => {
+    // A rulebook is durable but the engine's `VERBS` registry is in-memory, so a restart is
+    // the moment a codified verb can silently stop existing while its ruling stays on disk —
+    // a town whose laws are written down and no longer enforced. `makeArbiter` re-registers
+    // every active row at construction; this is the row that proves it still does.
+    const dir = tmp()
+    const first = await liveWorld({ dir, turn: INVENTING_TURN, verdict: SMOKE_VERDICT })
+    await run(first.world, 8)
+    const tickWas = first.world.loop.tick
+    expect(rulebookOf(dir).map((r) => r.recipe_id)).toContain(SMOKE_RECIPE.id)
+    await worlds.splice(worlds.indexOf(first.world), 1)[0]!.stop()
+
+    // ★ THE MUTATION IS THE TEST. `VERBS` is module state and the first boot already put the
+    // verb there, so leaving it registered would let this pass on a purely in-memory arbiter.
+    // Tearing it out first is what makes the second boot have to earn it back off disk.
+    unregisterVerb(SMOKE_RECIPE.id)
+    expect(VERBS[SMOKE_RECIPE.id]).toBeUndefined()
+
+    const second = await liveWorld({ dir, turn: INVENTING_TURN, verdict: SMOKE_VERDICT })
+    expect(second.world.resumedAtTick).toBe(tickWas)
+
+    // Re-registered from the durable rulebook, before a single tick of the resumed town.
+    expect(VERBS[SMOKE_RECIPE.id]).toBeDefined()
+    // One law, not two: a resumed town must not re-mint what it already knows.
+    expect(rulebookOf(dir).filter((r) => r.recipe_id === SMOKE_RECIPE.id)).toHaveLength(1)
+
+    // And the codex was not re-seeded on top of itself — genesis is inserted once per TOWN.
+    const arb = new Database(join(dir, 'minds', '_arbiter.db'), { readonly: true, fileMustExist: true })
+    try {
+      const n = (arb.prepare("SELECT COUNT(*) AS n FROM codex WHERE id = 'cooking'").get() as { n: number }).n
+      expect(n).toBe(1)
+      // The ruling itself survived too, so a rephrasing still short-circuits for free.
+      expect((arb.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n)
+        .toBeGreaterThan(0)
+    } finally { arb.close() }
+  }, 45_000)
+
+  it('★ SJ_ARBITER=0 leaves no god and no database, and the turn still lands', async () => {
+    const dir = tmp()
+    const { world } = await liveWorld({
+      dir, turn: INVENTING_TURN, verdict: SMOKE_VERDICT, useArbiter: false,
+    })
+    await run(world, 8)
+
+    // Off means off: not a wired arbiter that declines, but no arbiter and no laws on disk.
+    expect(existsSync(join(dir, 'minds', '_arbiter.db'))).toBe(false)
+    expect(eventsOf(dir, 'discovery_made')).toHaveLength(0)
+
+    // ★ AND HERE IS WHAT THE TOWN IS LIKE WITHOUT A GOD, which is the argument for the default.
+    // With no adjudicator wired `#reroutesUnknownVerb` declines to re-route at all, so the
+    // mind is handed the ENGINE'S OWN ERROR STRING as a memory it will read back next turn.
+    // That is the state this lane replaced, recorded rather than described.
+    expect(memoriesOf(dir, 'amara').some((t) => t.includes(`unknown verb: ${INVENTED_VERB}`)))
+      .toBe(true)
+  }, 30_000)
 })
 
 describe('★ the default stays scripted and free', () => {
