@@ -33,11 +33,9 @@ const GEN_PX = 2048
 const S = '/private/tmp/claude-501/-Users-deadpackets-workspace-SanJunipero/461805e8-9eb9-4d32-b2ea-e2ef16ce8545/scratchpad'
 const OUT = `${S}/r3/dwellings`
 const ART = `${S}/fqc2/art-root/production`
-// The anchor carries the palette and the craft. It also carries the architecture the user
-// rejected, and on `farmhouse` it won: two rolls came back with an arched door, a green
-// shingle roof and half-timbering, against a prompt that banned all three by name. Same bleed
-// gen-cast-v4 built WALK_NO_STYLE_ANCHOR for. DWELL_REF swaps in an already-approved building
-// of this round instead — same palette, same craft, and no medieval architecture to copy.
+// The anchor carries the palette AND the architecture the user rejected, and on `farmhouse` the
+// architecture won against a prompt that banned it by name. DWELL_REF swaps in an approved
+// building of this round instead.
 const STYLE_ANCHOR = readFileSync(process.env.DWELL_REF ?? 'packages/forge/content/reference/style-anchor.png')
 
 // The anchor cottage is the craft reference and ALSO the architecture the user rejected —

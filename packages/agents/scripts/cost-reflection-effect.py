@@ -1,8 +1,6 @@
-# ★ THE ONE QUESTION TASK 3 CANNOT BE ANSWERED WITHOUT.
 # A cheaper reflection that stops updating who a person is has broken the thing that makes this
-# project interesting. Cost per call is easy; this reads the night's actual work product out of
-# each arm's own tables: personality versions written, facts kept, scenes and day nodes made,
-# ledgers rewritten, autobiography paragraphs appended.
+# project interesting, and cost per call cannot see that. Reads each arm's night's work product
+# out of its own tables: personality versions, facts kept, scenes, day nodes, ledgers, paragraphs.
 import sqlite3, sys, os
 
 D = 'packages/agents/data/ladder'

@@ -1,8 +1,5 @@
-// LIVE (Phase B2, controller ruling on BLOCKED-STRIPS) — cap $PROBE_CAP (default $0.30).
-// RUNG 1: wide-canvas sw strip probe. First request doubles as the size-support probe:
-// size 1536x512; on a size rejection, retry the request shape with aspect_ratio '3:1'.
-// If a wide request is accepted: one unguided + one guided candidate, slice, v7, gates.
-// Cache keys strip-sw-w0-c{0,1} in the shared gen-character-v3 candidate cache.
+// LIVE (Phase B2) — cap $PROBE_CAP (default $0.30). Wide-canvas sw strip probe; the first
+// request doubles as the size probe: 1536x512, retried as aspect_ratio '3:1' on a rejection.
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'
 import { makeVlmJudge, type JudgeFn } from '../src/judge.js'

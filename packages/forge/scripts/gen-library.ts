@@ -160,15 +160,8 @@ async function main(): Promise<void> {
 
     if (chosen) {
       icon ??= chosenRaw ? integralSpriteCell(chosenRaw, e.iconPx).cell : deriveIcon(chosen, e.iconPx)
-      // Mechanical criteria are COUNTED, never asked of the judge. A sprite that fails the
-      // pixel bar never ships, whatever the eye said about it.
-      //
-      // ★ THAT COMMENT WAS FALSE FOR AS LONG AS IT HAS BEEN HERE. The loop below set
-      // `status = 'blocked'` and the code under it wrote `sprite.png`, `icon.png`, a codex
-      // record and `report.json` anyway — a gate that computes a verdict beside a caller
-      // that discards it, with a comment on top claiming the opposite. A superseded script
-      // with a lie in it is worse than a superseded script, because the lie is what the next
-      // person reads. The code now does what the comment always said.
+      // Mechanical criteria are COUNTED, never asked of the judge: a sprite that fails the pixel
+      // bar never ships, whatever the eye said about it.
       const barFailures = (await Promise.all([
         pixelBarReport({ name: e.kind, img: chosen, raw: { w: GEN_SIZE, h: GEN_SIZE } }),
         pixelBarReport({ name: `${e.kind}#icon`, img: icon, raw: { w: GEN_SIZE, h: GEN_SIZE } }),

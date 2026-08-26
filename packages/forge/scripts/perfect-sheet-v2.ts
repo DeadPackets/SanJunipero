@@ -1,9 +1,5 @@
-// OFFLINE — zero API spend. PIPELINE V7 (v6 + outline blend repair): measured fractional
-// pitch, natural heights, ε-cluster sampling, census-aware magenta sweep. Per image:
-// chromaKey → erode(round(sheetPitch/2)) → refineLattice → resampleClusterLattice →
-// despeckle(logged) → fillPinholes → sweepMagentaCensus → repairOutlineBlends →
-// registration → anchor.
-// Drift field and sheet-wide merge DROPPED (reconErr regression / linkage chaining).
+// OFFLINE — zero API spend. Pipeline v7 (v6 + outline blend repair).
+// Drift field and sheet-wide merge are DROPPED: reconErr regression and linkage chaining.
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import sharp from 'sharp'
 import { decodePng, encodePng, type RawImage } from '../src/post/raw.js'

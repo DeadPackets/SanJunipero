@@ -1,11 +1,6 @@
-// LIVE (cast portrait run) — cap $PORTRAIT_CAST_CAP (default $3.55). The B3-calibrated
-// portrait recipe (gen-portraits.ts: 512 gen on magenta → v7 chain → 128×128 bust,
-// palette jaccard ≥0.75 + bbox ±12% vs neutral) run per cast member, with the
-// character's ADOPTED production master as the identity anchor instead of a concept.
-// Stage 1: 3 neutral candidates, judged — best score is a RUNNER PICK (ratification
-// pending, B1/B3 precedent). Stage 2: 6 expressions × 2 candidates (3rd funded only
-// when both fail consistency). CAST env filters ids; a character only starts when
-// ≥$START_HEADROOM remains so no set is left half-finished.
+// LIVE (cast portrait run) — cap $PORTRAIT_CAST_CAP (default $3.55). The gen-portraits recipe
+// per cast member, anchored on the character's ADOPTED production master instead of a concept.
+// A character only starts when ≥$START_HEADROOM remains, so no set is left half-finished.
 import { mkdirSync, writeFileSync, readFileSync, existsSync, renameSync } from 'node:fs'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'
 import { makeVlmJudge, type JudgeFn } from '../src/judge.js'

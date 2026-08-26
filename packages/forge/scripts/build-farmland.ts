@@ -27,11 +27,8 @@ console.log(`seam h=${s.horizontalDelta.toFixed(1)} v=${s.verticalDelta.toFixed(
 console.log(`veto: ${veto ?? 'none'}`)
 console.log(`palette: ${bar.join('; ') || 'clean'}`)
 
-// ★ THIS FILE HAD NO CONTROL FLOW IN IT AT ALL. `materialVeto` and `paletteGate` were printed
-// and the material written whatever they said — and unlike the other probes in this sweep it
-// writes COMMITTED content, `content/tilesets/materials/terrain_farmland_0.png`. The seam is
-// already consumed, by `terrainIngest.test.ts` over every shipped material; these two were not
-// consumed anywhere.
+// `materialVeto` and `paletteGate` are binding here because this writes COMMITTED content;
+// the seam gate is instead consumed by `terrainIngest.test.ts` over every shipped material.
 if (veto !== null || bar.length > 0) throw new Error(
   `the farmland material FAILS its own gates and was not written.\n    `
   + `${[...(veto === null ? [] : [`veto: ${veto}`]), ...bar].join('\n    ')}\n`

@@ -162,17 +162,9 @@ for (const item of items) {
     }
   }
 
-  // ★ THE RANK ORDERED FAILURES INSTEAD OF EXCLUDING THEM (user ruling; the shape and the
-  // reason are in src/gate.ts). A failed pixel bar used to cost 100 rank points and a judge
-  // rejection 10 — both a penalty, neither a disqualification — so the least-bad candidate of
-  // a bad batch went into `content/items` and into the codex as `ready`. Both verdicts are
-  // binding now; the rank still chooses among what is left.
-  //
-  // ★ INCLUDING THE JUDGE'S. It is the only gate in the package that can tell a pail from a
-  // market stall, it is paid for on every candidate, and it could never refuse one.
-  //
-  // A NULL verdict is "not judged", not "failed": under LIB_DRY=1 the judge is never called,
-  // and a cached raw would otherwise refuse itself.
+  // Both verdicts are binding, the judge's included — it is the only gate that can tell a pail
+  // from a market stall. The rank chooses among what is left.
+  // A NULL verdict is "not judged", not "failed": under LIB_DRY=1 the judge is never called.
   const judgeFails = (c: Cand): string[] => (c.verdict !== null && c.verdict.overall !== 'pass'
     ? [`judge: ${c.verdict.overall} — ${c.verdict.feedback}`] : [])
   const clean = cands.filter((c) => c.fails.length === 0 && judgeFails(c).length === 0)

@@ -91,23 +91,13 @@ const VIEW: Record<AuthoredFacing, string> = {
   se: 'front three-quarter view, facing bottom-right',
   ne: 'back three-quarter view seen from behind, facing top-right, back of the head visible, NO face visible',
 }
-// ★ THE REFERENCE IS ONE FIGURE, NOT THE MASTER SHEET. Round 3 pointed these calls at the
-// two-figure master and told the model in words which half to use ("the LEFT figure of the
-// last reference image"). Measured here on omar: three straight candidates came back as TWO
-// figures — the model copies the reference's LAYOUT as readily as its identity, and a word
-// does not outrank a picture. The master's own single-figure crop carries exactly the same
-// costume and pixel scale and has no second figure in it to copy.
+// The reference is ONE figure, not the master sheet: the model copies the reference's LAYOUT as
+// readily as its identity, and a word naming which half to use does not outrank a picture.
 const VIEW_REF = 'the reference image'
 type WalkPose = Exclude<StripPoseV4, 'idle'>
 const WALK_POSES: readonly WalkPose[] = ['contact-a', 'passing', 'contact-b']
-// ★ SEEN FROM BEHIND, "THE OTHER FOOT" IS NOT A DESCRIPTION OF A SHAPE. Every SE contact
-// frame in the committed cast has feet 1.36x-2.04x the idle's; the NE contacts the model
-// volunteered across two lanes measured 1.00, 1.00, 1.02 and 1.02, and one of them is in the
-// committed art. `POSE_V4['contact-b']` asked for "the OTHER foot planted forward this time",
-// which from a back view — where you cannot tell one foot from the other — the model renders
-// as a body standing still. The A/B distinction has to stay, because `strideGateV4` needs the
-// two frames to differ; what it needs BESIDE it is the stride stated as a geometry rather
-// than as an identity, so that it survives a view in which the feet are interchangeable.
+// From behind you cannot tell one foot from the other, so "the OTHER foot planted forward"
+// renders as a body standing still. The stride has to be stated as a geometry, not an identity.
 const STRIDE_CLAUSE =
   ' THE FEET ARE WIDE APART: the gap between the two feet is at least as wide as the '
   + 'shoulders, with clear background visible between the legs. This is the WIDEST frame of '
@@ -135,11 +125,8 @@ const NO_SCENERY =
   + 'NO text, NO words, NO labels, NO captions anywhere.'
 
 function masterPrompt(m: CastMember, proportionRef: boolean): string {
-  // ★ THE PROPORTION REFERENCE IS LOAD-BEARING, and it was measured here, not assumed. The
-  // first four founders were generated without it because the anchor was not in that run:
-  // every one of them came back at FIVE heads tall in a finer pixel, beside a three-heads
-  // anchor. Round 3 recorded the same drift on nadia and reached the same fix. Words alone
-  // ("about 3 heads tall") did not hold it — the picture does.
+  // The proportion reference is load-bearing: generated without it, every founder came back at
+  // FIVE heads tall beside a three-heads anchor. Words alone did not hold it; the picture does.
   const proportionClause = proportionRef
     ? 'The SECOND reference image shows ANOTHER villager of this same game in the exact required '
       + 'layout: LEFT figure is the front three-quarter view facing bottom-right, RIGHT figure is '
@@ -190,11 +177,8 @@ function sleepPrompt(m: CastMember): string {
 
 // ── the pipeline ─────────────────────────────────────────────────────────────────────────────
 
-// ★ A REFERENCE WITH A TRANSPARENT BACKGROUND ASKS FOR A BACKGROUND. The master crop is
-// chroma-keyed and trimmed, so attaching it bare shows the model a figure on nothing — and
-// several frames came back on white with a little grass diorama under the feet, which keyBg
-// then refused (<10% keyed). The magenta is part of what the reference has to teach, so the
-// figure goes back onto a magenta field before it is attached. Same figure, right background.
+// The master crop is chroma-keyed and trimmed, so attaching it bare shows the model a figure on
+// nothing and it invents a background. The figure goes back onto a magenta field first.
 const MAGENTA: readonly [number, number, number] = [255, 0, 255]
 function onMagenta(img: RawImage, pad = 0.18): RawImage {
   const m = Math.round(Math.max(img.width, img.height) * pad)
@@ -314,23 +298,16 @@ async function runCharacter(m: CastMember): Promise<void> {
     try { sliceStrip(keyed, 2); two = true } catch { /* one cluster — good */ }
     if (two) throw new Error('slices into 2 figure clusters — multi-figure frame')
     const hi = processHiResCell(keyed, TARGET_H)
-    // ★ AND ONE BODY, NOTHING ELSE. `sliceStrip` above catches a SECOND FIGURE, which is what
-    // it was written for; it does not catch the model captioning its own work. Amara's
-    // contact-b-ne shipped with TACTICAL GEAR set beside her in silver, and the caption sat
-    // inside the figure's own column, so the strip slicer saw one cluster. This is a hard
-    // reject like the two above it: the candidate is dropped and another is drawn.
+    // `sliceStrip` catches a second FIGURE but not the model captioning its own work — a caption
+    // inside the figure's own column reads as one cluster. Hard reject: another candidate is drawn.
     const sole = soleSilhouetteGate(hi)
     if (!sole.ok) throw new Error(sole.failures.join('; '))
     const b = opaqueBbox(hi)!
     const aspect = (b.x1 - b.x0 + 1) / (b.y1 - b.y0 + 1)
     if (aspect > 1.15) throw new Error(`aspect ${aspect.toFixed(2)} > 1.15 — multi-figure or lying`)
     const gate = gateView(hi)
-    // ★ AND A CONTACT FRAME HAS TO BE A CONTACT POSE. Four candidates across two lanes were
-    // refused BY EYE for being standing figures dropped into a walk loop, every one of them
-    // clean on every gate in the package; `strideGateV4` cannot see it because it measures
-    // frame-to-frame distance, not stance. A failure rather than a throw, so the refusal
-    // message carries the margin — the operator's question is whether the model can draw a
-    // stride from behind at all, and only the numbers answer it.
+    // `strideGateV4` measures frame-to-frame distance, not stance, so it cannot see a standing
+    // figure dropped into a walk loop. A failure rather than a throw, so the margin is reported.
     const stance = p === 'passing' ? []
       : stanceGate(f, idleHi[f], [{ label: p, img: hi }]).map((x) => ({ ...x, a: key }))
     return { key, hi, gate, failures: [...coherenceGateV4(key, masterGate[f], gate), ...stance] }

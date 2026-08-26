@@ -94,10 +94,8 @@ const PALETTE_WORDS = [
 // post chain (2048 -> whole-number divide -> median block sample -> quantize), not from asking.
 
 // ── the frontage clauses, one per facing ────────────────────────────────────────────────────
-//
-// A 2:1 dimetric sprite shows exactly two walls. The +y wall runs down-left from the top of the
-// sprite and the +x wall runs down-right. Turning the building ninety degrees swaps which of
-// those two the front is, and reverses the roof ridge with it.
+// A 2:1 dimetric sprite shows exactly two walls: +y runs down-left, +x down-right. Turning the
+// building ninety degrees swaps which is the front and reverses the roof ridge with it.
 const FACING_CLAUSE: Record<StructureFacing, string> = {
   sw: 'ORIENTATION: the FRONT of the building — its door, its main windows, its porch or step — '
     + 'is on the wall facing the viewer\'s LOWER-LEFT. The right-hand wall shows only its plain '
@@ -292,11 +290,8 @@ for (const s of SUBJECTS) {
       }
     }
 
-    // ★ AMONG THE CLEAN ONES ONLY (user ruling; the shape and the reason are in src/gate.ts).
-    // This wrote the ten committed dwelling cells, and the line below used to fall back to the
-    // DIRTY candidate set when nothing was clean — committing the least-corrected FAILURE.
-    // Choosing is not deciding: the ranker still takes the smallest source correction, from a
-    // pool that cannot contain a failure.
+    // Among the CLEAN candidates only (user ruling; the shape and reason are in src/gate.ts).
+    // Choosing is not deciding: the ranker picks from a pool that cannot contain a failure.
     const clean = cands.filter((c) => c.fails.length === 0)
     const win = clean
       .sort((a, b) => Math.abs(1 - b.plan.sourceScale) - Math.abs(1 - a.plan.sourceScale)).at(-1)

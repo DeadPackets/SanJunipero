@@ -213,14 +213,9 @@ function bestOf(cands: FrameCand[]): FrameCand | null {
   }, null)
 }
 
-// ── ★ SUPERSEDED BY gen-cast-v5.ts, AND STILL UNDER THE SAME RULING ────────────────────────
-//
-// `bestOf` above is the identical policy that put TACTICAL GEAR into `content/cast`: a gate
-// measures a candidate and the caller ships the least-bad FAILURE. This script is the previous
-// standard, its output directory has been wiped, and the style bible still names it — so it
-// stays reachable by anyone who types the wrong filename, and it obeys the ruling too. The
-// shape and the reason are in `src/gate.ts`; this renders a `GateFailure` with its margin,
-// because the margin is what tells an operator a threshold from a bad drawing.
+// Superseded by gen-cast-v5.ts and still under the same ruling: `bestOf` chooses, it does not
+// decide. This renders a `GateFailure` with its margin — the margin is what tells an operator
+// a threshold from a bad drawing.
 const said = (x: GateFailure): string =>
   `${x.gate}: ${x.a} vs ${x.b} — ${x.value.toFixed(4)} against ${x.limit.toFixed(4)} `
   + `(off by ${Math.abs(x.value - x.limit).toFixed(4)})`

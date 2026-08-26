@@ -1,8 +1,6 @@
-// Zero-spend master repair: horizontally mirror ONE half of a cached two-figure
-// master raw (legal for characters — v3 mirror standard; buildings never). Used when
-// a generated master's front figure faces bottom-LEFT (SW) instead of bottom-right:
-// flipping the left half in place fixes the facing without a paid regen.
-// Env: FLIP_CHAR (production dir), FLIP_SRC key, FLIP_OUT key, FLIP_HALF left|right.
+// Zero-spend master repair: mirror ONE half of a cached two-figure master raw. Legal for
+// characters only (v3 mirror standard); buildings are never mirrored.
+// Env: FLIP_CHAR, FLIP_SRC, FLIP_OUT, FLIP_HALF left|right.
 import { writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { decodePng, encodePng } from '../src/post/raw.js'
 

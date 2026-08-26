@@ -96,11 +96,9 @@ const SYMMETRIC_CLAUSE =
   'ORIENTATION: this object has NO front and NO back — it reads the same from every side. Draw '
   + 'it square-on and symmetrical, lit from the upper left like everything else in the town.'
 
-// Two independent questions, and conflating them would have drawn the bridge square-on.
 //   `cells`  — one cell or two. `TWO_FACING_KINDS` is the authority.
-//   `clause` — whether the prompt orients the object at all. A well has no front to place; a
-//              bridge has no front either but it DOES have a long axis, and a span drawn
-//              square-on lies across the grid instead of along it.
+//   `clause` — whether the prompt orients the object at all; a bridge has no front but does have
+//              a long axis, and a span drawn square-on lies across the grid instead of along it.
 type Subject = {
   id: string; kind: string; fp: { w: number; h: number }
   cells: 'one' | 'two'
@@ -157,12 +155,8 @@ const SUBJECTS: readonly Subject[] = [
   },
   {
     id: 'shed', kind: 'shed', fp: { w: 1, h: 1 }, cells: 'two', clause: 'oriented',
-    // ★ THE MATERIAL IS REPEATED AND THE ALTERNATIVES ARE BANNED. The first SE roll came back
-    // as a CREAM RENDERED shed beside a HONEY-BOARD SW one — two different sheds, not one shed
-    // turned. The reference is a colour chart by law, so it cannot be shown its own other half;
-    // only the words can hold the two cells together, and one mention of the material was not
-    // enough. Both cells were re-rolled against this wording so the script still reproduces
-    // what shipped.
+    // The reference is a colour chart by law, so it cannot be shown its own other half — only the
+    // words hold the two cells together, and one mention of the material was not enough.
     desc:
       'a small TOOL SHED, the smallest building in the village and clearly not a home. EVERY '
       + 'wall, on ALL FOUR SIDES, is the same BARE HONEY-BROWN TIMBER, boards laid VERTICALLY '
@@ -317,12 +311,8 @@ for (const s of SUBJECTS) {
       }
     }
 
-    // ★ AMONG THE CLEAN ONES ONLY (user ruling; the shape and the reason are in src/gate.ts).
-    // This line used to read `(clean.length ? clean : cands)` — the most explicit statement of
-    // the policy anywhere in the package: when nothing was clean it fell back to the DIRTY set
-    // and committed the least-corrected failure. Choosing is not deciding. The ranker still
-    // picks the candidate whose source correction is smallest; it now picks from a pool that
-    // cannot contain a failure.
+    // Among the CLEAN candidates only (user ruling; the shape and reason are in src/gate.ts).
+    // Choosing is not deciding: the ranker picks from a pool that cannot contain a failure.
     const clean = cands.filter((c) => c.fails.length === 0)
     const win = clean
       .sort((a, b) => Math.abs(1 - b.plan.sourceScale) - Math.abs(1 - a.plan.sourceScale)).at(-1)
@@ -363,11 +353,8 @@ mkdirSync(`${S}/reports`, { recursive: true })
 writeFileSync(`${S}/reports/structures-v5.md`, md)
 console.log(`\n${md}`)
 
-// ★ THE VERDICTS ARE BINDING, AFTER THE REPORT IS ON DISK. The report is what tells an
-// operator whether the model or the threshold is wrong, so it is written first and then the
-// run fails. `classDensityGate` only ever went into that markdown; it is a class property, so
-// it can only be judged over what this run produced — the whole committed class is judged by
-// `artCoverage.test.ts`.
+// The report is written FIRST and then the run fails: it is what tells an operator whether the
+// model or the threshold is wrong. `classDensityGate` is a class property, judged by artCoverage.
 const stopped = [
   ...(refusedCells.length === 0 ? [] : [`${refusedCells.length} cell(s) shipped nothing: ${refusedCells.join(', ')}`]),
   ...cls.failures,
