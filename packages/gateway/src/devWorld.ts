@@ -239,7 +239,7 @@ export async function startDevWorld(
     const tiles = await ingestTerrainArt(forgeDb) // code-painted, offline, $0 — never throws on a missing root
     console.log(`dev world: ingested terrain tiles (${tiles.length} records, road strip included)`)
     try {
-      const entries = await ingestProductionArt(forgeDb)
+      const entries = ingestProductionArt(forgeDb)
       const gone = entries.filter((e) => e.action === 'missing')
       console.log(
         `dev world: ingested production art (${entries.length - gone.length} of ${entries.length} assets)`,
@@ -253,7 +253,7 @@ export async function startDevWorld(
     }
     // the premade library: the furniture the interior scenes place on their slots
     try {
-      const lib = await ingestLibraryArt(forgeDb)
+      const lib = ingestLibraryArt(forgeDb)
       console.log(`dev world: ingested library art (${lib.length} items, furniture included)`)
     } catch (e) {
       console.log(
@@ -305,7 +305,7 @@ export async function startDevWorld(
 
   // The handler is an indirection because a bridge and a loop each need the other first: the
   // bridge is constructed around `loop`, and `loop` runs the handler that bridge returns.
-  let handler: TickHandler = () => {}
+  let handler: TickHandler | null = null
   const loop: TickLoop = new TickLoop({
     store,
     state: resumed ? resumed.state : devGenesisState(config, terrain, map, rings),
@@ -313,7 +313,7 @@ export async function startDevWorld(
     config,
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
     onTick: (ctx) => {
-      handler(ctx)
+      handler?.(ctx)
     },
   })
   // the founders showcase town

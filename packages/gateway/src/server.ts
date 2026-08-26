@@ -15,7 +15,7 @@ import { mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
 import { makeStaticSite } from './staticSite.js'
 import { reportOnce } from './degraded.js'
-import { notFound, sendJson } from './http.js'
+import { frameText, notFound, sendJson } from './http.js'
 
 export type GatewayOpts = {
   dbPath: string
@@ -151,7 +151,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         return
       }
     }
-    if (site !== null && site(req, res, url.pathname)) return
+    if (site?.(req, res, url.pathname)) return
     notFound(res)
   })
 
@@ -162,17 +162,15 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const catchUp: string[] = []
   let catchUpSeq = 0
   const snapshotJson = (): string => {
-    if (snapJson === null) {
-      snapJson = JSON.stringify({
-        t: 'snapshot',
-        tick: mirror.state().tick,
-        seq: mirror.seq(),
-        state: mirror.state(),
-        config,
-        laws: mirror.state().laws ?? {},
-        live: true,
-      })
-    }
+    snapJson ??= JSON.stringify({
+      t: 'snapshot',
+      tick: mirror.state().tick,
+      seq: mirror.seq(),
+      state: mirror.state(),
+      config,
+      laws: mirror.state().laws ?? {},
+      live: true,
+    })
     return snapJson
   }
 
@@ -217,7 +215,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     sock.on('message', (data) => {
       let msg: ClientMsg
       try {
-        msg = ClientMsg.parse(JSON.parse(data.toString()))
+        msg = ClientMsg.parse(JSON.parse(frameText(data)))
       } catch {
         sock.close(CLOSE_BAD_HELLO)
         return

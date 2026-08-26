@@ -5,6 +5,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { BOND_RECENT_ACTS, BondsResponseSchema, DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
+import { toEvent, type EventRow } from './http.js'
 import { buildBonds } from './bonds.js'
 
 /** Every bond's act list is capped — the served surface must not grow with the log. */
@@ -73,9 +74,7 @@ describe('★ the bonds body has a ceiling that does not depend on the town’s 
     const apiDb = new Database(dbPath, { readonly: true })
     const sel = apiDb.prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq')
     const bodyAt = (tick: number): string => {
-      const events = (
-        sel.all() as { seq: number; tick: number; type: string; payload: string }[]
-      ).map((r) => ({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }))
+      const events = (sel.all() as EventRow[]).map(toEvent)
       return JSON.stringify(buildBonds(events, DEFAULT_CONFIG.movement.earshotRadius, tick))
     }
 

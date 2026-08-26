@@ -36,7 +36,7 @@ function opaqueBbox(img: RawImage): { w: number; h: number } {
     y1 = -1
   for (let y = 0; y < img.height; y++)
     for (let x = 0; x < img.width; x++) {
-      if (img.data[(y * img.width + x) * 4 + 3]! === 0) continue
+      if (img.data[(y * img.width + x) * 4 + 3] === 0) continue
       if (x < x0) x0 = x
       if (x > x1) x1 = x
       if (y < y0) y0 = y

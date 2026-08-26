@@ -57,7 +57,10 @@ function runDevWorld(interiors: boolean, ticks = TICKS): Run {
 }
 
 const of = (run: Run, type: string): Seen[] => run.events.filter((e) => e.type === type)
-const who = (e: Seen): string => String(e.payload.agentId ?? e.payload.id ?? '')
+const who = (e: Seen): string => {
+  const id = e.payload.agentId ?? e.payload.id
+  return typeof id === 'string' ? id : ''
+}
 
 describe('★ THE FIRST NIGHT — the showcase town on rings=3, three sim days', () => {
   const run = runDevWorld(true)

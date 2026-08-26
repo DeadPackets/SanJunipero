@@ -16,6 +16,7 @@ import {
 } from '@sj/engine'
 import { createLawsAdmin } from './adminLaws.js'
 import { createGateway, type Gateway } from './server.js'
+import { frameText } from './http.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const TOKEN = 'a-shared-secret'
@@ -172,7 +173,7 @@ describe('laws in the viewer protocol (T25b)', () => {
   const nextRaw = (sock: WebSocket): Promise<string> =>
     new Promise((resolve) =>
       sock.once('message', (d) => {
-        resolve(d.toString())
+        resolve(frameText(d))
       }),
     )
 

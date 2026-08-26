@@ -153,7 +153,8 @@ describe('GATE G-D — a discovery is credited, recorded, replayed, served, mark
   })
 
   it('7. NOT VACUOUS: a payload with no inventor never becomes a record', () => {
-    const { byId: _b, ...noCredit } = PAYLOAD
+    const noCredit: Record<string, unknown> = { ...PAYLOAD }
+    delete noCredit.byId
     expect(readDiscoveries(worldWith([{ tick: 40, payload: noCredit }]), (id) => id)).toEqual([])
   })
 

@@ -56,7 +56,7 @@ const px = (img: RawImage, x: number, y: number, c: Rgb): void => {
 export function buildPlaceholderSheet(agentId: string): RawImage {
   const pal = paletteRgb()
   // body fill alternates two warm-grey ramp entries chosen by agentId char-code sum parity
-  const parity = [...agentId].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 2
+  const parity = Array.from(agentId).reduce((s, ch) => s + ch.charCodeAt(0), 0) % 2
   const light = parity === 0 ? pal[24]! : pal[25]!
   const dark = parity === 0 ? pal[25]! : pal[26]!
   const barColor = pal[31]!

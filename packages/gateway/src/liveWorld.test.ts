@@ -519,7 +519,9 @@ describe("★ a mind's memory across a resume", () => {
     amara.close()
     expect(memoriesBefore).toBeGreaterThan(0)
     expect(row.tick).toBe(tickWas)
-    expect(JSON.parse(row.snapshot).stats.turns).toBeGreaterThan(0)
+    expect((JSON.parse(row.snapshot) as { stats: { turns: number } }).stats.turns).toBeGreaterThan(
+      0,
+    )
     expect(versions).toBe(1)
 
     const second = await liveWorld({ dir })
@@ -864,8 +866,6 @@ describe('★ the default stays scripted and free', () => {
     const s = src('serve.ts')
     expect(s).toMatch(/process\.env(\.SJ_ARBITER|\['SJ_ARBITER'\]) !== '0'/)
     expect(src('devWorld.ts')).not.toContain('SJ_ARBITER')
-    // Opt-OUT, not opt-in: absent the variable the expression is true.
-    expect(undefined !== '0').toBe(true)
   })
 
   it('serve.ts reaches the live world only through a dynamic import behind the flag', () => {

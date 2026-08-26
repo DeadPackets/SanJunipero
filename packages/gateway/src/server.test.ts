@@ -9,6 +9,7 @@ import { AssetCodex, openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
 import { WorldMirror } from './worldMirror.js'
+import { frameText } from './http.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 
@@ -43,7 +44,7 @@ function connect(port: number): Promise<WebSocket> {
 function nextRaw(sock: WebSocket): Promise<string> {
   return new Promise((resolve) =>
     sock.once('message', (d) => {
-      resolve(d.toString())
+      resolve(frameText(d))
     }),
   )
 }
@@ -55,7 +56,7 @@ async function hello(sock: WebSocket): Promise<string> {
 }
 
 function collect(sock: WebSocket, sink: string[]): void {
-  sock.on('message', (d) => sink.push(d.toString()))
+  sock.on('message', (d) => sink.push(frameText(d)))
 }
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -144,7 +145,7 @@ describe('gateway server', () => {
     await wait(80)
     const assets = aFrames.map((f) => ServerMsg.parse(JSON.parse(f))).filter((m) => m.t === 'asset')
     expect(assets).toHaveLength(1)
-    expect(assets[0]!.t === 'asset' && assets[0]!.record.status).toBe('placeholder')
+    expect(assets[0]!.record.status).toBe('placeholder')
 
     // asset catch-up: a late joiner receives existing codex records right after its snapshot
     const late = await connect(gw.port)
@@ -167,7 +168,6 @@ describe('gateway server', () => {
       .map((f) => ServerMsg.parse(JSON.parse(f)))
       .filter((m) => m.t === 'scrubbed')
     expect(scrubbed).toHaveLength(1)
-    if (scrubbed[0]!.t !== 'scrubbed') throw new Error('unreachable')
     expect(scrubbed[0]!.reqId).toBe(7)
     expect(scrubbed[0]!.tick).toBe(1)
     expect(stateHash(scrubbed[0]!.state)).toBe(
