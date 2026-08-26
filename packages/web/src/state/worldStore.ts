@@ -44,7 +44,21 @@ export function createWorldStore(): WorldStore {
   const subs = new Set<() => void>()
   const eventSubs = new Set<(evts: SimEvent[]) => void>()
 
-  const notify = (): void => { for (const fn of subs) fn() }
+  // A pump arrives as many messages — a hello alone is one `asset` frame per codex row — and
+  // every subscriber pass is a full entity sync, so the burst is coalesced onto the next frame
+  // rather than paid once per message. Off a browser (the tests, and any node host) there is
+  // no frame to wait for and the pass stays synchronous.
+  let pending = false
+  const flush = (): void => {
+    pending = false
+    for (const fn of subs) fn()
+  }
+  const notify = (): void => {
+    if (typeof requestAnimationFrame !== 'function') { flush(); return }
+    if (pending) return
+    pending = true
+    requestAnimationFrame(flush)
+  }
 
   return {
     getState: () => state,

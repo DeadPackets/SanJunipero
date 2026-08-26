@@ -113,7 +113,7 @@ describe('worldStore', () => {
     expect(store.recentEvents().map(e => e.type)).toEqual(['agent_spoke'])
   })
 
-  it('subscribe notifies on every server message and unsubscribes cleanly', () => {
+  it('subscribe notifies with no frame to wait for, and unsubscribes cleanly', () => {
     const store = createWorldStore()
     let n = 0
     const off = store.subscribe(() => n++)
@@ -122,5 +122,32 @@ describe('worldStore', () => {
     off()
     store.applyServer({ t: 'thought', agentId: 'a', tick: 1, text: 'x' })
     expect(n).toBe(1)
+  })
+
+  it('coalesces a burst of messages into ONE subscriber pass per frame', () => {
+    const frames: Array<() => void> = []
+    const g = globalThis as { requestAnimationFrame?: unknown }
+    const had = 'requestAnimationFrame' in g
+    const prev = g.requestAnimationFrame
+    g.requestAnimationFrame = (fn: () => void) => { frames.push(fn); return frames.length }
+    try {
+      const store = createWorldStore()
+      let n = 0
+      store.subscribe(() => n++)
+      store.applyServer(makeSnapshot())
+      for (let i = 0; i < 40; i++) {
+        store.applyServer({ t: 'thought', agentId: 'a', tick: 1, text: `t${i}` })
+      }
+      expect(n).toBe(0)                    // nothing has been drawn yet
+      expect(frames).toHaveLength(1)       // one frame asked for, not forty-one
+      frames.pop()!()
+      expect(n).toBe(1)
+      expect(store.thoughtsLog()).toHaveLength(40)   // every message still applied
+      store.applyServer({ t: 'thought', agentId: 'a', tick: 2, text: 'next' })
+      expect(frames).toHaveLength(1)       // the next burst asks for the next frame
+    } finally {
+      if (had) g.requestAnimationFrame = prev
+      else delete g.requestAnimationFrame
+    }
   })
 })

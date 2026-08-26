@@ -139,8 +139,13 @@ export function depthOrder(boxes: readonly DepthBox[], edge: EdgeRule = geometri
   const ready: number[] = []
   for (let i = 0; i < n; i++) if (indeg[i] === 0) ready.push(i)
   while (ready.length > 0) {
-    ready.sort((p, q) => p - q)
-    const i = ready.shift()!
+    // The smallest seed index, taken by a scan and a swap-with-last: a comparator sort plus a
+    // shift per iteration was the same choice at n comparator calls and an n-element memmove.
+    let k = 0
+    for (let m = 1; m < ready.length; m++) if (ready[m]! < ready[k]!) k = m
+    const i = ready[k]!
+    ready[k] = ready[ready.length - 1]!
+    ready.pop()
     out.push(seeded[i]!.id)
     for (const j of after[i]!) if (--indeg[j]! === 0) ready.push(j)
   }

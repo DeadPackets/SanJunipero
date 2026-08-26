@@ -2,7 +2,7 @@ import { Container, Graphics, Polygon, Rectangle, Sprite, Texture } from 'pixi.j
 import type { SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { WORLD_TEXT_LINE_H, WORLD_TEXT_PX } from '../textFloor.js'
-import { bodyDepthBox, type DepthBox } from './depth.js'
+import { bodyDepthBox } from './depth.js'
 import { facingFrom, tileToScreen, type Facing } from './iso.js'
 import type { DepthEntry } from './layers.js'
 import type { Scene } from './scene.js'
@@ -57,8 +57,9 @@ type CharEntry = {
   gait: Gait
   /** what the record says the leg in flight costs, so the legs can match the ground */
   legMs: number
-  /** the tile the body is standing on RIGHT NOW — interpolated, never rounded (F-3c) */
-  box: DepthBox
+  /** the tile the body is standing on RIGHT NOW — interpolated, never rounded (F-3c), held in
+   *  the one entry this body publishes every frame rather than rebuilt into a fresh pair */
+  depth: DepthEntry
   /** where in its tile's rank this body is standing, and where it is sliding to. A world
    *  offset, so the box, the cull, the shadow and every label follow it for free. */
   crowd: CrowdOffset
@@ -180,10 +181,11 @@ export function createCharacterLayer(
 
   // Publish where every body is standing. The frame's one owner sorts these against the
   // structures; a body no longer carries an opinion about who is in front of whom.
+  const published: DepthEntry[] = []
   scene.addDepthSource(() => {
-    const out: DepthEntry[] = []
-    for (const e of entries.values()) out.push({ box: e.box, node: e.sprite })
-    return out
+    published.length = 0
+    for (const e of entries.values()) published.push(e.depth)
+    return published
   })
 
   // shared 20×8 blob shadow — Graphics-generated once
@@ -270,7 +272,7 @@ export function createCharacterLayer(
       sprite, shadow, emote, nameTag, nameTagBg, nameTagLabel, hit, figureH: 0, hitScale: 0,
       ranked: false,
       emoteUntil: 0, facing: 'sw', gait: gaitOf(agentId), legMs: clock.periodMs,
-      path: [{ x, y, atMs: now }], box: bodyDepthBox(agentId, x, y),
+      path: [{ x, y, atMs: now }], depth: { box: bodyDepthBox(agentId, x, y), node: sprite },
       crowd: NO_OFFSET, crowdFrom: NO_OFFSET, crowdTo: NO_OFFSET, crowdSinceMs: now,
     }
     setHitScale(e, CHAR_TARGET_PX / 64, 64)
@@ -407,7 +409,7 @@ export function createCharacterLayer(
       const py = pos.y + e.crowd.dy
       const { sx, sy } = tileToScreen(px, py)
       e.sprite.position.set(sx, sy + bobY)
-      e.box = bodyDepthBox(a.id, px, py)
+      e.depth.box = bodyDepthBox(a.id, px, py)
       e.shadow.position.set(sx, sy)
       e.emote.position.set(sx, sy - CHAR_TARGET_PX - EMOTE_ABOVE_HEAD_PX)
       e.emote.visible = !emotesHidden && nowMs < e.emoteUntil && e.emote.texture !== Texture.EMPTY

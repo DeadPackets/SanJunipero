@@ -4,7 +4,7 @@ import type { Structure, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { hoverLabel, itemCropDetail, type HoverKind } from '../ui/interaction.js'
 import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
-import { structureDepthBox, tileDepthBox, type DepthBox } from './depth.js'
+import { structureDepthBox, tileDepthBox } from './depth.js'
 import { TILE_H, depthKey, tileToScreen } from './iso.js'
 import type { DepthEntry } from './layers.js'
 import { HIT_MIN_PX, artPrismPolygon, extrudeDiamond, inflateToMin } from './hitShapes.js'
@@ -185,8 +185,9 @@ type Entry = {
   footprint: { w: number; h: number }
   /** the camera scale this prism was last cut for — the 24 px floor is a SCREEN size */
   hitZoom: number
-  /** the ground this drawable stands on, republished every sync for the frame's depth sort */
-  box: DepthBox
+  /** the ground this drawable stands on, rewritten every sync inside the one entry this
+   *  drawable publishes to the frame's depth sort */
+  depth: DepthEntry
 }
 
 /** `entry.url` for a structure whose kind has no art at all — never a real url, so the
@@ -349,9 +350,10 @@ export function syncEntities(
     // Publish the ground every structure, item and crop stands on. One owner sorts the whole
     // frame from these; nothing here writes a depth of its own.
     const published = sync
+    const out: DepthEntry[] = []
     scene.addDepthSource(() => {
-      const out: DepthEntry[] = []
-      for (const e of published.entries.values()) out.push({ box: e.box, node: e.sprite })
+      out.length = 0
+      for (const e of published.entries.values()) out.push(e.depth)
       return out
     })
   }
@@ -397,7 +399,7 @@ export function syncEntities(
       entry = {
         sprite, url: '', pips: null, form: null, kind: s.kind,
         footprint: { w: s.w, h: s.h }, hitZoom: sync.hitZoom,
-        box: structureDepthBox(key, s),
+        depth: { box: structureDepthBox(key, s), node: sprite },
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
@@ -407,7 +409,7 @@ export function syncEntities(
     }
     const ground = tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
     entry.sprite.position.set(ground.sx, ground.sy)
-    entry.box = structureDepthBox(key, s)
+    entry.depth.box = structureDepthBox(key, s)
     if (s.stage === 'construction') {
       entry.sprite.tint = CONSTRUCTION_TINT
       if (entry.pips === null) {
@@ -452,7 +454,7 @@ export function syncEntities(
       entry = {
         sprite, url: '', pips: null, form: null, kind: it.kind,
         footprint: { w: 1, h: 1 }, hitZoom: 1,
-        box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX),
+        depth: { box: tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX), node: sprite },
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
@@ -464,7 +466,7 @@ export function syncEntities(
     }
     const ground = tileToScreen(it.loc.x, it.loc.y)
     entry.sprite.position.set(ground.sx, ground.sy)
-    entry.box = tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX)
+    entry.depth.box = tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX)
   }
 
   for (const c of Object.values(state.crops)) {
@@ -483,7 +485,7 @@ export function syncEntities(
       entry = {
         sprite, url: '', pips: null, form: null, kind: c.kind,
         footprint: { w: 1, h: 1 }, hitZoom: 1,
-        box: tileDepthBox(key, c.x, c.y),
+        depth: { box: tileDepthBox(key, c.x, c.y), node: sprite },
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
@@ -491,7 +493,7 @@ export function syncEntities(
     }
     const ground = tileToScreen(c.x, c.y)
     entry.sprite.position.set(ground.sx, ground.sy)
-    entry.box = tileDepthBox(key, c.x, c.y)
+    entry.depth.box = tileDepthBox(key, c.x, c.y)
     entry.sprite.scale.set(CROP_SCALE_BASE + CROP_SCALE_PER_STAGE * c.stage)
     entry.sprite.tint = c.withered ? WITHERED_TINT : 0xffffff
   }
