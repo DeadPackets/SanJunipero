@@ -89,14 +89,14 @@ function isSpawnPayload(p: unknown): p is { kind: string } {
 class ScriptedLlm {
   objectCalls = 0
 
-  async object<T>(opts: {
+  async object(opts: {
     system: string
     messages: LlmMessage[]
     schema: unknown
-  }): Promise<{ value: T; usage: LlmUsage }> {
+  }): Promise<{ value: unknown; usage: LlmUsage }> {
     void opts
     this.objectCalls += 1
-    return { value: boilSaltVerdict as unknown as T, usage: emptyUsage() }
+    return { value: boilSaltVerdict, usage: emptyUsage() }
   }
 
   async text(): Promise<{ text: string; usage: LlmUsage }> {

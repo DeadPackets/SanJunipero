@@ -77,14 +77,14 @@ class ScriptedLlm {
   systems: string[] = []
   constructor(private readonly respond: (system: string) => unknown) {}
 
-  async object<T>(opts: {
+  async object(opts: {
     system: string
     messages: LlmMessage[]
     schema: unknown
-  }): Promise<{ value: T; usage: LlmUsage }> {
+  }): Promise<{ value: unknown; usage: LlmUsage }> {
     this.objectCalls += 1
     this.systems.push(opts.system)
-    return { value: this.respond(opts.system) as T, usage: emptyUsage() }
+    return { value: this.respond(opts.system), usage: emptyUsage() }
   }
 
   async text(): Promise<{ text: string; usage: LlmUsage }> {
