@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import {
   CITY_HEARTH_KIND, classMembers, dayPhaseFromTick, fertilityAt, glowRadiusFor, inputName,
-  isRoofedKind, litSourceWithin, MINUTES_PER_DAY, simTimeFromTick, structureGlowRadius,
+  isRoofedKind, litSourceWithin, MINUTES_PER_DAY, sanitizeSpokenText, simTimeFromTick,
+  SPEECH_INPUT_MAX_CHARS, structureGlowRadius,
   T_PATH, T_ROAD, WATER_TILES,
   type RecipeDef, type SimConfig, type StructureRecipeDef, type TownFacing,
 } from '@sj/shared'
@@ -1697,7 +1698,10 @@ const douse: VerbDef = makeVerb({
   },
 })
 
-export const SpeakParams = z.object({ text: z.string().min(1) }).strict()
+// The cap is a size bound, not a style rule: `speak` is the only verb whose text a listener's
+// prompt interpolates, so an unbounded one is an unbounded prompt. Anything a mind actually
+// says is an order of magnitude under it.
+export const SpeakParams = z.object({ text: z.string().min(1).max(SPEECH_INPUT_MAX_CHARS) }).strict()
 export const GiveParams = z.object({ itemId: z.string(), targetId: z.string() }).strict()
 export const TakeParams = z.object({ itemId: z.string() }).strict()
 export const WriteParams = z.object({ itemId: z.string().optional(), text: z.string().min(1) }).strict()
@@ -1713,9 +1717,14 @@ const spoken = (
 ): PendingEvent[] => {
   const p = SpeakParams.parse(params)
   const a = state.agents[agentId]!
+  // Sanitized where speech ENTERS the world, so the event log, the viewer and every listener
+  // hold the same words. The render sanitizes again — old logs on disk carry raw text.
   return [{
     type: 'agent_spoke',
-    payload: { agentId, text: p.text, x: a.x, y: a.y, ...(a.insideId === undefined ? {} : { insideId: a.insideId }) },
+    payload: {
+      agentId, text: sanitizeSpokenText(p.text), x: a.x, y: a.y,
+      ...(a.insideId === undefined ? {} : { insideId: a.insideId }),
+    },
   }]
 }
 
@@ -1723,7 +1732,15 @@ const speak: VerbDef = makeVerb({
   kind: 'speak',
   validate(_state, _config, _agentId, params) {
     const p = SpeakParams.safeParse(params)
-    if (!p.success) return 'speak needs a {text}'
+    // Length is refused in the town's own words: the refusal becomes a memory the mind reads
+    // back, and `speak needs a {text}` is our schema talking where a body should be.
+    if (!p.success) {
+      const text: unknown = (params as { text?: unknown }).text
+      if (typeof text === 'string' && text.length > SPEECH_INPUT_MAX_CHARS) {
+        return 'that is more words than one breath holds'
+      }
+      return 'speak needs a {text}'
+    }
     return null
   },
   atOnce: spoken,

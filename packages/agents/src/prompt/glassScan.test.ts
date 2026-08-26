@@ -8,6 +8,9 @@ import {
 import { makeablesLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
 import { conversationPacket, fixtureBlocks, quietMeadowPacket } from '../testutil/fixtures.js'
+// The constants themselves, not copies of them: a test that retypes the string it guards stops
+// guarding the day somebody edits the source and not the test.
+import { CRAFT_HINT, REPEATED_REFUSAL } from '../runtime/agentRuntime.js'
 
 describe('scanPromptForGlassLeak', () => {
   it('flags the taxonomy, whatever case it arrives in', () => {
@@ -173,15 +176,61 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
   })
 
   it('★ and it is not vacuous: an honest refusal passes untouched', () => {
-    // The four reasons the arbiter can actually return today. If the guard reddens any of
-    // these it is banning the arbiter from refusing at all, which is worse than the leak.
+    // Every reason the arbiter can actually return today, plus the two strings the intents lane
+    // added. If the guard reddens any of these it is banning the arbiter from refusing at all,
+    // which is worse than the leak.
     for (const reason of [
       'nothing in the town lends itself to this',
       'no clear way to do this presents itself',
       'this would need a craft the town has not yet reached',
       'the river runs too fast here to stand in',
+      // ★ THE WIDER FALLBACK, and the loop-breaker. Both are mind-facing and both are ours.
+      'you turn it over and it will not come together as it stands',
+      REPEATED_REFUSAL,
+      CRAFT_HINT,
     ]) {
       expect(scanRulingForGlassLeak(reason), reason).toEqual([])
+    }
+  })
+
+  // ★ THE FOURTH SHAPE — a refusal that names the missing thing has handed over the answer.
+  it('★ catches a refusal that names the solution as an absence', () => {
+    // The exact sentence the brief names as the thing that must never be written, plus the
+    // shapes around it. None of these contains an ops word or a `you should`, which is why the
+    // scan as it stood waved every one of them through.
+    for (const line of [
+      'you cannot smoke fish without a rack',
+      'this will not hold unless you have a length of cord',
+      'nothing comes of it until you find a sharper stone',
+      'the fire will not take for lack of dry wood',
+      'there is no edge to cut it with',
+      // ★ VERBATIM FROM A LIVE RULING, intents lane A/B run. `without one` is the same
+      // conditional as `without a rack` and the first draft of this pattern missed it by a
+      // word. A leak found in the wild outranks a leak I invented.
+      'The town lacks a marker, and the action cannot even be started without one.',
+    ]) {
+      expect(scanRulingForGlassLeak(line), line).not.toEqual([])
+    }
+  })
+
+  it('★ and the fourth shape is not vacuous: a bare ABSENCE is a fact, not a recipe', () => {
+    // ★ THE LINE IS THE CONDITIONAL, NOT THE NOUN, and a red test is what found it. The first
+    // draft of the pattern also caught `you have no` and immediately reddened a shipped arbiter
+    // fixture — `You have no reeds here.` on an `insufficient_materials` verdict. That sentence
+    // states a fact the mind's own perception block already lists verbatim, and it connects
+    // that fact to no method. `without a rack` is the other thing: smoking REQUIRES a rack, a
+    // recipe fragment in a refusal.
+    //
+    // If this row ever reds, the guard has started refusing the arbiter the right to refuse.
+    for (const line of [
+      'this would need a craft the town has not yet reached',
+      'there is no ground here to build on',
+      'the water is too deep here',
+      'you turn it over and it will not come together as it stands',
+      'You have no reeds here.',
+      'nothing you are carrying answers to this',
+    ]) {
+      expect(scanRulingForGlassLeak(line), line).toEqual([])
     }
   })
 
