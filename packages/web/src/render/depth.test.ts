@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { depthKey } from './iso.js'
 import { structureZIndex } from './entities.js'
 import {
-  DEPTH_BUDGET, bodyDepthBox, depthFallbacks, depthOrder, depthSeed, inFrontOf,
+  DEPTH_BUDGET, bodyDepthBox, depthFallbacks, depthOrder, depthSeed, geometricEdge, inFrontOf,
   resetDepthFallbacks, screenOverlap, structureDepthBox, tileDepthBox, type DepthBox,
   type EdgeRule,
 } from './depth.js'
@@ -250,5 +250,94 @@ describe('determinism', () => {
     const a = bodyDepthBox('aaa', 5, 5), b = bodyDepthBox('bbb', 5, 5)
     expect(depthOrder([a, b])).toEqual(['aaa', 'bbb'])
     expect(depthOrder([b, a])).toEqual(['aaa', 'bbb'])
+  })
+})
+
+describe('the drain produces the order the sort-and-shift queue produced', () => {
+  /** `depthOrder` exactly as it stood before the ready queue lost its `sort` and `shift`, kept
+   *  as the pin: the painter's order two browsers agree on may not move. */
+  const legacyDepthOrder = (boxes: readonly DepthBox[], edge: EdgeRule = geometricEdge): string[] => {
+    const seeded = [...boxes].sort((a, b) => depthSeed(a) - depthSeed(b) || (a.id < b.id ? -1 : 1))
+    const n = seeded.length
+    if (n > DEPTH_BUDGET) return seeded.map((b) => b.id)
+    const after: number[][] = seeded.map(() => [])
+    const indeg = new Array<number>(n).fill(0)
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const front = edge(seeded[i]!, seeded[j]!)
+        if (front === null) continue
+        if (front === seeded[j]!) { after[i]!.push(j); indeg[j]!++ } else { after[j]!.push(i); indeg[i]!++ }
+      }
+    }
+    const out: string[] = []
+    const ready: number[] = []
+    for (let i = 0; i < n; i++) if (indeg[i] === 0) ready.push(i)
+    while (ready.length > 0) {
+      ready.sort((p, q) => p - q)
+      const i = ready.shift()!
+      out.push(seeded[i]!.id)
+      for (const j of after[i]!) if (--indeg[j]! === 0) ready.push(j)
+    }
+    if (out.length < n) for (let i = 0; i < n; i++) if (indeg[i]! > 0) out.push(seeded[i]!.id)
+    return out
+  }
+
+  /** A town, not a pair: three rings of houses with bodies, items and crops between them. */
+  const fixtureTown = (): DepthBox[] => {
+    const boxes: DepthBox[] = []
+    for (let ring = 1; ring <= 3; ring++) {
+      for (let k = 0; k < ring * 6; k++) {
+        const a = (k / (ring * 6)) * Math.PI * 2
+        const x = 40 + Math.round(Math.cos(a) * ring * 5), y = 40 + Math.round(Math.sin(a) * ring * 5)
+        boxes.push(structureDepthBox(`s${ring}_${k}`, { x, y, w: 1 + (k % 3), h: 1 + ((k + 1) % 3) }))
+        boxes.push(bodyDepthBox(`b${ring}_${k}`, x + 0.25 * (k % 5), y + 0.2 * (k % 7)))
+        boxes.push(tileDepthBox(`i${ring}_${k}`, x + 1, y + 1))
+        boxes.push(tileDepthBox(`c${ring}_${k}`, x - 1, y + 2))
+      }
+    }
+    return boxes
+  }
+
+  it('agrees on a three-ring town, and on every rotation of its input order', () => {
+    const town = fixtureTown()
+    expect(town.length).toBeGreaterThan(100)
+    expect(depthOrder(town)).toEqual(legacyDepthOrder(town))
+    for (const cut of [1, 37, 100]) {
+      const rotated = [...town.slice(cut), ...town.slice(0, cut)]
+      expect(depthOrder(rotated)).toEqual(legacyDepthOrder(rotated))
+    }
+  })
+
+  it('agrees on 400 dense random scenes — the constrained cases, not the sparse ones', () => {
+    let seed = 20260826
+    const rnd = (n: number): number => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return (seed / 2147483648) * n
+    }
+    for (let scene = 0; scene < 400; scene++) {
+      const boxes: DepthBox[] = []
+      for (let i = 0; i < 12; i++) {
+        boxes.push(rnd(1) < 0.5
+          ? bodyDepthBox(`b${i}`, 20 + rnd(8), 20 + rnd(8))
+          : structureDepthBox(`s${i}`, {
+            x: 20 + Math.floor(rnd(8)), y: 20 + Math.floor(rnd(8)),
+            w: 1 + Math.floor(rnd(3)), h: 1 + Math.floor(rnd(3)),
+          }))
+      }
+      expect(depthOrder(boxes), `scene ${scene}`).toEqual(legacyDepthOrder(boxes))
+    }
+  })
+
+  it('agrees where a cycle forces the fallback, and above the budget', () => {
+    const ring = ['p', 'q', 'r']
+    const cyclic: EdgeRule = (a, b) => {
+      const ia = ring.indexOf(a.id), ib = ring.indexOf(b.id)
+      if (ia < 0 || ib < 0) return null
+      return (ia + 1) % 3 === ib ? b : a
+    }
+    const three = [bodyDepthBox('p', 4, 4), bodyDepthBox('q', 5, 4), bodyDepthBox('r', 4, 5)]
+    expect(depthOrder(three, cyclic)).toEqual(legacyDepthOrder(three, cyclic))
+    const many = Array.from({ length: DEPTH_BUDGET + 44 }, (_, i) => bodyDepthBox(`b${i}`, i % 20, Math.floor(i / 20)))
+    expect(depthOrder(many)).toEqual(legacyDepthOrder(many))
   })
 })
