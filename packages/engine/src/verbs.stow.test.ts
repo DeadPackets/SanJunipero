@@ -18,7 +18,7 @@ const OPEN = ['........', '........', '........', '........', '........', '.....
 function world(stage: 'construction' | 'complete' = 'complete', kind = 'storehouse'): WorldState {
   let s = genesisState(
     DEFAULT_CONFIG,
-    OPEN.map((row) => [...row].map((): TileId => 0)),
+    OPEN.map((row) => Array.from(row).map((): TileId => 0)),
   )
   s = fold(
     s,

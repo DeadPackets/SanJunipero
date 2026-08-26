@@ -18,7 +18,7 @@ let seq = 100
 function makeWorld(rows: string[] = ['........', '........', '........', '........']): WorldState {
   const s = genesisState(
     DEFAULT_CONFIG,
-    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+    rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
   return fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }))
 }
@@ -170,7 +170,7 @@ describe('walk progression (stepWalk)', () => {
     while (s.agents.a1!.activity) {
       s = applyAll(s, stepWalk(s, 'a1'))
       ticks++
-      if (s.agents.a1!.activity?.ticksRemaining === 0) {
+      if (s.agents.a1!.activity.ticksRemaining === 0) {
         s = applyAll(s, [{ type: 'action_completed', payload: { agentId: 'a1', verb: 'walk' } }])
       }
       if (ticks > maxTicks) throw new Error('walk never finished')

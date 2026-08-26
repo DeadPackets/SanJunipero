@@ -122,7 +122,7 @@ describe('G11a-W1: a bucket filled at the river puts out a fire', () => {
 
   function town(): WorldState {
     const terrain = MAP()
-    for (let y = 0; y < terrain.length; y++) terrain[y]![2] = 2 // a river down the west side
+    for (const row of terrain) row[2] = 2 // a river down the west side
     let s = raise(genesisState(CFG, terrain), CFG, SHED)
     s = spawn(s, CFG, 'hand', 3, 5)
     s = give(s, CFG, 'hand', 'item_bucket', BUCKET_KIND, 1, { charges: 0 })
@@ -167,7 +167,7 @@ describe('G11a-W2: water led to the field, and the harvest that says so', () => 
   // A field far from any water, and one tile of it within a spade's reach of the river.
   function field(): WorldState {
     const terrain = MAP(32)
-    for (let y = 0; y < terrain.length; y++) terrain[y]![2] = 2
+    for (const row of terrain) row[2] = 2
     terrain[10]![20] = 6 // farmland, well out of the river's reach
     terrain[10]![19] = 0
     let s = spawn(genesisState(CFG, terrain), CFG, 'farmer', 19, 10)
@@ -235,9 +235,9 @@ describe('G11a-W3: a bridge completes, and the far bank stops being far', () => 
   // A river two tiles wide, so a six-plank deck can span it. Banks at x 9 and x 12.
   function banks(): WorldState {
     const terrain = MAP(24)
-    for (let y = 0; y < terrain.length; y++) {
-      terrain[y]![10] = 2
-      terrain[y]![11] = 2
+    for (const row of terrain) {
+      row[10] = 2
+      row[11] = 2
     }
     let s = spawn(genesisState(CFG, terrain), CFG, 'builder', 9, 5)
     s = give(s, CFG, 'builder', 'item_wood', 'wood', 6)
@@ -294,7 +294,7 @@ describe('G11a-W3: a bridge completes, and the far bank stops being far', () => 
     )
     // Three tiles of water and no bank at the far end: the wide crossing has nothing to rest on.
     const wide = banks()
-    for (let y = 0; y < wide.terrain.length; y++) wide.terrain[y]![12] = 2
+    for (const row of wide.terrain) row[12] = 2
     expect(
       doVerb(wide, CFG, 600, 'builder', 'build', { kind: BRIDGE_KIND, x: 10, y: 5 }).refusal,
     ).toBe('both ends must reach something solid')

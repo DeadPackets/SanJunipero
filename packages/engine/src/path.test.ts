@@ -31,7 +31,7 @@ const CHAR_TILE: Record<string, TileId> = {
 const world = (rows: string[]): WorldState =>
   genesisState(
     DEFAULT_CONFIG,
-    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+    rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
   seq,
@@ -106,7 +106,7 @@ describe('road tile (C9 T1b)', () => {
     const dear = SimConfigSchema.parse({ pathing: { roadCost: 1.5 } })
     const s = genesisState(
       dear,
-      ROAD_DETOUR.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+      ROAD_DETOUR.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
     )
     expect(findPath(s, { x: 0, y: 0 }, { x: 4, y: 1 }, dear)).toEqual([
       [1, 0],
@@ -307,7 +307,7 @@ describe('the A* heuristic is admissible (Task 37a)', () => {
     const flat = SimConfigSchema.parse({ pathing: { roadCost: 1 }, desirePaths: { pathCost: 1 } })
     const s = genesisState(
       flat,
-      ROAD_RING.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+      ROAD_RING.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
     )
     expect(findPath(s, { x: 0, y: 0 }, { x: 13, y: 0 }, flat)).toEqual(
       Array.from({ length: 13 }, (_, i) => [i + 1, 0]),
@@ -594,7 +594,7 @@ describe('build: planning a bridge', () => {
   function builder(rows: string[], config: SimConfig): WorldState {
     let s = genesisState(
       config,
-      rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+      rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
     )
     s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 1, ageDays: 7300 }), config)
     return fold(

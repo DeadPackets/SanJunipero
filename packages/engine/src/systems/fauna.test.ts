@@ -49,7 +49,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 function world(rows: string[], config = CFG): WorldState {
   return genesisState(
     config,
-    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+    rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
 }
 

@@ -55,7 +55,7 @@ function patch(
 ): WorldState {
   let s = genesisState(
     CFG,
-    rows.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
+    rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
   s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
   return fold(s, ev('forageable_spawned', { id: 'node_1', kind, x: at[0], y: at[1], stock }), CFG)

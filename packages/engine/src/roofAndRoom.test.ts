@@ -32,7 +32,7 @@ const OPEN = Array.from({ length: 10 }, () => '..........')
 function world(): WorldState {
   return genesisState(
     CFG,
-    OPEN.map((row) => [...row].map(() => 0)),
+    OPEN.map((row) => Array.from(row).map(() => 0)),
   )
 }
 
@@ -101,7 +101,7 @@ describe('★ a roof is a property of the kind, and the valley meant what it loo
     const kinds = new Set(
       g.events
         .filter((e) => e.type === 'structure_planned')
-        .map((e) => String((e.payload as { kind: string }).kind)),
+        .map((e) => (e.payload as { kind: string }).kind),
     )
     expect(kinds.size).toBeGreaterThan(4)
     // Every dwelling the valley stands up is one a body can get under.

@@ -148,7 +148,7 @@ describe('★ how an agent builds: the plot, never the coordinate', () => {
     const base = genesisTown()
     const s = withBuilder(base, 'a', doorFor(base), 0)
     const r = submitIntent(s, CFG, 'a', 'build', { kind: 'house' })
-    expect(r).toEqual({ ok: false, reason: expect.stringContaining('not enough wood') })
+    expect(r).toEqual({ ok: false, reason: expect.stringContaining('not enough wood') as string })
   })
 })
 
@@ -336,7 +336,7 @@ describe('★ two bodies raise one building — the second pair of hands joins t
     expect(buildSiteOf(far, CFG, 'c', { kind: 'house' }).resume).toBeNull()
     expect(submitIntent(far, CFG, 'c', 'build', { kind: 'house' })).toEqual({
       ok: false,
-      reason: expect.stringContaining('the town keeps ground for a house'),
+      reason: expect.stringContaining('the town keeps ground for a house') as string,
     })
   })
 
@@ -364,7 +364,7 @@ describe('★ two bodies raise one building — the second pair of hands joins t
     // A roof already up is not a job, so this body is still sent to the plot the town keeps.
     expect(submitIntent(s, CFG, 'd', 'build', { kind: 'house' })).toEqual({
       ok: false,
-      reason: expect.stringContaining('the town keeps ground for a house'),
+      reason: expect.stringContaining('the town keeps ground for a house') as string,
     })
   })
 
@@ -651,7 +651,7 @@ describe('★ help must help — what a second pair of hands buys the calendar',
       let worked = false
       for (const id of [...ids].sort()) {
         const act = s.agents[id]!.activity
-        if (!act || act.verb !== 'build') continue
+        if (act?.verb !== 'build') continue
         worked = true
         bodyTicks++
         s = foldWith(s, stepBuild(s, FAST, id), s.tick)

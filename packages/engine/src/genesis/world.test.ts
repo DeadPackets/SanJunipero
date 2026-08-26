@@ -313,7 +313,7 @@ describe('the ford: one reach where the channel runs two wide', () => {
 
   it('leaves a bank on both sides of it, and dry ground to stand on', () => {
     const s = foldAll()
-    for (let y = GENESIS_FORD.y0; y <= GENESIS_FORD.y1; y++) {
+    for (let y: number = GENESIS_FORD.y0; y <= GENESIS_FORD.y1; y++) {
       expect(isPassable(s, 47, y), `west bank at y=${y}`).toBe(true)
       expect(isPassable(s, GENESIS_FORD.x, y), `the spit at y=${y}`).toBe(true)
       expect(isPassable(s, 48, y)).toBe(false)
