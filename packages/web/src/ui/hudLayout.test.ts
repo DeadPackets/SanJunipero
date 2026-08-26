@@ -20,7 +20,6 @@ import {
   isFullyHidden,
   loadHud,
   saveHud,
-  type DockSlot,
   type HudLayout,
 } from './hudLayout.js'
 

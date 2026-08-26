@@ -129,7 +129,7 @@ describe('★ block 1 tells the truth about sleep', () => {
 
   /** One roofed building at (2,1), one body, and a way to put it inside or leave it out. */
   function body(opts: { indoors: boolean; energy?: number }): WorldState {
-    const rows = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
+    const rows = Array.from({ length: 8 }, () => Array.from({ length: 8 }, (): TileId => 0))
     let s = genesisState(CFG, rows)
     s = fold(
       s,

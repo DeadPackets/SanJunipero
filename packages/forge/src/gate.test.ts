@@ -116,7 +116,7 @@ describe('gen-cast-v5 ships nothing that failed a gate', () => {
   })
 
   it('reads the attempt knob its own header has documented since v4', () => {
-    expect(src).toContain("process.env['CAST_ATTEMPTS']")
+    expect(src).toMatch(/process\.env(\.CAST_ATTEMPTS|\['CAST_ATTEMPTS'\])/)
     expect(src, 'a hard-coded attempt count is left somewhere').not.toMatch(
       /for \(let i = 0; i < 3; i\+\+\)/,
     )

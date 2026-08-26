@@ -8,7 +8,7 @@ import {
   type BondsResponse,
   type SimEvent,
 } from '@sj/shared'
-import type { Structure, TileId, WorldState } from '@sj/engine/state'
+import type { Structure, WorldState } from '@sj/engine/state'
 import { EXPRESSIONS, moodOf, type MoodView } from '../../render/mood.js'
 import { GAMIFICATION_BAN } from '../townStats.js'
 import { RosterRowView, rowLabel } from './RosterRowView.js'
@@ -23,7 +23,6 @@ import {
   rosterRows2,
   sortRoster,
   type RosterRow2,
-  type RosterSort,
 } from './rosterRow.js'
 
 const EMOJI = /\p{Extended_Pictographic}/u

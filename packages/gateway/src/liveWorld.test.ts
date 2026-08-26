@@ -862,7 +862,7 @@ describe('★ the default stays scripted and free', () => {
     // `SJ_ARBITER` may only ever be read on the live path. Read in `devWorld.ts` it would be a
     // switch that appears to do something on a stream that has no minds to rule over.
     const s = src('serve.ts')
-    expect(s).toContain("process.env['SJ_ARBITER'] !== '0'")
+    expect(s).toMatch(/process\.env(\.SJ_ARBITER|\['SJ_ARBITER'\]) !== '0'/)
     expect(src('devWorld.ts')).not.toContain('SJ_ARBITER')
     // Opt-OUT, not opt-in: absent the variable the expression is true.
     expect(undefined !== '0').toBe(true)
@@ -872,7 +872,7 @@ describe('★ the default stays scripted and free', () => {
     const s = src('serve.ts')
     expect(s).not.toMatch(/^import .*liveWorld/m)
     expect(s).toContain("import('./liveWorld.js')")
-    expect(s).toContain("process.env['SJ_LIVE'] === '1'")
+    expect(s).toMatch(/process\.env(\.SJ_LIVE|\['SJ_LIVE'\]) === '1'/)
   })
 
   it('the ops db sits inside the minds directory, so the fresh wipe takes the ledger too', () => {

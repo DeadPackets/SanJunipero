@@ -29,7 +29,7 @@ import {
   type BecomingInput,
   type ExpandState,
 } from './expand.js'
-import type { TileId, WorldState } from '@sj/engine/state'
+import type { WorldState } from '@sj/engine/state'
 
 const DAY = 1440 // MINUTES_PER_DAY — one tick is one sim-minute
 const IDS = ['amara', 'nadia', 'yusuf']

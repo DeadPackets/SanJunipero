@@ -8,7 +8,7 @@ import {
   type SimConfig,
   type SimEvent,
 } from '@sj/shared'
-import { genesisState, type TileId, type WorldState } from './state.js'
+import { genesisState, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { composePerception } from './perception.js'

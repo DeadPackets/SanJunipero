@@ -78,7 +78,7 @@ describe('howFarUp — where the work has got to, in words', () => {
 
 describe('★ the packet carries how far up the walls are', () => {
   function siteWorld(progress: number): WorldState {
-    const rows = Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => 0))
+    const rows = Array.from({ length: 10 }, () => Array.from({ length: 10 }, (): TileId => 0))
     let s = genesisState(CFG, rows)
     s = fold(
       s,
@@ -324,7 +324,7 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
 // until one body plants walls on it: free ground alone cannot answer "where does work go".
 
 describe('* walls already standing are a place the world can name', () => {
-  const rows = () => Array.from({ length: 14 }, () => Array.from({ length: 14 }, () => 0))
+  const rows = () => Array.from({ length: 14 }, () => Array.from({ length: 14 }, (): TileId => 0))
   const ev2 = (seq: number, type: string, payload: unknown) => ({ seq, tick: 0, type, payload })
 
   function townWith(

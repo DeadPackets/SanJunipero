@@ -62,7 +62,8 @@ export class CodexStore {
     for (const id of recipeCanon) {
       if (known.has(id)) continue
       const row = prerequisite.get(id) as { prerequisite_id: string | null } | undefined
-      if (row?.prerequisite_id !== null && known.has(row.prerequisite_id)) continue
+      if (row !== undefined && row.prerequisite_id !== null && known.has(row.prerequisite_id))
+        continue
       return false
     }
     return true

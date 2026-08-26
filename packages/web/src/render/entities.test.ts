@@ -227,7 +227,7 @@ describe('one building, one hitbox, and the building says what a click does', ()
     expect(code).not.toMatch(/door\.eventMode/)
     // the two meanings both hang off the one tap handler
     expect(code).toMatch(/entersOnClick\(store\.getConfig\(\), store\.getState\(\), sid\)/)
-    expect(code).toMatch(/sync!\.onDoor\?\.\(sid\)/)
+    expect(code).toMatch(/sync!?\.onDoor\?\.\(sid\)/)
   })
 
   it('resolveHit: a body beats a building, nothing beats nothing', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ZOOM_STOPS, type ZoomStop } from '../render/camera.js'
+import { ZOOM_STOPS } from '../render/camera.js'
 import { LENSES, LENS_LABELS, type Lens } from './route.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 import {

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { BOND_RECENT_ACTS, BondsResponseSchema, DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { BOND_RECENT_ACTS, BondsResponseSchema, DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { buildBonds } from './bonds.js'
 
