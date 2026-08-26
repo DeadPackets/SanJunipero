@@ -1,12 +1,5 @@
-// LIVE (Asset Standard v3 production run) — cap $PROD_CAP (default $6.00).
-// Generates the remaining founder cast (cast.ts; Omar = the approved reference
-// character, not regenerated) through the calibrated v3 hi-res mirror pipeline:
-// per character 1 concept → master pair (2 candidates, picked by pixel pitch) →
-// 6 single-figure walk edit-calls → 1 sleep → code derivation to the 24-cell
-// contract + feet-anchor manifest + contact sheet + 4 GIFs. Prompts are the
-// calibrated gen-character-v4 prompts verbatim with only persona descriptors
-// swapped. Facing gate = HUMAN EYEBALL on the batch artifacts — this script
-// never claims facing sign-off.
+// LIVE (Asset Standard v3) — cap $PROD_CAP (default $6.00). Omar is not regenerated.
+// Facing gate = HUMAN EYEBALL on the batch artifacts; this script never claims sign-off.
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import sharp from 'sharp'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'

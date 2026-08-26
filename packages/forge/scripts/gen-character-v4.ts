@@ -1,12 +1,5 @@
-// LIVE (Asset Standard v3, phase 2c) — cap $V4_CAP (default $1.00).
-// USER RULING: cells are stored at NATIVE model resolution and the webview scales
-// down (visual fidelity). Idle SE/NE crop free from the adopted master (master-b0-c1);
-// the 6 walk frames (contact-a, passing, contact-b × SE/NE) generate as SINGLE-figure
-// edit-calls with the master attached; sleep re-keys from its cached phase-2b raw.
-// SW/NW/passing-b/sleep variants derive in code (mirror.ts) on the hi-res cells.
-// Gates (chroma, coherence-vs-master, in-strip stride) run on 96-canvas gate views
-// (majority-downscaled hi-res cells). Facing gate = HUMAN EYEBALL on the contact
-// sheet + GIFs — this script never claims facing sign-off.
+// LIVE (Asset Standard v3, phase 2c) — cap $V4_CAP (default $1.00). USER RULING: cells are
+// stored at NATIVE model resolution and the webview scales down.
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import sharp from 'sharp'
 import { BudgetGuard, BudgetExceededError } from '../src/budget.js'

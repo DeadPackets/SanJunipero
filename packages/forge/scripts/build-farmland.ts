@@ -1,17 +1,6 @@
 // OFFLINE, $0.00 — rebuild the farmland material the user rejected.
-//
-// `terrain_farmland_0` self-tiled into rows of isometric cottages because the style anchor
-// attached to every terrain call IS a cottage and the model copied it whole. Regenerating
-// with a GROUND material as the reference fixed the subject and then hit the wall the terrain
-// round documented: three attempts, blocked on the wrap, the eye scoring tiling 1.67/10, a
-// drawn field boundary every time. Its own output self-tiles into a lattice of dark bands —
-// the same failure in a second costume.
-//
-// So the soil is a material the model DID draw and the user already has in the game
-// (`terrain_earth_0`), graded to damp ploughed brown, and the furrow is arithmetic.
-//
-//   node node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/build-farmland.ts
+// The soil is `terrain_earth_0` graded and the furrow is arithmetic; every generated attempt
+// self-tiled into a lattice, because the style anchor attached to a terrain call IS a cottage.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

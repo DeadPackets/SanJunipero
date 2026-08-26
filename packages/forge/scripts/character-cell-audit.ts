@@ -1,15 +1,5 @@
-// REPORT-ONLY, LIVE. The retrofit audit's character half, rerun at PER-CELL granularity
-// (controller ruling on batch-C concern 5). The batch-A audit judged whole 24-cell contact
-// sheets, so `singleFigure` failed by construction and the class scored 0.000 first-pass —
-// a measurement artifact, not an art defect. One cell is one figure, so the rubric means
-// what it says. Nothing is regenerated, re-registered or overwritten.
-//
-//   DRY=1 node --env-file=/Users/deadpackets/workspace/SanJunipero/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/character-cell-audit.ts
-//
-// FOUNDERS= narrows the cast, CELLS= narrows the poses. Real defects are LISTED for the
-// C12 art-pool lane, never fixed here — characters are masters.
+// REPORT-ONLY, LIVE. The character audit at PER-CELL granularity — a whole 24-cell sheet fails
+// `singleFigure` by construction. FOUNDERS= narrows the cast, CELLS= the poses; nothing is fixed.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'

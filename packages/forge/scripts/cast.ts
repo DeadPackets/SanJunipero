@@ -1,11 +1,5 @@
-// Founder cast identities for the production run (Asset Standard v3).
-// Source of truth: docs/superpowers/specs/2026-08-15-san-junipero-design.md §10 +
-// c8-founders.DRAFT.md persona sheets. Costumes are simplified to sprite scale per
-// the v3 ruling (2-3 signature features; detail lives in portraits later).
-// The approved reference character (CHAR_DESC_V4: young-adult, sage cap, white tee,
-// honey overalls, satchel) maps to OMAR — the only young-adult male founder, and the
-// dockside tinkerer the cap+satchel silhouette was designed around. Omar is NOT
-// regenerated here.
+// Founder cast identities (Asset Standard v3). Costumes simplified to sprite scale: 2-3
+// signature features. Omar maps to the approved CHAR_DESC_V4 reference and is NOT regenerated.
 export type CastMember = {
   id: string
   desc: string // swaps in for CHAR_DESC_V4 in the calibrated prompts

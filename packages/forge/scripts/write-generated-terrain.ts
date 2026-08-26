@@ -1,12 +1,6 @@
-// OFFLINE, $0. Reads the materials gen-terrain-textures.ts produced and lands them in the
-// SHIPPED content directory under the keys the renderer already consumes: four seasonal 4x4
-// sheets and the 15-cell road strip. Read-merge-write, so neither the C10 seasons half nor
-// the C13 autotile half of the manifest is ever clobbered.
-//
-//   npx tsx packages/forge/scripts/write-generated-terrain.ts
-//
-// A material that was never generated falls back to its code-painted tile, so this is safe
-// to run after a partial generation batch.
+// OFFLINE, $0. Lands the generated materials in the SHIPPED content directory. Read-merge-write,
+// so neither the seasons half nor the autotile half of the manifest is ever clobbered.
+// A material that was never generated falls back to its code-painted tile.
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'

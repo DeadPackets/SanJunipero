@@ -1,10 +1,5 @@
-// LIVE batched generation of the 50-entry premade library. One BATCH per invocation, so
-// every batch meets an eyeball before the next one spends.
-//
-//   BATCH=tools DRY=1 node --env-file=/Users/deadpackets/workspace/SanJunipero/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs packages/forge/scripts/gen-library.ts
-//
-// Controls: BATCH (required), ITEMS=<comma list> for reruns, DRY=1 for the offline plan,
+// LIVE batched generation of the 50-entry premade library. One BATCH per invocation, so every
+// batch meets an eyeball before the next one spends. Controls: BATCH (required), ITEMS=, DRY=1,
 // CANDIDATES=2|3. Nothing generated is committed — art lives under $C13/library/.
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'

@@ -1,13 +1,5 @@
-// Emote treatment comparison — decision artifact for the user ruling on how the
-// 12-glyph emote set should be produced. Renders three treatments of the same three
-// glyphs (heart / sleep / alert) side by side at 4x:
-//   1. Current  — the existing authored 16×16 glyphs (src/emotes.ts).
-//   2. Authored — richer 32×32 code-drawn glyphs (shading + outline), extending the
-//                 emotes.ts char-code convention in this standalone script (no library
-//                 changes).
-//   3. Generated — 3 matching emotes from ONE image call (a 3×1 grid), sliced out and
-//                 downscaled to 32×32.
-// LIVE (one image call, ~$0.046) unless the generated raw is already cached.
+// LIVE (one image call, ~$0.046) unless the generated raw is cached. Three treatments of
+// heart/sleep/alert side by side at 4x: authored 16x16, authored 32x32, and one generated 3x1 grid.
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import sharp from 'sharp'
 import { encodePng, decodePng, type RawImage } from '../src/post/raw.js'

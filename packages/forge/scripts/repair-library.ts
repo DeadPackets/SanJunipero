@@ -1,12 +1,5 @@
-// LIVE — the library repair round. One targeted EDIT call per item on the raw the KEPT
-// sprite came from (the repair-building precedent, items instead of buildings), reprocessed
-// through the same item post chain and judged by both instruments (sprite, then icon).
-// Items are props, not masters, so a passing repair deploys itself; a failing one is kept
-// beside the original and reported.
-//
-//   ITEMS=timber,stool node --env-file=/Users/deadpackets/workspace/SanJunipero/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs packages/forge/scripts/repair-library.ts
-//
+// LIVE — one targeted EDIT call per item on the raw the KEPT sprite came from. Items are props,
+// not masters, so a passing repair deploys itself; a failing one is kept beside the original.
 // DRY=1 prints the plan and spends nothing. DEPLOY=0 judges without writing over the art.
 import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from 'node:fs'
 import { join, dirname } from 'node:path'

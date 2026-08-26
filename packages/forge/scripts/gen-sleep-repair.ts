@@ -1,18 +1,6 @@
 // LIVE — regenerate ONE founder's sleep cell only, cap $SLEEP_CAP (default $0.50).
-//
-// The shipped sleep prompt said "body fully horizontal", which the model read as horizontal
-// on SCREEN: nadia came back at -11.8 degrees and yusuf at +6.6, against omar's -36.4 and
-// salma's -38.9. Nothing caught it, because the only lying check was `aspect > 1` and a flat
-// body passes that most comfortably of all. This runs the corrected prompt against the
-// founder's own approved master and gates on sleepAxisGate, so a flat or mirrored body is
-// rejected mechanically instead of shipping.
-//
-// Everything else in the sheet is untouched — only the four sleep cells are rewritten, by
-// repair-sleep-cell, from the raw this picks.
-//
-//   FOUNDER=nadia node --env-file=<repo>/.env \
-//     node_modules/.pnpm/tsx@4.23.12/node_modules/tsx/dist/cli.mjs \
-//     packages/forge/scripts/gen-sleep-repair.ts
+// "Fully horizontal" was read as horizontal ON SCREEN and `aspect > 1` let a flat body pass;
+// this gates on sleepAxisGate instead. Only the sleep cells are rewritten.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { BudgetGuard } from '../src/budget.js'
 import { STYLE_PROMPT } from '../src/styleBible.js'
