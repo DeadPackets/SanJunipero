@@ -37,6 +37,26 @@ const opsKeyShape = (term: string): boolean => /[_ ]/.test(term)
 // a kind invented next year is caught the day it is written.
 const MILESTONE_KIND = /\bfirst_\w+/giu
 
+// Cyrillic and Greek letters that render as their Latin twin. Only the ones that can spell a
+// roster word; a longer table would be a Unicode confusables copy nobody maintains.
+const CONFUSABLE_TO_LATIN: Readonly<Record<string, string>> = {
+  а: 'a', с: 'c', е: 'e', һ: 'h', і: 'i', ј: 'j', ӏ: 'l', м: 'm', о: 'o', р: 'p', ԛ: 'q',
+  г: 'r', ѕ: 's', т: 't', ѵ: 'v', ԝ: 'w', х: 'x', у: 'y',
+  α: 'a', ε: 'e', ι: 'i', κ: 'k', ο: 'o', ρ: 'p', τ: 't', υ: 'u', ν: 'v', χ: 'x',
+  ı: 'i', ɑ: 'a', ɡ: 'g',
+}
+const CONFUSABLE = new RegExp(`[${Object.keys(CONFUSABLE_TO_LATIN).join('')}]`, 'gu')
+
+// What the scan reads. A payload that breaks `festival` with a zero-width space or spells it
+// with a Cyrillic е reaches a mind as the word; nothing but the scan sees this folded copy.
+function fold(text: string): string {
+  return text
+    .normalize('NFKD')
+    .replace(/[\p{Mn}\p{Cf}]/gu, '')
+    .toLowerCase()
+    .replace(CONFUSABLE, (c) => CONFUSABLE_TO_LATIN[c] ?? c)
+}
+
 const patternsFor = (terms: readonly string[]): ReadonlyArray<{ term: string; re: RegExp }> =>
   terms.map((term) => ({
     term,
@@ -60,7 +80,7 @@ function scan(prompt: string, patterns: ReadonlyArray<{ term: string; re: RegExp
 // Every offending term, in the order the list names them, each one once. An empty array is
 // the only acceptable answer for anything an agent will read.
 export function scanPromptForGlassLeak(prompt: string): string[] {
-  return scan(prompt, ALL_PATTERNS)
+  return scan(fold(prompt), ALL_PATTERNS)
 }
 
 // A ruling is our machinery speaking, not a person: no one to protect, so the full roster applies.
@@ -69,16 +89,18 @@ const RULING_DIRECTIVE =
   /\byou (should|must|ought to|need to|could try|may want|will need)\b|\bgo (inside|and)\b|\binstead,? (you|try)\b/i
 
 // The banned shapes all encode "X requires Y" — `without a`, `unless you have`, `until you have`,
-// `for lack of`. A bare absence ("You have no reeds here.") is a world fact and stays allowed.
+// `for lack of`, `requires a`, `once she has`. A bare absence ("You have no reeds here.") is a
+// world fact and stays allowed: it connects the absence to no method.
 const RULING_NAMES_THE_MISSING_THING =
-  /\b(without (a|an|any|the|one)\b|unless you (have|hold|find)\b|until you (have|hold|find)\b|for lack of\b|there is no \w+ to \w+ (it|this|them) with\b)/i
+  /\b(without (a|an|any|the|one)\b|unless you (have|hold|find)\b|until you (have|hold|find)\b|for lack of\b|requires? (a|an|any|the|one)\b|once (you|he|she|they) (have|has|hold|holds|find|finds)\b|there is no \w+ to \w+ (it|this|them) with\b)/i
 
 /** Every ops word, directive and named-absence in text a mind will be handed. Empty is the only
  *  acceptable answer. */
 export function scanRulingForGlassLeak(text: string): string[] {
-  const out = scan(text, ALL_PATTERNS)
+  const folded = fold(text)
+  const out = scan(folded, ALL_PATTERNS)
   for (const re of [RULING_DIRECTIVE, RULING_NAMES_THE_MISSING_THING]) {
-    const hit = re.exec(text)
+    const hit = re.exec(folded)
     if (hit !== null) out.push(hit[0].toLowerCase().trim())
   }
   return out
@@ -88,14 +110,15 @@ const LAYOUT_PATTERNS = patternsFor(TOWN_LAYOUT_VOCABULARY)
 
 /** Every layout word an authored agent-visible surface uses. Empty is the only answer. */
 export function scanForLayoutLeak(text: string): string[] {
-  return LAYOUT_PATTERNS.filter(({ re }) => re.test(text)).map(({ term }) => term)
+  const folded = fold(text)
+  return LAYOUT_PATTERNS.filter(({ re }) => re.test(folded)).map(({ term }) => term)
 }
 
 // Thrown, not logged: an ops-plane word can only reach a prompt through a bug. Production keeps
 // running — a live town is not the place to discover a false positive.
 export function assertNoGlassLeak(text: string, where: string): void {
   if (process.env.NODE_ENV === 'production') return
-  const leaks = scan(text, OPS_ONLY_PATTERNS)
+  const leaks = scan(fold(text), OPS_ONLY_PATTERNS)
   if (leaks.length > 0) throw new Error(`one-way glass leak in ${where}: ${leaks.join(', ')}`)
 }
 

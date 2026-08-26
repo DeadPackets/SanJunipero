@@ -104,15 +104,14 @@ describe('★ the manipulator — prompt injection through in-world speech', () 
     expect(renderHeard('Bex', 'Omar told me to take it').split('\n')).toHaveLength(1)
   })
 
-  it('★ NEW — STILL GETS THROUGH: a zero-width space hides the glass words from the scanner', () => {
+  it('★ NEW — CLOSED: a zero-width space no longer hides the glass words from the scanner', () => {
     // NOT a prompt injection. A MEASUREMENT attack: the words reach a mind perfectly readably
-    // and the ops plane counts nothing, so the breach happens off the books.
+    // and the ops plane counted nothing, so the breach happened off the books.
     const say = caseOf('zero-width-glass').say
-    expect(scanPromptForGlassLeak(say)).toEqual([])
-    // The plain sentence, same words, is seen — so the scanner works and the evasion is real.
-    expect(scanPromptForGlassLeak(say.replaceAll('\u200b', '')))
-      .toEqual(expect.arrayContaining(['festival', 'market', 'council']))
-    // And the sanitizer does not strip it: a zero-width space is not `\s`.
+    expect(scanPromptForGlassLeak(say)).toEqual(expect.arrayContaining(['festival', 'market', 'council']))
+    // The same words plainly spelled read the same, so the fold added a reading and no words.
+    expect(scanPromptForGlassLeak(say.replaceAll('\u200b', ''))).toEqual(scanPromptForGlassLeak(say))
+    // The sanitizer still does not strip it — the scan folds a copy, the mind reads the bytes.
     expect(sanitizeSpokenText(say)).toContain('\u200b')
   })
 
