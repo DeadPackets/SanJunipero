@@ -139,16 +139,8 @@ describe('the C11 vocabulary', () => {
     expect(chronicleLine(ev('agent_died', { agentId: 'a1', cause: 'exposure' }), look)).toBe('Rahel froze.')
   })
 
-  // ★ EVERY WAY OF BEING AFFLICTED GETS ITS OWN SENTENCE — the twin of the death-cause law
-  // above, and it was missing.
-  //
-  // `agent_afflicted` used to render everything that was not poison as "has fallen ill", and
-  // the test below only ever asked it about `illness` and `poison` — a check whose passing
-  // condition held while two of the four kinds were narrated as a disease nobody had. It cost
-  // a whole lane: the dev world's first night showed `Day 0 17:02  all five founders have
-  // fallen ill`, five times over, and not one of them was ill. Every one of those was
-  // `escalateFatigue` minting `agent_afflicted{kind:"fatigue"}` after a collapse. The town was
-  // exhausted, and the chronicle told the viewer it had an epidemic.
+  // escalateFatigue mints agent_afflicted{kind:'fatigue'}, which once narrated as "has fallen ill":
+  // five founders shown as an epidemic on the dev world's first night. Every kind needs its own sentence.
   it('gives every way of being afflicted its own human sentence', () => {
     const said = AFFLICTION_KINDS.map((kind) =>
       chronicleLine(ev('agent_afflicted', { agentId: 'a1', kind, severity: 1 }), look))

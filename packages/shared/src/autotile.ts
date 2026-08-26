@@ -30,8 +30,7 @@ export function roadAutotile(nb: RoadNeighbors): RoadAutotileKey {
   return BY_MASK[(nb.n ? 1 : 0) | (nb.e ? 2 : 0) | (nb.s ? 4 : 0) | (nb.w ? 8 : 0)]!
 }
 
-// The codex kind an ingested autotile strip cell is registered under. It lives here, beside
-// the keys, because the forge writes it and the renderer reads it — two spellings of one
+// Beside the keys because the forge writes it and the renderer reads it — two spellings of one
 // string would silently drop every road back to a flat variant.
 export const ROAD_AUTOTILE_CODEX_PREFIX = 'road:'
 

@@ -1,21 +1,5 @@
-// ★ THE TOWN, SEEN FROM THE WORLD.
-//
-// `townGrammar` lays a lattice in its own coordinates and `townClaim` hands out plots on it.
-// Neither knows where the town stands. This file is the one place that maps between the two
-// frames and answers the question a RUNNING WORLD asks: an agent is about to raise a roof —
-// where does it go?
-//
-// ★ THE ANSWER IS NEVER READ FROM THE ASKER. It is the free plot nearest the square, and
-// "free" is read off the rectangles that stand in the world. So the spacing floor the grammar
-// proved exhaustively (86.1626 px over 2 496 pairings) is a property of every town any
-// sequence of agent builds can reach — because no sequence of agent builds can put a building
-// anywhere else.
-//
-// ★ GRAMMAR (0, 0) IS THE TOWN'S SQUARE. The template's own corner walks one PITCH north-west
-// per ring, so it is useless as a fixed point; the square does not move at all. The world
-// coordinate of a grammar tile is therefore the square plus the tile, at every ring count
-// there will ever be — which `TOWN_SQUARE.x + RIVER_GRAMMAR_DX === GENESIS_RIVER_X` already
-// says about one column, and `townPlot.test.ts` says about the whole frame.
+// Maps grammar coordinates to world ones: grammar (0,0) is TOWN_SQUARE, the one fixed point —
+// the template's own corner walks a PITCH north-west per ring, so it cannot serve as one.
 
 import {
   BLOCK, PITCH, STREET, blockIsPlattable, doorFrontOf, place, plotsOf,
@@ -36,9 +20,8 @@ export const worldOf = (square: WorldXY, t: TileXY): WorldXY =>
 export const grammarOf = (square: WorldXY, p: WorldXY): TileXY =>
   ({ dx: p.x - square.x, dy: p.y - square.y })
 
-/** The most ground a plot can ever be asked to hold, as a grammar rectangle. Every legal
- *  building on the plot stands on a subset of it — `along` and `deep` only ever shrink — so a
- *  plot whose greatest extent is clear is a plot no building can collide on. */
+/** The most ground a plot can ever be asked to hold. Every legal building stands on a subset of
+ *  it — along and deep only shrink — so a plot whose greatest extent is clear cannot collide. */
 export function plotExtent(plot: Plot): { dx: number; dy: number; w: number; h: number } {
   const { dx, dy, w, h } = place(plot, '', plot.maxAlong, plot.maxDeep, null)
   return { dx, dy, w, h }
@@ -52,61 +35,27 @@ const overlaps = (
   return a.dx < g.dx + b.w && g.dx < a.dx + a.w && a.dy < g.dy + b.h && g.dy < a.dy + a.h
 }
 
-/**
- * ★ FREE IS READ OFF WHAT STANDS, NOT OFF A REGISTER — and in a running world "what stands"
- * is rectangles, not plot keys. A register would be a second source of truth and would drift
- * on the first crash recovery; a rectangle test also catches the things the grammar never
- * platted at all, so a grave or a wagon left across a frontage takes the plot it is on.
- */
+/** Free is read off standing rectangles, never a register that would drift on crash recovery. A
+ *  rectangle test also catches what the grammar never platted: a grave across a frontage takes the plot. */
 export const plotIsTaken = (square: WorldXY, standing: readonly WorldRect[]) => (plot: Plot): boolean => {
   const ext = plotExtent(plot)
   return standing.some((s) => overlaps(ext, s, square))
 }
 
-/**
- * ★ WHERE A BODY CAN PUT ITS FEET — which is not the same question as where the town may plat.
- *
- * The plat ground is conservative on purpose: it unions the grammar's channel with the world's
- * water, so no roof ever stands on either. Walking is the opposite question and takes the
- * opposite answer — the world's own ford is dry sand the grammar has never heard of, and a
- * DECK LAID OVER WATER IS NOT WATER. Asking one function both questions is how the far bank
- * stayed shut: a bridge cannot open ground that the plat rule has already called wet.
- */
+/** Walking is not platting: the world's ford is dry sand the grammar calls wet, and a deck over
+ *  water is not water. Asking one function both questions is how the far bank stayed shut. */
 export type Walk = (dx: number, dy: number) => boolean
 
 /** The walk a bare ground allows, and the default when nobody has built anything: every tile
  *  but the water. No bridge exists in a grammar with no world under it. */
 export const walkOnGround = (ground: Ground): Walk => (dx, dy) => ground(dx, dy) !== 'water'
 
-/** The tiles a walk reached, as a question rather than a collection: this is asked once per
- *  candidate plot in a loop that runs every tick, so it is a flat byte grid and not a Set of
- *  strings. Measured: the string form cost the end-to-end run 42 seconds. */
+/** A question rather than a collection: asked once per candidate plot in a loop that runs every
+ *  tick, so it is a flat byte grid — the string form cost the end-to-end run 42 seconds. */
 export type Reach = { has: (dx: number, dy: number) => boolean; size: number }
 
-/**
- * ★ A PLOT YOU CANNOT WALK TO IS NOT GROUND THE TOWN KEEPS FOR YOU — AND THE WALK IS A WALK.
- *
- * Every grammar tile a body can reach from the square on foot, four-connected, inside the
- * town's own box at `rings`. Found by running a world, not by reading the grammar: the first
- * plot ring 2 offers is block (-2, 0), which is across the channel. Masons walked to its door
- * and were refused twenty-one thousand times, and the town stopped at ring 1 for good.
- *
- * ★ THIS USED TO BE A WALK OVER BLOCKS, AND THAT WAS BOTH TOO STRICT AND VACUOUS. Too strict,
- * because a block-to-block hop can only step between PLATTED blocks and the river runs down
- * the middle of block column i = -1, which is never plattable — so no bridge anywhere could
- * ever have opened the far bank, whatever it was told. Vacuous, because its own water test
- * (`bandIsWalkable`) never fired: measured over 659 adjacent platted pairs at rings 1 to 6,
- * ZERO shared street bands are wet. Deleting that test changed no answer. A tile walk has
- * neither defect — it crosses unplatted ground the way feet do, and every tile it steps on is
- * a tile it actually stepped on.
- *
- * The far bank stays an earned milestone (C11 §2): the west of the river joins the town when
- * somebody can get there, and not before. What changed is that now somebody CAN — by building
- * the bridge, which is the whole of the mechanism and is derived fresh on every ask.
- *
- * Bounded by the town's box, because the town's reach is the town's own ground; the box grows
- * with the ring the claim is looking at, so a town that grows reaches further by construction.
- */
+/** Tile-connected reach from the square, bounded by the town's box at `rings`. Tiles, not blocks:
+ *  block column i=-1 is never plattable, so a block walk could never open the far bank. */
 export function reachOnFoot(rings: number, walk: Walk): Reach {
   const lo = -townOrigin(rings), span = townSpan(rings)
   const inBox = (ix: number, iy: number): boolean => ix >= 0 && ix < span && iy >= 0 && iy < span
@@ -149,12 +98,8 @@ export type TownClaim = {
   rings: number
 }
 
-/**
- * ★ THE ONE FUNCTION THAT DECIDES WHERE A BUILDING GOES. Nothing about the asker reaches it —
- * not a coordinate, not a preference, not a plot name. It takes the square, everything
- * standing, and how much ground the thing needs, and it answers with the free plot nearest the
- * square. `null` is "the town has nowhere for a thing that size", and it is loud at the caller.
- */
+/** Nothing about the asker reaches this — not a coordinate, not a preference, not a plot name.
+ *  `null` is "the town has nowhere for a thing that size", and it is loud at the caller. */
 export function claimTownPlot(a: {
   square: WorldXY
   standing: readonly WorldRect[]
@@ -174,9 +119,8 @@ export function claimTownPlot(a: {
       const r = Math.max(Math.abs(p.block.i), Math.abs(p.block.j))
       let reached = reach.get(r)
       if (reached === undefined) { reached = reachOnFoot(r, walk); reach.set(r, reached) }
-      // ★ THE DOOR, not the block. The builder has to stand on this exact tile to raise
-      // anything, so it is the tile that has to be walkable-to — and a claim that offered a
-      // plot whose door nobody can stand at would be the old defect wearing a new coat.
+      // The door, not the block: the builder has to stand on this exact tile to raise anything,
+      // so it is the tile that has to be walkable-to.
       const door = doorFrontOf(place(p, '', a.need.along, a.need.deep, null))
       return !reached.has(door.dx, door.dy) || taken(p)
     },
@@ -194,14 +138,8 @@ export function claimTownPlot(a: {
   }
 }
 
-/**
- * How many rings of the town are actually STANDING — the outermost ring that holds a building
- * on one of its plots. Read off the world like everything else here, and deliberately not off
- * a stored count: a count is a register, and this is the same question `plotIsTaken` answers.
- *
- * A structure that is not on a plot does not make a ring: the ford's bridge sits in block
- * (-1, -2) by arithmetic alone, and that block stands in the river and was never platted.
- */
+/** The outermost ring holding a building on one of its plots, read off the world and not off a
+ *  stored count. A structure not on a plot makes no ring: the ford's bridge was never platted. */
 export function ringsStanding(
   square: WorldXY, standing: readonly WorldRect[], ground: Ground = CITY_GROUND,
 ): number {
@@ -218,17 +156,8 @@ export function ringsStanding(
   return rings
 }
 
-/**
- * ★ THE GROUND THE TOWN HAS LAID, streets included — not the box of its roofs.
- *
- * The world-growth rule owes a block pitch of wild beyond the town, and it measured that from
- * the BUILT SET. That under-measures by exactly `STREET`: the outermost building stands three
- * tiles inside its own street, so a world that owes one pitch past the last roof owes three
- * tiles less than one pitch past the last kerb — and the next ring's far street band lands in
- * those three tiles. Measured, ring 1 → ring 2: the last roof is at world y 112 and ring 2's
- * far street band ends at 134, which is 22 = PITCH + STREET beyond it. That is the
- * world-growth lane's own C-5, and this is where it is paid.
- */
+/** Streets included, not the box of roofs: the outermost building stands STREET inside its own
+ *  kerb, so the next ring's far street band ends PITCH + STREET past the last roof. */
 export function townBoxOf(square: WorldXY, rings: number): WorldBox {
   const o = townOrigin(rings)
   return {
@@ -237,17 +166,9 @@ export function townBoxOf(square: WorldXY, rings: number): WorldBox {
   }
 }
 
-/**
- * The ground a block needs before anything can stand on it: every tile of the block cleared,
- * and every tile of its street ring paved. Both in world tiles, and both cut against the
- * river, because a road does not cross water until somebody builds a bridge.
- *
- * ★ A BLOCK IS LAID OUT WHEN ITS FIRST BUILDING IS RAISED — which is the user's parenthesis,
- * "as agents build new buildings AND ROADS", and the only way the streets of a ring the town
- * has not reached yet can arrive without anybody hand-placing them. Adjacent blocks share
- * their street band (a block's ring runs three tiles out and the pitch is BLOCK + 3), so a new
- * block's streets meet the ones already there and the town stays one connected road network.
- */
+/** The ground a block needs: every tile of the block cleared, every tile of its street ring paved,
+ *  both in WORLD tiles and both cut against the river. A block is laid out when its first building is raised.
+ *  Adjacent blocks share their street band (ring is 3 out, pitch is BLOCK + 3), so the road network stays one piece. */
 export function blockGroundOf(
   square: WorldXY, block: { i: number; j: number }, ground: Ground = CITY_GROUND,
 ): { cleared: WorldXY[]; paved: WorldXY[] } {

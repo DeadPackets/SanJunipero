@@ -30,9 +30,8 @@ export const DiscoveryResponseSchema = z.object({
 }).strict()
 export type DiscoveryResponse = z.infer<typeof DiscoveryResponseSchema>
 
-// The intent is the agent's OWN words and it never appears here: a headline reaches the
-// chronicle, the chronicle is agent-visible, and a mind reading its own sentence back is a
-// loop the one-way glass exists to prevent.
+// The intent is the agent's OWN words and never appears here: the chronicle is agent-visible,
+// and a mind reading its own sentence back is the loop the one-way glass prevents.
 export function discoveryHeadline(d: { kind: DiscoveryKind; name: string; by: string }): string {
   return d.kind === 'word' ? `${d.by} found a word: ${d.name}` : `${d.by} worked out ${d.name}`
 }

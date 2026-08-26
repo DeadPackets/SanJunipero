@@ -4,27 +4,16 @@ export const BOND_KINDS = ['partner', 'kin', 'friend', 'rival', 'owe', 'work'] a
 export const BondKindSchema = z.enum(BOND_KINDS)
 export type BondKind = z.infer<typeof BondKindSchema>
 
-/** One recorded act between two people. `note` is NOT on the wire: it is `BOND_NOTES` keyed by
- *  the act, the table is right here, and a sentence repeated a hundred thousand times is the
- *  single largest thing the old feed spent its bytes on. */
+/** One recorded act between two people. `note` is NOT on the wire: it is BOND_NOTES keyed by the
+ *  act, because a sentence repeated a hundred thousand times is what the old feed spent bytes on. */
 export const BondActSchema = z.object({
   tick: z.number().int().nonnegative(),
   kind: BondKindSchema,
 }).strict()
 export type BondAct = z.infer<typeof BondActSchema>
 
-/**
- * ★ THE CEILING. How many acts a bond carries on the wire, whatever the town's age.
- *
- * The feed used to carry EVERY act that ever formed a tie: 83 704 521 B at sim-day 20 of a
- * talkative town, growing without limit, on a surface handed to strangers and polled every
- * 30 s per viewer. A bond now carries the last `BOND_RECENT_ACTS` of them plus a whole-history
- * rollup, so the body is O(pairs), not O(pairs × history).
- *
- * 24 because the detail panel shows a scrolling column and a viewer reads the top of it; the
- * rollup below says how many there were in total, which is the number the list could never say
- * without being unreadable.
- */
+/** Caps the feed body at O(pairs) instead of O(pairs x history) — it reached 83.7 MB at sim-day 20.
+ *  24 because the detail panel is a scrolling column and the rollup carries the total. */
 export const BOND_RECENT_ACTS = 24
 
 /** Whole-history totals for one kind of act — at most one row per `BOND_KINDS`, so six. */
@@ -49,9 +38,8 @@ export const BondSchema = z.object({
   recent: z.array(BondActSchema).max(BOND_RECENT_ACTS),
   /** What the window cannot say: how many of each act there were, and when each began. */
   acts: z.array(BondRollupSchema).max(BOND_KINDS.length),
-  /** Decayed valence over the WHOLE history, evaluated at `lastUpdatedTick`. Exponential decay
-   *  is separable, so `decayWarmth(warmth, lastUpdatedTick, now)` is the exact warmth at any
-   *  later tick — the reader loses no precision by not holding the acts. */
+  /** Decayed valence over the WHOLE history, evaluated at `lastUpdatedTick`. Decay is separable,
+   *  so the reader loses no precision by not holding the acts. */
   warmth: z.number(),
   /** The same, restricted to acts at or before `asOfTick − WARMTH_HALF_LIFE_TICKS` and
    *  evaluated there: where this relationship stood a half-life ago, which is the arc's "from". */
@@ -74,12 +62,8 @@ export const BondsCountSchema = z.object({
 }).strict()
 export type BondsCount = z.infer<typeof BondsCountSchema>
 
-/**
- * ★ THE SIX ACTS A TIE IS DERIVED FROM, and the whole of them. `buildBonds` reads the record
- * for exactly these; a bond count of zero IS "none of these six has been recorded", which is
- * what lets the Bonds panel's empty state DESCRIBE instead of promise. Here rather than in the
- * gateway because the viewer has to be able to name them without reading the server.
- */
+/** The six acts a tie is derived from, and the whole of them: a bond count of zero IS "none of
+ *  these six". Here, not the gateway, so the viewer can name them without reading the server. */
 export const BOND_NOTES: Readonly<Record<string, string>> = {
   spoke: 'spoke together',
   give: 'gave something away',
@@ -102,9 +86,8 @@ export function bondId(a: string, b: string): string {
   return [a, b].sort().join('|')
 }
 
-// One bond per pair, so its kind has to be decided when two people are several things at
-// once. Closest claim wins and the history keeps everything: a couple who also traded are
-// still a couple, and a fight outranks a shift worked side by side.
+// One bond per pair, so its kind has to be decided when two people are several things at once.
+// Closest claim wins and the history keeps everything.
 export const BOND_KIND_PRECEDENCE: readonly BondKind[] = ['partner', 'kin', 'rival', 'owe', 'work', 'friend']
 
 export function strongerBondKind(a: BondKind, b: BondKind): BondKind {
@@ -112,10 +95,7 @@ export function strongerBondKind(a: BondKind, b: BondKind): BondKind {
 }
 
 // ── WARMTH: the one derivation, now that BOTH ends of the wire need it ─────────────────────
-//
-// It used to live in the viewer, over a history the viewer was handed. The history is no longer
-// handed over, so the fold happens once on the server and the reader decays the scalar forward.
-// One table, one half-life, one threshold list — a second copy is how the two ends disagree.
+// The fold happens once on the server and the reader decays the scalar forward; a second copy is how the two ends disagree.
 
 /** Signed weight per recorded act. The NEGATIVE half is what makes a level a relationship
  *  rather than a counter, and it is the only reason "hatred" is reachable at all. */
@@ -123,16 +103,12 @@ export const BOND_VALENCE: Readonly<Record<BondKind, number>> = {
   friend: 1, work: 2, owe: 3, partner: 4, kin: 0, rival: -8,
 }
 
-/**
- * A friendship needs keeping up: silence costs warmth, which is what lets a level FALL without
- * anybody doing anything wrong. A tick is a sim-MINUTE and `MINUTES_PER_DAY` is 1440, so this
- * is two sim-days.
- */
+/** Silence costs warmth, which is what lets a level fall without anybody doing anything wrong.
+ *  A tick is a sim-minute and MINUTES_PER_DAY is 1440, so this is two sim-days. */
 export const WARMTH_HALF_LIFE_TICKS = 2880
 
-/** Exponential decay is separable — `Σ wᵢ·2^-((t−tᵢ)/H) = 2^-((t−T)/H) · Σ wᵢ·2^-((T−tᵢ)/H)` —
- *  so one scalar at `fromTick` is the exact warmth at every later tick. This is the identity
- *  that lets a bounded body carry an unbounded history's warmth without rounding it. */
+/** Exponential decay is separable — `Σ wᵢ·2^-((t−tᵢ)/H) = 2^-((t−T)/H) · Σ wᵢ·2^-((T−tᵢ)/H)` — so
+ *  one scalar at `fromTick` is the exact warmth at every later tick. */
 export function decayWarmth(warmth: number, fromTick: number, toTick: number): number {
   return warmth * Math.pow(0.5, Math.max(0, toTick - fromTick) / WARMTH_HALF_LIFE_TICKS)
 }
@@ -186,18 +162,8 @@ export type BondFold = {
   bond(): Bond
 }
 
-/**
- * ★ ONE ACT IN, CONSTANT MEMORY OUT.
- *
- * Everything the contract carries is a running value: a 24-deep window, six rollup rows, three
- * scalars. Nothing here grows with how long the town has been running, which is the whole of
- * why the feed has a ceiling now.
- *
- * `levelChangedTick` is the reason this is a fold and not a formula. The reader used to find it
- * by re-summing the history at every distinct tick — O(acts²) IN THE BROWSER, per link, per
- * render, over a history that reached six figures. Folding forward gives the same answer in one
- * pass, and the pass happens once on the server rather than once per viewer per frame.
- */
+/** A fold, not a formula, because levelChangedTick was found by re-summing history per render —
+ *  O(acts^2) in the browser, per link. Nothing here grows with how long the town has run. */
 export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
   const [lo, hi] = [aId, bId].sort() as [string, string]
   const id = bondId(aId, bId)

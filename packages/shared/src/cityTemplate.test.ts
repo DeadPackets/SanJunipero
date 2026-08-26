@@ -66,13 +66,8 @@ describe('CityTemplateSchema', () => {
   })
 })
 
-// ★ FACING IS DATA, NOT INFERENCE.
-//
-// `facingFrom(dx, dy)` derives a facing from a delta and can answer `ne` or `nw`, for which
-// the forge has no art at all. That function is right for a WALKING BODY, which turns four
-// ways; it was never right for a building, which the user ruled turns two. So the template
-// carries the answer in a column and nothing infers it — and because the column is a two-value
-// enum, NE and NW are not merely unused here, they are unrepresentable.
+// facingFrom(dx, dy) can answer `ne` or `nw`, for which the forge has no art. A building turns
+// two ways, so the template carries the answer in a two-value column and nothing infers it.
 describe('every building says which way it faces', () => {
   it('carries a facing on every structure, and only ever one of the two', () => {
     for (const s of cityStructures())
@@ -154,10 +149,7 @@ describe('the genesis anchor', () => {
     expect(WORLD_SIZE_GENESIS - (y + CITY_H)).toBeGreaterThanOrEqual(8)
   })
 
-  // The anchor's ONE job beyond fitting: put the town's channel on the world's channel, so
-  // the map has one river in it rather than two. `world.test.ts` holds the other half, where
-  // `GENESIS_RIVER_X` can be named; here it is pinned as a number so a drift shows on both
-  // sides at once.
+  // Pinned as a number here and by name in world.test.ts, so a drift shows on both sides at once.
   it('lands the town channel on world column 49', () => {
     expect(CITY_ANCHOR_DEFAULT.x + RIVER_LOCAL_DX).toBe(49)
   })
@@ -191,9 +183,8 @@ describe('city roads', () => {
     }
   })
 
-  // ★ A PHANTOM ROAD ROW once ran straight through the frontage of a block, putting buildings
-  // on roads. It came from a special case that widened the main street, and the fix was
-  // DELETING the special case. This is the guard that keeps one from coming back.
+  // A special case that widened the main street once ran a phantom road row through a block's
+  // frontage. This is the guard that keeps one from coming back.
   it('never lays a street tile on a block', () => {
     const onBlock = new Set(cityBlocks().flatMap(b =>
       blockTiles(b.i, b.j).map(t => key(t.dx + TOWN_ORIGIN, t.dy + TOWN_ORIGIN))))
@@ -221,10 +212,8 @@ describe('city roads', () => {
     for (const [k, v] of keys) expect(ROAD_AUTOTILE_KEYS, k).toContain(v)
   })
 
-  // ★ THE LATTICE IS REGULAR BY CONSTRUCTION and that is a FEATURE: three-tile streets meet in
-  // crosses, tees and corners and never in a lane or a dead end, so the nine shapes below are
-  // the nine a town of this grammar can ask for. The remaining six belong to a renderer
-  // fixture, not to a town — see `web/src/render/g10.test.ts`.
+  // Three-tile streets meet in crosses, tees and corners and never in a lane or a dead end, so
+  // these nine shapes are the nine a town of this grammar can ask for.
   it('asks for the nine shapes a regular three-tile lattice makes, and no others', () => {
     const seen = new Set(cityRoadKeys(roads).values())
     expect([...seen].sort()).toEqual([
@@ -233,9 +222,8 @@ describe('city roads', () => {
     ])
   })
 
-  // The square's paving is laid AROUND the well and the fire pit, so its two monument tiles
-  // are the only interior tiles that are not road — and each one turns its four neighbours
-  // into tees, which is what makes a monument read as a thing you walk around.
+  // The paving is laid around the well and the fire pit, so their two tiles are the only interior
+  // tiles that are not road — and each turns its four neighbours into tees.
   it('resolves the square interior to cross, and the monuments to tees around them', () => {
     const keys = cityRoadKeys(roads)
     const monument = new Set([key(WELL_AT.dx, WELL_AT.dy), key(FIRE_PIT_AT.dx, FIRE_PIT_AT.dy)])
@@ -283,9 +271,8 @@ describe('the four dwelling kinds', () => {
     expect(isDwellingKind('hut')).toBe(false)
   })
 
-  // ★ THE TABLE IS THE UNTURNED FOOTPRINT: `w` along the street, `h` into the block. The same
-  // farmhouse is 4×2 on a south plot and 2×4 on an east one — one building, two ground shapes
-  // — and `footprintFor` is the only correct way to ask which.
+  // The UNTURNED footprint: the same farmhouse is 4x2 on a south plot and 2x4 on an east one,
+  // and footprintFor is the only correct way to ask which.
   it('measures each kind along the street and into the block', () => {
     const areas = CITY_DWELLING_KINDS.map((k) => {
       const f = DWELLING_FOOTPRINTS[k]
@@ -355,10 +342,7 @@ describe('city structures', () => {
       expect(s.owner, s.kind).toBeNull()
   })
 
-  // EVERY DWELLING THIS TEMPLATE PLATS IS ONE A BODY CAN GET INTO. It used to be only `house`,
-  // because two rosters in SimConfigSchema named `house` and nothing else, and the cottage, the
-  // cabin and the farmhouse were painted scenery a mind walked to all night. `roofed` on the
-  // recipe row is now the one answer, and this asserts the template and that row agree.
+  // `roofed` on the recipe row is the one answer; this asserts the template and that row agree.
   it('plats no dwelling the engine cannot let a body into', () => {
     for (const s of structures.filter(x => isDwellingKind(x.kind) || x.kind === 'storehouse')) {
       expect(isRoofedKind(DEFAULT_CONFIG, s.kind), `nobody can get into a ${s.kind}`).toBe(true)
@@ -467,13 +451,8 @@ describe('★ the town this grammar builds, measured', () => {
   })
 })
 
-// ★ THE WORLD MUST BE BIGGER THAN THE TOWN — AT EVERY RING, FOREVER.
-//
-// The generator lane closed on this: "ring 2 is 98 tiles and ring 3 is 136 against a 128-tile
-// world, so the world will need to grow before the town does." Two numbers decided the world's
-// size and both were round: 128 at genesis and a 192 ceiling on growth. Neither survives here.
-// What decides it now is the town: `worldSizeForRings` is `townSpan` plus a block pitch of wild
-// on each side, and it is unbounded in the ring count because the grammar is.
+// worldSizeForRings is townSpan plus a block pitch of wild on each side, unbounded in the ring
+// count because the grammar is.
 describe('★ the world a town of R rings needs', () => {
   it('is the town plus one block pitch of wild on every side, and has no ceiling', () => {
     expect(WORLD_MARGIN).toBe(PITCH)
@@ -485,9 +464,7 @@ describe('★ the world a town of R rings needs', () => {
     expect(worldSizeForRings(1000)).toBe(townSpan(1000) + 2 * PITCH)
   })
 
-  // ★ THE RED. This is the state the lane inherited, asserted as the thing that is wrong: a
-  // world pinned at 128 with the town pinned at the genesis anchor refuses ring 2 onward. The
-  // proof below is not vacuous because THIS is what it is measured against.
+  // The red this is measured against: a 128-tile world at the genesis anchor refuses ring 2 on.
   it('is exactly what a fixed 128-tile world at a fixed anchor could not give', () => {
     expect(templateFits(CITY_ANCHOR_DEFAULT, WORLD_SIZE_GENESIS, 1)).toBe(true)
     for (const r of [2, 3, 4, 5])
@@ -497,10 +474,8 @@ describe('★ the world a town of R rings needs', () => {
     expect(worldSizeForRings(2)).toBeGreaterThan(WORLD_SIZE_GENESIS)
   })
 
-  // ★ THE SQUARE IS THE FIXED POINT, so growing the town moves its CORNER and never its
-  // CENTRE — and never the river. This is what lets the world extend rather than be repainted:
-  // the ford, the lake fork and the forage nodes are placed against a channel that does not
-  // move, at any ring count.
+  // The square is the fixed point, so growing the town moves its corner, never its centre and
+  // never the river: the ford and the forage nodes sit against a channel that does not move.
   it('leaves the square and the channel exactly where they are, at every ring', () => {
     for (let r = 1; r <= 12; r++) {
       const a = anchorFor(r)
@@ -527,9 +502,7 @@ describe('★ the world a town of R rings needs', () => {
   })
 })
 
-// ★ THE THREE INVARIANTS, HELD AT RING 5 AND RING 6. The generator lane proved dry and
-// road-fronted out to ring 4 and could go no further, because past ring 1 there was no world to
-// stand the town in. IN-WORLD is the third, and it is the one this lane exists for.
+// Dry and road-fronted were proved out to ring 4; in-world is the third invariant.
 describe('★ the town still stands at ring 5', () => {
   for (const rings of [5, 6]) {
     it(`puts every legal building on every plot of ring ${rings} on dry, in-world, road-fronted ground`, () => {
@@ -559,10 +532,8 @@ describe('★ the town still stands at ring 5', () => {
       expect(wet, 'a building on water').toEqual([])
       expect(doorless, 'a door that is not on a road').toEqual([])
       expect(outside, 'a building off the edge of the world').toEqual([])
-      // Not merely inside: the whole TOWN — its streets, not only its walls — keeps a block
-      // pitch of wild on every side. Measured on the box rather than on the building tiles,
-      // because the outermost buildings stand three tiles in from their own street and that
-      // slack would swallow a shrunken margin without a single assertion noticing.
+      // Measured on the box, not on the building tiles: the outermost buildings stand three tiles
+      // in from their own street, and that slack would swallow a shrunken margin unnoticed.
       const span = townSpan(rings)
       const box = {
         dx0: world.anchor.x, dy0: world.anchor.y,
@@ -654,9 +625,8 @@ describe('edgesOwed', () => {
       .toEqual([{ edge: 'n', owed: 19 }, { edge: 'e', owed: 19 }, { edge: 's', owed: 19 }, { edge: 'w', owed: 19 }])
   })
 
-  // The genesis world is not a counter-example to the rule, it is the first thing the rule
-  // finds: 128 tiles leave the genesis town four rows short of its southern margin, which is
-  // the same shortfall the generator lane reported and the reason growth exists.
+  // The genesis world is not a counter-example but the first thing the rule finds: 128 tiles leave
+  // the town four rows short of its southern margin.
   it('finds the genesis world four rows short to the south, and short nowhere else', () => {
     const built = cityStructures()
     const a = CITY_ANCHOR_DEFAULT
@@ -794,9 +764,8 @@ const ORTHO = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const
 const roadSetOf = (t: CityTemplate): Set<string> =>
   new Set(t.tiles.filter(isRoadTile).map((x) => key(x.dx, x.dy)))
 
-/** 1. FRONTAGE. Pairs of structures whose footprints touch orthogonally. A door that opens
- *  against a neighbour's wall is not frontage, and a town has ground on every side of every
- *  building — so the invariant is that this list is empty. */
+/** 1. FRONTAGE. Pairs of structures whose footprints touch orthogonally. A town has ground on
+ *  every side of every building, so the invariant is that this list is empty. */
 function touchingStructures(t: CityTemplate): Array<[string, string]> {
   const out: Array<[string, string]> = []
   const at = new Map<string, number>()
@@ -869,10 +838,8 @@ type StreetRank = {
   dwellings: Array<{ kind: string; along: number; span: number }>
 }
 
-/** The houses of the town, grouped by the street their doors open onto and ordered along it.
- *  `along` is the near edge in the street's own direction and `span` the extent. The facing
- *  column decides which street a building is on — it is not inferred from the road set, so a
- *  building at a crossroads cannot be filed under the wrong one. */
+/** The houses grouped by the street their doors open onto and ordered along it. The facing column
+ *  decides which street a building is on, so one at a crossroads cannot be filed under the wrong one. */
 function dwellingRanks(t: CityTemplate): StreetRank[] {
   const byStreet = new Map<string, StreetRank['dwellings']>()
   for (const s of t.structures) {
@@ -889,9 +856,8 @@ function dwellingRanks(t: CityTemplate): StreetRank[] {
     .sort((a, b) => a.street.localeCompare(b.street))
 }
 
-/** 3. VARIETY OF MASS. The longest run of one dwelling kind standing consecutively on one
- *  street. Two neighbours of a kind read as neighbours; three read as a terrace, and five in
- *  a line was the complaint — so the ruling is N = 2. */
+/** 3. VARIETY OF MASS. The longest run of one dwelling kind on one street: two neighbours read as
+ *  neighbours, three read as a terrace, so the ruling is N = 2. */
 function longestKindRun(t: CityTemplate): number {
   let worst = 0
   for (const rank of dwellingRanks(t)) {
@@ -938,9 +904,8 @@ describe('PROPERTY 1 — buildings front onto something', () => {
     expect(touchingStructures(stub).length).toBeGreaterThan(0)
   })
 
-  // In this projection moving equally in +dx and +dy is PURE DEPTH, so a building directly
-  // behind another is a building you cannot see. Two doors on one line is the array-space
-  // signature of that, and the block-and-plot lattice cannot produce it.
+  // Moving equally in +dx and +dy is pure depth, so a building directly behind another cannot be
+  // seen. Two doors on one line is the array-space signature of that.
   it('never puts one door directly behind another', () => {
     const fronts = t.structures.filter(s => s.w > 1 || s.h > 1).map(doorFrontTile)
     expect(new Set(fronts.map(d => key(d.dx, d.dy))).size).toBe(fronts.length)

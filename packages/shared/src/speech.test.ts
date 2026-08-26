@@ -42,9 +42,8 @@ describe('★ speech is the one untrusted string that reaches a mind', () => {
   })
 
   it('★ ANTI-VACUITY: ordinary speech comes out byte-for-byte as it went in', () => {
-    // A cap set below normal speech is a gag, not a guard. Measured over every voice card in
-    // the tree: p50 29 chars, longest authored line 151, `wordBudget.burst` tops out at 28
-    // words (~170 chars). 240 is 8x the median and clear of the longest burst allowed.
+    // A cap set below normal speech is a gag, not a guard. Over every voice card in the tree:
+    // p50 29 chars, longest authored line 151, wordBudget.burst tops out at 28 words (~170).
     for (const said of [
       'The river is high today.',
       "Don't go past the ford, Nadia — it's running fast.",

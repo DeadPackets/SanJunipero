@@ -1,28 +1,5 @@
-// ★ A TOWN GRAMMAR, NOT A TOWN PICTURE.
-//
-// The layout is not a list of eleven positions. It is a block-and-plot lattice plus a rule for
-// extending it, so the town the agents grow is spaced correctly BY CONSTRUCTION and nobody
-// ever hand-places a building again. The genesis town and a town thirty builds later come out
-// of this one file; there is no special case for the start.
-//
-//   sx = (dx - dy) * 16      sy = (dx + dy) * 8
-//
-// ★ THE PROJECTION IS THE WHOLE REASON THE GRAMMAR LOOKS LIKE THIS. `dx - dy` IS screen x and
-// `dx + dy` IS screen y, so moving equally in +dx and +dy is PURE DEPTH — zero sideways
-// travel, maximum occlusion. That is why the old town had houses hiding behind houses. A
-// rectangle in the array renders as a diamond on screen and a diamond in the array renders as
-// a screen rectangle; everything counter-intuitive below follows from that one line, and any
-// "simplification" that forgets it re-creates the original defect.
-//
-// THE FACING CONSTRAINT decides where frontage can exist. Two facings, SW and SE, the user's
-// explicit choice — the forge has art for those and no others, so NE and NW are not merely
-// unused here, they are unrepresentable.
-//   SW: door on the +y face → the building stands NORTH of an east–west street.
-//   SE: door on the +x face → the building stands WEST  of a north–south street.
-// So a block is built out along its SOUTH and EAST edges only. Its north-west interior is
-// backland — yards, gardens, the outbuildings agents add later — and that is also the near
-// corner of the block on screen, so every block presents an L of frontage to the camera with
-// open ground behind it. Which is what an isometric town actually looks like.
+// sx=(dx-dy)*16, sy=(dx+dy)*8 — equal +dx/+dy is pure depth, so a lattice rectangle renders
+// as a diamond. Only SW/SE have art, so blocks build out along their south and east edges only.
 
 /** 16 tiles of block, 3 of street. STREET was 2 and gave 71.6 px against a 72 px floor. */
 export const BLOCK = 16
@@ -61,9 +38,8 @@ export const centreOf = (s: { dx: number; dy: number; w: number; h: number }): {
 export type GroundKind = 'dry' | 'water' | 'bank'
 export type Ground = (dx: number, dy: number) => GroundKind
 
-/** A real river is a reason for the town's shape, not a stripe. This one runs roughly
- *  north–south with a meander, and the grid simply is not platted where it would stand in
- *  water — which is why ring 1 plats five blocks and not eight. */
+/** A river is a reason for the town's shape, not a stripe: the grid is not platted where it would
+ *  stand in water, which is why ring 1 plats five blocks and not eight. */
 export const riverCentre = (dy: number): number => -6 + 5 * Math.sin(dy / 17) + dy * 0.22
 
 export const isRiverWater = (dx: number, dy: number): boolean =>
@@ -95,9 +71,8 @@ export function blockTiles(i: number, j: number): TileXY[] {
   return out
 }
 
-/** The street tiles doors actually open onto: the block's south street row and east street
- *  column. Platting requires these dry, which is what makes "every door fronts a road" a
- *  property of the plat rule rather than of a ring count. */
+/** The street tiles doors open onto: the block's south street row and east street column. Platting
+ *  requires these dry, which makes "every door fronts a road" a property of the plat rule. */
 export function frontageTiles(i: number, j: number): TileXY[] {
   const x0 = i * PITCH, y0 = j * PITCH
   const out: TileXY[] = []
@@ -239,20 +214,8 @@ export function closestPair(structures: readonly Massed[]): number {
   return worst
 }
 
-/**
- * ★ TWO NUMBERS, NEVER ONE — because the whole-town "closest pair" does not measure the floor.
- *
- * `latticeFloor` proves 86.1626 px over 2 496 pairings of every legal building on every plot.
- * But the well and the fire pit are 1×1 monuments standing in the paved square, which the
- * lattice never platted and the survey never measured, and they are 73.7564 px apart — closer
- * than any pair the grammar governs. A bridge is the same: it stands on the water where the
- * water decides, not on a plot.
- *
- * So a single whole-town figure silently mixes governed and ungoverned pairs, and one day it
- * will hide a real regression behind a monument. Report both, name both, assert both. The
- * caller decides what is governed — being SEATED ON A PLOT is the test, never "bigger than
- * 1×1", which a two-tile bridge deck passes and a plot never seated.
- */
+/** Two numbers: the well, the fire pit and a bridge are not seated on plots, and the monuments
+ *  are 73.76 px apart — closer than any pair the lattice governs. Seated-on-a-plot is the test. */
 export type TownSpacing = {
   /** Closest pair among plot-seated buildings. The invariant, and the only claim the floor makes. */
   latticeFloor: number
@@ -271,9 +234,7 @@ export function townSpacing(governed: readonly Massed[], ungoverned: readonly Ma
   }
 }
 
-/** Everything that can be wrong with a town, in one list: two buildings on one tile, a
- *  building in the river, a building on a road, two centres closer than the floor, a door
- *  that opens onto something that is not a road. An empty list is the whole claim. */
+/** Everything that can be wrong with a town, in one list. An empty list is the whole claim. */
 export function townErrors(
   structures: readonly PlacedStructure[],
   roads: readonly TileXY[],
@@ -303,12 +264,8 @@ export function townErrors(
   return errs
 }
 
-/**
- * ★ EXHAUSTIVE. Every legal building on every plot of a 3×3 patch of blocks, against every
- * other. The lattice is periodic on `PITCH` in both axes and a building never leaves its own
- * block, so a floor that holds across a 3×3 patch holds for the infinite lattice — which is
- * why no sequence of agent builds, in any order, can ever produce a collision.
- */
+/** Exhaustive: the lattice is periodic on PITCH in both axes and a building never leaves its own
+ *  block, so a floor that holds across a 3x3 patch holds for the infinite lattice. */
 export function latticeFloor(offsets: readonly number[] = PLOT_OFFSETS): {
   closest: number; worst: string; overlaps: number; pairings: number
 } {

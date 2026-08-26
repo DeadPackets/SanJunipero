@@ -6,20 +6,8 @@ import {
 } from './townGrammar.js'
 import { claimAll, plotKey, takenPlots, type Wanted } from './townClaim.js'
 
-// ★ THE TEMPLATE IS A PLOTTER, NOT A PICTURE.
-//
-// This file used to be a hand-written list of eight dwellings at literal coordinates, and the
-// user rejected the town it drew on sight: "This doesn't look like a real city. You need to
-// design a city that looks like it makes sense, can naturally expand (as agents build new
-// buildings and roads), and is still spaced enough." It now plats blocks on the 19-tile pitch,
-// derives plots from blocks and stands buildings on plots — and the genesis town comes out of
-// the SAME function that produces a town thirty builds later. One grammar, no special case for
-// the start. `townGrammar.ts` holds the rule and its exhaustive proof; this file is where the
-// rule meets the world: a ring count, an anchor, a river, and the eleven things genesis stands.
-//
-// Its consumer is genesis (engine/gateway), so it lives in shared: homing it in forge would
-// make the engine depend on sharp and better-sqlite3 to read a fixture (plan deviation D-2,
-// controller-accepted).
+// Plats blocks on the 19-tile pitch and stands buildings on plots, so the genesis town and a
+// town thirty builds later come out of one function. In shared: genesis (engine/gateway) reads it.
 
 /** The town starts one ring of blocks around the square. It does not STAY that: `townGrammar`
  *  plats the next ring when this one fills, and nothing in this file caps the count. */
@@ -32,44 +20,32 @@ export const townSpan = (rings: number): number => 2 * townOrigin(rings) + BLOCK
 
 export const TOWN_ORIGIN = townOrigin(TOWN_RINGS_GENESIS)
 
-// ★ THE SQUARE IS THE FIXED POINT OF THE WORLD — not the template's corner.
-//
-// The town grows OUTWARD around the square, so the square is the one town coordinate that has
-// a world coordinate. The template's own origin walks one PITCH north-west per ring, which is
-// why the anchor is a FUNCTION of the ring count and not a constant: a town of two rings
-// anchored where a town of one ring was anchored would be a town whose centre had moved.
+// The town grows outward around the square, so the square is the one town coordinate that has a
+// world coordinate; the template's own origin walks a PITCH north-west per ring.
 export const TOWN_SQUARE = { x: 65, y: 78 } as const
 
-/** Where the template's own (0, 0) stands, for a town of `rings` rings around `square`. In the
- *  authored frame this runs negative from ring 4 — the town needs ground the world's array
- *  origin does not address, which is what growing north and west is for. */
+/** Where the template's own (0, 0) stands, for a town of `rings` rings around `square`. Runs
+ *  negative from ring 4 — that ground is what growing north and west is for. */
 export const anchorFor = (
   rings: number, square: { x: number; y: number } = TOWN_SQUARE,
 ): { x: number; y: number } => ({ x: square.x - townOrigin(rings), y: square.y - townOrigin(rings) })
 
-// ★ THE ANCHOR PUTS THE TOWN'S RIVER ON THE WORLD'S RIVER. `RIVER_LOCAL_DX + anchor.x` is
-// `GENESIS_RIVER_X`; engine's world.test.ts asserts the two agree, because a town that paints
-// a channel the world does not have is a town with two rivers in it.
+// RIVER_LOCAL_DX + anchor.x is GENESIS_RIVER_X: a town that paints a channel the world does not
+// have is a town with two rivers in it.
 export const CITY_ANCHOR_DEFAULT = anchorFor(TOWN_RINGS_GENESIS)
 export const CITY_W = townSpan(TOWN_RINGS_GENESIS), CITY_H = townSpan(TOWN_RINGS_GENESIS)
 export const WORLD_SIZE_GENESIS = 128           // C11 §9; asserted here, never imported from engine
 
-// ★ THE WORLD MUST BE BIGGER THAN THE TOWN, AND THERE IS NO CEILING ON EITHER.
-//
-// The grammar plats rings forever, so any fixed world size is the same bug with a later fuse.
-// What the world owes the town is not a SIZE, it is a CLEARANCE: one block pitch of wild
-// beyond everything that stands, which is exactly the ground the next ring of blocks needs.
-// A world that keeps that promise can never be the thing that stops a build, and a town that
-// keeps building keeps widening its world.
+// Not a size, a clearance: one block pitch of wild beyond everything standing, which is exactly
+// the ground the next ring needs. So the world can never be the thing that stops a build.
 export const WORLD_MARGIN = PITCH
 
 /** The smallest square world that can hold a town of `rings` rings, margin and all. Unbounded
  *  in `rings`, because the grammar is: ask for a bigger town and get a bigger world. */
 export const worldSizeForRings = (rings: number): number => townSpan(rings) + 2 * WORLD_MARGIN
 
-/** That world, laid out: the town sits one margin in from every edge, so its square lands at
- *  `WORLD_MARGIN + townOrigin(rings)`. This is the world's OWN frame — its origin is not the
- *  authored origin, because growing north or west moves it. */
+/** That world, laid out: the town sits one margin in from every edge. This is the world's OWN
+ *  frame — its origin is not the authored origin, because growing north or west moves it. */
 export function worldForRings(rings: number): {
   size: number; anchor: { x: number; y: number }; square: { x: number; y: number }
 } {
@@ -83,16 +59,8 @@ export function worldForRings(rings: number): {
 
 export type EdgeOwed = { edge: 'n' | 'e' | 's' | 'w'; owed: number }
 
-/**
- * ★ HOW MUCH GROUND THE WORLD OWES, READ OFF WHAT STANDS IN IT.
- *
- * `box` is the tile box of the built set — the same measurement the camera's bounds, the
- * minimap's scale and the cull already derive, and deliberately NOT a ring count: a ring count
- * would need the square's world coordinate, and the world's array origin moves when it grows
- * north or west. What stands in the world moves with it, so this survives the shift.
- *
- * An empty list is the invariant. A non-empty one names the edges to widen and by how much.
- */
+/** Off a measured box of what stands, never a ring count: a ring count needs the square's world
+ *  coordinate and the array origin moves. An empty list is the invariant. */
 export function edgesOwed(
   box: { dx0: number; dy0: number; dx1: number; dy1: number },
   size: { w: number; h: number },
@@ -125,10 +93,8 @@ export const CityStructureSchema = z.object({
   // USER RULING 1: the five houses are owned, one founder each; every public building is null.
   // The field is REQUIRED; only its value may be null.
   owner: z.string().min(1).nullable(),
-  // ★ FACING IS DATA. `facingFrom(dx, dy)` derives a facing from a delta and can answer `ne`
-  // or `nw`, for which the forge has no art — right for a walking body, which turns four ways,
-  // never right for a building, which the user ruled turns two. Because this is a two-value
-  // enum and it is REQUIRED, NE and NW are not merely unused: they are unrepresentable.
+  // A two-value enum, and REQUIRED, so `ne` and `nw` — which the forge has no art for — are
+  // unrepresentable rather than merely unused. facingFrom(dx, dy) answers four ways.
   facing: z.enum(TOWN_FACINGS),
   furnishings: z.array(CityFurnishingSchema),
 }).strict()
@@ -157,19 +123,8 @@ export const key = (dx: number, dy: number): string => `${dx},${dy}`
 
 // ---------------------------------------------------------------- the ground the town plats on
 
-// ★ A RIVER IS A REASON FOR THE TOWN'S SHAPE, NOT A STRIPE. It is what makes ring 1 plat FIVE
-// blocks and not eight: the whole western column stands in water, so the grid is simply not
-// laid there, and the west of the template is riverfront rather than street. Nothing is placed
-// against it by hand — the plat rule reads the ground and the plots follow.
-//
-// STRAIGHT, not the reference meander. `townGrammar.RIVER_GROUND` carries the meander and the
-// grammar's own ruling numbers are proven on it; the town paints the water it is ACTUALLY
-// built beside, and the world's channel where the town stands is straight. A grammar that
-// refuses to build on water must refuse the water that is there.
-// ★ THE CHANNEL IS FIXED IN GRAMMAR COORDINATES, because the square is fixed in the world.
-// `TOWN_SQUARE.x + RIVER_GRAMMAR_DX === GENESIS_RIVER_X`, at every ring count there will ever
-// be — which is what keeps ONE river on the map as the town grows around it. The template-local
-// offset is the ring-dependent spelling of the same column.
+// Fixed in grammar coordinates: TOWN_SQUARE.x + RIVER_GRAMMAR_DX === GENESIS_RIVER_X at every
+// ring count. Straight, not the grammar's meander — the town paints the water it stands beside.
 export const RIVER_GRAMMAR_DX = -16
 export const RIVER_HALF = 1             // three tiles of channel
 export const BANK_HALF = 2              // one tile of wet earth either side
@@ -225,10 +180,8 @@ function rectTiles(r: Rect, to: number): CityTile[] {
   return out
 }
 
-/** ★ THE TOWN CLEARS ITS OWN GROUND. Every tile of the extent is authored — water, wet bank,
- *  or cleared grass — so a building never stands in a forest the world happened to grow there
- *  and a street is never impassable ground. Road tiles are laid by `cityRoadTiles` and cut out
- *  here, so the two sets stay disjoint. */
+/** Every tile of the extent is authored — water, wet bank or cleared grass — so a building never
+ *  stands in a forest and a street is never impassable. Road tiles are cut out here. */
 export function cityTerrainTiles(rings: number = TOWN_RINGS_GENESIS): CityTile[] {
   const road = new Set(cityRoadTiles(rings).map(t => key(t.dx, t.dy)))
   const span = townSpan(rings)
@@ -242,17 +195,9 @@ export function cityTerrainTiles(rings: number = TOWN_RINGS_GENESIS): CityTile[]
   return out
 }
 
-/**
- * The streets the grammar plats, plus the square's paving.
- *
- * ★ THERE IS NO SPECIAL CASE HERE AND THERE MUST NEVER BE ONE. A phantom road row once ran
- * straight through the frontage of a block, putting buildings on roads; it came from a special
- * case that widened the main street, and the fix was DELETING the special case. Every street
- * in this town is a street the plat rule laid.
- *
- * NO BRIDGE: `streetTiles` cuts water out of the set, so nothing here crosses the channel —
- * the far bank is an earned milestone (C11 §2).
- */
+/** The streets the grammar plats, plus the square's paving (the two monument tiles stay bare).
+ *  No special case, ever: a widened-main-street special case once ran a road through a block's
+ *  frontage. `streetTiles` cuts water, so nothing here crosses the channel. */
 export function cityRoadTiles(rings: number = TOWN_RINGS_GENESIS): CityTile[] {
   const well = wellAt(rings), firePit = firePitAt(rings)
   const monuments = new Set([key(well.dx, well.dy), key(firePit.dx, firePit.dy)])
@@ -278,24 +223,15 @@ export const isRoadTile = (t: CityTile): boolean => t.to === T_ROAD || t.to === 
 
 // ---------------------------------------------------------------- structures
 
-// ★ THE FOUR DWELLING KINDS — a shared contract with the art lane, for the CONTEMPORARY
-// RURAL setting. These are FIXTURES this template places, never new buildable verbs:
-// `structures.recipes` is the buildable set and it is C8's business, not this file's. `house`
-// is the exception that proves it — the founders' homes are also the one buildable dwelling.
+// A shared contract with the art lane: the dwelling kinds this template places. What can be
+// BUILT is structures.recipes, not this list.
 export const CITY_DWELLING_KINDS = ['cottage', 'farmhouse', 'cabin', 'house'] as const
 export type DwellingKind = (typeof CITY_DWELLING_KINDS)[number]
 export const isDwellingKind = (kind: string): kind is DwellingKind =>
   (CITY_DWELLING_KINDS as readonly string[]).includes(kind)
 
-// Mass, not palette. In isometric a change of DEPTH is nearly invisible and a change of WIDTH
-// along the street is not, so the kinds differ where the eye can see it: four, four, six and
-// eight ground tiles.
-//
-// ★ THIS TABLE IS THE UNTURNED FOOTPRINT — `w` runs ALONG the street, `h` INTO the block.
-// A building on an east plot stands on that same footprint TURNED, so a farmhouse is 4×2 on a
-// south plot and 2×4 on an east one: one building, two ground shapes. `footprintFor` is the
-// only correct way to ask what ground a placed building covers, and reading `w`/`h` off this
-// row for an SE building is the mistake it exists to prevent.
+// The UNTURNED footprint: w runs along the street, h into the block. footprintFor is the only
+// correct way to ask what ground a placed building covers — an SE building stands on it turned.
 export const DWELLING_FOOTPRINTS: Readonly<Record<DwellingKind, { w: number; h: number }>> = {
   cabin: { w: 2, h: 2 }, cottage: { w: 3, h: 2 }, farmhouse: { w: 4, h: 2 },
   // 2×2 is the footprint every landed gate measured a founder's home at, and `houseSize` in
@@ -303,13 +239,8 @@ export const DWELLING_FOOTPRINTS: Readonly<Record<DwellingKind, { w: number; h: 
   house: { w: 2, h: 2 },
 }
 
-// ★ HOW MANY BODIES A ROOM HOLDS, AND FLOOR IS WHY. Two tiles of floor per body: a 2×2 house
-// takes two, a 3×2 cottage three, a 4×2 farmhouse four. PHYSICS, NOT OWNERSHIP — nothing here
-// asks whose the building is.
-//
-// It lived in `engine/interiors.ts` and moved here because it is now read by TWO sides: the
-// engine caps a room by it, and the template below lays a bed down for every body a dwelling
-// sleeps. The engine re-exports it, so every caller it had is untouched.
+// Two tiles of floor per body — physics, not ownership. Read by both sides: the engine caps a
+// room by it, and the template below lays a bed per body.
 export const TILES_PER_BODY = 2
 
 export function roomCapacity(s: { w: number; h: number }): number {
@@ -330,14 +261,8 @@ export type FounderId = (typeof FOUNDER_IDS)[number]
 // C10 T11 owns what a room actually looks like.
 export const CITY_INTERIOR_SLOTS = { w: 3, h: 3 } as const
 
-/**
- * ★ AND THE GRID IS AS WIDE AS THE HOUSEHOLD, because a bed is TWO slots deep.
- *
- * A shared dwelling lays one bed per body. A bed's library footprint is 1 × 2, so three beds
- * fill two whole rows of a 3 × 3 grid and a farmhouse's fourth has nowhere to go — the grid,
- * not the floor, is what runs out. It widens with `roomCapacity` and never narrows below the
- * landed 3, so a house, a storehouse, a shed, a cabin and a cottage are all exactly 3 × 3 still.
- */
+/** A bed is 1x2, so three beds fill two rows of a 3x3 grid and a farmhouse's fourth has nowhere
+ *  to go: the grid, not the floor, is what runs out. Widens with roomCapacity, never below 3. */
 export function citySlotsFor(kind: string): { w: number; h: number } {
   const plan = DWELLING_FOOTPRINTS[kind as DwellingKind]
   const w = plan === undefined ? CITY_INTERIOR_SLOTS.w
@@ -352,42 +277,14 @@ export const CITY_FURNISHING_KINDS =
 export const CITY_BED_KIND = 'bed'
 export const CITY_HEARTH_KIND = 'hearth'
 
-// ★ THE FIRE AND THE BED, ON ONE PAIR OF SLOTS. More than one dwelling holds them now, and
-// (0, 2) written in three places is (0, 2) that drifts. These are also the only two furnishings
-// a LAW reads, which is why a kind can be given these and nothing else and still be honest.
+// (0, 2) written in three places is (0, 2) that drifts.
 const THE_BED: CityFurnishing = { kind: CITY_BED_KIND, slot: { x: 2, y: 1 } }
 const THE_HEARTH: CityFurnishing = { kind: CITY_HEARTH_KIND, slot: { x: 0, y: 2 } }
-/**
- * ★ HOW A SHARED ROOM DIFFERS FROM A PRIVATE ONE, AND IT IS THE LADDER DRAWN.
- *
- * `world-fixes` made a farmhouse a real rung: half the fuel per body-night (0.375 against a
- * house's 0.75), bought by giving up the one thing `privateKinds` names. **If the two rooms look
- * alike on screen, that trade is invisible and the ladder is a spreadsheet.**
- *
- * So the room says it with the count, and the count is not chosen — it is `roomCapacity`, the
- * same `floor(w × h / 2)` the ladder is priced on:
- *
- *   · a PRIVATE dwelling lays ONE bed. A house sleeps two and has one bed, because the two are
- *     a couple: `reproductionSystem` counts a night only under a roof in `privateKinds`, and
- *     `bedSlots` already lays a partnered pair down one cell each in a single bed. One bed IS
- *     what privacy looks like.
- *   · a SHARED dwelling lays ONE BED PER BODY. A cottage sleeps three and shows three; a
- *     farmhouse sleeps four and shows four. Nobody here chose anybody.
- *
- * And the seat says the same thing twice: a house has a CHAIR, which seats one; a cottage and a
- * farmhouse have a BENCH, which seats whoever sits down. No rug in a shared room — a rug is a
- * comfort somebody owns.
- *
- * The beds run along the back-right wall and wrap, so a bigger household is a longer row rather
- * than a denser pile.
- */
+/** Bed count is roomCapacity — the same floor(w*h/2) the ladder is priced on. A private kind
+ *  lays one bed (a couple); a shared kind lays one per body. */
 const bedRow = (count: number): CityFurnishing[] =>
   Array.from({ length: count }, (_, i) => ({ kind: CITY_BED_KIND, slot: { x: i, y: 0 } }))
 
-// The beds run along the back-right wall in ONE row — a bed is two slots deep, so a row of them
-// is the whole of the grid's top two rows and the last row is what the household shares: the
-// fire, the table everybody eats at, and the bench, which seats whoever sits down where a
-// house's chair seats one.
 const sharedDwelling = (kind: DwellingKind): CityFurnishing[] => {
   const slots = citySlotsFor(kind)
   return [
@@ -415,18 +312,11 @@ const STOREHOUSE_FURNISHINGS: CityFurnishing[] = [
 
 const STOREHOUSE_KIND = 'storehouse'
 
-/**
- * ★ WHAT GENESIS ASKS THE GRAMMAR FOR — a list of buildings, NOT a list of positions.
- *
- * Nine buildings in the order they are raised. Each one claims the free plot nearest the
- * square, so the order below is the only thing that decides where anything stands, and moving
- * a line moves a building without any chance of moving it onto a road, into the river, or on
- * top of a neighbour. The five founders' houses are interleaved with the public buildings
- * rather than ranked together, which is what gives the streets more than one silhouette.
- */
 const mass = (m: { w: number; h: number }): { along: number; deep: number } =>
   ({ along: m.w, deep: m.h })
 
+// Genesis asks for buildings in the order they are raised, never for positions: each claims the free
+// plot nearest the square, so moving a line moves a building and cannot move it onto a road or a neighbour.
 export const GENESIS_WANTED: readonly Wanted[] = [
   { kind: STOREHOUSE_KIND, ...mass(DWELLING_FOOTPRINTS.house), owner: null },
   { kind: 'house', ...mass(DWELLING_FOOTPRINTS.house), owner: 'amara' },
@@ -439,23 +329,14 @@ export const GENESIS_WANTED: readonly Wanted[] = [
   { kind: 'farmhouse', ...mass(DWELLING_FOOTPRINTS.farmhouse), owner: null },
 ]
 
-// ★ A KIND WHOSE ROW SAYS `hearth` IS FURNISHED WITH ONE, AND `config.test.ts` HOLDS THE TWO
-// HALVES EQUAL. A recipe that promises a fire over a room with no fire in it is a fire a mind
-// can feed and nobody can see — the same parting of ways that made the house's own hearth
-// scenery for a chunk. A cottage and a farmhouse get the pair and nothing more: no renderer
-// draws their interior yet, and a table nobody can see is the dead data the recipe row refuses.
+// A kind whose row says `hearth` is furnished with one, or it is a fire a mind can feed and
+// nobody can see; config.test.ts holds the two halves equal.
 const FURNISHINGS_BY_KIND: Readonly<Record<string, CityFurnishing[]>> = {
   house: HOUSE_FURNISHINGS,
   cottage: sharedDwelling('cottage'),
   farmhouse: sharedDwelling('farmhouse'),
-  // ★ THE CABIN'S STOVE AND NO BED: it is the founding valley's one indoor fire and it is a
-  // refuge, not a home. A body is warm in it and still sleeps on the boards.
-  //
-  // The bench and the woodpile are here now that a renderer draws this room. They are the two
-  // things a refuge has and a home does not need: somewhere to sit out a night you are not
-  // sleeping through, and the fuel the fire on the wall opposite is fed from. NO BED, NO TABLE,
-  // NO RUG — the absence is the point, and it is the only way the screen can say "refuge" where
-  // the config says `hearth: true, bed: false`.
+  // A refuge, not a home: no bed, no table, no rug. The bench and the woodpile are the two things
+  // a refuge has — somewhere to sit out a night, and the fuel the fire is fed from.
   cabin: [
     THE_HEARTH,
     { kind: 'bench', slot: { x: 1, y: 2 } },
@@ -471,15 +352,8 @@ export function cityPlacements(): PlacedStructure[] {
   return claimAll({ ground: CITY_GROUND, wanted: GENESIS_WANTED }).built
 }
 
-// Eleven structures, the count C13 pinned: nine buildings on nine claimed plots, and the two
-// monuments in the square. The STANDING STONE is deliberately absent — it stands beyond the
-// edge of town, unexplained (C11 §9).
-//
-// EVERY DWELLING IS A HOME, AND ONLY A HOUSE IS PRIVATE. The two rosters this note used to
-// name are gone; the kind's own row answers the way in, the fire and the bed, so the cottage
-// and the farmhouse are buildings a body walks into rather than fixtures the eye reads.
-// `structures.privateKinds` still names `house` alone, which is the one thing the five
-// founders' own doors keep over any bigger roof.
+// Eleven: nine buildings on nine claimed plots plus the two monuments. The standing stone is
+// deliberately absent. Only structures.privateKinds (house) separates a home from a bigger roof.
 export function cityStructures(rings: number = TOWN_RINGS_GENESIS): CityStructure[] {
   const monument = (kind: string, at: { dx: number; dy: number }): CityStructure => ({
     kind, dx: at.dx, dy: at.dy, w: 1, h: 1, owner: null, facing: 'sw', furnishings: [],
@@ -497,9 +371,8 @@ export function cityStructures(rings: number = TOWN_RINGS_GENESIS): CityStructur
   ]
 }
 
-// Geometry only, so a caller holding a footprint and nothing else can ask. Both take the four
-// numbers they read rather than a whole `CityStructure`: a schema field added for the art lane
-// is not a reason for the showcase rasteriser to stop compiling.
+// Geometry only: both take the four numbers they read rather than a whole CityStructure, so a
+// schema field added for the art lane cannot stop the showcase rasteriser compiling.
 export type StructureBox = { dx: number; dy: number; w: number; h: number }
 
 // The tile a resident walks out of, on the south face, at the centre of the frontage.
@@ -514,11 +387,8 @@ export function structureTiles(s: StructureBox): { dx: number; dy: number }[] {
   return out
 }
 
-/** ★ THE TILE THE DOOR OPENS ONTO — outside the building, on the face its `facing` names. SW
- *  opens on the +y face, SE on the +x face, and there is no third answer because there is no
- *  third facing. A door that opens onto anything but a road is this project's most repeated
- *  defect, four times over; the grammar makes it structurally impossible and `frontages`
- *  measures it. */
+/** The tile the door opens onto — outside the building, on the face its `facing` names: SW opens
+ *  on the +y face, SE on the +x, and there is no third. `frontages` measures it. */
 export function doorFrontTile(s: CityStructure): { dx: number; dy: number } {
   return doorFrontOf(s)
 }
@@ -545,38 +415,15 @@ export function templateFits(
     && anchor.x + span <= worldSize && anchor.y + span <= worldSize
 }
 
-// ★ ONE FUNCTION, THREE DEFECTS, AND NOBODY COULD STATE ITS CONTRACT.
-//
-// `cityFreePlots(t, rings)` was wrong three times in three lanes. It clamped every plot through
-// a RING-1 extent, so an agent in a ring-2 town was offered nothing at all, silently. It read
-// "taken" off the hard-coded genesis nine and not off the world, so it answered ELEVEN however
-// many houses stood. And it took a `CityTemplate` it never once read, which is the whole reason
-// the other two were believable: a function handed the world looks like it is answering about
-// the world.
-//
-// Every one of the three failed by returning a PLAUSIBLE WRONG ANSWER instead of an error. So
-// the shape below is loud, and the two questions that were hiding in one function are two:
-//
-//   plattedPlots(rings)       WHAT COULD EVER BE BUILT ON — a fact about the lattice.
-//   genesisEmptyPlots(rings)  WHAT GENESIS LEAVES EMPTY   — a fact about THE TEMPLATE, which
-//                             is why it answers the same thing forever, correctly.
-//   claimTownPlot(...)        WHAT IS FREE RIGHT NOW      — townPlot.ts, and it takes the
-//                             rectangles actually standing, because only the world knows.
-//
-// Neither of the two here takes a template, so neither can be mistaken for the third.
+// Two questions, never one function: plattedPlots(rings) is a fact about the lattice,
+// genesisEmptyPlots(rings) about the template. What is free right now is claimTownPlot (townPlot.ts).
 
 export type PlotTile = {
   dx: number; dy: number; facing: 'sw' | 'se'; block: { i: number; j: number }; slot: string
 }
 
-/**
- * ★ EVERY PLOT THE GRAMMAR PLATS OUT TO `rings`, in TEMPLATE coordinates. The tile returned is
- * the plot's street corner — the tile a 1×1 building would take — so a viewer can point at it.
- *
- * A plot outside the extent THROWS rather than being quietly dropped: the silent filter is how
- * the ring-1 clamp hid for as long as it did, and a caller who has mismatched its ring count
- * needs to be told, not handed a shorter list.
- */
+/** Every plot the grammar plats out to `rings`, in TEMPLATE coordinates; the tile is the plot's
+ *  street corner. A plot outside the extent THROWS rather than being quietly dropped. */
 export function plattedPlots(rings: number = TOWN_RINGS_GENESIS): PlotTile[] {
   if (!Number.isInteger(rings) || rings < 1) {
     throw new Error(`plattedPlots: a town of ${rings} ring(s) has no plots — ask for at least 1`)
@@ -596,15 +443,8 @@ export function plattedPlots(rings: number = TOWN_RINGS_GENESIS): PlotTile[] {
   })
 }
 
-/**
- * ★ THE PLOTS THE GENESIS TEMPLATE LEAVES EMPTY — a fact about the TEMPLATE, and deliberately
- * not about any running world. It answers eleven on day one and eleven on day one hundred,
- * because the template is the same template; that is now the documented contract rather than
- * a bug wearing the word "free".
- *
- * What is free in a world where agents have been building is `claimTownPlot`, which reads the
- * rectangles that stand. Nothing in this file can answer that and nothing here pretends to.
- */
+/** A fact about the template, not any running world: eleven on day one and eleven on day one
+ *  hundred. What is free now is claimTownPlot. */
 export function genesisEmptyPlots(rings: number = TOWN_RINGS_GENESIS): PlotTile[] {
   const taken = takenPlots(cityPlacements())
   return plattedPlots(rings).filter((p) => !taken.has(plotKey(p)))
@@ -614,11 +454,8 @@ export function genesisEmptyPlots(rings: number = TOWN_RINGS_GENESIS): PlotTile[
 const templateSpan = (t: CityTemplate): number =>
   t.tiles.reduce((m, x) => Math.max(m, x.dx + 1, x.dy + 1), 0)
 
-/**
- * The empty plots of THIS template, as bare tiles. `t` is CHECKED and no longer decorative: a
- * template built for one ring count asked about another is exactly the ring-1 clamp, and it
- * now throws instead of quietly answering with a shorter list.
- */
+/** The empty plots of THIS template, as bare tiles. Throws when `t` was built for another ring
+ *  count rather than quietly answering with a shorter list. */
 export function growthPlots(t: CityTemplate, rings: number = TOWN_RINGS_GENESIS): { dx: number; dy: number }[] {
   const span = templateSpan(t)
   if (span !== townSpan(rings)) {
@@ -635,8 +472,7 @@ export const cityBlocks = (rings: number = TOWN_RINGS_GENESIS): Array<{ i: numbe
 const ORTHO = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const
 
 /** Every structure's door, and the road tile it opens onto. `onto` is null when the face the
- *  building says it presents is not a road at all — the frontage invariant is that this never
- *  happens, for any building on any plot the grammar can ever offer. */
+ *  building presents is not a road — the frontage invariant is that this never happens. */
 export function frontages(t: CityTemplate): Array<{
   kind: string; door: { dx: number; dy: number }; onto: { dx: number; dy: number } | null
 }> {

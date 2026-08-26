@@ -54,10 +54,6 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(c.structures.privateKinds).toEqual(['house'])
   })
 
-  // ★ THE ROSTERS ARE GONE. `enterableKinds` and `sleepableKinds` were two hand-written lists
-  // of kind names and both said `house` (plus a storehouse) — so the valley's own cabins,
-  // cottages and farmhouses were buildings nobody could get into or lie down in. The kind's own
-  // row answers it now, and nothing may reintroduce a list of names beside it.
   it('a roof is a property of the kind, not a roster of names', () => {
     expect(c.structures).not.toHaveProperty('enterableKinds')
     expect(c.structures).not.toHaveProperty('sleepableKinds')
@@ -68,9 +64,6 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(isRoofedKind(c, 'standing_stone')).toBe(false)
   })
 
-  // ★ AND NEITHER IS A FIRE. `HEAT_SOURCE_KINDS` was the third roster — two names in a Set in
-  // the warmth system — and it is why the hearth every house has held was a thing the renderer
-  // drew and no verb could reach. Same medicine, same shape: ask the kind.
   it('a fire is a property of the kind, not a roster of names', () => {
     const hearths = Object.keys(c.structures.recipes).filter((k) => isHearthKind(c, k)).sort()
     // The old roster's first name, `hearth`, was a structure kind NOTHING in this world has
@@ -85,14 +78,8 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(isRoofedKind(c, 'fire_pit')).toBe(false)
   })
 
-  // ★ THE SEAM THAT MUST NOT DRIFT: the engine's furnishings ARE the ones the room draws. The
-  // city template furnishes a house with a hearth and a bed and furnishes nothing else with
-  // either, and if these two halves ever disagree then a mind can feed a fire nobody can see,
-  // or sleep in a bed that is not in the picture.
-  //
-  // The three buildable dwellings are on both sides. A storehouse is on neither: it is a roof
-  // over goods, and the ledger below is what keeps that from drifting into "every roof is a
-  // home".
+  // If the two halves disagree a mind can feed a fire nobody can see, or sleep in a bed that is
+  // not in the picture. A storehouse is on neither side: a roof over goods is not a home.
   it('the furnishings the engine acts on are exactly the ones the room is drawn with', () => {
     const furnishedWith = (kind: string): string[] => [...new Set(cityStructures()
       .filter((s) => s.furnishings.some((f) => f.kind === kind))
@@ -105,10 +92,8 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(dwellingsWith(isBeddedKind)).toEqual(furnishedWith(CITY_BED_KIND))
   })
 
-  // ★ AND A FURNISHING FLAG EXISTS ONLY WHERE A LAW ASKS FOR ONE. A house also holds a table, a
-  // chair and a rug; none of the three is here, because nothing in the world reads them and a
-  // mind handed a word with no verb behind it spends turns being refused. This test is what
-  // stops the row quietly becoming a copy of the renderer's furniture list.
+  // Table, chair and rug are absent because no law reads them, and a word with no verb behind it
+  // only buys refusals.
   it('the row carries the two furnishings a law reads and not the room\'s whole inventory', () => {
     const row = c.structures.recipes['house']!
     // `sited` joins the dimensions rather than the furnishings: it says who picks the ground,
@@ -228,10 +213,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(c.fauna.fishSchoolBonus).toBe(2)
     expect(c.foodVariety).toEqual({ enabled: true, windowDays: 3, bonusPerKind: 0.05, maxBonus: 0.2 })
     expect(c.regrowth).toEqual({ enabled: true, saplingChancePerDay: 0.02, saplingDays: 30 })
-    // ★ ONE KEY. `maxSize` was a ceiling on a grammar that plats rings forever and `step` and
-    // `structuresPerStep` were a pace guessed against it. The world owes a CLEARANCE now —
-    // `WORLD_MARGIN` of ground beyond everything standing — and a clearance names its own edge
-    // and its own depth. All that is left to decide is whether the world may widen at all.
+    // A clearance, not a ceiling: all that is left to decide is whether the world may widen at all.
     expect(c.mapGrowth).toEqual({ enabled: true })
     expect(() => SimConfigSchema.parse({ mapGrowth: { maxSize: 192 } })).toThrow()
   })
@@ -273,15 +255,11 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(r['well']).toEqual({ inputs: { stone: 8 }, w: 1, h: 1, maxHp: 30, flammable: false, durationTicks: 720, roofed: false, hearth: false, bed: false, sited: false })
     expect(r['bridge']).toEqual({ inputs: { wood: 6 }, w: 1, h: 2, maxHp: 20, flammable: false, durationTicks: 480, roofed: false, hearth: false, bed: false, sited: true })
     expect(r['grave']).toEqual({ inputs: {}, w: 1, h: 1, maxHp: 10, flammable: false, durationTicks: 1, roofed: false, hearth: false, bed: false, sited: false })
-    // The four the town template plants. All four are roofed; an empty `inputs` is still the
-    // whole of what "nobody builds this" means, and only the two 2x2 ones keep it — a buildable
-    // cabin or storehouse would be a second name for `house`.
+    // Only the two 2x2 kinds keep empty inputs: a buildable cabin or storehouse is a second name for house.
     for (const k of ['storehouse', 'cabin', 'cottage', 'farmhouse']) expect(r[k]!.roofed, k).toBe(true)
     expect(r['storehouse']!.inputs).toEqual({})
     expect(r['cabin']!.inputs).toEqual({})
-    // ★ ONE RATE, NOT THREE AUTHORED NUMBERS. A house is 4 tiles of floor for 10 wood and 2 880
-    // ticks. Everything else with a roof that a mind can raise is priced off that: 2.5 wood and
-    // 720 ticks a tile. They had to be buildable for genesis to stand them up roofless.
+    // One rate, not three authored numbers: a house is 4 tiles for 10 wood and 2 880 ticks.
     const perTileWood = r['house']!.inputs['wood']! / (r['house']!.w * r['house']!.h)
     const perTileTicks = r['house']!.durationTicks / (r['house']!.w * r['house']!.h)
     expect([perTileWood, perTileTicks]).toEqual([2.5, 720])
@@ -290,10 +268,8 @@ describe('SimConfigSchema: C9 living-world sections', () => {
       expect(r[k]!.inputs, k).toEqual({ wood: tiles * perTileWood })
       expect(r[k]!.durationTicks, k).toBe(tiles * perTileTicks)
     }
-    // ★ THE LAMP, AND ITS WHOLE ARGUMENT IN FOUR NUMBERS. 2 wood against a house's 10, and 120
-    // ticks against 2 880 — a night is 720, so this is the one roofless thing a want that
-    // arrives at dusk can actually finish before dawn. `sited` because a plot spent on a lamp
-    // is a house not built, and the lattice plats masses, not street furniture.
+    // A night is 720 ticks, so a lamp is the one roofless thing a want that arrives at dusk can
+    // finish before dawn. `sited` because the lattice plats masses, not street furniture.
     expect(r['lamp_post']).toEqual({ inputs: { wood: 2 }, w: 1, h: 1, maxHp: 15, flammable: false, durationTicks: 120, roofed: false, hearth: false, bed: false, sited: true })
     expect(r['lamp_post']!.durationTicks).toBeLessThan(MINUTES_PER_DAY / 2)   // finishable in one night
     // Only the two kinds that are not masses choose their own ground.

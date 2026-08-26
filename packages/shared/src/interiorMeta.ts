@@ -1,16 +1,7 @@
 import { z } from 'zod'
 
-// The single source for interior placement vocabulary. C10 T10's FurnishingKind union is
-// structurally identical, so that lane compiles untouched and may import this at its leisure.
-//
-// ★ THIS IS THE RENDERER'S ROOM VOCABULARY — WHAT HAS A ROOM DRAWN FOR IT. Enterability is NOT
-// this list; it is `isRoofedKind`, and the viewer asks the config for it. The two are related by
-// one law, held by `interiors.test.ts`: **every kind a body can enter must have a room here**,
-// or walking through a door is a body vanishing into a shape.
-//
-// The reverse does not hold, and `shed` is why: it is not roofed, nothing enters it, and it
-// keeps a room because its art and eight furnishing manifests are shipped and name it. That
-// exception is pinned by name, so a second unenterable room kind cannot arrive quietly.
+// The renderer's room vocabulary, not enterability — that is roofed. Every enterable kind must
+// have a room here (interiors.test.ts); shed is the one unenterable exception, pinned by name.
 export const INTERIOR_KINDS =
   ['house', 'storehouse', 'shed', 'cabin', 'cottage', 'farmhouse'] as const
 export type InteriorKind = (typeof INTERIOR_KINDS)[number]

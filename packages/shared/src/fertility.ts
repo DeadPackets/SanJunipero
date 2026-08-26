@@ -4,9 +4,8 @@ import type { SimConfig } from './config.js'
 // one definition site for the whole world (G4).
 export const WATER_TILES: ReadonlySet<number> = new Set([2, 10])
 
-// Fertility is a distance function, never a stored gradient — the harvest and C12's overlay
-// call this same function, so the ground the farmer feels and the ground the viewer draws
-// can never disagree. Pure, hash-free: nothing about it is written into the world.
+// A distance function, never a stored gradient: the harvest and the overlay call this same
+// function, so the ground the farmer feels and the ground the viewer draws cannot disagree.
 export function fertilityAt(terrain: number[][], x: number, y: number, config: SimConfig): number {
   const f = config.fertility
   if (!f.enabled) return 1
