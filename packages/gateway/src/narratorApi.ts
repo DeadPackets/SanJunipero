@@ -31,6 +31,11 @@ export type NarratorApiDeps = {
   agentDbDir?: string                       // agent memory, for the days a personality moved
 }
 
+/** How many entries `/api/chronicle` sends. Every open panel refetches the feed on a 20 s timer,
+ *  and unbounded that is the whole town history per viewer per poll. `/api/chronicle/count` still
+ *  counts the whole record, so the badge does not shrink with the page. */
+export const CHRONICLE_MAX = 200
+
 /** The five things the world's own log records that the town would remember. Anything else is
  *  the everyday, and a scrub bar covered in the everyday points nowhere. */
 export const MARK_EVENT_TYPES: readonly string[] = [
@@ -110,7 +115,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const { fromTick, toTick } = windowOf(url)
     sendPrebuilt(res, cache.json(`chronicle:${fromTick}:${toTick}`, () =>
-      ({ entries: chronicleEntries(fromTick, toTick) })))
+      ({ entries: chronicleEntries(fromTick, toTick).slice(-CHRONICLE_MAX) })))
   })
 
   /** How long the ledger is, without sending the ledger. It costs nothing extra:

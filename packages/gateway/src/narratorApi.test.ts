@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { CHRONICLE_ICONS, DEFAULT_CONFIG, MomentsResponseSchema, type ChronicleEntry } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
-import { NARRATOR_READ_TABLES } from './narratorApi.js'
+import { CHRONICLE_MAX, NARRATOR_READ_TABLES } from './narratorApi.js'
 import { createGateway, type Gateway } from './server.js'
 
 // The DDL below is copied from packages/narrator/src/schema.ts — importing @sj/narrator would
@@ -357,5 +357,51 @@ describe('the scrub bar can aim at a discovery', () => {
     const body = await (await fetch(`${bareBase}/api/timeline/marks`)).json() as
       { discoveries: unknown }
     expect(body.discoveries).toEqual([])
+  })
+})
+
+describe('a town with more history than a viewer can read', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-narrapi-long-'))
+  let gw: Gateway
+  let base: string
+
+  beforeAll(async () => {
+    const dbPath = join(dir, 'world.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('chronicle-length'),
+      snapshotEveryTicks: 100,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
+          emit('agent_spawned', { id: 'bob', name: 'Bob', x: 0, y: 1, ageDays: 7300 })
+        }
+        if (tick > 1) emit('co_slept', { aId: 'alice', bId: 'bob', day: tick })
+      },
+    })
+    for (let i = 0; i < CHRONICLE_MAX * 2; i++) loop.step()
+    gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    base = `http://127.0.0.1:${gw.port}`
+  })
+  afterAll(async () => {
+    await gw.close()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  /** Every open panel refetches this every 20 s; unbounded it is the whole town history per
+   *  viewer per poll, and an unbounded list of rows at the other end. */
+  it('★ sends the newest page, while the badge still counts the whole record', async () => {
+    const entries = ((await (await fetch(`${base}/api/chronicle`)).json()) as
+      { entries: ChronicleEntry[] }).entries
+    expect(entries.length).toBe(CHRONICLE_MAX)
+
+    const count = await (await fetch(`${base}/api/chronicle/count`)).json() as
+      { count: number; latestSeq: number }
+    expect(count.count, 'the badge counts what the panel does not send')
+      .toBeGreaterThan(CHRONICLE_MAX)
+    // the page kept is the newest one, not the first N of a town nobody is watching any more
+    expect(entries[entries.length - 1]!.seq).toBe(count.latestSeq)
   })
 })
