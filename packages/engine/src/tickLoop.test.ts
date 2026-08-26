@@ -49,6 +49,27 @@ describe('TickLoop', () => {
     expect(l.tick).toBe(3)
     expect(stateHash(replayLatest(store).state)).toBe(stateHash(l.state))
   })
+  it('rolls the streams back with the state, so the retry draws the number the throw ate', () => {
+    const rng = new RngStreams('t')
+    const draws: number[] = []
+    let boom = true
+    const store = new EventStore(openDb(':memory:'))
+    const l = new TickLoop({
+      store, state: genesisState(DEFAULT_CONFIG), rng,
+      onTick: ({ tick, emit }) => {
+        draws.push(rng.get('health').next())
+        emit('agent_spawned', { id: `a${tick}`, name: `a${tick}`, x: 0, y: 0, ageDays: 7300 })
+        if (boom) { boom = false; throw new Error('boom') }
+      },
+    })
+    const pre = rng.snapshot()
+    expect(() => l.step()).toThrow('boom')
+    expect(rng.snapshot()).toEqual(pre)
+    l.step()
+    expect(draws).toHaveLength(2)
+    expect(draws[1]).toBe(draws[0])
+  })
+
   it('a throw inside the running loop clears the timer, reports via onError, and start() works again', () => {
     vi.useFakeTimers()
     try {

@@ -42,13 +42,18 @@ export class RngStreams {
       __seed: this.seed,
     } as { __seed: string } & Record<string, RngState>
   }
+  /** Rewinds this object rather than making a new one, so every holder of the reference rewinds. */
+  load(snap: Record<string, RngState | string>): void {
+    this.streams.clear()
+    for (const [k, v] of Object.entries(snap)) {
+      if (k === '__seed') continue
+      this.streams.set(k, RngStream.from(v as RngState))
+    }
+  }
   static restore(snap: Record<string, RngState | string>): RngStreams {
     const seed = typeof snap.__seed === 'string' ? snap.__seed : ''
     const s = new RngStreams(seed)
-    for (const [k, v] of Object.entries(snap)) {
-      if (k === '__seed') continue
-      s.streams.set(k, RngStream.from(v as RngState))
-    }
+    s.load(snap)
     return s
   }
 }
