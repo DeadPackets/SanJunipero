@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } from '@sj/engine'
 import { AssetCodex, EMOTE_KINDS, decodePng, encodePng, openForgeDb, paletteRgb, type RawImage } from '@sj/forge'
+import { PLACEHOLDER_PX } from './assetsHttp.js'
 import { createGateway, type Gateway } from './server.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId))
@@ -71,6 +72,24 @@ describe('asset http routes', () => {
 
   it('404s an unknown placeholder class', async () => {
     expect((await fetch(`${base}/assets/placeholder/spaceship.png`)).status).toBe(404)
+  })
+
+  /** A sharp encode can fail — an exhausted libuv pool, an OOM on a big raw buffer. Unanswered,
+   *  the socket holds head-less and silent until Node's 300 s requestTimeout closes it. */
+  it('★ answers a failed encode instead of holding the socket open', async () => {
+    const real = PLACEHOLDER_PX.crop
+    PLACEHOLDER_PX.crop = { w: 0, h: 0 }   // sharp: "Input Buffer is empty"
+    try {
+      const res = await fetch(`${base}/assets/placeholder/crop.png`, {
+        signal: AbortSignal.timeout(5_000),
+      })
+      expect(res.status).toBe(500)
+      await res.text()
+    } finally {
+      PLACEHOLDER_PX.crop = real
+    }
+    // and the failure was not remembered as this key's answer for the life of the process
+    expect((await fetch(`${base}/assets/placeholder/crop.png`)).status).toBe(200)
   })
 
   it('builds a v2-geometry placeholder character sheet', async () => {
