@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { FELT_TAGS, MYSTERIES } from '@sj/engine'
 import { assemblePrompt, compactDayLog, type PromptBlocks } from './assemble.js'
 import { FELT_EVENT_PROSE, perceptionToProse } from './prose.js'
-import { FORBIDDEN_FRAMING, RULES_OF_BEING } from './rulesOfBeing.js'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
+import { RULES_OF_BEING } from './rulesOfBeing.js'
 import {
   conversationPacket,
   fixtureBlocks,

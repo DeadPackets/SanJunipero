@@ -94,6 +94,3 @@ out far less often than plain ones.
 The long dash is a crutch. A full stop does the same work, and a comma does the
 rest.`
 
-
-// The human-framing law lives in @sj/shared so the three packages that enforce it cannot drift.
-export { FORBIDDEN_FRAMING } from '@sj/shared'

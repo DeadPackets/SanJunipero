@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { openArbiterDb } from './schema.js'
 import { CodexStore, type CodexEntry } from './codex.js'
 import { CANON } from './canon.js'
-import { FORBIDDEN_FRAMING } from './prompt.js'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
 
 const LADDER: CodexEntry[] = [
   { id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null },

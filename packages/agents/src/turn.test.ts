@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dayPhaseFromTick, MINUTES_PER_DAY } from '@sj/shared'
+import { dayPhaseFromTick, FORBIDDEN_FRAMING, MINUTES_PER_DAY } from '@sj/shared'
 import { z } from 'zod'
 import * as engine from '@sj/engine'
 import { FALLBACK_TURN, IntentParamsSchema, IntentSchema, TurnSchema, parseTurnWithRepair, reconsiderTick } from './turn.js'
-import { FORBIDDEN_FRAMING } from './prompt/rulesOfBeing.js'
 
 const validTurn = {
   thought: 'The well is low; I should fetch water before noon.',

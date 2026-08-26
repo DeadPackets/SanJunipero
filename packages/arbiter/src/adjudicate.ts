@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
 import { scanRulingForGlassLeak, type LlmClient } from '@sj/agents'
 import { registerVerb, VERBS } from '@sj/engine'
-import type { DiscoveryCredit, DiscoveryKind } from '@sj/shared'
+import { FORBIDDEN_FRAMING, type DiscoveryCredit, type DiscoveryKind } from '@sj/shared'
 import { CANON } from './canon.js'
 import { CodexStore } from './codex.js'
 import { codify as codifyRecipe, verbFromRecipe } from './codify.js'
@@ -9,7 +9,7 @@ import {
   assembleExpressivePrompt, ExpressiveRulingSchema, expressiveRow, expressiveVerbFromRuling,
   isExpressive, isExpressiveRow, type ExpressiveRuling,
 } from './expressive.js'
-import { assembleAdjudicationPrompt, FORBIDDEN_FRAMING } from './prompt.js'
+import { assembleAdjudicationPrompt } from './prompt.js'
 import { recipeSanityRefusal, type RecipeVocabulary } from './sanity.js'
 import { ReviewStore } from './review.js'
 import { RulebookStore } from './rulebook.js'

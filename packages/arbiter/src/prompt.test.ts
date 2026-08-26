@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { assembleAdjudicationPrompt, FORBIDDEN_FRAMING, type AdjudicationBlocks } from './prompt.js'
+import { FORBIDDEN_FRAMING } from '@sj/shared'
+import { assembleAdjudicationPrompt, type AdjudicationBlocks } from './prompt.js'
 
 function fixtureBlocks(overrides: Partial<AdjudicationBlocks> = {}): AdjudicationBlocks {
   return {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, simTimeFromTick, type SimEvent } from '@sj/shared'
+import { DEFAULT_CONFIG, FORBIDDEN_FRAMING, MINUTES_PER_DAY, simTimeFromTick, type SimEvent } from '@sj/shared'
 import { fold, genesisState, submitIntent, type TileId, type WorldState } from '@sj/engine'
 import { assemblePrompt } from './assemble.js'
 import { calendarLine, perceptionToProse } from './prose.js'
-import { CAPABILITIES, FORBIDDEN_FRAMING, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
+import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
 import { fixtureBlocks, quietMeadowPacket, tamarIdentity } from '../testutil/fixtures.js'
 
 // Block 1 is the cache-stable prefix of every prompt.

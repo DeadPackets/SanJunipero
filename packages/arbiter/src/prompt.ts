@@ -67,9 +67,6 @@ function fenceSaying(saying: string | undefined): string | null {
   return fence('In their own words, the thought behind it', saying)
 }
 
-// The human-framing law lives in @sj/shared so the three packages that enforce it cannot drift.
-export { FORBIDDEN_FRAMING } from '@sj/shared'
-
 function renderAgent(agent: AdjudicationBlocks['agent']): string {
   const skills = Object.entries(agent.skills)
     .map(([track, level]) => `  ${track}: ${level}`)

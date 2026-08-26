@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { craftRoutes, makeables } from '@sj/engine'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { DEFAULT_CONFIG, FORBIDDEN_FRAMING } from '@sj/shared'
 import { makeablesLine } from './prose.js'
-import { FORBIDDEN_FRAMING } from './rulesOfBeing.js'
 
 // `build` and `craft` are useless without the nouns they take. The vocabulary is derived from
 // the two tables the verbs validate against, and it lives in the volatile block.
