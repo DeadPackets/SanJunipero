@@ -37,10 +37,11 @@ jobs:
       - name: install
         run: pnpm install --frozen-lockfile
 
-      # `pnpm typecheck` runs both halves; the agents scripts project is separate and has broken
-      # on its own before.
-      - name: typecheck
-        run: pnpm typecheck
+      # typecheck (both halves — the scripts projects are separate and have broken on their own
+      # before), then lint, format, knip and the suite. The vitest flags that keep this suite
+      # honest live in vitest.config.ts now, so a local run gets them too.
+      - name: check
+        run: pnpm check
 
       # vite's `build.assetsDir` and the gateway's `CLIENT_ASSET_DIR` must name the same
       # directory; if they drift the viewer 404s on its own scripts with a green suite.
@@ -52,14 +53,6 @@ jobs:
           test -f packages/web/dist/index.html
           test -d packages/web/dist/client
           grep -q '/client/' packages/web/dist/index.html
-
-      # --testTimeout/--hookTimeout fix timeout-shaped flakes and cost nothing on a green run.
-      # --maxWorkers=2 fixes what a timeout cannot: bonds.test.ts asserts a RATIO of two measured
-      # durations, and half of a 4-vCPU runner left idle keeps it measuring the code.
-      # If it flakes anyway, raise the timeout and lower workers to 1 — never add --retry.
-      # `pnpm exec vitest`, never `pnpm test -- …`: pnpm silently drops everything after `--`.
-      - name: test
-        run: pnpm exec vitest run --testTimeout=30000 --hookTimeout=30000 --maxWorkers=2
 
       # Build only: nothing is pushed, and there are no registry credentials in this workflow.
       - name: the image still builds
