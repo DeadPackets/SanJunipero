@@ -53,12 +53,8 @@ describe('★ where the town is, in a world that moves under it', () => {
     expect(townSquareOf(big)).toBeNull()
   })
 
-  // ★ THE VACUOUS-GUARD FAMILY'S FOURTEENTH MEMBER, CLOSED. The test used to be "the tile at
-  // TOWN_SQUARE is paved", whose passing condition is satisfiable without its property (this
-  // world's town is centred there) holding. The dev world carried no origin, so the engine
-  // looked ten rows north of the showcase's real square, found a paved tile of the plaza's own
-  // street ring, and answered confidently about a town that is not there — offering plots off
-  // the lattice a viewer can see. It did not fail; it lied.
+  // The test used to be "the tile at TOWN_SQUARE is paved", which is satisfiable without this
+  // world's town being centred there: the dev world answered confidently about a town that is not.
   it('★ A ROAD THROUGH THE SQUARE IS NOT A TOWN — one paved tile, and a whole paved crossing', () => {
     const blank = (): number[][] => Array.from({ length: 128 }, () => Array.from({ length: 128 }, () => 0))
 
@@ -121,11 +117,8 @@ describe('★ where the town is, in a world that moves under it', () => {
 })
 
 
-// ★ THE GRAMMAR KNOWS ONE RIVER; THE WORLD HAS A LAKE AS WELL.
-//
-// This guard passed its first mutation — deleting the world half of the ground changed
-// nothing, because rings 1 and 2 hold no water the grammar does not already know about. It is
-// ring 3 that needs it, and only running the mutation said so.
+// This guard passed its first mutation: rings 1 and 2 hold no water the grammar does not already
+// know about. It is ring 3 that needs the world half of the ground.
 describe('★ the plat rule reads the world s water too, not only the grammar s', () => {
   const WET = new Set([2, 10])
 

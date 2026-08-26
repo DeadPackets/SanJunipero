@@ -253,10 +253,8 @@ describe('G11a-W4: pave converts and consumes, and the costs are ordered', () =>
     expect(cost[0]).toBeGreaterThan(cost[8]!)
     expect(cost[8]).toBeGreaterThan(cost[7]!)
 
-    // And the search actually takes the cheap lane. Three corridors of the same length —
-    // grass, worn path, road — walled off from each other, both ends open. The road lane
-    // costs two extra grass tiles to reach at each end and is still the cheapest route,
-    // which is only true if the search is pricing tiles rather than counting them.
+    // Three corridors of the same length, walled off from each other. The road lane costs two
+    // extra grass tiles at each end and is still cheapest, which holds only if tiles are priced.
     const W = 42, H = 14
     const terrain: TileId[][] = Array.from({ length: H }, () => Array.from({ length: W }, (): TileId => 2))
     for (let y = 0; y < H; y++) { terrain[y]![0] = 0; terrain[y]![W - 1] = 0 }
@@ -270,10 +268,8 @@ describe('G11a-W4: pave converts and consumes, and the costs are ordered', () =>
 })
 
 describe('G11a-W5: feet wear a trail, and grass takes it back', () => {
-  // Owed here by batch 9 (D10): the golden's three short days never wear a tile through, so
-  // the assertion the regen could not fire lands in the gate, on REAL walking. The threshold
-  // is dialled down to make a trail reachable inside a test; the number the world ships with
-  // is asserted first, so the dial is visible and never a quiet weakening of the gate line.
+  // The threshold is dialled down to make a trail reachable inside a test; the number the world
+  // ships with is asserted first, so the dial is visible and never a quiet weakening.
   const WEAR_AT = 4
   const WORN: SimConfig = SimConfigSchema.parse({ ...QUIET, desirePaths: { wearThreshold: WEAR_AT } })
   const MID = { x: 5, y: 7 }

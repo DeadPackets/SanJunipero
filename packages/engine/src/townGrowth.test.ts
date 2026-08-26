@@ -1,16 +1,5 @@
-// @slow — ★ THE END-TO-END PROOF OF THE CLAIM SEAM.
-//
-// Not "the claim returns a plot": a RUNNING WORLD, stepped tick by tick through the real
-// `TickLoop` and the real `worldTick`, in which scripted bodies raise houses through the real
-// `build` verb until the town crosses into ring 2 — and then every building standing in it is
-// dry, in the world, road-fronted, one to a plot, and no closer to its neighbour than the
-// floor the grammar proved exhaustively.
-//
-// The world-growth lane proved 3 488 buildings at ring 5 with 0 violations FROM THE GRAMMAR
-// SIDE, by enumerating plots. This is the same claim from the AGENT side, where the only way a
-// building can exist at all is that a body stood on the ground and worked for it.
-//
-// Scripted policies only. No LLM, no network, $0.
+// @slow — the claim seam from the agent side: a real TickLoop and the real build verb raising
+// houses until the town crosses into ring 2. Scripted policies only, no LLM.
 import { describe, expect, it } from 'vitest'
 import {
   MINUTES_PER_DAY, SimConfigSchema, TOWN_SQUARE, T_ROAD, doorFrontOf, freePlots,
@@ -28,9 +17,8 @@ import { submitIntent } from './intent.js'
 import { isAdjacentToRect } from './verbs.js'
 import { claimInWorld, standingRects, townGroundOf } from './town.js'
 
-// ★ ONE FIXTURE DIAL, AND IT IS DECLARED: a house takes four hours here instead of two days,
-// so a town that reaches ring 2 fits inside a test suite. It changes how LONG a build takes
-// and nothing whatever about WHERE it goes — `buildTicks` is read after the site is settled.
+// One declared fixture dial: a house takes four hours here instead of two days, so a town that
+// reaches ring 2 fits inside a test suite. buildTicks is read after the site is settled.
 const HOUSE_TICKS = 240
 const CFG: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
@@ -48,12 +36,8 @@ const WET: ReadonlySet<number> = new Set([2, 10])
 
 type Run = { loop: TickLoop; store: EventStore; genesisTerrain: TileId[][]; growths: number; refusals: number }
 
-/**
- * Six masons who want roofs and nothing else. Each one asks the world where the ground is,
- * walks there, and builds. It never names a coordinate to build at, because after this lane
- * there is no such parameter — the two-step below is exactly what a mind reads out of the
- * perception line and, failing that, out of the refusal.
- */
+/** Six masons who want roofs and nothing else. None ever names a coordinate: the two-step below
+ *  is what a mind reads out of the perception line and, failing that, out of the refusal. */
 function runTown(seed = 'claim-seam'): Run {
   const { terrain, events: genesis } = makeGenesisWorld(CFG)
   const store = new EventStore(openDb(':memory:'))
@@ -70,10 +54,8 @@ function runTown(seed = 'claim-seam'): Run {
           id, name: id, x: TOWN_SQUARE.x + i + 1, y: TOWN_SQUARE.y + 1, ageDays: 7300,
         }))
       }
-      // FIXTURE UPKEEP, said out loud: this proof is about the lattice, not about the economy,
-      // so the masons are fed and re-supplied on a fixed clock — the same device the scripted
-      // G2 fixture uses to keep two bodies at a post for three days. Nothing here touches
-      // where a building goes; every one of them still goes through `build`.
+      // Fixture upkeep, said out loud: this proof is about the lattice and not the economy, so the
+      // masons are fed on a fixed clock. Every building still goes through `build`.
       if (tick % UPKEEP_EVERY === 0) {
         for (const id of ids) {
           if (loop.state.agents[id] === undefined) continue
@@ -132,9 +114,8 @@ const ringOf = (s: { x: number; y: number }): number => {
 const massOf = (s: { x: number; y: number; w: number; h: number }) =>
   ({ dx: s.x, dy: s.y, w: s.w, h: s.h })
 
-/** ★ THE TWO NUMBERS, and what decides which set a building falls in: BEING ON A PLOT. The
- *  proxy this used to use — bigger than 1×1 — happens to agree here and does not agree in
- *  `farBank.test.ts`, where a 2×1 deck stands on water the lattice never platted. */
+/** What decides which set a building falls in is BEING ON A PLOT. The proxy this used to use —
+ *  bigger than 1x1 — agrees here and not in farBank.test.ts, where a 2x1 deck stands on water. */
 const spacingOf = (state: WorldState, all: readonly Structure[]) => townSpacing(
   all.filter((s) => plotOf(state, s) !== null).map(massOf),
   all.filter((s) => plotOf(state, s) === null).map(massOf),
@@ -196,11 +177,8 @@ describe('★ agents build until the town reaches ring 2, and everything in it i
     expect(all.filter((s) => plotOf(state, s) === null).map((s) => s.kind).sort()).toEqual(['fire_pit', 'well'])
   })
 
-  // ★ TWO NUMBERS, NAMED APART. 86.1626 px is the exhaustive floor over 2 496 pairings of
-  // BUILDINGS ON PLOTS, and it is a claim about those pairs and no others. The whole-town
-  // minimum is smaller and always was: the well and the fire pit are 1×1 monuments standing in
-  // the paved square, which the lattice never platted and the survey never measured. Quoting
-  // one for the other would one day hide a real regression behind a monument.
+  // 86.1626 px is the exhaustive floor over 2 496 pairings of buildings ON PLOTS. The whole-town
+  // minimum is smaller: the two 1x1 monuments stand in a square the lattice never platted.
   it('★ and no two PLOT-SEATED buildings are closer than the floor the grammar proved', () => {
     const sp = spacingOf(state, all)
     expect(sp.latticeFloor).toBeGreaterThanOrEqual(latticeFloor().closest)
@@ -236,9 +214,8 @@ describe('★ agents build until the town reaches ring 2, and everything in it i
   })
 
   it('★ and the whole run replays from genesis, event for event, to the same hash', () => {
-    // The genesis terrain is the loop's starting condition, not an event, so replay is handed
-    // the same one. Everything after it — every street the town paved, every tree it felled,
-    // every row the world grew — is in the log and nowhere else.
+    // The genesis terrain is the loop's starting condition, not an event, so replay is handed the
+    // same one. Everything after it is in the log and nowhere else.
     expect(stateHash(replayFromGenesis(run.store, CFG, run.genesisTerrain))).toBe(stateHash(state))
   })
 

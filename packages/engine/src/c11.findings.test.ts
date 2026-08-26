@@ -1,13 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY } from '@sj/shared'
 
-// THREE FACTS ABOUT THE TUNING, PINNED SO THEY CANNOT DRIFT QUIETLY.
-//
-// All three are reachable only through `packages/shared/src/config.ts`, which is frozen: the
-// forge pin `stateHash(DEFAULT_CONFIG)` moves the moment any of them is touched. Under the
-// batch-11 absolute they are REPORTED with exact numbers and NOT fixed. These rows exist so
-// the numbers in cleanup/c11-batch11-report.md stay true, and so a later authorized regen has
-// something to measure itself against. Nothing here asks for a change.
+// Three tuning facts, pinned. All three are reachable only through packages/shared/src/config.ts,
+// which is frozen: the forge pin stateHash(DEFAULT_CONFIG) moves the moment any is touched.
 
 const C = DEFAULT_CONFIG
 const perDay = (perTick: number): number => perTick * MINUTES_PER_DAY
@@ -46,10 +41,8 @@ describe('C11 finding 1 — the energy budget spends more than a day holds', () 
 })
 
 describe('C11 finding 2 — the garment decides a winter hour, and only the mildest one', () => {
-  // `isExposed` is a threshold on `ambient + insulation >= comfortBand`. At 2 the only band a
-  // coat decided was an autumn dusk: the winter rungs closed because four walls are an
-  // absolute shield, not because of the coat, so the whole clothing line was decorative in the
-  // season it exists for. T37b step 2b closes exactly the gap the finding named and no more.
+  // isExposed is a threshold on `ambient + insulation >= comfortBand`. At 2 the only band a coat
+  // decided was an autumn dusk, so the clothing line was decorative in the season it exists for.
   const flips = (ambient: number): boolean =>
     (ambient >= C.warmth.comfortBand) !== (ambient + C.warmth.insulation.garment >= C.warmth.comfortBand)
 
@@ -85,10 +78,8 @@ describe('C11 finding 2 — the garment decides a winter hour, and only the mild
 })
 
 describe('C11 finding 3 — an untended wound is a clock, and the clock now waits to be noticed', () => {
-  // A consequence of the `slain` fix, which mints an `injury` affliction at the wound's tier.
-  // Correct by the affliction model and never reviewed as tuning until T37b step 2c. A wound
-  // has to outlast the walk of whoever might tend it, or the designed social overlap — one
-  // body sees another is hurt and crosses the town — cannot physically happen.
+  // A wound has to outlast the walk of whoever might tend it, or the designed social overlap —
+  // one body sees another is hurt and crosses the town — cannot physically happen.
   const hpAfterBlow = (kind: 'minor' | 'serious' | 'grave'): number => C.health.maxHp - C.health.injuryDamage[kind]
   const drainPerDay = (severity: number): number => perDay(C.mortality.drainPerTick.injury * severity)
   // The best case a body can give itself: fed, and asleep when the dawn payment lands.
@@ -110,9 +101,8 @@ describe('C11 finding 3 — an untended wound is a clock, and the clock now wait
   })
 
   it('a hungry body still does not mend, and even then a bruise is two and a half days', () => {
-    // `recoveryDelta` pays nothing to a body under the fed threshold unless somebody tends it.
-    // The threshold is left where it is: hunger should cost a wounded body its own recovery,
-    // and at this drain it still leaves a window somebody else can reach.
+    // recoveryDelta pays nothing to a body under the fed threshold unless somebody tends it.
+    // Hunger should cost a wounded body its recovery, and this drain still leaves a reachable window.
     expect(C.mortality.fedThreshold).toBe(40)
     expect(hpAfterBlow('minor') / drainPerDay(1)).toBeCloseTo(2.5, 2)
     expect(hpAfterBlow('grave') / drainPerDay(3) * 24).toBeGreaterThan(8)
@@ -125,9 +115,8 @@ describe('C11 finding 3 — an untended wound is a clock, and the clock now wait
     const tendedPerDay = C.health.tendedRecoveryHpPerDay * C.mortality.tendMultiplier
     expect(tendedPerDay).toBe(30)
     expect(drainPerDay(1)).toBeGreaterThan(tendedPerDay)
-    // Tended and asleep, a minor and a serious wound are both survivable — which is the point
-    // of the change: care is worth giving. A GRAVE one is not, and the leaf is still what
-    // decides it. Medicine stays load-bearing at exactly the tier that should need it.
+    // Tended and asleep, a minor and a serious wound are both survivable; a grave one is not, so
+    // medicine stays load-bearing at exactly the tier that should need it.
     const tendedAsleep = tendedPerDay * C.mortality.sleepRegenMultiplier
     expect(tendedAsleep).toBeGreaterThan(drainPerDay(2))
     expect(tendedAsleep).toBeLessThan(drainPerDay(3))

@@ -13,14 +13,8 @@ import { claimInWorld, townSquareOf } from './town.js'
 import { buildIsPlotted, isKindleable, isPlottedKind, isStokeable, workPenalty, type PendingEvent } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
 
-// ★ A LAMP POST — the standing light this world had no way to make.
-//
-// Before this the only fixed flames were the square's own fire pit, placed by genesis, and the
-// hearths inside houses. Everything else was a torch: 240 ticks in one hand, and it goes with
-// the hand. The dark has charged `light.nightWorkPenalty` for work since C11, so the hazard was
-// already shipped and the answer to it was not — which is the arm-B shape the motivation lane
-// measured, in a different costume. This file is the road, not a new hazard: nothing here makes
-// the night worse, and the tests below pin that it does not.
+// Before this the only fixed flames were the square's own fire pit and the hearths inside houses;
+// everything else was a torch. The road, not a new hazard: nothing here makes the night worse.
 
 const QUIET = {
   weather: { hourlyChangeChance: 0 },
@@ -105,10 +99,8 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
     expect(wood).toBe(2)
   })
 
-  // ★ THIS TEST WAS VACUOUS ON ITS FIRST WRITING and a mutation proved it: the fixture map has
-  // no town square, so `buildIsPlotted` is false for EVERY kind there and `sited: false` on the
-  // lamp passed all eleven tests. A siting rule can only be measured in a town. The world below
-  // is the genesis valley, which has one.
+  // Vacuous on its first writing: the fixture map has no town square, so buildIsPlotted is false
+  // for every kind there. A siting rule can only be measured in a town, so this one is the valley.
   it('★ in a TOWN, a house takes the plot and a lamp still takes a coordinate', () => {
     const g = makeGenesisWorld(CFG)
     const town = g.events.reduce((acc, e) => fold(acc, ev(e.type, e.payload), CFG), genesisState(CFG, g.terrain))
@@ -243,19 +235,15 @@ describe('what a lamp is NOT — the three ways it could have quietly made the n
     expect(out.events.filter((e) => e.type === 'fire_ignited')).toEqual([])
   })
 
-  // The house was this test's example of "a building is not a fire" — and by the time the merge
-  // put the two lanes together it had stopped being one, because `furnishings` gave it a
-  // `hearth` and `structureGlowRadius` gives that hearth its reach. The guard is unchanged and
-  // is what it always was: a building with NO fire in it takes no wood. Every roofed kind
-  // without a hearth is asked, so it cannot pass by everything being stokeable.
+  // The guard is what it always was: a building with NO fire in it takes no wood. Every roofed
+  // kind without a hearth is asked, so it cannot pass by everything being stokeable.
   it('is fed, never pocketed — and a building with no fire in it is not a fire', () => {
     expect(isStokeable(CFG, 'lamp_post')).toBe(true)
     expect(isStokeable(CFG, 'hearth')).toBe(true)
     expect(isStokeable(CFG, 'fire_pit')).toBe(true)
     expect(isStokeable(CFG, 'house')).toBe(true)      // it holds a hearth, and that is the fire
-    // Asked of the WHOLE table and not a hand-list, so a kind that gains a hearth is read off
-    // its row instead of going stale here. `lamp_post` is the one stokeable kind with no
-    // hearth: a fire that holds nobody's cold off is exactly what a street light is.
+    // Asked of the WHOLE table and not a hand-list, so a kind that gains a hearth is read off its
+    // row. lamp_post is the one stokeable kind with no hearth: a fire that holds nobody's cold off.
     for (const k of Object.keys(CFG.structures.recipes)) {
       expect(isStokeable(CFG, k), k).toBe(isHearthKind(CFG, k) || k === 'lamp_post')
     }

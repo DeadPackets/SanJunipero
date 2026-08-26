@@ -1,6 +1,5 @@
-// @slow — GATE G11a, the whole-world half: the 128x128 town, the map that widens, the laws an
-// operator may move, the night that hides a taking, the tick budget, and the question batch 9
-// left open — would a competent body have lived? Scripted actors only, no LLM, $0.
+// @slow — the whole-world half: the 128x128 town, the map that widens, the laws an operator may
+// move, the night that hides a taking, and whether a competent body would have lived.
 import { describe, it, expect } from 'vitest'
 import {
   CHUNK_TILES, chunkOf, chunksTouched, MINUTES_PER_DAY, SimConfigSchema, stateHash,
@@ -62,9 +61,8 @@ describe('G11a-M1: the genesis town folds, and it is the size the world says it 
 
     const structures = Object.values(state.structures)
     expect(structures).toHaveLength(11)
-    // Eleven buildings, and four of them still have a roof: the village was abandoned, and the
-    // other seven stand as walls a pair of hands can finish. That is the whole of the founding's
-    // want — sound, this valley held 21 bodies against a cast of five.
+    // Eleven buildings, four of them still roofed: the village was abandoned and the other seven
+    // stand as walls a pair of hands can finish. Sound, this valley held 21 bodies against five.
     expect(structures.filter((s) => s.stage === 'complete').map((s) => s.kind).sort())
       .toEqual(['cabin', 'fire_pit', 'storehouse', 'well'])
     expect(structures.filter((s) => s.kind === 'house')).toHaveLength(5)
@@ -101,12 +99,8 @@ describe('G11a-M1: the genesis town folds, and it is the size the world says it 
 describe('G11a-M2: the map grows, everything on it moves with it, and the log replays it', () => {
   const GROWS: SimConfig = SimConfigSchema.parse(QUIET)
 
-  // ★ THE WORLD WIDENS THE EDGE THE TOWN IS CROWDING, AND ONLY THAT ONE. The genesis town's
-  // southernmost roof stands four rows inside its own margin in a 128-tile world — the very
-  // shortfall the generator lane raised — and its southernmost KERB stands three rows further
-  // out again, because a building sits three tiles inside its own street. The clearance is
-  // owed to the ground the town has laid, not to its roofs, so the first midnight grows south
-  // by seven, and then the world owes nothing and stops.
+  // The clearance is owed to the ground the town has laid, not to its roofs: the southernmost
+  // kerb stands three rows past the southernmost roof, so the first midnight grows south by seven.
   it('widens the one edge the town crowds, by exactly the ground it owes, and then stops', () => {
     const { state: town } = genesisTown(GROWS)
     const grown = pass(town, GROWS, MINUTES_PER_DAY)
@@ -419,9 +413,8 @@ describe('G11a-P1: the perf gate on a full 128x128 town', () => {
   })
 
   it('a mid-run pave is visible to the very next search — there is no cache to go stale', () => {
-    // Task 37(d) (hierarchical pathing, a cached portal graph) was never implemented, and the
-    // `pathing.regionSize` dial that nothing read is gone. The property the cache line was
-    // there to protect is asserted directly: the search reads the ground as it stands.
+    // The property a cached portal graph would have had to protect, asserted directly: the search
+    // reads the ground as it stands.
     const terrain = MAP(40)
     let s = genesisState(CFG, terrain)
     const before = searchPath(s, { x: 0, y: 20 }, { x: 39, y: 20 }, CFG)!
@@ -439,10 +432,8 @@ describe('G11a-P1: the perf gate on a full 128x128 town', () => {
 
 // ------------------------------------------------- batch-9 concern 1, answered on the bench
 
-// The golden's three deaths are the cheapest offline reproduction of the live run's collapse
-// problem. The question the controller asked is not "did they die" but "would a COMPETENT body
-// have lived" — one that eats when there is food, sleeps when there is a bed, drinks when there
-// is water. This is that body, on the world's own defaults, for the golden's own three days.
+// The question is not "did they die" but "would a COMPETENT body have lived" — one that eats when
+// there is food, sleeps when there is a bed, drinks when there is water.
 describe('G11a-D1: a competent body comes through three days on the default world, untouched', () => {
   const HOUSE = { id: 'structure_1', kind: 'house', x: 6, y: 6, w: 2, h: 2 }
   const DAYS = 3
@@ -458,9 +449,8 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     const door = doorTile(s, s.structures[HOUSE.id]!)!
     s = fold(s, ev('agent_spawned', { id: 'ada', name: 'ada', x: door.x, y: door.y, ageDays: 7300 }), CFG)
     s = fold(s, ev('agent_entered', { agentId: 'ada', structureId: HOUSE.id }), CFG)
-    // She goes to bed on the night before day one. A body that starts a run awake at midnight
-    // has been up twenty-two hours by its first bedtime, which is a fixture artifact and not
-    // a fact about the world.
+    // She goes to bed on the night before day one: a body that starts a run awake at midnight has
+    // been up twenty-two hours by its first bedtime, which is a fixture artifact.
     s = fold(s, ev('agent_slept', { agentId: 'ada' }), CFG)
     for (let i = 0; i < 6; i++) {
       s = fold(s, ev('item_spawned', {
@@ -520,12 +510,8 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     expect(ada.hp).toBe(CFG.health.maxHp)
   })
 
-  // THE FINDING, asserted so it cannot change quietly: the ladder is a one-way ratchet. A
-  // single collapse mints a `fatigue` affliction; `agent_slept` clears the collapse COUNTER
-  // and leaves the affliction standing, and the only thing in the world that lifts one is a
-  // herb — eaten or pressed into the hand. So one bad night is a slow death sentence for a
-  // body with no herb, whatever it does afterwards. Whether that wants a recovery rule is a
-  // DESIGN DECISION and is ledgered for the controller, not invented here.
+  // The ladder is a one-way ratchet: agent_slept clears the collapse COUNTER and leaves the
+  // affliction standing, and the only thing in the world that lifts one is a herb.
   it('one collapse leaves a fatigue clock that a full night of sleep does not lift', () => {
     let s = genesisState(CFG, MAP())
     s = fold(s, ev('agent_spawned', { id: 'ada', name: 'ada', x: 5, y: 5, ageDays: 7300 }), CFG)
@@ -559,13 +545,8 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     expect(cured.agents.ada!.afflictions).toBeUndefined()
   })
 
-  // THE SHAPE THE LIVE RUN DIED OF, and the three halves of R15 that answer it. Before this,
-  // a body outdoors could not lie down until it had already fallen over: `sleep` refused
-  // "there is no bed here" while it was standing and allowed anywhere the moment it collapsed.
-  // So the only rest a roofless body could take was the rest that cost it a fall — and while
-  // `agent_slept` cleared the collapse COUNTER, it did not clear the AFFLICTION. One fall ever
-  // and the body was on a clock nothing but a herb stopped. Sleep and wake were 51% of every
-  // act the last live gate completed, and the ratchet was 74% of its refusals.
+  // Before this, a body outdoors could not lie down until it had already fallen over: sleep
+  // refused "there is no bed here" standing, and allowed anywhere the moment it collapsed.
   it('a weary body may lie down before it falls over, and a night lifts the clock every time', () => {
     const fatigueOf = (s: WorldState): number =>
       s.agents.ada!.afflictions?.find((x) => x.kind === 'fatigue')?.severity ?? 0
@@ -609,9 +590,8 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     expect(VERBS.sleep!.onComplete(feverish, CFG, 'ada', {}, new RngStreams('r15').get('illness')).map((e) => e.type))
       .toEqual(['agent_slept'])
 
-    // The clock it stops is still faster than anything else that answers it: a day of the
-    // drain is more than three days of the best dawn recovery a fed, sleeping body can get.
-    // Sleep is now the answer to fatigue, and it is the only one that keeps up.
+    // A day of the drain is more than three days of the best dawn recovery a fed, sleeping body
+    // can get, so sleep is the only answer to fatigue that keeps up.
     const drainPerDay = CFG.mortality.drainPerTick.fatigue * MINUTES_PER_DAY
     const bestRecoveryPerDay = CFG.health.recoveryHpPerDay * CFG.mortality.sleepRegenMultiplier
     expect(drainPerDay).toBeCloseTo(57.6, 6)

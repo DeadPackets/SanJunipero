@@ -9,10 +9,8 @@ import { genesisState, type TileId, type WorldState } from './state.js'
 import { VERBS } from './verbs.js'
 import { createWorldTick } from './worldTick.js'
 
-// One row per addendum §19's off-state table. Each row is asserted twice: once with the
-// flag off in the base config, once with the base config untouched and the flag turned
-// off by a world law. Both must behave identically — that is the whole point of routing
-// every system, verb and perception call through the effective config.
+// Each row is asserted twice: once with the flag off in the base config, once with it turned off
+// by a world law. Both must behave identically, which is what the effective config buys.
 
 const BASE = { weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } }
 const cfg = (over: Record<string, unknown> = {}): SimConfig => SimConfigSchema.parse({ ...BASE, ...over })

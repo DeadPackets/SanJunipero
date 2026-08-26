@@ -96,10 +96,8 @@ describe('makeGenesisWorld: the town', () => {
     for (const p of planned) expect(p['builderId']).toBe(GENESIS_BUILDER_ID)
   })
 
-  // ★ THE VILLAGE THE FOUNDERS WALK INTO IS ABANDONED, AND THE ROOFS SHOW IT. Two buildings
-  // still have theirs — the storehouse and the cabin — and the other seven dwellings stand as
-  // walls, three quarters up, on ground the town already platted. This is what puts a want in
-  // the founding: sound, the valley held 21 bodies against a cast of 5.
+  // Two buildings still have their roofs and the other seven stand as walls three quarters up.
+  // Sound, the valley held 21 bodies against a cast of 5, which is what puts a want in the founding.
   it('plants every building, and stands seven of them roofless', () => {
     const s = foldAll()
     const all = Object.values(s.structures)
@@ -110,9 +108,8 @@ describe('makeGenesisWorld: the town', () => {
     expect(fallen).toEqual(['cottage', 'farmhouse', 'house', 'house', 'house', 'house', 'house'])
   })
 
-  // ★ AND EVERY ONE OF THEM IS A WALL A PAIR OF HANDS CAN FINISH. A roofless building nobody
-  // can carry on is the cabin-that-was-not-a-cabin all over again — a thing that looks like an
-  // answer and refuses in words a mind cannot use. `roofFell` throws rather than plant one.
+  // A roofless building nobody can carry on is a thing that looks like an answer and refuses in
+  // words a mind cannot use; roofFell throws rather than plant one.
   it('stands nothing roofless that nobody could finish, and leaves one night of work on it', () => {
     const s = foldAll()
     for (const x of Object.values(s.structures)) {
@@ -161,8 +158,7 @@ describe('makeGenesisWorld: the town', () => {
     expect(s.terrain.every((row, y) => row[48] === T_WATER && row[49] === T_WATER
       && (row[50] === T_WATER) === !inFord(y))).toBe(true)
     // 128x128 holds more open ground than the 6000-node budget can walk, so the search cannot
-    // prove the far bank unreachable — it spends the budget and stops at the water, which is
-    // the same fact told the other way round (Task 29).
+    // prove the far bank unreachable — it spends the budget and stops at the water.
     const across = searchPath(s, { x: 30, y: 100 }, { x: 55, y: 100 }, DEFAULT_CONFIG)!
     expect(across.capped).toBe(true)
     expect(across.path.every(([x]) => x < 48)).toBe(true)
@@ -314,24 +310,8 @@ describe('the ford: one reach where the channel runs two wide', () => {
   })
 })
 
-// ★ THERE WAS NO FIRE A BODY COULD WALK TO INDOORS, ANYWHERE IN THE FOUNDING VALLEY.
-//
-// Genesis stands nine buildings and takes the roof off seven. The two that stand sound are the
-// storehouse and the cabin, and BOTH WERE HEARTHLESS — every `hearth: true` building in the
-// valley was walls three quarters of the way up. `fireIsOnYourSide` is what makes that fatal
-// rather than merely a pity: a body OUT in it is warmed by any fire within `heatRadius`, but a
-// body under a roof is warmed only by the fire in its own room. So the cold → shelter → fire
-// chain had no terminal state reachable on the shipped world, a 720-tick rehearsal measured
-// zero hearth behaviour because there was nowhere to measure it, and going indoors out of the
-// cold left a body colder than standing in the square.
-//
-// ★ THE TRAP: the square's fire pit does not close this. It is `hearth: true, roofed: false` —
-// an open fire, and stepping under a roof is stepping away from it.
-//
-// The answer is the cabin, and it is the only kind that COULD be the answer: `roofFell` throws
-// on any roofed kind that is unbuildable and not sound, so the sound set is forced to be
-// exactly the unbuildable roofed kinds — the storehouse and the cabin. A storehouse is a roof
-// over goods. A cabin with a stove in it is what a cabin is.
+// fireIsOnYourSide warms a roofed body only from a fire in its own room, and the square's pit is
+// roofless — the cabin is the valley's only indoor fire.
 describe('★ a fire indoors that a body can walk to, on the morning of day one', () => {
   const CFG = DEFAULT_CONFIG
   const isWarmRoom = (kind: string) => isRoofedKind(CFG, kind) && isHearthKind(CFG, kind)
@@ -348,18 +328,16 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
     expect(isRoofedKind(CFG, 'fire_pit'), 'and it is not indoors').toBe(false)
     expect(warmRooms(s).map((w) => w.kind)).not.toContain('fire_pit')
 
-    // ★ VACUOUS GUARD, both ways: some roof over the valley still holds no fire, and some fire
-    // in it is still behind unfinished walls. This passes for the wrong reason if every
-    // building is warm or if nothing is.
+    // Vacuous guard, both ways: some roof over the valley still holds no fire, and some fire in it
+    // is still behind unfinished walls. This passes for the wrong reason if everything is warm.
     expect(Object.values(s.structures).some((st) =>
       st.stage === 'complete' && isRoofedKind(CFG, st.kind) && !isHearthKind(CFG, st.kind))).toBe(true)
     expect(Object.values(s.structures).some((st) =>
       st.stage === 'construction' && isWarmRoom(st.kind))).toBe(true)
   })
 
-  // ★ AND IT COULD NOT HAVE BEEN ANY OTHER KIND. `roofFell` throws on a roofed kind that is
-  // unbuildable and not sound, so the sound set is not a taste — it is FORCED to be exactly the
-  // unbuildable roofed kinds. There are two, and one of them is a roof over goods.
+  // roofFell throws on a roofed kind that is unbuildable and not sound, so the sound set is FORCED
+  // to be exactly the unbuildable roofed kinds. There are two, and one is a roof over goods.
   it('★ had one candidate, because the sound set is forced and not chosen', () => {
     const unbuildableRoofs = Object.keys(CFG.structures.recipes)
       .filter((k) => isRoofedKind(CFG, k) && buildableRecipe(CFG, k) === null).sort()

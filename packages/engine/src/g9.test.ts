@@ -1,7 +1,5 @@
-// @slow — GATE G9a, the deterministic half of the living-world gate (addendum §17).
-// Scripted actors only: no LLM, no network, no clock acceleration where the clock is
-// the subject. Partnership runs on the REAL `coSleepNightsToPartner: 3`; only gestation
-// and the conception roll are forced, because 72 sim-days of waiting tests nothing.
+// @slow — the deterministic half of the living-world gate. Scripted actors only. Partnership
+// runs on the REAL coSleepNightsToPartner: 3; only gestation and the conception roll are forced.
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -183,9 +181,8 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
     // A hand expert enough to leave a mark on what it makes.
     s = fold(s, ev('skill_gained', { agentId: 'maker', track: 'carpentry', xp: 500 }), CFG)
     s = fold(s, ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 4, loc: { t: 'agent', id: 'maker' } }), CFG)
-    // By daylight: from C11 Task 26 the witness radius scales with the light on the tile
-    // looked at, and 4.5 tiles at midnight is past it. Who sees a theft is the point here,
-    // and the dark has its own row in perception.test.ts.
+    // The witness radius scales with the light on the tile looked at, and 4.5 tiles at midnight
+    // is past it. The dark has its own row in perception.test.ts.
     return { ...s, tick: 720 }
   }
 
@@ -332,10 +329,8 @@ describe('G9a-5: a shelf buys time', () => {
 })
 
 describe('G9a-6: a tool wears out and breaks', () => {
-  // The rule that decides *when* a tool wears is arbiter-side (`wearTools`, covered by
-  // packages/arbiter/src/codify.test.ts); an engine test cannot import it without making
-  // a package cycle. This row asserts the world's half: the wear lands, and the point
-  // that empties it takes the tool out of the hand.
+  // The rule that decides *when* a tool wears is arbiter-side and an engine test cannot import it
+  // without making a package cycle. This row asserts the world's half.
   function withRod(durability: number): WorldState {
     const s = spawn(genesisState(CFG, MAP()), CFG, { id: 'a1', x: 2, y: 2 })
     return fold(s, ev('item_spawned', {

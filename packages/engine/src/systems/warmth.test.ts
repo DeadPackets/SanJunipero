@@ -112,9 +112,8 @@ describe('exposure: what the cold takes, and who it cannot reach', () => {
 
   it('a garment offsets the band by its insulation, and that is what decides an autumn dusk', () => {
     const bare = bodyAt(AUTUMN_DUSK)
-    // Under the band bare, over it clothed: the offset is what decides, and at an autumn dusk
-    // it is decisive. (It was worth exactly this gap when the coat was worth two; it is worth
-    // twelve now, and the hour it was always about still comes out the same way.)
+    // Under the band bare, over it clothed: the offset is what decides, and at an autumn dusk it
+    // is decisive.
     expect(ambientTempAt(bare, CFG)).toBeLessThan(CFG.warmth.comfortBand)
     expect(ambientTempAt(bare, CFG) + CFG.warmth.insulation.garment)
       .toBeGreaterThanOrEqual(CFG.warmth.comfortBand)

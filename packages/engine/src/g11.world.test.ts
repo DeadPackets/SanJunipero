@@ -208,9 +208,8 @@ describe('G11a-F1: bodies with no minds — they run, they are hunted, and the c
 
 // ------------------------------------------------------- the cold, and what stands against it
 
-// Batch-5 controller ruling 1: the survivability ladder, proved as arithmetic and then as a
-// night actually lived. A rung "closes" when the body comes through the night with at least a
-// quarter of its energy still in it.
+// The survivability ladder, proved as arithmetic and then as a night actually lived. A rung
+// "closes" when the body comes through the night with at least a quarter of its energy left.
 describe('G11a-C1: the survivability arithmetic audit — each winter rung, with the margin', () => {
   const WINTER_DAY = 3 * DAYS_PER_SEASON * MINUTES_PER_DAY + 12 * 60 // −4
   const WINTER_DUSK = 3 * DAYS_PER_SEASON * MINUTES_PER_DAY + 19 * 60 // −8
@@ -285,9 +284,8 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
     expect(beside.energyLeft / 100).toBeGreaterThanOrEqual(0.25)
   })
 
-  // MEASURED, NOT ASSUMED. `isExposed` is a threshold, and at insulation 2 the garment was
-  // worth two degrees of it: at winter's −4/−8/−12 a coat changed nothing at all, which is
-  // what batch 10 escalated and T37b step 2b answers. Rung 1 is now the coat's own rung.
+  // isExposed is a threshold, and at insulation 2 the garment was worth two degrees of it: at
+  // winter's −4/−8/−12 a coat changed nothing at all. Rung 1 is now the coat's own rung.
   it('the garment is a threshold flip, and it flips the mildest winter hour and no other', () => {
     const at = (tick: number, garment: boolean): boolean => {
       let s = spawn(genesisState(CFG, MAP()), CFG, 'body', 4, 4)

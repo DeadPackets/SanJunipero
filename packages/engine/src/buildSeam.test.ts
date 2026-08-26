@@ -112,11 +112,8 @@ describe('★ how an agent builds: the plot, never the coordinate', () => {
   })
 })
 
-// ★ THE PROSE NAMES ONE TILE FOR EVERY KIND, AND THERE ARE THREE ROOFS TO RAISE NOW.
-// `groundForBuilding` answers with a 1x1 claim's door; a cottage and a farmhouse claim the same
-// PLOT but present a different frontage, so their own door tile is one row further south. A
-// mind told a tile that then refuses it is exactly the wasted act this lane exists to kill, so
-// the tile is asserted to work for every buildable roof rather than assumed to.
+// groundForBuilding answers with a 1x1 claim's door, and a cottage or farmhouse claims the same
+// plot with its own door one row further south — so the tile is asserted for every buildable roof.
 describe('the one tile the prose names works for every roof a mind can raise', () => {
   it('accepts a house, a cottage and a farmhouse from the tile groundForBuilding gives', () => {
     const base = genesisTown()
@@ -180,10 +177,8 @@ describe('a build that stops halfway goes back to the same walls', () => {
   })
 })
 
-// ★ OD22. `ownSite` is keyed on the BUILDER, so before this the town handed the second body a
-// different plot and five bodies raised five houses. The meadow never lost the behaviour —
-// `siteAt` is keyed on the ground — so the only joint-build coverage in the tree passed
-// throughout. Everything below asks the question of a TOWN.
+// ownSite is keyed on the BUILDER, so before this the town handed the second body a different
+// plot and five bodies raised five houses. The meadow never lost it — siteAt is keyed on the ground.
 describe('★ two bodies raise one building — the second pair of hands joins the walls', () => {
   /** The plot's north-west shoulder: within reach of the walls, and NOT the door tile, so what
    *  these prove is reach rather than a shared tile. */
@@ -410,9 +405,8 @@ describe('★ a block is laid out when its first building is raised', () => {
   })
 
   it('★ and it really does clear: the eastern blocks stand in the wood', () => {
-    // The first ring-2 block is west of the square, where the world is already meadow — so the
-    // clearing half of the rule does no work there and an assertion about it would be vacuous.
-    // Block (2, 0) is the one that meets the forest, and there the wood comes down.
+    // The first ring-2 block is west of the square where the world is already meadow, so an
+    // assertion about clearing would be vacuous there. Block (2, 0) is the one that meets the forest.
     const s = genesisTown()
     const lay = layBlock(s, TOWN_SQUARE, { i: 2, j: 0 })
     expect(lay).not.toBe('off the map')
@@ -467,13 +461,8 @@ describe('★ a block is laid out when its first building is raised', () => {
   })
 })
 
-// ★ THE WORLD COUNTS HANDS AND CANNOT SPEND THEM. Everything above proves the hands land on
-// one set of walls; nothing above asks what the walls got for them. Measured over 4 320
-// showcase ticks by the lane that wired joining: 29 roofs with one pair of hands, 16 with
-// five, 293 body-ticks per roof against 591. A joiner's own clock is set at intent time to
-// `buildTicks − progressTicks` and counts down one a tick whatever else is happening, so five
-// hands finish on the same tick one hand would and the site's ledger races past what the
-// building needs. Below, the two halves of that, and the night overshoot underneath them.
+// Measured over 4 320 showcase ticks before joining was wired: 29 roofs with one pair of hands,
+// 16 with five, 293 body-ticks per roof against 591.
 describe('★ help must help — what a second pair of hands buys the calendar', () => {
   const HOUSE_TICKS = 120
   const FAST = {
@@ -517,9 +506,8 @@ describe('★ help must help — what a second pair of hands buys the calendar',
     return { s, ids }
   }
 
-  /** `actionsSystem`'s build branch and nothing else — no needs, no weather, no walking — run
-   *  until every one of these bodies has stopped working. `ticks` is the CALENDAR: how long
-   *  the town waited. `bodyTicks` is the wage: how much of somebody's life it cost. */
+  /** actionsSystem's build branch and nothing else. `ticks` is the CALENDAR: how long the town
+   *  waited. `bodyTicks` is the wage: how much of somebody's life it cost. */
   function raise(s0: WorldState, ids: readonly string[], cap = 4000) {
     let s = s0
     let ticks = 0
@@ -581,9 +569,8 @@ describe('★ help must help — what a second pair of hands buys the calendar',
       const { s, ids } = crewOf(hands)
       const pt = raise(s, ids).raised.progressTicks
       expect(pt, `${hands} hands`).toBeLessThanOrEqual(HOUSE_TICKS)
-      // Short of the target by at most one tick per extra hand, and for a reason worth
-      // knowing: `actionsSystem` steps and then completes ONE BODY AT A TIME, so the first
-      // hand whose clock runs out finishes the walls before the rest have worked that tick.
+      // Short by at most one tick per extra hand: actionsSystem steps and then completes ONE BODY
+      // AT A TIME, so the first hand whose clock runs out finishes before the rest have worked.
       expect(pt, `${hands} hands`).toBeGreaterThan(HOUSE_TICKS - hands)
     }
   })
@@ -630,10 +617,8 @@ describe('★ help must help — what a second pair of hands buys the calendar',
     expect(handsOnSite(after, site.id)).toBe(1)
   })
 
-  // ★ THE SECOND BUG, WHICH WAS THERE BEFORE THE FIRST AND NEEDS ONLY ONE BUILDER.
-  // `submitIntent` multiplies a night builder's duration by `light.nightWorkPenalty` while
-  // `structure_progressed` still adds one a tick, so the ledger runs half again past what the
-  // building needs. G2's own pinned world books 2 903 ticks of work into a 2 880-tick house.
+  // submitIntent multiplies a night builder's duration by light.nightWorkPenalty while
+  // structure_progressed still adds one a tick, so the ledger runs half again past what is needed.
   describe('and the dark charges the clock, not the ledger', () => {
     it('a house raised blind still takes half again as long', () => {
       const { s, ids } = crewOf(1, NIGHT)

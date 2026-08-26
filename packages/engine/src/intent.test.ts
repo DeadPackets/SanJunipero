@@ -178,33 +178,16 @@ describe('verb registry', () => {
   })
 })
 
-// ★ THE INTERRUPT POLICY, STATED OVER THE WHOLE REGISTRY INSTEAD OF DECLARED PER VERB.
-//
-// `VerbDef` used to carry `interruptible: boolean`. Every verb set it true, `makeVerb`
-// defaulted it, `codify` mapped it off every recipe the arbiter authored — and NOTHING READ
-// IT. The guard that stood here asserted `VERBS.walk.interruptible === true`: a check whose
-// passing condition (the field is set) is satisfiable without its property (a walk can
-// actually be interrupted) holding. The engine stated an interrupt policy it did not
-// implement, and the arbiter was required to decide a boolean the world discarded.
-//
-// Measured before the field went: two verbs differing ONLY in that flag are refused in the
-// same words; all 37 registered verbs answer a second intent identically. And implementing it
-// instead — `submitIntent` honouring the flag — moves the G2 pin
-// (00d72434… → 6bfe8bb8…), which is a ruling and not a lane's call.
-//
-// So the truth is written down here, where it can fail: there is ONE policy, it applies to
-// every verb, and interruption is something the WORLD does to a body — never something a
-// mind can ask for.
+// One policy over the whole registry: interruption is something the world does to a body, never
+// something a mind can ask for. VerbDef used to declare it and nothing read it.
+// Implementing it instead — submitIntent honouring a flag — moves the G2 pin, so it is a ruling, not a lane's call.
 describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () => {
   const CFG = DEFAULT_CONFIG
   const busyWith = (verb: string): WorldState =>
     applyAll(makeWorld(), [{ type: 'action_started', payload: { agentId: 'a1', verb, params: {}, duration: 100 } }])
 
-  // ★ ONE EXEMPTION, AND IT IS THE MOUTH. The policy is about the HANDS. `speak` declares
-  // `atOnce`: it takes no activity slot and is never refused for busy-ness, because a body with
-  // an axe in its hands can still answer when it is spoken to. 159 refusals across twelve live
-  // nights — 39% of every refusal in the run — were this, and every one of them was a mind
-  // trying to talk while it built. Widening this set is a visible edit, not a quiet one.
+  // The policy is about the HANDS. `speak` declares `atOnce`, because a body with an axe in its
+  // hands can still answer when it is spoken to. Widening this set is a visible edit.
   it('★ the mouth is the only thing that does not wait for the hands', () => {
     const exempt = Object.keys(VERBS).filter((k) => VERBS[k]!.atOnce !== undefined).sort()
     expect(exempt).toEqual(['speak'])

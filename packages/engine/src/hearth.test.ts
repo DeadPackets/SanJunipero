@@ -12,18 +12,8 @@ import { fumblesInTheDark, VERBS } from './verbs.js'
 import { sleepRegenPerTick } from './systems/needs.js'
 import { isExposed, warmthTargetFor } from './systems/warmth.js'
 
-// ★ A BODY CAN WALK TO THE CHAIR AND THERE IS NOTHING IT CAN DO THERE.
-//
-// Every house in this world has held a hearth since the city template was written, and the
-// renderer has drawn a chimney breast in one for two chunks. `grep furnishing packages/engine`
-// returned nothing: every verb that could plausibly act on one took a `{structureId}` naming a
-// STRUCTURE, and no structure in the world was ever a hearth. So a body indoors on a winter
-// night stood in a room with a fireplace in it and read "you shiver against the cold" and
-// "these walls are holding it off you" in the same breath.
-//
-// This file is the proof that the fire in a house is now a fire: it can be fed, it throws
-// light, it warms the body in the room, and a pot can go over it out of the weather. Four
-// laws, ONE new fact — `structures.recipes.house.hearth` — and no new state on any body.
+// A house's hearth is a real fire: fed, lit, warming the room, cookable on — off one fact,
+// structures.recipes.house.hearth, with no new agent state.
 
 const quiet = {
   weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 },
@@ -56,8 +46,7 @@ const holding = (s: WorldState, id: string, kind: string, qty = 1): WorldState =
   fold(s, ev('item_spawned', { id, kind, qty, loc: { t: 'agent', id: 'a1' } }, s.tick), CFG)
 
 // A body that has gone in stands at its own doorway, which is where `enter` leaves it — the
-// room's reach is proved where it is load-bearing, in `lighting.test.ts`, on a body that has
-// walked away from the door.
+// room's reach is proved in lighting.test.ts, on a body that has walked away from the door.
 const indoors = (s: WorldState): WorldState =>
   fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'house_1' }, s.tick), CFG)
 
@@ -203,10 +192,8 @@ describe('★ the hearth in a house is a fire, and four laws already knew what t
   })
 })
 
-// ★ THE BED WAS FURNITURE THE RENDERER DREW. `sleep` validates that a body is under a roof and
-// has never named the bed under it: one flat `energyRegenAsleepPerTick` answered the bare
-// ground, a storehouse floor and a founder's own bed alike. A roof said a body MAY lie down.
-// Nothing in the world had ever said where it lies down WELL.
+// `sleep` validates that a body is under a roof and has never named the bed under it: one flat
+// energyRegenAsleepPerTick answered bare ground, a storehouse floor and a founder's bed alike.
 describe('★ a bed is worth something, and it was worth nothing', () => {
   const REGEN = CFG.needs.energyRegenAsleepPerTick
 
@@ -226,9 +213,8 @@ describe('★ a bed is worth something, and it was worth nothing', () => {
 
   it('★ a house sleeps a body faster than a roof with nothing but a floor under it', () => {
     expect(isBeddedKind(CFG, 'house')).toBe(true)
-    // ★ VACUOUS GUARD: passes for the wrong reason if EVERY roof counts as a bed. The cabin and
-    // the storehouse are 2x2, exactly a house's mass, and both are somewhere a body may lie down
-    // — so the difference this measures cannot be the roof, the floor area or the way in.
+    // Vacuous guard: passes for the wrong reason if EVERY roof counts as a bed. The cabin and the
+    // storehouse are 2x2, exactly a house's mass, and both are somewhere a body may lie down.
     expect(isBeddedKind(CFG, 'storehouse')).toBe(false)
     expect(isBeddedKind(CFG, 'cabin')).toBe(false)
 

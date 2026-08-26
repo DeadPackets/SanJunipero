@@ -93,9 +93,8 @@ describe('composePerception: structure visibility by nearest tile', () => {
   })
 })
 
-// The mini-rehearsal's worst causal chain: `enter` was tried 15 times and succeeded 0, because
-// the prose named a tile beside the wall and the verb measured against the doorway. The packet
-// now carries the doorway itself, from the same `doorTile` the verb uses.
+// `enter` was tried 15 times and succeeded 0, because the prose named a tile beside the wall and
+// the verb measured against the doorway. The packet now carries the doorway itself.
 describe('composePerception: the doorway a body must stand on', () => {
   const house = (s: WorldState, id: string, kind: string, x: number, y: number, complete: boolean): WorldState => {
     let out = fold(s, ev('structure_planned', {
@@ -581,10 +580,8 @@ describe('night-witness: a torch does not let you see, it lets the dark see you'
   it('with the law off, midnight witnesses exactly what noon does — but is still dark', () => {
     expect(composePerception(world(), DAY_CFG, 'a', takingAt(6, 0)).seen).toHaveLength(1)
     expect(composePerception(world(), DAY_CFG, 'a', []).visible.agents.map((g) => g.id)).toEqual(['thief'])
-    // ★ THE WITNESS LAW AND THE LIGHT LAW ARE TWO LAWS. This line used to read 'bright', which
-    // made a mind read broad daylight at midnight while `light.nightWorkPenalty` — a different
-    // dial, still on — charged it half again for the same hour's work. Who sees a theft is
-    // `nightWitness`; whether the ground is dark is `light`.
+    // This line used to read 'bright', so a mind read broad daylight at midnight while
+    // light.nightWorkPenalty charged it half again. Who sees a theft is nightWitness; the dark is light.
     expect(composePerception(world(), DAY_CFG, 'a', []).light).toBe('dark')
     expect(composePerception(world(), LIGHTLESS_CFG, 'a', []).light).toBe('bright')
   })
@@ -597,9 +594,8 @@ describe('night-witness: a torch does not let you see, it lets the dark see you'
   })
 })
 
-// R21-A: the two things a body knows about itself that the packet used to drop on the floor.
-// Between them they account for 59 of the live gate's 222 refusals, and for a mind that
-// restated the same journey in forty-four turns without ever setting off.
+// The two things a body knows about itself that the packet used to drop: 59 of the live gate's
+// 222 refusals, and a mind that restated one journey in forty-four turns without setting off.
 describe('composePerception: the body knows where it is and what it is doing', () => {
   it('names the roof overhead, and says nothing at all under open sky', () => {
     const outside = withHouse(makeWorld([{ id: 'a', x: 9, y: 12 }]))
@@ -631,9 +627,8 @@ describe('composePerception: the body knows where it is and what it is doing', (
   })
 })
 
-// R21-C: a body that looks ill looks ill. The live gate's healer thought about who might be
-// sick in 33 separate turns and tended nobody, because a pair of eyes got a name, a place and
-// nothing else — while the founder six tiles away died of a fever.
+// A body that looks ill looks ill: the live gate's healer thought about who might be sick in 33
+// turns and tended nobody, because a pair of eyes got a name, a place and nothing else.
 describe('composePerception: a body carries what ails it, where eyes can reach', () => {
   const sicken = (s: WorldState, id: string, kind: string, severity: number): WorldState =>
     fold(s, ev('agent_afflicted', { agentId: id, kind, severity }), DEFAULT_CONFIG)

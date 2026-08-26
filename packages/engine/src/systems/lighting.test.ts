@@ -115,9 +115,8 @@ describe('stoke: a fire is warm for as long as somebody feeds it', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.reason).toBe('not close enough to the fire')
 
-    // ★ THIS CASE USED TO BE A HOUSE, AND THAT WAS THE DEFECT. A house holds a hearth — the
-    // renderer has drawn one in every one of them for two chunks — and `stoke` answered "there
-    // is no fire there to feed". A WELL is the honest example of a building with no fire in it.
+    // This case used to be a house, and that was the defect: a house holds a hearth, so `stoke`
+    // answered "there is no fire there to feed". A WELL is a building with no fire in it.
     let well = holding(bodyAt(0), 'item_1', 'wood')
     well = fold(well, ev('structure_planned', {
       id: 'structure_2', kind: 'well', x: 5, y: 4, w: 1, h: 1, maxHp: 30, flammable: false, builderId: 'a1',
@@ -128,9 +127,8 @@ describe('stoke: a fire is warm for as long as somebody feeds it', () => {
     if (!wrong.ok) expect(wrong.reason).toBe('there is no fire there to feed')
   })
 
-  // ★ THE GAP THIS LANE EXISTS FOR. A body could walk to the hearth and there was nothing it
-  // could do there: every candidate verb took a `{structureId}` and no structure in the world
-  // was ever a hearth. The house IS the hearth's address, because a house holds exactly one.
+  // A body could walk to the hearth and there was nothing it could do there: every candidate verb
+  // took a {structureId} and no structure was ever a hearth. A house holds exactly one.
   it('★ a house holds a fire, and the same wood feeds it', () => {
     let s = holding(bodyAt(0), 'item_1', 'wood')
     s = fold(s, ev('structure_planned', {
