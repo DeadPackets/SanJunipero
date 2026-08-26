@@ -524,7 +524,8 @@ export function fold(state: WorldState, event: SimEvent, baseConfig: SimConfig =
       const p = AgentDied.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_died for unknown agent ${p.agentId}`)
-      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, alive: false, asleep: false, activity: null } } }
+      const { insideId: _, ...body } = a
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...body, alive: false, asleep: false, activity: null } } }
     }
     // The wound on the record, and only that: the hp comes off through the `agent_harmed` the
     // same blow emits, which is the one event that can name the hand behind it.
