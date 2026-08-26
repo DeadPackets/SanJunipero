@@ -49,11 +49,11 @@ export const HELLO_DEADLINE_MS = 5_000
 
 /** A viewer only ever sends `hello`, `scrub` or `live`, none of which reach 200 bytes. ws
  *  defaults to a 100 MB frame, which is 100 MB a stranger can make the server buffer. */
-export const MAX_CLIENT_FRAME = 4096
+const MAX_CLIENT_FRAME = 4096
 
 /** How many viewers one world serves before it turns people away. Refusing the 501st with a
  *  code is a stream at capacity; accepting it and degrading for the other 500 is an outage. */
-export const DEFAULT_MAX_VIEWERS = 500
+const DEFAULT_MAX_VIEWERS = 500
 
 /**
  * A 40-byte `scrub` frame makes the gateway load a snapshot, fold every event to the asked tick

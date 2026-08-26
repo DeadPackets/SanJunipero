@@ -29,7 +29,7 @@ export function writeWorldMeta(db: Database.Database, meta: WorldMeta): void {
 }
 
 /** The one instruction that gets an operator past a refused boot. */
-export const FRESH_HINT = 'start a new town instead with SJ_FRESH=1'
+const FRESH_HINT = 'start a new town instead with SJ_FRESH=1'
 
 /** Throws when the town on disk is not the town this boot asked for. Names both sides, because
  *  "map mismatch" without the two values is a bug report the operator has to write. */

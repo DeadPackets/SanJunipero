@@ -215,16 +215,16 @@ export const LEAVE_HOME_ABOVE = 80
 // the walk home is the first thing a viewer sees.
 export const DEV_FAST_FORWARD_FOR_INTERIORS = 810
 
-export const NEED_TOPUP_BELOW = 40
-export const HUNGER_TOPUP = 55
-export const WARMTH_TOPUP = 50
+const NEED_TOPUP_BELOW = 40
+const HUNGER_TOPUP = 55
+const WARMTH_TOPUP = 50
 
 export type Intent = { verb: string; params: Record<string, unknown> }
 const SLEEP: Intent = { verb: 'sleep', params: {} }
 
 /** Below this, the patrol would rather nap than take another turn about the town. A preference,
  *  not a physics number — what stops a body walking past the floor is `arrivesStanding`. */
-export const PATROL_SLEEP_BELOW = 20
+const PATROL_SLEEP_BELOW = 20
 
 /**
  * What a walk costs this body; `null` when there is no path. Priced at the TIRED rate always —
@@ -263,7 +263,7 @@ export function arrivesStanding(
 
 /** What `ticks` of standing up and working costs a body — the same law as `walkEnergyCost`,
  *  asked of work rather than of walking. */
-export function workEnergyCost(
+function workEnergyCost(
   state: WorldState,
   config: SimConfig,
   agentId: string,
@@ -287,7 +287,7 @@ const MASON_NEED = { along: 2, deep: 2 }
  *  changes how OFTEN a house goes up, never WHERE — the site is settled first. */
 export const MASON_WOOD_KIND = 'wood'
 
-export function heldWood(state: WorldState, agentId: string): number {
+function heldWood(state: WorldState, agentId: string): number {
   let n = 0
   for (const i of Object.values(state.items)) {
     if (i.kind === MASON_WOOD_KIND && i.loc.t === 'agent' && i.loc.id === agentId) n += i.qty
@@ -297,7 +297,7 @@ export function heldWood(state: WorldState, agentId: string): number {
 
 /** The whole errand: the walk out to the ground, and the raising once you are on it. `null`
  *  when there is no way to reach the ground at all. */
-export function masonErrandCost(
+function masonErrandCost(
   state: WorldState,
   config: SimConfig,
   agentId: string,
@@ -351,7 +351,7 @@ export function masonIntent(
 // where a deck can stand and no town can claim a plot on it (`isPlottedKind`).
 
 /** The first founder is the wright: with the same cast in the same order, deterministically. */
-export const bridgewrightOf = (cast: readonly FounderDef[]): string | null => cast[0]?.id ?? null
+const bridgewrightOf = (cast: readonly FounderDef[]): string | null => cast[0]?.id ?? null
 
 /** Walk to the far end of the crossing, then lay the deck. `null` once a deck is standing, or
  *  when this body cannot pay for the errand — a wright who falls in the river builds nothing. */
@@ -384,9 +384,9 @@ export function bridgewrightIntent(
 // `lamp_post` is `sited`, so the sites come off the town's own street ring — the door tiles of
 // the buildings already standing, stepped one tile off the way: a post in the road closes it.
 
-export const LAMP_KIND = 'lamp_post'
+const LAMP_KIND = 'lamp_post'
 
-export type LampSite = { x: number; y: number; stand: { x: number; y: number } }
+type LampSite = { x: number; y: number; stand: { x: number; y: number } }
 
 /** How far off a door the search will walk to find ground that is not the way itself. Three
  *  tiles: the grammar's streets are two wide with a shoulder. */
@@ -397,7 +397,7 @@ export const LAMP_VERGE_REACH = 3
  * first. One step off the door finds nothing — the grammar paves a wide street ring, so all
  * four neighbours of a door tile are more road, and `roadBlockRefusal` would refuse each one.
  */
-export function lampSites(state: WorldState, want: number): LampSite[] {
+function lampSites(state: WorldState, want: number): LampSite[] {
   const square = townSquareOf(state)
   if (square === null) return []
   const isWay = (x: number, y: number): boolean => {
@@ -450,7 +450,7 @@ export const lamplighterOf = (cast: readonly FounderDef[]): string | null => cas
 
 /** Raise the next lamp the town is short of, or go and feed the one that has burned down.
  *  `null` once every site is standing and lit — a lamplighter with nothing to do walks. */
-export function lamplighterIntent(
+function lamplighterIntent(
   state: WorldState,
   config: SimConfig,
   agentId: string,

@@ -45,7 +45,7 @@ export const CHRONICLE_MAX = 200
 
 /** The five things the world's own log records that the town would remember. Anything else is
  *  the everyday, and a scrub bar covered in the everyday points nowhere. */
-export const MARK_EVENT_TYPES: readonly string[] = [
+const MARK_EVENT_TYPES: readonly string[] = [
   'agent_died',
   'agent_born',
   'agent_spawned',

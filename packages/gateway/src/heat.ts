@@ -29,7 +29,7 @@ export function heatSince(windows: readonly HeatWindow[], nowTick: number): Heat
 /** `${windowIndex}\n${agentId}` → score. The whole of what heat needs to remember: one number
  *  per 60-tick window an agent was in, which is the answer itself and not the events behind it. */
 export type HeatScores = Map<string, number>
-export const heatKey = (tick: number, agentId: string): string =>
+const heatKey = (tick: number, agentId: string): string =>
   `${Math.floor(tick / HEAT_WINDOW_TICKS)}\n${agentId}`
 
 /**
