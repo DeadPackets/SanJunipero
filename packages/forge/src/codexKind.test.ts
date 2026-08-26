@@ -50,10 +50,10 @@ describe('codex kind column migration', () => {
     raw.close()
 
     const db = openForgeDb(path)
-    const rows = db.prepare('SELECT id, kind FROM assets ORDER BY seq').all() as Array<{
+    const rows = db.prepare('SELECT id, kind FROM assets ORDER BY seq').all() as {
       id: string
       kind: string | null
-    }>
+    }[]
     expect(rows).toEqual([
       { id: 'a1', kind: 'hut' },
       { id: 'a2', kind: null },

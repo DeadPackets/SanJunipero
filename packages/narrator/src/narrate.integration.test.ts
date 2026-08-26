@@ -19,24 +19,23 @@ const memStore = (): NarratorStore => {
 
 // The scripted NarratorLlm (no OpenRouter): summarizeChapter cites one dangling
 // 9999 so the render-layer hallucination guard is exercised at the gate.
-const gateLlm = (chapterCitations: number[]): NarratorLlm =>
-  ({
-    summarizeChapter: vi.fn(async () => ({
-      title: 'The Quarrel at the Wall',
-      text: 'Omar and Yusuf traded hard words at the wall, and by evening a first gift changed hands.',
-      citations: chapterCitations,
-    })),
-    summarizeEra: vi.fn(async () => ({
-      title: 'The First Days',
-      text: 'A week that opened with quarrels and closed with a gift.',
-      citations: [],
-    })),
-    newspaperCopy: vi.fn(),
-    biography: vi.fn(async () => ({
-      title: 'Omar of the Wall',
-      body: 'Omar was heard at the wall by midday and seen to give before nightfall.',
-    })),
-  }) as unknown as NarratorLlm
+const gateLlm = (chapterCitations: number[]): NarratorLlm => ({
+  summarizeChapter: vi.fn(async () => ({
+    title: 'The Quarrel at the Wall',
+    text: 'Omar and Yusuf traded hard words at the wall, and by evening a first gift changed hands.',
+    citations: chapterCitations,
+  })),
+  summarizeEra: vi.fn(async () => ({
+    title: 'The First Days',
+    text: 'A week that opened with quarrels and closed with a gift.',
+    citations: [],
+  })),
+  newspaperCopy: vi.fn(),
+  biography: vi.fn(async () => ({
+    title: 'Omar of the Wall',
+    body: 'Omar was heard at the wall by midday and seen to give before nightfall.',
+  })),
+})
 
 describe('GATE G7 — recorded eventful day replays to a verified chronicle', () => {
   const store = memStore()
@@ -45,7 +44,7 @@ describe('GATE G7 — recorded eventful day replays to a verified chronicle', ()
   let chapter: ChapterRow
   let heat: HeatScores[]
   let milestones: Milestone[]
-  let scenes: Array<SceneSegment & { id: number }>
+  let scenes: (SceneSegment & { id: number })[]
 
   beforeAll(async () => {
     const out = await narrateDay({

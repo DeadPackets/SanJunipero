@@ -152,7 +152,7 @@ function adjacentLivingTarget(
 ): string | null {
   if (targetId === agentId) return reasons.self
   const target = state.agents[targetId]
-  if (!target || !target.alive) return reasons.gone
+  if (!target?.alive) return reasons.gone
   if (reasons.busy !== undefined && target.activity) return reasons.busy
   const a = state.agents[agentId]!
   // A refusal must leave a door open (addendum §9): the one thing missing is two paces, so
@@ -478,7 +478,7 @@ const tend: VerbDef = makeVerb({
     const p = TendParams.parse(params)
     const target = state.agents[p.targetId]
     const a = state.agents[agentId]!
-    if (!target || !target.alive) return []
+    if (!target?.alive) return []
     if (Math.abs(a.x - target.x) > 1 || Math.abs(a.y - target.y) > 1) return []
     const item = p.itemId === undefined ? undefined : state.items[p.itemId]
     const offered =
@@ -1056,7 +1056,7 @@ const hunt: VerbDef = makeVerb({
     const p = HuntParams.safeParse(params)
     if (!p.success) return 'hunt needs a {faunaId}'
     const f = state.fauna?.[p.data.faunaId]
-    if (!f || !f.alive) return 'nothing there to hunt'
+    if (!f?.alive) return 'nothing there to hunt'
     if (!HUNTABLE_KINDS.has(f.kind)) return 'that is not something you can run down'
     const a = state.agents[agentId]!
     if (Math.max(Math.abs(a.x - f.x), Math.abs(a.y - f.y)) > 1) return 'too far off to reach'
@@ -1734,8 +1734,8 @@ export function craftRoutes(config: SimConfig, name: string): SeedRecipe[] {
 // those verbs have always accepted, gathered in one place so somebody can be told it.
 export type MakeableRoad = { inputs: Record<string, number>; atFire?: true; water?: number }
 export type Makeables = {
-  builds: Array<{ kind: string; inputs: Record<string, number> }>
-  crafts: Array<{ name: string; roads: MakeableRoad[] }>
+  builds: { kind: string; inputs: Record<string, number> }[]
+  crafts: { name: string; roads: MakeableRoad[] }[]
 }
 
 export function makeables(config: SimConfig): Makeables {
@@ -2148,7 +2148,7 @@ const give: VerbDef = makeVerb({
     const item = state.items[p.itemId]
     if (!item || item.loc.t !== 'agent' || item.loc.id !== agentId) return []
     const target = state.agents[p.targetId]
-    if (!target || !target.alive) return []
+    if (!target?.alive) return []
     // The only voluntary transfer of title the world has.
     return [
       { type: 'item_moved', payload: { id: p.itemId, loc: { t: 'agent', id: p.targetId } } },
@@ -2357,7 +2357,7 @@ const teach: VerbDef = makeVerb({
   onComplete(state, _config, agentId, params) {
     const p = TeachParams.parse(params)
     const target = state.agents[p.targetId]
-    if (!target || !target.alive) return []
+    if (!target?.alive) return []
     const teacherXp = state.agents[agentId]!.skills[p.track] ?? 0
     const grant = Math.min(teacherXp * 0.1, 50)
     return [{ type: 'skill_gained', payload: { agentId: p.targetId, track: p.track, xp: grant } }]
@@ -2388,7 +2388,7 @@ const attack: VerbDef = makeVerb({
     const p = AttackParams.parse(params)
     const a = state.agents[agentId]!
     const t = state.agents[p.targetId]
-    if (!t || !t.alive) return []
+    if (!t?.alive) return []
     if (Math.abs(a.x - t.x) > 1 || Math.abs(a.y - t.y) > 1) return []
     const maxPower = 2 * config.health.maxHp
     const scoreA = rng.next() * ((a.hp + a.needs.energy) / maxPower)

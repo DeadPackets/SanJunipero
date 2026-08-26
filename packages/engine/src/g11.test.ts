@@ -653,13 +653,7 @@ describe('G11a-D1: a competent body comes through three days on the default worl
                 ? { verb: 'drink', params: { itemId: skinInHand(s) } }
                 : null
       if (wants !== null && wants.params !== null) {
-        const out = submitIntent(
-          { ...s, tick },
-          CFG,
-          'ada',
-          wants.verb,
-          wants.params as Record<string, unknown>,
-        )
+        const out = submitIntent({ ...s, tick }, CFG, 'ada', wants.verb, wants.params)
         if (out.ok) s = apply({ ...s, tick }, CFG, out.events, tick)
       }
       const step = pass(s, CFG, tick, 'competent')

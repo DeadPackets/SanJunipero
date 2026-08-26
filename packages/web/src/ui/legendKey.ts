@@ -46,7 +46,7 @@ export function coverage(box: Box, stage: Stage): number {
 
 /** Which people the key is standing on. Inclusive on the near edges, like a hit box. */
 export function nodesUnder(
-  nodes: ReadonlyArray<{ id: string; x: number; y: number }>,
+  nodes: readonly { id: string; x: number; y: number }[],
   box: Box,
 ): string[] {
   return nodes

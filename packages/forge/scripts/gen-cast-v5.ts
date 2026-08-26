@@ -298,7 +298,7 @@ function refuseFailing(
 /** How many candidates a cell may be drawn as before the run gives up. Documented in this
  *  file's header since v4 and read nowhere until now; it is the knob the ruling above creates
  *  the need for, because every extra attempt is a paid generation. */
-const ATTEMPTS = Math.max(1, Number(process.env['CAST_ATTEMPTS'] ?? '3'))
+const ATTEMPTS = Math.max(1, Number(process.env.CAST_ATTEMPTS ?? '3'))
 const PALETTE_HARD_FLOOR = 0.6
 const MASTER_MIN_PITCH = 6
 
@@ -479,7 +479,7 @@ async function runCharacter(m: CastMember): Promise<void> {
       {
         idle: masterGate[f],
         'contact-a': chosen[f]['contact-a'].gate,
-        passing: chosen[f]['passing'].gate,
+        passing: chosen[f].passing.gate,
         'contact-b': chosen[f]['contact-b'].gate,
       },
       CALIBRATED_MEDIAN,
@@ -552,13 +552,13 @@ async function runCharacter(m: CastMember): Promise<void> {
       se: {
         idle: idleHi.se,
         'contact-a': chosen.se['contact-a'].hi,
-        passing: chosen.se['passing'].hi,
+        passing: chosen.se.passing.hi,
         'contact-b': chosen.se['contact-b'].hi,
       },
       ne: {
         idle: idleHi.ne,
         'contact-a': chosen.ne['contact-a'].hi,
-        passing: chosen.ne['passing'].hi,
+        passing: chosen.ne.passing.hi,
         'contact-b': chosen.ne['contact-b'].hi,
       },
     },

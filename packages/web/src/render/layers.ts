@@ -73,7 +73,7 @@ function authorised(path: string): boolean {
 /** Every line that assigns a zIndex from a file that has no business doing so, as
  *  `path:line — text`. A regression names its own call site. */
 export function literalZIndexOffenders(
-  files: ReadonlyArray<{ path: string; source: string }>,
+  files: readonly { path: string; source: string }[],
 ): string[] {
   const out: string[] = []
   for (const f of files) {

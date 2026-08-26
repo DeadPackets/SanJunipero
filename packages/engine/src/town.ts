@@ -25,7 +25,7 @@ import { authoredOrigin, type WorldState } from './state.js'
 
 /** TOWN_SQUARE is the plaza's north-west corner, not its middle. Ring-independent by construction:
  *  every offset is a difference of two plazaOf(rings) points. 254 of 256 — well and pit stand bare. */
-const PLAZA_PAVED: ReadonlyArray<{ dx: number; dy: number }> = (() => {
+const PLAZA_PAVED: readonly { dx: number; dy: number }[] = (() => {
   const r = plazaOf(),
     w = wellAt(),
     f = firePitAt()

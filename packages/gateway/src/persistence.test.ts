@@ -57,7 +57,9 @@ const countEvents = (dbPath: string, type: string): number => {
  *  db already holding 10 000 ticks. These tests pin both halves together. */
 describe('★ the town survives a restart', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-persist-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('resumes the same town on a second boot — same day, same buildings, same people', async () => {
     const dbPath = join(dir, 'resume.db')
@@ -94,7 +96,7 @@ describe('★ the town survives a restart', () => {
 
   it('does not re-publish every historic thought on resume', async () => {
     const dbPath = join(dir, 'thoughts.db')
-    const readThoughts = (): Array<{ id: number; tick: number }> => {
+    const readThoughts = (): { id: number; tick: number }[] => {
       const db = openDb(dbPath)
       try {
         return thoughtsSince(db, 0)
@@ -140,7 +142,9 @@ describe('★ the town survives a restart', () => {
  *  with no error anywhere. */
 describe('★ a resumed world refuses a boot that is not the same world', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-identity-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('records who the town is on the first boot', async () => {
     const dbPath = join(dir, 'meta.db')
@@ -199,7 +203,9 @@ describe('★ a resumed world refuses a boot that is not the same world', () => 
  *  boot gives the worst of both: the buildings gone and every mind still remembering. */
 describe('★ fresh means fresh for the minds too', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-minds-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('wipes the agent memory dbs together with the world db', async () => {
     const dbPath = join(dir, 'w.db')

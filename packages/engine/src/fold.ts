@@ -516,7 +516,7 @@ export function fold(
       const p = ActionStarted.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`action_started for unknown agent ${p.agentId}`)
-      let path: Array<[number, number]> | undefined
+      let path: [number, number][] | undefined
       if (p.verb === 'walk') {
         const w = WalkParams.parse(p.params)
         const found = findPath(state, a, w, config)
@@ -546,7 +546,7 @@ export function fold(
       const body = p.verb === 'eat' ? rested(a) : a
       // A meal is remembered by kind for as long as the variety window is wide, and the
       // remembering happens before the belly fills — the kind just eaten counts toward it.
-      const kind = p.verb === 'eat' ? p.results?.['kind'] : undefined
+      const kind = p.verb === 'eat' ? p.results?.kind : undefined
       if (typeof kind !== 'string' || !config.foodVariety.enabled) {
         return { ...state, agents: { ...state.agents, [p.agentId]: { ...body, activity: null } } }
       }
@@ -1102,8 +1102,8 @@ export function fold(
       // Params are translated on the `{x, y}` pair every landed coordinate-taking verb uses
       // (walk, till, plant, build): a destination in the old frame is a different tile now.
       const shiftParams = (params: Record<string, unknown>): Record<string, unknown> =>
-        typeof params['x'] === 'number' && typeof params['y'] === 'number'
-          ? { ...params, x: params['x'] + dx, y: params['y'] + dy }
+        typeof params.x === 'number' && typeof params.y === 'number'
+          ? { ...params, x: params.x + dx, y: params.y + dy }
           : params
       const agents = Object.fromEntries(
         Object.entries(state.agents).map(([id, a]) => [

@@ -11,8 +11,12 @@ export function StageVeil({ store }: { store: WorldStore }) {
 
   useEffect(() => {
     if (!awake) return
-    const t = setTimeout(() => setGone(true), VEIL_EXIT_MS)
-    return () => clearTimeout(t)
+    const t = setTimeout(() => {
+      setGone(true)
+    }, VEIL_EXIT_MS)
+    return () => {
+      clearTimeout(t)
+    }
   }, [awake])
 
   if (gone) return null

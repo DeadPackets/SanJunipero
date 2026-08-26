@@ -15,7 +15,7 @@ const LINES = CSS.split('\n')
 const BANNERS = LINES.filter((l) => /^\/\* [──══]/u.test(l))
 
 /** The two blocks a merge train actually risks, named so a failure says whose block went. */
-const LANE_BLOCKS: ReadonlyArray<readonly [lane: string, banner: string]> = [
+const LANE_BLOCKS: readonly (readonly [lane: string, banner: string])[] = [
   ['the Discovery Record', '/* ── the Discovery Record: a chain of museum labels'],
   ['THE LITTLE MAP', '/* ══ ★ THE LITTLE MAP ═'],
 ]

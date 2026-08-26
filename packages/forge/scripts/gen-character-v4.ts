@@ -308,7 +308,7 @@ const chosen: Record<AuthoredFacing, Record<WalkPose, FrameCand>> = { se: {}, ne
 for (const f of AUTHORED_FACINGS) {
   console.log(`walk frames ${f}`)
   for (const p of WALK_POSES) {
-    let c = await genFrame(f, p, 0)
+    const c = await genFrame(f, p, 0)
     if (c) frameCands[f][p].push(c)
     if (!c || c.failures.length > 0) {
       const retry = await genFrame(f, p, 1)
@@ -326,7 +326,7 @@ for (const f of AUTHORED_FACINGS) {
   const gateStrip = (): Record<StripPoseV4, RawImage> => ({
     idle: masterGate[f],
     'contact-a': chosen[f]['contact-a'].gate,
-    passing: chosen[f]['passing'].gate,
+    passing: chosen[f].passing.gate,
     'contact-b': chosen[f]['contact-b'].gate,
   })
   let stride = strideGateV4(f, gateStrip(), CALIBRATED_MEDIAN)
@@ -344,7 +344,7 @@ for (const f of AUTHORED_FACINGS) {
         const altStrip: Record<StripPoseV4, RawImage> = {
           idle: masterGate[f],
           'contact-a': alt['contact-a'].gate,
-          passing: alt['passing'].gate,
+          passing: alt.passing.gate,
           'contact-b': alt['contact-b'].gate,
         }
         const altStride = strideGateV4(f, altStrip, CALIBRATED_MEDIAN)
@@ -406,13 +406,13 @@ const authoredStrips: Record<AuthoredFacing, Record<StripPoseV4, RawImage>> = {
   se: {
     idle: idleHi.se,
     'contact-a': chosen.se['contact-a'].hi,
-    passing: chosen.se['passing'].hi,
+    passing: chosen.se.passing.hi,
     'contact-b': chosen.se['contact-b'].hi,
   },
   ne: {
     idle: idleHi.ne,
     'contact-a': chosen.ne['contact-a'].hi,
-    passing: chosen.ne['passing'].hi,
+    passing: chosen.ne.passing.hi,
     'contact-b': chosen.ne['contact-b'].hi,
   },
 }
@@ -494,7 +494,9 @@ for (const f of FACINGS) {
   const fw = frames[0]!.width,
     fh = frames[0]!.height
   const stacked = new Uint8ClampedArray(fw * fh * frames.length * 4)
-  frames.forEach((fr, i) => stacked.set(fr.data, fw * fh * 4 * i))
+  frames.forEach((fr, i) => {
+    stacked.set(fr.data, fw * fh * 4 * i)
+  })
   const gif = await sharp(Buffer.from(stacked.buffer), {
     raw: { width: fw, height: fh * frames.length, channels: 4, pageHeight: fh },
   })
@@ -512,7 +514,7 @@ const finalFailures = [
       {
         idle: masterGate[f],
         'contact-a': chosen[f]['contact-a'].gate,
-        passing: chosen[f]['passing'].gate,
+        passing: chosen[f].passing.gate,
         'contact-b': chosen[f]['contact-b'].gate,
       },
       CALIBRATED_MEDIAN,

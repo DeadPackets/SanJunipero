@@ -19,7 +19,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 // and every row below the night-witness block is about a horizon, not about the dark.
 const NOON = 720
 
-function makeWorld(agents: Array<{ id: string; x: number; y: number }>): WorldState {
+function makeWorld(agents: { id: string; x: number; y: number }[]): WorldState {
   let s = genesisState(
     DEFAULT_CONFIG,
     Array.from({ length: 64 }, () => Array.from({ length: 64 }, (): TileId => 0)),
@@ -346,7 +346,7 @@ const HOUSE = { id: 'structure_1', kind: 'house', x: 10, y: 10, w: 2, h: 2 }
 const DOOR = { x: 10, y: 12 }
 
 function withHouse(s: WorldState): WorldState {
-  let out = fold(
+  const out = fold(
     s,
     ev('structure_planned', {
       id: HOUSE.id,
@@ -720,7 +720,7 @@ describe('composePerception: witnessed takings', () => {
 
 describe('the ground underfoot: a benefit stated, never a rule given', () => {
   function paved(
-    tiles: Array<{ x: number; y: number; tile: TileId }>,
+    tiles: { x: number; y: number; tile: TileId }[],
     self = { x: 0, y: 0 },
   ): WorldState {
     const s = makeWorld([{ id: 'a', ...self }])
@@ -769,7 +769,7 @@ describe('night-witness: a torch does not let you see, it lets the dark see you'
     loc: unknown,
     config = CFG,
   ): WorldState => {
-    let out = fold(s, ev('item_spawned', { id: itemId, kind, qty: 1, loc }, s.tick), config)
+    const out = fold(s, ev('item_spawned', { id: itemId, kind, qty: 1, loc }, s.tick), config)
     return fold(out, ev('item_lit', { itemId, burnsUntilTick: s.tick + 500 }, s.tick), config)
   }
   const firePit = (

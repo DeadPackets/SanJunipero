@@ -203,7 +203,7 @@ describe('the genesis town and a grown one come out of ONE function', () => {
 
 // ── the three invariants the brief names, each proven for EVERY plot the grammar can produce ──
 
-const EVERY_SIZE: ReadonlyArray<{ along: number; deep: number }> = Array.from(
+const EVERY_SIZE: readonly { along: number; deep: number }[] = Array.from(
   { length: MAX_ALONG * MAX_DEEP },
   (_, n) => ({ along: (n % MAX_ALONG) + 1, deep: Math.floor(n / MAX_ALONG) + 1 }),
 )
@@ -329,7 +329,7 @@ describe('the town is as large as it has grown', () => {
 
 // The reference's own genesis and grown towns, rebuilt here from the exported grammar so the
 // numbers above are measured on the same buildings the Python measured.
-const REFERENCE_GENESIS: ReadonlyArray<[string, number, number, string | null]> = [
+const REFERENCE_GENESIS: readonly [string, number, number, string | null][] = [
   ['storehouse', 2, 2, null],
   ['house', 2, 2, 'amara'],
   ['house', 2, 2, 'yusuf'],
@@ -340,7 +340,7 @@ const REFERENCE_GENESIS: ReadonlyArray<[string, number, number, string | null]> 
   ['house', 2, 2, 'salma'],
   ['farmhouse', 4, 2, null],
 ]
-const REFERENCE_LATER: ReadonlyArray<[string, number, number]> = [
+const REFERENCE_LATER: readonly [string, number, number][] = [
   ['house', 2, 2],
   ['cabin', 2, 2],
   ['cottage', 3, 2],

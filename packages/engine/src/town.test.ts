@@ -103,7 +103,7 @@ describe('★ where the town is, in a world that moves under it', () => {
     const rows = shifted.terrain.map((r) => [...r])
     rows.unshift(rows.pop()!)
     expect(
-      townSquareOf({ ...shifted, terrain: rows as never }),
+      townSquareOf({ ...shifted, terrain: rows }),
       'the plaza shifted a row and the engine did not notice',
     ).toBeNull()
 

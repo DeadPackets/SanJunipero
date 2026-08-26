@@ -87,7 +87,9 @@ export function StageMount({
         })
         syncEntities(s, book, store, openDoor)
         // a place name is a map legend: it fades on the way in, so it follows the camera too
-        offCamera = s.onCamera(() => marks.sync())
+        offCamera = s.onCamera(() => {
+          marks.sync()
+        })
         marks.sync()
         chars = createCharacterLayer(s, book, store, (agentId) => {
           // click-to-inspect: the G6 check — route change only, React owns the chrome

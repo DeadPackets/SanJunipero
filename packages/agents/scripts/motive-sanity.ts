@@ -30,15 +30,15 @@ const store = new EventStore(db)
 const g = makeGenesisWorld(config)
 let state: WorldState = genesisState(config, g.terrain)
 const dropped = new Set<string>()
-const doors: Array<{ x: number; y: number }> = []
+const doors: { x: number; y: number }[] = []
 for (const e of g.events) {
   const p = e.payload as Record<string, unknown>
-  if (e.type === 'structure_planned' && ROOFED.has(String(p['kind']))) {
-    dropped.add(String(p['id']))
-    doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
+  if (e.type === 'structure_planned' && ROOFED.has(String(p.kind))) {
+    dropped.add(String(p.id))
+    doors.push({ x: Number(p.x), y: Number(p.y) + Number(p.h ?? 1) })
     continue
   }
-  if (e.type === 'structure_completed' && dropped.has(String(p['id']))) continue
+  if (e.type === 'structure_completed' && dropped.has(String(p.id))) continue
   state = fold(state, store.append(state.tick, e.type, e.payload), config)
 }
 const IDS = ['amara', 'yusuf', 'nadia', 'omar', 'salma']
@@ -82,7 +82,9 @@ const loop = new TickLoop({
   config,
   startTick: START_TICK,
   realMsPerTick: 0,
-  onTick: (c) => handler(c),
+  onTick: (c) => {
+    handler(c)
+  },
 })
 const bridge = new EngineBridge({ loop, store, simConfig: config })
 handler = bridge.wrapTickHandler(({ emit }) => {
@@ -118,12 +120,11 @@ if (spot !== null) {
   void bridge.submit('yusuf', { verb: 'walk', params: { x: spot.x, y: spot.y } })
   for (
     let i = 0;
-    i < 400 &&
-    (loop.state.agents['yusuf']!.x !== spot.x || loop.state.agents['yusuf']!.y !== spot.y);
+    i < 400 && (loop.state.agents.yusuf!.x !== spot.x || loop.state.agents.yusuf!.y !== spot.y);
     i++
   )
     loop.step()
-  const y = loop.state.agents['yusuf']!
+  const y = loop.state.agents.yusuf!
   console.log(`yusuf walked to (${y.x}, ${y.y}) in ${loop.tick - START_TICK - 1} ticks`)
   let verdict = 'no answer'
   void bridge.submit('yusuf', { verb: 'build', params: { kind: 'house' } }, (r) => {

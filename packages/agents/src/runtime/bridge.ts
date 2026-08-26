@@ -64,7 +64,7 @@ function coldOf(
 ): { biting: true } | { keptOffBy: 'walls' | 'coat' | 'fire' } | undefined {
   if (!config.warmth.enabled) return undefined
   const a = state.agents[agentId]
-  if (a === undefined || !a.alive) return undefined
+  if (!a?.alive) return undefined
   const ambient = ambientTempAt(state, config)
   if (ambient >= config.warmth.comfortBand) return undefined
   if (isExposed(state, config, agentId)) return { biting: true }
@@ -134,8 +134,8 @@ export class EngineBridge {
   readonly #simConfig: SimConfig
   readonly #recentWindowTicks: number
   #queue: QueuedSubmit[] = []
-  #announcements: Array<{ type: string; payload: Record<string, unknown> }> = []
-  #tickCallbacks: Array<(tick: number) => void> = []
+  #announcements: { type: string; payload: Record<string, unknown> }[] = []
+  #tickCallbacks: ((tick: number) => void)[] = []
   #window: SimEvent[] = []
   #lastSeq = 0
 
@@ -310,7 +310,7 @@ export class EngineBridge {
     for (const id of Object.keys(state.forageables ?? {}).sort()) {
       const node = state.forageables![id]!
       if (node.stock <= 0) continue
-      const kind = FORAGEABLE_YIELD[node.kind as keyof typeof FORAGEABLE_YIELD]
+      const kind = FORAGEABLE_YIELD[node.kind]
       if (kind === undefined || !isFoodKind(this.#simConfig, kind)) continue
       offer(node.x, node.y, kind)
     }

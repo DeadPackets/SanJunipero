@@ -11,7 +11,7 @@ import {
 import { bigTown } from './bigTown.js'
 
 const terrainOf = (w: number, h: number): TileId[][] =>
-  Array.from({ length: h }, () => Array.from({ length: w }, () => 0 as TileId))
+  Array.from({ length: h }, () => Array.from({ length: w }, () => 0))
 
 const STAGE = { w: 1728, h: 824 }
 

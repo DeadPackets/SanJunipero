@@ -33,7 +33,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 const map = (): TileId[][] =>
   Array.from({ length: 16 }, () => Array.from({ length: 16 }, (): TileId => 0))
 
-function town(config: SimConfig, at: Array<[string, number, number]>): WorldState {
+function town(config: SimConfig, at: [string, number, number][]): WorldState {
   let s = genesisState(config, map())
   for (const [id, x, y] of at) {
     s = fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), config)

@@ -17,9 +17,7 @@ import { EventStore, RngStreams, TickLoop, genesisState, openDb, type TileId } f
 import { createGateway, type Gateway } from './server.js'
 import { BOND_TYPES, buildBonds } from './bonds.js'
 
-const GRASS: TileId[][] = Array.from({ length: 24 }, () =>
-  Array.from({ length: 24 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0))
 
 describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-bonds-'))
@@ -192,13 +190,18 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
    * SELECT may drop them — `fauna_moved` alone carries 640 B payloads and dominates a real log.
    */
   it('★ answers what the whole log answers, reading only the five types a bond is made of', () => {
-    const rows = db
-      .prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq')
-      .all() as Array<{ seq: number; tick: number; type: string; payload: string }>
-    const all = rows.map(
-      (r) =>
-        ({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) }) as SimEvent,
-    )
+    const rows = db.prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq').all() as {
+      seq: number
+      tick: number
+      type: string
+      payload: string
+    }[]
+    const all = rows.map((r) => ({
+      seq: r.seq,
+      tick: r.tick,
+      type: r.type,
+      payload: JSON.parse(r.payload),
+    }))
     expect(
       all.some((e) => !BOND_TYPES.includes(e.type)),
       'the log carries types bonds ignore',
@@ -220,8 +223,12 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
  * the same answer in bounded time; this proves the "same answer" half.
  */
 describe('★ the talk window is a window, not the whole log', () => {
-  const spoke = (seq: number, tick: number, agentId: string, x: number): SimEvent =>
-    ({ seq, tick, type: 'agent_spoke', payload: { agentId, text: 'w', x, y: 0 } }) as SimEvent
+  const spoke = (seq: number, tick: number, agentId: string, x: number): SimEvent => ({
+    seq,
+    tick,
+    type: 'agent_spoke',
+    payload: { agentId, text: 'w', x, y: 0 },
+  })
 
   it('ties exactly the pairs inside the window and none outside it', () => {
     const events = [

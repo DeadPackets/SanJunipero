@@ -45,7 +45,9 @@ export function DiscoveryRecordView({
                 className="discovery-leaf"
                 aria-current={viewTick === leaf.record.tick ? 'true' : undefined}
                 aria-label={`${leaf.headline}, ${leaf.when}. Go to this moment.`}
-                onClick={() => onJump(leaf.record.tick)}
+                onClick={() => {
+                  onJump(leaf.record.tick)
+                }}
               >
                 {leaf.assetId === null ? (
                   <span className="discovery-art discovery-art-none" aria-hidden="true" />
@@ -122,7 +124,9 @@ export function DiscoveryPanel({
       throughTick={state?.tick ?? 0}
       loading={!loaded}
       viewTick={mode.live ? null : mode.tick}
-      onJump={(tick) => onView(tick)}
+      onJump={(tick) => {
+        onView(tick)
+      }}
     />
   )
 }

@@ -47,7 +47,7 @@ export const SHOWCASE_CONFIG: SimConfig = {
     ...DEFAULT_CONFIG.structures,
     recipes: {
       ...DEFAULT_CONFIG.structures.recipes,
-      house: { ...DEFAULT_CONFIG.structures.recipes['house']!, durationTicks: DEV_HOUSE_TICKS },
+      house: { ...DEFAULT_CONFIG.structures.recipes.house!, durationTicks: DEV_HOUSE_TICKS },
     },
   },
 }
@@ -312,7 +312,9 @@ export async function startDevWorld(
     rng,
     config,
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
-    onTick: (ctx) => handler(ctx),
+    onTick: (ctx) => {
+      handler(ctx)
+    },
   })
   // the founders showcase town
   const scriptedOnTick = makeFoundersOnTick(config, rng, () => loop.state, {
@@ -384,7 +386,7 @@ export async function startDevWorld(
   }
   // DEV_FAST_FORWARD=<tick>: step the world synchronously to a moment (e.g. 490 = Day 0
   // 08:10 daylight) before the real-time cadence starts — screenshot/QA convenience only
-  const ff = Number(process.env['DEV_FAST_FORWARD'] ?? '0')
+  const ff = Number(process.env.DEV_FAST_FORWARD ?? '0')
   if (Number.isFinite(ff) && ff > 0) {
     while (loop.state.tick < ff) tickOnce()
     console.log(`dev world: fast-forwarded to tick ${loop.state.tick}`)
@@ -423,18 +425,16 @@ export async function startDevWorld(
 // The human path defaults to the product town and to interiors on; the LIBRARY defaults stay
 // `scripted` and interiors off, because `g6.test.ts` and `devWorld.test.ts` hash exactly that.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const map: DevMapKind = process.env['SJ_MAP'] === 'scripted' ? 'scripted' : DEV_MAP_HUMAN
-  const interiors = process.env['SJ_INTERIORS'] !== '0'
-  const builders = process.env['SJ_BUILDERS'] !== '0'
-  const bridge = process.env['SJ_BRIDGE'] !== '0'
-  const jointBuild = process.env['SJ_JOINT'] === '1'
-  const fresh = process.env['SJ_FRESH'] === '1'
-  const asked = Number(process.env['SJ_RINGS'] ?? TOWN_RINGS_GENESIS)
+  const map: DevMapKind = process.env.SJ_MAP === 'scripted' ? 'scripted' : DEV_MAP_HUMAN
+  const interiors = process.env.SJ_INTERIORS !== '0'
+  const builders = process.env.SJ_BUILDERS !== '0'
+  const bridge = process.env.SJ_BRIDGE !== '0'
+  const jointBuild = process.env.SJ_JOINT === '1'
+  const fresh = process.env.SJ_FRESH === '1'
+  const asked = Number(process.env.SJ_RINGS ?? TOWN_RINGS_GENESIS)
   const rings = Number.isInteger(asked) && asked >= 1 ? asked : TOWN_RINGS_GENESIS
   if (rings !== asked)
-    console.log(
-      `dev world: SJ_RINGS=${process.env['SJ_RINGS']} is not a ring count; using ${rings}`,
-    )
+    console.log(`dev world: SJ_RINGS=${process.env.SJ_RINGS} is not a ring count; using ${rings}`)
   void startDevWorld({
     ingest: true,
     map,

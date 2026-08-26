@@ -153,9 +153,9 @@ describe('SILHOUETTE_RANK', () => {
   })
 
   it('reads a public building heavier than a dwelling', () => {
-    expect(SILHOUETTE_RANK['fire_pit']).toBeLessThan(SILHOUETTE_RANK['house'])
-    expect(SILHOUETTE_RANK['storehouse']).toBeLessThan(SILHOUETTE_RANK['house'])
-    expect(SILHOUETTE_RANK['well']).toBeLessThan(SILHOUETTE_RANK['house'])
+    expect(SILHOUETTE_RANK.fire_pit).toBeLessThan(SILHOUETTE_RANK.house)
+    expect(SILHOUETTE_RANK.storehouse).toBeLessThan(SILHOUETTE_RANK.house)
+    expect(SILHOUETTE_RANK.well).toBeLessThan(SILHOUETTE_RANK.house)
   })
 })
 
@@ -318,7 +318,7 @@ describe('★ the legend never covers the map it explains', () => {
 
   // Three towns with nothing in common but the grammar: the one a viewer opens, the hand-built
   // fixture the older tests use, and the ruler with a building on every plot of every block.
-  const TOWNS: Array<[string, S[]]> = [
+  const TOWNS: [string, S[]][] = [
     ['template ring 1', templateTown(1)],
     ['template ring 3', templateTown(3)],
     ['the task-59 town', TOWN],

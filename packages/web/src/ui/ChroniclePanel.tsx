@@ -56,7 +56,7 @@ export function tabFromKey(key: string, from: ChronicleView): ChronicleView | nu
   const i = CHRONICLE_VIEWS.indexOf(from)
   if (key === 'ArrowRight') return CHRONICLE_VIEWS[(i + 1) % n]!
   if (key === 'ArrowLeft') return CHRONICLE_VIEWS[(i - 1 + n) % n]!
-  if (key === 'Home') return CHRONICLE_VIEWS[0]!
+  if (key === 'Home') return CHRONICLE_VIEWS[0]
   if (key === 'End') return CHRONICLE_VIEWS[n - 1]!
   return null
 }
@@ -93,7 +93,9 @@ export function ChronicleViewTabs({
           aria-controls={`chronicle-view-${v}`}
           tabIndex={v === view ? 0 : -1}
           className={v === view ? 'feed-tab active' : 'feed-tab'}
-          onClick={() => onView(v)}
+          onClick={() => {
+            onView(v)
+          }}
         >
           {CHRONICLE_VIEW_LABEL[v]}
         </button>
@@ -134,7 +136,9 @@ export function ImportantFeedView({
             className="feed-jump"
             aria-current={viewTick === e.tick ? 'true' : undefined}
             aria-label={`${e.label} ${stamp(e.tick)}. Go to this moment.`}
-            onClick={() => onJump(e.tick)}
+            onClick={() => {
+              onJump(e.tick)
+            }}
           >
             <Glyph icon={e.icon} />
             <span className="stamp">{stamp(e.tick)}</span>
@@ -150,7 +154,7 @@ export function EverythingFeedView({
   lines,
   tick = 0,
 }: {
-  lines: Array<{ key: number; tick: number; kind: string; text: string }>
+  lines: { key: number; tick: number; kind: string; text: string }[]
   tick?: number
 }) {
   if (lines.length === 0) {
@@ -209,7 +213,7 @@ export function ChroniclePanel({
     }
   }, [])
 
-  const lines: Array<{ key: number; tick: number; kind: string; text: string }> = []
+  const lines: { key: number; tick: number; kind: string; text: string }[] = []
   for (let i = events.length - 1; i >= 0 && lines.length < FEED_MAX; i--) {
     const ev = events[i]!
     const text = describeEvent(ev, state)

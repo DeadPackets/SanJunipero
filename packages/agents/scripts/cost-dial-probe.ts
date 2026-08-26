@@ -22,7 +22,7 @@ const SCHEMA = z.object({ verb: z.string().min(1), reason: z.string().min(1) }).
 
 // The rungs. `reasoning:{enabled:false}` is OpenRouter's off switch; effort levels are its
 // three named rungs. `null` is the control: exactly what the code sends today.
-const RUNGS: Array<{ name: string; reasoning: unknown }> = [
+const RUNGS: { name: string; reasoning: unknown }[] = [
   { name: 'unset (today)', reasoning: null },
   { name: 'off', reasoning: { enabled: false } },
   { name: 'minimal', reasoning: { effort: 'minimal' } },
@@ -54,7 +54,7 @@ for (let rep = 0; rep < REPS; rep++) {
       models: [MIND_MODEL, ...FALLBACK_MODELS],
       provider: { order: PROVIDER_ORDER, allow_fallbacks: true },
     }
-    if (rung.reasoning !== null) extraBody['reasoning'] = rung.reasoning
+    if (rung.reasoning !== null) extraBody.reasoning = rung.reasoning
     try {
       const r = await generateText({
         model: openrouter(MIND_MODEL, { extraBody }),

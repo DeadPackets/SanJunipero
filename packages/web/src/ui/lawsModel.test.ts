@@ -11,12 +11,16 @@ import {
   postLaw,
 } from './lawsModel.js'
 
-const ev = (seq: number, tick: number, path: string, value: unknown): SimEvent =>
-  ({ seq, tick, type: 'config_changed', payload: { path, value } }) as SimEvent
+const ev = (seq: number, tick: number, path: string, value: unknown): SimEvent => ({
+  seq,
+  tick,
+  type: 'config_changed',
+  payload: { path, value },
+})
 
 const DELTAS: SimEvent[] = [
   ev(1, 100, 'mystery.enabled', false),
-  { seq: 2, tick: 101, type: 'agent_moved', payload: { id: 'a', x: 1, y: 1 } } as SimEvent,
+  { seq: 2, tick: 101, type: 'agent_moved', payload: { id: 'a', x: 1, y: 1 } },
   ev(3, 200, 'spoilage.storehouseMultiplier', 3),
   ev(4, 300, 'mystery.enabled', true),
 ]
@@ -120,7 +124,7 @@ describe('adminToken (T25c)', () => {
 
 describe('postLaw (T25c)', () => {
   function fakeFetch(status: number, body: string) {
-    const calls: Array<{ url: string; init: RequestInit }> = []
+    const calls: { url: string; init: RequestInit }[] = []
     const fn = async (url: string, init: RequestInit) => {
       calls.push({ url, init })
       return { status, text: async () => body } as Response

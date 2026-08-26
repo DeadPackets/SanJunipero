@@ -113,7 +113,9 @@ export function TimelineView({
                 className={`mark ${mk.kind}`}
                 style={{ left: markLeft(mk.tick, span) }}
                 aria-label={`Day ${at.day} ${at.time} — ${mk.words}. Go to this moment.`}
-                onClick={() => onScrub(mk.tick)}
+                onClick={() => {
+                  onScrub(mk.tick)
+                }}
               >
                 <MarkGlyph mark={mk} />
                 <span className="mark-tip" data-side={tipSide(mk.tick, span)}>

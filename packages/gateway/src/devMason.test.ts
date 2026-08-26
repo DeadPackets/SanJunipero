@@ -67,14 +67,15 @@ function runDevWorld(builders: boolean, rings = RINGS, ticks = TICKS, jointBuild
     rng,
     config,
     snapshotEveryTicks: 720,
-    onTick: (ctx) =>
+    onTick: (ctx) => {
       inner({
         tick: ctx.tick,
         emit: (type, payload) => {
           events.push({ type, tick: ctx.tick, payload: (payload ?? {}) as Record<string, unknown> })
           ctx.emit(type, payload)
         },
-      }),
+      })
+    },
   })
   for (let t = 0; t < ticks; t++) loop.step()
   return { state: loop.state, events }
@@ -136,10 +137,10 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
     expect(standingRects(run.state).length).toBe(GENESIS_STRUCTURES + raised.length)
     // ★ AND EVERY ONE OF THEM WAS UNDER SCAFFOLDING FOR A WHILE, which is the thing a viewer
     // is meant to catch: a roof that appears between one frame and the next was never built.
-    const planned = new Map(raised.map((e) => [String(e.payload['id']), e.tick]))
+    const planned = new Map(raised.map((e) => [String(e.payload.id), e.tick]))
     for (const e of finished) {
-      const at = planned.get(String(e.payload['id']))
-      expect(at, `${String(e.payload['id'])} completed without being planned`).toBeDefined()
+      const at = planned.get(String(e.payload.id))
+      expect(at, `${String(e.payload.id)} completed without being planned`).toBeDefined()
       // At least the recipe's own ticks, and sometimes half again: `workPenalty` charges the
       // dark for work, so a roof begun at dusk takes 360 where one begun at noon takes 240.
       expect(e.tick - at!, 'a house went up in one tick').toBeGreaterThanOrEqual(
@@ -150,18 +151,17 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
 
   it('★ AND NOT ONE OF THEM WAS TOLD WHERE — every build names {kind} and nothing else', () => {
     const builds = run.events.filter(
-      (e) => e.type === 'action_started' && e.payload['verb'] === 'build',
+      (e) => e.type === 'action_started' && e.payload.verb === 'build',
     )
     expect(builds.length).toBeGreaterThan(20)
     for (const b of builds) {
       expect(
-        Object.keys(b.payload['params'] as object).sort(),
+        Object.keys(b.payload.params as object).sort(),
         'a coordinate reached the verb',
       ).toEqual(['kind'])
     }
     // and it is a founder's hand on every one of them, not the tick-1 script's
-    for (const e of raised)
-      expect(FOUNDERS.map((f) => f.id)).toContain(String(e.payload['builderId']))
+    for (const e of raised) expect(FOUNDERS.map((f) => f.id)).toContain(String(e.payload.builderId))
   })
 
   // "Not on water, not on a street tile" PASSES with the square ten rows out — a plot shifted by
@@ -171,10 +171,10 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
     const plots = freePlots(RINGS + 2, townGroundOf(run.state, square)).map((p) => plotExtent(p))
     const tiles = new Set<string>()
     for (const e of raised) {
-      const x = Number(e.payload['x']),
-        y = Number(e.payload['y'])
-      const w = Number(e.payload['w']),
-        h = Number(e.payload['h'])
+      const x = Number(e.payload.x),
+        y = Number(e.payload.y)
+      const w = Number(e.payload.w),
+        h = Number(e.payload.h)
       const g = grammarOf(square, { x, y })
       const inside = plots.some(
         (p) => p.dx <= g.dx && g.dx + w <= p.dx + p.w && p.dy <= g.dy && g.dy + h <= p.dy + p.h,
@@ -193,7 +193,7 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
   })
 
   it('★ and the town claims a DIFFERENT plot each time — the register is not frozen at genesis', () => {
-    const seats = new Set(raised.map((e) => `${String(e.payload['x'])},${String(e.payload['y'])}`))
+    const seats = new Set(raised.map((e) => `${String(e.payload.x)},${String(e.payload.y)}`))
     expect(seats.size).toBe(raised.length)
     // the claim still has somewhere to offer at the end, so the run did not stop for want of one
     expect(claimInWorld(run.state, { along: 2, deep: 2 })).not.toBeNull()
@@ -232,13 +232,13 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
     const perTick = new Map<string, number>()
     for (const e of r.events) {
       if (e.type !== 'structure_progressed') continue
-      const k = `${e.tick}:${String(e.payload['id'])}`
+      const k = `${e.tick}:${String(e.payload.id)}`
       perTick.set(k, (perTick.get(k) ?? 0) + 1)
     }
     return Math.max(0, ...perTick.values())
   }
   const builds = (r: Run) =>
-    r.events.filter((e) => e.type === 'action_started' && e.payload['verb'] === 'build')
+    r.events.filter((e) => e.type === 'action_started' && e.payload.verb === 'build')
   const planted = (r: Run) => r.events.filter((e) => e.type === 'structure_planned' && e.tick > 1)
 
   it('★ more than one pair of hands lands on one house, and they are different people', () => {
@@ -258,9 +258,9 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
     const bodiesOn = new Map<string, Set<string>>() // `${tick}:${siteId}` -> agent ids
     let worker = ''
     for (const e of on.events) {
-      if (e.type === 'action_progressed') worker = String(e.payload['agentId'])
+      if (e.type === 'action_progressed') worker = String(e.payload.agentId)
       if (e.type !== 'structure_progressed') continue
-      const k = `${e.tick}:${String(e.payload['id'])}`
+      const k = `${e.tick}:${String(e.payload.id)}`
       const who = bodiesOn.get(k) ?? new Set<string>()
       who.add(worker)
       bodiesOn.set(k, who)
@@ -276,7 +276,7 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
     for (const id of peak.who) expect(FOUNDERS.map((f) => f.id)).toContain(id)
     const [peakTick, peakId] = peak.key.split(':')
     expect(
-      planted(on).some((e) => String(e.payload['id']) === peakId),
+      planted(on).some((e) => String(e.payload.id) === peakId),
       'the busiest site was never planned',
     ).toBe(true)
     console.log(
@@ -290,16 +290,14 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
   it('★ and the joiner pays nothing twice — no second plan, no second plot, no roof off the lattice', () => {
     // Every roof in the world was planted exactly once, and the count of standing things is
     // the genesis eleven plus what was planted — a join adds a pair of hands, never a building.
-    const ids = planted(on).map((e) => String(e.payload['id']))
+    const ids = planted(on).map((e) => String(e.payload.id))
     expect(new Set(ids).size).toBe(ids.length)
     expect(standingRects(on.state).length).toBe(GENESIS_STRUCTURES + ids.length)
-    const seats = new Set(
-      planted(on).map((e) => `${String(e.payload['x'])},${String(e.payload['y'])}`),
-    )
+    const seats = new Set(planted(on).map((e) => `${String(e.payload.x)},${String(e.payload.y)}`))
     expect(seats.size).toBe(ids.length)
     for (const b of builds(on)) {
       expect(
-        Object.keys(b.payload['params'] as object).sort(),
+        Object.keys(b.payload.params as object).sort(),
         'a coordinate reached the verb',
       ).toEqual(['kind'])
     }
@@ -308,9 +306,9 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
   it('★ the house they raised together finished, and nobody went down doing it', () => {
     const done = on.events.filter((e) => e.type === 'structure_completed' && e.tick > 1)
     expect(done.length, 'nothing was finished').toBeGreaterThan(0)
-    const plannedAt = new Map(planted(on).map((e) => [String(e.payload['id']), e.tick]))
+    const plannedAt = new Map(planted(on).map((e) => [String(e.payload.id), e.tick]))
     for (const e of done) {
-      expect(plannedAt.get(String(e.payload['id'])), 'finished without being planned').toBeDefined()
+      expect(plannedAt.get(String(e.payload.id)), 'finished without being planned').toBeDefined()
     }
     expect(on.events.filter((e) => e.type === 'agent_collapsed')).toEqual([])
     for (const f of FOUNDERS) expect(on.state.agents[f.id]!.alive, f.id).toBe(true)
@@ -324,7 +322,7 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
       const cfg = SHOWCASE_CONFIG
       let n = 0
       const put = (s: WorldState, type: string, payload: unknown): WorldState =>
-        fold(s, { seq: ++n, tick: 1, type, payload } as never, cfg)
+        fold(s, { seq: ++n, tick: 1, type, payload }, cfg)
       const body = (s: WorldState, id: string, at: { x: number; y: number }): WorldState =>
         put(
           put(s, 'agent_spawned', { id, name: id, x: at.x, y: at.y, ageDays: 7300 }),

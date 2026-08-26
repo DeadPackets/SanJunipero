@@ -194,7 +194,9 @@ for (const f of FACINGS) {
   const fw = frames[0]!.width,
     fh = frames[0]!.height
   const stacked = new Uint8ClampedArray(fw * fh * frames.length * 4)
-  frames.forEach((fr, i) => stacked.set(fr.data, fw * fh * 4 * i))
+  frames.forEach((fr, i) => {
+    stacked.set(fr.data, fw * fh * 4 * i)
+  })
   const gif = await sharp(Buffer.from(stacked.buffer), {
     raw: { width: fw, height: fh * frames.length, channels: 4, pageHeight: fh },
   })

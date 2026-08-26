@@ -42,7 +42,7 @@ describe('SimConfigSchema', () => {
     expect(c.health.injuryDamage.grave).toBe(60)
     expect(c.skills.tracks).toHaveLength(12)
     expect(c.weather.seasonTemps.winter).toBe(-4)
-    expect(c.crops['wheat']!.growthDays).toBe(8)
+    expect(c.crops.wheat!.growthDays).toBe(8)
     expect(c.fire.burnTicksToDestroy).toBe(120)
     expect(c.construction.houseMaterials.wood).toBe(10)
   })
@@ -96,7 +96,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(isHearthKind(c, 'standing_stone')).toBe(false)
     // Neither open fire is a shelter and nobody builds either — an empty `inputs` is the whole
     // of what "the world places this" means, and `buildableRecipe` reads exactly that.
-    expect(c.structures.recipes['fire_pit']!.inputs).toEqual({})
+    expect(c.structures.recipes.fire_pit!.inputs).toEqual({})
     expect(isRoofedKind(c, 'fire_pit')).toBe(false)
   })
 
@@ -124,7 +124,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
   // Table, chair and rug are absent because no law reads them, and a word with no verb behind it
   // only buys refusals.
   it("the row carries the two furnishings a law reads and not the room's whole inventory", () => {
-    const row = c.structures.recipes['house']!
+    const row = c.structures.recipes.house!
     // `sited` joins the dimensions rather than the furnishings: it says who picks the ground,
     // not what is in the room, so it is no more a furnishing than `w` is.
     expect(
@@ -324,7 +324,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
 
   it('structures.recipes is the one table that knows what a building costs and measures', () => {
     const r = SimConfigSchema.parse({}).structures.recipes
-    expect(r['house']).toEqual({
+    expect(r.house).toEqual({
       inputs: { wood: 10 },
       w: 2,
       h: 2,
@@ -336,7 +336,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
       bed: true,
       sited: false,
     })
-    expect(r['well']).toEqual({
+    expect(r.well).toEqual({
       inputs: { stone: 8 },
       w: 1,
       h: 1,
@@ -348,7 +348,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
       bed: false,
       sited: false,
     })
-    expect(r['bridge']).toEqual({
+    expect(r.bridge).toEqual({
       inputs: { wood: 6 },
       w: 1,
       h: 2,
@@ -360,7 +360,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
       bed: false,
       sited: true,
     })
-    expect(r['grave']).toEqual({
+    expect(r.grave).toEqual({
       inputs: {},
       w: 1,
       h: 1,
@@ -375,11 +375,11 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     // Only the two 2x2 kinds keep empty inputs: a buildable cabin or storehouse is a second name for house.
     for (const k of ['storehouse', 'cabin', 'cottage', 'farmhouse'])
       expect(r[k]!.roofed, k).toBe(true)
-    expect(r['storehouse']!.inputs).toEqual({})
-    expect(r['cabin']!.inputs).toEqual({})
+    expect(r.storehouse!.inputs).toEqual({})
+    expect(r.cabin!.inputs).toEqual({})
     // One rate, not three authored numbers: a house is 4 tiles for 10 wood and 2 880 ticks.
-    const perTileWood = r['house']!.inputs['wood']! / (r['house']!.w * r['house']!.h)
-    const perTileTicks = r['house']!.durationTicks / (r['house']!.w * r['house']!.h)
+    const perTileWood = r.house!.inputs.wood! / (r.house!.w * r.house!.h)
+    const perTileTicks = r.house!.durationTicks / (r.house!.w * r.house!.h)
     expect([perTileWood, perTileTicks]).toEqual([2.5, 720])
     for (const k of ['cottage', 'farmhouse']) {
       const tiles = r[k]!.w * r[k]!.h
@@ -388,7 +388,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     }
     // A night is 720 ticks, so a lamp is the one roofless thing a want that arrives at dusk can
     // finish before dawn. `sited` because the lattice plats masses, not street furniture.
-    expect(r['lamp_post']).toEqual({
+    expect(r.lamp_post).toEqual({
       inputs: { wood: 2 },
       w: 1,
       h: 1,
@@ -400,7 +400,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
       bed: false,
       sited: true,
     })
-    expect(r['lamp_post']!.durationTicks).toBeLessThan(MINUTES_PER_DAY / 2) // finishable in one night
+    expect(r.lamp_post!.durationTicks).toBeLessThan(MINUTES_PER_DAY / 2) // finishable in one night
     // Only the two kinds that are not masses choose their own ground.
     expect(
       Object.entries(r)
@@ -408,29 +408,29 @@ describe('SimConfigSchema: C9 living-world sections', () => {
         .map(([k]) => k)
         .sort(),
     ).toEqual(['bridge', 'lamp_post'])
-    expect(r['house']!.maxHp).toBe(50)
+    expect(r.house!.maxHp).toBe(50)
     // The house row must agree with the dials it replaces, or the generalisation drifts.
-    expect(r['house']!.inputs).toEqual(DEFAULT_CONFIG.construction.houseMaterials)
-    expect(r['house']!.durationTicks).toBe(DEFAULT_CONFIG.construction.houseTicks)
+    expect(r.house!.inputs).toEqual(DEFAULT_CONFIG.construction.houseMaterials)
+    expect(r.house!.durationTicks).toBe(DEFAULT_CONFIG.construction.houseTicks)
     // Enterability is `roofed` on this row, and there is nowhere else to say it.
-    expect(r['house']).not.toHaveProperty('enterable')
+    expect(r.house).not.toHaveProperty('enterable')
   })
 
   it('the clothing chain and the rabbit are on the tables their tasks read', () => {
     const c = SimConfigSchema.parse({})
-    expect(c.crafting.recipes['cloth']).toEqual({
+    expect(c.crafting.recipes.cloth).toEqual({
       inputs: { fiber: 2 },
       output: { kind: 'cloth', qty: 1 },
       skill: 'tailoring',
     })
-    expect(c.crafting.recipes['garment']).toEqual({
+    expect(c.crafting.recipes.garment).toEqual({
       inputs: { cloth: 2 },
       output: { kind: 'garment', qty: 1 },
       skill: 'tailoring',
     })
-    expect(c.spoilage.days['rabbit_meat']).toBe(3)
+    expect(c.spoilage.days.rabbit_meat).toBe(3)
     // A hide is a material, not a meal: absent means it keeps.
-    expect(c.spoilage.days['hide']).toBeUndefined()
+    expect(c.spoilage.days.hide).toBeUndefined()
   })
 
   it('every C11 section rejects an unknown key and overrides one dial without disturbing its neighbours', () => {

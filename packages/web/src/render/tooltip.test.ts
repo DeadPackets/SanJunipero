@@ -187,7 +187,7 @@ describe('createTooltipLayer — one owner, so nothing is ever left behind', () 
     worldText: {
       children: [] as unknown[],
       addChild(...cs: unknown[]): void {
-        ;(this.children as unknown[]).push(...cs)
+        this.children.push(...cs)
       },
     },
   })

@@ -214,7 +214,7 @@ export type FloorPool = { sx: number; sy: number; radius: number; alpha: number 
 /** Light from the doorway and from any furnishing that provides it. The doorway pool always
  *  exists and comes first, so the painter lays the ambient light down before any fire. */
 export function floorPools(
-  items: ReadonlyArray<{ tile: Tile; light: boolean }>,
+  items: readonly { tile: Tile; light: boolean }[],
   room: RoomSize = ROOM_TILES,
 ): FloorPool[] {
   const door = interiorToScreen(room.w, room.h)
@@ -346,7 +346,7 @@ export function roomPanTo(
 /** What the camera watches, in order: the followed body if it is in this room, else the
  *  centroid of everybody in it, else `resting`, else `null`. */
 export function roomFocusOf(
-  bodies: ReadonlyArray<{ id: string; sx: number; sy: number }>,
+  bodies: readonly { id: string; sx: number; sy: number }[],
   followedId: string | null,
   resting: { sx: number; sy: number } | null = null,
 ): { sx: number; sy: number } | null {

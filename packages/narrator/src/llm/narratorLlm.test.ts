@@ -11,15 +11,15 @@ import {
 
 const usage: LlmUsage = { inputTokens: 10, outputTokens: 10, cacheReadTokens: 0, costUsd: 0.0001 }
 
-type Captured = { system: string; messages: Array<{ role: string; content: string }> }
+type Captured = { system: string; messages: { role: string; content: string }[] }
 
 const scripted = (value: unknown, captured: Captured[] = []): NarratorLlmClient =>
   ({
-    async object(opts: { system: string; messages: Array<{ role: string; content: string }> }) {
+    async object(opts: { system: string; messages: { role: string; content: string }[] }) {
       captured.push({ system: opts.system, messages: opts.messages })
       return { value, usage }
     },
-    async text(opts: { system?: string; messages: Array<{ role: string; content: string }> }) {
+    async text(opts: { system?: string; messages: { role: string; content: string }[] }) {
       captured.push({ system: opts.system ?? '', messages: opts.messages })
       return { text: 'scripted text', usage }
     },

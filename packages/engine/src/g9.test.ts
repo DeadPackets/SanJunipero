@@ -618,7 +618,7 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
   type Run = {
     loop: TickLoop
     store: EventStore
-    events: Array<{ tick: number; type: string; payload: unknown }>
+    events: { tick: number; type: string; payload: unknown }[]
     preFlip: { state: WorldState; seq: number }
   }
 
@@ -629,7 +629,7 @@ describe('G9a-10: a law changes the world at a tick boundary, and the log rememb
     const queue: LawQueue = []
     const rng = new RngStreams('g9a-laws')
     const worldTick = createWorldTick(CFG, rng, queue)
-    const events: Array<{ tick: number; type: string; payload: unknown }> = []
+    const events: { tick: number; type: string; payload: unknown }[] = []
     const loop: TickLoop = new TickLoop({
       store,
       state: genesisState(CFG, MAP()),

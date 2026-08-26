@@ -238,8 +238,8 @@ describe('actionFor — total over everything the bar can render', () => {
 
   it('a zoom action lands on a real stop and clamps at the ends', () => {
     expect(zoomTargetOf(1, 1)).toBe(2)
-    expect(zoomTargetOf(0.5 as ZoomStop, -1)).toBe(0.25)
-    expect(zoomTargetOf(0.25 as ZoomStop, -1)).toBe(0.25)
+    expect(zoomTargetOf(0.5, -1)).toBe(0.25)
+    expect(zoomTargetOf(0.25, -1)).toBe(0.25)
     expect(zoomTargetOf(4, 1)).toBe(4)
     for (const z of ZOOM_STOPS) {
       for (const d of [1, -1] as const) {

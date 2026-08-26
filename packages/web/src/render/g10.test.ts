@@ -34,7 +34,7 @@ import {
 function showcaseTerrain(): TileId[][] {
   const t = makeCityTemplate({ x: 0, y: 0 })
   const grid: TileId[][] = Array.from({ length: CITY_H }, () =>
-    Array.from({ length: CITY_W }, () => 0 as TileId),
+    Array.from({ length: CITY_W }, () => 0),
   )
   for (const tile of t.tiles) {
     if (tile.dx < 0 || tile.dy < 0 || tile.dx >= CITY_W || tile.dy >= CITY_H) continue
@@ -43,8 +43,8 @@ function showcaseTerrain(): TileId[][] {
   }
   // The town's three-tile streets meet on a lattice and resolve to nine of the fifteen autotile
   // shapes, so a straight run and a dead end are drawn here to exercise the whole strip.
-  for (let y = 2; y <= 6; y++) grid[y]![13] = T_ROAD as TileId // straight-ns, cap-n, cap-s
-  for (let x = 12; x <= 16; x++) grid[10]![x] = T_ROAD as TileId // straight-ew, cap-e, cap-w
+  for (let y = 2; y <= 6; y++) grid[y]![13] = T_ROAD // straight-ns, cap-n, cap-s
+  for (let x = 12; x <= 16; x++) grid[10]![x] = T_ROAD // straight-ew, cap-e, cap-w
   return grid
 }
 
@@ -243,7 +243,7 @@ describe('GATE G10 — 4. interior purity', () => {
     expect(interiorOf(state, 'stone')).toBeNull()
     // reading the room did not touch the state it read
     expect(interiorOf(state, 'house1')).toEqual(room)
-    expect(state.agents['amara']!.insideId).toBe('house1')
+    expect(state.agents.amara!.insideId).toBe('house1')
   })
 
   it("furnishes the room from the C13 template and keeps the plan's minimum intact", () => {
@@ -258,7 +258,7 @@ describe('GATE G10 — 4. interior purity', () => {
     const sleeping = room.occupants.filter((id) => state.agents[id]!.asleep)
     const slots = bedSlots(room.kind, sleeping)
     expect(Object.keys(slots)).toEqual(['amara', 'yusuf'])
-    expect(slots['amara']).not.toEqual(slots['yusuf'])
+    expect(slots.amara).not.toEqual(slots.yusuf)
     expect(bedSlots('shed', sleeping)).toEqual({})
     expect(bedSlots('storehouse', sleeping)).toEqual({})
   })

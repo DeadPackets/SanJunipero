@@ -159,7 +159,7 @@ export const BOND_LEVELS = [
 export type BondLevel = (typeof BOND_LEVELS)[number]
 
 /** Ascending in warmth: the first row whose ceiling the warmth is at or under. */
-export const LEVEL_THRESHOLDS: ReadonlyArray<{ at: number; level: BondLevel }> = [
+export const LEVEL_THRESHOLDS: readonly { at: number; level: BondLevel }[] = [
   { at: -12, level: 'hatred' },
   { at: -3, level: 'strained' },
   { at: 2, level: 'strangers' },

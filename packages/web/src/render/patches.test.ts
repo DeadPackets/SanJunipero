@@ -18,8 +18,8 @@ const MASTER_PALETTE = [
   0xf4e289, 0xf5d3b3, 0xd9a876, 0x9c6b47,
 ]
 
-const rect = (w: number, h: number, ox = 0, oy = 0): Array<{ x: number; y: number }> => {
-  const out: Array<{ x: number; y: number }> = []
+const rect = (w: number, h: number, ox = 0, oy = 0): { x: number; y: number }[] => {
+  const out: { x: number; y: number }[] = []
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out.push({ x: ox + x, y: oy + y })
   return out
 }

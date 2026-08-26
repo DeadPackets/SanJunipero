@@ -25,7 +25,7 @@ function spy(reply: (keys: readonly string[]) => unknown, providerMetadata?: unk
   const gen: VisionGenerateFn = async (a: any) => {
     calls.push(a)
     const keys = Object.keys(a.schema.shape).filter((k) => k !== 'feedback')
-    return { object: reply(keys), providerMetadata } as any
+    return { object: reply(keys), providerMetadata }
   }
   return { calls, gen }
 }

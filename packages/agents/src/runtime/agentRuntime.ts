@@ -229,7 +229,9 @@ export class AgentRuntime {
     this.#wasNight = simTimeFromTick(this.#bridge.currentTick()).isNight
     this.#started = true
     if (this.#offTick === null) {
-      this.#offTick = (tick) => this.#onTick(tick)
+      this.#offTick = (tick) => {
+        this.#onTick(tick)
+      }
       this.#bridge.onTick(this.#offTick)
     }
   }
@@ -362,7 +364,9 @@ export class AgentRuntime {
     if (activity === null) {
       this.#planHeadInFlight = true
       const head = this.#plan.queue[0]!
-      void this.#bridge.submit(this.#agentId, head, (res) => this.#onPlanHeadResult(res, head))
+      void this.#bridge.submit(this.#agentId, head, (res) => {
+        this.#onPlanHeadResult(res, head)
+      })
     }
   }
 
@@ -520,13 +524,19 @@ export class AgentRuntime {
     const packet = this.#bridge.perception(this.#agentId)
     const day = Math.floor(tick / MINUTES_PER_DAY)
 
-    const prose = perceptionToProse(packet, (detail) => this.#llm.alert('prose', detail), {
-      isWalkable: (x, y) => this.#bridge.isWalkable(x, y),
-      isEdible: (kind) => this.#bridge.isEdible(kind),
-      waterAtHand: () => this.#bridge.waterAtHand(this.#agentId),
-      nearestWater: (x, y) => this.#bridge.nearestWater(x, y),
-      nearestFood: (x, y) => this.#bridge.nearestFood(x, y),
-    })
+    const prose = perceptionToProse(
+      packet,
+      (detail) => {
+        this.#llm.alert('prose', detail)
+      },
+      {
+        isWalkable: (x, y) => this.#bridge.isWalkable(x, y),
+        isEdible: (kind) => this.#bridge.isEdible(kind),
+        waterAtHand: () => this.#bridge.waterAtHand(this.#agentId),
+        nearestWater: (x, y) => this.#bridge.nearestWater(x, y),
+        nearestFood: (x, y) => this.#bridge.nearestFood(x, y),
+      },
+    )
     // The prompt keeps another mouth's bytes out of the narrator's block; the day log and this
     // mind's own memory still hold the whole moment.
     const heard = heardProse(packet)
@@ -598,7 +608,9 @@ export class AgentRuntime {
       turn = await parseTurnWithRepair(
         raw,
         (issues) => this.#repair(assembled, badText, issues),
-        (detail) => this.#llm.alert('turn_fallback', detail),
+        (detail) => {
+          this.#llm.alert('turn_fallback', detail)
+        },
       )
     } catch (err) {
       this.#doze(tick, err)
@@ -736,7 +748,9 @@ export class AgentRuntime {
         personality: this.#personality,
         llm: this.#reflectionLlm,
         day,
-        alert: (kind, detail) => this.#llm.alert(kind, detail),
+        alert: (kind, detail) => {
+          this.#llm.alert(kind, detail)
+        },
       })
       if (this.#dreamLlm !== null) {
         const dream = await rollDream({
@@ -755,8 +769,8 @@ export class AgentRuntime {
     }
   }
 
-  #buildLedgers(people: string[]): Array<{ name: string; doc: string }> {
-    const out: Array<{ name: string; doc: string }> = []
+  #buildLedgers(people: string[]): { name: string; doc: string }[] {
+    const out: { name: string; doc: string }[] = []
     for (const person of people) {
       const ledger = this.#mem!.getLedger(person)
       if (ledger) out.push({ name: person, doc: ledger.doc })

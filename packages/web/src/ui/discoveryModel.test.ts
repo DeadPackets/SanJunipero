@@ -15,23 +15,22 @@ export const D = (over: Partial<DiscoveryRecord> = {}): DiscoveryRecord => ({
   makes: ['waterskin'],
   ...over,
 })
-export const A = (kind: string, id = `asset_${kind}`): AssetRecord =>
-  ({
-    id,
-    seq: 1,
-    class: 'item',
-    desc: kind,
-    kind,
-    meta: null,
-    footprint: { w: 1, h: 1 },
-    widthPx: 64,
-    heightPx: 64,
-    status: 'ready',
-    score: 8,
-    attempts: 1,
-    costUsd: 0,
-    createdAt: '2026-01-01',
-  }) as AssetRecord
+export const A = (kind: string, id = `asset_${kind}`): AssetRecord => ({
+  id,
+  seq: 1,
+  class: 'item',
+  desc: kind,
+  kind,
+  meta: null,
+  footprint: { w: 1, h: 1 },
+  widthPx: 64,
+  heightPx: 64,
+  status: 'ready',
+  score: 8,
+  attempts: 1,
+  costUsd: 0,
+  createdAt: '2026-01-01',
+})
 
 describe('the leaves of the record', () => {
   it('keeps the archive’s order and gives each leaf its moment and its heading', () => {

@@ -166,13 +166,13 @@ async function main(): Promise<void> {
         attemptsUsed += res.attempts
         spriteVerdicts.push(...res.verdicts)
         chosen = res.sprite
-        res.verdicts.forEach((v, ix) =>
+        res.verdicts.forEach((v, ix) => {
           recordVerdict(db, v, {
             assetClass: 'item',
             attempt: attemptsUsed - res.verdicts.length + ix + 1,
             costUsd: 0,
-          }),
-        )
+          })
+        })
         ledger.flush()
         if (res.status === 'blocked') {
           status = 'blocked'

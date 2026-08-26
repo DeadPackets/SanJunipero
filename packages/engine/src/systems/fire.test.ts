@@ -373,7 +373,7 @@ describe('verb: douse', () => {
       payload: wide,
     })
     expect(parsed.payload).toEqual(wide)
-    expect(fold(s, parsed as SimEvent, CFG).structures.structure_1!.burning).toBe(false)
+    expect(fold(s, parsed, CFG).structures.structure_1!.burning).toBe(false)
     // The one field fold cannot do without: a dousing has to name what stopped burning.
     expect(() =>
       fold(s, ev('fire_extinguished', { cause: 'doused', x: 2, y: 2 }, s.tick), CFG),
@@ -440,7 +440,7 @@ describe('a carried flame is both the light and the hazard', () => {
 describe('fire_spread: a source that is gone by its turn is skipped, not crashed on', () => {
   it('survives a structure removed mid-loop, and still spreads from the ones still standing', () => {
     let state = ignite(ignite(rowWorld(), 'structure_1'), 'structure_3')
-    const emitted: Array<{ type: string; payload: unknown }> = []
+    const emitted: { type: string; payload: unknown }[] = []
     const ctx = {
       config: { ...CFG, fire: { ...CFG.fire, spreadChancePerTickAdjacent: 1 } },
       rng: new RngStreams('ghost'),
@@ -456,7 +456,9 @@ describe('fire_spread: a source that is gone by its turn is skipped, not crashed
         state = fold(state, ev(type, payload, state.tick), CFG)
       },
     }
-    expect(() => fireSystem(ctx)).not.toThrow()
+    expect(() => {
+      fireSystem(ctx)
+    }).not.toThrow()
     // The fire that was still standing did spread; the ghost was passed over in silence.
     expect(
       emitted.some(

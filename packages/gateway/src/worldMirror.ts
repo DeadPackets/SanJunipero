@@ -56,8 +56,8 @@ export class WorldMirror {
     return this.#seq
   }
 
-  poll(): Array<{ tick: number; events: SimEvent[] }> {
-    const groups: Array<{ tick: number; events: SimEvent[] }> = []
+  poll(): { tick: number; events: SimEvent[] }[] {
+    const groups: { tick: number; events: SimEvent[] }[] = []
     for (const row of this.#selEventsFrom.all(this.#seq) as EvRow[]) {
       const ev = parseEv(row)
       this.#state = fold(this.#state, ev, this.#config)

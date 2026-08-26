@@ -126,7 +126,7 @@ function stripPrompt(f: Facing): string {
 function sleepPrompt(f: Facing): string {
   return (
     `${STYLE_PROMPT} A single character sprite, exactly one figure. The character is ${FACING_CLAUSES[f]}. ` +
-    `The character is ${POSE_CLAUSES_V2['sleep']}. Subject: ${CHAR_DESC}. ${ASYMMETRY_CLAUSE} ${BIG_PIXEL}`
+    `The character is ${POSE_CLAUSES_V2.sleep}. Subject: ${CHAR_DESC}. ${ASYMMETRY_CLAUSE} ${BIG_PIXEL}`
   )
 }
 
@@ -196,7 +196,7 @@ function processStrip(keyedStrip: RawImage): ProcessedStrip {
   const outs = segments.map((s) => v7Chain(s, pitch).out)
   const cells = {} as Record<StripPoseV2, RawImage>
   const idle = place(outs[0]!)
-  cells['idle'] = idle
+  cells.idle = idle
   for (let i = 1; i < STRIP_POSES_V2.length; i++) {
     const placed = place(outs[i]!)
     const { dx } = registerToReference(idle, placed)
@@ -233,7 +233,7 @@ function withinFacingFailures(
     ...strideGate(f, walk, median),
     ...frameCoherenceGate(
       f,
-      cells['idle'],
+      cells.idle,
       WALK_POSES_V2.map((p) => ({ label: p, img: cells[p] })),
     ),
   ]
@@ -358,7 +358,7 @@ async function attemptSleep(
       )
       continue
     }
-    const failures = sleepGate(f, strips.get(f)!.strip.cells['idle'], cell)
+    const failures = sleepGate(f, strips.get(f)!.strip.cells.idle, cell)
     reportLines.push(
       `${cand.key} (${cand.guided ? 'guided' : 'unguided'}) score=${cand.score} gates=${failures.length === 0 ? 'PASS' : failures.map((x) => x.gate).join(',')}`,
     )
@@ -489,7 +489,9 @@ for (const f of FACINGS) {
   const fw = frames[0]!.width,
     fh = frames[0]!.height
   const stacked = new Uint8ClampedArray(fw * fh * frames.length * 4)
-  frames.forEach((fr, i) => stacked.set(fr.data, fw * fh * 4 * i))
+  frames.forEach((fr, i) => {
+    stacked.set(fr.data, fw * fh * 4 * i)
+  })
   const gif = await sharp(Buffer.from(stacked.buffer), {
     raw: { width: fw, height: fh * frames.length, channels: 4, pageHeight: fh },
   })

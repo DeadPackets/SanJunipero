@@ -31,7 +31,7 @@ export function frameLayout(stage: { w: number; h: number }, letterboxed: boolea
  * P19's guard: every box that CROSSES a band edge rather than sitting on one side of it. Touching
  * an edge is how a surface fills a band exactly, so only a strict crossing counts.
  */
-export function straddlers(boxes: ReadonlyArray<{ id: string } & Frame>, l: FrameLayout): string[] {
+export function straddlers(boxes: readonly ({ id: string } & Frame)[], l: FrameLayout): string[] {
   const edges = [l.picture.y, l.picture.y + l.picture.h].filter((_e, i) =>
     i === 0 ? l.bandTop.h > 0 : l.bandBottom.h > 0,
   )

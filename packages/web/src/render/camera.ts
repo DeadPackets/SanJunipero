@@ -162,7 +162,7 @@ export function cameraBoundsOf(terrain: readonly (readonly unknown[])[]): Camera
 /** The settlement's OWN box — the thing the first frame is of, and the thing `stageFill`
  *  measures. A map is mostly field; a town is what a viewer came for. */
 export function structureBoundsOf(
-  list: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
+  list: readonly { x: number; y: number; w: number; h: number }[],
 ): CameraBounds {
   if (list.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0 }
   let minX = Infinity,
@@ -191,7 +191,7 @@ export function structureBoundsOf(
 export const BUILDING_OVERHANG_PX_PER_TILE = 32 // textures.BUILDING_PX_PER_TILE
 
 export function drawnBoundsOf(
-  list: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
+  list: readonly { x: number; y: number; w: number; h: number }[],
 ): CameraBounds {
   if (list.length === 0) return { minX: 0, maxX: 0, minY: 0, maxY: 0 }
   let minX = Infinity,
@@ -217,7 +217,7 @@ export const REACH_MARGIN_PX = 96
 
 export function reachableBoundsOf(
   terrain: readonly (readonly unknown[])[],
-  structures: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
+  structures: readonly { x: number; y: number; w: number; h: number }[],
 ): CameraBounds {
   const t = cameraBoundsOf(terrain)
   if (structures.length === 0) return t

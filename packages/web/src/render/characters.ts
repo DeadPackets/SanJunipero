@@ -274,7 +274,9 @@ export function createCharacterLayer(
     sprite.cursor = 'pointer'
     const hit = new Polygon(bodyHitPolygon(64, CHAR_TARGET_PX / 64))
     sprite.hitArea = hit
-    sprite.on('pointertap', () => onSelect(agentId))
+    sprite.on('pointertap', () => {
+      onSelect(agentId)
+    })
     const shadow = new Sprite(shadowTexture)
     shadow.anchor.set(0.5, 0.5)
     shadow.alpha = SHADOW_ALPHA
@@ -401,13 +403,13 @@ export function createCharacterLayer(
     const live = new Set<string>()
     // Two passes: a rank belongs to a TILE, not to a body, so where each one stands depends on
     // who else is there and every position must settle before any of them is drawn.
-    const standing: Array<{ id: string; x: number; y: number; settled: boolean }> = []
-    const drawing: Array<{
+    const standing: { id: string; x: number; y: number; settled: boolean }[] = []
+    const drawing: {
       a: { id: string; name: string }
       e: CharEntry
       pos: { x: number; y: number }
       bobY: number
-    }> = []
+    }[] = []
     for (const a of Object.values(state.agents)) {
       if (!rendersOnMap(a)) continue
       live.add(a.id)

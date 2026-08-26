@@ -31,7 +31,7 @@ const SCALE = CHAR_TARGET_PX / FIGURE_H
 const DRAWN_H = FIGURE_H * SCALE // 52 screen px
 const DRAWN_W = FIGURE_W * SCALE // 26 screen px
 
-const pts = (poly: number[]): Array<[number, number]> =>
+const pts = (poly: number[]): [number, number][] =>
   Array.from({ length: poly.length / 2 }, (_, i) => [poly[i * 2]!, poly[i * 2 + 1]!])
 const screen = (poly: number[], scale: number): number[] => poly.map((v) => v * scale)
 
@@ -204,7 +204,7 @@ describe('the 24 px floor at the new ZOOM_MIN', () => {
 // its corners are void by construction and a test against it passes with the property broken.
 
 describe('★ a building is a volume, and the landed target was the ground under it', () => {
-  const SHAPES: Array<[number, number]> = [
+  const SHAPES: [number, number][] = [
     [1, 1],
     [2, 2],
     [1, 2],

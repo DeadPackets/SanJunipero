@@ -21,16 +21,16 @@ export class CodexStore {
   }
 
   known(): string[] {
-    const rows = this.db
-      .prepare('SELECT id FROM codex WHERE known = 1 ORDER BY rowid')
-      .all() as Array<{ id: string }>
+    const rows = this.db.prepare('SELECT id FROM codex WHERE known = 1 ORDER BY rowid').all() as {
+      id: string
+    }[]
     return rows.map((r) => r.id)
   }
 
   knownEra(): Era {
-    const rows = this.db.prepare('SELECT era FROM codex WHERE known = 1').all() as Array<{
+    const rows = this.db.prepare('SELECT era FROM codex WHERE known = 1').all() as {
       era: string
-    }>
+    }[]
     let best: Era = 'handwork'
     let bestOrder = 0
     for (const row of rows) {
@@ -51,7 +51,7 @@ export class CodexStore {
         'SELECT c.id FROM codex c JOIN codex p ON p.id = c.prerequisite_id' +
           ' WHERE c.known = 0 AND p.known = 1 ORDER BY c.id',
       )
-      .all() as Array<{ id: string }>
+      .all() as { id: string }[]
     return rows.map((r) => r.id)
   }
 
@@ -62,7 +62,7 @@ export class CodexStore {
     for (const id of recipeCanon) {
       if (known.has(id)) continue
       const row = prerequisite.get(id) as { prerequisite_id: string | null } | undefined
-      if (row && row.prerequisite_id !== null && known.has(row.prerequisite_id)) continue
+      if (row?.prerequisite_id !== null && known.has(row.prerequisite_id)) continue
       return false
     }
     return true

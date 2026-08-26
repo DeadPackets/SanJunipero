@@ -6,13 +6,13 @@ export type Digest = {
   deaths: unknown[]
   births: unknown[]
   structuresCompleted: unknown[]
-  topMoments: Array<{
+  topMoments: {
     tick: number
     agentId: string
     score: number
     moment: { day: number; time: string }
-  }>
-  agentLines: Array<{ agentId: string; line: string }>
+  }[]
+  agentLines: { agentId: string; line: string }[]
 }
 
 type Chapter = { tick: number; title: string }
@@ -37,7 +37,9 @@ export function DigestModal({
     const from = Math.max(0, to - missedTicks)
     void fetch(`/api/digest?fromTick=${from}&toTick=${to}`)
       .then(async (r) => (r.ok ? ((await r.json()) as Digest) : null))
-      .then((d) => setDigest(d))
+      .then((d) => {
+        setDigest(d)
+      })
       .catch(() => {})
     void fetch('/api/chapters')
       .then(async (r) => (r.ok ? ((await r.json()) as Chapter[]) : []))
@@ -51,7 +53,9 @@ export function DigestModal({
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+    }
   }, [onClose])
 
   const daysAway = Math.floor(missedTicks / 1440)
@@ -97,7 +101,12 @@ export function DigestModal({
             <ul className="moment-list">
               {digest.topMoments.slice(0, 5).map((m, i) => (
                 <li key={i}>
-                  <button className="moment-link" onClick={() => onMoment(m.tick)}>
+                  <button
+                    className="moment-link"
+                    onClick={() => {
+                      onMoment(m.tick)
+                    }}
+                  >
                     Day {m.moment.day} {m.moment.time}
                   </button>
                 </li>

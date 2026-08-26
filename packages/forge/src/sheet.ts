@@ -224,7 +224,7 @@ export function defringe(img: RawImage): RawImage {
   }
   for (let y = 0; y < img.height; y++)
     for (let x = 0; x < img.width; x++) {
-      const i = at(x, y)!
+      const i = at(x, y)
       if (img.data[i + 3] === 0 || !contaminated(i)) continue
       let onEdge = false
       for (let dy = -1; dy <= 1 && !onEdge; dy++)

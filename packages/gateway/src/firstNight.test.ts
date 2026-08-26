@@ -42,21 +42,22 @@ function runDevWorld(interiors: boolean, ticks = TICKS): Run {
     rng,
     config,
     snapshotEveryTicks: 720,
-    onTick: (ctx) =>
+    onTick: (ctx) => {
       inner({
         tick: ctx.tick,
         emit: (type, payload) => {
           events.push({ type, tick: ctx.tick, payload: (payload ?? {}) as Record<string, unknown> })
           ctx.emit(type, payload)
         },
-      }),
+      })
+    },
   })
   for (let t = 0; t < ticks; t++) loop.step()
   return { state: loop.state, events, store, terrain }
 }
 
 const of = (run: Run, type: string): Seen[] => run.events.filter((e) => e.type === type)
-const who = (e: Seen): string => String(e.payload['agentId'] ?? e.payload['id'] ?? '')
+const who = (e: Seen): string => String(e.payload.agentId ?? e.payload.id ?? '')
 
 describe('★ THE FIRST NIGHT — the showcase town on rings=3, three sim days', () => {
   const run = runDevWorld(true)
@@ -95,9 +96,7 @@ describe('★ THE FIRST NIGHT — the showcase town on rings=3, three sim days',
   it('★ and nobody is ever narrated as ill, because nobody is ever ill', () => {
     // `escalateFatigue` mints `agent_afflicted{kind:"fatigue"}` after every collapse, and the
     // chronicle renders a non-poison affliction as illness. Both halves are asserted.
-    expect(of(run, 'agent_afflicted').map((e) => `${who(e)}:${String(e.payload['kind'])}`)).toEqual(
-      [],
-    )
+    expect(of(run, 'agent_afflicted').map((e) => `${who(e)}:${String(e.payload.kind)}`)).toEqual([])
   })
 
   it('★ and the whole run replays from genesis, event for event, to the same hash', () => {

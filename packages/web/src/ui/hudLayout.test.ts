@@ -33,7 +33,9 @@ function fakeStorage(seed: Record<string, string> = {}): Storage {
     get length() {
       return map.size
     },
-    clear: () => map.clear(),
+    clear: () => {
+      map.clear()
+    },
     getItem: (k) => map.get(k) ?? null,
     key: (i) => [...map.keys()][i] ?? null,
     removeItem: (k) => {
@@ -179,7 +181,9 @@ describe('loadHud / saveHud — a preference, never a requirement', () => {
     saveHud(s, l)
     expect(loadHud(s)).toEqual(l)
     expect(loadHud(s)).toEqual(loadHud(s))
-    expect(() => saveHud(brokenStorage(), l)).not.toThrow()
+    expect(() => {
+      saveHud(brokenStorage(), l)
+    }).not.toThrow()
     expect(loadHud(brokenStorage())).toEqual(DEFAULT_HUD)
   })
 })
@@ -284,7 +288,7 @@ describe('HudDock — a viewer can never hide the way back', () => {
 
 describe('the slots the renderer must be able to place', () => {
   it('every slot has a word, and every dockable has a name', () => {
-    for (const s of DOCK_SLOTS) expect(SLOT_LABEL[s as DockSlot].length).toBeGreaterThan(4)
+    for (const s of DOCK_SLOTS) expect(SLOT_LABEL[s].length).toBeGreaterThan(4)
     for (const d of DOCKABLE) expect(DOCKABLE_LABEL[d].length).toBeGreaterThan(4)
   })
 })

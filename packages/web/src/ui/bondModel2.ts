@@ -46,7 +46,7 @@ export const BOND_TYPE_WORD: Readonly<Record<BondType, string>> = {
 /** What the lineage endpoint returns. Structural, so the viewer needs no import from the
  *  gateway (P1) and a typed empty is a perfectly good answer. */
 export type LineageLike = {
-  parentOf: ReadonlyArray<{ parentId: string; childId: string; tick: number }>
+  parentOf: readonly { parentId: string; childId: string; tick: number }[]
 }
 export const EMPTY_LINEAGE: LineageLike = { parentOf: [] }
 

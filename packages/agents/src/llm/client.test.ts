@@ -40,7 +40,9 @@ const SCHEMA = z.object({ mood: z.string(), count: z.number().int() }).strict()
 describe('migrateLlmTables', () => {
   it('is idempotent', () => {
     const db = openDb()
-    expect(() => migrateLlmTables(db)).not.toThrow()
+    expect(() => {
+      migrateLlmTables(db)
+    }).not.toThrow()
   })
 })
 
@@ -233,10 +235,10 @@ describe('LlmClient.object', () => {
     // The tokens were spent whether or not the shape was right, so they are reported.
     expect(all[0]!.input_tokens).toBe(1000)
     expect(usage.costUsd).toBeGreaterThan(0)
-    const alerts = db.prepare('SELECT kind, detail FROM alerts').all() as Array<{
+    const alerts = db.prepare('SELECT kind, detail FROM alerts').all() as {
       kind: string
       detail: string
-    }>
+    }[]
     // `NoObjectGeneratedError` carries no `providerMetadata`, so a repaired call books at the
     // ceiling and says so rather than guessing a cheap rate.
     expect(alerts.map((a) => a.kind)).toEqual(['decode_repaired', 'llm_price_unpriced_route'])
@@ -353,7 +355,7 @@ describe('served model attribution', () => {
     const row = rows(db)[0]!
     expect(row.model).toBe('deepseek/deepseek-chat')
     expect(row.cost_usd).toBeCloseTo((100 * 0.44 + 10 * 1.32) / 1e6, 12)
-    const kinds = db.prepare('SELECT kind FROM alerts').all() as Array<{ kind: string }>
+    const kinds = db.prepare('SELECT kind FROM alerts').all() as { kind: string }[]
     expect(kinds.map((k) => k.kind)).toContain('llm_price_unpriced_route')
   })
 })
@@ -362,7 +364,7 @@ describe('served model attribution', () => {
 // computes a second opinion; the two are compared every call.
 describe('price reconciliation', () => {
   const kinds = (db: Database.Database): string[] =>
-    (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as Array<{ kind: string }>).map(
+    (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as { kind: string }[]).map(
       (r) => r.kind,
     )
 
@@ -565,8 +567,7 @@ describe('pessimistic reservation (T21)', () => {
     const rejected = settled.filter((s) => s.status === 'rejected')
     expect(settled.filter((s) => s.status === 'fulfilled')).toHaveLength(2)
     expect(rejected).toHaveLength(3)
-    for (const r of rejected)
-      expect((r as PromiseRejectedResult).reason).toBeInstanceOf(BudgetExceededError)
+    for (const r of rejected) expect(r.reason).toBeInstanceOf(BudgetExceededError)
     expect(started()).toBe(2)
     expect(sumReserved(db, 'test')).toBe(0)
   })
@@ -690,10 +691,10 @@ describe('the back end that answered is written down (C11 R20)', () => {
     const client = new LlmClient({ model, db, caller: 'test', agentId: 'a1' })
     await client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA })
     await client.object({ system: 's', messages: [{ role: 'user', content: 'u' }], schema: SCHEMA })
-    const logged = db.prepare('SELECT provider, ok FROM llm_calls ORDER BY id').all() as Array<{
+    const logged = db.prepare('SELECT provider, ok FROM llm_calls ORDER BY id').all() as {
       provider: string | null
       ok: number
-    }>
+    }[]
     // A failure carries no answer, so it carries no back end to name it by.
     expect(logged).toEqual([
       { provider: 'Wafer', ok: 1 },

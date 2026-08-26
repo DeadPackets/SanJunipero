@@ -191,7 +191,7 @@ describe('legFacing', () => {
 // whole `scheduleLeg` → `prunePath` → `legFacing` → `charPose` queue.
 
 describe('a body walked through the queue points where it is going', () => {
-  const LEGS: Array<[string, number, number]> = [
+  const LEGS: [string, number, number][] = [
     ['+x', 1, 0],
     ['-x', -1, 0],
     ['+y', 0, 1],
@@ -202,7 +202,7 @@ describe('a body walked through the queue points where it is going', () => {
     LEAD_MS = 400
 
   // one leg at a time, the way `agent_moved` arrives: append, prune, read the facing
-  const walk = (steps: Array<[number, number]>): string[] => {
+  const walk = (steps: [number, number][]): string[] => {
     let path: Waypoint[] = [{ x: 0, y: 0, atMs: 0 }]
     let x = 0,
       y = 0,
@@ -441,7 +441,7 @@ function replay(opts: {
   const b: Body = { path: [{ x: 0, y: 0, atMs: 0 }], lastMoveArrival: 0, legMs: tickMs }
   let clock = initialTickClock()
   // one delta batch per tick; the body advances a tile every `perTile` of them
-  const batches: Array<{ at: number; moved: number | null }> = []
+  const batches: { at: number; moved: number | null }[] = []
   for (let i = 0; i < tiles * perTile; i++) {
     const wobble = jitter === 0 ? 0 : ((i * 2654435761) % (2 * jitter + 1)) - jitter
     batches.push({
@@ -450,7 +450,7 @@ function replay(opts: {
     })
   }
   let bi = 0
-  const samples: Array<{ t: number; x: number; sim: number }> = []
+  const samples: { t: number; x: number; sim: number }[] = []
   const end = batches[batches.length - 1]!.at + tickMs * perTile * 4
   for (let t = 0; t <= end; t += 1000 / 60) {
     while (bi < batches.length && batches[bi]!.at <= t) {
@@ -530,7 +530,7 @@ describe('★ B1 — positions WERE interpolated; the jank was the schedule', ()
         worstSettled = Math.max(worstSettled, a.settled.maxLagTiles)
       }
     }
-    // eslint-disable-next-line no-console
+
     console.log('LAG BEHIND THE RECORD, tiles\n  ' + rows.join('\n  '))
     // The bound is on TIME and it is structural: `scheduleLeg` never lets the tail sit more than
     // `legMs + leadMs` ahead of now, so two ticks of time can briefly hold over two tiles.
@@ -572,7 +572,7 @@ describe('★ B1 — positions WERE interpolated; the jank was the schedule', ()
       jitterMs: 60,
       landed: false,
     })
-    // eslint-disable-next-line no-console
+
     console.log(
       `PACE SWING p90/p10 — landed ${before.settled.spread.toFixed(1)}x, ` +
         `now ${after.settled.spread.toFixed(2)}x`,
@@ -824,7 +824,7 @@ describe('★ B2 — five people, five gaits, and none of them from a random num
       )
       if (distinct < FOUNDERS.length) inStep.push(`${msPerTile} ms/tile: ${distinct} of 5 cadences`)
     }
-    // eslint-disable-next-line no-console
+
     console.log('WALK CADENCE PER FOUNDER, ms/frame\n  ' + rows.join('\n  '))
     expect(inStep).toEqual([])
   })
@@ -928,7 +928,7 @@ describe('★ prefers-reduced-motion: the person still walks, the flourish goes'
   it('★ interpolation is NOT a flourish and survives — the person is still going somewhere', () => {
     // Not a count of call sites: a count cannot tell a new legitimate flourish from a leak into
     // the walk schedule, so every occurrence must BE one of the flourishes named here.
-    const FLOURISHES: ReadonlyArray<{ what: string; line: RegExp }> = [
+    const FLOURISHES: readonly { what: string; line: RegExp }[] = [
       {
         what: 'the 1px passing hop',
         line: /^\{ phase: e\.gait\.phase, bob: scene\.wantsMotion\(\) \},$/,

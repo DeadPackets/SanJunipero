@@ -73,8 +73,8 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB_SRC = join(HERE, '..')
 const src = (rel: string): string => readFileSync(join(WEB_SRC, rel), 'utf8')
 
-function sources(dir = WEB_SRC): Array<{ path: string; source: string }> {
-  const out: Array<{ path: string; source: string }> = []
+function sources(dir = WEB_SRC): { path: string; source: string }[] {
+  const out: { path: string; source: string }[] = []
   for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) {
@@ -182,13 +182,13 @@ describe('U5 — "roads read ghost-faint at 1x"', () => {
   it('carries a hard edge against the ground it runs through', () => {
     const dark = luma(0x9c6b47),
       light = luma(0xe8d5bc),
-      grass = luma(TILE_COLORS[0]!)
+      grass = luma(TILE_COLORS[0])
     expect(roadReadsAt(light, grass) || roadReadsAt(dark, grass)).toBe(true)
     expect(Math.abs(light - dark)).toBeGreaterThanOrEqual(ROAD_GROUND_LUMA_DELTA_MIN)
   })
 
   it('would still fail on the single shoulder tone it replaced, so the check is not vacuous', () => {
-    expect(roadReadsAt(luma(0xb89d7e), luma(TILE_COLORS[0]!))).toBe(false)
+    expect(roadReadsAt(luma(0xb89d7e), luma(TILE_COLORS[0]))).toBe(false)
   })
 })
 

@@ -79,12 +79,12 @@ export class ConstructStore {
   events(): ConstructOpsEvent[] {
     const rows = this.db
       .prepare('SELECT type, construct_id, tick, payload FROM construct_events ORDER BY id')
-      .all() as Array<{
+      .all() as {
       type: ConstructOpsType
       construct_id: string
       tick: number
       payload: string
-    }>
+    }[]
     return rows.map((r) => ({
       type: r.type,
       constructId: r.construct_id,

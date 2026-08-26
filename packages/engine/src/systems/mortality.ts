@@ -34,7 +34,7 @@ type Drain = { cause: DeathCause; amount: number; sinceTick: number; byId?: stri
 // the largest term is what killed it. One walk of the body, two questions answered.
 function drains(state: WorldState, config: SimConfig, agentId: string): Drain[] {
   const a = state.agents[agentId]
-  if (a === undefined || !a.alive) return []
+  if (!a?.alive) return []
   const { mortality } = config
   if (!mortality.enabled) return []
   const out: Drain[] = []

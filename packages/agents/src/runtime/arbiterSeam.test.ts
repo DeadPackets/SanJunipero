@@ -50,7 +50,15 @@ function world(opts: { well?: boolean; terrain?: TileId[][] } = {}) {
 
   const worldTick = createWorldTick(config, rng)
   let handler: TickHandler = () => {}
-  const loop = new TickLoop({ store, state, rng, config, onTick: (ctx) => handler(ctx) })
+  const loop = new TickLoop({
+    store,
+    state,
+    rng,
+    config,
+    onTick: (ctx) => {
+      handler(ctx)
+    },
+  })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
   handler = bridge.wrapTickHandler(({ emit: e }) => {
     for (const ev of worldTick(loop.state).events) e(ev.type, ev.payload)

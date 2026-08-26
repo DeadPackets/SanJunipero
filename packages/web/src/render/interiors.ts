@@ -128,7 +128,7 @@ export function roomPlan(kind: InteriorKind, records: AssetRecord[]): RoomItem[]
 export type RoomLight = { id: string; kind: string; tile: { x: number; y: number } }
 
 export function roomLights(
-  pieces: ReadonlyArray<{ kind: string; tile: { x: number; y: number } }>,
+  pieces: readonly { kind: string; tile: { x: number; y: number } }[],
   lightKinds: ReadonlySet<string>,
 ): RoomLight[] {
   return pieces
@@ -166,8 +166,8 @@ export function interiorOf(state: WorldState, structureId: string): Interior | n
 // each and a third sleeper gets none rather than lying on someone. The cells are INTERIOR TILES.
 export const BED_FOOTPRINT = { w: 1, h: 2 } as const
 
-function bedCells(kind: InteriorKind, records: AssetRecord[]): Array<{ x: number; y: number }> {
-  const cells: Array<{ x: number; y: number }> = []
+function bedCells(kind: InteriorKind, records: AssetRecord[]): { x: number; y: number }[] {
+  const cells: { x: number; y: number }[] = []
   // The same seating the room map uses, over the same list in the same order — a sleeper's
   // cell and the bed's own tiles are one answer or a body lies beside its bed.
   const plan = roomPlan(kind, records)
@@ -314,8 +314,8 @@ export function occupantTile(mode: OccupancyMode, own: Tile, at: Tile | null): T
 
 /** Every drawable in the room, in a stable order. */
 export function interiorPieces(
-  items: ReadonlyArray<PlacedItem>,
-  bodies: ReadonlyArray<PlacedBody>,
+  items: readonly PlacedItem[],
+  bodies: readonly PlacedBody[],
 ): RoomPiece[] {
   const out: RoomPiece[] = []
   const byId = new Map<string, PlacedItem>()

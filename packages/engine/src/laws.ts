@@ -53,7 +53,7 @@ export const TOGGLABLE_PATHS: Readonly<Record<string, z.ZodType>> = {
   'regrowth.saplingChancePerDay': z.number().min(0).max(1),
 }
 
-export type LawQueue = Array<{ path: string; value: unknown }>
+export type LawQueue = { path: string; value: unknown }[]
 
 // Enqueue only. The tick wrapper drains this at the boundary and emits the events;
 // nothing here touches state, so an operator can never land a change mid-tick.

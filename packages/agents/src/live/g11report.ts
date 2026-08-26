@@ -56,7 +56,7 @@ export function classifyVerb(verb: string): TurnClass {
 }
 
 // The three regexes chronicle.test.ts holds every line to, applied to the lines the run made.
-export const CHRONICLE_BANNED: ReadonlyArray<{ name: string; re: RegExp }> = [
+export const CHRONICLE_BANNED: readonly { name: string; re: RegExp }[] = [
   { name: 'mechanism', re: /\b(hp|severity|affliction|config|tier|roll|construct|milestone)\b/i },
   { name: 'number', re: /[0-9]/ },
   { name: 'machinery', re: /\b(ai|llm|model|prompt|token)\b/i },
@@ -343,13 +343,13 @@ export class FullNeedTally {
 
   // The samples, so a checkpoint can put them back. A resumed run that started this tally at
   // zero would report a day's full-need moments as the fraction taken after the resume.
-  entries(): Array<[string, number]> {
+  entries(): [string, number][] {
     return [...this.#counts.entries()]
   }
 
   static restore(
     ticksPerSample: number,
-    entries: ReadonlyArray<readonly [string, number]>,
+    entries: readonly (readonly [string, number])[],
   ): FullNeedTally {
     const t = new FullNeedTally(ticksPerSample)
     for (const [key, n] of entries) t.#counts.set(key, n)

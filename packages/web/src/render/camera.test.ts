@@ -65,7 +65,7 @@ const LANDED_COOLDOWN_MS = 200,
   LANDED_STEP_DELTA = 120,
   LANDED_GAP_MS = 140,
   LANDED_MIN_DELTA = 8
-function landedLadder(events: ReadonlyArray<{ dy: number; at: number }>, from: number): number {
+function landedLadder(events: readonly { dy: number; at: number }[], from: number): number {
   const idx = (z: number): number => ZOOM_STOPS.indexOf(z as ZoomStop)
   let stop = from,
     accum = 0,
@@ -93,9 +93,9 @@ function gesture(
   dy: number,
   gapMs: number,
   opts: { pinch?: boolean } = {},
-): { state: ZoomState; events: Array<{ dy: number; at: number }>; endMs: number } {
+): { state: ZoomState; events: { dy: number; at: number }[]; endMs: number } {
   let s = initialZoom(from)
-  const events: Array<{ dy: number; at: number }> = []
+  const events: { dy: number; at: number }[] = []
   let t = 1000
   for (let i = 0; i < n; i++) {
     events.push({ dy, at: t })
@@ -480,7 +480,7 @@ describe('every function is pure', () => {
 // ── the camera knows the edges, and there is a view of the whole town ─────────────────────
 
 const terrainOf = (w: number, h: number): TileId[][] =>
-  Array.from({ length: h }, () => Array.from({ length: w }, () => 0 as TileId))
+  Array.from({ length: h }, () => Array.from({ length: w }, () => 0))
 
 /** The showcase town rebuilt from the template, so this and `occlusion.test.ts` agree by construction rather than by a pasted number. */
 const ANCHOR = { x: 8, y: 8 } // gateway SHOWCASE_ANCHOR
@@ -648,7 +648,7 @@ describe('resizeIntent — a resize keeps the view the viewer asked for', () => 
 
 describe('★ the fill floor is derived per town and per stage, because both terms are', () => {
   it('publishes the ceiling and the floor for the boxes this project measures', () => {
-    const rows: Array<[string, typeof TOWN_DRAWN, { w: number; h: number }]> = [
+    const rows: [string, typeof TOWN_DRAWN, { w: number; h: number }][] = [
       ['the eleven-building fixture, drawn', TOWN_DRAWN, STAGE],
       ['the same, its ground with no roofs', TOWN_BOX, STAGE],
     ]
@@ -667,7 +667,7 @@ describe('★ the fill floor is derived per town and per stage, because both ter
           : `  fit ${fit}x -> ${(stageFill(box, fit, stage) * 100).toFixed(2)}%`)
       )
     })
-    // eslint-disable-next-line no-console
+
     console.log(
       'STAGE FILL — ceiling is what a FREE scale would reach; floor is that less the one rung\n' +
         `the ladder may cost it (${ZOOM_STOP_MAX_RATIO}x, so a quarter of the area). ` +

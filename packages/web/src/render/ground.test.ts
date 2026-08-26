@@ -64,9 +64,7 @@ function codexWithStrip(): AssetRecord[] {
 
 // a 3-tile straight north-south road down the middle of a grass field
 function roadStrip(): TileId[][] {
-  const g: TileId[][] = Array.from({ length: 5 }, () =>
-    Array.from({ length: 3 }, () => 0 as TileId),
-  )
+  const g: TileId[][] = Array.from({ length: 5 }, () => Array.from({ length: 3 }, () => 0))
   for (let y = 1; y <= 3; y++) g[y]![1] = ROAD_TILE_ID
   return g
 }

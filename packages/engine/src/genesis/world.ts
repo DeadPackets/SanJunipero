@@ -125,7 +125,7 @@ export function roofFell(config: SimConfig, kind: string): boolean {
 
 // Six things a founder wakes up owning. The bread is three sim-days of food and is stamped
 // like any other loaf, so the storehouse multiplier and the spoilage clock apply from tick 0.
-const FOUNDER_KIT: ReadonlyArray<{ kind: string; qty: number }> = [
+const FOUNDER_KIT: readonly { kind: string; qty: number }[] = [
   { kind: 'axe', qty: 1 },
   { kind: 'hoe', qty: 1 },
   { kind: 'knife', qty: 1 },
@@ -135,7 +135,7 @@ const FOUNDER_KIT: ReadonlyArray<{ kind: string; qty: number }> = [
 ]
 
 // `wood`, not "timber": these are the kinds the build and craft recipes actually consume.
-const STOREHOUSE_STOCK: ReadonlyArray<{ kind: string; qty: number }> = [
+const STOREHOUSE_STOCK: readonly { kind: string; qty: number }[] = [
   { kind: 'wood', qty: 20 },
   { kind: 'stone', qty: 12 },
   { kind: 'rope', qty: 4 },

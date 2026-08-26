@@ -192,7 +192,7 @@ const LAYER_NAMES = [
 
 function makeScene(): Scene & { sortDepth: () => void } {
   const layers = Object.fromEntries(LAYER_NAMES.map((n) => [n, new MockContainer()]))
-  const sources = new Set<() => Array<{ box: { id: string }; node: unknown }>>()
+  const sources = new Set<() => { box: { id: string }; node: unknown }[]>()
   return {
     app: { renderer: { generateTexture: () => ({ destroy: () => {} }) } },
     layers,
@@ -200,7 +200,7 @@ function makeScene(): Scene & { sortDepth: () => void } {
     getZoom: () => 1,
     wantsMotion: () => true,
     viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
-    addDepthSource: (fn: () => Array<{ box: { id: string }; node: unknown }>) => {
+    addDepthSource: (fn: () => { box: { id: string }; node: unknown }[]) => {
       sources.add(fn)
       return () => sources.delete(fn)
     },
@@ -209,8 +209,8 @@ function makeScene(): Scene & { sortDepth: () => void } {
   } as unknown as Scene & { sortDepth: () => void }
 }
 
-const publishedBoxes = (scene: Scene): Array<{ id: string }> =>
-  ((scene as unknown as { sortDepth: () => Array<{ box: { id: string } }> }).sortDepth() ?? []).map(
+const publishedBoxes = (scene: Scene): { id: string }[] =>
+  ((scene as unknown as { sortDepth: () => { box: { id: string } }[] }).sortDepth() ?? []).map(
     (e) => e.box,
   )
 
@@ -257,7 +257,7 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
 
   it('publishes one depth box per living body, at its INTERPOLATED tile', () => {
     layer.tick(1000)
-    const boxes = publishedBoxes(scene) as unknown as Array<{ id: string; x0: number; y0: number }>
+    const boxes = publishedBoxes(scene) as unknown as { id: string; x0: number; y0: number }[]
     expect(boxes.map((b) => b.id).sort()).toEqual(['nadia', 'omar'])
     const nadia = boxes.find((b) => b.id === 'nadia')!
     expect([nadia.x0, nadia.y0]).toEqual([2.5, 3.5]) // tile (3,4) spans [2.5,3.5]×[3.5,4.5]
@@ -316,11 +316,11 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
     const shadow = l.shadow!.children[0] as unknown as { eventMode: string }
     const sprite = l.entities!.children[0] as unknown as { eventMode: string }
-    const [emote, nameTag] = l.worldText!.children as unknown as Array<{ eventMode: string }>
-    expect(shadow!.eventMode).toBe('none')
+    const [emote, nameTag] = l.worldText!.children as unknown as { eventMode: string }[]
+    expect(shadow.eventMode).toBe('none')
     expect(emote!.eventMode).toBe('none')
     expect(nameTag!.eventMode).toBe('none')
-    expect(sprite!.eventMode).toBe('static')
+    expect(sprite.eventMode).toBe('static')
   })
 
   it('name-tag label anchors (0.5, 1) and the bg slab wraps it with 4px padding', () => {
@@ -390,9 +390,9 @@ function drawnRow(layer: ReturnType<typeof createCharacterLayer>, id: string): s
 
 /** Where the layer is DRAWING the body, in tiles, read back off its published depth box. */
 function drawnTile(scene: Scene, id: string): { x: number; y: number } {
-  const b = (
-    publishedBoxes(scene) as unknown as Array<{ id: string; x0: number; y0: number }>
-  ).find((q) => q.id === id)!
+  const b = (publishedBoxes(scene) as unknown as { id: string; x0: number; y0: number }[]).find(
+    (q) => q.id === id,
+  )!
   return { x: b.x0 + 0.5, y: b.y0 + 0.5 }
 }
 
@@ -480,7 +480,7 @@ describe("★ the layer walks each body at the record's pace, not a stopwatch's"
       const ids = ['nadia', 'omar', 'yusuf']
       const agents: MutableAgents = Object.fromEntries(
         ids.map((id) => [id, makeBodyAgent(id, 0, 0)]),
-      ) as MutableAgents
+      )
       const { layer, at } = await rig(agents)
       let differed = 0,
         sampled = 0
@@ -511,7 +511,7 @@ describe("★ the layer walks each body at the record's pace, not a stopwatch's"
       const run = async (): Promise<string[]> => {
         const agents: MutableAgents = Object.fromEntries(
           ids.map((id) => [id, makeBodyAgent(id, 0, 0)]),
-        ) as MutableAgents
+        )
         const { layer, at } = await rig(agents)
         const out: string[] = []
         for (let i = 1; i <= 8; i++) {
@@ -576,7 +576,7 @@ describe("★ the layer walks each body at the record's pace, not a stopwatch's"
           const s = layer.getSprite('nadia') as unknown as { position: { y: number } }
           const l = scene.layers as unknown as Record<
             string,
-            { children: Array<{ position: { y: number } }> }
+            { children: { position: { y: number } }[] }
           >
           expect(s.position.y - l.shadow!.children[0]!.position.y).toBe(0)
         }
@@ -601,7 +601,7 @@ describe('★ four people on one tile, through the real layer', () => {
   })
 
   /** Where the layer actually put each body's sprite, in the order it created them. */
-  const sprites = (): Array<{ x: number; y: number }> => {
+  const sprites = (): { x: number; y: number }[] => {
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
     return l.entities!.children.map((c) => ({ x: c.position.x, y: c.position.y }))
   }
@@ -617,12 +617,12 @@ describe('★ four people on one tile, through the real layer', () => {
   it('and the depth box follows the sprite, so the sort and the cull see the drawn place', () => {
     layer.tick(1000)
     layer.tick(2000)
-    const boxes = publishedBoxes(scene) as unknown as Array<{
+    const boxes = publishedBoxes(scene) as unknown as {
       id: string
       x0: number
       y0: number
       sx0: number
-    }>
+    }[]
     expect(new Set(boxes.map((b) => `${b.x0},${b.y0}`)).size).toBe(4)
     const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
     for (const b of boxes) {
@@ -693,19 +693,19 @@ describe('characterCell degrades inside its own facing, never across one', () =>
       string,
       { x: number; y: number; w: number; h: number; feetX: number; feetY: number }
     > = {}
-    FACES.forEach((f, fi) =>
+    FACES.forEach((f, fi) => {
       CELLS.forEach((p, pi) => {
         if (absent.includes(`${p}-${f}`)) return
         cells[`${p}-${f}`] = { x: pi * 100, y: fi * 200, w: 100, h: 200, feetX: 50, feetY: 199 }
-      }),
-    )
+      })
+    })
     return {
       url: '/a.png',
       manifest: { version: 'v4-hires-atlas', figureH: 180, cells },
       size: { w: 600, h: 800 },
     }
   }
-  const sheet = new MockTexture() as unknown as Parameters<typeof characterCell>[0]
+  const sheet = new MockTexture()
   const nameOf = (t: unknown): string => {
     const f = (t as { frame: { x: number; y: number } }).frame
     return `${CELLS[f.x / 100]}-${FACES[f.y / 200]}`
@@ -772,7 +772,7 @@ type MockSpriteT = {
 }
 /** `Scene.sortDepth` returns `void` in the product; the mock returns the entries, so the type has to be replaced rather than intersected. */
 type PickScene = Omit<Scene, 'sortDepth' | 'getZoom'> & {
-  sortDepth: () => Array<{ box: DepthBox; node: MockSpriteT }>
+  sortDepth: () => { box: DepthBox; node: MockSpriteT }[]
   getZoom: () => number
 }
 

@@ -18,9 +18,7 @@ import type { RouteHandler } from './server.js'
  * the first, and the heap must barely move. The bodies are checked too — "grew by 0 MB" is
  * satisfiable by a read path that answers `[]`.
  */
-const GRASS: TileId[][] = Array.from({ length: 64 }, () =>
-  Array.from({ length: 64 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 64 }, () => Array.from({ length: 64 }, () => 0))
 const AGENTS = 12
 const FIRST_TRANCHE_TICKS = 2_000
 const SECOND_TRANCHE_TICKS = 14_000
@@ -51,7 +49,9 @@ const ids = Array.from({ length: AGENTS }, (_, i) => `a${i}`)
 
 describe('★ the read path holds answers, not the log', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-footprint-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('three times the events must not be three times the memory', () => {
     const dbPath = join(dir, 'loud.db')
@@ -135,7 +135,7 @@ describe('★ the read path holds answers, not the log', () => {
         ['GET /api/society', '/api/society'],
         ['GET /api/heat', '/api/heat'],
         ['GET /api/digest', '/api/digest'],
-      ] as Array<[string, string]>) {
+      ] as [string, string][]) {
         let body = ''
         routes.get(key)!(
           { url } as IncomingMessage,
@@ -181,7 +181,7 @@ describe('★ the read path holds answers, not the log', () => {
       nodes: unknown[]
       links: unknown[]
     }
-    const heat = JSON.parse(bodies.get('GET /api/heat')!) as Array<{ fromTick: number }>
+    const heat = JSON.parse(bodies.get('GET /api/heat')!) as { fromTick: number }[]
     expect(society.nodes).toHaveLength(AGENTS)
     expect(society.links.length, 'a town this loud has talk and give links').toBeGreaterThan(100)
     expect(heat.length, 'and drama in most of its recent 60-tick windows').toBeGreaterThan(100)

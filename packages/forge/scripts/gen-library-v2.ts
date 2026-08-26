@@ -206,7 +206,7 @@ for (const item of items) {
       const msg =
         `${e.kind}: ${key} factor ${sprite.factor}, islands ${sprite.islands}, ` +
         `opaque ${(sprite.opaqueFrac * 100).toFixed(1)}%, ` +
-        `${fails.length === 0 ? 'pixel bar clean' : fails.join('; ')}` +
+        (fails.length === 0 ? 'pixel bar clean' : fails.join('; ')) +
         `${verdict ? `, judge ${verdict.overall}` : ''}${refused ? ' — REFUSED BY EYE' : ''}`
       lines.push(msg)
       console.log(`  ${msg}`)

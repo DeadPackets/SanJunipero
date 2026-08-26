@@ -53,12 +53,12 @@ function genesisStanding(): WorldRect[] {
 /** Raise `n` buildings of one mass through the claim, exactly as the engine does: each claim
  *  sees everything the ones before it put up, and nothing else. */
 function raise(n: number, need = { along: 2, deep: 2 }, standing: WorldRect[] = genesisStanding()) {
-  const built: Array<{
+  const built: {
     site: WorldRect
     door: { x: number; y: number }
     rings: number
     facing: string
-  }> = []
+  }[] = []
   for (let i = 0; i < n; i++) {
     const c = claimTownPlot({ square: TOWN_SQUARE, standing, need })
     if (c === null) break
@@ -343,12 +343,12 @@ const CHANNEL = [-17, -16, -15] as const
 
 /** A walk with a deck laid over the named grammar tiles. A deck over water is not water; a
  *  deck anywhere else is a plank on the grass and changes nothing. */
-const deck = (base: Walk, tiles: ReadonlyArray<{ dx: number; dy: number }>): Walk => {
+const deck = (base: Walk, tiles: readonly { dx: number; dy: number }[]): Walk => {
   const on = new Set(tiles.map((t) => `${t.dx},${t.dy}`))
   return (dx, dy) => base(dx, dy) || on.has(`${dx},${dy}`)
 }
 
-const span = (dy: number, cols: readonly number[] = CHANNEL): Array<{ dx: number; dy: number }> =>
+const span = (dy: number, cols: readonly number[] = CHANNEL): { dx: number; dy: number }[] =>
   cols.map((dx) => ({ dx, dy }))
 
 /** The blocks the claim will actually offer, in order, for a 2x2 — read off the claim itself, so
@@ -365,7 +365,7 @@ function raiseWith(
   standing: WorldRect[] = genesisStanding(),
   need = { along: 2, deep: 2 },
 ) {
-  const built: Array<{ site: WorldRect; door: { x: number; y: number }; rings: number }> = []
+  const built: { site: WorldRect; door: { x: number; y: number }; rings: number }[] = []
   for (let i = 0; i < n; i++) {
     const c = claimTownPlot({ square: TOWN_SQUARE, standing, need, walk })
     if (c === null) break

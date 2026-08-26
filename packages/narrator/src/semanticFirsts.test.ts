@@ -73,11 +73,11 @@ const run = async (llm: ScriptedLlm, over: Record<string, unknown> = {}) => {
   return { db, store, milestones }
 }
 
-const alerts = (db: Database.Database): Array<{ kind: string; detail: string }> =>
-  db.prepare('SELECT kind, detail FROM alerts ORDER BY id').all() as Array<{
+const alerts = (db: Database.Database): { kind: string; detail: string }[] =>
+  db.prepare('SELECT kind, detail FROM alerts ORDER BY id').all() as {
     kind: string
     detail: string
-  }>
+  }[]
 
 // A model whose answer the generator refuses outright — a hit citing neither an event nor a
 // remembered record — because that throw used to take the whole chapter down with it.

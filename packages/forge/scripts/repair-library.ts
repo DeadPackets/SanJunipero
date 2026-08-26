@@ -164,7 +164,7 @@ function deployRepair(e: LibraryEntry, n: number, r: Round, spend: number): void
     unknown
   >
   // Deploying the same strike twice must not append its verdicts twice.
-  const again = prior['repairRaw'] === r.raw
+  const again = prior.repairRaw === r.raw
   writeFileSync(
     join(dir, 'report.json'),
     JSON.stringify(
@@ -174,11 +174,11 @@ function deployRepair(e: LibraryEntry, n: number, r: Round, spend: number): void
         repairedAt: new Date().toISOString(),
         repairRaw: r.raw,
         spriteVerdicts: again
-          ? prior['spriteVerdicts']
-          : [...(prior['spriteVerdicts'] as VisionVerdict[]), r.sprite],
+          ? prior.spriteVerdicts
+          : [...(prior.spriteVerdicts as VisionVerdict[]), r.sprite],
         iconVerdicts: again
-          ? prior['iconVerdicts']
-          : [...(prior['iconVerdicts'] as VisionVerdict[]), r.icon],
+          ? prior.iconVerdicts
+          : [...(prior.iconVerdicts as VisionVerdict[]), r.icon],
         spendUsd: ledger.totalFor(`library:${e.kind}`),
       },
       null,

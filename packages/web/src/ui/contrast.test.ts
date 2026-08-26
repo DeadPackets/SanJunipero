@@ -17,7 +17,7 @@ export function luminance(hex: string): number {
 
 export function contrast(fg: string, bg: string): number {
   const [a, b] = [luminance(fg), luminance(bg)]
-  const [hi, lo] = a! > b! ? [a!, b!] : [b!, a!]
+  const [hi, lo] = a > b ? [a, b] : [b, a]
   return (hi + 0.05) / (lo + 0.05)
 }
 
@@ -44,14 +44,14 @@ const AA = 4.5
 
 describe('the palette these fixes are measured against', () => {
   it('reads the tokens out of the sheet', () => {
-    expect(T['ink']).toBe('#43394A')
-    expect(T['cream']).toBe('#FFF6E9')
-    expect(T['sand']).toBe('#E8D5BC')
+    expect(T.ink).toBe('#43394A')
+    expect(T.cream).toBe('#FFF6E9')
+    expect(T.sand).toBe('#E8D5BC')
   })
 
   it('agrees with the audit on the base pairs', () => {
-    expect(contrast(T['ink']!, T['parchment']!)).toBeCloseTo(9.06, 1)
-    expect(contrast(T['ink']!, T['cream']!)).toBeCloseTo(10.2, 1)
+    expect(contrast(T.ink!, T.parchment!)).toBeCloseTo(9.06, 1)
+    expect(contrast(T.ink!, T.cream!)).toBeCloseTo(10.2, 1)
   })
 })
 
@@ -66,8 +66,8 @@ describe('B3 — the timeline day labels are on the slab they sit on', () => {
 
   it('clears AA on the cream slab AND on the sand track it overhangs', () => {
     const fg = T[colour!]!
-    expect(contrast(fg, T['cream']!)).toBeGreaterThanOrEqual(AA)
-    expect(contrast(fg, T['sand']!)).toBeGreaterThanOrEqual(AA)
+    expect(contrast(fg, T.cream!)).toBeGreaterThanOrEqual(AA)
+    expect(contrast(fg, T.sand!)).toBeGreaterThanOrEqual(AA)
   })
 
   it('does not thin its own colour back down with opacity', () => {
@@ -130,7 +130,7 @@ describe('--ink-quiet — the de-emphasis token', () => {
 
   it('is genuinely quieter than ink, or it is not de-emphasis', () => {
     for (const paper of PAPERS) {
-      expect(contrast(T['ink-quiet']!, T[paper]!)).toBeLessThan(contrast(T['ink']!, T[paper]!))
+      expect(contrast(T['ink-quiet']!, T[paper]!)).toBeLessThan(contrast(T.ink!, T[paper]!))
     }
   })
 })
@@ -159,7 +159,7 @@ describe('--cream-quiet — the same de-emphasis, on the dark ground the town sp
       expect(
         contrast(T['cream-quiet']!, T[paper]!),
         `cream-quiet vs cream on ${paper}`,
-      ).toBeLessThan(contrast(T['cream']!, T[paper]!))
+      ).toBeLessThan(contrast(T.cream!, T[paper]!))
     }
   })
 
@@ -197,12 +197,12 @@ describe('a stale clock is legible, not just loud', () => {
     const bg = /background:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
     expect(bg, `${selector} sets no background token`).toBe('rose')
     expect(fg, `${selector} sets no colour token`).toBeDefined()
-    expect(contrast(T[fg!]!, T['rose']!), `${selector}`).toBeGreaterThanOrEqual(AA)
+    expect(contrast(T[fg!]!, T.rose!), selector).toBeGreaterThanOrEqual(AA)
   })
 
   it('records the pair it rejected, so it cannot come back', () => {
-    expect(contrast(T['cream']!, T['rose']!)).toBeCloseTo(3.12, 2)
-    expect(contrast(T['deep']!, T['rose']!)).toBeCloseTo(4.82, 2)
+    expect(contrast(T.cream!, T.rose!)).toBeCloseTo(3.12, 2)
+    expect(contrast(T.deep!, T.rose!)).toBeCloseTo(4.82, 2)
   })
 })
 
@@ -224,7 +224,7 @@ describe('a mark drawn to divide the panel can actually be seen', () => {
   })
 
   it('records the pair it rejected, so it cannot come back', () => {
-    expect(contrast(T['sand']!, T['parchment']!)).toBeCloseTo(1.19, 2)
-    expect(contrast(T['sand']!, T['cream']!)).toBeCloseTo(1.34, 2)
+    expect(contrast(T.sand!, T.parchment!)).toBeCloseTo(1.19, 2)
+    expect(contrast(T.sand!, T.cream!)).toBeCloseTo(1.34, 2)
   })
 })

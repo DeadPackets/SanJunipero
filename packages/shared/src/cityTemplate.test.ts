@@ -988,8 +988,8 @@ const roadSetOf = (t: CityTemplate): Set<string> =>
 
 /** 1. FRONTAGE. Pairs of structures whose footprints touch orthogonally. A town has ground on
  *  every side of every building, so the invariant is that this list is empty. */
-function touchingStructures(t: CityTemplate): Array<[string, string]> {
-  const out: Array<[string, string]> = []
+function touchingStructures(t: CityTemplate): [string, string][] {
+  const out: [string, string][] = []
   const at = new Map<string, number>()
   t.structures.forEach((s, i) => {
     for (const c of structureTiles(s)) at.set(key(c.dx, c.dy), i)
@@ -1071,7 +1071,7 @@ function plazaArrivals(t: CityTemplate): PlazaArrival[] {
 type StreetRank = {
   /** `row 38` or `col 40` — the line of road every door on this rank opens onto */
   street: string
-  dwellings: Array<{ kind: string; along: number; span: number }>
+  dwellings: { kind: string; along: number; span: number }[]
 }
 
 /** The houses grouped by the street their doors open onto and ordered along it. The facing column
@@ -1288,7 +1288,7 @@ describe('PROPERTY 5 — plots and gaps', () => {
       const street = s.facing === 'sw' ? `row ${s.dy + s.h}` : `col ${s.dx + s.w}`
       expect(
         dwellingRanks(t).map((r) => r.street),
-        `${s.kind}`,
+        s.kind,
       ).toContain(street)
     }
   })

@@ -97,7 +97,7 @@ export function InspectorBodyView({
   agent: InspectorAgent
   tick: number
   thought: { text: string } | null
-  carrying: ReadonlyArray<{ id: string; kind: string; qty: number }>
+  carrying: readonly { id: string; kind: string; qty: number }[]
   changes: readonly ChangeEntry[]
 }) {
   const moved = hasChanged(changes)
@@ -250,7 +250,9 @@ export function InspectorPanel({
       const { sx, sy } = tileToScreen(a.x, a.y)
       return { x: sx, y: sy }
     })
-    const offEnd = scene.onFollowEnd(() => setFollow(false))
+    const offEnd = scene.onFollowEnd(() => {
+      setFollow(false)
+    })
     // following someone through a door takes the camera in with them (C10 T11)
     scene.interior?.setFollowed(agentId)
     return () => {
@@ -312,7 +314,9 @@ export function InspectorPanel({
         <button
           className={follow ? 'tab active follow' : 'tab follow'}
           aria-pressed={follow}
-          onClick={() => setFollow((f) => !f)}
+          onClick={() => {
+            setFollow((f) => !f)
+          }}
         >
           {follow ? 'Following' : 'Follow'}
         </button>
@@ -328,7 +332,13 @@ export function InspectorPanel({
 
       <nav className="lens-tabs">
         {(['ledger', 'journal'] as const).map((t) => (
-          <button key={t} className={t === tab ? 'tab active' : 'tab'} onClick={() => setTab(t)}>
+          <button
+            key={t}
+            className={t === tab ? 'tab active' : 'tab'}
+            onClick={() => {
+              setTab(t)
+            }}
+          >
             {t === 'ledger' ? 'People' : 'Journal'}
           </button>
         ))}

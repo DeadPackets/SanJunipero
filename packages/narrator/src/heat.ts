@@ -74,7 +74,7 @@ export function scoreHeat(scene: SceneSegment, ctx: HeatCtx, events: SimEvent[])
 export function rankScenesForDirector(
   scenes: SceneSegment[],
   heats: HeatScores[],
-): Array<{ sceneIndex: number; total: number }> {
+): { sceneIndex: number; total: number }[] {
   return scenes
     .map((_s, i) => ({ sceneIndex: i, total: heats[i]!.total }))
     .sort((a, b) => b.total - a.total || a.sceneIndex - b.sceneIndex)

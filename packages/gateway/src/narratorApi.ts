@@ -105,12 +105,12 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   const chronicleEntries = (fromTick: number, toTick: number): readonly ChronicleEntry[] =>
     cache.value(`chronicle:${fromTick}:${toTick}`, () => {
       const look = lookup()
-      const rows = selWeighted.all(...CHRONICLE_TYPES, fromTick, toTick) as Array<{
+      const rows = selWeighted.all(...CHRONICLE_TYPES, fromTick, toTick) as {
         seq: number
         tick: number
         type: string
         payload: string
-      }>
+      }[]
       const entries: ChronicleEntry[] = []
       for (const r of rows) {
         const label = chronicleLine(toEvent(r), look)
@@ -227,7 +227,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
 
   /** The days a personality document actually MOVED. Version 1 is the document arriving, not
    *  a change, so it is excluded — otherwise everybody "changed" on the day they were written. */
-  const sweepChangeDays = (): Array<{ tick: number }> => {
+  const sweepChangeDays = (): { tick: number }[] => {
     if (deps.agentDbDir === undefined) return []
     let files: string[]
     try {
@@ -244,7 +244,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
         adb = new Database(join(deps.agentDbDir, file), { readonly: true, fileMustExist: true })
         for (const r of adb
           .prepare('SELECT day FROM personality_versions WHERE version > 1')
-          .all() as Array<{ day: number }>)
+          .all() as { day: number }[])
           ticks.push(r.day * MINUTES_PER_DAY)
       } catch {
         /* an agent with no memory file, or a file predating the table, simply has no changes */
@@ -258,8 +258,8 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   // Keyed on the world DAY, not `mirror.seq()`: the seq moves every pump, so a seq-keyed memo
   // reopens every agent db per poll. The mark is day-granular, so a day is what it may lag by.
   let sweptDay = -1
-  let sweptChanges: Array<{ tick: number }> = []
-  const changeDays = (): Array<{ tick: number }> => {
+  let sweptChanges: { tick: number }[] = []
+  const changeDays = (): { tick: number }[] => {
     const day = Math.floor(deps.mirror.state().tick / MINUTES_PER_DAY)
     if (day !== sweptDay) {
       sweptDay = day
@@ -292,7 +292,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
           deps.db,
           (id) => deps.mirror.state().agents[id]?.name ?? id,
         ).map((d) => ({ tick: d.tick, words: discoveryHeadline(d) })),
-        events: selMarkEvents.all(...MARK_EVENT_TYPES) as Array<{ tick: number; type: string }>,
+        events: selMarkEvents.all(...MARK_EVENT_TYPES) as { tick: number; type: string }[],
       })),
     )
   })

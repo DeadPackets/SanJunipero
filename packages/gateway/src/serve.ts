@@ -40,15 +40,15 @@ export async function main(): Promise<void> {
   }
   const port = intEnv('PORT', STREAM_PORT, 1)
   const rings = intEnv('SJ_RINGS', TOWN_RINGS_GENESIS, 1)
-  const map: DevMapKind = process.env['SJ_MAP'] === 'scripted' ? 'scripted' : 'showcase'
-  const interiors = process.env['SJ_INTERIORS'] === '1'
-  const fresh = process.env['SJ_FRESH'] === '1'
+  const map: DevMapKind = process.env.SJ_MAP === 'scripted' ? 'scripted' : 'showcase'
+  const interiors = process.env.SJ_INTERIORS === '1'
+  const fresh = process.env.SJ_FRESH === '1'
   const lamps = intEnv('SJ_LAMPS', STREAM_LAMPS, 0)
 
   // The import itself is behind the flag: `@sj/agents` pulls in onnxruntime and a 128 MB
   // sentence-transformer, and a scripted stream should pay for neither.
-  const live = process.env['SJ_LIVE'] === '1'
-  const mindsDir = process.env['SJ_MINDS_DIR'] ?? STREAM_MINDS_DIR
+  const live = process.env.SJ_LIVE === '1'
+  const mindsDir = process.env.SJ_MINDS_DIR ?? STREAM_MINDS_DIR
   let world: Awaited<ReturnType<typeof startDevWorld>> | undefined
   // A FACTORY, not a cast: `startDevWorld` deletes the minds when `SJ_FRESH=1`, and a cast
   // built out here would already be holding those files open. Wipe first, build second.
@@ -56,9 +56,9 @@ export async function main(): Promise<void> {
     import('./liveWorld.js').then(({ createLiveCast }) =>
       createLiveCast({
         agentDbDir: mindsDir,
-        ...(process.env['SJ_MODELS_DIR'] === undefined
+        ...(process.env.SJ_MODELS_DIR === undefined
           ? {}
-          : { modelsDir: process.env['SJ_MODELS_DIR'] }),
+          : { modelsDir: process.env.SJ_MODELS_DIR }),
         // The cap kills the process: a stream that stops thinking and keeps serving is a town of
         // statues nobody would notice for hours.
         onSpendStop: () => {
@@ -66,7 +66,7 @@ export async function main(): Promise<void> {
         },
         // Opt-OUT, and it only ever fires on an act the engine has no verb for — a per-novelty
         // call, not a per-turn one. It bills the same ledger and dies on the same $5 stop.
-        useArbiter: process.env['SJ_ARBITER'] !== '0',
+        useArbiter: process.env.SJ_ARBITER !== '0',
       }),
     )
 
@@ -121,8 +121,12 @@ export async function main(): Promise<void> {
     console.log(`stream: ${signal} — closing the town`)
     void running.stop().then(() => process.exit(0))
   }
-  process.on('SIGTERM', () => stop('SIGTERM'))
-  process.on('SIGINT', () => stop('SIGINT'))
+  process.on('SIGTERM', () => {
+    stop('SIGTERM')
+  })
+  process.on('SIGINT', () => {
+    stop('SIGINT')
+  })
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) void main()

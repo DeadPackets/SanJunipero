@@ -117,18 +117,18 @@ describe('the Discovery Record clears AA in both bands', () => {
   }
 
   it('paints its body text on parchment in a token that clears AA', () => {
-    expect(contrast(colourOf('.discovery-leaf p'), T['parchment']!)).toBeGreaterThanOrEqual(AA)
+    expect(contrast(colourOf('.discovery-leaf p'), T.parchment!)).toBeGreaterThanOrEqual(AA)
   })
 
   it('paints the leaf’s own grounds — heading and credit — clear of AA on cream', () => {
     for (const sel of ['.discovery-leaf h3', '.discovery-credit', '.discovery-makes']) {
-      expect(contrast(colourOf(sel), T['cream']!), sel).toBeGreaterThanOrEqual(AA)
+      expect(contrast(colourOf(sel), T.cream!), sel).toBeGreaterThanOrEqual(AA)
     }
-    expect(contrast(colourOf('.discovery-summary'), T['parchment']!)).toBeGreaterThanOrEqual(AA)
+    expect(contrast(colourOf('.discovery-summary'), T.parchment!)).toBeGreaterThanOrEqual(AA)
   })
 
   it('paints the quote block’s text on deep in a token that clears AA', () => {
-    expect(contrast(colourOf('.discovery-quote'), T['deep']!)).toBeGreaterThanOrEqual(AA)
+    expect(contrast(colourOf('.discovery-quote'), T.deep!)).toBeGreaterThanOrEqual(AA)
   })
 
   it('NO token it uses clears AA on BOTH grounds — per-band is not optional here', () => {
@@ -136,8 +136,8 @@ describe('the Discovery Record clears AA in both bands', () => {
     // bands down to one colour is told, in a failing test, why that cannot work.
     const light = colourOf('.discovery-leaf h3')
     const dark = colourOf('.discovery-quote')
-    expect(contrast(light, T['deep']!)).toBeLessThan(AA)
-    expect(contrast(dark, T['cream']!)).toBeLessThan(AA)
+    expect(contrast(light, T.deep!)).toBeLessThan(AA)
+    expect(contrast(dark, T.cream!)).toBeLessThan(AA)
   })
 
   it('draws the chain rule in something a viewer can actually see', () => {
@@ -145,7 +145,7 @@ describe('the Discovery Record clears AA in both bands', () => {
     // 1.19:1.
     const name = /border-left:[^;]*var\(--([\w-]+)\)/.exec(ruleBody(CSS, '.discovery-chain'))?.[1]
     expect(name, 'the chain has no rule').toBeDefined()
-    expect(contrast(T[name!]!, T['parchment']!)).toBeGreaterThanOrEqual(3)
+    expect(contrast(T[name!]!, T.parchment!)).toBeGreaterThanOrEqual(3)
   })
 
   it('NEVER thins a reading surface with opacity', () => {

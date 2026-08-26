@@ -25,10 +25,10 @@ export function publishThought(
 export function thoughtsSince(
   db: Database.Database,
   idExclusive: number,
-): Array<{ id: number; tick: number; agentId: string; text: string }> {
+): { id: number; tick: number; agentId: string; text: string }[] {
   const rows = db
     .prepare('SELECT id, tick, agent_id, text FROM observer_thoughts WHERE id > ? ORDER BY id')
-    .all(idExclusive) as Array<{ id: number; tick: number; agent_id: string; text: string }>
+    .all(idExclusive) as { id: number; tick: number; agent_id: string; text: string }[]
   return rows.map((r) => ({ id: r.id, tick: r.tick, agentId: r.agent_id, text: r.text }))
 }
 

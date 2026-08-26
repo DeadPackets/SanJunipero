@@ -10,8 +10,12 @@ import {
   type HeatWindow,
 } from './heat.js'
 
-const ev = (seq: number, tick: number, type: string, payload: Record<string, unknown>): SimEvent =>
-  ({ seq, tick, type, payload }) as SimEvent
+const ev = (
+  seq: number,
+  tick: number,
+  type: string,
+  payload: Record<string, unknown>,
+): SimEvent => ({ seq, tick, type, payload })
 
 // The read path's own fold, assembled from the pieces it uses — one score map, one context, and
 // the plan map it keeps as it goes. See `readFold` in api.ts; there is no second scorer to drift.

@@ -67,7 +67,7 @@ export function deadCallCounts(
     .prepare(
       'SELECT ts, agent_id AS agentId, error FROM llm_calls WHERE ok = 0 AND ts >= ? ORDER BY id',
     )
-    .all(opts.since ?? 0) as Array<{ ts: number; agentId: string | null; error: string | null }>
+    .all(opts.since ?? 0) as { ts: number; agentId: string | null; error: string | null }[]
   const byKey = new Map<string, DeadCallRow>()
   for (const row of rows) {
     const day = dayOf(row.ts)
@@ -157,12 +157,12 @@ export function providerCounts(
     .prepare(
       'SELECT provider, ok, error, cost_usd AS costUsd FROM llm_calls WHERE ts >= ? ORDER BY id',
     )
-    .all(opts.since ?? 0) as Array<{
+    .all(opts.since ?? 0) as {
     provider: string | null
     ok: number
     error: string | null
     costUsd: number
-  }>
+  }[]
   const byProvider = new Map<string, ProviderRow>()
   for (const row of rows) {
     const key = row.provider ?? ''

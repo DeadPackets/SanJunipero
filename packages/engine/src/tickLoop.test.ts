@@ -68,7 +68,9 @@ describe('TickLoop', () => {
     const preTick = l.tick
     const preHash = stateHash(l.state)
     const preSeq = store.lastSeq()
-    expect(() => l.step()).toThrow('boom')
+    expect(() => {
+      l.step()
+    }).toThrow('boom')
     expect(l.tick).toBe(2)
     expect(l.tick).toBe(preTick)
     expect(stateHash(l.state)).toBe(preHash)
@@ -96,7 +98,9 @@ describe('TickLoop', () => {
       },
     })
     const pre = rng.snapshot()
-    expect(() => l.step()).toThrow('boom')
+    expect(() => {
+      l.step()
+    }).toThrow('boom')
     expect(rng.snapshot()).toEqual(pre)
     l.step()
     expect(draws).toHaveLength(2)

@@ -54,7 +54,7 @@ export function ControlBar({
   }
 
   const here = (): number => {
-    const id = (ref.current?.ownerDocument.activeElement as HTMLElement | null)?.dataset['ctl']
+    const id = (ref.current?.ownerDocument.activeElement as HTMLElement | null)?.dataset.ctl
     const i = id === undefined ? -1 : focusable.findIndex((f) => f.id === id)
     return i >= 0 ? i : cursor
   }
@@ -105,7 +105,9 @@ export function ControlBar({
                   {...(item.disabled === true && item.disabledReason !== undefined
                     ? { 'aria-description': item.disabledReason }
                     : {})}
-                  onClick={() => onAction(actionFor(item))}
+                  onClick={() => {
+                    onAction(actionFor(item))
+                  }}
                   onFocus={() => {
                     const i = focusable.findIndex((f) => f.id === item.id)
                     if (i >= 0) setAt(i)

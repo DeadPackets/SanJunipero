@@ -37,13 +37,12 @@ const seedWorld = (): Database.Database => {
   return world
 }
 
-const bioLlm = (body: string): NarratorLlm =>
-  ({
-    summarizeChapter: vi.fn(),
-    summarizeEra: vi.fn(),
-    newspaperCopy: vi.fn(),
-    biography: vi.fn(async () => ({ title: 'Tamar of the Riverbend', body })),
-  }) as unknown as NarratorLlm
+const bioLlm = (body: string): NarratorLlm => ({
+  summarizeChapter: vi.fn(),
+  summarizeEra: vi.fn(),
+  newspaperCopy: vi.fn(),
+  biography: vi.fn(async () => ({ title: 'Tamar of the Riverbend', body })),
+})
 
 const bioLlmSeq = (bodies: string[]): NarratorLlm => {
   let i = 0
@@ -55,7 +54,7 @@ const bioLlmSeq = (bodies: string[]): NarratorLlm => {
       title: 'Tamar of the Riverbend',
       body: bodies[Math.min(i++, bodies.length - 1)]!,
     })),
-  } as unknown as NarratorLlm
+  }
 }
 
 describe('collectPublicRecord', () => {

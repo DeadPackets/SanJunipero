@@ -23,7 +23,9 @@ for (const [desc, klass] of subjects) {
     [],
     3,
   )
-  cands.forEach((c, i) => writeFileSync(`${OUT}/${klass}-${i}.png`, c.png))
+  cands.forEach((c, i) => {
+    writeFileSync(`${OUT}/${klass}-${i}.png`, c.png)
+  })
   console.log(
     `${klass}: ${cands.length} candidates, $${cands.reduce((s, c) => s + c.costUsd, 0).toFixed(3)}`,
   )

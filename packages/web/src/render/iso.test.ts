@@ -85,7 +85,7 @@ describe('dimetric math', () => {
 // against the PROJECTION instead, because the projection is what the viewer's eye is doing.
 
 describe('a facing is a screen direction, so the screen decides it', () => {
-  const cases: Array<[number, number]> = []
+  const cases: [number, number][] = []
   for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) cases.push([dx, dy])
 
   // Where each facing's art points, as a screen quadrant. `se` is drawn walking toward the

@@ -55,7 +55,7 @@ const VOCABULARY = {
 
 // Seven invented verbs a mind reached for, each with the thought behind it — an act the engine
 // has no verb for. Fixed order and cast, so the two arms differ in exactly one thing.
-const SEED: Array<{ verb: string; params: Record<string, unknown>; thought: string }> = [
+const SEED: { verb: string; params: Record<string, unknown>; thought: string }[] = [
   {
     verb: 'smoke_fish',
     params: { over: 'green wood' },

@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS publications (
 
 // One ledger widened rather than a rival one beside it; every existing row is a tier-1 engine
 // first, which is what the defaults say. Idempotent: columns are added only where missing.
-const MILESTONE_COLUMNS: ReadonlyArray<{ name: string; ddl: string }> = [
+const MILESTONE_COLUMNS: readonly { name: string; ddl: string }[] = [
   { name: 'tier', ddl: "ALTER TABLE milestones ADD COLUMN tier TEXT NOT NULL DEFAULT '1'" },
   {
     name: 'domain',
@@ -73,9 +73,7 @@ const MILESTONE_COLUMNS: ReadonlyArray<{ name: string; ddl: string }> = [
 export function migrateNarratorTables(db: Database.Database): void {
   db.exec(DDL)
   const have = new Set(
-    (db.prepare('PRAGMA table_info(milestones)').all() as Array<{ name: string }>).map(
-      (c) => c.name,
-    ),
+    (db.prepare('PRAGMA table_info(milestones)').all() as { name: string }[]).map((c) => c.name),
   )
   for (const col of MILESTONE_COLUMNS) if (!have.has(col.name)) db.exec(col.ddl)
 }

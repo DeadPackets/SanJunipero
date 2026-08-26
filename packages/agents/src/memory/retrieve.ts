@@ -133,7 +133,7 @@ async function retrieve(
          ORDER BY bm25(memories_fts)
          LIMIT ?`,
       )
-      .all(matchExpr, agentId, FTS_POOL) as Array<{ id: number; raw: number }>
+      .all(matchExpr, agentId, FTS_POOL) as { id: number; raw: number }[]
     for (const r of rows) {
       rawBm25.set(r.id, r.raw)
       candidates.add(r.id)
@@ -149,10 +149,10 @@ async function retrieve(
          WHERE embedding MATCH ? AND k = ?
            AND rowid IN (SELECT id FROM memories WHERE agent_id = ?)`,
       )
-      .all(Buffer.from(qvec.buffer, qvec.byteOffset, qvec.byteLength), VEC_POOL, agentId) as Array<{
+      .all(Buffer.from(qvec.buffer, qvec.byteOffset, qvec.byteLength), VEC_POOL, agentId) as {
       id: number
       dist: number
-    }>
+    }[]
     for (const r of rows) {
       // embeddings are L2-normalized: cosine = 1 − dist²/2
       cosine.set(r.id, 1 - (r.dist * r.dist) / 2)
@@ -169,7 +169,7 @@ async function retrieve(
          JOIN memories m ON m.id = t.memory_id
          WHERE t.tag IN (${placeholders}) AND m.agent_id = ?`,
       )
-      .all(...[...qTags], agentId) as Array<{ id: number }>
+      .all(...[...qTags], agentId) as { id: number }[]
     for (const r of rows) candidates.add(r.id)
   }
 

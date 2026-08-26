@@ -209,7 +209,7 @@ export function createInteriorScene(
   /** Where each body is on the room map, and the tiles it still has to cross to get where it
    *  is going. The engine has no interior position, so this is the renderer's own. */
   const walking = new Map<string, { at: Tile; path: Tile[]; t: number }>()
-  const changeCbs: Array<(id: string | null) => void> = []
+  const changeCbs: ((id: string | null) => void)[] = []
 
   // THE ROOM CAMERA. A farmhouse's box is 1 920 × 1 120 and there is no integer scene zoom below
   // 1, so part of it is off the glass and cannot be zoomed back on; what is left to choose is
@@ -290,7 +290,9 @@ export function createInteriorScene(
    * stands — the same art-independence law the ground answers to.
    */
   function paintWalls(m: RoomMap, records: AssetRecord[]): void {
-    wallArt.removeChildren().forEach((c) => c.destroy())
+    wallArt.removeChildren().forEach((c) => {
+      c.destroy()
+    })
     const art = hasInteriorTileset(records)
     walls.visible = !art // painted trapezoids OR authored elevations, never both
     if (!art) return
@@ -409,7 +411,7 @@ export function createInteriorScene(
    * that reaches the ground STANDS at the foot of its wall instead of hanging over it.
    */
   function placeFurniture(m: RoomMap, items: RoomItem[], asElevation: ReadonlySet<string>): void {
-    const onFloor: Array<{ piece: MapPiece; item: RoomItem }> = []
+    const onFloor: { piece: MapPiece; item: RoomItem }[] = []
     m.pieces.forEach((piece, i) => {
       const item = items[i]
       if (item === undefined) return
@@ -666,7 +668,7 @@ export function createInteriorScene(
       ]),
     )
     shadows.clear()
-    const bodyPts: Array<{ id: string; sx: number; sy: number }> = []
+    const bodyPts: { id: string; sx: number; sy: number }[] = []
     for (const p of pieces) {
       const node = p.kind === 'body' ? bodies.get(p.id) : furniture.get(p.id)
       if (node === undefined) continue

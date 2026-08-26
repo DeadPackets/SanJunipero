@@ -50,9 +50,9 @@ function answering(text: string): { model: MockLanguageModelV4; prompts: string[
   const prompts: string[] = []
   const model = new MockLanguageModelV4({
     doGenerate: async (options) => {
-      const parts = (options.prompt as Array<{ role: string; content: unknown }>).map((m) =>
+      const parts = (options.prompt as { role: string; content: unknown }[]).map((m) =>
         Array.isArray(m.content)
-          ? (m.content as Array<{ text?: string }>).map((p) => p.text ?? '').join('')
+          ? (m.content as { text?: string }[]).map((p) => p.text ?? '').join('')
           : String(m.content),
       )
       prompts.push(parts.join('\n'))

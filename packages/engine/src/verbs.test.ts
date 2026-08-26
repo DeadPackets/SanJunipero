@@ -121,7 +121,9 @@ describe('verb registry seam', () => {
   })
 
   it('registerVerb throws on a duplicate kind', () => {
-    expect(() => registerVerb({ ...testVerb, kind: 'walk' })).toThrow(/already registered/)
+    expect(() => {
+      registerVerb({ ...testVerb, kind: 'walk' })
+    }).toThrow(/already registered/)
   })
 
   it('unregisterVerb removes a verb; unknown and absent kinds are no-ops', () => {
@@ -131,7 +133,9 @@ describe('verb registry seam', () => {
       ok: false,
       reason: 'unknown verb: recipe:test',
     })
-    expect(() => unregisterVerb('never_existed')).not.toThrow()
+    expect(() => {
+      unregisterVerb('never_existed')
+    }).not.toThrow()
   })
 
   it('all Tier-1 verbs still resolve, and TIER1 is the whole built-in registry', () => {
@@ -899,7 +903,7 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
       ev(700, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }),
       config,
     )
-    const kit: Array<[string, string]> = [
+    const kit: [string, string][] = [
       ['item_1', 'wood'],
       ['item_2', 'stone'],
       ['item_3', 'fiber'],
@@ -955,7 +959,7 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
   })
 
   it('slows exactly the five working verbs, and leaves everything else at its own pace', () => {
-    const slowed: Array<[string, Record<string, unknown>]> = [
+    const slowed: [string, Record<string, unknown>][] = [
       ['build', { kind: 'house', x: 2, y: 1 }],
       ['craft', { recipe: 'plank' }],
       ['till', { x: 1, y: 2 }],
@@ -986,9 +990,7 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
   it('dig_channel is slowed too, beside the water it needs', () => {
     const wet = (tick: number): WorldState => {
       const s = site(tick)
-      const terrain = s.terrain.map((row, y) =>
-        row.map((t, x) => (x === 0 && y === 2 ? (2 as TileId) : t)),
-      )
+      const terrain = s.terrain.map((row, y) => row.map((t, x) => (x === 0 && y === 2 ? 2 : t)))
       return { ...s, terrain }
     }
     expect(durationOf(wet(MIDNIGHT), 'dig_channel', { x: 1, y: 2 })).toBe(
@@ -1120,7 +1122,9 @@ describe('food variety: the same meal twice is worth less than two meals', () =>
       const bonus = 1 + Math.min(CFG.foodVariety.maxBonus, CFG.foodVariety.bonusPerKind * i)
       return FULL * nutritionOf(CFG, kind) * bonus
     })
-    got.forEach((n, i) => expect([six[i], n]).toEqual([six[i], want[i]]))
+    got.forEach((n, i) => {
+      expect([six[i], n]).toEqual([six[i], want[i]])
+    })
     // Five kinds are already at the cap; the sixth buys nothing.
     expect(1 + CFG.foodVariety.bonusPerKind * 4).toBe(1 + CFG.foodVariety.maxBonus)
   })
@@ -1398,7 +1402,7 @@ describe('a torch is a thing hands can make', () => {
     mystery: { chancePerDay: 0 },
   })
 
-  function bench(stock: Array<[string, number]>): WorldState {
+  function bench(stock: [string, number][]): WorldState {
     let s = makeWorld()
     stock.forEach(([kind, qty], i) => {
       s = fold(

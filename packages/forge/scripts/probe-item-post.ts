@@ -45,5 +45,7 @@ await sharp({
   .composite(tiles.map((input, i) => ({ input, left: i * W, top: 0 })))
   .png()
   .toBuffer()
-  .then((b) => writeFileSync(out, b))
+  .then((b) => {
+    writeFileSync(out, b)
+  })
 console.log('wrote', out)

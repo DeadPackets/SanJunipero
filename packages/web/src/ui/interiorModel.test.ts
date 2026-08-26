@@ -231,8 +231,8 @@ describe('roomCard — what it holds', () => {
 describe('roomCard — the empty line', () => {
   it('says nobody is in NOW, never that nothing has happened yet', () => {
     const quiet = world()
-    delete quiet.agents['amara']
-    delete quiet.agents['yusuf']
+    delete quiet.agents.amara
+    delete quiet.agents.yusuf
     const c = roomCard(quiet, 'house1', RECORDS, null)!
     expect(c.present).toEqual([])
     expect(c.empty).toContain('now')

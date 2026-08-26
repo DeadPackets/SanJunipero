@@ -17,7 +17,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 
 function makeWorld(
   config = CFG,
-  agents: Array<{ id: string; x: number; y: number }> = [
+  agents: { id: string; x: number; y: number }[] = [
     { id: 'a1', x: 0, y: 0 },
     { id: 'a2', x: 1, y: 0 },
   ],

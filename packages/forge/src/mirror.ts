@@ -50,11 +50,11 @@ export function deriveSheet(authored: AuthoredSet): Map<string, RawImage> {
   const facingCells = (
     strip: Record<StripPoseV4, RawImage>,
   ): Record<Exclude<PoseV2, 'sleep'>, RawImage> => ({
-    idle: strip['idle'],
+    idle: strip.idle,
     'contact-a': strip['contact-a'],
-    'passing-a': strip['passing'],
+    'passing-a': strip.passing,
     'contact-b': strip['contact-b'],
-    'passing-b': strip['passing'],
+    'passing-b': strip.passing,
   })
   for (const f of AUTHORED_FACINGS) {
     const cells = facingCells(authored.strips[f])

@@ -15,7 +15,7 @@ export function broadcastFromSearch(search: string): boolean {
 
 /** Every operator surface the broadcast frame removes, with the reason. `broadcast.test.ts` holds
  *  the sheet to it, so nothing can be quietly left in the frame at 3px. */
-export const BROADCAST_REMOVED: ReadonlyArray<{ selector: string; why: string }> = [
+export const BROADCAST_REMOVED: readonly { selector: string; why: string }[] = [
   { selector: '.px-title', why: 'the channel already says whose town it is' },
   { selector: '.lens-tabs', why: 'nobody is navigating' },
   { selector: '.link-pill', why: 'the badge states the same trouble in a word (R8)' },

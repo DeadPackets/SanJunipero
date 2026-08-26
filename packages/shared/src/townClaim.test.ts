@@ -110,7 +110,7 @@ describe('claiming', () => {
 // ★ THE DELIVERABLE. Not "this town has no overlaps" — "no town this grammar can reach has
 // one". A hundred and twenty claims, each one a real agent build, checked as a whole town.
 describe('★ NO SEQUENCE OF AGENT BUILDS CAN BREAK THE SPACING', () => {
-  const KINDS: ReadonlyArray<[string, number, number]> = [
+  const KINDS: readonly [string, number, number][] = [
     ['house', 2, 2],
     ['cabin', 2, 2],
     ['cottage', 3, 2],

@@ -42,7 +42,7 @@ export type MoodView = {
   alive: boolean
   asleep: boolean
   ill: boolean
-  injuries: ReadonlyArray<{ kind: string; day: number }>
+  injuries: readonly { kind: string; day: number }[]
   needs: { hunger: number; energy: number; warmth: number; social: number }
   collapsedSinceTick: number | null
 }

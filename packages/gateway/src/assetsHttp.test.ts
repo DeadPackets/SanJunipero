@@ -16,9 +16,7 @@ import {
 import { PLACEHOLDER_PX } from './assetsHttp.js'
 import { createGateway, type Gateway } from './server.js'
 
-const GRASS: TileId[][] = Array.from({ length: 8 }, () =>
-  Array.from({ length: 8 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const CELL = 96
 
 function crop(img: RawImage, x0: number, y0: number, w: number, h: number): RawImage {
@@ -69,7 +67,9 @@ describe('asset http routes', () => {
       snapshotEveryTicks: 5,
       onTick: ({ tick, emit }) => {
         if (tick !== 1) return
-        CAST.forEach((id, i) => emit('agent_spawned', { id, name: id, x: i, y: 0, ageDays: 7300 }))
+        CAST.forEach((id, i) => {
+          emit('agent_spawned', { id, name: id, x: i, y: 0, ageDays: 7300 })
+        })
       },
     })
     loop.step()

@@ -77,7 +77,7 @@ describe('★ the seam law: a chunk boundary never lands between two screen pixe
       rows.push(`z=${z}: ${allChunks(grid).length} chunks, worst edge error ${worst} px`)
       expect(worst).toBe(0)
     }
-    // eslint-disable-next-line no-console
+
     console.log(`SEAM PROOF, ten rings\n  ${rows.join('\n  ')}`)
   })
 
@@ -155,7 +155,7 @@ describe('★ every shape reaches every chunk its paint touches', () => {
       }
     }
     expect(straddling).toBeGreaterThan(0) // the case the law exists for actually occurs
-    // eslint-disable-next-line no-console
+
     console.log(
       `COVERAGE, three rings: ${checked} shape-in-chunk claims, ${straddling} shapes straddle a boundary`,
     )
@@ -199,7 +199,7 @@ describe('the ground asks the entity cull’s own question', () => {
     for (const k of allChunks(grid)) {
       const box: DepthBox = {
         id: k.key,
-        rank: 0 as never,
+        rank: 0,
         x0: 0,
         y0: 0,
         x1: 0,
@@ -320,7 +320,7 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
       for (const k of allChunks(grid)) maxDim = Math.max(maxDim, k.texW, k.texH)
       for (const z of ZOOM_STOPS) {
         const p = peakVisible(grid, z)
-        after[rings]![z] = p.bytes
+        after[rings][z] = p.bytes
         cells.push(`${(p.bytes / MB).toFixed(1)}MB/${p.chunks}`.padStart(13))
       }
       const side = bigTownTerrain(rings).length
@@ -331,7 +331,7 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
           `${cells.join(' |')} | ${maxDim}`,
       )
     }
-    // eslint-disable-next-line no-console
+
     console.log(
       'GROUND VRAM — BEFORE is the landed whole-map texture; AFTER is the peak working set of\n' +
         `chunks over a ${STAGE.w}x${STAGE.h} stage, swept across the field. Add up to ` +
@@ -382,14 +382,14 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
           `${(bytes / MB).toFixed(1).padStart(6)} MB, ${(waste * 100).toFixed(1).padStart(5)}% over the view`,
       )
     }
-    // eslint-disable-next-line no-console
+
     console.log(`CHUNK SIZE, ten rings (side ${side}) at the 0.25 stop\n  ${rows.join('\n  ')}`)
     expect(CHUNK_PX_W / CHUNK_PX_H).toBe(TILE_W / TILE_H) // one chunk is a square of tiles
     expect(rows).toHaveLength(4)
   })
 
   /** The terrain has no fixed size: it widens to owe the built set a block pitch on every side — 250² at five rings, 440² at ten, against today's 128². */
-  const GROWN_SIDES: ReadonlyArray<[string, number]> = [
+  const GROWN_SIDES: readonly [string, number][] = [
     ['today, 128²', 128],
     ['world-growth, 5 rings, 250²', 250],
     ['world-growth, 10 rings, 440²', 440],
@@ -411,7 +411,7 @@ describe('★ VRAM at one, three, five and ten rings — before and after', () =
       for (const g of got.slice(2)) expect(g.bytes).toBe(asymptote)
       for (const g of got) expect(g.bytes).toBeLessThanOrEqual(asymptote)
     }
-    // eslint-disable-next-line no-console
+
     console.log(
       `WORKING SET vs WORLD SIZE — ${GROWN_SIDES.map(([n]) => n).join(' | ')}\n  ${rows.join('\n  ')}`,
     )
@@ -506,7 +506,7 @@ describe('★ what the real baker puts on the GPU', () => {
         CHUNK_PX_W + CHUNK_BLEED_PX,
       )
     }
-    // eslint-disable-next-line no-console
+
     console.log(
       `REAL BAKER, ten rings @1x: ${v.chunks} chunks, ${(v.bytes / MB).toFixed(1)} MB, ` +
         `largest allocation ${v.maxDimPx} px (whole-map bake was 12768 px / 310.9 MB)`,
@@ -530,7 +530,7 @@ describe('★ what the real baker puts on the GPU', () => {
     expect(peakChunks).toBeGreaterThan(0)
     const whole = wholeMapTextureBytes(d.grid.fieldW, d.grid.fieldH)
     expect(peak).toBeLessThan(whole)
-    // eslint-disable-next-line no-console
+
     console.log(
       `PAN SWEEP, ten rings @0.25 across ${d.grid.fieldW} px: peak ` +
         `${(peak / MB).toFixed(1)} MB vs ${(whole / MB).toFixed(1)} MB whole-map`,

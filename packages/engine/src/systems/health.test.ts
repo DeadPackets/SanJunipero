@@ -20,7 +20,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 
 function makeWorld(
   config = CFG,
-  agents: Array<{ id: string; x: number; y: number }> = [{ id: 'a1', x: 0, y: 0 }],
+  agents: { id: string; x: number; y: number }[] = [{ id: 'a1', x: 0, y: 0 }],
 ): WorldState {
   let s = genesisState(
     config,
@@ -46,7 +46,7 @@ function atTick(s: WorldState, tick: number): WorldState {
 }
 function applyAll(
   s: WorldState,
-  events: Array<{ type: string; payload: unknown }>,
+  events: { type: string; payload: unknown }[],
   config = CFG,
   tick = s.tick,
 ): WorldState {

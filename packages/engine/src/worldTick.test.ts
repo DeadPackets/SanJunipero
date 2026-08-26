@@ -50,7 +50,7 @@ function patchAgent(
 }
 function applyAll(
   s: WorldState,
-  events: Array<{ type: string; payload: unknown }>,
+  events: { type: string; payload: unknown }[],
   config = FAST,
   tick = s.tick,
 ): WorldState {

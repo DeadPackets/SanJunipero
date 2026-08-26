@@ -40,7 +40,7 @@ const material = (kind: string, seq: number): AssetRecord => ({
   id: `mat-${kind}`,
   seq,
   class: 'terrain',
-  kind: materialKind(kind as 'grass'),
+  kind: materialKind(kind),
   status: 'ready',
   desc: kind,
   meta: null,
@@ -385,7 +385,7 @@ function reaches(
   const seen = Array.from({ length: r.h }, () => Array.from({ length: r.w }, () => false))
   const start = [Math.round(from[0]), Math.round(from[1])] as [number, number]
   if (!r.grid[start[1]]?.[start[0]]) return false
-  const q: Array<[number, number]> = [start]
+  const q: [number, number][] = [start]
   seen[start[1]]![start[0]] = true
   while (q.length > 0) {
     const [x, y] = q.pop()!
@@ -407,11 +407,9 @@ function reaches(
   return false
 }
 
-const road = (n: number, cells: Array<[number, number]>): TileId[][] => {
-  const t: TileId[][] = Array.from({ length: n }, () =>
-    Array.from({ length: n }, () => 0 as TileId),
-  )
-  for (const [x, y] of cells) t[y]![x] = ROAD_TILE_ID as TileId
+const road = (n: number, cells: [number, number][]): TileId[][] => {
+  const t: TileId[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 0))
+  for (const [x, y] of cells) t[y]![x] = ROAD_TILE_ID
   return t
 }
 const centreOf = (r: { off: number }, x: number, y: number): [number, number] => [
@@ -446,7 +444,7 @@ describe('the rim only faces grass', () => {
     for (const key of ROAD_AUTOTILE_KEYS) {
       for (const poly of roadShoulderPolys(key)) {
         for (let i = 0; i < poly.length; i += 2) {
-          expect(inDiamond(poly[i]!, poly[i + 1]!), `${key}`).toBe(true)
+          expect(inDiamond(poly[i]!, poly[i + 1]!), key).toBe(true)
         }
       }
     }
@@ -507,15 +505,13 @@ describe('a road run is CONNECTED', () => {
 // The plaza cobble reads as a noisy stone-string on a 16px ribbon, so thin runs draw from a
 // calmer material. "Belongs to a fully-road 2x2 block" is the simplest rule that separates them.
 describe('mass vs ribbon', () => {
-  const grid = (n: number, cells: Array<[number, number]>): TileId[][] => {
-    const t: TileId[][] = Array.from({ length: n }, () =>
-      Array.from({ length: n }, () => 0 as TileId),
-    )
-    for (const [x, y] of cells) t[y]![x] = ROAD_TILE_ID as TileId
+  const grid = (n: number, cells: [number, number][]): TileId[][] => {
+    const t: TileId[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 0))
+    for (const [x, y] of cells) t[y]![x] = ROAD_TILE_ID
     return t
   }
-  const block = (x0: number, y0: number, w: number, h: number): Array<[number, number]> => {
-    const out: Array<[number, number]> = []
+  const block = (x0: number, y0: number, w: number, h: number): [number, number][] => {
+    const out: [number, number][] = []
     for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) out.push([x, y])
     return out
   }
@@ -724,7 +720,7 @@ describe('the two-tone rim', () => {
   })
 
   it('a straight 20-tile run keeps exactly two continuous rim bands and no interior wedge', () => {
-    const t: TileId[][] = field(22, 0 as TileId)
+    const t: TileId[][] = field(22, 0)
     for (let x = 1; x <= 20; x++) t[10]![x] = ROAD_TILE_ID
     const road = groundField(t, []).layers.filter((l) => l.kind === 'road')
     const keys = road.flatMap((l) => l.shapes.map((s) => s.roadKey)).filter((k) => k !== null)
@@ -733,8 +729,8 @@ describe('the two-tone rim', () => {
     const interior = keys.filter((k) => k === 'straight-ew')
     expect(interior).toHaveLength(18)
     for (const k of interior) {
-      expect(roadShoulderBands(k!).dark).toHaveLength(4) // two per arm, both long sides
-      expect(roadShoulderBands(k!).light).toHaveLength(4)
+      expect(roadShoulderBands(k).dark).toHaveLength(4) // two per arm, both long sides
+      expect(roadShoulderBands(k).light).toHaveLength(4)
     }
   })
 
@@ -827,8 +823,8 @@ describe('the ground stops repeating', () => {
   })
 
   it('drops under the ceiling once the layer is rotated and an octave is laid over it', () => {
-    const base = materialMatrix('grass', 0 as number)
-    const oct = octaveMatrix('grass', 0 as number)
+    const base = materialMatrix('grass', 0)
+    const oct = octaveMatrix('grass', 0)
     const rotated = materialMatrix('grass', 1) // index 0 is the 0-degree member
     const buf = bufferOf(W, H, (x, y) =>
       octaveComposite(sampleThrough(rotated, x, y), sampleThrough(octaveMatrix('grass', 1), x, y)),

@@ -372,7 +372,7 @@ export function makeScriptedOnTick(
     for (const id of ACTORS) {
       const state = getState()
       const a = state.agents[id]
-      if (!a || !a.alive) continue
+      if (!a?.alive) continue
       const packet = composePerception(state, config, id, [])
       const intent = policies[id]!(packet)
       if (!intent) continue

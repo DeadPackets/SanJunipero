@@ -32,7 +32,7 @@ const OPEN = Array.from({ length: 10 }, () => '..........')
 function world(): WorldState {
   return genesisState(
     CFG,
-    OPEN.map((row) => [...row].map(() => 0 as TileId)),
+    OPEN.map((row) => [...row].map(() => 0)),
   )
 }
 
@@ -149,7 +149,7 @@ describe('★ a dearer dwelling is never a worse one', () => {
   const buildableDwellings = Object.keys(r)
     .filter((k) => isRoofedKind(CFG, k) && buildableRecipe(CFG, k) !== null)
     .sort()
-  const woodOf = (k: string) => r[k]!.inputs['wood']!
+  const woodOf = (k: string) => r[k]!.inputs.wood!
   const slotsOf = (k: string) => roomCapacity({ w: r[k]!.w, h: r[k]!.h })
   /** What one night of fire costs each body under this roof. A night is 720 ticks and an armful
    *  buys `fuelBurnTicks` of them, and the whole room drinks the one fire. */
@@ -440,7 +440,7 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     for (const kind of ['cabin', 'storehouse']) {
       const row = CFG.structures.recipes[kind]!
       expect(row.w * row.h, kind).toBe(
-        CFG.structures.recipes['house']!.w * CFG.structures.recipes['house']!.h,
+        CFG.structures.recipes.house!.w * CFG.structures.recipes.house!.h,
       )
       expect(buildableRecipe(CFG, kind), `${kind} became a second name for a house`).toBeNull()
     }

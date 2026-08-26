@@ -94,7 +94,7 @@ function midnightEvents(
   s: WorldState,
   day: number,
   config = DEFAULT_CONFIG,
-): Array<{ type: string; payload: unknown }> {
+): { type: string; payload: unknown }[] {
   const tick = day * MINUTES_PER_DAY
   const advanced = fold({ ...s, tick: tick - 1 }, ev('tick_advanced', {}, tick), config)
   return createWorldTick(

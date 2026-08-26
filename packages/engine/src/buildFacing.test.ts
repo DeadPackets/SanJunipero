@@ -21,7 +21,7 @@ const BUILDER = 'b1'
 
 let seq = 50_000
 const ev = (type: string, payload: unknown) => ({ seq: seq++, tick: 1, type, payload })
-const apply = (s: WorldState, events: Array<{ type: string; payload: unknown }>): WorldState =>
+const apply = (s: WorldState, events: { type: string; payload: unknown }[]): WorldState =>
   events.reduce((acc, e) => fold(acc, ev(e.type, e.payload) as never, CFG), s)
 
 /** A genesis world with one builder standing in the square and planks enough for the town. */
@@ -124,15 +124,15 @@ describe('★ an agent-built house knows which way it faces', () => {
     const r = submitIntent(at, CFG, BUILDER, 'build', { kind: 'house' })
     expect(r.ok, r.ok ? '' : r.reason).toBe(true)
     const planned = (
-      r as { events: Array<{ type: string; payload: Record<string, unknown> }> }
+      r as { events: { type: string; payload: Record<string, unknown> }[] }
     ).events.find((e) => e.type === 'structure_planned')!
     expect(
       Object.keys(planned.payload),
       'a facing was written for a house that is not turned',
     ).not.toContain('facing')
     expect(
-      apply(at, (r as { events: Array<{ type: string; payload: unknown }> }).events).structures[
-        String(planned.payload['id'])
+      apply(at, (r as { events: { type: string; payload: unknown }[] }).events).structures[
+        String(planned.payload.id)
       ]!.facing,
     ).toBeUndefined()
   })
@@ -146,7 +146,7 @@ describe('★ an agent-built house knows which way it faces', () => {
     }
     const r = submitIntent(at, CFG, BUILDER, 'build', { kind: 'house' })
     const planned = (
-      r as { events: Array<{ type: string; payload: Record<string, unknown> }> }
+      r as { events: { type: string; payload: Record<string, unknown> }[] }
     ).events.find((e) => e.type === 'structure_planned')!
     for (const bad of ['ne', 'nw', 'north', '']) {
       expect(

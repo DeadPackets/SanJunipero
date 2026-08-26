@@ -168,7 +168,7 @@ export class MemoryStore {
   factsAbout(subject: string): FactRow[] {
     const rows = this.db
       .prepare('SELECT * FROM facts WHERE agent_id = ? AND subject = ? ORDER BY id')
-      .all(this.agentId, subject) as Array<{
+      .all(this.agentId, subject) as {
       id: number
       agent_id: string
       day: number
@@ -176,7 +176,7 @@ export class MemoryStore {
       predicate: string
       object: string
       src_memory_id: number
-    }>
+    }[]
     return rows.map((r) => ({
       id: r.id,
       agentId: r.agent_id,
@@ -235,7 +235,7 @@ export class MemoryStore {
       day === undefined ? '' : ' AND day = ?'
     } ORDER BY id`
     const params = day === undefined ? [this.agentId, level] : [this.agentId, level, day]
-    const rows = this.db.prepare(sql).all(...params) as Array<{
+    const rows = this.db.prepare(sql).all(...params) as {
       id: number
       agent_id: string
       level: SummaryLevel
@@ -244,7 +244,7 @@ export class MemoryStore {
       text: string
       child_ids: string
       memory_ids: string
-    }>
+    }[]
     return rows.map((r) => ({
       id: r.id,
       agentId: r.agent_id,
@@ -264,10 +264,10 @@ export class MemoryStore {
     return Number(res.lastInsertRowid)
   }
 
-  journalEntries(): Array<{ tick: number; day: number; text: string }> {
+  journalEntries(): { tick: number; day: number; text: string }[] {
     return this.db
       .prepare('SELECT tick, day, text FROM journal WHERE agent_id = ? ORDER BY id')
-      .all(this.agentId) as Array<{ tick: number; day: number; text: string }>
+      .all(this.agentId) as { tick: number; day: number; text: string }[]
   }
 
   appendAutobiography(day: number, paragraph: string): void {
@@ -279,7 +279,7 @@ export class MemoryStore {
   autobiography(): string[] {
     const rows = this.db
       .prepare('SELECT paragraph FROM autobiography WHERE agent_id = ? ORDER BY id')
-      .all(this.agentId) as Array<{ paragraph: string }>
+      .all(this.agentId) as { paragraph: string }[]
     return rows.map((r) => r.paragraph)
   }
 

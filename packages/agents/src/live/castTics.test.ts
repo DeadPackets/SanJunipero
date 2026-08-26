@@ -125,16 +125,16 @@ const cards = (): Card[] => {
     const rel = path.relative(PACKAGES, file)
 
     for (const m of src.matchAll(/(?<![A-Za-z0-9_$])voice\s*\(/g)) {
-      const open = m.index! + m[0].length - 1
+      const open = m.index + m[0].length - 1
       // `function voice(` and `const voice = (` are the helper's definition, not a cast.
-      if (/(?:function|=)\s*$/.test(src.slice(Math.max(0, m.index! - 12), m.index!))) continue
+      if (/(?:function|=)\s*$/.test(src.slice(Math.max(0, m.index - 12), m.index))) continue
       const a = args(span(src, open))
       if (a.length < 5 || !a[2]!.startsWith('[') || !a[4]!.startsWith('[')) continue
       found.push({ file: rel, tics: entries(a[2]!), exampleLines: entries(a[4]!) })
     }
 
     for (const m of src.matchAll(/\btics\s*:\s*\[/g)) {
-      const open = m.index! + m[0].length - 1
+      const open = m.index + m[0].length - 1
       const ticsSpan = span(src, open)
       const rest = src.slice(open + ticsSpan.length)
       const ex = /\bexampleLines\s*:\s*\[/.exec(rest.split(/\btics\s*:/)[0] ?? '')

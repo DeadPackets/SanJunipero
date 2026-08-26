@@ -38,9 +38,7 @@ function openAgentFixtureDb(path: string): Database.Database {
   return db
 }
 
-const GRASS: TileId[][] = Array.from({ length: 24 }, () =>
-  Array.from({ length: 24 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0))
 
 describe('observer data apis', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-gwapi-'))

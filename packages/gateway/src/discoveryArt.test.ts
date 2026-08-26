@@ -113,7 +113,9 @@ describe('the watcher', () => {
       codex: stubCodex([]),
       onError: (k) => seen.push(k),
     })
-    expect(() => w.onDiscovery({ name: 'x', makes: ['waterskin'] })).not.toThrow()
+    expect(() => {
+      w.onDiscovery({ name: 'x', makes: ['waterskin'] })
+    }).not.toThrow()
     await w.settle()
     expect(seen).toEqual(['waterskin'])
   })
@@ -135,7 +137,9 @@ describe('the watcher', () => {
 describe('the watcher that draws nothing', () => {
   it('accepts a discovery, commissions nothing, and settles', async () => {
     const w = noDiscoveryArt()
-    expect(() => w.onDiscovery({ name: 'stitch a waterskin', makes: ['waterskin'] })).not.toThrow()
+    expect(() => {
+      w.onDiscovery({ name: 'stitch a waterskin', makes: ['waterskin'] })
+    }).not.toThrow()
     await expect(w.settle()).resolves.toBeUndefined()
   })
 

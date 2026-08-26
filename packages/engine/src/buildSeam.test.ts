@@ -44,13 +44,10 @@ import { builtBox, owedBox } from './systems/mapGrowth.js'
 const CFG = DEFAULT_CONFIG
 const T_FOREST = 3
 let seq = 0
-const ev = (type: string, payload: unknown): SimEvent =>
-  ({ seq: ++seq, tick: 0, type, payload }) as unknown as SimEvent
+const ev = (type: string, payload: unknown): SimEvent => ({ seq: ++seq, tick: 0, type, payload })
 
-const apply = (
-  s: WorldState,
-  events: ReadonlyArray<{ type: string; payload: unknown }>,
-): WorldState => events.reduce((acc, e) => fold(acc, ev(e.type, e.payload), CFG), s)
+const apply = (s: WorldState, events: readonly { type: string; payload: unknown }[]): WorldState =>
+  events.reduce((acc, e) => fold(acc, ev(e.type, e.payload), CFG), s)
 
 function genesisTown(): WorldState {
   const g = makeGenesisWorld(CFG)
@@ -485,7 +482,7 @@ describe('★ a block is laid out when its first building is raised', () => {
     const s = genesisTown()
     const lay = layBlock(s, TOWN_SQUARE, { i: 2, j: 0 })
     expect(lay).not.toBe('off the map')
-    const changes = lay as Array<{ from: number; reason: string }>
+    const changes = lay as { from: number; reason: string }[]
     expect(
       changes.filter((c) => c.reason === 'levelled' && c.from === T_FOREST).length,
     ).toBeGreaterThan(200)
@@ -594,16 +591,11 @@ describe('★ help must help — what a second pair of hands buys the calendar',
 
   const foldWith = (
     s: WorldState,
-    events: ReadonlyArray<{ type: string; payload: unknown }>,
+    events: readonly { type: string; payload: unknown }[],
     tick = 0,
   ): WorldState =>
     events.reduce(
-      (acc, e) =>
-        fold(
-          acc,
-          { seq: ++seq, tick, type: e.type, payload: e.payload } as unknown as SimEvent,
-          FAST,
-        ),
+      (acc, e) => fold(acc, { seq: ++seq, tick, type: e.type, payload: e.payload }, FAST),
       s,
     )
 

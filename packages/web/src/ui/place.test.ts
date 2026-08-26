@@ -24,7 +24,7 @@ function world(
   over: {
     terrain?: TileId[][]
     structures?: Structure[]
-    agents?: Array<Partial<{ id: string; name: string; x: number; y: number; insideId: string }>>
+    agents?: Partial<{ id: string; name: string; x: number; y: number; insideId: string }>[]
   } = {},
 ): WorldState {
   const structures: Record<string, Structure> = {}

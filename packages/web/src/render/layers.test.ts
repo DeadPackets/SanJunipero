@@ -30,8 +30,8 @@ const { bigTown } = await import('./bigTown.js')
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB_SRC = join(HERE, '..')
 
-function sourcesUnder(dir: string): Array<{ path: string; source: string }> {
-  const out: Array<{ path: string; source: string }> = []
+function sourcesUnder(dir: string): { path: string; source: string }[] {
+  const out: { path: string; source: string }[] = []
   for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) {
@@ -47,7 +47,7 @@ function sourcesUnder(dir: string): Array<{ path: string; source: string }> {
 describe('createLayers', () => {
   it('adds exactly the eight layers, in the order they paint', () => {
     const world = new MockContainer()
-    const set = createLayers(world as never)
+    const set = createLayers(world)
     expect(world.children).toHaveLength(8)
     expect(LAYERS).toEqual([
       'ground',
@@ -63,7 +63,7 @@ describe('createLayers', () => {
   })
 
   it('depth-sorts ONE layer and no other', () => {
-    const set = createLayers(new MockContainer() as never)
+    const set = createLayers(new MockContainer())
     const sorted = LAYERS.filter(
       (n) => (set[n] as unknown as { sortableChildren: boolean }).sortableChildren,
     )
@@ -72,7 +72,7 @@ describe('createLayers', () => {
   })
 
   it('leaves only the sorted layer able to take a pointer', () => {
-    const set = createLayers(new MockContainer() as never)
+    const set = createLayers(new MockContainer())
     for (const name of LAYERS) {
       const mode = (set[name] as unknown as { eventMode: string }).eventMode
       expect(mode, name).toBe(name === SORTED_LAYER ? '' : 'none')
@@ -80,7 +80,7 @@ describe('createLayers', () => {
   })
 
   it('hands back a distinct container per layer', () => {
-    const set = createLayers(new MockContainer() as never)
+    const set = createLayers(new MockContainer())
     expect(new Set(LAYERS.map((n) => set[n])).size).toBe(LAYERS.length)
   })
 })

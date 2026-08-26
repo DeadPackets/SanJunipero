@@ -39,7 +39,7 @@ function sheetPx(selector: string): number {
 }
 
 /** Every caption the broadcast frame renders, resolved to a source size in px. */
-function measured(captions: readonly BroadcastCaption[]): Array<{ what: string; px: number }> {
+function measured(captions: readonly BroadcastCaption[]): { what: string; px: number }[] {
   return captions.map((c) => ({
     what: c.what,
     px: c.from === 'canvas' ? c.px : sheetPx(c.selector),

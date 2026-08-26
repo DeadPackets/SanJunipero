@@ -87,7 +87,7 @@ function presenceOf(ev: SimEvent): Presence | null {
 const near = (a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
   Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= ANCHOR_CELL
 
-const centroid = (ps: Array<{ x: number; y: number }>): { x: number; y: number } => ({
+const centroid = (ps: { x: number; y: number }[]): { x: number; y: number } => ({
   x: Math.round(ps.reduce((t, p) => t + p.x, 0) / ps.length),
   y: Math.round(ps.reduce((t, p) => t + p.y, 0) / ps.length),
 })
@@ -95,7 +95,7 @@ const centroid = (ps: Array<{ x: number; y: number }>): { x: number; y: number }
 // Greedy clustering seeded in the given order, so the same input always yields the same
 // groups. A grid would put two bodies standing side by side in different cells.
 function clusterBy<T extends { x: number; y: number }>(items: T[]): T[][] {
-  const clusters: Array<{ seed: { x: number; y: number }; items: T[] }> = []
+  const clusters: { seed: { x: number; y: number }; items: T[] }[] = []
   for (const item of items) {
     const hit = clusters.find((c) => near(c.seed, item))
     if (hit === undefined) clusters.push({ seed: { x: item.x, y: item.y }, items: [item] })

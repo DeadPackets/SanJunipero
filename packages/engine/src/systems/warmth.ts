@@ -63,7 +63,7 @@ export function warmthTargetFor(state: WorldState, config: SimConfig, agentId: s
 export function isExposed(state: WorldState, config: SimConfig, agentId: string): boolean {
   if (!config.warmth.enabled) return false
   const a = state.agents[agentId]
-  if (a === undefined || !a.alive) return false
+  if (!a?.alive) return false
   if (a.insideId !== undefined) return false
   if (
     ambientTempAt(state, config) + insulationOf(state, config, agentId) >=

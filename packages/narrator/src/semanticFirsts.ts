@@ -228,7 +228,7 @@ export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Mile
     }
 
     const source = findRecord(deps.records, hit)
-    if (source === undefined || !source.text.includes(hit.quote)) {
+    if (!source?.text.includes(hit.quote)) {
       void_('quote_not_in_source')
       continue
     }
@@ -248,7 +248,7 @@ export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Mile
         continue
       }
       const inner = findInner(deps.records, hit)
-      if (inner === undefined || !inner.text.includes(hit.quote2)) {
+      if (!inner?.text.includes(hit.quote2)) {
         void_('inner_quote_not_in_source')
         continue
       }

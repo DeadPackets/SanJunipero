@@ -450,7 +450,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   }
   const tags = createTooltipLayer(layers, viewRect, () => world.scale.x)
 
-  const tileCbs: Array<(t: { x: number; y: number }) => void> = []
+  const tileCbs: ((t: { x: number; y: number }) => void)[] = []
 
   // The depth sort has ONE owner and runs ONCE a frame over the whole live set. Modules
   // publish the ground they stand on; nobody publishes an opinion about who is in front.
@@ -471,7 +471,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   // ground that exists UNION the town as drawn — a building can stand past the tile array.
   let bounds: CameraBounds = cameraBoundsOf([])
 
-  const structureList = (): Array<{ x: number; y: number; w: number; h: number }> => {
+  const structureList = (): { x: number; y: number; w: number; h: number }[] => {
     const s = store.getState()
     return s === null ? [] : Object.values(s.structures)
   }
@@ -531,7 +531,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
 
   // smooth follow: eases the camera toward a moving world-space anchor each frame
   let followFn: (() => { x: number; y: number } | null) | null = null
-  const followEndCbs: Array<() => void> = []
+  const followEndCbs: (() => void)[] = []
   const breakFollow = (): void => {
     if (followFn === null) return
     followFn = null
@@ -552,7 +552,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   }
   app.ticker.add(followTick)
 
-  const cameraCbs: Array<() => void> = []
+  const cameraCbs: (() => void)[] = []
   const notifyCamera = (): void => {
     for (const cb of cameraCbs) cb()
   }
@@ -574,8 +574,9 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     zoom = zoomTo(zoom, stop, performance.now())
   }
 
-  const setZoom = (stop: ZoomStop): void =>
+  const setZoom = (stop: ZoomStop): void => {
     setZoomAt(stop, app.screen.width / 2, app.screen.height / 2)
+  }
 
   // The release lives here and not in `onWheel`, because the end of a gesture is the ABSENCE
   // of an event: nothing arrives to notice it, and the frame is the only thing still running.

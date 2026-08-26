@@ -426,7 +426,7 @@ describe('F-B — BOTH codification paths report their mint, and a third could n
       .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
       .map((f) => [f, readFileSync(new URL(f, dir), 'utf8')] as const)
 
-    const mints: Array<{ file: string; line: number; text: string }> = []
+    const mints: { file: string; line: number; text: string }[] = []
     for (const [file, src] of sources) {
       src.split('\n').forEach((text, i) => {
         if (/\brulebook\.insert\(/.test(text)) mints.push({ file, line: i + 1, text: text.trim() })

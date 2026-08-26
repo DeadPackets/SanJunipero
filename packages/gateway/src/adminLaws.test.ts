@@ -17,12 +17,10 @@ import {
 import { createLawsAdmin } from './adminLaws.js'
 import { createGateway, type Gateway } from './server.js'
 
-const GRASS: TileId[][] = Array.from({ length: 8 }, () =>
-  Array.from({ length: 8 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const TOKEN = 'a-shared-secret'
 
-type Submitted = Array<{ path: string; value: unknown }>
+type Submitted = { path: string; value: unknown }[]
 
 async function listen(server: Server, host = '127.0.0.1'): Promise<number> {
   return new Promise((resolve) => {
@@ -34,7 +32,11 @@ async function listen(server: Server, host = '127.0.0.1'): Promise<number> {
 }
 
 function shut(server: Server): Promise<void> {
-  return new Promise((resolve) => server.close(() => resolve()))
+  return new Promise((resolve) =>
+    server.close(() => {
+      resolve()
+    }),
+  )
 }
 
 async function post(
@@ -149,7 +151,7 @@ describe('createLawsAdmin (T25b)', () => {
 
 describe('laws in the viewer protocol (T25b)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-adminlaws-'))
-  const open: Array<WebSocket | Gateway> = []
+  const open: (WebSocket | Gateway)[] = []
   afterAll(async () => {
     for (const o of open) {
       if (o instanceof WebSocket) o.close()
@@ -161,12 +163,18 @@ describe('laws in the viewer protocol (T25b)', () => {
   function connect(port: number): Promise<WebSocket> {
     return new Promise((resolve, reject) => {
       const sock = new WebSocket(`ws://127.0.0.1:${port}/ws`)
-      sock.on('open', () => resolve(sock))
+      sock.on('open', () => {
+        resolve(sock)
+      })
       sock.on('error', reject)
     })
   }
   const nextRaw = (sock: WebSocket): Promise<string> =>
-    new Promise((resolve) => sock.once('message', (d) => resolve(d.toString())))
+    new Promise((resolve) =>
+      sock.once('message', (d) => {
+        resolve(d.toString())
+      }),
+    )
 
   async function hello(sock: WebSocket): Promise<string> {
     const first = nextRaw(sock)
@@ -178,7 +186,7 @@ describe('laws in the viewer protocol (T25b)', () => {
     const db = openDb(join(dir, 'laws.db'))
     const store = new EventStore(db)
     const rng = new RngStreams('admin-laws')
-    const laws: Array<{ path: string; value: unknown }> = []
+    const laws: { path: string; value: unknown }[] = []
     const worldTick = createWorldTick(DEFAULT_CONFIG, rng, laws)
     const loop = new TickLoop({
       store,

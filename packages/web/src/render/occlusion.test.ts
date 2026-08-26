@@ -81,7 +81,9 @@ function sweep(judge: (s: DepthBox, i: number, tile: { x: number; y: number }) =
   return { decided, disagreements: out }
 }
 
-beforeEach(() => resetDepthFallbacks())
+beforeEach(() => {
+  resetDepthFallbacks()
+})
 
 describe('the walk-around, on the eleven buildings of the real town', () => {
   it('is the real town — eleven buildings, five of them owned', () => {

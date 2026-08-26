@@ -185,7 +185,7 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
         failed(e)
         return
       }
-      if (encoded.size >= MAX_ENCODED) encoded.delete(encoded.keys().next().value as string)
+      if (encoded.size >= MAX_ENCODED) encoded.delete(encoded.keys().next().value!)
       encoded.set(key, p)
     }
     void p.then(then, failed)
@@ -203,7 +203,9 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
       res,
       `placeholder:${klass}`,
       () => makePlaceholder(klass as AssetClass, size),
-      (buf) => sendPng(res, buf),
+      (buf) => {
+        sendPng(res, buf)
+      },
     )
   })
 
@@ -231,14 +233,18 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
       res,
       `character:${agentId}`,
       () => buildPlaceholderSheet(agentId),
-      (buf) => sendPng(res, buf),
+      (buf) => {
+        sendPng(res, buf)
+      },
     )
   })
 
   router.route('GET', '/assets/:file', (_req, res, params) => {
     const file = params.file ?? ''
     if (file === 'emotes.png') {
-      onceEncoded(res, 'emotes', buildEmoteAtlas, (buf) => sendPng(res, buf))
+      onceEncoded(res, 'emotes', buildEmoteAtlas, (buf) => {
+        sendPng(res, buf)
+      })
       return
     }
     if (file === 'emotes.json') {

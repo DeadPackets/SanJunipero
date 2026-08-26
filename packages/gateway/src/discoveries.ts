@@ -16,7 +16,7 @@ export function readDiscoveries(
 ): DiscoveryRecord[] {
   const rows = db
     .prepare('SELECT seq, tick, payload FROM events WHERE type = ? ORDER BY tick, seq')
-    .all(DISCOVERY_EVENT) as Array<{ seq: number; tick: number; payload: string }>
+    .all(DISCOVERY_EVENT) as { seq: number; tick: number; payload: string }[]
   const out: DiscoveryRecord[] = []
   for (const r of rows) {
     const p = JSON.parse(r.payload) as Record<string, unknown>
@@ -50,13 +50,13 @@ export function readDiscoveries(
 
 export function mountDiscoveryApi(router: Router, deps: DiscoveryApiDeps): void {
   const cache = makeSeqCache(() => deps.mirror.seq())
-  router.route('GET', '/api/discoveries', (_req: IncomingMessage, res: ServerResponse) =>
+  router.route('GET', '/api/discoveries', (_req: IncomingMessage, res: ServerResponse) => {
     sendPrebuilt(
       res,
       cache.json('discoveries', () => {
         const state = deps.mirror.state()
         return { discoveries: readDiscoveries(deps.db, (id) => state.agents[id]?.name ?? id) }
       }),
-    ),
-  )
+    )
+  })
 }

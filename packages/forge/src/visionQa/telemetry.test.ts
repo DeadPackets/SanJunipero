@@ -88,12 +88,13 @@ describe('recordVerdict', () => {
 
 describe('passRates', () => {
   beforeEach(() => {
-    const rec = (id: string, klass: string, score: number, attempt: number) =>
+    const rec = (id: string, klass: string, score: number, attempt: number) => {
       recordVerdict(db, verdictAt(id, score, attempt), {
         assetClass: klass,
         attempt,
         costUsd: 0.0025,
       })
+    }
     rec('a1', 'building', 9, 1) // first-pass
     rec('a2', 'building', 4, 1)
     rec('a2', 'building', 5, 2)

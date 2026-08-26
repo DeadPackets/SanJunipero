@@ -81,7 +81,7 @@ export class RulingsStore {
     return row ? toRulingRow(row) : null
   }
 
-  async similar(query: string, k = 5): Promise<Array<{ ruling: RulingRow; cosine: number }>> {
+  async similar(query: string, k = 5): Promise<{ ruling: RulingRow; cosine: number }[]> {
     const db = this.db
     const ids = new Set<number>()
     const cosineById = new Map<number, number>()
@@ -95,7 +95,7 @@ export class RulingsStore {
          FROM rulings_vec
          WHERE embedding MATCH ? AND k = ?`,
       )
-      .all(qbuf, VEC_POOL) as Array<{ id: number; dist: number }>
+      .all(qbuf, VEC_POOL) as { id: number; dist: number }[]
     for (const r of knn) {
       ids.add(r.id)
       // embeddings are L2-normalized: cosine = 1 − dist²/2
@@ -113,11 +113,11 @@ export class RulingsStore {
            ORDER BY bm25(rulings_fts)
            LIMIT ?`,
         )
-        .all(matchExpr, FTS_POOL) as Array<{ id: number }>
+        .all(matchExpr, FTS_POOL) as { id: number }[]
       for (const r of fts) ids.add(r.id)
     }
 
-    const results: Array<{ ruling: RulingRow; cosine: number }> = []
+    const results: { ruling: RulingRow; cosine: number }[] = []
     for (const id of ids) {
       const ruling = this.get(id)
       if (!ruling) continue

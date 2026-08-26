@@ -15,7 +15,7 @@ import { ROAD_TILE_ID, TILE_KIND, roadNeighborsAt, tileKind } from './tileset.js
 // First id wins: C11's path/sapling/channel (8/9/10) alias onto earth/forest/water, and a
 // later duplicate would hand the kind its alias's palette colour instead of its own.
 const ID_OF_KIND = new Map<TerrainTileKind, TileId>()
-for (const [id, k] of Object.entries(TILE_KIND) as Array<[string, TerrainTileKind]>) {
+for (const [id, k] of Object.entries(TILE_KIND)) {
   if (!ID_OF_KIND.has(k)) ID_OF_KIND.set(k, Number(id) as TileId)
 }
 
@@ -362,7 +362,7 @@ export function materialTone(url: string, sample: ImageLike): number {
 }
 
 // each arm's two corner vertices, and the neighbouring direction that shares that edge
-const ARM_SIDES: Record<ArmDir, ReadonlyArray<{ v: readonly [number, number]; shared: ArmDir }>> = {
+const ARM_SIDES: Record<ArmDir, readonly { v: readonly [number, number]; shared: ArmDir }[]> = {
   n: [
     { v: [-0.5, -0.5], shared: 'w' },
     { v: [0.5, -0.5], shared: 'e' },
@@ -389,17 +389,17 @@ const lerp2 = (
 
 /** Every exposed rim wedge, as [outer edge a, corner, tapered corner, tapered a]. The two
  *  colour bands are cut out of these, so the SHOULDER_T rule has exactly one definition. */
-function shoulderWedges(key: RoadAutotileKey): Array<{
+function shoulderWedges(key: RoadAutotileKey): {
   a: readonly [number, number]
   v: readonly [number, number]
   other: readonly [number, number]
-}> {
+}[] {
   const arms = roadArms(key)
-  const out: Array<{
+  const out: {
     a: readonly [number, number]
     v: readonly [number, number]
     other: readonly [number, number]
-  }> = []
+  }[] = []
   for (const dir of Object.keys(ARM_DIRS) as ArmDir[]) {
     if (!arms[dir]) continue
     const sides = ARM_SIDES[dir]
@@ -446,7 +446,7 @@ export function roadRibbonPolys(key: RoadAutotileKey): number[][] {
     [...toScreen(-c, -c), ...toScreen(c, -c), ...toScreen(c, c), ...toScreen(-c, c)],
   ]
   // each arm is the quadrant it points into: |v| >= |u| for n/s, |u| >= |v| for e/w
-  const QUADRANT: Record<ArmDir, ReadonlyArray<readonly [number, number]>> = {
+  const QUADRANT: Record<ArmDir, readonly (readonly [number, number])[]> = {
     n: [
       [0, 0],
       [-0.5, -0.5],

@@ -19,7 +19,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 
 function makeWorld(
   config = CFG,
-  agents: Array<{ id: string; x: number; y: number }> = [
+  agents: { id: string; x: number; y: number }[] = [
     { id: 'a1', x: 0, y: 0 },
     { id: 'a2', x: 1, y: 0 },
   ],
@@ -45,7 +45,7 @@ function patchAgent(
 }
 function applyAll(
   s: WorldState,
-  events: Array<{ type: string; payload: unknown }>,
+  events: { type: string; payload: unknown }[],
   config = CFG,
   tick = s.tick,
 ): WorldState {
@@ -161,7 +161,7 @@ describe('verb: give', () => {
       { id: 'a1', x: 0, y: 0 },
       { id: 'a2', x: 5, y: 5 },
     ])
-    let s = fold(
+    const s = fold(
       far,
       ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' } }),
       CFG,
@@ -272,7 +272,7 @@ describe('verbs: write + read', () => {
 
     const rr = submitIntent(res.state, CFG, 'a1', 'read', { itemId: note.id })
     if (!rr.ok) throw new Error(rr.reason)
-    let s2 = applyAll(res.state, rr.events)
+    const s2 = applyAll(res.state, rr.events)
     const res2 = tickOnce(s2)
     const completed = res2.events.find((e) => e.type === 'action_completed')
     expect((completed?.payload as { results?: unknown })?.results).toEqual({

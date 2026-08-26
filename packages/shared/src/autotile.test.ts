@@ -11,7 +11,7 @@ import {
 const F = false,
   T = true
 // 16 explicit rows — the expectation is authored, never computed from the implementation.
-const TABLE: Array<[RoadNeighbors, string]> = [
+const TABLE: [RoadNeighbors, string][] = [
   [{ n: F, e: F, s: F, w: F }, 'cap-s'], // isolated (deviation 3)
   [{ n: T, e: F, s: F, w: F }, 'cap-n'],
   [{ n: F, e: T, s: F, w: F }, 'cap-e'],

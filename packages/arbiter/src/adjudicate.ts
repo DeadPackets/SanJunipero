@@ -85,12 +85,12 @@ export type AgentCtx = {
   agentId: string
   name: string
   skills: Record<string, number>
-  inventory: Array<{ kind: string; qty: number }>
+  inventory: { kind: string; qty: number }[]
   position: { x: number; y: number }
   // What the asker can see. Absent from a caller that projects no world — and then the
   // arbiter judges as it always did, on the asker alone.
   visible?: {
-    structures: Array<{ kind: string; x: number; y: number }>
+    structures: { kind: string; x: number; y: number }[]
     ground: string[]
   }
   // The asker's own sentence behind the ask. Threaded to the prompt, never to a precedent key.

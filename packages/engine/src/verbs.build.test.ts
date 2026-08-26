@@ -38,7 +38,7 @@ function makeWorld(config = CFG, wood = 10): WorldState {
 }
 function applyAll(
   s: WorldState,
-  events: Array<{ type: string; payload: unknown }>,
+  events: { type: string; payload: unknown }[],
   config = CFG,
 ): WorldState {
   for (const e of events) s = fold(s, ev(e.type, e.payload, s.tick), config)

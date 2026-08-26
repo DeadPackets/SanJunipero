@@ -45,7 +45,9 @@ import {
 import { townStructuresFor } from './founders.js'
 
 const dir = mkdtempSync(join(tmpdir(), 'sj-ingest-'))
-afterAll(() => rmSync(dir, { recursive: true, force: true }))
+afterAll(() => {
+  rmSync(dir, { recursive: true, force: true })
+})
 
 describe('ingestProductionArt', () => {
   it('registers every committed cell and every committed sheet, idempotently', async () => {

@@ -92,7 +92,7 @@ describe('expandReducer — one row open, and never a state shaped like nothing'
 describe('expanding never removes the way back, because the list never goes away', () => {
   const state: WorldState = {
     tick: 0,
-    terrain: Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0 as TileId)),
+    terrain: Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0)),
     weather: { kind: 'sunny', temperatureC: 12 },
     agents: Object.fromEntries(
       IDS.map((id, i) => [
@@ -115,7 +115,7 @@ describe('expanding never removes the way back, because the list never goes away
           zeroHungerSinceTick: null,
         },
       ]),
-    ) as WorldState['agents'],
+    ),
     structures: {},
     items: {},
     crops: {},
@@ -201,7 +201,7 @@ describe('becomingOf on a day-0 person', () => {
   })
 
   it('★ each line says THIS PERSON has not done it — never that the town has not started', () => {
-    for (const k of Object.keys(SECTION_EMPTY) as Array<keyof typeof SECTION_EMPTY>) {
+    for (const k of Object.keys(SECTION_EMPTY) as (keyof typeof SECTION_EMPTY)[]) {
       const line = SECTION_EMPTY[k]
       expect(line, k).toMatch(/\bthey\b/i)
       expect(line, k).not.toMatch(/the town has|nothing has happened|no one walks|not started/i)
@@ -324,9 +324,9 @@ describe('actsOf — what they DID, from the log and nowhere else', () => {
   it('reads the bond history and the live feed, and nobody else’s acts', () => {
     const bonds = api([bond('amara', 'nadia', 'owe', [at(10, 'owe')])])
     const events: SimEvent[] = [
-      { seq: 1, tick: 20, type: 'crop_harvested', payload: { agentId: 'amara' } } as SimEvent,
-      { seq: 2, tick: 21, type: 'crop_harvested', payload: { agentId: 'yusuf' } } as SimEvent,
-      { seq: 3, tick: 22, type: 'weather_changed', payload: { agentId: 'amara' } } as SimEvent,
+      { seq: 1, tick: 20, type: 'crop_harvested', payload: { agentId: 'amara' } },
+      { seq: 2, tick: 21, type: 'crop_harvested', payload: { agentId: 'yusuf' } },
+      { seq: 3, tick: 22, type: 'weather_changed', payload: { agentId: 'amara' } },
     ]
     const acts = actsOf('amara', bonds, events)
     expect(acts.map((a) => a.words).sort()).toEqual(['brought a harvest in', 'gave something away'])

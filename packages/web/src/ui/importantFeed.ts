@@ -25,7 +25,7 @@ export function chronicleLabel(ev: SimEvent, state: WorldState | null): string |
 // shape and colour would belong to the reader's font rather than to the town.
 export type ChronicleGlyph = {
   label: string
-  pixels: ReadonlyArray<readonly [number, number, string]>
+  pixels: readonly (readonly [number, number, string])[]
 }
 
 const INK = '#43394A',
@@ -42,8 +42,8 @@ export const GLYPH_PALETTE: readonly string[] = [INK, EMBER, HONEY, SAGE, ROSE, 
 
 const px = (
   fill: string,
-  ...cells: ReadonlyArray<readonly [number, number]>
-): Array<readonly [number, number, string]> => cells.map(([x, y]) => [x, y, fill] as const)
+  ...cells: readonly (readonly [number, number])[]
+): (readonly [number, number, string])[] => cells.map(([x, y]) => [x, y, fill] as const)
 
 export const CHRONICLE_GLYPH: Record<string, ChronicleGlyph> = {
   cross: {

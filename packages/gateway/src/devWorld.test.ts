@@ -84,7 +84,9 @@ describe('★ the fixture world must be asked for by name, never received by sil
 
 describe('dev world server', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-devworld-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('serves the founders town live with observer thoughts', async () => {
     const dw = await startDevWorld({ realMsPerTick: 1, port: 0, dbPath: join(dir, 'dev.db') })
@@ -111,7 +113,7 @@ describe('dev world server', () => {
       }
       // the five founders by name, the six approved buildings complete on day 0
       expect(Object.keys(state.agents).sort()).toEqual(['amara', 'nadia', 'omar', 'salma', 'yusuf'])
-      expect(state.agents['omar']?.name).toBe('Omar')
+      expect(state.agents.omar?.name).toBe('Omar')
       const kinds = Object.values(state.structures)
         .map((s) => s.kind)
         .sort()

@@ -91,12 +91,12 @@ export function stepCostAt(
   ctx?: PathCtx,
 ): number {
   if (onDeck(state, x, y, ctx)) return config.pathing.roadCost
-  return (ctx?.cost ?? terrainCostFor(config))[state.terrain[y]![x]!]!
+  return (ctx?.cost ?? terrainCostFor(config))[state.terrain[y]![x]!]
 }
 
 // Neighbor order + comparator prefer lower y then lower x: deterministic ties under a Manhattan heuristic.
 // Movement is 4-directional so a path can't cut corners; canStep enforces that invariant for any step.
-const NEIGHBORS: ReadonlyArray<readonly [number, number]> = [
+const NEIGHBORS: readonly (readonly [number, number])[] = [
   [0, -1],
   [-1, 0],
   [1, 0],
@@ -127,10 +127,10 @@ type Node = { x: number; y: number; g: number; h: number; f: number; parent: Nod
 
 // A finished search and one that ran out of budget are both walkable answers; only the second is
 // a lie about where the walking ends, and `capped` is the bit that tells them apart.
-export type PathSearch = { path: Array<[number, number]>; capped: boolean }
+export type PathSearch = { path: [number, number][]; capped: boolean }
 
-function pathTo(node: Node): Array<[number, number]> {
-  const path: Array<[number, number]> = []
+function pathTo(node: Node): [number, number][] {
+  const path: [number, number][] = []
   for (let n: Node | null = node; n && n.parent; n = n.parent) path.push([n.x, n.y])
   return path.reverse()
 }
@@ -229,6 +229,6 @@ export function findPath(
   from: Point,
   to: Point,
   config: SimConfig = DEFAULT_CONFIG,
-): Array<[number, number]> | null {
+): [number, number][] | null {
   return searchPath(state, from, to, config)?.path ?? null
 }

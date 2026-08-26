@@ -7,13 +7,11 @@ import { PersonalityEditSchema, type PersonalityDoc, type PersonalityStore } fro
 export type ReflectionLlm = {
   extractFacts(
     dayMemories: MemoryRow[],
-  ): Promise<Array<{ subject: string; predicate: string; object: string; srcMemoryId: number }>>
+  ): Promise<{ subject: string; predicate: string; object: string; srcMemoryId: number }[]>
   summarizeScenes(
     dayMemories: MemoryRow[],
-  ): Promise<Array<{ title: string; text: string; memoryIds: number[] }>>
-  summarizeDay(
-    scenes: Array<{ title: string; text: string }>,
-  ): Promise<{ title: string; text: string }>
+  ): Promise<{ title: string; text: string; memoryIds: number[] }[]>
+  summarizeDay(scenes: { title: string; text: string }[]): Promise<{ title: string; text: string }>
   updateLedger(personName: string, existing: string | null, relevant: MemoryRow[]): Promise<string>
   autobiographyParagraph(daySummary: string, doc: PersonalityDoc): Promise<string>
   proposeEdit(
@@ -193,7 +191,7 @@ type LlmPrompt = { system: string; messages: LlmMessage[] }
 
 function compactMemories(
   memories: MemoryRow[],
-): Array<{ id: number; text: string; importance: number; tags: MemoryRow['tags'] }> {
+): { id: number; text: string; importance: number; tags: MemoryRow['tags'] }[] {
   return memories.map((m) => ({ id: m.id, text: m.text, importance: m.importance, tags: m.tags }))
 }
 
@@ -232,7 +230,7 @@ export function summarizeScenesPrompt(dayMemories: MemoryRow[]): LlmPrompt {
   }
 }
 
-export function summarizeDayPrompt(scenes: Array<{ title: string; text: string }>): LlmPrompt {
+export function summarizeDayPrompt(scenes: { title: string; text: string }[]): LlmPrompt {
   return {
     system: [
       'Before sleep, you look back over the whole day.',

@@ -110,10 +110,10 @@ describe('makeGenesisWorld: the town', () => {
     const planned = events
       .filter((e) => e.type === 'structure_planned')
       .map((e) => e.payload as Payload)
-    const publics = planned.filter((p) => p['kind'] !== 'house')
+    const publics = planned.filter((p) => p.kind !== 'house')
     expect(publics.length).toBeGreaterThan(0)
     for (const p of publics) expect(Object.keys(p)).not.toContain('owner')
-    for (const p of planned) expect(p['builderId']).toBe(GENESIS_BUILDER_ID)
+    for (const p of planned) expect(p.builderId).toBe(GENESIS_BUILDER_ID)
   })
 
   // Two buildings still have their roofs and the other seven stand as walls three quarters up.
@@ -160,10 +160,10 @@ describe('makeGenesisWorld: the town', () => {
     const s = foldAll()
     const house = Object.values(s.structures).find((x) => x.kind === 'house')!
     expect({ w: house.w, h: house.h }).toEqual({ w: 2, h: 2 })
-    expect(house.maxHp).toBe(DEFAULT_CONFIG.structures.recipes['house']!.maxHp)
+    expect(house.maxHp).toBe(DEFAULT_CONFIG.structures.recipes.house!.maxHp)
     expect(house.flammable).toBe(true)
     const well = Object.values(s.structures).find((x) => x.kind === 'well')!
-    expect(well.maxHp).toBe(DEFAULT_CONFIG.structures.recipes['well']!.maxHp)
+    expect(well.maxHp).toBe(DEFAULT_CONFIG.structures.recipes.well!.maxHp)
     expect(well.flammable).toBe(false)
   })
 
@@ -230,7 +230,7 @@ describe('makeGenesisWorld: the town', () => {
   it('stamps spoilage on the food and on nothing else', () => {
     const s = foldAll()
     const bread = Object.values(s.items).find((i) => i.kind === 'bread')!
-    expect(bread.spoilage).toEqual({ spawnDay: 0, days: DEFAULT_CONFIG.spoilage.days['bread'] })
+    expect(bread.spoilage).toEqual({ spawnDay: 0, days: DEFAULT_CONFIG.spoilage.days.bread })
     expect(Object.values(s.items).find((i) => i.kind === 'axe')!.spoilage).toBeUndefined()
   })
 
@@ -451,7 +451,7 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
         ...CFG.structures,
         recipes: {
           ...CFG.structures.recipes,
-          hut: { ...CFG.structures.recipes['cabin']!, inputs: {} },
+          hut: { ...CFG.structures.recipes.cabin!, inputs: {} },
         },
       },
     }
@@ -530,7 +530,7 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
         CFG,
       )
     }
-    expect([s.agents['walker']!.x, s.agents['walker']!.y]).toEqual([target.x, target.y])
+    expect([s.agents.walker!.x, s.agents.walker!.y]).toEqual([target.x, target.y])
 
     /** Run a verb to completion the way the tick loop would, and refuse to guess. */
     const apply = (verb: string, params: Record<string, unknown>): void => {
@@ -553,7 +553,7 @@ describe('★ a fire indoors that a body can walk to, on the morning of day one'
     }
 
     apply('enter', { structureId: room.id })
-    expect(s.agents['walker']!.insideId).toBe(room.id)
+    expect(s.agents.walker!.insideId).toBe(room.id)
 
     // Indoors and cold: the roof alone buys a body nothing against the air, which is exactly
     // why a roofed hearthless valley measured no hearth behaviour.

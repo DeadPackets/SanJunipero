@@ -128,9 +128,9 @@ describe('codex', () => {
 
   it('duplicate insert throws (PK)', () => {
     const store = seededStore()
-    expect(() =>
-      store.insert({ id: 'fire', era: 'handwork', name: 'Fire again', prerequisiteId: null }),
-    ).toThrow(/UNIQUE constraint failed/)
+    expect(() => {
+      store.insert({ id: 'fire', era: 'handwork', name: 'Fire again', prerequisiteId: null })
+    }).toThrow(/UNIQUE constraint failed/)
   })
 })
 

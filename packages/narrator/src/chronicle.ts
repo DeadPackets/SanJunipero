@@ -14,8 +14,8 @@ export const NARRATOR_VOCABULARY_NOTES = [
 ].join(' ')
 
 // Who actually sat with whom, off the ledger. The chapter may credit care only from this.
-export function creditedCare(events: SimEvent[]): Array<{ patient: string; tender: string }> {
-  const out: Array<{ patient: string; tender: string }> = []
+export function creditedCare(events: SimEvent[]): { patient: string; tender: string }[] {
+  const out: { patient: string; tender: string }[] = []
   for (const ev of events) {
     if (ev.type !== 'agent_tended') continue
     const p = (ev.payload ?? {}) as { agentId?: unknown; tenderId?: unknown }
@@ -26,8 +26,8 @@ export function creditedCare(events: SimEvent[]): Array<{ patient: string; tende
 }
 
 // The hand a death was witnessed by — the payload's own `byId`, and nothing inferred.
-export function witnessedAttackers(events: SimEvent[]): Array<{ victim: string; byId: string }> {
-  const out: Array<{ victim: string; byId: string }> = []
+export function witnessedAttackers(events: SimEvent[]): { victim: string; byId: string }[] {
+  const out: { victim: string; byId: string }[] = []
   for (const ev of events) {
     if (ev.type !== 'agent_died') continue
     const p = (ev.payload ?? {}) as { agentId?: unknown; byId?: unknown }

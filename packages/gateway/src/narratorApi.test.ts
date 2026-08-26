@@ -33,9 +33,7 @@ function openNarratorFixtureDb(path: string): Database.Database {
   return db
 }
 
-const GRASS: TileId[][] = Array.from({ length: 24 }, () =>
-  Array.from({ length: 24 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0))
 
 function scriptedWorld(dbPath: string, withDiscoveries = true): Database.Database {
   const db = openDb(dbPath)
@@ -289,11 +287,11 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     expect(res.status).toBe(200)
     const body = (await res.json()) as {
       throughTick: number
-      chapters: Array<{ day: number; title: string }>
-      milestones: Array<{ label: string; day: number; tick: number }>
-      moments: Array<{ day: number; startTick: number }>
-      changes: Array<{ tick: number }>
-      events: Array<{ tick: number; type: string }>
+      chapters: { day: number; title: string }[]
+      milestones: { label: string; day: number; tick: number }[]
+      moments: { day: number; startTick: number }[]
+      changes: { tick: number }[]
+      events: { tick: number; type: string }[]
     }
     expect(body.throughTick).toBeGreaterThanOrEqual(60)
     expect(body.chapters).toEqual([
@@ -311,7 +309,7 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
 
   it('sends only the events the town would remember, and nothing else', async () => {
     const body = (await (await fetch(`${base}/api/timeline/marks`)).json()) as {
-      events: Array<{ tick: number; type: string }>
+      events: { tick: number; type: string }[]
     }
     expect(body.events).toEqual([
       { tick: 1, type: 'agent_spawned' },
@@ -374,12 +372,12 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
     const res = await fetch(`${base}/api/timeline/marks`)
     expect(res.status).toBe(200)
     const body = (await res.json()) as Record<string, unknown>
-    expect(body['chapters']).toEqual([])
-    expect(body['milestones']).toEqual([])
-    expect(body['moments']).toEqual([])
-    expect(body['changes']).toEqual([])
+    expect(body.chapters).toEqual([])
+    expect(body.milestones).toEqual([])
+    expect(body.moments).toEqual([])
+    expect(body.changes).toEqual([])
     // the world's own log survives the narrator's absence — those are the town's, not C7's
-    expect((body['events'] as unknown[]).length).toBeGreaterThan(0)
+    expect((body.events as unknown[]).length).toBeGreaterThan(0)
   })
 
   it('still keeps the chronicle — the events are the town’s, not the narrator’s', async () => {
@@ -443,7 +441,7 @@ describe('the scrub bar can aim at a discovery', () => {
 
   it('ships discoveries as their own source, with words already in them', async () => {
     const res = await fetch(`${base}/api/timeline/marks`)
-    const body = (await res.json()) as { discoveries?: Array<{ tick: number; words: string }> }
+    const body = (await res.json()) as { discoveries?: { tick: number; words: string }[] }
     expect(body.discoveries).toBeDefined()
     expect(body.discoveries).toEqual([
       { tick: 40, words: 'Alice worked out stitch a waterskin' },
@@ -453,7 +451,7 @@ describe('the scrub bar can aim at a discovery', () => {
 
   it('keeps the five event marks it already had, unchanged', async () => {
     const body = (await (await fetch(`${base}/api/timeline/marks`)).json()) as {
-      events: Array<{ type: string }>
+      events: { type: string }[]
     }
     expect(body.events.length).toBeGreaterThan(0)
     expect(new Set(body.events.map((e) => e.type))).not.toContain('discovery_made')
@@ -474,10 +472,10 @@ describe('the days a personality moved', () => {
   let base: string
   let loop: TickLoop
 
-  const changes = async (): Promise<Array<{ tick: number }>> =>
+  const changes = async (): Promise<{ tick: number }[]> =>
     (
       (await (await fetch(`${base}/api/timeline/marks`)).json()) as {
-        changes: Array<{ tick: number }>
+        changes: { tick: number }[]
       }
     ).changes
 

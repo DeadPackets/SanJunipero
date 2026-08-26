@@ -84,8 +84,8 @@ function world(ids: string[], config = CFG, box = HOUSE, opts: WorldOpts = {}): 
 
 type Midnight = {
   state: WorldState
-  events: Array<{ type: string; payload: unknown }>
-  coSlept: Array<{ type: string; payload: unknown }>
+  events: { type: string; payload: unknown }[]
+  coSlept: { type: string; payload: unknown }[]
 }
 
 function midnight(s: WorldState, day: number, config = CFG, seed = 'repro'): Midnight {

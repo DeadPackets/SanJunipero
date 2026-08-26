@@ -69,7 +69,7 @@ export function makeSeqCache(
       fresh()
       if (values.has(key)) return values.get(key) as T
       const v = build()
-      if (values.size >= MAX_VALUES) values.delete(values.keys().next().value as string)
+      if (values.size >= MAX_VALUES) values.delete(values.keys().next().value!)
       values.set(key, v)
       return v
     },

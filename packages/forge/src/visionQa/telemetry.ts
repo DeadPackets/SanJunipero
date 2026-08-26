@@ -34,12 +34,12 @@ export function passRates(
       max(CASE WHEN overall = 'pass' THEN 1 ELSE 0 END)                 AS any_pass,
       max(attempt)                                                      AS last_attempt
     FROM vision_qa ${where} GROUP BY asset_id`)
-    .all(...params) as Array<{
+    .all(...params) as {
     asset_id: string
     first_pass: number
     any_pass: number
     last_attempt: number
-  }>
+  }[]
 
   const n = rows.length
   if (n === 0) return { firstPass: 0, withinRetries: 0, blocked: 0, n: 0 } // the G13 threshold reads this

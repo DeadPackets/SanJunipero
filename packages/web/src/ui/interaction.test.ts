@@ -150,8 +150,8 @@ describe('lensFromKey', () => {
   })
 
   it('walks left and wraps at the start', () => {
-    expect(lensFromKey('ArrowLeft', LENSES[1]!)).toBe(LENSES[0])
-    expect(lensFromKey('ArrowLeft', LENSES[0]!)).toBe(LENSES[LENSES.length - 1])
+    expect(lensFromKey('ArrowLeft', LENSES[1])).toBe(LENSES[0])
+    expect(lensFromKey('ArrowLeft', LENSES[0])).toBe(LENSES[LENSES.length - 1])
   })
 
   it('ignores every other key', () => {

@@ -106,7 +106,9 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
       return { text: 'the day passes', usage: NO_USAGE }
     },
     totalCostUsd: () => 0,
-    alert: (kind: string, detail: string) => insertAlert(db, { agentId, kind, detail }),
+    alert: (kind: string, detail: string) => {
+      insertAlert(db, { agentId, kind, detail })
+    },
   } as unknown as LlmClient
 }
 
@@ -250,13 +252,13 @@ async function run(world: DevWorld, ticks: number): Promise<void> {
 }
 
 /** The world's own log, read back out of the db the way any other reader would. */
-function eventsOf(dir: string, type: string): Array<Record<string, unknown>> {
+function eventsOf(dir: string, type: string): Record<string, unknown>[] {
   const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
   try {
     return (
-      db.prepare('SELECT payload FROM events WHERE type = ? ORDER BY seq').all(type) as Array<{
+      db.prepare('SELECT payload FROM events WHERE type = ? ORDER BY seq').all(type) as {
         payload: string
-      }>
+      }[]
     ).map((r) => JSON.parse(r.payload) as Record<string, unknown>)
   } finally {
     db.close()
@@ -281,8 +283,8 @@ describe('★ THE SEAM — a served world whose bodies are driven by minds', () 
     expect(world.live).toBe(true)
     const spoke = eventsOf(dir, 'agent_spoke')
     expect(spoke.length).toBeGreaterThan(0)
-    expect(spoke.map((p) => p['text'])).toContain(SPOKEN)
-    expect(spoke.map((p) => p['agentId'])).toEqual(expect.arrayContaining(['amara']))
+    expect(spoke.map((p) => p.text)).toContain(SPOKEN)
+    expect(spoke.map((p) => p.agentId)).toEqual(expect.arrayContaining(['amara']))
   }, 30_000)
 
   it('★ AND THE SAME WORLD WITH THE SCRIPTED CAST SAYS NOTHING — the row above is not vacuous', async () => {
@@ -308,7 +310,7 @@ describe('★ THE SEAM — a served world whose bodies are driven by minds', () 
     await run(world, 6)
 
     // The minds ARE walking, so a world still publishing the canned lines would publish one.
-    expect(eventsOf(dir, 'action_started').some((p) => p['verb'] === 'walk')).toBe(true)
+    expect(eventsOf(dir, 'action_started').some((p) => p.verb === 'walk')).toBe(true)
     const texts = thoughtTexts(dir)
     expect(texts).toContain(THOUGHT)
     // `THOUGHT_LINES.walk`, and the fallback for a verb the table has no line for.
@@ -326,13 +328,13 @@ describe('★ THE SEAM — a served world whose bodies are driven by minds', () 
 
     expect(eventsOf(dir, 'action_started')).toHaveLength(0)
     // And the scripted larder top-up is gone with it: a live town feeds itself or it does not.
-    expect(eventsOf(dir, 'need_changed').filter((p) => Number(p['delta']) > 0)).toHaveLength(0)
+    expect(eventsOf(dir, 'need_changed').filter((p) => Number(p.delta) > 0)).toHaveLength(0)
   }, 30_000)
 })
 
 describe('★ the money, inside the served world', () => {
   it('stops every mind and calls the stop the moment the ledger reaches the cap', async () => {
-    const stops: Array<{ spent: number; cap: number }> = []
+    const stops: { spent: number; cap: number }[] = []
     const dir = tmp()
     const { world, opsDb } = await liveWorld({
       dir,
@@ -365,7 +367,7 @@ describe('★ the money, inside the served world', () => {
   // The total cap stops a lane's mistake and cannot stop a leak on a process meant to run for
   // weeks. This row spends FAR UNDER the cap and fast, the exact shape the cap is blind to.
   it('★ stops a town burning too fast even though it is nowhere near its cap', async () => {
-    const stops: Array<{ spent: number; cap: number }> = []
+    const stops: { spent: number; cap: number }[] = []
     const dir = tmp()
     const { world, opsDb } = await liveWorld({
       dir,
@@ -398,7 +400,7 @@ describe('★ the money, inside the served world', () => {
   }, 40_000)
 
   it('leaves the measured rate alone — the real stream must not trip its own wire', async () => {
-    const stops: Array<{ spent: number; cap: number }> = []
+    const stops: { spent: number; cap: number }[] = []
     const dir = tmp()
     const { world, opsDb } = await liveWorld({
       dir,
@@ -613,7 +615,9 @@ describe('★ what the first live boot broke', () => {
     // Hold a port, then ask the world for it.
     const blocker = createServer()
     const taken = await new Promise<number>((resolve) => {
-      blocker.listen(0, () => resolve((blocker.address() as { port: number }).port))
+      blocker.listen(0, () => {
+        resolve((blocker.address() as { port: number }).port)
+      })
     })
     let stopped = 0
     try {
@@ -670,16 +674,16 @@ describe('★ closing the town without closing a database under a mind', () => {
  * AND came back as something the world or the mind can perceive.
  */
 describe('★ a mind attempts what the engine has no verb for, and a god rules on it', () => {
-  const rulebookOf = (dir: string): Array<{ recipe_id: string; verb: string }> => {
+  const rulebookOf = (dir: string): { recipe_id: string; verb: string }[] => {
     const db = new Database(join(dir, 'minds', '_arbiter.db'), {
       readonly: true,
       fileMustExist: true,
     })
     try {
-      return db.prepare('SELECT recipe_id, verb FROM rulebook').all() as Array<{
+      return db.prepare('SELECT recipe_id, verb FROM rulebook').all() as {
         recipe_id: string
         verb: string
-      }>
+      }[]
     } finally {
       db.close()
     }
@@ -688,9 +692,9 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     const db = new Database(join(dir, 'minds', `${id}.db`), { readonly: true, fileMustExist: true })
     try {
       return (
-        db.prepare('SELECT text FROM memories WHERE agent_id = ?').all(id) as Array<{
+        db.prepare('SELECT text FROM memories WHERE agent_id = ?').all(id) as {
           text: string
-        }>
+        }[]
       ).map((r) => r.text)
     } finally {
       db.close()
@@ -712,17 +716,17 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     // 3. The world was TOLD — `onCodified` -> `bridge.announce` -> the event log the gateway
     //    serves and the chronicle renders. This is the half a viewer can actually see.
     const discoveries = eventsOf(dir, 'discovery_made')
-    expect(discoveries.map((p) => p['name'])).toContain(SMOKE_RECIPE.name)
-    const mine = discoveries.find((p) => p['name'] === SMOKE_RECIPE.name)!
-    expect(mine['byId']).toBe('amara')
+    expect(discoveries.map((p) => p.name)).toContain(SMOKE_RECIPE.name)
+    const mine = discoveries.find((p) => p.name === SMOKE_RECIPE.name)!
+    expect(mine.byId).toBe('amara')
     // `humanizeIntent` takes the underscore out of the coined verb, so the chronicle renders
     // `smoke fish green wood` and not the identifier the schema made of it.
-    expect(String(mine['intent'])).toContain(INVENTED_VERB.replace(/_/g, ' '))
-    expect(String(mine['intent'])).not.toContain(INVENTED_VERB)
+    expect(String(mine.intent)).toContain(INVENTED_VERB.replace(/_/g, ' '))
+    expect(String(mine.intent)).not.toContain(INVENTED_VERB)
 
     // 4. ★ AND THE BODY DID IT. The mind's own hands ran a verb that did not exist eight ticks
     //    ago. Without this row the three above are satisfied by a god talking to itself.
-    expect(eventsOf(dir, 'action_started').some((p) => p['verb'] === SMOKE_RECIPE.id)).toBe(true)
+    expect(eventsOf(dir, 'action_started').some((p) => p.verb === SMOKE_RECIPE.id)).toBe(true)
   }, 30_000)
 
   it('★ a refusal comes back in words the MIND can read, and teaches it something', async () => {

@@ -115,7 +115,9 @@ describe('SpendLedger persistence', () => {
     const l = new SpendLedger(file, now)
     expect(l.rows()).toHaveLength(0)
     l.append(row('a', 1))
-    expect(() => l.flush()).not.toThrow()
+    expect(() => {
+      l.flush()
+    }).not.toThrow()
     expect(JSON.parse(readFileSync(file, 'utf8'))).toHaveLength(1)
   })
 })
@@ -125,7 +127,9 @@ describe('anomaly stop', () => {
     const l = new SpendLedger(null, now)
     l.append(row('a', 4.5))
     l.append(row('b', 4.9))
-    expect(() => l.append(row('a', 0.6))).toThrow(AnomalyStopError)
+    expect(() => {
+      l.append(row('a', 0.6))
+    }).toThrow(AnomalyStopError)
     expect(l.totalFor('a')).toBe(4.5)
     expect(l.rows()).toHaveLength(2)
     l.append(row('b', 0.05))
@@ -136,7 +140,9 @@ describe('anomaly stop', () => {
     const l = new SpendLedger(null, now)
     l.append(row('a', ANOMALY_STOP_USD))
     expect(l.totalFor('a')).toBe(5)
-    expect(() => l.append(row('a', 0.01))).toThrow(/anomaly stop/)
+    expect(() => {
+      l.append(row('a', 0.01))
+    }).toThrow(/anomaly stop/)
   })
 
   it('carries the asset id and the attempted total', () => {

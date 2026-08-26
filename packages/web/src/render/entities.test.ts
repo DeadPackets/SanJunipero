@@ -134,7 +134,7 @@ const box = (x: number, y: number, w: number, h: number, kind = 'house'): Struct
   burnTicks: 0,
 })
 
-const SHAPES: Array<[number, number]> = [
+const SHAPES: [number, number][] = [
   [1, 1],
   [2, 2],
   [1, 2],
@@ -330,7 +330,7 @@ describe('★ enterability is asked of the config, and there is no second list',
 function spriteAt(s: Structure): { sx: number; sy: number } {
   return tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
 }
-function worldPoly(local: number[], s: Structure): Array<[number, number]> {
+function worldPoly(local: number[], s: Structure): [number, number][] {
   const at = spriteAt(s)
   return Array.from(
     { length: local.length / 2 },
@@ -338,7 +338,7 @@ function worldPoly(local: number[], s: Structure): Array<[number, number]> {
   )
 }
 
-function contains(poly: Array<[number, number]>, px: number, py: number): boolean {
+function contains(poly: [number, number][], px: number, py: number): boolean {
   let inside = false
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, yi] = poly[i]!,
@@ -356,7 +356,7 @@ function drawnDoorPoint(s: Structure): [number, number] {
 }
 
 /** The whole drawn cell's corner points, so "outside the picture" can be tested. */
-function drawnCorners(s: Structure): Array<[number, number]> {
+function drawnCorners(s: Structure): [number, number][] {
   const at = spriteAt(s)
   const side = (s.w + s.h) * BUILDING_PX_PER_TILE
   return [
@@ -568,10 +568,11 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
     })
     const h = harness([house, cottage, well])
     syncEntities(h.scene, h.book, h.store, (id) => h.doors.push(id))
-    const tap = (id: string): void =>
-      (entitySpriteOf(h.scene, 'structure', id) as never as { fire: (n: string) => void }).fire(
+    const tap = (id: string): void => {
+      ;(entitySpriteOf(h.scene, 'structure', id) as never as { fire: (n: string) => void }).fire(
         'pointertap',
       )
+    }
     // The well is the negative: it is unroofed, while a cottage is roofed and so is a door.
     tap(well.id)
     expect(h.doors).toEqual([])

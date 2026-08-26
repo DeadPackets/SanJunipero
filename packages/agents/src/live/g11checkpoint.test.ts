@@ -137,14 +137,16 @@ describe("the checkpoint carries the run's memory, not only its world", () => {
   })
 
   it('refuses a snapshot that is not there rather than starting an empty world', () => {
-    expect(() => restoreSnapshot(join(dir, 'nothing.db'), dbPath)).toThrow(/no checkpoint snapshot/)
+    expect(() => {
+      restoreSnapshot(join(dir, 'nothing.db'), dbPath)
+    }).toThrow(/no checkpoint snapshot/)
   })
 
   it('a torn write leaves the previous checkpoint standing, because the copy is renamed', () => {
     writeCheckpoint(db, snapPath, checkpointAt(1440))
-    expect(() =>
-      writeCheckpoint(db, join(dir, 'no-such-dir', 'x.db'), checkpointAt(2880)),
-    ).toThrow()
+    expect(() => {
+      writeCheckpoint(db, join(dir, 'no-such-dir', 'x.db'), checkpointAt(2880))
+    }).toThrow()
     restoreSnapshot(snapPath, join(dir, 'copy.db'))
     const old = new Database(join(dir, 'copy.db'))
     expect(readCheckpoint(old)!.sidecar.tick).toBe(1440)
@@ -155,13 +157,17 @@ describe("the checkpoint carries the run's memory, not only its world", () => {
 describe('a checkpoint cannot launder a failure into a pass', () => {
   it('only ever moves forward: an earlier tick may not overwrite a later one', () => {
     writeCheckpoint(db, snapPath, checkpointAt(4320))
-    expect(() => writeCheckpoint(db, snapPath, checkpointAt(2880))).toThrow(/may only move forward/)
+    expect(() => {
+      writeCheckpoint(db, snapPath, checkpointAt(2880))
+    }).toThrow(/may only move forward/)
     expect(readCheckpoint(db)!.sidecar.tick).toBe(4320)
   })
 
   it('allows a checkpoint at the same tick, which is a rewrite and not a rewind', () => {
     writeCheckpoint(db, snapPath, checkpointAt(4320))
-    expect(() => writeCheckpoint(db, snapPath, checkpointAt(4320))).not.toThrow()
+    expect(() => {
+      writeCheckpoint(db, snapPath, checkpointAt(4320))
+    }).not.toThrow()
   })
 
   it('refuses to continue a run taken on a different commit', () => {
@@ -172,7 +178,7 @@ describe('a checkpoint cannot launder a failure into a pass', () => {
   })
 
   it('refuses every difference that makes it a different gate', () => {
-    const differences: Array<Partial<G11Fingerprint>> = [
+    const differences: Partial<G11Fingerprint>[] = [
       { configHash: 'other' },
       { totalTicks: 2880 },
       { startTick: 0 },

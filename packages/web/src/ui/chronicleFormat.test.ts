@@ -5,7 +5,7 @@ import { describeEvent, isNarratable } from './chronicleFormat.js'
 
 function fixtureState(): WorldState {
   const s = genesisState(DEFAULT_CONFIG)
-  s.agents['farmer'] = {
+  s.agents.farmer = {
     id: 'farmer',
     name: 'Wren',
     x: 1,
@@ -22,7 +22,7 @@ function fixtureState(): WorldState {
     collapsedSinceTick: null,
     zeroHungerSinceTick: null,
   }
-  s.structures['s1'] = {
+  s.structures.s1 = {
     id: 's1',
     kind: 'storehouse',
     x: 2,

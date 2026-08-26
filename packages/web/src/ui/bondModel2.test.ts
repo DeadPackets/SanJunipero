@@ -46,7 +46,7 @@ const bondWarmth = warmthOf
 
 const api = (bonds: Bond[]): BondsResponse => ({ bonds, asOfTick: 0 })
 
-const lineage = (edges: Array<[string, string]>, tick = 100): LineageLike => ({
+const lineage = (edges: [string, string][], tick = 100): LineageLike => ({
   parentOf: edges.map(([parentId, childId]) => ({ parentId, childId, tick })),
 })
 
@@ -70,7 +70,7 @@ describe('U15: the landed model calls anyone who ever spoke a friend', () => {
 })
 
 describe('every level is reachable, one history each', () => {
-  const cases: Array<[BondLevel, BondAct[]]> = [
+  const cases: [BondLevel, BondAct[]][] = [
     ['strangers', [at(0, 'friend')]],
     ['acquaintances', [at(0, 'friend'), at(0, 'friend'), at(0, 'work')]],
     ['friendly', [at(0, 'owe'), at(0, 'owe'), at(0, 'partner'), at(0, 'friend')]],

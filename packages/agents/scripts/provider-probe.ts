@@ -65,10 +65,10 @@ async function publishedPrices(): Promise<Map<string, { prompt: number; completi
     if (!res.ok) return out
     const body = (await res.json()) as {
       data?: {
-        endpoints?: Array<{
+        endpoints?: {
           provider_name?: string
           pricing?: { prompt?: string; completion?: string }
-        }>
+        }[]
       }
     }
     for (const e of body.data?.endpoints ?? []) {
@@ -133,7 +133,7 @@ async function main(): Promise<void> {
               .prepare(
                 'SELECT DISTINCT provider FROM llm_calls WHERE caller = ? AND provider IS NOT NULL',
               )
-              .all(c.name) as Array<{ provider: string }>
+              .all(c.name) as { provider: string }[]
           ).map((r) => r.provider),
       })
       rounds.push(result)

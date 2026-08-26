@@ -199,7 +199,7 @@ function pointSampled(terrain: readonly (readonly number[])[], f: MinimapFit): U
       const t = screenToTile(p.sx, p.sy - TILE_H / 2)
       const id = terrain[t.y]?.[t.x]
       if (id === undefined) continue
-      const c = TILE_COLORS[id as 0]!
+      const c = TILE_COLORS[id as 0]
       const i = (my * f.w + mx) * 4
       px[i] = (c >> 16) & 0xff
       px[i + 1] = (c >> 8) & 0xff
@@ -232,7 +232,7 @@ describe('the picture keeps the features that make a town legible', () => {
     for (const rings of [1, 3, 10]) {
       const { bounds, terrain } = townOf(rings)
       const f = minimapFit(bounds)
-      const road = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[ROAD]!)
+      const road = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[ROAD])
       expect(road.total, `${rings} rings: no road at all`).toBeGreaterThan(f.w)
       // one lattice of streets is ONE shape
       expect(
@@ -245,8 +245,8 @@ describe('the picture keeps the features that make a town legible', () => {
   it('★ and the control proves it: the same map, point-sampled, comes apart', () => {
     const { bounds, terrain } = townOf(10)
     const f = minimapFit(bounds)
-    const ours = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[ROAD]!)
-    const naive = shapeOf(pointSampled(terrain, f), f, TILE_COLORS[ROAD]!)
+    const ours = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[ROAD])
+    const naive = shapeOf(pointSampled(terrain, f), f, TILE_COLORS[ROAD])
     console.log(
       `\n  ten rings, the street lattice: ours ${ours.total} px in ${ours.pieces} piece(s)` +
         ` · point-sampled ${naive.total} px in ${naive.pieces} piece(s)`,
@@ -258,7 +258,7 @@ describe('the picture keeps the features that make a town legible', () => {
   it('★ a one-tile channel is still a channel when a pixel is four tiles wide', () => {
     const { bounds, terrain } = townOf(10)
     const f = minimapFit(bounds)
-    const water = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[WATER]!)
+    const water = shapeOf(minimapPixels(terrain, [], f), f, TILE_COLORS[WATER])
     expect(water.total).toBeGreaterThan(f.h / 4)
     expect(water.largest / water.total).toBeGreaterThan(0.9)
   })
@@ -274,9 +274,9 @@ describe('the picture keeps the features that make a town legible', () => {
         if (c >= 0) seen.add(c)
       }
     }
-    expect(seen.has(TILE_COLORS[ROAD]!)).toBe(true)
-    expect(seen.has(TILE_COLORS[WATER]!)).toBe(true)
-    expect(seen.has(TILE_COLORS[0]!)).toBe(true)
+    expect(seen.has(TILE_COLORS[ROAD])).toBe(true)
+    expect(seen.has(TILE_COLORS[WATER])).toBe(true)
+    expect(seen.has(TILE_COLORS[0])).toBe(true)
   })
 
   it('marks what is built, so the extent of the town is visible as such', () => {
@@ -337,7 +337,7 @@ describe('the rectangle that says where the camera is', () => {
     const v = viewAfterTravel(
       { sx: (one.bounds.minX + one.bounds.maxX) / 2, sy: (one.bounds.minY + one.bounds.maxY) / 2 },
       one.bounds,
-      ZOOM_STOPS[0]!,
+      ZOOM_STOPS[0],
     )
     const box = minimapViewBox(v, f1)
     expect(box.w).toBeCloseTo(f1.w, 0)
@@ -587,7 +587,7 @@ describe('the marks a viewer reads, against every ground under them', () => {
     dotOps([dot], f).map((o) => o.color)
 
   it('prints the table this rule is enforced from', () => {
-    const marks: Array<[string, number[]]> = [
+    const marks: [string, number[]][] = [
       [
         'the camera rectangle',
         [...new Set(viewOps({ x: 0, y: 0, w: 2000, h: 1000 }, f).map((o) => o.color))],
@@ -616,7 +616,7 @@ describe('the marks a viewer reads, against every ground under them', () => {
   })
 
   it('★ every mark clears 3:1 on every ground the raster can draw', () => {
-    const marks: Array<[string, number[]]> = [
+    const marks: [string, number[]][] = [
       [
         'camera rectangle',
         [...new Set(viewOps({ x: 0, y: 0, w: 2000, h: 1000 }, f).map((o) => o.color))],

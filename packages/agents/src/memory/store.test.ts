@@ -134,7 +134,7 @@ describe('FTS5 external content', () => {
     })
     const rows = db
       .prepare("SELECT rowid FROM memories_fts WHERE memories_fts MATCH 'storehouse'")
-      .all() as Array<{ rowid: number }>
+      .all() as { rowid: number }[]
     expect(rows.map((r) => r.rowid)).toContain(id)
   })
 })
@@ -168,10 +168,10 @@ describe('sqlite-vec KNN', () => {
     const q = await embedder.embed(text)
     const rows = db
       .prepare('SELECT rowid, distance FROM memory_vec WHERE embedding MATCH ? AND k = 3')
-      .all(Buffer.from(q.buffer, q.byteOffset, q.byteLength)) as Array<{
+      .all(Buffer.from(q.buffer, q.byteOffset, q.byteLength)) as {
       rowid: number
       distance: number
-    }>
+    }[]
     expect(rows).toHaveLength(3)
     expect(rows[0]!.rowid).toBe(id)
     expect(rows[0]!.distance).toBeCloseTo(0, 4)
@@ -288,7 +288,7 @@ describe('facts, summaries, journal, autobiography, miss log', () => {
       .prepare(
         'SELECT agent_id, tick, query, mode, top_score, result_count FROM recall_misses ORDER BY id',
       )
-      .all() as Array<Record<string, unknown>>
+      .all() as Record<string, unknown>[]
     expect(rows).toEqual([
       {
         agent_id: 'tamar',
@@ -316,7 +316,7 @@ describe('schema', () => {
     expect(() => openAgentDb(':memory:')).not.toThrow()
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type IN ('table','trigger') ORDER BY name")
-      .all() as Array<{ name: string }>
+      .all() as { name: string }[]
     const names = tables.map((t) => t.name)
     for (const t of [
       'memories',

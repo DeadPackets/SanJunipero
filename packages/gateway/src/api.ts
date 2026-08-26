@@ -98,7 +98,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): void {
   const completedTick = new Map<string, number>()
   const heat: HeatScores = new Map()
   const weights = new Map<string, number>() // `${source}\n${target}\n${kind}` → weight
-  const deaths: Array<{ agentId: string; tick: number; cause: string }> = []
+  const deaths: { agentId: string; tick: number; cause: string }[] = []
   // Bounded by construction: a spoke older than the talk window can never pair with a new one,
   // and the started map is keyed by agent and verb, so it is the size of the cast times three.
   let spokes: Spoke[] = []

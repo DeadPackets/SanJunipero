@@ -93,7 +93,7 @@ describe('fold', () => {
     ).toThrow()
   })
   it('strict payloads reject extra keys on the migrated C1 events', () => {
-    let s = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
+    const s = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
     expect(() => fold(s, ev(2, 'tick_advanced', { extra: 1 }, 1))).toThrow()
     expect(() => fold(s, ev(2, 'agent_moved', { id: 'a1', x: 1, y: 1, extra: 1 }))).toThrow()
     expect(() =>

@@ -149,7 +149,7 @@ export function preflightRefusal(r: PreflightResult): string {
 export type PreflightLlm = {
   object<T>(opts: {
     system: string
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>
+    messages: { role: 'user' | 'assistant'; content: string }[]
     schema: { _zod?: unknown }
   }): Promise<{ value: T }>
 }

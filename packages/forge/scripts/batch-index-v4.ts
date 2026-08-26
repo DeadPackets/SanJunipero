@@ -31,7 +31,7 @@ type Part = { buf: Buffer; h: number }
 const parts: Part[] = []
 async function add(buf: Buffer): Promise<void> {
   const meta = await sharp(buf).metadata()
-  parts.push({ buf, h: meta.height! })
+  parts.push({ buf, h: meta.height })
 }
 
 await add(
@@ -81,7 +81,7 @@ await add(
       .png()
       .toBuffer()
     const meta = await sharp(buf).metadata()
-    thumbs.push({ buf, w: meta.width! })
+    thumbs.push({ buf, w: meta.width })
   }
   const total = thumbs.reduce((n, t) => n + t.w, 0)
   const gap = Math.max(8, Math.floor((W - total) / (thumbs.length + 1)))

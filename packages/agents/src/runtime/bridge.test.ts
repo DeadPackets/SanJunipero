@@ -43,12 +43,25 @@ function buildBridge(): { bridge: EngineBridge; step: () => void } {
 
   const worldTick = createWorldTick(config, rng)
   let handler: TickHandler = () => {}
-  const loop = new TickLoop({ store, state, rng, config, onTick: (ctx) => handler(ctx) })
+  const loop = new TickLoop({
+    store,
+    state,
+    rng,
+    config,
+    onTick: (ctx) => {
+      handler(ctx)
+    },
+  })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
   handler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
-  return { bridge, step: () => loop.step() }
+  return {
+    bridge,
+    step: () => {
+      loop.step()
+    },
+  }
 }
 
 // A second town where things are owned, so the bridge's ownership mapping is observable.
@@ -90,7 +103,15 @@ function ownedWorld(opts: { recentWindowTicks?: number } = {}): {
 
   const worldTick = createWorldTick(config, rng)
   let handler: TickHandler = () => {}
-  const loop = new TickLoop({ store, state, rng, config, onTick: (ctx) => handler(ctx) })
+  const loop = new TickLoop({
+    store,
+    state,
+    rng,
+    config,
+    onTick: (ctx) => {
+      handler(ctx)
+    },
+  })
   const bridge = new EngineBridge({ loop, store, simConfig: config, ...opts })
   handler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
@@ -106,7 +127,12 @@ function ownedWorld(opts: { recentWindowTicks?: number } = {}): {
       })
     }
   })
-  return { bridge, step: () => loop.step() }
+  return {
+    bridge,
+    step: () => {
+      loop.step()
+    },
+  }
 }
 
 describe('EngineBridge carries ownership through to the mind', () => {
@@ -173,7 +199,7 @@ describe('EngineBridge.drain (T23)', () => {
 
   it('drain resolves every queued submit as refused and returns the count', async () => {
     const { bridge } = buildBridge()
-    const seen: Array<{ ok: boolean; reason?: string }> = []
+    const seen: { ok: boolean; reason?: string }[] = []
     const a = bridge.submit(AGENT, { verb: 'walk', params: { x: 4, y: 3 } }, (r) => seen.push(r))
     const b = bridge.submit(AGENT, { verb: 'sleep', params: {} }, (r) => seen.push(r))
 
@@ -328,7 +354,9 @@ function announceHarness(): {
     state,
     rng: new RngStreams('bridge-announce'),
     config,
-    onTick: (ctx) => handler(ctx),
+    onTick: (ctx) => {
+      handler(ctx)
+    },
   })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
   handler = bridge.wrapTickHandler(() => {})

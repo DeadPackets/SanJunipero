@@ -148,7 +148,7 @@ export const HIT_PRIORITY: Readonly<Record<'agent' | 'item' | 'crop' | 'structur
 }
 
 export function resolveHit(
-  candidates: ReadonlyArray<{ kind: keyof typeof HIT_PRIORITY; id: string }>,
+  candidates: readonly { kind: keyof typeof HIT_PRIORITY; id: string }[],
 ): string | null {
   let best: { kind: keyof typeof HIT_PRIORITY; id: string } | null = null
   for (const c of candidates) {

@@ -32,9 +32,7 @@ import { WorldMirror } from './worldMirror.js'
 // The renderer-side half lives in packages/web/src/render/g10.test.ts: the web package is
 // DOM-typed and bundler-resolved, so a gateway test cannot import from it without breaking `tsc -b`.
 
-const GRASS: TileId[][] = Array.from({ length: 24 }, () =>
-  Array.from({ length: 24 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 24 }, () => Array.from({ length: 24 }, () => 0))
 
 function openNarratorFixtureDb(path: string): Database.Database {
   const db = new Database(path)
@@ -308,13 +306,13 @@ describe('GATE G10 — automated half, gateway side', () => {
       const db = openDb(join(dir, 'world.db'))
       try {
         const state = new WorldMirror({ db, config: DEFAULT_CONFIG, terrain: GRASS }).state()
-        expect(state.structures['house1']!.kind).toBe('house')
-        expect(state.agents['amara']!.insideId).toBe('house1')
-        expect(state.agents['yusuf']!.insideId).toBe('house1')
-        expect(state.agents['nadia']!.insideId).toBeUndefined()
-        expect(state.items['i1']!.loc).toEqual({ t: 'structure', id: 'house1' })
+        expect(state.structures.house1!.kind).toBe('house')
+        expect(state.agents.amara!.insideId).toBe('house1')
+        expect(state.agents.yusuf!.insideId).toBe('house1')
+        expect(state.agents.nadia!.insideId).toBeUndefined()
+        expect(state.items.i1!.loc).toEqual({ t: 'structure', id: 'house1' })
         // this is the fixture the web-side g10 file re-asserts interiorOf/bedSlots against
-        expect(state.agents['amara']!.asleep).toBe(true)
+        expect(state.agents.amara!.asleep).toBe(true)
       } finally {
         db.close()
       }

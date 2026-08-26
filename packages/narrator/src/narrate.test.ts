@@ -46,21 +46,20 @@ const DAY1: SimEvent[] = [
   ev(11, 1521, 'agent_moved', { id: 'omar', x: 5, y: 6 }),
 ]
 
-const scriptedLlm = (citations: number[] = [4, 9999]): NarratorLlm =>
-  ({
-    summarizeChapter: vi.fn(async () => ({
-      title: 'The Wall Quarrel',
-      text: 'Omar and Yusuf quarrelled over a wall.',
-      citations,
-    })),
-    summarizeEra: vi.fn(async () => ({
-      title: 'The First Week',
-      text: 'A week of walls and words.',
-      citations: [],
-    })),
-    newspaperCopy: vi.fn(),
-    biography: vi.fn(),
-  }) as unknown as NarratorLlm
+const scriptedLlm = (citations: number[] = [4, 9999]): NarratorLlm => ({
+  summarizeChapter: vi.fn(async () => ({
+    title: 'The Wall Quarrel',
+    text: 'Omar and Yusuf quarrelled over a wall.',
+    citations,
+  })),
+  summarizeEra: vi.fn(async () => ({
+    title: 'The First Week',
+    text: 'A week of walls and words.',
+    citations: [],
+  })),
+  newspaperCopy: vi.fn(),
+  biography: vi.fn(),
+})
 
 describe('narrateDay', () => {
   it('segments, scores, detects firsts, persists, and renders a resolving chapter', async () => {
@@ -160,15 +159,14 @@ describe('narrateDay', () => {
 
 // One night's chronicle failing is one loss; it must not silently cost the semantic pass too.
 describe('narrateDay: a chronicle that will not render does not take the semantic pass with it', () => {
-  const throwingLlm = (): NarratorLlm =>
-    ({
-      summarizeChapter: vi.fn(async () => {
-        throw new Error('response did not match schema')
-      }),
-      summarizeEra: vi.fn(),
-      newspaperCopy: vi.fn(),
-      biography: vi.fn(),
-    }) as unknown as NarratorLlm
+  const throwingLlm = (): NarratorLlm => ({
+    summarizeChapter: vi.fn(async () => {
+      throw new Error('response did not match schema')
+    }),
+    summarizeEra: vi.fn(),
+    newspaperCopy: vi.fn(),
+    biography: vi.fn(),
+  })
 
   const semanticRig = () => {
     const db = new Database(':memory:')

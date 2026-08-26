@@ -52,7 +52,9 @@ const lcg = (seed: number) => (): number => {
 
 describe('GATE G6 — automated half', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-g6-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('dual-viewer byte parity over ~3 sim days, then a scrub parity sweep', async () => {
     const dbPath = join(dir, 'g6-run.db')

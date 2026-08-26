@@ -80,7 +80,9 @@ function town(startTick: number): { bridge: EngineBridge; loop: TickLoop; homeId
     config: CFG,
     startTick,
     realMsPerTick: 0,
-    onTick: (c) => handler(c),
+    onTick: (c) => {
+      handler(c)
+    },
   })
   const bridge = new EngineBridge({ loop, store, simConfig: CFG })
   handler = bridge.wrapTickHandler(({ emit }) => {

@@ -19,7 +19,7 @@ export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
 export const CEILING_PRICE_PER_M: ModelPrices = { input: 0.44, output: 1.32, cacheRead: 0.114 }
 
 // The pinned route's real price. Kept as the name the rest of the tree imports.
-export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Wafer as ModelPrices
+export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Wafer!
 
 // For the case where a fallback MODEL answered rather than a different back end. An unlisted
 // model is a different product, so it books at the ceiling and not at the pinned rate.

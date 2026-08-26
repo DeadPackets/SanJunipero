@@ -20,7 +20,7 @@ export type FixtureStructure = {
 
 /** The footprints the town actually stands, smallest to largest — a 4×2 roof is the one that
  *  reaches furthest past its own ground, which is what a cull margin has to survive. */
-const FOOTPRINTS: ReadonlyArray<{ kind: string; w: number; h: number }> = [
+const FOOTPRINTS: readonly { kind: string; w: number; h: number }[] = [
   { kind: 'well', w: 1, h: 1 },
   { kind: 'house', w: 2, h: 2 },
   { kind: 'cottage', w: 2, h: 2 },
@@ -29,7 +29,7 @@ const FOOTPRINTS: ReadonlyArray<{ kind: string; w: number; h: number }> = [
 ]
 
 /** Eight plots around one block's perimeter, the way a street rank claims frontage. */
-const PLOT_OFFSETS: ReadonlyArray<{ dx: number; dy: number }> = [
+const PLOT_OFFSETS: readonly { dx: number; dy: number }[] = [
   { dx: 1, dy: 1 },
   { dx: 7, dy: 1 },
   { dx: 13, dy: 1 },

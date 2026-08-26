@@ -74,7 +74,7 @@ const skyOf = (tick: number, kind: string): WorldState => ({
 
 describe('ambientTempAt: a deterministic table, never a roll', () => {
   it('returns the ratified band for every season and phase', () => {
-    const table: Array<[number, number]> = [
+    const table: [number, number][] = [
       [at(10, 12), 14],
       [at(10, 6), 9],
       [at(10, 22), 5],

@@ -178,7 +178,7 @@ describe('interiorOf', () => {
     const s = fixture()
     const reversed: WorldState = {
       ...s,
-      agents: { yusuf: s.agents['yusuf']!, amara: s.agents['amara']! },
+      agents: { yusuf: s.agents.yusuf!, amara: s.agents.amara! },
     }
     expect(interiorOf(reversed, 'house1')!.occupants).toEqual(interiorOf(s, 'house1')!.occupants)
   })
@@ -262,11 +262,11 @@ describe('bedSlots', () => {
   it('lays two sleepers down on the house bed at distinct slots', () => {
     const slots = bedSlots('house', ['amara', 'yusuf'])
     expect(Object.keys(slots).sort()).toEqual(['amara', 'yusuf'])
-    expect(slots['amara']).not.toEqual(slots['yusuf'])
+    expect(slots.amara).not.toEqual(slots.yusuf)
     // INTERIOR TILES, not template slots: `slotToTile` puts slot (2,1) on tile (9,2), and the
     // bed is 1x2, so the second sleeper takes the tile behind the first.
-    expect(slots['amara']).toEqual(slotToTile({ x: 2, y: 1 }))
-    expect(slots['yusuf']).toEqual({ x: 9, y: 3 })
+    expect(slots.amara).toEqual(slotToTile({ x: 2, y: 1 }))
+    expect(slots.yusuf).toEqual({ x: 9, y: 3 })
   })
 
   it('maps nobody in a kind with no bed', () => {

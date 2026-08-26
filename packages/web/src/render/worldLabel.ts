@@ -44,7 +44,7 @@ class VoidLabel extends Container {
 export function createWorldLabel(text: string, style: WorldLabelStyle): WorldLabel {
   if (bitmapFontInstalled(style.fontFamily)) {
     try {
-      return new BitmapText({ text, style }) as unknown as WorldLabel
+      return new BitmapText({ text, style })
     } catch {
       /* the font said it was there and was not — fall through to a canvas glyph */
     }
@@ -52,8 +52,8 @@ export function createWorldLabel(text: string, style: WorldLabelStyle): WorldLab
   try {
     const t = new Text({ text, style })
     t.resolution = LABEL_RESOLUTION
-    return t as unknown as WorldLabel
+    return t
   } catch {
-    return new VoidLabel() as unknown as WorldLabel
+    return new VoidLabel()
   }
 }

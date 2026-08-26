@@ -24,8 +24,7 @@ const CFG = DEFAULT_CONFIG
 const MORNING_TICK = 420
 
 let seq = 0
-const ev = (type: string, payload: unknown): SimEvent =>
-  ({ seq: ++seq, tick: 0, type, payload }) as unknown as SimEvent
+const ev = (type: string, payload: unknown): SimEvent => ({ seq: ++seq, tick: 0, type, payload })
 
 // The genesis town with its five founders each at their own doorway — the exact opening
 // position `g11-deepworld.ts` builds before the first turn is asked for.
@@ -63,7 +62,7 @@ function prosePacket(state: WorldState, agentId: string): PerceptionPacket {
         loc: { t: 'tile' as const, x: i.x, y: i.y },
       })),
     },
-  } as PerceptionPacket
+  }
 }
 
 const WORLD = {
@@ -127,7 +126,7 @@ describe('R21 candidate 4 — "distance makes gathering irrational": REFUTED', (
       [46, 66],
       [47, 70],
       [22, 100],
-    ] as Array<[number, number]>) {
+    ] as [number, number][]) {
       expect(walk(s, 'amara', x, y)).toBeNull()
     }
   })
@@ -385,7 +384,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
 
 describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21-D answers it', () => {
   // Every designed survival-social overlap, asked from a founder's doorway on the first morning.
-  const NOW: ReadonlyArray<[string, Record<string, unknown>, string]> = [
+  const NOW: readonly [string, Record<string, unknown>, string][] = [
     [
       'forage',
       {},
@@ -447,7 +446,7 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
       ['fish', { x: 62, y: 62 }, 'no water there'],
       ['douse', { x: 62, y: 62 }, 'nothing is burning there'],
       ['hunt', {}, 'hunt needs a {faunaId}'],
-    ] as ReadonlyArray<[string, Record<string, unknown>, string]>) {
+    ] as readonly [string, Record<string, unknown>, string][]) {
       expect(submitIntent(s, CFG, 'amara', verb, params)).toEqual({ ok: false, reason })
     }
     // And the one that always did leave a door open still does.

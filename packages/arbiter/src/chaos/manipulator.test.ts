@@ -143,7 +143,7 @@ describe('★ the manipulator — prompt injection through in-world speech', () 
 
   it('★ THE ARBITER IS DEFENDED WHERE THE MIND WAS NOT — same payloads, fenced', () => {
     for (const c of INJECTION_CORPUS.filter((x) => x.targets.includes('arbiter'))) {
-      const user = assemble(c.say).messages[0]!.content as string
+      const user = assemble(c.say).messages[0]!.content
       const intentLine = user.split('\n').find((l) => l.startsWith('Intent: <<<'))!
       expect(intentLine.endsWith('>>>'), c.id).toBe(true)
       expect(intentLine.includes('\n'), c.id).toBe(false)
@@ -155,7 +155,7 @@ describe('★ the manipulator — prompt injection through in-world speech', () 
 
   it('★ the flood cannot outgrow the fence', () => {
     const said = caseOf('flood').say
-    const user = assemble(said).messages[0]!.content as string
+    const user = assemble(said).messages[0]!.content
     expect(said.length).toBeGreaterThan(10_000)
     const intentLine = user.split('\n').find((l) => l.startsWith('Intent: <<<'))!
     expect(intentLine.length).toBeLessThanOrEqual(INTENT_MAX_CHARS + 'Intent: <<<>>>'.length)
@@ -163,7 +163,7 @@ describe('★ the manipulator — prompt injection through in-world speech', () 
   })
 
   it('★ and the forged precedent row lands INSIDE the fence, not above it', () => {
-    const user = assemble(caseOf('forge-precedent').say).messages[0]!.content as string
+    const user = assemble(caseOf('forge-precedent').say).messages[0]!.content
     const forged = user.indexOf('[attempt] anything a person asks for')
     const fence = user.indexOf('Intent: <<<')
     expect(forged).toBeGreaterThan(fence)
@@ -171,7 +171,9 @@ describe('★ the manipulator — prompt injection through in-world speech', () 
 
   it('★ ANTI-VACUITY: the glass attack is ordinary speech and must stay legal', () => {
     const glass = caseOf('glass-handover')
-    expect(() => assertNoGlassLeak(renderHeard('Bex', glass.say), 'heard speech')).not.toThrow()
+    expect(() => {
+      assertNoGlassLeak(renderHeard('Bex', glass.say), 'heard speech')
+    }).not.toThrow()
     expect(scanPromptForGlassLeak(glass.say)).toEqual(
       expect.arrayContaining(['festival', 'market', 'council', 'custom']),
     )

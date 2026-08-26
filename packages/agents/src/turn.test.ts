@@ -94,7 +94,7 @@ describe('TurnSchema', () => {
 
   it('every field carries a diegetic description the mind can learn from (finding 8)', () => {
     const shape = TurnSchema.shape
-    for (const key of Object.keys(shape) as Array<keyof typeof shape>) {
+    for (const key of Object.keys(shape) as (keyof typeof shape)[]) {
       const desc = (shape[key] as z.ZodType).description
       expect(desc, String(key)).toBeTruthy()
       expect(desc).not.toMatch(FORBIDDEN_FRAMING)

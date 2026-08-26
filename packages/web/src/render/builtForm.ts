@@ -6,7 +6,7 @@ import { TILE_H, TILE_W } from './iso.js'
 
 /** The footprint diamond in the sprite's LOCAL space, origin at the centre tile's top vertex — the one ground shape both the hit area and the built form are cut from. */
 export function footprintDiamond(w: number, h: number): number[] {
-  const corners: ReadonlyArray<readonly [number, number]> = [
+  const corners: readonly (readonly [number, number])[] = [
     [0.5 - w / 2, 0.5 - h / 2], // north
     [w / 2 + 0.5, 0.5 - h / 2], // east
     [w / 2 + 0.5, h / 2 + 0.5], // south
@@ -137,12 +137,12 @@ export function builtFormSpec(kind: string, w: number, h: number): BuiltForm {
     heightPx,
     plinth: { poly: footprintDiamond(w, h), color: ramp.plinth },
     faces: [
-      { poly: [...gW!, ...gS!, ...tS!, ...tW!], color: ramp.left },
-      { poly: [...gS!, ...gE!, ...tE!, ...tS!], color: ramp.right },
+      { poly: [...gW, ...gS, ...tS, ...tW], color: ramp.left },
+      { poly: [...gS, ...gE, ...tE, ...tS], color: ramp.right },
       { poly: top, color: ramp.top },
     ],
-    silhouette: [...gW!, ...gS!, ...gE!, ...tE!, ...tN!, ...tW!],
-    nearEdge: [gS![0], gS![1], tS![0], tS![1]],
+    silhouette: [...gW, ...gS, ...gE, ...tE, ...tN, ...tW],
+    nearEdge: [gS[0], gS[1], tS[0], tS[1]],
     accent: {
       poly: raise(inset(w, h, BUILT_FORM_ACCENT_INSET_TILES), -heightPx),
       color: BUILT_FORM_ACCENTS[kind] ?? BUILT_FORM_ACCENTS.default!,

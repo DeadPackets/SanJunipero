@@ -61,7 +61,7 @@ const config: SimConfig = BEFORE
         recipes: {
           ...SimConfigSchema.parse({}).structures.recipes,
           house: {
-            ...SimConfigSchema.parse({}).structures.recipes['house']!,
+            ...SimConfigSchema.parse({}).structures.recipes.house!,
             hearth: false,
             bed: false,
           },
@@ -76,12 +76,12 @@ const config: SimConfig = BEFORE
 // 1.2 and a run starting above 1.0 cannot tell a wanting town from a busy one.
 function buildWorld(store: EventStore): {
   state: WorldState
-  doors: Array<{ x: number; y: number }>
+  doors: { x: number; y: number }[]
   houseId: string
 } {
   const g = makeGenesisWorld(config)
   let state = genesisState(config, g.terrain)
-  const doors: Array<{ x: number; y: number }> = []
+  const doors: { x: number; y: number }[] = []
   const emit = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
@@ -90,15 +90,15 @@ function buildWorld(store: EventStore): {
     const p = e.payload as Record<string, unknown>
     if (e.type === 'structure_planned') {
       // The same five spawn tiles the motive probe uses, so the two records stack.
-      if (p['kind'] === 'house' || p['kind'] === 'storehouse') {
-        doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
+      if (p.kind === 'house' || p.kind === 'storehouse') {
+        doors.push({ x: Number(p.x), y: Number(p.y) + Number(p.h ?? 1) })
       }
-      if (p['kind'] === 'cabin') {
-        dropped.add(String(p['id']))
+      if (p.kind === 'cabin') {
+        dropped.add(String(p.id))
         continue
       }
     }
-    if (dropped.has(String(p['id']))) continue
+    if (dropped.has(String(p.id))) continue
     emit(e.type, e.payload)
   }
   // The lowest-id roofless house, finished. Lowest id so the arms cannot pick different ones.
@@ -176,11 +176,13 @@ async function main(): Promise<void> {
     config,
     startTick: START_TICK,
     realMsPerTick: 0,
-    onTick: (c) => handler(c),
+    onTick: (c) => {
+      handler(c)
+    },
   })
 
-  const refusals: Array<{ tick: number; id: string; verb: string; reason: string }> = []
-  const attempts: Array<{ tick: number; id: string; verb: string; params: string }> = []
+  const refusals: { tick: number; id: string; verb: string; reason: string }[] = []
+  const attempts: { tick: number; id: string; verb: string; params: string }[] = []
   class Watched extends EngineBridge {
     override submit(
       agentId: string,
@@ -208,7 +210,7 @@ async function main(): Promise<void> {
   const embedder = await Embedder.create(
     fileURLToPath(new URL('../../../data/models/', import.meta.url)),
   )
-  const thoughts: Array<{ tick: number; agentId: string; text: string }> = []
+  const thoughts: { tick: number; agentId: string; text: string }[] = []
   const runtimes: AgentRuntime[] = []
   for (const spec of MINDS) {
     const personality = new PersonalityStore(db, spec.id)

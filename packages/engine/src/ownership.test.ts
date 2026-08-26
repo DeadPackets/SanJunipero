@@ -16,7 +16,7 @@ const ev = (type: string, payload: unknown): SimEvent => ({ seq: seq++, tick: 0,
 
 const ROWS = ['..###...', '........', '........', '..~~....', '........', '........']
 
-function world(...agents: Array<{ id: string; x: number; y: number }>): WorldState {
+function world(...agents: { id: string; x: number; y: number }[]): WorldState {
   let s = genesisState(
     DEFAULT_CONFIG,
     ROWS.map((row) => [...row].map((c) => CHAR_TILE[c]!)),
@@ -28,7 +28,7 @@ function world(...agents: Array<{ id: string; x: number; y: number }>): WorldSta
 
 function apply(
   s: WorldState,
-  events: Array<{ type: string; payload: unknown }>,
+  events: { type: string; payload: unknown }[],
   config = DEFAULT_CONFIG,
 ): WorldState {
   return events.reduce((acc, e) => fold(acc, ev(e.type, e.payload), config), s)

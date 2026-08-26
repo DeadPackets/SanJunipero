@@ -78,9 +78,9 @@ const beforeTheLadder = (c: SimConfig): SimConfig => ({
     ...c.structures,
     recipes: {
       ...c.structures.recipes,
-      cabin: { ...c.structures.recipes['cabin']!, hearth: false },
-      cottage: { ...c.structures.recipes['cottage']!, hearth: false, bed: false },
-      farmhouse: { ...c.structures.recipes['farmhouse']!, hearth: false, bed: false },
+      cabin: { ...c.structures.recipes.cabin!, hearth: false },
+      cottage: { ...c.structures.recipes.cottage!, hearth: false, bed: false },
+      farmhouse: { ...c.structures.recipes.farmhouse!, hearth: false, bed: false },
     },
   },
 })
@@ -108,27 +108,27 @@ const REMOVED: ReadonlySet<string> = VALLEY === 'stripped' ? ROOFED : new Set<st
 
 function buildWorld(store: EventStore): {
   state: WorldState
-  doors: Array<{ x: number; y: number }>
+  doors: { x: number; y: number }[]
 } {
   const g = makeGenesisWorld(config)
   let state = genesisState(config, g.terrain)
   const dropped = new Set<string>()
-  const doors: Array<{ x: number; y: number }> = []
+  const doors: { x: number; y: number }[] = []
   for (const e of g.events) {
     const p = e.payload as Record<string, unknown>
-    if (e.type === 'structure_planned' && ROOFED.has(String(p['kind']))) {
+    if (e.type === 'structure_planned' && ROOFED.has(String(p.kind))) {
       // Collected whether or not the roof is then dropped, so every arm and BOTH valleys spawn
       // their five founders on exactly the same five tiles.
-      doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
+      doors.push({ x: Number(p.x), y: Number(p.y) + Number(p.h ?? 1) })
     }
-    if (e.type === 'structure_planned' && REMOVED.has(String(p['kind']))) {
-      dropped.add(String(p['id']))
+    if (e.type === 'structure_planned' && REMOVED.has(String(p.kind))) {
+      dropped.add(String(p.id))
       continue
     }
     // Anything naming a building that is not there. An item carries its own `id`, so the location
     // has to be asked FIRST or the founder kit spawned inside the walls slips past.
-    const loc = p['loc'] as { t?: string; id?: string } | undefined
-    const names = loc?.t === 'structure' ? loc.id : (p['structureId'] ?? p['id'])
+    const loc = p.loc as { t?: string; id?: string } | undefined
+    const names = loc?.t === 'structure' ? loc.id : (p.structureId ?? p.id)
     if (e.type !== 'structure_planned' && typeof names === 'string' && dropped.has(names)) continue
     state = fold(state, store.append(state.tick, e.type, e.payload), config)
   }
@@ -206,11 +206,13 @@ async function main(): Promise<void> {
     config,
     startTick: START_TICK,
     realMsPerTick: 0,
-    onTick: (c) => handler(c),
+    onTick: (c) => {
+      handler(c)
+    },
   })
 
-  const refusals: Array<{ tick: number; id: string; verb: string; reason: string }> = []
-  const attempts: Array<{ tick: number; id: string; verb: string; params: string }> = []
+  const refusals: { tick: number; id: string; verb: string; reason: string }[] = []
+  const attempts: { tick: number; id: string; verb: string; params: string }[] = []
   class Watched extends EngineBridge {
     override submit(
       agentId: string,
@@ -242,7 +244,7 @@ async function main(): Promise<void> {
   const embedder = await Embedder.create(
     fileURLToPath(new URL('../../../data/models/', import.meta.url)),
   )
-  const thoughts: Array<{ tick: number; agentId: string; text: string }> = []
+  const thoughts: { tick: number; agentId: string; text: string }[] = []
   const runtimes: AgentRuntime[] = []
   for (const spec of MINDS) {
     const personality = new PersonalityStore(db, spec.id)

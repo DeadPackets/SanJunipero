@@ -26,8 +26,12 @@ const body = (over: Partial<MoodView> = {}): MoodView => ({
   ...over,
 })
 
-const ev = (type: string, payload: Record<string, unknown>, tick = NOW - 10): SimEvent =>
-  ({ seq: 1, tick, type, payload }) as SimEvent
+const ev = (type: string, payload: Record<string, unknown>, tick = NOW - 10): SimEvent => ({
+  seq: 1,
+  tick,
+  type,
+  payload,
+})
 
 const rec = (id: string, kind: string): AssetRecord => ({
   id,
@@ -47,7 +51,7 @@ const rec = (id: string, kind: string): AssetRecord => ({
 })
 
 describe('moodOf — each row of the table fires exactly once', () => {
-  const cases: Array<[Expression, MoodView, SimEvent[]]> = [
+  const cases: [Expression, MoodView, SimEvent[]][] = [
     ['asleep', body({ asleep: true }), []],
     ['angry', body(), [ev('agent_attacked', { targetId: 'amara' })]],
     ['sad', body(), [ev('agent_died', { id: 'amara' })]],

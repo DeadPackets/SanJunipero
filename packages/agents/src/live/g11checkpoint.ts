@@ -148,7 +148,7 @@ export function fingerprintMismatch(saved: G11Fingerprint, now: G11Fingerprint):
   const say = (field: string, a: unknown, b: unknown): void => {
     out.push(`${field}: checkpoint has ${JSON.stringify(a)}, this run has ${JSON.stringify(b)}`)
   }
-  for (const key of Object.keys(G11FingerprintSchema.shape) as Array<keyof G11Fingerprint>) {
+  for (const key of Object.keys(G11FingerprintSchema.shape) as (keyof G11Fingerprint)[]) {
     const a = saved[key]
     const b = now[key]
     if (JSON.stringify(a) !== JSON.stringify(b)) say(key, a, b)

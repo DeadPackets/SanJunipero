@@ -127,7 +127,7 @@ function world(seeds: AgentSeed[], structures: Structure[] = [], tick = 0): Worl
   for (const s of structures) byId[s.id] = s
   return {
     tick,
-    terrain: Array.from({ length: 48 }, () => Array.from({ length: 48 }, () => 0 as TileId)),
+    terrain: Array.from({ length: 48 }, () => Array.from({ length: 48 }, () => 0)),
     weather: { kind: 'sunny', temperatureC: 12 },
     agents: agents as WorldState['agents'],
     structures: byId,
@@ -299,7 +299,7 @@ describe('portrait — three honest fallbacks, never a broken image', () => {
 describe('mood — one table, not two', () => {
   it('is exactly what moodOf says, called on the same body', () => {
     const state = world([{ id: 'amara', name: 'Amara', asleep: true }])
-    const a = state.agents['amara']!
+    const a = state.agents.amara!
     const view: MoodView = {
       id: a.id,
       alive: a.alive,
@@ -353,7 +353,7 @@ describe('sortRoster — a preference, never a ranking', () => {
 
   it('is total over ROSTER_SORTS, and never changes the SET', () => {
     for (const by of ROSTER_SORTS) {
-      const sorted = sortRoster(rows, by as RosterSort)
+      const sorted = sortRoster(rows, by)
       expect(sorted.map((r) => r.id).sort(), by).toEqual(rows.map((r) => r.id).sort())
       expect(sortRoster(rows, by), by).toEqual(sorted) // stable across two reads
       expect(ROSTER_SORT_WORD[by].length).toBeGreaterThan(4)

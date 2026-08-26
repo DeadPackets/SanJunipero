@@ -58,7 +58,7 @@ export function migrateLlmTables(db: Database.Database): void {
   `)
   // A ledger written before the column existed is still a ledger: add it in place rather
   // than making every recorded run unreadable.
-  const cols = db.prepare('PRAGMA table_info(llm_calls)').all() as Array<{ name: string }>
+  const cols = db.prepare('PRAGMA table_info(llm_calls)').all() as { name: string }[]
   if (!cols.some((c) => c.name === 'provider'))
     db.exec('ALTER TABLE llm_calls ADD COLUMN provider TEXT')
   if (!cols.some((c) => c.name === 'reported_cost_usd')) {

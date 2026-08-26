@@ -74,7 +74,9 @@ export function DirectorMode({
   // (glide-interpolated), so cuts and tracking are smooth; a drag interrupts it
   useEffect(() => {
     if (scene === null || !autoCut) return
-    return () => scene.setFollow(null)
+    return () => {
+      scene.setFollow(null)
+    }
   }, [scene, autoCut])
   // With no subject the picture is the whole settlement: pushing to 3x before the first heat
   // poll has named anybody frames a 3x crop of whatever the camera was over.

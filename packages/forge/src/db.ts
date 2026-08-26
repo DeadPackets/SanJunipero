@@ -34,7 +34,7 @@ export function openForgeDb(path: string): Database.Database {
     );
     CREATE INDEX IF NOT EXISTS idx_vision_qa_class ON vision_qa(asset_class, created_at);
   `)
-  const cols = db.pragma('table_info(assets)') as Array<{ name: string }>
+  const cols = db.pragma('table_info(assets)') as { name: string }[]
   if (!cols.some((c) => c.name === 'kind')) {
     db.exec('ALTER TABLE assets ADD COLUMN kind TEXT')
     // backfill pre-existing rows only, by the desc-prefix convention; new rows set kind at register

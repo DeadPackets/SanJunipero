@@ -52,12 +52,26 @@ function town(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
 
   const worldTick = createWorldTick(config, rng)
   let handler: TickHandler = () => {}
-  const loop = new TickLoop({ store, state, rng, config, onTick: (ctx) => handler(ctx) })
+  const loop = new TickLoop({
+    store,
+    state,
+    rng,
+    config,
+    onTick: (ctx) => {
+      handler(ctx)
+    },
+  })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
   handler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
-  return { bridge, step: () => loop.step(), loop }
+  return {
+    bridge,
+    step: () => {
+      loop.step()
+    },
+    loop,
+  }
 }
 
 const proseFor = (bridge: EngineBridge): string =>

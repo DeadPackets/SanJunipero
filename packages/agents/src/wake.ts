@@ -42,7 +42,7 @@ export type BodyNeeds = { hunger: number; energy: number; warmth: number }
 export type AlarmBody = {
   needs: BodyNeeds
   thirst?: number
-  afflictions?: ReadonlyArray<{ kind: string; severity: number }>
+  afflictions?: readonly { kind: string; severity: number }[]
 }
 
 // The three needs the alarm has always watched, and the fourth C11 gave it.

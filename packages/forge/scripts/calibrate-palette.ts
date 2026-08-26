@@ -44,7 +44,9 @@ const sheet: RawImage = {
   height: blockH * moods.length,
   data: new Uint8ClampedArray(blockW * blockH * moods.length * 4),
 }
-moods.forEach((m, i) => sheet.data.set(applyTint(base, TINTS[m]).data, i * blockW * blockH * 4))
+moods.forEach((m, i) => {
+  sheet.data.set(applyTint(base, TINTS[m]).data, i * blockW * blockH * 4)
+})
 
 mkdirSync('packages/forge/out/calibration', { recursive: true })
 writeFileSync('packages/forge/out/calibration/palette-tints.png', await encodePng(sheet))

@@ -209,7 +209,7 @@ async function provenanceText(structureId: string, state: WorldState | null): Pr
   // the "why" line: the builder's journal entry nearest plannedTick, omitted when the journal is empty
   const jres = await fetch(`/api/agent/${p.builderId}/journal`)
   if (jres.ok) {
-    const entries = (await jres.json()) as Array<{ tick: number; text: string }>
+    const entries = (await jres.json()) as { tick: number; text: string }[]
     const nearest = entries.reduce<{ tick: number; text: string } | null>(
       (best, e) =>
         best === null || Math.abs(e.tick - p.plannedTick) < Math.abs(best.tick - p.plannedTick)
@@ -309,7 +309,9 @@ export function syncEntities(
       // `sprite.y - sprite.height` landed above the roof and off nobody's screen in particular
       if (text !== null) tags.show('hover', text, anchorForSprite(sprite, sprite.getLocalBounds()))
     })
-    sprite.on('pointerout', () => tags.hide('hover'))
+    sprite.on('pointerout', () => {
+      tags.hide('hover')
+    })
   }
   const records = store.assetRecords()
   const live = new Set<string>()
@@ -327,12 +329,12 @@ export function syncEntities(
       // with its story. The hover tag says which before the click is made.
       sprite.on('pointertap', (e: FederatedPointerEvent) => {
         if (entersOnClick(store.getConfig(), store.getState(), sid)) {
-          sync!.onDoor?.(sid)
+          sync.onDoor?.(sid)
           return
         }
-        void provenanceText(sid, store.getState()).then((text) =>
-          showPopover(text, e.client.x, e.client.y),
-        )
+        void provenanceText(sid, store.getState()).then((text) => {
+          showPopover(text, e.client.x, e.client.y)
+        })
       })
       entry = {
         sprite,

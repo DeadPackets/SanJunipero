@@ -20,7 +20,7 @@ export function fromSaplingKey(key: string): { x: number; y: number } {
   return { x: Number(key.slice(0, comma)), y: Number(key.slice(comma + 1)) }
 }
 
-const ORTHOGONAL: ReadonlyArray<readonly [number, number]> = [
+const ORTHOGONAL: readonly (readonly [number, number])[] = [
   [0, -1],
   [-1, 0],
   [1, 0],

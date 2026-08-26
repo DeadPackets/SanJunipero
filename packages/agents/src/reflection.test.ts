@@ -68,7 +68,7 @@ const TWO_PERSON_DAY = [
 async function seedDay(
   mem: MemoryStore,
   day: number,
-  specs: Array<{ text: string; people: string[]; importance: number }>,
+  specs: { text: string; people: string[]; importance: number }[],
 ): Promise<MemoryRow[]> {
   let i = 0
   for (const s of specs) {
@@ -122,7 +122,7 @@ class ScriptedReflectionLlm implements ReflectionLlm {
     ]
   }
 
-  async summarizeDay(_scenes: Array<{ title: string; text: string }>) {
+  async summarizeDay(_scenes: { title: string; text: string }[]) {
     this.calls.push('summarizeDay')
     return { title: 'Trade and promises', text: 'The day was full of deals.' }
   }
@@ -293,10 +293,10 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
   }
 
   function alertSink(): {
-    alerts: Array<{ kind: string; detail: string }>
+    alerts: { kind: string; detail: string }[]
     alert: (k: string, d: string) => void
   } {
-    const alerts: Array<{ kind: string; detail: string }> = []
+    const alerts: { kind: string; detail: string }[] = []
     return { alerts, alert: (kind, detail) => alerts.push({ kind, detail }) }
   }
 
@@ -502,9 +502,9 @@ describe('makeReflectionLlm prompts', () => {
 
   function recordingClient(): {
     client: LlmClient
-    calls: Array<{ system: string; messages: LlmMessage[] }>
+    calls: { system: string; messages: LlmMessage[] }[]
   } {
-    const calls: Array<{ system: string; messages: LlmMessage[] }> = []
+    const calls: { system: string; messages: LlmMessage[] }[] = []
     const client = {
       async object(opts: { system: string; messages: LlmMessage[]; schema: unknown }) {
         calls.push({ system: opts.system, messages: opts.messages })

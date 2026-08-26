@@ -42,7 +42,7 @@ export function renderNewspaper(
 export function timelapseCaptions(
   chapters: ChapterRow[],
   intervalDays = 1,
-): Array<{ day: number; caption: string }> {
+): { day: number; caption: string }[] {
   return [...chapters]
     .sort((a, b) => a.day - b.day)
     .filter((_c, i) => i % intervalDays === 0)
@@ -116,12 +116,12 @@ export function collectPublicRecord(
       `SELECT seq, tick, type, payload FROM events
        WHERE tick <= ? AND type IN (${PUBLIC_EVENT_TYPES.map(() => '?').join(',')}) ORDER BY seq`,
     )
-    .all(maxTick, ...PUBLIC_EVENT_TYPES) as Array<{
+    .all(maxTick, ...PUBLIC_EVENT_TYPES) as {
     seq: number
     tick: number
     type: string
     payload: string
-  }>
+  }[]
   const out: PublicRecord[] = []
   for (const r of rows) {
     const payload = JSON.parse(r.payload) as P

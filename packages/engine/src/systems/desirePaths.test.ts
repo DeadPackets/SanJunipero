@@ -124,8 +124,8 @@ describe('desirePathsSystem: wear', () => {
     const worn = midnight(cross(withWalker(meadow()), 120), 1).state
     expect(stepCostAt(worn, 1, 1, CFG)).toBe(0.8)
     const cost = terrainCostFor(CFG)
-    expect(cost[7]).toBeLessThan(cost[8]!)
-    expect(cost[8]).toBeLessThan(cost[0]!)
+    expect(cost[7]).toBeLessThan(cost[8])
+    expect(cost[8]).toBeLessThan(cost[0])
   })
 
   it('every counter falls a tenth a night, floored', () => {

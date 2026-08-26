@@ -78,7 +78,7 @@ describe('howFarUp — where the work has got to, in words', () => {
 
 describe('★ the packet carries how far up the walls are', () => {
   function siteWorld(progress: number): WorldState {
-    const rows = Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => 0 as TileId))
+    const rows = Array.from({ length: 10 }, () => Array.from({ length: 10 }, () => 0))
     let s = genesisState(CFG, rows)
     s = fold(
       s,
@@ -324,12 +324,11 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
 // until one body plants walls on it: free ground alone cannot answer "where does work go".
 
 describe('* walls already standing are a place the world can name', () => {
-  const rows = () => Array.from({ length: 14 }, () => Array.from({ length: 14 }, () => 0 as TileId))
-  const ev2 = (seq: number, type: string, payload: unknown) =>
-    ({ seq, tick: 0, type, payload }) as SimEvent
+  const rows = () => Array.from({ length: 14 }, () => Array.from({ length: 14 }, () => 0))
+  const ev2 = (seq: number, type: string, payload: unknown) => ({ seq, tick: 0, type, payload })
 
   function townWith(
-    sites: Array<{ id: string; kind: string; x: number; y: number; progress: number }>,
+    sites: { id: string; kind: string; x: number; y: number; progress: number }[],
   ): WorldState {
     let s = genesisState(CFG, rows())
     let seq = 0
@@ -383,7 +382,7 @@ describe('* walls already standing are a place the world can name', () => {
   // again: a building that looks like an answer and refuses in words a mind cannot use.
   it('says nothing about walls no pair of hands could carry on', () => {
     const s = townWith([{ id: 'structure_1', kind: 'cabin', x: 2, y: 2, progress: 1 }])
-    expect(CFG.structures.recipes['cabin']!.inputs).toEqual({})
+    expect(CFG.structures.recipes.cabin!.inputs).toEqual({})
     expect(unfinishedWork(s, CFG, { x: 1, y: 1 }), 'named an unfinishable wall').toBeNull()
   })
 

@@ -284,7 +284,7 @@ function parentIndex(events: SimEvent[]): Map<string, string[]> {
 
 export function detectTier2(events: SimEvent[], ctx: Tier2Ctx): Milestone[] {
   const parents = parentIndex(events)
-  const found: Array<Found | null> = [
+  const found: (Found | null)[] = [
     conversation(events, ctx.config),
     ...quarrelAndPeace(events),
     partnership(events, ctx.config),

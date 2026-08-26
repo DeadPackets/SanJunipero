@@ -123,7 +123,7 @@ describe('the shipped content/tilesets manifest', () => {
   it('carries the C10 seasons/scaffolding block AND the C13 autotile block', () => {
     const m = loadTilesetManifest()
     expect(Object.keys(m.seasons).sort()).toEqual(['autumn', 'spring', 'summer', 'winter'])
-    for (const s of Object.values(m.seasons)) expect(s!.tiles).toHaveLength(16)
+    for (const s of Object.values(m.seasons)) expect(s.tiles).toHaveLength(16)
     expect(m.scaffolding.file).toBe('scaffolding.png')
     expect(m.tileW).toBe(32)
     expect(Object.keys(m.autotile!.road.tiles).sort()).toEqual([...ROAD_AUTOTILE_KEYS].sort())
@@ -134,8 +134,8 @@ describe('the shipped content/tilesets manifest', () => {
   it('keeps every key the renderer consumes, whoever painted the pixels', () => {
     const m = loadTilesetManifest()
     for (const season of ['spring', 'summer', 'autumn', 'winter'] as const) {
-      expect(m.seasons[season]!.file).toBe(`${season}.png`)
-      expect(m.seasons[season]!.tiles).toEqual(seasonTileNames())
+      expect(m.seasons[season].file).toBe(`${season}.png`)
+      expect(m.seasons[season].tiles).toEqual(seasonTileNames())
     }
     expect([m.tileW, m.tileH, m.cols, m.rows]).toEqual([32, 16, 4, 4])
     expect(m.autotile!.road.file).toBe('road-autotile.png')
@@ -149,8 +149,8 @@ describe('the shipped content/tilesets manifest', () => {
     const m = loadTilesetManifest()
     const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'content', 'tilesets')
     for (const season of Object.values(m.seasons)) {
-      const img = await decodePng(readFileSync(join(dir, season!.file)))
-      expect([img.width, img.height], season!.file).toEqual([m.cols * m.tileW, m.rows * m.tileH])
+      const img = await decodePng(readFileSync(join(dir, season.file)))
+      expect([img.width, img.height], season.file).toEqual([m.cols * m.tileW, m.rows * m.tileH])
     }
     const strip = await decodePng(readFileSync(join(dir, m.autotile!.road.file)))
     expect([strip.width, strip.height]).toEqual([ROAD_AUTOTILE_KEYS.length * m.tileW, m.tileH])

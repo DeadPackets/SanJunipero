@@ -66,8 +66,12 @@ describe('the scene owns its clock', () => {
     const clock = sceneClock(app)
     clock.close()
     app.ticker = null // exactly what Application.destroy() does
-    expect(() => clock.set(true)).not.toThrow()
-    expect(() => clock.set(false)).not.toThrow()
+    expect(() => {
+      clock.set(true)
+    }).not.toThrow()
+    expect(() => {
+      clock.set(false)
+    }).not.toThrow()
     expect(calls).toEqual([])
   })
 })

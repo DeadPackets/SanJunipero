@@ -43,7 +43,7 @@ const CFG: SimConfig = SimConfigSchema.parse({
     recipes: {
       ...SimConfigSchema.parse({}).structures.recipes,
       house: {
-        ...SimConfigSchema.parse({}).structures.recipes['house']!,
+        ...SimConfigSchema.parse({}).structures.recipes.house!,
         durationTicks: HOUSE_TICKS,
       },
     },
@@ -90,15 +90,15 @@ function runTown(seed = 'far-bank'): Run {
     onTick: ({ tick, emit }) => {
       if (tick === 1) {
         for (const e of genesis) emit(e.type, e.payload)
-        ids.forEach((id, i) =>
+        ids.forEach((id, i) => {
           emit('agent_spawned', {
             id,
             name: id,
             x: TOWN_SQUARE.x + i + 1,
             y: TOWN_SQUARE.y + 1,
             ageDays: 7300,
-          }),
-        )
+          })
+        })
       }
       // Declared fixture upkeep, exactly as the claim-seam proof does it: this is a proof about
       // the lattice and the river, not about the economy.
@@ -205,7 +205,6 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
   const size = { w: state.terrain[0]!.length, h: state.terrain.length }
 
   it('★ an agent built a bridge, and the town then crossed the river', () => {
-    // eslint-disable-next-line no-console
     console.log(
       `[far-bank] ${DAYS * MINUTES_PER_DAY} ticks, ${MASONS} masons:` +
         ` deck complete at tick ${run.bridgeTick}, first claim west of the channel at tick ${run.crossedTick};` +
@@ -322,7 +321,7 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     const governed = all.filter((s) => plotOf(state, s) !== null).map(massOf)
     const ungoverned = all.filter((s) => plotOf(state, s) === null).map(massOf)
     const sp = townSpacing(governed, ungoverned)
-    // eslint-disable-next-line no-console
+
     console.log(
       `[far-bank] lattice floor over ${sp.governed} plot-seated buildings:` +
         ` ${sp.latticeFloor.toFixed(4)} px (exhaustive floor ${latticeFloor().closest.toFixed(4)});` +
@@ -422,7 +421,7 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     const reachedFromSquare = (s: WorldState): Set<string> => {
       const walk = townWalkOf(s, square)
       const seen = new Set([`${square.x},${square.y}`])
-      const stack: Array<readonly [number, number]> = [[square.x, square.y]]
+      const stack: (readonly [number, number])[] = [[square.x, square.y]]
       while (stack.length > 0) {
         const [cx, cy] = stack.pop()!
         for (const [ox, oy] of [

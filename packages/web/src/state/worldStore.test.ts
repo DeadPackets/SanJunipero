@@ -3,16 +3,14 @@ import { DEFAULT_CONFIG, stateHash, type AssetRecord, type SimEvent } from '@sj/
 import { fold, genesisState, type TileId } from '@sj/engine'
 import { createWorldStore } from './worldStore.js'
 
-const GRASS: TileId[][] = Array.from({ length: 4 }, () =>
-  Array.from({ length: 4 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => 0))
 
 const spawn: SimEvent = {
   seq: 1,
   tick: 1,
   type: 'agent_spawned',
   payload: { id: 'walker', name: 'Walker', x: 0, y: 0, ageDays: 7300 },
-} as SimEvent
+}
 
 function makeSnapshot() {
   const state = fold(genesisState(DEFAULT_CONFIG, GRASS), spawn, DEFAULT_CONFIG)
@@ -57,7 +55,9 @@ describe('worldStore', () => {
       ...makeSnapshot(),
       config: { ...JSON.parse(JSON.stringify(DEFAULT_CONFIG)), mystery: 1 },
     }
-    expect(() => store.applyServer(bad)).toThrow()
+    expect(() => {
+      store.applyServer(bad)
+    }).toThrow()
   })
 
   it('tick messages fold with the adopted config, bit-identical to the engine fold', () => {
@@ -65,13 +65,13 @@ describe('worldStore', () => {
     const snap = makeSnapshot()
     store.applyServer(snap)
     // a real delta always leads with tick_advanced, then the tick's events
-    const adv: SimEvent = { seq: 2, tick: 2, type: 'tick_advanced', payload: {} } as SimEvent
+    const adv: SimEvent = { seq: 2, tick: 2, type: 'tick_advanced', payload: {} }
     const ev: SimEvent = {
       seq: 3,
       tick: 2,
       type: 'agent_moved',
       payload: { id: 'walker', x: 1, y: 2 },
-    } as SimEvent
+    }
     store.applyServer({ t: 'tick', tick: 2, events: [adv, ev] })
     const reference = fold(fold(snap.state, adv, DEFAULT_CONFIG), ev, DEFAULT_CONFIG)
     expect(stateHash(store.getState())).toBe(stateHash(JSON.parse(JSON.stringify(reference))))
@@ -114,16 +114,12 @@ describe('worldStore', () => {
     store.applyServer(makeSnapshot())
     const seen: SimEvent[][] = []
     store.onEvents((evts) => seen.push(evts))
-    const events: SimEvent[] = Array.from(
-      { length: 401 },
-      (_, i) =>
-        ({
-          seq: 2 + i,
-          tick: 2,
-          type: 'agent_spoke',
-          payload: { agentId: 'walker', text: 'hm', x: 0, y: 0 },
-        }) as SimEvent,
-    )
+    const events: SimEvent[] = Array.from({ length: 401 }, (_, i) => ({
+      seq: 2 + i,
+      tick: 2,
+      type: 'agent_spoke',
+      payload: { agentId: 'walker', text: 'hm', x: 0, y: 0 },
+    }))
     store.applyServer({ t: 'tick', tick: 2, events })
     expect(seen).toHaveLength(1)
     expect(seen[0]).toHaveLength(401)
@@ -138,16 +134,12 @@ describe('worldStore', () => {
     store.applyServer(makeSnapshot())
     const seen: SimEvent[][] = []
     store.onEvents((evts) => seen.push(evts))
-    const noise: SimEvent[] = Array.from(
-      { length: 20 },
-      (_, i) =>
-        ({
-          seq: 10 + i,
-          tick: 3,
-          type: 'need_changed',
-          payload: { id: 'walker', need: 'hunger', delta: -1 },
-        }) as SimEvent,
-    )
+    const noise: SimEvent[] = Array.from({ length: 20 }, (_, i) => ({
+      seq: 10 + i,
+      tick: 3,
+      type: 'need_changed',
+      payload: { id: 'walker', need: 'hunger', delta: -1 },
+    }))
     const spoke = {
       seq: 40,
       tick: 3,
@@ -173,7 +165,7 @@ describe('worldStore', () => {
   })
 
   it('coalesces a burst of messages into ONE subscriber pass per frame', () => {
-    const frames: Array<() => void> = []
+    const frames: (() => void)[] = []
     const g = globalThis as { requestAnimationFrame?: unknown }
     const had = 'requestAnimationFrame' in g
     const prev = g.requestAnimationFrame

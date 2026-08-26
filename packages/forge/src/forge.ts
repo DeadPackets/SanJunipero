@@ -80,5 +80,10 @@ export function createForge(deps: {
       costUsd,
     })
   }
-  return { commission, onAssetReady: (cb) => deps.codex.onAssetReady(cb) }
+  return {
+    commission,
+    onAssetReady: (cb) => {
+      deps.codex.onAssetReady(cb)
+    },
+  }
 }

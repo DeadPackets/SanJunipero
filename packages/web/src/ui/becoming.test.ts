@@ -23,8 +23,8 @@ import {
 
 const WEB_SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-function sourceFiles(): Array<{ path: string; source: string }> {
-  const out: Array<{ path: string; source: string }> = []
+function sourceFiles(): { path: string; source: string }[] {
+  const out: { path: string; source: string }[] = []
   const walk = (dir: string): void => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const p = join(dir, e.name)
@@ -84,7 +84,7 @@ describe('substanceOf — a measure of becoming, not of being', () => {
   })
 
   it('is monotonic non-decreasing in every single term', () => {
-    for (const k of Object.keys(ZERO) as Array<keyof SubstanceInput>) {
+    for (const k of Object.keys(ZERO) as (keyof SubstanceInput)[]) {
       let last = -1
       for (const n of [0, 1, 2, 5, 10, 50, 1000]) {
         const v = substanceOf({ ...ZERO, [k]: n })
@@ -114,7 +114,7 @@ describe('substanceOf — a measure of becoming, not of being', () => {
   it('every share is positive, and the shares add up to exactly one whole person', () => {
     const total = Object.values(SUBSTANCE_WEIGHTS).reduce((a, b) => a + b, 0)
     expect(total).toBeCloseTo(1, 10)
-    for (const k of Object.keys(ZERO) as Array<keyof SubstanceInput>) {
+    for (const k of Object.keys(ZERO) as (keyof SubstanceInput)[]) {
       expect(SUBSTANCE_WEIGHTS[k], k).toBeGreaterThan(0)
       expect(SUBSTANCE_FULL[k], k).toBeGreaterThan(0)
     }
@@ -283,7 +283,7 @@ describe('the inspector on a day-0 person makes no claim the run has not earned'
   // WHAT THE BROWSER CAUGHT: the header badge prints the state and so did the Doing section,
   // so an idle person read "Asleep" twice on one panel.
   it('says what a person is doing exactly once on the panel', () => {
-    const withHeader = `<span class="badge">${'Asleep'}</span>${html}`
+    const withHeader = `<span class="badge">Asleep</span>${html}`
     expect(withHeader.match(/Asleep/g)?.length).toBe(1)
     const busy = renderToStaticMarkup(
       createElement(InspectorBodyView, {

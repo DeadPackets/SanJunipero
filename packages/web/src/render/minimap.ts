@@ -94,7 +94,7 @@ function put(px: Uint8ClampedArray, rank: Uint8Array, i: number, color: number, 
  */
 export function minimapPixels(
   terrain: readonly (readonly number[])[],
-  structures: ReadonlyArray<{ x: number; y: number; w: number; h: number }>,
+  structures: readonly { x: number; y: number; w: number; h: number }[],
   f: MinimapFit,
 ): Uint8ClampedArray<ArrayBuffer> {
   const px = new Uint8ClampedArray(f.w * f.h * 4)
@@ -175,8 +175,8 @@ export function minimapViewBox(
   let h = Math.min(f.h, Math.max(VIEW_MIN_PX, view.h * f.scale))
   const cx = a.mx + (view.w * f.scale) / 2,
     cy = a.my + (view.h * f.scale) / 2
-  let x = clamp(cx - w / 2, 0, Math.max(0, f.w - w))
-  let y = clamp(cy - h / 2, 0, Math.max(0, f.h - h))
+  const x = clamp(cx - w / 2, 0, Math.max(0, f.w - w))
+  const y = clamp(cy - h / 2, 0, Math.max(0, f.h - h))
   if (x + w > f.w) w = f.w - x
   if (y + h > f.h) h = f.h - y
   return { x, y, w, h }
@@ -258,7 +258,7 @@ export function onMinimap(p: MapPerson, focusId: string | null): boolean {
 /** One dot per person, deduplicated to the map's own pixel grid, so the cost is bounded by the
  *  MAP and not by the population. The watched person is exempt from the dedup and drawn LAST. */
 export function peopleDots(
-  people: ReadonlyArray<MapPerson>,
+  people: readonly MapPerson[],
   f: MinimapFit,
   focusId: string | null,
 ): PersonDot[] {

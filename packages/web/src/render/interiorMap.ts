@@ -270,7 +270,7 @@ export function standingTiles(map: RoomMap, p: MapPiece): Tile[] {
 
 /** Four-directional, in the engine's own neighbour order (`engine/path.ts`): a room path and a
  *  town path break their ties the same way, so a body does not walk by two different laws. */
-const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [
+const NEIGHBOURS: readonly (readonly [number, number])[] = [
   [0, -1],
   [-1, 0],
   [1, 0],

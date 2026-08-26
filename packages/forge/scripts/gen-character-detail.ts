@@ -22,9 +22,11 @@ const cands = await client.generateCandidates(
   [],
   3,
 )
-cands.forEach((c, i) => writeFileSync(`${OUT}/rig-part2-${i}.png`, c.png))
+cands.forEach((c, i) => {
+  writeFileSync(`${OUT}/rig-part2-${i}.png`, c.png)
+})
 console.log(`rig-part2: ${cands.length} candidates`)
-cands.forEach((c, i) =>
-  console.log(`  rig-part2-${i}.png  model=${c.model}  cost=$${c.costUsd.toFixed(4)}`),
-)
+cands.forEach((c, i) => {
+  console.log(`  rig-part2-${i}.png  model=${c.model}  cost=$${c.costUsd.toFixed(4)}`)
+})
 console.log(`total spend=$${budget.total.toFixed(4)} (cap $1)`)

@@ -61,7 +61,7 @@ function emptyUsage(): LlmUsage {
 class ScriptedLlm {
   objectCalls = 0
   systems: string[] = []
-  constructor(private readonly type: string = 'festival') {}
+  constructor(private readonly type = 'festival') {}
 
   async object<T>(opts: {
     system: string

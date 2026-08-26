@@ -49,7 +49,7 @@ export function placeTag(
     r.y >= view.y + EDGE_PAD_PX &&
     r.y + r.h <= view.y + view.h - EDGE_PAD_PX
 
-  const candidates: Array<{ side: Placed['side']; rect: Rect }> = [
+  const candidates: { side: Placed['side']; rect: Rect }[] = [
     {
       side: 'above',
       rect: { x: a.sx - size.w / 2, y: a.topY - TAG_GAP_PX - size.h, w: size.w, h: size.h },
@@ -108,7 +108,7 @@ export type TooltipLayer = {
   setOccupied(boxes: readonly Rect[]): void
   /** the live label boxes, in draw order. The layer's own bookkeeping, exposed because the
    *  next label placed has to avoid them. */
-  boxes(): Array<{ owner: TagOwner; rect: Rect }>
+  boxes(): { owner: TagOwner; rect: Rect }[]
   destroy(): void
 }
 

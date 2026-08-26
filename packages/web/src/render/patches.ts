@@ -40,7 +40,7 @@ const EDGES = [
 ] as const
 
 /** The outline of a set of tiles, as closed screen-space polylines with interior edges cut. */
-export function patchOutline(tiles: ReadonlyArray<Tile>): number[][] {
+export function patchOutline(tiles: readonly Tile[]): number[][] {
   const set = new Set(tiles.map((t) => keyOf(t.x, t.y)))
   // sorted, so the output does not depend on the order the caller collected tiles in
   const sorted = [...tiles].sort((a, b) => a.y - b.y || a.x - b.x)
@@ -84,7 +84,7 @@ export function patchOutline(tiles: ReadonlyArray<Tile>): number[][] {
 }
 
 /** Parallel lines along a patch's longer axis, spaced one tile apart across its shorter one. */
-export function furrowLines(tiles: ReadonlyArray<Tile>): number[][] {
+export function furrowLines(tiles: readonly Tile[]): number[][] {
   if (tiles.length === 0) return []
   const xs = tiles.map((t) => t.x),
     ys = tiles.map((t) => t.y)

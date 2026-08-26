@@ -7,11 +7,11 @@ export type AgentCtx = {
   agentId: string
   name: string
   skills: Record<string, number>
-  inventory: Array<{ kind: string; qty: number }>
+  inventory: { kind: string; qty: number }[]
   position: { x: number; y: number }
   // The world the asker is standing in: an arbiter shown neither rules on a town it cannot see.
   visible: {
-    structures: Array<{ kind: string; x: number; y: number }>
+    structures: { kind: string; x: number; y: number }[]
     ground: string[]
   }
   // The thought that reached for the act, verbatim. It rides here and not in the intent string

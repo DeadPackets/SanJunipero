@@ -49,7 +49,7 @@ function builderWorld(rings: number): WorldState {
       tick: 1,
       type: 'agent_spawned',
       payload: { id: 'wright', name: 'Wright', x: 0, y: 0, ageDays: 7300 },
-    } as never,
+    },
     SHOWCASE_CONFIG,
   )
   return fold(
@@ -59,14 +59,14 @@ function builderWorld(rings: number): WorldState {
       tick: 1,
       type: 'item_spawned',
       payload: { id: 'item_wood_wright', kind: 'wood', qty: 99, loc: { t: 'agent', id: 'wright' } },
-    } as never,
+    },
     SHOWCASE_CONFIG,
   )
 }
 
 const at = (s: WorldState, x: number, y: number): WorldState => ({
   ...s,
-  agents: { ...s.agents, wright: { ...s.agents['wright']!, x, y } },
+  agents: { ...s.agents, wright: { ...s.agents.wright!, x, y } },
 })
 
 /** The engine's own answer for a deck whose top-left corner is this tile, asked from every tile
@@ -163,9 +163,9 @@ describe('★ THE WRIGHT STOPS WHEN THE DECK IS UP, and the reason it needed its
     agents: {
       ...s.agents,
       wright: {
-        ...s.agents['wright']!,
+        ...s.agents.wright!,
         ...stand,
-        needs: { ...s.agents['wright']!.needs, energy: 100 },
+        needs: { ...s.agents.wright!.needs, energy: 100 },
       },
     },
   })
@@ -190,7 +190,7 @@ describe('★ THE WRIGHT STOPS WHEN THE DECK IS UP, and the reason it needed its
           flammable: false,
           builderId: 'wright',
         },
-      } as never,
+      },
       SHOWCASE_CONFIG,
     )
     const done = fold(
@@ -200,7 +200,7 @@ describe('★ THE WRIGHT STOPS WHEN THE DECK IS UP, and the reason it needed its
         tick: 3,
         type: 'structure_completed',
         payload: { id: 'deck' },
-      } as never,
+      },
       SHOWCASE_CONFIG,
     )
     expect(bridgeAt(done, deck.x, deck.y)).toBe(true)
@@ -343,12 +343,12 @@ describe('★ THE DEV WORLD CROSSES ITS OWN RIVER — a founder builds a deck, t
   it('★ AND HOUSES STAND ON THE FAR BANK, on plots the town claimed and nobody named', () => {
     expect(west.length, 'no house stands west of the channel').toBeGreaterThan(0)
     const builds = run.events.filter(
-      (e) => e.type === 'action_started' && e.payload['verb'] === 'build',
+      (e) => e.type === 'action_started' && e.payload.verb === 'build',
     )
-    const houses = builds.filter((b) => (b.payload['params'] as { kind: string }).kind === 'house')
+    const houses = builds.filter((b) => (b.payload.params as { kind: string }).kind === 'house')
     for (const b of houses) {
       expect(
-        Object.keys(b.payload['params'] as object).sort(),
+        Object.keys(b.payload.params as object).sort(),
         'a coordinate reached a house',
       ).toEqual(['kind'])
     }

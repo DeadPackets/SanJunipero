@@ -18,7 +18,7 @@ import {
 
 const at = (vx: number, vy: number): Fling => ({ vx, vy, ms: 0 })
 
-const track = (pts: ReadonlyArray<[number, number, number]>): DragTrack => {
+const track = (pts: readonly [number, number, number][]): DragTrack => {
   let t: DragTrack = trackDrag(null, pts[0]![0], pts[0]![1], pts[0]![2])
   for (const [x, y, ms] of pts.slice(1)) t = trackDrag(t, x, y, ms)
   return t

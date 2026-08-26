@@ -94,11 +94,13 @@ if (result.candidates.length === 0) {
   console.error(`BLOCKED ${MODEL}: HTTP ${e.status} ${e.detail.slice(0, 500)}`)
   process.exitCode = 1
 } else {
-  result.candidates.forEach((c, i) => writeFileSync(`${OUT}/rig-part4-${i}.png`, c.png))
+  result.candidates.forEach((c, i) => {
+    writeFileSync(`${OUT}/rig-part4-${i}.png`, c.png)
+  })
   console.log(`rig-part4: ${result.candidates.length} candidates (fallback=${fallback})`)
-  result.candidates.forEach((c, i) =>
-    console.log(`  rig-part4-${i}.png  model=${MODEL}  cost=$${c.costUsd.toFixed(4)}`),
-  )
+  result.candidates.forEach((c, i) => {
+    console.log(`  rig-part4-${i}.png  model=${MODEL}  cost=$${c.costUsd.toFixed(4)}`)
+  })
   const actual = result.candidates.reduce((s, c) => s + c.costUsd, 0)
   console.log(
     `actual spend=$${actual.toFixed(4)}  budget.total=$${budget.total.toFixed(4)} (cap $1.5)`,

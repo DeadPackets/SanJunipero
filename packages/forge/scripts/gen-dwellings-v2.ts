@@ -363,7 +363,7 @@ for (const s of SUBJECTS) {
         const msg =
           `${label}: ${key} subject ${subject}px, factor ${r.plan.factor}, window ${r.plan.window}, ` +
           `source x${r.plan.sourceScale.toFixed(3)}, ${fails.length === 0 ? 'gates clean' : fails.join('; ')}` +
-          `${refused ? ' — REFUSED BY EYE' : ''}`
+          (refused ? ' — REFUSED BY EYE' : '')
         lines.push(msg)
         console.log(`  ${msg}`)
         if (fails.length === 0 && !refused) break

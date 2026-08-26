@@ -30,7 +30,7 @@ const MASTER_PALETTE = [
 
 // Every structure kind this product can raise today.
 const ALL_KINDS = [...new Set([...TOWN_KINDS, ...INTERIOR_KINDS, 'grave', 'bridge', 'cottage'])]
-const SHAPES: Array<[number, number]> = [
+const SHAPES: [number, number][] = [
   [1, 1],
   [2, 2],
   [1, 2],
@@ -109,9 +109,9 @@ describe('a structure kind with no art still reads as a built thing', () => {
   it('never paints a checkerboard: no two adjacent faces share a colour', () => {
     for (const kind of ALL_KINDS) {
       const [left, right, top] = builtFormSpec(kind, 2, 2).faces
-      expect(left!.color, kind).not.toBe(right!.color)
-      expect(right!.color, kind).not.toBe(top!.color)
-      expect(top!.color, kind).not.toBe(left!.color)
+      expect(left.color, kind).not.toBe(right.color)
+      expect(right.color, kind).not.toBe(top.color)
+      expect(top.color, kind).not.toBe(left.color)
     }
   })
 

@@ -66,14 +66,14 @@ export const CANOPY_SHADE = 0x4f7040
 const CANOPY_ROWS: readonly number[] = [2, 3, 4, 5, 5, 6, 6, 6, 5, 5, 4, 3, 2]
 
 /** The tree, as flat blocks with hard edges — one row of the crown at a time. */
-export function canopyBlocks(): Array<{
+export function canopyBlocks(): {
   x: number
   y: number
   w: number
   h: number
   color: number
-}> {
-  const out: Array<{ x: number; y: number; w: number; h: number; color: number }> = []
+}[] {
+  const out: { x: number; y: number; w: number; h: number; color: number }[] = []
   const mid = CANOPY_PX.w / 2
   for (const [y, half] of CANOPY_ROWS.entries()) {
     out.push({ x: mid - half, y, w: half * 2, h: 1, color: CANOPY_BODY })
@@ -197,13 +197,13 @@ export function createAmbient(
   const smoke = new Map<string, Sprite[]>()
   const glows = new Map<string, Sprite>()
   const fires = new Map<string, Sprite>()
-  const bounces: Array<{ kind: 'structure' | 'item'; id: string; at: number }> = []
+  const bounces: { kind: 'structure' | 'item'; id: string; at: number }[] = []
   const bounceBase = new Map<string, { x: number; y: number }>()
 
   // ── sampled terrain sprites ──
   let sampledTerrain: TileId[][] | null = null
-  const shimmers: Array<{ sprite: Sprite; phase: number }> = []
-  const trees: Array<{ sprite: Sprite; phase: number }> = []
+  const shimmers: { sprite: Sprite; phase: number }[] = []
+  const trees: { sprite: Sprite; phase: number }[] = []
 
   const sampleTerrain = (terrain: TileId[][]): void => {
     for (const s of shimmers) s.sprite.destroy()

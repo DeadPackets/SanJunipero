@@ -35,10 +35,18 @@ function buildWorld() {
     )
   }
   let handler: TickHandler = () => {}
-  const loop = new TickLoop({ store, state, rng, config, onTick: (ctx) => handler(ctx) })
+  const loop = new TickLoop({
+    store,
+    state,
+    rng,
+    config,
+    onTick: (ctx) => {
+      handler(ctx)
+    },
+  })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
   // No world systems: this test drives births by hand, not by gestation.
-  let pending: Array<{ type: string; payload: unknown }> = []
+  let pending: { type: string; payload: unknown }[] = []
   handler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of pending) emit(e.type, e.payload)
     pending = []
@@ -46,7 +54,9 @@ function buildWorld() {
   return {
     bridge,
     store,
-    step: () => loop.step(),
+    step: () => {
+      loop.step()
+    },
     bear: (id: string, name: string) => {
       pending.push({
         type: 'agent_born',

@@ -31,17 +31,16 @@ const scenes: SceneSegment[] = [
   { day: 1, startTick: 1500, endTick: 1510, eventIds: [4, 5], cast: ['nadia'], location: null },
 ]
 
-const llmWith = (citations: number[]): NarratorLlm =>
-  ({
-    summarizeChapter: vi.fn(async () => ({
-      title: 'The Quarrel',
-      text: 'Blows by the storehouse.',
-      citations,
-    })),
-    summarizeEra: vi.fn(),
-    newspaperCopy: vi.fn(),
-    biography: vi.fn(),
-  }) as unknown as NarratorLlm
+const llmWith = (citations: number[]): NarratorLlm => ({
+  summarizeChapter: vi.fn(async () => ({
+    title: 'The Quarrel',
+    text: 'Blows by the storehouse.',
+    citations,
+  })),
+  summarizeEra: vi.fn(),
+  newspaperCopy: vi.fn(),
+  biography: vi.fn(),
+})
 
 describe('verifyCitations', () => {
   it('splits citations into valid and dangling', () => {

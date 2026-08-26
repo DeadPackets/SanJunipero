@@ -43,9 +43,7 @@ function markWeights(): Record<string, number> {
   return out
 }
 
-const GRASS: TileId[][] = Array.from({ length: 8 }, () =>
-  Array.from({ length: 8 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 
 const PAYLOAD = {
   recipeId: 'recipe:waterskin',
@@ -63,7 +61,7 @@ const LOOK: ChronicleLookup = {
 }
 
 /** A world log with those rows in it, and nothing else — the shape the archive reads. */
-function worldWith(rows: Array<{ tick: number; payload: unknown }>): Database.Database {
+function worldWith(rows: { tick: number; payload: unknown }[]): Database.Database {
   const db = openDb(':memory:')
   const store = new EventStore(db)
   for (const r of rows) store.append(r.tick, DISCOVERY_EVENT, r.payload)
@@ -126,15 +124,15 @@ describe('GATE G-D — a discovery is credited, recorded, replayed, served, mark
   it('3. reads as a sentence, weighted second in the feed, with a glyph of its own', () => {
     const ev: SimEvent = { seq: 1, tick: 40, type: DISCOVERY_EVENT, payload: PAYLOAD }
     expect(chronicleLine(ev, LOOK)).toBe('Maret found the way of it — stitch a waterskin.')
-    expect(CHRONICLE_WEIGHTS['discovery_made']).toBe(19)
-    expect(CHRONICLE_WEIGHTS['agent_died']!).toBeGreaterThan(19)
+    expect(CHRONICLE_WEIGHTS.discovery_made).toBe(19)
+    expect(CHRONICLE_WEIGHTS.agent_died!).toBeGreaterThan(19)
     expect(chronicleIcon('discovery_made')).toBe('key')
   })
 
   it('4. is the heaviest thing on the scrub bar', () => {
     const w = markWeights()
     expect(Object.keys(w)).toHaveLength(9)
-    expect(w['discovery']).toBe(18)
+    expect(w.discovery).toBe(18)
     expect(Math.max(...Object.values(w))).toBe(18)
   })
 

@@ -31,7 +31,7 @@ function tickTo(s: WorldState, tick: number, rng = new RngStreams('t')): WorldTi
 }
 function applyAll(
   s: WorldState,
-  events: Array<{ type: string; payload: unknown }>,
+  events: { type: string; payload: unknown }[],
   tick = s.tick,
 ): WorldState {
   for (const e of events) s = fold(s, ev(e.type, e.payload, tick), CFG)

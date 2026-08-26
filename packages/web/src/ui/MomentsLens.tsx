@@ -28,7 +28,7 @@ const clock = (tick: number): string => {
 // Drawn, not typed: ▶ and ❙❙ are pictographic characters whose shape belongs to the reader's
 // font. The town draws its own controls, in its own pixels.
 const CREAM = '#FFF6E9'
-const PLAY_PIXELS: ReadonlyArray<readonly [number, number]> = [
+const PLAY_PIXELS: readonly (readonly [number, number])[] = [
   [2, 0],
   [2, 1],
   [3, 1],
@@ -50,7 +50,7 @@ const PLAY_PIXELS: ReadonlyArray<readonly [number, number]> = [
   [3, 6],
   [2, 7],
 ]
-const PAUSE_PIXELS: ReadonlyArray<readonly [number, number]> = [
+const PAUSE_PIXELS: readonly (readonly [number, number])[] = [
   [1, 0],
   [2, 0],
   [5, 0],
@@ -141,7 +141,9 @@ export function MomentCardView({
         className={open ? 'moment-card open' : 'moment-card'}
         aria-current={open ? 'true' : undefined}
         aria-label={`${thumbTitle(moment)}. Day ${label.day}, ${label.cast}, ${where}. Play this day.`}
-        onClick={() => onOpen(moment.id)}
+        onClick={() => {
+          onOpen(moment.id)
+        }}
       >
         <Motif moment={moment} />
         <span className="thumb-body">
@@ -352,9 +354,13 @@ export function MomentsLens({
   useEffect(() => {
     const el = rootRef.current
     if (el === null || typeof ResizeObserver === 'undefined') return
-    const ro = new ResizeObserver(([entry]) => setBandW(entry?.contentRect.width ?? 0))
+    const ro = new ResizeObserver(([entry]) => {
+      setBandW(entry?.contentRect.width ?? 0)
+    })
     ro.observe(el)
-    return () => ro.disconnect()
+    return () => {
+      ro.disconnect()
+    }
   }, [])
 
   const people: PeopleIndex = useMemo(() => {
@@ -394,7 +400,9 @@ export function MomentsLens({
       raf = requestAnimationFrame(frame)
     }
     raf = requestAnimationFrame(frame)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(raf)
+    }
   }, [open, player.status, handle])
 
   const seek = (frac: number): void => {
@@ -434,15 +442,17 @@ export function MomentsLens({
           <PlayerStripView
             moment={open}
             player={player}
-            onToggle={() =>
+            onToggle={() => {
               setPlayer((prev) =>
                 prev.status === 'playing'
                   ? pausePlayer(prev)
                   : playPlayer(prev, open.startTick, open.endTick),
               )
-            }
+            }}
             onSeek={seek}
-            onSpeed={() => setPlayer((prev) => ({ ...prev, speed: nextPlaySpeed(prev.speed) }))}
+            onSpeed={() => {
+              setPlayer((prev) => ({ ...prev, speed: nextPlaySpeed(prev.speed) }))
+            }}
             onLive={goLive}
           />
         )}

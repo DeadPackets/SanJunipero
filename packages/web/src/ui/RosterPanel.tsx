@@ -52,7 +52,9 @@ export function RosterPanelView({
                 type="button"
                 className={by === sort ? 'roster-sort on' : 'roster-sort'}
                 aria-pressed={by === sort}
-                onClick={() => onSort(by)}
+                onClick={() => {
+                  onSort(by)
+                }}
               >
                 {ROSTER_SORT_WORD[by]}
               </button>

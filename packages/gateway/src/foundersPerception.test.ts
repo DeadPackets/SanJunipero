@@ -52,14 +52,15 @@ function streamRun(): number {
     rng: new RngStreams('perception-lane-world'),
     config: SHOWCASE_CONFIG,
     snapshotEveryTicks: 720,
-    onTick: (ctx) =>
+    onTick: (ctx) => {
       inner({
         tick: ctx.tick,
         emit: (type, payload) => {
           if (type === 'structure_planned') planned++
           ctx.emit(type, payload)
         },
-      }),
+      })
+    },
   })
   for (let t = 0; t < TICKS; t++) loop.step()
   return planned
@@ -76,7 +77,7 @@ function patrolRun(): void {
   )
   let seq = 0
   for (let tick = 1; tick <= TICKS; tick++) {
-    const emitted: Array<{ type: string; payload: unknown }> = []
+    const emitted: { type: string; payload: unknown }[] = []
     onTick({ tick, emit: (type, payload) => emitted.push({ type, payload }) })
     for (const e of emitted) state = fold(state, { seq: ++seq, tick, ...e }, SHOWCASE_CONFIG)
   }

@@ -321,7 +321,7 @@ async function runCharacter(m: CastMember): Promise<void> {
   // MASTER_OVERRIDE=<key> pins a specific cached raw (e.g. an edit-call output) as the
   // sole master candidate — used for the yusuf NE-head facing fix.
   const override = process.env.MASTER_OVERRIDE
-  const masterKeys = override && override.startsWith(`master-${m.id}`) ? [override] : null
+  const masterKeys = override?.startsWith(`master-${m.id}`) ? [override] : null
   const masterRefs = PROPORTION_REF
     ? [STYLE_ANCHOR, PROPORTION_REF, concept]
     : [STYLE_ANCHOR, concept]
@@ -498,7 +498,7 @@ async function runCharacter(m: CastMember): Promise<void> {
       {
         idle: masterGate[f],
         'contact-a': chosen[f]['contact-a'].gate,
-        passing: chosen[f]['passing'].gate,
+        passing: chosen[f].passing.gate,
         'contact-b': chosen[f]['contact-b'].gate,
       },
       CALIBRATED_MEDIAN,
@@ -518,7 +518,7 @@ async function runCharacter(m: CastMember): Promise<void> {
             {
               idle: masterGate[f],
               'contact-a': alt['contact-a'].gate,
-              passing: alt['passing'].gate,
+              passing: alt.passing.gate,
               'contact-b': alt['contact-b'].gate,
             },
             CALIBRATED_MEDIAN,
@@ -614,13 +614,13 @@ async function runCharacter(m: CastMember): Promise<void> {
       se: {
         idle: idleHi.se,
         'contact-a': chosen.se['contact-a'].hi,
-        passing: chosen.se['passing'].hi,
+        passing: chosen.se.passing.hi,
         'contact-b': chosen.se['contact-b'].hi,
       },
       ne: {
         idle: idleHi.ne,
         'contact-a': chosen.ne['contact-a'].hi,
-        passing: chosen.ne['passing'].hi,
+        passing: chosen.ne.passing.hi,
         'contact-b': chosen.ne['contact-b'].hi,
       },
     },
@@ -708,7 +708,9 @@ async function runCharacter(m: CastMember): Promise<void> {
     const fw = frames[0]!.width,
       fh = frames[0]!.height
     const stacked = new Uint8ClampedArray(fw * fh * frames.length * 4)
-    frames.forEach((fr, i) => stacked.set(fr.data, fw * fh * 4 * i))
+    frames.forEach((fr, i) => {
+      stacked.set(fr.data, fw * fh * 4 * i)
+    })
     const gif = await sharp(Buffer.from(stacked.buffer), {
       raw: { width: fw, height: fh * frames.length, channels: 4, pageHeight: fh },
     })
@@ -725,7 +727,7 @@ async function runCharacter(m: CastMember): Promise<void> {
         {
           idle: masterGate[f],
           'contact-a': chosen[f]['contact-a'].gate,
-          passing: chosen[f]['passing'].gate,
+          passing: chosen[f].passing.gate,
           'contact-b': chosen[f]['contact-b'].gate,
         },
         CALIBRATED_MEDIAN,

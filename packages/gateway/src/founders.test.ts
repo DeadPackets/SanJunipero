@@ -28,7 +28,7 @@ import {
 // The dev world after its first tick: five founders, six finished buildings.
 function townAtTick1(): WorldState {
   let state = genesisState(SHOWCASE_CONFIG, makeFixtureMap())
-  const events: Array<{ type: string; payload: unknown }> = []
+  const events: { type: string; payload: unknown }[] = []
   const onTick = makeFoundersOnTick(SHOWCASE_CONFIG, new RngStreams('founders-test'), () => state)
   onTick({ tick: 1, emit: (type, payload) => events.push({ type, payload }) })
   let seq = 0
@@ -107,7 +107,7 @@ describe('a founder leaves for home while the legs can still pay for the walk', 
   it('costs a walk out of the world’s own numbers — path × tiles-per-tick × decay', () => {
     const s = at(door.x + 10, door.y, 50)
     const cost = walkEnergyCost(s, SHOWCASE_CONFIG, 'omar', door)!
-    const path = findPath(s, s.agents['omar']!, door, SHOWCASE_CONFIG)!
+    const path = findPath(s, s.agents.omar!, door, SHOWCASE_CONFIG)!
     const tired = Math.max(
       SHOWCASE_CONFIG.movement.baseTicksPerTile,
       SHOWCASE_CONFIG.movement.debuffTicksPerTile,
@@ -232,7 +232,7 @@ const SHOWCASE_STRUCTURES = devTown().structures
 // The real town at tick 1: five founders and eleven buildings, five of them owned.
 function showcaseTownAtTick1(): WorldState {
   let state = genesisState(SHOWCASE_CONFIG, showcaseTerrain())
-  const events: Array<{ type: string; payload: unknown }> = []
+  const events: { type: string; payload: unknown }[] = []
   const onTick = makeFoundersOnTick(SHOWCASE_CONFIG, new RngStreams('u25'), () => state, {
     structures: SHOWCASE_STRUCTURES,
   })
@@ -280,7 +280,7 @@ describe('U25 — the humans were all sleeping inside one house', () => {
       // Tired enough that home is the only errand, rested enough that home is still reachable:
       // a body that cannot pay for the walk lies down instead, which is proved above.
       for (const id of FOUNDER_IDS) state = spend(state, id, GO_HOME_BELOW - 5)
-      const evs: Array<{ type: string; payload: unknown }> = []
+      const evs: { type: string; payload: unknown }[] = []
       onTick({ tick, emit: (type, payload) => evs.push({ type, payload }) })
       for (const e of evs) state = fold(state, { seq: ++seq, tick, ...e }, SHOWCASE_CONFIG)
       if (FOUNDER_IDS.every((id) => state.agents[id]?.insideId !== undefined)) break
@@ -372,7 +372,7 @@ describe('the storerooms hold something', () => {
   function showcaseAtTick1(): WorldState {
     const structures = townStructuresFor('showcase')
     let state = genesisState(SHOWCASE_CONFIG, showcaseTerrain())
-    const events: Array<{ type: string; payload: unknown }> = []
+    const events: { type: string; payload: unknown }[] = []
     const onTick = makeFoundersOnTick(
       SHOWCASE_CONFIG,
       new RngStreams('holdings-test'),

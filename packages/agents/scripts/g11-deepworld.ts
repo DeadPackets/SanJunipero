@@ -206,7 +206,7 @@ class DryLlm {
 // one of the schemas this run assembles; the turn cycles its act so the buckets, the trail and
 // the water line are all exercised for nothing.
 let dryTurn = 0
-const DRY_ACTS: Array<{ verb: string; params: Record<string, unknown> }> = [
+const DRY_ACTS: { verb: string; params: Record<string, unknown> }[] = [
   { verb: 'speak', params: { text: 'morning' } },
   { verb: 'walk', params: { x: 62, y: 70 } },
   { verb: 'walk', params: { x: 62, y: 62 } },
@@ -450,7 +450,7 @@ type Rejection = { tick: number; agentId: string; verb: string; reason: string }
 
 class WatchedBridge extends EngineBridge {
   readonly rejections: Rejection[] = []
-  readonly accepted: Array<{ tick: number; agentId: string; verb: string }> = []
+  readonly accepted: { tick: number; agentId: string; verb: string }[] = []
   #tick: () => number = () => 0
 
   watchTicks(tick: () => number): void {
@@ -688,7 +688,9 @@ async function main(): Promise<void> {
     config,
     startTick: saved?.sidecar.tick ?? START_TICK,
     realMsPerTick: REAL_MS_PER_TICK,
-    onTick: (ctx) => handler(ctx),
+    onTick: (ctx) => {
+      handler(ctx)
+    },
   })
   const bridge = new WatchedBridge({ loop, store, simConfig: config })
   if (saved !== null) bridge.restore(saved.sidecar)
@@ -701,8 +703,7 @@ async function main(): Promise<void> {
 
   // --- the minds ---
   const embedder = await Embedder.create(MODELS_DIR)
-  const thoughts: Array<{ tick: number; agentId: string; text: string }> =
-    saved?.sidecar.thoughts ?? []
+  const thoughts: { tick: number; agentId: string; text: string }[] = saved?.sidecar.thoughts ?? []
   const runtimes = new Map<string, AgentRuntime>()
   let seam: { adjudicate: Adjudicator; codify: Codifier } | null = null
 
@@ -796,13 +797,13 @@ async function main(): Promise<void> {
       discoveryArt.onDiscovery({ name: d.name, makes: d.makes })
     },
   })
-  const adjudications: Array<{
+  const adjudications: {
     tick: number
     agentId: string
     intent: string
     kind: string
     verb: string | null
-  }> = saved?.sidecar.adjudications ?? []
+  }[] = saved?.sidecar.adjudications ?? []
   const watched = {
     adjudicate: async (intent: string, ctx: Parameters<typeof arbiter.adjudicate>[1]) => {
       const verdict = await arbiter.adjudicate(intent, ctx)
@@ -939,7 +940,7 @@ async function main(): Promise<void> {
   }
 
   // --- the run ---
-  const spendProjections: Array<{ tick: number; usdPerSimDay: number }> =
+  const spendProjections: { tick: number; usdPerSimDay: number }[] =
     saved?.sidecar.spendProjections ?? []
   const FULL_NEED_SAMPLE_TICKS = 10
   const fullNeed =
@@ -1237,7 +1238,7 @@ async function main(): Promise<void> {
     const PROBE = 'probe_walker'
     const probeWorld = (
       at: { x: number; y: number },
-      extra: Array<[string, unknown]> = [],
+      extra: [string, unknown][] = [],
     ): WorldState => {
       let s: WorldState = { ...finalState }
       const put = (type: string, payload: unknown): void => {
@@ -1486,12 +1487,11 @@ async function main(): Promise<void> {
       })
       .map((e) => `${e.type} at tick ${e.tick}`)
     const sick = finalState.agents[SICK_ONE]
-    const stagedResolved =
-      sick === undefined || !sick.alive
-        ? ('died' as const)
-        : (sick.afflictions?.some((x) => x.kind === 'illness') ?? false)
-          ? ('standing' as const)
-          : ('recovered' as const)
+    const stagedResolved = !sick?.alive
+      ? ('died' as const)
+      : (sick.afflictions?.some((x) => x.kind === 'illness') ?? false)
+        ? ('standing' as const)
+        : ('recovered' as const)
 
     // --- perception in the dark, read out of the run's own memory rows ---
     // The sentence `perceptionToProse` writes when `packet.light` reads 'dark' — the words a
@@ -1590,7 +1590,7 @@ async function main(): Promise<void> {
         darkPerception: darkExcerpt,
         chronicleLine: lines[0] ?? null,
         constructName: constructRows.find((c) => c.name !== null)?.name ?? null,
-        tendedProse: lines.find((l) => / cared for /.test(l)) ?? null,
+        tendedProse: lines.find((l) => l.includes(' cared for ')) ?? null,
       },
       evidence: {
         ticksRun: loop.tick - START_TICK,
@@ -1746,9 +1746,9 @@ async function main(): Promise<void> {
 
 function transcript(
   report: G11Report,
-  thoughts: Array<{ tick: number; agentId: string; text: string }>,
+  thoughts: { tick: number; agentId: string; text: string }[],
   events: SimEvent[],
-  adjudications: Array<{ tick: number; agentId: string; intent: string; kind: string }>,
+  adjudications: { tick: number; agentId: string; intent: string; kind: string }[],
   rejections: Rejection[],
 ): string {
   const spoke = events.filter((e) => e.type === 'agent_spoke')

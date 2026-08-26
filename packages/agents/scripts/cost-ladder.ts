@@ -68,16 +68,16 @@ const MINDS = FOUNDER_MINDS
 
 function buildWorld(store: EventStore): {
   state: WorldState
-  doors: Array<{ x: number; y: number }>
+  doors: { x: number; y: number }[]
 } {
   const g = makeGenesisWorld(config)
   let state = genesisState(config, g.terrain)
-  const doors: Array<{ x: number; y: number }> = []
+  const doors: { x: number; y: number }[] = []
   for (const e of g.events) {
     const p = e.payload as Record<string, unknown>
     // Remember the doorways so every arm spawns its five founders on exactly the same tiles.
-    if (e.type === 'structure_planned' && p['kind'] === 'house') {
-      doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
+    if (e.type === 'structure_planned' && p.kind === 'house') {
+      doors.push({ x: Number(p.x), y: Number(p.y) + Number(p.h ?? 1) })
     }
     state = fold(state, store.append(state.tick, e.type, e.payload), config)
   }
@@ -145,12 +145,14 @@ async function main(): Promise<void> {
     config,
     startTick: START_TICK,
     realMsPerTick: 0,
-    onTick: (c) => handler(c),
+    onTick: (c) => {
+      handler(c)
+    },
   })
 
-  const refusals: Array<{ tick: number; id: string; verb: string; reason: string }> = []
-  const accepted: Array<{ tick: number; id: string; verb: string }> = []
-  const attempts: Array<{ tick: number; id: string; verb: string; params: string }> = []
+  const refusals: { tick: number; id: string; verb: string; reason: string }[] = []
+  const accepted: { tick: number; id: string; verb: string }[] = []
+  const attempts: { tick: number; id: string; verb: string; params: string }[] = []
   class Watched extends EngineBridge {
     override submit(
       agentId: string,
@@ -178,7 +180,7 @@ async function main(): Promise<void> {
   const embedder = await Embedder.create(
     fileURLToPath(new URL('../../../data/models/', import.meta.url)),
   )
-  const thoughts: Array<{ tick: number; agentId: string; text: string }> = []
+  const thoughts: { tick: number; agentId: string; text: string }[] = []
   const runtimes: AgentRuntime[] = []
   for (const spec of MINDS) {
     const personality = new PersonalityStore(db, spec.id)
@@ -292,7 +294,7 @@ async function main(): Promise<void> {
            COALESCE(SUM(cost_usd),0) AS cost
     FROM llm_calls GROUP BY caller
   `)
-    .all() as Array<{
+    .all() as {
     caller: string
     calls: number
     okCalls: number
@@ -301,7 +303,7 @@ async function main(): Promise<void> {
     reasonTok: number
     cacheTok: number
     cost: number
-  }>
+  }[]
   const repairs = db
     .prepare("SELECT COUNT(*) AS n FROM alerts WHERE kind = 'decode_repaired'")
     .get() as { n: number }

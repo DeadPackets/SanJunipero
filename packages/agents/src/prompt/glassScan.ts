@@ -106,7 +106,7 @@ function fold(text: string): string {
     .replace(CONFUSABLE, (c) => CONFUSABLE_TO_LATIN[c] ?? c)
 }
 
-const patternsFor = (terms: readonly string[]): ReadonlyArray<{ term: string; re: RegExp }> =>
+const patternsFor = (terms: readonly string[]): readonly { term: string; re: RegExp }[] =>
   terms.map((term) => ({
     term,
     re: new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'iu'),
@@ -117,7 +117,7 @@ export const MID_RUN_ENFORCED: readonly string[] = CONSTRUCT_VOCABULARY.filter(o
 const ALL_PATTERNS = patternsFor(CONSTRUCT_VOCABULARY)
 const OPS_ONLY_PATTERNS = patternsFor(MID_RUN_ENFORCED)
 
-function scan(prompt: string, patterns: ReadonlyArray<{ term: string; re: RegExp }>): string[] {
+function scan(prompt: string, patterns: readonly { term: string; re: RegExp }[]): string[] {
   const out = patterns.filter(({ re }) => re.test(prompt)).map(({ term }) => term)
   for (const m of prompt.matchAll(MILESTONE_KIND)) {
     const kind = m[0].toLowerCase()

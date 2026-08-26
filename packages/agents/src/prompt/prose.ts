@@ -94,11 +94,11 @@ export type PerceptionPacket = {
     body: {
       needs: { hunger: number; energy: number; warmth: number; social: number }
       hp: number
-      injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
+      injuries: { kind: 'minor' | 'serious' | 'grave'; day: number }[]
       ill: boolean
       thirst?: number
       // What ails this body and how badly. Absent on a packet from before C11 named them.
-      afflictions?: Array<{ kind: string; severity: number }>
+      afflictions?: { kind: string; severity: number }[]
     }
     x: number
     y: number
@@ -133,7 +133,7 @@ export type PerceptionPacket = {
     fauna?: PerceptionFauna[]
     forageables?: PerceptionForageable[]
   }
-  heard: Array<{ speakerId: string; name: string; text: string; distance: number }>
+  heard: { speakerId: string; name: string; text: string; distance: number }[]
   seen: PerceptionSeen[]
   feltEvents: string[]
 }

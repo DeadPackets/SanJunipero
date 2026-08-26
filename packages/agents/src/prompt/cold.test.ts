@@ -35,7 +35,7 @@ const WORLD = {
 // same object the runtime reads its packets from, so nothing here is a hand-built fixture.
 function town(
   startTick: number,
-  extraItems: Array<Record<string, unknown>> = [],
+  extraItems: Record<string, unknown>[] = [],
 ): { bridge: EngineBridge; loop: TickLoop; homes: Record<string, string> } {
   const db = openDb(':memory:')
   const g = makeGenesisWorld(CFG)
@@ -72,7 +72,7 @@ function town(
       state,
       store.append(state.tick, 'item_spawned', {
         ...item,
-        spoilage: { spawnDay: 0, days: CFG.spoilage.days['fish'] },
+        spoilage: { spawnDay: 0, days: CFG.spoilage.days.fish },
       }),
       CFG,
     )
@@ -87,7 +87,9 @@ function town(
     config: CFG,
     startTick,
     realMsPerTick: 0,
-    onTick: (c) => handler(c),
+    onTick: (c) => {
+      handler(c)
+    },
   })
   const bridge = new EngineBridge({ loop, store, simConfig: CFG })
   handler = bridge.wrapTickHandler(({ emit }) => {
@@ -112,7 +114,7 @@ describe('the cold a body can feel, and the thing that answers it', () => {
 
   it('a body under a roof on the same cold night is told the walls are holding it off', () => {
     const { bridge, loop, homes } = town(COLD_HOUR - 2)
-    void bridge.submit('yusuf', { verb: 'enter', params: { structureId: homes['yusuf']! } })
+    void bridge.submit('yusuf', { verb: 'enter', params: { structureId: homes.yusuf! } })
     loop.step()
     loop.step()
     expect(isExposed(loop.state, CFG, 'yusuf')).toBe(false)
@@ -123,7 +125,7 @@ describe('the cold a body can feel, and the thing that answers it', () => {
 
   it('the two bodies read different sentences on the same night — the pair is the whole lesson', () => {
     const { bridge, loop, homes } = town(COLD_HOUR - 2)
-    void bridge.submit('yusuf', { verb: 'enter', params: { structureId: homes['yusuf']! } })
+    void bridge.submit('yusuf', { verb: 'enter', params: { structureId: homes.yusuf! } })
     loop.step()
     loop.step()
     const outside = proseFor(bridge, 'amara')

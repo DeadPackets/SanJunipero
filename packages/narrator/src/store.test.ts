@@ -93,7 +93,9 @@ describe('NarratorStore', () => {
     store.insertMilestone(m)
     expect(store.milestoneKinds()).toEqual(new Set(['first_trade']))
     expect(store.milestones()).toEqual([m])
-    expect(() => store.insertMilestone(m)).toThrow()
+    expect(() => {
+      store.insertMilestone(m)
+    }).toThrow()
   })
 
   it('institutions round-trip memberIds/sourceEventIds', () => {

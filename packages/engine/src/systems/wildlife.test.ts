@@ -35,7 +35,7 @@ function withWildlife(s: WorldState, wildlife: WorldState['wildlife']): WorldSta
 }
 function applyAll(
   s: WorldState,
-  events: Array<{ type: string; payload: unknown }>,
+  events: { type: string; payload: unknown }[],
   config = CFG,
   tick = s.tick,
 ): WorldState {
@@ -150,7 +150,7 @@ describe('verb: forage', () => {
   })
 
   it('yields the seasonal amount of berries in spring', () => {
-    let s = makeWorld(['.f', '..'])
+    const s = makeWorld(['.f', '..'])
     const r = submitIntent(s, CFG, 'a1', 'forage', {})
     if (!r.ok) throw new Error(r.reason)
     const t = tickOnce(applyAll(s, r.events))
@@ -172,7 +172,7 @@ describe('verb: forage', () => {
   })
 
   it('yields nothing in winter', () => {
-    let s = atTick(makeWorld(['.f', '..']), WINTER + 5)
+    const s = atTick(makeWorld(['.f', '..']), WINTER + 5)
     const r = submitIntent(s, CFG, 'a1', 'forage', {})
     if (!r.ok) throw new Error(r.reason)
     const t = tickOnce(applyAll(s, r.events))

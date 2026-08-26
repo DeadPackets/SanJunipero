@@ -101,11 +101,11 @@ function runUntil(
   seed = 'g11a',
 ): {
   state: WorldState
-  log: Array<{ tick: number; type: string; payload: unknown }>
+  log: { tick: number; type: string; payload: unknown }[]
   tick: number
 } {
   let state = s
-  const log: Array<{ tick: number; type: string; payload: unknown }> = []
+  const log: { tick: number; type: string; payload: unknown }[] = []
   for (let tick = from; tick < from + limit; tick++) {
     const out = pass(state, config, tick, seed)
     state = out.state
@@ -115,7 +115,7 @@ function runUntil(
   return { state, log, tick: from + limit }
 }
 
-const died = (log: Array<{ tick: number; type: string; payload: unknown }>, id: string) =>
+const died = (log: { tick: number; type: string; payload: unknown }[], id: string) =>
   log.find((e) => e.type === 'agent_died' && (e.payload as { agentId?: string }).agentId === id)
 
 function noteCause(payload: unknown): void {
@@ -199,7 +199,7 @@ describe('G11a-M1: thirst is a clock of its own, and it kills on a schedule arit
 
   it('a drink resets the clock — from open water, from a well, and from a waterskin', () => {
     // Open water: a river tile beside the body.
-    let s = parched()
+    const s = parched()
     s.terrain[5]![6] = 2
     let out = act(s, CFG, START, 'dry', 'drink')
     expect(out.refusal).toBeNull()

@@ -27,9 +27,11 @@ const desc =
 
 const prompt = buildAssetPrompt(desc, { w: 1, h: 1 }, 'rig-part')
 const cands = await client.generateCandidates(prompt, [refPng], 3)
-cands.forEach((c, i) => writeFileSync(`${OUT}/rig-part3-${i}.png`, c.png))
+cands.forEach((c, i) => {
+  writeFileSync(`${OUT}/rig-part3-${i}.png`, c.png)
+})
 console.log(`rig-part3: ${cands.length} candidates`)
-cands.forEach((c, i) =>
-  console.log(`  rig-part3-${i}.png  model=${c.model}  cost=$${c.costUsd.toFixed(4)}`),
-)
+cands.forEach((c, i) => {
+  console.log(`  rig-part3-${i}.png  model=${c.model}  cost=$${c.costUsd.toFixed(4)}`)
+})
 console.log(`total spend=$${budget.total.toFixed(4)} (cap $1)`)

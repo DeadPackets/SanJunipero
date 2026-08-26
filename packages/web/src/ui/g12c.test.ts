@@ -56,8 +56,8 @@ function broadcastSheetPx(selector: string): number {
   return hits.at(-1)!
 }
 
-function sources(dir = WEB_SRC): Array<{ path: string; source: string }> {
-  const out: Array<{ path: string; source: string }> = []
+function sources(dir = WEB_SRC): { path: string; source: string }[] {
+  const out: { path: string; source: string }[] = []
   for (const name of readdirSync(dir).sort()) {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) {
@@ -206,8 +206,12 @@ describe("U13 — \"'Asleep' and 'Resting' mean the same thing\"", () => {
 
 // ── U14 · the chronicle timeline ──────────────────────────────────────────────────────────
 
-const ev = (tick: number, type: string, payload: Record<string, unknown> = {}): SimEvent =>
-  ({ seq: tick, tick, type, payload }) as unknown as SimEvent
+const ev = (tick: number, type: string, payload: Record<string, unknown> = {}): SimEvent => ({
+  seq: tick,
+  tick,
+  type,
+  payload,
+})
 
 describe('U14 — "the timeline is missing MARKS; the font is hard to read and too small"', () => {
   const marks = marksFrom({
@@ -350,7 +354,7 @@ describe('U16 — "an element sits ON TOP of the letterbox"', () => {
 describe('U17 — "world laws are super technical"', () => {
   it('is total over every togglable path', () => {
     for (const path of Object.keys(TOGGLABLE_PATHS)) {
-      expect(LAW_COPY[path as keyof typeof LAW_COPY], path).toBeDefined()
+      expect(LAW_COPY[path], path).toBeDefined()
     }
   })
 
@@ -441,7 +445,7 @@ describe('U22 — "I should have controls at the bottom to let me do what I want
     expect(items.length).toBeGreaterThan(4)
     for (const item of items) {
       expect(item.label.length, item.id).toBeGreaterThan(2)
-      // eslint-disable-next-line no-control-regex
+
       expect(/[^\u0000-\u00FF]/.test(item.label), `${item.id} label "${item.label}"`).toBe(false)
       expect(item.glyph.length, item.id).toBeGreaterThan(0)
     }
@@ -587,7 +591,7 @@ describe('P22 — personality is an OUTPUT, not an input', () => {
       people: { a1: 'A', a2: 'B' },
       changes: [],
     }
-    const quiet = becomingOf({ ...base, id: 'a1', acts: [] } as never)
+    const quiet = becomingOf({ ...base, id: 'a1', acts: [] })
     const busy = becomingOf({
       ...base,
       id: 'a2',

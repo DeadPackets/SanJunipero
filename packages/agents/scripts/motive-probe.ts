@@ -75,18 +75,18 @@ const REMOVED_BY_ARM: Record<string, string[]> = {
 // Arm B puts the roofs back on: the valley as it stood before the ruling, and the only arm
 // where the want is answered before the first tick.
 const ROOFS_BACK_ON = ARM === 'b'
-const REMOVED = new Set(REMOVED_BY_ARM[ARM] ?? REMOVED_BY_ARM['g']!)
+const REMOVED = new Set(REMOVED_BY_ARM[ARM] ?? REMOVED_BY_ARM.g!)
 void isRoofedKind
 
 function buildWorld(store: EventStore): {
   state: WorldState
-  doors: Array<{ x: number; y: number }>
+  doors: { x: number; y: number }[]
 } {
   const g = makeGenesisWorld(config)
   let state = genesisState(config, g.terrain)
   const dropped = new Set<string>()
   const roofless = new Set<string>()
-  const doors: Array<{ x: number; y: number }> = []
+  const doors: { x: number; y: number }[] = []
   const emit = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
@@ -95,18 +95,18 @@ function buildWorld(store: EventStore): {
     if (e.type === 'structure_planned') {
       // Every arm spawns its five founders on exactly the same five tiles, so the arms differ
       // in nothing but what stands around them.
-      if (SPAWN_KINDS.has(String(p['kind'])))
-        doors.push({ x: Number(p['x']), y: Number(p['y']) + Number(p['h'] ?? 1) })
-      if (REMOVED.has(String(p['kind']))) {
-        dropped.add(String(p['id']))
+      if (SPAWN_KINDS.has(String(p.kind)))
+        doors.push({ x: Number(p.x), y: Number(p.y) + Number(p.h ?? 1) })
+      if (REMOVED.has(String(p.kind))) {
+        dropped.add(String(p.id))
         continue
       }
-      roofless.add(String(p['id']))
+      roofless.add(String(p.id))
       emit(e.type, e.payload)
       continue
     }
-    if (dropped.has(String(p['id']))) continue
-    if (e.type === 'structure_completed') roofless.delete(String(p['id']))
+    if (dropped.has(String(p.id))) continue
+    if (e.type === 'structure_completed') roofless.delete(String(p.id))
     // ARM B ONLY: the progress genesis books into a roofless dwelling is skipped and the
     // building is completed instead — the sound village, as every earlier run measured it.
     if (ROOFS_BACK_ON && e.type === 'structure_progressed') continue
@@ -187,11 +187,13 @@ async function main(): Promise<void> {
     config,
     startTick: START_TICK,
     realMsPerTick: 0,
-    onTick: (c) => handler(c),
+    onTick: (c) => {
+      handler(c)
+    },
   })
 
-  const refusals: Array<{ tick: number; id: string; verb: string; reason: string }> = []
-  const attempts: Array<{ tick: number; id: string; verb: string; params: string }> = []
+  const refusals: { tick: number; id: string; verb: string; reason: string }[] = []
+  const attempts: { tick: number; id: string; verb: string; params: string }[] = []
   class Watched extends EngineBridge {
     override submit(
       agentId: string,
@@ -217,7 +219,7 @@ async function main(): Promise<void> {
       const p = super.perception(agentId)
       if (ARM === 'b' || ARM === 'c') return p
       const { cold: _dropped, ...rest } = p
-      return rest as typeof p
+      return rest
     }
   }
   const bridge = new Watched({ loop, store, simConfig: config })
@@ -228,7 +230,7 @@ async function main(): Promise<void> {
   const embedder = await Embedder.create(
     fileURLToPath(new URL('../../../data/models/', import.meta.url)),
   )
-  const thoughts: Array<{ tick: number; agentId: string; text: string }> = []
+  const thoughts: { tick: number; agentId: string; text: string }[] = []
   const runtimes: AgentRuntime[] = []
   for (const spec of MINDS) {
     const personality = new PersonalityStore(db, spec.id)
@@ -284,7 +286,7 @@ async function main(): Promise<void> {
   const collapsed = MINDS.filter((m) => loop.state.agents[m.id]?.collapsedSinceTick != null).length
   const sheltered = MINDS.filter((m) => loop.state.agents[m.id]?.insideId !== undefined).length
   const noWayIn = refusals.filter((r) => /no way into|has no roof/.test(r.reason)).length
-  const noFloor = refusals.filter((r) => /no floor left/.test(r.reason)).length
+  const noFloor = refusals.filter((r) => r.reason.includes('no floor left')).length
   const ledger = shelterLedger(loop.state, config)
 
   const report = {

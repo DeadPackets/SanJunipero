@@ -394,9 +394,9 @@ describe('a discovery, in the town’s own words', () => {
   })
 
   it('sits second in the feed — under a death, over a birth', () => {
-    expect(CHRONICLE_WEIGHTS['discovery_made']).toBe(19)
-    expect(CHRONICLE_WEIGHTS['agent_died']).toBeGreaterThan(19)
-    expect(CHRONICLE_WEIGHTS['agent_born']).toBeLessThan(19)
+    expect(CHRONICLE_WEIGHTS.discovery_made).toBe(19)
+    expect(CHRONICLE_WEIGHTS.agent_died).toBeGreaterThan(19)
+    expect(CHRONICLE_WEIGHTS.agent_born).toBeLessThan(19)
   })
 
   it('has a glyph of its own, shared with nothing else', () => {

@@ -73,11 +73,11 @@ export function wrapBubble(text: string, maxChars = WRAP_CHARS): string[] {
 
 /** De-conflicts the whole live set through `placeTag` in the layer's own arrival order, so a bubble does not jump about while the one beside it is dying. */
 export function placeBubbles(
-  want: ReadonlyArray<{ id: string; sx: number; sy: number; size: { w: number; h: number } }>,
+  want: readonly { id: string; sx: number; sy: number; size: { w: number; h: number } }[],
   view: Rect,
-): Array<{ id: string; sx: number; sy: number; side: BubbleSide; rect: Rect }> {
+): { id: string; sx: number; sy: number; side: BubbleSide; rect: Rect }[] {
   const taken: Rect[] = []
-  const out: Array<{ id: string; sx: number; sy: number; side: BubbleSide; rect: Rect }> = []
+  const out: { id: string; sx: number; sy: number; side: BubbleSide; rect: Rect }[] = []
   for (const b of want) {
     const at = placeTag(
       { sx: b.sx, sy: b.sy, halfW: b.size.w / 2, topY: b.sy },
@@ -160,7 +160,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       return
     }
     nineSlice(w, h, BUBBLE_SLICE).forEach((r, i) => {
-      const piece = new Sprite(slices[i]!)
+      const piece = new Sprite(slices[i])
       piece.position.set(r.dx, r.dy)
       piece.width = r.dw
       piece.height = r.dh
@@ -242,7 +242,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
   const spawn = (agentId: string, text: string, isThought: boolean): void => {
     if (isThought && suppressed) return // thought wisps stop under grave tone; speech is world fact
     const state = store.getState()
-    if (state === null || state.agents[agentId] === undefined) return // visible agents only
+    if (state?.agents[agentId] === undefined) return // visible agents only
     const now = performance.now()
     const built = build(text, isThought)
     scene.layers.bubbles.addChild(built.node)
@@ -257,8 +257,12 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
   }
 
   return {
-    spawnSpeech: (agentId, text) => spawn(agentId, text, false),
-    spawnThought: (agentId, text) => spawn(agentId, text, true),
+    spawnSpeech: (agentId, text) => {
+      spawn(agentId, text, false)
+    },
+    spawnThought: (agentId, text) => {
+      spawn(agentId, text, true)
+    },
     setSuppressed: (v) => {
       suppressed = v
       if (v) {

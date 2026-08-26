@@ -57,14 +57,14 @@ export type Becoming = {
   /** the one authored-SHAPED sentence, and it is arithmetic rather than a trait */
   lived: string
   /** what they have actually done, from the log, newest day first */
-  done: Array<{ words: string; day: number }>
-  knows: Array<{ id: string; name: string; level: BondLevel; type: BondType; words: string }>
+  done: { words: string; day: number }[]
+  knows: { id: string; name: string; level: BondLevel; type: BondType; words: string }[]
   /** skill BANDS in words, never xp and never a level number */
-  good: Array<{ words: string }>
+  good: { words: string }[]
   /** drives — empty until the society lane emits them, and an empty section does not render */
-  wants: Array<{ words: string }>
+  wants: { words: string }[]
   /** P22.5 — the days this person became different */
-  changed: Array<{ day: number; words: string }>
+  changed: { day: number; words: string }[]
 }
 
 /** One line per section for a person the run has not yet made anything of. Each says THIS PERSON
@@ -106,7 +106,7 @@ const SMALL = [
 const inWords = (n: number): string => SMALL[n] ?? String(n)
 
 /** Five bands, no numbers — the same shape v1 task 22's `skillPhrase` lands with. */
-export const SKILL_BANDS: ReadonlyArray<{ at: number; words: string }> = [
+export const SKILL_BANDS: readonly { at: number; words: string }[] = [
   { at: 4, words: 'has just started' },
   { at: 12, words: 'is getting the hang of' },
   { at: 30, words: 'has a practised hand at' },
@@ -142,13 +142,13 @@ export function actsOf(
   agentId: string,
   bonds: BondsResponse | null,
   events: readonly SimEvent[],
-): Array<{ tick: number; words: string }> {
-  const out: Array<{ tick: number; words: string }> = []
+): { tick: number; words: string }[] {
+  const out: { tick: number; words: string }[] = []
   for (const b of bonds?.bonds ?? []) {
     if (b.aId !== agentId && b.bId !== agentId) continue
     // The window says what has happened lately; the rollup's two stamps keep the day an act FIRST
     // happened. Both fold to one row per day per act, so nothing is duplicated.
-    const ticks: Array<{ tick: number; kind: string }> = [
+    const ticks: { tick: number; kind: string }[] = [
       ...b.recent,
       ...b.acts.flatMap((a) => [
         { tick: a.firstTick, kind: a.kind },
@@ -167,8 +167,7 @@ export function actsOf(
     const words = FEED_WORDS[ev.type]
     if (words === undefined) continue
     const p = ev.payload as Record<string, unknown>
-    if (p?.['agentId'] !== agentId && p?.['builderId'] !== agentId && p?.['id'] !== agentId)
-      continue
+    if (p?.agentId !== agentId && p?.builderId !== agentId && p?.id !== agentId) continue
     out.push({ tick: ev.tick, words })
   }
   return out
@@ -189,7 +188,7 @@ export type BecomingInput = {
   name: string
   nowTick: number
   skills: Readonly<Record<string, number>>
-  acts: ReadonlyArray<{ tick: number; words: string }>
+  acts: readonly { tick: number; words: string }[]
   bonds: BondsResponse | null
   lineage: LineageLike
   /** id → name, from the world the viewer already holds */
@@ -258,7 +257,7 @@ export function becomingOf(input: BecomingInput): Becoming {
 }
 
 /** Which sections have something to say. `wants` is never shown while it is empty (P22.2). */
-export const ALWAYS_SHOWN: ReadonlyArray<keyof Becoming> = [
+export const ALWAYS_SHOWN: readonly (keyof Becoming)[] = [
   'lived',
   'done',
   'knows',

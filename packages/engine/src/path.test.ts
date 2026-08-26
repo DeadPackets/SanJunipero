@@ -59,8 +59,8 @@ describe('the C11 tiles: path, sapling, channel', () => {
   it('a worn path is cheaper than grass and dearer than road', () => {
     const cost = terrainCostFor(DEFAULT_CONFIG)
     expect(cost[8]).toBe(0.8)
-    expect(cost[7]).toBeLessThan(cost[8]!)
-    expect(cost[8]).toBeLessThan(cost[0]!)
+    expect(cost[7]).toBeLessThan(cost[8])
+    expect(cost[8]).toBeLessThan(cost[0])
     expect(terrainCostFor(SimConfigSchema.parse({ desirePaths: { pathCost: 0.95 } }))[8]).toBe(0.95)
   })
   it('a sapling walks like grass and a channel is impassable', () => {
@@ -287,7 +287,7 @@ describe('findPath (A*)', () => {
 // because a road is 0.6. An A* charging a full grass tile per remaining step cannot believe that.
 const ROAD_RING = ['..............', 'R............R', 'R............R', 'RRRRRRRRRRRRRR']
 
-const costOf = (s: WorldState, path: Array<[number, number]>, config: SimConfig): number =>
+const costOf = (s: WorldState, path: [number, number][], config: SimConfig): number =>
   path.reduce((sum, [x, y]) => sum + stepCostAt(s, x, y, config), 0)
 
 describe('the A* heuristic is admissible (Task 37a)', () => {

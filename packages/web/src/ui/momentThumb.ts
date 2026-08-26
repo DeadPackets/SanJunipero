@@ -20,7 +20,7 @@ export function thumbTitle(m: Moment): string {
 
 // ------------------------------------------------------------------ location motifs
 
-export type Motif = { name: string; pixels: ReadonlyArray<readonly [number, number, string]> }
+export type Motif = { name: string; pixels: readonly (readonly [number, number, string])[] }
 
 const INK = '#43394A',
   EMBER = '#E8785A',
@@ -32,8 +32,8 @@ const WATER = '#7FB0C9',
 
 const px = (
   fill: string,
-  ...cells: ReadonlyArray<readonly [number, number]>
-): Array<readonly [number, number, string]> => cells.map(([x, y]) => [x, y, fill] as const)
+  ...cells: readonly (readonly [number, number])[]
+): (readonly [number, number, string])[] => cells.map(([x, y]) => [x, y, fill] as const)
 
 export const MOTIFS: readonly Motif[] = [
   {
@@ -82,7 +82,7 @@ export const MOTIFS: readonly Motif[] = [
 const MOTIF_BY_NAME = new Map(MOTIFS.map((m) => [m.name, m]))
 
 // Authored, not guessed: a small keyword table over the narrator's own location words.
-const MOTIF_WORDS: ReadonlyArray<readonly [RegExp, string]> = [
+const MOTIF_WORDS: readonly (readonly [RegExp, string])[] = [
   [/plaza|square|road|street|stone|wall/, 'stone'],
   [/river|water|bank|well|lake|shore/, 'water'],
   [/field|farm|crop|meadow|garden/, 'field'],

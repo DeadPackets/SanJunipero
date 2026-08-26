@@ -87,7 +87,9 @@ describe('detectFirsts', () => {
     const ms = detectFirsts(speechAndTrade, { seenKinds: store.milestoneKinds(), rulebookCount: 0 })
     for (const m of ms) store.insertMilestone(m)
     expect(store.milestoneKinds()).toEqual(new Set(['first_speech', 'first_trade']))
-    expect(() => store.insertMilestone(ms[0]!)).toThrow()
+    expect(() => {
+      store.insertMilestone(ms[0]!)
+    }).toThrow()
     // a re-run gated by seenKinds emits nothing new
     expect(
       detectFirsts(speechAndTrade, { seenKinds: store.milestoneKinds(), rulebookCount: 0 }),

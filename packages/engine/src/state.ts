@@ -47,7 +47,7 @@ export type AgentBody = {
   asleep: boolean
   needs: { hunger: number; energy: number; warmth: number; social: number }
   hp: number
-  injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
+  injuries: { kind: 'minor' | 'serious' | 'grave'; day: number }[]
   ill: boolean
   ageDays: number
   sex?: 'f' | 'm' // absent = 'f'; read through sexOf(), keeps pre-C9 hashes stable
@@ -65,7 +65,7 @@ export type AgentBody = {
   coldTicksSinceRecovery?: number
   // What this body has eaten lately, pruned to the variety window at every meal. Absent until
   // the first one, so a body that has never eaten hashes as it always did.
-  recentFoods?: Array<{ kind: string; day: number }>
+  recentFoods?: { kind: string; day: number }[]
   // What the body is wearing. One slot in v1; absent until the first thing is put on, so a
   // town that never made a garment hashes exactly as it always did.
   equipped?: { body?: string }
@@ -77,7 +77,7 @@ export type AgentBody = {
     verb: string
     ticksRemaining: number
     params: Record<string, unknown>
-    path?: Array<[number, number]>
+    path?: [number, number][]
   }
   collapsedSinceTick: number | null
   zeroHungerSinceTick: number | null

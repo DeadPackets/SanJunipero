@@ -211,10 +211,7 @@ export type Waypoint = { x: number; y: number; atMs: number }
 
 // The body steps through each waypoint tile — never a straight line to the final destination —
 // so a corner leg cannot sweep across a building's drawn volume. path[0] is the anchor.
-export function interpolatePos(
-  path: ReadonlyArray<Waypoint>,
-  nowMs: number,
-): { x: number; y: number } {
+export function interpolatePos(path: readonly Waypoint[], nowMs: number): { x: number; y: number } {
   if (path.length === 0) return { x: 0, y: 0 }
   const first = path[0]!
   if (nowMs <= first.atMs) return { x: first.x, y: first.y }
@@ -245,7 +242,7 @@ export function prunePath(path: Waypoint[], nowMs: number): Waypoint[] {
 
 // Facing for the leg being walked NOW — path[0] (anchor) → path[1] — so a queued
 // multi-waypoint path never turns the body toward its final leg early.
-export function legFacing(path: ReadonlyArray<Waypoint>): Facing | null {
+export function legFacing(path: readonly Waypoint[]): Facing | null {
   if (path.length < 2) return null
   return facingFrom(path[1]!.x - path[0]!.x, path[1]!.y - path[0]!.y)
 }

@@ -47,38 +47,37 @@ function pln(overrides: Partial<PlanState> = {}): PlanState {
 }
 
 describe('decideWake — one case per reason', () => {
-  const cases: Array<[string, PerceptionPacket, MindClock, number, PlanState, WakeReason | null]> =
+  const cases: [string, PerceptionPacket, MindClock, number, PlanState, WakeReason | null][] = [
+    ['body_alarm', withNeeds(24, 78, 71), clk(), 10, pln(), 'body_alarm'],
     [
-      ['body_alarm', withNeeds(24, 78, 71), clk(), 10, pln(), 'body_alarm'],
-      [
-        'salient_perception (heard speech)',
-        conversationPacket,
-        clk(),
-        10,
-        pln(),
-        'salient_perception',
-      ],
-      [
-        'salient_perception (felt event only)',
-        { ...quietMeadowPacket, feltEvents: ['rain_started'] },
-        clk(),
-        10,
-        pln(),
-        'salient_perception',
-      ],
-      ['plan_blocked', pkt(), clk(), 10, pln({ lastResult: 'blocked' }), 'plan_blocked'],
-      ['plan_done', pkt(), clk(), 30, pln({ lastResult: 'done' }), 'plan_done'],
-      [
-        'conversation_beat',
-        pkt(),
-        clk({ lastTurnTick: 100, conversationUntilTick: 160 }),
-        102,
-        pln(),
-        'conversation_beat',
-      ],
-      ['reconsider', pkt(), clk({ reconsiderAtTick: 100 }), 100, pln(), 'reconsider'],
-      ['boredom', pkt(), clk(), 130, pln(), 'boredom'],
-    ]
+      'salient_perception (heard speech)',
+      conversationPacket,
+      clk(),
+      10,
+      pln(),
+      'salient_perception',
+    ],
+    [
+      'salient_perception (felt event only)',
+      { ...quietMeadowPacket, feltEvents: ['rain_started'] },
+      clk(),
+      10,
+      pln(),
+      'salient_perception',
+    ],
+    ['plan_blocked', pkt(), clk(), 10, pln({ lastResult: 'blocked' }), 'plan_blocked'],
+    ['plan_done', pkt(), clk(), 30, pln({ lastResult: 'done' }), 'plan_done'],
+    [
+      'conversation_beat',
+      pkt(),
+      clk({ lastTurnTick: 100, conversationUntilTick: 160 }),
+      102,
+      pln(),
+      'conversation_beat',
+    ],
+    ['reconsider', pkt(), clk({ reconsiderAtTick: 100 }), 100, pln(), 'reconsider'],
+    ['boredom', pkt(), clk(), 130, pln(), 'boredom'],
+  ]
   it.each(cases)('%s', (_name, packet, clock, tick, plan, expected) => {
     expect(decideWake(cfg, packet, clock, tick, plan)).toBe(expected)
   })

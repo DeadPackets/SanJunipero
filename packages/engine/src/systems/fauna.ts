@@ -20,7 +20,7 @@ export const FAUNA_HABITAT: Readonly<Record<FaunaKind, ReadonlySet<TileId>>> = {
 export const FAUNA_SPAWN_CHANCE = 0.25
 
 // The eight ways out of a tile, in a fixed order so the roll means the same thing every run.
-const STEPS: ReadonlyArray<readonly [number, number]> = [
+const STEPS: readonly (readonly [number, number])[] = [
   [0, -1],
   [1, -1],
   [1, 0],
@@ -95,7 +95,7 @@ export function faunaSystem(ctx: TickCtx): void {
   const time = simTimeFromTick(tick)
 
   if (tick % cfg.movePeriodTicks === 0) {
-    const moves: Array<{ id: string; x: number; y: number }> = []
+    const moves: { id: string; x: number; y: number }[] = []
     for (const id of Object.keys(ctx.state().fauna ?? {}).sort()) {
       const f = ctx.state().fauna![id]!
       if (!f.alive) continue

@@ -42,7 +42,7 @@ export function screenToWorldOffset(sx: number, sy: number): CrowdOffset {
 
 /** Slot offsets keyed by id. Only SETTLED bodies take a slot, so a group does not shuffle aside for somebody walking through it; a body absent from the map is drawn where the record puts it. */
 export function crowdOffsets(
-  bodies: ReadonlyArray<{ id: string; x: number; y: number; settled: boolean }>,
+  bodies: readonly { id: string; x: number; y: number; settled: boolean }[],
 ): Map<string, CrowdOffset> {
   const byTile = new Map<string, string[]>()
   for (const b of bodies) {

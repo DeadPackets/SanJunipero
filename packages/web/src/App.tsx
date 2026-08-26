@@ -150,7 +150,9 @@ export function App() {
       })
     }
 
-    const onPop = (): void => setRoute(parseRoute(location.pathname, location.search))
+    const onPop = (): void => {
+      setRoute(parseRoute(location.pathname, location.search))
+    }
     window.addEventListener('popstate', onPop)
     return () => {
       handle.close()
@@ -226,7 +228,9 @@ export function App() {
       showRoster()
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+    }
   }, [route, insideId, dockOpen])
 
   // Left/right walk the lens bar from anywhere in the chrome. The map owns the arrows for
@@ -252,7 +256,9 @@ export function App() {
       nav(next)
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+    }
   }, [route])
 
   const live = useSyncExternalStore(store.subscribe, () => store.getMode().live)
@@ -270,7 +276,9 @@ export function App() {
       applyHud(hudToggle(hudRef.current))
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+    }
   }, [])
 
   useEffect(() => {
@@ -289,7 +297,9 @@ export function App() {
       raf = requestAnimationFrame(step)
     }
     raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(raf)
+    }
   }, [lensScene.phase])
 
   // the bar mirrors the camera's rest stop; the camera owns the truth, this follows it
@@ -355,8 +365,12 @@ export function App() {
     prevTelevisedRef.current = televised
     if (was && !televised) {
       setDirectorLeaving(true)
-      const t = setTimeout(() => setDirectorLeaving(false), SCENE_TOTAL_MS)
-      return () => clearTimeout(t)
+      const t = setTimeout(() => {
+        setDirectorLeaving(false)
+      }, SCENE_TOTAL_MS)
+      return () => {
+        clearTimeout(t)
+      }
     }
   }, [televised])
 

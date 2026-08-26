@@ -41,7 +41,7 @@ const CFG: SimConfig = SimConfigSchema.parse({
     recipes: {
       ...SimConfigSchema.parse({}).structures.recipes,
       house: {
-        ...SimConfigSchema.parse({}).structures.recipes['house']!,
+        ...SimConfigSchema.parse({}).structures.recipes.house!,
         durationTicks: HOUSE_TICKS,
       },
     },
@@ -79,15 +79,15 @@ function runTown(seed = 'claim-seam'): Run {
     onTick: ({ tick, emit }) => {
       if (tick === 1) {
         for (const e of genesis) emit(e.type, e.payload)
-        ids.forEach((id, i) =>
+        ids.forEach((id, i) => {
           emit('agent_spawned', {
             id,
             name: id,
             x: TOWN_SQUARE.x + i + 1,
             y: TOWN_SQUARE.y + 1,
             ageDays: 7300,
-          }),
-        )
+          })
+        })
       }
       // Fixture upkeep, said out loud: this proof is about the lattice and not the economy, so the
       // masons are fed on a fixed clock. Every building still goes through `build`.
@@ -182,7 +182,6 @@ describe('★ agents build until the town reaches ring 2, and everything in it i
   const size = { w: state.terrain[0]!.length, h: state.terrain.length }
 
   it('the town crossed into ring 2, and it was agents that took it there', () => {
-    // eslint-disable-next-line no-console
     console.log(
       `[claim-seam] ${DAYS * MINUTES_PER_DAY} ticks, ${MASONS} masons: ${built.length} agent builds` +
         ` (ring 1: ${built.filter((s) => ringOf(s) === 1).length}, ring 2: ${built.filter((s) => ringOf(s) === 2).length}),` +

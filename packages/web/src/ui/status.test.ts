@@ -32,8 +32,8 @@ import {
 const WEB_SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** every non-test source file the viewer ships, read off disk */
-function sourceFiles(): Array<{ path: string; source: string }> {
-  const out: Array<{ path: string; source: string }> = []
+function sourceFiles(): { path: string; source: string }[] {
+  const out: { path: string; source: string }[] = []
   const walk = (dir: string): void => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       const p = join(dir, e.name)
@@ -208,7 +208,7 @@ describe('conditionsOf — zero or more, and never a state', () => {
   })
 
   it('reads each condition off its own field', () => {
-    const cases: Array<[Condition, AgentView]> = [
+    const cases: [Condition, AgentView][] = [
       ['unwell', body({ ill: true })],
       ['hurt', body({ injuries: [{ kind: 'serious', day: 2 }] })],
       ['hungry', body({ needs: { hunger: NEED_LOW - 1, energy: 80, warmth: 80, social: 80 } })],
@@ -282,7 +282,7 @@ describe('statusLiteralOffenders — the synonym bug cannot come back', () => {
 
   it('names every banned literal it is asked to catch, and reports each file once', () => {
     for (const lit of BANNED_STATUS_LITERALS) {
-      const machine = (MACHINE_STATUS_IDS as readonly string[]).includes(lit)
+      const machine = MACHINE_STATUS_IDS.includes(lit)
       const src = `const x = '${lit}'`
       expect(statusLiteralOffenders([{ path: 'x.ts', source: src }]), lit).toEqual(
         machine ? [] : ['x.ts'],

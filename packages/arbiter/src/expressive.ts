@@ -157,7 +157,7 @@ export function expressiveVerbFromRuling(name: string, ruling: ExpressiveRuling)
       const targetId = p.data.targetId
       if (targetId === undefined) return `${name} needs someone to ${name} for`
       const target = state.agents[targetId]
-      if (!target || !target.alive) return 'no one there'
+      if (!target?.alive) return 'no one there'
       const self = state.agents[agentId]!
       if (Math.max(Math.abs(target.x - self.x), Math.abs(target.y - self.y)) > 1)
         return 'too far away'

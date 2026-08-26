@@ -163,17 +163,17 @@ export const MARK_WORDS: Readonly<Record<MarkKind, { one: string; many: (n: numb
   }
 
 export type MarkSources = {
-  chapters: ReadonlyArray<{ day: number; title: string }>
-  milestones: ReadonlyArray<{ label: string; day: number; tick: number }>
+  chapters: readonly { day: number; title: string }[]
+  milestones: readonly { label: string; day: number; tick: number }[]
   /** A narrated scene. A day the narrator kept but never titled still deserves a mark. */
-  moments: ReadonlyArray<{ day: number; startTick: number }>
+  moments: readonly { day: number; startTick: number }[]
   /** The days a personality document actually moved — Task 83's change log. */
-  changes: ReadonlyArray<{ tick: number }>
+  changes: readonly { tick: number }[]
   /** The world's own log. Anything not in EVENT_MARK is noise here. */
-  events: ReadonlyArray<{ tick: number; type: string }>
+  events: readonly { tick: number; type: string }[]
   /** Already credited and already prose — the gateway owns the sentence, because only the
    *  gateway can turn an agent id into a name. */
-  discoveries: ReadonlyArray<{ tick: number; words: string }>
+  discoveries: readonly { tick: number; words: string }[]
 }
 
 const MINUTES_PER_DAY = 1440

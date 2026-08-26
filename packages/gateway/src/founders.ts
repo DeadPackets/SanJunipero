@@ -134,7 +134,7 @@ export type DevHolding = {
  * Past the card's eight-row cap on purpose, so the "and N more" line is a thing a viewer can
  * see. `wood`, NOT `timber` — nothing in the world eats `timber`; a house is `{ wood: 10 }`.
  */
-const STOREHOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
+const STOREHOUSE_STOCK: readonly (readonly [string, number])[] = [
   ['wheat_sheaf', 12],
   ['bread', 6],
   ['fish', 4],
@@ -148,7 +148,7 @@ const STOREHOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
   ['hide', 2],
   ['clay', 6],
 ]
-const SHED_STOCK: ReadonlyArray<readonly [string, number]> = [
+const SHED_STOCK: readonly (readonly [string, number])[] = [
   ['axe', 1],
   ['saw', 1],
   ['hammer', 1],
@@ -159,7 +159,7 @@ const SHED_STOCK: ReadonlyArray<readonly [string, number]> = [
  * `composePerception` shows a building's shelves only to somebody inside it or standing against
  * its wall, so the public store's wood might as well not be there. Ten wood is one house.
  */
-const HOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
+const HOUSE_STOCK: readonly (readonly [string, number])[] = [
   ['bread', 2],
   ['waterskin', 1],
   ['herb_bundle', 3],
@@ -168,21 +168,21 @@ const HOUSE_STOCK: ReadonlyArray<readonly [string, number]> = [
 
 /** A refuge holds fuel and a blanket. The guard below asks every room to hold something, so
  *  none reads as empty by accident. */
-const CABIN_STOCK: ReadonlyArray<readonly [string, number]> = [
+const CABIN_STOCK: readonly (readonly [string, number])[] = [
   ['wood', 6],
   ['cloth', 2],
 ]
 
 /** A household's larder rather than one family's, plus a house's worth of wood on the same
  *  reasoning as HOUSE_STOCK. */
-const SHARED_STOCK: ReadonlyArray<readonly [string, number]> = [
+const SHARED_STOCK: readonly (readonly [string, number])[] = [
   ['bread', 6],
   ['waterskin', 3],
   ['herb_bundle', 5],
   ['wood', 10],
 ]
 
-const STOCK_FOR: Readonly<Record<string, ReadonlyArray<readonly [string, number]>>> = {
+const STOCK_FOR: Readonly<Record<string, readonly (readonly [string, number])[]>> = {
   storehouse: STOREHOUSE_STOCK,
   shed: SHED_STOCK,
   house: HOUSE_STOCK,
@@ -405,7 +405,7 @@ export function lampSites(state: WorldState, want: number): LampSite[] {
     return t === T_ROAD || t === T_PATH
   }
   const seen = new Set<string>()
-  const out: Array<LampSite & { d: number }> = []
+  const out: (LampSite & { d: number })[] = []
   for (const id of Object.keys(state.structures).sort()) {
     const s = state.structures[id]!
     if (s.stage !== 'complete' || s.kind === LAMP_KIND) continue
@@ -699,7 +699,7 @@ export function makeFoundersOnTick(
     // scripted need top-ups keep the showcase town alive without a food economy
     for (const f of cast) {
       const a = getState().agents[f.id]
-      if (!a || !a.alive) continue
+      if (!a?.alive) continue
       if (a.needs.hunger < NEED_TOPUP_BELOW)
         emit('need_changed', { id: f.id, need: 'hunger', delta: HUNGER_TOPUP })
       if (a.needs.warmth < NEED_TOPUP_BELOW)
@@ -724,7 +724,7 @@ export function makeFoundersOnTick(
     for (const f of cast) {
       const state = getState()
       const a = state.agents[f.id]
-      if (!a || !a.alive) continue
+      if (!a?.alive) continue
       // Rule A: decide only when the hands are free. `submitIntent` refuses everything while an
       // activity runs, so a decision taken here would be a decision discarded.
       if (a.activity) continue

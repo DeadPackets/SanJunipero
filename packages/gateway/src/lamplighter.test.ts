@@ -70,7 +70,7 @@ describe('★ the lamplighter: the showcase town lights its own streets', () => 
       .filter((d) => d !== null)
     for (const l of standing) {
       const near = doors.some(
-        (d) => Math.max(Math.abs(d!.x - l.x), Math.abs(d!.y - l.y)) <= LAMP_VERGE_REACH,
+        (d) => Math.max(Math.abs(d.x - l.x), Math.abs(d.y - l.y)) <= LAMP_VERGE_REACH,
       )
       expect(near, `the lamp at ${l.x},${l.y} is beside no door in the town`).toBe(true)
     }

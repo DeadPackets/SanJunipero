@@ -7,19 +7,19 @@ export type AdjudicationBlocks = {
   agent: {
     name: string
     skills: Record<string, number>
-    inventory: Array<{ kind: string; qty: number }>
+    inventory: { kind: string; qty: number }[]
     position: { x: number; y: number }
     // What stands around the asker and what the ground is. Rendered into the asker block,
     // never into the cache-stable system prefix: it changes with every step taken.
     visible?: {
-      structures: Array<{ kind: string; x: number; y: number }>
+      structures: { kind: string; x: number; y: number }[]
       ground: string[]
     }
     // The asker's own sentence, verbatim. Fenced exactly like the intent, because it is the
     // same class of string: agent-authored text going into a prompt.
     saying?: string | undefined
   }
-  precedent: Array<{ summary: string; verdictKind: string; recipeName?: string }>
+  precedent: { summary: string; verdictKind: string; recipeName?: string }[]
   // The words for stuff. Every material and building the recipe may name has to be on the
   // page, or the ruling is thrown away unread.
   materials?: { itemKinds: readonly string[]; structureKinds: readonly string[] }

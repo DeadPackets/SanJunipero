@@ -348,7 +348,7 @@ export function latticeFloor(offsets: readonly number[] = PLOT_OFFSETS): {
   overlaps: number
   pairings: number
 } {
-  const patch: ReadonlyArray<[number, number]> = [
+  const patch: readonly [number, number][] = [
     [0, 0],
     [1, 0],
     [0, 1],
@@ -360,7 +360,7 @@ export function latticeFloor(offsets: readonly number[] = PLOT_OFFSETS): {
     [-1, 1],
   ]
   const ps = patch.flatMap(([i, j]) => plotsAt(i, j, offsets))
-  const sizes: Array<[number, number]> = []
+  const sizes: [number, number][] = []
   for (let a = 1; a <= MAX_ALONG; a++) for (let d = 1; d <= MAX_DEEP; d++) sizes.push([a, d])
   let closest = Infinity,
     worst = '',

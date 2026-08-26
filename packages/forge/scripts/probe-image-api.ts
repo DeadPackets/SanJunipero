@@ -172,7 +172,9 @@ async function main() {
   const candidates = await Promise.all(
     [0, 1, 2].map(() => generate('google/gemini-3.1-flash-image', [])),
   )
-  candidates.forEach((c, i) => writeFileSync(`${OUT}/candidate-${i}.png`, c.png))
+  candidates.forEach((c, i) => {
+    writeFileSync(`${OUT}/candidate-${i}.png`, c.png)
+  })
 
   // 2) input_references round-trip: candidate 0 fed back as reference
   const ref = `data:image/png;base64,${candidates[0]!.png.toString('base64')}`

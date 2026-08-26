@@ -89,9 +89,13 @@ export function SocietyLens({
   useEffect(() => {
     const el = boxRef.current
     if (el === null) return
-    const ro = new ResizeObserver(() => setDims({ w: el.clientWidth, h: el.clientHeight }))
+    const ro = new ResizeObserver(() => {
+      setDims({ w: el.clientWidth, h: el.clientHeight })
+    })
     ro.observe(el)
-    return () => ro.disconnect()
+    return () => {
+      ro.disconnect()
+    }
   }, [])
 
   // Names come from the world the viewer already holds — the bonds endpoint carries ties, not
@@ -159,7 +163,9 @@ export function SocietyLens({
           className="key-summary"
           aria-expanded={keyOpen}
           aria-controls="society-key-body"
-          onClick={() => setKeyOpen((v) => !v)}
+          onClick={() => {
+            setKeyOpen((v) => !v)
+          }}
         >
           {keyOpen ? 'Hide the key' : 'How to read this'}
           {hiddenCount > 0 && <span className="key-filtered">{hiddenCount} hidden</span>}
@@ -183,7 +189,9 @@ export function SocietyLens({
                       key={key(r)}
                       row={r}
                       off={hidden.has(key(r))}
-                      onToggle={() => toggle(key(r))}
+                      onToggle={() => {
+                        toggle(key(r))
+                      }}
                     />
                   ))}
               </div>
@@ -216,7 +224,9 @@ export function SocietyLens({
           level={selected.level}
           arc={selected.arc}
           words={selected.words}
-          onClose={() => setSelected(null)}
+          onClose={() => {
+            setSelected(null)
+          }}
         />
       )}
 
@@ -280,8 +290,12 @@ export function SocietyLens({
         linkWidth={(l) => ((l as RelationLink).strokeCount === 2 ? 3 : 1.5)}
         linkLineDash={(l) => (l as RelationLink).dash as number[] | null}
         linkLabel={(l) => (l as RelationLink).words}
-        onLinkClick={(l) => setSelected(l as unknown as RelationLink)}
-        onNodeClick={(n) => onPick((n as BondNode).id)}
+        onLinkClick={(l) => {
+          setSelected(l as unknown as RelationLink)
+        }}
+        onNodeClick={(n) => {
+          onPick((n as BondNode).id)
+        }}
       />
     </div>
   )

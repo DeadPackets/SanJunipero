@@ -143,10 +143,10 @@ function capturingModel(responses: unknown[]): {
   let i = 0
   const model = new MockLanguageModelV4({
     doGenerate: async (options) => {
-      const msgs = (options.prompt as Array<{ role: string; content: unknown }>).map((m) => ({
+      const msgs = (options.prompt as { role: string; content: unknown }[]).map((m) => ({
         role: m.role,
         text: Array.isArray(m.content)
-          ? (m.content as Array<{ text?: string }>).map((p) => p.text ?? '').join('')
+          ? (m.content as { text?: string }[]).map((p) => p.text ?? '').join('')
           : String(m.content),
       }))
       prompts.push(msgs)
@@ -174,10 +174,10 @@ function blankModel(
   const model = new MockLanguageModelV4({
     doGenerate: async (options) => {
       prompts.push(
-        (options.prompt as Array<{ role: string; content: unknown }>).map((m) => ({
+        (options.prompt as { role: string; content: unknown }[]).map((m) => ({
           role: m.role,
           text: Array.isArray(m.content)
-            ? (m.content as Array<{ text?: string }>).map((p) => p.text ?? '').join('')
+            ? (m.content as { text?: string }[]).map((p) => p.text ?? '').join('')
             : String(m.content),
         })),
       )
@@ -288,7 +288,9 @@ async function setup(opts: {
     state: world.state,
     rng: world.rng,
     config: world.config,
-    onTick: (ctx) => handler(ctx),
+    onTick: (ctx) => {
+      handler(ctx)
+    },
   })
   const bridge = new EngineBridge({ loop, store: world.store, simConfig: world.config })
   handler = bridge.wrapTickHandler(({ emit }) => {
@@ -340,56 +342,57 @@ async function stepUntil(loop: TickLoop, predicate: () => boolean, max = 500): P
 
 function startedVerbs(db: Database.Database): string[] {
   return (
-    db
-      .prepare("SELECT payload FROM events WHERE type = 'action_started' ORDER BY seq")
-      .all() as Array<{ payload: string }>
+    db.prepare("SELECT payload FROM events WHERE type = 'action_started' ORDER BY seq").all() as {
+      payload: string
+    }[]
   ).map((r) => (JSON.parse(r.payload) as { verb: string }).verb)
 }
 
 function completedVerbs(db: Database.Database): string[] {
   return (
-    db
-      .prepare("SELECT payload FROM events WHERE type = 'action_completed' ORDER BY seq")
-      .all() as Array<{ payload: string }>
+    db.prepare("SELECT payload FROM events WHERE type = 'action_completed' ORDER BY seq").all() as {
+      payload: string
+    }[]
   ).map((r) => (JSON.parse(r.payload) as { verb: string }).verb)
 }
 
 function spokeTexts(db: Database.Database): string[] {
   return (
-    db
-      .prepare("SELECT payload FROM events WHERE type = 'agent_spoke' ORDER BY seq")
-      .all() as Array<{ payload: string }>
+    db.prepare("SELECT payload FROM events WHERE type = 'agent_spoke' ORDER BY seq").all() as {
+      payload: string
+    }[]
   ).map((r) => (JSON.parse(r.payload) as { text: string }).text)
 }
 
 function memoriesOfKind(
   db: Database.Database,
   kind: string,
-): Array<{ tick: number; text: string; importance: number }> {
+): { tick: number; text: string; importance: number }[] {
   return db
     .prepare(
       'SELECT tick, text, importance FROM memories WHERE agent_id = ? AND kind = ? ORDER BY id',
     )
-    .all(AGENT, kind) as Array<{ tick: number; text: string; importance: number }>
+    .all(AGENT, kind) as { tick: number; text: string; importance: number }[]
 }
 
-function journalRows(db: Database.Database): Array<{ tick: number; text: string }> {
-  return db
-    .prepare('SELECT tick, text FROM journal WHERE agent_id = ? ORDER BY id')
-    .all(AGENT) as Array<{ tick: number; text: string }>
+function journalRows(db: Database.Database): { tick: number; text: string }[] {
+  return db.prepare('SELECT tick, text FROM journal WHERE agent_id = ? ORDER BY id').all(AGENT) as {
+    tick: number
+    text: string
+  }[]
 }
 
 function alertKinds(db: Database.Database): string[] {
-  return (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as Array<{ kind: string }>).map(
+  return (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as { kind: string }[]).map(
     (r) => r.kind,
   )
 }
 
 function alertDetails(db: Database.Database, kind: string): string[] {
   return (
-    db.prepare('SELECT detail FROM alerts WHERE kind = ? ORDER BY id').all(kind) as Array<{
+    db.prepare('SELECT detail FROM alerts WHERE kind = ? ORDER BY id').all(kind) as {
       detail: string
-    }>
+    }[]
   ).map((r) => r.detail)
 }
 
@@ -472,12 +475,16 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       model: throwingModel(),
       mindConfig: { ...FAST_MIND, dozeTicks: 20 },
     })
-    expect(() => loop.step()).not.toThrow()
+    expect(() => {
+      loop.step()
+    }).not.toThrow()
     await flush()
     expect(runtime.stats().dozes).toBe(1)
     expect(alertKinds(agentDb)).toContain('doze_off')
     for (let i = 0; i < 19; i++) {
-      expect(() => loop.step()).not.toThrow()
+      expect(() => {
+        loop.step()
+      }).not.toThrow()
       await flush()
     }
     expect(runtime.stats().dozes).toBe(1)
@@ -534,7 +541,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
     expect(
-      memoriesOfKind(agentDb, 'action').some((m) => /You realize you cannot/.test(m.text)),
+      memoriesOfKind(agentDb, 'action').some((m) => m.text.includes('You realize you cannot')),
     ).toBe(true)
     // A plain physics refusal is not a craft the town can teach.
     expect(memoriesOfKind(agentDb, 'action').some((m) => m.text.includes(CRAFT_HINT))).toBe(false)
@@ -731,7 +738,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
     expect(
-      memoriesOfKind(agentDb, 'action').some((m) => /You realize you cannot/.test(m.text)),
+      memoriesOfKind(agentDb, 'action').some((m) => m.text.includes('You realize you cannot')),
     ).toBe(true)
     // Let any wrongly-submitted head drain and complete before asserting, so a
     // regression of the rejection race (head submitted despite the block) shows up.
@@ -925,9 +932,9 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     await stepUntil(loop, () => loop.tick >= DAWN_TICK && !loop.state.agents[AGENT]!.asleep, 500)
     expect(loop.state.agents[AGENT]!.asleep).toBe(false)
     expect(startedVerbs(world.engineDb)).toContain('wake')
-    expect(memoriesOfKind(agentDb, 'action').some((m) => /no path to that spot/.test(m.text))).toBe(
-      true,
-    )
+    expect(
+      memoriesOfKind(agentDb, 'action').some((m) => m.text.includes('no path to that spot')),
+    ).toBe(true)
   })
 
   it('backs off on non-provider turn failures', async () => {
@@ -940,12 +947,16 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
         },
       },
     })
-    expect(() => loop.step()).not.toThrow()
+    expect(() => {
+      loop.step()
+    }).not.toThrow()
     await flush()
     expect(runtime.stats().turns).toBe(0)
     expect(alertKinds(agentDb).filter((k) => k === 'turn_crash')).toHaveLength(1)
     for (let i = 0; i < 19; i++) {
-      expect(() => loop.step()).not.toThrow()
+      expect(() => {
+        loop.step()
+      }).not.toThrow()
       await flush()
     }
     expect(runtime.stats().turns).toBe(0)
@@ -953,7 +964,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   })
 
   it('fires the optional onThought hook once per turn with tick, agentId, and the turn thought', async () => {
-    const seen: Array<{ tick: number; agentId: string; text: string }> = []
+    const seen: { tick: number; agentId: string; text: string }[] = []
     const { loop, runtime } = await setup({
       model: turnModel([BENIGN_TURN]),
       mindConfig: FAST_MIND,
@@ -974,7 +985,7 @@ describe('arbiter seam (T19)', () => {
   }
 
   it('routes a freeform intent to the adjudicator and executes a map verdict as a Tier-1 act', async () => {
-    const seen: Array<{ intent: string; ctx: AgentCtx }> = []
+    const seen: { intent: string; ctx: AgentCtx }[] = []
     const adjudicator: Adjudicator = async (intent, ctx) => {
       seen.push({ intent, ctx })
       return { kind: 'map', verb: 'walk', params: { x: 5, y: 6 } }
@@ -1169,7 +1180,9 @@ describe('arbiter seam (T19)', () => {
 
 describe('arbiter wiring expansion (T20)', () => {
   const RECIPE_VERB = 'recipe:t20_weave'
-  afterEach(() => unregisterVerb(RECIPE_VERB))
+  afterEach(() => {
+    unregisterVerb(RECIPE_VERB)
+  })
 
   const unknownVerbTurn = {
     thought: 'I will patch the roof.',
@@ -1288,7 +1301,7 @@ describe('arbiter wiring expansion (T20)', () => {
   })
 
   it('names the asking mind and its own words where the recipe becomes law (F-A)', async () => {
-    const calls: Array<{ recipeId: string; credit: DiscoveryCredit | undefined }> = []
+    const calls: { recipeId: string; credit: DiscoveryCredit | undefined }[] = []
     const INTENT = 'weave reeds into a mat'
     let asked = ''
     const arbiter: SeamArbiter = {

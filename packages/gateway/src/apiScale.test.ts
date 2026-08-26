@@ -10,9 +10,7 @@ import { mountDataApi } from './api.js'
 import { WorldMirror } from './worldMirror.js'
 import type { RouteHandler, Router } from './server.js'
 
-const GRASS: TileId[][] = Array.from({ length: 16 }, () =>
-  Array.from({ length: 16 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 16 }, () => Array.from({ length: 16 }, () => 0))
 
 type EventRead = { via: 'all' | 'iterate'; rows: number }
 
@@ -27,7 +25,7 @@ function spyOnEventReads(db: Database.Database): EventRead[] {
         all: (...a: unknown[]) => unknown[]
         iterate: (...a: unknown[]) => Iterable<unknown>
       }
-      if (!/FROM events/.test(sql)) return st
+      if (!sql.includes('FROM events')) return st
       const realAll = st.all.bind(st)
       st.all = (...a: unknown[]): unknown[] => {
         const r = realAll(...a)
@@ -60,7 +58,9 @@ const collect = (): { router: Router; call: (key: string) => void } => {
         routes.set(`${m} ${p}`, fn)
       },
     },
-    call: (key) => routes.get(key)!({ url: '/' } as IncomingMessage, res, {}),
+    call: (key) => {
+      routes.get(key)!({ url: '/' } as IncomingMessage, res, {})
+    },
   }
 }
 
@@ -95,7 +95,9 @@ const bodyOf = (db: Database.Database, mirror: WorldMirror, path: string): strin
  */
 describe('★ the read API reads the tick, not the history', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-apiscale-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('reads only the events appended since the generation it last saw', () => {
     const dbPath = join(dir, 'w.db')

@@ -35,7 +35,7 @@ export const SUBSTANCE_FULL: Readonly<Record<keyof SubstanceInput, number>> = {
   changeDays: 6,
 }
 
-const KEYS = Object.keys(SUBSTANCE_WEIGHTS) as Array<keyof SubstanceInput>
+const KEYS = Object.keys(SUBSTANCE_WEIGHTS) as (keyof SubstanceInput)[]
 
 /** 0..1. NOT a score and never rendered as a number (P3). */
 export function substanceOf(i: SubstanceInput): number {
@@ -68,7 +68,7 @@ const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g
  * `const { traits } = a` — never `{ background: RED }`, which is a style key being written.
  */
 export function authoredIdentityOffenders(
-  files: ReadonlyArray<{ path: string; source: string }>,
+  files: readonly { path: string; source: string }[],
 ): string[] {
   const patterns = AUTHORED_IDENTITY_FIELDS.map(
     (f) =>

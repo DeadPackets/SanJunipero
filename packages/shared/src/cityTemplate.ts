@@ -556,7 +556,7 @@ export function growthPlots(
 }
 
 /** The blocks the town has platted, for a viewer that wants to draw them. */
-export const cityBlocks = (rings: number = TOWN_RINGS_GENESIS): Array<{ i: number; j: number }> =>
+export const cityBlocks = (rings: number = TOWN_RINGS_GENESIS): { i: number; j: number }[] =>
   plattedBlocks(rings, CITY_GROUND)
 
 const ORTHO = [
@@ -568,11 +568,11 @@ const ORTHO = [
 
 /** Every structure's door, and the road tile it opens onto. `onto` is null when the face the
  *  building presents is not a road — the frontage invariant is that this never happens. */
-export function frontages(t: CityTemplate): Array<{
+export function frontages(t: CityTemplate): {
   kind: string
   door: { dx: number; dy: number }
   onto: { dx: number; dy: number } | null
-}> {
+}[] {
   const roads = new Set(t.tiles.filter(isRoadTile).map((x) => key(x.dx, x.dy)))
   return t.structures.map((s) => {
     const front = doorFrontTile(s)

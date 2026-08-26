@@ -79,7 +79,9 @@ export function RosterRowView({
       data-lived={row.substance >= 0.34 ? 'much' : row.substance > 0 ? 'some' : 'none'}
       aria-expanded={open}
       aria-label={rowLabel(row)}
-      onClick={() => onToggle(row.id)}
+      onClick={() => {
+        onToggle(row.id)
+      }}
     >
       <Portrait row={row} />
       <span className="rr-who">

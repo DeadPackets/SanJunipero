@@ -92,7 +92,7 @@ describe('the C-level bar', () => {
       'terrain',
     ])
     for (const r of rows) {
-      expect(integerScaleGate(r.rawCrop, r.native), `${r.klass}`).toMatchObject({ ok: true })
+      expect(integerScaleGate(r.rawCrop, r.native), r.klass).toMatchObject({ ok: true })
       expect(r.factor).toBeGreaterThanOrEqual(MIN_DOWNSCALE_FACTOR)
       expect(r.rawCrop.w, r.klass).toBeLessThanOrEqual(r.genPx)
       expect(r.rawCrop.h, r.klass).toBeLessThanOrEqual(r.genPx)

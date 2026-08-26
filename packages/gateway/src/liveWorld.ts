@@ -127,9 +127,7 @@ export type LiveCastOpts = {
 
 /** A new town whose minds remember an older one is refused rather than served: it is strictly
  *  worse than either a clean reset or a clean resume. */
-export function amnesiaRefusal(
-  remembering: ReadonlyArray<{ id: string; memories: number }>,
-): string {
+export function amnesiaRefusal(remembering: readonly { id: string; memories: number }[]): string {
   const who = remembering.map((r) => `${r.id} (${r.memories})`).join(', ')
   return [
     'stream: could not start — this is a new town at tick 0, and its minds remember an older one.',
@@ -249,7 +247,11 @@ const countMemories = (db: Database.Database): number => {
  *  pre-flight both run first and either can refuse the whole run; everything that needs the world
  *  happens in `attach`, because a bridge needs the loop and the loop needs the bridge's handler. */
 export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
-  const log = opts.log ?? ((line: string) => console.log(line))
+  const log =
+    opts.log ??
+    ((line: string) => {
+      console.log(line)
+    })
   const minds = opts.minds ?? FOUNDER_MINDS
   const cap = opts.spendCapUsd ?? LIVE_SPEND_STOP_USD
   mkdirSync(opts.agentDbDir, { recursive: true })
@@ -278,7 +280,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         })
 
   if (opts.preflight !== false) {
-    if (!process.env['OPENROUTER_API_KEY']) {
+    if (!process.env.OPENROUTER_API_KEY) {
       throw new Error('SJ_LIVE=1 needs OPENROUTER_API_KEY — run with node --env-file=<repo>/.env')
     }
     // Scoped to THIS boot's pre-flight rows: the ledger is resumed with the town, so the whole

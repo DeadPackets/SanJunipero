@@ -9,9 +9,7 @@ import { createGateway, type Gateway } from './server.js'
 import { readDiscoveries } from './discoveries.js'
 import { clearDegradations, degradations } from './degraded.js'
 
-const GRASS: TileId[][] = Array.from({ length: 16 }, () =>
-  Array.from({ length: 16 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 16 }, () => Array.from({ length: 16 }, () => 0))
 
 const D1 = {
   recipeId: 'recipe:waterskin',
@@ -105,9 +103,9 @@ describe('the archive — every discovery, in order, with its credit', () => {
         world.prepare('DELETE FROM events WHERE type = ?').run('discovery_made'),
       ).toThrow(/readonly/i)
       const tables = (
-        world.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{
+        world.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as {
           name: string
-        }>
+        }[]
       ).map((t) => t.name)
       expect(tables).toContain('events')
       expect(tables).not.toContain('rulebook') // the ops plane is not in this database at all
@@ -158,7 +156,9 @@ describe('the archive — every discovery, in order, with its credit', () => {
  */
 describe('★ a dropped discovery row is said out loud, once', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-drift-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('answers without the bad row AND reports the drift, naming the field', () => {
     clearDegradations()

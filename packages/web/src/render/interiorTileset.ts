@@ -53,7 +53,7 @@ const wallSpan = (wall: WallKind, room: { w: number; h: number }): number =>
   wall === 'back-right' ? room.w : room.h
 
 export function wallCourses(
-  features: ReadonlyArray<{ kind: string; wall: WallKind; atTiles: number }>,
+  features: readonly { kind: string; wall: WallKind; atTiles: number }[],
   room = ROOM_TILES,
 ): WallCourse[] {
   const out: WallCourse[] = []
@@ -112,7 +112,7 @@ export function hasInteriorTileset(records: readonly AssetRecord[]): boolean {
 export type FloorRegion = { x0: number; y0: number; x1: number; y1: number }
 
 export function flagstoneRegions(
-  hearths: ReadonlyArray<{ x: number; y: number }>,
+  hearths: readonly { x: number; y: number }[],
   room = ROOM_TILES,
 ): FloorRegion[] {
   const out: FloorRegion[] = [

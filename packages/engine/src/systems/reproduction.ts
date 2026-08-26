@@ -58,7 +58,7 @@ export function reproductionSystem(ctx: TickCtx): void {
   if (time.hour !== 0 || time.minute !== 0) return
   const day = Math.floor(ctx.state().tick / MINUTES_PER_DAY)
 
-  const tonight: Array<[string, string]> = []
+  const tonight: [string, string][] = []
   for (const structureId of Object.keys(ctx.state().structures).sort()) {
     const s = ctx.state().structures[structureId]!
     if (s.stage !== 'complete' || !ctx.config.structures.privateKinds.includes(s.kind)) continue

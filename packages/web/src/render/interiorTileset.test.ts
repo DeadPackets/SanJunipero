@@ -125,13 +125,13 @@ describe('interiorTileset — what goes on the wall', () => {
     const chimney = c.filter((x) => x.piece === 'wall-chimney')
     expect(chimney).toHaveLength(1)
     expect(chimney[0]!.wall).toBe('back-left')
-    expect(FURNISHING_WALL_PIECE['hearth']).toBe('wall-chimney')
+    expect(FURNISHING_WALL_PIECE.hearth).toBe('wall-chimney')
     // it stays inside its own wall — a strip pushed off the end is a strip nobody sees
     expect(wallStripWidth('back-left', chimney[0]!.atTiles)).toBeGreaterThan(0)
   })
 
   it('a furnishing with no elevation of its own puts nothing on the wall', () => {
-    expect(FURNISHING_WALL_PIECE['lantern']).toBeUndefined()
+    expect(FURNISHING_WALL_PIECE.lantern).toBeUndefined()
     const c = wallCourses([{ kind: 'lantern', wall: 'back-left', atTiles: 2 }])
     expect(
       c

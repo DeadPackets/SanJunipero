@@ -57,7 +57,7 @@ function tickOnce(s: WorldState, config = CFG, rng = new RngStreams('m')) {
   const advanced = fold({ ...s, tick: s.tick }, ev('tick_advanced', {}, s.tick + 1), config)
   return createWorldTick(config, rng)(advanced)
 }
-const hpDeltas = (r: { events: Array<{ type: string; payload: unknown }> }) =>
+const hpDeltas = (r: { events: { type: string; payload: unknown }[] }) =>
   r.events.filter((e) => e.type === 'hp_changed').map((e) => (e.payload as { delta: number }).delta)
 
 describe('fold: the afflicted body', () => {
@@ -209,7 +209,7 @@ const hurt = (s: WorldState, amount: number) =>
   fold(s, ev('agent_harmed', { agentId: 'a1', amount, source: 'accident' }), CFG)
 const starve = (s: WorldState) =>
   fold(s, ev('need_changed', { id: 'a1', need: 'hunger', delta: -100 }), CFG)
-const died = (r: { events: Array<{ type: string; payload: unknown }> }) =>
+const died = (r: { events: { type: string; payload: unknown }[] }) =>
   r.events.find((e) => e.type === 'agent_died')?.payload
 const graveOf = (s: WorldState) => Object.values(s.structures).find((x) => x.kind === 'grave')
 
@@ -219,7 +219,7 @@ const SLIVER = 0.01
 const nearlyDead = (s: WorldState) => hurt(s, CFG.health.maxHp - SLIVER)
 
 // One tick of drain on a body with a sliver of hp left is a death with a name on it.
-const SCENARIOS: Array<[DeathCause, () => WorldState]> = [
+const SCENARIOS: [DeathCause, () => WorldState][] = [
   ['injury', () => nearlyDead(afflict(body(), 'injury', 2, 0))],
   ['slain', () => nearlyDead(afflict(body(), 'injury', 2, 0, { sourceId: 'a2' }))],
   ['poison', () => nearlyDead(afflict(body(), 'poison', 1, 0))],
@@ -405,7 +405,7 @@ describe('a collapse that never recovers becomes fatigue', () => {
 
   it('escalates one step for every collapse the body never came back from', () => {
     let s = body()
-    const seen: Array<number | undefined> = []
+    const seen: (number | undefined)[] = []
     for (let i = 0; i < 3; i++) {
       s = fall(s, 10 + i * 10)
       seen.push(fatigueOf(s))

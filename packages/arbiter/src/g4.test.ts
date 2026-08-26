@@ -173,9 +173,9 @@ class ForcedRngStreams extends RngStreams {
 // 5 duration ticks, collecting every event the pipeline emits.
 function runTier1(state: WorldState): {
   state: WorldState
-  events: Array<{ type: string; payload: unknown }>
+  events: { type: string; payload: unknown }[]
 } {
-  const events: Array<{ type: string; payload: unknown }> = []
+  const events: { type: string; payload: unknown }[] = []
   const rng = new ForcedRngStreams('g4-scripted', {
     'recipe:boil_salt': RngStream.from([0, 0, 0, 0]),
   })

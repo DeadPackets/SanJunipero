@@ -61,7 +61,7 @@ export function wrapCharsFor(family: string, size: number, maxPx: number): numbe
 // ── installing the faces ──────────────────────────────────────────────────────────────────
 
 /** ASCII plus the punctuation the narrator and the agents actually use. */
-const CHARS: Array<string | string[]> = [
+const CHARS: (string | string[])[] = [
   ['a', 'z'],
   ['A', 'Z'],
   ['0', '9'],
@@ -188,10 +188,10 @@ export function scallopTrail(
   side: BubbleSide,
   w: number,
   h: number,
-): Array<{ cx: number; cy: number; r: number }> {
+): { cx: number; cy: number; r: number }[] {
   const cx = Math.round(w / 2),
     cy = Math.round(h / 2)
-  const out: Array<{ cx: number; cy: number; r: number }> = []
+  const out: { cx: number; cy: number; r: number }[] = []
   for (let i = 0; i < SCALLOP_COUNT; i++) {
     const r = Math.max(1, THOUGHT_SCALLOP_R - i)
     const step = 3 + i * (THOUGHT_SCALLOP_R + 2)

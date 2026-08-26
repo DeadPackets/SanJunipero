@@ -113,7 +113,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 
 // Walk a path and hand back the container holding its last segment, so a fix can be applied
 // where the schema said the fault was.
-function containerAt(root: unknown, path: ReadonlyArray<PropertyKey>): unknown {
+function containerAt(root: unknown, path: readonly PropertyKey[]): unknown {
   let cur: unknown = root
   for (const key of path) {
     if (Array.isArray(cur) && typeof key === 'number') cur = cur[key]
@@ -139,7 +139,7 @@ function applySchemaIssues<T>(
   value: unknown,
   schema: z.ZodType<T>,
 ): { value: T; how: string } | undefined {
-  let current = structuredClone(value)
+  const current = structuredClone(value)
   const applied: string[] = []
   for (let round = 0; round < 4; round += 1) {
     const parsed = schema.safeParse(current)

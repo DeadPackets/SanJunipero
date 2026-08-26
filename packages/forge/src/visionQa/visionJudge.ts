@@ -64,11 +64,7 @@ export function makeVisionJudge(opts: {
   const config = opts.config ?? DEFAULT_FORGE_CONFIG
   const modelName = opts.model ?? config.visionQa.model
   const gen: VisionGenerateFn =
-    opts.generateFn ??
-    ((args) =>
-      generateObject(
-        args as Parameters<typeof generateObject>[0],
-      ) as unknown as ReturnType<VisionGenerateFn>)
+    opts.generateFn ?? ((args) => generateObject(args as Parameters<typeof generateObject>[0]))
   const model = opts.generateFn ? null : createOpenRouter({ apiKey: opts.apiKey }).chat(modelName)
 
   return async (a) => {

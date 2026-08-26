@@ -21,7 +21,7 @@ export function migrateArbiterTables(db: Database.Database): void {
     );
   `)
   // Pre-known-flag DBs: every existing row was earned, so default 1.
-  const codexCols = db.prepare('PRAGMA table_info(codex)').all() as Array<{ name: string }>
+  const codexCols = db.prepare('PRAGMA table_info(codex)').all() as { name: string }[]
   if (!codexCols.some((c) => c.name === 'known')) {
     db.exec('ALTER TABLE codex ADD COLUMN known INTEGER NOT NULL DEFAULT 1')
   }

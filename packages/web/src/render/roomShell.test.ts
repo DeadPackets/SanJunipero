@@ -66,8 +66,8 @@ const MASTER_PALETTE = [
   0xf4e289, 0xf5d3b3, 0xd9a876, 0x9c6b47,
 ]
 
-const pts = (poly: number[]): Array<[number, number]> => {
-  const out: Array<[number, number]> = []
+const pts = (poly: number[]): [number, number][] => {
+  const out: [number, number][] = []
   for (let i = 0; i < poly.length; i += 2) out.push([poly[i]!, poly[i + 1]!])
   return out
 }
@@ -497,7 +497,7 @@ describe('roomShell — the room fits the stage', () => {
 describe('★★ the camera inside a room, and its range IS the crop', () => {
   // The union of every place a room kind can come from, never a hand-list, so a kind added to
   // the recipes, the template or the renderer's vocabulary is in this law the day it lands.
-  const roomsOf = (): ReadonlyArray<{ kind: string; room: { w: number; h: number } }> => {
+  const roomsOf = (): readonly { kind: string; room: { w: number; h: number } }[] => {
     const kinds = [
       ...new Set([
         ...Object.keys(DEFAULT_CONFIG.structures.recipes),

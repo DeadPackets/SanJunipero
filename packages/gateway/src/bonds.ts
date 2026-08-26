@@ -65,7 +65,7 @@ export function buildBonds(
   // Every spoke against every earlier spoke is O(n²) and a badge polls this. A spoke older than
   // the talk window can pair with nothing ever again, so dropping it is the same answer in
   // bounded time.
-  let spokes: Array<{ agentId: string; tick: number; x: number; y: number }> = []
+  let spokes: { agentId: string; tick: number; x: number; y: number }[] = []
   const started = new Map<string, Record<string, unknown>>() // `${agentId}\n${verb}` → params
 
   for (const ev of events) {
@@ -122,19 +122,21 @@ export function mountBondsApi(router: Router, deps: BondsDeps): void {
       return buildBonds(events(), deps.config.movement.earshotRadius, deps.mirror.state().tick)
     })
 
-  router.route('GET', '/api/bonds', (_req, res) => sendPrebuilt(res, cache.json('bonds', bonds)))
+  router.route('GET', '/api/bonds', (_req, res) => {
+    sendPrebuilt(res, cache.json('bonds', bonds))
+  })
 
   /**
    * How many bonds there are without sending the bonds: a `Bond` carries its whole `history`,
    * and the badge polls. The panel and the badge share one memoised build.
    */
-  router.route('GET', '/api/bonds/count', (_req, res) =>
+  router.route('GET', '/api/bonds/count', (_req, res) => {
     sendPrebuilt(
       res,
       cache.json('bonds-count', () => {
         const b = bonds()
         return { count: b.bonds.length, asOfTick: b.asOfTick }
       }),
-    ),
-  )
+    )
+  })
 }

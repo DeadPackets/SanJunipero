@@ -108,7 +108,7 @@ describe('ControlBar — an honest refusal', () => {
 
   it('a disabled control is never the tab stop', () => {
     const wide = render({ zoom: 0.25 })
-    const stop = wide.match(/data-ctl="([^"]+)"(?:(?!<button)[\s\S])*?tabindex="0"/)
+    const stop = /data-ctl="([^"]+)"(?:(?!<button)[\s\S])*?tabindex="0"/.exec(wide)
     expect(stop?.[1]).not.toBe('zoom-out')
     expect((wide.match(/tabindex="0"/g) ?? []).length).toBe(1)
   })

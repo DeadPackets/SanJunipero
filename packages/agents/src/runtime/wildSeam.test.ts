@@ -53,12 +53,26 @@ function wild(): { bridge: EngineBridge; step: () => void; loop: TickLoop } {
 
   const worldTick = createWorldTick(config, rng)
   let handler: TickHandler = () => {}
-  const loop = new TickLoop({ store, state, rng, config, onTick: (ctx) => handler(ctx) })
+  const loop = new TickLoop({
+    store,
+    state,
+    rng,
+    config,
+    onTick: (ctx) => {
+      handler(ctx)
+    },
+  })
   const bridge = new EngineBridge({ loop, store, simConfig: config })
   handler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
-  return { bridge, step: () => loop.step(), loop }
+  return {
+    bridge,
+    step: () => {
+      loop.step()
+    },
+    loop,
+  }
 }
 
 const proseFor = (bridge: EngineBridge): string =>
@@ -89,7 +103,7 @@ describe('the wild seam — prose, intent, verb, the thing taken', () => {
     const carried = Object.values(loop.state.items)
       .filter((i) => i.loc.t === 'agent' && i.loc.id === AGENT)
       .map((i) => i.kind)
-    if (deer === undefined || !deer.alive) expect(carried).toContain('venison')
+    if (!deer?.alive) expect(carried).toContain('venison')
     else expect({ x: deer.x, y: deer.y }).not.toEqual({ x: 9, y: 8 })
   })
 

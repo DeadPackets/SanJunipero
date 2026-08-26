@@ -128,7 +128,7 @@ describe('★ every item and every cast cell reaches the screen at a whole-numbe
         `   (${r.where})`
       )
     })
-    // eslint-disable-next-line no-console
+
     console.log(`DRAW SCALE — authored size over world size\n${rows.join('\n')}`)
     expect(rows.length).toBeGreaterThan(0)
   })

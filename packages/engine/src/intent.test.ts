@@ -29,7 +29,7 @@ function patchAgent(
 ): WorldState {
   return { ...s, agents: { ...s.agents, [id]: { ...s.agents[id]!, ...patch } } }
 }
-function applyAll(s: WorldState, events: Array<{ type: string; payload: unknown }>): WorldState {
+function applyAll(s: WorldState, events: { type: string; payload: unknown }[]): WorldState {
   for (const e of events) s = fold(s, ev(seq++, e.type, e.payload))
   return s
 }

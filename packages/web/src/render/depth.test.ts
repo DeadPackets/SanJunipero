@@ -22,7 +22,9 @@ const house = structureDepthBox('house', HOUSE)
 const before = (order: string[], a: string, b: string): boolean =>
   order.indexOf(a) < order.indexOf(b)
 
-beforeEach(() => resetDepthFallbacks())
+beforeEach(() => {
+  resetDepthFallbacks()
+})
 
 describe('F-3(b) — the exact tie the old scalar produced', () => {
   it('LANDED BUG: a body at tile (20,22) and a 2×2 house at (20,20) both computed 42021', () => {
@@ -63,7 +65,7 @@ describe('F-3(c) — a rounded depth against an unrounded position', () => {
   })
 
   it('is monotonic walking up to a building too — one transition, never a flicker', () => {
-    const flips: Array<{ py: number; front: boolean }> = []
+    const flips: { py: number; front: boolean }[] = []
     let prev: boolean | null = null
     for (let i = 0; i <= 400; i++) {
       const py = 16 + i / 100
@@ -82,7 +84,7 @@ describe('F-3(c) — a rounded depth against an unrounded position', () => {
 })
 
 describe('F-3(a) — a footprint is a range, not a corner', () => {
-  const RING: Array<[string, number, number]> = [
+  const RING: [string, number, number][] = [
     ['e', 23.5, 20.5],
     ['se', 22.5, 22.5],
     ['s', 20.5, 23.5],

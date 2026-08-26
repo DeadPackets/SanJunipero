@@ -148,7 +148,7 @@ export function landmarksOf(state: WorldState): Landmark[] {
     if (kind === 'fire_pit')
       out.push({ id: s.id, name: SINGLE_NAME[kind]!, x: s.x, y: s.y, rank: 1, of: [boxOf(s)] })
     else if (SINGLE_NAME[kind] !== undefined)
-      out.push({ id: s.id, name: SINGLE_NAME[kind]!, x: s.x, y: s.y, rank: 3, of: [boxOf(s)] })
+      out.push({ id: s.id, name: SINGLE_NAME[kind], x: s.x, y: s.y, rank: 3, of: [boxOf(s)] })
   }
 
   for (const district of DISTRICT_ORDER) {
@@ -236,11 +236,11 @@ export const leashOf = (of: readonly Rect[], size: { w: number; h: number }): Re
 export function placeLandmarks(
   marks: readonly PlaceableMark[],
   view: Rect,
-): Array<{ id: string; sx: number; sy: number; rect: Rect }> {
+): { id: string; sx: number; sy: number; rect: Rect }[] {
   const m0 = LANDMARK_CULL_MARGIN_PX
   const places = marks.flatMap((m) => m.of)
   const taken: Rect[] = []
-  const out: Array<{ id: string; sx: number; sy: number; rect: Rect }> = []
+  const out: { id: string; sx: number; sy: number; rect: Rect }[] = []
   for (const m of marks) {
     if (m.sx < view.x - m0 || m.sx > view.x + view.w + m0) continue
     if (m.sy < view.y - m0 || m.sy > view.y + view.h + m0) continue

@@ -329,8 +329,8 @@ describe('G11a-W4: pave converts and consumes, and the costs are ordered', () =>
 
   it('grass costs more than a worn path, and a worn path more than a road', () => {
     const cost = terrainCostFor(CFG)
-    expect(cost[0]).toBeGreaterThan(cost[8]!)
-    expect(cost[8]).toBeGreaterThan(cost[7]!)
+    expect(cost[0]).toBeGreaterThan(cost[8])
+    expect(cost[8]).toBeGreaterThan(cost[7])
 
     // Three corridors of the same length, walled off from each other. The road lane costs two
     // extra grass tiles at each end and is still cheapest, which holds only if tiles are priced.

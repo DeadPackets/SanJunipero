@@ -46,7 +46,9 @@ export function HudDock({
         aria-label={handleLabel}
         aria-expanded={open}
         title={handleLabel}
-        onClick={() => onOpen(!open)}
+        onClick={() => {
+          onOpen(!open)
+        }}
       >
         <span className="hud-grip" aria-hidden="true" />
       </button>
@@ -65,7 +67,9 @@ export function HudDock({
                     data-dock={`${what}:${slot}`}
                     aria-label={`${DOCKABLE_LABEL[what]}: ${SLOT_LABEL[slot]}`}
                     aria-pressed={layout[what] === slot}
-                    onClick={() => onEvent({ kind: 'dock', what, to: slot })}
+                    onClick={() => {
+                      onEvent({ kind: 'dock', what, to: slot })
+                    }}
                   >
                     {SLOT_LABEL[slot]}
                   </button>
@@ -78,7 +82,9 @@ export function HudDock({
               type="button"
               className="hud-slot"
               aria-label={all ? 'Bring everything back' : 'Put everything away'}
-              onClick={() => onEvent({ kind: all ? 'show-all' : 'hide-all' })}
+              onClick={() => {
+                onEvent({ kind: all ? 'show-all' : 'hide-all' })
+              }}
             >
               {all ? 'Bring everything back' : 'Put everything away'}
             </button>
@@ -86,7 +92,9 @@ export function HudDock({
               type="button"
               className="hud-slot"
               aria-label="Put the controls back where they started"
-              onClick={() => onEvent({ kind: 'reset' })}
+              onClick={() => {
+                onEvent({ kind: 'reset' })
+              }}
             >
               Back to the start
             </button>

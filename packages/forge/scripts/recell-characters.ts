@@ -101,8 +101,8 @@ for (const c of CAST) {
     console.log(`${c.id}: no chosen= line in report.txt — SKIPPED`)
     continue
   }
-  const walks = (chosen['walk'] ?? '').split(',').filter(Boolean)
-  const sleepKey = chosen['sleep']
+  const walks = (chosen.walk ?? '').split(',').filter(Boolean)
+  const sleepKey = chosen.sleep
   if (walks.length !== 6 || sleepKey === undefined) {
     console.log(
       `${c.id}: report.txt names ${walks.length} walk raws and sleep=${sleepKey} — SKIPPED`,
@@ -174,15 +174,15 @@ for (const c of CAST) {
   const cells = deriveSheet({
     strips: {
       se: {
-        idle: strips.se['idle']!,
+        idle: strips.se.idle!,
         'contact-a': strips.se['contact-a']!,
-        passing: strips.se['passing']!,
+        passing: strips.se.passing!,
         'contact-b': strips.se['contact-b']!,
       },
       ne: {
-        idle: strips.ne['idle']!,
+        idle: strips.ne.idle!,
         'contact-a': strips.ne['contact-a']!,
-        passing: strips.ne['passing']!,
+        passing: strips.ne.passing!,
         'contact-b': strips.ne['contact-b']!,
       },
     },

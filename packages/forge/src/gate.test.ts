@@ -210,12 +210,12 @@ describe('★ no generator in the package ships a candidate that failed a gate',
       .filter((n) => n.endsWith('.ts'))
       .sort()) {
       const s = read(f)
-      if (/clean\.length \? clean/.test(s))
+      if (s.includes('clean.length ? clean'))
         offenders.push(`${f}: falls back to the DIRTY candidate set when nothing is clean`)
-      if (/fails\.length \* 100/.test(s))
+      if (s.includes('fails.length * 100'))
         offenders.push(`${f}: RANKS a failure instead of excluding it`)
       // the least-bad reduce is legal — CHOOSING is not deciding — but only beside a refusal
-      if (/failures\.length < a\.failures\.length/.test(s) && !/refuseFailing\(/.test(s))
+      if (s.includes('failures.length < a.failures.length') && !s.includes('refuseFailing('))
         offenders.push(`${f}: picks the least-bad candidate and never refuses one`)
     }
     expect(offenders, 'a generator ships a candidate its own gate failed').toEqual([])
@@ -272,7 +272,7 @@ describe('★ no generator in the package ships a candidate that failed a gate',
         )
       )
         continue
-      if (!/writeFileSync/.test(s)) continue
+      if (!s.includes('writeFileSync')) continue
       // `write-generated-terrain.ts` prints SEAM and writes anyway; `terrainIngest.test.ts` asserts
       // `tileSeamGate` over every shipped material, so the consumer is in the suite.
       if (f === 'write-generated-terrain.ts') continue

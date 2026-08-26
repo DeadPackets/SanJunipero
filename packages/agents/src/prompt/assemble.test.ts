@@ -270,7 +270,7 @@ describe('perceptionToProse', () => {
 
   it('renders a known felt event to its exact prose', () => {
     const prose = perceptionToProse(conversationPacket)
-    expect(prose).toContain(FELT_EVENT_PROSE['rain_started'])
+    expect(prose).toContain(FELT_EVENT_PROSE.rain_started)
   })
 
   it('renders every precipitation start tag the engine emits without alerting', () => {
@@ -287,10 +287,10 @@ describe('perceptionToProse', () => {
   it('renders a collapse as its own sensation, never the fallback, never an alert', () => {
     const alert = vi.fn()
     const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: ['you_collapsed'] }, alert)
-    expect(prose).toContain(FELT_EVENT_PROSE['you_collapsed'])
+    expect(prose).toContain(FELT_EVENT_PROSE.you_collapsed)
     expect(prose).not.toContain('You sense something change nearby.')
     expect(alert).not.toHaveBeenCalled()
-    expect(FELT_EVENT_PROSE['you_collapsed']).not.toMatch(FORBIDDEN_FRAMING)
+    expect(FELT_EVENT_PROSE.you_collapsed).not.toMatch(FORBIDDEN_FRAMING)
   })
 
   // The enumeration comes from the engine, so a new tag cannot slip in mute:

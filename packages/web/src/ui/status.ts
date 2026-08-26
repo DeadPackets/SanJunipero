@@ -10,7 +10,7 @@ export type AgentView = {
   needs: { hunger: number; energy: number; warmth: number; social: number }
   hp: number
   ill: boolean
-  injuries: ReadonlyArray<{ kind: string; day: number }>
+  injuries: readonly { kind: string; day: number }[]
   collapsedSinceTick: number | null
   lastSpokeTick?: number
   thirst?: number
@@ -152,7 +152,7 @@ const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g
 
 /** Every viewer file that prints a banned status word. One entry per file, in the order given. */
 export function statusLiteralOffenders(
-  files: ReadonlyArray<{ path: string; source: string }>,
+  files: readonly { path: string; source: string }[],
 ): string[] {
   const banned = BANNED_STATUS_LITERALS.filter((w) => !MACHINE_STATUS_IDS.includes(w))
   // whole words only, so `idle-se` and `sleeping_bag` are identifiers and not copy

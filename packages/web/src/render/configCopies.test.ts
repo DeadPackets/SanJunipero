@@ -57,7 +57,6 @@ describe('★ a renderer constant that copies a config field still equals it', (
   const copies = declaredCopies()
 
   it('publishes the sweep', () => {
-    // eslint-disable-next-line no-console
     console.log(
       `CONFIG COPIES IN THE RENDERER — ${copies.length}\n` +
         copies

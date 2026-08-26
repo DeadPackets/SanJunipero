@@ -178,7 +178,7 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
   it('will not stand in the road, and the refusal says why', () => {
     for (const tile of [T_ROAD, T_PATH] as const) {
       const map = MAP()
-      map[4]![5] = tile as TileId
+      map[4]![5] = tile
       let s = spawn(genesisState(CFG, map), 'wright', 4, 4)
       s = give(s, 'wright', 'item_wood', 'wood', 4)
       const r = submitIntent({ ...s, tick: NIGHT }, CFG, 'wright', 'build', {
@@ -194,7 +194,7 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
     }
     // And the verge one tile over takes it, so the refusal is a redirection and not a wall.
     const map = MAP()
-    map[4]![5] = T_ROAD as TileId
+    map[4]![5] = T_ROAD
     let s = spawn(genesisState(CFG, map), 'wright', 4, 4)
     s = give(s, 'wright', 'item_wood', 'wood', 4)
     expect(

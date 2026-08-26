@@ -21,9 +21,7 @@ import { AGENT_ID } from './api.js'
 import { MAX_BYTES, MAX_KEYS, MAX_VALUES, makeSeqCache } from './seqCache.js'
 import { CLIENT_ASSET_DIR, resolveInRoot } from './staticSite.js'
 
-const GRASS: TileId[][] = Array.from({ length: 8 }, () =>
-  Array.from({ length: 8 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 const dir = mkdtempSync(join(tmpdir(), 'sj-public-'))
@@ -73,7 +71,9 @@ function makeWorld(dbPath: string) {
 const connect = (port: number): Promise<WebSocket> =>
   new Promise((resolve, reject) => {
     const s = new WebSocket(`ws://127.0.0.1:${port}/ws`)
-    s.on('open', () => resolve(s))
+    s.on('open', () => {
+      resolve(s)
+    })
     s.on('error', reject)
   })
 
@@ -81,7 +81,9 @@ const connect = (port: number): Promise<WebSocket> =>
  *  assertion rather than a timeout. */
 const closeCode = (s: WebSocket, ms = 1000): Promise<number | 'open'> =>
   new Promise((resolve) => {
-    const t = setTimeout(() => resolve('open'), ms)
+    const t = setTimeout(() => {
+      resolve('open')
+    }, ms)
     s.on('close', (code) => {
       clearTimeout(t)
       resolve(code)
@@ -89,7 +91,7 @@ const closeCode = (s: WebSocket, ms = 1000): Promise<number | 'open'> =>
   })
 
 describe('the public surface a stranger reaches', () => {
-  const open: Array<WebSocket | Gateway> = []
+  const open: (WebSocket | Gateway)[] = []
   afterAll(async () => {
     for (const o of open) {
       if (o instanceof WebSocket) o.close()
@@ -256,7 +258,7 @@ describe('the public surface a stranger reaches', () => {
     const gw = await gwPromise
     const sock = await connect(gw.port)
     open.push(sock)
-    const frames: Array<{ t: string; reqId?: number; tick?: number }> = []
+    const frames: { t: string; reqId?: number; tick?: number }[] = []
     sock.on('message', (d) => frames.push(JSON.parse(d.toString())))
     sock.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: null }))
     await wait(60)

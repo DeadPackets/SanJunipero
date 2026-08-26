@@ -69,9 +69,7 @@ async function main(): Promise<void> {
   const plan = planTerrainProgram()
   const requested = generationItems(plan)
     .filter((i) => ONLY.length === 0 || ONLY.includes(i.assetId))
-    .filter(
-      (i) => process.env['GROUND_ONLY'] !== '1' || i.sort === 'ground' || i.sort === 'material',
-    )
+    .filter((i) => process.env.GROUND_ONLY !== '1' || i.sort === 'ground' || i.sort === 'material')
   const done = requested.filter((i) => !FORCE && existsSync(materialPath(i.assetId)))
   const items = requested.filter((i) => FORCE || !existsSync(materialPath(i.assetId)))
   const derived = plan.filter((p) => p.generateFrom !== undefined)

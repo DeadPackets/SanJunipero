@@ -94,7 +94,9 @@ export function LensTabsView({
             aria-current={l === lens ? 'page' : undefined}
             aria-label={`${LENS_LABELS[l]} — ${hint.hint}`}
             title={hint.hint}
-            onClick={() => onNav(l)}
+            onClick={() => {
+              onNav(l)
+            }}
           >
             {LENS_LABELS[l]}
             {hint.count !== null && (

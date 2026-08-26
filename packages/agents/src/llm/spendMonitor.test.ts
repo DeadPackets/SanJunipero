@@ -35,11 +35,11 @@ function seedCall(db: Database.Database, agoMinutes: number, costUsd: number, no
   ).run(now - agoMinutes * 60_000, costUsd)
 }
 
-function alerts(db: Database.Database): Array<{ kind: string; detail: string }> {
-  return db.prepare('SELECT kind, detail FROM alerts ORDER BY id').all() as Array<{
+function alerts(db: Database.Database): { kind: string; detail: string }[] {
+  return db.prepare('SELECT kind, detail FROM alerts ORDER BY id').all() as {
     kind: string
     detail: string
-  }>
+  }[]
 }
 
 afterEach(() => {

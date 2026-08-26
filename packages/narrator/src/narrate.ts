@@ -175,7 +175,9 @@ export async function narrateDay(deps: {
       typeCounts,
       alert: deps.alert,
     })
-    chapter.sceneIds.forEach((sceneId, i) => store.insertHeat(sceneId, heats[i]!))
+    chapter.sceneIds.forEach((sceneId, i) => {
+      store.insertHeat(sceneId, heats[i]!)
+    })
   } catch (err) {
     renderFailure = err
   }

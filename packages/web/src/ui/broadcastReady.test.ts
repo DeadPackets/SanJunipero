@@ -131,8 +131,12 @@ const TOWN = {
   weather: { kind: 'clear' },
 } as unknown as WorldState
 
-const ev = (type: string, payload: Record<string, unknown>): SimEvent =>
-  ({ seq: 1, tick: 480, type, payload }) as unknown as SimEvent
+const ev = (type: string, payload: Record<string, unknown>): SimEvent => ({
+  seq: 1,
+  tick: 480,
+  type,
+  payload,
+})
 
 /** Every string a broadcast surface can put in front of a viewer, with where it came from. */
 export function broadcastStrings(state: WorldState): StringSite[] {
@@ -163,8 +167,8 @@ export function broadcastStrings(state: WorldState): StringSite[] {
   // where every living person is, in words
   for (const a of Object.values(state.agents)) {
     push('roster place', placeOf(state, a.id).words)
-    push('roster state', stateWord(a as never))
-    for (const c of conditionsOf(a as never)) push('roster condition', CONDITION_WORD[c])
+    push('roster state', stateWord(a))
+    for (const c of conditionsOf(a)) push('roster condition', CONDITION_WORD[c])
     push('hover', hoverLabel(state, 'agent', a.id))
   }
 
@@ -233,7 +237,7 @@ describe('R4 · nothing on screen is a machine word, an id, or a number without 
 // ── R2 ────────────────────────────────────────────────────────────────────────────────────
 
 /** Every caption a broadcast burns into the frame, and its source size in CSS px. */
-const CAPTIONS: ReadonlyArray<{ what: string; px: number }> = [
+const CAPTIONS: readonly { what: string; px: number }[] = [
   { what: 'speech bubble', px: 16 }, // FACE_INSTALL_PX
   { what: 'director subtitle', px: 0.95 * 16 },
   {

@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 
-const installs: Array<Record<string, unknown>> = []
+const installs: Record<string, unknown>[] = []
 vi.mock('pixi.js', () => ({
   BitmapFont: {
     install: (o: Record<string, unknown>) => {
@@ -312,14 +312,14 @@ describe('the letter after an f survives — no derived kerning on a ligature fa
       fonts: { load: async () => [], ready: Promise.resolve() } as unknown as FontFaceSet,
     })
     expect(installs.length).toBe(2)
-    for (const o of installs) expect(o['skipKerning'], String(o['name'])).toBe(true)
+    for (const o of installs) expect(o.skipKerning, String(o.name)).toBe(true)
   })
 
   it('keeps the atlas one texel per screen pixel and tintable, so one atlas serves every ink', () => {
     for (const o of installs) {
-      expect(o['resolution'], String(o['name'])).toBe(1)
-      expect(o['dynamicFill'], String(o['name'])).toBe(true)
-      expect((o['textureStyle'] as { scaleMode: string }).scaleMode).toBe('nearest')
+      expect(o.resolution, String(o.name)).toBe(1)
+      expect(o.dynamicFill, String(o.name)).toBe(true)
+      expect((o.textureStyle as { scaleMode: string }).scaleMode).toBe('nearest')
     }
   })
 })

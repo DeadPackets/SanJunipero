@@ -30,11 +30,11 @@ import { buildTicks, isAdjacentToRect, walkIsCapped, workPenalty } from './verbs
 export type SelfBody = {
   needs: { hunger: number; energy: number; warmth: number; social: number }
   hp: number
-  injuries: Array<{ kind: 'minor' | 'serious' | 'grave'; day: number }>
+  injuries: { kind: 'minor' | 'serious' | 'grave'; day: number }[]
   ill: boolean
   thirst: number // always a number here: absence is a storage fact, not something a body feels
   // A body knows what ails it and how badly. It does not know the tick it fell ill.
-  afflictions: Array<{ kind: AfflictionKind; severity: number }>
+  afflictions: { kind: AfflictionKind; severity: number }[]
 }
 
 export type PerceivedAgent = {
@@ -86,7 +86,7 @@ export function conditionProse(
   agentId: string,
 ): string | undefined {
   const a = state.agents[agentId]
-  if (a === undefined || !a.alive) return undefined
+  if (!a?.alive) return undefined
   const worst = [...(a.afflictions ?? [])].sort(
     (p, q) => q.severity - p.severity || (p.kind < q.kind ? -1 : p.kind > q.kind ? 1 : 0),
   )[0]

@@ -6,7 +6,9 @@ describe('makeQuantizer', () => {
   it('exact palette colors map to their own index', () => {
     const pal = paletteRgb()
     const { nearest } = makeQuantizer(pal)
-    pal.forEach(([r, g, b], i) => expect(nearest(r, g, b)).toBe(i))
+    pal.forEach(([r, g, b], i) => {
+      expect(nearest(r, g, b)).toBe(i)
+    })
   })
   it('off-palette colors snap to the nearest by squared RGB distance', () => {
     const { nearest } = makeQuantizer([

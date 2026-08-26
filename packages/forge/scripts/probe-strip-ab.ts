@@ -75,7 +75,7 @@ function stripPrompt(hardened: boolean): string {
   return (
     `${STYLE_PROMPT} A horizontal sprite strip of exactly FIVE copies of the SAME character side by side, ` +
     `evenly spaced with clear magenta gaps between figures, whole body visible in each. Every figure is ` +
-    `${FACING_CLAUSES['sw']}. Left to right: ${phases}. The five figures are identical in costume, colors and ` +
+    `${FACING_CLAUSES.sw}. Left to right: ${phases}. The five figures are identical in costume, colors and ` +
     `proportions — only the pose changes. Subject: ${CHAR_DESC}. ${ASYMMETRY_CLAUSE} ${BIG_PIXEL}` +
     (hardened ? HARDEN : '')
   )
@@ -137,7 +137,7 @@ function processStrip(keyedStrip: RawImage): {
   const outs = segments.map((s) => v7Chain(s, pitch).out)
   const cells = {} as Record<StripPoseV2, RawImage>
   const idle = place(outs[0]!)
-  cells['idle'] = idle
+  cells.idle = idle
   for (let i = 1; i < STRIP_POSES_V2.length; i++) {
     const placed = place(outs[i]!)
     const { dx } = registerToReference(idle, placed)
@@ -190,7 +190,7 @@ async function probe(key: string, guided: boolean, hardened: boolean): Promise<P
       ...strideGate('sw', walk, PROVISIONAL_MEDIAN),
       ...frameCoherenceGate(
         'sw',
-        cells['idle'],
+        cells.idle,
         WALK_POSES_V2.map((p) => ({ label: p, img: cells[p] })),
       ),
     ]

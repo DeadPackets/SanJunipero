@@ -88,9 +88,7 @@ describe('seeding: the forest edge creeps back into the grass', () => {
 
   it('never seeds a tile that is not grass', () => {
     const paved = { ...wood(SURE, midnightOf(1)) }
-    const terrain = paved.terrain.map((row, y) =>
-      row.map((t, x) => (x === 1 && y === 2 ? (7 as TileId) : t)),
-    )
+    const terrain = paved.terrain.map((row, y) => row.map((t, x) => (x === 1 && y === 2 ? 7 : t)))
     expect(seeded(tickOnce({ ...paved, terrain }, SURE)).map((p) => [p.x, p.y])).not.toContainEqual(
       [1, 2],
     )
@@ -219,7 +217,7 @@ describe('a sapling is ground you can walk on and ground you can clear', () => {
 })
 
 describe('the wood loop: felling is the consumer the regrowth cycle was missing', () => {
-  function stand(config = CFG, trees: Array<[number, number]> = [[2, 2]]): WorldState {
+  function stand(config = CFG, trees: [number, number][] = [[2, 2]]): WorldState {
     const t = Array.from({ length: 6 }, () => Array.from({ length: 6 }, (): TileId => 0))
     for (const [x, y] of trees) t[y]![x] = 3
     const s = { ...genesisState(config, t), tick: 720 }
@@ -254,9 +252,9 @@ describe('the wood loop: felling is the consumer the regrowth cycle was missing'
       payload: { x: 2, y: 2, from: 3, to: 0, reason: 'cleared', byId: 'a1' },
     })
     const timber = out.find((e) => e.type === 'item_spawned')!.payload as Record<string, unknown>
-    expect(timber['kind']).toBe('wood')
-    expect(timber['qty']).toBe(TIMBER_PER_TREE)
-    expect(timber['loc']).toEqual({ t: 'agent', id: 'a1' })
+    expect(timber.kind).toBe('wood')
+    expect(timber.qty).toBe(TIMBER_PER_TREE)
+    expect(timber.loc).toEqual({ t: 'agent', id: 'a1' })
   })
 
   it('the stump is grass, and grass beside a wood is where the next sapling comes up', () => {

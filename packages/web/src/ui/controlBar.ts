@@ -334,5 +334,5 @@ export const CONTROL_GLYPH: Readonly<Record<string, GlyphPixel[]>> = {
 
 /** A glyph nobody has drawn is a filled square, never a crash and never a missing button. */
 export function controlGlyph(id: string): GlyphPixel[] {
-  return CONTROL_GLYPH[id] ?? CONTROL_GLYPH['fit']!
+  return CONTROL_GLYPH[id] ?? CONTROL_GLYPH.fit!
 }

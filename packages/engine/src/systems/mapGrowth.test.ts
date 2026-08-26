@@ -94,7 +94,7 @@ function tickAt(s: WorldState, tick: number, config = CFG, seed = 'grow') {
   return createWorldTick(config, new RngStreams(seed))(advanced)
 }
 
-const grown = (r: { events: Array<{ type: string; payload: unknown }> }) =>
+const grown = (r: { events: { type: string; payload: unknown }[] }) =>
   r.events.filter((e) => e.type === 'world_grown')
 
 // The rule is a clearance: the world owes every side of the built set WORLD_MARGIN of ground and
@@ -144,7 +144,7 @@ describe('mapGrowthSystem', () => {
   // over, because the debt it just paid is gone from the next night's reading.
   it('works through every edge it owes, one a night, and then stops for good', () => {
     let s = bigTown()
-    const steps: Array<{ edge: string; depth: number }> = []
+    const steps: { edge: string; depth: number }[] = []
     for (let day = 1; day <= 6; day++) {
       const r = tickAt(s, day * MINUTES_PER_DAY)
       for (const e of grown(r)) {
@@ -295,9 +295,9 @@ describe('fold: world_grown', () => {
     expect(after.terrain).toHaveLength(SIZE)
     expect(after.terrain[0]).toHaveLength(SIZE + 4)
     expect(after.agents.a1).toMatchObject({ x: 4, y: 6 })
-    expect(after.structures['structure_1']).toMatchObject({ x: 10, y: 20 })
-    expect(after.items['item_1']!.loc).toEqual({ t: 'tile', x: 7, y: 9 })
-    expect(after.crops['crop_1']).toMatchObject({ x: 3, y: 3 })
+    expect(after.structures.structure_1).toMatchObject({ x: 10, y: 20 })
+    expect(after.items.item_1!.loc).toEqual({ t: 'tile', x: 7, y: 9 })
+    expect(after.crops.crop_1).toMatchObject({ x: 3, y: 3 })
     expect(before.agents.a1!.x).toBe(4) // the input is never mutated
   })
 
@@ -305,17 +305,17 @@ describe('fold: world_grown', () => {
     const after = growTo('w')
     expect(after.terrain[0]).toHaveLength(SIZE + 4)
     expect(after.agents.a1).toMatchObject({ x: 8, y: 6 })
-    expect(after.structures['structure_1']).toMatchObject({ x: 14, y: 20 })
-    expect(after.items['item_1']!.loc).toEqual({ t: 'tile', x: 11, y: 9 })
-    expect(after.crops['crop_1']).toMatchObject({ x: 7, y: 3 })
+    expect(after.structures.structure_1).toMatchObject({ x: 14, y: 20 })
+    expect(after.items.item_1!.loc).toEqual({ t: 'tile', x: 11, y: 9 })
+    expect(after.crops.crop_1).toMatchObject({ x: 7, y: 3 })
   })
 
   it('growing north shifts the other axis and leaves x alone', () => {
     const after = growTo('n')
     expect(after.terrain).toHaveLength(SIZE + 4)
     expect(after.agents.a1).toMatchObject({ x: 4, y: 10 })
-    expect(after.structures['structure_1']).toMatchObject({ x: 10, y: 24 })
-    expect(after.crops['crop_1']).toMatchObject({ x: 3, y: 7 })
+    expect(after.structures.structure_1).toMatchObject({ x: 10, y: 24 })
+    expect(after.crops.crop_1).toMatchObject({ x: 3, y: 7 })
   })
 
   it('the same route still resolves between the same two landmarks after a shift', () => {

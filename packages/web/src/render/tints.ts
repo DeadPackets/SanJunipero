@@ -1,7 +1,7 @@
 import type { Season } from '@sj/shared'
 
 // LUT reuses forge's calibrated atmosphere TINTS — the palette was locked under these.
-export const CLOCK_STOPS: Array<{ minute: number; tint: [number, number, number] }> = [
+export const CLOCK_STOPS: { minute: number; tint: [number, number, number] }[] = [
   { minute: 0, tint: [0.45, 0.52, 0.95] }, // deep night   (forge TINTS.night)
   { minute: 300, tint: [0.45, 0.52, 0.95] }, // 05:00 still night
   { minute: 390, tint: [1.0, 0.94, 0.78] }, // 06:30 golden dawn (TINTS.dawn clamped ≤1)

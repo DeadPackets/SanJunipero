@@ -120,7 +120,7 @@ export const EMPTY_COPY = {
 // never borrows an emoji, whose shape and colour belong to the reader's font, not the town.
 export type WeatherGlyph = {
   label: string
-  pixels: ReadonlyArray<readonly [number, number, string]>
+  pixels: readonly (readonly [number, number, string])[]
 }
 
 const HONEY = '#F2C879',
@@ -129,7 +129,7 @@ const HONEY = '#F2C879',
   DEEP_WATER = '#5A8CAB',
   ICE = '#D6EAF2'
 
-const CLOUD: ReadonlyArray<readonly [number, number, string]> = [
+const CLOUD: readonly (readonly [number, number, string])[] = [
   [2, 1, STONE],
   [3, 1, STONE],
   [4, 1, STONE],

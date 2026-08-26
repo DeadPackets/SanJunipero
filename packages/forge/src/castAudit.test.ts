@@ -189,7 +189,7 @@ describe('the derived facings are exact mirrors, and the gate now agrees across 
           const x = gateView(crop(`${p}-${f}`))
           return (
             `${p} ${paletteJaccard(idle, x).toFixed(6)} ${(opaqueArea(x) / ia).toFixed(6)} ` +
-            `${headRegionDiff(idle, x).toFixed(6)}`
+            headRegionDiff(idle, x).toFixed(6)
           )
         }).join(' | ')
       }

@@ -38,7 +38,7 @@ const deathDefs: MilestoneDef[] = Object.entries(DEATH_CAUSE_LABELS).map(([cause
 
 // Kinds are `first_*` without exception, which is what lets the glass scan catch a kind it
 // has never heard of the day somebody writes it.
-const POPULATION_MARKS: ReadonlyArray<{ n: number; word: string }> = [
+const POPULATION_MARKS: readonly { n: number; word: string }[] = [
   { n: 10, word: 'ten' },
   { n: 25, word: 'twenty_five' },
   { n: 50, word: 'fifty' },

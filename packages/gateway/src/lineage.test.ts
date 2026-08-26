@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest'
 import type { SimEvent } from '@sj/shared'
 import { EMPTY_LINEAGE, buildLineage, householdsOf, parentEdges } from './lineage.js'
 
-const ev = (seq: number, tick: number, type: string, payload: unknown): SimEvent =>
-  ({ seq, tick, type, payload }) as SimEvent
+const ev = (seq: number, tick: number, type: string, payload: unknown): SimEvent => ({
+  seq,
+  tick,
+  type,
+  payload,
+})
 
 const agents = (
-  list: Array<{ id: string; name?: string; alive?: boolean; insideId?: string }>,
+  list: { id: string; name?: string; alive?: boolean; insideId?: string }[],
 ): Record<string, { id: string; name: string; alive: boolean; insideId?: string }> =>
   Object.fromEntries(
     list.map((a) => [

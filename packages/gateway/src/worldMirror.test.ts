@@ -16,9 +16,7 @@ import {
 } from '@sj/engine'
 import { WorldMirror } from './worldMirror.js'
 
-const GRASS: TileId[][] = Array.from({ length: 8 }, () =>
-  Array.from({ length: 8 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 
 function makeWorld(dbPath: string) {
   const db = openDb(dbPath)
@@ -39,7 +37,9 @@ function makeWorld(dbPath: string) {
 
 describe('WorldMirror', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-mirror-'))
-  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('boots to the live state, polls new ticks, and scrubs with stateAt', () => {
     const dbPath = join(dir, 'world.db')

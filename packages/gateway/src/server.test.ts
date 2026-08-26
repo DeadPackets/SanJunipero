@@ -10,9 +10,7 @@ import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishThought } from './observer.js'
 import { WorldMirror } from './worldMirror.js'
 
-const GRASS: TileId[][] = Array.from({ length: 8 }, () =>
-  Array.from({ length: 8 }, () => 0 as TileId),
-)
+const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 
 function makeWorld(dbPath: string) {
   const db = openDb(dbPath)
@@ -35,13 +33,19 @@ function makeWorld(dbPath: string) {
 function connect(port: number): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const sock = new WebSocket(`ws://127.0.0.1:${port}/ws`)
-    sock.on('open', () => resolve(sock))
+    sock.on('open', () => {
+      resolve(sock)
+    })
     sock.on('error', reject)
   })
 }
 
 function nextRaw(sock: WebSocket): Promise<string> {
-  return new Promise((resolve) => sock.once('message', (d) => resolve(d.toString())))
+  return new Promise((resolve) =>
+    sock.once('message', (d) => {
+      resolve(d.toString())
+    }),
+  )
 }
 
 async function hello(sock: WebSocket): Promise<string> {
@@ -58,7 +62,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 describe('gateway server', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-gwsrv-'))
-  const open: Array<WebSocket | Gateway> = []
+  const open: (WebSocket | Gateway)[] = []
   afterAll(async () => {
     for (const o of open) {
       if (o instanceof WebSocket) o.close()
@@ -192,14 +196,22 @@ describe('gateway server', () => {
     // malformed first frame → close 4400
     const c = await connect(gw.port)
     open.push(c)
-    const closed = new Promise<number>((resolve) => c.on('close', (code) => resolve(code)))
+    const closed = new Promise<number>((resolve) =>
+      c.on('close', (code) => {
+        resolve(code)
+      }),
+    )
     c.send('not json at all')
     expect(await closed).toBe(4400)
 
     // wrong protocol version → close 4400
     const d = await connect(gw.port)
     open.push(d)
-    const closedD = new Promise<number>((resolve) => d.on('close', (code) => resolve(code)))
+    const closedD = new Promise<number>((resolve) =>
+      d.on('close', (code) => {
+        resolve(code)
+      }),
+    )
     d.send(JSON.stringify({ t: 'hello', v: 999, lastSeenTick: null }))
     expect(await closedD).toBe(4400)
   }, 20000)

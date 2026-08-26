@@ -73,7 +73,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const hasTable = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
 
   // ── HTTP route registry (Tasks 6–7 mount here) ──
-  const routes: Array<{ method: string; segs: string[]; fn: RouteHandler }> = []
+  const routes: { method: string; segs: string[]; fn: RouteHandler }[] = []
   const router: Router = {
     route(method, pattern, fn) {
       routes.push({ method, segs: pattern.split('/').filter(Boolean), fn })
@@ -266,7 +266,9 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       removers.delete(sock)
     })
     // A viewer's connection dying mid-frame must not throw out of the socket server.
-    sock.on('error', () => sock.terminate())
+    sock.on('error', () => {
+      sock.terminate()
+    })
   })
 
   // ── poll pump ──

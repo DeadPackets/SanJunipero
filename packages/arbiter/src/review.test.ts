@@ -61,7 +61,9 @@ function makeReview() {
 
 type ReviewStatusRow = { status: string; reason?: string | null }
 describe('ReviewStore', () => {
-  afterEach(() => unregisterVerb('recipe:boil_salt'))
+  afterEach(() => {
+    unregisterVerb('recipe:boil_salt')
+  })
   it('queue then pending returns the row with status pending', () => {
     const { review, rulebook } = makeReview()
     const ruleId = rulebook.insert(boilSaltRecipe, 200)
@@ -142,9 +144,9 @@ describe('ReviewStore', () => {
     review.queue(ruleId, 'recipe:boil_salt', 600)
     expect(review.pending()).toHaveLength(1) // idempotent re-queue: no duplicate pending
     review.revert(ruleId, 'physics wrong', 700)
-    const rows = db
-      .prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?')
-      .all(ruleId) as Array<{ status: string }>
+    const rows = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').all(ruleId) as {
+      status: string
+    }[]
     expect(rows).toEqual([{ status: 'reverted' }])
     expect(review.pending()).toEqual([])
   })
@@ -158,7 +160,9 @@ describe('ReviewStore', () => {
     )
     review.revert(ruleId, 'physics wrong', 500)
     review.queue(ruleId, 'recipe:boil_salt', 600) // re-queue a reverted rule
-    expect(() => review.approve(ruleId)).toThrow(/reverted/)
+    expect(() => {
+      review.approve(ruleId)
+    }).toThrow(/reverted/)
     const row = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').get(ruleId) as {
       status: string
     }
@@ -170,9 +174,9 @@ describe('ReviewStore', () => {
     const ruleId = rulebook.insert(boilSaltRecipe, 200) // bypass codify: no auto-queue
     review.revertByRecipe('recipe:boil_salt', 'physics wrong', 500)
     expect(review.pending()).toEqual([])
-    const rows = db
-      .prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?')
-      .all(ruleId) as Array<{ status: string }>
+    const rows = db.prepare('SELECT status FROM ruling_reviews WHERE rule_id = ?').all(ruleId) as {
+      status: string
+    }[]
     expect(rows).toEqual([{ status: 'reverted' }])
   })
 })

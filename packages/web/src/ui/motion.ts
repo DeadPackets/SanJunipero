@@ -159,8 +159,8 @@ const TIME = /(?:^|[\s,(])(\d*\.?\d+)(ms|s)(?![\w-])/g
 
 /** Every duration the sheet states, as `selector — value`. Longhand and shorthand both: a
  *  shorthand's FIRST time is its duration and any second one is a delay, per the CSS grammar. */
-export function durationsIn(css: string): Array<{ selector: string; value: string }> {
-  const out: Array<{ selector: string; value: string }> = []
+export function durationsIn(css: string): { selector: string; value: string }[] {
+  const out: { selector: string; value: string }[] = []
   for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     for (const [, prop, raw] of (body ?? '').matchAll(
       /(transition-duration|animation-duration|transition|animation)\s*:\s*([^;}]+)/g,

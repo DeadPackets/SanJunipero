@@ -57,7 +57,7 @@ const MEADOW = ['.........', '.........', '.........', '.........', '.........']
 
 function withFauna(
   s: WorldState,
-  scatter: Array<{ id: string; kind: string; x: number; y: number; stock?: number }>,
+  scatter: { id: string; kind: string; x: number; y: number; stock?: number }[],
   config = CFG,
 ): WorldState {
   for (const f of scatter) s = fold(s, ev('fauna_spawned', f), config)

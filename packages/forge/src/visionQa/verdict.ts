@@ -69,7 +69,7 @@ export const NA_CRITERION = (klass: string): VisionCriterion => ({
 // A verdict stored before a criterion existed does not carry it (`tiling`, added 2026-08-17).
 // Every reader of an archived verdict goes through here rather than indexing straight in.
 export function criterionOf(v: VisionVerdict, c: Criterion): VisionCriterion | undefined {
-  return v.criteria[c] as VisionCriterion | undefined
+  return v.criteria[c]
 }
 
 export function deriveOverall(

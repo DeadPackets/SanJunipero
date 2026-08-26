@@ -18,7 +18,11 @@ export class SocketHub {
   #report: HubReport
 
   /** A viewer more than 1 MiB behind is marked lagging and reported, not dropped silently. */
-  constructor(report: HubReport = (line) => console.warn(`gateway: ${line}`)) {
+  constructor(
+    report: HubReport = (line) => {
+      console.warn(`gateway: ${line}`)
+    },
+  ) {
     this.#report = report
   }
 
