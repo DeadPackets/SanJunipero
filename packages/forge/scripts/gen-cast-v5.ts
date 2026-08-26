@@ -462,7 +462,7 @@ async function runCharacter(m: CastMember): Promise<void> {
         const c = await genFrame(f, p, i)
         if (c) cands.push(c)
         const best = bestOf(cands)
-        if (best && best.failures.length === 0 && !identityBroken(best)) break
+        if (best?.failures.length === 0 && !identityBroken(best)) break
       }
       const best = bestOf(cands)
       if (!best) throw new Error(`${m.id} ${f}/${p}: every candidate failed processing`)

@@ -104,8 +104,10 @@ async function main(): Promise<void> {
     let attemptsUsed = 0,
       extra = ''
     let chosen: RawImage | null = null,
-      chosenRaw: RawImage | null = null,
       icon: RawImage | null = null
+    // Written from inside `regenerate`; a boxed field survives the narrowing a closure-assigned
+    // `let` loses.
+    const chosenRaw: { raw: RawImage | null } = { raw: null }
     const spriteVerdicts: VisionVerdict[] = [],
       iconVerdicts: VisionVerdict[] = []
     let status: ItemResult['status'] = 'blocked'
@@ -155,7 +157,7 @@ async function main(): Promise<void> {
                 ),
                 await encodePng(p.cell),
               )
-            chosenRaw = pick.raw
+            chosenRaw.raw = pick.raw
             return {
               sprite: pick.cell,
               model: pick.c.model,
@@ -182,8 +184,8 @@ async function main(): Promise<void> {
 
         // Resample the icon from the paid generation at its own cell count: an integer
         // downscale of the 24 px sprite lands on 12 px of art, which the judge reads as mush.
-        icon = chosenRaw
-          ? integralSpriteCell(chosenRaw, e.iconPx).cell
+        icon = chosenRaw.raw
+          ? integralSpriteCell(chosenRaw.raw, e.iconPx).cell
           : deriveIcon(res.sprite, e.iconPx)
         const iv = await judge({
           assetId: `${assetId}#icon`,
@@ -216,17 +218,15 @@ async function main(): Promise<void> {
     if (status !== 'error') status = spriteGateStatus(spriteVerdicts, status)
 
     if (chosen) {
-      icon ??= chosenRaw
-        ? integralSpriteCell(chosenRaw, e.iconPx).cell
+      icon ??= chosenRaw.raw
+        ? integralSpriteCell(chosenRaw.raw, e.iconPx).cell
         : deriveIcon(chosen, e.iconPx)
       // Mechanical criteria are COUNTED, never asked of the judge: a sprite that fails the pixel
       // bar never ships, whatever the eye said about it.
-      const barFailures = (
-        await Promise.all([
-          pixelBarReport({ name: e.kind, img: chosen, raw: { w: GEN_SIZE, h: GEN_SIZE } }),
-          pixelBarReport({ name: `${e.kind}#icon`, img: icon, raw: { w: GEN_SIZE, h: GEN_SIZE } }),
-        ])
-      ).flatMap((bar) => (bar.ok ? [] : bar.failures))
+      const barFailures = [
+        pixelBarReport({ name: e.kind, img: chosen, raw: { w: GEN_SIZE, h: GEN_SIZE } }),
+        pixelBarReport({ name: `${e.kind}#icon`, img: icon, raw: { w: GEN_SIZE, h: GEN_SIZE } }),
+      ].flatMap((bar) => (bar.ok ? [] : bar.failures))
       if (barFailures.length > 0) {
         status = 'blocked'
         note = `${note} pixel bar: ${barFailures.join('; ')}`.trim()

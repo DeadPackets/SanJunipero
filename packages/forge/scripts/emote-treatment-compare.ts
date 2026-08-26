@@ -293,7 +293,7 @@ async function main(): Promise<void> {
   for (let c = 0; c < COLS; c++) {
     const label = await textPng(TREATMENTS[c]!, 14)
     const meta = await sharp(label).metadata()
-    const w = meta.width ?? 0
+    const w = meta.width
     layers.push({
       input: label,
       left: LABEL_W + c * (CELL + GAP) + Math.round((CELL - w) / 2),
@@ -304,7 +304,7 @@ async function main(): Promise<void> {
   for (let r = 0; r < ROWS; r++) {
     const label = await textPng(GLYPH_NAMES[r]!, 20)
     const meta = await sharp(label).metadata()
-    const h = meta.height ?? 0
+    const h = meta.height
     layers.push({
       input: label,
       left: 8,
@@ -345,7 +345,7 @@ async function main(): Promise<void> {
   console.log(`wrote ${reportPath}`)
 }
 
-main().catch((e) => {
+main().catch((e: unknown) => {
   console.error(e)
   process.exit(1)
 })

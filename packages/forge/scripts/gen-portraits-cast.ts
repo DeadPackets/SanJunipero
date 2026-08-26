@@ -195,13 +195,23 @@ async function runCharacter(m: PortraitMember): Promise<void> {
   const judge: JudgeFn = makeVlmJudge({ apiKey: KEY!, refSheets: baseRefs })
 
   const SCORES_PATH = `${CACHE}/scores.json`
-  const scores: Record<string, { score: number; notes: string }> = (() => {
-    try {
-      return JSON.parse(readFileSync(SCORES_PATH, 'utf8'))
-    } catch {
-      return {}
-    }
-  })()
+  const scores = new Map<string, { score: number; notes: string }>(
+    Object.entries(
+      (() => {
+        try {
+          return JSON.parse(readFileSync(SCORES_PATH, 'utf8')) as Record<
+            string,
+            { score: number; notes: string }
+          >
+        } catch {
+          return {}
+        }
+      })(),
+    ),
+  )
+  const writeScores = () => {
+    writeFileSync(SCORES_PATH, JSON.stringify(Object.fromEntries(scores), null, 1))
+  }
 
   // REJECT=<key,...> archives eyeball-rejected candidates (rejected- prefix, provenance
   // kept, score dropped) so the slot regenerates — e.g. salma happy-c0's blonde hair,
@@ -212,8 +222,8 @@ async function runCharacter(m: PortraitMember): Promise<void> {
     .filter(Boolean)) {
     if (existsSync(`${CACHE}/${key}.png`) && !existsSync(`${CACHE}/rejected-${key}.png`)) {
       renameSync(`${CACHE}/${key}.png`, `${CACHE}/rejected-${key}.png`)
-      delete scores[key]
-      writeFileSync(SCORES_PATH, JSON.stringify(scores, null, 1))
+      scores.delete(key)
+      writeScores()
       console.log(`  ${key}: REJECTED by eyeball — archived, slot will regenerate`)
     }
   }
@@ -236,11 +246,11 @@ async function runCharacter(m: PortraitMember): Promise<void> {
       console.log(`  ${key}: post-process failed: ${String(e)}`)
       return null
     }
-    let v = scores[key]
+    let v = scores.get(key)
     if (!v) {
       v = await judge(raw)
-      scores[key] = v
-      writeFileSync(SCORES_PATH, JSON.stringify(scores, null, 1))
+      scores.set(key, v)
+      writeScores()
     }
     writeFileSync(`${CACHE}/${key}-shipped.png`, await encodePng(shipped))
     console.log(`  ${key}: score=${v.score} — ${v.notes}`)

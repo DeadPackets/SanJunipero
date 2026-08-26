@@ -18,13 +18,19 @@ function scored(score: number, extra: Record<string, unknown> = {}) {
   })
 }
 
-type Call = { model: unknown; schema: { shape: Record<string, unknown> }; messages: any[] }
+type ContentPart = { type: string; text?: string; image?: Buffer }
+type Call = {
+  model: unknown
+  schema: { shape: Record<string, unknown> }
+  messages: { content: ContentPart[] }[]
+}
 
 function spy(reply: (keys: readonly string[]) => unknown, providerMetadata?: unknown) {
   const calls: Call[] = []
-  const gen: VisionGenerateFn = async (a: any) => {
-    calls.push(a)
-    const keys = Object.keys(a.schema.shape).filter((k) => k !== 'feedback')
+  const gen: VisionGenerateFn = async (a) => {
+    const call = a as unknown as Call
+    calls.push(call)
+    const keys = Object.keys(call.schema.shape).filter((k) => k !== 'feedback')
     return { object: reply(keys), providerMetadata }
   }
   return { calls, gen }
@@ -42,16 +48,16 @@ describe('vision judge', () => {
   it('sends rubric text, then refs in order, then the palette card, then the checker card', async () => {
     const { calls, gen } = spy(scored(9))
     await makeVisionJudge({ apiKey: 'k', refs: REFS, generateFn: gen })(ARGS)
-    const content = calls[0]!.messages[0].content
+    const content = calls[0]!.messages[0]!.content
     expect(content).toHaveLength(1 + REFS.length + 2)
-    expect(content[0].type).toBe('text')
-    expect(content[0].text).toContain('a squat storehouse')
+    expect(content[0]!.type).toBe('text')
+    expect(content[0]!.text).toContain('a squat storehouse')
     for (let i = 0; i < REFS.length; i++) {
-      expect(content[1 + i].type).toBe('image')
-      expect(content[1 + i].image).toEqual(REFS[i])
+      expect(content[1 + i]!.type).toBe('image')
+      expect(content[1 + i]!.image).toEqual(REFS[i])
     }
-    expect(content[1 + REFS.length].image).toEqual(await encodePng(paletteCard()))
-    expect(content[2 + REFS.length].image).toEqual(await encodePng(checkerCard(ARGS.sprite)))
+    expect(content[1 + REFS.length]!.image).toEqual(await encodePng(paletteCard()))
+    expect(content[2 + REFS.length]!.image).toEqual(await encodePng(checkerCard(ARGS.sprite)))
   })
 
   it('defaults the model to the config and lets an explicit option win', async () => {

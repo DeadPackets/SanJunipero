@@ -102,7 +102,7 @@ export function registerCommittedBuildings(
     const existing = latestBuilding(codex, b.codexKind)
     if (existing !== null && existing.meta === meta) {
       const stored = codex.get(existing.id)
-      if (stored !== null && stored.png.equals(b.png)) {
+      if (stored?.png.equals(b.png)) {
         out.push({ kind: b.codexKind, action: 'unchanged', id: existing.id })
         continue
       }

@@ -78,7 +78,7 @@ export function downscaleMajority(img: RawImage, w: number, h: number): RawImage
         for (let sx = x0; sx < x1; sx++) {
           total++
           const i = (sy * img.width + sx) * 4
-          if (img.data[i + 3]! === 0) {
+          if (img.data[i + 3] === 0) {
             clear++
             continue
           }
@@ -852,7 +852,7 @@ export function driftField(img: RawImage, pitch: number, phase: { ox: number; oy
     let k = 0
     for (let i = 1; i < DELTAS.length; i++) {
       const b = best[nBands - 1]!
-      if (b[i]! > b[k]! || (b[i]! === b[k]! && Math.abs(DELTAS[i]!) < Math.abs(DELTAS[k]!))) k = i
+      if (b[i]! > b[k]! || (b[i] === b[k] && Math.abs(DELTAS[i]!) < Math.abs(DELTAS[k]!))) k = i
     }
     const out = new Array<number>(nBands)
     for (let b = nBands - 1; b >= 0; b--) {

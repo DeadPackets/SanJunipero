@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import type { AssetRecord } from '@sj/shared'
 import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
 
@@ -45,7 +46,7 @@ describe('AssetCodex', () => {
       throw new Error('listener boom')
     })
     codex.onAssetReady((r) => seen.push(r.desc))
-    let rec
+    let rec: AssetRecord | undefined
     expect(() => {
       rec = codex.register(input)
     }).not.toThrow() // row is committed; no duplicate regen

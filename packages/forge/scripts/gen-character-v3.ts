@@ -77,7 +77,10 @@ const judge: JudgeFn = makeVlmJudge({ apiKey: KEY, refSheets: REFS })
 const SCORES_PATH = `${CACHE}/scores.json`
 const scores: Record<string, { score: number; notes: string }> = (() => {
   try {
-    return JSON.parse(readFileSync(SCORES_PATH, 'utf8'))
+    return JSON.parse(readFileSync(SCORES_PATH, 'utf8')) as Record<
+      string,
+      { score: number; notes: string }
+    >
   } catch {
     return {}
   }
@@ -295,7 +298,7 @@ async function attemptStrip(
       attempts: cands.map((c) => c.key),
     }
     if (failures.length === 0) return { ok: true, state }
-    if (!best) best = state
+    best ??= state
   }
   if (!best) throw new Error(`${f}: every strip candidate failed processing at attempt ${attempt}`)
   return { ok: false, state: best }
@@ -364,7 +367,7 @@ async function attemptSleep(
     )
     const state: SleepState = { cand, cell, retries: attempt, failures }
     if (failures.length === 0) return { ok: true, state }
-    if (!best) best = state
+    best ??= state
   }
   if (!best) throw new Error(`${f}/sleep: every candidate failed processing at attempt ${attempt}`)
   return { ok: false, state: best }
@@ -395,7 +398,7 @@ for (const f of FACINGS) {
   // full gate pass; a still-failing facing ships flagged, no further spend.
   if (SEED_SLEEP && last && last.failures.length > 0) {
     const sw = sleeps.get('sw')
-    if (sw && sw.failures.length === 0) {
+    if (sw?.failures.length === 0) {
       try {
         const r = await attemptSleep(f, 3, sw.cand.raw)
         if (r.ok) last = r.state

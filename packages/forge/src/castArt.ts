@@ -71,9 +71,9 @@ export function registerCommittedCast(
   for (const c of listCommittedCast(opts.root)) {
     const meta = JSON.stringify(c.manifest)
     const existing = latest.get(c.codexKind)
-    if (existing !== undefined && existing.meta === meta) {
+    if (existing?.meta === meta) {
       const stored = codex.get(existing.id)
-      if (stored !== null && stored.png.equals(c.atlas)) {
+      if (stored?.png.equals(c.atlas)) {
         out.push({ kind: c.codexKind, action: 'unchanged', id: existing.id })
         continue
       }

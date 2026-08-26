@@ -98,7 +98,7 @@ function criterionAsk(
   k: Criterion,
   a: { klass: string; expectedFacing?: string | undefined },
 ): string {
-  const pitch = CANONICAL_PITCH[a.klass as keyof typeof CANONICAL_PITCH]
+  const pitch = (CANONICAL_PITCH as Record<string, number | undefined>)[a.klass]
   switch (k) {
     case 'palette':
       return 'palette — every opaque colour is a member of the palette card shown above. No colour outside it, no gradient bands, no soft anti-aliased edges.'

@@ -26,7 +26,9 @@ const manifest = {
 describe('TilesetManifest', () => {
   it('accepts the 4-season 32x16 shape and rejects a missing season', () => {
     expect(TilesetManifest.parse(manifest).tileW).toBe(32)
-    const { winter: _drop, ...three } = manifest.seasons as Record<string, unknown>
+    const three = Object.fromEntries(
+      Object.entries(manifest.seasons as Record<string, unknown>).filter(([k]) => k !== 'winter'),
+    )
     expect(() => TilesetManifest.parse({ ...manifest, seasons: three })).toThrow()
   })
 })
@@ -66,7 +68,7 @@ describe('TilesetManifest.autotile (additive, optional)', () => {
   })
 
   it('rejects 14 keys with the all-15 message', () => {
-    const { cross: _drop, ...fourteen } = allTiles
+    const fourteen = Object.fromEntries(Object.entries(allTiles).filter(([k]) => k !== 'cross'))
     expect(() =>
       TilesetManifest.parse({
         ...manifest,

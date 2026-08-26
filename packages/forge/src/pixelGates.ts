@@ -241,14 +241,14 @@ export function tilesetVarietyGate(
   let shortestPeriod: number | null = null
   let worst = ''
   const lastSeen = new Map<string, number>()
-  sequence.forEach((piece, i) => {
+  for (const [i, piece] of sequence.entries()) {
     const prev = lastSeen.get(piece)
     if (prev !== undefined && (shortestPeriod === null || i - prev < shortestPeriod)) {
       shortestPeriod = i - prev
       worst = piece
     }
     lastSeen.set(piece, i)
-  })
+  }
   const failures =
     shortestPeriod !== null && shortestPeriod < opts.minPeriod
       ? [
@@ -344,7 +344,7 @@ export type PixelBarArgs = {
   seam?: boolean
 }
 
-export async function pixelBarReport(a: PixelBarArgs): Promise<GateResult & { name: string }> {
+export function pixelBarReport(a: PixelBarArgs): GateResult & { name: string } {
   const failures: string[] = []
   if (a.raw) failures.push(...integerScaleGate(a.raw, { w: a.img.width, h: a.img.height }).failures)
   if (a.artPx !== undefined) failures.push(...pixelGridGate(a.img, a.artPx).failures)

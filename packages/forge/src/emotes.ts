@@ -267,7 +267,6 @@ const GLYPHS: Record<EmoteKind, string[]> = {
 
 export function renderEmote(kind: EmoteKind): RawImage {
   const rows = GLYPHS[kind]
-  if (!rows) throw new Error(`unknown emote kind: ${kind}`)
   if (rows.length !== EMOTE_SIZE)
     throw new Error(`${kind}: expected ${EMOTE_SIZE} rows, got ${rows.length}`)
   const data = new Uint8ClampedArray(EMOTE_SIZE * EMOTE_SIZE * 4)
