@@ -207,9 +207,9 @@ export async function settle(
 /**
  * ★ THE RATE TRIPWIRE — the guard the `$5` cap cannot be.
  *
- * The seam lane's **$0.053/hour** books HALF of what a turn costs — `pins.ts` counts one side of
- * the call — so the true rate is **$0.106/hour** and the total cap is **~45 hours of streaming**,
- * not the 94 this comment claimed. Either way it stops a lane's mistake and cannot stop a runaway
+ * The seam lane's **$0.053/hour** was booked at half price — `pins.ts` counted one side of the
+ * call until the `price` lane fixed it — so the true rate is **$0.106/hour** and the total cap is
+ * **~45 hours of streaming**, not 94. Either way it stops a lane's mistake and cannot stop a runaway
  * on a process meant to run for weeks: a regression has to be ~45x the normal rate before the cap
  * lands inside an hour. A total is the wrong instrument for a leak — you need the FLOW.
  *
@@ -219,7 +219,7 @@ export async function settle(
  * | | $/mind/sim-day |
  * |---|---|
  * | measured, five minds over 1 252 ticks, as booked | **0.0106** |
- * | the same figure with `pins.ts`' half-counting undone | **0.0212** |
+ * | the same figure at the honest price the `price` lane now books | **0.0212** |
  * | the same run's worst 15 minutes — the nightly reflection burst, 34% of a day's spend in 90 s | ~0.0308 |
  * | **this ceiling** | **0.21** — 9.9x the true rate, 6.8x the worst measured window |
  *
