@@ -13,6 +13,10 @@ export type LlmCallInsert = {
   cacheReadTokens: number
   reasoningTokens: number
   costUsd: number
+  // What the provider said it charged, when it said. Null on failures, on the repair path, and
+  // for any back end that does not report one — kept beside `costUsd` so the two can be
+  // reconciled over a whole run, not only per call.
+  reportedCostUsd: number | null
   latencyMs: number
   ok: boolean
   error: string | null
@@ -31,6 +35,7 @@ export function migrateLlmTables(db: Database.Database): void {
       cache_read_tokens INTEGER NOT NULL,
       reasoning_tokens INTEGER NOT NULL,
       cost_usd REAL NOT NULL,
+      reported_cost_usd REAL,
       latency_ms INTEGER NOT NULL,
       ok INTEGER NOT NULL,
       error TEXT,
@@ -57,6 +62,9 @@ export function migrateLlmTables(db: Database.Database): void {
   // than making every recorded run unreadable.
   const cols = db.prepare('PRAGMA table_info(llm_calls)').all() as Array<{ name: string }>
   if (!cols.some((c) => c.name === 'provider')) db.exec('ALTER TABLE llm_calls ADD COLUMN provider TEXT')
+  if (!cols.some((c) => c.name === 'reported_cost_usd')) {
+    db.exec('ALTER TABLE llm_calls ADD COLUMN reported_cost_usd REAL')
+  }
 }
 
 export function sumReserved(db: Database.Database, caller: string): number {
@@ -99,8 +107,8 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void 
   db.prepare(
     `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
-        reasoning_tokens, cost_usd, latency_ms, ok, error, provider)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reasoning_tokens, cost_usd, reported_cost_usd, latency_ms, ok, error, provider)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     Date.now(),
     call.agentId,
@@ -111,6 +119,7 @@ export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void 
     call.cacheReadTokens,
     call.reasoningTokens,
     call.costUsd,
+    call.reportedCostUsd,
     Math.round(call.latencyMs),
     call.ok ? 1 : 0,
     call.error,

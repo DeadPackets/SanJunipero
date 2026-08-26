@@ -13,6 +13,8 @@ export type ScriptedResponse = {
   servedModelId?: string
   // Which OpenRouter back end answered, as OpenRouter reports it (C11 R20).
   provider?: string
+  // What OpenRouter says it charged, as `usage.cost` under usage accounting.
+  reportedCostUsd?: number
 }
 
 export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
@@ -37,9 +39,18 @@ export function mockModel(responses: ScriptedResponse[]): MockLanguageModelV4 {
         },
         warnings: [],
         ...(scripted.servedModelId === undefined ? {} : { response: { modelId: scripted.servedModelId } }),
-        ...(scripted.provider === undefined
+        ...(scripted.provider === undefined && scripted.reportedCostUsd === undefined
           ? {}
-          : { providerMetadata: { openrouter: { provider: scripted.provider } } }),
+          : {
+              providerMetadata: {
+                openrouter: {
+                  ...(scripted.provider === undefined ? {} : { provider: scripted.provider }),
+                  ...(scripted.reportedCostUsd === undefined
+                    ? {}
+                    : { usage: { cost: scripted.reportedCostUsd } }),
+                },
+              },
+            }),
       }
     },
   })

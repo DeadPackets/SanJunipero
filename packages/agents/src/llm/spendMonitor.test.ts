@@ -10,8 +10,10 @@ import {
   deadCallCounts,
   projectDailySpend,
   providerCounts,
+  reconcileCosts,
   reportDeadCalls,
   reportProviders,
+  reportReconciliation,
 } from './spendMonitor.js'
 
 const NOW = 1_700_000_000_000
@@ -260,5 +262,47 @@ describe('providerCounts: which back end answered, and how much of it was worth 
   it('a ledger with nothing in the window reports nothing at all', () => {
     const db = mixed()
     expect(providerCounts(db, { since: NOW + 1 })).toEqual([])
+  })
+})
+
+// The whole-run version of the per-call reconciliation. This is the shape of the comparison
+// that actually found the defect: one lane's bill against the project's ledger.
+describe('price reconciliation over a run', () => {
+  const insert = (db: Database.Database, computed: number, reported: number | null): void => {
+    db.prepare(
+      `INSERT INTO llm_calls (ts, agent_id, caller, model, input_tokens, output_tokens,
+         cache_read_tokens, reasoning_tokens, cost_usd, reported_cost_usd, latency_ms, ok, error)
+       VALUES (?, NULL, 'c', 'm', 0, 0, 0, 0, ?, ?, 0, 1, NULL)`,
+    ).run(NOW, computed, reported)
+  }
+
+  it('is silent when the ledger matches the bill', () => {
+    const db = openDb()
+    insert(db, 0.001, 0.001)
+    const r = reportReconciliation(db)
+    expect(r.ratio).toBeCloseTo(1, 10)
+    expect(db.prepare('SELECT COUNT(*) AS n FROM alerts').get()).toEqual({ n: 0 })
+  })
+
+  it('reports the 2x the project actually had', () => {
+    const db = openDb()
+    // What 611 Wafer calls looked like: booked at Baidu's price, charged at Wafer's.
+    insert(db, 0.43, 0.89)
+    const r = reportReconciliation(db)
+    expect(r.ratio).toBeCloseTo(2.07, 2)
+    const row = db.prepare('SELECT kind, detail FROM alerts').get() as { kind: string; detail: string }
+    expect(row.kind).toBe('llm_price_reconciliation')
+    expect(row.detail).toContain('2.07x out')
+  })
+
+  it('counts the calls it could not reconcile rather than hiding them', () => {
+    const db = openDb()
+    insert(db, 0.001, null)
+    insert(db, 0.001, 0.001)
+    const r = reconcileCosts(db)
+    expect(r.reconciledCalls).toBe(1)
+    expect(r.unreconciledCalls).toBe(1)
+    // The unreconcilable call is excluded from BOTH sides, so it cannot skew the ratio.
+    expect(r.computedUsd).toBeCloseTo(0.001, 10)
   })
 })

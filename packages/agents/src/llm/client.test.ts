@@ -19,6 +19,7 @@ type CallRow = {
   cache_read_tokens: number
   reasoning_tokens: number
   cost_usd: number
+  reported_cost_usd: number | null
   latency_ms: number
   ok: number
   error: string | null
@@ -49,6 +50,8 @@ describe('LlmClient.object', () => {
     const model = mockModel([
       {
         json: { mood: 'calm', count: 3 },
+        provider: 'Wafer',
+        servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 50, cacheReadTokens: 600 },
       },
     ])
@@ -60,9 +63,9 @@ describe('LlmClient.object', () => {
     })
     expect(value).toEqual({ mood: 'calm', count: 3 })
 
-    // ((1000-600)*0.14 + 600*0.028 + 50*0.28) / 1e6 = 0.0000868
-    const expectedCost = ((1000 - 600) * 0.14 + 600 * 0.028 + 50 * 0.28) / 1e6
-    expect(expectedCost).toBeCloseTo(0.0000868, 10)
+    // Wafer's real price: ((1000-600)*0.28 + 600*0.07 + 50*0.56) / 1e6 = 0.000182
+    const expectedCost = ((1000 - 600) * 0.28 + 600 * 0.07 + 50 * 0.56) / 1e6
+    expect(expectedCost).toBeCloseTo(0.000182, 10)
     expect(usage).toEqual({
       inputTokens: 1000,
       outputTokens: 50,
@@ -89,6 +92,8 @@ describe('LlmClient.object', () => {
     const model = mockModel([
       {
         json: { mood: 'busy', count: 2 },
+        provider: 'Wafer',
+        servedModelId: MIND_MODEL,
         usage: { inputTokens: 500, outputTokens: 6168, reasoningTokens: 6100 },
       },
     ])
@@ -102,7 +107,7 @@ describe('LlmClient.object', () => {
     expect(row.reasoning_tokens).toBe(6100)
     expect(row.output_tokens).toBe(6168)
     // reasoning bills as output: cost formula unchanged
-    const expectedCost = (500 * 0.14 + 6168 * 0.28) / 1e6
+    const expectedCost = (500 * 0.28 + 6168 * 0.56) / 1e6
     expect(Math.abs(row.cost_usd - expectedCost)).toBeLessThan(1e-6)
     expect(usage.costUsd).toBe(row.cost_usd)
   })
@@ -177,9 +182,11 @@ describe('LlmClient.object', () => {
     expect(all[0]!.input_tokens).toBe(1000)
     expect(usage.costUsd).toBeGreaterThan(0)
     const alerts = db.prepare('SELECT kind, detail FROM alerts').all() as Array<{ kind: string; detail: string }>
-    expect(alerts).toHaveLength(1)
-    expect(alerts[0]!.kind).toBe('decode_repaired')
-    expect(alerts[0]!.detail).toContain('narrator')
+    // `NoObjectGeneratedError` carries no `providerMetadata`, so a repaired call can name
+    // neither its back end nor its cost. It books at the ceiling and says so rather than
+    // guessing a cheap rate — the second alert is that, and it is deliberate.
+    expect(alerts.map((a) => a.kind)).toEqual(['decode_repaired', 'llm_price_unpriced_route'])
+    expect(alerts.find((a) => a.kind === 'decode_repaired')!.detail).toContain('narrator')
   })
 
   it('still fails, and still does not re-ask, when the shape cannot be repaired without guessing', async () => {
@@ -264,12 +271,17 @@ describe('budget guard', () => {
     db.prepare(
       "INSERT INTO llm_calls (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens, reasoning_tokens, cost_usd, latency_ms, ok, error) VALUES (0, NULL, 'other', 'm', 0, 0, 0, 0, 99.0, 0, 1, NULL)",
     ).run()
-    expect(client.totalCostUsd()).toBeCloseTo((100 * 0.14 + 100 * 0.28) / 1e6, 10)
+    // Unattributed, so it books at the ceiling.
+    expect(client.totalCostUsd()).toBeCloseTo((100 * 0.44 + 100 * 1.32) / 1e6, 10)
   })
 })
 
 describe('served model attribution', () => {
-  it('logs the model that actually answered, costed with pinned prices when unknown', async () => {
+  // This assertion used to read "costed with pinned prices when unknown", and that was the
+  // defect: an unpriced route booked at the pinned model's cheap rate and nobody could see it.
+  // An unknown model is a different product at an unknown price, so it now books at the worst
+  // rate any endpoint charges and raises an alert. It can only over-report.
+  it('logs the model that actually answered, costed at the ceiling when unpriced', async () => {
     const db = openDb()
     const model = mockModel([
       { text: 'a', usage: { inputTokens: 100, outputTokens: 10 }, servedModelId: 'deepseek/deepseek-chat' },
@@ -278,8 +290,129 @@ describe('served model attribution', () => {
     await client.text({ messages: [{ role: 'user', content: 'u' }] })
     const row = rows(db)[0]!
     expect(row.model).toBe('deepseek/deepseek-chat')
-    // no price pin for the fallback model: falls back to the pinned prices
-    expect(row.cost_usd).toBeCloseTo((100 * 0.14 + 10 * 0.28) / 1e6, 12)
+    expect(row.cost_usd).toBeCloseTo((100 * 0.44 + 10 * 1.32) / 1e6, 12)
+    const kinds = db.prepare('SELECT kind FROM alerts').all() as Array<{ kind: string }>
+    expect(kinds.map((k) => k.kind)).toContain('llm_price_unpriced_route')
+  })
+})
+
+// The guard that would have caught this project's own defect on call 1 instead of call 611.
+// OpenRouter reports what it charged on the same response that carries the tokens; the pinned
+// table computes a second opinion; the two are compared every call.
+describe('price reconciliation', () => {
+  const kinds = (db: Database.Database): string[] =>
+    (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as Array<{ kind: string }>).map((r) => r.kind)
+
+  it('books the provider\'s own number, not the table\'s, when the provider reports one', async () => {
+    const db = openDb()
+    const model = mockModel([
+      {
+        text: 'a', provider: 'Wafer', servedModelId: MIND_MODEL,
+        usage: { inputTokens: 1000, outputTokens: 1000 },
+        reportedCostUsd: 0.00099,
+      },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test' })
+    const { usage } = await client.text({ messages: [{ role: 'user', content: 'u' }] })
+    const row = rows(db)[0]!
+    expect(row.cost_usd).toBeCloseTo(0.00099, 12)
+    expect(row.reported_cost_usd).toBeCloseTo(0.00099, 12)
+    expect(usage.costUsd).toBeCloseTo(0.00099, 12)
+  })
+
+  // THE DEFECT. Wafer charges 0.28/0.56; the table said 0.14/0.28 and booked half. With the
+  // table restored to Baidu's prices this alert is what fires on the first call.
+  it('alerts when the table disagrees with what the provider charged', async () => {
+    const db = openDb()
+    // Wafer's real price for these tokens is (1000*0.28 + 1000*0.56)/1e6 = $0.00084.
+    const model = mockModel([
+      {
+        text: 'a', provider: 'Wafer', servedModelId: MIND_MODEL,
+        usage: { inputTokens: 1000, outputTokens: 1000 },
+        // ...but suppose the provider actually charges double what the table believes.
+        reportedCostUsd: 0.00168,
+      },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test' })
+    await client.text({ messages: [{ role: 'user', content: 'u' }] })
+    expect(kinds(db)).toContain('llm_price_divergence')
+    const detail = (db.prepare(
+      "SELECT detail FROM alerts WHERE kind = 'llm_price_divergence'",
+    ).get() as { detail: string }).detail
+    expect(detail).toContain('Wafer')
+    expect(detail).toContain('the pin is stale')
+    // The bill wins: the ledger books what was charged, not what the table guessed.
+    expect(rows(db)[0]!.cost_usd).toBeCloseTo(0.00168, 12)
+  })
+
+  // A reconciliation that alerts on every call is one people mute inside a week.
+  it('is silent when the table agrees with the provider', async () => {
+    const db = openDb()
+    const model = mockModel([
+      {
+        text: 'a', provider: 'Wafer', servedModelId: MIND_MODEL,
+        usage: { inputTokens: 1000, outputTokens: 1000 },
+        reportedCostUsd: (1000 * 0.28 + 1000 * 0.56) / 1e6,
+      },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test' })
+    await client.text({ messages: [{ role: 'user', content: 'u' }] })
+    expect(kinds(db)).toEqual([])
+  })
+
+  it('stays silent on sub-cent rounding rather than crying wolf', async () => {
+    const db = openDb()
+    const exact = (10 * 0.28 + 2 * 0.56) / 1e6
+    const model = mockModel([
+      {
+        text: 'a', provider: 'Wafer', servedModelId: MIND_MODEL,
+        usage: { inputTokens: 10, outputTokens: 2 },
+        // A tiny absolute wobble on a tiny call: a bare ratio would scream, the floor holds.
+        reportedCostUsd: exact + 1e-6,
+      },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test' })
+    await client.text({ messages: [{ role: 'user', content: 'u' }] })
+    expect(kinds(db)).toEqual([])
+  })
+
+  // The mechanism of the original defect, on its own, because it deserves its own test: a
+  // `served` value with no price row must not fall through to somebody else's cheap rate.
+  it('books an unpriced provider at the ceiling and complains, never at the pinned rate', async () => {
+    const db = openDb()
+    const model = mockModel([
+      {
+        text: 'a', provider: 'SomeNewProvider', servedModelId: MIND_MODEL,
+        usage: { inputTokens: 1000, outputTokens: 1000 },
+      },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test' })
+    await client.text({ messages: [{ role: 'user', content: 'u' }] })
+    const row = rows(db)[0]!
+    expect(row.cost_usd).toBeCloseTo((1000 * 0.44 + 1000 * 1.32) / 1e6, 12)
+    // Strictly more than the pinned route would have charged: it can only over-report.
+    expect(row.cost_usd).toBeGreaterThan((1000 * 0.28 + 1000 * 0.56) / 1e6)
+    expect(row.reported_cost_usd).toBeNull()
+    const detail = (db.prepare(
+      "SELECT detail FROM alerts WHERE kind = 'llm_price_unpriced_route'",
+    ).get() as { detail: string }).detail
+    expect(detail).toContain('SomeNewProvider')
+  })
+
+  it('takes the provider\'s number even for a route it cannot price', async () => {
+    const db = openDb()
+    const model = mockModel([
+      {
+        text: 'a', provider: 'SomeNewProvider', servedModelId: MIND_MODEL,
+        usage: { inputTokens: 1000, outputTokens: 1000 },
+        reportedCostUsd: 0.00042,
+      },
+    ])
+    const client = new LlmClient({ model, db, caller: 'test' })
+    await client.text({ messages: [{ role: 'user', content: 'u' }] })
+    expect(rows(db)[0]!.cost_usd).toBeCloseTo(0.00042, 12)
+    // Still says nobody priced the route, so the table gets fixed rather than drifting.
+    expect(kinds(db)).toContain('llm_price_unpriced_route')
   })
 })
 

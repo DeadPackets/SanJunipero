@@ -31,6 +31,9 @@ export {
 } from './live/providerPreflight.js'
 export {
   checkSpend,
+  reconcileCosts,
+  reportReconciliation,
+  RECONCILE_TOLERANCE,
   classifyFailure,
   deadCallCounts,
   projectDailySpend,
