@@ -1,23 +1,26 @@
-import { generateText, Output } from 'ai'
+import { generateText, Output, type LanguageModelUsage } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import { z } from 'zod'
 import { PRICE_PER_M } from '../src/llm/pins.js'
+import { servedProvider } from '../src/llm/client.js'
 
 const MODEL = 'deepseek/deepseek-v4-flash-0731'
 const CAP_USD = 5.0
 let spentUsd = 0
 // Imported, not re-typed: this script booked its own spend at 0.14/0.28/0.028 while the route
 // charged double, so its own $5 cap was a $10 cap.
-function book(usage: any, label: string) {
-  const cin = usage?.inputTokenDetails?.cacheReadTokens ?? 0
+function book(usage: LanguageModelUsage, label: string): number {
+  const cin = usage.inputTokenDetails.cacheReadTokens ?? 0
+  const inTok = usage.inputTokens ?? 0
+  const outTok = usage.outputTokens ?? 0
   const cost =
-    ((usage.inputTokens - cin) * PRICE_PER_M.input +
+    ((inTok - cin) * PRICE_PER_M.input +
       cin * PRICE_PER_M.cacheRead +
-      usage.outputTokens * PRICE_PER_M.output) /
+      outTok * PRICE_PER_M.output) /
     1e6
   spentUsd += cost
   console.log(
-    `[${label}] in=${usage.inputTokens} out=${usage.outputTokens} cacheRead=${cin} cost=$${cost.toFixed(6)} total=$${spentUsd.toFixed(4)}`,
+    `[${label}] in=${inTok} out=${outTok} cacheRead=${cin} cost=$${cost.toFixed(6)} total=$${spentUsd.toFixed(4)}`,
   )
   if (spentUsd > CAP_USD) {
     console.error('BUDGET CAP EXCEEDED')
@@ -34,8 +37,8 @@ function fail(msg: string): never {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-function providerOf(result: { providerMetadata?: Record<string, any> | undefined }): string {
-  return String(result.providerMetadata?.openrouter?.provider ?? 'unknown')
+function providerOf(result: { finalStep: { providerMetadata?: unknown } }): string {
+  return servedProvider(undefined, result.finalStep.providerMetadata) ?? 'unknown'
 }
 
 // ---- Check 1: basic call ----
@@ -108,10 +111,10 @@ let observedProvider = 'unknown'
 {
   const res = await fetch('https://openrouter.ai/api/v1/models')
   if (!res.ok) fail(`check4 models list HTTP ${res.status}`)
-  const body: any = await res.json()
-  const secondId: string | undefined = body.data
-    .map((m: any) => m.id as string)
-    .filter((id: string) => id.startsWith('deepseek/') && id !== MODEL && !id.endsWith(':free'))
+  const body = (await res.json()) as { data: { id: string }[] }
+  const secondId = body.data
+    .map((m) => m.id)
+    .filter((id) => id.startsWith('deepseek/') && id !== MODEL && !id.endsWith(':free'))
     .sort()[0]
   if (!secondId) fail('check4 no second deepseek model id found')
   console.log(`[check4] verified second deepseek model id: ${secondId}`)
@@ -126,7 +129,7 @@ let observedProvider = 'unknown'
     maxOutputTokens: 32,
   })
   book(r.usage, 'fallback-shape')
-  const served = String((r as any).response?.modelId ?? 'unknown')
+  const served = r.finalStep.response.modelId
   console.log(`CHECK 4 PASS: request accepted; served model=${served} provider=${providerOf(r)}`)
   console.log(`[pins] PROVIDER_ORDER=[${observedProvider}] FALLBACK_MODELS=[${secondId}]`)
 }

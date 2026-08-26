@@ -96,7 +96,8 @@ async function main(): Promise<void> {
   // One fixed seed for every arm. Two prior lanes priced the same prompt clause at +229 and at
   // +64 because their baselines differed; nothing here is allowed to differ but the dial.
   const rng = new RngStreams('cost-ladder')
-  let { state, doors } = buildWorld(store)
+  const { state: builtState, doors } = buildWorld(store)
+  let state = builtState
   MINDS.forEach((m, i) => {
     const at = doors[i] ?? doors[0]!
     state = fold(
@@ -137,7 +138,6 @@ async function main(): Promise<void> {
 
   const lawQueue: LawQueue = []
   const worldTick = createWorldTick(config, rng, lawQueue)
-  let handler: TickHandler = () => {}
   const loop = new TickLoop({
     store,
     state,
@@ -173,7 +173,7 @@ async function main(): Promise<void> {
     }
   }
   const bridge = new Watched({ loop, store, simConfig: config })
-  handler = bridge.wrapTickHandler(({ emit }) => {
+  const handler: TickHandler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
 
@@ -271,7 +271,7 @@ async function main(): Promise<void> {
     ...thoughts.map((t) => t.text),
     ...events
       .filter((e) => e.type === 'agent_spoke')
-      .map((e) => String((e.payload as { text?: string }).text ?? '')),
+      .map((e) => (e.payload as { text?: string }).text ?? ''),
   ]
   const emDashLines = said.filter((s) => s.includes('—')).length
   const openers = said

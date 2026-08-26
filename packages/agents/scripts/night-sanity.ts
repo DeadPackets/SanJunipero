@@ -8,12 +8,16 @@ import { CAPABILITIES } from '../src/prompt/rulesOfBeing.js'
 
 const LAMP = 'lamp_post'
 const withoutLamp = (c: SimConfig): SimConfig => {
-  const { [LAMP]: _r, ...recipes } = c.structures.recipes
-  const { [LAMP]: _g, ...glowRadius } = c.light.glowRadius as Record<string, number>
+  const recipes = Object.fromEntries(
+    Object.entries(c.structures.recipes).filter(([k]) => k !== LAMP),
+  )
+  const glowRadius = Object.fromEntries(
+    Object.entries(c.light.glowRadius).filter(([k]) => k !== LAMP),
+  ) as typeof c.light.glowRadius
   return {
     ...c,
     structures: { ...c.structures, recipes },
-    light: { ...c.light, glowRadius: glowRadius as typeof c.light.glowRadius },
+    light: { ...c.light, glowRadius },
   }
 }
 

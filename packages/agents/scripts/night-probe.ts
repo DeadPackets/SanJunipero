@@ -59,12 +59,16 @@ const DATA_DIR = fileURLToPath(new URL('../data/night/', import.meta.url))
 // reads the recipe table, so arm A's minds are never given the noun "lamp post" at all.
 const LAMP = 'lamp_post'
 const withoutLamp = (c: SimConfig): SimConfig => {
-  const { [LAMP]: _r, ...recipes } = c.structures.recipes
-  const { [LAMP]: _g, ...glowRadius } = c.light.glowRadius as Record<string, number>
+  const recipes = Object.fromEntries(
+    Object.entries(c.structures.recipes).filter(([k]) => k !== LAMP),
+  )
+  const glowRadius = Object.fromEntries(
+    Object.entries(c.light.glowRadius).filter(([k]) => k !== LAMP),
+  ) as typeof c.light.glowRadius
   return {
     ...c,
     structures: { ...c.structures, recipes },
-    light: { ...c.light, glowRadius: glowRadius as typeof c.light.glowRadius },
+    light: { ...c.light, glowRadius },
   }
 }
 
@@ -147,7 +151,8 @@ async function main(): Promise<void> {
 
   const store = new EventStore(db)
   const rng = new RngStreams('night-probe')
-  let { state, doors } = buildWorld(store)
+  const { state: builtState, doors } = buildWorld(store)
+  let state = builtState
   MINDS.forEach((m, i) => {
     const at = doors[i] ?? doors[0]!
     state = fold(
@@ -198,7 +203,6 @@ async function main(): Promise<void> {
 
   const lawQueue: LawQueue = []
   const worldTick = createWorldTick(config, rng, lawQueue)
-  let handler: TickHandler = () => {}
   const loop = new TickLoop({
     store,
     state,
@@ -237,7 +241,7 @@ async function main(): Promise<void> {
     // The arms differ in the WORLD, not in what a mind is told about it.
   }
   const bridge = new Watched({ loop, store, simConfig: config })
-  handler = bridge.wrapTickHandler(({ emit }) => {
+  const handler: TickHandler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
 

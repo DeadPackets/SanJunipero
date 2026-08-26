@@ -128,7 +128,8 @@ async function main(): Promise<void> {
 
   const store = new EventStore(db)
   const rng = new RngStreams('motive-probe')
-  let { state, doors } = buildWorld(store)
+  const { state: builtState, doors } = buildWorld(store)
+  let state = builtState
   MINDS.forEach((m, i) => {
     const at = doors[i] ?? doors[0]!
     state = fold(
@@ -179,7 +180,6 @@ async function main(): Promise<void> {
 
   const lawQueue: LawQueue = []
   const worldTick = createWorldTick(config, rng, lawQueue)
-  let handler: TickHandler = () => {}
   const loop = new TickLoop({
     store,
     state,
@@ -218,12 +218,13 @@ async function main(): Promise<void> {
     override perception(agentId: string): ReturnType<EngineBridge['perception']> {
       const p = super.perception(agentId)
       if (ARM === 'b' || ARM === 'c') return p
-      const { cold: _dropped, ...rest } = p
+      const rest = { ...p }
+      delete rest.cold
       return rest
     }
   }
   const bridge = new Watched({ loop, store, simConfig: config })
-  handler = bridge.wrapTickHandler(({ emit }) => {
+  const handler: TickHandler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
 
