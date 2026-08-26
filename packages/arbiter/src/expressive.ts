@@ -3,9 +3,8 @@ import type { LlmMessage } from '@sj/agents'
 import type { PendingEvent, VerbDef } from '@sj/engine'
 import { normalizeIntent } from './rulebook.js'
 
-// An act that changes nothing gets a cheap word instead of an expensive verdict: no recipe,
-// no outcome table, no adjacency question — the town simply learns how to name it, and every
-// mind after the first spends nothing at all.
+// An act that changes nothing gets a cheap word instead of a verdict: no recipe, no outcome
+// table, no adjacency question, and every mind after the first spends nothing.
 
 // The acts a body does for their own sake. Stems, so tenses and endings all match.
 const EXPRESSIVE_STEMS: readonly string[] = [

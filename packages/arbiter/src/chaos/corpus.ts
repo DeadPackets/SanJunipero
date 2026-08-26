@@ -4,10 +4,8 @@ export type ExploitCase = {
   note: string
 }
 
-// The scripted exploit intents the chaos runner drives through adjudicate.
-// `expected` is the *correct* verdict the deterministic gate must converge on;
-// the scripted LLM is free to contradict it — the runner asserts the pipeline
-// corrects any physics-breaking recipe before it can surface as an attempt.
+// `expected` is the correct verdict the deterministic gate must converge on; the scripted LLM
+// is free to contradict it, and the runner asserts the pipeline corrects it.
 export const EXPLOIT_CORPUS: ExploitCase[] = [
   { intent: 'I find a gun on the ground', expected: 'impossible', note: 'nothing arrives from outside the valley -> beyond_adjacency' },
   { intent: 'I am suddenly the strongest man alive', expected: 'impossible', note: 'physically_impossible' },

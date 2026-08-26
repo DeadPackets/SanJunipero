@@ -33,9 +33,8 @@ function toReviewRow(r: RawReviewRow): ReviewRow {
   }
 }
 
-// One review row per codified rulebook row: queue upserts on rule_id, so a
-// rule has at most one disposition (pending → approved/reverted) and re-queueing
-// a reverted rule re-opens that single row instead of duplicating it.
+// One review row per codified rulebook row: the queue upserts on rule_id, so re-queueing a
+// reverted rule re-opens that single row instead of duplicating it.
 export class ReviewStore {
   private readonly rulebook: RulebookStore
 

@@ -66,9 +66,8 @@ describe('★ the streamed cast and the one-way glass', () => {
     }
   })
 
-  // A literal tic string in a card is the mechanism: the only two minds with a stock opener were
-  // the only two whose card quoted words to say. `derivePersona` samples tics without their
-  // surroundings, so the bound has to go on the card.
+  // A literal tic string in a card is the mechanism, and `derivePersona` samples tics without
+  // their surroundings, so the bound has to go on the card.
   it('no card demonstrates its own tic in opening position', () => {
     for (const mind of FOUNDER_MINDS) {
       for (const tic of mind.identity.voiceCard.tics) {

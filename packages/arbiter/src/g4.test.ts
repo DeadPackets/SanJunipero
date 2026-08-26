@@ -1,6 +1,5 @@
-// GATE G4 — "boil river water for salt" adjudicates once, codifies, then the
-// byte-identical intent resolves Tier-1 with zero further Arbiter LLM calls.
-// Fully deterministic: scripted LlmClient, FakeEmbedder, :memory: db, no live API.
+// An intent adjudicates once, codifies, and the byte-identical intent then resolves Tier-1
+// with zero further arbiter calls. Fully deterministic: no live API.
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import {

@@ -172,9 +172,8 @@ describe('rollOutcomeTable', () => {
       { weight: 1, success: false, label: 'fail', effects: [{ op: 'none' }] },
       { weight: 1, success: true, label: 'win', effects: [{ op: 'none' }] },
     ]
-    // factor 0.5 → weights [1, 0.5], total 1.5; failure covers [0,1), success (1,1.5].
-    // rng.next()=0.6 → roll=0.9 → failure. (Scaling neither row: roll=1.2 → success;
-    // scaling both: total=1.0, roll=0.6 → success.) So failure proves exactly the brief's claim.
+    // factor 0.5 -> weights [1, 0.5], total 1.5, so roll 0.9 is a failure. Scaling neither row,
+    // or both, would make the same roll a success, which is what makes this row load-bearing.
     expect(rollOutcomeTable(t, { next: () => 0.6 }, 0.5).label).toBe('fail')
   })
 })

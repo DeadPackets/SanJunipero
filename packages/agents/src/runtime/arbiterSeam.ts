@@ -35,9 +35,8 @@ export type Codifier = (
 // Both halves of the arbiter the runtime needs: rule on it, then make it law.
 export type SeamArbiter = { adjudicate: Adjudicator; codify: Codifier }
 
-// Values only, read in sorted key order: this string is a precedent key (rulebook exact match,
-// then 0.92 cosine), so anything varying per mind or per turn must never enter it. The mind's
-// own sentence rides in `AgentCtx.saying` instead.
+// Values only, in sorted key order: this string is a precedent key, so anything varying per
+// mind or per turn must never enter it. The mind's own sentence rides in `AgentCtx.saying`.
 export function humanizeIntent(verb: string, params: Record<string, unknown>): string {
   const values = Object.keys(params)
     .sort()

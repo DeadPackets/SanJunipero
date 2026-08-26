@@ -1,6 +1,5 @@
-// @slow — GATE G11a, the ledger half: the firsts an engine event makes, the firsts a shape
-// across several makes, and the firsts only a reader can find. No network: the model here is a
-// script. $0.
+// @slow — the ledger half: the firsts an engine event makes, the firsts a shape across several
+// makes, and the firsts only a reader can find. The model here is a script.
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import type { LlmClient, LlmMessage, LlmUsage } from '@sj/agents'

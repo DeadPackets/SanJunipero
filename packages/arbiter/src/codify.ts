@@ -184,9 +184,8 @@ export function codify(
   if (unsound !== null) throw new Error(`cannot codify ${recipe.id}: ${unsound}`)
   const existing = deps.rulebook.byId(recipe.id)
   if (existing) {
-    // Active row → idempotent no-op; reverted row → reactivate it so the
-    // review queue's re-open path is reachable (UNIQUE(recipe_id) forbids a
-    // second insert either way).
+    // Active row is a no-op; a reverted one is reactivated so the review queue's re-open path
+    // stays reachable, since UNIQUE(recipe_id) forbids a second insert either way.
     if (existing.revertedAtTick !== null) {
       deps.rulebook.reactivate(recipe, deps.tick)
       if (!VERBS[recipe.id]) registerVerb(verbFromRecipe(recipe))

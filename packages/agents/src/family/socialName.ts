@@ -41,9 +41,8 @@ function namingPrompt(born: AgentBornPayload, mother: ParentPersona): { system: 
   }
 }
 
-// Never throws and never costs the town a birth: a mother who is dead, silent,
-// or past her budget simply leaves the name unset. The town will settle on
-// something eventually, or it will not.
+// Never throws and never costs the town a birth: a mother who is dead, silent or past her
+// budget simply leaves the name unset.
 export async function captureSocialName(
   llm: LlmClient,
   db: Database.Database,

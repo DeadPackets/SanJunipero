@@ -151,9 +151,8 @@ export class EngineBridge {
   // then notify per-tick subscribers. Never awaits anything: intents are pure.
   wrapTickHandler(world: TickHandler): TickHandler {
     return (ctx) => {
-      // ANNOUNCEMENTS FIRST. A discovery is what made the intent behind it possible, and the
-      // runtime codifies then submits in one synchronous stretch — drain the other way round
-      // and the log reads "used the verb" before "the verb existed".
+      // Announcements first: the runtime codifies then submits in one synchronous stretch, so
+      // the other order writes "used the verb" before "the verb existed".
       const announced = this.#announcements
       this.#announcements = []
       for (const a of announced) ctx.emit(a.type, a.payload)
@@ -236,17 +235,15 @@ export class EngineBridge {
     return groundForBuilding(this.#loop.state)
   }
 
-  // The other place work can go. Free ground was the only answer the world ever gave, and it
-  // moves to a fresh plot the moment somebody plants walls — so the second body to ask was sent
-  // away from the first body's house, every time.
+  // The other place work can go: free ground moves to a fresh plot the moment somebody plants
+  // walls, so it alone sends every later body away from the first body's house.
   unfinishedWork(agentId: string): StandingWalls | null {
     const a = this.#loop.state.agents[agentId]
     return a === undefined ? null : unfinishedWork(this.#loop.state, this.#simConfig, a)
   }
 
-  // Water is terrain, and terrain is the one thing perception never projects: a body that
-  // feels "your throat burns" has no field to answer it with. Both answers come from the
-  // engine's own reach test, so what the prose promises is what `drink` and `fill` accept.
+  // Terrain is the one thing perception never projects. Both answers come from the engine's own
+  // reach test, so what the prose promises is what `drink` and `fill` accept.
   waterAtHand(agentId: string): boolean {
     return waterWithinReach(this.#loop.state, agentId) !== null
   }
@@ -277,9 +274,8 @@ export class EngineBridge {
     return best
   }
 
-  // The nearest thing worth walking to for a meal: a loaf on a shelf, a loaf on the ground, or
-  // a patch still standing. Kind and place only — the mark is still earned by going and
-  // looking, exactly as `nearestWater` names a bank and never a well's id.
+  // The nearest thing worth walking to for a meal. Kind and place only: the mark is still
+  // earned by going and looking, as `nearestWater` names a bank and never a well's id.
   nearestFood(x: number, y: number, radius = 24): { x: number; y: number; kind: string } | null {
     const state = this.#loop.state
     let best: { x: number; y: number; kind: string } | null = null
@@ -309,9 +305,8 @@ export class EngineBridge {
     return best
   }
 
-  // The ground within sight, in the words a recipe may ask for — sorted, deduplicated, and
-  // silent about tiles the recipe vocabulary has no word for. Terrain is the one thing
-  // perception never projects, and the arbiter has to be able to see the river it rules on.
+  // The ground within sight in the words a recipe may ask for, silent about tiles the recipe
+  // vocabulary has no word for. The arbiter has to be able to see the river it rules on.
   groundKinds(agentId: string): string[] {
     const state = this.#loop.state
     const a = state.agents[agentId]

@@ -37,9 +37,7 @@ function buildBridge(): { bridge: EngineBridge; step: () => void } {
   return { bridge, step: () => loop.step() }
 }
 
-// A second town where things are owned, so the bridge's ownership mapping is
-// observable: Tamar holds her own bread, Bex's plank sits on the ground beside
-// her, and Cass lifts it while she watches.
+// A second town where things are owned, so the bridge's ownership mapping is observable.
 function ownedWorld(opts: { recentWindowTicks?: number } = {}): { bridge: EngineBridge; step: () => void } {
   const config = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } })
   const terrain: TileId[][] = Array.from({ length: 12 }, () => Array.from({ length: 12 }, (): TileId => 0))
@@ -279,9 +277,8 @@ describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
   })
 
   it('an announcement lands BEFORE the intent it made possible', () => {
-    // The whole argument for draining announcements first: the runtime codifies and then
-    // submits in one synchronous stretch, so the other order writes a log that lies about
-    // causality — "used the verb" recorded before "the verb existed".
+    // The runtime codifies then submits in one synchronous stretch, so draining the other way
+    // round writes "used the verb" before "the verb existed".
     const { store, loop, bridge } = announceHarness()
     void bridge.submit(AGENT, { verb: 'walk', params: { x: 4, y: 3 } })
     bridge.announce(DISCOVERY_EVENT, {

@@ -8,9 +8,8 @@ import {
   howFarUp, makeablesLine, perceptionToProse, standingWallsLine, type PerceptionPacket,
 } from './prose.js'
 
-// Hands are the rate — `stepBuild` adds one to the walls per hand on the site — so a house is
-// a night's work for five. What stopped them was that "still being built" reads the same one
-// hour short as four days short, and a half-raised wall was invisible as a place work can go.
+// Hands are the rate — `stepBuild` adds one per hand on the site — so a house is a night's work
+// for five. "Still being built" reads the same one hour short as four days short.
 
 const CFG = DEFAULT_CONFIG
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({ seq, tick: 0, type, payload })
@@ -192,9 +191,8 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
   })
 })
 
-// ------------------------------------------- R3's remainder: the OTHER place work can go ---
 // `groundForBuilding` names the town's next FREE plot, which is the same plot for everyone
-// until one body plants walls on it — so free ground alone cannot answer "where does work go".
+// until one body plants walls on it: free ground alone cannot answer "where does work go".
 
 describe('* walls already standing are a place the world can name', () => {
   const rows = () => Array.from({ length: 14 }, () => Array.from({ length: 14 }, () => 0 as TileId))

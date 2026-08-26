@@ -12,9 +12,8 @@ export const ERA_ORDER: Record<Era, number> = {
   industry: 5,
 }
 
-// Mind-facing and byte-stable, written as the town's own people and never as a game designer;
-// every noun clears FORBIDDEN_FRAMING and the one-way-glass roster, which is why a shared
-// arrangement is described and never named.
+// Mind-facing and byte-stable, in the town's own voice; every noun clears FORBIDDEN_FRAMING and
+// the one-way-glass roster, which is why a shared arrangement is described and never named.
 export const CANON = `The town of San Junipero sits where two branches of a river meet, in a wide valley of field and forest. Its people farm the ground, fish the water, and keep their own machinery in repair. A generator gives them light and current for as long as somebody feeds it. What breaks here is mended here, by hand, out of what the sheds already hold.
 
 There is no factory within reach of this valley, no yard that pours metal, no counter that will sell them a finished part. Nothing arrives from outside; what cannot be made or mended between these two rivers cannot be had at all. So the new thing this town finds is far more often an arrangement between its people — a turn agreed at the well, a store held in common, a name that sticks to a place — than a machine nobody here could build.

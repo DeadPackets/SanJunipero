@@ -4,7 +4,6 @@ import type { PersonalityDoc } from '../personality.js'
 import type { IdentityCore } from '../prompt/assemble.js'
 import type { MindSpec } from './liveMinds.js'
 
-// ---------------------------------------------------------------- the minds ---
 // Goals are neutral on purpose — a goal like "cut timber for a deck" is the fixture
 // instructing the mind.
 export type Mind = MindSpec

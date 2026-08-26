@@ -103,9 +103,8 @@ function phrase(ev: SimEvent, ctx: Ctx): Phrased | null {
   }
 }
 
-// The child's first memories: the public record of the household, never one
-// line of a parent's own memory store. Per-agent isolation is a law, and a
-// birth does not get to break it — so this reads the event log and only that.
+// The public record of the household, never a line of a parent's own memory store: per-agent
+// isolation is a law, so this reads the event log and only that.
 export function buildHouseholdSeed(store: EventStore, opts: HouseholdSeedOpts): SeedEntry[] {
   const ctx: Ctx = {
     ...opts,

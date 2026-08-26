@@ -4,9 +4,8 @@ import { effectiveConfig, TOGGLABLE_PATHS } from '@sj/engine'
 import { MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
 import type { ConstructStore } from './constructStore.js'
 
-// The recognizer reads the log and writes the arbiter's own registry. It names a TYPE; the
-// name is the town's, quoted from a mouth or left null. Nothing in this file may reach a
-// prompt an agent sees, a perception packet, world state or the hash (G8).
+// The recognizer names a TYPE; the name itself is the town's, quoted from a mouth or left null.
+// Nothing here may reach a prompt, a perception packet, world state or the hash.
 
 export const CONSTRUCT_TYPES = ['festival', 'faith', 'council', 'market', 'custom'] as const
 export type ConstructType = (typeof CONSTRUCT_TYPES)[number]

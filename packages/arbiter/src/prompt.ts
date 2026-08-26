@@ -2,8 +2,7 @@ import type { LlmMessage } from '@sj/agents'
 
 export type AdjudicationBlocks = {
   canon: string // CANON + "The town currently knows: " + codex known list (prose)
-  // The codex adjacency frontier — the unearned rungs `withinAdjacency` accepts. Without it
-  // the arbiter judges "beyond adjacency" blind.
+  // The unearned rungs `withinAdjacency` accepts; without it the arbiter judges blind.
   frontier: string[]
   agent: {
     name: string
@@ -61,9 +60,8 @@ function fenceIntent(intent: string): string {
   return fence('Intent', intent)
 }
 
-// A flattened act says what; the thought says why, and why is what decides whether a first
-// step exists. It goes below the intent and inside the same `<<< >>>` fence — it is the second
-// untrusted string this prompt carries.
+// A flattened act says what; the thought says why, and why decides whether a first step exists.
+// It rides inside the same `<<< >>>` fence — it is the second untrusted string here.
 function fenceSaying(saying: string | undefined): string | null {
   if (saying === undefined || saying.trim().length === 0) return null
   return fence('In their own words, the thought behind it', saying)

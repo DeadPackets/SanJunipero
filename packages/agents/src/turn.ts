@@ -30,9 +30,8 @@ export const IntentSchema = z.object({
   verb: z.string().min(1).describe('The exact word of the act, such as walk or eat.'),
   params: IntentParamsSchema.default({}).describe('Exactly what the act asks for, named by its keys.'),
 }).strict()
-// Every optional field takes null as well as absence: a strict optional turns a model's "none"
-// into a whole-turn parse failure. Not normalised away by `.transform()`, which
-// `z.toJSONSchema(..., { io: 'output' })` refuses to represent — readers treat both alike.
+// Every optional field takes null as well as absence, and not via `.transform()`, which
+// `z.toJSONSchema(..., { io: 'output' })` refuses to represent. Readers treat both alike.
 export const TurnSchema = z.object({
   thought: z.string().min(1)
     .describe('What passes through your mind this moment. Yours alone; no one else ever hears it.'),

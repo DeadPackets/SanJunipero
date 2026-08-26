@@ -1,8 +1,7 @@
 import type { z } from 'zod'
 
-// May remove framing, re-parse the provider's own characters, and drop what the schema does not
-// model. It may never add a field, a value or a meaning, and every candidate is checked back
-// against the caller's own schema, so a payload that needs guessing stays a failure.
+// May remove framing and re-read the provider's own characters; it may never add a field, a
+// value or a meaning, and a payload that needs guessing stays a failure.
 
 export type RepairCandidate = { value: unknown; how: string }
 
@@ -16,9 +15,8 @@ const jsonOrNothing = (text: string): unknown | undefined => {
   }
 }
 
-// Every balanced object or array that starts at depth zero, found with a string-aware walk so
-// a brace inside a quoted sentence is never mistaken for structure — and so prose containing
-// its own braces cannot hide the real payload behind it.
+// Every balanced object or array at depth zero, found with a string-aware walk so a brace
+// inside a quoted sentence is never mistaken for structure.
 export function balancedSpans(text: string): string[] {
   const spans: string[] = []
   let depth = 0
@@ -125,9 +123,8 @@ const quotedNumber = (v: unknown): number | undefined => {
   return Number.isFinite(n) && String(n) === trimmed ? n : undefined
 }
 
-// The two repairs the schema itself asks for by name, applied to a fixpoint. Both only remove
-// or re-read what is already written: a key the schema does not model is dropped, and a number
-// the provider put in quotes is read as the number it spells. Nothing is supplied.
+// The two repairs the schema asks for by name, applied to a fixpoint: an unmodelled key is
+// dropped and a quoted number is read as the number it spells. Nothing is supplied.
 function applySchemaIssues<T>(value: unknown, schema: z.ZodType<T>): { value: T; how: string } | undefined {
   let current = structuredClone(value)
   const applied: string[] = []

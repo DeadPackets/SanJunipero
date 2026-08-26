@@ -34,9 +34,8 @@ export type BootMindsOpts = {
   minds: readonly MindSpec[]
   bridge: EngineBridge
   embedder: { embed(t: string): Promise<Float32Array> }
-  /** One database per mind (`<agentDbDir>/<id>.db`) is what the gateway's read API expects; one
-   *  shared database is what the gate scripts pass. Both are legal — every row is keyed by
-   *  `agent_id`. */
+  /** One database per mind (`<agentDbDir>/<id>.db`) is what the gateway's read API expects and
+   *  one shared database is what a gate script passes; every row is keyed by `agent_id`. */
   dbFor: (agentId: string) => Database.Database
   /** The LLM for a mind's turns. Separate from `dbFor`: the call ledger is ops, not memory. */
   turnLlm: (agentId: string) => LlmClient

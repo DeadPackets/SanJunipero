@@ -94,9 +94,8 @@ const args = (parenSpan: string): string[] => {
 
 type Card = { file: string; tics: string[]; exampleLines: string[] }
 
-/** Every voice card written down anywhere, in either of the two shapes this repo uses: the
- *  `voice(register, rhythm, tics, neverSays, exampleLines, …)` helper each probe defines for
- *  itself, and a plain `{ tics: […], …, exampleLines: […] }` object literal. */
+/** Every voice card written down anywhere, in either shape this repo uses: the `voice(...)`
+ *  helper each probe defines for itself, and a plain object literal. */
 const cards = (): Card[] => {
   const found: Card[] = []
   for (const file of sources(PACKAGES)) {

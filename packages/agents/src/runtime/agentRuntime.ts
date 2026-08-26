@@ -285,8 +285,7 @@ export class AgentRuntime {
     }
   }
 
-  // A roused sleeper owes the world a wake. If the turn it was given put no
-  // act into the world — or the world refused every act it tried — the body
+  // A roused sleeper owes the world a wake: if its turn put no act into the world, the body
   // answers its own alarm and rises by the wake verb.
   #answerWakeOwed(packet: PerceptionPacket): void {
     if (!this.#wakeOwed) return
@@ -299,9 +298,8 @@ export class AgentRuntime {
     void this.#bridge.submit(this.#agentId, { verb: 'wake', params: {} })
   }
 
-  // Submit the queue head exactly when the agent is idle, and advance the queue
-  // when an in-flight head's action completes. A rejected head is handled
-  // synchronously during the drain (onResult), before #pumpPlan ever runs.
+  // Submit the queue head only when the agent is idle. A rejected head is handled
+  // synchronously during the drain, before `#pumpPlan` ever runs.
   #pumpPlan(activity: string | null): void {
     if (this.#plan.lastResult !== 'running') return
     // A held direct action outranks the plan: the queue waits its turn.
@@ -346,9 +344,8 @@ export class AgentRuntime {
       .then(() => undefined)
   }
 
-  // An invented verb is not a mistake, it is a proposal: it re-enters the turn
-  // as freeform words for the arbiter. Once per turn — a second failure is the
-  // world's final answer, or an unwired arbiter would loop on itself.
+  // An invented verb is a proposal, not a mistake: it re-enters the turn as freeform words.
+  // Once per turn, or an unwired arbiter would loop on itself.
   #reroutesUnknownVerb(reason: string): boolean {
     if (!reason.startsWith('unknown verb:')) return false
     if (this.#adjudicator === null || this.#reframedThisTurn) return false
@@ -368,9 +365,8 @@ export class AgentRuntime {
   async #adjudicateFreeform(description: string): Promise<void> {
     const fallback = (): Promise<void> =>
       this.#holdIntent({ verb: 'experiment', params: { description } })
-    // The same idea, said again, inside the window: answered from this mind's own history. It
-    // costs no call, and the memory is DIFFERENT from the first refusal, which is the whole
-    // point — a mind handed the identical sentence a third time has learned nothing.
+    // The same idea inside the window, answered from this mind's own history at no call. The
+    // memory it leaves differs from the first refusal, or the mind learns nothing.
     if (this.#alreadyRefused(description)) {
       await this.#writeActionMemory(REPEATED_REFUSAL)
       return
@@ -388,9 +384,8 @@ export class AgentRuntime {
       await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
       return
     }
-    // Adjudicate once, physics forever: the recipe becomes a verb the engine
-    // owns, and this mind is the first to use it. With no codifier wired the
-    // attempt still reaches the world rather than vanishing.
+    // Adjudicate once, physics forever. With no codifier wired the attempt still reaches the
+    // world rather than vanishing.
     if (this.#codify === null) return fallback()
     let verb: string
     try {
@@ -526,9 +521,8 @@ export class AgentRuntime {
       // retry is the same request again — byte-identical, and so still a cached prefix.
       if (isBlankAnswer(answer.raw)) answer = await this.#ask(assembled)
       if (isBlankAnswer(answer.raw)) {
-        // Twice nothing. The turn is left UNSPENT: no thought the mind never had, no turn
-        // counted, and whatever the body was already doing carries on being done. The doze
-        // is the back-pressure, so a silent back end is not hammered.
+        // Twice nothing leaves the turn UNSPENT: no invented thought, no turn counted. The
+        // doze is the back-pressure, so a silent back end is not hammered.
         this.#llm.alert('blank_answer', 'two blank answers; the turn is left unspent')
         this.#doze(tick)
         return

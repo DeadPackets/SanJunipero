@@ -5,9 +5,8 @@ export const FALLBACK_MODELS: string[] = ['deepseek/deepseek-chat']
 
 export type ModelPrices = { input: number; output: number; cacheRead: number }
 
-// $/M tokens from OpenRouter's endpoint list for MIND_MODEL (`/api/v1/models/<id>/endpoints`,
-// free and unauthenticated; scripts/price-probe.ts re-reads it). The price depends on WHO
-// served the call, so the table is keyed by that and not by the model alone.
+// $/M tokens from `/api/v1/models/<id>/endpoints`, which scripts/price-probe.ts re-reads. The
+// price depends on WHO served the call, so the table is keyed by that and not by the model.
 export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
   Wafer: { input: 0.28, output: 0.56, cacheRead: 0.07 },
   Baidu: { input: 0.14, output: 0.28, cacheRead: 0.028 },

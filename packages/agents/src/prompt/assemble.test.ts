@@ -152,9 +152,8 @@ describe('perceptionToProse', () => {
     expect(prose).toContain('"Good to see you."')
   })
 
-  // ★ THE CONTAINMENT, PROVED THROUGH THE REAL RENDERER. The manipulator's `renderHeard` is a
-  // MIRROR of the line below, and a mirror can drift; these rows drive `perceptionToProse`
-  // itself, which is the string a mind is actually handed.
+  // The manipulator's `renderHeard` is a mirror and a mirror can drift, so these rows drive
+  // `perceptionToProse` itself — the string a mind is actually handed.
   const heard = (text: string): string =>
     perceptionToProse({ ...conversationPacket, heard: [{ speakerId: 'a_bex', name: 'Bex', text, distance: 2 }] })
 
