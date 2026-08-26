@@ -1,16 +1,7 @@
 import type { AssetRecord, SimEvent } from '@sj/shared'
 import { resolveAssetId } from './textures.js'
 
-// THE ONE FACE TABLE (v1 task 2, the viewer half — the hard prerequisite of task 81).
-//
-// SCOPE, stated plainly: this is `Expression`, `moodOf` and `portraitUrl` — everything task 81's
-// roster row needs. Task 2's OTHER half, the gateway's `ingestPortraits` that puts the painted
-// faces in the codex, is NOT here and task 2 still owns it. `portraitUrl` therefore returns
-// `null` on today's dev world, which is exactly the fallback path the roster already draws.
-//
-// There is no engine mood stat and §23 bans adding one. This is PRESENTATION INFERENCE over the
-// body the engine ticked and the events the log recorded — and it is one function, so the roster,
-// the inspector and every later surface can never disagree about a face.
+// No engine mood stat: §23 bans one, so a face is inferred from the ticked body and the log.
 
 export const EXPRESSIONS =
   ['neutral', 'happy', 'sad', 'angry', 'surprised', 'weary', 'asleep'] as const
@@ -31,8 +22,7 @@ export function portraitKind(agentId: string, e: Expression): string {
   return `portrait:${agentId}:${e}`
 }
 
-/** What a face needs to know. Optional fields are C11's; absent means that row never matches,
- *  so this is correct before C11 lands. */
+/** What a face needs to know. An absent optional field simply never matches. */
 export type MoodView = {
   id: string
   alive: boolean

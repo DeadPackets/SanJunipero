@@ -10,9 +10,8 @@ import { CROWD_PITCH_PX } from './crowd.js'
 import { ZOOM_STOPS } from './camera.js'
 import { ZOOM_MAX, ZOOM_MIN } from './scene.js'
 
-// The v2 sheet the product ships: a 96 px cell whose figure is 64 px tall, drawn at
-// CHAR_TARGET_PX. figureW/figureH are SHEET px throughout; multiplied by the sprite scale
-// they are what the viewer sees — 26 × 52 screen px.
+// The v2 sheet the product ships: a 96 px cell whose figure is 64 px tall. figureW/figureH are
+// SHEET px throughout; multiplied by the sprite scale they are what the viewer sees.
 const FIGURE_H = 64
 const FIGURE_W = 32
 const SCALE = CHAR_TARGET_PX / FIGURE_H
@@ -132,9 +131,8 @@ describe('inflateToMin — small on screen is still clickable', () => {
   })
 })
 
-// TASK 75 MAKES THE FLOOR LIVE. `ZOOM_MIN` was 1, where every target already cleared 24 px,
-// so `inflateToMin` shipped unexercised. The 0.5 overview stop is a real product state now,
-// and every hit class has to be measured there rather than assumed.
+// `ZOOM_MIN` is 0.5, so the floor is a live product state: every hit class is measured at the
+// overview stop rather than assumed to clear it.
 describe('the 24 px floor at the new ZOOM_MIN', () => {
   const local = bodyHitPolygon(FIGURE_H, SCALE)
 
@@ -176,19 +174,17 @@ describe('the 24 px floor at the new ZOOM_MIN', () => {
 
 // ── ★ THE STRUCTURE PRISM ─────────────────────────────────────────────────────────────────
 //
-// The numbers cited here were measured by decoding every building root in the town's codex and
-// counting opaque pixels — `scratchpad/hb/alpha.mts`, twenty roots. They are not derived from
-// `cull.ts`'s AABB and they cannot be: the cull's box is the bounding RECTANGLE of a diamond,
-// so its corners are void by construction and a test against it passes with the property
-// broken. The oracle here is the art.
+// The numbers here were measured by decoding every building root and counting opaque pixels.
+// They cannot come from `cull.ts`'s AABB: that box is the bounding RECTANGLE of a diamond, so
+// its corners are void by construction and a test against it passes with the property broken.
 
 describe('★ a building is a volume, and the landed target was the ground under it', () => {
   const SHAPES: Array<[number, number]> = [[1, 1], [2, 2], [1, 2], [2, 1], [3, 2], [2, 4]]
 
   it('THE DEFECT: the flat footprint diamond and the drawn sprite barely touch', () => {
-    // The art is fitted to a (w+h)·32 SQUARE whose lowest opaque row is the sprite's own
-    // anchor, so the drawn body occupies y ∈ [−side, 0]. The ground plan runs from the
-    // footprint's north vertex DOWN. For a 2×2 they share 8 px of a 128 px tall picture.
+    // The art is fitted to a (w+h)·32 SQUARE whose lowest opaque row is the sprite's own anchor,
+    // so the drawn body occupies y ∈ [−side, 0] while the ground plan runs from the footprint's
+    // north vertex DOWN.
     const flat = legacyFootprintPolygon(footprintDiamond(2, 2), 1)
     expect(polygonBounds(flat)).toEqual({ w: 64, h: 32, cx: 0, cy: 8 })
     const prism = artPrismPolygon(2, 2, 1)
@@ -272,10 +268,9 @@ describe('★ the floor yields to the neighbour, because the neighbour is the ha
   })
 
   it('★ capped at the pitch, a ranked body keeps its OWN width at every stop', () => {
-    // And the cap binds at every one of them, which is not a coincidence: a rank is DEFINED as
-    // a pitch narrower than a body (14 px against 28 px of shoulder), so there is never room
-    // to grow sideways into. The HEIGHT still takes the floor — bodies in a rank stand beside
-    // each other, not on each other, so a taller target costs nobody their click.
+    // The cap binds at every stop by definition: a rank IS a pitch narrower than a body (14 px
+    // against 28 px of shoulder), so there is never room to grow sideways into. The HEIGHT still
+    // takes the floor — bodies in a rank stand beside each other, not on each other.
     expect(CROWD_PITCH_PX).toBeLessThan(SHOULDER_W)
     for (const z of ZOOM_STOPS) {
       const k = SCALE * z

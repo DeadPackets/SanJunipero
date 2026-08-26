@@ -20,14 +20,9 @@ describe('dimetric math', () => {
     }
   })
 
-  // ★ AND THAT SWEEP ON ITS OWN IS A VACUOUS GUARD, WHICH IS WHY THE NEXT ONE EXISTS.
-  //
-  // It samples only `tileToScreen`'s OWN OUTPUT — the lattice vertices, the exactly-measure-zero
-  // set of points where a rounding rule and a flooring rule cannot disagree. It passed for the
-  // whole life of a `screenToTile` that answered with the tile whose top vertex was nearest
-  // rather than the tile the point is standing ON, i.e. the neighbour to the south for every
-  // point in a tile's lower half. `ground.ts` states the convention this violated in its own
-  // header: tile (x, y) covers `[x, x+1] × [y, y+1]`.
+  // The sweep above samples only `tileToScreen`'s OWN OUTPUT — the lattice vertices, the one
+  // set of points where a rounding rule and a flooring rule cannot disagree. This one samples
+  // inside the tile, where `ground.ts`'s convention `[x, x+1] × [y, y+1]` is decidable.
   it('★ names the tile a point is STANDING ON, everywhere inside the tile', () => {
     for (let x = 0; x < 6; x++) for (let y = 0; y < 6; y++) {
       // the four quadrants of the tile's own diamond, plus its centre
@@ -76,17 +71,9 @@ describe('dimetric math', () => {
 
 // ── ★ WHICH WAY A BODY IS POINTED, AND THE RULE THAT DECIDES IT ───────────────────────────
 //
-// THE COMPLAINT, verbatim: "some of the characters have their sprites facing the wrong
-// direction when walking."
-//
-// The landed rule classified the WORLD vector (`|dx|` vs `|dy|`, then the sign of one world
-// axis) and labelled the answer with SCREEN names. The four cardinals are the one set of
-// inputs on which those two frames agree, and the four cardinals were the whole of the landed
-// test — `facingFrom maps axes and breaks ties toward x`, six assertions, four of them
-// cardinal and the other two both on the `+dx +dy` diagonal. It could not see the defect.
-//
-// Everything below is stated against the PROJECTION instead, because the projection is what
-// the viewer's eye is doing.
+// The four cardinals are the one set of inputs on which a WORLD classification and a SCREEN
+// name agree, so a test built out of them cannot see the difference. Everything below is stated
+// against the PROJECTION instead, because the projection is what the viewer's eye is doing.
 
 describe('a facing is a screen direction, so the screen decides it', () => {
   const cases: Array<[number, number]> = []
@@ -125,11 +112,8 @@ describe('a facing is a screen direction, so the screen decides it', () => {
     for (const [f, n] of seen) expect(n, `${f} is barely reachable`).toBeGreaterThanOrEqual(6)
   })
 
-  // ★ THE ONE THE OLD RULE BROKE. Swapping dx and dy reflects the motion across the screen's
-  // vertical axis — `sx` flips, `sy` is untouched — so the facing must reflect with it and
-  // keep the same side of the body to the camera. The old rule answered `se` (a FRONT view)
-  // for (+1,−1) and `nw` (a BACK view) for (−1,+1): two bodies crossing the screen in mirrored
-  // directions, one facing the camera and one facing away.
+  // Swapping dx and dy reflects the motion across the screen's vertical axis — `sx` flips, `sy`
+  // is untouched — so the facing must reflect with it and keep the same side to the camera.
   const MIRROR: Record<string, string> = { se: 'sw', sw: 'se', ne: 'nw', nw: 'ne' }
 
   it('★ mirrors left-right when the motion mirrors left-right', () => {
@@ -149,10 +133,8 @@ describe('a facing is a screen direction, so the screen decides it', () => {
     }
   })
 
-  // ★ PURE DEPTH — the case the brief said to look at first. Equal +dx +dy is zero sideways
-  // travel and maximum depth, so either hand is honest; what is NOT honest is showing a body's
-  // back while it walks toward the camera. Both ties take the right-hand facing so the pair
-  // stays a mirror of itself under reversal.
+  // Equal +dx +dy is zero sideways travel and maximum depth, so either hand is honest; both
+  // ties take the right-hand facing so the pair stays a mirror of itself under reversal.
   it('walks a pure-depth diagonal toward the camera facing the camera', () => {
     expect(tileToScreen(1, 1)).toEqual({ sx: 0, sy: 16 }) // straight down the screen
     for (const n of [1, 2, 5]) expect(facingFrom(n, n)).toBe('se')
@@ -180,9 +162,8 @@ describe('a facing is a screen direction, so the screen decides it', () => {
 describe('the facing roster is written down once', () => {
   it('is the atlas column order, and the forge agrees letter for letter', () => {
     expect([...FACINGS]).toEqual(['sw', 'se', 'ne', 'nw'])
-    // `@sj/web` does not depend on `@sj/forge` (drawScale.test.ts holds that boundary), so the
-    // only check available is to read the literal off disk. A reordered forge roster re-cuts
-    // every v2 placeholder sheet's columns, and this is what says so.
+    // `@sj/web` does not depend on `@sj/forge`, so the only check available is to read the
+    // literal off disk. A reordered forge roster re-cuts every v2 sheet's columns.
     const forge = readFileSync(
       new URL('../../../forge/src/sheet.ts', import.meta.url), 'utf8')
     const m = /export const FACINGS = \[([^\]]*)\] as const/.exec(forge)
@@ -194,11 +175,9 @@ describe('the facing roster is written down once', () => {
 
 // ── ★ THE FOSSIL, AND THE LINE THAT KEEPS IT DEAD ─────────────────────────────────────────
 //
-// `depthKey`'s doc comment said it was "the minimap's cheap draw order". No minimap existed —
-// `ui/hudLayout.ts` said so outright — and the sentence cost the camera lane real time: it read
-// it, believed a minimap was there, and planned around one. There is a minimap now, and it does
-// not use this. A comment asserting a fact nothing enforces is the defect this project keeps
-// finding; a comment asserting a fact that was NEVER true is the same defect with a longer fuse.
+// A comment asserting a fact nothing enforces is a defect; one asserting a fact that was NEVER
+// true is the same defect with a longer fuse. `depthKey`'s doc claimed a minimap that did not
+// exist, and a lane read it and planned around one.
 
 describe('depthKey says what it is for, and it is not the minimap', () => {
   const src = readFileSync(new URL('./iso.ts', import.meta.url), 'utf8')

@@ -4,17 +4,13 @@ import {
 } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
 
-// AMENDMENT (C13 §4) seam: an autotiled road strip is ingested one record per key, under the
-// codex kind `road:<key>`. The forge writes that kind and the renderer reads it, so the
-// spelling lives in @sj/shared beside the keys — this is the renderer's door onto it.
 export { roadAutotileKind } from '@sj/shared'
 
 export const TERRAIN_KIND_FALLBACK: TerrainTileKind = 'grass'
 export const ROAD_TILE_ID = 7
 
-// Every TileId the engine can emit has a tile kind — C9 Task 1b added road (7), so a road
-// tile must never fall through to grass. C11's path/sapling/channel borrow the nearest
-// existing art kind; their own terrain art is C12's, not the engine's.
+// Every TileId the engine can emit needs an entry, or it falls back to grass. 8/9/10
+// (path, sapling, channel) borrow the nearest existing art kind until they have their own.
 export const TILE_KIND: Record<TileId, TerrainTileKind> = {
   0: 'grass', 1: 'earth', 2: 'water', 3: 'forest', 4: 'rock', 5: 'sand', 6: 'farmland', 7: 'road',
   8: 'earth', 9: 'forest', 10: 'water',
@@ -59,10 +55,8 @@ function readyTerrain(records: AssetRecord[], kind: string): Candidate[] {
 
 const urlOf = (rec: AssetRecord): string => `/assets/${rec.id}.png`
 
-// Four variant records share one codex kind, so a single resolveAsset lookup CANNOT select
-// variants — ~3 of 4 tiles would silently fall back to flat diamonds. Scan every ready
-// 'terrain' record of the kind and match manifest.variant; a missing exact variant falls back
-// to the first record of the kind (textured beats flat).
+// Four variant records share one codex kind, so a single resolveAsset lookup cannot select a
+// variant — scan every ready record of the kind and match manifest.variant.
 export function resolveTerrainTile(
   records: AssetRecord[], id: number, x: number, y: number, autotile: RoadAutotileKey | null = null,
 ): TerrainTex {

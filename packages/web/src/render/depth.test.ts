@@ -171,11 +171,8 @@ describe('the counted deterministic fallback', () => {
   })
 
   it('MEASURED: how often 20 000 dense random scenes actually reach the fallback', () => {
-    // Separation alone cannot produce a cycle — a pair that is east of one another while
-    // south of it is mutually in front, so its edge is dropped. The OVERLAP RANK can: a body
-    // standing on a building jumps in front of it regardless of separation. This is the
-    // measurement, not an assumption, and the scenes below are far denser than any real town
-    // (five drawables inside a 6×6 patch).
+    // Separation alone cannot produce a cycle — a mutually-in-front pair drops its edge. The
+    // OVERLAP RANK can: a body standing on a building jumps in front of it regardless.
     let seed = 20260817
     const rnd = (n: number): number => {
       seed = (seed * 1103515245 + 12345) % 2147483648

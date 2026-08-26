@@ -1,15 +1,7 @@
 import { TILE_H, TILE_W } from './iso.js'
 
-// A TOWN LARGER THAN THE VIEWPORT, BUILT WITHOUT THE GENERATOR.
-//
-// The approved layout plats blocks in rings around a square and agents claim plots forever, so
-// the renderer has to be ready for an extent nobody wrote down. This module is that extent: the
-// same 19-tile block pitch the grammar uses, laid out to any ring count, with a structure on
-// every plot. It is a measuring instrument for the camera and the cull — the numbers in the
-// camera report come from here — and it stands in no shipped scene.
-//
-// It lives here rather than in `cityTemplate.ts` because the template is a place agents live in
-// and this is a ruler. Nothing imports it but tests.
+// A town larger than the viewport, platted to any ring count on the grammar's own 19-tile
+// pitch. A measuring instrument for the camera and the cull; nothing but tests imports it.
 
 /** 18 tiles of block and one of road between them, the pitch the ring grammar plats on. */
 export const BLOCK_PITCH = 19
@@ -43,11 +35,7 @@ const PLOT_OFFSETS: ReadonlyArray<{ dx: number; dy: number }> = [
   { dx: 1, dy: 15 }, { dx: 7, dy: 15 }, { dx: 13, dy: 15 },
 ]
 
-/**
- * Every block in `rings` rings about the square, each with eight claimed plots. Ring 0 is the
- * square itself and stands nothing, so a town of R rings holds `((2R+1)² − 1) · 8` structures.
- * Deterministic: the same ring count always yields the same list, in the same order.
- */
+/** Eight claimed plots per block; ring 0 is the square and stands nothing, so R rings hold `((2R+1)² − 1) · 8` structures, always in the same order. */
 export function bigTown(rings: number): FixtureStructure[] {
   const out: FixtureStructure[] = []
   for (let by = -rings; by <= rings; by++) {
@@ -71,11 +59,8 @@ export function bigTown(rings: number): FixtureStructure[] {
 }
 
 // ── the same platting, as GROUND ─────────────────────────────────────────────────────────
-//
-// A terrain array cannot hold a negative index, so the ruler above is offered a second time in
-// a frame shifted to the origin: `bigTownTerrain` lays the streets, the square and a channel,
-// and `bigTownPlaced` moves the structures to match. The two agree by construction — both are
-// `bigTownTileExtent(rings)` shifted by the same `lo` — so a fixture cannot drift apart.
+// A terrain array cannot hold a negative index, so this frame is shifted to the origin; ground
+// and structures cannot drift apart because both shift `bigTownTileExtent(rings)` by the same `lo`.
 
 export const ROAD = 7, WATER = 2, GRASS = 0
 

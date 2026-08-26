@@ -19,11 +19,10 @@ import { LENSES } from '../ui/route.js'
 
 // ── THE MINIMAP, MEASURED ON A TOWN NOBODY WROTE A SIZE FOR ───────────────────────────────
 //
-// Every number here comes from a pure function over `bigTown`'s ring grammar. The measurement
-// law binds: nothing in this file may come from a browser, and nothing in the minimap may
-// assume a size the grammar is free to outgrow.
+// Every number here comes from a pure function over `bigTown`'s ring grammar: nothing may come
+// from a browser, and nothing in the minimap may assume a size the grammar is free to outgrow.
 
-/** The stage the C12 audit measured, less the 56 px the control bar takes (task 77). */
+/** The stage the audit measured, less the 56 px the control bar takes. */
 const STAGE = { w: 1728, h: 880 - 56 }
 
 const townOf = (rings: number): { bounds: CameraBounds; terrain: number[][]; town: ReturnType<typeof bigTownPlaced> } => {
@@ -100,11 +99,9 @@ describe('the map is a fixed box at a scale the town sets', () => {
 // ── 2 · the picture, and the feature a point sample loses ─────────────────────────────────
 
 /**
- * The largest 8-connected run of one colour, and how many pieces the colour is in.
- *
- * EIGHT, not four: an iso street runs diagonally across the raster, so consecutive tiles land
- * on pixels that touch at a corner. Four-connectivity would call a perfectly drawn diagonal a
- * heap of dots, which is a bug in the ruler and not in the map.
+ * The largest 8-connected run of one colour, and how many pieces the colour is in. EIGHT, not
+ * four: an iso street runs diagonally across the raster, so consecutive tiles land on pixels
+ * that touch at a corner, and four-connectivity would call a clean diagonal a heap of dots.
  */
 function shapeOf(px: Uint8ClampedArray, f: MinimapFit, color: number): { total: number; largest: number; pieces: number } {
   const hit = new Uint8Array(f.w * f.h)
@@ -142,9 +139,8 @@ function shapeOf(px: Uint8ClampedArray, f: MinimapFit, color: number): { total: 
 
 /**
  * THE NAIVE MAP, KEPT AS A CONTROL. One sample at the centre of every map pixel — the raster
- * anybody writes first, and the one whose failure this whole design is about. It stays in the
- * suite so the claim "a point sample loses the street grid" is re-proved on every run instead
- * of being remembered from a report.
+ * anybody writes first. It stays in the suite so "a point sample loses the street grid" is
+ * re-proved on every run instead of being remembered from a report.
  */
 function pointSampled(terrain: readonly (readonly number[])[], f: MinimapFit): Uint8ClampedArray {
   const px = new Uint8ClampedArray(f.w * f.h * 4)
@@ -289,10 +285,8 @@ describe('the rectangle that says where the camera is', () => {
 
 // ── 3b · the map leaves when the town is already all on screen ────────────────────────────
 //
-// ★ WHAT THE FOREGROUNDED BROWSER CAUGHT. At 0.25 on the showcase town the whole settlement was
-// 370 x 190 px in the middle of the stage, and the map sat in the corner drawing the same thing
-// smaller, under a rectangle that covered its whole self. This asserts the rule against CLAMPED
-// views — the ones a real camera can actually be in — rather than against invented rectangles.
+// Asserted against CLAMPED views — the ones a real camera can actually be in — rather than
+// against invented rectangles.
 
 describe('the map is only there when the town is bigger than the view', () => {
   it('★ is away exactly when the town fits, at every stop and at every ring count', () => {
@@ -412,12 +406,8 @@ describe('people on a map the size of a postcard', () => {
     expect(peopleDots(spread, f, null).length).toBeGreaterThan(10)
   })
 
-  // ★ WHAT THE FOREGROUNDED BROWSER CAUGHT AND NOTHING HERE COULD HAVE.
-  //
-  // A dead agent stays in `state.agents` with `alive: false`; the roster counts it as
-  // "remembered". Every fixture above is `{ id, x, y }`, so the field that decides this was not
-  // in the shape being tested — and the dev world showed five white dots standing in the square
-  // under a status strip reading TOWNSFOLK 0.
+  // A dead agent stays in `state.agents` with `alive: false`. Every fixture above is
+  // `{ id, x, y }`, so the field that decides this was not in the shape being tested.
   it('★ does not draw the dead, whose bodies are still in the state', () => {
     const alive = { id: 'a', x: 40, y: 40, alive: true }
     const dead = { id: 'b', x: 60, y: 60, alive: false }
@@ -468,9 +458,8 @@ describe('what one frame of the overlay costs, counted', () => {
     ), f)
     expect(few.length).toBeGreaterThan(4)
     expect(few.length).toBeLessThan(64)
-    // ★ 4000 people cannot cost 4000 ops. Every mark is two rectangles — a dark halo under a
-    // light core, because no single colour clears 3:1 on every ground this map draws — so the
-    // ceiling is TWO PER MAP PIXEL, set by the widget and never by the population.
+    // Every mark is two rectangles — a dark halo under a light core — so the ceiling is TWO PER
+    // MAP PIXEL, set by the widget and never by the population.
     expect(many.length).toBeLessThanOrEqual(2 * f.w * f.h + 16)
     expect(many.length).toBeLessThan(4000)
   })
@@ -491,15 +480,9 @@ describe('what one frame of the overlay costs, counted', () => {
 
 // ── 5b · ★ EVERY MARK IS LEGIBLE ON EVERY GROUND, AND IT IS MEASURED ──────────────────────
 //
-// The chrome's mandate is that no single palette token clears AA in both bands, so per-band
-// tokens are mandatory. The same is true one level down, on this canvas: the grounds run from
-// `forest` #4F7040 to `sand` #E8D5BC and include the ink of the buildings, and NO ONE COLOUR
-// clears 3:1 on all of them. So every mark is layered, and the law is: for each ground, at
-// least one tone of the mark must clear 3:1 against it.
-//
-// This caught a real failure. The watched marker was two tones, and on `forest` the ember read
-// 1.95 and its own `--deep` halo 2.85 — both under the floor, on the one mark a viewer is
-// hunting for. It is three tones now. Opacity is not a contrast strategy and is not used here.
+// The grounds run from `forest` #4F7040 to `sand` #E8D5BC and include the ink of the buildings,
+// and NO ONE COLOUR clears 3:1 on all of them. So every mark is layered, and the law is: for
+// each ground, at least one tone of the mark must clear 3:1 against it.
 
 const channel = (v: number): number => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
 const luminance = (c: number): number => {
@@ -596,17 +579,10 @@ describe('a minimap that covers the town it explains is worse than none', () => 
     expect(minimapShown('map', null, true)).toBe(false)
   })
 
-  // ★ THE WHITELIST WAS THE BUG, NOT THE MISSING WORD IN IT.
-  //
-  // `MINIMAP_LENSES = ['map', 'inspector', 'laws']` was written before the Discovery Record
-  // existed. `discoveries` then arrived, was never once mentioned in this module or in either
-  // of its two test files, and got "no map" by silence — the SAME right-hand slide-over as
-  // `inspector`, which is on the list. Nobody decided; a list defaulted.
-  //
-  // These two close it. The first says every lens the route can produce has an answer written
-  // down, so a lens added later fails HERE rather than shipping a default. The second is the
-  // same claim at compile time, and it is the stronger of the two: `Record<Lens, boolean>`
-  // cannot be written at all without an entry per lens.
+  // A whitelist defaults to silence: `discoveries` arrived after the list was written, was never
+  // mentioned in this module, and got "no map" without anybody deciding. The first case says
+  // every lens the route can produce has an answer written down; the second is the same claim at
+  // compile time, and `Record<Lens, boolean>` cannot be written without an entry per lens.
   it('★ every lens the route can reach has an explicit answer — no lens defaults', () => {
     for (const lens of LENSES) {
       expect(
@@ -678,10 +654,9 @@ describe('the minimap in one number per ring count', () => {
     // ★ THE CLAIM: the raster is the same size at ten rings as at one. Only the scale moved.
     expect(new Set(rows.map((r) => r.raster)).size).toBe(1)
     expect(rows[0]!.raster).toBe(MINIMAP_W * MINIMAP_H)
-    // ★ AND THE ONE THAT MATTERS FOR A FRAME: what a camera MOVE costs is set by the crowd and
-    // the widget, never by the town. Eight rectangles for the camera, two per person, and one
-    // more for the third tone the watched marker needs to clear forest — and a ten-ring town
-    // does not cost one op more than a three-ring one.
+    // What a camera MOVE costs is set by the crowd and the widget, never by the town: eight
+    // rectangles for the camera, two per person, and one more for the watched marker's third
+    // tone.
     const CEILING = 8 + 2 * 24 + 1
     for (const r of rows) expect(r.ops, `${r.rings} rings`).toBeLessThanOrEqual(CEILING)
     expect(rows[rows.length - 1]!.ops).toBeLessThanOrEqual(rows[2]!.ops)

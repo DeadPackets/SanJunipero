@@ -14,12 +14,11 @@ export const BOB_PX = 1 // passing frames render 1px lower — render-time only,
 export const CHAR_TARGET_PX = 52 // ≈1.6 tiles of 32px; art height 64 in cell → scale 52/64
 export const WALK_FRAME_MS_V4 = 180 // v4 ruling: F1-F2-F1-F3 cadence at 180ms/frame
 
-// The click target BEFORE U9: a 52×72 rectangle around a figure drawn 26×52, i.e. 2.77× the
-// silhouette's area. hitShapes.ts replaced it with a measured capsule; these two constants
-// stay because they are the before-state the gate cites.
+// Superseded by the measured capsule in hitShapes.ts; kept because the gate cites them as the
+// before-state.
 export const HIT_AREA_W = 52
 export const HIT_AREA_H = 72
-/** @deprecated superseded by hitShapes.bodyHitPolygon (U9). Kept for the landed C10 tests. */
+/** @deprecated superseded by hitShapes.bodyHitPolygon. Kept for the landed tests. */
 export function hitRect(scale: number): { x: number; y: number; w: number; h: number } {
   return { x: -HIT_AREA_W / 2 / scale, y: -HIT_AREA_H / scale, w: HIT_AREA_W / scale, h: HIT_AREA_H / scale }
 }
@@ -30,19 +29,8 @@ export function nameTagText(name: string): string {
   return name.length <= NAME_TAG_MAX_CHARS ? name : `${name.slice(0, NAME_TAG_MAX_CHARS - 1)}…`
 }
 
-// ── ★ FIVE PEOPLE, ONE GAIT — AND WHY THAT WAS TRUE BY CONSTRUCTION ───────────────────────
-//
-// THE COMPLAINT, verbatim: "all the characters walk at the EXACT same jumpy pace."
-//
-// `charPose` read ONE clock — `nowMs` — so every walking body in the town was on the same
-// frame of the same loop at the same instant. Not similar: IDENTICAL, provably, because the
-// agent's identity was not an input to the function. Real crowds never do that.
-//
-// ★ THE CONSTRAINT THAT DECIDES HOW THE VARIANCE IS MADE: the engine is the record and the
-// renderer is a view. So the variance is DERIVED FROM IDENTITY — a stable hash of the agent's
-// id — and never from `Math.random()`, which would make two people watching the same replay
-// see two different towns. `charAnim.test.ts` proves the derivation is stable across a fresh
-// module instance and scans this file and `characters.ts` for any random source at all.
+// Gait variance is derived from a stable hash of the agent's id, never from `Math.random()`:
+// two people watching the same replay must see the same town.
 
 /** FNV-1a, 32-bit. Small, stable, and dependency-free: the same id gives the same number in
  *  every process, every session and every replay, which is the whole requirement. */
@@ -55,13 +43,7 @@ export function hash32(s: string): number {
   return h >>> 0
 }
 
-/**
- * How much two people's stride LENGTHS may differ at the same walking speed. A taller person
- * covers more ground per step and so cycles their legs more slowly — this is that, and it is
- * why the variance goes on the stride rather than on the speed. The speed belongs to the
- * record; the stride is a property of the body, and the renderer is allowed to know bodies
- * apart. At 12 % the slowest gait cycles 1.27x slower than the fastest.
- */
+/** How much two people's stride LENGTHS may differ at one walking speed. The variance goes on the stride, not the speed: the speed belongs to the record. */
 export const GAIT_STRIDE_SPREAD = 0.12
 
 export type Gait = {
@@ -83,19 +65,7 @@ export function gaitOf(agentId: string): Gait {
 export type SheetRow = (typeof SHEET_ROWS)[number]
 export type CharPose = { row: SheetRow; facing: Facing; bobY: number }
 
-/**
- * ★ WHAT A BODY DRAWS WHEN THE CELL IT WANTS IS NOT IN THE SHEET, in the order it tries.
- *
- * The landed renderer answered this by DOING NOTHING: on a missing cell it left
- * `sprite.texture` at whatever was in it, which is the previous frame — of whatever facing the
- * body was pointing LAST. So a missing cell drew a body walking one way with the art for
- * another, silently, and the first frame of a body's life drew nothing at all.
- *
- * The ladder is the LAST GOOD FRAME OF THE SAME FACING and never leaves it: the walk loop
- * backwards from the frame before this one, then that facing's idle. Borrowing across facings
- * is the one thing it must not do — that is exactly "facing the wrong direction", and a body
- * frozen on one good frame of the right facing reads as a hitch, which is honest.
- */
+/** What a body draws when the cell it wants is missing, in the order it tries: never another facing's art, which would be a body walking one way drawn facing the other. */
 export function cellRowLadder(row: SheetRow): readonly SheetRow[] {
   const i = (WALK_LOOP as readonly string[]).indexOf(row)
   // the walk loop backwards from the frame before this one — the last frame that was drawn
@@ -130,87 +100,30 @@ export function charPose(
   return { row: 'idle', facing: a.facing, bobY: 0 }
 }
 
-// ── ★ THE STRIDE FOLLOWS THE GROUND, WHICH IS MOST OF "JANKY" ─────────────────────────────
-//
-// THE COMPLAINT, verbatim: "Walking animations are janky, don't feel smooth."
-//
-// Positions WERE already interpolated — `interpolatePos` below has been there since C10, and
-// the brief's guess that they were not is wrong. The jank is two other things.
-//
-// The first is FOOT SLIDE. The loop ran at a fixed 180 ms a frame however fast the body was
-// actually travelling, so the legs had no relationship to the ground: at the dev world's
-// 400 ms a tile a body crossed two tiles per gait cycle, and at the shipped 2500 ms a tile it
-// crossed a third of one. Nothing about the limbs said which. A walk cycle that does not match
-// the ground reads as skating, and no easing inside the sprite hides it.
+// ── THE STRIDE FOLLOWS THE GROUND ─────────────────────────────────────────────────────────
+// A walk cycle at a fixed frame time has no relationship to the ground and reads as skating.
 
-/**
- * How far one four-frame cycle carries a body, in tiles. Derived twice, and the two agree
- * inside 20 %:
- *
- *  A. From the landed cadence. `WALK_FRAME_MS_V4` is 180 ms, so a cycle is 720 ms, and at the
- *     dev world's 400 ms a tile that is 1.8 tiles. Shipped behaviour at the rate the feedback
- *     was given against is reproduced exactly — `charAnim.test.ts` asserts that identity.
- *  B. From the body. A walking human's stride is about 0.75 of their height; a figure is
- *     `CHAR_TARGET_PX` = 52 px tall and one tile of ground travel is drawn about 36 px long,
- *     so a step is ~1.09 tiles and a cycle — which is two steps — is ~2.18.
- *
- * A is the one taken, because it keeps a shipped look at the cadence a viewer is watching.
- */
+/** How far one four-frame cycle carries a body, in tiles: the v4 cadence's 720 ms cycle at the dev world's 400 ms a tile, so the shipped look is reproduced exactly. */
 export const STRIDE_TILES = 1.8
 
-/** Outside this band the legs stop matching the ground, and that is deliberate: a body
- *  crossing a tile in 2.5 s would otherwise cycle its legs once every 4.5 s, which reads as a
- *  freeze rather than an amble. Inside it the feet are planted; outside it they slide, slowly
- *  at the top and quickly at the bottom, which is the least bad thing available.
- *
- *  The band bounds the world's NOMINAL cadence, not a body's own. See `strideFrameMs`. */
+/** Outside this band the legs slide on purpose: a body crossing a tile in 2.5 s would otherwise cycle its legs once every 4.5 s, which reads as a freeze rather than an amble.
+ *  The band bounds the world's NOMINAL cadence, not a body's own — see `strideFrameMs`. */
 export const WALK_FRAME_MIN_MS = 90
 export const WALK_FRAME_MAX_MS = 360
 
 /**
  * The frame time whose four-frame loop carries `STRIDE_TILES` tiles at this speed.
  *
- * ★ THE STRIDE SCALES THE CLAMPED CADENCE, NOT THE IDEAL — AND THAT IS THE WHOLE OF B2 IN THE
- * SHIPPED PRODUCT. This used to clamp `msPerTile x STRIDE_TILES x stride / 4`, with the stride
- * INSIDE the clamp. At the world's real rate the clamp binds: 2500 ms a tile asks for 1125 ms a
- * frame, and every stride in the +-12 % band asks for 990 to 1260 — all of them above
- * `WALK_FRAME_MAX_MS`, so all five founders came out at exactly 360 ms. MEASURED: 5 of 5
- * distinct at the dev world's 400 ms a tile, 1 of 5 from about 800 ms a tile upward, including
- * every rate this product has ever been watched at.
- *
- * So half of "they all walk at the EXACT same jumpy pace" was still true where the user was
- * looking, and the landed guard could not see it: it asserted two founders differ at 400 ms,
- * which is the DEV rate. A check that passes at a rate the product does not run at is the
- * vacuous-guard family's newest member.
- *
- * Scaling after the clamp costs nothing physically — past the clamp the feet are already
- * sliding, which is what the band says — and the reachable output widens by exactly the gait
- * spread, to `[WALK_FRAME_MIN_MS x (1 - s), WALK_FRAME_MAX_MS x (1 + s)]`. Inside the band, where
- * the clamp does not bind, the arithmetic is unchanged and so is every landed number.
+ * Scales the CLAMPED cadence, not the ideal — inside the clamp all five founders came out at
+ * exactly 360 ms at the product's real 2500 ms a tile (5 of 5 distinct only at the dev world's 400 ms).
  */
 export function strideFrameMs(msPerTile: number, strideScale = 1): number {
   const ideal = (msPerTile * STRIDE_TILES) / WALK_LOOP.length
   return Math.min(WALK_FRAME_MAX_MS, Math.max(WALK_FRAME_MIN_MS, ideal)) * strideScale
 }
 
-// ── ★ THE WORLD'S CLOCK, AS THE RENDERER SEES IT ──────────────────────────────────────────
-//
-// The second half of "janky", and the worse one. The landed scheduler took a leg's duration
-// from WALL-CLOCK IDLE TIME — `clamp(now - lastMoveArrival, 200, 4000)` — and appended it to
-// the tail of the queue with `max(now, last.atMs) + glide`. Two consequences, both measured:
-//
-//  · A body that had stood still for four seconds spent FOUR SECONDS crossing its first tile,
-//    and because the excess was appended rather than absorbed it never drained. Measured over
-//    a twelve-tile walk at 400 ms a tick: 9.96 TILES BEHIND THE RECORD, still growing.
-//  · A leg's speed was the PREVIOUS leg's arrival jitter, so a slow tick made one leg lurch
-//    and every later one inherit the debt. Measured in the running page over three seconds:
-//    each body's own speed swung 6x between its 10th and 90th percentile frame, while all five
-//    bodies shared a median inside 6 % of each other. That is the user's sentence exactly —
-//    the same pace, and jumpy.
-//
-// The fix is to stop guessing. The world ticks; the renderer can see the ticks arrive, and the
-// record says how many ticks a tile costs this person. A leg is then `ticks x period`, which
-// is a duration derived rather than sampled, and the queue is capped so no debt accumulates.
+// ── THE WORLD'S CLOCK, AS THE RENDERER SEES IT ────────────────────────────────────────────
+// A leg's duration comes from the tick, not from wall-clock idle time.
 
 /** Where the clock starts before it has seen two batches: the declared default, which is the
  *  only tick rate anything in this repo writes down. It is replaced by the first measurement. */
@@ -228,11 +141,7 @@ export function initialTickClock(periodMs = TICK_PERIOD_SEED_MS): TickClock {
   return { periodMs, lastArrivalMs: -Infinity, samples: 0 }
 }
 
-/**
- * One batch of deltas arrived, carrying `ticks` ticks of the world. The first batch only
- * records the time — a gap needs two — and the first real sample REPLACES the seed rather
- * than being averaged with it, so a dev world at 400 ms is not walked at 2500 for ten seconds.
- */
+/** One batch of deltas carrying `ticks` ticks. The first batch only records the time, and the first real sample REPLACES the seed rather than being averaged with it. */
 export function observeTick(prev: TickClock, nowMs: number, ticks = 1): TickClock {
   if (!Number.isFinite(prev.lastArrivalMs)) {
     return { periodMs: prev.periodMs, lastArrivalMs: nowMs, samples: 0 }
@@ -247,20 +156,8 @@ export function observeTick(prev: TickClock, nowMs: number, ticks = 1): TickCloc
   return { periodMs, lastArrivalMs: nowMs, samples: prev.samples + 1 }
 }
 
-/**
- * ★ HOW FAST THIS PERSON WALKS, ACCORDING TO THE RECORD.
- *
- * The engine already knows, and it already varies: `verbs.ticksPerTile` gives a body whose
- * needs have fallen under the debuff threshold `movement.debuffTicksPerTile` and everyone else
- * `movement.baseTicksPerTile` — 2 and 1 by default, so a hungry, cold, exhausted or lonely
- * person walks at HALF SPEED and always has. The renderer simply ignored it.
- *
- * So "gait should follow what a person is doing" needed no new engine field: it needed the
- * renderer to read the one that is already there. This restates the engine's expression rather
- * than importing it — `@sj/engine` publishes no `./verbs` subpath and its barrel drags
- * `better-sqlite3` into the browser bundle — and `charAnim.test.ts` reads `engine/src/verbs.ts`
- * off disk and asserts the two are the same expression, so they cannot drift apart in silence.
- */
+/** Restates `verbs.ticksPerTile` rather than importing it: `@sj/engine` publishes no `./verbs` subpath and its barrel drags `better-sqlite3` into the browser bundle.
+ *  `charAnim.test.ts` reads `engine/src/verbs.ts` off disk and asserts the two are one expression. */
 export function ticksPerTileOf(
   needs: Readonly<Record<string, number>>,
   cfg: { debuffThreshold: number; base: number; debuff: number },
@@ -269,24 +166,10 @@ export function ticksPerTileOf(
   return debuffed ? cfg.debuff : cfg.base
 }
 
-/**
- * ★ THE INTERPOLATION BUFFER, IN TICKS.
- *
- * The renderer plays the record slightly behind itself so a late batch is absorbed instead of
- * stalling a body mid-stride. One tick of slack is enough for the jitter a websocket produces
- * and is the smallest amount that is any use; more would be visible lag for no gain.
- */
+/** The renderer plays the record one tick behind itself: enough to absorb websocket jitter, and the smallest amount that is any use — more is visible lag for no gain. */
 export const WALK_LEAD_TICKS = 1
 
-/**
- * Append one tile of walk to a body's queue, and never let the queue run away from the world.
- *
- * `legMs` is what the record says the leg costs. The cap is what makes the debt bounded: the
- * tail may sit at most one leg plus one tick of buffer ahead of now, so a body that has fallen
- * behind catches up by walking its next legs at their proper speed against a nearer deadline
- * rather than by teleporting — and a body that has stood still for a minute starts walking at
- * once instead of spending four seconds on its first tile.
- */
+/** Appends one tile of walk. The cap bounds the debt: the tail may sit at most one leg plus one tick of buffer ahead of now, so a body behind the record catches up rather than teleports. */
 export function scheduleLeg(
   path: readonly Waypoint[], x: number, y: number,
   opts: { nowMs: number; legMs: number; leadMs: number },
@@ -297,20 +180,9 @@ export function scheduleLeg(
   const cap = nowMs + legMs + leadMs
   if (wanted <= cap) return [...path, { x, y, atMs: wanted }]
 
-  // ★ THE QUEUE HAS FALLEN BEHIND, AND SIMPLY REFUSING TO REWIND IS NOT ENOUGH.
-  //
-  // The first version of this clamped the new waypoint to `max(last.atMs, min(wanted, cap))`,
-  // which cannot drain a debt at all: `last.atMs` IS the debt, so the cap never binds. Caught
-  // by the replay at 120 ms a tick, where the clock's 2500 ms seed put the first leg 2.4 s in
-  // the future and the body stayed 11 tiles behind for the rest of the walk.
-  //
-  // So the future is COMPRESSED instead: every leg still ahead is squeezed toward now by the
-  // same factor, and the body catches up by walking quicker for a moment rather than by
-  // teleporting. The order it visits tiles is untouched.
-  //
-  // The anchor is the body's position AT THIS INSTANT, not the last waypoint it passed. Left
-  // as the passed waypoint, squeezing the segment the body is part way along would change
-  // where it is drawn THIS FRAME — a jump, which is the exact thing being fixed.
+  // The future is COMPRESSED rather than clamped: clamping against `last.atMs` cannot drain the
+  // debt, because `last.atMs` IS the debt. The anchor is where the body is at THIS INSTANT —
+  // anchoring on the last passed waypoint would move it mid-segment, which is the jump being fixed.
   const here = interpolatePos(path, nowMs)
   const k = (cap - nowMs) / (wanted - nowMs)
   const out: Waypoint[] = [{ x: here.x, y: here.y, atMs: nowMs }]
@@ -321,9 +193,8 @@ export function scheduleLeg(
 
 export type Waypoint = { x: number; y: number; atMs: number }
 
-// Interpolate along a scheduled path polyline (path[0] is the anchor). The body
-// steps through each waypoint tile — never a straight line from start to final
-// destination — so a corner leg can't sweep across a building's drawn volume.
+// The body steps through each waypoint tile — never a straight line to the final destination —
+// so a corner leg cannot sweep across a building's drawn volume. path[0] is the anchor.
 export function interpolatePos(path: ReadonlyArray<Waypoint>, nowMs: number): { x: number; y: number } {
   if (path.length === 0) return { x: 0, y: 0 }
   const first = path[0]!
@@ -342,9 +213,8 @@ export function interpolatePos(path: ReadonlyArray<Waypoint>, nowMs: number): { 
   return { x: last.x, y: last.y }
 }
 
-// Drop waypoints we've passed, keeping the last-passed one as the anchor so the
-// path queue stays short while the interpolation never re-winds. The no-op case
-// returns the same array — this runs 60fps per character.
+// Keeps the last-passed waypoint as the anchor so the interpolation never re-winds. The no-op
+// case returns the same array — this runs 60fps per character.
 export function prunePath(path: Waypoint[], nowMs: number): Waypoint[] {
   let cut = 0
   for (let i = 0; i < path.length - 1; i++) {
@@ -368,7 +238,7 @@ export type EmoteKind = (typeof EMOTE_KINDS)[number]
 export const NEED_EMOTE_BELOW = 30
 
 export function emoteFor(a: AgentBody, recent: SimEvent[]): EmoteKind | null {
-  if (!a.alive) return null // the renderer's tone handling owns death (Task 15)
+  if (!a.alive) return null // the renderer's tone handling owns death
   const mine = (type: string): boolean =>
     recent.some((ev) => ev.type === type && (ev.payload as { agentId?: string }).agentId === a.id)
   if (mine('agent_injured')) return 'hurt'

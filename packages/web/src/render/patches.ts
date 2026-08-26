@@ -1,11 +1,7 @@
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { ROAD_SHOULDER_DARK } from './groundField.js'
 
-// U7: "the farmland/plaza patch reads as an amorphous blob." The mechanism is that a patch was
-// only ever the union of its tiles' diamonds filled with one material — a shape with no edge.
-// A real field has a boundary: a headland where the plough turns, and furrows that say which
-// way it was worked. A real plaza has a kerb. Both are lines, and both are cheap: they are
-// drawn into the ground bake, so they cost nothing per frame.
+// Outlines and furrows are drawn into the ground bake, so they cost nothing per frame.
 
 export type Tile = { x: number; y: number }
 
@@ -43,12 +39,7 @@ const EDGES = [
   { dx: -1, dy: 0, from: 'left', to: 'top' },       // NW
 ] as const
 
-/**
- * The outline of a set of tiles, as closed screen-space polylines with every interior edge
- * removed. Two tiles that touch only at a corner stay TWO outlines: at such a pinch vertex the
- * walk prefers the outgoing edge belonging to the same tile it arrived on, so the loops never
- * fuse into a figure of eight.
- */
+/** The outline of a set of tiles, as closed screen-space polylines with interior edges cut. */
 export function patchOutline(tiles: ReadonlyArray<Tile>): number[][] {
   const set = new Set(tiles.map((t) => keyOf(t.x, t.y)))
   // sorted, so the output does not depend on the order the caller collected tiles in
@@ -91,10 +82,7 @@ export function patchOutline(tiles: ReadonlyArray<Tile>): number[][] {
   return loops
 }
 
-/**
- * Furrows: parallel lines across a patch, running ALONG its longer axis and spaced one tile
- * apart across its shorter one — the direction a field is actually ploughed.
- */
+/** Parallel lines along a patch's longer axis, spaced one tile apart across its shorter one. */
 export function furrowLines(tiles: ReadonlyArray<Tile>): number[][] {
   if (tiles.length === 0) return []
   const xs = tiles.map((t) => t.x), ys = tiles.map((t) => t.y)

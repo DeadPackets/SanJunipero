@@ -2,25 +2,9 @@ import { CELL, CHAR_TARGET_PX, FEET_Y } from './charAnim.js'
 import { TILE_H, tileToScreen } from './iso.js'
 import { BUILDING_PX_PER_TILE } from './textures.js'
 
-// THE DEPTH SORT, REWRITTEN (U8, plan task 70).
-//
-// U8 asked for a review of the layering, not a patch, and the review found THREE independent
-// faults in one scalar:
-//   (a) a footprint was treated as a SCALAR — a 2×2 house sorted from its far corner only, so
-//       the four tiles it actually occupies had no say;
-//   (b) the `+x` tiebreak produced EXACT TIES — a body at tile (20,22) and a 2×2 house at
-//       (20,20) both computed 42021, and a tie in a sortableChildren container is resolved by
-//       insertion order, i.e. by nothing;
-//   (c) a body's depth was ROUNDED (`depthKey(Math.round(px), Math.round(py))`) while its
-//       position was not, so a walking body's order POPPED half a tile away from where its
-//       feet were.
-//
-// The replacement sorts GEOMETRY. Every drawable declares the ground it stands on in
-// tile-EDGE coordinates — tile (x, y) spans [x − 0.5, x + 0.5] × [y − 0.5, y + 0.5] — and a
-// body's box follows its interpolated position with no rounding, which is what removes the
-// pop. Pairs that can visually overlap become edges in a graph, and a topological pass over
-// that graph produces the paint order. Where geometry has nothing to say, the old scalar is
-// the seed, so the new order degrades to the old one exactly where the old one was right.
+// The sort is GEOMETRIC: a drawable declares its ground in tile-EDGE coordinates — tile (x, y)
+// spans [x − 0.5, x + 0.5] × [y − 0.5, y + 0.5] — and a body's box follows its interpolated
+// position unrounded. Where geometry has nothing to say, a scalar seed decides.
 
 /** Who wins when two drawables stand on the SAME ground. A body in a doorway is in FRONT of
  *  the building it is standing in, never inside it; an item on the floor is under both. */
@@ -38,9 +22,7 @@ export type DepthBox = {
   sx0: number; sy0: number; sx1: number; sy1: number
 }
 
-/** `a` is strictly nearer the viewer than `b`. In dimetric both +x and +y run toward the
- *  camera, so "nearer" is "past the far edge on either world axis". Touching edges count:
- *  a body on the tile immediately south of a house IS in front of it. */
+/** `a` is strictly nearer the viewer than `b`. Both +x and +y run toward the camera in dimetric, so "nearer" is "past the far edge on either world axis", and touching edges count. */
 export function inFrontOf(a: DepthBox, b: DepthBox): boolean {
   return a.x0 >= b.x1 || a.y0 >= b.y1
 }
@@ -60,24 +42,11 @@ export function depthSeed(b: DepthBox): number {
   return (b.x1 + b.y1) * 1000 + b.x1
 }
 
-/**
- * Above this many drawables in one frame the topological pass is skipped and the seed order
- * stands. The cap exists so a pathological frame degrades instead of stalling.
- *
- * 256 WAS A GUESS MADE WHEN THE COMMENT HERE CLAIMED A CULL THAT DID NOT EXIST. With
- * `cull.ts` the input is bounded by the VIEWPORT rather than by the settlement, so the number
- * can be set to what a viewport-sized frame actually costs. Timed on the ring-grammar fixture:
- * 256 boxes is 0.27 ms a frame, 512 is 0.96 ms — 5.7 % of a 60 fps budget — and 640 is 1.53 ms.
- * 512 is the stop that keeps a three-ring town inside the topological pass at every zoom stop
- * from 1× in, which is every stop where an occlusion error is a thing a viewer can see.
- */
+/** Above this many drawables the topological pass is skipped and the seed order stands. Timed on the ring-grammar fixture: 256 boxes is 0.27 ms a frame, 512 is 0.96 ms, 640 is 1.53 ms. */
 export const DEPTH_BUDGET = 512
 
-// THE COUNTED FALLBACK (ratified substitute for "cycles are impossible"). With sprites that
-// overhang their footprint by 1.85×, three of them CAN overlap in a pinwheel whose
-// constraints form a cycle. That is not a crash and it is not a guess: the survivors are
-// appended in seed order — the behaviour this replaces — and every occurrence is counted,
-// because a number nobody reads is not a safeguard. G12c cites this count.
+// Sprites overhang their footprint, so three of them CAN overlap in a pinwheel whose constraints
+// form a cycle. The survivors are then appended in seed order, and every occurrence is counted.
 let fallbackFrames = 0
 let fallbackNodes = 0
 
@@ -90,10 +59,7 @@ export function resetDepthFallbacks(): void {
   fallbackNodes = 0
 }
 
-/** Which of an overlapping pair must be drawn LAST, or `null` when geometry has nothing to
- *  say and the seed decides. Injectable so the cycle fallback can be exercised: no AABB
- *  arrangement produces a cycle (see depth.test.ts), and an untested branch is not a
- *  safeguard. */
+/** Which of an overlapping pair is drawn LAST, or `null` when geometry has nothing to say. Injectable so the cycle fallback can be exercised: no AABB arrangement produces a cycle. */
 export type EdgeRule = (a: DepthBox, b: DepthBox) => DepthBox | null
 
 export const geometricEdge: EdgeRule = (a, b) => {

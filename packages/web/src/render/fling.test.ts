@@ -14,16 +14,9 @@ const track = (pts: ReadonlyArray<[number, number, number]>): DragTrack => {
   return t
 }
 
-// ── ★ 48 PX OF KEYBOARD WILL NOT CROSS A 1900 PX TOWN ─────────────────────────────────────
-//
-// Drag-to-pan already existed; what it had no answer for was distance. Forty flicks of a wheel
-// or forty presses of an arrow is not a camera control, it is a chore. A throw carries.
-//
-// It must not fight the two gestures that share the same pointer. A TAP is a tile pick and has
-// always been told apart by TAP_SLOP_PX of total travel; a fling asks the same question and
-// gets the same answer, so a click can never become a throw. And a wheel is a zoom that pins a
-// world point under the cursor, which a moving camera would tear out from under it — so any
-// zoom kills the glide rather than composing with it.
+// ── A THROW, AGAINST THE TWO GESTURES THAT SHARE ITS POINTER ──────────────────────────────
+// A tap is told from a drag by TAP_SLOP_PX, the same question a fling asks, so a click can
+// never become a throw; and a zoom pins a world point, so it kills a glide rather than compose.
 
 describe('telling a tap from a drag — one threshold, both questions', () => {
   it('a still finger is not a drag however long it rests', () => {

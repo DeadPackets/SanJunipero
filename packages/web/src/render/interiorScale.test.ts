@@ -11,27 +11,14 @@ import {
   roomSizeOf, slotGridOf, type PlacedItem,
 } from './interiors.js'
 
-// ★ THE COMPOSITION GUARD — the laws a per-element test cannot see.
-//
-// WHAT THE USER SAW, in the shipped Option C room: "Omar dwarfs his own bed. The table reads as
-// a footstool beside him." Every per-element law in the suite was GREEN while that was on the
-// screen, and two of them said so in as many words:
-//
-//   roomShell.test.ts  "★ a body is exactly as tall indoors as it is out of doors"
-//                      expect(CHAR_TARGET_PX * INTERIOR_PX_SCALE * ROOM_ZOOM).toBe(208)
-//   interiors.test.ts  "puts a bed within reach of the person lying in it"
-//                      expect(bedTownPx / CHAR_TARGET_PX).toBeLessThan(1.5)
-//
-// The first asserted the defect as a law. The second compared the bed's sprite width DIVIDED
-// BY FOUR against a body's TOWN height — the very conflation of the pixel factor with the
-// world factor that caused the bug — and its bounds were loose enough to admit it.
-//
-// So the laws below are RELATIONSHIPS BETWEEN DRAWN LENGTHS, all of them in one space: interior
-// pixels on the glass. Every one of them fails on the picture the user was shown.
+// THE COMPOSITION GUARD — the laws a per-element test cannot see. The per-element laws were all
+// green while a body dwarfed his own bed, because they compared a sprite width divided by four
+// against a body's TOWN height. So the laws below are relationships between DRAWN LENGTHS, all
+// of them in one space: interior pixels on the glass.
 
 /** How much longer a lying figure is than the same figure standing, in the shipped cast atlas:
- *  `cast/omar/manifest.json` has `figureH` 954 and a `sleep` cell 962 px across. Rounded up, so
- *  the laws below are stated against the longest a body can be drawn. */
+ *  `figureH` 954 against a `sleep` cell 962 px across. Rounded up, so the laws below are stated
+ *  against the longest a body can be drawn. */
 const LYING_OVER_STANDING = 1.05
 /** And how much SHORTER it is: the same cell is 846 px tall against a 954 px standing figure. */
 const LYING_H_OVER_STANDING = 846 / 954
@@ -43,10 +30,8 @@ const SHIPPED_BODY_PX = CHAR_TARGET_PX * INTERIOR_PX_SCALE * ROOM_ZOOM
 
 describe('★ THE ROOM IS BUILT FOR PEOPLE — drawn length against drawn length', () => {
   it('★ YOU CAN STAND UP IN IT: a body is shorter than the room\'s own wall', () => {
-    // The wall art is 160 px and is authored as a room: wainscot, dado rail, a door that
-    // reaches the floor line, a mantel. A head that goes through it is not a scale question,
-    // it is a picture of a giant. A person fills between three fifths and four fifths of the
-    // height of the room they live in.
+    // The wall art is 160 px and is authored as a room: wainscot, dado rail, a door that reaches
+    // the floor line, a mantel. A person fills between three fifths and four fifths of it.
     const ratio = bodyPx() / (WALL_H_PX * ROOM_ZOOM)
     expect(bodyPx()).toBeLessThan(WALL_H_PX * ROOM_ZOOM)
     expect(ratio).toBeGreaterThanOrEqual(0.6)
@@ -71,18 +56,16 @@ describe('★ THE ROOM IS BUILT FOR PEOPLE — drawn length against drawn length
   })
 
   it('★ NOR A DOLL: a body is taller than the floor tile it stands on is deep', () => {
-    // The fence on the other side. "Shrink the person until it looks right" ends here: a
-    // townsperson is at least a tile-and-a-half of height, which is what stops the fix from
-    // being a number tuned until one screenshot passed.
+    // The fence on the other side: a townsperson is at least a tile-and-a-half of height, which
+    // is what stops the fix from being a number tuned until one screenshot passed.
     expect(bodyPx()).toBeGreaterThan(INTERIOR_TILE.h * ROOM_ZOOM)
     expect(bodyPx()).toBeGreaterThan(groundRunPx(1) * ROOM_ZOOM)
   })
 
   it('★ the height is DERIVED, not chosen', () => {
-    // One interior tile is one metre of floor — the library authors a bed at 1x2, a table at
-    // 1x1 and a chair at 1x1, which are the dimensions those things have. In a 2:1 dimetric the
-    // vertical edge of a unit cube projects to exactly the tile's own height, so a metre of
-    // height is INTERIOR_TILE.h and nothing else is available to choose.
+    // One interior tile is one metre of floor, and in a 2:1 dimetric the vertical edge of a unit
+    // cube projects to exactly the tile's own height — so a metre of height is INTERIOR_TILE.h
+    // and nothing else is available to choose.
     expect(INTERIOR_PX_PER_M).toBe(INTERIOR_TILE.h)
     expect(INTERIOR_BODY_PX).toBe(Math.round(ADULT_HEIGHT_M * INTERIOR_PX_PER_M))
     // The two authored things in the room with a size everybody knows agree with it: the wall
@@ -92,10 +75,8 @@ describe('★ THE ROOM IS BUILT FOR PEOPLE — drawn length against drawn length
   })
 
   it('★ and it is a DOWNSCALE of the cast atlas, never an upscale', () => {
-    // The lane before this one took the furniture composite from 2.0 to 1.0 because half of
-    // every interior was being invented by the sampler. A body must not give that back: the
-    // shipped atlas figure is 954 px, so every scale below is far under 1, and the NEW one is
-    // further under than the old.
+    // A body must not give back what the furniture composite won: the shipped atlas figure is
+    // 954 px, so every scale here is far under 1 and the new one is further under than the old.
     const FIGURE_H = 954              // cast/omar/manifest.json
     const cell = CHAR_TARGET_PX / FIGURE_H
     expect(interiorBodyScale(cell)).toBeLessThan(1)
@@ -107,24 +88,21 @@ describe('★ THE ROOM IS BUILT FOR PEOPLE — drawn length against drawn length
 describe('★ AND IT HOLDS FOR A SECOND BODY, EVERY ROOM KIND AND EVERY ZOOM', () => {
   it('★ a second body is drawn at exactly the height of the first', () => {
     // The scale is a pure function of the cell scale, so two bodies off two different atlases
-    // still reach the glass the same height. That is the whole claim, and it is checkable:
-    // give it two different figure heights and the drawn height is one number.
+    // still reach the glass at the same height.
     for (const figureH of [954, 512, 96]) {
       expect(interiorBodyScale(CHAR_TARGET_PX / figureH) * figureH).toBeCloseTo(INTERIOR_BODY_PX, 6)
     }
   })
 
   it('★ every room kind the town builds obeys the same law', () => {
-    // Total over INTERIOR_KINDS — a kind added to the vocabulary is covered by construction,
-    // not by remembering to add a case. The wall and the body are the same in every room; what
-    // changes per kind is what stands in it, and none of it may be taller than the wall.
+    // Total over INTERIOR_KINDS — a kind added to the vocabulary is covered by construction. The
+    // wall and the body are the same in every room; what changes is what stands in it.
     expect(INTERIOR_KINDS.length).toBeGreaterThanOrEqual(3)
     for (const kind of INTERIOR_KINDS) {
       const pieces = roomFurnishings(kind)
       expect(pieces.length, `${kind} is furnished`).toBeGreaterThan(0)
-      // ★ AGAINST ITS OWN ROOM, NOT THE HOUSE'S. Rooms differ in size since the shared
-      // dwellings landed — a farmhouse is 24 x 6 — so measuring every kind against `ROOM_TILES`
-      // asked a farmhouse to fit in a house.
+      // Against its OWN room, not the house's: rooms differ in size, so measuring every kind
+      // against `ROOM_TILES` asks a farmhouse to fit in a house.
       const room = roomSizeOf(kind)
       expect(room.w, `${kind} room`).toBeGreaterThanOrEqual(ROOM_TILES.w)
       for (const f of pieces) {
@@ -140,9 +118,8 @@ describe('★ AND IT HOLDS FOR A SECOND BODY, EVERY ROOM KIND AND EVERY ZOOM', (
   })
 
   it('★ every zoom the camera allows: the ratios are scale-free', () => {
-    // The room container carries ONE scale, and the wall, the furniture and the body are all
-    // children of it — so a ratio between two of them cannot move with the zoom. Asserted by
-    // computing the two laws at an arbitrary zoom and getting the same numbers.
+    // The room container carries ONE scale and the wall, the furniture and the body are all
+    // children of it, so a ratio between two of them cannot move with the zoom.
     for (const h of [400, 678, 734, 900, 1440, 2000]) expect(roomZoomFor(h)).toBe(ROOM_ZOOM)
     for (const k of [0.5, 1, 2, 3.7]) {
       expect((INTERIOR_BODY_PX * k) / (WALL_H_PX * k)).toBeCloseTo(INTERIOR_BODY_PX / WALL_H_PX, 10)
@@ -157,10 +134,8 @@ describe('★ A FURNISHING A BODY LIES IN IS CUT IN TWO AND PUT BACK EXACTLY', (
     ({ kind, tile: { x: 5, y: 2 }, meta: { slots: { w: 1, h }, placement: 'floor', interiorKinds: ['house'] } })
 
   it('★ both halves are anchored on the WHOLE piece, not on their own half', () => {
-    // THE DEFECT, and the browser had it in every room: `interiorPieces` pushes the front
-    // half's TILE half a footprint nearer the viewer so a body sorts between the halves, and
-    // the renderer spent that a SECOND time as a position. A chair's back floated a tile clear
-    // of its own seat and the cushion was drawn twice.
+    // `interiorPieces` pushes the front half's TILE half a footprint nearer the viewer so a body
+    // sorts between the halves; spending that a SECOND time as a position tears the piece in two.
     for (const [kind, h] of [['chair', 1], ['bed', 2]] as const) {
       const pieces = interiorPieces([item(kind, h)], [])
       const back = pieces.find((p) => p.half === 'back')!
@@ -211,12 +186,9 @@ describe('★ AND A BODY IN A BED IS ON THE MATTRESS', () => {
   })
 
   it('★ you can SEE the sleeper: most of her clears the blanket, and some of her does not', () => {
-    // THE DEFECT THIS CLOSES, and the scale fix is what created it. A body is anchored at its
-    // FEET, on the ground it stands on — right everywhere except inside something you get INTO.
-    // At the old, wrong body scale a sleeper stuck a long way out of the bed and the error was
-    // invisible under a much larger one. At the room's real scale she lands almost entirely
-    // behind the bed's own front half: the browser showed a made bed with a sliver of hair at
-    // one end of it.
+    // A body is anchored at its FEET, on the ground it stands on — right everywhere except
+    // inside something you get INTO, where she lands almost entirely behind the bed's own front
+    // half.
     const bedFootSy = interiorToScreen(9 + BED_FOOTPRINT.w / 2, 2 + BED_FOOTPRINT.h / 2).sy
     const bedTexH = (BED_FOOTPRINT.w + BED_FOOTPRINT.h) * (INTERIOR_TILE.w / 2)   // 192, authored
     const blanket = bedFootSy - (bedTexH - Math.round(bedTexH / 2))   // top edge of the front half
@@ -234,10 +206,9 @@ describe('★ AND A BODY IN A BED IS ON THE MATTRESS', () => {
 
 describe('★ THE NEAR CORNER — how much of the room this stage cannot show', () => {
   it('★ a stage that cannot hold the box says by how much, and spends nothing on courtesy', () => {
-    // The box is 736 px (160 of wall over 576 of floor). A stage shorter than that CROPS,
-    // because there is no integer zoom under 1 and a fractional one resamples the pixel art
-    // this room exists to stop resampling. What it must not do is crop MORE than it has to:
-    // the two 8 px margins are a courtesy and a courtesy is not paid out of the picture.
+    // The box is 736 px (160 of wall over 576 of floor). A stage shorter than that CROPS, because
+    // there is no integer zoom under 1 and a fractional one resamples the pixel art this room
+    // exists to stop resampling. What it must not do is crop MORE than it has to.
     expect(roomCropPx(2000)).toBe(0)
     // the margins are given back the moment the box does not fit
     expect(roomCropPx(736)).toBe(0)

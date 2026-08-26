@@ -7,15 +7,10 @@ import {
 import { bigTown, bigTownScreenSize, type FixtureStructure } from './bigTown.js'
 
 // ── WHAT THE CULL IS WORTH, IN NUMBERS ────────────────────────────────────────────────────
-//
-// The measurement law binds: these come from pure functions over a synthetic world, never from
-// a browser's own report. The town is `bigTown` — the ring grammar's 19-tile block pitch with a
-// structure on every plot — and the stage is the 1728 × 880 the C12 audit measured against.
-//
-// The numbers this file prints are the numbers in the camera report. It is a measuring
-// instrument that also asserts, so a regression in the cull moves a number a reader can see.
+// Every number here comes from pure functions over a synthetic world, never from a browser's
+// own report.
 
-/** The audit's stage, less the 56 px the control bar takes off the bottom (task 77). */
+/** The audit's stage, less the 56 px the control bar takes off the bottom. */
 const STAGE = { w: 1728, h: 880 - 56 }
 
 /** A viewport centred on the middle of the town, in the world space `tileToScreen` produces. */
@@ -26,11 +21,7 @@ function viewAt(scale: number, centre: { sx: number; sy: number }): ViewRect {
   }
 }
 
-/**
- * Pixi batches consecutive sprites that share a texture, so a DRAW CALL is a run of one kind in
- * painter's order — the honest count, not one per sprite. Kind stands in for texture because
- * the codex resolves one art url per kind.
- */
+/** Pixi batches consecutive sprites sharing a texture, so a DRAW CALL is a run of one kind in painter's order. Kind stands in for texture: the codex resolves one art url per kind. */
 function drawCalls(order: readonly string[], kindOf: ReadonlyMap<string, string>): number {
   let calls = 0, last: string | null = null
   for (const id of order) {
@@ -127,14 +118,9 @@ describe('the cull, measured on a town the viewport cannot hold', () => {
     })
   }
 
-  // ★ THE ONE THING THE CULL CANNOT DO, SAID PLAINLY.
-  //
-  // At the overview stop the whole town is on screen BY DEFINITION, so the cull removes almost
-  // nothing and `depthOrder` is handed the entire settlement — well past `DEPTH_BUDGET`. The
-  // topological pass is abandoned and the town paints in seed order. That is not a defect to
-  // fix here: at 0.5× a house is eight pixels tall and an occlusion error is not a thing a
-  // viewer can see, which is the case the counted fallback was built for. What matters is that
-  // the budget holds at every stop where the error WOULD be visible.
+  // At the overview stop the whole town is on screen by definition, so `depthOrder` is handed the
+  // settlement and passes `DEPTH_BUDGET`. A house is eight pixels tall there and an occlusion
+  // error is not visible, which is the case the counted fallback was built for.
   it('★ the budget holds from 1× in, and gives way only at the overview', () => {
     const rows = measure(bigTown(3))
     const overview = rows.find((r) => r.zoom === 0.5)!

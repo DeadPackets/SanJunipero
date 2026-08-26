@@ -146,8 +146,7 @@ describe('road silhouettes', () => {
 
   it('reaches the shared edge so a run joins up with no gap', () => {
     // the n arm's far edge IS the diamond's upper-right edge, whose midpoint is where the
-    // neighbouring tile's s arm arrives. roadTiles.ts paints that same point at (23,4) of a
-    // 32x16 cell — (+7,-4) from the centre, so (8,4) from the top vertex.
+    // neighbouring tile's s arm arrives — (8,4) from the top vertex of a 32x16 cell.
     const n = roadRibbonPolys('straight-ns')[1]!
     expect([(n[2]! + n[4]!) / 2, (n[3]! + n[5]!) / 2]).toEqual([8, 4])
   })
@@ -176,12 +175,8 @@ describe('road silhouettes', () => {
 })
 
 // ── THE PERIODICITY GUARD ───────────────────────────────────────────────────────────────
-// The user's complaint made measurable. Sample the baked ground along a world-space SCANLINE
-// and look for the PLATEAU a per-tile choice leaves: inside one tile the value never changes,
-// so a half-tile lag is almost perfectly self-correlated, while a full-tile lag lands on an
-// independently chosen neighbour and is not. That gap — high at half a tile, collapsed at a
-// whole one — is the checkerboard's fingerprint. A continuous field has no plateau and no
-// gap: the material varies at its own scale, which knows nothing about tile boundaries.
+// A per-tile choice leaves a PLATEAU: a half-tile lag is almost perfectly self-correlated while
+// a whole-tile lag lands on an independent neighbour. That gap is the checkerboard's fingerprint.
 
 /** normalised autocorrelation of a series at a lag */
 function autocorr(series: number[], lag: number): number {
@@ -231,11 +226,8 @@ describe('the ground carries no tile-frequency pattern', () => {
 })
 
 
-// FPS REGRESSION GUARD. The ground bake tessellates every tile outline on the map, and it was
-// firing once per ASSET MESSAGE. With the C13 library ingested that is ~166 messages back to
-// back — enough main-thread blocking that requestAnimationFrame itself (which is what the FPS
-// overlay counts, not the Pixi ticker) fell to 0.2 frames per second. Only terrain records can
-// change the ground; nothing else may trigger a bake.
+// The ground bake tessellates every tile outline on the map, so a bake per asset message blocks
+// the main thread for as long as the ingest runs. Only terrain records may trigger one.
 describe('groundArtSignature', () => {
   const rec = (klass: string, kind: string, seq: number): AssetRecord => ({
     id: `r${seq}`, seq, class: klass as 'terrain', kind, status: 'ready', desc: kind, meta: null,
@@ -271,11 +263,9 @@ describe('groundArtSignature', () => {
 })
 
 
-// ── CONNECTIVITY ACCEPTANCE (controller, final round) ───────────────────────────────────
-// Roads rendered as chains of disconnected cobble islands. Adjacent quadrants SHARE an edge
-// mathematically, so the gaps are a rasterisation seam: two polygons abutting on a boundary
-// can each drop the boundary pixel. The acceptance test is the controller's own — flood-fill
-// a rasterised run from one end and require the other end to be reachable.
+// ── CONNECTIVITY ACCEPTANCE ─────────────────────────────────────────────────────────────
+// Adjacent quadrants share an edge mathematically, so a gap between them is a rasterisation
+// seam: two polygons abutting on a boundary can each drop the boundary pixel.
 
 /** rasterise a road run into a boolean grid the way the baker fills it */
 function rasterRun(terrain: TileId[][]): { grid: boolean[][]; w: number; h: number; off: number } {
@@ -398,10 +388,8 @@ describe('a road run is CONNECTED', () => {
 })
 
 
-// TERRAIN V2.1. The plaza cobble reads right at plaza scale and as a noisy stone-string on a
-// 16px ribbon, so thin runs draw from a calmer material. The rule has to separate a wide area
-// from a one-tile-wide run, and "belongs to a fully-road 2x2 block" is the simplest one that
-// actually does — including at a crossroads, where each 2x2 still holds a diagonal of grass.
+// The plaza cobble reads as a noisy stone-string on a 16px ribbon, so thin runs draw from a
+// calmer material. "Belongs to a fully-road 2x2 block" is the simplest rule that separates them.
 describe('mass vs ribbon', () => {
   const grid = (n: number, cells: Array<[number, number]>): TileId[][] => {
     const t: TileId[][] = Array.from({ length: n }, () => Array.from({ length: n }, () => 0 as TileId))
@@ -474,18 +462,8 @@ describe('mass vs ribbon', () => {
 })
 
 // ------------------------------------------------------------- U5: a road you can see at 1x
-//
-// MEASURED, 2026-08-17, from the shipped 256x256 materials in
-// packages/forge/content/tilesets/materials (mean WCAG relative luminance over every pixel):
-//
-//   terrain_grass_0      0.418555
-//   terrain_road_0       0.506648   delta vs grass 0.088093
-//   terrain_road-calm_0  0.510628   delta vs grass 0.092073
-//   ROAD_SHOULDER        0.358106   delta vs grass 0.060449
-//
-// The road surface cannot be repainted — the art is generated and P11 forbids tinting it — so
-// the fix has to be an EDGE. These are pinned rather than decoded in-test because @sj/web has
-// no PNG decoder and must not take sharp (a forge dependency) to run a unit test.
+// Mean WCAG relative luminance of the shipped materials, pinned rather than decoded in-test:
+// `@sj/web` has no PNG decoder and must not take sharp, a forge dependency, to run a unit test.
 const GRASS_TONE = 0.418555
 const ROAD_TONE = 0.506648
 
@@ -583,10 +561,8 @@ describe('the two-tone rim', () => {
 })
 
 // --------------------------------------------------- U6: two periods that never line up
-//
 // The lattice is a property of the SAMPLING, not of the art: any material tiled by an identity
-// matrix repeats exactly at MATERIAL_REPEAT_PX. So the detector is calibrated on synthetic
-// buffers, then pointed at buffers built by the real sampling transforms.
+// matrix repeats exactly at MATERIAL_REPEAT_PX.
 
 // A deterministic stand-in material: value noise that is NOT itself periodic at 256.
 const materialAt = (u: number, v: number): number => {

@@ -5,17 +5,8 @@ import { describe, expect, it } from 'vitest'
 import { ZOOM_STOPS } from './camera.js'
 import { BUILDING_PX_PER_TILE } from './textures.js'
 
-// ★ THE DISCOLOURATION IS NOT IN THE ART. IT IS THE FILTER.
-//
-// `scene.ts` sets the whole renderer to NEAREST, and exactly two classes opted out through
-// `smoothSource`: hi-res building cells and hi-res character sheets — which are precisely the
-// two classes the user reported as discoloured, and precisely why items, terrain and portraits
-// looked right to them.
-//
-// A bilinear sample at any scale that is not 1.0 returns a WEIGHTED AVERAGE of neighbouring
-// texels, and the average of two palette members is not a palette member. The forge lane
-// measured 38–79% off-palette pixels at the 4x stop; the three stops below it are worse,
-// because they downscale further. The proof below is offline and covers all four.
+// A bilinear sample at any scale but 1.0 averages neighbouring texels, and the average of two
+// palette members is not a palette member — so nothing may opt out of NEAREST.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB_SRC = join(HERE, '..')
@@ -41,9 +32,7 @@ export function offPalette(row: readonly number[], palette: ReadonlySet<number>)
   return row.filter((v) => !palette.has(v)).length
 }
 
-/** A hi-res building cell as the forge ships it, and the Style Bible target a 1x1 footprint
- *  is drawn into: `(w + h) * BUILDING_PX_PER_TILE` = 64. The composite scale a viewer sees is
- *  that fit times the camera's stop. */
+/** A hi-res building cell as the forge ships it; a 1x1 footprint is drawn into 64px. */
 const SOURCE_PX = 128
 const drawnPx = (stop: number): number =>
   Math.max(1, Math.round(SOURCE_PX * ((1 + 1) * BUILDING_PX_PER_TILE / SOURCE_PX) * stop))

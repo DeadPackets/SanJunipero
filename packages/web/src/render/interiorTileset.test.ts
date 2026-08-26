@@ -80,10 +80,8 @@ describe('interiorTileset — what goes on the wall', () => {
     expect(Math.max(...left) + WALL_STRIP_TILES).toBeGreaterThanOrEqual(ROOM_TILES.h)
   })
 
-  // ★ EVERY BAY OF THE LONG WALL IS GLAZED, and the door takes the near one. It used to be ONE
-  // window: a 12-tile wall is three bays, so the middle one was 256 px of blank wainscot in the
-  // visual centre of the room, which is part of what "nowhere near as nice as expected" was
-  // looking at. A rule per bay, not a coordinate, so a longer wall gets more glass.
+  // Every bay of the long wall is glazed and the door takes the near one. A rule per bay, not a
+  // coordinate, so a longer wall gets more glass instead of a blank middle bay.
   it('a room has a door at the near end of the long wall and a window in every other bay', () => {
     const c = wallCourses([])
     const windows = c.filter((x) => x.piece === 'wall-window')
@@ -140,10 +138,8 @@ describe('interiorTileset — art independence', () => {
     expect(resolveInteriorPiece([{ ...newer, class: 'item' }], 'wall-plain')).toBeNull()
   })
 
-  // ★ TASK 84 §2, AS A SOURCE ASSERTION. The mock drew the hearth twice — once as the authored
-  // chimney breast on the wall, once as a freestanding sprite standing in front of it — because
-  // its compositor declared `placement` and never read it. The scene now skips any furnishing
-  // the wall itself draws.
+  // A compositor that declares `placement` and never reads it draws the hearth twice — once as
+  // the authored chimney breast, once as a sprite standing in front of it.
   it('★ a furnishing the wall draws is not ALSO drawn as an object', () => {
     const src = readFileSync(new URL('./interiorScene.ts', import.meta.url), 'utf8')
     expect(src).toContain('if (asElevation.has(piece.kind)) return')

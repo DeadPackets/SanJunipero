@@ -4,26 +4,13 @@ import {
 } from './camera.js'
 import { bigTown, bigTownScreenSize } from './bigTown.js'
 
-/** The audit's stage, less the 56 px the control bar takes off the bottom (task 77). */
+/** The audit's stage, less the 56 px the control bar takes off the bottom. */
 const STAGE = { w: 1728, h: 880 - 56 }
 
-// ── ★ "THE WHOLE TOWN" MUST MEAN A TOWN OF ANY SIZE ───────────────────────────────────────
-//
-// The control exists and the stop ladder stopped at 0.5. Measured on the ring grammar, 0.5
-// holds two rings and no more: a three-ring town is 4224 × 2112 px, and half of that is
-// 2112 × 1056 against 1680 × 776 of usable stage. `fitStop` fell to 0.5, the town did not fit,
-// and nothing said so — the viewer pressed "The whole town" and got most of the town.
-//
-// THE CHOICE, and why it is not a continuous scale. P18: rest stops stay exact so the pixel
-// grid stays exact. 0.25 is 1/4 — four world px become one screen px with no resampling — so
-// it joins the ladder without touching the NEAREST law. A fitted scale of, say, 0.387 would
-// resample every sprite in the town into shimmer, on the surface people watch.
-//
-// AND WHY THE LADDER STOPS THERE. 0.25 holds four rings, 640 buildings. Below it the
-// interface fails before the picture does: the ≥24 screen px hit floor is a WORLD size of
-// 24 / z, so at 0.125 a door's target is 192 world px — six tiles wide, swallowing its
-// neighbours. A view whose controls do not work is not a wider view. Past four rings the
-// answer is navigation, and `tooBigToFit` is how the bar says so out loud.
+// ── "THE WHOLE TOWN" MUST MEAN A TOWN OF ANY SIZE ─────────────────────────────────────────
+// A fitted continuous scale would resample every sprite in the town, so the ladder takes 0.25
+// (an exact 1/4) instead — and stops there, because the >=24 screen px hit floor is 24/z WORLD
+// px and at 0.125 a door's target is six tiles wide.
 
 describe('the stop ladder', () => {
   it('gained one stop below the old floor, and it is an exact reciprocal', () => {

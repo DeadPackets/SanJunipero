@@ -18,11 +18,8 @@ export const SMOKE_PUFF_R = 3          // a round puff, not an 8x8 card
 export const SMOKE_MAX_ALPHA = 0.42
 export const SMOKE_COLOR = 0xcfc6bc    // warm grey, MASTER_PALETTE — cream read as white glass
 
-// Smoke rises from a FIRE and a window glows because something is burning inside it, so both
-// effects answer to the same question: does this building have a hearth? The C13 city
-// template says which kinds are furnished with one (the house), and a fire pit is an open fire
-// whether or not anything furnished it. EVERY completed structure used to do both, which is
-// why pale squares hung over the wagon and the shed — neither has a chimney or a window.
+// Smoke and a lit window both answer one question: does this kind have a hearth? The city
+// template names the furnished kinds, and a fire pit is an open fire whether or not it is.
 export const HEARTH_KINDS: ReadonlySet<string> = new Set([
   ...cityStructures().filter((c) => c.furnishings.some((f) => f.kind === CITY_HEARTH_KIND)).map((c) => c.kind),
   'fire_pit',
@@ -52,22 +49,12 @@ export const FIRE_FROZEN_ALPHA = 0.6
 const WATER: TileId = 2
 const FOREST: TileId = 3
 
-/** The two ground decorations, at the size they are painted. Named because the law below is a
- *  statement about these rectangles and a test that measured different ones would measure
- *  nothing. A canopy is anchored bottom-centre on its tile's CENTRE; a shimmer is anchored
- *  top-left one pixel to the left of it. */
+/** The two ground decorations at painted size: a canopy anchors bottom-centre on its tile's centre, a shimmer top-left one pixel to the left of it. */
 export const CANOPY_PX = { w: 12, h: 20 } as const
 export const SHIMMER_PX = { w: 2, h: 2 } as const
 
-// ★ AND IT WAS A BARE RECTANGLE. `canopyTex` was `px(12, 20, 0x6f9455)` — one flat fill, no
-// silhouette, no trunk — so eighty untextured green slabs stood along the forest edge. Proved
-// by tinting this constant red in the running product and watching every slab turn red.
-//
-// The fix is code-painted rather than commissioned: this is scenery, not a structure kind, so
-// it is outside the codex the coverage gate measures, and `terrainTiles.paintScaffolding()`
-// already sets the precedent for a palette-true decoration drawn in code. It costs $0 and it
-// cannot go missing from a scratchpad, which is the defect the rest of this branch is about.
-// Same 12×20 box, so every number the ground law measures is unchanged.
+// Painted in code, not commissioned: scenery is not a structure kind, so it sits outside the
+// codex the art coverage gate measures.
 export const CANOPY_TRUNK = 0x7e512b
 export const CANOPY_BODY = 0x6f9455
 export const CANOPY_LIT = 0x93b573    // lit from the upper left, like everything else
@@ -99,20 +86,7 @@ export function decorationQuad(d: Decoration): ScreenRect {
     : { x0: d.sx, y0: d.sy, x1: d.sx + size.w, y1: d.sy + size.h }
 }
 
-/**
- * ★ WHAT THE DECORATION LAYER PLACES — AND THE RULE THAT WAS MISSING.
- *
- * A canopy is 20 px tall and stands on its tile's CENTRE, so it reaches 12 px ABOVE that tile's
- * top vertex — over the neighbour up-left. On row 0 and column 0 there is no neighbour up-left:
- * there is the void past the edge of the drawn ground, and the canopy hangs over it. Measured
- * on the genesis world, which is the one the product wakes into: **38 of the 140 quads this
- * function used to place left the painted ground, by up to 0.9375 tiles = 15 world px.** On the
- * showcase dev map none do, but the closest clears the edge by 0.0 px — which is why a human
- * looking at the running product read the whole row as standing on nothing.
- *
- * Pure, and separated from the Pixi sprites on purpose: the law is measured on these
- * rectangles, so the thing the test checks and the thing the renderer draws are one function.
- */
+/** Places the decorations, refusing any quad that leaves the painted ground — a 20 px canopy on a tile centre reaches 12 px past the top vertex, so an edge tile hangs over the void. */
 export function sampleDecorations(terrain: TileId[][]): Decoration[] {
   const out: Decoration[] = []
   const place = (kind: Decoration['kind'], x: number, y: number): boolean => {

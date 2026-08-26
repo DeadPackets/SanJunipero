@@ -3,11 +3,6 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// R3: `new BitmapText(...)` for a font that is not installed does not degrade — it throws
-// inside the renderer and BLANKS THE ENTIRE CANVAS. One label the pixel-font task has not
-// reached yet costs the whole view. So the decision "bitmap or canvas glyph" is made ONCE,
-// from the font cache, before any renderer sees the object.
-
 let installed = new Set<string>()
 let bitmapThrows = false
 let textThrows = false

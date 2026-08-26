@@ -8,13 +8,7 @@ import { progress } from '../ui/motion.js'
 
 export type Atmosphere = { update(state: WorldState): void; destroy(): void }
 
-/**
- * DAYBREAK AND NIGHTFALL CROSS; THEY DO NOT STEP (U23, Task 91). `clockTint` interpolates by
- * the MINUTE, and a minute arrives once every 2.5 real seconds — so dawn used to walk across
- * the town in visible jumps. The quad now eases from the tint it was showing to the tint the
- * clock has just named, over `MOTION.ambient`, on the ticker rather than on the tick. v1
- * Task 5 owns the ramp; this owns the CROSSING.
- */
+/** Cross-fades the day tint on the ticker: `clockTint` steps once a sim minute, which arrives every 2.5 real seconds and reads as a jump. */
 export function createAtmosphere(scene: Scene): Atmosphere {
   // the deep-blue night IS this multiply quad over the whole screen
   const quad = new Sprite(Texture.WHITE)

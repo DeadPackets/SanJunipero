@@ -1,17 +1,9 @@
 import { CITY_INTERIOR_SLOTS, type TownFacing } from '@sj/shared'
 import { TILE_H, TILE_W } from './iso.js'
 
-// ★ THE ROOM IS A MAP, NOT A BACKDROP — Option C, measured off `mocks/interiors` treatment `c`.
-//
-// The user chose C over A and B for one stated reason: "I want NPCs to be able to actually walk
-// around and interact with objects." 72 tiles instead of 36 buys nothing unless a body can
-// occupy them, so this module is the room as a GRID: which tiles are floor, which are taken by
-// a piece of furniture, where a body stands to use one, and whether a walk between two tiles
-// exists. Pure — no Pixi, no pixels — so every number here is measurable offline.
-//
-// THE PROJECTION DOES NOT CHANGE. It is the town's own 2:1 dimetric; what changes is the pixel
-// scale of one tile. `INTERIOR_PX_SCALE` town pixels become one interior pixel, so the camera
-// pushing through a doorway is a push-IN and never a change of world.
+// The room as a GRID: which tiles are floor, which a furnishing takes, where a body stands to
+// use one, and whether a walk between two tiles exists. Pure — no Pixi, no pixels. The
+// projection is the town's own 2:1; only the pixel scale of one tile changes.
 
 /** How many town pixels one interior pixel is worth. The mock's `ips`. */
 export const INTERIOR_PX_SCALE = 4
@@ -19,34 +11,16 @@ export const INTERIOR_PX_SCALE = 4
  *  forge already authors against — `assetResolution.INTERIOR_TILE`. */
 export const INTERIOR_TILE = { w: TILE_W * INTERIOR_PX_SCALE, h: TILE_H * INTERIOR_PX_SCALE } as const
 
-/**
- * ★ ONE TEMPLATE SLOT IS 4 × 2 INTERIOR TILES, AND THAT IS WHERE THE WALKING ROOM COMES FROM.
- *
- * `cityTemplate.CITY_INTERIOR_SLOTS` is 3×3 and is engine truth: it is where the world says a
- * bed goes. It is NOT a unit of floor. Giving each slot a 4×2 block of tiles turns the same
- * furnished room into a 12×6 map, so a 1×1 furnishing stands on ONE of its block's eight tiles
- * and the other seven are floor a body can cross.
- */
+/** `CITY_INTERIOR_SLOTS` is engine truth about where a bed goes, not a unit of floor. Giving
+ *  each slot a 4 × 2 block leaves seven walkable tiles around a 1×1 furnishing. */
 export const TILES_PER_SLOT = { w: 4, h: 2 } as const
 export const ROOM_TILES = {
   w: CITY_INTERIOR_SLOTS.w * TILES_PER_SLOT.w,
   h: CITY_INTERIOR_SLOTS.h * TILES_PER_SLOT.h,
 } as const
 
-/**
- * ★ A ROOM IS AS BIG AS THE BUILDING IT IS INSIDE, AND THE FACTOR IS NOT A TASTE CALL.
- *
- * Every room was `ROOM_TILES` — 12 × 6 whatever stood outside — and that was true while the only
- * rooms drawn were a 2 × 2 house, a 2 × 2 storehouse and a 1 × 1 shed nobody enters. A farmhouse
- * is 4 × 2 on the plan and the world says it sleeps FOUR: `interiors.roomCapacity` is
- * `floor(w × h / 2)`, which is the same arithmetic the whole dwelling ladder is priced on. Draw
- * that on a house's floor and the picture contradicts the law — two derivations of one fact,
- * which is the disease this lane exists to kill.
- *
- * The factor is FORCED by the room already shipped: a house is 2 × 2 and its room is 12 × 6, so
- * one plan tile is 6 interior tiles across and 3 deep. Nothing is chosen here — a house, a
- * storehouse and a cabin all still come out at exactly 12 × 6.
- */
+/** Forced, not chosen: a 2 × 2 house's room is 12 × 6, so one plan tile is 6 interior tiles
+ *  across and 3 deep — and a house, a storehouse and a cabin all still come out at 12 × 6. */
 export const ROOM_TILES_PER_PLAN_TILE = { w: 6, h: 3 } as const
 
 export function roomTilesFor(plan: { w: number; h: number }): Size {
@@ -57,8 +31,7 @@ export function roomTilesFor(plan: { w: number; h: number }): Size {
 }
 
 /** How many interior tiles one template slot owns in a room this size. The template grid is
- *  3 × 3 for every kind — a longer building spends its extra floor on wider slots, not on more
- *  of them — so this is a division and never a second table. */
+ *  3 × 3 for every kind, so this is a division and never a second table. */
 export function tilesPerSlot(room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS): Size {
   return {
     w: Math.max(1, Math.floor(room.w / Math.max(1, slots.w))),
@@ -73,30 +46,15 @@ export const SLOT_ORIGIN_OFFSET = { x: 1, y: 0 } as const
  *  authored at (`wall-*.png` is 256 × 160). */
 export const WALL_H_PX = 160
 
-// ── ★ THE ROOM'S HUMAN SCALE — AND WHY THE BODY WAS TWICE THE SIZE IT SHOULD BE ──────────
+// ── THE ROOM'S HUMAN SCALE ───────────────────────────────────────────────────────────────
 //
-// WHAT THE BROWSER SHOWED: a sleeper dwarfs his own bed and the table beside him reads as a
-// footstool. Measured off the glass: a body is 208 px against a 192 px bed, and against a
-// 160 px WALL — a person a third taller than the room he is standing in.
-//
-// WHY, AND IT IS NOT AN 8% MISMATCH. Going indoors is TWO changes at once and only one of them
-// ever reached a body:
-//   1. PIXEL DENSITY — one interior pixel is `INTERIOR_PX_SCALE` town pixels.
-//   2. WORLD SCALE — an interior tile is NOT a quarter of a town tile of ground. The library
-//      authors furniture against it in the dimensions furniture actually has: a bed is 1×2, a
-//      table 1×1, a chair 1×1. ONE INTERIOR TILE IS ONE METRE OF FLOOR, where a town tile is
-//      a whole corner of a house's plot. Going through a door is a zoom in the WORLD, not only
-//      in the pixels.
-// The renderer multiplied a body by (1) alone, so it kept the town's body-to-tile ratio inside
-// a room whose tile means something else entirely. Nothing showed it while the furniture was
-// resampled to the town's own scale; Option C drew the furniture at its authored size and the
-// disagreement became the picture.
+// Going indoors is TWO changes, not one: pixel density (`INTERIOR_PX_SCALE` town px to one
+// interior px) AND world scale — one interior tile is ONE METRE of floor, where a town tile is
+// a whole corner of a plot. A body scaled by density alone comes out taller than the wall.
 
-/** ★ ONE METRE OF HEIGHT, IN INTERIOR PIXELS. In a 2:1 dimetric the vertical edge of a unit
- *  cube projects to exactly the tile's own height, so the room's height scale is not a taste
- *  call: it is `INTERIOR_TILE.h`. It is corroborated by the only two authored things in the
- *  room that have a known real size — the 160 px wall is 2.5 m, which is a cottage wall, and
- *  a 1×2 bed's 2-tile run is 2 m, which is a bed. */
+/** One metre of height, in interior px. In a 2:1 dimetric the vertical edge of a unit cube
+ *  projects to exactly the tile's own height, so this is `INTERIOR_TILE.h` and not a taste
+ *  call — corroborated by the 160 px wall (2.5 m) and a 1×2 bed's 2-tile run (2 m). */
 export const INTERIOR_PX_PER_M = INTERIOR_TILE.h
 /** A grown townsperson, standing. */
 export const ADULT_HEIGHT_M = 1.7
@@ -128,21 +86,9 @@ export function slotToTile(slot: Slot, room: Size = ROOM_TILES, slots: Size = CI
 }
 
 /**
- * ★ WHERE INSIDE ITS OWN BLOCK A PIECE SITS — and the room's furniture stops being scattered.
- *
- * THE GAP THE USER REACTED TO: the room "is nowhere near as nice as expected", and part of that
- * is that it is a warehouse. The template says the chair belongs with the table — their slots
- * are (1,1) and (1,2), adjacent — and the mock draws them together. The product drew them TWO
- * TILES APART, because every piece took the same corner of its own block: a block is two tiles
- * deep, so two adjacent slots land two tiles apart however close the world says they are.
- *
- * `SLOT_ORIGIN_OFFSET` was the only answer to "where in the block", and it is the same answer
- * for every piece. This is the other half of it, and it is still derived from world data: a
- * piece sits on the side of its own block that its neighbour's slot is on. No per-kind
- * coordinate table — the arrangement is still the slots', which is what the world owns.
- *
- * Only the depth axis, because only the depth axis is short: a block is FOUR tiles across, so
- * two pieces side by side already read as a pair, and it is two tiles deep, where they do not.
+ * Where inside its own block a piece sits: on the side its neighbour's slot is on, so two
+ * adjacent slots do not land two tiles apart. Only the depth axis — a block is four tiles
+ * across, where two pieces side by side already read as a pair, and two deep, where they do not.
  */
 export function seatInBlock(
   slot: Slot, others: readonly Slot[], room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS,
@@ -159,12 +105,8 @@ export const inRoom = (t: Tile, room: Size = ROOM_TILES): boolean =>
 
 // ── THE TWO WALLS, AND THE TWO FACINGS THEY PRESENT ──────────────────────────────────────
 //
-// ★ TASK 2, AND IT IS A TYPE FIX. The room used to decide which wall a `placement: 'wall'`
-// furnishing hangs on with `slot.x > slot.y`, and NOTHING anywhere said which way the piece
-// then faces. That is how a fireplace authored facing SW came to be mounted on the wall whose
-// face points SE — the mismatch the user saw. A wall's face has exactly one direction, so it
-// is named here, once, in `TownFacing` — the project's two-facing law. NE and NW are
-// unauthored and are therefore not in the type, so no placement can ask for one.
+// A wall's face has exactly one direction, so it is named here once, in `TownFacing`. NE and NW
+// are unauthored and are therefore not in the type, so no placement can ask for one.
 
 export const WALL_KINDS = ['back-left', 'back-right'] as const
 export type WallKind = (typeof WALL_KINDS)[number]
@@ -174,9 +116,8 @@ export type WallKind = (typeof WALL_KINDS)[number]
 export const WALL_FACING = { 'back-left': 'se', 'back-right': 'sw' } as const satisfies
   Record<WallKind, TownFacing>
 
-/** The wall a tile is against, or `null` when it touches neither. A wall furnishing in a tile
- *  that touches no wall is a PLACEMENT ERROR and reads as one, rather than hanging in the air
- *  on whichever wall an arbitrary comparison picked. */
+/** The wall a tile is against, or `null` when it touches neither — a wall furnishing in a tile
+ *  that touches no wall is a PLACEMENT ERROR and reads as one, not as art hanging in the air. */
 export function wallOfTile(t: Tile): WallKind | null {
   if (t.y === 0) return 'back-right'
   if (t.x === 0) return 'back-left'
@@ -187,35 +128,12 @@ export function wallOfTile(t: Tile): WallKind | null {
 export const alongWall = (wall: WallKind, t: Tile): number =>
   wall === 'back-right' ? t.x : t.y
 
-/**
- * A `placement: 'wall'` furnishing either STANDS at the foot of its wall — a hearth, a dresser:
- * masonry or joinery that reaches the ground — or HANGS on the wall face above it, like a shelf
- * or a lantern. The room hung all of them, which is what put a fireplace halfway up a wall.
- *
- * ★ HANDED BACK: `InteriorMeta` has no field for this, so the answer lives here as one table
- * rather than being guessed per piece. It belongs in the library manifest beside `placement`.
- */
+/** A `placement: 'wall'` piece either STANDS at the foot of its wall — masonry or joinery that
+ *  reaches the ground — or HANGS on the face above it. `InteriorMeta` has no field for this. */
 export const WALL_PIECES_THAT_STAND: ReadonlySet<string> = new Set(['hearth', 'dresser'])
 
-/**
- * ★ A BODY IN A BED IS ON THE MATTRESS, NOT ON THE FLOORBOARDS UNDER IT.
- *
- * A body is anchored at its FEET, and its feet are on the ground it stands on — which is right
- * everywhere except inside a furnishing you get INTO. At the old, wrong body scale a sleeper
- * stuck out well above the bed and the error was invisible under a much larger one. At the
- * room's real scale she is the right size and disappears: anchored on the floor, almost all of
- * her lands behind the bed's own front half, and the browser shows a bed with a sliver of hair
- * at one end of it.
- *
- * Measured off the shipped art in the running app: the bed's mattress surface is 44 px above
- * the near vertex of the ground it stands on, and the chair's seat 34. Lifting a body by that
- * puts her head and shoulders clear of the blanket and the rest of her under it, which is what
- * a person in a bed looks like.
- *
- * ★ HANDED BACK: `InteriorMeta` has no field for the height of the surface a piece offers —
- * the same gap `WALL_PIECES_THAT_STAND` names, and it belongs in the library manifest beside
- * `placement`. Until it does, it lives here as one table, total over the 'in' kinds.
- */
+/** How far above the ground's near vertex each piece's own surface sits, measured off the
+ *  shipped art: a body anchored at its feet would otherwise lie under a mattress, not on it. */
 export const FURNISHING_SEAT_PX: Readonly<Record<string, number>> = { bed: 44, chair: 34, bench: 30 }
 
 /** How far above the floor a body drawn INSIDE `kind` is lifted. 0 for anything else, so a
@@ -226,10 +144,7 @@ export const seatLiftPx = (kind: string | null): number =>
 // ── THE PIECES, AND THE MAP THEY MAKE ────────────────────────────────────────────────────
 
 /** A furnishing placed on the room map. `size` is in INTERIOR TILES, which is what the library
- *  manifest's `slots` has always meant: the forge sizes item art at `(w + h) × 64` px off the
- *  128 × 64 interior tile (`assetResolution.nativeSizeFor`), so a 1×2 bed is authored 192 px
- *  across. The renderer used to read the same field as 2×2-town-tile SLOTS and drew that art at
- *  twice its own resolution. */
+ *  manifest's `slots` has always meant — never 2×2-town-tile slots. */
 export type MapPiece = {
   kind: string
   tile: Tile
@@ -266,11 +181,8 @@ export type PieceInput = {
   flat?: boolean
 }
 
-/**
- * The room the furnishings make. A wall piece is pushed onto the wall its slot touches, so it
- * is part of the elevation rather than an object standing in front of one; its facing is the
- * wall's, by construction, which is the only way the art and the surface can agree.
- */
+/** The room the furnishings make. A wall piece is pushed onto the wall its slot touches and
+ *  takes that wall's facing by construction, so the art and the surface cannot disagree. */
 export function roomMapOf(
   inputs: readonly PieceInput[], room: Size = ROOM_TILES, slots: Size = CITY_INTERIOR_SLOTS,
 ): RoomMap {
@@ -331,11 +243,8 @@ export function standingTiles(map: RoomMap, p: MapPiece): Tile[] {
  *  town path break their ties the same way, so a body does not walk by two different laws. */
 const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [[0, -1], [-1, 0], [1, 0], [0, 1]]
 
-/**
- * The tiles a body steps through to get from `from` to `to`, excluding the tile it starts on.
- * `null` when no walk exists. Uniform-cost — a room floor is a room floor — so this is a
- * breadth-first search, and the frontier is expanded in NEIGHBOURS order for determinism.
- */
+/** The tiles a body steps through from `from` to `to`, excluding the start; `null` when no walk
+ *  exists. Uniform cost, so breadth-first, expanded in NEIGHBOURS order for determinism. */
 export function interiorPath(map: RoomMap, from: Tile, to: Tile): Tile[] | null {
   if (!isWalkable(map, from) || !isWalkable(map, to)) return null
   if (from.x === to.x && from.y === to.y) return []
@@ -368,20 +277,9 @@ export function interiorPath(map: RoomMap, from: Tile, to: Tile): Tile[] | null 
 // ── WHAT A BODY CAN DO WITH EACH PIECE ───────────────────────────────────────────────────
 
 /**
- * ★ THE HONEST LEDGER, AND ITS ONE UNCOMFORTABLE FACT: THE ENGINE HAS NO FURNISHINGS.
- *
- * `grep -rn furnishing packages/engine/src` returns nothing. Every verb that could plausibly
- * act on one addresses either a STRUCTURE (`sleep`, `stow`, `stoke`, `extinguish` — all
- * `{structureId}`) or an ITEM in hand (`kindle`, `snuff` — `{itemId}`). A body inside a
- * structure carries `insideId` and no interior position at all, so where it stands in the room
- * is the renderer's own truth and cannot yet be the world's.
- *
- * So `verb` here is the verb that comes CLOSEST, `via` is what it actually addresses, and
- * `needs` is the exact thing the engine would have to grow. Nothing in this file invents a
- * verb; a row with a `needs` is a gap handed back, not a feature half-built.
- *
- * `approach` is how a body relates to the piece once it has walked to a standing tile — the
- * same vocabulary `interiors.occupancyOf` already sorts depth by.
+ * The engine has no furnishings: every verb addresses a structure or a held item, and a body
+ * inside one carries `insideId` and no interior position. So `verb` is the CLOSEST verb that
+ * exists, `via` what it actually addresses, and `needs` the engine change still missing.
  */
 export type PieceAct = {
   kind: string

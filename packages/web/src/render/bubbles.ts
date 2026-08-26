@@ -60,15 +60,7 @@ export function wrapBubble(text: string, maxChars = WRAP_CHARS): string[] {
   return lines
 }
 
-/**
- * ★ TWO SPEAKERS STANDING TOGETHER USED TO COMPOSITE INTO ONE PILE (audit M8, carried in from
- * batch 5). Bubbles published their boxes to `scene.tags.setOccupied`, so a TOOLTIP knew to
- * avoid them and no bubble knew to avoid another bubble. `placeTag` is the product's one
- * placement rule and it already solves this; the only thing missing was calling it.
- *
- * Order is the layer's own arrival order, so the answer is deterministic and a bubble does not
- * jump about while the one beside it is dying.
- */
+/** De-conflicts the whole live set through `placeTag` in the layer's own arrival order, so a bubble does not jump about while the one beside it is dying. */
 export function placeBubbles(
   want: ReadonlyArray<{ id: string; sx: number; sy: number; size: { w: number; h: number } }>,
   view: Rect,
@@ -234,12 +226,8 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       // that does not know about the bubble beside it is the pile the user saw.
       const want = bubbles.map((b, i) => {
         const a = state!.agents[b.agentId]!
-        // ★ OVER THE BODY, NOT OVER THE RECORD'S TILE. `anchorOf` is where the character layer
-        // actually DREW this person a moment ago — its interpolated step, and its place in the
-        // rank when it is one of several sharing a tile. Reading `a.x, a.y` put every bubble of
-        // a crowd on one point and pointed every tail at a person who was not there; it also
-        // left a walker's bubble sitting on the tile behind them for the length of a leg. The
-        // character layer ticks before this one, so the anchor is this frame's.
+        // Over the BODY, not the record's tile: `anchorOf` carries the interpolated step and the
+        // crowd rank. The character layer ticks before this one, so the anchor is this frame's.
         const at = scene.anchorOf?.(b.agentId) ?? null
         const { sx, sy } = at === null ? tileToScreen(a.x, a.y) : { sx: at.x, sy: at.y }
         const drift = b.isThought ? (THOUGHT_DRIFT_PX * (nowMs - b.bornMs)) / (b.dieMs - b.bornMs) : 0
@@ -260,7 +248,6 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         }
         boxes.push(at.rect)
       }
-      // audit M8: a tag and a bubble used to composite into an unreadable pile
       scene.tags.setOccupied(boxes)
     },
     destroy: () => {

@@ -4,24 +4,9 @@ import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { roadAutotile } from '@sj/shared'
 import { ROAD_TILE_ID, resolveTerrainTile, roadNeighborsAt } from './tileset.js'
 
-// ★ THE PAINTED GROUND, AS A PREDICATE — AND WHY IT IS NOT THE CULL'S AABB.
-//
-// A row of flat untextured rectangles was standing on the void past the bottom-right edge of
-// the stage. They are the ambient layer's tree canopies, and the reason nothing caught them is
-// that no test ever asked whether a thing the renderer draws is ON THE GROUND.
-//
-// The obvious place to ask is `cull.ts`, which already computes an exact drawn AABB. It is the
-// wrong instrument, and that is measured rather than asserted: of the 140 decoration quads the
-// genesis world places, **38 leave the painted ground and 0 leave the field's AABB**. The AABB
-// is the bounding box of a DIAMOND, so its four corners are void by construction and a test
-// against it passes with the property broken — the same shape as every other guard this
-// project has had to kill. The cull's question is "does this reach the VIEW", which is a
-// different question that happens to share a rectangle.
-//
-// So the law is asked of the field's own geometry, read back rather than re-invented:
-// `tilesetPlan` lays one diamond per tile over the whole w×h lattice, and `tileToScreen`
-// returns a tile's TOP vertex — so tile (x, y) covers the unit square [x, x+1] × [y, y+1] in
-// continuous tile space, and the painted field is exactly [0, w] × [0, h].
+// Not the cull's AABB: that is a DIAMOND's bounding box, whose corners are void by construction,
+// and its question is "does this reach the VIEW". `tileToScreen` returns a tile's TOP vertex, so
+// the painted field is exactly [0, w] × [0, h] in continuous tile space.
 
 /** The continuous inverse of `tileToScreen`. `screenToTile` rounds to a tile; this does not,
  *  because a quad's corner lands between tiles and the rounding is what hides an overhang. */
@@ -32,9 +17,7 @@ export function screenToTileF(sx: number, sy: number): { fx: number; fy: number 
 
 export type ScreenRect = { x0: number; y0: number; x1: number; y1: number }
 
-/** How far a screen rectangle reaches past the painted ground, in TILES. `<= 0` is inside;
- *  `0` means it touches the edge exactly. Every corner is tested, because a diamond's edge is
- *  diagonal and the corner that leaves first is not the one nearest the map's centre. */
+/** How far a screen rectangle reaches past the painted ground, in TILES; `<= 0` is inside. Every corner is tested: a diamond's edge is diagonal, so the first to leave is not the nearest. */
 export function groundOverhangTiles(
   terrain: { length: number; [i: number]: { length: number } }, r: ScreenRect,
 ): number {
@@ -118,9 +101,8 @@ export function tilesetPlan(terrain: TileId[][], records: AssetRecord[]): TilePl
       // flat road variants stay the fallback when no autotiled strip is in the codex.
       const autotile = id === ROAD_TILE_ID ? roadAutotile(roadNeighborsAt(terrain, x, y)) : null
       const { manifest, url, overlay } = resolveTerrainTile(records, id, x, y, autotile)
-      // A ribbon drawn INSTEAD of the ground shows the stage through its own transparency —
-      // half of a straight run is a hole. The road is painted to meet GRASS at its edges
-      // (roadTiles.ts strokes exactly that seam), so grass is what goes underneath it.
+      // A ribbon drawn INSTEAD of the ground shows the stage through its own transparency. The
+      // road is painted to meet GRASS at its edges, so grass is what goes underneath it.
       let base: TileLayer | null = null
       if (overlay) {
         const under = resolveTerrainTile(records, GRASS_TILE_ID, x, y)

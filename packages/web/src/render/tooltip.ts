@@ -6,18 +6,6 @@ import { createWorldLabel } from './worldLabel.js'
 // bubbles.ts — bubbles.ts now needs `placeTag` from here, and an alias is not worth a cycle
 import { SPEECH_FILL as BUBBLE_FILL, SPEECH_INK as BUBBLE_INK, faceFor, worldTextScale } from './textFaces.js'
 
-// TOOLTIPS THAT LAND WHERE THEY POINT (U10, plan task 74).
-//
-// There were FOUR different rules for where a label goes and none of them agreed:
-// `sprite.y − sprite.height` for the shared tag (which, for a base-anchored 1.85× building
-// sprite, is somewhere above the roof and to nobody's knowledge where), `door.y − DOOR_H`
-// for the door, a third rule for per-body tags, and nothing at all for the viewport — a tag
-// on a screen-edge sprite was simply drawn off-screen. Nothing de-conflicted either, so a tag
-// and a speech bubble composited into an unreadable pile (audit M8). And because a destroyed
-// sprite never fires `pointerout`, a tag could outlive the thing it named.
-//
-// One rule, one owner, one place to change it.
-
 export const TAG_FONT_PX = faceFor('label').size
 export const TAG_LINE_H = Math.max(WORLD_TEXT_LINE_H, TAG_FONT_PX + 2)
 export const TAG_PAD_X = 5
@@ -29,9 +17,7 @@ export const TAG_MAX_CHARS = 48
 export const TAG_GAP_PX = 6, EDGE_PAD_PX = 8, STACK_STEP_PX = 4
 export const MAX_STACK_STEPS = 3
 
-/** Where a label is pointing, in the same world space the label is drawn in. `sy` is the
- *  anchor's BASE (its feet, or the ground the building stands on) and `topY` the top of what
- *  is actually DRAWN, which for a building is the top of its 1.85× sprite. */
+/** Where a label points. `sy` is the anchor's BASE and `topY` the top of what is DRAWN. */
 export type Anchor = { sx: number; sy: number; halfW: number; topY: number }
 export type Rect = { x: number; y: number; w: number; h: number }
 export type Placed = { sx: number; sy: number; side: 'above' | 'below' | 'left' | 'right' }
@@ -41,11 +27,8 @@ const overlaps = (a: Rect, b: Rect): boolean =>
 
 const clamp = (v: number, lo: number, hi: number): number => (lo > hi ? lo : Math.min(Math.max(v, lo), hi))
 
-/**
- * ONE rule for every label in the product. Prefers above-centre; flips below when the anchor's
- * top is too near the top of the view; falls to the side when neither fits; slides
- * horizontally to stay inside; and steps clear of anything already occupying its place.
- */
+/** The one placement rule: above-centre, else below, else to a side, clamped into the view and
+ *  stepped clear of anything already there. */
 export function placeTag(
   a: Anchor, size: { w: number; h: number }, view: Rect, occupied: readonly Rect[] = [],
 ): Placed {
@@ -79,12 +62,8 @@ export function placeTag(
   return { sx: rect.x + size.w / 2, sy: rect.y, side: chosen.side }
 }
 
-/**
- * The anchor for a sprite, from the sprite's DRAWN bounds rather than from a rule per caller.
- * A building is anchored at its base and overhangs upward by ~1.85×, which is exactly why the
- * old `sprite.y − sprite.height` landed above the roof: it subtracted the whole sprite height
- * from a point that is already the bottom of it.
- */
+/** The anchor for a sprite, from its DRAWN bounds — a sprite's `y` is already its base, so
+ *  subtracting the full height gives the top rather than the middle. */
 export function anchorForSprite(
   sprite: { x: number; y: number }, bounds: { width: number; height: number },
 ): Anchor {

@@ -39,9 +39,8 @@ const TOWN: S[] = [
 const worldOf = (list: S[]): WorldState =>
   ({ structures: Object.fromEntries(list.map((s) => [s.id, s])) }) as unknown as WorldState
 
-/** A placeable name whose subject is a small building standing where the name points. Every
- *  call site has to name a subject now: a plate that does not know what it labels cannot be
- *  kept off it, and that omission is exactly how the legend came to cover the map. */
+/** A placeable name whose subject is a small building standing where the name points. Every call
+ *  site has to name a subject: a plate that does not know what it labels cannot be kept off it. */
 const mk = (
   id: string, sx: number, sy: number, size: { w: number; h: number },
 ): PlaceableMark => ({ id, sx, sy, size, of: [{ x: sx - 16, y: sy - 32, w: 32, h: 40 }] })
@@ -134,20 +133,17 @@ describe('the label type floor', () => {
   })
 })
 
-// ★ CARRY-IN FROM BATCH 5. At the overview stop "the storehouse", "the well", "the houses" and
-// "the fire pit" all landed within a few pixels of each other and composited into one smear —
-// the same audit-M8 fault that was fixed for tag-vs-bubble and never applied here. `placeTag`
-// is the product's one placement rule and it already knows how to step clear.
+// At the overview stop four place names landed within a few pixels of each other and composited
+// into one smear. `placeTag` is the product's one placement rule and it already knows how to
+// step clear.
 describe('two place names never land on each other', () => {
   const VIEW = { x: 0, y: 0, w: 800, h: 600 }
   const overlaps = (a: Rect, b: Rect): boolean =>
     a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
-  // This used to assert all four were placed. It cannot any more, and the reason is the fix:
-  // four names pointing at ONE building, which is itself keep-out now and holds one plate's
-  // worth of clear ground inside a leash of itself. The three that cannot be that building's
-  // caption are dropped instead of marching off across the map. Separation is the law; the
-  // count never was — and the count is exactly what the old picture's stack satisfied.
+  // Not all four are placed, and that is the fix: four names point at ONE building, which is
+  // itself keep-out and holds one plate's worth of clear ground. Separation is the law; the
+  // count never was, and the count is what the old picture's stack satisfied.
   it('separates the names that ask for the same point, and drops the ones with no room', () => {
     const size = { w: 120, h: 22 }
     const placed = placeLandmarks(
@@ -193,25 +189,13 @@ describe('a place name is legible over any ground, in both light bands', () => {
   })
 })
 
-// ★ WHAT THE BROWSER CAUGHT AND THE CONTRAST TEST DID NOT. The plate measured 15.02:1 as a
-// MATERIAL and then the layer drew it at `RANK_ALPHA` 0.75 over grass, at a camera stop whose
-// own `landmarkAlpha` was 0.5 — so the number the test proved was never the number on screen.
-// It is the same fault as quoting a bubble's ratio without the night tint: a ratio belongs to
-// a viewer, and alpha is a de-emphasis channel whose ratio is unknowable at the call site.
-// ★ WHAT THE BROWSER CAUGHT AT THE NEW WIDEST STOP. The camera lane added 0.25, and there the
-// eleven-building town is 320 px across while six counter-scaled plates are 140 px each — the
-// legend covered the map it explains, stacked into a column taller than the settlement. A name
-// is a legend for a view in which you can still see the place; below that the town is a shape.
 // ── ★ A NAME FOR A PLACE THAT IS NOT ON SCREEN ────────────────────────────────────────────
 //
 // `placeTag` CLAMPS every plate into the visible rect and then steps it clear of the plates
-// already there — which is right for a tag whose subject is on screen and catastrophic for one
-// whose subject is not. Handed every landmark in a town that does not fit the viewport, it
-// drags all of them into the view and stacks them into a column: a wall of names for places
-// the viewer cannot see, hiding the few that are actually there. It is also O(n²) in a number
-// that now grows without bound.
-//
-// A place name belongs to a place. If the place is off screen, so is its name.
+// already there — right for a tag whose subject is on screen, catastrophic for one whose subject
+// is not: handed every landmark in a town that does not fit the viewport it drags all of them
+// into view and stacks them, hiding the few places that are actually there, O(n²) in a number
+// that grows without bound. A place name belongs to a place.
 
 describe('placeLandmarks culls to the view', () => {
   const VIEW = { x: 0, y: 0, w: 800, h: 600 }
@@ -251,40 +235,28 @@ describe('placeLandmarks culls to the view', () => {
   })
 })
 
-// ★★ WHAT TWO MORE BROWSER SESSIONS CAUGHT, WITH THE PREVIOUS FIX LIVE AND THE SUITE GREEN.
-//
-// The camera lane answered the covered map with a bottom end on `landmarkAlpha`: gone at 0.25,
-// full at 0.5. That is true of ONE town at ONE stop. At 0.5 the same eleven-building showcase
-// still put THE WELL, THE HOUSES, THE SQUARE and THE FIRE PIT into a stepped stack over the
-// square, the well and the fire pit — photographed by merge train 2 and again by this lane —
-// because `placeTag` stepped each plate clear of the other PLATES and of nothing else. And in
-// the other direction the ramp was wrong too: a four-ring town at 0.25 is 1056 px across and
-// has ample room for its names, and the hard-coded 0.25 would have hidden them anyway.
-//
-// So neither end is a zoom number. Both are geometry:
+// Neither end of the rule is a zoom number; both are geometry:
 //   1. a name is drawn only where it covers no named place and no other name;
 //   2. the legend as a whole is drawn only while its ink is a small share of the settlement's
 //      drawn area ON SCREEN — the one quantity that moves with the zoom AND with the town.
-// The tests below assert those two relationships over ring counts and zoom stops, never a
-// plate count and never a scale.
+// The tests below assert those two relationships over ring counts and zoom stops, never a plate
+// count and never a scale.
 
 describe('★ the legend never covers the map it explains', () => {
   const VIEW = { x: -4000, y: -4000, w: 8000, h: 8000 }
   const overlaps = (a: Rect, b: Rect): boolean =>
     a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
-  /** THE TOWN A VIEWER OPENS — the grammar's own output at the showcase anchor, not a fixture
-   *  written beside it. Its six names and its 1136 × 520 drawn box are the numbers in the two
-   *  browser reports this rule answers. */
+  /** The grammar's own output at the showcase anchor, not a fixture written beside it — so the
+   *  town under test is the town a viewer opens. */
   const templateTown = (rings: number): S[] => {
     const a = anchorFor(rings)
     return makeCityTemplate(a, rings).structures.map((s, i) =>
       stand(`s${i}_${s.kind}`, s.kind, a.x + s.dx, a.y + s.dy, s.w, s.h))
   }
 
-  /** Every name the town derives, with the drawn box of what it names and a plate sized off
-   *  the face this product really sets it in. `size` is in WORLD units, as the layer computes
-   *  it: a plate counter-scales, so it holds a constant SCREEN size and grows as you zoom out. */
+  /** Every name the town derives, with the drawn box of what it names. `size` is in WORLD units,
+   *  as the layer computes it: a plate counter-scales, so it holds a constant SCREEN size. */
   const legendOf = (list: S[], zoom: number): PlaceableMark[] =>
     landmarksOf(worldOf(list)).map((m) => {
       const style = landmarkStyle(m.rank)

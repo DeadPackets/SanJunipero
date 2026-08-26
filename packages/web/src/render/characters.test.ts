@@ -304,11 +304,8 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
 })
 
 // ══════════════════════════════════════════════════════════════════════════════════════════
-// ★ THE WALK, DRIVEN THROUGH THE REAL LAYER
-//
-// `charAnim.test.ts` proves the rules. These prove the LAYER CALLS THEM — which is a different
-// claim, and the one a source scan can only gesture at. The book resolves a texture here, so
-// the posed cell actually reaches the sprite and the frame rectangle says which row is drawn.
+// THE WALK, DRIVEN THROUGH THE REAL LAYER
+// `charAnim.test.ts` proves the rules; these prove the LAYER CALLS THEM.
 // ══════════════════════════════════════════════════════════════════════════════════════════
 
 const NEEDS_WELL = { hunger: 90, energy: 90, warmth: 90, social: 90 }
@@ -344,9 +341,8 @@ describe('★ the layer walks each body at the record\'s pace, not a stopwatch\'
     movement: { baseTicksPerTile: 1, debuffTicksPerTile: 2 },
   }
 
-  // The layer reads the wall clock in `onEvents` (a socket message has no frame time) and the
-  // frame's own clock in `tick`. StageMount drives the second with `performance.now()`, so in
-  // the product they are ONE clock; the test makes that true by owning it.
+  // The layer reads the wall clock in `onEvents` and the frame's own clock in `tick`; StageMount
+  // drives the second with `performance.now()`, so in the product they are ONE clock.
   let clockMs = 0
   beforeEach(() => {
     clockMs = 0
@@ -596,13 +592,9 @@ describe('★ four people on one tile, through the real layer', () => {
   })
 })
 
-// ── ★ A MISSING CELL MUST NOT POINT A BODY THE WRONG WAY ──────────────────────────────────
-//
-// The landed draw path read the cell, and if it was not there it did NOTHING — `sprite.texture`
-// kept whatever was in it, which is the frame from the last time a cell WAS found, of whatever
-// facing the body was pointing then. A body that turned into a facing with a hole in its sheet
-// therefore walked on wearing the art for the direction it came from, silently, with no error
-// anywhere. `characterCell` degrades inside the facing instead (`charAnim.cellRowLadder`).
+// ── A MISSING CELL MUST NOT POINT A BODY THE WRONG WAY ────────────────────────────────────
+// Leaving `sprite.texture` alone keeps the last facing that HAD a cell, so `characterCell`
+// degrades inside the facing instead (`charAnim.cellRowLadder`).
 
 describe('characterCell degrades inside its own facing, never across one', () => {
   const CELLS = ['idle', 'contact-a', 'passing-a', 'contact-b', 'passing-b', 'sleep'] as const
@@ -653,18 +645,10 @@ describe('characterCell degrades inside its own facing, never across one', () =>
   })
 })
 
-// ── ★ FIVE ON ONE TILE ARE FIVE TARGETS, THROUGH THE REAL LAYER ───────────────────────────
-//
-// The rank is the picture the user asked for and picking has to match it. The bodies genuinely
-// OVERLAP — a 14 px pitch against 28 px of shoulder is what makes a group read as a group — so
-// "five targets" cannot mean five disjoint capsules. It means what it means in the picture:
-// for each of the five there is somewhere on screen where THAT body is the one in front, and
-// clicking there selects them.
-//
-// The pick below is Pixi's own rule restated: every capsule containing the point, resolved by
-// the FRONT-MOST, where front-most comes from `depthOrder` over the boxes the layer publishes —
-// the same call `layers.applyDepthOrder` makes to set the zIndex Pixi then hit-tests in. The
-// sort cannot disagree with the pixels because it is the sort that made the pixels.
+// ── FIVE ON ONE TILE ARE FIVE TARGETS, THROUGH THE REAL LAYER ─────────────────────────────
+// The bodies genuinely overlap — a 14 px pitch against 28 px of shoulder — so "five targets"
+// means each has somewhere on screen where it is front-most, by the same `depthOrder` that
+// made the pixels.
 
 function containsPoly(points: number[], px: number, py: number): boolean {
   let inside = false
@@ -682,9 +666,7 @@ type MockSpriteT = {
   scale: { x: number }
   hitArea: { points: number[] } | null
 }
-/** The test scene, seen through the one thing this suite needs of it: the published boxes and
- *  the nodes they belong to. `Scene.sortDepth` returns `void` in the product; the mock returns
- *  the entries, so the type has to be replaced rather than intersected. */
+/** `Scene.sortDepth` returns `void` in the product; the mock returns the entries, so the type has to be replaced rather than intersected. */
 type PickScene = Omit<Scene, 'sortDepth' | 'getZoom'> & {
   sortDepth: () => Array<{ box: DepthBox; node: MockSpriteT }>
   getZoom: () => number
@@ -700,9 +682,7 @@ describe('★ five people on one tile are five separate hit targets', () => {
     return s
   }
 
-  /** Pixi's pick, restated: the point is taken into the sprite's LOCAL space — which is what
-   *  divides the sprite scale back out of a hitArea — and the front-most capsule containing it
-   *  wins, where front-most is `depthOrder` over the boxes the layer publishes. */
+  /** Pixi's pick, restated: the point goes into the sprite's LOCAL space (dividing the sprite scale back out of the hitArea) and the front-most capsule containing it wins. */
   function pickAt(
     scene: PickScene, sx: number, sy: number,
   ): string | null {
@@ -720,9 +700,7 @@ describe('★ five people on one tile are five separate hit targets', () => {
     return best
   }
 
-  /** Which screen-x COLUMNS each body owns — the columns where it is the one in front
-   *  somewhere. A rank divides the pointer left to right, so this is the division that has to
-   *  survive; the height is free to take the floor because nobody stands above anybody. */
+  /** Which screen-x COLUMNS each body owns. A rank divides the pointer left to right, so the height is free to take the floor — nobody stands above anybody. */
   function ownedColumns(
     scene: PickScene,
   ): Map<string, { n: number; x0: number; x1: number }> {
@@ -755,17 +733,9 @@ describe('★ five people on one tile are five separate hit targets', () => {
     layer.destroy()
   })
 
-  // ★ THE PROPERTY THAT MAKES THIS NON-VACUOUS, AND MY FIRST VERSION DID NOT HAVE IT.
-  //
-  // "each of the five owns at least one pixel" PASSES with the cap deleted — measured, not
-  // guessed: uncapped at the 0.25 stop the five still own (1727, 3248, 140, 12758, 1998) world
-  // px² between them, because inflating five identical shapes about their own centroids leaves
-  // each of them a sliver somewhere. A guard that survives its own mutation is not a guard.
-  //
-  // What the cap actually protects is that A BODY'S TARGET NEVER REACHES OUTSIDE THE BODY.
-  // That is what "accurate hitbox" means, it is the property the floor is in tension with, and
-  // it is what the mutation destroys: uncapped at 0.25 the front body's columns run 137 wide
-  // against 28 px of shoulder, and every one of the extra ones is taken off a neighbour.
+  // "Each of the five owns at least one pixel" passes with the cap deleted: inflating five
+  // identical shapes about their own centroids leaves each of them a sliver somewhere. What the
+  // cap protects is that a body's target never reaches outside the body.
   it('★ no body\'s target reaches outside its own SHOULDERS, at any zoom stop', () => {
     for (const z of ZOOM_STOPS) {
       const scene = zoomableScene(z)

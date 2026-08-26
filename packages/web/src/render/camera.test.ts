@@ -17,9 +17,7 @@ import { boxInView, type ViewRect } from './cull.js'
 import { structureDepthBox, type DepthBox } from './depth.js'
 import { bigTown } from './bigTown.js'
 
-/** The AABB the renderer will actually paint — the cull's own margin plays no part in it.
- *  The same predicate `cull.test.ts` sweeps with, so the two cannot come to different
- *  answers about what "on screen" means. */
+/** The AABB the renderer will actually paint, margin excluded — the same predicate `cull.test.ts` sweeps with. */
 function drawnIntersectsView(b: DepthBox, v: ViewRect): boolean {
   return b.sx1 >= v.x && b.sx0 <= v.x + v.w && b.sy1 >= v.y && b.sy0 <= v.y + v.h
 }
@@ -35,10 +33,8 @@ function rng(seed: number): () => number {
   }
 }
 
-// ── ★ THE ZOOM: CONTINUOUS UNDER THE HAND, EXACT THE MOMENT IT LETS GO ────────────────────
-//
-// The landed rule is quoted here as a function, so the before-state is MEASURED rather than
-// remembered — one rung per 200 ms cooldown window, whatever the hand actually did.
+// ── THE ZOOM: CONTINUOUS UNDER THE HAND, EXACT THE MOMENT IT LETS GO ──────────────────────
+// The superseded rule, kept as a function so the before-state is measured rather than remembered.
 const LANDED_COOLDOWN_MS = 200, LANDED_STEP_DELTA = 120, LANDED_GAP_MS = 140, LANDED_MIN_DELTA = 8
 function landedLadder(events: ReadonlyArray<{ dy: number; at: number }>, from: number): number {
   const idx = (z: number): number => ZOOM_STOPS.indexOf(z as ZoomStop)
@@ -72,8 +68,6 @@ function gesture(
 }
 
 describe('★ the complaint, as a test — "zooming is very hard to control"', () => {
-  // Measured on the landed handler in the running page, 2026-08-24. Reproduced here against
-  // the landed RULE so the numbers do not depend on a browser being available.
   it('★ THE DEFECT: what the camera did depended on how LONG the gesture took, not how FAR', () => {
     // one trackpad gesture, 34 events, 322 px of deltaY — the SAME hand distance both times
     const shape = (i: number): number => -(i < 4 ? 2 + i * 3 : i < 24 ? 12 : Math.max(1, 12 - (i - 24) * 1.5))
@@ -114,10 +108,8 @@ describe('★ the complaint, as a test — "zooming is very hard to control"', (
   })
 
   it('A NOTCH ALWAYS MOVES, whatever that mouse calls a notch — the landed guarantee, kept', () => {
-    // The landed code learned the hard way that "one notch is 120" is a convention, not a
-    // fact: Chrome commonly reports 100 and some mice report 53. The guarantee is that a
-    // deliberate notch is never swallowed. It is `ZOOM_COMMIT_OCTAVES` that keeps it: 53 px
-    // is 0.24 of an octave, which nearest-stop alone would snap straight back.
+    // "One notch is 120" is a convention, not a fact: Chrome commonly reports 100 and some mice
+    // 53, which is 0.24 of an octave — nearest-stop alone would snap that straight back.
     for (const notch of [53, 100, 120]) {
       expect(gesture(2, 1, -notch, 0).state.stop, `in ${notch}`).toBe(3)
       expect(gesture(2, 1, notch, 0).state.stop, `out ${notch}`).toBe(1)
@@ -132,17 +124,14 @@ describe('★ the complaint, as a test — "zooming is very hard to control"', (
 
   it('★ A PINCH ZOOMS. The 40 px pinch that moved the camera NOT AT ALL now moves a rung', () => {
     // Chrome delivers a macOS trackpad pinch as a wheel event with ctrlKey and 1-3 px deltas.
-    // Against WHEEL_MIN_DELTA = 8 every one of those was a graze, and against
-    // WHEEL_STEP_DELTA = 120 a whole comfortable pinch was under the bar.
     const asPinch = gesture(1, 40, -1, 8, { pinch: true })
     expect(landedLadder(asPinch.events, 1)).toBe(1)              // the landed rule: NOTHING
     expect(asPinch.state.stop).toBe(2)                           // now: one rung in
   })
 
   it('★ and a PINCH is not a SCROLL — the same delta means more from a pinching hand', () => {
-    // The first version of this guard compared a 40 px pinch with a 40 px scroll and both
-    // landed on 2, because ZOOM_COMMIT_OCTAVES carries either one rung. It passed with the
-    // ctrlKey flag IGNORED ENTIRELY. Found by running the mutation, not by reading the test.
+    // 180 px, not 40: at 40 `ZOOM_COMMIT_OCTAVES` carries either one rung, so the guard would
+    // pass with the ctrlKey flag ignored entirely.
     expect(PINCH_PX_PER_OCTAVE).toBeLessThan(WHEEL_PX_PER_OCTAVE)
     const big = 180
     expect(gesture(1, big, -1, 6, { pinch: true }).state.stop).toBe(4)   // 2 octaves
@@ -242,16 +231,9 @@ describe('★ the resting frame is EXACT — P18 is untouched by a continuous ge
   })
 })
 
-// ── ★ WHAT A LONGER FRACTIONAL WINDOW DOES TO THE CULL AND THE SEAMS ──────────────────────
-//
-// The render lane's warning, taken seriously: a continuous zoom is the most likely way this
-// lane breaks something real, because the renderer's two scale-sensitive systems were only
-// ever asked to survive a fractional scale for the ~200 ms of an eased transit.
-//
-// THE CULL DOES NOT SEE THE ZOOM AT ALL, and that is the answer rather than an excuse. It is
-// handed a view RECTANGLE in world space — `viewRect()` divides the screen by the scale — and
-// it does float geometry against it. A fractional scale makes that rectangle a fractional
-// size, which is the same arithmetic on different numbers. Proved here rather than argued.
+// ── WHAT A LONGER FRACTIONAL WINDOW DOES TO THE CULL AND THE SEAMS ────────────────────────
+// The cull never sees the zoom: it is handed a view RECTANGLE in world space, so a fractional
+// scale is the same float arithmetic on different numbers. Proved here rather than argued.
 describe('★ the cull holds at every scale a gesture passes through', () => {
   const boxes = bigTown(2).map((s) => structureDepthBox(s.id, s))
   const STAGE_PX = { w: 1728, h: 824 }
@@ -289,10 +271,8 @@ describe('★ the cull holds at every scale a gesture passes through', () => {
   })
 
   it('★ a ground chunk lands on whole screen pixels at every one of those scales', () => {
-    // The render lane's mechanism 1 — the one that lets the global `roundPixels` round two
-    // neighbours by the same fraction — restored for the whole gesture, not just at rest.
-    // A chunk boundary sits at `n · CHUNK_PX_W · z` from the bake origin; if that is an
-    // integer for every n, every chunk carries the same fractional part and rounds alike.
+    // A chunk boundary sits at `n · CHUNK_PX_W · z` from the bake origin; if that is an integer
+    // for every n, every chunk carries the same fractional part and `roundPixels` rounds alike.
     let worst = 0
     for (let oct = -2; oct <= 2; oct += 1 / 64) {
       const z = quantiseScale(Math.pow(2, oct))
@@ -428,14 +408,12 @@ describe('every function is pure', () => {
   })
 })
 
-// ── TASK 76: the camera knows the edges, and there is a view of the whole town (U19, R8) ──
+// ── the camera knows the edges, and there is a view of the whole town ─────────────────────
 
 const terrainOf = (w: number, h: number): TileId[][] =>
   Array.from({ length: h }, () => Array.from({ length: w }, () => 0 as TileId))
 
-/** The task-59 town, rebuilt from the template at the gateway's showcase anchor — the same
- *  eleven buildings `occlusion.test.ts` measures U8 against, so the two agree by construction
- *  rather than by a pasted number. */
+/** The showcase town rebuilt from the template, so this and `occlusion.test.ts` agree by construction rather than by a pasted number. */
 const ANCHOR = { x: 8, y: 8 }        // gateway SHOWCASE_ANCHOR
 const TOWN = makeCityTemplate(ANCHOR).structures.map((s) => ({
   x: ANCHOR.x + s.dx, y: ANCHOR.y + s.dy, w: s.w, h: s.h,
@@ -548,9 +526,6 @@ describe('fitStop — a view of the whole thing, with a margin', () => {
   })
 })
 
-// A STAGE THAT CHANGES SIZE (batch 3 concern 6, controller ruling R4.2). Docking the control
-// bar to another edge, or opening a panel, resizes the stage; the landed observer re-CLAMPS and
-// stops there, so a viewer who asked for the whole town keeps a camera that no longer shows it.
 describe('resizeIntent — a resize keeps the view the viewer asked for', () => {
   // the bar moving from the bottom edge to the left edge: 56 px off the width, 56 px back on
   // the height, and the town no longer fits at the stop it was fitted to
@@ -588,11 +563,6 @@ describe('resizeIntent — a resize keeps the view the viewer asked for', () => 
   })
 })
 
-// ★ AND THE FLOOR IS NO LONGER A CONSTANT. `STAGE_FILL_MIN = 0.45` was a number nobody had
-// derived, and the generator lane proved it unreachable at 38.85 % on the real plotted town.
-// `stageFillFloor(box, stage)` is what replaced it — see the derivation in `camera.ts`. Every
-// assertion below that used to read `STAGE_FILL_MIN` now reads the floor for its OWN box, which
-// is what the sentence was always trying to say.
 describe('★ the fill floor is derived per town and per stage, because both terms are', () => {
   it('publishes the ceiling and the floor for the boxes this project measures', () => {
     const rows: Array<[string, typeof TOWN_DRAWN, { w: number; h: number }]> = [
@@ -659,11 +629,6 @@ describe('★ the fill floor is derived per town and per stage, because both ter
 })
 
 describe('stageFill — the number R8 is about', () => {
-  // ★ RE-MEASURED ON THE TOWN THE GRAMMAR GROWS. R8 was about a town so small on the stage
-  // that it read as a model on a table: eleven buildings in 576 × 376 px of drawing, 14.8 % of
-  // a 1728 × 880 stage. The block-and-plot lattice puts those same eleven across five blocks
-  // of a 19-tile pitch, so the drawing is now 1136 × 520 and the town fills 38.8 % — two and a
-  // half times the frame it had.
   it('THE R8 MEASUREMENT: the town the grammar grows fills two and a half times the frame', () => {
     expect(TOWN_BOX).toEqual({ minX: -528, maxX: 528, minY: 448, maxY: 840 })
     expect(TOWN_DRAWN).toEqual(drawnBoundsOf(TOWN))
@@ -673,12 +638,6 @@ describe('stageFill — the number R8 is about', () => {
       .toBeGreaterThan(2.5)
   })
 
-  // ★ AND THE LADDER IS NOW WHAT LIMITS IT, NOT THE CAMERA. The town wants 1.48× to fill the
-  // stage and the stops go 1, 2 — so the camera takes 1 and leaves 38.8 %. The flat 45 %
-  // `STAGE_FILL_MIN` this line used to read no longer exists: the render lane derived
-  // `stageFillFloor(box, stage)` per town and per stage in its place, and 38.8 % clears this
-  // town's own floor of 21.2 %. What is asserted is that the camera does the best the ladder
-  // allows, which is the part the town can be held to.
   it('takes the largest stop that fits, and no larger one does', () => {
     const at = fitStop(TOWN_DRAWN, STAGE)
     expect(at).toBe(1)
@@ -688,10 +647,8 @@ describe('stageFill — the number R8 is about', () => {
       .toBeGreaterThanOrEqual(stageFillFloor(TOWN_DRAWN, STAGE))
   })
 
-  // WHAT THE BROWSER CAUGHT: fitting the FOOTPRINT box rather than the drawing puts the camera
-  // a whole stop too close and cuts the roofs off the top and the right. The default stage no
-  // longer separates the two — the town outgrew it — so the claim is measured on the stage
-  // where it shows, which is what it was always about.
+  // Measured on a wider stage: the default one no longer separates footprint from drawing,
+  // because the town outgrew it.
   it('fitting the footprint instead of the drawing overshoots by a whole stop', () => {
     const WIDE = { w: 2400, h: 900 }
     expect(fitStop(TOWN_BOX, WIDE)).toBe(2)

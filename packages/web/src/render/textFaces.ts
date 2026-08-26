@@ -1,22 +1,5 @@
 import { BitmapFont } from 'pixi.js'
 
-/**
- * U18 — THE TOWN SPEAKS IN ITS OWN TYPEFACE, OUT OF A FRAME THAT BELONGS TO IT.
- *
- * Three defects, all measurable:
- *  1. Every world label asked for `fontFamily: 'monospace'`. The pixel faces were loaded, but
- *     no Pixi BitmapFont was ever installed, so the world spoke in the browser's default mono.
- *  2. A bubble was `roundRect(…, 4)` with a one-pixel stroke, while the chrome around it wore
- *     a whole nine-slice pixel-frame language.
- *  3. A thought was `alpha: 0.55` — de-emphasis by transparency, whose ratio is unknowable at
- *     the call site, on the one surface where legibility matters most.
- *
- * ★ WHICH FACE SAYS WHAT, and it is the opposite of what the names suggest. Silkscreen has NO
- * lowercase: "Hey Nadia" sets as HEY NADIA, so a town set in it would shout every sentence.
- * Press Start 2P has real lowercase. The pixel face therefore LABELS and the display face
- * SPEAKS.
- */
-
 /** Silkscreen — capitals only. Names, chips, the words on a slab. */
 export const FACE_PX = 'sj-px'
 /** Press Start 2P — has lowercase. Sentences people actually say. */
@@ -38,14 +21,8 @@ export const FACE_SIZES = [8, 16, 24] as const
  *  pixels and nothing is resampled. 8 would be crisper still and is under the 12px floor. */
 export const FACE_INSTALL_PX = 16
 
-/**
- * ★ THE BROADCAST MULTIPLIER: TWO, NOT 1.5. R2 needs a 22px source to survive the 0.25
- * downscale to a 480px player, and `FACE_INSTALL_PX` is 16. But these faces are nearest-sampled
- * off an atlas baked at the install size, so only a WHOLE multiple keeps one texel on one
- * pixel — 1.5 would give the town a caption with alternating one- and two-pixel strokes, which
- * is the resampling fault the whole nearest law exists to forbid. 32 on screen is 8.00px on the
- * player. Applied by `bubbles.ts` through `Scene.textScale`.
- */
+/** Two, not 1.5: the faces are nearest-sampled off an atlas baked at the install size, so only
+ *  a WHOLE multiple keeps one texel on one pixel. Applied through `Scene.textScale`. */
 export const BROADCAST_TEXT_SCALE = 2
 
 export const FACE_ROLES = ['name', 'speech', 'thought', 'label'] as const
@@ -62,16 +39,8 @@ export function faceFor(role: FaceRole): { family: string; size: number } {
   return ROLE_FACE[role]
 }
 
-/**
- * ★ THE CAMERA DOES NOT GET A VOTE ON HOW BIG A WORD IS.
- *
- * World labels live in world space, so the camera multiplied them: the same thought bubble was
- * 8 px of type at the 0.5x stop and 750 CSS px across at 3x. The landmark layer had quietly
- * solved this for itself years of tasks ago with a private `1 / world.scale`; nothing else had
- * a rule. Multiply a world label's node by this and the face is FACE_INSTALL_PX to the reader
- * at every stop — which also lands the atlas at one texel per screen pixel, so it is the crisp
- * answer as well as the legible one.
- */
+/** Multiply a world label's node by this and the face stays FACE_INSTALL_PX to the reader at
+ *  every zoom stop, which also lands the atlas at one texel per screen pixel. */
 export function worldTextScale(zoom: number): number {
   return Number.isFinite(zoom) && zoom > 0 ? 1 / zoom : 1
 }
@@ -99,11 +68,8 @@ export function facesInstalled(): boolean {
   return installed
 }
 
-/**
- * Two-line adapter with no logic (P6). Awaited before the scene is built; if the webfonts
- * never resolve the landed canvas glyphs remain and the world is still readable — a font that
- * fails to load must never blank the dialogue.
- */
+/** Awaited before the scene is built. Resolves even when the webfonts do not, so a font that
+ *  fails to load leaves canvas glyphs rather than blanking the dialogue. */
 export async function installFaces(doc: { fonts: FontFaceSet }): Promise<void> {
   if (installed) return
   try {
@@ -115,10 +81,8 @@ export async function installFaces(doc: { fonts: FontFaceSet }): Promise<void> {
         // white + no stroke, so ONE atlas serves every ink the world writes in (dynamicFill)
         style: { fontFamily: source, fontSize: FACE_INSTALL_PX, fill: 0xffffff },
         chars: CHARS,
-        // ★ Press Start 2P has `fi` and `fl` LIGATURES: the browser measures "fi" as one 16px
-        // em, so Pixi derives measure(fi) − measure(f) − measure(i) = −16 and stacks the `i`
-        // on the `f`. Uncorrected, the town said "the fsh are biting". Both faces are
-        // monospace, so there is no kerning worth deriving and this loses nothing.
+        // Press Start 2P has `fi`/`fl` ligatures, so Pixi derives a −16 kern and stacks the `i`
+        // on the `f`. Both faces are monospace, so skipping kerning loses nothing.
         skipKerning: true,
         resolution: 1,
         padding: 2,
@@ -190,12 +154,8 @@ export function tailPoly(side: BubbleSide, w: number, h: number): number[] {
 
 // ── the two materials ─────────────────────────────────────────────────────────────────────
 
-// ★ THE NIGHT TINT IS THE VIEWER'S, AND IT DECIDES THESE TWO VALUES.
-// `--ink` on cream is 10.2:1 as a MATERIAL and **4.41:1 to a viewer** under the deep-night
-// multiply — below AA on the surface where the town is literally speaking. The night ceiling
-// is 6.37:1 (black on white), and only three palette pairs clear AA inside it, so BOTH bubbles
-// take `--deep` and the difference between them is carried by the PAPER, the frame art and the
-// edge shape — never by a thinner ink, and never by alpha. Measured in legibility.ts.
+// Only three palette pairs clear AA under the deep-night multiply, so BOTH bubbles take
+// `--deep` and carry their difference in the paper and the edge shape, never in the ink.
 export const SPEECH_FILL = 0xfff6e9        // --cream:     15.02:1 day / 5.19:1 night
 export const SPEECH_INK = 0x241f2b         // --deep
 export const THOUGHT_FILL = 0xf6e8d5       // --parchment: 13.34:1 day / 4.67:1 night
@@ -205,9 +165,8 @@ export const BUBBLE_EDGE = 0x241f2b        // --deep, the stepped ledge under ev
 export const THOUGHT_SCALLOP_R = 3
 export const SCALLOP_COUNT = 3
 
-/** The three shrinking dots that trail from a thought toward its thinker. It points the same
- *  four ways the speech tail does, because a bubble that de-conflicts can end up on any side
- *  of the head and a trail that always ran downward would point at the wrong person. */
+/** The three shrinking dots that trail from a thought toward its thinker, pointing the same
+ *  four ways the speech tail does — a de-conflicted bubble can sit on any side of the head. */
 export function scallopTrail(
   side: BubbleSide, w: number, h: number,
 ): Array<{ cx: number; cy: number; r: number }> {

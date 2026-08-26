@@ -33,16 +33,8 @@ describe('rendererOptions (B1 — the canvas at the screen’s own resolution)',
 
 // ── THE LOAD-TIME TypeError R1 FORBIDS ────────────────────────────────────────────────────
 //
-// `TypeError: Cannot read properties of null (reading 'start')`, thrown at load from
-// `App.tsx`'s `scene.app.ticker.start()`. Reproduced in a FOREGROUNDED browser tab against
-// the running dev world: `scene.app.ticker` is a live Ticker, `scene.destroy()` runs, and
-// Pixi's `Application.destroy()` nulls the field — so the very next `.start()` throws.
-//
-// ★ IT IS NOT StrictMode. `main.tsx` renders `<App />` bare and StrictMode has never appeared
-// in this tree; the double-mount is Vite Fast Refresh remounting `StageMount`, whose effect
-// destroys the scene while React state upstream still points at it. The cause is the same
-// either way and so is the fix: React must never hold a dead scene, and the scene must not be
-// reached through `app.ticker` by anyone who cannot know whether it is still alive.
+// Pixi's `Application.destroy()` nulls `app.ticker`, so anyone holding a scene across a Fast
+// Refresh remount can call `.start()` on null.
 
 const WEB_SRC = resolve(fileURLToPath(new URL('.', import.meta.url)), '..')
 
@@ -96,9 +88,7 @@ describe('nobody outside the renderer reaches through app.ticker', () => {
 // ── the cull's one wire ───────────────────────────────────────────────────────────────────
 //
 // The type says `applyDepthOrder` takes a view; it cannot say the view is THIS FRAME'S. A rect
-// captured once at boot would typecheck, pass every unit test, and cull against a camera that
-// has since moved — the whole town would blink out the moment a viewer panned. That is the
-// green-suite-blank-screen failure this project keeps meeting, so the wire is scanned.
+// captured once at boot typechecks and culls against a camera that has moved, so it is scanned.
 
 describe('the frame culls against the camera it is actually looking through', () => {
   const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
@@ -120,23 +110,10 @@ describe('the frame culls against the camera it is actually looking through', ()
 
 // ── the throw, and the four things that outrank it ────────────────────────────────────────
 //
-// fling.ts is pure and fully tested; what it cannot test is that the scene ASKED. A glide left
-// running while a zoom captures its anchor, or while a follow is steering, is not a slow bug —
-// it is two owners writing the same position every frame.
+// fling.ts is pure and fully tested; what it cannot test is that the scene ASKED.
 
-/**
- * ★ ONE FUNCTION'S BODY, AND NOT ITS NEIGHBOUR'S.
- *
- * This read `src.slice(i, i + 420)`. Four hundred and twenty characters is longer than most of
- * the movers, so a short one's window spilled into whatever was declared next — and `panBy`,
- * `centerHome` and `setFollow` all sit in one list of camera writers that each begin with
- * `stopGlide()`. Caught while adding the fifth: with `travelTo`'s own `stopGlide()` DELETED,
- * "travelTo stops it" still passed, on the line belonging to the function below it. A guard
- * that can be satisfied by its neighbour is not a guard, and this one was one deletion away
- * from being discovered by a viewer instead of by a test.
- *
- * A body now ends where its indentation says it ends.
- */
+/** One function's body, ending where its indentation says it ends — a fixed-length window
+ *  spilled into the neighbouring mover, which begins with the same `stopGlide()`. */
 export function functionBody(src: string, name: string): string {
   const i = src.indexOf(name)
   if (i < 0) return ''
@@ -173,13 +150,6 @@ describe('a glide is ended by anything that says where the camera should be', ()
     expect(src).not.toMatch(/Math\.abs\(dx\) \+ Math\.abs\(dy\) >/)
   })
 
-  // ★ THE STAGE'S SCREEN-SIZED SQUARE IS THE THIRD GROUND SQUARE, AND IT HAS A SECOND JOB.
-  //
-  // The tap on it turned the pointer into a TILE, which was the pointer's tile and not the
-  // clicked thing's — the open defect on a shoulder rank, where a body is drawn up to 1.3
-  // tiles from the tile the record puts it on. What is retired is that claim. The hit area
-  // itself STAYS: drag-to-pan, the fling and the wheel-zoom anchor are all stage handlers and
-  // every one of them needs a target under the pointer.
   it('★ a tile pick means the pointer landed on the GROUND, not on a body or a building', () => {
     expect(body("app.stage.on('pointertap'")).toContain('e.target !== app.stage')
   })
@@ -207,11 +177,8 @@ describe('a glide is ended by anything that says where the camera should be', ()
 
 // ── ★ THE GESTURE MUST BE RELEASED, OR THE CAMERA NEVER RESTS ON AN EXACT STOP ────────────
 //
-// The pure rules are proved in `camera.test.ts`, but a pure rule nobody calls is a decoration.
-// The END of a wheel gesture is the ABSENCE of an event: no handler fires to notice it, so the
-// release lives on the frame. Delete that one line and the camera holds whatever fractional
-// scale the hand left it at, forever — every texture off the pixel grid, P18 broken, and a
-// green suite. That is precisely the failure this lane must not introduce.
+// The end of a wheel gesture is the ABSENCE of an event, so the release lives on the frame;
+// without it the camera holds whatever fractional scale the hand left it at.
 describe('★ the wheel gesture is released on the frame, so the resting frame stays exact', () => {
   const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
   const body = (name: string): string => functionBody(src, name)
@@ -247,12 +214,8 @@ describe('★ the wheel gesture is released on the frame, so the resting frame s
 
 // ── ★ THE MINIMAP DOES NOT OPEN A FIFTH DOOR ONTO THE CAMERA ──────────────────────────────
 //
-// Four things already outrank a running throw, and each does the same four steps in the same
-// order. A minimap that wrote `world.position` itself, or that called `centerOnScreen` without
-// the other three, would be a way to move the camera that skips every guard the camera lane
-// proved bites — and it would look right in the browser until the day somebody clicked the map
-// while a throw was still in the air. So the ONE new mover is asserted to be the same shape as
-// the four, in order, and the chrome is scanned for anyone reaching past it.
+// A mover that wrote `world.position` itself would skip every guard, and would look right in
+// the browser until somebody clicked the map while a throw was still in the air.
 
 describe('going somewhere from the map takes the same road as going home', () => {
   const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
@@ -289,18 +252,6 @@ describe('going somewhere from the map takes the same road as going home', () =>
     expect(offenders).toEqual([])
   })
 
-  // ★ THE CAMERA MOVED AND NOTHING WAS TOLD.
-  //
-  // `onCamera` is how every surface off the canvas learns the view changed — the place-name
-  // cull, the bar's stop readout, and now the rectangle on the map. Four of the ways the camera
-  // moves never fired it: a DRAG (`pointermove` places and returns), a FOLLOW (`followTick`
-  // places every frame), a RESIZE, and `panBy` — the arrow keys. Only the zoom, the throw, the
-  // fit and `centerHome` announced themselves, which is why nothing had noticed: those four are
-  // the ones the landed chrome happened to depend on.
-  //
-  // There is exactly one writer of the camera's position and it already exists, because "every
-  // write goes through the clamp" was the task-76 rule. So the announcement belongs THERE, and
-  // then it cannot be forgotten by a fifth mover that has not been written yet.
   it('★ the one writer of the camera position is the one that announces it', () => {
     expect(src.match(/world\.position\.set\(/g), 'more than one camera writer').toHaveLength(1)
     const p = functionBody(src, 'function place(')

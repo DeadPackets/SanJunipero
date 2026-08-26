@@ -4,9 +4,8 @@ import {
   FURROW_SPACING_TILES, HEADLAND_COLOR, KERB_COLOR, furrowLines, patchOutline,
 } from './patches.js'
 
-// The forge's 40-colour master palette (packages/forge/src/palette.ts). @sj/web cannot import
-// it — forge pulls sharp and better-sqlite3 — so it is restated here, the same way
-// importantFeed.ts restates its own subset, and every colour below must be a member.
+// The forge's 40-colour master palette (packages/forge/src/palette.ts), restated because
+// @sj/web cannot import forge — it pulls in sharp and better-sqlite3.
 const MASTER_PALETTE = [
   0xfff6e9, 0xf6e8d5, 0xe8d5bc, 0xd4bc9e, 0xb89d7e,
   0xf2c879, 0xe0a95e, 0xc68a48, 0xa66e38, 0x7e512b,

@@ -62,9 +62,8 @@ export function StageMount(
     let offInterior: (() => void) | null = null
     let offEvents: (() => void) | null = null
     let tickFn: (() => void) | null = null
-    // The town's faces are installed BEFORE the scene exists, so the first label a viewer
-    // sees is already a bitmap glyph. If the webfonts never resolve, installFaces resolves
-    // anyway and worldLabel keeps drawing canvas glyphs — a font must never blank the world.
+    // Faces install before the scene exists so the first label drawn is already a bitmap
+    // glyph; installFaces resolves even when the webfonts never do.
     void installFaces(document).then(() => createScene(rootEl, store)).then((s) => {
       if (disposed) {
         s.destroy()
@@ -73,7 +72,7 @@ export function StageMount(
       scene = s
       const book = new TextureBook()
       const openDoor = (structureId: string): void => {
-        s.tags.hideAll()   // a destroyed sprite never fires pointerout (audit M8)
+        s.tags.hideAll()   // a destroyed sprite never fires pointerout
         interiorRef.current?.setActive(structureId)
       }
       landmarks = createLandmarkLayer(s, store)

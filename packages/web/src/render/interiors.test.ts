@@ -122,9 +122,8 @@ describe('INTERIOR_LAYOUTS and roomFurnishings', () => {
     expect(house.map((f) => f.kind)).toEqual(['bed', 'hearth', 'table', 'chair', 'rug'])
     expect(roomFurnishings('storehouse').map((f) => f.kind))
       .toEqual(['shelf', 'shelf', 'crate', 'crate', 'barrel'])
-    // The town plan no longer stands a shed, so the room falls back to INTERIOR_LAYOUTS —
-    // which is what that fallback is for. The plan's `tools` is still the library's anvil
-    // (interiorMeta's declared alias).
+    // The town plan no longer stands a shed, so the room falls back to INTERIOR_LAYOUTS. The
+    // plan's `tools` is still the library's anvil — interiorMeta's declared alias.
     expect(roomFurnishings('shed').map((f) => f.kind)).toEqual(['anvil', 'crate'])
     expect(roomFurnishings('cabin').map((f) => f.kind)).toEqual(['hearth', 'bench', 'crate'])
     for (const kind of INTERIOR_KINDS) {
@@ -171,9 +170,8 @@ describe('bedSlots', () => {
     const slots = bedSlots('house', ['amara', 'yusuf'])
     expect(Object.keys(slots).sort()).toEqual(['amara', 'yusuf'])
     expect(slots['amara']).not.toEqual(slots['yusuf'])
-    // the bed sits at (2,1) and is 1×2, so its cells are (2,1) and (2,2)
-    // INTERIOR TILES now, not template slots: `slotToTile` puts slot (2,1) on tile (9,2) and
-    // the bed is 1x2, so the second sleeper takes the tile behind the first.
+    // INTERIOR TILES, not template slots: `slotToTile` puts slot (2,1) on tile (9,2), and the
+    // bed is 1x2, so the second sleeper takes the tile behind the first.
     expect(slots['amara']).toEqual(slotToTile({ x: 2, y: 1 }))
     expect(slots['yusuf']).toEqual({ x: 9, y: 3 })
   })
@@ -254,7 +252,7 @@ describe('advanceInterior', () => {
   })
 })
 
-// ── TASK 67: furniture that touches the floor, and bodies that lie IN the bed (U4) ────────
+// ── furniture that touches the floor, and bodies that lie IN the bed ────────
 
 const im = (over: Partial<InteriorMeta> = {}): InteriorMeta => ({
   slots: { w: 1, h: 1 }, placement: 'floor', interiorKinds: ['house'], ...over,
@@ -390,12 +388,8 @@ describe('furniture stands on its own ground', () => {
   })
 })
 
-// WHAT THE BROWSER CAUGHT: the room drew library furniture at NATIVE size and bodies at
-// CHAR_TARGET_PX, so a sleeper was three times the length of the bed he was lying in.
-// ★ AND THEN THE LIBRARY SHIPPED AT 128 AND THE FACTOR WAS POINTING THE WRONG WAY. These three
-// assertions were written for 24 px art and each one encoded that as a law. They are re-stated
-// against the size the art is actually authored at, not weakened to let a number through:
-// the factor is still ONE whole number for the whole room, it is now a divisor.
+// The factor is ONE whole number for the whole room. These assertions were written for 24 px
+// art; they are re-stated against the size the art is actually authored at, not weakened.
 describe('furnishingScale — one room, one scale', () => {
   it('is the whole-number factor between the authored tile and the ground it lands on', () => {
     expect(furnishingDivisor()).toBe(1)
@@ -406,14 +400,9 @@ describe('furnishingScale — one room, one scale', () => {
     expect(LIBRARY_TILE_PX * furnishingScale()).toBe(INTERIOR_TILE.w)
   })
 
-  // ★ THIS ASSERTION WAS GREEN WHILE THE SLEEPER WAS HALF AGAIN THE LENGTH OF HIS BED.
-  //
-  // It divided the bed's INTERIOR sprite width by 4 to compare it with a body's TOWN height —
-  // the exact conflation of the pixel factor with the world factor that caused the defect —
-  // and then bounded the answer between 0.5 and 1.5, which is wide enough to hold both the bug
-  // and the fix. The relationship it was reaching for is real, so it is re-stated in the space
-  // the viewer actually sees, in `interiorScale.test.ts`. What survives here is the part that
-  // is genuinely about `furnishingScale`: the bed's sprite covers its own ground and no more.
+  // What survives of an older assertion that divided the bed's INTERIOR sprite width by 4 to
+  // compare it with a body's TOWN height: the part genuinely about `furnishingScale`, that the
+  // bed's sprite covers its own ground and no more. The rest is in `interiorScale.test.ts`.
   it('puts a bed on exactly the ground a bed covers', () => {
     const bedSpanPx = (BED_FOOTPRINT.w + BED_FOOTPRINT.h) * (INTERIOR_TILE.w / 2)
     expect(bedSpanPx).toBe(192)                                      // what the library authors
@@ -456,19 +445,12 @@ describe('contactShadow — nothing floats', () => {
   })
 })
 
-// ── ★ THE CABIN, AND WHY THIS ROOM AND NOT ANOTHER ONE FIRST ─────────────────────────────
+// ── ★ THE CABIN ──────────────────────────────────────────────────────────────────────────
 //
-// `world-fixes` proved the ENGINE's half of this walk and this lane does not re-prove it:
-// `searchPath` from all five founders' doorsteps and from the storehouse door, every route
-// `capped: false`, the body walked tile by tile, `enter`, warmth asserted UNCHANGED indoors,
-// then `stoke`, then warmth up by exactly `2 x warmth.fireWarmth`.
-//
-// What it could not prove is that any of it is on screen, and its own report says so: *"a mind
-// can feed a fire the viewer cannot see."* The cabin holds the founding valley's ONLY reachable
-// indoor fire, so it is the room that makes the whole chain visible, and it is first for that
-// reason and no other.
-//
-// THIS IS THE VIEWER'S HALF: that the room a body walks into is the room the engine says it is.
+// The engine's half of this walk is proved next door; what that could not prove is that any of
+// it is on screen. The cabin holds the founding valley's ONLY reachable indoor fire, so it is
+// the room that makes the chain visible. This is the viewer's half: that the room a body walks
+// into is the room the engine says it is.
 describe('★ the cabin is a room, and it is the room the engine says it is', () => {
   const HEARTH = libraryRecord('hearth', {
     slots: { w: 1, h: 1 }, placement: 'wall', interiorKinds: ['house'],
@@ -482,9 +464,8 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
   })
   const RECORDS = [HEARTH, BENCH, CRATE]
 
-  // The same assembly `interiorScene.layoutRoom` runs: the plan becomes a room map, and a wall
-  // furnishing goes on its wall. Written out rather than imported because the scene builds it
-  // inside a Pixi closure — the pieces are these three lines and nothing else.
+  // The same assembly `interiorScene.layoutRoom` runs. Written out rather than imported because
+  // the scene builds it inside a Pixi closure.
   const mapFor = (kind: InteriorKind): RoomMap => roomMapOf(
     roomPlan(kind, RECORDS).map((i) => ({
       kind: i.kind, slot: i.slot, size: i.meta?.slots ?? { w: 1, h: 1 },
@@ -531,10 +512,8 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
     expect(walkableCount(map)).toBeGreaterThan(0)
   })
 
-  // ★ THE TWO HALVES AGREE. Over every kind the viewer draws a room for, what the room CONTAINS
-  // is what the recipe row SAYS it contains. A room that draws a fire the config denies is a
-  // fire nobody can stoke; a room that omits one the config promises is `world-fixes`' defect
-  // coming back through the renderer.
+  // Over every kind the viewer draws a room for, what the room CONTAINS is what the recipe row
+  // SAYS it contains: a room that draws a fire the config denies is a fire nobody can stoke.
   it('★ the fire in the room is the fire in the config, over every room there is', () => {
     for (const kind of INTERIOR_KINDS) {
       const kinds = mapFor(kind).pieces.map((p) => p.kind)
@@ -550,16 +529,9 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
     expect(beds.length).toBeLessThan(INTERIOR_KINDS.length)
   })
 
-  // ★ FOUND BY EYE, IN THE RUNNING APP, ON THE ONE FIRE THIS LANE EXISTS TO MAKE VISIBLE.
-  //
   // The room's glow was a child of the furnishing's own sprite, and `placeFurniture` returns
-  // early for any kind the tileset draws as a wall elevation — the chimney breast IS the hearth,
-  // so no object is drawn as well, which is right. But the hearth is the ONLY elevated kind that
-  // provides light, so `providesLight` was computed and then discarded for exactly the hearths
-  // that reach the screen. The suite was green and the cabin's fireplace was cold.
-  //
-  // It is not fixable in the art: `wall-chimney` is authored as "a warm-grey stone chimney breast
-  // … with a mantel and soot above the opening" — a chimney, correctly, and no fire.
+  // early for any kind the tileset draws as a wall elevation. The hearth is the ONLY elevated
+  // kind that provides light, so its glow was computed and then discarded.
   it('★ a fire the WALL draws is still a fire the room has to light', () => {
     const map = mapFor('cabin')
     const fire = map.pieces.find((p) => p.kind === 'hearth')!
@@ -610,24 +582,12 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
   })
 })
 
-// ── ★ THE DESIGN QUESTION OF THIS LANE, AS A LAW ─────────────────────────────────────────
+// ── ★ A SHARED ROOM AND A PRIVATE ROOM ───────────────────────────────────────────────────
 //
-// `world-fixes` made the farmhouse a real rung: HALF THE FUEL PER BODY-NIGHT (0.375 against a
-// house's 0.75), bought by giving up the one thing `structures.privateKinds` names. If a viewer
-// cannot tell the two rooms apart, that trade is invisible and the ladder is a spreadsheet.
-//
-// THE ANSWER: THE ROOM SAYS IT WITH THE BED COUNT, AND THE COUNT IS NOT CHOSEN.
-//
-//   · a PRIVATE dwelling lays ONE bed. A house sleeps two and shows one, because the two are a
-//     couple — `reproductionSystem` counts a night only under a roof in `privateKinds`, and
-//     `bedSlots` already lays a partnered pair down one cell each in a single bed.
-//     ONE BED IS WHAT PRIVACY LOOKS LIKE.
-//   · a SHARED dwelling lays ONE BED PER BODY — `roomCapacity`, the same `floor(w x h / 2)` the
-//     ladder is priced on. A cottage shows three, a farmhouse four. Nobody chose anybody.
-//
-// The seat says it a second time: a house has a CHAIR, which seats one; the shared dwellings
-// have a BENCH, which seats whoever sits down. And no rug in a shared room — a rug is a comfort
-// somebody owns.
+// The bed count is not chosen. A PRIVATE dwelling lays ONE bed — `reproductionSystem` counts a
+// night only under a roof in `privateKinds`, and `bedSlots` lays a partnered pair down one cell
+// each in a single bed. A SHARED dwelling lays one bed per body, out of `roomCapacity`, the same
+// `floor(w x h / 2)` the ladder is priced on.
 describe('★ a shared room and a private room, and the difference is the ladder', () => {
   const beds = (kind: InteriorKind): number =>
     roomFurnishings(kind).filter((f) => f.kind === 'bed').length

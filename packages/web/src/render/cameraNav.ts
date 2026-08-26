@@ -22,9 +22,7 @@ export function cameraActionFor(key: string): CameraAction | null {
   }
 }
 
-/** One step along `ZOOM_STOPS` (task 75). The keyboard, the bar's buttons and the wheel all
- *  come through here, so `+` and one notch mean exactly the same thing. A camera caught
- *  mid-transit is snapped to the stop it is nearest before stepping. */
+/** One step along `ZOOM_STOPS` for keyboard, bar and wheel alike; a camera caught mid-transit snaps to its nearest stop first. */
 export function stepZoom(current: number, dir: 1 | -1): ZoomStop {
   return stepStop(nearestStop(current), dir)
 }

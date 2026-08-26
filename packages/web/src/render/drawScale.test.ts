@@ -9,34 +9,20 @@ import { BUILDING_PX_PER_TILE } from './textures.js'
 import { TILE_W } from './iso.js'
 
 /**
- * ★ THE GATE THE CODEX CANNOT SEE.
+ * Coverage proves a record exists; this proves the art reaches the screen at a whole-number
+ * downscale of its authored size.
  *
- * The art lane shipped 100 item records and 5 cast rigs and its coverage gate stayed green
- * through a defect that made every one of them draw wrong, because that gate reads the CODEX:
- * it asks whether a record exists, which it did. This one reads the RENDERER, and asks the only
- * question the codex cannot answer — **does the art reach the screen at a whole-number downscale
- * of the size it was authored at?**
- *
- * THE LAW, AT THE LEVEL IT ACTUALLY HOLDS. A sprite's WORLD size must be its authored size
- * divided by a whole number. The zoom is then an integer stop on top, which is the camera's own
- * law and not this one — `assetResolution.ts` is written to exactly this rule (`CHAR_FIGURE_PX =
- * 52 * 4` exists to make `CHAR_TARGET_PX / figureH` come out at 1/4, and `buildingCellPx` does
- * the same for a building), so this file holds the renderer to the authority the forge already
- * publishes rather than to a number invented here.
- *
- * WHY THE AUTHORED SIZES ARE READ OFF DISK. They live in `packages/forge/src/assetResolution.ts`
- * and `packages/forge/src/reCell.ts`, and `@sj/web` does not depend on `@sj/forge`. Restating
- * them here would be two constants free to drift apart in silence, which is the whole shape of
- * the defect this gate exists for. Every read asserts that it MATCHED, so a rename turns this
- * red instead of quietly measuring nothing.
+ * The authored sizes are read off `packages/forge/src` at runtime because `@sj/web` cannot
+ * depend on `@sj/forge` — a restated constant would drift in silence, which is the defect this
+ * gate is for. Every read asserts it matched.
  */
 
 const FORGE = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../forge/src')
 
 function forgeNumber(file: string, name: string): number {
   const src = readFileSync(resolve(FORGE, file), 'utf8')
-  // `52 * BUILDING_ZOOM_STOP` is one of these, and the product is the point — a literal 156
-  // would satisfy the arithmetic while losing the reason, so the reference is followed.
+  // `52 * BUILDING_ZOOM_STOP` is one of these: a literal 156 would satisfy the arithmetic while
+  // losing the reason, so the reference is followed.
   const m = new RegExp(`export const ${name}\\s*=\\s*([0-9]+)(?:\\s*\\*\\s*([A-Z_][0-9A-Z_]*))?`).exec(src)
   expect(m, `${name} is no longer declared in forge/src/${file}`).not.toBeNull()
   const base = Number(m![1])
@@ -71,9 +57,7 @@ const spanOn = (w: number, h: number, tileW: number): number => (w + h) * (tileW
 
 type Row = { klass: string; authoredPx: number; drawnPx: number; where: string }
 
-/** Every class of art the renderer draws, with the size it is authored at and the size the
- *  renderer gives it in WORLD px. Read from the live constants, so a constant that moves moves
- *  this table with it. */
+/** Every class of art the renderer draws, authored size against WORLD px — read from the live constants, so a constant that moves moves this table with it. */
 function drawTable(): Row[] {
   const rows: Row[] = [
     {
@@ -144,9 +128,7 @@ describe('★ every item and every cast cell reaches the screen at a whole-numbe
   }
 
   it('the world item lands 1:1 at the deepest zoom stop, as the cast already does', () => {
-    // This is what the whole-number rule BUYS: at the stop a viewer looks closest at, no
-    // resampling happens at all. It is why `CHAR_FIGURE_PX` is `52 * 4` and not some other
-    // number, and the item now shares the reason rather than merely the arithmetic.
+    // What the whole-number rule buys: at the stop a viewer looks closest at, nothing resamples.
     expect(WORLD_SPRITE_PX / ITEM_PX).toBe(BUILDING_ZOOM_STOP)
     expect(CHAR_FIGURE_PX / CHAR_TARGET_PX).toBe(BUILDING_ZOOM_STOP)
   })
@@ -159,10 +141,8 @@ describe('★ every item and every cast cell reaches the screen at a whole-numbe
   })
 })
 
-// ★ OPTION C RETIRED THE DIVISOR. It was 2 against a scene zoom of 4 — a composite of 2, so
-// every 128 px library sprite was pixel-DOUBLED by the camera on its way to the glass. The
-// room's unit is now the interior tile the art is already authored against, at a scene zoom of
-// 1, so the factor is 1 and nothing in the room is resampled at all.
+// The room's unit is the interior tile the art is authored against, at a scene zoom of 1, so
+// the factor is 1 and nothing in the room is resampled.
 describe('★ the room draws library art at NATIVE size — no upscale and no downscale', () => {
   it('the divisor is the authored tile over the tile the room lays it on, and it is one', () => {
     expect(LIBRARY_TILE_PX).toBe(INTERIOR_TILE.w)

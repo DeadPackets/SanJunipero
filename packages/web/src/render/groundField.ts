@@ -15,19 +15,9 @@ for (const [id, k] of Object.entries(TILE_KIND) as Array<[string, TerrainTileKin
   if (!ID_OF_KIND.has(k)) ID_OF_KIND.set(k, Number(id) as TileId)
 }
 
-// TERRAIN V2 — user directive 2026-08-17: "why are they not high fidelity textures? You
-// should have just generated a square and placed it on the grid. It also looks unsettling to
-// have a checkerboard texture on the city, I want a natural normal distribution."
-//
-// The old ground stamped one 32x16 diamond PER TILE and picked between four variants with a
-// per-tile hash. Both halves of that are the complaint: a 32x16 stamp cannot carry fidelity,
-// and a per-tile choice puts a visible pattern at exactly tile frequency — the checkerboard.
-//
-// The ground is now a CONTINUOUS FIELD. One high-resolution seamless material per terrain is
-// laid across the whole map in WORLD SPACE, and each tile is a window onto it: the material
-// flows across tile boundaries, so there is no stamp to see and nothing varies at tile
-// frequency. A tile contributes only its SHAPE, to the mask that decides where its terrain
-// shows. Roads keep their autotile silhouettes — as mask shapes now, not as baked art.
+// The ground is a CONTINUOUS FIELD: one seamless material per terrain laid across the whole map
+// in WORLD SPACE, with each tile contributing only its SHAPE to the mask. A per-tile stamp would
+// vary at exactly tile frequency, which the eye reads as a checkerboard.
 
 export const MATERIAL_REPEAT_PX = 256   // must match the forge's MATERIAL_PX
 
@@ -38,17 +28,9 @@ export function materialUv(sx: number, sy: number, repeat: number = MATERIAL_REP
 }
 
 // ── U6: two periods that never line up ──────────────────────────────────────────────────────
-//
-// Terrain v2 removed TILE-frequency pattern and introduced MATERIAL-frequency pattern in its
-// place: every ground shape was filled with `{ texture, matrix: new Matrix() }`, an identity
-// matrix, so one 256px material tiled on an axis-aligned 256px lattice across the whole map.
-// The eye finds a 256px grid as easily as a 32px one.
-//
-// Two fixes, both to WHERE the material is sampled — the geometry never moves, so nothing in
-// the world shifts. First, each ground layer gets its own small rotation and offset, derived
-// from its id so two runs agree. Second, each layer is filled a second time with the same
-// material at an incommensurate scale and low alpha: two periods whose least common multiple
-// exceeds the map cannot produce a visible lattice.
+// An identity matrix tiles one 256px material on an axis-aligned lattice, and the eye finds a
+// 256px grid as easily as a 32px one. Both fixes move only WHERE the material is sampled, so no
+// geometry shifts: a per-layer rotation and offset, and a second fill at an incommensurate scale.
 
 /** Bounded and auditable: a layer's rotation is drawn from this set by index, never rolled. */
 export const MATERIAL_ROTATIONS_DEG: readonly number[] = [0, 7.5, -5, 12]
@@ -120,10 +102,8 @@ export function latticePeak(
   return d === 0 ? 0 : Math.max(0, cov / d)
 }
 
-// What the GROUND cares about in the codex. `assetsSeq` counts every asset that has ever
-// arrived, so with the library ingested (50 items = 100 records) a bed sprite landing was
-// re-baking the whole map. Only terrain records can change the ground, and records are
-// append-only, so counting them is a complete signature and costs one pass.
+// What the GROUND cares about in the codex: `assetsSeq` counts every asset that has ever arrived,
+// so a bed sprite landing would re-bake the map. Records are append-only, so a count is complete.
 export function groundArtSignature(records: AssetRecord[]): number {
   let n = 0
   for (const r of records) if (r.class === 'terrain' && r.status === 'ready') n++
@@ -163,12 +143,8 @@ export type GroundField = {
 
 export const ROAD_UNDER: TerrainTileKind = 'grass'
 
-// TERRAIN V2.1: the plaza cobble is right at plaza scale and reads as a noisy stone-string on
-// a 16px ribbon. So a road tile draws from one of two materials, and the rule for which is the
-// simplest one that actually separates a wide area from a one-tile-wide run: a tile is MASS if
-// it belongs to any fully-road 2x2 block. Every tile of a plaza does, including its edges and
-// corners; no tile of a 1-wide run ever does, not even where two runs cross, because each 2x2
-// there still contains a diagonal of grass.
+// A tile is MASS if it belongs to any fully-road 2x2 block: every tile of a plaza does, edges
+// and corners included, and no tile of a 1-wide run ever does, not even at a crossing.
 export const CALM_ROAD_KIND = 'road-calm'
 
 export function isRoadMass(terrain: TileId[][], x: number, y: number): boolean {
@@ -259,11 +235,8 @@ export function roadStripFrame(key: RoadAutotileKey, keys: readonly RoadAutotile
 }
 
 // ── road silhouettes as SHAPES over the continuous material ─────────────────────────────
-// C13's strip painted each junction as finished art. In a continuous field the road surface
-// comes from the material like every other ground, and a key contributes only its outline:
-// a stub at the tile centre plus one arm per direction the road actually continues in. The
-// arms are read from the key NAME, the same rule roadTiles.ts paints from — the isolated
-// tile and the south stub share `cap-s`, and only the name tells them apart.
+// A key contributes only its outline: a stub at the tile centre plus one arm per direction the
+// road continues in, read from the key NAME — an isolated tile and a south stub share `cap-s`.
 
 export const ARM_HALF_W = 5 / 32          // half-width of an arm, in tile-space units
 export const ARM_DIRS = { n: [0, -1], e: [1, 0], s: [0, 1], w: [-1, 0] } as const
@@ -284,29 +257,14 @@ export function roadArms(key: RoadAutotileKey): Record<ArmDir, boolean> {
 const toScreen = (dx: number, dy: number): [number, number] =>
   [(dx - dy) * (TILE_W / 2), (dx + dy) * (TILE_H / 2) + TILE_H / 2]
 
-// A road needs a rim where it meets grass, and NOWHERE ELSE. Growing the whole silhouette
-// about the tile centre put a dark wedge at every tile's side corners — perpendicular to the
-// run, once per tile — which is precisely what read as "disconnected cobble islands with
-// grass gaps". Measuring the spine of a 20-tile run proved the surface was continuous all
-// along; the banding was the shoulder, not the road.
-//
-// So the rim is drawn only on the sides that face a MISSING arm: each present arm's two side
-// edges are shared with an adjacent quadrant, and only the ones whose neighbour is absent get
-// a wedge. On a straight run that is the two long sides and nothing at the joins.
+// A road needs a rim where it meets grass and NOWHERE else, so the wedge is drawn only on sides
+// facing a MISSING arm — a rim at a join reads as a gap between cobble islands.
 export const SHOULDER_T = 0.26            // how far into the arm the rim reaches
 export const ROAD_SHOULDER = 0xb89d7e     // v1's own ROAD_EDGE, a MASTER_PALETTE member
 
 // ── U5: a road you can see from the widest view ─────────────────────────────────────────────
-//
-// MEASURED from the shipped 256px materials: grass reads 0.4186 mean relative luminance and
-// road reads 0.5066 — a delta of 0.088, so at scale 1 a one-tile ribbon is 32x16 px of a
-// near-flat average that lands within a few luma points of the grass beside it. The single
-// shoulder colour above is WORSE: 0xB89D7E is 0.3581, only 0.060 from the grass. That is the
-// whole mechanism of "roads read ghost-faint at 1x".
-//
-// The fix is an EDGE, not a repaint — the art is generated and P11 forbids tinting it. The rim
-// wedge is split across its depth into two palette tones, so the ribbon carries a hard edge at
-// any zoom: dark where the shoulder meets the road, light where it meets the ground.
+// Grass and road differ by 0.088 of mean relative luminance, so a one-tile ribbon reads faint at
+// scale 1. The art is generated and may not be tinted, so the rim wedge is split into two tones.
 
 /** WCAG-style relative luminance of a packed 0xRRGGBB colour, 0..1. */
 export function luma(rgb: number): number {
@@ -389,11 +347,7 @@ export function roadShoulderPolys(key: RoadAutotileKey): number[][] {
       .flatMap(([dx, dy]) => toScreen(dx, dy)))
 }
 
-/**
- * The same rim, in two tones across its depth. `light` is the outer strip, against the ground;
- * `dark` is the inner strip, against the road. Both are subdivisions of the wedge above, so
- * they inherit its "only on edges facing a missing arm" rule and stay inside their own tile.
- */
+/** The same rim in two tones across its depth: `light` outer against the ground, `dark` inner against the road, both subdivisions of the wedge above. */
 export function roadShoulderBands(key: RoadAutotileKey): { dark: number[][]; light: number[][] } {
   const split = SHOULDER_T * (1 - SHOULDER_SPLIT)
   const dark: number[][] = [], light: number[][] = []
@@ -406,15 +360,7 @@ export function roadShoulderBands(key: RoadAutotileKey): { dark: number[][]; lig
   return { dark, light }
 }
 
-/**
- * Polygons covering one road cell, in screen coords relative to the tile's TOP VERTEX.
- *
- * This reproduces what roadTiles.ts PAINTS, which is not a narrow band: the painter fills the
- * whole diamond and then removes the outer wedge of every quadrant the key has no arm for. So
- * a present arm owns its entire QUADRANT — half the tile for a straight run — and only the
- * central core survives in the directions the road does not continue. A narrow-band version
- * of this made roads read as faint dotted ribbons at 1x.
- */
+/** Polygons covering one road cell, relative to the tile's TOP VERTEX. A present arm owns its whole QUADRANT — half the tile for a straight run — because a narrow band reads as a dotted ribbon at 1x. */
 export function roadRibbonPolys(key: RoadAutotileKey): number[][] {
   const c = ARM_HALF_W
   // the core stub, always kept, so an isolated tile is still a piece of road

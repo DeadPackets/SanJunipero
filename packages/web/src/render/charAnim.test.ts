@@ -110,22 +110,16 @@ describe('legFacing', () => {
     expect(legFacing([])).toBeNull()
   })
 
-  // ★ AND NULL FOR A LEG OF NO LENGTH. `scheduleLeg`'s catch-up branch anchors the queue on the
-  // body's interpolated position AT THIS INSTANT, and that position lands exactly on the next
-  // waypoint whenever the compression factor is 1 — at which point the leg has zero delta.
-  // `facingFrom` used to answer `se` for that, so a body caught up mid-walk turned to face the
-  // bottom-right of the screen for a frame whichever way it was actually going.
+  // `scheduleLeg`'s catch-up branch anchors on the body's position at this instant, which lands
+  // exactly on the next waypoint at compression factor 1 — a real leg of zero delta.
   it('★ is null for a zero-length leg, instead of naming a direction', () => {
     expect(legFacing([wp(2, 2), wp(2, 2, 100)])).toBeNull()
   })
 })
 
-// ── ★ EVERY DIRECTION OF TRAVEL, THROUGH THE PIPELINE THE PRODUCT ACTUALLY RUNS ───────────
-//
-// `facingFrom` is unit-tested against the projection in `iso.test.ts`. This is the other half:
-// that a body walked through `scheduleLeg` → `prunePath` → `legFacing` → `charPose` comes out
-// pointing the way it is going, on every leg, including the pure-depth diagonals the two-axis
-// engine reaches by taking two cardinal legs in a row, and including a corner turn.
+// ── EVERY DIRECTION OF TRAVEL, THROUGH THE PIPELINE THE PRODUCT ACTUALLY RUNS ─────────────
+// `iso.test.ts` unit-tests `facingFrom` against the projection; this is the other half, the
+// whole `scheduleLeg` → `prunePath` → `legFacing` → `charPose` queue.
 
 describe('a body walked through the queue points where it is going', () => {
   const LEGS: Array<[string, number, number]> = [
@@ -154,9 +148,8 @@ describe('a body walked through the queue points where it is going', () => {
     expect(walk([[dx, dy], [dx, dy], [dx, dy]])).toEqual([EXPECT[name], EXPECT[name], EXPECT[name]])
   })
 
-  // ★ PURE DEPTH. The engine's paths are four-neighbour (`engine/src/path.ts` NEIGHBORS), so a
-  // body travelling +dx +dy does it as alternating cardinal legs — and THAT is where the two
-  // facings must not flap between a front view and a back view frame to frame.
+  // The engine's paths are four-neighbour, so +dx +dy is walked as alternating cardinal legs —
+  // which is where the two facings must not flap between a front and a back view.
   it('★ crosses a pure-depth diagonal toward the camera without turning its back', () => {
     expect(walk([[1, 0], [0, 1], [1, 0], [0, 1]])).toEqual(['se', 'sw', 'se', 'sw'])
   })
@@ -273,8 +266,7 @@ describe('character hit area + name tag', () => {
 })
 
 // ══════════════════════════════════════════════════════════════════════════════════════════
-// ★ THE WALK — "janky, don't feel smooth, and all the characters walk at the EXACT same
-//   jumpy pace." Two complaints, two causes, and neither of them is the one the brief guessed.
+// THE WALK
 // ══════════════════════════════════════════════════════════════════════════════════════════
 
 const ENGINE_SRC = readFileSync(
@@ -282,9 +274,7 @@ const ENGINE_SRC = readFileSync(
 const SHARED_CONFIG_SRC = readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'shared', 'src', 'config.ts'), 'utf8')
 
-// ── the LANDED scheduler, restated so the before-state is measured and not remembered ──────
-// characters.ts, as it was: glide = clamp(now - lastMoveArrival, 200, 4000), appended with
-// max(now, last.atMs) + glide.
+// ── the superseded scheduler, restated so the before-state is measured, not remembered ─────
 const LANDED_GLIDE_MIN = 200, LANDED_GLIDE_MAX = 4000
 type Body = { path: Waypoint[]; lastMoveArrival: number; legMs: number }
 
@@ -295,13 +285,7 @@ function landedPush(b: Body, x: number, y: number, nowMs: number): void {
   b.lastMoveArrival = nowMs
 }
 
-/**
- * One walk, played at 60 fps, reported as the two things a viewer feels: how far behind the
- * record the body is drawn, and how much its own speed swings from frame to frame.
- *
- * `stillMsBefore` is the thing that broke the landed version: a body that had been standing
- * still for four seconds spent four seconds on its first tile, and the excess never drained.
- */
+/** One walk played at 60 fps, reported as the two things a viewer feels: how far behind the record the body is drawn, and how much its own speed swings frame to frame. */
 type Window = { maxLagTiles: number; p10: number; p90: number; spread: number }
 function replay(opts: {
   tickMs: number; tiles: number; stillMsBefore: number; jitterMs?: number; landed: boolean
@@ -380,11 +364,8 @@ describe('★ B1 — positions WERE interpolated; the jank was the schedule', ()
   })
 
   it('★ the record-driven schedule stays inside its own buffer, at every tick rate', () => {
-    // THE STATED TRANSIENT: the renderer cannot know the world's rate until two batches have
-    // arrived, so the first leg is scheduled against the declared 2500 ms default. Once the
-    // clock has a measurement the queue is COMPRESSED rather than merely capped, and the debt
-    // drains inside one leg. Both windows are asserted, because hiding the transient behind a
-    // loose bound would be the same as not measuring it.
+    // The renderer cannot know the world's rate until two batches have arrived, so the first leg
+    // goes against the declared default; both the transient and the settled window are asserted.
     const rows: string[] = []
     let worstAll = 0, worstSettled = 0
     for (const tickMs of [120, 400, 1000, 2500]) {
@@ -398,12 +379,8 @@ describe('★ B1 — positions WERE interpolated; the jank was the schedule', ()
     }
     // eslint-disable-next-line no-console
     console.log('LAG BEHIND THE RECORD, tiles\n  ' + rows.join('\n  '))
-    // ★ THE BOUND IS ON TIME, AND IT IS STRUCTURAL: `scheduleLeg` never lets the tail sit more
-    // than `legMs + leadMs` ahead of now, which is two ticks. Tiles are what a viewer counts,
-    // so they are reported — but the number asserted here is derived from the schedule rather
-    // than fitted to the measurement. Observed tile lag runs a little over two while a
-    // compression is draining, because two ticks of TIME can briefly hold more than two tiles
-    // of distance; it is bounded by the same construction and it never accumulates.
+    // The bound is on TIME and it is structural: `scheduleLeg` never lets the tail sit more than
+    // `legMs + leadMs` ahead of now, so two ticks of time can briefly hold over two tiles.
     expect(worstSettled).toBeLessThanOrEqual(3)
     expect(worstAll).toBeLessThanOrEqual(3)
     // and the landed version, over the same walk, was ten and still growing
@@ -488,9 +465,7 @@ describe('the tick clock — measured, not assumed', () => {
 
 describe('scheduleLeg — the queue can never run away from the world', () => {
   it('★ compressing the queue never MOVES the body — the position at this instant is kept', () => {
-    // the guarantee is not that a timestamp survives; it is that nothing jumps. A queue that
-    // has fallen behind is squeezed toward now, and the frame it is squeezed on must draw the
-    // body exactly where the frame before drew it.
+    // the guarantee is not that a timestamp survives; it is that nothing jumps
     const p: Waypoint[] = [{ x: 0, y: 0, atMs: 0 }, { x: 1, y: 0, atMs: 5000 }]
     for (const nowMs of [0, 1, 100, 2500, 4999]) {
       const before = interpolatePos(p, nowMs)
@@ -594,9 +569,8 @@ describe('★ B2 — five people, five gaits, and none of them from a random num
   })
 
   it('★ AND IT IS PINNED, so two viewers of one replay see the same town', () => {
-    // A gait derived from identity is only worth anything if the derivation cannot drift. The
-    // literals are the point: change the hash, the mix or the spread and every character in
-    // every recording walks differently, so it must be a decision somebody makes on purpose.
+    // The literals are the point: change the hash, the mix or the spread and every character in
+    // every recording walks differently.
     expect(FOUNDERS.map((id) => hash32(id)))
       .toEqual([3866124158, 3817335319, 909508363, 327684010, 1753767877])
     expect(FOUNDERS.map((id) => Number(gaitOf(id).phase.toFixed(6))))
@@ -606,9 +580,8 @@ describe('★ B2 — five people, five gaits, and none of them from a random num
   })
 
   it('★ NO RANDOM SOURCE EXISTS in the two files that decide how a body moves', () => {
-    // comments are stripped first, and deliberately: this file's own prose says the word
-    // `Math.random()` in the paragraph explaining why it is never called, and a scan that
-    // cannot tell a promise from a call is not a guard
+    // comments are stripped first, deliberately: the prose in those files names `Math.random()`
+    // while explaining why it is never called
     const code = (rel: string): string =>
       readFileSync(join(dirname(fileURLToPath(import.meta.url)), rel), 'utf8')
         .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
@@ -639,15 +612,8 @@ describe('★ B2 — five people, five gaits, and none of them from a random num
     for (const [i, n] of buckets.entries()) expect(n, `bucket ${i}`).toBeGreaterThan(20)
   })
 
-  // ★ AND IT MUST BE TRUE AT THE RATE THE PRODUCT RUNS AT, WHICH IS NOT THE DEV RATE.
-  //
-  // The guard below asserted two founders differ at 400 ms a tile — `devWorld`'s old cadence.
-  // The world ticks at `TICK_REAL_MS` = 2500 ms, and at 2500 the clamp bound: the ideal frame
-  // time is 1125 ms and every stride in the ±12 % band asks for 990–1260 ms, all of them over
-  // `WALK_FRAME_MAX_MS`. MEASURED before the fix: 5 distinct frame times at 400 ms a tile,
-  // ONE at 1000 and at 2500. Half of "they all walk at the EXACT same jumpy pace" was still
-  // true in the shipped product and CI was green, because the assertion was made at a rate
-  // nobody watches.
+  // Every rate, not just the dev world's: at the shipped 2500 ms a tile the clamp binds, so a
+  // guard made only at 400 ms passes while all five founders share one cadence.
   it('★ five founders keep five cadences at EVERY rate, the shipped one included', () => {
     const rows: string[] = [], inStep: string[] = []
     for (const msPerTile of [120, 400, 1000, TICK_REAL_MS, 6000]) {
@@ -740,12 +706,8 @@ describe('★ prefers-reduced-motion: the person still walks, the flourish goes'
   })
 
   it('★ interpolation is NOT a flourish and survives — the person is still going somewhere', () => {
-    // ★ THIS USED TO COUNT THE CALL SITES AND REQUIRE EXACTLY ONE. That number was never the
-    // property; it was a proxy for it, and it went red the first time a SECOND legitimate
-    // flourish appeared — the rank's settle glide, which honours reduced motion exactly as it
-    // should. A count cannot tell a new flourish from a leak into the walk schedule. So every
-    // occurrence must now BE one of the flourishes named here, and the walk keeps its own row:
-    // an unnamed caller fails whether it is the eleventh or the second.
+    // Not a count of call sites: a count cannot tell a new legitimate flourish from a leak into
+    // the walk schedule, so every occurrence must BE one of the flourishes named here.
     const FLOURISHES: ReadonlyArray<{ what: string; line: RegExp }> = [
       { what: 'the 1px passing hop', line: /^\{ phase: e\.gait\.phase, bob: scene\.wantsMotion\(\) \},$/ },
       { what: "a crowd re-forming into its rank", line: /^const t = scene\.wantsMotion\(\)$/ },

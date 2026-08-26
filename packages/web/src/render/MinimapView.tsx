@@ -6,23 +6,12 @@ import {
   peopleDots, travelTargetAt, viewHoldsTown, viewOps, type MapOp, type MapPerson, type MinimapFit,
 } from './minimap.js'
 
-// THE ONLY OTHER REACT/CANVAS CONTACT POINT, AND IT DECIDES NOTHING (P6).
-//
-// Every number is minimap.ts's. This file owns three things and no opinions: a 2D context, a
-// pointer and a keyboard. It adds NO ticker callback — the map repaints when the camera moves
-// and when the ground or the built extent changes, so a camera at rest costs it nothing at all.
-//
-// The two repaints are deliberately different sizes. A GROUND rebuild walks every tile and is
-// paid on a terrain change, beside a ground bake that tessellates the same tiles into a render
-// texture. A FRAME repaint is one `putImageData` of a fixed 208 x 112 buffer plus the display
-// list — eight rectangles for the camera and two per person, and the people are rebuilt on a
-// tick rather than on a frame because that is how often anybody walks.
+// Every number is minimap.ts's; this file owns a 2D context, a pointer and a keyboard. It adds
+// NO ticker callback — the map repaints on a camera move or a terrain change, so a camera at
+// rest costs nothing.
 
-/**
- * The whole instrument, spoken. It has to name the pointer AND the keyboard, because the
- * keyboard half is not a fallback here — an arrow travels a screenful, which is a thing the
- * pointer cannot do at all.
- */
+/** The whole instrument, spoken. The keyboard half is not a fallback — an arrow travels a
+ *  screenful, which the pointer cannot do at all. */
 export const MINIMAP_LABEL =
   'The little map of the town. Press anywhere on it to take the camera there, or drag across it '
   + 'to sweep. The arrow keys travel a screenful at a time and Home shows the whole town.'
@@ -60,9 +49,8 @@ export function Minimap(
     const paint = (): void => {
       const f = fitRef.current, ground = groundRef.current
       if (f === null || ground === null) return
-      // The map leaves when the view already holds the whole town — see `viewHoldsTown`. The
-      // attribute drives the sheet, and React is not told: this runs on every frame of a zoom
-      // and a re-render per frame is the cost this whole file exists to avoid.
+      // The map leaves when the view already holds the whole town. The attribute drives the
+      // sheet and React is not told: this runs on every frame of a zoom.
       const idle = viewHoldsTown(scene.viewRect(), f)
       canvas.parentElement?.setAttribute('data-idle', idle ? 'true' : 'false')
       if (idle) return
@@ -181,9 +169,8 @@ export function Minimap(
     <div
       className="minimap"
       data-idle="true"
-      // The same role the stage wears, for the same reason and with one more: `App`'s lens
-      // walk yields its Left and Right to anything inside `[role="application"]`, which is
-      // what lets an arrow here mean a screenful of town instead of the next lens.
+      // `App`'s lens walk yields Left and Right to anything inside `[role="application"]`,
+      // which is what lets an arrow here mean a screenful of town instead of the next lens.
       role="application"
       tabIndex={0}
       aria-label={MINIMAP_LABEL}
