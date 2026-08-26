@@ -180,18 +180,18 @@ class DryLlm {
     private readonly agentId: string | null,
   ) {}
 
-  async object<T>(opts: {
+  object<T>(opts: {
     schema: { safeParse(v: unknown): { success: boolean; data?: T } }
   }): Promise<{ value: T; usage: typeof NO_USAGE }> {
     for (const candidate of dryAnswers()) {
       const parsed = opts.schema.safeParse(candidate)
-      if (parsed.success) return { value: parsed.data as T, usage: NO_USAGE }
+      if (parsed.success) return Promise.resolve({ value: parsed.data as T, usage: NO_USAGE })
     }
     throw new Error('dry run: no canned answer fits this schema')
   }
 
-  async text(): Promise<{ text: string; usage: typeof NO_USAGE }> {
-    return { text: 'the day passes', usage: NO_USAGE }
+  text(): Promise<{ text: string; usage: typeof NO_USAGE }> {
+    return Promise.resolve({ text: 'the day passes', usage: NO_USAGE })
   }
 
   totalCostUsd(): number {
@@ -491,6 +491,9 @@ const qRows = <T>(db: Database.Database, sql: string, ...p: unknown[]): T[] =>
 const payloadOf = (e: SimEvent): Record<string, unknown> =>
   (e.payload ?? {}) as Record<string, unknown>
 
+const isExpressive = (a: { verb: string | null }): boolean =>
+  a.verb?.startsWith('express:') === true
+
 // The sha is part of the fingerprint so a resume cannot score a repaired run on broken evidence.
 // The run rewrites its own artifacts under data/, so `-uno` and that exclusion let it resume.
 function gitSha(): string {
@@ -680,7 +683,6 @@ async function main(): Promise<void> {
   const lawQueue: LawQueue = []
   const worldTick = createWorldTick(config, rng, lawQueue)
   const tickMs: number[] = saved?.sidecar.tickMs ?? []
-  let handler: TickHandler = () => {}
   const loop = new TickLoop({
     store,
     state,
@@ -695,7 +697,7 @@ async function main(): Promise<void> {
   const bridge = new WatchedBridge({ loop, store, simConfig: config })
   if (saved !== null) bridge.restore(saved.sidecar)
   bridge.watchTicks(() => loop.tick)
-  handler = bridge.wrapTickHandler(({ emit: e }) => {
+  const handler: TickHandler = bridge.wrapTickHandler(({ emit: e }) => {
     const at = performance.now()
     for (const ev of worldTick(loop.state).events) e(ev.type, ev.payload)
     tickMs.push(performance.now() - at)
@@ -1117,8 +1119,7 @@ async function main(): Promise<void> {
   async function resolveReuse(): Promise<void> {
     if (reuseResolved) return
     reuseResolved = true
-    const first =
-      adjudications.find((a) => a.verb !== null && a.verb.startsWith('express:')) ?? null
+    const first = adjudications.find(isExpressive) ?? null
     if (first === null) return
     const other = MINDS.map((m) => m.id).find(
       (id) => id !== first.agentId && loop.state.agents[id]?.alive === true,
@@ -1172,15 +1173,8 @@ async function main(): Promise<void> {
     const finalState: WorldState = loop.state
     const simDays = TOTAL_TICKS / MINUTES_PER_DAY
 
-    const expressiveVerbs = [
-      ...new Set(
-        adjudications
-          .filter((a) => a.verb !== null && a.verb.startsWith('express:'))
-          .map((a) => a.verb!),
-      ),
-    ]
-    const firstExpressive =
-      adjudications.find((a) => a.verb !== null && a.verb.startsWith('express:')) ?? null
+    const expressiveVerbs = [...new Set(adjudications.filter(isExpressive).map((a) => a.verb!))]
+    const firstExpressive = adjudications.find(isExpressive) ?? null
     const { reusedBy, reuseArbiterCalls } = reuse
 
     // --- the chronicle, over every C11 event that fired ---
@@ -1512,8 +1506,7 @@ async function main(): Promise<void> {
     // --- the recognizer's own rows, and the naming law over them ---
     const constructRows = constructStore.all()
     const namingLawHolds = constructRows.every(
-      (c) =>
-        c.name === null || (c.nameProvenance !== null && c.nameProvenance.quote.includes(c.name)),
+      (c) => c.name === null || c.nameProvenance?.quote.includes(c.name) === true,
     )
     const viewerCopy = constructRows.map((c) =>
       c.name === null ? UNNAMED_CONSTRUCT_COPY : `they call it ${c.name}`,
@@ -1679,8 +1672,9 @@ async function main(): Promise<void> {
             }
             for (const e of started.filter((x) => payloadOf(x).verb === 'build')) {
               const p = payloadOf(e).params as { x?: number; y?: number } | undefined
+              if (p === undefined) continue
               const at = Object.values(finalState.structures).find(
-                (s) => s.x === p?.x && s.y === p?.y,
+                (s) => s.x === p.x && s.y === p.y,
               )
               if (at !== undefined) byStructure.get(at.id)?.add(String(payloadOf(e).agentId))
             }
@@ -1780,7 +1774,7 @@ function transcript(
   ].join('\n')
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   console.error('g11-deepworld crashed:', err)
   process.exit(1)
 })

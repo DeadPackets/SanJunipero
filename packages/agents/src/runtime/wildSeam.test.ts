@@ -147,7 +147,7 @@ describe('the wild seam — prose, intent, verb, the thing taken', () => {
     step()
     expect(await blind).toMatchObject({
       ok: false,
-      reason: expect.stringMatching(/^no forest nearby — /),
+      reason: expect.stringMatching(/^no forest nearby — /) as string,
     })
   })
 })

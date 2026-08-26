@@ -7,7 +7,7 @@ export type RepairCandidate = { value: unknown; how: string }
 
 const FENCE = /```[a-zA-Z0-9_-]*\r?\n([\s\S]*?)```/
 
-const jsonOrNothing = (text: string): unknown | undefined => {
+const jsonOrNothing = (text: string): unknown => {
   try {
     return JSON.parse(text) as unknown
   } catch {
@@ -17,7 +17,7 @@ const jsonOrNothing = (text: string): unknown | undefined => {
 
 // Every balanced object or array at depth zero, found with a string-aware walk so a brace
 // inside a quoted sentence is never mistaken for structure.
-export function balancedSpans(text: string): string[] {
+function balancedSpans(text: string): string[] {
   const spans: string[] = []
   let depth = 0
   let start = -1
@@ -54,7 +54,7 @@ export function balancedSpans(text: string): string[] {
 
 // A comma before a closing brace is a habit, not a meaning. Dropped only outside a string, so
 // a sentence that happens to read `bad, }` keeps every character the provider wrote.
-export function dropTrailingCommas(text: string): string {
+function dropTrailingCommas(text: string): string {
   let out = ''
   let inString = false
   let escaped = false
@@ -153,6 +153,7 @@ function applySchemaIssues<T>(
         if (!isRecord(holder)) continue
         for (const key of issue.keys)
           if (key in holder) {
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- strict zod refuses the key itself, so it has to go
             delete holder[key]
             changed = true
           }

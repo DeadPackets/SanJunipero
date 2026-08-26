@@ -35,7 +35,7 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   ambientK: 8,
 }
 
-export type BodyNeeds = { hunger: number; energy: number; warmth: number }
+type BodyNeeds = { hunger: number; energy: number; warmth: number }
 
 // The body the alarm reads. `thirst` and `afflictions` are absent on a packet from before
 // C11, which reads as a full body carrying nothing.

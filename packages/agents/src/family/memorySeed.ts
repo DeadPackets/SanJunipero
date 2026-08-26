@@ -30,7 +30,10 @@ type Phrased = { text: string; importance: number; tags: string[] }
 // newborn is told; nothing here invents a happening the log does not carry.
 function phrase(ev: SimEvent, ctx: Ctx): Phrased | null {
   const p = ev.payload as Record<string, unknown>
-  const str = (k: string): string => String(p[k] ?? '')
+  const str = (k: string): string => {
+    const v = p[k]
+    return typeof v === 'string' || typeof v === 'number' ? String(v) : ''
+  }
   const home = (id: string): boolean => id === ctx.homeStructureId
   const kin = (id: string): boolean => ctx.relation(id) !== null
 

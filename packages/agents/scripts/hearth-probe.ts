@@ -120,7 +120,8 @@ async function main(): Promise<void> {
 
   const store = new EventStore(db)
   const rng = new RngStreams('hearth-probe')
-  let { state, doors, houseId } = buildWorld(store)
+  const { state: builtState, doors, houseId } = buildWorld(store)
+  let state = builtState
   MINDS.forEach((m, i) => {
     const at = doors[i] ?? doors[0]!
     state = fold(
@@ -168,7 +169,6 @@ async function main(): Promise<void> {
 
   const lawQueue: LawQueue = []
   const worldTick = createWorldTick(config, rng, lawQueue)
-  let handler: TickHandler = () => {}
   const loop = new TickLoop({
     store,
     state,
@@ -203,7 +203,7 @@ async function main(): Promise<void> {
     }
   }
   const bridge = new Watched({ loop, store, simConfig: config })
-  handler = bridge.wrapTickHandler(({ emit }) => {
+  const handler: TickHandler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
 

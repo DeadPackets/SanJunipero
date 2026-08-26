@@ -74,7 +74,6 @@ const worldTick = createWorldTick(config, rngOf(), lawQueue)
 function rngOf(): RngStreams {
   return new RngStreams('motive-sanity')
 }
-let handler: TickHandler = () => {}
 const loop = new TickLoop({
   store,
   state,
@@ -87,7 +86,7 @@ const loop = new TickLoop({
   },
 })
 const bridge = new EngineBridge({ loop, store, simConfig: config })
-handler = bridge.wrapTickHandler(({ emit }) => {
+const handler: TickHandler = bridge.wrapTickHandler(({ emit }) => {
   for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
 })
 loop.step()
@@ -147,7 +146,7 @@ console.log(
   `\nexposed at ${Math.floor(loop.tick / 60)}:00 — ${IDS.map((id) => `${id}=${isExposed(loop.state, config, id) ? 'YES' : 'no'}`).join(' ')}`,
 )
 const p = bridge.perception('amara')
-const prose = perceptionToProse(p, () => {}, {
+const prose = perceptionToProse(p, undefined, {
   isWalkable: (x, y) => bridge.isWalkable(x, y),
   isEdible: (k) => bridge.isEdible(k),
   waterAtHand: () => bridge.waterAtHand('amara'),

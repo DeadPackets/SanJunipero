@@ -14,11 +14,7 @@ export type ReflectionLlm = {
   summarizeDay(scenes: { title: string; text: string }[]): Promise<{ title: string; text: string }>
   updateLedger(personName: string, existing: string | null, relevant: MemoryRow[]): Promise<string>
   autobiographyParagraph(daySummary: string, doc: PersonalityDoc): Promise<string>
-  proposeEdit(
-    daySummary: string,
-    doc: PersonalityDoc,
-    dayMemories: MemoryRow[],
-  ): Promise<unknown | null>
+  proposeEdit(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): Promise<unknown>
 }
 
 export type ReflectionResult = {
@@ -68,14 +64,14 @@ export async function runSleepReflection(deps: {
 
   // The first refused step ends the thinking; every later step reads this latch
   // rather than spending another call the guard will refuse anyway.
-  let degraded: string | null = null
+  const degraded: { reason: string | null } = { reason: null }
   async function step<T>(run: () => Promise<T>): Promise<T | null> {
-    if (degraded !== null) return null
+    if (degraded.reason !== null) return null
     try {
       return await run()
     } catch (err) {
       if (!isDegradable(err)) throw err
-      degraded = err instanceof Error ? err.message : String(err)
+      degraded.reason = err instanceof Error ? err.message : String(err)
       return null
     }
   }
@@ -146,8 +142,8 @@ export async function runSleepReflection(deps: {
 
   // 7. Personality edit — ≤1 by construction, drift-limiter validates.
   const proposal = await step(() => llm.proposeEdit(daySummaryText, personalityDoc, dayMemories))
-  if (degraded !== null) {
-    alert?.('reflection_fallback', degraded)
+  if (degraded.reason !== null) {
+    alert?.('reflection_fallback', degraded.reason)
     return {
       factCount,
       sceneCount: scenes.length,

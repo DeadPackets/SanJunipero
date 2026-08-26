@@ -89,7 +89,7 @@ export function servedProvider(response: unknown, meta: unknown): string | null 
 
 // What the bill says, reported under `usage.cost` once `usage: { include: true }` is set on
 // the request. The only number here that cannot go stale.
-export function reportedCostUsd(meta: unknown): number | null {
+function reportedCostUsd(meta: unknown): number | null {
   const cost = (meta as { openrouter?: { usage?: { cost?: unknown } } } | undefined)?.openrouter
     ?.usage?.cost
   return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? cost : null
@@ -97,8 +97,8 @@ export function reportedCostUsd(meta: unknown): number | null {
 
 // How far the table may sit from the bill before it is a defect rather than rounding. Sub-cent
 // calls round hard, so a divergence has to clear BOTH bars.
-export const COST_DIVERGENCE_FRACTION = 0.2
-export const COST_DIVERGENCE_FLOOR_USD = 5e-6
+const COST_DIVERGENCE_FRACTION = 0.2
+const COST_DIVERGENCE_FLOOR_USD = 5e-6
 
 export type LlmClientOpts = {
   model?: LanguageModel
@@ -122,10 +122,10 @@ export type LlmClientOpts = {
   expectedCallCostUsd?: number
 }
 
-export const DEFAULT_EXPECTED_CALL_COST_USD = 0.005
+const DEFAULT_EXPECTED_CALL_COST_USD = 0.005
 
 // Six minutes: ~75% headroom over the slowest call that has ever legitimately answered.
-export const DEFAULT_REQUEST_TIMEOUT_MS = 360_000
+const DEFAULT_REQUEST_TIMEOUT_MS = 360_000
 
 export class LlmClient {
   private readonly db: Database.Database
@@ -179,9 +179,9 @@ export class LlmClient {
         return {
           usage: r.usage,
           value: r.output,
-          servedModel: r.response.modelId,
-          provider: servedProvider(r.response, r.providerMetadata),
-          reportedCostUsd: reportedCostUsd(r.providerMetadata),
+          servedModel: r.finalStep.response.modelId,
+          provider: servedProvider(r.finalStep.response, r.finalStep.providerMetadata),
+          reportedCostUsd: reportedCostUsd(r.finalStep.providerMetadata),
         }
       } catch (err) {
         // Re-frames the provider's own bytes against this caller's schema; never re-asks,
@@ -216,9 +216,9 @@ export class LlmClient {
       return {
         usage: r.usage,
         value: r.text,
-        servedModel: r.response.modelId,
-        provider: servedProvider(r.response, r.providerMetadata),
-        reportedCostUsd: reportedCostUsd(r.providerMetadata),
+        servedModel: r.finalStep.response.modelId,
+        provider: servedProvider(r.finalStep.response, r.finalStep.providerMetadata),
+        reportedCostUsd: reportedCostUsd(r.finalStep.providerMetadata),
       }
     })
     return { text: value, usage }

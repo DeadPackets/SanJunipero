@@ -220,7 +220,7 @@ async function main(): Promise<void> {
   )
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   console.error('provider-probe crashed:', err)
   process.exit(1)
 })
