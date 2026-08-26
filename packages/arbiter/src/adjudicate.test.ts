@@ -163,13 +163,20 @@ class LexicalEmbedder {
 
 type EmbedderLike = { embed(t: string): Promise<Float32Array> }
 
-async function makeRig(llm: ScriptedLlm, embedder?: EmbedderLike): Promise<{ db: Database.Database; arbiter: Arbiter; embedder: EmbedderLike }> {
+async function makeRig(
+  llm: ScriptedLlm,
+  embedder?: EmbedderLike,
+  vocabulary?: { itemKinds: readonly string[]; structureKinds: readonly string[] },
+): Promise<{ db: Database.Database; arbiter: Arbiter; embedder: EmbedderLike }> {
   const db = openArbiterDb(':memory:')
   const codex = new CodexStore(db)
   codex.insert({ id: 'fire', era: 'handwork', name: 'Fire', prerequisiteId: null })
   codex.insert({ id: 'pottery', era: 'handwork', name: 'Pottery', prerequisiteId: null })
   const emb = embedder ?? (await FakeEmbedder.create())
-  const arbiter = makeArbiter({ db, llm: llm as unknown as LlmClient, embedder: emb, tick: () => 100 })
+  const arbiter = makeArbiter({
+    db, llm: llm as unknown as LlmClient, embedder: emb, tick: () => 100,
+    ...(vocabulary === undefined ? {} : { vocabulary }),
+  })
   return { db, arbiter, embedder: emb }
 }
 
@@ -239,6 +246,69 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
       expect(verdict.kind === 'impossible' ? verdict.reason : '', leak).toBe(
         'nothing in the town lends itself to this')
     }
+  })
+
+  // Live, mind-facing, from the A/B run: "The action requires 'green wood' as a resource, but
+  // the agent's inventory contains only 'wood'…". `requires X` named the machinery's own table.
+  it('★ swaps a refusal that hands over the recipe as a conditional', async () => {
+    for (const leak of [
+      'this requires a sharpened axe you do not carry',
+      'you cannot smoke fish without a rack',
+      'she can attempt this once she has a sharper stone',
+    ]) {
+      const llm = new ScriptedLlm(() => ({ kind: 'impossible', reason: leak, class: 'insufficient_materials' }))
+      const { arbiter } = await makeRig(llm)
+      const verdict = await arbiter.adjudicate(`I try ${leak}`, ctx)
+      expect(verdict.kind === 'impossible' ? verdict.reason : '', leak).toBe(
+        'nothing in the town lends itself to this')
+    }
+  })
+
+  // Told the town's materials, the same conditional about a KNOWN thing is a fact the mind's
+  // own perception block already states, and it reaches the mind in the arbiter's words.
+  it('★ and a conditional about a material the town has a word for survives', async () => {
+    const vocabulary = { itemKinds: ['wood', 'clay_pot', 'axe'], structureKinds: ['hearth'] }
+    const known = 'this requires a sharpened axe you do not carry'
+    const llmKnown = new ScriptedLlm(() => ({ kind: 'impossible', reason: known, class: 'insufficient_materials' }))
+    const rigKnown = await makeRig(llmKnown, undefined, vocabulary)
+    expect(await rigKnown.arbiter.adjudicate('I fell the tree', ctx)).toHaveProperty('reason', known)
+
+    const unknown = 'this requires a bellows you do not carry'
+    const llmUnknown = new ScriptedLlm(() => ({ kind: 'impossible', reason: unknown, class: 'insufficient_materials' }))
+    const rigUnknown = await makeRig(llmUnknown, undefined, vocabulary)
+    expect(await rigUnknown.arbiter.adjudicate('I smelt the ore', ctx))
+      .toHaveProperty('reason', 'nothing in the town lends itself to this')
+  })
+
+  // The model answering with its own class id. Two word rosters and no shape test let it through.
+  it('★ swaps a reason that is a machine token, not a sentence', async () => {
+    for (const token of ['INSUFFICIENT_MATERIALS', 'NO_AXE_IN_INVENTORY', 'PHYSICALLY_IMPOSSIBLE']) {
+      const llm = new ScriptedLlm(() => ({ kind: 'impossible', reason: token, class: 'physically_impossible' }))
+      const { arbiter } = await makeRig(llm)
+      const verdict = await arbiter.adjudicate(`I try ${token}`, ctx)
+      expect(verdict.kind === 'impossible' ? verdict.reason : '', token).toBe(
+        'nothing in the town lends itself to this')
+    }
+  })
+
+  // prompt.ts states the law and the validation loop enforced three others and not this one.
+  it('★ swaps a refusal whose own words say the act can be attempted', async () => {
+    for (const leak of [
+      'she can attempt this, but not here',
+      'you could try it with a steadier hand',
+      'it may begin only at first light',
+    ]) {
+      const llm = new ScriptedLlm(() => ({ kind: 'impossible', reason: leak, class: 'physically_impossible' }))
+      const { arbiter } = await makeRig(llm)
+      const verdict = await arbiter.adjudicate(`I try ${leak}`, ctx)
+      expect(verdict.kind === 'impossible' ? verdict.reason : '', leak).toBe(
+        'nothing in the town lends itself to this')
+    }
+    // ANTI-VACUITY: a refusal that says nobody can begin it is a refusal, and it survives.
+    const honest = 'no one can begin this in the dark'
+    const llm = new ScriptedLlm(() => ({ kind: 'impossible', reason: honest, class: 'physically_impossible' }))
+    const { arbiter } = await makeRig(llm)
+    expect(await arbiter.adjudicate('I work by night', ctx)).toHaveProperty('reason', honest)
   })
 
   it('★ and it is not vacuous: an honest refusal reaches the mind in its own words', async () => {

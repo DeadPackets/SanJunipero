@@ -19,7 +19,7 @@ import {
 import { MINUTES_PER_DAY, SimConfigSchema, stateHash, type DiscoveryCredit, type SimConfig } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
 import {
-  AgentRuntime, CRAFT_HINT, REFUSAL_MEMORY_TICKS, REPEATED_REFUSAL, refusalMemoryText,
+  AgentRuntime, CRAFT_HINT, OPAQUE_REFUSAL, REFUSAL_MEMORY_TICKS, REPEATED_REFUSAL, refusalMemoryText,
 } from './agentRuntime.js'
 import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
 import { openAgentDb } from '../memory/schema.js'
@@ -228,6 +228,7 @@ async function setup(opts: {
   simConfig?: SimConfig
   onThought?: (t: { tick: number; agentId: string; text: string }) => void
   adjudicator?: Adjudicator
+  budgetUsd?: number
 }) {
   const world = buildWorld(opts.simConfig)
   const worldTick = createWorldTick(world.config, world.rng)
@@ -249,7 +250,10 @@ async function setup(opts: {
   const embedder = opts.embedder ?? (await FakeEmbedder.create())
   const personality = new PersonalityStore(agentDb, AGENT)
   personality.init(baseDoc(), 0)
-  const llm = new LlmClient({ model: opts.model, db: agentDb, caller: 'turn', agentId: AGENT, maxRetries: opts.maxRetries ?? 2 })
+  const llm = new LlmClient({
+    model: opts.model, db: agentDb, caller: 'turn', agentId: AGENT, maxRetries: opts.maxRetries ?? 2,
+    ...(opts.budgetUsd === undefined ? {} : { budgetUsd: opts.budgetUsd }),
+  })
   const runtime = new AgentRuntime({
     db: agentDb,
     llm,
@@ -307,6 +311,11 @@ function journalRows(db: Database.Database): Array<{ tick: number; text: string 
 
 function alertKinds(db: Database.Database): string[] {
   return (db.prepare('SELECT kind FROM alerts ORDER BY id').all() as Array<{ kind: string }>).map((r) => r.kind)
+}
+
+function alertDetails(db: Database.Database, kind: string): string[] {
+  return (db.prepare('SELECT detail FROM alerts WHERE kind = ? ORDER BY id').all(kind) as Array<{ detail: string }>)
+    .map((r) => r.detail)
 }
 
 describe('EngineBridge + AgentRuntime against the real engine', () => {
@@ -387,6 +396,30 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       await flush()
     }
     expect(runtime.stats().dozes).toBe(1)
+  })
+
+  // ★ The alerts table is where an operator reads why the town went quiet. A crossed cap and a
+  // dead back end are different problems and were the same row.
+  it('★ a doze names its own cause: a crossed cap is not a dead provider', async () => {
+    const { loop, agentDb } = await setup({
+      model: turnModel([]),
+      mindConfig: { ...FAST_MIND, dozeTicks: 20 },
+      budgetUsd: 0,
+    })
+    loop.step()
+    await flush()
+    expect(alertDetails(agentDb, 'doze_off')[0]).toContain('budget exceeded')
+    expect(alertDetails(agentDb, 'doze_off')[0]).not.toContain('providers unavailable')
+  })
+
+  it('★ and it is not vacuous: a dead back end still reads as one', async () => {
+    const { loop, agentDb } = await setup({
+      model: throwingModel(),
+      mindConfig: { ...FAST_MIND, dozeTicks: 20 },
+    })
+    loop.step()
+    await flush()
+    expect(alertDetails(agentDb, 'doze_off')[0]).toContain('provider down')
   })
 
   it('respects the doze backoff even when body_alarm keeps firing during an outage', async () => {
@@ -993,7 +1026,32 @@ describe('arbiter wiring expansion (T20)', () => {
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
 
     expect(calls).toBe(1)
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe('You realize you cannot: unknown verb: patch_again')
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(`You realize you cannot: ${OPAQUE_REFUSAL}`)
+  })
+
+  // ★ Four voided promises with no rejection sink, in a process with no `unhandledRejection`
+  // handler. A failed action-memory write took the whole gateway down instead of an alert row.
+  it('★ a failed action-memory write lands as an alert, not as an unhandled rejection', async () => {
+    const base = await FakeEmbedder.create()
+    const embedder = {
+      embed: async (t: string): Promise<Float32Array> => {
+        if (t.startsWith('You realize you cannot')) throw new Error('The database connection is not open')
+        return base.embed(t)
+      },
+    }
+    const unhandled: unknown[] = []
+    const onUnhandled = (err: unknown): void => { unhandled.push(err) }
+    process.on('unhandledRejection', onUnhandled)
+    try {
+      const { loop, agentDb } = await setup({ model: turnModel([unknownVerbTurn]), mindConfig: FAST_MIND, embedder })
+      await stepUntil(loop, () => alertKinds(agentDb).includes('memory_write_failed'), 100)
+      expect(alertKinds(agentDb)).toContain('memory_write_failed')
+      expect(alertDetails(agentDb, 'memory_write_failed')[0]).toContain('database connection is not open')
+      await flush()
+      expect(unhandled).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+    }
   })
 
   it('codifies an attempt verdict and then submits the new recipe verb', async () => {
@@ -1080,6 +1138,31 @@ describe('refusal prose teaches a path (T18)', () => {
       'You realize you cannot: you have not the hands for it — perhaps someone nearby knows the craft.',
     )
     expect(CRAFT_HINT).toBe(' — perhaps someone nearby knows the craft.')
+  })
+
+  // ★ The engine's reasons are machinery: its registry's word for itself and its param schemas.
+  // `refusalMemoryText` wrote them verbatim into a retrievable memory.
+  it('★ never writes the engine\'s own words into a mind\'s memory', () => {
+    for (const reason of [
+      'unknown verb: dance',
+      'no such agent',
+      'walk needs a destination {x, y}',
+      'enter needs a {structureId}',
+      'eat needs an {itemId}',
+    ]) {
+      expect(refusalMemoryText(reason), reason).toBe(`You realize you cannot: ${OPAQUE_REFUSAL}`)
+    }
+  })
+
+  it('★ and it is not vacuous: a world fact still reaches the mind in its own words', () => {
+    for (const reason of [
+      'collapsed and unable to act',
+      'the dead do not act',
+      'the roof is beyond mending',
+      'you have not the hands for it',
+    ]) {
+      expect(refusalMemoryText(reason), reason).toBe(`You realize you cannot: ${reason}`)
+    }
   })
 
   it('leaves every other refusal exactly as the world stated it', () => {

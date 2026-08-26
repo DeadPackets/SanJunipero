@@ -21,7 +21,6 @@ export type SemanticConfig = {
   minConfidence: number
   lieMinConfidence: number
   lieTopicWindowTicks: number
-  dailyBudgetUsd: number
 }
 
 export const DEFAULT_SEMANTIC_CONFIG: SemanticConfig = {
@@ -30,7 +29,6 @@ export const DEFAULT_SEMANTIC_CONFIG: SemanticConfig = {
   minConfidence: 0.8,
   lieMinConfidence: 0.9,
   lieTopicWindowTicks: 120,
-  dailyBudgetUsd: 0.1,
 }
 
 export type TranscriptRecord = {
@@ -152,9 +150,6 @@ export type SemanticPassDeps = {
   day: number
   records: TranscriptRecord[]
   config?: Partial<SemanticConfig>
-  // What the narrator has already spent today. At or over the cap the pass is skipped, and
-  // the skip is an alert row — never a silent drop.
-  spentUsdToday?: number
 }
 
 // One batched pass per night, after the chapters. Cost decays toward nothing on its own: a
@@ -166,15 +161,6 @@ export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Mile
   const found = deps.store.semanticFirstKinds()
   const remaining = cfg.concepts.filter((c) => !found.has(c))
   if (remaining.length === 0 || deps.records.length === 0) return []
-
-  if ((deps.spentUsdToday ?? 0) >= cfg.dailyBudgetUsd) {
-    insertAlert(deps.db, {
-      agentId: null,
-      kind: 'semantic_firsts_budget',
-      detail: `day ${deps.day}: pass skipped, ${(deps.spentUsdToday ?? 0).toFixed(4)} spent against a cap of ${cfg.dailyBudgetUsd}`,
-    })
-    return []
-  }
 
   const system = semanticInstruction(remaining)
   // The generator throws on a verdict that does not fit the schema, so a second parse here is

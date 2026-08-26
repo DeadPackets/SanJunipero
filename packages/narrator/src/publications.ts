@@ -131,6 +131,9 @@ export function collectPublicRecord(
   return out
 }
 
+const framingViolated = (bio: { title: string; body: string }): boolean =>
+  FORBIDDEN_FRAMING.test(bio.title) || FORBIDDEN_FRAMING.test(bio.body)
+
 export async function writeBiography(deps: {
   store: NarratorStore
   llm: NarratorLlm
@@ -144,8 +147,12 @@ export async function writeBiography(deps: {
   let title = deps.name
   let body = 'Nothing is known of them yet.'
   if (record.length > 0) {
-    const bio = await deps.llm.biography(deps.agentId, deps.name, record)
-    if (FORBIDDEN_FRAMING.test(bio.title) || FORBIDDEN_FRAMING.test(bio.body)) {
+    // Asked twice at most. The roster bans world words a true record can force — a town whose
+    // first tool is a tier-1 milestone makes `tool` the honest draft — so one refused draft is
+    // a sampling accident, and two is the answer.
+    let bio = await deps.llm.biography(deps.agentId, deps.name, record)
+    if (framingViolated(bio)) bio = await deps.llm.biography(deps.agentId, deps.name, record)
+    if (framingViolated(bio)) {
       deps.alert?.(`framing_violation: biography of ${deps.agentId} broke the human framing law — not persisted`)
       throw new Error(`framing_violation: biography of ${deps.agentId} rejected`)
     }

@@ -184,14 +184,6 @@ describe('the nightly pass', () => {
     expect(llm.objectCalls).toBe(2)
   })
 
-  it('skips on the day\'s cap and says so out loud', async () => {
-    const llm = new ScriptedLlm()
-    const { db, milestones } = await run(llm, { spentUsdToday: 0.2 })
-    expect(milestones).toEqual([])
-    expect(llm.objectCalls).toBe(0)
-    expect(alerts(db)).toHaveLength(1)
-    expect(alerts(db)[0]!.kind).toBe('semantic_firsts_budget')
-  })
 })
 
 describe('the prompt', () => {

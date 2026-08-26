@@ -298,18 +298,28 @@ export class LlmClient {
         return { value, usage: { inputTokens, outputTokens, cacheReadTokens, costUsd } }
       } catch (err) {
         lastError = err
+        // A generation that came back with nothing was still billed, and it carries the tokens
+        // to say so. Priced here rather than through `book`: there is no reported cost to
+        // reconcile against, and an unattributed route would alert on every dead call.
+        const dead = NoObjectGeneratedError.isInstance(err) ? err : null
+        const served = dead?.response?.modelId ?? modelName
+        const provider = dead === null ? null : servedProvider(dead.response, undefined)
+        const raw = dead?.usage
+        const inputTokens = raw?.inputTokens ?? 0
+        const outputTokens = raw?.outputTokens ?? 0
+        const cacheReadTokens = raw?.inputTokenDetails.cacheReadTokens ?? 0
         insertLlmCall(this.db, {
           agentId: this.agentId,
           caller: this.caller,
-          model: modelName,
-          // A failure carries no answer, so it carries no back end to name it by. The
+          model: served,
+          // A failure that carries no answer carries no back end to name it by. The
           // per-provider empty-call rate is therefore a rate over the calls that landed.
-          provider: null,
-          inputTokens: 0,
-          outputTokens: 0,
-          cacheReadTokens: 0,
-          reasoningTokens: 0,
-          costUsd: 0,
+          provider,
+          inputTokens,
+          outputTokens,
+          cacheReadTokens,
+          reasoningTokens: raw?.outputTokenDetails.reasoningTokens ?? 0,
+          costUsd: computeCostUsd(inputTokens, outputTokens, cacheReadTokens, served, provider).costUsd,
           reportedCostUsd: null,
           latencyMs: performance.now() - start,
           ok: false,

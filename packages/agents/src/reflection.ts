@@ -39,10 +39,13 @@ function dayDigest(dayMemories: MemoryRow[]): string {
   return full.length <= FALLBACK_DIGEST_CHARS ? full : `${full.slice(0, FALLBACK_DIGEST_CHARS)}…`
 }
 
-// Only a refused budget or unusable model output degrade the night. Anything
-// else is a real fault and belongs to the caller's alert path.
+// Only a refused budget, unusable model output or a transient provider stall degrade the
+// night. Anything else is a real fault and belongs to the caller's alert path.
+// Matched by name, not by class: an abort wrapped on its way up is the same stall.
 function isDegradable(err: unknown): boolean {
-  return err instanceof BudgetExceededError || NoObjectGeneratedError.isInstance(err)
+  return err instanceof BudgetExceededError
+    || NoObjectGeneratedError.isInstance(err)
+    || (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError'))
 }
 
 export async function runSleepReflection(deps: {

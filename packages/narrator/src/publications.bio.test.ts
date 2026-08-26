@@ -36,6 +36,16 @@ const bioLlm = (body: string): NarratorLlm =>
     biography: vi.fn(async () => ({ title: 'Tamar of the Riverbend', body })),
   }) as unknown as NarratorLlm
 
+const bioLlmSeq = (bodies: string[]): NarratorLlm => {
+  let i = 0
+  return {
+    summarizeChapter: vi.fn(),
+    summarizeEra: vi.fn(),
+    newspaperCopy: vi.fn(),
+    biography: vi.fn(async () => ({ title: 'Tamar of the Riverbend', body: bodies[Math.min(i++, bodies.length - 1)]! })),
+  } as unknown as NarratorLlm
+}
+
 describe('collectPublicRecord', () => {
   it('returns only public events of the agent, never memories/journal content', () => {
     const world = seedWorld()
@@ -89,12 +99,41 @@ describe('writeBiography', () => {
     const world = seedWorld()
     const store = memStore()
     const alert = vi.fn()
+    const llm = bioLlmSeq(['Written by a language model.'])
     await expect(
-      writeBiography({ store, llm: bioLlm('Written by a language model.'), world, agentId: 'tamar', name: 'Tamar', throughDay: 0, alert }),
+      writeBiography({ store, llm, world, agentId: 'tamar', name: 'Tamar', throughDay: 0, alert }),
     ).rejects.toThrow(/framing/)
+    // Twice asked, once refused: a second bad draft is the answer, not a coin still in the air.
+    expect((llm.biography as ReturnType<typeof vi.fn>).mock.calls.length).toBe(2)
     expect(alert).toHaveBeenCalledTimes(1)
     expect(String(alert.mock.calls[0]![0])).toContain('framing_violation')
     expect(store.publications('biography')).toEqual([])
+  })
+
+  // ★ `tool` is on the framing roster AND is what the tier-1 milestone "the first tool made"
+  // makes a plausible draft. One refused draft used to lose the whole biography.
+  it('★ asks again once when the first draft breaks the framing law', async () => {
+    const world = seedWorld()
+    const store = memStore()
+    const alert = vi.fn()
+    const llm = bioLlmSeq([
+      'She made the first tool the town had seen.',
+      'She shaped the first cutting edge the town had seen.',
+    ])
+    const row = await writeBiography({ store, llm, world, agentId: 'tamar', name: 'Tamar', throughDay: 0, alert })
+
+    expect(row.body).toContain('cutting edge')
+    expect((llm.biography as ReturnType<typeof vi.fn>).mock.calls.length).toBe(2)
+    expect(alert).not.toHaveBeenCalled()
+    expect(store.publications('biography').length).toBe(1)
+  })
+
+  it('★ and it asks once only: a clean first draft is never re-asked', async () => {
+    const world = seedWorld()
+    const store = memStore()
+    const llm = bioLlmSeq(['She was heard to speak of the river turning.'])
+    await writeBiography({ store, llm, world, agentId: 'tamar', name: 'Tamar', throughDay: 0 })
+    expect((llm.biography as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1)
   })
 
   it('handles an agent with no public record: deterministic body, no LLM call', async () => {

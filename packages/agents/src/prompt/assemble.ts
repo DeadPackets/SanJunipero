@@ -25,7 +25,9 @@ export type PromptBlocks = {
   personality: { doc: PersonalityDoc; autobiography: string[] } // block 3 — changes at sleep only
   scene: { ledgers: Array<{ name: string; doc: string }>; memories: ScoredMemory[] } // block 4 — per scene
   dayLog: string[] // block 5 — append-only all day
-  now: { prose: string } // block 6 — every turn
+  // block 6 — every turn. `heard` is another mouth's bytes and rides its own message, so no
+  // utterance can ever read as a sentence the narrator wrote.
+  now: { prose: string; heard?: string }
 }
 
 export type AssembledPrompt = {
@@ -107,8 +109,9 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const scene = renderScene(blocks.scene)
   const dayLog = blocks.dayLog.join('\n')
   const now = blocks.now.prose
+  const heard = blocks.now.heard ?? ''
   // The last door before a mind reads anything: no ops-plane label goes through it.
-  assertNoGlassLeak(`${system}\n${dayLog}\n${scene}\n${now}`, 'assemblePrompt')
+  assertNoGlassLeak(`${system}\n${dayLog}\n${scene}\n${now}\n${heard}`, 'assemblePrompt')
   // dayLog is append-only all day; the scene changes every turn. Stable
   // before volatile keeps the byte prefix cacheable across turns.
   const messages: Array<{ role: 'user'; content: string }> = [
@@ -116,7 +119,8 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
     { role: 'user', content: scene },
     { role: 'user', content: now },
   ]
-  const serialized = `${system}${dayLog}${scene}${now}`
+  if (heard.length > 0) messages.push({ role: 'user', content: heard })
+  const serialized = `${system}${dayLog}${scene}${now}${heard}`
   return {
     system,
     messages,

@@ -334,6 +334,33 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     expect(sink.alerts).toHaveLength(1)
   })
 
+  // ★ Live, 2026-08-26: three attempts stalled past the per-attempt timeout, `invokeReserved`
+  // rethrew the raw `TimeoutError`, and the whole night was lost with one `reflection_failed`.
+  it('★ a provider stall degrades the night instead of losing it', async () => {
+    for (const name of ['TimeoutError', 'AbortError']) {
+      const { mem, personality } = await makeStores()
+      const memories = await seedDay(mem, DAY, SINGLE_PERSON_DAY)
+      const llm = new ScriptedReflectionLlm(null)
+      llm.extractFacts = async () => {
+        llm.calls.push('extractFacts')
+        const err = new Error('The operation was aborted due to timeout')
+        err.name = name
+        throw err
+      }
+      const sink = alertSink()
+
+      const res = await runSleepReflection({ mem, personality, llm, day: DAY, alert: sink.alert })
+
+      expect(res.fallback, name).toBe(true)
+      expect(llm.calls, name).toEqual(['extractFacts'])
+      const days = mem.summaryNodes('day', DAY)
+      expect(days, name).toHaveLength(1)
+      for (const m of memories) expect(days[0]!.text, name).toContain(m.text)
+      expect(mem.autobiography(), name).toEqual([FALLBACK_AUTOBIOGRAPHY])
+      expect(sink.alerts.map((a) => a.kind), name).toEqual(['reflection_fallback'])
+    }
+  })
+
   it('a failure that is not budget or malformed output still rejects', async () => {
     const { mem, personality } = await makeStores()
     await seedDay(mem, DAY, SINGLE_PERSON_DAY)
